@@ -37,6 +37,10 @@ func (f *fixture) rateLimitReleaseFile() string {
 	return filepath.Join(f.root, "ratelimit-release")
 }
 
+func (f *fixture) lateFinishScanHold() string {
+	return filepath.Join(f.root, "late-finish-scan-hold")
+}
+
 func cleanScript(diskDir string) string { return filepath.Join(diskDir, "clean.sh") }
 
 // setupDisk gives every scenario the fake disk: the server reads its free space

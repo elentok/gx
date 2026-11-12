@@ -54,6 +54,9 @@ type Output struct {
 	// RateLimitReleaseFile is the file whose creation ends the rate-limit hold of a
 	// RateLimitFromUsage scenario; the hold lasts until then. Empty elsewhere.
 	RateLimitReleaseFile string `json:"ratelimit_release_file,omitempty"`
+	// LateFinishScanHoldFile is the file whose presence stops the server's late-finish
+	// rescan, so a flow's answer meets the late finish first. Empty elsewhere.
+	LateFinishScanHoldFile string `json:"late_finish_scan_hold_file,omitempty"`
 	// Transcripts are the limit-burn live shape's Claude transcript paths, keyed
 	// queue, one_off, design and other, plus the sessions that set SessionSpec.Key;
 	// the directories may not exist yet.

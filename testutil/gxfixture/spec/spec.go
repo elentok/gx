@@ -104,6 +104,9 @@ type Scenario struct {
 	ProjectExtra map[string]string
 	// Hold keeps every worker running until the hold file is removed, as --hold does.
 	Hold bool
+	// HoldLateFinishScan stops the server's late-finish rescan until the flow removes
+	// Output.LateFinishScanHoldFile.
+	HoldLateFinishScan bool
 	// AgentProcs writes the first fake agent's pids into the process table once it runs.
 	AgentProcs bool
 	// RecentlyFinished is the server.recently-finished cap; zero keeps the default.

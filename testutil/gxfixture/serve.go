@@ -384,6 +384,9 @@ func (f *fixture) buildOutput(sc scenario, rs *runningServer, s seeded) spec.Out
 	if sc.RateLimitFromUsage {
 		res.RateLimitReleaseFile = f.rateLimitReleaseFile()
 	}
+	if sc.HoldLateFinishScan {
+		res.LateFinishScanHoldFile = f.lateFinishScanHold()
+	}
 	f.addScenarioOutput(&res, sc, s.transcripts)
 	return res
 }

@@ -142,6 +142,12 @@ func (f *fixture) applyScenarioEnv(o opts, sc scenario) error {
 	if sc.DropAskedAgent {
 		f.env = append(f.env, "GX_DROP_ASKED_AGENT=1")
 	}
+	if sc.HoldLateFinishScan {
+		if err := os.WriteFile(f.lateFinishScanHold(), nil, 0o644); err != nil {
+			return err
+		}
+		f.env = append(f.env, "GX_HOLD_LATE_FINISH_SCAN="+f.lateFinishScanHold())
+	}
 	if sc.UnknownSkill {
 		f.env = append(f.env, agentfake.TUIUnknownSkillEnv+"=1")
 	}

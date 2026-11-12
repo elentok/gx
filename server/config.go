@@ -81,6 +81,11 @@ type Config struct {
 	// has no herdr to exercise that path.
 	DropAskedAgent bool
 
+	// LateFinishScanHold is a file path; while the file exists the rescan skips
+	// late-finish adoption. Test-only: gxfixture sets it so a flow can answer
+	// before the scan wins the race.
+	LateFinishScanHold string
+
 	// Sleep paces the ralphloop waits (finish debounce, poll backoffs); nil
 	// means time.Sleep. Tests shrink it so each merge skips the real seconds.
 	Sleep func(time.Duration)

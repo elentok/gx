@@ -26,4 +26,6 @@ var AnswerFinished = scenario{
 	Behaviour:      map[string]string{project + ":finished-answer-epic/01": agentfake.BehaviourAskEmptyFinish},
 	DropAskedAgent: true,
 	Hold:           true,
+	// The rescan would otherwise adopt the late finish before the answer arrives.
+	HoldLateFinishScan: true,
 }

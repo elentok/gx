@@ -322,7 +322,7 @@ func runServer(ctx context.Context, d Deps) error {
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, RunnerWait: cfg.RunnerWait, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, LogLevel: logLevel,
 		AutoAdvanceDelay: autoAdvanceDelay, CommandListAge: commandListAge, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.Env.Env,
 		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval, TokenPollInterval: tokenPollInterval, PromptGrace: promptGrace, RateLimitResetBuffer: rateLimitBuffer, GuardPoll: guardPoll, BudgetKillGrace: budgetKillGrace,
-		ProcessSource: processSource, DropAskedAgent: dropAskedAgent(os.Getenv)})
+		ProcessSource: processSource, DropAskedAgent: dropAskedAgent(os.Getenv), LateFinishScanHold: lateFinishScanHold(os.Getenv)})
 	if err != nil {
 		return err
 	}
