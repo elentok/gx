@@ -9,7 +9,7 @@ import type { ProjectChecks } from "./status";
 afterEach(cleanup);
 
 const defaults: Record<string, string> = {
-  format: "gofmt / prettier on changed files",
+  format: "gofmt / biome (or prettier) on changed files",
   lint: "go vet / eslint on changed files",
   typecheck: "go build / tsc on changed packages",
   test: "go test / vitest on changed packages",

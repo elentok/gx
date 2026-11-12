@@ -218,20 +218,26 @@ func (r *runner) jsSteps(kind string, p *jsPackage) ([]step, string) {
 		need = &installNeed{dir: p.lockDir, cmd: p.lock.Install}
 	}
 	has := func(tool string) bool { return listed(p.dir, tool) || listed(p.lockDir, tool) }
-	runner := func(tool string, args []string, fs []string) (out []step) {
-		if !has(tool) {
-			return nil
-		}
+	run := func(tool string, args []string, fs []string) (out []step) {
 		argv := append(slices.Clone(p.lock.Runner[1:]), tool)
 		for _, batch := range chunkFiles(fs, r.limit) {
 			out = append(out, step{name: p.lock.Runner[0], dir: p.dir, argv: append(append(argv, args...), batch...), install: need})
 		}
 		return out
 	}
+	runner := func(tool string, args []string, fs []string) []step {
+		if !has(tool) {
+			return nil
+		}
+		return run(tool, args, fs)
+	}
 	switch kind {
 	case "format":
+		if has("@biomejs/biome") {
+			return run("biome", []string{"format", "--write", "--no-errors-on-unmatched"}, p.files), ""
+		}
 		if !has("prettier") && len(p.files) > 0 {
-			return nil, r.rel(p.dir) + ": no prettier"
+			return nil, r.rel(p.dir) + ": no biome or prettier"
 		}
 		return runner("prettier", []string{"--write"}, p.files), ""
 	case "lint":

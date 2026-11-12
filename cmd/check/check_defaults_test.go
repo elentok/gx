@@ -294,6 +294,23 @@ func TestCheck_JSPackageWithoutNodeModulesInstallsFirst(t *testing.T) {
 	}
 }
 
+func TestCheck_FormatPrefersBiomeOverPrettier(t *testing.T) {
+	repo := checkRepo(t, `{}`)
+	tools := fakeTools(t, nil, "pnpm")
+	testutil.WriteFile(t, repo, "web/package.json", `{"devDependencies":{"@biomejs/biome":"2","prettier":"3"}}`)
+	testutil.WriteFile(t, repo, "web/pnpm-lock.yaml", "")
+	testutil.WriteFile(t, repo, "web/node_modules/.keep", "")
+	testutil.WriteFile(t, repo, "web/a.ts", "export {}\n")
+
+	out, code := runCheckCmd(t, repo, "--kind", "format")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s", code, out)
+	}
+	if got := readLog(t, tools); got != "pnpm exec biome format --write --no-errors-on-unmatched a.ts\n" {
+		t.Errorf("tool log:\n%s", got)
+	}
+}
+
 func TestCheck_FailedFrozenInstallFailsTheKindWithItsOutputInTheLog(t *testing.T) {
 	repo := checkRepo(t, `{}`)
 	fakeTools(t, map[string]string{"pnpm": `echo "lockfile is out of date"; exit 1`}, "pnpm")
@@ -325,7 +342,7 @@ func TestCheck_JSPackageWithoutLockfileIsSkipped(t *testing.T) {
 	}
 }
 
-func TestCheck_JSPackageWithoutPrettierSaysNoPrettierInsteadOfNoMatchingFiles(t *testing.T) {
+func TestCheck_JSPackageWithoutFormatterSaysNoFormatterInsteadOfNoMatchingFiles(t *testing.T) {
 	repo := checkRepo(t, `{}`)
 	tools := fakeTools(t, nil, "npm", "npx")
 	testutil.WriteFile(t, repo, "web/package.json", `{"devDependencies":{"eslint":"9"}}`)
@@ -334,7 +351,7 @@ func TestCheck_JSPackageWithoutPrettierSaysNoPrettierInsteadOfNoMatchingFiles(t 
 	testutil.WriteFile(t, repo, "web/a.ts", "export {}\n")
 
 	out, code := runCheckCmd(t, repo, "--kind", "format")
-	if code != 3 || !strings.Contains(out, "web: no prettier") || strings.Contains(out, "no matching files") {
+	if code != 3 || !strings.Contains(out, "web: no biome or prettier") || strings.Contains(out, "no matching files") {
 		t.Fatalf("exit %d\n%s", code, out)
 	}
 	if got := readLog(t, tools); got != "" {
