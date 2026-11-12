@@ -29,6 +29,26 @@ func TestUninstallRemovesManifestOwnedPathsAndManifest(t *testing.T) {
 	}
 }
 
+func TestUninstallPrunesEmptyFoldersButNotRoot(t *testing.T) {
+	srcDir := t.TempDir()
+	root := t.TempDir()
+	manifestPath := filepath.Join(t.TempDir(), "skill.json")
+
+	files := []SourceFile{writeSourceFile(t, srcDir, "gx-bump/agents/openai.yaml", "x")}
+	if _, err := Install(manifestPath, InstallRequest{Source: "example/skill", AgentRoots: []string{root}, Files: files}); err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if _, err := Uninstall(manifestPath, ForcePolicy{}); err != nil {
+		t.Fatalf("Uninstall: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "gx-bump")); !os.IsNotExist(err) {
+		t.Errorf("empty skill folder left behind: err = %v", err)
+	}
+	if _, err := os.Stat(root); err != nil {
+		t.Errorf("root removed: %v", err)
+	}
+}
+
 func TestUninstallPreservesUnrelatedFilesAndDirectories(t *testing.T) {
 	srcDir := t.TempDir()
 	root := t.TempDir()

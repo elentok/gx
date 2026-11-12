@@ -15,6 +15,9 @@ type operation struct {
 	entry  ManagedFile
 	data   []byte
 	remove bool
+	// pruneRoot, when set on a remove, makes applyOperation delete the parent
+	// folders the removal left empty, stopping below this root.
+	pruneRoot string
 }
 
 type installationPlan struct {
@@ -355,7 +358,7 @@ func buildInstallPlan(manifestPath string, req InstallRequest) (*installationPla
 			if err := protect(path); err != nil {
 				return nil, err
 			}
-			p.operations = append(p.operations, operation{path: path, remove: true})
+			p.operations = append(p.operations, operation{path: path, remove: true, pruneRoot: root})
 		}
 	}
 	displayTargets(p, req.AgentRoots)

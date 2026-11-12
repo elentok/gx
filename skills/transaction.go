@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -88,12 +89,27 @@ func applyOperation(op operation) error {
 		return err
 	}
 	if op.remove {
+		pruneEmptyParents(op.path, op.pruneRoot)
 		return nil
 	}
 	if op.entry.Kind == KindFileLink || op.entry.Kind == KindDirectoryLink {
 		return os.Symlink(op.entry.LinkTarget, op.path)
 	}
 	return os.WriteFile(op.path, op.data, 0644)
+}
+
+// pruneEmptyParents removes empty folders above path, stopping at the first
+// non-empty one and never touching root itself. os.Remove refuses non-empty
+// folders, so a user's unrelated files keep their folder.
+func pruneEmptyParents(path, root string) {
+	if root == "" {
+		return
+	}
+	for dir := filepath.Dir(path); dir != root && strings.HasPrefix(dir, root+string(filepath.Separator)); dir = filepath.Dir(dir) {
+		if os.Remove(dir) != nil {
+			return
+		}
+	}
 }
 
 func restorePath(saved savedPath) error {

@@ -49,7 +49,7 @@ func buildUninstallPlan(manifestPath string, force ForcePolicy) (*installationPl
 			if err := protectRecordedSources(path, m); err != nil {
 				return nil, err
 			}
-			p.operations = append(p.operations, operation{path: path, remove: true})
+			p.operations = append(p.operations, operation{path: path, remove: true, pruneRoot: root})
 		}
 	}
 	p.manifest.Files = nil
