@@ -100,6 +100,7 @@ type Server struct {
 	// schedState and schedRunner start Scheduled runs at each set time.
 	schedState  *schedules.State
 	schedRunner *schedules.Scheduler
+	schedules   *schedules.Schedules
 	// sessionChat reads the sessions' transcripts, commands, permissions and screens.
 	sessionChat *chat.Chat
 	// prompt holds the auto-advance countdowns and the turn settling.
@@ -383,6 +384,18 @@ func New(cfg Config) (*Server, error) {
 	s.schedRunner = &schedules.Scheduler{
 		Store: schedrec.NewStore(cfg.TicketStore), State: schedState, Submit: s.oneOffs, Notify: s.chat.Notify, TicketStore: cfg.TicketStore, Log: log,
 		Now: cfg.SchedulesClock, Interval: cfg.SchedulesInterval, Ready: s.migrator.StartupDone(),
+	}
+	s.schedules = &schedules.Schedules{
+		Store: s.schedRunner.Store, State: schedState, TicketStore: cfg.TicketStore, Now: cfg.SchedulesClock,
+		Projects: func() ([]string, error) {
+			ps, err := idx.ListProjects()
+			names := make([]string, 0, len(ps))
+			for _, p := range ps {
+				names = append(names, p.Name)
+			}
+			return names, err
+		},
+		DefaultHarness: func(project string) string { return string(s.harness.DefaultHarness(project)) },
 	}
 	s.harness.GiveLog(cfg.Runner)
 	if s.cfg.Player == nil {

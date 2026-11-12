@@ -149,6 +149,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `cmd/evolve` — `gx evolve` run, skip, all, inputs and export (`New`, `Deps` with the `UserHomeDir` and `ConfirmForce` hooks)
   - `cmd/skills` — `gx skills install|uninstall` (`New`, `Deps` with the `skills*` hooks, `DefaultDeps`, `Refresh` for `gx server start`)
   - `cmd/term` — `gx term` (`New`, `Deps` with the `GOOS` field)
+  - `cmd/schedules` — `gx schedules list` and `show <project:slug>` (`New`, `Deps` with no hooks of its own)
   - `cmd/limits` — `gx budget`, `gx usage`, `gx afk`, `gx vimode` (`New`, `NewUsage`, `NewAFK`, `NewViMode`, `Deps` with no hooks of its own; `BudgetLine` is called by `gx server status`)
   - `cmd/agent` — `gx agent`, `gx agents`, `gx designs` and the hidden `agent-holder` (`New`, `NewAgents`, `NewDesigns`, `NewHolder`; `Deps` with the `OpenTab`, `ReadClaudeOccupancy`, `VerifyCodexSession`, `ReadCodexContext`, `ReadAutoAdvance` and `ReadSessionHarness` hooks; `DefaultDeps`)
   - `cmd/gitops` — git-work verbs `gx push`, `merge`, `cleanup`, `bump`, `stashify`, the hidden `run`, and the `gx worktrees` subcommands `list`, `abs-path`, `clone` (`NewPush`, `NewMerge`, `NewCleanup`, `NewBump`, `NewStashify`, `NewRun`, `WorktreeCommands`; `Deps` with the `ChoosePushDivergence` and `ConfirmForce` hooks; `DefaultDeps`). Not `ui/gitops`

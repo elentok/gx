@@ -21,6 +21,7 @@ import (
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/sched"
+	"github.com/elentok/gx/server/schedules"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/sessions/fixagent"
@@ -81,6 +82,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 			func() func(wire.QueueRequest) (wire.QueueResult, error) { return s.PR.TryAgain },
 			func() func(wire.QueueRequest) (wire.QueueResult, error) { return s.merger.EpicMarkMerged },
 		),
+		schedules.Routes(func() *schedules.Schedules { return s.schedules }),
 		sched.Routes(func() *sched.Scheduler { return s.scheduler }, func() *sched.Explainer { return s.explain }),
 	)
 }

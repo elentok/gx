@@ -2563,6 +2563,71 @@ export interface ScheduleRun {
    */
   attention_address: string;
 }
+export const ScheduleReasonUnknown = "unknown-schedule";
+export const ScheduleReasonInvalidProject = "invalid-project";
+/**
+ * Reasons a Schedule read is refused.
+ */
+export type ScheduleReason = typeof ScheduleReasonUnknown | typeof ScheduleReasonInvalidProject;
+/**
+ * ScheduleInfo is one Schedule as the list and show results carry it.
+ */
+export interface ScheduleInfo {
+  name: string;
+  slug: string;
+  project: string;
+  /**
+   * Days are lowercase three-letter day names in week order.
+   */
+  days: string[];
+  /**
+   * Times are HH:MM local times.
+   */
+  times: string[];
+  /**
+   * Harness is empty when the Schedule follows the Default.
+   */
+  harness: string;
+  /**
+   * DefaultHarness is the name the Default resolves to for the project.
+   */
+  default_harness: string;
+  late_limit_hours: number /* float64 */;
+  /**
+   * Switch is the on/off switch of this machine.
+   */
+  switch: boolean;
+  project_found: boolean;
+  /**
+   * NextRun is RFC 3339; empty when the switch is off or the project is missing.
+   */
+  next_run: string;
+  updated_at: string;
+}
+/**
+ * SchedulesResult is the list of Schedules. A refusal is a result.
+ */
+export interface SchedulesResult {
+  refused: boolean;
+  reason: string;
+  message: string;
+  schedules: ScheduleInfo[];
+  /**
+   * Projects are the registered project names, for the Project select.
+   */
+  projects: string[];
+}
+/**
+ * ScheduleShowResult is one Schedule with its prompt and Last runs.
+ */
+export interface ScheduleShowResult {
+  refused: boolean;
+  reason: string;
+  message: string;
+  schedule: ScheduleInfo;
+  prompt: string;
+  last_runs: ScheduleRun[];
+}
 
 //////////
 // source: sessions.go

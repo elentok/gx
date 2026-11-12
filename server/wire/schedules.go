@@ -31,3 +31,51 @@ type ScheduleRun struct {
 	// AttentionAddress is the blocking ticket of a needs-attention skip.
 	AttentionAddress string `json:"attention_address"`
 }
+
+// Reasons a Schedule read is refused.
+const (
+	ScheduleReasonUnknown        = "unknown-schedule"
+	ScheduleReasonInvalidProject = "invalid-project"
+)
+
+// ScheduleInfo is one Schedule as the list and show results carry it.
+type ScheduleInfo struct {
+	Name    string `json:"name"`
+	Slug    string `json:"slug"`
+	Project string `json:"project"`
+	// Days are lowercase three-letter day names in week order.
+	Days []string `json:"days"`
+	// Times are HH:MM local times.
+	Times []string `json:"times"`
+	// Harness is empty when the Schedule follows the Default.
+	Harness string `json:"harness"`
+	// DefaultHarness is the name the Default resolves to for the project.
+	DefaultHarness string  `json:"default_harness"`
+	LateLimitHours float64 `json:"late_limit_hours"`
+	// Switch is the on/off switch of this machine.
+	Switch       bool `json:"switch"`
+	ProjectFound bool `json:"project_found"`
+	// NextRun is RFC 3339; empty when the switch is off or the project is missing.
+	NextRun   string `json:"next_run"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+// SchedulesResult is the list of Schedules. A refusal is a result.
+type SchedulesResult struct {
+	Refused   bool           `json:"refused"`
+	Reason    string         `json:"reason"`
+	Message   string         `json:"message"`
+	Schedules []ScheduleInfo `json:"schedules"`
+	// Projects are the registered project names, for the Project select.
+	Projects []string `json:"projects"`
+}
+
+// ScheduleShowResult is one Schedule with its prompt and Last runs.
+type ScheduleShowResult struct {
+	Refused  bool          `json:"refused"`
+	Reason   string        `json:"reason"`
+	Message  string        `json:"message"`
+	Schedule ScheduleInfo  `json:"schedule"`
+	Prompt   string        `json:"prompt"`
+	LastRuns []ScheduleRun `json:"last_runs"`
+}
