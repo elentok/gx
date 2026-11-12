@@ -160,6 +160,28 @@ func TestCodexArgs_QuestionTool(t *testing.T) {
 	}
 }
 
+func TestCodexHarness_PlainChatArgsReachLaunchAndResume(t *testing.T) {
+	t.Parallel()
+	h, err := harness.Lookup(harness.Codex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := harness.LaunchOptions{Args: harness.CodexArgs(harness.CodexArgsInput{QuestionTool: true})}
+	resume, ok := h.Resume("abc", opts)
+	if !ok {
+		t.Fatal("Resume not supported")
+	}
+	if !slices.Equal(resume.Args[:2], []string{"resume", "abc"}) {
+		t.Errorf("Resume args = %q, want resume abc first", resume.Args)
+	}
+	for name, args := range map[string][]string{"Launch": h.Launch(opts).Args, "Resume": resume.Args} {
+		joined := strings.Join(args, " ")
+		if !slices.Contains(args, "--no-daemon") || !strings.Contains(joined, "-c "+harness.CodexQuestionToolFlag) {
+			t.Errorf("%s args %q lack --no-daemon or the question flag", name, args)
+		}
+	}
+}
+
 func TestCodexHarness_LaunchWithoutSystemPrompt(t *testing.T) {
 	t.Parallel()
 	h, err := harness.Lookup(harness.Codex)

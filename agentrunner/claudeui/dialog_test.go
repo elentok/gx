@@ -162,22 +162,30 @@ func TestParseDialog_OptionOneMustBeExactlyYes(t *testing.T) {
 }
 
 func TestReadDialog_WrappedOptionRows(t *testing.T) {
-	rows := dialogRows(t, "permission-wrapped-w80.screen.txt")
-	v := ReadDialog(rows)
-	want := []string{
-		"Yes",
-		"Yes, and always allow access to /private/tmp/claude-501/scratchpad/wf/perm from this project",
-		"Yes, and switch to auto mode · auto mode handles these prompts for you",
-		"No",
+	tests := map[string]struct{ file, always string }{
+		"80 columns":  {"permission-wrapped-w80.screen.txt", "Yes, and always allow access to /private/tmp/claude-501/scratchpad/wf/perm from this project"},
+		"120 columns": {"permission-wrapped-w120.screen.txt", "Yes, and always allow access to /private/tmp/claude-501/scratchpad/workflows/with/a/much/deeper/directory/tree/for/wrapping/at/wide/terminals/perm from this project"},
 	}
-	if strings.Join(v.Options, "|") != strings.Join(want, "|") {
-		t.Fatalf("options = %q, want %q", v.Options, want)
-	}
-	if v.Cursor != 0 || v.ID == "" {
-		t.Fatalf("cursor=%d id=%q", v.Cursor, v.ID)
-	}
-	if d := ParseDialog(rows); d.Approvable || d.Header != "" {
-		t.Fatalf("ParseDialog on wrapped layout = %+v, want zero Dialog", d)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			rows := dialogRows(t, tc.file)
+			v := ReadDialog(rows)
+			want := []string{
+				"Yes",
+				tc.always,
+				"Yes, and switch to auto mode · auto mode handles these prompts for you",
+				"No",
+			}
+			if strings.Join(v.Options, "|") != strings.Join(want, "|") {
+				t.Fatalf("options = %q, want %q", v.Options, want)
+			}
+			if v.Cursor != 0 || v.ID == "" {
+				t.Fatalf("cursor=%d id=%q", v.Cursor, v.ID)
+			}
+			if d := ParseDialog(rows); d.Approvable || d.Header != "" {
+				t.Fatalf("ParseDialog on wrapped layout = %+v, want zero Dialog", d)
+			}
+		})
 	}
 }
 

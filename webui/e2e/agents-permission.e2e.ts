@@ -353,6 +353,13 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await page.getByRole("button", { name: "Answer in the terminal" }).click()
   await expect(sheet).toHaveCount(0)
 
+  // Answered at the terminal: the permission card clears with no click in the page.
+  await go(page, `#/agents/${wrapped.id}`)
+  await expect(sheet).toBeVisible()
+  await fixture.controlClaude(await conversationOf(fixture, wrapped.id), { action: "finish" })
+  await leavesBlocked(fixture, wrapped.id)
+  await expect(sheet).toHaveCount(0)
+
   const allow = await blockIdle(fixture, BASH_DIALOG("rg allow-me"))
   let before = await fixture.input(allow.conv)
   await open(page, `#/agents/${allow.s.id}`)
