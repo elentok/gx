@@ -20,6 +20,7 @@ import {
   DAYS,
   formOf,
   harnessOptions,
+  tierOptions,
   isDirty,
   newForm,
   refusalField,
@@ -461,6 +462,21 @@ function Editor({
         </chakra.select>
       </Row>
 
+      <Row part="row-tier" label="Tier">
+        <chakra.select
+          {...field}
+          aria-label="Tier"
+          value={form.tier}
+          onChange={(e) => set({ tier: e.target.value })}
+        >
+          {tierOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </chakra.select>
+      </Row>
+
       <Row
         part="row-late-limit"
         label="Late limit"
@@ -512,6 +528,10 @@ function Editor({
           alignItems="center"
           gap="3"
           mt="6"
+          position="sticky"
+          bottom="4"
+          zIndex="1"
+          boxShadow="0 4px 16px rgba(0, 0, 0, 0.25)"
           px="4"
           py="3"
           borderWidth="1px"

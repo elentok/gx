@@ -13,6 +13,7 @@ func (sc *Scheduler) runRequest(s schedrec.Schedule) wire.OneOffRequest {
 		Prompt:  Prompt(s.Name, s.Prompt),
 		Project: s.Project,
 		Agent:   s.Harness,
+		Tier:    s.Tier,
 		Name:    s.Slug,
 		Unique:  sc.dedupeKey(Key{Project: s.Project, Slug: s.Slug}),
 	}

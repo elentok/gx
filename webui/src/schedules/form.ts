@@ -3,6 +3,7 @@ import type {
   ScheduleEditRequest,
   ScheduleShowResult,
 } from "../generated/server"
+import { TIERS } from "../tiers"
 
 export const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const
 
@@ -21,6 +22,8 @@ export interface ScheduleForm {
   project: string
   /** Empty means the Default. */
   harness: string
+  /** Empty means the worker tier. */
+  tier: string
   lateLimit: string
 }
 
@@ -33,6 +36,7 @@ export const newForm = (): ScheduleForm => ({
   times: ["07:00"],
   project: "scratch",
   harness: "",
+  tier: "",
   lateLimit: "2",
 })
 
@@ -43,6 +47,7 @@ export const formOf = (res: ScheduleShowResult): ScheduleForm => ({
   times: [...res.schedule.times],
   project: res.schedule.project,
   harness: res.schedule.harness,
+  tier: res.schedule.tier,
   lateLimit: String(res.schedule.late_limit_hours),
 })
 
@@ -50,6 +55,11 @@ export const harnessOptions = (defaultName: string) => [
   { value: "", label: defaultName ? `Default (${defaultName})` : "Default" },
   { value: "claude", label: "claude" },
   { value: "codex", label: "codex" },
+]
+
+export const tierOptions = [
+  { value: "", label: "Default (Worker)" },
+  ...TIERS.map((t) => ({ value: t.id, label: t.label })),
 ]
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -81,6 +91,7 @@ export const isDirty = (a: ScheduleForm, b: ScheduleForm) =>
   a.prompt !== b.prompt ||
   a.project !== b.project ||
   a.harness !== b.harness ||
+  a.tier !== b.tier ||
   a.lateLimit !== b.lateLimit ||
   !sameList(a.days, b.days) ||
   !sameList(a.times, b.times)
@@ -99,6 +110,7 @@ export const toCreateRequest = (f: ScheduleForm): ScheduleCreateRequest => ({
   times: times(f),
   project: f.project,
   harness: f.harness,
+  tier: f.tier,
   late_limit_hours: parseLateLimit(f.lateLimit),
 })
 
@@ -114,6 +126,7 @@ export const toEditRequest = (
   days: days(f),
   times: times(f),
   harness: f.harness,
+  tier: f.tier,
   late_limit_hours: parseLateLimit(f.lateLimit),
 })
 

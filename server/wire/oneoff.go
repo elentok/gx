@@ -9,6 +9,8 @@ type OneOffRequest struct {
 	Cwd   string `json:"cwd,omitempty"`
 	Name  string `json:"name,omitempty"`
 	Agent string `json:"agent,omitempty"`
+	// Tier pins the first launch to light, worker or strongest; empty means worker.
+	Tier string `json:"tier,omitempty"`
 	// Type is the ticket type: "prompt" (default), "evolve" or "diagnose". A
 	// one-off never commits.
 	Type string `json:"type,omitempty"`

@@ -43,6 +43,7 @@ type ScheduleInfo struct {
 	Days           []string `json:"days"`            // lowercase three-letter names in week order
 	Times          []string `json:"times"`           // HH:MM local
 	Harness        string   `json:"harness"`         // empty when the Schedule follows the Default
+	Tier           string   `json:"tier"`            // empty when the Schedule runs on the worker tier
 	DefaultHarness string   `json:"default_harness"` // what the Default resolves to for the project
 	LateLimitHours float64  `json:"late_limit_hours"`
 	Switch         bool     `json:"switch"` // the on/off switch of this machine
@@ -83,6 +84,7 @@ type ScheduleCreateRequest struct {
 	Times          []string `json:"times"`
 	Project        string   `json:"project"`
 	Harness        string   `json:"harness"`
+	Tier           string   `json:"tier"`
 	LateLimitHours *float64 `json:"late_limit_hours"`
 }
 
@@ -118,6 +120,7 @@ type ScheduleEditRequest struct {
 	Days           []string `json:"days"`
 	Times          []string `json:"times"`
 	Harness        *string  `json:"harness"`
+	Tier           *string  `json:"tier"`
 	LateLimitHours *float64 `json:"late_limit_hours"`
 }
 

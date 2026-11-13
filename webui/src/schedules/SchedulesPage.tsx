@@ -47,9 +47,14 @@ function ScheduleRow({
       alignItems="center"
       gap="4"
       py="3"
+      px="3"
+      mx="-3"
+      borderRadius="8px"
       cursor="pointer"
       borderBottomWidth="1px"
       borderColor="border"
+      transition="background 0.12s"
+      _hover={{ bg: "surface.raised" }}
     >
       <Box minW="0" flex="1">
         <Text data-mock-part="schedule-name" fontWeight="600" truncate>

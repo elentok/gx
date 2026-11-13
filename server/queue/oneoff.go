@@ -15,6 +15,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/broker"
@@ -157,6 +158,7 @@ func (o *OneOffs) oneOffValidate(req wire.OneOffRequest, scheduledFor time.Time,
 		return oneOffRefusal(bad.Reason, bad.Message), nil
 	}
 	tk.Agent = string(agent)
+	tk.TierOverride = req.Tier
 	*plan = oneOffPlan{project: project, dir: dir, epic: OneOffsEpic, slug: slug, prompt: prompt, tk: tk, agent: string(agent), front: req.Front}
 	return wire.OneOffResult{}, nil
 }
@@ -309,6 +311,9 @@ func (o *OneOffs) oneOffOptionsRefusal(project string, req wire.OneOffRequest) *
 	refuse := func(reason, msg string) *wire.OneOffResult {
 		r := oneOffRefusal(reason, msg)
 		return &r
+	}
+	if req.Tier != "" && !agent.Tier(req.Tier).Valid() {
+		return refuse(wire.ReasonBadTier, "tier must be light, worker or strongest")
 	}
 	if req.ExpectedContextWindow < 0 {
 		return refuse(wire.ReasonBadWindow, "expected context window must be non-negative")

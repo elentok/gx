@@ -45,10 +45,10 @@ func expandDays(vals []string) []string {
 
 // writeFlags are the flags create and edit share.
 type writeFlags struct {
-	name, prompt, project, harness string
-	days, times                    []string
-	lateLimit                      float64
-	jsonOut                        bool
+	name, prompt, project, harness, tier string
+	days, times                          []string
+	lateLimit                            float64
+	jsonOut                              bool
 }
 
 func (f *writeFlags) bind(cmd *cobra.Command) {
@@ -59,6 +59,7 @@ func (f *writeFlags) bind(cmd *cobra.Command) {
 	fl.StringSliceVar(&f.times, "time", nil, "run time HH:MM, local (repeatable or comma list)")
 	fl.StringVar(&f.project, "project", "", "project name")
 	fl.StringVar(&f.harness, "harness", "", "claude or codex; empty follows the Default")
+	fl.StringVar(&f.tier, "tier", "", "light, worker or strongest; empty runs on worker")
 	fl.Float64Var(&f.lateLimit, "late-limit", 0, "Late limit in hours")
 	fl.BoolVar(&f.jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 }
@@ -86,7 +87,7 @@ func newCreate(d Deps) *cobra.Command {
 				return err
 			}
 			req := wire.ScheduleCreateRequest{
-				Name: f.name, Prompt: prompt, Days: expandDays(f.days), Times: f.times, Project: f.project, Harness: f.harness,
+				Name: f.name, Prompt: prompt, Days: expandDays(f.days), Times: f.times, Project: f.project, Harness: f.harness, Tier: f.tier,
 			}
 			if c.Flags().Changed("late-limit") {
 				req.LateLimitHours = &f.lateLimit
@@ -137,6 +138,9 @@ func newEdit(d Deps) *cobra.Command {
 			}
 			if changed("harness") {
 				req.Harness = &f.harness
+			}
+			if changed("tier") {
+				req.Tier = &f.tier
 			}
 			if changed("late-limit") {
 				req.LateLimitHours = &f.lateLimit

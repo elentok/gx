@@ -127,6 +127,8 @@ func TestValidate_Reasons(t *testing.T) {
 		{"negative late limit", func(s *Schedule) { s.LateLimitHours = -1 }, ReasonInvalidLateLimit},
 		{"bad harness", func(s *Schedule) { s.Harness = "gemini" }, ReasonInvalidHarness},
 		{"ok codex", func(s *Schedule) { s.Harness = "codex" }, ""},
+		{"bad tier", func(s *Schedule) { s.Tier = "huge" }, ReasonInvalidTier},
+		{"ok strongest", func(s *Schedule) { s.Tier = "strongest" }, ""},
 		{"ok decimal late limit", func(s *Schedule) { s.LateLimitHours = 1.5 }, ""},
 		{"ok 23:59", func(s *Schedule) { s.Times = []string{"00:00", "23:59"} }, ""},
 	}

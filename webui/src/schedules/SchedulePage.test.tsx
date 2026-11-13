@@ -50,6 +50,7 @@ const shown = (over: Partial<ScheduleShowResult> = {}): ScheduleShowResult => ({
     days: ["mon", "tue"],
     times: ["08:30"],
     harness: "",
+    tier: "",
     default_harness: "claude",
     late_limit_hours: 2,
     switch: true,
@@ -140,6 +141,7 @@ test("Create posts the form and opens the new Schedule", async () => {
     days: ["mon", "tue", "wed", "thu", "fri"],
     times: ["07:00"],
     harness: "",
+    tier: "",
     late_limit_hours: 2,
   })
   await waitFor(() => expect(router.state.location.pathname).toBe("/schedules/gx:morning"))

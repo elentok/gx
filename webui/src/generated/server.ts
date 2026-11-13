@@ -2589,6 +2589,10 @@ export interface ScheduleInfo {
    */
   harness: string;
   /**
+   * Tier is empty when the Schedule runs on the worker tier.
+   */
+  tier: string;
+  /**
    * DefaultHarness is the name the Default resolves to for the project.
    */
   default_harness: string;
@@ -2649,6 +2653,7 @@ export interface ScheduleCreateRequest {
   times: string[];
   project: string;
   harness: string;
+  tier: string;
   late_limit_hours?: number /* float64 */;
 }
 /**
@@ -2689,6 +2694,7 @@ export interface ScheduleEditRequest {
   days: string[];
   times: string[];
   harness?: string;
+  tier?: string;
   late_limit_hours?: number /* float64 */;
 }
 /**

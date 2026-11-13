@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	schedrec "github.com/elentok/gx/schedules"
 	"github.com/elentok/gx/server/schedules"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func (r *rig) runNow(t *testing.T) wire.ScheduleRunNowResult {
@@ -180,5 +182,33 @@ func TestSchedulesRunNow_PublishesSchedulesChanged(t *testing.T) {
 		case <-time.After(10 * time.Second):
 			t.Fatal("no schedules-changed event")
 		}
+	}
+}
+
+func TestSchedulesRunNow_TheScheduleTierPinsTheRunsFirstLaunch(t *testing.T) {
+	t.Parallel()
+	r := start(t, 2, "09:00")
+	store := schedrec.NewStore(r.h.TicketStore)
+	sc, err := store.Get(r.key.Project, r.key.Slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc.Tier = "strongest"
+	if _, err := store.Update(r.key.Project, r.key.Slug, sc); err != nil {
+		t.Fatal(err)
+	}
+	if res := r.runNow(t); res.Refused {
+		t.Fatalf("run-now = %+v", res)
+	}
+	runs := r.runs(t)
+	if len(runs) != 1 {
+		t.Fatalf("one-offs = %d, want 1", len(runs))
+	}
+	tk, err := schema.ParseTicket(runs[0].Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := tk.TierOverride; got != "strongest" {
+		t.Errorf("TierOverride = %q, want strongest", got)
 	}
 }

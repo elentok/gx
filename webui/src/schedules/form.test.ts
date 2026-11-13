@@ -1,6 +1,7 @@
 import { expect, test } from "vitest"
 import {
   harnessOptions,
+  tierOptions,
   isDirty,
   newForm,
   parseLateLimit,
@@ -27,6 +28,10 @@ test("a new Schedule starts on weekdays at 07:00 in scratch with 2 hours", () =>
   expect(f.times).toEqual(["07:00"])
   expect(f.project).toBe("scratch")
   expect(f.lateLimit).toBe("2")
+})
+
+test("the tier options are the Default then every tier", () => {
+  expect(tierOptions.map((o) => o.value)).toEqual(["", "light", "worker", "strongest"])
 })
 
 test("the first harness option is the Default and means unset", () => {
@@ -59,6 +64,7 @@ test("dirty compares every field", () => {
   expect(isDirty(a, { ...a, name: "x" })).toBe(true)
   expect(isDirty(a, { ...a, times: ["07:00", "08:00"] })).toBe(true)
   expect(isDirty(a, { ...a, harness: "codex" })).toBe(true)
+  expect(isDirty(a, { ...a, tier: "strongest" })).toBe(true)
   expect(isDirty(a, { ...a, lateLimit: "3" })).toBe(true)
 })
 
@@ -81,6 +87,7 @@ test("the requests put days in week order and collapse duplicate times", () => {
     times: ["07:00", "21:00"],
     project: "scratch",
     harness: "",
+    tier: "",
     late_limit_hours: 1.5,
   })
   const edit = toEditRequest("gx", "morning", f)

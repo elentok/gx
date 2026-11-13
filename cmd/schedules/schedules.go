@@ -109,7 +109,11 @@ func printShow(w io.Writer, res wire.ScheduleShowResult) error {
 	if harness == "" {
 		harness = "default (" + s.DefaultHarness + ")"
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\nproject: %s\nharness: %s\nlate limit: %gh\nprompt:\n%s\n", s.Name, strings.Join(s.Days, ","), strings.Join(s.Times, ","), nextText(s), s.Project, harness, s.LateLimitHours, res.Prompt); err != nil {
+	tier := s.Tier
+	if tier == "" {
+		tier = "worker"
+	}
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\nproject: %s\nharness: %s\ntier: %s\nlate limit: %gh\nprompt:\n%s\n", s.Name, strings.Join(s.Days, ","), strings.Join(s.Times, ","), nextText(s), s.Project, harness, tier, s.LateLimitHours, res.Prompt); err != nil {
 		return err
 	}
 	for _, r := range res.LastRuns {

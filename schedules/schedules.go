@@ -42,6 +42,7 @@ const (
 	ReasonInvalidTime      = "invalid-time"
 	ReasonInvalidLateLimit = "invalid-late-limit"
 	ReasonInvalidHarness   = "invalid-harness"
+	ReasonInvalidTier      = "invalid-tier"
 	ReasonSlugExists       = "slug-exists"
 	ReasonInvalidProject   = "invalid-project"
 )
@@ -84,7 +85,9 @@ type Schedule struct {
 	Days  []time.Weekday `yaml:"days"`
 	Times []string       `yaml:"times"`
 	// Harness is "" (Default, resolved on every run), "claude" or "codex".
-	Harness        string    `yaml:"harness,omitempty"`
+	Harness string `yaml:"harness,omitempty"`
+	// Tier is "" (worker), "light", "worker" or "strongest"; each run launches on it.
+	Tier           string    `yaml:"tier,omitempty"`
 	LateLimitHours float64   `yaml:"late_limit_hours"`
 	CreatedAt      time.Time `yaml:"created_at"`
 	UpdatedAt      time.Time `yaml:"updated_at"`
@@ -140,6 +143,9 @@ func Validate(s *Schedule) error {
 	}
 	if err := agent.ValidateAgentKind(agent.AgentKind(s.Harness)); err != nil {
 		return refuse(ReasonInvalidHarness, err.Error())
+	}
+	if s.Tier != "" && !agent.Tier(s.Tier).Valid() {
+		return refuse(ReasonInvalidTier, s.Tier)
 	}
 	s.Times = uniqueSorted(s.Times)
 	s.Days = uniqueSorted(s.Days)

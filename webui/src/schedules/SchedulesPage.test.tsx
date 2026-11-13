@@ -34,6 +34,7 @@ const sched = (over: Partial<ScheduleInfo>): ScheduleInfo => ({
   days: ["mon", "tue", "wed", "thu", "fri"],
   times: ["08:30"],
   harness: "",
+  tier: "",
   default_harness: "claude",
   late_limit_hours: 2,
   switch: true,

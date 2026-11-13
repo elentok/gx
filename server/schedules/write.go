@@ -89,7 +89,7 @@ func (s *Schedules) create(req wire.ScheduleCreateRequest) (wire.ScheduleShowRes
 	if err != nil {
 		return refusedShow(schedrec.ReasonNoDays, err.Error()), nil
 	}
-	sc := schedrec.Schedule{Name: req.Name, Prompt: req.Prompt, Days: days, Times: req.Times, Harness: req.Harness}
+	sc := schedrec.Schedule{Name: req.Name, Prompt: req.Prompt, Days: days, Times: req.Times, Harness: req.Harness, Tier: req.Tier}
 	if res, refused := lateLimit(&sc, req.LateLimitHours); refused {
 		return res, nil
 	}
@@ -138,6 +138,9 @@ func (s *Schedules) edit(req wire.ScheduleEditRequest) (wire.ScheduleShowResult,
 	}
 	if req.Harness != nil {
 		sc.Harness = *req.Harness
+	}
+	if req.Tier != nil {
+		sc.Tier = *req.Tier
 	}
 	if res, refused := lateLimit(&sc, req.LateLimitHours); refused {
 		return res, nil

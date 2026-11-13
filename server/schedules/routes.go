@@ -116,7 +116,7 @@ func (s *Schedules) registered(sc schedrec.Schedule) (bool, error) {
 func (s *Schedules) info(sc schedrec.Schedule, registered bool, now time.Time) wire.ScheduleInfo {
 	on := s.State.Enabled(Key{Project: sc.Project, Slug: sc.Slug})
 	info := wire.ScheduleInfo{
-		Name: sc.Name, Slug: sc.Slug, Project: sc.Project, Times: sc.Times, Harness: sc.Harness,
+		Name: sc.Name, Slug: sc.Slug, Project: sc.Project, Times: sc.Times, Harness: sc.Harness, Tier: sc.Tier,
 		DefaultHarness: s.DefaultHarness(sc.Project), LateLimitHours: sc.LateLimitHours,
 		Switch: on, ProjectFound: registered, UpdatedAt: sc.UpdatedAt.Format(time.RFC3339),
 	}
