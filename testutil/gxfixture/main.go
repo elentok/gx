@@ -41,6 +41,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/gxfixture/catalog"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
@@ -56,9 +57,9 @@ func run(args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	sc, ok := scenarios[o.scenario]
+	sc, ok := catalog.Scenarios[o.scenario]
 	if !ok {
-		return fmt.Errorf("unknown scenario %q; known: %s", o.scenario, strings.Join(scenarioNames(), ", "))
+		return fmt.Errorf("unknown scenario %q; known: %s", o.scenario, strings.Join(catalog.Names(), ", "))
 	}
 	shape, err := checkShape(sc, o.shape)
 	if err != nil {

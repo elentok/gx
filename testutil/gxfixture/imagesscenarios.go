@@ -18,19 +18,6 @@ import (
 	"github.com/elentok/gx/transcript"
 )
 
-// agentsImagesScenario is the agents scenario with saved images in the chat of
-// its first Claude session and its Codex session.
-func agentsImagesScenario() scenario {
-	sc := spec.AgentsScenario()
-	sc.Sessions = slices.Clone(sc.Sessions)
-	for i := range sc.Sessions {
-		if i == 0 || sc.Sessions[i].Harness == "codex" {
-			sc.Sessions[i].Images = true
-		}
-	}
-	return sc
-}
-
 // pngBase64 is a 1x1 PNG.
 const pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
 

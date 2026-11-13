@@ -4,12 +4,13 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/designs/drafts"
+	"github.com/elentok/gx/testutil/gxfixture/catalog"
 )
 
 func TestDraftsScenario_SeedsThreeDraftsWithImages(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if err := seedDrafts(dir, scenarios["drafts"].Drafts); err != nil {
+	if err := seedDrafts(dir, catalog.Scenarios["drafts"].Drafts); err != nil {
 		t.Fatal(err)
 	}
 	items, err := drafts.New(dir).List()

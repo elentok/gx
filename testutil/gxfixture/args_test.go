@@ -3,6 +3,8 @@ package main
 import (
 	"reflect"
 	"testing"
+
+	"github.com/elentok/gx/testutil/gxfixture/catalog"
 )
 
 func TestParseArgs(t *testing.T) {
@@ -49,7 +51,7 @@ func TestParseArgs(t *testing.T) {
 }
 
 func TestCheckShape_DevMode(t *testing.T) {
-	sc := scenarios["dev-mode"]
+	sc := catalog.Scenarios["dev-mode"]
 	if got, err := checkShape(sc, ""); err != nil || got != "running" {
 		t.Errorf("default = %q, %v, want running", got, err)
 	}

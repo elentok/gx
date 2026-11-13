@@ -306,10 +306,12 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   isolated real `gx server` (pty runner, `fakeclaude` as `claude`) and prints JSON with `web_url`,
   socket, state dir, hold file and `log_file` (the server's stdout+stderr, which holds the cleanup
   command's output tail); SIGTERM stops it. Per-ticket worker behaviour
-  (finish/ask/fail) lives in `.agentfake-worker.json`, see `scenarios.go`. The scenario data model
+  (finish/ask/fail) lives in `.agentfake-worker.json`, see `catalog/scenarios.go`. The scenario data model
   (`Scenario`, `Epic`, `Ticket`, `SessionSpec`) and the scenario definitions that need nothing from
-  the fixture program live in the sub-package `testutil/gxfixture/spec`; `scenarios.go` keeps the
-  registry and aliases the spec types. New scenario definitions that take no `fixture` go there too
+  the fixture program live in the sub-package `testutil/gxfixture/spec`. The registry
+  (`catalog.Scenarios`, `catalog.Names()`) lives in `testutil/gxfixture/catalog` (`scenarios.go`,
+  `cachegate.go`, `launchstate.go`, `imagesscenarios.go`: data only); `scenarios.go` in `main` keeps
+  the spec aliases. New scenario definitions that take no `fixture` go there too
   (the package is near the `sizeguard` limits). `Output`, the JSON it prints, lives in `spec` too.
   Its scenario tests run in the test-only packages `designflows`, `limitsflows` and `webflows`
   (each with a `TestMain` calling `fixturetest.Run`); the harness they share (`Start`, the
@@ -317,7 +319,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   of the fixture program's own internals (`parseArgs`, `isolatedEnv`, the health and shutdown
   files) stay in `package main`. A new flow test goes in the flows package for its area; a
   helper two packages need goes in `fixturetest`. The `cache-gate` and
-  `cache-gate-custom` scenarios (`cachegate.go`) output `gate_dir`: a fake `go` and `ps` in
+  `cache-gate-custom` scenarios (`catalog/cachegate.go`) output `gate_dir`: a fake `go` and `ps` in
   `bin/` (put it first on PATH), `go-hold` to hold a fake build, and `go-clean.log`. The
   `pr-flow-draft-ci-running`, `pr-flow-fixing` and `pr-flow-ready` scenarios (`spec/prflow.go`,
   `fakegh.go`) seed epic `ticket-search` with PR 412 under a `pr`-delivery project whose `gh` is the
