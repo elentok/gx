@@ -1,4 +1,4 @@
-package epics_test
+package epicflows_test
 
 import (
 	"github.com/elentok/gx/server/servertest/rigs"

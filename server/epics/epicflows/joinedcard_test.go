@@ -1,4 +1,4 @@
-package epics_test
+package epicflows_test
 
 import (
 	"context"
