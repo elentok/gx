@@ -169,7 +169,7 @@ var allowed = map[string]int{
 	"ui/components/runner_test.go":                            2,
 	"ui/log/e2e_test.go":                                      2,
 	"ui/push/push_test.go":                                    1,
-	"ui/status/e2e_test.go":                                   1,
+	"ui/status/statusflows/e2e_test.go":                       1,
 }
 
 // countSleeps counts the time.Sleep calls in src. Lines that start with a

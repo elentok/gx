@@ -1,4 +1,4 @@
-package status_test
+package statusflows
 
 import (
 	"bytes"
