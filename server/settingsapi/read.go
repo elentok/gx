@@ -50,7 +50,18 @@ func (w *Writer) Read(t Target, pendingRestart []string) (ops.SettingsReadRespon
 	}
 
 	for _, e := range entries {
-		resp.Entries = append(resp.Entries, buildEntry(e, t.Project != "", targetDoc, globalDoc))
+		entry := buildEntry(e, t.Project != "", targetDoc, globalDoc)
+		if e.Key.String() == "checks" && resp.Project != nil && resp.Project.RepoChecksFile {
+			data, err := os.ReadFile(filepath.Join(resp.Project.Repo, check.RepoConfigPath))
+			if err != nil {
+				return resp, err
+			}
+			if _, err := check.ParseConfig(data); err != nil {
+				return resp, err
+			}
+			entry.Value, entry.Set, entry.ReadOnly = data, true, true
+		}
+		resp.Entries = append(resp.Entries, entry)
 	}
 	return resp, nil
 }

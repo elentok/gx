@@ -17,6 +17,24 @@ const (
 	testWebhook = "https://hooks.slack.example/SECRET-WEBHOOK"
 )
 
+func TestReadChecksUsesRepoFile(t *testing.T) {
+	t.Parallel()
+	w, repo := readFixture(t, `{}`, `{"repo":"REPO","checks":{"lint":false}}`)
+	if err := os.MkdirAll(filepath.Join(repo, ".gx"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	want := `{"format":"format {files}","test":{"changed":"test changed","full":"test all"}}`
+	writeFile(t, filepath.Join(repo, ".gx", "checks.json"), want)
+	resp, err := w.Read(Target{Project: "proj"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := entryByKey(t, resp, "checks")
+	if string(e.Value) != want || !e.Set || !e.ReadOnly {
+		t.Fatalf("checks = %+v, want read-only repo checks %s", e, want)
+	}
+}
+
 func entryByKey(t *testing.T, resp ops.SettingsReadResponse, key string) ops.SettingsEntry {
 	t.Helper()
 	for _, e := range resp.Entries {

@@ -283,11 +283,11 @@ export function ChecksEditor({
           py="2"
           borderRadius="md"
         >
-          This repo has a .gx/checks.json, which wins over these settings. Edits below have no
-          effect.
+          Showing the active checks from .gx/checks.json. Edit that file in the repo to change
+          these commands.
         </Text>
       )}
-      <Box data-mock-part="checks-editor" display="grid" gap="2">
+      <chakra.fieldset disabled={repoChecksFile} data-mock-part="checks-editor" display="grid" gap="2" minW="0">
         {CHECK_KINDS.map((kind) => (
           <KindCard
             key={kind}
@@ -297,11 +297,11 @@ export function ChecksEditor({
             onChange={(patch) => edit(kind, patch)}
           />
         ))}
-      </Box>
+      </chakra.fieldset>
       <Box display="flex" gap="2" alignItems="center">
         <Button
           size="sm"
-          disabled={!dirty || Object.keys(errors).length > 0 || write.pending}
+          disabled={repoChecksFile || !dirty || Object.keys(errors).length > 0 || write.pending}
           onClick={() =>
             void write.run(() => onWrite([modelToChange(model)]), {
               onDone: () => {
