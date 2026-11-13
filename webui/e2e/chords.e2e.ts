@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test"
-import { sessions } from "./agentsKit"
+import { chatOf, row, sessions, titleHeading } from "./agentsKit"
 import { expect, nav, test } from "./fixture"
 
 const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash)
@@ -209,6 +209,88 @@ test("Chords", async ({ page, start }) => {
   const chordChatUrl = new RegExp(`#/agents/${chordChat.id}$`)
   await goto(page, `#/agents/${chordChat.id}`)
   await expect(page).toHaveURL(chordChatUrl)
+
+  // Rename chat: Leader then r opens the popup on the open chat with its name selected, Enter renames it
+  // everywhere without a reload and types /rename into the Claude chat, Esc and an empty name change nothing.
+  const renameDialog = page.getByRole("dialog", { name: "Rename chat" })
+  const renameField = renameDialog.getByRole("textbox", nav("Name"))
+  const renameButton = renameDialog.getByRole("button", nav("Rename"))
+  const otherChat = (await sessions(fx)).find(
+    (s) => s.id !== chordChat.id && !s.design && !s.queue && s.harness !== "codex" && s.name,
+  )!
+  await expect
+    .poll(async () => (await sessions(fx)).find((s) => s.id === chordChat.id)?.status.state)
+    .toBe("idle")
+  const chordConv = (await chatOf(fx, chordChat.id)).conversation_id
+  await page.evaluate(() => ((window as unknown as { __kept?: boolean }).__kept = true))
+  await prompt.fill("a draft")
+  await openBox()
+  await expect(chordBox.getByRole("menuitem", { name: /^r\s*Rename chat/ })).toBeVisible()
+  await page.keyboard.press("r")
+  await expect(renameDialog).toBeVisible()
+  await expect(renameField).toBeFocused()
+  await expect(renameField).toHaveValue("chord-chat")
+  expect(
+    await renameField.evaluate((e: HTMLInputElement) => [e.selectionStart, e.selectionEnd]),
+  ).toEqual([0, "chord-chat".length])
+  await expect(prompt).toHaveValue("a draft")
+  await page.keyboard.press("Tab")
+  await expect(renameDialog.getByRole("button", nav("Cancel"))).toBeFocused()
+  await page.keyboard.press("Tab")
+  await expect(renameButton).toBeFocused()
+  await renameField.fill("")
+  await expect(renameButton).toBeDisabled()
+  await renameField.fill("zzz")
+  await page.keyboard.press("Escape")
+  await expect(renameDialog).toHaveCount(0)
+  await expect(row(page, chordChat)).toContainText("chord-chat")
+  await expect(prompt).toHaveValue("a draft")
+  await prompt.fill("")
+  await openBox()
+  await page.keyboard.press("r")
+  await renameField.fill("chord-renamed")
+  await page.keyboard.press("Enter")
+  await expect(renameDialog).toHaveCount(0)
+  await expect(row(page, chordChat)).toContainText("chord-renamed")
+  await expect(titleHeading(page)).toContainText("chord-renamed")
+  await expect.poll(() => fx.cli("agents", "list")).toContain("chord-renamed")
+  await expect.poll(() => fx.input(chordConv)).toContain("/rename chord-renamed")
+  expect(await page.evaluate(() => (window as unknown as { __kept?: boolean }).__kept)).toBe(true)
+  expect((await sessions(fx)).find((s) => s.id === otherChat.id)!.name).toBe(otherChat.name)
+  // The palette's Rename chat opens the same popup on the same chat.
+  await page.keyboard.press("ControlOrMeta+p")
+  await page.getByRole("dialog", nav("Commands")).getByRole("combobox").fill("Rename")
+  await page.keyboard.press("Enter")
+  await expect(renameDialog).toBeVisible()
+  await expect(renameField).toHaveValue("chord-renamed")
+  await renameField.fill("chord-palette")
+  await page.keyboard.press("Enter")
+  await expect(row(page, chordChat)).toContainText("chord-palette")
+  await expect(titleHeading(page)).toContainText("chord-palette")
+  expect((await sessions(fx)).find((s) => s.id === otherChat.id)!.name).toBe(otherChat.name)
+
+  // A refusal shows its reason in the popup and keeps the text: the chat is removed from the CLI while the popup is open.
+  await goto(page, "#/epics")
+  await openBox()
+  await page.keyboard.press("c")
+  await chordForm.getByRole("textbox", nav("Name")).fill("refuse-chat")
+  await chordForm.getByRole("textbox", nav("First prompt")).fill("hi")
+  await chordForm.getByRole("button", nav("Create session")).click()
+  await expect(chordForm).toHaveCount(0)
+  const refuseChat = (await sessions(fx)).find((s) => s.name === "refuse-chat")!
+  await goto(page, `#/agents/${refuseChat.id}`)
+  await expect(titleHeading(page)).toContainText("refuse-chat")
+  await openBox()
+  await page.keyboard.press("r")
+  await renameField.fill("refused-name")
+  await fx.cli("agents", "remove", "--yes", refuseChat.id)
+  await page.keyboard.press("Enter")
+  await expect(renameDialog.getByRole("alert")).toBeVisible()
+  await expect(renameField).toHaveValue("refused-name")
+  await page.keyboard.press("Escape")
+  await expect(renameDialog).toHaveCount(0)
+  await goto(page, `#/agents/${chordChat.id}`)
+  await expect(page).toHaveURL(chordChatUrl)
   const removeRow = chordBox.getByRole("menuitem", { name: /^x\s*Remove/ })
   const removeConfirm = page.getByRole("dialog").filter({ hasText: "Stop and remove" })
   await openBox()
@@ -231,14 +313,35 @@ test("Chords", async ({ page, start }) => {
   await expect.poll(() => fx.cli("agents", "list")).not.toContain(chordChat.id)
 
   // Design page, Queue and a Queue agent: the box has c, d and s only, and x does nothing.
+  // The palette lists no Rename chat there; its New chat row proves the filter ran.
+  const expectNoRenameInPalette = async () => {
+    await page.keyboard.press("ControlOrMeta+p")
+    const commands = page.getByRole("dialog", nav("Commands"))
+    await commands.getByRole("combobox").fill("chat")
+    await expect(commands.getByText("New chat")).toBeVisible()
+    await expect(commands.getByText("Rename chat")).toHaveCount(0)
+    await page.keyboard.press("Escape")
+    await expect(commands).toHaveCount(0)
+  }
   const queueAgentHash = (await queueAgent.getAttribute("href"))!
   for (const hash of ["#/d/side:side-design", queueAgentHash]) {
     await goto(page, hash)
     await openBox()
     await expect(chordBox.getByRole("menuitem")).toHaveCount(3)
     await expect(chordBox.getByRole("menuitem", { name: /^x/ })).toHaveCount(0)
+    await expect(chordBox.getByRole("menuitem", { name: /^r/ })).toHaveCount(0)
     await page.keyboard.press("x")
     await expect(page.getByRole("dialog")).toHaveCount(0)
+    await page.keyboard.press("Escape")
+    await expect(chordBox).toHaveCount(0)
+    await expectNoRenameInPalette()
+  }
+  // The epics page and the agents list are not a chat page either.
+  for (const hash of ["#/epics", "#/agents"]) {
+    await goto(page, hash)
+    await openBox()
+    await expect(chordBox.getByRole("menuitem", { name: /^c\s*New chat/ })).toBeVisible()
+    await expect(chordBox.getByRole("menuitem", { name: /^r/ })).toHaveCount(0)
     await page.keyboard.press("Escape")
     await expect(chordBox).toHaveCount(0)
   }
@@ -249,8 +352,10 @@ test("Chords", async ({ page, start }) => {
   await expect(working).toHaveAttribute("aria-current", "page")
   await openBox()
   await expect(chordBox.getByRole("menuitem", { name: /^x\s*Remove$/ })).toBeVisible()
+  await expect(chordBox.getByRole("menuitem", { name: /^r/ })).toHaveCount(0)
   await page.keyboard.press("x")
   await expect(removeConfirm).toBeVisible()
   await removeConfirm.getByRole("button", nav("Keep")).click()
   await expect(removeConfirm).toHaveCount(0)
+  await expectNoRenameInPalette()
 })

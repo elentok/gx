@@ -129,15 +129,15 @@ const chat = (state: "idle" | "exited"): ItemRef => ({
   session: session("s3", "p", { name: "talk", status: { state } }),
 })
 
-test("a live chat offers Stop and Remove; Stop posts the stop", async () => {
+test("a live chat offers Rename, Stop and Remove; Stop posts the stop", async () => {
   const stop = vi.fn(async () => ({}))
   await open(chat("idle"), writers({ stop }))
-  expect(labels()).toEqual(["Move to workspace›", "Stop", "Remove"])
+  expect(labels()).toEqual(["Move to workspace›", "Rename", "Stop", "Remove"])
   fireEvent.click(screen.getByRole("menuitem", { name: "Stop" }))
   await waitFor(() => expect(stop).toHaveBeenCalledWith(expect.objectContaining({ id: "s3" })))
 })
 
-test("an exited chat offers Remove only; Remove asks first, then removes and reports", async () => {
+test("an exited chat offers Rename and Remove; Remove asks first, then removes and reports", async () => {
   const remove = vi.fn(async () => ({}))
   const onRemoved = vi.fn()
   renderThemed(
@@ -153,7 +153,7 @@ test("an exited chat offers Remove only; Remove asks first, then removes and rep
   )
   fireEvent.click(screen.getByRole("button", { name: "More actions" }))
   await screen.findAllByRole("menuitem")
-  expect(labels()).toEqual(["Move to workspace›", "Remove"])
+  expect(labels()).toEqual(["Move to workspace›", "Rename", "Remove"])
   fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }))
   expect((await screen.findByText("Remove talk? Its session is deleted.")).textContent).toBeTruthy()
   expect(remove).not.toHaveBeenCalled()

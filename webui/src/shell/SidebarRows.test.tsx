@@ -277,13 +277,14 @@ test("a row's ... menu opens and Move posts the other workspace", async () => {
   })
 })
 
-test("a chat row's menu offers Move, Stop and Remove", async () => {
+test("a chat row's menu offers Move, Rename, Stop and Remove", async () => {
   setup("desktop")
   const chat = await body().findByRole("link", { name: /^Chat talk/ })
   fireEvent.click(within(chat.closest("li")!).getByRole("button", { name: "More actions" }))
   await screen.findAllByRole("menuitem")
   expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
     "Move to workspace›",
+    "Rename",
     "Stop",
     "Remove",
   ])

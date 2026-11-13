@@ -1,6 +1,15 @@
 import type { Page } from "@playwright/test"
 import { expect, nav, test, type Fixture } from "./fixture"
-import { chatOf, claudeIdle, codexIdle, go, messageBox, sendButton, sessions } from "./agentsKit"
+import {
+  chatOf,
+  claudeIdle,
+  codexIdle,
+  go,
+  messageBox,
+  moreActions,
+  sendButton,
+  sessions,
+} from "./agentsKit"
 
 /** The conversation id the fake claude of a session is named by. */
 const conversationOf = async (fixture: Fixture, id: string) =>
@@ -52,6 +61,17 @@ test("153. Send a command, typed once or nudged, and /clear", async ({ page, sta
   await sendButton(page).click()
   await expect(page.getByText("$review-skill", { exact: true })).toBeVisible()
   await expect.poll(() => fixture.cli("agents", "chat", codex.id)).toContain("$review-skill")
+
+  // A Codex chat renames in gx and shows no failure. `fixture.input` reads only the Claude fake's file, so
+  // the Go test in the prompt package is what proves what the Codex pane receives.
+  const renameDialog = page.getByRole("dialog", nav("Rename chat"))
+  await moreActions(page).click()
+  await page.getByRole("menuitem", nav("Rename")).click()
+  await renameDialog.getByRole("textbox", nav("Name")).fill("codex-renamed")
+  await page.keyboard.press("Enter")
+  await expect(renameDialog).toHaveCount(0)
+  await expect.poll(() => fixture.cli("agents", "list")).toContain("codex-renamed")
+  await expect(page.getByText("Send failed")).toHaveCount(0)
 
   // `/clear` on the Idle session starts a new conversation: the open chat resets and a draft typed since stays.
   const withOutput = await findWithOutput(fixture)

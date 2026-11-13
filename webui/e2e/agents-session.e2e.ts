@@ -50,10 +50,14 @@ test("75. Read a session", async ({ page, start }) => {
       .getByRole("menu", nav("More actions"))
       .getByRole("menuitem", { name: "Promote to Design", exact: true }),
   ).toBeVisible()
-  await expect(async () => {
-    await page.keyboard.press("Escape")
-    await expect(page.getByRole("menu", nav("More actions"))).toHaveCount(0, { timeout: 500 })
-  }).toPass()
+  // The same menu has Rename, which opens the rename popup on this chat.
+  await page.getByRole("menu", nav("More actions")).getByRole("menuitem", nav("Rename")).click()
+  const renameDialog = page.getByRole("dialog", nav("Rename chat"))
+  await expect(renameDialog).toBeVisible()
+  await expect(renameDialog.getByRole("textbox", nav("Name"))).toBeFocused()
+  await page.keyboard.press("Escape")
+  await expect(renameDialog).toHaveCount(0)
+  await expect(page.getByRole("menu", nav("More actions"))).toHaveCount(0)
   const ticketed = list.find((s) => s.ticket && s.harness === "claude")!
   await go(page, `#/agents/${ticketed.id}`)
   await expect(header.getByText(ticketed.ticket!, { exact: true })).toBeVisible()
@@ -115,6 +119,17 @@ test("75. Read a session", async ({ page, start }) => {
   await go(page, `#/agents/${tools[0].id}`)
   await expect(row).toHaveText("Working · running shell: make test")
   await expect(row.getByRole("button")).toHaveCount(0)
+  // A Working chat renames too: /rename reaches its input while the turn runs, and the session stays Working.
+  const toolsConv = (await chatOf(toolsFixture, tools[0].id)).conversation_id
+  await moreActions(page).click()
+  await page.getByRole("menu", nav("More actions")).getByRole("menuitem", nav("Rename")).click()
+  await expect(renameDialog).toBeVisible()
+  await renameDialog.getByRole("textbox", nav("Name")).fill("busy-renamed")
+  await page.keyboard.press("Enter")
+  await expect(renameDialog).toHaveCount(0)
+  await expect(titleHeading(page)).toContainText("busy-renamed")
+  await expect.poll(() => toolsFixture.input(toolsConv)).toContain("/rename busy-renamed")
+  await expect(row).toHaveText("Working · running shell: make test")
   await go(page, `#/agents/${tools[1].id}`)
   await expect(row).toContainText("searching: InFlightTool")
   const more = row.getByRole("button", { name: "(+2 more)" })

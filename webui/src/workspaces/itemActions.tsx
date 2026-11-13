@@ -13,7 +13,8 @@ import {
 } from "../generated/server"
 import { postTargetsTo, refusalOf, type StopSession } from "../design/open"
 import { useSessionManage } from "../agents/useSessionManage"
-import type { RemoveSession } from "../agents/sessionWrites"
+import { isChat, type RemoveSession } from "../agents/sessionWrites"
+import { openRename } from "../shell/renameOpen"
 import { Button } from "../ui/button/Button"
 import { Modal } from "../ui/modal/Modal"
 import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu"
@@ -243,7 +244,19 @@ export function useItemActions(
     ])
   }
 
-  if (item.kind === "chat" && manage.items.length > 0) groups.push(manage.items)
+  // The same item the chat page's menu has; a Fix agent or Queue agent row is no chat.
+  const renameItem: MenuEntry[] =
+    item.kind === "chat" && item.session && isChat(item.session)
+      ? [
+          {
+            value: "rename",
+            label: "Rename",
+            onSelect: () => openRename({ session: item.session! }),
+          },
+        ]
+      : []
+  const manageItems = [...renameItem, ...manage.items]
+  if (item.kind === "chat" && manageItems.length > 0) groups.push(manageItems)
 
   if (item.kind !== "chat") {
     const hold = () =>

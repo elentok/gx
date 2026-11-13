@@ -124,13 +124,42 @@ test("Workspaces touch", async ({ page, start }) => {
 
   // The chat row's "..." menu: Stop ends the live session, Remove confirms and deletes it, and removing the open chat leaves its page.
   const chatId = page.url().split("/agents/")[1]
+  // A rename re-sorts the rows, so the row is found by its id and not by its place.
+  const ownRow = sidebar.locator(`a[href$="/agents/${chatId}"]`)
   const chatMenu = () =>
-    chatRow.locator("xpath=ancestor::li").getByRole("button", nav("More actions"))
+    ownRow.locator("xpath=ancestor::li").getByRole("button", nav("More actions"))
   await goto(page, "#/epics")
   await page.getByRole("button", nav("Show sidebar")).click()
+  // Rename from the row's menu at 390px: the popup fits the screen, the page does not scroll sideways, and the rename shows in the row.
+  const renameDialog = page.getByRole("dialog", nav("Rename chat"))
+  const renameField = renameDialog.getByRole("textbox", nav("Name"))
+  const renameFromMenu = async (name: string) => {
+    await chatMenu().click()
+    await page.getByRole("menuitem", nav("Rename")).click()
+    await expect(renameDialog).toBeVisible()
+    await renameField.fill(name)
+    await page.keyboard.press("Enter")
+    await expect(renameDialog).toHaveCount(0)
+    await expect(ownRow).toContainText(name)
+  }
+  await chatMenu().click()
+  await page.getByRole("menuitem", nav("Rename")).click()
+  await expect(renameDialog).toBeVisible()
+  await expect(renameField).toBeVisible()
+  const sheet = (await renameDialog.boundingBox())!
+  expect(sheet.x).toBeGreaterThanOrEqual(0)
+  expect(sheet.x + sheet.width).toBeLessThanOrEqual(390)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  await page.keyboard.press("Escape")
+  await expect(renameDialog).toHaveCount(0)
+  await renameFromMenu("touch-renamed")
+  await expect.poll(() => fx.cli("agents", "list")).toContain("touch-renamed")
   await chatMenu().click()
   await page.getByRole("menuitem", nav("Stop")).click()
-  await expect(chatRow).toContainText("Exited")
+  await expect(ownRow).toContainText("Exited")
+  // An Exited chat renames in gx only: the verb succeeds and no session is touched.
+  await renameFromMenu("touch-exited")
+  await expect.poll(() => fx.cli("agents", "list")).toContain("touch-exited")
   await chatMenu().click()
   await expect(page.getByRole("menuitem", nav("Remove"))).toBeVisible()
   await expect(page.getByRole("menuitem", nav("Stop"))).toHaveCount(0)
