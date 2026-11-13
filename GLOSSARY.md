@@ -877,6 +877,16 @@ _Avoid_: landing (the merge itself is instant), rebasing.
 whose tickets are all done but whose branch may not have merged yet.
 _Avoid_: landed epic, closed epic.
 
+**Epic range** — the two commits that bound an epic's work: its base and its tip. Before the merge
+they are the epic's current base and its branch. At the merge gx stamps both SHAs on the epic, so a
+**Merged epic** keeps its range after its branch is gone.
+_Avoid_: epic diff base, merge range.
+
+**Diff page** — the read-only web page that compares two refs of one project: the changes on the
+second ref since it forked from the first (a three-dot diff), with the range's commits grouped by
+ticket. The epic page opens it on the **Epic range**.
+_Avoid_: compare page, review page (kept for the later human code review).
+
 **Delivery** — a project setting: how a complete epic's branch reaches **Trunk**. `merge` (the
 default): gx merges the branch into local trunk itself. `pr`: gx pushes the branch and opens a pull
 request on GitHub; a person merges the PR there, and the epic becomes a **Merged epic** only once
