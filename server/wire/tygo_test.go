@@ -32,7 +32,16 @@ var notGenerated = map[string]bool{
 	"ViModeResult": true, "WebInfo": true, "WebLogin": true, "WebLoginsResult": true, "WebMode": true,
 }
 
-func tygoFiles(t *testing.T) map[string]bool {
+const wirePath = "github.com/elentok/gx/server/wire"
+
+// tygoPackage is one tygo.yaml package at or below server/wire.
+type tygoPackage struct {
+	dir    string // relative to the repo root, e.g. server/wire/ops
+	output string // output_path, relative to the repo root
+	files  map[string]bool
+}
+
+func tygoPackages(t *testing.T) []tygoPackage {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "tygo.yaml"))
 	if err != nil {
@@ -41,24 +50,32 @@ func tygoFiles(t *testing.T) map[string]bool {
 	var cfg struct {
 		Packages []struct {
 			Path         string   `yaml:"path"`
+			OutputPath   string   `yaml:"output_path"`
 			IncludeFiles []string `yaml:"include_files"`
 		} `yaml:"packages"`
 	}
 	if err := yaml.Unmarshal(raw, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	files := map[string]bool{}
+	var pkgs []tygoPackage
 	for _, p := range cfg.Packages {
-		if strings.HasSuffix(p.Path, "/server/wire") {
-			for _, f := range p.IncludeFiles {
-				files[f] = true
-			}
+		if p.Path != wirePath && !strings.HasPrefix(p.Path, wirePath+"/") {
+			continue
 		}
+		files := map[string]bool{}
+		for _, f := range p.IncludeFiles {
+			files[f] = true
+		}
+		pkgs = append(pkgs, tygoPackage{
+			dir:    strings.TrimPrefix(p.Path, "github.com/elentok/gx/"),
+			output: p.OutputPath,
+			files:  files,
+		})
 	}
-	if len(files) == 0 {
-		t.Fatal("tygo.yaml lists no server/wire files")
+	if len(pkgs) == 0 {
+		t.Fatal("tygo.yaml has no server/wire package")
 	}
-	return files
+	return pkgs
 }
 
 func exportedTypes(t *testing.T, file string) []string {
@@ -86,32 +103,36 @@ func exportedTypes(t *testing.T, file string) []string {
 // file tygo.yaml lists must exist and declare an exported type, and every
 // exported type elsewhere must be in notGenerated.
 func TestTygoCoversWireTypes(t *testing.T) {
-	listed := tygoFiles(t)
-	for f := range listed {
-		if _, err := os.Stat(f); err != nil {
-			t.Errorf("tygo.yaml lists %s, which is missing: update include_files", f)
-		} else if len(exportedTypes(t, f)) == 0 {
-			t.Errorf("tygo.yaml lists %s, which declares no exported types: update include_files", f)
-		}
-	}
-	files, err := filepath.Glob("*.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var unlisted []string
-	for _, f := range files {
-		if strings.HasSuffix(f, "_test.go") || listed[f] {
-			continue
-		}
-		for _, name := range exportedTypes(t, f) {
-			if !notGenerated[name] {
-				unlisted = append(unlisted, f+": "+name)
+	for _, pkg := range tygoPackages(t) {
+		dir := filepath.Join("..", "..", pkg.dir)
+		for f := range pkg.files {
+			path := filepath.Join(dir, f)
+			if _, err := os.Stat(path); err != nil {
+				t.Errorf("tygo.yaml lists %s/%s, which is missing: update include_files", pkg.dir, f)
+			} else if len(exportedTypes(t, path)) == 0 {
+				t.Errorf("tygo.yaml lists %s/%s, which declares no exported types: update include_files", pkg.dir, f)
 			}
 		}
-	}
-	sort.Strings(unlisted)
-	for _, u := range unlisted {
-		t.Errorf("%s is in a file tygo.yaml does not list: add the file to include_files or the type to notGenerated", u)
+		files, err := filepath.Glob(filepath.Join(dir, "*.go"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var unlisted []string
+		for _, path := range files {
+			f := filepath.Base(path)
+			if strings.HasSuffix(f, "_test.go") || pkg.files[f] {
+				continue
+			}
+			for _, name := range exportedTypes(t, path) {
+				if !notGenerated[name] {
+					unlisted = append(unlisted, f+": "+name)
+				}
+			}
+		}
+		sort.Strings(unlisted)
+		for _, u := range unlisted {
+			t.Errorf("%s/%s is in a file tygo.yaml does not list: add the file to include_files or the type to notGenerated", pkg.dir, u)
+		}
 	}
 }
 
@@ -195,16 +216,18 @@ func TestTygoAgentUnionsMatchGoConsts(t *testing.T) {
 // a name prefix (both `Reason*` groups became `type Reason`), which breaks the
 // webui build with TS2300.
 func TestGeneratedTypesAreUnique(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join("..", "..", "webui", "src", "generated", "server.ts"))
-	if err != nil {
-		t.Fatal(err)
-	}
 	decl := regexp.MustCompile(`(?m)^export (?:type|interface|const) (\w+)\b`)
-	seen := map[string]bool{}
-	for _, m := range decl.FindAllStringSubmatch(string(src), -1) {
-		if seen[m[1]] {
-			t.Errorf("generated/server.ts declares %s twice: rename a Go const group so its names stop sharing a prefix", m[1])
+	seen := map[string]string{} // name -> output file that declared it
+	for _, pkg := range tygoPackages(t) {
+		src, err := os.ReadFile(filepath.Join("..", "..", pkg.output))
+		if err != nil {
+			t.Fatal(err)
 		}
-		seen[m[1]] = true
+		for _, m := range decl.FindAllStringSubmatch(string(src), -1) {
+			if first, dup := seen[m[1]]; dup {
+				t.Errorf("%s declares %s twice (first in %s): rename a Go const group so its names stop sharing a prefix, or a type declared in two wire packages", pkg.output, m[1], first)
+			}
+			seen[m[1]] = pkg.output
+		}
 	}
 }

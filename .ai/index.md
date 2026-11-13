@@ -373,18 +373,21 @@ Web checks:
 - Type-check with `gx brief tsc`, not a hand-built `pnpm exec tsc ... | tail`.
 - The web UI formats with Biome (`webui/biome.json`: no semicolons, double quotes, width 100).
   Run `cd webui && pnpm format <files>`. `gx check --kind format` does the same. Never run prettier or npx.
-- Regenerate `webui/src/generated/server.ts` and `wire.ts` with `make web-types`. Wire types live in
-  `server/wire` and generate `wire.ts`; `server.ts` re-exports it, so web code keeps importing
-  `generated/server`. tygo cannot resolve a constant or alias from another package (it emits
-  `any`), so give wire types literal values and map cross-package types in `tygo.yaml`
-  `type_mappings` (a wire type used by a `server` type needs an `import type` in the `server`
-  entry's `frontmatter` too). Check `git diff` for `any`. During the wire split,
-  `scripts/webtypes-diff.sh <base-sha>` compares the output with the base.
+- `make web-types` writes `webui/src/generated/server.ts` from `server/wire` and
+  `webui/src/generated/ops.ts` from `server/wire/ops`. The `server/wire` entry has the frontmatter
+  `export * from './ops';`, so web code keeps importing `generated/server`. A new tygo package under
+  `server/wire` needs its own `tygo.yaml` entry with its `type_mappings`. tygo emits `any` for a
+  constant or alias from another package, so give wire types literal values and map cross-package
+  types in `type_mappings` (a wire type used by a `server` type needs an `import type` in the
+  `server` entry's `frontmatter` too). Check `git diff` for `any`.
+  `scripts/webtypes-diff.sh <base-sha>` regenerates the types on a base commit and on the working
+  tree and compares them.
   `tygo.yaml` lists wire files, so moving a type to another file drops it from the generated
-  TypeScript silently. `TestTygoCoversWireTypes` (`server/wire/tygo_test.go`) fails when a listed
-  file is gone or has no exported types, or an exported type sits in an unlisted file and is not in
-  its `notGenerated` list. A sizeguard split of `server/wire` ends with "tygo.yaml still covers the
-  moved types" and a clean `make web-types` diff.
+  TypeScript silently. `TestTygoCoversWireTypes` and `TestGeneratedTypesAreUnique`
+  (`server/wire/tygo_test.go`) cover every tygo package under `server/wire`. The first fails when a
+  listed file is gone or has no exported types, or an exported type sits in an unlisted file and is
+  not in the shared `notGenerated` list. The second fails when a type name is declared twice across
+  the generated files.
 - Run e2e with `make web-e2e`. It rebuilds the web bundle first. `pnpm e2e` does not rebuild.
 
 ## UI
