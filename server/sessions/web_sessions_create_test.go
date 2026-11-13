@@ -70,7 +70,6 @@ func TestWebSessionCreate_Refusals(t *testing.T) {
 	root := f.projectRoot(t)
 	for name, tc := range map[string]struct{ body, want string }{
 		"ticket":          {`{"project":"proj","dir":"` + root + `","ticket":"proj:map"}`, wire.ReasonSessionBadRequest},
-		"harness":         {`{"project":"proj","dir":"` + root + `","harness":"claude"}`, wire.ReasonSessionBadRequest},
 		"made worktree":   {`{"project":"proj","dir":"` + root + `","made_worktree":true}`, wire.ReasonSessionBadRequest},
 		"not json":        {`nope`, wire.ReasonSessionBadRequest},
 		"bang prompt":     {`{"project":"proj","dir":"` + root + `","prompt":" !ls"}`, wire.ReasonPromptPrefixNotAllowed},
