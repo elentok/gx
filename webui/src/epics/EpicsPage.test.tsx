@@ -683,6 +683,7 @@ test("leaving the page ends its select mode", async () => {
   )
   expect(screen.getByTestId("select-count")).toBeTruthy()
   await act(() => router.navigate("/stats"))
+  await waitFor(() => expect(screen.queryByTestId("select-count")).toBeNull())
   await act(() => router.navigate("/epics"))
   await filterBox()
   expect(screen.queryByTestId("select-count")).toBeNull()

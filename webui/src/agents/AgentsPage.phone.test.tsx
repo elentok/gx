@@ -20,13 +20,13 @@ test("phone: #/agents never redirects to the last session", () => {
   expect(r.router.state.location.pathname).toBe("/agents")
 })
 
-test("phone: a session shows its title and project · status", () => {
+test("phone: a session shows its title and project · status", async () => {
   render([session("s-1", "gx", { name: "plain" })], "/agents/s-1", true, {}, false)
-  expect(screen.getByRole("heading", { name: "plain" })).toBeTruthy()
+  expect(await screen.findByRole("heading", { name: "plain" })).toBeTruthy()
   expect(screen.getByText("Chat · gx · Idle")).toBeTruthy()
 })
 
-test("phone: a design session's header links to its design page", () => {
+test("phone: a design session's header links to its design page", async () => {
   render(
     [session("s-1", "p", { design: true, ticket: "gx:map/01" })],
     "/agents/s-1",
@@ -34,9 +34,9 @@ test("phone: a design session's header links to its design page", () => {
     {},
     false,
   )
-  expect(screen.getByRole("link", { name: "Open design page →" }).getAttribute("href")).toBe(
-    "#/d/gx:map",
-  )
+  expect(
+    (await screen.findByRole("link", { name: "Open design page →" })).getAttribute("href"),
+  ).toBe("#/d/gx:map")
 })
 
 test("phone: a plain session's header has no design link", () => {

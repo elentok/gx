@@ -1,5 +1,5 @@
 import { Box, chakra, Image, Portal } from "@chakra-ui/react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Outlet } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import type { FetchEpicList } from "../epics/list"
@@ -11,6 +11,7 @@ import { CloseSignalContext } from "../ui/closeSignal"
 import { EmptyState } from "../ui/empty-state/EmptyState"
 import { hasLayer } from "../ui/modal/layers"
 import { Strip } from "../ui/strip/Strip"
+import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { useDevToast } from "../dev/useDevToast"
 import { useDevice, type Device } from "../useWide"
 import { isMac } from "../platform"
@@ -364,7 +365,9 @@ export function AppShell({
           {snapshot === null && !connected ? (
             <EmptyState title="Can't reach gx. Retrying…" />
           ) : (
-            (children ?? <Outlet />)
+            <Suspense fallback={<FullScreenLoader label="Loading page" />}>
+              {children ?? <Outlet />}
+            </Suspense>
           )}
         </Box>
         <JumpPalette fetcher={fetchEpicList} active={active} />

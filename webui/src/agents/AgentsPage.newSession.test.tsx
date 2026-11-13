@@ -14,7 +14,7 @@ useAgentsPageHooks()
 test("a create from the New session form opens the new session", async () => {
   stubNewSession(session("q-9", "q"))
   const { router } = render([session("s-1", "q")], "/agents", true, entryOptions)
-  fireEvent.click(screen.getByRole("button", { name: "New session" }))
+  fireEvent.click(await screen.findByRole("button", { name: "New session" }))
   await screen.findByRole("combobox", { name: "Project" })
   fireEvent.click(screen.getByRole("button", { name: "Create session" }))
   await vi.waitFor(() => expect(router.state.location.pathname).toBe("/agents/q-9"))
@@ -25,7 +25,7 @@ test("a create from the New session form opens the new session", async () => {
 test("closing the New session form stays on the page", async () => {
   stubNewSession()
   const { router } = render([session("s-1", "q")], "/agents", true, entryOptions)
-  fireEvent.click(screen.getByRole("button", { name: "New session" }))
+  fireEvent.click(await screen.findByRole("button", { name: "New session" }))
   await screen.findByRole("combobox", { name: "Project" })
   fireEvent.click(screen.getByRole("button", { name: "Close" }))
   await vi.waitFor(() => expect(screen.queryByRole("dialog", { name: "New session" })).toBeNull())
@@ -39,7 +39,7 @@ test.each([
 ])("the %s panel's New session button opens the form", async (text, sessions) => {
   stubNewSession()
   render(sessions, "/agents", true, entryOptions)
-  expect(screen.getByText(text)).toBeTruthy()
+  expect(await screen.findByText(text)).toBeTruthy()
   fireEvent.click(screen.getByRole("button", { name: "New session" }))
   expect(await screen.findByRole("dialog", { name: "New session" })).toBeTruthy()
 })

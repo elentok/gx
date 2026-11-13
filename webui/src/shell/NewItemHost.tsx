@@ -1,20 +1,28 @@
 import { Portal } from "@chakra-ui/react"
+import { lazy, Suspense } from "react"
 import { useNavigate } from "react-router"
 import { fetchWorktrees, postCreateSession } from "../agents/newSession"
-import { NewSessionForm } from "../agents/NewSessionForm"
-import { NewDesignForm } from "../design/NewDesignForm"
 import { useEpicList } from "../epics/list"
 import { designHref } from "../hrefs"
 import { closeNewItem, useNewItemRequest } from "./newItemOpen"
 import { useShell } from "./ShellContext"
+
+const NewSessionForm = lazy(() =>
+  import("../agents/NewSessionForm").then(({ NewSessionForm }) => ({ default: NewSessionForm })),
+)
+const NewDesignForm = lazy(() =>
+  import("../design/NewDesignForm").then(({ NewDesignForm }) => ({ default: NewDesignForm })),
+)
 
 /** Renders the New design / New chat form for the open request; navigates only once the item exists. */
 export function NewItemHost() {
   const request = useNewItemRequest()
   return (
     <Portal>
-      {request?.kind === "design" && <DesignDialog />}
-      {request?.kind === "agent" && <AgentDialog />}
+      <Suspense fallback={null}>
+        {request?.kind === "design" && <DesignDialog />}
+        {request?.kind === "agent" && <AgentDialog />}
+      </Suspense>
     </Portal>
   )
 }

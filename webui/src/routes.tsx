@@ -1,4 +1,5 @@
 import { Text } from "@chakra-ui/react"
+import { lazy } from "react"
 import {
   createHashRouter,
   Navigate,
@@ -7,37 +8,24 @@ import {
   useParams,
   type RouteObject,
 } from "react-router"
-import { AgentsPage } from "./agents/AgentsPage"
 import type { AuthState } from "./auth/authState"
 import { AppShell } from "./shell/AppShell"
-import { AuthenticatorPage, ChangePasswordPage } from "./settings/AccountPages"
-import {
-  CertificatePage,
-  SettingsPage,
-  UnknownSettingsPage,
-  WebLoginPage,
-  WebLoginsPage,
-} from "./settings/SettingsPage"
 import type { FetchLogins } from "./settings/logins"
 import type { FetchSettings } from "./settings/settingsApi"
 import { sectionPath } from "./settings/SettingsShell"
 import type { FetchChat } from "./design/chat"
-import { DesignPage } from "./design/DesignPage"
 import type { DeleteDesign, OpenDesign, OpenFlow, ResumeSession, StopSession } from "./design/open"
 import type { AbandonTriage, ApproveTriage } from "./triage/api"
-import { TriagePage } from "./triage/TriagePage"
 import type { FetchTriage } from "./triage/useTriage"
 import type { PostFocus } from "./design/focus"
 import type { PostAnswer, PostPrompt } from "./design/prompt"
 import type { FetchScreen } from "./design/screen"
 import type { FetchMapImages } from "./design/mapImages"
 import type { FetchEpicDetail } from "./epic/detail"
-import { EpicPage } from "./epic/EpicPage"
 import type { FixAgent } from "./epic/fixAgent"
 import type { SaveChecks } from "./checks/setup"
 import type { FetchChecksStatus } from "./checks/status"
 import type { FetchArchived } from "./archive/archive"
-import { ArchivePage } from "./archive/ArchivePage"
 import type {
   FetchScheduleShow,
   FetchSchedules,
@@ -47,18 +35,71 @@ import type {
   PostRunNow,
   PostSwitch,
 } from "./schedules/schedules"
-import { SchedulePage } from "./schedules/SchedulePage"
-import { SchedulesPage } from "./schedules/SchedulesPage"
 import { EpicsPage } from "./epics/EpicsPage"
 import type { FetchEpicList } from "./epics/list"
 import type { FetchCleanup, PostCleanup } from "./cleanup/cleanup"
-import { CleanupPage } from "./cleanup/CleanupPage"
 import type { FetchTips } from "./tips/tips"
-import { TipsPage } from "./tips/TipsPage"
 import type { FetchStats } from "./stats/stats"
-import { StatsPage } from "./stats/StatsPage"
 import type { FetchDetail } from "./ticket/detail"
-import { TicketPage } from "./ticket/TicketPage"
+
+const AgentsPage = lazy(() =>
+  import("./agents/AgentsPage").then(({ AgentsPage }) => ({ default: AgentsPage })),
+)
+const ArchivePage = lazy(() =>
+  import("./archive/ArchivePage").then(({ ArchivePage }) => ({ default: ArchivePage })),
+)
+const CleanupPage = lazy(() =>
+  import("./cleanup/CleanupPage").then(({ CleanupPage }) => ({ default: CleanupPage })),
+)
+const DesignPage = lazy(() =>
+  import("./design/DesignPage").then(({ DesignPage }) => ({ default: DesignPage })),
+)
+const EpicPage = lazy(() =>
+  import("./epic/EpicPage").then(({ EpicPage }) => ({ default: EpicPage })),
+)
+const SchedulePage = lazy(() =>
+  import("./schedules/SchedulePage").then(({ SchedulePage }) => ({ default: SchedulePage })),
+)
+const SchedulesPage = lazy(() =>
+  import("./schedules/SchedulesPage").then(({ SchedulesPage }) => ({ default: SchedulesPage })),
+)
+const StatsPage = lazy(() =>
+  import("./stats/StatsPage").then(({ StatsPage }) => ({ default: StatsPage })),
+)
+const TicketPage = lazy(() =>
+  import("./ticket/TicketPage").then(({ TicketPage }) => ({ default: TicketPage })),
+)
+const TipsPage = lazy(() =>
+  import("./tips/TipsPage").then(({ TipsPage }) => ({ default: TipsPage })),
+)
+const TriagePage = lazy(() =>
+  import("./triage/TriagePage").then(({ TriagePage }) => ({ default: TriagePage })),
+)
+
+const accountPagesModule = () => import("./settings/AccountPages")
+const AuthenticatorPage = lazy(() =>
+  accountPagesModule().then(({ AuthenticatorPage }) => ({ default: AuthenticatorPage })),
+)
+const ChangePasswordPage = lazy(() =>
+  accountPagesModule().then(({ ChangePasswordPage }) => ({ default: ChangePasswordPage })),
+)
+
+const settingsPagesModule = () => import("./settings/SettingsPage")
+const CertificatePage = lazy(() =>
+  settingsPagesModule().then(({ CertificatePage }) => ({ default: CertificatePage })),
+)
+const SettingsPage = lazy(() =>
+  settingsPagesModule().then(({ SettingsPage }) => ({ default: SettingsPage })),
+)
+const UnknownSettingsPage = lazy(() =>
+  settingsPagesModule().then(({ UnknownSettingsPage }) => ({ default: UnknownSettingsPage })),
+)
+const WebLoginPage = lazy(() =>
+  settingsPagesModule().then(({ WebLoginPage }) => ({ default: WebLoginPage })),
+)
+const WebLoginsPage = lazy(() =>
+  settingsPagesModule().then(({ WebLoginsPage }) => ({ default: WebLoginsPage })),
+)
 
 function TicketRoute({
   fetchDetail,
