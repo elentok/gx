@@ -221,10 +221,6 @@ type Config struct {
 	// DefaultCompactRewaitTimeout.
 	CompactRewaitTimeout time.Duration
 
-	// TCPAddr, when set, adds a loopback-only TCP listener serving the same
-	// handler as the socket. No auth: loopback is the only protection.
-	TCPAddr string
-
 	// WebAddr, when set, adds a separate read-only HTTP listener for the web UI.
 	// A bind failure is reported in the handshake and never stops the server.
 	WebAddr string

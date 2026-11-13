@@ -49,7 +49,6 @@ type Harness struct {
 	// ConversationsDir holds the linked sessions' conversation records.
 	ConversationsDir string
 	TicketStore      string
-	TCPAddr          string // empty unless started with StartWithTCP
 	// Banners records the OS banners the server sent, unless an option set
 	// its own Notifier. A harness never shows a real banner.
 	Banners *Banners

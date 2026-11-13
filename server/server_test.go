@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"github.com/elentok/gx/server/servertest/rigs"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -268,90 +267,6 @@ func TestSnapshot_HandEditShowsUpWithWatchAndWithPollOnly(t *testing.T) {
 				t.Error("seq did not advance on change")
 			}
 		})
-	}
-}
-
-func TestTCP_SameRoutesAnswerOverLoopback(t *testing.T) {
-	t.Parallel()
-	h := servertest.StartWithTCP(t)
-
-	resp, err := http.Get("http://" + h.TCPAddr + "/v1/snapshot")
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("snapshot over TCP: %s", resp.Status)
-	}
-	got, err := h.Client.Handshake(context.Background())
-	if err != nil || got.TCPAddr != h.TCPAddr {
-		t.Errorf("handshake TCPAddr = %q (err %v), want %q", got.TCPAddr, err, h.TCPAddr)
-	}
-}
-
-func TestTCP_RefusesBrowserRequests(t *testing.T) {
-	t.Parallel()
-	h := servertest.StartWithTCP(t)
-
-	get := func(header, value string) int {
-		t.Helper()
-		req, err := http.NewRequest(http.MethodGet, "http://"+h.TCPAddr+"/v1/snapshot", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		switch header {
-		case "Host":
-			req.Host = value
-		case "":
-		default:
-			req.Header.Set(header, value)
-		}
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		resp.Body.Close()
-		return resp.StatusCode
-	}
-
-	for _, tc := range []struct {
-		name, header, value string
-		want                int
-	}{
-		{"plain", "", "", http.StatusOK},
-		{"localhost host", "Host", "localhost:7421", http.StatusOK},
-		{"origin", "Origin", "http://evil.example", http.StatusForbidden},
-		{"sec-fetch-site", "Sec-Fetch-Site", "cross-site", http.StatusForbidden},
-		{"foreign host", "Host", "evil.example", http.StatusForbidden},
-		{"foreign ip host", "Host", "10.0.0.1:80", http.StatusForbidden},
-	} {
-		if got := get(tc.header, tc.value); got != tc.want {
-			t.Errorf("%s: status %d, want %d", tc.name, got, tc.want)
-		}
-	}
-
-	logged, err := os.ReadFile(server.LogPath(h.StateDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if n := strings.Count(string(logged), "refused browser request"); n != 1 {
-		t.Errorf("%d refusal log lines for 4 refusals, want 1", n)
-	}
-}
-
-func TestTCP_OffByDefault(t *testing.T) {
-	t.Parallel()
-	got, err := servertest.Start(t).Client.Handshake(context.Background())
-	if err != nil || got.TCPAddr != "" {
-		t.Errorf("handshake TCPAddr = %q (err %v), want empty", got.TCPAddr, err)
-	}
-}
-
-func TestTCP_RefusesNonLoopbackAddr(t *testing.T) {
-	t.Parallel()
-	_, err := server.New(server.Config{StateDir: t.TempDir(), TicketStore: t.TempDir(), TCPAddr: "0.0.0.0:0", Runner: runnerfake.NewRunner()})
-	if err == nil {
-		t.Fatal("expected error for non-loopback address")
 	}
 }
 

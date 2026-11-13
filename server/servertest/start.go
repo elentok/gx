@@ -29,13 +29,13 @@ func (h *Harness) SetHerdrDown(down bool) { h.herdrDown.Store(down) }
 // StartHerdrDown is Start with herdr failing from before the server starts.
 func StartHerdrDown(t *testing.T, opts ...func(*server.Config)) *Harness {
 	t.Helper()
-	return startWith(t, t.TempDir(), "", true, opts...)
+	return startWith(t, t.TempDir(), true, opts...)
 }
 
 // StartHerdrDownWithStore is StartHerdrDown over a caller-seeded ticket store.
 func StartHerdrDownWithStore(t *testing.T, store string, opts ...func(*server.Config)) *Harness {
 	t.Helper()
-	return startWith(t, store, "", true, opts...)
+	return startWith(t, store, true, opts...)
 }
 
 // Start runs a server until the test ends. Tickets already written to
@@ -50,21 +50,14 @@ func Start(t *testing.T, opts ...func(*server.Config)) *Harness {
 // Options tweak the server config before it starts.
 func StartWithStore(t *testing.T, store string, opts ...func(*server.Config)) *Harness {
 	t.Helper()
-	return startWith(t, store, "", false, opts...)
-}
-
-// StartWithTCP is Start with the loopback TCP listener on a free port;
-// Harness.TCPAddr is where it bound.
-func StartWithTCP(t *testing.T, opts ...func(*server.Config)) *Harness {
-	t.Helper()
-	return startWith(t, t.TempDir(), "127.0.0.1:0", false, opts...)
+	return startWith(t, store, false, opts...)
 }
 
 // shortTempRoot is the temp root of a harness's state dir, short enough for the
 // holder sockets below it.
 const shortTempRoot = "/tmp"
 
-func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func(*server.Config)) *Harness {
+func startWith(t *testing.T, store string, herdrDown bool, opts ...func(*server.Config)) *Harness {
 	t.Helper()
 	// Unix socket paths are capped near 100 bytes; t.TempDir() can exceed that,
 	// and so can macOS's default temp root once a holder socket sits under it.
@@ -104,7 +97,7 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	})
 	_, herdrEnv := herdrfake.StartStateEnv(t, herdr)
 
-	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, ConversationsDir: h.ConversationsDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
+	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, ConversationsDir: h.ConversationsDir, Build: "test-build", TicketStore: h.TicketStore}
 	// The production defaults: an implement launch with no model is refused.
 	h.cfg.AgentsClaude, h.cfg.AgentsCodex = config.DefaultAgentsConfig().Claude, config.DefaultAgentsConfig().Codex
 	// An empty registry, so a harness server never runs the real steps over a
@@ -285,7 +278,6 @@ func (h *Harness) serve(t *testing.T) {
 	}
 	h.Server = srv
 	trustWebRoot(h.StateDir)
-	h.TCPAddr = srv.TCPAddr()
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ctx) }()

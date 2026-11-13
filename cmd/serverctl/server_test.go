@@ -75,9 +75,9 @@ func TestStatusWarnings(t *testing.T) {
 	if got := statusWarnings(apiclient.Negotiation{}, remote); len(got) != 0 {
 		t.Fatalf("clean warnings = %q", got)
 	}
-	n := apiclient.Negotiation{Handshake: wire.Handshake{TCPAddr: "127.0.0.1:1"}, Hint: "server is an older build"}
+	n := apiclient.Negotiation{Handshake: wire.Handshake{WebError: "address in use"}, Hint: "server is an older build"}
 	all := strings.Join(statusWarnings(n, remote), "\n")
-	for _, want := range []string{"TCP listener is on", "older build"} {
+	for _, want := range []string{"web UI listener failed to bind", "older build"} {
 		if !strings.Contains(all, want) {
 			t.Errorf("missing %q in %q", want, all)
 		}

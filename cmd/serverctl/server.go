@@ -183,10 +183,6 @@ func runServer(ctx context.Context, d Deps) error {
 		ptyOverride.LaunchCaps = claudeui.LaunchProofCaps{UnknownGrace: grace, Grace: 3 * grace}
 	}
 	runner, runnerFor := runnerbuild.New(choice, dirs.Environ(), stateDir, cfg.RunnerWait, runnerOpts, ptyOverride)
-	var tcpAddr string
-	if cfg.Server.TCPListen {
-		tcpAddr = server.DefaultTCPAddr
-	}
 	configPath, err := dirs.FilePath()
 	if err != nil {
 		return err
@@ -319,7 +315,7 @@ func runServer(ctx context.Context, d Deps) error {
 	serverSettings.Chat.ProgressInterval = chatHooks.ProgressInterval
 	serverSettings.Chat.TelegramBaseURL = chatHooks.TelegramBaseURL
 	srv, err := server.New(server.Config{Migrations: migrationReg, Settings: serverSettings, StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor, RestartBinary: restartBin,
-		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, RunnerWait: cfg.RunnerWait, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, LogLevel: logLevel,
+		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, RunnerWait: cfg.RunnerWait, WebAddr: cfg.Server.Web.Listen, LogLevel: logLevel,
 		AutoAdvanceDelay: autoAdvanceDelay, CommandListAge: commandListAge, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.Env.Env,
 		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval, TokenPollInterval: tokenPollInterval, PromptGrace: promptGrace, RateLimitResetBuffer: rateLimitBuffer, GuardPoll: guardPoll, BudgetKillGrace: budgetKillGrace,
 		ProcessSource: processSource, DropAskedAgent: dropAskedAgent(os.Getenv), LateFinishScanHold: lateFinishScanHold(os.Getenv)})
@@ -489,9 +485,6 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 // binary-on-disk-vs-running-build mismatch (and API mismatch).
 func statusWarnings(n apiclient.Negotiation, storePath string) []string {
 	var out []string
-	if n.TCPAddr != "" {
-		out = append(out, fmt.Sprintf("TCP listener is on (%s): any local process can use the API, no auth", n.TCPAddr))
-	}
 	if n.WebError != "" {
 		out = append(out, "web UI listener failed to bind: "+n.WebError)
 	}

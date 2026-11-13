@@ -179,7 +179,7 @@ func (r rootRoutes) streamEvents(w http.ResponseWriter, req *http.Request) {
 func (r rootRoutes) handshake(w http.ResponseWriter, _ *http.Request) {
 	s := r.s
 	w.Header().Set("Content-Type", "application/json")
-	h := wire.Handshake{APIVersion: wire.APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.web.Err()}
+	h := wire.Handshake{APIVersion: wire.APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), WebURL: s.WebURL(), WebError: s.web.Err()}
 	h.HerdrText, h.HerdrUnavailable = s.herdr.Banner()
 	h.Migrating = s.migrator.Migrating()
 	if s.web.Listener() != nil {

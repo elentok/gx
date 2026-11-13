@@ -5,8 +5,6 @@ type Handshake struct {
 	APIVersion int    `json:"api_version"`
 	Build      string `json:"build"`
 	Pid        int    `json:"pid"`
-	// TCPAddr is the loopback address of the opt-in TCP listener; empty when off.
-	TCPAddr string `json:"tcp_addr,omitempty"`
 	// WebURL is the base URL of the web listener; empty when it is off or failed to bind.
 	WebURL string `json:"web_url,omitempty"`
 	// WebError is why the web listener failed to bind; empty otherwise.

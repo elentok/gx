@@ -80,9 +80,6 @@ func SocketPath(stateDir string) string { return filepath.Join(stateDir, socketF
 // It is an alias so the many readers and hand-built test values keep the name.
 type Settings = settings.Settings
 
-// DefaultTCPAddr is where the opt-in TCP listener binds.
-const DefaultTCPAddr = "127.0.0.1:7421"
-
 // Server owns the state-dir lock and the listening socket.
 type Server struct {
 	cfg Config
@@ -108,10 +105,8 @@ type Server struct {
 	prompt         *sessprompt.Prompt
 	lock           *lifecycle.Lock
 	ln             net.Listener
-	tcp            net.Listener // nil unless Config.TCPAddr is set
 	http           *http.Server
-	tcpHTTP        *http.Server // the socket's routes behind refuseBrowsers
-	web            *web.Web     // the web listener; off unless Config.WebAddr is set and bound
+	web            *web.Web // the web listener; off unless Config.WebAddr is set and bound
 	vite           *devvite.Supervisor
 	viteServed     atomic.Bool // the web UI is served from Vite, so a swap away needs a reload; see devmode.go
 	logf           *lifecycle.RotatingFile
@@ -289,20 +284,9 @@ func New(cfg Config) (*Server, error) {
 		lock.Release()
 		return nil, err
 	}
-	var tcp net.Listener
-	if cfg.TCPAddr != "" {
-		if tcp, err = listenLoopback(cfg.TCPAddr); err != nil {
-			ln.Close()
-			lock.Release()
-			return nil, err
-		}
-	}
 	logf, err := lifecycle.OpenServerLog(cfg.StateDir)
 	if err != nil {
 		ln.Close()
-		if tcp != nil {
-			tcp.Close()
-		}
 		lock.Release()
 		return nil, err
 	}
@@ -312,9 +296,6 @@ func New(cfg Config) (*Server, error) {
 	registry, savedRuns, err := runs.Open(cfg.StateDir, log)
 	if err != nil {
 		ln.Close()
-		if tcp != nil {
-			tcp.Close()
-		}
 		_ = logf.Close()
 		lock.Release()
 		return nil, fmt.Errorf("load runs: %w", err)
@@ -323,7 +304,6 @@ func New(cfg Config) (*Server, error) {
 		cfg:  cfg,
 		lock: lock,
 		ln:   ln,
-		tcp:  tcp,
 		logf: logf,
 		log:  log,
 		idx:  idx,
@@ -367,9 +347,6 @@ func New(cfg Config) (*Server, error) {
 	})
 	if err != nil {
 		ln.Close()
-		if tcp != nil {
-			tcp.Close()
-		}
 		_ = logf.Close()
 		lock.Release()
 		return nil, fmt.Errorf("load budget ledger: %w", err)
@@ -541,7 +518,6 @@ func New(cfg Config) (*Server, error) {
 	s.routes = assembleRoutes(s)
 	registerRoutes(mux, s.routes)
 	s.http = &http.Server{Handler: mux}
-	s.tcpHTTP = &http.Server{Handler: refuseBrowsers(mux, log)}
 	s.web = s.newWeb()
 	s.web.Bind()
 	if err := (devHost{s}).newDevVite(); err != nil {
@@ -588,33 +564,11 @@ func RoutePatterns() []string {
 	return out
 }
 
-// listenLoopback refuses any address that isn't a loopback IP, since the TCP
-// listener has no auth.
-func listenLoopback(addr string) (net.Listener, error) {
-	host, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		return nil, err
-	}
-	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() {
-		return nil, fmt.Errorf("tcp listener %q: host must be a loopback IP", addr)
-	}
-	return net.Listen("tcp", addr)
-}
-
-// TCPAddr is the bound TCP listener address, or "" when TCP is off.
-func (s *Server) TCPAddr() string {
-	if s.tcp == nil {
-		return ""
-	}
-	return s.tcp.Addr().String()
-}
-
 // startupConfig is the values the server started with, for every registry key
 // flagged Restart. Anything the server was not handed stays at its default.
 func startupConfig(cfg Config) config.Config {
 	c := config.Default()
 	c.TicketStore.Path = cfg.TicketStore
-	c.Server.TCPListen = cfg.TCPAddr != ""
 	c.Server.Web.Listen = cfg.WebAddr
 	if cfg.AgentRunner != "" {
 		c.AgentRunner = cfg.AgentRunner
@@ -640,19 +594,15 @@ func (s *Server) Serve(ctx context.Context) error {
 	// Before the socket serves, so a session created at startup is never
 	// taken for one whose holder died while the server was down.
 	s.resumer.RestoreSessions()
-	errc := make(chan error, 3)
+	errc := make(chan error, 2)
 	lns := []net.Listener{s.ln}
 	go func() { errc <- s.http.Serve(s.ln) }()
-	if s.tcp != nil {
-		lns = append(lns, s.tcp)
-		go func() { errc <- s.tcpHTTP.Serve(s.tcp) }()
-	}
 	shutdown := func() error {
-		return errors.Join(s.http.Shutdown(context.Background()), s.tcpHTTP.Shutdown(context.Background()))
+		return s.http.Shutdown(context.Background())
 	}
 	if ln := s.web.Listener(); ln != nil {
 		shutdown = func() error {
-			return errors.Join(s.http.Shutdown(context.Background()), s.tcpHTTP.Shutdown(context.Background()), s.web.Shutdown(context.Background()))
+			return errors.Join(s.http.Shutdown(context.Background()), s.web.Shutdown(context.Background()))
 		}
 		lns = append(lns, ln)
 		go func() { errc <- s.web.Serve() }()
