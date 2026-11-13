@@ -1,11 +1,13 @@
 import { act, cleanup, fireEvent, screen } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import { session } from "../agents/agentsTestKit"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import { Modal } from "../ui/modal/Modal"
 import { renderThemed } from "../ui/render"
 import { ChordHost } from "./ChordHost"
 import type { Chord } from "./chords"
+import { closeRename, useRenameRequest } from "./renameOpen"
 
 beforeEach(() => {
   vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64")
@@ -160,4 +162,68 @@ test("an empty Leader key means no box", () => {
   setup([chord("a", () => {})], "")
   leaderKey()
   expect(box()).toBeNull()
+})
+
+function RenameProbe() {
+  return <p data-testid="renaming">{useRenameRequest()?.session.id ?? "none"}</p>
+}
+
+function setupChats(path: string, sessions = [session("s1", "gamma"), session("s2", "gamma")]) {
+  const state = {
+    snapshot: { leader_key: "ctrl+e", sessions },
+    connected: true,
+  } as unknown as ConnectionState
+  const conn = {
+    getState: () => state,
+    subscribe: () => () => {},
+    onEvent: () => () => {},
+  } as unknown as Connection
+  const router = createMemoryRouter(
+    [
+      {
+        path: "*",
+        element: (
+          <>
+            <textarea aria-label="Message" defaultValue="" />
+            <RenameProbe />
+            <ChordHost />
+          </>
+        ),
+      },
+    ],
+    { initialEntries: [path] },
+  )
+  renderThemed(
+    <ConnectionContext.Provider value={conn}>
+      <RouterProvider router={router} />
+    </ConnectionContext.Provider>,
+  )
+}
+
+test("{leader} r on a chat page renames that chat only", () => {
+  setupChats("/agents/s2")
+  leaderKey()
+  press("KeyR")
+  expect(screen.getByTestId("renaming").textContent).toBe("s2")
+  act(() => closeRename())
+})
+
+test("{leader} r from the Message box opens the popup and keeps the draft", () => {
+  setupChats("/agents/s1")
+  const field = screen.getByLabelText("Message") as HTMLTextAreaElement
+  field.focus()
+  fireEvent.change(field, { target: { value: "half a thought" } })
+  leaderKey(field)
+  press("KeyR")
+  expect(screen.getByTestId("renaming").textContent).toBe("s1")
+  expect(field.value).toBe("half a thought")
+  act(() => closeRename())
+})
+
+test("{leader} r does nothing on a Queue agent page", () => {
+  setupChats("/agents/q1", [session("q1", "gamma", { queue: true })])
+  leaderKey()
+  expect(screen.queryByRole("menuitem", { name: /Rename chat/ })).toBeNull()
+  press("KeyR")
+  expect(screen.getByTestId("renaming").textContent).toBe("none")
 })

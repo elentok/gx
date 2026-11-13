@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
 import { session } from "../agents/agentsTestKit"
@@ -17,6 +17,7 @@ import { CommandPalette } from "./CommandPalette"
 import { JumpPalette } from "./JumpPalette"
 import { NewItemHost } from "./NewItemHost"
 import { closeNewItem } from "./newItemOpen"
+import { closeRename, useRenameRequest } from "./renameOpen"
 import { ShellContext, type Shell } from "./ShellContext"
 
 afterEach(() => {
@@ -29,6 +30,10 @@ afterEach(() => {
 
 function Where() {
   return <div data-testid="where">{useLocation().pathname}</div>
+}
+
+function RenameProbe() {
+  return <p data-testid="renaming">{useRenameRequest()?.session.id ?? "none"}</p>
 }
 
 const projects = ["alpha", "beta", "gamma"]
@@ -54,6 +59,7 @@ function setup({
   afk = false,
   epics = defaultEpics,
   follow_ups = [] as unknown[],
+  sessions = [session("s1", "gamma")],
 } = {}) {
   vi.spyOn(navigator, "platform", "get").mockReturnValue(mac ? "MacIntel" : "Linux x86_64")
   vi.stubGlobal(
@@ -75,7 +81,7 @@ function setup({
       removeEventListener() {},
     }))
   const state = {
-    snapshot: { sessions: [session("s1", "gamma")], placements: [], workspaces: [], afk },
+    snapshot: { sessions, placements: [], workspaces: [], afk },
     connected: true,
     loadedOnce: true,
     tick: 0,
@@ -97,6 +103,7 @@ function setup({
               <CommandPalette />
             </ShellContext.Provider>
             <NewItemHost />
+            <RenameProbe />
             <Where />
           </>
         ),
@@ -142,6 +149,29 @@ test("opens from a focused text box with the filter focused, and a second press 
   expect(document.activeElement).toBe(screen.getByRole("combobox"))
   press({ key: "p", ctrlKey: true })
   expect(palette()).toBeNull()
+})
+
+test("lists Rename chat after New chat on a chat's page and opens the popup for that chat", () => {
+  setup({ path: "/agents/s2", sessions: [session("s1", "gamma"), session("s2", "gamma")] })
+  press({ key: "p", ctrlKey: true })
+  const list = names()
+  expect(list.indexOf("Rename chat")).toBe(list.indexOf("New chat") + 1)
+  fireEvent.click(screen.getByRole("option", { name: /Rename chat/ }))
+  expect(screen.getByTestId("renaming").textContent).toBe("s2")
+  act(() => closeRename())
+})
+
+test.each([
+  ["a Queue agent page", "/agents/s1", { queue: true }],
+  ["a Fix agent page", "/agents/s1", { fix_of: "gx:e/1" }],
+  ["a Ticket agent page", "/agents/s1", { ticket: "gx:e/1" }],
+  ["a Design page", "/designs/s1", {}],
+  ["the agents list", "/agents", {}],
+  ["the epics page", "/epics", {}],
+])("hides Rename chat on %s", (_, path, over) => {
+  setup({ path, sessions: [session("s1", "gamma", over)] })
+  press({ key: "p", ctrlKey: true })
+  expect(names()).not.toContain("Rename chat")
 })
 
 test("does nothing under a Modal", () => {

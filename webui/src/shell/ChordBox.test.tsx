@@ -53,7 +53,15 @@ test("a row click runs its action, then closes", () => {
 
 test("lists the real chord table", () => {
   renderThemed(
-    <ChordBox leader="cmd+e" ctx={ctx} chords={chordTable(() => {})} onClose={() => {}} />,
+    <ChordBox
+      leader="cmd+e"
+      ctx={ctx}
+      chords={chordTable(
+        () => {},
+        () => {},
+      )}
+      onClose={() => {}}
+    />,
   )
   expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
     "cNew chat",

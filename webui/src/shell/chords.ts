@@ -1,4 +1,4 @@
-import { canManage } from "../agents/sessionWrites"
+import { canManage, isChat } from "../agents/sessionWrites"
 import type { SessionInfo } from "../generated/server"
 import { isMac } from "../platform"
 import { focusSidebar } from "./focusSidebar"
@@ -82,12 +82,17 @@ export const agentIdOf = (path: string): string | undefined =>
 const canRemove = (ctx: ChordContext) =>
   agentIdOf(ctx.path) !== undefined && ctx.session !== undefined && canManage(ctx.session)
 
-/** The chord table. `remove` is the Remove opener, handed in so this module does not depend on it. */
-export function chordTable(remove: () => void): Chord[] {
+/** The one rule for the Rename chat chord and palette row: the open page is a chat's page. */
+export const canRename = (ctx: ChordContext) =>
+  agentIdOf(ctx.path) !== undefined && ctx.session !== undefined && isChat(ctx.session)
+
+/** The chord table. `remove` and `rename` are the popup openers, handed in so this module does not depend on them. */
+export function chordTable(remove: () => void, rename: () => void): Chord[] {
   return [
     { key: "c", label: () => "New chat", run: openNewAgent, available: () => true },
     { key: "d", label: () => "New design", run: openNewDesign, available: () => true },
     { key: "s", label: () => "Focus sidebar", run: focusSidebar, available: () => true },
+    { key: "r", label: () => "Rename chat", run: rename, available: canRename },
     {
       key: "x",
       label: ({ session: s }) => (s && (s.ticket || s.fix_of || s.flow) ? "Remove" : "Remove chat"),

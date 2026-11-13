@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { SessionInfo } from "../generated/server"
-import { agentIdOf, chordTable, displayKey, letterOf, matchesKey } from "./chords"
+import { agentIdOf, canRename, chordTable, displayKey, letterOf, matchesKey } from "./chords"
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -97,7 +97,10 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo => ({
 })
 
 describe("chord table x", () => {
-  const x = chordTable(() => {}).find((c) => c.key === "x")!
+  const x = chordTable(
+    () => {},
+    () => {},
+  ).find((c) => c.key === "x")!
   const page = "/agents/s-a"
 
   it("is available for a chat session, labelled Remove chat", () => {
@@ -122,7 +125,7 @@ describe("chord table x", () => {
   })
   it("calls the handed-in remove opener and is danger", () => {
     const remove = vi.fn()
-    const row = chordTable(remove).find((c) => c.key === "x")!
+    const row = chordTable(remove, () => {}).find((c) => c.key === "x")!
     row.run()
     expect(remove).toHaveBeenCalledOnce()
     expect(row.danger).toBe(true)
@@ -131,12 +134,42 @@ describe("chord table x", () => {
 
 describe("chord table c and d", () => {
   it("are always available with their labels", () => {
-    const t = chordTable(() => {})
+    const t = chordTable(
+      () => {},
+      () => {},
+    )
     expect(t.map((c) => [c.key, c.label({ path: "/" }), c.available({ path: "/" })])).toEqual([
       ["c", "New chat", true],
       ["d", "New design", true],
       ["s", "Focus sidebar", true],
+      ["r", "Rename chat", false],
       ["x", "Remove chat", false],
     ])
+  })
+})
+
+describe("chord table r", () => {
+  const rename = vi.fn()
+  const r = chordTable(() => {}, rename).find((c) => c.key === "r")!
+  const page = "/agents/s-a"
+
+  it("is available on a chat's page", () => {
+    expect(r.available({ path: page, session: session() })).toBe(true)
+    expect(canRename({ path: page, session: session() })).toBe(true)
+  })
+  it.each([{ queue: true }, { ticket: "gx:e/1" }, { fix_of: "gx:e/1" }, { flow: "triage" }])(
+    "is unavailable for %j",
+    (over) => {
+      expect(r.available({ path: page, session: session(over) })).toBe(false)
+    },
+  )
+  it("is unavailable off an agent page or without a session", () => {
+    expect(r.available({ path: "/designs/a", session: session() })).toBe(false)
+    expect(r.available({ path: "/agents", session: session() })).toBe(false)
+    expect(r.available({ path: page })).toBe(false)
+  })
+  it("calls the handed-in rename opener", () => {
+    r.run()
+    expect(rename).toHaveBeenCalledOnce()
   })
 })

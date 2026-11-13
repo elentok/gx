@@ -6,6 +6,7 @@ import { hasLayer } from "../ui/modal/layers"
 import { ChordBox } from "./ChordBox"
 import { agentIdOf, chordTable, letterOf, matchesKey, type Chord } from "./chords"
 import { openRemoveConfirm } from "./removeConfirmOpen"
+import { openRename } from "./renameOpen"
 
 const MODIFIER_KEYS = new Set(["Control", "Meta", "Alt", "Shift"])
 const BOX = '[role="menu"][aria-label="Chords"]'
@@ -43,10 +44,16 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
   const table = useMemo(
     () =>
       chords ??
-      chordTable(() => {
-        const { session: s, navigate: nav } = live.current
-        if (s) openRemoveConfirm({ session: s, onRemoved: () => nav("/agents") })
-      }),
+      chordTable(
+        () => {
+          const { session: s, navigate: nav } = live.current
+          if (s) openRemoveConfirm({ session: s, onRemoved: () => nav("/agents") })
+        },
+        () => {
+          const { session: s } = live.current
+          if (s) openRename({ session: s })
+        },
+      ),
     [chords],
   )
   const tableRef = useLatest(table)

@@ -9,8 +9,10 @@ import { jumpHref, Menu, type ListSection } from "../nav/JumpMenu"
 import { isMac } from "../platform"
 import { useWide } from "../useWide"
 import { setCommandOpen, useCommandOpen } from "./commandOpen"
+import { agentIdOf, canRename } from "./chords"
 import { openNewAgent, openNewDesign } from "./newItemOpen"
 import { nextQuestion } from "./nextQuestion"
+import { openRename } from "./renameOpen"
 import { useShell } from "./ShellContext"
 import { useDismissLayer } from "./useDismissLayer"
 
@@ -27,9 +29,12 @@ export interface Command {
 function useCommands(): Command[] {
   const navigate = useNavigate()
   const shell = useShell()
-  const afk = useConnectionState(useConnectionContext()).snapshot?.afk ?? false
+  const snapshot = useConnectionState(useConnectionContext()).snapshot
+  const afk = snapshot?.afk ?? false
   const { list } = useEpicList()
   const { pathname } = useLocation()
+  const sessionId = agentIdOf(pathname)
+  const session = sessionId ? snapshot?.sessions?.find((s) => s.id === sessionId) : undefined
   const workspace = shell?.workspace || undefined
   const { next, count } = useMemo(
     () =>
@@ -65,6 +70,9 @@ function useCommands(): Command[] {
     return [
       { id: "new-design", title: "New design", run: () => openNewDesign() },
       { id: "new-chat", title: "New chat", run: () => openNewAgent() },
+      ...(session && canRename({ path: pathname, session })
+        ? [{ id: "rename-chat", title: "Rename chat", run: () => openRename({ session }) }]
+        : []),
       nextRow,
       goto("go-epics", "Go to Epics", EPICS_HREF),
       goto("go-agents", "Go to Agents", AGENTS_HREF),
@@ -77,7 +85,7 @@ function useCommands(): Command[] {
         run: () => toggleAfk(afk),
       },
     ]
-  }, [navigate, shell, afk, next, count])
+  }, [navigate, shell, afk, next, count, session, pathname])
 }
 
 /** Cmd+P on a Mac, Ctrl+P elsewhere, on every page, in text fields too. Same layout as the jump palette. */
