@@ -91,13 +91,13 @@ func (p *Prompt) typeCommandOnce(dir, text string, imgs imageSet) error {
 	if err := run.typeStepWith(0, text, imgs); err != nil {
 		return err
 	}
-	return p.checkCodexKnownCommand(dir, run, text)
+	return checkCodexKnownCommand(dir, run, text)
 }
 
 // checkCodexKnownCommand watches a Codex pane briefly after a "/" command.
 // Codex draws "Unrecognized command" on screen and never writes it to the
 // rollout, so without this the person sees nothing.
-func (p *Prompt) checkCodexKnownCommand(dir string, run *actionRun, text string) error {
+func checkCodexKnownCommand(dir string, run *actionRun, text string) error {
 	meta, err := sessions.ReadMeta(dir)
 	if err != nil || meta.Harness != string(harness.Codex) {
 		return nil

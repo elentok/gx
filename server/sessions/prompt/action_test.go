@@ -246,3 +246,56 @@ func TestRunAction_RunsWhileABackgroundTaskRuns(t *testing.T) {
 	}
 	waitForSubmitted(t, conv, "\"/clear\"\n\"next-step\"\n")
 }
+
+// blockedChat is an Idle plain chat turned Blocked.
+func blockedChat(t *testing.T, f promptFixture) (id, conv string) {
+	t.Helper()
+	id, conv = plainChat(t, f, "old")
+	report(t, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"})
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
+	return id, conv
+}
+
+func TestRenameHold_BlockedClosingIntoWorkingOrIdleTypesTheLatestName(t *testing.T) {
+	t.Parallel()
+	for state, want := range map[string]string{"working": wire.SessionWorking, "idle": wire.SessionIdle} {
+		t.Run(state, func(t *testing.T) {
+			f := startPromptSession(t)
+			id, conv := blockedChat(t, f)
+			f.rename(t, id, "first")
+			if res := f.rename(t, id, "second"); res.Session == nil || res.Session.Name != "second" {
+				t.Fatalf("rename = %+v, want the gx name set at once", res)
+			}
+			report(t, conv, agentfake.Control{State: state})
+			waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == want })
+			waitForSubmitted(t, conv, "\"/rename second\"\n")
+		})
+	}
+}
+
+func TestRenameHold_DroppedWhenBlockedClosesIntoRateLimited(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	id, conv := blockedChat(t, f)
+	f.rename(t, id, "new name")
+	report(t, conv, agentfake.Control{State: "ratelimited"})
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionRateLimited })
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	time.Sleep(2 * actionWatchSettle) // negative wait: a release would type within this window
+	if got := submitted(t, conv); got != "" {
+		t.Errorf("submitted = %q, want the held command dropped", got)
+	}
+}
+
+func TestRenameHold_ANewPopupKeepsTheHold(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	id, conv := blockedChat(t, f)
+	f.rename(t, id, "new name")
+	report(t, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "run pwd?"})
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.Message == "run pwd?" })
+	report(t, conv, agentfake.Control{State: "working"})
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
+	waitForSubmitted(t, conv, "\"/rename new name\"\n")
+}

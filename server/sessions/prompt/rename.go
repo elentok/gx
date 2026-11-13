@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
@@ -96,7 +97,79 @@ func (p namer) typeRename(dir, id string, seq uint64, command string) error {
 	if err := run.typeStepWith(0, command, imageSet{}); err != nil {
 		return err
 	}
-	return p.checkCodexKnownCommand(dir, run, command)
+	return checkCodexKnownCommand(dir, run, command)
+}
+
+// holdRename follows a Blocked chat's status stream and types the held rename
+// when Blocked closes into Working or Idle. It drops the command when the chat
+// goes Starting, Rate-limited or Exited, or the stream ends. One watcher
+// serves the chat (renameSlots.claimWatch); it ends on release, on drop and
+// when the server stops. A new popup (Blocked to Blocked) keeps the hold.
+// SendAction is not reused: it stops at Blocked and only types from Idle.
+func (p namer) holdRename(dir string) {
+	id := filepath.Base(dir)
+	run, closeRun, err := p.openActionRun(dir, RunOpts{})
+	if err != nil {
+		p.dropHeldRename(id)
+		return
+	}
+	defer closeRun()
+	for {
+		select {
+		case <-p.sessions.Watches.Stop:
+			return
+		case msg, ok := <-run.msgs:
+			err := run.apply(msg, ok)
+			if err == nil && msg.Type != holder.StreamStatus {
+				continue
+			}
+			switch state := run.State(); {
+			case err != nil:
+				p.dropHeldRename(id)
+				return
+			case state == wire.SessionBlocked:
+			case state == wire.SessionWorking, state == wire.SessionIdle:
+				if p.releaseHeldRename(dir, id) {
+					return
+				}
+			default:
+				p.dropHeldRename(id)
+				return
+			}
+		}
+	}
+}
+
+// dropHeldRename empties the slot and ends the watcher, serving a newer
+// request that arrives in between by dropping it too.
+func (p namer) dropHeldRename(id string) {
+	for {
+		seq, _ := p.renames.current(id)
+		if p.renames.endWatch(id, seq) {
+			return
+		}
+	}
+}
+
+// releaseHeldRename types the held command and reports whether the watcher is
+// done. typeRename re-reads the status first: Blocked again keeps holding,
+// anything else but Working or Idle drops.
+func (p namer) releaseHeldRename(dir, id string) bool {
+	for {
+		seq, command := p.renames.current(id)
+		if command == "" {
+			return p.renames.endWatch(id, seq)
+		}
+		err := p.typeRename(dir, id, seq, command)
+		if !errors.Is(err, errRenameSkip) {
+			finishSend(p.Prompt, dir, command, imageSet{}, err)
+		} else if _, left := p.renames.current(id); left != "" {
+			return false
+		}
+		if p.renames.endWatch(id, seq) {
+			return true
+		}
+	}
 }
 
 // renameSession sets a plain chat's gx name in any Session status, then sends
@@ -132,8 +205,12 @@ func (p namer) renameSession(req wire.SessionRenameRequest) (wire.SessionResult,
 		command = "/rename " + name
 	}
 	seq := p.renames.put(req.ID, command)
-	if command != "" && info.Status.State != wire.SessionBlocked {
+	switch {
+	case command == "":
+	case info.Status.State != wire.SessionBlocked:
 		p.sessions.Watches.Start(func() { p.sendRename(dir, seq, command) })
+	case p.renames.claimWatch(req.ID):
+		p.sessions.Watches.Start(func() { p.holdRename(dir) })
 	}
 	return wire.SessionResult{Session: &info}, nil
 }
