@@ -344,7 +344,7 @@ describe("SettingsRow", () => {
         "b",
       ],
       [
-        "server.tcp-listen",
+        "test.risky-bool",
         { type: "bool", default: false },
         (v) => fireEvent.click(v.getByRole("switch")),
         true,
