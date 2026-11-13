@@ -1,5 +1,5 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useState, type KeyboardEvent } from "react"
+import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import { Field, field } from "./formField"
 
 export interface Option {
@@ -12,37 +12,61 @@ export interface Option {
 
 export const baseName = (path: string) => path.replace(/\/+$/, "").split("/").pop() ?? path
 
-/** The Worktree combobox: filter `rows`, or type a name to offer "+ Create worktree". */
+/** A searchable combobox: filter `rows`; with `canCreate`, a typed name offers "+ Create worktree". Arrow keys move, Enter picks. */
 export function WorktreePicker({
   rows,
   picked,
-  creating,
+  creating = "",
   onPick,
+  label = "Worktree",
+  canCreate = true,
 }: {
+  label?: string
+  canCreate?: boolean
   rows: Option[]
   picked: Option | undefined
   /** The new worktree's name once "+ Create worktree" was chosen. */
-  creating: string
+  creating?: string
   onPick: (o: Option) => void
 }) {
   // The text being typed; null shows the current choice.
   const [query, setQuery] = useState<string | null>(null)
 
+  const [active, setActive] = useState(0)
+  const listRef = useRef<HTMLDivElement>(null)
+  const listId = `combo-${label.toLowerCase()}`
+
   const q = query?.trim() ?? ""
   const options: Option[] = []
-  if (q && !rows.some((r) => r.key !== "root" && r.label === q)) {
-    options.push({ key: "create", label: `+ Create worktree “${q}”`, path: "", create: q })
+  if (canCreate && q && !rows.some((r) => r.key !== "root" && r.label === q)) {
+    options.push({
+      key: "create",
+      label: `+ Create worktree “${q}”`,
+      path: "",
+      create: q,
+    })
   }
   options.push(...rows.filter((r) => !q || r.label.toLowerCase().includes(q.toLowerCase())))
+
+  const at = Math.min(active, Math.max(options.length - 1, 0))
+  useEffect(() => {
+    listRef.current?.children[at]?.scrollIntoView?.({ block: "nearest" })
+  }, [at, query])
 
   const pick = (o: Option) => {
     onPick(o)
     setQuery(null)
   }
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter" && query !== null) {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault()
-      if (options[0]) pick(options[0])
+      if (query === null) setQuery("")
+      else if (options.length) {
+        setActive((at + (e.key === "ArrowDown" ? 1 : options.length - 1)) % options.length)
+      }
+    } else if (e.key === "Enter" && query !== null) {
+      e.preventDefault()
+      if (options[at]) pick(options[at])
     } else if (e.key === "Escape" && query !== null) {
       e.stopPropagation()
       setQuery(null)
@@ -50,12 +74,13 @@ export function WorktreePicker({
   }
 
   return (
-    <Field label="Worktree" caret>
+    <Field label={label} caret>
       <chakra.input
         role="combobox"
-        aria-label="Worktree"
+        aria-label={label}
         aria-expanded={query !== null}
-        aria-controls="new-session-worktrees"
+        aria-controls={listId}
+        aria-activedescendant={query !== null && options[at] ? `${listId}-${at}` : undefined}
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"
@@ -66,14 +91,18 @@ export function WorktreePicker({
         value={query ?? (creating || picked?.label || "")}
         onFocus={() => setQuery((q) => q ?? "")}
         onBlur={() => setQuery(null)}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          setActive(0)
+        }}
         onKeyDown={onKeyDown}
       />
       {query !== null && (
         <Box
-          id="new-session-worktrees"
+          ref={listRef}
+          id={listId}
           role="listbox"
-          aria-label="Worktrees"
+          aria-label={`${label}s`}
           position="absolute"
           top="100%"
           left="0"
@@ -86,9 +115,10 @@ export function WorktreePicker({
           borderColor="border"
           borderRadius="8px"
         >
-          {options.map((o) => (
+          {options.map((o, i) => (
             <chakra.div
               key={o.key}
+              id={`${listId}-${i}`}
               role="option"
               aria-selected={o.create ? false : o.path === picked?.path && !creating}
               display="flex"
@@ -97,7 +127,7 @@ export function WorktreePicker({
               py="2"
               cursor="pointer"
               color={o.create ? "tone.done.fg" : "text"}
-              bg={o.create ? "surface" : undefined}
+              bg={i === at ? "surface" : o.create ? "surface" : undefined}
               _hover={{ bg: "surface" }}
               // Keeps the input focused so its blur does not close the list before the click lands.
               onMouseDown={(e) => e.preventDefault()}

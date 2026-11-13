@@ -12,7 +12,7 @@ import (
 )
 
 // WebCreateSessionRequest is the body of POST /v1/sessions/create on the web
-// mux. It has no ticket, harness or worktree-bookkeeping fields: the page may
+// mux. It has no ticket or worktree-bookkeeping fields: the page may
 // only start a plain chat session in a project's root or one of its worktrees.
 type WebCreateSessionRequest struct {
 	Project string `json:"project"`
@@ -24,6 +24,8 @@ type WebCreateSessionRequest struct {
 	Prompt string `json:"prompt,omitempty"`
 	// Tier is light, worker or strongest; empty means worker.
 	Tier agent.Tier `json:"tier,omitempty"`
+	// Harness is the agent CLI to run, such as claude or codex; empty means claude.
+	Harness string `json:"harness,omitempty"`
 	// Workspace is the workspace the chat lands in; missing or unknown reads as Default.
 	Workspace string `json:"workspace,omitempty"`
 }
@@ -89,6 +91,7 @@ func (mg *Manager) createWebSession(req WebCreateSessionRequest) (wire.SessionRe
 		Name:     req.Name,
 		Prompt:   prompt,
 		Tier:     req.Tier,
+		Harness:  req.Harness,
 	}, SessionCtx{})
 	if err == nil && res.Session != nil && req.Workspace != "" && mg.workspaces != nil {
 		// An unknown name is refused by SetMember and the chat stays in Default.

@@ -24,16 +24,25 @@ import { baseName, WorktreePicker, type Option } from "./WorktreePicker"
 import { setLastProject, type DraftsClient } from "../design/drafts"
 import { useDefaultProject } from "../workspaces/defaultProject"
 
-// The picker is Claude-only and a tier reads as the family: "Worker (Claude Sonnet)".
+type Harness = "claude" | "codex"
+const HARNESSES: { id: Harness; label: string }[] = [
+  { id: "claude", label: "Claude" },
+  { id: "codex", label: "Codex" },
+]
+const TRUNK_NAMES = ["main", "master"]
+
+// A Claude tier reads as the family: "Worker (Claude Sonnet)". Tier models are only known for Claude.
 const tierModel = (id: string) => modelName(id, "claude")
 
-/** The First prompt textarea with the `/` menu. The session is always Claude; the list is read for the chosen worktree, or the project root when one is being created. */
+/** The First prompt textarea with the `/` menu. The list is read for the chosen worktree, or the project root when one is being created. */
 function PromptField({
   value,
   onChange,
   target,
   fetcher,
+  harness,
 }: {
+  harness: Harness
   value: string
   onChange: (text: string) => void
   target: CommandTarget
@@ -46,7 +55,7 @@ function PromptField({
   const c = useCompletion(
     {
       target,
-      harness: "claude",
+      harness,
       fetcher,
       sends: false,
       listMaxH: "250px",
@@ -113,6 +122,7 @@ export function NewSessionForm({
   const focusFirst = useFocusFirstField()
   const [loadError, setLoadError] = useState(false)
   const [tier, setTier] = useState<TierId>("worker")
+  const [harness, setHarness] = useState<Harness>("claude")
   const { draft, update, clear } = useNewSessionDraft()
   const { connected } = useConnectionState(useConnectionContext())
   const { run, pending, refusal, error } = useWrite()
@@ -139,16 +149,14 @@ export function NewSessionForm({
         ...current.worktrees.map((path) => ({ key: path, label: baseName(path), path })),
       ]
     : []
-  const picked = rows.find((r) => r.path === draft.dir) ?? rows[0]
+  // No saved choice: the trunk worktree (main or master), else the project root.
+  const trunk = rows.find((r) => r.key !== "root" && TRUNK_NAMES.includes(r.label))
+  const picked = rows.find((r) => r.path === draft.dir) ?? trunk ?? rows[0]
   const worktreeName = draft.create || (picked ? baseName(picked.path) : "")
 
   const patch = (p: Partial<NewSessionDraft>) => update({ project, ...p })
   const pick = (o: Option) =>
-    patch(
-      o.create
-        ? { create: o.create, dir: "" }
-        : { create: "", dir: o.key === "root" ? "" : o.path },
-    )
+    patch(o.create ? { create: o.create, dir: "" } : { create: "", dir: o.path })
   const discard = () => {
     clear()
     onClose()
@@ -165,6 +173,7 @@ export function NewSessionForm({
           name: trimmed(draft.name),
           prompt: trimmed(draft.prompt),
           tier,
+          harness,
           ...(workspace ? { workspace } : {}),
         }),
       {
@@ -237,23 +246,13 @@ export function NewSessionForm({
           </Text>
         ) : (
           <>
-            <Field label="Project" caret>
-              <chakra.select
-                aria-label="Project"
-                value={project}
-                onChange={(e) => patch({ project: e.target.value, dir: "", create: "" })}
-                {...field}
-                h="40px"
-                appearance="none"
-                pr="8"
-              >
-                {projects.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </chakra.select>
-            </Field>
+            <WorktreePicker
+              label="Project"
+              canCreate={false}
+              rows={projects.map((p) => ({ key: p, label: p, path: "" }))}
+              picked={{ key: project, label: project, path: "" }}
+              onPick={(o) => patch({ project: o.key, dir: "", create: "" })}
+            />
             <WorktreePicker rows={rows} picked={picked} creating={draft.create} onPick={pick} />
             <Field label="Name" optional>
               <chakra.input
@@ -268,6 +267,23 @@ export function NewSessionForm({
                 onChange={(e) => patch({ name: e.target.value })}
               />
             </Field>
+            <Field label="Harness" caret>
+              <chakra.select
+                aria-label="Harness"
+                value={harness}
+                onChange={(e) => setHarness(e.target.value as Harness)}
+                {...field}
+                h="40px"
+                appearance="none"
+                pr="8"
+              >
+                {HARNESSES.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.label}
+                  </option>
+                ))}
+              </chakra.select>
+            </Field>
             <Field label="Tier" caret>
               <chakra.select
                 aria-label="Tier"
@@ -280,7 +296,7 @@ export function NewSessionForm({
               >
                 {TIERS.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {current?.tiers[t.id]
+                    {harness === "claude" && current?.tiers[t.id]
                       ? `${t.label} (${tierModel(current.tiers[t.id])})`
                       : t.label}
                   </option>
@@ -290,6 +306,7 @@ export function NewSessionForm({
             <Field label="First prompt" optional>
               <PromptField
                 fetcher={fetchCommands}
+                harness={harness}
                 value={draft.prompt}
                 onChange={(prompt) => patch({ prompt })}
                 target={{

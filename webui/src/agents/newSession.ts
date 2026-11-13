@@ -5,7 +5,7 @@ import type { CreateSessionRequest, ProjectWorktrees, SessionResult } from "../g
 /** The web create route takes only these fields of the full create request. */
 export type NewSessionBody = Pick<
   CreateSessionRequest,
-  "project" | "dir" | "worktree" | "name" | "prompt" | "tier"
+  "project" | "dir" | "worktree" | "name" | "prompt" | "tier" | "harness"
 > & {
   /** The workspace the chat lands in; the web route reads it, the wire request has no such field. */
   workspace?: string

@@ -1,6 +1,6 @@
 import { useState } from "react"
 
-/** `dir` is a picked worktree (empty: the project root); `create` names a new worktree and wins over `dir`. */
+/** `dir` is a picked worktree or the project root (empty: the default, trunk); `create` names a new worktree and wins over `dir`. */
 export interface NewSessionDraft {
   project: string
   dir: string

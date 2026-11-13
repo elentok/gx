@@ -51,6 +51,7 @@ function mount(
     setLast?: (project: string) => Promise<void>
     fetchCommands?: FetchCommands
     workspace?: string
+    fetchTrees?: () => Promise<ProjectWorktrees[]>
     device?: Device
   } = {},
 ) {
@@ -78,7 +79,7 @@ function mount(
           >
             <NewSessionForm
               drafts={drafts}
-              fetchTrees={async () => trees}
+              fetchTrees={over.fetchTrees ?? (async () => trees)}
               create={create}
               fetchCommands={over.fetchCommands}
               onCreated={onCreated}
@@ -224,7 +225,14 @@ test("picking a dir posts dir", async () => {
   submit()
   await waitFor(() => expect(onCreated).toHaveBeenCalledWith("gx-7"))
   expect(posts).toEqual([
-    { project: "gx", dir: "/dev/gx-stats", name: undefined, prompt: undefined, tier: "worker" },
+    {
+      project: "gx",
+      dir: "/dev/gx-stats",
+      name: undefined,
+      prompt: undefined,
+      tier: "worker",
+      harness: "claude",
+    },
   ])
 })
 
@@ -236,7 +244,14 @@ test("the default root posts its dir, with a typed name and prompt", async () =>
   submit()
   await waitFor(() => expect(onCreated).toHaveBeenCalled())
   expect(posts).toEqual([
-    { project: "gx", dir: "/dev/gx", name: "mine", prompt: "do it", tier: "worker" },
+    {
+      project: "gx",
+      dir: "/dev/gx",
+      name: "mine",
+      prompt: "do it",
+      tier: "worker",
+      harness: "claude",
+    },
   ])
 })
 
@@ -247,7 +262,14 @@ test("the create row posts worktree", async () => {
   submit()
   await waitFor(() => expect(onCreated).toHaveBeenCalled())
   expect(posts).toEqual([
-    { project: "gx", worktree: "fresh", name: undefined, prompt: undefined, tier: "worker" },
+    {
+      project: "gx",
+      worktree: "fresh",
+      name: undefined,
+      prompt: undefined,
+      tier: "worker",
+      harness: "claude",
+    },
   ])
 })
 
@@ -393,4 +415,51 @@ test("submit is disabled offline", async () => {
   expect(
     (screen.getByRole("button", { name: "Create session" }) as HTMLButtonElement).disabled,
   ).toBe(true)
+})
+
+test("Harness posts codex when picked", async () => {
+  const { posts, onCreated } = mount()
+  await ready()
+  fireEvent.change(screen.getByRole("combobox", { name: "Harness" }), {
+    target: { value: "codex" },
+  })
+  submit()
+  await waitFor(() => expect(onCreated).toHaveBeenCalled())
+  expect(posts[0].harness).toBe("codex")
+})
+
+test("arrow keys move through the worktree list and Enter picks", async () => {
+  const { posts, onCreated } = mount()
+  const wt = await ready()
+  fireEvent.focus(wt)
+  fireEvent.keyDown(wt, { key: "ArrowDown" })
+  fireEvent.keyDown(wt, { key: "Enter" })
+  expect(wt.value).toBe("gx-stats")
+  submit()
+  await waitFor(() => expect(onCreated).toHaveBeenCalled())
+  expect(posts[0].dir).toBe("/dev/gx-stats")
+})
+
+test("the Project combobox filters by typing and picks with the arrow keys", async () => {
+  mount({ path: "/e/blog:x" })
+  await ready()
+  const project = screen.getByRole("combobox", {
+    name: "Project",
+  }) as HTMLInputElement
+  fireEvent.focus(project)
+  fireEvent.change(project, { target: { value: "gx" } })
+  expect(
+    within(screen.getByRole("listbox", { name: "Projects" }))
+      .getAllByRole("option")
+      .map((o) => o.textContent),
+  ).toEqual(["gx"])
+  fireEvent.keyDown(project, { key: "Enter" })
+  expect(project.value).toBe("gx")
+})
+
+test("the default worktree is main when the project has one", async () => {
+  mount({
+    fetchTrees: async () => [{ ...trees[0], worktrees: ["/dev/gx-stats", "/dev/main"] }],
+  })
+  expect((await ready()).value).toBe("main")
 })
