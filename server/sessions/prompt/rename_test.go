@@ -1,0 +1,159 @@
+package prompt_test
+
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/agentfake"
+)
+
+// plainChat starts an Idle plain chat with the given name. An empty name
+// leaves an automatic one.
+func plainChat(t *testing.T, f promptFixture, name string) (id, conv string) {
+	t.Helper()
+	res, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: name, Harness: string(agentfake.HarnessKind)})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	id = res.Session.ID
+	conv, _ = readMeta(t, f.h, id)["conversation_id"].(string)
+	waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	return id, conv
+}
+
+func termTitle(t *testing.T, conv, title string) {
+	t.Helper()
+	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionTitle, Title: title}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (f promptFixture) rename(t *testing.T, id, name string) wire.SessionResult {
+	t.Helper()
+	res, err := f.h.Client.Sessions.Rename(f.ctx, wire.SessionRenameRequest{ID: id, Name: name})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func TestSessionRename_SetsTheTrimmedNameInSnapshotAndMeta(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	id, _ := plainChat(t, f, "old")
+	res := f.rename(t, id, "  new name \n")
+	if res.Refused || res.Session == nil || res.Session.Name != "new name" {
+		t.Fatalf("rename = %+v", res)
+	}
+	got := waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Name == "new name" })
+	if got.AutoName {
+		t.Error("renamed session still has auto_name set")
+	}
+	if name, _ := readMeta(t, f.h, id)["name"].(string); name != "new name" {
+		t.Errorf("meta name = %q, want new name", name)
+	}
+}
+
+func TestSessionRename_Refusals(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	id, _ := plainChat(t, f, "old")
+	for name, tc := range map[string]struct{ id, name, want string }{
+		"unknown":    {"nope", "x", wire.ReasonSessionUnknown},
+		"queue":      {queue.AgentIDPrefix + "1", "x", wire.ReasonSessionQueue},
+		"design":     {f.id, "x", wire.ReasonSessionNotPlain},
+		"too long":   {id, strings.Repeat("a", wire.MaxSessionPromptBytes+1), wire.ReasonPromptTextTooLong},
+		"empty":      {id, "  ", wire.ReasonSessionBadName},
+		"line break": {id, "a\nb", wire.ReasonSessionBadName},
+	} {
+		res := f.rename(t, tc.id, tc.name)
+		if !res.Refused || res.Reason != tc.want {
+			t.Errorf("%s: rename = %+v, want reason %q", name, res, tc.want)
+		}
+	}
+	if name, _ := readMeta(t, f.h, id)["name"].(string); name != "old" {
+		t.Errorf("refusals changed the name to %q", name)
+	}
+}
+
+// changedBefore returns the addresses of the session-changed events that
+// arrive before marker's.
+func changedBefore(t *testing.T, f promptFixture, marker string) []string {
+	t.Helper()
+	var seen []string
+	for {
+		ev := servertest.WaitForEvent(f.ctx, t, f.evs, wire.EventSessionChanged, "")
+		if ev.Address == marker {
+			return seen
+		}
+		seen = append(seen, ev.Address)
+	}
+}
+
+func TestSessionRename_SamePinnedNamePublishesNothing(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	id, _ := plainChat(t, f, "mine")
+	other, _ := plainChat(t, f, "other")
+	// The first marker consumes the events the two chats' startup published.
+	f.rename(t, other, "first")
+	changedBefore(t, f, other)
+	if res := f.rename(t, id, "mine"); res.Refused || res.Session == nil || res.Session.Name != "mine" {
+		t.Fatalf("rename = %+v, want success", res)
+	}
+	// Events arrive in order, so the marker's event comes after any of id's.
+	f.rename(t, other, "second")
+	for _, addr := range changedBefore(t, f, other) {
+		if addr == id {
+			t.Fatal("renaming to the same pinned name published session-changed")
+		}
+	}
+}
+
+func TestSessionRename_SameAutomaticNamePinsAndPublishes(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	id, conv := plainChat(t, f, "")
+	termTitle(t, conv, "Fix bug")
+	got := waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Name == "Fix bug" })
+	if !got.AutoName {
+		t.Fatal("a terminal title should leave auto_name set")
+	}
+	if res := f.rename(t, id, "Fix bug"); res.Refused || res.Session == nil || res.Session.AutoName {
+		t.Fatalf("rename = %+v, want pinned", res)
+	}
+	servertest.WaitForEvent(f.ctx, t, f.evs, wire.EventSessionChanged, id)
+	termTitle(t, conv, "Something else")
+	report(t, conv, agentfake.Control{State: "done"})
+	got = waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	if got.Name != "Fix bug" {
+		t.Errorf("name = %q, want the pinned Fix bug", got.Name)
+	}
+}
+
+func TestSessionRename_TerminalTitleChangePublishesSessionChanged(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	id, conv := plainChat(t, f, "")
+	termTitle(t, conv, "From the terminal")
+	servertest.WaitForEvent(f.ctx, t, f.evs, wire.EventSessionChanged, id)
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Name == "From the terminal" })
+}
+
+func TestSessionPrompt_TypedRenamePinsAnUnchangedAutomaticName(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	id, conv := plainChat(t, f, "")
+	termTitle(t, conv, "Fix bug")
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Name == "Fix bug" })
+	res, err := f.h.Client.Sessions.Prompt(f.ctx, wire.SessionPromptRequest{ID: id, Text: "/rename Fix bug"})
+	if err != nil || res.Refused || res.Session == nil || res.Session.AutoName {
+		t.Fatalf("prompt = %+v, %v; want the name pinned", res, err)
+	}
+}

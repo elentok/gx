@@ -24,7 +24,15 @@ const (
 	ReasonSessionNameTaken      = "name-taken"
 	ReasonSessionQueue          = "queue-session"
 	ReasonSessionNotPlain       = "not-plain-session"
+	// ReasonSessionBadName is ReasonBadName, so the public contract has one value.
+	ReasonSessionBadName = "bad-name"
 )
+
+// SessionRenameRequest is the body of POST /v1/sessions/rename.
+type SessionRenameRequest struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
 
 // Session states, as SessionStatus.State.
 const (

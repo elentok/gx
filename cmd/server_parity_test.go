@@ -134,6 +134,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/sessions/run-action":              "agents run-action",
 	"POST /v1/sessions/resume":                  "agents resume",
 	"POST /v1/sessions/prompt":                  "agents prompt",
+	"POST /v1/sessions/rename":                  "agents rename",
 	"POST /v1/sessions/images":                  "agents image add",
 	"GET /v1/sessions/images":                   "agents image get",
 	"POST /v1/sessions/images/delete":           "agents image rm",

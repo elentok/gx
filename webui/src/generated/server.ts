@@ -2102,7 +2102,7 @@ export interface QueueResult {
    * carries the current Question and its State token.
    */
   outcome?: string;
-  question?: any /* tickets.LogEvent */;
+  question?: any /* ticketlog.LogEvent */;
   state?: string;
   refused?: boolean;
   reason?: string;
@@ -2233,9 +2233,20 @@ export const ReasonSessionNameTaken = "name-taken";
 export const ReasonSessionQueue = "queue-session";
 export const ReasonSessionNotPlain = "not-plain-session";
 /**
+ * ReasonSessionBadName is ReasonBadName, so the public contract has one value.
+ */
+export const ReasonSessionBadName = "bad-name";
+/**
  * Refusal reasons of the interactive-session writes.
  */
-export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionHarnessMissing | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonSessionNotDesign | typeof ReasonSessionNameTaken | typeof ReasonSessionQueue | typeof ReasonSessionNotPlain;
+export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionHarnessMissing | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonSessionNotDesign | typeof ReasonSessionNameTaken | typeof ReasonSessionQueue | typeof ReasonSessionNotPlain | typeof ReasonSessionBadName;
+/**
+ * SessionRenameRequest is the body of POST /v1/sessions/rename.
+ */
+export interface SessionRenameRequest {
+  id: string;
+  name: string;
+}
 export const SessionStarting = "starting";
 export const SessionWorking = "working";
 export const SessionIdle = "idle";
@@ -2770,6 +2781,11 @@ export const StaleRowMessage = "changed, reselect";
 export interface SessionInfo {
   id: string;
   name?: string;
+  /**
+   * AutoName marks a name gx derives (the terminal title), as opposed to one a
+   * person typed or set with the rename verb.
+   */
+  auto_name?: boolean;
   project: string;
   dir: string;
   harness: string;

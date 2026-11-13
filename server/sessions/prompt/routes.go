@@ -85,6 +85,11 @@ func Routes(get func() *Prompt) []wire.Route {
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().imageDeleteHandler(w, r) },
 		},
 		{
+			Pattern: "POST /v1/sessions/rename",
+			Web:     wire.WebWrite,
+			Handler: func(w http.ResponseWriter, r *http.Request) { namer{get()}.renameHandler(w, r) },
+		},
+		{
 			Pattern: "POST /v1/sessions/actionable",
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().actionableWrite(w, r) },
 		},

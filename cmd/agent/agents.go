@@ -32,7 +32,7 @@ func NewAgents(d Deps) *cobra.Command {
 		newAgentsSessionCmd(d, "resume", "resume an Exited session's conversation", (*apiclient.Sessions).Resume),
 		newAgentsSessionCmd(d, "run-action", "send an Idle session's Action prompts, one per turn", (*apiclient.Sessions).RunAction),
 		newAgentsSessionCmd(d, "focus", "show a session in the most recently focused TUI", (*apiclient.Sessions).Focus),
-		newAgentsReportFocusCmd(d), newAgentsPromptCmd(d), newAgentsImageCmd(d), newAgentsAutoAdvanceCmd(d), newAgentsAutoQueueCmd(d), newAgentsFixCmd(d),
+		newAgentsReportFocusCmd(d), newAgentsPromptCmd(d), newAgentsRenameCmd(d), newAgentsImageCmd(d), newAgentsAutoAdvanceCmd(d), newAgentsAutoQueueCmd(d), newAgentsFixCmd(d),
 		newAgentsSessionCmd(d, "auto-advance-cancel", "stop a design session's running auto-advance countdown", (*apiclient.Sessions).CancelAutoAdvance),
 		newAgentsSessionCmd(d, "auto-queue-cancel", "stop a design session's running auto-queue countdown", (*apiclient.Sessions).CancelAutoQueue))
 	return cmd
@@ -126,6 +126,28 @@ func newAgentsPromptCmd(d Deps) *cobra.Command {
 			}
 			req.ID, req.Text = args[0], args[1]
 			return runAgentsPrompt(c.Context(), cl, c.OutOrStdout(), jsonOut, req)
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
+// newAgentsRenameCmd is `gx agents rename`: it sets a plain chat's gx name and
+// types nothing into the agent.
+func newAgentsRenameCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "rename <id> <name>",
+		Short: "set the gx name of a plain chat",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			return runAgentsSessionCall(c.Context(), c.OutOrStdout(), jsonOut, func(ctx context.Context) (wire.SessionResult, error) {
+				return cl.Sessions.Rename(ctx, wire.SessionRenameRequest{ID: args[0], Name: args[1]})
+			})
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")

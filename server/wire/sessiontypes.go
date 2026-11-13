@@ -9,11 +9,14 @@ import (
 // SessionInfo is an interactive session on the wire: everything the Agents
 // tab shows.
 type SessionInfo struct {
-	ID      string `json:"id"`
-	Name    string `json:"name,omitempty"`
-	Project string `json:"project"`
-	Dir     string `json:"dir"`
-	Harness string `json:"harness"`
+	ID   string `json:"id"`
+	Name string `json:"name,omitempty"`
+	// AutoName marks a name gx derives (the terminal title), as opposed to one a
+	// person typed or set with the rename verb.
+	AutoName bool   `json:"auto_name,omitempty"`
+	Project  string `json:"project"`
+	Dir      string `json:"dir"`
+	Harness  string `json:"harness"`
 	// Ticket is the Session ticket's address.
 	Ticket string `json:"ticket,omitempty"`
 	// Design marks a session whose ticket is on a map epic: a gx-design run.

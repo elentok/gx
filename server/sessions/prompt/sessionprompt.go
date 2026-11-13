@@ -125,14 +125,12 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 		}
 	} else {
 		p.sessions.Watches.Start(func() { p.sendPrompt(dir, text, imgs) })
-		if name, ok := renameCommandArg(text); ok && name != meta.Name {
+		if name, ok := renameCommandArg(text); ok {
 			// The harness renames itself, but a typed name never follows the
 			// terminal title, so the Agents tab would keep the old one.
-			meta.Name, meta.AutoName = name, false
-			if err := sessions.WriteMeta(dir, meta); err != nil {
+			if err := (namer{p}).setName(dir, &meta, name); err != nil {
 				return wire.SessionResult{}, err
 			}
-			p.events.Publish(wire.EventSessionChanged, req.ID)
 		}
 		if err := p.notePersonTyped(dir, meta, "Auto-advance stopped: you typed"); err != nil {
 			return wire.SessionResult{}, err
@@ -201,6 +199,6 @@ func renameCommandArg(text string) (string, bool) {
 	if cmd != "/rename" && cmd != "/name" {
 		return "", false
 	}
-	arg = strings.TrimSpace(arg)
-	return arg, arg != "" && !strings.ContainsAny(arg, "\r\n")
+	arg, ok := validName(arg)
+	return arg, ok
 }

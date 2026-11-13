@@ -181,6 +181,7 @@ func (m Meta) Info() wire.SessionInfo {
 	info := wire.SessionInfo{
 		ID:              m.ID,
 		Name:            m.Name,
+		AutoName:        m.AutoName,
 		Project:         m.Project,
 		Dir:             m.Dir,
 		Harness:         m.Harness,
