@@ -45,7 +45,15 @@ export const Markdown = memo(function Markdown({
       data-small-headings={smallHeadings ? "" : undefined}
       css={{
         "&[data-small-headings] h2": { fontSize: "md", fontWeight: "600" },
-        "& table": { borderCollapse: "collapse", marginBlock: "2" },
+        // A wide table scrolls on its own; overflowWrap resets the chat's "anywhere" so cells do not squeeze.
+        "& table": {
+          borderCollapse: "collapse",
+          marginBlock: "2",
+          display: "block",
+          maxWidth: "100%",
+          overflowX: "auto",
+          overflowWrap: "normal",
+        },
         "& th, & td": {
           border: "1px solid {colors.border}",
           paddingInline: "2",
@@ -75,6 +83,8 @@ export const Markdown = memo(function Markdown({
           // Leave room for macOS overlay scrollbars before the following paragraph.
           marginBottom: "4",
           overflowX: "auto",
+          maxWidth: "100%",
+          overflowWrap: "normal",
           lineHeight: "1.5",
         },
         "& pre code": { background: "none", color: "inherit", padding: 0, fontSize: "0.85em" },

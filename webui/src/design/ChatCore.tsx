@@ -377,6 +377,9 @@ function ChatScroller({
       flex="1"
       minH="0"
       overflowY="auto"
+      // No sideways scroll: it would steal the swipe that opens the sidebar on a phone.
+      overflowX="hidden"
+      overflowWrap="anywhere"
       lineHeight="1.65"
       display="flex"
       flexDirection="column"
