@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 func startWrite(t *testing.T) (*servertest.Harness, *rigs.SchedulesClock) {
@@ -21,11 +21,11 @@ func startWrite(t *testing.T) (*servertest.Harness, *rigs.SchedulesClock) {
 	return h, clock
 }
 
-func baseCreate() wire.ScheduleCreateRequest {
-	return wire.ScheduleCreateRequest{Name: "Nightly", Prompt: "check the logs", Days: []string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}, Times: []string{"09:00"}, Project: "proj"}
+func baseCreate() ops.ScheduleCreateRequest {
+	return ops.ScheduleCreateRequest{Name: "Nightly", Prompt: "check the logs", Days: []string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}, Times: []string{"09:00"}, Project: "proj"}
 }
 
-func create(t *testing.T, h *servertest.Harness, req wire.ScheduleCreateRequest) wire.ScheduleShowResult {
+func create(t *testing.T, h *servertest.Harness, req ops.ScheduleCreateRequest) ops.ScheduleShowResult {
 	t.Helper()
 	res, err := h.Client.Schedules.Create(context.Background(), req)
 	if err != nil {
@@ -34,7 +34,7 @@ func create(t *testing.T, h *servertest.Harness, req wire.ScheduleCreateRequest)
 	return res
 }
 
-func edit(t *testing.T, h *servertest.Harness, req wire.ScheduleEditRequest) wire.ScheduleShowResult {
+func edit(t *testing.T, h *servertest.Harness, req ops.ScheduleEditRequest) ops.ScheduleShowResult {
 	t.Helper()
 	res, err := h.Client.Schedules.Edit(context.Background(), req)
 	if err != nil {
@@ -58,16 +58,16 @@ func TestSchedulesWrite_CreateRefusalsWriteNothing(t *testing.T) {
 	zero := 0.0
 	cases := []struct {
 		reason string
-		mod    func(*wire.ScheduleCreateRequest)
+		mod    func(*ops.ScheduleCreateRequest)
 	}{
-		{schedrec.ReasonEmptyName, func(r *wire.ScheduleCreateRequest) { r.Name = " " }},
-		{schedrec.ReasonEmptyPrompt, func(r *wire.ScheduleCreateRequest) { r.Prompt = "" }},
-		{schedrec.ReasonNoDays, func(r *wire.ScheduleCreateRequest) { r.Days = nil }},
-		{schedrec.ReasonNoTimes, func(r *wire.ScheduleCreateRequest) { r.Times = nil }},
-		{schedrec.ReasonInvalidTime, func(r *wire.ScheduleCreateRequest) { r.Times = []string{"25:00"} }},
-		{schedrec.ReasonInvalidLateLimit, func(r *wire.ScheduleCreateRequest) { r.LateLimitHours = &zero }},
-		{schedrec.ReasonInvalidHarness, func(r *wire.ScheduleCreateRequest) { r.Harness = "nope" }},
-		{schedrec.ReasonInvalidProject, func(r *wire.ScheduleCreateRequest) { r.Project = "nope" }},
+		{schedrec.ReasonEmptyName, func(r *ops.ScheduleCreateRequest) { r.Name = " " }},
+		{schedrec.ReasonEmptyPrompt, func(r *ops.ScheduleCreateRequest) { r.Prompt = "" }},
+		{schedrec.ReasonNoDays, func(r *ops.ScheduleCreateRequest) { r.Days = nil }},
+		{schedrec.ReasonNoTimes, func(r *ops.ScheduleCreateRequest) { r.Times = nil }},
+		{schedrec.ReasonInvalidTime, func(r *ops.ScheduleCreateRequest) { r.Times = []string{"25:00"} }},
+		{schedrec.ReasonInvalidLateLimit, func(r *ops.ScheduleCreateRequest) { r.LateLimitHours = &zero }},
+		{schedrec.ReasonInvalidHarness, func(r *ops.ScheduleCreateRequest) { r.Harness = "nope" }},
+		{schedrec.ReasonInvalidProject, func(r *ops.ScheduleCreateRequest) { r.Project = "nope" }},
 	}
 	for _, c := range cases {
 		req := baseCreate()
@@ -137,7 +137,7 @@ func TestSchedulesWrite_EditRenameKeepsSlugAndOtherFields(t *testing.T) {
 	h, _ := startWrite(t)
 	create(t, h, baseCreate())
 	name, late := "Evening", 3.0
-	res := edit(t, h, wire.ScheduleEditRequest{Project: "proj", Slug: "nightly", Name: &name, LateLimitHours: &late})
+	res := edit(t, h, ops.ScheduleEditRequest{Project: "proj", Slug: "nightly", Name: &name, LateLimitHours: &late})
 	if res.Refused {
 		t.Fatalf("refused: %+v", res)
 	}
@@ -155,21 +155,21 @@ func TestSchedulesWrite_EditRefusals(t *testing.T) {
 	h, _ := startWrite(t)
 	create(t, h, baseCreate())
 	other := "scratch"
-	if res := edit(t, h, wire.ScheduleEditRequest{Project: "proj", Slug: "nightly", NewProject: &other}); !res.Refused || res.Reason != wire.ScheduleReasonProjectReadOnly {
+	if res := edit(t, h, ops.ScheduleEditRequest{Project: "proj", Slug: "nightly", NewProject: &other}); !res.Refused || res.Reason != ops.ScheduleReasonProjectReadOnly {
 		t.Errorf("project change: %+v", res)
 	}
-	if res := edit(t, h, wire.ScheduleEditRequest{Project: "proj", Slug: "nope"}); !res.Refused || res.Reason != wire.ScheduleReasonUnknown {
+	if res := edit(t, h, ops.ScheduleEditRequest{Project: "proj", Slug: "nope"}); !res.Refused || res.Reason != ops.ScheduleReasonUnknown {
 		t.Errorf("unknown: %+v", res)
 	}
 	empty := ""
-	if res := edit(t, h, wire.ScheduleEditRequest{Project: "proj", Slug: "nightly", Name: &empty}); !res.Refused || res.Reason != schedrec.ReasonEmptyName {
+	if res := edit(t, h, ops.ScheduleEditRequest{Project: "proj", Slug: "nightly", Name: &empty}); !res.Refused || res.Reason != schedrec.ReasonEmptyName {
 		t.Errorf("empty name: %+v", res)
 	}
-	if res := edit(t, h, wire.ScheduleEditRequest{Project: "proj", Slug: "nightly", Days: []string{}}); !res.Refused || res.Reason != schedrec.ReasonNoDays {
+	if res := edit(t, h, ops.ScheduleEditRequest{Project: "proj", Slug: "nightly", Days: []string{}}); !res.Refused || res.Reason != schedrec.ReasonNoDays {
 		t.Errorf("no days: %+v", res)
 	}
 	zero := 0.0
-	if res := edit(t, h, wire.ScheduleEditRequest{Project: "proj", Slug: "nightly", LateLimitHours: &zero}); !res.Refused || res.Reason != schedrec.ReasonInvalidLateLimit {
+	if res := edit(t, h, ops.ScheduleEditRequest{Project: "proj", Slug: "nightly", LateLimitHours: &zero}); !res.Refused || res.Reason != schedrec.ReasonInvalidLateLimit {
 		t.Errorf("late limit: %+v", res)
 	}
 	shown, err := h.Client.Schedules.Show(context.Background(), "proj", "nightly")
@@ -185,7 +185,7 @@ func TestSchedulesWrite_RenameKeepsOldRuns(t *testing.T) {
 	r.clock.Set(at(9, 0).Add(time.Minute))
 	r.waitRuns(t, 1)
 	name := "Renamed"
-	if res := edit(t, r.h, wire.ScheduleEditRequest{Project: "proj", Slug: "nightly", Name: &name}); res.Refused {
+	if res := edit(t, r.h, ops.ScheduleEditRequest{Project: "proj", Slug: "nightly", Name: &name}); res.Refused {
 		t.Fatalf("refused: %+v", res)
 	}
 	shown, err := r.h.Client.Schedules.Show(context.Background(), "proj", "nightly")
@@ -206,7 +206,7 @@ func TestSchedulesWrite_EditStartsNoRunForAnEarlierTime(t *testing.T) {
 	create(t, h, ctl)
 	clock.Set(at(9, 30))
 	late := 4.0
-	if res := edit(t, h, wire.ScheduleEditRequest{Project: "proj", Slug: "nightly", LateLimitHours: &late}); res.Refused {
+	if res := edit(t, h, ops.ScheduleEditRequest{Project: "proj", Slug: "nightly", LateLimitHours: &late}); res.Refused {
 		t.Fatalf("refused: %+v", res)
 	}
 	if err := h.Stop(); err != nil {
@@ -228,11 +228,11 @@ func TestSchedulesWrite_AWriteDoesPublishSchedulesChanged(t *testing.T) {
 	events := rigs.EventStream(t, h)
 	create(t, h, baseCreate())
 	name := "Evening"
-	edit(t, h, wire.ScheduleEditRequest{Project: "proj", Slug: "nightly", Name: &name})
+	edit(t, h, ops.ScheduleEditRequest{Project: "proj", Slug: "nightly", Name: &name})
 	for got := 0; got < 2; {
 		select {
 		case ev := <-events:
-			if ev.Type == wire.EventSchedulesChanged && ev.Address == "proj:nightly" {
+			if ev.Type == ops.EventSchedulesChanged && ev.Address == "proj:nightly" {
 				got++
 			}
 		case <-time.After(10 * time.Second):

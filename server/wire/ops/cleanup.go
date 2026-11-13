@@ -1,4 +1,4 @@
-package wire
+package ops
 
 // EventCleanupSizeChanged is emitted when a worktree's disk size lands; the
 // event's address is the project.

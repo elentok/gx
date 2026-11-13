@@ -17,7 +17,7 @@ import (
 
 	"golang.org/x/crypto/argon2"
 
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 const (
@@ -78,7 +78,7 @@ func (e *WebAuthWaitError) Error() string {
 }
 
 type webLoginRecord struct {
-	wire.WebLogin
+	ops.WebLogin
 	CookieHash string `json:"cookie_hash"`
 	// savedAt is the last used time on disk, to write at most once a minute.
 	savedAt time.Time
@@ -639,7 +639,7 @@ func signOutExcept(f webAuthFile, keep func(*webLoginRecord) bool) (webAuthFile,
 
 // Lookup finds the web login for a cookie and renews its last used time. A web
 // login idle for 90 days is refused and dropped.
-func (w *WebAuth) Lookup(cookie, ip string) (wire.WebLogin, bool) {
+func (w *WebAuth) Lookup(cookie, ip string) (ops.WebLogin, bool) {
 	sum := sha256.Sum256([]byte(cookie))
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -651,12 +651,12 @@ func (w *WebAuth) Lookup(cookie, ip string) (wire.WebLogin, bool) {
 		}
 	}
 	if found == nil {
-		return wire.WebLogin{}, false
+		return ops.WebLogin{}, false
 	}
 	now := w.now()
 	if now.Sub(found.LastUsed) >= webLoginIdleLimit {
 		w.dropLoginLocked(found.ID)
-		return wire.WebLogin{}, false
+		return ops.WebLogin{}, false
 	}
 	found.LastUsed, found.LastIP = now, ip
 	if now.Sub(found.savedAt) >= webLoginWriteInterval {
@@ -670,10 +670,10 @@ func (w *WebAuth) Lookup(cookie, ip string) (wire.WebLogin, bool) {
 }
 
 // List returns the web logins, oldest first.
-func (w *WebAuth) List() []wire.WebLogin {
+func (w *WebAuth) List() []ops.WebLogin {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	out := make([]wire.WebLogin, 0, len(w.file.Logins))
+	out := make([]ops.WebLogin, 0, len(w.file.Logins))
 	for _, rec := range w.file.Logins {
 		out = append(out, rec.WebLogin)
 	}
@@ -771,7 +771,7 @@ func newWebLoginRecord(userAgent, ip string, at time.Time) (string, *webLoginRec
 	cookie := base64.RawURLEncoding.EncodeToString(raw)
 	sum := sha256.Sum256([]byte(cookie))
 	return cookie, &webLoginRecord{
-		WebLogin: wire.WebLogin{
+		WebLogin: ops.WebLogin{
 			ID:        hex.EncodeToString(id),
 			Name:      deviceName(userAgent),
 			UserAgent: userAgent,

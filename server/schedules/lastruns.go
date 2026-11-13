@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -34,14 +34,14 @@ func skipText(reason string, lateLimitHours float64) string {
 }
 
 type lastRow struct {
-	run  wire.ScheduleRun
+	run  ops.ScheduleRun
 	at   time.Time
 	path string // the One-off's file, to read its Result
 }
 
 // LastRuns is the Schedule's newest ten runs: its One-offs from every machine
 // sharing the store (live and archived) plus the skips this machine logged.
-func LastRuns(ticketStore string, st *State, k Key, lateLimitHours float64) ([]wire.ScheduleRun, error) {
+func LastRuns(ticketStore string, st *State, k Key, lateLimitHours float64) ([]ops.ScheduleRun, error) {
 	live, archived, err := tickets.LoadOneOffs(filepath.Join(ticketStore, k.Project))
 	if err != nil {
 		return nil, err
@@ -61,10 +61,10 @@ func LastRuns(ticketStore string, st *State, k Key, lateLimitHours float64) ([]w
 	for _, sk := range st.Skips(k) {
 		rows = append(rows, lastRow{
 			at: sk.SetTime,
-			run: wire.ScheduleRun{
+			run: ops.ScheduleRun{
 				ScheduledFor:     sk.SetTime.Format(time.RFC3339),
 				CreatedAt:        sk.LoggedAt.Format(time.RFC3339),
-				Status:           wire.ScheduleRunSkipped,
+				Status:           ops.ScheduleRunSkipped,
 				Reason:           sk.Reason,
 				ReasonText:       skipText(sk.Reason, lateLimitHours),
 				AttentionAddress: sk.Blocking,
@@ -75,7 +75,7 @@ func LastRuns(ticketStore string, st *State, k Key, lateLimitHours float64) ([]w
 	if len(rows) > LastRunsLimit {
 		rows = rows[:LastRunsLimit]
 	}
-	out := make([]wire.ScheduleRun, len(rows))
+	out := make([]ops.ScheduleRun, len(rows))
 	for i, r := range rows {
 		if r.path != "" {
 			r.run.Result = resultLine(r.path)
@@ -86,7 +86,7 @@ func LastRuns(ticketStore string, st *State, k Key, lateLimitHours float64) ([]w
 }
 
 func oneOffRow(project, epic string, t tickets.Ticket) lastRow {
-	run := wire.ScheduleRun{
+	run := ops.ScheduleRun{
 		Address: tickets.Address{Project: project, Epic: epic, ID: t.DisplayNumber()}.String(),
 		Status:  oneOffStatus(t),
 	}
@@ -103,21 +103,21 @@ func oneOffRow(project, epic string, t tickets.Ticket) lastRow {
 	return lastRow{run: run, at: at, path: t.FilePath()}
 }
 
-func oneOffStatus(t tickets.Ticket) wire.ScheduleRunStatus {
+func oneOffStatus(t tickets.Ticket) ops.ScheduleRunStatus {
 	switch t.RawStatus() {
 	case tickets.StatusClaimed:
-		return wire.ScheduleRunRunning
+		return ops.ScheduleRunRunning
 	case tickets.StatusDone:
 		if !t.ScheduledFor.IsZero() && t.CreatedAt.Sub(t.ScheduledFor) > lateAfter {
-			return wire.ScheduleRunRanLate
+			return ops.ScheduleRunRanLate
 		}
-		return wire.ScheduleRunFinished
+		return ops.ScheduleRunFinished
 	case tickets.StatusPausedAnswer, tickets.StatusPausedRepair:
-		return wire.ScheduleRunPaused
+		return ops.ScheduleRunPaused
 	case tickets.StatusCancelled:
-		return wire.ScheduleRunCancelled
+		return ops.ScheduleRunCancelled
 	default:
-		return wire.ScheduleRunQueued
+		return ops.ScheduleRunQueued
 	}
 }
 

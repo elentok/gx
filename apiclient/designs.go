@@ -5,6 +5,8 @@ import (
 	"net/url"
 
 	"github.com/elentok/gx/server/wire"
+
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // designs holds the Design methods of Sessions. Sessions embeds it, so callers
@@ -39,23 +41,23 @@ func (s *designs) DesignWorktree(ctx context.Context, req wire.DesignWorktreeReq
 }
 
 // DesignDrafts lists the New Design drafts, most recently edited first.
-func (s *designs) DesignDrafts(ctx context.Context) ([]wire.DesignDraftItem, error) {
-	var items []wire.DesignDraftItem
+func (s *designs) DesignDrafts(ctx context.Context) ([]ops.DesignDraftItem, error) {
+	var items []ops.DesignDraftItem
 	err := s.t.get(ctx, "/v1/designs/drafts", &items)
 	return items, err
 }
 
 // DesignDraft reads one draft. A gone draft is a refused result, not an error.
-func (s *designs) DesignDraft(ctx context.Context, id string) (wire.DesignDraftSaveResult, error) {
-	var res wire.DesignDraftSaveResult
+func (s *designs) DesignDraft(ctx context.Context, id string) (ops.DesignDraftSaveResult, error) {
+	var res ops.DesignDraftSaveResult
 	err := s.t.get(ctx, "/v1/designs/drafts/read?id="+url.QueryEscape(id), &res)
 	return res, err
 }
 
 // SaveDesignDraft saves a draft's text fields against req.Revision. A stale
 // revision or a gone draft is a refused result, not an error.
-func (s *designs) SaveDesignDraft(ctx context.Context, req wire.DesignDraftSaveRequest) (wire.DesignDraftSaveResult, error) {
-	var res wire.DesignDraftSaveResult
+func (s *designs) SaveDesignDraft(ctx context.Context, req ops.DesignDraftSaveRequest) (ops.DesignDraftSaveResult, error) {
+	var res ops.DesignDraftSaveResult
 	err := s.t.post(ctx, "/v1/designs/drafts/save", req, &res)
 	return res, err
 }
@@ -93,23 +95,23 @@ func (s *designs) RemoveDesignDraftImage(ctx context.Context, id, image string) 
 }
 
 // DeleteDesignDraftdeletes a draft. A draft already gone is not an error.
-func (s *designs) DeleteDesignDraft(ctx context.Context, id string) (wire.DesignDraftSaveResult, error) {
-	var res wire.DesignDraftSaveResult
-	err := s.t.post(ctx, "/v1/designs/drafts/delete", wire.DesignDraftDeleteRequest{ID: id}, &res)
+func (s *designs) DeleteDesignDraft(ctx context.Context, id string) (ops.DesignDraftSaveResult, error) {
+	var res ops.DesignDraftSaveResult
+	err := s.t.post(ctx, "/v1/designs/drafts/delete", ops.DesignDraftDeleteRequest{ID: id}, &res)
 	return res, err
 }
 
 // DesignLastProject reads the project the New Design form last used ("" on a
 // fresh server).
-func (s *designs) DesignLastProject(ctx context.Context) (wire.DesignLastProject, error) {
-	var res wire.DesignLastProject
+func (s *designs) DesignLastProject(ctx context.Context) (ops.DesignLastProject, error) {
+	var res ops.DesignLastProject
 	err := s.t.get(ctx, "/v1/designs/drafts/last-project", &res)
 	return res, err
 }
 
 // SetDesignLastProject records the last-used project; the newest write wins.
-func (s *designs) SetDesignLastProject(ctx context.Context, project string) (wire.DesignLastProject, error) {
-	var res wire.DesignLastProject
-	err := s.t.post(ctx, "/v1/designs/drafts/last-project", wire.DesignLastProject{Project: project}, &res)
+func (s *designs) SetDesignLastProject(ctx context.Context, project string) (ops.DesignLastProject, error) {
+	var res ops.DesignLastProject
+	err := s.t.post(ctx, "/v1/designs/drafts/last-project", ops.DesignLastProject{Project: project}, &res)
 	return res, err
 }

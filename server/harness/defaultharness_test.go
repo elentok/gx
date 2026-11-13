@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 func readJSONFile(t *testing.T, path string) map[string]any {
@@ -165,11 +166,11 @@ func TestDefaultHarness_GenericWriteEndpointRunsTheHook(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
-	set := func(project, harness string) wire.SettingsWriteResult {
+	set := func(project, harness string) ops.SettingsWriteResult {
 		t.Helper()
-		res, err := h.Client.Admin.SetSettings(context.Background(), wire.SettingsWriteRequest{
+		res, err := h.Client.Admin.SetSettings(context.Background(), ops.SettingsWriteRequest{
 			Project: project,
-			Changes: []wire.SettingChange{{Key: "agents.default-harness", Value: json.RawMessage(`"` + harness + `"`)}},
+			Changes: []ops.SettingChange{{Key: "agents.default-harness", Value: json.RawMessage(`"` + harness + `"`)}},
 		})
 		if err != nil {
 			t.Fatal(err)

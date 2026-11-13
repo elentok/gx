@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/spf13/cobra"
 )
 
@@ -162,11 +163,11 @@ func printDraftImageResult(w io.Writer, jsonOut bool, res wire.SessionImageResul
 
 // draftNotRunning is the refusal every drafts verb prints when no server
 // answers: the verbs never start the server.
-func draftNotRunning(err error) (wire.DesignDraftSaveResult, bool) {
+func draftNotRunning(err error) (ops.DesignDraftSaveResult, bool) {
 	if apiclient.IsNotRunning(err) {
-		return wire.DesignDraftSaveResult{Refused: true, Reason: wire.ReasonServerNotRunning}, true
+		return ops.DesignDraftSaveResult{Refused: true, Reason: wire.ReasonServerNotRunning}, true
 	}
-	return wire.DesignDraftSaveResult{}, false
+	return ops.DesignDraftSaveResult{}, false
 }
 
 func writeDraftJSON(w io.Writer, v any) error {
@@ -181,7 +182,7 @@ func writeDraftJSON(w io.Writer, v any) error {
 
 // printDraftResult prints a read, save or delete result: the JSON form, or a
 // refusal as an error, or text via ok.
-func printDraftResult(w io.Writer, jsonOut bool, res wire.DesignDraftSaveResult, err error, ok func(wire.DesignDraftSaveResult) error) error {
+func printDraftResult(w io.Writer, jsonOut bool, res ops.DesignDraftSaveResult, err error, ok func(ops.DesignDraftSaveResult) error) error {
 	if r, down := draftNotRunning(err); down {
 		res, err = r, nil
 	}
@@ -210,7 +211,7 @@ func runDraftsList(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonO
 	}
 	if jsonOut {
 		return writeDraftJSON(w, struct {
-			Drafts []wire.DesignDraftItem `json:"drafts"`
+			Drafts []ops.DesignDraftItem `json:"drafts"`
 		}{items})
 	}
 	for _, it := range items {
@@ -230,7 +231,7 @@ func runDraftsList(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonO
 
 func runDraftsShow(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string) error {
 	res, err := cl.Sessions.DesignDraft(ctx, id)
-	return printDraftResult(w, jsonOut, res, err, func(res wire.DesignDraftSaveResult) error {
+	return printDraftResult(w, jsonOut, res, err, func(res ops.DesignDraftSaveResult) error {
 		_, err := fmt.Fprintln(w, res.Draft.Idea)
 		return err
 	})
@@ -238,12 +239,12 @@ func runDraftsShow(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonO
 
 func runDraftsDelete(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string) error {
 	res, err := cl.Sessions.DeleteDesignDraft(ctx, id)
-	return printDraftResult(w, jsonOut, res, err, func(wire.DesignDraftSaveResult) error { return nil })
+	return printDraftResult(w, jsonOut, res, err, func(ops.DesignDraftSaveResult) error { return nil })
 }
 
-func runDraftsSave(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req wire.DesignDraftSaveRequest) error {
+func runDraftsSave(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req ops.DesignDraftSaveRequest) error {
 	res, err := cl.Sessions.SaveDesignDraft(ctx, req)
-	return printDraftResult(w, jsonOut, res, err, func(res wire.DesignDraftSaveResult) error {
+	return printDraftResult(w, jsonOut, res, err, func(res ops.DesignDraftSaveResult) error {
 		if res.Deleted {
 			return nil
 		}
@@ -309,7 +310,7 @@ func newDraftsDeleteCmd(d Deps) *cobra.Command {
 // runDraftsLastProject prints the shared last-used project, or sets it when
 // project is non-empty and prints the new value.
 func runDraftsLastProject(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, project string) error {
-	var res wire.DesignLastProject
+	var res ops.DesignLastProject
 	var err error
 	if project == "" {
 		res, err = cl.Sessions.DesignLastProject(ctx)
@@ -353,7 +354,7 @@ func newDraftsLastProjectCmd(d Deps) *cobra.Command {
 
 func newDraftsSaveCmd(d Deps) *cobra.Command {
 	var jsonOut bool
-	var req wire.DesignDraftSaveRequest
+	var req ops.DesignDraftSaveRequest
 	cmd := &cobra.Command{
 		Use:   "save <id> --revision <n> [--project p] [--slug s] [--idea text|-] [--name n]",
 		Short: "save a draft's text fields against the revision you last saw",

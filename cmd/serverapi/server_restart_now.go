@@ -8,7 +8,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +41,7 @@ func runServerRestartNow(ctx context.Context, cl *apiclient.Client, w io.Writer,
 	if err != nil {
 		return fmt.Errorf("server read failed: %w", err)
 	}
-	if rep.Status != wire.RestartCheckOK {
+	if rep.Status != ops.RestartCheckOK {
 		return fmt.Errorf("restart check failed (%s): %s", rep.Status, rep.Error)
 	}
 	res, err := cl.Admin.Restart(ctx, restartRequestFor(rep))
@@ -59,8 +59,8 @@ func runServerRestartNow(ctx context.Context, cl *apiclient.Client, w io.Writer,
 }
 
 // restartRequestFor confirms the values a check showed.
-func restartRequestFor(rep wire.RestartCheckReport) wire.RestartRequest {
-	req := wire.RestartRequest{NewVersion: rep.NewVersion, ConfigOK: rep.Config.OK, FailingProjects: []string{}}
+func restartRequestFor(rep ops.RestartCheckReport) ops.RestartRequest {
+	req := ops.RestartRequest{NewVersion: rep.NewVersion, ConfigOK: rep.Config.OK, FailingProjects: []string{}}
 	for _, p := range rep.Projects {
 		if !p.OK {
 			req.FailingProjects = append(req.FailingProjects, p.Name)
@@ -98,12 +98,12 @@ func newServerRestartCheckCmd(d Deps) *cobra.Command {
 	return c
 }
 
-func writeRestartCheck(w io.Writer, rep wire.RestartCheckReport) error {
+func writeRestartCheck(w io.Writer, rep ops.RestartCheckReport) error {
 	fmt.Fprintf(w, "running: %s\nbinary:  %s\n", rep.RunningVersion, rep.Binary)
 	switch rep.Status {
-	case wire.RestartCheckTooOld:
+	case ops.RestartCheckTooOld:
 		fmt.Fprintf(w, "too old: %s\n%s\n", rep.Error, rep.Hint)
-	case wire.RestartCheckUnreadable:
+	case ops.RestartCheckUnreadable:
 		fmt.Fprintf(w, "unreadable version: %s\n", rep.Error)
 	default:
 		fmt.Fprintf(w, "new:     %s\n", rep.NewVersion)

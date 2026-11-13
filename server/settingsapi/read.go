@@ -10,14 +10,14 @@ import (
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/config/registry"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // Read returns the entries that apply to the target with the values its file
 // holds. Secrets carry only whether they are set. pendingRestart is passed
 // through for the page's "Restart needed" notice.
-func (w *Writer) Read(t Target, pendingRestart []string) (wire.SettingsReadResponse, error) {
-	resp := wire.SettingsReadResponse{PendingRestart: pendingRestart, Entries: []wire.SettingsEntry{}}
+func (w *Writer) Read(t Target, pendingRestart []string) (ops.SettingsReadResponse, error) {
+	resp := ops.SettingsReadResponse{PendingRestart: pendingRestart, Entries: []ops.SettingsEntry{}}
 	globalDoc, err := readDoc(w.GlobalPath)
 	if err != nil {
 		return resp, err
@@ -55,12 +55,12 @@ func (w *Writer) Read(t Target, pendingRestart []string) (wire.SettingsReadRespo
 	return resp, nil
 }
 
-func buildEntry(e registry.Entry, project bool, targetDoc, globalDoc []byte) wire.SettingsEntry {
+func buildEntry(e registry.Entry, project bool, targetDoc, globalDoc []byte) ops.SettingsEntry {
 	path := e.Key
 	if project {
 		path = e.ProjectPath()
 	}
-	out := wire.SettingsEntry{
+	out := ops.SettingsEntry{
 		Key: e.Key.String(), Path: e.Key, Type: typeName(e.Type), Section: e.Section.String(),
 		Description: e.Description, Enum: e.Enum, Min: e.Min, Integer: e.Integer,
 		Restart: e.Restart, Risky: e.Risky, ConfirmText: e.ConfirmText, ReadOnly: e.ReadOnly, Identity: e.Identity,
@@ -104,13 +104,13 @@ func globalValue(e registry.Entry, globalDoc []byte) (string, json.RawMessage) {
 	return key.String(), nil
 }
 
-func projectInfo(name string, doc []byte) (*wire.SettingsProject, error) {
+func projectInfo(name string, doc []byte) (*ops.SettingsProject, error) {
 	pf, err := config.ParseProjectFile(doc)
 	if err != nil {
 		return nil, err
 	}
 	// An unset vcs means git: only a repo-less project writes "none".
-	info := &wire.SettingsProject{Name: name, VCS: "git"}
+	info := &ops.SettingsProject{Name: name, VCS: "git"}
 	if pf.Name != nil {
 		info.Name = *pf.Name
 	}

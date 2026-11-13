@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 type apiFixture struct {
@@ -36,9 +36,9 @@ func startAPI(t *testing.T, fields map[string]any) apiFixture {
 	return apiFixture{h: servertest.StartWithStore(t, store, servertest.WithConfigFile(path)), store: store, config: path}
 }
 
-func (f apiFixture) set(t *testing.T, project string, changes ...wire.SettingChange) wire.SettingsWriteResult {
+func (f apiFixture) set(t *testing.T, project string, changes ...ops.SettingChange) ops.SettingsWriteResult {
 	t.Helper()
-	res, err := f.h.Client.Admin.SetSettings(context.Background(), wire.SettingsWriteRequest{Project: project, Changes: changes})
+	res, err := f.h.Client.Admin.SetSettings(context.Background(), ops.SettingsWriteRequest{Project: project, Changes: changes})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,11 +61,11 @@ type queueConfig struct {
 	Budget map[string]any `json:"budget"`
 }
 
-func val(key, v string) wire.SettingChange {
-	return wire.SettingChange{Key: key, Value: json.RawMessage(v)}
+func val(key, v string) ops.SettingChange {
+	return ops.SettingChange{Key: key, Value: json.RawMessage(v)}
 }
 
-func remove(key string) wire.SettingChange { return wire.SettingChange{Key: key, Remove: true} }
+func remove(key string) ops.SettingChange { return ops.SettingChange{Key: key, Remove: true} }
 
 func TestWriteSetAndRemoveKeepOtherKeys(t *testing.T) {
 	f := startAPI(t, map[string]any{"execution-queue": map[string]any{"max-agents": 2, "max-one-off-agents": 4}, "budget": map[string]any{"soft-limit": 10}})
@@ -143,7 +143,7 @@ func TestWriteWithWatcherReloadsOnceWithoutBanner(t *testing.T) {
 func TestWriteConcurrentSavesAreBothKept(t *testing.T) {
 	f := startAPI(t, nil)
 	var wg sync.WaitGroup
-	for _, c := range []wire.SettingChange{val("execution-queue.max-agents", "4"), val("execution-queue.max-one-off-agents", "5")} {
+	for _, c := range []ops.SettingChange{val("execution-queue.max-agents", "4"), val("execution-queue.max-one-off-agents", "5")} {
 		wg.Go(func() { f.set(t, "", c) })
 	}
 	wg.Wait()

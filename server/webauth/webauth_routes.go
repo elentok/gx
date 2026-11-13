@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // Refusal reasons of the web login routes (ADR 0028).
@@ -128,7 +129,7 @@ type webAuthBody struct {
 }
 
 type webLoginEntry struct {
-	wire.WebLogin
+	ops.WebLogin
 	ThisDevice bool `json:"this_device"`
 }
 
@@ -180,10 +181,10 @@ func RemoteIP(r *http.Request) string {
 }
 
 // webLoginFor finds the web login behind the request's cookie.
-func (g *Gate) webLoginFor(r *http.Request) (wire.WebLogin, string, bool) {
+func (g *Gate) webLoginFor(r *http.Request) (ops.WebLogin, string, bool) {
 	c, err := r.Cookie(g.cookie)
 	if err != nil {
-		return wire.WebLogin{}, "", false
+		return ops.WebLogin{}, "", false
 	}
 	login, ok := g.Lookup(c.Value, RemoteIP(r))
 	return login, c.Value, ok

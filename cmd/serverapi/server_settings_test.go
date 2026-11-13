@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config/registry"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 const secretToken = "123456:SECRET-TOKEN-VALUE"
@@ -42,7 +42,7 @@ func TestServerSettings_JSONMatchesEndpointAndHidesSecrets(t *testing.T) {
 		if strings.Contains(out.String(), secretToken) {
 			t.Errorf("%s output leaks the secret", target)
 		}
-		var got wire.SettingsReadResponse
+		var got ops.SettingsReadResponse
 		if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 			t.Fatalf("%s cli json: %v", target, err)
 		}
@@ -90,7 +90,7 @@ func TestServerSettingsSet_ResultMatchesEndpoint(t *testing.T) {
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
 	ctx := context.Background()
 
-	run := func(req wire.SettingsWriteRequest) wire.SettingsWriteResult {
+	run := func(req ops.SettingsWriteRequest) ops.SettingsWriteResult {
 		t.Helper()
 		var out bytes.Buffer
 		runErr := runServerSettingsSet(ctx, h.Client, &out, req, true)
@@ -98,7 +98,7 @@ func TestServerSettingsSet_ResultMatchesEndpoint(t *testing.T) {
 		if runErr != nil && !(errors.As(runErr, &exit) && exit.Code == 1) {
 			t.Fatal(runErr)
 		}
-		var got wire.SettingsWriteResult
+		var got ops.SettingsWriteResult
 		if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 			t.Fatalf("cli json %s: %v", out.String(), err)
 		}
@@ -117,19 +117,19 @@ func TestServerSettingsSet_ResultMatchesEndpoint(t *testing.T) {
 		return got
 	}
 
-	if res := run(wire.SettingsWriteRequest{Changes: []wire.SettingChange{{Key: "execution-queue.max-agents", Value: json.RawMessage("5")}}}); res.Refused {
+	if res := run(ops.SettingsWriteRequest{Changes: []ops.SettingChange{{Key: "execution-queue.max-agents", Value: json.RawMessage("5")}}}); res.Refused {
 		t.Fatalf("set refused: %+v", res)
 	}
-	if res := run(wire.SettingsWriteRequest{Changes: []wire.SettingChange{{Key: "execution-queue.max-agents", Remove: true}}}); res.Refused {
+	if res := run(ops.SettingsWriteRequest{Changes: []ops.SettingChange{{Key: "execution-queue.max-agents", Remove: true}}}); res.Refused {
 		t.Fatalf("remove refused: %+v", res)
 	}
-	if res := run(wire.SettingsWriteRequest{Project: "proj", Changes: []wire.SettingChange{{Key: "project.max-agents", Value: json.RawMessage("3")}}}); res.Refused {
+	if res := run(ops.SettingsWriteRequest{Project: "proj", Changes: []ops.SettingChange{{Key: "project.max-agents", Value: json.RawMessage("3")}}}); res.Refused {
 		t.Fatalf("project set refused: %+v", res)
 	}
 	if b, err := os.ReadFile(filepath.Join(store, "proj", "project.json")); err != nil || !strings.Contains(string(b), `"max-agents": 3`) {
 		t.Fatalf("project.json = %s, %v", b, err)
 	}
-	res := run(wire.SettingsWriteRequest{Changes: []wire.SettingChange{{Key: "execution-queue.max-agents", Value: json.RawMessage(`"x"`)}}})
+	res := run(ops.SettingsWriteRequest{Changes: []ops.SettingChange{{Key: "execution-queue.max-agents", Value: json.RawMessage(`"x"`)}}})
 	if !res.Refused || len(res.Keys) != 1 || res.Keys[0] != "execution-queue.max-agents" {
 		t.Fatalf("bad value result = %+v", res)
 	}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/config/registry"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 const (
@@ -17,7 +17,7 @@ const (
 	testWebhook = "https://hooks.slack.example/SECRET-WEBHOOK"
 )
 
-func entryByKey(t *testing.T, resp wire.SettingsReadResponse, key string) wire.SettingsEntry {
+func entryByKey(t *testing.T, resp ops.SettingsReadResponse, key string) ops.SettingsEntry {
 	t.Helper()
 	for _, e := range resp.Entries {
 		if e.Key == key {
@@ -25,10 +25,10 @@ func entryByKey(t *testing.T, resp wire.SettingsReadResponse, key string) wire.S
 		}
 	}
 	t.Fatalf("no entry %s", key)
-	return wire.SettingsEntry{}
+	return ops.SettingsEntry{}
 }
 
-func hasKey(resp wire.SettingsReadResponse, key string) bool {
+func hasKey(resp ops.SettingsReadResponse, key string) bool {
 	for _, e := range resp.Entries {
 		if e.Key == key {
 			return true

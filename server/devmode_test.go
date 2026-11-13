@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/server/devvite/vitetest"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 type devRig struct {
@@ -151,8 +152,8 @@ func TestDevMode_SettingsWriteStartsViteAndSurvivesARestart(t *testing.T) {
 	checkout := vitetest.WriteDevCheckout(t, true)
 	r := startDevRig(t, checkout, false)
 	r.fake.Release()
-	res, err := r.h.Client.Admin.SetSettings(context.Background(), wire.SettingsWriteRequest{
-		Changes: []wire.SettingChange{{Key: "server.web.dev-frontend", Value: json.RawMessage("true")}},
+	res, err := r.h.Client.Admin.SetSettings(context.Background(), ops.SettingsWriteRequest{
+		Changes: []ops.SettingChange{{Key: "server.web.dev-frontend", Value: json.RawMessage("true")}},
 	})
 	if err != nil || res.Refused {
 		t.Fatalf("write = %+v, %v", res, err)

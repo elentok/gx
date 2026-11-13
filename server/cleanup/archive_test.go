@@ -8,13 +8,13 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
 
-func archiveReq(epic string) wire.CleanupWriteRequest {
-	return wire.CleanupWriteRequest{Project: "proj", Epic: epic}
+func archiveReq(epic string) ops.CleanupWriteRequest {
+	return ops.CleanupWriteRequest{Project: "proj", Epic: epic}
 }
 
 func TestCleanupArchive_DoneMergedEpicLeavesTheActiveList(t *testing.T) {
@@ -73,7 +73,7 @@ func TestCleanupArchive_RefusesAQueuedEpic(t *testing.T) {
 	}
 
 	res, err := h.Client.Reads.ArchiveCleanupEpic(ctx, archiveReq("queued"))
-	if err != nil || !res.Refused || res.Reason != wire.ReasonCleanupQueued || res.Message == "" {
+	if err != nil || !res.Refused || res.Reason != ops.ReasonCleanupQueued || res.Message == "" {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
 	if archived, _ := tickets.ArchivedEpicNames(filepath.Join(store, "proj")); archived["queued"] {

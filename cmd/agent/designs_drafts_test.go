@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 func TestDesignsDrafts_ListShowDelete(t *testing.T) {
@@ -35,7 +36,7 @@ func TestDesignsDrafts_ListShowDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	var listed struct {
-		Drafts []wire.DesignDraftItem `json:"drafts"`
+		Drafts []ops.DesignDraftItem `json:"drafts"`
 	}
 	if err := json.Unmarshal(out.Bytes(), &listed); err != nil || len(listed.Drafts) != 1 || listed.Drafts[0].ID != d.ID {
 		t.Errorf("list --json = %s, %v", out.String(), err)
@@ -53,7 +54,7 @@ func TestDesignsDrafts_ListShowDelete(t *testing.T) {
 	if err := runDraftsShow(ctx, h.Client, &out, true, d.ID); err != nil {
 		t.Fatal(err)
 	}
-	var shown wire.DesignDraftSaveResult
+	var shown ops.DesignDraftSaveResult
 	if err := json.Unmarshal(out.Bytes(), &shown); err != nil || shown.Draft == nil || shown.Draft.ID != d.ID {
 		t.Errorf("show --json = %s, %v", out.String(), err)
 	}
@@ -63,7 +64,7 @@ func TestDesignsDrafts_ListShowDelete(t *testing.T) {
 		t.Fatalf("delete = %q, %v", out.String(), err)
 	}
 	err = runDraftsShow(ctx, h.Client, &out, false, d.ID)
-	if err == nil || !strings.Contains(err.Error(), wire.ReasonDraftGone) {
+	if err == nil || !strings.Contains(err.Error(), ops.ReasonDraftGone) {
 		t.Errorf("show after delete: err = %v, want a draft-gone refusal", err)
 	}
 }
@@ -84,7 +85,7 @@ func TestDesignsDrafts_LastProject(t *testing.T) {
 	if err := runDraftsLastProject(ctx, h.Client, &out, true, ""); err != nil {
 		t.Fatal(err)
 	}
-	var got wire.DesignLastProject
+	var got ops.DesignLastProject
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil || got.Project != "alpha" {
 		t.Errorf("read --json = %s, %v", out.String(), err)
 	}
@@ -184,9 +185,9 @@ func TestDesignsDrafts_SaveRevisionConflict(t *testing.T) {
 		t.Fatal(d, err)
 	}
 	var out bytes.Buffer
-	req := wire.DesignDraftSaveRequest{ID: d.ID, Project: "proj", Idea: "new", Revision: d.Revision + 3}
+	req := ops.DesignDraftSaveRequest{ID: d.ID, Project: "proj", Idea: "new", Revision: d.Revision + 3}
 	err = runDraftsSave(context.Background(), h.Client, &out, false, req)
-	if err == nil || !strings.Contains(err.Error(), wire.ReasonDraftRevisionConflict) {
+	if err == nil || !strings.Contains(err.Error(), ops.ReasonDraftRevisionConflict) {
 		t.Errorf("stale save: err = %v, want revision-conflict", err)
 	}
 	req.Revision = d.Revision

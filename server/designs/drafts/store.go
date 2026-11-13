@@ -19,6 +19,7 @@ import (
 
 	"github.com/elentok/gx/server/imagestore"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 const (
@@ -60,14 +61,14 @@ func (s *Store) lock(id string) func() {
 	return mu.Unlock
 }
 
-func isEmpty(d *wire.DesignDraft) bool {
+func isEmpty(d *ops.DesignDraft) bool {
 	return d.Name == "" && d.Slug == "" && d.Idea == "" && len(d.Images) == 0
 }
 
 // Create stores a new draft at revision 1. A draft with nothing in it stores
 // nothing and returns nil.
-func (s *Store) Create(project, slug, idea, name string) (*wire.DesignDraft, error) {
-	d := &wire.DesignDraft{Project: project, Slug: slug, Idea: idea, Name: name, Images: []string{}}
+func (s *Store) Create(project, slug, idea, name string) (*ops.DesignDraft, error) {
+	d := &ops.DesignDraft{Project: project, Slug: slug, Idea: idea, Name: name, Images: []string{}}
 	if isEmpty(d) {
 		return nil, nil
 	}
@@ -87,7 +88,7 @@ func (s *Store) Create(project, slug, idea, name string) (*wire.DesignDraft, err
 }
 
 // Get reads a draft without changing its revision or edited-at.
-func (s *Store) Get(id string) (*wire.DesignDraft, error) {
+func (s *Store) Get(id string) (*ops.DesignDraft, error) {
 	if !idPattern.MatchString(id) {
 		return nil, ErrNotFound
 	}
@@ -98,7 +99,7 @@ func (s *Store) Get(id string) (*wire.DesignDraft, error) {
 	if err != nil {
 		return nil, err
 	}
-	var d wire.DesignDraft
+	var d ops.DesignDraft
 	if err := json.Unmarshal(b, &d); err != nil {
 		return nil, fmt.Errorf("draft %s: %w", id, err)
 	}
@@ -109,15 +110,15 @@ func (s *Store) Get(id string) (*wire.DesignDraft, error) {
 }
 
 // List returns every draft, most recently edited first. An unreadable draft is skipped.
-func (s *Store) List() ([]wire.DesignDraftItem, error) {
+func (s *Store) List() ([]ops.DesignDraftItem, error) {
 	entries, err := os.ReadDir(s.root)
 	if errors.Is(err, os.ErrNotExist) {
-		return []wire.DesignDraftItem{}, nil
+		return []ops.DesignDraftItem{}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	items := []wire.DesignDraftItem{}
+	items := []ops.DesignDraftItem{}
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
@@ -126,7 +127,7 @@ func (s *Store) List() ([]wire.DesignDraftItem, error) {
 		if err != nil {
 			continue
 		}
-		items = append(items, wire.DesignDraftItem{
+		items = append(items, ops.DesignDraftItem{
 			ID: d.ID, Project: d.Project, Slug: d.Slug, Idea: d.Idea, Name: d.Name,
 			ImageCount: len(d.Images), EditedAt: d.EditedAt,
 		})
@@ -138,41 +139,41 @@ func (s *Store) List() ([]wire.DesignDraftItem, error) {
 // Save applies a text save. It never touches the image list. A stale revision
 // or a missing draft is a refused result, not an error. A save that leaves the
 // draft empty deletes it and reports Deleted.
-func (s *Store) Save(id string, req wire.DesignDraftSaveRequest) (wire.DesignDraftSaveResult, error) {
+func (s *Store) Save(id string, req ops.DesignDraftSaveRequest) (ops.DesignDraftSaveResult, error) {
 	if !idPattern.MatchString(id) {
-		return wire.DesignDraftSaveResult{Refused: true, Reason: wire.ReasonDraftGone}, nil
+		return ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftGone}, nil
 	}
 	unlock := s.lock(id)
 	defer unlock()
 	d, err := s.Get(id)
 	if errors.Is(err, ErrNotFound) {
-		return wire.DesignDraftSaveResult{Refused: true, Reason: wire.ReasonDraftGone}, nil
+		return ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftGone}, nil
 	}
 	if err != nil {
-		return wire.DesignDraftSaveResult{}, err
+		return ops.DesignDraftSaveResult{}, err
 	}
 	if d.Revision != req.Revision {
-		return wire.DesignDraftSaveResult{Refused: true, Reason: wire.ReasonDraftRevisionConflict}, nil
+		return ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftRevisionConflict}, nil
 	}
 	d.Project, d.Slug, d.Idea, d.Name = req.Project, req.Slug, req.Idea, req.Name
 	if isEmpty(d) {
 		if err := os.RemoveAll(s.dir(id)); err != nil {
-			return wire.DesignDraftSaveResult{}, err
+			return ops.DesignDraftSaveResult{}, err
 		}
-		return wire.DesignDraftSaveResult{Deleted: true}, nil
+		return ops.DesignDraftSaveResult{Deleted: true}, nil
 	}
 	d.Revision++
 	if !req.KeepEditedAt {
 		d.EditedAt = s.now().UTC()
 	}
 	if err := s.write(d); err != nil {
-		return wire.DesignDraftSaveResult{}, err
+		return ops.DesignDraftSaveResult{}, err
 	}
-	return wire.DesignDraftSaveResult{Draft: d}, nil
+	return ops.DesignDraftSaveResult{Draft: d}, nil
 }
 
 func goneImage() wire.SessionImageResult {
-	return imagestore.Refusal(wire.ReasonDraftGone, "draft is gone")
+	return imagestore.Refusal(ops.ReasonDraftGone, "draft is gone")
 }
 
 // AddImage stores one image in the draft's folder and lists its id on the
@@ -275,7 +276,7 @@ func (s *Store) SetLastProject(project string) error {
 	return writeAtomic(filepath.Join(s.root, lastUsedRec), b)
 }
 
-func (s *Store) write(d *wire.DesignDraft) error {
+func (s *Store) write(d *ops.DesignDraft) error {
 	b, err := json.MarshalIndent(d, "", "  ")
 	if err != nil {
 		return err

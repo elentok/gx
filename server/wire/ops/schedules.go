@@ -1,4 +1,4 @@
-package wire
+package ops
 
 // ScheduleRunStatus is where one Last runs row stands.
 type ScheduleRunStatus string

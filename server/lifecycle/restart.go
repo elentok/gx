@@ -13,6 +13,8 @@ import (
 	"syscall"
 
 	"github.com/elentok/gx/server/wire"
+
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // RestartConfig is what the restart routes read from the server's Config.
@@ -54,7 +56,7 @@ func (rs *Restarter) Instance() string { return rs.instanceID }
 
 // ServeWrite handles POST /v1/restart.
 func (rs *Restarter) ServeWrite(w http.ResponseWriter, r *http.Request) {
-	var req wire.RestartRequest
+	var req ops.RestartRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -62,7 +64,7 @@ func (rs *Restarter) ServeWrite(w http.ResponseWriter, r *http.Request) {
 	// The flag stays set after a start: the new server replaces this one, so a
 	// second request would race it. It is cleared only when the spawn fails.
 	if !rs.restarting.CompareAndSwap(false, true) {
-		wire.WriteJSON(w, wire.RestartResult{Refused: true, Reason: wire.ReasonRestartInProgress, Restarting: true,
+		wire.WriteJSON(w, ops.RestartResult{Refused: true, Reason: ops.ReasonRestartInProgress, Restarting: true,
 			Message: "a restart is already running"})
 		return
 	}
@@ -73,14 +75,14 @@ func (rs *Restarter) ServeWrite(w http.ResponseWriter, r *http.Request) {
 	wire.WriteJSON(w, res)
 }
 
-func (rs *Restarter) restart(r *http.Request, req wire.RestartRequest) wire.RestartResult {
+func (rs *Restarter) restart(r *http.Request, req ops.RestartRequest) ops.RestartResult {
 	rep := rs.Check(r.Context())
-	if rep.Status != wire.RestartCheckOK {
-		return wire.RestartResult{Refused: true, Reason: wire.ReasonRestartCheck, Report: &rep,
+	if rep.Status != ops.RestartCheckOK {
+		return ops.RestartResult{Refused: true, Reason: ops.ReasonRestartCheck, Report: &rep,
 			Message: "the restart check failed: " + rep.Error}
 	}
 	if !restartConfirmed(req, rep) {
-		return wire.RestartResult{Refused: true, Reason: wire.ReasonRestartChanged, Report: &rep,
+		return ops.RestartResult{Refused: true, Reason: ops.ReasonRestartChanged, Report: &rep,
 			Message: "the check changed since you looked at it"}
 	}
 	spawn := rs.cfg.SpawnRestart
@@ -88,20 +90,20 @@ func (rs *Restarter) restart(r *http.Request, req wire.RestartRequest) wire.Rest
 		spawn = rs.spawnRestart
 	}
 	if err := spawn(rep.Binary); err != nil {
-		return wire.RestartResult{Refused: true, Reason: wire.ReasonRestartCheck, Report: &rep,
+		return ops.RestartResult{Refused: true, Reason: ops.ReasonRestartCheck, Report: &rep,
 			Message: "could not start the restart: " + err.Error()}
 	}
-	return wire.RestartResult{Started: true, Restarting: true, RestartLog: rep.RestartLog}
+	return ops.RestartResult{Started: true, Restarting: true, RestartLog: rep.RestartLog}
 }
 
 // restartConfirmed reports whether the fresh check still matches what the
 // dialog showed.
-func restartConfirmed(req wire.RestartRequest, rep wire.RestartCheckReport) bool {
+func restartConfirmed(req ops.RestartRequest, rep ops.RestartCheckReport) bool {
 	return req.NewVersion == rep.NewVersion && req.ConfigOK == rep.Config.OK &&
 		slices.Equal(sortedCopy(req.FailingProjects), failingProjects(rep))
 }
 
-func failingProjects(rep wire.RestartCheckReport) []string {
+func failingProjects(rep ops.RestartCheckReport) []string {
 	out := []string{}
 	for _, p := range rep.Projects {
 		if !p.OK {

@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // qrQuietZone is the blank border, in modules, that scanners need around a code.
@@ -86,13 +87,13 @@ func newServerWebURLCmd(d Deps) *cobra.Command {
 
 // webURLResult is the `gx server web-url --json` payload.
 type webURLResult struct {
-	wire.WebInfo
+	ops.WebInfo
 	// URL is the setup link while setup is pending, else the base URL.
 	URL string `json:"url,omitempty"`
 }
 
 func (webURLResult) Refuse(reason, message string) webURLResult {
-	return webURLResult{WebInfo: wire.WebInfo{}.Refuse(reason, message)}
+	return webURLResult{WebInfo: ops.WebInfo{}.Refuse(reason, message)}
 }
 
 // setupLink is the link that opens the web page's setup step with the code filled in.
@@ -153,7 +154,7 @@ func newServerWebNewRootCmd(d Deps) *cobra.Command {
 }
 
 func runWebNewRoot(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Writer) error {
-	return runWebCall(ctx, c.Web.NewRoot, "server write failed", jsonOut, w, func(info wire.WebInfo) error {
+	return runWebCall(ctx, c.Web.NewRoot, "server write failed", jsonOut, w, func(info ops.WebInfo) error {
 		_, err := fmt.Fprintln(w, "new root fingerprint: "+info.Fingerprint)
 		return err
 	})
@@ -195,8 +196,8 @@ func runWebReset(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Wr
 }
 
 // printSetupCode prints the Setup code line of a reset result.
-func printSetupCode(w io.Writer) func(wire.WebInfo) error {
-	return func(info wire.WebInfo) error {
+func printSetupCode(w io.Writer) func(ops.WebInfo) error {
+	return func(info ops.WebInfo) error {
 		_, err := fmt.Fprintln(w, cmdbase.SetupCodeLine(info.SetupCode, info.SetupExpires))
 		return err
 	}
@@ -221,7 +222,7 @@ func newServerWebLoginsCmd(d Deps) *cobra.Command {
 }
 
 func runWebLogins(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Writer) error {
-	return runWebCall(ctx, c.Web.Logins, "server request failed", jsonOut, w, func(res wire.WebLoginsResult) error {
+	return runWebCall(ctx, c.Web.Logins, "server request failed", jsonOut, w, func(res ops.WebLoginsResult) error {
 		if len(res.Logins) == 0 {
 			_, err := fmt.Fprintln(w, "no web logins")
 			return err
@@ -259,8 +260,8 @@ func newServerWebRevokeCmd(d Deps) *cobra.Command {
 }
 
 func runWebRevoke(ctx context.Context, c *apiclient.Client, id string, jsonOut bool, w io.Writer) error {
-	revoke := func(ctx context.Context) (wire.WebLoginsResult, error) { return c.Web.RevokeLogin(ctx, id) }
-	return runWebCall(ctx, revoke, "server request failed", jsonOut, w, func(wire.WebLoginsResult) error {
+	revoke := func(ctx context.Context) (ops.WebLoginsResult, error) { return c.Web.RevokeLogin(ctx, id) }
+	return runWebCall(ctx, revoke, "server request failed", jsonOut, w, func(ops.WebLoginsResult) error {
 		_, err := fmt.Fprintln(w, "revoked web login "+id)
 		return err
 	})
@@ -325,8 +326,8 @@ func readNewPassword(d Deps, fromStdin bool) (string, error) {
 }
 
 func runWebPassword(ctx context.Context, c *apiclient.Client, password string, jsonOut bool, w io.Writer) error {
-	set := func(ctx context.Context) (wire.WebLoginsResult, error) { return c.Web.SetPassword(ctx, password) }
-	return runWebCall(ctx, set, "server request failed", jsonOut, w, func(wire.WebLoginsResult) error {
+	set := func(ctx context.Context) (ops.WebLoginsResult, error) { return c.Web.SetPassword(ctx, password) }
+	return runWebCall(ctx, set, "server request failed", jsonOut, w, func(ops.WebLoginsResult) error {
 		_, err := fmt.Fprintln(w, "web password changed; every web login is signed out")
 		return err
 	})

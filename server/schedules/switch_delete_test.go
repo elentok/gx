@@ -7,21 +7,21 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
-func (r *rig) switchTo(t *testing.T, on bool) wire.ScheduleShowResult {
+func (r *rig) switchTo(t *testing.T, on bool) ops.ScheduleShowResult {
 	t.Helper()
-	res, err := r.h.Client.Schedules.Switch(context.Background(), wire.ScheduleSwitchRequest{Project: r.key.Project, Slug: r.key.Slug, On: on})
+	res, err := r.h.Client.Schedules.Switch(context.Background(), ops.ScheduleSwitchRequest{Project: r.key.Project, Slug: r.key.Slug, On: on})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return res
 }
 
-func (r *rig) deleteVia(t *testing.T) wire.ScheduleDeleteResult {
+func (r *rig) deleteVia(t *testing.T) ops.ScheduleDeleteResult {
 	t.Helper()
-	res, err := r.h.Client.Schedules.Delete(context.Background(), wire.ScheduleDeleteRequest{Project: r.key.Project, Slug: r.key.Slug})
+	res, err := r.h.Client.Schedules.Delete(context.Background(), ops.ScheduleDeleteRequest{Project: r.key.Project, Slug: r.key.Slug})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,12 +108,12 @@ func TestSchedulesDelete_CancelsQueuedAtOnceAndKeepsLiveAndPaused(t *testing.T) 
 func TestSchedulesSwitchAndDelete_UnknownScheduleIsRefused(t *testing.T) {
 	t.Parallel()
 	h, _ := startWrite(t)
-	sw, err := h.Client.Schedules.Switch(context.Background(), wire.ScheduleSwitchRequest{Project: "proj", Slug: "nope", On: true})
-	if err != nil || !sw.Refused || sw.Reason != wire.ScheduleReasonUnknown {
+	sw, err := h.Client.Schedules.Switch(context.Background(), ops.ScheduleSwitchRequest{Project: "proj", Slug: "nope", On: true})
+	if err != nil || !sw.Refused || sw.Reason != ops.ScheduleReasonUnknown {
 		t.Errorf("switch = %+v err = %v", sw, err)
 	}
-	del, err := h.Client.Schedules.Delete(context.Background(), wire.ScheduleDeleteRequest{Project: "proj", Slug: "nope"})
-	if err != nil || !del.Refused || del.Reason != wire.ScheduleReasonUnknown {
+	del, err := h.Client.Schedules.Delete(context.Background(), ops.ScheduleDeleteRequest{Project: "proj", Slug: "nope"})
+	if err != nil || !del.Refused || del.Reason != ops.ScheduleReasonUnknown {
 		t.Errorf("delete = %+v err = %v", del, err)
 	}
 }
@@ -124,16 +124,16 @@ func TestSchedulesSwitchAndDelete_PublishSchedulesChanged(t *testing.T) {
 	create(t, h, baseCreate())
 	events := rigs.EventStream(t, h)
 	ctx := context.Background()
-	if _, err := h.Client.Schedules.Switch(ctx, wire.ScheduleSwitchRequest{Project: "proj", Slug: "nightly", On: false}); err != nil {
+	if _, err := h.Client.Schedules.Switch(ctx, ops.ScheduleSwitchRequest{Project: "proj", Slug: "nightly", On: false}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.Client.Schedules.Delete(ctx, wire.ScheduleDeleteRequest{Project: "proj", Slug: "nightly"}); err != nil {
+	if _, err := h.Client.Schedules.Delete(ctx, ops.ScheduleDeleteRequest{Project: "proj", Slug: "nightly"}); err != nil {
 		t.Fatal(err)
 	}
 	for got := 0; got < 2; {
 		select {
 		case ev := <-events:
-			if ev.Type == wire.EventSchedulesChanged && ev.Address == "proj:nightly" {
+			if ev.Type == ops.EventSchedulesChanged && ev.Address == "proj:nightly" {
 				got++
 			}
 		case <-time.After(10 * time.Second):

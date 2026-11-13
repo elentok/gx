@@ -2,11 +2,10 @@
 packages:
   - path: "github.com/elentok/gx/server/wire"
     output_path: "webui/src/generated/server.ts"
+    frontmatter: "export * from './ops';"
     include_files:
       - archivedlist.go
       - checkstatus.go
-      - cleanup.go
-      - designdrafts.go
       - designs.go
       - detail.go
       - devstatus.go
@@ -20,11 +19,8 @@ packages:
       - limitsstore.go
       - migrate.go
       - queue.go
-      - restart.go
-      - schedules.go
       - sessions.go
       - sessiontypes.go
-      - settingspage.go
       - stats.go
       - targets.go
       - triage.go
@@ -36,4 +32,16 @@ packages:
       json.RawMessage: "unknown"
       agent.ContextLevel: '"green" | "yellow" | "orange" | "red"'
       agent.Tier: '"light" | "worker" | "strongest"'
+    enum_style: "union"
+  - path: "github.com/elentok/gx/server/wire/ops"
+    output_path: "webui/src/generated/ops.ts"
+    include_files:
+      - cleanup.go
+      - designdrafts.go
+      - restart.go
+      - schedules.go
+      - settingspage.go
+    type_mappings:
+      time.Time: "string"
+      json.RawMessage: "unknown"
     enum_style: "union"

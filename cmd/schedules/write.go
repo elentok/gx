@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/server/wire"
+
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 var (
@@ -86,7 +88,7 @@ func newCreate(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			req := wire.ScheduleCreateRequest{
+			req := ops.ScheduleCreateRequest{
 				Name: f.name, Prompt: prompt, Days: expandDays(f.days), Times: f.times, Project: f.project, Harness: f.harness, Tier: f.tier,
 			}
 			if c.Flags().Changed("late-limit") {
@@ -115,7 +117,7 @@ func newEdit(d Deps) *cobra.Command {
 			if !ok || project == "" || slug == "" {
 				return fmt.Errorf("want <project:slug>, got %q", args[0])
 			}
-			req := wire.ScheduleEditRequest{Project: project, Slug: slug}
+			req := ops.ScheduleEditRequest{Project: project, Slug: slug}
 			changed := c.Flags().Changed
 			if changed("project") {
 				req.NewProject = &f.project
@@ -185,7 +187,7 @@ func newSwitch(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res, err := cl.Schedules.Switch(ctx(c), wire.ScheduleSwitchRequest{Project: project, Slug: slug, On: args[1] == "on"})
+			res, err := cl.Schedules.Switch(ctx(c), ops.ScheduleSwitchRequest{Project: project, Slug: slug, On: args[1] == "on"})
 			return finish(c.OutOrStdout(), jsonOut, res, res.Refused, res.Reason, res.Message, err, printAddress)
 		},
 	}
@@ -208,8 +210,8 @@ func newDelete(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res, err := cl.Schedules.Delete(ctx(c), wire.ScheduleDeleteRequest{Project: project, Slug: slug})
-			return finish(c.OutOrStdout(), jsonOut, res, res.Refused, res.Reason, res.Message, err, func(w io.Writer, _ wire.ScheduleDeleteResult) error {
+			res, err := cl.Schedules.Delete(ctx(c), ops.ScheduleDeleteRequest{Project: project, Slug: slug})
+			return finish(c.OutOrStdout(), jsonOut, res, res.Refused, res.Reason, res.Message, err, func(w io.Writer, _ ops.ScheduleDeleteResult) error {
 				_, err := fmt.Fprintf(w, "%s:%s\n", project, slug)
 				return err
 			})
@@ -234,12 +236,12 @@ func newRunNow(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res, err := cl.Schedules.RunNow(ctx(c), wire.ScheduleRunNowRequest{Project: project, Slug: slug})
+			res, err := cl.Schedules.RunNow(ctx(c), ops.ScheduleRunNowRequest{Project: project, Slug: slug})
 			message := res.Message
 			if res.AttentionAddress != "" {
 				message += " (needs attention: " + res.AttentionAddress + ")"
 			}
-			return finish(c.OutOrStdout(), jsonOut, res, res.Refused, res.Reason, message, err, func(w io.Writer, res wire.ScheduleRunNowResult) error {
+			return finish(c.OutOrStdout(), jsonOut, res, res.Refused, res.Reason, message, err, func(w io.Writer, res ops.ScheduleRunNowResult) error {
 				_, err := fmt.Fprintln(w, res.Address)
 				return err
 			})
@@ -249,7 +251,7 @@ func newRunNow(d Deps) *cobra.Command {
 	return cmd
 }
 
-func printAddress(w io.Writer, res wire.ScheduleShowResult) error {
+func printAddress(w io.Writer, res ops.ScheduleShowResult) error {
 	_, err := fmt.Fprintf(w, "%s:%s\n", res.Schedule.Project, res.Schedule.Slug)
 	return err
 }

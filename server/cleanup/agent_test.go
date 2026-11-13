@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -45,7 +46,7 @@ func startAgentFixture(t *testing.T, withUnresolved bool) *servertest.Harness {
 func TestCleanupAgent_PromptNamesOnlyTheAgentGroup(t *testing.T) {
 	h := startAgentFixture(t, true)
 
-	res, err := h.Client.Reads.StartCleanupAgent(context.Background(), wire.CleanupWriteRequest{Project: "proj"})
+	res, err := h.Client.Reads.StartCleanupAgent(context.Background(), ops.CleanupWriteRequest{Project: "proj"})
 	if err != nil || res.Refused || res.Address == "" {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
@@ -68,8 +69,8 @@ func TestCleanupAgent_PromptNamesOnlyTheAgentGroup(t *testing.T) {
 func TestCleanupAgent_RefusesWhenNothingIsForTheAgent(t *testing.T) {
 	h := startAgentFixture(t, false)
 
-	res, err := h.Client.Reads.StartCleanupAgent(context.Background(), wire.CleanupWriteRequest{Project: "proj"})
-	if err != nil || !res.Refused || res.Reason != wire.ReasonCleanupNothingForAgent {
+	res, err := h.Client.Reads.StartCleanupAgent(context.Background(), ops.CleanupWriteRequest{Project: "proj"})
+	if err != nil || !res.Refused || res.Reason != ops.ReasonCleanupNothingForAgent {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
 }
@@ -78,10 +79,10 @@ func TestCleanupAgent_ARepeatPressDoesNotStartASecond(t *testing.T) {
 	h := startAgentFixture(t, true)
 	ctx := context.Background()
 
-	if res, err := h.Client.Reads.StartCleanupAgent(ctx, wire.CleanupWriteRequest{Project: "proj"}); err != nil || res.Refused {
+	if res, err := h.Client.Reads.StartCleanupAgent(ctx, ops.CleanupWriteRequest{Project: "proj"}); err != nil || res.Refused {
 		t.Fatalf("first: %+v, %v", res, err)
 	}
-	res, err := h.Client.Reads.StartCleanupAgent(ctx, wire.CleanupWriteRequest{Project: "proj"})
+	res, err := h.Client.Reads.StartCleanupAgent(ctx, ops.CleanupWriteRequest{Project: "proj"})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonDuplicateLive {
 		t.Fatalf("second: %+v, %v", res, err)
 	}
@@ -96,12 +97,12 @@ func TestCleanupAgent_ReportMarksTheAgentGroup(t *testing.T) {
 	}
 	marked := map[string]bool{}
 	for _, wt := range rep.Worktrees {
-		if wt.Action == wire.CleanupActionAgent {
+		if wt.Action == ops.CleanupActionAgent {
 			marked[wt.Branch] = true
 		}
 	}
 	for _, e := range rep.Epics {
-		if e.Action == wire.CleanupActionAgent {
+		if e.Action == ops.CleanupActionAgent {
 			marked[e.Name] = true
 		}
 	}

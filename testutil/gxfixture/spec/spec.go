@@ -8,7 +8,7 @@ import (
 
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/agentfake/triageplay"
 	"github.com/elentok/gx/testutil/gxfixture/limitseed"
@@ -381,14 +381,14 @@ type RestartSpec struct {
 }
 
 // CheckOutput is what the fake prints for the scenario's projects.
-func (r RestartSpec) CheckOutput(projects []string) wire.RestartCheckOutput {
+func (r RestartSpec) CheckOutput(projects []string) ops.RestartCheckOutput {
 	version := r.Version
 	if version == "" {
 		version = DefaultNewVersion
 	}
-	out := wire.RestartCheckOutput{Version: version, Config: wire.RestartCheckConfig{OK: r.ConfigError == "", Error: r.ConfigError}}
+	out := ops.RestartCheckOutput{Version: version, Config: ops.RestartCheckConfig{OK: r.ConfigError == "", Error: r.ConfigError}}
 	for _, name := range projects {
-		p := wire.RestartCheckProject{Name: name, OK: true, Files: []string{}, Pending: r.Pending[name]}
+		p := ops.RestartCheckProject{Name: name, OK: true, Files: []string{}, Pending: r.Pending[name]}
 		if msg, bad := r.Failing[name]; bad {
 			p.OK, p.Error = false, msg
 		}

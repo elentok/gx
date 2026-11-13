@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -51,7 +52,7 @@ func TestCleanupWrite_RemoveWorktreeLeavesNoFolderAndNoBranch(t *testing.T) {
 	repo, wt := testutil.TempRepoWithLinkedWorktree(t, "feature-x")
 	h := startCleanup(t, repo)
 
-	res, err := h.Client.Reads.RemoveCleanupWorktree(context.Background(), wire.CleanupWriteRequest{Project: "proj", Branch: "feature-x"})
+	res, err := h.Client.Reads.RemoveCleanupWorktree(context.Background(), ops.CleanupWriteRequest{Project: "proj", Branch: "feature-x"})
 	if err != nil || res.Refused {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
@@ -73,7 +74,7 @@ func TestCleanupWrite_SquashMergedBranchIsDeletedWithForce(t *testing.T) {
 	testutil.CommitAll(t, repo, "squash")
 	h := startCleanup(t, repo)
 
-	res, err := h.Client.Reads.DeleteCleanupBranch(context.Background(), wire.CleanupWriteRequest{Project: "proj", Branch: "squashed"})
+	res, err := h.Client.Reads.DeleteCleanupBranch(context.Background(), ops.CleanupWriteRequest{Project: "proj", Branch: "squashed"})
 	if err != nil || res.Refused {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
@@ -92,7 +93,7 @@ func TestCleanupWrite_CherryPickedBranchIsDeletedWithForce(t *testing.T) {
 	gitIn(t, repo, "cherry-pick", sha)
 	h := startCleanup(t, repo)
 
-	res, err := h.Client.Reads.DeleteCleanupBranch(context.Background(), wire.CleanupWriteRequest{Project: "proj", Branch: "picked"})
+	res, err := h.Client.Reads.DeleteCleanupBranch(context.Background(), ops.CleanupWriteRequest{Project: "proj", Branch: "picked"})
 	if err != nil || res.Refused {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
@@ -118,7 +119,7 @@ func TestCleanupWrite_IterationBranchMergedIntoEpicBranchIsDeletedWithForce(t *t
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
 
-	res, err := h.Client.Reads.DeleteCleanupBranch(context.Background(), wire.CleanupWriteRequest{Project: "proj", Branch: "ralph-loop/myepic-item-01"})
+	res, err := h.Client.Reads.DeleteCleanupBranch(context.Background(), ops.CleanupWriteRequest{Project: "proj", Branch: "ralph-loop/myepic-item-01"})
 	if err != nil || res.Refused {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
@@ -135,8 +136,8 @@ func TestCleanupWrite_RefusesWhatIsNotProvenMerged(t *testing.T) {
 	gitIn(t, repo, "switch", trunk)
 	h := startCleanup(t, repo)
 
-	res, err := h.Client.Reads.DeleteCleanupBranch(context.Background(), wire.CleanupWriteRequest{Project: "proj", Branch: "extra"})
-	if err != nil || !res.Refused || res.Reason != wire.ReasonCleanupNotMerged {
+	res, err := h.Client.Reads.DeleteCleanupBranch(context.Background(), ops.CleanupWriteRequest{Project: "proj", Branch: "extra"})
+	if err != nil || !res.Refused || res.Reason != ops.ReasonCleanupNotMerged {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
 	if !strings.Contains(branches(t, repo), "extra") {
@@ -154,8 +155,8 @@ func TestCleanupWrite_RefusesWhenTheStateChangedSinceTheScan(t *testing.T) {
 	}
 	gitIn(t, repo, "branch", "-d", "gone")
 
-	res, err := h.Client.Reads.DeleteCleanupBranch(ctx, wire.CleanupWriteRequest{Project: "proj", Branch: "gone"})
-	if err != nil || !res.Refused || res.Reason != wire.ReasonCleanupUnknown {
+	res, err := h.Client.Reads.DeleteCleanupBranch(ctx, ops.CleanupWriteRequest{Project: "proj", Branch: "gone"})
+	if err != nil || !res.Refused || res.Reason != ops.ReasonCleanupUnknown {
 		t.Errorf("res = %+v, err = %v", res, err)
 	}
 }
@@ -166,12 +167,12 @@ func TestCleanupWrite_RouteMustMatchWhetherTheBranchHasAWorktree(t *testing.T) {
 	h := startCleanup(t, repo)
 	ctx := context.Background()
 
-	res, _ := h.Client.Reads.DeleteCleanupBranch(ctx, wire.CleanupWriteRequest{Project: "proj", Branch: "feature-x"})
-	if res.Reason != wire.ReasonCleanupHasWorktree {
+	res, _ := h.Client.Reads.DeleteCleanupBranch(ctx, ops.CleanupWriteRequest{Project: "proj", Branch: "feature-x"})
+	if res.Reason != ops.ReasonCleanupHasWorktree {
 		t.Errorf("delete on a worktree branch = %+v", res)
 	}
-	res, _ = h.Client.Reads.RemoveCleanupWorktree(ctx, wire.CleanupWriteRequest{Project: "proj", Branch: "bare-branch"})
-	if res.Reason != wire.ReasonCleanupNoWorktree {
+	res, _ = h.Client.Reads.RemoveCleanupWorktree(ctx, ops.CleanupWriteRequest{Project: "proj", Branch: "bare-branch"})
+	if res.Reason != ops.ReasonCleanupNoWorktree {
 		t.Errorf("remove on a branch without worktree = %+v", res)
 	}
 }
@@ -183,8 +184,8 @@ func TestCleanupWrite_GitsOwnReasonComesBackForARefusedRow(t *testing.T) {
 	}
 	h := startCleanup(t, repo)
 
-	res, err := h.Client.Reads.RemoveCleanupWorktree(context.Background(), wire.CleanupWriteRequest{Project: "proj", Branch: "feature-x"})
-	if err != nil || !res.Refused || res.Reason != wire.ReasonCleanupGitRefused || !strings.Contains(res.Message, "untracked") {
+	res, err := h.Client.Reads.RemoveCleanupWorktree(context.Background(), ops.CleanupWriteRequest{Project: "proj", Branch: "feature-x"})
+	if err != nil || !res.Refused || res.Reason != ops.ReasonCleanupGitRefused || !strings.Contains(res.Message, "untracked") {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
 	if _, err := os.Stat(wt); err != nil {
@@ -201,9 +202,9 @@ func TestCleanupWrite_WaitsForTheWorktreeLock(t *testing.T) {
 	h := startCleanup(t, repo)
 
 	worktree.Lock.Lock()
-	done := make(chan wire.CleanupWriteResult, 1)
+	done := make(chan ops.CleanupWriteResult, 1)
 	go func() {
-		res, _ := h.Client.Reads.DeleteCleanupBranch(context.Background(), wire.CleanupWriteRequest{Project: "proj", Branch: "waiting"})
+		res, _ := h.Client.Reads.DeleteCleanupBranch(context.Background(), ops.CleanupWriteRequest{Project: "proj", Branch: "waiting"})
 		done <- res
 	}()
 	select {
@@ -226,9 +227,9 @@ func TestCleanupWrite_WaitsForTheWorktreeLock(t *testing.T) {
 	}
 }
 
-func removeUnmerged(t *testing.T, h *servertest.Harness) wire.CleanupWriteResult {
+func removeUnmerged(t *testing.T, h *servertest.Harness) ops.CleanupWriteResult {
 	t.Helper()
-	res, err := h.Client.Reads.RemoveUnmergedCleanupWorktree(context.Background(), wire.CleanupWriteRequest{Project: "proj", Branch: "feature-x"})
+	res, err := h.Client.Reads.RemoveUnmergedCleanupWorktree(context.Background(), ops.CleanupWriteRequest{Project: "proj", Branch: "feature-x"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +260,7 @@ func TestCleanupWrite_UnmergedDirtyWorktreeIsRefused(t *testing.T) {
 	}
 	h := startCleanup(t, repo)
 
-	if res := removeUnmerged(t, h); !res.Refused || res.Reason != wire.ReasonCleanupDirty {
+	if res := removeUnmerged(t, h); !res.Refused || res.Reason != ops.ReasonCleanupDirty {
 		t.Fatalf("res = %+v", res)
 	}
 	if _, err := os.Stat(wt); err != nil {
@@ -281,7 +282,7 @@ func TestCleanupWrite_UnmergedWorktreeWithALiveSessionIsRefused(t *testing.T) {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 
-	if got := removeUnmerged(t, h); !got.Refused || got.Reason != wire.ReasonCleanupLive {
+	if got := removeUnmerged(t, h); !got.Refused || got.Reason != ops.ReasonCleanupLive {
 		t.Fatalf("res = %+v", got)
 	}
 	if _, err := os.Stat(wt); err != nil {

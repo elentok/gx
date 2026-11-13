@@ -8,7 +8,7 @@ import (
 
 	"github.com/elentok/gx/server/schedules"
 	"github.com/elentok/gx/server/servertest/rigs"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 func TestSchedulesRead_ListShowsDaysTimesAndNextRun(t *testing.T) {
@@ -80,7 +80,7 @@ func TestSchedulesRead_ShowReturnsEveryFieldAndTheLastRuns(t *testing.T) {
 	if res.Prompt != "check the logs" || s.LateLimitHours != 3 || s.Harness != "" || s.DefaultHarness != "claude" || s.UpdatedAt == "" || s.NextRun == "" {
 		t.Errorf("show = %+v", res)
 	}
-	if len(res.LastRuns) != 1 || res.LastRuns[0].Status != wire.ScheduleRunSkipped || res.LastRuns[0].Reason != schedules.ReasonLate {
+	if len(res.LastRuns) != 1 || res.LastRuns[0].Status != ops.ScheduleRunSkipped || res.LastRuns[0].Reason != schedules.ReasonLate {
 		t.Errorf("last runs = %+v", res.LastRuns)
 	}
 }
@@ -92,11 +92,11 @@ func TestSchedulesRead_UnknownScheduleIsARefusalResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an unknown schedule must not be an error: %v", err)
 	}
-	if !res.Refused || res.Reason != wire.ScheduleReasonUnknown {
+	if !res.Refused || res.Reason != ops.ScheduleReasonUnknown {
 		t.Errorf("res = %+v", res)
 	}
 	res, err = r.h.Client.Schedules.Show(context.Background(), "nope", "nightly")
-	if err != nil || !res.Refused || res.Reason != wire.ScheduleReasonInvalidProject {
+	if err != nil || !res.Refused || res.Reason != ops.ScheduleReasonInvalidProject {
 		t.Errorf("unknown project: res = %+v err = %v", res, err)
 	}
 }

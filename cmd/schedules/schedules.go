@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // Deps is the runtime context of every command in this package.
@@ -94,7 +95,7 @@ func finish[R any](w io.Writer, jsonOut bool, res R, refused bool, reason, messa
 	return print(w, res)
 }
 
-func printList(w io.Writer, res wire.SchedulesResult) error {
+func printList(w io.Writer, res ops.SchedulesResult) error {
 	for _, s := range res.Schedules {
 		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", s.Name, strings.Join(s.Days, ","), strings.Join(s.Times, ","), nextText(s)); err != nil {
 			return err
@@ -103,7 +104,7 @@ func printList(w io.Writer, res wire.SchedulesResult) error {
 	return nil
 }
 
-func printShow(w io.Writer, res wire.ScheduleShowResult) error {
+func printShow(w io.Writer, res ops.ScheduleShowResult) error {
 	s := res.Schedule
 	harness := s.Harness
 	if harness == "" {
@@ -128,7 +129,7 @@ func printShow(w io.Writer, res wire.ScheduleShowResult) error {
 	return nil
 }
 
-func nextText(s wire.ScheduleInfo) string {
+func nextText(s ops.ScheduleInfo) string {
 	switch {
 	case !s.ProjectFound:
 		return "project not found"

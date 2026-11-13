@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/cpuwatch"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // Admin is the sub-client for config, checks, harness, health, restart,
@@ -57,16 +58,16 @@ func (a *Admin) ConfigStatus(ctx context.Context) (wire.ConfigStatus, error) {
 }
 
 // RestartCheck runs the restart check from the binary a restart would start.
-func (a *Admin) RestartCheck(ctx context.Context) (wire.RestartCheckReport, error) {
-	var rep wire.RestartCheckReport
+func (a *Admin) RestartCheck(ctx context.Context) (ops.RestartCheckReport, error) {
+	var rep ops.RestartCheckReport
 	err := a.t.get(ctx, "/v1/restart/check", &rep)
 	return rep, err
 }
 
 // Restart starts a restart when the check still matches req. A refusal is a
 // result (Refused set), not an error.
-func (a *Admin) Restart(ctx context.Context, req wire.RestartRequest) (wire.RestartResult, error) {
-	var res wire.RestartResult
+func (a *Admin) Restart(ctx context.Context, req ops.RestartRequest) (ops.RestartResult, error) {
+	var res ops.RestartResult
 	err := a.t.post(ctx, "/v1/restart", req, &res)
 	return res, err
 }
@@ -103,16 +104,16 @@ func (a *Admin) DefaultHarness(ctx context.Context) (wire.DefaultHarnessStatus, 
 }
 
 // Settings is the settings read model of a target: "global" or a project name.
-func (a *Admin) Settings(ctx context.Context, target string) (wire.SettingsReadResponse, error) {
-	var resp wire.SettingsReadResponse
+func (a *Admin) Settings(ctx context.Context, target string) (ops.SettingsReadResponse, error) {
+	var resp ops.SettingsReadResponse
 	err := a.t.get(ctx, "/v1/settings?"+url.Values{"target": {target}}.Encode(), &resp)
 	return resp, err
 }
 
 // SetSettings applies key changes to a target's file together or not at all.
 // A refusal is a result (Refused set), not an error.
-func (a *Admin) SetSettings(ctx context.Context, req wire.SettingsWriteRequest) (wire.SettingsWriteResult, error) {
-	var res wire.SettingsWriteResult
+func (a *Admin) SetSettings(ctx context.Context, req ops.SettingsWriteRequest) (ops.SettingsWriteResult, error) {
+	var res ops.SettingsWriteResult
 	err := a.t.post(ctx, "/v1/settings", req, &res)
 	return res, err
 }

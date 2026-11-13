@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -116,8 +117,8 @@ func TestArchive_RefusalsAndManyTargets(t *testing.T) {
 
 	res := r.archive(t, false, false, "proj:open", "proj:nope", "proj:done")
 	want := []struct{ status, reason string }{
-		{wire.TargetRefused, wire.ReasonCleanupNotDone},
-		{wire.TargetRefused, wire.ReasonCleanupUnknown},
+		{wire.TargetRefused, ops.ReasonCleanupNotDone},
+		{wire.TargetRefused, ops.ReasonCleanupUnknown},
 		{wire.TargetDone, ""},
 	}
 	for i, w := range want {

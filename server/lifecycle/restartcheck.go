@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 const restartCheckTimeout = 2 * time.Minute
@@ -33,11 +34,11 @@ func (rs *Restarter) ServeCheck(w http.ResponseWriter, r *http.Request) {
 
 // Check runs the restart check from the binary a restart would start.
 // It never touches this server.
-func (rs *Restarter) Check(ctx context.Context) wire.RestartCheckReport {
-	rep := wire.RestartCheckReport{
+func (rs *Restarter) Check(ctx context.Context) ops.RestartCheckReport {
+	rep := ops.RestartCheckReport{
 		Binary:         rs.restartBinary(),
 		RunningVersion: rs.cfg.Build,
-		Projects:       []wire.RestartCheckProject{},
+		Projects:       []ops.RestartCheckProject{},
 		Agents:         rs.agents(),
 		Instance:       rs.instanceID,
 		RestartLog:     migratefail.RestartLogPath(rs.cfg.StateDir),
@@ -45,24 +46,24 @@ func (rs *Restarter) Check(ctx context.Context) wire.RestartCheckReport {
 	out, status, detail := runRestartCheckBinary(ctx, rep.Binary, rs.cfg.Env)
 	rep.Status, rep.Error = status, detail
 	switch status {
-	case wire.RestartCheckOK:
+	case ops.RestartCheckOK:
 		rep.NewVersion, rep.Config = out.Version, out.Config
 		if out.Projects != nil {
 			rep.Projects = out.Projects
 		}
-	case wire.RestartCheckTooOld:
+	case ops.RestartCheckTooOld:
 		rep.Hint = "that binary has no restart check; use `gx server restart` instead"
 	}
 	return rep
 }
 
-func runRestartCheckBinary(ctx context.Context, bin string, env []string) (wire.RestartCheckOutput, string, string) {
-	var out wire.RestartCheckOutput
+func runRestartCheckBinary(ctx context.Context, bin string, env []string) (ops.RestartCheckOutput, string, string) {
+	var out ops.RestartCheckOutput
 	if bin == "" {
-		return out, wire.RestartCheckUnreadable, "no binary to restart with"
+		return out, ops.RestartCheckUnreadable, "no binary to restart with"
 	}
 	if _, err := os.Stat(bin); err != nil {
-		return out, wire.RestartCheckUnreadable, err.Error()
+		return out, ops.RestartCheckUnreadable, err.Error()
 	}
 	ctx, cancel := context.WithTimeout(ctx, restartCheckTimeout)
 	defer cancel()
@@ -74,15 +75,15 @@ func runRestartCheckBinary(ctx context.Context, bin string, env []string) (wire.
 		msg := strings.TrimSpace(stderr.String())
 		var exit *exec.ExitError
 		if errors.As(err, &exit) && strings.Contains(msg, "unknown command") {
-			return out, wire.RestartCheckTooOld, msg
+			return out, ops.RestartCheckTooOld, msg
 		}
 		if msg == "" {
 			msg = err.Error()
 		}
-		return out, wire.RestartCheckUnreadable, msg
+		return out, ops.RestartCheckUnreadable, msg
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &out); err != nil {
-		return out, wire.RestartCheckUnreadable, "unreadable output: " + err.Error()
+		return out, ops.RestartCheckUnreadable, "unreadable output: " + err.Error()
 	}
-	return out, wire.RestartCheckOK, ""
+	return out, ops.RestartCheckOK, ""
 }

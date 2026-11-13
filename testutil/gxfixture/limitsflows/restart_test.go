@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
@@ -21,9 +21,9 @@ func (r *running) setRestart(t *testing.T, name, value string) {
 }
 
 // restartCheck is the server's restart-check route answer, through the CLI.
-func (r *running) restartCheck(t *testing.T) wire.RestartCheckReport {
+func (r *running) restartCheck(t *testing.T) ops.RestartCheckReport {
 	t.Helper()
-	var rep wire.RestartCheckReport
+	var rep ops.RestartCheckReport
 	if err := json.Unmarshal([]byte(r.Gx(t, "server", "restart-check", "--json")), &rep); err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestRestartScenarios_TheFakeBinaryAnswersTheCheck(t *testing.T) {
 			r := start(t, tc.scenario)
 			defer r.Stop(t)
 			rep := r.restartCheck(t)
-			if rep.Status != wire.RestartCheckOK || rep.NewVersion != spec.DefaultNewVersion || !rep.Config.OK {
+			if rep.Status != ops.RestartCheckOK || rep.NewVersion != spec.DefaultNewVersion || !rep.Config.OK {
 				t.Fatalf("report = %+v, want ok with version %s", rep, spec.DefaultNewVersion)
 			}
 			if !strings.HasSuffix(rep.Binary, tc.wantBin) {
@@ -79,7 +79,7 @@ func TestRestartAgents_CountsTheRunningAgent(t *testing.T) {
 func TestRestartProjects_ReportsTheMigrationError(t *testing.T) {
 	r := start(t, "restart-projects")
 	defer r.Stop(t)
-	var broken *wire.RestartCheckProject
+	var broken *ops.RestartCheckProject
 	rep := r.restartCheck(t)
 	for i, p := range rep.Projects {
 		if p.Name == "broken" {
@@ -108,16 +108,16 @@ func TestRestartScenarios_ControlFilesSteerTheFake(t *testing.T) {
 	}
 
 	r.setRestart(t, "old", "")
-	if rep := r.restartCheck(t); rep.Status != wire.RestartCheckTooOld {
-		t.Errorf("status = %q, want %q", rep.Status, wire.RestartCheckTooOld)
+	if rep := r.restartCheck(t); rep.Status != ops.RestartCheckTooOld {
+		t.Errorf("status = %q, want %q", rep.Status, ops.RestartCheckTooOld)
 	}
 }
 
 func TestRestartMissing_TheBinaryIsUnreadable(t *testing.T) {
 	r := start(t, "restart-missing")
 	defer r.Stop(t)
-	if rep := r.restartCheck(t); rep.Status != wire.RestartCheckUnreadable {
-		t.Errorf("status = %q, want %q", rep.Status, wire.RestartCheckUnreadable)
+	if rep := r.restartCheck(t); rep.Status != ops.RestartCheckUnreadable {
+		t.Errorf("status = %q, want %q", rep.Status, ops.RestartCheckUnreadable)
 	}
 }
 

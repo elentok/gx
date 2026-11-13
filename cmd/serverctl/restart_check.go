@@ -8,7 +8,7 @@ import (
 	"github.com/elentok/gx/cmd/ticketsmigrate"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/migrations"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
@@ -18,9 +18,9 @@ import (
 // with an unknown-command error, one that ran exits zero even when the config
 // or a dry run failed (the failure is in the JSON).
 type (
-	restartCheck        = wire.RestartCheckOutput
-	restartCheckConfig  = wire.RestartCheckConfig
-	restartCheckProject = wire.RestartCheckProject
+	restartCheck        = ops.RestartCheckOutput
+	restartCheckConfig  = ops.RestartCheckConfig
+	restartCheckProject = ops.RestartCheckProject
 )
 
 // NewRestartCheck builds the top-level `gx restart-check`.

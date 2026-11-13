@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -189,10 +190,10 @@ func TestUnarchive_UnknownTarget(t *testing.T) {
 	r := start(t, "done")
 	r.archive(t, false, false, "proj:done")
 	res := r.unarchive(t, "proj:nope", "proj:done", "nowhere:x")
-	if res[0].Reason != wire.ReasonCleanupUnknown || res[1].Status != wire.TargetDone || res[2].Reason != wire.ReasonCleanupUnknown {
+	if res[0].Reason != ops.ReasonCleanupUnknown || res[1].Status != wire.TargetDone || res[2].Reason != ops.ReasonCleanupUnknown {
 		t.Errorf("results = %+v", res)
 	}
-	if got := r.unarchive(t, "proj:done")[0]; got.Reason != wire.ReasonCleanupUnknown {
+	if got := r.unarchive(t, "proj:done")[0]; got.Reason != ops.ReasonCleanupUnknown {
 		t.Errorf("an active epic = %+v, want unknown", got)
 	}
 }

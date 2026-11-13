@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 func fakeRestartBinary(t *testing.T, script string) string {
@@ -37,13 +37,13 @@ func startRestartCheck(t *testing.T, bin func() string) (*servertest.Harness, st
 	return h, hs.WebURL
 }
 
-func restartCheckOver(t *testing.T, h *servertest.Harness, base string) wire.RestartCheckReport {
+func restartCheckOver(t *testing.T, h *servertest.Harness, base string) ops.RestartCheckReport {
 	t.Helper()
 	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/restart/check")
 	if code != http.StatusOK {
 		t.Fatalf("GET /v1/restart/check = %d: %s", code, body)
 	}
-	var rep wire.RestartCheckReport
+	var rep ops.RestartCheckReport
 	if err := json.Unmarshal([]byte(body), &rep); err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestRestartCheck_ReportsVersionsConfigDryRunAgentsInstanceAndLog(t *testing
 	bin := fakeRestartBinary(t, okCheckScript)
 	h, base := startRestartCheck(t, func() string { return bin })
 	rep := restartCheckOver(t, h, base)
-	if rep.Status != wire.RestartCheckOK || rep.RunningVersion != "running-1" || rep.NewVersion != "new-2" {
+	if rep.Status != ops.RestartCheckOK || rep.RunningVersion != "running-1" || rep.NewVersion != "new-2" {
 		t.Errorf("status/versions = %+v", rep)
 	}
 	if rep.Config.OK || rep.Config.Error != "bad key" {
@@ -95,9 +95,9 @@ func TestRestartCheck_BadBinariesAreThreeDistinctResults(t *testing.T) {
 		name, status string
 		bin          func(t *testing.T) string
 	}{
-		{"missing", wire.RestartCheckUnreadable, func(t *testing.T) string { return filepath.Join(t.TempDir(), "gone") }},
-		{"failing", wire.RestartCheckUnreadable, func(t *testing.T) string { return fakeRestartBinary(t, "echo kaput >&2; exit 1") }},
-		{"too old", wire.RestartCheckTooOld, func(t *testing.T) string {
+		{"missing", ops.RestartCheckUnreadable, func(t *testing.T) string { return filepath.Join(t.TempDir(), "gone") }},
+		{"failing", ops.RestartCheckUnreadable, func(t *testing.T) string { return fakeRestartBinary(t, "echo kaput >&2; exit 1") }},
+		{"too old", ops.RestartCheckTooOld, func(t *testing.T) string {
 			return fakeRestartBinary(t, `echo 'Error: unknown command "restart-check" for "gx"' >&2; exit 1`)
 		}},
 	}
@@ -110,7 +110,7 @@ func TestRestartCheck_BadBinariesAreThreeDistinctResults(t *testing.T) {
 			if rep.Status != c.status || rep.Error == "" || rep.RunningVersion != "running-1" || rep.Instance == "" {
 				t.Errorf("report = %+v", rep)
 			}
-			if hasHint := strings.Contains(rep.Hint, "gx server restart"); hasHint != (c.status == wire.RestartCheckTooOld) {
+			if hasHint := strings.Contains(rep.Hint, "gx server restart"); hasHint != (c.status == ops.RestartCheckTooOld) {
 				t.Errorf("hint = %q", rep.Hint)
 			}
 			// The old server still answers.

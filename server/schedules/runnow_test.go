@@ -13,18 +13,19 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
 )
 
-func (r *rig) runNow(t *testing.T) wire.ScheduleRunNowResult {
+func (r *rig) runNow(t *testing.T) ops.ScheduleRunNowResult {
 	t.Helper()
 	return runNowOf(t, r.h, r.key)
 }
 
-func runNowOf(t *testing.T, h *servertest.Harness, k schedules.Key) wire.ScheduleRunNowResult {
+func runNowOf(t *testing.T, h *servertest.Harness, k schedules.Key) ops.ScheduleRunNowResult {
 	t.Helper()
-	res, err := h.Client.Schedules.RunNow(context.Background(), wire.ScheduleRunNowRequest{Project: k.Project, Slug: k.Slug})
+	res, err := h.Client.Schedules.RunNow(context.Background(), ops.ScheduleRunNowRequest{Project: k.Project, Slug: k.Slug})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +148,7 @@ func TestSchedulesRunNow_UnknownScheduleIsRefused(t *testing.T) {
 	t.Parallel()
 	r := start(t, 2, "09:00")
 	res := runNowOf(t, r.h, schedules.Key{Project: "proj", Slug: "nope"})
-	if !res.Refused || res.Reason != wire.ScheduleReasonUnknown {
+	if !res.Refused || res.Reason != ops.ScheduleReasonUnknown {
 		t.Errorf("run-now = %+v", res)
 	}
 }
@@ -176,7 +177,7 @@ func TestSchedulesRunNow_PublishesSchedulesChanged(t *testing.T) {
 	for {
 		select {
 		case ev := <-events:
-			if ev.Type == wire.EventSchedulesChanged && ev.Address == "proj:nightly" {
+			if ev.Type == ops.EventSchedulesChanged && ev.Address == "proj:nightly" {
 				return
 			}
 		case <-time.After(10 * time.Second):

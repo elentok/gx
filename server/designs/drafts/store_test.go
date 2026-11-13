@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 func newStore(t *testing.T) *Store {
@@ -17,7 +17,7 @@ func newStore(t *testing.T) *Store {
 	return s
 }
 
-func mustCreate(t *testing.T, s *Store, idea string) *wire.DesignDraft {
+func mustCreate(t *testing.T, s *Store, idea string) *ops.DesignDraft {
 	t.Helper()
 	d, err := s.Create("proj", "", idea, "")
 	if err != nil || d == nil {
@@ -29,7 +29,7 @@ func mustCreate(t *testing.T, s *Store, idea string) *wire.DesignDraft {
 func TestSave_CurrentRevisionBumpsAndStamps(t *testing.T) {
 	s := newStore(t)
 	d := mustCreate(t, s, "a")
-	res, err := s.Save(d.ID, wire.DesignDraftSaveRequest{Project: "proj", Idea: "b", Revision: d.Revision})
+	res, err := s.Save(d.ID, ops.DesignDraftSaveRequest{Project: "proj", Idea: "b", Revision: d.Revision})
 	if err != nil || res.Refused || res.Draft == nil {
 		t.Fatalf("save: %+v %v", res, err)
 	}
@@ -41,7 +41,7 @@ func TestSave_CurrentRevisionBumpsAndStamps(t *testing.T) {
 func TestSave_KeepEditedAtLeavesTimeAndBumpsRevision(t *testing.T) {
 	s := newStore(t)
 	d := mustCreate(t, s, "a")
-	res, err := s.Save(d.ID, wire.DesignDraftSaveRequest{Project: "other", Idea: "a", Revision: d.Revision, KeepEditedAt: true})
+	res, err := s.Save(d.ID, ops.DesignDraftSaveRequest{Project: "other", Idea: "a", Revision: d.Revision, KeepEditedAt: true})
 	if err != nil || res.Draft == nil {
 		t.Fatalf("save: %+v %v", res, err)
 	}
@@ -53,12 +53,12 @@ func TestSave_KeepEditedAtLeavesTimeAndBumpsRevision(t *testing.T) {
 func TestSave_OldRevisionConflictLeavesFile(t *testing.T) {
 	s := newStore(t)
 	d := mustCreate(t, s, "a")
-	if _, err := s.Save(d.ID, wire.DesignDraftSaveRequest{Idea: "b", Revision: d.Revision}); err != nil {
+	if _, err := s.Save(d.ID, ops.DesignDraftSaveRequest{Idea: "b", Revision: d.Revision}); err != nil {
 		t.Fatal(err)
 	}
 	before, _ := os.ReadFile(s.record(d.ID))
-	res, _ := s.Save(d.ID, wire.DesignDraftSaveRequest{Idea: "stale", Revision: d.Revision})
-	if !res.Refused || res.Reason != wire.ReasonDraftRevisionConflict {
+	res, _ := s.Save(d.ID, ops.DesignDraftSaveRequest{Idea: "stale", Revision: d.Revision})
+	if !res.Refused || res.Reason != ops.ReasonDraftRevisionConflict {
 		t.Fatalf("want conflict, got %+v", res)
 	}
 	after, _ := os.ReadFile(s.record(d.ID))
@@ -73,8 +73,8 @@ func TestSave_DeletedDraftIsGone(t *testing.T) {
 	if err := s.Delete(d.ID); err != nil {
 		t.Fatal(err)
 	}
-	res, err := s.Save(d.ID, wire.DesignDraftSaveRequest{Idea: "x", Revision: d.Revision})
-	if err != nil || !res.Refused || res.Reason != wire.ReasonDraftGone {
+	res, err := s.Save(d.ID, ops.DesignDraftSaveRequest{Idea: "x", Revision: d.Revision})
+	if err != nil || !res.Refused || res.Reason != ops.ReasonDraftGone {
 		t.Fatalf("want gone, got %+v %v", res, err)
 	}
 }
@@ -85,7 +85,7 @@ func TestSave_EmptyingDeletesDraftAndImages(t *testing.T) {
 	if err := os.MkdirAll(s.ImagesDir(d.ID), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	res, err := s.Save(d.ID, wire.DesignDraftSaveRequest{Project: "proj", Revision: d.Revision})
+	res, err := s.Save(d.ID, ops.DesignDraftSaveRequest{Project: "proj", Revision: d.Revision})
 	if err != nil || !res.Deleted {
 		t.Fatalf("want deleted, got %+v %v", res, err)
 	}
@@ -104,7 +104,7 @@ func TestSave_KeepsImageList(t *testing.T) {
 	if err := s.write(d); err != nil {
 		t.Fatal(err)
 	}
-	res, _ := s.Save(d.ID, wire.DesignDraftSaveRequest{Revision: d.Revision})
+	res, _ := s.Save(d.ID, ops.DesignDraftSaveRequest{Revision: d.Revision})
 	if res.Deleted || res.Draft == nil || len(res.Draft.Images) != 1 {
 		t.Fatalf("a draft with an image is not empty: %+v", res)
 	}
@@ -126,7 +126,7 @@ func TestListOrderedByEditedAtAndReadChangesNothing(t *testing.T) {
 	s := newStore(t)
 	a := mustCreate(t, s, "a")
 	b := mustCreate(t, s, "b")
-	if _, err := s.Save(a.ID, wire.DesignDraftSaveRequest{Idea: "a2", Revision: a.Revision}); err != nil {
+	if _, err := s.Save(a.ID, ops.DesignDraftSaveRequest{Idea: "a2", Revision: a.Revision}); err != nil {
 		t.Fatal(err)
 	}
 	items, _ := s.List()
@@ -147,11 +147,11 @@ func TestSave_ConcurrentSameRevisionOneWinner(t *testing.T) {
 	s := New(t.TempDir())
 	d := mustCreate(t, s, "a")
 	const n = 8
-	results := make(chan wire.DesignDraftSaveResult, n)
+	results := make(chan ops.DesignDraftSaveResult, n)
 	var wg sync.WaitGroup
 	for range n {
 		wg.Go(func() {
-			res, err := s.Save(d.ID, wire.DesignDraftSaveRequest{Idea: "x", Revision: d.Revision})
+			res, err := s.Save(d.ID, ops.DesignDraftSaveRequest{Idea: "x", Revision: d.Revision})
 			if err != nil {
 				t.Error(err)
 			}
@@ -165,7 +165,7 @@ func TestSave_ConcurrentSameRevisionOneWinner(t *testing.T) {
 		switch {
 		case r.Draft != nil:
 			wins++
-		case r.Reason == wire.ReasonDraftRevisionConflict:
+		case r.Reason == ops.ReasonDraftRevisionConflict:
 			conflicts++
 		}
 	}

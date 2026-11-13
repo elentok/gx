@@ -1,4 +1,4 @@
-package wire
+package ops
 
 // Restart refusal reasons.
 const (

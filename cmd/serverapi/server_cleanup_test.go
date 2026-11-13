@@ -9,7 +9,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -24,8 +24,8 @@ func TestServerCleanupWrite_JSONPrintsAndARefusalExitsNonZero(t *testing.T) {
 	call := (*apiclient.Reads).DeleteCleanupBranch
 
 	var out bytes.Buffer
-	err := runServerCleanupWrite(context.Background(), h.Client, &out, call, wire.CleanupWriteRequest{Project: "proj", Branch: "nope"}, true)
-	if err == nil || !strings.Contains(out.String(), wire.ReasonCleanupUnknown) {
+	err := runServerCleanupWrite(context.Background(), h.Client, &out, call, ops.CleanupWriteRequest{Project: "proj", Branch: "nope"}, true)
+	if err == nil || !strings.Contains(out.String(), ops.ReasonCleanupUnknown) {
 		t.Errorf("err = %v, out = %s", err, out.String())
 	}
 }

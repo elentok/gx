@@ -11,6 +11,7 @@ import (
 	schedrec "github.com/elentok/gx/schedules"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 var dayNames = []string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
@@ -62,25 +63,25 @@ func (s *Schedules) registeredProject(project string) (bool, error) {
 
 // lateLimit applies a requested Late limit; a refusal result is returned when
 // it is not above 0 (Validate would silently default a 0).
-func lateLimit(sc *schedrec.Schedule, hours *float64) (wire.ScheduleShowResult, bool) {
+func lateLimit(sc *schedrec.Schedule, hours *float64) (ops.ScheduleShowResult, bool) {
 	if hours == nil {
-		return wire.ScheduleShowResult{}, false
+		return ops.ScheduleShowResult{}, false
 	}
 	if !(*hours > 0) {
 		return refusedShow(schedrec.ReasonInvalidLateLimit, "late limit must be above 0"), true
 	}
 	sc.LateLimitHours = *hours
-	return wire.ScheduleShowResult{}, false
+	return ops.ScheduleShowResult{}, false
 }
 
-func (s *Schedules) create(req wire.ScheduleCreateRequest) (wire.ScheduleShowResult, error) {
+func (s *Schedules) create(req ops.ScheduleCreateRequest) (ops.ScheduleShowResult, error) {
 	project := req.Project
 	if project == "" {
 		project = projects.ScratchProject
 	}
 	ok, err := s.registeredProject(project)
 	if err != nil {
-		return wire.ScheduleShowResult{}, err
+		return ops.ScheduleShowResult{}, err
 	}
 	if !ok {
 		return refusedShow(schedrec.ReasonInvalidProject, "no project "+project), nil
@@ -97,28 +98,28 @@ func (s *Schedules) create(req wire.ScheduleCreateRequest) (wire.ScheduleShowRes
 	if res, handled := refusalOf(err); handled {
 		return res, nil
 	} else if err != nil {
-		return wire.ScheduleShowResult{}, err
+		return ops.ScheduleShowResult{}, err
 	}
 	// A new Schedule is on here only; other machines show it "Off here".
 	if err := s.State.Enable(Key{Project: created.Project, Slug: created.Slug}, created.CreatedAt); err != nil {
-		return wire.ScheduleShowResult{}, err
+		return ops.ScheduleShowResult{}, err
 	}
 	return s.written(created)
 }
 
-func (s *Schedules) edit(req wire.ScheduleEditRequest) (wire.ScheduleShowResult, error) {
+func (s *Schedules) edit(req ops.ScheduleEditRequest) (ops.ScheduleShowResult, error) {
 	if req.NewProject != nil && *req.NewProject != "" && *req.NewProject != req.Project {
-		return refusedShow(wire.ScheduleReasonProjectReadOnly, "the project of a Schedule cannot change"), nil
+		return refusedShow(ops.ScheduleReasonProjectReadOnly, "the project of a Schedule cannot change"), nil
 	}
 	sc, err := s.Store.Get(req.Project, req.Slug)
 	switch {
 	case errors.Is(err, schedrec.ErrNotFound):
-		return refusedShow(wire.ScheduleReasonUnknown, "no schedule "+req.Project+":"+req.Slug), nil
+		return refusedShow(ops.ScheduleReasonUnknown, "no schedule "+req.Project+":"+req.Slug), nil
 	case err != nil:
 		if res, handled := refusalOf(err); handled {
 			return res, nil
 		}
-		return wire.ScheduleShowResult{}, err
+		return ops.ScheduleShowResult{}, err
 	}
 	if req.Name != nil {
 		sc.Name = *req.Name
@@ -149,11 +150,11 @@ func (s *Schedules) edit(req wire.ScheduleEditRequest) (wire.ScheduleShowResult,
 	if res, handled := refusalOf(err); handled {
 		return res, nil
 	} else if err != nil {
-		return wire.ScheduleShowResult{}, err
+		return ops.ScheduleShowResult{}, err
 	}
 	// The edit applies at Save: no earlier time runs on this machine.
 	if err := s.State.Advance(Key{Project: updated.Project, Slug: updated.Slug}, updated.UpdatedAt); err != nil {
-		return wire.ScheduleShowResult{}, err
+		return ops.ScheduleShowResult{}, err
 	}
 	return s.written(updated)
 }
@@ -161,16 +162,16 @@ func (s *Schedules) edit(req wire.ScheduleEditRequest) (wire.ScheduleShowResult,
 // switchTo writes only this machine's state, never the Schedule file. Turning
 // on sets the baseline to now, so time spent off never runs; turning off
 // leaves a queued run alone.
-func (s *Schedules) switchTo(req wire.ScheduleSwitchRequest) (wire.ScheduleShowResult, error) {
+func (s *Schedules) switchTo(req ops.ScheduleSwitchRequest) (ops.ScheduleShowResult, error) {
 	sc, err := s.Store.Get(req.Project, req.Slug)
 	switch {
 	case errors.Is(err, schedrec.ErrNotFound):
-		return refusedShow(wire.ScheduleReasonUnknown, "no schedule "+req.Project+":"+req.Slug), nil
+		return refusedShow(ops.ScheduleReasonUnknown, "no schedule "+req.Project+":"+req.Slug), nil
 	case err != nil:
 		if res, handled := refusalOf(err); handled {
 			return res, nil
 		}
-		return wire.ScheduleShowResult{}, err
+		return ops.ScheduleShowResult{}, err
 	}
 	k := Key{Project: sc.Project, Slug: sc.Slug}
 	if req.On {
@@ -179,43 +180,43 @@ func (s *Schedules) switchTo(req wire.ScheduleSwitchRequest) (wire.ScheduleShowR
 		err = s.State.Disable(k)
 	}
 	if err != nil {
-		return wire.ScheduleShowResult{}, err
+		return ops.ScheduleShowResult{}, err
 	}
 	return s.written(sc)
 }
 
 // remove deletes the Schedule file, then runs one check so this machine's own
 // queued runs are cancelled and its state dropped without waiting for a tick.
-func (s *Schedules) remove(req wire.ScheduleDeleteRequest) (wire.ScheduleDeleteResult, error) {
+func (s *Schedules) remove(req ops.ScheduleDeleteRequest) (ops.ScheduleDeleteResult, error) {
 	err := s.Store.Delete(req.Project, req.Slug)
 	switch {
 	case errors.Is(err, schedrec.ErrNotFound):
-		return wire.ScheduleDeleteResult{Refused: true, Reason: wire.ScheduleReasonUnknown, Message: "no schedule " + req.Project + ":" + req.Slug}, nil
+		return ops.ScheduleDeleteResult{Refused: true, Reason: ops.ScheduleReasonUnknown, Message: "no schedule " + req.Project + ":" + req.Slug}, nil
 	case err != nil:
 		if reason := schedrec.ReasonOf(err); reason != "" {
-			return wire.ScheduleDeleteResult{Refused: true, Reason: reason, Message: err.Error()}, nil
+			return ops.ScheduleDeleteResult{Refused: true, Reason: reason, Message: err.Error()}, nil
 		}
-		return wire.ScheduleDeleteResult{}, err
+		return ops.ScheduleDeleteResult{}, err
 	}
 	if s.Check != nil {
 		s.Check()
 	}
 	s.publish(req.Project, req.Slug)
-	return wire.ScheduleDeleteResult{}, nil
+	return ops.ScheduleDeleteResult{}, nil
 }
 
 // runNow starts one run of the Schedule at once, whatever the switch says.
-func (s *Schedules) runNow(req wire.ScheduleRunNowRequest) (wire.ScheduleRunNowResult, error) {
+func (s *Schedules) runNow(req ops.ScheduleRunNowRequest) (ops.ScheduleRunNowResult, error) {
 	sc, err := s.Store.Get(req.Project, req.Slug)
 	switch {
 	case errors.Is(err, schedrec.ErrNotFound):
-		return wire.ScheduleRunNowResult{Refused: true, Reason: wire.ScheduleReasonUnknown, Message: "no schedule " + req.Project + ":" + req.Slug}, nil
+		return ops.ScheduleRunNowResult{Refused: true, Reason: ops.ScheduleReasonUnknown, Message: "no schedule " + req.Project + ":" + req.Slug}, nil
 	case err != nil:
-		return wire.ScheduleRunNowResult{}, err
+		return ops.ScheduleRunNowResult{}, err
 	}
 	registered, err := s.registered(sc)
 	if err != nil {
-		return wire.ScheduleRunNowResult{}, err
+		return ops.ScheduleRunNowResult{}, err
 	}
 	res, err := s.RunNow(sc, registered)
 	if err == nil && !res.Refused {
@@ -226,24 +227,24 @@ func (s *Schedules) runNow(req wire.ScheduleRunNowRequest) (wire.ScheduleRunNowR
 
 func (s *Schedules) publish(project, slug string) {
 	if s.Events != nil {
-		s.Events.Publish(wire.EventSchedulesChanged, project+":"+slug)
+		s.Events.Publish(ops.EventSchedulesChanged, project+":"+slug)
 	}
 }
 
 // written publishes schedules-changed and returns the Schedule's show payload.
-func (s *Schedules) written(sc schedrec.Schedule) (wire.ScheduleShowResult, error) {
+func (s *Schedules) written(sc schedrec.Schedule) (ops.ScheduleShowResult, error) {
 	s.publish(sc.Project, sc.Slug)
 	registered, err := s.registered(sc)
 	if err != nil {
-		return wire.ScheduleShowResult{}, err
+		return ops.ScheduleShowResult{}, err
 	}
-	return wire.ScheduleShowResult{Schedule: s.info(sc, registered, s.now()), Prompt: sc.Prompt, LastRuns: []wire.ScheduleRun{}}, nil
+	return ops.ScheduleShowResult{Schedule: s.info(sc, registered, s.now()), Prompt: sc.Prompt, LastRuns: []ops.ScheduleRun{}}, nil
 }
 
 // refusalOf maps a schedrec refusal to a result.
-func refusalOf(err error) (wire.ScheduleShowResult, bool) {
+func refusalOf(err error) (ops.ScheduleShowResult, bool) {
 	if reason := schedrec.ReasonOf(err); reason != "" {
 		return refusedShow(reason, err.Error()), true
 	}
-	return wire.ScheduleShowResult{}, false
+	return ops.ScheduleShowResult{}, false
 }

@@ -57,6 +57,7 @@ import (
 	"github.com/elentok/gx/server/triage"
 	"github.com/elentok/gx/server/web"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/syshealth"
@@ -427,7 +428,7 @@ func New(cfg Config) (*Server, error) {
 	s.cleanup = cleanup.New(cleanup.Deps{TicketStore: cfg.TicketStore, Env: cfg.Env, Events: events,
 		Sessions:     func() ([]wire.SessionInfo, error) { return s.sessions.ListSessions() },
 		SubmitOneOff: s.oneOffs.Submit,
-		ArchiveEpic: func(project, epic string, yes bool) (wire.CleanupWriteResult, error) {
+		ArchiveEpic: func(project, epic string, yes bool) (ops.CleanupWriteResult, error) {
 			return s.archive.Cleanup(project, epic, yes)
 		}})
 	s.disks = disk.New(disk.Deps{

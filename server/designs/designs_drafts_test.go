@@ -12,11 +12,11 @@ import (
 
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // seedDraft writes a draft straight into the store the server reads.
-func (f designsFixture) seedDraft(t *testing.T, project, slug, idea string) *wire.DesignDraft {
+func (f designsFixture) seedDraft(t *testing.T, project, slug, idea string) *ops.DesignDraft {
 	t.Helper()
 	d, err := drafts.New(f.h.StateDir).Create(project, slug, idea, "")
 	if err != nil || d == nil {
@@ -46,14 +46,14 @@ func (f designsFixture) webGet(t *testing.T, path string, out any) {
 	}
 }
 
-func (f designsFixture) webSave(t *testing.T, id string, rev int, idea string) wire.DesignDraftSaveResult {
+func (f designsFixture) webSave(t *testing.T, id string, rev int, idea string) ops.DesignDraftSaveResult {
 	t.Helper()
 	body := fmt.Sprintf(`{"id":%q,"project":"proj","slug":"s","idea":%q,"revision":%d}`, id, idea, rev)
 	code, out := servertest.WebPostJSON(t, f.base+"/v1/designs/drafts/save", body, f.ck, "", servertest.JSONPost(f.base))
 	if code != http.StatusOK {
 		t.Fatalf("save = %d %s", code, out)
 	}
-	var res wire.DesignDraftSaveResult
+	var res ops.DesignDraftSaveResult
 	if err := json.Unmarshal([]byte(out), &res); err != nil {
 		t.Fatal(err)
 	}
@@ -68,13 +68,13 @@ func TestWebDesignDrafts_ListReadSaveDelete(t *testing.T) {
 	}
 	newer := f.seedDraft(t, "proj", "newer", "second idea")
 
-	var items []wire.DesignDraftItem
+	var items []ops.DesignDraftItem
 	f.webGet(t, "/v1/designs/drafts", &items)
 	if len(items) != 2 || items[0].ID != newer.ID || items[1].ID != older.ID {
 		t.Fatalf("list = %+v, want newest first", items)
 	}
 
-	var read wire.DesignDraftSaveResult
+	var read ops.DesignDraftSaveResult
 	f.webGet(t, "/v1/designs/drafts/read?id="+url.QueryEscape(older.ID), &read)
 	if read.Refused || read.Draft == nil || read.Draft.Idea != "first idea" {
 		t.Fatalf("read = %+v", read)
@@ -90,7 +90,7 @@ func TestWebDesignDrafts_ListReadSaveDelete(t *testing.T) {
 		t.Fatalf("delete = %d %s", code, out)
 	}
 	f.webGet(t, "/v1/designs/drafts/read?id="+url.QueryEscape(older.ID), &read)
-	if !read.Refused || read.Reason != wire.ReasonDraftGone {
+	if !read.Refused || read.Reason != ops.ReasonDraftGone {
 		t.Errorf("read after delete = %+v, want draft-gone", read)
 	}
 }
@@ -107,7 +107,7 @@ func TestWebDesignDrafts_LastProject(t *testing.T) {
 	}
 	read := func() string {
 		t.Helper()
-		var res wire.DesignLastProject
+		var res ops.DesignLastProject
 		f.webGet(t, "/v1/designs/drafts/last-project", &res)
 		return res.Project
 	}
@@ -139,20 +139,20 @@ func TestWebDesignDrafts_SaveRefusals(t *testing.T) {
 	f := startDesigns(t)
 	d := f.seedDraft(t, "proj", "s", "idea")
 
-	if res := f.webSave(t, d.ID, d.Revision+5, "x"); !res.Refused || res.Reason != wire.ReasonDraftRevisionConflict {
+	if res := f.webSave(t, d.ID, d.Revision+5, "x"); !res.Refused || res.Reason != ops.ReasonDraftRevisionConflict {
 		t.Errorf("stale save = %+v, want revision-conflict", res)
 	}
-	if res := f.webSave(t, "0123456789abcdef", 1, "x"); !res.Refused || res.Reason != wire.ReasonDraftGone {
+	if res := f.webSave(t, "0123456789abcdef", 1, "x"); !res.Refused || res.Reason != ops.ReasonDraftGone {
 		t.Errorf("save of a missing draft = %+v, want draft-gone", res)
 	}
 
 	// The socket (CLI) call refuses the same way as the web call.
-	cli, err := f.h.Client.Sessions.SaveDesignDraft(f.ctx, wire.DesignDraftSaveRequest{ID: d.ID, Project: "proj", Idea: "x", Revision: d.Revision + 5})
-	if err != nil || !cli.Refused || cli.Reason != wire.ReasonDraftRevisionConflict {
+	cli, err := f.h.Client.Sessions.SaveDesignDraft(f.ctx, ops.DesignDraftSaveRequest{ID: d.ID, Project: "proj", Idea: "x", Revision: d.Revision + 5})
+	if err != nil || !cli.Refused || cli.Reason != ops.ReasonDraftRevisionConflict {
 		t.Errorf("socket stale save = %+v, %v", cli, err)
 	}
-	cli, err = f.h.Client.Sessions.SaveDesignDraft(f.ctx, wire.DesignDraftSaveRequest{ID: "0123456789abcdef", Idea: "x", Revision: 1})
-	if err != nil || !cli.Refused || cli.Reason != wire.ReasonDraftGone {
+	cli, err = f.h.Client.Sessions.SaveDesignDraft(f.ctx, ops.DesignDraftSaveRequest{ID: "0123456789abcdef", Idea: "x", Revision: 1})
+	if err != nil || !cli.Refused || cli.Reason != ops.ReasonDraftGone {
 		t.Errorf("socket gone save = %+v, %v", cli, err)
 	}
 }
@@ -165,7 +165,7 @@ func TestWebDesignDrafts_SaveWithoutIDCreates(t *testing.T) {
 	if res.Refused || res.Draft == nil || res.Draft.ID == "" || res.Draft.Idea != "first words" || res.Draft.Revision != 1 {
 		t.Fatalf("create save = %+v", res)
 	}
-	var items []wire.DesignDraftItem
+	var items []ops.DesignDraftItem
 	f.webGet(t, "/v1/designs/drafts", &items)
 	if len(items) != 1 || items[0].ID != res.Draft.ID {
 		t.Errorf("list = %+v, want the created draft", items)
@@ -184,7 +184,7 @@ func TestWebDesignDrafts_EmptyingSaveDeletes(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(out, `"deleted":true`) {
 		t.Fatalf("emptying save = %d %s", code, out)
 	}
-	var items []wire.DesignDraftItem
+	var items []ops.DesignDraftItem
 	f.webGet(t, "/v1/designs/drafts", &items)
 	if len(items) != 0 {
 		t.Errorf("list = %+v, want none", items)

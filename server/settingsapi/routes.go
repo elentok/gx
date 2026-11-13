@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/config/registry"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // GlobalTarget is the `target` value that names the global config file.
@@ -39,7 +40,7 @@ func Routes(w func() *Writer, pending func() []string, reload func() wire.Reload
 			wire.WriteJSON(rw, resp)
 		}},
 		{Pattern: "POST /v1/settings", Web: wire.WebWrite, Handler: func(rw http.ResponseWriter, r *http.Request) {
-			var req wire.SettingsWriteRequest
+			var req ops.SettingsWriteRequest
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(rw, "bad request: "+err.Error(), http.StatusBadRequest)
 				return
@@ -58,7 +59,7 @@ func Routes(w func() *Writer, pending func() []string, reload func() wire.Reload
 }
 
 // write saves the changes, then reloads config.json once for a global write.
-func write(w *Writer, t Target, in []wire.SettingChange, pending func() []string, reload func() wire.ReloadResult) wire.SettingsWriteResult {
+func write(w *Writer, t Target, in []ops.SettingChange, pending func() []string, reload func() wire.ReloadResult) ops.SettingsWriteResult {
 	// A hook may reload inside the write; reuse its result rather than reload twice.
 	var reloaded *wire.ReloadResult
 	t.Reload = func() wire.ReloadResult {
@@ -77,11 +78,11 @@ func write(w *Writer, t Target, in []wire.SettingChange, pending func() []string
 			for i, k := range ref.Keys {
 				keys[i] = k.String()
 			}
-			return wire.SettingsWriteResult{Refused: true, Keys: keys, Reason: ref.Reason}
+			return ops.SettingsWriteResult{Refused: true, Keys: keys, Reason: ref.Reason}
 		}
-		return wire.SettingsWriteResult{Refused: true, Reason: err.Error()}
+		return ops.SettingsWriteResult{Refused: true, Reason: err.Error()}
 	}
-	out := wire.SettingsWriteResult{Values: make(map[string]json.RawMessage, len(res.Values)), Notices: res.Notices}
+	out := ops.SettingsWriteResult{Values: make(map[string]json.RawMessage, len(res.Values)), Notices: res.Notices}
 	for k, v := range res.Values {
 		out.Values[k] = v
 	}
@@ -103,7 +104,7 @@ func write(w *Writer, t Target, in []wire.SettingChange, pending func() []string
 	return out
 }
 
-func toChanges(reg *registry.Registry, in []wire.SettingChange) ([]Change, error) {
+func toChanges(reg *registry.Registry, in []ops.SettingChange) ([]Change, error) {
 	byKey := map[string]registry.KeyPath{}
 	for _, e := range reg.All() {
 		byKey[e.Key.String()] = e.Key

@@ -5,21 +5,21 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
-func (r *running) schedulesList(t *testing.T) []wire.ScheduleInfo {
+func (r *running) schedulesList(t *testing.T) []ops.ScheduleInfo {
 	t.Helper()
-	var res wire.SchedulesResult
+	var res ops.SchedulesResult
 	if err := json.Unmarshal([]byte(r.Gx(t, "schedules", "list", "--json")), &res); err != nil {
 		t.Fatal(err)
 	}
 	return res.Schedules
 }
 
-func (r *running) scheduleRuns(t *testing.T, addr string) []wire.ScheduleRun {
+func (r *running) scheduleRuns(t *testing.T, addr string) []ops.ScheduleRun {
 	t.Helper()
-	var res wire.ScheduleShowResult
+	var res ops.ScheduleShowResult
 	if err := json.Unmarshal([]byte(r.Gx(t, "schedules", "show", addr, "--json")), &res); err != nil {
 		t.Fatal(err)
 	}
@@ -75,10 +75,10 @@ func TestSchedulesScenario_PageShapesSeedLastRuns(t *testing.T) {
 	addr := "demo:weather-check"
 	for _, w := range []struct {
 		shape  string
-		status []wire.ScheduleRunStatus
+		status []ops.ScheduleRunStatus
 	}{
-		{"page", []wire.ScheduleRunStatus{wire.ScheduleRunFinished, wire.ScheduleRunFinished, wire.ScheduleRunRanLate, wire.ScheduleRunSkipped}},
-		{"paused", []wire.ScheduleRunStatus{wire.ScheduleRunPaused, wire.ScheduleRunFinished, wire.ScheduleRunFinished, wire.ScheduleRunRanLate, wire.ScheduleRunSkipped}},
+		{"page", []ops.ScheduleRunStatus{ops.ScheduleRunFinished, ops.ScheduleRunFinished, ops.ScheduleRunRanLate, ops.ScheduleRunSkipped}},
+		{"paused", []ops.ScheduleRunStatus{ops.ScheduleRunPaused, ops.ScheduleRunFinished, ops.ScheduleRunFinished, ops.ScheduleRunRanLate, ops.ScheduleRunSkipped}},
 	} {
 		t.Run(w.shape, func(t *testing.T) {
 			t.Parallel()
@@ -92,15 +92,15 @@ func TestSchedulesScenario_PageShapesSeedLastRuns(t *testing.T) {
 					t.Errorf("run %d status = %q, want %q", i, run.Status, w.status[i])
 				}
 				switch run.Status {
-				case wire.ScheduleRunSkipped:
+				case ops.ScheduleRunSkipped:
 					if run.Reason != "late" || run.Address != "" {
 						t.Errorf("skip row %+v", run)
 					}
-				case wire.ScheduleRunFinished, wire.ScheduleRunRanLate:
+				case ops.ScheduleRunFinished, ops.ScheduleRunRanLate:
 					if run.Result == "" || run.Address == "" {
 						t.Errorf("finished row without a Result line or address: %+v", run)
 					}
-				case wire.ScheduleRunPaused:
+				case ops.ScheduleRunPaused:
 					if run.Address == "" {
 						t.Errorf("paused row without a ticket address: %+v", run)
 					}

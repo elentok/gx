@@ -6,11 +6,13 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/server/wire"
+
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 )
 
 func (c *Cleanup) agentWrite(w http.ResponseWriter, r *http.Request) {
-	decodeAndRun(w, r, func(req wire.CleanupWriteRequest) (wire.OneOffResult, error) {
+	decodeAndRun(w, r, func(req ops.CleanupWriteRequest) (wire.OneOffResult, error) {
 		return c.StartAgent(req.Project)
 	})
 }
@@ -25,17 +27,17 @@ func (c *Cleanup) StartAgent(project string) (wire.OneOffResult, error) {
 	}
 	var branches, epics []string
 	for _, wt := range rep.Worktrees {
-		if wt.Action == wire.CleanupActionAgent {
+		if wt.Action == ops.CleanupActionAgent {
 			branches = append(branches, wt.Branch)
 		}
 	}
 	for _, e := range rep.Epics {
-		if e.Action == wire.CleanupActionAgent {
+		if e.Action == ops.CleanupActionAgent {
 			epics = append(epics, e.Name)
 		}
 	}
 	if len(branches) == 0 && len(epics) == 0 {
-		return wire.OneOffResult{Refused: true, Reason: wire.ReasonCleanupNothingForAgent, Message: "no branch or epic needs the cleanup agent"}, nil
+		return wire.OneOffResult{Refused: true, Reason: ops.ReasonCleanupNothingForAgent, Message: "no branch or epic needs the cleanup agent"}, nil
 	}
 	return c.d.SubmitOneOff(wire.OneOffRequest{
 		Prompt:  agentPrompt(project, branches, epics),

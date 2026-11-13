@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 func (f designsFixture) openFromDraft(t *testing.T, slug, idea, draft string) wire.SessionResult {
@@ -20,7 +21,7 @@ func (f designsFixture) openFromDraft(t *testing.T, slug, idea, draft string) wi
 }
 
 // draftWithImages seeds a draft holding two PNG uploads and returns it with the image file names.
-func (f designsFixture) draftWithImages(t *testing.T) (*wire.DesignDraft, []string) {
+func (f designsFixture) draftWithImages(t *testing.T) (*ops.DesignDraft, []string) {
 	t.Helper()
 	d := f.seedDraft(t, "proj", "fresh-idea", "an idea")
 	var names []string

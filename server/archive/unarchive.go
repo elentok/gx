@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/server/wire"
+
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/archivekey"
@@ -32,7 +34,7 @@ func (a *Archive) Unarchive(req wire.UnarchiveRequest) (wire.TargetsResult, erro
 
 func (a *Archive) unarchiveOne(target string) (wire.TargetResult, error) {
 	unknown := func(msg string) (wire.TargetResult, error) {
-		return wire.RefusedTarget(target, wire.ReasonCleanupUnknown, msg), nil
+		return wire.RefusedTarget(target, ops.ReasonCleanupUnknown, msg), nil
 	}
 	project, epic, ok := tickets.ParseEpicAddress(strings.TrimSpace(target))
 	if !ok {

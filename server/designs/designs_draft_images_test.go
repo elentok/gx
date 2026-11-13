@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/server/imagestore"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 func (f designsFixture) uploadDraftImage(t *testing.T, draft string, data []byte) wire.SessionImageResult {
@@ -44,9 +45,9 @@ func (f designsFixture) removeDraftImage(t *testing.T, draft, image string) wire
 	return res
 }
 
-func (f designsFixture) readDraft(t *testing.T, id string) *wire.DesignDraft {
+func (f designsFixture) readDraft(t *testing.T, id string) *ops.DesignDraft {
 	t.Helper()
-	var read wire.DesignDraftSaveResult
+	var read ops.DesignDraftSaveResult
 	f.webGet(t, "/v1/designs/drafts/read?id="+url.QueryEscape(id), &read)
 	if read.Draft == nil {
 		t.Fatalf("read %s = %+v", id, read)
@@ -113,10 +114,10 @@ func TestWebDesignDraftImages_GoneDraft(t *testing.T) {
 	if err := drafts.New(f.h.StateDir).Delete(d.ID); err != nil {
 		t.Fatal(err)
 	}
-	if res := f.uploadDraftImage(t, d.ID, png); res.Reason != wire.ReasonDraftGone {
+	if res := f.uploadDraftImage(t, d.ID, png); res.Reason != ops.ReasonDraftGone {
 		t.Errorf("upload to a deleted draft = %+v, want draft-gone", res)
 	}
-	if res := f.removeDraftImage(t, d.ID, "abcd1234"); res.Reason != wire.ReasonDraftGone {
+	if res := f.removeDraftImage(t, d.ID, "abcd1234"); res.Reason != ops.ReasonDraftGone {
 		t.Errorf("remove from a deleted draft = %+v, want draft-gone", res)
 	}
 }
@@ -183,7 +184,7 @@ func TestWebDesignDraftImages_DraftWithImageSurvivesEmptyingText(t *testing.T) {
 
 	body := fmt.Sprintf(`{"id":%q,"project":"proj","slug":"","idea":"","revision":%d}`, d.ID, d.Revision)
 	code, out := servertest.WebPostJSON(t, f.base+"/v1/designs/drafts/save", body, f.ck, "", servertest.JSONPost(f.base))
-	var res wire.DesignDraftSaveResult
+	var res ops.DesignDraftSaveResult
 	if code != http.StatusOK || json.Unmarshal([]byte(out), &res) != nil || res.Deleted || res.Draft == nil {
 		t.Fatalf("emptying save = %d %s, want the draft kept", code, out)
 	}
@@ -196,7 +197,7 @@ func TestWebDesignDraftImages_DraftWithImageSurvivesEmptyingText(t *testing.T) {
 	cur := f.readDraft(t, d.ID)
 	body = fmt.Sprintf(`{"id":%q,"project":"proj","slug":"","idea":"","revision":%d}`, d.ID, cur.Revision)
 	code, out = servertest.WebPostJSON(t, f.base+"/v1/designs/drafts/save", body, f.ck, "", servertest.JSONPost(f.base))
-	res = wire.DesignDraftSaveResult{}
+	res = ops.DesignDraftSaveResult{}
 	if code != http.StatusOK || json.Unmarshal([]byte(out), &res) != nil || !res.Deleted {
 		t.Errorf("emptying a draft with no images = %d %s, want deleted", code, out)
 	}

@@ -5,6 +5,7 @@ import (
 
 	schedrec "github.com/elentok/gx/schedules"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // runRequest is the submit of one run of the Schedule, timed or Run now.
@@ -19,8 +20,8 @@ func (sc *Scheduler) runRequest(s schedrec.Schedule) wire.OneOffRequest {
 	}
 }
 
-func runNowRefusal(reason, message, attention string) wire.ScheduleRunNowResult {
-	return wire.ScheduleRunNowResult{Refused: true, Reason: reason, Message: message, AttentionAddress: attention}
+func runNowRefusal(reason, message, attention string) ops.ScheduleRunNowResult {
+	return ops.ScheduleRunNowResult{Refused: true, Reason: reason, Message: message, AttentionAddress: attention}
 }
 
 // RunNow starts one run now, under the timed rule: a queued never-started
@@ -28,7 +29,7 @@ func runNowRefusal(reason, message, attention string) wire.ScheduleRunNowResult 
 // skip. It ignores the switch and leaves the baseline alone.
 //
 // A missing project refuses first, so no queued run is cancelled for nothing.
-func (sc *Scheduler) RunNow(s schedrec.Schedule, registered bool) (wire.ScheduleRunNowResult, error) {
+func (sc *Scheduler) RunNow(s schedrec.Schedule, registered bool) (ops.ScheduleRunNowResult, error) {
 	sc.checkMu.Lock()
 	defer sc.checkMu.Unlock()
 	if !registered {
@@ -36,7 +37,7 @@ func (sc *Scheduler) RunNow(s schedrec.Schedule, registered bool) (wire.Schedule
 	}
 	d, err := sc.settlePrevious(Key{Project: s.Project, Slug: s.Slug})
 	if err != nil {
-		return wire.ScheduleRunNowResult{}, err
+		return ops.ScheduleRunNowResult{}, err
 	}
 	if d.Action == ActionSkip {
 		res := runNowRefusal(d.Reason, "the previous run of "+s.Name+" is live: "+d.Address, "")
@@ -48,9 +49,9 @@ func (sc *Scheduler) RunNow(s schedrec.Schedule, registered bool) (wire.Schedule
 	out, err := sc.Submit.SubmitScheduled(sc.runRequest(s), time.Time{})
 	switch {
 	case err != nil:
-		return wire.ScheduleRunNowResult{}, err
+		return ops.ScheduleRunNowResult{}, err
 	case out.Refused:
 		return runNowRefusal(out.Reason, out.Message, ""), nil
 	}
-	return wire.ScheduleRunNowResult{Address: out.Address, Status: out.Status}, nil
+	return ops.ScheduleRunNowResult{Address: out.Address, Status: out.Status}, nil
 }

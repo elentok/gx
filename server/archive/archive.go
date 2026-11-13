@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/cleanupscan"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/archivekey"
@@ -84,15 +85,15 @@ func (a *Archive) Epics(req wire.ArchiveRequest) (wire.TargetsResult, error) {
 }
 
 // Cleanup maps the one-epic alias onto the same code.
-func (a *Archive) Cleanup(project, epic string, yes bool) (wire.CleanupWriteResult, error) {
+func (a *Archive) Cleanup(project, epic string, yes bool) (ops.CleanupWriteResult, error) {
 	res, err := a.Epics(wire.ArchiveRequest{Targets: []string{project + ":" + epic}, Yes: yes})
 	if err != nil || len(res.Results) == 0 {
-		return wire.CleanupWriteResult{}, err
+		return ops.CleanupWriteResult{}, err
 	}
 	if r := res.Results[0]; r.Refused() {
-		return wire.CleanupWriteResult{Refused: true, Reason: r.Reason, Message: r.Message}, nil
+		return ops.CleanupWriteResult{Refused: true, Reason: r.Reason, Message: r.Message}, nil
 	}
-	return wire.CleanupWriteResult{}, nil
+	return ops.CleanupWriteResult{}, nil
 }
 
 func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error) {
@@ -101,12 +102,12 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 	}
 	project, epic, ok := tickets.ParseEpicAddress(strings.TrimSpace(target))
 	if !ok {
-		return refuse(wire.ReasonCleanupUnknown, "not an epic address (want project:epic)")
+		return refuse(ops.ReasonCleanupUnknown, "not an epic address (want project:epic)")
 	}
 	dir, err := tickets.ProjectDirByName(a.d.TicketStore, project)
 	if err != nil {
 		if _, isAddr := errors.AsType[*tickets.AddressError](err); isAddr {
-			return refuse(wire.ReasonCleanupUnknown, err.Error())
+			return refuse(ops.ReasonCleanupUnknown, err.Error())
 		}
 		return wire.TargetResult{}, err
 	}
@@ -209,7 +210,7 @@ func (a *Archive) checkArchivable(project, dir, base string, scan func(string) (
 		return nil
 	}
 	if !a.d.DesignExists(halves[0].key) {
-		if err := queued(halves[0].key, wire.ReasonCleanupQueued, "the epic is queued"); err != nil {
+		if err := queued(halves[0].key, ops.ReasonCleanupQueued, "the epic is queued"); err != nil {
 			return nil, false, err
 		}
 		row, err := scan(base)
@@ -218,9 +219,9 @@ func (a *Archive) checkArchivable(project, dir, base string, scan func(string) (
 		}
 		switch {
 		case row == nil:
-			return nil, false, refusal{wire.ReasonCleanupUnknown, errors.New("no such epic")}
+			return nil, false, refusal{ops.ReasonCleanupUnknown, errors.New("no such epic")}
 		case !row.AllDone:
-			return nil, false, refusal{wire.ReasonCleanupNotDone, errors.New("the epic has tickets that are not done")}
+			return nil, false, refusal{ops.ReasonCleanupNotDone, errors.New("the epic has tickets that are not done")}
 		}
 		return halves, row.MergedToTrunk, nil
 	}
@@ -243,7 +244,7 @@ func (a *Archive) checkArchivable(project, dir, base string, scan func(string) (
 			return nil, false, refusal{wire.ReasonArchiveNotFinished, errors.New(DesignNotFinishedText)}
 		}
 	}
-	if err := queued(halves[0].key, wire.ReasonCleanupQueued, "the epic is queued"); err != nil {
+	if err := queued(halves[0].key, ops.ReasonCleanupQueued, "the epic is queued"); err != nil {
 		return nil, false, err
 	}
 	if !hasImpl {

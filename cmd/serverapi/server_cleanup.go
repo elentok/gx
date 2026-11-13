@@ -13,20 +13,21 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
-type cleanupWrite func(*apiclient.Reads, context.Context, wire.CleanupWriteRequest) (wire.CleanupWriteResult, error)
+type cleanupWrite func(*apiclient.Reads, context.Context, ops.CleanupWriteRequest) (ops.CleanupWriteResult, error)
 
 // extraFlags registers a command's own flags on req and returns the name of the
 // one that is required.
-type extraFlags func(c *cobra.Command, req *wire.CleanupWriteRequest) (required string)
+type extraFlags func(c *cobra.Command, req *ops.CleanupWriteRequest) (required string)
 
-func branchFlag(c *cobra.Command, req *wire.CleanupWriteRequest) string {
+func branchFlag(c *cobra.Command, req *ops.CleanupWriteRequest) string {
 	c.Flags().StringVar(&req.Branch, "branch", "", "the branch")
 	return "branch"
 }
 
-func epicFlags(c *cobra.Command, req *wire.CleanupWriteRequest) string {
+func epicFlags(c *cobra.Command, req *ops.CleanupWriteRequest) string {
 	c.Flags().StringVar(&req.Epic, "epic", "", "the epic")
 	c.Flags().BoolVar(&req.Yes, "yes", false, "confirm stopping the epic's live sessions")
 	return "epic"
@@ -34,9 +35,9 @@ func epicFlags(c *cobra.Command, req *wire.CleanupWriteRequest) string {
 
 // newCleanupCmd builds a cleanup command with --json and the required --project
 // plus, when extra is not nil, its flags and its required flag.
-func newCleanupCmd(d Deps, use, short string, extra extraFlags, run func(ctx context.Context, cl *apiclient.Client, w io.Writer, req wire.CleanupWriteRequest, jsonOut bool) error) *cobra.Command {
+func newCleanupCmd(d Deps, use, short string, extra extraFlags, run func(ctx context.Context, cl *apiclient.Client, w io.Writer, req ops.CleanupWriteRequest, jsonOut bool) error) *cobra.Command {
 	var jsonOut bool
-	var req wire.CleanupWriteRequest
+	var req ops.CleanupWriteRequest
 	c := &cobra.Command{
 		Use:   use,
 		Short: short,
@@ -82,15 +83,15 @@ func newServerCleanupDeleteCmd(d Deps) *cobra.Command {
 }
 
 func newServerCleanupWriteCmd(d Deps, use, short string, extra extraFlags, call cleanupWrite) *cobra.Command {
-	return newCleanupCmd(d, use, short, extra, func(ctx context.Context, cl *apiclient.Client, w io.Writer, req wire.CleanupWriteRequest, jsonOut bool) error {
+	return newCleanupCmd(d, use, short, extra, func(ctx context.Context, cl *apiclient.Client, w io.Writer, req ops.CleanupWriteRequest, jsonOut bool) error {
 		return runServerCleanupWrite(ctx, cl, w, call, req, jsonOut)
 	})
 }
 
 // runServerCleanupWrite prints the result. A refusal returns an error, so the
 // command exits non-zero.
-func runServerCleanupWrite(ctx context.Context, cl *apiclient.Client, w io.Writer, call cleanupWrite, req wire.CleanupWriteRequest, jsonOut bool) error {
-	return runWebCall(ctx, func(ctx context.Context) (wire.CleanupWriteResult, error) { return call(cl.Reads, ctx, req) }, "server write failed", jsonOut, w, func(wire.CleanupWriteResult) error {
+func runServerCleanupWrite(ctx context.Context, cl *apiclient.Client, w io.Writer, call cleanupWrite, req ops.CleanupWriteRequest, jsonOut bool) error {
+	return runWebCall(ctx, func(ctx context.Context) (ops.CleanupWriteResult, error) { return call(cl.Reads, ctx, req) }, "server write failed", jsonOut, w, func(ops.CleanupWriteResult) error {
 		_, err := fmt.Fprintf(w, "cleaned %s\n", cmp.Or(req.Branch, req.Epic))
 		return err
 	})
@@ -98,7 +99,7 @@ func runServerCleanupWrite(ctx context.Context, cl *apiclient.Client, w io.Write
 
 func newServerCleanupCmd(d Deps) *cobra.Command {
 	return newCleanupCmd(d, "cleanup", "Show a project's cleanup scan with the worktree sizes that are ready", nil,
-		func(ctx context.Context, cl *apiclient.Client, w io.Writer, req wire.CleanupWriteRequest, jsonOut bool) error {
+		func(ctx context.Context, cl *apiclient.Client, w io.Writer, req ops.CleanupWriteRequest, jsonOut bool) error {
 			return runServerCleanup(ctx, cl, w, req.Project, jsonOut)
 		})
 }
@@ -129,7 +130,7 @@ func runServerCleanup(ctx context.Context, cl *apiclient.Client, w io.Writer, pr
 
 func newServerCleanupAgentCmd(d Deps) *cobra.Command {
 	return newCleanupCmd(d, "cleanup-agent", "Start the cleanup agent on the branches and epics no button can decide", nil,
-		func(ctx context.Context, cl *apiclient.Client, w io.Writer, req wire.CleanupWriteRequest, jsonOut bool) error {
+		func(ctx context.Context, cl *apiclient.Client, w io.Writer, req ops.CleanupWriteRequest, jsonOut bool) error {
 			return runWebCall(ctx, func(ctx context.Context) (wire.OneOffResult, error) {
 				return cl.Reads.StartCleanupAgent(ctx, req)
 			}, "server write failed", jsonOut, w, func(res wire.OneOffResult) error {

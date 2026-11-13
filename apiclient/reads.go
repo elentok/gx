@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	"github.com/elentok/gx/server/wire"
+
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // Reads is the sub-client for project, budget, history, epic and stats reads
@@ -29,16 +31,16 @@ func (r *Reads) ProjectWorktrees(ctx context.Context) ([]wire.ProjectWorktrees, 
 }
 
 // Cleanup is project's cleanup scan with the worktree sizes that are ready.
-func (r *Reads) Cleanup(ctx context.Context, project string) (wire.CleanupReport, error) {
-	var rep wire.CleanupReport
+func (r *Reads) Cleanup(ctx context.Context, project string) (ops.CleanupReport, error) {
+	var rep ops.CleanupReport
 	err := r.t.get(ctx, "/v1/cleanup?"+url.Values{"project": {project}}.Encode(), &rep)
 	return rep, err
 }
 
 // RemoveCleanupWorktree removes a merged branch's worktree, then the branch. A
 // refusal is a result (Refused set), not an error.
-func (r *Reads) RemoveCleanupWorktree(ctx context.Context, req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {
-	var res wire.CleanupWriteResult
+func (r *Reads) RemoveCleanupWorktree(ctx context.Context, req ops.CleanupWriteRequest) (ops.CleanupWriteResult, error) {
+	var res ops.CleanupWriteResult
 	err := r.t.post(ctx, "/v1/cleanup/remove-worktree", req, &res)
 	return res, err
 }
@@ -46,23 +48,23 @@ func (r *Reads) RemoveCleanupWorktree(ctx context.Context, req wire.CleanupWrite
 // RemoveUnmergedCleanupWorktree removes an unmerged branch's worktree when it
 // is clean and idle, and keeps the branch. A refusal is a result (Refused set),
 // not an error.
-func (r *Reads) RemoveUnmergedCleanupWorktree(ctx context.Context, req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {
-	var res wire.CleanupWriteResult
+func (r *Reads) RemoveUnmergedCleanupWorktree(ctx context.Context, req ops.CleanupWriteRequest) (ops.CleanupWriteResult, error) {
+	var res ops.CleanupWriteResult
 	err := r.t.post(ctx, "/v1/cleanup/remove-unmerged-worktree", req, &res)
 	return res, err
 }
 
 // ArchiveCleanupEpic archives a done epic that has landed on trunk. A refusal
 // is a result (Refused set), not an error.
-func (r *Reads) ArchiveCleanupEpic(ctx context.Context, req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {
-	var res wire.CleanupWriteResult
+func (r *Reads) ArchiveCleanupEpic(ctx context.Context, req ops.CleanupWriteRequest) (ops.CleanupWriteResult, error) {
+	var res ops.CleanupWriteResult
 	err := r.t.post(ctx, "/v1/cleanup/archive-epic", req, &res)
 	return res, err
 }
 
 // StartCleanupAgent starts a one-off /gx-cleanup on the rows no button can
 // decide. A refusal is a result (Refused set), not an error.
-func (r *Reads) StartCleanupAgent(ctx context.Context, req wire.CleanupWriteRequest) (wire.OneOffResult, error) {
+func (r *Reads) StartCleanupAgent(ctx context.Context, req ops.CleanupWriteRequest) (wire.OneOffResult, error) {
 	var res wire.OneOffResult
 	err := r.t.post(ctx, "/v1/cleanup/agent", req, &res)
 	return res, err
@@ -70,8 +72,8 @@ func (r *Reads) StartCleanupAgent(ctx context.Context, req wire.CleanupWriteRequ
 
 // DeleteCleanupBranch deletes a merged branch that has no worktree. A refusal
 // is a result (Refused set), not an error.
-func (r *Reads) DeleteCleanupBranch(ctx context.Context, req wire.CleanupWriteRequest) (wire.CleanupWriteResult, error) {
-	var res wire.CleanupWriteResult
+func (r *Reads) DeleteCleanupBranch(ctx context.Context, req ops.CleanupWriteRequest) (ops.CleanupWriteResult, error) {
+	var res ops.CleanupWriteResult
 	err := r.t.post(ctx, "/v1/cleanup/delete-branch", req, &res)
 	return res, err
 }

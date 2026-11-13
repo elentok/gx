@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -40,7 +40,7 @@ func TestCleanupRead_SizesLandInTheBackgroundAndPublishAnEvent(t *testing.T) {
 	}
 
 	for ev := range evs {
-		if ev.Type == wire.EventCleanupSizeChanged && ev.Address == "proj" {
+		if ev.Type == ops.EventCleanupSizeChanged && ev.Address == "proj" {
 			break
 		}
 		if ctx.Err() != nil {
@@ -88,8 +88,8 @@ func TestCleanupRead_FreshSquashMergedBranchGetsTheMergedDelete(t *testing.T) {
 	testutil.CommitAll(t, repo, "squash")
 	h := startCleanup(t, repo)
 
-	if got := actionsByBranch(t, h)["squashed"]; got != wire.CleanupActionMergedDelete {
-		t.Errorf("action = %q, want %q", got, wire.CleanupActionMergedDelete)
+	if got := actionsByBranch(t, h)["squashed"]; got != ops.CleanupActionMergedDelete {
+		t.Errorf("action = %q, want %q", got, ops.CleanupActionMergedDelete)
 	}
 }
 
@@ -98,8 +98,8 @@ func TestCleanupRead_RecentCommitUnmergedCleanWorktreeGetsTheUnmergedRemove(t *t
 	commitFile(t, wt, "x.txt")
 	h := startCleanup(t, repo)
 
-	if got := actionsByBranch(t, h)["feature-x"]; got != wire.CleanupActionUnmergedRemove {
-		t.Errorf("action = %q, want %q", got, wire.CleanupActionUnmergedRemove)
+	if got := actionsByBranch(t, h)["feature-x"]; got != ops.CleanupActionUnmergedRemove {
+		t.Errorf("action = %q, want %q", got, ops.CleanupActionUnmergedRemove)
 	}
 }
 
@@ -119,7 +119,7 @@ func TestCleanupRead_DetachedWorktreeGetsNoAction(t *testing.T) {
 	}
 }
 
-func findWorktree(rep wire.CleanupReport, path string) *wire.CleanupWorktree {
+func findWorktree(rep ops.CleanupReport, path string) *ops.CleanupWorktree {
 	for i := range rep.Worktrees {
 		if rep.Worktrees[i].Path == path {
 			return &rep.Worktrees[i]

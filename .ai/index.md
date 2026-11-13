@@ -164,7 +164,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `cmd/ticketsmigrate` — `gx tickets migrate` (`New`, `Deps` with no hooks of its own; `DryRunChanges` is also called by `gx restart-check`)
   - `cmd/ticketref` — ticket, epic and project resolution: addresses, paths, bare epic names (`FindTicket`, `ProjectRoot`, `ResolveEpicArg`, `TicketLabel`)
 - `server/` — the gx server; `server/servertest/` holds its test helpers (`server/servertest/rigs/` holds the leaf scenario rigs built on them); `server/wire/` holds the
-  wire types, consts and pure methods (no behaviour, no import of `server`); `server/schedules/` holds the per-machine Schedule state in the state dir (machine id, switch, baseline with forward-only `Advance`, skip log of the newest 10, cleanup; the scheduler comes later); `server/broker/` holds
+  wire types, consts and pure methods (no behaviour, no import of `server`); `server/wire/ops/` holds the wire types that hold only data (schedules, cleanup, settings page, restart, web info, design drafts), generated to `webui/src/generated/ops.ts` and re-exported by `server.ts`; `server/schedules/` holds the per-machine Schedule state in the state dir (machine id, switch, baseline with forward-only `Advance`, skip log of the newest 10, cleanup; the scheduler comes later); `server/broker/` holds
   the SSE event broker and throttle (imports `wire` only); `server/webtls/` holds web TLS: the
   root and leaf certificates, SNI and source-IP listeners, host allowlist and the root downloads;
   `server/web/` holds the web listener: bind, the login-gated mux, static and dev proxy, the

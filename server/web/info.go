@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // Info answers the CLI with the web UI's address, fingerprint and Setup code.
@@ -24,7 +25,7 @@ func (w *Web) NewRoot(rw http.ResponseWriter, _ *http.Request) {
 	}
 	if err := w.certs.NewRoot(); err != nil {
 		w.log.Error("new root failed", "err", err)
-		wire.WriteJSON(rw, wire.WebInfo{Refused: true, Reason: wire.ReasonWebNewRootFailed, Message: "could not make a new root: " + err.Error()})
+		wire.WriteJSON(rw, ops.WebInfo{Refused: true, Reason: ops.ReasonWebNewRootFailed, Message: "could not make a new root: " + err.Error()})
 		return
 	}
 	info := w.info()
@@ -42,7 +43,7 @@ func (w *Web) Reset(rw http.ResponseWriter, _ *http.Request) {
 	removed, err := w.auth.WebReset()
 	if err != nil {
 		w.log.Error("web reset failed", "err", err)
-		wire.WriteJSON(rw, wire.WebInfo{Refused: true, Reason: wire.ReasonWebResetFailed, Message: "could not reset the web account: " + err.Error()})
+		wire.WriteJSON(rw, ops.WebInfo{Refused: true, Reason: ops.ReasonWebResetFailed, Message: "could not reset the web account: " + err.Error()})
 		return
 	}
 	w.auth.DropLogins(removed...)
@@ -61,7 +62,7 @@ func (w *Web) ResetAuthenticator(rw http.ResponseWriter, _ *http.Request) {
 	removed, _, err := w.auth.ClearAuthenticator()
 	if err != nil {
 		w.log.Error("web authenticator reset failed", "err", err)
-		wire.WriteJSON(rw, wire.WebInfo{Refused: true, Reason: wire.ReasonWebAuthenticatorResetFailed, Message: "could not reset the authenticator: " + err.Error()})
+		wire.WriteJSON(rw, ops.WebInfo{Refused: true, Reason: ops.ReasonWebAuthenticatorResetFailed, Message: "could not reset the authenticator: " + err.Error()})
 		return
 	}
 	w.auth.DropLogins(removed...)
@@ -72,7 +73,7 @@ func (w *Web) ResetAuthenticator(rw http.ResponseWriter, _ *http.Request) {
 }
 
 // addResetCode puts the pending authenticator reset's Setup code on info.
-func (w *Web) addResetCode(info *wire.WebInfo) {
+func (w *Web) addResetCode(info *ops.WebInfo) {
 	code, expires, ok, err := w.auth.AuthenticatorResetCode()
 	if err != nil {
 		w.log.Error("web setup code unavailable", "err", err)
@@ -83,9 +84,9 @@ func (w *Web) addResetCode(info *wire.WebInfo) {
 	}
 }
 
-func offLogins() wire.WebLoginsResult {
+func offLogins() ops.WebLoginsResult {
 	off := offInfo()
-	return wire.WebLoginsResult{Refused: true, Reason: off.Reason, Message: off.Message}
+	return ops.WebLoginsResult{Refused: true, Reason: off.Reason, Message: off.Message}
 }
 
 // LoginList answers the CLI with every web login.
@@ -94,7 +95,7 @@ func (w *Web) LoginList(rw http.ResponseWriter, _ *http.Request) {
 		wire.WriteJSON(rw, offLogins())
 		return
 	}
-	wire.WriteJSON(rw, wire.WebLoginsResult{Logins: w.auth.List()})
+	wire.WriteJSON(rw, ops.WebLoginsResult{Logins: w.auth.List()})
 }
 
 // LoginRevoke revokes one web login by id. An unknown id is a refusal.
@@ -113,12 +114,12 @@ func (w *Web) LoginRevoke(rw http.ResponseWriter, r *http.Request) {
 	switch err := w.auth.Revoke(body.ID, "cli"); {
 	case errors.Is(err, webauth.ErrWebLoginNotFound):
 		w.auth.LogEvent("web login revoke refused", "cli", "", wire.ReasonLoginNotFound)
-		wire.WriteJSON(rw, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonLoginNotFound, Message: "no web login has that id"})
+		wire.WriteJSON(rw, ops.WebLoginsResult{Refused: true, Reason: wire.ReasonLoginNotFound, Message: "no web login has that id"})
 	case err != nil:
 		w.log.Error("web revoke failed", "err", err)
-		wire.WriteJSON(rw, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonWebRevokeFailed, Message: "could not revoke the web login: " + err.Error()})
+		wire.WriteJSON(rw, ops.WebLoginsResult{Refused: true, Reason: ops.ReasonWebRevokeFailed, Message: "could not revoke the web login: " + err.Error()})
 	default:
-		wire.WriteJSON(rw, wire.WebLoginsResult{})
+		wire.WriteJSON(rw, ops.WebLoginsResult{})
 	}
 }
 
@@ -140,27 +141,27 @@ func (w *Web) SetPassword(rw http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, webauth.ErrPasswordTooShort):
 		w.auth.LogEvent("web password change refused", "cli", "", wire.ReasonPasswordTooShort)
-		wire.WriteJSON(rw, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonPasswordTooShort, Message: "the password is too short: use at least 6 characters"})
+		wire.WriteJSON(rw, ops.WebLoginsResult{Refused: true, Reason: wire.ReasonPasswordTooShort, Message: "the password is too short: use at least 6 characters"})
 	case err != nil:
 		w.log.Error("web password change failed", "err", err)
-		wire.WriteJSON(rw, wire.WebLoginsResult{Refused: true, Reason: wire.ReasonWebPasswordFailed, Message: "could not save the password: " + err.Error()})
+		wire.WriteJSON(rw, ops.WebLoginsResult{Refused: true, Reason: ops.ReasonWebPasswordFailed, Message: "could not save the password: " + err.Error()})
 	default:
 		w.auth.LogEvent("web password changed", "cli", "", "")
 		w.auth.DropLogins(removed...)
-		wire.WriteJSON(rw, wire.WebLoginsResult{})
+		wire.WriteJSON(rw, ops.WebLoginsResult{})
 	}
 }
 
-func offInfo() wire.WebInfo {
-	return wire.WebInfo{Refused: true, Reason: wire.ReasonWebOff, Message: "the web UI is off: set server.web.listen in the config and restart the server"}
+func offInfo() ops.WebInfo {
+	return ops.WebInfo{Refused: true, Reason: ops.ReasonWebOff, Message: "the web UI is off: set server.web.listen in the config and restart the server"}
 }
 
-func (w *Web) info() wire.WebInfo {
+func (w *Web) info() ops.WebInfo {
 	if w.ln == nil {
 		return offInfo()
 	}
 	skipped := w.certs.Skipped()
-	info := wire.WebInfo{
+	info := ops.WebInfo{
 		BaseURL:      w.URL(),
 		Fingerprint:  webtls.RootFingerprint(w.certs.Root().Raw),
 		LeftOutHosts: skipped.Hosts,

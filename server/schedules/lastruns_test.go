@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/server/schedules"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 func ts(h, m, s int) string { return at(h, m).Add(time.Duration(s) * time.Second).Format(time.RFC3339) }
@@ -22,7 +22,7 @@ func (r *rig) seed(t *testing.T, epic, id, machine string, opts servertest.Ticke
 	servertest.WriteTicketWith(t, r.h.TicketStore, "proj", epic, id, "run"+id, opts)
 }
 
-func (r *rig) lastRuns(t *testing.T) []wire.ScheduleRun {
+func (r *rig) lastRuns(t *testing.T) []ops.ScheduleRun {
 	t.Helper()
 	got, err := schedules.LastRuns(r.h.TicketStore, r.h.Server.Schedules(), r.key, 2)
 	if err != nil {
@@ -38,19 +38,19 @@ func TestLastRuns_StatusTable(t *testing.T) {
 	cases := []struct {
 		id, epic string
 		opts     servertest.TicketOpts
-		want     wire.ScheduleRunStatus
+		want     ops.ScheduleRunStatus
 	}{
-		{"01", "one-offs", servertest.TicketOpts{ScheduledFor: sched}, wire.ScheduleRunQueued},
-		{"02", "one-offs", servertest.TicketOpts{ScheduledFor: sched, ClaimedAt: ts(9, 0, 5)}, wire.ScheduleRunQueued},
-		{"03", "one-offs", servertest.TicketOpts{Status: "claimed", ScheduledFor: sched, ClaimedAt: ts(9, 0, 5)}, wire.ScheduleRunRunning},
-		{"04", "one-offs-archived", servertest.TicketOpts{Status: "done", ScheduledFor: sched, CreatedAt: ts(9, 0, 60)}, wire.ScheduleRunFinished},
-		{"05", "one-offs-archived", servertest.TicketOpts{Status: "done", ScheduledFor: sched, CreatedAt: ts(9, 1, 1)}, wire.ScheduleRunRanLate},
-		{"06", "one-offs", servertest.TicketOpts{Status: "claimed", ScheduledFor: sched, CreatedAt: ts(9, 30, 0)}, wire.ScheduleRunRunning},
-		{"07", "one-offs", servertest.TicketOpts{Status: "done"}, wire.ScheduleRunFinished},
-		{"08", "one-offs", servertest.TicketOpts{PauseReason: "question"}, wire.ScheduleRunPaused},
-		{"09", "one-offs", servertest.TicketOpts{Status: "needs-answer"}, wire.ScheduleRunPaused}, // oldword:ok legacy status input
-		{"10", "one-offs", servertest.TicketOpts{Status: "needs-repair"}, wire.ScheduleRunPaused}, // oldword:ok legacy status input
-		{"11", "one-offs-archived", servertest.TicketOpts{Status: "cancelled", CancelledAt: ts(9, 5, 0)}, wire.ScheduleRunCancelled},
+		{"01", "one-offs", servertest.TicketOpts{ScheduledFor: sched}, ops.ScheduleRunQueued},
+		{"02", "one-offs", servertest.TicketOpts{ScheduledFor: sched, ClaimedAt: ts(9, 0, 5)}, ops.ScheduleRunQueued},
+		{"03", "one-offs", servertest.TicketOpts{Status: "claimed", ScheduledFor: sched, ClaimedAt: ts(9, 0, 5)}, ops.ScheduleRunRunning},
+		{"04", "one-offs-archived", servertest.TicketOpts{Status: "done", ScheduledFor: sched, CreatedAt: ts(9, 0, 60)}, ops.ScheduleRunFinished},
+		{"05", "one-offs-archived", servertest.TicketOpts{Status: "done", ScheduledFor: sched, CreatedAt: ts(9, 1, 1)}, ops.ScheduleRunRanLate},
+		{"06", "one-offs", servertest.TicketOpts{Status: "claimed", ScheduledFor: sched, CreatedAt: ts(9, 30, 0)}, ops.ScheduleRunRunning},
+		{"07", "one-offs", servertest.TicketOpts{Status: "done"}, ops.ScheduleRunFinished},
+		{"08", "one-offs", servertest.TicketOpts{PauseReason: "question"}, ops.ScheduleRunPaused},
+		{"09", "one-offs", servertest.TicketOpts{Status: "needs-answer"}, ops.ScheduleRunPaused}, // oldword:ok legacy status input
+		{"10", "one-offs", servertest.TicketOpts{Status: "needs-repair"}, ops.ScheduleRunPaused}, // oldword:ok legacy status input
+		{"11", "one-offs-archived", servertest.TicketOpts{Status: "cancelled", CancelledAt: ts(9, 5, 0)}, ops.ScheduleRunCancelled},
 	}
 	// Ten rows is the cap, so the eleven cases go through two rigs.
 	for _, group := range [][]int{{0, 5}, {5, len(cases)}} {
@@ -60,7 +60,7 @@ func TestLastRuns_StatusTable(t *testing.T) {
 			r.seed(t, c.epic, c.id, m, c.opts)
 		}
 		servertest.WriteTicketWith(t, r.h.TicketStore, "proj", "one-offs", "99", "foreign", servertest.TicketOpts{Unique: "schedule:proj/" + r.key.Slug + "-b@x"})
-		got := map[string]wire.ScheduleRunStatus{}
+		got := map[string]ops.ScheduleRunStatus{}
 		for _, row := range r.lastRuns(t) {
 			got[row.Address] = row.Status
 		}
@@ -94,7 +94,7 @@ func TestLastRuns_OnlyNewestTenAndRunNowAndSkipShapes(t *testing.T) {
 		t.Errorf("newest row = %+v, want the Run now", got[0])
 	}
 	last := got[9]
-	if last.Status != wire.ScheduleRunSkipped || last.Address != "" || last.Reason != schedules.ReasonLate {
+	if last.Status != ops.ScheduleRunSkipped || last.Address != "" || last.Reason != schedules.ReasonLate {
 		t.Errorf("oldest kept row = %+v, want the skip", last)
 	}
 	if last.ReasonText != "Past the 2 h Late limit." {
@@ -119,7 +119,7 @@ func TestLastRuns_TwoMachinesShareOneOffsButNotSkips(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 3 || got[0].Status != wire.ScheduleRunSkipped {
+	if len(got) != 3 || got[0].Status != ops.ScheduleRunSkipped {
 		t.Errorf("machine b rows = %+v, want its skip first then both One-offs", got)
 	}
 }

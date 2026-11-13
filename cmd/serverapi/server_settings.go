@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/settingsapi"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/spf13/cobra"
 )
 
@@ -72,16 +72,16 @@ func newServerSettingsSetCmd(d Deps) *cobra.Command {
 			"A refused value exits 1; with --json the body is still printed first.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			req := wire.SettingsWriteRequest{Project: project}
+			req := ops.SettingsWriteRequest{Project: project}
 			for _, s := range sets {
 				key, val, ok := strings.Cut(s, "=")
 				if !ok || key == "" {
 					return fmt.Errorf("--set %q: want KEY=VALUE", s)
 				}
-				req.Changes = append(req.Changes, wire.SettingChange{Key: key, Value: jsonValue(val)})
+				req.Changes = append(req.Changes, ops.SettingChange{Key: key, Value: jsonValue(val)})
 			}
 			for _, key := range removes {
-				req.Changes = append(req.Changes, wire.SettingChange{Key: key, Remove: true})
+				req.Changes = append(req.Changes, ops.SettingChange{Key: key, Remove: true})
 			}
 			if len(req.Changes) == 0 {
 				return fmt.Errorf("nothing to change: pass --set KEY=VALUE or --remove KEY")
@@ -109,7 +109,7 @@ func jsonValue(v string) json.RawMessage {
 	return b
 }
 
-func runServerSettingsSet(ctx context.Context, cl *apiclient.Client, w io.Writer, req wire.SettingsWriteRequest, jsonOut bool) error {
+func runServerSettingsSet(ctx context.Context, cl *apiclient.Client, w io.Writer, req ops.SettingsWriteRequest, jsonOut bool) error {
 	res, err := cl.Admin.SetSettings(ctx, req)
 	if err != nil {
 		return fmt.Errorf("server write failed: %w", err)

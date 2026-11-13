@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/imagestore"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 func (s *Designs) draftList(w http.ResponseWriter, _ *http.Request) {
@@ -26,27 +27,27 @@ func (s *Designs) draftRead(w http.ResponseWriter, r *http.Request) {
 	d, err := s.drafts.Get(r.URL.Query().Get("id"))
 	switch {
 	case errors.Is(err, drafts.ErrNotFound):
-		wire.WriteJSON(w, wire.DesignDraftSaveResult{Refused: true, Reason: wire.ReasonDraftGone})
+		wire.WriteJSON(w, ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftGone})
 	case err != nil:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	default:
-		wire.WriteJSON(w, wire.DesignDraftSaveResult{Draft: d})
+		wire.WriteJSON(w, ops.DesignDraftSaveResult{Draft: d})
 	}
 }
 
 func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
-	var req wire.DesignDraftSaveRequest
+	var req ops.DesignDraftSaveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	var res wire.DesignDraftSaveResult
+	var res ops.DesignDraftSaveResult
 	var err error
 	if req.ID == "" {
 		// The form's first save of a new draft has no id yet.
-		var d *wire.DesignDraft
+		var d *ops.DesignDraft
 		if d, err = s.drafts.Create(req.Project, req.Slug, req.Idea, req.Name); err == nil {
-			res = wire.DesignDraftSaveResult{Draft: d, Deleted: d == nil}
+			res = ops.DesignDraftSaveResult{Draft: d, Deleted: d == nil}
 		}
 	} else {
 		res, err = s.drafts.Save(req.ID, req)
@@ -64,11 +65,11 @@ func (s *Designs) lastProjectRead(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	wire.WriteJSON(w, wire.DesignLastProject{Project: p})
+	wire.WriteJSON(w, ops.DesignLastProject{Project: p})
 }
 
 func (s *Designs) lastProjectSet(w http.ResponseWriter, r *http.Request) {
-	var req wire.DesignLastProject
+	var req ops.DesignLastProject
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -161,7 +162,7 @@ func (s *Designs) mapImageServe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Designs) draftDelete(w http.ResponseWriter, r *http.Request) {
-	var req wire.DesignDraftDeleteRequest
+	var req ops.DesignDraftDeleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -170,5 +171,5 @@ func (s *Designs) draftDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	wire.WriteJSON(w, wire.DesignDraftSaveResult{Deleted: true})
+	wire.WriteJSON(w, ops.DesignDraftSaveResult{Deleted: true})
 }

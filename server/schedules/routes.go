@@ -9,6 +9,7 @@ import (
 	schedrec "github.com/elentok/gx/schedules"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // Schedules serves the read routes over the stored Schedules and this
@@ -27,7 +28,7 @@ type Schedules struct {
 	// Check runs one scheduler check; a delete uses it to tidy at once.
 	Check func()
 	// RunNow starts one run of a Schedule now.
-	RunNow func(sc schedrec.Schedule, registered bool) (wire.ScheduleRunNowResult, error)
+	RunNow func(sc schedrec.Schedule, registered bool) (ops.ScheduleRunNowResult, error)
 }
 
 // Routes lists the read routes. The getter is called per request.
@@ -56,7 +57,7 @@ func (s *Schedules) listRead(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	res := wire.SchedulesResult{Schedules: []wire.ScheduleInfo{}, Projects: append([]string{}, names...)}
+	res := ops.SchedulesResult{Schedules: []ops.ScheduleInfo{}, Projects: append([]string{}, names...)}
 	now := s.now()
 	for _, it := range items {
 		res.Schedules = append(res.Schedules, s.info(it.Schedule, it.Registered, now))
@@ -69,10 +70,10 @@ func (s *Schedules) showRead(w http.ResponseWriter, r *http.Request) {
 	sc, err := s.Store.Get(project, slug)
 	switch {
 	case errors.Is(err, schedrec.ErrNotFound):
-		wire.WriteJSON(w, refusedShow(wire.ScheduleReasonUnknown, "no schedule "+project+":"+slug))
+		wire.WriteJSON(w, refusedShow(ops.ScheduleReasonUnknown, "no schedule "+project+":"+slug))
 		return
 	case schedrec.ReasonOf(err) == schedrec.ReasonInvalidProject:
-		wire.WriteJSON(w, refusedShow(wire.ScheduleReasonInvalidProject, "no project "+project))
+		wire.WriteJSON(w, refusedShow(ops.ScheduleReasonInvalidProject, "no project "+project))
 		return
 	case err != nil:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -89,13 +90,13 @@ func (s *Schedules) showRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if runs == nil {
-		runs = []wire.ScheduleRun{}
+		runs = []ops.ScheduleRun{}
 	}
-	wire.WriteJSON(w, wire.ScheduleShowResult{Schedule: s.info(sc, registered, s.now()), Prompt: sc.Prompt, LastRuns: runs})
+	wire.WriteJSON(w, ops.ScheduleShowResult{Schedule: s.info(sc, registered, s.now()), Prompt: sc.Prompt, LastRuns: runs})
 }
 
-func refusedShow(reason, msg string) wire.ScheduleShowResult {
-	return wire.ScheduleShowResult{Refused: true, Reason: reason, Message: msg, LastRuns: []wire.ScheduleRun{}}
+func refusedShow(reason, msg string) ops.ScheduleShowResult {
+	return ops.ScheduleShowResult{Refused: true, Reason: reason, Message: msg, LastRuns: []ops.ScheduleRun{}}
 }
 
 // registered reports whether sc's project directory has a project.json; Get
@@ -113,9 +114,9 @@ func (s *Schedules) registered(sc schedrec.Schedule) (bool, error) {
 	return false, nil
 }
 
-func (s *Schedules) info(sc schedrec.Schedule, registered bool, now time.Time) wire.ScheduleInfo {
+func (s *Schedules) info(sc schedrec.Schedule, registered bool, now time.Time) ops.ScheduleInfo {
 	on := s.State.Enabled(Key{Project: sc.Project, Slug: sc.Slug})
-	info := wire.ScheduleInfo{
+	info := ops.ScheduleInfo{
 		Name: sc.Name, Slug: sc.Slug, Project: sc.Project, Times: sc.Times, Harness: sc.Harness, Tier: sc.Tier,
 		DefaultHarness: s.DefaultHarness(sc.Project), LateLimitHours: sc.LateLimitHours,
 		Switch: on, ProjectFound: registered, UpdatedAt: sc.UpdatedAt.Format(time.RFC3339),

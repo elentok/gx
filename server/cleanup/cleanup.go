@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/cleanupscan"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketgit"
 )
@@ -34,7 +35,7 @@ type Deps struct {
 	// Sessions lists every session, for refusing a worktree one still works in.
 	Sessions func() ([]wire.SessionInfo, error)
 	// ArchiveEpic is the one-epic archive alias; server/archive owns the code.
-	ArchiveEpic func(project, epic string, yes bool) (wire.CleanupWriteResult, error)
+	ArchiveEpic func(project, epic string, yes bool) (ops.CleanupWriteResult, error)
 	// SubmitOneOff starts a one-off agent ticket.
 	SubmitOneOff func(wire.OneOffRequest) (wire.OneOffResult, error)
 }
@@ -104,18 +105,18 @@ func (c *Cleanup) repoFor(project string) (dir, root string, err error) {
 
 // Report scans project and starts a background size read for every worktree
 // whose size is not cached yet.
-func (c *Cleanup) Report(project string) (wire.CleanupReport, error) {
+func (c *Cleanup) Report(project string) (ops.CleanupReport, error) {
 	_, repo, err := c.repoFor(project)
 	if err != nil {
-		return wire.CleanupReport{}, err
+		return ops.CleanupReport{}, err
 	}
 	res, err := cleanupscan.ScanIn(c.d.TicketStore, repo)
 	if err != nil {
-		return wire.CleanupReport{}, err
+		return ops.CleanupReport{}, err
 	}
-	rep := wire.CleanupReport{Project: project, Epics: []wire.CleanupEpic{}, Worktrees: []wire.CleanupWorktree{}, AtticRefs: res.AtticRefs}
+	rep := ops.CleanupReport{Project: project, Epics: []ops.CleanupEpic{}, Worktrees: []ops.CleanupWorktree{}, AtticRefs: res.AtticRefs}
 	for _, e := range res.Epics {
-		rep.Epics = append(rep.Epics, wire.CleanupEpic{
+		rep.Epics = append(rep.Epics, ops.CleanupEpic{
 			Name: e.Name, AllDone: e.AllDone, MergedToTrunk: e.MergedToTrunk,
 			HasCodeReviewTicket: e.HasCodeReviewTicket, CodeReviewDone: e.CodeReviewDone,
 			Action: epicAction(e),
@@ -126,10 +127,10 @@ func (c *Cleanup) Report(project string) (wire.CleanupReport, error) {
 		live := ""
 		if wt.Path != "" {
 			if live, err = c.liveSessionIn(wt.Path); err != nil {
-				return wire.CleanupReport{}, err
+				return ops.CleanupReport{}, err
 			}
 		}
-		out := wire.CleanupWorktree{
+		out := ops.CleanupWorktree{
 			Branch: wt.Branch, Path: wt.Path, Kind: wt.Kind, Active: wt.Active, Dirty: wt.Dirty, Head: wt.Head,
 			Epic: wt.Epic, TicketID: wt.TicketID, TicketDone: wt.TicketDone, Merged: wt.Merged,
 			MergedToTrunk: wt.MergedToTrunk, DeleteMode: wt.DeleteMode, Recommendation: wt.Recommendation,
@@ -150,9 +151,9 @@ func epicAction(e cleanupscan.EpicScan) string {
 	case !e.AllDone:
 		return ""
 	case e.MergedToTrunk:
-		return wire.CleanupActionArchive
+		return ops.CleanupActionArchive
 	}
-	return wire.CleanupActionAgent
+	return ops.CleanupActionAgent
 }
 
 // worktreeAction decides the row's one button, once, for the page and the agent
@@ -163,15 +164,15 @@ func worktreeAction(wt cleanupscan.WorktreeScan, live bool) string {
 	case wt.Branch == "":
 		return ""
 	case wt.DeleteMode != cleanupscan.DeleteNone && wt.Path == "":
-		return wire.CleanupActionMergedDelete
+		return ops.CleanupActionMergedDelete
 	case wt.DeleteMode != cleanupscan.DeleteNone:
-		return wire.CleanupActionMergedRemove
+		return ops.CleanupActionMergedRemove
 	case wt.Path != "" && !wt.Dirty && !live:
-		return wire.CleanupActionUnmergedRemove
+		return ops.CleanupActionUnmergedRemove
 	case wt.Path != "" || wt.Active:
 		return ""
 	}
-	return wire.CleanupActionAgent
+	return ops.CleanupActionAgent
 }
 
 // sizeOf returns path's cached size, or queues path to be measured.
@@ -215,7 +216,7 @@ func (c *Cleanup) measure(project, path string) {
 	}
 	c.mu.Unlock()
 	if err == nil && c.d.Events != nil {
-		c.d.Events.Publish(wire.EventCleanupSizeChanged, project)
+		c.d.Events.Publish(ops.EventCleanupSizeChanged, project)
 	}
 }
 
