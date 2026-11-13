@@ -148,7 +148,6 @@ export function ContextBadge({
   const tone = LEVEL_TONE[level]
   const fill = Math.min(1, Math.max(0, used / ceiling))
   const percent = Math.round((used / ceiling) * 100)
-  const remaining = ceiling - used
   return (
     <Popover.Root positioning={{ placement: "top-end", gutter: 8 }} lazyMount unmountOnExit>
       <Popover.Trigger asChild>
@@ -183,7 +182,7 @@ export function ContextBadge({
             boxShadow="lg"
             color="text"
             boxSizing="border-box"
-            w="72"
+            w="80"
             maxW="calc(100vw - 2rem)"
             p="3"
             fontSize="xs"
@@ -201,11 +200,6 @@ export function ContextBadge({
               <Text color="text.dim">of {kilo(ceiling)} smart zone</Text>
             </Flex>
             <ContextSplit usage={usage} ceiling={ceiling} used={used} />
-            <Text mt="1" color={remaining < 0 ? `tone.${tone}.fg` : "text.dim"}>
-              {remaining < 0
-                ? `${tokens(Math.abs(remaining))} over smart zone`
-                : `${tokens(remaining)} headroom`}
-            </Text>
             {usage ? <UsageFooter usage={usage} /> : null}
           </Popover.Content>
         </Popover.Positioner>

@@ -54,18 +54,19 @@ test("the badge shows whole thousands and opens context details", async () => {
   const details = await screen.findByRole("dialog", { name: "Context usage" })
   expect(details.textContent).toContain("Context35%")
   expect(details.textContent).toContain("70Kof 200K smart zone")
-  expect(details.textContent).toContain("129.6K headroom")
+  expect(details.textContent).not.toContain("headroom")
+  expect(details.textContent).not.toContain("over smart zone")
   expect(details.textContent).not.toContain("Used")
 })
 
-test("the popover reports usage above the smart zone without wrapping it into headroom", async () => {
+test("the popover reports usage above the smart zone without a remaining-token line", async () => {
   render(session({ context_tokens: 185_375, context_level: "red" }), { ceiling: 130_000 })
   fireEvent.click(badge()!)
   const details = await screen.findByRole("dialog", { name: "Context usage" })
   expect(details.textContent).toContain("143%")
   expect(details.textContent).toContain("185Kof 130K smart zone")
-  expect(details.textContent).toContain("55.4K over smart zone")
   expect(details.textContent).not.toContain("headroom")
+  expect(details.textContent).not.toContain("over smart zone")
 })
 
 test("the popover splits Claude context and shows cumulative usage", async () => {
