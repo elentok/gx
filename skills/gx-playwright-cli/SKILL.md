@@ -2,7 +2,7 @@
 name: gx-playwright-cli
 description: Automate browser interactions, test web pages and work with Playwright tests.
 allowed-tools:
-  Bash(playwright-cli:*) Bash(npx playwright:*) Bash(npx playwright-cli:*) Bash(npm init
+  Bash(playwright-cli:*) Bash(pnpm exec playwright:*) Bash(pnpm exec playwright-cli:*) Bash(npm init
   playwright:*) Bash(npm install -g @playwright/cli:*) Bash(npm run:*)
 ---
 
@@ -343,13 +343,13 @@ playwright-cli kill-all
 
 ## Installation
 
-If global `playwright-cli` command is not available, try a local version via `npx playwright-cli`:
+If global `playwright-cli` command is not available, try a local version via `pnpm exec playwright-cli`:
 
 ```bash
-npx --no-install playwright-cli --version
+pnpm exec playwright-cli --version
 ```
 
-When local version is available, use `npx playwright-cli` in all commands. Otherwise, install
+When local version is available, use `pnpm exec playwright-cli` in all commands. Otherwise, install
 `playwright-cli` as a global command:
 
 ```bash

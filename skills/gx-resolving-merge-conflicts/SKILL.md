@@ -43,7 +43,7 @@ description: "Use when you need to resolve an in-progress git merge/rebase confl
    conflict-resolution ticket itself when you exit; a hand-written status can pause the parent.
 
 7. **Never leave the worktree root with a bare `cd`.** The shell keeps the new directory, so the
-   next command runs in the wrong place. Use a subshell, `(cd webui && npx vitest ...)`, or
+   next command runs in the wrong place. Use a subshell, `(cd webui && pnpm exec vitest ...)`, or
    absolute paths. Use the same worktree root for Bash and for Read/Edit paths.
 
 8. **Finish with zero background shells.** If a call was moved to the background, read its output,

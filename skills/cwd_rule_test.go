@@ -11,7 +11,7 @@ func TestCwdRuleAnchors(t *testing.T) {
 		t.Run(path, func(t *testing.T) {
 			checkAnchors(t, path,
 				"Never leave the worktree root with a bare `cd`",
-				"(cd webui && npx vitest ...)",
+				"(cd webui && pnpm exec vitest ...)",
 				"Read/Edit paths",
 			)
 		})

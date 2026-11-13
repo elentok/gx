@@ -91,7 +91,7 @@ Then, while working:
 - **One check per shell call (Bash).** A chained call (`rg ...; go test; tsc`) can return the output
   of one segment only. Run each check in its own call.
 - **Never leave the worktree root with a bare `cd`.** The shell keeps the new directory, so the
-  next command runs in the wrong place. Use a subshell, `(cd webui && npx vitest ...)`, or absolute
+  next command runs in the wrong place. Use a subshell, `(cd webui && pnpm exec vitest ...)`, or absolute
   paths. Use the same worktree root for shell calls and for Read/Edit paths (file read and file edit).
 - **When a test fails, decide why before you fix anything.** If it caught a real bug, fix the
   code. If it checks behaviour the ticket changed on purpose, fix the test: a flaky test waits for

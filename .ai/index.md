@@ -1,5 +1,7 @@
 # AI Rules
 
+**Web UI: format with `cd webui && pnpm format <files>` (Biome). Never run prettier or `npx`.**
+
 ## Reading files
 
 The harness elides the middle of a long `Read` ("... (N lines omitted)"), and code you did not see
@@ -369,10 +371,8 @@ Testing a click on a Chakra menu item needs `waitFor`. See "Testing a Chakra men
 Web checks:
 
 - Type-check with `gx brief tsc`, not a hand-built `pnpm exec tsc ... | tail`.
-- The web UI formats with Biome (`webui/biome.json`: no semicolons, double quotes, width 100), not prettier.
-  Format changed files with `cd webui && pnpm exec biome format --write <files>`. Never run prettier:
-  it reformats the whole file.
-  `gx check` says `webui: no prettier` on the format line for webui files; that is expected, not a pass.
+- The web UI formats with Biome (`webui/biome.json`: no semicolons, double quotes, width 100).
+  Run `cd webui && pnpm format <files>`. `gx check --kind format` does the same. Never run prettier or npx.
 - Regenerate `webui/src/generated/server.ts` and `wire.ts` with `make web-types`. Wire types live in
   `server/wire` and generate `wire.ts`; `server.ts` re-exports it, so web code keeps importing
   `generated/server`. tygo cannot resolve a constant or alias from another package (it emits
