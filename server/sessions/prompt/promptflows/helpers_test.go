@@ -12,13 +12,34 @@ import (
 
 const firstPromptGrace = rigs.FirstPromptGrace
 
+const (
+	runEndText     = rigs.RunEndText
+	countdownDelay = rigs.CountdownDelay
+)
+
+type grillingFixture = rigs.GrillingFixture
+
 var (
-	readMeta         = servertest.ReadMeta
-	report           = servertest.Report
-	submitted        = servertest.Submitted
-	waitForHolder    = servertest.WaitForHolder
-	waitForSession   = servertest.WaitForSession
-	waitForSubmitted = servertest.WaitForSubmitted
+	readMeta               = servertest.ReadMeta
+	report                 = servertest.Report
+	submitted              = servertest.Submitted
+	waitForHolder          = servertest.WaitForHolder
+	waitForSession         = servertest.WaitForSession
+	waitForSubmitted       = servertest.WaitForSubmitted
+	screenHas              = servertest.ScreenHas
+	waitForScreen          = servertest.WaitForScreen
+	waitUntil              = servertest.WaitUntil
+	storeWithMapStep       = rigs.StoreWithMapStep
+	writeAssistantMessage  = rigs.WriteAssistantMessage
+	clearByInput           = rigs.ClearByInput
+	startAdvancing         = rigs.StartAdvancing
+	endTurn                = rigs.EndTurn
+	sessionSnapshot        = rigs.SessionSnapshot
+	autoSends              = rigs.AutoSends
+	startWebDesign         = rigs.StartWebDesign
+	webSessionWrite        = rigs.WebSessionWrite
+	sessionToken           = rigs.SessionToken
+	startGrillingSessionIn = rigs.StartGrillingSessionIn
 )
 
 // designsFixture wraps rigs.DesignsFixture with lower-case fields.
