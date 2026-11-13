@@ -10,6 +10,9 @@ export const isExited = (s: SessionInfo) => s.status.state === "exited"
 /** Queue agents belong to ralph-loop, so the page offers no Stop or Remove for them. */
 export const canManage = (s: SessionInfo) => !s.queue
 
+/** A plain chat: not a queue agent, and not tied to a ticket, a fix or a flow (a Design is a flow). */
+export const isChat = (s: SessionInfo) => !s.queue && !s.ticket && !s.fix_of && !s.flow
+
 /** The Exited design sessions: the ones the sidebar's bulk clean-up removes. */
 export const exitedDesigns = (sessions: SessionInfo[]) =>
   sessions.filter((s) => s.design && isExited(s))

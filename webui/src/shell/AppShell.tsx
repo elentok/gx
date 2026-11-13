@@ -21,6 +21,7 @@ import { setJumpOpen } from "./jumpOpen"
 import { MascotToggle } from "./MascotToggle"
 import { NewItemHost } from "./NewItemHost"
 import { RemoveConfirmHost } from "./RemoveConfirmHost"
+import { RenameHost } from "./RenameHost"
 import { ShellContext, type Shell } from "./ShellContext"
 import { SidebarFooter } from "./SidebarFooter"
 import { LIST_ATTR, useSidebarKeys } from "./SidebarKeys"
@@ -370,6 +371,7 @@ export function AppShell({
         <CommandPalette />
         <NewItemHost />
         <RemoveConfirmHost />
+        <RenameHost />
         <ChordHost />
       </Box>
     </ShellContext.Provider>

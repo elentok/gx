@@ -50,6 +50,24 @@ test("Remove on a live session is one call with the row token", async () => {
   expect(remove).toHaveBeenCalledExactlyOnceWith({ id: "s-a", state: rowToken(live) })
 })
 
+test.each([
+  ["a chat", {}, true],
+  ["an exited chat", { status: { state: "exited" } }, true],
+  ["a Design", { design: true, flow: "design" }, false],
+  ["a ticket agent", { ticket: "01" }, false],
+  ["a Fix agent", { fix_of: "x" }, false],
+])("Rename is offered for %s: %s", async (_n, over, offered) => {
+  renderThemed(<SessionActions session={session(over)} onRemoved={() => {}} />)
+  await openMenu()
+  await screen.findByRole("menu")
+  expect(!!screen.queryByRole("menuitem", { name: "Rename" })).toBe(offered)
+})
+
+test("a Queue agent has no Rename item", () => {
+  renderThemed(<SessionActions session={session({ queue: true })} onRemoved={() => {}} />)
+  expect(screen.queryByRole("menuitem", { name: "Rename" })).toBeNull()
+})
+
 test("Stop sends the row token", async () => {
   const live = session()
   const stop = vi.fn(async () => ({}))

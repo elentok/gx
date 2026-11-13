@@ -5,6 +5,7 @@ import {
   type DesignDeleteRequest,
   type DesignOpenRequest,
   type SessionInfo,
+  type SessionRenameRequest,
   type SessionRequest,
   type SessionResult,
   type TargetResult,
@@ -69,6 +70,8 @@ export const postTarget =
   }
 
 export const postStopSession: StopSession = postTarget("/v1/sessions/stop")
+export type RenameSession = (body: SessionRenameRequest) => Promise<SessionResult>
+export const postRenameSession: RenameSession = postJson("/v1/sessions/rename")
 export const postResumeSession: ResumeSession = postJson("/v1/sessions/resume")
 export const postInterruptSession: InterruptSession = postJson("/v1/sessions/interrupt")
 export type SetAutoAdvance = (body: AutoAdvanceRequest) => Promise<SessionResult>
