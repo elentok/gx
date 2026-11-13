@@ -1,4 +1,4 @@
-package serverapi
+package oneoff
 
 import (
 	"bytes"
@@ -57,7 +57,7 @@ func TestServerOneOff_TypeFlagReachesTheServerRequest(t *testing.T) {
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Close() })
 
-	if newServerOneOffCmd(Deps{Env: cmdbase.Env{Env: cmdtest.EnvFor(t)}}).Flag("type") == nil {
+	if NewCmd(cmdbase.Env{Env: cmdtest.EnvFor(t)}).Flag("type") == nil {
 		t.Fatal("no --type flag")
 	}
 	var out bytes.Buffer
@@ -93,7 +93,7 @@ func TestServerOneOff_AgentFlagIsSentOnlyWhenGiven(t *testing.T) {
 		args []string
 		want string
 	}{{[]string{"a prompt"}, ""}, {[]string{"a prompt", "--agent", "codex"}, "codex"}} {
-		cmd := newServerOneOffCmd(Deps{Env: cmdbase.Env{Env: cmdtest.EnvFor(t), NewClient: func() (*apiclient.Client, error) { return apiclient.New(sock), nil }}})
+		cmd := NewCmd(cmdbase.Env{Env: cmdtest.EnvFor(t), NewClient: func() (*apiclient.Client, error) { return apiclient.New(sock), nil }})
 		var out bytes.Buffer
 		cmd.SetOut(&out)
 		cmd.SetErr(&out)
@@ -135,7 +135,7 @@ func TestServerOneOff_NameFlagPrintsTheSharedEpicAddress(t *testing.T) {
 
 func TestServerOneOff_RemovedFlagsAreUnknown(t *testing.T) {
 	for _, flag := range []string{"commits", "base"} {
-		if newServerOneOffCmd(Deps{Env: cmdbase.Env{Env: cmdtest.EnvFor(t)}}).Flag(flag) != nil {
+		if NewCmd(cmdbase.Env{Env: cmdtest.EnvFor(t)}).Flag(flag) != nil {
 			t.Errorf("--%s still exists; a one-off never commits", flag)
 		}
 	}

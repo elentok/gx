@@ -1,4 +1,4 @@
-package serverapi
+package oneoff
 
 import (
 	"os"

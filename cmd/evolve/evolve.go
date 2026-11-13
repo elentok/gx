@@ -13,7 +13,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
-	"github.com/elentok/gx/cmd/serverapi"
+	"github.com/elentok/gx/cmd/serverapi/oneoff"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server/projects"
@@ -184,7 +184,7 @@ func submitRetro(ctx context.Context, env evolveEnv, w, errW io.Writer, project,
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
-	d := serverapi.DecideOneOff(res, false)
+	d := oneoff.DecideOneOff(res, false)
 	if d.Notice != "" {
 		fmt.Fprintln(errW, d.Notice)
 	}

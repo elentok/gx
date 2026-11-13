@@ -1,4 +1,5 @@
-package serverapi
+// Package oneoff is the `gx server one-off` verb, shared with `gx evolve`.
+package oneoff
 
 import (
 	"context"
@@ -23,7 +24,7 @@ const exitServerNotRunning = 8
 // same dedupe key.
 const exitDuplicateLive = 7
 
-func newServerOneOffCmd(d Deps) *cobra.Command {
+func NewCmd(d cmdbase.Env) *cobra.Command {
 	var req wire.OneOffRequest
 	var file string
 	var jsonOut, wait bool

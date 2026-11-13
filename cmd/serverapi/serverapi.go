@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/cmd/serverapi/oneoff"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -46,7 +47,7 @@ func Commands(d Deps) []*cobra.Command {
 	return []*cobra.Command{
 		newServerSnapshotCmd(d), newServerEventsCmd(d), newServerLocksCmd(d), newServerTicketsCmd(d),
 		newServerEpicsCmd(d), newServerStatsCmd(d), newServerTipsCmd(d), newServerIterationsCmd(d), newServerAgentsCmd(d),
-		newServerQueueCmd(d), newServerOneOffCmd(d), newServerReloadConfigCmd(d), newServerConfigStatusCmd(d),
+		newServerQueueCmd(d), oneoff.NewCmd(d.Env), newServerReloadConfigCmd(d), newServerConfigStatusCmd(d),
 		newServerChecksCmd(d), newServerChecksSaveCmd(d), newServerDefaultHarnessCmd(d), newServerDefaultHarnessSetCmd(d), newServerSettingsCmd(d), newServerSettingsSetCmd(d),
 		newServerCleanupCmd(d), newServerCleanupRemoveCmd(d), newServerCleanupRemoveUnmergedCmd(d), newServerCleanupArchiveCmd(d), newServerCleanupAgentCmd(d), newServerCleanupDeleteCmd(d), newServerDiskCmd(d), newServerHealthCmd(d), newServerRestartCheckCmd(d), newServerRestartNowCmd(d),
 		newServerCPUSpikeCmd(d), newServerWebURLCmd(d), newServerWebNewRootCmd(d), newServerWebResetCmd(d),
