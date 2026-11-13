@@ -9,16 +9,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/proctable"
 )
 
 // sysctlProcs is set by procs_darwin.go, the only file that cannot compile
 // on Linux.
-var sysctlProcs nativerunner.ProcessTable
+var sysctlProcs proctable.ProcessTable
 
 // NewProcessTable reads the kernel's process table in process, so a lookup
 // spawns no `ps`. The harness's PTY runner takes it as Pty.Procs.
-func NewProcessTable() nativerunner.ProcessTable {
+func NewProcessTable() proctable.ProcessTable {
 	if runtime.GOOS == "darwin" && sysctlProcs != nil {
 		return sysctlProcs
 	}
@@ -29,23 +29,23 @@ func NewProcessTable() nativerunner.ProcessTable {
 // on every OS.
 type procfsTable struct{ root string }
 
-func (t procfsTable) Lookup(pid int) (nativerunner.Process, bool, error) {
+func (t procfsTable) Lookup(pid int) (proctable.Process, bool, error) {
 	dir := t.root + "/" + strconv.Itoa(pid)
 	stat, err := os.ReadFile(dir + "/stat")
 	if errors.Is(err, fs.ErrNotExist) {
-		return nativerunner.Process{}, false, nil
+		return proctable.Process{}, false, nil
 	}
 	if err != nil {
-		return nativerunner.Process{}, false, err
+		return proctable.Process{}, false, err
 	}
 	start, ok := procfsStart(stat)
 	if !ok {
-		return nativerunner.Process{}, false, errors.New("malformed " + dir + "/stat")
+		return proctable.Process{}, false, errors.New("malformed " + dir + "/stat")
 	}
 	// A zombie or another user's process has no readable cmdline.
 	cmdline, _ := os.ReadFile(dir + "/cmdline")
 	args := strings.Join(strings.Split(strings.TrimRight(string(cmdline), "\x00"), "\x00"), " ")
-	return nativerunner.Process{Start: start, Cmdline: args}, true, nil
+	return proctable.Process{Start: start, Cmdline: args}, true, nil
 }
 
 // procfsStart is field 22 (starttime) of /proc/<pid>/stat. The comm field

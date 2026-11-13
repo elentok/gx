@@ -1,4 +1,5 @@
-package nativerunner
+// Package proctable reads the process table and watches adopted holders for exit.
+package proctable
 
 import (
 	"errors"
@@ -23,8 +24,11 @@ type ProcessTable interface {
 	Lookup(pid int) (Process, bool, error)
 }
 
-// orPS returns p, or the real process table when p is nil.
-func orPS(p ProcessTable) ProcessTable {
+// PS is the real process table.
+var PS ProcessTable = psTable{}
+
+// OrPS returns p, or the real process table when p is nil.
+func OrPS(p ProcessTable) ProcessTable {
 	if p == nil {
 		return psTable{}
 	}

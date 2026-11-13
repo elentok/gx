@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/nativerunner/proctable"
 )
 
 // Launch helpers shared by the headless runner, the pty runner and the holder.
@@ -68,7 +69,7 @@ func NewUUID() (string, error) {
 
 // RecordLaunch confirms the launched process is still alive, stamps its start
 // time into meta and writes meta.json.
-func RecordLaunch(procs ProcessTable, dir string, meta *Meta) error {
+func RecordLaunch(procs proctable.ProcessTable, dir string, meta *Meta) error {
 	proc, ok, err := procs.Lookup(meta.PID)
 	if err != nil {
 		return err

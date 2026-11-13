@@ -19,6 +19,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/proccap"
 )
 
@@ -49,7 +50,7 @@ type Headless struct {
 	// PromptTimeout is how long Prompt waits for claude to start the turn.
 	PromptTimeout time.Duration
 	// Procs checks agent liveness on reattach; defaults to ps.
-	Procs ProcessTable
+	Procs proctable.ProcessTable
 	// N is the configured runner wait; zero means agentrunner.DefaultN.
 	N time.Duration
 	// ProcCap is read at each launch: claude's process tree may grow its
@@ -271,7 +272,7 @@ func (h *Headless) follow(ss *headlessSession, out string, offset int64) {
 	h.sessions[ss.session.Label] = ss
 }
 
-func (h *Headless) procs() ProcessTable { return orPS(h.Procs) }
+func (h *Headless) procs() proctable.ProcessTable { return proctable.OrPS(h.Procs) }
 
 // lineBoundary returns the end of out, first ending a partial last line left
 // by an earlier run so it can't merge with this session's first event.

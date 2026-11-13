@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/transcript"
 )
@@ -148,14 +148,14 @@ func checkPidStatus(in Input) (string, bool) {
 	}
 	var waitingFor []string
 	for i, snap := range in.Snapshots {
-		s, err := nativerunner.ParsePidStatus(snap)
+		s, err := harness.ParsePidStatus(snap)
 		if err != nil {
 			return fmt.Sprintf("snapshot %d: %v", i, err), false
 		}
-		if s.Status == nativerunner.ClaudeStarting {
+		if s.Status == harness.ClaudeStarting {
 			return fmt.Sprintf("snapshot %d has no status", i), false
 		}
-		if (s.Status == nativerunner.ClaudeWaiting) != (s.WaitingFor != "") {
+		if (s.Status == harness.ClaudeWaiting) != (s.WaitingFor != "") {
 			return fmt.Sprintf("snapshot %d: status %q with waitingFor %q", i, s.Status, s.WaitingFor), false
 		}
 		if s.WaitingFor != "" {

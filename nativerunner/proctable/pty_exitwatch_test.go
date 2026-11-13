@@ -1,4 +1,4 @@
-package nativerunner
+package proctable
 
 import (
 	"maps"
@@ -32,10 +32,10 @@ func (b *batchProcs) set(pid int, start string) {
 
 func TestExitWatcher_OnePollerClosesOnlyTheGoneOrReusedHolders(t *testing.T) {
 	procs := &batchProcs{starts: map[int]string{1: "a", 2: "b", 3: "c"}}
-	var w exitWatcher
+	var w ExitWatcher
 	exits := map[int]chan struct{}{1: make(chan struct{}), 2: make(chan struct{}), 3: make(chan struct{})}
 	for pid, ch := range exits {
-		w.watch(procs, 5*time.Millisecond, pid, map[int]string{1: "a", 2: "b", 3: "c"}[pid], ch)
+		w.Watch(procs, 5*time.Millisecond, pid, map[int]string{1: "a", 2: "b", 3: "c"}[pid], ch)
 	}
 	procs.set(1, "")      // gone
 	procs.set(2, "other") // pid reused

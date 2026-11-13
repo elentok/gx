@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/proccap"
 	"github.com/elentok/gx/sessionlookup"
 )
@@ -25,7 +26,7 @@ type PtyOverride struct {
 	Holder       []string
 	Claude       string
 	Codex        string
-	Procs        nativerunner.ProcessTable
+	Procs        proctable.ProcessTable
 	PollInterval time.Duration
 	StartTimeout time.Duration
 	PromptGrace  time.Duration

@@ -20,8 +20,10 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/runnertest"
+	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/claudeenv"
 )
@@ -474,7 +476,7 @@ func TestPty_StartRecordsBothPidsAndLaunchArgs(t *testing.T) {
 		{"claude", meta.PID, meta.PIDStart},
 		{"holder", meta.HolderPID, meta.HolderPIDStart},
 	} {
-		proc, ok, err := nativerunner.PS.Lookup(want.pid)
+		proc, ok, err := proctable.PS.Lookup(want.pid)
 		if err != nil || !ok {
 			t.Fatalf("%s pid %d not running: %v", want.name, want.pid, err)
 		}
@@ -485,7 +487,7 @@ func TestPty_StartRecordsBothPidsAndLaunchArgs(t *testing.T) {
 			t.Errorf("%s cmdline %q lacks the session id", want.name, proc.Cmdline)
 		}
 	}
-	claude, _, _ := nativerunner.PS.Lookup(meta.PID)
+	claude, _, _ := proctable.PS.Lookup(meta.PID)
 	if got := strings.Count(claude.Cmdline, "--disallowedTools"); got != 1 {
 		t.Errorf("claude cmdline %q has --disallowedTools %d times, want 1", claude.Cmdline, got)
 	}
@@ -544,7 +546,7 @@ func TestPty_ResumeStartsClaudeWithResumeAlone(t *testing.T) {
 		t.Errorf("SessionID = %q, want the resumed %q", s.SessionID, prev)
 	}
 	meta := readPtyMeta(t, p)
-	claude, _, _ := nativerunner.PS.Lookup(meta.PID)
+	claude, _, _ := proctable.PS.Lookup(meta.PID)
 	if !strings.Contains(claude.Cmdline, "--resume "+prev) || strings.Contains(claude.Cmdline, "--session-id") {
 		t.Errorf("claude cmdline %q, want --resume %s and no --session-id", claude.Cmdline, prev)
 	}
@@ -640,7 +642,7 @@ func TestPty_ReattachAdoptsOlderHolder(t *testing.T) {
 	p, dir := preparePtyAgent(t, ptyAgentProcs())
 	serveOldHolder(t, dir, map[string]any{
 		"ping":   map[string]any{"pid": agentPID},
-		"status": map[string]any{"claude": nativerunner.PidStatus{Status: nativerunner.ClaudeIdle}, "turn": 3},
+		"status": map[string]any{"claude": gxharness.PidStatus{Status: gxharness.ClaudeIdle}, "turn": 3},
 	})
 
 	s, verdict, err := p.Reattach("e-01")
@@ -664,7 +666,7 @@ type gatedProcs struct {
 	release chan struct{}
 }
 
-func (g *gatedProcs) Lookup(pid int) (nativerunner.Process, bool, error) {
+func (g *gatedProcs) Lookup(pid int) (proctable.Process, bool, error) {
 	g.once.Do(func() {
 		close(g.entered)
 		<-g.release
@@ -714,7 +716,7 @@ func TestPty_ReattachDoesNotBlockOtherCalls(t *testing.T) {
 // died, even one whose last turn ended.
 func TestPty_ReattachDeadAgentDied(t *testing.T) {
 	t.Parallel()
-	reused := nativerunner.Process{Start: "Tue Oct  7 09:00:00 2026", Cmdline: "claude --session-id " + agentSID}
+	reused := proctable.Process{Start: "Tue Oct  7 09:00:00 2026", Cmdline: "claude --session-id " + agentSID}
 	tests := []struct {
 		name   string
 		procs  func(*fakeProcs)
@@ -725,7 +727,7 @@ func TestPty_ReattachDeadAgentDied(t *testing.T) {
 		{name: "holder pid reused", procs: func(f *fakeProcs) { f.procs[holderPID] = reused }},
 		{name: "claude pid reused", procs: func(f *fakeProcs) { f.procs[agentPID] = reused }},
 		{name: "holder lacks session id", procs: func(f *fakeProcs) {
-			f.procs[holderPID] = nativerunner.Process{Start: holderStart, Cmdline: "vim notes.md"}
+			f.procs[holderPID] = proctable.Process{Start: holderStart, Cmdline: "vim notes.md"}
 		}},
 		{name: "socket silent", silent: true},
 	}
@@ -763,7 +765,7 @@ func TestPty_FindAdoptsUntrackedLiveHolder(t *testing.T) {
 	p, dir := preparePtyAgent(t, ptyAgentProcs())
 	serveOldHolder(t, dir, map[string]any{
 		"ping":   map[string]any{"pid": agentPID},
-		"status": map[string]any{"claude": nativerunner.PidStatus{Status: nativerunner.ClaudeIdle}, "turn": 3},
+		"status": map[string]any{"claude": gxharness.PidStatus{Status: gxharness.ClaudeIdle}, "turn": 3},
 	})
 
 	s, ok, err := p.Find("e-01")
@@ -864,7 +866,7 @@ const (
 // ptyAgentProcs is a process table where the holder and claude both still run.
 func ptyAgentProcs() *fakeProcs {
 	procs := agentProcs()
-	procs.procs[holderPID] = nativerunner.Process{
+	procs.procs[holderPID] = proctable.Process{
 		Start:   holderStart,
 		Cmdline: "gx agent-holder --session-id " + agentSID + " -- claude --session-id " + agentSID,
 	}

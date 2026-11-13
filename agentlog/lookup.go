@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
@@ -70,7 +71,7 @@ type Locator struct {
 	// CodexHome is where Codex keeps its rollouts. Empty means unknown.
 	CodexHome string
 	// Procs overrides the process table native liveness checks use.
-	Procs nativerunner.ProcessTable
+	Procs proctable.ProcessTable
 	// Herdr looks up a live herdr iteration by full ticket address. Nil
 	// means herdr isn't in play.
 	Herdr func(ctx context.Context, address string) (HerdrIteration, bool, error)

@@ -13,7 +13,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner/screen"
 	gxharness "github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/syshealth"
 )
@@ -65,12 +64,12 @@ func TestHolderSocket_StatusCountsTurns(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
 	_, c, _ := startHolder(t, pidChild)
 
-	waitForStatus(t, c, nativerunner.PidStatus{Status: nativerunner.ClaudeStarting}, 0)
-	steps := []nativerunner.PidStatus{
-		{Status: nativerunner.ClaudeBusy},
-		{Status: nativerunner.ClaudeWaiting, WaitingFor: "input needed"},
-		{Status: nativerunner.ClaudeBusy},
-		{Status: nativerunner.ClaudeIdle},
+	waitForStatus(t, c, gxharness.PidStatus{Status: gxharness.ClaudeStarting}, 0)
+	steps := []gxharness.PidStatus{
+		{Status: gxharness.ClaudeBusy},
+		{Status: gxharness.ClaudeWaiting, WaitingFor: "input needed"},
+		{Status: gxharness.ClaudeBusy},
+		{Status: gxharness.ClaudeIdle},
 	}
 	for i, want := range steps {
 		if err := c.SendKeys(want.Status + "\r"); err != nil {
@@ -80,7 +79,7 @@ func TestHolderSocket_StatusCountsTurns(t *testing.T) {
 	}
 }
 
-func waitForStatus(t *testing.T, c *holder.HolderClient, want nativerunner.PidStatus, turn int) {
+func waitForStatus(t *testing.T, c *holder.HolderClient, want gxharness.PidStatus, turn int) {
 	t.Helper()
 	waitFor(t, fmt.Sprintf("status %+v at turn %d", want, turn), func() bool {
 		got, n, err := c.Status()
@@ -269,7 +268,7 @@ func startDenyHolderWith(t *testing.T, tail string, setup func(*testing.T)) *hol
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
 	_, c, _ := startHolder(t, denyChild+tail)
 	waitForScreen(t, c, "ready")
-	waitForStatus(t, c, nativerunner.PidStatus{Status: nativerunner.ClaudeWaiting, WaitingFor: "permission prompt"}, 1)
+	waitForStatus(t, c, gxharness.PidStatus{Status: gxharness.ClaudeWaiting, WaitingFor: "permission prompt"}, 1)
 	return c
 }
 
@@ -327,7 +326,7 @@ func TestHolderSocket_DenyReason(t *testing.T) {
 				return
 			case <-time.After(5 * time.Millisecond):
 			}
-			if s, _, err := c.Status(); err == nil && s.Status == nativerunner.ClaudeIdle {
+			if s, _, err := c.Status(); err == nil && s.Status == gxharness.ClaudeIdle {
 				idle = true
 			}
 		}
@@ -341,7 +340,7 @@ func TestHolderSocket_DenyReason(t *testing.T) {
 		t.Error("status showed idle during the op")
 	}
 	waitForScreen(t, c, "got:use rg")
-	if s, _, _ := c.Status(); s == nil || s.Status != nativerunner.ClaudeBusy {
+	if s, _, _ := c.Status(); s == nil || s.Status != gxharness.ClaudeBusy {
 		t.Errorf("status after the op = %+v; want busy", s)
 	}
 }
@@ -396,7 +395,7 @@ func TestHolderSocket_DenyReason_OverrideSendsNoStrayI(t *testing.T) {
 	opts := holder.HolderOptions{SessionID: "deny-override-no-i"}
 	dir, c, _ := startHolderWith(t, opts, denyChild+denyGoesIdle, "--settings", `{"editorMode":"normal"}`)
 	waitForScreen(t, c, "ready")
-	waitForStatus(t, c, nativerunner.PidStatus{Status: nativerunner.ClaudeWaiting, WaitingFor: "permission prompt"}, 1)
+	waitForStatus(t, c, gxharness.PidStatus{Status: gxharness.ClaudeWaiting, WaitingFor: "permission prompt"}, 1)
 	if err := c.DenyWithReason("use rg"); err != nil {
 		t.Fatal(err)
 	}
@@ -422,16 +421,16 @@ func TestHolderSocket_StatusFailsOnceClaudeExits(t *testing.T) {
 	if err := c.SendKeys("x"); err != nil {
 		t.Fatal(err)
 	}
-	waitForStatus(t, c, nativerunner.PidStatus{Status: nativerunner.ClaudeIdle}, 2)
+	waitForStatus(t, c, gxharness.PidStatus{Status: gxharness.ClaudeIdle}, 2)
 
 	if err := c.SendKeys("quit\r"); err != nil {
 		t.Fatal(err)
 	}
 	var err error
 	waitFor(t, "status fails", func() bool {
-		var s *nativerunner.PidStatus
+		var s *gxharness.PidStatus
 		s, _, err = c.Status()
-		if err == nil && s.Status != nativerunner.ClaudeIdle {
+		if err == nil && s.Status != gxharness.ClaudeIdle {
 			t.Fatalf("status = %+v; want idle until it fails", s)
 		}
 		return err != nil

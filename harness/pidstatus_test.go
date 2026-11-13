@@ -1,11 +1,10 @@
-package nativerunner_test
+package harness_test
 
 import (
 	"path/filepath"
 	"testing"
 
-	claudeharness "github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/harness"
 )
 
 // pidFileJSON is a pid status file as claude writes it, with the given
@@ -19,11 +18,11 @@ func TestParsePidStatus(t *testing.T) {
 	tests := []struct {
 		name   string
 		fields string
-		want   nativerunner.PidStatus
+		want   harness.PidStatus
 	}{
-		{"starting", ``, nativerunner.PidStatus{Status: nativerunner.ClaudeStarting}},
-		{"busy", `"status":"busy",`, nativerunner.PidStatus{Status: nativerunner.ClaudeBusy}},
-		{"idle", `"status":"idle",`, nativerunner.PidStatus{Status: nativerunner.ClaudeIdle}},
+		{"starting", ``, harness.PidStatus{Status: harness.ClaudeStarting}},
+		{"busy", `"status":"busy",`, harness.PidStatus{Status: harness.ClaudeBusy}},
+		{"idle", `"status":"idle",`, harness.PidStatus{Status: harness.ClaudeIdle}},
 	}
 	for _, reason := range []string{
 		"permission prompt", "input needed", "dialog open",
@@ -32,16 +31,16 @@ func TestParsePidStatus(t *testing.T) {
 		tests = append(tests, struct {
 			name   string
 			fields string
-			want   nativerunner.PidStatus
+			want   harness.PidStatus
 		}{
 			"waiting " + reason,
 			`"status":"waiting","waitingFor":"` + reason + `",`,
-			nativerunner.PidStatus{Status: nativerunner.ClaudeWaiting, WaitingFor: reason},
+			harness.PidStatus{Status: harness.ClaudeWaiting, WaitingFor: reason},
 		})
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := nativerunner.ParsePidStatus([]byte(pidFileJSON(tt.fields)))
+			got, err := harness.ParsePidStatus([]byte(pidFileJSON(tt.fields)))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -53,10 +52,10 @@ func TestParsePidStatus(t *testing.T) {
 }
 
 func TestClaudeSessionsDirIn(t *testing.T) {
-	if got, _ := claudeharness.ClaudeSessionsDirIn([]string{"HOME=/h"}); got != filepath.Join("/h", ".claude", "sessions") {
+	if got, _ := harness.ClaudeSessionsDirIn([]string{"HOME=/h"}); got != filepath.Join("/h", ".claude", "sessions") {
 		t.Errorf("default = %q", got)
 	}
-	if got, _ := claudeharness.ClaudeSessionsDirIn([]string{"HOME=/h", "CLAUDE_CONFIG_DIR=/cfg"}); got != filepath.Join("/cfg", "sessions") {
+	if got, _ := harness.ClaudeSessionsDirIn([]string{"HOME=/h", "CLAUDE_CONFIG_DIR=/cfg"}); got != filepath.Join("/cfg", "sessions") {
 		t.Errorf("with CLAUDE_CONFIG_DIR = %q", got)
 	}
 }

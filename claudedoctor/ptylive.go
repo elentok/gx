@@ -97,8 +97,8 @@ func (r *ptyRecorder) snapshot() {
 		return
 	}
 	data = line.Bytes()
-	s, err := nativerunner.ParsePidStatus(data)
-	if err != nil || s.Status == nativerunner.ClaudeStarting {
+	s, err := harness.ParsePidStatus(data)
+	if err != nil || s.Status == harness.ClaudeStarting {
 		return
 	}
 	if key := s.Status + "\x00" + s.WaitingFor; key != r.lastStatus {

@@ -14,14 +14,15 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/proctable"
 )
 
 type fakeProcs struct {
 	mu    sync.Mutex
-	procs map[int]nativerunner.Process
+	procs map[int]proctable.Process
 }
 
-func (f *fakeProcs) Lookup(pid int) (nativerunner.Process, bool, error) {
+func (f *fakeProcs) Lookup(pid int) (proctable.Process, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	p, ok := f.procs[pid]
@@ -41,7 +42,7 @@ const (
 )
 
 func agentProcs() *fakeProcs {
-	return &fakeProcs{procs: map[int]nativerunner.Process{
+	return &fakeProcs{procs: map[int]proctable.Process{
 		agentPID: {Start: agentStart, Cmdline: "claude -p --session-id " + agentSID},
 	}}
 }
@@ -77,11 +78,11 @@ const (
 )
 
 func TestReattach_DeadAgentVerdicts(t *testing.T) {
-	reused := map[int]nativerunner.Process{agentPID: {Start: "Tue Oct  7 09:00:00 2026", Cmdline: "claude -p --session-id " + agentSID}}
-	otherCmd := map[int]nativerunner.Process{agentPID: {Start: agentStart, Cmdline: "vim notes.md"}}
+	reused := map[int]proctable.Process{agentPID: {Start: "Tue Oct  7 09:00:00 2026", Cmdline: "claude -p --session-id " + agentSID}}
+	otherCmd := map[int]proctable.Process{agentPID: {Start: agentStart, Cmdline: "vim notes.md"}}
 	tests := []struct {
 		name          string
-		procs         map[int]nativerunner.Process
+		procs         map[int]proctable.Process
 		before, after string
 		want          nativerunner.Verdict
 	}{

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/nativerunner/proctable"
 	"os"
 	"path/filepath"
 	"slices"
@@ -21,7 +22,7 @@ type layout struct {
 	logs []string
 	// transient files are removed by Cleanup on land or cancel.
 	transient []string
-	alive     func(procs ProcessTable, meta Meta) (bool, error)
+	alive     func(procs proctable.ProcessTable, meta Meta) (bool, error)
 	// readsTranscript: the readable log is the claude transcript, not
 	// logs[0]. raw.log is terminal bytes nothing should parse.
 	readsTranscript bool
@@ -97,7 +98,9 @@ func (d Dir) PTY() bool { return d.Meta.Runner == ptyRunnerName }
 func (d Dir) Pruned() bool { return d.l.pruned(d.Path) }
 
 // Alive reports whether the agent still runs. Nil procs means ps.
-func (d Dir) Alive(procs ProcessTable) (bool, error) { return d.l.alive(orPS(procs), d.Meta) }
+func (d Dir) Alive(procs proctable.ProcessTable) (bool, error) {
+	return d.l.alive(proctable.OrPS(procs), d.Meta)
+}
 
 // Inspect reads label's meta.json and reports whether its agent still runs.
 // Errors are OpenDir's.

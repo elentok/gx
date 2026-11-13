@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/proccap"
 	"github.com/elentok/gx/transcript"
 )
@@ -183,7 +184,7 @@ type ptyLauncher struct {
 	claude       string
 	codex        string
 	env          []string
-	procs        ProcessTable
+	procs        proctable.ProcessTable
 	poll         time.Duration
 	startTimeout time.Duration
 	// capsOverride is Pty.LaunchCaps: set fields replace the default caps.
@@ -240,7 +241,7 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 			return err
 		}
 	}
-	procs := orPS(l.procs)
+	procs := proctable.OrPS(l.procs)
 	holderProc, ok, err := procs.Lookup(ss.holderPID)
 	if err != nil {
 		return err
@@ -295,7 +296,7 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 			return err
 		}
 		claude := resp.Claude
-		if !watchReady && claude != nil && claude.Status == ClaudeIdle {
+		if !watchReady && claude != nil && claude.Status == harness.ClaudeIdle {
 			return nil
 		}
 		select {

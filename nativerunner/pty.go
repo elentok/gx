@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/proccap"
 )
 
@@ -49,9 +50,9 @@ type Pty struct {
 	// kills it.
 	StopGrace time.Duration
 	// Procs stamps pid start times; defaults to ps.
-	Procs ProcessTable
+	Procs proctable.ProcessTable
 	// exits watches every adopted holder with one poller.
-	exits exitWatcher
+	exits proctable.ExitWatcher
 	// BackgroundTasks reports whether the claude behind s still runs a
 	// background task. Nil reads the transcript under the HOME in Env, and
 	// means no gating without one.
@@ -235,14 +236,14 @@ func killLaunch(pids ...int) {
 // killSessions SIGKILLs claude's and the holder's whole sessions, each pid
 // re-checked by signalGroup first.
 func (p *Pty) killSessions(ss *ptySession) {
-	procs := orPS(p.Procs)
+	procs := proctable.OrPS(p.Procs)
 	signalGroup(procs, ss.claudePID, ss.claudeStart, ss.session.SessionID, syscall.SIGKILL)
 	signalGroup(procs, ss.holderPID, ss.holderStart, ss.session.SessionID, syscall.SIGKILL)
 }
 
 // awaitHolderGone polls until ss's holder pid is gone, for at most grace.
 func (p *Pty) awaitHolderGone(ss *ptySession, grace time.Duration) error {
-	procs := orPS(p.Procs)
+	procs := proctable.OrPS(p.Procs)
 	deadline := time.Now().Add(grace)
 	for {
 		proc, ok, err := procs.Lookup(ss.holderPID)
@@ -307,14 +308,14 @@ func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 		return st, nil
 	}
 	switch claude.Status {
-	case ClaudeIdle:
+	case harness.ClaudeIdle:
 		// Idle, not Working, with a background task: Wait must return so the
 		// finish gate sees the task, logs the hold and lets recovery raise it.
 		st.State = agentrunner.StateIdle
 		st.Background = p.turns().backgroundTasks(ss.session)
 	case harness.ClaudeShell:
 		st.State, st.Background = agentrunner.StateIdle, true
-	case ClaudeWaiting:
+	case harness.ClaudeWaiting:
 		st.State, st.BlockedReason = agentrunner.StateBlocked, claude.WaitingFor
 		// Only here, on demand: the screen is never read on a timer for it.
 		if claude.WaitingFor == holder.PermissionPrompt {
@@ -426,7 +427,7 @@ func (p *Pty) Cleanup(label string) error {
 		return err
 	}
 	if err == nil {
-		live, err := pidAlive(orPS(p.Procs), meta.HolderPID, meta.HolderPIDStart, meta.SessionID)
+		live, err := pidAlive(proctable.OrPS(p.Procs), meta.HolderPID, meta.HolderPIDStart, meta.SessionID)
 		if err != nil {
 			return fmt.Errorf("cleanup %s: holder pid %d: %w", label, meta.HolderPID, err)
 		}
@@ -517,9 +518,9 @@ func (p *Pty) Interrupt(s agentrunner.Session) error {
 	}
 	var key string
 	switch {
-	case program == "blocked" || (program == "" && claude != nil && claude.Status == ClaudeWaiting):
+	case program == "blocked" || (program == "" && claude != nil && claude.Status == harness.ClaudeWaiting):
 		key = "\x1b"
-	case program == "working" || (program == "" && claude != nil && claude.Status == ClaudeBusy):
+	case program == "working" || (program == "" && claude != nil && claude.Status == harness.ClaudeBusy):
 		key = "\x03"
 	default:
 		return nil
@@ -580,7 +581,7 @@ func (p *Pty) exitPollInterval() time.Duration {
 	if p.PollInterval > 0 {
 		return p.PollInterval
 	}
-	return exitPollInterval
+	return proctable.ExitPollInterval
 }
 
 func (p *Pty) pollInterval() time.Duration {

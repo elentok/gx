@@ -17,14 +17,15 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/nativerunner/proctable"
 )
 
 // movedProcs is the real process table until moved is set; then every pid
 // reports another start time, as if the OS reused it.
 type movedProcs struct{ moved atomic.Bool }
 
-func (m *movedProcs) Lookup(pid int) (nativerunner.Process, bool, error) {
-	proc, ok, err := nativerunner.PS.Lookup(pid)
+func (m *movedProcs) Lookup(pid int) (proctable.Process, bool, error) {
+	proc, ok, err := proctable.PS.Lookup(pid)
 	if ok && m.moved.Load() {
 		proc.Start = "moved"
 	}

@@ -1,4 +1,4 @@
-package nativerunner
+package proctable
 
 import (
 	"errors"
@@ -11,9 +11,9 @@ import (
 	"time"
 )
 
-// exitPollInterval is how often adopted holders are checked for exit. Startup
+// ExitPollInterval is how often adopted holders are checked for exit. Startup
 // polling needs the fast PollInterval; noticing a dead holder does not.
-const exitPollInterval = time.Second
+const ExitPollInterval = time.Second
 
 // startTimer is an optional ProcessTable capability: StartTimes returns the
 // start time of every live pid among pids in one lookup. Missing pids are
@@ -58,16 +58,16 @@ type exitWatch struct {
 	exit  chan struct{}
 }
 
-// exitWatcher closes a watch's exit channel once its holder is gone. Adopted
+// ExitWatcher closes a watch's exit channel once its holder is gone. Adopted
 // holders aren't the server's children, so there is no Wait to block on. One
 // goroutine serves every watch and stops when none is left.
-type exitWatcher struct {
+type ExitWatcher struct {
 	mu      sync.Mutex
 	watches []exitWatch
 	running bool
 }
 
-func (w *exitWatcher) watch(procs ProcessTable, interval time.Duration, pid int, start string, exit chan struct{}) {
+func (w *ExitWatcher) Watch(procs ProcessTable, interval time.Duration, pid int, start string, exit chan struct{}) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.watches = append(w.watches, exitWatch{pid: pid, start: start, exit: exit})
@@ -77,7 +77,7 @@ func (w *exitWatcher) watch(procs ProcessTable, interval time.Duration, pid int,
 	}
 }
 
-func (w *exitWatcher) loop(procs ProcessTable, interval time.Duration) {
+func (w *ExitWatcher) loop(procs ProcessTable, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for range ticker.C {
@@ -88,7 +88,7 @@ func (w *exitWatcher) loop(procs ProcessTable, interval time.Duration) {
 }
 
 // poll closes the exited watches and reports whether none are left.
-func (w *exitWatcher) poll(procs ProcessTable) bool {
+func (w *ExitWatcher) poll(procs ProcessTable) bool {
 	w.mu.Lock()
 	watches := append([]exitWatch(nil), w.watches...)
 	w.mu.Unlock()

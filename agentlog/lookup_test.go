@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
@@ -20,9 +21,9 @@ import (
 
 var addr = tickets.Address{Project: "proj", Epic: "epic", ID: "07"}
 
-type fakeProcs map[int]nativerunner.Process
+type fakeProcs map[int]proctable.Process
 
-func (f fakeProcs) Lookup(pid int) (nativerunner.Process, bool, error) {
+func (f fakeProcs) Lookup(pid int) (proctable.Process, bool, error) {
 	p, ok := f[pid]
 	return p, ok, nil
 }

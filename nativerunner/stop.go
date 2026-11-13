@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"syscall"
 	"time"
+
+	"github.com/elentok/gx/nativerunner/proctable"
 )
 
 // signalGroup signals pid's process group only while pid is still the
 // process start and sessionID name. The pid may have been reused since it
 // was recorded, so a pid that fails the check, or whose lookup errors, is
 // never signalled.
-func signalGroup(procs ProcessTable, pid int, start, sessionID string, sig syscall.Signal) {
+func signalGroup(procs proctable.ProcessTable, pid int, start, sessionID string, sig syscall.Signal) {
 	if live, err := pidAlive(procs, pid, start, sessionID); err == nil && live {
 		_ = syscall.Kill(-pid, sig)
 	}

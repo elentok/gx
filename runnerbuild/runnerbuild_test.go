@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/proccap"
 )
 
@@ -127,7 +128,7 @@ func TestNew_ProcHeadroomReachesEveryRunnerWithoutAnOverride(t *testing.T) {
 	}
 }
 
-type fakeProcs struct{ nativerunner.ProcessTable }
+type fakeProcs struct{ proctable.ProcessTable }
 
 func TestNew_PtyOverrideReachesThePty(t *testing.T) {
 	override := &PtyOverride{

@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server"
@@ -20,8 +21,8 @@ import (
 // noProcs runs no process, so every agent directory is dead.
 type noProcs struct{}
 
-func (noProcs) Lookup(int) (nativerunner.Process, bool, error) {
-	return nativerunner.Process{}, false, nil
+func (noProcs) Lookup(int) (proctable.Process, bool, error) {
+	return proctable.Process{}, false, nil
 }
 
 func agentDir(t *testing.T, root, label string, touched time.Time) string {

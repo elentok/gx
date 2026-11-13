@@ -10,7 +10,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	agentharness "github.com/elentok/gx/harness"
-	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil"
 )
@@ -32,7 +31,7 @@ func startKeyHolder(t *testing.T, tail string) (*holder.HolderClient, string) {
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
 	_, c, _ := startHolder(t, keyChild(tail))
 	waitForScreen(t, c, "ready")
-	waitForStatus(t, c, nativerunner.PidStatus{Status: nativerunner.ClaudeWaiting, WaitingFor: "permission prompt"}, 1)
+	waitForStatus(t, c, agentharness.PidStatus{Status: agentharness.ClaudeWaiting, WaitingFor: "permission prompt"}, 1)
 	return c, filepath.Join(home, "key")
 }
 

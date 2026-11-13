@@ -20,6 +20,3 @@ func LaunchCommand(p *Pty, opts agentrunner.StartOptions, dir, sessionID string)
 func KillLeftovers(p *Pty, pgid int) {
 	p.killLeftovers(&ptySession{claudePID: pgid})
 }
-
-// PS is the real process table.
-var PS ProcessTable = psTable{}

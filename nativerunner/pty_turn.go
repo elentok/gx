@@ -34,7 +34,7 @@ func (t ptyTurn) promptSlash(pr *ptyPrompter, text string) error {
 	if err != nil {
 		return t.p.died(pr.ss, err)
 	}
-	if program == "working" || (claude != nil && claude.Status == ClaudeBusy) {
+	if program == "working" || (claude != nil && claude.Status == harness.ClaudeBusy) {
 		return fmt.Errorf("%w: %q started no turn and claude is not idle", agentrunner.ErrNotDelivered, text)
 	}
 	return nil
@@ -67,11 +67,11 @@ func (t ptyTurn) awaitNotBusy(ss *ptySession) (int, error) {
 		}
 		// Enter on a dialog would pick its first option, allowing a permission
 		// prompt nobody answered.
-		if claude != nil && claude.Status == ClaudeWaiting {
+		if claude != nil && claude.Status == harness.ClaudeWaiting {
 			return 0, fmt.Errorf("%w: blocked on %s", agentrunner.ErrNotReady, claude.WaitingFor)
 		}
 		// The OSC report leads the pid file by up to a poll.
-		if program != "working" && (claude == nil || claude.Status != ClaudeBusy) {
+		if program != "working" && (claude == nil || claude.Status != harness.ClaudeBusy) {
 			return turn, nil
 		}
 		if time.Now().After(deadline) {
@@ -99,7 +99,7 @@ func (t ptyTurn) awaitIdle(ss *ptySession) error {
 			program = watchedProgram(w.Status)
 		}
 		busy := program == "working" || program == "blocked" ||
-			(program == "" && claude != nil && (claude.Status == ClaudeBusy || claude.Status == ClaudeWaiting))
+			(program == "" && claude != nil && (claude.Status == harness.ClaudeBusy || claude.Status == harness.ClaudeWaiting))
 		if !busy {
 			return nil
 		}

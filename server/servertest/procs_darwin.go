@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/nativerunner/proctable"
 )
 
 // Build-tagged because unix.SysctlKinfoProc does not exist on Linux (ADR 0035).
@@ -19,17 +19,17 @@ func init() { sysctlProcs = darwinTable{} }
 
 type darwinTable struct{}
 
-func (darwinTable) Lookup(pid int) (nativerunner.Process, bool, error) {
+func (darwinTable) Lookup(pid int) (proctable.Process, bool, error) {
 	kp, err := unix.SysctlKinfoProc("kern.proc.pid", pid)
 	if errors.Is(err, unix.EIO) || (err == nil && int(kp.Proc.P_pid) != pid) {
-		return nativerunner.Process{}, false, nil
+		return proctable.Process{}, false, nil
 	}
 	if err != nil {
-		return nativerunner.Process{}, false, err
+		return proctable.Process{}, false, err
 	}
 	st := kp.Proc.P_starttime
 	start := strconv.FormatInt(st.Sec, 10) + "." + strconv.FormatInt(int64(st.Usec), 10)
-	return nativerunner.Process{Start: start, Cmdline: procArgs(pid)}, true, nil
+	return proctable.Process{Start: start, Cmdline: procArgs(pid)}, true, nil
 }
 
 // procArgs is pid's argv joined by spaces, or "" when it can't be read (a

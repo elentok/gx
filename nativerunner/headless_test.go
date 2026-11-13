@@ -19,6 +19,7 @@ import (
 	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/proccap"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/agentfake/tuiclaude"
@@ -643,10 +644,10 @@ type blockingProcs struct {
 	release chan struct{}
 }
 
-func (b blockingProcs) Lookup(pid int) (nativerunner.Process, bool, error) {
+func (b blockingProcs) Lookup(pid int) (proctable.Process, bool, error) {
 	close(b.entered)
 	<-b.release
-	return nativerunner.PS.Lookup(pid)
+	return proctable.PS.Lookup(pid)
 }
 
 func TestHeadless_StatusDoesNotBlockOnAStartInProgress(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/nativerunner/proctable"
 )
 
 type adoption int
@@ -32,7 +33,7 @@ func (p *Pty) adopt(label string) (agentrunner.Session, adoption, error) {
 	if err != nil {
 		return agentrunner.Session{}, 0, err
 	}
-	live, err := ptyAlive(orPS(p.Procs), meta)
+	live, err := ptyAlive(proctable.OrPS(p.Procs), meta)
 	if err != nil {
 		return agentrunner.Session{}, 0, err
 	}
@@ -52,7 +53,7 @@ func (p *Pty) adopt(label string) (agentrunner.Session, adoption, error) {
 	}
 	// A concurrent adopt of label may have won meanwhile.
 	s, _ := p.reg.putUnlessLive(label, ss, func() {
-		p.exits.watch(orPS(p.Procs), p.exitPollInterval(), meta.HolderPID, meta.HolderPIDStart, ss.exited)
+		p.exits.Watch(proctable.OrPS(p.Procs), p.exitPollInterval(), meta.HolderPID, meta.HolderPIDStart, ss.exited)
 	})
 	return s, adoptedLive, nil
 }
@@ -60,7 +61,7 @@ func (p *Pty) adopt(label string) (agentrunner.Session, adoption, error) {
 // holderRuns reports whether ss's holder pid still runs. A failed lookup
 // counts as running, so a session is never forgotten on a guess.
 func (p *Pty) holderRuns(ss *ptySession) bool {
-	live, err := pidAlive(orPS(p.Procs), ss.holderPID, ss.holderStart, ss.session.SessionID)
+	live, err := pidAlive(proctable.OrPS(p.Procs), ss.holderPID, ss.holderStart, ss.session.SessionID)
 	return err != nil || live
 }
 

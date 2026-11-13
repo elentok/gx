@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/nativerunner/proctable"
 )
 
 // Verdict is what Reattach found in an agent directory.
@@ -90,13 +91,13 @@ func (h *Headless) alive(meta Meta) (bool, error) {
 // headlessAlive reports whether meta's claude still runs: the pid exists,
 // started when meta says, and still carries the session id. A pid the OS
 // reused for another process fails the start-time or cmdline check.
-func headlessAlive(procs ProcessTable, meta Meta) (bool, error) {
+func headlessAlive(procs proctable.ProcessTable, meta Meta) (bool, error) {
 	return pidAlive(procs, meta.PID, meta.PIDStart, meta.SessionID)
 }
 
 // ptyAlive reports whether both the holder and its claude still run, each
 // checked like headlessAlive. Losing either one leaves no usable agent.
-func ptyAlive(procs ProcessTable, meta Meta) (bool, error) {
+func ptyAlive(procs proctable.ProcessTable, meta Meta) (bool, error) {
 	live, err := pidAlive(procs, meta.HolderPID, meta.HolderPIDStart, meta.SessionID)
 	if err != nil || !live {
 		return false, err
@@ -104,7 +105,7 @@ func ptyAlive(procs ProcessTable, meta Meta) (bool, error) {
 	return headlessAlive(procs, meta)
 }
 
-func pidAlive(procs ProcessTable, pid int, start, sessionID string) (bool, error) {
+func pidAlive(procs proctable.ProcessTable, pid int, start, sessionID string) (bool, error) {
 	proc, ok, err := procs.Lookup(pid)
 	if err != nil || !ok {
 		return false, err
