@@ -23,6 +23,7 @@ const DayLayout = "2006-01-02"
 // Config is the part of the server config the limits read.
 type Config struct {
 	StateDir    string
+	SessionsDir string
 	TicketStore string
 	// UsagePollInterval is how often agent records are scanned; zero means one minute.
 	UsagePollInterval time.Duration

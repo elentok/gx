@@ -295,6 +295,18 @@ func (l *Limits) scanUsage() {
 			l.log.Warn("scan codex usage", "root", root, "err", err)
 		}
 	}
+	if l.cfg.SessionsDir != "" {
+		if err := l.usageCodex.scan(l.cfg.SessionsDir, func(sessionDir string) (nativerunner.UsageRecord, bool) {
+			sample, ok := l.readCodexSessionSample(sessionDir)
+			if !ok {
+				return nativerunner.UsageRecord{}, false
+			}
+			codexSamples = append(codexSamples, sample)
+			return codexUsageRecord(sample), true
+		}); err != nil {
+			l.log.Warn("scan codex session usage", "root", l.cfg.SessionsDir, "err", err)
+		}
+	}
 	saved, err := l.history.recordCodex(codexSamples, time.Now().Unix())
 	if err != nil {
 		l.log.Warn("save codex limit history", "err", err)
@@ -311,16 +323,39 @@ func (l *Limits) readCodexSample(agentDir string) (codexsession.UsageSample, boo
 	if err != nil || agentrunner.Kind(d.Meta.Harness) != harness.Codex {
 		return codexsession.UsageSample{}, false
 	}
-	home, err := l.projects.CodexHome()
-	if err != nil {
-		return codexsession.UsageSample{}, false
-	}
 	// Meta holds gx's start id; Codex names its rollout by the id the hook saved.
 	sessionID := d.Meta.SessionID
 	if saved := harness.ReadCodexSessionID(agentDir); saved != "" {
 		sessionID = saved
 	}
-	sample, ok, err := codexsession.LatestUsageIn(home, d.Meta.Cwd, sessionID)
+	return l.readCodexUsage(d.Meta.Cwd, sessionID)
+}
+
+// readCodexSessionSample reads an interactive Codex session. Interactive
+// session metadata has a different layout from Queue agent metadata.
+func (l *Limits) readCodexSessionSample(sessionDir string) (codexsession.UsageSample, bool) {
+	var meta struct {
+		Harness        agentrunner.Kind `json:"harness"`
+		Dir            string           `json:"dir"`
+		ConversationID string           `json:"conversation_id"`
+	}
+	data, err := os.ReadFile(filepath.Join(sessionDir, "meta.json"))
+	if err != nil || json.Unmarshal(data, &meta) != nil || meta.Harness != harness.Codex {
+		return codexsession.UsageSample{}, false
+	}
+	sessionID := meta.ConversationID
+	if saved := harness.ReadCodexSessionID(sessionDir); saved != "" {
+		sessionID = saved
+	}
+	return l.readCodexUsage(meta.Dir, sessionID)
+}
+
+func (l *Limits) readCodexUsage(cwd, sessionID string) (codexsession.UsageSample, bool) {
+	home, err := l.projects.CodexHome()
+	if err != nil {
+		return codexsession.UsageSample{}, false
+	}
+	sample, ok, err := codexsession.LatestUsageIn(home, cwd, sessionID)
 	if err != nil || !ok || sample.SeenAt.IsZero() {
 		return codexsession.UsageSample{}, false
 	}

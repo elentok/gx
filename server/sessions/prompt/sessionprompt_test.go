@@ -359,3 +359,18 @@ func TestWebSessionPrompt_KeepsTheWriteChecks(t *testing.T) {
 		t.Errorf("text/plain = %d, want 403", code)
 	}
 }
+
+func TestSessionPrompt_CodexUnrecognizedSlashCommandRaisesSendFailed(t *testing.T) {
+	t.Parallel()
+	f := fromPrompt(rigs.StartCodexPromptSession(t))
+	if res := f.prompt(t, "/handoff"); res.Refused {
+		t.Fatalf("prompt = %+v", res)
+	}
+	got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised }).Actionable
+	if !strings.HasPrefix(got.Reason, "Send failed: ") || !strings.Contains(got.Reason, "Unrecognized command") {
+		t.Errorf("reason = %q, want a Send failed card naming Unrecognized command", got.Reason)
+	}
+	if len(got.Action) != 1 || got.Action[0] != "/handoff" {
+		t.Errorf("action = %v, want the text to resend", got.Action)
+	}
+}

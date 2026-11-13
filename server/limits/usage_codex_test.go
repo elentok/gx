@@ -46,6 +46,24 @@ func (r *codexUsageRig) writeCodexAgent(agent string, seen time.Time, primary, s
 	if err := os.WriteFile(filepath.Join(dir, nativerunner.MetaFile), meta, 0o644); err != nil {
 		r.t.Fatal(err)
 	}
+	r.writeCodexRollout(agent, seen, primary, secondary)
+}
+
+func (r *codexUsageRig) writeCodexSession(id string, seen time.Time, primary, secondary string) {
+	r.t.Helper()
+	dir := filepath.Join(r.sessionsDir, id)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		r.t.Fatal(err)
+	}
+	meta := fmt.Sprintf(`{"id":%q,"harness":"codex","dir":%q,"conversation_id":%q}`, id, "/repo/"+id, "sess-"+id)
+	if err := os.WriteFile(filepath.Join(dir, "meta.json"), []byte(meta), 0o644); err != nil {
+		r.t.Fatal(err)
+	}
+	r.writeCodexRollout(id, seen, primary, secondary)
+}
+
+func (r *codexUsageRig) writeCodexRollout(id string, seen time.Time, primary, secondary string) {
+	r.t.Helper()
 	null := func(w string) string {
 		if w == "" {
 			return "null"
@@ -54,8 +72,8 @@ func (r *codexUsageRig) writeCodexAgent(agent string, seen time.Time, primary, s
 	}
 	rollout := fmt.Sprintf(`{"type":"session_meta","payload":{"id":"sess-%[1]s","cwd":"/repo/%[1]s"}}
 {"timestamp":%[2]q,"type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":%[3]s,"secondary":%[4]s}}}
-`, agent, seen.UTC().Format(time.RFC3339), null(primary), null(secondary))
-	path := filepath.Join(r.codexHome, "sessions", "2026", "10", "30", "rollout-2026-10-30T10-00-00-sess-"+agent+".jsonl")
+`, id, seen.UTC().Format(time.RFC3339), null(primary), null(secondary))
+	path := filepath.Join(r.codexHome, "sessions", "2026", "10", "30", "rollout-2026-10-30T10-00-00-sess-"+id+".jsonl")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		r.t.Fatal(err)
 	}
@@ -66,6 +84,21 @@ func (r *codexUsageRig) writeCodexAgent(agent string, seen time.Time, primary, s
 
 func codexWindowJSON(pct float64, minutes int, resets time.Time) string {
 	return fmt.Sprintf(`{"used_percent":%v,"window_minutes":%d,"resets_at":%d}`, pct, minutes, resets.Unix())
+}
+
+func TestUsageSummary_CodexInteractiveSession(t *testing.T) {
+	t.Parallel()
+	r := newCodexUsageRig(t)
+	s := r.server()
+	now := time.Now()
+	r.writeCodexSession("chat", now, codexWindowJSON(42, 10080, now.Add(72*time.Hour)), "")
+
+	s.scanUsage()
+
+	got := s.codexSummary(now)
+	if got == nil || got.SevenDay == nil || got.SevenDay.UsedPercentage != 42 {
+		t.Fatalf("codex summary = %+v, want interactive session's 42%% weekly limit", got)
+	}
 }
 
 func TestUsageGate_CodexWindowsGateCodexOnly(t *testing.T) {

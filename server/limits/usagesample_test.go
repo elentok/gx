@@ -18,9 +18,10 @@ import (
 )
 
 type usageRig struct {
-	t        *testing.T
-	store    string
-	stateDir string
+	t           *testing.T
+	store       string
+	stateDir    string
+	sessionsDir string
 }
 
 func newUsageRig(t *testing.T) *usageRig {
@@ -31,7 +32,7 @@ func newUsageRig(t *testing.T) *usageRig {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
-	r := &usageRig{t: t, store: t.TempDir(), stateDir: stateDir}
+	r := &usageRig{t: t, store: t.TempDir(), stateDir: stateDir, sessionsDir: filepath.Join(stateDir, "sessions")}
 	if err := os.MkdirAll(filepath.Join(r.store, "proj"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +50,7 @@ func (r *usageRig) limits(env []string, eventInterval time.Duration) *Limits {
 	set.Store(&settings.Settings{})
 	reg := projects.NewRegistry(func() projects.Env { return projects.Env{Env: env} }, slog.New(slog.NewTextHandler(io.Discard, nil)), nil, set, nil, nil)
 	l := New(Deps{
-		Config:   Config{StateDir: r.stateDir, TicketStore: r.store, LimitsEventInterval: eventInterval},
+		Config:   Config{StateDir: r.stateDir, SessionsDir: r.sessionsDir, TicketStore: r.store, LimitsEventInterval: eventInterval},
 		Settings: set, Projects: reg, Events: broker.New(64), Guards: runs.NewGuards(),
 		Log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
 		SpendDays: func() map[string]float64 { return nil },

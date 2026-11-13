@@ -444,7 +444,12 @@ func (c *codexFake) submit(text string) error {
 	}
 	if strings.HasPrefix(text, "/") {
 		// A "/" command is no turn and has no output in the rollout, only the
-		// user message.
+		// user message. An unknown one is drawn on screen only, as real Codex
+		// does: `Unrecognized command '/x'`.
+		if !codexKnownCommand(text) {
+			fmt.Fprintf(c.out, "\r\nUnrecognized command '%s'. Type \"/\" for a list of supported commands.\r\n", strings.Fields(text)[0])
+			return nil
+		}
 		return c.writeLine("response_item", c.message("user", "input_text", text))
 	}
 	if agentfake.IsDesignPrompt(text) || (c.design.Active && !strings.HasPrefix(text, "$")) {
@@ -520,4 +525,14 @@ func (c *codexFake) work(cfg agentfake.WorkerConfig, address string) {
 		return
 	}
 	_ = agentfake.SendControl(c.ctlPath, agentfake.Control{Action: agentfake.ActionFinish})
+}
+
+// codexKnownCommand reports whether text starts with a "/" command the fake
+// treats as real. Any other is drawn as unrecognized.
+func codexKnownCommand(text string) bool {
+	switch strings.Fields(text)[0] {
+	case "/clear", "/compact", "/cost", "/status", "/model", "/new", "/review", "/diff":
+		return true
+	}
+	return false
 }

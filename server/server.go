@@ -432,7 +432,7 @@ func New(cfg Config) (*Server, error) {
 	})
 	s.limits = limits.New(limits.Deps{
 		Config: limits.Config{
-			StateDir: cfg.StateDir, TicketStore: cfg.TicketStore,
+			StateDir: cfg.StateDir, SessionsDir: cfg.SessionsDir, TicketStore: cfg.TicketStore,
 			UsagePollInterval: cfg.UsagePollInterval, LimitsEventInterval: cfg.LimitsEventInterval,
 			TokenPollInterval: cfg.TokenPollInterval,
 		},

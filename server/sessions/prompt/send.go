@@ -11,8 +11,14 @@ import (
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/codexui"
+	"github.com/elentok/gx/harness"
 )
+
+// codexUnknownWait bounds the pane watch for Codex's "Unrecognized command".
+const codexUnknownWait = 2 * time.Second
 
 const sendFailedPrefix = "Send failed: "
 
@@ -76,7 +82,31 @@ func (p *Prompt) typeCommandOnce(dir, text string, imgs imageSet) error {
 	if err := run.CatchUp(); err != nil {
 		return err
 	}
-	return run.typeStepWith(0, text, imgs)
+	if err := run.typeStepWith(0, text, imgs); err != nil {
+		return err
+	}
+	return p.checkCodexKnownCommand(dir, run, text)
+}
+
+// checkCodexKnownCommand watches a Codex pane briefly after a "/" command.
+// Codex draws "Unrecognized command" on screen and never writes it to the
+// rollout, so without this the person sees nothing.
+func (p *Prompt) checkCodexKnownCommand(dir string, run *actionRun, text string) error {
+	meta, err := sessions.ReadMeta(dir)
+	if err != nil || meta.Harness != string(harness.Codex) {
+		return nil
+	}
+	deadline := time.Now().Add(codexUnknownWait)
+	for {
+		rows, _, err := run.Holder().Screen(0)
+		if err == nil && strings.Contains(strings.Join(rows, "\n"), codexui.UnknownCommandMarker) {
+			return fmt.Errorf("%w: %q: %s", agentrunner.ErrUnknownSkill, text, codexui.UnknownCommandMarker)
+		}
+		if !time.Now().Before(deadline) {
+			return nil
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 func (p *Prompt) nudgePrompt(dir, text string, imgs imageSet) error {

@@ -8,6 +8,11 @@ import (
 	"github.com/elentok/gx/agentrunner/claudeui"
 )
 
+// UnknownCommandMarker is the pane line Codex draws for a "/" command it does
+// not know: `Unrecognized command '/x'`. Codex keeps it out of its rollout, so
+// the pane is the only place to see it.
+const UnknownCommandMarker = "Unrecognized command"
+
 // NoneLabel is the row Codex appends to every question's options.
 const NoneLabel = "None of the above"
 
