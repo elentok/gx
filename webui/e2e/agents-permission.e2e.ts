@@ -3,8 +3,17 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Page } from "@playwright/test"
 import type { SessionInfo } from "../src/generated/server"
-import { expect, test, type Fixture } from "./fixture"
-import { cardSession, chatOf, claudeIdle, go, sessions } from "./agentsKit"
+import { expect, nav, test, type Fixture } from "./fixture"
+import {
+  cardSession,
+  chatOf,
+  claudeIdle,
+  go,
+  moreActions,
+  row,
+  sessions,
+  sidebar,
+} from "./agentsKit"
 
 const conversationOf = async (fixture: Fixture, id: string) =>
   (await chatOf(fixture, id)).conversation_id
@@ -376,6 +385,32 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await noticeButton(page, "Deny").click()
   await leavesBlocked(fixture, deny.s.id)
   await expect.poll(() => readSince(fixture, deny.conv, before)).toBe("\x1b")
+
+  // A rename of a Blocked chat is held: the name shows at once, /rename reaches the input only after the answer.
+  const held = await blockIdle(fixture, BASH_DIALOG("rg hold-rename"))
+  expect(held.s.ticket).toBeFalsy()
+  before = await fixture.input(held.conv)
+  await open(page, `#/agents/${held.s.id}`)
+  await expect(failure(page)).toContainText("rg hold-rename")
+  await moreActions(page).click()
+  await page.getByRole("menu", nav("More actions")).getByRole("menuitem", nav("Rename")).click()
+  const renameDialog = page.getByRole("dialog", nav("Rename chat"))
+  await renameDialog.getByRole("textbox", nav("Name")).fill("held-name")
+  await page.keyboard.press("Enter")
+  await expect(renameDialog).toHaveCount(0)
+  await expect(row(page, held.s)).toContainText("held-name")
+  await expect.poll(() => fixture.cli("agents", "list")).toContain("held-name")
+  await expect(failure(page)).toContainText("rg hold-rename")
+  await expect(sidebar(page).getByText(/held|pending|rename.*waiting/i)).toHaveCount(0)
+  await expect(failure(page).getByText(/held|pending|rename.*waiting/i)).toHaveCount(0)
+  await expect.poll(() => readSince(fixture, held.conv, before)).toBe("")
+  expect(await readSince(fixture, held.conv, before)).toBe("")
+  await noticeButton(page, "Allow once").click()
+  await leavesBlocked(fixture, held.s.id)
+  await expect.poll(() => readSince(fixture, held.conv, before)).toContain("/rename held-name")
+  const sent = await readSince(fixture, held.conv, before)
+  expect(sent.startsWith("\r")).toBe(true)
+  expect(sent.split("held-name")).toHaveLength(2)
 
   // Allow once refused for Claude prompts gx cannot approve.
   const refused = async (text: string, notice: string) => {
