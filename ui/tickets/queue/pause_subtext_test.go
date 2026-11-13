@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	rowspkg "github.com/elentok/gx/ui/tickets/queue/rows"
 	"github.com/elentok/gx/ui/tree"
 )
 
@@ -82,10 +83,10 @@ func TestQueueModel_PausedTicketWithChildren_ReasonRendersDirectlyUnderItself(t 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	entries := m.rows.Tree.Entries()
-	var parent tree.Entry[Node]
+	var parent tree.Entry[rowspkg.Node]
 	parentIdx := -1
 	for i, e := range entries {
-		if e.Value.Kind == NodeTicket && e.Value.Ticket.Ticket.Identifier == "01" {
+		if e.Value.Kind == rowspkg.NodeTicket && e.Value.Ticket.Ticket.Identifier == "01" {
 			parent, parentIdx = e, i
 			break
 		}

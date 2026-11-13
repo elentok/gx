@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	rowspkg "github.com/elentok/gx/ui/tickets/queue/rows"
 )
 
 func TestQueueSearch_SlashEntersInputMode(t *testing.T) {
@@ -51,9 +52,9 @@ func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
 
 	dimPrefix := strings.SplitN(ui.StyleDim.Render("PROBE"), "PROBE", 2)[0]
 	var ticketRows []int
-	var ticketValues []Node
+	var ticketValues []rowspkg.Node
 	for i, e := range m.rows.Tree.Entries() {
-		if e.Value.Kind == NodeTicket {
+		if e.Value.Kind == rowspkg.NodeTicket {
 			ticketRows = append(ticketRows, i)
 			ticketValues = append(ticketValues, e.Value)
 		}
@@ -94,10 +95,10 @@ func TestQueueSearch_MatchesEpicHeaderRows(t *testing.T) {
 	entries := m.rows.Tree.Entries()
 	first, _ := m.search.Match(0)
 	second, _ := m.search.Match(1)
-	if e := entries[first.DataIndex].Value; e.Kind != NodeEpicName || e.Epic.Name != "alpha" {
+	if e := entries[first.DataIndex].Value; e.Kind != rowspkg.NodeEpicName || e.Epic.Name != "alpha" {
 		t.Fatalf("expected first match to be the alpha epic header, got %+v", e)
 	}
-	if e := entries[second.DataIndex].Value; e.Kind != NodeTicket || e.Ticket.Ticket.Title != "Alpha tweak" {
+	if e := entries[second.DataIndex].Value; e.Kind != rowspkg.NodeTicket || e.Ticket.Ticket.Title != "Alpha tweak" {
 		t.Fatalf("expected second match to be the alpha-tweak ticket, got %+v", e)
 	}
 }

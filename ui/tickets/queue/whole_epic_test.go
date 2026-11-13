@@ -7,12 +7,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server/wire"
+	rowspkg "github.com/elentok/gx/ui/tickets/queue/rows"
 )
 
 func queueRowPaths(m QueueModel) []string {
 	var paths []string
 	for _, e := range m.rows.BuildEntries(m.rowsEnv()) {
-		if e.Value.Kind == NodeTicket {
+		if e.Value.Kind == rowspkg.NodeTicket {
 			paths = append(paths, e.Value.Ticket.Ticket.Path)
 		}
 	}
@@ -59,7 +60,7 @@ func TestQueueWholeEpic_HideCompleteHidesDoneExtraTicket(t *testing.T) {
 func TestQueueWholeEpic_DeleteIsNotOfferedOnNonItemRow(t *testing.T) {
 	m, _ := deliverQueue(t, wholeEpicSnapshot("open"), []wire.QueueItem{{Address: "gx:alpha/01"}})
 	for i, e := range m.rows.Tree.Entries() {
-		if e.Value.Kind == NodeTicket && e.Value.Ticket.Ticket.Path == "gx:alpha/02" {
+		if e.Value.Kind == rowspkg.NodeTicket && e.Value.Ticket.Ticket.Path == "gx:alpha/02" {
 			m.rows.Tree.SetSelectedIndex(i)
 		}
 	}

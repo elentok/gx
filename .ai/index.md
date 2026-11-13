@@ -288,6 +288,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `ui/status/filetree` — the file tree pane of `ui/status` (`Pane`, `Data`, tree entries, layout and chrome)
   - `ui/status/statusflows` — test-only package holding the stage end-to-end flows of `ui/status`
   - `ui/tickets/queue/header` — the Queue tab header: title, run-state banner, epic status rows and recently finished epics (`Header`, `FinishedLines`)
+  - `ui/tickets/queue/rows` — the Queue tab's tree builder and row renderer (`Rows`, `RowsEnv`, `Node`, `Row`)
   - `ui/worktrees/launch` — terminal launchers for `ui/worktrees` (the only `ui/worktrees` package that imports `herdr`)
   - `ui/worktrees/modal` — modals of `ui/worktrees`
   - `ui/agents/agentstyle` — shared agent row styles

@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/tickets/preview"
+	rowspkg "github.com/elentok/gx/ui/tickets/queue/rows"
 )
 
 // selectedQueueRow returns the queue row under m.rows.queueTree's current
@@ -18,15 +19,15 @@ import (
 // header/separator/error row, a deliberate minor behavior change from the
 // old rows()-only selection (05's "Real gap" section): those rows are left
 // selectable but read as "nothing selected" to the preview.
-func (m QueueModel) selectedQueueRow() (Row, bool) {
+func (m QueueModel) selectedQueueRow() (rowspkg.Row, bool) {
 	entries := m.rows.Tree.Entries()
 	idx := m.rows.Tree.SelectedIndex()
 	if idx < 0 || idx >= len(entries) {
-		return Row{}, false
+		return rowspkg.Row{}, false
 	}
 	entry := entries[idx]
-	if entry.Value.Kind != NodeTicket {
-		return Row{}, false
+	if entry.Value.Kind != rowspkg.NodeTicket {
+		return rowspkg.Row{}, false
 	}
 	return entry.Value.Ticket, true
 }

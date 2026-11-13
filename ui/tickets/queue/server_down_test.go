@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
+	rowspkg "github.com/elentok/gx/ui/tickets/queue/rows"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -148,12 +149,12 @@ func TestQueueServerMode_ProjectInEpicHeaderAndFiltersByProject(t *testing.T) {
 		}
 	}
 
-	m.rows.ProjectFilter = NextProject(m.rows.Epics, "")
+	m.rows.ProjectFilter = rowspkg.NextProject(m.rows.Epics, "")
 	view = ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "01 Second") || strings.Contains(view, "01 First") {
 		t.Errorf("filter %q should show only blog:\n%s", m.rows.ProjectFilter, view)
 	}
-	if got := NextProject(m.rows.Epics, "gx"); got != "" {
+	if got := rowspkg.NextProject(m.rows.Epics, "gx"); got != "" {
 		t.Errorf("after the last project the filter should return to all, got %q", got)
 	}
 }
@@ -173,7 +174,7 @@ func TestQueueFocusEpic_SelectsTheEpicHeaderOnceItsRowsArrive(t *testing.T) {
 	m = next.(QueueModel)
 
 	entry := m.rows.Tree.Entries()[m.rows.Tree.SelectedIndex()].Value
-	if entry.Kind != NodeEpicName || entry.Epic.Path != "gx:beta" {
+	if entry.Kind != rowspkg.NodeEpicName || entry.Epic.Path != "gx:beta" {
 		t.Fatalf("selected = %+v, want the gx:beta header", entry)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tickets/queue/header"
+	rowspkg "github.com/elentok/gx/ui/tickets/queue/rows"
 	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
@@ -63,7 +64,7 @@ func (m QueueModel) selectedQueuePath() string {
 func (m QueueModel) selectedQueueEpic() (tickets.Epic, bool) {
 	entries := m.rows.Tree.Entries()
 	idx := m.rows.Tree.SelectedIndex()
-	if idx < 0 || idx >= len(entries) || entries[idx].Value.Kind != NodeEpicName {
+	if idx < 0 || idx >= len(entries) || entries[idx].Value.Kind != rowspkg.NodeEpicName {
 		return tickets.Epic{}, false
 	}
 	return entries[idx].Value.Epic, true

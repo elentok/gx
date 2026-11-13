@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/queue/header"
+	rowspkg "github.com/elentok/gx/ui/tickets/queue/rows"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 	"github.com/elentok/gx/viewmodel"
@@ -187,7 +188,7 @@ func TestQueueServerMode_EpicAddressItemShowsItsTickets(t *testing.T) {
 
 	var shown []string
 	for _, e := range m.rows.BuildEntries(m.rowsEnv()) {
-		if e.Value.Kind == NodeTicket {
+		if e.Value.Kind == rowspkg.NodeTicket {
 			shown = append(shown, e.Value.Ticket.Ticket.Path)
 		}
 	}

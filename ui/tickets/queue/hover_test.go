@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/queue/header"
+	rowspkg "github.com/elentok/gx/ui/tickets/queue/rows"
 )
 
 // hoverFixture drives the Tickets and Queue tabs through the same hover cases.
@@ -37,7 +38,7 @@ func queueHoverFixture(t *testing.T) hoverFixture {
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	other := -1
 	for i, e := range m.rows.Tree.Entries() {
-		if e.Value.Kind == NodeTicket && i != m.rows.Tree.SelectedIndex() {
+		if e.Value.Kind == rowspkg.NodeTicket && i != m.rows.Tree.SelectedIndex() {
 			other = i
 		}
 	}

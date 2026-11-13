@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/preview"
+	rowspkg "github.com/elentok/gx/ui/tickets/queue/rows"
 	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
@@ -58,7 +59,7 @@ func TestQueueModel_ClickOnTicketIconTogglesIt(t *testing.T) {
 
 	parentIdx := -1
 	for i, e := range m.rows.Tree.Entries() {
-		if e.Value.Kind == NodeTicket && e.HasChildren {
+		if e.Value.Kind == rowspkg.NodeTicket && e.HasChildren {
 			parentIdx = i
 			break
 		}

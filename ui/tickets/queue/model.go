@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/queue/header"
+	rowspkg "github.com/elentok/gx/ui/tickets/queue/rows"
 	"github.com/elentok/gx/ui/tickets/rowactions"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 	"github.com/elentok/gx/ui/tickets/tabapi"
@@ -41,7 +42,7 @@ type QueueModel struct {
 
 	// rows is the tree builder and row renderer with the state they own (see
 	// queue_rows.go). The header is stateless: header() builds it per call.
-	rows Rows
+	rows rowspkg.Rows
 
 	// menus is the Tickets tab's row menu plus the Queue group.
 	menus rowactions.Menus
@@ -82,10 +83,10 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 	sp := spinner.New()
 	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
 	km := newQueueKeysManager()
-	queueTree := tree.NewModel[Node]()
-	queueTree.SetIsSelectable(func(n Node) bool {
+	queueTree := tree.NewModel[rowspkg.Node]()
+	queueTree.SetIsSelectable(func(n rowspkg.Node) bool {
 		switch n.Kind {
-		case NodeEpicSeparator, NodeEpicBar, NodeEpicStatusLine, NodeEpicSpacer, NodeEpicError:
+		case rowspkg.NodeEpicSeparator, rowspkg.NodeEpicBar, rowspkg.NodeEpicStatusLine, rowspkg.NodeEpicSpacer, rowspkg.NodeEpicError:
 			return false
 		default:
 			return true
@@ -96,7 +97,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 		worktreeRoot: worktreeRoot,
 		settings:     settings,
 		editor:       rowactions.Editor{WorktreeRoot: worktreeRoot, Settings: settings},
-		rows:         NewRows(queueTree),
+		rows:         rowspkg.NewRows(queueTree),
 		server: Server{
 			Live:         map[string]map[string]rowfmt.LiveTicketState{},
 			RunningEpics: map[string]bool{},
@@ -338,7 +339,7 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 		if !ok {
 			return m, nil
 		}
-		if kind := m.rows.Tree.Entries()[idx].Value.Kind; kind != NodeTicket && kind != NodeEpicName {
+		if kind := m.rows.Tree.Entries()[idx].Value.Kind; kind != rowspkg.NodeTicket && kind != rowspkg.NodeEpicName {
 			return m, nil
 		}
 		m.rows.Tree.SetSelectedIndex(idx)
@@ -348,7 +349,7 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 		entry := m.rows.Tree.Entries()[idx]
 		// Only ticket rows draw a triangle; the label's leading cell is the
 		// indent renderQueueTicketRow puts before it.
-		if entry.Value.Kind == NodeTicket && rowfmt.OnTreeIcon(mouse.X, entry, 1, m.icons()) && m.rows.Tree.ToggleEntry(idx) {
+		if entry.Value.Kind == rowspkg.NodeTicket && rowfmt.OnTreeIcon(mouse.X, entry, 1, m.icons()) && m.rows.Tree.ToggleEntry(idx) {
 			m.clampSelected()
 			if m.search.HasQuery() {
 				m.recomputeQueueSearchMatches()
@@ -458,7 +459,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if m.server.ServerAPI == nil {
 				return m, nil
 			}
-			m.rows.ProjectFilter = NextProject(m.rows.Epics, m.rows.ProjectFilter)
+			m.rows.ProjectFilter = rowspkg.NextProject(m.rows.Epics, m.rows.ProjectFilter)
 			m.clampSelected()
 			label := "all projects"
 			if m.rows.ProjectFilter != "" {
@@ -627,8 +628,8 @@ func (m QueueModel) header() header.Header {
 }
 
 // rowsEnv gathers what queueRows reads from the rest of the tab.
-func (m QueueModel) rowsEnv() RowsEnv {
-	return RowsEnv{
+func (m QueueModel) rowsEnv() rowspkg.RowsEnv {
+	return rowspkg.RowsEnv{
 		Header:        m.header(),
 		MaxParallel:   m.settings.MaxConcurrentTicketsPerEpic(),
 		LabelWidth:    m.layout().labelWidth(),

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui/search"
+	rowspkg "github.com/elentok/gx/ui/tickets/queue/rows"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
 
@@ -39,9 +40,9 @@ func (m *QueueModel) recomputeQueueSearchMatches() {
 	for i, e := range m.rows.Tree.Entries() {
 		matched := false
 		switch e.Value.Kind {
-		case NodeTicket:
+		case rowspkg.NodeTicket:
 			matched = rowfmt.TicketMatchesQuery(e.Value.Ticket.Epic, e.Value.Ticket.Ticket, q)
-		case NodeEpicName:
+		case rowspkg.NodeEpicName:
 			matched = rowfmt.EpicMatchesQuery(e.Value.Epic, q)
 		}
 		if matched {

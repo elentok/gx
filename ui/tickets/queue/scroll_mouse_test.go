@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/preview"
 	"github.com/elentok/gx/ui/tickets/queue/header"
+	rowspkg "github.com/elentok/gx/ui/tickets/queue/rows"
 )
 
 // TestQueueModelScrollsWithKeysAndMouse covers ticket 25's third request: the
@@ -269,7 +270,7 @@ func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 	// anymore now every entry is exactly one line.
 	var ticketRows []int
 	for i, e := range m.rows.Tree.Entries() {
-		if e.Value.Kind == NodeTicket {
+		if e.Value.Kind == rowspkg.NodeTicket {
 			ticketRows = append(ticketRows, i)
 		}
 	}
@@ -312,13 +313,13 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
-	rowOf := map[NodeKind]int{}
+	rowOf := map[rowspkg.NodeKind]int{}
 	var secondTicket int
 	for i, e := range m.rows.Tree.Entries() {
 		if _, seen := rowOf[e.Value.Kind]; !seen {
 			rowOf[e.Value.Kind] = i
 		}
-		if e.Value.Kind == NodeTicket {
+		if e.Value.Kind == rowspkg.NodeTicket {
 			secondTicket = i
 		}
 	}
@@ -328,7 +329,7 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 
 	for name, click := range map[string]tea.MouseClickMsg{
 		"preview": {Button: tea.MouseRight, X: px, Y: py},
-		"context": {Button: tea.MouseRight, Y: rowY(rowOf[NodeEpicStatusLine])},
+		"context": {Button: tea.MouseRight, Y: rowY(rowOf[rowspkg.NodeEpicStatusLine])},
 	} {
 		updated, cmd := m.Update(click)
 		got := updated.(QueueModel)
@@ -347,9 +348,9 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 		t.Fatalf("expected the ticket menu resolving for %q, got pending=%q cmd=%v", want, m.menus.Pending, cmd != nil)
 	}
 
-	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, Y: rowY(rowOf[NodeEpicName])})
+	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, Y: rowY(rowOf[rowspkg.NodeEpicName])})
 	m = updated.(QueueModel)
-	if m.rows.Tree.SelectedIndex() != rowOf[NodeEpicName] || !m.menus.Menu.IsOpen || !strings.Contains(m.menus.Menu.View(), "Add epic to queue") {
+	if m.rows.Tree.SelectedIndex() != rowOf[rowspkg.NodeEpicName] || !m.menus.Menu.IsOpen || !strings.Contains(m.menus.Menu.View(), "Add epic to queue") {
 		t.Fatalf("expected the epic menu open on the epic header, got selection=%d view:\n%s", m.rows.Tree.SelectedIndex(), m.menus.Menu.View())
 	}
 }
@@ -372,7 +373,7 @@ func TestQueueMouseClickRowMappingStaysCorrectAcrossBannerTransition(t *testing.
 
 	var ticketRows []int
 	for i, e := range m.rows.Tree.Entries() {
-		if e.Value.Kind == NodeTicket {
+		if e.Value.Kind == rowspkg.NodeTicket {
 			ticketRows = append(ticketRows, i)
 		}
 	}
@@ -502,9 +503,9 @@ func TestQueueModelCursorSkipsFillerRowsBetweenEpics(t *testing.T) {
 	var alphaTicket, betaHeader int
 	for i, e := range m.rows.Tree.Entries() {
 		switch {
-		case e.Value.Kind == NodeTicket && e.Value.Epic.Name == "alpha":
+		case e.Value.Kind == rowspkg.NodeTicket && e.Value.Epic.Name == "alpha":
 			alphaTicket = i
-		case e.Value.Kind == NodeEpicName && e.Value.Epic.Name == "beta":
+		case e.Value.Kind == rowspkg.NodeEpicName && e.Value.Epic.Name == "beta":
 			betaHeader = i
 		}
 	}
@@ -581,7 +582,7 @@ func TestQueueModelClampSelectedSkipsFillerRowAfterRebuild(t *testing.T) {
 
 	var openTicketIdx int
 	for i, e := range m.rows.Tree.Entries() {
-		if e.Value.Kind == NodeTicket && e.Value.Epic.Name == "alpha" && e.Value.Ticket.Ticket.Identifier == "02" {
+		if e.Value.Kind == rowspkg.NodeTicket && e.Value.Epic.Name == "alpha" && e.Value.Ticket.Ticket.Identifier == "02" {
 			openTicketIdx = i
 		}
 	}
