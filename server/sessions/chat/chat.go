@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/commandlist"
+	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/transcript"
@@ -111,6 +112,9 @@ type Chat struct {
 	codexTurns FileCache[codexsession.TurnModel]
 	// codexContext caches the context tokens of each rollout's newest token_count.
 	codexContext FileCache[int]
+	// claudeTotals and codexTotals cache cumulative usage for the composer popover.
+	claudeTotals FileCache[metrics.TranscriptUsage]
+	codexTotals  FileCache[int64]
 	// codexQuestions caches the open question tool call of each rollout.
 	codexQuestions FileCache[codexQuestionRead]
 	// rolloutPath replaces codexsession.RolloutPathIn; tests count lookups with it.

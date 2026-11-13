@@ -11,6 +11,7 @@ import { shellEntries } from "./shellEntries"
 import { ConnectionContext, type Connection } from "../connection"
 import { DraftSwitcher } from "../design/DraftSwitcher"
 import { DraftImages } from "../design/DraftImages"
+import { ContextBadge } from "../design/ContextBadge"
 import { ImageStrip } from "../design/ImageStrip"
 import type { DraftImages as DraftImagesState } from "../design/useDraftImages"
 import { NewDesignForm } from "../design/NewDesignForm"
@@ -618,6 +619,40 @@ export const galleryEntries: GalleryEntry[] = [
     )),
   },
   { name: "Badge", cases: perTone((tone) => <Badge tone={tone}>{tone}</Badge>) },
+  {
+    name: "ContextBadge",
+    cases: [
+      {
+        label: "usage popover",
+        node: (
+          <ContextBadge
+            tokens={70_000}
+            level="green"
+            ceiling={200_000}
+            usage={{
+              input_tokens: 5_000,
+              cache_read_tokens: 60_000,
+              cache_creation_tokens: 5_000,
+              total_tokens: 1_840_000,
+              estimated_cost: 4.72,
+              compactions: 2,
+            }}
+          />
+        ),
+      },
+      {
+        label: "over smart zone",
+        node: (
+          <ContextBadge
+            tokens={185_375}
+            level="red"
+            ceiling={130_000}
+            usage={{ total_tokens: 15_800_000 }}
+          />
+        ),
+      },
+    ],
+  },
   {
     name: "PromptBox",
     cases: [

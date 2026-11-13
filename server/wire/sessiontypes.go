@@ -82,6 +82,21 @@ type SessionInfo struct {
 	// while there is no reading.
 	ContextTokens *int               `json:"context_tokens,omitempty"`
 	ContextLevel  agent.ContextLevel `json:"context_level,omitempty"`
+	// Usage is the current conversation's context split and cumulative token
+	// accounting. EstimatedCost is absent for harnesses gx cannot price.
+	Usage *SessionUsage `json:"usage,omitempty"`
+}
+
+// SessionUsage is the token accounting shown beside an interactive session's
+// composer. The three context fields add up to ContextTokens for Claude. Codex
+// reports only TotalTokens.
+type SessionUsage struct {
+	InputTokens         int      `json:"input_tokens,omitempty"`
+	CacheReadTokens     int      `json:"cache_read_tokens,omitempty"`
+	CacheCreationTokens int      `json:"cache_creation_tokens,omitempty"`
+	TotalTokens         int64    `json:"total_tokens"`
+	EstimatedCost       *float64 `json:"estimated_cost,omitempty"`
+	Compactions         int      `json:"compactions,omitempty"`
 }
 
 // SessionStatus is a Session status.

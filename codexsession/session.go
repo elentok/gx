@@ -88,6 +88,32 @@ func ReadContextTokens(path string) (tokens int, ok bool, err error) {
 	return scanContextTokens(path, true, func(sessionLine) bool { return true })
 }
 
+// ReadTotalTokens returns the newest cumulative total-token count in the
+// rollout at path. ok is false while the rollout has no such reading.
+func ReadTotalTokens(path string) (tokens int64, ok bool, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, false, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+	for scanner.Scan() {
+		var line sessionLine
+		if json.Unmarshal(scanner.Bytes(), &line) != nil || line.Type != "event_msg" || line.Payload.Type != "token_count" {
+			continue
+		}
+		if total := line.Payload.Info.TotalTokenUsage.TotalTokens; total > 0 {
+			tokens, ok = int64(total), true
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return 0, false, err
+	}
+	return tokens, ok, nil
+}
+
 // VerifyIdentityIn reports whether the Codex home has rollout metadata for
 // sessionID launched in cwd. Token events are not required because a live
 // session may not have produced its first response yet.

@@ -122,6 +122,20 @@ func TestSessionInfoContext_ClaudeReplyGivesCountAndLevel(t *testing.T) {
 	}
 }
 
+func TestSessionInfoUsage_ClaudeGivesContextSplitTotalsCostAndCompactions(t *testing.T) {
+	t.Parallel()
+	first := `{"type":"assistant","timestamp":"2026-01-01T00:00:00Z","message":{"model":"claude-sonnet-5-5","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":20,"cache_creation_input_tokens":30}}}`
+	boundary := `{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"manual"}}`
+	last := `{"type":"assistant","timestamp":"2026-01-01T00:01:00Z","message":{"model":"claude-sonnet-5-5","usage":{"input_tokens":40,"output_tokens":6,"cache_read_input_tokens":50,"cache_creation_input_tokens":60}}}`
+	info := modelTestServer(t, "/work/proj", first, boundary, last).SessionInfo(contextMeta)
+	if info.Usage == nil {
+		t.Fatal("usage = nil")
+	}
+	if got := *info.Usage; got.InputTokens != 40 || got.CacheReadTokens != 50 || got.CacheCreationTokens != 60 || got.TotalTokens != 221 || got.EstimatedCost == nil || *got.EstimatedCost <= 0 || got.Compactions != 1 {
+		t.Errorf("usage = %+v, want the last context split, 221 total tokens, a cost and one compaction", got)
+	}
+}
+
 func TestSessionInfoContext_NoReadingCarriesNeither(t *testing.T) {
 	t.Parallel()
 	cases := map[string]sessions.Meta{
@@ -274,10 +288,14 @@ func TestSessionInfoContext_CodexRolloutGivesCountAndLevel(t *testing.T) {
 	for name, tc := range map[string]struct {
 		lines []string
 		want  int
+		total int64
 	}{
-		"newest token_count wins":   {[]string{tokenCount(30000), tokenCount(80000)}, 80000},
-		"zero reading is skipped":   {[]string{tokenCount(80000), tokenCount(0)}, 80000},
-		"no token_count gives none": {[]string{`{"type":"turn_context","payload":{"model":"gpt-6.1-sol"}}`}, 0},
+		"newest token_count wins": {
+			[]string{tokenCount(30000), `{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":80000},"total_token_usage":{"total_tokens":300000}}}}`},
+			80000, 300000,
+		},
+		"zero reading is skipped":   {[]string{tokenCount(80000), tokenCount(0)}, 80000, 0},
+		"no token_count gives none": {[]string{`{"type":"turn_context","payload":{"model":"gpt-6.1-sol"}}`}, 0, 0},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -298,6 +316,9 @@ func TestSessionInfoContext_CodexRolloutGivesCountAndLevel(t *testing.T) {
 			}
 			if info.ContextTokens == nil || *info.ContextTokens != tc.want || info.ContextLevel != agent.LevelYellow {
 				t.Errorf("context = %v/%q, want %d/yellow", info.ContextTokens, info.ContextLevel, tc.want)
+			}
+			if tc.total > 0 && (info.Usage == nil || info.Usage.TotalTokens != tc.total || info.Usage.EstimatedCost != nil) {
+				t.Errorf("usage = %+v, want %d total tokens and no estimated cost", info.Usage, tc.total)
 			}
 		})
 	}

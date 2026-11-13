@@ -80,6 +80,7 @@ type sessionStats struct {
 	firstOccupancy int
 	totalTokens    int
 	cost           float64
+	compactions    int
 	start, end     time.Time
 	ok             bool // false if the transcript couldn't be read/found
 }
@@ -120,6 +121,9 @@ func readTranscriptStats(path string) (sessionStats, error) {
 
 	stats := sessionStats{ok: true}
 	for _, l := range lines {
+		if l.IsCompactBoundary() {
+			stats.compactions++
+		}
 		// ReadAll keeps undated compaction boundaries; they can't bound the session.
 		if !l.Timestamp.IsZero() {
 			if stats.start.IsZero() || l.Timestamp.Before(stats.start) {
@@ -148,6 +152,29 @@ func readTranscriptStats(path string) (sessionStats, error) {
 	stats.totalTokens += subTokens
 	stats.cost += subCost
 	return stats, nil
+}
+
+// TranscriptUsage is one Claude conversation's cumulative token accounting.
+// TotalTokens and Cost include subagent transcripts; Compactions counts the
+// main conversation's compact boundaries.
+type TranscriptUsage struct {
+	TotalTokens int64
+	Cost        float64
+	Compactions int
+}
+
+// ReadTranscriptUsage reads the cumulative usage of the Claude transcript at
+// path. ok is false when the transcript is missing or empty.
+func ReadTranscriptUsage(path string) (usage TranscriptUsage, ok bool, err error) {
+	stats, err := readTranscriptStats(path)
+	if err != nil || !stats.ok {
+		return TranscriptUsage{}, false, err
+	}
+	return TranscriptUsage{
+		TotalTokens: int64(stats.totalTokens),
+		Cost:        stats.cost,
+		Compactions: stats.compactions,
+	}, true, nil
 }
 
 // subagentUsage sums the tokens and cost of the subagent transcripts stored in

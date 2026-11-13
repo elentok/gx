@@ -1,4 +1,4 @@
-import { act, cleanup, screen } from "@testing-library/react"
+import { cleanup, fireEvent, screen, within } from "@testing-library/react"
 import { afterEach, expect, test } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type { SessionInfo } from "../generated/server"
@@ -47,11 +47,63 @@ test("a phone drops the effort", () => {
   expect(screen.getByText("Claude Opus 4.7")).toBeTruthy()
 })
 
-test("the badge shows whole thousands and a tooltip against the ceiling on focus", async () => {
+test("the badge shows whole thousands and opens context details", async () => {
   render(session({ context_tokens: 70_400, context_level: "green" }))
   expect(badge()!.textContent).toBe("70K")
-  await act(async () => badge()!.focus())
-  expect(await screen.findByText("70K of 200K smart zone")).toBeTruthy()
+  fireEvent.click(badge()!)
+  const details = await screen.findByRole("dialog", { name: "Context usage" })
+  expect(details.textContent).toContain("Context35%")
+  expect(details.textContent).toContain("70Kof 200K smart zone")
+  expect(details.textContent).toContain("129.6K headroom")
+  expect(details.textContent).not.toContain("Used")
+})
+
+test("the popover reports usage above the smart zone without wrapping it into headroom", async () => {
+  render(session({ context_tokens: 185_375, context_level: "red" }), { ceiling: 130_000 })
+  fireEvent.click(badge()!)
+  const details = await screen.findByRole("dialog", { name: "Context usage" })
+  expect(details.textContent).toContain("143%")
+  expect(details.textContent).toContain("185Kof 130K smart zone")
+  expect(details.textContent).toContain("55.4K over smart zone")
+  expect(details.textContent).not.toContain("headroom")
+})
+
+test("the popover splits Claude context and shows cumulative usage", async () => {
+  render(
+    session({
+      context_tokens: 70_000,
+      context_level: "green",
+      usage: {
+        input_tokens: 5_000,
+        cache_read_tokens: 60_000,
+        cache_creation_tokens: 5_000,
+        total_tokens: 1_840_000,
+        estimated_cost: 4.72,
+        compactions: 2,
+      },
+    }),
+  )
+  fireEvent.click(badge()!)
+  const details = within(await screen.findByRole("dialog", { name: "Context usage" }))
+  expect(details.getByText("Reused cache")).toBeTruthy()
+  expect(details.getByText("60K")).toBeTruthy()
+  expect(details.getByText("New input")).toBeTruthy()
+  expect(details.getByText("Newly cached")).toBeTruthy()
+  expect(details.getByText("1.8M")).toBeTruthy()
+  expect(details.getByText("total tokens")).toBeTruthy()
+  expect(details.getByText("≈$4.72")).toBeTruthy()
+  expect(details.getByText("2 compactions")).toBeTruthy()
+})
+
+test("Codex total tokens render without an estimated cost", async () => {
+  render(
+    session({ context_tokens: 70_000, context_level: "green", usage: { total_tokens: 300_000 } }),
+  )
+  fireEvent.click(badge()!)
+  const details = within(await screen.findByRole("dialog", { name: "Context usage" }))
+  expect(details.getByText("300K")).toBeTruthy()
+  expect(details.getByText("total tokens")).toBeTruthy()
+  expect(details.queryByText(/\$/)).toBeNull()
 })
 
 test("each level maps to its own colour", () => {

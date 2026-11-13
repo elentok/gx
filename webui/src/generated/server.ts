@@ -2890,6 +2890,24 @@ export interface SessionInfo {
    */
   context_tokens?: number /* int */;
   context_level?: "green" | "yellow" | "orange" | "red";
+  /**
+   * Usage is the current conversation's context split and cumulative token
+   * accounting. EstimatedCost is absent for harnesses gx cannot price.
+   */
+  usage?: SessionUsage;
+}
+/**
+ * SessionUsage is the token accounting shown beside an interactive session's
+ * composer. The three context fields add up to ContextTokens for Claude. Codex
+ * reports only TotalTokens.
+ */
+export interface SessionUsage {
+  input_tokens?: number /* int */;
+  cache_read_tokens?: number /* int */;
+  cache_creation_tokens?: number /* int */;
+  total_tokens: number /* int64 */;
+  estimated_cost?: number /* float64 */;
+  compactions?: number /* int */;
 }
 /**
  * SessionStatus is a Session status.
