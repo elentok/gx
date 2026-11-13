@@ -88,10 +88,11 @@ type Settings struct {
 	WatchConfig bool
 
 	// The interactive-session keys of config agents.*.
-	AgentsResumeOnStart bool
-	AgentsBanners       bool
-	AgentsSounds        config.AgentsSoundsConfig
-	AgentsClaudeArgs    []string
+	AgentsResumeOnStart       bool
+	AgentsBanners             bool
+	AgentsSounds              config.AgentsSoundsConfig
+	AgentsClaudeArgs          []string
+	AgentsWritableDirectories []string
 	// AgentsFixAgentRemoteControl is read at each fix-agent start.
 	AgentsFixAgentRemoteControl bool
 
@@ -182,6 +183,7 @@ func FromConfig(cfg config.Config) Settings {
 		AgentsBanners:               cfg.Agents.Banners.Enabled,
 		AgentsSounds:                cfg.Agents.Sounds,
 		AgentsClaudeArgs:            cfg.Agents.ClaudeArgs,
+		AgentsWritableDirectories:   cfg.Agents.WritableDirectories,
 		AgentsFixAgentRemoteControl: cfg.Agents.FixAgentRemoteControl,
 		CPUWatchdog:                 cfg.CPUWatchdog,
 		Watchdog:                    cfg.Watchdog,

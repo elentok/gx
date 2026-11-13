@@ -228,7 +228,7 @@ func (p *Registry) ChatOverride(project string) *notify.ServerChatConfig {
 // top.
 func (p *Registry) AgentsConfig(project string) config.AgentsConfig {
 	set := p.settings.Load()
-	cfg := config.Config{Agents: config.AgentsConfig{Claude: set.AgentsClaude, Codex: set.AgentsCodex, DefaultHarness: set.AgentsDefaultHarness}}
+	cfg := config.Config{Agents: config.AgentsConfig{Claude: set.AgentsClaude, Codex: set.AgentsCodex, DefaultHarness: set.AgentsDefaultHarness, WritableDirectories: set.AgentsWritableDirectories}}
 	if dir, err := p.Dir(project); err == nil {
 		if pf, err := config.ReadProjectFile(dir); err == nil {
 			cfg = cfg.WithProject(pf)

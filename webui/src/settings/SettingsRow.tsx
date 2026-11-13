@@ -279,6 +279,17 @@ const needsConfirm = (e: SettingsEntry, change: SettingChange) =>
 /** In a project, a key with a global counterpart is inherited until the project file holds it. */
 function projectTexts(e: SettingsEntry, project: string) {
   const global = displayValue(e.global_value)
+  if (e.override === "add") {
+    return {
+      inherit: (
+        <>
+          Global directories still apply: <b>{global}</b>
+        </>
+      ),
+      start: `Add directories for ${project}`,
+      back: "Remove project additions",
+    }
+  }
   if (e.override === "cap") {
     return {
       inherit: (
@@ -393,7 +404,7 @@ export function SettingsRow({
         )}
         {overridable && entry.set && (
           <Box data-mock-part="overridden-chip">
-            <Chip tone="running">Overridden</Chip>
+            <Chip tone="running">{entry.override === "add" ? "Added" : "Overridden"}</Chip>
           </Box>
         )}
         <Box flex="1" />
@@ -431,7 +442,14 @@ export function SettingsRow({
             emphasis="secondary"
             tone="muted"
             disabled={write.pending}
-            onClick={() => send(setChange(entry.key, followsGlobal ? false : entry.global_value))}
+            onClick={() =>
+              send(
+                setChange(
+                  entry.key,
+                  entry.override === "add" ? [] : followsGlobal ? false : entry.global_value,
+                ),
+              )
+            }
           >
             {texts.start}
           </Button>

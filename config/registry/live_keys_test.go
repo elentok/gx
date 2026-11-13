@@ -21,7 +21,7 @@ server.web.allowed-hosts server.web.totp server.web.vi-escape server.web.leader-
 cpu-watchdog.enabled cpu-watchdog.threshold-percent cpu-watchdog.sustain cpu-watchdog.cooldown
 watchdog.max-tree-processes watchdog.interval watchdog.ulimit-headroom
 disk-space.warn-below disk-space.clean-below disk-space.cleanup-command
-agents.default-harness
+agents.default-harness agents.writable-directories
 agents.claude.model agents.claude.effort agents.claude.light.model agents.claude.light.effort
 agents.claude.strongest.model agents.claude.strongest.effort
 agents.codex.model agents.codex.effort agents.codex.light.model agents.codex.light.effort

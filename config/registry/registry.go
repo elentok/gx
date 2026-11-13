@@ -78,6 +78,8 @@ const (
 	// OverrideFollowsGlobal: a bool that is on by following the global
 	// setting; the project file holds the key only to turn it off.
 	OverrideFollowsGlobal OverrideMode = "follows-global"
+	// OverrideAdd appends project values to the global list.
+	OverrideAdd OverrideMode = "add"
 )
 
 // Entry describes one setting. The registry holds no default.

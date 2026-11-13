@@ -152,8 +152,9 @@ func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
 	ctx, release := l.Sessions.Watches.Context()
 	defer release()
 	one := ralphloop.OneIteration{
-		Context: ctx,
-		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agentKind, Ticket: t, RootBase: c.rootBase, LeafBase: c.leafBase,
+		WritableDirectories: l.Projects.AgentsConfig(ticket.Project).WritableDirectories,
+		Context:             ctx,
+		RepoDir:             repo, Epic: queued.Epic, ScratchDir: dir, Agent: agentKind, Ticket: t, RootBase: c.rootBase, LeafBase: c.leafBase,
 		Model: model, Effort: effort, Sink: l.Writer.FinishSink(ticket, t.Path), StallNudgeDelay: l.Host.StalledNudgeDelay(),
 		OnDepsStart: func() { l.setLaunchStep(ticketAddr, runs.StepInstallingDeps) },
 		OnDepsDone:  func() { l.setLaunchStep(ticketAddr, runs.StepStartingAgent) },

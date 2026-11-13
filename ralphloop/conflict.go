@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/supervise/startprompt"
@@ -322,7 +323,7 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 		Epic:  p.FeatureBranch,
 		Cwd:   p.FeatureWorktree,
 		Kind:  agentrunner.Kind(p.Agent),
-		Args:  agent.AgentArgs(p.Agent, p.FeatureWorktree, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
+		Args:  harness.WritableDirectoryArgs(agentrunner.Kind(p.Agent), agent.AgentArgs(p.Agent, p.FeatureWorktree, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort), p.WritableDirectories, d.SessionHomes.Claude, p.FeatureWorktree),
 	}, prompt, startprompt.Hooks{
 		OnFail: func(attempt int, kind events.Kind, err error) {
 			p.logLaunchFailed(label, attempt, kind, err)

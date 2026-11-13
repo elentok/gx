@@ -92,6 +92,7 @@ func (c Config) WithProject(pf ProjectFile) Config {
 		c.DiskSpace.CleanupCommand = slices.Clone(*d.CleanupCommand)
 	}
 	if a := pf.Agents; a != nil {
+		c.Agents.WritableDirectories = append(slices.Clone(c.Agents.WritableDirectories), a.WritableDirectories...)
 		c.Agents.Claude = overlayAgent(c.Agents.Claude, a.Claude)
 		c.Agents.Codex = overlayAgent(c.Agents.Codex, a.Codex)
 		c.Agents.DefaultHarness = firstNonEmpty(a.DefaultHarness, c.Agents.DefaultHarness)

@@ -87,6 +87,9 @@ func buildEntry(e registry.Entry, project bool, targetDoc, globalDoc []byte) ops
 	}
 	if project {
 		out.GlobalKey, out.GlobalValue = globalValue(e, globalDoc)
+		if e.Override == registry.OverrideAdd {
+			out.Default = json.RawMessage(`[]`)
+		}
 		// The Identity row reads the entry, not Project.VCS: an unset vcs means git.
 		if e.Key.String() == "vcs" && !set {
 			out.Default = json.RawMessage(`"git"`)

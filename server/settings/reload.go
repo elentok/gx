@@ -172,6 +172,7 @@ func changedKeys(old, next Settings) []string {
 		{"agents.banners.enabled", old.AgentsBanners, next.AgentsBanners},
 		{"agents.sounds", old.AgentsSounds, next.AgentsSounds},
 		{"agents.claude-args", old.AgentsClaudeArgs, next.AgentsClaudeArgs},
+		{"agents.writable-directories", old.AgentsWritableDirectories, next.AgentsWritableDirectories},
 		{"agents.fix-agent-remote-control", old.AgentsFixAgentRemoteControl, next.AgentsFixAgentRemoteControl},
 		{"agents.claude", old.AgentsClaude, next.AgentsClaude},
 		{"agents.codex", old.AgentsCodex, next.AgentsCodex},

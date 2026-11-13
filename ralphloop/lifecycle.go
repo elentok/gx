@@ -50,6 +50,8 @@ type FinishOutcome struct {
 // outside Run (the server's runner). Label, branch and worktree names come out
 // of the same helpers Run uses, so both orchestrators leave identical state.
 type OneIteration struct {
+	WritableDirectories []string
+
 	RepoDir     string
 	WorkspaceID string
 	Epic        string
@@ -210,23 +212,24 @@ func DiscardIteration(d deps.Deps, o OneIteration, w IterationWorktree) error {
 // held) is an error, like any failed finish; the caller pauses it.
 func FinishIteration(d deps.Deps, o OneIteration, w IterationWorktree, pane string) (FinishOutcome, error) {
 	p := iterationParams{
-		WorkspaceID:     o.WorkspaceID,
-		RepoDir:         o.RepoDir,
-		WorktreeDir:     w.worktreeDir,
-		FeatureWorktree: w.featureWorktree,
-		FeatureBranch:   o.Epic,
-		Agent:           o.Agent,
-		Runner:          runnerName(d),
-		Label:           w.Label,
-		Model:           o.Model,
-		Effort:          o.Effort,
-		Skill:           agent.DefaultWorkerSkill,
-		KeepAskedAgent:  o.KeepAskedAgent,
-		Ticket:          o.Ticket,
-		ScratchDir:      o.ScratchDir,
-		SmartZone:       o.smartZone(),
-		Gate:            supervise.NewGate(),
-		Sink:            o.sink(),
+		WritableDirectories: o.WritableDirectories,
+		WorkspaceID:         o.WorkspaceID,
+		RepoDir:             o.RepoDir,
+		WorktreeDir:         w.worktreeDir,
+		FeatureWorktree:     w.featureWorktree,
+		FeatureBranch:       o.Epic,
+		Agent:               o.Agent,
+		Runner:              runnerName(d),
+		Label:               w.Label,
+		Model:               o.Model,
+		Effort:              o.Effort,
+		Skill:               agent.DefaultWorkerSkill,
+		KeepAskedAgent:      o.KeepAskedAgent,
+		Ticket:              o.Ticket,
+		ScratchDir:          o.ScratchDir,
+		SmartZone:           o.smartZone(),
+		Gate:                supervise.NewGate(),
+		Sink:                o.sink(),
 	}
 	sessionID := supervise.RecordLiveSession(d, w.Label, o.Ticket.Path)
 	err := finishIteration(d, p, w.Path, pane, w.base, w.Branch, sessionID)
@@ -542,7 +545,8 @@ func agentReported(ticketPath string) (bool, error) {
 // mergeBuilt merges a built iteration that was waiting on the merge queue.
 func mergeBuilt(d deps.Deps, p iterationParams, built *builtAwaitingMergeError) error {
 	lp := mergeQueueParams{
-		WorkspaceID: p.WorkspaceID, RepoDir: p.RepoDir, WorktreeDir: p.WorktreeDir,
+		WritableDirectories: p.WritableDirectories,
+		WorkspaceID:         p.WorkspaceID, RepoDir: p.RepoDir, WorktreeDir: p.WorktreeDir,
 		FeatureWorktree: p.FeatureWorktree, FeatureBranch: p.FeatureBranch, Agent: p.Agent,
 		Model: p.Model, Effort: p.Effort, Skill: p.Skill, ScratchDir: p.ScratchDir,
 		SmartZone: p.SmartZone, Gate: p.Gate, Sink: p.Sink,

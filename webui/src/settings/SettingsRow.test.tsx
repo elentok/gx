@@ -428,6 +428,44 @@ describe("SettingsRow", () => {
     }
     const inherits = (v: { container: HTMLElement }) =>
       v.container.querySelector("[data-mock-part=inherits-global]")?.textContent
+
+    it("starts directory additions with an empty list and saves new directories", async () => {
+      const view = inProject(
+        entry({
+          key: "agents.writable-directories",
+          type: "string-list",
+          override: "add",
+          default: [],
+          global_key: "agents.writable-directories",
+          global_value: ["~/Library/pnpm"],
+        }),
+      )
+      fireEvent.click(view.getByRole("button", { name: "Add directories for gx" }))
+      await flush()
+      expect(view.onWrite).toHaveBeenLastCalledWith([
+        { key: "agents.writable-directories", value: [] },
+      ])
+      view.unmount()
+      const editing = inProject(
+        entry({
+          key: "agents.writable-directories",
+          type: "string-list",
+          override: "add",
+          set: true,
+          value: [],
+          default: [],
+          global_key: "agents.writable-directories",
+          global_value: ["~/Library/pnpm"],
+        }),
+      )
+      fireEvent.change(editing.getByRole("textbox"), { target: { value: "/project/cache" } })
+      fireEvent.click(editing.getByRole("button", { name: "Add" }))
+      await flush()
+      expect(editing.onWrite).toHaveBeenLastCalledWith([
+        { key: "agents.writable-directories", value: ["/project/cache"] },
+      ])
+    })
+
     const per = (over: Partial<SettingsEntry>) =>
       entry({
         key: "execution-queue.max-agents-per-epic",

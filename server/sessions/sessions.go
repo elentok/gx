@@ -308,6 +308,8 @@ func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, re
 		// A plain Codex chat gets the question tool and no GX prompt.
 		NoSystemPrompt: isPlainCodex(meta),
 	}
+	home := harness.LookupEnv(env, "HOME")
+	opts.Args = harness.WritableDirectoryArgs(agentrunner.Kind(meta.Harness), opts.Args, mg.projects.AgentsConfig(meta.Project).WritableDirectories, home, meta.Dir)
 	launch := h.Launch(opts)
 	if resume {
 		var ok bool

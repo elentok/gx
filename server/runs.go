@@ -30,6 +30,10 @@ func (s *Server) ResolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralphloo
 // reclaimHost is sched.ReclaimHost.
 type reclaimHost struct{ s *Server }
 
+func (h reclaimHost) WritableDirectories(project string) []string {
+	return h.s.projects.AgentsConfig(project).WritableDirectories
+}
+
 func (h reclaimHost) ConfiguredRunner() string { return h.s.cfg.Runner.Name() }
 
 func (h reclaimHost) RunnerFor(run runs.Run) agentrunner.Runner { return h.s.harness.RunnerForRun(run) }

@@ -88,6 +88,8 @@ func (e *builtAwaitingMergeError) Error() string {
 // minus the per-ticket fields (Ticket, Report) that mergeJob/the call site
 // supply instead.
 type mergeQueueParams struct {
+	WritableDirectories []string
+
 	WorkspaceID     string
 	RepoDir         string
 	WorktreeDir     string
@@ -112,20 +114,21 @@ type mergeQueueParams struct {
 // with the mutex this worker replaces).
 func (lp mergeQueueParams) iterationParamsFor(job mergeJob) iterationParams {
 	return iterationParams{
-		WorkspaceID:     lp.WorkspaceID,
-		RepoDir:         lp.RepoDir,
-		WorktreeDir:     lp.WorktreeDir,
-		FeatureWorktree: lp.FeatureWorktree,
-		FeatureBranch:   lp.FeatureBranch,
-		Agent:           lp.Agent,
-		Model:           lp.Model,
-		Effort:          lp.Effort,
-		Skill:           lp.Skill,
-		Ticket:          job.ticket,
-		ScratchDir:      lp.ScratchDir,
-		SmartZone:       lp.SmartZone,
-		Gate:            lp.Gate,
-		Sink:            lp.Sink,
+		WritableDirectories: lp.WritableDirectories,
+		WorkspaceID:         lp.WorkspaceID,
+		RepoDir:             lp.RepoDir,
+		WorktreeDir:         lp.WorktreeDir,
+		FeatureWorktree:     lp.FeatureWorktree,
+		FeatureBranch:       lp.FeatureBranch,
+		Agent:               lp.Agent,
+		Model:               lp.Model,
+		Effort:              lp.Effort,
+		Skill:               lp.Skill,
+		Ticket:              job.ticket,
+		ScratchDir:          lp.ScratchDir,
+		SmartZone:           lp.SmartZone,
+		Gate:                lp.Gate,
+		Sink:                lp.Sink,
 	}
 }
 

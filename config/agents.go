@@ -58,6 +58,10 @@ type AgentsConfig struct {
 	Banners         AgentsBannersConfig `json:"banners"`
 	Sounds          AgentsSoundsConfig  `json:"sounds"`
 	ClaudeArgs      []string            `json:"claude-args,omitempty"`
+
+	// WritableDirectories extends each agent's writable paths. Project entries
+	// are added to the global list, rather than replacing it.
+	WritableDirectories []string `json:"writable-directories"`
 	// FixAgentRemoteControl starts Claude fix-agent sessions with
 	// --remote-control.
 	FixAgentRemoteControl bool `json:"fix-agent-remote-control"`
@@ -101,7 +105,8 @@ func validateDefaultHarness(v string) error {
 // DefaultAgentsConfig returns the agents defaults.
 func DefaultAgentsConfig() AgentsConfig {
 	return AgentsConfig{
-		DefaultHarness: HarnessClaude,
+		DefaultHarness:      HarnessClaude,
+		WritableDirectories: []string{"~/Library/pnpm"},
 		Claude: AgentConfig{
 			Model: defaultClaudeModel, Effort: defaultClaudeEffort,
 			Light:     TierConfig{Model: defaultClaudeLightModel},

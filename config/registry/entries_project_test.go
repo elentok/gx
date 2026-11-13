@@ -26,7 +26,7 @@ func TestProjectView(t *testing.T) {
 			if e.Key.String() == "evolve.deep-read-cap" {
 				t.Error("evolve.deep-read-cap must not be in the project view")
 			}
-			if len(e.Key) > 1 && e.Key[0] == "agents" && e.Key[1] != "claude" && e.Key[1] != "codex" && e.Key[1] != "default-harness" {
+			if len(e.Key) > 1 && e.Key[0] == "agents" && e.Key[1] != "claude" && e.Key[1] != "codex" && e.Key[1] != "default-harness" && e.Key[1] != "writable-directories" {
 				t.Errorf("ignored agents sub-key in project view: %v", e.Key)
 			}
 			paths[e.ProjectPath().String()] = e

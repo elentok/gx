@@ -367,6 +367,9 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 		if raw.Agents.ClaudeArgs != nil {
 			cfg.Agents.ClaudeArgs = raw.Agents.ClaudeArgs
 		}
+		if raw.Agents.WritableDirectories != nil {
+			cfg.Agents.WritableDirectories = raw.Agents.WritableDirectories
+		}
 		if raw.Agents.FixAgentRemoteControl != nil {
 			cfg.Agents.FixAgentRemoteControl = *raw.Agents.FixAgentRemoteControl
 		}

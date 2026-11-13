@@ -180,6 +180,16 @@
             }
           },
           "type": "object"
+        },
+        "writable-directories": {
+          "default": [
+            "~/Library/pnpm"
+          ],
+          "description": "Additional directories agents may write. Project directories are added to the global list. Supports ~/ paths; relative paths use the agent's working directory. Applies on launch or resume. Default: ~/Library/pnpm.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"

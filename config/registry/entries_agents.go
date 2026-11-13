@@ -57,6 +57,8 @@ func agentsEntries() []Entry {
 		Description: "The sound file played when a session needs you, relative to the config directory. Empty uses the built-in sound."})
 	add(a, Entry{Key: Key("agents", "claude-args"), Type: TypeStringList,
 		Description: "Extra command-line arguments passed to every Claude session."})
+	add(a, Entry{Key: Key("agents", "writable-directories"), Type: TypeStringList, ProjectOverridable: true, Override: OverrideAdd,
+		Description: "Additional directories agents may write. Project directories are added to the global list. Supports ~/ paths; relative paths use the agent's working directory. Applies on launch or resume. Default: ~/Library/pnpm."})
 	add(a, Entry{Key: Key("agents", "fix-agent-remote-control"), Type: TypeBool,
 		Description: "Start Claude fix-agent sessions with remote control on."})
 	add(a, Entry{Key: Key("agent-runner"), Type: TypeEnum, Enum: runnerChoices(), Restart: true,

@@ -67,6 +67,7 @@ type rawConfig struct {
 			Attention *string `json:"attention"`
 		} `json:"sounds"`
 		ClaudeArgs            []string `json:"claude-args"`
+		WritableDirectories   []string `json:"writable-directories"`
 		FixAgentRemoteControl *bool    `json:"fix-agent-remote-control"`
 	} `json:"agents"`
 	Subscription *struct {

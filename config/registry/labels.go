@@ -29,6 +29,7 @@ var labels = map[string]string{
 	"agents.sounds.done":               "Done sound",
 	"agents.sounds.attention":          "Attention sound",
 	"agents.claude-args":               "Extra Claude arguments",
+	"agents.writable-directories":      "Writable directories",
 	"agents.fix-agent-remote-control":  "Remote control for fix agents",
 	"agent-runner":                     "Agent runner",
 	"runner-wait":                      "Runner wait",

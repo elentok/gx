@@ -28,6 +28,7 @@ import (
 
 // ReclaimHost is what the reclaim needs from the server.
 type ReclaimHost interface {
+	WritableDirectories(project string) []string
 	// ConfiguredRunner is the name of the runner new launches use.
 	ConfiguredRunner() string
 	// RunnerFor is the runner that started run, or nil when unavailable.
@@ -362,7 +363,8 @@ func (r *Reclaimer) ResolveRun(t runs.TrackedRun) (ralphloop.OneIteration, ralph
 		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, merge.IterationMode{}, err
 	}
 	one := ralphloop.OneIteration{
-		RepoDir: t.Repo, WorkspaceID: t.Workspace, Epic: addr.Epic, ScratchDir: dir, Agent: agent.AgentKind(t.Agent),
+		WritableDirectories: r.host.WritableDirectories(addr.Project),
+		RepoDir:             t.Repo, WorkspaceID: t.Workspace, Epic: addr.Epic, ScratchDir: dir, Agent: agent.AgentKind(t.Agent),
 		// The model the run launched under, so the guard on its finish path still
 		// has an expected model to check.
 		Model: t.Model, Effort: t.Effort,

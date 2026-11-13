@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
@@ -155,6 +156,8 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 	// A server stop ends the launch prompt's wait, which Serve would otherwise
 	// sit out before it can finish.
 	ctx := one.Context
+	args := agent.AgentArgs(agentKind, cwd, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...)
+	args = harness.WritableDirectoryArgs(agentrunner.Kind(agentKind), args, l.Projects.AgentsConfig(ticket.Project).WritableDirectories, deps.SessionHomes.Claude, cwd)
 	start := func() (agentrunner.Session, error) {
 		l.setLaunchStep(ticket.String(), runs.StepStartingAgent)
 		launched, err := startprompt.StartAndPrompt(ctx, deps.Runner, agentrunner.StartOptions{
@@ -163,7 +166,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 			Epic:            ticket.Epic,
 			Cwd:             cwd,
 			Kind:            agentrunner.Kind(agentKind),
-			Args:            agent.AgentArgs(agentKind, cwd, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
+			Args:            args,
 			Env:             agentEnv(l.Settings.Load().TabEnv, t, ticket, agentKind),
 			ResumeSessionID: resumeID,
 		}, srvrecovery.LaunchPrompt(agentKind, srvrecovery.LaunchSkill(t), launchNote(t, cwd), ticket.String()), startprompt.Hooks{

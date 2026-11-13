@@ -10,6 +10,8 @@ import (
 
 // iterationParams are the per-ticket inputs to an iteration's launch and finish.
 type iterationParams struct {
+	WritableDirectories []string
+
 	WorkspaceID string
 	RepoDir     string
 	// WorktreeDir is the directory this Run call's iteration worktrees live
