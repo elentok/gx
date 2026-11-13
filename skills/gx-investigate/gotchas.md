@@ -83,7 +83,7 @@ archived and renumbered, and the tracker isn't on every machine.
   (formerly `ralphloop/loop.go`) routes a reclaim of a ticket with a still-live tab/pane through
   `reattachIteration`, which deliberately sets `StartEvent=""` (`ralphloop/lifecycle.go`);
   that gates off both the run-log event and `sink().IterationStarted`
-  (`ralphloop/supervise/startandprompt.go`). The UI spinner (`ui/tickets/live_row.go`) and the epic-paused
+  (`ralphloop/supervise/startprompt/startandprompt.go`). The UI spinner (`ui/tickets/live_row.go`) and the epic-paused
   count (in the since-deleted `ui/tickets/loop_registry.go`) both only updated on
   `IterationStarted`/`TicketReattached`/`IterationPaused` events, never recomputing from ticket
   status directly — so a ticket can sit `claimed` with `gx` genuinely still polling it (confirmed
@@ -103,7 +103,7 @@ archived and renumbered, and the tracker isn't on every machine.
   *original* stalled session (`state_change_seq` unchanged since). Not fixed as of this entry.
 - **A `herdr agent prompt agent_prompt_stalled` error leaves a ticket Paused (repair) with no
   `iteration-started` ever logged, and the retry code that exists doesn't cover it.**
-  `iteration-started` is logged only after `AgentPrompt` succeeds (`ralphloop/supervise/startandprompt.go`);
+  `iteration-started` is logged only after `AgentPrompt` succeeds (`ralphloop/supervise/startprompt/startandprompt.go`);
   a failed prompt-send returns before that line ever runs. There's a nudge-retry
   (`promptWithNudge`, `ralphloop/deps/deps.go`) but it only fires when the error text contains
   "timed out" (`isPollTimeout`, `ralphloop/supervise/waitforfinish.go`) — herdr's stalled-prompt

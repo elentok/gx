@@ -20,7 +20,7 @@ func (m QueueModel) View() tea.View {
 		// The checked set can change between Update calls with no queueEpicsLoadedMsg/
 		// clampSelected in between, so this must be re-evaluated on every
 		// render rather than only on the events clampSelected's own doc
-		// comment lists. BuildEntriesCached (queue/rows.go) reuses the
+		// comment lists. BuildEntriesCached (queue/rows/rows.go) reuses the
 		// previous tree when the checked set (among its other inputs) actually
 		// didn't change, rather than always rebuilding from scratch.
 		m.rows.Tree.SetEntries(m.rows.BuildEntriesCached(m.rowsEnv()))

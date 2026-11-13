@@ -123,6 +123,39 @@ func TestQueueModelHLeftEscReturnFocusFromPreview(t *testing.T) {
 	}
 }
 
+// TestQueueModelHAndLCollapseAndExpandParentRow covers the key binding the
+// rows package test can't: "h" on a selected parent row hides its children and
+// "l" brings them back.
+func TestQueueModelHAndLCollapseAndExpandParentRow(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	tickettest.WriteTicket(t, root, "alpha", "01-parent.md", "Status: open\n\nBody.\n")
+	tickettest.WriteRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\n\nBody.\n")
+	tickettest.WriteTicket(t, root, "alpha", "03-other.md", "Status: open\n\nBody.\n")
+
+	checked := map[string]bool{
+		tickettest.TicketPath(root, "alpha", "01-parent.md"): true,
+		tickettest.TicketPath(root, "alpha", "02-child.md"):  true,
+		tickettest.TicketPath(root, "alpha", "03-other.md"):  true,
+	}
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
+	m = selectFirstQueueTicketRow(t, m)
+
+	if got := len(queueTicketEntries(m)); got != 3 {
+		t.Fatalf("expected 3 ticket rows before collapsing, got %d", got)
+	}
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
+	m = updated.(QueueModel)
+	if got := len(queueTicketEntries(m)); got != 2 {
+		t.Fatalf("expected 2 ticket rows after \"h\" on the parent, got %d", got)
+	}
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	m = updated.(QueueModel)
+	if got := len(queueTicketEntries(m)); got != 3 {
+		t.Fatalf("expected 3 ticket rows after \"l\" on the parent, got %d", got)
+	}
+}
+
 // withChecked seeds a local-mode QueueModel's checked set, standing in for
 // the queue a server load would supply.
 func withChecked(m QueueModel, checked map[string]bool) QueueModel {
