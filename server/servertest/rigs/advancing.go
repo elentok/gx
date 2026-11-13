@@ -1,9 +1,10 @@
-package servertest
+package rigs
 
 import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -14,7 +15,7 @@ const CountdownDelay = time.Second
 // auto-advance countdown set to CountdownDelay.
 func StartAdvancing(t *testing.T, store string) *GrillingFixture {
 	t.Helper()
-	h, ctx, evs, id, conv, path := StartGrillingSessionIn(t, "proj:map", store, WithAutoAdvanceDelay(CountdownDelay))
+	h, ctx, evs, id, conv, path := StartGrillingSessionIn(t, "proj:map", store, servertest.WithAutoAdvanceDelay(CountdownDelay))
 	return &GrillingFixture{H: h, Ctx: ctx, Evs: evs, ID: id, Conv: conv, Path: path}
 }
 
@@ -37,7 +38,7 @@ func SessionSnapshot(t *testing.T, f *GrillingFixture) wire.SessionInfo {
 // AutoSends is how many Continues in a row the server sent the fixture session.
 func AutoSends(t *testing.T, f *GrillingFixture) int {
 	t.Helper()
-	n, _ := ReadMeta(t, f.H, f.ID)["auto_sends"].(float64)
+	n, _ := servertest.ReadMeta(t, f.H, f.ID)["auto_sends"].(float64)
 	return int(n)
 }
 

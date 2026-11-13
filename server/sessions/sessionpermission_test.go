@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
@@ -16,12 +17,12 @@ import (
 )
 
 // permissionRead GETs the permission route on the web mux.
-func permissionRead(t *testing.T, f servertest.PromptFixture, id string) (int, string) {
+func permissionRead(t *testing.T, f rigs.PromptFixture, id string) (int, string) {
 	t.Helper()
 	return servertest.WebDoCookie(t, http.MethodGet, f.Base+"/v1/sessions/permission?session="+id, f.Ck)
 }
 
-func wantPermission(t *testing.T, f servertest.PromptFixture, want wire.SessionPermissionResponse) {
+func wantPermission(t *testing.T, f rigs.PromptFixture, want wire.SessionPermissionResponse) {
 	t.Helper()
 	code, body := permissionRead(t, f, f.ID)
 	var got wire.SessionPermissionResponse
@@ -54,7 +55,7 @@ func TestSessionPermission_ClaudeDialogs(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+			f := rigs.StartPromptSession(t, rigs.FirstPromptGrace)
 			f.BlockOn(t, tc.rows)
 			wantPermission(t, f, tc.want)
 		})
@@ -63,7 +64,7 @@ func TestSessionPermission_ClaudeDialogs(t *testing.T) {
 
 func TestSessionPermission_CodexHookRequestGivesItsText(t *testing.T) {
 	t.Parallel()
-	f := servertest.StartCodexPermissionSession(t, false)
+	f := rigs.StartCodexPermissionSession(t, false)
 	dir := filepath.Join(f.H.SessionsDir, f.ID)
 	if err := holder.WritePermissionRequest(dir, holder.PermissionRequest{ID: "req-1", Tool: "Bash", Description: "rg foo"}); err != nil {
 		t.Fatal(err)
@@ -74,7 +75,7 @@ func TestSessionPermission_CodexHookRequestGivesItsText(t *testing.T) {
 
 func TestSessionPermission_CodexScreenOnly(t *testing.T) {
 	t.Parallel()
-	f := servertest.StartCodexPermissionSession(t, true)
+	f := rigs.StartCodexPermissionSession(t, true)
 	f.BlockCodex(t, "rg foo")
 	code, body := permissionRead(t, f, f.ID)
 	var got wire.SessionPermissionResponse
@@ -88,8 +89,8 @@ func TestSessionPermission_CodexScreenOnly(t *testing.T) {
 
 func TestSessionPermission_Refusals(t *testing.T) {
 	t.Parallel()
-	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
-	servertest.SeedSession(t, f, "seeded-exited", wire.SessionExited)
+	f := rigs.StartPromptSession(t, rigs.FirstPromptGrace)
+	rigs.SeedSession(t, f, "seeded-exited", wire.SessionExited)
 	for name, tc := range map[string]struct{ id, want string }{
 		"not blocked": {f.ID, wire.ReasonNotBlocked},
 		"exited":      {"seeded-exited", wire.ReasonSessionNotLive},
@@ -106,7 +107,7 @@ func TestSessionPermission_Refusals(t *testing.T) {
 
 func TestSessionPermission_QueueAgentIsReadOnly(t *testing.T) {
 	t.Parallel()
-	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	f := rigs.StartPromptSession(t, rigs.FirstPromptGrace)
 	code, body := permissionRead(t, f, "queue-agent-x")
 	if code == http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonSessionReadOnly {
 		t.Errorf("permission = %d %s, want refusal %s", code, body, wire.ReasonSessionReadOnly)

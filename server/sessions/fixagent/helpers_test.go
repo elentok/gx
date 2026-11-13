@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
@@ -21,7 +22,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-const repairToken = servertest.RepairToken
+const repairToken = rigs.RepairToken
 
 var (
 	readMeta        = servertest.ReadMeta
@@ -42,13 +43,13 @@ type designsFixture struct {
 // the web mux up.
 func startDesignsIn(t *testing.T, store string, opts ...func(*server.Config)) designsFixture {
 	t.Helper()
-	d := servertest.StartDesignsIn(t, store, opts...)
+	d := rigs.StartDesignsIn(t, store, opts...)
 	return designsFixture{h: d.H, ctx: d.Ctx, evs: d.Evs, repo: d.Repo, base: d.Base, ck: d.Ck}
 }
 
 // shared is the servertest fixture the shared methods run on.
-func (f designsFixture) shared() servertest.DesignsFixture {
-	return servertest.DesignsFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, Repo: f.repo, Base: f.base, Ck: f.ck}
+func (f designsFixture) shared() rigs.DesignsFixture {
+	return rigs.DesignsFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, Repo: f.repo, Base: f.base, Ck: f.ck}
 }
 
 func (f designsFixture) live(t *testing.T) []wire.SessionInfo {

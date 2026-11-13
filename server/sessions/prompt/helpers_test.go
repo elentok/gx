@@ -2,9 +2,10 @@ package prompt_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"testing"
+
+	"github.com/elentok/gx/server/servertest/rigs"
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -13,11 +14,11 @@ import (
 // Aliases for the helpers that live in servertest, so the callers here keep
 // their short names.
 const (
-	runEndText     = servertest.RunEndText
-	countdownDelay = servertest.CountdownDelay
+	runEndText     = rigs.RunEndText
+	countdownDelay = rigs.CountdownDelay
 )
 
-type grillingFixture = servertest.GrillingFixture
+type grillingFixture = rigs.GrillingFixture
 
 var (
 	readMeta               = servertest.ReadMeta
@@ -27,20 +28,20 @@ var (
 	waitForScreen          = servertest.WaitForScreen
 	waitForSession         = servertest.WaitForSession
 	waitUntil              = servertest.WaitUntil
-	storeWithMapStep       = servertest.StoreWithMapStep
-	writeAssistantMessage  = servertest.WriteAssistantMessage
-	clearByInput           = servertest.ClearByInput
-	startAdvancing         = servertest.StartAdvancing
-	endTurn                = servertest.EndTurn
-	sessionSnapshot        = servertest.SessionSnapshot
-	autoSends              = servertest.AutoSends
+	storeWithMapStep       = rigs.StoreWithMapStep
+	writeAssistantMessage  = rigs.WriteAssistantMessage
+	clearByInput           = rigs.ClearByInput
+	startAdvancing         = rigs.StartAdvancing
+	endTurn                = rigs.EndTurn
+	sessionSnapshot        = rigs.SessionSnapshot
+	autoSends              = rigs.AutoSends
 	startWebDesign         = rigs.StartWebDesign
 	webSessionWrite        = rigs.WebSessionWrite
 	sessionToken           = rigs.SessionToken
 	startFakeSession       = servertest.StartFakeSession
 	idleWithAction         = servertest.IdleWithAction
 	startFakeSessionWith   = servertest.StartFakeSessionWith
-	startGrillingSessionIn = servertest.StartGrillingSessionIn
+	startGrillingSessionIn = rigs.StartGrillingSessionIn
 	submitted              = servertest.Submitted
 	waitForSubmitted       = servertest.WaitForSubmitted
 	waitAlerts             = servertest.WaitAlerts
@@ -48,7 +49,7 @@ var (
 	writeTranscript        = servertest.WriteTranscript
 )
 
-// designsFixture wraps servertest.DesignsFixture with lower-case fields.
+// designsFixture wraps rigs.DesignsFixture with lower-case fields.
 type designsFixture struct {
 	h    *servertest.Harness
 	ctx  context.Context
@@ -58,13 +59,13 @@ type designsFixture struct {
 	ck   *http.Cookie
 }
 
-func fromShared(d servertest.DesignsFixture) designsFixture {
+func fromShared(d rigs.DesignsFixture) designsFixture {
 	return designsFixture{h: d.H, ctx: d.Ctx, evs: d.Evs, repo: d.Repo, base: d.Base, ck: d.Ck}
 }
 
 // shared is the servertest fixture the shared methods run on.
-func (f designsFixture) shared() servertest.DesignsFixture {
-	return servertest.DesignsFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, Repo: f.repo, Base: f.base, Ck: f.ck}
+func (f designsFixture) shared() rigs.DesignsFixture {
+	return rigs.DesignsFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, Repo: f.repo, Base: f.base, Ck: f.ck}
 }
 
 func (f promptFixture) answer(t *testing.T, req wire.SessionAnswerRequest) wire.SessionResult {

@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 )
 
-func bugsMembers(ctx context.Context, f servertest.DesignsFixture) int {
+func bugsMembers(ctx context.Context, f rigs.DesignsFixture) int {
 	l, _ := f.H.Client.Reads.Workspaces(ctx)
 	for _, w := range l.Workspaces {
 		if w.Name == "Bugs" {
@@ -21,14 +22,14 @@ func bugsMembers(ctx context.Context, f servertest.DesignsFixture) int {
 	return -1
 }
 
-func moveToBugs(t *testing.T, f servertest.DesignsFixture, key string) {
+func moveToBugs(t *testing.T, f rigs.DesignsFixture, key string) {
 	t.Helper()
 	if res, err := f.H.Client.Admin.MoveToWorkspace(f.Ctx, "Bugs", key); err != nil || res.Results[0].Refused() {
 		t.Fatalf("move %s = %+v, %v", key, res, err)
 	}
 }
 
-func newChat(t *testing.T, f servertest.DesignsFixture) string {
+func newChat(t *testing.T, f rigs.DesignsFixture) string {
 	t.Helper()
 	chat, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir()})
 	if err != nil || chat.Session == nil {
@@ -78,7 +79,7 @@ func TestWorkspacesCleanup_AFinishedEpicKeepsItsMembership(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteCompleteEpic(t, store, "done-epic")
 	servertest.WriteTicket(t, store, "proj", "gone", "01", "first", "")
-	f := servertest.StartDesignsIn(t, store)
+	f := rigs.StartDesignsIn(t, store)
 	if _, err := f.H.Client.Admin.CreateWorkspace(f.Ctx, "Bugs"); err != nil {
 		t.Fatal(err)
 	}

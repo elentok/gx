@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -100,7 +101,7 @@ func TestSessionKeysSettle(t *testing.T) {
 
 	t.Run("CodexSessionReturnsRows", func(t *testing.T) {
 		t.Parallel()
-		f := servertest.StartCodexPromptSession(t)
+		f := rigs.StartCodexPromptSession(t)
 		res := f.Keys(t, wire.SessionKeysRequest{Text: "codex-text", Settle: true})
 		if res.Refused || len(res.Rows) == 0 {
 			t.Errorf("result = %+v, want rows", res)

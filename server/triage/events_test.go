@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/herdrfake"
 	triagerec "github.com/elentok/gx/triage"
@@ -23,7 +24,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func nextTriageEvent(t *testing.T, f servertest.DesignsFixture) wire.Event {
+func nextTriageEvent(t *testing.T, f rigs.DesignsFixture) wire.Event {
 	t.Helper()
 	timeout := time.After(10 * time.Second)
 	for {
@@ -38,11 +39,11 @@ func nextTriageEvent(t *testing.T, f servertest.DesignsFixture) wire.Event {
 	}
 }
 
-func startFixture(t *testing.T) (servertest.DesignsFixture, *triagerec.Store) {
+func startFixture(t *testing.T) (rigs.DesignsFixture, *triagerec.Store) {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "plain", "01", "first", servertest.TicketOpts{})
-	f := servertest.StartDesignsIn(t, store)
+	f := rigs.StartDesignsIn(t, store)
 	return f, triagerec.NewStore(filepath.Join(store, "proj"))
 }
 

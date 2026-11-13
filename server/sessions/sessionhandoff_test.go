@@ -2,16 +2,15 @@ package sessions_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -71,7 +70,7 @@ func TestChartingHandoff_AutoAdvanceRestartsUnderWorkerArgs(t *testing.T) {
 	f := startHandoff(t, "chart", servertest.WithAutoAdvanceDelay(200*time.Millisecond))
 	setMapStep(t, f.store, "resolve-tickets")
 	writeAssistantMessage(t, filepath.Join(f.cfg, "projects", "-repo", f.conv+".jsonl"), runEndText)
-	servertest.EndTurn(t, &servertest.GrillingFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, ID: f.id, Conv: f.conv})
+	rigs.EndTurn(t, &rigs.GrillingFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, ID: f.id, Conv: f.conv})
 	f.wantRestartedOnWorker(t)
 }
 

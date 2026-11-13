@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 )
 
 // Seam: with every cap at 1 a live design session holds no slot, so a queued
@@ -17,7 +18,7 @@ import (
 func TestDesignSession_TakesNoSlotAndIsOutsideTheQueueViews(t *testing.T) {
 	t.Parallel()
 	fake := servertest.NewHeadlessFake(nativerunner.VerdictLive)
-	f := servertest.StartDesigns(t, servertest.WithRunner(fake), func(c *server.Config) {
+	f := rigs.StartDesigns(t, servertest.WithRunner(fake), func(c *server.Config) {
 		c.BudgetPollInterval = time.Hour
 		c.MaxAgents = 1
 		c.MaxAgentsPerRoot = 1

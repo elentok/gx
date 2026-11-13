@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server/servertest"
@@ -22,7 +23,7 @@ const (
 // arguments the helpers here take.
 func designPromptSession(t *testing.T) (*servertest.Harness, context.Context, <-chan wire.Event, string, string, string) {
 	t.Helper()
-	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	f := rigs.StartPromptSession(t, rigs.FirstPromptGrace)
 	return f.H, f.Ctx, f.Evs, f.ID, f.Conv, f.Transcript
 }
 

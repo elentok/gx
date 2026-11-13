@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/testutil/agentfake"
@@ -12,7 +13,7 @@ import (
 
 func TestSessionAutoQueue_FlipsTheSwitchAndKeepsItAcrossARestart(t *testing.T) {
 	t.Parallel()
-	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	f := rigs.StartPromptSession(t, rigs.FirstPromptGrace)
 	snapshotSwitch := func() wire.SessionInfo {
 		snap, err := f.H.Client.Snapshot(f.Ctx)
 		if err != nil {
@@ -46,7 +47,7 @@ func TestSessionAutoQueue_FlipsTheSwitchAndKeepsItAcrossARestart(t *testing.T) {
 
 func TestSessionAutoQueue_RefusesAPlainAndAnUnknownSession(t *testing.T) {
 	t.Parallel()
-	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	f := rigs.StartPromptSession(t, rigs.FirstPromptGrace)
 	plain, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || plain.Session == nil {
 		t.Fatalf("create = %+v, %v", plain, err)

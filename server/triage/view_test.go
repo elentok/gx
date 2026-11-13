@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/triage"
 	"github.com/elentok/gx/server/wire"
 	triagerec "github.com/elentok/gx/triage"
@@ -18,16 +19,16 @@ const (
 	addrB = "proj:follow-ups/02"
 )
 
-func startViewFixture(t *testing.T) (servertest.DesignsFixture, *triagerec.Store) {
+func startViewFixture(t *testing.T) (rigs.DesignsFixture, *triagerec.Store) {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "follow-ups", "01", "first", servertest.TicketOpts{})
 	servertest.WriteTicketWith(t, store, "proj", "follow-ups", "02", "second", servertest.TicketOpts{})
-	f := servertest.StartDesignsIn(t, store)
+	f := rigs.StartDesignsIn(t, store)
 	return f, triagerec.NewStore(filepath.Join(store, "proj"))
 }
 
-func show(t *testing.T, f servertest.DesignsFixture) wire.TriageView {
+func show(t *testing.T, f rigs.DesignsFixture) wire.TriageView {
 	t.Helper()
 	v, err := f.H.Client.Triage.Show(f.Ctx, "proj")
 	if err != nil {

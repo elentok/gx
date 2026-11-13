@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
@@ -27,7 +28,7 @@ func startPair(t *testing.T, step string, noImpl bool, opts ...func(*server.Conf
 	if !noImpl {
 		servertest.WriteCompleteEpic(t, store, "foo-impl")
 	}
-	return rig{servertest.StartDesignsIn(t, store, opts...), store}
+	return rig{rigs.StartDesignsIn(t, store, opts...), store}
 }
 
 func TestArchiveDesign_PairArchivesAsOneRow(t *testing.T) {

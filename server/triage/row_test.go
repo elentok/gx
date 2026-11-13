@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	triagerec "github.com/elentok/gx/triage"
 )
@@ -30,7 +31,7 @@ func toApprove(t *testing.T, store *triagerec.Store) (*triagerec.Record, string,
 	return rec, a, b
 }
 
-func saveRow(t *testing.T, f servertest.DesignsFixture, req wire.TriageRowRequest) wire.TriageEditResult {
+func saveRow(t *testing.T, f rigs.DesignsFixture, req wire.TriageRowRequest) wire.TriageEditResult {
 	t.Helper()
 	req.Project = "proj"
 	res, err := f.H.Client.Triage.SaveRow(f.Ctx, req)
@@ -283,7 +284,7 @@ func TestAbandon_AtPlanEndsSessionAndMovesToHistoryWithoutTouchingTickets(t *tes
 	root := t.TempDir()
 	servertest.WriteTicketWith(t, root, "proj", "follow-ups", "01", "first", servertest.TicketOpts{})
 	servertest.WriteTicketWith(t, root, "proj", "follow-ups", "02", "second", servertest.TicketOpts{})
-	f := servertest.StartDesignsIn(t, root)
+	f := rigs.StartDesignsIn(t, root)
 	store := triagerec.NewStore(filepath.Join(root, "proj"))
 	sess := openTriage(t, f, wire.TriageOpenRequest{Project: "proj"}).Session
 	servertest.WaitForHolder(t, filepath.Join(f.H.SessionsDir, sess.ID))

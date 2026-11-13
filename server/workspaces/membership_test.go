@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/tickets"
@@ -17,7 +18,7 @@ import (
 
 // startMembership seeds a Design (map + map-impl), a plain epic, a one-offs
 // epic and a follow-ups epic in project proj.
-func startMembership(t *testing.T) (servertest.DesignsFixture, context.Context) {
+func startMembership(t *testing.T) (rigs.DesignsFixture, context.Context) {
 	t.Helper()
 	store := t.TempDir()
 	for _, epic := range []string{"map", "map-impl", "plain", "one-offs", "follow-ups"} {
@@ -26,7 +27,7 @@ func startMembership(t *testing.T) (servertest.DesignsFixture, context.Context) 
 	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	f := servertest.StartDesignsIn(t, store)
+	f := rigs.StartDesignsIn(t, store)
 	if _, err := f.H.Client.Admin.CreateWorkspace(f.Ctx, "Bugs"); err != nil {
 		t.Fatal(err)
 	}

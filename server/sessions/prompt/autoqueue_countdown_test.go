@@ -8,31 +8,32 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 )
 
 // startReadyMap starts a Design session on proj:map with its impl epic
 // ready to be queued, and a countdown delay set.
-func startReadyMap(t *testing.T, c mapCase) (*servertest.GrillingFixture, string) {
+func startReadyMap(t *testing.T, c mapCase) (*rigs.GrillingFixture, string) {
 	t.Helper()
 	store := t.TempDir()
 	c.name = "map"
 	writeMapCase(t, store, c)
-	return servertest.StartAdvancing(t, store), store
+	return rigs.StartAdvancing(t, store), store
 }
 
-func setAutoQueue(t *testing.T, f *servertest.GrillingFixture, on bool) {
+func setAutoQueue(t *testing.T, f *rigs.GrillingFixture, on bool) {
 	t.Helper()
 	if res, err := f.H.Client.Sessions.SetAutoQueue(f.Ctx, f.ID, on); err != nil || res.Refused {
 		t.Fatalf("set auto-queue %v = %+v, %v", on, res, err)
 	}
 }
 
-func queued(f *servertest.GrillingFixture) bool {
+func queued(f *rigs.GrillingFixture) bool {
 	return strings.Contains(queueText(f), "map-impl")
 }
 
-func queueText(f *servertest.GrillingFixture) string {
+func queueText(f *rigs.GrillingFixture) string {
 	items, err := f.H.Client.Queue.Items(f.Ctx)
 	if err != nil {
 		return ""
@@ -44,7 +45,7 @@ func queueText(f *servertest.GrillingFixture) string {
 	return strings.Join(addrs, "\n")
 }
 
-func waitForBanner(t *testing.T, f *servertest.GrillingFixture, want string) {
+func waitForBanner(t *testing.T, f *rigs.GrillingFixture, want string) {
 	t.Helper()
 	if !servertest.Poll(5*time.Second, func() bool {
 		for _, b := range f.H.Banners.Sent() {
@@ -63,9 +64,9 @@ func TestAutoQueue_SwitchOnOverAReadyMapCountsDownThenQueues(t *testing.T) {
 	f, _ := startReadyMap(t, mapCase{step: "branch", implStatus: "open", base: "other"})
 	before := time.Now()
 	setAutoQueue(t, f, true)
-	got := servertest.SessionSnapshot(t, f)
-	if got.AutoQueueAt == nil || got.AutoQueueAt.Before(before.Add(servertest.CountdownDelay-time.Millisecond)) || got.AutoQueueAt.After(time.Now().Add(servertest.CountdownDelay)) {
-		t.Fatalf("auto_queue_at = %v, want about %v after the switch", got.AutoQueueAt, servertest.CountdownDelay)
+	got := rigs.SessionSnapshot(t, f)
+	if got.AutoQueueAt == nil || got.AutoQueueAt.Before(before.Add(rigs.CountdownDelay-time.Millisecond)) || got.AutoQueueAt.After(time.Now().Add(rigs.CountdownDelay)) {
+		t.Fatalf("auto_queue_at = %v, want about %v after the switch", got.AutoQueueAt, rigs.CountdownDelay)
 	}
 	if queued(f) {
 		t.Fatal("queued before the countdown ended")
@@ -98,10 +99,10 @@ func TestAutoQueue_SwitchOnOverANotReadyOrHeldMapStartsNothing(t *testing.T) {
 				}
 			}
 			setAutoQueue(t, f, true)
-			if got := servertest.SessionSnapshot(t, f); got.AutoQueueAt != nil || !got.AutoQueue {
+			if got := rigs.SessionSnapshot(t, f); got.AutoQueueAt != nil || !got.AutoQueue {
 				t.Errorf("session = switch %v at %v, want the switch on with no countdown", got.AutoQueue, got.AutoQueueAt)
 			}
-			time.Sleep(servertest.CountdownDelay + 500*time.Millisecond)
+			time.Sleep(rigs.CountdownDelay + 500*time.Millisecond)
 			if queued(f) || len(f.H.Banners.Sent()) != 0 {
 				t.Errorf("queued = %v, banners = %+v, want neither", queued(f), f.H.Banners.Sent())
 			}
@@ -112,21 +113,21 @@ func TestAutoQueue_SwitchOnOverANotReadyOrHeldMapStartsNothing(t *testing.T) {
 func TestAutoQueue_ConditionsFailingDuringTheCountdownQueueNothingAndSendABanner(t *testing.T) {
 	t.Parallel()
 	for name, c := range map[string]struct {
-		change func(t *testing.T, f *servertest.GrillingFixture, store string)
+		change func(t *testing.T, f *rigs.GrillingFixture, store string)
 		want   string
 	}{
-		"draft": {want: "is a draft", change: func(t *testing.T, _ *servertest.GrillingFixture, store string) {
+		"draft": {want: "is a draft", change: func(t *testing.T, _ *rigs.GrillingFixture, store string) {
 			md := "---\nstatus: draft\n---\n\n# map-impl\n"
 			if err := os.WriteFile(filepath.Join(store, "proj", "map-impl", "ticket.md"), []byte(md), 0o644); err != nil {
 				t.Fatal(err)
 			}
 		}},
-		"queued by hand": {want: "already queued", change: func(t *testing.T, f *servertest.GrillingFixture, _ string) {
+		"queued by hand": {want: "already queued", change: func(t *testing.T, f *rigs.GrillingFixture, _ string) {
 			if res, err := f.H.Server.Prompt().QueueEpic("proj", "map-impl"); err != nil || res.Refused {
 				t.Fatalf("queue = %+v, %v", res, err)
 			}
 		}},
-		"design held": {want: "held", change: func(t *testing.T, f *servertest.GrillingFixture, _ string) {
+		"design held": {want: "held", change: func(t *testing.T, f *rigs.GrillingFixture, _ string) {
 			if err := f.H.Server.Workspaces().Hold("proj:map"); err != nil {
 				t.Fatal(err)
 			}
@@ -150,16 +151,16 @@ func TestAutoQueue_ConditionsFailingDuringTheCountdownQueueNothingAndSendABanner
 func TestAutoQueue_SwitchOffOrCancelStopsTheCountdownWithABanner(t *testing.T) {
 	t.Parallel()
 	for name, c := range map[string]struct {
-		stop       func(t *testing.T, f *servertest.GrillingFixture)
+		stop       func(t *testing.T, f *rigs.GrillingFixture)
 		wantSwitch bool
 		banner     string
 	}{
 		"switch off": {
-			stop:   func(t *testing.T, f *servertest.GrillingFixture) { setAutoQueue(t, f, false) },
+			stop:   func(t *testing.T, f *rigs.GrillingFixture) { setAutoQueue(t, f, false) },
 			banner: "Auto-queue switched off",
 		},
 		"cancel": {
-			stop: func(t *testing.T, f *servertest.GrillingFixture) {
+			stop: func(t *testing.T, f *rigs.GrillingFixture) {
 				if res, err := f.H.Client.Sessions.CancelAutoQueue(f.Ctx, f.ID); err != nil || res.Refused {
 					t.Fatalf("cancel = %+v, %v", res, err)
 				}
@@ -172,15 +173,15 @@ func TestAutoQueue_SwitchOffOrCancelStopsTheCountdownWithABanner(t *testing.T) {
 			t.Parallel()
 			f, _ := startReadyMap(t, mapCase{step: "branch", implStatus: "open"})
 			setAutoQueue(t, f, true)
-			if servertest.SessionSnapshot(t, f).AutoQueueAt == nil {
+			if rigs.SessionSnapshot(t, f).AutoQueueAt == nil {
 				t.Fatal("no countdown running")
 			}
 			c.stop(t, f)
-			if got := servertest.SessionSnapshot(t, f); got.AutoQueueAt != nil || got.AutoQueue != c.wantSwitch {
+			if got := rigs.SessionSnapshot(t, f); got.AutoQueueAt != nil || got.AutoQueue != c.wantSwitch {
 				t.Errorf("session = switch %v at %v, want switch %v with no countdown", got.AutoQueue, got.AutoQueueAt, c.wantSwitch)
 			}
 			waitForBanner(t, f, c.banner)
-			time.Sleep(servertest.CountdownDelay + 500*time.Millisecond)
+			time.Sleep(rigs.CountdownDelay + 500*time.Millisecond)
 			if queued(f) {
 				t.Error("queued after the countdown was stopped")
 			}
@@ -215,27 +216,27 @@ func TestAutoQueue_CancelLeavesAutoAdvanceAndAutoAdvanceCancelLeavesAutoQueue(t 
 		t.Fatal("the map never became ready")
 	}
 	prompt.DesignReachedBranch("proj", "map")
-	if got := servertest.SessionSnapshot(t, f); got.AutoAdvanceAt == nil || got.AutoQueueAt == nil {
+	if got := rigs.SessionSnapshot(t, f); got.AutoAdvanceAt == nil || got.AutoQueueAt == nil {
 		t.Fatalf("countdowns: advance at %v, queue at %v, want both running", got.AutoAdvanceAt, got.AutoQueueAt)
 	}
 
 	if res, err := f.H.Client.Sessions.CancelAutoQueue(f.Ctx, f.ID); err != nil || res.Refused {
 		t.Fatalf("cancel auto-queue = %+v, %v", res, err)
 	}
-	got := servertest.SessionSnapshot(t, f)
+	got := rigs.SessionSnapshot(t, f)
 	if got.AutoQueueAt != nil || got.AutoAdvanceAt == nil {
 		t.Fatalf("after cancelling auto-queue: queue at %v, advance at %v, want only advance running", got.AutoQueueAt, got.AutoAdvanceAt)
 	}
 
 	setAutoQueue(t, f, false)
 	setAutoQueue(t, f, true)
-	if servertest.SessionSnapshot(t, f).AutoQueueAt == nil {
+	if rigs.SessionSnapshot(t, f).AutoQueueAt == nil {
 		t.Fatal("no auto-queue countdown after switching it back on")
 	}
 	if res, err := f.H.Client.Sessions.CancelAutoAdvance(f.Ctx, f.ID); err != nil || res.Refused {
 		t.Fatalf("cancel auto-advance = %+v, %v", res, err)
 	}
-	got = servertest.SessionSnapshot(t, f)
+	got = rigs.SessionSnapshot(t, f)
 	if got.AutoAdvanceAt != nil || got.AutoQueueAt == nil {
 		t.Errorf("after cancelling auto-advance: queue at %v, advance at %v, want only queue running", got.AutoQueueAt, got.AutoAdvanceAt)
 	}
@@ -243,15 +244,15 @@ func TestAutoQueue_CancelLeavesAutoAdvanceAndAutoAdvanceCancelLeavesAutoQueue(t 
 
 func TestAutoQueue_SwitchOffLeavesAutoAdvanceCountingDown(t *testing.T) {
 	t.Parallel()
-	store := servertest.StoreWithMapStep(t, "spec")
-	f := servertest.StartAdvancing(t, store)
+	store := rigs.StoreWithMapStep(t, "spec")
+	f := rigs.StartAdvancing(t, store)
 	writeAssistantMessage(t, f.Path, runEndText)
 	endTurn(t, f)
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
-	servertest.SessionSnapshot(t, f)
+	rigs.SessionSnapshot(t, f)
 	setAutoQueue(t, f, true)
 	setAutoQueue(t, f, false)
-	got := servertest.SessionSnapshot(t, f)
+	got := rigs.SessionSnapshot(t, f)
 	if got.AutoAdvanceAt == nil {
 		t.Errorf("auto_advance_at cleared by switching auto-queue off: %+v", got)
 	}
@@ -262,7 +263,7 @@ func TestAutoQueue_ARestartDropsTheCountdownAndKeepsTheSwitch(t *testing.T) {
 	f, _ := startReadyMap(t, mapCase{step: "branch", implStatus: "open"})
 	setAutoQueue(t, f, true)
 	f.H.Restart(t)
-	got := servertest.SessionSnapshot(t, f)
+	got := rigs.SessionSnapshot(t, f)
 	if !got.AutoQueue || got.AutoQueueAt != nil {
 		t.Errorf("after restart switch = %v at %v, want on with no countdown", got.AutoQueue, got.AutoQueueAt)
 	}

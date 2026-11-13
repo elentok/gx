@@ -7,12 +7,13 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 )
 
 // moveMapToBranch rewrites the map's step through the store, then rescans. A
 // ping first makes the server see the old step, so the move is a transition and
 // not a first sight.
-func moveMapToBranch(t *testing.T, f *servertest.GrillingFixture, store string) {
+func moveMapToBranch(t *testing.T, f *rigs.GrillingFixture, store string) {
 	t.Helper()
 	if err := f.H.Client.Tickets.Changed(f.Ctx, "proj:map"); err != nil {
 		t.Fatal(err)
@@ -26,10 +27,10 @@ func moveMapToBranch(t *testing.T, f *servertest.GrillingFixture, store string) 
 	}
 }
 
-func noCountdownFor(t *testing.T, f *servertest.GrillingFixture) {
+func noCountdownFor(t *testing.T, f *rigs.GrillingFixture) {
 	t.Helper()
-	time.Sleep(servertest.CountdownDelay + 500*time.Millisecond) // negative wait: nothing marks a countdown that must not start
-	if got := servertest.SessionSnapshot(t, f); got.AutoQueueAt != nil {
+	time.Sleep(rigs.CountdownDelay + 500*time.Millisecond) // negative wait: nothing marks a countdown that must not start
+	if got := rigs.SessionSnapshot(t, f); got.AutoQueueAt != nil {
 		t.Errorf("auto_queue_at = %v, want no countdown", got.AutoQueueAt)
 	}
 	if queued(f) || len(f.H.Banners.Sent()) != 0 {
@@ -42,7 +43,7 @@ func TestAutoQueueTrigger_ReachingBranchWithTheSwitchOnCountsDownThenQueues(t *t
 	f, store := startReadyMap(t, mapCase{step: "spec", implStatus: "open", base: "other"})
 	setAutoQueue(t, f, true)
 	moveMapToBranch(t, f, store)
-	if !servertest.Poll(5*time.Second, func() bool { return servertest.SessionSnapshot(t, f).AutoQueueAt != nil }) {
+	if !servertest.Poll(5*time.Second, func() bool { return rigs.SessionSnapshot(t, f).AutoQueueAt != nil }) {
 		t.Fatal("no countdown after the map reached Branch")
 	}
 	if !servertest.Poll(5*time.Second, func() bool { return queued(f) }) {
@@ -65,8 +66,8 @@ func TestAutoQueueTrigger_AnAlreadyQueuedEpicStartsNoCountdown(t *testing.T) {
 		t.Fatalf("queue = %+v, %v", res, err)
 	}
 	moveMapToBranch(t, f, store)
-	time.Sleep(servertest.CountdownDelay + 500*time.Millisecond) // negative wait
-	if got := servertest.SessionSnapshot(t, f); got.AutoQueueAt != nil {
+	time.Sleep(rigs.CountdownDelay + 500*time.Millisecond) // negative wait
+	if got := rigs.SessionSnapshot(t, f); got.AutoQueueAt != nil {
 		t.Errorf("auto_queue_at = %v, want no countdown", got.AutoQueueAt)
 	}
 	if len(f.H.Banners.Sent()) != 0 {

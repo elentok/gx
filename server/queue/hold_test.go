@@ -21,7 +21,7 @@ func TestQueueAdd_ClearsTheHoldOfAHeldEpic(t *testing.T) {
 		t.Fatal(err)
 	}
 	rigs.WriteEpicFiles(t, store, "map-impl", "---\nstatus: open\n---\n", map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
-	f := servertest.StartDesignsIn(t, store)
+	f := rigs.StartDesignsIn(t, store)
 
 	for _, addr := range []string{"proj:plain", "proj:other", "proj:map"} {
 		if res, err := f.H.Client.Admin.HoldEpics(f.Ctx, []string{addr}, true, false); err != nil || res.Results[0].Refused() {

@@ -7,12 +7,13 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/triage"
 	"github.com/elentok/gx/server/wire"
 	triagerec "github.com/elentok/gx/triage"
 )
 
-func openTriage(t *testing.T, f servertest.DesignsFixture, req wire.TriageOpenRequest) wire.SessionResult {
+func openTriage(t *testing.T, f rigs.DesignsFixture, req wire.TriageOpenRequest) wire.SessionResult {
 	t.Helper()
 	res, err := f.H.Client.Triage.Open(f.Ctx, req)
 	if err != nil {
@@ -154,7 +155,7 @@ func TestOpen_RefusesAtApprove(t *testing.T) {
 func TestOpen_RefusesWithNoOpenFollowUp(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "follow-ups", "01", "done one", servertest.TicketOpts{Status: "done"})
-	f := servertest.StartDesignsIn(t, store)
+	f := rigs.StartDesignsIn(t, store)
 	res := openTriage(t, f, wire.TriageOpenRequest{Project: "proj"})
 	if !res.Refused || res.Reason != wire.ReasonTriageNoFollowUps {
 		t.Fatalf("open = %+v, want %s", res, wire.ReasonTriageNoFollowUps)

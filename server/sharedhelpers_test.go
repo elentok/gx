@@ -14,8 +14,8 @@ const (
 	apiError401          = rigs.APIError401
 	reply                = rigs.Reply
 	turnDurationLine     = servertest.TurnDurationLine
-	runEndText           = servertest.RunEndText
-	repairToken          = servertest.RepairToken
+	runEndText           = rigs.RunEndText
+	repairToken          = rigs.RepairToken
 	holderLabel          = servertest.HolderLabel
 	investigateAddr      = servertest.InvestigateAddr
 	answerAddr           = servertest.AnswerAddr
@@ -115,10 +115,10 @@ var (
 	reportFocus            = servertest.ReportFocus
 	screenHas              = servertest.ScreenHas
 	waitForScreen          = servertest.WaitForScreen
-	startGrillingSessionIn = servertest.StartGrillingSessionIn
-	storeWithMapStep       = servertest.StoreWithMapStep
-	writeAssistantMessage  = servertest.WriteAssistantMessage
-	clearByInput           = servertest.ClearByInput
+	startGrillingSessionIn = rigs.StartGrillingSessionIn
+	storeWithMapStep       = rigs.StoreWithMapStep
+	writeAssistantMessage  = rigs.WriteAssistantMessage
+	clearByInput           = rigs.ClearByInput
 	startWebDesign         = rigs.StartWebDesign
 	sessionToken           = rigs.SessionToken
 	webSessionWrite        = rigs.WebSessionWrite

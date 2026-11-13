@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	triagerec "github.com/elentok/gx/triage"
 )
@@ -13,7 +13,7 @@ func approveReq(rec *triagerec.Record) wire.TriageApproveRequest {
 	return wire.TriageApproveRequest{Project: "proj", Revision: rec.Revision}
 }
 
-func approve(t *testing.T, f servertest.DesignsFixture, req wire.TriageApproveRequest) wire.TriageEditResult {
+func approve(t *testing.T, f rigs.DesignsFixture, req wire.TriageApproveRequest) wire.TriageEditResult {
 	t.Helper()
 	res, err := f.H.Client.Triage.Approve(f.Ctx, req)
 	if err != nil {
@@ -118,7 +118,7 @@ func TestApprove_WebAndChatPathRaceToOneWinner(t *testing.T) {
 	}
 }
 
-func rowAction(t *testing.T, f servertest.DesignsFixture, keep bool, rec *triagerec.Record, addr string) wire.TriageEditResult {
+func rowAction(t *testing.T, f rigs.DesignsFixture, keep bool, rec *triagerec.Record, addr string) wire.TriageEditResult {
 	t.Helper()
 	req := wire.TriageRowActionRequest{Project: "proj", Revision: rec.Revision, Address: addr}
 	call := f.H.Client.Triage.Retry
@@ -180,7 +180,7 @@ func TestKeep_LastOpenRowWithLastPassCompleteMakesTheTriageDone(t *testing.T) {
 	}
 }
 
-func sendBack(t *testing.T, f servertest.DesignsFixture, rec *triagerec.Record) wire.TriageEditResult {
+func sendBack(t *testing.T, f rigs.DesignsFixture, rec *triagerec.Record) wire.TriageEditResult {
 	t.Helper()
 	res, err := f.H.Client.Triage.SendBack(f.Ctx, wire.TriageSendBackRequest{Project: "proj", Revision: rec.Revision})
 	if err != nil {

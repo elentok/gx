@@ -20,7 +20,7 @@ import (
 // questionRig is an idle Design session whose server chats to a recording
 // Slack hook.
 type questionRig struct {
-	f       servertest.PromptFixture
+	f       rigs.PromptFixture
 	chat    *rigs.SlackHook
 	started int
 	gate    string
@@ -30,7 +30,7 @@ func startQuestionRig(t *testing.T, afk bool) *questionRig {
 	t.Helper()
 	chat := rigs.NewSlackHook(t)
 	gate := filepath.Join(t.TempDir(), "gate.json")
-	f := servertest.StartPromptSessionWith(t, servertest.FirstPromptGrace, servertest.WithAlerts(true, false), func(c *server.Config) {
+	f := rigs.StartPromptSessionWith(t, rigs.FirstPromptGrace, servertest.WithAlerts(true, false), func(c *server.Config) {
 		c.Chat = notify.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: gate, FlushInterval: servertest.FlushInterval}
 	})
 	started := chat.WaitStarted(t)

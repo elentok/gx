@@ -14,7 +14,7 @@ import (
 
 // holdFixture is a Design proj:map with a ready, unqueued proj:map-impl, and a
 // plain loop epic proj:plain.
-func holdFixture(t *testing.T) servertest.DesignsFixture {
+func holdFixture(t *testing.T) rigs.DesignsFixture {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
@@ -23,10 +23,10 @@ func holdFixture(t *testing.T) servertest.DesignsFixture {
 		t.Fatal(err)
 	}
 	rigs.WriteEpicFiles(t, store, "map-impl", "---\nstatus: open\n---\n", map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
-	return servertest.StartDesignsIn(t, store)
+	return rigs.StartDesignsIn(t, store)
 }
 
-func liveIDs(t *testing.T, f servertest.DesignsFixture) []string {
+func liveIDs(t *testing.T, f rigs.DesignsFixture) []string {
 	t.Helper()
 	var ids []string
 	for _, s := range f.Live(t) {
@@ -133,7 +133,7 @@ func TestHold_RefusesOneOffsFollowUpsAndUnknown(t *testing.T) {
 	}
 }
 
-func hold(t *testing.T, f servertest.DesignsFixture, yes, dryRun bool, targets ...string) wire.TargetsResult {
+func hold(t *testing.T, f rigs.DesignsFixture, yes, dryRun bool, targets ...string) wire.TargetsResult {
 	t.Helper()
 	res, err := f.H.Client.Admin.HoldEpics(f.Ctx, targets, yes, dryRun)
 	if err != nil {

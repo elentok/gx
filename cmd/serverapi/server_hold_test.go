@@ -27,7 +27,7 @@ func runServer(t *testing.T, h *servertest.Harness, args ...string) (string, err
 	return out.String(), err
 }
 
-func holdFixture(t *testing.T) servertest.DesignsFixture {
+func holdFixture(t *testing.T) rigs.DesignsFixture {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
@@ -36,7 +36,7 @@ func holdFixture(t *testing.T) servertest.DesignsFixture {
 		t.Fatal(err)
 	}
 	rigs.WriteEpicFiles(t, store, "map-impl", "---\nstatus: open\n---\n", map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
-	return servertest.StartDesignsIn(t, store)
+	return rigs.StartDesignsIn(t, store)
 }
 
 func TestServerHold_NeedsYesWhileDesignSessionsAreLive(t *testing.T) {

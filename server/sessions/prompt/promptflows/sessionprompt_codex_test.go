@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server/servertest"
@@ -33,7 +34,7 @@ func startCodexPromptSession(t *testing.T, extraEnv ...string) promptFixture {
 // wait for an answer to take effect, for a test whose fake does real work first.
 func startCodexPromptSessionWithGrace(t *testing.T, grace time.Duration, extraEnv ...string) promptFixture {
 	t.Helper()
-	return fromPrompt(servertest.StartCodexPromptSessionWithGrace(t, grace, extraEnv...))
+	return fromPrompt(rigs.StartCodexPromptSessionWithGrace(t, grace, extraEnv...))
 }
 
 func TestSessionPrompt_CodexIsRefusedWhileWorkingAndTypedAtIdle(t *testing.T) {

@@ -1,4 +1,4 @@
-package servertest
+package rigs
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -22,7 +23,7 @@ const RunEndText = "Done.\n✅ Map: drafted. Next: start a fresh session"
 // GrillingFixture is a started grilling session: its harness, event stream,
 // session and conversation ids, and transcript path.
 type GrillingFixture struct {
-	H    *Harness
+	H    *servertest.Harness
 	Ctx  context.Context
 	Evs  <-chan wire.Event
 	ID   string
@@ -33,28 +34,28 @@ type GrillingFixture struct {
 // EndTurn runs a working-then-idle turn on the session.
 func EndTurn(t *testing.T, f *GrillingFixture) {
 	t.Helper()
-	Report(t, f.Conv, agentfake.Control{State: "working"})
-	WaitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
-	Report(t, f.Conv, agentfake.Control{State: "idle"})
+	servertest.Report(t, f.Conv, agentfake.Control{State: "working"})
+	servertest.WaitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
+	servertest.Report(t, f.Conv, agentfake.Control{State: "idle"})
 }
 
 // StartGrillingSessionIn starts a fake session on a map epic (Design) or a
 // plain one, on a store the caller has already seeded, with claude's config
 // dir pointed at a temp dir. It returns the transcript path of its
 // conversation.
-func StartGrillingSessionIn(t *testing.T, ticket, store string, opts ...func(*server.Config)) (*Harness, context.Context, <-chan wire.Event, string, string, string) {
+func StartGrillingSessionIn(t *testing.T, ticket, store string, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan wire.Event, string, string, string) {
 	t.Helper()
 	cfg := t.TempDir()
-	WriteTicket(t, store, "proj", "map", "01", "first", "")
-	WriteTicket(t, store, "proj", "plain", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
 	// A caller may seed the map with a design_step first.
 	if mapFile := filepath.Join(store, "proj", "map", "ticket.md"); !strings.Contains(string(mustRead(mapFile)), "kind: map") {
 		if err := os.WriteFile(mapFile, []byte("---\nkind: map\n---\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	opts = append([]func(*server.Config){WithTestHolder(), WithChatHarness(string(agentfake.HarnessKind)), WithDefaultHarness(string(agentfake.HarnessKind)), WithAlerts(true, true), WithEnv("CLAUDE_CONFIG_DIR=" + cfg)}, opts...)
-	h := StartWithStore(t, store, opts...)
+	opts = append([]func(*server.Config){servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)), servertest.WithAlerts(true, true), servertest.WithEnv("CLAUDE_CONFIG_DIR=" + cfg)}, opts...)
+	h := servertest.StartWithStore(t, store, opts...)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)
 	evs, err := h.Client.Events(ctx, 0)
@@ -66,7 +67,7 @@ func StartGrillingSessionIn(t *testing.T, ticket, store string, opts ...func(*se
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 	id := res.Session.ID
-	conv, _ := ReadMeta(t, h, id)["conversation_id"].(string)
+	conv, _ := servertest.ReadMeta(t, h, id)["conversation_id"].(string)
 	return h, ctx, evs, id, conv, filepath.Join(cfg, "projects", "-repo", conv+".jsonl")
 }
 
@@ -110,7 +111,7 @@ func WriteAssistantMessage(t *testing.T, path, text string) {
 
 // ClearByInput types a key into the session's terminal, which clears the
 // raised Actionable.
-func ClearByInput(t *testing.T, h *Harness, id string) {
+func ClearByInput(t *testing.T, h *servertest.Harness, id string) {
 	t.Helper()
 	c, err := holder.DialHolder(filepath.Join(h.SessionsDir, id))
 	if err != nil {

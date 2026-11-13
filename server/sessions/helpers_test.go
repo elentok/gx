@@ -2,13 +2,13 @@ package sessions_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"os"
 	"testing"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
@@ -28,8 +28,8 @@ const (
 	apiError401       = rigs.APIError401
 	reply             = rigs.Reply
 	turnDurationLine  = servertest.TurnDurationLine
-	runEndText        = servertest.RunEndText
-	repairToken       = servertest.RepairToken
+	runEndText        = rigs.RunEndText
+	repairToken       = rigs.RepairToken
 	schedEpic         = servertest.SchedEpic
 	testFlushInterval = servertest.FlushInterval
 )
@@ -68,10 +68,10 @@ var (
 	reportFocus            = servertest.ReportFocus
 	screenHas              = servertest.ScreenHas
 	waitForScreen          = servertest.WaitForScreen
-	startGrillingSessionIn = servertest.StartGrillingSessionIn
-	storeWithMapStep       = servertest.StoreWithMapStep
-	writeAssistantMessage  = servertest.WriteAssistantMessage
-	clearByInput           = servertest.ClearByInput
+	startGrillingSessionIn = rigs.StartGrillingSessionIn
+	storeWithMapStep       = rigs.StoreWithMapStep
+	writeAssistantMessage  = rigs.WriteAssistantMessage
+	clearByInput           = rigs.ClearByInput
 	startWebDesign         = rigs.StartWebDesign
 	sessionToken           = rigs.SessionToken
 	rowToken               = rigs.RowToken
@@ -92,22 +92,22 @@ type designsFixture struct {
 // in project proj, whose repo is the trunk checkout, with the web mux up.
 func startDesigns(t *testing.T, opts ...func(*server.Config)) designsFixture {
 	t.Helper()
-	return fromShared(servertest.StartDesigns(t, opts...))
+	return fromShared(rigs.StartDesigns(t, opts...))
 }
 
 // startDesignsIn is startDesigns on a store the caller has already seeded.
 func startDesignsIn(t *testing.T, store string, opts ...func(*server.Config)) designsFixture {
 	t.Helper()
-	return fromShared(servertest.StartDesignsIn(t, store, opts...))
+	return fromShared(rigs.StartDesignsIn(t, store, opts...))
 }
 
-func fromShared(d servertest.DesignsFixture) designsFixture {
+func fromShared(d rigs.DesignsFixture) designsFixture {
 	return designsFixture{h: d.H, ctx: d.Ctx, evs: d.Evs, repo: d.Repo, base: d.Base, ck: d.Ck}
 }
 
 // shared is the servertest fixture the shared methods run on.
-func (f designsFixture) shared() servertest.DesignsFixture {
-	return servertest.DesignsFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, Repo: f.repo, Base: f.base, Ck: f.ck}
+func (f designsFixture) shared() rigs.DesignsFixture {
+	return rigs.DesignsFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, Repo: f.repo, Base: f.base, Ck: f.ck}
 }
 
 func (f designsFixture) open(t *testing.T, epic string, isNew bool) wire.SessionResult {

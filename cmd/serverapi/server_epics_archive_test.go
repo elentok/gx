@@ -9,17 +9,18 @@ import (
 
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
-func archiveFixture(t *testing.T, done ...string) (servertest.DesignsFixture, string) {
+func archiveFixture(t *testing.T, done ...string) (rigs.DesignsFixture, string) {
 	t.Helper()
 	store := t.TempDir()
 	for _, e := range done {
 		servertest.WriteCompleteEpic(t, store, e)
 	}
-	return servertest.StartDesignsIn(t, store), store
+	return rigs.StartDesignsIn(t, store), store
 }
 
 func archivedNames(t *testing.T, store string) map[string]bool {
@@ -95,7 +96,7 @@ func TestServerCleanupWrite_ArchiveDesignTargetsJSON(t *testing.T) {
 	design("foo", "done", true)
 	design("bar", "chart", true)
 	design("baz", "done", true)
-	f := servertest.StartDesignsIn(t, store)
+	f := rigs.StartDesignsIn(t, store)
 
 	out, err := runServer(t, f.H, "epics", "archive", "proj:foo", "proj:bar", "proj:baz-impl", "--json")
 	if exit, ok := err.(*cmdbase.ExitError); !ok || exit.Code != 1 {

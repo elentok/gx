@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/apiclient"
@@ -63,7 +64,7 @@ func TestAgentsCreateAndList_JSON(t *testing.T) {
 func TestAgentsList_JSONKeepsTheSameIDsUnderTheUnarchivedAddress(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteCompleteEpic(t, store, "foo")
-	f := servertest.StartDesignsIn(t, store)
+	f := rigs.StartDesignsIn(t, store)
 	res, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Ticket: "proj:foo/01", FixOf: "proj:foo/01"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)

@@ -1,4 +1,4 @@
-package servertest
+package rigs
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -20,7 +21,7 @@ const RepairToken = "0:repair"
 // DesignsFixture is a server with the web mux up, for tests that open design
 // and fix-agent sessions.
 type DesignsFixture struct {
-	H    *Harness
+	H    *servertest.Harness
 	Ctx  context.Context
 	Evs  <-chan wire.Event
 	Repo string
@@ -33,10 +34,10 @@ type DesignsFixture struct {
 func StartDesignsIn(t *testing.T, store string, opts ...func(*server.Config)) DesignsFixture {
 	t.Helper()
 	repo := testutil.TempRepo(t)
-	SetProjectRepoNoAutoMerge(t, store, "proj", repo)
-	opts = append([]func(*server.Config){WithTestHolder(), WithChatHarness(string(agentfake.HarnessKind)), WithDefaultHarness(string(agentfake.HarnessKind)),
+	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
+	opts = append([]func(*server.Config){servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)),
 		func(c *server.Config) { c.WebAddr = "127.0.0.1:0" }}, opts...)
-	h := StartWithStore(t, store, opts...)
+	h := servertest.StartWithStore(t, store, opts...)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	t.Cleanup(cancel)
 	evs, err := h.Client.Events(ctx, 0)
@@ -47,7 +48,7 @@ func StartDesignsIn(t *testing.T, store string, opts ...func(*server.Config)) De
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
-	return DesignsFixture{H: h, Ctx: ctx, Evs: evs, Repo: repo, Base: hs.WebURL, Ck: Login(t, h.StateDir, hs.WebURL)}
+	return DesignsFixture{H: h, Ctx: ctx, Evs: evs, Repo: repo, Base: hs.WebURL, Ck: servertest.Login(t, h.StateDir, hs.WebURL)}
 }
 
 // Open opens (or creates, when isNew) the design session of epic.
@@ -81,8 +82,8 @@ func (f DesignsFixture) Live(t *testing.T) []wire.SessionInfo {
 func StartDesigns(t *testing.T, opts ...func(*server.Config)) DesignsFixture {
 	t.Helper()
 	store := t.TempDir()
-	WriteTicket(t, store, "proj", "map", "01", "first", "")
-	WriteTicket(t, store, "proj", "plain", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
 	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -118,17 +119,17 @@ func StartPromptSessionWith(t *testing.T, grace time.Duration, opts ...func(*ser
 func StartPromptSessionAs(t *testing.T, grace time.Duration, create wire.CreateSessionRequest, opts ...func(*server.Config)) PromptFixture {
 	t.Helper()
 	cfg := t.TempDir()
-	f := StartDesigns(t, append([]func(*server.Config){func(c *server.Config) { c.PromptGrace = grace }, WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg)}, opts...)...)
+	f := StartDesigns(t, append([]func(*server.Config){func(c *server.Config) { c.PromptGrace = grace }, servertest.WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg)}, opts...)...)
 	create.Project, create.Dir, create.Harness = "proj", t.TempDir(), string(agentfake.HarnessKind)
 	res, err := f.H.Client.Sessions.Create(f.Ctx, create)
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 	id := res.Session.ID
-	conv, _ := ReadMeta(t, f.H, id)["conversation_id"].(string)
-	WaitForHolder(t, filepath.Join(f.H.SessionsDir, id))
-	Report(t, conv, agentfake.Control{State: "idle"})
-	WaitForSession(f.Ctx, t, f.H, f.Evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	conv, _ := servertest.ReadMeta(t, f.H, id)["conversation_id"].(string)
+	servertest.WaitForHolder(t, filepath.Join(f.H.SessionsDir, id))
+	servertest.Report(t, conv, agentfake.Control{State: "idle"})
+	servertest.WaitForSession(f.Ctx, t, f.H, f.Evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	return PromptFixture{DesignsFixture: f, ID: id, Conv: conv, Transcript: filepath.Join(cfg, "projects", "-repo", conv+".jsonl")}
 }
 

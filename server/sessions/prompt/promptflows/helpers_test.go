@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 )
 
-const firstPromptGrace = servertest.FirstPromptGrace
+const firstPromptGrace = rigs.FirstPromptGrace
 
 var (
 	readMeta         = servertest.ReadMeta
@@ -20,7 +21,7 @@ var (
 	waitForSubmitted = servertest.WaitForSubmitted
 )
 
-// designsFixture wraps servertest.DesignsFixture with lower-case fields.
+// designsFixture wraps rigs.DesignsFixture with lower-case fields.
 type designsFixture struct {
 	h    *servertest.Harness
 	ctx  context.Context
@@ -30,12 +31,12 @@ type designsFixture struct {
 	ck   *http.Cookie
 }
 
-func fromShared(d servertest.DesignsFixture) designsFixture {
+func fromShared(d rigs.DesignsFixture) designsFixture {
 	return designsFixture{h: d.H, ctx: d.Ctx, evs: d.Evs, repo: d.Repo, base: d.Base, ck: d.Ck}
 }
 
-func (f designsFixture) shared() servertest.DesignsFixture {
-	return servertest.DesignsFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, Repo: f.repo, Base: f.base, Ck: f.ck}
+func (f designsFixture) shared() rigs.DesignsFixture {
+	return rigs.DesignsFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, Repo: f.repo, Base: f.base, Ck: f.ck}
 }
 
 // promptFixture is a design session on a fake program with an input box,
@@ -47,15 +48,15 @@ type promptFixture struct {
 
 func startPromptSession(t *testing.T) promptFixture {
 	t.Helper()
-	return fromPrompt(servertest.StartPromptSession(t, firstPromptGrace))
+	return fromPrompt(rigs.StartPromptSession(t, firstPromptGrace))
 }
 
 // fixture is the servertest fixture the shared methods run on.
-func (f promptFixture) fixture() servertest.PromptFixture {
-	return servertest.PromptFixture{DesignsFixture: f.shared(), ID: f.id, Conv: f.conv, Transcript: f.transcript}
+func (f promptFixture) fixture() rigs.PromptFixture {
+	return rigs.PromptFixture{DesignsFixture: f.shared(), ID: f.id, Conv: f.conv, Transcript: f.transcript}
 }
 
-func fromPrompt(p servertest.PromptFixture) promptFixture {
+func fromPrompt(p rigs.PromptFixture) promptFixture {
 	return promptFixture{designsFixture: fromShared(p.DesignsFixture), id: p.ID, conv: p.Conv, transcript: p.Transcript}
 }
 

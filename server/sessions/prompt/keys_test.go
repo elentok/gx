@@ -2,13 +2,14 @@ package prompt_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/servertest/rigs"
 
 	"github.com/elentok/gx/server/wire"
 
@@ -30,7 +31,7 @@ func (f promptFixture) keysWeb(t *testing.T, req wire.SessionKeysRequest) string
 
 func seedSession(t *testing.T, f promptFixture, id, state string) {
 	t.Helper()
-	servertest.SeedSession(t, f.fixture(), id, state)
+	rigs.SeedSession(t, f.fixture(), id, state)
 }
 
 func TestSessionKeys_Refusals(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -27,7 +28,7 @@ func (f promptFixture) cardSources(t *testing.T) []string {
 // round while idle, and each live blocker (permission, then plan) alone.
 func TestQuestionList_FixSessionListsPermissionPlanRoundAndTicketAsk(t *testing.T) {
 	t.Parallel()
-	f := fromPrompt(servertest.StartPromptSessionAs(t, 10*time.Second, wire.CreateSessionRequest{FixOf: "proj:plain/02"}))
+	f := fromPrompt(rigs.StartPromptSessionAs(t, 10*time.Second, wire.CreateSessionRequest{FixOf: "proj:plain/02"}))
 	servertest.WriteTicketWith(t, f.h.TicketStore, "proj", "plain", "02", "asking", servertest.TicketOpts{PauseReason: "self-reported"})
 	ask := "## Question\n\nWhich option?\n\n```gx-question\n" + servertest.OptionsBlock + "```\n\n## Handoff\n\nHalf done.\n"
 	if res, err := f.h.Client.Tickets.Ask(f.ctx, "proj:plain/02", ask); err != nil || res.Refused {

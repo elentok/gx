@@ -18,7 +18,7 @@ import (
 
 func TestSessionInterrupt_SendsCtrlCToAWorkingSession(t *testing.T) {
 	t.Parallel()
-	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	f := rigs.StartPromptSession(t, rigs.FirstPromptGrace)
 	report(t, f.Conv, agentfake.Control{State: "working"})
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	res, err := f.H.Client.Sessions.Interrupt(f.Ctx, f.ID)
@@ -30,7 +30,7 @@ func TestSessionInterrupt_SendsCtrlCToAWorkingSession(t *testing.T) {
 
 func TestSessionInterrupt_SendsOneEscToACodexSession(t *testing.T) {
 	t.Parallel()
-	f := servertest.StartCodexPromptSession(t)
+	f := rigs.StartCodexPromptSession(t)
 	if res := f.Prompt(t, "work"); res.Refused {
 		t.Fatalf("prompt = %+v", res)
 	}
@@ -48,7 +48,7 @@ func TestSessionInterrupt_SendsOneEscToACodexSession(t *testing.T) {
 
 func TestSessionInterrupt_RefusesAnIdleSession(t *testing.T) {
 	t.Parallel()
-	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	f := rigs.StartPromptSession(t, rigs.FirstPromptGrace)
 	res, err := f.H.Client.Sessions.Interrupt(f.Ctx, f.ID)
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionNotWorking {
 		t.Errorf("interrupt while idle = %+v, %v; want %s", res, err, wire.ReasonSessionNotWorking)
@@ -76,7 +76,7 @@ func TestWebSessions_InterruptNeedsAFreshTokenOnAnAgentSession(t *testing.T) {
 
 func TestWebSessions_InterruptsAWorkingChatAndDesignSession(t *testing.T) {
 	t.Parallel()
-	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	f := rigs.StartPromptSession(t, rigs.FirstPromptGrace)
 	res, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)

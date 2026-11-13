@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/servertest/rigs"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
@@ -71,7 +72,7 @@ func TestDesignSession_StartsOnTheDefaultAtStartTime(t *testing.T) {
 	seedMap(t, store, "map-a")
 	seedMap(t, store, "map-b")
 	path := filepath.Join(t.TempDir(), "config.json")
-	f := servertest.StartDesignsIn(t, store, servertest.WithDefaultHarness("codex"), servertest.WithChatHarness("codex"), servertest.WithConfigFile(path), withFakeAgents(t))
+	f := rigs.StartDesignsIn(t, store, servertest.WithDefaultHarness("codex"), servertest.WithChatHarness("codex"), servertest.WithConfigFile(path), withFakeAgents(t))
 	servertest.WriteConfig(t, path, store, map[string]any{"agents": map[string]any{"default-harness": "codex"}})
 
 	first := f.Open(t, "proj:map-a", false)
@@ -107,13 +108,13 @@ func TestFixAgent_StartsOnACodexDefault(t *testing.T) {
 			t.Parallel()
 			store := t.TempDir()
 			servertest.WriteTicketWith(t, store, "proj", "loop", "01", "broken", servertest.TicketOpts{PauseReason: "merge-conflict"})
-			f := servertest.StartDesignsIn(t, store, servertest.WithDefaultHarness("codex"), servertest.WithChatHarness("codex"), withFakeAgents(t))
+			f := rigs.StartDesignsIn(t, store, servertest.WithDefaultHarness("codex"), servertest.WithChatHarness("codex"), withFakeAgents(t))
 			if route == "tui" {
 				if res := f.Fix(t, "proj:loop/01"); res.Refused {
 					t.Fatalf("fix = %+v", res)
 				}
 			} else {
-				body, _ := json.Marshal(wire.FixAgentRequest{Address: "proj:loop/01", State: servertest.RepairToken})
+				body, _ := json.Marshal(wire.FixAgentRequest{Address: "proj:loop/01", State: rigs.RepairToken})
 				if code, out := servertest.WebPostJSON(t, f.Base+"/v1/tickets/fix-agent", string(body), f.Ck, "", servertest.JSONPost(f.Base)); code != 200 || servertest.ReasonOf(t, out) != "" {
 					t.Fatalf("web fix = %d %s", code, out)
 				}

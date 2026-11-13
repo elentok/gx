@@ -1,4 +1,4 @@
-package servertest
+package rigs
 
 import (
 	"encoding/json"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/agentfake/codex"
@@ -47,11 +48,11 @@ func StartCodexPromptSessionWith(t *testing.T, cfg func(*server.Config), extraEn
 func StartCodexPromptSessionAs(t *testing.T, cfg func(*server.Config), create wire.CreateSessionRequest, extraEnv ...string) PromptFixture {
 	t.Helper()
 	conv := "thread-server-prompt-" + strings.ReplaceAll(t.Name(), "/", "-")
-	bin := FakeCodexDir(t)
+	bin := servertest.FakeCodexDir(t)
 	home := t.TempDir()
 	f := StartDesigns(t, cfg,
-		WithChatHarness("codex"),
-		WithEnv(append([]string{
+		servertest.WithChatHarness("codex"),
+		servertest.WithEnv(append([]string{
 			"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"),
 			"HOME=" + home,
 			"CODEX_HOME=" + filepath.Join(home, ".codex"),
@@ -64,8 +65,8 @@ func StartCodexPromptSessionAs(t *testing.T, cfg func(*server.Config), create wi
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 	id := res.Session.ID
-	WaitForHolder(t, filepath.Join(f.H.SessionsDir, id))
-	WaitForSession(f.Ctx, t, f.H, f.Evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	servertest.WaitForHolder(t, filepath.Join(f.H.SessionsDir, id))
+	servertest.WaitForSession(f.Ctx, t, f.H, f.Evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	return PromptFixture{DesignsFixture: f, ID: id, Conv: conv, CodexHome: filepath.Join(home, ".codex")}
 }
 
@@ -89,7 +90,7 @@ func StartCodexPermissionSession(t *testing.T, withDialog bool) PromptFixture {
 		if res := f.Prompt(t, "run it"); res.Refused {
 			t.Fatalf("prompt = %+v", res)
 		}
-		WaitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
+		servertest.WaitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
 	}
 	return f
 }
@@ -130,11 +131,11 @@ func (f PromptFixture) KeysWeb(t *testing.T, req wire.SessionKeysRequest) string
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, out := WebPostJSON(t, f.Base+"/v1/sessions/keys", string(body), f.Ck, "", JSONPost(f.Base))
+	code, out := servertest.WebPostJSON(t, f.Base+"/v1/sessions/keys", string(body), f.Ck, "", servertest.JSONPost(f.Base))
 	if code != 200 {
 		t.Fatalf("web keys = %d %s", code, out)
 	}
-	return ReasonOf(t, out)
+	return servertest.ReasonOf(t, out)
 }
 
 // Block sends c to the fake and waits for the session to report Blocked.
@@ -143,7 +144,7 @@ func (f PromptFixture) Block(t *testing.T, c agentfake.Control) {
 	if err := agentfake.SendProgramControl(f.Conv, c); err != nil {
 		t.Fatal(err)
 	}
-	WaitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
+	servertest.WaitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
 }
 
 // BlockOn opens a dialog that Enter or Esc closes.
@@ -158,7 +159,7 @@ func (f PromptFixture) BlockCodex(t *testing.T, command string) {
 	t.Helper()
 	f.Block(t, agentfake.Control{Action: agentfake.ActionPermission, Command: command})
 	// The fake reports Blocked before it draws the dialog.
-	WaitForScreen(t, WaitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID)), "Blocked by hook")
+	servertest.WaitForScreen(t, servertest.WaitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID)), "Blocked by hook")
 }
 
 // Permission answers the pending permission request with decision.
@@ -171,10 +172,10 @@ func (f PromptFixture) Permission(t *testing.T, decision, requestID string) wire
 // the refused answer sent would be logged ahead of it.
 func (f PromptFixture) NothingSent(t *testing.T) {
 	t.Helper()
-	Report(t, f.Conv, agentfake.Control{State: "idle"})
-	WaitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	servertest.Report(t, f.Conv, agentfake.Control{State: "idle"})
+	servertest.WaitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 	if res := f.Keys(t, wire.SessionKeysRequest{Key: "Tab"}); res.Refused {
 		t.Fatalf("tab = %+v", res)
 	}
-	WaitForSubmitted(t, f.Conv, strconv.Quote("<tab>")+"\n")
+	servertest.WaitForSubmitted(t, f.Conv, strconv.Quote("<tab>")+"\n")
 }

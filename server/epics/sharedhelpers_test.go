@@ -2,12 +2,13 @@ package epics_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server"
-	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 )
 
 // Short names for the helpers that live in servertest because the root
@@ -17,26 +18,26 @@ const (
 	epicNotMergedText = rigs.EpicNotMergedText
 	answerAddr        = servertest.AnswerAddr
 	optionsBlock      = servertest.OptionsBlock
-	runEndText        = servertest.RunEndText
-	repairToken       = servertest.RepairToken
+	runEndText        = rigs.RunEndText
+	repairToken       = rigs.RepairToken
 )
 
 type (
 	schedFixture    = servertest.SchedFixture
-	designsFixture  = servertest.DesignsFixture
-	grillingFixture = servertest.GrillingFixture
+	designsFixture  = rigs.DesignsFixture
+	grillingFixture = rigs.GrillingFixture
 )
 
 var (
 	newSchedFixture         = servertest.NewSchedFixture
-	startDesigns            = servertest.StartDesigns
-	startDesignsIn          = servertest.StartDesignsIn
-	startAdvancing          = servertest.StartAdvancing
-	endTurn                 = servertest.EndTurn
+	startDesigns            = rigs.StartDesigns
+	startDesignsIn          = rigs.StartDesignsIn
+	startAdvancing          = rigs.StartAdvancing
+	endTurn                 = rigs.EndTurn
 	startBlockedClaimed     = rigs.StartBlockedClaimed
 	startWaitingRestartFake = servertest.StartWaitingRestartFake
 	pauseWithQuestion       = servertest.PauseWithQuestion
-	storeWithMapStep        = servertest.StoreWithMapStep
+	storeWithMapStep        = rigs.StoreWithMapStep
 	commitWork              = servertest.CommitWork
 	commitOnBranch          = servertest.CommitOnBranch
 	writeCompleteEpic       = servertest.WriteCompleteEpic
@@ -49,7 +50,7 @@ var (
 	waitForSession          = servertest.WaitForSession
 	report                  = servertest.Report
 	readMeta                = servertest.ReadMeta
-	writeAssistantMessage   = servertest.WriteAssistantMessage
+	writeAssistantMessage   = rigs.WriteAssistantMessage
 )
 
 func TestSnapshot_TicketsCarryRenderedStatus(t *testing.T) {

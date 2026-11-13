@@ -34,15 +34,15 @@ func codexQuestions() []agentfake.QuestionSpec {
 	return qs
 }
 
-func startCodexQuestionSession(t *testing.T, extraEnv ...string) servertest.PromptFixture {
+func startCodexQuestionSession(t *testing.T, extraEnv ...string) rigs.PromptFixture {
 	t.Helper()
-	return servertest.StartCodexPromptSessionWith(t, func(c *server.Config) {
-		c.PromptGrace = servertest.FirstPromptGrace
+	return rigs.StartCodexPromptSessionWith(t, func(c *server.Config) {
+		c.PromptGrace = rigs.FirstPromptGrace
 		c.CodexQuestionWait = time.Second
 	}, extraEnv...)
 }
 
-func openCodexQuestion(t *testing.T, f servertest.PromptFixture, call agentfake.QuestionCall) {
+func openCodexQuestion(t *testing.T, f rigs.PromptFixture, call agentfake.QuestionCall) {
 	t.Helper()
 	call.CallID = codexQuestionCall
 	if call.Questions == nil {
@@ -61,7 +61,7 @@ func openCodexQuestion(t *testing.T, f servertest.PromptFixture, call agentfake.
 	servertest.WaitForScreen(t, servertest.WaitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID)), "Question "+strconv.Itoa(call.StartAt+1)+"/")
 }
 
-func waitForCodexCard(t *testing.T, f servertest.PromptFixture) wire.QuestionCard {
+func waitForCodexCard(t *testing.T, f rigs.PromptFixture) wire.QuestionCard {
 	t.Helper()
 	var card wire.QuestionCard
 	servertest.WaitFor(t, 5*time.Second, "the codex-question card", func() bool {
@@ -80,7 +80,7 @@ func waitForCodexCard(t *testing.T, f servertest.PromptFixture) wire.QuestionCar
 	return card
 }
 
-func answerCodex(t *testing.T, f servertest.PromptFixture, cardID string, answers ...wire.SessionAnswer) wire.SessionResult {
+func answerCodex(t *testing.T, f rigs.PromptFixture, cardID string, answers ...wire.SessionAnswer) wire.SessionResult {
 	t.Helper()
 	res, err := f.H.Client.Sessions.Answer(f.Ctx, wire.SessionAnswerRequest{
 		ID: f.ID, Source: wire.CardSourceCodex, CardID: cardID, Answers: answers,
@@ -91,7 +91,7 @@ func answerCodex(t *testing.T, f servertest.PromptFixture, cardID string, answer
 	return res
 }
 
-func codexKeys(t *testing.T, f servertest.PromptFixture) []string {
+func codexKeys(t *testing.T, f rigs.PromptFixture) []string {
 	t.Helper()
 	keys, err := codex.ReadQuestionKeys(f.CodexHome, f.Conv)
 	if err != nil {
@@ -101,7 +101,7 @@ func codexKeys(t *testing.T, f servertest.PromptFixture) []string {
 }
 
 // codexOutput is the answers of the call's function_call_output, by question id.
-func codexOutput(t *testing.T, f servertest.PromptFixture) map[string][]string {
+func codexOutput(t *testing.T, f rigs.PromptFixture) map[string][]string {
 	t.Helper()
 	paths, _ := filepath.Glob(filepath.Join(f.CodexHome, "sessions", "*", "*", "*", "rollout-*"+f.Conv+".jsonl"))
 	if len(paths) != 1 {
@@ -149,7 +149,7 @@ func splitLines(data []byte) [][]byte {
 	return lines
 }
 
-func wantKeys(t *testing.T, f servertest.PromptFixture, want ...string) {
+func wantKeys(t *testing.T, f rigs.PromptFixture, want ...string) {
 	t.Helper()
 	if got := codexKeys(t, f); !slices.Equal(got, want) {
 		t.Fatalf("keys = %q, want %q", got, want)
@@ -339,8 +339,8 @@ func TestSessionAnswer_CodexQuestionWrappedQuestionIsNotAMismatch(t *testing.T) 
 func TestCodexQuestion_FixSessionListsNoCodexCard(t *testing.T) {
 	t.Parallel()
 	chatHook := rigs.NewSlackHook(t)
-	f := servertest.StartCodexPromptSessionAs(t, func(c *server.Config) {
-		c.PromptGrace = servertest.FirstPromptGrace
+	f := rigs.StartCodexPromptSessionAs(t, func(c *server.Config) {
+		c.PromptGrace = rigs.FirstPromptGrace
 		c.CodexQuestionWait = time.Second
 		c.Chat = notify.ServerChatConfig{SlackWebhookURL: chatHook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: servertest.FlushInterval}
 	}, wire.CreateSessionRequest{Ticket: "proj:plain/01", FixOf: "proj:plain/01"})

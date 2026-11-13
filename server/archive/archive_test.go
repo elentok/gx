@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
@@ -15,7 +16,7 @@ import (
 
 // rig is a server over a store whose proj has the given done epics.
 type rig struct {
-	servertest.DesignsFixture
+	rigs.DesignsFixture
 	store string
 }
 
@@ -25,7 +26,7 @@ func start(t *testing.T, doneEpics ...string) rig {
 	for _, e := range doneEpics {
 		servertest.WriteCompleteEpic(t, store, e)
 	}
-	return rig{servertest.StartDesignsIn(t, store), store}
+	return rig{rigs.StartDesignsIn(t, store), store}
 }
 
 func (r rig) archive(t *testing.T, yes, dryRun bool, targets ...string) []wire.TargetResult {
@@ -138,7 +139,7 @@ func TestArchive_DesignTargetIsNotFinished(t *testing.T) {
 		t.Fatal(err)
 	}
 	servertest.WriteTicket(t, store, "proj", "map-impl", "01", "first", "")
-	r := rig{servertest.StartDesignsIn(t, store), store}
+	r := rig{rigs.StartDesignsIn(t, store), store}
 
 	for _, addr := range []string{"proj:map", "proj:map-impl"} {
 		got := r.archive(t, true, false, addr)[0]

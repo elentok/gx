@@ -6,15 +6,16 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // triageSession is an idle plain session linked to proj's Triage, on the
 // fixture of a Design session.
-func triageSession(t *testing.T) (servertest.PromptFixture, string, string) {
+func triageSession(t *testing.T) (rigs.PromptFixture, string, string) {
 	t.Helper()
-	f := servertest.StartPromptSession(t, servertest.FirstPromptGrace)
+	f := rigs.StartPromptSession(t, rigs.FirstPromptGrace)
 	res, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
@@ -65,7 +66,7 @@ func TestTriageSession_PromoteIsRefused(t *testing.T) {
 // for the Actionable that line raises.
 func triageRunEnd(t *testing.T, step string, done bool) *grillingFixture {
 	t.Helper()
-	f, _ := servertest.StartTriageSession(t, step, done)
+	f, _ := rigs.StartTriageSession(t, step, done)
 	writeAssistantMessage(t, f.Path, runEndText)
 	endTurn(t, f)
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
@@ -109,8 +110,8 @@ func TestTriageRunEnd_FinalStepsRaiseNoContinueAndNoCountdown(t *testing.T) {
 			if len(got.Actionable.Action) != 0 || got.AutoAdvanceAt != nil {
 				t.Fatalf("actionable = %+v, advance at %v, want the line alone", got.Actionable, got.AutoAdvanceAt)
 			}
-			time.Sleep(2 * servertest.CountdownDelay) // negative wait: a countdown would have sent by now
-			if n := servertest.AutoSends(t, f); n != 0 {
+			time.Sleep(2 * rigs.CountdownDelay) // negative wait: a countdown would have sent by now
+			if n := rigs.AutoSends(t, f); n != 0 {
 				t.Errorf("auto sends = %d, want none", n)
 			}
 		})

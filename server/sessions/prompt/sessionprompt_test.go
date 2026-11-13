@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/ralphloop/runlog"
@@ -33,15 +34,15 @@ func startPromptSession(t *testing.T) promptFixture {
 // typed prompt's turn to start, for a test that must act inside it.
 func startPromptSessionWithGrace(t *testing.T, grace time.Duration) promptFixture {
 	t.Helper()
-	return fromPrompt(servertest.StartPromptSession(t, grace))
+	return fromPrompt(rigs.StartPromptSession(t, grace))
 }
 
 // fixture is the servertest fixture the shared methods run on.
-func (f promptFixture) fixture() servertest.PromptFixture {
-	return servertest.PromptFixture{DesignsFixture: f.shared(), ID: f.id, Conv: f.conv, Transcript: f.transcript}
+func (f promptFixture) fixture() rigs.PromptFixture {
+	return rigs.PromptFixture{DesignsFixture: f.shared(), ID: f.id, Conv: f.conv, Transcript: f.transcript}
 }
 
-func fromPrompt(p servertest.PromptFixture) promptFixture {
+func fromPrompt(p rigs.PromptFixture) promptFixture {
 	return promptFixture{designsFixture: fromShared(p.DesignsFixture), id: p.ID, conv: p.Conv, transcript: p.Transcript}
 }
 

@@ -163,7 +163,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   - `cmd/ticketsflow` — the workflow verbs of `gx tickets`: `epic`, `publish`, `follow-up`, the ensure verbs, `verify-plan`, `calibration`, `lint-claims`, `filter-run-log`, `triage` (`create`, `show`, `pending`, `verdict`) (`Commands(Deps) []*cobra.Command`, passed to `tickets.New` as extras; `Deps` = Env + `WriteFile` + lazy `CommandTree` for lint-claims)
   - `cmd/ticketsmigrate` — `gx tickets migrate` (`New`, `Deps` with no hooks of its own; `DryRunChanges` is also called by `gx restart-check`)
   - `cmd/ticketref` — ticket, epic and project resolution: addresses, paths, bare epic names (`FindTicket`, `ProjectRoot`, `ResolveEpicArg`, `TicketLabel`)
-- `server/` — the gx server; `server/servertest/` holds its test helpers (`server/servertest/rigs/` holds the leaf scenario rigs built on them); `server/wire/` holds the
+- `server/` — the gx server; `server/servertest/` holds its test helpers (`server/servertest/rigs/` holds the leaf scenario rigs built on them, and the design, grilling, advancing, triage session and prompt session fixtures); `server/wire/` holds the
   wire types, consts and pure methods (no behaviour, no import of `server`); `server/wire/ops/` holds the wire types that hold only data (schedules, cleanup, settings page, restart, web info, design drafts), generated to `webui/src/generated/ops.ts` and re-exported by `server.ts`; `server/schedules/` holds the per-machine Schedule state in the state dir (machine id, switch, baseline with forward-only `Advance`, skip log of the newest 10, cleanup; the scheduler comes later); `server/broker/` holds
   the SSE event broker and throttle (imports `wire` only); `server/webtls/` holds web TLS: the
   root and leaf certificates, SNI and source-IP listeners, host allowlist and the root downloads;
@@ -241,7 +241,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `server/sessions/prompt/` holds the session prompts: the auto-advance countdown, turn settle,
   draft clearing, the start clock, prompt send and keys, the first prompt, and the actions and
   actionables, with `Routes()` for all six prompt routes (`sessions/auto-advance` and `/cancel`
-  among them). It has no `Host`; its tests share `servertest/promptsession.go`;
+  among them). It has no `Host`; its tests share `servertest/rigs/promptsession.go`;
   `server/ticketops/` holds the ticket operations: ask and answer, the agent verbs, cancel, unmute,
   retry, recommend and the repair verbs (resume, start over, merge, verify), with `Routes()`. It
   reaches the run loop in the root through the `Launch` interface (the root implements it; the

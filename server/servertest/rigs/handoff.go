@@ -14,7 +14,7 @@ import (
 )
 
 // SessionSnapshotOf is session id's entry in the snapshot.
-func SessionSnapshotOf(t *testing.T, f servertest.DesignsFixture, id string) wire.SessionInfo {
+func SessionSnapshotOf(t *testing.T, f DesignsFixture, id string) wire.SessionInfo {
 	t.Helper()
 	snap, err := f.H.Client.Snapshot(f.Ctx)
 	if err != nil {
@@ -41,7 +41,7 @@ func SetMapStep(t *testing.T, store, step string) {
 // HandoffFixture is a design session launched by gx on a map at the chart
 // step, Idle on a fake program with an input box.
 type HandoffFixture struct {
-	servertest.DesignsFixture
+	DesignsFixture
 	Store, Cfg, ID, Conv string
 }
 
@@ -52,7 +52,7 @@ func StartHandoff(t *testing.T, step string, opts ...func(*server.Config)) Hando
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "map-impl", "01", "first", "")
 	SetMapStep(t, store, step)
-	f := servertest.StartDesignsIn(t, store, append(opts, servertest.WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg))...)
+	f := StartDesignsIn(t, store, append(opts, servertest.WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg))...)
 	res := f.Open(t, "proj:map", false)
 	if res.Refused || res.Session == nil {
 		t.Fatalf("open = %+v", res)

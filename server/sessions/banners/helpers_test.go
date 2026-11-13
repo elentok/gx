@@ -49,6 +49,6 @@ var (
 	waitAlerts             = servertest.WaitAlerts
 	openTUI                = servertest.OpenTUI
 	reportFocus            = servertest.ReportFocus
-	startGrillingSessionIn = servertest.StartGrillingSessionIn
-	writeAssistantMessage  = servertest.WriteAssistantMessage
+	startGrillingSessionIn = rigs.StartGrillingSessionIn
+	writeAssistantMessage  = rigs.WriteAssistantMessage
 )

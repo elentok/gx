@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/server"
@@ -15,7 +16,7 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-const firstPromptGrace = servertest.FirstPromptGrace
+const firstPromptGrace = rigs.FirstPromptGrace
 
 // startFirstPromptSession starts a session with an input box and a first
 // prompt, still waiting for its ready report.

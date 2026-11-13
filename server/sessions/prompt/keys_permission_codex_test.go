@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/nativerunner/holder"
@@ -16,7 +16,7 @@ import (
 // parallel. withDialog makes the fake draw its own approval dialog.
 func startCodexPermissionSession(t *testing.T, withDialog bool) promptFixture {
 	t.Helper()
-	return fromPrompt(servertest.StartCodexPermissionSession(t, withDialog))
+	return fromPrompt(rigs.StartCodexPermissionSession(t, withDialog))
 }
 
 func (f promptFixture) blockCodex(t *testing.T, command string) {
