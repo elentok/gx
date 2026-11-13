@@ -236,12 +236,9 @@ func (f *firstPrompt) deliver(prompt string) error {
 	if err != nil {
 		return err
 	}
-	handedOver := false
-	defer func() {
-		if !handedOver {
-			release()
-		}
-	}()
+	p := f.prompter(c, turn)
+	p.held = release
+	defer p.releaseHeld()
 	if !f.typing().ReadyToType(f.p.projects.TypingIO(f.dir, c, "first-prompt")) {
 		return claudeui.ErrNotReadyToType
 	}
@@ -250,8 +247,6 @@ func (f *firstPrompt) deliver(prompt string) error {
 	}
 	caps := claudeui.DefaultNudgeCaps
 	caps.Grace = cmp.Or(f.p.cfg.PromptGrace, caps.Grace)
-	p := f.prompter(c, turn)
-	p.held, handedOver = release, true
 	report := func(d claudeui.NudgeDecision) {
 		f.log.Debug("first prompt nudge", "decision", string(d))
 	}
@@ -408,16 +403,21 @@ type holderPrompter struct {
 	// Nil takes none.
 	lock func() (func(), error)
 	// held is a lock the caller already took; the next Submit uses it instead of
-	// taking its own, and releases it.
+	// taking its own. Submit and the caller both release it, once.
 	held func()
+}
+
+func (p *holderPrompter) releaseHeld() {
+	if release := p.held; release != nil {
+		p.held = nil
+		release()
+	}
 }
 
 // acquire returns the release func of the typing lock for one Submit.
 func (p *holderPrompter) acquire() (func(), error) {
 	if p.held != nil {
-		release := p.held
-		p.held = nil
-		return release, nil
+		return p.releaseHeld, nil
 	}
 	if p.lock == nil {
 		return func() {}, nil

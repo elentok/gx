@@ -110,6 +110,35 @@ func TestTypingLock_WaiterEndsOnServerStop(t *testing.T) {
 	}
 }
 
+// A first prompt whose nudge ends before any Submit still releases the lock it
+// handed to the prompter, so a rename or composer send is not left waiting.
+func TestTypingLock_FirstPromptNudgeFailureBeforeSubmitReleases(t *testing.T) {
+	p := newLockPrompt()
+	release, err := lockTyping(p, "s1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hp := &holderPrompter{held: release}
+	hp.releaseHeld()
+	hp.releaseHeld()
+	done := make(chan error, 1)
+	go func() {
+		r, err := lockTyping(p, "s1", nil)
+		if err == nil {
+			r()
+		}
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("second typer waited on a lock the failed nudge never released")
+	}
+}
+
 func TestTypingLock_OtherChatIsNotBlocked(t *testing.T) {
 	p := newLockPrompt()
 	release, err := lockTyping(p, "s1", nil)
