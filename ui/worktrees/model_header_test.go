@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/badge"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/worktrees/modal"
@@ -65,7 +66,7 @@ func TestWorktreesHeaderShowsPasteChipAndSource(t *testing.T) {
 func TestWorktreesPasteChipMatchesVisualChip(t *testing.T) {
 	t.Parallel()
 	m := withPaste(headerTestModel(120))
-	if want := ui.RenderChip("PASTE", ui.ColorBlue); !strings.Contains(m.normalView(), want) {
+	if want := badge.RenderChip("PASTE", ui.ColorBlue); !strings.Contains(m.normalView(), want) {
 		t.Fatalf("header lacks the shared chip %q", want)
 	}
 }

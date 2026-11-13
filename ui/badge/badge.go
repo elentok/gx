@@ -1,10 +1,12 @@
-package ui
+package badge
 
 import (
 	"image/color"
 	"strings"
 
 	"charm.land/lipgloss/v2"
+
+	"github.com/elentok/gx/ui"
 )
 
 type BadgeVariant string
@@ -28,7 +30,7 @@ func RenderBadge(label string, variant BadgeVariant, nerd bool, padding bool) st
 // RenderBadgeWithColor renders a pill badge using an explicit foreground color.
 // padding adds a space on each side of the label.
 func RenderBadgeWithColor(label string, fg color.Color, nerd bool, padding bool) string {
-	return renderPill(label, ColorDeepBg, fg, false, nerd, padding)
+	return renderPill(label, ui.ColorDeepBg, fg, false, nerd, padding)
 }
 
 // RenderBadgeText renders a label as plain colored text with no background
@@ -43,7 +45,7 @@ func RenderBadgeText(label string, fg color.Color) string {
 // RenderChip renders a bold, padded label filled with bg, without rounded
 // caps, for a mode indicator in a panel header (e.g. VISUAL).
 func RenderChip(label string, bg color.Color) string {
-	return renderPill(label, bg, ColorDeepBg, true, false, true)
+	return renderPill(label, bg, ui.ColorDeepBg, true, false, true)
 }
 
 // BadgeGroupItem is one decoration name plus its foreground color, to be
@@ -61,7 +63,7 @@ func RenderBadgeGroup(items []BadgeGroupItem, nerd bool) string {
 	if len(items) == 0 {
 		return ""
 	}
-	bg := ColorDeepBg
+	bg := ui.ColorDeepBg
 	sep := lipgloss.NewStyle().Background(bg).Render(" ")
 	parts := make([]string, 0, len(items))
 	for _, item := range items {
@@ -101,29 +103,29 @@ func renderPill(label string, bgColor color.Color, fgColor color.Color, bold boo
 func badgeBackground(variant BadgeVariant) color.Color {
 	switch variant {
 	case BadgeVariantBlue:
-		return ColorBlue
+		return ui.ColorBlue
 	case BadgeVariantGreen:
-		return ColorGreen
+		return ui.ColorGreen
 	case BadgeVariantYellow:
-		return ColorYellow
+		return ui.ColorYellow
 	case BadgeVariantOrange:
-		return ColorOrange
+		return ui.ColorOrange
 	case BadgeVariantMauve:
-		return ColorMauve
+		return ui.ColorMauve
 	case BadgeVariantDeepBg:
-		return ColorDeepBg
+		return ui.ColorDeepBg
 	default:
-		return ColorSurface
+		return ui.ColorSurface
 	}
 }
 
 func badgeForeground(variant BadgeVariant) color.Color {
 	switch variant {
 	case BadgeVariantSurface:
-		return ColorSubtle
+		return ui.ColorSubtle
 	case BadgeVariantDeepBg:
-		return ColorSubtle
+		return ui.ColorSubtle
 	default:
-		return ColorDeepBg
+		return ui.ColorDeepBg
 	}
 }

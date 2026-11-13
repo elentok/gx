@@ -277,6 +277,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
 - `ui/...` — TUI (`ui/app` is the root model; one package per tab or component)
   - `ui/tickets` — the Tickets tab root (`Model`); children never import it: `ui/tickets/rowfmt` (leaf: metrics, pause labels, live row), `ui/tickets/tabapi` (names `ui/app` and `ui/agents` use: `ServerAPI`, `ServerLink*`, messages), `ui/tickets/preview` (preview pane), `ui/tickets/rowactions` (row menus, row editor, watch modal), `ui/tickets/queue` (`QueueModel` and children), `ui/tickets/sidebar` (sidebar tree), `ui/tickets/serverlink` (`Binding`: the client, last snapshot, project scope and link state), `ui/tickets/internal/tickettest` (shared test helpers)
   - `ui` itself is the render kit and tokens (styles, frames, overlays, icons, key hints). A helper with a domain gets its own package
+  - `ui/badge` — badges, chips and buttons (`RenderBadge*`, `RenderChip`, `RenderButton`); imports `ui`, never the reverse
   - `ui/gitops` — shared bump, push and pull handling for `ui/status` and `ui/log`
   - `ui/commitops` — shared commit handling for `ui/commit` and `ui/log`
   - `ui/fuzzy` — fuzzy matching and scoring

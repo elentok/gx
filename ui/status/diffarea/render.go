@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/badge"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffcore"
 	"github.com/elentok/gx/ui/diffview/diffrender"
@@ -184,7 +185,7 @@ func (d *Model) headerOptions(diffviewModel *diffview.Model, section Section, fo
 		out = lipgloss.NewStyle().Foreground(accent).Render(wrap) + dim.Render(" · ") + out
 	}
 	if diffviewModel.DataRef().VisualActive {
-		out = ui.RenderChip("VISUAL", accent) + " " + out
+		out = badge.RenderChip("VISUAL", accent) + " " + out
 	}
 	return out
 }

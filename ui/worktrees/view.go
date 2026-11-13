@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/badge"
 	"github.com/elentok/gx/ui/worktrees/modal"
 
 	tea "charm.land/bubbletea/v2"
@@ -111,7 +112,7 @@ func (m Model) headerStatus(avail int, bg color.Color) string {
 	paste, pasting := m.modal.(modal.Paste)
 	switch {
 	case pasting:
-		fixed = ui.RenderChip("PASTE", ui.ColorBlue)
+		fixed = badge.RenderChip("PASTE", ui.ColorBlue)
 		text = fmt.Sprintf("%d files from %s", len(paste.Clipboard().Files), paste.Clipboard().SrcName)
 	case m.spinnerActive:
 		fixed = dim.Render(strings.TrimSpace(m.spinner.View()))

@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/badge"
 	"github.com/elentok/gx/ui/list"
 	"github.com/elentok/gx/ui/pushstate"
 )
@@ -306,13 +307,13 @@ func (m listPanel) renderBadges(decorations []git.RefDecoration) string {
 
 	parts := make([]string, 0, len(sorted))
 	for _, dec := range sorted {
-		parts = append(parts, ui.RenderBadgeText(m.hl(dec.Name), m.decorationColor(dec)))
+		parts = append(parts, badge.RenderBadgeText(m.hl(dec.Name), m.decorationColor(dec)))
 	}
 	return strings.Join(parts, " ")
 }
 
 // decorationColor returns the foreground color a decoration would use as its
-// own separate badge, matching ui.BadgeVariantDeepBg's foreground when no
+// own separate badge, matching badge.BadgeVariantDeepBg's foreground when no
 // rule matches.
 func (m listPanel) decorationColor(dec git.RefDecoration) color.Color {
 	if c, ok := matchRefRule(dec.Name, m.hints.compiledRefRules); ok {

@@ -1,14 +1,16 @@
-package ui
+package badge
 
 import (
 	"strings"
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/elentok/gx/ui"
 )
 
 func TestRenderBadgeWithColor(t *testing.T) {
-	got := RenderBadgeWithColor("tag", ColorBlue, false, true)
+	got := RenderBadgeWithColor("tag", ui.ColorBlue, false, true)
 	stripped := ansi.Strip(got)
 	if !strings.Contains(stripped, "tag") {
 		t.Errorf("RenderBadgeWithColor = %q, want 'tag' in output", stripped)
@@ -46,8 +48,8 @@ func TestRenderBadgeGroupEmptyReturnsEmptyString(t *testing.T) {
 }
 
 func TestRenderBadgeGroupSingleItemMatchesSingleBadge(t *testing.T) {
-	group := RenderBadgeGroup([]BadgeGroupItem{{Label: "main", Fg: ColorGreen}}, false)
-	single := RenderBadgeWithColor("main", ColorGreen, false, false)
+	group := RenderBadgeGroup([]BadgeGroupItem{{Label: "main", Fg: ui.ColorGreen}}, false)
+	single := RenderBadgeWithColor("main", ui.ColorGreen, false, false)
 	if group != single {
 		t.Fatalf("single-item group = %q, want it to match a single badge %q", group, single)
 	}
@@ -55,8 +57,8 @@ func TestRenderBadgeGroupSingleItemMatchesSingleBadge(t *testing.T) {
 
 func TestRenderBadgeGroupJoinsNamesWithSharedBackground(t *testing.T) {
 	got := RenderBadgeGroup([]BadgeGroupItem{
-		{Label: "main", Fg: ColorGreen},
-		{Label: "origin/main", Fg: ColorBlue},
+		{Label: "main", Fg: ui.ColorGreen},
+		{Label: "origin/main", Fg: ui.ColorBlue},
 	}, false)
 	stripped := ansi.Strip(got)
 	if stripped != "main origin/main" {
@@ -68,7 +70,7 @@ func TestRenderBadgeGroupJoinsNamesWithSharedBackground(t *testing.T) {
 }
 
 func TestRenderBadgeGroupUsesPillCapsWhenNerd(t *testing.T) {
-	got := RenderBadgeGroup([]BadgeGroupItem{{Label: "main", Fg: ColorGreen}}, true)
+	got := RenderBadgeGroup([]BadgeGroupItem{{Label: "main", Fg: ui.ColorGreen}}, true)
 	if !strings.Contains(got, capLeft) || !strings.Contains(got, capRight) {
 		t.Fatalf("expected badge group to render pill caps when nerd fonts enabled")
 	}

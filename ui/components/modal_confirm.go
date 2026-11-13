@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/badge"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -38,7 +39,7 @@ var ConfirmHint = ui.RenderInlineBindings(
 )
 
 func RenderConfirmChoices(yes bool, nerd bool) string {
-	return "  " + ui.RenderButton("Yes", yes, nerd) + "   " + ui.RenderButton("No", !yes, nerd)
+	return "  " + badge.RenderButton("Yes", yes, nerd) + "   " + badge.RenderButton("No", !yes, nerd)
 }
 
 func RenderConfirmContent(prompt string, yes bool, nerd bool, items ...string) string {
@@ -105,8 +106,8 @@ func LocateConfirmButtons(prompt string, items ...string) ConfirmButtonBounds {
 	row := len(strings.Split(body, "\n")) // choices is body's last line; +1 for the top border
 
 	const colOffset = 2 // border char + default padding column
-	yesW := ansi.StringWidth(ui.RenderButton("Yes", true, false))
-	noW := ansi.StringWidth(ui.RenderButton("No", false, false))
+	yesW := ansi.StringWidth(badge.RenderButton("Yes", true, false))
+	noW := ansi.StringWidth(badge.RenderButton("No", false, false))
 
 	yesX0 := colOffset + 2 // "  " prefix in RenderConfirmChoices
 	yesX1 := yesX0 + yesW

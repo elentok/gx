@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/badge"
 	"github.com/elentok/gx/ui/pushstate"
 )
 
@@ -298,7 +299,7 @@ func (m Model) renderSubjectLine(pr pr.PR, facets pr.Facets, width int) string {
 
 	draft := ""
 	if pr.IsDraft {
-		draft = ui.RenderBadgeText("DRAFT", ui.ColorYellow) + " "
+		draft = badge.RenderBadgeText("DRAFT", ui.ColorYellow) + " "
 	}
 
 	markerW := ansi.StringWidth(marker)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/git/stage"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/badge"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/diffview/diffcore"
 	"github.com/elentok/gx/ui/refrules"
@@ -187,7 +188,7 @@ func decorationBadgeParts(decorations []git.RefDecoration, hideRefs []*regexp.Re
 	sorted := refrules.SortDecorations(visible, rules)
 	parts := make([]string, 0, len(sorted))
 	for _, decoration := range sorted {
-		parts = append(parts, ui.RenderBadgeText(decoration.Name, badgeColorForDecoration(decoration, trunk)))
+		parts = append(parts, badge.RenderBadgeText(decoration.Name, badgeColorForDecoration(decoration, trunk)))
 	}
 	return parts
 }

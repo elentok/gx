@@ -1,4 +1,4 @@
-package ui
+package badge
 
 import (
 	"strings"

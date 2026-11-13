@@ -1,9 +1,11 @@
-package ui
+package badge
 
 import (
 	"image/color"
 
 	"charm.land/lipgloss/v2"
+
+	"github.com/elentok/gx/ui"
 )
 
 const (
@@ -19,7 +21,7 @@ func RenderButton(label string, selected bool, nerd bool) string {
 	var bgColor color.Color
 	var fgColor color.Color
 	if selected {
-		bgColor = ColorGreen
+		bgColor = ui.ColorGreen
 		fgColor = lipgloss.Color("0")
 	} else {
 		bgColor = lipgloss.Color("240")
