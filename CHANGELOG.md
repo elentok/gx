@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.49.7 - 2026-11-13
+
+- Removed the opt-in loopback TCP listener and the `server.tcp-listen` setting. The unix socket is now the only API entry. An old `tcp-listen` key in a config file is ignored.
+
 ## v0.49.6 - 2026-11-13
 
 - Added a Tier picker to scheduled prompts, plus a sticky save bar and row hover on the Schedules pages.

@@ -21,8 +21,6 @@ The web UI listener serves HTTPS only. A plain-HTTP request on the same port is 
 - **Host and Origin checks.** The listener checks the `Host` header against `server.web.allowed-hosts`
   and checks `Origin` and `Content-Type` on writes.
 - **Rate limit.** Wrong passwords, codes and Setup codes count toward a login rate limit.
-- **TCP listener.** The opt-in loopback listener (`server.tcp-listen`) refuses any request with an
-  `Origin` or `Sec-Fetch-Site` header, or with a non-loopback `Host`, so a browser cannot reach it.
 
 ## First-run setup
 

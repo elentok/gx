@@ -34,7 +34,6 @@ a `since` older than the window answers `410`, which means "take a new snapshot"
 
 - Adding a route means adding a CLI verb in the same change.
 - Refusal `reason` strings are a public contract. Renaming one breaks clients.
-- The TCP listener has no auth, so it binds to loopback addresses only.
 - Clients must handle `410` by re-snapshotting, never by retrying the same `since`.
 
 ## Amendment
