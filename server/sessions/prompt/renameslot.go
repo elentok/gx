@@ -95,13 +95,3 @@ func (s *renameSlots) settle(id string, seq uint64) {
 		slot.command = ""
 	}
 }
-
-// pending is the chat's held command, empty when none.
-func (s *renameSlots) pending(id string) string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if slot := s.chats[id]; slot != nil {
-		return slot.command
-	}
-	return ""
-}

@@ -118,6 +118,17 @@ func TestSessionRename_SamePinnedNamePublishesNothing(t *testing.T) {
 	}
 }
 
+func TestSessionRename_SamePinnedNameTypesNothing(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	id, conv := plainChat(t, f, "mine")
+	f.rename(t, id, "mine")
+	time.Sleep(2 * firstPromptGrace) // negative wait: a send would type within this window
+	if got := submitted(t, conv); got != "" {
+		t.Errorf("submitted = %q, want nothing for an unchanged pinned name", got)
+	}
+}
+
 func TestSessionRename_SameAutomaticNamePinsAndPublishes(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)

@@ -128,7 +128,7 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wi
 		if name, ok := renameCommandArg(text); ok {
 			// The harness renames itself, but a typed name never follows the
 			// terminal title, so the Agents tab would keep the old one.
-			if err := (namer{p}).setName(dir, &meta, name); err != nil {
+			if _, err := (namer{p}).setName(dir, &meta, name); err != nil {
 				return wire.SessionResult{}, err
 			}
 		}
@@ -199,6 +199,5 @@ func renameCommandArg(text string) (string, bool) {
 	if cmd != "/rename" && cmd != "/name" {
 		return "", false
 	}
-	arg, ok := validName(arg)
-	return arg, ok
+	return validName(arg)
 }
