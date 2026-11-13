@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.49.6 - 2026-11-13
+
+- Added a Tier picker to scheduled prompts, plus a sticky save bar and row hover on the Schedules pages.
+- Changed New chat to let you pick a harness, search projects and use arrow-key menus. It now defaults to main.
+- Changed the sidebar to show only the current triage session and hide exited ones.
+- Changed round cards in Agents to allow Submit with gaps when any question has an answer or note.
+- Fixed sideways page scroll in chat. Wide tables and code blocks now scroll on their own.
+
 ## v0.49.5 - 2026-11-13
 
 - Added Scheduled prompts. A Schedule is stored as a file under `.schedules` and starts a run at each set time, with catch-up after a sleep or restart. It follows daylight saving rules and keeps per-machine state.
