@@ -36,7 +36,7 @@ func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
 		t.Errorf("fresh status = %q, want no config block", out.String())
 	}
 
-	servertest.WriteConfig(t, path, store, map[string]any{"server": map[string]any{"tcp-listen": true}})
+	servertest.WriteConfig(t, path, store, map[string]any{"server": map[string]any{"web": map[string]any{"listen": "127.0.0.1:0"}}})
 	if _, err := h.Client.Admin.ReloadConfig(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &st); err != nil {
 		t.Fatal(err)
 	}
-	if st.LastReload == nil || st.LastReload.Outcome != wire.EventLevelWarning || !slices.Equal(st.PendingRestart, []string{"server.tcp-listen"}) {
+	if st.LastReload == nil || st.LastReload.Outcome != wire.EventLevelWarning || !slices.Equal(st.PendingRestart, []string{"server.web.listen"}) {
 		t.Errorf("config-status --json = %s", out.String())
 	}
 
@@ -62,7 +62,7 @@ func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &info); err != nil {
 		t.Fatal(err)
 	}
-	if info.Config == nil || info.Config.LastReload == nil || !slices.Equal(info.Config.PendingRestart, []string{"server.tcp-listen"}) {
+	if info.Config == nil || info.Config.LastReload == nil || !slices.Equal(info.Config.PendingRestart, []string{"server.web.listen"}) {
 		t.Errorf("status --json = %s, want the config block", out.String())
 	}
 
@@ -70,7 +70,7 @@ func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
 	if err := runServerStatusWith(ctx, dirs, h.Client, false, &out); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"config:\n  last reload: warning (command, ", "\n  restart needed for: server.tcp-listen\n"} {
+	for _, want := range []string{"config:\n  last reload: warning (command, ", "\n  restart needed for: server.web.listen\n"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("status = %q, want %q", out.String(), want)
 		}

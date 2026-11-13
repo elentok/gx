@@ -63,7 +63,7 @@ func TestReadGlobalHidesSecretsAndShowsChatID(t *testing.T) {
 	w, _ := readFixture(t, `{
 		"notifications":{"telegram":{"bot-token":"`+testToken+`","chat-id":"4242"},"slack":{"webhook-url":"`+testWebhook+`"}},
 		"execution-queue":{"max-agents":3}}`, `{}`)
-	resp, err := w.Read(Target{}, []string{"server.tcp-listen"})
+	resp, err := w.Read(Target{}, []string{"server.web.listen"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestReadGlobalHidesSecretsAndShowsChatID(t *testing.T) {
 	if e := entryByKey(t, resp, "notifications.telegram.chat-id"); string(e.Value) != `"4242"` {
 		t.Errorf("chat-id = %s", e.Value)
 	}
-	if len(resp.PendingRestart) != 1 || resp.PendingRestart[0] != "server.tcp-listen" {
+	if len(resp.PendingRestart) != 1 || resp.PendingRestart[0] != "server.web.listen" {
 		t.Errorf("pending = %v", resp.PendingRestart)
 	}
 	for _, e := range w.Registry.All() {
@@ -105,7 +105,7 @@ func TestReadDistinguishesSetFromDefault(t *testing.T) {
 	if unset.Set || unset.Value != nil || unset.Default == nil {
 		t.Errorf("unset entry = %+v", unset)
 	}
-	if e := entryByKey(t, resp, "server.tcp-listen"); !e.Restart || !e.Risky || e.ConfirmText == "" {
+	if e := entryByKey(t, resp, "server.web.listen"); !e.Restart || !e.Risky || e.ConfirmText == "" {
 		t.Errorf("flags lost: %+v", e)
 	}
 }
@@ -128,7 +128,7 @@ func TestReadProjectListsOnlyProjectKeys(t *testing.T) {
 			t.Errorf("project read lists notifications key %s", e.Key)
 		}
 	}
-	for _, key := range []string{"evolve.deep-read-cap", "notifications.telegram.chat-id", "server.tcp-listen"} {
+	for _, key := range []string{"evolve.deep-read-cap", "notifications.telegram.chat-id", "server.web.listen"} {
 		if hasKey(resp, key) {
 			t.Errorf("project read lists %s", key)
 		}

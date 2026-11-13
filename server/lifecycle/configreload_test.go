@@ -129,9 +129,9 @@ func TestConfigReload_StartupOnlyKeyWarnsUntilRestart(t *testing.T) {
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path), func(c *server.Config) { c.MaxAgents = 3 })
 	servertest.WriteConfig(t, path, store, map[string]any{
 		"execution-queue": map[string]any{"max-agents": 4},
-		"server":          map[string]any{"tcp-listen": true},
+		"server":          map[string]any{"web": map[string]any{"listen": "127.0.0.1:0"}},
 	})
-	want := []string{"restart needed for server.tcp-listen"}
+	want := []string{"restart needed for server.web.listen"}
 	res := reload(t, h)
 	if res.Refused || !slices.Contains(res.Changed, "execution-queue.max-agents") || !slices.Equal(res.Warnings, want) {
 		t.Fatalf("first = %+v, want max-agents changed and warnings %v", res, want)
@@ -192,8 +192,8 @@ func TestConfigReload_ReportsBannerAndEventNotChat(t *testing.T) {
 		{"unchanged", func() {},
 			wire.EventLevelSuccess, osnotify.Notification{Title: "gx config reloaded successfully", Body: "no changes", Group: "gx-config"}},
 		{"warning", func() {
-			servertest.WriteConfig(t, path, store, map[string]any{"execution-queue": map[string]any{"max-agents": 4}, "server": map[string]any{"tcp-listen": true}})
-		}, wire.EventLevelWarning, osnotify.Notification{Title: "gx config reloaded with warnings", Body: "restart needed for server.tcp-listen", Group: "gx-config"}},
+			servertest.WriteConfig(t, path, store, map[string]any{"execution-queue": map[string]any{"max-agents": 4}, "server": map[string]any{"web": map[string]any{"listen": "127.0.0.1:0"}}})
+		}, wire.EventLevelWarning, osnotify.Notification{Title: "gx config reloaded with warnings", Body: "restart needed for server.web.listen", Group: "gx-config"}},
 		{"invalid", func() {
 			if err := os.WriteFile(path, []byte(`{`), 0o644); err != nil {
 				t.Fatal(err)

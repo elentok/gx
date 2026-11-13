@@ -22,13 +22,13 @@ func TestReloadConfig_PrintsChangesWarningsAndRefusals(t *testing.T) {
 
 	servertest.WriteConfig(t, path, store, map[string]any{
 		"execution-queue": map[string]any{"max-agents": 4},
-		"server":          map[string]any{"tcp-listen": true},
+		"server":          map[string]any{"web": map[string]any{"listen": "127.0.0.1:0"}},
 	})
 	var out bytes.Buffer
 	if err := runReloadConfig(ctx, h.Client, &out, false); err != nil {
 		t.Fatalf("success: %v", err)
 	}
-	for _, want := range []string{"gx config reloaded successfully\n", "changed: ", "execution-queue.max-agents", "warning: restart needed for server.tcp-listen\n"} {
+	for _, want := range []string{"gx config reloaded successfully\n", "changed: ", "execution-queue.max-agents", "warning: restart needed for server.web.listen\n"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output = %q, want %q", out.String(), want)
 		}
