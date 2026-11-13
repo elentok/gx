@@ -208,6 +208,7 @@ func runProgram() (int, error) {
 		}
 		p.box.leaveI = os.Getenv(ProgramClearLeavesIEnv) == "1"
 		p.box.logClear = p.box.leaveI || os.Getenv(ProgramLogClearEnv) == "1"
+		p.box.Hung = os.Getenv(ProgramClearNeverEnv) == "1"
 		p.box.configPath = claudesettings.Path()
 		if s := os.Getenv(ProgramReadyDelayEnv); s != "" {
 			if p.inputBoxDelay, err = time.ParseDuration(s); err != nil {

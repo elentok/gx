@@ -29,6 +29,10 @@ const ProgramInsertNoMarkerEnv = "GX_AGENTFAKE_PROGRAM_INSERT_NO_MARKER"
 // "i" in the input; the second clears it. It also logs every clear key.
 const ProgramClearLeavesIEnv = "GX_AGENTFAKE_PROGRAM_CLEAR_LEAVES_I"
 
+// ProgramClearNeverEnv, set to "1", makes the clear key and Enter do nothing,
+// so a draft seeded by ProgramDraftEnv stays.
+const ProgramClearNeverEnv = "GX_AGENTFAKE_PROGRAM_CLEAR_NEVER"
+
 // ProgramLogClearEnv, set to "1", logs every clear key (Ctrl+U) to
 // ProgramSubmittedPath as ProgramClearEntry, so a test counts them. It is off
 // by default because other tests compare that log exactly. Pre-typed text

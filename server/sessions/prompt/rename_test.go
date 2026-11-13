@@ -1,10 +1,12 @@
 package prompt_test
 
 import (
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
+	"github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -268,6 +271,63 @@ func TestSessionRename_CodexUnrecognizedCommandRaisesSendFailed(t *testing.T) {
 	}
 	if len(got.Action) != 1 || got.Action[0] != "/rename new name" {
 		t.Errorf("action = %v, want the rename command to resend", got.Action)
+	}
+}
+
+func TestSessionRename_DraftThatWillNotClearRaisesTheCard(t *testing.T) {
+	t.Parallel()
+	f := fromPrompt(rigs.StartPromptSessionAs(t, firstPromptGrace, wire.CreateSessionRequest{Name: "old"}, servertest.WithEnv(agentfake.ProgramDraftEnv+"=my draft", agentfake.ProgramClearNeverEnv+"=1")))
+	f.rename(t, f.id, "new name")
+	got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised }).Actionable
+	if !strings.Contains(got.Reason, prompt.DraftReason) {
+		t.Errorf("reason = %q, want it to name %q", got.Reason, prompt.DraftReason)
+	}
+	if len(got.Action) != 1 || got.Action[0] != "/rename new name" {
+		t.Errorf("action = %v, want the rename command to resend", got.Action)
+	}
+}
+
+// A Blocked chat can only close into Starting through a restart with a dead
+// holder, and the restart drops the in-memory hold with it.
+func TestRenameHold_DroppedWhenBlockedClosesIntoStartingOnRestart(t *testing.T) {
+	t.Parallel()
+	f := fromPrompt(rigs.StartPromptSessionAs(t, firstPromptGrace, wire.CreateSessionRequest{Name: "old"}, func(c *server.Config) { c.AgentsResumeOnStart = true }))
+	id, conv := blockedChat(t, f)
+	f.rename(t, id, "new name")
+	child := waitForHolder(t, filepath.Join(f.h.SessionsDir, id)).ChildPID()
+	if err := f.h.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	// A reboot kills the holder and its child together.
+	out, err := exec.Command("ps", "-o", "ppid=", "-p", strconv.Itoa(child)).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	holder, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = syscall.Kill(holder, syscall.SIGKILL)
+	_ = syscall.Kill(-child, syscall.SIGKILL)
+
+	f.h.Restart(t)
+	waitUntil(t, "session resumed", func() bool {
+		snap, err := f.h.Client.Snapshot(f.ctx)
+		if err != nil {
+			return false
+		}
+		for _, s := range snap.Sessions {
+			if s.ID == id {
+				return s.Status.State == wire.SessionStarting
+			}
+		}
+		return false
+	})
+	waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
+	report(t, conv, agentfake.Control{State: "idle"})
+	time.Sleep(2 * actionWatchSettle) // negative wait: a release would type within this window
+	if got := submitted(t, conv); got != "" {
+		t.Errorf("submitted = %q, want the held command dropped", got)
 	}
 }
 
