@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server/sessions/chat"
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/triage"
+	"github.com/elentok/gx/server/web"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/workspaces"
@@ -134,6 +135,11 @@ func (s *Server) SettleReleasedRun(address string) {
 // Scheduler is the claim loop's watchdogs. Tests outside the package read their
 // seams through here.
 func (s *Server) Scheduler() *sched.Scheduler { return s.scheduler }
+
+// WebUI is the web listener, for tests outside the package that switch what
+// it serves (UseViteProxy, UseBuiltUI).
+// A function, not a method: Server sits at its method limit.
+func WebUI(s *Server) *web.Web { return s.web }
 
 // WebAuth is the web login gate, nil unless the web listener is bound. Tests
 // outside the package read its seams through here.

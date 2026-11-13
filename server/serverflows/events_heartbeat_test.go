@@ -1,4 +1,4 @@
-package server_test
+package serverflows_test
 
 import (
 	"bufio"

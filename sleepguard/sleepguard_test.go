@@ -41,7 +41,7 @@ var allowed = map[string]int{
 	"nativerunner/ptycodex/codex_test.go":                     2, // poll loops with a deadline
 	"nativerunner/ptycodex/codexapproval_test.go":             2, // poll loops with a deadline
 	"procwatch/procwatch_test.go":                             3, // a poll loop with a deadline; negative waits: a killed forker forks no more, a storm is not reported under the threshold
-	"server/devmode_failure_test.go":                          1, // negative wait: a crashed Vite is not restarted on its own
+	"server/serverflows/devmode_failure_test.go":              1, // negative wait: a crashed Vite is not restarted on its own
 	"server/designs/designready_test.go":                      1, // negative wait: no Ready message follows a rescan
 	"server/prflow/giveup_test.go":                            1, // negative wait: giving up on CI sends no second notice
 	"server/prflow/markmerged_test.go":                        1, // negative wait: a hand Mark as merged sends no merged notice
@@ -144,7 +144,7 @@ var allowed = map[string]int{
 	"server/merge/trunkconflict_claim_test.go":                1,
 	"server/servertest/ptyrunner_test.go":                     3, // negative waits: a wrong reap or kill would come within a few polls
 	"server/merge/trunklock_test.go":                          1,
-	"server/unavailable_test.go":                              1,
+	"server/serverflows/unavailable_test.go":                  1,
 	"storecommit/storecommit_test.go":                         1,
 	"testutil/agentfake/tuiclaude/tui_test.go":                10, // poll loop with a deadline; negative waits: a slow-marker status must stay busy; an unarmed slash prompt starts no turn; an ignored Allow keeps the dialog open; a lone Esc leaves the turn alone; a stall lands before the prompt; the registry delay (1s) must pass before the retry; the launch-record opt-out writes no user record
 	"testutil/agentfake/worker_test.go":                       1,
