@@ -717,3 +717,38 @@ test("a /clear echo leaves with the old conversation, though the old one began w
   await vi.waitFor(() => expect(screen.getAllByText("/clear")).toHaveLength(1))
   expect(prompts.at(-1)?.text).toBe("/clear")
 })
+
+test("Codex /clear hides the old conversation before Codex reports the new conversation id", async () => {
+  stubPrompt(accepted)
+  let next = chat()
+  const { emit } = render([session("s-1", "p", { harness: "codex" })], "/agents/s-1", true, {
+    chat: async () => ({ kind: "ok", detail: next }),
+  })
+  await screen.findByText("hello there")
+
+  await type("/clear ")
+  fireEvent.click(sendButton())
+  await vi.waitFor(() => expect(screen.queryByText("hello there")).toBeNull())
+  expect(screen.queryByText("/clear")).toBeNull()
+
+  await vi.waitFor(async () => expect((await composerBox()).value).toBe(""))
+  await type("first prompt")
+  fireEvent.click(sendButton())
+  await screen.findByText("first prompt")
+  expect(screen.queryByText("hello there")).toBeNull()
+
+  next = chat({
+    conversation_id: "c2",
+    messages: [
+      {
+        id: "n1",
+        role: "person",
+        kind: "prompt",
+        text: "first prompt",
+        at: "2026-01-01T00:00:00Z",
+      },
+    ],
+  })
+  emit("s-1")
+  await vi.waitFor(() => expect(screen.getAllByText("first prompt")).toHaveLength(1))
+})

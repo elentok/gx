@@ -205,16 +205,25 @@ export function SessionView({
   const [echoed, setEchoed] = useState<
     (EchoPrompt & { sessionId: string; conversationId: string; seen: number; after?: string })[]
   >([])
+  // Codex clears its screen before it reports the new conversation id. Keep the old transcript hidden during that gap.
+  const [cleared, setCleared] = useState<{ sessionId: string; conversationId: string }>()
+  const historyCleared =
+    session.harness === "codex" &&
+    cleared?.sessionId === session.id &&
+    cleared.conversationId === chat?.conversation_id
+  const messages = historyCleared ? [] : (chat?.messages ?? [])
   // An echo belongs to the conversation it was sent in: /clear starts a new one whose first message is its own /clear,
   // so the old count would never be passed and the echo would stay.
   const waiting = echoed.filter(
     (e) =>
       e.sessionId === session.id &&
       (e.conversationId === "" || e.conversationId === chat?.conversation_id) &&
-      echoMatches(chat?.messages ?? [], e) <= e.seen,
+      echoMatches(messages, e) <= e.seen,
   )
   const shown =
-    chat && waiting.length > 0 ? { ...chat, messages: withEchoes(chat.messages, waiting) } : chat
+    chat && (historyCleared || waiting.length > 0)
+      ? { ...chat, messages: withEchoes(messages, waiting) }
+      : chat
   return (
     <Box display="flex" flexDirection="column" height="100%" minH="0">
       <SessionHeader
@@ -277,6 +286,11 @@ export function SessionView({
         onStale={refetch}
         onSent={(sent, images) => {
           const echo = { text: stripChips(sent), images }
+          if (session.harness === "codex" && echo.text === "/clear" && images.length === 0) {
+            setCleared({ sessionId: session.id, conversationId: chat?.conversation_id ?? "" })
+            setEchoed((all) => all.filter((e) => e.sessionId !== session.id))
+            return
+          }
           setEchoed((all) => [
             ...all,
             {
