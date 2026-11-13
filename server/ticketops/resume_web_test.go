@@ -10,15 +10,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func webResume(t *testing.T, h *servertest.Harness, req wire.RepairRequest) wire.RepairResult {
@@ -81,7 +80,7 @@ func TestWebResume_ZeroCommitWithAGoneAgentReopensAndLogsTheAnswer(t *testing.T)
 		t.Errorf("ticket = %+v, %v; want open", tk, err)
 	}
 	got := answerEvents(t, e.Ticket)
-	if len(got) != 1 || got[0].Choice != "unpark" || got[0].Source != "web" || got[0].How != tickets.HowResume || got[0].Base != "" {
+	if len(got) != 1 || got[0].Choice != "unpark" || got[0].Source != "web" || got[0].How != ticketlog.HowResume || got[0].Base != "" {
 		t.Errorf("answers = %+v; want one web pause.answer{choice: unpark, how: resume}", got)
 	}
 }
@@ -100,12 +99,12 @@ func TestWebResume_SelfReportedWithAGoneAgentEndsTheRoundAsResume(t *testing.T) 
 	}
 
 	resumeResult(t, webResume(t, h, wire.RepairRequest{State: state}))
-	evs, err := tickets.ReadLog(ticketPath)
+	evs, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rounds := tickets.Rounds(evs)
-	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowResume || rounds[0].End.Source != tickets.SourceWeb {
+	rounds := ticketlog.Rounds(evs)
+	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != ticketlog.HowResume || rounds[0].End.Source != ticketlog.SourceWeb {
 		t.Errorf("rounds = %+v; want one ended by web resume", rounds)
 	}
 }
@@ -140,18 +139,18 @@ func TestWebResume_ZeroCommitPromptKeepsTheRoundOpenAndIsLogged(t *testing.T) {
 
 	resumeResult(t, webResume(t, e.H, wire.RepairRequest{State: state}))
 
-	evs, err := tickets.ReadLog(e.Ticket)
+	evs, err := ticketlog.ReadLog(e.Ticket)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var prompts []tickets.LogEvent
+	var prompts []ticketlog.LogEvent
 	for _, ev := range evs {
-		if ev.Type == tickets.EventPausePrompted {
+		if ev.Type == ticketlog.EventPausePrompted {
 			prompts = append(prompts, ev)
 		}
 	}
-	open := tickets.OpenRound(evs)
-	if len(prompts) != 1 || open == nil || prompts[0].Question != open.Seq || prompts[0].Source != tickets.SourceWeb {
+	open := ticketlog.OpenRound(evs)
+	if len(prompts) != 1 || open == nil || prompts[0].Question != open.Seq || prompts[0].Source != ticketlog.SourceWeb {
 		t.Fatalf("prompts = %+v, open = %+v; want one web pause.prompted on the open round", prompts, open)
 	}
 	if got := stateOf(t, e.Ticket); got != state {
@@ -319,7 +318,7 @@ func TestWebResume_AnUnreadableLogIsAnErrorNotStale(t *testing.T) {
 	e := startAnswerEnv(t, nil)
 	state := pauseEnvZeroCommit(t, e)
 
-	logPath := tickets.LogPath(e.Ticket)
+	logPath := ticketlog.LogPath(e.Ticket)
 	if err := os.Chmod(logPath, 0); err != nil {
 		t.Fatal(err)
 	}

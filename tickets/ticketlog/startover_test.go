@@ -45,7 +45,7 @@ Earlier note.
 `)
 
 	now := time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC)
-	if err := StartOver(path, now, "", tickets.SourceCLI); err != nil {
+	if err := StartOver(path, now, "", SourceCLI); err != nil {
 		t.Fatalf("StartOver: %v", err)
 	}
 
@@ -83,7 +83,7 @@ func TestStartOver_RetiresOldRepairSection(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
 	tickettest.WriteFile(t, path, "---\nid: \"05\"\nstatus: paused\npause_reason: merge-conflict\ntype: implement\n---\n\n"+tickets.LegacyRepairHeading+"\n\nBroke.\n")
 
-	if err := StartOver(path, time.Now(), "", tickets.SourceCLI); err != nil {
+	if err := StartOver(path, time.Now(), "", SourceCLI); err != nil {
 		t.Fatalf("StartOver: %v", err)
 	}
 
@@ -99,7 +99,7 @@ func TestStartOver_MarksVerifiedEntriesAsHistory(t *testing.T) {
 	body := schema.AppendVerified("# 05 — Thing\n", schema.VerifiedEntry{Story: "45", Verdict: "pass", Commit: "abc"})
 	tickettest.WriteFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n"+body)
 
-	if err := StartOver(path, time.Now(), "", tickets.SourceCLI); err != nil {
+	if err := StartOver(path, time.Now(), "", SourceCLI); err != nil {
 		t.Fatalf("StartOver: %v", err)
 	}
 
@@ -114,7 +114,7 @@ func TestStartOver_NoteIsWrittenInSameWrite(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
 	tickettest.WriteFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
 
-	if err := StartOver(path, time.Now(), "restart note text\n", tickets.SourceCLI); err != nil {
+	if err := StartOver(path, time.Now(), "restart note text\n", SourceCLI); err != nil {
 		t.Fatalf("StartOver: %v", err)
 	}
 
@@ -127,24 +127,24 @@ func TestStartOver_NoteIsWrittenInSameWrite(t *testing.T) {
 func TestStartOver_ClosesOpenQuestion(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
 	tickettest.WriteFile(t, path, "---\nid: \"05\"\nstatus: paused\npause_reason: self-reported\ntype: implement\n---\n\n# 05 — Thing\n")
-	q, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "Which?", Text: "Which?"})
+	q, err := AppendLog(path, LogEvent{Type: EventPauseQuestion, By: "gx", Summary: "Which?", Text: "Which?"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := StartOver(path, time.Now(), "", tickets.SourceCLI); err != nil {
+	if err := StartOver(path, time.Now(), "", SourceCLI); err != nil {
 		t.Fatalf("StartOver: %v", err)
 	}
 
-	evs, _ := tickets.ReadLog(path)
-	if len(evs) != 2 || evs[1].Type != tickets.EventPauseClosed || evs[1].Question != q.Seq || evs[1].Reason != "start-over" || evs[1].Source != tickets.SourceCLI || evs[1].How != tickets.HowStartOver {
+	evs, _ := ReadLog(path)
+	if len(evs) != 2 || evs[1].Type != EventPauseClosed || evs[1].Question != q.Seq || evs[1].Reason != "start-over" || evs[1].Source != SourceCLI || evs[1].How != HowStartOver {
 		t.Fatalf("log = %+v, want pause.closed{question: %d, reason: start-over, source: cli, how: start-over}", evs, q.Seq)
 	}
 	// A second start over has no open question: no write, no error.
-	if err := StartOver(path, time.Now(), "", tickets.SourceCLI); err != nil {
+	if err := StartOver(path, time.Now(), "", SourceCLI); err != nil {
 		t.Fatalf("second StartOver: %v", err)
 	}
-	if evs, _ = tickets.ReadLog(path); len(evs) != 2 {
+	if evs, _ = ReadLog(path); len(evs) != 2 {
 		t.Fatalf("log grew without an open question: %+v", evs)
 	}
 }
@@ -152,13 +152,13 @@ func TestStartOver_ClosesOpenQuestion(t *testing.T) {
 func TestStartOver_WithoutSourceLeavesTheRoundOpen(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
 	tickettest.WriteFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
-	if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "Which?", Text: "Which?"}); err != nil {
+	if _, err := AppendLog(path, LogEvent{Type: EventPauseQuestion, By: "gx", Summary: "Which?", Text: "Which?"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := StartOver(path, time.Now(), "", ""); err != nil {
 		t.Fatalf("StartOver: %v", err)
 	}
-	if evs, _ := tickets.ReadLog(path); len(evs) != 1 {
+	if evs, _ := ReadLog(path); len(evs) != 1 {
 		t.Fatalf("log = %+v, want only the question", evs)
 	}
 }
@@ -166,10 +166,10 @@ func TestStartOver_WithoutSourceLeavesTheRoundOpen(t *testing.T) {
 func TestStartOver_NoQuestionWritesNoLog(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
 	tickettest.WriteFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
-	if err := StartOver(path, time.Now(), "", tickets.SourceCLI); err != nil {
+	if err := StartOver(path, time.Now(), "", SourceCLI); err != nil {
 		t.Fatalf("StartOver: %v", err)
 	}
-	if _, err := os.Stat(tickets.LogPath(path)); !os.IsNotExist(err) {
+	if _, err := os.Stat(LogPath(path)); !os.IsNotExist(err) {
 		t.Fatalf("log exists after start over with no question: %v", err)
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/ticketgit"
 )
 
@@ -87,7 +88,7 @@ func ScanEpic(storePath, cwd, name string) (*EpicScan, error) {
 		return nil, err
 	}
 	for _, epic := range epics {
-		if epic.Name != name || tickets.IsOneOffsEpicName(epic.Name) {
+		if epic.Name != name || oneoff.IsOneOffsEpicName(epic.Name) {
 			continue
 		}
 		scan, err := scanEpic(repo, epic)
@@ -190,7 +191,7 @@ func ScanIn(storePath, cwd string) (Result, error) {
 	result := Result{Epics: []EpicScan{}}
 	for _, epic := range activeEpics {
 		// The standing one-offs epic never finishes and never merges as a unit.
-		if tickets.IsOneOffsEpicName(epic.Name) {
+		if oneoff.IsOneOffsEpicName(epic.Name) {
 			continue
 		}
 		scan, err := scanEpic(repo, epic)

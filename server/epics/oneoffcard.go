@@ -9,8 +9,8 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/triage"
 )
@@ -18,7 +18,7 @@ import (
 // oneOffCards lists the cards of e's one-off tickets, none when e holds none. A
 // done or archived one-off gets a Finished card; capFinishedOneOffs trims those.
 func (s *Epics) oneOffCards(project string, e tickets.Epic, qidx queueIndex) []wire.EpicListRow {
-	if !tickets.IsOneOffEpic(e) {
+	if !oneoff.IsOneOffEpic(e) {
 		return nil
 	}
 	var rows []wire.EpicListRow

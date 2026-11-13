@@ -3,7 +3,6 @@ package launchtest_test
 import (
 	"context"
 	"errors"
-	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,16 +11,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // claimOpen puts ticket 01 in the queue as a ticket that has run before
@@ -43,14 +42,14 @@ func claimOpen(t *testing.T, runner string, agent string, answered, rollout bool
 	if err := os.WriteFile(path, []byte(withSession), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "agent", Summary: "which one?", Handoff: "half done"}); err != nil {
+	if _, err := ticketlog.AppendLog(path, ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, By: "agent", Summary: "which one?", Handoff: "half done"}); err != nil {
 		t.Fatal(err)
 	}
-	end := tickets.LogEvent{Type: tickets.EventPauseClosed, Question: 1, Reason: "resume"}
+	end := ticketlog.LogEvent{Type: ticketlog.EventPauseClosed, Question: 1, Reason: "resume"}
 	if answered {
-		end = tickets.LogEvent{Type: tickets.EventPauseAnswer, Question: 1, Source: "web", Choice: "a"}
+		end = ticketlog.LogEvent{Type: ticketlog.EventPauseAnswer, Question: 1, Source: "web", Choice: "a"}
 	}
-	if _, err := tickets.AppendLog(path, end); err != nil {
+	if _, err := ticketlog.AppendLog(path, end); err != nil {
 		t.Fatal(err)
 	}
 

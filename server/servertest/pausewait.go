@@ -10,8 +10,8 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // WaitStatus waits for the ticket at ticketPath to reach want.
@@ -61,14 +61,14 @@ func AssertPauseRecordsRun(t *testing.T, store string, pause events.Type, runner
 // AppendPauseRound logs a zero-commit pause question, and its cli close when closed.
 func AppendPauseRound(t *testing.T, ticketPath string, closed bool) {
 	t.Helper()
-	q, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseQuestion, PauseKind: "zero-commit"})
+	q, err := ticketlog.AppendLog(ticketPath, ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, PauseKind: "zero-commit"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !closed {
 		return
 	}
-	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseClosed, Question: q.Seq, Source: tickets.SourceCLI}); err != nil {
+	if _, err := ticketlog.AppendLog(ticketPath, ticketlog.LogEvent{Type: ticketlog.EventPauseClosed, Question: q.Seq, Source: ticketlog.SourceCLI}); err != nil {
 		t.Fatal(err)
 	}
 }

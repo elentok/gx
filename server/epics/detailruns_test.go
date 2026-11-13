@@ -1,18 +1,17 @@
 package epics_test
 
 import (
-	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/server/servertest/rigs"
+	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 var runsT0 = time.Date(2026, 1, 2, 10, 0, 0, 0, time.UTC)
@@ -48,8 +47,8 @@ func runsWith(t *testing.T, status, extra string, answerMins []int, prep func(ti
 		}
 		path := filepath.Join(store, "proj", "work", "issues", "01-a.md")
 		for _, min := range answerMins {
-			ev := tickets.LogEvent{Type: tickets.EventPauseAnswer, TS: runsT0.Add(time.Duration(min) * time.Minute), Choice: "go"}
-			if _, err := tickets.AppendLog(path, ev); err != nil {
+			ev := ticketlog.LogEvent{Type: ticketlog.EventPauseAnswer, TS: runsT0.Add(time.Duration(min) * time.Minute), Choice: "go"}
+			if _, err := ticketlog.AppendLog(path, ev); err != nil {
 				t.Fatal(err)
 			}
 		}

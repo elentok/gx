@@ -12,7 +12,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestFinishingScenario_LastTicketFinishesAndMerges(t *testing.T) {
@@ -183,12 +183,12 @@ func (r *running) roundTypes(t *testing.T, project, epic, id string) []string {
 	if len(paths) != 1 {
 		t.Fatalf("ticket files for %s = %v", id, paths)
 	}
-	evs, err := tickets.ReadLog(paths[0])
+	evs, err := ticketlog.ReadLog(paths[0])
 	if err != nil {
 		t.Fatal(err)
 	}
 	var types []string
-	for _, round := range tickets.AllRounds(evs) {
+	for _, round := range ticketlog.AllRounds(evs) {
 		types = append(types, round.Question.Type)
 	}
 	return types
@@ -199,13 +199,13 @@ func TestPausedScenario_EachPauseHasTheRoundOfItsKind(t *testing.T) {
 	r := start(t, "paused")
 	// A question only where the reply goes to the agent.
 	for id, want := range map[string]string{
-		"03": tickets.EventPauseQuestion,
-		"04": tickets.EventPauseQuestion,
-		"05": tickets.EventPauseRepair,
-		"06": tickets.EventPauseQuestion,
-		"07": tickets.EventPauseRepair,
-		"08": tickets.EventPauseRepair,
-		"09": tickets.EventPauseRepair,
+		"03": ticketlog.EventPauseQuestion,
+		"04": ticketlog.EventPauseQuestion,
+		"05": ticketlog.EventPauseRepair,
+		"06": ticketlog.EventPauseQuestion,
+		"07": ticketlog.EventPauseRepair,
+		"08": ticketlog.EventPauseRepair,
+		"09": ticketlog.EventPauseRepair,
 	} {
 		if got := r.roundTypes(t, "demo", "paused-epic", id); !slices.Equal(got, []string{want}) {
 			t.Errorf("%s rounds = %v, want [%s]", id, got, want)

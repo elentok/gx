@@ -18,8 +18,8 @@ import (
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 	triagerec "github.com/elentok/gx/triage"
 )
 
@@ -302,17 +302,17 @@ func (f *fixture) initRepo(dir string) error {
 // stored on it as an investigate agent would.
 func seedPauseRound(ticketPath, reason string, rec recommendation) error {
 	summary := "Seeded pause: " + reason
-	ev := tickets.LogEvent{Type: tickets.EventPauseRepair, By: "gx", PauseKind: reason, Reason: summary}
+	ev := ticketlog.LogEvent{Type: ticketlog.EventPauseRepair, By: "gx", PauseKind: reason, Reason: summary}
 	if schema.PauseReason(reason).AsksQuestion() {
-		ev = tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: summary}
+		ev = ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, By: "gx", Summary: summary}
 	}
-	if _, err := tickets.AppendLog(ticketPath, ev); err != nil {
+	if _, err := ticketlog.AppendLog(ticketPath, ev); err != nil {
 		return err
 	}
 	if rec.Verb == "" {
 		return nil
 	}
-	_, err := tickets.RecommendOpenRound(ticketPath, rec.Verb, rec.Diagnosis)
+	_, err := ticketlog.RecommendOpenRound(ticketPath, rec.Verb, rec.Diagnosis)
 	return err
 }
 

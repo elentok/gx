@@ -12,8 +12,8 @@ import (
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // KeepWaiting puts the live run of a background-task-gate pause back in the
@@ -62,7 +62,7 @@ func (o *Ops) gateVerb(req wire.QueueRequest, heldReason string, act func(run ru
 				return wire.QueueResult{}, err
 			}
 		}
-		if err := tickets.EndOpenRound(ref.Ticket.Path, req.Source, tickets.HowResume, ticketops.CloseResumed); err != nil {
+		if err := ticketlog.EndOpenRound(ref.Ticket.Path, req.Source, ticketlog.HowResume, ticketops.CloseResumed); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.Addr, err)
 		}
 		held := run.Run.PauseEvent()

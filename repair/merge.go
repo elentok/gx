@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // MergeResult is the --json success payload of `gx server tickets merge`.
@@ -180,7 +181,7 @@ func abortOrphanLock(epicPath, lockDir, id string) (MergeResult, string, error) 
 // through the pause path. The ticket's open Pause round ends first, so a crash
 // between the two leaves a closed round on a paused ticket, not an open one on a done ticket.
 func recordLanded(epicPath, epic, source string, t tickets.Ticket, status schema.Status, res merge.MergeResult, session merge.MergeSession) error {
-	if err := tickets.EndOpenRound(t.Path, source, tickets.HowManualMerge, "manual-merge"); err != nil {
+	if err := ticketlog.EndOpenRound(t.Path, source, ticketlog.HowManualMerge, "manual-merge"); err != nil {
 		return fmt.Errorf("end pause round of %s: %w", t.Identifier, err)
 	}
 	ev := runlog.Event{

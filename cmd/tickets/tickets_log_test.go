@@ -6,17 +6,17 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/cmd/cmdtest"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func appendTestLog(t *testing.T, project string) {
 	t.Helper()
 	path := filepath.Join(project, "epic", "issues", "06-hello.md")
-	for _, ev := range []tickets.LogEvent{
-		{Type: tickets.EventPauseQuestion, By: "person", Summary: "Which?", Text: "detail"},
-		{Type: tickets.EventPauseAnswer, Question: 1, Choice: "a"},
+	for _, ev := range []ticketlog.LogEvent{
+		{Type: ticketlog.EventPauseQuestion, By: "person", Summary: "Which?", Text: "detail"},
+		{Type: ticketlog.EventPauseAnswer, Question: 1, Choice: "a"},
 	} {
-		if _, err := tickets.AppendLog(path, ev); err != nil {
+		if _, err := ticketlog.AppendLog(path, ev); err != nil {
 			t.Fatal(err)
 		}
 	}

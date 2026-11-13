@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // pastCLINotice is longer than the 1 s after which the CLI prints "waiting for
@@ -70,13 +71,13 @@ func TestMigrate_AgentOutputWriteWaitsForTheMigrationThenLands(t *testing.T) {
 	if got.err != nil || got.res.Refused {
 		t.Fatalf("answer = %+v, %v", got.res, got.err)
 	}
-	events, err := tickets.ReadLog(ticket)
+	events, err := ticketlog.ReadLog(ticket)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var logged bool
 	for _, ev := range events {
-		logged = logged || ev.Type == tickets.EventPausePermission
+		logged = logged || ev.Type == ticketlog.EventPausePermission
 	}
 	if !logged {
 		t.Errorf("permission answer not in the ticket log after the migration: %+v", events)

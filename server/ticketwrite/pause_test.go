@@ -2,7 +2,6 @@ package ticketwrite_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/servertest/rigs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,9 +11,10 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestFinish_ZeroCommitPauseRecordsRun(t *testing.T) {
@@ -44,7 +44,7 @@ func TestFinish_ZeroCommitPauseRecordsRun(t *testing.T) {
 
 func assertGxQuestion(t *testing.T, ticketPath string, kind events.Kind, summary string) {
 	t.Helper()
-	evs, err := tickets.ReadLog(ticketPath)
+	evs, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func assertGxQuestion(t *testing.T, ticketPath string, kind events.Kind, summary
 	}
 	got := evs[0]
 	// The text is the fixed summary, then the pause reason when it adds detail.
-	if got.Type != tickets.EventPauseQuestion || got.By != "gx" || got.PauseKind != string(kind) || got.Summary != summary || !strings.HasPrefix(got.Text, summary) {
+	if got.Type != ticketlog.EventPauseQuestion || got.By != "gx" || got.PauseKind != string(kind) || got.Summary != summary || !strings.HasPrefix(got.Text, summary) {
 		t.Errorf("event = %+v, want a by-gx %s question %q", got, kind, summary)
 	}
 }

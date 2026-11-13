@@ -8,20 +8,19 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func answerCount(t *testing.T, ticketPath string) int {
 	t.Helper()
-	evs, err := tickets.ReadLog(ticketPath)
+	evs, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	n := 0
 	for _, ev := range evs {
-		if ev.Type == tickets.EventPauseAnswer {
+		if ev.Type == ticketlog.EventPauseAnswer {
 			n++
 		}
 	}
@@ -48,7 +47,7 @@ func TestAnswer_DeliversTheFrameAndClaimsTheTicket(t *testing.T) {
 		t.Errorf("pause.answer lines = %d, want 1", n)
 	}
 	// The body claims cli; the client's origin header decides, and an API client sets none.
-	if got := answerEvents(t, ticketPath); len(got) != 1 || got[0].How != tickets.HowAnswer || got[0].Source != tickets.SourceCLI {
+	if got := answerEvents(t, ticketPath); len(got) != 1 || got[0].How != ticketlog.HowAnswer || got[0].Source != ticketlog.SourceCLI {
 		t.Errorf("answers = %+v; want how: answer, source: cli", got)
 	}
 	tk, err := schema.ParseTicket(ticketPath)
@@ -189,7 +188,7 @@ func requireQueued(t *testing.T, h *servertest.Harness, ticketPath string, fake 
 	if err != nil || tk.Status != schema.StatusOpen {
 		t.Errorf("ticket = %+v, %v; want open", tk, err)
 	}
-	evs, err := tickets.ReadLog(ticketPath)
+	evs, err := ticketlog.ReadLog(ticketPath)
 	if err != nil || !ticketlog.Answered(tk.Status, evs) {
 		t.Errorf("Answered = false (%v), want true", err)
 	}
@@ -248,13 +247,13 @@ func TestAnswer_GoneAgentThenCodexClaimStartsFromTheHandoff(t *testing.T) {
 	if got := fake.ResumeSessionID("epic-a-iter-01"); got != "" {
 		t.Errorf("claim resumed session %q, want a cold start", got)
 	}
-	evs, err := tickets.ReadLog(ticketPath)
+	evs, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var handoff string
 	for _, ev := range evs {
-		if ev.Type == tickets.EventPauseQuestion {
+		if ev.Type == ticketlog.EventPauseQuestion {
 			handoff = ev.Handoff
 		}
 	}

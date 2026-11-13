@@ -13,12 +13,13 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // importOldTicket writes one old-shape ticket (plus an optional event) into a
 // fresh old tree, imports it with --to-store as project "mine" and returns the
 // project directory and the imported ticket path.
-func importOldTicket(t *testing.T, store, status, body string, ev *tickets.LogEvent) (project, ticket string) {
+func importOldTicket(t *testing.T, store, status, body string, ev *ticketlog.LogEvent) (project, ticket string) {
 	t.Helper()
 	repo := testutil.TempRepo(t)
 	old := filepath.Join(t.TempDir(), ".scratch")
@@ -32,7 +33,7 @@ func importOldTicket(t *testing.T, store, status, body string, ev *tickets.LogEv
 		t.Fatal(err)
 	}
 	if ev != nil {
-		if _, err := tickets.AppendLog(src, *ev); err != nil {
+		if _, err := ticketlog.AppendLog(src, *ev); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -90,7 +91,7 @@ func TestExecute_TicketsMigrateToStore_FirstServerStartRunsEveryStep(t *testing.
 
 func TestExecute_TicketsMigrateToStore_NeedsRepairKeepsItsPauseReasonAfterStart(t *testing.T) {
 	store := cmdtest.IsolateTicketStore(t)
-	ev := tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", PauseKind: "spinning", Summary: "stuck"}
+	ev := ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, By: "gx", PauseKind: "spinning", Summary: "stuck"}
 	project, ticket := importOldTicket(t, store, "needs-repair", "Body.\n", &ev)
 
 	if _, err := serverStart(t, project); err != nil {
@@ -107,13 +108,13 @@ func TestExecute_TicketsMigrateToStore_NeedsRepairKeepsItsPauseReasonAfterStart(
 // from the event log, although the first half already rewrote the ticket.
 func TestExecute_TicketsMigrateToStore_PartialPauseUnitRetryRerunsAndKeepsReason(t *testing.T) {
 	store := cmdtest.IsolateTicketStore(t)
-	ev := tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", PauseKind: "spinning", Summary: "stuck"}
+	ev := ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, By: "gx", PauseKind: "spinning", Summary: "stuck"}
 	body := "Body.\n\n## Needs Answer\n\nWhich way?\n"
 	project, ticket := importOldTicket(t, store, "needs-repair", body, &ev)
 
 	// A directory where the ticket's log should be makes the question step fail
 	// after the frontmatter migration has run.
-	logPath := tickets.LogPath(ticket)
+	logPath := ticketlog.LogPath(ticket)
 	saved, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatal(err)
@@ -170,12 +171,12 @@ func TestExecute_TicketsMigrateToStore_NeedsAnswerQuestionIsLoggedBeforeHeadingB
 	if _, err := serverStart(t, project); err != nil {
 		t.Fatalf("server start: %v", err)
 	}
-	events, err := tickets.ReadLog(ticket)
+	events, err := ticketlog.ReadLog(ticket)
 	if err != nil {
 		t.Fatal(err)
 	}
-	asked := slices.IndexFunc(events, func(e tickets.LogEvent) bool {
-		return e.Type == tickets.EventPauseQuestion && strings.Contains(e.Text, "Which way should it go?")
+	asked := slices.IndexFunc(events, func(e ticketlog.LogEvent) bool {
+		return e.Type == ticketlog.EventPauseQuestion && strings.Contains(e.Text, "Which way should it go?")
 	})
 	if asked < 0 {
 		t.Fatalf("question missing from the log: %+v", events)

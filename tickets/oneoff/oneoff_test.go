@@ -1,6 +1,10 @@
-package tickets
+package oneoff
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/elentok/gx/tickets"
+)
 
 func TestIsOneOffEpic_ByNameAndLegacyFile(t *testing.T) {
 	t.Parallel()
@@ -12,11 +16,11 @@ func TestIsOneOffEpic_ByNameAndLegacyFile(t *testing.T) {
 		{"/store/proj/one-offs-archived", true},
 		{"/store/proj/ordinary", false},
 	} {
-		if got := IsOneOffEpic(Epic{Path: tc.path}); got != tc.want {
+		if got := IsOneOffEpic(tickets.Epic{Path: tc.path}); got != tc.want {
 			t.Errorf("IsOneOffEpic(%s) = %v, want %v", tc.path, got, tc.want)
 		}
 	}
-	legacy := Epic{Path: "/store/proj/old", Tickets: []Ticket{{Path: "/store/proj/old/issues/01-one-off.md"}}}
+	legacy := tickets.Epic{Path: "/store/proj/old", Tickets: []tickets.Ticket{{Path: "/store/proj/old/issues/01-one-off.md"}}}
 	if !IsOneOffEpic(legacy) {
 		t.Error("old single-ticket one-off epic is not detected")
 	}

@@ -24,6 +24,7 @@ import (
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketmove"
 )
@@ -397,7 +398,7 @@ func defaultOneOffName(prompt string) string {
 	if len(words) > oneOffNameWords {
 		words = words[:oneOffNameWords]
 	}
-	return tickets.Slug(strings.Join(words, " "))
+	return oneoff.Slug(strings.Join(words, " "))
 }
 
 // The epics holding one-off tickets: every ticket in OneOffsEpic is a one-off,

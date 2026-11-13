@@ -271,7 +271,7 @@ func AnsweredSession(t tickets.Ticket) string {
 	if err != nil || len(st.SessionIDs) == 0 {
 		return ""
 	}
-	evs, err := tickets.ReadLog(t.Path)
+	evs, err := ticketlog.ReadLog(t.Path)
 	if err != nil || !ticketlog.Answered(st.Status, evs) {
 		return ""
 	}

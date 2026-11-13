@@ -14,8 +14,8 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // HolderLabel is the launch label of proj:epic-a/01.
@@ -151,13 +151,13 @@ func StartWithLeftover(t *testing.T, state agentrunner.State) (*Harness, *runner
 }
 
 // EndedRounds returns the pause rounds in the ticket's log.
-func EndedRounds(t *testing.T, ticketPath string) []tickets.PauseRound {
+func EndedRounds(t *testing.T, ticketPath string) []ticketlog.PauseRound {
 	t.Helper()
-	evs, err := tickets.ReadLog(ticketPath)
+	evs, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return tickets.AllRounds(evs)
+	return ticketlog.AllRounds(evs)
 }
 
 // RunLog returns the run-log events of proj:epic-a.

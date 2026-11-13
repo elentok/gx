@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // PauseRequest pauses a ticket with a person's one-line reason. It refuses a
@@ -101,9 +102,9 @@ func (w *Writer) Relaunch(req wire.QueueRequest, qc queue.Ctx) (wire.QueueResult
 		}
 		source := req.Source
 		if qc.Actor != "" {
-			source = tickets.SourceGx
+			source = ticketlog.SourceGx
 		}
-		if err := tickets.EndOpenRound(ref.Ticket.Path, source, tickets.HowRelaunch, ticketops.CloseRelaunch); err != nil {
+		if err := ticketlog.EndOpenRound(ref.Ticket.Path, source, ticketlog.HowRelaunch, ticketops.CloseRelaunch); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.Addr, err)
 		}
 		if qc.Actor == "" {

@@ -10,8 +10,8 @@ import (
 	"github.com/elentok/gx/server/epics/prstate"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/triage"
 )
@@ -22,7 +22,7 @@ const followUpsEpicName = "follow-ups"
 // epicListed reports whether the Epics page can show e: one-offs, follow-ups
 // and archived epics are never listed.
 func epicListed(e tickets.Epic) bool {
-	return e.Name != followUpsEpicName && !strings.HasSuffix(e.Name, "-archived") && !tickets.IsOneOffEpic(e)
+	return e.Name != followUpsEpicName && !strings.HasSuffix(e.Name, "-archived") && !oneoff.IsOneOffEpic(e)
 }
 
 // epicListState is the one rule for a listed epic's state. A map has no

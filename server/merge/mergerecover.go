@@ -2,17 +2,18 @@ package merge
 
 import (
 	"fmt"
-	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/server/runs"
-	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 
+	"github.com/elentok/gx/events"
 	rlmerge "github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/ralphloop/verify"
 	"github.com/elentok/gx/repair"
+	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // RecoverMerges runs before anything is scheduled. A merge lock whose owner is
@@ -84,7 +85,7 @@ func (s *Merger) recoverEpicMerge(projectDir, epicPath string) error {
 	switch v.Merging {
 	case verify.MergingMerged:
 		ev := runlog.Event{Outcome: string(rlmerge.Merged), SHA: v.SHA}
-		if err := tickets.EndOpenRound(t.Path, tickets.SourceGx, tickets.HowManualMerge, "manual-merge"); err != nil {
+		if err := ticketlog.EndOpenRound(t.Path, ticketlog.SourceGx, ticketlog.HowManualMerge, "manual-merge"); err != nil {
 			return fmt.Errorf("end pause round of %s: %w", addr, err)
 		}
 		if err := ticketops.RecordManualMerge(projectDir, epic, t.Identifier, t.Path, t.IsDone(), ev); err != nil {

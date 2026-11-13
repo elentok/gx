@@ -3,7 +3,6 @@ package rigs
 import (
 	"context"
 	"fmt"
-	"github.com/elentok/gx/server/servertest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,12 +15,13 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // AnswerLabel is the session label of the iteration AnswerEnv starts.
@@ -54,9 +54,9 @@ func StartAnswerEnv(t *testing.T, wrap func(*runnerfake.Runner) agentrunner.Runn
 }
 
 // PermissionEvents returns the pause.permission events logged on the ticket.
-func (e AnswerEnv) PermissionEvents(t *testing.T) []tickets.LogEvent {
+func (e AnswerEnv) PermissionEvents(t *testing.T) []ticketlog.LogEvent {
 	t.Helper()
-	return logEventsOfType(t, e.Ticket, tickets.EventPausePermission)
+	return logEventsOfType(t, e.Ticket, ticketlog.EventPausePermission)
 }
 
 // Answer sends req for ticket 01 through the client.
@@ -93,11 +93,11 @@ func PauseEnvZeroCommit(t *testing.T, e AnswerEnv) string {
 // StateOf is the state token ("seq:class") of the ticket's open question.
 func StateOf(t *testing.T, ticketPath string) string {
 	t.Helper()
-	evs, err := tickets.ReadLog(ticketPath)
+	evs, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	open := tickets.OpenQuestion(evs)
+	open := ticketlog.OpenQuestion(evs)
 	if open == nil {
 		t.Fatal("no open question")
 	}
@@ -109,18 +109,18 @@ func StateOf(t *testing.T, ticketPath string) string {
 }
 
 // AnswerEvents returns the pause.answer events logged on the ticket.
-func AnswerEvents(t *testing.T, ticketPath string) []tickets.LogEvent {
+func AnswerEvents(t *testing.T, ticketPath string) []ticketlog.LogEvent {
 	t.Helper()
-	return logEventsOfType(t, ticketPath, tickets.EventPauseAnswer)
+	return logEventsOfType(t, ticketPath, ticketlog.EventPauseAnswer)
 }
 
-func logEventsOfType(t *testing.T, ticketPath string, typ string) []tickets.LogEvent {
+func logEventsOfType(t *testing.T, ticketPath string, typ string) []ticketlog.LogEvent {
 	t.Helper()
-	evs, err := tickets.ReadLog(ticketPath)
+	evs, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var out []tickets.LogEvent
+	var out []ticketlog.LogEvent
 	for _, ev := range evs {
 		if ev.Type == typ {
 			out = append(out, ev)

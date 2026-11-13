@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // TicketRef is a ticket found in the store, with where it lives.
@@ -46,13 +47,13 @@ func MapProgress(m tickets.Epic) wire.ProgressStep {
 // AnswerState is the token a client sends back: it covers the latest
 // question's seq and the ticket's pause class, so an answer to a question that
 // was replaced, closed or re-paused is stale.
-func AnswerState(q tickets.LogEvent, class schema.PauseClass) string {
+func AnswerState(q ticketlog.LogEvent, class schema.PauseClass) string {
 	return fmt.Sprintf("%d:%s", q.Seq, class)
 }
 
 // ReadLogLenient reads a ticket's log for the snapshot, where an unreadable log
 // only costs the question details.
-func ReadLogLenient(t tickets.Ticket) []tickets.LogEvent {
-	evs, _ := tickets.ReadLog(t.Path)
+func ReadLogLenient(t tickets.Ticket) []ticketlog.LogEvent {
+	evs, _ := ticketlog.ReadLog(t.Path)
 	return evs
 }

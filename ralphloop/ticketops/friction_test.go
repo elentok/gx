@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestFriction(t *testing.T) {
@@ -16,23 +16,23 @@ func TestFriction(t *testing.T) {
 	run := func(s int, typ, kind string) runlog.Event {
 		return runlog.Event{Time: at(s), Type: typ, Ticket: "03", Kind: kind}
 	}
-	q := func(seq, s int, kind string) tickets.LogEvent {
-		return tickets.LogEvent{Seq: seq, TS: at(s), Type: tickets.EventPauseQuestion, PauseKind: kind}
+	q := func(seq, s int, kind string) ticketlog.LogEvent {
+		return ticketlog.LogEvent{Seq: seq, TS: at(s), Type: ticketlog.EventPauseQuestion, PauseKind: kind}
 	}
-	closed := func(seq, question, s int, source string) tickets.LogEvent {
-		return tickets.LogEvent{Seq: seq, TS: at(s), Type: tickets.EventPauseClosed, Question: question, Source: source}
+	closed := func(seq, question, s int, source string) ticketlog.LogEvent {
+		return ticketlog.LogEvent{Seq: seq, TS: at(s), Type: ticketlog.EventPauseClosed, Question: question, Source: source}
 	}
 
 	tests := []struct {
 		name string
 		evs  []runlog.Event
-		log  []tickets.LogEvent
+		log  []ticketlog.LogEvent
 		want schema.FrictionSummary
 	}{
 		{
 			name: "one round is one pause, ended by a person",
 			evs:  []runlog.Event{run(0, "paused", "zero-commit"), run(5, "paused", "zero-commit")},
-			log:  []tickets.LogEvent{q(1, 0, "zero-commit"), closed(2, 1, 90, "web")},
+			log:  []ticketlog.LogEvent{q(1, 0, "zero-commit"), closed(2, 1, 90, "web")},
 			want: schema.FrictionSummary{
 				PausesByReason:  map[string]int{"zero-commit": 1},
 				PauseEndings:    map[string]int{"web": 1},
@@ -42,7 +42,7 @@ func TestFriction(t *testing.T) {
 		},
 		{
 			name: "gx-ended round counts in the total only",
-			log:  []tickets.LogEvent{q(1, 0, "blocked-pane"), closed(2, 1, 30, "gx")},
+			log:  []ticketlog.LogEvent{q(1, 0, "blocked-pane"), closed(2, 1, 30, "gx")},
 			want: schema.FrictionSummary{
 				PausesByReason:  map[string]int{"blocked-pane": 1},
 				PauseEndings:    map[string]int{"gx": 1},
@@ -51,7 +51,7 @@ func TestFriction(t *testing.T) {
 		},
 		{
 			name: "round without kind or source, and an open round",
-			log:  []tickets.LogEvent{q(1, 0, ""), closed(2, 1, 10, ""), q(3, 20, "budget-killed")},
+			log:  []ticketlog.LogEvent{q(1, 0, ""), closed(2, 1, 10, ""), q(3, 20, "budget-killed")},
 			want: schema.FrictionSummary{
 				PausesByReason:  map[string]int{"unknown": 1, "budget-killed": 1},
 				PauseEndings:    map[string]int{"unknown": 1},
@@ -60,7 +60,7 @@ func TestFriction(t *testing.T) {
 		},
 		{
 			name: "legacy kind name maps to the current one",
-			log:  []tickets.LogEvent{q(1, 0, "land-conflict"), closed(2, 1, 4, "cli")},
+			log:  []ticketlog.LogEvent{q(1, 0, "land-conflict"), closed(2, 1, 4, "cli")},
 			want: schema.FrictionSummary{
 				PausesByReason:  map[string]int{"merge-conflict": 1},
 				PauseEndings:    map[string]int{"cli": 1},

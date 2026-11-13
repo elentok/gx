@@ -19,8 +19,8 @@ var markdownMarkerPattern = regexp.MustCompile(`[*_` + "`" + `]+`)
 func PauseDetail(e tickets.Epic, t tickets.Ticket) string {
 	switch status := e.RenderedStatus(t); status {
 	case tickets.StatusPausedAnswer:
-		if evs, err := tickets.ReadLog(t.Path); err == nil {
-			if q := tickets.OpenQuestion(evs); q != nil && q.Summary != "" {
+		if evs, err := ReadLog(t.Path); err == nil {
+			if q := OpenQuestion(evs); q != nil && q.Summary != "" {
 				return strings.TrimSpace(markdownMarkerPattern.ReplaceAllString(q.Summary, ""))
 			}
 		}

@@ -8,18 +8,18 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // answerSource is the source of the ticket's only pause.answer line.
 func answerSource(t *testing.T, ticketPath string) string {
 	t.Helper()
-	evs, err := tickets.ReadLog(ticketPath)
+	evs, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, ev := range evs {
-		if ev.Type == tickets.EventPauseAnswer {
+		if ev.Type == ticketlog.EventPauseAnswer {
 			return ev.Source
 		}
 	}

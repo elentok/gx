@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/config"
@@ -16,8 +18,8 @@ import (
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/tickets/ticketmove"
-	"github.com/spf13/cobra"
 )
 
 var closeReasons = []string{"fixed", "obsolete", "duplicate", "not-worth-it", "promoted"}
@@ -69,7 +71,7 @@ func runTicketsClose(d Deps, addr, reason, note string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	log, err := tickets.ReadLog(src.Path)
+	log, err := ticketlog.ReadLog(src.Path)
 	if err != nil {
 		return err
 	}

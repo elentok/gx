@@ -8,8 +8,8 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 )
 
 // cardSectionOrder is the order the page lists the sections in.
@@ -76,7 +76,7 @@ func decorateLoopCard(row *wire.EpicListRow, position int) {
 // queueKey is the queue slot key of an item address: its epic root, or the
 // ticket itself for a one-off.
 func queueKey(a tickets.Address) string {
-	if tickets.IsOneOffsEpicName(a.Epic) {
+	if oneoff.IsOneOffsEpicName(a.Epic) {
 		return a.String()
 	}
 	return queue.RootOf(a).String()

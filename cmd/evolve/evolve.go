@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/serverapi/oneoff"
@@ -21,8 +23,8 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/tickets"
+	ticketsoneoff "github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/schema"
-	"github.com/spf13/cobra"
 )
 
 // CodeEvolveNoGxProject is the stable refusal code every `gx evolve` verb gives
@@ -241,7 +243,7 @@ func evolveCandidates(env evolveEnv, projectDir string, since time.Duration) ([]
 	cutoff := env.now().Add(-since)
 	var out []tickets.Epic
 	for _, e := range epics {
-		if tickets.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
+		if ticketsoneoff.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
 			continue
 		}
 		if e.IsMap && !mapIsDone(e) {

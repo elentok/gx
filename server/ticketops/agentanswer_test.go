@@ -8,7 +8,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // herdrFake is a fake that reports itself as the herdr runner.
@@ -103,22 +103,22 @@ func TestAgentAnswer_DenyNoteIsSentAndCapped(t *testing.T) {
 	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	e.Fake.SetPending(answerLabel, &agentrunner.Pending{
-		ID: "req-1", Tool: "Bash", Input: json.RawMessage(strings.Repeat("x", tickets.MaxLogTextChars+1)),
+		ID: "req-1", Tool: "Bash", Input: json.RawMessage(strings.Repeat("x", ticketlog.MaxLogTextChars+1)),
 	})
 
-	res := e.Answer(t, wire.QueueRequest{Decision: "deny", RequestID: "req-1", Text: strings.Repeat("n", tickets.MaxLogTextChars+10)})
+	res := e.Answer(t, wire.QueueRequest{Decision: "deny", RequestID: "req-1", Text: strings.Repeat("n", ticketlog.MaxLogTextChars+10)})
 	if res.Refused {
 		t.Fatalf("answer = %+v", res)
 	}
 	got := e.Fake.Answers(answerLabel)
-	if len(got) != 1 || len(got[0].Text) != tickets.MaxLogTextChars {
-		t.Fatalf("answers = %d, note length %d; want the note capped at %d", len(got), len(got[0].Text), tickets.MaxLogTextChars)
+	if len(got) != 1 || len(got[0].Text) != ticketlog.MaxLogTextChars {
+		t.Fatalf("answers = %d, note length %d; want the note capped at %d", len(got), len(got[0].Text), ticketlog.MaxLogTextChars)
 	}
 	evs := e.PermissionEvents(t)
-	if len(evs) != 1 || evs[0].Decision != "deny" || len(evs[0].Note) != tickets.MaxLogTextChars {
+	if len(evs) != 1 || evs[0].Decision != "deny" || len(evs[0].Note) != ticketlog.MaxLogTextChars {
 		t.Fatalf("events = %+v", evs)
 	}
-	if s := evs[0].Shown; s == nil || !s.Truncated || len(s.Input) != tickets.MaxLogTextChars {
+	if s := evs[0].Shown; s == nil || !s.Truncated || len(s.Input) != ticketlog.MaxLogTextChars {
 		t.Errorf("shown = %+v; want truncated input", evs[0].Shown)
 	}
 }

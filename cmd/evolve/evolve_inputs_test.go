@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/worktree"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func inputsFixture(t *testing.T) *evolveFixture {
@@ -118,7 +118,7 @@ func TestEvolveInputs_HuhAnswerFlagsAndCounts(t *testing.T) {
 	f := inputsFixture(t)
 	log := `{"seq":1,"ts":"2026-01-01T00:00:00Z","type":"pause.question","by":"agent","handoff":"h","summary":"Which one?"}` + "\n" +
 		`{"seq":2,"ts":"2026-01-01T00:00:01Z","type":"pause.answer","question":1,"huh":true}` + "\n"
-	if err := os.WriteFile(tickets.LogPath(filepath.Join(f.epic, "issues", "02-b.md")), []byte(log), 0o644); err != nil {
+	if err := os.WriteFile(ticketlog.LogPath(filepath.Join(f.epic, "issues", "02-b.md")), []byte(log), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer

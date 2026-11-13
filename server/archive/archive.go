@@ -22,6 +22,7 @@ import (
 	"github.com/elentok/gx/server/workspaces"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/archivekey"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/ticketgit"
 )
 
@@ -375,7 +376,7 @@ func (a *Archive) write(target, dir string, halves []half, name string, cleanup 
 		if err := tickets.OverwriteEpicFields(filepath.Join(archive, m.name), fields); err != nil {
 			return err
 		}
-		rekeyErrs = append(rekeyErrs, a.rekey(tickets.EpicAddress, m.key, archivekey.New(m.key, m.name)))
+		rekeyErrs = append(rekeyErrs, a.rekey(oneoff.EpicAddress, m.key, archivekey.New(m.key, m.name)))
 	}
 	a.d.Events.Publish(wire.EventWorkspacesChanged, "")
 	if err := errors.Join(rekeyErrs...); err != nil {

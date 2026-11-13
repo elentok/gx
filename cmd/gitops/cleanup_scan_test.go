@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/ticketgit"
 )
 
@@ -163,7 +164,7 @@ func TestExecute_CleanupScan_OneOffsEpicNeverListed(t *testing.T) {
 
 	result := scanJSON(t, dir)
 	for _, e := range result.Epics {
-		if tickets.IsOneOffsEpicName(e.Name) {
+		if oneoff.IsOneOffsEpicName(e.Name) {
 			t.Errorf("epics include %q, want it never listed", e.Name)
 		}
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // runTicketsValidate parses path via schema.ParseTicket and reports whether
@@ -68,20 +69,20 @@ func runEpicValidate(path string, w, stderr io.Writer) error {
 // open latest question, and an over-long question summary only warns. This
 // lives here rather than in schema.Validate, which stays free of log checks.
 func validateTicketLog(path string, ticket schema.Ticket, stderr io.Writer) error {
-	events, err := tickets.ReadLog(path)
+	events, err := ticketlog.ReadLog(path)
 	if err != nil {
 		return err
 	}
-	if ticket.PausedAsking() && tickets.OpenQuestion(events) == nil {
+	if ticket.PausedAsking() && ticketlog.OpenQuestion(events) == nil {
 		return fmt.Errorf("%s: ticket is paused for an answer but the log has no open question", ticketref.TicketLabel(path))
 	}
 	for _, ev := range events {
-		if ev.Type != tickets.EventPauseQuestion {
+		if ev.Type != ticketlog.EventPauseQuestion {
 			continue
 		}
-		if n := utf8.RuneCountInString(ev.Summary); n > tickets.MaxLogSummaryChars {
+		if n := utf8.RuneCountInString(ev.Summary); n > ticketlog.MaxLogSummaryChars {
 			fmt.Fprintf(stderr, "warning: %s: question %d summary is %d characters, max %d\n",
-				ticketref.TicketLabel(path), ev.Seq, n, tickets.MaxLogSummaryChars)
+				ticketref.TicketLabel(path), ev.Seq, n, ticketlog.MaxLogSummaryChars)
 		}
 	}
 	return nil

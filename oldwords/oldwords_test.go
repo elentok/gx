@@ -57,7 +57,7 @@ func allow(reason string, tokens ...string) allowance { return allowance{reason,
 var allowed = map[string]allowance{
 	// The read shim: the single place old logs and tickets are loaded.
 	"tickets/status.go":                      allow("read shim", "needsanswer", "needsrepair"),
-	"tickets/log.go":                         allow("read shim", "park"),
+	"tickets/ticketlog/log.go":               allow("read shim", "park"),
 	"tickets/ticketmigrate/migrate.go":       allow("read shim", "needsanswer", "needsrepair"),
 	"tickets/ticketmigrate/migrate_pause.go": allow("read shim", "park", "needsanswer", "needsrepair"),
 	"tickets/schema/ticket.go":               allow("read shim", "needsanswer", "needsrepair", "land"),
@@ -117,7 +117,7 @@ var allowed = map[string]allowance{
 	"ralphloop/ticketops/claim_test.go":                      allow("tests demoting the legacy Needs Answer and Needs Repair sections", "park", "needsanswer", "needsrepair"),
 	"ralphloop/ticketops/resumeticket_test.go":               allow("tests demoting the legacy Needs Repair section", "needsrepair"),
 	"tickets/loader_test.go":                                 allow("loads legacy statuses, park_kind and headings", "land", "needsanswer", "needsrepair"),
-	"tickets/log_test.go":                                    allow("reads legacy park.* log events and writes under a legacy needs-answer ticket", "park", "needsanswer"),
+	"tickets/ticketlog/log_test.go":                          allow("reads legacy park.* log events and writes under a legacy needs-answer ticket", "park", "needsanswer"),
 	"migrations/steps.go":                                    allow("comment names the legacy Needs Answer heading the question step reads", "needsanswer"),
 	"cmd/serverctl/server_restart_test.go":                   allow("legacy needs-answer ticket the migration must rewrite", "needsanswer"),
 	"testutil/gxfixture/catalog/scenarios.go":                allow("fixture writes a pause status of the old shape for the migration scenario", "needsanswer"),

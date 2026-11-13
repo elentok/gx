@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // Cancel withdraws a ticket and every non-terminal ticket forked from it.
@@ -63,7 +64,7 @@ func (o *Ops) CancelOneOffWeb(req wire.QueueRequest) (wire.QueueResult, error) {
 // markCancelled closes t's pause round and settles it as cancelled. Its live
 // agent is the caller's to stop.
 func (o *Ops) markCancelled(ref queue.TicketRef, t tickets.Ticket, source string) error {
-	if err := tickets.EndOpenRound(t.Path, source, tickets.HowCancel, "cancelled"); err != nil {
+	if err := ticketlog.EndOpenRound(t.Path, source, ticketlog.HowCancel, "cancelled"); err != nil {
 		return fmt.Errorf("end pause round of %s: %w", ref.Address(t), err)
 	}
 	if err := ticketops.SetStatus(t.Path, string(schema.StatusCancelled)); err != nil {

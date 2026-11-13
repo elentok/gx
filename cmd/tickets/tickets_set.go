@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/ticketref"
@@ -17,8 +19,8 @@ import (
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/tickets/ticketmove"
-	"github.com/spf13/cobra"
 )
 
 // ticketsSchemaText is gx tickets schema's entire output, verbatim from
@@ -646,11 +648,11 @@ func checkOpenQuestionGuard(c *cobra.Command, path string) error {
 	if verb == "" {
 		return nil
 	}
-	evs, err := tickets.ReadLog(path)
+	evs, err := ticketlog.ReadLog(path)
 	if err != nil {
 		return err
 	}
-	if tickets.OpenQuestion(evs) != nil {
+	if ticketlog.OpenQuestion(evs) != nil {
 		return nil
 	}
 	return fmt.Errorf("%s: the log has no open question; use `gx tickets %s` instead of `tickets set`", ticketref.TicketLabel(path), verb)

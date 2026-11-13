@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketgit"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // Host is what the fix agent needs from the rest of the server.
@@ -44,9 +45,9 @@ func refusal(reason, msg string) wire.FixAgentResult {
 
 // RepairState is the web state token of a ticket paused for repair: the answerState
 // of its latest round's question (zero when it has none) and its pause class.
-func RepairState(evs []tickets.LogEvent, class schema.PauseClass) string {
-	var q tickets.LogEvent
-	if rounds := tickets.Rounds(evs); len(rounds) > 0 {
+func RepairState(evs []ticketlog.LogEvent, class schema.PauseClass) string {
+	var q ticketlog.LogEvent
+	if rounds := ticketlog.Rounds(evs); len(rounds) > 0 {
 		q = rounds[len(rounds)-1].Question
 	}
 	return queue.AnswerState(q, class)

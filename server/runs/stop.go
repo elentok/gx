@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // Stop is why gx is stopping a run: the pause kind it ends in, the detail
@@ -61,7 +62,7 @@ func (s *Stopper) pause(t TrackedRun, stop Stop) error {
 	if closeErr == nil {
 		closeErr = r.Stop(t.Session)
 	}
-	if err := tickets.EndOpenRound(t.TicketPath, tickets.SourceGx, tickets.HowAuto, stop.CloseReason); err != nil {
+	if err := ticketlog.EndOpenRound(t.TicketPath, ticketlog.SourceGx, ticketlog.HowAuto, stop.CloseReason); err != nil {
 		closeErr = errors.Join(closeErr, err)
 	}
 	pauseErr := s.PauseTicket(dir, addr, t.TicketPath, stop.Kind, stop.Reason, t.Run)

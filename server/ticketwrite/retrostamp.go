@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -22,7 +23,7 @@ func RetroSubmit(project, epic string, now time.Time) wire.OneOffRequest {
 	return wire.OneOffRequest{
 		Prompt:  "Retro of epic " + project + ":" + epic,
 		Project: project,
-		Name:    tickets.Slug("evolve-" + epic + "-" + now.Format("20060102-1504")),
+		Name:    oneoff.Slug("evolve-" + epic + "-" + now.Format("20060102-1504")),
 		Type:    string(schema.TypeEvolve),
 		Unique:  RetroKeyPrefix + project + "/" + epic,
 		Notify:  true,

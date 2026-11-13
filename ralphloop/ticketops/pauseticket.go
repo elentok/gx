@@ -7,8 +7,8 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // PauseRequest describes one pause outcome. Kind is mandatory: every pause event
@@ -65,15 +65,15 @@ func logGxQuestion(ticketPath string, kind events.Kind, reason string) error {
 		// The fixed wording carries no detail; the reason (e.g. the dirty file) does.
 		text += "\n\n" + reason
 	}
-	ev := tickets.LogEvent{
-		Type:      tickets.EventPauseQuestion,
+	ev := ticketlog.LogEvent{
+		Type:      ticketlog.EventPauseQuestion,
 		By:        "gx",
 		PauseKind: string(kind),
 		Summary:   summary,
 		Text:      text,
 	}
-	_, err := tickets.AppendLogIf(ticketPath, ev, func(evs []tickets.LogEvent) error {
-		if tickets.OpenQuestion(evs) != nil {
+	_, err := ticketlog.AppendLogIf(ticketPath, ev, func(evs []ticketlog.LogEvent) error {
+		if ticketlog.OpenQuestion(evs) != nil {
 			return errQuestionOpen
 		}
 		return nil
@@ -97,19 +97,19 @@ const (
 // question, so the log ends it before the status moves on. A ticket without an
 // open question is left alone.
 func CloseOpenQuestion(ticketPath, reason string) error {
-	evs, err := tickets.ReadLog(ticketPath)
+	evs, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		return err
 	}
-	q := tickets.OpenQuestion(evs)
+	q := ticketlog.OpenQuestion(evs)
 	if q == nil {
 		return nil
 	}
 	// The guard re-checks under the ticket lock: an answer may have merged since the read.
-	_, err = tickets.AppendLogIf(ticketPath, tickets.LogEvent{
-		Type: tickets.EventPauseClosed, Question: q.Seq, Reason: reason,
-	}, func(evs []tickets.LogEvent) error {
-		if cur := tickets.OpenQuestion(evs); cur == nil || cur.Seq != q.Seq {
+	_, err = ticketlog.AppendLogIf(ticketPath, ticketlog.LogEvent{
+		Type: ticketlog.EventPauseClosed, Question: q.Seq, Reason: reason,
+	}, func(evs []ticketlog.LogEvent) error {
+		if cur := ticketlog.OpenQuestion(evs); cur == nil || cur.Seq != q.Seq {
 			return errQuestionGone
 		}
 		return nil
@@ -197,8 +197,8 @@ func PauseTicket(sink runlog.EventSink, req PauseRequest) (reason string, writeE
 		reason = fmt.Sprintf("%s (also failed marking %s: %v)", reason, req.Type, writeErr)
 	}
 	if req.Type == events.Paused && !req.Kind.AwaitsAnswer() && writeErr == nil {
-		if _, err := tickets.AppendLog(req.Path, tickets.LogEvent{
-			Type: tickets.EventPauseRepair, By: "gx", PauseKind: string(req.Kind), Reason: reason,
+		if _, err := ticketlog.AppendLog(req.Path, ticketlog.LogEvent{
+			Type: ticketlog.EventPauseRepair, By: "gx", PauseKind: string(req.Kind), Reason: reason,
 		}); err != nil {
 			reason = fmt.Sprintf("%s (also failed logging repair round: %v)", reason, err)
 		}

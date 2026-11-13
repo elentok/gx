@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/transcript"
 	triagerec "github.com/elentok/gx/triage"
 )
@@ -105,7 +106,7 @@ func (p *Prompt) triageFinal(project string) bool {
 // designFinal reports whether the map behind a design ticket is at Branch or
 // Done, where no step follows. A map that cannot be read is not final.
 func (p *Prompt) designFinal(ticket string) bool {
-	addr := tickets.EpicAddress(ticket)
+	addr := oneoff.EpicAddress(ticket)
 	project, name, _ := strings.Cut(addr, ":")
 	epics, err := p.projects.Epics(project)
 	if err != nil {

@@ -9,8 +9,8 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 	"charm.land/lipgloss/v2"
-
 	"github.com/charmbracelet/x/ansi"
+
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
@@ -113,7 +113,7 @@ func RenderTicket(epic tickets.Epic, t tickets.Ticket, width int) (string, int, 
 
 // ticketLogEvents is t's event log, nil when it can't be read: a preview
 // without the rounds block beats an error in place of the whole preview.
-func ticketLogEvents(t tickets.Ticket) []tickets.LogEvent {
+func ticketLogEvents(t tickets.Ticket) []ticketlog.LogEvent {
 	// A server-mode ticket's Path is its address, not a file.
 	path := t.File
 	if path == "" {
@@ -122,7 +122,7 @@ func ticketLogEvents(t tickets.Ticket) []tickets.LogEvent {
 	if path == "" {
 		return nil
 	}
-	events, err := tickets.ReadLog(path)
+	events, err := ticketlog.ReadLog(path)
 	if err != nil {
 		return nil
 	}
@@ -134,12 +134,12 @@ func ticketLogEvents(t tickets.Ticket) []tickets.LogEvent {
 // orange and earlier rounds plain. line is the latest round's first line
 // within block, for the caller to scroll to; found is false when the log has
 // no pause round.
-func renderPauseRoundsBlock(events []tickets.LogEvent, width int) (block string, line int, found bool) {
+func renderPauseRoundsBlock(events []ticketlog.LogEvent, width int) (block string, line int, found bool) {
 	rounds := ticketlog.RenderRounds(events)
 	if rounds == "" {
 		return "", 0, false
 	}
-	latest := fmt.Sprintf("%d. ", len(tickets.Rounds(events)))
+	latest := fmt.Sprintf("%d. ", len(ticketlog.Rounds(events)))
 	orange := lipgloss.NewStyle().Foreground(ui.ColorOrange)
 
 	var out []string

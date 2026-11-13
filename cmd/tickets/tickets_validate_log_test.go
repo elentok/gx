@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/cmd/cmdtest"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestExecute_TicketsValidate_LogTornLastLinePasses(t *testing.T) {
@@ -58,7 +58,7 @@ func TestExecute_TicketsValidate_AnswerPauseWithOpenQuestionPasses(t *testing.T)
 func TestExecute_TicketsValidate_LongQuestionSummaryWarns(t *testing.T) {
 	t.Parallel()
 	path := cmdtest.WriteEpicTicket(t, t.TempDir(), "e", "01-a.md", cmdtest.TicketFrontmatter("01", ""))
-	long := strings.Repeat("x", tickets.MaxLogSummaryChars+1)
+	long := strings.Repeat("x", ticketlog.MaxLogSummaryChars+1)
 	cmdtest.WriteLogFile(t, path, `{"seq":1,"ts":"2026-01-01T00:00:00Z","type":"pause.question","by":"agent","handoff":"h","summary":"`+long+`"}`+"\n")
 
 	stderr, err := validateStderr(t, path)

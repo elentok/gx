@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // modelMismatchKey is the follow-up's one dedupe key: every wrong-model pause
@@ -85,7 +86,7 @@ func (w *Writer) refuseEmptyModel(scratchDir, path string, addr tickets.Address)
 // session, logged with the rest.
 func (w *Writer) recordModelMismatch(scratchDir, path string, addr tickets.Address, run runs.Run, m *supervise.ModelMismatchError, stopErr error) {
 	ticketAddr := addr.String()
-	if err := tickets.EndOpenRound(path, tickets.SourceGx, tickets.HowAuto, ticketops.CloseModelMismatch); err != nil {
+	if err := ticketlog.EndOpenRound(path, ticketlog.SourceGx, ticketlog.HowAuto, ticketops.CloseModelMismatch); err != nil {
 		stopErr = errors.Join(stopErr, err)
 	}
 	if err := schema.UpdateTicketWithBody(path, func(t *schema.Ticket, _ *string) {

@@ -2,11 +2,10 @@ package epics_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/wire"
 	"slices"
 	"testing"
 
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
@@ -54,7 +53,7 @@ func TestDetail_ZeroCommitOffersRetryOnly(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "no commits"}); err != nil {
+	if _, err := ticketlog.AppendLog(ticketPath, ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, By: "gx", Summary: "no commits"}); err != nil {
 		t.Fatal(err)
 	}
 	d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
@@ -70,7 +69,7 @@ func TestDetail_ActionsFollowTheTable(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "paused"}); err != nil {
+	if _, err := ticketlog.AppendLog(ticketPath, ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, By: "gx", Summary: "paused"}); err != nil {
 		t.Fatal(err)
 	}
 	cases := []struct {
@@ -119,7 +118,7 @@ func TestDetail_GatePauseVerbsFollowTheLiveTask(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "task still running"}); err != nil {
+	if _, err := ticketlog.AppendLog(ticketPath, ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, By: "gx", Summary: "task still running"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
@@ -193,7 +192,7 @@ func TestDetail_AnsweredAndClosedRounds(t *testing.T) {
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	pauseWithQuestion(t, ticketPath, optionsBlock)
-	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseAnswer, Question: 1, Source: "web", Choice: "b"}); err != nil {
+	if _, err := ticketlog.AppendLog(ticketPath, ticketlog.LogEvent{Type: ticketlog.EventPauseAnswer, Question: 1, Source: "web", Choice: "b"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) { tk.Status = schema.StatusOpen }); err != nil {
@@ -211,11 +210,11 @@ func TestDetail_AnsweredAndClosedRounds(t *testing.T) {
 	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) { tk.Status = schema.StatusLegacyAnswer }); err != nil {
 		t.Fatal(err)
 	}
-	q, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "agent", Summary: "again", Handoff: "h"})
+	q, err := ticketlog.AppendLog(ticketPath, ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, By: "agent", Summary: "again", Handoff: "h"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseClosed, Question: q.Seq, Reason: "resumed"}); err != nil {
+	if _, err := ticketlog.AppendLog(ticketPath, ticketlog.LogEvent{Type: ticketlog.EventPauseClosed, Question: q.Seq, Reason: "resumed"}); err != nil {
 		t.Fatal(err)
 	}
 	d, err = h.Client.Reads.Detail(context.Background(), answerAddr)

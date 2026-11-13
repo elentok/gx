@@ -8,16 +8,14 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/elentok/gx/server/queue"
-	"github.com/elentok/gx/server/runs"
-
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/backgroundtask"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/ticketops"
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/syshealth"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
@@ -122,15 +120,15 @@ func (o *Ops) Answer(req wire.QueueRequest) (wire.QueueResult, error) {
 		address := ref.Addr.String()
 		var run runs.TrackedRun
 		var queued bool
-		_, err := tickets.AppendLogFrom(ref.Ticket.Path, func(evs []tickets.LogEvent) (tickets.LogEvent, error) {
+		_, err := ticketlog.AppendLogFrom(ref.Ticket.Path, func(evs []ticketlog.LogEvent) (ticketlog.LogEvent, error) {
 			t, err := schema.ParseTicket(ref.Ticket.Path)
 			if err != nil {
-				return tickets.LogEvent{}, err
+				return ticketlog.LogEvent{}, err
 			}
-			refuse := func(res wire.QueueResult) (tickets.LogEvent, error) {
-				return tickets.LogEvent{}, answerRefused{res}
+			refuse := func(res wire.QueueResult) (ticketlog.LogEvent, error) {
+				return ticketlog.LogEvent{}, answerRefused{res}
 			}
-			open := tickets.OpenQuestion(evs)
+			open := ticketlog.OpenQuestion(evs)
 			switch {
 			case t.PausedClass() == "":
 				return refuse(queue.Refusal(wire.ReasonNotPaused, address+" is not paused"))
@@ -151,7 +149,7 @@ func (o *Ops) Answer(req wire.QueueRequest) (wire.QueueResult, error) {
 				return refuse(*bad)
 			}
 			if queued, err = o.AgentGone(address); err != nil {
-				return tickets.LogEvent{}, err
+				return ticketlog.LogEvent{}, err
 			}
 			if !queued {
 				// The budget check guards live delivery only: a queued answer
@@ -162,7 +160,7 @@ func (o *Ops) Answer(req wire.QueueRequest) (wire.QueueResult, error) {
 				run, _ = o.d.Registry.Tracked(address)
 				runner, err := o.d.Harness.RunnerOf(run.Run)
 				if err != nil {
-					return tickets.LogEvent{}, err
+					return ticketlog.LogEvent{}, err
 				}
 				reply := yesNoReply(q, answer)
 				if req.Huh {
@@ -175,15 +173,15 @@ func (o *Ops) Answer(req wire.QueueRequest) (wire.QueueResult, error) {
 				case errors.Is(err, agentrunner.ErrNotFound), errors.Is(err, agentrunner.ErrSessionDied):
 					queued = true
 				case err != nil:
-					return tickets.LogEvent{}, fmt.Errorf("prompt %s: %w", address, err)
+					return ticketlog.LogEvent{}, fmt.Errorf("prompt %s: %w", address, err)
 				default:
 					// The agent can die right after taking the prompt.
 					if queued, err = o.AgentGone(address); err != nil {
-						return tickets.LogEvent{}, err
+						return ticketlog.LogEvent{}, err
 					}
 				}
 			}
-			ev := tickets.LogEvent{Type: tickets.EventPauseAnswer, Source: req.Source, How: tickets.HowAnswer, Question: open.Seq, Choice: answer, Note: note, Huh: req.Huh}
+			ev := ticketlog.LogEvent{Type: ticketlog.EventPauseAnswer, Source: req.Source, How: ticketlog.HowAnswer, Question: open.Seq, Choice: answer, Note: note, Huh: req.Huh}
 			if q.Kind == ticketlog.QuestionText {
 				ev.Choice, ev.Text = "", answer
 			}

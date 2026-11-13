@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // EpicTicketMD is the epic ticket.md SetupEpicSetProject writes.
@@ -109,7 +110,7 @@ const LogQuestionLine = `{"seq":1,"ts":"2026-01-01T00:00:00Z","type":"pause.ques
 // WriteLogFile writes content as the log beside the ticket at ticketPath.
 func WriteLogFile(t *testing.T, ticketPath, content string) {
 	t.Helper()
-	if err := os.WriteFile(tickets.LogPath(ticketPath), []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(ticketlog.LogPath(ticketPath), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }

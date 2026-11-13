@@ -3,7 +3,9 @@
 // tickets, so tickets itself stays under its size limits.
 package archivekey
 
-import "strings"
+import (
+	"strings"
+)
 
 // epicPrefix starts the epic part of an archive key. Archive names never start
 // with a dot, so no active epic can collide with it.
@@ -44,7 +46,7 @@ func Address(key string) (string, bool) {
 }
 
 // Epic drops a /NN ticket suffix from an archive key, leaving the epic's key.
-// tickets.EpicAddress cannot do this: it cuts at the first slash, which inside
+// oneoff.EpicAddress cannot do this: it cuts at the first slash, which inside
 // an archive key is the one after ".archive".
 func Epic(key string) string {
 	head, rest, ok := strings.Cut(key, epicPrefix)

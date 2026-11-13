@@ -5,8 +5,8 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // unknownFriction labels a pause with no recorded kind and a pause end with no
@@ -34,7 +34,7 @@ var frictionRunEvents = map[events.Type]events.Type{
 // (old data) counts one pause per spell in the run log: a spell starts at the
 // first paused event after the ticket last started an iteration, so repeated
 // paused lines count once, and it ends at the next start or resume.
-func Friction(ticket string, runEvents []runlog.Event, log []tickets.LogEvent) schema.FrictionSummary {
+func Friction(ticket string, runEvents []runlog.Event, log []ticketlog.LogEvent) schema.FrictionSummary {
 	var f schema.FrictionSummary
 	var mine []runlog.Event
 	for _, ev := range runEvents {
@@ -47,7 +47,7 @@ func Friction(ticket string, runEvents []runlog.Event, log []tickets.LogEvent) s
 		}
 	}
 
-	if rounds := tickets.AllRounds(log); len(rounds) > 0 {
+	if rounds := ticketlog.AllRounds(log); len(rounds) > 0 {
 		for _, r := range rounds {
 			frictionRound(&f, r)
 		}
@@ -66,7 +66,7 @@ func StampFriction(scratchDir, epic, ticket, ticketPath string) error {
 	if err != nil {
 		return err
 	}
-	log, err := tickets.ReadLog(ticketPath)
+	log, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func StampFriction(scratchDir, epic, ticket, ticketPath string) error {
 	return schema.UpdateTicket(ticketPath, func(t *schema.Ticket) { t.Friction = &friction })
 }
 
-func frictionRound(f *schema.FrictionSummary, r tickets.PauseRound) {
+func frictionRound(f *schema.FrictionSummary, r ticketlog.PauseRound) {
 	bump(&f.PausesByReason, orUnknown(string(events.CurrentKind(events.Kind(r.Question.PauseKind)))))
 	if r.End == nil {
 		return
@@ -83,7 +83,7 @@ func frictionRound(f *schema.FrictionSummary, r tickets.PauseRound) {
 	bump(&f.PauseEndings, source)
 	secs := int(r.End.TS.Sub(r.Question.TS).Seconds())
 	f.TotalPausedSecs += secs
-	if slices.Contains([]string{tickets.SourceWeb, tickets.SourceTUI, tickets.SourceCLI}, source) {
+	if slices.Contains([]string{ticketlog.SourceWeb, ticketlog.SourceTUI, ticketlog.SourceCLI}, source) {
 		f.PersonPauseSecs = append(f.PersonPauseSecs, secs)
 	}
 }

@@ -3,7 +3,7 @@ package wire
 import (
 	"time"
 
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // QueueItem is one queued ticket and the agent it will run under.
@@ -36,12 +36,12 @@ type QueueResult struct {
 	PauseKind     string `json:"park_kind,omitempty"`
 	// Outcome is an answer's result: delivered or adopted. A stale refusal
 	// carries the current Question and its State token.
-	Outcome  string            `json:"outcome,omitempty"`
-	Question *tickets.LogEvent `json:"question,omitempty"`
-	State    string            `json:"state,omitempty"`
-	Refused  bool              `json:"refused,omitempty"`
-	Reason   string            `json:"reason,omitempty"`
-	Message  string            `json:"message,omitempty"`
+	Outcome  string              `json:"outcome,omitempty"`
+	Question *ticketlog.LogEvent `json:"question,omitempty"`
+	State    string              `json:"state,omitempty"`
+	Refused  bool                `json:"refused,omitempty"`
+	Reason   string              `json:"reason,omitempty"`
+	Message  string              `json:"message,omitempty"`
 }
 
 // QueueRequest is the body of the queue writes; each uses the fields it needs.

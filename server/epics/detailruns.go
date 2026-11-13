@@ -1,15 +1,15 @@
 package epics
 
 import (
-	"github.com/elentok/gx/server/queue"
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"time"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // runSources is everything the run lines of one ticket are built from.
@@ -163,14 +163,14 @@ func runEnd(ev runlog.Event) string {
 }
 
 // ticketRuns reads the ticket's run lines from its epic's run log.
-func (s *Epics) ticketRuns(ref queue.TicketRef, t schema.Ticket, log []tickets.LogEvent, statusWrittenAt time.Time) ([]wire.DetailRun, error) {
+func (s *Epics) ticketRuns(ref queue.TicketRef, t schema.Ticket, log []ticketlog.LogEvent, statusWrittenAt time.Time) ([]wire.DetailRun, error) {
 	evs, err := s.History.ReadHistory(ref.Addr)
 	if err != nil {
 		return nil, err
 	}
 	src := runSources{events: evs, ticket: t, statusWrittenAt: statusWrittenAt}
 	for _, ev := range log {
-		if ev.Type == tickets.EventPauseAnswer {
+		if ev.Type == ticketlog.EventPauseAnswer {
 			src.answers = append(src.answers, ev.TS)
 		}
 	}

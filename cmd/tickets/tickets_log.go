@@ -6,7 +6,7 @@ import (
 
 	"github.com/elentok/gx/cmd/ticketref"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // runTicketsLog is file-only: the log sits beside the ticket file, so it needs
@@ -16,7 +16,7 @@ func runTicketsLog(dirs config.Dirs, cwd, addr, eventType string, w io.Writer) e
 	if err != nil {
 		return err
 	}
-	events, err := tickets.ReadLog(t.Path)
+	events, err := ticketlog.ReadLog(t.Path)
 	if err != nil {
 		return err
 	}

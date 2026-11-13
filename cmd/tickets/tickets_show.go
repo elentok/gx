@@ -236,7 +236,7 @@ func printTicket(a tickets.Address, t tickets.Ticket, jsonOut bool, w io.Writer)
 	if !strings.HasSuffix(t.Body, "\n") {
 		fmt.Fprintln(w)
 	}
-	events, err := tickets.ReadLog(t.Path)
+	events, err := ticketlog.ReadLog(t.Path)
 	if err != nil {
 		return err
 	}

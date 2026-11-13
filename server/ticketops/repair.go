@@ -12,23 +12,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
+	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/ticketops"
+	"github.com/elentok/gx/ralphloop/worktree"
+	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/ticketwrite"
-
-	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/ticketops"
-	"github.com/elentok/gx/ralphloop/worktree"
-	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // repairCtx is what the server knows about a repair write that the body does
@@ -358,7 +358,7 @@ func (o *Ops) repairResume(req wire.RepairRequest, rc repairCtx) (wire.RepairRes
 			return repairRefusal(err), nil
 		}
 		if prompted {
-			if err := tickets.PromptOpenRound(t.Path, rc.origin); err != nil {
+			if err := ticketlog.PromptOpenRound(t.Path, rc.origin); err != nil {
 				return wire.RepairResult{}, fmt.Errorf("log prompt of %s: %w", addr, err)
 			}
 			ev := runlog.Event{Type: string(events.PausePrompted), Ticket: id, Address: addr.String(), Text: prompt}
@@ -395,7 +395,7 @@ func (o *Ops) repairResume(req wire.RepairRequest, rc repairCtx) (wire.RepairRes
 			clearTierOverride(t.Path, req.Tier)
 			return repairRefusal(err), nil
 		}
-		if err := tickets.EndOpenRound(t.Path, rc.origin, tickets.HowResume, ticketops.CloseResumed); err != nil {
+		if err := ticketlog.EndOpenRound(t.Path, rc.origin, ticketlog.HowResume, ticketops.CloseResumed); err != nil {
 			return wire.RepairResult{}, fmt.Errorf("end pause round of %s: %w", addr, err)
 		}
 	}
@@ -465,20 +465,20 @@ func (e resumeRefused) Error() string { return "resume refused" }
 // again under the lock, and a refusal or a failed reopen appends nothing, so a
 // failure never leaves an answered question on a paused ticket.
 func resumeAnswered(ticketPath, id string, req wire.RepairRequest, origin string) (repair.ResumeResult, *wire.RepairResult, error) {
-	_, err := tickets.AppendLogFrom(ticketPath, func(evs []tickets.LogEvent) (tickets.LogEvent, error) {
+	_, err := ticketlog.AppendLogFrom(ticketPath, func(evs []ticketlog.LogEvent) (ticketlog.LogEvent, error) {
 		t, err := schema.ParseTicket(ticketPath)
 		if err != nil {
-			return tickets.LogEvent{}, err
+			return ticketlog.LogEvent{}, err
 		}
-		open := tickets.OpenQuestion(evs)
+		open := ticketlog.OpenQuestion(evs)
 		if !t.PausedAsking() || open == nil || queue.AnswerState(*open, t.PausedClass()) != req.State {
-			return tickets.LogEvent{}, resumeRefused{staleResumeRefusal()}
+			return ticketlog.LogEvent{}, resumeRefused{staleResumeRefusal()}
 		}
 		if err := ticketops.ResumeTicketWithBaseLocked(ticketPath, time.Now(), req.Base); err != nil {
-			return tickets.LogEvent{}, resumeRefused{repairRefusal(err)}
+			return ticketlog.LogEvent{}, resumeRefused{repairRefusal(err)}
 		}
-		return tickets.LogEvent{
-			Type: tickets.EventPauseAnswer, Source: origin, How: tickets.HowResume, Question: open.Seq, Choice: "unpark", Base: req.Base,
+		return ticketlog.LogEvent{
+			Type: ticketlog.EventPauseAnswer, Source: origin, How: ticketlog.HowResume, Question: open.Seq, Choice: "unpark", Base: req.Base,
 		}, nil
 	})
 	var refused resumeRefused
@@ -637,7 +637,7 @@ func (o *Ops) resumeSelfReported(epicPath, id, origin string) (wire.RepairResult
 	if !selfReported {
 		return wire.RepairResult{}, false, nil
 	}
-	if err := tickets.EndOpenRound(t.Path, origin, tickets.HowResume, ticketops.CloseResumed); err != nil {
+	if err := ticketlog.EndOpenRound(t.Path, origin, ticketlog.HowResume, ticketops.CloseResumed); err != nil {
 		return wire.RepairResult{}, false, fmt.Errorf("close question of %s: %w", address, err)
 	}
 	return wire.RepairResult{}, false, nil

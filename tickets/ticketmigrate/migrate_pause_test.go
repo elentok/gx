@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/projectlock"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/tickets/tickettest"
 )
 
@@ -29,7 +29,7 @@ func TestApplyPauseMigration_RunsWhileProjectLockHeld(t *testing.T) {
 	go func() {
 		_, err := ApplyPauseMigration([]PauseStep{{Path: path, Reason: schema.PausedReason("", schema.PauseClassAnswer)}})
 		if err == nil {
-			_, err = tickets.AppendLogInner(path, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "Which?", Text: "Which?"})
+			_, err = ticketlog.AppendLogInner(path, ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, By: "gx", Summary: "Which?", Text: "Which?"})
 		}
 		done <- err
 	}()

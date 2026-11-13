@@ -6,8 +6,8 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // Recommend stores an investigate agent's diagnosis and recommended verb
@@ -33,18 +33,18 @@ func (o *Ops) Recommend(req wire.QueueRequest, qc queue.Ctx) (wire.QueueResult, 
 		if t.PausedClass() == "" {
 			return queue.Refusal(wire.ReasonNotPaused, ref.Addr.String()+" is not paused"), nil
 		}
-		evs, err := tickets.ReadLog(ref.Ticket.Path)
+		evs, err := ticketlog.ReadLog(ref.Ticket.Path)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
-		actions, err := o.d.Epics.DetailFor(ref.Addr.String(), t, tickets.Rounds(evs), nil)
+		actions, err := o.d.Epics.DetailFor(ref.Addr.String(), t, ticketlog.Rounds(evs), nil)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}
 		if !slices.Contains(actions, verb) {
 			return queue.Refusal(wire.ReasonVerbNotOffered, verb+" is not an action of "+ref.Addr.String()), nil
 		}
-		written, err := tickets.RecommendOpenRound(ref.Ticket.Path, verb, diagnosis)
+		written, err := ticketlog.RecommendOpenRound(ref.Ticket.Path, verb, diagnosis)
 		if err != nil {
 			return wire.QueueResult{}, err
 		}

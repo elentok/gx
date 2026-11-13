@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 const (
@@ -50,8 +50,8 @@ func pauseSentence(ticketPath string, kind events.Kind, reason string, marked []
 	switch kind {
 	case events.SelfReported:
 		if ticketPath != "" {
-			if evs, err := tickets.ReadLog(ticketPath); err == nil {
-				if q := tickets.OpenQuestion(evs); q != nil && q.Summary != "" {
+			if evs, err := ticketlog.ReadLog(ticketPath); err == nil {
+				if q := ticketlog.OpenQuestion(evs); q != nil && q.Summary != "" {
 					return q.Summary
 				}
 			}

@@ -21,8 +21,8 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // Relaunch and nudge start agent work outside the queue (recovery remedies use
@@ -298,20 +298,20 @@ func testBudgetKillPausesBudgetKilled(t *testing.T, cost func() float64, ticket 
 func TestBudget_HardLimitKillClosesTheOpenQuestion(t *testing.T) {
 	t.Parallel()
 	path := runBudgetKill(t, func() float64 { return 6 }, servertest.TicketOpts{}, func(path string) {
-		if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "q?"}); err != nil {
+		if _, err := ticketlog.AppendLog(path, ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, By: "gx", Summary: "q?"}); err != nil {
 			t.Fatal(err)
 		}
 	})
-	evs, err := tickets.ReadLog(path)
+	evs, err := ticketlog.ReadLog(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(evs) != 3 || evs[1].Type != tickets.EventPauseClosed || evs[1].Question != 1 || evs[1].Reason != "budget-killed" ||
-		evs[2].Type != tickets.EventPauseRepair {
+	if len(evs) != 3 || evs[1].Type != ticketlog.EventPauseClosed || evs[1].Question != 1 || evs[1].Reason != "budget-killed" ||
+		evs[2].Type != ticketlog.EventPauseRepair {
 		t.Errorf("log = %+v, want the question, pause.closed{question 1, budget-killed}, then the repair round", evs)
 		return
 	}
-	if evs[1].Source != tickets.SourceGx || evs[1].How != tickets.HowAuto {
+	if evs[1].Source != ticketlog.SourceGx || evs[1].How != ticketlog.HowAuto {
 		t.Errorf("pause.closed = %+v, want source gx, how auto", evs[1])
 	}
 }
@@ -319,7 +319,7 @@ func TestBudget_HardLimitKillClosesTheOpenQuestion(t *testing.T) {
 func TestBudget_HardLimitKillWithoutQuestionOpensOnlyARepairRound(t *testing.T) {
 	t.Parallel()
 	path := runBudgetKill(t, func() float64 { return 6 }, servertest.TicketOpts{}, nil)
-	if evs, _ := tickets.ReadLog(path); len(evs) != 1 || evs[0].Type != tickets.EventPauseRepair {
+	if evs, _ := ticketlog.ReadLog(path); len(evs) != 1 || evs[0].Type != ticketlog.EventPauseRepair {
 		t.Errorf("log = %+v, want one pause.repair", evs)
 	}
 }

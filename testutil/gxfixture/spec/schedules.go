@@ -6,6 +6,7 @@ import (
 	"github.com/elentok/gx/server/schedules"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 )
 
 // SchedulesMachineID is the machine id the fixture's server state is opened with,
@@ -77,7 +78,7 @@ func SchedulesScenario(shape string) (Scenario, bool) {
 // weatherRuns is the Last runs of the page shape, newest first: Finished, Finished,
 // Ran late and a Skipped set time, with a paused One-off above them for paused.
 func weatherRuns(now time.Time, paused bool) ([]Epic, map[string]string, []schedules.Skip) {
-	key := schedules.DedupeKey(schedules.Key{Project: project, Slug: tickets.Slug("Weather check")}, SchedulesMachineID)
+	key := schedules.DedupeKey(schedules.Key{Project: project, Slug: oneoff.Slug("Weather check")}, SchedulesMachineID)
 	day := 24 * time.Hour
 	stamp := func(t time.Time) string { return t.Format(time.RFC3339) }
 	run := func(due time.Time, lag time.Duration, result string) servertest.TicketOpts {

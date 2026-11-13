@@ -10,8 +10,8 @@ import (
 
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestExecute_TicketsMigrate_RewritesOldStatusesToPaused(t *testing.T) {
@@ -28,7 +28,7 @@ func TestExecute_TicketsMigrate_RewritesOldStatusesToPaused(t *testing.T) {
 		"08-broken.md":         "no frontmatter at all\n",
 	})
 	path := func(name string) string { return filepath.Join(issuesDir, name) }
-	if _, err := tickets.AppendLog(path("04-repair-log.md"), tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", PauseKind: "spinning", Summary: "stuck"}); err != nil {
+	if _, err := ticketlog.AppendLog(path("04-repair-log.md"), ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, By: "gx", PauseKind: "spinning", Summary: "stuck"}); err != nil {
 		t.Fatal(err)
 	}
 

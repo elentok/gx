@@ -7,9 +7,9 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func summaryTicket(n, status string, blockedBy ...string) tickets.Ticket {
@@ -187,7 +187,7 @@ func TestSummarizeEpic_MergeBlockActionsFollowTheVerbTable(t *testing.T) {
 	}
 	for kind, actions := range want {
 		e := tickets.Epic{Name: "epic", CompletedAt: time.Unix(50, 0), MergeBlockKind: kind, MergeBlockReason: "why", Tickets: []tickets.Ticket{summaryTicket("01", "done")}}
-		got := summarizeEpic(root, e, "merge", func(string) (time.Time, bool) { return time.Time{}, false }, func(string) string { return "" }, func(tickets.Ticket) []tickets.LogEvent { return nil })
+		got := summarizeEpic(root, e, "merge", func(string) (time.Time, bool) { return time.Time{}, false }, func(string) string { return "" }, func(tickets.Ticket) []ticketlog.LogEvent { return nil })
 		if !equalStrings(got.Actions, actions) {
 			t.Errorf("%s actions = %v, want %v", kind, got.Actions, actions)
 		}
@@ -222,7 +222,7 @@ func TestSummarizeEpic_PausedDetails(t *testing.T) {
 	}
 }
 
-func noLog(tickets.Ticket) []tickets.LogEvent { return nil }
+func noLog(tickets.Ticket) []ticketlog.LogEvent { return nil }
 
 func TestSummarizeEpic_PausedEntriesCarrySummaryAnswerableAnswered(t *testing.T) {
 	t.Parallel()
@@ -232,18 +232,18 @@ func TestSummarizeEpic_PausedEntriesCarrySummaryAnswerableAnswered(t *testing.T)
 	repair := repairPausedTicket("02")
 	repair.Body = "## Needs Repair\n\nthe repair reason\n"
 	answered := summaryTicket("03", "open")
-	question := func(seq int, summary string) tickets.LogEvent {
-		return tickets.LogEvent{Type: tickets.EventPauseQuestion, Seq: seq, Summary: summary}
+	question := func(seq int, summary string) ticketlog.LogEvent {
+		return ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, Seq: seq, Summary: summary}
 	}
-	logs := map[string][]tickets.LogEvent{
+	logs := map[string][]ticketlog.LogEvent{
 		"01": {question(1, "which one?")},
-		"03": {question(1, "old"), {Type: tickets.EventPauseAnswer, Seq: 2, Question: 1}},
+		"03": {question(1, "old"), {Type: ticketlog.EventPauseAnswer, Seq: 2, Question: 1}},
 	}
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{asked, repair, answered}}
 	got := summarizeEpic(root, epic, "merge",
 		func(string) (time.Time, bool) { return time.Time{}, false },
 		func(string) string { return "" },
-		func(tk tickets.Ticket) []tickets.LogEvent { return logs[tk.Identifier] })
+		func(tk tickets.Ticket) []ticketlog.LogEvent { return logs[tk.Identifier] })
 	if len(got.Paused) != 3 {
 		t.Fatalf("paused = %+v", got.Paused)
 	}

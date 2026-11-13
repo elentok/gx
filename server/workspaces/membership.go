@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/archivekey"
+	"github.com/elentok/gx/tickets/oneoff"
 )
 
 // Directory is what the membership rules and placement need from the server:
@@ -30,14 +31,14 @@ func (s *Store) joinable(key string) error {
 	}
 	dir := s.dir()
 	if _, name, ok := tickets.ParseEpicAddress(key); ok {
-		if name == tickets.FollowUpsEpic || name == tickets.ArchivedFollowUpsEpic || tickets.IsOneOffsEpicName(name) {
+		if name == tickets.FollowUpsEpic || name == tickets.ArchivedFollowUpsEpic || oneoff.IsOneOffsEpicName(name) {
 			return ReasonNotJoinable
 		}
 		e, ok := dir.Epic(key)
 		switch {
 		case !ok:
 			return ReasonUnknownKey
-		case tickets.IsOneOffEpic(e):
+		case oneoff.IsOneOffEpic(e):
 			return ReasonNotJoinable
 		}
 		return nil
@@ -59,7 +60,7 @@ func (s *Store) joinable(key string) error {
 
 func inOneOffs(si wire.SessionInfo) bool {
 	a, err := tickets.ParseQueuedAddress(si.Ticket)
-	return err == nil && tickets.IsOneOffsEpicName(a.Epic)
+	return err == nil && oneoff.IsOneOffsEpicName(a.Epic)
 }
 
 // Place says where each session sits. Rules stay here; the web only renders.
@@ -88,12 +89,12 @@ func (s *Store) place(si wire.SessionInfo) wire.SessionPlacement {
 	}
 	// A project-level Fix agent has a bare project name here, which does not parse.
 	a, err := tickets.ParseQueuedAddress(addr)
-	if err != nil || tickets.IsOneOffsEpicName(a.Epic) {
+	if err != nil || oneoff.IsOneOffsEpicName(a.Epic) {
 		return other
 	}
 	epic := a.Project + ":" + a.Epic
 	dir := s.dir()
-	if e, ok := dir.Epic(epic); ok && tickets.IsOneOffEpic(e) {
+	if e, ok := dir.Epic(epic); ok && oneoff.IsOneOffEpic(e) {
 		return other
 	}
 	if design, ok := strings.CutSuffix(epic, tickets.ImplEpicSuffix); ok && dir.DesignExists(design) {

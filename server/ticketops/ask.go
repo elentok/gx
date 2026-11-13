@@ -6,7 +6,6 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
@@ -26,16 +25,16 @@ func (o *Ops) Ask(req wire.QueueRequest) (wire.QueueResult, error) {
 		return queue.Refusal(wire.ReasonHandoffRequired, "a non-empty ## Handoff section is required"), nil
 	}
 	return o.d.Writer.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
-		ev := tickets.LogEvent{
-			Type:    tickets.EventPauseQuestion,
+		ev := ticketlog.LogEvent{
+			Type:    ticketlog.EventPauseQuestion,
 			By:      askAuthorAgent,
 			Summary: q.Summary,
 			Text:    q.Detail,
 			Block:   ticketlog.QuestionBlock(req.Text),
 			Handoff: q.Handoff,
 		}
-		_, err := tickets.AppendLogIf(ref.Ticket.Path, ev, func(events []tickets.LogEvent) error {
-			if tickets.OpenQuestion(events) != nil {
+		_, err := ticketlog.AppendLogIf(ref.Ticket.Path, ev, func(events []ticketlog.LogEvent) error {
+			if ticketlog.OpenQuestion(events) != nil {
 				return errQuestionOpen
 			}
 			return nil

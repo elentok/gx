@@ -8,8 +8,8 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -18,7 +18,7 @@ import (
 // time. A cancelled one-off carries no stamp and never counts.
 func finishedOneOffs(project string, e tickets.Epic) []wire.FinishedEpic {
 	epic := filepath.Base(e.Path)
-	if !tickets.IsOneOffsEpicName(epic) {
+	if !oneoff.IsOneOffsEpicName(epic) {
 		return nil
 	}
 	var out []wire.FinishedEpic
@@ -50,7 +50,7 @@ func RecentlyFinished(loaded map[string][]tickets.Epic, limit int) []wire.Finish
 	for dir, epics := range loaded {
 		project := tickets.ProjectName(dir)
 		for _, e := range epics {
-			if e.IsMap || e.CompletedAt.IsZero() || tickets.IsOneOffsEpicName(filepath.Base(e.Path)) {
+			if e.IsMap || e.CompletedAt.IsZero() || oneoff.IsOneOffsEpicName(filepath.Base(e.Path)) {
 				continue
 			}
 			f := wire.FinishedEpic{

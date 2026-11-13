@@ -3,12 +3,10 @@ package ticketlog
 import (
 	"strings"
 	"testing"
-
-	"github.com/elentok/gx/tickets"
 )
 
 func TestRenderRounds_NoRoundsIsEmpty(t *testing.T) {
-	events := []tickets.LogEvent{{Seq: 1, Type: tickets.EventPausePermission, Decision: "allow"}}
+	events := []LogEvent{{Seq: 1, Type: EventPausePermission, Decision: "allow"}}
 	if got := RenderRounds(events); got != "" {
 		t.Errorf("RenderRounds = %q, want empty", got)
 	}
@@ -18,8 +16,8 @@ func TestRenderRounds_NoRoundsIsEmpty(t *testing.T) {
 }
 
 func TestRenderRounds_OpenRoundShowsQuestionBlockAndHandoff(t *testing.T) {
-	events := []tickets.LogEvent{{
-		Seq: 1, Type: tickets.EventPauseQuestion, Summary: "Pick a store?", Text: "Details here.",
+	events := []LogEvent{{
+		Seq: 1, Type: EventPauseQuestion, Summary: "Pick a store?", Text: "Details here.",
 		Block: "type: yes-no", Handoff: "Resume at step 3.",
 	}}
 	want := "Pause rounds\n" +
@@ -34,9 +32,9 @@ func TestRenderRounds_OpenRoundShowsQuestionBlockAndHandoff(t *testing.T) {
 }
 
 func TestRenderRounds_AnsweredRoundShowsAnswer(t *testing.T) {
-	events := []tickets.LogEvent{
-		{Seq: 1, Type: tickets.EventPauseQuestion, Summary: "Which?", Text: "body"},
-		{Seq: 2, Type: tickets.EventPauseAnswer, Question: 1, Choice: "a", Note: "go"},
+	events := []LogEvent{
+		{Seq: 1, Type: EventPauseQuestion, Summary: "Which?", Text: "body"},
+		{Seq: 2, Type: EventPauseAnswer, Question: 1, Choice: "a", Note: "go"},
 	}
 	want := "Pause rounds\n" +
 		"1. answered: Which?\n" +
@@ -48,9 +46,9 @@ func TestRenderRounds_AnsweredRoundShowsAnswer(t *testing.T) {
 }
 
 func TestRenderRounds_FreeTextAnswerIsShown(t *testing.T) {
-	events := []tickets.LogEvent{
-		{Seq: 1, Type: tickets.EventPauseQuestion, Summary: "Which?", Text: "body"},
-		{Seq: 2, Type: tickets.EventPauseAnswer, Question: 1, Text: "use the proposed fix"},
+	events := []LogEvent{
+		{Seq: 1, Type: EventPauseQuestion, Summary: "Which?", Text: "body"},
+		{Seq: 2, Type: EventPauseAnswer, Question: 1, Text: "use the proposed fix"},
 	}
 	want := "Pause rounds\n" +
 		"1. answered: Which?\n" +
@@ -62,9 +60,9 @@ func TestRenderRounds_FreeTextAnswerIsShown(t *testing.T) {
 }
 
 func TestRenderRounds_ClosedRoundShowsReason(t *testing.T) {
-	events := []tickets.LogEvent{
-		{Seq: 1, Type: tickets.EventPauseQuestion, Summary: "Which?"},
-		{Seq: 2, Type: tickets.EventPauseClosed, Question: 1, Reason: "ticket dropped"},
+	events := []LogEvent{
+		{Seq: 1, Type: EventPauseQuestion, Summary: "Which?"},
+		{Seq: 2, Type: EventPauseClosed, Question: 1, Reason: "ticket dropped"},
 	}
 	want := "Pause rounds\n1. closed: Which?\n   closed: ticket dropped\n"
 	if got := RenderRounds(events); got != want {
@@ -73,12 +71,12 @@ func TestRenderRounds_ClosedRoundShowsReason(t *testing.T) {
 }
 
 func TestRenderRounds_ThreeRoundsEarlierOnesAreOneLine(t *testing.T) {
-	events := []tickets.LogEvent{
-		{Seq: 1, Type: tickets.EventPauseQuestion, Summary: "First?", Text: "first detail"},
-		{Seq: 2, Type: tickets.EventPauseAnswer, Question: 1, Choice: "yes"},
-		{Seq: 3, Type: tickets.EventPauseQuestion, Summary: "Second?", Text: "second detail"},
-		{Seq: 4, Type: tickets.EventPauseClosed, Question: 3},
-		{Seq: 5, Type: tickets.EventPauseQuestion, Summary: "Third?", Text: "third detail"},
+	events := []LogEvent{
+		{Seq: 1, Type: EventPauseQuestion, Summary: "First?", Text: "first detail"},
+		{Seq: 2, Type: EventPauseAnswer, Question: 1, Choice: "yes"},
+		{Seq: 3, Type: EventPauseQuestion, Summary: "Second?", Text: "second detail"},
+		{Seq: 4, Type: EventPauseClosed, Question: 3},
+		{Seq: 5, Type: EventPauseQuestion, Summary: "Third?", Text: "third detail"},
 	}
 	want := "Pause rounds\n" +
 		"1. answered: First? -> answer: yes\n" +

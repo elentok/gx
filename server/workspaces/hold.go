@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 )
 
 // SessionKinds picks which of an epic's live Sessions a stop reaches.
@@ -30,7 +31,7 @@ func LiveEpicSessions(dir Directory, epic string, kinds SessionKinds) []string {
 		if si.Status.State == wire.SessionExited || !kinds.has(si) {
 			continue
 		}
-		if tickets.EpicAddress(cmp.Or(si.FixOf, si.Ticket)) == epic {
+		if oneoff.EpicAddress(cmp.Or(si.FixOf, si.Ticket)) == epic {
 			live = append(live, si.ID)
 		}
 	}

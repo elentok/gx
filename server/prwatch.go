@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -92,7 +93,7 @@ func (h prWatchHost) AutoPR() []prflow.Target {
 			continue
 		}
 		for _, e := range epics {
-			if tickets.IsOneOffsEpicName(e.Name) || prstate.Of(e, config.DeliveryPR) != wire.EpicStateAwaitingPR {
+			if oneoff.IsOneOffsEpicName(e.Name) || prstate.Of(e, config.DeliveryPR) != wire.EpicStateAwaitingPR {
 				continue
 			}
 			out = append(out, prflow.Target{Project: tickets.ProjectName(dir), Epic: e.Name, Dir: e.Path})

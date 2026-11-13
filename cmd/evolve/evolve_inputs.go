@@ -11,6 +11,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/spf13/cobra"
+
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
@@ -21,8 +23,8 @@ import (
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/tickets/ticketspec"
-	"github.com/spf13/cobra"
 )
 
 // Flag names in the evolve inputs table. They are part of the JSON contract the
@@ -235,13 +237,13 @@ const countHuh = "huh"
 
 // huhAnswers counts the pause.answer events of the ticket's log sent as Huh?.
 func huhAnswers(ticketPath string) (int, error) {
-	evs, err := tickets.ReadLog(ticketPath)
+	evs, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		return 0, err
 	}
 	n := 0
 	for _, ev := range evs {
-		if ev.Type == tickets.EventPauseAnswer && ev.Huh {
+		if ev.Type == ticketlog.EventPauseAnswer && ev.Huh {
 			n++
 		}
 	}

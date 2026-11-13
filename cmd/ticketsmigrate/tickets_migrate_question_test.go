@@ -9,7 +9,7 @@ import (
 
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestExecute_TicketsMigrate_MovesNeedsAnswerIntoLog(t *testing.T) {
@@ -33,7 +33,7 @@ func TestExecute_TicketsMigrate_MovesNeedsAnswerIntoLog(t *testing.T) {
 	}
 	run()
 
-	events, err := tickets.ReadLog(parked)
+	events, err := ticketlog.ReadLog(parked)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,23 +41,23 @@ func TestExecute_TicketsMigrate_MovesNeedsAnswerIntoLog(t *testing.T) {
 		t.Fatalf("parked log has %d events, want 1: %+v", len(events), events)
 	}
 	q := events[0]
-	if q.Type != tickets.EventPauseQuestion || q.By != "agent" || q.PauseKind != "self-reported" ||
+	if q.Type != ticketlog.EventPauseQuestion || q.By != "agent" || q.PauseKind != "self-reported" ||
 		q.Summary != "Which store?" || q.Handoff != "Resume at step 3." {
 		t.Errorf("question = %+v", q)
 	}
-	if tickets.OpenQuestion(events) == nil {
+	if ticketlog.OpenQuestion(events) == nil {
 		t.Error("parked ticket has no open question")
 	}
 
-	events, err = tickets.ReadLog(answered)
+	events, err = ticketlog.ReadLog(answered)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(events) != 2 || events[0].PauseKind != "zero-commit" ||
-		events[1].Type != tickets.EventPauseAnswer || events[1].Question != events[0].Seq {
+		events[1].Type != ticketlog.EventPauseAnswer || events[1].Question != events[0].Seq {
 		t.Fatalf("answered log = %+v, want question (zero-commit) then its answer", events)
 	}
-	if tickets.OpenQuestion(events) != nil {
+	if ticketlog.OpenQuestion(events) != nil {
 		t.Error("answered ticket still has an open question")
 	}
 
@@ -70,7 +70,7 @@ func TestExecute_TicketsMigrate_MovesNeedsAnswerIntoLog(t *testing.T) {
 			t.Errorf("%s has no retired comment:\n%s", p, b)
 		}
 	}
-	if _, err := os.Stat(tickets.LogPath(filepath.Join(issuesDir, "03-plain.md"))); !os.IsNotExist(err) {
+	if _, err := os.Stat(ticketlog.LogPath(filepath.Join(issuesDir, "03-plain.md"))); !os.IsNotExist(err) {
 		t.Errorf("plain ticket got a log: %v", err)
 	}
 
@@ -82,7 +82,7 @@ func TestExecute_TicketsMigrate_MovesNeedsAnswerIntoLog(t *testing.T) {
 	if !bytes.Equal(before, after) {
 		t.Error("parked ticket changed on second run")
 	}
-	if events, _ := tickets.ReadLog(parked); len(events) != 1 {
+	if events, _ := ticketlog.ReadLog(parked); len(events) != 1 {
 		t.Errorf("second run grew the log to %d events", len(events))
 	}
 }

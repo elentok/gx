@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // PauseStep is one stored needs-answer / needs-repair ticket and the paused
@@ -116,12 +117,12 @@ func planPauseStep(path string) (PauseStep, bool, error) {
 // latestLoggedReason is the reason of the latest pause event in the ticket's
 // log, or class's default when the log has none that fits.
 func latestLoggedReason(path string, class schema.PauseClass) (schema.PauseReason, error) {
-	events, err := tickets.ReadLog(path)
+	events, err := ticketlog.ReadLog(path)
 	if err != nil {
 		return "", fmt.Errorf("reading log of %s: %w", path, err)
 	}
 	for _, ev := range slices.Backward(events) {
-		if ev.Type == tickets.EventPauseQuestion {
+		if ev.Type == ticketlog.EventPauseQuestion {
 			return schema.PausedReason(ev.PauseKind, class), nil
 		}
 	}

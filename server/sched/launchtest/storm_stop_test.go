@@ -8,13 +8,13 @@ import (
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func countPauseEvents(t *testing.T, ticketPath, typ string) int {
 	t.Helper()
-	log, err := tickets.ReadLog(ticketPath)
+	log, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,23 +52,23 @@ func TestStormStop_PausesProcessStormOnceWhicheverPathGetsThereFirst(t *testing.
 	if tk.Status != schema.StatusPaused || tk.PauseReason != schema.PauseProcessStorm {
 		t.Errorf("ticket = status %q reason %q, want paused process-storm", tk.Status, tk.PauseReason)
 	}
-	log, err := tickets.ReadLog(ticketPath)
+	log, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var detail string
 	for _, ev := range log {
-		if ev.Type == tickets.EventPauseRepair {
+		if ev.Type == ticketlog.EventPauseRepair {
 			detail += ev.Reason
 		}
 	}
 	if !strings.Contains(detail, "812") || !strings.Contains(detail, "500") {
 		t.Errorf("pause detail = %q, want count and threshold", detail)
 	}
-	if n := countPauseEvents(t, ticketPath, tickets.EventPauseRepair); n != 1 {
+	if n := countPauseEvents(t, ticketPath, ticketlog.EventPauseRepair); n != 1 {
 		t.Errorf("pause.repair events = %d, want 1", n)
 	}
-	if n := countPauseEvents(t, ticketPath, tickets.EventPauseClosed); n > 1 {
+	if n := countPauseEvents(t, ticketPath, ticketlog.EventPauseClosed); n > 1 {
 		t.Errorf("pause.closed events = %d, want at most 1", n)
 	}
 }
@@ -89,7 +89,7 @@ func TestStormStop_SettlePathFirstPausesOnceAndStartsNoRecovery(t *testing.T) {
 	if err := stopper.StormStop(tracked, 812, 500); err != nil {
 		t.Fatal(err)
 	}
-	if n := countPauseEvents(t, ticketPath, tickets.EventPauseRepair); n != 1 {
+	if n := countPauseEvents(t, ticketPath, ticketlog.EventPauseRepair); n != 1 {
 		t.Errorf("pause.repair events = %d, want 1", n)
 	}
 	if got := len(h.Server.Runs()); got > 1 {

@@ -5,10 +5,9 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
-
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
@@ -58,7 +57,7 @@ func (s *Epics) TicketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 	if err != nil {
 		return brokenDetail(ref, err), nil
 	}
-	evs, err := tickets.ReadLog(ref.Ticket.Path)
+	evs, err := ticketlog.ReadLog(ref.Ticket.Path)
 	if err != nil {
 		return wire.TicketDetail{}, err
 	}
@@ -98,10 +97,10 @@ func (s *Epics) TicketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 		}
 	}
 	d.State = detailState(evs, t)
-	if rec := tickets.RecommendationOf(evs); rec != nil && t.PausedClass() != "" {
+	if rec := ticketlog.RecommendationOf(evs); rec != nil && t.PausedClass() != "" {
 		d.Recommendation = &wire.DetailRecommendation{Verb: rec.Choice, Diagnosis: rec.Text}
 	}
-	rounds := tickets.Rounds(evs)
+	rounds := ticketlog.Rounds(evs)
 	if d.Actions, err = s.DetailFor(ref.Addr.String(), t, rounds, d.Permission); err != nil {
 		return wire.TicketDetail{}, err
 	}
@@ -115,7 +114,7 @@ func (s *Epics) TicketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 		d.Rounds = append(d.Rounds, detailRound(r, false))
 	}
 	latest := detailRound(*last, true)
-	if at := tickets.LastPrompt(evs, last.Question.Seq); !at.IsZero() && last.End == nil {
+	if at := ticketlog.LastPrompt(evs, last.Question.Seq); !at.IsZero() && last.End == nil {
 		latest.PromptedAt = &at
 		latest.Prompt = "Prompt sent to the running agent at " + at.Local().Format("15:04")
 	}
@@ -130,8 +129,8 @@ func (s *Epics) TicketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 
 // DetailFor is what a person may do with a parsed ticket now, given its pause
 // rounds. The ticket detail and ticketRecommend both read their actions from here.
-func (s *Epics) DetailFor(addr string, t schema.Ticket, rounds []tickets.PauseRound, card *wire.PermissionCard) ([]string, error) {
-	var last *tickets.PauseRound
+func (s *Epics) DetailFor(addr string, t schema.Ticket, rounds []ticketlog.PauseRound, card *wire.PermissionCard) ([]string, error) {
+	var last *ticketlog.PauseRound
 	if len(rounds) > 0 {
 		last = &rounds[len(rounds)-1]
 	}
@@ -199,10 +198,10 @@ func storedStatus(t schema.Ticket) schema.Status {
 
 // detailState is the token the detail page carries. A paused ticket's token
 // names its latest round of any kind, so repair and manual pauses have one.
-func detailState(evs []tickets.LogEvent, t schema.Ticket) string {
-	rounds := tickets.Rounds(evs)
+func detailState(evs []ticketlog.LogEvent, t schema.Ticket) string {
+	rounds := ticketlog.Rounds(evs)
 	if t.PausedClass() != "" {
-		rounds = tickets.AllRounds(evs)
+		rounds = ticketlog.AllRounds(evs)
 	}
 	if len(rounds) == 0 {
 		return ""
@@ -279,7 +278,7 @@ func (s *Epics) PermissionCard(addr tickets.Address) (*wire.PermissionCard, erro
 
 // detailActions is what a person may do with the ticket right now. Approve
 // joins when the permission card can be approved from here.
-func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone, tracked bool, task BackgroundTask, card *wire.PermissionCard) []string {
+func detailActions(t schema.Ticket, latest *ticketlog.PauseRound, agentGone, tracked bool, task BackgroundTask, card *wire.PermissionCard) []string {
 	actions := []string{}
 	if card != nil && card.RequestID != "" {
 		actions = append(actions, wire.ActionApprove)
@@ -313,11 +312,11 @@ func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone, track
 }
 
 // detailRound reads a round's question leniently: a bad block is free text.
-func detailRound(r tickets.PauseRound, full bool) wire.DetailRound {
+func detailRound(r ticketlog.PauseRound, full bool) wire.DetailRound {
 	out := wire.DetailRound{Seq: r.Question.Seq, By: r.Question.By, Summary: r.Question.Summary, Outcome: wire.RoundOpen}
 	if r.End != nil {
 		out.Outcome = wire.RoundClosed
-		if r.End.Type == tickets.EventPauseAnswer {
+		if r.End.Type == ticketlog.EventPauseAnswer {
 			out.Outcome = wire.RoundAnswered
 		}
 	}
@@ -336,7 +335,7 @@ func detailRound(r tickets.PauseRound, full bool) wire.DetailRound {
 	if r.End == nil {
 		return out
 	}
-	if r.End.Type == tickets.EventPauseAnswer {
+	if r.End.Type == ticketlog.EventPauseAnswer {
 		out.Answer = &wire.DetailAnswer{Source: r.End.Source, Choice: r.End.Choice, Text: r.End.Text, Note: r.End.Note}
 		if r.End.Huh {
 			// A choice question's Huh? logs no text; the history shows what the agent heard.

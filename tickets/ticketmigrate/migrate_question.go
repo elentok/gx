@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 const (
@@ -86,19 +87,19 @@ func migrateQuestionSection(path string, now time.Time) (bool, error) {
 		by = "agent"
 	}
 	summary, _, _ := strings.Cut(text, "\n")
-	q, err := tickets.AppendLogInner(path, tickets.LogEvent{
-		Type:      tickets.EventPauseQuestion,
+	q, err := ticketlog.AppendLogInner(path, ticketlog.LogEvent{
+		Type:      ticketlog.EventPauseQuestion,
 		By:        by,
 		PauseKind: string(kind),
-		Summary:   tickets.ClipRunes(strings.TrimSpace(summary), tickets.MaxLogSummaryChars),
-		Text:      tickets.ClipRunes(text, tickets.MaxLogTextChars),
-		Handoff:   tickets.ClipRunes(handoff, tickets.MaxLogTextChars),
+		Summary:   ticketlog.ClipRunes(strings.TrimSpace(summary), ticketlog.MaxLogSummaryChars),
+		Text:      ticketlog.ClipRunes(text, ticketlog.MaxLogTextChars),
+		Handoff:   ticketlog.ClipRunes(handoff, ticketlog.MaxLogTextChars),
 	})
 	if err != nil {
 		return false, err
 	}
 	if t.Status == schema.StatusOpen {
-		_, err = tickets.AppendLogInner(path, tickets.LogEvent{Type: tickets.EventPauseAnswer, Question: q.Seq, Source: "cli", Note: handAnsweredNote})
+		_, err = ticketlog.AppendLogInner(path, ticketlog.LogEvent{Type: ticketlog.EventPauseAnswer, Question: q.Seq, Source: "cli", Note: handAnsweredNote})
 		if err != nil {
 			return false, err
 		}

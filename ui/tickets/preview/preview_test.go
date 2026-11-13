@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/tickets/rowfmt"
 )
@@ -36,7 +37,7 @@ func TestRenderTicket_PausedAnswerAppendsPauseRounds(t *testing.T) {
 	if err := os.WriteFile(file, []byte("---\nid: \"20\"\nstatus: paused\npause_reason: blocked-pane\ntype: research\n---\n\n# 20 — A\n\nThe body text.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tickets.AppendLog(file, tickets.LogEvent{Type: tickets.EventPauseQuestion, Summary: "Which store?", Text: "Details."}); err != nil {
+	if _, err := ticketlog.AppendLog(file, ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, Summary: "Which store?", Text: "Details."}); err != nil {
 		t.Fatal(err)
 	}
 	rendered := tickets.StatusPausedAnswer
@@ -73,10 +74,10 @@ func TestHighlightPauseSection_PausedRepairRed(t *testing.T) {
 
 func TestRenderPauseRoundsBlock_OnlyLatestRoundIsOrange(t *testing.T) {
 	t.Parallel()
-	events := []tickets.LogEvent{
-		{Seq: 1, Type: tickets.EventPauseQuestion, Summary: "First?"},
-		{Seq: 2, Type: tickets.EventPauseAnswer, Question: 1, Choice: "yes"},
-		{Seq: 3, Type: tickets.EventPauseQuestion, Summary: "Second?", Text: "detail"},
+	events := []ticketlog.LogEvent{
+		{Seq: 1, Type: ticketlog.EventPauseQuestion, Summary: "First?"},
+		{Seq: 2, Type: ticketlog.EventPauseAnswer, Question: 1, Choice: "yes"},
+		{Seq: 3, Type: ticketlog.EventPauseQuestion, Summary: "Second?", Text: "detail"},
 	}
 	block, line, ok := renderPauseRoundsBlock(events, 80)
 	if !ok {

@@ -6,10 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elentok/gx/server/queue"
-	"github.com/elentok/gx/server/runs"
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
@@ -18,8 +14,12 @@ import (
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/ralphloop/worktree"
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // AdoptablePause reports whether a late finish can adopt a pause with this
@@ -226,7 +226,7 @@ func (s *Reconciler) adoptLateFinish(lf lateFinish) bool {
 	}
 	defer unlock()
 	one.Model, one.Effort = s.projects.RunAgentConfig(addr.Project, one.Agent, run)
-	if err := tickets.EndOpenRound(lf.path, tickets.SourceGx, tickets.HowAuto, "adopted"); err != nil {
+	if err := ticketlog.EndOpenRound(lf.path, ticketlog.SourceGx, ticketlog.HowAuto, "adopted"); err != nil {
 		s.log.Warn("late finish: close question", "ticket", addr, "err", err)
 		return false
 	}

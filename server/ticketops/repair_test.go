@@ -12,8 +12,8 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestWebStartOver_EmptyReasonRefusalNamesNoCLIFlag(t *testing.T) {
@@ -40,7 +40,7 @@ func TestRepair_MergeEndsThePauseRoundAsAManualMerge(t *testing.T) {
 		t.Fatalf("merge = %+v, %v; want merged", res, err)
 	}
 	rounds := endedRounds(t, ticketPath)
-	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowManualMerge || rounds[0].End.Source != wire.OriginCLI {
+	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != ticketlog.HowManualMerge || rounds[0].End.Source != wire.OriginCLI {
 		t.Errorf("rounds = %+v; want one ended by cli manual-merge", rounds)
 	}
 }

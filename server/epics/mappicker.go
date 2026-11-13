@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -35,7 +35,7 @@ func (s *Epics) designActivities() map[string]designActivity {
 		if !info.Design {
 			continue
 		}
-		addr := tickets.EpicAddress(info.Ticket)
+		addr := oneoff.EpicAddress(info.Ticket)
 		a := out[addr]
 		exited := info.Status.State == wire.SessionExited
 		switch {

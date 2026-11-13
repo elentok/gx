@@ -79,18 +79,18 @@ func (s *Epics) needsApproval(address string) bool {
 }
 
 // answeredLatest reports whether the latest question has an answer.
-func answeredLatest(evs []tickets.LogEvent) bool {
-	rounds := tickets.Rounds(evs)
+func answeredLatest(evs []ticketlog.LogEvent) bool {
+	rounds := ticketlog.Rounds(evs)
 	if len(rounds) == 0 {
 		return false
 	}
 	end := rounds[len(rounds)-1].End
-	return end != nil && end.Type == tickets.EventPauseAnswer
+	return end != nil && end.Type == ticketlog.EventPauseAnswer
 }
 
 // summarizeEpic applies the state rules, first match wins. A claimed ticket
 // counts as runnable, but only one with a server claim time counts as running.
-func summarizeEpic(root queue.RootRef, e tickets.Epic, delivery string, claimedAt func(string) (time.Time, bool), recoveryOf func(string) string, logOf func(tickets.Ticket) []tickets.LogEvent) wire.EpicSummary {
+func summarizeEpic(root queue.RootRef, e tickets.Epic, delivery string, claimedAt func(string) (time.Time, bool), recoveryOf func(string) string, logOf func(tickets.Ticket) []ticketlog.LogEvent) wire.EpicSummary {
 	sum := wire.EpicSummary{
 		Address: root.String(), Name: e.Name, Project: root.Project, Done: e.DoneCount(), Total: e.TotalCount(),
 		Active: []wire.SummaryTicket{}, Paused: []wire.SummaryTicket{},
@@ -103,7 +103,7 @@ func summarizeEpic(root queue.RootRef, e tickets.Epic, delivery string, claimedA
 		case IsPaused(e, t):
 			info.Recovery, info.Reason = recoveryOf(addr), ticketlog.PauseDetail(e, t)
 			info.ReasonLabel = t.PauseReason.Label()
-			open := tickets.OpenQuestion(logOf(t))
+			open := ticketlog.OpenQuestion(logOf(t))
 			info.Summary = info.Reason
 			if open != nil {
 				info.Summary = open.Summary

@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // StartOverTrunkConflict is Start over for a trunk-conflict ticket. There is no
@@ -38,7 +39,7 @@ func (s *Landing) StartOverTrunkConflict(req wire.RepairRequest, origin string, 
 	if err := git.RestoreFromTree(dir, e.TrunkConflictBackup, e.TrunkConflictFiles); err != nil {
 		return repair.StartOverResult{}, fmt.Errorf("restoring %s from %s: %w", listFiles(e.TrunkConflictFiles), e.TrunkConflictBackup, err)
 	}
-	if err := tickets.EndOpenRound(t.Path, origin, tickets.HowStartOver, "start-over"); err != nil {
+	if err := ticketlog.EndOpenRound(t.Path, origin, ticketlog.HowStartOver, "start-over"); err != nil {
 		return repair.StartOverResult{}, err
 	}
 	if err := ticketops.MarkDone(t.Path); err != nil {

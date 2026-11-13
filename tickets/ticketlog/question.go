@@ -9,7 +9,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -106,7 +105,7 @@ func ParseQuestionLenient(body string) Question {
 }
 
 // QuestionOfEvent is the question a pause.question line recorded, read leniently.
-func QuestionOfEvent(ev tickets.LogEvent) Question {
+func QuestionOfEvent(ev LogEvent) Question {
 	q := Question{Kind: QuestionText, Summary: ev.Summary, Detail: ev.Text, Handoff: ev.Handoff}
 	if ev.Block == "" {
 		return q

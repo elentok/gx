@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/git/pr"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 )
 
 // Outcome is what one Open attempt did.
@@ -153,7 +154,7 @@ func Open(h OpenHost, root queue.RootRef) (Outcome, error) {
 // openGate is step 1: a Complete epic (pr-text tickets aside), not a one-off or
 // a map, with no PR yet.
 func openGate(dir string, root queue.RootRef) bool {
-	if tickets.IsOneOffsEpicName(root.Epic) {
+	if oneoff.IsOneOffsEpicName(root.Epic) {
 		return false
 	}
 	e := tickets.LoadEpicAt(dir)

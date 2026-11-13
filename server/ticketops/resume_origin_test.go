@@ -6,7 +6,7 @@ import (
 
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestResume_ZeroCommitEndsTheRoundWithTheClientsSource(t *testing.T) {
@@ -25,7 +25,7 @@ func TestResume_ZeroCommitEndsTheRoundWithTheClientsSource(t *testing.T) {
 			}
 			resumeResult(t, res)
 			rounds := endedRounds(t, e.Ticket)
-			if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowResume || rounds[0].End.Source != origin {
+			if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != ticketlog.HowResume || rounds[0].End.Source != origin {
 				t.Errorf("rounds = %+v; want one ended by %s resume", rounds, origin)
 			}
 		})

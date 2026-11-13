@@ -12,8 +12,8 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // AnswerAddr is the address of the ticket the answer and paused-run helpers use.
@@ -186,8 +186,8 @@ func PauseWithQuestion(t *testing.T, ticketPath, block string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ev, err := tickets.AppendLog(ticketPath, tickets.LogEvent{
-		Type: tickets.EventPauseQuestion, By: "agent", Summary: "which?", Handoff: "h", Block: block,
+	ev, err := ticketlog.AppendLog(ticketPath, ticketlog.LogEvent{
+		Type: ticketlog.EventPauseQuestion, By: "agent", Summary: "which?", Handoff: "h", Block: block,
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestPauseChatDetail_Families(t *testing.T) {
@@ -20,8 +20,8 @@ func TestPauseChatDetail_Families(t *testing.T) {
 	if err := os.WriteFile(withQuestion, []byte("---\nid: \"02\"\n---\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tickets.AppendLog(withQuestion, tickets.LogEvent{
-		Type: tickets.EventPauseQuestion, By: "agent", Summary: "Per-project cache?", Handoff: "h",
+	if _, err := ticketlog.AppendLog(withQuestion, ticketlog.LogEvent{
+		Type: ticketlog.EventPauseQuestion, By: "agent", Summary: "Per-project cache?", Handoff: "h",
 	}); err != nil {
 		t.Fatal(err)
 	}

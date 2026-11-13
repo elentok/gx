@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
@@ -451,8 +452,8 @@ func medianMs(xs []int64) int64 {
 // WebShare is web / (web + TUI + CLI) over pause endings by source; gx- and
 // unknown-ended pauses are not person endings, so with none it returns nil.
 func WebShare(endings map[string]int) *float64 {
-	web := endings[tickets.SourceWeb]
-	person := web + endings[tickets.SourceTUI] + endings[tickets.SourceCLI]
+	web := endings[ticketlog.SourceWeb]
+	person := web + endings[ticketlog.SourceTUI] + endings[ticketlog.SourceCLI]
 	if person == 0 {
 		return nil
 	}

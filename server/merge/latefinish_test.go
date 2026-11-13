@@ -12,8 +12,8 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestLateFinish_MergesLateCommit(t *testing.T) {
@@ -36,22 +36,22 @@ func TestLateFinish_MergesLateCommit(t *testing.T) {
 func TestLateFinish_ClosesQuestionAsAdopted(t *testing.T) {
 	t.Parallel()
 	p := pauseZeroCommit(t, true)
-	evs, err := tickets.ReadLog(p.TicketPath)
+	evs, err := ticketlog.ReadLog(p.TicketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	q := tickets.OpenQuestion(evs)
+	q := ticketlog.OpenQuestion(evs)
 	if q == nil {
 		t.Fatal("zero-commit pause left no open question")
 	}
 	p.Report(t, p.FinishedLate(true))
 	p.Adopted(t)
-	evs, _ = tickets.ReadLog(p.TicketPath)
+	evs, _ = ticketlog.ReadLog(p.TicketPath)
 	last := evs[len(evs)-1]
-	if last.Type != tickets.EventPauseClosed || last.Question != q.Seq || last.Reason != "adopted" {
+	if last.Type != ticketlog.EventPauseClosed || last.Question != q.Seq || last.Reason != "adopted" {
 		t.Errorf("last event = %+v, want pause.closed{question: %d, reason: adopted}", last, q.Seq)
 	}
-	if last.Source != tickets.SourceGx || last.How != tickets.HowAuto {
+	if last.Source != ticketlog.SourceGx || last.How != ticketlog.HowAuto {
 		t.Errorf("last event = %+v, want source gx, how auto", last)
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // Unmute clears a ticket's mutes and reopens it if the mute paused it.
@@ -19,7 +19,7 @@ func (o *Ops) Unmute(req wire.QueueRequest) (wire.QueueResult, error) {
 		if err := ticketops.UnmuteTicket(ref.Ticket.Path, time.Now()); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("unmute %s: %w", ref.Addr, err)
 		}
-		if err := tickets.EndOpenRound(ref.Ticket.Path, req.Source, tickets.HowResume, ticketops.CloseResumed); err != nil {
+		if err := ticketlog.EndOpenRound(ref.Ticket.Path, req.Source, ticketlog.HowResume, ticketops.CloseResumed); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.Addr, err)
 		}
 		o.d.Index.Rescan()

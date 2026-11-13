@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // MoveRefusal is a refused move with a stable code.
@@ -466,7 +467,7 @@ func (p MovePlan) finish() error {
 			return err
 		}
 	}
-	if err := os.Rename(tickets.LogPath(p.OldPath), tickets.LogPath(p.NewPath)); err != nil && !os.IsNotExist(err) {
+	if err := os.Rename(ticketlog.LogPath(p.OldPath), ticketlog.LogPath(p.NewPath)); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("moving log: %w", err)
 	}
 	return os.Remove(p.OldPath)

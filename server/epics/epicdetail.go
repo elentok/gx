@@ -2,16 +2,17 @@ package epics
 
 import (
 	"errors"
-	"github.com/elentok/gx/server/sessions/fixagent"
 	"net/http"
 	"slices"
 	"time"
 
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/sessions/fixagent"
 	"github.com/elentok/gx/server/stats"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // mergeBlockActions is the verbs the pause-to-verb table lists for a blocked
@@ -210,7 +211,7 @@ func (s *Epics) decorateRow(row *wire.EpicDetailRow, root queue.RootRef, e ticke
 		row.HolderUnreachable = s.Runs.HolderUnreachableOf(row.Address)
 	}
 	evs := queue.ReadLogLenient(t)
-	if open := tickets.OpenQuestion(evs); open != nil && status == tickets.StatusPausedAnswer {
+	if open := ticketlog.OpenQuestion(evs); open != nil && status == tickets.StatusPausedAnswer {
 		row.Asking, row.Question = true, open.Summary
 	}
 	if status == tickets.StatusPausedRepair {

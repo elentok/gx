@@ -12,14 +12,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/elentok/gx/server/imagestore"
-	"github.com/elentok/gx/server/sessions"
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/server/imagestore"
+	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketgit"
 )
@@ -701,7 +701,7 @@ func (s *Designs) liveDesignSessionExcept(epicAddr, excludeID string) (*wire.Ses
 	var live *wire.SessionInfo
 	for i := range list {
 		in := &list[i]
-		if in.ID != excludeID && in.Design && in.Status.State != wire.SessionExited && tickets.EpicAddress(in.Ticket) == epicAddr &&
+		if in.ID != excludeID && in.Design && in.Status.State != wire.SessionExited && oneoff.EpicAddress(in.Ticket) == epicAddr &&
 			(live == nil || !in.RunStartedAt.Before(live.RunStartedAt)) {
 			live = in
 		}

@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/recovery"
 	srvrecovery "github.com/elentok/gx/server/recovery"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestRetryAndCancel_WorkingLeftoverRefuses(t *testing.T) {
@@ -58,7 +58,7 @@ func TestCancel_StopClosesALeftoverThroughTheRunner(t *testing.T) {
 func TestRelaunch_RecoveryEndsTheRoundWithSourceGx(t *testing.T) {
 	t.Parallel()
 	h, _, _, path := startWithLeftover(t, agentrunner.StateDone)
-	if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseRepair, Summary: "stuck"}); err != nil {
+	if _, err := ticketlog.AppendLog(path, ticketlog.LogEvent{Type: ticketlog.EventPauseRepair, Summary: "stuck"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -66,7 +66,7 @@ func TestRelaunch_RecoveryEndsTheRoundWithSourceGx(t *testing.T) {
 		t.Fatal(err)
 	}
 	rounds := endedRounds(t, path)
-	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowRelaunch || rounds[0].End.Source != tickets.SourceGx {
+	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != ticketlog.HowRelaunch || rounds[0].End.Source != ticketlog.SourceGx {
 		t.Errorf("rounds = %+v; want the repair round ended by a gx relaunch", rounds)
 	}
 }

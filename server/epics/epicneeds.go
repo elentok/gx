@@ -8,7 +8,6 @@ import (
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
@@ -134,10 +133,10 @@ func (s *Epics) ticketWaitOf(root queue.RootRef, e tickets.Epic, t tickets.Ticke
 			Pill: PillPaused, Reason: label + ": " + ticketlog.PauseDetail(e, t),
 			Action: wire.CardAction{Kind: wire.CardActionOpenTicket, Label: "Open ticket", Target: addr.String()},
 		}
-		if rounds := tickets.AllRounds(evs); len(rounds) > 0 {
+		if rounds := ticketlog.AllRounds(evs); len(rounds) > 0 {
 			n.Since = rounds[len(rounds)-1].Question.TS
 		}
-		if open := tickets.OpenQuestion(evs); status == tickets.StatusPausedAnswer && open != nil {
+		if open := ticketlog.OpenQuestion(evs); status == tickets.StatusPausedAnswer && open != nil {
 			n.Pill, n.Reason = PillQuestion, label+": "+open.Summary
 			n.Action = wire.CardAction{Kind: wire.CardActionAnswer, Label: "Answer", Target: addr.String()}
 		}
@@ -157,9 +156,9 @@ func (s *Epics) ticketWaitOf(root queue.RootRef, e tickets.Epic, t tickets.Ticke
 }
 
 // permissionSince is the time of the newest permission request in a ticket's log.
-func permissionSince(evs []tickets.LogEvent) time.Time {
+func permissionSince(evs []ticketlog.LogEvent) time.Time {
 	for i := len(evs) - 1; i >= 0; i-- {
-		if evs[i].Type == tickets.EventPausePermission {
+		if evs[i].Type == ticketlog.EventPausePermission {
 			return evs[i].TS
 		}
 	}

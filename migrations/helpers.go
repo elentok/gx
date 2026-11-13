@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketgit"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/tickets/ticketmigrate"
 )
 
@@ -167,7 +168,7 @@ func ticketFrictionUnder(root string) func(epicName string, t tickets.Ticket) (s
 		if err != nil {
 			return schema.FrictionSummary{}, fmt.Errorf("run log of %s: %w", epicName, err)
 		}
-		log, err := tickets.ReadLog(t.FilePath())
+		log, err := ticketlog.ReadLog(t.FilePath())
 		if err != nil {
 			return schema.FrictionSummary{}, err
 		}

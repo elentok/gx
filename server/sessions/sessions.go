@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/ralphloop/agent"
-	"github.com/elentok/gx/tickets"
 	"io/fs"
 	"net/http"
 	"os"
@@ -19,15 +17,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elentok/gx/server/health"
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/proccap"
+	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/server/health"
+	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/ticketgit"
 )
 
@@ -652,7 +652,7 @@ func (mg *Manager) UpdateSessionMeta(dir, id string, change func(*Meta) bool) er
 		mg.sessionGone(id)
 	}
 	if exited && meta.IsDesign() {
-		if project, epic, ok := strings.Cut(tickets.EpicAddress(meta.Ticket), ":"); ok {
+		if project, epic, ok := strings.Cut(oneoff.EpicAddress(meta.Ticket), ":"); ok {
 			time.Sleep(mg.cfg.SessionExitCleanupDelay)
 			mg.designs.CleanupDesign(project, epic)
 		}

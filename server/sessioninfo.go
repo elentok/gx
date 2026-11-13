@@ -5,7 +5,6 @@ import (
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
@@ -43,7 +42,7 @@ func (c chatSource) TicketAsk(address string) (ticketlog.Question, string, bool)
 	if err != nil || t.PausedClass() == "" || t.PausedClass() == schema.PauseClassRepair || t.PauseReason != schema.PauseSelfReported {
 		return ticketlog.Question{}, "", false
 	}
-	open := tickets.OpenQuestion(queue.ReadLogLenient(ref.Ticket))
+	open := ticketlog.OpenQuestion(queue.ReadLogLenient(ref.Ticket))
 	if open == nil {
 		return ticketlog.Question{}, "", false
 	}

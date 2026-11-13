@@ -1,18 +1,17 @@
 package epicflows_test
 
 import (
-	"github.com/elentok/gx/server/servertest/rigs"
 	"net/http"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/server/servertest/rigs"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 var (
@@ -46,7 +45,7 @@ func TestEpicDetail_LoopEpic(t *testing.T) {
 			t.Fatal(err)
 		}
 		question = "Which base?"
-		if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "agent", Summary: question, Handoff: "h"}); err != nil {
+		if _, err := ticketlog.AppendLog(path, ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, By: "agent", Summary: question, Handoff: "h"}); err != nil {
 			t.Fatal(err)
 		}
 	})

@@ -22,6 +22,7 @@ import (
 	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 )
 
 const (
@@ -207,7 +208,7 @@ func (st *Store) Create(project string, s Schedule) (Schedule, error) {
 	if err := Validate(&s); err != nil {
 		return Schedule{}, err
 	}
-	s.Slug = tickets.Slug(s.Name)
+	s.Slug = oneoff.Slug(s.Name)
 	s.Project = ProjectNameOf(filepath.Join(st.dir, project))
 	if _, err := os.Stat(st.path(project, s.Slug)); err == nil {
 		return Schedule{}, refuse(ReasonSlugExists, s.Slug)

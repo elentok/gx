@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/cmd/cmdtest"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestTicketsSchemaText_HasTicketAndEpicSections(t *testing.T) {
@@ -584,8 +584,8 @@ func TestExecute_TicketsSet_IterationStatusAskingAcceptedWithOpenQuestion(t *tes
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
 	cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
-	q := tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "agent", Summary: "Which?", Text: "Which?", Handoff: "Resume after the answer."}
-	if _, err := tickets.AppendLog(path, q); err != nil {
+	q := ticketlog.LogEvent{Type: ticketlog.EventPauseQuestion, By: "agent", Summary: "Which?", Text: "Which?", Handoff: "Resume after the answer."}
+	if _, err := ticketlog.AppendLog(path, q); err != nil {
 		t.Fatal(err)
 	}
 

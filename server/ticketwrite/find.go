@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // FindTicket resolves a canonical address to its ticket, or reports it unknown.
@@ -84,10 +85,10 @@ func PauseStale(ticketPath, state string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	evs, err := tickets.ReadLog(ticketPath)
+	evs, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		return false, fmt.Errorf("read log of %s: %w", ticketPath, err)
 	}
-	open := tickets.OpenRound(evs)
+	open := ticketlog.OpenRound(evs)
 	return t.PausedClass() == "" || open == nil || queue.AnswerState(*open, t.PausedClass()) != state, nil
 }

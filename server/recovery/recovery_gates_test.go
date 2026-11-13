@@ -9,9 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server/runs"
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner"
@@ -19,10 +16,12 @@ import (
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func iterationAgent(t *testing.T, name string, state agentrunner.State) (renamedFake, agentrunner.Session) {
@@ -98,7 +97,7 @@ func raiseGateHeld(t *testing.T, runner string, state agentrunner.State, prepare
 	data, _ := os.ReadFile(ticketPath)
 	got.ticket, got.worktree = string(data), worktree
 	// The pause reason lives in the log's question, not in the markdown.
-	if evs, err := tickets.ReadLog(ticketPath); err == nil {
+	if evs, err := ticketlog.ReadLog(ticketPath); err == nil {
 		for _, ev := range evs {
 			got.question += ev.Text + "\n"
 		}

@@ -9,14 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server/queue"
-
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/worktree"
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestCancel_EndsThePausedTicketsRoundWithTheRequestsSource(t *testing.T) {
@@ -32,7 +31,7 @@ func TestCancel_EndsThePausedTicketsRoundWithTheRequestsSource(t *testing.T) {
 		t.Fatalf("cancel = %+v, %v", res, err)
 	}
 	rounds := endedRounds(t, path)
-	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowCancel || rounds[0].End.Source != wire.OriginCLI {
+	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != ticketlog.HowCancel || rounds[0].End.Source != wire.OriginCLI {
 		t.Errorf("rounds = %+v; want one ended by cli cancel", rounds)
 	}
 }

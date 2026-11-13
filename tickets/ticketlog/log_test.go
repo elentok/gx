@@ -1,4 +1,4 @@
-package tickets
+package ticketlog
 
 import (
 	"os"
@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/projectlock"
+	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/tickettest"
 )
 
 // lockedProjectTicketPath makes a ticket inside a store project (a dir holding
@@ -20,9 +22,9 @@ func lockedProjectTicketPath(t *testing.T, content string) (projectDir, path str
 	if err := os.MkdirAll(issues, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, filepath.Join(projectDir, "project.json"), "{}")
+	tickettest.WriteFile(t, filepath.Join(projectDir, "project.json"), "{}")
 	path = filepath.Join(issues, "01-a.md")
-	writeFile(t, path, content)
+	tickettest.WriteFile(t, path, content)
 	return projectDir, path
 }
 
@@ -62,7 +64,7 @@ func TestAppendLog_WaitsForProjectMigration(t *testing.T) {
 func logTicketPath(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "04-thing.md")
-	writeFile(t, path, "---\nid: \"04\"\nstatus: claimed\ntype: implement\n---\n")
+	tickettest.WriteFile(t, path, "---\nid: \"04\"\nstatus: claimed\ntype: implement\n---\n")
 	return path
 }
 
@@ -112,7 +114,7 @@ func TestReadLog_SkipsTornLastLine(t *testing.T) {
 
 func TestReadLog_HuhFlagIsAdditive(t *testing.T) {
 	path := logTicketPath(t)
-	writeFile(t, LogPath(path), `{"seq":1,"ts":"2026-01-01T00:00:00Z","type":"pause.answer","question":1,"choice":"a"}`+"\n"+
+	tickettest.WriteFile(t, LogPath(path), `{"seq":1,"ts":"2026-01-01T00:00:00Z","type":"pause.answer","question":1,"choice":"a"}`+"\n"+
 		`{"seq":2,"ts":"2026-01-01T00:00:01Z","type":"pause.answer","question":2,"huh":true}`+"\n")
 	events, err := ReadLog(path)
 	if err != nil || len(events) != 2 {
@@ -127,7 +129,7 @@ func TestReadLog_HuhFlagIsAdditive(t *testing.T) {
 // kind field, and reads back in the current spelling.
 func TestReadLog_FoldsOldEventTypesAndKind(t *testing.T) {
 	path := logTicketPath(t)
-	writeFile(t, LogPath(path), `{"seq":1,"ts":"2026-01-01T00:00:00Z","type":"park.question","by":"gx","park_kind":"zero-commit","summary":"s"}`+"\n"+
+	tickettest.WriteFile(t, LogPath(path), `{"seq":1,"ts":"2026-01-01T00:00:00Z","type":"park.question","by":"gx","park_kind":"zero-commit","summary":"s"}`+"\n"+
 		`{"seq":2,"ts":"2026-01-01T00:00:01Z","type":"park.answer","question":1}`+"\n")
 
 	events, err := ReadLog(path)
@@ -148,7 +150,7 @@ func TestReadLog_FoldsOldEventTypesAndKind(t *testing.T) {
 func TestReadLog_MalformedMiddleLineIsError(t *testing.T) {
 	path := logTicketPath(t)
 	good := `{"seq":1,"ts":"2026-01-01T00:00:00Z","type":"park.closed","question":1}` + "\n"
-	writeFile(t, LogPath(path), good+"not json\n"+good)
+	tickettest.WriteFile(t, LogPath(path), good+"not json\n"+good)
 
 	_, err := ReadLog(path)
 	if err == nil || !strings.Contains(err.Error(), "line 2") {
@@ -287,12 +289,12 @@ func TestOpenQuestionAndRounds(t *testing.T) {
 func TestLoad_IgnoresLogFiles(t *testing.T) {
 	dir := t.TempDir()
 	md := filepath.Join(dir, "my-epic", "issues", "01-first.md")
-	writeFile(t, md, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n")
+	tickettest.WriteFile(t, md, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n")
 	if _, err := AppendLog(md, question("agent")); err != nil {
 		t.Fatal(err)
 	}
 
-	epics, err := Load(dir)
+	epics, err := tickets.Load(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

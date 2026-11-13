@@ -11,8 +11,8 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 func TestPause_WritesTicketEventAndNotifies(t *testing.T) {
@@ -128,7 +128,7 @@ func TestPause_LogsGxQuestionPerKind(t *testing.T) {
 			}); err != nil {
 				t.Fatal(err)
 			}
-			evs, err := tickets.ReadLog(path)
+			evs, err := ticketlog.ReadLog(path)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -151,11 +151,11 @@ func TestPause_RepairKindOpensRepairRoundWithNoQuestion(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	evs, _ := tickets.ReadLog(path)
-	if len(evs) != 1 || evs[0].Type != tickets.EventPauseRepair || evs[0].Summary != "" || evs[0].Text != "" {
+	evs, _ := ticketlog.ReadLog(path)
+	if len(evs) != 1 || evs[0].Type != ticketlog.EventPauseRepair || evs[0].Summary != "" || evs[0].Text != "" {
 		t.Fatalf("log = %+v, want one question-less pause.repair", evs)
 	}
-	if tickets.OpenQuestion(evs) != nil {
+	if ticketlog.OpenQuestion(evs) != nil {
 		t.Error("a repair round must not read as an open question")
 	}
 }
@@ -190,11 +190,11 @@ func TestPause_RepairStampsPauseKindClearedOnClaim(t *testing.T) {
 // openQuestionSummary is the summary of the ticket's open log question, "" when none.
 func openQuestionSummary(t *testing.T, path string) string {
 	t.Helper()
-	evs, err := tickets.ReadLog(path)
+	evs, err := ticketlog.ReadLog(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if q := tickets.OpenQuestion(evs); q != nil {
+	if q := ticketlog.OpenQuestion(evs); q != nil {
 		return q.Summary
 	}
 	return ""
@@ -219,11 +219,11 @@ func TestPause_BlockedPaneLongReasonStillOpensAQuestion(t *testing.T) {
 	if got != reason {
 		t.Errorf("reason = %q, want it unchanged (no failed-logging suffix)", got)
 	}
-	evs, err := tickets.ReadLog(path)
+	evs, err := ticketlog.ReadLog(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	q := tickets.OpenQuestion(evs)
+	q := ticketlog.OpenQuestion(evs)
 	if q == nil || !strings.Contains(q.Text, reason) {
 		t.Errorf("open question = %+v, want one carrying the whole reason", q)
 	}
@@ -266,11 +266,11 @@ func TestPause_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T
 			if data, _ := os.ReadFile(path); strings.Contains(string(data), "## Handoff") {
 				t.Errorf("pause wrote a conversation section into the .md:\n%s", data)
 			}
-			qevs, err := tickets.ReadLog(path)
+			qevs, err := ticketlog.ReadLog(path)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if open := tickets.OpenQuestion(qevs); (open != nil) != c.question {
+			if open := ticketlog.OpenQuestion(qevs); (open != nil) != c.question {
 				t.Errorf("open question = %+v, want present=%v", open, c.question)
 			}
 			evs, _, _ := runlog.ReadEvents(scratchDir, "my-epic")

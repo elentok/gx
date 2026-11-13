@@ -8,7 +8,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // agentVerb resolves a ticket to the runner session of its live iteration, so
@@ -73,7 +73,7 @@ func (o *Ops) AgentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 		answer := agentrunner.Answer{Decision: decision, RequestID: req.RequestID}
 		var note string
 		if decision == agentrunner.DecisionDeny {
-			note, _ = tickets.ClipLogText(req.Text)
+			note, _ = ticketlog.ClipLogText(req.Text)
 			answer.Text = note
 		}
 		if req.RequestID != "" && runner.Name() == string(agentrunner.ChoiceHerdr) {
@@ -88,11 +88,11 @@ func (o *Ops) AgentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 		if err := runner.Answer(sess, answer); err != nil {
 			return answerRefusal(err)
 		}
-		ev := tickets.LogEvent{Type: tickets.EventPausePermission, Decision: req.Decision, Source: req.Source, Note: note}
+		ev := ticketlog.LogEvent{Type: ticketlog.EventPausePermission, Decision: req.Decision, Source: req.Source, Note: note}
 		if statusErr == nil {
 			ev.Shown = permissionShown(st.Pending)
 		}
-		if _, err := tickets.AppendLog(ref.Ticket.Path, ev); err != nil {
+		if _, err := ticketlog.AppendLog(ref.Ticket.Path, ev); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("log permission for %s: %w", ref.Addr, err)
 		}
 		if err := o.d.Writer.LeaveBlocked(ref.Addr.String()); err != nil {
@@ -148,11 +148,11 @@ func answerRefusal(err error) (wire.QueueResult, error) {
 }
 
 // permissionShown is what the person saw of p, each text capped for the log.
-func permissionShown(p *agentrunner.Pending) *tickets.PermissionShown {
+func permissionShown(p *agentrunner.Pending) *ticketlog.PermissionShown {
 	if p == nil {
 		return nil
 	}
-	input, inputCut := tickets.ClipLogText(string(p.Input))
-	desc, descCut := tickets.ClipLogText(p.Description)
-	return &tickets.PermissionShown{RequestID: p.ID, Tool: p.Tool, Input: input, Description: desc, Truncated: inputCut || descCut}
+	input, inputCut := ticketlog.ClipLogText(string(p.Input))
+	desc, descCut := ticketlog.ClipLogText(p.Description)
+	return &ticketlog.PermissionShown{RequestID: p.ID, Tool: p.Tool, Input: input, Description: desc, Truncated: inputCut || descCut}
 }

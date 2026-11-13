@@ -6,21 +6,21 @@ import (
 
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
-func resumeEvents(t *testing.T, ticketPath string) (closed []tickets.LogEvent, answers int) {
+func resumeEvents(t *testing.T, ticketPath string) (closed []ticketlog.LogEvent, answers int) {
 	t.Helper()
-	evs, err := tickets.ReadLog(ticketPath)
+	evs, err := ticketlog.ReadLog(ticketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, ev := range evs {
 		switch ev.Type {
-		case tickets.EventPauseClosed:
+		case ticketlog.EventPauseClosed:
 			closed = append(closed, ev)
-		case tickets.EventPauseAnswer:
+		case ticketlog.EventPauseAnswer:
 			answers++
 		}
 	}

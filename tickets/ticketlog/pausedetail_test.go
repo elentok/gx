@@ -23,8 +23,8 @@ func pausedTicket(t *testing.T, body string) (tickets.Epic, tickets.Ticket) {
 func TestPauseDetail_AnswerClassReadsLogSummary(t *testing.T) {
 	t.Parallel()
 	e, tk := pausedTicket(t, "# A\n")
-	q := tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "Adopt it as **done**?", Text: "Adopt it as done?"}
-	if _, err := tickets.AppendLog(tk.Path, q); err != nil {
+	q := LogEvent{Type: EventPauseQuestion, By: "gx", Summary: "Adopt it as **done**?", Text: "Adopt it as done?"}
+	if _, err := AppendLog(tk.Path, q); err != nil {
 		t.Fatal(err)
 	}
 	if got, want := PauseDetail(e, tk), "Adopt it as done?"; got != want {

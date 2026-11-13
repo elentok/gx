@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -113,7 +114,7 @@ func TestEpicsDeps_DesignActivitiesReadsTheSessionsFake(t *testing.T) {
 	d.Sessions = fakeSessions{list: []wire.SessionInfo{{Design: true, Ticket: "p:map/01"}}}
 	s := New(d)
 	got := s.designActivities()
-	if a := got[tickets.EpicAddress("p:map/01")]; !a.running {
+	if a := got[oneoff.EpicAddress("p:map/01")]; !a.running {
 		t.Fatalf("activities = %+v, want the map running", got)
 	}
 }

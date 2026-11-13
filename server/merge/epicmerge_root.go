@@ -21,6 +21,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/epicstats"
+	"github.com/elentok/gx/tickets/oneoff"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/tickets/ticketmigrate"
@@ -308,7 +309,7 @@ func (s *Merger) pauseRoot(root queue.RootRef, one ralphloop.OneIteration, dir s
 // notifyEpicOutcome sends the epic-level notice. A one-off skips it.
 func (s *Merger) notifyEpicOutcome(project, dir string, one ralphloop.OneIteration, e tickets.Epic, merged bool) {
 	// The epic, not one: a one-off's merge ticket is not its one-off file.
-	if !s.chat.Enabled() || tickets.IsOneOffEpic(e) {
+	if !s.chat.Enabled() || oneoff.IsOneOffEpic(e) {
 		return
 	}
 	elapsed, cost := schedule.EpicTotals(e)
@@ -323,7 +324,7 @@ func (s *Merger) notifyEpicOutcome(project, dir string, one ralphloop.OneIterati
 // marked done. A refused submit is logged, never an error: the dedupe key
 // refuses a second live retro of the same epic.
 func (s *Merger) submitRetro(root queue.RootRef, projectDir string, e tickets.Epic) {
-	if tickets.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
+	if oneoff.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
 		return
 	}
 	pf, err := config.ReadProjectFile(projectDir)
@@ -454,7 +455,7 @@ func (s *Merger) pauseEpic(root queue.RootRef, e tickets.Epic, p mergePause) {
 	kind, reason := p.kind, p.reason
 	s.storeMergeBlock(root, e.Path, p)
 	s.events.PublishEvent(wire.Event{Type: wire.EventRootPaused, Address: root.String(), Kind: string(kind), Level: wire.EventLevelWarning, Message: reason})
-	if s.chat.Enabled() && !tickets.IsOneOffEpic(e) {
+	if s.chat.Enabled() && !oneoff.IsOneOffEpic(e) {
 		s.chat.EpicPause(root.Project, s.projects.ChatOverride(root.Project), root.Epic, schema.PauseReason(kind).Label(), reason)
 	}
 }

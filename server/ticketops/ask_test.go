@@ -2,15 +2,15 @@ package ticketops_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/wire"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 const askBody = "## Question\n\nShould we keep the cache?\n\nIt costs memory.\n\n" +
@@ -24,9 +24,9 @@ func askFixture(t *testing.T, ticketType string) (*servertest.Harness, string) {
 	return servertest.StartWithStore(t, store), filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 }
 
-func askLog(t *testing.T, path string) []tickets.LogEvent {
+func askLog(t *testing.T, path string) []ticketlog.LogEvent {
 	t.Helper()
-	evs, err := tickets.ReadLog(path)
+	evs, err := ticketlog.ReadLog(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestAsk_AppendsQuestionAndSetsIterationStatus(t *testing.T) {
 				t.Fatalf("log has %d events, want 1", len(evs))
 			}
 			ev := evs[0]
-			if ev.Type != tickets.EventPauseQuestion || ev.By != "agent" || ev.Summary != "Should we keep the cache?" ||
+			if ev.Type != ticketlog.EventPauseQuestion || ev.By != "agent" || ev.Summary != "Should we keep the cache?" ||
 				ev.Text != "It costs memory." || ev.Handoff != "Cache code is half done." ||
 				!strings.Contains(ev.Block, "type: yes-no") {
 				t.Errorf("event = %+v", ev)
@@ -88,7 +88,7 @@ func TestAsk_Refusals(t *testing.T) {
 			if err != nil || !res.Refused || res.Reason != tc.reason {
 				t.Fatalf("ask = %+v, %v; want refusal %s", res, err, tc.reason)
 			}
-			if _, err := os.Stat(tickets.LogPath(path)); !os.IsNotExist(err) {
+			if _, err := os.Stat(ticketlog.LogPath(path)); !os.IsNotExist(err) {
 				t.Errorf("a refused ask must not create the log, stat err = %v", err)
 			}
 			tk, err := schema.ParseTicket(path)
