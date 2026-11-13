@@ -21,7 +21,7 @@ import {
 } from "../generated/server"
 import { ReasonStale } from "../ticket/answer"
 import { Button } from "../ui/button/Button"
-import { allAnswered, type QuestionMode } from "../ui/question-sheet/round"
+import { allAnswered, isAnswered, type QuestionMode } from "../ui/question-sheet/round"
 
 // Codex calls whose keys were partly typed. Module-level so leaving the page and coming back keeps Submit off.
 const stoppedCalls = new Set<string>()
@@ -46,7 +46,11 @@ function CardSheet({
   // Codex typed some keys and stopped: another Submit would type the rest on top of them.
   const [stopped, setStopped] = useState(() => stoppedCalls.has(card.id))
   const cards = sheetCardsOf(card)
-  const ready = allAnswered(cards, draft.answers)
+  // A round may go with gaps (as in the Design chat): any answer or note is enough. Dialogs and permissions need every answer.
+  const ready =
+    card.source === CardSourceRound
+      ? cards.some((c) => isAnswered(draft.answers[c.label], c) || !!draft.answers[c.label]?.note?.trim())
+      : allAnswered(cards, draft.answers)
   const claude = card.source === CardSourceClaudeDialog
   const hook = claude && !card.fallback
   const dismissable = claude || card.source === CardSourcePermission
