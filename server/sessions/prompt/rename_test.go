@@ -2,8 +2,10 @@ package prompt_test
 
 import (
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
@@ -144,6 +146,38 @@ func TestSessionRename_TerminalTitleChangePublishesSessionChanged(t *testing.T) 
 	termTitle(t, conv, "From the terminal")
 	servertest.WaitForEvent(f.ctx, t, f.evs, wire.EventSessionChanged, id)
 	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Name == "From the terminal" })
+}
+
+func TestSessionRename_TypesTheAgentCommandOnceForIdleAndWorking(t *testing.T) {
+	t.Parallel()
+	for _, state := range []string{"done", "working"} {
+		t.Run(state, func(t *testing.T) {
+			f := startPromptSession(t)
+			id, conv := plainChat(t, f, "old")
+			if state == "working" {
+				report(t, conv, agentfake.Control{State: "working"})
+				waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
+			}
+			f.rename(t, id, "new name")
+			waitForSubmitted(t, conv, strconv.Quote("/rename new name")+"\n")
+		})
+	}
+}
+
+func TestSessionRename_BlockedChatTypesNothing(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	id, conv := plainChat(t, f, "old")
+	report(t, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"})
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionBlocked })
+	res := f.rename(t, id, "new name")
+	if res.Refused || res.Session == nil || res.Session.Name != "new name" {
+		t.Fatalf("rename = %+v", res)
+	}
+	time.Sleep(2 * firstPromptGrace) // negative wait: a send would type within this window
+	if got := submitted(t, conv); got != "" {
+		t.Errorf("submitted = %q, want nothing typed into a Blocked chat", got)
+	}
 }
 
 func TestSessionPrompt_TypedRenamePinsAnUnchangedAutomaticName(t *testing.T) {

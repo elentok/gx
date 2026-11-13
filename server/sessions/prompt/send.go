@@ -27,12 +27,18 @@ const sendFailedPrefix = "Send failed: "
 // paste. A send that gives up raises a gx Actionable with the text, so the
 // person can send it again.
 func (p *Prompt) sendPrompt(dir, text string, imgs imageSet) {
-	log := p.log.With("session", filepath.Base(dir))
 	send := p.nudgePrompt
 	if isSingleSendCommand(text) {
 		send = p.typeCommandOnce
 	}
-	err := send(dir, text, imgs)
+	finishSend(p, dir, text, imgs, send(dir, text, imgs))
+}
+
+// finishSend settles a send's result: a success clears an earlier "Send failed"
+// card, a stop raises nothing and any other error raises the card. A plain
+// function, so Prompt's method count stays down.
+func finishSend(p *Prompt, dir, text string, imgs imageSet, err error) {
+	log := p.log.With("session", filepath.Base(dir))
 	switch {
 	case err == nil:
 		p.clearSendFailed(dir)

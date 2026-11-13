@@ -88,6 +88,9 @@ type actionRun struct {
 	convChanged bool
 	// personTyped is set once a person's own key or paste reaches the session.
 	personTyped bool
+	// gate, when set, runs under the typing lock before typeStepWith types; an
+	// error stops the step.
+	gate func() error
 	RunOpts
 }
 
@@ -193,6 +196,11 @@ func (r *actionRun) typeStepWith(i int, prompt string, imgs imageSet) error {
 		return err
 	}
 	defer release()
+	if r.gate != nil {
+		if err := r.gate(); err != nil {
+			return err
+		}
+	}
 	if !r.p.projects.Typing().ReadyToType(r.p.projects.TypingIO(r.dir, r.holder, "action-step")) {
 		return fmt.Errorf("step %d: %w", i, claudeui.ErrNotReadyToType)
 	}

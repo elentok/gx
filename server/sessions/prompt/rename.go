@@ -2,8 +2,10 @@ package prompt
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/elentok/gx/server/queue"
@@ -50,8 +52,56 @@ func (p namer) renameHandler(w http.ResponseWriter, r *http.Request) {
 	wire.WriteJSON(w, res)
 }
 
-// renameSession sets a plain chat's gx name in any Session status. It types
-// nothing into the agent.
+// errRenameSkip ends a rename send that must type nothing: the chat is not
+// Working or Idle any more, or a newer rename owns the slot.
+var errRenameSkip = errors.New("rename not typed")
+
+// sendRename types the rename command into the agent once, under the typing
+// lock. It re-reads the status and the slot after taking the lock. A Blocked
+// chat keeps the command held in the slot.
+func (p namer) sendRename(dir string, seq uint64, command string) {
+	id := filepath.Base(dir)
+	err := p.typeRename(dir, id, seq, command)
+	if errors.Is(err, errRenameSkip) {
+		return
+	}
+	if err == nil {
+		p.renames.settle(id, seq)
+	}
+	finishSend(p.Prompt, dir, command, imageSet{}, err)
+}
+
+func (p namer) typeRename(dir, id string, seq uint64, command string) error {
+	run, closeRun, err := p.openActionRun(dir, RunOpts{})
+	if err != nil {
+		return err
+	}
+	defer closeRun()
+	run.gate = func() error {
+		if err := run.CatchUp(); err != nil {
+			return err
+		}
+		if !p.renames.owns(id, seq) {
+			return errRenameSkip
+		}
+		switch run.State() {
+		case wire.SessionWorking, wire.SessionIdle:
+			return nil
+		case wire.SessionBlocked:
+		default:
+			p.renames.settle(id, seq)
+		}
+		return errRenameSkip
+	}
+	if err := run.typeStepWith(0, command, imageSet{}); err != nil {
+		return err
+	}
+	return p.checkCodexKnownCommand(dir, run, command)
+}
+
+// renameSession sets a plain chat's gx name in any Session status, then sends
+// the agent its own /rename when the chat is Working or Idle. A Blocked chat's
+// command is held in the chat's pending slot.
 func (p namer) renameSession(req wire.SessionRenameRequest) (wire.SessionResult, error) {
 	if strings.HasPrefix(req.ID, queue.AgentIDPrefix) {
 		return sessions.Refusal(wire.ReasonSessionQueue, fmt.Sprintf("session %s is a Queue agent", req.ID)), nil
@@ -76,5 +126,14 @@ func (p namer) renameSession(req wire.SessionRenameRequest) (wire.SessionResult,
 		return wire.SessionResult{}, err
 	}
 	info := meta.Info()
+	command := ""
+	switch info.Status.State {
+	case wire.SessionWorking, wire.SessionIdle, wire.SessionBlocked:
+		command = "/rename " + name
+	}
+	seq := p.renames.put(req.ID, command)
+	if command != "" && info.Status.State != wire.SessionBlocked {
+		p.sessions.Watches.Start(func() { p.sendRename(dir, seq, command) })
+	}
 	return wire.SessionResult{Session: &info}, nil
 }

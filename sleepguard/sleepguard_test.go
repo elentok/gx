@@ -129,6 +129,7 @@ var allowed = map[string]int{
 	"server/sessions/prompt/promptflows/triage_advance_test.go":        1, // negative wait: a final Triage step starts no countdown and sends nothing
 	"server/triage/stepsource_test.go":                                 1, // negative wait: a session that must stay is not stopped within the window
 	"server/sessions/prompt/keys_test.go":                              2, // negative waits: no nudge follows a person's key; a guarded key keeps the countdown
+	"server/sessions/prompt/rename_test.go":                            1, // negative wait: a rename of a Blocked chat types nothing
 	"server/sessions/prompt/sessionprompt_test.go":                     5, // four negative waits: no nudge or Continue follows a typed / command; a failure is not raised within the grace window
 	"server/sessions/prompt/design_question_test.go":                   1, // negative wait: no Question follows within a few chat flushes
 	"server/sessions/prompt/codexquestion_test.go":                     1, // negative wait: no Question push follows a Fix session's open question call within a few chat flushes

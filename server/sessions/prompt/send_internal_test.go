@@ -219,3 +219,29 @@ func TestRenameCommandArg(t *testing.T) {
 		}
 	}
 }
+
+func TestRenameSlots_OnlyANewerRequestOwnsTheSlot(t *testing.T) {
+	var s renameSlots
+	a := s.put("s1", "/rename A")
+	b := s.put("s1", "/rename B")
+	if s.owns("s1", a) || !s.owns("s1", b) {
+		t.Fatalf("owns(a)=%v owns(b)=%v, want only the newer", s.owns("s1", a), s.owns("s1", b))
+	}
+	s.settle("s1", a) // the older request finishing must not empty B's command
+	if got := s.pending("s1"); got != "/rename B" {
+		t.Errorf("pending = %q, want B kept", got)
+	}
+	s.settle("s1", b)
+	if got := s.pending("s1"); got != "" {
+		t.Errorf("pending = %q, want empty once B settled", got)
+	}
+}
+
+func TestRenameSlots_EmptyRequestSupersedesAParkedOne(t *testing.T) {
+	var s renameSlots
+	s.put("s1", "/rename A")
+	s.put("s1", "")
+	if got := s.pending("s1"); got != "" {
+		t.Errorf("pending = %q, want the held command replaced", got)
+	}
+}
