@@ -2,13 +2,16 @@ package prompt_test
 
 import (
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -201,4 +204,95 @@ func TestSessionPrompt_TypedRenamePinsAnUnchangedAutomaticName(t *testing.T) {
 	if err != nil || res.Refused || res.Session == nil || res.Session.AutoName {
 		t.Fatalf("prompt = %+v, %v; want the name pinned", res, err)
 	}
+}
+
+func TestSessionRename_RateLimitedAndExitedChangeTheNameAndTypeNothing(t *testing.T) {
+	t.Parallel()
+	for _, state := range []string{wire.SessionRateLimited, wire.SessionExited} {
+		t.Run(state, func(t *testing.T) {
+			f := startPromptSession(t)
+			id, conv := plainChat(t, f, "old")
+			if state == wire.SessionExited {
+				if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionExit}); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				report(t, conv, agentfake.Control{State: "ratelimited"})
+			}
+			waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == state })
+			if res := f.rename(t, id, "new name"); res.Refused || res.Session == nil || res.Session.Name != "new name" {
+				t.Fatalf("rename = %+v", res)
+			}
+			time.Sleep(2 * firstPromptGrace) // negative wait: a send would type within this window
+			if got := submitted(t, conv); got != "" {
+				t.Errorf("submitted = %q, want nothing typed", got)
+			}
+		})
+	}
+}
+
+func TestSessionRename_StartingChangesTheNameAndTypesNothing(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	seedSession(t, f, "seeded-starting", wire.SessionStarting)
+	res := f.rename(t, "seeded-starting", "new name")
+	if res.Refused || res.Session == nil || res.Session.Name != "new name" {
+		t.Fatalf("rename = %+v", res)
+	}
+}
+
+func TestRenameHold_DroppedWhenBlockedClosesIntoExited(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	id, conv := blockedChat(t, f)
+	f.rename(t, id, "new name")
+	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionExit}); err != nil {
+		t.Fatal(err)
+	}
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
+	time.Sleep(2 * actionWatchSettle) // negative wait: a release would type within this window
+	if got := submitted(t, conv); got != "" {
+		t.Errorf("submitted = %q, want the held command dropped", got)
+	}
+}
+
+// A slash command is typed once and never nudged, so Codex's rejection is the
+// one way a rename send fails; the card keeps the command to resend (story 27).
+func TestSessionRename_CodexUnrecognizedCommandRaisesSendFailed(t *testing.T) {
+	t.Parallel()
+	f := fromPrompt(rigs.StartCodexPromptSession(t))
+	f.rename(t, f.id, "new name")
+	got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised }).Actionable
+	if !strings.HasPrefix(got.Reason, "Send failed: ") || !strings.Contains(got.Reason, "Unrecognized command") {
+		t.Errorf("reason = %q, want a Send failed card naming Unrecognized command", got.Reason)
+	}
+	if len(got.Action) != 1 || got.Action[0] != "/rename new name" {
+		t.Errorf("action = %v, want the rename command to resend", got.Action)
+	}
+}
+
+func TestSessionRename_FixAgentIsRefused(t *testing.T) {
+	t.Parallel()
+	f := fromPrompt(rigs.StartCodexPromptSessionAs(t, func(c *server.Config) { c.PromptGrace = firstPromptGrace }, wire.CreateSessionRequest{Ticket: "proj:foo/01", FixOf: "proj:foo/01"}))
+	if res := f.rename(t, f.id, "x"); !res.Refused || res.Reason != wire.ReasonSessionNotPlain {
+		t.Errorf("rename = %+v, want refused %s", res, wire.ReasonSessionNotPlain)
+	}
+}
+
+func TestSessionRename_DuringAComposerSendBothArriveWhole(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	id, conv := plainChat(t, f, "old")
+	// A slash command is typed once and never nudged, so the log holds one line per send.
+	if res, err := f.h.Client.Sessions.Prompt(f.ctx, wire.SessionPromptRequest{ID: id, Text: "/cost"}); err != nil || res.Refused {
+		t.Fatalf("prompt = %+v, %v", res, err)
+	}
+	f.rename(t, id, "new name")
+	want := []string{strconv.Quote("/cost"), strconv.Quote("/rename new name")}
+	slices.Sort(want)
+	waitUntil(t, "both texts submitted whole", func() bool {
+		lines := strings.Split(strings.TrimSuffix(submitted(t, conv), "\n"), "\n")
+		slices.Sort(lines)
+		return slices.Equal(lines, want)
+	})
 }
