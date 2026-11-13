@@ -231,6 +231,17 @@ func (f *firstPrompt) deliver(prompt string) error {
 	}
 	// Before the draft clear: vim NORMAL has to reach INSERT first. The nudge
 	// runs the same step again, which presses nothing once in INSERT.
+	// The first Submit inherits this lock, so the clear and the first type are one unit.
+	release, err := lockTyping(f.p, f.id, f.cancel)
+	if err != nil {
+		return err
+	}
+	handedOver := false
+	defer func() {
+		if !handedOver {
+			release()
+		}
+	}()
 	if !f.typing().ReadyToType(f.p.projects.TypingIO(f.dir, c, "first-prompt")) {
 		return claudeui.ErrNotReadyToType
 	}
@@ -240,6 +251,7 @@ func (f *firstPrompt) deliver(prompt string) error {
 	caps := claudeui.DefaultNudgeCaps
 	caps.Grace = cmp.Or(f.p.cfg.PromptGrace, caps.Grace)
 	p := f.prompter(c, turn)
+	p.held, handedOver = release, true
 	report := func(d claudeui.NudgeDecision) {
 		f.log.Debug("first prompt nudge", "decision", string(d))
 	}
@@ -392,6 +404,25 @@ type holderPrompter struct {
 	// images are pasted before the text on every Submit, so a retype after a
 	// clear attaches them again.
 	images imageSet
+	// lock takes the chat's typing lock; Submit holds it for its type and Enter.
+	// Nil takes none.
+	lock func() (func(), error)
+	// held is a lock the caller already took; the next Submit uses it instead of
+	// taking its own, and releases it.
+	held func()
+}
+
+// acquire returns the release func of the typing lock for one Submit.
+func (p *holderPrompter) acquire() (func(), error) {
+	if p.held != nil {
+		release := p.held
+		p.held = nil
+		return release, nil
+	}
+	if p.lock == nil {
+		return func() {}, nil
+	}
+	return p.lock()
 }
 
 func (p *holderPrompter) cancelled() error {
@@ -404,6 +435,11 @@ func (p *holderPrompter) cancelled() error {
 }
 
 func (p *holderPrompter) Submit(text string) error {
+	release, err := p.acquire()
+	if err != nil {
+		return err
+	}
+	defer release()
 	if err := p.cancelled(); err != nil {
 		return err
 	}
@@ -462,7 +498,7 @@ func (f *firstPrompt) typing() harness.Typing {
 }
 
 func (f *firstPrompt) prompter(c *holder.HolderClient, turn int) *firstPrompter {
-	return &firstPrompter{holderPrompter: holderPrompter{c: c, typing: f.typing(), io: f.p.projects.TypingIO(f.dir, c, "first-prompt-nudge"), cancel: f.cancel, onTyped: f.markTyped}, f: f, turn: turn}
+	return &firstPrompter{holderPrompter: holderPrompter{c: c, typing: f.typing(), io: f.p.projects.TypingIO(f.dir, c, "first-prompt-nudge"), cancel: f.cancel, onTyped: f.markTyped, lock: func() (func(), error) { return lockTyping(f.p, f.id, f.cancel) }}, f: f, turn: turn}
 }
 
 func (p *firstPrompter) WaitStart(timeout time.Duration) (bool, error) {

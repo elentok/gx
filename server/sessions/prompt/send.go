@@ -122,7 +122,8 @@ func (p *Prompt) nudgePrompt(dir, text string, imgs imageSet) error {
 	run.ClearPersonTyped()
 	caps := claudeui.DefaultNudgeCaps
 	caps.Grace = cmp.Or(p.cfg.PromptGrace, caps.Grace)
-	pr := &runPrompter{holderPrompter: holderPrompter{c: run.Holder(), typing: p.projects.SessionTyping(dir), io: p.projects.TypingIO(dir, run.Holder(), "send-nudge"), images: imgs}, run: run}
+	pr := &runPrompter{holderPrompter: holderPrompter{c: run.Holder(), typing: p.projects.SessionTyping(dir), io: p.projects.TypingIO(dir, run.Holder(), "send-nudge"), images: imgs,
+		lock: func() (func(), error) { return lockTyping(p, filepath.Base(dir), nil) }}, run: run}
 	report := func(d claudeui.NudgeDecision) {
 		p.log.Info("send nudge", "session", filepath.Base(dir), "decision", string(d))
 	}

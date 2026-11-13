@@ -133,6 +133,7 @@ type Prompt struct {
 
 	autoAdvances autoAdvances
 	autoQueues   autoAdvances
+	typingLocks  typingLocks
 
 	// imageMu orders the numbering of a session's Prompt images.
 	imageMu sync.Mutex

@@ -188,6 +188,11 @@ func (r *actionRun) TypeStep(i int, prompt string) error {
 // typeStepWith is TypeStep that pastes imgs after the draft check and before
 // the prompt.
 func (r *actionRun) typeStepWith(i int, prompt string, imgs imageSet) error {
+	release, err := lockTyping(r.p, filepath.Base(r.dir), r.Cancel)
+	if err != nil {
+		return err
+	}
+	defer release()
 	if !r.p.projects.Typing().ReadyToType(r.p.projects.TypingIO(r.dir, r.holder, "action-step")) {
 		return fmt.Errorf("step %d: %w", i, claudeui.ErrNotReadyToType)
 	}

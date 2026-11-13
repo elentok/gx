@@ -3,13 +3,137 @@ package prompt
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/server/sessions"
 )
+
+func newLockPrompt() *Prompt {
+	p := New(Deps{})
+	p.GiveSessions(&sessions.Manager{Watches: sessions.NewSessionWatches()})
+	return p
+}
+
+// typeOnce stands in for one clear, type and Enter: it types its text one
+// key at a time into out under the chat's lock.
+func typeOnce(p *Prompt, id, text string, out *strings.Builder) error {
+	release, err := lockTyping(p, id, nil)
+	if err != nil {
+		return err
+	}
+	defer release()
+	for _, r := range text {
+		out.WriteRune(r)
+		runtime.Gosched()
+	}
+	out.WriteString("|")
+	return nil
+}
+
+func TestTypingLock_TwoTypersOnOneChatNeverMix(t *testing.T) {
+	p := newLockPrompt()
+	var out strings.Builder
+	var wg sync.WaitGroup
+	for _, text := range []string{"aaaaaaaa", "bbbbbbbb", "cccccccc"} {
+		wg.Go(func() {
+			if err := typeOnce(p, "s1", text, &out); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	for part := range strings.SplitSeq(strings.TrimSuffix(out.String(), "|"), "|") {
+		if len(part) != 8 || strings.Trim(part, string(part[0])) != "" {
+			t.Fatalf("typed text mixed: %q", out.String())
+		}
+	}
+}
+
+func TestTypingLock_TwoSendsInARowArriveWholeAndInOrder(t *testing.T) {
+	p := newLockPrompt()
+	var out strings.Builder
+	for _, text := range []string{"first", "second"} {
+		if err := typeOnce(p, "s1", text, &out); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := out.String(); got != "first|second|" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestTypingLock_WaiterEndsOnCancel(t *testing.T) {
+	p := newLockPrompt()
+	release, err := lockTyping(p, "s1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	cancel := make(chan struct{})
+	done := make(chan error, 1)
+	go func() { _, err := lockTyping(p, "s1", cancel); done <- err }()
+	close(cancel)
+	select {
+	case err := <-done:
+		if !errors.Is(err, errNudgeCancelled) {
+			t.Fatalf("err = %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("waiter did not end on cancel")
+	}
+}
+
+func TestTypingLock_WaiterEndsOnServerStop(t *testing.T) {
+	p := newLockPrompt()
+	release, err := lockTyping(p, "s1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	done := make(chan error, 1)
+	go func() { _, err := lockTyping(p, "s1", nil); done <- err }()
+	close(p.sessions.Watches.Stop)
+	select {
+	case err := <-done:
+		if !errors.Is(err, ErrServerStopping) {
+			t.Fatalf("err = %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("waiter did not end on server stop")
+	}
+}
+
+func TestTypingLock_OtherChatIsNotBlocked(t *testing.T) {
+	p := newLockPrompt()
+	release, err := lockTyping(p, "s1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	done := make(chan error, 1)
+	go func() {
+		r, err := lockTyping(p, "s2", nil)
+		if err == nil {
+			r()
+		}
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("other chat blocked")
+	}
+}
 
 func TestFailureReason(t *testing.T) {
 	t.Parallel()
