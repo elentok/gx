@@ -9,7 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
-	"github.com/elentok/gx/ralphloop/supervise"
+	"github.com/elentok/gx/ralphloop/supervise/startprompt"
 	"github.com/elentok/gx/ralphloop/worktree"
 )
 
@@ -20,7 +20,7 @@ func TestWaitIterationFinished_SessionDied_ReturnsDiedReason(t *testing.T) {
 	d, _, _ := fakes.FakeDeps()
 	r := fakes.FakeRunner(d)
 	r.DieAfterPrompt(label, agentrunner.SessionDied("claude exited (code 1)"))
-	launched, err := supervise.StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: label, Epic: epic}, "/gx-implement gx:my-epic/01", supervise.Hooks{})
+	launched, err := startprompt.StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: label, Epic: epic}, "/gx-implement gx:my-epic/01", startprompt.Hooks{})
 	session := launched.Session
 	if err != nil {
 		t.Fatalf("StartAndPrompt = %v", err)

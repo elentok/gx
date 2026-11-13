@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/supervise"
+	"github.com/elentok/gx/ralphloop/supervise/startprompt"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"path/filepath"
@@ -514,16 +515,16 @@ func nudgeIfStalled(d deps.Deps, in *supervise.PersonInput, o OneIteration, w It
 // transcript keeps the generic text.
 func stallNudgeText(d deps.Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) string {
 	if d.ReadLaunchRecorded == nil {
-		return supervise.StallNudgeText
+		return startprompt.StallNudgeText
 	}
 	status, err := d.Runner.Status(s)
 	if err != nil || status.SessionID == "" {
-		return supervise.StallNudgeText
+		return startprompt.StallNudgeText
 	}
 	launch := agent.SkillPrompt(o.Agent, agent.LaunchSkill(o.Ticket, agent.DefaultWorkerSkill), ticketAddress(o.Ticket))
 	recorded, known, err := d.ReadLaunchRecorded(o.Agent, w.Path, status.SessionID, launch)
 	if err != nil || recorded || (!known && o.Agent != agent.AgentCodex) {
-		return supervise.StallNudgeText
+		return startprompt.StallNudgeText
 	}
 	return launch
 }

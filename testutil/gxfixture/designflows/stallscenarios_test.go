@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/supervise"
+	"github.com/elentok/gx/ralphloop/supervise/startprompt"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -100,14 +100,14 @@ func TestStallVimScenario_AToggleToVimGetsTheNudgeWithNoStrayCharacter(t *testin
 	r.toggleVim(t)
 	r.WaitStatus(t, stallVimTicket, "done")
 	nudges := r.events(t, stallVimTicket, string(events.StallNudged))
-	if len(nudges) == 0 || nudges[0].Text != supervise.StallNudgeText {
+	if len(nudges) == 0 || nudges[0].Text != startprompt.StallNudgeText {
 		t.Fatalf("stall-nudged events = %+v, want one with the nudge text", nudges)
 	}
 	in := r.agentInput(t)
-	if strings.Contains(in, "i"+supervise.StallNudgeText) {
+	if strings.Contains(in, "i"+startprompt.StallNudgeText) {
 		t.Errorf("a stray i reached the input before the nudge:\n%q", in)
 	}
-	if !strings.Contains(in, supervise.StallNudgeText) {
+	if !strings.Contains(in, startprompt.StallNudgeText) {
 		t.Errorf("the nudge text never reached the agent:\n%q", in)
 	}
 	r.Stop(t)
@@ -118,10 +118,10 @@ func TestStallVimScenario_NormalSettingsGetTheNudgeWithNoStrayCharacter(t *testi
 	r := start(t, "stall-vim")
 	r.WaitStatus(t, stallVimTicket, "done")
 	in := r.agentInput(t)
-	if strings.Contains(in, "i"+supervise.StallNudgeText) {
+	if strings.Contains(in, "i"+startprompt.StallNudgeText) {
 		t.Errorf("a stray i reached the input before the nudge:\n%q", in)
 	}
-	if !strings.Contains(in, supervise.StallNudgeText) {
+	if !strings.Contains(in, startprompt.StallNudgeText) {
 		t.Errorf("the nudge text never reached the agent:\n%q", in)
 	}
 	r.Stop(t)

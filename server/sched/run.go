@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/supervise"
+	"github.com/elentok/gx/ralphloop/supervise/startprompt"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/merge"
@@ -194,7 +195,7 @@ func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
 		kind, reason := events.IterationError, "launch failed: "+err.Error()
 		if taken := (*nameTakenError)(nil); errors.As(err, &taken) {
 			kind, reason = events.AgentNameTaken, "agent name taken: "+taken.reason
-		} else if k, ok := supervise.LaunchFailureKind(err); ok {
+		} else if k, ok := startprompt.LaunchFailureKind(err); ok {
 			kind = k
 		}
 		if kind == events.IterationError {
@@ -279,7 +280,7 @@ func (l *Launcher) finishWithRecovery(rc *runContext, addr tickets.Address, stop
 			err = l.waitKeepingHolder(*rc, addr)
 			if _, again := errors.AsType[*ralphloop.RelaunchRequest](err); again {
 				l.stopHung(*rc)
-				err = &supervise.LaunchFailure{Kind: events.AgentPromptStalled, Err: fmt.Errorf("pane stopped taking keys, twice: %w", err)}
+				err = &startprompt.LaunchFailure{Kind: events.AgentPromptStalled, Err: fmt.Errorf("pane stopped taking keys, twice: %w", err)}
 			}
 		}
 	}
@@ -367,7 +368,7 @@ func (l *Launcher) markHolderUnreachable(addr tickets.Address, unreachable bool)
 func (l *Launcher) relaunchHung(rc *runContext, hung error) error {
 	return l.relaunch(rc, rc.one.ResumeSessionID, func() error {
 		if _, live, _ := rc.deps.Runner.Find(rc.run.Session.Label); live {
-			return &supervise.LaunchFailure{Kind: events.AgentPromptStalled, Err: fmt.Errorf("%w: %s is still live after stop, not relaunching", hung, rc.run.Session.Label)}
+			return &startprompt.LaunchFailure{Kind: events.AgentPromptStalled, Err: fmt.Errorf("%w: %s is still live after stop, not relaunching", hung, rc.run.Session.Label)}
 		}
 		return nil
 	})
@@ -528,7 +529,7 @@ func (l *Launcher) settleRun(rc runContext, err error) {
 		l.Log.Warn("finish iteration", "ticket", ticketAddr, "err", err)
 		// Pause it: a claimed ticket nobody is working on is stuck, not failed.
 		kind, reason := events.IterationError, markedIterationReason(err, err.Error())
-		if k, ok := supervise.LaunchFailureKind(err); ok {
+		if k, ok := startprompt.LaunchFailureKind(err); ok {
 			kind, reason = k, err.Error()
 		}
 		if perr := l.Writer.Pause(one.ScratchDir, addr, one.Ticket.Path, kind, reason, run); perr != nil {

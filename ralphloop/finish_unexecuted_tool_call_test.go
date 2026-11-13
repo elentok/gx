@@ -15,7 +15,7 @@ import (
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/supervise"
+	"github.com/elentok/gx/ralphloop/supervise/startprompt"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -43,8 +43,8 @@ func driveIteration(t *testing.T, d deps.Deps, scratchDir, path string, sink run
 	if err != nil {
 		t.Fatalf("PrepareIteration: %v", err)
 	}
-	s, err := supervise.StartAndPrompt(context.Background(), d.Runner, agentrunner.StartOptions{Label: w.Label, Epic: "epic", Cwd: w.Path},
-		"/gx-implement gx:epic/01", supervise.Hooks{})
+	s, err := startprompt.StartAndPrompt(context.Background(), d.Runner, agentrunner.StartOptions{Label: w.Label, Epic: "epic", Cwd: w.Path},
+		"/gx-implement gx:epic/01", startprompt.Hooks{})
 	if err != nil {
 		t.Fatalf("StartAndPrompt: %v", err)
 	}

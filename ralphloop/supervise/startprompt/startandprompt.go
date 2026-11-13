@@ -1,4 +1,4 @@
-package supervise
+package startprompt
 
 import (
 	"cmp"
@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/ralphloop/supervise"
 )
 
 // StallNudgeText is the fixed text of the stall nudge.
@@ -181,7 +182,7 @@ type Launched struct {
 
 // PromptedLaunch is the post-prompt half of a launch for a session started
 // and prompted through Deps.Runner, with baseline its pre-prompt Turn.
-func PromptedLaunch(d deps.Deps, p LaunchParams, baseline int) (string, error) {
+func PromptedLaunch(d deps.Deps, p supervise.LaunchParams, baseline int) (string, error) {
 	status, err := d.Runner.Status(p.Session)
 	if err != nil {
 		log.Printf("reading %s status after initial prompt: %v", p.Label, err)
@@ -196,16 +197,16 @@ func PromptedLaunch(d deps.Deps, p LaunchParams, baseline int) (string, error) {
 
 // startedLaunch logs and reports a freshly prompted agent's start, with seq as
 // its stalled-since-launch baseline, then waits for it to finish.
-func startedLaunch(d deps.Deps, p LaunchParams, sessionID string, seq int) (string, error) {
+func startedLaunch(d deps.Deps, p supervise.LaunchParams, sessionID string, seq int) (string, error) {
 	reportStarted(d, p, sessionID, seq)
 	return waitLaunched(d, p, sessionID)
 }
 
-func reportStarted(d deps.Deps, p LaunchParams, sessionID string, seq int) {
+func reportStarted(d deps.Deps, p supervise.LaunchParams, sessionID string, seq int) {
 	p.LogAgentStartEvent(p.StartEvent, sessionID, seq)
 	if p.StartEvent != "" {
 		p.EventSink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID, p.Agent, p.Pane)
-		EmitContextOccupancy(d, p.EventSink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
+		supervise.EmitContextOccupancy(d, p.EventSink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
 	}
 }
 
@@ -214,7 +215,7 @@ func reportStarted(d deps.Deps, p LaunchParams, sessionID string, seq int) {
 // baseline (see noActivitySinceLaunch) never got its prompt, so it gets it
 // now; an idle one that has moved is already finished; anything else is
 // waited out.
-func AdoptedLaunch(d deps.Deps, p LaunchParams) (string, error) {
+func AdoptedLaunch(d deps.Deps, p supervise.LaunchParams) (string, error) {
 	status, err := d.Runner.Status(p.Session)
 	if err != nil {
 		return "", fmt.Errorf("reading adopted %s status: %w", p.Label, err)
@@ -223,11 +224,11 @@ func AdoptedLaunch(d deps.Deps, p LaunchParams) (string, error) {
 	// Seq 0 keeps the original launch's baseline the one noActivitySinceLaunch
 	// finds.
 	reportStarted(d, p, sessionID, 0)
-	if AlreadyFinished(string(status.State)) {
+	if supervise.AlreadyFinished(string(status.State)) {
 		if !noActivitySinceLaunch(p.ScratchDir, p.EpicName, sessionID, status.Turn) {
 			return sessionID, p.LogLifecycleEvent(p.FinishEvent, sessionID)
 		}
-		if err := PromptIdle(d, p, p.Prompt); err != nil {
+		if err := supervise.PromptIdle(d, p, p.Prompt); err != nil {
 			return "", fmt.Errorf("sending initial prompt to stalled adopted session: %w", err)
 		}
 	}
@@ -236,9 +237,9 @@ func AdoptedLaunch(d deps.Deps, p LaunchParams) (string, error) {
 
 // waitLaunched is WaitForFinish keeping sessionID on a blocked-pane pause,
 // whose caller still records the live session.
-func waitLaunched(d deps.Deps, p LaunchParams, sessionID string) (string, error) {
-	if err := WaitForFinish(d, p, sessionID); err != nil {
-		if errors.Is(err, ErrBlockedPanePaused) {
+func waitLaunched(d deps.Deps, p supervise.LaunchParams, sessionID string) (string, error) {
+	if err := supervise.WaitForFinish(d, p, sessionID); err != nil {
+		if errors.Is(err, supervise.ErrBlockedPanePaused) {
 			return sessionID, err
 		}
 		return "", err

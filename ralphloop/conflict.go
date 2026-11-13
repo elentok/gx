@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/supervise"
+	"github.com/elentok/gx/ralphloop/supervise/startprompt"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"strings"
 
@@ -316,13 +317,13 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 		return "", pauseConflictResolutionChildRepair(p, childPath, childID, label, reason)
 	}
 
-	l, err := supervise.StartAndPrompt(context.Background(), d.Runner, agentrunner.StartOptions{
+	l, err := startprompt.StartAndPrompt(context.Background(), d.Runner, agentrunner.StartOptions{
 		Label: label,
 		Epic:  p.FeatureBranch,
 		Cwd:   p.FeatureWorktree,
 		Kind:  agentrunner.Kind(p.Agent),
 		Args:  agent.AgentArgs(p.Agent, p.FeatureWorktree, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
-	}, prompt, supervise.Hooks{
+	}, prompt, startprompt.Hooks{
 		OnFail: func(attempt int, kind events.Kind, err error) {
 			p.logLaunchFailed(label, attempt, kind, err)
 		},
@@ -331,7 +332,7 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 		},
 	})
 
-	var launchFail *supervise.LaunchFailure
+	var launchFail *startprompt.LaunchFailure
 	if errors.As(err, &launchFail) {
 		return "", fmt.Errorf("starting conflict-resolution agent %s: %w", label, err)
 	}
@@ -352,9 +353,9 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 	case err != nil:
 		err = fmt.Errorf("sending initial prompt: %w", err)
 	case l.Adopted:
-		sessionID, err = supervise.AdoptedLaunch(d, launchParams)
+		sessionID, err = startprompt.AdoptedLaunch(d, launchParams)
 	default:
-		sessionID, err = supervise.PromptedLaunch(d, launchParams, l.Baseline)
+		sessionID, err = startprompt.PromptedLaunch(d, launchParams, l.Baseline)
 	}
 	if err != nil {
 		return "", fmt.Errorf("conflict-resolution agent %s did not finish (possibly stuck): %w", label, err)

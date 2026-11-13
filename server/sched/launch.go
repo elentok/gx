@@ -19,7 +19,7 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/runlog"
-	"github.com/elentok/gx/ralphloop/supervise"
+	"github.com/elentok/gx/ralphloop/supervise/startprompt"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
@@ -157,7 +157,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 	ctx := one.Context
 	start := func() (agentrunner.Session, error) {
 		l.setLaunchStep(ticket.String(), runs.StepStartingAgent)
-		launched, err := supervise.StartAndPrompt(ctx, deps.Runner, agentrunner.StartOptions{
+		launched, err := startprompt.StartAndPrompt(ctx, deps.Runner, agentrunner.StartOptions{
 			NoAdopt:         true,
 			Label:           label,
 			Epic:            ticket.Epic,
@@ -166,7 +166,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 			Args:            agent.AgentArgs(agentKind, cwd, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
 			Env:             agentEnv(l.Settings.Load().TabEnv, t, ticket, agentKind),
 			ResumeSessionID: resumeID,
-		}, srvrecovery.LaunchPrompt(agentKind, srvrecovery.LaunchSkill(t), launchNote(t, cwd), ticket.String()), supervise.Hooks{
+		}, srvrecovery.LaunchPrompt(agentKind, srvrecovery.LaunchSkill(t), launchNote(t, cwd), ticket.String()), startprompt.Hooks{
 			OnNudge: func(attempt int, decision string) {
 				l.LogEvent(ticket, runlog.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
 			},
