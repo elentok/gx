@@ -30,20 +30,6 @@ func TestLoadServerLogRetention(t *testing.T) {
 	}
 }
 
-func TestLoadServerTCPListen(t *testing.T) {
-	for body, want := range map[string]bool{`{}`: false, `{"server":{"tcp-listen":true}}`: true} {
-		tmp := t.TempDir()
-		prev := userConfigDirFn
-		userConfigDirFn = func() (string, error) { return tmp, nil }
-		t.Cleanup(func() { userConfigDirFn = prev })
-		writeBudgetConfig(t, tmp, body)
-		cfg, err := Load()
-		if err != nil || cfg.Server.TCPListen != want {
-			t.Errorf("%s: TCPListen = %v (err %v), want %v", body, cfg.Server.TCPListen, err, want)
-		}
-	}
-}
-
 func TestParseServerWatchConfig(t *testing.T) {
 	for body, want := range map[string]bool{`{}`: true, `{"server":{}}`: true, `{"server":{"watch-config":false}}`: false, `{"server":{"watch-config":true}}`: true} {
 		cfg, err := Parse([]byte(body))

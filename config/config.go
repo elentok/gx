@@ -84,8 +84,6 @@ const DefaultRecoveryNotifyHold = 10 * time.Minute
 
 // ServerConfig configures the orchestrator server.
 type ServerConfig struct {
-	// TCPListen adds a loopback-only, unauthenticated TCP listener.
-	TCPListen bool `json:"tcp-listen"`
 	// TabEnv is KEY=VALUE entries set on every iteration tab's shell, for
 	// overriding what the user's shell rc would otherwise decide (e.g. PATH).
 	TabEnv []string `json:"tab-env"`
@@ -384,9 +382,6 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 	}
 	if raw.TicketStore != nil && raw.TicketStore.PushRemote != nil {
 		cfg.TicketStore.PushRemote = *raw.TicketStore.PushRemote
-	}
-	if raw.Server != nil && raw.Server.TCPListen != nil {
-		cfg.Server.TCPListen = *raw.Server.TCPListen
 	}
 	if raw.Server != nil && raw.Server.WatchConfig != nil {
 		cfg.Server.WatchConfig = *raw.Server.WatchConfig

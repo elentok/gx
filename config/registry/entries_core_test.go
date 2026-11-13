@@ -32,7 +32,6 @@ func TestCoreEntries(t *testing.T) {
 		{key: Key("notifications", "telegram", "bot-token"), typ: TypeSecret, section: n},
 		{key: Key("notifications", "telegram", "chat-id"), typ: TypeString, section: n},
 		{key: Key("notifications", "slack", "webhook-url"), typ: TypeSecret, section: n},
-		{key: Key("server", "tcp-listen"), typ: TypeBool, section: s, restart: true, risky: true},
 		{key: Key("server", "tab-env"), typ: TypeStringList, section: s},
 		{key: Key("server", "log-retention"), typ: TypeDuration, section: s},
 		{key: Key("server", "watch-config"), typ: TypeBool, section: s},

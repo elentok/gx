@@ -56,9 +56,6 @@ func coreEntries() []Entry {
 		e.Risky, e.ConfirmText = true, confirm
 		return e
 	}
-	add(s, risky(Entry{Key: Key("server", "tcp-listen"), Type: TypeBool, Restart: true,
-		Description: "Let other machines reach the gx server over TCP, not only this machine."},
-		"Other machines on the network will be able to reach the gx server. Turn this on only on a network you trust."))
 	add(s, Entry{Key: Key("server", "tab-env"), Type: TypeStringList,
 		Description: "Environment variable names copied into every new terminal tab."})
 	add(s, dur(Key("server", "log-retention"), "How long server logs are kept before they are deleted."))

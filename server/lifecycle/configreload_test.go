@@ -2,9 +2,11 @@ package lifecycle_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -138,6 +140,49 @@ func TestConfigReload_StartupOnlyKeyWarnsUntilRestart(t *testing.T) {
 	}
 	if res := reload(t, h); slices.Contains(res.Changed, "execution-queue.max-agents") || !slices.Equal(res.Warnings, want) {
 		t.Errorf("second = %+v, want no max-agents change and warnings %v", res, want)
+	}
+}
+
+// A config file that still has the removed tcp-listen key starts like any
+// unknown key: no tcp_addr in the handshake, no warning, no pending restart.
+func TestStart_RemovedTCPListenKeyIsIgnored(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	path := filepath.Join(t.TempDir(), "config.json")
+	servertest.WriteConfig(t, path, store, map[string]any{"server": map[string]any{"tcp-listen": true}})
+	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
+
+	ctx := context.Background()
+	hc := &http.Client{Transport: &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(ctx, "unix", server.SocketPath(h.StateDir))
+	}}}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://gx/v1/handshake", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := hc.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var raw map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := raw["tcp_addr"]; ok {
+		t.Errorf("handshake = %v, want no tcp_addr key", raw)
+	}
+
+	st, err := h.Client.Admin.ConfigStatus(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(st.PendingRestart) != 0 || (st.LastReload != nil && st.LastReload.Outcome != "success") {
+		t.Errorf("config status = %+v, want no pending restart and no warning", st)
+	}
+	if res := reload(t, h); res.Refused || len(res.Warnings) != 0 {
+		t.Errorf("reload = %+v, want no warnings", res)
 	}
 }
 

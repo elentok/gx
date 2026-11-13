@@ -6,7 +6,6 @@ var labels = map[string]string{
 	"notifications.telegram.bot-token": "Telegram bot token",
 	"notifications.telegram.chat-id":   "Telegram chat ID",
 	"notifications.slack.webhook-url":  "Slack webhook URL",
-	"server.tcp-listen":                "Listen on TCP",
 	"server.tab-env":                   "Tab environment variables",
 	"server.watch-config":              "Reload config on save",
 	"server.recently-finished":         "Recently finished list size",

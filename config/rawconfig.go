@@ -78,7 +78,6 @@ type rawConfig struct {
 		PushRemote     *string `json:"push-remote"`
 	} `json:"ticket-store"`
 	Server *struct {
-		TCPListen    *bool    `json:"tcp-listen"`
 		TabEnv       []string `json:"tab-env"`
 		LogRetention *string  `json:"log-retention"`
 		WatchConfig  *bool    `json:"watch-config"`

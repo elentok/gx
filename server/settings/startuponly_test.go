@@ -16,7 +16,6 @@ func startupOnlyCases(t *testing.T) map[string]map[string]any {
 	other := t.TempDir()
 	return map[string]map[string]any{
 		"ticket-store.path": {"ticket-store": map[string]any{"path": other}},
-		"server.tcp-listen": {"server": map[string]any{"tcp-listen": true}},
 		"server.web.listen": {"server": map[string]any{"web": map[string]any{"listen": "127.0.0.1:0"}}},
 		"agent-runner":      {"agent-runner": "headless"},
 		"runner-wait":       {"runner-wait": "7s"},

@@ -441,11 +441,6 @@
           },
           "type": "array"
         },
-        "tcp-listen": {
-          "default": false,
-          "description": "Let other machines reach the gx server over TCP, not only this machine.",
-          "type": "boolean"
-        },
         "watch-config": {
           "default": true,
           "description": "Reload the config automatically when config.json changes.",
