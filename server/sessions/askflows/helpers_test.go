@@ -24,4 +24,10 @@ const (
 	schedEpic  = servertest.SchedEpic
 )
 
-var waitFor = servertest.Await
+var (
+	waitFor          = servertest.Await
+	startFakeSession = servertest.StartFakeSession
+	waitForHolder    = servertest.WaitForHolder
+	waitForScreen    = servertest.WaitForScreen
+	waitForSession   = servertest.WaitForSession
+)

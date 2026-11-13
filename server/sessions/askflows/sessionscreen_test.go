@@ -1,4 +1,4 @@
-package sessions_test
+package askflows_test
 
 import (
 	"os"

@@ -1,4 +1,4 @@
-package sessions_test
+package convflows_test
 
 import (
 	"context"
@@ -14,95 +14,59 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-// handoffFixture is a design session launched by gx on a map at the chart
-// step, Idle on a fake program with an input box.
-type handoffFixture struct {
-	designsFixture
-	store, cfg, id, conv string
-}
-
-func startHandoff(t *testing.T, step string, opts ...func(*server.Config)) handoffFixture {
-	t.Helper()
-	s := rigs.StartHandoff(t, step, opts...)
-	d := s.DesignsFixture
-	return handoffFixture{
-		designsFixture: designsFixture{h: d.H, ctx: d.Ctx, evs: d.Evs, repo: d.Repo, base: d.Base, ck: d.Ck},
-		store:          s.Store, cfg: s.Cfg, id: s.ID, conv: s.Conv,
-	}
-}
-
-func (f handoffFixture) shared() rigs.HandoffFixture {
-	return rigs.HandoffFixture{DesignsFixture: f.designsFixture.shared(), Store: f.store, Cfg: f.cfg, ID: f.id, Conv: f.conv}
-}
-
-func (f handoffFixture) continueSession(t *testing.T) {
-	t.Helper()
-	f.shared().ContinueSession(t)
-}
-
-func (f handoffFixture) newConversation(t *testing.T, old string) map[string]any {
-	t.Helper()
-	return f.shared().NewConversation(t, old)
-}
-
-func (f handoffFixture) wantRestartedOnWorker(t *testing.T) {
-	t.Helper()
-	f.shared().WantRestartedOnWorker(t)
-}
-
 func TestChartingHandoff_ContinueRestartsUnderWorkerArgs(t *testing.T) {
 	t.Parallel()
-	f := startHandoff(t, "chart")
-	before := readMeta(t, f.h, f.id)
+	f := rigs.StartHandoff(t, "chart")
+	before := readMeta(t, f.H, f.ID)
 	if before["tier"] != "strongest" {
 		t.Fatalf("tier = %v, want strongest", before["tier"])
 	}
-	setMapStep(t, f.store, "resolve-tickets")
-	f.continueSession(t)
-	f.wantRestartedOnWorker(t)
-	if after := readMeta(t, f.h, f.id); after["name"] != before["name"] {
+	setMapStep(t, f.Store, "resolve-tickets")
+	f.ContinueSession(t)
+	f.WantRestartedOnWorker(t)
+	if after := readMeta(t, f.H, f.ID); after["name"] != before["name"] {
 		t.Errorf("name = %v, want %v", after["name"], before["name"])
 	}
 }
 
 func TestChartingHandoff_AutoAdvanceRestartsUnderWorkerArgs(t *testing.T) {
 	t.Parallel()
-	f := startHandoff(t, "chart", servertest.WithAutoAdvanceDelay(200*time.Millisecond))
-	setMapStep(t, f.store, "resolve-tickets")
-	writeAssistantMessage(t, filepath.Join(f.cfg, "projects", "-repo", f.conv+".jsonl"), runEndText)
-	rigs.EndTurn(t, &rigs.GrillingFixture{H: f.h, Ctx: f.ctx, Evs: f.evs, ID: f.id, Conv: f.conv})
-	f.wantRestartedOnWorker(t)
+	f := rigs.StartHandoff(t, "chart", servertest.WithAutoAdvanceDelay(200*time.Millisecond))
+	setMapStep(t, f.Store, "resolve-tickets")
+	writeAssistantMessage(t, filepath.Join(f.Cfg, "projects", "-repo", f.Conv+".jsonl"), runEndText)
+	rigs.EndTurn(t, &rigs.GrillingFixture{H: f.H, Ctx: f.Ctx, Evs: f.Evs, ID: f.ID, Conv: f.Conv})
+	f.WantRestartedOnWorker(t)
 }
 
 func TestChartingHandoff_FailedRestartExitsCrashedAndResumeWorks(t *testing.T) {
 	t.Parallel()
-	f := startHandoff(t, "chart")
-	dir := readMeta(t, f.h, f.id)["dir"].(string)
-	setMapStep(t, f.store, "resolve-tickets")
-	setWorkerModel(t, f.store, "stale-model")
+	f := rigs.StartHandoff(t, "chart")
+	dir := readMeta(t, f.H, f.ID)["dir"].(string)
+	setMapStep(t, f.Store, "resolve-tickets")
+	setWorkerModel(t, f.Store, "stale-model")
 	// A session dir that is gone stands in for a stale worker slug: the new
 	// agent cannot start.
 	moved := dir + ".moved"
 	if err := os.Rename(dir, moved); err != nil {
 		t.Fatal(err)
 	}
-	f.continueSession(t)
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool {
+	f.ContinueSession(t)
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool {
 		return s.Status.State == wire.SessionExited && s.Exit == wire.SessionExitCrashed
 	})
 	if err := os.Rename(moved, dir); err != nil {
 		t.Fatal(err)
 	}
-	if model := readMeta(t, f.h, f.id)["model"]; model != "stale-model" {
+	if model := readMeta(t, f.H, f.ID)["model"]; model != "stale-model" {
 		t.Fatalf("model after the failed restart = %v, want stale-model", model)
 	}
-	setWorkerModel(t, f.store, "sonnet")
-	res, err := f.h.Client.Sessions.Resume(f.ctx, f.id)
+	setWorkerModel(t, f.Store, "sonnet")
+	res, err := f.H.Client.Sessions.Resume(f.Ctx, f.ID)
 	if err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v", res, err)
 	}
-	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Status.State != wire.SessionExited })
-	if model := readMeta(t, f.h, f.id)["model"]; model != "sonnet" {
+	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State != wire.SessionExited })
+	if model := readMeta(t, f.H, f.ID)["model"]; model != "sonnet" {
 		t.Errorf("model after Resume = %v, want the fixed config's sonnet", model)
 	}
 }
@@ -118,58 +82,60 @@ func setWorkerModel(t *testing.T, store, model string) {
 func TestChartingHandoff_NothingRestartsOutsideAStrongestDesignLaunch(t *testing.T) {
 	t.Parallel()
 	t.Run("worker session", func(t *testing.T) {
-		f := startHandoff(t, "resolve-tickets")
-		f.continueSession(t)
+		f := rigs.StartHandoff(t, "resolve-tickets")
+		f.ContinueSession(t)
 		wantResetInPlace(t, f, "worker")
 	})
 	t.Run("still charting", func(t *testing.T) {
-		f := startHandoff(t, "chart")
-		f.continueSession(t)
+		f := rigs.StartHandoff(t, "chart")
+		f.ContinueSession(t)
 		wantResetInPlace(t, f, "strongest")
 	})
 	t.Run("linked later", func(t *testing.T) {
-		f := startHandoff(t, "chart")
-		setMapStep(t, f.store, "resolve-tickets")
+		f := rigs.StartHandoff(t, "chart")
+		setMapStep(t, f.Store, "resolve-tickets")
 		// A session linked to the design later has no launch kind.
-		res, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
+		res, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
 		if err != nil || res.Session == nil {
 			t.Fatalf("create = %+v, %v", res, err)
 		}
 		id := res.Session.ID
-		conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)
-		waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
+		conv, _ := readMeta(t, f.H, id)["conversation_id"].(string)
+		waitForHolder(t, filepath.Join(f.H.SessionsDir, id))
 		report(t, conv, agentfake.Control{State: "idle"})
-		waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
-		other := handoffFixture{designsFixture: f.designsFixture, id: id, conv: conv}
-		other.continueSession(t)
+		waitForSession(f.Ctx, t, f.H, f.Evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+		other := f
+		other.ID, other.Conv = id, conv
+		other.ContinueSession(t)
 		wantResetInPlace(t, other, "worker")
 	})
 	t.Run("triage session", func(t *testing.T) {
-		f := startHandoff(t, "chart")
-		setMapStep(t, f.store, "resolve-tickets")
-		res, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+		f := rigs.StartHandoff(t, "chart")
+		setMapStep(t, f.Store, "resolve-tickets")
+		res, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 		if err != nil || res.Session == nil {
 			t.Fatalf("create = %+v, %v", res, err)
 		}
 		id := res.Session.ID
-		conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)
-		waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
+		conv, _ := readMeta(t, f.H, id)["conversation_id"].(string)
+		waitForHolder(t, filepath.Join(f.H.SessionsDir, id))
 		report(t, conv, agentfake.Control{State: "idle"})
-		waitForSession(f.ctx, t, f.h, f.evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
-		if link, err := f.h.Client.Sessions.Link(f.ctx, wire.LinkSessionRequest{ID: id, Flow: "triage", FlowKey: "proj"}); err != nil || link.Refused {
+		waitForSession(f.Ctx, t, f.H, f.Evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+		if link, err := f.H.Client.Sessions.Link(f.Ctx, wire.LinkSessionRequest{ID: id, Flow: "triage", FlowKey: "proj"}); err != nil || link.Refused {
 			t.Fatalf("link = %+v, %v", link, err)
 		}
-		other := handoffFixture{designsFixture: f.designsFixture, id: id, conv: conv}
-		other.continueSession(t)
+		other := f
+		other.ID, other.Conv = id, conv
+		other.ContinueSession(t)
 		wantResetInPlace(t, other, "worker")
 	})
 }
 
 // wantResetInPlace waits for the fake agent to move to a new conversation on
 // /clear, then checks the session never got a new holder run.
-func wantResetInPlace(t *testing.T, f handoffFixture, tier string) {
+func wantResetInPlace(t *testing.T, f rigs.HandoffFixture, tier string) {
 	t.Helper()
-	meta := f.newConversation(t, f.conv)
+	meta := f.NewConversation(t, f.Conv)
 	if meta["run"] != nil || meta["tier"] != tier {
 		t.Errorf("meta run=%v tier=%v, want the same run on %s", meta["run"], meta["tier"], tier)
 	}

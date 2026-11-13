@@ -1,4 +1,4 @@
-package sessions_test
+package convflows_test
 
 import (
 	"context"

@@ -28,7 +28,6 @@ const (
 	apiError401       = rigs.APIError401
 	reply             = rigs.Reply
 	turnDurationLine  = servertest.TurnDurationLine
-	runEndText        = rigs.RunEndText
 	repairToken       = rigs.RepairToken
 	schedEpic         = servertest.SchedEpic
 	testFlushInterval = servertest.FlushInterval
@@ -54,7 +53,6 @@ var (
 	waitSessionState       = servertest.WaitSessionState
 	failureNow             = rigs.FailureNow
 	waitForFailure         = rigs.WaitForFailure
-	setMapStep             = rigs.SetMapStep
 	gitOut                 = servertest.GitOut
 	waitFor                = servertest.Await
 	reload                 = servertest.Reload
