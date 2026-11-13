@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.49.5 - 2026-11-13
+
+- Added Scheduled prompts. A Schedule is stored as a file under `.schedules` and starts a run at each set time, with catch-up after a sleep or restart. It follows daylight saving rules and keeps per-machine state.
+- Added `gx schedules` commands to list, show, create, edit, switch on or off, delete and run a Schedule now.
+- Added a Scheduled prompts page in the web UI, listed in the Epics menu. You can create and edit a Schedule, use Run now and the on/off switch, see Last runs, and delete it. It also has an empty state, an all-off banner and a project-not-found row.
+- Added rules for overlapping runs. A queued previous run is replaced. A run is skipped if the previous one started or needs attention, or if the Schedule's project is gone. Deleting a Schedule cancels its queued runs.
+- Added a Cancel button for a one-off on its ticket page.
+- Added faster ticket authoring. `gx tickets draft` checks paths and symbols and refuses TODO markers. Triage groups small overlapping follow-ups, and Write publishes ready rows through `gx-to-tickets`. Publishing links tickets to their follow-ups and archives them as promoted. Stats count a promoted follow-up once.
+- Added the ticket's agent to `gx tickets show` output (text and `--json`), and a `--tickets` option on `tickets show --section`.
+- Added `gx server epics mark-seen`.
+- Changed Roving rows and cards to drop the More actions Tab stop. `.` and Shift+F10 now open the focused item's menu.
+- Changed the store commit loop to wake on store-watch events with a 60s fallback, instead of running `git status` every second.
+- Fixed a list Back crash in the web UI, a stale-run message in the finish gate error, a wrong Design workspace fallback (Default is now used only when the workspace is gone), and the Answered card's Show more after a rotation.
+
 ## v0.49.4 - 2026-11-12
 
 - Added keyboard shortcuts to the question sheet: n, p, j, k and N move between questions, Esc leaves a text box, and Cmd+Enter sends the answers.
