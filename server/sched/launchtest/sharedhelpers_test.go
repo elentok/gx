@@ -22,6 +22,9 @@ type (
 var epicA01 = servertest.EpicA01
 
 var (
+	assertPaused            = rigs.AssertPaused
+	markWaiting             = servertest.MarkWaiting
+	runsJSONHas             = servertest.RunsJSONHas
 	asHeadlessRun           = servertest.AsHeadlessRun
 	commitAgentWork         = servertest.CommitAgentWork
 	newSlackHook            = rigs.NewSlackHook

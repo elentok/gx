@@ -92,7 +92,7 @@ var allowed = map[string]int{
 	"server/disk/diskwatch_test.go":                           3,
 	"server/merge/handmerged_test.go":                         2, // negative waits: an out-of-scope epic is not probed; a PR epic is not stamped
 	"server/sched/fill_order_test.go":                         1, // negative wait: a wrong later launch would show within a beat
-	"server/sched/headless_block_reclaim_test.go":             2,
+	"server/sched/launchtest/headless_block_reclaim_test.go":  2,
 	"server/health/healthprocs_test.go":                       4,
 	"server/merge/latefinish_test.go":                         1,
 	"server/limits/limithistory_codex_test.go":                2, // settle wait for the event coalescer; received-at has second granularity
