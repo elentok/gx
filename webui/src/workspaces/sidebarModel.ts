@@ -6,6 +6,7 @@ import {
   PlacementOther,
   SectionNeedsYou,
   SectionOnHold,
+  SessionExited,
   SessionWorking,
   SortActivity,
   SortName,
@@ -199,6 +200,20 @@ function sortBy<T>(sort: Sort, entries: Sortable<T>[]): T[] {
   return [...entries].sort(cmp).map((e) => e.item)
 }
 
+/** Triage sessions: drop exited ones, keep only the newest per flow_key. */
+function currentTriage(ss: SessionInfo[]): SessionInfo[] {
+  const newest = new Map<string, SessionInfo>()
+  for (const s of ss) {
+    if (s.flow !== "triage" || s.status.state === SessionExited) continue
+    const k = s.flow_key ?? s.id
+    const cur = newest.get(k)
+    if (!cur || (sessionTime(s) ?? 0) >= (sessionTime(cur) ?? 0)) newest.set(k, s)
+  }
+  return ss.filter((s) => s.flow !== "triage" || newest.get(s.flow_key ?? s.id) === s)
+}
+
+const sessionTime = (s: SessionInfo) => time(s.status_changed_at)
+
 export function buildSidebar({
   rows,
   sessions,
@@ -289,6 +304,8 @@ export function buildSidebar({
       mode,
       mine.filter((r) => r.section === SectionOnHold).map((r) => cardEntry(r, true)),
     ),
-    other: sortAgents(placed.filter(({ p }) => p.kind === PlacementOther).map(({ s }) => s)),
+    other: sortAgents(
+      currentTriage(placed.filter(({ p }) => p.kind === PlacementOther).map(({ s }) => s)),
+    ),
   }
 }
