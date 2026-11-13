@@ -109,6 +109,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/epics/create-pr":                  "server epics create-pr",
 	"POST /v1/epics/try-again":                  "server epics try-again",
 	"POST /v1/epics/mark-merged":                "server epics mark-merged",
+	"POST /v1/epics/mark-seen":                  "server epics mark-seen",
 	"POST /v1/epics/stash-merge":                "server epics stash-merge",
 	"GET /v1/sessions":                          "agents list",
 	"GET /v1/sessions/chat":                     "agents chat",

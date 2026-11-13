@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -61,8 +62,11 @@ func TestServerQueueWriteJSON_ReportsServerVia(t *testing.T) {
 		func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
 			return cl.Queue.Add(ctx, "p:e/01", "")
 		})
-	if err != nil {
-		t.Fatalf("runServerQueueWrite: %v", err)
+	// No server listens on the socket, so the result is a refusal: the body is
+	// printed, then the command exits 1.
+	var exit *cmdbase.ExitError
+	if !errors.As(err, &exit) || exit.Code != 1 {
+		t.Fatalf("runServerQueueWrite: %v; want exit 1 after the refusal body", err)
 	}
 	got := decodeJSON(t, out.Bytes())
 	if got["via"] != "server" || got["actor"] == nil {

@@ -76,6 +76,14 @@ func (s *Tickets) EpicTryAgain(ctx context.Context, address string) (wire.QueueR
 	return s.t.queueWriteTo(ctx, "/v1/epics/try-again", wire.QueueRequest{Address: address})
 }
 
+// EpicMarkSeen records that a person has seen an epic card's current state,
+// which clears its Unread mark.
+func (s *Tickets) EpicMarkSeen(ctx context.Context, address string) (struct{}, error) {
+	var res struct{}
+	err := s.t.post(ctx, "/v1/epics/mark-seen", wire.EpicSeenRequest{Address: address}, &res)
+	return res, err
+}
+
 // EpicMarkMerged records a merge done outside gx on an epic.
 func (s *Tickets) EpicMarkMerged(ctx context.Context, address string) (wire.QueueResult, error) {
 	return s.t.queueWriteTo(ctx, "/v1/epics/mark-merged", wire.QueueRequest{Address: address})

@@ -100,6 +100,28 @@ func newServerEpicsCmd(d Deps) *cobra.Command {
 	markMerged.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(markMerged)
 
+	var seenJSON bool
+	markSeen := &cobra.Command{
+		Use:   "mark-seen <project:epic>",
+		Short: "record that an epic card's current state was seen, which clears its unread mark",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			if _, _, ok := tickets.ParseEpicAddress(args[0]); !ok {
+				return fmt.Errorf("%s is not an epic address (want project:epic)", args[0])
+			}
+			return cmdbase.ServerRead(d.Dial(), c.Context(), seenJSON, c.OutOrStdout(),
+				func(ctx context.Context, cl *apiclient.Client) (struct{}, error) {
+					return cl.Tickets.EpicMarkSeen(ctx, args[0])
+				},
+				func(w io.Writer, _ struct{}) error {
+					_, err := fmt.Fprintf(w, "marked %s seen\n", args[0])
+					return err
+				})
+		},
+	}
+	markSeen.Flags().BoolVar(&seenJSON, "json", false, "emit the result as JSON")
+	cmd.AddCommand(markSeen)
+
 	stashMerge := &cobra.Command{
 		Use:   "stash-merge <project:epic>",
 		Short: "merge an epic paused on a dirty trunk: set the clashing files aside, merge, restore them with conflict markers",

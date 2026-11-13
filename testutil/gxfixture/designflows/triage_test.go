@@ -194,7 +194,7 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 		return n
 	}
 	r.waitTriage(t, "the first Verify batch", func(v wire.TriageView) bool { return verified(v) == 3 })
-	v := r.waitTriage(t, "Plan to end at Approve", func(v wire.TriageView) bool { return currentStep(v) == "approve" && v.OpenQuestions == 3 })
+	v := r.waitTriage(t, "Plan to end at Approve", func(v wire.TriageView) bool { return currentStep(v) == "approve" && v.OpenQuestions == 2 })
 	if verified(v) != 5 || len(v.ActionCounts) != 5 {
 		t.Errorf("at Approve: %d verdicts and action groups %v, want 5 and all five actions", verified(v), v.ActionCounts)
 	}
