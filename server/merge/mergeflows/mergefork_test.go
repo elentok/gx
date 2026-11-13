@@ -1,4 +1,4 @@
-package merge_test
+package mergeflows_test
 
 import (
 	"context"
@@ -117,7 +117,7 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 				t.Errorf("%s queued with no enqueue time", it.Address)
 			}
 		}
-		if md := f.epicMD(t); strings.Contains(md, "completed_at:") || strings.Contains(md, "merged_at:") {
+		if md := f.EpicMD(t); strings.Contains(md, "completed_at:") || strings.Contains(md, "merged_at:") {
 			t.Errorf("epic stamped while its merge ticket runs:\n%s", md)
 		}
 		if n := f.others.Load(); n != 0 {
@@ -145,7 +145,7 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 	if strings.Contains(body, "parent:") || !strings.Contains(body, "type: merge") || !strings.Contains(body, "status: done") {
 		t.Errorf("merge ticket is not a done top-level merge ticket:\n%s", body)
 	}
-	f.assertStamps(t, true)
+	f.AssertStamps(t, true)
 	wantAddr := "original_address: proj:" + schedEpic + "/" + strings.TrimSuffix(filepath.Base(files[0]), "-merge.md")
 	if !strings.Contains(body, "created_at:") || !strings.Contains(body, wantAddr) {
 		t.Errorf("merge ticket lacks created_at or %q:\n%s", wantAddr, body)
@@ -184,14 +184,14 @@ func TestMergeFork_DeliverySwitchToPRMidRunFinishesTheTicketAndLeavesTheEpicForA
 	if files := f.mergeTicketFiles(t); len(files) != 1 {
 		t.Errorf("merge tickets = %v, want only the running one", files)
 	}
-	f.assertStamps(t, false)
+	f.AssertStamps(t, false)
 	if out := f.Git(t, "branch", "--contains", schedEpic, "main"); strings.TrimSpace(out) != "" {
 		t.Errorf("main holds the epic's tip after the switch to pr: %s", out)
 	}
 	if got := f.H.Server.EpicState(queue.RootRef{Project: "proj", Epic: schedEpic}, tickets.LoadEpicAt(filepath.Join(f.Store, "proj", schedEpic))); got != wire.EpicStateAwaitingPR {
 		t.Errorf("epic state = %q, want %q", got, wire.EpicStateAwaitingPR)
 	}
-	if md := f.epicMD(t); strings.Contains(md, "pr_number:") || strings.Contains(md, "pr_url:") {
+	if md := f.EpicMD(t); strings.Contains(md, "pr_number:") || strings.Contains(md, "pr_url:") {
 		t.Errorf("epic got a PR:\n%s", md)
 	}
 }
@@ -211,7 +211,7 @@ func TestMergeFork_AnEpicWithAPRIsNeverMergedLocally(t *testing.T) {
 	if files := f.mergeTicketFiles(t); len(files) != 0 {
 		t.Errorf("merge tickets = %v, want none: the watcher forks them, not the finish", files)
 	}
-	f.assertStamps(t, false)
+	f.AssertStamps(t, false)
 	// The ticket's own turn moves main on; a local merge would put the epic's commits on it.
 	if out := f.Git(t, "branch", "--contains", schedEpic, "main"); strings.TrimSpace(out) != "" {
 		t.Errorf("main holds the epic's tip after the finish: %s", out)
@@ -231,7 +231,7 @@ func TestMergeFork_TrunkMovingTwiceForksAThirdThenPausesAtTheCap(t *testing.T) {
 		return history.MergeBranchInto(repo, wts, branch, target)
 	})
 
-	ev := f.pauseRoot(t)
+	ev := f.PauseRoot(t)
 
 	if want := "needs rebase: " + schedEpic + " onto main; rebase it, then merge again"; ev.Kind != string(events.NeedsRebase) || ev.Message != want {
 		t.Errorf("pause = kind %q, reason %q, want kind %q, reason %q", ev.Kind, ev.Message, events.NeedsRebase, want)
@@ -248,8 +248,8 @@ func TestMergeFork_TrunkMovingTwiceForksAThirdThenPausesAtTheCap(t *testing.T) {
 			t.Errorf("merge ticket not done:\n%s", body)
 		}
 	}
-	f.assertRootQueued(t)
-	f.assertStamps(t, false)
+	f.AssertRootQueued(t)
+	f.AssertStamps(t, false)
 }
 
 func TestMergeFork_DirtyTrunkAfterAMergeTicketPausesWithoutAnother(t *testing.T) {
@@ -259,7 +259,7 @@ func TestMergeFork_DirtyTrunkAfterAMergeTicketPausesWithoutAnother(t *testing.T)
 		testutil.WriteFile(t, f.Repo, "01.txt", "local")
 	})
 
-	ev := f.pauseRoot(t)
+	ev := f.PauseRoot(t)
 
 	if ev.Kind != string(events.DirtyTrunk) {
 		t.Errorf("kind = %q, want %q (%s)", ev.Kind, events.DirtyTrunk, ev.Message)
@@ -275,5 +275,5 @@ func TestMergeFork_DirtyTrunkAfterAMergeTicketPausesWithoutAnother(t *testing.T)
 	if got := f.merges.Load(); got != 1 {
 		t.Errorf("merge turns = %d, want 1", got)
 	}
-	f.assertRootQueued(t)
+	f.AssertRootQueued(t)
 }

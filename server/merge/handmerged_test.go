@@ -61,7 +61,7 @@ func TestHandMerged_PausedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T)
 		commitFiles(t, p, "a.txt")
 		testutil.WriteFile(t, f.Repo, "a.txt", "local")
 	}, chat)
-	f.pauseRoot(t)
+	f.PauseRoot(t)
 
 	if err := os.Remove(filepath.Join(f.Repo, "a.txt")); err != nil {
 		t.Fatal(err)
@@ -72,7 +72,7 @@ func TestHandMerged_PausedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T)
 		q, err := f.H.Client.Queue.Items(context.Background())
 		return err == nil && !slices.ContainsFunc(q, func(e wire.QueueItem) bool { return e.Address == "proj:"+schedEpic+"/01" })
 	})
-	f.assertStamps(t, true)
+	f.AssertStamps(t, true)
 	if got := waitForChat(count, epicMergedText); got != 1 {
 		t.Errorf("epic merged sent %d times, want once", got)
 	}

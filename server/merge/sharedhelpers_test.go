@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/merge/mergetest"
 	"github.com/elentok/gx/server/servertest"
 )
 
@@ -55,17 +56,17 @@ var (
 // schedFixture adds the merge-only helpers (other files' methods) to the shared
 // servertest.SchedFixture. Its callbacks receive the wrapper.
 type schedFixture struct {
-	*servertest.SchedFixture
+	*mergetest.Fixture
 }
 
 func retroFixture(t *testing.T, opts ...func(*server.Config)) *schedFixture {
 	t.Helper()
-	return &schedFixture{servertest.RetroFixture(t, opts...)}
+	return &schedFixture{&mergetest.Fixture{SchedFixture: servertest.RetroFixture(t, opts...)}}
 }
 
 func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, agentTurn func(f *schedFixture, p *servertest.Turn, id string), cfgOpts ...func(*server.Config)) *schedFixture {
 	t.Helper()
-	f := &schedFixture{}
+	f := &schedFixture{Fixture: &mergetest.Fixture{}}
 	var inner func(*servertest.SchedFixture, *servertest.Turn, string)
 	if agentTurn != nil {
 		inner = func(_ *servertest.SchedFixture, p *servertest.Turn, id string) { agentTurn(f, p, id) }

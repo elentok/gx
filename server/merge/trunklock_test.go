@@ -108,7 +108,7 @@ func TestTrunkLock_AlreadyMergedEpicDoesNoGitWorkAndNotifiesOnce(t *testing.T) {
 	if got := waitForChat(count, epicMergedText); got != 1 {
 		t.Errorf("%q sent %d times, want once", epicMergedText, got)
 	}
-	f.assertStamps(t, true)
+	f.AssertStamps(t, true)
 }
 
 func TestTrunkLock_TrunkMovedBeforeTheFFPausesNeedsRebaseNotMergeFailed(t *testing.T) {
@@ -123,11 +123,11 @@ func TestTrunkLock_TrunkMovedBeforeTheFFPausesNeedsRebaseNotMergeFailed(t *testi
 		return history.MergeOutcome{}, errors.New("cannot lock ref 'refs/heads/main'")
 	})
 
-	ev := f.pauseRoot(t)
+	ev := f.PauseRoot(t)
 
 	if ev.Kind != "needs-rebase" || ev.Message != "needs rebase: "+schedEpic+" onto main; rebase it, then merge again" {
 		t.Errorf("pause = kind %q, reason %q, want a needs-rebase pause", ev.Kind, ev.Message)
 	}
-	f.assertRootQueued(t)
-	f.assertStamps(t, false)
+	f.AssertRootQueued(t)
+	f.AssertStamps(t, false)
 }

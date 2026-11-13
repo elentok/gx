@@ -97,9 +97,9 @@ var allowed = map[string]int{
 	"server/merge/latefinish_test.go":                                  1,
 	"server/limits/limithistory_codex_test.go":                         2, // settle wait for the event coalescer; received-at has second granularity
 	"server/epics/map_done_test.go":                                    1,
-	"server/merge/merge_finish_test.go":                                1,
+	"server/merge/mergeflows/merge_finish_test.go":                     1,
 	"server/merge/mergedecide_test.go":                                 3,
-	"server/merge/mergefork_test.go":                                   1,
+	"server/merge/mergeflows/mergefork_test.go":                        1,
 	"server/lifecycle/migrate_gate_test.go":                            1, // negative wait: a gate that leaks would have acted by now
 	"server/projects/migrate_test.go":                                  1, // negative wait: a step that ignored the gate would have run by now
 	"server/merge/missingtrunk_test.go":                                2,

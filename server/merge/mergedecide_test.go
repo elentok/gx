@@ -95,7 +95,7 @@ func TestMergeDecide_RepeatNeedsRebasePauseIsQuiet(t *testing.T) {
 		testutil.WriteFile(t, f.Repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.Repo, "main moves on")
 	}, rigs.WithEvolve(config.EvolveContributor), chat)
-	f.pauseRoot(t)
+	f.PauseRoot(t)
 	if got := waitForChat(count, epicNotMergedText); got != 1 {
 		t.Fatalf("%q sent %d times, want once", epicNotMergedText, got)
 	}

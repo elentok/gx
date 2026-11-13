@@ -1,4 +1,4 @@
-package merge_test
+package mergeflows_test
 
 import (
 	"context"
@@ -146,7 +146,7 @@ func completedUnmerged(ctx context.Context, t *testing.T, f *schedFixture) <-cha
 	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "proj:"+schedEpic)
-	f.assertStamps(t, false)
+	f.AssertStamps(t, false)
 	if f.rootQueued(t) {
 		t.Fatal("root still queued after completing with auto-ff-merge off")
 	}
@@ -174,7 +174,7 @@ func TestEpicMerge_FastForwardMergesDirectlyWithAutoFFMergeOff(t *testing.T) {
 	if got := f.Git(t, "rev-parse", "main"); got != f.Git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the feature branch tip", got)
 	}
-	f.assertStamps(t, true)
+	f.AssertStamps(t, true)
 	if f.rootQueued(t) {
 		t.Error("root queued after the direct merge")
 	}
@@ -383,8 +383,8 @@ func TestEpicMerge_DirtyTrunkPausesTheRootAndLeavesItQueued(t *testing.T) {
 	if ev.Kind != string(events.DirtyTrunk) {
 		t.Errorf("kind = %q, want %q (%s)", ev.Kind, events.DirtyTrunk, ev.Message)
 	}
-	f.assertRootQueued(t)
-	f.assertStamps(t, false)
+	f.AssertRootQueued(t)
+	f.AssertStamps(t, false)
 }
 
 // The root a merge re-queues pins no harness: its item has an empty agent, so
@@ -432,8 +432,8 @@ func TestEpicMerge_MergeErrorReturnsAMergeErrorPause(t *testing.T) {
 	if !strings.HasPrefix(res.Message, "merge failed: ") {
 		t.Errorf("message = %q, want a merge failure", res.Message)
 	}
-	f.assertRootQueued(t)
-	f.assertStamps(t, false)
+	f.AssertRootQueued(t)
+	f.AssertStamps(t, false)
 }
 
 // assertMergePaused checks the merge returned a pause of kind with a message.
@@ -492,7 +492,7 @@ func TestEpicMerge_TrunkMovingDuringTheMergeAtTheCapPauses(t *testing.T) {
 	if files := f.mergeTicketFiles(t); len(files) != 0 {
 		t.Errorf("forked merge tickets = %v, want none past the cap", files)
 	}
-	f.assertRootQueued(t)
+	f.AssertRootQueued(t)
 }
 
 // assertManualTicket checks the merge returned the one manual merge ticket.
@@ -530,7 +530,7 @@ func TestEpicMerge_NonFFForksAManualTicketWhoseFinishMergesTheEpic(t *testing.T)
 	if got := f.Git(t, "rev-parse", "main"); got != f.Git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the rebased feature branch tip", got)
 	}
-	f.assertStamps(t, true)
+	f.AssertStamps(t, true)
 	if f.rootQueued(t) {
 		t.Error("root still queued after the merge")
 	}
@@ -552,7 +552,7 @@ func TestEpicMerge_ForkingAManualTicketClearsTheStoredBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.assertManualTicket(t, res, "02")
-	if md := f.epicMD(t); strings.Contains(md, "land_block") {
+	if md := f.EpicMD(t); strings.Contains(md, "land_block") {
 		t.Errorf("fork left the block on the epic:\n%s", md)
 	}
 }
@@ -588,13 +588,13 @@ func TestEpicMerge_RetryTicketFinishingLastAfterTheManualOneStillMerges(t *testi
 	if got := f.Git(t, "rev-parse", "main"); got != f.Git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the rebased feature branch tip", got)
 	}
-	f.assertStamps(t, true)
+	f.AssertStamps(t, true)
 }
 
 func TestEpicMerge_ManualTicketResetsTheCapAndResumesTheRoot(t *testing.T) {
 	t.Parallel()
 	f := newForkFixtureWith(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), nil)
-	ev := f.pauseRoot(t)
+	ev := f.PauseRoot(t)
 	if ev.Kind != string(events.NeedsRebase) {
 		t.Fatalf("pause kind = %q (%s), want a needs-rebase pause", ev.Kind, ev.Message)
 	}
@@ -615,7 +615,7 @@ func TestEpicMerge_ManualTicketResetsTheCapAndResumesTheRoot(t *testing.T) {
 	if got := f.Git(t, "rev-parse", "main"); got != f.Git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the rebased feature branch tip", got)
 	}
-	f.assertStamps(t, true)
+	f.AssertStamps(t, true)
 	if f.rootQueued(t) {
 		t.Error("root still queued after the merge")
 	}

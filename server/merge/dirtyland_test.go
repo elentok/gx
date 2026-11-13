@@ -86,10 +86,10 @@ func TestDirtyLand_CleanRestoreLandsWithoutAPauseAndKeepsTheLocalContent(t *test
 	if got := f.read(t, "same.txt"); got != "same" {
 		t.Errorf("same.txt = %q", got)
 	}
-	if md := f.epicMD(t); strings.Contains(md, "land_block") {
+	if md := f.EpicMD(t); strings.Contains(md, "land_block") {
 		t.Errorf("a pause was stored:\n%s", md)
 	}
-	f.assertStamps(t, true)
+	f.AssertStamps(t, true)
 }
 
 func TestDirtyLand_BackupRefHoldsTheFilesAndRefsStashIsUntouched(t *testing.T) {
@@ -185,7 +185,7 @@ func TestDirtyLand_ConflictingRestoreStillPausesAndTouchesNothing(t *testing.T) 
 	f := dirtyLandFixture(t, true, nil)
 	main := f.Git(t, "rev-parse", "main")
 
-	ev := f.pauseRoot(t)
+	ev := f.PauseRoot(t)
 
 	if ev.Kind != string(events.DirtyTrunk) {
 		t.Errorf("kind = %q, want %q", ev.Kind, events.DirtyTrunk)

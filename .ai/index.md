@@ -224,6 +224,10 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   the `Reconciler` (parent-defect and late-finish scans the root registers as `OnRescan` steps),
   with `Routes()` for `epics/merge` and `epics/stash-merge`. The root implements its `Deps`; the
   merge guard's `closeAndWait` stays with the root's shutdown;
+  `server/merge/mergetest/` (`github.com/elentok/gx/server/merge/mergetest`) holds the shared fixture
+  helpers: `Fixture`, `PauseRoot`, `AssertRootQueued`, `EpicMD`, `AssertStamps`, `FinishCommitless`;
+  `server/merge/mergeflows/` (`github.com/elentok/gx/server/merge/mergeflows`) holds the end-to-end
+  merge tests;
   `server/epics/` holds the epic read models (ticket detail, epic list and detail, epic and design
   cards, map progress, recently finished) and the epic-state predicates, with `Routes()` for
   `tickets/detail`, `epics` and `epics/detail`. The root implements its `Deps`;

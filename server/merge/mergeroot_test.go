@@ -3,7 +3,6 @@ package merge_test
 import (
 	"context"
 	"github.com/elentok/gx/server/wire"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -117,31 +116,6 @@ func TestMergeRoot_NeedsRebasePausesTheRootWithoutRebasing(t *testing.T) {
 	}
 }
 
-// epicMD is the epic's ticket.md, read after the root settled.
-func (f *schedFixture) epicMD(t *testing.T) string {
-	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(f.Store, "proj", schedEpic, "ticket.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(raw)
-}
-
-// assertStamps checks completed_at is stamped and merged_at is stamped only when wantMerged.
-func (f *schedFixture) assertStamps(t *testing.T, wantMerged bool) {
-	t.Helper()
-	md := f.epicMD(t)
-	if !strings.Contains(md, "completed_at:") {
-		t.Errorf("epic ticket.md has no completed_at:\n%s", md)
-	}
-	if got := strings.Contains(md, "merged_at:"); got != wantMerged {
-		t.Errorf("epic ticket.md has merged_at = %v, want %v:\n%s", got, wantMerged, md)
-	}
-	if !strings.Contains(md, "status:") {
-		t.Errorf("epic ticket.md lost its other keys:\n%s", md)
-	}
-}
-
 func TestMergeRoot_StampsCompletedAtWhenAutoMergeIsOff(t *testing.T) {
 	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
@@ -153,7 +127,7 @@ func TestMergeRoot_StampsCompletedAtWhenAutoMergeIsOff(t *testing.T) {
 	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
-	f.assertStamps(t, false)
+	f.AssertStamps(t, false)
 }
 
 func TestMergeRoot_StampsMergedAtAndCompletedAtWhenTheEpicMerges(t *testing.T) {
@@ -166,15 +140,7 @@ func TestMergeRoot_StampsMergedAtAndCompletedAtWhenTheEpicMerges(t *testing.T) {
 	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
-	f.assertStamps(t, true)
-}
-
-// finishCommitless is the agent's turn for a ticket that needs no commit.
-func (f *schedFixture) finishCommitless(t *testing.T, id string) {
-	t.Helper()
-	path := f.TicketFile(t, id)
-	body := strings.Replace(servertest.ReadFile(t, path), "---\n", "---\ncommitless: true\niteration_status: finished\n", 1)
-	testutil.WriteFile(t, filepath.Dir(path), filepath.Base(path), body)
+	f.AssertStamps(t, true)
 }
 
 func TestMergeRoot_NothingToMergeStampsBothRegardlessOfAutoFFMerge(t *testing.T) {
@@ -182,7 +148,7 @@ func TestMergeRoot_NothingToMergeStampsBothRegardlessOfAutoFFMerge(t *testing.T)
 	for name, autoMerge := range map[string]bool{"on": true, "off": false} {
 		t.Run(name, func(t *testing.T) {
 			f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, _ *servertest.Turn, id string) {
-				f.finishCommitless(t, id)
+				f.FinishCommitless(t, id)
 			})
 			if !autoMerge {
 				servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
@@ -193,7 +159,7 @@ func TestMergeRoot_NothingToMergeStampsBothRegardlessOfAutoFFMerge(t *testing.T)
 			evs := f.QueueEpic(ctx, t, "01")
 			servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
-			f.assertStamps(t, true)
+			f.AssertStamps(t, true)
 			if got := f.Git(t, "rev-parse", "main"); got != main {
 				t.Errorf("main moved to %s, want it untouched at %s", got, main)
 			}
@@ -204,7 +170,7 @@ func TestMergeRoot_NothingToMergeStampsBothRegardlessOfAutoFFMerge(t *testing.T)
 func TestMergeRoot_NothingToMergeLeavesAnEpicWithAPRUnmerged(t *testing.T) {
 	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, _ *servertest.Turn, id string) {
-		f.finishCommitless(t, id)
+		f.FinishCommitless(t, id)
 	})
 	if err := tickets.StampEpicFields(filepath.Join(f.Store, "proj", schedEpic), map[string]any{"pr_number": 5, "pr_url": "https://github.com/o/r/pull/5"}); err != nil {
 		t.Fatal(err)
@@ -215,7 +181,7 @@ func TestMergeRoot_NothingToMergeLeavesAnEpicWithAPRUnmerged(t *testing.T) {
 	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
-	f.assertStamps(t, false)
+	f.AssertStamps(t, false)
 }
 
 func TestMergeRoot_StampsOnlyCompletedAtWhenTheMergePauses(t *testing.T) {
@@ -230,5 +196,5 @@ func TestMergeRoot_StampsOnlyCompletedAtWhenTheMergePauses(t *testing.T) {
 	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootPaused, "")
 
-	f.assertStamps(t, false)
+	f.AssertStamps(t, false)
 }

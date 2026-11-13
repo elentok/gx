@@ -15,46 +15,6 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-// pauseRoot runs the epic to its root pause, failing on an iteration-failed on
-// the way, and returns the pause event.
-func (f *schedFixture) pauseRoot(t *testing.T) wire.Event {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	evs := f.QueueEpic(ctx, t, "01")
-	for {
-		select {
-		case ev, open := <-evs:
-			if !open {
-				t.Fatal("event stream ended before root-paused")
-			}
-			switch ev.Type {
-			case wire.EventIterationFailed:
-				t.Fatalf("iteration-failed on a merge error: %+v", ev)
-			case wire.EventRootPaused:
-				return ev
-			}
-		case <-ctx.Done():
-			t.Fatalf("no root-paused: %v", ctx.Err())
-		}
-	}
-}
-
-// assertRootQueued checks the paused root was not dequeued.
-func (f *schedFixture) assertRootQueued(t *testing.T) {
-	t.Helper()
-	q, err := f.H.Client.Queue.Items(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range q {
-		if e.Address == "proj:"+schedEpic+"/01" {
-			return
-		}
-	}
-	t.Errorf("root dequeued: %+v", q)
-}
-
 // commitFiles is the agent's turn committing every name as a file.
 func commitFiles(t *testing.T, p *servertest.Turn, names ...string) {
 	t.Helper()
@@ -77,7 +37,7 @@ func TestMergeError_DirtyTrunkPausesTheRootWithACappedFileList(t *testing.T) {
 	}, chat)
 	main := f.Git(t, "rev-parse", "main")
 
-	ev := f.pauseRoot(t)
+	ev := f.PauseRoot(t)
 
 	if ev.Kind != string(events.DirtyTrunk) {
 		t.Errorf("kind = %q, want %q", ev.Kind, events.DirtyTrunk)
@@ -90,8 +50,8 @@ func TestMergeError_DirtyTrunkPausesTheRootWithACappedFileList(t *testing.T) {
 	if got := f.Git(t, "rev-parse", "main"); got != main {
 		t.Errorf("main moved to %s", got)
 	}
-	f.assertRootQueued(t)
-	f.assertStamps(t, false)
+	f.AssertRootQueued(t)
+	f.AssertStamps(t, false)
 	if got := waitForChat(count, "clash with a.txt"); got != 1 {
 		t.Errorf("pause sent %d times, want once", got)
 	}
@@ -108,7 +68,7 @@ func TestMergeError_DirtyTrunkNamesOnlyTheClashingFiles(t *testing.T) {
 		testutil.WriteFile(t, f.Repo, "unrelated.txt", "local")
 	})
 
-	ev := f.pauseRoot(t)
+	ev := f.PauseRoot(t)
 
 	want := fmt.Sprintf("uncommitted changes on main (%s) clash with clash.txt; commit or discard them, then merge again", f.Repo)
 	if ev.Kind != string(events.DirtyTrunk) || ev.Message != want {
@@ -135,7 +95,7 @@ func TestMergeError_DirtyTrunkListsNewDirectoryFilesAndBothRenamePaths(t *testin
 		testutil.WriteFile(t, f.Repo, "new.txt", "local")
 	})
 
-	ev := f.pauseRoot(t)
+	ev := f.PauseRoot(t)
 
 	want := fmt.Sprintf("uncommitted changes on main (%s) clash with new.txt, newdir/x.txt; commit or discard them, then merge again", f.Repo)
 	if ev.Message != want {
@@ -162,9 +122,9 @@ func dirtyTrunkFixture(t *testing.T) (f *schedFixture, clean func()) {
 func TestMergeError_PauseStoresKindAndReasonUntilALaterMergeClearsThem(t *testing.T) {
 	t.Parallel()
 	f, clean := dirtyTrunkFixture(t)
-	ev := f.pauseRoot(t)
+	ev := f.PauseRoot(t)
 
-	md := f.epicMD(t)
+	md := f.EpicMD(t)
 	if !strings.Contains(md, "land_block_kind: "+string(events.DirtyTrunk)) || !strings.Contains(md, "land_block_reason:") {
 		t.Errorf("pause not stored on the epic:\n%s", md)
 	}
@@ -177,7 +137,7 @@ func TestMergeError_PauseStoresKindAndReasonUntilALaterMergeClearsThem(t *testin
 	if err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v", res, err)
 	}
-	if md := f.epicMD(t); strings.Contains(md, "land_block") {
+	if md := f.EpicMD(t); strings.Contains(md, "land_block") {
 		t.Errorf("merge left the block on the epic:\n%s", md)
 	}
 }
@@ -191,9 +151,9 @@ func TestMergeError_DirtyTrunkStoresTheFullFileListAndForksNoInvestigation(t *te
 			testutil.WriteFile(t, f.Repo, n, "local "+n)
 		}
 	})
-	f.pauseRoot(t)
+	f.PauseRoot(t)
 
-	md := f.epicMD(t)
+	md := f.EpicMD(t)
 	for _, n := range files {
 		if !strings.Contains(md, "- "+n+"\n") {
 			t.Errorf("land_block_files lacks %s:\n%s", n, md)
@@ -213,13 +173,13 @@ func TestMergeError_DirtyTrunkStoresTheFullFileListAndForksNoInvestigation(t *te
 func TestMergeError_MergeAgainPausesWithAFreshListThenLandsOnceClean(t *testing.T) {
 	t.Parallel()
 	f, clean := dirtyTrunkFixture(t)
-	f.pauseRoot(t)
+	f.PauseRoot(t)
 
 	res, err := f.H.Client.Tickets.EpicMerge(context.Background(), "proj:"+schedEpic)
 	if err != nil || !res.Paused || res.PauseKind != string(events.DirtyTrunk) {
 		t.Fatalf("merge again = %+v, %v; want a dirty-trunk pause", res, err)
 	}
-	if md := f.epicMD(t); strings.Count(md, "land_block_kind") != 1 || !strings.Contains(md, "- a.txt\n") {
+	if md := f.EpicMD(t); strings.Count(md, "land_block_kind") != 1 || !strings.Contains(md, "- a.txt\n") {
 		t.Errorf("pause not rewritten once:\n%s", md)
 	}
 
@@ -228,7 +188,7 @@ func TestMergeError_MergeAgainPausesWithAFreshListThenLandsOnceClean(t *testing.
 	if err != nil || !res.Merged {
 		t.Fatalf("merge after cleaning = %+v, %v", res, err)
 	}
-	if md := f.epicMD(t); strings.Contains(md, "land_block") {
+	if md := f.EpicMD(t); strings.Contains(md, "land_block") {
 		t.Errorf("landing left the block on the epic:\n%s", md)
 	}
 }
@@ -236,7 +196,7 @@ func TestMergeError_MergeAgainPausesWithAFreshListThenLandsOnceClean(t *testing.
 func TestMergeError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
 	t.Parallel()
 	f, _ := dirtyTrunkFixture(t)
-	f.pauseRoot(t)
+	f.PauseRoot(t)
 
 	servertest.SetProjectRepoNoAutoMerge(t, f.Store, "proj", f.Repo)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -251,7 +211,7 @@ func TestMergeError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
 	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
-	if md := f.epicMD(t); strings.Contains(md, "land_block") {
+	if md := f.EpicMD(t); strings.Contains(md, "land_block") {
 		t.Errorf("default-path finish left the block on the epic:\n%s", md)
 	}
 }
@@ -279,7 +239,7 @@ func TestMergeError_OtherGitFailurePausesMergeFailed(t *testing.T) {
 		}
 	})
 
-	ev := f.pauseRoot(t)
+	ev := f.PauseRoot(t)
 
 	if ev.Kind != string(events.MergeError) {
 		t.Errorf("kind = %q, want %q", ev.Kind, events.MergeError)
@@ -288,6 +248,6 @@ func TestMergeError_OtherGitFailurePausesMergeFailed(t *testing.T) {
 		!strings.HasSuffix(ev.Message, "; fix it, then merge again") {
 		t.Errorf("reason = %q", ev.Message)
 	}
-	f.assertRootQueued(t)
-	f.assertStamps(t, false)
+	f.AssertRootQueued(t)
+	f.AssertStamps(t, false)
 }

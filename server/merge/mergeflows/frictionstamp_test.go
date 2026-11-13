@@ -1,4 +1,4 @@
-package merge_test
+package mergeflows_test
 
 import (
 	"testing"

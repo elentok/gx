@@ -1,4 +1,4 @@
-package merge_test
+package mergeflows_test
 
 import (
 	"context"
@@ -111,7 +111,7 @@ func TestWorktreeRemoval_FastForwardMergeRemovesTheWorktreeAndKeepsTheBranch(t *
 	defer cancel()
 	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
-	f.assertStamps(t, true)
+	f.AssertStamps(t, true)
 
 	f.settle(t)
 	f.assertWorktreeRemoved(t)
@@ -120,13 +120,13 @@ func TestWorktreeRemoval_FastForwardMergeRemovesTheWorktreeAndKeepsTheBranch(t *
 func TestWorktreeRemoval_NothingToMergeRemovesTheWorktree(t *testing.T) {
 	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, _ *servertest.Turn, id string) {
-		f.finishCommitless(t, id)
+		f.FinishCommitless(t, id)
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.QueueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
-	f.assertStamps(t, true)
+	f.AssertStamps(t, true)
 
 	f.settle(t)
 	f.assertWorktreeRemoved(t)
@@ -194,8 +194,8 @@ func TestWorktreeRemoval_QueuedRootKeepsTheWorktree(t *testing.T) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.Repo, id+".txt", "local")
 	})
-	f.pauseRoot(t)
-	f.assertRootQueued(t)
+	f.PauseRoot(t)
+	f.AssertRootQueued(t)
 	f.stampMergedByHand(t)
 
 	f.H.Server.Reconciler().RemoveMergedWorktreeSettled("proj", schedEpic)

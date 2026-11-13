@@ -48,7 +48,7 @@ func stashMergeFixtureWith(t *testing.T, conflictTurn func(f *schedFixture, p *s
 	if err := os.WriteFile(filepath.Join(f.Store, "proj", "waiter", "ticket.md"), []byte(waiterMD), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	f.pauseRoot(t)
+	f.PauseRoot(t)
 	return f
 }
 
@@ -167,10 +167,10 @@ func TestStashMerge_RecordsTheBackupOnTheRootAndTheRunLogAndKeepsTheRootUnmerged
 	if !epic.MergedAt.IsZero() || !epic.CompletedAt.IsZero() {
 		t.Errorf("merged_at %v, completed_at %v, want both unset", epic.MergedAt, epic.CompletedAt)
 	}
-	if md := f.epicMD(t); strings.Contains(md, "land_block") {
+	if md := f.EpicMD(t); strings.Contains(md, "land_block") {
 		t.Errorf("the dirty-trunk pause is still stored:\n%s", md)
 	}
-	f.assertRootQueued(t)
+	f.AssertRootQueued(t)
 
 	log, _, err := runlog.ReadEvents(filepath.Join(f.Store, "proj"), schedEpic)
 	if err != nil {
