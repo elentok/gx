@@ -97,10 +97,7 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo => ({
 })
 
 describe("chord table x", () => {
-  const x = chordTable(
-    () => {},
-    () => {},
-  ).find((c) => c.key === "x")!
+  const x = chordTable({ remove: () => {}, rename: () => {} }).find((c) => c.key === "x")!
   const page = "/agents/s-a"
 
   it("is available for a chat session, labelled Remove chat", () => {
@@ -125,7 +122,7 @@ describe("chord table x", () => {
   })
   it("calls the handed-in remove opener and is danger", () => {
     const remove = vi.fn()
-    const row = chordTable(remove, () => {}).find((c) => c.key === "x")!
+    const row = chordTable({ remove, rename: () => {} }).find((c) => c.key === "x")!
     row.run()
     expect(remove).toHaveBeenCalledOnce()
     expect(row.danger).toBe(true)
@@ -134,10 +131,7 @@ describe("chord table x", () => {
 
 describe("chord table c and d", () => {
   it("are always available with their labels", () => {
-    const t = chordTable(
-      () => {},
-      () => {},
-    )
+    const t = chordTable({ remove: () => {}, rename: () => {} })
     expect(t.map((c) => [c.key, c.label({ path: "/" }), c.available({ path: "/" })])).toEqual([
       ["c", "New chat", true],
       ["d", "New design", true],
@@ -150,7 +144,7 @@ describe("chord table c and d", () => {
 
 describe("chord table r", () => {
   const rename = vi.fn()
-  const r = chordTable(() => {}, rename).find((c) => c.key === "r")!
+  const r = chordTable({ remove: () => {}, rename }).find((c) => c.key === "r")!
   const page = "/agents/s-a"
 
   it("is available on a chat's page", () => {

@@ -7,8 +7,8 @@ import type { SessionInfo } from "../generated/server"
 import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu"
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
 import { useWide } from "../useWide"
-import { openRename } from "../shell/renameOpen"
-import { isChat, postRemoveSession, type RemoveSession } from "./sessionWrites"
+import { renameEntry } from "../shell/renameOpen"
+import { postRemoveSession, type RemoveSession } from "./sessionWrites"
 import { useSessionManage } from "./useSessionManage"
 
 /** The "⋯" menu: the Agent block, plus Stop (while live) and Remove for a session a person manages. */
@@ -64,10 +64,7 @@ export function SessionActions({
     ])
   }
   // Rename goes here and not in useSessionManage, which the Workspaces menu also uses.
-  const renameItem: MenuEntry[] = isChat(session)
-    ? [{ value: "rename", label: "Rename", onSelect: () => openRename({ session }) }]
-    : []
-  const manageItems = [...renameItem, ...manage.items]
+  const manageItems = [...renameEntry(session), ...manage.items]
   if (manageItems.length > 0) groups.push(manageItems)
   // A queue session with no tier, model or effort has nothing to put in the menu.
   if (groups.length === 0) return null

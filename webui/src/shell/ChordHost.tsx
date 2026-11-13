@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useLocation, useNavigate } from "react-router"
+import { useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { leaderKeyOf } from "../leaderKey"
 import { hasLayer } from "../ui/modal/layers"
 import { ChordBox } from "./ChordBox"
-import { agentIdOf, chordTable, letterOf, matchesKey, type Chord } from "./chords"
+import { chordTable, letterOf, matchesKey, useOpenChat, type Chord } from "./chords"
 import { openRemoveConfirm } from "./removeConfirmOpen"
 import { openRename } from "./renameOpen"
 
@@ -24,12 +24,10 @@ function useLatest<T>(value: T) {
  * `chords` replaces the real table (tests pass their own).
  */
 export function ChordHost({ chords }: { chords?: Chord[] }) {
-  const { pathname } = useLocation()
   const navigate = useNavigate()
   const { snapshot } = useConnectionState(useConnectionContext())
   const leader = leaderKeyOf(snapshot)
-  const sessionId = agentIdOf(pathname)
-  const session = sessionId ? snapshot?.sessions?.find((s) => s.id === sessionId) : undefined
+  const { path: pathname, session } = useOpenChat()
   const ctx = useMemo(() => ({ path: pathname, session }), [pathname, session])
 
   const [open, setOpen] = useState(false)
@@ -44,16 +42,16 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
   const table = useMemo(
     () =>
       chords ??
-      chordTable(
-        () => {
+      chordTable({
+        remove: () => {
           const { session: s, navigate: nav } = live.current
           if (s) openRemoveConfirm({ session: s, onRemoved: () => nav("/agents") })
         },
-        () => {
+        rename: () => {
           const { session: s } = live.current
           if (s) openRename({ session: s })
         },
-      ),
+      }),
     [chords],
   )
   const tableRef = useLatest(table)

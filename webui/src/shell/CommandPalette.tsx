@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react"
 import { useCallback, useEffect, useMemo, useRef } from "react"
-import { useLocation, useNavigate } from "react-router"
+import { useNavigate } from "react-router"
 import { toggleAfk } from "../afk"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { useEpicList } from "../epics/list"
@@ -9,7 +9,7 @@ import { jumpHref, Menu, type ListSection } from "../nav/JumpMenu"
 import { isMac } from "../platform"
 import { useWide } from "../useWide"
 import { setCommandOpen, useCommandOpen } from "./commandOpen"
-import { agentIdOf, canRename } from "./chords"
+import { canRename, useOpenChat } from "./chords"
 import { openNewAgent, openNewDesign } from "./newItemOpen"
 import { nextQuestion } from "./nextQuestion"
 import { openRename } from "./renameOpen"
@@ -32,9 +32,7 @@ function useCommands(): Command[] {
   const snapshot = useConnectionState(useConnectionContext()).snapshot
   const afk = snapshot?.afk ?? false
   const { list } = useEpicList()
-  const { pathname } = useLocation()
-  const sessionId = agentIdOf(pathname)
-  const session = sessionId ? snapshot?.sessions?.find((s) => s.id === sessionId) : undefined
+  const { path: pathname, session } = useOpenChat()
   const workspace = shell?.workspace || undefined
   const { next, count } = useMemo(
     () =>

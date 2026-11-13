@@ -1,4 +1,6 @@
+import { useLocation } from "react-router"
 import { canManage, isChat } from "../agents/sessionWrites"
+import { useConnectionContext, useConnectionState } from "../connection"
 import type { SessionInfo } from "../generated/server"
 import { isMac } from "../platform"
 import { focusSidebar } from "./focusSidebar"
@@ -86,8 +88,23 @@ const canRemove = (ctx: ChordContext) =>
 export const canRename = (ctx: ChordContext) =>
   agentIdOf(ctx.path) !== undefined && ctx.session !== undefined && isChat(ctx.session)
 
+/** The path and the session of the open `/agents/:id` page. `session` is undefined off that page. */
+export function useOpenChat(): { path: string; session: SessionInfo | undefined } {
+  const { pathname } = useLocation()
+  const { snapshot } = useConnectionState(useConnectionContext())
+  const id = agentIdOf(pathname)
+  const session = id ? snapshot?.sessions?.find((s) => s.id === id) : undefined
+  return { path: pathname, session }
+}
+
 /** The chord table. `remove` and `rename` are the popup openers, handed in so this module does not depend on them. */
-export function chordTable(remove: () => void, rename: () => void): Chord[] {
+export function chordTable({
+  remove,
+  rename,
+}: {
+  remove: () => void
+  rename: () => void
+}): Chord[] {
   return [
     { key: "c", label: () => "New chat", run: openNewAgent, available: () => true },
     { key: "d", label: () => "New design", run: openNewDesign, available: () => true },

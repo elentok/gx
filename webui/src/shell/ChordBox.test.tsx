@@ -56,10 +56,7 @@ test("lists the real chord table", () => {
     <ChordBox
       leader="cmd+e"
       ctx={ctx}
-      chords={chordTable(
-        () => {},
-        () => {},
-      )}
+      chords={chordTable({ remove: () => {}, rename: () => {} })}
       onClose={() => {}}
     />,
   )

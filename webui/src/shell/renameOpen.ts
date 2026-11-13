@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react"
+import { isChat } from "../agents/sessionWrites"
 import type { SessionInfo } from "../generated/server"
+import type { MenuEntry } from "../ui/menu/Menu"
 import type { RenameSession } from "../design/open"
 
 export type RenameRequest = {
@@ -20,6 +22,12 @@ function set(next: RenameRequest) {
 
 export const openRename = (open: NonNullable<RenameRequest>) => set(open)
 export const closeRename = () => set(null)
+
+/** The Rename menu item both chat menus share: empty unless the session is a chat. */
+export function renameEntry(session: SessionInfo | undefined): MenuEntry[] {
+  if (!session || !isChat(session)) return []
+  return [{ value: "rename", label: "Rename", onSelect: () => openRename({ session }) }]
+}
 
 export function useRenameRequest(): RenameRequest {
   return useSyncExternalStore(
