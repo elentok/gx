@@ -636,6 +636,44 @@ export const galleryEntries: GalleryEntry[] = [
               total_tokens: 1_840_000,
               estimated_cost: 4.72,
               compactions: 2,
+              first_context: 24_000,
+              peak_context: 115_000,
+              scope: "conversation",
+              main_tokens: 1_400_000,
+              subagent_tokens: 440_000,
+              totals: {
+                input_tokens: 140_000,
+                cache_read_tokens: 1_500_000,
+                cache_creation_tokens: 100_000,
+                output_tokens: 100_000,
+              },
+            }}
+          />
+        ),
+      },
+      {
+        label: "Codex after compaction",
+        node: (
+          <ContextBadge
+            tokens={180_000}
+            level="orange"
+            ceiling={200_000}
+            usage={{
+              input_tokens: 20_000,
+              cache_read_tokens: 160_000,
+              total_tokens: 2_400_000,
+              first_context: 30_000,
+              peak_context: 180_000,
+              model_context_window: 475_000,
+              scope: "thread",
+              context_stale: true,
+              compactions: 1,
+              totals: {
+                input_tokens: 300_000,
+                cache_read_tokens: 2_000_000,
+                output_tokens: 100_000,
+                reasoning_tokens: 60_000,
+              },
             }}
           />
         ),

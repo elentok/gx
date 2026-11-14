@@ -2898,8 +2898,7 @@ export interface SessionInfo {
 }
 /**
  * SessionUsage is the token accounting shown beside an interactive session's
- * composer. The three context fields add up to ContextTokens for Claude. Codex
- * reports only TotalTokens.
+ * composer. The three context fields are disjoint request-input categories.
  */
 export interface SessionUsage {
   input_tokens?: number /* int */;
@@ -2908,6 +2907,28 @@ export interface SessionUsage {
   total_tokens: number /* int64 */;
   estimated_cost?: number /* float64 */;
   compactions?: number /* int */;
+  first_context?: number /* int */;
+  peak_context?: number /* int */;
+  context_stale?: boolean;
+  model_context_window?: number /* int */;
+  /**
+   * Scope is "conversation" for Claude including subagents, or "thread" for Codex.
+   */
+  scope?: string;
+  main_tokens?: number /* int64 */;
+  subagent_tokens?: number /* int64 */;
+  totals?: SessionTokenTotals;
+}
+/**
+ * SessionTokenTotals has disjoint input categories. Reasoning is a subset of output.
+ * Pointers preserve the difference between an unreported field and a reported zero.
+ */
+export interface SessionTokenTotals {
+  input_tokens?: number /* int64 */;
+  cache_read_tokens?: number /* int64 */;
+  cache_creation_tokens?: number /* int64 */;
+  output_tokens?: number /* int64 */;
+  reasoning_tokens?: number /* int64 */;
 }
 /**
  * SessionStatus is a Session status.

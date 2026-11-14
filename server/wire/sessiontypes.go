@@ -88,8 +88,7 @@ type SessionInfo struct {
 }
 
 // SessionUsage is the token accounting shown beside an interactive session's
-// composer. The three context fields add up to ContextTokens for Claude. Codex
-// reports only TotalTokens.
+// composer. The three context fields are disjoint request-input categories.
 type SessionUsage struct {
 	InputTokens         int      `json:"input_tokens,omitempty"`
 	CacheReadTokens     int      `json:"cache_read_tokens,omitempty"`
@@ -97,6 +96,25 @@ type SessionUsage struct {
 	TotalTokens         int64    `json:"total_tokens"`
 	EstimatedCost       *float64 `json:"estimated_cost,omitempty"`
 	Compactions         int      `json:"compactions,omitempty"`
+	FirstContext        int      `json:"first_context,omitempty"`
+	PeakContext         int      `json:"peak_context,omitempty"`
+	ContextStale        bool     `json:"context_stale,omitempty"`
+	ModelContextWindow  int      `json:"model_context_window,omitempty"`
+	// Scope is "conversation" for Claude including subagents, or "thread" for Codex.
+	Scope          string              `json:"scope,omitempty"`
+	MainTokens     *int64              `json:"main_tokens,omitempty"`
+	SubagentTokens *int64              `json:"subagent_tokens,omitempty"`
+	Totals         *SessionTokenTotals `json:"totals,omitempty"`
+}
+
+// SessionTokenTotals has disjoint input categories. Reasoning is a subset of output.
+// Pointers preserve the difference between an unreported field and a reported zero.
+type SessionTokenTotals struct {
+	InputTokens         *int64 `json:"input_tokens,omitempty"`
+	CacheReadTokens     *int64 `json:"cache_read_tokens,omitempty"`
+	CacheCreationTokens *int64 `json:"cache_creation_tokens,omitempty"`
+	OutputTokens        *int64 `json:"output_tokens,omitempty"`
+	ReasoningTokens     *int64 `json:"reasoning_tokens,omitempty"`
 }
 
 // SessionStatus is a Session status.

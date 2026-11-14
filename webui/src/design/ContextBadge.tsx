@@ -1,6 +1,7 @@
 import { Box, chakra, Flex, Grid, Popover, Portal, Text } from "@chakra-ui/react"
 import type { SessionInfo, SessionUsage } from "../generated/server"
 import type { Tone } from "../ui/tone"
+import { ContextDetails, UsageDetails } from "./ContextDetails"
 
 type ContextLevel = NonNullable<SessionInfo["context_level"]>
 
@@ -14,12 +15,6 @@ const LEVEL_TONE: Record<ContextLevel, Tone> = {
 const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 })
 const kilo = (n: number) => `${Math.round(n / 1000)}K`
 const tokens = (n: number) => compact.format(n)
-const money = (n: number) =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-  }).format(n)
 
 const RING = 14
 const STROKE = 2.5
@@ -103,37 +98,6 @@ function ContextSplit({
   )
 }
 
-function UsageFooter({ usage }: { usage: SessionUsage }) {
-  return (
-    <Flex
-      borderTopWidth="1px"
-      borderColor="border"
-      mt="3"
-      pt="2"
-      gap="2"
-      justify="space-between"
-      flexWrap="wrap"
-    >
-      <Text whiteSpace="nowrap">
-        <chakra.span fontFamily="mono" fontWeight="700">
-          {tokens(usage.total_tokens)}
-        </chakra.span>{" "}
-        <chakra.span color="text.dim">total tokens</chakra.span>
-      </Text>
-      <Flex gap="2" color="text.dim" flexWrap="wrap">
-        {usage.estimated_cost != null ? (
-          <Text whiteSpace="nowrap">≈{money(usage.estimated_cost)}</Text>
-        ) : null}
-        {(usage.compactions ?? 0) > 0 ? (
-          <Text whiteSpace="nowrap">
-            {usage.compactions} {usage.compactions === 1 ? "compaction" : "compactions"}
-          </Text>
-        ) : null}
-      </Flex>
-    </Flex>
-  )
-}
-
 export function ContextBadge({
   tokens: used,
   level,
@@ -149,7 +113,11 @@ export function ContextBadge({
   const fill = Math.min(1, Math.max(0, used / ceiling))
   const percent = Math.round((used / ceiling) * 100)
   return (
-    <Popover.Root positioning={{ placement: "top-end", gutter: 8 }} lazyMount unmountOnExit>
+    <Popover.Root
+      positioning={{ placement: "top-end", gutter: 8, fitViewport: true, overflowPadding: 8 }}
+      lazyMount
+      unmountOnExit
+    >
       <Popover.Trigger asChild>
         <chakra.button
           type="button"
@@ -184,11 +152,13 @@ export function ContextBadge({
             boxSizing="border-box"
             w="80"
             maxW="calc(100vw - 2rem)"
+            maxH="min(calc(100dvh - 2rem), var(--available-height))"
+            overflowY="auto"
             p="3"
             fontSize="xs"
           >
             <Flex justify="space-between" align="baseline">
-              <Text fontWeight="700">Context</Text>
+              <Text fontWeight="700">Latest request input</Text>
               <Text color={`tone.${tone}.fg`} fontFamily="mono" fontWeight="600">
                 {percent}%
               </Text>
@@ -200,7 +170,8 @@ export function ContextBadge({
               <Text color="text.dim">of {kilo(ceiling)} smart zone</Text>
             </Flex>
             <ContextSplit usage={usage} ceiling={ceiling} used={used} />
-            {usage ? <UsageFooter usage={usage} /> : null}
+            <ContextDetails usage={usage} used={used} ceiling={ceiling} />
+            {usage ? <UsageDetails usage={usage} /> : null}
           </Popover.Content>
         </Popover.Positioner>
       </Portal>

@@ -113,8 +113,8 @@ type Chat struct {
 	// codexContext caches the context tokens of each rollout's newest token_count.
 	codexContext FileCache[int]
 	// claudeTotals and codexTotals cache cumulative usage for the composer popover.
-	claudeTotals FileCache[metrics.TranscriptUsage]
-	codexTotals  FileCache[int64]
+	claudeTotals FileCache[metrics.TranscriptFileUsage]
+	codexTotals  FileCache[codexsession.ContextUsage]
 	// codexQuestions caches the open question tool call of each rollout.
 	codexQuestions FileCache[codexQuestionRead]
 	// rolloutPath replaces codexsession.RolloutPathIn; tests count lookups with it.

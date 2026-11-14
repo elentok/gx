@@ -8,7 +8,6 @@ import (
 
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/transcript"
 )
@@ -106,54 +105,6 @@ func (c *Chat) ReportedCodex(m Meta) (codexsession.TurnModel, int) {
 		c.log.Warn("read codex context tokens", "session", m.ID, "err", err)
 	}
 	return codexsession.TurnModel{Model: cmp.Or(turn.Model, m.Model), Effort: cmp.Or(turn.Effort, m.Effort)}, tokens
-}
-
-// ConversationUsage returns the current conversation's context split and
-// cumulative usage. It reads through file caches, so unchanged transcripts do
-// not get parsed again while session rows refresh.
-func (c *Chat) ConversationUsage(m Meta) *wire.SessionUsage {
-	path, _, ok := c.Transcript(m.ID, m)
-	if !ok {
-		return nil
-	}
-	if m.Harness == string(harness.Codex) {
-		total, err := c.codexTotals.Read(path, func(p string) (int64, error) {
-			total, _, err := codexsession.ReadTotalTokens(p)
-			return total, err
-		})
-		if err != nil || total == 0 {
-			return nil
-		}
-		return &wire.SessionUsage{TotalTokens: total}
-	}
-	if m.Harness != string(harness.Claude) {
-		return nil
-	}
-	current, err := c.reportedUsage.Read(path, func(p string) (transcript.Usage, error) {
-		usage, _, err := transcript.LastAssistantReading(p)
-		return usage, err
-	})
-	if err != nil {
-		c.log.Warn("read context split", "session", m.ID, "err", err)
-		return nil
-	}
-	totals, err := c.claudeTotals.Read(path, func(p string) (metrics.TranscriptUsage, error) {
-		usage, _, err := metrics.ReadTranscriptUsage(p)
-		return usage, err
-	})
-	if err != nil {
-		c.log.Warn("read conversation usage", "session", m.ID, "err", err)
-		return nil
-	}
-	cost := totals.Cost
-	return &wire.SessionUsage{
-		InputTokens:         current.InputTokens,
-		CacheReadTokens:     current.CacheReadInputTokens,
-		CacheCreationTokens: current.CacheCreationInputTokens,
-		TotalTokens:         totals.TotalTokens,
-		EstimatedCost:       &cost,
-		Compactions:         totals.Compactions,
-	}
 }
 
 // ModelSwitched reports that the model shown is not the one the launch tier

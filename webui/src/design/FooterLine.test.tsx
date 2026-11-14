@@ -52,19 +52,20 @@ test("the badge shows whole thousands and opens context details", async () => {
   expect(badge()!.textContent).toBe("70K")
   fireEvent.click(badge()!)
   const details = await screen.findByRole("dialog", { name: "Context usage" })
-  expect(details.textContent).toContain("Context35%")
+  expect(details.textContent).toContain("Latest request input35%")
   expect(details.textContent).toContain("70Kof 200K smart zone")
   expect(details.textContent).not.toContain("headroom")
   expect(details.textContent).not.toContain("over smart zone")
   expect(details.textContent).not.toContain("Used")
 })
 
-test("the popover reports usage above the smart zone without a remaining-token line", async () => {
+test("the popover reports usage above the smart zone with zero remaining", async () => {
   render(session({ context_tokens: 185_375, context_level: "red" }), { ceiling: 130_000 })
   fireEvent.click(badge()!)
   const details = await screen.findByRole("dialog", { name: "Context usage" })
   expect(details.textContent).toContain("143%")
   expect(details.textContent).toContain("185Kof 130K smart zone")
+  expect(details.textContent).toContain("Remaining to smart zone0")
   expect(details.textContent).not.toContain("headroom")
   expect(details.textContent).not.toContain("over smart zone")
 })
@@ -105,6 +106,70 @@ test("Codex total tokens render without an estimated cost", async () => {
   expect(details.getByText("300K")).toBeTruthy()
   expect(details.getByText("total tokens")).toBeTruthy()
   expect(details.queryByText(/\$/)).toBeNull()
+})
+
+test("Codex details distinguish context, cumulative subsets, and stale readings", async () => {
+  render(
+    session({
+      context_tokens: 70_000,
+      context_level: "green",
+      usage: {
+        total_tokens: 300_000,
+        first_context: 20_000,
+        peak_context: 90_000,
+        model_context_window: 475_000,
+        scope: "thread",
+        context_stale: true,
+        compactions: 1,
+        totals: {
+          input_tokens: 80_000,
+          cache_read_tokens: 200_000,
+          output_tokens: 20_000,
+          reasoning_tokens: 10_000,
+        },
+      },
+    }),
+  )
+  fireEvent.click(badge()!)
+  const details = within(await screen.findByRole("dialog", { name: "Context usage" }))
+  for (const label of [
+    "First request",
+    "Peak request",
+    "Remaining to smart zone",
+    "Reported model capacity",
+    "This thread only",
+    "Reasoning, included in output",
+    "1 compaction",
+  ]) {
+    expect(details.getByText(label)).toBeTruthy()
+  }
+  expect(details.getByRole("status").textContent).toContain("Waiting for a new request reading")
+  expect(details.queryByText("Cache writes")).toBeNull()
+  expect(details.queryByText("Subagents")).toBeNull()
+})
+
+test("Claude details show main and subagent accounting including a reported zero", async () => {
+  render(
+    session({
+      context_tokens: 70_000,
+      context_level: "green",
+      usage: {
+        total_tokens: 300_000,
+        scope: "conversation",
+        main_tokens: 300_000,
+        subagent_tokens: 0,
+        totals: { input_tokens: 0, output_tokens: 50_000 },
+      },
+    }),
+  )
+  fireEvent.click(badge()!)
+  const details = within(await screen.findByRole("dialog", { name: "Context usage" }))
+  expect(details.getByText("Conversation, including subagents")).toBeTruthy()
+  expect(details.getByText("Main agent")).toBeTruthy()
+  expect(details.getByText("Subagents")).toBeTruthy()
+  expect(details.getByText("Uncached input")).toBeTruthy()
+  expect(details.queryByText("First request")).toBeNull()
+  expect(details.queryByText("Reported model capacity")).toBeNull()
 })
 
 test("each level maps to its own colour", () => {
