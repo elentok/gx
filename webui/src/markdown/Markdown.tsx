@@ -5,12 +5,34 @@ import remarkGfm from "remark-gfm"
 import { FileLink } from "../files/FileLink"
 import { useFileLinks, useFoundFile } from "../files/FileLinkContext"
 import { detectPaths } from "../files/paths"
+import { rawUrl } from "../files/rawUrl"
 import { remarkFileCandidates } from "../files/remarkCandidates"
 
 const inlineElements = ["strong", "em", "del", "code", "a", "span"]
 
 const remarkPlugins = [remarkGfm]
 const remarkPluginsWithFiles = [remarkGfm, remarkFileCandidates]
+
+const hasScheme = /^[a-z][a-z0-9+.-]*:/i
+
+/** The absolute path of a relative `src` next to `file`, or undefined for anything else. */
+function resolveRelative(file: string, src: string): string | undefined {
+  if (
+    !src ||
+    src.startsWith("/") ||
+    src.startsWith("#") ||
+    src.startsWith("~/") ||
+    hasScheme.test(src)
+  ) {
+    return undefined
+  }
+  const parts = file.split("/").slice(0, -1)
+  for (const seg of decode(src.split(/[?#]/)[0]).split("/")) {
+    if (seg === "..") parts.pop()
+    else if (seg !== "." && seg !== "") parts.push(seg)
+  }
+  return parts.join("/") || "/"
+}
 
 const siblingTicketLink = /^(?:issues\/)?(\d+)-[^/]*\.md$/
 
@@ -29,7 +51,10 @@ function FileTarget({ href, children }: { href: string; children?: ReactNode }) 
   const hash = target.indexOf("#")
   const pathPart = hash < 0 ? target : target.slice(0, hash)
   const heading = hash < 0 ? undefined : target.slice(hash + 1) || undefined
-  const hit = pathPart ? detectPaths(pathPart, { wholeText: true })[0] : undefined
+  const hit =
+    pathPart && !hasScheme.test(pathPart)
+      ? detectPaths(pathPart, { wholeText: true })[0]
+      : undefined
   const found = useFoundFile(hit?.path)
   if (!pathPart) {
     if (!ctx?.file || !heading) return <>{children}</>
@@ -89,6 +114,12 @@ function buildComponents(epic: string | undefined, files: boolean): Components {
     },
   }
   if (files) {
+    components.img = function MarkdownImage({ node: _node, src, alt }) {
+      const ctx = useFileLinks()
+      const abs = ctx?.file && typeof src === "string" ? resolveRelative(ctx.file, src) : undefined
+      if (!abs) return <img src={src} alt={alt} />
+      return <img src={rawUrl(abs)} alt={alt} />
+    }
     components.span = function MarkdownSpan({ node: _node, children, ...rest }) {
       const c = candidateProps(rest)
       if (!c) return <span {...rest}>{children}</span>

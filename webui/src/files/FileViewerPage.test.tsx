@@ -35,7 +35,11 @@ const found = (path: string): HostedResolved => ({
 // Never started, so it touches no network.
 const idleConnection = createConnection({ fetchSnapshot: () => new Promise(() => {}) })
 
-function renderAt(route: string, fileResolve: FetchFileResolve, fileText?: FetchFileText) {
+function renderAt(
+  route: string,
+  fileResolve: FetchFileResolve,
+  fileText: FetchFileText = async () => "# Hello",
+) {
   const router = createMemoryRouter(appRoutes({ fileResolve, fileText }), {
     initialEntries: [route],
   })
@@ -53,7 +57,7 @@ test("a found file shows path, meta, buttons and the neutral note", async () => 
   expect(await screen.findByText("/Users/me/my notes.md")).toBeTruthy()
   expect(resolve).toHaveBeenCalledWith("/Users/me/my notes.md")
   expect(screen.getByText("3.1 KB · 2m ago")).toBeTruthy()
-  expect(screen.getByText("No preview yet")).toBeTruthy()
+  expect(await screen.findByRole("heading", { name: "Hello" })).toBeTruthy()
   const raw = screen.getByRole("link", { name: "Raw" })
   expect(raw.getAttribute("href")).toBe("/v1/files/Users/me/my%20notes.md")
   expect(raw.getAttribute("target")).toBe("_blank")
@@ -113,7 +117,23 @@ test("a failed resolve shows an error with Retry, not not-found", async () => {
   expect(await screen.findByText("Could not load file")).toBeTruthy()
   expect(screen.queryByText("File not found")).toBeNull()
   fireEvent.click(screen.getByRole("button", { name: "Retry" }))
-  expect(await screen.findByText("No preview yet")).toBeTruthy()
+  expect(await screen.findByRole("heading", { name: "Hello" })).toBeTruthy()
+})
+
+test("a Markdown file opens rendered; Source toggles raw text with no refetch or URL change", async () => {
+  const fetchText = vi.fn(async () => "# Hello\n\nsome *words*")
+  const resolve = vi.fn(async (p: string) => found(p))
+  const router = renderAt("/files/Users/me/a.md", resolve, fetchText)
+  expect(await screen.findByRole("heading", { name: "Hello" })).toBeTruthy()
+  const before = router.state.location.pathname + router.state.location.search
+  fireEvent.click(screen.getByRole("button", { name: "Source" }))
+  expect(screen.queryByRole("heading", { name: "Hello" })).toBeNull()
+  expect(document.body.textContent).toContain("some *words*")
+  fireEvent.click(screen.getByRole("button", { name: "Source" }))
+  expect(await screen.findByRole("heading", { name: "Hello" })).toBeTruthy()
+  expect(fetchText).toHaveBeenCalledTimes(1)
+  expect(resolve).toHaveBeenCalledTimes(1)
+  expect(router.state.location.pathname + router.state.location.search).toBe(before)
 })
 
 const withKind = (p: string, kind: HostedResolved["kind"], size = 1000): HostedResolved => ({

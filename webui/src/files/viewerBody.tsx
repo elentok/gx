@@ -3,6 +3,7 @@ import {
   HostedKindBinary,
   HostedKindCode,
   HostedKindImage,
+  HostedKindMarkdown,
   HostedKindPDF,
   HostedKindSVG,
   HostedKindText,
@@ -11,7 +12,9 @@ import {
 import { Spinner } from "../ui/spinner/Spinner"
 import { CodeView } from "./CodeView"
 import { languageOf } from "./language"
+import { MarkdownView } from "./MarkdownView"
 import { rawUrl } from "./rawUrl"
+import type { FileResolver } from "./resolve"
 
 /** Files over this size show no preview. The hover card reuses it. */
 export const MAX_PREVIEW_BYTES = 2 * 1024 * 1024
@@ -54,9 +57,14 @@ export function ViewerBody({
   path,
   text,
   line,
+  source = false,
+  resolver,
   onImageLoad,
   onImageError,
 }: {
+  /** Markdown only: show the raw text instead of the rendered file. */
+  source?: boolean
+  resolver?: FileResolver
   file: HostedResolved
   path: string
   /** The file text of a code or text file; undefined while it loads. */
@@ -80,6 +88,10 @@ export function ViewerBody({
         />
       </Box>
     )
+  }
+  if (file.kind === HostedKindMarkdown) {
+    if (text === undefined) return <Spinner label="Loading file" />
+    return <MarkdownView path={path} text={text} source={source} resolver={resolver} />
   }
   if (file.kind === HostedKindCode || file.kind === HostedKindText) {
     if (text === undefined) return <Spinner label="Loading file" />

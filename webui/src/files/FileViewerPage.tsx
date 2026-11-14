@@ -3,7 +3,13 @@ import { useEffect, useState } from "react"
 import { useParams, useSearchParams } from "react-router"
 import { copyText } from "../clipboard"
 import { formatAge } from "../epics/cardTime"
-import { HostedFound, HostedKindCode, HostedKindText, type HostedResolved } from "../generated/ops"
+import {
+  HostedFound,
+  HostedKindCode,
+  HostedKindMarkdown,
+  HostedKindText,
+  type HostedResolved,
+} from "../generated/ops"
 import { sizeText } from "../health/formatBytes"
 import { DetailPage } from "../page/DetailPage"
 import { Button } from "../ui/button/Button"
@@ -55,7 +61,18 @@ async function copyViewerLink(path: string) {
   )
 }
 
-function Bar({ path, meta, found }: { path: string; meta: string; found: boolean }) {
+function Bar({
+  path,
+  meta,
+  found,
+  source,
+}: {
+  path: string
+  meta: string
+  found: boolean
+  /** Markdown only: the Source toggle. */
+  source?: { on: boolean; toggle: () => void }
+}) {
   return (
     <Box
       data-testid="viewer-bar"
@@ -75,6 +92,17 @@ function Bar({ path, meta, found }: { path: string; meta: string; found: boolean
         <Text fontSize="12px" color="text.muted">
           {meta}
         </Text>
+      )}
+      {source && (
+        <Button
+          emphasis="secondary"
+          size="sm"
+          data-mock-part="source-toggle"
+          aria-pressed={source.on}
+          onClick={source.toggle}
+        >
+          Source
+        </Button>
       )}
       {found && (
         <>
@@ -105,7 +133,9 @@ function NotFound() {
 }
 
 function isTextKind(file: HostedResolved): boolean {
-  return (file.kind === HostedKindCode || file.kind === HostedKindText) && !previewNote(file)
+  const text =
+    file.kind === HostedKindCode || file.kind === HostedKindText || file.kind === HostedKindMarkdown
+  return text && !previewNote(file)
 }
 
 /** The file text of a code or text file, kept out of the page cache. */
@@ -138,6 +168,7 @@ function FoundView({
 }) {
   const [pixels, setPixels] = useState("")
   const [imageFailed, setImageFailed] = useState(false)
+  const [showSource, setShowSource] = useState(false)
   const body = useFileText(path, isTextKind(file), fetchText)
   if (imageFailed || body.missing) {
     return (
@@ -150,12 +181,22 @@ function FoundView({
   const meta = [metaText(file), pixels].filter(Boolean).join(" · ")
   return (
     <>
-      <Bar path={path} meta={meta} found />
+      <Bar
+        path={path}
+        meta={meta}
+        found
+        source={
+          file.kind === HostedKindMarkdown && isTextKind(file)
+            ? { on: showSource, toggle: () => setShowSource((s) => !s) }
+            : undefined
+        }
+      />
       <ViewerBody
         file={file}
         path={path}
         text={body.text}
         line={line}
+        source={showSource}
         onImageLoad={(w, h) => setPixels(`${w}×${h}`)}
         onImageError={() => setImageFailed(true)}
       />
