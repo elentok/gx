@@ -13,6 +13,8 @@ export type ResolveBase = { session?: string; project?: string; dir?: string }
 export type ResolveOptions = {
   /** The session has a new message: candidates that were missing are asked again. */
   recheckMissing?: boolean
+  /** Ask the server again even for candidates cached as found. */
+  fresh?: boolean
 }
 
 export type FileResolver = {
@@ -62,7 +64,8 @@ export function createResolver(
 
   return {
     async resolve(candidates, options = {}) {
-      if (options.recheckMissing) for (const c of candidates) missing.delete(c)
+      if (options.recheckMissing || options.fresh) for (const c of candidates) missing.delete(c)
+      if (options.fresh) for (const c of candidates) found.delete(c)
       const todo = [...new Set(candidates)].filter((c) => !found.has(c) && !missing.has(c))
       const calls: Promise<void>[] = []
       for (let i = 0; i < todo.length; i += MaxHostedCandidates) {

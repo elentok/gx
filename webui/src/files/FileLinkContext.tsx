@@ -18,7 +18,12 @@ export type FileLinkContextValue = {
   verdict(candidate: string): HostedResolved | undefined
   /** True for a canonical path marked missing after it was found. */
   isMissing(path: string): boolean
+  /** Marks a path missing: its links dim and every card says "File not found". */
   markMissing(path: string): void
+  /** The found verdict whose canonical path is `path`. */
+  byPath(path: string): HostedResolved | undefined
+  /** Asks the server once more about one canonical path; a missing verdict marks it missing. */
+  recheck(path: string): Promise<void>
   /** The file the page shows, for fragment-only links. */
   file?: string
 }
@@ -100,15 +105,31 @@ export function FileLinkProvider({
     ask(again, true)
   }, [recheckKey, ask])
 
+  const markMissing = useCallback(
+    (path: string) => setMissing((prev) => (prev.has(path) ? prev : new Set(prev).add(path))),
+    [],
+  )
+  const recheck = useCallback(
+    async (path: string) => {
+      const got = await active.resolve([path], { fresh: true })
+      const r = got.get(path)
+      if (r?.verdict === "missing") markMissing(path)
+    },
+    [active, markMissing],
+  )
+
   const value = useMemo<FileLinkContextValue>(
     () => ({
       register,
       verdict: (candidate) => verdicts.get(candidate),
       isMissing: (path) => missing.has(path),
-      markMissing: (path) => setMissing((prev) => new Set(prev).add(path)),
+      markMissing,
+      byPath: (path) =>
+        [...verdicts.values()].find((r) => r.verdict === HostedFound && r.path === path),
+      recheck,
       file,
     }),
-    [register, verdicts, missing, file],
+    [register, verdicts, missing, markMissing, recheck, file],
   )
   return <FileLinkCtx.Provider value={value}>{children}</FileLinkCtx.Provider>
 }
