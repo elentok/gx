@@ -58,6 +58,18 @@ type Sample struct {
 	PresentationDelay *float64 `json:"presentation_delay,omitempty"`
 	Action            string   `json:"action,omitempty"`
 	WorstChunk        string   `json:"worst_chunk,omitempty"`
+	InteractionType   string   `json:"interaction_type,omitempty"`
+	WorstFrame        *float64 `json:"worst_frame,omitempty"`
+
+	LCPLoadDelay    *float64 `json:"lcp_load_delay,omitempty"`
+	LCPLoadDuration *float64 `json:"lcp_load_duration,omitempty"`
+	LCPRenderDelay  *float64 `json:"lcp_render_delay,omitempty"`
+
+	// Outcome is ready, error or empty; Trigger is how a route span began;
+	// DataSource is cache or network. Set on route and app readiness samples.
+	Outcome    string `json:"outcome,omitempty"`
+	Trigger    string `json:"trigger,omitempty"`
+	DataSource string `json:"data_source,omitempty"`
 }
 
 // Store is a handle on the day files. Safe for concurrent use.

@@ -63,6 +63,7 @@ import (
 	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tokenledger"
+	"github.com/elentok/gx/webperf"
 )
 
 const (
@@ -127,6 +128,7 @@ type Server struct {
 	oneOffs    *queue.OneOffs
 	budget     *budget.Budget
 	tokens     *tokenledger.Ledger
+	webPerf    *webperf.Store
 	limits     *limits.Limits
 	stats      *stats.Stats
 	tips       *tips.Tips
@@ -271,6 +273,15 @@ func New(cfg Config) (*Server, error) {
 		lock.Release()
 		return nil, fmt.Errorf("load token ledger: %w", err)
 	}
+	clock := cfg.Clock
+	if clock == nil {
+		clock = time.Now
+	}
+	webPerf, err := webperf.Open(cfg.StateDir, clock)
+	if err != nil {
+		lock.Release()
+		return nil, fmt.Errorf("open web performance store: %w", err)
+	}
 	sock := SocketPath(cfg.StateDir)
 	// We hold the lock, so any socket file is stale from a crashed server.
 	_ = os.Remove(sock)
@@ -317,6 +328,7 @@ func New(cfg Config) (*Server, error) {
 
 		workspaces: wsStore,
 		tokens:     tokens,
+		webPerf:    webPerf,
 		events:     events,
 		guards:     runs.NewGuards(),
 
@@ -736,6 +748,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	stopCommits()
 	recordShutdown("chat-close")
 	s.chat.Close()
+	s.webPerf.Close()
 	_ = os.Remove(SocketPath(s.cfg.StateDir))
 	s.log.Info("server stopped")
 	_ = s.logf.Close()

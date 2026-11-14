@@ -10,12 +10,14 @@ import (
 
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/webperf"
 )
 
 type fakeHost struct{ routes []wire.Route }
 
 func (h fakeHost) Settings() *settings.Settings { return &settings.Settings{} }
 func (h fakeHost) Routes() []wire.Route         { return h.routes }
+func (h fakeHost) WebPerf() *webperf.Store      { return nil }
 
 func tagHandler(tag string) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(tag)) }

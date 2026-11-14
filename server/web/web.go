@@ -22,6 +22,7 @@ import (
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/webperf"
 	"github.com/elentok/gx/webui"
 )
 
@@ -37,6 +38,7 @@ type Config struct {
 type Host interface {
 	Settings() *settings.Settings
 	Routes() []wire.Route
+	WebPerf() *webperf.Store
 }
 
 // Web owns the web listener and its login gate. After Bind, nothing writes its
@@ -46,16 +48,17 @@ type Web struct {
 	log  *slog.Logger
 	host Host
 
-	built    http.Handler                 // the embedded files
-	ui       atomic.Pointer[http.Handler] // the handler in force for non-API GETs
-	ln       net.Listener                 // nil unless Config.Addr is set and bound
-	srv      *http.Server
-	err      string        // why the bind failed
-	listenIP net.IP        // nil when the listener binds every interface
-	certs    *webtls.Certs // nil unless the listener is bound
-	auth     *webauth.Gate // nil unless the listener is bound
-	streams  streams
-	errs     ipLimiter
+	built     http.Handler                 // the embedded files
+	ui        atomic.Pointer[http.Handler] // the handler in force for non-API GETs
+	ln        net.Listener                 // nil unless Config.Addr is set and bound
+	srv       *http.Server
+	err       string        // why the bind failed
+	listenIP  net.IP        // nil when the listener binds every interface
+	certs     *webtls.Certs // nil unless the listener is bound
+	auth      *webauth.Gate // nil unless the listener is bound
+	streams   streams
+	errs      ipLimiter
+	perfLimit ipLimiter
 }
 
 // New makes a Web that is off until Bind opens the listener.

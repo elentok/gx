@@ -34,6 +34,7 @@ func Routes(web func() *Web) []wire.Route {
 		{Pattern: "POST /v1/web/login-revoke", Handler: call((*Web).LoginRevoke)},
 		{Pattern: "POST /v1/web/set-password", Handler: call((*Web).SetPassword)},
 		{Pattern: "POST /v1/client-errors", Web: wire.WebPublic, WebHandler: call((*Web).clientErrorReport)},
+		{Pattern: "POST /v1/web-performance", Web: wire.WebWrite, WebHandler: call((*Web).webPerfReport)},
 	}
 }
 
