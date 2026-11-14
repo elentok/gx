@@ -309,7 +309,20 @@ const manageCase = (label: string, step: (root: HTMLElement) => boolean) => ({
     <ConnectionContext.Provider value={connection}>
       <Frame w="800px" h="460px">
         <Drive step={step}>
-          <ManageWorkspaces workspaces={workspaces} onClose={() => {}} />
+          <ManageWorkspaces
+            workspaces={workspaces}
+            drafts={[
+              {
+                id: "d2",
+                label: "Landing page",
+                project: "p",
+                slug: "",
+                edited_at: "2026-05-01T10:00:00Z",
+                workspace: "Work",
+              },
+            ]}
+            onClose={() => {}}
+          />
         </Drive>
       </Frame>
     </ConnectionContext.Provider>

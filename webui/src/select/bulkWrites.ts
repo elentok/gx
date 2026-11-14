@@ -1,5 +1,12 @@
+import { deleteDraft, type DeleteDraft } from "../design/drafts"
 import { postTargetsTo, rowToken } from "../design/open"
-import { TargetDone, type SessionInfo, type TargetResult } from "../generated/server"
+import {
+  TargetDone,
+  TargetFailed,
+  TargetRefused,
+  type SessionInfo,
+  type TargetResult,
+} from "../generated/server"
 import { showToast } from "../ui/toaster"
 import { WriteError } from "../useWrite"
 
@@ -71,6 +78,30 @@ export async function unarchiveWithToasts(
 
 export const bulkStop = (sessions: SessionInfo[]) =>
   postSessions("/v1/sessions/stop", sessions, false)
+
+/** One draft Remove per row, reported as target results keyed by the row so one refusal does not hide the others. */
+export async function bulkRemoveDrafts(
+  drafts: { key: string; id: string }[],
+  remove: DeleteDraft = deleteDraft,
+): Promise<TargetResult[]> {
+  return Promise.all(
+    drafts.map(async ({ key, id }): Promise<TargetResult> => {
+      try {
+        const res = await remove(id)
+        // A draft already gone (or started) is as removed as one this call removed.
+        return res.kind === "deleted" || res.kind === "gone"
+          ? { target: key, status: TargetDone }
+          : { target: key, status: TargetRefused, message: "The draft changed. Try again." }
+      } catch (err) {
+        return {
+          target: key,
+          status: TargetFailed,
+          message: err instanceof WriteError ? err.message : "Could not reach gx. Try again.",
+        }
+      }
+    }),
+  )
+}
 
 /** Remove confirms with yes: the server stops a live session first. */
 export const bulkRemove = (sessions: SessionInfo[]) =>

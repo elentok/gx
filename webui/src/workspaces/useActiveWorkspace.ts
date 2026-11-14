@@ -2,19 +2,21 @@ import { useCallback, useEffect, useState } from "react"
 import { useLocation } from "react-router"
 import { useConnectionState, type Connection } from "../connection"
 import { useEpicList, type FetchEpicList } from "../epics/list"
-import type { Workspace, SessionPlacement } from "../generated/server"
+import type { DesignDraftRow, Workspace, SessionPlacement } from "../generated/server"
 import { readStoredWorkspace, resolveActive, routePending, writeStoredWorkspace } from "./active"
 
 /** The ordered workspaces, the session placements and the total Needs-you count of the connection snapshot. */
 export function useWorkspaces(conn: Connection): {
   workspaces: Workspace[]
   placements: SessionPlacement[]
+  drafts: DesignDraftRow[]
   needsYouTotal: number
 } {
   const snapshot = useConnectionState(conn).snapshot
   return {
     workspaces: snapshot?.workspaces ?? [],
     placements: snapshot?.placements ?? [],
+    drafts: snapshot?.design_drafts ?? [],
     needsYouTotal: snapshot?.needs_you_total ?? 0,
   }
 }
@@ -24,7 +26,7 @@ export function useActiveWorkspace(
   conn: Connection,
   fetcher?: FetchEpicList,
 ): { active: string; resolved: boolean; setActive: (name: string) => void } {
-  const { workspaces, placements } = useWorkspaces(conn)
+  const { workspaces, placements, drafts } = useWorkspaces(conn)
   const { list } = useEpicList(fetcher, conn)
   const route = useLocation().pathname
   const [stored, setStored] = useState(readStoredWorkspace)
@@ -34,10 +36,17 @@ export function useActiveWorkspace(
   // The open item's workspace wins only for a route not yet applied; after that a pick (stored) wins.
   const [appliedRoute, setAppliedRoute] = useState<string | null>(null)
   // A route whose agent placement has not arrived stays pending, so it is applied once it does.
-  const routePendingNow = routePending({ route, placements })
+  const routePendingNow = routePending({ route, placements, drafts })
   const routeIsNew = route !== appliedRoute && !routePendingNow
   const active = loaded
-    ? resolveActive({ route: routeIsNew ? route : "", rows, placements, workspaces, stored })
+    ? resolveActive({
+        route: routeIsNew ? route : "",
+        rows,
+        placements,
+        drafts,
+        workspaces,
+        stored,
+      })
     : (stored ?? "")
 
   // Persist what resolved, so an opened item's workspace sticks and a vanished one falls back to Default at once.

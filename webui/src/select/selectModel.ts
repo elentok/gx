@@ -26,7 +26,9 @@ export const SELECT_ACTIONS: SelectAction[] = [
 export interface SelectRow {
   /** A row's address, or the session id of an agent row. */
   key: string
-  kind: "epic" | "design" | "chat" | "agent" | "archived"
+  kind: "epic" | "design" | "chat" | "draft" | "agent" | "archived"
+  /** A draft row's id, which the draft Remove write takes; its `key` is the workspace membership key. */
+  draftId?: string
   /** False while the row is in a collapsed section. */
   visible: boolean
   /** False on a Queue agent row. */
@@ -84,7 +86,9 @@ type Verdict = string | undefined
 /** undefined fits; a string is the reason the row is skipped. */
 const RULES: Record<SelectAction, (r: SelectRow) => Verdict> = {
   move: (r) =>
-    r.kind === "epic" || r.kind === "design" || r.kind === "chat" ? undefined : "can't be moved",
+    r.kind === "epic" || r.kind === "design" || r.kind === "chat" || r.kind === "draft"
+      ? undefined
+      : "can't be moved",
   hold: (r) => {
     if (r.kind !== "epic" && r.kind !== "design") return "can't be held"
     if (r.queued) return "queued"
@@ -97,6 +101,7 @@ const RULES: Record<SelectAction, (r: SelectRow) => Verdict> = {
     return isExited(r.session) ? "not live" : undefined
   },
   remove: (r) => {
+    if (r.kind === "draft") return undefined
     if (!r.session) return "not an agent"
     return canManage(r.session) ? undefined : "managed by the queue"
   },

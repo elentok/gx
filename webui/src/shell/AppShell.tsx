@@ -183,7 +183,7 @@ export function AppShell({
     onClose: () => hasLayer() || shell.close(),
   })
   const { snapshot, connected } = useConnectionState(conn)
-  const { workspaces } = useWorkspaces(conn)
+  const { workspaces, drafts } = useWorkspaces(conn)
   useShortcuts({ fetcher: fetchEpicList, active, setActive })
   useDevToast()
   const [newWorkspace, setNewWorkspace] = useState(false)
@@ -338,6 +338,7 @@ export function AppShell({
                 {manageWorkspaces && (
                   <ManageWorkspaces
                     workspaces={workspaces}
+                    drafts={drafts}
                     onClose={() => setManageWorkspaces(false)}
                   />
                 )}

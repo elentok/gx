@@ -1,5 +1,6 @@
 import {
   SectionOnHold,
+  type DesignDraftRow,
   type EpicListRow,
   type SessionPlacement,
   type Workspace,
@@ -29,6 +30,8 @@ export interface ResolveInput {
   route: string
   rows: EpicListRow[]
   placements: SessionPlacement[]
+  /** The snapshot's draft rows; missing reads as none. */
+  drafts?: DesignDraftRow[]
   workspaces: Workspace[]
   stored: string | null
 }
@@ -43,10 +46,12 @@ function epicWorkspace(rows: EpicListRow[], address: string): string | null {
   return row.workspace || null
 }
 
-function itemWorkspace({ route, rows, placements }: ResolveInput): string | null {
+function itemWorkspace({ route, rows, placements, drafts = [] }: ResolveInput): string | null {
   const [, kind, ...rest] = route.split("/")
   const id = decodeURIComponent(rest.join("/"))
   switch (kind) {
+    case "drafts":
+      return drafts.find((d) => d.id === id)?.workspace || null
     case "d":
     case "e":
       return epicWorkspace(rows, id)
@@ -63,15 +68,18 @@ function itemWorkspace({ route, rows, placements }: ResolveInput): string | null
   }
 }
 
-/** An agent route whose placement the snapshot does not know yet (a just-started agent): not found, unlike found without a workspace. */
+/** An agent or draft route the snapshot does not know yet (a just-started agent, a just-created draft): not found, unlike found without a workspace. */
 export function routePending({
   route,
   placements,
-}: Pick<ResolveInput, "route" | "placements">): boolean {
+  drafts = [],
+}: Pick<ResolveInput, "route" | "placements" | "drafts">): boolean {
   const [, kind, ...rest] = route.split("/")
-  if (kind !== "agents") return false
   const id = decodeURIComponent(rest.join("/"))
-  return id !== "" && !placements.some((x) => x.session === id)
+  if (id === "") return false
+  if (kind === "agents") return !placements.some((x) => x.session === id)
+  if (kind === "drafts") return !drafts.some((d) => d.id === id)
+  return false
 }
 
 /** The active workspace: the open item's, else the stored one, and Default when that is gone. */

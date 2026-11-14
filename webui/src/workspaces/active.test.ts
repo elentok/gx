@@ -71,6 +71,26 @@ describe("resolveActive", () => {
   test("nothing stored resolves to Default", () => expect(resolve("/stats", null)).toBe("Main"))
 })
 
+describe("draft routes", () => {
+  const drafts = [
+    { id: "d1", label: "Landing", project: "p", slug: "", edited_at: "", workspace: "Ops" },
+    { id: "d2", label: "Gone", project: "p", slug: "", edited_at: "", workspace: "Deleted" },
+  ]
+  const resolveDraft = (route: string) =>
+    resolveActive({ route, rows, placements, drafts, workspaces, stored: "Main" })
+
+  test("a draft in another workspace resolves to it", () =>
+    expect(resolveDraft("/drafts/d1")).toBe("Ops"))
+  test("a draft in a deleted workspace falls back to Default", () =>
+    expect(resolveDraft("/drafts/d2")).toBe("Main"))
+  test("an unknown draft id stays pending and does not move the stored workspace", () => {
+    expect(routePending({ route: "/drafts/new", placements, drafts })).toBe(true)
+    expect(resolveDraft("/drafts/new")).toBe("Main")
+  })
+  test("a known draft is not pending", () =>
+    expect(routePending({ route: "/drafts/d1", placements, drafts })).toBe(false))
+})
+
 describe("routePending", () => {
   const pending = (route: string) => routePending({ route, placements })
   test("an agent the snapshot does not know is pending", () =>

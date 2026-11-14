@@ -1,6 +1,11 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { useState } from "react"
-import type { Workspace, WorkspaceRequest, WorkspaceResult } from "../generated/server"
+import type {
+  DesignDraftRow,
+  Workspace,
+  WorkspaceRequest,
+  WorkspaceResult,
+} from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { Modal } from "../ui/modal/Modal"
 import { refusalText, useWrite } from "../useWrite"
@@ -18,6 +23,15 @@ export const postWorkspaceWriters: WorkspaceWriters = {
   rename: (name, to) => post("rename", { name, to }),
   remove: (name) => post("delete", { name }),
   reorder: (order) => post("reorder", { name: "", order }),
+}
+
+/** `, including the draft "A"` or `, including the drafts "A" and "B"`; nothing when there is none. */
+function draftsClause(drafts: DesignDraftRow[]): string {
+  if (drafts.length === 0) return ""
+  const names = drafts.map((d) => `"${d.label}"`)
+  const list =
+    names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
+  return `, including the ${drafts.length === 1 ? "draft" : "drafts"} ${list}`
 }
 
 const problemText = (
@@ -169,10 +183,13 @@ function Row({
 /** Rename, reorder and delete workspaces. The list is the snapshot's, so every accepted write shows once the server's event arrives. */
 export function ManageWorkspaces({
   workspaces,
+  drafts = [],
   writers = postWorkspaceWriters,
   onClose,
 }: {
   workspaces: Workspace[]
+  /** The snapshot's draft rows, so the delete question can name the drafts that move. */
+  drafts?: DesignDraftRow[]
   writers?: WorkspaceWriters
   onClose: () => void
 }) {
@@ -237,7 +254,7 @@ export function ManageWorkspaces({
           <Text>
             {target.members === 0
               ? `Delete ${target.name}? It has no items.`
-              : `Delete ${target.name}? Its ${target.members} ${target.members === 1 ? "item goes" : "items go"} back to the Default workspace.`}
+              : `Delete ${target.name}? Its ${target.members} ${target.members === 1 ? "item goes" : "items go"} back to the Default workspace${draftsClause(drafts.filter((d) => d.workspace === target.name))}.`}
           </Text>
           <Box display="flex" gap="2" justifyContent="flex-end">
             <Button emphasis="secondary" onClick={() => setDeleting(undefined)} autoFocus>

@@ -9,6 +9,7 @@ import {
   bulkHold,
   bulkMove,
   bulkRemove,
+  bulkRemoveDrafts,
   bulkStop,
   bulkUnhold,
   unarchiveWithToasts,
@@ -30,11 +31,18 @@ import type { SelectApi } from "./SidebarSelect"
 
 const BUSY_TOAST = "bulk-action-busy"
 
+/** A selected draft: its row key (the name lookup) and the id its Remove takes. */
+interface DraftTarget {
+  key: string
+  id: string
+}
+
 const SIDEBAR_ACTIONS: SelectAction[] = ["move", "hold", "unhold", "stop", "remove", "archive"]
 
 /** The question a bulk action is waiting on. Each kind carries the view it opened from, so confirming runs that same view. */
 type Confirm =
-  | { kind: "stop" | "remove"; view: ActionView; sessions: SessionInfo[] }
+  | { kind: "stop"; view: ActionView; sessions: SessionInfo[] }
+  | { kind: "remove"; view: ActionView; sessions: SessionInfo[]; drafts: DraftTarget[] }
   | { kind: "hold"; view: ActionView; keys: string[]; sessions: string[] }
   /** An archive dry run: the rows that would run and the ones it refused. */
   | { kind: "archive"; view: ActionView; fits: TargetResult[]; refused: TargetResult[] }
@@ -185,14 +193,24 @@ export function SidebarBulkActions({
 
   // Stop asks once, listing the rows; Exited rows were already skipped "not live" by the fit.
   // Remove asks once and says which rows are live.
-  const ask = (kind: "stop" | "remove", v: ActionView) =>
-    setConfirm({ kind, view: v, sessions: sessionsOf(v.fit.fits) })
+  const draftsOf = (keys: string[]): DraftTarget[] =>
+    keys.flatMap((key) => {
+      const id = sel.rows.find((r) => r.key === key)?.draftId
+      return id ? [{ key, id }] : []
+    })
 
   const onClick: Partial<Record<SelectAction, (v: ActionView) => void>> = {
     hold: (v) => void hold(v),
     unhold: (v) => void run(v, () => bulkUnhold(v.fit.fits)),
-    stop: (v) => ask("stop", v),
-    remove: (v) => ask("remove", v),
+    stop: (v) => setConfirm({ kind: "stop", view: v, sessions: sessionsOf(v.fit.fits) }),
+    // Remove always asks, even for one empty draft: a selection is deliberate.
+    remove: (v) =>
+      setConfirm({
+        kind: "remove",
+        view: v,
+        sessions: sessionsOf(v.fit.fits),
+        drafts: draftsOf(v.fit.fits),
+      }),
     archive: (v) => void archive(v),
     unarchive: (v) => void run(v, () => unarchiveWithToasts(v.fit.fits, sel.nameOf)),
   }
@@ -230,16 +248,28 @@ export function SidebarBulkActions({
             confirmLabel="Remove"
             tone="paused"
             onCancel={close}
-            onConfirm={() => confirmed(c.view, () => bulkRemove(c.sessions))}
+            onConfirm={() =>
+              confirmed(c.view, async () => [
+                ...(c.sessions.length > 0 ? await bulkRemove(c.sessions) : []),
+                ...(await bulkRemoveDrafts(c.drafts)),
+              ])
+            }
           >
-            <Text>
-              Remove {c.sessions.map(nameOfSession).join(", ")}? Their sessions are deleted.
-              {c.sessions.some((s) => !isExited(s)) &&
-                ` Live and stopped first: ${c.sessions
-                  .filter((s) => !isExited(s))
-                  .map(nameOfSession)
-                  .join(", ")}.`}
-            </Text>
+            {c.sessions.length > 0 && (
+              <Text>
+                Remove {c.sessions.map(nameOfSession).join(", ")}? Their sessions are deleted.
+                {c.sessions.some((s) => !isExited(s)) &&
+                  ` Live and stopped first: ${c.sessions
+                    .filter((s) => !isExited(s))
+                    .map(nameOfSession)
+                    .join(", ")}.`}
+              </Text>
+            )}
+            {c.drafts.map((d) => (
+              <Text key={d.key}>
+                Remove {sel.nameOf(d.key)}? Its prompt and images are deleted.
+              </Text>
+            ))}
           </ConfirmModal>
         )
       case "hold":

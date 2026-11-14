@@ -15,7 +15,10 @@ import {
   CardKindDesign,
   CardKindImplementation,
   SectionImplementing,
+  ProgressDone,
+  SectionFinished,
   SectionOnHold,
+  type DesignDraftRow,
   type EpicListRow,
   type SessionPlacement,
 } from "../generated/server"
@@ -76,18 +79,48 @@ const sessions = () => [
   session("s6", "p", { name: "queuer", queue: true, tier: "worker" }),
 ]
 
-function setup() {
+interface Call {
+  url: string
+  body: { targets?: ({ id: string } | string)[]; id?: string; name?: string }
+}
+
+function setup({
+  drafts = [],
+  extraRows = [],
+}: {
+  drafts?: DesignDraftRow[]
+  extraRows?: EpicListRow[]
+} = {}) {
+  const calls: Call[] = []
   vi.stubGlobal(
     "fetch",
-    vi.fn(
-      async () => new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 }),
-    ),
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (!/\/v1\/(workspaces|sessions|designs\/drafts)\//.test(String(url)))
+        return new Response(JSON.stringify({ epics: [...rows, ...extraRows], follow_ups: [] }), {
+          status: 200,
+        })
+      const body = JSON.parse(String(init?.body)) as Call["body"]
+      calls.push({ url: String(url), body })
+      const reply = body.targets
+        ? {
+            results: body.targets.map((t) => ({
+              target: typeof t === "string" ? t : t.id,
+              status: "done",
+            })),
+          }
+        : { deleted: true }
+      return new Response(JSON.stringify(reply), { status: 200 })
+    }),
   )
   const listeners = new Set<() => void>()
   let state = {
     snapshot: {
       needs_you_total: 0,
-      workspaces: [{ name: "Default", default: true, members: 0 }],
+      workspaces: [
+        { name: "Default", default: true, members: 0 },
+        { name: "Work", members: 0 },
+      ],
+      design_drafts: drafts,
       sessions: sessions(),
       placements,
     },
@@ -115,6 +148,7 @@ function setup() {
     </DeviceContext.Provider>,
   )
   return {
+    calls,
     removeSession(id: string) {
       state = {
         ...state,
@@ -291,4 +325,77 @@ test("a row that leaves the list leaves the selection", async () => {
   expect(count()).toBe("2 selected")
   ctl.removeSession("s1")
   await waitFor(() => expect(count()).toBe("1 selected"))
+})
+
+const draft: DesignDraftRow = {
+  id: "d1",
+  label: "Landing page",
+  project: "p",
+  slug: "",
+  edited_at: "2026-05-01T10:00:00Z",
+  workspace: "Default",
+}
+const bar = () => within(document.querySelector("[data-part='select-bar']") as HTMLElement)
+
+test("Move on a draft and a Design sends the draft's membership key with the Design's address", async () => {
+  const ctl = setup({ drafts: [draft] })
+  await enterSelect()
+  fireEvent.click(box("Select Landing page"))
+  fireEvent.click(box("Select Shop"))
+  fireEvent.click(bar().getByRole("button", { name: "Move 2" }))
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Work" }))
+  await waitFor(() => expect(ctl.calls).toHaveLength(1))
+  expect(ctl.calls[0]!.url).toMatch(/\/v1\/workspaces\/move/)
+  expect(ctl.calls[0]!.body).toEqual({ name: "Work", targets: ["draft:d1", "p:shop"] })
+})
+
+test("bulk Remove on one empty draft still asks, and Remove deletes it", async () => {
+  const ctl = setup({ drafts: [draft] })
+  await enterSelect()
+  fireEvent.click(box("Select Landing page"))
+  fireEvent.click(bar().getByRole("button", { name: "Remove 1" }))
+  const dialog = await screen.findByRole("dialog")
+  expect(dialog.textContent).toContain("Remove Landing page? Its prompt and images are deleted.")
+  expect(within(dialog).getByRole("button", { name: "Keep" })).toBeTruthy()
+  expect(ctl.calls).toHaveLength(0)
+  fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }))
+  await waitFor(() => expect(ctl.calls).toHaveLength(1))
+  expect(ctl.calls[0]!.url).toMatch(/drafts\/delete/)
+  expect(ctl.calls[0]!.body).toEqual({ id: "d1" })
+})
+
+test("a chat and a draft share one confirmation, and Remove calls both removes once", async () => {
+  const ctl = setup({ drafts: [draft] })
+  await enterSelect()
+  fireEvent.click(box("Select talk"))
+  fireEvent.click(box("Select Landing page"))
+  fireEvent.click(bar().getByRole("button", { name: "Remove 2" }))
+  const dialog = await screen.findByRole("dialog")
+  expect(dialog.textContent).toContain("Their sessions are deleted.")
+  expect(dialog.textContent).toContain("Its prompt and images are deleted.")
+  fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }))
+  await waitFor(() => expect(ctl.calls).toHaveLength(2))
+  expect(ctl.calls.filter((c) => /sessions\/remove/.test(c.url))).toHaveLength(1)
+  expect(ctl.calls.filter((c) => /drafts\/delete/.test(c.url))).toHaveLength(1)
+})
+
+test("Stop and Archive skip a draft and name it by its label", async () => {
+  const finished = row("p:fin", {
+    name: "Fin",
+    card_kind: CardKindDesign,
+    section: SectionFinished,
+    progress_step: ProgressDone,
+  })
+  setup({ drafts: [draft], extraRows: [finished] })
+  await enterSelect()
+  fireEvent.click(box("Select Landing page"))
+  fireEvent.click(box("Select talk"))
+  expect(bar().getByRole("button", { name: "Stop 1 of 2" }).title).toBe(
+    "Runs on talk\nLanding page: not an agent",
+  )
+  fireEvent.click(box("Select talk"))
+  fireEvent.click(box("Select Fin"))
+  expect(bar().getByRole("button", { name: "Archive 1 of 2" }).title).toBe(
+    "Runs on Fin\nLanding page: can't be archived",
+  )
 })

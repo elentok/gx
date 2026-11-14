@@ -181,7 +181,8 @@ function useSidebarSelectKeys(sel: SidebarSelect) {
 
 const rowOf = (r: SidebarRow, visible: boolean): SelectRow => ({
   key: r.key,
-  kind: r.kind === "chat" || r.kind === "design" ? r.kind : "epic",
+  kind: r.kind === "chat" || r.kind === "design" || r.kind === "draft" ? r.kind : "epic",
+  draftId: r.draft?.id,
   visible,
   selectable: true,
   group: r.held ? GROUP_ON_HOLD : undefined,

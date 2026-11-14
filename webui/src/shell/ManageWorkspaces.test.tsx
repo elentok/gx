@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
-import type { Workspace } from "../generated/server"
+import type { DesignDraftRow, Workspace } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { ManageWorkspaces, type WorkspaceWriters } from "./ManageWorkspaces"
 
@@ -12,7 +12,7 @@ const list: Workspace[] = [
   { name: "Home", members: 1 },
 ]
 
-function setup(overrides: Partial<WorkspaceWriters> = {}) {
+function setup(overrides: Partial<WorkspaceWriters> = {}, drafts: DesignDraftRow[] = []) {
   const writers = {
     rename: vi.fn(async () => ({})),
     remove: vi.fn(async () => ({})),
@@ -20,7 +20,9 @@ function setup(overrides: Partial<WorkspaceWriters> = {}) {
     ...overrides,
   } satisfies WorkspaceWriters
   const onClose = vi.fn()
-  renderThemed(<ManageWorkspaces workspaces={list} writers={writers} onClose={onClose} />)
+  renderThemed(
+    <ManageWorkspaces workspaces={list} drafts={drafts} writers={writers} onClose={onClose} />,
+  )
   return { writers, onClose }
 }
 
@@ -126,6 +128,39 @@ test("delete asks first and names the member count", async () => {
   expect(writers.remove).not.toHaveBeenCalled()
   fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }))
   await waitFor(() => expect(writers.remove).toHaveBeenCalledWith("Work"))
+})
+
+const draft = (id: string, label: string, workspace: string): DesignDraftRow => ({
+  id,
+  label,
+  project: "p",
+  slug: "",
+  edited_at: "2026-05-01T10:00:00Z",
+  workspace,
+})
+
+test("delete names the draft members by label, and only the deleted workspace's", () => {
+  setup({}, [draft("d1", "Landing page", "Work"), draft("d2", "Elsewhere", "Home")])
+  fireEvent.click(screen.getByRole("button", { name: "Delete Work" }))
+  expect(screen.getByRole("dialog", { name: "Delete Work" }).textContent).toContain(
+    'Its 3 items go back to the Default workspace, including the draft "Landing page".',
+  )
+})
+
+test("delete names several drafts", () => {
+  setup({}, [draft("d1", "A", "Work"), draft("d2", "B", "Work")])
+  fireEvent.click(screen.getByRole("button", { name: "Delete Work" }))
+  expect(screen.getByRole("dialog", { name: "Delete Work" }).textContent).toContain(
+    'including the drafts "A" and "B".',
+  )
+})
+
+test("a workspace with no draft keeps the old text", () => {
+  setup({}, [draft("d1", "Elsewhere", "Home")])
+  fireEvent.click(screen.getByRole("button", { name: "Delete Work" }))
+  expect(screen.getByRole("dialog", { name: "Delete Work" }).textContent).toContain(
+    "Delete Work? Its 3 items go back to the Default workspace.",
+  )
 })
 
 test("keeping a workspace posts nothing", () => {

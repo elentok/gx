@@ -8,6 +8,7 @@ import {
   CardKindImplementation,
   SectionImplementing,
   SectionOnHold,
+  type DesignDraftRow,
   type EpicListRow,
   type SessionPlacement,
 } from "../generated/server"
@@ -56,7 +57,7 @@ const placements: SessionPlacement[] = [{ session: "s3", kind: "chat", workspace
 
 type Reply = (route: string, body: Record<string, unknown>) => unknown
 
-function setup(reply: Reply) {
+function setup(reply: Reply, drafts: DesignDraftRow[] = []) {
   const calls: { route: string; body: Record<string, unknown> }[] = []
   vi.stubGlobal(
     "fetch",
@@ -76,6 +77,7 @@ function setup(reply: Reply) {
         { name: "Default", default: true, members: 0 },
         { name: "Work", members: 0 },
       ],
+      design_drafts: drafts,
       sessions: [session("s3", "p", { name: "talk" })],
       placements,
     },
@@ -195,6 +197,33 @@ test("Take off hold runs on held rows only, with no question", async () => {
   expect(
     toast.mock.calls.some(
       ([t]) => /Not run/.test(t.title) && /Blog: not on hold/.test(t.description),
+    ),
+  ).toBe(true)
+})
+
+test("Hold with a draft and a Design selected holds only the Design and toasts the draft as skipped", async () => {
+  const calls = setup(
+    (_, b) => ({ results: (b.targets as string[]).map((t) => done(t)) }),
+    [
+      {
+        id: "d1",
+        label: "Landing page",
+        project: "p",
+        slug: "",
+        edited_at: "2026-05-01T10:00:00Z",
+        workspace: "Default",
+      },
+    ],
+  )
+  await selectRows("Landing page", "Shop")
+  const hold = bar().getByRole("button", { name: "Hold 1 of 2" })
+  expect(hold.title).toBe("Runs on Shop\nLanding page: can't be held")
+  fireEvent.click(hold)
+  await waitFor(() => expect(calls).toHaveLength(2))
+  expect(calls[1]!.body).toEqual({ targets: ["p:shop"] })
+  expect(
+    toast.mock.calls.some(
+      ([t]) => /Not run/.test(t.title) && /Landing page: can't be held/.test(t.description),
     ),
   ).toBe(true)
 })
