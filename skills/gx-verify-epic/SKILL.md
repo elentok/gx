@@ -121,6 +121,20 @@ Run `gx check --full` once per epic: in the lone ticket, or in the collect ticke
 parts. Pick one, and say which in your ticket. Send each failure through
 [the failing-tests rule](../gx-failing-tests.md). A branch fault is a finding.
 
+The one command, run in the background (`run_in_background`):
+
+```
+gx check --full
+```
+
+- Plain command: no pipe, no `|| gx check --full` fallback. A failing check exits non-zero too, so a
+  fallback starts a second full run.
+- Do not wrap it in `scripts/proc-cap`. `gx check` already caps its own test processes, and the
+  header of `scripts/proc-cap` says not to wrap `gx check`.
+- Wait for the harness to say the background task ended. Do not start a Monitor for it.
+- A failing check is a result to read. Send it through the failing-tests rule. Never run the check
+  again because it failed.
+
 A flow that fails at HEAD is rerun at `git merge-base main HEAD` in a temporary worktree. Rerun only on
 failure. A flow that fails there too is not the epic's fault: record it as `pre-existing, <follow-up
 addr>`.
