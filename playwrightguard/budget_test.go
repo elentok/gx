@@ -46,7 +46,9 @@ import (
 // and footer half (swipes, 744px and 390px, New chat and New design, footer sizes) runs as its own flow.
 // Schedules flow (+1): the menu entry, the list and page across fixture shapes, Run now against a real queue and
 // a real delete need a server round trip and a real browser; vitest and Go tests cover each rule alone.
-const maxFlows = 143
+// Diff page flow (+1): the View diff link round trip over real git ranges, URL reload, real p/n keys, the phone
+// layout, the virtualized scroll box and computed styles need a real server and browser; vitest covers each render alone.
+const maxFlows = 144
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
