@@ -37,7 +37,7 @@ func TestServerStats_HasJSONRangeAndProjectFlags(t *testing.T) {
 	if err != nil || c.RunE == nil {
 		t.Fatalf("server stats = %v, err %v; want a runnable verb", c, err)
 	}
-	for _, flag := range []string{"json", "range", "project"} {
+	for _, flag := range []string{"json", "range", "project", "include-dev"} {
 		if c.Flags().Lookup(flag) == nil {
 			t.Errorf("server stats has no --%s", flag)
 		}
@@ -99,5 +99,51 @@ func TestServerStats_JSONHoldsGrillingSeries(t *testing.T) {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("--json output lacks %s: %s", want, buf.String())
 		}
+	}
+}
+
+func f64(v float64) *float64 { return &v }
+
+func TestServerStats_TextEndsWithWebPerformanceBlock(t *testing.T) {
+	s := wire.Stats{Range: 7}
+	s.WebPerformance.HardLoads = []wire.StatsWebPerfCard{
+		{Metric: "lcp", Count: 40, P75: f64(2100), Status: "good", ChangePct: f64(-5)},
+		{Metric: "cls", Count: 40, P75: f64(0.12), Status: "needs-improvement"},
+	}
+	s.WebPerformance.RouteChanges = []wire.StatsWebPerfCard{
+		{Metric: "route_ready", Count: 9, P75: f64(300)},
+	}
+	s.WebPerformance.BuildStrip = &wire.StatsWebPerfBuildStrip{
+		Current:      wire.StatsWebPerfBuild{BuildID: "b2", WebVersion: "1.1"},
+		LCPChangePct: f64(12.5),
+	}
+	var buf bytes.Buffer
+	if err := printStats(&buf, s); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	i := strings.Index(out, "web performance")
+	if i < 0 {
+		t.Fatalf("no web performance block: %s", out)
+	}
+	block := out[i:]
+	for _, want := range []string{"7 days", "dev samples hidden", "lcp", "2100", "count 40", "good", "needs-improvement", "route_ready", "b2", "+12.5%", "inp -", "launch: no data"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q: %s", want, out)
+		}
+	}
+	if n := strings.Count(block, "\n"); n > 15 {
+		t.Errorf("block has %d lines, want at most 15: %s", n, block)
+	}
+}
+
+func TestServerStats_NoWebPerformanceSamplesIsOneLine(t *testing.T) {
+	var buf bytes.Buffer
+	if err := printStats(&buf, wire.Stats{}); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.HasSuffix(out, "launch: no data\nweb performance: no samples\n") {
+		t.Errorf("output = %q, want launch line then the one-line block", out)
 	}
 }

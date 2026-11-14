@@ -172,14 +172,18 @@ func (r *Reads) ArchivedEpicDetail(ctx context.Context, address string) (wire.Ep
 }
 
 // Stats returns the per-day stats for one range in days (0 is the server's
-// default) and one project (empty means all).
-func (r *Reads) Stats(ctx context.Context, days int, project string) (wire.Stats, error) {
+// default) and one project (empty means all). includeDev also counts dev
+// web performance samples.
+func (r *Reads) Stats(ctx context.Context, days int, project string, includeDev bool) (wire.Stats, error) {
 	q := url.Values{}
 	if days > 0 {
 		q.Set("range", strconv.Itoa(days))
 	}
 	if project != "" {
 		q.Set("project", project)
+	}
+	if includeDev {
+		q.Set("include_dev", "true")
 	}
 	var s wire.Stats
 	err := r.t.get(ctx, "/v1/stats?"+q.Encode(), &s)
