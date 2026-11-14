@@ -1243,6 +1243,15 @@ password and TOTP, or on the login card to add a new authenticator. It works onc
 an hour.
 _Avoid_: token, setup token, invite code
 
+**Hosted file** — a file on the gx machine that the web UI shows to a logged-in person, through a
+gx link instead of a server the agent starts itself. Only files under a known root qualify.
+_Avoid_: shared file, published file, served file
+
+**Known root** — a folder whose files gx may host: a registered project repo or one of its
+worktrees, the tickets store, or a system temp folder. In a temp folder, only files the gx user
+owns count.
+_Avoid_: allowed dir, whitelist, scope
+
 ## Commands and completion
 
 **Command** — text at the start of a session's prompt that the harness runs itself instead of sending
