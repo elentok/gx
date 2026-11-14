@@ -89,6 +89,68 @@ func TestMergeTicket_NoRecoverableSession_OmitsMetrics(t *testing.T) {
 	}
 }
 
+func TestMergeTicket_MultiCommitPick_StampsEveryCommitMetricsOnHeadOnly(t *testing.T) {
+	dir := testutil.TempRepo(t)
+	base, _ := git.RevParse(dir, "HEAD")
+	testutil.MustGitExported(t, dir, "checkout", "-b", "iter", base)
+	for _, f := range []string{"a.txt", "b.txt", "c.txt"} {
+		testutil.WriteFile(t, dir, f, f+"\n")
+		testutil.CommitAll(t, dir, "add "+f)
+	}
+	tip, _ := git.RevParse(dir, "HEAD")
+	testutil.MustGitExported(t, dir, "checkout", "main")
+	testutil.WriteFile(t, dir, "before.txt", "x\n")
+	testutil.CommitAll(t, dir, "before the pick")
+
+	home := t.TempDir()
+	ticketPath := filepath.Join(t.TempDir(), "03-a.md")
+	if err := os.WriteFile(ticketPath, []byte("---\nid: \"03\"\nstatus: claimed\ntype: implement\n---\n# A\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	cwd := worktree.IterationWorktreePath("/fake/worktrees", "epic", "03")
+	fixture.WriteFakeTranscript(t, home, cwd, "sess-multi", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		[3]any{"claude-sonnet-5", 1000, 0},
+		[3]any{"claude-sonnet-5", 2000, 5000},
+	)
+	d := MergeDepsOf(fakes.TestDeps())
+	d.SessionHomes = metrics.SessionHomes{Claude: home}
+	lp := MergeParams{
+		FeatureWorktree: dir, FeatureBranch: "main", TicketID: "03", TicketPath: ticketPath,
+		SourceRange: SourceRange{Base: base, Tip: tip},
+		Session:     MergeSession{Agent: agent.AgentClaude, Cwd: cwd, ID: "sess-multi"},
+	}
+
+	res, err := MergeTicket(d, lp)
+	if err != nil || res.Outcome != Merged || !res.MetricsStamped {
+		t.Fatalf("MergeTicket = (%+v, %v), want Merged with metrics", res, err)
+	}
+
+	if head, _ := git.RevParse(dir, "HEAD"); res.SHA != head {
+		t.Errorf("SHA = %q, want rewritten HEAD %q", res.SHA, head)
+	}
+	out, err := exec.Command("git", "-C", dir, "log", "--format=%s%x00%B%x01", "-5").Output()
+	if err != nil {
+		t.Fatalf("git log: %v", err)
+	}
+	var msgs []string
+	for c := range strings.SplitSeq(strings.TrimSpace(string(out)), "\x01") {
+		msgs = append(msgs, strings.TrimSpace(c))
+	}
+	// Newest first: c, b, a (the pick), then the commit before it.
+	for i, m := range msgs[:3] {
+		if n := strings.Count(m, TicketTrailerKey+":"); n != 1 {
+			t.Errorf("pick commit %d has %d ticket trailers, want 1:\n%s", i, n, m)
+		}
+		hasMetrics := strings.Contains(m, TokensTrailerKey) || strings.Contains(m, ElapsedTrailerKey)
+		if hasMetrics != (i == 0) {
+			t.Errorf("pick commit %d metrics trailers = %v, want HEAD only:\n%s", i, hasMetrics, m)
+		}
+	}
+	if strings.Contains(msgs[3], TicketTrailerKey) {
+		t.Errorf("commit before the pick was stamped:\n%s", msgs[3])
+	}
+}
+
 func TestMergeTicket_SecondCall_IsAlreadyAppliedWithoutRestamp(t *testing.T) {
 	dir, lp := mergeFixture(t, false)
 	d := MergeDepsOf(fakes.TestDeps())

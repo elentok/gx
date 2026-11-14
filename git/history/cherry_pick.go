@@ -2,6 +2,8 @@ package history
 
 import (
 	"bytes"
+	"fmt"
+	"slices"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/internal/run"
@@ -14,15 +16,15 @@ import (
 // ref whose key trailer value satisfies match. Other commits in ref's history
 // count for nothing.
 func TrailerLines(dir, ref, key string, match func(value string) bool) (added, removed int, err error) {
-	trailers, err := TrailerMap(dir, ref, key)
+	commits, err := trailerCommits(dir, ref, key)
 	if err != nil {
 		return 0, 0, err
 	}
-	for value, sha := range trailers {
-		if !match(value) {
+	for _, c := range commits {
+		if !match(c.value) {
 			continue
 		}
-		out, _, err := run.Exec(dir, []string{"show", "--numstat", "--format=", sha})
+		out, _, err := run.Exec(dir, []string{"show", "--numstat", "--format=", c.sha})
 		if err != nil {
 			return 0, 0, err
 		}
@@ -157,6 +159,11 @@ func AppendTrailers(dir string, trailers ...Trailer) error {
 	if err != nil {
 		return err
 	}
+	_, err = RewordHead(dir, withTrailers(msg, trailers))
+	return err
+}
+
+func withTrailers(msg string, trailers []Trailer) string {
 	var b strings.Builder
 	b.WriteString(strings.TrimRight(msg, "\n"))
 	b.WriteString("\n\n")
@@ -166,8 +173,89 @@ func AppendTrailers(dir string, trailers ...Trailer) error {
 		b.WriteString(t.Value)
 		b.WriteString("\n")
 	}
-	_, err = RewordHead(dir, b.String())
+	return b.String()
+}
+
+// StampTrailerRange adds the trailers to the message of every commit in
+// start..HEAD, oldest first, and leaves the current branch at the rewritten
+// tip. Each commit keeps its tree, author and committer (name, email, date);
+// only the message and the parent chain change. The rewrite builds commit
+// objects with plumbing and moves the branch once, compare-and-swap against
+// the old tip, so a failure leaves the branch where it was. The index and
+// worktree need no update: the new tip has the old tip's tree. A commit that
+// already carries every one of the trailers is not restamped, so a repeat is
+// safe; an empty range or nothing to stamp changes nothing. start must be an
+// ancestor of HEAD on a linear history.
+func StampTrailerRange(dir, start string, trailers ...Trailer) error {
+	out, _, err := run.Exec(dir, []string{"rev-list", "--reverse", start + "..HEAD"})
+	if err != nil {
+		return err
+	}
+	shas := strings.Fields(out)
+	if len(shas) == 0 {
+		return nil
+	}
+	parent, _, err := run.Exec(dir, []string{"rev-parse", start})
+	if err != nil {
+		return err
+	}
+	parent = strings.TrimSpace(parent)
+	changed := false
+	for _, sha := range shas {
+		msg, _, err := run.Exec(dir, []string{"log", "-1", "--format=%B", sha})
+		if err != nil {
+			return err
+		}
+		if !hasTrailers(msg, trailers) {
+			msg = withTrailers(msg, trailers)
+			changed = true
+		}
+		if !changed {
+			parent = sha
+			continue
+		}
+		parent, err = recommit(dir, sha, parent, msg)
+		if err != nil {
+			return err
+		}
+	}
+	if !changed {
+		return nil
+	}
+	_, _, err = run.Exec(dir, []string{"update-ref", "-m", "stamp trailers", "HEAD", parent, shas[len(shas)-1]})
 	return err
+}
+
+func hasTrailers(msg string, trailers []Trailer) bool {
+	lines := strings.Split(msg, "\n")
+	for _, t := range trailers {
+		if !slices.Contains(lines, t.Key+": "+t.Value) {
+			return false
+		}
+	}
+	return true
+}
+
+// recommit writes a copy of sha on top of parent with message msg.
+func recommit(dir, sha, parent, msg string) (string, error) {
+	meta, _, err := run.Exec(dir, []string{"log", "-1", "--date=raw", "--format=%T%x00%an%x00%ae%x00%ad%x00%cn%x00%ce%x00%cd", sha})
+	if err != nil {
+		return "", err
+	}
+	f := strings.Split(strings.TrimRight(meta, "\n"), "\x00")
+	if len(f) != 7 {
+		return "", fmt.Errorf("unexpected metadata for commit %s", sha)
+	}
+	env := append(run.NonInteractiveEnv(),
+		"GIT_AUTHOR_NAME="+f[1], "GIT_AUTHOR_EMAIL="+f[2], "GIT_AUTHOR_DATE="+f[3],
+		"GIT_COMMITTER_NAME="+f[4], "GIT_COMMITTER_EMAIL="+f[5], "GIT_COMMITTER_DATE="+f[6],
+	)
+	stdout, _, err := run.RunWith(dir, env, run.RunOptions{Stdin: strings.NewReader(msg)},
+		"commit-tree", f[0], "-p", parent, "-F", "-")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(stdout), nil
 }
 
 // TrailerCommitExists reports whether any commit reachable from ref carries
@@ -202,21 +290,34 @@ func TrailerPrefixCommit(dir, ref, key string, prefixes ...string) (string, erro
 // call per value being looked up. A commit with no such trailer contributes
 // nothing (the placeholder expands to an empty string, trimmed away here).
 func TrailerMap(dir, ref, key string) (map[string]string, error) {
+	commits, err := trailerCommits(dir, ref, key)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]string, len(commits))
+	for _, c := range commits {
+		result[c.value] = c.sha
+	}
+	return result, nil
+}
+
+type trailerCommit struct{ sha, value string }
+
+// trailerCommits lists, newest first, every commit reachable from ref that has
+// a key trailer, with the trailer's value.
+func trailerCommits(dir, ref, key string) ([]trailerCommit, error) {
 	out, _, err := run.Exec(dir, []string{"log", "--format=%H %(trailers:key=" + key + ",valueonly)", ref})
 	if err != nil {
 		return nil, err
 	}
-	result := make(map[string]string)
+	var result []trailerCommit
 	for line := range strings.SplitSeq(out, "\n") {
 		sha, value, found := strings.Cut(line, " ")
-		if !found {
-			continue
-		}
 		value = strings.TrimSpace(value)
-		if value == "" {
+		if !found || value == "" {
 			continue
 		}
-		result[value] = sha
+		result = append(result, trailerCommit{sha, value})
 	}
 	return result, nil
 }

@@ -280,6 +280,7 @@ func resolveMerge(in MergeInput, d deps.Deps) (MergeResult, string, error) {
 		TicketID:        t.Identifier,
 		TicketPath:      t.Path,
 		Session:         session,
+		PickStart:       marker.PrePickHead,
 	})
 	if err != nil {
 		return MergeResult{}, "", err

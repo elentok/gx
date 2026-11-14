@@ -139,6 +139,10 @@ type Deps struct {
 	// ticket trailer later even if a subsequent rebase-plus-manual-conflict-
 	// resolution changes the commit's hash and patch-id both.
 	AppendTrailers func(dir string, trailers ...history.Trailer) error
+	// StampTrailerRange adds trailers to every commit of start..HEAD that
+	// lacks them, so a multi-commit pick carries the ticket trailer on each
+	// commit, not only the last.
+	StampTrailerRange func(dir, start string, trailers ...history.Trailer) error
 	// TrailerMap maps each value of trailer key on the commits of ref (any
 	// rev or range) to its commit; `merge --continue` reads it to tell its own
 	// unstamped pick from other tickets' merges.
@@ -331,6 +335,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		RebaseInProgress:     history.RebaseInProgress,
 		PatchesApplied:       history.PatchesApplied,
 		AppendTrailers:       history.AppendTrailers,
+		StampTrailerRange:    history.StampTrailerRange,
 		TrailerMap:           history.TrailerMap,
 		RebaseOntoOrAbort:    rebaseOntoOrAbort,
 		WorktreeExists:       worktreeExists,

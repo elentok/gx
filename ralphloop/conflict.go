@@ -67,6 +67,19 @@ func cherryPickWithConflictResolution(d deps.Deps, p iterationParams, base, bran
 			if err != nil {
 				return merge.MergeResult{}, "", err
 			}
+			// The pre-pick HEAD is no longer known in this call; the merge
+			// lock's owner recorded it.
+			lockDir, err := mergeLockDirFor(d, p.ScratchDir, p.FeatureBranch)
+			if err != nil {
+				return merge.MergeResult{}, "", err
+			}
+			owner, err := merge.ReadMergeLock(lockDir)
+			if err != nil {
+				return merge.MergeResult{}, "", fmt.Errorf("reading merge lock: %w", err)
+			}
+			if owner != nil {
+				lp.PickStart = owner.PrePickHead
+			}
 			res, err := merge.StampMerged(ld, lp)
 			return res, resolutionSessionID, err
 		}
@@ -133,6 +146,7 @@ func cherryPickWithConflictResolution(d deps.Deps, p iterationParams, base, bran
 		return merge.MergeResult{}, "", err
 	}
 
+	lp.PickStart = res.PickStart
 	res, err = merge.StampMerged(ld, lp)
 	return res, resolutionSessionID, err
 }

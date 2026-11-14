@@ -49,6 +49,7 @@ type MergeDeps struct {
 	CherryPickRange      func(dir, fromExclusive, toInclusive string) error
 	CherryPickInProgress func(dir string) (bool, error)
 	AppendTrailers       func(dir string, trailers ...history.Trailer) error
+	StampTrailerRange    func(dir, start string, trailers ...history.Trailer) error
 	MergedTickets        func(dir, base, featureBranch string) (map[string]bool, error)
 	// SessionHomes are where the merging session's transcripts are read from.
 	SessionHomes metrics.SessionHomes
@@ -65,6 +66,11 @@ type MergeParams struct {
 	// ladder's first rung; empty skips that rung.
 	RecordedSHA string
 	Session     MergeSession
+	// PickStart is the feature branch's HEAD before the pick: StampMerged
+	// stamps the ticket trailer on every commit of PickStart..HEAD. MergeTicket
+	// sets it itself; a caller of StampMerged alone sets it. Empty stamps HEAD
+	// only.
+	PickStart string
 }
 
 // MergeResult is MergeTicket's outcome. SHA is empty for Conflicted.
@@ -73,6 +79,9 @@ type MergeResult struct {
 	SHA            string
 	TrailerValue   string
 	MetricsStamped bool
+	// PickStart is the feature branch's HEAD before the pick, set for
+	// Conflicted so the caller can stamp the resolved pick (MergeParams.PickStart).
+	PickStart string
 }
 
 // MergeDepsOf narrows d to what a merging needs.
@@ -84,6 +93,7 @@ func MergeDepsOf(d deps.Deps) MergeDeps {
 		CherryPickRange:      d.CherryPickRange,
 		CherryPickInProgress: d.CherryPickInProgress,
 		AppendTrailers:       d.AppendTrailers,
+		StampTrailerRange:    d.StampTrailerRange,
 		MergedTickets:        MergedTicketsSince,
 		SessionHomes:         d.SessionHomes,
 	}
@@ -93,6 +103,11 @@ func MergeDepsOf(d deps.Deps) MergeDeps {
 // check (see alreadyApplied), the pick, then StampMerged. A conflict is a
 // result, never an error.
 func MergeTicket(d MergeDeps, lp MergeParams) (MergeResult, error) {
+	start, err := d.RevParse(lp.FeatureWorktree, "HEAD")
+	if err != nil {
+		return MergeResult{}, fmt.Errorf("resolving %s before the pick: %w", lp.FeatureBranch, err)
+	}
+	lp.PickStart = start
 	outcome, err := pickRange(d, lp)
 	if err != nil {
 		return MergeResult{}, err
@@ -109,7 +124,7 @@ func MergeTicket(d MergeDeps, lp MergeParams) (MergeResult, error) {
 		}
 		return MergeResult{Outcome: AlreadyApplied, SHA: sha, TrailerValue: mergeTrailerValue(lp), MetricsStamped: stamped}, nil
 	case Conflicted:
-		return MergeResult{Outcome: Conflicted, TrailerValue: mergeTrailerValue(lp)}, nil
+		return MergeResult{Outcome: Conflicted, TrailerValue: mergeTrailerValue(lp), PickStart: start}, nil
 	}
 	return StampMerged(d, lp)
 }
@@ -254,8 +269,10 @@ func mergeTrailerValue(lp MergeParams) string {
 }
 
 // StampMerged writes the merging session's metrics into the ticket's
-// frontmatter, then stamps the ticket trailer — plus the metrics trailers when
-// a session was recoverable — in a single amend, and resolves the merged SHA.
+// frontmatter, then stamps HEAD with the ticket trailer — plus the metrics
+// trailers when a session was recoverable — in a single amend. The ticket
+// trailer then goes on every earlier commit of lp.PickStart..HEAD too, so the
+// metrics are counted once. The merged SHA is HEAD after that rewrite.
 // Metrics are omitted, never fabricated, when no session is recoverable. It is
 // also the stamping half of MergeTicket, for a resolved conflict
 // (`merge --continue`).
@@ -278,6 +295,11 @@ func StampMerged(d MergeDeps, lp MergeParams) (MergeResult, error) {
 	}
 	if err := d.AppendTrailers(lp.FeatureWorktree, trailers...); err != nil {
 		return MergeResult{}, fmt.Errorf("stamping trailers on merged commit: %w", err)
+	}
+	if lp.PickStart != "" {
+		if err := d.StampTrailerRange(lp.FeatureWorktree, lp.PickStart, trailers[0]); err != nil {
+			return MergeResult{}, fmt.Errorf("stamping the ticket trailer on the earlier commits of the pick: %w", err)
+		}
 	}
 
 	sha, err := d.RevParse(lp.FeatureWorktree, "HEAD")

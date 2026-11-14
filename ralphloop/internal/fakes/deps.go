@@ -143,6 +143,9 @@ func FakeDeps() (d deps.Deps, prompts *[]string, removedBranches *[]string) {
 		AppendTrailers: func(dir string, trailers ...history.Trailer) error {
 			return nil
 		},
+		StampTrailerRange: func(dir, start string, trailers ...history.Trailer) error {
+			return nil
+		},
 		WorktreeExists: func(path string) (bool, error) {
 			return true, nil
 		},

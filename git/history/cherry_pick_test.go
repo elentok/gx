@@ -319,3 +319,85 @@ func TestSquashApplied(t *testing.T) {
 		t.Fatalf("after squash = %v, %v; want true, nil", got, err)
 	}
 }
+
+func gitOut(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output()
+	if err != nil {
+		t.Fatalf("git %v: %v", args, err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func TestStampTrailerRange_StampsEveryCommitKeepingTheRest(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	start := gitOut(t, dir, "rev-parse", "HEAD")
+	testutil.MustGitExported(t, dir, "checkout", "-b", "feature")
+	for i, f := range []string{"a.txt", "b.txt", "c.txt"} {
+		testutil.WriteFile(t, dir, f, f+"\n")
+		testutil.MustGitExported(t, dir, "add", ".")
+		testutil.MustGitExported(t, dir, "commit", "-m", "add "+f, "--author", "Other Dev <other@example.com>", "--date", "2020-01-0"+string(rune('1'+i))+"T10:00:00Z")
+	}
+	format := "--format=%s|%an|%ae|%ad|%cd|%T"
+	before := gitOut(t, dir, "log", "--reverse", "--date=raw", format, start+"..HEAD")
+
+	tr := history.Trailer{Key: "Ralph-Loop-Ticket", Value: "gx:e/01"}
+	if err := history.StampTrailerRange(dir, start, tr); err != nil {
+		t.Fatalf("StampTrailerRange: %v", err)
+	}
+
+	if after := gitOut(t, dir, "log", "--reverse", "--date=raw", format, start+"..HEAD"); after != before {
+		t.Errorf("subjects, authors, dates or trees changed:\n%s\nwant\n%s", after, before)
+	}
+	if got := gitOut(t, dir, "rev-list", "--count", "--grep=^Ralph-Loop-Ticket: gx:e/01$", start+"..HEAD"); got != "3" {
+		t.Errorf("commits with the trailer = %s, want 3", got)
+	}
+	for body := range strings.SplitSeq(gitOut(t, dir, "log", "--format=%B%x00", start+"..HEAD"), "\x00") {
+		if n := strings.Count(body, "Ralph-Loop-Ticket:"); n > 1 {
+			t.Errorf("trailer appears %d times in %q", n, body)
+		}
+	}
+	if got := gitOut(t, dir, "rev-parse", "--abbrev-ref", "HEAD"); got != "feature" {
+		t.Errorf("HEAD on %q, want feature", got)
+	}
+	if st := gitOut(t, dir, "status", "--porcelain"); st != "" {
+		t.Errorf("worktree dirty after rewrite: %q", st)
+	}
+	if got := gitOut(t, dir, "rev-parse", "HEAD~3"); got != start {
+		t.Errorf("commits before the range changed")
+	}
+
+	// A repeat stamps nothing more.
+	tip := gitOut(t, dir, "rev-parse", "HEAD")
+	if err := history.StampTrailerRange(dir, start, tr); err != nil {
+		t.Fatalf("repeat: %v", err)
+	}
+	if got := gitOut(t, dir, "rev-parse", "HEAD"); got != tip {
+		t.Errorf("repeat moved HEAD")
+	}
+}
+
+func TestStampTrailerRange_EmptyRangeChangesNothing(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	head := gitOut(t, dir, "rev-parse", "HEAD")
+	if err := history.StampTrailerRange(dir, head, history.Trailer{Key: "K", Value: "v"}); err != nil {
+		t.Fatalf("StampTrailerRange: %v", err)
+	}
+	if got := gitOut(t, dir, "rev-parse", "HEAD"); got != head {
+		t.Errorf("HEAD moved on an empty range")
+	}
+}
+
+func TestStampTrailerRange_BadStartLeavesBranchUnchanged(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	head := gitOut(t, dir, "rev-parse", "HEAD")
+	if err := history.StampTrailerRange(dir, "no-such-ref", history.Trailer{Key: "K", Value: "v"}); err == nil {
+		t.Fatal("StampTrailerRange succeeded for a bad start")
+	}
+	if got := gitOut(t, dir, "rev-parse", "HEAD"); got != head {
+		t.Errorf("HEAD moved after a failure")
+	}
+}

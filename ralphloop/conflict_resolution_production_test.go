@@ -163,6 +163,17 @@ func gitSubject(t *testing.T, dir, ref string) string {
 	return strings.TrimSpace(string(out))
 }
 
+func gitMessage(t *testing.T, dir, ref string) string {
+	t.Helper()
+	cmd := exec.Command("git", "log", "-1", "--format=%B", ref)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git log --format=%%B %s: %v", ref, err)
+	}
+	return string(out)
+}
+
 // realMergingDeps is realGitDeps plus the rest of merging's git operations,
 // for driving a genuine cherry-pick conflict.
 func realMergingDeps() deps.Deps {
@@ -173,6 +184,7 @@ func realMergingDeps() deps.Deps {
 	d.CherryPickRange = real.CherryPickRange
 	d.CherryPickInProgress = real.CherryPickInProgress
 	d.AbortCherryPick = real.AbortCherryPick
+	d.StampTrailerRange = real.StampTrailerRange
 	return d
 }
 
@@ -227,6 +239,13 @@ func conflictParams(t *testing.T, dir string) iterationParams {
 func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	t.Parallel()
 	dir, base, iterTip, wantSubject := conflictRepo(t)
+	// A second, clean commit makes it a multi-commit pick.
+	mainHead, _ := git.RevParse(dir, "HEAD")
+	testutil.MustGitExported(t, dir, "checkout", "ralph-loop/main/iter-03")
+	testutil.WriteFile(t, dir, "second.txt", "second\n")
+	testutil.CommitAll(t, dir, "Add second.txt from iteration")
+	iterTip, _ = git.RevParse(dir, "HEAD")
+	testutil.MustGitExported(t, dir, "checkout", "main")
 
 	const resolutionSessionID = "resolver-session-1"
 	const iterationSessionID = "iteration-session-1"
@@ -271,8 +290,21 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 		t.Errorf("shared.txt = %q, want deterministic resolved content %q", gotContent, resolvedText)
 	}
 
-	if gotSubject := gitSubject(t, dir, "HEAD"); gotSubject != wantSubject {
+	if gotSubject := gitSubject(t, dir, "HEAD~1"); gotSubject != wantSubject {
 		t.Errorf("merged commit subject = %q, want original cherry-picked subject %q preserved", gotSubject, wantSubject)
+	}
+
+	// Every commit of the pick carries the ticket trailer, the one before it none.
+	for _, ref := range []string{"HEAD", "HEAD~1"} {
+		if msg := gitMessage(t, dir, ref); !strings.Contains(msg, merge.TicketTrailerKey+": ") {
+			t.Errorf("%s lacks the ticket trailer:\n%s", ref, msg)
+		}
+	}
+	if got := gitSubject(t, dir, "HEAD~2"); got != "Add shared.txt from main" {
+		t.Errorf("HEAD~2 = %q, want the commit before the pick", got)
+	}
+	if got := gitSubject(t, dir, mainHead); strings.Contains(gitMessage(t, dir, mainHead), merge.TicketTrailerKey) {
+		t.Errorf("commit before the pick %q was stamped", got)
 	}
 
 	evs, ok, err := runlog.ReadEvents(p.ScratchDir, "main")

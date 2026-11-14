@@ -53,6 +53,25 @@ func TestTrailerLines_SumsOnlyCommitsWhoseTrailerMatches(t *testing.T) {
 	}
 }
 
+func TestTrailerLines_SumsEveryCommitOfOneTrailerValue(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	testutil.WriteFile(t, dir, "a.txt", "one\ntwo\n")
+	testutil.CommitAll(t, dir, "first\n\nRalph-Loop-Ticket: mine/01")
+	testutil.WriteFile(t, dir, "b.txt", "x\ny\nz\n")
+	testutil.CommitAll(t, dir, "second\n\nRalph-Loop-Ticket: mine/01")
+
+	added, removed, err := history.TrailerLines(dir, "HEAD", "Ralph-Loop-Ticket", func(v string) bool {
+		return v == "mine/01"
+	})
+	if err != nil {
+		t.Fatalf("TrailerLines: %v", err)
+	}
+	if added != 5 || removed != 0 {
+		t.Errorf("TrailerLines() = +%d -%d, want +5 -0", added, removed)
+	}
+}
+
 func TestDiffLines_SameRefIsZero(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
