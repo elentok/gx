@@ -63,6 +63,18 @@ interface FixtureOutput {
   migrate_dir?: string
   /** The `dev-mode` scenario's fake pnpm control file. */
   dev_control_file?: string
+  /** Only the `host-files` scenario prints its paths. */
+  host_files?: HostFiles
+}
+
+/** The `host-files` scenario's paths (`testutil/gxfixture/spec/hostfiles.go`). */
+export interface HostFiles {
+  repo: string
+  second_worktree: string
+  second_only: string
+  temp_dir: string
+  other_origin: string
+  ticket: string
 }
 
 export interface Fixture {
@@ -158,6 +170,8 @@ export interface Fixture {
   readonly codexSessionsDir: string
   /** The `dev-mode` scenario's fake pnpm control file; write `{"vite":"crash"}` to take Vite down. Empty elsewhere. */
   readonly devControlFile: string
+  /** The `host-files` scenario's repo, worktree and temp paths. Undefined elsewhere. */
+  readonly hostFiles?: HostFiles
 }
 
 /** The value after `--name` in an argv, or undefined. */
@@ -275,6 +289,7 @@ async function startFixture(
     transcripts: out.transcripts ?? {},
     codexSessionsDir: out.codex_sessions_dir ?? "",
     devControlFile: out.dev_control_file ?? "",
+    hostFiles: out.host_files,
     async cli(...args) {
       // A CLI call that blocks would otherwise eat the whole test timeout with no hint of which call hung.
       try {

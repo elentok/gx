@@ -48,7 +48,10 @@ import (
 // a real delete need a server round trip and a real browser; vitest and Go tests cover each rule alone.
 // Diff page flow (+1): the View diff link round trip over real git ranges, URL reload, real p/n keys, the phone
 // layout, the virtualized scroll box and computed styles need a real server and browser; vitest covers each render alone.
-const maxFlows = 144
+// Hosted files wide flow (+1): the sandbox, the token redirect, the cookie, the hover card and the 30-odd link
+// checks need a real server, a real iframe and real layout; vitest and Go tests (the route matrix in
+// server/web/web_test.go, the detector tests) cover each rule alone but cannot see them together.
+const maxFlows = 145
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
