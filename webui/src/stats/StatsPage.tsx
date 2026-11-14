@@ -1,6 +1,7 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { useSearchParams } from "react-router"
 import { useConnectionContext } from "../connection"
+import { useFetchedReady } from "../useReady"
 import { useEpicList, type FetchEpicList } from "../epics/list"
 import { DetailPage } from "../page/DetailPage"
 import { PageHeader } from "../page/PageHeader"
@@ -296,7 +297,8 @@ export function StatsPage({
   const [params, setParams] = useSearchParams()
   const range = parseRange(params.get("range"))
   const project = params.get("project") ?? ""
-  const { stats, failed, retry } = useStats({ range, project }, fetchStats, conn)
+  const { stats, failed, source, retry } = useStats({ range, project }, fetchStats, conn)
+  useFetchedReady({ failed, source })
   const { list } = useEpicList(fetchEpics, conn)
 
   const projects = [

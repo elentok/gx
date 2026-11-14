@@ -22,6 +22,7 @@ import { Button } from "../ui/button/Button"
 import { EmptyState } from "../ui/empty-state/EmptyState"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { useFetched } from "../useFetched"
+import { useFetchedReady } from "../useReady"
 import { useWorkspaces } from "../workspaces/useActiveWorkspace"
 import { EpicCard } from "./EpicCard"
 import { useEpicList, type FetchEpicList } from "./list"
@@ -126,7 +127,8 @@ export function EpicsPage({
   saveChecks?: SaveChecks
 }) {
   const conn = useConnectionContext()
-  const { list, failed, retry } = useEpicList(fetchList, conn)
+  const { list, failed, source, retry } = useEpicList(fetchList, conn)
+  useFetchedReady({ failed, source }, list?.epics.length === 0)
   // A failed read shows no banner: it is not worth an error state.
   const { data: checks, retry: rereadChecks } = useFetched("checks", fetchChecks, conn)
   const [bannerHidden, setBannerHidden] = useState(false)

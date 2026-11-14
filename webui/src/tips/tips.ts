@@ -14,6 +14,6 @@ export const fetchTips: FetchTips = async () => {
 }
 
 export function useTips(fetcher: FetchTips = fetchTips, conn?: Connection) {
-  const { data, failed, retry } = useFetched("tips", fetcher, conn)
-  return { tips: data, failed, retry }
+  const { data, failed, source, retry } = useFetched("tips", fetcher, conn)
+  return { tips: data, failed, source, retry }
 }

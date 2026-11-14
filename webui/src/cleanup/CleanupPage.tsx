@@ -2,6 +2,7 @@ import { Box, chakra, Text } from "@chakra-ui/react"
 import { useState, type ReactNode } from "react"
 import { useSearchParams } from "react-router"
 import { useConnectionContext } from "../connection"
+import { useFetchedReady } from "../useReady"
 import { useEpicList, type FetchEpicList } from "../epics/list"
 import { DetailPage } from "../page/DetailPage"
 import { PageHeader } from "../page/PageHeader"
@@ -144,7 +145,8 @@ export function CleanupPage({
   const { list } = useEpicList(fetchEpics, conn)
   const projects = [...new Set(list?.epics.map((e) => e.project) ?? [])].sort()
   const project = params.get("project") ?? projects[0] ?? ""
-  const { report, failed, retry } = useCleanup(project, fetchCleanup, conn)
+  const { report, failed, source, retry } = useCleanup(project, fetchCleanup, conn)
+  useFetchedReady({ failed, source: report ? source : null })
   const groups = report ? groupReport(report) : []
   const { run, pending } = useWrite({ toastRefusal: false })
   const [refused, setRefused] = useState<Record<string, string>>({})

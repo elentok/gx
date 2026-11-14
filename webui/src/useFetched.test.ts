@@ -1,8 +1,122 @@
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, expect, test, vi } from "vitest"
+import { markReady } from "./routeSpans"
+import { ROUTE_NAMES } from "./routeNames"
 import { useFetched } from "./useFetched"
+import { useFetchedReady } from "./useReady"
 
-beforeEach(() => sessionStorage.clear())
+vi.mock("./routeSpans", () => ({ markReady: vi.fn() }))
+
+beforeEach(() => {
+  sessionStorage.clear()
+  vi.mocked(markReady).mockClear()
+})
+
+function useWired(
+  key: string,
+  fetcher: () => Promise<unknown>,
+  empty: (d: unknown) => boolean = () => false,
+) {
+  const state = useFetched(key, fetcher)
+  useFetchedReady(state, state.data !== null && empty(state.data))
+  return state
+}
+
+test("a network paint ends the span as ready from the network", async () => {
+  renderHook(() =>
+    useWired(
+      "n1",
+      () => Promise.resolve("x"),
+      () => false,
+    ),
+  )
+  await waitFor(() => expect(markReady).toHaveBeenCalledWith("ready", "network"))
+  expect(markReady).toHaveBeenCalledTimes(1)
+})
+
+test("a cache paint ends the span as ready from the cache, and the network answer adds nothing", async () => {
+  sessionStorage.setItem("gx.page.c1", JSON.stringify({ id: "", value: "old" }))
+  const { result } = renderHook(() =>
+    useWired(
+      "c1",
+      () => Promise.resolve("new"),
+      () => false,
+    ),
+  )
+  expect(markReady).toHaveBeenCalledWith("ready", "cache")
+  await waitFor(() => expect(result.current.data).toBe("new"))
+  expect(result.current.source).toBe("network")
+  // The hook may call again with the network source; the span engine keeps only the first call.
+  expect(vi.mocked(markReady).mock.calls[0]).toEqual(["ready", "cache"])
+})
+
+test("a failed first fetch ends the span with error", async () => {
+  renderHook(() => useWired("e1", () => Promise.reject(new Error("no"))))
+  await waitFor(() => expect(markReady).toHaveBeenCalledWith("error", "network"))
+})
+
+test("an empty answer ends the span with empty", async () => {
+  renderHook(() =>
+    useWired(
+      "m1",
+      () => Promise.resolve([]),
+      (d) => (d as unknown[]).length === 0,
+    ),
+  )
+  await waitFor(() => expect(markReady).toHaveBeenCalledWith("empty", "network"))
+})
+
+test("an error over cached data stays ready", async () => {
+  sessionStorage.setItem("gx.page.e2", JSON.stringify({ id: "", value: "old" }))
+  const { result } = renderHook(() =>
+    useWired(
+      "e2",
+      () => Promise.reject(new Error("no")),
+      () => false,
+    ),
+  )
+  expect(result.current.failed).toBe(false)
+  expect(markReady).toHaveBeenCalledWith("ready", "cache")
+  expect(markReady).not.toHaveBeenCalledWith("error", expect.anything())
+})
+
+test("nothing fires while the first fetch is pending", () => {
+  renderHook(() => useWired("p1", () => new Promise(() => {})))
+  expect(markReady).not.toHaveBeenCalled()
+})
+
+// Every normalized route needs a decision. Add the new route here when ROUTE_NAMES grows.
+const READY_WIRING: Record<string, "useFetched" | "ready-streaming"> = {
+  "/epics": "useFetched",
+  "/archive": "useFetched",
+  "/archive/*": "ready-streaming",
+  "/agents/*": "ready-streaming",
+  "/stats": "useFetched",
+  "/cleanup": "useFetched",
+  "/schedules": "useFetched",
+  "/schedules/new": "useFetched",
+  "/schedules/*": "useFetched",
+  "/tips": "useFetched",
+  "/settings": "useFetched",
+  "/settings/s/:section": "useFetched",
+  "/settings/p/:project": "useFetched",
+  "/settings/p/:project/s/:section": "useFetched",
+  "/settings/logins": "useFetched",
+  "/settings/logins/:id": "useFetched",
+  "/settings/password": "useFetched",
+  "/settings/authenticator": "useFetched",
+  "/settings/certificate": "useFetched",
+  "/settings/agents": "ready-streaming",
+  "/settings/*": "ready-streaming",
+  "/d/*": "ready-streaming",
+  "/triage/*": "ready-streaming",
+  "/t/*": "ready-streaming",
+  "/e/*": "ready-streaming",
+}
+
+test("every normalized route has a readiness case", () => {
+  expect(Object.keys(READY_WIRING).sort()).toEqual(Object.keys(ROUTE_NAMES).sort())
+})
 
 const focus = () => act(() => void window.dispatchEvent(new Event("focus")))
 

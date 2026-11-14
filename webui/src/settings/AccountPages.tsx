@@ -11,6 +11,7 @@ import { PageIcon } from "../page/PageIcon"
 import { Button } from "../ui/button/Button"
 import { Spinner } from "../ui/spinner/Spinner"
 import { useFetched } from "../useFetched"
+import { useFetchedReady } from "../useReady"
 import { useWrite } from "../useWrite"
 import { beginReset, changePassword, finishReset, type AccountCall } from "./account"
 import { fetchLogins, type FetchLogins } from "./logins"
@@ -230,6 +231,12 @@ export function AuthenticatorView({
 function useAccountPage(fetchAuth: () => Promise<AuthState>, fetchList: FetchLogins) {
   const auth = useFetched("settings-auth", fetchAuth)
   const logins = useFetched("settings-logins", fetchList)
+  // Both reads are primary here: the page waits for each.
+  useFetchedReady({
+    failed: auth.failed || logins.failed,
+    source:
+      auth.source && logins.source && (auth.source === "network" ? auth.source : logins.source),
+  })
   const write = useWrite({ toastRefusal: false })
   const otherDevices = logins.data?.filter((l) => !l.this_device).length ?? 0
   const leave = () => {

@@ -8,6 +8,7 @@ import { PageHeader } from "../page/PageHeader"
 import { Button } from "../ui/button/Button"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { useFetched } from "../useFetched"
+import { useFetchedReady } from "../useReady"
 import { useWrite } from "../useWrite"
 import { formatNextRun, formatWhen } from "./format"
 import { fetchSchedules, postSwitch, type FetchSchedules, type PostSwitch } from "./schedules"
@@ -86,7 +87,8 @@ export function SchedulesPage({
 }) {
   const conn = useConnectionContext()
   const navigate = useNavigate()
-  const { data, failed } = useFetched("schedules", fetchList, conn)
+  const { data, failed, source } = useFetched("schedules", fetchList, conn)
+  useFetchedReady({ failed, source }, data?.schedules.length === 0)
   // A switch's answer shows at once; a fresh list replaces the answers.
   const [answers, setAnswers] = useState<Record<string, ScheduleInfo>>({})
   useEffect(() => setAnswers({}), [data])

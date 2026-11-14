@@ -7,6 +7,8 @@ export interface FetchedState<T> {
   data: T | null
   /** The first fetch failed and nothing is on screen. */
   failed: boolean
+  /** Where the data on screen came from; null while nothing is shown. Feeds `useFetchedReady`. */
+  source: "cache" | "network" | null
   retry: () => void
 }
 
@@ -60,6 +62,8 @@ export function useFetched<T>(
 
   // Memoized: each read parses a fresh object, and a changing identity re-fires effects keyed on `data`.
   const cached = useMemo(() => readPageCache<T>(key, id), [key, id])
-  const data = loaded?.id === id ? loaded.data : cached
-  return { data, failed: failed && data === null, retry }
+  const fresh = loaded?.id === id
+  const data = fresh ? loaded.data : cached
+  const source = fresh ? "network" : cached !== null ? "cache" : null
+  return { data, failed: failed && data === null, source, retry }
 }

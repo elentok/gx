@@ -35,6 +35,7 @@ import { Button } from "../ui/button/Button"
 import { Chip } from "../ui/chip/Chip"
 import { Spinner } from "../ui/spinner/Spinner"
 import { useFetched, type FetchedState } from "../useFetched"
+import { useFetchedReady } from "../useReady"
 import { useWrite } from "../useWrite"
 import {
   endsInDays,
@@ -428,6 +429,7 @@ export function CertificatePage({
   fetchAuth?: () => Promise<AuthState>
 }) {
   const auth = useFetched("settings-auth", fetchAuth)
+  useFetchedReady(auth)
   return (
     <DetailPage title={{ kind: "Settings", name: "Certificate" }}>
       {auth.data ? <CertificateView cert={auth.data} /> : <Spinner label="Loading" />}
@@ -453,6 +455,7 @@ function useSettingsTarget(
 ) {
   const target = project ?? GLOBAL_TARGET
   const settings = useSettings(target, undefined, fetchSettings)
+  useFetchedReady(settings)
   const { list } = useEpicList(fetchEpics)
   const projects = [...new Set(list?.epics.map((e) => e.project) ?? [])].sort()
   const onWrite: WriteSetting = async (changes) => {
@@ -659,6 +662,7 @@ export function WebLoginsPage({
   now?: () => number
 }) {
   const logins = useFetched("settings-logins", fetchList)
+  useFetchedReady(logins)
   return (
     <DetailPage title={{ kind: "Settings", name: "Web logins" }}>
       {logins.data ? (
@@ -685,6 +689,7 @@ export function WebLoginPage({
 }) {
   const { id = "" } = useParams()
   const logins = useFetched("settings-logins", fetchList)
+  useFetchedReady(logins)
   const write = useWrite()
   const login = logins.data?.find((l) => l.id === id)
   return (

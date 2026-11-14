@@ -1,5 +1,6 @@
 import { Box, Text } from "@chakra-ui/react"
 import { useConnectionContext } from "../connection"
+import { useFetchedReady } from "../useReady"
 import { DetailPage } from "../page/DetailPage"
 import { PageHeader } from "../page/PageHeader"
 import { PageIcon } from "../page/PageIcon"
@@ -31,7 +32,8 @@ function TipSection({ tip }: { tip: Tip }) {
 
 export function TipsPage({ fetchTips }: { fetchTips?: FetchTips }) {
   const conn = useConnectionContext()
-  const { tips, failed, retry } = useTips(fetchTips, conn)
+  const { tips, failed, source, retry } = useTips(fetchTips, conn)
+  useFetchedReady({ failed, source }, tips?.length === 0)
   return (
     <DetailPage title={{ kind: "Tips" }}>
       <PageHeader title="Tips" icon={<PageIcon kind="tips" />} />

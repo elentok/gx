@@ -20,6 +20,7 @@ import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
 import { ProgressRing } from "../ui/progress-ring/ProgressRing"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { useFetched } from "../useFetched"
+import { useFetchedReady } from "../useReady"
 import { fetchArchived, type FetchArchived } from "./archive"
 
 const ONLY_UNARCHIVE = ["unarchive" as const]
@@ -112,7 +113,8 @@ function ArchiveRow({
 export function ArchivePage({ fetchList = fetchArchived }: { fetchList?: FetchArchived }) {
   const conn = useConnectionContext()
   const navigate = useNavigate()
-  const { data, failed } = useFetched("archived", fetchList, conn)
+  const { data, failed, source } = useFetched("archived", fetchList, conn)
+  useFetchedReady({ failed, source }, data?.epics.length === 0)
   // Rows an action's response removed; a fresh list replaces them.
   const [gone, setGone] = useState<Set<string>>(new Set())
   // A page-cache read returns a new object each render, so keep the same Set when nothing is gone.

@@ -1,7 +1,7 @@
 import { apiFetch } from "../apiFetch"
 import type { Connection } from "../connection"
 import { SectionNeedsYou, type EpicList, type EpicListRow } from "../generated/server"
-import { useFetched } from "../useFetched"
+import { useFetched, type FetchedState } from "../useFetched"
 
 export type { EpicList }
 
@@ -17,6 +17,7 @@ export interface EpicListState {
   list: EpicList | null
   /** The first fetch failed and nothing is on screen. */
   failed: boolean
+  source: FetchedState<EpicList>["source"]
   retry: () => void
 }
 
@@ -37,8 +38,8 @@ export function useEpicList(
   fetcher: FetchEpicList = fetchEpicList,
   conn?: Connection,
 ): EpicListState {
-  const { data, failed, retry } = useFetched("epics", shareInFlight(fetcher), conn)
-  return { list: data, failed, retry }
+  const { data, failed, source, retry } = useFetched("epics", shareInFlight(fetcher), conn)
+  return { list: data, failed, source, retry }
 }
 
 export const isCurrent = (row: EpicListRow, current: string) =>

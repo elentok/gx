@@ -50,13 +50,13 @@ export function useCleanup(
   conn?: Connection,
 ) {
   // An empty project has nothing to read yet, so the fetch stays pending and the page shows its spinner.
-  const { data, failed, retry } = useFetched(
+  const { data, failed, source, retry } = useFetched(
     "cleanup",
     () => (project ? fetcher(project) : new Promise<CleanupReport>(() => {})),
     conn,
     { id: project },
   )
-  return { report: project ? data : null, failed, retry }
+  return { report: project ? data : null, failed, source, retry }
 }
 
 export interface CleanupGroup {

@@ -7,7 +7,7 @@ import {
   StatsRangeWeek,
   type Stats,
 } from "../generated/server"
-import { useFetched } from "../useFetched"
+import { useFetched, type FetchedState } from "../useFetched"
 
 export type { Stats }
 
@@ -41,6 +41,7 @@ export interface StatsState {
   stats: Stats | null
   /** The first fetch failed and nothing is on screen. */
   failed: boolean
+  source: FetchedState<Stats>["source"]
   retry: () => void
 }
 
@@ -50,9 +51,14 @@ export function useStats(
   conn?: Connection,
 ): StatsState {
   const { range, project } = query
-  const { data, failed, retry } = useFetched("stats", () => fetcher({ range, project }), conn, {
-    id: `${range}:${project}`,
-    debounceMs: STATS_REFETCH_DEBOUNCE_MS,
-  })
-  return { stats: data, failed, retry }
+  const { data, failed, source, retry } = useFetched(
+    "stats",
+    () => fetcher({ range, project }),
+    conn,
+    {
+      id: `${range}:${project}`,
+      debounceMs: STATS_REFETCH_DEBOUNCE_MS,
+    },
+  )
+  return { stats: data, failed, source, retry }
 }

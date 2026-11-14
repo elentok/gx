@@ -15,6 +15,7 @@ import { Button } from "../ui/button/Button"
 import { PromptBox } from "../ui/expandable-text/PromptBox"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { useFetched } from "../useFetched"
+import { useFetchedReady } from "../useReady"
 import { refusalText, useWrite, type Refusable } from "../useWrite"
 import {
   DAYS,
@@ -607,7 +608,8 @@ function Fresh({
   edit: PostEdit
 }) {
   const conn = useConnectionContext()
-  const { data, failed } = useFetched("schedules", fetchList, conn)
+  const { data, failed, source } = useFetched("schedules", fetchList, conn)
+  useFetchedReady({ failed, source })
   const [base, setBase] = useState(newForm)
   if (failed) return <Text mt="6">Could not load the projects</Text>
   if (!data) return <FullScreenLoader label="Loading Schedule" />
@@ -641,9 +643,13 @@ function Existing({
   const i = address.indexOf(":")
   const project = address.slice(0, i)
   const slug = address.slice(i + 1)
-  const { data, failed, retry } = useFetched("schedule", () => fetchShow(project, slug), conn, {
-    id: address,
-  })
+  const { data, failed, source, retry } = useFetched(
+    "schedule",
+    () => fetchShow(project, slug),
+    conn,
+    { id: address },
+  )
+  useFetchedReady({ failed, source })
   const [base, setBase] = useState<ScheduleForm>()
   const loaded = data && !data.refused ? formOf(data) : undefined
   const loadedKey = JSON.stringify(loaded)
