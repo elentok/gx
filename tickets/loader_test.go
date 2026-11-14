@@ -428,6 +428,26 @@ func TestLoad_ArchiveAndBranchFields(t *testing.T) {
 	}
 }
 
+func TestLoad_RangeFields(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "with", "ticket.md"), "---\nstatus: open\nrange_base: aaa111\nrange_tip: bbb222\n---\n# E\n")
+	writeFile(t, filepath.Join(dir, "without", "ticket.md"), "---\nstatus: open\n---\n# E\n")
+
+	epics, err := Load(dir)
+	if err != nil || len(epics) != 2 {
+		t.Fatalf("Load = %v, %v", epics, err)
+	}
+	for _, e := range epics {
+		wantBase, wantTip := "", ""
+		if e.Name == "with" {
+			wantBase, wantTip = "aaa111", "bbb222"
+		}
+		if e.RangeBase != wantBase || e.RangeTip != wantTip {
+			t.Errorf("%s: got %q %q, want %q %q", e.Name, e.RangeBase, e.RangeTip, wantBase, wantTip)
+		}
+	}
+}
+
 func TestBranchHelpers(t *testing.T) {
 	tests := []struct {
 		name               string

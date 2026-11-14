@@ -41,6 +41,37 @@ func TestStampEpicFields_KeepsOtherKeysAndNeverOverwrites(t *testing.T) {
 	}
 }
 
+func TestStampEpicFields_WritesMergedAtAndRangeTogetherWithoutOverwriting(t *testing.T) {
+	epic := t.TempDir()
+	path := filepath.Join(epic, "ticket.md")
+	if err := os.WriteFile(path, []byte("---\nstatus: open\nbase: main\n---\n\n# epic\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	merged := time.Date(2026, 5, 6, 7, 8, 9, 0, time.UTC)
+	if err := StampEpicFields(epic, map[string]any{"merged_at": merged, "range_base": "aaa", "range_tip": "bbb"}); err != nil {
+		t.Fatal(err)
+	}
+	// A second stamp with other values must not overwrite any of the three.
+	if err := StampEpicFields(epic, map[string]any{"merged_at": merged.Add(time.Hour), "range_base": "ccc", "range_tip": "ddd"}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(raw)
+	for _, want := range []string{"status: open", "base: main", "merged_at: 2026-05-06T07:08:09Z", "range_base: aaa", "range_tip: bbb"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("ticket.md missing %q:\n%s", want, got)
+		}
+	}
+	for _, bad := range []string{"ccc", "ddd", "08:08:09"} {
+		if strings.Contains(got, bad) {
+			t.Errorf("existing key overwritten (%q):\n%s", bad, got)
+		}
+	}
+}
+
 func TestStampEpicFields_WaitsForProjectMigration(t *testing.T) {
 	requireWaitsForProjectMigration(t, func(t *testing.T, root string) (string, func() error) {
 		project, epic := storeProjectWithEpic(t, root, "status: open\n")

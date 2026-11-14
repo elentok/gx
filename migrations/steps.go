@@ -98,6 +98,10 @@ func init() {
 	Default.Register(Step{Name: "ticket-scheduled-for", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
+	// epic-range-backfill: range_base and range_tip are optional; absent is "no recorded range". The backfill ticket fills in this step's Run.
+	Default.Register(Step{Name: "epic-range-backfill", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

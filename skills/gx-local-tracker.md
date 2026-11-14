@@ -193,7 +193,7 @@ conversation history.
   `design_step` (`--design-step <step>`: chart, resolve-tickets, spec, review, grill-findings,
   create-tickets, branch, done; `branch` means the map's design branch was merged into a new
   `<epic>-impl` branch, step 8 of gx-design; a move to an earlier step needs `--allow-backward`); `completed_at`,
-  `evolved_at`, `evolve_skipped` and `evolve_ticket` are server-stamped and read-only. Never
+  `evolved_at`, `evolve_skipped`, `evolve_ticket`, `range_base` and `range_tip` are server-stamped and read-only. Never
   hand-edit an epic's `ticket.md`.
 
 ### From `draft` to `open`

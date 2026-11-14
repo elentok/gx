@@ -336,6 +336,8 @@ type ticketMDYAML struct {
 	ArchivedAt        *time.Time `yaml:"archived_at"`
 	ArchivedWorkspace string     `yaml:"archived_workspace"`
 	BranchName        string     `yaml:"branch_name"`
+	RangeBase         string     `yaml:"range_base"`
+	RangeTip          string     `yaml:"range_tip"`
 
 	DesignStartedAt *time.Time `yaml:"design_started_at"`
 
@@ -418,6 +420,7 @@ func loadEpicTicketMD(epic *Epic) {
 		epic.ArchivedAt = *wire.ArchivedAt
 	}
 	epic.ArchivedWorkspace, epic.BranchName = wire.ArchivedWorkspace, wire.BranchName
+	epic.RangeBase, epic.RangeTip = wire.RangeBase, wire.RangeTip
 	if wire.QueuedAt != nil {
 		epic.QueuedAt = *wire.QueuedAt
 	}

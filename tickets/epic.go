@@ -99,6 +99,11 @@ type Epic struct {
 	ArchivedAt        time.Time
 	ArchivedWorkspace string
 	BranchName        string
+	// RangeBase and RangeTip are the full SHAs of the Epic range, stamped
+	// together with MergedAt. Both empty means no recorded range; equal and
+	// non-empty is the stamped empty range of an epic with no commits.
+	RangeBase string
+	RangeTip  string
 	// QueuedAt is when the epic was first added to the queue; zero on an epic
 	// queued before the field existed.
 	QueuedAt time.Time
