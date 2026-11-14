@@ -262,6 +262,10 @@ type Scenario struct {
 	// DevMode seeds a Dev checkout and the fake pnpm in the state the --shape
 	// value names (default running); see DevModeShapes and devmode.go.
 	DevMode bool
+	// HostFiles seeds demo's repo files, second worktree, mock page, second
+	// origin and temp folder for the host-files links, in the --shape state
+	// (default main-worktree); see HostFilesShapes and hostfiles.go.
+	HostFiles bool
 }
 
 // WebMode is how far the fixture takes the web setup and sign-in.
@@ -323,6 +327,8 @@ type SessionSpec struct {
 	Images bool
 	// Interrupted appends one interrupted turn to the chat (see InterruptedScenario).
 	Interrupted bool
+	// HostFilesChat appends the host-files scenario's link messages to the chat.
+	HostFilesChat bool
 	// Rejected says the agent rejects the first prompt (see Scenario.UnknownSkill):
 	// the session is settled once it raises the Unknown command Actionable.
 	Rejected bool

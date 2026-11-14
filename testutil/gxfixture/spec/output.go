@@ -85,6 +85,8 @@ type Output struct {
 	Origin  string `json:"origin,omitempty"`
 	// FeatureWorktree is demo's `feature` worktree, in scenarios that make one.
 	FeatureWorktree string `json:"feature_worktree,omitempty"`
+	// HostFiles is the host-files scenario's paths; nil elsewhere.
+	HostFiles *HostFilesOutput `json:"host_files,omitempty"`
 }
 
 // ShellEnv is the output as `export` lines a shell can source: the CLI env, then

@@ -708,6 +708,9 @@ var Scenarios = map[string]scenario{
 	"agents-promote": spec.PromoteScenario(),
 	// agents-images: agents plus saved images in the chat of one Claude and one Codex session.
 	"agents-images": agentsImagesScenario(),
+	// host-files: demo's repo files, a second worktree, a mock page with a second origin and a
+	// chat that links them. -shape no-main-worktree checks out demo's trunk nowhere.
+	"host-files": hostFilesScenario(),
 	// agents-interrupted: Claude and Codex, Chat and Design sessions whose chat holds one interrupted turn.
 	"agents-interrupted": spec.InterruptedScenario(),
 	// agents-commands: six lean sessions and two design sessions with fixed

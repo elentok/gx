@@ -113,6 +113,8 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	model := fs.String("model", "", "")
 	fs.String("effort", "", "")
 	fs.String("remote-control", "", "")
+	// gx adds one per configured agents.writable-directories entry (the default has one).
+	fs.Func("add-dir", "", func(string) error { return nil })
 	if err := fs.Parse(args); err != nil {
 		return tuiOptions{}, err
 	}

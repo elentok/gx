@@ -16,6 +16,7 @@
 // --shape <list|all-off|empty|page|paused|missing-project> picks the Schedules and Last runs of the schedules scenario (default list).
 // --shape <merged|running|unstamped|empty|missing-sha|pr|backfill> picks the Epic ranges and branches of the epic-diff scenario (default merged).
 // --shape <running|off|installing|starting|down|no-checkout> picks the Dev mode state of the dev-mode scenario (default running).
+// --shape <main-worktree|no-main-worktree> picks whether demo's trunk is checked out in the host-files scenario (default main-worktree).
 // --env prints `export` lines (see Output.ShellEnv) instead of the JSON, so a shell can source them.
 // --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
 // --mock-dir <path> serves that directory over loopback HTTP and reports its base URL as mock_url.
@@ -215,6 +216,8 @@ type fixture struct {
 	chatCapture string
 	// devControl is the dev-mode scenario's fake pnpm control file; empty elsewhere.
 	devControl string
+	// hostFiles is the host-files scenario's printed paths; nil elsewhere.
+	hostFiles *spec.HostFilesOutput
 }
 
 // waitReady polls until the server answers with its web URL and Setup code.

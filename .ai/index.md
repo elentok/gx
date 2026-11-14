@@ -319,7 +319,8 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   (`Scenario`, `Epic`, `Ticket`, `SessionSpec`) and the scenario definitions that need nothing from
   the fixture program live in the sub-package `testutil/gxfixture/spec`. The registry
   (`catalog.Scenarios`, `catalog.Names()`) lives in `testutil/gxfixture/catalog` (`scenarios.go`,
-  `cachegate.go`, `launchstate.go`, `imagesscenarios.go`: data only); `scenarios.go` in `main` keeps
+  `cachegate.go`, `launchstate.go`, `imagesscenarios.go`, `hostfiles.go`: data only; the
+  `host-files` scenario's repo files, second origin and chat lines are `hostfiles.go` in `main`); `scenarios.go` in `main` keeps
   the spec aliases. New scenario definitions that take no `fixture` go there too
   (the package is near the `sizeguard` limits). `Output`, the JSON it prints, lives in `spec` too.
   Its scenario tests run in the test-only packages `designflows`, `limitsflows` and `webflows`

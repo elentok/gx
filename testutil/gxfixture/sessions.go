@@ -250,6 +250,9 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 	if s.Interrupted {
 		return f.seedInterrupted(id, s.Harness)
 	}
+	if s.HostFilesChat {
+		return f.seedHostFilesChat(id, s.Harness)
+	}
 	return nil
 }
 

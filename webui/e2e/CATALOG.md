@@ -60,6 +60,14 @@ held), `starting` (on, Vite never ready), `running` (on, ready), `down` (starts 
 state moves to `down`, so the toast fires after the page loaded) and `no-checkout` (key on, no `dev-dir`, no stamp: no checkout). The
 output field `dev_control_file` is the fake's JSON control file (`{"install":"hold"|"fail"|"ok","vite":"hold"|"crash"|"ready"}`): write
 `{"vite":"crash"}` to take Vite down, or `{}` to release a hold. Data: `testutil/gxfixture/devmode.go`.
+The `host-files` scenario is demo with a checked-out main worktree, a second worktree (`feature`) holding `only-in-feature.md`, one Claude
+session whose chat links the files (the plan, `~/dev/gx/.scratch/flow.mmd`, `mocks/04-viewer.html`, `shot-1.png`, `handler.go:42`, the missing
+`notes/gone.md`), a tool line for `handler.go`, a prompt with a path and a question card, and a ticket (`files-epic/01`) whose body names a
+relative and an absolute path. The repo also holds `.env`, a 3 MB `big.log`, `doc.pdf`, `blob.bin`, a `logo.svg` with a script, `outside-link` (a
+symlink to `/etc/hosts`), `docs/plans/host-files.md` (relative link, image, `mermaid` fence, fragment link, `other.md#install`) and the mock
+`mocks/04-viewer.html` with its four siblings; a second loopback origin serves one script and one JSON path. The output field `host_files`
+names `repo`, `second_worktree`, `second_only`, `temp_dir` (holds `shot-1.png`), `other_origin` and `ticket`. `--shape no-main-worktree` moves
+the repo off `main`, so no worktree has the trunk (default `main-worktree`). Data: `testutil/gxfixture/hostfiles.go`.
 The `context-window` scenario seeds Claude sessions at 40K, 90K, 128K and 170K tokens (output `transcripts` keys `green`, `yellow`,
 `orange`, `red`, plus `compact`, a session that ran `/compact`), a fresh one, a finished one, one with no transcript file, a Codex one, a
 Queue agent, a Design session at 128K and an open Triage. The server announces transcript growth only while a session works, so a flow

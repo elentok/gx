@@ -205,6 +205,11 @@ func (f *fixture) prepareStore(sc scenario, shape string, port int, configs []st
 	if err := f.seed(sc); err != nil {
 		return err
 	}
+	if sc.HostFiles {
+		if err := f.setupHostFiles(shape); err != nil {
+			return fmt.Errorf("host files: %w", err)
+		}
+	}
 	// The server migrates on every start. The seed is already in the current
 	// shape, so only the migrate scenarios leave steps pending.
 	if !sc.Migrate {
@@ -245,6 +250,7 @@ func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts m
 	if sc.Commands != nil {
 		res.FeatureWorktree = filepath.Join(f.root, "repo", ".worktrees", "feature")
 	}
+	res.HostFiles = f.hostFiles
 	if cwd, err := os.Getwd(); err == nil {
 		res.BrowserSession = filepath.Base(cwd)
 		res.Worktree = cwd

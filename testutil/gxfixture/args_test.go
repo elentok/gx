@@ -2,6 +2,7 @@ package main
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/testutil/gxfixture/catalog"
@@ -47,6 +48,19 @@ func TestParseArgs(t *testing.T) {
 				t.Fatalf("got %+v, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCheckShape_HostFiles(t *testing.T) {
+	sc := catalog.Scenarios["host-files"]
+	if got, err := checkShape(sc, ""); err != nil || got != "main-worktree" {
+		t.Errorf("default = %q, %v, want main-worktree", got, err)
+	}
+	if got, err := checkShape(sc, "no-main-worktree"); err != nil || got != "no-main-worktree" {
+		t.Errorf("no-main-worktree = %q, %v", got, err)
+	}
+	if _, err := checkShape(sc, "bogus"); err == nil || !strings.Contains(err.Error(), "no-main-worktree") {
+		t.Errorf("bogus err = %v, want the known list", err)
 	}
 }
 
