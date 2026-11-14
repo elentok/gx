@@ -341,6 +341,10 @@ type SessionSpec struct {
 type Draft struct {
 	Project, Slug, Idea string
 	Images              int
+	// AfterStart seeds the draft once the server is up, through the create
+	// route. An empty draft cannot be seeded before start: the sweep at server
+	// start deletes every empty draft with no live lease.
+	AfterStart bool
 }
 
 // CommandStep is one "/" command a seeded session runs. Output is the stdout

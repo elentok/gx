@@ -50,6 +50,9 @@ func seedDrafts(stateDir string, list []spec.Draft) error {
 	}
 	store := drafts.New(stateDir)
 	for _, d := range list {
+		if d.AfterStart {
+			continue
+		}
 		saved, err := store.Create(d.Project, d.Slug, d.Idea)
 		if err != nil {
 			return err

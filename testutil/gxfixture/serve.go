@@ -15,6 +15,7 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/migratefail"
@@ -174,6 +175,22 @@ func sessionWorking(ctx context.Context, cl *apiclient.Client, id string) (bool,
 	}), nil
 }
 
+// seedLateDrafts creates the AfterStart drafts through the real create route.
+// Scenario order matters: creating a draft sweeps older unleased empty drafts,
+// so list the empty one last.
+func (f *fixture) seedLateDrafts(ctx context.Context, list []spec.Draft) error {
+	cl := apiclient.New(server.SocketPath(f.stateD))
+	for _, d := range list {
+		if !d.AfterStart {
+			continue
+		}
+		if res, err := cl.Sessions.SaveDesignDraft(ctx, ops.DesignDraftSaveRequest{Idea: d.Idea}); err != nil || res.Refused {
+			return fmt.Errorf("late draft %q: %v %+v", d.Slug, err, res)
+		}
+	}
+	return nil
+}
+
 // startFixAgents starts the scenario's Fix agents through the API: one per
 // FixAgents ticket, and the project-level one for a recorded failed migration.
 func (f *fixture) startFixAgents(ctx context.Context, sc scenario) error {
@@ -255,6 +272,9 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 		}
 	}
 	if err := runSteps(f, sc.Steps); err != nil {
+		return s, err
+	}
+	if err := f.seedLateDrafts(ctx, sc.Drafts); err != nil {
 		return s, err
 	}
 	if err := f.startFixAgents(ctx, sc); err != nil {

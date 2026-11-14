@@ -9,7 +9,10 @@ import (
 // Workspace the bulk-actions scenario creates, besides the Default workspace.
 const WorkspaceBulk = "bulk"
 
-// ArchivedWorkspaceGone is the stored workspace of an archived epic whose workspace no longer exists.
+// DraftSlugBulk is the slug of the non-empty Design draft the bulk-actions scenario seeds.
+const DraftSlugBulk = "bulk-draft"
+
+// ArchivedWorkspaceGoneis the stored workspace of an archived epic whose workspace no longer exists.
 const ArchivedWorkspaceGone = "gone-ws"
 
 // BulkActionsScenario seeds what the bulk actions act on: finished epics (with
@@ -76,6 +79,10 @@ func BulkActionsScenario() scenario {
 			{"server", "epics", "archive", archivedAgents, "--yes"},
 		},
 		Sessions: []sessionSpec{{Project: project, Prompt: "hello", Crash: true, Read: true}},
+		Drafts: []Draft{
+			{Project: project, Slug: DraftSlugBulk, Idea: "A draft to move or remove"},
+			{Project: project, AfterStart: true},
+		},
 		Steps: [][]string{
 			{"server", "workspaces", "create", WorkspaceBulk},
 			{"server", "workspaces", "move", heldEpic, WorkspaceBulk},

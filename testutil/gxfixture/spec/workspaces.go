@@ -15,6 +15,10 @@ const (
 	WorkspaceResearch = "research"
 )
 
+// DraftSlugWorkspaces is the slug of the Design draft the workspaces scenario
+// seeds with no workspace membership.
+const DraftSlugWorkspaces = "ws-draft"
+
 // WorkspacesScenario seeds the workspaces the sidebar and the Epics page group
 // by: a live Design and a held Design in "gx bugs", an implementation epic with
 // a held worker and a held epic in "research", a chat and the one-off agent in
@@ -76,8 +80,9 @@ func WorkspacesScenario() scenario {
 				{"04", "a-draft", servertest.TicketOpts{Category: "idea", Status: "draft"}},
 			}},
 		},
+		Drafts: []Draft{{Project: project, Slug: DraftSlugWorkspaces, Idea: "A draft in no workspace"}},
 		EpicMeta: map[string]string{
-			project + ":ws-design":       "status: open\nkind: map\n",
+			project + ":ws-design":      "status: open\nkind: map\n",
 			project + ":held-design":     "status: open\nkind: map\n",
 			project + ":design-new":      "status: open\nkind: map\n",
 			sideProject + ":side-design": "status: open\nkind: map\n",

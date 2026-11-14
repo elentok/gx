@@ -3,6 +3,8 @@ package designflows
 import (
 	"encoding/json"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -10,7 +12,31 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
+
+func TestWorkspacesScenario_SeedsADraftWithNoMembership(t *testing.T) {
+	t.Parallel()
+	r := sharedWorkspaces(t)
+	var snap wire.Snapshot
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "snapshot", "--json")), &snap); err != nil {
+		t.Fatal(err)
+	}
+	if len(snap.DesignDrafts) != 1 {
+		t.Fatalf("design drafts = %+v, want exactly one", snap.DesignDrafts)
+	}
+	d := snap.DesignDrafts[0]
+	if d.Label != spec.DraftSlugWorkspaces || d.Workspace != "Default workspace" {
+		t.Errorf("draft = %+v, want label %q in Default workspace", d, spec.DraftSlugWorkspaces)
+	}
+	raw, err := os.ReadFile(filepath.Join(r.StateDir, "workspaces.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), d.ID) {
+		t.Errorf("members file mentions draft %s:\n%s", d.ID, raw)
+	}
+}
 
 // The read-only TestWorkspacesScenario_* tests share one workspaces fixture,
 // which TestMain starts and stops: under a whole-package run, a fixture per

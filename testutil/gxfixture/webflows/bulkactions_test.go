@@ -10,9 +10,43 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
+
+func TestBulkActions_SeedsADraftAndAnEmptyDraft(t *testing.T) {
+	t.Parallel()
+	r := start(t, "bulk-actions")
+	defer r.Stop(t)
+	var out struct {
+		Drafts []ops.DesignDraftItem `json:"drafts"`
+	}
+	if err := json.Unmarshal([]byte(r.Gx(t, "designs", "drafts", "list", "--json")), &out); err != nil {
+		t.Fatal(err)
+	}
+	var named, empty int
+	for _, d := range out.Drafts {
+		switch {
+		case d.Label == spec.DraftSlugBulk:
+			named++
+		case d.ImageCount == 0 && d.Slug == "" && d.Idea == "":
+			empty++
+		}
+	}
+	if len(out.Drafts) != 2 || named != 1 || empty != 1 {
+		t.Errorf("want one %q draft and one empty draft, got %+v", spec.DraftSlugBulk, out.Drafts)
+	}
+	var list wire.EpicList
+	if err := json.Unmarshal([]byte(r.Gx(t, "server", "epics", "--json")), &list); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range list.Epics {
+		if c.Name == spec.DraftSlugBulk {
+			t.Errorf("epics list shows the draft %q", c.Name)
+		}
+	}
+}
 
 func TestBulkActions_SeedsCardsAgentsWorkspacesAndArchivedEpics(t *testing.T) {
 	t.Parallel()
