@@ -93,6 +93,9 @@ type Deps struct {
 	Pauses   Pauses
 	Sessions Sessions
 
+	// Diff may be nil, which leaves an unmerged epic without View diff.
+	Diff DiffRefs
+
 	Workspaces Workspaces
 
 	// Seen keeps the last Needs-you or Merged state a person saw per card. Nil

@@ -1,14 +1,34 @@
 package server
 
 import (
+	"errors"
 	"time"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketgit"
 )
+
+// epicDiffRefs answers epics.DiffRefs with the merger's ref derivation, the
+// one the Epic range stamp uses, and one rev-list count per call.
+type epicDiffRefs struct{ s *Server }
+
+func (d epicDiffRefs) EpicBranchAhead(project string, epics []tickets.Epic, e tickets.Epic) (string, int, error) {
+	repo := ticketgit.ProjectRepoRoot(d.s.cfg.TicketStore, project)
+	if repo == "" {
+		return "", 0, errors.New("project has no repo")
+	}
+	_, base, _, err := d.s.merger.EpicRefs(project, epics, e.Name, repo)
+	if err != nil {
+		return "", 0, err
+	}
+	ahead, err := git.CommitsAhead(repo, base, e.Branch())
+	return base, ahead, err
+}
 
 // epicsDeps wires the epic read models to the root. The helpers that stay up
 // are bound late, so a test that swaps a Server member is still seen.
@@ -27,6 +47,7 @@ func (s *Server) epicsDeps() epics.Deps {
 		Queue:    s.queue,
 		Pauses:   &s.pauseHold,
 		Sessions: s.sessions,
+		Diff:     epicDiffRefs{s},
 
 		Workspaces: s.workspaces,
 		Seen:       epics.OpenSeen(s.cfg.StateDir),

@@ -162,6 +162,8 @@ type TicketDetail struct {
 	Epic      string `json:"epic"`
 	// MapEpic is set for a ticket of a map epic, which has no stats and never pauses.
 	MapEpic bool `json:"map_epic"`
+	// ShowsViewDiff is set for a done, non-commitless ticket whose epic shows View diff.
+	ShowsViewDiff bool `json:"shows_view_diff,omitempty"`
 	// Body is the whole body markdown, comments included.
 	Body string `json:"body,omitempty"`
 	// LatestSummary is unset when the body has no Iteration summaries entry.

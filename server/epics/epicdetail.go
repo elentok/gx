@@ -62,7 +62,9 @@ func (s *Epics) buildEpicDetail(root queue.RootRef, epics []tickets.Epic, e tick
 	if e.IsMap {
 		return s.buildMapDetail(root, epics, e, now)
 	}
-	return s.buildLoopDetail(root, e, now)
+	d := s.buildLoopDetail(root, e, now)
+	applyViewDiff(&d, s.viewDiffOf(root.Project, epics, e))
+	return d
 }
 
 // decorateLive adds the live state of an active epic to its static detail d.

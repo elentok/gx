@@ -382,6 +382,10 @@ export interface TicketDetail {
    */
   map_epic: boolean;
   /**
+   * ShowsViewDiff is set for a done, non-commitless ticket whose epic shows View diff.
+   */
+  shows_view_diff?: boolean;
+  /**
    * Body is the whole body markdown, comments included.
    */
   body?: string;
@@ -937,6 +941,19 @@ export interface EpicDetail {
    * ArchivedAt is set on an archived epic's detail only; it is absent for an active one.
    */
   archived_at?: string;
+  /**
+   * HasCommitsAhead is set for an unmerged loop epic whose branch has a commit
+   * past its derived base.
+   */
+  has_commits_ahead?: boolean;
+  /**
+   * ShowsViewDiff says whether the page shows View diff. DiffBase and DiffTip
+   * are the two refs the link opens: base and branch for an unmerged epic, the
+   * stamped SHAs for a merged one (both empty when no range was recorded).
+   */
+  shows_view_diff?: boolean;
+  diff_base?: string;
+  diff_tip?: string;
   /**
    * Queueable is set when the Queue action applies; see epicQueueable.
    */
