@@ -9,6 +9,15 @@ test("204. Hosted files, wide", async ({ page, start }) => {
   const hf = fixture.hostFiles!
   const plan = join(hf.repo, "docs/plans/host-files.md")
 
+  // The Mermaid bundle is requested only when a diagram shows: a Markdown file without one asks for none.
+  const bundleRequests: string[] = []
+  page.on("request", (r) => {
+    if (/mermaid/i.test(new URL(r.url()).pathname)) bundleRequests.push(r.url())
+  })
+  await go(page, `#/files${join(hf.repo, "docs/plans/other.md")}`)
+  await expect(page.getByRole("heading", { name: "Other", level: 1 })).toBeVisible()
+  expect(bundleRequests).toHaveLength(0)
+
   // Steps 1: the CLI prints a stable viewer link; the viewer shows the Markdown.
   const link = (await fixture.cli("files", "url", plan)).trim()
   expect(link).toMatch(/^https:\/\//)
@@ -143,6 +152,138 @@ test("204. Hosted files, wide", async ({ page, start }) => {
   const ticketLink = (name: string) => page.getByRole("link", { name, exact: true })
   await expect(ticketLink("docs/plans/host-files.md")).toBeVisible()
   await expect(ticketLink(join(hf.repo, ".scratch/flow.mmd"))).toBeVisible()
+
+  // Step 8: hover cards, one per kind.
+  await go(page, `#/agents/${sessionId}`)
+  await ask(
+    fixture,
+    sessionId,
+    "Previews: docs/plans/host-files.md .scratch/flow.mmd mocks/04-viewer.html docs/plans/pic.png server/files/handler.go:42 big.log doc.pdf blob.bin logo.svg",
+  )
+  const previews = page
+    .locator("p, div")
+    .filter({ hasText: /^Previews:/ })
+    .last()
+  // The cards of every chat link stay mounted, closed; only the open one counts.
+  const hoverCard = page.locator("[data-file-hover-card][data-state='open']")
+  const body = hoverCard.locator("[data-preview-body]")
+  const previewLink = (name: string) => previews.getByRole("link", { name, exact: true })
+  const hoverOver = async (name: string) => {
+    const l = previewLink(name)
+    await expect(l).toBeVisible()
+    await l.hover()
+    await expect(hoverCard).toBeVisible()
+    return l
+  }
+  const leave = async () => {
+    await page.mouse.move(0, 0)
+    await expect(hoverCard).toHaveCount(0)
+  }
+  await hoverOver("docs/plans/host-files.md")
+  await expect(body).toContainText("Host files plan")
+  await leave()
+  await hoverOver(".scratch/flow.mmd")
+  await expect(body.locator("svg")).toBeVisible()
+  await leave()
+  await hoverOver("mocks/04-viewer.html")
+  await expect(body).toHaveAttribute("data-preview-body", "html")
+  await expect(body).toContainText("No live preview")
+  await expect(hoverCard.locator("iframe")).toHaveCount(0)
+  await leave()
+  await hoverOver("docs/plans/pic.png")
+  await expect(body.locator("img")).toBeVisible()
+  await leave()
+  await hoverOver("server/files/handler.go:42")
+  await expect(body.locator("[data-line='42']")).toHaveAttribute("aria-current", "true")
+  await leave()
+  for (const name of ["big.log", "doc.pdf"]) {
+    await hoverOver(name)
+    await expect(body).toContainText("No preview")
+    await leave()
+  }
+  // Keyboard focus opens the card; Escape closes it.
+  await previewLink("big.log").focus()
+  await expect(hoverCard).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(hoverCard).toHaveCount(0)
+
+  // Step 9: the viewer, one kind at a time.
+  const bar = page.getByTestId("viewer-bar")
+  const view = (name: string) => go(page, `#/files${join(hf.repo, name)}`)
+  const source = bar.getByRole("button", { name: "Source" })
+  const rawLink = bar.getByRole("link", { name: "Raw" })
+  const download = bar.getByRole("link", { name: "Download" })
+  await view("docs/plans/other.md")
+  await expect(page.getByRole("heading", { name: "Other", level: 1 })).toBeVisible()
+  await expect(source).toHaveAttribute("aria-pressed", "false")
+  await source.click()
+  await expect(source).toHaveAttribute("aria-pressed", "true")
+  await expect(page.getByTestId("code-view")).toContainText("## Install")
+  await view(".scratch/flow.mmd")
+  await expect(page.getByTestId("mermaid-view").locator("svg")).toBeVisible()
+  expect(bundleRequests.length).toBeGreaterThan(0)
+  await view("mocks/04-viewer.html")
+  await expect(page.getByText("Sandboxed page, scripts allowed, no access to gx")).toBeVisible()
+  await view("server/files/handler.go")
+  await expect(page.getByTestId("code-view").locator("[data-line='42']")).toBeVisible()
+  await view("logo.svg")
+  await expect(page.locator("img[src*='logo.svg']")).toBeVisible()
+  expect(await page.evaluate(() => (window as { svgRan?: boolean }).svgRan)).toBeUndefined()
+  for (const name of ["big.log", "blob.bin"]) {
+    await view(name)
+    await expect(rawLink).toBeVisible()
+    await expect(download).toBeVisible()
+    await expect(source).toHaveCount(0)
+  }
+
+  // Step 10: doc.pdf has Raw and Download, no Source; Raw is a PDF with the sandbox header.
+  await view("doc.pdf")
+  await expect(rawLink).toBeVisible()
+  await expect(download).toBeVisible()
+  await expect(source).toHaveCount(0)
+  const pdfUrl = new URL((await rawLink.getAttribute("href"))!, page.url()).toString()
+  const pdf = await page.context().request.get(pdfUrl)
+  expect(pdf.status()).toBe(200)
+  expect(pdf.headers()["content-type"]).toContain("application/pdf")
+  expect(pdf.headers()["content-security-policy"]).toContain("sandbox")
+  // Opened as a top-level page, headless Chromium downloads the PDF instead of showing it (see the
+  // ticket's Spec deviations), so the flow checks the reply, not what the browser draws.
+
+  // Step 11: hosted Markdown links. A link is a real <a href>; the fragment link scrolls without a refetch.
+  const fileFetches: string[] = []
+  page.on("request", (r) => {
+    if (r.url().includes("/v1/files/") && r.url().endsWith("/docs/plans/host-files.md"))
+      fileFetches.push(r.url())
+  })
+  await view("docs/plans/host-files.md")
+  const md = page.getByTestId("markdown-view")
+  await expect(md.getByRole("heading", { name: "Host files plan", level: 1 })).toBeVisible()
+  await expect(md.locator("svg[aria-roledescription='flowchart-v2']")).toBeVisible()
+  const handlerLink = md.getByRole("link", { name: "the handler" })
+  await expect(handlerLink).toHaveAttribute("href", /#\/files\/.*\/server\/files\/handler\.go$/)
+  const picture = md.getByRole("img", { name: "pic" })
+  await expect(picture).toHaveAttribute("src", /\/v1\/files\//)
+  await expect
+    .poll(() => picture.evaluate((i: HTMLImageElement) => i.naturalWidth))
+    .toBeGreaterThan(0)
+  const fetchedBefore = fileFetches.length
+  const install = md.getByRole("heading", { name: "Install steps" })
+  await expect(install).not.toBeInViewport()
+  await md.getByRole("link", { name: "the install steps" }).click()
+  await expect(page).toHaveURL(/heading=install-steps/)
+  await expect(install).toBeInViewport()
+  expect(fileFetches).toHaveLength(fetchedBefore)
+  await md.getByRole("link", { name: "other.md#install" }).click()
+  await expect(page).toHaveURL(/docs\/plans\/other\.md\?heading=install/)
+  await expect(page.getByRole("heading", { name: "Install", level: 2 })).toBeInViewport()
+
+  // Step 12: Copy link puts the stable viewer link on the clipboard.
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"])
+  await view("docs/plans/host-files.md")
+  await bar.getByRole("button", { name: "Copy link" }).click()
+  await expect(page.getByText("Link copied")).toBeVisible()
+  const copied = await page.evaluate(() => navigator.clipboard.readText())
+  expect(copied).toBe(link)
 
   // A second start in the same test works; the absolute path still links on the other shape.
   // Its relative path should not link (no checked-out trunk), but the fixture repo is not bare,
