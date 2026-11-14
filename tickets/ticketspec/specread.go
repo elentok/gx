@@ -3,6 +3,7 @@ package ticketspec
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -70,34 +71,53 @@ func SpecListItem(section string, n int) (string, bool) {
 	return "", false
 }
 
-var specGroupRe = regexp.MustCompile(`\(stories (\d+) to (\d+)\)\s*$`)
+var (
+	// specGroupRe matches `(stories A to B[, C to D ...][, including ...])` at the
+	// end of a line; group 1 holds the ranges.
+	specGroupRe = regexp.MustCompile(`\(stories (\d+ to \d+(?:, \d+ to \d+)*)(?:, including [^)]*)?\)\s*$`)
+	specRangeRe = regexp.MustCompile(`(\d+) to (\d+)`)
+)
+
+// isListOrIndentedLine reports whether l is a list item or an indented line,
+// which never counts as a group heading.
+func isListOrIndentedLine(l string) bool {
+	return strings.HasPrefix(l, " ") || strings.HasPrefix(l, "\t") || specItemRe.MatchString(l) ||
+		strings.HasPrefix(l, "- ") || strings.HasPrefix(l, "* ")
+}
+
+// groupHeadingHolds reports whether l is a group heading, and whether n falls
+// in one of its ranges.
+func groupHeadingHolds(l string, n int) (heading, holds bool) {
+	if isListOrIndentedLine(l) {
+		return false, false
+	}
+	m := specGroupRe.FindStringSubmatch(l)
+	if m == nil {
+		return false, false
+	}
+	for _, r := range specRangeRe.FindAllStringSubmatch(m[1], -1) {
+		a, errA := strconv.Atoi(r[1])
+		b, errB := strconv.Atoi(r[2])
+		if errA == nil && errB == nil && a <= n && n <= b {
+			return true, true
+		}
+	}
+	return true, false
+}
 
 // SpecGroupBlock returns the block of the group heading whose `(stories A to
-// B)` range holds n, word for word: the heading and everything up to the next
-// group heading. A group heading is a line outside any list that ends in the
-// range; list lines and indented lines never count.
+// B[, C to D ...])` ranges hold n, word for word: the heading and everything
+// up to the next group heading. A group heading is a line outside any list
+// that ends in the ranges; list lines and indented lines never count.
 func SpecGroupBlock(section string, n int) (string, bool) {
 	lines := strings.Split(section, "\n")
-	isHeading := func(l string) []string {
-		if strings.HasPrefix(l, " ") || strings.HasPrefix(l, "\t") || specItemRe.MatchString(l) ||
-			strings.HasPrefix(l, "- ") || strings.HasPrefix(l, "* ") {
-			return nil
-		}
-		return specGroupRe.FindStringSubmatch(l)
-	}
 	start := -1
 	for i, l := range lines {
-		m := isHeading(l)
-		if start >= 0 && m != nil {
+		heading, holds := groupHeadingHolds(l, n)
+		if start >= 0 && heading {
 			return strings.TrimRight(strings.Join(lines[start:i], "\n"), "\n"), true
 		}
-		if m == nil || start >= 0 {
-			continue
-		}
-		var a, b int
-		fmt.Sscan(m[1], &a)
-		fmt.Sscan(m[2], &b)
-		if a <= n && n <= b {
+		if holds && start < 0 {
 			start = i
 		}
 	}

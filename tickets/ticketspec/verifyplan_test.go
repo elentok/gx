@@ -148,6 +148,31 @@ func TestVerifyBodies_GroupHeadingGivesWholeBlock(t *testing.T) {
 	}
 }
 
+func TestSpecGroupBlock_MultiRangeHeading(t *testing.T) {
+	t.Parallel()
+	section := "Skill size (stories 29 to 31)\n\n- size\n\n" +
+		"Triage (stories 32 to 43, 55 to 57, including 36a and 39b)\n\n- triage\n\n" +
+		"Last (stories 60 to 60)\n\n- last\n"
+	for _, n := range []int{32, 43, 55, 57} {
+		got, ok := SpecGroupBlock(section, n)
+		if !ok || !strings.HasPrefix(got, "Triage (") || !strings.HasSuffix(got, "- triage") {
+			t.Errorf("story %d: got %q, %v", n, got, ok)
+		}
+	}
+	for _, n := range []int{44, 54, 58} {
+		if got, ok := SpecGroupBlock(section, n); ok {
+			t.Errorf("story %d in a gap got block %q", n, got)
+		}
+	}
+	got, _ := SpecGroupBlock(section, 30)
+	if strings.Contains(got, "triage") || !strings.HasSuffix(got, "- size") {
+		t.Errorf("previous group runs past the multi-range heading: %q", got)
+	}
+	if got, ok := SpecVerificationEntry(section, 56); !ok || !strings.Contains(got, "- triage") {
+		t.Errorf("entry for 56: %q, %v", got, ok)
+	}
+}
+
 func TestVerifyBodies_NumberedItemBeatsGroup(t *testing.T) {
 	t.Parallel()
 	spec := strings.Replace(groupedSpec, "## Verification\n\n", "## Verification\n\n2. numbered two\n\n", 1)

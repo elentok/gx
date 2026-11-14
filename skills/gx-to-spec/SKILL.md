@@ -66,7 +66,9 @@ A list of testing decisions that were made. Include:
 
 ## Verification
 
-One entry per user story, by number. A verify ticket runs these against a temporary gx server after
+One entry per user story, by number. Or one block per group of stories, under a heading line
+`Heading (stories N to M[, N to M ...])`, optionally ending `, including 36a, 39b)`. A story belongs
+to the group when it falls in any range. A verify ticket runs these against a temporary gx server after
 the epic is built. Each entry lists:
 
 - The flow-catalog flows to run for the story.
