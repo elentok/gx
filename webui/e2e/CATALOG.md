@@ -34,6 +34,16 @@ one-line help reply. `writing` (session running, two failed rows: one before its
 (Done, two kept rows, a ready epic and a map epic), `stopped` (started from the CLI: no session, stopped at Plan). `journey` has
 follow-ups and no record, for the Triage journey flow. Records are written with the `triage` package; the `verify` and `writing`
 sessions are started with `gx server triage open`. Data: `testutil/gxfixture/spec/triage.go`.
+`backlog` (project `demo`, no Triage) seeds three areas holding 11 (`parser`, plus a claimed ticket that is not counted), 5 (`sync`) and
+0 (`webui`) open tickets, and the half-filled charting map `retry-work` for "Finish move": its Notes name `sync` and list tickets 01 to 04,
+of which 03 and 04 are still in the area. Start Design (`gx agents start-design demo:<area>`) runs a fake chat: it prints the "Start this
+Design?" card (title, map name, numbered tickets with a reason each: every open ticket up to 14, so the 5-ticket area shows the small
+case), `drop <n>` removes the n-th ticket and reprints the card once, any other text reprints it unchanged, and `yes` runs
+`gx tickets start-design` and prints the Design link (`triageplay.PhraseDesignYes`, `PhraseDesignDrop`). `old-epics` (project `gx`, a
+Triage open at Route, no area) seeds charting maps whose Notes say "Triaged from follow-ups": `test-flakes`, `agent-guidance` and
+`ticket-authoring` (slugs in the shipped table), `scratch-ideas` (not in the table), plus `tickets-cli` (past charting, never a candidate),
+`gx-check` (empty) and `stuck-ticket-watchdog` (holds only a claimed ticket, so the summary shows it as waiting). Route saves a move
+unit per table epic, registers the table areas, and lists the moves and the waiting epic on its summary card.
 The `schedules` scenario seeds Schedules in the project `demo` (`start("schedules", { shape })`; default `list`). Set times are
 local, at least two hours ahead, and each switched-on Schedule's baseline is the start time, so no run starts by itself. `list`
 has three Schedules: "Weather check" (every day, two times) and "Morning PR digest" (weekdays) on, "Weekly cleanup report"

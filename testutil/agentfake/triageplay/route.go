@@ -155,6 +155,12 @@ func (p *Player) route(rec *triage.Record) (string, error) {
 			return "", err
 		}
 	}
+	// The move units are saved at the Route step, so before the plan, which
+	// moves the record on to Questions.
+	moveLines, err := p.oldEpicMoves(areas)
+	if err != nil {
+		return "", err
+	}
 	body, err := json.Marshal(RoutePlan(rec, areas))
 	if err != nil {
 		return "", err
@@ -166,7 +172,7 @@ func (p *Player) route(rec *triage.Record) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	card := strings.Join(summaryLines(v.Record, nil), "\n")
+	card := strings.Join(append(summaryLines(v.Record, nil), moveLines...), "\n")
 	// Route chains to Questions in the same session; the round is the last
 	// thing printed, with no run-end line.
 	next, err := p.questions(v.Record)
@@ -174,6 +180,59 @@ func (p *Player) route(rec *triage.Record) (string, error) {
 		return "", err
 	}
 	return "Route summary:\n" + card + "\n\n" + next, nil
+}
+
+// oldEpicMoves plans the old epics' moves as the skill does: each epic with
+// tickets to move goes to its table area (the closest area when the table has
+// none) and an epic that only holds claimed tickets is a "waiting" line. It
+// returns the card's lines.
+func (p *Player) oldEpicMoves(areas []string) ([]string, error) {
+	out, err := p.triage("", "oldepics", "--json")
+	if err != nil || out == "" {
+		return nil, err
+	}
+	var list []struct {
+		Epic    string   `json:"epic"`
+		Area    string   `json:"area"`
+		Move    []string `json:"move"`
+		Waiting bool     `json:"waiting"`
+		Claimed []string `json:"claimed"`
+	}
+	if err := json.Unmarshal([]byte(out), &list); err != nil {
+		return nil, err
+	}
+	var lines []string
+	units := []triage.MoveUnit{}
+	seen := map[string]bool{}
+	for _, e := range list {
+		if e.Waiting {
+			lines = append(lines, fmt.Sprintf("waiting: %s holds claimed %s", e.Epic, strings.Join(e.Claimed, ", ")))
+			continue
+		}
+		area := e.Area
+		if area == "" {
+			area = closestArea(areas)
+		} else if !seen[area] && !slices.Contains(areas, area) {
+			seen[area] = true
+			if _, err := p.triage("", "area", "--name", area, "--source", triage.AreaTable); err != nil {
+				return nil, err
+			}
+		}
+		if len(e.Move) == 0 {
+			continue
+		}
+		units = append(units, triage.MoveUnit{OldEpic: e.Epic, Area: area})
+		lines = append(lines, fmt.Sprintf("move %s -> area %s: %d tickets", e.Epic, area, len(e.Move)))
+	}
+	if len(units) == 0 {
+		return lines, nil
+	}
+	body, err := json.Marshal(units)
+	if err != nil {
+		return nil, err
+	}
+	_, err = p.triage(string(body), "moves")
+	return lines, err
 }
 
 // legacyPlan is Route as the journey flow still expects it: one action per row

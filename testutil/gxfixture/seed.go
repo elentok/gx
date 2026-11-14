@@ -206,9 +206,10 @@ func (f *fixture) seed(sc scenario) error {
 				return err
 			}
 		}
-		if meta, ok := sc.EpicMeta[addr]; ok {
+		meta, hasMeta := sc.EpicMeta[addr]
+		if body, hasBody := sc.EpicBody[addr]; hasMeta || hasBody {
 			ticketMD := filepath.Join(f.store, e.Project, e.Name, "ticket.md")
-			if err := os.WriteFile(ticketMD, []byte("---\n"+meta+"---\n"), 0o644); err != nil {
+			if err := os.WriteFile(ticketMD, []byte("---\n"+meta+"---\n"+body), 0o644); err != nil {
 				return err
 			}
 		}

@@ -2,10 +2,12 @@ package spec
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake/triageplay"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketmove"
 	"github.com/elentok/gx/triage"
 )
 
@@ -28,7 +30,85 @@ type TriageSeed struct {
 var TriageShapes = []string{
 	"c-zero", "c-few", "c-many", "c-live", "c-named",
 	"verify", "route", "route-12-areas", "route-no-area", "questions", "final-approval",
-	"writing", "result", "stopped", "journey",
+	"writing", "result", "stopped", "journey", "backlog", "old-epics",
+}
+
+// oldEpicsProject is the project of the old-epics shape: the shipped area
+// table is keyed by project and old-epic slug.
+const oldEpicsProject = "gx"
+
+// areaEpic is an area with n open tickets (draft and open alternating), from
+// id first on, and claimed more that are not open.
+func areaEpic(sc *Scenario, name string, first, n, claimed int) {
+	e := Epic{Project: project, Name: name}
+	add := func(opts servertest.TicketOpts) {
+		id := fmt.Sprintf("%02d", first+len(e.Tickets))
+		e.Tickets = append(e.Tickets, Ticket{id, fmt.Sprintf("%s-%s", name, id), opts})
+	}
+	for i := range n {
+		status := "open"
+		if i%2 == 1 {
+			status = "draft"
+		}
+		add(servertest.TicketOpts{Status: status})
+	}
+	for range claimed {
+		add(servertest.TicketOpts{Status: "claimed", ClaimedAt: time.Now().UTC().Format(time.RFC3339)})
+	}
+	sc.Epics = append(sc.Epics, e)
+	sc.EpicMeta[project+":"+name] = "status: open\nkind: area\n"
+}
+
+// backlogScenario seeds three areas with 11, 5 and 0 open tickets and, in the
+// five-ticket one, a half-filled charting map for "Finish move".
+func backlogScenario(sc *Scenario) {
+	sc.EpicMeta = map[string]string{}
+	sc.EpicBody = map[string]string{}
+	areaEpic(sc, "parser", 1, 11, 1)
+	// Tickets 01 and 02 already moved into the map; 03 and 04 are still here.
+	areaEpic(sc, "sync", 3, 5, 0)
+	areaEpic(sc, "webui", 1, 0, 0)
+	mapAddr := project + ":retry-work"
+	sc.Epics = append(sc.Epics, Epic{project, "retry-work", []Ticket{
+		{"01", "moved-01", servertest.TicketOpts{}}, {"02", "moved-02", servertest.TicketOpts{}},
+	}})
+	sc.EpicMeta[mapAddr] = "status: open\nkind: map\ndestination_unconfirmed: true\n"
+	sc.EpicBody[mapAddr] = "# Retry work\n\n## Destination\n\nA provisional Destination for the \"Retry work\" theme of the \"sync\" area.\n\n## Notes\n\n" +
+		ticketmove.StartDesignNotes(project, "sync", []string{"01", "02", "03", "04"})
+}
+
+// oldEpicsScenario seeds old triage-made maps in project gx and no area, plus
+// a follow-up epic so a Triage starts and its Route plans the moves.
+func oldEpicsScenario(sc *Scenario, open func(string) []string) {
+	sc.EpicMeta = map[string]string{}
+	sc.EpicBody = map[string]string{}
+	oldEpic := func(name, meta string, ticketOpts ...servertest.TicketOpts) {
+		e := Epic{Project: oldEpicsProject, Name: name}
+		for i, opts := range ticketOpts {
+			id := fmt.Sprintf("%02d", i+1)
+			e.Tickets = append(e.Tickets, Ticket{id, name + "-" + id, opts})
+		}
+		sc.Epics = append(sc.Epics, e)
+		addr := oldEpicsProject + ":" + name
+		sc.EpicMeta[addr] = "status: open\nkind: map\n" + meta
+		sc.EpicBody[addr] = "# " + name + "\n\n## Notes\n\n" + triage.OldEpicNote + "\n"
+	}
+	ready := servertest.TicketOpts{}
+	oldEpic("test-flakes", "", ready, servertest.TicketOpts{Status: "draft"})
+	oldEpic("agent-guidance", "", ready)
+	oldEpic("ticket-authoring", "", ready)
+	oldEpic("scratch-ideas", "", ready) // not in the shipped table
+	oldEpic("tickets-cli", "design_step: spec\n", ready)
+	oldEpic("gx-check", "") // empty
+	oldEpic("stuck-ticket-watchdog", "", servertest.TicketOpts{Status: "claimed", ClaimedAt: time.Now().UTC().Format(time.RFC3339)})
+	sc.Epics = append(sc.Epics, followUps(oldEpicsProject, 4, 2))
+	sc.Triage = []TriageSeed{{oldEpicsProject, func(rec *triage.Record) {
+		for i := range rec.Rows {
+			rec.Rows[i].Verdict = triage.VerdictRelevant
+		}
+		rec.Step = tickets.StepRoute
+	}}}
+	sc.Steps = [][]string{open(oldEpicsProject)}
 }
 
 // triageAreaNames are the area epics a shape seeds, first n for n areas.
@@ -61,6 +141,10 @@ func TriageScenario(shape string) (Scenario, bool) {
 		return sc, true
 	}
 	switch shape {
+	case "backlog":
+		return with(backlogScenario)
+	case "old-epics":
+		return with(func(sc *Scenario) { oldEpicsScenario(sc, open) })
 	case "c-zero":
 		return with(func(sc *Scenario) { sc.Projects = []string{project} })
 	case "c-few":

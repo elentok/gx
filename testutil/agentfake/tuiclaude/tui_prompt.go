@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/testutil/agentfake/triageplay"
 )
 
 // submit is Enter. A stalled fake leaves the text unsent in the input box.
@@ -49,6 +51,8 @@ func (t *tui) submit() error {
 		switch kind {
 		case promptDesign:
 			return t.designTurn(text)
+		case promptStartDesign:
+			return t.startDesignTurn(text)
 		case promptTriage:
 			return t.triageTurn(text)
 		case promptWorker:
@@ -216,6 +220,7 @@ type promptKind int
 const (
 	promptPlain promptKind = iota
 	promptDesign
+	promptStartDesign
 	promptTriage
 	promptWorker
 	promptSlash
@@ -227,6 +232,9 @@ const (
 // worker prompt is also a slash command. For a worker prompt it returns the
 // ticket address and the worker config.
 func (t *tui) classify(text string) (promptKind, string, WorkerConfig) {
+	if triageplay.IsStartDesignPrompt(text) || (t.startDesign != nil && text != "" && !strings.HasPrefix(text, "/")) {
+		return promptStartDesign, "", WorkerConfig{}
+	}
 	if IsDesignPrompt(text) || (t.design.Active && text != "" && !strings.HasPrefix(text, "/")) {
 		return promptDesign, "", WorkerConfig{}
 	}

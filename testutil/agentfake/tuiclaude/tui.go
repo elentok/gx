@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/testutil/agentfake/triageplay"
 )
 
 type tui struct {
@@ -63,6 +65,9 @@ type tui struct {
 	// triageProject is the project of the Triage session this fake runs; a
 	// plain typed message then goes to the Triage player.
 	triageProject string
+	// startDesign is the card of the Start Design chat this fake runs; a plain
+	// typed message then edits or approves it.
+	startDesign *triageplay.DesignCard
 	// resume is the ticket a ratelimit or question-menu worker finishes on the
 	// next prompt, whatever that prompt says.
 	resume *PendingWork
