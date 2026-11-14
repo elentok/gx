@@ -106,6 +106,7 @@ func TestLoadServerWebKeybindings(t *testing.T) {
 	type keys struct{ mac, other, vi string }
 	for body, want := range map[string]keys{
 		`{}`:                                    {"cmd+e", "ctrl+e", ""},
+		`{"server":{}}`:                         {"cmd+e", "ctrl+e", ""},
 		`{"server":{"web":{"vi-escape":"jk"}}}`: {"cmd+e", "ctrl+e", "jk"},
 		`{"server":{"web":{"leader-key-mac":"alt+j","leader-key":"ctrl+k"}}}`: {"alt+j", "ctrl+k", ""},
 		`{"server":{"web":{"leader-key-mac":"","leader-key":""}}}`:            {"", "", ""},

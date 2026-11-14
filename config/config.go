@@ -397,29 +397,32 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 	if raw.Server != nil && raw.Server.RecentlyFinished != nil && *raw.Server.RecentlyFinished >= 0 {
 		cfg.Server.RecentlyFinished = *raw.Server.RecentlyFinished
 	}
-	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.Listen != nil {
-		cfg.Server.Web.Listen = *raw.Server.Web.Listen
-	}
-	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.DevFrontend != nil {
-		cfg.Server.Web.DevFrontend = *raw.Server.Web.DevFrontend
-	}
-	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.DevDir != nil {
-		cfg.Server.Web.DevDir = *raw.Server.Web.DevDir
-	}
-	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.AllowedHosts != nil {
-		cfg.Server.Web.AllowedHosts = raw.Server.Web.AllowedHosts
-	}
-	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.TOTP != nil {
-		cfg.Server.Web.TOTP = *raw.Server.Web.TOTP
-	}
-	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.ViEscape != nil {
-		cfg.Server.Web.ViEscape = *raw.Server.Web.ViEscape
-	}
-	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.LeaderKeyMac != nil {
-		cfg.Server.Web.LeaderKeyMac = *raw.Server.Web.LeaderKeyMac
-	}
-	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.LeaderKey != nil {
-		cfg.Server.Web.LeaderKey = *raw.Server.Web.LeaderKey
+	if raw.Server != nil && raw.Server.Web != nil {
+		w := raw.Server.Web
+		if w.Listen != nil {
+			cfg.Server.Web.Listen = *w.Listen
+		}
+		if w.DevFrontend != nil {
+			cfg.Server.Web.DevFrontend = *w.DevFrontend
+		}
+		if w.DevDir != nil {
+			cfg.Server.Web.DevDir = *w.DevDir
+		}
+		if w.AllowedHosts != nil {
+			cfg.Server.Web.AllowedHosts = w.AllowedHosts
+		}
+		if w.TOTP != nil {
+			cfg.Server.Web.TOTP = *w.TOTP
+		}
+		if w.ViEscape != nil {
+			cfg.Server.Web.ViEscape = *w.ViEscape
+		}
+		if w.LeaderKeyMac != nil {
+			cfg.Server.Web.LeaderKeyMac = *w.LeaderKeyMac
+		}
+		if w.LeaderKey != nil {
+			cfg.Server.Web.LeaderKey = *w.LeaderKey
+		}
 	}
 	if raw.Server != nil && raw.Server.TabEnv != nil {
 		cfg.Server.TabEnv = raw.Server.TabEnv
