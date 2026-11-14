@@ -3,7 +3,7 @@ import { afterEach, expect, test, vi } from "vitest"
 import type { DiffRange } from "../generated/server"
 import type { Device } from "../useWide"
 import type { DiffFilesResult, FetchDiffCommitPatches, FetchDiffFiles, FetchDiffPatch } from "./api"
-import { COMMITS, filesForCommits, renderDiff } from "./renderDiff"
+import { COMMITS, filesForCommits, renderDiff } from "./renderDiff.testutil"
 
 afterEach(cleanup)
 

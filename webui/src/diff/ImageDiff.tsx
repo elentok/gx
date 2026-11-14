@@ -1,7 +1,8 @@
 import { Box, Spinner } from "@chakra-ui/react"
 import { useEffect, useState } from "react"
 import type { DiffFile } from "../generated/server"
-import type { BlobSide, DiffBlobsBody, FetchDiffBlob } from "./api"
+import { useKeyedFetch } from "../useKeyedFetch"
+import type { BlobSide, FetchDiffBlob } from "./api"
 import type { PatchRange } from "./DiffFileCard"
 
 const IMAGE_MIME: Record<string, string> = {
@@ -28,24 +29,6 @@ export function isImageFile(file: DiffFile): boolean {
 
 export function kb(size: number | undefined): string {
   return `${((size ?? 0) / 1024).toFixed(1)} KB`
-}
-
-type Blobs = { key: string; blobs: DiffBlobsBody } | { key: string; failed: true }
-
-function useBlobs(file: DiffFile, range: PatchRange, fetchBlob: FetchDiffBlob) {
-  const key = `${range.project}\n${range.firstSha}\n${range.secondSha}\n${file.path}`
-  const [state, setState] = useState<Blobs>()
-  useEffect(() => {
-    let current = true
-    fetchBlob(range.project, range.firstSha, range.secondSha, file.path).then(
-      (blobs) => current && setState({ key, blobs }),
-      () => current && setState({ key, failed: true }),
-    )
-    return () => {
-      current = false
-    }
-  }, [fetchBlob, range.project, range.firstSha, range.secondSha, file.path, key])
-  return state?.key === key ? state : undefined
 }
 
 function Note({ children, testId }: { children: string; testId: string }) {
@@ -121,12 +104,15 @@ export function BinaryBody({
   range: PatchRange
   fetchBlob: FetchDiffBlob
 }) {
-  const state = useBlobs(file, range, fetchBlob)
+  const state = useKeyedFetch(
+    `${range.project}\n${range.firstSha}\n${range.secondSha}\n${file.path}`,
+    () => fetchBlob(range.project, range.firstSha, range.secondSha, file.path),
+  )
   if (!state) return <Loading />
   if ("failed" in state) {
     return <Note testId="blob-error">Could not load this file.</Note>
   }
-  const { old: before, new: after } = state.blobs
+  const { old: before, new: after } = state.value
   const shown = [before, after].every((s) => s.kind === "absent" || s.kind === "image")
   if (isImageFile(file) && shown) {
     const mime = IMAGE_MIME[ext(file.path)]

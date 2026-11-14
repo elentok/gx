@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
-import { COMMITS, filesForCommits, renderDiff } from "./renderDiff"
+import { COMMITS, filesForCommits, renderDiff } from "./renderDiff.testutil"
 
 afterEach(cleanup)
 

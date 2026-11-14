@@ -1,7 +1,8 @@
 import { Box, Spinner } from "@chakra-ui/react"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import type { DiffFile } from "../generated/server"
 import { Button } from "../ui/button/Button"
+import { useKeyedFetch } from "../useKeyedFetch"
 import type { DiffBlobsBody, FetchDiffBlob, FetchDiffCommitPatches, FetchDiffPatch } from "./api"
 import { DiffBody, type DiffView } from "./DiffBody"
 import { BinaryBody, isBinaryFile } from "./ImageDiff"
@@ -10,7 +11,6 @@ export type PatchRange = { project: string; firstSha: string; secondSha: string 
 
 /** A whole-range patch has no label; a narrowed view has one part per commit, labelled by subject. */
 type PatchPart = { label?: string; text: string }
-type Patch = { key: string; parts: PatchPart[] } | { key: string; failed: true }
 
 const STATUS_TONE: Record<string, string> = { A: "done", D: "deadlocked" }
 
@@ -82,44 +82,18 @@ function Body({
   loadBlobs: () => Promise<DiffBlobsBody>
 }) {
   const [nonce, setNonce] = useState(0)
-  const [patch, setPatch] = useState<Patch>()
   const narrowKey = commits?.join(",") ?? ""
   const key = `${range.project}\n${range.firstSha}\n${range.secondSha}\n${file.path}\n${narrowKey}\n${nonce}`
 
-  useEffect(() => {
-    let current = true
-    const load: Promise<PatchPart[]> =
-      commits && fetchCommitPatches
-        ? fetchCommitPatches(
-            range.project,
-            range.firstSha,
-            range.secondSha,
-            file.path,
-            commits,
-          ).then((ps) => ps.map((p) => ({ label: p.subject, text: p.patch })))
-        : fetchPatch(range.project, range.firstSha, range.secondSha, file.path).then((text) => [
-            { text },
-          ])
-    load.then(
-      (parts) => current && setPatch({ key, parts }),
-      () => current && setPatch({ key, failed: true }),
-    )
-    return () => {
-      current = false
-    }
-    // `commits` is covered by narrowKey, which the key carries.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    fetchPatch,
-    fetchCommitPatches,
-    range.project,
-    range.firstSha,
-    range.secondSha,
-    file.path,
-    key,
-  ])
-
-  const fresh = patch?.key === key ? patch : undefined
+  const fresh = useKeyedFetch<PatchPart[]>(key, () =>
+    commits && fetchCommitPatches
+      ? fetchCommitPatches(range.project, range.firstSha, range.secondSha, file.path, commits).then(
+          (ps) => ps.map((p) => ({ label: p.subject, text: p.patch })),
+        )
+      : fetchPatch(range.project, range.firstSha, range.secondSha, file.path).then((text) => [
+          { text },
+        ]),
+  )
   if (!fresh) {
     return (
       <Box role="status" aria-label="Loading patch" p="4" display="flex" justifyContent="center">
@@ -139,7 +113,7 @@ function Body({
   }
   return (
     <>
-      {fresh.parts.map((part, i) => (
+      {fresh.value.map((part, i) => (
         <Box key={i} data-testid={part.label === undefined ? undefined : "commit-patch"}>
           {part.label !== undefined && (
             <Box
