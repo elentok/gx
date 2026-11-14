@@ -208,7 +208,7 @@ func commitInfo(dir, sha string) (Commit, error) {
 }
 
 // ListFilesIn lists the files the selected commits changed. A file several
-// commits changed appears once, with their counts added and the last status.
+// commits changed appears once, with their counts added and the net status.
 func ListFilesIn(dir string, r Range, shas []string) (FileList, error) {
 	picked, err := selectedCommits(dir, r, shas)
 	if err != nil {
@@ -225,21 +225,43 @@ func ListFilesIn(dir string, r Range, shas []string) (FileList, error) {
 			return FileList{}, err
 		}
 		for _, f := range cf {
-			i, seen := index[f.Path]
+			// A rename continues the entry of its source path.
+			key := f.Path
+			if f.OldPath != "" {
+				if _, ok := index[f.OldPath]; ok {
+					key = f.OldPath
+				}
+			}
+			i, seen := index[key]
 			if !seen {
 				index[f.Path] = len(files)
 				files = append(files, f)
 				continue
 			}
-			prev := files[i]
-			f.Added += prev.Added
-			f.Deleted += prev.Deleted
-			f.Large = f.Large || prev.Large
-			f.Binary = f.Binary || prev.Binary
-			files[i] = f
+			files[i] = foldCommitFile(files[i], f)
+			if key != f.Path {
+				delete(index, key)
+				index[f.Path] = i
+			}
 		}
 	}
 	return capFiles(files), nil
+}
+
+// foldCommitFile combines a file's entry so far with its change in a later
+// selected commit. Added or renamed stays so across later edits.
+func foldCommitFile(prev, next File) File {
+	next.Added += prev.Added
+	next.Deleted += prev.Deleted
+	next.Large = next.Large || prev.Large
+	next.Binary = next.Binary || prev.Binary
+	if (prev.Status == "A" || prev.Status == "R") && next.Status == "M" {
+		next.Status = prev.Status
+		next.OldPath = prev.OldPath
+	} else if prev.Status == "R" && next.Status == "R" {
+		next.OldPath = prev.OldPath
+	}
+	return next
 }
 
 // CommitPatch is one selected commit's patch of a file.

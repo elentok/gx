@@ -143,6 +143,46 @@ func TestNarrowFilesAndPatchesPerCommit(t *testing.T) {
 	}
 }
 
+func TestNarrowFilesKeepNetStatusAndRename(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	body := "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\n"
+	testutil.WriteFile(t, dir, "old.txt", body)
+	testutil.CommitAll(t, dir, "seed")
+	mustGit(t, dir, "branch", "base")
+	testutil.WriteFile(t, dir, "new.txt", "n\n")
+	testutil.CommitAll(t, dir, "add new")
+	testutil.WriteFile(t, dir, "new.txt", "n\nm\n")
+	testutil.CommitAll(t, dir, "edit new")
+	mustGit(t, dir, "mv", "old.txt", "moved.txt")
+	testutil.CommitAll(t, dir, "rename old")
+	testutil.WriteFile(t, dir, "moved.txt", body+"l9\n")
+	testutil.CommitAll(t, dir, "edit moved")
+	r := mustResolve(t, dir, "base", "HEAD")
+	var shas []string
+	for _, c := range commitsOf(t, dir).Commits {
+		shas = append(shas, c.SHA)
+	}
+
+	list, err := rangediff.ListFilesIn(dir, r, shas)
+	if err != nil {
+		t.Fatalf("ListFilesIn: %v", err)
+	}
+	got := map[string]rangediff.File{}
+	for _, f := range list.Files {
+		got[f.Path] = f
+	}
+	if f := got["new.txt"]; f.Status != "A" || f.Added != 2 {
+		t.Errorf("new.txt = %+v, want status A with 2 added", f)
+	}
+	if f := got["moved.txt"]; f.Status != "R" || f.OldPath != "old.txt" {
+		t.Errorf("moved.txt = %+v, want R from old.txt", f)
+	}
+	if len(list.Files) != 2 {
+		t.Errorf("files = %+v, want 2", list.Files)
+	}
+}
+
 func TestNarrowMergeCommitHasNoPatchAndUnknownSHAIsRefused(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
