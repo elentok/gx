@@ -112,6 +112,7 @@ const READY_WIRING: Record<
   "/settings/agents": "redirect",
   "/settings/*": "useReady",
   "/d/*": "useDetailReady",
+  "/drafts/:id": "useReadyWhen",
   "/triage/*": "useDetailReady",
   "/t/*": "useDetailReady",
   "/e/*": "useDetailReady",

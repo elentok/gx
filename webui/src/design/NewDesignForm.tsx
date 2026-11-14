@@ -28,6 +28,7 @@ import { saveUnsaved, type Restored } from "./unsaved"
 import { useDesignWrite } from "./SessionControls"
 import { useWide } from "../useWide"
 import { useViMode } from "../vimode"
+import { useReadyWhen } from "../useReady"
 import { ModeText } from "../ui/expandable-text/ModeText"
 import type { ViMode } from "../ui/expandable-text/CodeEditor"
 import { DraftBanner } from "./DraftBanner"
@@ -126,6 +127,8 @@ export function DraftPage({ drafts = realDrafts, ...props }: PageProps) {
     // The client is fixed for the page's life.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  useReadyWhen(loaded !== undefined, loaded ? "ready" : "empty", "network")
 
   if (!loaded) {
     return (
