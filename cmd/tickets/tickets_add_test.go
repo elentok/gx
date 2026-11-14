@@ -277,6 +277,30 @@ func TestRunTicketsAdd_WritesParentFrontmatter(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsAdd_TicketAddressWithParentFlag(t *testing.T) {
+	repo, project := cmdtest.SetupShowProject(t)
+	if _, err := runIn(t, repo, "tickets", "add", "mine:inbox", "--slug", "parent"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runIn(t, repo, "tickets", "add", "mine:inbox/01", "--parent", "01", "--slug", "child")
+	if err != nil {
+		t.Fatalf("same --parent id refused: %v", err)
+	}
+	tk, err := schema.ParseTicket(cmdtest.AddedPath(t, filepath.Join(project, "inbox"), out))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tk.Parent == nil || *tk.Parent != "01" {
+		t.Errorf("parent = %v, want 01", tk.Parent)
+	}
+
+	_, err = runIn(t, repo, "tickets", "add", "mine:inbox/01", "--parent", "02", "--slug", "other")
+	if err == nil || !strings.Contains(err.Error(), "add <epic> --parent") || !strings.Contains(err.Error(), "add mine:inbox/01") {
+		t.Errorf("other --parent err = %v, want a refusal naming both forms", err)
+	}
+}
+
 // TestRunTicketsAdd_LeavesParentUntouched covers the contraction's other
 // half: with children derived from `parent`, adding a fork writes exactly one
 // file and leaves the parent byte-identical, so there is no backfill left to

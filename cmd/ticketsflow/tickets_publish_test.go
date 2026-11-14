@@ -493,7 +493,7 @@ func promoteManifest(t *testing.T, from map[string]string, slugs ...string) stri
 	dir := t.TempDir()
 	var m strings.Builder
 	for _, slug := range slugs {
-		writeTicketFile(t, filepath.Join(dir, slug+".md"), "# "+slug+"\n"+shapeSections)
+		writeTicketFile(t, filepath.Join(dir, slug+".md"), "# "+slug+"\n"+shapeSections+groupCriteria(from[slug]))
 		fmt.Fprintf(&m, "- slug: %s\n  type: implement\n  body: %s.md\n", slug, slug)
 		if from[slug] != "" {
 			fmt.Fprintf(&m, "  from: %s\n", from[slug])
@@ -608,6 +608,19 @@ var blockedByRE = regexp.MustCompile(`(?m)^blocked_by:.*(\n\s*- .*)*`)
 // groupEntry is one manifest ticket of groupFixture.
 type groupEntry struct{ slug, window, blockedBy, from string }
 
+// groupCriteria is an Acceptance criteria section with one group per address
+// of a manifest `from:` value ("a" or "[a, b]").
+func groupCriteria(from string) string {
+	var b strings.Builder
+	b.WriteString("\n## Acceptance criteria\n")
+	for addr := range strings.SplitSeq(strings.Trim(from, "[]"), ",") {
+		if addr = strings.TrimSpace(addr); addr != "" {
+			fmt.Fprintf(&b, "\n### From %s\n\n- [ ] done\n", addr)
+		}
+	}
+	return b.String()
+}
+
 // groupFixture is open follow-ups 01..03 and a manifest of implement tickets.
 func groupFixture(t *testing.T, entries ...groupEntry) (d Deps, project, manifest string) {
 	t.Helper()
@@ -619,7 +632,7 @@ func groupFixture(t *testing.T, entries ...groupEntry) (d Deps, project, manifes
 	dir := t.TempDir()
 	var m strings.Builder
 	for _, e := range entries {
-		writeTicketFile(t, filepath.Join(dir, e.slug+".md"), "# "+e.slug+"\n"+shapeSections)
+		writeTicketFile(t, filepath.Join(dir, e.slug+".md"), "# "+e.slug+"\n"+shapeSections+groupCriteria(e.from))
 		fmt.Fprintf(&m, "- slug: %s\n  type: implement\n  body: %s.md\n", e.slug, e.slug)
 		if e.from != "" {
 			fmt.Fprintf(&m, "  from: %s\n", e.from)
@@ -670,6 +683,27 @@ func TestPublishGroupOpensOneTicketWithUnionBlockedBy(t *testing.T) {
 	}
 	if len(want) != 0 {
 		t.Errorf("follow-ups not archived: %v", want)
+	}
+}
+
+func TestPublishGroupMissingCriteriaGroupIsRefused(t *testing.T) {
+	d, project, manifest := groupFixture(t,
+		groupEntry{"g", "", "", "[follow-ups/01, follow-ups/02]"},
+		groupEntry{"single", "", "", "follow-ups/03"},
+	)
+	// The group body drops follow-ups/02's group; the single entry keeps a plain body.
+	dir := filepath.Dir(manifest)
+	writeTicketFile(t, filepath.Join(dir, "g.md"), "# g\n"+shapeSections+groupCriteria("follow-ups/01"))
+	writeTicketFile(t, filepath.Join(dir, "single.md"), "# single\n"+shapeSections)
+	err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d)
+	if err == nil || !strings.Contains(err.Error(), "g:") || !strings.Contains(err.Error(), "follow-ups/02") {
+		t.Fatalf("err = %v, want a refusal naming g and follow-ups/02", err)
+	}
+	if strings.Contains(err.Error(), "single") {
+		t.Errorf("single-from entry was refused: %v", err)
+	}
+	if names := issueNames(t, project, "e"); len(names) != 0 {
+		t.Errorf("wrote %v", names)
 	}
 }
 

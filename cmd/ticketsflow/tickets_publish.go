@@ -34,10 +34,12 @@ type publishedTicket struct {
 // bytes of both the draft file written first and the open file written last.
 type plannedTicket struct {
 	publishedTicket
-	ID    string
-	Path  string
-	Type  string
-	Body  string
+	ID   string
+	Path string
+	Type string
+	Body string
+	// From is the canonical origin of each manifest `from:` address.
+	From  []string
 	Draft []byte
 	Open  []byte
 }
@@ -50,6 +52,9 @@ type publishPlan struct {
 	// of the new tickets that cite it, in the order the follow-ups first appear.
 	Promoted      map[string][]string
 	PromotedOrder []string
+	// canon is the lenient form of the resolveFrom: an address that does not
+	// resolve is compared as written.
+	canon func(string) string
 }
 
 // resolveFrom turns a manifest `from:` address into its canonical form, or
@@ -99,6 +104,23 @@ var publishPreWriteChecks = []func(*publishPlan) []error{
 	checkRenderedTickets,
 	checkDraftMarkers,
 	checkPublishShape,
+	checkGroupCriteria,
+}
+
+// checkGroupCriteria refuses a group (a `from:` of two or more follow-ups)
+// whose body lacks one acceptance-criteria group per member, unless
+// --allow-check-misses.
+func checkGroupCriteria(p *publishPlan) []error {
+	if p.AllowCheckMisses {
+		return nil
+	}
+	var errs []error
+	for _, t := range p.Tickets {
+		for _, miss := range ticketspec.GroupCriteriaMisses(t.From, t.Body, p.canon) {
+			errs = append(errs, fmt.Errorf("%s: %s (--allow-check-misses publishes anyway)", t.Slug, miss))
+		}
+	}
+	return errs
 }
 
 // checkDraftMarkers refuses a body with an unwritten `draft` part. Unlike the
@@ -172,6 +194,12 @@ func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, e
 	}
 
 	plan := &publishPlan{EpicPath: epicPath, AllowCheckMisses: allowCheckMisses, Promoted: map[string][]string{}}
+	plan.canon = func(addr string) string {
+		if canon, err := resolve(addr); err == nil {
+			return canon
+		}
+		return addr
+	}
 	var fromErrs []error
 	now := time.Now().UTC()
 	for _, e := range m.Entries {
@@ -194,6 +222,7 @@ func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, e
 			t.BlockedBy = append(t.BlockedBy, schema.TicketID(ref))
 		}
 		origins := []string{address.String()}
+		var from []string
 		if len(e.From) > 0 {
 			origins = origins[:0]
 			for _, raw := range e.From {
@@ -207,6 +236,7 @@ func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, e
 				}
 				plan.Promoted[canon] = append(plan.Promoted[canon], address.String())
 				origins = append(origins, canon)
+				from = append(from, canon)
 			}
 		}
 		t.StampCreated(now, origins...)
@@ -227,6 +257,7 @@ func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, e
 			Path:            path,
 			Type:            e.Type,
 			Body:            rendered,
+			From:            from,
 			Draft:           draft,
 			Open:            open,
 		})

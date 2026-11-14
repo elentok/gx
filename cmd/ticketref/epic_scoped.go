@@ -1,7 +1,7 @@
 package ticketref
 
 import (
-	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -61,8 +61,8 @@ func ResolveAddTarget(env cmdbase.Env, arg, parentFlag string) (epicPath, parent
 		}
 		return epicPath, parentFlag, nil
 	}
-	if parentFlag != "" {
-		return "", "", errors.New("--parent conflicts with a ticket address argument")
+	if parentFlag != "" && parentFlag != t.Identifier {
+		return "", "", fmt.Errorf("--parent %s conflicts with ticket address %s, which already makes the new ticket a child of %s; use `add %s` or `add <epic> --parent %s`", parentFlag, arg, t.Identifier, arg, parentFlag)
 	}
 	return filepath.Dir(filepath.Dir(t.Path)), t.Identifier, nil
 }

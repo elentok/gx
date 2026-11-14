@@ -192,7 +192,10 @@ The fix-ticket rules (verified "Where to look" paths, real ticket ids, chained `
 tickets that share a file, acceptance wording checked against existing tests) are in
 [gx-to-tickets](../gx-to-tickets/SKILL.md) section 4d. Follow them.
 
-Pass `--parent <this-ticket-id>` on every `gx tickets add` call. `--parent` makes the new ticket a
+Pass `--parent <this-ticket-id>` on every `gx tickets add` call, as
+`gx tickets add <epic> --parent <id> --slug <slug> ...`. (The ticket-address form,
+`gx tickets add <epic>/<id> --slug <slug> ...`, needs no `--parent`: it already means "child of that
+ticket".) `--parent` makes the new ticket a
 scheduling and UI child of this one: the scheduler's scope resolution and the Queue tab's tree
 nesting both walk the child's own `parent:` field, the only edge there is, and nothing is recorded
 on this ticket. Never set it in a later `gx tickets set`. A running epic's scheduler can claim the

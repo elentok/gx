@@ -15,6 +15,33 @@ func TestPublishShapeMisses_SubHeadingAndFencedCommentStayInSection(t *testing.T
 	}
 }
 
+func TestGroupCriteriaMisses(t *testing.T) {
+	canon := func(a string) string { return strings.TrimPrefix(a, "mine:") }
+	from := []string{"mine:follow-ups/01", "mine:follow-ups/02"}
+	body := func(criteria string) string { return "## What to build\n\nx\n\n## Acceptance criteria\n" + criteria }
+	type tc struct {
+		from []string
+		body string
+		want []string
+	}
+	tests := map[string]tc{
+		"all groups present": {from, body("\n### From follow-ups/01\n\n- [ ] a\n\n### From mine:follow-ups/02\n\n- [x] b\n"), nil},
+		"one missing": {from, body("\n### From follow-ups/01\n\n- [ ] a\n"),
+			[]string{"no `### From mine:follow-ups/02` group under ## Acceptance criteria"}},
+		"empty group": {from, body("\n### From follow-ups/01\n\n- [ ] a\n\n### From follow-ups/02\n\nprose only\n\n## Other\n\n- [ ] not here\n"),
+			[]string{"`### From mine:follow-ups/02` group has no `- [ ]` item"}},
+		"short heading matches canonical member": {from, body("\n### From follow-ups/02\n\n- [ ] b\n\n### From follow-ups/01\n\n- [ ] a\n"), nil},
+		"single from is not a group":             {from[:1], body("- [ ] plain\n"), nil},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := GroupCriteriaMisses(tc.from, tc.body, canon); !slices.Equal(got, tc.want) {
+				t.Errorf("misses = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestBundledCounts_ReadsPastSubHeadingAndFencedComment(t *testing.T) {
 	criteria, _ := BundledCounts(subHeadingBody, nil)
 	if criteria != 3 {

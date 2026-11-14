@@ -81,7 +81,8 @@ path, a ticket address) as an argument, read its full body (`gx tickets show <ad
 When the input is follow-up bodies (gx-triage-follow-ups Write) and no spec, the input is the bodies
 themselves. In this "no spec" mode: skip `verify-plan`, `ensure-verify` and the quiz (the "spec does
 not name the slices" trigger does not apply); no verify ticket is made. Each manifest entry carries
-`from: <address of the follow-up>` (a list for a group). Run `ensure-code-review` for the ready epic, then
+`from: <address of the follow-up>` (a list for a group; a group body needs one `### From <address>` group with at least one `- [ ]` item
+under `## Acceptance criteria` per member, and `publish` refuses it otherwise). Run `ensure-code-review` for the ready epic, then
 `gx tickets set <epic> --status open` last, only if the epic is still `draft` (a re-run of the same
 Triage publishes into the epic it already made).
 

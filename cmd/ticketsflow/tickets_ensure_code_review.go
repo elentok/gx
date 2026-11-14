@@ -24,6 +24,6 @@ func runTicketsEnsureCodeReview(epicPath string, w io.Writer) error {
 
 		contextWindow: 30000,
 		bodyArgs:      []any{epicSpecLine(epicPath)},
-		bodyFormat:    "\n# %s — Code review: %s\n\n## What to review\n\n%sThe epic's commits: those whose subject starts with `%[2]s/`.\n\n## Test seams\n\nnone — review ticket, opens fix tickets as children (`parent:` pointing back here) if it finds anything.\n\n## Acceptance criteria\n\n- [ ] Full epic reviewed for correctness and cross-ticket consistency\n- [ ] Any findings opened as child fix tickets\n",
+		bodyFormat:    "\n# %s — Code review: %s\n\n## What to review\n\n%sThe epic's commits: those whose subject starts with `%[2]s/`.\n\n## Test seams\n\nnone — review ticket, opens fix tickets as children (`gx tickets add <epic> --parent <this-id> --slug <slug> ...` writes `parent:` pointing back here) if it finds anything.\n\n## Acceptance criteria\n\n- [ ] Full epic reviewed for correctness and cross-ticket consistency\n- [ ] Any findings opened as child fix tickets\n",
 	})
 }
