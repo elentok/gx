@@ -22,8 +22,6 @@ const (
 	webPerfWindow        = time.Minute
 	webPerfMaxString     = 64
 	webPerfMaxSkew       = 24 * time.Hour
-	poorINP              = 200.0
-	poorLCP              = 2500.0
 )
 
 var (
@@ -188,7 +186,7 @@ func (s *webPerfSample) convert(b *webPerfBody, received time.Time) (webperf.Sam
 		Tab: s.Tab, Timestamp: s.Timestamp, Outcome: s.Outcome, Trigger: s.Trigger, DataSource: s.DataSource,
 		TTFB: s.TTFB, APILatency: s.APILatency, JSBytes: s.JSBytes, CSSBytes: s.CSSBytes,
 	}
-	poor := s.Metric == "inp" && *s.Value > poorINP || s.Metric == "lcp" && *s.Value > poorLCP
+	poor := s.Metric == "inp" && *s.Value > webperf.PoorINP || s.Metric == "lcp" && *s.Value > webperf.PoorLCP
 	if poor {
 		sm.InputDelay, sm.Processing, sm.PresentationDelay = s.InputDelay, s.Processing, s.PresentationDelay
 		sm.InteractionType, sm.Action, sm.WorstChunk, sm.WorstFrame = s.InteractionType, s.Action, s.WorstChunk, s.WorstFrame

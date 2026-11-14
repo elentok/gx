@@ -19,9 +19,6 @@ type WebPerf interface {
 	OldestDay() (string, bool)
 }
 
-// webPerfMinSamples is the count below which a value has no status and no change.
-const webPerfMinSamples = 20
-
 const (
 	tabHard  = "hard"
 	tabRoute = "route"
@@ -112,7 +109,7 @@ func p75(vals []float64) *float64 {
 
 func statusOf(metric string, v *float64, count int) string {
 	c, ok := cutoffs[metric]
-	if !ok || v == nil || count < webPerfMinSamples {
+	if !ok || v == nil || count < webperf.MinSamples {
 		return ""
 	}
 	switch {
@@ -136,31 +133,26 @@ func dayLabels(first time.Time, offset, n int) []string {
 func buildWebPerformance(src WebPerf, win limits.StatsWindow, includeDev bool) (wire.StatsWebPerformance, error) {
 	n := len(win.Days)
 	days := win.Labels()
-	out := wire.StatsWebPerformance{
-		HardLoads: []wire.StatsWebPerfCard{}, RouteChanges: []wire.StatsWebPerfCard{},
-		Trend: []wire.StatsWebPerfTrend{}, SlowestRoutes: []wire.StatsWebPerfRoute{},
-		WhySlow: []wire.StatsWebPerfWhySlow{}, PoorINP: wire.StatsWebPerfPoorINP{TopActions: []wire.StatsWebPerfAction{}},
-	}
+	out := wire.NewStatsWebPerformance()
 	if src == nil {
 		return out, nil
 	}
-	want := days
-	var prevDays []string
+	// Load every stored day once: the cards and trend read the window and the
+	// window before it, the build strip reads all of history.
+	start, hasPrev := days[0], false
 	if oldest, ok := src.OldestDay(); ok {
-		if first := dayLabels(win.Days[0], -n, n); oldest <= first[0] {
-			prevDays = first
-			want = append(slices.Clone(first), days...)
-		}
+		hasPrev = oldest <= dayLabels(win.Days[0], -n, n)[0]
+		start = min(oldest, start)
 	}
-	loaded, err := loadDays(src, want)
+	loaded, err := loadDays(src, allDays(start, win.Days[n-1]))
 	if err != nil {
 		return out, err
 	}
-	loadedPrev, loadedCur := loaded[:len(prevDays)], loaded[len(prevDays):]
+	loadedCur := loaded[len(loaded)-n:]
 	cur := perfValues(loadedCur, includeDev)
 	var prev map[perfKey][]float64
-	if prevDays != nil {
-		prev = perfValues(loadedPrev, includeDev)
+	if hasPrev {
+		prev = perfValues(loaded[len(loaded)-2*n:len(loaded)-n], includeDev)
 	}
 	cards := func(tab string, metrics []string) []wire.StatsWebPerfCard {
 		out := make([]wire.StatsWebPerfCard, len(metrics))
@@ -168,12 +160,7 @@ func buildWebPerformance(src WebPerf, win limits.StatsWindow, includeDev bool) (
 			vals := cur[perfKey{tab, m}]
 			card := wire.StatsWebPerfCard{Metric: m, Count: len(vals), P75: p75(vals)}
 			card.Status = statusOf(m, card.P75, card.Count)
-			if before := prev[perfKey{tab, m}]; prev != nil && len(before) >= webPerfMinSamples && card.Count >= webPerfMinSamples {
-				if b := p75(before); *b != 0 {
-					pct := (*card.P75 - *b) / *b * 100
-					card.ChangePct = &pct
-				}
-			}
+			card.ChangePct = pctChange(vals, prev[perfKey{tab, m}])
 			out[i] = card
 		}
 		return out
@@ -219,5 +206,7 @@ func buildWebPerformance(src WebPerf, win limits.StatsWindow, includeDev bool) (
 		return cmp.Or(cmp.Compare(b.P75, a.P75), cmp.Compare(a.Route, b.Route))
 	})
 	out.SlowestRoutes = out.SlowestRoutes[:min(len(out.SlowestRoutes), slowestRoutes)]
-	return out, buildWebPerfBuilds(src, win, includeDev, &out)
+	b := buildWebPerfBuilds(loaded, win, includeDev)
+	out.BuildStrip, out.WhySlow, out.PoorINP = b.strip, b.whySlow, b.poorINP
+	return out, nil
 }

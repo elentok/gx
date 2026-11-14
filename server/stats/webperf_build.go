@@ -13,9 +13,6 @@ import (
 
 const topActions = 3
 
-// poorINP is the INP value above which attribution is kept.
-const poorINP = 200
-
 // buildVals are one build's values over the selected range. Transfer sizes of
 // zero mean cached or unknown and are never added.
 type buildVals struct {
@@ -41,8 +38,11 @@ func (b *buildVals) add(d *webperf.Day, i int, metric, tab string) {
 	case "app_ready", "route_ready":
 		addVal(&b.api, d.APILatency[i], false)
 	}
-	if tab == tabHard {
+	// Poor LCP samples also carry ttfb; counting them would double a hard load.
+	if metric == "app_ready" {
 		addVal(&b.ttfb, d.TTFB[i], false)
+	}
+	if tab == tabHard {
 		addVal(&b.js, d.JSBytes[i], true)
 		addVal(&b.css, d.CSSBytes[i], true)
 	}
@@ -50,7 +50,7 @@ func (b *buildVals) add(d *webperf.Day, i int, metric, tab string) {
 
 // pctChange is nil unless both sides have enough samples.
 func pctChange(cur, prev []float64) *float64 {
-	if len(cur) < webPerfMinSamples || len(prev) < webPerfMinSamples {
+	if len(cur) < webperf.MinSamples || len(prev) < webperf.MinSamples {
 		return nil
 	}
 	c, p := p75(cur), p75(prev)
@@ -91,19 +91,18 @@ func topCount(counts map[string]int, limit int) []wire.StatsWebPerfAction {
 	return out[:min(len(out), limit)]
 }
 
-// buildWebPerfBuilds fills the build strip, Why slow? rows and poor-INP block.
-func buildWebPerfBuilds(src WebPerf, win limits.StatsWindow, includeDev bool, out *wire.StatsWebPerformance) error {
-	out.WhySlow = []wire.StatsWebPerfWhySlow{}
-	out.PoorINP.TopActions = []wire.StatsWebPerfAction{}
-	oldest, ok := src.OldestDay()
-	if !ok {
-		return nil
-	}
-	days := allDays(oldest, win.Days[len(win.Days)-1])
-	loaded, err := loadDays(src, days)
-	if err != nil {
-		return err
-	}
+// webPerfBuilds are the build strip, Why slow? rows and poor-INP block.
+type webPerfBuilds struct {
+	strip   *wire.StatsWebPerfBuildStrip
+	whySlow []wire.StatsWebPerfWhySlow
+	poorINP wire.StatsWebPerfPoorINP
+}
+
+// buildWebPerfBuilds reads every loaded day for build order; values count only
+// inside the window.
+func buildWebPerfBuilds(loaded []*webperf.Day, win limits.StatsWindow, includeDev bool) webPerfBuilds {
+	empty := wire.NewStatsWebPerformance()
+	out := webPerfBuilds{whySlow: empty.WhySlow, poorINP: empty.PoorINP}
 	rangeStart := win.Labels()[0]
 
 	// builds is in first-seen order: the last is current, the one before previous.
@@ -128,8 +127,8 @@ func buildWebPerfBuilds(src WebPerf, win limits.StatsWindow, includeDev bool, ou
 					b.add(d, i, metric, tab)
 				}
 			}
-			if inRange && metric == "inp" && d.Value[i] > poorINP {
-				out.PoorINP.Count++
+			if inRange && metric == "inp" && d.Value[i] > webperf.PoorINP {
+				out.poorINP.Count++
 				addVal(&poor.in, d.InputDelay[i], false)
 				addVal(&poor.proc, d.Processing[i], false)
 				addVal(&poor.pres, d.PresentationDelay[i], false)
@@ -142,10 +141,10 @@ func buildWebPerfBuilds(src WebPerf, win limits.StatsWindow, includeDev bool, ou
 			}
 		})
 	}
-	out.PoorINP.InputDelayP75, out.PoorINP.ProcessingP75, out.PoorINP.PresentationDelayP75 = p75(poor.in), p75(poor.proc), p75(poor.pres)
-	out.PoorINP.TopActions = topCount(poor.actions, topActions)
+	out.poorINP.InputDelayP75, out.poorINP.ProcessingP75, out.poorINP.PresentationDelayP75 = p75(poor.in), p75(poor.proc), p75(poor.pres)
+	out.poorINP.TopActions = topCount(poor.actions, topActions)
 	if c := topCount(poor.chunks, 1); len(c) > 0 {
-		out.PoorINP.WorstChunk = c[0].Action
+		out.poorINP.WorstChunk = c[0].Action
 	}
 
 	var cur, prev *buildVals
@@ -156,7 +155,7 @@ func buildWebPerfBuilds(src WebPerf, win limits.StatsWindow, includeDev bool, ou
 		prev = builds[len(builds)-2]
 	}
 	if cur == nil {
-		return nil
+		return out
 	}
 	strip := &wire.StatsWebPerfBuildStrip{Current: buildSide(cur)}
 	var prevVals buildVals
@@ -168,7 +167,7 @@ func buildWebPerfBuilds(src WebPerf, win limits.StatsWindow, includeDev bool, ou
 		strip.INPChangePct = pctChange(cur.inp, prev.inp)
 		strip.JSChangePct = pctChange(cur.js, prev.js)
 	}
-	out.BuildStrip = strip
+	out.strip = strip
 	for _, r := range []struct {
 		metric    string
 		cur, prev []float64
@@ -178,10 +177,10 @@ func buildWebPerfBuilds(src WebPerf, win limits.StatsWindow, includeDev bool, ou
 		{"js_bytes", cur.js, prevVals.js},
 		{"css_bytes", cur.css, prevVals.css},
 	} {
-		out.WhySlow = append(out.WhySlow, wire.StatsWebPerfWhySlow{
+		out.whySlow = append(out.whySlow, wire.StatsWebPerfWhySlow{
 			Metric: r.metric, Count: len(r.cur), P75: p75(r.cur), PreviousP75: p75(r.prev),
 			ChangePct: pctChange(r.cur, r.prev),
 		})
 	}
-	return nil
+	return out
 }

@@ -97,6 +97,16 @@ type Stats struct {
 	WebPerformance StatsWebPerformance `json:"web_performance"`
 }
 
+// NewStatsWebPerformance is the empty section: every list is empty, not nil,
+// so it encodes as [].
+func NewStatsWebPerformance() StatsWebPerformance {
+	return StatsWebPerformance{
+		HardLoads: []StatsWebPerfCard{}, RouteChanges: []StatsWebPerfCard{},
+		Trend: []StatsWebPerfTrend{}, SlowestRoutes: []StatsWebPerfRoute{},
+		WhySlow: []StatsWebPerfWhySlow{}, PoorINP: StatsWebPerfPoorINP{TopActions: []StatsWebPerfAction{}},
+	}
+}
+
 // StatsWebPerformance is the Web performance section. It is account-wide: the
 // project filter does not change it. Timings are milliseconds, CLS is unitless.
 // Nil values are absent (no samples, or no change to show).

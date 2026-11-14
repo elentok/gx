@@ -131,6 +131,21 @@ func TestStats_WebPerformanceWhySlowRowsCompareBuildsAndSkipZeroTransfers(t *tes
 	ptrVal(t, "css previous", css.PreviousP75, 50)
 }
 
+func TestStats_WebPerformanceWhySlowTTFBCountsOnlyAppReadySamples(t *testing.T) {
+	t.Parallel()
+	ready := inBuild("a1", "v", perfSample("app_ready", "hard", 1000))
+	ready.TTFB = fptr(100)
+	poorLCP := inBuild("a1", "v", perfSample("lcp", "hard", 5000))
+	poorLCP.TTFB = fptr(900)
+	get := perfStats(t, perfRepeat(1, 20, ready), perfRepeat(1, 20, poorLCP))
+
+	ttfb := whySlow(t, get("?range=7").WebPerformance.WhySlow, "ttfb")
+	if ttfb.Count != 20 {
+		t.Errorf("ttfb count = %d, want 20 (app_ready samples only)", ttfb.Count)
+	}
+	ptrVal(t, "ttfb p75", ttfb.P75, 100)
+}
+
 func TestStats_WebPerformancePoorINPCoversBothTabsAndAllBuilds(t *testing.T) {
 	t.Parallel()
 	poor := func(build, tab, action, chunk string, v float64) webperf.Sample {

@@ -47,11 +47,7 @@ func newStats(n int) wire.Stats {
 		Launch: wire.StatsLaunch{
 			Days: make([]wire.StatsAmount, n), StepMedianMs: map[string]int64{},
 		},
-		WebPerformance: wire.StatsWebPerformance{
-			HardLoads: []wire.StatsWebPerfCard{}, RouteChanges: []wire.StatsWebPerfCard{},
-			Trend: []wire.StatsWebPerfTrend{}, SlowestRoutes: []wire.StatsWebPerfRoute{},
-			WhySlow: []wire.StatsWebPerfWhySlow{}, PoorINP: wire.StatsWebPerfPoorINP{TopActions: []wire.StatsWebPerfAction{}},
-		},
+		WebPerformance: wire.NewStatsWebPerformance(),
 	}
 }
 
