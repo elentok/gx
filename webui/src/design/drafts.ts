@@ -3,7 +3,6 @@ import {
   ReasonDraftGone,
   ReasonDraftRevisionConflict,
   type DesignDraft,
-  type DesignDraftItem,
   type DesignDraftLeaseRequest,
   type DesignDraftSaveRequest,
   type DesignDraftSaveResult,
@@ -21,7 +20,6 @@ export type DraftResult =
   /** `started` is the Design address when the draft was started, else the draft was removed. */
   | { kind: "gone"; started?: string }
 
-export type ListDrafts = () => Promise<DesignDraftItem[]>
 export type ReadDraft = (id: string) => Promise<DraftResult>
 export type SaveDraft = (body: DesignDraftSaveRequest) => Promise<DraftResult>
 export type SaveDraftFields = (body: DesignDraftTargetRequest) => Promise<DraftResult>
@@ -42,7 +40,6 @@ export type SetLastProject = (project: string) => Promise<void>
 
 /** The draft calls the form makes; the prop defaults to the real ones. */
 export interface DraftsClient {
-  list: ListDrafts
   read: ReadDraft
   save: SaveDraft
   saveFields: SaveDraftFields
@@ -93,8 +90,6 @@ function toResult(r: DesignDraftSaveResult): DraftResult {
   throw new WriteError("Empty draft answer")
 }
 
-export const listDrafts: ListDrafts = () => json<DesignDraftItem[]>(BASE)
-
 export const readDraft: ReadDraft = async (id) =>
   toResult(await json<DesignDraftSaveResult>(`${BASE}/read?id=${encodeURIComponent(id)}`))
 
@@ -125,16 +120,6 @@ export const createDraft: CreateDraft = async ({ workspace, project, slug, idea 
   return id
 }
 
-/** The most recent draft, or null when there is none (or it cannot be read). */
-export async function openLatest(client: {
-  list: ListDrafts
-  read: ReadDraft
-}): Promise<DesignDraft | null> {
-  const [latest] = await client.list()
-  const res = latest ? await client.read(latest.id) : undefined
-  return res?.kind === "ok" ? res.draft : null
-}
-
 export const deleteDraft: DeleteDraft = async (id) =>
   toResult(await json<DesignDraftSaveResult>(`${BASE}/delete`, { id }))
 
@@ -155,14 +140,4 @@ export const getLastProject: GetLastProject = async () =>
 
 export const setLastProject: SetLastProject = async (project) => {
   await request(`${BASE}/last-project`, { project } satisfies DesignLastProject)
-}
-
-/** "just now", "N min ago", "N h ago", "N d ago". */
-export function timeAgo(editedAt: string, now: Date = new Date()): string {
-  const minutes = Math.floor((now.getTime() - Date.parse(editedAt)) / 60_000)
-  if (!(minutes >= 1)) return "just now"
-  if (minutes < 60) return `${minutes} min ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} h ago`
-  return `${Math.floor(hours / 24)} d ago`
 }

@@ -205,9 +205,9 @@ func TestDesignsImages_ListGet(t *testing.T) {
 	}
 }
 
-func TestDesignsDrafts_SaveWorkspaceFlagCreatesIntoWorkspace(t *testing.T) {
-	if newDraftsSaveCmd(Deps{}).Flags().Lookup("workspace") == nil {
-		t.Fatal("drafts save has no --workspace flag")
+func TestDesignsDrafts_SaveWithWorkspaceCreatesIntoWorkspace(t *testing.T) {
+	if newDraftsSaveCmd(Deps{}).Flags().Lookup("workspace") != nil {
+		t.Fatal("drafts save has a --workspace flag")
 	}
 	h := servertest.StartWithStore(t, t.TempDir())
 	ctx := context.Background()

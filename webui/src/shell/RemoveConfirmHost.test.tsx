@@ -51,17 +51,16 @@ test("Remove calls the writer, then the opener's callback", async () => {
 })
 
 describe("a draft request", () => {
-  const target = { id: "d1", label: "Checkout", empty: false }
-  const openDraft = (empty: boolean) => {
+  const openDraft = () => {
     const remove = vi.fn(async () => ({ kind: "deleted" }) as DraftResult)
     const onRemoved = vi.fn()
     renderThemed(<RemoveConfirmHost />)
-    act(() => openRemoveConfirm({ draft: { ...target, empty }, onRemoved, remove }))
+    act(() => openRemoveConfirm({ draft: { id: "d1", label: "Checkout" }, onRemoved, remove }))
     return { remove, onRemoved }
   }
 
-  test("a non-empty draft asks; Keep removes nothing", () => {
-    const { remove } = openDraft(false)
+  test("a draft asks; Keep removes nothing", () => {
+    const { remove } = openDraft()
     expect(screen.getByText("Remove Checkout? Its prompt and images are deleted.")).toBeTruthy()
     fireEvent.click(screen.getByRole("button", { name: "Keep" }))
     expect(screen.queryByText(/Its prompt and images/)).toBeNull()
@@ -69,15 +68,8 @@ describe("a draft request", () => {
   })
 
   test("Remove deletes the draft and calls onRemoved", async () => {
-    const { remove, onRemoved } = openDraft(false)
+    const { remove, onRemoved } = openDraft()
     fireEvent.click(screen.getByRole("button", { name: "Remove" }))
-    await waitFor(() => expect(onRemoved).toHaveBeenCalledTimes(1))
-    expect(remove).toHaveBeenCalledExactlyOnceWith("d1")
-  })
-
-  test("an empty draft is removed with no modal", async () => {
-    const { remove, onRemoved } = openDraft(true)
-    expect(screen.queryByRole("button", { name: "Keep" })).toBeNull()
     await waitFor(() => expect(onRemoved).toHaveBeenCalledTimes(1))
     expect(remove).toHaveBeenCalledExactlyOnceWith("d1")
   })

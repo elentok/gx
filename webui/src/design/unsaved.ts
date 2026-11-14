@@ -58,7 +58,7 @@ export async function saveUnsaved(
     try {
       const res = await save({ id, idea: e.idea, revision: e.revision })
       // A draft that is gone has nothing to keep the text for.
-      if (res.kind === "ok" || res.kind === "deleted" || res.kind === "gone") {
+      if (res.kind === "ok" || res.kind === "gone") {
         clearUnsaved(id)
         continue
       }

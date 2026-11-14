@@ -122,7 +122,7 @@ export interface CleanupWriteResult {
  */
 export const ReasonDraftRevisionConflict = "revision-conflict";
 /**
- * ReasonDraftGone: the draft was deleted (or emptied) since the caller loaded it.
+ * ReasonDraftGone: the draft was deleted since the caller loaded it.
  */
 export const ReasonDraftGone = "draft-gone";
 /**
@@ -134,7 +134,7 @@ export const ReasonDraftUnknownWorkspace = "unknown-workspace";
  */
 export const ReasonDraftNotEmpty = "draft-not-empty";
 /**
- * Refusal reasons of a New Design draft text save.
+ * Refusal reasons of a draft text save.
  */
 export type ReasonDraft = typeof ReasonDraftRevisionConflict | typeof ReasonDraftGone | typeof ReasonDraftUnknownWorkspace | typeof ReasonDraftNotEmpty;
 /**
@@ -224,8 +224,8 @@ export interface DesignDraftLeaseRequest {
 /**
  * DesignDraftSaveResult answers a text save, and a draft read (Draft set, or
  * refused draft-gone) and delete (Deleted). A refusal is a result: Reason is
- * one of the ReasonDraft* constants. Deleted: the save left the draft empty and
- * removed it. Draft is set on a successful, non-deleting save.
+ * one of the ReasonDraft* constants. Deleted: a delete removed the draft.
+ * Draft is set on a successful, non-deleting call.
  */
 export interface DesignDraftSaveResult {
   refused?: boolean;

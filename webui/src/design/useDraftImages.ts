@@ -86,7 +86,7 @@ export class DraftSlots {
 }
 
 /**
- * Image state of a New Design draft: the server's ids plus the uploads this tab runs. `ensureDraft` resolves to the
+ * Image state of a draft: the server's ids plus the uploads this tab runs. `ensureDraft` resolves to the
  * draft's id, saving the text first when the draft has none yet; `draftId` reads the current id for urls and removes.
  */
 export function useDraftImages({

@@ -4,6 +4,7 @@ import { HoldQueuedText, ReasonNeedsYes, type Workspace } from "../generated/ser
 import { session } from "../agents/agentsTestKit"
 import { rowToken } from "../design/open"
 import { RemoveConfirmHost } from "../shell/RemoveConfirmHost"
+import { closeRemoveConfirm } from "../shell/removeConfirmOpen"
 import { renderThemed } from "../ui/render"
 import { WideContext } from "../useWide"
 import { ItemMenu, postHold, type ItemRef, type ItemWriters } from "./itemActions"
@@ -14,9 +15,19 @@ vi.mock("../agents/sessionWrites", async (importOriginal) => ({
   postRemoveSession,
 }))
 
+const { readDraft, deleteDraft } = vi.hoisted(() => ({ readDraft: vi.fn(), deleteDraft: vi.fn() }))
+vi.mock("../design/drafts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../design/drafts")>()),
+  readDraft,
+  deleteDraft,
+}))
+
 afterEach(() => {
   cleanup()
+  closeRemoveConfirm()
   postRemoveSession.mockReset()
+  readDraft.mockReset()
+  deleteDraft.mockReset()
 })
 
 const workspaces: Workspace[] = [
@@ -238,4 +249,55 @@ test("a draft offers Rename, Move to workspace and Remove in that order, and pos
   fireEvent.click(screen.getByRole("menuitem", { name: "Move to workspace" }))
   fireEvent.click(await screen.findByRole("menuitem", { name: "Default" }))
   await waitFor(() => expect(w.move).toHaveBeenCalledExactlyOnceWith("draft/d1", "Default"))
+})
+
+const draftRow: ItemRef = {
+  key: "draft/d1",
+  name: "Checkout",
+  kind: "draft",
+  workspace: "Work",
+  draft: {
+    id: "d1",
+    label: "Checkout",
+    project: "p",
+    slug: "",
+    edited_at: "2026-01-02T00:00:00Z",
+    workspace: "Work",
+  },
+}
+const stored = (idea: string) => ({
+  kind: "ok",
+  draft: { id: "d1", idea, slug: "", images: [] },
+})
+
+async function removeDraftRow() {
+  const onRemoved = vi.fn()
+  renderThemed(
+    <WideContext.Provider value={true}>
+      <ItemMenu item={draftRow} workspaces={workspaces} writers={writers()} onRemoved={onRemoved} />
+      <RemoveConfirmHost />
+    </WideContext.Provider>,
+  )
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }))
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }))
+  return onRemoved
+}
+
+test("Remove deletes an empty draft with no dialog", async () => {
+  readDraft.mockResolvedValue(stored("  "))
+  deleteDraft.mockResolvedValue({ kind: "deleted" })
+  const onRemoved = await removeDraftRow()
+  await waitFor(() => expect(onRemoved).toHaveBeenCalledTimes(1))
+  expect(deleteDraft).toHaveBeenCalledExactlyOnceWith("d1")
+  expect(screen.queryByRole("button", { name: "Keep" })).toBeNull()
+})
+
+test.each([
+  ["a draft with text", () => readDraft.mockResolvedValue(stored("build a form"))],
+  ["a draft that cannot be read", () => readDraft.mockRejectedValue(new Error("down"))],
+])("Remove asks before deleting %s", async (_name, arrange) => {
+  arrange()
+  await removeDraftRow()
+  await screen.findByRole("button", { name: "Keep" })
+  expect(deleteDraft).not.toHaveBeenCalled()
 })

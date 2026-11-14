@@ -241,19 +241,11 @@ export function useDraftAutosave({
     if (phase.current === "finished" || blocked.current) return
     chain.current = chain.current.then(persist).catch(() => setStatus("none"))
   }
-  /** Start, Remove or a switch has taken the draft over: nothing saves from here on. */
-  const takeOver = () => {
-    phase.current = "finished"
-  }
+  /** Start or Remove has taken the draft over: nothing saves from here on. */
   const stopSaving = () => {
-    takeOver()
+    phase.current = "finished"
     clearTimeout(timer.current)
     settle()
-  }
-  /** Cancels the pending autosave; resolves once the saves in flight are done. */
-  const idle = () => {
-    clearTimeout(timer.current)
-    return chain.current
   }
   const currentId = () => server.current.id
 
@@ -370,11 +362,8 @@ export function useDraftAutosave({
     remove,
     start,
     flush,
-    /** For the switching hook: what a draft switch needs, without the refs behind it. */
     hasContent,
     stopSaving,
-    takeOver,
-    idle,
     currentId,
   }
 }

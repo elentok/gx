@@ -2,11 +2,10 @@ import type { SessionInfo } from "../generated/server"
 import type { DeleteDraft } from "../design/drafts"
 import { createExternalStore } from "./externalStore"
 
-/** The draft a Remove names; `empty` drafts are removed with no question. */
+/** The draft a Remove names. */
 export interface DraftRemoveTarget {
   id: string
   label: string
-  empty: boolean
 }
 
 export type RemoveConfirmRequest =

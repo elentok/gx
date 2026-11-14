@@ -405,7 +405,6 @@ func newDraftsSaveCmd(d Deps) *cobra.Command {
 	}
 	cmd.Flags().IntVar(&req.Revision, "revision", 0, "the revision you last saw")
 	cmd.Flags().StringVar(&req.Idea, "idea", "", "idea, or - to read it from stdin")
-	cmd.Flags().StringVar(&req.Workspace, "workspace", "", "workspace a newly created draft joins (ignored on a save of an existing draft)")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
 	return cmd
 }

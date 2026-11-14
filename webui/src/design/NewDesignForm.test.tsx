@@ -46,7 +46,6 @@ function fakeDrafts(over: Partial<DesignDraft> = {}) {
     },
   )
   const client: DraftsClient = {
-    list: async () => [],
     read: async () => ({ kind: "ok", draft: { ...stored } }),
     save,
     saveFields,

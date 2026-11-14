@@ -4,12 +4,10 @@ import {
   createDraft,
   deleteDraft,
   getLastProject,
-  listDrafts,
   readDraft,
   saveDraft,
   saveDraftFields,
   setLastProject,
-  timeAgo,
 } from "./drafts"
 
 afterEach(() => vi.unstubAllGlobals())
@@ -33,20 +31,6 @@ const draft = {
   edited_at: "2026-01-01T00:00:00Z",
 }
 const req = { id: "d1", idea: "x", revision: 1 }
-
-const now = new Date("2026-01-10T12:00:00Z")
-test.each([
-  ["2026-01-10T11:59:40Z", "just now"],
-  ["2026-01-10T12:00:30Z", "just now"],
-  ["2026-01-10T11:59:00Z", "1 min ago"],
-  ["2026-01-10T11:01:00Z", "59 min ago"],
-  ["2026-01-10T11:00:00Z", "1 h ago"],
-  ["2026-01-09T13:00:00Z", "23 h ago"],
-  ["2026-01-09T12:00:00Z", "1 d ago"],
-  ["2026-01-03T12:00:00Z", "7 d ago"],
-])("time: %s", (at, want) => {
-  expect(timeAgo(at, now)).toBe(want)
-})
 
 const bodyOf = (f: ReturnType<typeof stub>) =>
   JSON.parse((f.mock.calls[0][1] as RequestInit).body as string)
@@ -103,9 +87,7 @@ test("read and delete use their routes and map refusals", async () => {
   expect(JSON.parse((g.mock.calls[0][1] as RequestInit).body as string)).toEqual({ id: "d1" })
 })
 
-test("list and last project", async () => {
-  stub([{ id: "d1" }])
-  expect(await listDrafts()).toEqual([{ id: "d1" }])
+test("last project", async () => {
   stub({ project: "gx" })
   expect(await getLastProject()).toBe("gx")
   const f = stub({ project: "other" })
@@ -119,7 +101,6 @@ test("list and last project", async () => {
 test("a 500 body throws its text", async () => {
   stub("disk full\n", 500)
   await expect(saveDraft(req)).rejects.toThrow("disk full")
-  await expect(listDrafts()).rejects.toThrow("disk full")
   await expect(setLastProject("x")).rejects.toThrow("disk full")
 })
 

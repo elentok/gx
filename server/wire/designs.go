@@ -29,7 +29,7 @@ type DesignOpenRequest struct {
 	// Workspace is the workspace a new Design lands in; FromSession wins, and
 	// a missing or unknown name reads as Default.
 	Workspace string `json:"workspace,omitempty"`
-	// DraftID is the New Design draft being started: its images move into the
+	// DraftID is the draft being started: its images move into the
 	// map and the draft is deleted. An unknown id is ignored.
 	DraftID string `json:"draft_id,omitempty"`
 }

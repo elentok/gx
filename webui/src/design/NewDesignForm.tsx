@@ -7,7 +7,6 @@ import {
   createDraft,
   deleteDraft,
   getLastProject,
-  listDrafts,
   pingDraft,
   readDraft,
   removeDraftIfEmpty,
@@ -44,7 +43,6 @@ import { registerDraftPage } from "../shell/draftPageActions"
 const CodeEditor = lazy(() => import("../ui/expandable-text/CodeEditor"))
 
 const realDrafts: DraftsClient = {
-  list: listDrafts,
   read: readDraft,
   save: saveDraft,
   saveFields: saveDraftFields,

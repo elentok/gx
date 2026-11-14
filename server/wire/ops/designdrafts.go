@@ -2,11 +2,11 @@ package ops
 
 import "time"
 
-// Refusal reasons of a New Design draft text save.
+// Refusal reasons of a draft text save.
 const (
 	// ReasonDraftRevisionConflict: the caller saved against a revision that is no longer current.
 	ReasonDraftRevisionConflict = "revision-conflict"
-	// ReasonDraftGone: the draft was deleted (or emptied) since the caller loaded it.
+	// ReasonDraftGone: the draft was deleted since the caller loaded it.
 	ReasonDraftGone = "draft-gone"
 	// ReasonDraftUnknownWorkspace: a create named a workspace that does not exist; no draft was stored.
 	ReasonDraftUnknownWorkspace = "unknown-workspace"
@@ -87,8 +87,8 @@ type DesignDraftLeaseRequest struct {
 
 // DesignDraftSaveResult answers a text save, and a draft read (Draft set, or
 // refused draft-gone) and delete (Deleted). A refusal is a result: Reason is
-// one of the ReasonDraft* constants. Deleted: the save left the draft empty and
-// removed it. Draft is set on a successful, non-deleting save.
+// one of the ReasonDraft* constants. Deleted: a delete removed the draft.
+// Draft is set on a successful, non-deleting call.
 type DesignDraftSaveResult struct {
 	Refused bool         `json:"refused,omitempty"`
 	Reason  string       `json:"reason,omitempty"`

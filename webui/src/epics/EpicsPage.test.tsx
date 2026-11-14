@@ -11,7 +11,6 @@ import type { FetchEpicList } from "./list"
 // A draft page opens on the server's drafts; here there are none and saves go nowhere.
 vi.mock("../design/drafts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../design/drafts")>()),
-  listDrafts: async () => [],
   saveDraft: async () => ({ kind: "deleted" }),
   deleteDraft: async () => ({ kind: "deleted" }),
 }))

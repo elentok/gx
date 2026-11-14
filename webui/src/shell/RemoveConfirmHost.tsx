@@ -1,5 +1,4 @@
 import { Box, Text } from "@chakra-ui/react"
-import { useEffect } from "react"
 import { forgetLast } from "../agents/lastAgent"
 import { isExited, postRemoveSession, removeSession } from "../agents/sessionWrites"
 import { deleteDraft, type DeleteDraft } from "../design/drafts"
@@ -76,12 +75,6 @@ function DraftRemove({
       { onDone: onRemoved },
     )
   }
-  // An empty draft holds nothing to lose, so no question.
-  useEffect(() => {
-    if (draft.empty) removeNow()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  if (draft.empty) return null
   return (
     <Modal label={`Remove ${draft.label}`} onClose={closeRemoveConfirm} maxW="sm">
       <Text>{`Remove ${draft.label}? Its prompt and images are deleted.`}</Text>

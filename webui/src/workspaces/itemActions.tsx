@@ -14,7 +14,7 @@ import {
 } from "../generated/server"
 import { postTargetsTo, refusalOf, type StopSession } from "../design/open"
 import { useSessionManage } from "../agents/useSessionManage"
-import { readDraft } from "../design/drafts"
+import { deleteDraft, readDraft } from "../design/drafts"
 import { openRemoveConfirm } from "../shell/removeConfirmOpen"
 import { draftRenameEntry, renameEntry } from "../shell/renameOpen"
 import { Button } from "../ui/button/Button"
@@ -207,12 +207,26 @@ function ArchiveDialog({
   )
 }
 
-/** Asks to remove a draft; one with no prompt, slug or images goes at once. A draft that cannot be read is asked about. */
-async function removeDraft(id: string, label: string, onRemoved: () => void) {
+/** Asks to remove a draft; one with no prompt, slug or images is deleted at once. A draft that cannot be read is asked about. */
+async function removeDraft(
+  id: string,
+  label: string,
+  onRemoved: () => void,
+  run: ReturnType<typeof useWrite>["run"],
+) {
   const res = await readDraft(id).catch(() => undefined)
   const d = res?.kind === "ok" ? res.draft : undefined
-  const empty = !!d && !d.idea.trim() && !d.slug && d.images.length === 0
-  openRemoveConfirm({ draft: { id, label, empty }, onRemoved })
+  if (d && !d.idea.trim() && !d.slug && d.images.length === 0) {
+    void run(
+      async () => {
+        await deleteDraft(id)
+        return {}
+      },
+      { onDone: onRemoved },
+    )
+    return
+  }
+  openRemoveConfirm({ draft: { id, label }, onRemoved })
 }
 
 /** The Move, Remove and Hold sections of an item's menu, plus the dialogs they open. No item, no sections and no dialogs. */
@@ -260,7 +274,11 @@ export function useItemActions(
   if (item.kind === "draft" && item.draft) {
     const { id, label } = item.draft
     groups.push([
-      { value: "remove", label: "Remove", onSelect: () => void removeDraft(id, label, onRemoved) },
+      {
+        value: "remove",
+        label: "Remove",
+        onSelect: () => void removeDraft(id, label, onRemoved, run),
+      },
     ])
   }
 

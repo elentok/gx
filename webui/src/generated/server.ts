@@ -132,7 +132,7 @@ export interface DesignOpenRequest {
    */
   workspace?: string;
   /**
-   * DraftID is the New Design draft being started: its images move into the
+   * DraftID is the draft being started: its images move into the
    * map and the draft is deleted. An unknown id is ignored.
    */
   draft_id?: string;
@@ -1974,7 +1974,7 @@ export interface Snapshot {
    */
   placements?: SessionPlacement[];
   /**
-   * DesignDrafts are the New Design draft rows; filled in by the handler.
+   * DesignDrafts are the draft rows; filled in by the handler.
    */
   design_drafts?: DesignDraftRow[];
   /**
@@ -4018,7 +4018,7 @@ export const EventWorkspacesChanged = "workspaces-changed";
  */
 export const EventDesignDraftsChanged = "design-drafts-changed";
 /**
- * DesignDraftRow is one New Design draft in the snapshot: what the sidebar row
+ * DesignDraftRow is one draft in the snapshot: what the sidebar row
  * shows. It carries no prompt text and no image list.
  */
 export interface DesignDraftRow {
