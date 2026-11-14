@@ -110,41 +110,57 @@ func ListFiles(dir string, r Range) (FileList, error) {
 	if r.NoCommonHistory {
 		return FileList{}, nil
 	}
-	base := []string{"diff", "--no-color", "--find-renames", "--no-ext-diff"}
-	tail := []string{r.MergeBase, r.SecondSHA, "--"}
-	env := run.NonInteractiveEnv()
+	files, err := diffFiles(dir, []string{"diff"}, []string{r.MergeBase, r.SecondSHA, "--"})
+	if err != nil {
+		return FileList{}, err
+	}
+	return capFiles(files), nil
+}
 
-	status, _, err := run.RunRaw(dir, env, append(append(base, "--name-status", "-z"), tail...)...)
-	if err != nil {
-		return FileList{}, err
-	}
-	numstat, _, err := run.RunRaw(dir, env, append(append(base, "--numstat", "-z"), tail...)...)
-	if err != nil {
-		return FileList{}, err
-	}
-	patch, _, err := run.RunRaw(dir, env, append(append(base, "--patch"), tail...)...)
-	if err != nil {
-		return FileList{}, err
-	}
-
-	files, err := parseNameStatus(string(status))
-	if err != nil {
-		return FileList{}, err
-	}
-	if err := applyNumstat(files, string(numstat)); err != nil {
-		return FileList{}, err
-	}
-	applySizes(files, string(patch))
-	for i := range files {
-		files[i].Generated = isGenerated(files[i].Path)
-	}
-
+func capFiles(files []File) FileList {
 	list := FileList{Files: files}
 	if len(files) > MaxFiles {
 		list.Files = files[:MaxFiles]
 		list.Truncated = true
 	}
-	return list, nil
+	return list
+}
+
+// diffFiles lists the files one git diff-like call changes. cmd is "diff" or
+// "show --format=" and tail names what to compare.
+func diffFiles(dir string, cmd, tail []string) ([]File, error) {
+	base := append(append([]string{}, cmd...), "--no-color", "--find-renames", "--no-ext-diff")
+	env := run.NonInteractiveEnv()
+	call := func(extra ...string) ([]byte, error) {
+		out, _, err := run.RunRaw(dir, env, append(append(append([]string{}, base...), extra...), tail...)...)
+		return out, err
+	}
+
+	status, err := call("--name-status", "-z")
+	if err != nil {
+		return nil, err
+	}
+	numstat, err := call("--numstat", "-z")
+	if err != nil {
+		return nil, err
+	}
+	patch, err := call("--patch")
+	if err != nil {
+		return nil, err
+	}
+
+	files, err := parseNameStatus(string(status))
+	if err != nil {
+		return nil, err
+	}
+	if err := applyNumstat(files, string(numstat)); err != nil {
+		return nil, err
+	}
+	applySizes(files, string(patch))
+	for i := range files {
+		files[i].Generated = isGenerated(files[i].Path)
+	}
+	return files, nil
 }
 
 func parseNameStatus(out string) ([]File, error) {
