@@ -12,7 +12,7 @@ import (
 )
 
 // EpicDiffShapes are the --shape names of the epic-diff scenario; the first is the default.
-var EpicDiffShapes = []string{"merged", "running", "unstamped", "empty", "missing-sha"}
+var EpicDiffShapes = []string{"merged", "running", "unstamped", "empty", "missing-sha", "pr", "backfill"}
 
 // Names the Diff page flows look at.
 const (
@@ -50,6 +50,11 @@ const (
 
 const epicDiffMergedAt = "2026-02-10T11:00:00Z"
 
+// epicDiffMergedMeta is the frontmatter of a merged epic; extra adds its fields.
+func epicDiffMergedMeta(extra string) string {
+	return "status: open\ncompleted_at: 2026-02-10T10:00:00Z\nmerged_at: " + epicDiffMergedAt + "\n" + extra
+}
+
 // EpicDiffScenario is the epic-diff scenario in the given shape. The stored
 // epics hold SHAs of the repo's own history, so GitSetup writes them into the
 // meta once it has made the commits (seed reads the meta after GitSetup).
@@ -58,9 +63,7 @@ func EpicDiffScenario(shape string) (Scenario, bool) {
 	done := func(id, slug string) Ticket {
 		return Ticket{ID: id, Slug: slug, Opts: servertest.TicketOpts{Status: "done", DoneAt: epicDiffMergedAt}}
 	}
-	mergedMeta := func(extra string) string {
-		return "status: open\ncompleted_at: 2026-02-10T10:00:00Z\nmerged_at: " + epicDiffMergedAt + "\n" + extra
-	}
+	mergedMeta := epicDiffMergedMeta
 	mapMeta := mergedMeta("kind: map\n")
 	switch shape {
 	case "merged":
@@ -122,6 +125,10 @@ func EpicDiffScenario(shape string) (Scenario, bool) {
 			s.runningBranches()
 			return s.err
 		}
+	case "pr":
+		return epicDiffPRScenario(), true
+	case "backfill":
+		return epicDiffBackfillScenario(), true
 	default:
 		return Scenario{}, false
 	}
@@ -156,8 +163,13 @@ func (s *epicDiffGit) write(path string, data string) {
 func (s *epicDiffGit) commit(subject string, ticketTrailers ...string) {
 	s.run("add", "-A")
 	args := []string{"commit", "-m", subject}
-	for _, v := range ticketTrailers {
-		args = append(args, "-m", merge.TicketTrailerKey+": "+v)
+	if len(ticketTrailers) > 0 {
+		// One paragraph: git reads trailers from the last one only.
+		lines := make([]string, len(ticketTrailers))
+		for i, v := range ticketTrailers {
+			lines[i] = merge.TicketTrailerKey + ": " + v
+		}
+		args = append(args, "-m", strings.Join(lines, "\n"))
 	}
 	s.run(args...)
 }

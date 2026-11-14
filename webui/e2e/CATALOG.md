@@ -42,7 +42,17 @@ commitless; `widgets-old-impl` is archived with its own range. `running` has `al
 (blocked by `alpha-impl`, so based on its branch; the project is on-done), `gamma-impl` (blocked by merged `shipped-impl`, based
 on trunk), `custom-impl` (`base: release`) and `quiet-impl` (no commits past its base). `unstamped` is a merged epic with no
 range and no branch; `empty` has a stamped range with base equal to tip; `missing-sha` has a tip SHA that was never committed.
-The names are constants in `testutil/gxfixture/spec/epicdiff.go`; the commits are made by `GitSetup` there.
+`pr` (project on PR delivery, fake gh, bare origin) has four epics whose PRs are merged on origin only, so the server's trunk sync
+stamps their range after start-up: `pr-merge-impl` (merge commit), `pr-squash-impl` (squash commit whose body holds trailer lines
+for tickets 01 and 02; done ticket 03 has none), `pr-rebase-impl` (commits re-created with the same headlines) and
+`pr-reworded-impl` (other headlines, so no range). `stack-kept-impl` and `stack-gone-impl` are merged, stacked on the squash epic
+and stamped in the seed; the first one's objects exist, the second one's SHAs were never committed. `backfill` (two projects,
+`demo` and `second` with its own repo; the migration is pending, so the server's start-up backfill stamps ranges) has merged epics
+with no range and a real trunk reflog: exact matches (`bf-exact-a-impl`, `bf-exact-b-impl`, `bf-second-exact-impl`) and the empty
+range of epics with a run log and no pick (`bf-nocommit-impl`, `bf-second-nocommit-impl`) get one; `bf-pull-x-impl` and
+`bf-pull-y-impl` (one entry), `bf-spread-impl` (spread over two entries), `bf-twice-impl` (merged twice), the map `bf-exact-a`,
+`bf-nolog-impl` (no run log) and `bf-offtrunk-impl` (commits not on trunk) get none.
+The names are constants in `testutil/gxfixture/spec/epicdiff.go`, `epicdiffpr.go` and `epicdiffbackfill.go`; the commits are made by `GitSetup` there.
 The `dev-mode` scenario runs a Dev checkout (`server.web.dev-dir`, with `webui/package.json`) against the fake `pnpm`
 (`testutil/vitefake`), first on the server's PATH, in the state its shape names (`start("dev-mode", { shape })`; default `running`).
 The snapshot Dev block (`GET /v1/snapshot`) shows: `off` (key off, valid checkout), `installing` (key on, stale `node_modules`, install

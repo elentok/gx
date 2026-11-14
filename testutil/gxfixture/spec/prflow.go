@@ -31,6 +31,10 @@ type FakeGH struct {
 	// MergedFile makes the PR's merge commit (on origin) add this file, while local
 	// Trunk has an uncommitted file of the same name: it cannot fast-forward.
 	MergedFile string
+	// OriginSetup runs in the project repo once origin has trunk, to land merges on
+	// origin only. It may fill State's PR merge commits: the state file is
+	// written again after it.
+	OriginSetup func(git Git, repo string) error
 }
 
 // prCheck is a check of PR 412's head; status is "COMPLETED" or "IN_PROGRESS".

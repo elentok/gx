@@ -31,7 +31,7 @@ func (f fakeGH) setupFakeGH(sc *spec.FakeGH) error {
 		return err
 	}
 	f.env = append(f.env, ghfake.DirEnv+"="+f.ghDir())
-	if err := ghfake.Locked(f.ghDir(), func(s *ghfake.State) error { *s = sc.State; return nil }); err != nil {
+	if err := f.writeState(sc); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(f.origin(), 0o755); err != nil {
@@ -47,10 +47,22 @@ func (f fakeGH) addOrigin(repo string, sc *spec.FakeGH) error {
 			return err
 		}
 	}
+	if sc.OriginSetup != nil {
+		if err := sc.OriginSetup(f.git, repo); err != nil {
+			return err
+		}
+		if err := f.writeState(sc); err != nil {
+			return err
+		}
+	}
 	if sc.MergedFile != "" {
 		return f.mergeOnOrigin(repo, sc.MergedFile)
 	}
 	return nil
+}
+
+func (f fakeGH) writeState(sc *spec.FakeGH) error {
+	return ghfake.Locked(f.ghDir(), func(s *ghfake.State) error { *s = sc.State; return nil })
 }
 
 // mergeOnOrigin puts a commit adding file on origin's main, which local Trunk

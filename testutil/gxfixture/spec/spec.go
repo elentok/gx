@@ -135,6 +135,11 @@ type Scenario struct {
 	NoCheckConfig bool
 	// OwnRepos lists the projects that get a repo of their own instead of the shared one.
 	OwnRepos []string
+	// OwnGitSetup shapes an OwnRepos project's repo, like GitSetup does the shared one.
+	OwnGitSetup map[string]func(git Git, repo string) error
+	// PickedEpics (project:epic) get a run log with a cherry-picked event, the
+	// mark of an epic whose commits reached trunk.
+	PickedEpics []string
 	// QueueAfterSessions queues sc.Queue once the sessions are seeded: a Queue
 	// agent's control file would otherwise break seedSession's before/after diff.
 	QueueAfterSessions bool

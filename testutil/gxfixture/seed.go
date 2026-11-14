@@ -117,10 +117,20 @@ func (f *fixture) seed(sc scenario) error {
 	}
 	// ownRepo makes a project's own repo; with the chat knob it carries the
 	// worker config too, since a session reads the config from its dir.
+	ownRepos := map[string]string{}
 	ownRepo := func(p string) (string, error) {
 		dir := filepath.Join(f.root, p+"-repo")
+		if _, made := ownRepos[p]; made {
+			return dir, nil
+		}
+		ownRepos[p] = dir
 		if err := f.initRepo(dir); err != nil {
 			return "", err
+		}
+		if setup := sc.OwnGitSetup[p]; setup != nil {
+			if err := setup(f.git, dir); err != nil {
+				return "", err
+			}
 		}
 		if sc.Chat {
 			return dir, os.WriteFile(filepath.Join(dir, agentfake.WorkerConfigFile), cfg, 0o644)
@@ -207,6 +217,12 @@ func (f *fixture) seed(sc scenario) error {
 		}
 		if kind, ok := sc.Recovered[addr]; ok {
 			ev := runlog.Event{Time: time.Now(), Type: string(events.RecoveryApplied), Kind: kind, Reason: "seeded", Outcome: "ok"}
+			if err := runlog.AppendEvent(filepath.Join(f.store, e.Project), e.Name, ev); err != nil {
+				return err
+			}
+		}
+		if slices.Contains(sc.PickedEpics, addr) {
+			ev := runlog.Event{Time: time.Now(), Type: string(events.CherryPicked)}
 			if err := runlog.AppendEvent(filepath.Join(f.store, e.Project), e.Name, ev); err != nil {
 				return err
 			}
