@@ -294,6 +294,27 @@ func TestReport_PlaywrightPrintsMatchingSnapshotLinesOnFailureOnly(t *testing.T)
 	}
 }
 
+func TestReport_PlaywrightPrintsSnapshotsOnlyUnderUnitsShownWithText(t *testing.T) {
+	n := maxFullUnits + 3
+	o := Outcome{Contexts: map[string]string{}}
+	for i := 1; i <= n; i++ {
+		name := fmt.Sprintf("%d. T", i)
+		text := fmt.Sprintf("Error: boom %d\nLocator: getByText('L%d')", i, i)
+		o.Failures = append(o.Failures, Unit{Location: "e2e/a.e2e.ts", Name: name, Text: text})
+		o.Contexts["a.e2e.ts."+name] = fmt.Sprintf("- text \"L%d\"", i)
+	}
+	got := runReport(o, 1)
+	if c := strings.Count(got, "snapshot for"); c != maxFullUnits {
+		t.Errorf("snapshot blocks = %d, want %d:\n%s", c, maxFullUnits, got)
+	}
+	for i := 1; i <= maxFullUnits; i++ {
+		want := fmt.Sprintf("    Locator: getByText('L%d')\n  snapshot for %d. T:\n    - text \"L%d\"\n", i, i, i)
+		if !strings.Contains(got, want) {
+			t.Errorf("snapshot %d not directly under its unit:\n%s", i, got)
+		}
+	}
+}
+
 func TestPlaywrightParse_FailureHeadingWithoutRule(t *testing.T) {
 	out := "  1) [chromium] › e2e/a.e2e.ts:177:1 › 158. A very long title that fills the line \n\n    Error: boom\n\n  1 failed\n    [chromium] › e2e/a.e2e.ts:177:1 › 158. A very long title that fills the line\n"
 	got := Playwright{}.Parse([]byte(out), 1)

@@ -65,6 +65,12 @@ func renderUnits(w io.Writer, units []Unit) { renderUnitsMax(w, units, maxFullUn
 // renderUnitsMax is renderUnits with the number of units shown with text
 // chosen by the caller.
 func renderUnitsMax(w io.Writer, units []Unit, maxFull int) {
+	renderUnitsWith(w, units, maxFull, nil)
+}
+
+// renderUnitsWith is renderUnitsMax that also calls after(unit) right below the
+// text of each unit shown with text. Units listed by name only get no call.
+func renderUnitsWith(w io.Writer, units []Unit, maxFull int, after func(Unit)) {
 	units, counts := collapseUnits(units)
 	prev := ""
 	for i, u := range units {
@@ -90,6 +96,9 @@ func renderUnitsMax(w io.Writer, units []Unit, maxFull int) {
 		for _, l := range limitText(u.Text) {
 			fmt.Fprintf(w, "    %s\n", l)
 		}
+		if after != nil {
+			after(u)
+		}
 	}
 	if len(units) > maxFull {
 		fmt.Fprintf(w, "%d more failures are listed by name only; see the log for their text\n", len(units)-maxFull)
@@ -103,6 +112,8 @@ const maxSlowest = 5
 // for tools that report page snapshots (playwright). It prints nothing when
 // there are no durations.
 func renderSlowest(tool Tool, w io.Writer, durations map[string]int64) {
+	// Only tools that read page snapshots (playwright) report durations; the
+	// ContextReader check is a stand-in for "is playwright".
 	if _, ok := tool.(ContextReader); !ok || len(durations) == 0 {
 		return
 	}
@@ -114,18 +125,16 @@ func renderSlowest(tool Tool, w io.Writer, durations map[string]int64) {
 	}
 }
 
-// renderSnapshots prints, under each failure, the lines of its page snapshot
-// that match the failing locator. A failure without a snapshot prints nothing.
-func renderSnapshots(w io.Writer, o Outcome) {
-	for _, u := range o.Failures {
-		lines := snapshotExcerpt(u.Text, o.Contexts[contextKey(u.Location, u.Name)])
-		if len(lines) == 0 {
-			continue
-		}
-		fmt.Fprintf(w, "  snapshot for %s:\n", u.Name)
-		for _, l := range lines {
-			fmt.Fprintf(w, "    %s\n", l)
-		}
+// renderSnapshot prints the lines of u's page snapshot that match the failing
+// locator. A failure without a snapshot prints nothing.
+func renderSnapshot(w io.Writer, o Outcome, u Unit) {
+	lines := snapshotExcerpt(u.Text, o.Contexts[contextKey(u.Location, u.Name)])
+	if len(lines) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "  snapshot for %s:\n", u.Name)
+	for _, l := range lines {
+		fmt.Fprintf(w, "    %s\n", l)
 	}
 }
 

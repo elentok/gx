@@ -390,8 +390,7 @@ func report(tool Tool, o Options, outcome Outcome, out []byte, e indexEntry) int
 			rawHead(o.Out, out)
 		} else {
 			fmt.Fprintf(o.Out, "FAIL %s: %d failed in %s\n", tool.Name(), len(outcome.Failures), dur)
-			renderUnits(o.Out, outcome.Failures)
-			renderSnapshots(o.Out, outcome)
+			renderUnitsWith(o.Out, outcome.Failures, maxFullUnits, func(u Unit) { renderSnapshot(o.Out, outcome, u) })
 			if re := tool.RerunArgs(o.Args, outcome.Failures); re != nil {
 				fmt.Fprintln(o.Out, rerunLine(tool.Name(), o.CDir, re))
 			}
