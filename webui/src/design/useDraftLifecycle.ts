@@ -1,0 +1,68 @@
+import { useEffect, useRef } from "react"
+import { useNavigate } from "react-router"
+import { useConnectionContext } from "../connection"
+import { EventDesignDraftsChanged } from "../generated/server"
+import { designHref } from "../hrefs"
+import type { DraftsClient } from "./drafts"
+import type { DraftAutosave } from "./useDraftAutosave"
+
+/** The note the Epics page shows after a draft vanished. */
+export const REMOVED_NOTE = "This draft was removed."
+const LEASE_MS = 30_000
+
+/** Leaves a gone draft's page: for the Design it was started as, else for the Epics page with a note. */
+export function useLeaveGone() {
+  const navigate = useNavigate()
+  return (started?: string) =>
+    started
+      ? navigate(designHref(started).slice(1), { replace: true })
+      : navigate("/epics", { replace: true, state: { note: REMOVED_NOTE } })
+}
+
+/**
+ * The open draft page's link to the server: it renews the lease on open and every 30 s, and
+ * re-reads the draft when a ping fails, the draft rows change or a save finds it gone.
+ */
+export function useDraftLifecycle({
+  drafts,
+  autosave,
+}: {
+  drafts: DraftsClient
+  autosave: DraftAutosave
+}) {
+  const conn = useConnectionContext()
+  const leave = useLeaveGone()
+  const { currentId, stopSaving, mayRedirect, adoptTarget, gone } = autosave
+  const reread = async () => {
+    if (!mayRedirect()) return
+    const res = await drafts.read(currentId()).catch(() => undefined)
+    if (!mayRedirect()) return
+    if (res?.kind === "ok") adoptTarget(res.draft)
+    else if (res?.kind === "gone") {
+      stopSaving()
+      leave(res.started)
+    }
+  }
+  const latest = useRef(reread)
+  latest.current = reread
+
+  useEffect(() => {
+    const check = () => void latest.current()
+    const ping = () => drafts.ping(currentId()).catch(check)
+    ping()
+    const timer = setInterval(ping, LEASE_MS)
+    const off = conn.onEvent((_address, type) => {
+      if (type === EventDesignDraftsChanged) check()
+    })
+    return () => {
+      clearInterval(timer)
+      off()
+    }
+    // The client and connection are fixed for the page's life.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (gone) void latest.current()
+  }, [gone])
+}

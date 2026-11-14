@@ -85,8 +85,15 @@ export type Chord = {
 export const agentIdOf = (path: string): string | undefined =>
   /^\/agents\/([^/]+)\/?$/.exec(path)?.[1]
 
+/** The id of a `/drafts/:id` page, or undefined for any other path. */
+export const draftIdOf = (path: string): string | undefined =>
+  /^\/drafts\/([^/]+)\/?$/.exec(path)?.[1]
+
 const canRemove = (ctx: ChordContext) =>
-  agentIdOf(ctx.path) !== undefined && ctx.session !== undefined && canManage(ctx.session)
+  draftIdOf(ctx.path) !== undefined ||
+  (agentIdOf(ctx.path) !== undefined && ctx.session !== undefined && canManage(ctx.session))
+
+const canRenameHere = (ctx: ChordContext) => draftIdOf(ctx.path) !== undefined || canRename(ctx)
 
 /** The one rule for the Rename chat chord and palette row: the open page is a chat's page. */
 export const canRename = (ctx: ChordContext) =>
@@ -113,10 +120,16 @@ export function chordTable({
     { key: "c", label: () => "New chat", run: openNewAgent, available: () => true },
     { key: "d", label: () => "New design", run: openNewDesign, available: () => true },
     { key: "s", label: () => "Focus sidebar", run: focusSidebar, available: () => true },
-    { key: "r", label: () => "Rename chat", run: rename, available: canRename },
+    {
+      key: "r",
+      label: ({ path }) => (draftIdOf(path) ? "Rename" : "Rename chat"),
+      run: rename,
+      available: canRenameHere,
+    },
     {
       key: "x",
-      label: ({ session: s }) => (s && (s.ticket || s.fix_of || s.flow) ? "Remove" : "Remove chat"),
+      label: ({ path, session: s }) =>
+        draftIdOf(path) || (s && (s.ticket || s.fix_of || s.flow)) ? "Remove" : "Remove chat",
       run: remove,
       danger: true,
       available: canRemove,

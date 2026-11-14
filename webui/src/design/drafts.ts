@@ -4,6 +4,7 @@ import {
   ReasonDraftRevisionConflict,
   type DesignDraft,
   type DesignDraftItem,
+  type DesignDraftLeaseRequest,
   type DesignDraftSaveRequest,
   type DesignDraftSaveResult,
   type DesignDraftTargetRequest,
@@ -17,7 +18,8 @@ export type DraftResult =
   | { kind: "ok"; draft: DesignDraft }
   | { kind: "deleted" }
   | { kind: "conflict" }
-  | { kind: "gone" }
+  /** `started` is the Design address when the draft was started, else the draft was removed. */
+  | { kind: "gone"; started?: string }
 
 export type ListDrafts = () => Promise<DesignDraftItem[]>
 export type ReadDraft = (id: string) => Promise<DraftResult>
@@ -25,6 +27,9 @@ export type SaveDraft = (body: DesignDraftSaveRequest) => Promise<DraftResult>
 export type SaveDraftFields = (body: DesignDraftTargetRequest) => Promise<DraftResult>
 export type CreateDraft = (workspace?: string) => Promise<string>
 export type DeleteDraft = (id: string) => Promise<DraftResult>
+/** Renews the open page's lease; throws when the draft is gone or the call fails. */
+export type PingDraft = (id: string) => Promise<void>
+export type RemoveDraftIfEmpty = (id: string) => Promise<void>
 export type GetLastProject = () => Promise<string>
 export type SetLastProject = (project: string) => Promise<void>
 
@@ -35,6 +40,8 @@ export interface DraftsClient {
   save: SaveDraft
   saveFields: SaveDraftFields
   remove: DeleteDraft
+  ping: PingDraft
+  removeIfEmpty: RemoveDraftIfEmpty
   getLastProject: GetLastProject
   setLastProject: SetLastProject
   uploadImage: UploadDraftImage
@@ -71,7 +78,7 @@ async function json<T>(path: string, body?: unknown): Promise<T> {
 function toResult(r: DesignDraftSaveResult): DraftResult {
   if (r.refused) {
     if (r.reason === ReasonDraftRevisionConflict) return { kind: "conflict" }
-    if (r.reason === ReasonDraftGone) return { kind: "gone" }
+    if (r.reason === ReasonDraftGone) return { kind: "gone", started: r.started }
     throw new WriteError(r.reason || "Draft refused")
   }
   if (r.deleted) return { kind: "deleted" }
@@ -111,6 +118,18 @@ export async function openLatest(client: {
 
 export const deleteDraft: DeleteDraft = async (id) =>
   toResult(await json<DesignDraftSaveResult>(`${BASE}/delete`, { id }))
+
+export const pingDraft: PingDraft = async (id) => {
+  const res = await json<DesignDraftSaveResult>(`${BASE}/lease`, {
+    id,
+  } satisfies DesignDraftLeaseRequest)
+  if (res.refused) throw new WriteError(res.reason || "Draft refused")
+}
+
+/** The server refuses when text arrived meanwhile, which is not an error here. */
+export const removeDraftIfEmpty: RemoveDraftIfEmpty = async (id) => {
+  await request(`${BASE}/remove-if-empty`, { id } satisfies DesignDraftLeaseRequest)
+}
 
 export const getLastProject: GetLastProject = async () =>
   (await json<DesignLastProject>(`${BASE}/last-project`)).project

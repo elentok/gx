@@ -8,7 +8,9 @@ import {
   deleteDraft,
   getLastProject,
   listDrafts,
+  pingDraft,
   readDraft,
+  removeDraftIfEmpty,
   saveDraft,
   saveDraftFields,
   setLastProject,
@@ -35,6 +37,8 @@ import { DraftBanner } from "./DraftBanner"
 import { type Fields } from "./draftFields"
 import { slugProblem } from "./draftSlug"
 import { useDraftAutosave } from "./useDraftAutosave"
+import { useDraftLifecycle, useLeaveGone } from "./useDraftLifecycle"
+import { registerDraftPage } from "../shell/draftPageActions"
 
 const CodeEditor = lazy(() => import("../ui/expandable-text/CodeEditor"))
 
@@ -44,6 +48,8 @@ const realDrafts: DraftsClient = {
   save: saveDraft,
   saveFields: saveDraftFields,
   remove: deleteDraft,
+  ping: pingDraft,
+  removeIfEmpty: removeDraftIfEmpty,
   getLastProject,
   setLastProject,
   uploadImage: uploadDraftImage,
@@ -93,6 +99,7 @@ interface Loaded {
 export function DraftPage({ drafts = realDrafts, ...props }: PageProps) {
   const params = useParams()
   const id = props.id ?? params.id ?? ""
+  const leaveGone = useLeaveGone()
   const { list } = useEpicList()
   const projects =
     props.projects ??
@@ -119,7 +126,10 @@ export function DraftPage({ drafts = realDrafts, ...props }: PageProps) {
       } else if (!res && mine) {
         next = { draft: mine.draft, restored: mine.state, lastProject }
       }
-      if (live) setLoaded(next)
+      if (!live) return
+      // A bookmarked draft that was started or removed sends the person where it went.
+      if (res?.kind === "gone") leaveGone(res.started)
+      else setLoaded(next)
     })().catch(() => live && setLoaded(null))
     return () => {
       live = false
@@ -164,7 +174,6 @@ function DraftForm({
 }) {
   const sheetMode = !useWide()
   const shell = useShell()
-  const workspace = shell?.workspace
   const navigate = useNavigate()
   const slugInput = useRef<HTMLInputElement | null>(null)
   // An upload or failed tile stays with its draft.
@@ -187,6 +196,27 @@ function DraftForm({
   const attachIcon = useAttachIcon()
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
+  const [confirming, setConfirming] = useState(false)
+  useDraftLifecycle({ drafts, autosave })
+
+  const removeNow = () => {
+    autosave.remove()
+    navigate("/epics")
+  }
+  // An empty draft has nothing to lose, so it goes at once.
+  const askRemove = () => (autosave.hasContent() ? setConfirming(true) : removeNow())
+  const renameFocus = () => slugInput.current?.focus()
+  // The Chord host calls these through the registry, so it always sees the latest closures.
+  const actions = useRef({ remove: askRemove, rename: renameFocus })
+  actions.current = { remove: askRemove, rename: renameFocus }
+  useEffect(
+    () =>
+      registerDraftPage({
+        remove: () => actions.current.remove(),
+        rename: () => actions.current.rename(),
+      }),
+    [],
+  )
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -200,7 +230,6 @@ function DraftForm({
             idea: draft.idea,
             project: draft.project,
             draft_id,
-            ...(workspace ? { workspace } : {}),
           }),
         ),
       {
@@ -252,7 +281,7 @@ function DraftForm({
             type="button"
             aria-label="Rename"
             title="Rename"
-            onClick={() => slugInput.current?.focus()}
+            onClick={renameFocus}
             color="text.dim"
             h="32px"
             w="32px"
@@ -349,7 +378,7 @@ function DraftForm({
             {movedFrom} no longer exists; moved to {draft.project}
           </Text>
         )}
-        {banner && <DraftBanner kind={banner} actions={bannerActions} />}
+        {banner && <DraftBanner actions={bannerActions} />}
         {viMode ? (
           <Box
             flex="1"
@@ -434,17 +463,37 @@ function DraftForm({
           bg="surface.raised"
           flexShrink="0"
         >
-          {attachIcon && <AttachButton onClick={() => fileInput.current?.click()} />}
-          {/* Item 10 wires Remove. */}
-          <Button type="button" emphasis="ghost" tone="muted">
-            Remove
-          </Button>
-          <Box flex="1" />
-          {!sheetMode && reasonText}
-          <Button type="submit" tone="running" disabled={pending || !!reason || !!banner}>
-            {pending && <Spinner size="sm" />}
-            Start design
-          </Button>
+          {confirming ? (
+            <>
+              <Text fontSize="sm" flex="1" minW="0" color="tone.paused.fg" fontWeight="600">
+                Remove this draft and its images?
+              </Text>
+              <Button
+                type="button"
+                emphasis="ghost"
+                tone="muted"
+                onClick={() => setConfirming(false)}
+              >
+                Keep
+              </Button>
+              <Button type="button" tone="paused" onClick={removeNow}>
+                Remove
+              </Button>
+            </>
+          ) : (
+            <>
+              {attachIcon && <AttachButton onClick={() => fileInput.current?.click()} />}
+              <Button type="button" emphasis="ghost" tone="muted" onClick={askRemove}>
+                Remove
+              </Button>
+              <Box flex="1" />
+              {!sheetMode && reasonText}
+              <Button type="submit" tone="running" disabled={pending || !!reason || !!banner}>
+                {pending && <Spinner size="sm" />}
+                Start design
+              </Button>
+            </>
+          )}
         </Box>
       </Box>
     </DetailPage>

@@ -1,12 +1,13 @@
 import { act, cleanup, fireEvent, screen } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
-import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { session } from "../agents/agentsTestKit"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import { Modal } from "../ui/modal/Modal"
 import { renderThemed } from "../ui/render"
 import { ChordHost } from "./ChordHost"
 import type { Chord } from "./chords"
+import { registerDraftPage } from "./draftPageActions"
 import { closeRename, useRenameRequest } from "./renameOpen"
 
 beforeEach(() => {
@@ -218,6 +219,39 @@ test("{leader} r from the Message box opens the popup and keeps the draft", () =
   expect(screen.getByTestId("renaming").textContent).toBe("s1")
   expect(field.value).toBe("half a thought")
   act(() => closeRename())
+})
+
+describe("on a draft page", () => {
+  const actions = { remove: vi.fn(), rename: vi.fn() }
+  let unregister = () => {}
+  beforeEach(() => {
+    actions.remove.mockClear()
+    actions.rename.mockClear()
+    unregister = registerDraftPage(actions)
+  })
+  afterEach(() => unregister())
+
+  test("{leader} r runs the page's rename and x its remove", () => {
+    setupChats("/drafts/d1")
+    leaderKey()
+    expect(screen.getByRole("menuitem", { name: /Rename/ })).toBeTruthy()
+    press("KeyR")
+    expect(actions.rename).toHaveBeenCalledTimes(1)
+    leaderKey()
+    press("KeyX")
+    expect(actions.remove).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId("renaming").textContent).toBe("none")
+  })
+
+  test("r and x do nothing on a page that is neither a chat nor a draft", () => {
+    setupChats("/epics")
+    leaderKey()
+    press("KeyR")
+    leaderKey()
+    press("KeyX")
+    expect(actions.rename).not.toHaveBeenCalled()
+    expect(actions.remove).not.toHaveBeenCalled()
+  })
 })
 
 test("{leader} r does nothing on a Queue agent page", () => {

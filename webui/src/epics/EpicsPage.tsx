@@ -2,7 +2,7 @@ import { Box, chakra, Input, Text } from "@chakra-ui/react"
 import { ARCHIVE_HREF } from "../hrefs"
 import { HeaderLink } from "../page/HeaderLink"
 import { useEffect, useRef, useState } from "react"
-import { useLocation } from "react-router"
+import { useLocation, useNavigate } from "react-router"
 import { MissingBanner } from "../checks/MissingBanner"
 import { SetupDialog } from "../checks/SetupDialog"
 import { postSaveChecks, type SaveChecks } from "../checks/setup"
@@ -181,7 +181,16 @@ export function EpicsPage({
   const area = useRef<HTMLDivElement>(null)
   usePageKeys(area, select)
   // Route state `focus` names a card (the sidebar's follow-ups popover): open its section once, then scroll to it.
-  const focus = (useLocation().state as { focus?: string } | null)?.focus
+  const location = useLocation()
+  const navigate = useNavigate()
+  const focus = (location.state as { focus?: string } | null)?.focus
+  // A one-time note from the page that sent us here (a removed draft). It is kept in state, then cleared from the history entry so a reload does not show it again.
+  const [note] = useState(() => (location.state as { note?: string } | null)?.note)
+  useEffect(() => {
+    if (note) navigate(location.pathname, { replace: true, state: { focus } })
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const focused = useRef<string | undefined>(undefined)
   const [scrollTo, setScrollTo] = useState<string>()
   useEffect(() => {
@@ -237,6 +246,11 @@ export function EpicsPage({
             </>
           }
         />
+        {note && (
+          <Text role="status" fontSize="sm" color="text.dim" mt="3">
+            {note}
+          </Text>
+        )}
         <Box display="flex" alignItems="center" gap="4" mt="4">
           <Input
             type="search"

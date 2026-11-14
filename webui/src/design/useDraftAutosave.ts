@@ -13,10 +13,10 @@ const AUTOSAVE_MS = 800
 const RETRY_MS = 5000
 
 export type SaveStatus = "none" | "saving" | "saved" | "unsaved"
-export type Banner = "conflict" | "gone" | undefined
+export type Banner = "conflict" | undefined
 
-/** `editing` saves; `starting` is Start in flight; `finished` is Start, Discard or a switch having taken the draft over. */
-type Phase = "editing" | "starting" | "finished"
+/** `editing` saves; `starting` is Start in flight; `finished` is Start, Remove or a switch having taken the draft over. */
+type Phase = "editing" | "starting" | "finished" | "gone"
 
 const targetKey = (d: Fields) => JSON.stringify({ slug: d.slug, project: d.project })
 
@@ -78,6 +78,10 @@ export function useDraftAutosave({
   // The banner's ref twin, so a flush in flight sees it before a render.
   const blocked = useRef<Banner>(restored === "conflict" ? restored : undefined)
   const [banner, setBanner] = useState<Banner>(blocked.current)
+  // Set when a save finds the draft gone; the page then asks where it went.
+  const [gone, setGone] = useState(false)
+  const pageHidden = useRef(false)
+  const mounted = useRef(false)
 
   /** The draft's id for an image upload, once the saves in flight are done. */
   const ensureDraft = async () => {
@@ -98,18 +102,24 @@ export function useDraftAutosave({
     stashUnsaved(s.id, { revision: s.revision, idea: latest.current.idea })
     stashed.current = true
   }
-  /** The prompt reached the server, or Start or Discard took it over. */
+  /** The prompt reached the server, or Start or Remove took it over. */
   const settle = () => {
     if (stashed.current) clearUnsaved(server.current.id)
     stashed.current = false
   }
 
   /** A refusal pauses autosave until the person picks a way out of the banner. */
-  const raise = (kind: "conflict" | "gone") => {
+  const raise = () => {
     stash()
-    blocked.current = kind
-    setBanner(kind)
+    blocked.current = "conflict"
+    setBanner("conflict")
     setStatus("none")
+  }
+  /** A save found the draft gone: nothing saves from here on. */
+  const markGone = () => {
+    phase.current = "gone"
+    setStatus("none")
+    setGone(true)
   }
 
   /** Saves the prompt; false when it did not settle. */
@@ -134,7 +144,8 @@ export function useDraftAutosave({
       settle()
       return true
     }
-    raise(res.kind === "conflict" ? "conflict" : "gone")
+    if (res.kind === "conflict") raise()
+    else markGone()
     return false
   }
 
@@ -162,7 +173,7 @@ export function useDraftAutosave({
       setLabel(res.draft.label)
       return true
     }
-    raise("gone")
+    markGone()
     return false
   }
 
@@ -173,11 +184,11 @@ export function useDraftAutosave({
     if (textOk && fieldsOk) setStatus(hasText(latest.current) || imgs.count > 0 ? "saved" : "none")
   }
 
-  /** Reads the server's copy; a draft that is gone raises the gone banner instead. */
+  /** Reads the server's copy; a draft that is gone leaves the page instead. */
   const readServer = async () => {
     const res = await drafts.read(server.current.id)
     if (res.kind === "ok") return res.draft
-    raise("gone")
+    markGone()
   }
   const resume = () => {
     blocked.current = undefined
@@ -210,12 +221,25 @@ export function useDraftAutosave({
     },
   }
 
+  /** Takes a slug or project changed elsewhere, unless the person has an edit of their own pending. */
+  const adoptTarget = (theirs: DesignDraft) => {
+    const s = server.current
+    if (targetKey(latest.current) !== s.target) return
+    const next = { ...latest.current, slug: theirs.slug, project: theirs.project }
+    const key = targetKey(next)
+    if (key === s.target) return
+    s.target = key
+    latest.current = next
+    setDraft(next)
+    setLabel(theirs.label)
+  }
+
   const flush = () => {
     clearTimeout(timer.current)
     if (phase.current === "finished" || blocked.current) return
     chain.current = chain.current.then(persist).catch(() => setStatus("none"))
   }
-  /** Start, Discard or a switch has taken the draft over: nothing saves from here on. */
+  /** Start, Remove or a switch has taken the draft over: nothing saves from here on. */
   const takeOver = () => {
     phase.current = "finished"
   }
@@ -243,10 +267,22 @@ export function useDraftAutosave({
         stash()
       flush()
     }
-    window.addEventListener("pagehide", leave)
-    return () => {
-      window.removeEventListener("pagehide", leave)
+    const hide = () => {
+      pageHidden.current = true
       leave()
+    }
+    window.addEventListener("pagehide", hide)
+    mounted.current = true
+    return () => {
+      window.removeEventListener("pagehide", hide)
+      leave()
+      mounted.current = false
+      // In-app navigation only: a reload or tab close may come back to the page. The microtask
+      // lets React's dev-mode remount cancel the request.
+      queueMicrotask(() => {
+        if (!mounted.current && !pageHidden.current && phase.current === "editing" && !hasContent())
+          drafts.removeIfEmpty(server.current.id).catch(() => {})
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -279,8 +315,8 @@ export function useDraftAutosave({
     patch({ project })
     drafts.setLastProject(project).catch(() => {})
   }
-  /** Discards the draft: stops saving and deletes it once an in-flight save is done. */
-  const discard = () => {
+  /** Removes the draft: stops saving and deletes it once an in-flight save is done. */
+  const remove = () => {
     stopSaving()
     chain.current = chain.current
       .then(async () => {
@@ -307,8 +343,12 @@ export function useDraftAutosave({
     }
   }
 
-  // Images keep a draft with no text from being blank.
-  const hasContent = () => hasText(latest.current) || imgs.count > 0
+  // Images keep a draft with no text from being blank. Reads refs only, for the unmount cleanup.
+  const imageCount = useRef(0)
+  imageCount.current = imgs.count
+  function hasContent() {
+    return hasText(latest.current) || imageCount.current > 0
+  }
 
   return {
     draft,
@@ -321,7 +361,11 @@ export function useDraftAutosave({
     moved,
     movedFrom,
     imgs,
-    discard,
+    gone,
+    adoptTarget,
+    /** Whether a gone draft should send the page elsewhere: not once Start or Remove has taken it over. */
+    mayRedirect: () => phase.current === "editing" || phase.current === "gone",
+    remove,
     start,
     flush,
     /** For the switching hook: what a draft switch needs, without the refs behind it. */

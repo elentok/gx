@@ -1,7 +1,7 @@
 import type { DesignDraft } from "../generated/server"
 import type { SaveDraft } from "./drafts"
 
-/** The prompt a failed autosave could not put on the server, kept per draft id until a save, Start or Discard settles it. */
+/** The prompt a failed autosave could not put on the server, kept per draft id until a save, Start or Remove settles it. */
 export interface UnsavedEntry {
   revision: number
   idea: string
@@ -43,7 +43,7 @@ export type Restored = "unsaved" | "conflict"
 /**
  * Saves each fallback entry to its draft with its revision. The first one that cannot settle
  * (a refusal, or the server still down) is returned for the page to open on when it is that
- * draft's page; its entry stays until the page saves, starts or discards it.
+ * draft's page; its entry stays until the page saves, starts or removes it.
  */
 export async function saveUnsaved(
   save: SaveDraft,

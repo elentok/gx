@@ -325,6 +325,21 @@ test("New Design creates a draft and opens its page", async () => {
   expect(screen.queryByRole("dialog")).toBeNull()
 })
 
+test("a note from a removed draft shows once", async () => {
+  stubFetch(mixed())
+  const router = createMemoryRouter(appRoutes({ epicList: async () => mixed() }), {
+    initialEntries: [{ pathname: "/epics", state: { note: "This draft was removed." } }],
+  })
+  renderThemed(
+    <ConnectionContext.Provider value={conn}>
+      <RouterProvider router={router} />
+    </ConnectionContext.Provider>,
+  )
+  expect(await screen.findByText("This draft was removed.")).toBeTruthy()
+  // The history entry no longer carries it, so a reload shows nothing.
+  await waitFor(() => expect(router.state.location.state?.note).toBeUndefined())
+})
+
 test("the first load shows a spinner under the filter", async () => {
   renderEpics(() => new Promise(() => {}))
   expect(await screen.findByRole("status", { name: "Loading epics" })).toBeTruthy()

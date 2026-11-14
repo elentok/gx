@@ -4,7 +4,8 @@ import { useConnectionContext, useConnectionState } from "../connection"
 import { leaderKeyOf } from "../leaderKey"
 import { hasLayer } from "../ui/modal/layers"
 import { ChordBox } from "./ChordBox"
-import { chordTable, letterOf, matchesKey, useOpenChat, type Chord } from "./chords"
+import { draftPageActions } from "./draftPageActions"
+import { chordTable, draftIdOf, letterOf, matchesKey, useOpenChat, type Chord } from "./chords"
 import { openRemoveConfirm } from "./removeConfirmOpen"
 import { openRename } from "./renameOpen"
 
@@ -44,12 +45,14 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
       chords ??
       chordTable({
         remove: () => {
-          const { session: s, navigate: nav } = live.current
-          if (s) openRemoveConfirm({ session: s, onRemoved: () => nav("/agents") })
+          const { session: s, navigate: nav, ctx: c } = live.current
+          if (draftIdOf(c.path)) draftPageActions()?.remove()
+          else if (s) openRemoveConfirm({ session: s, onRemoved: () => nav("/agents") })
         },
         rename: () => {
-          const { session: s } = live.current
-          if (s) openRename({ session: s })
+          const { session: s, ctx: c } = live.current
+          if (draftIdOf(c.path)) draftPageActions()?.rename()
+          else if (s) openRename({ session: s })
         },
       }),
     [chords],

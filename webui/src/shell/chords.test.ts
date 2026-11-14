@@ -5,6 +5,7 @@ import {
   canRename,
   chordTable,
   displayKey,
+  draftIdOf,
   letterOf,
   matchesKey,
   parseKey,
@@ -116,6 +117,27 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo => ({
   auto_advance: true,
   auto_queue: false,
   ...over,
+})
+
+describe("draft page chords", () => {
+  const table = chordTable({ remove: () => {}, rename: () => {} })
+  const ctx = { path: "/drafts/d1" }
+  it("offers Rename and Remove on a draft page only", () => {
+    for (const [key, label] of [
+      ["r", "Rename"],
+      ["x", "Remove"],
+    ]) {
+      const ch = table.find((c) => c.key === key)!
+      expect(ch.available(ctx)).toBe(true)
+      expect(ch.label(ctx)).toBe(label)
+      expect(ch.available({ path: "/epics" })).toBe(false)
+    }
+  })
+  it("reads the draft id from the path", () => {
+    expect(draftIdOf("/drafts/d1")).toBe("d1")
+    expect(draftIdOf("/drafts/d1/x")).toBeUndefined()
+    expect(draftIdOf("/agents/d1")).toBeUndefined()
+  })
 })
 
 describe("chord table x", () => {

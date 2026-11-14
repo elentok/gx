@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, screen } from "@testing-library/react"
-import { afterEach, expect, test, vi } from "vitest"
-import { MemoryRouter } from "react-router"
+import { afterEach, describe, expect, test, vi } from "vitest"
+import { MemoryRouter, Route, Routes, useLocation } from "react-router"
 import { ConnectionContext, type Connection } from "../connection"
 import type { DesignDraft } from "../generated/server"
 import { renderThemed } from "../ui/render"
@@ -8,6 +8,7 @@ import { DeviceContext, type Device } from "../useWide"
 import type { DraftResult, DraftsClient } from "./drafts"
 import type { OpenDesign } from "./open"
 import { DraftPage } from "./NewDesignForm"
+import { designHref } from "../hrefs"
 
 afterEach(() => {
   cleanup()
@@ -48,7 +49,9 @@ function fakeDrafts(over: Partial<DesignDraft> = {}) {
     read: async () => ({ kind: "ok", draft: { ...stored } }),
     save,
     saveFields,
-    remove: async () => ({ kind: "deleted" }),
+    remove: vi.fn(async (): Promise<DraftResult> => ({ kind: "deleted" })),
+    ping: vi.fn(async () => {}),
+    removeIfEmpty: vi.fn(async () => {}),
     getLastProject: async () => "",
     setLastProject: vi.fn(async () => {}),
     uploadImage: vi.fn(async () => "img1"),
@@ -56,6 +59,17 @@ function fakeDrafts(over: Partial<DesignDraft> = {}) {
   }
   return { client, save, saveFields, stored }
 }
+
+/** Shows where the router is, so a redirect is visible. */
+function Where() {
+  const { pathname, state } = useLocation()
+  return (
+    <p data-testid="where">
+      {pathname} {(state as { note?: string } | null)?.note}
+    </p>
+  )
+}
+const where = () => screen.getByTestId("where").textContent
 
 async function mount(
   fake: ReturnType<typeof fakeDrafts>,
@@ -74,23 +88,35 @@ async function mount(
   } = {},
 ) {
   const connState = { snapshot: { sessions: [], vi_mode: viMode } }
+  const listeners = new Set<(address: string, type: string) => void>()
   const connection = {
     refresh: () => {},
     getState: () => connState,
     subscribe: () => () => {},
-    onEvent: () => () => {},
+    onEvent: (l: (address: string, type: string) => void) => {
+      listeners.add(l)
+      return () => listeners.delete(l)
+    },
   } as unknown as Connection
   await act(async () => {
     renderThemed(
       <DeviceContext.Provider value={device}>
         <ConnectionContext.Provider value={connection}>
           <MemoryRouter initialEntries={[pathname]}>
-            <DraftPage id="d1" projects={projects} open={open} drafts={fake.client} />
+            <Routes>
+              <Route path="/epics" element={<Where />} />
+              <Route path="/d/*" element={<Where />} />
+              <Route
+                path="*"
+                element={<DraftPage id="d1" projects={projects} open={open} drafts={fake.client} />}
+              />
+            </Routes>
           </MemoryRouter>
         </ConnectionContext.Provider>
       </DeviceContext.Provider>,
     )
   })
+  return { emit: (type: string) => act(async () => listeners.forEach((l) => l("", type))) }
 }
 const type = (name: string, value: string) =>
   fireEvent.change(screen.getByRole(name === "Project" ? "combobox" : "textbox", { name }), {
@@ -118,11 +144,27 @@ test("one project hides the select", async () => {
   expect(screen.queryByRole("combobox", { name: "Project" })).toBeNull()
 })
 
-test("a draft that is gone shows the empty state", async () => {
+test("a draft that cannot be read shows the empty state", async () => {
+  const fake = fakeDrafts()
+  fake.client.read = async () => {
+    throw new Error("down")
+  }
+  await mount(fake)
+  expect(screen.getByText("Draft not found")).toBeTruthy()
+})
+
+test("a bookmarked draft that is gone goes to the Epics page with a note", async () => {
   const fake = fakeDrafts()
   fake.client.read = async () => ({ kind: "gone" })
   await mount(fake)
-  expect(screen.getByText("Draft not found")).toBeTruthy()
+  expect(where()).toBe("/epics This draft was removed.")
+})
+
+test("a bookmarked draft that was started goes to its Design page", async () => {
+  const fake = fakeDrafts()
+  fake.client.read = async () => ({ kind: "gone", started: "gx:fresh" })
+  await mount(fake)
+  expect(where()).toBe(`${designHref("gx:fresh").slice(1)} `)
 })
 
 test("Start names its reason: prompt, then epic, then the slug", async () => {
@@ -345,4 +387,210 @@ test("a conflict shows the banner with its two ways out", async () => {
   expect(screen.getByText("This draft changed on another device.")).toBeTruthy()
   for (const name of ["Load theirs", "Keep mine"])
     expect(screen.getByRole("button", { name })).toBeTruthy()
+})
+
+test("Load theirs takes the server's copy and Keep mine saves over it", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts()
+  fake.save.mockResolvedValueOnce({ kind: "conflict" })
+  await mount(fake)
+  type("Prompt", "mine")
+  await wait(800)
+  fake.stored.idea = "theirs"
+  fake.stored.revision = 9
+  await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Load theirs" })))
+  expect((screen.getByRole("textbox", { name: "Prompt" }) as HTMLTextAreaElement).value).toBe(
+    "theirs",
+  )
+  expect(screen.queryByText("This draft changed on another device.")).toBeNull()
+
+  fake.save.mockResolvedValueOnce({ kind: "conflict" })
+  type("Prompt", "mine again")
+  await wait(800)
+  await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Keep mine" })))
+  await wait(0)
+  expect(fake.save).toHaveBeenLastCalledWith({ id: "d1", idea: "mine again", revision: 9 })
+})
+
+test("a slug changed elsewhere updates the field and raises no banner", async () => {
+  const fake = fakeDrafts({ slug: "old", label: "old" })
+  const page = await mount(fake)
+  Object.assign(fake.stored, { slug: "renamed", label: "renamed" })
+  await page.emit("design-drafts-changed")
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe(
+    "renamed",
+  )
+  expect(screen.queryByRole("alert")).toBeNull()
+})
+
+test("Remove on an empty draft deletes at once and goes to the Epics page", async () => {
+  const fake = fakeDrafts()
+  await mount(fake)
+  await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Remove" })))
+  expect(screen.queryByText("Remove this draft and its images?")).toBeNull()
+  expect(fake.client.remove).toHaveBeenCalledTimes(1)
+  expect(fake.client.remove).toHaveBeenCalledWith("d1")
+  expect(where()).toBe("/epics ")
+})
+
+test.each([
+  ["a prompt", { idea: "text" }],
+  ["a slug", { slug: "x", label: "x" }],
+])(
+  "Remove on a draft with %s asks first; Keep removes nothing, Remove deletes",
+  async (_n, over) => {
+    const fake = fakeDrafts(over)
+    await mount(fake)
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+    expect(screen.getByText("Remove this draft and its images?")).toBeTruthy()
+    expect(fake.client.remove).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button", { name: "Keep" }))
+    expect(screen.queryByText("Remove this draft and its images?")).toBeNull()
+    expect(fake.client.remove).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+    await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Remove" })))
+    expect(fake.client.remove).toHaveBeenCalledTimes(1)
+    expect(where()).toBe("/epics ")
+  },
+)
+
+test("Remove on a draft with only an image asks first", async () => {
+  const fake = fakeDrafts()
+  await mount(fake)
+  addImages(png())
+  await screen.findByText("1 of 10 images")
+  fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+  expect(screen.getByText("Remove this draft and its images?")).toBeTruthy()
+})
+
+test("a good Start goes to the Design page with the draft id and no workspace", async () => {
+  const fake = fakeDrafts({ slug: "fresh", idea: "an idea" })
+  const open = vi.fn<OpenDesign>(
+    async () => ({ refused: false, start_error: "no session" }) as never,
+  )
+  await mount(fake, { open })
+  await act(async () => void fireEvent.click(start()))
+  const body = open.mock.calls[0][0]
+  expect(body.draft_id).toBe("d1")
+  expect(body).not.toHaveProperty("workspace")
+  expect(where()).toBe(`${designHref("gx:fresh").slice(1)} `)
+})
+
+test("a refused Start keeps the text and the draft saves again", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts({ slug: "fresh", idea: "an idea" })
+  const open = vi.fn<OpenDesign>(async () => ({ refused: true, reason: "has an epic" }) as never)
+  await mount(fake, { open })
+  await act(async () => void fireEvent.click(start()))
+  expect((screen.getByRole("textbox", { name: "Prompt" }) as HTMLTextAreaElement).value).toBe(
+    "an idea",
+  )
+  type("Prompt", "more")
+  await wait(800)
+  expect(fake.save).toHaveBeenCalledWith(expect.objectContaining({ idea: "more" }))
+  expect(fake.client.remove).not.toHaveBeenCalled()
+})
+
+test("the page pings the lease on open and every 30 s, and stops after unmount", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts()
+  await mount(fake)
+  expect(fake.client.ping).toHaveBeenCalledTimes(1)
+  expect(fake.client.ping).toHaveBeenCalledWith("d1")
+  await wait(30_000)
+  expect(fake.client.ping).toHaveBeenCalledTimes(2)
+  await wait(30_000)
+  expect(fake.client.ping).toHaveBeenCalledTimes(3)
+  cleanup()
+  await wait(60_000)
+  expect(fake.client.ping).toHaveBeenCalledTimes(3)
+})
+
+const leaveApp = async () => {
+  cleanup()
+  await act(async () => void (await Promise.resolve()))
+}
+
+describe("leaving the page", () => {
+  test("an empty draft sends one remove-if-empty", async () => {
+    const fake = fakeDrafts()
+    await mount(fake)
+    await leaveApp()
+    expect(fake.client.removeIfEmpty).toHaveBeenCalledTimes(1)
+    expect(fake.client.removeIfEmpty).toHaveBeenCalledWith("d1")
+  })
+
+  test("a pagehide before the unmount sends none", async () => {
+    const fake = fakeDrafts()
+    await mount(fake)
+    window.dispatchEvent(new Event("pagehide"))
+    await leaveApp()
+    expect(fake.client.removeIfEmpty).not.toHaveBeenCalled()
+  })
+
+  test("a draft with a slug sends none; clearing the slug and leaving sends one", async () => {
+    const withSlug = fakeDrafts({ slug: "x", label: "x" })
+    await mount(withSlug)
+    await leaveApp()
+    expect(withSlug.client.removeIfEmpty).not.toHaveBeenCalled()
+
+    const cleared = fakeDrafts({ slug: "x", label: "x" })
+    await mount(cleared)
+    type("Epic slug", "")
+    await leaveApp()
+    expect(cleared.client.removeIfEmpty).toHaveBeenCalledTimes(1)
+  })
+
+  test("unmounting after Remove or Start sends none", async () => {
+    const removed = fakeDrafts()
+    await mount(removed)
+    await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Remove" })))
+    await leaveApp()
+    expect(removed.client.removeIfEmpty).not.toHaveBeenCalled()
+
+    const started = fakeDrafts({ slug: "fresh", idea: "an idea" })
+    await mount(started)
+    await act(async () => void fireEvent.click(start()))
+    await leaveApp()
+    expect(started.client.removeIfEmpty).not.toHaveBeenCalled()
+  })
+})
+
+describe("a draft that vanished", () => {
+  test("a design-drafts-changed event and a gone read go to the Epics page with the note", async () => {
+    const fake = fakeDrafts()
+    const page = await mount(fake)
+    fake.client.read = async () => ({ kind: "gone" })
+    await page.emit("design-drafts-changed")
+    expect(where()).toBe("/epics This draft was removed.")
+  })
+
+  test("a Start record sends the page to the Design page", async () => {
+    const fake = fakeDrafts()
+    const page = await mount(fake)
+    fake.client.read = async () => ({ kind: "gone", started: "gx:fresh" })
+    await page.emit("design-drafts-changed")
+    expect(where()).toBe(`${designHref("gx:fresh").slice(1)} `)
+  })
+
+  test("a failed ping re-reads", async () => {
+    vi.useFakeTimers()
+    const fake = fakeDrafts()
+    await mount(fake)
+    vi.mocked(fake.client.ping).mockRejectedValue(new Error("gone"))
+    fake.client.read = async () => ({ kind: "gone" })
+    await wait(30_000)
+    expect(where()).toBe("/epics This draft was removed.")
+  })
+
+  test("a save against a gone draft redirects, with no banner", async () => {
+    vi.useFakeTimers()
+    const fake = fakeDrafts()
+    fake.save.mockResolvedValue({ kind: "gone", started: "gx:fresh" })
+    await mount(fake)
+    type("Prompt", "mine")
+    fake.client.read = async () => ({ kind: "gone", started: "gx:fresh" })
+    await wait(800)
+    expect(where()).toBe(`${designHref("gx:fresh").slice(1)} `)
+  })
 })

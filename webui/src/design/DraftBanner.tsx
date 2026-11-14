@@ -1,21 +1,12 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import type { Banner, DraftAutosave } from "./useDraftAutosave"
+import type { DraftAutosave } from "./useDraftAutosave"
 
-/** The refusal banner: what happened to the draft on another device and the ways out. */
-export function DraftBanner({
-  kind,
-  actions,
-}: {
-  kind: NonNullable<Banner>
-  actions: DraftAutosave["bannerActions"]
-}) {
-  const buttons =
-    kind === "conflict"
-      ? [
-          { text: "Load theirs", onClick: actions.loadTheirs },
-          { text: "Keep mine", onClick: actions.keepMine },
-        ]
-      : []
+/** The conflict banner: the draft's text changed on another device, and the ways out. */
+export function DraftBanner({ actions }: { actions: DraftAutosave["bannerActions"] }) {
+  const buttons = [
+    { text: "Load theirs", onClick: actions.loadTheirs },
+    { text: "Keep mine", onClick: actions.keepMine },
+  ]
   return (
     <Box
       role="alert"
@@ -34,9 +25,7 @@ export function DraftBanner({
       flexShrink="0"
     >
       <Text flex="1" minW="0">
-        {kind === "conflict"
-          ? "This draft changed on another device."
-          : "This draft was deleted or started on another device."}
+        This draft changed on another device.
       </Text>
       {buttons.map(({ text, onClick }) => (
         <chakra.button
