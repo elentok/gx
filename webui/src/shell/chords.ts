@@ -11,7 +11,11 @@ const MODIFIERS: readonly Modifier[] = ["cmd", "ctrl", "alt", "shift"]
 
 export type ParsedKey = { mods: ReadonlySet<Modifier>; code: string; char: string }
 
-/** Parses a Leader key setting such as "cmd+e". Null for an empty or malformed setting. */
+/**
+ * Parses a Leader key setting such as "cmd+e". Null for an empty or malformed setting.
+ * checkLeaderKey in config/registry/check.go is the other copy of this grammar and must change
+ * with it. The parseKey table in chords.test.ts mirrors TestLeaderKeyEntries.
+ */
 export function parseKey(setting: string | undefined): ParsedKey | null {
   if (!setting) return null
   const parts = setting.trim().toLowerCase().split("+")

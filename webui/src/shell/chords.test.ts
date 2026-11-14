@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { SessionInfo } from "../generated/server"
-import { agentIdOf, canRename, chordTable, displayKey, letterOf, matchesKey } from "./chords"
+import {
+  agentIdOf,
+  canRename,
+  chordTable,
+  displayKey,
+  letterOf,
+  matchesKey,
+  parseKey,
+} from "./chords"
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -54,6 +62,20 @@ describe("matchesKey", () => {
   it("matches digit keys by Digit code", () => {
     expect(matchesKey(ev({ code: "Digit1", altKey: true }), "alt+1")).toBe(true)
     expect(matchesKey(ev({ code: "KeyE", altKey: true }), "alt+1")).toBe(false)
+  })
+})
+
+// Mirrors the keys in TestLeaderKeyEntries (config/registry/entries_core_test.go). Keep both in step.
+// Only keys where parseKey and checkLeaderKey agree are listed. They differ in two ways:
+// parseKey trims and lower-cases its input, so it accepts "cmd+E", and it does not need a cmd, ctrl
+// or alt modifier, so it accepts "e" and "shift+e". The server refuses both when the setting is
+// saved, so a stored value is always valid.
+describe("parseKey", () => {
+  it.each(["cmd+e", "alt+e", "ctrl+shift+j", "alt+7"])("accepts %s", (key) => {
+    expect(parseKey(key)).not.toBeNull()
+  })
+  it.each(["cmd+", "cmd+ee", "meta+e", "alt+space", "ctrl+f1", ""])("rejects %j", (key) => {
+    expect(parseKey(key)).toBeNull()
   })
 })
 

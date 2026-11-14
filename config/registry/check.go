@@ -92,6 +92,10 @@ func CheckValue(e Entry, raw json.RawMessage, parseSize SizeParser) error {
 // checkLeaderKey accepts "" (chords off) or modifiers cmd, ctrl, alt, shift
 // joined with "+", then one lower-case letter or digit, with at least one of
 // cmd, ctrl or alt.
+//
+// parseKey in webui/src/shell/chords.ts is the other copy of this grammar and
+// must change with it. TestLeaderKeyEntries and the parseKey table in
+// chords.test.ts mirror each other.
 func checkLeaderKey(s string) error {
 	if s == "" {
 		return nil

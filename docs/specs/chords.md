@@ -105,7 +105,7 @@ a modal is open, and every code editor sits in a bottom sheet.
   keymap on a default-prevented event, which matters only if the modal guard is ever relaxed).
   Key matching uses `event.code` and the exact set of modifiers, so Alt+E works on a Mac, where
   `event.key` is "Dead". The setting syntax is fixed: modifiers (`cmd`, `ctrl`, `alt`, `shift`)
-  joined with `+`, then a key name, in lower case (`cmd+e`, `alt+j`). While the Chord box is open the same listener takes every
+  joined with `+`, then one letter or digit, in lower case (`cmd+e`, `alt+j`). While the Chord box is open the same listener takes every
   keydown: a listed chord key runs and closes the box, Esc or any other key closes it. Each of those
   keys is prevented so it never reaches a field. Pressing the Leader key again also closes the box,
   as an unlisted key. The listener calls `stopImmediatePropagation()` on every key it takes while the
