@@ -179,11 +179,11 @@ func (r *Reads) Stats(ctx context.Context, days int, project string, includeDev 
 	if days > 0 {
 		q.Set("range", strconv.Itoa(days))
 	}
-	if project != "" {
-		q.Set("project", project)
-	}
 	if includeDev {
 		q.Set("include_dev", "true")
+	}
+	if project != "" {
+		q.Set("project", project)
 	}
 	var s wire.Stats
 	err := r.t.get(ctx, "/v1/stats?"+q.Encode(), &s)

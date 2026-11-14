@@ -15,6 +15,7 @@ one Codex ticket running. To make the usage scan save a new Codex sample, append
 (`{"timestamp":<ISO>,"type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":N,"window_minutes":10080,"resets_at":<epoch>}}}}`)
 to the `rollout-*.jsonl` under `fixture.codexSessionsDir` (`codex_sessions_dir` in the fixture output). `fixture.cliInput(input, ...args)` and
 `fixture.cliEnvInput(extra, input, ...args)` are `cli`/`cliEnv` with `input` on stdin.
+The `web-performance` scenario seeds 14 days of web performance samples in two builds, with dev samples, and `web-performance-low` seeds one build with under 20 samples of every metric and one route with 6.
 The `triage` scenario seeds follow-ups of both categories and a Triage in the state its shape names
 (`start("triage", { shape })`; default `c-few`). Each shape is its own server start, because the sidebar badge sums every project of a
 workspace. Counts: `c-zero` (no open follow-up), `c-few` (3: 2 bugs and 1 idea across `demo` and `side`), `c-many` (45: 30 bugs, 15 ideas),

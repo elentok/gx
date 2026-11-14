@@ -59,6 +59,11 @@ var Scenarios = map[string]scenario{
 	"web-logins": {Projects: []string{project}, ExtraLogins: []time.Duration{time.Hour, 3 * 24 * time.Hour, 70 * 24 * time.Hour}},
 	// limits: a project with no epics and a seeded limits state, shaped by --shape.
 	"limits": {Projects: []string{project}, Limits: true},
+	// web-performance: 14 days of web performance samples in two builds, with dev
+	// samples (mock states hard-loads and route-changes).
+	"web-performance": {Projects: []string{project}, WebPerf: spec.WebPerfFull},
+	// web-performance-low: one build and under 20 samples of every metric (mock state low-samples).
+	"web-performance-low": {Projects: []string{project}, WebPerf: spec.WebPerfLow},
 	// limit-burn: seeded limit history (--shape, see limitburn.go) and one Codex
 	// ticket held running. It writes no usage sample of its own: a flow appends a
 	// token_count line to the rollout under Output.CodexSessionsDir to make the

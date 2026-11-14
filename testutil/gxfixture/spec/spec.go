@@ -209,6 +209,9 @@ type Scenario struct {
 	// Spend seeds the budget ledger before the server starts, in the shape the
 	// --shape flag names (default normal), and prints the held agent's transcript path.
 	Spend bool
+	// WebPerf names the canned web performance samples (WebPerfFull or
+	// WebPerfLow) written to disk before the server starts.
+	WebPerf func() []WebPerfDay
 	// CheckWaiting writes a live check-lock waiting state for the held agent's
 	// worktree once it runs, and prints the file's path.
 	CheckWaiting bool

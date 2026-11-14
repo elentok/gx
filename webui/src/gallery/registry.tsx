@@ -8,6 +8,7 @@ import { authEntries } from "./authEntries"
 import { designFooterEntries } from "./designFooterEntries"
 import { questionEntries } from "./questionEntries"
 import { shellEntries } from "./shellEntries"
+import { webPerformanceFull, webPerformanceLow } from "./webPerformanceData"
 import { ConnectionContext, type Connection } from "../connection"
 import { DraftSwitcher } from "../design/DraftSwitcher"
 import { DraftImages } from "../design/DraftImages"
@@ -503,7 +504,21 @@ const headerCase = (
   ),
 })
 
+// Until the section exists, each case shows its canned payload as text.
+const webPerformanceCase = (label: string, data: unknown): GalleryCase => ({
+  label,
+  node: <pre>{JSON.stringify(data, null, 2)}</pre>,
+})
+
 export const galleryEntries: GalleryEntry[] = [
+  {
+    name: "WebPerformance",
+    cases: [
+      webPerformanceCase("hard-loads", webPerformanceFull),
+      webPerformanceCase("route-changes", webPerformanceFull),
+      webPerformanceCase("low-samples", webPerformanceLow),
+    ],
+  },
   {
     name: "PageHeader",
     cases: [
