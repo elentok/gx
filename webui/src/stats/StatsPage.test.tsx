@@ -611,3 +611,87 @@ test("a server event triggers one debounced refetch", async () => {
   })
   expect(fetchStats).toHaveBeenCalledTimes(before + 1)
 })
+
+const buildStats = (wp: Partial<Stats["web_performance"]> = {}) =>
+  perfStats({
+    hard_loads: [perfCard("lcp", 30, { p75: 2000, status: "good" })],
+    build_strip: {
+      current: { build_id: "b-a91cdead", web_version: "0.14.2" },
+      previous: { build_id: "b-5be0beef", web_version: "0.14.1" },
+      lcp_change_pct: -12.4,
+      inp_change_pct: undefined,
+      js_change_pct: -31,
+    },
+    ...wp,
+  })
+
+test("the build strip names both builds and shows the changes, a null change as a dash", async () => {
+  renderStats(async () => buildStats())
+  const strip = (await screen.findByTestId("perf-build-strip")).textContent ?? ""
+  expect(strip).toContain("Current build0.14.2 · a91c")
+  expect(strip).toContain("Compared with0.14.1 · 5be0")
+  expect(strip).toContain("LCP p75 -12% · INP — · JS transfer -31%")
+})
+
+test("with no previous build the strip shows only the current build", async () => {
+  renderStats(async () =>
+    buildStats({ build_strip: { current: { build_id: "b-a91cdead", web_version: "0.14.2" } } }),
+  )
+  const strip = (await screen.findByTestId("perf-build-strip")).textContent ?? ""
+  expect(strip).toContain("0.14.2 · a91c")
+  expect(strip).toContain("no earlier build in range")
+  expect(strip).not.toContain("Compared with")
+  expect(strip).not.toContain("%")
+})
+
+test("Why slow? is collapsed, then shows rows that dim under 20 samples and dash per the rule", async () => {
+  renderStats(async () =>
+    buildStats({
+      why_slow: [
+        { metric: "ttfb", count: 50, p75: 210, previous_p75: 240, change_pct: -12 },
+        { metric: "api_latency", count: 5, p75: 320, previous_p75: 390 },
+        { metric: "js_bytes", count: 50, p75: 286000, previous_p75: 412000, change_pct: -31 },
+        { metric: "css_bytes", count: 50, p75: 41000 },
+      ],
+      poor_inp: {
+        count: 40,
+        input_delay_p75: 30,
+        processing_p75: 120,
+        presentation_delay_p75: 45,
+        top_actions: [
+          { action: "click:merge", count: 9 },
+          { action: "key:j", count: 4 },
+        ],
+        worst_chunk: "app.js",
+      },
+    }),
+  )
+  await screen.findByTestId("perf-build-strip")
+  expect(screen.queryByTestId("why-row-ttfb")).toBeNull()
+  fireEvent.click(screen.getByRole("button", { name: /Why slow\? Diagnostics/ }))
+  const ttfb = screen.getByTestId("why-row-ttfb")
+  expect(ttfb.textContent).toBe("TTFB210 ms240 ms")
+  expect(ttfb.dataset.low).toBeUndefined()
+  const api = screen.getByTestId("why-row-api_latency")
+  expect(api.textContent).toBe("Blocking API latencynot enough—")
+  expect(api.dataset.low).toBe("true")
+  expect(screen.getByTestId("why-row-js_bytes").textContent).toContain("286 KB412 KB")
+  expect(screen.getByTestId("why-row-css_bytes").textContent).toBe("CSS transferred41.0 KB—")
+  const poor = screen.getByTestId("perf-poor-inp").textContent ?? ""
+  expect(poor).toContain("(40 samples)")
+  expect(poor).toContain("Processing120 ms")
+  expect(poor).toContain("Slow action: click:merge9 poor")
+  expect(poor).toContain("Worst-frame chunkapp.js")
+})
+
+test("the poor-INP block dims with not enough below 20 poor samples", async () => {
+  renderStats(async () =>
+    buildStats({ poor_inp: { count: 6, top_actions: [], processing_p75: 100 } }),
+  )
+  await screen.findByTestId("perf-build-strip")
+  fireEvent.click(screen.getByRole("button", { name: /Why slow\? Diagnostics/ }))
+  const poor = screen.getByTestId("perf-poor-inp")
+  expect(poor.dataset.low).toBe("true")
+  expect(poor.textContent).toContain("not enough")
+  expect(poor.textContent).not.toContain("Processing")
+})

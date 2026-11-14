@@ -4,6 +4,7 @@ import { SectionHeading } from "../page/SectionHeading"
 import { Button } from "../ui/button/Button"
 import { Chip } from "../ui/chip/Chip"
 import type { Tone } from "../ui/tone"
+import { BuildStrip, WhySlow } from "./WebPerformanceBuild"
 import { WebPerformanceTrend } from "./WebPerformanceTrend"
 
 export type PerfTab = "hard" | "route"
@@ -150,6 +151,7 @@ export function WebPerformance({
         </Box>
       ) : (
         <>
+          {data.build_strip && <BuildStrip strip={data.build_strip} />}
           <Box
             display="flex"
             gap="2"
@@ -182,6 +184,11 @@ export function WebPerformance({
             ))}
           </Box>
           <WebPerformanceTrend trends={data.trend} days={days} routes={data.slowest_routes} />
+          <WhySlow
+            rows={data.why_slow}
+            poor={data.poor_inp}
+            hasPrevious={data.build_strip?.previous !== undefined}
+          />
         </>
       )}
     </Box>
