@@ -3,6 +3,11 @@ import { card, expect, nav, section, test } from "./fixture"
 const step = (page: import("@playwright/test").Page, name: string, state: string) =>
   page.locator(`li[data-step="${name}"][data-state="${state}"]`)
 
+// A Triage session link, found by its icon's test id: the link's name starts with the icon's
+// aria-label ("Triage <name> ..."), which is not a stable thing to match.
+const triageSessionLinks = (page: import("@playwright/test").Page) =>
+  page.getByRole("link").filter({ has: page.getByTestId("triage-icon") })
+
 test.describe("199. Triage journey", () => {
   test("start, Verify chain, Plan, the card and the sidebar popover", async ({ page, start }) => {
     const fixture = await start("triage", { shape: "journey", autoAdvanceDelay: "3s", reloads: 1 })
@@ -219,7 +224,7 @@ test.describe("199. Triage journey", () => {
       expect(reasons.filter((r) => r === "approved")).toHaveLength(1)
       expect(reasons.find((r) => r !== "approved")).toMatch(/^(triage-already-approved|stale)$/)
       // Only one Write session was launched, whichever tab won.
-      await expect(page.getByRole("link", { name: /^Chat triage (?!Exited)/ })).toHaveCount(1)
+      await expect(triageSessionLinks(page).filter({ hasNotText: /Exited/ })).toHaveCount(1)
     } finally {
       await other.close()
     }
@@ -350,10 +355,7 @@ test.describe("199. Triage journey", () => {
 
     // The Agents page labels the Triage sessions.
     await page.evaluate(() => (location.hash = "#/agents"))
-    await page
-      .getByRole("link", { name: /^Chat triage/ })
-      .first()
-      .click()
+    await triageSessionLinks(page).first().click()
     await expect(page.getByRole("link", nav("Open triage page →"))).toBeVisible()
 
     // Phone: a third Triage at Approve has no Progress panel and no sideways scroll.
