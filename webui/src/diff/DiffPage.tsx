@@ -13,8 +13,10 @@ import { useDevice } from "../useWide"
 import { useReadyWhen } from "../useReady"
 import {
   fetchDiffFiles,
+  fetchDiffBlob,
   fetchDiffPatch,
   type DiffFilesResult,
+  type FetchDiffBlob,
   type FetchDiffFiles,
   type FetchDiffPatch,
 } from "./api"
@@ -203,6 +205,7 @@ function FilesBrowser({
   files,
   range,
   fetchPatch,
+  fetchBlob,
   view,
   selectedPath,
   onSelect,
@@ -211,6 +214,7 @@ function FilesBrowser({
   files: DiffFile[]
   range: PatchRange
   fetchPatch: FetchDiffPatch
+  fetchBlob: FetchDiffBlob
   view: DiffView
   selectedPath: string | undefined
   onSelect: (path: string) => void
@@ -262,6 +266,7 @@ function FilesBrowser({
             range={range}
             view={view}
             fetchPatch={fetchPatch}
+            fetchBlob={fetchBlob}
           />
         )}
       </Box>
@@ -366,9 +371,11 @@ function noticeOf(
 export function DiffPage({
   fetchFiles = fetchDiffFiles,
   fetchPatch = fetchDiffPatch,
+  fetchBlob = fetchDiffBlob,
 }: {
   fetchFiles?: FetchDiffFiles
   fetchPatch?: FetchDiffPatch
+  fetchBlob?: FetchDiffBlob
 }) {
   const [params, setParams] = useSearchParams()
   const url = parseDiffUrl(params)
@@ -451,6 +458,7 @@ export function DiffPage({
             secondSha: fresh.result.files.second_sha,
           }}
           fetchPatch={fetchPatch}
+          fetchBlob={fetchBlob}
           view={view}
           selectedPath={url.file}
           onSelect={(file) => setParams(diffQuery({ ...url, file }))}

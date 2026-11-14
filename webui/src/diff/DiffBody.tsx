@@ -1,6 +1,7 @@
-import type { DiffLineAnnotation } from "@pierre/diffs"
-import { PatchDiff } from "@pierre/diffs/react"
+import type { DiffLineAnnotation, FileDiffLoadedFiles, FileDiffMetadata } from "@pierre/diffs"
+import { PatchDiff, Virtualizer } from "@pierre/diffs/react"
 import { useMemo } from "react"
+import type { DiffBlobsBody } from "./api"
 
 export type DiffView = "split" | "unified"
 
@@ -40,9 +41,29 @@ export function lineAnchors(patch: string, path: string): DiffLineAnnotation<Lin
   return out
 }
 
-/** The only place that touches Pierre. Takes the patch, the view and the file path. */
-export function DiffBody({ patch, view, path }: { patch: string; view: DiffView; path: string }) {
+/**
+ * The only place that touches Pierre. Takes the patch, the view and the file path.
+ * `loadBlobs` reads both sides of the file at the resolved SHAs; Pierre calls it on the first click
+ * on an expand row. A narrowed view has no loader, and a patch without one has no expand rows.
+ * A large file is drawn in a virtualized 70vh box so the page never mounts thousands of rows.
+ */
+export function DiffBody({
+  patch,
+  view,
+  path,
+  large = false,
+  narrowed = false,
+  loadBlobs,
+}: {
+  patch: string
+  view: DiffView
+  path: string
+  large?: boolean
+  narrowed?: boolean
+  loadBlobs?: () => Promise<DiffBlobsBody>
+}) {
   const lineAnnotations = useMemo(() => lineAnchors(patch, path), [patch, path])
+  const expandable = !narrowed && !!loadBlobs
   const options = useMemo(
     () => ({
       diffStyle: view,
@@ -50,8 +71,23 @@ export function DiffBody({ patch, view, path }: { patch: string; view: DiffView;
       themeType: "dark" as const,
       disableFileHeader: true,
       unsafeCSS: UNSAFE_CSS,
+      ...(expandable && loadBlobs
+        ? {
+            loadDiffFiles: async (meta: FileDiffMetadata): Promise<FileDiffLoadedFiles> => {
+              const blobs = await loadBlobs()
+              const newFile = { name: meta.name, contents: blobs.new.text ?? "" }
+              if (meta.type === "rename-pure") return { oldFile: null, newFile }
+              return {
+                oldFile: { name: meta.prevName ?? meta.name, contents: blobs.old.text ?? "" },
+                newFile,
+              }
+            },
+          }
+        : { hunkSeparators: "simple" as const }),
     }),
-    [view],
+    [view, expandable, loadBlobs],
   )
-  return <PatchDiff patch={patch} options={options} lineAnnotations={lineAnnotations} />
+  const diff = <PatchDiff patch={patch} options={options} lineAnnotations={lineAnnotations} />
+  if (!large) return diff
+  return <Virtualizer style={{ height: "70vh", overflow: "auto" }}>{diff}</Virtualizer>
 }

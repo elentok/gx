@@ -1,9 +1,10 @@
 import { Box, Spinner } from "@chakra-ui/react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import type { DiffFile } from "../generated/server"
 import { Button } from "../ui/button/Button"
-import type { FetchDiffPatch } from "./api"
+import type { DiffBlobsBody, FetchDiffBlob, FetchDiffPatch } from "./api"
 import { DiffBody, type DiffView } from "./DiffBody"
+import { BinaryBody, isBinaryFile } from "./ImageDiff"
 
 export type PatchRange = { project: string; firstSha: string; secondSha: string }
 
@@ -64,11 +65,15 @@ function Body({
   range,
   view,
   fetchPatch,
+  narrowed,
+  loadBlobs,
 }: {
   file: DiffFile
   range: PatchRange
   view: DiffView
   fetchPatch: FetchDiffPatch
+  narrowed: boolean
+  loadBlobs: () => Promise<DiffBlobsBody>
 }) {
   const [nonce, setNonce] = useState(0)
   const [patch, setPatch] = useState<Patch>()
@@ -103,18 +108,58 @@ function Body({
       </Box>
     )
   }
-  return <DiffBody patch={fresh.text} view={view} path={file.path} />
+  return (
+    <DiffBody
+      patch={fresh.text}
+      view={view}
+      path={file.path}
+      large={!!file.large}
+      narrowed={narrowed}
+      loadBlobs={loadBlobs}
+    />
+  )
 }
 
-/** One file's card. The parent keys it by path so only one is mounted at a time. */
+function Collapsed({ file, onLoad }: { file: DiffFile; onLoad: () => void }) {
+  const text = file.large
+    ? `Large diff, collapsed (${file.added + file.deleted} lines)`
+    : "Generated file, collapsed"
+  return (
+    <Box data-testid="collapsed-diff" p="4" fontSize="sm" color="text.muted">
+      {text}{" "}
+      <Button emphasis="secondary" onClick={onLoad}>
+        Load diff
+      </Button>
+    </Box>
+  )
+}
+
+/**
+ * One file's card. The parent keys it by path so only one is mounted at a time, which also resets
+ * the loaded state when the file changes. `narrowed` is false until the commits view passes it.
+ */
 export function DiffFileCard(props: {
   file: DiffFile
   range: PatchRange
   view: DiffView
   fetchPatch: FetchDiffPatch
+  fetchBlob: FetchDiffBlob
+  narrowed?: boolean
 }) {
-  const { file } = props
-  const skipped = !!(file.large || file.generated || file.binary)
+  const { file, range, fetchBlob, narrowed = false } = props
+  const [loaded, setLoaded] = useState(false)
+  const loadBlobs = useCallback(
+    () => fetchBlob(range.project, range.firstSha, range.secondSha, file.path),
+    [fetchBlob, range.project, range.firstSha, range.secondSha, file.path],
+  )
+  let body
+  if (isBinaryFile(file)) {
+    body = <BinaryBody file={file} range={range} fetchBlob={fetchBlob} />
+  } else if ((file.large || file.generated) && !loaded) {
+    body = <Collapsed file={file} onLoad={() => setLoaded(true)} />
+  } else {
+    body = <Body {...props} narrowed={narrowed} loadBlobs={loadBlobs} />
+  }
   return (
     <Box
       data-testid="file-card"
@@ -125,7 +170,7 @@ export function DiffFileCard(props: {
       overflow="hidden"
     >
       <Header file={file} />
-      {skipped ? null : <Body {...props} />}
+      {body}
     </Box>
   )
 }

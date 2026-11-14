@@ -32,6 +32,32 @@ export const fetchDiffPatch: FetchDiffPatch = async (project, first, second, pat
   return body.patch ?? ""
 }
 
+// The generated DiffBlob is the kind enum only (the Go struct and the enum share a name), so the
+// side shape is written here.
+export type BlobSide = {
+  kind: "absent" | "text" | "image" | "binary" | "too_large"
+  size?: number
+  text?: string
+  image_base64?: string
+}
+
+export type DiffBlobsBody = { merge_base: string; tip: string; old: BlobSide; new: BlobSide }
+
+/** The server finds the old path of a renamed file itself, so only the current path is sent. */
+export type FetchDiffBlob = (
+  project: string,
+  base: string,
+  tip: string,
+  path: string,
+) => Promise<DiffBlobsBody>
+
+export const fetchDiffBlob: FetchDiffBlob = async (project, base, tip, path) => {
+  const q = new URLSearchParams({ project, base, tip, path })
+  const res = await apiFetch(`/v1/diff/blob?${q}`)
+  if (!res.ok) throw new Error(`diff blob: HTTP ${res.status}`)
+  return res.json()
+}
+
 export const fetchDiffFiles: FetchDiffFiles = async (project, first, second) => {
   const q = new URLSearchParams({ project, first, second })
   const res = await apiFetch(`/v1/diff/files?${q}`)

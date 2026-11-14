@@ -8,6 +8,7 @@ vi.mock("@pierre/diffs/react", () => ({
     props.last = p
     return <div data-testid="pierre" />
   },
+  Virtualizer: ({ children }: { children: unknown }) => <>{children}</>,
 }))
 
 const PATCH = `diff --git a/a.go b/a.go
