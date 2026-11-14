@@ -55,9 +55,16 @@ func (f *finishFixture) record(t *testing.T, exit int, kindFilter string, failed
 
 func (f *finishFixture) recordTree(t *testing.T, tree string, exit int, kindFilter string, failed ...string) {
 	t.Helper()
+	f.recordKinds(t, tree, exit, kindFilter, check.KindRecord{Kind: "test", Failed: failed})
+}
+
+// recordKinds appends a record with the given kinds, for runs that mix kinds
+// or set a kind's Status.
+func (f *finishFixture) recordKinds(t *testing.T, tree string, exit int, kindFilter string, kinds ...check.KindRecord) {
+	t.Helper()
 	rec := check.Record{
 		Run: "r", Time: "2026-01-02T03:04:05Z", Head: f.head, Exit: exit, KindFilter: kindFilter, Branch: "ralph-loop/e-item-01", TreeID: tree,
-		Kinds: []check.KindRecord{{Kind: "test", Failed: failed}},
+		Kinds: kinds,
 	}
 	line, err := json.Marshal(rec)
 	if err != nil {
@@ -269,6 +276,79 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 		if err := f.finish(t, "--check-failures=02"); err != nil {
 			t.Fatalf("one address for the new failure: %v", err)
 		}
+	})
+
+	t.Run("kinds that record no test names are waived by kind", func(t *testing.T) {
+		lint := check.KindRecord{Kind: "lint", Status: check.StatusFail}
+		test := check.KindRecord{Kind: "test", Status: check.StatusFail}
+		// setup records the base run, commits, and returns a recorder for the current tree.
+		setup := func(t *testing.T, base ...check.KindRecord) (*finishFixture, func(...check.KindRecord)) {
+			f := newFinishFixture(t)
+			mb, err := git.MergeBase(f.wt, "HEAD", "e")
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.head = mb
+			f.recordKinds(t, "base-tree", check.ExitFail, "", base...)
+			f.head = ""
+			cmdtest.CommitFile(t, f.wt, "a.txt", "a")
+			tree, err := history.TreeID(f.wt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return f, func(kinds ...check.KindRecord) { f.recordKinds(t, tree, check.ExitFail, "", kinds...) }
+		}
+
+		t.Run("lint red on the base is waived", func(t *testing.T) {
+			f, now := setup(t, lint)
+			now(lint)
+			var stderr bytes.Buffer
+			d := testDeps(t, &bytes.Buffer{}, &stderr, func() (string, error) { return f.wt, nil })
+			if err := execute(t, []string{"tickets", "set", f.ticket, "--iteration-status=finished"}, d); err != nil {
+				t.Fatalf("finish: %v", err)
+			}
+			if !strings.Contains(stderr.String(), "pre-existing failure (red on the base, waived): lint") {
+				t.Errorf("stderr = %q", stderr.String())
+			}
+		})
+
+		t.Run("lint passing on the base is fresh", func(t *testing.T) {
+			f, now := setup(t, check.KindRecord{Kind: "lint", Status: check.StatusPass})
+			now(lint)
+			if err := f.finish(t); err == nil {
+				t.Fatal("want a refusal")
+			}
+			if err := f.finish(t, "--check-failures=02"); err != nil {
+				t.Fatalf("one address: %v", err)
+			}
+		})
+
+		t.Run("lint absent on the base is fresh", func(t *testing.T) {
+			f, now := setup(t, check.KindRecord{Kind: "test", Failed: []string{"TestA"}, Status: check.StatusFail})
+			now(lint)
+			if err := f.finish(t); err == nil {
+				t.Fatal("want a refusal")
+			}
+		})
+
+		t.Run("named base failure does not waive a nameless one", func(t *testing.T) {
+			f, now := setup(t, check.KindRecord{Kind: "test", Failed: []string{"TestA"}, Status: check.StatusFail})
+			now(test)
+			if err := f.finish(t); err == nil {
+				t.Fatal("want a refusal")
+			}
+		})
+
+		t.Run("fresh named test plus waived lint needs one address", func(t *testing.T) {
+			f, now := setup(t, lint)
+			now(lint, check.KindRecord{Kind: "test", Failed: []string{"TestNew"}, Status: check.StatusFail})
+			if err := f.finish(t); err == nil || !strings.Contains(err.Error(), "at least 1 follow-up") {
+				t.Fatalf("want a refusal needing 1 address, got %v", err)
+			}
+			if err := f.finish(t, "--check-failures=02"); err != nil {
+				t.Fatalf("one address: %v", err)
+			}
+		})
 	})
 
 	t.Run("known failures: one address covers the failing set", func(t *testing.T) {

@@ -106,7 +106,7 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 
 	// Tests already red on the base are waived: a ticket claimed on a red tree
 	// can still finish. Only a failure the base did not have needs a follow-up.
-	failedNow := failedTests(*failing)
+	failedNow := append(failedTests(*failing), namelessFailedKinds(*failing)...)
 	preexisting := baselineFailures(recs0, base)
 	var fresh []string
 	for _, n := range failedNow {
@@ -183,7 +183,7 @@ func staleRunHint(recs []check.Record, branch string) string {
 func baselineFailures(recs []check.Record, base string) []string {
 	for _, r := range slices.Backward(recs) {
 		if r.Head == base && r.Exit == check.ExitFail && r.KindFilter == "" {
-			return failedTests(r)
+			return append(failedTests(r), namelessFailedKinds(r)...)
 		}
 	}
 	return nil
@@ -228,6 +228,18 @@ func splitAddrs(c *cobra.Command, flag string) []string {
 		}
 	}
 	return addrs
+}
+
+// namelessFailedKinds names the check kinds that failed without recording test
+// names (lint, for example), so the guard can compare them by kind.
+func namelessFailedKinds(r check.Record) []string {
+	var kinds []string
+	for _, k := range r.Kinds {
+		if k.Status == check.StatusFail && len(k.Failed) == 0 && !slices.Contains(kinds, k.Kind) {
+			kinds = append(kinds, k.Kind)
+		}
+	}
+	return kinds
 }
 
 func failedTests(r check.Record) []string {
