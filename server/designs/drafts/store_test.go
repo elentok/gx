@@ -329,3 +329,155 @@ func TestLastProject(t *testing.T) {
 		t.Fatalf("last-used file listed as a draft: %v", items)
 	}
 }
+
+func mustDeleteIfEmpty(t *testing.T, s *Store, id string) ops.DesignDraftSaveResult {
+	t.Helper()
+	res, err := s.DeleteIfEmpty(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func TestDeleteIfEmpty(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+
+	empty := mustCreate(t, s, "")
+	if err := os.MkdirAll(s.ImagesDir(empty.ID), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if res := mustDeleteIfEmpty(t, s, empty.ID); !res.Deleted {
+		t.Fatalf("empty draft: %+v, want deleted", res)
+	}
+	if _, err := os.Stat(s.dir(empty.ID)); !os.IsNotExist(err) {
+		t.Errorf("draft folder still there: %v", err)
+	}
+	if res := mustDeleteIfEmpty(t, s, empty.ID); res.Deleted || res.Reason != ops.ReasonDraftGone {
+		t.Errorf("second delete: %+v, want draft-gone", res)
+	}
+
+	withIdea := mustCreate(t, s, "words")
+	withImage := mustCreate(t, s, "")
+	withImage.Images = []string{"img1"}
+	if err := s.write(withImage); err != nil {
+		t.Fatal(err)
+	}
+	withSlug, err := s.Create("proj", "a-slug", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range []*ops.DesignDraft{withIdea, withImage, withSlug} {
+		if res := mustDeleteIfEmpty(t, s, d.ID); res.Deleted || res.Reason != ops.ReasonDraftNotEmpty {
+			t.Errorf("draft %+v: %+v, want kept as draft-not-empty", d, res)
+		}
+	}
+
+	if _, err := s.SetTarget(withSlug.ID, "proj", "", false); err != nil {
+		t.Fatal(err)
+	}
+	if res := mustDeleteIfEmpty(t, s, withSlug.ID); !res.Deleted {
+		t.Errorf("after clearing the slug: %+v, want deleted", res)
+	}
+}
+
+func TestDeleteIfEmpty_TextSavedAfterTheCallersReadKeepsTheDraft(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+	d := mustCreate(t, s, "")
+	// The caller saw an empty draft; another device then saved text.
+	if _, err := s.Save(d.ID, ops.DesignDraftSaveRequest{Idea: "typed elsewhere", Revision: d.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	if res := mustDeleteIfEmpty(t, s, d.ID); res.Deleted {
+		t.Fatalf("got %+v, want the draft kept", res)
+	}
+	if _, err := s.Get(d.ID); err != nil {
+		t.Errorf("draft lost: %v", err)
+	}
+}
+
+// fakeClock makes the store's time move only when the test says so.
+func fakeClock(s *Store) *time.Time {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	s.now = func() time.Time { return now }
+	return &now
+}
+
+func TestLease(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+	now := fakeClock(s)
+	d := mustCreate(t, s, "")
+
+	if s.leased(d.ID) {
+		t.Fatal("leased before any ping")
+	}
+	if res, err := s.Lease(d.ID); err != nil || res.Refused {
+		t.Fatalf("ping = %+v, %v", res, err)
+	}
+	if !s.leased(d.ID) {
+		t.Fatal("not leased after a ping")
+	}
+	*now = now.Add(LeaseTTL - time.Second)
+	if !s.leased(d.ID) {
+		t.Error("lease ended before the TTL")
+	}
+	if _, err := s.Lease(d.ID); err != nil {
+		t.Fatal(err)
+	}
+	*now = now.Add(LeaseTTL - time.Second)
+	if !s.leased(d.ID) {
+		t.Error("a second ping did not extend the lease")
+	}
+	*now = now.Add(2 * time.Second)
+	if s.leased(d.ID) {
+		t.Error("lease still live after the TTL")
+	}
+
+	if res, err := s.Lease("0123456789abcdef"); err != nil || !res.Refused || res.Reason != ops.ReasonDraftGone {
+		t.Errorf("ping on a missing draft = %+v, %v; want draft-gone", res, err)
+	}
+}
+
+func TestSweepEmpty(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+	now := fakeClock(s)
+	empty := mustCreate(t, s, "")
+	leased := mustCreate(t, s, "")
+	skipped := mustCreate(t, s, "")
+	kept := mustCreate(t, s, "words")
+	if _, err := s.Lease(leased.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	removed, err := s.SweepEmpty(skipped.ID)
+	if err != nil || len(removed) != 1 || removed[0] != empty.ID {
+		t.Fatalf("sweep = %v, %v; want only %s", removed, err, empty.ID)
+	}
+	if _, err := s.Get(empty.ID); err != ErrNotFound {
+		t.Errorf("swept draft reads %v, want ErrNotFound", err)
+	}
+	for _, d := range []*ops.DesignDraft{leased, skipped, kept} {
+		if _, err := s.Get(d.ID); err != nil {
+			t.Errorf("draft %s lost: %v", d.ID, err)
+		}
+	}
+
+	*now = now.Add(LeaseTTL + time.Second)
+	removed, err = s.SweepEmpty()
+	if err != nil || len(removed) != 2 {
+		t.Fatalf("sweep after expiry = %v, %v; want the leased and skipped drafts", removed, err)
+	}
+	if _, err := s.Get(kept.ID); err != nil {
+		t.Errorf("non-empty draft lost: %v", err)
+	}
+}
+
+func TestSweepEmpty_NoRootIsFine(t *testing.T) {
+	t.Parallel()
+	if removed, err := New(t.TempDir()).SweepEmpty(); err != nil || len(removed) != 0 {
+		t.Fatalf("sweep = %v, %v", removed, err)
+	}
+}

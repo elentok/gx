@@ -48,6 +48,7 @@ func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
 		var d *ops.DesignDraft
 		if d, err = s.drafts.Create("", "", req.Idea); err == nil {
 			res = ops.DesignDraftSaveResult{Draft: d}
+			_, err = s.drafts.SweepEmpty(d.ID)
 		}
 	} else {
 		res, err = s.drafts.Save(req.ID, req)
@@ -179,6 +180,36 @@ func (s *Designs) mapImageServe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	imagestore.Serve(w, r, folder, r.URL.Query().Get("id"))
+}
+
+// draftRemoveIfEmpty serves POST /v1/designs/drafts/remove-if-empty.
+func (s *Designs) draftRemoveIfEmpty(w http.ResponseWriter, r *http.Request) {
+	var req ops.DesignDraftLeaseRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	res, err := s.drafts.DeleteIfEmpty(req.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	wire.WriteJSON(w, res)
+}
+
+// draftLease serves POST /v1/designs/drafts/lease: the open page's ping.
+func (s *Designs) draftLease(w http.ResponseWriter, r *http.Request) {
+	var req ops.DesignDraftLeaseRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	res, err := s.drafts.Lease(req.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	wire.WriteJSON(w, res)
 }
 
 func (s *Designs) draftDelete(w http.ResponseWriter, r *http.Request) {

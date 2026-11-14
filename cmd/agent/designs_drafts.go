@@ -18,7 +18,7 @@ import (
 // form keeps on the server. It calls the routes the form calls.
 func newDesignsDraftsCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "drafts", Short: "New Design drafts kept by the server", Args: cobra.NoArgs}
-	cmd.AddCommand(newDraftsListCmd(d), newDraftsShowCmd(d), newDraftsSaveCmd(d), newDraftsSetCmd(d), newDraftsDeleteCmd(d), newDraftsLastProjectCmd(d), newDraftsImageCmd(d))
+	cmd.AddCommand(newDraftsListCmd(d), newDraftsShowCmd(d), newDraftsSaveCmd(d), newDraftsSetCmd(d), newDraftsDeleteCmd(d), newDraftsRemoveIfEmptyCmd(d), newDraftsLeaseCmd(d), newDraftsLastProjectCmd(d), newDraftsImageCmd(d))
 	return cmd
 }
 
@@ -297,6 +297,45 @@ func newDraftsDeleteCmd(d Deps) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
 	return cmd
+}
+
+// runDraftsRemoveIfEmpty prints nothing when the draft was deleted. Content
+// that keeps the draft is a refusal (draft-not-empty), like a missing draft.
+func runDraftsRemoveIfEmpty(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string) error {
+	res, err := cl.Sessions.RemoveDesignDraftIfEmpty(ctx, id)
+	return printDraftResult(w, jsonOut, res, err, func(ops.DesignDraftSaveResult) error { return nil })
+}
+
+func runDraftsLease(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string) error {
+	res, err := cl.Sessions.LeaseDesignDraft(ctx, id)
+	return printDraftResult(w, jsonOut, res, err, func(ops.DesignDraftSaveResult) error { return nil })
+}
+
+// newDraftsIDCmd builds a one-argument drafts verb around run.
+func newDraftsIDCmd(d Deps, use, short string, run func(context.Context, *apiclient.Client, io.Writer, bool, string) error) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   use + " <id>",
+		Short: short,
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			return run(c.Context(), cl, c.OutOrStdout(), jsonOut, args[0])
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
+	return cmd
+}
+
+func newDraftsRemoveIfEmptyCmd(d Deps) *cobra.Command {
+	return newDraftsIDCmd(d, "remove-if-empty", "delete a draft only while it is still empty", runDraftsRemoveIfEmpty)
+}
+
+func newDraftsLeaseCmd(d Deps) *cobra.Command {
+	return newDraftsIDCmd(d, "lease", "ping a draft's page lease so the sweep skips it", runDraftsLease)
 }
 
 // runDraftsLastProject prints the shared last-used project, or sets it when

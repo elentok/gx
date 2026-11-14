@@ -109,6 +109,20 @@ func (s *designs) DeleteDesignDraft(ctx context.Context, id string) (ops.DesignD
 	return res, err
 }
 
+// RemoveDesignDraftIfEmpty deletes a draft only while it is still empty.
+func (s *designs) RemoveDesignDraftIfEmpty(ctx context.Context, id string) (ops.DesignDraftSaveResult, error) {
+	var res ops.DesignDraftSaveResult
+	err := s.t.post(ctx, "/v1/designs/drafts/remove-if-empty", ops.DesignDraftLeaseRequest{ID: id}, &res)
+	return res, err
+}
+
+// LeaseDesignDraft pings the page lease of a draft; a missing draft is refused draft-gone.
+func (s *designs) LeaseDesignDraft(ctx context.Context, id string) (ops.DesignDraftSaveResult, error) {
+	var res ops.DesignDraftSaveResult
+	err := s.t.post(ctx, "/v1/designs/drafts/lease", ops.DesignDraftLeaseRequest{ID: id}, &res)
+	return res, err
+}
+
 // DesignLastProject reads the project the New Design form last used ("" on a
 // fresh server).
 func (s *designs) DesignLastProject(ctx context.Context) (ops.DesignLastProject, error) {

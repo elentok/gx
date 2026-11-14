@@ -75,6 +75,9 @@ func New(d Deps) *Designs {
 	if err := ds.MigrateNames(); err != nil && d.Log != nil {
 		d.Log.Warn("design drafts: name migration failed", "err", err)
 	}
+	if _, err := ds.SweepEmpty(); err != nil && d.Log != nil {
+		d.Log.Warn("design drafts: sweep failed", "err", err)
+	}
 	return &Designs{
 		log: d.Log, ticketStore: d.TicketStore, conversationsDir: d.ConversationsDir,
 		idx: d.Idx, projects: d.Projects, events: d.Events, guards: d.Guards,

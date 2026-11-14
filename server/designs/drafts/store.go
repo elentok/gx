@@ -45,7 +45,17 @@ type Store struct {
 	now  func() time.Time
 	// locks maps a draft id to its *sync.Mutex.
 	locks sync.Map
+	// leases maps a draft id to when its page lease ends; guarded by leaseMu.
+	leaseMu sync.Mutex
+	leases  map[string]time.Time
 }
+
+const (
+	// LeasePing is how often an open draft page pings its lease.
+	LeasePing = 30 * time.Second
+	// LeaseTTL is how long one ping keeps a draft from the sweep: a few missed pings.
+	LeaseTTL = 2 * time.Minute
+)
 
 // New builds a Store rooted in stateDir.
 func New(stateDir string) *Store {
@@ -361,6 +371,84 @@ func (s *Store) Delete(id string) error {
 	unlock := s.lock(id)
 	defer unlock()
 	return os.RemoveAll(s.dir(id))
+}
+
+// DeleteIfEmpty deletes a draft only while it is still empty, judged under the
+// draft's lock on a fresh read, so text saved elsewhere in the meantime keeps
+// it. Deleted is set when it removed the draft; otherwise the result is refused
+// draft-gone or draft-not-empty.
+func (s *Store) DeleteIfEmpty(id string) (ops.DesignDraftSaveResult, error) {
+	if !idPattern.MatchString(id) {
+		return ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftGone}, nil
+	}
+	unlock := s.lock(id)
+	defer unlock()
+	d, err := s.Get(id)
+	if errors.Is(err, ErrNotFound) {
+		return ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftGone}, nil
+	}
+	if err != nil {
+		return ops.DesignDraftSaveResult{}, err
+	}
+	if !isEmpty(d) {
+		return ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftNotEmpty}, nil
+	}
+	if err := os.RemoveAll(s.dir(id)); err != nil {
+		return ops.DesignDraftSaveResult{}, err
+	}
+	return ops.DesignDraftSaveResult{Deleted: true}, nil
+}
+
+// Lease records that a draft's page is open until now+LeaseTTL. Leases live in
+// memory only: after a server start none is live. A missing draft is refused
+// draft-gone.
+func (s *Store) Lease(id string) (ops.DesignDraftSaveResult, error) {
+	if _, err := s.Get(id); errors.Is(err, ErrNotFound) {
+		return ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftGone}, nil
+	} else if err != nil {
+		return ops.DesignDraftSaveResult{}, err
+	}
+	s.leaseMu.Lock()
+	defer s.leaseMu.Unlock()
+	if s.leases == nil {
+		s.leases = map[string]time.Time{}
+	}
+	s.leases[id] = s.now().Add(LeaseTTL)
+	return ops.DesignDraftSaveResult{}, nil
+}
+
+func (s *Store) leased(id string) bool {
+	s.leaseMu.Lock()
+	defer s.leaseMu.Unlock()
+	return s.now().Before(s.leases[id])
+}
+
+// SweepEmpty deletes every empty draft that has no live lease, except the ids
+// in skip, and returns the ids it removed. It deletes through DeleteIfEmpty, so
+// text that arrived meanwhile still keeps a draft.
+func (s *Store) SweepEmpty(skip ...string) ([]string, error) {
+	entries, err := os.ReadDir(s.root)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var removed []string
+	for _, e := range entries {
+		id := e.Name()
+		if !e.IsDir() || !idPattern.MatchString(id) || slices.Contains(skip, id) || s.leased(id) {
+			continue
+		}
+		res, err := s.DeleteIfEmpty(id)
+		if err != nil {
+			return removed, err
+		}
+		if res.Deleted {
+			removed = append(removed, id)
+		}
+	}
+	return removed, nil
 }
 
 // LastProject is the last-used project name, "" when none was ever set.

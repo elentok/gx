@@ -69,6 +69,33 @@ func TestDesignsDrafts_ListShowDelete(t *testing.T) {
 	}
 }
 
+func TestDesignsDrafts_RemoveIfEmptyAndLease(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir())
+	empty, err := drafts.New(h.StateDir).Create("proj", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	full, err := drafts.New(h.StateDir).Create("proj", "", "words")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	var out bytes.Buffer
+
+	if err := runDraftsLease(ctx, h.Client, &out, false, empty.ID); err != nil {
+		t.Fatalf("lease: %v", err)
+	}
+	if err := runDraftsRemoveIfEmpty(ctx, h.Client, &out, false, full.ID); err == nil || !strings.Contains(err.Error(), ops.ReasonDraftNotEmpty) {
+		t.Errorf("remove-if-empty on a full draft: %v, want a draft-not-empty refusal", err)
+	}
+	if err := runDraftsRemoveIfEmpty(ctx, h.Client, &out, false, empty.ID); err != nil {
+		t.Fatalf("remove-if-empty: %v", err)
+	}
+	if err := runDraftsLease(ctx, h.Client, &out, false, empty.ID); err == nil || !strings.Contains(err.Error(), ops.ReasonDraftGone) {
+		t.Errorf("lease after removal: %v, want a draft-gone refusal", err)
+	}
+}
+
 func TestDesignsDrafts_LastProject(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir())
 	ctx := context.Background()

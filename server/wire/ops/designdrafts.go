@@ -8,6 +8,8 @@ const (
 	ReasonDraftRevisionConflict = "revision-conflict"
 	// ReasonDraftGone: the draft was deleted (or emptied) since the caller loaded it.
 	ReasonDraftGone = "draft-gone"
+	// ReasonDraftNotEmpty: remove-if-empty found content, so the draft stays.
+	ReasonDraftNotEmpty = "draft-not-empty"
 )
 
 // DesignDraft is one New Design form kept on the server. Slug may be empty;
@@ -68,6 +70,12 @@ type DesignLastProject struct {
 
 // DesignDraftDeleteRequest deletes one draft.
 type DesignDraftDeleteRequest struct {
+	ID string `json:"id"`
+}
+
+// DesignDraftLeaseRequest pings the page lease of one draft; the remove-if-empty
+// route takes the same body.
+type DesignDraftLeaseRequest struct {
 	ID string `json:"id"`
 }
 

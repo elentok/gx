@@ -126,9 +126,13 @@ export const ReasonDraftRevisionConflict = "revision-conflict";
  */
 export const ReasonDraftGone = "draft-gone";
 /**
+ * ReasonDraftNotEmpty: remove-if-empty found content, so the draft stays.
+ */
+export const ReasonDraftNotEmpty = "draft-not-empty";
+/**
  * Refusal reasons of a New Design draft text save.
  */
-export type ReasonDraft = typeof ReasonDraftRevisionConflict | typeof ReasonDraftGone;
+export type ReasonDraft = typeof ReasonDraftRevisionConflict | typeof ReasonDraftGone | typeof ReasonDraftNotEmpty;
 /**
  * DesignDraft is one New Design form kept on the server. Slug may be empty;
  * Images lists image ids the server alone writes.
@@ -198,6 +202,13 @@ export interface DesignLastProject {
  * DesignDraftDeleteRequest deletes one draft.
  */
 export interface DesignDraftDeleteRequest {
+  id: string;
+}
+/**
+ * DesignDraftLeaseRequest pings the page lease of one draft; the remove-if-empty
+ * route takes the same body.
+ */
+export interface DesignDraftLeaseRequest {
   id: string;
 }
 /**

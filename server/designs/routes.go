@@ -48,6 +48,16 @@ func Routes(get func() *Designs) []wire.Route {
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftDelete(w, r) },
 		},
 		{
+			Pattern: "POST /v1/designs/drafts/remove-if-empty",
+			Web:     wire.WebWrite,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftRemoveIfEmpty(w, r) },
+		},
+		{
+			Pattern: "POST /v1/designs/drafts/lease",
+			Web:     wire.WebWrite,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftLease(w, r) },
+		},
+		{
 			Pattern: "POST /v1/designs/drafts/images",
 			Web:     wire.WebWrite,
 			RawBody: true,

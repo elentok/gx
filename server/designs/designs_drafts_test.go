@@ -272,6 +272,106 @@ func TestWebDesignDrafts_EmptyingSaveKeeps(t *testing.T) {
 	}
 }
 
+func (f designsFixture) webPostDraft(t *testing.T, route, id string) ops.DesignDraftSaveResult {
+	t.Helper()
+	code, out := servertest.WebPostJSON(t, f.base+route, fmt.Sprintf(`{"id":%q}`, id), f.ck, "", servertest.JSONPost(f.base))
+	if code != http.StatusOK {
+		t.Fatalf("%s = %d %s", route, code, out)
+	}
+	var res ops.DesignDraftSaveResult
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func TestWebDesignDrafts_RemoveIfEmpty(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	empty := f.seedDraft(t, "proj", "", "")
+	full := f.seedDraft(t, "proj", "", "words")
+
+	if res := f.webPostDraft(t, "/v1/designs/drafts/remove-if-empty", empty.ID); !res.Deleted {
+		t.Errorf("empty draft: %+v, want deleted", res)
+	}
+	if res := f.webPostDraft(t, "/v1/designs/drafts/remove-if-empty", full.ID); res.Deleted || res.Reason != ops.ReasonDraftNotEmpty {
+		t.Errorf("draft with a prompt: %+v, want draft-not-empty", res)
+	}
+	if res := f.webPostDraft(t, "/v1/designs/drafts/remove-if-empty", empty.ID); res.Reason != ops.ReasonDraftGone {
+		t.Errorf("already gone: %+v, want draft-gone", res)
+	}
+	var read ops.DesignDraftSaveResult
+	f.webGet(t, "/v1/designs/drafts/read?id="+empty.ID, &read)
+	if !read.Refused || read.Reason != ops.ReasonDraftGone {
+		t.Errorf("read of a removed draft = %+v, want draft-gone", read)
+	}
+}
+
+func TestWebDesignDrafts_Lease(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	d := f.seedDraft(t, "proj", "", "")
+	if res := f.webPostDraft(t, "/v1/designs/drafts/lease", d.ID); res.Refused {
+		t.Errorf("ping = %+v, want accepted", res)
+	}
+	if res := f.webPostDraft(t, "/v1/designs/drafts/lease", "0123456789abcdef"); res.Reason != ops.ReasonDraftGone {
+		t.Errorf("ping on a missing draft = %+v, want draft-gone", res)
+	}
+}
+
+func TestWebDesignDrafts_SweepOnCreateAndRestart(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	old := f.seedDraft(t, "proj", "", "")
+	leased := f.seedDraft(t, "proj", "", "")
+	full := f.seedDraft(t, "proj", "", "words")
+	f.webPostDraft(t, "/v1/designs/drafts/lease", leased.ID)
+
+	created := f.webSave(t, "", 0, "")
+	if created.Draft == nil {
+		t.Fatalf("create = %+v", created)
+	}
+	var items []ops.DesignDraftItem
+	f.webGet(t, "/v1/designs/drafts", &items)
+	got := map[string]bool{}
+	for _, it := range items {
+		got[it.ID] = true
+	}
+	if got[old.ID] || !got[leased.ID] || !got[full.ID] || !got[created.Draft.ID] {
+		t.Errorf("after create: %v; want the old empty draft swept, the leased, non-empty and new ones kept", got)
+	}
+
+	// A restart has no live lease: the empty drafts go, the others stay.
+	designs.New(designs.Deps{StateDir: f.h.StateDir})
+	store := drafts.New(f.h.StateDir)
+	for _, id := range []string{leased.ID, created.Draft.ID} {
+		if _, err := store.Get(id); err != drafts.ErrNotFound {
+			t.Errorf("empty draft %s after restart: %v, want gone", id, err)
+		}
+	}
+	if _, err := store.Get(full.ID); err != nil {
+		t.Errorf("non-empty draft after restart: %v", err)
+	}
+}
+
+func TestWebDesignDrafts_RestartSweepKeepsAMigratedNameOnlyDraft(t *testing.T) {
+	t.Parallel()
+	state := t.TempDir()
+	d, err := drafts.New(state).Create("proj", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := filepath.Join(state, "design-drafts", d.ID, "draft.json")
+	old := fmt.Sprintf(`{"id":%q,"project":"proj","slug":"","name":"Named","idea":"","images":[],"revision":1,"edited_at":"2026-01-01T00:00:00Z"}`, d.ID)
+	if err := os.WriteFile(rec, []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	designs.New(designs.Deps{StateDir: state})
+	if got, err := drafts.New(state).Get(d.ID); err != nil || got.Slug != "named" {
+		t.Fatalf("name-only draft after start = %+v, %v; want it kept with its slug", got, err)
+	}
+}
+
 func TestWebDesignDrafts_DraftsAreNotEpics(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
