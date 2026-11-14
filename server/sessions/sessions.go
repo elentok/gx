@@ -302,11 +302,11 @@ func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, re
 	}
 	opts := harness.LaunchOptions{
 		SessionID: meta.ConversationID,
-		Args:      launchArgs(meta, mg.settings.Load().AgentsClaudeArgs, codexRoots(mg, meta)),
+		Args:      launchArgs(meta, mg.settings.Load().AgentsClaudeArgs, codexRoots(mg, meta), harness.GXFilesPromptFile()),
 		Env:       env,
 		Cwd:       meta.Dir,
-		// A plain Codex chat gets the question tool and no GX prompt.
-		NoSystemPrompt: isPlainCodex(meta),
+		// Only loop agents get the `gx tickets ask` text.
+		FilesOnly: true,
 	}
 	home := harness.LookupEnv(env, "HOME")
 	opts.Args = harness.WritableDirectoryArgs(agentrunner.Kind(meta.Harness), opts.Args, mg.projects.AgentsConfig(meta.Project).WritableDirectories, home, meta.Dir)
@@ -360,8 +360,10 @@ func procCapArgs(mg *Manager) []string {
 
 // launchArgs is the extra harness args of a launch or resume. Only Claude and
 // Codex get any. The model, effort and remote-control name come from the meta,
-// never the settings, so a resume keeps what the launch used.
-func launchArgs(meta *Meta, claudeArgs, codexRoots []string) []string {
+// never the settings, so a resume keeps what the launch used. A Claude
+// session also gets the files sentence through filesPromptFile, on launch and
+// resume alike; Codex gets it as a launch option instead.
+func launchArgs(meta *Meta, claudeArgs, codexRoots []string, filesPromptFile string) []string {
 	switch meta.Harness {
 	case string(harness.Codex):
 		return harness.CodexArgs(harness.CodexArgsInput{Model: meta.Model, Effort: meta.Effort, WritableRoots: codexRoots, QuestionTool: isPlainCodex(meta)})
@@ -387,7 +389,7 @@ func launchArgs(meta *Meta, claudeArgs, codexRoots []string) []string {
 		// The other launches ban the tool or never ask a person.
 		args = append(args, harness.ClaudeAskHookArgs()...)
 	}
-	return args
+	return harness.WithGXFilesPrompt(args, filesPromptFile)
 }
 
 // isPlainClaude is a Claude chat with no flow, ticket or fix-of.

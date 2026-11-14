@@ -61,12 +61,16 @@ func tomlString(s string) string {
 
 // WithGXSystemPrompt appends --append-system-prompt GXLoopPrompt to claude
 // args unless args already carry either prompt flag. Only loop launches call
-// it: the Agents tab and gx-design sessions go through Launch without it.
+// it; other sessions get WithGXFilesPrompt.
 func WithGXSystemPrompt(args []string) []string {
-	if slices.Contains(args, "--append-system-prompt") || slices.Contains(args, "--append-system-prompt-file") {
+	if hasPromptFlag(args) {
 		return args
 	}
 	return append(args, "--append-system-prompt", GXLoopPrompt)
+}
+
+func hasPromptFlag(args []string) bool {
+	return slices.Contains(args, "--append-system-prompt") || slices.Contains(args, "--append-system-prompt-file")
 }
 
 // GXSystemPromptFile writes GXLoopPrompt to a file in the user cache dir and
@@ -75,23 +79,47 @@ func WithGXSystemPrompt(args []string) []string {
 // It returns "" when the file cannot be written; callers then pass the text
 // inline.
 func GXSystemPromptFile() string {
+	return promptFile("system-prompt", GXLoopPrompt)
+}
+
+// GXFilesPromptFile is GXSystemPromptFile for the files sentence alone, which
+// every non-loop Claude session gets. It is a separate file: the loop's holds
+// both texts.
+func GXFilesPromptFile() string {
+	return promptFile("files-prompt", GXFilesSentence)
+}
+
+// WithGXFilesPrompt appends the files sentence to claude args, through file
+// (from GXFilesPromptFile) or inline when file is "". It skips args that
+// already carry either prompt flag.
+func WithGXFilesPrompt(args []string, file string) []string {
+	if hasPromptFlag(args) {
+		return args
+	}
+	if file == "" {
+		return append(args, "--append-system-prompt", GXFilesSentence)
+	}
+	return append(args, "--append-system-prompt-file", file)
+}
+
+func promptFile(name, text string) string {
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		return ""
 	}
 	dir = filepath.Join(dir, "gx")
-	path := filepath.Join(dir, "system-prompt.md")
-	if cur, err := os.ReadFile(path); err == nil && string(cur) == GXLoopPrompt {
+	path := filepath.Join(dir, name+".md")
+	if cur, err := os.ReadFile(path); err == nil && string(cur) == text {
 		return path
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return ""
 	}
-	tmp, err := os.CreateTemp(dir, "system-prompt-*.tmp")
+	tmp, err := os.CreateTemp(dir, name+"-*.tmp")
 	if err != nil {
 		return ""
 	}
-	_, werr := tmp.WriteString(GXLoopPrompt)
+	_, werr := tmp.WriteString(text)
 	cerr := tmp.Close()
 	if werr != nil || cerr != nil || os.Rename(tmp.Name(), path) != nil {
 		os.Remove(tmp.Name())

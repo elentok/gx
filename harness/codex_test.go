@@ -182,15 +182,21 @@ func TestCodexHarness_PlainChatArgsReachLaunchAndResume(t *testing.T) {
 	}
 }
 
-func TestCodexHarness_LaunchWithoutSystemPrompt(t *testing.T) {
+func TestCodexHarness_FilesOnlyLaunchCarriesTheSentenceAndResumeNothing(t *testing.T) {
 	t.Parallel()
 	h, err := harness.Lookup(harness.Codex)
 	if err != nil {
 		t.Fatal(err)
 	}
-	launch := h.Launch(harness.LaunchOptions{Args: []string{"--model", "m"}, NoSystemPrompt: true})
-	if !slices.Equal(launch.Args, []string{"--model", "m"}) {
-		t.Errorf("Launch args = %q, want no developer_instructions", launch.Args)
+	opts := harness.LaunchOptions{Args: []string{"--model", "m"}, FilesOnly: true}
+	launch := h.Launch(opts)
+	want := []string{"--model", "m", "-c", "developer_instructions=" + harness.TOMLString(harness.GXFilesSentence)}
+	if !slices.Equal(launch.Args, want) {
+		t.Errorf("Launch args = %q, want %q", launch.Args, want)
+	}
+	resume, _ := h.Resume("abc", opts)
+	if strings.Contains(strings.Join(resume.Args, " "), "developer_instructions") {
+		t.Errorf("Resume args = %q, want no developer_instructions", resume.Args)
 	}
 }
 

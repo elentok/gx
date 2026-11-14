@@ -48,9 +48,9 @@ func TestGXLoopPrompt_AskThenFilesOnOneLine(t *testing.T) {
 	}
 }
 
-// Agents-tab and gx-design sessions go through Launch and Resume as is: the
-// system prompt is the loop path's to add.
-func TestClaudeLaunchAndResume_OmitGXSystemPrompt(t *testing.T) {
+// The harness adds no prompt by itself: its caller's args carry the flag, and
+// launch and resume both pass them on.
+func TestClaudeLaunchAndResume_PromptComesFromTheArgs(t *testing.T) {
 	h, err := harness.Lookup(harness.Claude)
 	if err != nil {
 		t.Fatal(err)
@@ -58,9 +58,52 @@ func TestClaudeLaunchAndResume_OmitGXSystemPrompt(t *testing.T) {
 	launch := h.Launch(harness.LaunchOptions{SessionID: "s"})
 	resume, _ := h.Resume("s", harness.LaunchOptions{})
 	for name, cmd := range map[string]harness.Command{"launch": launch, "resume": resume} {
-		if slices.Contains(cmd.Args, "--append-system-prompt") {
-			t.Errorf("%s args %q carry --append-system-prompt", name, cmd.Args)
+		if slices.Contains(cmd.Args, "--append-system-prompt") || slices.Contains(cmd.Args, "--append-system-prompt-file") {
+			t.Errorf("%s args %q carry a prompt flag by themselves", name, cmd.Args)
 		}
+	}
+	args := harness.WithGXFilesPrompt([]string{"--x"}, "/p/files.md")
+	opts := harness.LaunchOptions{SessionID: "s", Args: args}
+	resume, _ = h.Resume("s", opts)
+	for name, cmd := range map[string]harness.Command{"launch": h.Launch(opts), "resume": resume} {
+		n := 0
+		for _, a := range cmd.Args {
+			if a == "--append-system-prompt-file" {
+				n++
+			}
+		}
+		if n != 1 || !slices.Contains(cmd.Args, "/p/files.md") {
+			t.Errorf("%s args %q, want the files flag once", name, cmd.Args)
+		}
+	}
+}
+
+func TestWithGXFilesPrompt(t *testing.T) {
+	t.Parallel()
+	if got, want := harness.WithGXFilesPrompt([]string{"--x"}, ""), []string{"--x", "--append-system-prompt", harness.GXFilesSentence}; !slices.Equal(got, want) {
+		t.Errorf("inline = %q, want %q", got, want)
+	}
+	for _, flag := range []string{"--append-system-prompt", "--append-system-prompt-file"} {
+		in := []string{flag, "v"}
+		if got := harness.WithGXFilesPrompt(in, "/p/files.md"); !slices.Equal(got, in) {
+			t.Errorf("with %s: args = %q, want unchanged", flag, got)
+		}
+	}
+}
+
+func TestGXFilesPromptFile_HoldsTheSentenceAlone(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	path := harness.GXFilesPromptFile()
+	if path == "" || path == harness.GXSystemPromptFile() {
+		t.Fatalf("path = %q, want its own file", path)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != harness.GXFilesSentence {
+		t.Errorf("file = %q, want the files sentence alone", got)
 	}
 }
 

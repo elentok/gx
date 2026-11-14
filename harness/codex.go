@@ -127,13 +127,11 @@ const (
 // carry it again (an instruction survives a resume).
 func (codexHarness) Launch(opts LaunchOptions) Command {
 	args := slices.Clone(opts.Args)
-	if !opts.NoSystemPrompt {
-		prompt := GXSystemPromptFor(Codex)
-		if opts.FilesOnly {
-			prompt = GXFilesSentence
-		}
-		args = append(args, "-c", "developer_instructions="+tomlString(prompt))
+	prompt := GXSystemPromptFor(Codex)
+	if opts.FilesOnly {
+		prompt = GXFilesSentence
 	}
+	args = append(args, "-c", "developer_instructions="+tomlString(prompt))
 	return codexCommand(args, opts.Env)
 }
 

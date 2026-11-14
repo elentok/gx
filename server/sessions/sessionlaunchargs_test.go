@@ -10,6 +10,42 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+const testFilesPrompt = "/cache/gx/files-prompt.md"
+
+// Every kind of Claude session, new or resumed, carries the files-only flag
+// and never the ask text; a Codex session's args carry no prompt flag (its
+// launch option adds the sentence, tested in the harness package).
+func TestLaunchArgs_FilesPromptReachesClaudeLaunchAndResume(t *testing.T) {
+	t.Parallel()
+	h, err := harness.Lookup(harness.Claude)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, meta := range []Meta{
+		{Harness: "claude"},
+		{Harness: "claude", Flow: tickets.FlowDesign},
+		{Harness: "claude", Flow: tickets.FlowTriage, FlowKey: "proj"},
+		{Harness: "claude", Ticket: "gx:e/01"},
+		{Harness: "claude", FixOf: "gx:e/01"},
+	} {
+		opts := harness.LaunchOptions{SessionID: "s", Args: launchArgs(&meta, nil, nil, testFilesPrompt)}
+		resume, _ := h.Resume("s", opts)
+		for name, cmd := range map[string]harness.Command{"launch": h.Launch(opts), "resume": resume} {
+			i := slices.Index(cmd.Args, "--append-system-prompt-file")
+			if i < 0 || cmd.Args[i+1] != testFilesPrompt || slices.Contains(cmd.Args[i+1:], "--append-system-prompt-file") {
+				t.Errorf("%+v %s args %q, want the files flag once", meta, name, cmd.Args)
+			}
+			if strings.Contains(strings.Join(cmd.Args, " "), "gx tickets ask") {
+				t.Errorf("%+v %s args carry the ask text", meta, name)
+			}
+		}
+	}
+	args := launchArgs(&Meta{Harness: "codex"}, nil, nil, testFilesPrompt)
+	if slices.Contains(args, "--append-system-prompt-file") {
+		t.Errorf("codex args %q carry a Claude prompt flag", args)
+	}
+}
+
 func TestLaunchArgs(t *testing.T) {
 	t.Parallel()
 	claudeArgs := []string{"--verbose"}
@@ -26,6 +62,7 @@ func TestLaunchArgs(t *testing.T) {
 		{"claude triage bans AskUserQuestion", Meta{Harness: "claude", Flow: tickets.FlowTriage, FlowKey: "proj"}, claudeArgs, []string{"--verbose", "--disallowedTools", "AskUserQuestion"}},
 		{"codex without a model or effort gets the shape only", Meta{Harness: "codex", RemoteControl: "proj:loop/01"}, claudeArgs, harness.CodexArgs(harness.CodexArgsInput{WritableRoots: roots, QuestionTool: true})},
 		{"other harnesses get none", Meta{Harness: "agentfake"}, claudeArgs, nil},
+		{"claude-args hold a system prompt", Meta{Harness: "claude"}, []string{"--append-system-prompt", "mine"}, []string{"--append-system-prompt", "mine"}},
 		{"claude model and effort", Meta{Harness: "claude", Model: "sonnet", Effort: "medium"}, claudeArgs, []string{"--verbose", "--model", "sonnet", "--effort", "medium"}},
 		{"claude empty model", Meta{Harness: "claude", Tier: "worker", Effort: "high"}, nil, []string{"--effort", "high"}},
 		{"claude empty effort", Meta{Harness: "claude", Tier: "worker", Model: "opus"}, nil, []string{"--model", "opus"}},
@@ -47,7 +84,10 @@ func TestLaunchArgs(t *testing.T) {
 		if tc.meta.Harness == "claude" && tc.meta.Flow == "" {
 			want = append(slices.Clone(want), harness.ClaudeAskHookArgs()...)
 		}
-		if got := launchArgs(&tc.meta, tc.claudeArgs, roots); !slices.Equal(got, want) {
+		if tc.meta.Harness == "claude" && !slices.Contains(tc.claudeArgs, "--append-system-prompt") {
+			want = append(slices.Clone(want), "--append-system-prompt-file", testFilesPrompt)
+		}
+		if got := launchArgs(&tc.meta, tc.claudeArgs, roots, testFilesPrompt); !slices.Equal(got, want) {
 			t.Errorf("%s: args = %v, want %v", tc.name, got, want)
 		}
 	}
@@ -78,7 +118,7 @@ func TestLaunchArgs_CodexQuestionToolOnPlainChatOnly(t *testing.T) {
 		{"design", Meta{Harness: "codex", Flow: tickets.FlowDesign}, false},
 		{"triage", Meta{Harness: "codex", Flow: tickets.FlowTriage, FlowKey: "proj"}, false},
 	} {
-		args := launchArgs(&tc.meta, nil, []string{"/repo/.git"})
+		args := launchArgs(&tc.meta, nil, []string{"/repo/.git"}, testFilesPrompt)
 		if got := slices.Contains(args, harness.CodexQuestionToolFlag); got != tc.plain {
 			t.Errorf("%s: question tool flag = %v, want %v", tc.name, got, tc.plain)
 		}
@@ -136,7 +176,7 @@ func TestLaunchArgs_ClaudeAskHookOnPlainLaunchOnly(t *testing.T) {
 		{"queue ticket", Meta{Harness: "claude", Ticket: "gx:e/01"}, false},
 		{"fix", Meta{Harness: "claude", FixOf: "gx:e/01"}, false},
 	} {
-		if got := askHookInSettings(t, launchArgs(&tc.meta, []string{"--verbose"}, nil)); got != tc.want {
+		if got := askHookInSettings(t, launchArgs(&tc.meta, []string{"--verbose"}, nil, testFilesPrompt)); got != tc.want {
 			t.Errorf("%s: ask hook installed = %v, want %v", tc.name, got, tc.want)
 		}
 	}
