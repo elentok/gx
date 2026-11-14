@@ -2,23 +2,23 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
-import type { DiffFiles } from "../generated/server"
+import type { DiffRange } from "../generated/server"
 import { appRoutes } from "../routes"
 import { renderThemed } from "../ui/render"
 import type { DiffFilesResult, FetchDiffFiles } from "./api"
 
 afterEach(cleanup)
 
-const range = (over: Partial<DiffFiles["DiffRange"]> = {}): DiffFiles["DiffRange"] => ({
+const range = (over: Partial<DiffRange> = {}): DiffRange => ({
   first_sha: "a",
   second_sha: "b",
   merge_base: "a",
   ...over,
 })
 const file = { path: "a.go", status: "M", added: 1, deleted: 0 }
-const files = (n: number, over: Partial<DiffFiles["DiffRange"]> = {}): DiffFilesResult => ({
+const files = (n: number, over: Partial<DiffRange> = {}): DiffFilesResult => ({
   kind: "files",
-  files: { DiffRange: range(over), files: Array.from({ length: n }, () => file) },
+  files: { ...range(over), files: Array.from({ length: n }, () => file) },
 })
 
 function render(path: string, fetchFiles: FetchDiffFiles) {
@@ -127,7 +127,7 @@ test("no common history is a neutral notice like No changes", async () => {
   render(OPEN, async () => files(0, { no_common_history: true }))
   const n = await notice()
   expect(n.textContent).toContain("No common history")
-  expect(n.querySelector("[data-tone]")?.getAttribute("data-tone")).toBe("muted")
+  expect(n.getAttribute("data-tone")).toBe("muted")
   editable()
 })
 
@@ -139,7 +139,7 @@ test("an epic with empty refs shows No diff recorded and fetches nothing", async
   expect(n.textContent).toContain(
     "gx has no exact range for this epic. Type two refs above to compare them.",
   )
-  expect(n.querySelector("[data-tone]")?.getAttribute("data-tone")).toBe("waiting")
+  expect(n.getAttribute("data-tone")).toBe("waiting")
   expect(fetchFiles).not.toHaveBeenCalled()
   await base()
   editable()
@@ -149,7 +149,7 @@ test("unavailable commits show an amber notice in the same area", async () => {
   render(OPEN, async () => files(0, { commits_unavailable: true }))
   const n = await notice()
   expect(n.textContent).toContain("Commits not available in this clone")
-  expect(n.querySelector("[data-tone]")?.getAttribute("data-tone")).toBe("waiting")
+  expect(n.getAttribute("data-tone")).toBe("waiting")
   editable()
 })
 

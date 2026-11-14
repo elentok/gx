@@ -1,8 +1,12 @@
 import { apiFetch } from "../apiFetch"
-import type { DiffFiles } from "../generated/server"
+import type { DiffFiles, DiffRange } from "../generated/server"
+
+// The Go DiffFiles embeds DiffRange, so the JSON is flat. The generated type nests it under
+// "DiffRange", which the server never sends.
+export type DiffFilesBody = Omit<DiffFiles, "DiffRange"> & DiffRange
 
 export type DiffFilesResult =
-  | { kind: "files"; files: DiffFiles }
+  | { kind: "files"; files: DiffFilesBody }
   /** The server answered 400 and named the field that does not resolve. */
   | { kind: "unknown-ref"; side: "first" | "second" }
 

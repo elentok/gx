@@ -4,7 +4,6 @@ import { useSearchParams } from "react-router"
 import { DetailPage } from "../page/DetailPage"
 import { PageHeader } from "../page/PageHeader"
 import { Button } from "../ui/button/Button"
-import { EmptyState } from "../ui/empty-state/EmptyState"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { useDevice } from "../useWide"
 import { useReadyWhen } from "../useReady"
@@ -58,18 +57,30 @@ function RefInput({
 
 function ViewToggle({ view, onChange }: { view: DiffView; onChange: (v: DiffView) => void }) {
   return (
-    <Box data-testid="view-toggle" role="group" aria-label="Diff layout" display="flex" gap="1">
+    <Box
+      data-testid="view-toggle"
+      role="group"
+      aria-label="Diff layout"
+      display="flex"
+      border="1px solid"
+      borderColor="border"
+      borderRadius="8px"
+      overflow="hidden"
+    >
       {(["split", "unified"] as const).map((v) => (
-        <Button
+        <chakra.button
           key={v}
-          size="md"
-          tone={v === view ? "running" : "muted"}
-          emphasis={v === view ? "secondary" : "ghost"}
+          type="button"
           aria-pressed={v === view}
           onClick={() => onChange(v)}
+          h="38px"
+          px="3"
+          fontSize="sm"
+          bg={v === view ? "tone.running.bg" : "transparent"}
+          color={v === view ? "text" : "text.muted"}
         >
           {v === "split" ? "Split" : "Unified"}
-        </Button>
+        </chakra.button>
       ))}
     </Box>
   )
@@ -87,10 +98,24 @@ function Notice({
   children: string
 }) {
   return (
-    <Box data-testid="notice" data-kind={kind} mt="6">
-      <EmptyState tone={tone} title={title}>
+    <Box
+      data-testid="notice"
+      data-kind={kind}
+      data-tone={tone}
+      mt="4"
+      px="4"
+      py="3"
+      bg="surface.raised"
+      border="1px solid"
+      borderColor={tone === "muted" ? "border" : `tone.${tone}.fg`}
+      borderRadius="8px"
+    >
+      <Box fontWeight="600" fontSize="md" color="text">
+        {title}
+      </Box>
+      <Box mt="1" fontSize="sm" color="text.muted">
         {children}
-      </EmptyState>
+      </Box>
     </Box>
   )
 }
@@ -135,7 +160,7 @@ function noticeOf(
       invalid: result.side,
     }
   }
-  const { DiffRange: range, files } = result.files
+  const { files, ...range } = result.files
   if (range.commits_unavailable) {
     return {
       notice: (

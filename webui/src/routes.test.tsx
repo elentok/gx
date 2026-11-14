@@ -126,7 +126,9 @@ test("/diff renders the Diff page through the lazy chunk and asks for the file l
   const diffFiles = vi.fn(async () => ({
     kind: "files" as const,
     files: {
-      DiffRange: { first_sha: "a", second_sha: "b", merge_base: "a" },
+      first_sha: "a",
+      second_sha: "b",
+      merge_base: "a",
       files: [],
     },
   }))
