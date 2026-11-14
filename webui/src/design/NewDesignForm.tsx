@@ -22,6 +22,7 @@ import { AttachButton, imageFiles, useAttachIcon } from "./ComposerImages"
 import { DraftSlots, type DraftImages as DraftImagesState } from "./useDraftImages"
 import { useShell } from "../shell/ShellContext"
 import { DraftIcon } from "../shell/SidebarRows"
+import { MascotToggle } from "../shell/MascotToggle"
 import { useEpicList } from "../epics/list"
 import { DetailPage } from "../page/DetailPage"
 import { designHref } from "../hrefs"
@@ -197,6 +198,9 @@ function DraftForm({
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
   const [confirming, setConfirming] = useState(false)
+  // Like PageHeader: the mascot toggle leads this header, so the shell drops its floating one.
+  const claimHeader = shell?.claimHeader
+  useEffect(() => claimHeader?.(), [claimHeader])
   useDraftLifecycle({ drafts, autosave })
 
   const removeNow = () => {
@@ -266,6 +270,7 @@ function DraftForm({
         overflow="hidden"
       >
         <Box display="flex" alignItems="center" gap="2" px="3" pt="3" flexShrink="0">
+          <MascotToggle />
           <DraftIcon />
           <Text
             as="h1"
