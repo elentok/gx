@@ -18,10 +18,10 @@ const (
 
 // EpicActions are the plan actions whose row goes to an epic; a merge may only
 // target a row with one of them.
-var EpicActions = []string{"ready", "map"}
+var EpicActions = []string{"ready", ActionArea, "map"}
 
-// Plan actions.
-var planActions = []string{"ready", "map", "merge", "close", "keep"}
+// Plan actions. "map" is the version 1 name of area and stays readable.
+var planActions = []string{"ready", ActionArea, "map", "merge", "close", "keep"}
 
 // ErrAlreadyApproved is returned by Approve when the step is past approve.
 var ErrAlreadyApproved = errors.New("already approved")
@@ -233,9 +233,27 @@ func (s *Store) SavePlan(id string, revision int, plan []PlanRow, gone []string)
 			if err := checkQuestions(row, p); err != nil {
 				return err
 			}
+			if p.Action == "ready" {
+				if p.Fallback == "" {
+					p.Fallback = row.Fallback
+				}
+				if p.Fallback == "" && slices.ContainsFunc(p.Questions, func(q Question) bool { return q.Kind == QuestionAsk }) {
+					return phaseErr("row %s: a ready row with an ask question needs a fallback area", p.RowID)
+				}
+			}
+			if p.Action == ActionArea {
+				if p.Destination == "" {
+					return phaseErr("row %s: a row to an area needs the area name", p.RowID)
+				}
+				if err := rec.checkAreaCap(s.projectDir, p.Destination); err != nil {
+					return err
+				}
+			}
+			if p.Fallback != "" {
+				row.Fallback = p.Fallback
+			}
 			p := p
 			row.Plan = &p
-			applyAutoAnswers(row, p)
 		}
 		if !rec.planPending() {
 			rec.assignGroups()
@@ -346,21 +364,7 @@ func (r *Row) AskedQuestions() []Question {
 	return slices.DeleteFunc(r.AllQuestions(), func(q Question) bool { return q.Kind == QuestionDesign })
 }
 
-// applyAutoAnswers answers the plan's auto questions with their default. An
-// answer the person already gave stays.
-func applyAutoAnswers(row *Row, p PlanRow) {
-	for _, q := range p.Questions {
-		if !q.Auto || q.Kind != QuestionAsk || row.Person.Answers[q.ID] != "" {
-			continue
-		}
-		if row.Person.Answers == nil {
-			row.Person.Answers = map[string]string{}
-		}
-		row.Person.Answers[q.ID] = q.Default
-	}
-}
-
-// Question option limits: a quick question is a pick from a short list.
+// Question option limits: an ask question is a pick from a short list.
 const (
 	minOptions = 2
 	maxOptions = 4
@@ -368,8 +372,9 @@ const (
 
 // checkQuestions refuses a plan row whose questions the person could not answer
 // from the Questions view: every verdict question must come back in the plan, and
-// every quick question needs 2 to 4 distinct options and a recommended default
-// that is one of them. A design question travels with its ticket and needs neither.
+// every ask question needs 2 to 4 distinct options and a recommended default
+// that is one of them. A design or decide question follows the same rule only
+// when it sends options or a recommendation.
 func checkQuestions(row *Row, p PlanRow) error {
 	for _, vq := range row.Questions {
 		if !slices.ContainsFunc(p.Questions, func(q Question) bool { return q.ID == vq.ID }) {
@@ -377,24 +382,8 @@ func checkQuestions(row *Row, p PlanRow) error {
 		}
 	}
 	for _, q := range p.Questions {
-		if q.Kind != QuestionAsk {
-			continue
-		}
-		if q.Text == "" {
-			return phaseErr("row %s question %s: the text is empty", p.RowID, q.ID)
-		}
-		opts := map[string]bool{}
-		for _, o := range q.Options {
-			if o == "" || opts[o] {
-				return phaseErr("row %s question %s: options must be non-empty and distinct", p.RowID, q.ID)
-			}
-			opts[o] = true
-		}
-		if len(q.Options) < minOptions || len(q.Options) > maxOptions {
-			return phaseErr("row %s question %s: a quick question needs %d to %d options, got %d", p.RowID, q.ID, minOptions, maxOptions, len(q.Options))
-		}
-		if !opts[q.Default] {
-			return phaseErr("row %s question %s: the default %q must be one of the options (the recommended one)", p.RowID, q.ID, q.Default)
+		if err := checkOptions("row "+p.RowID, q); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -430,8 +419,11 @@ func (s *Store) Approve(id string, revision int) (*Record, error) {
 			if orphans := rec.MergeOrphans(); len(orphans) > 0 {
 				return phaseErr("approve is refused: %v merge into a row that is no longer a ready or map epic", orphans)
 			}
-			if n := rec.OpenQuestions(); n > 0 {
-				return phaseErr("approve is refused: %d questions are still open", n)
+			if _, open, ok := rec.OpenRound(); ok {
+				return phaseErr("approve is refused: %d questions of a saved round are still open", len(open))
+			}
+			if areas := rec.unconfirmedAreas(); len(areas) > 0 {
+				return phaseErr("approve is refused: areas %v are not confirmed", areas)
 			}
 			rec.Approved = true
 			rec.Step = tickets.StepWrite

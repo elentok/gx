@@ -39,7 +39,7 @@ func show(t *testing.T, f rigs.DesignsFixture) wire.TriageView {
 
 func TestView_ExposesTheActionsThatTakeAnEpic(t *testing.T) {
 	f, _ := startViewFixture(t)
-	if got, want := show(t, f).EpicActions, []string{"ready", "map"}; !slices.Equal(got, want) {
+	if got, want := show(t, f).EpicActions, []string{"ready", "area", "map"}; !slices.Equal(got, want) {
 		t.Fatalf("epic_actions = %v, want %v", got, want)
 	}
 }
@@ -96,7 +96,7 @@ func TestView_RecordAtEachStep(t *testing.T) {
 	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrB, Verdict: "fixed"}))
 	q := triagerec.Question{ID: "q1", Text: "Which area?\nmore detail", Kind: triagerec.QuestionAsk, Options: []string{"x", "y"}, Default: "x"}
 	rec = mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
-		{RowID: addrA, Action: "ready", Questions: []triagerec.Question{q}},
+		{RowID: addrA, Action: "ready", Fallback: "core", Questions: []triagerec.Question{q}},
 		{RowID: addrB, Action: "close", Destination: "fixed already"},
 	}, nil))
 	v = show(t, f)

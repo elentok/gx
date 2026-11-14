@@ -69,7 +69,7 @@ func toApproveAsking(t *testing.T, store *triagerec.Store) (*triagerec.Record, s
 	}
 	q := triagerec.Question{ID: "q1", Text: "Keep it?", Kind: triagerec.QuestionAsk, Options: []string{"yes", "no"}, Default: "no"}
 	rec = mustRec(store.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
-		{RowID: a, Action: "ready", Questions: []triagerec.Question{q}},
+		{RowID: a, Action: "ready", Fallback: "core", Questions: []triagerec.Question{q}},
 		{RowID: b, Action: "ready"},
 	}, nil))
 	return rec, a

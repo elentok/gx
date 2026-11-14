@@ -269,9 +269,15 @@ func TestTriage_ApproveAfterRowSaveWithOldRevisionIsStale(t *testing.T) {
 }
 
 func TestTriage_ApproveRefusedWhileQuestionOpen(t *testing.T) {
-	repo := triageProject(t)
-	s := triageAtApprove(t, repo, true)
-	_, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(s.Revision))
+	repo, project := triageProjectDir(t)
+	s := triageAtApprove(t, repo, false)
+	// The CLI has no round verb yet (triage-verbs-wire), so save the round in the store.
+	q := triage.Question{ID: "q1", RowID: s.Rows[0].Address, Text: "which?", Kind: triage.QuestionAsk, Options: []string{"a", "b"}, Default: "a"}
+	rec, err := triage.NewStore(project).SaveRound(s.ID, s.Revision, []triage.Question{q}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(rec.Revision))
 	if err == nil || !strings.Contains(err.Error(), "open") {
 		t.Errorf("approve with open question = %v, want refusal", err)
 	}

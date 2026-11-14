@@ -77,14 +77,15 @@ func TestApprove_OpenQuestionIsRefused(t *testing.T) {
 	}))
 	rec = mustRec(store.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: b}))
 	rec = mustRec(store.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
-		{RowID: a, Action: "ready", Questions: []triagerec.Question{{ID: "q1", Text: "which?", Kind: triagerec.QuestionAsk, Options: []string{"x", "y"}, Default: "x"}}},
+		{RowID: a, Action: "ready", Fallback: "core", Questions: []triagerec.Question{{ID: "q1", Text: "which?", Kind: triagerec.QuestionAsk, Options: []string{"x", "y"}, Default: "x"}}},
 		{RowID: b, Action: "ready"},
 	}, nil))
+	rec = mustRec(store.SaveRound(rec.ID, rec.Revision, []triagerec.Question{{ID: "q1", RowID: a, Text: "which?", Kind: triagerec.QuestionAsk, Options: []string{"x", "y"}, Default: "x"}}, false))
 	res := approve(t, f, approveReq(rec))
 	if !res.Refused || res.Reason != wire.ReasonTriagePhase {
 		t.Fatalf("approve = %+v, want refused while a question is open", res)
 	}
-	rec = mustRec(store.SetPerson(rec.ID, rec.Revision, a, triagerec.PersonFields{Answers: map[string]string{"q1": "x"}}))
+	rec = mustRec(store.SaveAnswer(rec.ID, rec.Revision, "q1", "x"))
 	if res := approve(t, f, approveReq(rec)); res.Refused {
 		t.Fatalf("approve after answering = %+v", res)
 	}

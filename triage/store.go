@@ -142,6 +142,8 @@ type PlanRow struct {
 	OverlapWith []string   `json:"overlapWith,omitempty"`
 	// Estimate is the row's size estimate for a ready row, such as "12K".
 	Estimate string `json:"estimate,omitempty"`
+	// Fallback is the area a ready row goes to when its own area is unusable.
+	Fallback string `json:"fallback,omitempty"`
 }
 
 // PersonFields are what the person decided for a row.

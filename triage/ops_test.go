@@ -467,7 +467,7 @@ func TestPlan_QuickQuestionsNeedOptionsAndADefault(t *testing.T) {
 	for name, q := range cases {
 		t.Run(name, func(t *testing.T) {
 			s, rec := atPlan(t)
-			if _, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Questions: []Question{q}}, {RowID: rowB, Action: "close"}}, nil); err == nil {
+			if _, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Fallback: "core", Questions: []Question{q}}, {RowID: rowB, Action: "close"}}, nil); err == nil {
 				t.Fatal("want the plan refused")
 			}
 		})
@@ -490,7 +490,7 @@ func TestPlan_EveryVerdictQuestionComesBackInThePlan(t *testing.T) {
 		t.Fatal("want the plan refused: the verdict question has no plan question")
 	}
 	q := Question{ID: "q1", Text: "Fix it where?", Kind: QuestionAsk, Options: []string{"parser", "caller"}, Default: "parser"}
-	rec, err = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Questions: []Question{q}}, {RowID: rowB, Action: "close"}}, nil)
+	rec, err = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Fallback: "core", Questions: []Question{q}}, {RowID: rowB, Action: "close"}}, nil)
 	rec = must(t, rec, err)
 	got := rec.Rows[0].AllQuestions()
 	if len(got) != 1 || got[0].Text != "Fix it where?" || got[0].Default != "parser" {
@@ -498,24 +498,23 @@ func TestPlan_EveryVerdictQuestionComesBackInThePlan(t *testing.T) {
 	}
 }
 
-func TestPlan_AutoQuestionsAreAnsweredWithTheirDefault(t *testing.T) {
+func TestPlan_ReadyRowWithAnAskQuestionNeedsAFallbackArea(t *testing.T) {
 	s, rec := atPlan(t)
-	auto := Question{ID: "q1", Text: "Keep the old flag?", Kind: QuestionAsk, Options: []string{"yes", "no"}, Default: "no", Auto: true}
-	ask := Question{ID: "q2", Text: "Fix it where?", Kind: QuestionAsk, Options: []string{"parser", "caller"}, Default: "parser"}
-	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Questions: []Question{auto, ask}}, {RowID: rowB, Action: "close"}}, nil)
-	rec = must(t, rec, err)
-	if got := rec.Rows[0].Person.Answers; len(got) != 1 || got["q1"] != "no" {
-		t.Fatalf("answers = %v, want only q1=no", got)
+	ask := Question{ID: "q1", Text: "Fix it where?", Kind: QuestionAsk, Options: []string{"parser", "caller"}, Default: "parser"}
+	if _, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Questions: []Question{ask}}, {RowID: rowB, Action: "close"}}, nil); err == nil {
+		t.Fatal("want the plan refused without a fallback area")
 	}
-	if rec.OpenQuestions() != 1 {
-		t.Fatalf("open = %d, want 1", rec.OpenQuestions())
+	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Fallback: "core", Questions: []Question{ask}}, {RowID: rowB, Action: "close"}}, nil)
+	rec = must(t, rec, err)
+	if rec.Rows[0].Fallback != "core" || len(rec.Rows[0].Person.Answers) != 0 {
+		t.Fatalf("row = %+v: the fallback is saved and no question is auto-answered", rec.Rows[0])
 	}
 }
 
 func TestSendBack_KeepsTheAnswersAsEarlierRoundsAndReturnsToPlan(t *testing.T) {
 	s, rec := atPlan(t)
 	q := Question{ID: "q1", Text: "Fix it where?", Kind: QuestionAsk, Options: []string{"parser", "caller"}, Default: "parser"}
-	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Destination: "x", Questions: []Question{q}}, {RowID: rowB, Action: "close"}}, nil)
+	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Destination: "x", Fallback: "core", Questions: []Question{q}}, {RowID: rowB, Action: "close"}}, nil)
 	rec = must(t, rec, err)
 	if _, err := s.SendBack(rec.ID, rec.Revision); err == nil {
 		t.Fatal("want send back refused while a question is open")
@@ -539,7 +538,7 @@ func TestSendBack_KeepsTheAnswersAsEarlierRoundsAndReturnsToPlan(t *testing.T) {
 	}
 	// The agent plans again; the new round starts with no answers and approve is back.
 	q2 := Question{ID: "q1", Text: "Which caller?", Kind: QuestionAsk, Options: []string{"a", "b"}, Default: "a"}
-	rec, err = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Questions: []Question{q2}}, {RowID: rowB, Action: "close"}}, nil)
+	rec, err = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Fallback: "core", Questions: []Question{q2}}, {RowID: rowB, Action: "close"}}, nil)
 	rec = must(t, rec, err)
 	if rec.Step != "questions" || rec.OpenQuestions() != 1 {
 		t.Fatalf("step %s open %d", rec.Step, rec.OpenQuestions())
