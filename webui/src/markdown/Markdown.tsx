@@ -1,27 +1,110 @@
 import { Box, type BoxProps } from "@chakra-ui/react"
-import { memo, useMemo } from "react"
+import { memo, type ReactNode, useMemo } from "react"
 import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { FileLink } from "../files/FileLink"
+import { useFileLinks, useFoundFile } from "../files/FileLinkContext"
+import { detectPaths } from "../files/paths"
+import { remarkFileCandidates } from "../files/remarkCandidates"
 
-const inlineElements = ["strong", "em", "del", "code", "a"]
+const inlineElements = ["strong", "em", "del", "code", "a", "span"]
 
 const remarkPlugins = [remarkGfm]
+const remarkPluginsWithFiles = [remarkGfm, remarkFileCandidates]
 
 const siblingTicketLink = /^(?:issues\/)?(\d+)-[^/]*\.md$/
 
-function linkComponent(epic: string | undefined): Components["a"] {
-  return function MarkdownLink({ href, children }) {
-    if (href && /^https?:\/\//i.test(href)) {
+function decode(href: string) {
+  try {
+    return decodeURI(href)
+  } catch {
+    return href
+  }
+}
+
+// A link target that is neither http(s) nor a sibling ticket: a file path, maybe with a `#heading`.
+function FileTarget({ href, children }: { href: string; children?: ReactNode }) {
+  const ctx = useFileLinks()
+  const target = decode(href)
+  const hash = target.indexOf("#")
+  const pathPart = hash < 0 ? target : target.slice(0, hash)
+  const heading = hash < 0 ? undefined : target.slice(hash + 1) || undefined
+  const hit = pathPart ? detectPaths(pathPart, { wholeText: true })[0] : undefined
+  const found = useFoundFile(hit?.path)
+  if (!pathPart) {
+    if (!ctx?.file || !heading) return <>{children}</>
+    return (
+      <FileLink path={ctx.file} heading={heading}>
+        {children}
+      </FileLink>
+    )
+  }
+  if (!found?.path) return <>{children}</>
+  return (
+    <FileLink path={found.path} line={hit?.line} heading={heading}>
+      {children}
+    </FileLink>
+  )
+}
+
+function Candidate({
+  path,
+  line,
+  children,
+}: {
+  path: string
+  line?: number
+  children?: ReactNode
+}) {
+  const found = useFoundFile(path)
+  if (!found?.path) return <>{children}</>
+  return (
+    <FileLink path={found.path} line={line}>
+      {children}
+    </FileLink>
+  )
+}
+
+function candidateProps(props: object) {
+  const p = props as { "data-file-candidate"?: string; "data-line"?: string }
+  const path = p["data-file-candidate"]
+  if (!path) return null
+  return { path, line: p["data-line"] ? Number(p["data-line"]) : undefined }
+}
+
+function buildComponents(epic: string | undefined, files: boolean): Components {
+  const components: Components = {
+    a: function MarkdownLink({ href, children }) {
+      if (href && /^https?:\/\//i.test(href)) {
+        return (
+          <a href={href} target="_blank" rel="noopener noreferrer">
+            {children}
+          </a>
+        )
+      }
+      const id = href?.match(siblingTicketLink)?.[1]
+      if (epic && id) return <a href={`#/t/${epic}/${id}`}>{children}</a>
+      if (files && href) return <FileTarget href={href}>{children}</FileTarget>
+      return <>{children}</>
+    },
+  }
+  if (files) {
+    components.span = function MarkdownSpan({ node: _node, children, ...rest }) {
+      const c = candidateProps(rest)
+      if (!c) return <span {...rest}>{children}</span>
+      return <Candidate {...c}>{children}</Candidate>
+    }
+    components.code = function MarkdownCode({ node: _node, children, ...rest }) {
+      const c = candidateProps(rest)
+      if (!c) return <code {...rest}>{children}</code>
       return (
-        <a href={href} target="_blank" rel="noopener noreferrer">
-          {children}
-        </a>
+        <code>
+          <Candidate {...c}>{children}</Candidate>
+        </code>
       )
     }
-    const id = href?.match(siblingTicketLink)?.[1]
-    if (epic && id) return <a href={`#/t/${epic}/${id}`}>{children}</a>
-    return <>{children}</>
   }
+  return components
 }
 
 // Server text written in markdown, such as an epic summary or a ticket body. react-markdown builds
@@ -37,7 +120,8 @@ export const Markdown = memo(function Markdown({
   inline,
   ...box
 }: { children: string; epic?: string; smallHeadings?: boolean; inline?: boolean } & BoxProps) {
-  const components = useMemo(() => ({ a: linkComponent(epic) }), [epic])
+  const files = useFileLinks() !== null
+  const components = useMemo(() => buildComponents(epic, files), [epic, files])
   return (
     <Box
       as={inline ? "span" : undefined}
@@ -91,7 +175,7 @@ export const Markdown = memo(function Markdown({
       }}
     >
       <ReactMarkdown
-        remarkPlugins={remarkPlugins}
+        remarkPlugins={files ? remarkPluginsWithFiles : remarkPlugins}
         components={components}
         allowedElements={inline ? inlineElements : undefined}
         unwrapDisallowed={inline}
