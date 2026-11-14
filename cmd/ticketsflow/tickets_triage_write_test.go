@@ -466,3 +466,111 @@ func TestTriageEpics_RecordedBeforeEpicAddSoARerunIsKnown(t *testing.T) {
 		t.Error("a second ready epic was accepted")
 	}
 }
+
+type moveLocateOut struct {
+	Exists  bool     `json:"exists"`
+	Move    []string `json:"move"`
+	Claimed []string `json:"claimed"`
+	Stamped bool     `json:"stamped"`
+	Archive bool     `json:"archive"`
+}
+
+func moveLocate(t *testing.T, repo, epic string) moveLocateOut {
+	t.Helper()
+	out, err := runIn(t, repo, "tickets", "triage", "move-locate", "--epic", epic)
+	if err != nil {
+		t.Fatalf("move-locate: %v", err)
+	}
+	var l moveLocateOut
+	if err := json.Unmarshal([]byte(out), &l); err != nil {
+		t.Fatalf("move-locate json %q: %v", out, err)
+	}
+	return l
+}
+
+// triageAtRoute is a verified Triage still at route; the plan is saved after
+// the moves.
+func triageAtRoute(t *testing.T, repo string) []string {
+	t.Helper()
+	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
+		t.Fatal(err)
+	}
+	rows := triagePending(t, repo)
+	for _, addr := range rows {
+		if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", addr); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return rows
+}
+
+func TestTriageMoves_SavedPendingAndAWaitingEpicIsRefused(t *testing.T) {
+	repo, project := triageProjectDir(t)
+	writeOldEpic(t, project, "old-a", "", triagedNote, "open", "claimed")
+	writeOldEpic(t, project, "old-w", "", triagedNote, "claimed", "done")
+	writeOldEpic(t, project, "area-a", "", "")
+	rows := triageAtRoute(t, repo)
+
+	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-w","area":"area-a"}]`, "tickets", "triage", "moves"); err == nil {
+		t.Fatal("an epic with a claimed ticket and nothing to move got a unit")
+	}
+	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-a","area":"missing"}]`, "tickets", "triage", "moves"); err == nil {
+		t.Fatal("an unknown area was accepted")
+	}
+	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-a","area":"area-a"}]`, "tickets", "triage", "moves"); err != nil {
+		t.Fatalf("moves: %v", err)
+	}
+	plan := `[{"rowId":"` + rows[0] + `","action":"ready"},{"rowId":"` + rows[1] + `","action":"ready"}]`
+	if _, err := runInStdin(t, repo, plan, "tickets", "triage", "plan"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runIn(t, repo, "tickets", "triage", "show", "--json")
+	if err != nil || !strings.Contains(out, `"oldEpic": "old-a"`) || !strings.Contains(out, `"state": "pending"`) {
+		t.Fatalf("show = %q, %v", out, err)
+	}
+}
+
+func TestTriageMoveLocate_ReadsTheStoreSoARerunSkipsWhatHappened(t *testing.T) {
+	repo, project := triageProjectDir(t)
+	writeOldEpic(t, project, "old-a", "", triagedNote, "open", "draft", "claimed", "done")
+	got := moveLocate(t, repo, "old-a")
+	if !got.Exists || len(got.Move) != 2 || len(got.Claimed) != 1 || got.Archive || got.Stamped {
+		t.Fatalf("locate = %+v", got)
+	}
+	writeOldEpic(t, project, "old-b", "completed_at: 2026-11-01T00:00:00Z\n", triagedNote, "done", "cancelled")
+	got = moveLocate(t, repo, "old-b")
+	if !got.Exists || len(got.Move) != 0 || !got.Archive || !got.Stamped {
+		t.Fatalf("stamped locate = %+v", got)
+	}
+	if got := moveLocate(t, repo, "no-such"); got.Exists || got.Archive {
+		t.Fatalf("missing locate = %+v", got)
+	}
+}
+
+func TestTriageMoveState_SavesAtWriteRefusesBefore(t *testing.T) {
+	repo, project := triageProjectDir(t)
+	writeOldEpic(t, project, "old-a", "", triagedNote, "open")
+	writeOldEpic(t, project, "area-a", "", "")
+	rows := triageAtRoute(t, repo)
+	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-a","area":"area-a"}]`, "tickets", "triage", "moves"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runIn(t, repo, "tickets", "triage", "move-state", "--epic", "old-a", "--state", "done"); err == nil {
+		t.Fatal("move-state accepted at route")
+	}
+	plan := `[{"rowId":"` + rows[0] + `","action":"ready"},{"rowId":"` + rows[1] + `","action":"ready"}]`
+	if _, err := runInStdin(t, repo, plan, "tickets", "triage", "plan"); err != nil {
+		t.Fatal(err)
+	}
+	s := triageShow(t, repo)
+	if _, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(s.Revision)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runIn(t, repo, "tickets", "triage", "move-state", "--epic", "old-a", "--state", "failed", "--error", "needs-yes"); err != nil {
+		t.Fatalf("move-state: %v", err)
+	}
+	out, err := runIn(t, repo, "tickets", "triage", "show", "--json")
+	if err != nil || !strings.Contains(out, "needs-yes") {
+		t.Fatalf("show = %q, %v", out, err)
+	}
+}

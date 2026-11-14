@@ -577,3 +577,95 @@ func TestSendBack_OnlyAtApprove(t *testing.T) {
 		t.Fatal("want send back refused at write")
 	}
 }
+
+func TestSaveMoves_PendingAtRouteOnly(t *testing.T) {
+	s, rec := atPlan(t)
+	addTicket(t, s, "old", "01")
+	addTicket(t, s, "area", "01")
+	if _, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Area: "nowhere"}}); err == nil {
+		t.Fatal("unknown area accepted")
+	}
+	rec, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Area: "area", State: MoveDone}})
+	must(t, rec, err)
+	if len(rec.Moves) != 1 || rec.Moves[0].State != MovePending {
+		t.Fatalf("moves = %+v", rec.Moves)
+	}
+	rec, _ = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready"}, {RowID: rowB, Action: "close"}}, nil)
+	if _, err := s.SaveMoves(rec.ID, rec.Revision, nil); err == nil {
+		t.Fatal("moves saved after route")
+	}
+}
+
+func atWriteWithMove(t *testing.T) (*Store, *Record) {
+	s, rec := atPlan(t)
+	addTicket(t, s, "old", "01")
+	addTicket(t, s, "area", "01")
+	rec, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Area: "area"}})
+	must(t, rec, err)
+	rec, err = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready"}, {RowID: rowB, Action: "close"}}, nil)
+	must(t, rec, err)
+	rec, err = s.Approve(rec.ID, rec.Revision)
+	return s, must(t, rec, err)
+}
+
+func TestMoveState_RetryKeepAndStep(t *testing.T) {
+	s, rec := atWriteWithMove(t)
+	if _, err := s.KeepForLater(rec.ID, rec.Revision, "old"); err == nil {
+		t.Fatal("keep accepted on a pending unit")
+	}
+	if _, err := s.Retry(rec.ID, rec.Revision, "old"); err == nil {
+		t.Fatal("retry accepted on a pending unit")
+	}
+	rec, err := s.SaveMoveState(rec.ID, rec.Revision, "old", MoveFailed, "needs-yes")
+	must(t, rec, err)
+	if rec.Moves[0].State != MoveFailed || rec.Moves[0].LastError != "needs-yes" {
+		t.Fatalf("move = %+v", rec.Moves[0])
+	}
+	rec, err = s.Retry(rec.ID, rec.Revision, "old")
+	must(t, rec, err)
+	if rec.Moves[0].State != MovePending {
+		t.Fatalf("move = %+v", rec.Moves[0])
+	}
+	rec, _ = s.SaveMoveState(rec.ID, rec.Revision, "old", MoveFailed, "boom")
+	rec, err = s.KeepForLater(rec.ID, rec.Revision, "old")
+	must(t, rec, err)
+	if rec.Moves[0].State != MoveKept {
+		t.Fatalf("move = %+v", rec.Moves[0])
+	}
+	if _, err := s.SaveMoveState(rec.ID, rec.Revision, "old", "bogus", ""); err == nil {
+		t.Fatal("unknown state accepted")
+	}
+}
+
+func TestMoveState_RefusedOutsideWrite(t *testing.T) {
+	s, rec := atPlan(t)
+	addTicket(t, s, "old", "01")
+	addTicket(t, s, "area", "01")
+	rec, _ = s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Area: "area"}})
+	if _, err := s.SaveMoveState(rec.ID, rec.Revision, "old", MoveDone, ""); err == nil {
+		t.Fatal("move state accepted at route")
+	}
+	if _, err := s.Retry(rec.ID, rec.Revision, "old"); err == nil {
+		t.Fatal("retry accepted at route")
+	}
+	if _, err := s.KeepForLater(rec.ID, rec.Revision, "old"); err == nil {
+		t.Fatal("keep accepted at route")
+	}
+}
+
+func TestDoneRule_EveryUnitDoneOrKept(t *testing.T) {
+	s, rec := atWriteWithMove(t)
+	rec, _ = s.WriteRow(rec.ID, rec.Revision, rowA, WriteDone, nil, "")
+	rec, _ = s.WriteRow(rec.ID, rec.Revision, rowB, WriteDone, nil, "")
+	rec, _ = s.SetLastPass(rec.ID, rec.Revision, true)
+	if rec.State != StateLive {
+		t.Fatal("done with a pending unit")
+	}
+	rec, _ = s.SaveMoveState(rec.ID, rec.Revision, "old", MoveFailed, "boom")
+	if rec.State != StateLive {
+		t.Fatal("done with a failed unit")
+	}
+	rec, err := s.KeepForLater(rec.ID, rec.Revision, "old")
+	must(t, rec, err)
+	assertDone(t, s, rec)
+}

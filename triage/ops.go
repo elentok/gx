@@ -581,11 +581,96 @@ func (s *Store) RecordEpics(id string, revision int, ready string, maps, areas [
 	})
 }
 
-// Retry turns a failed row back to pending. Allowed only at step write.
+// SaveMoves stores the old-epic move units during Route, each pending. It
+// replaces the earlier list. The target area must be an epic of the project or
+// an area entry of the record, and an epic may have one unit.
+func (s *Store) SaveMoves(id string, revision int, units []MoveUnit) (*Record, error) {
+	return s.modify(id, revision, func(rec *Record) error {
+		if err := requireStep(rec, "move units", tickets.StepRoute); err != nil {
+			return err
+		}
+		epics, err := tickets.Load(s.projectDir)
+		if err != nil {
+			return err
+		}
+		var out []MoveUnit
+		for _, u := range units {
+			if u.OldEpic == "" || u.Area == "" {
+				return phaseErr("a move unit needs the old epic and the area")
+			}
+			if slices.ContainsFunc(out, func(o MoveUnit) bool { return o.OldEpic == u.OldEpic }) {
+				return phaseErr("old epic %s has two move units", u.OldEpic)
+			}
+			inRecord := slices.ContainsFunc(rec.Areas, func(a Area) bool { return a.Name == u.Area })
+			if !inRecord && !slices.ContainsFunc(epics, func(e tickets.Epic) bool { return e.Name == u.Area }) {
+				return phaseErr("move unit %s: area %q is not an epic or an area of this triage", u.OldEpic, u.Area)
+			}
+			out = append(out, MoveUnit{OldEpic: u.OldEpic, Area: u.Area, State: MovePending})
+		}
+		rec.Moves = out
+		return nil
+	})
+}
+
+func (r *Record) move(epic string) *MoveUnit {
+	for i := range r.Moves {
+		if r.Moves[i].OldEpic == epic {
+			return &r.Moves[i]
+		}
+	}
+	return nil
+}
+
+// SaveMoveState stores one move unit's state during Write. A failed state keeps
+// the error text; any other state clears it.
+func (s *Store) SaveMoveState(id string, revision int, epic string, state MoveState, lastError string) (*Record, error) {
+	return s.modify(id, revision, func(rec *Record) error {
+		if err := requireStep(rec, "move state", tickets.StepWrite); err != nil {
+			return err
+		}
+		u := rec.move(epic)
+		if u == nil {
+			return fmt.Errorf("no move unit %q in triage %s", epic, rec.ID)
+		}
+		switch state {
+		case MovePending, MoveDone, MoveFailed, MoveKept:
+		default:
+			return phaseErr("unknown move state %q", state)
+		}
+		u.State = state
+		u.LastError = ""
+		if state == MoveFailed {
+			u.LastError = lastError
+		}
+		return nil
+	})
+}
+
+// failedMove returns the unit named by address when it is failed. ok is false
+// when address names no unit.
+func (r *Record) failedMove(address string) (u *MoveUnit, ok bool, err error) {
+	if u = r.move(address); u == nil {
+		return nil, false, nil
+	}
+	if u.State != MoveFailed {
+		return nil, true, phaseErr("move unit %s is %s, not failed", address, u.State)
+	}
+	return u, true, nil
+}
+
+// Retry turns a failed row, or a failed move unit named by its old epic, back
+// to pending. Allowed only at step write.
 func (s *Store) Retry(id string, revision int, address string) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
 		if err := requireStep(rec, "retry", tickets.StepWrite); err != nil {
 			return err
+		}
+		if u, ok, err := rec.failedMove(address); ok {
+			if err != nil {
+				return err
+			}
+			u.State = MovePending
+			return nil
 		}
 		row, err := rec.row(address)
 		if err != nil {
@@ -606,6 +691,13 @@ func (s *Store) KeepForLater(id string, revision int, address string) (*Record, 
 	return s.modify(id, revision, func(rec *Record) error {
 		if err := requireStep(rec, "keep for later", tickets.StepWrite); err != nil {
 			return err
+		}
+		if u, ok, err := rec.failedMove(address); ok {
+			if err != nil {
+				return err
+			}
+			u.State = MoveKept
+			return nil
 		}
 		row, err := rec.row(address)
 		if err != nil {
