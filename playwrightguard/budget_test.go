@@ -51,7 +51,10 @@ import (
 // Hosted files wide flow (+1): the sandbox, the token redirect, the cookie, the hover card and the 30-odd link
 // checks need a real server, a real iframe and real layout; vitest and Go tests (the route matrix in
 // server/web/web_test.go, the detector tests) cover each rule alone but cannot see them together.
-const maxFlows = 145
+// Hosted files phone flow (+1): the bottom sheet needs the real (hover: none) media query, a touch tap and the
+// clipboard in a real browser; FileLinkSheet.test.tsx (vitest) covers the sheet for a forced rule but cannot see
+// the media query. It is its own flow because it needs a touch, 390px context the wide flow does not have.
+const maxFlows = 146
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

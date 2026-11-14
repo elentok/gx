@@ -1,6 +1,6 @@
 import { rm } from "node:fs/promises"
 import { join } from "node:path"
-import { expect, test } from "./fixture"
+import { expect, test, touch } from "./fixture"
 import { ask, go } from "./agentsKit"
 
 test("204. Hosted files, wide", async ({ page, start }) => {
@@ -291,4 +291,67 @@ test("204. Hosted files, wide", async ({ page, start }) => {
   const bare = await start("host-files", { shape: "no-main-worktree" })
   await go(page, `#/t/${bare.hostFiles!.ticket}`)
   await expect(ticketLink(join(bare.hostFiles!.repo, ".scratch/flow.mmd"))).toBeVisible()
+})
+
+// The bottom sheet needs the real (hover: none) media query, so this flow gets its own touch context.
+test.describe("205. Hosted files, phone", () => {
+  test.use({ ...touch, viewport: { width: 390, height: 844 } })
+
+  test("a tap opens the bottom sheet, Copy link copies the viewer link, Open goes to the viewer", async ({
+    page,
+    start,
+  }) => {
+    const fixture = await start("host-files")
+    const hf = fixture.hostFiles!
+    await go(page, "#/")
+    expect(await page.evaluate(() => matchMedia("(hover: none)").matches)).toBe(true)
+
+    const sessionId = (await fixture.cli("agents", "list")).split("\n")[0].split("\t")[0]
+    await go(page, `#/agents/${sessionId}`)
+    await expect(page.getByText("I wrote the plan to")).toBeVisible()
+    const message = page
+      .locator("p, div")
+      .filter({ hasText: /^I wrote the plan to/ })
+      .last()
+    const sheet = page.locator("[data-file-sheet]")
+    const hoverCard = page.locator("[data-file-hover-card][data-state='open']")
+
+    // Story 38: a tap opens the sheet with the preview, Open and Copy link; the page does not navigate.
+    const before = page.url()
+    await message.getByRole("link", { name: "docs/plans/host-files.md" }).tap()
+    await expect(sheet).toBeVisible()
+    await expect(sheet).toContainText("Host files plan")
+    await expect(sheet.getByRole("link", { name: "Open" })).toBeVisible()
+    await expect(sheet.getByRole("button", { name: "Copy link" })).toBeVisible()
+    await expect(hoverCard).toHaveCount(0)
+    expect(page.url()).toBe(before)
+
+    // Story 39: Copy link puts the stable viewer link on the clipboard.
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"])
+    await sheet.getByRole("button", { name: "Copy link" }).tap()
+    await expect(page.getByText("Link copied")).toBeVisible()
+    const copied = await page.evaluate(() => navigator.clipboard.readText())
+    const stable = (
+      await fixture.cli("files", "url", join(hf.repo, "docs/plans/host-files.md"))
+    ).trim()
+    expect(copied).toBe(stable)
+    expect(copied).toContain("#/files/")
+
+    // Tap outside closes the sheet; a Mermaid file shows the same sheet with its own preview.
+    await page.touchscreen.tap(195, 40)
+    await expect(sheet).toHaveCount(0)
+    await message.getByRole("link", { name: "~/dev/gx/.scratch/flow.mmd" }).tap()
+    await expect(sheet).toBeVisible()
+    await expect(sheet.locator("svg")).toBeVisible()
+    await expect(sheet.getByRole("link", { name: "Open" })).toBeVisible()
+    await page.touchscreen.tap(195, 40)
+    await expect(sheet).toHaveCount(0)
+
+    // Open goes to the viewer for that file.
+    await message.getByRole("link", { name: "docs/plans/host-files.md" }).tap()
+    await expect(sheet).toBeVisible()
+    await sheet.getByRole("link", { name: "Open" }).tap()
+    await expect(page).toHaveURL(/#\/files\/.*\/docs\/plans\/host-files\.md/)
+    await expect(page.getByRole("heading", { name: "Host files plan", level: 1 })).toBeVisible()
+  })
 })
