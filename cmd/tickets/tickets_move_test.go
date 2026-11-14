@@ -166,15 +166,21 @@ func TestExecute_TicketsMove_Refusals(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsMove_MapEpicSourceRefusedTargetAllowed(t *testing.T) {
+func TestExecute_TicketsMove_MapEpicSourceRefusedOncePastChartingTargetAllowed(t *testing.T) {
 	f := setupMoveProject(t)
 	testutil.WriteFile(t, filepath.Join(f.project, "atlas", "issues"), "01-m.md",
 		"---\nid: \"01\"\nstatus: open\ntype: implement\n---\n\n# 01\n")
+	testutil.WriteFile(t, filepath.Join(f.project, "atlas"), "ticket.md",
+		"---\nstatus: open\nkind: map\ndesign_step: spec\n---\n\n# Atlas\n")
 
+	before := moveTreeSnapshot(t, f.project)
 	_, err := runIn(t, f.repo, "tickets", "move", "atlas/01", "dst")
 	var ae *tickets.AddressError
-	if !errors.As(err, &ae) || ae.Code != tickets.CodeMoveMapSource {
+	if !errors.As(err, &ae) || ae.Code != tickets.CodeMoveMapSource || !strings.Contains(err.Error(), "Design has started") {
 		t.Fatalf("map source err = %v, want %s", err, tickets.CodeMoveMapSource)
+	}
+	if after := moveTreeSnapshot(t, f.project); after != before {
+		t.Errorf("refusal wrote something:\nbefore %s\nafter  %s", before, after)
 	}
 
 	out, err := runIn(t, f.repo, "tickets", "move", "src/01", "atlas")

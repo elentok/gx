@@ -175,7 +175,9 @@ conversation history.
 - **Move a ticket**: `gx tickets move <addr> <epic> [--slug s] [--dry-run] [--json]` — moves one
   flat, never-run `draft`/`open` ticket to another epic of the same project and rewrites every
   `blocked_by`/`base` reference to it. It refuses a ticket with run history, a `parent` or fork
-  children, one queued or live on the server, and a map-epic source. A map-epic target is allowed.
+  children, one queued or live on the server, and a map-epic source whose Design has started
+  (`design_step` past `chart`; a charting map is a valid source). An area is a valid source and
+  target, and a map target is allowed.
   Prose mentions of the old address are not rewritten; the files that hold one are listed as
   warnings. Use `--dry-run` first.
 - **Close a follow-up**: `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it|promoted

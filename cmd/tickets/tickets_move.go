@@ -50,10 +50,6 @@ func runTicketsMove(d Deps, addr, target, slug string, dryRun, jsonOut bool, w i
 	if info, err := os.Stat(dstEpicPath); err != nil || !info.IsDir() {
 		return ticketmove.MoveRefusal(tickets.CodeUnknownEpic, "no epic %q in project %q", dstEpic, a.Project)
 	}
-	if tickets.IsMapEpic(srcEpicPath) {
-		return ticketmove.MoveRefusal(tickets.CodeMoveMapSource, "epic %q is a map; its tickets cannot be moved out", a.Epic)
-	}
-
 	unlock, err := ticketmove.LockEpics(srcEpicPath, dstEpicPath)
 	if err != nil {
 		return err
