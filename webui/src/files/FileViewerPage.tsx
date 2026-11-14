@@ -34,12 +34,15 @@ const resolveOwnPath: FetchFileResolve = async (path) => {
   return reply
 }
 
+// One look for every bar button: links and the Button component (whose own bold, larger style
+// these props override).
 const linkButtonProps = {
   display: "inline-flex",
   alignItems: "center",
   px: "3",
   h: "30px",
   fontSize: "12.5px",
+  fontWeight: "400",
   borderWidth: "1px",
   borderColor: "border",
   borderRadius: "8px",
@@ -87,7 +90,16 @@ function Bar({
       borderBottomWidth="1px"
       borderColor="border"
     >
-      <Text flex="1" minW="140px" fontFamily="mono" fontSize="12.5px" overflowWrap="anywhere">
+      <Text
+        flex="1"
+        minW="140px"
+        fontFamily="mono"
+        fontSize="12.5px"
+        whiteSpace="nowrap"
+        overflow="hidden"
+        textOverflow="ellipsis"
+        title={path}
+      >
         {path}
       </Text>
       {meta && (
@@ -99,6 +111,7 @@ function Bar({
         <Button
           emphasis="secondary"
           size="sm"
+          {...linkButtonProps}
           data-mock-part="source-toggle"
           aria-pressed={source.on}
           onClick={source.toggle}
@@ -116,7 +129,12 @@ function Bar({
           </chakra.a>
         </>
       )}
-      <Button emphasis="secondary" size="sm" onClick={() => void copyViewerLink(path)}>
+      <Button
+        emphasis="secondary"
+        size="sm"
+        {...linkButtonProps}
+        onClick={() => void copyViewerLink(path)}
+      >
         Copy link
       </Button>
     </Box>
