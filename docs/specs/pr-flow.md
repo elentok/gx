@@ -88,7 +88,7 @@ button. The epic page shows a **PR activity list** of what gx did.
 56. As a person, I want an epic with an open PR to keep PR tracking after I switch to `merge` until the PR merges or closes, so that a switch never orphans a PR.
 57. As a person, I want turning `auto-pr` off while the text ticket runs to let the flow finish, so that a half-started flow does not strand.
 58. As a person, I want Awaiting merge and Awaiting PR epics to follow a changed Delivery on the next tick, and a running text ticket cancelled when a no-PR epic switches to `merge`, so that the setting is honored.
-59. As a person, I want a running Merge ticket to finish when I switch `merge` to `pr`, so that an in-flight merge is not interrupted.
+59. As a person, I want a running Merge ticket to finish without interruption when I switch `merge` to `pr`, and then the epic waits for a PR, so that nothing reaches main behind my back.
 60. As a person, I want `auto-pr` ignored in a `merge` project while the manual Create PR button still works, so that the key has one meaning.
 61. As a person, I want one-offs to stay out of the PR flow, so that commitless work never opens a PR.
 62. As a contributor, I want every new pause kind to have a row in the pause-to-verb table and a web button, so that ADR 0042 holds.
@@ -113,7 +113,7 @@ button. The epic page shows a **PR activity list** of what gx did.
   timeline; the plain Merge action is not offered) until the PR merges or closes, then follows the
   current Delivery. `pr` to `merge` on an Awaiting PR epic makes it Awaiting merge on the next tick
   and cancels a running `pr-text` ticket (no PR opens). `merge` to `pr` makes an Awaiting merge epic
-  Awaiting PR on the next tick; a running Merge ticket finishes and merges. `auto-pr` off while a
+  Awaiting PR on the next tick; a running Merge ticket finishes, nothing is merged, and the epic is Awaiting PR. `auto-pr` off while a
   `pr-text` ticket runs or retries lets it finish and the PR open; `auto-pr` on opens the PR for an
   Awaiting PR epic on the next tick through the same `gh` check as the button.
 
@@ -427,7 +427,7 @@ scenarios below are implementation tickets (`pr-flow-awaiting`, `pr-flow-draft-c
 56. `pr` to `merge` with an open PR: tracking continues, no Merge button; after the PR closes the epic is Awaiting merge.
 57. `auto-pr` off during a running `pr-text` ticket: the PR still opens.
 58. `pr` to `merge` on an Awaiting PR epic with a running text ticket: the ticket is cancelled and no PR opens; `merge` to `pr` on Awaiting merge becomes Awaiting PR.
-59. `merge` to `pr` with a running Merge ticket: it finishes and merges.
+59. `merge` to `pr` with a running Merge ticket: it finishes, main does not move, and the epic is Awaiting PR.
 60. `auto-pr: true` in a `merge` project opens no PR; the manual Create PR still opens one.
 61. A one-off shows no Create PR and opens no PR.
 62. The pause-to-verb table test passes with the "CI failing" and "PR text failed" rows, and Try again clears each.
