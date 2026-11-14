@@ -4,6 +4,7 @@ import { SectionHeading } from "../page/SectionHeading"
 import { Button } from "../ui/button/Button"
 import { Chip } from "../ui/chip/Chip"
 import type { Tone } from "../ui/tone"
+import { WebPerformanceTrend } from "./WebPerformanceTrend"
 
 export type PerfTab = "hard" | "route"
 
@@ -98,6 +99,7 @@ const TABS: { id: PerfTab; label: string }[] = [
 
 export function WebPerformance({
   data,
+  days,
   range,
   tab,
   onTab,
@@ -105,6 +107,7 @@ export function WebPerformance({
   onIncludeDev,
 }: {
   data: StatsWebPerformance
+  days: string[]
   range: number
   tab: PerfTab
   onTab: (tab: PerfTab) => void
@@ -178,6 +181,7 @@ export function WebPerformance({
               <MetricCard key={c.metric} card={c} range={range} />
             ))}
           </Box>
+          <WebPerformanceTrend trends={data.trend} days={days} routes={data.slowest_routes} />
         </>
       )}
     </Box>

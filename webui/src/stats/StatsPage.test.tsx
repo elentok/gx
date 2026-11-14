@@ -492,6 +492,78 @@ test("the empty state leaves out the dev line when no dev samples are hidden", a
   expect(empty).not.toContain("Dev samples")
 })
 
+const trendStats = () =>
+  statsOf(
+    {},
+    {
+      days: ["2026-11-12", "2026-11-13", "2026-11-14"],
+      web_performance: {
+        ...statsOf().web_performance,
+        hard_loads: [perfCard("lcp", 30, { p75: 2000, status: "good" })],
+        route_changes: [perfCard("route_ready", 50, { p75: 420 })],
+        trend: [
+          {
+            metric: "lcp",
+            days: [{ count: 5, p75: 2100 }, { count: 0 }, { count: 40, p75: 2300 }],
+          },
+          {
+            metric: "cls",
+            days: [{ count: 30, p75: 0.04 }, { count: 30, p75: 0.05 }, { count: 30 }],
+          },
+        ],
+        slowest_routes: [
+          { route: "ticket", p75: 780, count: 141 },
+          { route: "stats", p75: 610, count: 6 },
+          { route: "epic", p75: 640, count: 212 },
+        ],
+      },
+    },
+  )
+
+test("the trend shades low-sample days, skips empty days and ignores the tab", async () => {
+  renderStats(async () => trendStats())
+  const svg = await screen.findByRole("img", { name: "daily p75 LCP" })
+  expect(svg.textContent).toContain("fewer than 20 samples")
+  expect(svg.querySelectorAll("[data-testid=trend-low-day]").length).toBe(2)
+  expect(svg.querySelectorAll("[data-testid=trend-point]").length).toBe(2)
+  fireEvent.click(screen.getByRole("button", { name: "Route changes" }))
+  await screen.findByTestId("perf-card-route_ready")
+  expect(screen.getByRole("img", { name: "daily p75 LCP" })).toBeTruthy()
+})
+
+test("the trend picker shows one metric with its own unit and is not in the URL", async () => {
+  const router = renderStats(async () => trendStats())
+  expect((await screen.findByRole("img", { name: "daily p75 LCP" })).textContent).toContain(" s")
+  fireEvent.click(screen.getByRole("button", { name: "CLS" }))
+  const cls = screen.getByRole("img", { name: "daily p75 CLS" })
+  expect(cls.textContent).not.toMatch(/ms| s$/)
+  expect(cls.textContent).toContain("0.05")
+  expect(router.state.location.search).toBe("")
+  for (const l of ["LCP", "INP", "CLS", "FCP", "App ready", "Route ready"]) {
+    expect(screen.getByRole("button", { name: l })).toBeTruthy()
+  }
+})
+
+test("the slowest routes table sorts by p75 and dims routes under 20 samples", async () => {
+  renderStats(async () => trendStats())
+  const table = await screen.findByTestId("slowest-routes")
+  expect([...table.querySelectorAll("tbody tr")].map((r) => r.getAttribute("data-testid"))).toEqual(
+    ["route-row-ticket", "route-row-epic", "route-row-stats"],
+  )
+  const stats = screen.getByTestId("route-row-stats")
+  expect(stats.getAttribute("data-low")).toBe("true")
+  expect(stats.textContent).toContain("6 · not enough")
+  expect(screen.getByTestId("route-row-ticket").getAttribute("data-low")).toBeNull()
+})
+
+test("with no slowest routes the section shows a dash and no table", async () => {
+  const s = trendStats()
+  renderStats(async () => ({ ...s, web_performance: { ...s.web_performance, slowest_routes: [] } }))
+  const box = await screen.findByTestId("slowest-routes")
+  expect(box.querySelector("table")).toBeNull()
+  expect(box.textContent).toContain("—")
+})
+
 test("a bad range falls back to 7 days", async () => {
   const fetchStats = vi.fn<FetchStats>(async () => statsOf())
   renderStats(fetchStats, "/stats?range=5")

@@ -371,6 +371,7 @@ export function StatsPage({
           <Launch stats={stats} />
           <WebPerformance
             data={stats.web_performance}
+            days={stats.days}
             range={range}
             tab={perfTab}
             onTab={(t) => set("perf", t === "hard" ? "" : t)}
