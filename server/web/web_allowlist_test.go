@@ -34,6 +34,23 @@ func TestWeb_EpicDetailIsServed(t *testing.T) {
 	}
 }
 
+func TestWeb_DiffRoutesAreServedReadOnly(t *testing.T) {
+	t.Parallel()
+	h, base := servertest.StartWeb(t)
+	for _, path := range []string{"/v1/diff/files", "/v1/diff/patch", "/v1/diff/commits", "/v1/diff/blob"} {
+		url := base + path + "?project=nope&first=a&second=b"
+		if code, _ := servertest.WebDo(t, h, http.MethodGet, url); code != http.StatusNotFound {
+			t.Errorf("GET %s with cookie = %d, want the handler's 404 for an unknown project", path, code)
+		}
+		if code, _ := servertest.WebDoCookie(t, http.MethodGet, url, nil); code != http.StatusUnauthorized {
+			t.Errorf("GET %s without cookie = %d, want 401", path, code)
+		}
+		if code, _ := servertest.WebDo(t, h, http.MethodPost, url); code == http.StatusOK || code == http.StatusNotFound {
+			t.Errorf("POST %s = %d, want it refused", path, code)
+		}
+	}
+}
+
 func TestWeb_AnswerAndResumeNeedAStateToken(t *testing.T) {
 	t.Parallel()
 	h, base := servertest.StartWeb(t)

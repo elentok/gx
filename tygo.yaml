@@ -9,6 +9,7 @@ packages:
       - designs.go
       - detail.go
       - devstatus.go
+      - diff.go
       - diskwatch.go
       - epicdetail.go
       - epiclist.go

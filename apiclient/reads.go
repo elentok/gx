@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/elentok/gx/server/wire"
 
@@ -188,6 +189,47 @@ func (r *Reads) Stats(ctx context.Context, days int, project string, includeDev 
 	var s wire.Stats
 	err := r.t.get(ctx, "/v1/stats?"+q.Encode(), &s)
 	return s, err
+}
+
+func diffQuery(project, first, second string, commits []string) url.Values {
+	q := url.Values{"project": {project}, "first": {first}, "second": {second}}
+	if len(commits) > 0 {
+		q.Set("commits", strings.Join(commits, ","))
+	}
+	return q
+}
+
+// DiffFiles lists the files the second ref changed since its merge base with
+// the first. commits, when set, narrows it to those commit SHAs.
+func (r *Reads) DiffFiles(ctx context.Context, project, first, second string, commits []string) (wire.DiffFiles, error) {
+	var d wire.DiffFiles
+	err := r.t.get(ctx, "/v1/diff/files?"+diffQuery(project, first, second, commits).Encode(), &d)
+	return d, err
+}
+
+// DiffPatch returns one file's patch of the range, or one patch per selected
+// commit when commits is set.
+func (r *Reads) DiffPatch(ctx context.Context, project, first, second, path string, commits []string) (wire.DiffPatch, error) {
+	q := diffQuery(project, first, second, commits)
+	q.Set("path", path)
+	var d wire.DiffPatch
+	err := r.t.get(ctx, "/v1/diff/patch?"+q.Encode(), &d)
+	return d, err
+}
+
+// DiffCommits lists the range's commits with their canonical ticket addresses.
+func (r *Reads) DiffCommits(ctx context.Context, project, first, second string) (wire.DiffCommits, error) {
+	var d wire.DiffCommits
+	err := r.t.get(ctx, "/v1/diff/commits?"+diffQuery(project, first, second, nil).Encode(), &d)
+	return d, err
+}
+
+// DiffBlob reads the old and new content of one file by the SHAs the file list echoed.
+func (r *Reads) DiffBlob(ctx context.Context, project, base, tip, path string) (wire.DiffBlobs, error) {
+	q := url.Values{"project": {project}, "base": {base}, "tip": {tip}, "path": {path}}
+	var d wire.DiffBlobs
+	err := r.t.get(ctx, "/v1/diff/blob?"+q.Encode(), &d)
+	return d, err
 }
 
 // Tips returns the tips for the server machine's OS.

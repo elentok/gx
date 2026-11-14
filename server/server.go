@@ -36,6 +36,7 @@ import (
 	"github.com/elentok/gx/server/cleanup"
 	"github.com/elentok/gx/server/designs"
 	"github.com/elentok/gx/server/devvite"
+	"github.com/elentok/gx/server/diff"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/epics"
 	harnesschoice "github.com/elentok/gx/server/harness"
@@ -131,6 +132,7 @@ type Server struct {
 	webPerf    *webperf.Store
 	limits     *limits.Limits
 	stats      *stats.Stats
+	diff       *diff.Diff
 	tips       *tips.Tips
 	events     *broker.Broker
 	herdr      *sched.HerdrWatch
@@ -456,6 +458,7 @@ func New(cfg Config) (*Server, error) {
 		TicketStore: cfg.TicketStore, ConversationsDir: cfg.ConversationsDir,
 		Tokens: s.tokens, Burns: s.limits, MapEpics: tokenHost{s}, WebPerf: s.webPerf,
 	})
+	s.diff = diff.New(diff.Deps{TicketStore: cfg.TicketStore, Epics: s.projects.Epics})
 	s.tips = tips.New(tips.Deps{
 		Projects: func() []string {
 			dirs, _ := tickets.ProjectDirs(cfg.TicketStore)

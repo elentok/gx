@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server/budget"
 	"github.com/elentok/gx/server/cleanup"
 	"github.com/elentok/gx/server/designs"
+	"github.com/elentok/gx/server/diff"
 	"github.com/elentok/gx/server/disk"
 	"github.com/elentok/gx/server/epics"
 	harnesschoice "github.com/elentok/gx/server/harness"
@@ -65,6 +66,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		limits.Routes(func() *limits.Limits { return s.limits }),
 		budget.Routes(func() *budget.Budget { return s.budget }),
 		stats.Routes(func() *stats.Stats { return s.stats }),
+		diff.Routes(func() *diff.Diff { return s.diff }),
 		tips.Routes(func() *tips.Tips { return s.tips }),
 		chat.Routes(func() *chat.Chat { return s.sessionChat }),
 		sessions.Routes(func() *sessions.Manager { return s.sessions }, func() *sessions.Resumer { return s.resumer }, func() *queue.Queue { return s.queue }),

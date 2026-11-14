@@ -589,6 +589,106 @@ export interface DevStatus {
 }
 
 //////////
+// source: diff.go
+
+export const DiffBlobAbsent = "absent";
+export const DiffBlobText = "text";
+export const DiffBlobImage = "image";
+export const DiffBlobBinary = "binary";
+export const DiffBlobTooLarge = "too_large";
+/**
+ * Blob kinds of a DiffBlob.
+ */
+export type DiffBlob = typeof DiffBlobAbsent | typeof DiffBlobText | typeof DiffBlobImage | typeof DiffBlobBinary | typeof DiffBlobTooLarge;
+/**
+ * DiffRange is what every Diff response says about the range: the resolved
+ * SHAs (the Diff page sends them back and never sends typed refs again).
+ * CommitsUnavailable means a SHA or ref names a commit that is not in this
+ * clone; every other field is then empty.
+ */
+export interface DiffRange {
+  first_sha: string;
+  second_sha: string;
+  merge_base: string;
+  no_common_history?: boolean;
+  commits_unavailable?: boolean;
+}
+/**
+ * DiffFile is one changed file. It is the entry shared by the list and patch calls.
+ */
+export interface DiffFile {
+  path: string;
+  old_path?: string;
+  status: string;
+  added: number /* int */;
+  deleted: number /* int */;
+  large?: boolean;
+  binary?: boolean;
+  generated?: boolean;
+}
+/**
+ * DiffFiles answers GET /v1/diff/files.
+ */
+export interface DiffFiles {
+  DiffRange: DiffRange;
+  files: DiffFile[];
+  truncated?: boolean;
+}
+/**
+ * DiffCommitPatch is one selected commit's patch of a file.
+ */
+export interface DiffCommitPatch {
+  sha: string;
+  subject: string;
+  patch: string;
+}
+/**
+ * DiffPatch answers GET /v1/diff/patch. Patch holds the whole-range patch;
+ * CommitPatches holds one patch per selected commit when the request narrowed
+ * by commits.
+ */
+export interface DiffPatch {
+  DiffRange: DiffRange;
+  file: DiffFile;
+  patch?: string;
+  commit_patches?: DiffCommitPatch[];
+}
+/**
+ * DiffCommit is one commit of the range. Ticket is the canonical
+ * "<project>:<epic>/<id>" and empty when the commit has no usable trailer.
+ */
+export interface DiffCommit {
+  sha: string;
+  subject: string;
+  time: string;
+  ticket?: string;
+  merge?: boolean;
+  files: string[];
+}
+/**
+ * DiffCommits answers GET /v1/diff/commits.
+ */
+export interface DiffCommits {
+  DiffRange: DiffRange;
+  commits: DiffCommit[];
+  truncated?: boolean;
+}
+/**
+ * DiffBlob is one side of a file. ImageBase64 is set for Kind image only.
+ */
+/**
+ * DiffBlobs answers GET /v1/diff/blob. The call is made by SHA: MergeBase and
+ * Tip are the values the file list returned.
+ */
+export interface DiffBlobs {
+  merge_base: string;
+  tip: string;
+  commits_unavailable?: boolean;
+  old: DiffBlob;
+  new: DiffBlob;
+}
+
+//////////
 // source: diskwatch.go
 
 /**
