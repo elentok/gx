@@ -837,6 +837,14 @@ func TestParseTUIArgs_AcceptsRemoteControl(t *testing.T) {
 	}
 }
 
+// The launcher appends one --add-dir per configured writable directory.
+func TestParseTUIArgs_AcceptsAddDir(t *testing.T) {
+	args := append([]string{"--add-dir", "/a", "--add-dir", "/b"}, tuiLaunchArgs...)
+	if _, err := parseTUIArgs(args); err != nil {
+		t.Fatalf("parseTUIArgs: %v", err)
+	}
+}
+
 func TestClassify_InvestigatePromptIsASlashPrompt(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, WorkerConfigFile), []byte(`{}`), 0o644); err != nil {

@@ -106,6 +106,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		}
 		return nil
 	})
+	fs.Func("add-dir", "", func(string) error { return nil })
 	fs.String("disallowedTools", "", "")
 	fs.String("append-system-prompt", "", "")
 	fs.String("append-system-prompt-file", "", "")
