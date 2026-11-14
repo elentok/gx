@@ -1,9 +1,9 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useState } from "react"
-import { useParams } from "react-router"
+import { useEffect, useState } from "react"
+import { useParams, useSearchParams } from "react-router"
 import { copyText } from "../clipboard"
 import { formatAge } from "../epics/cardTime"
-import { HostedFound, type HostedResolved } from "../generated/ops"
+import { HostedFound, HostedKindCode, HostedKindText, type HostedResolved } from "../generated/ops"
 import { sizeText } from "../health/formatBytes"
 import { DetailPage } from "../page/DetailPage"
 import { Button } from "../ui/button/Button"
@@ -12,8 +12,9 @@ import { showToast } from "../ui/toaster"
 import { useFetched } from "../useFetched"
 import { useFetchedReady } from "../useReady"
 import { rawUrl } from "./rawUrl"
+import { type FetchFileText, fetchRawText } from "./rawText"
 import { createResolver } from "./resolve"
-import { ViewerBody } from "./viewerBody"
+import { previewNote, ViewerBody } from "./viewerBody"
 import { viewerLink } from "./viewerUrl"
 
 /** The verdict for one absolute path. Rejects when the call failed. */
@@ -103,10 +104,42 @@ function NotFound() {
   )
 }
 
-function FoundView({ path, file }: { path: string; file: HostedResolved }) {
+function isTextKind(file: HostedResolved): boolean {
+  return (file.kind === HostedKindCode || file.kind === HostedKindText) && !previewNote(file)
+}
+
+/** The file text of a code or text file, kept out of the page cache. */
+function useFileText(path: string, wanted: boolean, fetchText: FetchFileText) {
+  const [state, setState] = useState<{ text?: string; missing: boolean }>({ missing: false })
+  useEffect(() => {
+    if (!wanted) return
+    let live = true
+    fetchText(path).then(
+      (text) => live && setState({ text, missing: text === undefined }),
+      () => live && setState({ missing: true }),
+    )
+    return () => {
+      live = false
+    }
+  }, [path, wanted, fetchText])
+  return state
+}
+
+function FoundView({
+  path,
+  file,
+  line,
+  fetchText,
+}: {
+  path: string
+  file: HostedResolved
+  line?: number
+  fetchText: FetchFileText
+}) {
   const [pixels, setPixels] = useState("")
   const [imageFailed, setImageFailed] = useState(false)
-  if (imageFailed) {
+  const body = useFileText(path, isTextKind(file), fetchText)
+  if (imageFailed || body.missing) {
     return (
       <>
         <Bar path={path} meta="" found={false} />
@@ -121,6 +154,8 @@ function FoundView({ path, file }: { path: string; file: HostedResolved }) {
       <ViewerBody
         file={file}
         path={path}
+        text={body.text}
+        line={line}
         onImageLoad={(w, h) => setPixels(`${w}×${h}`)}
         onImageError={() => setImageFailed(true)}
       />
@@ -130,11 +165,16 @@ function FoundView({ path, file }: { path: string; file: HostedResolved }) {
 
 export function FileViewerPage({
   fetchResolve = resolveOwnPath,
+  fetchText = fetchRawText,
 }: {
   fetchResolve?: FetchFileResolve
+  fetchText?: FetchFileText
 }) {
   // The router already decoded the splat once; it is the absolute path without its leading slash.
   const path = `/${useParams()["*"] ?? ""}`
+  // Only the kinds that show lines read `line`; a bad value means no mark.
+  const [params] = useSearchParams()
+  const line = Number(params.get("line") ?? NaN)
   const { data, failed, source, retry } = useFetched(
     "file-viewer",
     () => fetchResolve(path),
@@ -164,7 +204,7 @@ export function FileViewerPage({
           bg="surface"
         >
           {data.verdict === HostedFound ? (
-            <FoundView key={path} path={path} file={data} />
+            <FoundView key={path} path={path} file={data} line={line} fetchText={fetchText} />
           ) : (
             <>
               <Bar path={path} meta="" found={false} />

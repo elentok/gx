@@ -1,11 +1,16 @@
 import { Box, Text } from "@chakra-ui/react"
 import {
   HostedKindBinary,
+  HostedKindCode,
   HostedKindImage,
   HostedKindPDF,
   HostedKindSVG,
+  HostedKindText,
   type HostedResolved,
 } from "../generated/ops"
+import { Spinner } from "../ui/spinner/Spinner"
+import { CodeView } from "./CodeView"
+import { languageOf } from "./language"
 import { rawUrl } from "./rawUrl"
 
 /** Files over this size show no preview. The hover card reuses it. */
@@ -47,11 +52,16 @@ function NoteBody({ note }: { note: Note }) {
 export function ViewerBody({
   file,
   path,
+  text,
+  line,
   onImageLoad,
   onImageError,
 }: {
   file: HostedResolved
   path: string
+  /** The file text of a code or text file; undefined while it loads. */
+  text?: string
+  line?: number
   onImageLoad?: (width: number, height: number) => void
   onImageError?: () => void
 }) {
@@ -69,6 +79,16 @@ export function ViewerBody({
           onError={() => onImageError?.()}
         />
       </Box>
+    )
+  }
+  if (file.kind === HostedKindCode || file.kind === HostedKindText) {
+    if (text === undefined) return <Spinner label="Loading file" />
+    return (
+      <CodeView
+        text={text}
+        language={file.kind === HostedKindCode ? languageOf(path) : undefined}
+        line={line}
+      />
     )
   }
   return (

@@ -49,6 +49,7 @@ import type {
   FetchDiffPatch,
 } from "./diff/api"
 import type { FetchFileResolve } from "./files/FileViewerPage"
+import type { FetchFileText } from "./files/rawText"
 
 const AgentsPage = lazy(() =>
   import("./agents/AgentsPage").then(({ AgentsPage }) => ({ default: AgentsPage })),
@@ -268,6 +269,7 @@ export interface RouteFetchers {
   settings?: FetchSettings
   signOut?: () => void | Promise<void>
   fileResolve?: FetchFileResolve
+  fileText?: FetchFileText
 }
 
 // An unknown path lands on /epics, which reports no span.
@@ -324,7 +326,10 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
       element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} />,
     },
     // The splat is the absolute path of the file, without its leading slash.
-    { path: "/files/*", element: <FileViewerPage fetchResolve={fetchers.fileResolve} /> },
+    {
+      path: "/files/*",
+      element: <FileViewerPage fetchResolve={fetchers.fileResolve} fetchText={fetchers.fileText} />,
+    },
     {
       path: "/stats",
       element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} />,

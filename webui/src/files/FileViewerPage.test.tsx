@@ -9,12 +9,14 @@ import {
   HostedKindMarkdown,
   HostedKindPDF,
   HostedKindSVG,
+  HostedKindText,
   type HostedResolved,
 } from "../generated/ops"
 import { ConnectionContext, createConnection } from "../connection"
 import { appRoutes } from "../routes"
 import { renderThemed } from "../ui/render"
 import type { FetchFileResolve } from "./FileViewerPage"
+import type { FetchFileText } from "./rawText"
 
 vi.mock("../webPerf", () => ({ queueSample: vi.fn(), enableQueue: vi.fn(), dropQueue: vi.fn() }))
 
@@ -33,8 +35,10 @@ const found = (path: string): HostedResolved => ({
 // Never started, so it touches no network.
 const idleConnection = createConnection({ fetchSnapshot: () => new Promise(() => {}) })
 
-function renderAt(route: string, fileResolve: FetchFileResolve) {
-  const router = createMemoryRouter(appRoutes({ fileResolve }), { initialEntries: [route] })
+function renderAt(route: string, fileResolve: FetchFileResolve, fileText?: FetchFileText) {
+  const router = createMemoryRouter(appRoutes({ fileResolve, fileText }), {
+    initialEntries: [route],
+  })
   renderThemed(
     <ConnectionContext.Provider value={idleConnection}>
       <RouterProvider router={router} />
@@ -187,6 +191,49 @@ test("binary and PDF show their notes", async () => {
   expect(screen.getByRole("link", { name: "Download" }).getAttribute("href")).toBe(
     "/v1/files/tmp/doc.pdf?download=1",
   )
+})
+
+const lines50 = Array.from({ length: 50 }, (_, i) => `// line ${i + 1}`).join("\n")
+
+test.each([HostedKindCode, HostedKindText] as const)(
+  "a %s file shows numbered lines, marks ?line=42 and has no Source toggle",
+  async (kind) => {
+    Element.prototype.scrollIntoView = vi.fn()
+    const name = kind === HostedKindCode ? "handler.go" : "notes.txt"
+    renderAt(
+      `/files/Users/me/${name}?line=42`,
+      async (p) => ({ ...found(p), kind }),
+      async () => lines50,
+    )
+    await waitFor(() => expect(document.querySelectorAll("[data-line]")).toHaveLength(50))
+    const marked = document.querySelectorAll("[aria-current='true']")
+    expect(Array.from(marked).map((r) => r.getAttribute("data-line"))).toEqual(["42"])
+    expect(screen.getByRole("link", { name: "Raw" })).toBeTruthy()
+    expect(screen.getByRole("link", { name: "Download" })).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Copy link" })).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "Source" })).toBeNull()
+    expect(sessionStorage.length).toBe(1) // the resolve result only, not the file text
+    expect(JSON.stringify({ ...sessionStorage })).not.toContain("line 42")
+  },
+)
+
+test("a bad line marks nothing on a code file", async () => {
+  renderAt(
+    "/files/Users/me/handler.go?line=abc",
+    async (p) => ({ ...found(p), kind: HostedKindCode }),
+    async () => lines50,
+  )
+  await waitFor(() => expect(document.querySelectorAll("[data-line]")).toHaveLength(50))
+  expect(document.querySelector("[aria-current]")).toBeNull()
+})
+
+test("a 404 on the raw fetch shows the not-found page", async () => {
+  renderAt(
+    "/files/Users/me/handler.go",
+    async (p) => ({ ...found(p), kind: HostedKindCode }),
+    async () => undefined,
+  )
+  expect(await screen.findByText("File not found")).toBeTruthy()
 })
 
 test("a pending resolve shows the spinner", async () => {
