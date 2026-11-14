@@ -11,8 +11,8 @@ const MAX_IN_FLIGHT = 2
 export type ResolveBase = { session?: string; project?: string; dir?: string }
 
 export type ResolveOptions = {
-  /** The session has a new message: candidates that were missing are asked again. */
-  recheckMissing?: boolean
+  /** The session has a new message: these candidates, if cached as missing, are asked again. */
+  recheckMissing?: ReadonlySet<string>
   /** Ask the server again even for candidates cached as found. */
   fresh?: boolean
 }
@@ -64,7 +64,9 @@ export function createResolver(
 
   return {
     async resolve(candidates, options = {}) {
-      if (options.recheckMissing || options.fresh) for (const c of candidates) missing.delete(c)
+      for (const c of candidates) {
+        if (options.fresh || options.recheckMissing?.has(c)) missing.delete(c)
+      }
       if (options.fresh) for (const c of candidates) found.delete(c)
       const todo = [...new Set(candidates)].filter((c) => !found.has(c) && !missing.has(c))
       const calls: Promise<void>[] = []

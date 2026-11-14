@@ -102,9 +102,11 @@ describe("file links in the chat", () => {
     expect(calls).toHaveLength(1)
     act(() => append())
     await settle()
-    // The recheck of the earlier missing paths and the new candidate: two calls in all after the append.
-    expect(calls.length).toBeGreaterThanOrEqual(2)
-    expect(calls.flatMap((c) => c.candidates)).toContain("new/file.go")
+    expect(calls).toHaveLength(2)
+    const missingBefore = calls[0].candidates.filter((c) => c !== "server/files/handler.go")
+    expect(missingBefore.length).toBeGreaterThan(0)
+    expect(calls[1].candidates).toEqual(expect.arrayContaining([...missingBefore, "new/file.go"]))
+    expect([...(calls[1].recheckMissing ?? [])].sort()).toEqual([...missingBefore].sort())
   })
 
   it("keeps the session id as the resolve base on the Design and Agents pages", async () => {

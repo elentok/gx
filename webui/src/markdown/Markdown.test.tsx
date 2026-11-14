@@ -158,7 +158,7 @@ describe("file links", () => {
     act(() => setKey("m2"))
     await settle()
     expect(calls).toHaveLength(2)
-    expect(calls[1].recheckMissing).toBe(true)
+    expect([...(calls[1].recheckMissing ?? [])].sort()).toEqual(["b.md", "c/d.md"])
     expect(calls[1].candidates.sort()).toEqual(["b.md", "c/d.md"])
   })
 })

@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react"
-import { type HostedResolved, HostedFound } from "../generated/ops"
+import { type HostedResolved, HostedFound, HostedMissing } from "../generated/ops"
 import { createResolver, type FileResolver, type ResolveBase } from "./resolve"
 
 export type FileLinkContextValue = {
@@ -69,41 +69,44 @@ export function FileLinkProvider({
   const latest = useRef(verdicts)
   latest.current = verdicts
 
-  const ask = useCallback(
-    (candidates: string[], recheckMissing: boolean) => {
-      if (candidates.length === 0) return
-      void active.resolve(candidates, { recheckMissing }).then((got) => {
+  const rechecking = useRef(new Set<string>())
+
+  // Registrations and rechecks of one tick share one resolve call.
+  const flushSoon = useCallback(() => {
+    if (scheduled.current || pending.current.size === 0) return
+    scheduled.current = true
+    queueMicrotask(() => {
+      scheduled.current = false
+      const batch = [...pending.current]
+      const recheckMissing = new Set(rechecking.current)
+      pending.current.clear()
+      rechecking.current.clear()
+      void active.resolve(batch, { recheckMissing }).then((got) => {
         if (got.size === 0) return
         setVerdicts((prev) => new Map([...prev, ...got]))
       })
-    },
-    [active],
-  )
+    })
+  }, [active])
 
   const register = useCallback(
     (candidates: string[]) => {
       for (const c of candidates) if (!latest.current.has(c)) pending.current.add(c)
-      if (scheduled.current || pending.current.size === 0) return
-      scheduled.current = true
-      queueMicrotask(() => {
-        scheduled.current = false
-        const batch = [...pending.current]
-        pending.current.clear()
-        ask(batch, false)
-      })
+      flushSoon()
     },
-    [ask],
+    [flushSoon],
   )
 
   const lastKey = useRef(recheckKey)
   useEffect(() => {
     if (lastKey.current === recheckKey) return
     lastKey.current = recheckKey
-    const again = [...latest.current.values()]
-      .filter((r) => r.verdict !== HostedFound)
-      .map((r) => r.candidate)
-    ask(again, true)
-  }, [recheckKey, ask])
+    for (const r of latest.current.values()) {
+      if (r.verdict === HostedFound) continue
+      pending.current.add(r.candidate)
+      rechecking.current.add(r.candidate)
+    }
+    flushSoon()
+  }, [recheckKey, flushSoon])
 
   const markMissing = useCallback(
     (path: string) => setMissing((prev) => (prev.has(path) ? prev : new Set(prev).add(path))),
@@ -113,24 +116,26 @@ export function FileLinkProvider({
     async (path: string) => {
       const got = await active.resolve([path], { fresh: true })
       const r = got.get(path)
-      if (r?.verdict === "missing") markMissing(path)
+      if (r?.verdict === HostedMissing) markMissing(path)
     },
     [active, markMissing],
   )
 
-  const value = useMemo<FileLinkContextValue>(
-    () => ({
+  const value = useMemo<FileLinkContextValue>(() => {
+    const found = new Map<string, HostedResolved>()
+    for (const r of verdicts.values()) {
+      if (r.verdict === HostedFound && r.path) found.set(r.path, r)
+    }
+    return {
       register,
       verdict: (candidate) => verdicts.get(candidate),
       isMissing: (path) => missing.has(path),
       markMissing,
-      byPath: (path) =>
-        [...verdicts.values()].find((r) => r.verdict === HostedFound && r.path === path),
+      byPath: (path) => found.get(path),
       recheck,
       file,
-    }),
-    [register, verdicts, missing, markMissing, recheck, file],
-  )
+    }
+  }, [register, verdicts, missing, markMissing, recheck, file])
   return <FileLinkCtx.Provider value={value}>{children}</FileLinkCtx.Provider>
 }
 

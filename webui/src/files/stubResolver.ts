@@ -3,7 +3,7 @@ import type { FileResolver } from "./resolve"
 
 /** A test resolver: candidates in `found` resolve to `/abs/<candidate>`, the rest are missing. */
 export function stubResolver(found: string[]) {
-  const calls: { candidates: string[]; recheckMissing?: boolean }[] = []
+  const calls: { candidates: string[]; recheckMissing?: ReadonlySet<string> }[] = []
   const resolver: FileResolver = {
     async resolve(candidates, options) {
       calls.push({ candidates, recheckMissing: options?.recheckMissing })

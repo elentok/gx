@@ -73,7 +73,7 @@ describe("createResolver", () => {
     await r.resolve(["a.go", "b.go"])
     expect(fn).toHaveBeenCalledTimes(1)
     verdicts["b.go"] = "found"
-    const got = await r.resolve(["a.go", "b.go"], { recheckMissing: true })
+    const got = await r.resolve(["a.go", "b.go"], { recheckMissing: new Set(["b.go"]) })
     expect(fn).toHaveBeenCalledTimes(2)
     expect(sent(fn, 1).candidates).toEqual(["b.go"])
     expect(got.get("b.go")?.verdict).toBe("found")
