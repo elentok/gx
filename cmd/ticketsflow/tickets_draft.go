@@ -16,6 +16,7 @@ import (
 
 func newTicketsDraftCmd(d Deps) *cobra.Command {
 	var planPath, manifestPath string
+	var noGopls bool
 	c := &cobra.Command{
 		Use:   "draft <project:epic> --plan <plan.yaml> --manifest <manifest.yaml>",
 		Short: "write a publish manifest and body skeletons from a draft plan",
@@ -28,11 +29,12 @@ func newTicketsDraftCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runDraft(cwd, d.Env.Env, planPath, manifestPath, c.OutOrStdout())
+			return runDraft(cwd, d.Env.Env, planPath, manifestPath, noGopls, c.OutOrStdout())
 		},
 	}
 	c.Flags().StringVar(&planPath, "plan", "", "the draft plan (YAML)")
 	c.Flags().StringVar(&manifestPath, "manifest", "", "publish manifest to write or extend; body files go next to it")
+	c.Flags().BoolVar(&noGopls, "no-gopls", false, "find callers with rg only, never gopls")
 	return c
 }
 
@@ -40,7 +42,7 @@ func newTicketsDraftCmd(d Deps) *cobra.Command {
 // of an existing body, and deletes the body file of a slug the plan dropped.
 // It then checks the plan's names against the checkout at cwd and exits
 // non-zero when any is missing; the files are written either way.
-func runDraft(cwd string, env []string, planPath, manifestPath string, w io.Writer) error {
+func runDraft(cwd string, env []string, planPath, manifestPath string, noGopls bool, w io.Writer) error {
 	start := time.Now()
 	data, err := os.ReadFile(planPath)
 	if err != nil {
@@ -58,7 +60,8 @@ func runDraft(cwd string, env []string, planPath, manifestPath string, w io.Writ
 	if err != nil {
 		return err
 	}
-	misses := draftMisses(&plan, root, commit, env)
+	finder := newCallerFinder(root, commit, env, noGopls)
+	misses := draftMisses(&plan, root, finder)
 	dir := filepath.Dir(manifestPath)
 	rows := make([]ticketspec.ManifestRow, 0, len(plan.Tickets))
 	bodies := map[string]string{}
@@ -97,6 +100,9 @@ func runDraft(cwd string, env []string, planPath, manifestPath string, w io.Writ
 	}
 	for _, m := range misses {
 		fmt.Fprintf(w, "miss: %s\n", m)
+	}
+	if note := finder.goplsNote(); note != "" {
+		fmt.Fprintf(w, "note: %s\n", note)
 	}
 	fmt.Fprintf(w, "draft took %s\n", time.Since(start).Round(time.Millisecond))
 	if len(misses) > 0 {

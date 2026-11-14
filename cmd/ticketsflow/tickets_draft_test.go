@@ -343,6 +343,90 @@ func TestTicketsDraft_VerifiedAtAfterDaemonDialError(t *testing.T) {
 	}
 }
 
+// loggingGopls installs a fake gopls that appends one line per call to the
+// returned log file, then runs body.
+func loggingGopls(t *testing.T, body string) string {
+	t.Helper()
+	gopls, err := exec.LookPath("gopls")
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := filepath.Join(t.TempDir(), "gopls.log")
+	script := "#!/bin/sh\necho \"$*\" >> " + log + "\n" + body
+	if err := os.WriteFile(gopls, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return log
+}
+
+func goplsCalls(t *testing.T, log string) int {
+	t.Helper()
+	data, err := os.ReadFile(log)
+	if os.IsNotExist(err) {
+		return 0
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Count(string(data), "\n")
+}
+
+func TestTicketsDraft_GoplsFailureNotedOnceAndStopsGopls(t *testing.T) {
+	plan := strings.Replace(factsPlan, "entry_symbols: [runAlpha]", "entry_symbols: [runAlpha, runBeta]", 1)
+	d, planPath, manifest := draftSetup(t, plan)
+	factsFixture(t, d)
+	onlyTools(t, true, "rg", "git")
+	log := loggingGopls(t, "echo 'boom: no packages'; exit 1\n")
+	out, err := draftOut(t, d, planPath, manifest)
+	if err != nil {
+		t.Fatalf("draft: %v\n%s", err, out)
+	}
+	if n := strings.Count(out, "note: gopls failed"); n != 1 {
+		t.Errorf("note count = %d:\n%s", n, out)
+	}
+	if !strings.Contains(out, "note: gopls failed (boom: no packages); used rg for 3 symbol(s)") {
+		t.Errorf("note wording:\n%s", out)
+	}
+	if strings.Index(out, "note:") > strings.Index(out, "draft took") {
+		t.Errorf("note must come before draft took:\n%s", out)
+	}
+	body := readManifestFile(t, filepath.Join(filepath.Dir(manifest), "draft-body-facts.md"))
+	if !strings.Contains(body, "rg result, not verified") {
+		t.Errorf("body:\n%s", body)
+	}
+	if n := goplsCalls(t, log); n > 2 {
+		t.Errorf("gopls called %d times, want at most 2", n)
+	}
+}
+
+func TestTicketsDraft_NoGoplsFlagSkipsGoplsSilently(t *testing.T) {
+	d, plan, manifest := draftSetup(t, factsPlan)
+	factsFixture(t, d)
+	onlyTools(t, true, "rg", "git")
+	log := loggingGopls(t, "exit 1\n")
+	var buf bytes.Buffer
+	d.Env.Stdout = &buf
+	if err := execute(t, []string{"tickets", "draft", "mine:demo-impl", "--plan", plan, "--manifest", manifest, "--no-gopls"}, d); err != nil {
+		t.Fatalf("draft: %v\n%s", err, buf.String())
+	}
+	if strings.Contains(buf.String(), "note:") {
+		t.Errorf("unexpected note:\n%s", buf.String())
+	}
+	if n := goplsCalls(t, log); n != 0 {
+		t.Errorf("gopls called %d times", n)
+	}
+}
+
+func TestTicketsDraft_HelpListsNoGopls(t *testing.T) {
+	d, _, _ := draftSetup(t, factsPlan)
+	var buf bytes.Buffer
+	d.Env.Stdout = &buf
+	_ = execute(t, []string{"tickets", "draft", "--help"}, d)
+	if !strings.Contains(buf.String(), "--no-gopls") {
+		t.Errorf("help:\n%s", buf.String())
+	}
+}
+
 func TestTicketsDraft_MissingMakeTargetAndAnchoredPatternFail(t *testing.T) {
 	plan := strings.Replace(factsPlan, "[web-types]", "[no-such-target]", 1)
 	plan = strings.Replace(plan, `"Seven"`, `"^7"`, 1)

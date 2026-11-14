@@ -2,6 +2,7 @@ package ticketsflow
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -23,7 +24,7 @@ const (
 // names that the checkout at root lacks. It also fills each ticket's Callers.
 // The judgment checks (what a change hides, which side wins, signature fallout)
 // are the agent's: nothing here claims one.
-func draftMisses(plan *ticketspec.DraftPlan, root, commit string, procEnv []string) []string {
+func draftMisses(plan *ticketspec.DraftPlan, root string, finder *callerFinder) []string {
 	env := ticketspec.LintEnv{
 		Root:    root,
 		GoTests: ticketspec.LoadGoTestNames(root),
@@ -46,7 +47,6 @@ func draftMisses(plan *ticketspec.DraftPlan, root, commit string, procEnv []stri
 		misses = append(misses, "symbols: rg not found on PATH, so symbol existence and callers are unchecked")
 	}
 	if rgOK {
-		finder := newCallerFinder(root, commit, procEnv)
 		for _, s := range symbols {
 			text, found := finder.callers(s)
 			if !found {
@@ -63,7 +63,7 @@ func draftMisses(plan *ticketspec.DraftPlan, root, commit string, procEnv []stri
 	for i := range plan.Tickets {
 		plan.Tickets[i].Callers = callers
 	}
-	misses = append(misses, draftFacts(plan, root, newCallerFinder(root, commit, procEnv), rgOK)...)
+	misses = append(misses, draftFacts(plan, root, finder, rgOK)...)
 	return misses
 }
 
@@ -85,11 +85,39 @@ type callerFinder struct {
 	env          []string
 	gopls        bool
 	noRemote     bool
+	// goplsFailure is the first gopls failure of the run; rgFallbacks counts
+	// the symbols answered by rg after it.
+	goplsFailure string
+	rgFallbacks  int
 }
 
-func newCallerFinder(root, commit string, env []string) *callerFinder {
+func newCallerFinder(root, commit string, env []string, noGopls bool) *callerFinder {
 	_, err := exec.LookPath("gopls")
-	return &callerFinder{root: root, commit: commit, env: env, gopls: err == nil}
+	return &callerFinder{root: root, commit: commit, env: env, gopls: err == nil && !noGopls}
+}
+
+// goplsNote is the one-line notice that gopls failed and rg stood in, or "".
+func (f *callerFinder) goplsNote() string {
+	if f.goplsFailure == "" {
+		return ""
+	}
+	return fmt.Sprintf("gopls failed (%s); used rg for %d symbol(s)", f.goplsFailure, f.rgFallbacks)
+}
+
+// failGopls turns gopls off for the rest of the run and remembers why.
+func (f *callerFinder) failGopls(out string, err error) {
+	f.gopls = false
+	if f.goplsFailure != "" {
+		return
+	}
+	reason, _, _ := strings.Cut(strings.TrimSpace(out), "\n")
+	if errors.Is(err, context.DeadlineExceeded) {
+		reason = "timed out"
+	}
+	if reason == "" {
+		reason = err.Error()
+	}
+	f.goplsFailure = reason
 }
 
 func (f *callerFinder) command(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -106,14 +134,19 @@ func (f *callerFinder) callers(symbol string) (string, bool) {
 	name := symbol[strings.LastIndex(symbol, ".")+1:]
 	if f.gopls {
 		if pos, ok := f.goDefinition(name); ok {
-			if out, err := f.goplsReferences(pos); err == nil {
+			out, err := f.goplsReferences(pos)
+			if err == nil {
 				return fmt.Sprintf("verified at %s: %s", f.commit, f.summarize(refLines(out))), true
 			}
+			f.failGopls(out, err)
 		}
 	}
 	lines := f.rgLines(name)
 	if len(lines) == 0 {
 		return "", false
+	}
+	if f.goplsFailure != "" {
+		f.rgFallbacks++
 	}
 	return "rg result, not verified: " + f.summarize(lines), true
 }
@@ -126,6 +159,9 @@ func (f *callerFinder) goplsReferences(pos string) (string, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), goplsTimeout)
 		defer cancel()
 		out, err := f.command(ctx, "gopls", args...).CombinedOutput()
+		if ctx.Err() != nil {
+			err = ctx.Err()
+		}
 		return string(out), err
 	}
 	if !f.noRemote {
