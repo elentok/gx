@@ -6,6 +6,7 @@ import { formatAge } from "../epics/cardTime"
 import {
   HostedFound,
   HostedKindCode,
+  HostedKindHTML,
   HostedKindMarkdown,
   HostedKindMermaid,
   HostedKindText,
@@ -175,7 +176,9 @@ function FoundView({
   const [pixels, setPixels] = useState("")
   const [imageFailed, setImageFailed] = useState(false)
   const [showSource, setShowSource] = useState(false)
-  const body = useFileText(path, isTextKind(file), fetchText)
+  const isHtml = file.kind === HostedKindHTML && !previewNote(file)
+  // An HTML file's text is only needed for Source; the frame loads the page itself.
+  const body = useFileText(path, isTextKind(file) || (isHtml && showSource), fetchText)
   if (imageFailed || body.missing) {
     return (
       <>
@@ -192,7 +195,8 @@ function FoundView({
         meta={meta}
         found
         source={
-          (file.kind === HostedKindMarkdown || file.kind === HostedKindMermaid) && isTextKind(file)
+          (file.kind === HostedKindMarkdown || file.kind === HostedKindMermaid || isHtml) &&
+          (isTextKind(file) || isHtml)
             ? { on: showSource, toggle: () => setShowSource((s) => !s) }
             : undefined
         }

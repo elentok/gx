@@ -2,6 +2,7 @@ import { Box, Text } from "@chakra-ui/react"
 import {
   HostedKindBinary,
   HostedKindCode,
+  HostedKindHTML,
   HostedKindImage,
   HostedKindMarkdown,
   HostedKindMermaid,
@@ -12,6 +13,7 @@ import {
 } from "../generated/ops"
 import { Spinner } from "../ui/spinner/Spinner"
 import { CodeView } from "./CodeView"
+import { HtmlView } from "./HtmlView"
 import { languageOf } from "./language"
 import { MarkdownView } from "./MarkdownView"
 import { MermaidView } from "./MermaidView"
@@ -100,6 +102,7 @@ export function ViewerBody({
       <MarkdownView path={path} text={text} source={source} resolver={resolver} heading={heading} />
     )
   }
+  if (file.kind === HostedKindHTML) return <HtmlView path={path} text={text} source={source} />
   if (file.kind === HostedKindMermaid) {
     if (text === undefined) return <Spinner label="Loading file" />
     return <MermaidView text={text} source={source} />
