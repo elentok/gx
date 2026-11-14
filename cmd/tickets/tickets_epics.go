@@ -15,8 +15,8 @@ import (
 // bare slugs only, no path-building, so it composes with `gx tickets root`
 // in shell tooling like `cd $(gx tickets root)/$(gx tickets epics | fzf)`.
 // When mapsOnly is set, only epics with a ticket.md of kind: map (Epic.IsMap) are
-// printed.
-func runTicketsEpics(dirs config.Dirs, cwd string, w io.Writer, mapsOnly bool) error {
+// printed; areasOnly does the same for kind: area (Epic.IsArea).
+func runTicketsEpics(dirs config.Dirs, cwd string, w io.Writer, mapsOnly, areasOnly bool) error {
 	root, err := tickets.RootForDirs(dirs, cwd)
 	if err != nil {
 		return err
@@ -28,7 +28,7 @@ func runTicketsEpics(dirs config.Dirs, cwd string, w io.Writer, mapsOnly bool) e
 	}
 
 	for _, epic := range epics {
-		if mapsOnly && !epic.IsMap {
+		if mapsOnly && !epic.IsMap || areasOnly && !epic.IsArea {
 			continue
 		}
 		fmt.Fprintln(w, epic.Name)

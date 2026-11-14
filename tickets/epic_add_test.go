@@ -28,6 +28,39 @@ func TestParseEpicFields_RefusesPRFields(t *testing.T) {
 	}
 }
 
+func TestCreateEpic_ThirteenthAreaRefusesAndWritesNothing(t *testing.T) {
+	root := t.TempDir()
+	conv := t.TempDir()
+	// Maps, loops and archived areas do not count toward the cap.
+	for _, name := range []string{"m", "l"} {
+		kind := KindMap
+		if name == "l" {
+			kind = KindLoop
+		}
+		if _, err := CreateEpic(conv, root, name, EpicFields{Kind: kind, Status: "open"}, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeFile(t, filepath.Join(root, ".archive", "old", "ticket.md"), "---\nkind: area\nstatus: open\n---\n# old\n")
+	for i := 0; i < MaxAreas; i++ {
+		name := "area-" + string(rune('a'+i))
+		if _, err := CreateEpic(conv, root, name, EpicFields{Kind: KindArea, Status: "open"}, ""); err != nil {
+			t.Fatalf("area %d: %v", i+1, err)
+		}
+	}
+
+	_, err := CreateEpic(conv, root, "one-too-many", EpicFields{Kind: KindArea, Status: "open"}, "")
+	if err == nil || !strings.Contains(err.Error(), "areas") {
+		t.Fatalf("err = %v, want the area-limit refusal", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "one-too-many")); statErr == nil {
+		t.Error("refusal wrote an epic directory")
+	}
+	if _, err := CreateEpic(conv, root, "another-loop", EpicFields{Kind: KindLoop}, ""); err != nil {
+		t.Errorf("a loop at the area cap: %v", err)
+	}
+}
+
 func TestCreateEpic_RejectsCallerCreatedAtAndWritesNothing(t *testing.T) {
 	root := t.TempDir()
 	fields := EpicFields{Kind: KindLoop, CreatedAt: time.Now()}

@@ -12,6 +12,13 @@ import (
 // never runs it and `tickets set` may claim and close its tickets directly.
 const KindMap = "map"
 
+// KindArea is the ticket.md `kind:` of an area epic: it holds follow-ups that
+// need deciding and never runs a Design. Its kind never changes.
+const KindArea = "area"
+
+// MaxAreas is the most live area epics one project may have.
+const MaxAreas = 12
+
 // The epics a person files follow-ups into, live and archived. Neither is
 // schedulable work, so neither can be queued.
 const (
@@ -54,6 +61,14 @@ func IsMapEpic(epicPath string) bool {
 	return epic.IsMap
 }
 
+// IsAreaEpic reports whether the epic at epicPath is an area, without loading
+// its tickets: its ticket.md says kind: area.
+func IsAreaEpic(epicPath string) bool {
+	epic := Epic{Path: epicPath}
+	loadEpicTicketMD(&epic)
+	return epic.IsArea
+}
+
 // LoadEpicTicketMD reads the epic at epicPath's ticket.md, without loading
 // its tickets.
 func LoadEpicTicketMD(epicPath string) Epic {
@@ -69,6 +84,7 @@ type Epic struct {
 	Name    string
 	Path    string
 	IsMap   bool   // a wayfinder map: ticket.md says kind: map
+	IsArea  bool   // an area: ticket.md says kind: area
 	Body    string // ticket.md's body
 	Tickets []Ticket
 

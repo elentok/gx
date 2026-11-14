@@ -102,6 +102,10 @@ func init() {
 	Default.Register(Step{Name: "epic-range-backfill", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return ticketmigrate.BackfillEpicRange(e.Root, epicRangeUnder(e.Dirs, e.LookupRoot, e.Log))
 	}})
+	// area-epic-kind: kind: area is optional; existing stores need no rewrite.
+	Default.Register(Step{Name: "area-epic-kind", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

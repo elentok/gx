@@ -68,16 +68,16 @@ func ParseEpicFields(yamlPart string) (EpicFields, error) {
 	return f, nil
 }
 
-// validate checks the values: kind is map or loop, status is draft or open
+// validate checks the values: kind is map, loop or area, status is draft or open
 // (either may be empty, meaning not given).
 func (f EpicFields) validate() error {
 	if !f.CreatedAt.IsZero() {
 		return errors.New("created_at is server-stamped and cannot be set")
 	}
 	switch f.Kind {
-	case "", KindMap, KindLoop:
+	case "", KindMap, KindLoop, KindArea:
 	default:
-		return fmt.Errorf("kind %q; want map or loop", f.Kind)
+		return fmt.Errorf("kind %q; want map, loop or area", f.Kind)
 	}
 	switch schema.Status(f.Status) {
 	case "", schema.StatusOpen, schema.StatusDraft:
@@ -111,7 +111,7 @@ func CreateEpic(conversationsDir, projectDir, name string, fields EpicFields, bo
 		body = text
 	}
 	if fields.Kind == "" {
-		return "", errors.New("kind is required (map or loop)")
+		return "", errors.New("kind is required (map, loop or area)")
 	}
 	if fields.Status == "" {
 		fields.Status = string(schema.StatusDraft)
@@ -122,6 +122,15 @@ func CreateEpic(conversationsDir, projectDir, name string, fields EpicFields, bo
 		return "", fmt.Errorf("epic %q already exists", name)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", err
+	}
+	if fields.Kind == KindArea {
+		n, err := countAreas(projectDir)
+		if err != nil {
+			return "", err
+		}
+		if n >= MaxAreas {
+			return "", fmt.Errorf("project already has %d areas (the limit)", MaxAreas)
+		}
 	}
 
 	fields.CreatedAt = time.Now().UTC()
@@ -162,6 +171,25 @@ func CreateEpic(conversationsDir, projectDir, name string, fields EpicFields, bo
 		return epicPath, err
 	}
 	return epicPath, nil
+}
+
+// countAreas counts the live area epics under projectDir; dot directories such
+// as .archive are skipped.
+func countAreas(projectDir string) (int, error) {
+	entries, err := os.ReadDir(projectDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	n := 0
+	for _, e := range entries {
+		if e.IsDir() && !strings.HasPrefix(e.Name(), ".") && IsAreaEpic(filepath.Join(projectDir, e.Name())) {
+			n++
+		}
+	}
+	return n, nil
 }
 
 // StampMapCompletion stamps the map at mapPath as completed at at: its

@@ -45,6 +45,7 @@ struct tickets.Epic
   Name string 
   Path string 
   IsMap bool 
+  IsArea bool 
   Body string 
   Tickets []tickets.Ticket 
   HasTicketMD bool 
