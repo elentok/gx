@@ -82,7 +82,7 @@ func WorkspacesScenario() scenario {
 		},
 		Drafts: []Draft{{Project: project, Slug: DraftSlugWorkspaces, Idea: "A draft in no workspace"}},
 		EpicMeta: map[string]string{
-			project + ":ws-design":      "status: open\nkind: map\n",
+			project + ":ws-design":       "status: open\nkind: map\n",
 			project + ":held-design":     "status: open\nkind: map\n",
 			project + ":design-new":      "status: open\nkind: map\n",
 			sideProject + ":side-design": "status: open\nkind: map\n",
