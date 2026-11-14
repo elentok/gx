@@ -12,6 +12,7 @@ import {
   test,
   type Fixture,
 } from "./fixture"
+import { startDesign } from "./draftKit"
 import { expectOption } from "./question"
 
 // The card's title opens the epic page, whose Start button starts the session and moves on.
@@ -372,16 +373,6 @@ test.describe("12. The auto-advance switch", () => {
     await expect(page.getByText(/Queuing design-epic in/)).toHaveCount(0)
   })
 })
-
-// Starts a Design through the New Design dialog, which lands on its Design page.
-const startDesign = async (page: Page, slug: string) => {
-  await page.getByRole("button", nav("New Design")).click()
-  const dialog = page.getByRole("dialog", nav("New Design"))
-  await dialog.getByRole("textbox", nav("Epic slug")).fill(slug)
-  await dialog.getByRole("textbox", nav("Rough idea")).fill("An idea.")
-  await dialog.getByRole("button", nav("Start design")).click()
-  await expect(page).toHaveURL(new RegExp(`#/d/demo:${slug}$`))
-}
 
 const isLive = (row: string) => !/exited/.test(row)
 const rowId = (row: string) => row.split("\t")[0].trim()
