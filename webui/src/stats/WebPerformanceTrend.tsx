@@ -89,7 +89,7 @@ function Trend({
         />
       ))}
       {low.length > 0 && (
-        <text x={LEFT + 4} y={22} fontSize="11" fill="currentColor">
+        <text x={LEFT + 4} y={TOP + 16} fontSize="11" fill="currentColor">
           fewer than 20 samples
         </text>
       )}
@@ -183,39 +183,41 @@ export function WebPerformanceTrend({
         {top.length === 0 ? (
           <Text color="text.muted">—</Text>
         ) : (
-          <chakra.table w="100%" fontSize="sm">
-            <thead>
-              <tr>
-                <chakra.th textAlign="left">Route</chakra.th>
-                <chakra.th textAlign="right">p75 route ready</chakra.th>
-                <chakra.th textAlign="right">samples</chakra.th>
-              </tr>
-            </thead>
-            <tbody>
-              {top.map((r) => {
-                const lowRow = r.count < MIN_SAMPLES
-                return (
-                  <chakra.tr
-                    key={r.route}
-                    data-testid={`route-row-${r.route}`}
-                    data-low={lowRow || undefined}
-                    opacity={lowRow ? 0.55 : 1}
-                    borderTopWidth="1px"
-                  >
-                    <chakra.td fontFamily="mono" py="1.5" px="2">
-                      {r.route}
-                    </chakra.td>
-                    <chakra.td textAlign="right" py="1.5" px="2">
-                      {formatTick("route_ready", r.p75)}
-                    </chakra.td>
-                    <chakra.td textAlign="right" py="1.5" px="2">
-                      {lowRow ? `${r.count} · not enough` : r.count}
-                    </chakra.td>
-                  </chakra.tr>
-                )
-              })}
-            </tbody>
-          </chakra.table>
+          <Box overflowX="auto">
+            <chakra.table w="100%" fontSize="sm" whiteSpace="nowrap">
+              <thead>
+                <tr>
+                  <chakra.th textAlign="left">Route</chakra.th>
+                  <chakra.th textAlign="right">p75 route ready</chakra.th>
+                  <chakra.th textAlign="right">samples</chakra.th>
+                </tr>
+              </thead>
+              <tbody>
+                {top.map((r) => {
+                  const lowRow = r.count < MIN_SAMPLES
+                  return (
+                    <chakra.tr
+                      key={r.route}
+                      data-testid={`route-row-${r.route}`}
+                      data-low={lowRow || undefined}
+                      opacity={lowRow ? 0.55 : 1}
+                      borderTopWidth="1px"
+                    >
+                      <chakra.td fontFamily="mono" py="1.5" px="2">
+                        {r.route}
+                      </chakra.td>
+                      <chakra.td textAlign="right" py="1.5" px="2">
+                        {formatTick("route_ready", r.p75)}
+                      </chakra.td>
+                      <chakra.td textAlign="right" py="1.5" px="2">
+                        {lowRow ? `${r.count} · not enough` : r.count}
+                      </chakra.td>
+                    </chakra.tr>
+                  )
+                })}
+              </tbody>
+            </chakra.table>
+          </Box>
         )}
       </Box>
     </Box>
