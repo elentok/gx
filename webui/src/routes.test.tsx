@@ -2,7 +2,13 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { createMemoryRouter, Navigate, RouterProvider } from "react-router"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { ROUTE_NAMES } from "./routeNames"
-import { hardLoadNavigationType, noteAuthScreen, resetRouteSpans, trackRouter } from "./routeSpans"
+import {
+  hardLoadNavigationType,
+  noteApiRequest,
+  noteAuthScreen,
+  resetRouteSpans,
+  trackRouter,
+} from "./routeSpans"
 import { useReady } from "./useReady"
 import { queueSample } from "./webPerf"
 import {
@@ -1101,6 +1107,60 @@ test("the first span of a load is app_ready from navigation start, later ones ro
   await waitFor(() => expect(sampled).toHaveBeenCalledTimes(2))
   expect(samples()[1]).toMatchObject({ metric: "route_ready", route: "epics", tab: "route" })
   vi.restoreAllMocks()
+})
+
+test("app_ready carries ttfb and same-origin js and css bytes, route_ready carries neither", async () => {
+  const entry = (name: string, initiatorType: string, transferSize: number) => ({
+    name,
+    initiatorType,
+    transferSize,
+  })
+  vi.spyOn(performance, "getEntriesByType").mockImplementation((type: string) =>
+    type === "navigation"
+      ? ([{ type: "navigate", responseStart: 42 }] as never)
+      : ([
+          entry(`${location.origin}/assets/a.js`, "script", 100),
+          entry(`${location.origin}/assets/b.js`, "link", 20),
+          entry(`${location.origin}/assets/a.css`, "link", 30),
+          entry("https://cdn.example.com/x.js", "script", 999),
+          entry(`${location.origin}/v1/x`, "fetch", 999),
+        ] as never),
+  )
+  const router = renderSpans("/tips")
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  expect(samples()[0]).toMatchObject({ ttfb: 42, js_bytes: 120, css_bytes: 30 })
+  await act(() => router.navigate("/epics"))
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(2))
+  expect(samples()[1]).not.toHaveProperty("ttfb")
+  expect(samples()[1]).not.toHaveProperty("js_bytes")
+  expect(samples()[1]).not.toHaveProperty("css_bytes")
+})
+
+test("zero transfer sizes send no byte fields", async () => {
+  vi.spyOn(performance, "getEntriesByType").mockImplementation((type: string) =>
+    type === "navigation"
+      ? ([{ type: "navigate", responseStart: 0 }] as never)
+      : ([
+          { name: `${location.origin}/assets/a.js`, initiatorType: "script", transferSize: 0 },
+        ] as never),
+  )
+  renderSpans("/tips")
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  expect(samples()[0]).not.toHaveProperty("js_bytes")
+  expect(samples()[0]).not.toHaveProperty("css_bytes")
+  expect(samples()[0]).not.toHaveProperty("ttfb")
+})
+
+test("a span carries the slowest apiFetch latency that overlapped it, and none without a call", async () => {
+  const router = renderSpans("/tips")
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  expect(samples()[0]).not.toHaveProperty("api_latency")
+  const finish = noteApiRequest()
+  await new Promise((r) => setTimeout(r, 20))
+  await act(() => router.navigate("/epics"))
+  finish()
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(2))
+  expect(samples()[1].api_latency).toBeGreaterThanOrEqual(15)
 })
 
 test("the trigger is the last input before the navigation, history for POP, else programmatic", async () => {

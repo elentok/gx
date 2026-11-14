@@ -1,5 +1,5 @@
 import { clearPageCache } from "./pageCache"
-import { noteSignedOut } from "./routeSpans"
+import { noteApiRequest, noteSignedOut } from "./routeSpans"
 import { dropQueue } from "./webPerf"
 
 const signedOutListeners = new Set<() => void>()
@@ -20,7 +20,12 @@ export function signOut(): void {
 
 /** Every web API call goes through here, so a 401 signs the page out in one place. */
 export async function apiFetch(...args: Parameters<typeof fetch>): Promise<Response> {
-  const res = await fetch(...args)
-  if (res.status === 401) signOut()
-  return res
+  const done = noteApiRequest()
+  try {
+    const res = await fetch(...args)
+    if (res.status === 401) signOut()
+    return res
+  } finally {
+    done()
+  }
 }

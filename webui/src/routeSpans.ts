@@ -40,6 +40,7 @@ export function resetRouteSpans(): void {
   hardDropped = false
   bfcache = false
   lastInput = undefined
+  apiRequests = []
 }
 
 /** The sign-in or setup screen showed: this load has no app_ready and the app's first span after it reports nothing. */
@@ -74,6 +75,59 @@ export function hardLoadNavigationType(): NavigationType | undefined {
   return type === "prerender" ? "navigate" : undefined
 }
 
+// Web API requests of the current span, from apiFetch. Only times, never the URL.
+type ApiRequest = { start: number; end?: number }
+let apiRequests: ApiRequest[] = []
+
+/** apiFetch calls this when a request starts. Call the returned function when it settles. */
+export function noteApiRequest(): () => void {
+  const request: ApiRequest = { start: performance.now() }
+  apiRequests.push(request)
+  return () => {
+    request.end = performance.now()
+  }
+}
+
+/** The longest request that overlapped the span, in ms. Undefined when there was none. */
+function slowestApiRequest(spanStart: number, spanEnd: number): number | undefined {
+  let slowest: number | undefined
+  for (const r of apiRequests) {
+    const end = r.end ?? spanEnd
+    if (end < spanStart || r.start > spanEnd) continue
+    slowest = Math.max(slowest ?? 0, end - r.start)
+  }
+  return slowest
+}
+
+/** Time to first byte of the page load. Undefined when the browser reports none. */
+function ttfb(): number | undefined {
+  const nav = performance.getEntriesByType?.("navigation")[0] as
+    | PerformanceNavigationTiming
+    | undefined
+  return nav && nav.responseStart > 0 ? nav.responseStart : undefined
+}
+
+/** Transferred bytes of this origin's scripts and stylesheets. A sum of zero means cached or unknown, so it is left out. */
+function transferredBytes(): Pick<WebPerfSample, "js_bytes" | "css_bytes"> {
+  let js = 0
+  let css = 0
+  for (const e of performance.getEntriesByType?.("resource") ?? []) {
+    const entry = e as PerformanceResourceTiming
+    if (!["script", "link", "css"].includes(entry.initiatorType)) continue
+    let url: URL
+    try {
+      url = new URL(entry.name)
+    } catch {
+      continue
+    }
+    if (url.origin !== location.origin) continue
+    // A link entry is a stylesheet or a modulepreload, so the file extension decides.
+    if (url.pathname.endsWith(".css")) css += entry.transferSize
+    else if (url.pathname.endsWith(".js")) js += entry.transferSize
+  }
+  return { ...(js > 0 && { js_bytes: js }), ...(css > 0 && { css_bytes: css }) }
+}
+
 function recentInput(): Trigger | undefined {
   return lastInput && performance.now() - lastInput.at < INPUT_WINDOW_MS
     ? lastInput.trigger
@@ -95,6 +149,7 @@ function begin(
     const hard = hardPending
     hardPending = false
     performance.mark("route_start")
+    apiRequests = apiRequests.filter((r) => r.end === undefined)
     span = {
       start: hard ? 0 : performance.now(),
       trigger,
@@ -118,14 +173,24 @@ export function markReady(outcome: Outcome, dataSource: DataSource): void {
   s.done = true
   const end = performance.mark("route_ready").startTime
   if (s.skip || !s.route) return
-  const common = { route: s.route, outcome, data_source: dataSource }
+  const latency = slowestApiRequest(s.start, end)
+  const common = {
+    route: s.route,
+    outcome,
+    data_source: dataSource,
+    ...(latency !== undefined && { api_latency: latency }),
+  }
+  apiRequests = apiRequests.filter((r) => r.end === undefined)
   if (s.hard) {
+    const first = ttfb()
     queueSample({
       ...common,
       metric: "app_ready",
       value: end,
       tab: "hard",
       navigation_type: hardLoadNavigationType(),
+      ...(first !== undefined && { ttfb: first }),
+      ...transferredBytes(),
     })
   } else {
     queueSample({
