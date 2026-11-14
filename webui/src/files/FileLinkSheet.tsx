@@ -1,4 +1,4 @@
-import { Button, chakra, Flex } from "@chakra-ui/react"
+import { Button, Flex } from "@chakra-ui/react"
 import { useState } from "react"
 import { copyText } from "../clipboard"
 import { BottomSheet } from "../ui/modal/BottomSheet"
@@ -40,20 +40,15 @@ export function FileLinkSheet({
         line={line}
         onPixelSize={setPixels}
       />
-      <Flex gap="3" px="3" py="2" borderTopWidth="1px" justify="flex-end" align="center">
-        <Button size="sm" variant="outline" onClick={() => void copy()}>
+      <Flex gap="3" p="3" borderTopWidth="1px">
+        <Button asChild flex="1" colorPalette="blue" variant="solid">
+          <a href={viewerHref(path, { line, heading })} data-file-open="" onClick={onClose}>
+            Open
+          </a>
+        </Button>
+        <Button flex="1" variant="outline" color="text" onClick={() => void copy()}>
           Copy link
         </Button>
-        <chakra.a
-          href={viewerHref(path, { line, heading })}
-          data-file-open=""
-          onClick={onClose}
-          color="tone.done.fg"
-          textDecoration="underline"
-          fontSize="sm"
-        >
-          Open
-        </chakra.a>
       </Flex>
     </BottomSheet>
   )
