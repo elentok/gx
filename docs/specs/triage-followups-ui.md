@@ -8,6 +8,8 @@ The web runs a Triage the way it runs a Design. Each project's open follow-up co
 
 A Triage has five steps: Verify, Plan, Approve, Write, Done. The agent verifies each follow-up against the code and plans the rows. The person then opens the Approve step of the Triage page, answers the quick questions in the shared question component, reviews five collapsible action groups, changes any row, and approves once. Approve starts a Write session that writes the rows. The Done view lists the result with links and offers a Queue button for the ready epic. gx never queues it on its own. One `gx-triage-follow-ups` skill drives both the web and the plain CLI, with the same routing rules.
 
+_Superseded by docs/specs/better-triage.md: the steps are now Verify, Route, Questions, Write, Done, and the Approve step with its Review view is gone._
+
 ## User Stories
 
 1. As a person with several projects, I want a follow-up badge in the sidebar footer, so that I can see that follow-ups are waiting without opening the Epics page.
@@ -23,23 +25,33 @@ A Triage has five steps: Verify, Plan, Approve, Write, Done. The agent verifies 
 11. As a person, I want Triage on the card to start a Triage and open its page, or open the live one when it exists, so that I never start a second Triage by accident.
 12. As a person, I want the same card to show a five-step ring, a state pill and a button that match the Triage state, so that I do not need a second Triage card.
 13. As a person, I want the Epics page to place a Triage card by this order, so that it orders my attention: a running session goes under "Designing" with Open; with no session and rows `pending`, under "Designing" with the pill "Stopped" and Continue (like a stopped Design); with no session, no `pending` row and at least one `failed` row, under "Needs you" with the pill "Waiting for you" and the button "Review failures"; and a Triage at Approve (always, since no session runs there) always under "Needs you" with the pill "Waiting for you" and the button "Review plan".
+    _Superseded by docs/specs/better-triage.md: the new card replaces the "Stopped" and "Waiting for you" pills and the Approve-first placement._
 14. As a person, I want the card to stay, reading "0 left", while a Triage is not done, so that the ring and pill do not vanish mid-Write.
 15. As a person, I want no Finished card after a Triage, and the card to stay with the kept count and a Triage button when rows were kept, so that the Epics page does not clutter.
 16. As a person, I want a Triage started from a plain CLI session and stopped at Verify, Plan or Write to show on the card as "Stopped" with Continue, and one at Approve to show "Waiting for you" with "Review plan" (never "Stopped"), so that I can pick it up in the web.
+    _Superseded by docs/specs/better-triage.md: the new card replaces the "Stopped" pill and the "Waiting for you" state at Approve._
 17. As a person, I want Continue on a stopped Triage to start a stepped session at the next step and never a second Triage, so that no work repeats.
 18. As a person, I want the Triage page at `/triage/<project>` to look like the Design page (header, step line, ring, primary button, session strip, Progress panel, composer), so that I already know how to use it.
 19. As a person, I want Verify to run as a working step that saves each verdict as it returns, so that I can see the progress.
 20. As a person, I want Verify to span as many sessions as it needs and auto-advance to chain them, so that a long list needs no babysitting.
 21. As a person, I want a fresh session to verify only the rows with no verdict yet, so that a stopped Triage never redoes saved work.
 22. As a person, I want Plan to end its session without a Continue or countdown, so that nothing moves on before I look at the plan.
+    _Superseded by docs/specs/better-triage.md: the Plan step is now Route, and the session does not end without a way on._
 23. As a person, I want the Approve step to open on a Questions view while any question is open and on a Review view once none is, so that I answer first.
+    _Superseded by docs/specs/better-triage.md: there is no Approve step, Questions view or Review view; the Questions step asks in rounds._
 24. As a person, I want the Questions view to be the shared question component unchanged (dots, "N of M answered", choices with the recommended mark, Huh?, Note, Prev and Next), so that answering behaves as on a Design.
+    _Superseded by docs/specs/better-triage.md: the Triage chat has no Questions view now._
 25. As a person, I want the Review view to show five collapsible action groups (Ready epic, Map epics, Merge into another, Close, Keep for later) with count, note and a set-all control, so that I can check the plan by action.
+    _Superseded by docs/specs/better-triage.md: the Review view and its five action groups are gone._
 26. As a person, I want to change a row's action and destination, with a changed row outlined, so that I see what I edited. The destination choices are the plan's suggested epics, the project's open map epics, and a "new map epic" option with a typed name; "Merge into" lists only the other rows whose current action is Ready epic or Map epic. When a merge target's action changes away from those, the rows merged into it are outlined and the Approve bar stays disabled until each one is re-pointed. The routing rules are unchanged.
+    _Superseded by docs/specs/better-triage.md: row edits are now routing corrections made through the Questions step, not edits in a Review view._
 27. As a person, I want an Evidence button on each row, so that I can check the verdict before I agree.
 28. As a person, I want one Approve bar under both views that is disabled while a question is open, says how many are left and links to Questions, so that I cannot approve with questions open.
+    _Superseded by docs/specs/better-triage.md: the Approve bar is gone; approval happens in the Questions step._
 29. As a person, I want the bar to show the counts per action and how many rows I changed, so that I know what Approve will do.
+    _Superseded by docs/specs/better-triage.md: the Approve bar and its counts are gone._
 30. As a person, I want Approve to save the plan as approved and start the Write session at once, so that no session waits while I edit. Approve is one verb doing a compare-and-set on the record revision.
+    _Superseded by docs/specs/better-triage.md: approval now moves the step from Questions to Write, with no Approve bar._
 31. As a person, I want the answers I gave to go into each ticket body when Write runs, so that the agent that picks the ticket up sees them.
 32. As a person, I want the Write step to list a row per follow-up with its state, so that I can follow the writes.
 33. As a person, I want a failed row to show the verb name and the refusal text unchanged, with Retry and Keep for later while the follow-up is still in `follow-ups`, and Retry only after its `move`, so that the ready epic never holds a half-set ticket I called "kept".
@@ -68,6 +80,7 @@ A Triage has five steps: Verify, Plan, Approve, Write, Done. The agent verifies 
 - One table keyed by flow gives the step list, labels, final step, skill name and Continue argument. Design keeps its list, `gx-design <map address>` and final step Branch or Done. Triage uses the five steps, `gx-triage-follow-ups --project <project>` and final step Done.
 - The wire step type is a plain string with a `flow` field. The generated TS regenerates, and the step-sync test moves to per-flow lists.
 - Each flow step says whether it needs a person. Triage Plan raises no Continue and no countdown, and Approve is the only way on. Verify and Write chain with auto-advance as usual. The Triage context-growth values for `gx agent context-window --fits` (verify, write) are the implementer's choice.
+  _Superseded by docs/specs/better-triage.md: Triage Plan and Approve no longer exist; the Questions step is the one that waits for the person._
 - Design-only code (design worktree launch, cleanup, map creation, drafts, charting handoff, Grilling, Hold, the impl link, Delete, workspace Move) stays in the Design packages and web files. The shared session code never imports it. It is reached only through a flow check at its own entry points.
 - Triage launch skips the design worktree and runs in the trunk checkout. A Triage session has no Ticket.
 - The `AskUserQuestion` ban stays on every stepped session, because the plan view replaces chat questions. A Triage has no Grilling round.
@@ -88,7 +101,9 @@ A Triage has five steps: Verify, Plan, Approve, Write, Done. The agent verifies 
 **Steps and sessions.**
 - Verify: Verify finds the live record and snapshot (created by the server start, or by the skill's create verb in a plain session). Each verdict is saved the moment its subagent returns, by the main session (subagents write nothing). Verify ends when every row has a verdict. Verify subagents use `gx agent model worker`.
 - Plan: dedupe is part of Plan, and merges stay plan rows until Write. Plan writes no epics or tickets and ends its session with a run-end line pointing to the web plan view. Plan's last save moves the stored step to Approve.
+  _Superseded by docs/specs/better-triage.md: Plan is now Route and Questions, and there is no Approve step._
 - Approve: no session runs. The Approve button calls the approve verb (compare-and-set on the revision) and launches a new Write session only if it won. The view (Questions or Review) is derived from the open-question count, and no new step is stored.
+  _Superseded by docs/specs/better-triage.md: there is no Approve step; the approve verb now moves the step from Questions to Write._
 - Write: takes the approved plan from the record and treats the person's fields as final (it never re-plans). Per row the ordered verbs are: write answers into the ticket body (the answers verb checks the body first and skips if they are already there), add the "seen again" merge note, `move` or `close`, then `set` type and status. Each verb checks the real ticket state first and skips what already happened, so no per-verb progress is stored. Retry reruns the whole row. Chain edges between ready-epic tickets and the code-review stub are written in a last pass, which a Retry of a failed row reruns (the server launches a Write session for it).
 - Done: every snapshot row is `done`, kept or gone and the last pass is complete (the record verb sets the Triage done then). The Done view shows the Queue button only when a ready epic exists, and a queued state derived from the ready epic's queue state, so it survives a reload. Follow-ups filed after the snapshot do not count and wait for the next Triage. The `--sweep` of `done` and `cancelled` follow-ups runs in Write's last pass.
 - Every step ends with a `✅ <step>: … Next: …` line. Continue is `/clear` then `/gx-triage-follow-ups --project <project>`, and the skill reads the step from the record.
@@ -98,11 +113,14 @@ A Triage has five steps: Verify, Plan, Approve, Write, Done. The agent verifies 
 **Skill.**
 - `gx-triage-follow-ups` runs `gx agent link --triage <project>` first. Success means web mode: Plan saves the rows and ends for the web plan view. Failure means chat mode: it prints the table in chat, asks the `quick` questions in one chat message, saves answers and edits through the person-field verb, and on "yes" runs Write in the same session. Both modes use the same record and verbs. It calls `gx agent step <verify|plan|write|done>` at each step.
 - Step detection reads the record through a verb: no live Triage starts one, otherwise the first match of Verify rows with no verdict, then Plan, then Approve (plan saved, not yet approved: wait for the person, in chat mode ask for "yes"), then Write once approved, then Done. A live Triage found from a plain session is continued, not duplicated.
+  _Superseded by docs/specs/better-triage.md: step detection is now verify, route, questions, write, done._
 - Unchanged: routing rules, "never grills", the correct-fix section, the `follow-ups-<date>` ready epic and map epics. The skill never queues the ready epic and points to the local tracker doc for verb syntax.
 
 **Server and wire.**
 - The Follow-ups card (one per project, absent when no open follow-up and no live Triage) takes the Triage state: count words of open follow-ups still in the epic, a five-step ring filled the way the Design epic card fills its ring, a state pill and a button per state. Placement order, with Approve checked first: a Triage at Approve always goes to Needs you with the pill "Waiting for you" and the button "Review plan", even while a Plan session is still live for a moment; then a running session goes to Designing with Open (as `placeDesign` puts a running Design); then no session with a row `pending`, or with all rows written but the last pass not complete (a crash after the last row save), goes to Designing with the ring at the stored step, the pill "Stopped" and Continue (Continue reruns the last pass), like a stopped Design (a stopped Design shows no pill today, so the pill is new); then no session, no `pending` row and at least one `failed` row goes to Needs you with the pill "Waiting for you" and the button "Review failures" opening `/triage/<project>`. The ring percent is `(index of the stored step + share of the step's rows handled) / 4`, as a percent, Done = 100 (the mock numbers are illustrative). A card with no Triage is in "Ready to design". "Stopped" never shows at Approve. The card stays while a Triage is not done (even at zero open follow-ups, reading "0 left"); after done it is absent at zero and present with the kept count when rows were kept. The card title links to `/triage/<project>`.
+  _Superseded by docs/specs/better-triage.md: the card placement that checks Approve first, and the "Stopped" and "Waiting for you" pills, are replaced by the new card._
 - gx stops an idle Triage session once its stored step is final (Approve, Done, or Write with no row `pending`), as `stopFinishedDesign` does for a Design. This is what "Plan ends its session" and "Approve: no session runs" mean, so the card reads "no session" at Approve and after a Write that left failed rows. It never stops a working session. It adds no pause kind.
+  _Superseded by docs/specs/better-triage.md: an idle Triage session at the Questions step is kept alive, not stopped._
 - "N left" is the number of snapshot rows whose follow-up is still in `follow-ups` as draft or open (kept rows count; follow-ups filed after the snapshot do not).
 - A project is in a workspace when at least one of its Design or Implementation cards is; a project with none is in the Default workspace. The count entry and the card carry that list, so a named workspace shows the card and the badge row of its projects.
 - The ledger rebuild that reads session `meta.json` reads `flow` too, so rebuilt Triage sessions stay in the Triage group. This is not a schema migration.

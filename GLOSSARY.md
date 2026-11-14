@@ -293,8 +293,7 @@ question's type (`yes-no`, `options` or `text`), its options, and which option i
 question without one is a free-text question. A question in a **Grilling round** carries one too.
 Not the **Pause reason text**, which is the question's summary line.
 
-**Question sheet** — the panel in a web chat that shows the chat's **Question cards**. The Design and
-Triage chats call it the Questions view today.
+**Question sheet** — the panel in a web chat that shows the chat's **Question cards**.
 
 **Question card** — one item in a **Question sheet**. The server builds it from one source and gives it
 a source, an id and a type. Not a **Pause round**'s question, which is one question a Paused ticket
@@ -643,9 +642,9 @@ the epic).
 
 **Triage** — one run that empties a project's `follow-ups` epic: each follow-up is checked against
 the code, duplicates are merged, and every one is either resolved into a real epic (a ready epic of
-fixes, or an area map epic for what needs deciding) or closed with a reason. A person approves the
-plan once before anything is written. Like a Design, a Triage moves through steps in one or more
-sessions. _Avoid_: resolve follow-ups, follow-ups review.
+fixes, or an **Area** for what needs deciding) or closed with a reason. In the Questions step the agent
+asks the person in rounds, then the person approves once before anything is written. Like a Design, a
+Triage moves through steps in one or more sessions. _Avoid_: resolve follow-ups, follow-ups review.
 
 **Area** — a project's standing backlog of follow-ups that need deciding, grouped by subject (for
 example test health). An area never runs a Design itself. A Triage adds to it, and a Design starts
@@ -659,8 +658,8 @@ Design button.
 list, final step and skill. _Avoid_: wizard (it implies a person clicking through screens), workflow.
 
 **Stepped session** — an interactive session that runs a **Flow**: a design session or a Triage
-session. Both show Progress, offer Continue between steps and can auto-advance, except where a step
-needs the person (the Triage plan).
+session. Both show Progress, offer Continue between steps and can auto-advance, except that a Triage
+stops at its Questions step until the person answers and approves.
 
 **Retro** — a look back at one finished loop epic's run, judging the tooling and process (not the
 project's code) and filing follow-ups for what went wrong. An epic gets at most one retro; once it

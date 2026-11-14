@@ -182,8 +182,10 @@ conversation history.
   warnings. Use `--dry-run` first.
 - **Close a follow-up**: `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it|promoted
   [--note ...]` — see "Follow-ups".
-- **Create or edit an epic**: `gx tickets epic add <project:epic> --kind map|loop --status
-  draft|open [--body -]` creates the epic's `ticket.md`. It refuses a taken name: an existing epic,
+- **Create or edit an epic**: `gx tickets epic add <project:epic> --kind map|loop|area --status
+  draft|open [--body -]` creates the epic's `ticket.md`. An `area` epic is a project's standing
+  backlog: its status is `open`, a project has at most 12, `gx tickets epics --areas` lists them, the
+  queue refuses one, and `gx tickets set --kind` cannot change a kind to or from `area`. It refuses a taken name: an existing epic,
   a branch of that name, or a name an earlier, merged epic used (its `Ralph-Loop-Ticket` trailers
   are on trunk). `publish` refuses a taken name the same way when it creates the epic.
   `gx tickets epic next-name <project:base>` prints the first free name of `base`, `base-2`,
@@ -342,8 +344,9 @@ dot prefix keeps the epic loader away; no folder means no Triage). The record, n
 says where the run is, so a `/clear`ed or a web session continues the same record.
 
 - **Record state**: `live`, `done` or `abandoned`. One live record per project.
-- **Step**, detected by `gx tickets triage show`: `start` (no live record), `verify` (a row has no
-  verdict), `plan`, `approve` (plan saved, not approved), `write` (approved), `done`.
+- **Version**: 2. **Step**, detected by `gx tickets triage show`: `start` (no live record), `verify` (a
+  row has no verdict), `route` (rows and areas are chosen), `questions` (rounds of questions, then
+  the approval), `write` (approved), `done`.
 - **Row write state**, set during write: `pending`, `done`, `failed` or `gone`.
 - **Every verb takes `--project <p>`** (default: the cwd's project). Write verbs take `--revision <n>`; a
   stale one is refused, so reprint the record and ask again. Run `gx tickets triage --help` and
@@ -351,13 +354,25 @@ says where the run is, so a `/clear`ed or a web session continues the same recor
   - `create`, `show [--json]`, `pending [--json]`: start, read, and list the rows with no verdict.
   - `verdict --row <addr> [--verdict relevant|fixed|obsolete] [--evidence ..] [--file ..] [--question ..]
     [--destination ..] | --gone`: save one verdict.
-  - `plan [--gone <addr>]` (rows as JSON on stdin; a quick question with `"auto": true` is saved answered
-    with its default), `row --row <addr> --revision <n> ...` (the person's
-    edits, step approve only), `approve --revision <n>`, `abandon`.
+  - `plan [--gone <addr>]` (rows as JSON on stdin), `row --row <addr> --revision <n> ...` (the person's
+    edits), `area --name <area> --source table|agent [--confirm]` (an area entry, step route or
+    questions), `correct --row <addr> --action area|ready` (a routing correction).
+  - `round [--objection]` (questions as JSON on stdin, saved before they are printed; at most 6 per
+    round, a fourth ordinary round is refused), `answer --question <id> --answer <text>`, `decide
+    --row <addr> --question <text> --choice <text>` (a question the agent settled itself), `object
+    --row <addr> --question <text> --option <text>...` (the person's objection to a decision),
+    `open-round [--json]` (the first round with unanswered questions; a fresh session reprints it).
+  - `oldepics [--json]`: the old triage-made map epics to move into areas (read only), then `moves`
+    (step route, JSON on stdin), `move-state`, `move-locate`: the move units.
+  - `approve --revision <n>`: step questions only. A step already past questions prints "already
+    approved"; a changed revision is refused as stale. It is also refused while a question is open,
+    an agent area is unconfirmed or a merge target is orphaned.
+  - `abandon`: allowed at verify, route and questions.
+  - Start Design is `gx tickets start-design <project:area>`: it creates a charting map from an
+    area's tickets and moves them in. Rerun it after a failure.
   - `locate --row <addr> [--seen-from <addr>]`: where the follow-up is now and what is already written.
   - `answers`, `seen-again`, `epics`, `write-state`, `last-pass`: the idempotent write-step verbs.
   - `abandon` is refused once the step is `write`.
-
 ## Skill conventions
 
 Rules every gx skill follows when it names a model or launches a sub-agent:
