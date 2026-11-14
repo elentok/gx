@@ -74,11 +74,13 @@ func checkShape(sc scenario, shape string) (string, error) {
 		def, names = "c-few", spec.TriageShapes
 	case sc.SchedulesShaped:
 		def, names = "list", spec.SchedulesShapes
+	case sc.EpicDiffShaped:
+		def, names = spec.EpicDiffShapes[0], spec.EpicDiffShapes
 	case sc.DevMode:
 		def, names = spec.DevModeShapes[0], spec.DevModeShapes
 	default:
 		if shape != "" {
-			return "", fmt.Errorf("--shape only applies to the limits, spend, limit-burn, triage, schedules and dev-mode scenarios")
+			return "", fmt.Errorf("--shape only applies to the limits, spend, limit-burn, triage, schedules, epic-diff and dev-mode scenarios")
 		}
 		return "", nil
 	}

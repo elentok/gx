@@ -634,6 +634,9 @@ var Scenarios = map[string]scenario{
 	// schedules: Schedules and their Last runs in the shape --shape names (default list).
 	// run swaps in spec.SchedulesScenario(shape).
 	"schedules": {SchedulesShaped: true},
+	// epic-diff: real git history and stored epics for the Diff page, in the shape --shape
+	// names (default merged). run swaps in spec.EpicDiffScenario(shape).
+	"epic-diff": {EpicDiffShaped: true},
 	// dev-mode: a Dev checkout and a fake pnpm in the state --shape names (default running).
 	"dev-mode": {DevMode: true},
 	// dirty-trunk: a complete epic whose merge is paused because trunk's checkout

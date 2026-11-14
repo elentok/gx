@@ -14,6 +14,7 @@
 // --shape <menu|few-days|stale|past-reset|stats> picks the seeded limit history of the limit-burn scenario (default menu).
 // --shape <c-zero|c-few|c-many|c-live|c-named|verify|b-questions|b-review|writing|result|stopped|journey> picks the Triage state of the triage scenario (default c-few).
 // --shape <list|all-off|empty|page|paused|missing-project> picks the Schedules and Last runs of the schedules scenario (default list).
+// --shape <merged|running|unstamped|empty|missing-sha> picks the Epic ranges and branches of the epic-diff scenario (default merged).
 // --shape <running|off|installing|starting|down|no-checkout> picks the Dev mode state of the dev-mode scenario (default running).
 // --env prints `export` lines (see Output.ShellEnv) instead of the JSON, so a shell can source them.
 // --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
@@ -70,6 +71,9 @@ func run(args []string) (err error) {
 	}
 	if sc.SchedulesShaped {
 		sc, _ = spec.SchedulesScenario(shape)
+	}
+	if sc.EpicDiffShaped {
+		sc, _ = spec.EpicDiffScenario(shape)
 	}
 	if sc.LimitBurn && shape == "live" {
 		sc = limitBurnLive()

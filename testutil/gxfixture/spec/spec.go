@@ -251,6 +251,9 @@ type Scenario struct {
 	// SchedulesShaped marks the schedules scenario, whose whole content comes
 	// from the --shape value (SchedulesScenario).
 	SchedulesShaped bool
+	// EpicDiffShaped marks the epic-diff scenario, whose whole content comes
+	// from the --shape value (EpicDiffScenario).
+	EpicDiffShaped bool
 	// DevMode seeds a Dev checkout and the fake pnpm in the state the --shape
 	// value names (default running); see DevModeShapes and devmode.go.
 	DevMode bool

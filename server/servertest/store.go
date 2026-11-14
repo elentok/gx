@@ -84,6 +84,8 @@ type TicketOpts struct {
 	Launch []schema.LaunchStamp
 	// Result is the body of a "## Result" section, omitted when empty.
 	Result string
+	// Commitless writes commitless: true, a ticket that makes no commit.
+	Commitless bool
 }
 
 // WriteTicketWith is WriteTicket with a type, a parent and several blockers. Unlike
@@ -169,6 +171,9 @@ func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) err
 		if stamp[1] != "" {
 			fm += stamp[0] + ": " + stamp[1] + "\n"
 		}
+	}
+	if opts.Commitless {
+		fm += "commitless: true\n"
 	}
 	if opts.LongTicketTurns > 0 {
 		fm += "long_ticket_turns: " + strconv.Itoa(opts.LongTicketTurns) + "\n"

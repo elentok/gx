@@ -33,6 +33,16 @@ first: Finished, Finished, Ran late and a Skipped set time (reason `late`); `pau
 `missing-project` has one Schedule, on, in a store folder with no `project.json`. The machine id is fixed (`fixture1`) so the
 seeded One-offs carry the server's Dedupe key. Data: `testutil/gxfixture/spec/schedules.go`; the files and state are written by
 `testutil/gxfixture/seedschedules.go`.
+The `epic-diff` scenario seeds real git history and stored epics in the project `demo` for the Diff page
+(`start("epic-diff", { shape })`; default `merged`). Shapes: `merged` is the merged `widgets-impl` (map `widgets`, merged, no
+range) with a stamped Epic range of 15 commits over tickets 01 (every commit stamped `demo:<epic>/<id>`), 02 (legacy
+`<epic>/<id>` form) and 03 (only the last commit stamped; 01's commits are not adjacent), a design commit, an Other commit, the
+design merge commit, a rename, a png, `go.sum`, a 5000-line file and a 200-line file with few changes; ticket 04 is done and
+commitless; `widgets-old-impl` is archived with its own range. `running` has `alpha-impl` (commits past trunk), `beta-impl`
+(blocked by `alpha-impl`, so based on its branch; the project is on-done), `gamma-impl` (blocked by merged `shipped-impl`, based
+on trunk), `custom-impl` (`base: release`) and `quiet-impl` (no commits past its base). `unstamped` is a merged epic with no
+range and no branch; `empty` has a stamped range with base equal to tip; `missing-sha` has a tip SHA that was never committed.
+The names are constants in `testutil/gxfixture/spec/epicdiff.go`; the commits are made by `GitSetup` there.
 The `dev-mode` scenario runs a Dev checkout (`server.web.dev-dir`, with `webui/package.json`) against the fake `pnpm`
 (`testutil/vitefake`), first on the server's PATH, in the state its shape names (`start("dev-mode", { shape })`; default `running`).
 The snapshot Dev block (`GET /v1/snapshot`) shows: `off` (key off, valid checkout), `installing` (key on, stale `node_modules`, install
