@@ -3764,6 +3764,10 @@ export interface ProjectWorktrees {
   root: string;
   worktrees: string[];
   tiers: { [key: string]: string};
+  /**
+   * TierModels holds configured models by harness and tier.
+   */
+  tier_models?: { [key: string]: { [key: string]: string}};
 }
 /**
  * Tip is one entry of the tips page. Folders is filled by the call for tips

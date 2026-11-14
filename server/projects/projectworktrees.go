@@ -14,8 +14,12 @@ import (
 // tierModels resolves each tier's model for the harness a web-created session
 // launches.
 func (p *Registry) TierModels(project string) map[string]string {
+	return p.tierModelsFor(project, p.LaunchHarness(project))
+}
+
+func (p *Registry) tierModelsFor(project, harness string) map[string]string {
 	agents := p.AgentsConfig(project)
-	agentKind := agent.AgentFor(p.LaunchHarness(project))
+	agentKind := agent.AgentFor(harness)
 	out := map[string]string{}
 	for _, t := range agent.AllTiers {
 		out[string(t)], _ = agent.ResolveTier(agents, agentKind, t)
@@ -40,7 +44,12 @@ func (p *Registry) ListWorktrees() ([]wire.ProjectWorktrees, error) {
 			continue
 		}
 		name := tickets.ProjectName(dir)
-		p := wire.ProjectWorktrees{Project: name, Root: repo.Root, Worktrees: []string{}, Tiers: p.TierModels(name)}
+		p := wire.ProjectWorktrees{Project: name, Root: repo.Root, Worktrees: []string{}, Tiers: p.TierModels(name),
+			TierModels: map[string]map[string]string{
+				"claude": p.tierModelsFor(name, "claude"),
+				"codex":  p.tierModelsFor(name, "codex"),
+			},
+		}
 		wts, _ := git.ListWorktrees(*repo)
 		for _, wt := range wts {
 			if filepath.Clean(wt.Path) != filepath.Clean(repo.Root) {

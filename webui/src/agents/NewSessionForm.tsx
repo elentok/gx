@@ -31,9 +31,6 @@ const HARNESSES: { id: Harness; label: string }[] = [
 ]
 const TRUNK_NAMES = ["main", "master"]
 
-// A Claude tier reads as the family: "Worker (Claude Sonnet)". Tier models are only known for Claude.
-const tierModel = (id: string) => modelName(id, "claude")
-
 /** The First prompt textarea with the `/` menu. The list is read for the chosen worktree, or the project root when one is being created. */
 function PromptField({
   value,
@@ -294,13 +291,18 @@ export function NewSessionForm({
                 appearance="none"
                 pr="8"
               >
-                {TIERS.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {harness === "claude" && current?.tiers[t.id]
-                      ? `${t.label} (${tierModel(current.tiers[t.id])})`
-                      : t.label}
-                  </option>
-                ))}
+                {TIERS.map((t) => {
+                  // Older servers only expose Claude's tier models.
+                  const models =
+                    current?.tier_models?.[harness] ??
+                    (harness === "claude" ? current?.tiers : undefined)
+                  const model = models?.[t.id]
+                  return (
+                    <option key={t.id} value={t.id}>
+                      {model ? `${t.label} (${modelName(model, harness)})` : t.label}
+                    </option>
+                  )
+                })}
               </chakra.select>
             </Field>
             <Field label="First prompt" optional>

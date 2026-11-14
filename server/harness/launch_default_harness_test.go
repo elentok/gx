@@ -73,6 +73,14 @@ func TestProjectWorktrees_TiersFollowProjectDefaultHarness(t *testing.T) {
 		t.Fatalf("worktrees = %+v, %v", list, err)
 	}
 	for _, p := range list {
+		for harness, kind := range map[string]agent.AgentKind{"claude": agent.AgentClaude, "codex": agent.AgentCodex} {
+			for _, tier := range agent.AllTiers {
+				want, _ := agent.ResolveTier(config.DefaultAgentsConfig(), kind, tier)
+				if got := p.TierModels[harness][string(tier)]; got != want {
+					t.Errorf("%s %s %s model = %q, want %q", p.Project, harness, tier, got, want)
+				}
+			}
+		}
 		agentKind := agent.AgentCodex
 		if p.Project == "claude" {
 			agentKind = agent.AgentClaude

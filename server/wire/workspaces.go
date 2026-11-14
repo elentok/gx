@@ -11,6 +11,8 @@ type ProjectWorktrees struct {
 	Root      string            `json:"root"`
 	Worktrees []string          `json:"worktrees"`
 	Tiers     map[string]string `json:"tiers"`
+	// TierModels holds configured models by harness and tier.
+	TierModels map[string]map[string]string `json:"tier_models,omitempty"`
 }
 
 // Tip is one entry of the tips page. Folders is filled by the call for tips

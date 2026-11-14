@@ -32,6 +32,10 @@ const trees: ProjectWorktrees[] = [
     root: "/dev/gx",
     worktrees: ["/dev/gx-stats", "/dev/gx-stats-axis-labels"],
     tiers: { light: "haiku", worker: "sonnet", strongest: "opus" },
+    tier_models: {
+      claude: { light: "haiku", worker: "sonnet", strongest: "opus" },
+      codex: { light: "gpt-5.4-mini", worker: "gpt-5.4", strongest: "custom" },
+    },
   },
   {
     project: "blog",
@@ -287,6 +291,41 @@ test("the tier picker lists three tiers with their models, defaults to worker an
   submit()
   await waitFor(() => expect(onCreated).toHaveBeenCalled())
   expect(posts[0].tier).toBe("strongest")
+})
+
+test("older servers still show Claude tier models", async () => {
+  mount({
+    fetchTrees: async () => [
+      {
+        project: "gx",
+        root: "/dev/gx",
+        worktrees: [],
+        tiers: { light: "haiku", worker: "claude-sonnet-5-5", strongest: "opus" },
+      },
+    ],
+  })
+  await ready()
+  expect(screen.getByRole("option", { name: "Worker (Claude Sonnet 5.5)" })).toBeTruthy()
+  fireEvent.change(screen.getByRole("combobox", { name: "Harness" }), {
+    target: { value: "codex" },
+  })
+  expect(screen.queryByRole("option", { name: /Sonnet/ })).toBeNull()
+})
+
+test("switching harness updates the models and keeps the selected tier", async () => {
+  mount()
+  await ready()
+  const picker = screen.getByRole("combobox", { name: "Tier" }) as HTMLSelectElement
+  fireEvent.change(picker, { target: { value: "strongest" } })
+  fireEvent.change(screen.getByRole("combobox", { name: "Harness" }), {
+    target: { value: "codex" },
+  })
+  expect([...picker.options].map((o) => o.textContent)).toEqual([
+    "Light (Codex GPT-5.4-Mini)",
+    "Worker (Codex GPT-5.4)",
+    "Strongest (Codex custom)",
+  ])
+  expect(picker.value).toBe("strongest")
 })
 
 test("the Name placeholder follows the worktree", async () => {
