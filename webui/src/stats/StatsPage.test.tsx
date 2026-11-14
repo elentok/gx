@@ -447,6 +447,30 @@ test("the Web performance cards show value, pill, the server's change and the de
   expect(fcp.dataset.low).toBe("true")
 })
 
+test("a project filter leaves the Web performance values unchanged and the scope text says so", async () => {
+  const wp = perfStats({
+    hard_loads: [perfCard("lcp", 412, { p75: 2310, status: "good", change_pct: -7.2 })],
+  }).web_performance
+  // Like the server: the project narrows the other sections, never Web performance.
+  const fetchStats = vi.fn<FetchStats>(async ({ project }) =>
+    statsOf({ tickets_merged: project ? [9, 9, 9] : [1, 2, 3] }, { web_performance: wp }),
+  )
+  const sectionText = async () => (await screen.findByTestId("perf-card-lcp")).textContent ?? ""
+
+  renderStats(fetchStats, "/stats")
+  const unfiltered = await sectionText()
+  expect(await cardText("Tickets merged")).toContain("6")
+  cleanup()
+  sessionStorage.clear()
+
+  renderStats(fetchStats, "/stats?project=gx")
+  expect(await sectionText()).toBe(unfiltered)
+  expect(unfiltered).toContain("2.31 s")
+  expect(await cardText("Tickets merged")).toContain("27")
+  expect(fetchStats).toHaveBeenLastCalledWith({ range: 7, project: "gx", includeDev: false })
+  expect(screen.getByText(/All projects, ignores the project filter/)).toBeTruthy()
+})
+
 test("the Route changes tab shows its cards and round-trips through the URL", async () => {
   const router = renderStats(async () =>
     perfStats({

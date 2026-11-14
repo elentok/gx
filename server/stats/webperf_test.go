@@ -152,6 +152,24 @@ func TestStats_WebPerformanceChangeIsNullWithoutStoredPrecedingWindow(t *testing
 	}
 }
 
+func TestStats_WebPerformanceCountsFollowTheRange(t *testing.T) {
+	t.Parallel()
+	get := perfStats(t,
+		perfRepeat(3, 10, perfSample("lcp", "hard", 1000)),
+		perfRepeat(20, 20, perfSample("lcp", "hard", 1000)),
+		perfRepeat(60, 30, perfSample("lcp", "hard", 1000)),
+	)
+	for _, tc := range []struct {
+		query string
+		want  int
+	}{{"?range=7", 10}, {"?range=30", 30}, {"?range=90", 60}} {
+		lcp := perfCard(t, get(tc.query).WebPerformance.HardLoads, "lcp")
+		if lcp.Count != tc.want {
+			t.Errorf("%s lcp count = %d, want %d", tc.query, lcp.Count, tc.want)
+		}
+	}
+}
+
 func TestStats_WebPerformanceChangeIsAlwaysNullFor90Days(t *testing.T) {
 	t.Parallel()
 	get := perfStats(t, perfRepeat(1, 20, perfSample("lcp", "hard", 1500)), perfRepeat(100, 20, perfSample("lcp", "hard", 1000)))
