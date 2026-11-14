@@ -305,8 +305,13 @@ func runTicketsPublish(d Deps, epicArg, manifestPath string, dryRun, jsonOut, al
 		if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, *epic, resolve); err != nil {
 			return err
 		}
-	} else if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, tickets.Epic{}, resolve); err != nil {
-		return err
+	} else {
+		if err := refuseTakenEpicName(projectDir, project, name); err != nil {
+			return err
+		}
+		if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, tickets.Epic{}, resolve); err != nil {
+			return err
+		}
 	}
 
 	// The lint report goes to stderr when the table is JSON, so stdout stays parseable.

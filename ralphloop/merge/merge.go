@@ -49,7 +49,7 @@ type MergeDeps struct {
 	CherryPickRange      func(dir, fromExclusive, toInclusive string) error
 	CherryPickInProgress func(dir string) (bool, error)
 	AppendTrailers       func(dir string, trailers ...history.Trailer) error
-	MergedTickets        func(dir, featureBranch string) (map[string]bool, error)
+	MergedTickets        func(dir, base, featureBranch string) (map[string]bool, error)
 	// SessionHomes are where the merging session's transcripts are read from.
 	SessionHomes metrics.SessionHomes
 }
@@ -84,7 +84,7 @@ func MergeDepsOf(d deps.Deps) MergeDeps {
 		CherryPickRange:      d.CherryPickRange,
 		CherryPickInProgress: d.CherryPickInProgress,
 		AppendTrailers:       d.AppendTrailers,
-		MergedTickets:        MergedTickets,
+		MergedTickets:        MergedTicketsSince,
 		SessionHomes:         d.SessionHomes,
 	}
 }
@@ -156,7 +156,8 @@ func (e *AmbiguousMergeError) Error() string {
 // alreadyApplied is the evidence ladder: recorded-SHA reachability, then
 // patch-equivalence. A ticket trailer with neither is an AmbiguousMergeError,
 // not proof: a re-resolved conflict and a different commit reusing the ticket
-// trailer look the same, and picking again could merge it twice. An unreadable
+// trailer look the same, and picking again could merge it twice. Only trailers
+// after the iteration base count (see MergedTicketsSince). An unreadable
 // trailer history is inconclusive, not an error: the pick itself still guards
 // against a double merging.
 func alreadyApplied(d MergeDeps, lp MergeParams) (bool, error) {
@@ -176,7 +177,7 @@ func alreadyApplied(d MergeDeps, lp MergeParams) (bool, error) {
 	if applied {
 		return true, nil
 	}
-	merged, err := d.MergedTickets(lp.FeatureWorktree, lp.FeatureBranch)
+	merged, err := d.MergedTickets(lp.FeatureWorktree, lp.SourceRange.Base, lp.FeatureBranch)
 	if err != nil || !merged[lp.TicketID] {
 		return false, nil
 	}

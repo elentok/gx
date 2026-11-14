@@ -24,7 +24,20 @@ func EpicTrailerLines(dir, ref, epic string) (added, removed int, err error) {
 // doesn't exist) — callers must keep that "unknown" outcome distinct from a
 // ticket simply being absent from a successfully-computed map ("not merged").
 func MergedTickets(dir, featureBranch string) (map[string]bool, error) {
-	trailers, err := history.TrailerMap(dir, featureBranch, TicketTrailerKey)
+	return MergedTicketsSince(dir, "", featureBranch)
+}
+
+// MergedTicketsSince is MergedTickets over the commits of base..featureBranch
+// only; an empty base reads the whole history. A merge check passes the
+// iteration base: a trailer reachable from it predates the iteration, such as
+// one left on trunk by an earlier epic with the same slug, so it can't mean
+// this iteration merged.
+func MergedTicketsSince(dir, base, featureBranch string) (map[string]bool, error) {
+	ref := featureBranch
+	if base != "" {
+		ref = base + ".." + featureBranch
+	}
+	trailers, err := history.TrailerMap(dir, ref, TicketTrailerKey)
 	if err != nil {
 		return nil, err
 	}

@@ -22,6 +22,9 @@ func runTicketsEpicAdd(cfgDirs config.Dirs, cwd, arg, kind, status, body string,
 	if err != nil {
 		return err
 	}
+	if err := refuseTakenEpicName(projectDir, project, name); err != nil {
+		return err
+	}
 	records, err := conversations.DirIn(cfgDirs)
 	if err != nil {
 		return err
@@ -86,7 +89,28 @@ func newTicketsEpicCmd(d Deps) *cobra.Command {
 	addCmd.Flags().StringVar(&kind, "kind", "", "map or loop (required unless the body's frontmatter sets it)")
 	addCmd.Flags().StringVar(&status, "status", "", "draft or open (default draft)")
 	addCmd.Flags().StringVar(&body, "body", "", "epic body, or - to read it from stdin; its frontmatter may set kind, status, destination_unconfirmed")
-	epicCmd.AddCommand(addCmd, newTicketsEpicSetCmd(d))
+	nextNameCmd := &cobra.Command{
+		Use:   "next-name <project:base>",
+		Short: "print project:base, or project:base-2, -3 … when base is taken (exists, or used by an earlier epic)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cwd, err := d.Getwd()
+			if err != nil {
+				return err
+			}
+			projectDir, project, base, err := resolveEpicTarget(d.dirs(), cwd, args[0])
+			if err != nil {
+				return err
+			}
+			name, err := nextEpicName(projectDir, project, base)
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(c.OutOrStdout(), "%s:%s\n", project, name)
+			return err
+		},
+	}
+	epicCmd.AddCommand(addCmd, nextNameCmd, newTicketsEpicSetCmd(d))
 	return epicCmd
 }
 

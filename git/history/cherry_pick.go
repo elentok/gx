@@ -181,6 +181,21 @@ func TrailerCommitExists(dir, ref, key, value string) (bool, error) {
 	return strings.TrimSpace(out) != "", nil
 }
 
+// TrailerPrefixCommit returns the newest commit reachable from ref whose
+// message has a "key: <prefix>..." line for any of prefixes, or "" when none
+// does. It stops at the first match, so a used prefix is cheap to find.
+func TrailerPrefixCommit(dir, ref, key string, prefixes ...string) (string, error) {
+	args := []string{"log", "-1", "--format=%H", "--fixed-strings"}
+	for _, p := range prefixes {
+		args = append(args, "--grep="+key+": "+p)
+	}
+	out, _, err := run.Exec(dir, append(args, ref))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
 // TrailerMap parses every commit reachable from ref for a key trailer (git
 // log --format='%H %(trailers:key=...,valueonly)') into a value→SHA map — a
 // single shell-out replacing what would otherwise be one TrailerCommitExists

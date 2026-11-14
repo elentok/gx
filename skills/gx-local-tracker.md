@@ -181,7 +181,11 @@ conversation history.
 - **Close a follow-up**: `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it|promoted
   [--note ...]` — see "Follow-ups".
 - **Create or edit an epic**: `gx tickets epic add <project:epic> --kind map|loop --status
-  draft|open [--body -]` creates the epic's `ticket.md` and refuses an existing epic. A frontmatter
+  draft|open [--body -]` creates the epic's `ticket.md`. It refuses a taken name: an existing epic,
+  a branch of that name, or a name an earlier, merged epic used (its `Ralph-Loop-Ticket` trailers
+  are on trunk). `publish` refuses a taken name the same way when it creates the epic.
+  `gx tickets epic next-name <project:base>` prints the first free name of `base`, `base-2`,
+  `base-3`, …. A frontmatter
   block at the top of the body may carry the settable epic fields (e.g.
   `destination_unconfirmed: true`); any other field refuses the add. `gx tickets section` and
   `gx tickets set` accept an epic address (`project:epic`, no ticket id) and validate it against the

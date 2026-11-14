@@ -110,7 +110,7 @@ One row per item with its action and suggested destination:
 
 - **close (reason)** — `fixed` or `obsolete`, with the evidence.
 - **merge into X** — a duplicate of X.
-- **ready epic** — `follow-ups-<date>`, as `implement`.
+- **ready epic** — `follow-ups-<date>` (Write may add a `-2` suffix, see Write), as `implement`.
 - **map epic Y** — as `grilling` or `research`, with the area slug Y.
 
 Routing, first match wins:
@@ -154,7 +154,12 @@ Write. Do not write anything before approval.
 ## 4. Write
 
 Write takes the approved plan as final and never re-plans. Report the step with `gx agent step
-write`. Record the epics first (`gx tickets triage epics`), then run each row in order with the
+write`. Name the ready epic first. If `gx tickets triage show --json` already has a `readyEpic`
+(a re-run), use it. Otherwise run `gx tickets epic next-name <project>:follow-ups-<date>`, with
+today's date. It prints `follow-ups-<date>` when that name is free, else the next free one
+(`follow-ups-<date>-2`, `-3`, …). A name is taken when the epic exists or an earlier epic with that
+name merged. Each Triage makes its own ready epic and never joins another one. Record the epics
+(`gx tickets triage epics`), then run each row in order with the
 tracker's verbs. Before each action ask `gx tickets triage locate`, and do only what it says is not
 yet done, so a re-run after a `/clear` repeats nothing.
 
@@ -171,7 +176,7 @@ Per row, in this order:
 
 **Ready epic.** `implement` rows are not moved one by one. After every row's answers are saved
 (`gx tickets triage answers` runs first, so the answers sit in the body's Decisions), publish the
-whole ready epic `<project>:follow-ups-<date>` once, unattended, through
+whole ready epic once, unattended, through
 [gx-to-tickets](../gx-to-tickets/SKILL.md) in its "no spec" mode. It never quizzes. The input is the
 follow-up bodies: the brief (`Suggested fix`) with the verify evidence and the answers. Build one
 plan, run `draft`, the writers (when 4 or more), `lint-claims` and one `publish`.

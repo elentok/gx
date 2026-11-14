@@ -120,7 +120,7 @@ func TestMergeTicket_TrailerOnly_IsAmbiguousNamingTheSHAs(t *testing.T) {
 	d := MergeDepsOf(fakes.TestDeps())
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.PatchesApplied = func(dir, upstream, base, branch string) (bool, error) { return false, nil }
-	d.MergedTickets = func(dir, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
+	d.MergedTickets = func(dir, base, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
 
 	res, err := MergeTicket(d, lp)
 	var amb *AmbiguousMergeError
@@ -138,7 +138,7 @@ func TestMergeTicket_TrailerOnlyWithoutRecordedSHA_SaysNone(t *testing.T) {
 	_, lp := mergeFixture(t, false)
 	d := MergeDepsOf(fakes.TestDeps())
 	d.PatchesApplied = func(dir, upstream, base, branch string) (bool, error) { return false, nil }
-	d.MergedTickets = func(dir, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
+	d.MergedTickets = func(dir, base, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
 
 	_, err := MergeTicket(d, lp)
 	if err == nil || !strings.Contains(err.Error(), "recorded SHA none") {
