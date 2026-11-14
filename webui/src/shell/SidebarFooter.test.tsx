@@ -8,6 +8,9 @@ import { SidebarFooter } from "./SidebarFooter"
 
 afterEach(cleanup)
 
+const startNewDesign = vi.hoisted(() => vi.fn())
+vi.mock("../design/newDesign", () => ({ startNewDesign }))
+
 const meter = (state: string) => ({ level: 1, state, read_at: "" })
 
 function setup(
@@ -62,6 +65,14 @@ test("Dev mode alone adds no indicator to the footer", () => {
   setup({ mode: "running", dev: { state: "running", has_checkout: true } })
   expect(document.querySelector('[data-part="indicators"]')).toBeNull()
   expect(document.querySelector('[data-part="dev-pill"]')).toBeNull()
+})
+
+test("the + New menu's New design item calls the action once", async () => {
+  startNewDesign.mockClear()
+  setup()
+  fireEvent.click(screen.getByRole("button", { name: "+ New" }))
+  fireEvent.click(await screen.findByRole("menuitem", { name: "New design" }))
+  await waitFor(() => expect(startNewDesign).toHaveBeenCalledTimes(1))
 })
 
 test("the + New menu lists the three items and New workspace calls its prop", async () => {

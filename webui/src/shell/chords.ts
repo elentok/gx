@@ -4,7 +4,8 @@ import { useConnectionContext, useConnectionState } from "../connection"
 import type { SessionInfo } from "../generated/server"
 import { isMac } from "../platform"
 import { focusSidebar } from "./focusSidebar"
-import { openNewAgent, openNewDesign } from "./newItemOpen"
+import { startNewDesign } from "../design/newDesign"
+import { openNewAgent } from "./newItemOpen"
 
 type Modifier = "cmd" | "ctrl" | "alt" | "shift"
 const MODIFIERS: readonly Modifier[] = ["cmd", "ctrl", "alt", "shift"]
@@ -118,7 +119,12 @@ export function chordTable({
 }): Chord[] {
   return [
     { key: "c", label: () => "New chat", run: openNewAgent, available: () => true },
-    { key: "d", label: () => "New design", run: openNewDesign, available: () => true },
+    {
+      key: "d",
+      label: () => "New design",
+      run: () => void startNewDesign(),
+      available: () => true,
+    },
     { key: "s", label: () => "Focus sidebar", run: focusSidebar, available: () => true },
     {
       key: "r",

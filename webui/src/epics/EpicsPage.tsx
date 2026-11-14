@@ -13,7 +13,7 @@ import { usePageKeys } from "../select/pageKeys"
 import { rowOfCard, type SelectAction } from "../select/selectModel"
 import { SidebarBulkActions } from "../shell/SidebarBulkActions"
 import { SelectBar, useSelectApi, type SelectApi } from "../shell/SidebarSelect"
-import { openNewDesign } from "../shell/newItemOpen"
+import { startNewDesign } from "../design/newDesign"
 import { followUpsFocus } from "../workspaces/followUpsBadge"
 import { DetailPage } from "../page/DetailPage"
 import { PageHeader } from "../page/PageHeader"
@@ -214,8 +214,13 @@ export function EpicsPage({
     setScrollTo(undefined)
   }, [scrollTo, toggled, list])
   const newDesign = (
-    <Button emphasis="main" flexShrink="0" whiteSpace="nowrap" onClick={() => openNewDesign()}>
-      New Design
+    <Button
+      emphasis="main"
+      flexShrink="0"
+      whiteSpace="nowrap"
+      onClick={() => void startNewDesign()}
+    >
+      New design
     </Button>
   )
   const hasEpics = !!list && list.epics.length > 0

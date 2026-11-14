@@ -18,7 +18,8 @@ import {
 import { useDevice } from "../useWide"
 import { FooterButton, footerHover, interactiveStyle } from "./FooterButton"
 import { GearMenu } from "./GearMenu"
-import { openNewAgent, openNewDesign } from "./newItemOpen"
+import { startNewDesign } from "../design/newDesign"
+import { openNewAgent } from "./newItemOpen"
 import { useShell } from "./ShellContext"
 
 const icon = (children: ReactNode) => (
@@ -323,7 +324,7 @@ export function SidebarFooter({
             </chakra.button>
           }
           items={[
-            { value: "design", label: "New design", onSelect: () => openNewDesign() },
+            { value: "design", label: "New design", onSelect: () => void startNewDesign() },
             { value: "agent", label: "New chat", onSelect: openNewAgent },
             { kind: "separator" },
             { value: "workspace", label: "New workspace…", onSelect: onNewWorkspace },

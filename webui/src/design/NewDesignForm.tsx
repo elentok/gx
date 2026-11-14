@@ -1,6 +1,6 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react"
-import { useNavigate, useParams } from "react-router"
+import { useLocation, useNavigate, useParams } from "react-router"
 import { Button } from "../ui/button/Button"
 import type { DesignDraft } from "../generated/server"
 import {
@@ -85,8 +85,6 @@ interface PageProps {
   /** The projects to choose from; the epic list's by default. */
   projects?: string[]
   open?: OpenDesign
-  /** Runs with the new Design's address once its map exists; `startFailure` is why the session did not start. */
-  onStarted?: (address: string, startFailure?: string) => void
   drafts?: DraftsClient
 }
 
@@ -155,7 +153,6 @@ export function DraftPage({ drafts = realDrafts, ...props }: PageProps) {
       key={loaded.draft.id}
       projects={projects}
       open={props.open}
-      onStarted={props.onStarted}
       drafts={drafts}
       loaded={loaded}
     />
@@ -165,7 +162,6 @@ export function DraftPage({ drafts = realDrafts, ...props }: PageProps) {
 function DraftForm({
   projects,
   open = postOpenDesign,
-  onStarted,
   drafts,
   loaded: { draft: initial, restored, lastProject },
 }: Omit<PageProps, "id" | "projects"> & {
@@ -211,16 +207,31 @@ function DraftForm({
   const askRemove = () => (autosave.hasContent() ? setConfirming(true) : removeNow())
   const renameFocus = () => slugInput.current?.focus()
   // The Chord host calls these through the registry, so it always sees the latest closures.
-  const actions = useRef({ remove: askRemove, rename: renameFocus })
-  actions.current = { remove: askRemove, rename: renameFocus }
+  const formRef = useRef<HTMLFormElement | null>(null)
+  const focusPrompt = () =>
+    formRef.current
+      ?.querySelector<HTMLElement>("textarea[name='design-idea'], [contenteditable='true']")
+      ?.focus()
+  const actions = useRef({ remove: askRemove, rename: renameFocus, focusPrompt })
+  actions.current = { remove: askRemove, rename: renameFocus, focusPrompt }
   useEffect(
     () =>
       registerDraftPage({
         remove: () => actions.current.remove(),
         rename: () => actions.current.rename(),
+        isEmpty: () => !autosave.hasContent(),
+        focusPrompt: () => actions.current.focusPrompt(),
       }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   )
+  // A page opened by New design asks for the Prompt's focus; a click or a bookmark does not.
+  const { key: locationKey, state: locationState } = useLocation()
+  const focusWanted = (locationState as { focusPrompt?: boolean } | null)?.focusPrompt === true
+  useEffect(() => {
+    if (focusWanted) focusPrompt()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationKey, focusWanted])
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -240,11 +251,8 @@ function DraftForm({
         onDone: (res) => {
           // With start_error the map exists though no session started; the Design page offers the retry.
           const address = `${draft.project}:${slug}`
-          if (onStarted) onStarted(address, res.start_error)
-          else {
-            navigate(designHref(address).slice(1), { state: { startFailure: res.start_error } })
-            shell?.closeSliding()
-          }
+          navigate(designHref(address).slice(1), { state: { startFailure: res.start_error } })
+          shell?.closeSliding()
         },
       },
     )
@@ -262,6 +270,7 @@ function DraftForm({
     <DetailPage fill title={{ kind: "Design draft", name: label }}>
       <Box
         as="form"
+        ref={formRef}
         onSubmit={submit}
         flex="1"
         minH="0"
@@ -409,7 +418,7 @@ function DraftForm({
                 onSelectionChange={() => {}}
                 viMode
                 onModeChange={setViModeNow}
-                autoFocus={false}
+                autoFocus={focusWanted}
               />
             </Suspense>
             <ModeText mode={viModeNow} />

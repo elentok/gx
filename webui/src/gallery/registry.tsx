@@ -12,12 +12,10 @@ import { webPerformanceFull, webPerformanceLow } from "./webPerformanceData"
 import { WebPerformance, type PerfTab } from "../stats/WebPerformance"
 import type { StatsWebPerformance } from "../generated/server"
 import { ConnectionContext, type Connection } from "../connection"
-import { DraftSwitcher } from "../design/DraftSwitcher"
 import { DraftImages } from "../design/DraftImages"
 import { ContextBadge } from "../design/ContextBadge"
 import { ImageStrip } from "../design/ImageStrip"
 import type { DraftImages as DraftImagesState } from "../design/useDraftImages"
-import type { DraftsClient } from "../design/drafts"
 import type { ComposerImage } from "../design/useComposerImages"
 import { CoarsePointerContext, type Device, DeviceContext, WideContext } from "../useWide"
 import { EpicPage } from "../epic/EpicPage"
@@ -58,7 +56,6 @@ import { TicketLine } from "../ui/ticket-line/TicketLine"
 import { StickyTopContainer } from "../ui/top-bar/StickyTopContainer"
 import { Tray } from "../ui/tray/Tray"
 import type {
-  DesignDraftItem,
   EpicDetail,
   EpicDetailRow,
   EpicListRow,
@@ -138,31 +135,6 @@ const idleConnection = {
   onEvent: () => () => {},
 } as unknown as Connection
 // A transform makes the modal's fixed overlay fill this frame instead of the page.
-const sampleDrafts = (n: number): DesignDraftItem[] =>
-  Array.from({ length: n }, (_, i) => ({
-    id: `d${i}`,
-    project: ["gx", "blog", "dotfiles"][i % 3],
-    slug: `epic-${i + 1}`,
-    idea: "",
-    label: `epic-${i + 1}`,
-    image_count: i % 4,
-    edited_at: new Date(Date.now() - i * 5_400_000).toISOString(),
-  }))
-
-const SwitcherFrame = ({ drafts, open }: { drafts: DesignDraftItem[]; open?: boolean }) => (
-  <Box position="relative" w="360px" h="380px" pt="2">
-    <DraftSwitcher
-      label="epic-1"
-      currentId={drafts[0]?.id}
-      load={async () => drafts}
-      onPick={() => {}}
-      onNew={() => {}}
-      onDelete={async () => {}}
-      defaultOpen={open}
-    />
-  </Box>
-)
-
 const ModalFrame = ({
   children,
   h = "600px",
@@ -1868,13 +1840,4 @@ export const galleryEntries: GalleryEntry[] = [
   ...authEntries,
   ...shellEntries,
   ...designFooterEntries,
-  {
-    name: "DraftSwitcher",
-    cases: [
-      { label: "menu closed", node: <SwitcherFrame drafts={sampleDrafts(3)} /> },
-      { label: "menu open", node: <SwitcherFrame drafts={sampleDrafts(3)} open /> },
-      { label: "empty list", node: <SwitcherFrame drafts={[]} open /> },
-      { label: "many drafts", node: <SwitcherFrame drafts={sampleDrafts(30)} open /> },
-    ],
-  },
 ]

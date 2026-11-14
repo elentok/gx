@@ -6,7 +6,9 @@ import { ConnectionContext, type Connection, type ConnectionState } from "../con
 import type { DesignDraft } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { NewItemHost } from "./NewItemHost"
-import { closeNewItem, openNewAgent, openNewDesign } from "./newItemOpen"
+import { startNewDesign } from "../design/newDesign"
+import { closeNewItem, openNewAgent } from "./newItemOpen"
+import { ShellContext, type Shell } from "./ShellContext"
 
 afterEach(() => {
   closeNewItem()
@@ -22,7 +24,7 @@ const epics = [
 ]
 
 /** `created` is what the server answers a draft save with. */
-function mount(path: string, created?: DesignDraft) {
+function mount(path: string, created?: DesignDraft, closeSliding = () => {}) {
   const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
     const u = String(url)
     const body = u.includes("worktrees")
@@ -49,7 +51,9 @@ function mount(path: string, created?: DesignDraft) {
   })
   renderThemed(
     <ConnectionContext.Provider value={conn}>
-      <RouterProvider router={router} />
+      <ShellContext.Provider value={{ closeSliding } as Shell}>
+        <RouterProvider router={router} />
+      </ShellContext.Provider>
     </ConnectionContext.Provider>,
   )
   return { router, fetchMock }
@@ -95,7 +99,7 @@ describe("the project a new blank draft starts on", () => {
   })
 })
 
-test("New design creates a draft and opens its page", async () => {
+test("New design renders no dialog, creates a draft, opens its page and closes the sliding sidebar", async () => {
   const created: DesignDraft = {
     id: "d9",
     project: "",
@@ -106,9 +110,13 @@ test("New design creates a draft and opens its page", async () => {
     revision: 1,
     edited_at: "",
   }
-  const { router, fetchMock } = mount("/epics", created)
-  act(() => openNewDesign())
+  const closeSliding = vi.fn()
+  const { router, fetchMock } = mount("/epics", created, closeSliding)
+  await act(() => startNewDesign())
   await waitFor(() => expect(router.state.location.pathname).toBe("/drafts/d9"))
+  expect(screen.queryByRole("dialog")).toBeNull()
+  expect(closeSliding).toHaveBeenCalledTimes(1)
+  expect(router.state.location.state).toEqual({ focusPrompt: true })
   const call = fetchMock.mock.calls.find((c) => String(c[0]).endsWith("/drafts/save"))
   expect(JSON.parse((call?.[1] as RequestInit).body as string)).toMatchObject({
     idea: "",

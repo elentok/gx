@@ -25,7 +25,14 @@ export type ListDrafts = () => Promise<DesignDraftItem[]>
 export type ReadDraft = (id: string) => Promise<DraftResult>
 export type SaveDraft = (body: DesignDraftSaveRequest) => Promise<DraftResult>
 export type SaveDraftFields = (body: DesignDraftTargetRequest) => Promise<DraftResult>
-export type CreateDraft = (workspace?: string) => Promise<string>
+/** What a new draft starts with; the text, slug and project are all optional. */
+export interface NewDraft {
+  workspace?: string
+  project?: string
+  slug?: string
+  idea?: string
+}
+export type CreateDraft = (init?: NewDraft) => Promise<string>
 export type DeleteDraft = (id: string) => Promise<DraftResult>
 /** Renews the open page's lease; throws when the draft is gone or the call fails. */
 export type PingDraft = (id: string) => Promise<void>
@@ -99,11 +106,19 @@ export const saveDraft: SaveDraft = async (body) =>
 export const saveDraftFields: SaveDraftFields = async (body) =>
   toResult(await json<DesignDraftSaveResult>(`${BASE}/target`, body))
 
-/** A new empty draft in `workspace`; its id is the page's address. */
-export const createDraft: CreateDraft = async (workspace) => {
-  const res = await saveDraft({ idea: "", revision: 0, ...(workspace ? { workspace } : {}) })
+/** A new draft in `workspace`; its id is the page's address. The project and slug are a second, revision-free write that may fail without losing the draft. */
+export const createDraft: CreateDraft = async ({ workspace, project, slug, idea } = {}) => {
+  const res = await saveDraft({
+    idea: idea ?? "",
+    revision: 0,
+    ...(workspace ? { workspace } : {}),
+  })
   if (res.kind !== "ok") throw new WriteError("The draft was not created")
-  return res.draft.id
+  const id = res.draft.id
+  if (project || slug) {
+    await saveDraftFields({ id, project: project ?? "", slug: slug ?? "" }).catch(() => {})
+  }
+  return id
 }
 
 /** The most recent draft, or null when there is none (or it cannot be read). */

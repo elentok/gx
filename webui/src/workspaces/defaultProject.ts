@@ -3,24 +3,28 @@ import { useLocation } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { getLastProject, type DraftsClient } from "../design/drafts"
 import { activeProjectFilter, readStoredProjects } from "../epics/storedProjects"
-import type { SessionInfo } from "../generated/server"
+import type { DesignDraftRow, SessionInfo } from "../generated/server"
 import { currentAddress } from "../hrefs"
 
-/** The project of the open page, or undefined: an epic, Design or ticket address, or a chat's session. */
+/** The project of the open page, or undefined: an epic, Design or ticket address, a chat's session or a draft's snapshot row. */
 export function pageProject(
   pathname: string,
   sessions: Pick<SessionInfo, "id" | "project">[],
+  drafts: Pick<DesignDraftRow, "id" | "project">[] = [],
 ): string | undefined {
   const address = currentAddress(pathname)
   if (address) return address.includes(":") ? address.slice(0, address.indexOf(":")) : undefined
   const [, kind, id] = pathname.split("/")
-  if (kind !== "agents" || !id) return undefined
+  if (!id) return undefined
+  if (kind === "drafts") return drafts.find((d) => d.id === decodeURIComponent(id))?.project
+  if (kind !== "agents") return undefined
   return sessions.find((s) => s.id === decodeURIComponent(id))?.project
 }
 
 export interface DefaultProjectInput {
   pathname: string
   sessions: Pick<SessionInfo, "id" | "project">[]
+  drafts?: Pick<DesignDraftRow, "id" | "project">[]
   /** The form's project list; a candidate outside it is skipped. */
   projects: string[]
   lastProject?: string
@@ -30,12 +34,13 @@ export interface DefaultProjectInput {
 export function defaultProject({
   pathname,
   sessions,
+  drafts,
   projects,
   lastProject,
 }: DefaultProjectInput): string {
   const filter = activeProjectFilter(readStoredProjects(), projects)
   const candidates = [
-    pageProject(pathname, sessions),
+    pageProject(pathname, sessions, drafts),
     filter?.length === 1 ? filter[0] : undefined,
     lastProject,
   ]

@@ -10,7 +10,8 @@ import { isMac } from "../platform"
 import { useWide } from "../useWide"
 import { setCommandOpen, useCommandOpen } from "./commandOpen"
 import { canRename, useOpenChat } from "./chords"
-import { openNewAgent, openNewDesign } from "./newItemOpen"
+import { startNewDesign } from "../design/newDesign"
+import { openNewAgent } from "./newItemOpen"
 import { nextQuestion } from "./nextQuestion"
 import { openRename } from "./renameOpen"
 import { useShell } from "./ShellContext"
@@ -66,7 +67,7 @@ function useCommands(): Command[] {
           run: () => {},
         }
     return [
-      { id: "new-design", title: "New design", run: () => openNewDesign() },
+      { id: "new-design", title: "New design", run: () => void startNewDesign() },
       { id: "new-chat", title: "New chat", run: () => openNewAgent() },
       ...(session && canRename({ path: pathname, session })
         ? [{ id: "rename-chat", title: "Rename chat", run: () => openRename({ session }) }]

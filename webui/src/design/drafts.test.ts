@@ -74,7 +74,7 @@ test("saveFields writes the slug and project through the target route with no re
 
 test("createDraft saves an empty draft in the workspace and returns its id", async () => {
   const f = stub({ draft })
-  expect(await createDraft("w1")).toBe("d1")
+  expect(await createDraft({ workspace: "w1" })).toBe("d1")
   expect(bodyOf(f)).toEqual({ idea: "", revision: 0, workspace: "w1" })
   stub({ deleted: true })
   await expect(createDraft()).rejects.toThrow()

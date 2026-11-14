@@ -13,6 +13,9 @@ import {
 
 afterEach(() => vi.restoreAllMocks())
 
+const startNewDesign = vi.hoisted(() => vi.fn())
+vi.mock("../design/newDesign", () => ({ startNewDesign }))
+
 describe("agentIdOf", () => {
   it("reads the id of an agent page, with or without a trailing slash", () => {
     expect(agentIdOf("/agents/s1")).toBe("s1")
@@ -183,6 +186,16 @@ describe("chord table c and d", () => {
       ["r", "Rename chat", false],
       ["x", "Remove chat", false],
     ])
+  })
+})
+
+describe("chord table d", () => {
+  it("runs the New design action once", () => {
+    startNewDesign.mockClear()
+    chordTable({ remove: () => {}, rename: () => {} })
+      .find((c) => c.key === "d")
+      ?.run()
+    expect(startNewDesign).toHaveBeenCalledTimes(1)
   })
 })
 

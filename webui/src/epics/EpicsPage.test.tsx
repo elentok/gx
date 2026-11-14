@@ -8,12 +8,18 @@ import { closeNewItem } from "../shell/newItemOpen"
 import { renderThemed } from "../ui/render"
 import type { FetchEpicList } from "./list"
 
-// The New Design form opens on the server's drafts; here there are none and saves go nowhere.
+// A draft page opens on the server's drafts; here there are none and saves go nowhere.
 vi.mock("../design/drafts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../design/drafts")>()),
   listDrafts: async () => [],
   saveDraft: async () => ({ kind: "deleted" }),
   deleteDraft: async () => ({ kind: "deleted" }),
+}))
+
+const startNewDesign = vi.hoisted(() => vi.fn())
+vi.mock("../design/newDesign", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../design/newDesign")>()),
+  startNewDesign,
 }))
 
 afterEach(() => {
@@ -131,7 +137,7 @@ test("the page has an Epics heading with the epic count and the New Design actio
   expect(screen.getByRole("heading", { level: 1, name: "Epics" })).toBeTruthy()
   expect(screen.getByTestId("page-header-subtitle").textContent).toMatch(/^\d+ epics?$/)
   expect(
-    within(screen.getByTestId("page-header-actions")).getByRole("button", { name: "New Design" }),
+    within(screen.getByTestId("page-header-actions")).getByRole("button", { name: "New design" }),
   ).toBeTruthy()
 })
 
@@ -288,10 +294,10 @@ test("a filter with no match says No match", async () => {
   expect(sectionRegions()).toHaveLength(0)
 })
 
-test("no epics shows the empty state with a New Design button", async () => {
+test("no epics shows the empty state with a New design button", async () => {
   await loaded(listOf([]))
   expect(screen.getByText("No epics yet.")).toBeTruthy()
-  expect(screen.getAllByRole("button", { name: "New Design" })).toHaveLength(1)
+  expect(screen.getAllByRole("button", { name: "New design" })).toHaveLength(1)
 })
 
 test("the follow-ups counts line is gone", async () => {
@@ -305,23 +311,13 @@ test("the follow-ups counts line is gone", async () => {
   expect(screen.queryByText(/Follow-ups/)).toBeNull()
 })
 
-// The default project of a blank draft is tested on DraftPage (NewDesignForm.test.tsx).
-test("New Design creates a draft and opens its page", async () => {
-  const draft = {
-    id: "d7",
-    project: "",
-    slug: "",
-    idea: "",
-    label: "Untitled design",
-    images: [],
-    revision: 1,
-    edited_at: "",
-  }
-  stubFetch(mixed(), () => ({ draft }))
-  const { router } = renderEpics(async () => mixed())
+test("the New design button calls the action once", async () => {
+  startNewDesign.mockClear()
+  stubFetch(mixed())
+  renderEpics(async () => mixed())
   await filterBox()
-  fireEvent.click(await screen.findByRole("button", { name: "New Design" }))
-  await waitFor(() => expect(router.state.location.pathname).toBe("/drafts/d7"))
+  fireEvent.click(await screen.findByRole("button", { name: "New design" }))
+  expect(startNewDesign).toHaveBeenCalledTimes(1)
   expect(screen.queryByRole("dialog")).toBeNull()
 })
 

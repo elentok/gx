@@ -222,7 +222,7 @@ test("{leader} r from the Message box opens the popup and keeps the draft", () =
 })
 
 describe("on a draft page", () => {
-  const actions = { remove: vi.fn(), rename: vi.fn() }
+  const actions = { remove: vi.fn(), rename: vi.fn(), isEmpty: () => true, focusPrompt: vi.fn() }
   let unregister = () => {}
   beforeEach(() => {
     actions.remove.mockClear()

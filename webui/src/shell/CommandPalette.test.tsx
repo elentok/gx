@@ -17,6 +17,12 @@ import { CommandPalette } from "./CommandPalette"
 import { JumpPalette } from "./JumpPalette"
 import { NewItemHost } from "./NewItemHost"
 import { closeNewItem } from "./newItemOpen"
+
+const startNewDesign = vi.hoisted(() => vi.fn())
+vi.mock("../design/newDesign", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../design/newDesign")>()),
+  startNewDesign,
+}))
 import { closeRename, useRenameRequest } from "./renameOpen"
 import { ShellContext, type Shell } from "./ShellContext"
 
@@ -198,6 +204,15 @@ test("does nothing under a Modal", () => {
   expect(palette()).toBeNull()
 })
 
+test("the New design row runs the action once and opens no dialog", async () => {
+  setup()
+  press({ key: "p", ctrlKey: true })
+  fireEvent.click(screen.getByRole("option", { name: "New design" }))
+  expect(startNewDesign).toHaveBeenCalledTimes(1)
+  expect(palette()).toBeNull()
+  expect(screen.queryByRole("dialog")).toBeNull()
+})
+
 test("never stacks with Cmd+K, in either order", async () => {
   setup()
   press({ key: "p", ctrlKey: true })
@@ -246,14 +261,15 @@ test("rows are in fixed order, hold no epic or session rows, and filter fuzzily"
 const projectSelect = async () =>
   ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value
 
-test("typing ndes then Enter creates a draft and opens its page", async () => {
+test("typing ndes then Enter runs the New design action", () => {
+  startNewDesign.mockClear()
   setup({ path: "/stats" })
   press({ key: "p", ctrlKey: true })
   const box = screen.getByRole("combobox")
   fireEvent.change(box, { target: { value: "ndes" } })
   fireEvent.keyDown(box, { key: "Enter" })
   expect(palette()).toBeNull()
-  await waitFor(() => expect(where()).toBe("/drafts/d9"))
+  expect(startNewDesign).toHaveBeenCalledTimes(1)
 })
 
 test.each([
