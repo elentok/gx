@@ -2,7 +2,7 @@ import { act, fireEvent } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { type HostedKind, type HostedResolved, HostedFound } from "../generated/ops"
 import { renderThemed } from "../ui/render"
-import { CoarsePointerContext } from "../useWide"
+import { CannotHoverContext, CoarsePointerContext } from "../useWide"
 import { FileLink } from "./FileLink"
 import { FileLinkProvider, useFoundFile } from "./FileLinkContext"
 import type { FileResolver } from "./resolve"
@@ -130,6 +130,25 @@ describe("FileHoverCard", () => {
     )
     await settle()
     await hover(view.container.querySelector("a") as HTMLElement)
+    expect(card()).toBeNull()
+  })
+
+  it("shows the sheet, not nothing, on a coarse pointer that can still hover", async () => {
+    const { resolver } = resolverFor("code", 100)
+    const view = renderThemed(
+      <CoarsePointerContext.Provider value={true}>
+        <CannotHoverContext.Provider value={false}>
+          <FileLinkProvider resolver={resolver}>
+            <Link />
+          </FileLinkProvider>
+        </CannotHoverContext.Provider>
+      </CoarsePointerContext.Provider>,
+    )
+    await settle()
+    await act(async () => {
+      fireEvent.click(view.container.querySelector("a") as HTMLElement)
+    })
+    expect(document.querySelector("[data-file-sheet]")).not.toBeNull()
     expect(card()).toBeNull()
   })
 })

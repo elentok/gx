@@ -1,7 +1,7 @@
 import { chakra, HoverCard, Portal } from "@chakra-ui/react"
 import { type ReactElement, useState } from "react"
-import { useCannotHover, useCoarsePointer } from "../useWide"
 import type { PixelSize } from "./FileHoverCardMedia"
+import { usePreviewMode } from "./FileLink"
 import { FilePreviewBody, FilePreviewHeader } from "./FilePreviewBody"
 import { useFileLinks } from "./FileLinkContext"
 import { viewerHref } from "./viewerUrl"
@@ -20,10 +20,9 @@ export function FileHoverCard({
 }) {
   const ctx = useFileLinks()
   const [pixels, setPixels] = useState<PixelSize>()
-  const coarse = useCoarsePointer()
-  const cannotHover = useCannotHover()
+  const mode = usePreviewMode(path)
   const file = ctx?.byPath(path)
-  if (coarse || cannotHover || !ctx || !file) return children
+  if (mode !== "card" || !ctx || !file) return children
   return (
     <HoverCard.Root
       openDelay={100}

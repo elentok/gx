@@ -1,13 +1,22 @@
 import { chakra } from "@chakra-ui/react"
 import { type ReactNode, useState } from "react"
 import { LuFileText } from "react-icons/lu"
-import { useCannotHover } from "../useWide"
+import { useCannotHover, useCoarsePointer } from "../useWide"
 import { FileHoverCard } from "./FileHoverCard"
 import { useFileLinks } from "./FileLinkContext"
 import { FileLinkSheet } from "./FileLinkSheet"
 import { viewerHref } from "./viewerUrl"
 
 const Anchor = chakra("a")
+
+/** What a file link opens: hover card, phone sheet, or nothing (a plain link). Touch or no-hover gets the sheet. */
+export function usePreviewMode(path: string): "card" | "sheet" | "none" {
+  const ctx = useFileLinks()
+  const coarse = useCoarsePointer()
+  const cannotHover = useCannotHover()
+  if (!ctx?.byPath(path)) return "none"
+  return coarse || cannotHover ? "sheet" : "card"
+}
 
 /** Link look A: a dotted mono link with a file icon. `path` is the canonical path from the server. */
 export function FileLink({
@@ -23,9 +32,8 @@ export function FileLink({
 }) {
   const ctx = useFileLinks()
   const missing = ctx?.isMissing(path) ?? false
-  const cannotHover = useCannotHover()
   const [sheet, setSheet] = useState(false)
-  const sheetLink = cannotHover && !!ctx?.byPath(path)
+  const sheetLink = usePreviewMode(path) === "sheet"
   return (
     <>
       <FileHoverCard path={path} line={line} heading={heading}>
