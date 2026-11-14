@@ -60,7 +60,11 @@ function Choice({
       color={on ? "surface" : "text"}
       fontWeight="500"
       cursor="pointer"
-      onClick={onClick}
+      onClick={(e) => {
+        // A file link in the label navigates; it must not toggle the answer.
+        if ((e.target as HTMLElement).closest("a")) return
+        onClick()
+      }}
     >
       <Box display="flex" alignItems="center" gap="2">
         {letter && <Text as="span">{letter}</Text>}

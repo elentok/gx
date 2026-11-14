@@ -2,6 +2,7 @@ import { Box, chakra, Text } from "@chakra-ui/react"
 import { useEffect, useState, type ReactNode } from "react"
 import { useConnectionContext, useConnectionState } from "../connection"
 import type { SessionChatResponse, SessionInfo } from "../generated/server"
+import { FileLinkProvider } from "../files/FileLinkContext"
 import { hasChat, roundKeyOf, roundOf } from "./chat"
 import { ChatMessages, WorkingRow, type WorkingStep } from "./ChatCore"
 import type { AutoMenuState } from "./AutoMenu"
@@ -256,58 +257,60 @@ function ChatBody({
   }, [questions, onQuestions])
   const busy = session.status.state === "working" && !session.status.background
   return (
-    <Box display="flex" flexDirection="column" gap="3" flex="1" minH="0">
-      {hasRound && (
-        <ViewToggle
-          answered={round.filter((c) => isAnswered(roundDraft.draft.answers[c.label])).length}
-          total={round.length}
+    <FileLinkProvider base={{ session: session.id }} recheckKey={chat.messages.at(-1)?.id}>
+      <Box display="flex" flexDirection="column" gap="3" flex="1" minH="0">
+        {hasRound && (
+          <ViewToggle
+            answered={round.filter((c) => isAnswered(roundDraft.draft.answers[c.label])).length}
+            total={round.length}
+            questions={questions}
+            onQuestions={onQuestions}
+            menu={tabsMenu}
+          />
+        )}
+        {!questions && (
+          <ChatMessages
+            chat={chat}
+            head={logTop}
+            busy={busy}
+            sessionId={session.id}
+            working={
+              step && (
+                <WorkingRow
+                  {...step}
+                  background={chat.background}
+                  current={chat.current}
+                  others={chat.others}
+                />
+              )
+            }
+          />
+        )}
+        {questions && busy && step && (
+          <WorkingRow
+            {...step}
+            background={chat.background}
+            current={chat.current}
+            others={chat.others}
+          />
+        )}
+        <ChatTail
+          session={session}
+          chat={chat}
+          connected={connected}
+          post={post}
+          answer={answer}
+          onStale={onStale}
+          done={done}
+          nextTitle={nextTitle}
+          actions={actions}
           questions={questions}
           onQuestions={onQuestions}
-          menu={tabsMenu}
+          roundDraft={roundDraft}
+          autoMenu={autoMenu}
         />
-      )}
-      {!questions && (
-        <ChatMessages
-          chat={chat}
-          head={logTop}
-          busy={busy}
-          sessionId={session.id}
-          working={
-            step && (
-              <WorkingRow
-                {...step}
-                background={chat.background}
-                current={chat.current}
-                others={chat.others}
-              />
-            )
-          }
-        />
-      )}
-      {questions && busy && step && (
-        <WorkingRow
-          {...step}
-          background={chat.background}
-          current={chat.current}
-          others={chat.others}
-        />
-      )}
-      <ChatTail
-        session={session}
-        chat={chat}
-        connected={connected}
-        post={post}
-        answer={answer}
-        onStale={onStale}
-        done={done}
-        nextTitle={nextTitle}
-        actions={actions}
-        questions={questions}
-        onQuestions={onQuestions}
-        roundDraft={roundDraft}
-        autoMenu={autoMenu}
-      />
-    </Box>
+      </Box>
+    </FileLinkProvider>
   )
 }
 

@@ -2,6 +2,7 @@ import { Box, Text } from "@chakra-ui/react"
 import { useState } from "react"
 import { ChatMessages, WorkingRow } from "../design/ChatCore"
 import { sheetCardsOf } from "../design/chat"
+import { FileLinkProvider } from "../files/FileLinkContext"
 import { FailureBanner, visibleFailure } from "../design/FailureBanner"
 import { postAnswer, type PostAnswer } from "../design/prompt"
 import { QuestionSheet } from "../design/QuestionSheet"
@@ -49,7 +50,9 @@ function CardSheet({
   // A round may go with gaps (as in the Design chat): any answer or note is enough. Dialogs and permissions need every answer.
   const ready =
     card.source === CardSourceRound
-      ? cards.some((c) => isAnswered(draft.answers[c.label], c) || !!draft.answers[c.label]?.note?.trim())
+      ? cards.some(
+          (c) => isAnswered(draft.answers[c.label], c) || !!draft.answers[c.label]?.note?.trim(),
+        )
       : allAnswered(cards, draft.answers)
   const claude = card.source === CardSourceClaudeDialog
   const hook = claude && !card.fallback
@@ -153,35 +156,37 @@ export function AgentChat({
   const failure = visibleFailure(session.failure)
   const card = chat.questions[0]
   return (
-    // Sized by its content first, so the "No messages yet" row beside it cannot squeeze a card and banner under the composer.
-    <Box display="flex" flexDirection="column" gap="3" flex="1 1 auto" minH="0">
-      <ChatMessages
-        chat={chat}
-        busy={busy}
-        sessionId={session.id}
-        showTools
-        working={<WorkingRow current={chat.current} others={chat.others} />}
-      />
-      {card && (
-        <CardSheet
-          key={card.id}
-          session={session}
-          card={card}
-          lastMessage={chat.messages.at(-1)?.id}
-          post={post}
-          refetch={refetch}
+    <FileLinkProvider base={{ session: session.id }} recheckKey={chat.messages.at(-1)?.id}>
+      {/* Sized by its content first, so the "No messages yet" row beside it cannot squeeze a card and banner under the composer. */}
+      <Box display="flex" flexDirection="column" gap="3" flex="1 1 auto" minH="0">
+        <ChatMessages
+          chat={chat}
+          busy={busy}
+          sessionId={session.id}
+          showTools
+          working={<WorkingRow current={chat.current} others={chat.others} />}
         />
-      )}
-      {failure && !sheetCoversBlock(failure.kind, card) && (
-        <FailureBanner
-          failure={failure}
-          session={session}
-          lastMessage={chat.messages.at(-1)?.id}
-          onStale={refetch}
-          restore={false}
-          address=""
-        />
-      )}
-    </Box>
+        {card && (
+          <CardSheet
+            key={card.id}
+            session={session}
+            card={card}
+            lastMessage={chat.messages.at(-1)?.id}
+            post={post}
+            refetch={refetch}
+          />
+        )}
+        {failure && !sheetCoversBlock(failure.kind, card) && (
+          <FailureBanner
+            failure={failure}
+            session={session}
+            lastMessage={chat.messages.at(-1)?.id}
+            onStale={refetch}
+            restore={false}
+            address=""
+          />
+        )}
+      </Box>
+    </FileLinkProvider>
   )
 }

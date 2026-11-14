@@ -11,6 +11,7 @@ import type {
 import { ImageViewer } from "./ImageViewer"
 import { InFlightTools } from "./InFlightTools"
 import { sessionImageUrl } from "./sessionImages"
+import { LinkedText } from "../files/LinkedText"
 import { Markdown } from "../markdown/Markdown"
 
 // The part of the chat both the Design page and the Agents page show: the scrolling messages and the working row.
@@ -162,7 +163,7 @@ function Entry({
         {hasImages && <ChatImageGrid images={images} sessionId={sessionId} />}
         {m.text && (
           <Box as="span" data-mock-part="chat-text" whiteSpace="pre-wrap">
-            {m.text}
+            <LinkedText>{m.text}</LinkedText>
           </Box>
         )}
       </Box>
@@ -221,7 +222,7 @@ function ToolCalls({ m }: { m: SessionChatMessage }) {
             borderColor="border"
             px="2.5"
           >
-            {c}
+            <LinkedText>{c}</LinkedText>
           </Box>
         ))}
       </Box>

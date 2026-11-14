@@ -1,5 +1,7 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
+import { FileLinkProvider } from "../../files/FileLinkContext"
+import { stubResolver } from "../../files/stubResolver"
 import { renderThemed as render } from "../render"
 import { Question } from "./Question"
 import type { QuestionCard } from "./round"
@@ -89,6 +91,30 @@ test("a fresh card has no pressed option and no recommended badge", () => {
 test("a recommended option shows its badge", () => {
   show(options({ recommended: "a" }))
   expect(screen.getByText(/recommended/)).toBeTruthy()
+})
+
+test("a found path in the title, body and an option label links; clicking it does not select the option", async () => {
+  const { resolver } = stubResolver(["a/t.go", "a/b.go", "a/o.go"])
+  const onChange = vi.fn()
+  render(
+    <FileLinkProvider resolver={resolver}>
+      <Question
+        card={options({
+          title: "Check a/t.go",
+          body: "See a/b.go",
+          options: [{ id: "a", label: "Use a/o.go" }],
+        })}
+        answer={{}}
+        onChange={onChange}
+        onPicked={vi.fn()}
+      />
+    </FileLinkProvider>,
+  )
+  await act(async () => {})
+  const links = screen.getAllByRole("link")
+  expect(links.map((l) => l.textContent)).toEqual(["a/t.go", "a/b.go", "a/o.go"])
+  fireEvent.click(links[2])
+  expect(onChange).not.toHaveBeenCalled()
 })
 
 test("Huh? shows only when the card is a printed round", () => {
