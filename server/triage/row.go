@@ -36,7 +36,7 @@ func (t *Triage) abandon(req wire.TriageAbandonRequest) (wire.TriageEditResult, 
 		if rec.Revision != req.Revision {
 			return nil, triagerec.ErrStaleRevision
 		}
-		if !CanAbandon(true, rec.Step, t.stopped(req.Project)) {
+		if !CanAbandon(true, rec.Step, rec.LegacyWrite()) {
 			return nil, refusal(wire.ReasonTriagePhase, "abandon is not offered at step "+rec.Step)
 		}
 		if err := t.stopSessions(req.Project); err != nil {

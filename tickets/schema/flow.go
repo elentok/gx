@@ -65,7 +65,7 @@ const (
 	StepQuestions = "questions"
 	StepWrite     = "write"
 	// StepPlan and StepApprove are version 1 steps, kept for reading old records
-	// and the flowSpecs below.
+	// and the epic card's ring.
 	StepPlan    = "plan"
 	StepApprove = "approve"
 )

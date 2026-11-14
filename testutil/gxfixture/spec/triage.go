@@ -195,7 +195,7 @@ func TriageScenario(shape string) (Scenario, bool) {
 				for i := range rec.Rows {
 					rec.Rows[i].Verdict = triage.VerdictRelevant
 				}
-				rec.Step = tickets.StepPlan
+				rec.Step = tickets.StepRoute
 			}}}
 		})
 	case "journey":
@@ -231,7 +231,7 @@ func followUps(project string, bugs, ideas int) Epic {
 // atApprove puts rec at the approve step with a verdict and a plan on every row
 // (all "ready" unless shape changes it).
 func atApprove(rec *triage.Record, shape func(i int, p *triage.PlanRow)) {
-	rec.Step = tickets.StepApprove
+	rec.Step = tickets.StepQuestions
 	for i := range rec.Rows {
 		row := &rec.Rows[i]
 		row.Verdict = triage.VerdictRelevant

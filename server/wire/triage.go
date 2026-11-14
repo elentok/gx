@@ -194,6 +194,35 @@ type TriageHistoryItem struct {
 	Result    TriageResult `json:"result"`
 }
 
+// TriageOpenRound is the first saved round that still has an unanswered
+// question. Number counts from 1.
+type TriageOpenRound struct {
+	Number    int `json:"number"`
+	Questions int `json:"questions"`
+	Answered  int `json:"answered"`
+}
+
+// TriageMove is one old-epic move unit of the plan. State is pending, done,
+// failed or kept.
+type TriageMove struct {
+	OldEpic   string `json:"old_epic"`
+	Area      string `json:"area"`
+	State     string `json:"state"`
+	LastError string `json:"last_error,omitempty"`
+}
+
+// TriageSummary is the plan summary the web shows, built from record rows.
+type TriageSummary struct {
+	// Actions counts the rows that are not gone by action; Areas counts the rows
+	// that go to an area by area name.
+	Actions map[string]int `json:"actions"`
+	Areas   map[string]int `json:"areas"`
+	Moves   []TriageMove   `json:"moves"`
+	// Waiting lists "waiting: <epic> holds claimed <address>" lines: old epics
+	// with nothing to move and a claimed ticket.
+	Waiting []string `json:"waiting"`
+}
+
 // TriageView is the payload of GET /v1/triage?project=: the live Triage of the
 // project, else the latest, plus the past ones.
 type TriageView struct {
@@ -208,6 +237,15 @@ type TriageView struct {
 	Revision    int    `json:"revision,omitempty"`
 	// Round counts the times the answers were sent back to the agent.
 	Round int `json:"round,omitempty"`
+	// OpenRound is nil when no saved round waits for an answer.
+	OpenRound *TriageOpenRound `json:"open_round,omitempty"`
+	// FinalApproval is true at Questions when no ask question is left and the
+	// record waits for the "Write this plan?" yes.
+	FinalApproval bool `json:"final_approval,omitempty"`
+	// Summary is always set by the server; a pointer so older web fixtures stay valid.
+	Summary *TriageSummary `json:"summary,omitempty"`
+	// LegacyWrite marks a version 1 record at Write: Abandon is its only action.
+	LegacyWrite bool `json:"legacy_write,omitempty"`
 
 	Rows          []TriageRow         `json:"rows"`
 	OpenQuestions int                 `json:"open_questions"`

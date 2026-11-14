@@ -194,7 +194,7 @@ func triagePlanRows(rec *triage.Record) []triage.PlanRow {
 }
 
 func (p *Player) plan(rec *triage.Record) (string, error) {
-	if _, err := p.gx("", "agent", "step", "plan"); err != nil {
+	if _, err := p.gx("", "agent", "step", "route"); err != nil {
 		return "", err
 	}
 	body, err := json.Marshal(triagePlanRows(rec))

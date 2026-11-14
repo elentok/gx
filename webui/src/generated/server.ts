@@ -1144,8 +1144,8 @@ export const EpicListFollowUps: EpicListState = "follow-ups";
  */
 export type ProgressStep = string;
 export const ProgressVerify: ProgressStep = "verify";
-export const ProgressPlan: ProgressStep = "plan";
-export const ProgressApprove: ProgressStep = "approve";
+export const ProgressRoute: ProgressStep = "route";
+export const ProgressQuestions: ProgressStep = "questions";
 export const ProgressWrite: ProgressStep = "write";
 export const ProgressChart: ProgressStep = "chart";
 export const ProgressResolveTickets: ProgressStep = "resolve-tickets";
@@ -3972,6 +3972,42 @@ export interface TriageHistoryItem {
   result: TriageResult;
 }
 /**
+ * TriageOpenRound is the first saved round that still has an unanswered
+ * question. Number counts from 1.
+ */
+export interface TriageOpenRound {
+  number: number /* int */;
+  questions: number /* int */;
+  answered: number /* int */;
+}
+/**
+ * TriageMove is one old-epic move unit of the plan. State is pending, done,
+ * failed or kept.
+ */
+export interface TriageMove {
+  old_epic: string;
+  area: string;
+  state: string;
+  last_error?: string;
+}
+/**
+ * TriageSummary is the plan summary the web shows, built from record rows.
+ */
+export interface TriageSummary {
+  /**
+   * Actions counts the rows that are not gone by action; Areas counts the rows
+   * that go to an area by area name.
+   */
+  actions: { [key: string]: number /* int */};
+  areas: { [key: string]: number /* int */};
+  moves: TriageMove[];
+  /**
+   * Waiting lists "waiting: <epic> holds claimed <address>" lines: old epics
+   * with nothing to move and a claimed ticket.
+   */
+  waiting: string[];
+}
+/**
  * TriageView is the payload of GET /v1/triage?project=: the live Triage of the
  * project, else the latest, plus the past ones.
  */
@@ -3991,6 +4027,23 @@ export interface TriageView {
    * Round counts the times the answers were sent back to the agent.
    */
   round?: number /* int */;
+  /**
+   * OpenRound is nil when no saved round waits for an answer.
+   */
+  open_round?: TriageOpenRound;
+  /**
+   * FinalApproval is true at Questions when no ask question is left and the
+   * record waits for the "Write this plan?" yes.
+   */
+  final_approval?: boolean;
+  /**
+   * Summary is always set by the server; a pointer so older web fixtures stay valid.
+   */
+  summary?: TriageSummary;
+  /**
+   * LegacyWrite marks a version 1 record at Write: Abandon is its only action.
+   */
+  legacy_write?: boolean;
   rows: TriageRow[];
   open_questions: number /* int */;
   action_counts: { [key: string]: number /* int */};

@@ -22,7 +22,7 @@ func TestProgressStepsMatchTickets(t *testing.T) {
 		wire.ProgressGrillFindings, wire.ProgressCreateTickets, wire.ProgressBranch, wire.ProgressDone,
 	}
 	triage := []wire.ProgressStep{
-		wire.ProgressVerify, wire.ProgressPlan, wire.ProgressApprove, wire.ProgressWrite, wire.ProgressDone,
+		wire.ProgressVerify, wire.ProgressRoute, wire.ProgressQuestions, wire.ProgressWrite, wire.ProgressDone,
 	}
 	asStrings := func(steps []wire.ProgressStep) []string {
 		out := make([]string, len(steps))

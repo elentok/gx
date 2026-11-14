@@ -26,7 +26,7 @@ func (t *Triage) StopFinished(project string) {
 	}
 	// A Questions session stays alive in every round state: the person may
 	// answer, object or ask for another round while it waits.
-	if rec != nil && rec.State == triagerec.StateLive && pageStep(rec.Step) == tickets.StepApprove {
+	if rec != nil && rec.State == triagerec.StateLive && rec.Step == tickets.StepQuestions {
 		return
 	}
 	infos, err := t.sessions()

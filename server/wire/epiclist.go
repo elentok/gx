@@ -46,10 +46,10 @@ const (
 type ProgressStep string
 
 const (
-	ProgressVerify  ProgressStep = "verify"
-	ProgressPlan    ProgressStep = "plan"
-	ProgressApprove ProgressStep = "approve"
-	ProgressWrite   ProgressStep = "write"
+	ProgressVerify    ProgressStep = "verify"
+	ProgressRoute     ProgressStep = "route"
+	ProgressQuestions ProgressStep = "questions"
+	ProgressWrite     ProgressStep = "write"
 )
 
 const (

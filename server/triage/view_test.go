@@ -2,6 +2,7 @@ package triage_test
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -219,21 +220,18 @@ func TestOfferRules(t *testing.T) {
 		name               string
 		live               bool
 		step               string
-		stopped            bool
+		legacyWrite        bool
 		row                triagerec.Row
 		keep, retry, abort bool
 	}{
 		{"verify", true, "verify", false, row("pending", "", false), false, false, true},
-		{"verify stopped", true, "verify", true, row("pending", "", false), false, false, true},
-		{"plan stopped", true, "plan", true, row("pending", "", false), false, false, true},
-		{"approve", true, "approve", false, row("pending", "", false), false, false, true},
-		{"approve stopped", true, "approve", true, row("pending", "", false), false, false, false},
-		{"write running", true, "write", false, row("pending", "", false), false, false, false},
-		{"write stopped", true, "write", true, row("pending", "", false), false, false, false},
+		{"route", true, "route", false, row("pending", "", false), false, false, true},
+		{"questions", true, "questions", false, row("pending", "", false), false, false, true},
+		{"write", true, "write", false, row("pending", "", false), false, false, false},
+		{"version 1 write", true, "write", true, row("pending", "", false), false, false, true},
 		{"write failed before move", true, "write", false, row("failed", "", false), true, true, false},
 		{"write failed after move", true, "write", false, row("failed", "proj:ready/01", false), false, true, false},
 		{"write failed already kept", true, "write", false, row("failed", "", true), false, true, false},
-		{"write stopped with failed row", true, "write", true, row("failed", "", false), true, true, false},
 		{"write done row", true, "write", false, row("done", "", false), false, false, false},
 		{"done", false, "done", false, row("failed", "", false), false, false, false},
 	}
@@ -244,9 +242,115 @@ func TestOfferRules(t *testing.T) {
 		if got := triage.CanRetry(c.live, c.step, c.row); got != c.retry {
 			t.Errorf("%s: CanRetry = %v", c.name, got)
 		}
-		if got := triage.CanAbandon(c.live, c.step, c.stopped); got != c.abort {
+		if got := triage.CanAbandon(c.live, c.step, c.legacyWrite); got != c.abort {
 			t.Errorf("%s: CanAbandon = %v", c.name, got)
 		}
+	}
+}
+
+func TestView_OpenRoundAndFinalApproval(t *testing.T) {
+	f, s := startViewFixture(t)
+	rec := mustRec(s.Create())
+	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrA, Verdict: "relevant"}))
+	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrB, Verdict: "relevant"}))
+	if v := show(t, f); v.FinalApproval || v.OpenRound != nil {
+		t.Fatalf("route: %+v", v)
+	}
+	q := triagerec.Question{ID: "q1", RowID: addrA, Text: "Which area?", Kind: triagerec.QuestionAsk, Options: []string{"x", "y"}, Default: "x"}
+	rec = mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
+		{RowID: addrA, Action: "ready", Fallback: "core", Questions: []triagerec.Question{q}},
+		{RowID: addrB, Action: "close"},
+	}, nil))
+	if v := show(t, f); v.FinalApproval || v.OpenRound != nil || stepStates(v) != "ddctt" {
+		t.Fatalf("an ask question waits for a round: %+v", v)
+	}
+
+	rec = mustRec(s.SaveRound(rec.ID, rec.Revision, []triagerec.Question{q}, false))
+	v := show(t, f)
+	if v.OpenRound == nil || *v.OpenRound != (wire.TriageOpenRound{Number: 1, Questions: 1, Answered: 0}) || v.FinalApproval {
+		t.Fatalf("open round: %+v", v.OpenRound)
+	}
+
+	rec = mustRec(s.SaveAnswer(rec.ID, rec.Revision, "q1", "x"))
+	if v = show(t, f); v.OpenRound != nil || !v.FinalApproval || !v.CanAbandon {
+		t.Fatalf("final approval: %+v", v)
+	}
+
+	mustRec(s.Approve(rec.ID, rec.Revision))
+	if v = show(t, f); v.FinalApproval || v.CanAbandon {
+		t.Fatalf("write: %+v", v)
+	}
+}
+
+func writeOldEpic(t *testing.T, projectDir, name string, statuses ...string) {
+	t.Helper()
+	dir := filepath.Join(projectDir, name, "issues")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "---\nkind: map\n---\n\n# " + name + "\n\n## Notes\n\nTriaged from follow-ups on 2026-10-01\n"
+	if err := os.WriteFile(filepath.Join(projectDir, name, "ticket.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for i, st := range statuses {
+		id := string(rune('1'+i)) + "0"
+		ticket := "---\nid: \"" + id + "\"\nstatus: " + st + "\ntype: research\n---\n\n# T" + id + "\n"
+		if err := os.WriteFile(filepath.Join(dir, id+"-t.md"), []byte(ticket), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestView_SummaryCountsMovesAndWaiting(t *testing.T) {
+	// The old epics exist before the server starts: its index scans the store then.
+	store := t.TempDir()
+	servertest.WriteTicketWith(t, store, "proj", "follow-ups", "01", "first", servertest.TicketOpts{})
+	servertest.WriteTicketWith(t, store, "proj", "follow-ups", "02", "second", servertest.TicketOpts{})
+	writeOldEpic(t, filepath.Join(store, "proj"), "movable", "open")
+	writeOldEpic(t, filepath.Join(store, "proj"), "stuck", "claimed", "done")
+	f := rigs.StartDesignsIn(t, store)
+	s := triagerec.NewStore(filepath.Join(store, "proj"))
+	rec := mustRec(s.Create())
+	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrA, Verdict: "relevant"}))
+	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrB, Verdict: "relevant"}))
+	rec = mustRec(s.SaveAreas(rec.ID, rec.Revision, []triagerec.Area{{Name: "core", Source: triagerec.AreaAgent}}))
+	rec = mustRec(s.SaveMoves(rec.ID, rec.Revision, []triagerec.MoveUnit{{OldEpic: "movable", Area: "core"}}))
+	v := show(t, f)
+	wantWait := "waiting: stuck holds claimed proj:stuck/10"
+	if m := v.Summary.Moves; len(m) != 1 || m[0].OldEpic != "movable" || m[0].Area != "core" || m[0].State != "pending" {
+		t.Fatalf("moves = %+v", m)
+	}
+	if w := v.Summary.Waiting; len(w) != 1 || w[0] != wantWait {
+		t.Fatalf("waiting = %v, want %q", w, wantWait)
+	}
+
+	mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
+		{RowID: addrA, Action: triagerec.ActionArea, Destination: "core"},
+		{RowID: addrB, Action: "close"},
+	}, nil))
+	v = show(t, f)
+	if v.Summary.Actions["area"] != 1 || v.Summary.Actions["close"] != 1 || v.Summary.Areas["core"] != 1 {
+		t.Fatalf("summary = %+v", v.Summary)
+	}
+}
+
+func TestView_VersionOneRecordAtWriteWaitsForYou(t *testing.T) {
+	f, s := startViewFixture(t)
+	folder := filepath.Join(s.ProjectDir(), ".triage")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `{"version":1,"id":"v1","startedAt":"2026-01-01T00:00:00Z","project":"proj","state":"live","step":"write","revision":3,` +
+		`"rows":[{"address":"` + addrA + `","title":"first","write":"pending"}]}`
+	if err := os.WriteFile(filepath.Join(folder, "v1.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(folder, "live"), []byte("v1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	v := show(t, f)
+	if !v.CanAbandon || !v.LegacyWrite || v.StepNote != "Waiting for you" {
+		t.Fatalf("version 1 at write: %+v", v)
 	}
 }
 

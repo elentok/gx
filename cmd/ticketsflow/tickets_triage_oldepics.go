@@ -7,13 +7,11 @@ import (
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/triage"
 	"github.com/spf13/cobra"
 )
 
-const (
-	oldEpicAreasFile = "gx-triage-follow-ups/old-epic-areas.txt"
-	oldEpicNote      = "Triaged from follow-ups"
-)
+const oldEpicAreasFile = "gx-triage-follow-ups/old-epic-areas.txt"
 
 // oldEpic is one old triage-made area map epic the first Triage after the
 // change moves into areas.
@@ -55,14 +53,6 @@ func shippedOldEpicAreas() (map[string]map[string]string, error) {
 	return table, nil
 }
 
-// isOldEpic: a map, still charting, whose Notes say it was triaged from
-// follow-ups. tickets.Load skips archived epics.
-func isOldEpic(e tickets.Epic) bool {
-	step := schema.DesignStep(e.DesignStep)
-	return e.IsMap && (step == "" || step == schema.StepChart) &&
-		strings.Contains(schema.Section(e.Body, "Notes"), oldEpicNote)
-}
-
 func listOldEpics(projectDir, project string, table map[string]map[string]string) ([]oldEpic, error) {
 	epics, err := tickets.Load(projectDir)
 	if err != nil {
@@ -70,7 +60,7 @@ func listOldEpics(projectDir, project string, table map[string]map[string]string
 	}
 	out := []oldEpic{}
 	for _, e := range epics {
-		if !isOldEpic(e) {
+		if !triage.IsOldEpic(e) {
 			continue
 		}
 		c := oldEpic{Epic: e.Name, Area: table[project][e.Name], Move: []string{}, Claimed: []string{}}

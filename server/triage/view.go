@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 	triagerec "github.com/elentok/gx/triage"
 )
 
@@ -18,8 +19,8 @@ var flowSteps = []struct {
 	step wire.ProgressStep
 }{
 	{tickets.StepVerify, wire.ProgressVerify},
-	{tickets.StepPlan, wire.ProgressPlan},
-	{tickets.StepApprove, wire.ProgressApprove},
+	{tickets.StepRoute, wire.ProgressRoute},
+	{tickets.StepQuestions, wire.ProgressQuestions},
 	{tickets.StepWrite, wire.ProgressWrite},
 	{string(tickets.StepDone), wire.ProgressDone},
 }
@@ -39,17 +40,18 @@ func CanRetry(live bool, step string, r triagerec.Row) bool {
 	return live && step == tickets.StepWrite && r.Write == triagerec.WriteFailed
 }
 
-// CanAbandon is whether the Triage offers Abandon. Never at write. When the
-// Triage session is stopped, only while the stored step is verify or plan.
-func CanAbandon(live bool, step string, stopped bool) bool {
+// CanAbandon is whether the Triage offers Abandon: at verify, route and
+// questions, never at write, except for a version 1 record at write, where it
+// is the only action.
+func CanAbandon(live bool, step string, legacyWrite bool) bool {
 	if !live {
 		return false
 	}
-	switch pageStep(step) {
-	case tickets.StepVerify, tickets.StepPlan:
+	switch step {
+	case tickets.StepVerify, tickets.StepRoute, tickets.StepQuestions:
 		return true
-	case tickets.StepApprove:
-		return !stopped
+	case tickets.StepWrite:
+		return legacyWrite
 	}
 	return false
 }
@@ -83,8 +85,11 @@ func (t *Triage) View(project string) (wire.TriageView, error) {
 	if rec == nil && len(past) > 0 {
 		rec = past[0]
 	}
-	v := buildView(project, rec, t.stopped(project))
+	v := buildView(project, rec)
 	v.Destinations = t.destinations(project, rec)
+	if rec != nil && rec.State == triagerec.StateLive {
+		v.Summary.Waiting = t.waitingLines(project)
+	}
 	v.History = []wire.TriageHistoryItem{}
 	for _, p := range past {
 		res := resultOf(p)
@@ -96,27 +101,34 @@ func (t *Triage) View(project string) (wire.TriageView, error) {
 	return v, nil
 }
 
-// stopped reports whether the project has a Triage session and all of them
-// have exited. No session at all is not stopped.
-func (t *Triage) stopped(project string) bool {
-	if t.sessions == nil {
-		return false
-	}
-	infos, err := t.sessions()
+// waitingLines lists the old epics that have nothing to move and hold a claimed
+// ticket: the Triage leaves them out and they wait. Read from the store, as the
+// move units only name epics that can move.
+func (t *Triage) waitingLines(project string) []string {
+	out := []string{}
+	epics, err := t.projects.Epics(project)
 	if err != nil {
-		return false
+		return out
 	}
-	found := false
-	for _, s := range infos {
-		if s.Flow != string(tickets.FlowTriage) || s.FlowKey != project {
+	for _, e := range epics {
+		if !triagerec.IsOldEpic(e) {
 			continue
 		}
-		if s.Status.State != wire.SessionExited {
-			return false
+		var claimed []string
+		movable := false
+		for _, tk := range e.Tickets {
+			switch schema.Status(tk.Status) {
+			case schema.StatusOpen, schema.StatusDraft:
+				movable = true
+			case schema.StatusClaimed:
+				claimed = append(claimed, tickets.Address{Project: project, Epic: e.Name, ID: tk.Identifier}.String())
+			}
 		}
-		found = true
+		if !movable && len(claimed) > 0 {
+			out = append(out, fmt.Sprintf("waiting: %s holds claimed %s", e.Name, strings.Join(claimed, ", ")))
+		}
 	}
-	return found
+	return out
 }
 
 // destinations lists the choices for a row's destination: the epics the
@@ -154,12 +166,15 @@ func (t *Triage) destinations(project string, rec *triagerec.Record) []wire.Tria
 	return append(out, wire.TriageDestination{Kind: "new-map-epic", Label: "New map epic"})
 }
 
-func buildView(project string, rec *triagerec.Record, stopped bool) wire.TriageView {
+func buildView(project string, rec *triagerec.Record) wire.TriageView {
 	v := wire.TriageView{
 		Project: project, State: wire.TriageNone, Flow: string(tickets.FlowTriage),
 		Rows: []wire.TriageRow{}, ActionCounts: map[string]int{}, Destinations: []wire.TriageDestination{},
 		EpicActions: triagerec.EpicActions,
 		History:     []wire.TriageHistoryItem{},
+		Summary: &wire.TriageSummary{
+			Actions: map[string]int{}, Areas: map[string]int{}, Moves: []wire.TriageMove{}, Waiting: []string{},
+		},
 	}
 	if rec == nil {
 		v.Steps = steps("")
@@ -167,8 +182,17 @@ func buildView(project string, rec *triagerec.Record, stopped bool) wire.TriageV
 	}
 	isLive := rec.State == triagerec.StateLive
 	v.ID, v.State, v.Revision, v.Round = rec.ID, wire.TriageState(rec.State), rec.Revision, rec.Round
-	v.Steps = steps(pageStep(rec.Step))
-	v.CanAbandon = CanAbandon(isLive, rec.Step, stopped)
+	v.Steps = steps(rec.Step)
+	v.LegacyWrite = rec.LegacyWrite()
+	v.CanAbandon = CanAbandon(isLive, rec.Step, v.LegacyWrite)
+	if isLive && rec.Step == tickets.StepQuestions {
+		v.OpenRound, v.FinalApproval = openRound(rec)
+	}
+	for _, m := range rec.Moves {
+		v.Summary.Moves = append(v.Summary.Moves, wire.TriageMove{
+			OldEpic: m.OldEpic, Area: m.Area, State: string(m.State), LastError: m.LastError,
+		})
+	}
 
 	orphans := rec.MergeOrphans()
 	var verdicts, plans, written int
@@ -185,6 +209,12 @@ func buildView(project string, rec *triagerec.Record, stopped bool) wire.TriageV
 			plans++
 			written++
 			continue
+		}
+		if action, dest := r.Effective(); action != "" {
+			v.Summary.Actions[action]++
+			if action == triagerec.ActionArea && dest != "" {
+				v.Summary.Areas[dest]++
+			}
 		}
 		if r.Verdict != "" {
 			verdicts++
@@ -207,16 +237,17 @@ func buildView(project string, rec *triagerec.Record, stopped bool) wire.TriageV
 	return v
 }
 
-// pageStep maps a version 2 step to the version 1 step the page still shows,
-// until the page tickets replace those views.
-func pageStep(step string) string {
-	switch step {
-	case tickets.StepRoute:
-		return tickets.StepPlan
-	case tickets.StepQuestions:
-		return tickets.StepApprove
+// openRound reports the first saved round that waits for an answer, and the
+// final-approval marker: no round open and no ask question left to round.
+func openRound(rec *triagerec.Record) (*wire.TriageOpenRound, bool) {
+	index, open, ok := rec.OpenRound()
+	if ok {
+		round := rec.Rounds[index]
+		return &wire.TriageOpenRound{
+			Number: index + 1, Questions: len(round.Questions), Answered: len(round.Questions) - len(open),
+		}, false
 	}
-	return step
+	return nil, !rec.Approved && len(rec.Unrounded()) == 0
 }
 
 func steps(current string) []wire.MapStep {
@@ -246,14 +277,17 @@ func progress(rec *triagerec.Record, total, verdicts, plans, written int) (strin
 		return float64(n) / float64(total)
 	}
 	idx, within, note := 0, 0.0, ""
-	switch pageStep(rec.Step) {
+	switch rec.Step {
 	case tickets.StepVerify:
 		within, note = frac(verdicts), fmt.Sprintf("%d of %d verdicts saved", verdicts, total)
-	case tickets.StepPlan:
+	case tickets.StepRoute:
 		idx, within, note = 1, frac(plans), fmt.Sprintf("%d of %d rows planned", plans, total)
-	case tickets.StepApprove:
+	case tickets.StepQuestions:
 		idx = 2
 	case tickets.StepWrite:
+		if rec.LegacyWrite() {
+			return "Waiting for you", 75
+		}
 		idx, within, note = 3, frac(written), fmt.Sprintf("rows written %d of %d", written, total)
 	default:
 		return "", 100

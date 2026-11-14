@@ -32,13 +32,13 @@ func TestTriageScenario_EveryShapeShowsTheCardItNames(t *testing.T) {
 		{shape: "c-zero", triage: ""},
 		{shape: "c-few", section: wire.SectionReadyToDesign, words: "1 bug, 1 idea", triage: wire.FollowUpTriageNone},
 		{shape: "c-many", section: wire.SectionReadyToDesign, words: "30 bugs, 15 ideas", triage: wire.FollowUpTriageNone},
-		{shape: "c-live", section: wire.SectionNeedsYou, pill: "Needs you", words: "6 bugs, 6 ideas", triage: wire.FollowUpTriageWaiting, step: "approve", state: wire.TriageLive},
+		{shape: "c-live", section: wire.SectionNeedsYou, pill: "Needs you", words: "6 bugs, 6 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
 		{shape: "verify", section: wire.SectionDesigning, pill: "Verify", words: "30 bugs, 15 ideas", triage: wire.FollowUpTriageRunning, step: "verify", state: wire.TriageLive},
-		{shape: "b-questions", section: wire.SectionNeedsYou, pill: "Needs you", words: "3 bugs, 3 ideas", triage: wire.FollowUpTriageWaiting, step: "approve", state: wire.TriageLive},
-		{shape: "b-review", section: wire.SectionNeedsYou, pill: "Needs you", words: "5 bugs, 5 ideas", triage: wire.FollowUpTriageWaiting, step: "approve", state: wire.TriageLive},
+		{shape: "b-questions", section: wire.SectionNeedsYou, pill: "Needs you", words: "3 bugs, 3 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
+		{shape: "b-review", section: wire.SectionNeedsYou, pill: "Needs you", words: "5 bugs, 5 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
 		{shape: "writing", section: wire.SectionDesigning, pill: "Write", words: "6 bugs", triage: wire.FollowUpTriageRunning, step: "write", state: wire.TriageLive},
 		{shape: "result", section: wire.SectionReadyToDesign, pill: "Done", words: "2 bugs", triage: wire.FollowUpTriageNone, state: wire.TriageDone},
-		{shape: "stopped", section: wire.SectionDesigning, pill: "Route", words: "4 bugs", triage: wire.FollowUpTriageStopped, step: "plan", state: wire.TriageLive},
+		{shape: "stopped", section: wire.SectionDesigning, pill: "Route", words: "4 bugs", triage: wire.FollowUpTriageStopped, step: "route", state: wire.TriageLive},
 		{shape: "journey", section: wire.SectionReadyToDesign, words: "3 bugs, 2 ideas", triage: wire.FollowUpTriageNone},
 	} {
 		t.Run(w.shape, func(t *testing.T) {
@@ -194,7 +194,7 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 		return n
 	}
 	r.waitTriage(t, "the first Verify batch", func(v wire.TriageView) bool { return verified(v) == 3 })
-	v := r.waitTriage(t, "Plan to end at Approve", func(v wire.TriageView) bool { return currentStep(v) == "approve" && v.OpenQuestions == 2 })
+	v := r.waitTriage(t, "Route to end at Questions", func(v wire.TriageView) bool { return currentStep(v) == "questions" && v.OpenQuestions == 2 })
 	if verified(v) != 5 || len(v.ActionCounts) != 5 {
 		t.Errorf("at Approve: %d verdicts and action groups %v, want 5 and all five actions", verified(v), v.ActionCounts)
 	}
