@@ -22,6 +22,7 @@ packages:
       - queue.go
       - sessions.go
       - sessiontypes.go
+      - startdesign.go
       - stats.go
       - targets.go
       - triage.go

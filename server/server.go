@@ -49,6 +49,7 @@ import (
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/sessions/fixagent"
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
+	"github.com/elentok/gx/server/sessions/startdesign"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/settingsapi"
 	"github.com/elentok/gx/server/stats"
@@ -165,6 +166,8 @@ type Server struct {
 	sessions *sessions.Manager
 	resumer  *sessions.Resumer
 	fixAgent *fixagent.FixAgent
+	// startDesign starts the Backlog's Start Design chats.
+	startDesign *startdesign.StartDesign
 	// designs opens, cleans up and deletes the Design sessions; the Manager calls it back.
 	designs *designs.Designs
 	// triage publishes triage-changed for the live Triage records.
@@ -505,6 +508,7 @@ func New(cfg Config) (*Server, error) {
 	s.rec.GiveSessions(s.sessions)
 	s.resumer = newResumer(s)
 	s.fixAgent = fixagent.New(fixAgentHost{sessionHost{s}})
+	s.startDesign = startdesign.New(startDesignHost{sessionHost{s}})
 	s.prompt.GiveResumer(s.resumer)
 	s.PR = PRFlow{s}
 	s.epics = epics.New(s.epicsDeps())

@@ -3305,6 +3305,46 @@ export interface SessionResult {
 }
 
 //////////
+// source: startdesign.go
+
+export const ReasonStartDesignUnknownProject = "unknown-project";
+export const ReasonStartDesignNotArea = "not-area";
+export const ReasonStartDesignNoOpenTickets = "no-open-tickets";
+export const ReasonStartDesignMoveFailed = "move-failed";
+/**
+ * Refusal reasons of the start-design routes, beside the session ones.
+ */
+export type ReasonStartDesign = typeof ReasonStartDesignUnknownProject | typeof ReasonStartDesignNotArea | typeof ReasonStartDesignNoOpenTickets | typeof ReasonStartDesignMoveFailed;
+/**
+ * StartDesignRequest is the body of POST /v1/backlog/start-design. Hint is the
+ * person's optional steer for the theme.
+ */
+export interface StartDesignRequest {
+  project: string;
+  area: string;
+  hint?: string;
+}
+/**
+ * FinishMoveRequest is the body of POST /v1/backlog/finish-move: carry on the
+ * unfinished move into the named charting map.
+ */
+export interface FinishMoveRequest {
+  project: string;
+  area: string;
+  map: string;
+}
+/**
+ * FinishMoveResult answers a finish-move. A refusal is a result: Refused is
+ * set with Reason and Message; otherwise Address is the map's address.
+ */
+export interface FinishMoveResult {
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+  address?: string;
+}
+
+//////////
 // source: stats.go
 
 /**

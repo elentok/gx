@@ -30,6 +30,22 @@ func (s *Sessions) FixAgent(ctx context.Context, req wire.FixAgentRequest) (wire
 	return res, err
 }
 
+// StartDesign starts the chat that proposes a Design theme for an area, or
+// returns the live one. A refusal is a result (Refused set), not an error.
+func (s *Sessions) StartDesign(ctx context.Context, req wire.StartDesignRequest) (wire.SessionResult, error) {
+	var res wire.SessionResult
+	err := s.t.post(ctx, "/v1/backlog/start-design", req, &res)
+	return res, err
+}
+
+// FinishMove carries on an unfinished move into a charting map. A refusal is
+// a result (Refused set), not an error.
+func (s *Sessions) FinishMove(ctx context.Context, req wire.FinishMoveRequest) (wire.FinishMoveResult, error) {
+	var res wire.FinishMoveResult
+	err := s.t.post(ctx, "/v1/backlog/finish-move", req, &res)
+	return res, err
+}
+
 // RetryMigration runs a project's pending migration steps again in the server.
 // A refusal is a result (Refused set), not an error.
 func (s *Sessions) RetryMigration(ctx context.Context, req wire.RetryMigrationRequest) (wire.RetryMigrationResult, error) {

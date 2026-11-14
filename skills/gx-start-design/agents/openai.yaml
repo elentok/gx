@@ -1,0 +1,5 @@
+interface:
+  display_name: "Start Design"
+  short_description: "Propose a Design theme from an area's open tickets"
+policy:
+  allow_implicit_invocation: false

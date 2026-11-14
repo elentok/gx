@@ -40,6 +40,26 @@ func TestPromotedSentenceDriftIsCaught(t *testing.T) {
 	}
 }
 
+func TestGxStartDesignSkill(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-start-design/SKILL.md"))
+	for _, want := range []string{
+		"gx tickets epic next-name",
+		"\"Start this Design?\"",
+		"8 to 14",
+		"fewer than 8 open tickets proposes all of them",
+		"numbered tickets",
+		"print the card again **once**",
+		"gx tickets start-design <project:area> --map <name> --title",
+		"gx server web-url --json",
+		"/#/d/<project>:<map>",
+		"[gx-grilling](../gx-grilling/SKILL.md)",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("gx-start-design/SKILL.md lacks %q", want)
+		}
+	}
+}
+
 func TestGxPromoteToDesignSkill(t *testing.T) {
 	text := collapseSpace(readFile(t, "gx-promote-to-design/SKILL.md"))
 	for _, want := range []string{

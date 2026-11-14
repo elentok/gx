@@ -27,6 +27,7 @@ import (
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/sessions/fixagent"
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
+	"github.com/elentok/gx/server/sessions/startdesign"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/settingsapi"
 	"github.com/elentok/gx/server/stats"
@@ -72,6 +73,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		chat.Routes(func() *chat.Chat { return s.sessionChat }),
 		sessions.Routes(func() *sessions.Manager { return s.sessions }, func() *sessions.Resumer { return s.resumer }, func() *queue.Queue { return s.queue }),
 		fixagent.Routes(func() *fixagent.FixAgent { return s.fixAgent }),
+		startdesign.Routes(func() *startdesign.StartDesign { return s.startDesign }),
 		ticketwrite.Routes(func() *ticketwrite.Writer { return s.writer }),
 		ticketops.Routes(func() *ticketops.Ops { return s.ops }),
 		srvrecovery.Routes(func() *srvrecovery.Recovery { return s.recovery }),
