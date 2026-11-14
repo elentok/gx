@@ -103,7 +103,7 @@ func (q *Queue) Attach(d QueueDeps) {
 // EpicQueueable reports whether an epic can be queued: an unqueued, unmerged
 // loop epic that still has an open ticket. The epic list shares this rule.
 func EpicQueueable(e tickets.Epic, queued bool) bool {
-	if e.IsMap || queued || !e.MergedAt.IsZero() || e.QueueRefusal() != tickets.QueueRefusalNone {
+	if e.IsMap || e.IsArea || queued || !e.MergedAt.IsZero() || e.QueueRefusal() != tickets.QueueRefusalNone {
 		return false
 	}
 	return slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool { return t.Status == string(schema.StatusOpen) })
@@ -178,25 +178,27 @@ func (q *Queue) Write(address string, mutate func(items []wire.QueueItem) ([]wir
 
 // mapEpicRefusal refuses to queue a ticket of a map epic: a map's tickets are
 // decisions a person resolves by hand, never scheduled work.
+// An area's tickets are refused the same way, with ReasonAreaEpic.
 func (q *Queue) mapEpicRefusal(address string) *wire.QueueResult {
-	if !q.inMapEpic(address) {
-		return nil
-	}
-	r := Refusal(wire.ReasonMapEpic, address+" is in a map epic; its tickets are resolved by hand, not scheduled")
-	return &r
-}
-
-// inMapEpic reports whether address names a ticket (or root) of a map epic.
-func (q *Queue) inMapEpic(address string) bool {
 	a, err := tickets.ParseQueuedAddress(address)
 	if err != nil {
-		return false
+		return nil
 	}
 	dir, err := q.projects.Dir(a.Project)
 	if err != nil {
-		return false
+		return nil
 	}
-	return tickets.IsMapEpic(filepath.Join(dir, a.Epic))
+	epicPath := filepath.Join(dir, a.Epic)
+	var r wire.QueueResult
+	switch {
+	case tickets.IsMapEpic(epicPath):
+		r = Refusal(wire.ReasonMapEpic, address+" is in a map epic; its tickets are resolved by hand, not scheduled")
+	case tickets.IsAreaEpic(epicPath):
+		r = Refusal(wire.ReasonAreaEpic, address+" is in an area; its tickets are follow-ups, not scheduled")
+	default:
+		return nil
+	}
+	return &r
 }
 
 func (q *Queue) hasTicket(address string) bool {
@@ -296,6 +298,8 @@ func (q *Queue) refusal(t queueTarget) *wire.QueueResult {
 	switch {
 	case e.IsMap:
 		r = Refusal(wire.ReasonMapEpic, t.address+" is a map epic; its tickets are resolved by hand, not scheduled")
+	case e.IsArea:
+		r = Refusal(wire.ReasonAreaEpic, t.address+" is an area; its tickets are follow-ups, not scheduled")
 	case !e.MergedAt.IsZero():
 		r = Refusal(wire.ReasonAlreadyMerged, t.address+" is already merged")
 	case e.QueueRefusal() == tickets.QueueRefusalFollowUps:

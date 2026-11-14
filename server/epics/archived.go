@@ -58,6 +58,9 @@ func archivedRows(project string, archived []tickets.Epic, knownWorkspaces map[s
 	}
 	var rows []wire.ArchivedEpicRow
 	for _, e := range archived {
+		if e.IsArea {
+			continue
+		}
 		if design, ok := strings.CutSuffix(e.Name, tickets.ImplEpicSuffix); ok && byName[design].IsMap {
 			continue
 		}

@@ -158,7 +158,7 @@ func openGate(dir string, root queue.RootRef) bool {
 		return false
 	}
 	e := tickets.LoadEpicAt(dir)
-	return !e.IsMap && e.PRNumber == 0 && e.MergedAt.IsZero() && complete(e)
+	return !e.IsMap && !e.IsArea && e.PRNumber == 0 && e.MergedAt.IsZero() && complete(e)
 }
 
 func createDraft(r pr.Runner, repo, head, base, title, body string) (int, string, error) {

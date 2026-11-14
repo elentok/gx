@@ -34,7 +34,7 @@ func (s *Epics) EpicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 			continue
 		}
 		i := slices.IndexFunc(projEpics, func(e tickets.Epic) bool { return e.Name == root.Epic })
-		if i < 0 || projEpics[i].IsMap || !projEpics[i].MergedAt.IsZero() {
+		if i < 0 || projEpics[i].IsMap || projEpics[i].IsArea || !projEpics[i].MergedAt.IsZero() {
 			continue
 		}
 		sum := summarizeEpic(root, projEpics[i], s.Delivery(root.Project), s.Runs.StartedAtOf, recoveryOf, queue.ReadLogLenient)

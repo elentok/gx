@@ -93,6 +93,7 @@ const (
 	ReasonBadPosition      = "bad-position"
 	ReasonTicketLive       = "ticket-live"
 	ReasonMapEpic          = "map-epic"
+	ReasonAreaEpic         = "area-epic"
 	ReasonNoOpenTickets    = "no-open-tickets"
 	ReasonEpicDraft        = "epic-draft"
 	ReasonEpicNotOpen      = "epic-not-open"

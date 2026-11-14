@@ -83,7 +83,7 @@ func LoadNamedEpic(scratchDir, name string) (*tickets.Epic, error) {
 // frontier for free. A map epic has no frontier: its tickets are decisions a
 // person resolves by hand, so no scheduler ever claims one.
 func Frontier(e tickets.Epic) []tickets.Ticket {
-	if e.IsMap {
+	if e.IsMap || e.IsArea {
 		return nil
 	}
 	var frontier []tickets.Ticket

@@ -114,7 +114,9 @@ type statsBuilder struct {
 
 func (b *statsBuilder) addEpic(project string, e tickets.Epic) {
 	cost := b.impl
-	if e.IsMap {
+	if e.IsArea {
+		// An area is no loop epic and no design: only its tickets count.
+	} else if e.IsMap {
 		cost = b.design
 		cost.addMapRemainder(b.win, e)
 		b.addWaiting(e)

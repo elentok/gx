@@ -41,6 +41,10 @@ func TestWeb_QueueAddEpicAddress(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(store, "proj", "map-epic", "ticket.md"), []byte("---\nkind: map\nstatus: open\n---\n# Map\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	servertest.WriteTicket(t, store, "proj", "area-epic", "01", "followup", "")
+	if err := os.WriteFile(filepath.Join(store, "proj", "area-epic", "ticket.md"), []byte("---\nkind: area\nstatus: open\n---\n# Area\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	hs, err := h.Client.Handshake(t.Context())
 	if err != nil || hs.WebURL == "" {
@@ -66,6 +70,7 @@ func TestWeb_QueueAddEpicAddress(t *testing.T) {
 	for _, c := range []struct{ name, address, reason string }{
 		{"already queued", "proj:epic-a", wire.ReasonAlreadyQueued},
 		{"map epic", "proj:map-epic", wire.ReasonMapEpic},
+		{"area epic", "proj:area-epic", wire.ReasonAreaEpic},
 		{"draft epic", "proj:epic-drafting", wire.ReasonEpicDraft},
 		{"follow-ups", "proj:follow-ups", wire.ReasonFollowUpsEpic},
 		{"follow-ups archived", "proj:follow-ups-archived", wire.ReasonFollowUpsEpic},

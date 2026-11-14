@@ -50,7 +50,7 @@ func RecentlyFinished(loaded map[string][]tickets.Epic, limit int) []wire.Finish
 	for dir, epics := range loaded {
 		project := tickets.ProjectName(dir)
 		for _, e := range epics {
-			if e.IsMap || e.CompletedAt.IsZero() || oneoff.IsOneOffsEpicName(filepath.Base(e.Path)) {
+			if e.IsMap || e.IsArea || e.CompletedAt.IsZero() || oneoff.IsOneOffsEpicName(filepath.Base(e.Path)) {
 				continue
 			}
 			f := wire.FinishedEpic{

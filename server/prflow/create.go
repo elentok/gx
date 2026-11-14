@@ -53,6 +53,8 @@ func Create(h CreateHost, req wire.QueueRequest) (wire.QueueResult, error) {
 	switch {
 	case e.IsMap:
 		return queue.Refusal(wire.ReasonMapEpic, root.String()+" is a map epic; its tickets are resolved by hand"), nil
+	case e.IsArea:
+		return queue.Refusal(wire.ReasonAreaEpic, root.String()+" is an area; it never opens a PR"), nil
 	case !root.Mergeable():
 		return queue.Refusal(wire.ReasonOneOffsEpic, root.String()+" is the one-offs inbox; it never opens a PR"), nil
 	case !e.MergedAt.IsZero():

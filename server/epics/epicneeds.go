@@ -48,7 +48,7 @@ type ticketWait struct {
 // too. An epic without one waits on its deadlock, its blocked merge, or an
 // unmerged finish in a project with auto-merge off.
 func (s *Epics) loopNeedsYou(root queue.RootRef, e tickets.Epic, state wire.EpicListState) (needsYou, bool) {
-	if e.IsMap || !e.MergedAt.IsZero() {
+	if e.IsMap || e.IsArea || !e.MergedAt.IsZero() {
 		return needsYou{}, false
 	}
 	fallback := cmp.Or(e.CompletedAt, lastActivity(e))

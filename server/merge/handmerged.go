@@ -33,7 +33,7 @@ func (s *Reconciler) StampHandMerged() {
 		var waited map[string]bool
 		for _, e := range epics {
 			// A PR epic is stamped by the PR-merged watcher or Mark as merged, never by its branch being an ancestor.
-			if e.IsMap || e.PRNumber != 0 || e.CompletedAt.IsZero() || !e.MergedAt.IsZero() {
+			if e.IsMap || e.IsArea || e.PRNumber != 0 || e.CompletedAt.IsZero() || !e.MergedAt.IsZero() {
 				continue
 			}
 			root := queue.RootRef{Project: project, Epic: e.Name}

@@ -38,6 +38,9 @@ func (w *Writer) PauseRequest(req wire.QueueRequest) (wire.QueueResult, error) {
 		if ref.Epic.IsMap {
 			return queue.Refusal(wire.ReasonMapEpic, ref.Addr.String()+" is in a map epic; its tickets are resolved by hand, not scheduled"), nil
 		}
+		if ref.Epic.IsArea {
+			return queue.Refusal(wire.ReasonAreaEpic, ref.Addr.String()+" is in an area; its tickets are follow-ups, not scheduled"), nil
+		}
 		run, _ := w.d.Registry.Tracked(ref.Addr.String())
 		if err := w.Pause(ref.ProjectDir, ref.Addr, ref.Ticket.Path, events.Manual, reason, run.Run); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("pause %s: %w", ref.Addr, err)
