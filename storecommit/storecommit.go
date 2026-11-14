@@ -71,13 +71,14 @@ func (l *Loop) countDirty() (int, string, error) {
 
 // Loop is a running store commit loop.
 type Loop struct {
-	dir  string
-	env  []string   // environment of every git child; nil means git.NonInteractiveEnv()
-	refs int        // guarded by regMu
-	mu   sync.Mutex // serializes commits
-	stop chan struct{}
-	done chan struct{}
-	kick chan struct{} // Touch signals here; coalesces
+	dir   string
+	env   []string   // environment of every git child; nil means git.NonInteractiveEnv()
+	refs  int        // guarded by regMu
+	mu    sync.Mutex // serializes commits
+	stop  chan struct{}
+	done  chan struct{}
+	kick  chan struct{} // Touch signals here; coalesces
+	check chan struct{} // Check signals here; coalesces
 	// fallback is how often the loop checks for changes nobody reported.
 	fallback time.Duration
 
@@ -146,7 +147,7 @@ func startWith(dir string, o Options, fallback time.Duration) (*Loop, error) {
 		l.refs++
 		return l, nil
 	}
-	l := &Loop{dir: dir, env: o.Env, debounce: o.Debounce, fallback: fallback, kick: make(chan struct{}, 1), refs: 1, stop: make(chan struct{}), done: make(chan struct{}),
+	l := &Loop{dir: dir, env: o.Env, debounce: o.Debounce, fallback: fallback, kick: make(chan struct{}, 1), check: make(chan struct{}, 1), refs: 1, stop: make(chan struct{}), done: make(chan struct{}),
 		pushRemote: o.PushRemote, onError: o.OnError, pushKick: make(chan struct{}, 1), pushStop: make(chan struct{}), pushDone: make(chan struct{})}
 	reg[dir] = l
 	go l.run()
@@ -196,6 +197,16 @@ func (l *Loop) Touch() {
 	}
 }
 
+// Check asks the loop to look for unreported changes now. Unlike Touch it
+// restarts the quiet period only when the dirty files changed, so a caller may
+// poll with it.
+func (l *Loop) Check() {
+	select {
+	case l.check <- struct{}{}:
+	default:
+	}
+}
+
 // Flush commits any pending change now. A server calls it on start to commit
 // edits made while it was down.
 func (l *Loop) Flush() error { return l.commit("") }
@@ -236,6 +247,18 @@ func (l *Loop) run() {
 		debounce, _ := l.settings()
 		quiet = time.After(debounce)
 	}
+	// check restarts the quiet period only when the dirty files changed, so it
+	// is safe to run often.
+	check := func() {
+		n, sig, err := l.countDirty()
+		switch {
+		case err != nil || n == 0:
+			lastSig, quiet = "", nil
+		case sig != lastSig:
+			lastSig = sig
+			restart()
+		}
+	}
 	fallback := time.NewTicker(l.fallback)
 	defer fallback.Stop()
 	for {
@@ -245,14 +268,9 @@ func (l *Loop) run() {
 		case <-l.kick:
 			restart()
 		case <-fallback.C:
-			n, sig, err := l.countDirty()
-			switch {
-			case err != nil || n == 0:
-				lastSig, quiet = "", nil
-			case sig != lastSig:
-				lastSig = sig
-				restart()
-			}
+			check()
+		case <-l.check:
+			check()
 		case <-quiet:
 			quiet, lastSig = nil, ""
 			_ = l.commit("")

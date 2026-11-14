@@ -61,3 +61,30 @@ func TestStoreCommits_ServerCommitsEditsMadeWhileDownOnStart(t *testing.T) {
 		t.Errorf("log = %q, want a sync commit of the down-time edit", got)
 	}
 }
+
+// With the watch off no event touches the loop; the poll must still get an
+// edit committed within a few debounce periods, not the 60s fallback.
+func TestStoreCommits_WatchOffEditIsCommittedByThePoll(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic", "01", "first", "")
+	servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.DisableWatch = true
+		c.PollInterval = 20 * time.Millisecond
+		c.StoreCommitDebounce = 100 * time.Millisecond
+	})
+	servertest.Poll(5*time.Second, func() bool { return storeLog(t, store) != "" })
+	before := strings.Count(storeLog(t, store), "\n")
+
+	path := filepath.Join(store, "proj", "epic", "issues", "01-first.md")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, append(raw, []byte("\nedited\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !servertest.Poll(5*time.Second, func() bool { return strings.Count(storeLog(t, store), "\n") > before }) {
+		t.Fatal("edit was not committed by the poll")
+	}
+}

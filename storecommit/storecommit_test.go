@@ -98,6 +98,41 @@ func TestTouch_CommitsAfterQuietWithoutPolling(t *testing.T) {
 	}
 }
 
+func TestCheck_CommitsUnreportedEditAfterQuiet(t *testing.T) {
+	dir := t.TempDir()
+	l, err := start(dir, 20*time.Millisecond, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Stop()
+
+	write(t, dir, "a.md", "x")
+	l.Check()
+	waitForCommit(t, dir)
+	if got := logLines(t, dir); len(got) != 1 {
+		t.Fatalf("log = %v, want one commit", got)
+	}
+}
+
+func TestCheck_RepeatedChecksDoNotPostponeCommit(t *testing.T) {
+	dir := t.TempDir()
+	l, err := start(dir, 200*time.Millisecond, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Stop()
+
+	write(t, dir, "a.md", "x")
+	for range 5 {
+		l.Check()
+		quiet(30 * time.Millisecond)
+	}
+	waitForCommit(t, dir)
+	if got := logLines(t, dir); len(got) != 1 {
+		t.Fatalf("log = %v, want one commit", got)
+	}
+}
+
 func TestNoTouchNoFallback_RunsNoGit(t *testing.T) {
 	dir := t.TempDir()
 	l, err := start(dir, 20*time.Millisecond, time.Hour)

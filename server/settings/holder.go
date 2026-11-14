@@ -139,6 +139,15 @@ func (h *Holder) TouchStoreCommits() {
 	}
 }
 
+// CheckStoreCommits asks the commit loop to look for unreported changes. It
+// is the poll counterpart of TouchStoreCommits: it only restarts the quiet
+// period when the files changed.
+func (h *Holder) CheckStoreCommits() {
+	if loop := h.commits.Load(); loop != nil {
+		loop.Check()
+	}
+}
+
 // ApplyStoreCommits is the reload step that retunes the running commit loop.
 func (h *Holder) ApplyStoreCommits(old, next Settings) func() {
 	if loop := h.commits.Load(); loop != nil && (next.StoreCommitDebounce != old.StoreCommitDebounce || next.StorePushRemote != old.StorePushRemote) {

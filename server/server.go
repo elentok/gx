@@ -624,6 +624,7 @@ func (s *Server) Serve(ctx context.Context) error {
 			DisableWatch:  s.cfg.DisableWatch,
 			Start:         s.startup.AfterMigrations,
 			OnStoreChange: s.settings.TouchStoreCommits,
+			OnPoll:        s.settings.CheckStoreCommits,
 		})
 	}()
 	herdrDone := make(chan struct{})
