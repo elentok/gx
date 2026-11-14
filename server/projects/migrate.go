@@ -169,7 +169,7 @@ func (m *Migrator) migrateProject(reg *migrations.Registry, dir string, pass *mi
 		Dirs: config.DirsFrom(m.cfg().Env), Root: dir, LookupRoot: dir,
 		AppliedPath: filepath.Join(dir, migrations.AppliedFile),
 		SkipApplied: true,
-		StateDir:    m.cfg().StateDir, Pass: pass,
+		StateDir:    m.cfg().StateDir, Pass: pass, Log: m.log,
 	})
 	for _, c := range changes {
 		for _, note := range c.Notes {

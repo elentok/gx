@@ -14,6 +14,7 @@ package migrations
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 
 	"github.com/elentok/gx/config"
@@ -43,6 +44,9 @@ type Env struct {
 	// Pass is shared by the project runs of one pass (see Pass). Nil means this
 	// run is a pass of its own.
 	Pass *Pass
+	// Log receives lines a step wants a person to read but that are not
+	// changes (a refusal). Nil means no logging.
+	Log *slog.Logger
 }
 
 // StepFunc runs one step and returns the files it changed.

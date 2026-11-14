@@ -4,17 +4,21 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/migrations"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -57,6 +61,65 @@ var waitMigrations = servertest.WaitMigrations
 func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
 	servertest.WaitFor(t, 15*time.Second, "the condition", ok)
+}
+
+// Seam: a start backfills the Epic range of every registered project, each from
+// its own repo's reflog, through the default registry.
+func TestMigrate_StartBackfillsEveryProjectEpicRange(t *testing.T) {
+	t.Parallel()
+	store := migrateStore(t, "alpha", "beta")
+	want := map[string][2]string{}
+	for _, project := range []string{"alpha", "beta"} {
+		repo := testutil.TempRepo(t)
+		epic := project + "-epic"
+		testutil.MustGitExported(t, repo, "checkout", "-b", "b-"+epic, "main")
+		testutil.WriteFile(t, repo, epic+".txt", epic)
+		testutil.CommitAll(t, repo, "work\n\nRalph-Loop-Ticket: "+epic+"/01")
+		testutil.MustGitExported(t, repo, "checkout", "main")
+		old := gitRev(t, repo, "main")
+		testutil.MustGitExported(t, repo, "merge", "--ff-only", "b-"+epic)
+		want[project] = [2]string{old, gitRev(t, repo, "main")}
+
+		if err := servertest.WriteProjectRepo(store, project, repo, `,"trunk":"main"`); err != nil {
+			t.Fatal(err)
+		}
+		dir := filepath.Join(store, project, epic)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		md := "---\nkind: loop\nstatus: open\ncreated_at: 2026-01-02T03:04:05Z\nmerged_at: 2026-02-02T03:04:05Z\n---\n# E\n"
+		if err := os.WriteFile(filepath.Join(dir, "ticket.md"), []byte(md), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		ev := runlog.Event{Type: string(events.CherryPicked), Ticket: "01"}
+		if err := runlog.AppendEvent(filepath.Join(store, project), epic, ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Migrations = migrations.Default })
+	waitMigrations(t, h)
+
+	for project, r := range want {
+		e := tickets.LoadEpicTicketMD(filepath.Join(store, project, project+"-epic"))
+		if e.RangeBase != r[0] || e.RangeTip != r[1] {
+			t.Errorf("%s range = %s..%s, want %s..%s", project, e.RangeBase, e.RangeTip, r[0], r[1])
+		}
+		if !strings.Contains(appliedOf(t, store, project), "epic-range-backfill\n") {
+			t.Errorf("%s applied = %q", project, appliedOf(t, store, project))
+		}
+	}
+}
+
+func gitRev(t *testing.T, dir, ref string) string {
+	t.Helper()
+	cmd := exec.Command("git", "rev-parse", ref)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git rev-parse %s: %v", ref, err)
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // Seam: a start migrates, records, keeps going past a failure, clears a stale

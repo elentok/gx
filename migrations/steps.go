@@ -98,9 +98,9 @@ func init() {
 	Default.Register(Step{Name: "ticket-scheduled-for", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
-	// epic-range-backfill: range_base and range_tip are optional; absent is "no recorded range". The backfill ticket fills in this step's Run.
+	// epic-range-backfill: range_base and range_tip are optional; absent is "no recorded range".
 	Default.Register(Step{Name: "epic-range-backfill", Run: func(e Env) ([]tickets.MigrationChange, error) {
-		return nil, nil
+		return ticketmigrate.BackfillEpicRange(e.Root, epicRangeUnder(e.Dirs, e.LookupRoot, e.Log))
 	}})
 }
 

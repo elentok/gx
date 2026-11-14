@@ -3,6 +3,7 @@ package migrations
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -201,6 +202,68 @@ func epicTrailerLinesUnder(dirs config.Dirs, root string) func(tickets.Epic) (in
 		}
 		added, removed, err := merge.EpicTrailerLines(repoRoot, ref, e.Name)
 		return added, removed, err == nil, err
+	}
+}
+
+// epicRangeUnder decides the Epic range of a merged epic of the tracker root's
+// repo: an empty range at trunk's tip for an epic whose run log shows no
+// picks, else the one reflog entry holding all its commits. Every refusal is
+// logged once (log may be nil) and stamps nothing. The repo, trunk and
+// matcher are built on first use, so a root with nothing to backfill never
+// needs a repo, and a root outside any repo stamps nothing.
+func epicRangeUnder(dirs config.Dirs, root string, log *slog.Logger) func(tickets.Epic) (string, string, bool, error) {
+	var repoRoot, trunk string
+	var matcher *merge.ReflogMatcher
+	noRepo := false
+	refuse := func(e tickets.Epic, reason string) (string, string, bool, error) {
+		if log != nil {
+			log.Info("epic range not backfilled", "epic", tickets.ProjectName(root)+"/"+e.Name, "reason", reason)
+		}
+		return "", "", false, nil
+	}
+	return func(e tickets.Epic) (string, string, bool, error) {
+		evs, ok, err := runlog.ReadEvents(epicLogRoot(root, e.Name), e.Name)
+		if err != nil {
+			return "", "", false, fmt.Errorf("run log of %s: %w", e.Name, err)
+		}
+		if !ok {
+			return refuse(e, "no run log")
+		}
+		if noRepo {
+			return "", "", false, nil
+		}
+		if repoRoot == "" {
+			repoRoot, trunk, err = trackerRepo(dirs, root)
+			if errors.Is(err, git.ErrNoRepo) {
+				noRepo = true
+				return "", "", false, nil
+			}
+			if err != nil {
+				return "", "", false, fmt.Errorf("backfilling epic range: %w", err)
+			}
+		}
+		picked := slices.ContainsFunc(evs, func(ev runlog.Event) bool { return ev.Type == string(events.CherryPicked) })
+		if !picked {
+			tip, err := git.RevParse(repoRoot, trunk)
+			if err != nil {
+				return "", "", false, fmt.Errorf("backfilling epic range: %w", err)
+			}
+			return tip, tip, true, nil
+		}
+		if matcher == nil {
+			matcher, err = merge.NewReflogMatcher(repoRoot, trunk)
+			if err != nil {
+				return "", "", false, fmt.Errorf("backfilling epic range: %w", err)
+			}
+		}
+		r, refusal := matcher.Match(e)
+		if refusal != nil {
+			if refusal.Reason == merge.ReasonNoTrailerCommits {
+				return refuse(e, "commits not on trunk")
+			}
+			return refuse(e, string(refusal.Reason))
+		}
+		return r.Base, r.Tip, true, nil
 	}
 }
 
