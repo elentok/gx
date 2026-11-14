@@ -119,17 +119,26 @@ test("a group shows as one row listing its members, with an Ungroup action", () 
   screen.getByRole("button", { name: "Action for row 3" })
 })
 
-test("Ungroup posts the row edit with ungroup on the current revision, then refetches", async () => {
-  const save = vi.fn().mockResolvedValue({ revision: 5 })
+test("Ungroup posts the ungroup request on the current revision, then refetches", async () => {
+  const save = vi.fn()
+  const ungroupRow = vi.fn().mockResolvedValue({ revision: 5 })
   const refetch = vi.fn()
-  render(<ReviewView project="gx" view={grouped()} refetch={refetch} save={save} />)
+  render(
+    <ReviewView
+      project="gx"
+      view={grouped()}
+      refetch={refetch}
+      save={save}
+      ungroupRow={ungroupRow}
+    />,
+  )
   fireEvent.click(screen.getByRole("button", { name: /^Ungroup/ }))
   await waitFor(() => expect(refetch).toHaveBeenCalledTimes(1))
-  expect(save).toHaveBeenCalledWith({
+  expect(save).not.toHaveBeenCalled()
+  expect(ungroupRow).toHaveBeenCalledWith({
     project: "gx",
     revision: 4,
     address: "gx:follow-ups/1",
-    ungroup: true,
   })
 })
 

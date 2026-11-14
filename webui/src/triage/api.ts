@@ -5,6 +5,7 @@ import type {
   TriageRowActionRequest,
   TriageRowRequest,
   TriageSendBackRequest,
+  TriageUngroupRequest,
 } from "../generated/server"
 import { postJson } from "../design/open"
 import type { OpenFlow } from "../design/open"
@@ -17,6 +18,9 @@ export type AbandonTriage = (body: TriageAbandonRequest) => Promise<TriageEditRe
 export const postAbandonTriage: AbandonTriage = postJson<TriageEditResult>("/v1/triage/abandon")
 export type SaveTriageRow = (body: TriageRowRequest) => Promise<TriageEditResult>
 export const postSaveTriageRow: SaveTriageRow = postJson<TriageEditResult>("/v1/triage/row")
+export type UngroupTriageRow = (body: TriageUngroupRequest) => Promise<TriageEditResult>
+export const postUngroupTriageRow: UngroupTriageRow =
+  postJson<TriageEditResult>("/v1/triage/ungroup")
 export type TriageRowAction = (body: TriageRowActionRequest) => Promise<TriageEditResult>
 export const postRetryTriageRow: TriageRowAction = postJson<TriageEditResult>("/v1/triage/retry")
 export const postKeepTriageRow: TriageRowAction = postJson<TriageEditResult>("/v1/triage/keep")

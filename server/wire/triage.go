@@ -112,8 +112,14 @@ type TriageRowRequest struct {
 	Destination  string            `json:"destination,omitempty"`
 	Answers      map[string]string `json:"answers,omitempty"`
 	KeepForLater bool              `json:"keep_for_later,omitempty"`
-	// Ungroup undoes the group the row is in; the other fields are ignored.
-	Ungroup bool `json:"ungroup,omitempty"`
+}
+
+// TriageUngroupRequest is the body of POST /v1/triage/ungroup. It undoes the
+// group the row is in; Revision is the record revision the web read.
+type TriageUngroupRequest struct {
+	Project  string `json:"project"`
+	Revision int    `json:"revision"`
+	Address  string `json:"address"`
 }
 
 // TriageApproveRequest is the body of POST /v1/triage/approve.

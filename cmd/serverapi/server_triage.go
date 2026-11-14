@@ -138,6 +138,32 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 	row.Flags().BoolVar(&rowKeep, "keep-for-later", false, "keep the follow-up for later")
 	cmd.AddCommand(row)
 
+	var ungroupJSON bool
+	var ungroupRevision int
+	ungroup := &cobra.Command{
+		Use:   "ungroup <project> <address>",
+		Short: "undo the group a row is in, on the record revision read",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			res, err := cl.Triage.Ungroup(ctx, wire.TriageUngroupRequest{Project: args[0], Revision: ungroupRevision, Address: args[1]})
+			if err != nil {
+				return fmt.Errorf("server write failed: %w", err)
+			}
+			return editOut(c, res, ungroupJSON)
+		},
+	}
+	ungroup.Flags().BoolVar(&ungroupJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	ungroup.Flags().IntVar(&ungroupRevision, "revision", 0, "the record revision read")
+	cmd.AddCommand(ungroup)
+
 	var abandonJSON bool
 	var abandonRevision int
 	abandon := &cobra.Command{

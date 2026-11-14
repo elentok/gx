@@ -1,7 +1,12 @@
 import { Box, Text, chakra } from "@chakra-ui/react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { postSaveTriageRow, type SaveTriageRow } from "./api"
-import type { TriageRow, TriageRowRequest, TriageView } from "../generated/server"
+import {
+  postSaveTriageRow,
+  postUngroupTriageRow,
+  type SaveTriageRow,
+  type UngroupTriageRow,
+} from "./api"
+import type { TriageEditResult, TriageRow, TriageView } from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu"
 import { Modal } from "../ui/modal/Modal"
@@ -31,7 +36,13 @@ function saveBody(project: string, revision: number, row: TriageRow, edit: Edit)
 }
 
 /** Saves row edits one after another on the revision the last save returned. Shown edits stay until the view changes. */
-function useRowEdits(project: string, view: TriageView, refetch: () => void, save: SaveTriageRow) {
+function useRowEdits(
+  project: string,
+  view: TriageView,
+  refetch: () => void,
+  save: SaveTriageRow,
+  ungroupRow: UngroupTriageRow,
+) {
   const [drafts, setDrafts] = useState<Record<string, Edit>>({})
   const revision = useRef(view.revision ?? 0)
   const queue = useRef<Promise<void>>(Promise.resolve())
@@ -40,10 +51,13 @@ function useRowEdits(project: string, view: TriageView, refetch: () => void, sav
     setDrafts({})
   }, [view.revision])
 
-  const enqueue = (bodies: ((revision: number) => TriageRowRequest)[]) => {
+  const enqueue = <B,>(
+    send: (body: B) => Promise<TriageEditResult>,
+    bodies: ((revision: number) => B)[],
+  ) => {
     queue.current = queue.current.then(async () => {
       for (const body of bodies) {
-        const res = await save(body(revision.current))
+        const res = await send(body(revision.current))
         if (res.refused) {
           showToast(
             res.reason === REASON_STALE
@@ -63,6 +77,7 @@ function useRowEdits(project: string, view: TriageView, refetch: () => void, sav
   const edit = (changes: [TriageRow, Edit][]) => {
     setDrafts((d) => ({ ...d, ...Object.fromEntries(changes.map(([r, e]) => [r.address, e])) }))
     enqueue(
+      save,
       changes.map(
         ([row, e]) =>
           (rev) =>
@@ -72,7 +87,7 @@ function useRowEdits(project: string, view: TriageView, refetch: () => void, sav
   }
   /** Undoes the group the row is in: the same record operation as `triage row --ungroup`. */
   const ungroup = (row: TriageRow) =>
-    enqueue([(rev) => ({ project, revision: rev, address: row.address, ungroup: true })])
+    enqueue(ungroupRow, [(rev) => ({ project, revision: rev, address: row.address })])
   return { drafts, edit, ungroup }
 }
 
@@ -442,13 +457,15 @@ export function ReviewView({
   view,
   refetch,
   save = postSaveTriageRow,
+  ungroupRow = postUngroupTriageRow,
 }: {
   project: string
   view: TriageView
   refetch: () => void
   save?: SaveTriageRow
+  ungroupRow?: UngroupTriageRow
 }) {
-  const { drafts, edit, ungroup } = useRowEdits(project, view, refetch, save)
+  const { drafts, edit, ungroup } = useRowEdits(project, view, refetch, save, ungroupRow)
   const [open, setOpen] = useState<Record<string, boolean>>({ ready: true })
   const rows = view.rows
     .filter((r) => !r.gone && r.action)

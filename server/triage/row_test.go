@@ -41,6 +41,15 @@ func saveRow(t *testing.T, f rigs.DesignsFixture, req wire.TriageRowRequest) wir
 	return res
 }
 
+func ungroup(t *testing.T, f rigs.DesignsFixture, revision int, address string) wire.TriageEditResult {
+	t.Helper()
+	res, err := f.H.Client.Triage.Ungroup(f.Ctx, wire.TriageUngroupRequest{Project: "proj", Revision: revision, Address: address})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
 func rowOf(v wire.TriageView, addr string) wire.TriageRow {
 	for _, r := range v.Rows {
 		if r.Address == addr {
@@ -111,7 +120,7 @@ func TestRow_EditSavesAndTheViewShowsItChanged(t *testing.T) {
 	}
 }
 
-func TestSaveRow_UngroupUndoesAGroupLikeTheCLI(t *testing.T) {
+func TestUngroup_UndoesAGroupLikeTheCLIAndRefusesAStaleRevision(t *testing.T) {
 	f, store := startViewFixture(t)
 	rec := mustRec(store.Create())
 	a, b := rec.Rows[0].Address, rec.Rows[1].Address
@@ -125,7 +134,10 @@ func TestSaveRow_UngroupUndoesAGroupLikeTheCLI(t *testing.T) {
 	if rec.Rows[0].Group == "" {
 		t.Fatal("rows were not grouped")
 	}
-	if res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Ungroup: true}); res.Refused {
+	if res := ungroup(t, f, rec.Revision+5, a); !res.Refused || res.Reason != wire.ReasonStale {
+		t.Fatalf("stale ungroup = %+v, want a stale-revision refusal", res)
+	}
+	if res := ungroup(t, f, rec.Revision, a); res.Refused {
 		t.Fatalf("ungroup = %+v", res)
 	}
 	got := mustRec(store.LoadLive())
@@ -169,7 +181,7 @@ func TestView_GroupMembersShareTheMarkerAndUngroupedRowsShowTheirChain(t *testin
 	if rowOf(v, a).Group == "" || rowOf(v, a).Group != rowOf(v, b).Group {
 		t.Fatalf("groups = %q, %q, want one shared marker", rowOf(v, a).Group, rowOf(v, b).Group)
 	}
-	if res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Ungroup: true}); res.Refused {
+	if res := ungroup(t, f, rec.Revision, a); res.Refused {
 		t.Fatalf("ungroup = %+v", res)
 	}
 	v = show(t, f)

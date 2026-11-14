@@ -68,6 +68,11 @@ func Routes(get func() *Triage) []wire.Route {
 			Handler: func(w http.ResponseWriter, r *http.Request) { jsonHandler(get().saveRow)(w, r) },
 		},
 		{
+			Pattern: "POST /v1/triage/ungroup",
+			Web:     wire.WebWrite,
+			Handler: func(w http.ResponseWriter, r *http.Request) { jsonHandler(get().ungroup)(w, r) },
+		},
+		{
 			Pattern: "POST /v1/triage/abandon",
 			Web:     wire.WebWrite,
 			Handler: func(w http.ResponseWriter, r *http.Request) { jsonHandler(get().abandon)(w, r) },

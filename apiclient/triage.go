@@ -34,6 +34,13 @@ func (s *Triage) SaveRow(ctx context.Context, req wire.TriageRowRequest) (wire.T
 	return res, err
 }
 
+// Ungroup undoes the group a row is in. A refusal is a result, not an error.
+func (s *Triage) Ungroup(ctx context.Context, req wire.TriageUngroupRequest) (wire.TriageEditResult, error) {
+	var res wire.TriageEditResult
+	err := s.t.post(ctx, "/v1/triage/ungroup", req, &res)
+	return res, err
+}
+
 // Abandon ends project's live Triage. A refusal is a result, not an error.
 func (s *Triage) Abandon(ctx context.Context, req wire.TriageAbandonRequest) (wire.TriageEditResult, error) {
 	var res wire.TriageEditResult
