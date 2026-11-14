@@ -24,6 +24,15 @@ func TestVerifiedRoundTrip(t *testing.T) {
 	}
 }
 
+func TestIsOptionalSection(t *testing.T) {
+	if !IsOptionalSection("Iteration summaries") {
+		t.Error("Iteration summaries should be optional")
+	}
+	if IsOptionalSection("Spec deviations") {
+		t.Error("Spec deviations should not be optional")
+	}
+}
+
 func TestMarkVerifiedHistory(t *testing.T) {
 	body := AppendVerified(oldBody, VerifiedEntry{Story: "s", Verdict: "pass", Commit: "abc"})
 	got := ParseVerified(MarkVerifiedHistory(body))

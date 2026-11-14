@@ -214,6 +214,21 @@ func TestExecute_TicketsShow_SectionPrintsOnlyMatchingSections(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsShow_OptionalSectionMissingPrintsNothing(t *testing.T) {
+	repo, project := cmdtest.SetupShowProject(t)
+	testutil.WriteFile(t, filepath.Join(project, "epic", "issues"), "07-second.md",
+		"---\nid: \"07\"\nstatus: done\ntype: implement\n---\n\n# 07 — Second\n\n## Iteration summaries\n\n- did X\n")
+
+	out, err := runIn(t, repo, "tickets", "show", "mine:epic/06", "--section", "Iteration summaries")
+	if err != nil || out != "" {
+		t.Errorf("missing optional section printed %q, err %v; want nothing and no error", out, err)
+	}
+	out, err = runIn(t, repo, "tickets", "show", "mine:epic/07", "--section", "Iteration summaries")
+	if err != nil || out != "mine:epic/07  Second\n- did X\n\n" {
+		t.Errorf("present optional section printed %q, err %v", out, err)
+	}
+}
+
 func TestExecute_TicketsShow_SectionTicketsFilterNarrowsEpic(t *testing.T) {
 	repo, project := cmdtest.SetupShowProject(t)
 	issues := filepath.Join(project, "epic", "issues")

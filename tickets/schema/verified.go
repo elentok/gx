@@ -3,6 +3,7 @@ package schema
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -14,6 +15,15 @@ const (
 
 	historyMarker = " [history]"
 )
+
+// OptionalSections are headings a ticket may lack until the first entry is
+// written; reading one that is missing yields nothing instead of an error.
+var OptionalSections = []string{IterationSummaryHeading}
+
+// IsOptionalSection reports whether heading is on OptionalSections.
+func IsOptionalSection(heading string) bool {
+	return slices.Contains(OptionalSections, heading)
+}
 
 // VerifiedEntry is one "## Verified" bullet: a story, the verdict reached and
 // the commit that was checked. History entries predate a Start over.

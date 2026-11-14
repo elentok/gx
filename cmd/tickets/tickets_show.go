@@ -66,7 +66,7 @@ func runTicketsShow(dirs config.Dirs, cwd, addr string, jsonOut bool, section, o
 		return errors.New("--tickets only applies to an epic address")
 	}
 	if section != "" {
-		if t.ReadErr == "" && !schema.HasSection(t.Body, section) {
+		if t.ReadErr == "" && !schema.HasSection(t.Body, section) && !schema.IsOptionalSection(section) {
 			return fmt.Errorf("no section %s in %s", section, a)
 		}
 		return printTicketSection(a, t, section, w)
