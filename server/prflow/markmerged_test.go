@@ -1,6 +1,7 @@
 package prflow_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,6 +13,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/ghfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -51,6 +53,53 @@ func TestMarkMerged_StampsAMergeProjectEpicAndASecondCallIsANoOp(t *testing.T) {
 	}
 	if got := tickets.LoadEpicAt(f.EpicDir()).MergedAt; !got.Equal(first) {
 		t.Errorf("second call moved merged_at from %v to %v", first, got)
+	}
+}
+
+func TestMarkMerged_NoPRNumberStampsTheReflogRangeByTheSameRuleInBothDeliveryModes(t *testing.T) {
+	cases := map[string]struct {
+		trailers []string // trailer commits added to epic-a before the hand merge
+		want     string   // "range", "none" or "empty"
+	}{
+		"matching entry":       {[]string{"epic-a/01"}, "range"},
+		"entry shares commits": {[]string{"epic-a/01", "elsewhere/01"}, "none"},
+		"no trailer commits":   {nil, "empty"},
+	}
+	for name, c := range cases {
+		for mode, extra := range map[string]string{"merge": deliveryMerge, "pr": ""} {
+			t.Run(name+"/"+mode, func(t *testing.T) {
+				f := openRig(t, "")
+				setProject(t, f, extra)
+				repo := f.Origin.Local
+				servertest.RunGitIn(t, repo, "checkout", "-q", "epic-a")
+				for i, tr := range c.trailers {
+					testutil.WriteFile(t, repo, fmt.Sprintf("t%d.txt", i), "x\n")
+					testutil.CommitAll(t, repo, "work\n\nRalph-Loop-Ticket: "+tr)
+				}
+				servertest.RunGitIn(t, repo, "checkout", "-q", "main")
+				before := servertest.GitOut(t, repo, "rev-parse", "main")
+				servertest.RunGitIn(t, repo, "merge", "-q", "--ff-only", "epic-a")
+				after := servertest.GitOut(t, repo, "rev-parse", "main")
+
+				if res := markMerged(t, f); res.Refused {
+					t.Fatalf("refused: %+v", res)
+				}
+				e := tickets.LoadEpicAt(f.EpicDir())
+				if e.MergedAt.IsZero() {
+					t.Fatal("merged_at not stamped")
+				}
+				wantBase, wantTip := "", ""
+				switch c.want {
+				case "range":
+					wantBase, wantTip = before, after
+				case "empty":
+					wantBase, wantTip = after, after
+				}
+				if e.RangeBase != wantBase || e.RangeTip != wantTip {
+					t.Errorf("range = %q..%q, want %q..%q", e.RangeBase, e.RangeTip, wantBase, wantTip)
+				}
+			})
+		}
 	}
 }
 

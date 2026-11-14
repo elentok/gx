@@ -3,6 +3,7 @@ package merge
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"path/filepath"
 	"slices"
@@ -13,6 +14,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	rlmerge "github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/projects"
@@ -207,7 +209,8 @@ func (s *Merger) mergeEpic(root queue.RootRef, one ralphloop.OneIteration, repo 
 		}
 	case e.PRNumber == 0 && s.NothingToMerge(project, epics, one, repo):
 		s.stampMergedEpic(root, e, 0, 0, nil)
-		s.StampEpic(root, e.Path, "merged_at", "completed_at")
+		rangeBase, rangeTip := reflogRange(s.log, root, e, repo, target)
+		s.StampEpicRange(root, e.Path, rangeBase, rangeTip, "merged_at", "completed_at")
 		first = true
 	// An epic with a PR is merged on GitHub by a person, never here.
 	case e.PRNumber == 0 && (force || s.AutoFFMerge(project) || hasManualMergeTicket(e)):
@@ -402,6 +405,37 @@ func (s *Merger) StampEpicRange(root queue.RootRef, epicPath, base, tip string, 
 		}
 		s.guards.GoSettle(func() { s.rec.RemoveMergedWorktree(root) })
 	}
+}
+
+// reflogRange is the Epic range of an epic merged outside gx's own fast-forward,
+// for the caller to stamp with merged_at. The caller holds target's trunk lock.
+// No trailer commits on target is an empty range (base = tip = the target tip,
+// no reflog asked). A match gives its entry's base and tip. Any other refusal
+// gives no range, logged: a hand merge never gets a guessed range. A map epic
+// and a git error give no range too.
+func reflogRange(log *slog.Logger, root queue.RootRef, e tickets.Epic, repo, target string) (base, tip string) {
+	if e.IsMap {
+		return "", ""
+	}
+	m, err := rlmerge.NewReflogMatcher(repo, target)
+	if err != nil {
+		log.Warn("read reflog, stamping no range", "root", root, "err", err)
+		return "", ""
+	}
+	r, refusal := m.Match(e)
+	switch {
+	case refusal == nil:
+		return r.Base, r.Tip
+	case refusal.Reason == rlmerge.ReasonNoTrailerCommits:
+		head, err := git.RevParse(repo, "refs/heads/"+target)
+		if err != nil {
+			log.Warn("read target tip, stamping no range", "root", root, "err", err)
+			return "", ""
+		}
+		return head, head
+	}
+	log.Info("no reflog range for merged epic", "root", root, "reason", string(refusal.Reason))
+	return "", ""
 }
 
 // stampTotals records the epic's summed tokens, cost, Codex marker and friction.

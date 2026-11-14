@@ -50,7 +50,7 @@ func (s *Merger) syncTrunk(root queue.RootRef, notify bool) bool {
 		s.pauseTrunkUpdate(root, e, p)
 		return false
 	}
-	s.stampAndDequeueMerged(root, e, repo, unlock)
+	s.stampAndDequeueMerged(root, e, repo, target, unlock)
 	if notify {
 		s.notifyEpicOutcome(root.Project, dir, ralphloop.OneIteration{Epic: e.Name, Ticket: one}, e, true)
 	}
@@ -59,13 +59,19 @@ func (s *Merger) syncTrunk(root queue.RootRef, notify bool) bool {
 
 // stampAndDequeueMerged is the shared tail of every merge that lands: under the
 // Trunk lock the caller holds (released here) it stamps merged_at once, then
-// clears the merge block, dequeues the root and publishes the events.
-func (s *Merger) stampAndDequeueMerged(root queue.RootRef, e tickets.Epic, repo string, unlock func()) {
+// clears the merge block, dequeues the root and publishes the events. An epic
+// with no PR number (Mark as merged) gets the reflog range; a PR epic stamps no
+// range here.
+func (s *Merger) stampAndDequeueMerged(root queue.RootRef, e tickets.Epic, repo, target string, unlock func()) {
 	// Read the stamp under the lock: a hand-merge detection racing us stamps first.
 	if tickets.LoadEpicTicketMD(e.Path).MergedAt.IsZero() {
 		added, deleted, cerr := rlmerge.EpicTrailerLines(repo, "refs/heads/"+e.Name, e.Name)
 		s.stampMergedEpic(root, e, added, deleted, cerr)
-		s.StampEpic(root, e.Path, "merged_at")
+		base, tip := "", ""
+		if e.PRNumber == 0 {
+			base, tip = reflogRange(s.log, root, e, repo, target)
+		}
+		s.StampEpicRange(root, e.Path, base, tip, "merged_at")
 	}
 	unlock()
 	s.clearMergeBlock(root, e.Path)

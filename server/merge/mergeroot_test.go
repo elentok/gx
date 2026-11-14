@@ -2,6 +2,7 @@ package merge_test
 
 import (
 	"context"
+	"fmt"
 	"github.com/elentok/gx/server/wire"
 	"path/filepath"
 	"strings"
@@ -163,7 +164,63 @@ func TestMergeRoot_NothingToMergeStampsBothRegardlessOfAutoFFMerge(t *testing.T)
 			if got := f.Git(t, "rev-parse", "main"); got != main {
 				t.Errorf("main moved to %s, want it untouched at %s", got, main)
 			}
+			e := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
+			if tip := strings.TrimSpace(main); e.RangeBase != tip || e.RangeTip != tip {
+				t.Errorf("range = %q..%q, want empty at %q", e.RangeBase, e.RangeTip, tip)
+			}
 		})
+	}
+}
+
+// handMergeBeforeCompletion is an agent turn that finishes commitless after a
+// person merged trailer commits (one per trailer) into main by hand, with the
+// epic's branch gone. main reports main before and after that merge.
+func handMergeBeforeCompletion(t *testing.T, trailers ...string) (turn func(f *schedFixture, _ *servertest.Turn, id string), main func() (before, after string)) {
+	var before, after string
+	turn = func(f *schedFixture, _ *servertest.Turn, id string) {
+		before = strings.TrimSpace(f.Git(t, "rev-parse", "main"))
+		f.Git(t, "checkout", "-q", "-b", "handwork", "main")
+		for i, tr := range trailers {
+			testutil.WriteFile(t, f.Repo, fmt.Sprintf("hand%d.txt", i), "x\n")
+			testutil.CommitAll(t, f.Repo, "work\n\nRalph-Loop-Ticket: "+tr)
+		}
+		f.Git(t, "checkout", "-q", "main")
+		f.Git(t, "merge", "-q", "--ff-only", "handwork")
+		f.Git(t, "branch", "-q", "-D", "handwork")
+		after = strings.TrimSpace(f.Git(t, "rev-parse", "main"))
+		f.FinishCommitless(t, id)
+	}
+	return turn, func() (string, string) { return before, after }
+}
+
+func TestMergeRoot_NothingToMergeStampsTheReflogRangeOfAnEpicMergedOutsideGx(t *testing.T) {
+	t.Parallel()
+	turn, main := handMergeBeforeCompletion(t, schedEpic+"/01")
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, turn)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	servertest.WaitForEvent(ctx, t, f.QueueEpic(ctx, t, "01"), wire.EventRootCompleted, "")
+
+	f.AssertStamps(t, true)
+	before, after := main()
+	e := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
+	if e.RangeBase != before || e.RangeTip != after {
+		t.Errorf("range = %q..%q, want %q..%q", e.RangeBase, e.RangeTip, before, after)
+	}
+}
+
+func TestMergeRoot_NothingToMergeStampsNoRangeWhenTheEntryHoldsAnotherEpicsCommits(t *testing.T) {
+	t.Parallel()
+	turn, _ := handMergeBeforeCompletion(t, schedEpic+"/01", "elsewhere/01")
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, turn)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	servertest.WaitForEvent(ctx, t, f.QueueEpic(ctx, t, "01"), wire.EventRootCompleted, "")
+
+	f.AssertStamps(t, true)
+	e := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
+	if e.RangeBase != "" || e.RangeTip != "" {
+		t.Errorf("range = %q..%q, want none", e.RangeBase, e.RangeTip)
 	}
 }
 

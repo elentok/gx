@@ -137,6 +137,9 @@ func TestEpicMerge_CommitlessEpicWithNoBranchIsStampedMerged(t *testing.T) {
 	if md.LinesAdded == nil || *md.LinesAdded != 0 || md.LinesRemoved == nil || *md.LinesRemoved != 0 {
 		t.Errorf("lines = %v/%v, want 0/0", md.LinesAdded, md.LinesRemoved)
 	}
+	if tip := servertest.GitOut(t, f.Repo, "rev-parse", "main"); md.RangeBase != tip || md.RangeTip != tip {
+		t.Errorf("range = %q..%q, want empty at %q", md.RangeBase, md.RangeTip, tip)
+	}
 }
 
 // completedUnmerged runs the epic to its completion with auto-ff-merge off,

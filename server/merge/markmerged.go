@@ -60,7 +60,7 @@ func (s *Merger) stampMarkedMerged(m mergeEpicRef) error {
 	if err != nil {
 		return err
 	}
-	s.stampAndDequeueMerged(m.root, m.epic, m.repo, s.guards.Trunks.Lock(m.repo, target))
+	s.stampAndDequeueMerged(m.root, m.epic, m.repo, target, s.guards.Trunks.Lock(m.repo, target))
 	return nil
 }
 

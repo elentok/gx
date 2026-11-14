@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -132,6 +133,104 @@ func TestHandMerged_StampsLinesFromTheEpicsTrailerCommits(t *testing.T) {
 	md := tickets.LoadEpicTicketMD(filepath.Join(store, "proj", "blocker"))
 	if md.LinesAdded == nil || *md.LinesAdded != 5 || md.LinesRemoved == nil || *md.LinesRemoved != 0 {
 		t.Errorf("lines = %v/%v, want 5/0", md.LinesAdded, md.LinesRemoved)
+	}
+}
+
+func revParse(t *testing.T, repo string) string {
+	t.Helper()
+	sha, err := git.RevParse(repo, "refs/heads/main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sha
+}
+
+// trailerBranch creates branch off main with one commit per trailer and returns to main.
+func trailerBranch(t *testing.T, repo, branch string, trailers ...string) {
+	t.Helper()
+	runGitIn(t, repo, "checkout", "-q", "-b", branch, "main")
+	for i, tr := range trailers {
+		testutil.WriteFile(t, repo, branch+strings.Repeat("x", i)+".txt", "x\n")
+		testutil.CommitAll(t, repo, "work\n\nRalph-Loop-Ticket: "+tr)
+	}
+	runGitIn(t, repo, "checkout", "-q", "main")
+}
+
+// handMergeRange hand-merges the branches with mergeArgs and returns main before and after plus the stored blocker epic.
+func handMergeRange(t *testing.T, store, repo string, epics []string, mergeArgs ...string) (before, after string, got map[string]tickets.Epic) {
+	t.Helper()
+	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
+	servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
+	before = revParse(t, repo)
+	runGitIn(t, repo, mergeArgs...)
+	after = revParse(t, repo)
+	got = map[string]tickets.Epic{}
+	for _, name := range epics {
+		dir := filepath.Join(store, "proj", name)
+		waitUntil(t, name+" merged_at", func() bool { return !tickets.LoadEpicTicketMD(dir).MergedAt.IsZero() })
+		got[name] = tickets.LoadEpicTicketMD(dir)
+	}
+	return before, after, got
+}
+
+func TestHandMerged_FastForwardStampsTheReflogRange(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	trailerBranch(t, repo, "blocker", "blocker/01", "blocker/02")
+	writeCompleteEpic(t, store, "blocker")
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker"}})
+	before, after, got := handMergeRange(t, store, repo, []string{"blocker"}, "merge", "-q", "--ff-only", "blocker")
+	if e := got["blocker"]; e.RangeBase != before || e.RangeTip != after {
+		t.Errorf("range = %q..%q, want %q..%q", e.RangeBase, e.RangeTip, before, after)
+	}
+}
+
+func TestHandMerged_NoFFMergeCommitMatches(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	trailerBranch(t, repo, "blocker", "blocker/01")
+	testutil.WriteFile(t, repo, "moved.txt", "m\n")
+	testutil.CommitAll(t, repo, "main moves on")
+	writeCompleteEpic(t, store, "blocker")
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker"}})
+	before, after, got := handMergeRange(t, store, repo, []string{"blocker"}, "merge", "-q", "--no-ff", "-m", "merge", "blocker")
+	if e := got["blocker"]; e.RangeBase != before || e.RangeTip != after {
+		t.Errorf("range = %q..%q, want %q..%q", e.RangeBase, e.RangeTip, before, after)
+	}
+}
+
+func TestHandMerged_TwoEpicsInOneEntryGetNoRangeButBothMerged(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	trailerBranch(t, repo, "blocker", "blocker/01")
+	runGitIn(t, repo, "checkout", "-q", "blocker")
+	testutil.WriteFile(t, repo, "second.txt", "x\n")
+	testutil.CommitAll(t, repo, "work\n\nRalph-Loop-Ticket: other/01")
+	runGitIn(t, repo, "branch", "other", "blocker")
+	runGitIn(t, repo, "checkout", "-q", "main")
+	writeCompleteEpic(t, store, "blocker")
+	writeCompleteEpic(t, store, "other")
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker", "other"}})
+	_, _, got := handMergeRange(t, store, repo, []string{"blocker", "other"}, "merge", "-q", "--ff-only", "blocker")
+	for name, e := range got {
+		if e.RangeBase != "" || e.RangeTip != "" {
+			t.Errorf("%s range = %q..%q, want none", name, e.RangeBase, e.RangeTip)
+		}
+	}
+}
+
+func TestHandMerged_EpicWithNoTrailerCommitsGetsAnEmptyRangeAtMainsTip(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	runGitIn(t, repo, "checkout", "-q", "-b", "blocker", "main")
+	testutil.WriteFile(t, repo, "plain.txt", "x\n")
+	testutil.CommitAll(t, repo, "no trailer")
+	runGitIn(t, repo, "checkout", "-q", "main")
+	writeCompleteEpic(t, store, "blocker")
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker"}})
+	_, after, got := handMergeRange(t, store, repo, []string{"blocker"}, "merge", "-q", "--ff-only", "blocker")
+	if e := got["blocker"]; e.RangeBase != after || e.RangeTip != after {
+		t.Errorf("range = %q..%q, want empty at %q", e.RangeBase, e.RangeTip, after)
 	}
 }
 
