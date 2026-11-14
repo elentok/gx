@@ -137,11 +137,17 @@ export function DraftPage({ drafts = realDrafts, ...props }: PageProps) {
 
   useReadyWhen(loaded !== undefined, loaded ? "ready" : "empty", "network")
 
-  if (!loaded) {
+  // After a route change `loaded` still holds the previous draft until the new read lands; show the spinner, not its form.
+  const stale = !!loaded && loaded.draft.id !== id
+  if (!loaded || stale) {
     return (
       <DetailPage title={{ kind: "Design draft" }}>
         <Box display="flex" alignItems="center" justifyContent="center" py="10">
-          {loaded === undefined ? <Spinner /> : <Text color="text.dim">Draft not found</Text>}
+          {loaded === undefined || stale ? (
+            <Spinner />
+          ) : (
+            <Text color="text.dim">Draft not found</Text>
+          )}
         </Box>
       </DetailPage>
     )
