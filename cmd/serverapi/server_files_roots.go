@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -49,7 +46,7 @@ func newFilesRootsEdit(d Deps, use, short string, call func(*apiclient.Web, cont
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			path, err := absRootPath(d, args[0])
+			path, err := d.AbsPath(args[0])
 			if err != nil {
 				return err
 			}
@@ -77,27 +74,4 @@ func printRoots(w io.Writer, res ops.HostedRootsResult) error {
 		}
 	}
 	return nil
-}
-
-// absRootPath makes a relative or "~/" path absolute, so the server only sees absolute ones.
-func absRootPath(d Deps, p string) (string, error) {
-	if p == "~" || strings.HasPrefix(p, "~/") {
-		home, err := d.Dirs().Home()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(home, p[1:]), nil
-	}
-	if filepath.IsAbs(p) {
-		return filepath.Clean(p), nil
-	}
-	getwd := d.Getwd
-	if getwd == nil {
-		getwd = os.Getwd
-	}
-	cwd, err := getwd()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(cwd, p), nil
 }

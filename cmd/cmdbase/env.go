@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
@@ -34,6 +36,34 @@ func (e Env) Dial() func() (*apiclient.Client, error) {
 		return e.NewClient
 	}
 	return func() (*apiclient.Client, error) { return ServerClient(e.Dirs()) }
+}
+
+// AbsPath makes arg absolute: "~" and "~/x" against HOME, a relative path
+// against the caller's folder. The server only ever sees absolute paths.
+func (e Env) AbsPath(arg string) (string, error) {
+	if arg == "~" || strings.HasPrefix(arg, "~/") {
+		home, err := e.Dirs().Home()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, arg[1:]), nil
+	}
+	if filepath.IsAbs(arg) {
+		return filepath.Clean(arg), nil
+	}
+	cwd, err := e.Cwd()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cwd, arg), nil
+}
+
+// Cwd is the caller's folder: the injected Getwd, or the real one.
+func (e Env) Cwd() (string, error) {
+	if e.Getwd != nil {
+		return e.Getwd()
+	}
+	return os.Getwd()
 }
 
 // IsTerminal reports whether stdin is a terminal, by the given hook; a nil

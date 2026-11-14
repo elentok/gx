@@ -123,6 +123,27 @@ func TestResolve_BaseFlagsOverrideTheWorkingFolder(t *testing.T) {
 	}
 }
 
+func TestResolve_BaseFlagIsMadeAbsoluteOnTheClient(t *testing.T) {
+	f := start(t)
+	home := filepath.Dir(f.repo)
+	for name, base := range map[string]string{
+		"relative": "docs",
+		"tilde":    "~/" + filepath.Base(f.repo) + "/docs",
+	} {
+		var out bytes.Buffer
+		env := cmdbase.Env{
+			Stdout:    &out,
+			Env:       []string{"HOME=" + home},
+			Getwd:     func() (string, error) { return f.repo, nil },
+			NewClient: func() (*apiclient.Client, error) { return f.h.Client, nil },
+		}
+		err := cmdtest.Run(t, env, []string{"files", "resolve", "--json", "--base", base, "plans/host-files.md"}, New(Deps{Env: env}))
+		if err != nil || decode(t, out.String()).Files[0].Verdict != "found" {
+			t.Errorf("%s: out = %q err = %v", name, out.String(), err)
+		}
+	}
+}
+
 func TestResolve_SessionFlagUsesTheSessionFolder(t *testing.T) {
 	f := start(t)
 	created, err := f.h.Client.Sessions.Create(context.Background(), wire.CreateSessionRequest{Project: "proj", Dir: f.repo, Harness: string(agentfake.HarnessKind)})
