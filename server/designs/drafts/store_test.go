@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire/ops"
+	"github.com/elentok/gx/tickets"
 )
 
 func newStore(t *testing.T) *Store {
@@ -479,5 +480,36 @@ func TestSweepEmpty_NoRootIsFine(t *testing.T) {
 	t.Parallel()
 	if removed, err := New(t.TempDir()).SweepEmpty(); err != nil || len(removed) != 0 {
 		t.Fatalf("sweep = %v, %v", removed, err)
+	}
+}
+
+func TestMemberKey(t *testing.T) {
+	t.Parallel()
+	if _, _, ok := tickets.ParseEpicAddress(MemberKey("0123456789abcdef")); ok {
+		t.Errorf("MemberKey parses as an epic address")
+	}
+}
+
+func TestStartRecord(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+	now := fakeClock(s)
+	const id = "0123456789abcdef"
+	if got := s.Started(id); got != "" {
+		t.Fatalf("Started before any record = %q", got)
+	}
+	if err := s.RecordStart(id, "proj:map"); err != nil {
+		t.Fatal(err)
+	}
+	*now = now.Add(startRecordTTL - time.Hour)
+	if got := s.Started(id); got != "proj:map" {
+		t.Errorf("Started at 6d23h = %q, want proj:map", got)
+	}
+	*now = now.Add(time.Hour + time.Second)
+	if got := s.Started(id); got != "" {
+		t.Errorf("Started after 7 days = %q, want pruned", got)
+	}
+	if _, err := os.Stat(s.startPath(id)); !os.IsNotExist(err) {
+		t.Errorf("record file still there: %v", err)
 	}
 }

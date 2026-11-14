@@ -88,4 +88,6 @@ type DesignDraftSaveResult struct {
 	Reason  string       `json:"reason,omitempty"`
 	Deleted bool         `json:"deleted,omitempty"`
 	Draft   *DesignDraft `json:"draft,omitempty"`
+	// Started is the Design address ("project:epic") a gone draft was started as.
+	Started string `json:"started,omitempty"`
 }

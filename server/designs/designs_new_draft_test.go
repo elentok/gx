@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
+	"github.com/elentok/gx/server/workspaces"
 )
 
 func (f designsFixture) openFromDraft(t *testing.T, slug, idea, draft string) wire.SessionResult {
@@ -125,5 +126,89 @@ func TestDesignsOpenNew_MapWriteFailureKeepsTheDraft(t *testing.T) {
 	}
 	if got := f.readDraft(t, d.ID); len(got.Images) != len(names) {
 		t.Errorf("draft images = %v", got.Images)
+	}
+}
+
+func TestDesignsOpenNew_DraftWorkspaceWins(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	for _, name := range []string{"A", "B"} {
+		if _, err := f.h.Client.Admin.CreateWorkspace(f.ctx, name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ws := f.h.Server.Workspaces()
+	d := f.seedDraft(t, "proj", "in-a", "an idea")
+	if err := ws.SetMember(drafts.MemberKey(d.ID), "A"); err != nil {
+		t.Fatal(err)
+	}
+	res, err := f.h.Client.Sessions.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "in-a", NewDesign: true, Idea: "an idea", Project: "proj", DraftID: d.ID, Workspace: "B"})
+	if err != nil || res.Refused {
+		t.Fatalf("open = %+v, %v", res, err)
+	}
+	if got := ws.Workspace("proj:in-a"); got != "A" {
+		t.Errorf("design workspace = %q, want A", got)
+	}
+	bare := f.seedDraft(t, "proj", "in-default", "an idea")
+	res, err = f.h.Client.Sessions.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "in-default", NewDesign: true, Idea: "an idea", Project: "proj", DraftID: bare.ID, Workspace: "B"})
+	if err != nil || res.Refused {
+		t.Fatalf("open = %+v, %v", res, err)
+	}
+	if got := ws.Workspace("proj:in-default"); got != workspaces.DefaultName {
+		t.Errorf("design workspace = %q, want %q", got, workspaces.DefaultName)
+	}
+}
+
+func TestDesignsOpenNew_StartRecord(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	d := f.seedDraft(t, "proj", "fresh-idea", "an idea")
+	if res := f.openFromDraft(t, "fresh-idea", "an idea", d.ID); res.Refused {
+		t.Fatalf("open = %+v", res)
+	}
+	st := drafts.New(f.h.StateDir)
+	if got := st.Started(d.ID); got != "proj:fresh-idea" {
+		t.Errorf("Started = %q", got)
+	}
+	// A Start with a missing draft writes no record.
+	f.openFromDraft(t, "other-idea", "an idea", "0123456789abcdef")
+	if got := st.Started("0123456789abcdef"); got != "" {
+		t.Errorf("Started for a missing draft = %q", got)
+	}
+	// A failed start keeps the draft and writes no record.
+	keep := f.seedDraft(t, "proj", "map", "an idea")
+	if res := f.openFromDraft(t, "map", "an idea", keep.ID); !res.Refused {
+		t.Fatalf("open = %+v, want a refusal", res)
+	}
+	if got := st.Started(keep.ID); got != "" {
+		t.Errorf("Started after a refused start = %q", got)
+	}
+}
+
+func TestWebDesignDrafts_ReadRedirect(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	d := f.seedDraft(t, "proj", "fresh-idea", "an idea")
+	f.openFromDraft(t, "fresh-idea", "an idea", d.ID)
+	var res ops.DesignDraftSaveResult
+	f.webGet(t, "/v1/designs/drafts/read?id="+d.ID, &res)
+	if !res.Refused || res.Reason != ops.ReasonDraftGone || res.Started != "proj:fresh-idea" {
+		t.Errorf("read started = %+v", res)
+	}
+	res = ops.DesignDraftSaveResult{}
+	f.webGet(t, "/v1/designs/drafts/read?id=0123456789abcdef", &res)
+	if !res.Refused || res.Reason != ops.ReasonDraftGone || res.Started != "" {
+		t.Errorf("read unknown = %+v", res)
+	}
+}
+
+func TestWebDesignDrafts_SaveRedirect(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	d := f.seedDraft(t, "proj", "fresh-idea", "an idea")
+	f.openFromDraft(t, "fresh-idea", "an idea", d.ID)
+	res := f.webSave(t, d.ID, d.Revision, "edited")
+	if !res.Refused || res.Reason != ops.ReasonDraftGone || res.Started != "proj:fresh-idea" {
+		t.Errorf("save started = %+v", res)
 	}
 }

@@ -27,7 +27,7 @@ func (s *Designs) draftRead(w http.ResponseWriter, r *http.Request) {
 	d, err := s.drafts.Get(r.URL.Query().Get("id"))
 	switch {
 	case errors.Is(err, drafts.ErrNotFound):
-		wire.WriteJSON(w, ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftGone})
+		wire.WriteJSON(w, s.withStarted(ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftGone}, r.URL.Query().Get("id")))
 	case err != nil:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	default:
@@ -52,12 +52,21 @@ func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		res, err = s.drafts.Save(req.ID, req)
+		res = s.withStarted(res, req.ID)
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	wire.WriteJSON(w, res)
+}
+
+// withStarted adds the Design a gone draft was started as, when a Start record exists.
+func (s *Designs) withStarted(res ops.DesignDraftSaveResult, id string) ops.DesignDraftSaveResult {
+	if res.Refused && res.Reason == ops.ReasonDraftGone {
+		res.Started = s.drafts.Started(id)
+	}
+	return res
 }
 
 // draftTarget serves POST /v1/designs/drafts/target: the revision-free write

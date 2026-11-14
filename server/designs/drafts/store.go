@@ -480,6 +480,80 @@ func (s *Store) SetLastProject(project string) error {
 	return writeAtomic(filepath.Join(s.root, lastUsedRec), b)
 }
 
+// startRecordTTL is how long a Start record keeps an old draft URL redirecting.
+const startRecordTTL = 7 * 24 * time.Hour
+
+const startsDir = "starts"
+
+// MemberKey is the one name of a draft's workspace membership. The "/" keeps it
+// from parsing as an epic address, and it is never a session id.
+func MemberKey(id string) string { return "draft/" + id }
+
+type startRecord struct {
+	Design    string    `json:"design"`
+	StartedAt time.Time `json:"startedAt"`
+}
+
+func (s *Store) startPath(id string) string {
+	return filepath.Join(s.root, startsDir, id+".json")
+}
+
+// RecordStart remembers that draft id became the Design at designAddr
+// ("project:epic"), so the old draft URL can redirect to it.
+func (s *Store) RecordStart(id, designAddr string) error {
+	if !idPattern.MatchString(id) {
+		return nil
+	}
+	b, err := json.Marshal(startRecord{Design: designAddr, StartedAt: s.now().UTC()})
+	if err != nil {
+		return err
+	}
+	if err := writeAtomic(s.startPath(id), b); err != nil {
+		return err
+	}
+	s.pruneStarts()
+	return nil
+}
+
+// Started is the Design address draft id became, "" when no live record exists.
+func (s *Store) Started(id string) string {
+	if !idPattern.MatchString(id) {
+		return ""
+	}
+	s.pruneStarts()
+	b, err := os.ReadFile(s.startPath(id))
+	if err != nil {
+		return ""
+	}
+	var rec startRecord
+	if json.Unmarshal(b, &rec) != nil {
+		return ""
+	}
+	return rec.Design
+}
+
+// pruneStarts deletes records older than startRecordTTL. Failures are ignored:
+// a stale record only keeps a redirect a little longer.
+func (s *Store) pruneStarts() {
+	dir := filepath.Join(s.root, startsDir)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	cutoff := s.now().Add(-startRecordTTL)
+	for _, e := range entries {
+		p := filepath.Join(dir, e.Name())
+		b, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		var rec startRecord
+		if json.Unmarshal(b, &rec) != nil || rec.StartedAt.Before(cutoff) {
+			_ = os.Remove(p)
+		}
+	}
+}
+
 func (s *Store) write(d *ops.DesignDraft) error {
 	rec := *d
 	rec.Label = "" // computed on read, never stored

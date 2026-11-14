@@ -222,6 +222,10 @@ export interface DesignDraftSaveResult {
   reason?: string;
   deleted?: boolean;
   draft?: DesignDraft;
+  /**
+   * Started is the Design address ("project:epic") a gone draft was started as.
+   */
+  started?: string;
 }
 
 //////////

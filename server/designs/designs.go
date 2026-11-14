@@ -480,8 +480,14 @@ func (s *Designs) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult,
 
 	// A draft that is gone must not block Start: it just brings no images.
 	var images []string
+	var draftExisted bool
+	draftWorkspace := ""
+	if req.DraftID != "" && s.workspaces != nil {
+		draftWorkspace = s.workspaces.Workspace(drafts.MemberKey(req.DraftID))
+	}
 	if req.DraftID != "" {
 		if d, err := s.drafts.Get(req.DraftID); err == nil {
+			draftExisted = true
 			for _, id := range d.Images {
 				if p, ok := imagestore.Find(s.drafts.ImagesDir(req.DraftID), id); ok {
 					images = append(images, p)
@@ -497,15 +503,24 @@ func (s *Designs) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult,
 		if err := s.drafts.Delete(req.DraftID); err != nil {
 			s.log.Warn("delete started draft", "draft", req.DraftID, "err", err)
 		}
+		if draftExisted {
+			if err := s.drafts.RecordStart(req.DraftID, addr); err != nil {
+				s.log.Warn("record draft start", "draft", req.DraftID, "err", err)
+			}
+		}
 	}
 	if err := s.drafts.SetLastProject(req.Project); err != nil {
 		s.log.Warn("set last-used project", "project", req.Project, "err", err)
 	}
 	if s.workspaces != nil {
-		// FromSession wins over the requested name; an unknown name is refused
-		// by SetMember and the Design stays in Default.
+		// A draft's own workspace decides. Otherwise FromSession wins over the
+		// requested name; an unknown name is refused by SetMember and the Design
+		// stays in Default.
 		name := req.Workspace
-		if req.FromSession != "" {
+		switch {
+		case req.DraftID != "":
+			name = draftWorkspace
+		case req.FromSession != "":
 			name = s.workspaces.Workspace(req.FromSession)
 		}
 		if name != "" {
