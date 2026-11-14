@@ -458,7 +458,7 @@ func New(cfg Config) (*Server, error) {
 		TicketStore: cfg.TicketStore, ConversationsDir: cfg.ConversationsDir,
 		Tokens: s.tokens, Burns: s.limits, MapEpics: tokenHost{s}, WebPerf: s.webPerf,
 	})
-	s.diff = diff.New(diff.Deps{TicketStore: cfg.TicketStore, Epics: s.projects.Epics})
+	s.diff = diff.New(diff.Deps{TicketStore: cfg.TicketStore, Epics: s.projects.EpicsWithArchived})
 	s.tips = tips.New(tips.Deps{
 		Projects: func() []string {
 			dirs, _ := tickets.ProjectDirs(cfg.TicketStore)

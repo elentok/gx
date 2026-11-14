@@ -63,7 +63,9 @@ func (s *Epics) buildEpicDetail(root queue.RootRef, epics []tickets.Epic, e tick
 		return s.buildMapDetail(root, epics, e, now)
 	}
 	d := s.buildLoopDetail(root, e, now)
-	applyViewDiff(&d, s.viewDiffOf(root.Project, epics, e))
+	v := s.viewDiffOf(root.Project, epics, e)
+	d.HasCommitsAhead = v.HasCommitsAhead
+	applyViewDiff(&d.ViewDiff, v)
 	return d
 }
 

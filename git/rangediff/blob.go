@@ -52,7 +52,7 @@ var imageExts = map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".gif
 // the object store. Both SHAs must be the resolved ids the file list returned,
 // and the path must be in that list.
 func Blobs(dir, mergeBase, tip, p string) (BlobPair, error) {
-	if !isObjectID(mergeBase) || !isObjectID(tip) {
+	if !IsObjectID(mergeBase) || !IsObjectID(tip) {
 		return BlobPair{}, fmt.Errorf("%w: not an object id", ErrBadBlobRequest)
 	}
 	if err := checkBlobPath(p); err != nil {
@@ -62,13 +62,7 @@ func Blobs(dir, mergeBase, tip, p string) (BlobPair, error) {
 	if err != nil {
 		return BlobPair{}, err
 	}
-	var entry *File
-	for i := range list.Files {
-		if list.Files[i].Path == p {
-			entry = &list.Files[i]
-			break
-		}
-	}
+	entry := list.Find(p)
 	if entry == nil {
 		return BlobPair{}, fmt.Errorf("%w: %q is not in the range", ErrBadBlobRequest, p)
 	}
@@ -91,7 +85,9 @@ func Blobs(dir, mergeBase, tip, p string) (BlobPair, error) {
 	return pair, nil
 }
 
-func isObjectID(s string) bool {
+// IsObjectID reports whether s is a full lowercase object id. A typed ref of
+// that shape names a commit by SHA (a stamped range), not a branch or tag.
+func IsObjectID(s string) bool {
 	if len(s) != 40 && len(s) != 64 {
 		return false
 	}

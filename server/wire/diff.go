@@ -9,6 +9,15 @@ const (
 	DiffBlobTooLarge = "too_large"
 )
 
+// ViewDiff is the View diff link of an epic or ticket response.
+type ViewDiff struct {
+	// ShowsViewDiff says whether the page shows the View diff link.
+	ShowsViewDiff bool `json:"shows_view_diff,omitempty"`
+	// DiffBase and DiffTip are the two refs the link opens; set with ShowsViewDiff.
+	DiffBase string `json:"diff_base,omitempty"`
+	DiffTip  string `json:"diff_tip,omitempty"`
+}
+
 // DiffRange is what every Diff response says about the range: the resolved
 // SHAs (the Diff page sends them back and never sends typed refs again).
 // CommitsUnavailable means a SHA or ref names a commit that is not in this

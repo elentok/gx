@@ -118,12 +118,9 @@ type EpicDetail struct {
 	// HasCommitsAhead is set for an unmerged loop epic whose branch has a commit
 	// past its derived base.
 	HasCommitsAhead bool `json:"has_commits_ahead,omitempty"`
-	// ShowsViewDiff says whether the page shows View diff. DiffBase and DiffTip
-	// are the two refs the link opens: base and branch for an unmerged epic, the
-	// stamped SHAs for a merged one (both empty when no range was recorded).
-	ShowsViewDiff bool   `json:"shows_view_diff,omitempty"`
-	DiffBase      string `json:"diff_base,omitempty"`
-	DiffTip       string `json:"diff_tip,omitempty"`
+	// ViewDiff: DiffBase and DiffTip are base and branch for an unmerged epic,
+	// the stamped SHAs for a merged one (both empty when no range was recorded).
+	ViewDiff `tstype:",extends"`
 	// Queueable is set when the Queue action applies; see epicQueueable.
 	Queueable bool `json:"queueable"`
 	// Queued is set when the epic holds a queue item. A Waiting epic that is not

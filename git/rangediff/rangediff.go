@@ -105,6 +105,16 @@ type FileList struct {
 	Truncated bool
 }
 
+// Find returns the entry for path, or nil when the list has none.
+func (l FileList) Find(path string) *File {
+	for i := range l.Files {
+		if l.Files[i].Path == path {
+			return &l.Files[i]
+		}
+	}
+	return nil
+}
+
 // ListFiles lists what the second ref changed since the merge base.
 func ListFiles(dir string, r Range) (FileList, error) {
 	if r.NoCommonHistory {

@@ -83,13 +83,31 @@ func rangeOf(w http.ResponseWriter, dir string, r *http.Request) (rng rangediff.
 	return rangediff.Range{}, false, false
 }
 
-func rangeWire(rng rangediff.Range, unavailable bool) wire.DiffRange {
-	if unavailable {
+// request is a resolved range read: the project's repo and its typed refs.
+type request struct {
+	project, dir string
+	rng          rangediff.Range
+	unavailable  bool
+}
+
+// resolve runs the prologue every range route shares. ok is false once an
+// error response is written.
+func (d *Diff) resolve(w http.ResponseWriter, r *http.Request) (req request, ok bool) {
+	req.project, req.dir, ok = d.repoDir(w, r)
+	if !ok {
+		return request{}, false
+	}
+	req.rng, req.unavailable, ok = rangeOf(w, req.dir, r)
+	return req, ok
+}
+
+func (q request) rangeWire() wire.DiffRange {
+	if q.unavailable {
 		return wire.DiffRange{CommitsUnavailable: true}
 	}
 	return wire.DiffRange{
-		FirstSHA: rng.FirstSHA, SecondSHA: rng.SecondSHA, MergeBase: rng.MergeBase,
-		NoCommonHistory: rng.NoCommonHistory,
+		FirstSHA: q.rng.FirstSHA, SecondSHA: q.rng.SecondSHA, MergeBase: q.rng.MergeBase,
+		NoCommonHistory: q.rng.NoCommonHistory,
 	}
 }
 
@@ -121,7 +139,7 @@ func fileWire(f rangediff.File) wire.DiffFile {
 	}
 }
 
-func (d *Diff) fileList(dir string, rng rangediff.Range, shas []string) (rangediff.FileList, error) {
+func fileList(dir string, rng rangediff.Range, shas []string) (rangediff.FileList, error) {
 	if len(shas) > 0 {
 		return rangediff.ListFilesIn(dir, rng, shas)
 	}
@@ -130,17 +148,13 @@ func (d *Diff) fileList(dir string, rng rangediff.Range, shas []string) (rangedi
 
 // Files serves GET /v1/diff/files?project=&first=&second=[&commits=sha,sha].
 func (d *Diff) Files(w http.ResponseWriter, r *http.Request) {
-	_, dir, ok := d.repoDir(w, r)
+	q, ok := d.resolve(w, r)
 	if !ok {
 		return
 	}
-	rng, unavailable, ok := rangeOf(w, dir, r)
-	if !ok {
-		return
-	}
-	out := wire.DiffFiles{DiffRange: rangeWire(rng, unavailable), Files: []wire.DiffFile{}}
-	if !unavailable {
-		list, err := d.fileList(dir, rng, commitFilter(r))
+	out := wire.DiffFiles{DiffRange: q.rangeWire(), Files: []wire.DiffFile{}}
+	if !q.unavailable {
+		list, err := fileList(q.dir, q.rng, commitFilter(r))
 		if err != nil {
 			fail(w, err)
 			return
@@ -155,33 +169,24 @@ func (d *Diff) Files(w http.ResponseWriter, r *http.Request) {
 
 // Patch serves GET /v1/diff/patch with Files' query plus path=.
 func (d *Diff) Patch(w http.ResponseWriter, r *http.Request) {
-	_, dir, ok := d.repoDir(w, r)
+	q, ok := d.resolve(w, r)
 	if !ok {
 		return
 	}
-	rng, unavailable, ok := rangeOf(w, dir, r)
-	if !ok {
-		return
-	}
-	out := wire.DiffPatch{DiffRange: rangeWire(rng, unavailable)}
-	if unavailable {
+	dir, rng := q.dir, q.rng
+	out := wire.DiffPatch{DiffRange: q.rangeWire()}
+	if q.unavailable {
 		wire.WriteJSON(w, out)
 		return
 	}
 	shas := commitFilter(r)
-	list, err := d.fileList(dir, rng, shas)
+	list, err := fileList(dir, rng, shas)
 	if err != nil {
 		fail(w, err)
 		return
 	}
 	path := r.URL.Query().Get("path")
-	var entry *rangediff.File
-	for i := range list.Files {
-		if list.Files[i].Path == path {
-			entry = &list.Files[i]
-			break
-		}
-	}
+	entry := list.Find(path)
 	if entry == nil {
 		http.Error(w, "path is not in the file list: "+path, http.StatusBadRequest)
 		return
@@ -206,17 +211,13 @@ func (d *Diff) Patch(w http.ResponseWriter, r *http.Request) {
 
 // Commits serves GET /v1/diff/commits?project=&first=&second=.
 func (d *Diff) Commits(w http.ResponseWriter, r *http.Request) {
-	project, dir, ok := d.repoDir(w, r)
+	q, ok := d.resolve(w, r)
 	if !ok {
 		return
 	}
-	rng, unavailable, ok := rangeOf(w, dir, r)
-	if !ok {
-		return
-	}
-	out := wire.DiffCommits{DiffRange: rangeWire(rng, unavailable), Commits: []wire.DiffCommit{}}
-	if !unavailable {
-		epics, err := d.Epics(project)
+	out := wire.DiffCommits{DiffRange: q.rangeWire(), Commits: []wire.DiffCommit{}}
+	if !q.unavailable {
+		epics, err := d.Epics(q.project)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -225,7 +226,7 @@ func (d *Diff) Commits(w http.ResponseWriter, r *http.Request) {
 		for i, e := range epics {
 			names[i] = rangediff.EpicName{Name: e.Name, Branch: e.Branch()}
 		}
-		list, err := rangediff.ListCommits(dir, rng, project, names)
+		list, err := rangediff.ListCommits(q.dir, q.rng, q.project, names)
 		if err != nil {
 			fail(w, err)
 			return

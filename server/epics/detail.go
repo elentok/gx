@@ -86,9 +86,7 @@ func (s *Epics) TicketDetail(ref queue.TicketRef) (wire.TicketDetail, error) {
 	}
 	d.Related = relatedTickets(ref, epics)
 	if t.Status == schema.StatusDone && !ref.Ticket.Commitless {
-		if v := s.viewDiffOf(ref.Addr.Project, epics, ref.Epic); v.Shows {
-			d.ShowsViewDiff, d.DiffBase, d.DiffTip = true, v.Base, v.Tip
-		}
+		applyViewDiff(&d.ViewDiff, s.viewDiffOf(ref.Addr.Project, epics, ref.Epic))
 	}
 	// A blocked-pane pause keeps its agent's prompt, and Approve ends that pause.
 	if t.Status == schema.StatusClaimed || t.PauseReason == schema.PauseBlockedPane {

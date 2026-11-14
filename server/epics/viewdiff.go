@@ -43,9 +43,9 @@ func (s *Epics) viewDiffOf(project string, epics []tickets.Epic, e tickets.Epic)
 	return viewDiff{HasCommitsAhead: ahead > 0, Shows: ahead > 0, Base: base, Tip: e.Branch()}
 }
 
-// applyViewDiff copies v onto the epic response d.
-func applyViewDiff(d *wire.EpicDetail, v viewDiff) {
-	d.HasCommitsAhead, d.ShowsViewDiff = v.HasCommitsAhead, v.Shows
+// applyViewDiff copies v onto a response's View diff part.
+func applyViewDiff(d *wire.ViewDiff, v viewDiff) {
+	d.ShowsViewDiff = v.Shows
 	if v.Shows {
 		d.DiffBase, d.DiffTip = v.Base, v.Tip
 	}

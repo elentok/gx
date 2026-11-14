@@ -191,5 +191,12 @@ func TestDetail_ShowsViewDiff(t *testing.T) {
 		if d.ShowsViewDiff != want {
 			t.Errorf("%s: ShowsViewDiff = %v, want %v", addr, d.ShowsViewDiff, want)
 		}
+		wantBase, wantTip := "", ""
+		if want {
+			wantBase, wantTip = "main", "ahead"
+		}
+		if d.DiffBase != wantBase || d.DiffTip != wantTip {
+			t.Errorf("%s: diff %q..%q, want %q..%q", addr, d.DiffBase, d.DiffTip, wantBase, wantTip)
+		}
 	}
 }

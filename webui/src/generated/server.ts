@@ -342,7 +342,7 @@ export interface LatestSummary {
 /**
  * TicketDetail is the /v1/tickets/detail payload.
  */
-export interface TicketDetail {
+export interface TicketDetail extends ViewDiff {
   address: string;
   title: string;
   status: string;
@@ -381,15 +381,6 @@ export interface TicketDetail {
    * MapEpic is set for a ticket of a map epic, which has no stats and never pauses.
    */
   map_epic: boolean;
-  /**
-   * ShowsViewDiff is set for a done, non-commitless ticket whose epic shows View diff.
-   */
-  shows_view_diff?: boolean;
-  /**
-   * DiffBase and DiffTip are the epic's refs the link opens; set with ShowsViewDiff.
-   */
-  diff_base?: string;
-  diff_tip?: string;
   /**
    * Body is the whole body markdown, comments included.
    */
@@ -609,6 +600,20 @@ export const DiffBlobTooLarge = "too_large";
  * Blob kinds of a DiffBlob.
  */
 export type DiffBlob = typeof DiffBlobAbsent | typeof DiffBlobText | typeof DiffBlobImage | typeof DiffBlobBinary | typeof DiffBlobTooLarge;
+/**
+ * ViewDiff is the View diff link of an epic or ticket response.
+ */
+export interface ViewDiff {
+  /**
+   * ShowsViewDiff says whether the page shows the View diff link.
+   */
+  shows_view_diff?: boolean;
+  /**
+   * DiffBase and DiffTip are the two refs the link opens; set with ShowsViewDiff.
+   */
+  diff_base?: string;
+  diff_tip?: string;
+}
 /**
  * DiffRange is what every Diff response says about the range: the resolved
  * SHAs (the Diff page sends them back and never sends typed refs again).
@@ -920,7 +925,7 @@ export interface EpicFriction {
  * EpicDetail is the /v1/epics/detail payload. Seconds and dollars throughout;
  * the payload carries no token counts outside Stats.
  */
-export interface EpicDetail {
+export interface EpicDetail extends ViewDiff {
   address: string;
   kind: string;
   /**
@@ -951,14 +956,6 @@ export interface EpicDetail {
    * past its derived base.
    */
   has_commits_ahead?: boolean;
-  /**
-   * ShowsViewDiff says whether the page shows View diff. DiffBase and DiffTip
-   * are the two refs the link opens: base and branch for an unmerged epic, the
-   * stamped SHAs for a merged one (both empty when no range was recorded).
-   */
-  shows_view_diff?: boolean;
-  diff_base?: string;
-  diff_tip?: string;
   /**
    * Queueable is set when the Queue action applies; see epicQueueable.
    */

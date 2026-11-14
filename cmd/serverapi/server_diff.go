@@ -16,7 +16,7 @@ const commitsUnavailableText = "commits not available: a SHA of this range is no
 
 // newDiffCmd builds one Diff verb. The refs and path are positional so a value
 // after `--` (such as `--output=x`) reaches the server and fails there.
-func newDiffCmd[T any](d Deps, use, short string, args int, fetch func(context.Context, *apiclient.Client, string, []string, []string) (T, error), text func(io.Writer, T) error) *cobra.Command {
+func newDiffCmd[T any](d Deps, use, short string, args int, withCommits bool, fetch func(context.Context, *apiclient.Client, string, []string, []string) (T, error), text func(io.Writer, T) error) *cobra.Command {
 	var jsonOut bool
 	var project string
 	var commits []string
@@ -34,35 +34,35 @@ func newDiffCmd[T any](d Deps, use, short string, args int, fetch func(context.C
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.Flags().StringVar(&project, "project", "", "the project whose repo to diff")
 	_ = cmd.MarkFlagRequired("project")
-	if strings.HasPrefix(use, "diff-files") || strings.HasPrefix(use, "diff-patch") {
+	if withCommits {
 		cmd.Flags().StringSliceVar(&commits, "commits", nil, "narrow to these commit SHAs")
 	}
 	return cmd
 }
 
 func newServerDiffFilesCmd(d Deps) *cobra.Command {
-	return newDiffCmd(d, "diff-files <first> <second>", "list the files the second ref changed since its merge base with the first", 2,
+	return newDiffCmd(d, "diff-files <first> <second>", "list the files the second ref changed since its merge base with the first", 2, true,
 		func(ctx context.Context, cl *apiclient.Client, project string, a, commits []string) (wire.DiffFiles, error) {
 			return cl.Reads.DiffFiles(ctx, project, a[0], a[1], commits)
 		}, printDiffFiles)
 }
 
 func newServerDiffPatchCmd(d Deps) *cobra.Command {
-	return newDiffCmd(d, "diff-patch <first> <second> <path>", "show one file's patch of the range", 3,
+	return newDiffCmd(d, "diff-patch <first> <second> <path>", "show one file's patch of the range", 3, true,
 		func(ctx context.Context, cl *apiclient.Client, project string, a, commits []string) (wire.DiffPatch, error) {
 			return cl.Reads.DiffPatch(ctx, project, a[0], a[1], a[2], commits)
 		}, printDiffPatch)
 }
 
 func newServerDiffCommitsCmd(d Deps) *cobra.Command {
-	return newDiffCmd(d, "diff-commits <first> <second>", "list the range's commits with their ticket addresses", 2,
+	return newDiffCmd(d, "diff-commits <first> <second>", "list the range's commits with their ticket addresses", 2, false,
 		func(ctx context.Context, cl *apiclient.Client, project string, a, _ []string) (wire.DiffCommits, error) {
 			return cl.Reads.DiffCommits(ctx, project, a[0], a[1])
 		}, printDiffCommits)
 }
 
 func newServerDiffBlobCmd(d Deps) *cobra.Command {
-	return newDiffCmd(d, "diff-blob <merge-base> <tip> <path>", "read one file's old and new content by the SHAs diff-files printed", 3,
+	return newDiffCmd(d, "diff-blob <merge-base> <tip> <path>", "read one file's old and new content by the SHAs diff-files printed", 3, false,
 		func(ctx context.Context, cl *apiclient.Client, project string, a, _ []string) (wire.DiffBlobs, error) {
 			return cl.Reads.DiffBlob(ctx, project, a[0], a[1], a[2])
 		}, printDiffBlob)

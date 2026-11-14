@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -128,6 +129,24 @@ func (p *Registry) Epics(project string) ([]tickets.Epic, error) {
 		return tickets.LoadResolved(project, dir)
 	}
 	return nil, &tickets.AddressError{Code: tickets.CodeUnknownProject, Msg: "no project " + project}
+}
+
+// EpicsWithArchived is Epics plus the project's archived epics, so a commit
+// trailer naming an archived epic still resolves.
+func (p *Registry) EpicsWithArchived(project string) ([]tickets.Epic, error) {
+	live, err := p.Epics(project)
+	if err != nil {
+		return nil, err
+	}
+	dir, err := p.Dir(project)
+	if err != nil {
+		return nil, err
+	}
+	archived, err := tickets.LoadArchived(dir)
+	if err != nil {
+		return nil, err
+	}
+	return append(slices.Clone(live), archived...), nil
 }
 
 // MergingOnMerged reports whether the project uses the on-merged merging policy.

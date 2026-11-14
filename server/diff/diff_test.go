@@ -281,6 +281,23 @@ func TestDiffRoutesCommitListCanonicalTickets(t *testing.T) {
 	}
 }
 
+func TestDiffRoutesCommitListGroupsArchivedEpicTickets(t *testing.T) {
+	t.Parallel()
+	h, repo := start(t, map[string]string{"epic": "", ".archive/old": ""})
+	mustGit(t, repo, "branch", "base")
+	commit(t, repo, "a.txt", "a\n", "archived")
+	if err := history.AppendTrailer(repo, "Ralph-Loop-Ticket", "proj:old/01"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := h.Client.Reads.DiffCommits(context.Background(), project, "base", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Commits) != 1 || got.Commits[0].Ticket != "proj:old/01" {
+		t.Errorf("commits = %+v, want the archived epic's ticket address", got.Commits)
+	}
+}
+
 func TestDiffRoutesBlob(t *testing.T) {
 	t.Parallel()
 	h, repo := start(t, map[string]string{"epic": ""})
