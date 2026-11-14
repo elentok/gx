@@ -40,7 +40,8 @@ async function renderTicket(
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   )
-  await screen.findByRole("heading", { level: 1 })
+  // While the detail loads the h1 shows the address, so wait for the loaded title.
+  await screen.findByRole("heading", { level: 1, name: detail.title.trim() })
 }
 
 test("a ticket with a pty agent has a Screen button that opens the screen by ticket address", async () => {
@@ -78,7 +79,7 @@ test("the ticket header shows the check-lock waiting label as a status label, an
 // Replaces the ticket-page half of e2e flow 148 (Long-running badge).
 test("the ticket header shows the Long-running badge only for a marked ticket", async () => {
   await renderTicket({ ...base, long_ticket_turns: 120, long_ticket_threshold: 100 })
-  expect(screen.getByText("Long-running").getAttribute("title")).toBe(
+  expect((await screen.findByText("Long-running")).getAttribute("title")).toBe(
     "120 assistant turns (threshold 100)",
   )
   cleanup()
