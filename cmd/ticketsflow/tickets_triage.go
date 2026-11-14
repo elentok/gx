@@ -81,7 +81,9 @@ func newTicketsTriageCmd(d Deps) *cobra.Command {
 	cmd.AddCommand(newTriageCreateCmd(d), newTriageShowCmd(d), newTriagePendingCmd(d), newTriageVerdictCmd(d),
 		newTriagePlanCmd(d), newTriageRowCmd(d), newTriageApproveCmd(d), newTriageAbandonCmd(d),
 		newTriageLocateCmd(d), newTriageAnswersCmd(d), newTriageSeenAgainCmd(d), newTriageWriteStateCmd(d),
-		newTriageEpicsCmd(d), newTriageLastPassCmd(d), newTriageDropRowsCmd(d))
+		newTriageEpicsCmd(d), newTriageLastPassCmd(d), newTriageDropRowsCmd(d),
+		newTriageRoundCmd(d), newTriageAnswerCmd(d), newTriageOpenRoundCmd(d), newTriageDecideCmd(d),
+		newTriageObjectCmd(d), newTriageCorrectCmd(d), newTriageAreaCmd(d))
 	return cmd
 }
 
@@ -114,6 +116,9 @@ func newTriageCreateCmd(d Deps) *cobra.Command {
 type triageView struct {
 	*triage.Record
 	Next triage.Branch `json:"next"`
+	// OpenRound is the saved round with unanswered questions, so a session
+	// killed mid-round reprints it.
+	OpenRound *openRoundView `json:"openRound,omitempty"`
 }
 
 func newTriageShowCmd(d Deps) *cobra.Command {
@@ -124,7 +129,8 @@ func newTriageShowCmd(d Deps) *cobra.Command {
 		Short: "show the live Triage record (or the latest) with its next step",
 		Long: "Usage: gx tickets triage show [--project <p>] [--json]\n\n" +
 			"Show the live record, else the latest, with its revision, the detected next step\n" +
-			"(start, verify, plan, approve, write or done) and the rows.",
+			"(start, verify, route, questions, write or done) and the rows. --json also lists the decisions with\n" +
+			"their objected flag and the open round.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			t, err := resolveTriage(d, project)
@@ -135,7 +141,7 @@ func newTriageShowCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			view := triageView{Record: rec, Next: triage.Next(rec)}
+			view := triageView{Record: rec, Next: triage.Next(rec), OpenRound: openRoundOf(rec)}
 			out := c.OutOrStdout()
 			if asJSON {
 				return writeJSON(out, view)
@@ -145,10 +151,10 @@ func newTriageShowCmd(d Deps) *cobra.Command {
 				return nil
 			}
 			fmt.Fprintf(out, "%s  state=%s step=%s revision=%d next=%s", rec.ID, rec.State, rec.Step, rec.Revision, view.Next)
-			if rec.Round > 0 {
-				fmt.Fprintf(out, " round=%d", rec.Round)
-			}
 			fmt.Fprintln(out)
+			if open := view.OpenRound; open != nil {
+				fmt.Fprintf(out, "  open round %d: %d unanswered\n", open.Index+1, len(open.Questions))
+			}
 			for _, r := range rec.Rows {
 				fmt.Fprintf(out, "  %s  verdict=%s write=%s  %s\n", r.Address, r.Verdict, r.Write, r.Title)
 			}

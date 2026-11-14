@@ -32,10 +32,11 @@ func newTriagePlanCmd(d Deps) *cobra.Command {
 			"Read a JSON array of plan rows on stdin: [{\"rowId\", \"action\", \"destination\", \"questions\":\n" +
 			"[{\"id\", \"text\", \"kind\", \"options\", \"default\"}], \"overlapWith\", \"estimate\"}]. Small ready rows\n" +
 			"that overlap, each with an estimate (such as \"12K\") and under 45K combined, are saved as one group.\n" +
-			"A quick question needs 2 to 4\n" +
-			"options and a default that is one of them (the recommended one); a design question needs neither. Every\n" +
-			"verdict question comes back here under its id, worded as the final question. Rows named by --gone are\n" +
-			"marked gone and their plan rows are left out. When every other row has a plan the stored step moves to approve.",
+			"A question's kind is decide (the agent settles it), ask (the person answers it) or design (left to the\n" +
+			"design that follows). An ask question needs 2 to 4 options and a default that is one of them (the\n" +
+			"recommended one); a design question needs neither. Every verdict question comes back here under its id,\n" +
+			"worded as the final question. Rows named by --gone are marked gone and their plan rows are left out.\n" +
+			"When every other row has a plan the stored step moves to questions.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			t, err := resolveTriage(d, project)
@@ -83,7 +84,7 @@ func newTriageRowCmd(d Deps) *cobra.Command {
 		Long: "Usage: gx tickets triage row --row <address> --revision <n> [--action <a>] [--destination <epic>]\n" +
 			"  [--answer <question-id>=<text>]... [--keep-for-later] [--project <p>]\n\n" +
 			"Replace the person's fields for one row. --revision is required and a stale one is refused.\n" +
-			"Allowed only at step approve.",
+			"Allowed only at step questions.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			if row == "" {
@@ -155,10 +156,10 @@ func newTriageApproveCmd(d Deps) *cobra.Command {
 		Use:   "approve",
 		Short: "approve the plan at the given revision; prints the new revision and write",
 		Long: "Usage: gx tickets triage approve --revision <n> [--project <p>]\n\n" +
-			"Move the step from approve to write if the record is still at --revision. Prints the new\n" +
-			"revision and \"write\". A step already past approve prints \"already approved\"; a changed\n" +
-			"revision at step approve is refused as stale. Refused while a question is open or a merge\n" +
-			"target is orphaned.",
+			"Move the step from questions to write if the record is still at --revision, and set the approved\n" +
+			"flag. Prints the new revision and \"write\". A step already past questions prints \"already\n" +
+			"approved\"; a changed revision at step questions is refused as stale. Refused while a question is\n" +
+			"open, an agent area is unconfirmed or a merge target is orphaned.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			if !c.Flags().Changed("revision") {
@@ -196,7 +197,7 @@ func newTriageAbandonCmd(d Deps) *cobra.Command {
 		Use:   "abandon",
 		Short: "abandon the live Triage (refused once the step is write)",
 		Long: "Usage: gx tickets triage abandon [--revision <n>] [--project <p>]\n\n" +
-			"End the live record without writing to tickets. Allowed at verify, plan and approve.",
+			"End the live record without writing to tickets. Allowed at verify, route and questions.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			t, err := resolveTriage(d, project)

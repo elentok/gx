@@ -269,15 +269,10 @@ func TestTriage_ApproveAfterRowSaveWithOldRevisionIsStale(t *testing.T) {
 }
 
 func TestTriage_ApproveRefusedWhileQuestionOpen(t *testing.T) {
-	repo, project := triageProjectDir(t)
+	repo := triageProject(t)
 	s := triageAtApprove(t, repo, false)
-	// The CLI has no round verb yet (triage-verbs-wire), so save the round in the store.
-	q := triage.Question{ID: "q1", RowID: s.Rows[0].Address, Text: "which?", Kind: triage.QuestionAsk, Options: []string{"a", "b"}, Default: "a"}
-	rec, err := triage.NewStore(project).SaveRound(s.ID, s.Revision, []triage.Question{q}, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(rec.Revision))
+	rev := saveRound(t, repo, s.Rows[0].Address, "q1")
+	_, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", rev)
 	if err == nil || !strings.Contains(err.Error(), "open") {
 		t.Errorf("approve with open question = %v, want refusal", err)
 	}
@@ -435,5 +430,180 @@ func TestDropRows_RequiresManifest(t *testing.T) {
 	repo := triageProject(t)
 	if _, err := runIn(t, repo, "tickets", "triage", "drop-rows", "--row", "p:f/01"); err == nil {
 		t.Fatal("want an error without --manifest")
+	}
+}
+
+// roundJSON is a round of ask questions on one row, one per id.
+func roundJSON(row string, ids ...string) string {
+	var qs []string
+	for _, id := range ids {
+		qs = append(qs, `{"id":"`+id+`","rowId":"`+row+`","text":"which `+id+`?","kind":"ask","options":["a","b"],"default":"a"}`)
+	}
+	return "[" + strings.Join(qs, ",") + "]"
+}
+
+// saveRound saves a round through the verb and returns the new revision.
+func saveRound(t *testing.T, repo, row string, ids ...string) string {
+	t.Helper()
+	out, err := runInStdin(t, repo, roundJSON(row, ids...), "tickets", "triage", "round")
+	if err != nil {
+		t.Fatalf("round: %v", err)
+	}
+	return strings.TrimSpace(out)
+}
+
+func showOpenRound(t *testing.T, repo string) []string {
+	t.Helper()
+	out, err := runIn(t, repo, "tickets", "triage", "show", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s struct {
+		OpenRound *struct {
+			Questions []struct {
+				ID string `json:"id"`
+			} `json:"questions"`
+		} `json:"openRound"`
+	}
+	if err := json.Unmarshal([]byte(out), &s); err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	if s.OpenRound != nil {
+		for _, q := range s.OpenRound.Questions {
+			ids = append(ids, q.ID)
+		}
+	}
+	return ids
+}
+
+func TestTriage_AKilledSessionReprintsTheOpenRoundWithoutAnsweredQuestions(t *testing.T) {
+	repo := triageProject(t)
+	s := triageAtApprove(t, repo, false)
+	rev := saveRound(t, repo, s.Rows[0].Address, "q1", "q2")
+	if got := showOpenRound(t, repo); len(got) != 2 {
+		t.Fatalf("open round after save = %v, want q1 and q2", got)
+	}
+	if _, err := runIn(t, repo, "tickets", "triage", "answer", "--question", "q1", "--answer", "b", "--revision", rev); err != nil {
+		t.Fatalf("answer: %v", err)
+	}
+	// A fresh session starts here: it reads the open round and asks only q2.
+	if got := showOpenRound(t, repo); len(got) != 1 || got[0] != "q2" {
+		t.Errorf("open round after one answer = %v, want [q2]", got)
+	}
+	out, err := runIn(t, repo, "tickets", "triage", "open-round")
+	if err != nil || !strings.Contains(out, "q2") || strings.Contains(out, "q1") {
+		t.Errorf("open-round = %q, %v, want q2 only", out, err)
+	}
+	if _, err := runIn(t, repo, "tickets", "triage", "answer", "--question", "q2", "--answer", "a"); err != nil {
+		t.Fatal(err)
+	}
+	if got := showOpenRound(t, repo); len(got) != 0 {
+		t.Errorf("open round after all answers = %v, want none", got)
+	}
+	cur := triageShow(t, repo)
+	if _, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(cur.Revision)); err != nil {
+		t.Errorf("approve after the round is answered: %v", err)
+	}
+}
+
+func TestTriage_RoundRefusalsComeBackAsTheVerbsError(t *testing.T) {
+	repo := triageProject(t)
+	s := triageAtApprove(t, repo, false)
+	row := s.Rows[0].Address
+	if _, err := runInStdin(t, repo, roundJSON(row, "a", "b", "c", "d", "e", "f", "g"), "tickets", "triage", "round"); err == nil {
+		t.Error("a round of 7 questions accepted")
+	}
+	for i, id := range []string{"r1", "r2", "r3"} {
+		saveRound(t, repo, row, id)
+		if _, err := runIn(t, repo, "tickets", "triage", "answer", "--question", id, "--answer", "a"); err != nil {
+			t.Fatalf("answer %d: %v", i, err)
+		}
+	}
+	if _, err := runInStdin(t, repo, roundJSON(row, "r4"), "tickets", "triage", "round"); err == nil {
+		t.Error("a fourth ordinary round accepted")
+	}
+	if _, err := runInStdin(t, repo, roundJSON(row, "r4"), "tickets", "triage", "round", "--objection"); err != nil {
+		t.Errorf("objection round refused: %v", err)
+	}
+}
+
+func TestTriage_DecideAndObjectListTheDecisionWithTheObjectedFlag(t *testing.T) {
+	repo := triageProject(t)
+	s := triageAtApprove(t, repo, false)
+	row := s.Rows[0].Address
+	if _, err := runIn(t, repo, "tickets", "triage", "decide", "--row", row, "--question", "where?", "--choice", "parser", "--reason", "one caller"); err != nil {
+		t.Fatalf("decide: %v", err)
+	}
+	if _, err := runIn(t, repo, "tickets", "triage", "object", "--row", row, "--question", "where?", "--option", "parser", "--option", "caller"); err != nil {
+		t.Fatalf("object: %v", err)
+	}
+	out, err := runIn(t, repo, "tickets", "triage", "show", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Decided []struct {
+			Choice   string `json:"choice"`
+			Objected bool   `json:"objected"`
+		} `json:"decided"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Decided) != 1 || got.Decided[0].Choice != "parser" || !got.Decided[0].Objected {
+		t.Errorf("decided = %+v, want one objected parser decision", got.Decided)
+	}
+	if strings.Contains(out, `"quick"`) {
+		t.Errorf("show --json still has a quick kind:\n%s", out)
+	}
+	if ids := showOpenRound(t, repo); len(ids) != 1 {
+		t.Errorf("objection round = %v, want one question", ids)
+	}
+}
+
+func TestTriage_AnUnconfirmedAgentAreaRefusesApproveUntilConfirmed(t *testing.T) {
+	repo := triageProject(t)
+	triageAtApprove(t, repo, false)
+	if _, err := runIn(t, repo, "tickets", "triage", "area", "--name", "ui", "--source", "agent"); err != nil {
+		t.Fatalf("area: %v", err)
+	}
+	cur := triageShow(t, repo)
+	if _, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(cur.Revision)); err == nil || !strings.Contains(err.Error(), "not confirmed") {
+		t.Fatalf("approve with an unconfirmed area = %v, want refusal", err)
+	}
+	if _, err := runIn(t, repo, "tickets", "triage", "area", "--name", "ui", "--source", "agent", "--confirm"); err != nil {
+		t.Fatal(err)
+	}
+	cur = triageShow(t, repo)
+	if _, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(cur.Revision)); err != nil {
+		t.Errorf("approve after confirming: %v", err)
+	}
+}
+
+func TestTriage_CorrectMovesARowToAnArea(t *testing.T) {
+	repo := triageProject(t)
+	s := triageAtApprove(t, repo, false)
+	row := s.Rows[0].Address
+	if _, err := runIn(t, repo, "tickets", "triage", "correct", "--row", row, "--action", "area", "--destination", "ui"); err != nil {
+		t.Fatalf("correct: %v", err)
+	}
+	if _, err := runIn(t, repo, "tickets", "triage", "correct", "--row", row, "--action", "bogus"); err == nil {
+		t.Error("a correction to an unknown action accepted")
+	}
+}
+
+func TestTriage_VerdictTakesThreeTagQuestions(t *testing.T) {
+	repo := triageProject(t)
+	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
+		t.Fatal(err)
+	}
+	row := triagePending(t, repo)[0]
+	q := `{"text":"where?","kind":"ask","options":["a","b"],"default":"a"}`
+	if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", row, "--question", q); err != nil {
+		t.Fatalf("verdict: %v", err)
+	}
+	if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", row, "--question", "plain text"); err == nil {
+		t.Error("a plain-text --question accepted")
 	}
 }
