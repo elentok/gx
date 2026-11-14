@@ -6,7 +6,7 @@ import type { DiffRange } from "../generated/server"
 import { appRoutes } from "../routes"
 import { renderThemed } from "../ui/render"
 import { type Device, DeviceContext } from "../useWide"
-import type { DiffFilesResult, FetchDiffFiles } from "./api"
+import type { DiffFilesResult, FetchDiffFiles, FetchDiffPatch } from "./api"
 
 afterEach(cleanup)
 
@@ -22,7 +22,20 @@ const files = (n: number, over: Partial<DiffRange> = {}): DiffFilesResult => ({
   files: { ...range(over), files: Array.from({ length: n }, () => file) },
 })
 
-function render(path: string, fetchFiles: FetchDiffFiles, device?: Device) {
+const pierre = vi.hoisted(() => ({ last: undefined as Record<string, unknown> | undefined }))
+vi.mock("@pierre/diffs/react", () => ({
+  PatchDiff: (p: Record<string, unknown>) => {
+    pierre.last = p
+    return <div data-testid="pierre" data-patch={p.patch as string} />
+  },
+}))
+
+function render(
+  path: string,
+  fetchFiles: FetchDiffFiles,
+  device?: Device,
+  fetchPatch: FetchDiffPatch = async (_p, _a, _b, path) => `patch of ${path}`,
+) {
   const state = {
     snapshot: { sessions: [], pending: [] },
     connected: true,
@@ -35,7 +48,7 @@ function render(path: string, fetchFiles: FetchDiffFiles, device?: Device) {
     onEvent: () => () => {},
     refresh: () => {},
   } as unknown as Connection
-  const router = createMemoryRouter(appRoutes({ diffFiles: fetchFiles }), {
+  const router = createMemoryRouter(appRoutes({ diffFiles: fetchFiles, diffPatch: fetchPatch }), {
     initialEntries: [path],
   })
   renderThemed(
@@ -227,4 +240,72 @@ test("the Split/Unified switch is in the ref bar", async () => {
   expect(screen.getByRole("button", { name: "Split" }).getAttribute("aria-pressed")).toBe("true")
   fireEvent.click(screen.getByRole("button", { name: "Unified" }))
   expect(screen.getByRole("button", { name: "Unified" }).getAttribute("aria-pressed")).toBe("true")
+})
+
+const style = () => (pierre.last?.options as { diffStyle: string }).diffStyle
+
+test("the selected file's patch is fetched alone, by the resolved SHAs", async () => {
+  const fetchPatch = vi.fn<FetchDiffPatch>(async (_p, _a, _b, path) => `patch of ${path}`)
+  render(OPEN, async () => TREE(), undefined, fetchPatch)
+  const body = await screen.findByTestId("pierre")
+  expect(body.getAttribute("data-patch")).toBe("patch of src/a.go")
+  expect(fetchPatch).toHaveBeenCalledTimes(1)
+  expect(fetchPatch).toHaveBeenCalledWith("gx", "a", "b", "src/a.go")
+  press("n")
+  await waitFor(() =>
+    expect(screen.getByTestId("pierre").getAttribute("data-patch")).toBe("patch of src/b.go"),
+  )
+  expect(fetchPatch).toHaveBeenCalledTimes(2)
+  expect(screen.getAllByTestId("file-card")).toHaveLength(1)
+})
+
+test("a failed patch shows a retry that fetches again", async () => {
+  const fetchPatch = vi
+    .fn<FetchDiffPatch>()
+    .mockRejectedValueOnce(new Error("boom"))
+    .mockResolvedValue("ok")
+  render(OPEN, async () => files(1), undefined, fetchPatch)
+  fireEvent.click(await screen.findByRole("button", { name: "Retry" }))
+  expect((await screen.findByTestId("pierre")).getAttribute("data-patch")).toBe("ok")
+  expect(fetchPatch).toHaveBeenCalledTimes(2)
+})
+
+test("a renamed file shows both paths in its header", async () => {
+  const renamed: DiffFilesResult = {
+    kind: "files",
+    files: { ...range(), files: [{ ...file, path: "new.go", old_path: "old.go", status: "R" }] },
+  }
+  render(OPEN, async () => renamed)
+  const header = await screen.findByTestId("file-card-header")
+  expect(header.textContent).toContain("old.go → new.go")
+})
+
+test("large, generated and binary files get a header and no body or fetch", async () => {
+  const fetchPatch = vi.fn<FetchDiffPatch>(async () => "x")
+  const flagged: DiffFilesResult = {
+    kind: "files",
+    files: { ...range(), files: [{ ...file, path: "big.go", large: true }] },
+  }
+  render(OPEN, async () => flagged, undefined, fetchPatch)
+  expect(await screen.findByTestId("file-card-header")).toBeTruthy()
+  expect(screen.queryByTestId("pierre")).toBeNull()
+  expect(fetchPatch).not.toHaveBeenCalled()
+})
+
+test("split on desktop, unified on phone, and the switch changes the view and survives a file change", async () => {
+  render(OPEN, async () => TREE())
+  await screen.findByTestId("pierre")
+  expect(style()).toBe("split")
+  fireEvent.click(screen.getByRole("button", { name: "Unified" }))
+  await waitFor(() => expect(style()).toBe("unified"))
+  press("n")
+  await waitFor(() =>
+    expect(screen.getByTestId("pierre").getAttribute("data-patch")).toBe("patch of src/b.go"),
+  )
+  expect(style()).toBe("unified")
+  cleanup()
+  render(OPEN, async () => TREE(), "phone")
+  fireEvent.click((await screen.findAllByTestId("tree-file"))[0])
+  await screen.findByTestId("pierre")
+  expect(style()).toBe("unified")
 })

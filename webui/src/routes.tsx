@@ -42,7 +42,7 @@ import type { FetchCleanup, PostCleanup } from "./cleanup/cleanup"
 import type { FetchTips } from "./tips/tips"
 import type { FetchStats } from "./stats/stats"
 import type { FetchDetail } from "./ticket/detail"
-import type { FetchDiffFiles } from "./diff/api"
+import type { FetchDiffFiles, FetchDiffPatch } from "./diff/api"
 
 const AgentsPage = lazy(() =>
   import("./agents/AgentsPage").then(({ AgentsPage }) => ({ default: AgentsPage })),
@@ -227,6 +227,7 @@ export interface RouteFetchers {
   epic?: FetchEpicDetail
   epicList?: FetchEpicList
   diffFiles?: FetchDiffFiles
+  diffPatch?: FetchDiffPatch
   archived?: FetchArchived
   schedules?: FetchSchedules
   switchSchedule?: PostSwitch
@@ -354,7 +355,10 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
       path: "/t/*",
       element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} />,
     },
-    { path: "/diff", element: <DiffPage fetchFiles={fetchers.diffFiles} /> },
+    {
+      path: "/diff",
+      element: <DiffPage fetchFiles={fetchers.diffFiles} fetchPatch={fetchers.diffPatch} />,
+    },
     {
       path: "/e/*",
       element: (

@@ -11,10 +11,18 @@ import { Button } from "../ui/button/Button"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { useDevice } from "../useWide"
 import { useReadyWhen } from "../useReady"
-import { fetchDiffFiles, type DiffFilesResult, type FetchDiffFiles } from "./api"
+import {
+  fetchDiffFiles,
+  fetchDiffPatch,
+  type DiffFilesResult,
+  type FetchDiffFiles,
+  type FetchDiffPatch,
+} from "./api"
+import type { DiffView } from "./DiffBody"
+import { DiffFileCard, type PatchRange } from "./DiffFileCard"
 import { diffQuery, parseDiffUrl } from "./diffUrl"
 
-export type DiffView = "split" | "unified"
+export type { DiffView }
 
 type Loaded = { key: string; result: DiffFilesResult } | { key: string; failed: true }
 
@@ -193,12 +201,16 @@ function Tabs({
 
 function FilesBrowser({
   files,
+  range,
+  fetchPatch,
   view,
   selectedPath,
   onSelect,
   phone,
 }: {
   files: DiffFile[]
+  range: PatchRange
+  fetchPatch: FetchDiffPatch
   view: DiffView
   selectedPath: string | undefined
   onSelect: (path: string) => void
@@ -210,6 +222,7 @@ function FilesBrowser({
   const all = useMemo(() => treeOrder(files), [files])
   const selected = all.find((f) => f.path === selectedPath)?.path ?? order[0]?.path ?? all[0]?.path
   const index = order.findIndex((f) => f.path === selected)
+  const selectedFile = all.find((f) => f.path === selected)
 
   const step = (d: 1 | -1) => {
     if (order.length === 0) return
@@ -241,8 +254,17 @@ function FilesBrowser({
   const right = (
     <Box minW="0">
       <FileNav index={index} visible={order} onStep={step} />
-      {/* The diff render ticket draws the selected file here. */}
-      <Box data-testid="diff-area" data-view={view} data-file={selected} mt="4" />
+      <Box data-testid="diff-area" data-view={view} data-file={selected} mt="4">
+        {selectedFile && (
+          <DiffFileCard
+            key={selectedFile.path}
+            file={selectedFile}
+            range={range}
+            view={view}
+            fetchPatch={fetchPatch}
+          />
+        )}
+      </Box>
     </Box>
   )
   if (phone) {
@@ -341,7 +363,13 @@ function noticeOf(
   return { notice: null, files: files.length }
 }
 
-export function DiffPage({ fetchFiles = fetchDiffFiles }: { fetchFiles?: FetchDiffFiles }) {
+export function DiffPage({
+  fetchFiles = fetchDiffFiles,
+  fetchPatch = fetchDiffPatch,
+}: {
+  fetchFiles?: FetchDiffFiles
+  fetchPatch?: FetchDiffPatch
+}) {
   const [params, setParams] = useSearchParams()
   const url = parseDiffUrl(params)
   const device = useDevice()
@@ -414,9 +442,15 @@ export function DiffPage({ fetchFiles = fetchDiffFiles }: { fetchFiles?: FetchDi
       </Box>
       {notice}
       {canFetch && !fresh && !noRange && <FullScreenLoader label="Loading diff" />}
-      {!notice && fresh && "result" in fresh && files ? (
+      {!notice && fresh && "result" in fresh && fresh.result.kind === "files" && files ? (
         <FilesBrowser
-          files={fresh.result.kind === "files" ? fresh.result.files.files : []}
+          files={fresh.result.files.files}
+          range={{
+            project,
+            firstSha: fresh.result.files.first_sha,
+            secondSha: fresh.result.files.second_sha,
+          }}
+          fetchPatch={fetchPatch}
           view={view}
           selectedPath={url.file}
           onSelect={(file) => setParams(diffQuery({ ...url, file }))}

@@ -1,5 +1,5 @@
 import { apiFetch } from "../apiFetch"
-import type { DiffFiles, DiffRange } from "../generated/server"
+import type { DiffFiles, DiffPatch, DiffRange } from "../generated/server"
 
 // The Go DiffFiles embeds DiffRange, so the JSON is flat. The generated type nests it under
 // "DiffRange", which the server never sends.
@@ -15,6 +15,22 @@ export type FetchDiffFiles = (
   first: string,
   second: string,
 ) => Promise<DiffFilesResult>
+
+/** The patch call gets the SHAs the file list resolved, so a moving branch cannot mix two ranges. */
+export type FetchDiffPatch = (
+  project: string,
+  firstSha: string,
+  secondSha: string,
+  path: string,
+) => Promise<string>
+
+export const fetchDiffPatch: FetchDiffPatch = async (project, first, second, path) => {
+  const q = new URLSearchParams({ project, first, second, path })
+  const res = await apiFetch(`/v1/diff/patch?${q}`)
+  if (!res.ok) throw new Error(`diff patch: HTTP ${res.status}`)
+  const body: DiffPatch = await res.json()
+  return body.patch ?? ""
+}
 
 export const fetchDiffFiles: FetchDiffFiles = async (project, first, second) => {
   const q = new URLSearchParams({ project, first, second })
