@@ -207,37 +207,124 @@ New scenario `epic-diff`, shapes (implementation tickets):
 
 Entries:
 
-1. Stories 1 to 5, 74, 75 (typed refs and page shell): flow "Diff page" on `merged`: open the page with two typed refs, change a field, press Reload. Vitest: the `...` is shown between the fields. CLI: the file-list verb with the two refs prints the same files as the page. Mock states `desktop-default`.
-2. Stories 3, 78 (any ref, injection): server test: a branch, a tag and a SHA resolve; a ref starting with `-` and an unknown ref return 400 "Unknown ref" (one `--verify` call per ref); the response carries SHAs only. CLI: the file-list verb with `--output=x` as a ref exits non-zero.
-3. Stories 6 to 9, 88 (links before the merge): flow "Diff page" on `running`: the epic page link opens the derived base and branch; the first stacked epic's link uses the blocker's branch; the second stacked epic (blocker merged) uses trunk; the epic with an explicit `base:` uses it; the unmerged epic with no commits past its base has no link. Server test: the epic response's "has commits past its base" boolean is false for that epic and true for the others. Mock states `desktop-default`.
-4. Stories 10, 11, 14 (links after the merge): flow "Diff page" on `merged` and `unstamped`: the merged epic and the archived epic page open the stamped range; the unstamped epic opens empty ref fields. Vitest: the "No diff recorded" notice with the reason-neutral text. Mock states `desktop-no-diff-recorded`.
-5. Stories 12, 89 (done ticket link): flow "Diff page": a done ticket's "View diff" opens the epic page's Diff page narrowed to that ticket, and the done commitless ticket has no link. Server tests: the epic and ticket responses carry the "shows View diff" boolean. Vitest: a narrowing that matches no returned commit shows an empty tree, with the cap notice when `truncated` and "No commits of this ticket in this range" otherwise. Mock states `desktop-commits-narrowed`.
-6. Stories 13, 29 (empty epic): flow "Diff page" on `empty`: no "View diff" link on the epic page. Vitest: typed equal refs show "No changes". Mock states `desktop-empty-range`.
-7. Stories 15 to 17, 83, 84 (stamp at merge): Go test with `servertest`: merging a fast-forward epic and a stacked epic sets base SHA and tip SHA together with `merged_at`; both equal the derived target tip before and after, including an epic with an explicit `base:`. A merged epic with no commits is stamped with base equal to tip. Hand-merge detection, `NothingToMerge` and "Mark as merged" with no PR number (also in a `pr` project) stamp only on an exact reflog match and otherwise stamp nothing; an empty epic on any of these paths stamps base = tip; `NothingToMerge` on an epic merged outside gx uses the reflog rule, not an empty range; an entry holding another epic's commits is refused; a map epic gets no range; an epic with a PR number marked merged by hand uses the PR rules. CLI: `gx tickets show` of the epic lists both fields.
-8. Stories 18 to 23 (PR styles): Go tests on the `pr` shape: merge commit, squash and rebase-and-merge each stamp the stated base and tip; non-matching headlines stamp nothing and the page shows "No diff recorded"; in the squash epic the commit call returns a null trailer for a squash body with several `Ralph-Loop-Ticket` lines, and a done ticket's narrowing there shows "No commits of this ticket in this range"; a stacked epic behind a squash-merged blocker keeps its stamp and shows the diff while its objects exist, and "Commits not available in this clone" once they are removed. Mock states `desktop-no-diff-recorded`.
-9. Stories 24 to 28, 30, 81, 82 (migration and backfill): Go test on the `backfill` shape: the step stamps exact matches, stamps an empty range for the epic with no commits, refuses the ambiguous and double-merge epics and the entry holding two epics, stamps nothing on the map epic, the epic with no run log and the epic not on trunk, logs each refusal with its reason, and skips an epic that already has a range. A re-run with the applied list skipped (as `archivefields_test.go` does with `SkipApplied`) changes nothing. `go test ./migrations -run TestSchemaSnapshot` passes after the snapshot update. Flow "Diff page" on `unstamped`: the ref fields are empty. Vitest: "No diff recorded". Mock states `desktop-no-diff-recorded`.
-10. Story 31 (missing SHA): flow "Diff page" on `missing-sha`: no diff and the ref fields stay editable. Vitest: the notice "Commits not available in this clone", amber, in the same area as "No diff recorded". Mock states `desktop-no-diff-recorded` (same notice area, amber).
-11. Stories 32 to 39, 86, 87, 90 (grouping): server test: the commit call returns the canonical address for a modern trailer, a legacy `<epic>/<id>` trailer and a renamed epic's old name, and marks a merge commit with no files. Vitest on grouping: trailer groups with titles, order by first commit, Design by `<map>:` subject, Other commits (including the older ticket's earlier commits and the merge commit, labelled as a merge), empty commit shown, no Design without an epic. CLI: the commit verb prints the trailer address for each commit. Mock states `desktop-commits-narrowed`.
-12. Stories 40 to 47 (commit list and narrowing): flow "Diff page": the list is collapsed at load; opening it shows All commits, Design and tickets; clicking a ticket narrows the tree and shows the chip; clearing the chip restores the full tree. Vitest: narrowing to "Design", to "Other commits" and to a single commit each filters the tree and sets the chip. Mock states `desktop-commits-narrowed`.
-13. Stories 44, 45, 90 (narrowed patches): server test: with `commits=` the patch call returns one patch per selected commit in commit order, a ticket's non-adjacent commits omit the commits between them, and a merge commit returns no patch. Vitest: a narrowed file shows commit subjects as labels. Mock states `desktop-commits-narrowed`.
-14. Stories 48, 49 (500 cap): server test with 501 commits: the commit call returns 500 and `truncated`, the file list still lists every file. Vitest: the notice "Showing the first 500 commits". Mock states `desktop-default`.
-15. Stories 50 to 54 (file tree and filter): vitest on tree building (order, folding, counts), collapsing a directory hides its rows (story 52), and a file row shows its status letter and change bar (story 51). Flow "Diff page": typing in the filter rebuilds the tree. Vitest: a string with no match shows "No files match". Mock states `desktop-filtered` and `desktop-filter-no-match`.
-16. Stories 55 to 59 (one file, keys, URL): flow "Diff page": `p` and `n` move and wrap, the counter updates, keys are ignored while the filter has focus, the URL holds the file and narrowing, and a reload at that URL shows the same file. This flow declares one reload. Mock states `desktop-default`.
-17. Story 60 (renames): server test: a renamed file is listed with its source and status R. Mock states `desktop-default`.
-18. Stories 61, 62, 76 (view mode and theme): flow "Diff page" at 1200px and 390px: split by default on desktop, unified on phone, the switch changes it; the diff background equals the app's surface color and the code font is 12px/18px (computed style). Mock states `desktop-default` and `phone-diff`.
-19. Story 63 (phone tabs): flow "Diff page" at 390px: the Files and Diff tabs, with no sideways page scroll. Mock states `phone-files` and `phone-diff`.
-20. Stories 64 to 66 (large and generated): server test: a patch over 2000 lines or 60 KB is flagged `large`, a lock file `generated`, and the patch call sends them on request. Flow "Diff page": Load diff on the 5000-line file renders in a 70vh box and scrolling reaches the middle. Mock states `desktop-large-file`.
-21. Stories 67, 68 (expand): flow "Diff page": expanding context works un-narrowed (a real blob round trip). Vitest: the narrowed view shows no expand rows. Mock states `desktop-default` and `desktop-commits-narrowed`.
-22. Stories 69, 70 (images and binaries): server test: the blob call returns bytes for a png of 2 MB or less and a flag for svg, other binaries and a png over 2 MB. Vitest: the image file shows before and after boxes with sizes; a non-image binary shows "Binary file, N KB". Mock states `desktop-image-file`.
-23. Stories 71, 74 (empty notice): see entry 6. Mock states `desktop-empty-range`.
-24. Stories 72, 74 (unknown ref): server test: an unknown ref returns 400 and names the unknown field. Vitest: a typed unknown ref shows `Unknown ref "x"` with a red border on that field and the fields stay editable. Mock states `desktop-unknown-ref`.
-25. Story 73 (no common history): server test and vitest: two refs with no common ancestor show "No common history" with editable fields. Mock states `desktop-empty-range` (same notice style).
-26. Story 77 (auth): `TestWeb_EverythingElseIs404` covers the new routes; a signed-out API call gets 401, and a non-GET method is refused. CLI: each new route has its verb (`TestRouteTableHasCLIVerbs`).
-27. Story 79 (object store only): server test: a blob call for a path outside the file list, an absolute path, a `..` path, a leading `-` and a NUL byte is refused; a symlink returns its target text; a dirty file on disk is not read.
-28. Story 80 (line addressing): vitest: the diff component exposes a line annotation by file, side and line number for an added and a deleted line.
-29. Stories 85, 86 (trailer on every commit): Go test in `ralphloop/merge`: `StampMerged` on a multi-commit ticket leaves `Ralph-Loop-Ticket` on every commit of the pick, not only HEAD, including a pick resolved after a conflict (`PrePickHead..HEAD`); the tokens, elapsed and cost trailers stay on HEAD only. Server test: a commit without the trailer, from a ticket merged before the change, comes back with a null trailer and lands in "Other commits".
+Entry 1: typed refs and page shell (stories 1 to 5, 74 to 74, 75 to 75)
 
-### Mock states
+flow "Diff page" on `merged`: open the page with two typed refs, change a field, press Reload. Vitest: the `...` is shown between the fields. CLI: the file-list verb with the two refs prints the same files as the page. Mock states `desktop-default`.
+
+Entry 2: any ref, injection (stories 3 to 3, 78 to 78)
+
+server test: a branch, a tag and a SHA resolve; a ref starting with `-` and an unknown ref return 400 "Unknown ref" (one `--verify` call per ref); the response carries SHAs only. CLI: the file-list verb with `--output=x` as a ref exits non-zero.
+
+Entry 3: links before the merge (stories 6 to 9, 88 to 88)
+
+flow "Diff page" on `running`: the epic page link opens the derived base and branch; the first stacked epic's link uses the blocker's branch; the second stacked epic (blocker merged) uses trunk; the epic with an explicit `base:` uses it; the unmerged epic with no commits past its base has no link. Server test: the epic response's "has commits past its base" boolean is false for that epic and true for the others. Mock states `desktop-default`.
+
+Entry 4: links after the merge (stories 10 to 10, 11 to 11, 14 to 14)
+
+flow "Diff page" on `merged` and `unstamped`: the merged epic and the archived epic page open the stamped range; the unstamped epic opens empty ref fields. Vitest: the "No diff recorded" notice with the reason-neutral text. Mock states `desktop-no-diff-recorded`.
+
+Entry 5: done ticket link (stories 12 to 12, 89 to 89)
+
+flow "Diff page": a done ticket's "View diff" opens the epic page's Diff page narrowed to that ticket, and the done commitless ticket has no link. Server tests: the epic and ticket responses carry the "shows View diff" boolean. Vitest: a narrowing that matches no returned commit shows an empty tree, with the cap notice when `truncated` and "No commits of this ticket in this range" otherwise. Mock states `desktop-commits-narrowed`.
+
+Entry 6: empty epic (stories 13 to 13, 29 to 29)
+
+flow "Diff page" on `empty`: no "View diff" link on the epic page. Vitest: typed equal refs show "No changes". Mock states `desktop-empty-range`.
+
+Entry 7: stamp at merge (stories 15 to 17, 83 to 83, 84 to 84, 91 to 91)
+
+Go test with `servertest`: merging a fast-forward epic and a stacked epic sets base SHA and tip SHA together with `merged_at`; both equal the derived target tip before and after, including an epic with an explicit `base:`. A merged epic with no commits is stamped with base equal to tip. Hand-merge detection, `NothingToMerge` and "Mark as merged" with no PR number (also in a `pr` project) stamp only on an exact reflog match and otherwise stamp nothing; an empty epic on any of these paths stamps base = tip; `NothingToMerge` on an epic merged outside gx uses the reflog rule, not an empty range; an entry holding another epic's commits is refused; a map epic gets no range; an epic with a PR number marked merged by hand uses the PR rules. CLI: `gx tickets show` of the epic lists both fields.
+
+Entry 8: PR styles (stories 18 to 23, 93 to 93)
+
+Go tests on the `pr` shape: merge commit, squash and rebase-and-merge each stamp the stated base and tip; non-matching headlines stamp nothing and the page shows "No diff recorded"; in the squash epic the commit call returns a null trailer for a squash body with several `Ralph-Loop-Ticket` lines, and a done ticket's narrowing there shows "No commits of this ticket in this range"; a stacked epic behind a squash-merged blocker keeps its stamp and shows the diff while its objects exist, and "Commits not available in this clone" once they are removed. Mock states `desktop-no-diff-recorded`.
+
+Entry 9: migration and backfill (stories 24 to 28, 30 to 30, 81 to 81, 82 to 82, 92 to 92)
+
+Go test on the `backfill` shape: the step stamps exact matches, stamps an empty range for the epic with no commits, refuses the ambiguous and double-merge epics and the entry holding two epics, stamps nothing on the map epic, the epic with no run log and the epic not on trunk, logs each refusal with its reason, and skips an epic that already has a range. A re-run with the applied list skipped (as `archivefields_test.go` does with `SkipApplied`) changes nothing. `go test ./migrations -run TestSchemaSnapshot` passes after the snapshot update. Flow "Diff page" on `unstamped`: the ref fields are empty. Vitest: "No diff recorded". Mock states `desktop-no-diff-recorded`.
+
+Entry 10: missing SHA (stories 31 to 31)
+
+flow "Diff page" on `missing-sha`: no diff and the ref fields stay editable. Vitest: the notice "Commits not available in this clone", amber, in the same area as "No diff recorded". Mock states `desktop-no-diff-recorded` (same notice area, amber).
+
+Entry 11: grouping (stories 32 to 39, 86 to 86, 87 to 87, 90 to 90)
+
+server test: the commit call returns the canonical address for a modern trailer, a legacy `<epic>/<id>` trailer and a renamed epic's old name, and marks a merge commit with no files. Vitest on grouping: trailer groups with titles, order by first commit, Design by `<map>:` subject, Other commits (including the older ticket's earlier commits and the merge commit, labelled as a merge), empty commit shown, no Design without an epic. CLI: the commit verb prints the trailer address for each commit. Mock states `desktop-commits-narrowed`.
+
+Entry 12: commit list and narrowing (stories 40 to 47)
+
+flow "Diff page": the list is collapsed at load; opening it shows All commits, Design and tickets; clicking a ticket narrows the tree and shows the chip; clearing the chip restores the full tree. Vitest: narrowing to "Design", to "Other commits" and to a single commit each filters the tree and sets the chip. Mock states `desktop-commits-narrowed`.
+
+Entry 13: narrowed patches (stories 44 to 44, 45 to 45, 90 to 90)
+
+server test: with `commits=` the patch call returns one patch per selected commit in commit order, a ticket's non-adjacent commits omit the commits between them, and a merge commit returns no patch. Vitest: a narrowed file shows commit subjects as labels. Mock states `desktop-commits-narrowed`.
+
+Entry 14: 500 cap (stories 48 to 48, 49 to 49)
+
+server test with 501 commits: the commit call returns 500 and `truncated`, the file list still lists every file. Vitest: the notice "Showing the first 500 commits". Mock states `desktop-default`.
+
+Entry 15: file tree and filter (stories 50 to 54)
+
+vitest on tree building (order, folding, counts), collapsing a directory hides its rows (story 52), and a file row shows its status letter and change bar (story 51). Flow "Diff page": typing in the filter rebuilds the tree. Vitest: a string with no match shows "No files match". Mock states `desktop-filtered` and `desktop-filter-no-match`.
+
+Entry 16: one file, keys, URL (stories 55 to 59)
+
+flow "Diff page": `p` and `n` move and wrap, the counter updates, keys are ignored while the filter has focus, the URL holds the file and narrowing, and a reload at that URL shows the same file. This flow declares one reload. Mock states `desktop-default`.
+
+Entry 17: renames (stories 60 to 60)
+
+server test: a renamed file is listed with its source and status R. Mock states `desktop-default`.
+
+Entry 18: view mode and theme (stories 61 to 61, 62 to 62, 76 to 76)
+
+flow "Diff page" at 1200px and 390px: split by default on desktop, unified on phone, the switch changes it; the diff background equals the app's surface color and the code font is 12px/18px (computed style). Mock states `desktop-default` and `phone-diff`.
+
+Entry 19: phone tabs (stories 63 to 63)
+
+flow "Diff page" at 390px: the Files and Diff tabs, with no sideways page scroll. Mock states `phone-files` and `phone-diff`.
+
+Entry 20: large and generated (stories 64 to 66)
+
+server test: a patch over 2000 lines or 60 KB is flagged `large`, a lock file `generated`, and the patch call sends them on request. Flow "Diff page": Load diff on the 5000-line file renders in a 70vh box and scrolling reaches the middle. Mock states `desktop-large-file`.
+
+Entry 21: expand (stories 67 to 67, 68 to 68)
+
+flow "Diff page": expanding context works un-narrowed (a real blob round trip). Vitest: the narrowed view shows no expand rows. Mock states `desktop-default` and `desktop-commits-narrowed`.
+
+Entry 22: images and binaries (stories 69 to 69, 70 to 70)
+
+server test: the blob call returns bytes for a png of 2 MB or less and a flag for svg, other binaries and a png over 2 MB. Vitest: the image file shows before and after boxes with sizes; a non-image binary shows "Binary file, N KB". Mock states `desktop-image-file`.
+
+Entry 23: empty notice (stories 71 to 71, 74 to 74)
+
+see entry 6. Mock states `desktop-empty-range`.
+
+Entry 24: unknown ref (stories 72 to 72, 74 to 74)
+
+server test: an unknown ref returns 400 and names the unknown field. Vitest: a typed unknown ref shows `Unknown ref "x"` with a red border on that field and the fields stay editable. Mock states `desktop-unknown-ref`.
+
+Entry 25: no common history (stories 73 to 73)
+
+server test and vitest: two refs with no common ancestor show "No common history" with editable fields. Mock states `desktop-empty-range` (same notice style).
+
+Entry 26: auth (stories 77 to 77)
+
+`TestWeb_EverythingElseIs404` covers the new routes; a signed-out API call gets 401, and a non-GET method is refused. CLI: each new route has its verb (`TestRouteTableHasCLIVerbs`).
+
+Entry 27: object store only (stories 79 to 79)
+
+server test: a blob call for a path outside the file list, an absolute path, a `..` path, a leading `-` and a NUL byte is refused; a symlink returns its target text; a dirty file on disk is not read.
+
+Entry 28: line addressing (stories 80 to 80)
+
+vitest: the diff component exposes a line annotation by file, side and line number for an added and a deleted line.
+
+Entry 29: trailer on every commit (stories 85 to 85, 86 to 86)
+
+Go test in `ralphloop/merge`: `StampMerged` on a multi-commit ticket leaves `Ralph-Loop-Ticket` on every commit of the pick, not only HEAD, including a pick resolved after a conflict (`PrePickHead..HEAD`); the tokens, elapsed and cost trailers stay on HEAD only. Server test: a commit without the trailer, from a ticket merged before the change, comes back with a null trailer and lands in "Other commits".
+
+
+**Mock states**
 
 - `/Users/david/.local/share/gx/tickets/gx/epic-diff/mocks/04-mock-the-diff-page.html`, `desktop-default`, 1200px, the `epic-diff` scenario `merged`, split view, first file open, commits collapsed: ref-bar, view-toggle, commits-disclosure, file-filter, file-tree, file-nav, file-card, diff-body.
 - `/Users/david/.local/share/gx/tickets/gx/epic-diff/mocks/04-mock-the-diff-page.html`, `desktop-commits-narrowed`, 1200px, the `epic-diff` scenario `merged` narrowed to one ticket: ref-bar, view-toggle, commits-disclosure, file-filter, file-tree, file-nav, file-card, diff-body.
