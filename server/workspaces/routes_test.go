@@ -7,10 +7,59 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/workspaces"
 )
+
+func TestWorkspacesRoutes_MoveDraftPublishes(t *testing.T) {
+	f, ctx := startMembership(t)
+	d, err := drafts.New(f.H.StateDir).Create("proj", "a-draft", "an idea")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Skip the Bugs workspace's event and a sentinel's: the stream replays from the start.
+	if _, err := f.H.Client.Admin.CreateWorkspace(ctx, "s0"); err != nil {
+		t.Fatal(err)
+	}
+	servertest.WaitForEvent(ctx, t, f.Evs, wire.EventWorkspacesChanged, "")
+	servertest.WaitForEvent(ctx, t, f.Evs, wire.EventWorkspacesChanged, "")
+	// moved returns the event types one move published; the sentinel
+	// workspace's event comes after them on the ordered stream.
+	moved := func(sentinel string, keys ...string) (workspacesEvents, draftEvents int) {
+		t.Helper()
+		if res, err := f.H.Client.Admin.MoveToWorkspace(ctx, "Bugs", keys...); err != nil || res.Results[0].Status != wire.TargetDone {
+			t.Fatalf("move = %+v, %v", res, err)
+		}
+		if _, err := f.H.Client.Admin.CreateWorkspace(ctx, sentinel); err != nil {
+			t.Fatal(err)
+		}
+		for {
+			select {
+			case ev := <-f.Evs:
+				switch ev.Type {
+				case wire.EventDesignDraftsChanged:
+					draftEvents++
+				case wire.EventWorkspacesChanged:
+					workspacesEvents++
+					// the sentinel's own event is the last one
+					if workspacesEvents == 2 {
+						return workspacesEvents, draftEvents
+					}
+				}
+			case <-ctx.Done():
+				t.Fatal(ctx.Err())
+			}
+		}
+	}
+	if w, dr := moved("s1", drafts.MemberKey(d.ID)); w != 2 || dr != 1 {
+		t.Errorf("draft move published %d workspaces-changed and %d design-drafts-changed, want 2 and 1", w, dr)
+	}
+	if w, dr := moved("s2", "proj:plain"); w != 2 || dr != 0 {
+		t.Errorf("design move published %d workspaces-changed and %d design-drafts-changed, want 2 and 0", w, dr)
+	}
+}
 
 func names(l []wire.Workspace) []string {
 	out := make([]string, len(l))

@@ -97,6 +97,7 @@ func (r rootRoutes) snapshot(w http.ResponseWriter, _ *http.Request) {
 	}
 	snap.Sessions = sessions
 	snap.Placements = s.workspaces.Place(sessions)
+	snap.DesignDrafts = s.designs.DraftRows(s.workspaces.Workspace)
 	_ = json.NewEncoder(w).Encode(snap)
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/wire"
 )
 
 // Deps is everything the design code copies when it is built. A field the root
@@ -97,18 +98,49 @@ func (s *Designs) DraftExists(id string) bool {
 	return err == nil
 }
 
-// dropDrafts clears the workspace membership of deleted drafts. Every path that
-// deletes a draft goes through it, so none leaves a dead member. A nil
-// workspace store skips it.
+// dropDrafts clears the workspace membership of deleted drafts and announces
+// the changed rows once. Every path that deletes a draft goes through it, so
+// none leaves a dead member or a stale row. A nil workspace store skips the
+// membership.
 func (s *Designs) dropDrafts(ids ...string) {
-	if s.workspaces == nil {
+	if len(ids) == 0 {
 		return
 	}
-	for _, id := range ids {
-		if err := s.workspaces.Remove(drafts.MemberKey(id)); err != nil && s.log != nil {
-			s.log.Warn("drop draft membership", "draft", id, "err", err)
+	if s.workspaces != nil {
+		for _, id := range ids {
+			if err := s.workspaces.Remove(drafts.MemberKey(id)); err != nil && s.log != nil {
+				s.log.Warn("drop draft membership", "draft", id, "err", err)
+			}
 		}
 	}
+	s.publishDrafts()
+}
+
+// publishDrafts announces that the draft rows changed.
+func (s *Designs) publishDrafts() {
+	if s.events != nil {
+		s.events.Publish(wire.EventDesignDraftsChanged, "")
+	}
+}
+
+// DraftRows lists the drafts as snapshot rows, most recently edited first.
+// workspace names the workspace of a member key; "" or an unknown key is Default.
+func (s *Designs) DraftRows(workspace func(key string) string) []wire.DesignDraftRow {
+	items, err := s.drafts.List()
+	if err != nil {
+		if s.log != nil {
+			s.log.Warn("list design drafts", "err", err)
+		}
+		return nil
+	}
+	rows := make([]wire.DesignDraftRow, 0, len(items))
+	for _, it := range items {
+		rows = append(rows, wire.DesignDraftRow{
+			ID: it.ID, Label: it.Label, Project: it.Project, Slug: it.Slug,
+			EditedAt: it.EditedAt, Workspace: workspace(drafts.MemberKey(it.ID)),
+		})
+	}
+	return rows
 }
 
 // GiveSessions sets the Manager the design sessions are made and stopped through.

@@ -1974,6 +1974,10 @@ export interface Snapshot {
    */
   placements?: SessionPlacement[];
   /**
+   * DesignDrafts are the New Design draft rows; filled in by the handler.
+   */
+  design_drafts?: DesignDraftRow[];
+  /**
    * SkillsInstallProblem is why the skill install `gx server start` ran
    * last did not finish; empty when it did. Filled in by the handler.
    */
@@ -4008,6 +4012,23 @@ export interface PendingRow {
  * EventWorkspacesChanged announces that a workspace, a membership or a hold mark changed.
  */
 export const EventWorkspacesChanged = "workspaces-changed";
+/**
+ * EventDesignDraftsChanged announces that the set of Design draft rows changed
+ * (a draft was created, relabelled, retargeted, moved or deleted). The address is "".
+ */
+export const EventDesignDraftsChanged = "design-drafts-changed";
+/**
+ * DesignDraftRow is one New Design draft in the snapshot: what the sidebar row
+ * shows. It carries no prompt text and no image list.
+ */
+export interface DesignDraftRow {
+  id: string;
+  label: string;
+  project: string;
+  slug: string;
+  edited_at: string;
+  workspace: string;
+}
 /**
  * ProjectWorktrees is one project in the /v1/projects/worktrees payload: its
  * repo root, the dirs of its other worktrees and the model each tier runs under

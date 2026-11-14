@@ -136,6 +136,8 @@ type Snapshot struct {
 	// Placements say where each session sits, keyed by session id; filled in by
 	// the handler.
 	Placements []SessionPlacement `json:"placements,omitempty"`
+	// DesignDrafts are the New Design draft rows; filled in by the handler.
+	DesignDrafts []DesignDraftRow `json:"design_drafts,omitempty"`
 	// SkillsInstallProblem is why the skill install `gx server start` ran
 	// last did not finish; empty when it did. Filled in by the handler.
 	SkillsInstallProblem string `json:"skills_install_problem,omitempty"`

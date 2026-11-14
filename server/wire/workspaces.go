@@ -1,7 +1,24 @@
 package wire
 
+import "time"
+
 // EventWorkspacesChanged announces that a workspace, a membership or a hold mark changed.
 const EventWorkspacesChanged = "workspaces-changed"
+
+// EventDesignDraftsChanged announces that the set of Design draft rows changed
+// (a draft was created, relabelled, retargeted, moved or deleted). The address is "".
+const EventDesignDraftsChanged = "design-drafts-changed"
+
+// DesignDraftRow is one New Design draft in the snapshot: what the sidebar row
+// shows. It carries no prompt text and no image list.
+type DesignDraftRow struct {
+	ID        string    `json:"id"`
+	Label     string    `json:"label"`
+	Project   string    `json:"project"`
+	Slug      string    `json:"slug"`
+	EditedAt  time.Time `json:"edited_at"`
+	Workspace string    `json:"workspace"`
+}
 
 // ProjectWorktrees is one project in the /v1/projects/worktrees payload: its
 // repo root, the dirs of its other worktrees and the model each tier runs under

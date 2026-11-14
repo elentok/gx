@@ -15,7 +15,9 @@ import (
 	"github.com/elentok/gx/server/designs"
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
+	"github.com/elentok/gx/server/workspaces"
 )
 
 // seedDraft writes a draft straight into the store the server reads.
@@ -61,6 +63,170 @@ func (f designsFixture) webSave(t *testing.T, id string, rev int, idea string) o
 		t.Fatal(err)
 	}
 	return res
+}
+
+// settle waits until every event published so far has been streamed, by
+// creating a workspace (the events are ordered) and waiting for its event.
+func (f designsFixture) settle(t *testing.T) {
+	t.Helper()
+	name := fmt.Sprintf("sentinel-%d", time.Now().UnixNano())
+	if _, err := f.h.Client.Admin.CreateWorkspace(f.ctx, name); err != nil {
+		t.Fatal(err)
+	}
+	servertest.WaitForEvent(f.ctx, t, f.evs, wire.EventWorkspacesChanged, "")
+}
+
+// draftEvents runs act and counts the design-drafts-changed events it caused.
+// act must not publish workspaces-changed itself.
+func (f designsFixture) draftEvents(t *testing.T, act func()) int {
+	t.Helper()
+	f.settle(t)
+	act()
+	name := fmt.Sprintf("sentinel-%d", time.Now().UnixNano())
+	if _, err := f.h.Client.Admin.CreateWorkspace(f.ctx, name); err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for {
+		select {
+		case ev := <-f.evs:
+			switch ev.Type {
+			case wire.EventDesignDraftsChanged:
+				n++
+			case wire.EventWorkspacesChanged:
+				return n
+			}
+		case <-f.ctx.Done():
+			t.Fatal(f.ctx.Err())
+		}
+	}
+}
+
+func (f designsFixture) wantDraftEvents(t *testing.T, what string, want int, act func()) {
+	t.Helper()
+	if got := f.draftEvents(t, act); got != want {
+		t.Errorf("%s: %d design-drafts-changed events, want %d", what, got, want)
+	}
+}
+
+func TestWebDesignDrafts_Snapshot(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	if _, err := f.h.Client.Admin.CreateWorkspace(f.ctx, "A"); err != nil {
+		t.Fatal(err)
+	}
+	slugged := f.seedDraft(t, "proj", "my-slug", "secret prompt text")
+	prompted := f.seedDraft(t, "proj", "", "one two three four five six")
+	if err := f.h.Server.Workspaces().SetMember(drafts.MemberKey(prompted.ID), "A"); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := f.h.Client.Snapshot(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := map[string]wire.DesignDraftRow{}
+	for _, r := range snap.DesignDrafts {
+		rows[r.ID] = r
+	}
+	if r := rows[slugged.ID]; r.Label != "my-slug" || r.Slug != "my-slug" || r.Project != "proj" || r.Workspace != workspaces.DefaultName || r.EditedAt.IsZero() {
+		t.Errorf("slug row = %+v", r)
+	}
+	if r := rows[prompted.ID]; r.Label != "one two three four five" || r.Workspace != "A" {
+		t.Errorf("prompt row = %+v", r)
+	}
+	b, _ := json.Marshal(snap.DesignDrafts)
+	if strings.Contains(string(b), `"idea"`) || strings.Contains(string(b), "secret") || strings.Contains(string(b), `"images"`) {
+		t.Errorf("rows leak the prompt or images: %s", b)
+	}
+}
+
+func TestWebDesignDrafts_Event(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	ctx := f.ctx
+	var created *ops.DesignDraft
+	f.wantDraftEvents(t, "create", 1, func() {
+		res, err := f.h.Client.Sessions.SaveDesignDraft(ctx, ops.DesignDraftSaveRequest{Idea: "hello"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		created = res.Draft
+	})
+	target := func(project, slug string) func() {
+		return func() {
+			if _, err := f.h.Client.Sessions.SetDesignDraftTarget(ctx, ops.DesignDraftTargetRequest{ID: created.ID, Project: project, Slug: slug}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	f.wantDraftEvents(t, "slug change", 1, target("", "a-slug"))
+	f.wantDraftEvents(t, "project change", 1, target("proj", "a-slug"))
+	f.wantDraftEvents(t, "no-op target", 0, target("proj", "a-slug"))
+
+	other := f.seedDraft(t, "proj", "gone", "text")
+	f.wantDraftEvents(t, "remove", 1, func() {
+		if _, err := f.h.Client.Sessions.DeleteDesignDraft(ctx, other.ID); err != nil {
+			t.Fatal(err)
+		}
+	})
+	empty := f.seedDraft(t, "", "", "")
+	f.wantDraftEvents(t, "remove-if-empty", 1, func() {
+		if res, err := f.h.Client.Sessions.RemoveDesignDraftIfEmpty(ctx, empty.ID); err != nil || !res.Deleted {
+			t.Fatalf("remove-if-empty = %+v, %v", res, err)
+		}
+	})
+	f.seedDraft(t, "", "", "")
+	f.seedDraft(t, "", "", "")
+	f.wantDraftEvents(t, "create with a sweep of two", 1, func() {
+		if _, err := f.h.Client.Sessions.SaveDesignDraft(ctx, ops.DesignDraftSaveRequest{Idea: "again"}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	start := f.seedDraft(t, "proj", "fresh-start", "an idea")
+	f.wantDraftEvents(t, "start", 1, func() { f.openFromDraft(t, "fresh-start", "an idea", start.ID) })
+}
+
+func TestWebDesignDrafts_EventSilentAutosave(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	ctx := f.ctx
+	d := f.seedDraft(t, "proj", "", "one two three four five")
+	rev := d.Revision
+	save := func(id string, idea string) func() {
+		return func() {
+			res, err := f.h.Client.Sessions.SaveDesignDraft(ctx, ops.DesignDraftSaveRequest{ID: id, Idea: idea, Revision: rev})
+			if err != nil || res.Draft == nil {
+				t.Fatalf("save = %+v, %v", res, err)
+			}
+			rev = res.Draft.Revision
+		}
+	}
+	f.wantDraftEvents(t, "later words", 0, save(d.ID, "one two three four five six seven"))
+	f.wantDraftEvents(t, "label change", 1, save(d.ID, "zero two three four five six"))
+
+	slugged := f.seedDraft(t, "proj", "has-slug", "words")
+	rev = slugged.Revision
+	f.wantDraftEvents(t, "slug-labelled prompt save", 0, save(slugged.ID, "other words entirely"))
+
+	f.wantDraftEvents(t, "image add and remove", 0, func() {
+		img, err := f.h.Client.Sessions.AddDesignDraftImage(ctx, d.ID, imageBytes("\x89PNG\r\n\x1a\n", 40))
+		if err != nil || img.ID == "" {
+			t.Fatalf("add image = %+v, %v", img, err)
+		}
+		if _, err := f.h.Client.Sessions.RemoveDesignDraftImage(ctx, d.ID, img.ID); err != nil {
+			t.Fatal(err)
+		}
+	})
+	f.wantDraftEvents(t, "lease ping", 0, func() {
+		if _, err := f.h.Client.Sessions.LeaseDesignDraft(ctx, d.ID); err != nil {
+			t.Fatal(err)
+		}
+	})
+	f.wantDraftEvents(t, "last project", 0, func() {
+		if _, err := f.h.Client.Sessions.SetDesignLastProject(ctx, "proj"); err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func TestWebDesignDrafts_ListReadSaveDelete(t *testing.T) {

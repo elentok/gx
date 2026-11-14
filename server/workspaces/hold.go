@@ -179,11 +179,21 @@ func (s *Store) UnholdEpics(targets []string) (wire.TargetsResult, error) {
 // MoveTargets puts each key in the workspace on its own, in order.
 func (s *Store) MoveTargets(keys []string, workspace string) (wire.TargetsResult, error) {
 	res := wire.TargetsResult{Results: make([]wire.TargetResult, 0, len(keys))}
+	movedDraft := false
+	// A draft row carries its workspace, so a moved draft changes the rows.
+	defer func() {
+		if movedDraft {
+			s.events.Publish(wire.EventDesignDraftsChanged, "")
+		}
+	}()
 	for _, key := range keys {
 		err := s.Join(key, workspace)
 		var reason Reason
 		switch {
 		case err == nil:
+			if _, isDraft := drafts.ParseMemberKey(key); isDraft {
+				movedDraft = true
+			}
 			res.Results = append(res.Results, wire.TargetResult{Target: key, Status: wire.TargetDone})
 		case errors.As(err, &reason):
 			res.Results = append(res.Results, wire.RefusedTarget(key, refusals[reason], reason.Error()))

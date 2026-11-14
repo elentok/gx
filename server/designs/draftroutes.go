@@ -55,11 +55,19 @@ func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
 				var removed []string
 				removed, err = s.drafts.SweepEmpty(d.ID)
 				s.dropDrafts(removed...)
+				if len(removed) == 0 { // a sweep that removed drafts already announced the change
+					s.publishDrafts()
+				}
 			}
 		}
 	} else {
+		before, getErr := s.drafts.Get(req.ID)
 		res, err = s.drafts.Save(req.ID, req)
 		res = s.withStarted(res, req.ID)
+		// The label, not the text: typing past the fifth word changes no row.
+		if err == nil && getErr == nil && res.Draft != nil && res.Draft.Label != before.Label {
+			s.publishDrafts()
+		}
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -108,6 +116,9 @@ func (s *Designs) draftTarget(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if getErr == nil && res.Draft != nil && (before.Slug != res.Draft.Slug || before.Project != res.Draft.Project) {
+		s.publishDrafts()
 	}
 	wire.WriteJSON(w, res)
 }
