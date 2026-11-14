@@ -162,7 +162,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 
 ## Stats, health, disk and checks (`stats`, `health`, `disk`, `check-lock`, `checks`)
 
-- **`stats.e2e.ts`:** **184. Live token ledger (and 182. Stats limit burn, phone)**; **57. Stats, Grilling section, phone.**
+- **`stats.e2e.ts`:** **184. Live token ledger (and 182. Stats limit burn, phone)** (also: web performance counts rise after a click and a hidden page, the Web performance region sits after Launch, the Include dev toggle round trip, and the Hard loads and Route changes tabs with their cards); **57. Stats, Grilling section, phone.**
 - **`health.e2e.ts` 81. Tray popover (and 82. Tray offline).**
 - **`disk.e2e.ts`:** **76. Disk banner and Clean now (and 78. Clean now fails)**; **77. Disk hold.**
 - **`check-lock.e2e.ts`:** the waiting label and holder show, then clear.

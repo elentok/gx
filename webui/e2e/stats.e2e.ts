@@ -111,6 +111,64 @@ test("184. Live token ledger (and 182. Stats limit burn, phone)", async ({ page,
   await expect(steps).toContainText("worktree")
   await expect(steps).not.toContainText("—")
 
+  // Web performance: the browser sends its own samples when the page is hidden. Run this first, a section
+  // with no samples shows only the empty state, with no tabs or cards.
+  const perfCounts = async () => {
+    const stats = JSON.parse(
+      await fixture.cli("server", "stats", "--json", "--range", "7", "--include-dev"),
+    )
+    const wp = stats.web_performance
+    const by = (cards: { metric: string; count: number }[], m: string) =>
+      cards.find((c) => c.metric === m)?.count ?? 0
+    return [
+      by(wp.hard_loads, "lcp"),
+      by(wp.hard_loads, "fcp"),
+      by(wp.hard_loads, "cls"),
+      by(wp.hard_loads, "app_ready"),
+      by(wp.hard_loads, "inp") + by(wp.route_changes, "inp"),
+    ]
+  }
+  const perfBefore = await perfCounts()
+  // An element with a gx action name gives INP a target.
+  await page.locator("[data-gx-action]:visible").first().click()
+  // Hide by hand: the queue flush and web-vitals both listen for visibilitychange on document.
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true })
+    Object.defineProperty(document, "hidden", { value: true, configurable: true })
+    document.dispatchEvent(new Event("visibilitychange"))
+  })
+  await expect
+    .poll(async () => (await perfCounts()).every((n, i) => n > perfBefore[i]), { timeout: 60_000 })
+    .toBe(true)
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true })
+    Object.defineProperty(document, "hidden", { value: false, configurable: true })
+    document.dispatchEvent(new Event("visibilitychange"))
+  })
+
+  await page.evaluate(() => (location.hash = "#/stats?range=30"))
+  const perf = page.getByRole("region", nav("Web performance"))
+  await expect(perf).toBeVisible()
+  const launchBox = (await launch.boundingBox())!
+  const perfBox = (await perf.boundingBox())!
+  expect(perfBox.y).toBeGreaterThan(launchBox.y)
+
+  const dev = perf.getByRole("checkbox", { name: "Include dev" })
+  await expect(dev).not.toBeChecked()
+  await dev.check()
+  await expect(page).toHaveURL(/[?&]dev=1/)
+  await dev.uncheck()
+  await expect(page).not.toHaveURL(/dev=1/)
+
+  const card = (m: string) => perf.getByTestId(`perf-card-${m}`)
+  await perf.getByRole("button", { name: "Route changes" }).click()
+  await expect(page).toHaveURL(/[?&]perf=route/)
+  for (const m of ["route_ready", "inp", "cls"]) await expect(card(m)).toBeVisible()
+  await expect(card("lcp")).toHaveCount(0)
+  await perf.getByRole("button", { name: "Hard loads" }).click()
+  await expect(page).not.toHaveURL(/perf=route/)
+  for (const m of ["lcp", "inp", "cls", "fcp", "app_ready"]) await expect(card(m)).toBeVisible()
+
   // 182 phone: the four limit cards stack in one column with no horizontal overflow.
   await page.setViewportSize({ width: 375, height: 812 })
   // The sidebar slides away on the way to phone width; measure after it has.
