@@ -1,10 +1,10 @@
 package server
 
 import (
-	"io"
+	"mime"
 	"net/http"
 	"os"
-	"strconv"
+	"path/filepath"
 	"strings"
 
 	"github.com/elentok/gx/server/files"
@@ -16,8 +16,7 @@ const (
 )
 
 // raw serves GET /v1/files/<absolute path>. Every failure, whatever the rule,
-// answers the same 404, so the route cannot be used to probe the disk. Range,
-// download and the PDF rules are not here yet.
+// answers the same 404, so the route cannot be used to probe the disk.
 func (h hostedFiles) raw(w http.ResponseWriter, r *http.Request) {
 	rest, ok := strings.CutPrefix(r.URL.EscapedPath(), rawPrefix)
 	if !ok || strings.HasPrefix(rest, tokenPrefix) {
@@ -41,7 +40,25 @@ func (h hostedFiles) raw(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 	w.Header().Set("Content-Type", files.ContentType(hosted.Path))
-	w.Header().Set("Content-Length", strconv.FormatInt(hosted.Size, 10))
-	w.WriteHeader(http.StatusOK)
-	_, _ = io.CopyN(w, f, hosted.Size)
+	if r.URL.Query().Get("download") == "1" {
+		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filepath.Base(hosted.Path)}))
+	}
+	// ServeContent answers Range (206/416) and keeps the Content-Type set above.
+	http.ServeContent(&keepCache{ResponseWriter: w, value: w.Header().Get("Cache-Control")}, r, "", hosted.ModTime, f)
 }
+
+// keepCache restores Cache-Control on the header write: ServeContent drops it
+// from its error replies (416), which must stay no-store like the 200.
+type keepCache struct {
+	http.ResponseWriter
+	value string
+}
+
+func (k *keepCache) WriteHeader(code int) {
+	if k.value != "" {
+		k.Header().Set("Cache-Control", k.value)
+	}
+	k.ResponseWriter.WriteHeader(code)
+}
+
+func (k *keepCache) Unwrap() http.ResponseWriter { return k.ResponseWriter }
