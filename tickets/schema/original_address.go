@@ -17,6 +17,14 @@ type OriginalAddresses []string
 // Has reports whether addr is one of the entries.
 func (o OriginalAddresses) Has(addr string) bool { return slices.Contains(o, addr) }
 
+// First returns the first entry, or "" for an empty list.
+func (o OriginalAddresses) First() string {
+	if len(o) == 0 {
+		return ""
+	}
+	return o[0]
+}
+
 // String joins the entries with ", "; a single entry is returned as is.
 func (o OriginalAddresses) String() string { return strings.Join(o, ", ") }
 

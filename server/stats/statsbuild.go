@@ -84,8 +84,7 @@ func buildStats(in statsInput) wire.Stats {
 	}
 	for _, se := range in.Epics {
 		if project == "" || se.Project == project {
-			b.project = se.Project
-			b.addEpic(se.Epic)
+			b.addEpic(se.Project, se.Epic)
 		}
 	}
 	b.finishPromoted()
@@ -109,11 +108,10 @@ type statsBuilder struct {
 	friction frictionTally
 	launch   launchTally
 
-	project  string                       // the project of the epic being added
 	promoted map[string]*promotedFollowUp // by follow-up address
 }
 
-func (b *statsBuilder) addEpic(e tickets.Epic) {
+func (b *statsBuilder) addEpic(project string, e tickets.Epic) {
 	cost := b.impl
 	if e.IsMap {
 		cost = b.design
@@ -134,7 +132,7 @@ func (b *statsBuilder) addEpic(e tickets.Epic) {
 		}
 	}
 	for _, tk := range e.Tickets {
-		b.addTicket(e, tk, cost)
+		b.addTicket(project, e, tk, cost)
 	}
 }
 
@@ -142,7 +140,7 @@ func (b *statsBuilder) addEpic(e tickets.Epic) {
 // series. Only done tickets are finished items for cost and merged counts;
 // cancelled ones still count for friction and finished follow-ups. Map epics'
 // tickets are design work, not merged tickets.
-func (b *statsBuilder) addTicket(e tickets.Epic, tk tickets.Ticket, cost costSeries) {
+func (b *statsBuilder) addTicket(project string, e tickets.Epic, tk tickets.Ticket, cost costSeries) {
 	if tk.IsDone() {
 		if i := b.win.Bucket(tk.DoneAt); i >= 0 {
 			cost[i].add(tk.TotalTokens, tk.ActualCost)
@@ -154,7 +152,7 @@ func (b *statsBuilder) addTicket(e tickets.Epic, tk tickets.Ticket, cost costSer
 	finished := b.win.Bucket(tk.FinishedAt())
 	b.friction.addTicket(finished, tk)
 	b.launch.addTicket(b.win, tk)
-	if b.addPromoted(tk) {
+	if b.addPromoted(project, tk) {
 		return
 	}
 	if originalEpic(tk, e.Name) == followUpsEpic {
@@ -178,7 +176,7 @@ type promotedFollowUp struct {
 	last    time.Time
 }
 
-func (b *statsBuilder) address(project, raw string) string {
+func address(project, raw string) string {
 	addr, err := tickets.ParseAddress(raw, tickets.AddressContext{Project: project})
 	if err != nil {
 		return ""
@@ -197,8 +195,8 @@ func (b *statsBuilder) collectPromoted(project string, e tickets.Epic) {
 			continue
 		}
 		key := tickets.Address{Project: project, Epic: followUpsEpic, ID: tk.Identifier}.String()
-		if len(tk.OriginalAddress) > 0 {
-			key = b.address(project, tk.OriginalAddress[0])
+		if raw := tk.OriginalAddress.First(); raw != "" {
+			key = address(project, raw)
 		}
 		b.promoted[key] = &promotedFollowUp{}
 		if i := b.win.Bucket(tk.CreatedAt); i >= 0 {
@@ -210,13 +208,13 @@ func (b *statsBuilder) collectPromoted(project string, e tickets.Epic) {
 // addPromoted reports whether tk is a promoted follow-up or a ticket made from
 // one. Neither adds to the follow-up series here: the follow-up was counted as
 // created already and finishes in finishPromoted.
-func (b *statsBuilder) addPromoted(tk tickets.Ticket) bool {
+func (b *statsBuilder) addPromoted(project string, tk tickets.Ticket) bool {
 	if tickets.IsPromoted(tk) && tk.Status == string(schema.StatusCancelled) {
 		return true
 	}
 	found := false
 	for _, raw := range tk.OriginalAddress {
-		p := b.promoted[b.address(b.project, raw)]
+		p := b.promoted[address(project, raw)]
 		if p == nil {
 			continue
 		}
@@ -464,10 +462,7 @@ func WebShare(endings map[string]int) *float64 {
 // originalEpic is the epic a ticket was first created in, wherever it lives
 // now: its original address, else the move's Resolution line, else its epic.
 func originalEpic(tk tickets.Ticket, current string) string {
-	var raw string
-	if len(tk.OriginalAddress) > 0 {
-		raw = tk.OriginalAddress[0] // a list names follow-ups of one epic
-	}
+	raw := tk.OriginalAddress.First() // a list names follow-ups of one epic
 	if raw == "" {
 		for line := range strings.SplitSeq(schema.Section(tk.Body, "Resolution"), "\n") {
 			if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "- original: "); ok {
