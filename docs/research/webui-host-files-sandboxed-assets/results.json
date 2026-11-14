@@ -1,0 +1,1234 @@
+[
+ {
+  "engine": "chromium",
+  "mode": "top",
+  "version": "157.0.8103.15",
+  "cookies": [
+   "__Host-probe_login secure=true httpOnly=true sameSite=Lax"
+  ],
+  "results": {
+   "origin": "https://localhost:60080",
+   "opaque": false,
+   "scriptLoaded": true,
+   "selfOrigin": "null",
+   "isolatedOrigin": "false",
+   "localStorage": "blocked: SecurityError",
+   "docCookie": "blocked: SecurityError",
+   "cssApplied": false,
+   "extScript": false,
+   "fetchRelative": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "fetchApi": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "fetchApiInclude": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "postWrite": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "postWriteInclude": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "imgLoaded": false,
+   "modLoaded": false
+  },
+  "server": [
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/page.html",
+    "cookie": true,
+    "origin": null,
+    "site": "none",
+    "dest": "document",
+    "mode": "navigate",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/style.css",
+    "cookie": false,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "style",
+    "mode": "no-cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/img.png",
+    "cookie": false,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "image",
+    "mode": "no-cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/app.js",
+    "cookie": false,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "no-cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/mod.js",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/data.json",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json?inc",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write?inc",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   }
+  ]
+ },
+ {
+  "engine": "chromium",
+  "mode": "iframe",
+  "version": "157.0.8103.15",
+  "cookies": [
+   "__Host-probe_login secure=true httpOnly=true sameSite=Lax"
+  ],
+  "results": {
+   "origin": "https://localhost:60080",
+   "opaque": false,
+   "scriptLoaded": true,
+   "selfOrigin": "null",
+   "isolatedOrigin": "false",
+   "localStorage": "blocked: SecurityError",
+   "docCookie": "blocked: SecurityError",
+   "cssApplied": false,
+   "extScript": false,
+   "fetchRelative": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "fetchApi": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "fetchApiInclude": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "postWrite": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "postWriteInclude": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "imgLoaded": false,
+   "modLoaded": false
+  },
+  "server": [
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/parent?src=/v1/files/d/page.html",
+    "cookie": true,
+    "origin": null,
+    "site": "none",
+    "dest": "document",
+    "mode": "navigate",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/page.html",
+    "cookie": true,
+    "origin": null,
+    "site": "same-origin",
+    "dest": "iframe",
+    "mode": "navigate",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/style.css",
+    "cookie": false,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "style",
+    "mode": "no-cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/img.png",
+    "cookie": false,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "image",
+    "mode": "no-cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/app.js",
+    "cookie": false,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "no-cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/mod.js",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/data.json",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json?inc",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write?inc",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   }
+  ]
+ },
+ {
+  "engine": "chromium",
+  "mode": "top-token",
+  "version": "157.0.8103.15",
+  "cookies": [
+   "__Host-probe_login secure=true httpOnly=true sameSite=Lax"
+  ],
+  "results": {
+   "origin": "https://localhost:60080",
+   "opaque": false,
+   "scriptLoaded": true,
+   "selfOrigin": "null",
+   "isolatedOrigin": "false",
+   "localStorage": "blocked: SecurityError",
+   "docCookie": "blocked: SecurityError",
+   "cssApplied": true,
+   "extScript": true,
+   "fetchRelative": {
+    "status": 200,
+    "body": "{\"secret\":\"gx-data\"}"
+   },
+   "fetchApi": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "fetchApiInclude": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "postWrite": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "postWriteInclude": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "imgLoaded": true,
+   "modLoaded": true
+  },
+  "server": [
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/page.html",
+    "cookie": true,
+    "origin": null,
+    "site": "none",
+    "dest": "document",
+    "mode": "navigate",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/style.css",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "style",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/img.png",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "image",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/app.js",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/mod.js",
+    "cookie": true,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/data.json",
+    "cookie": true,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json?inc",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write?inc",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   }
+  ]
+ },
+ {
+  "engine": "chromium",
+  "mode": "iframe-token",
+  "version": "157.0.8103.15",
+  "cookies": [
+   "__Host-probe_login secure=true httpOnly=true sameSite=Lax"
+  ],
+  "results": {
+   "origin": "https://localhost:60080",
+   "opaque": false,
+   "scriptLoaded": true,
+   "selfOrigin": "null",
+   "isolatedOrigin": "false",
+   "localStorage": "blocked: SecurityError",
+   "docCookie": "blocked: SecurityError",
+   "cssApplied": true,
+   "extScript": true,
+   "fetchRelative": {
+    "status": 200,
+    "body": "{\"secret\":\"gx-data\"}"
+   },
+   "fetchApi": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "fetchApiInclude": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "postWrite": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "postWriteInclude": {
+    "error": "TypeError: Failed to fetch"
+   },
+   "imgLoaded": true,
+   "modLoaded": true
+  },
+  "server": [
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/parent?src=/t/abc/v1/files/d/page.html",
+    "cookie": true,
+    "origin": null,
+    "site": "none",
+    "dest": "document",
+    "mode": "navigate",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/page.html",
+    "cookie": true,
+    "origin": null,
+    "site": "same-origin",
+    "dest": "iframe",
+    "mode": "navigate",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/style.css",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "style",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/img.png",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "image",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/app.js",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/mod.js",
+    "cookie": true,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/data.json",
+    "cookie": true,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json?inc",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write?inc",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   }
+  ]
+ },
+ {
+  "engine": "webkit",
+  "mode": "top",
+  "version": "27.2",
+  "cookies": [
+   "__Host-probe_login secure=true httpOnly=true sameSite=Lax"
+  ],
+  "results": {
+   "origin": "https://localhost:60080",
+   "opaque": false,
+   "scriptLoaded": true,
+   "selfOrigin": "null",
+   "isolatedOrigin": "false",
+   "localStorage": "blocked: SecurityError",
+   "docCookie": "blocked: SecurityError",
+   "cssApplied": false,
+   "extScript": false,
+   "fetchRelative": {
+    "error": "TypeError: Load failed"
+   },
+   "fetchApi": {
+    "error": "TypeError: Load failed"
+   },
+   "fetchApiInclude": {
+    "error": "TypeError: Load failed"
+   },
+   "postWrite": {
+    "error": "TypeError: Load failed"
+   },
+   "postWriteInclude": {
+    "error": "TypeError: Load failed"
+   },
+   "imgLoaded": false,
+   "modLoaded": false
+  },
+  "server": [
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/page.html",
+    "cookie": true,
+    "origin": null,
+    "site": "none",
+    "dest": "document",
+    "mode": "navigate",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/style.css",
+    "cookie": false,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "style",
+    "mode": "no-cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/img.png",
+    "cookie": false,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "image",
+    "mode": "no-cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/app.js",
+    "cookie": false,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "no-cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/mod.js",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/data.json",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json?inc",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write?inc",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   }
+  ]
+ },
+ {
+  "engine": "webkit",
+  "mode": "iframe",
+  "version": "27.2",
+  "cookies": [
+   "__Host-probe_login secure=true httpOnly=true sameSite=Lax"
+  ],
+  "results": {
+   "origin": "https://localhost:60080",
+   "opaque": false,
+   "scriptLoaded": true,
+   "selfOrigin": "null",
+   "isolatedOrigin": "false",
+   "localStorage": "blocked: SecurityError",
+   "docCookie": "blocked: SecurityError",
+   "fetchRelative": {
+    "error": "TypeError: Load failed"
+   },
+   "cssApplied": true,
+   "extScript": true,
+   "fetchApi": {
+    "error": "TypeError: Load failed"
+   },
+   "fetchApiInclude": {
+    "error": "TypeError: Load failed"
+   },
+   "postWrite": {
+    "error": "TypeError: Load failed"
+   },
+   "postWriteInclude": {
+    "error": "TypeError: Load failed"
+   },
+   "imgLoaded": true,
+   "modLoaded": false
+  },
+  "server": [
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/parent?src=/v1/files/d/page.html",
+    "cookie": true,
+    "origin": null,
+    "site": "none",
+    "dest": "document",
+    "mode": "navigate",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/page.html",
+    "cookie": true,
+    "origin": null,
+    "site": "same-origin",
+    "dest": "iframe",
+    "mode": "navigate",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/style.css",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "style",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/img.png",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "image",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/app.js",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/data.json",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/files/d/mod.js",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json?inc",
+    "cookie": true,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write?inc",
+    "cookie": true,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 403
+   }
+  ]
+ },
+ {
+  "engine": "webkit",
+  "mode": "top-token",
+  "version": "27.2",
+  "cookies": [
+   "__Host-probe_login secure=true httpOnly=true sameSite=Lax"
+  ],
+  "results": {
+   "origin": "https://localhost:60080",
+   "opaque": false,
+   "scriptLoaded": true,
+   "selfOrigin": "null",
+   "isolatedOrigin": "false",
+   "localStorage": "blocked: SecurityError",
+   "docCookie": "blocked: SecurityError",
+   "fetchRelative": {
+    "status": 200,
+    "body": "{\"secret\":\"gx-data\"}"
+   },
+   "cssApplied": true,
+   "extScript": true,
+   "fetchApi": {
+    "error": "TypeError: Load failed"
+   },
+   "fetchApiInclude": {
+    "error": "TypeError: Load failed"
+   },
+   "postWrite": {
+    "error": "TypeError: Load failed"
+   },
+   "postWriteInclude": {
+    "error": "TypeError: Load failed"
+   },
+   "imgLoaded": true,
+   "modLoaded": true
+  },
+  "server": [
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/page.html",
+    "cookie": true,
+    "origin": null,
+    "site": "none",
+    "dest": "document",
+    "mode": "navigate",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/style.css",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "style",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/img.png",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "image",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/app.js",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/data.json",
+    "cookie": true,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/mod.js",
+    "cookie": true,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "cors",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json?inc",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write?inc",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   }
+  ]
+ },
+ {
+  "engine": "webkit",
+  "mode": "iframe-token",
+  "version": "27.2",
+  "cookies": [
+   "__Host-probe_login secure=true httpOnly=true sameSite=Lax"
+  ],
+  "results": {
+   "origin": "https://localhost:60080",
+   "opaque": false,
+   "scriptLoaded": true,
+   "selfOrigin": "null",
+   "isolatedOrigin": "false",
+   "localStorage": "blocked: SecurityError",
+   "docCookie": "blocked: SecurityError",
+   "fetchRelative": {
+    "status": 200,
+    "body": "{\"secret\":\"gx-data\"}"
+   },
+   "cssApplied": true,
+   "extScript": true,
+   "fetchApi": {
+    "error": "TypeError: Load failed"
+   },
+   "fetchApiInclude": {
+    "error": "TypeError: Load failed"
+   },
+   "postWrite": {
+    "error": "TypeError: Load failed"
+   },
+   "postWriteInclude": {
+    "error": "TypeError: Load failed"
+   },
+   "imgLoaded": true,
+   "modLoaded": true
+  },
+  "server": [
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/parent?src=/t/abc/v1/files/d/page.html",
+    "cookie": true,
+    "origin": null,
+    "site": "none",
+    "dest": "document",
+    "mode": "navigate",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/page.html",
+    "cookie": true,
+    "origin": null,
+    "site": "same-origin",
+    "dest": "iframe",
+    "mode": "navigate",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/style.css",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "style",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/img.png",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "image",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/app.js",
+    "cookie": true,
+    "origin": null,
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "no-cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/mod.js",
+    "cookie": true,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "script",
+    "mode": "cors",
+    "status": 200
+   },
+   {
+    "viaToken": true,
+    "method": "GET",
+    "path": "/v1/files/d/data.json",
+    "cookie": true,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "GET",
+    "path": "/v1/api.json?inc",
+    "cookie": true,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 200
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write",
+    "cookie": false,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 401
+   },
+   {
+    "viaToken": false,
+    "method": "POST",
+    "path": "/v1/write?inc",
+    "cookie": true,
+    "origin": "null",
+    "site": "cross-site",
+    "dest": "empty",
+    "mode": "cors",
+    "status": 403
+   }
+  ]
+ }
+]
