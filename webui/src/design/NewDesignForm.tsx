@@ -63,9 +63,9 @@ function startBlocker(draft: Fields, imgs: DraftImagesState): string | undefined
 const field = {
   fontSize: "16px",
   color: "text",
-  bg: "surface",
+  bg: "surface.raised",
   borderWidth: "1px",
-  borderColor: "transparent",
+  borderColor: "hairline",
   borderRadius: "8px",
   _placeholder: { color: "text.dim" },
 } as const
@@ -234,8 +234,6 @@ function DraftForm({
         minH="0"
         display="flex"
         flexDirection="column"
-        bg="surface.raised"
-        borderRadius="lg"
         overflow="hidden"
       >
         <Box display="flex" alignItems="center" gap="2" px="3" pt="3" flexShrink="0">
@@ -262,7 +260,19 @@ function DraftForm({
             borderRadius="8px"
             _hover={{ bg: "surface", color: "text" }}
           >
-            ✎
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M3 13l.6-3 6.9-6.9a1.3 1.3 0 0 1 1.8 0l.6.6a1.3 1.3 0 0 1 0 1.8L6 12.4z" />
+            </svg>
           </chakra.button>
           <Box flex="1" />
           {status !== "none" && (
@@ -282,7 +292,7 @@ function DraftForm({
           gap="2"
           p="3"
           borderBottomWidth="1px"
-          borderColor="border"
+          borderColor="hairline"
           flexShrink="0"
         >
           {projects.length > 1 && (
@@ -420,8 +430,8 @@ function DraftForm({
           gap="2"
           p="3"
           borderTopWidth="1px"
-          borderColor="border"
-          bg="surface"
+          borderColor="hairline"
+          bg="surface.raised"
           flexShrink="0"
         >
           {attachIcon && <AttachButton onClick={() => fileInput.current?.click()} />}

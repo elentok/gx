@@ -108,11 +108,11 @@ export function DraftIcon() {
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeDasharray="3 3"
         aria-label="Design draft"
         role="img"
       >
-        <path d="M7 4.5h7.5L19 9v11.5a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 6 20.5v-14A1.5 1.5 0 0 1 7 4.5z" />
+        <rect x="5.5" y="4.5" width="15" height="17" rx="2.5" strokeDasharray="3 2.4" />
+        <path d="M9 10h8M9 13.5h8M9 17h4" />
       </svg>
     </Box>
   )

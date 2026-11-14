@@ -178,8 +178,8 @@ func sessionWorking(ctx context.Context, cl *apiclient.Client, id string) (bool,
 // seedLateDrafts creates the AfterStart drafts through the real create route.
 // Scenario order matters: creating a draft sweeps older unleased empty drafts,
 // so list the empty one last.
-func (f *fixture) seedLateDrafts(ctx context.Context, list []spec.Draft) error {
-	cl := apiclient.New(server.SocketPath(f.stateD))
+func seedLateDrafts(ctx context.Context, stateD string, list []spec.Draft) error {
+	cl := apiclient.New(server.SocketPath(stateD))
 	for _, d := range list {
 		if !d.AfterStart {
 			continue
@@ -274,7 +274,7 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 	if err := runSteps(f, sc.Steps); err != nil {
 		return s, err
 	}
-	if err := f.seedLateDrafts(ctx, sc.Drafts); err != nil {
+	if err := seedLateDrafts(ctx, f.stateD, sc.Drafts); err != nil {
 		return s, err
 	}
 	if err := f.startFixAgents(ctx, sc); err != nil {
