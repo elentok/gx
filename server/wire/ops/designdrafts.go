@@ -56,14 +56,15 @@ type DesignDraftSaveRequest struct {
 	Workspace string `json:"workspace,omitempty"`
 }
 
-// DesignDraftTargetRequest sets a draft's slug and project. It is revision-free
-// and never bumps Revision. An empty Slug clears it. KeepEditedAt writes
-// without moving the edited-at time, as on the text save.
+// DesignDraftTargetRequest sets a draft's slug and/or project. It is
+// revision-free and never bumps Revision. Only a present field is written; a
+// present empty Slug clears it, a present blank Project is refused.
+// KeepEditedAt writes without moving the edited-at time, as on the text save.
 type DesignDraftTargetRequest struct {
-	ID           string `json:"id"`
-	Project      string `json:"project"`
-	Slug         string `json:"slug"`
-	KeepEditedAt bool   `json:"keep_edited_at,omitempty"`
+	ID           string  `json:"id"`
+	Project      *string `json:"project,omitempty"`
+	Slug         *string `json:"slug,omitempty"`
+	KeepEditedAt bool    `json:"keep_edited_at,omitempty"`
 }
 
 // DesignLastProject is the project the New design and New chat forms last

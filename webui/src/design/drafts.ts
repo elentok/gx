@@ -102,7 +102,7 @@ export const readDraft: ReadDraft = async (id) =>
 export const saveDraft: SaveDraft = async (body) =>
   toResult(await json<DesignDraftSaveResult>(`${BASE}/save`, body))
 
-/** The revision-free write of the slug and project. */
+/** The revision-free write of the slug and/or project; only a present field is written. */
 export const saveDraftFields: SaveDraftFields = async (body) =>
   toResult(await json<DesignDraftSaveResult>(`${BASE}/target`, body))
 
@@ -116,7 +116,11 @@ export const createDraft: CreateDraft = async ({ workspace, project, slug, idea 
   if (res.kind !== "ok") throw new WriteError("The draft was not created")
   const id = res.draft.id
   if (project || slug) {
-    await saveDraftFields({ id, project: project ?? "", slug: slug ?? "" }).catch(() => {})
+    await saveDraftFields({
+      id,
+      ...(project && { project }),
+      ...(slug && { slug }),
+    }).catch(() => {})
   }
   return id
 }

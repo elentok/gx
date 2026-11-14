@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -57,7 +58,7 @@ func TestSave_KeepEditedAtLeavesTimeAndBumpsRevision(t *testing.T) {
 func TestSetTarget_KeepsRevisionMovesEditedAt(t *testing.T) {
 	s := newStore(t)
 	d := mustCreate(t, s, "a")
-	res, err := s.SetTarget(d.ID, "other", "a-slug", false)
+	res, err := s.SetTarget(d.ID, new("other"), new("a-slug"), false)
 	if err != nil || res.Refused || res.Draft == nil {
 		t.Fatalf("set target: %+v %v", res, err)
 	}
@@ -65,16 +66,57 @@ func TestSetTarget_KeepsRevisionMovesEditedAt(t *testing.T) {
 	if got.Revision != d.Revision || !got.EditedAt.After(d.EditedAt) || got.Slug != "a-slug" || got.Project != "other" || got.Label != "a-slug" {
 		t.Fatalf("draft = %+v", got)
 	}
-	res, _ = s.SetTarget(d.ID, "other", "", true)
-	if res.Draft.Slug != "" || !res.Draft.EditedAt.Equal(got.EditedAt) {
+	res, _ = s.SetTarget(d.ID, nil, new(""), true)
+	if res.Draft.Slug != "" || res.Draft.Project != "other" || !res.Draft.EditedAt.Equal(got.EditedAt) {
 		t.Fatalf("empty slug / keepEditedAt: %+v", res.Draft)
+	}
+}
+
+func TestSetTarget_OnlyPresentFieldsAreWritten(t *testing.T) {
+	s := newStore(t)
+	d := mustCreate(t, s, "a")
+	if _, err := s.SetTarget(d.ID, new("proj"), new("keep-me"), false); err != nil {
+		t.Fatal(err)
+	}
+	res, _ := s.SetTarget(d.ID, nil, new("next"), false)
+	if res.Draft.Slug != "next" || res.Draft.Project != "proj" {
+		t.Errorf("slug only: %+v, want project kept", res.Draft)
+	}
+	res, _ = s.SetTarget(d.ID, new("other"), nil, false)
+	if res.Draft.Slug != "next" || res.Draft.Project != "other" {
+		t.Errorf("project only: %+v, want slug kept", res.Draft)
+	}
+}
+
+func TestSetTarget_RefusesBadSlugAndBlankProjectWritingNothing(t *testing.T) {
+	s := newStore(t)
+	d := mustCreate(t, s, "a")
+	if _, err := s.SetTarget(d.ID, new("proj"), new("good"), false); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := s.Get(d.ID)
+	cases := map[string]struct{ project, slug *string }{
+		"bad slug":      {nil, new("Bad Slug")},
+		"bad with good": {new("other"), new("a/b")},
+		"blank project": {new("  "), new("fine")},
+		"empty project": {new(""), nil},
+	}
+	for name, tc := range cases {
+		res, err := s.SetTarget(d.ID, tc.project, tc.slug, false)
+		if err != nil || !res.Refused || res.Reason == "" || res.Reason == ops.ReasonDraftGone {
+			t.Errorf("%s: %+v %v, want refused", name, res, err)
+		}
+		after, _ := s.Get(d.ID)
+		if !reflect.DeepEqual(after, before) {
+			t.Errorf("%s: wrote %+v over %+v", name, after, before)
+		}
 	}
 }
 
 func TestSetTarget_MissingDraftIsGone(t *testing.T) {
 	s := newStore(t)
 	for _, id := range []string{"0123456789abcdef", "../x"} {
-		res, err := s.SetTarget(id, "p", "s", false)
+		res, err := s.SetTarget(id, new("p"), new("s"), false)
 		if err != nil || !res.Refused || res.Reason != ops.ReasonDraftGone {
 			t.Errorf("%s: %+v %v, want draft-gone", id, res, err)
 		}
@@ -84,7 +126,7 @@ func TestSetTarget_MissingDraftIsGone(t *testing.T) {
 func TestSave_AfterTargetKeepsSlugAndProject(t *testing.T) {
 	s := newStore(t)
 	d := mustCreate(t, s, "a")
-	if _, err := s.SetTarget(d.ID, "other", "new-slug", false); err != nil {
+	if _, err := s.SetTarget(d.ID, new("other"), new("new-slug"), false); err != nil {
 		t.Fatal(err)
 	}
 	res, err := s.Save(d.ID, ops.DesignDraftSaveRequest{Idea: "b", Revision: d.Revision})
@@ -374,7 +416,7 @@ func TestDeleteIfEmpty(t *testing.T) {
 		}
 	}
 
-	if _, err := s.SetTarget(withSlug.ID, "proj", "", false); err != nil {
+	if _, err := s.SetTarget(withSlug.ID, nil, new(""), false); err != nil {
 		t.Fatal(err)
 	}
 	if res := mustDeleteIfEmpty(t, s, withSlug.ID); !res.Deleted {

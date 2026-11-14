@@ -419,8 +419,7 @@ func runDraftsSet(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOu
 }
 
 // newDraftsSetCmd is `gx designs drafts set`: the revision-free write of a
-// draft's project and slug. Both flags are written as given, so an omitted
-// --slug clears the slug; an omitted --project keeps the draft's own.
+// draft's project and slug. Only the flags given are sent; --slug "" clears it.
 func newDraftsSetCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	var project, slug string
@@ -433,19 +432,14 @@ func newDraftsSetCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !c.Flags().Changed("project") || !c.Flags().Changed("slug") {
-				cur, err := cl.Sessions.DesignDraft(c.Context(), args[0])
-				if err != nil || cur.Draft == nil {
-					return printDraftResult(c.OutOrStdout(), jsonOut, cur, err, func(ops.DesignDraftSaveResult) error { return nil })
-				}
-				if !c.Flags().Changed("project") {
-					project = cur.Draft.Project
-				}
-				if !c.Flags().Changed("slug") {
-					slug = cur.Draft.Slug
-				}
+			req := ops.DesignDraftTargetRequest{ID: args[0]}
+			if c.Flags().Changed("project") {
+				req.Project = &project
 			}
-			return runDraftsSet(c.Context(), cl, c.OutOrStdout(), jsonOut, ops.DesignDraftTargetRequest{ID: args[0], Project: project, Slug: slug})
+			if c.Flags().Changed("slug") {
+				req.Slug = &slug
+			}
+			return runDraftsSet(c.Context(), cl, c.OutOrStdout(), jsonOut, req)
 		},
 	}
 	cmd.Flags().StringVar(&project, "project", "", "project")

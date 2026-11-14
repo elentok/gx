@@ -253,13 +253,17 @@ func TestDesignsDrafts_SetWritesSlugAndProjectWithoutBumpingRevision(t *testing.
 		t.Fatal(d, err)
 	}
 	var out bytes.Buffer
-	req := ops.DesignDraftTargetRequest{ID: d.ID, Project: "other", Slug: "new-slug"}
+	req := ops.DesignDraftTargetRequest{ID: d.ID, Project: new("other"), Slug: new("new-slug")}
 	if err := runDraftsSet(context.Background(), h.Client, &out, false, req); err != nil || !strings.Contains(out.String(), "new-slug") {
 		t.Fatalf("set = %q, %v", out.String(), err)
 	}
 	got, err := drafts.New(h.StateDir).Get(d.ID)
 	if err != nil || got.Slug != "new-slug" || got.Project != "other" || got.Revision != d.Revision {
 		t.Fatalf("draft = %+v, %v", got, err)
+	}
+	badReq := ops.DesignDraftTargetRequest{ID: d.ID, Slug: new("Bad Slug")}
+	if err := runDraftsSet(context.Background(), h.Client, &out, false, badReq); err == nil || !strings.Contains(err.Error(), "is not a slug") {
+		t.Errorf("bad slug: err = %v, want the slug refusal", err)
 	}
 	req.ID = "0123456789abcdef"
 	if err := runDraftsSet(context.Background(), h.Client, &out, false, req); err == nil || !strings.Contains(err.Error(), ops.ReasonDraftGone) {

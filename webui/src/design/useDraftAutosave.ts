@@ -156,11 +156,13 @@ export function useDraftAutosave({
     const key = targetKey(fields)
     if (key === s.target || slugProblem(fields.slug)) return true
     let res
+    // Only the field the person changed, so an outside change to the other one is never written back.
+    const had: { slug: string; project: string } = JSON.parse(s.target)
     try {
       res = await drafts.saveFields({
         id: s.id,
-        project: fields.project,
-        slug: fields.slug,
+        ...(fields.project !== had.project && { project: fields.project }),
+        ...(fields.slug !== had.slug && { slug: fields.slug }),
         ...(key === unedited.current && { keep_edited_at: true }),
       })
     } catch {

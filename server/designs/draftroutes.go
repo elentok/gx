@@ -110,8 +110,8 @@ func (s *Designs) draftTarget(w http.ResponseWriter, r *http.Request) {
 	}
 	before, getErr := s.drafts.Get(req.ID)
 	res, err := s.drafts.SetTarget(req.ID, req.Project, req.Slug, req.KeepEditedAt)
-	if err == nil && res.Draft != nil && req.Project != "" && (getErr != nil || before.Project != req.Project) {
-		err = s.drafts.SetLastProject(req.Project)
+	if err == nil && res.Draft != nil && req.Project != nil && (getErr != nil || before.Project != *req.Project) {
+		err = s.drafts.SetLastProject(*req.Project)
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

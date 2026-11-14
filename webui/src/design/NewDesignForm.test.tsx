@@ -39,8 +39,9 @@ function fakeDrafts(over: Partial<DesignDraft> = {}) {
     return { kind: "ok", draft: { ...stored } }
   })
   const saveFields = vi.fn(
-    async (body: { slug: string; project: string }): Promise<DraftResult> => {
-      Object.assign(stored, body, { label: body.slug || "Untitled design" })
+    async (body: { slug?: string; project?: string }): Promise<DraftResult> => {
+      Object.assign(stored, body)
+      stored.label = stored.slug || "Untitled design"
       return { kind: "ok", draft: { ...stored } }
     },
   )
@@ -215,18 +216,31 @@ test("a slug or project goes through saveFields, never the text save, and moves 
   await mount(fake)
   type("Epic slug", "my-epic")
   await wait(800)
-  expect(fake.saveFields).toHaveBeenCalledWith({ id: "d1", project: "gx", slug: "my-epic" })
+  expect(fake.saveFields).toHaveBeenCalledWith({ id: "d1", slug: "my-epic" })
   expect(fake.save).not.toHaveBeenCalled()
   expect(document.title).toBe("my-epic · Design draft · gx")
 
   type("Project", "blog")
   await wait(800)
-  expect(fake.saveFields).toHaveBeenLastCalledWith({ id: "d1", project: "blog", slug: "my-epic" })
+  expect(fake.saveFields).toHaveBeenLastCalledWith({ id: "d1", project: "blog" })
 
   // A text save after that does not carry the slug.
   type("Prompt", "more")
   await wait(800)
   expect(fake.save).toHaveBeenCalledWith({ id: "d1", idea: "more", revision: 3 })
+})
+
+test("a slug edit after an outside project change never writes the old project back", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts({ idea: "text" })
+  await mount(fake)
+  type("Epic slug", "first")
+  await wait(800)
+  fake.stored.project = "elsewhere"
+  type("Epic slug", "second")
+  await wait(800)
+  expect(fake.saveFields).toHaveBeenLastCalledWith({ id: "d1", slug: "second" })
+  expect(fake.stored.project).toBe("elsewhere")
 })
 
 test("an invalid slug shows its problem and writes nothing; an empty one is written", async () => {
@@ -239,7 +253,7 @@ test("an invalid slug shows its problem and writes nothing; an empty one is writ
   expect(fake.saveFields).not.toHaveBeenCalled()
   type("Epic slug", "")
   await wait(800)
-  expect(fake.saveFields).toHaveBeenCalledWith({ id: "d1", project: "gx", slug: "" })
+  expect(fake.saveFields).toHaveBeenCalledWith({ id: "d1", slug: "" })
 })
 
 test("a page opened by New design takes back focus that a closing menu returns to its trigger", async () => {

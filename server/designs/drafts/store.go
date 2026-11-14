@@ -203,11 +203,18 @@ func (s *Store) Save(id string, req ops.DesignDraftSaveRequest) (ops.DesignDraft
 	return ops.DesignDraftSaveResult{Draft: d}, nil
 }
 
-// SetTarget writes the slug and the project under the draft's lock. It never
-// changes Revision, so a text save in flight does not conflict with it, and it
-// moves EditedAt unless keepEditedAt. An empty slug clears it. A missing draft
-// is a refused result.
-func (s *Store) SetTarget(id, project, slug string, keepEditedAt bool) (ops.DesignDraftSaveResult, error) {
+// SetTarget writes the slug and/or the project under the draft's lock; a nil
+// field is left alone. It never changes Revision, so a text save in flight
+// does not conflict with it, and it moves EditedAt unless keepEditedAt. An
+// empty slug clears it. A non-empty slug failing SlugRe and a blank project
+// are refused and nothing is written. A missing draft is a refused result.
+func (s *Store) SetTarget(id string, project, slug *string, keepEditedAt bool) (ops.DesignDraftSaveResult, error) {
+	if slug != nil && *slug != "" && !SlugRe.MatchString(*slug) {
+		return ops.DesignDraftSaveResult{Refused: true, Reason: fmt.Sprintf("%q is not a slug (want lowercase words joined by -)", *slug)}, nil
+	}
+	if project != nil && strings.TrimSpace(*project) == "" {
+		return ops.DesignDraftSaveResult{Refused: true, Reason: "project must not be blank"}, nil
+	}
 	if !idPattern.MatchString(id) {
 		return ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftGone}, nil
 	}
@@ -220,7 +227,12 @@ func (s *Store) SetTarget(id, project, slug string, keepEditedAt bool) (ops.Desi
 	if err != nil {
 		return ops.DesignDraftSaveResult{}, err
 	}
-	d.Project, d.Slug = project, slug
+	if project != nil {
+		d.Project = *project
+	}
+	if slug != nil {
+		d.Slug = *slug
+	}
 	if !keepEditedAt {
 		d.EditedAt = s.now().UTC()
 	}

@@ -154,14 +154,14 @@ func TestWebDesignDrafts_Event(t *testing.T) {
 	})
 	target := func(project, slug string) func() {
 		return func() {
-			if _, err := f.h.Client.Sessions.SetDesignDraftTarget(ctx, ops.DesignDraftTargetRequest{ID: created.ID, Project: project, Slug: slug}); err != nil {
+			if _, err := f.h.Client.Sessions.SetDesignDraftTarget(ctx, ops.DesignDraftTargetRequest{ID: created.ID, Project: &project, Slug: &slug}); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
-	f.wantDraftEvents(t, "slug change", 1, target("", "a-slug"))
-	f.wantDraftEvents(t, "project change", 1, target("proj", "a-slug"))
-	f.wantDraftEvents(t, "no-op target", 0, target("proj", "a-slug"))
+	f.wantDraftEvents(t, "slug change", 1, target("proj", "a-slug"))
+	f.wantDraftEvents(t, "project change", 1, target("other", "a-slug"))
+	f.wantDraftEvents(t, "no-op target", 0, target("other", "a-slug"))
 
 	other := f.seedDraft(t, "proj", "gone", "text")
 	f.wantDraftEvents(t, "remove", 1, func() {
@@ -392,6 +392,28 @@ func TestWebDesignDrafts_TargetWriteIsRevisionFree(t *testing.T) {
 	}
 	if res := f.webTarget(t, "0123456789abcdef", "p", "s"); !res.Refused || res.Reason != ops.ReasonDraftGone {
 		t.Errorf("target of a missing draft = %+v, want draft-gone", res)
+	}
+}
+
+func TestWebDesignDrafts_TargetRefusesBadSlugAndWritesOnlyPresentFields(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	d := f.seedDraft(t, "proj", "old", "idea")
+	post := func(body string) ops.DesignDraftSaveResult {
+		t.Helper()
+		code, out := servertest.WebPostJSON(t, f.base+"/v1/designs/drafts/target", body, f.ck, "", servertest.JSONPost(f.base))
+		var res ops.DesignDraftSaveResult
+		if code != http.StatusOK || json.Unmarshal([]byte(out), &res) != nil {
+			t.Fatalf("target = %d %s", code, out)
+		}
+		return res
+	}
+	bad := post(fmt.Sprintf(`{"id":%q,"slug":"Bad Slug"}`, d.ID))
+	if !bad.Refused || !strings.Contains(bad.Reason, "is not a slug") {
+		t.Errorf("bad slug = %+v, want the slug refusal", bad)
+	}
+	if res := post(fmt.Sprintf(`{"id":%q,"project":"other"}`, d.ID)); res.Draft == nil || res.Draft.Project != "other" || res.Draft.Slug != "old" {
+		t.Errorf("project only = %+v, want slug kept", res)
 	}
 }
 

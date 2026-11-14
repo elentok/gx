@@ -100,12 +100,12 @@ describe("a draft request", () => {
     expect(screen.queryByText(/Automatic name/)).toBeNull()
   })
 
-  test("a valid slug is written once with the draft id and project, then closes", async () => {
+  test("a valid slug is written once with the draft id and no project, then closes", async () => {
     const save = openDraft()
     fireEvent.change(slug(), { target: { value: "new-slug" } })
     submit()
     await waitFor(() => expect(screen.queryByRole("textbox", { name: "Slug" })).toBeNull())
-    expect(save).toHaveBeenCalledExactlyOnceWith({ id: "d1", project: "p", slug: "new-slug" })
+    expect(save).toHaveBeenCalledExactlyOnceWith({ id: "d1", slug: "new-slug" })
   })
 
   test("an empty submit is enabled and clears the slug", async () => {
@@ -115,9 +115,7 @@ describe("a draft request", () => {
       false,
     )
     submit()
-    await waitFor(() =>
-      expect(save).toHaveBeenCalledExactlyOnceWith({ id: "d1", project: "p", slug: "" }),
-    )
+    await waitFor(() => expect(save).toHaveBeenCalledExactlyOnceWith({ id: "d1", slug: "" }))
   })
 
   test("an invalid slug shows the page field's message, writes nothing and stays open", () => {

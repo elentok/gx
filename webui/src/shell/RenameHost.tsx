@@ -134,7 +134,7 @@ function DraftRenameForm({
     // The slug write, never the text save, so the revision does not move.
     void run(
       async () => {
-        const res = await saveFields({ id: draft.id, project: draft.project, slug: text })
+        const res = await saveFields({ id: draft.id, slug: text })
         if (res.kind === "gone") return { refused: true, message: "This draft no longer exists." }
         if (res.kind === "conflict")
           return { refused: true, message: "The draft changed. Try again." }
