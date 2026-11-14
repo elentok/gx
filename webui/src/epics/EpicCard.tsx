@@ -58,6 +58,7 @@ import {
   isCreatingTickets,
   isLive,
   isReadyForReview,
+  followUpsTone,
   needsYouTone,
   ringProgress,
   ringTone,
@@ -258,8 +259,8 @@ export function EpicCard({
         (isReadyForReview(row) ? READY_FOR_REVIEW_REASON : undefined))
   const hasButtons = footerActions(row).length > 0
   const tone = needsYou ? needsYouTone(row) : undefined
-  const pillTone =
-    tone ?? (row.card_kind === CardKindFollowUps && row.state_pill ? needsYouTone(row) : undefined)
+  const followUps = row.card_kind === CardKindFollowUps
+  const pillTone = followUps && row.state_pill ? followUpsTone(row) : tone
   const held = row.section === SectionOnHold
   const { run } = useWrite()
   const [confirmMerged, setConfirmMerged] = useState(false)
@@ -408,7 +409,13 @@ export function EpicCard({
       </Box>
       <PrLine row={row} />
       {(needsYou || pillTone || reason) && (
-        <Box display="flex" flexDirection="column" alignItems="flex-start" gap="2">
+        <Box
+          display="flex"
+          flexDirection={followUps ? "row" : "column"}
+          flexWrap={followUps ? "wrap" : undefined}
+          alignItems={followUps ? "center" : "flex-start"}
+          gap="2"
+        >
           {pillTone && (
             <Box
               data-testid="pill"
@@ -427,7 +434,12 @@ export function EpicCard({
             </Box>
           )}
           {reason && (
-            <Text data-testid="reason" fontSize="14px" color="text.dim" lineClamp="2">
+            <Text
+              data-testid="reason"
+              fontSize="14px"
+              color="text.dim"
+              lineClamp={followUps ? undefined : "2"}
+            >
               {reason}
             </Text>
           )}

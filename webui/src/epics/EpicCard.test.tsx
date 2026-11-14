@@ -4,6 +4,7 @@ import { VerdictConcurrencyCap, type EpicListRow } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { toaster } from "../ui/toaster"
 import { EpicCard } from "./EpicCard"
+import { followUpsTone, ringTone } from "./ring"
 
 afterEach(() => {
   cleanup()
@@ -483,6 +484,39 @@ test.each([
 ])("a Follow-ups card shows the %s pill", (pill, section) => {
   renderThemed(<EpicCard row={followUps({ section, state_pill: pill })} />)
   expect(text(screen.getByTestId("pill"))).toBe(pill)
+})
+
+test.each(["Verify", "Route"])(
+  "a Follow-ups %s pill is running, with its reason on one row",
+  (pill) => {
+    renderThemed(
+      <EpicCard
+        row={followUps({
+          section: "designing",
+          state_pill: pill,
+          reason: "Verifying 51 of 84",
+          ring_progress: 20,
+        })}
+      />,
+    )
+    const pillEl = screen.getByTestId("pill")
+    expect(text(pillEl)).toBe(pill)
+    const reason = screen.getByTestId("reason")
+    expect(reason.parentElement).toBe(pillEl.parentElement)
+    expect(getComputedStyle(pillEl.parentElement as HTMLElement).flexDirection).toBe("row")
+    expect(screen.getByText("20%")).toBeTruthy()
+  },
+)
+
+test("a Follow-ups Needs you pill stays amber but a step pill does not", () => {
+  expect(followUpsTone(followUps({ state_pill: "Needs you" }))).toBe("waiting")
+  expect(followUpsTone(followUps({ state_pill: "Verify" }))).toBe("running")
+  expect(followUpsTone(followUps({ state_pill: "Stopped" }))).toBe("paused")
+})
+
+test("the ring of a Follow-ups card is running with a pill and muted without", () => {
+  expect(ringTone(followUps({ state_pill: "Route" }))).toBe("running")
+  expect(ringTone(followUps({ state: "idle", state_pill: undefined }))).toBe("muted")
 })
 
 test("the Follow-ups title links to the Triage page and the ring shows the percent", () => {
