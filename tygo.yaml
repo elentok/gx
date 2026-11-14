@@ -5,6 +5,7 @@ packages:
     frontmatter: "export * from './ops';"
     include_files:
       - archivedlist.go
+      - backlog.go
       - checkstatus.go
       - designs.go
       - detail.go

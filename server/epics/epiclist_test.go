@@ -1,7 +1,9 @@
 package epics_test
 
 import (
+	"encoding/json"
 	"github.com/elentok/gx/server/servertest/rigs"
+	"github.com/elentok/gx/tickets/ticketmove"
 	"maps"
 	"net/http"
 	"slices"
@@ -303,6 +305,75 @@ func TestEpicList_OneOffCardsAndTheFinishedCap(t *testing.T) {
 	want := []string{"proj:one-offs-archived/03", "proj:one-offs-archived/02", "proj:newer-epic", "proj:older-epic"}
 	if !slices.Equal(got, want) {
 		t.Errorf("Finished = %v, want %v (all cards: %v)", got, want, addrs)
+	}
+}
+
+func TestBacklog_AreasCountsAndUnfinishedMoves(t *testing.T) {
+	t.Parallel()
+	loop := "---\nstatus: open\n---\n"
+	area := "---\nstatus: open\nkind: area\n---\n"
+	moveMap := func(extra, areaName string, ids ...string) string {
+		return "---\nstatus: open\nkind: map\n" + extra + "---\n\n## Notes\n\n" + ticketmove.StartDesignNotes("proj", areaName, ids)
+	}
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "ideas", area, map[string]string{
+			"01-a.md": rigs.IssueMD("01", "draft", "", "A"),
+			"02-b.md": rigs.IssueMD("02", "open", "", "B"),
+			"03-c.md": rigs.IssueMD("03", "claimed", "", "C"),
+			"04-d.md": rigs.IssueMD("04", "done", "", "D"),
+			"05-e.md": rigs.IssueMD("05", "cancelled", "", "E"),
+		})
+		rigs.WriteEpicFiles(t, store, "bugs", area, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+		rigs.WriteEpicFiles(t, store, "partial", moveMap("", "ideas", "01", "02", "09"), map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+		rigs.WriteEpicFiles(t, store, "work", loop, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+		rigs.WriteProjectEpic(t, store, "noarea", "work", loop, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+		rigs.WriteProjectEpic(t, store, "stale", "ideas", area, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+		rigs.WriteProjectEpic(t, store, "stale", "completed", moveMap("completed_at: 2026-01-03T11:00:00Z\n", "ideas", "01"), map[string]string{"01-a.md": rigs.IssueMD("01", "done", "", "A")})
+		rigs.WriteProjectEpic(t, store, "stale", "later", moveMap("design_step: spec\n", "ideas", "01"), map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+	})
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/backlog")
+	if code != http.StatusOK {
+		t.Fatalf("status %d: %s", code, body)
+	}
+	var got wire.BacklogList
+	if err := json.Unmarshal([]byte(body), &got); err != nil {
+		t.Fatal(err)
+	}
+	byProject := map[string]wire.BacklogProject{}
+	for _, p := range got.Projects {
+		byProject[p.Project] = p
+	}
+	if _, ok := byProject["noarea"]; ok || len(byProject) != 2 {
+		t.Errorf("projects = %v, want proj and stale only: %s", slices.Collect(maps.Keys(byProject)), body)
+	}
+	areas := map[string]wire.BacklogArea{}
+	for _, a := range byProject["proj"].Areas {
+		areas[a.Address] = a
+	}
+	if a := areas["proj:ideas"]; a.Open != 2 || a.Unfinished == nil || *a.Unfinished != (wire.BacklogUnfinishedMove{Map: "proj:partial", ToMove: 2}) {
+		t.Errorf("proj:ideas = %+v, want open 2 and unfinished proj:partial with 2 to move", a)
+	}
+	if a := areas["proj:bugs"]; a.Open != 1 || a.Unfinished != nil {
+		t.Errorf("proj:bugs = %+v, want open 1 and no unfinished move", a)
+	}
+	if len(byProject["proj"].Workspaces) == 0 {
+		t.Errorf("proj has no workspaces: %s", body)
+	}
+	if a := byProject["stale"].Areas[0]; a.Unfinished != nil {
+		t.Errorf("stale:ideas = %+v, a completed or past-charting map must not count", a)
+	}
+}
+
+func TestBacklog_LeavesTheEpicsListWithoutAreas(t *testing.T) {
+	t.Parallel()
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "ideas", "---\nstatus: open\nkind: area\n---\n", map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+	})
+	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
+	for _, r := range rigs.GetEpicList(t, code, body).Epics {
+		if strings.Contains(r.Address, "ideas") {
+			t.Errorf("Epics page lists the area: %+v", r)
+		}
 	}
 }
 

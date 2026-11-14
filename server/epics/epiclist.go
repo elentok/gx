@@ -221,19 +221,7 @@ func (s *Epics) applyFollowUpWorkspaces(rows []wire.EpicListRow, counts []wire.F
 	if s.Workspaces == nil {
 		return
 	}
-	byProject := map[string][]string{}
-	for _, r := range rows {
-		if r.Workspace != "" && !slices.Contains(byProject[r.Project], r.Workspace) {
-			byProject[r.Project] = append(byProject[r.Project], r.Workspace)
-		}
-	}
-	of := func(project string) []string {
-		if ws := byProject[project]; len(ws) > 0 {
-			return ws
-		}
-		// A project name is never a member key, so this is the Default workspace.
-		return []string{s.Workspaces.Workspace(project)}
-	}
+	of := s.projectWorkspaces(rows)
 	for i := range rows {
 		if rows[i].CardKind == wire.CardKindFollowUps {
 			rows[i].Workspaces = of(rows[i].Project)

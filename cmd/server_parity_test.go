@@ -181,6 +181,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/backlog/start-design":             "agents start-design",
 	"POST /v1/backlog/finish-move":              "agents finish-move",
 	"POST /v1/projects/retry-migration":         "project retry-migration",
+	"GET /v1/backlog":                           "server backlog",
 	"GET /v1/epics":                             "server epics",
 	"GET /v1/epics/detail":                      "server epics detail",
 	"GET /v1/epics/archived":                    "server epics archived",

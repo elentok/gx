@@ -41,6 +41,47 @@ export interface ArchivedEpicList {
 }
 
 //////////
+// source: backlog.go
+
+/**
+ * BacklogList is the Backlog page's read model: each project with at least one
+ * area, with the areas' open ticket counts. GET /v1/backlog.
+ */
+export interface BacklogList {
+  projects: BacklogProject[];
+}
+/**
+ * BacklogProject is one project's areas. Workspaces are those a Follow-ups card
+ * gets; the page filters by the active workspace.
+ */
+export interface BacklogProject {
+  project: string;
+  workspaces: string[];
+  areas: BacklogArea[];
+}
+/**
+ * BacklogArea is one area. Open counts its draft and open tickets, the ones a
+ * Start Design move can take.
+ */
+export interface BacklogArea {
+  address: string;
+  name: string;
+  open: number /* int */;
+  /**
+   * Unfinished is the area's unfinished Start Design move, when it has one.
+   */
+  unfinished?: BacklogUnfinishedMove;
+}
+/**
+ * BacklogUnfinishedMove is a charting map from a partial Start Design run. Map
+ * is its address; ToMove counts its listed tickets still in the area.
+ */
+export interface BacklogUnfinishedMove {
+  map: string;
+  to_move: number /* int */;
+}
+
+//////////
 // source: checkstatus.go
 
 /**
