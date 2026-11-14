@@ -122,6 +122,20 @@ test.each([
   await waitFor(() => expect(title()).toBe(expected))
 })
 
+test("/diff renders the Diff page through the lazy chunk and asks for the file list", async () => {
+  const diffFiles = vi.fn(async () => ({
+    kind: "files" as const,
+    files: {
+      DiffRange: { first_sha: "a", second_sha: "b", merge_base: "a" },
+      files: [],
+    },
+  }))
+  renderAt("/diff?project=gx&base=main&tip=dev", okFor, undefined, undefined, { diffFiles })
+  expect(await screen.findByTestId("ref-bar")).toBeTruthy()
+  await waitFor(() => expect(title()).toBe("Diff · gx"))
+  expect(diffFiles).toHaveBeenCalledWith("gx", "main", "dev")
+})
+
 test("/settings/agents redirects to the Agents section", async () => {
   const { router } = renderAt("/settings/agents", okFor, undefined, undefined, {
     settings: async () => ({ entries: [] }),
@@ -1293,6 +1307,7 @@ test("every page route pattern has one of the 14 route names", () => {
       "archive-epic",
       "cleanup",
       "design",
+      "diff",
       "epic",
       "epics",
       "schedule",

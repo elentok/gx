@@ -115,6 +115,7 @@ const READY_WIRING: Record<
   "/triage/*": "useDetailReady",
   "/t/*": "useDetailReady",
   "/e/*": "useDetailReady",
+  "/diff": "useReadyWhen",
 }
 
 test("a detail ends the span once: cache first, then the network answer adds nothing", () => {

@@ -1,4 +1,9 @@
+import { type DiffUrl, diffQuery } from "./diff/diffUrl"
+
 export const epicHref = (address: string) => `#/e/${address}`
+
+/** The Diff page; the query holds the project, refs, epic, narrowing and file. */
+export const diffHref = (url: DiffUrl) => `#/diff?${diffQuery(url)}`
 
 export const ticketPath = (address: string) => `/t/${address}`
 

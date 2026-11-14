@@ -8,6 +8,8 @@ test.each<[PageTitle, string]>([
   [{ kind: "Agents" }, "Agents · gx"],
   [{ kind: "Epic", name: "my-epic" }, "my-epic · Epic · gx"],
   [{ kind: "Design", name: "my-epic" }, "my-epic · Design · gx"],
+  [{ kind: "Diff", name: "gx:my-epic" }, "gx:my-epic · Diff · gx"],
+  [{ kind: "Diff" }, "Diff · gx"],
   [{ kind: "Triage", name: "gx" }, "gx · Triage · gx"],
   [{ kind: "Ticket", name: "demo:mixed-epic/02" }, "demo:mixed-epic/02 · Ticket · gx"],
   [{ kind: "Ticket", name: "" }, "Ticket · gx"],

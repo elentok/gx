@@ -6,6 +6,7 @@ export type PageTitle = {
     | "Stats"
     | "Agents"
     | "Epic"
+    | "Diff"
     | "Design"
     | "Triage"
     | "Ticket"

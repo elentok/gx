@@ -28,6 +28,7 @@ export const ROUTE_NAMES: Record<string, string> = {
   "/triage/*": "triage",
   "/t/*": "ticket",
   "/e/*": "epic",
+  "/diff": "diff",
 }
 
 export function routeName(pattern: string | undefined): string | undefined {
