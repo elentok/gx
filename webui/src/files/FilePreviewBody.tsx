@@ -1,44 +1,9 @@
 import { chakra, Flex, Text } from "@chakra-ui/react"
-import {
-  type HostedResolved,
-  HostedKindBinary,
-  HostedKindCode,
-  HostedKindHTML,
-  HostedKindImage,
-  HostedKindMarkdown,
-  HostedKindMermaid,
-  HostedKindPDF,
-  HostedKindSVG,
-  HostedKindText,
-} from "../generated/ops"
+import type { HostedResolved } from "../generated/ops"
 import { sizeText } from "../health/formatBytes"
 import { FileHoverCardMedia, type PixelSize } from "./FileHoverCardMedia"
 import { FileHoverCardText } from "./FileHoverCardText"
-
-export const PREVIEW_MAX_BYTES = 2 * 1024 * 1024
-
-export type PreviewState = "missing" | "html" | "none" | "other"
-
-/** Which body a file gets. "other" is for the text and media bodies that later tickets add. */
-export function previewState(file: HostedResolved, missing: boolean): PreviewState {
-  if (missing) return "missing"
-  if (file.kind === HostedKindHTML) return "html"
-  if (file.kind === HostedKindPDF || file.kind === HostedKindBinary) return "none"
-  if ((file.size ?? 0) > PREVIEW_MAX_BYTES) return "none"
-  return "other"
-}
-
-function isTextPreview(file: HostedResolved): boolean {
-  return (
-    file.kind === HostedKindMarkdown || file.kind === HostedKindCode || file.kind === HostedKindText
-  )
-}
-
-function isMediaPreview(file: HostedResolved): boolean {
-  return (
-    file.kind === HostedKindMermaid || file.kind === HostedKindImage || file.kind === HostedKindSVG
-  )
-}
+import { previewVerdict } from "./viewerBody"
 
 export function FilePreviewHeader({
   path,
@@ -89,10 +54,10 @@ export function FilePreviewBody({
   line?: number
   onPixelSize?: (size: PixelSize) => void
 }) {
-  const state = previewState(file, missing)
+  const { body } = previewVerdict(file, missing)
   return (
     <chakra.div
-      data-preview-body={state}
+      data-preview-body={body}
       position="relative"
       h="170px"
       overflow="hidden"
@@ -107,8 +72,8 @@ export function FilePreviewBody({
         background: "linear-gradient(to bottom, transparent, {colors.surface.raised})",
       }}
     >
-      {state === "missing" && <Note>File not found. It may have been deleted or moved.</Note>}
-      {state === "html" && (
+      {body === "missing" && <Note>File not found. It may have been deleted or moved.</Note>}
+      {body === "html" && (
         <Flex direction="column" gap="2" align="flex-start">
           <Note>
             HTML page. No live preview. Pages run scripts, so they open only in the viewer.
@@ -124,11 +89,11 @@ export function FilePreviewBody({
           </chakra.span>
         </Flex>
       )}
-      {state === "none" && <Note>No preview</Note>}
-      {state === "other" && isTextPreview(file) && (
+      {body === "note" && <Note>No preview</Note>}
+      {(body === "markdown" || body === "code" || body === "text") && (
         <FileHoverCardText path={path} file={file} line={line} />
       )}
-      {state === "other" && isMediaPreview(file) && (
+      {(body === "mermaid" || body === "image") && (
         <FileHoverCardMedia path={path} file={file} onPixelSize={onPixelSize} />
       )}
     </chakra.div>
