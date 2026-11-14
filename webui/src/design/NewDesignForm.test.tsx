@@ -57,24 +57,35 @@ function fakeDrafts(over: Partial<DesignDraft> = {}) {
   return { client, save, saveFields, stored }
 }
 
-const connState = { snapshot: { sessions: [] } }
-const connection = {
-  refresh: () => {},
-  getState: () => connState,
-  subscribe: () => () => {},
-  onEvent: () => () => {},
-} as unknown as Connection
-
 async function mount(
   fake: ReturnType<typeof fakeDrafts>,
-  { projects = ["gx", "blog"], device }: { projects?: string[]; device?: Device } = {},
+  {
+    projects = ["gx", "blog"],
+    device,
+    pathname = "/drafts/d1",
+    viMode = false,
+    open = ok,
+  }: {
+    projects?: string[]
+    device?: Device
+    pathname?: string
+    viMode?: boolean
+    open?: OpenDesign
+  } = {},
 ) {
+  const connState = { snapshot: { sessions: [], vi_mode: viMode } }
+  const connection = {
+    refresh: () => {},
+    getState: () => connState,
+    subscribe: () => () => {},
+    onEvent: () => () => {},
+  } as unknown as Connection
   await act(async () => {
     renderThemed(
       <DeviceContext.Provider value={device}>
         <ConnectionContext.Provider value={connection}>
-          <MemoryRouter initialEntries={["/drafts/d1"]}>
-            <DraftPage id="d1" projects={projects} open={ok} drafts={fake.client} />
+          <MemoryRouter initialEntries={[pathname]}>
+            <DraftPage id="d1" projects={projects} open={open} drafts={fake.client} />
           </MemoryRouter>
         </ConnectionContext.Provider>
       </DeviceContext.Provider>,
@@ -122,6 +133,16 @@ test("Start names its reason: prompt, then epic, then the slug", async () => {
   expect(screen.getByText("Name the epic to start.")).toBeTruthy()
   type("Epic slug", "my-epic")
   expect(start().disabled).toBe(false)
+})
+
+test("Start posts new_design with the draft's fields", async () => {
+  const fake = fakeDrafts({ slug: "fresh", idea: "an idea" })
+  const open = vi.fn<OpenDesign>(async () => ({ refused: false }) as never)
+  await mount(fake, { open })
+  await act(async () => void fireEvent.click(start()))
+  expect(open).toHaveBeenCalledWith(
+    expect.objectContaining({ epic: "fresh", new_design: true, idea: "an idea", project: "gx" }),
+  )
 })
 
 test("the reason sits above the footer on a phone", async () => {
@@ -203,6 +224,115 @@ test("a failed save shows Not saved, keeps one fallback by draft id and the next
   await mount(fake)
   expect(fake.save).toHaveBeenLastCalledWith({ id: "d1", idea: "kept more", revision: 3 })
   expect(localStorage.getItem(UNSAVED_KEY)).toBeNull()
+})
+
+const project = () => (screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value
+const blank = { project: "" }
+
+test("a blank draft starts on the page's project, then the one-project filter, the last used, then the first", async () => {
+  const projects = ["blog", "gx", "web"]
+  const withLast = (last: string) => {
+    const fake = fakeDrafts(blank)
+    fake.client.getLastProject = async () => last
+    return fake
+  }
+  await mount(withLast("gx"), { projects, pathname: "/e/web:x" })
+  expect(project()).toBe("web")
+  cleanup()
+  localStorage.setItem("gx.epics.project", JSON.stringify(["gx"]))
+  await mount(withLast("web"), { projects })
+  expect(project()).toBe("gx")
+  localStorage.clear()
+  cleanup()
+  await mount(withLast("web"), { projects })
+  expect(project()).toBe("web")
+  cleanup()
+  await mount(withLast(""), { projects })
+  expect(project()).toBe("blog")
+  cleanup()
+  await mount(withLast("gone"), { projects })
+  expect(project()).toBe("blog")
+})
+
+test("a filter of several projects does not steer a blank draft", async () => {
+  localStorage.setItem("gx.epics.project", JSON.stringify(["gx", "web"]))
+  await mount(fakeDrafts(blank), { projects: ["blog", "gx", "web"] })
+  expect(project()).toBe("blog")
+})
+
+test("a saved draft keeps its project against the page", async () => {
+  await mount(fakeDrafts({ project: "gx" }), { pathname: "/e/blog:x" })
+  expect(project()).toBe("gx")
+})
+
+test("a draft whose project is gone moves to another with a note", async () => {
+  await mount(fakeDrafts({ project: "old" }))
+  expect(project()).toBe("gx")
+  expect(screen.getByText("old no longer exists; moved to gx")).toBeTruthy()
+})
+
+test("with a vi snapshot the prompt is the code editor, labelled Prompt", async () => {
+  await mount(fakeDrafts(), { viMode: true })
+  expect(await screen.findByLabelText("Prompt")).toBeTruthy()
+  expect(screen.queryByRole("textbox", { name: "Prompt" })?.tagName).not.toBe("TEXTAREA")
+})
+
+const png = (name = "a.png") =>
+  new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], name, {
+    type: "image/png",
+  })
+const addImages = (...files: File[]) =>
+  fireEvent.change(screen.getByTestId("image-input"), { target: { files } })
+const big = () => {
+  const f = png("big.png")
+  Object.defineProperty(f, "size", { value: 21 * 1024 * 1024 })
+  return f
+}
+
+test("Add image opens the file picker, and a chosen file uploads at once with a count", async () => {
+  const fake = fakeDrafts()
+  await mount(fake)
+  const click = vi.spyOn(screen.getByTestId("image-input"), "click")
+  fireEvent.click(screen.getByRole("button", { name: "Add image" }))
+  expect(click).toHaveBeenCalled()
+  addImages(png())
+  await screen.findByText("1 of 10 images")
+  expect(fake.client.uploadImage).toHaveBeenCalledWith("d1", expect.any(File))
+})
+
+test("a pasted image uploads at once", async () => {
+  const fake = fakeDrafts()
+  await mount(fake)
+  fireEvent.paste(screen.getByRole("textbox", { name: "Prompt" }), {
+    clipboardData: { files: [png()], types: ["Files"] },
+  })
+  await screen.findByText("1 of 10 images")
+  expect(fake.client.uploadImage).toHaveBeenCalledTimes(1)
+})
+
+test("Start names a held upload and a failed one, and a refused file is never uploaded", async () => {
+  const fake = fakeDrafts({ slug: "x", idea: "y" })
+  await mount(fake)
+  expect(start().disabled).toBe(false)
+  let land: (id: string) => void = () => {}
+  vi.mocked(fake.client.uploadImage).mockImplementationOnce(
+    () => new Promise<string>((ok) => (land = ok)),
+  )
+  addImages(png())
+  await screen.findByText("Wait for the upload to finish")
+  expect(start().disabled).toBe(true)
+  await act(async () => land("i9"))
+  expect(screen.queryByText("Wait for the upload to finish")).toBeNull()
+  expect(start().disabled).toBe(false)
+
+  vi.mocked(fake.client.uploadImage).mockClear()
+  addImages(big())
+  await screen.findByText("Too large, max 20 MB")
+  expect(screen.getByText("Remove the failed image first")).toBeTruthy()
+  expect(start().disabled).toBe(true)
+  expect(fake.client.uploadImage).not.toHaveBeenCalled()
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove image" }).at(-1)!)
+  expect(start().disabled).toBe(false)
 })
 
 test("a conflict shows the banner with its two ways out", async () => {

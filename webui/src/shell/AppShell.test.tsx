@@ -6,7 +6,7 @@ import { PageHeader } from "../page/PageHeader"
 import { renderThemed } from "../ui/render"
 import { DeviceContext, type Device } from "../useWide"
 import { AppShell } from "./AppShell"
-import { closeNewItem, openNewAgent, openNewDesign } from "./newItemOpen"
+import { closeNewItem, openNewAgent } from "./newItemOpen"
 import { EDGE_PX, NO_SIDEBAR_SWIPE_ATTR } from "./useSidebarSwipe"
 
 afterEach(() => {
@@ -189,16 +189,19 @@ describe("closing the sidebar closes its menus", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(
-        async () =>
-          new Response(JSON.stringify({ epics: [], follow_ups: [], projects: [] }), {
-            status: 200,
-          }),
+        async (url: string) =>
+          new Response(
+            JSON.stringify(
+              String(url).includes("worktrees") ? [] : { epics: [], follow_ups: [], projects: [] },
+            ),
+            { status: 200 },
+          ),
       ),
     )
     setup("phone")
     fireEvent.click(mascot()!)
     fireEvent.click(screen.getByRole("button", { name: "+ New" }))
-    fireEvent.click(await screen.findByRole("menuitem", { name: "New design" }))
+    fireEvent.click(await screen.findByRole("menuitem", { name: "New chat" }))
     await screen.findByRole("dialog")
     fireEvent.keyDown(window, { key: "b", ctrlKey: true })
     swipe(sidebar(), [200, 300], [100, 300])
@@ -207,7 +210,7 @@ describe("closing the sidebar closes its menus", () => {
     vi.unstubAllGlobals()
   })
 
-  test("the shared opener opens each form over the page, and closing leaves the page", async () => {
+  test("the shared opener opens the chat form over the page, and closing leaves the page", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -221,14 +224,12 @@ describe("closing the sidebar closes its menus", () => {
       ),
     )
     setup("desktop")
-    for (const open of [() => openNewDesign(), openNewAgent]) {
-      act(open)
-      await screen.findByRole("dialog")
-      expect(screen.getByText("item")).toBeTruthy()
-      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
-      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
-      expect(screen.getByText("item")).toBeTruthy()
-    }
+    act(openNewAgent)
+    await screen.findByRole("dialog")
+    expect(screen.getByText("item")).toBeTruthy()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+    expect(screen.getByText("item")).toBeTruthy()
     vi.unstubAllGlobals()
   })
 })

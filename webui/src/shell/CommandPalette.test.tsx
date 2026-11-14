@@ -52,6 +52,17 @@ const card = (name: string, day: number, over: Partial<EpicListRow> = {}): EpicL
 
 const defaultEpics = [{ address: "beta:feat", project: "beta" }] as EpicListRow[]
 
+const newDraft = {
+  id: "",
+  project: "",
+  slug: "",
+  idea: "",
+  label: "Untitled design",
+  images: [],
+  revision: 1,
+  edited_at: "",
+}
+
 function setup({
   narrow = false,
   mac = false,
@@ -68,9 +79,11 @@ function setup({
       const u = String(url)
       const body = u.includes("worktrees")
         ? projects.map((project) => ({ project, root: `/${project}`, worktrees: [], tiers: {} }))
-        : u.includes("drafts")
-          ? []
-          : { epics, follow_ups, projects }
+        : u.endsWith("/drafts/save")
+          ? { draft: { ...newDraft, id: "d9" } }
+          : u.includes("drafts")
+            ? []
+            : { epics, follow_ups, projects }
       return new Response(JSON.stringify(body), { status: 200 })
     }),
   )
@@ -233,9 +246,17 @@ test("rows are in fixed order, hold no epic or session rows, and filter fuzzily"
 const projectSelect = async () =>
   ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value
 
+test("typing ndes then Enter creates a draft and opens its page", async () => {
+  setup({ path: "/stats" })
+  press({ key: "p", ctrlKey: true })
+  const box = screen.getByRole("combobox")
+  fireEvent.change(box, { target: { value: "ndes" } })
+  fireEvent.keyDown(box, { key: "Enter" })
+  expect(palette()).toBeNull()
+  await waitFor(() => expect(where()).toBe("/drafts/d9"))
+})
+
 test.each([
-  ["ndes", "/stats", "alpha"],
-  ["ndes", "/e/beta:feat", "beta"],
   ["nc", "/stats", "alpha"],
   ["nc", "/agents/s1", "gamma"],
 ])(

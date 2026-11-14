@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type { EpicList, EpicListRow } from "../generated/server"
 import { appRoutes } from "../routes"
-import { closeNewItem, openNewDesign } from "../shell/newItemOpen"
+import { closeNewItem } from "../shell/newItemOpen"
 import { renderThemed } from "../ui/render"
 import type { FetchEpicList } from "./list"
 
@@ -305,84 +305,24 @@ test("the follow-ups counts line is gone", async () => {
   expect(screen.queryByText(/Follow-ups/)).toBeNull()
 })
 
-test("New Design opens the form in a dialog, Close closes it", async () => {
-  await loaded(mixed())
-  expect(screen.queryByRole("dialog")).toBeNull()
-  fireEvent.click(screen.getByRole("button", { name: "New Design" }))
-  expect(await screen.findByRole("textbox", { name: "Epic slug" })).toBeTruthy()
-  const dialog = screen.getByRole("dialog", { name: "New Design" })
-  fireEvent.click(within(dialog).getByRole("button", { name: "Close" }))
-  expect(screen.queryByRole("dialog")).toBeNull()
-})
-
-test("the New Design project starts on the page's filtered project", async () => {
-  localStorage.setItem("gx.epics.project", "gx")
-  await loaded(listOf([row("a"), row("b", { project: "blog", address: "blog:b" })]))
-  fireEvent.click(screen.getByRole("button", { name: "New Design" }))
-  expect(
-    ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value,
-  ).toBe("gx")
-})
-
-test("the New Design project ignores a filter of several projects", async () => {
-  localStorage.setItem("gx.epics.project", '["gx","other"]')
-  await loaded(
-    listOf([
-      row("a"),
-      row("b", { project: "blog", address: "blog:b" }),
-      row("c", { project: "other", address: "other:c" }),
-    ]),
-  )
-  fireEvent.click(screen.getByRole("button", { name: "New Design" }))
-  expect(
-    ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value,
-  ).toBe("blog")
-})
-
-test("the stored one-project filter keeps steering New design after leaving the Epics page", async () => {
-  // Unfiltered, the form starts on the first project ("blog"), so "gx" proves the filter reached it.
-  localStorage.setItem("gx.epics.project", "gx")
-  const list = listOf([row("a"), row("b", { project: "blog", address: "blog:b" })])
-  stubFetch(list)
-  const { router } = renderEpics(async () => list)
-  await filterBox()
-  await waitFor(() => expect(screen.queryByRole("status", { name: "Loading epics" })).toBeNull())
-  act(() => openNewDesign())
-  expect(
-    ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value,
-  ).toBe("gx")
-  act(() => closeNewItem())
-  await act(() => router.navigate("/agents"))
-  await waitFor(() => expect(screen.queryByRole("searchbox", { name: "Filter epics" })).toBeNull())
-  act(() => openNewDesign())
-  expect(
-    ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value,
-  ).toBe("gx")
-})
-
-test("Start posts new_design and opens the new Design page", async () => {
-  const open = vi.fn(() => ({ refused: false }))
-  stubFetch(mixed(), open)
+// The default project of a blank draft is tested on DraftPage (NewDesignForm.test.tsx).
+test("New Design creates a draft and opens its page", async () => {
+  const draft = {
+    id: "d7",
+    project: "",
+    slug: "",
+    idea: "",
+    label: "Untitled design",
+    images: [],
+    revision: 1,
+    edited_at: "",
+  }
+  stubFetch(mixed(), () => ({ draft }))
   const { router } = renderEpics(async () => mixed())
   await filterBox()
   fireEvent.click(await screen.findByRole("button", { name: "New Design" }))
-  fireEvent.change(await screen.findByRole("textbox", { name: "Epic slug" }), {
-    target: { value: "fresh" },
-  })
-  const dialog = screen.getByRole("dialog", { name: "New Design" })
-  fireEvent.change(within(dialog).getByRole("textbox", { name: "Rough idea" }), {
-    target: { value: "an idea" },
-  })
-  await act(async () =>
-    fireEvent.click(within(dialog).getByRole("button", { name: "Start design" })),
-  )
-  expect(open).toHaveBeenCalledWith({
-    epic: "fresh",
-    new_design: true,
-    idea: "an idea",
-    project: "gx",
-  })
-  await waitFor(() => expect(router.state.location.pathname).toBe("/d/gx:fresh"))
+  await waitFor(() => expect(router.state.location.pathname).toBe("/drafts/d7"))
+  expect(screen.queryByRole("dialog")).toBeNull()
 })
 
 test("the first load shows a spinner under the filter", async () => {
