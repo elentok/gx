@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
 import { session } from "../agents/agentsTestKit"
@@ -9,6 +9,7 @@ import {
   CardKindImplementation,
   SectionImplementing,
   SectionOnHold,
+  type DesignDraftRow,
   type EpicListRow,
   type SessionPlacement,
 } from "../generated/server"
@@ -66,9 +67,10 @@ function setup(device: Device, path = "/") {
       async () => new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 }),
     ),
   )
-  const state = {
+  let state = {
     snapshot: {
       needs_you_total: 0,
+      design_drafts: [] as DesignDraftRow[],
       workspaces: [
         { name: "Default", default: true, members: 0 },
         { name: "Work", members: 0 },
@@ -87,11 +89,20 @@ function setup(device: Device, path = "/") {
     loadedOnce: true,
     tick: 0,
   } as unknown as ConnectionState
+  const listeners = new Set<() => void>()
   const conn = {
     getState: () => state,
-    subscribe: () => () => {},
+    subscribe: (fn: () => void) => {
+      listeners.add(fn)
+      return () => listeners.delete(fn)
+    },
     onEvent: () => () => {},
   } as unknown as Connection
+  /** A new snapshot, as a refetch after design-drafts-changed delivers it. */
+  const setDrafts = (drafts: DesignDraftRow[]) => {
+    state = { ...state, snapshot: { ...state.snapshot, design_drafts: drafts } } as ConnectionState
+    act(() => listeners.forEach((fn) => fn()))
+  }
   const router = createMemoryRouter(
     [{ element: <AppShell />, children: [{ path: "*", element: <Page /> }] }],
     { initialEntries: [path] },
@@ -103,9 +114,39 @@ function setup(device: Device, path = "/") {
       </ConnectionContext.Provider>
     </DeviceContext.Provider>,
   )
+  return { setDrafts }
 }
 
 const body = () => within(screen.getByTestId("sidebar-body"))
+
+const draftRow = (over: Partial<DesignDraftRow> = {}): DesignDraftRow => ({
+  id: "d1",
+  label: "Checkout redesign",
+  project: "p",
+  slug: "checkout-redesign",
+  edited_at: "2026-01-02T00:00:00Z",
+  workspace: "Default",
+  ...over,
+})
+
+test("a draft row shows the icon, label and Draft with no dot, ring or menu; a snapshot update adds and removes it", async () => {
+  const { setDrafts } = setup("desktop", "/")
+  await body().findByRole("link", { name: /Blog/ })
+  expect(body().queryByRole("img", { name: "Design draft" })).toBeNull()
+
+  setDrafts([draftRow(), draftRow({ id: "d2", label: "Elsewhere", workspace: "Work" })])
+  const link = await body().findByRole("link", { name: /Checkout redesign/ })
+  expect(link.getAttribute("href")).toBe("#/drafts/d1")
+  expect(link.textContent).toContain("Draft")
+  expect(within(link).getByRole("img", { name: "Design draft" })).toBeTruthy()
+  expect(within(link).queryByTestId("kind-dot")).toBeNull()
+  expect(within(link).queryByRole("progressbar")).toBeNull()
+  expect(within(link.closest("li")!).queryByRole("button", { name: "More actions" })).toBeNull()
+  expect(body().queryByRole("link", { name: /Elsewhere/ })).toBeNull()
+
+  setDrafts([])
+  await waitFor(() => expect(body().queryByRole("link", { name: /Checkout redesign/ })).toBeNull())
+})
 
 test("rows show the name and status words; the open epic is current and stays collapsed", async () => {
   setup("desktop", "/e/p:blog")

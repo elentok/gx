@@ -63,7 +63,7 @@ const placements: SessionPlacement[] = [
   { session: "s2", kind: "other" },
 ]
 
-async function setup(withChat = false, withQueue = false) {
+async function setup(withChat = false, withQueue = false, withDraft = false) {
   vi.stubGlobal(
     "fetch",
     vi.fn(
@@ -74,6 +74,18 @@ async function setup(withChat = false, withQueue = false) {
     snapshot: {
       needs_you_total: 0,
       workspaces: [{ name: "Default", default: true, members: 0 }],
+      design_drafts: withDraft
+        ? [
+            {
+              id: "d1",
+              label: "Checkout redesign",
+              project: "p",
+              slug: "checkout-redesign",
+              edited_at: "2026-01-02T00:00:00Z",
+              workspace: "Default",
+            },
+          ]
+        : [],
       sessions: [
         session("s1", "p", { name: "builder" }),
         session("s2", "p", { name: "scratch" }),
@@ -448,4 +460,13 @@ test("select keys are ignored while a menu is open", async () => {
   item.focus()
   fireEvent.keyDown(item, { key: "s" })
   expect(body().queryByRole("checkbox")).toBeNull()
+})
+
+test("Alt+n opens a draft row's page, numbered among the own rows", async () => {
+  const router = await setup(false, false, true)
+  // Needs you sorts by name here: Blog, Checkout redesign, Shop.
+  await waitFor(() => {
+    act(() => void fireEvent.keyDown(window, { key: "™", code: "Digit2", altKey: true }))
+    expect(router.state.location.pathname).toBe("/drafts/d1")
+  })
 })

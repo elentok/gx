@@ -95,6 +95,29 @@ function ChatIcon({ working }: { working?: boolean }) {
   )
 }
 
+/** The Design draft icon: a dashed page outline in the Design purple. */
+export function DraftIcon() {
+  return (
+    <Box as="span" display="grid">
+      <svg
+        width="26"
+        height="26"
+        viewBox="0 0 26 26"
+        fill="none"
+        stroke="var(--chakra-colors-kind-design-fg)"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeDasharray="3 3"
+        aria-label="Design draft"
+        role="img"
+      >
+        <path d="M7 4.5h7.5L19 9v11.5a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 6 20.5v-14A1.5 1.5 0 0 1 7 4.5z" />
+      </svg>
+    </Box>
+  )
+}
+
 function WrenchIcon({ status }: { status: SidebarStatus }) {
   return (
     <Box as="span" data-testid="fix-wrench" flex="none" display="grid" color={statusColor(status)}>
@@ -399,8 +422,9 @@ function MenuSlot({ number, children }: { number?: number; children: ReactNode }
   )
 }
 
-const itemKind = (kind: SidebarRow["kind"]): ItemRef["kind"] =>
-  kind === "chat" || kind === "design" ? kind : "epic"
+/** A draft has no item menu until its own actions exist. */
+const itemKind = (kind: SidebarRow["kind"]): ItemRef["kind"] | undefined =>
+  kind === "draft" ? undefined : kind === "chat" || kind === "design" ? kind : "epic"
 
 function Row({
   row,
@@ -416,10 +440,11 @@ function Row({
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const nested = row.agents.length > 0
-  const item: ItemRef = {
+  const kind = itemKind(row.kind)
+  const item: ItemRef | undefined = kind && {
     key: row.key,
     name: row.title,
-    kind: itemKind(row.kind),
+    kind,
     workspace: active,
     queued: row.queued,
     held: row.held,
@@ -456,6 +481,8 @@ function Row({
           <IconSlot>
             {row.kind === "chat" ? (
               <ChatIcon working={row.status.tone === "running"} />
+            ) : row.kind === "draft" ? (
+              <DraftIcon />
             ) : (
               <Box position="relative" flex="none">
                 <ProgressRing
@@ -495,7 +522,7 @@ function Row({
         </chakra.a>
         <Box flex="none">
           <MenuSlot number={row.number}>
-            <ItemMenu item={item} workspaces={workspaces} onRemoved={onRemoved} roving />
+            {item && <ItemMenu item={item} workspaces={workspaces} onRemoved={onRemoved} roving />}
           </MenuSlot>
         </Box>
       </RowFrame>
@@ -613,6 +640,7 @@ export function useSidebarModel(fetcher: FetchEpicList | undefined, active: stri
     rows: list.epics,
     sessions: snapshot?.sessions ?? [],
     placements: snapshot?.placements ?? [],
+    drafts: snapshot?.design_drafts,
     workspace: active,
     sort,
   })

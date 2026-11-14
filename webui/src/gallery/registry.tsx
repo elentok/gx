@@ -48,6 +48,7 @@ import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
 import { Modal } from "../ui/modal/Modal"
 import { ProgressBar } from "../ui/progress-bar/ProgressBar"
 import { ProgressRing } from "../ui/progress-ring/ProgressRing"
+import { DraftIcon } from "../shell/SidebarRows"
 import { SegmentedBar } from "../ui/progress-bar/SegmentedBar"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { Spinner } from "../ui/spinner/Spinner"
@@ -635,6 +636,10 @@ export const galleryEntries: GalleryEntry[] = [
         </Modal>
       </ModalFrame>
     )),
+  },
+  {
+    name: "DraftIcon",
+    cases: [{ label: "sidebar, 26px", node: <DraftIcon /> }],
   },
   {
     name: "ProgressRing",

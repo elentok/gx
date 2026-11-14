@@ -13,6 +13,7 @@ import {
   SortNeedsYou,
   SortProject,
   SortStatus,
+  type DesignDraftRow,
   type EpicListRow,
   type SessionInfo,
   type SessionPlacement,
@@ -20,13 +21,14 @@ import {
 } from "../generated/server"
 import { isActionable, isUnread, stateLabel } from "../agents/rules"
 import { RING_KIND, isLive, ringProgress } from "../epics/ring"
-import { agentHref, designHref, triageHref } from "../hrefs"
+import { agentHref, designHref, draftHref, triageHref } from "../hrefs"
 import { isArchivable } from "../select/selectModel"
 import { titleHref } from "../epics/cardLinks"
 import type { Kind, Tone } from "../ui/tone"
 
 export const NEEDS_YOU = "Needs you"
 export const WORKING = "Working"
+export const DRAFT = "Draft"
 export const MAX_NUMBERED = 9
 
 export interface SidebarStatus {
@@ -50,8 +52,8 @@ export interface SidebarAgent {
 
 export interface SidebarRow {
   key: string
-  /** Design is purple, epic teal (the ring kinds), chat pink. */
-  kind: Kind | "chat"
+  /** Design is purple, epic teal (the ring kinds), chat pink; a draft has its own icon. */
+  kind: Kind | "chat" | "draft"
   title: string
   href: string
   status: SidebarStatus
@@ -85,9 +87,14 @@ export interface SidebarInput {
   sessions: SessionInfo[]
   placements: SessionPlacement[]
   workspace: string
+  /** The snapshot's Design draft rows; missing reads as none. */
+  drafts?: DesignDraftRow[]
   /** The active workspace's Sort value; missing or unknown reads as needs-you. */
   sort?: string
 }
+
+/** A draft is never Needs you or Working; nothing else sets its status. */
+export const draftStatus = (): SidebarStatus => ({ words: DRAFT, tone: "muted" })
 
 const isCard = (r: EpicListRow) =>
   r.card_kind === CardKindDesign || r.card_kind === CardKindImplementation
@@ -219,6 +226,7 @@ export function buildSidebar({
   sessions,
   placements,
   workspace,
+  drafts = [],
   sort,
 }: SidebarInput): Sidebar {
   const mode = sortOf(sort)
@@ -286,9 +294,30 @@ export function buildSidebar({
         at: sessionAt(s),
       }
     })
-  const all = sortBy(mode, [...own, ...chats])
+  const draftEntries = drafts
+    .filter((d) => d.workspace === workspace)
+    .map((d): Sortable<SidebarRow> => {
+      const status = draftStatus()
+      return {
+        item: {
+          key: `draft:${d.id}`,
+          kind: "draft",
+          title: d.label,
+          href: draftHref(d.id),
+          status,
+          agents: [],
+        },
+        name: d.label,
+        needsYou: false,
+        project: d.project,
+        words: status.words,
+        at: time(d.edited_at),
+      }
+    })
+  const entries = [...own, ...chats, ...draftEntries]
+  const all = sortBy(mode, entries)
   if (mode === SortProject || mode === SortStatus) {
-    const entryOf = new Map([...own, ...chats].map((e) => [e.item, e]))
+    const entryOf = new Map(entries.map((e) => [e.item, e]))
     for (const row of all) {
       const e = entryOf.get(row)!
       row.group = mode === SortProject ? e.project : e.words

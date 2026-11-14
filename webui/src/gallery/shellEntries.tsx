@@ -73,6 +73,16 @@ const state = {
   snapshot: {
     needs_you_total: 1,
     workspaces,
+    design_drafts: [
+      {
+        id: "d1",
+        label: "Checkout redesign",
+        project: "p",
+        slug: "checkout-redesign",
+        edited_at: "2026-05-01T10:00:00Z",
+        workspace: "Default",
+      },
+    ],
     sessions: [
       session("s1", "builder"),
       session("s2", "scratch"),

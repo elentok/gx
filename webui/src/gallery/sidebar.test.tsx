@@ -64,6 +64,14 @@ test("the switcher menu case opens the menu", async () => {
   expect(await screen.findByRole("menu")).toBeTruthy()
 })
 
+test("the DraftIcon case renders, and the sidebar case lists a draft row", async () => {
+  render("DraftIcon", "sidebar, 26px")
+  expect(screen.getByRole("img", { name: "Design draft" })).toBeTruthy()
+  cleanup()
+  render("Sidebar", "desktop, docked")
+  expect(await screen.findByRole("link", { name: /Checkout redesign/ })).toBeTruthy()
+})
+
 test("the Manage workspaces cases show the list, a rename in progress and the delete confirmation", async () => {
   render("ManageWorkspaces", "default")
   expect(await screen.findByRole("dialog", { name: "Manage workspaces" })).toBeTruthy()

@@ -4,6 +4,7 @@ import {
   CardKindFollowUps,
   CardKindImplementation,
   CardKindOneOff,
+  type DesignDraftRow,
   SectionDesigning,
   SectionFinished,
   SectionImplementing,
@@ -423,5 +424,97 @@ describe("buildSidebar", () => {
     const b = buildSidebar({ ...base, workspace: "Elsewhere", rows: [], sessions, placements })
     expect(a.other).toEqual(b.other)
     expect(a.other).toHaveLength(1)
+  })
+})
+
+describe("buildSidebar Design drafts", () => {
+  const draft = (
+    id: string,
+    label: string,
+    over: Partial<DesignDraftRow> = {},
+  ): DesignDraftRow => ({
+    id,
+    label,
+    project: "p",
+    slug: id,
+    edited_at: "2026-01-02T00:00:00Z",
+    workspace: "Default",
+    ...over,
+  })
+  const drafts = [
+    draft("d-beta", "Beta"),
+    draft("d-alpha", "Alpha", { project: "z", edited_at: "2026-01-01T00:00:00Z" }),
+    draft("d-away", "Away", { workspace: "Work" }),
+  ]
+  const rows = [
+    row("p:blog", { name: "Blog", section: SectionNeedsYou, status_words: "Waiting" }),
+    row("p:mid", { name: "Mid", project: "q", last_activity_at: "2026-01-04T00:00:00Z" }),
+  ]
+  const chat = session("c1", "p", {
+    name: "Chat",
+    status: { state: "working" },
+    status_changed_at: "2025-12-31T00:00:00Z",
+  } as never)
+  const input = {
+    ...base,
+    rows,
+    drafts,
+    sessions: [chat],
+    placements: [place("c1", "chat", { workspace: "Default" })],
+  }
+  const titles = (sort: string) => buildSidebar({ ...input, sort }).rows.map((r) => r.title)
+
+  it("builds a draft row for the active workspace only", () => {
+    const s = buildSidebar(input)
+    const beta = s.rows.find((r) => r.kind === "draft" && r.title === "Beta")
+    expect(beta).toMatchObject({
+      key: "draft:d-beta",
+      href: "#/drafts/d-beta",
+      status: { words: "Draft", tone: "muted" },
+      agents: [],
+    })
+    expect(beta?.ring).toBeUndefined()
+    expect(s.rows.some((r) => r.title === "Away")).toBe(false)
+    expect(s.held.some((r) => r.kind === "draft")).toBe(false)
+  })
+
+  it("reads no drafts when the snapshot has none", () => {
+    expect(buildSidebar({ ...input, drafts: undefined }).rows.map((r) => r.title)).toEqual([
+      "Blog",
+      "Chat",
+      "Mid",
+    ])
+  })
+
+  it("never reads Needs you or Working, even beside a busy session", () => {
+    const s = buildSidebar(input)
+    for (const r of s.rows.filter((r) => r.kind === "draft"))
+      expect(r.status).toEqual({ words: "Draft", tone: "muted" })
+  })
+
+  it.each([
+    ["needs-you", ["Blog", "Alpha", "Beta", "Chat", "Mid"]],
+    ["name", ["Alpha", "Beta", "Blog", "Chat", "Mid"]],
+    ["activity", ["Mid", "Beta", "Alpha", "Chat", "Blog"]],
+    ["project", ["Chat", "Beta", "Blog", "Mid", "Alpha"]],
+    ["status", ["Blog", "Chat", "Alpha", "Beta", "Mid"]],
+  ])("sorts a draft under %s", (sort, expected) => {
+    expect(titles(sort)).toEqual(expected)
+  })
+
+  it("groups a draft by its project and by Draft", () => {
+    const groupOf = (sort: string) =>
+      Object.fromEntries(
+        buildSidebar({ ...input, sort })
+          .rows.filter((r) => r.kind === "draft")
+          .map((r) => [r.title, r.group]),
+      )
+    expect(groupOf("project")).toEqual({ Alpha: "z", Beta: "p" })
+    expect(groupOf("status")).toEqual({ Alpha: "Draft", Beta: "Draft" })
+  })
+
+  it("numbers drafts with the other own rows, contiguously", () => {
+    const s = buildSidebar({ ...input, sort: "name" })
+    expect(s.rows.map((r) => r.number)).toEqual([1, 2, 3, 4, 5])
   })
 })
