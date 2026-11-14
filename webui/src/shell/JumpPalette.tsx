@@ -14,16 +14,23 @@ import {
   SectionNeedsYou,
   SectionOnHold,
   SectionReadyToDesign,
+  type DesignDraftRow,
   type EpicListRow,
   type SessionInfo,
   type SessionPlacement,
   type Workspace,
 } from "../generated/server"
 import { ItemMenu, itemOfCard, type ItemRef } from "../workspaces/itemActions"
-import { agentHref, currentAddress } from "../hrefs"
+import { agentHref, currentAddress, draftHref } from "../hrefs"
+import { DraftIcon } from "./SidebarRows"
 import { epicRow, Menu, type ListRowData, type ListSection } from "../nav/JumpMenu"
 import { useWide } from "../useWide"
-import { cardStatus, sessionStatus, type SidebarStatus } from "../workspaces/sidebarModel"
+import {
+  cardStatus,
+  draftStatus,
+  sessionStatus,
+  type SidebarStatus,
+} from "../workspaces/sidebarModel"
 import { setJumpOpen, useJumpOpen } from "./jumpOpen"
 import { useDismissLayer } from "./useDismissLayer"
 
@@ -77,10 +84,31 @@ function agentRow(
   }
 }
 
+function draftRow(d: DesignDraftRow, subtitle: string, workspaces: Workspace[]): ListRowData {
+  const status = draftStatus()
+  const item: ItemRef = {
+    key: `draft:${d.id}`,
+    name: d.label,
+    kind: "draft",
+    workspace: d.workspace,
+    draft: d,
+  }
+  return {
+    key: `draft:${d.id}`,
+    title: d.label,
+    subtitle,
+    href: draftHref(d.id),
+    searchText: [d.label, d.project, subtitle].join(" "),
+    lead: <DraftIcon />,
+    trailing: trailingOf(status, item, workspaces),
+  }
+}
+
 export interface PaletteInput {
   rows: EpicListRow[]
   sessions: SessionInfo[]
   placements: SessionPlacement[]
+  drafts?: DesignDraftRow[]
   workspaces?: Workspace[]
   workspace: string
   current: string
@@ -94,6 +122,7 @@ export function buildPalette({
   rows,
   sessions,
   placements,
+  drafts = [],
   workspaces = [],
   workspace,
   current,
@@ -138,6 +167,11 @@ export function buildPalette({
       rows: open.filter((r) => mine(r) && r.card_kind === CardKindDesign).map((r) => row(r)),
     },
     {
+      key: "design-drafts",
+      title: "Design drafts",
+      rows: drafts.filter((d) => d.workspace === workspace).map((d) => draftRow(d, "", workspaces)),
+    },
+    {
       key: "epics",
       title: "Epics",
       rows: open.filter((r) => mine(r) && r.card_kind !== CardKindDesign).map((r) => row(r)),
@@ -169,6 +203,9 @@ export function buildPalette({
           .filter((r) => !mine(r) && r.section !== SectionNeedsYou)
           .map((r) => row(r, elsewhere(r))),
         ...chats.filter(({ p, s }) => p.workspace !== workspace && !isActionable(s)).map(chatRow),
+        ...drafts
+          .filter((d) => d.workspace !== workspace)
+          .map((d) => draftRow(d, d.workspace, workspaces)),
       ],
     },
     {
@@ -239,6 +276,7 @@ export function JumpPalette({ fetcher, active }: { fetcher?: FetchEpicList; acti
   const sessions = snapshot?.sessions
   const placements = snapshot?.placements
   const workspaces = snapshot?.workspaces
+  const drafts = snapshot?.design_drafts
   const current = currentAddress(pathname)
   const sections = useMemo(
     () =>
@@ -246,11 +284,12 @@ export function JumpPalette({ fetcher, active }: { fetcher?: FetchEpicList; acti
         rows: rows ?? [],
         sessions: sessions ?? [],
         placements: placements ?? [],
+        drafts,
         workspaces,
         workspace: active,
         current,
       }),
-    [rows, sessions, placements, workspaces, active, current],
+    [rows, sessions, placements, drafts, workspaces, active, current],
   )
   if (!open) return null
   return (

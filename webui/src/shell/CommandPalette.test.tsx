@@ -218,6 +218,14 @@ test("the New design row runs the action once and opens no dialog", async () => 
   expect(screen.queryByRole("dialog")).toBeNull()
 })
 
+test("on a draft page the list has no Remove, Start design or Rename chat row", () => {
+  setup({ path: "/drafts/d1" })
+  press({ key: "p", ctrlKey: true })
+  const list = names()
+  expect(list).toContain("New design")
+  expect(list.filter((n) => /remove|start design|rename/i.test(n ?? ""))).toEqual([])
+})
+
 test("never stacks with Cmd+K, in either order", async () => {
   setup()
   press({ key: "p", ctrlKey: true })

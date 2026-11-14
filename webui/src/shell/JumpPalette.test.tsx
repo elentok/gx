@@ -11,6 +11,7 @@ import {
   SectionNeedsYou,
   SectionOnHold,
   SectionReadyToDesign,
+  type DesignDraftRow,
   type EpicListRow,
   type SessionPlacement,
 } from "../generated/server"
@@ -67,6 +68,19 @@ const sessions = [
   session("a3", "p", { name: "quiet-oneoff" }),
 ]
 
+const draft = (id: string, label: string, workspace: string, project = "p"): DesignDraftRow => ({
+  id,
+  label,
+  project,
+  slug: "",
+  edited_at: "2026-01-01T00:00:00Z",
+  workspace,
+})
+const drafts = [
+  draft("d1", "Kitchen sketch", "Default", "homes"),
+  draft("d2", "Far sketch", "Work"),
+]
+
 function Where() {
   return <div data-testid="where">{useLocation().pathname}</div>
 }
@@ -96,6 +110,7 @@ function setup({ path = "/agents", narrow = false } = {}) {
     snapshot: {
       sessions,
       placements,
+      design_drafts: drafts,
       workspaces: [
         { name: "Default", default: true, members: 3 },
         { name: "Work", members: 2 },
@@ -193,13 +208,76 @@ test("the empty menu is the active workspace, then Needs you elsewhere", async (
   await waitFor(() => expect(names()).toContain("blog"))
   expect(screen.getAllByRole("group").map((g) => g.getAttribute("aria-label"))).toEqual([
     "Designs",
+    "Design drafts",
     "Epics",
     "Chats",
     "Needs you elsewhere",
   ])
-  expect(names()).toEqual(["shop", "blog", "my-chat", "away-waiting", "waiting-oneoff"])
+  expect(names()).toEqual([
+    "shop",
+    "Kitchen sketch",
+    "blog",
+    "my-chat",
+    "away-waiting",
+    "waiting-oneoff",
+  ])
   expect(within(option("away-waiting")).getByText("Work")).toBeTruthy()
   expect(within(option("waiting-oneoff")).getByText("Needs you")).toBeTruthy()
+})
+
+test("a draft of another workspace shows only after a search, under Other workspaces", async () => {
+  setup()
+  await open()
+  await waitFor(() => expect(names()).toContain("blog"))
+  expect(names()).not.toContain("Far sketch")
+  type("far sk")
+  expect(names()).toEqual(["Far sketch"])
+  expect(within(option("Far sketch")).getByText("Work")).toBeTruthy()
+  expect(screen.getByRole("group").getAttribute("aria-label")).toBe("Other workspaces")
+})
+
+test("a draft row shows the label, Draft and a menu with Rename, Move and Remove", async () => {
+  setup()
+  await open()
+  await waitFor(() => expect(names()).toContain("blog"))
+  expect(within(option("Kitchen sketch")).getByText("Draft")).toBeTruthy()
+  fireEvent.click(menuOf("Kitchen sketch")!)
+  const items = await screen.findAllByRole("menuitem")
+  expect(items).toHaveLength(3)
+  for (const name of ["Rename", "Move to workspace", "Remove"])
+    expect(screen.getByRole("menuitem", { name: new RegExp(`^${name}`) })).toBeTruthy()
+})
+
+test("Enter and a click open the draft's page, a click on its menu does not", async () => {
+  setup()
+  await open()
+  await waitFor(() => expect(names()).toContain("blog"))
+  fireEvent.click(menuOf("Kitchen sketch")!)
+  await screen.findAllByRole("menuitem")
+  expect(screen.getByTestId("where").textContent).toBe("/agents")
+  fireEvent.keyDown(document.body, { key: "Escape" })
+  cleanup()
+  setup()
+  await open()
+  type("kitchen")
+  fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" })
+  await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/drafts/d1"))
+  cleanup()
+  setup()
+  await open()
+  type("kitchen")
+  fireEvent.click(option("Kitchen sketch"))
+  await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/drafts/d1"))
+})
+
+test("searching by the label or the project name finds the draft", async () => {
+  setup()
+  await open()
+  await waitFor(() => expect(names()).toContain("blog"))
+  type("kitchen")
+  expect(names()).toEqual(["Kitchen sketch"])
+  type("homes")
+  expect(names()).toEqual(["Kitchen sketch"])
 })
 
 test("holds no commands", async () => {
