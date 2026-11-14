@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -121,16 +122,54 @@ const startTimeout = 40 * time.Second
 func LaunchProc(register func(func()), scenario string, env []string, flags ...string) (*Running, error) {
 	// Startup is the fork-heavy phase; a parallel test run starting every
 	// fixture at once exhausted the user's process limit.
-	launchSlots <- struct{}{}
-	defer func() { <-launchSlots }()
+	release, err := acquireLaunchSlot(filepath.Join(os.TempDir(), "gx-fixture-launch"), maxParallelLaunches)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	r, err := launchProc(register, scenario, env, flags...)
 	return r, explainStartErr(err)
 }
 
-// maxParallelLaunches caps the fixtures starting at once in one test binary.
+// maxParallelLaunches caps the fixtures starting at once, shared across every
+// test binary on the machine (flock slot files), not just one process.
 const maxParallelLaunches = 4
 
-var launchSlots = make(chan struct{}, maxParallelLaunches)
+// launchPoll is how long acquireLaunchSlot sleeps when every slot is taken.
+const launchPoll = 20 * time.Millisecond
+
+// acquireLaunchSlot takes one of slots flock files in dir, waiting while all
+// are held. The kernel drops the lock when the process dies, so a crashed
+// binary leaks nothing. The returned release is safe to call more than once.
+func acquireLaunchSlot(dir string, slots int) (release func(), err error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	files := make([]*os.File, slots)
+	for i := range files {
+		if files[i], err = os.OpenFile(filepath.Join(dir, fmt.Sprintf("slot-%d", i)), os.O_CREATE|os.O_RDWR, 0o644); err != nil {
+			for _, f := range files[:i] {
+				f.Close()
+			}
+			return nil, err
+		}
+	}
+	for {
+		for i, f := range files {
+			if syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) != nil {
+				continue
+			}
+			for j, other := range files {
+				if j != i {
+					other.Close()
+				}
+			}
+			var once sync.Once
+			return func() { once.Do(func() { f.Close() }) }, nil
+		}
+		time.Sleep(launchPoll)
+	}
+}
 
 // explainStartErr names the process limit when fork/exec hit it, so a mass
 // failure reads as one cause instead of many unrelated test failures.
