@@ -302,7 +302,7 @@ investigating had never been authored? If yes, it's a tooling bug — `gx-follow
 Whatever you published (or didn't), end with a report in this fixed shape. Keep long detail in the
 published ticket; the report stays scannable but complete. Unattended, the report is also the
 `## Findings` section of your own ticket, and it ends at item 6: no offers or questions. Use full addresses
-(`<project:epic/NN>`), never a bare `/02`.
+(`<project:epic/NN>`), never a bare `/02`. Link any file the person should open with `gx files url <path>`; never start an HTTP server.
 
 1. **Verdict and root cause** — one or two lines.
 2. **Evidence** — the log lines, commits and `file:line` references the diagnosis rests on.

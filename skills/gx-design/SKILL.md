@@ -61,7 +61,7 @@ would show it.
 
 Every question to the person is a round, not only the occasions listed above. That includes the
 question that ends a prototype or mock ("Do you agree with B?", "Which look do you want?"): print
-it as a `❓ **Q1**` card with a `gx-question` block, after the link to the mock. A question in plain
+it as a `❓ **Q1**` card with a `gx-question` block, after the link to the mock. Give a mock or spec file the person must open as a `gx files url <path>` link, and never start an HTTP server. A question in plain
 prose gets no card, so the person sees only the chat and gx never marks the session Actionable.
 
 The `gx-question` block is YAML with a `type` key (`yes-no` or `options`), never JSON and never
