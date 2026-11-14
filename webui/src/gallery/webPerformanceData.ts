@@ -338,6 +338,7 @@ export const webPerformanceFull: StatsWebPerformance = {
       change_pct: -10.0964,
     },
   ],
+  dev_hidden: false,
   poor_inp: {
     count: 44,
     input_delay_p75: 79.04,
@@ -620,6 +621,7 @@ export const webPerformanceLow: StatsWebPerformance = {
       p75: 36504,
     },
   ],
+  dev_hidden: false,
   poor_inp: {
     count: 8,
     input_delay_p75: 82.8,

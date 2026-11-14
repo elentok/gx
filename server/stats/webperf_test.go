@@ -178,6 +178,23 @@ func TestStats_WebPerformanceDevSamplesNeedIncludeDev(t *testing.T) {
 	ptrVal(t, "include_dev p75", lcp.P75, 9000)
 }
 
+func TestStats_WebPerformanceDevHiddenFlag(t *testing.T) {
+	t.Parallel()
+	dev := perfSample("lcp", "hard", 9000)
+	dev.Env = "dev"
+	withDev := perfStats(t, perfRepeat(1, 20, perfSample("lcp", "hard", 1000)), perfRepeat(1, 5, dev))
+	if !withDev("").WebPerformance.DevHidden {
+		t.Error("dev rows hidden: DevHidden = false, want true")
+	}
+	if withDev("?include_dev=true").WebPerformance.DevHidden {
+		t.Error("include_dev on: DevHidden = true, want false")
+	}
+	noDev := perfStats(t, perfRepeat(1, 20, perfSample("lcp", "hard", 1000)))
+	if noDev("").WebPerformance.DevHidden {
+		t.Error("no dev rows: DevHidden = true, want false")
+	}
+}
+
 func TestStats_WebPerformanceBadIncludeDevIs400(t *testing.T) {
 	t.Parallel()
 	h, base := servertest.StartWeb(t)

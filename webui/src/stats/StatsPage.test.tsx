@@ -67,6 +67,7 @@ const statsOf = (over: Partial<Stats["throughput"]> = {}, extra: Partial<Stats> 
     slowest_routes: [],
     why_slow: [],
     poor_inp: { count: 0, top_actions: [] },
+    dev_hidden: false,
   },
   ...extra,
 })
@@ -290,6 +291,7 @@ test("the Grilling section sits between Cost and effort and Friction", async () 
     "stats-grilling",
     "stats-friction",
     "stats-launch",
+    "stats-web-performance",
   ])
   expect(screen.getByText("Questions asked")).toBeTruthy()
 })
@@ -376,7 +378,7 @@ test("the URL filters drive the fetch and the controls", async () => {
   const fetchStats = vi.fn<FetchStats>(async () => statsOf())
   renderStats(fetchStats, "/stats?range=7&project=gx")
   await screen.findByText("Tickets merged")
-  expect(fetchStats).toHaveBeenCalledWith({ range: 7, project: "gx" })
+  expect(fetchStats).toHaveBeenCalledWith({ range: 7, project: "gx", includeDev: false })
   expect((screen.getByLabelText("Range") as HTMLSelectElement).value).toBe("7")
   await waitFor(() =>
     expect(
@@ -392,17 +394,109 @@ test("changing a control rewrites the URL and refetches", async () => {
   const fetchStats = vi.fn<FetchStats>(async () => statsOf())
   const router = renderStats(fetchStats)
   await screen.findByText("Tickets merged")
-  expect(fetchStats).toHaveBeenLastCalledWith({ range: 7, project: "" })
+  expect(fetchStats).toHaveBeenLastCalledWith({ range: 7, project: "", includeDev: false })
   fireEvent.change(screen.getByLabelText("Range"), { target: { value: "90" } })
-  await waitFor(() => expect(fetchStats).toHaveBeenLastCalledWith({ range: 90, project: "" }))
+  await waitFor(() =>
+    expect(fetchStats).toHaveBeenLastCalledWith({ range: 90, project: "", includeDev: false }),
+  )
   expect(router.state.location.search).toBe("?range=90")
+})
+
+const perfCard = (
+  metric: string,
+  count: number,
+  over: Partial<Stats["web_performance"]["hard_loads"][number]> = {},
+) => ({ metric, count, ...over })
+
+const perfStats = (wp: Partial<Stats["web_performance"]> = {}) =>
+  statsOf({}, { web_performance: { ...statsOf().web_performance, ...wp } })
+
+test("the Web performance cards show value, pill, the server's change and the definition", async () => {
+  renderStats(async () =>
+    perfStats({
+      hard_loads: [
+        perfCard("lcp", 412, { p75: 2310, status: "good", change_pct: -7.2 }),
+        perfCard("inp", 96, { p75: 168, status: "needs-improvement" }),
+        perfCard("cls", 412, { p75: 0.04, status: "poor", change_pct: 0 }),
+        perfCard("app_ready", 412, { p75: 1840 }),
+        perfCard("fcp", 14, { p75: 1120, status: "good", change_pct: -11 }),
+      ],
+    }),
+  )
+  const lcp = (await screen.findByTestId("perf-card-lcp")).textContent ?? ""
+  expect(lcp).toContain("2.31 s")
+  expect(lcp).toContain("412 samples")
+  expect(lcp).toContain("good")
+  expect(lcp).toContain("-7% vs previous 7d")
+  expect(lcp).toContain("Largest Contentful Paint")
+  const inp = screen.getByTestId("perf-card-inp").textContent ?? ""
+  expect(inp).toContain("168 ms")
+  expect(inp).toContain("needs improvement")
+  expect(inp).not.toContain("%")
+  expect(inp).toContain("—")
+  const cls = screen.getByTestId("perf-card-cls").textContent ?? ""
+  expect(cls).toContain("0.04")
+  expect(cls).toContain("poor")
+  expect(cls).toContain("0% vs previous 7d")
+  const app = screen.getByTestId("perf-card-app_ready").textContent ?? ""
+  expect(app).toContain("no standard threshold")
+  expect(app).not.toContain("good")
+  const fcp = screen.getByTestId("perf-card-fcp")
+  expect(fcp.textContent).toContain("not enough samples")
+  expect(fcp.textContent).not.toContain("good")
+  expect(fcp.dataset.low).toBe("true")
+})
+
+test("the Route changes tab shows its cards and round-trips through the URL", async () => {
+  const router = renderStats(async () =>
+    perfStats({
+      hard_loads: [perfCard("lcp", 30, { p75: 2000, status: "good" })],
+      route_changes: [perfCard("route_ready", 50, { p75: 420 })],
+    }),
+  )
+  await screen.findByTestId("perf-card-lcp")
+  expect(screen.queryByTestId("perf-card-route_ready")).toBeNull()
+  fireEvent.click(screen.getByRole("button", { name: "Route changes" }))
+  expect(await screen.findByTestId("perf-card-route_ready")).toBeTruthy()
+  expect(router.state.location.search).toBe("?perf=route")
+  fireEvent.click(screen.getByRole("button", { name: "Hard loads" }))
+  await screen.findByTestId("perf-card-lcp")
+  expect(router.state.location.search).toBe("")
+})
+
+test("Include dev refetches with includeDev and lives in the URL", async () => {
+  const fetchStats = vi.fn<FetchStats>(async () => perfStats())
+  const router = renderStats(fetchStats)
+  await screen.findByText("Web performance")
+  const toggle = screen.getByLabelText("Include dev") as HTMLInputElement
+  expect(toggle.checked).toBe(false)
+  fireEvent.click(toggle)
+  await waitFor(() =>
+    expect(fetchStats).toHaveBeenLastCalledWith({ range: 7, project: "", includeDev: true }),
+  )
+  expect(router.state.location.search).toBe("?dev=1")
+  expect((screen.getByLabelText("Include dev") as HTMLInputElement).checked).toBe(true)
+})
+
+test("with no samples the section shows the empty state, and says dev samples are hidden", async () => {
+  renderStats(async () => perfStats({ dev_hidden: true }))
+  const empty = (await screen.findByTestId("perf-empty")).textContent ?? ""
+  expect(empty).toContain("No web performance samples in this range.")
+  expect(empty).toContain("Dev samples are hidden.")
+  expect(screen.getByLabelText("Include dev")).toBeTruthy()
+})
+
+test("the empty state leaves out the dev line when no dev samples are hidden", async () => {
+  renderStats(async () => perfStats())
+  const empty = (await screen.findByTestId("perf-empty")).textContent ?? ""
+  expect(empty).not.toContain("Dev samples")
 })
 
 test("a bad range falls back to 7 days", async () => {
   const fetchStats = vi.fn<FetchStats>(async () => statsOf())
   renderStats(fetchStats, "/stats?range=5")
   await screen.findByText("Tickets merged")
-  expect(fetchStats).toHaveBeenCalledWith({ range: 7, project: "" })
+  expect(fetchStats).toHaveBeenCalledWith({ range: 7, project: "", includeDev: false })
 })
 
 test("shows the spinner first, then an error with Retry when the fetch fails", async () => {

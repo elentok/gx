@@ -186,6 +186,14 @@ func buildWebPerformance(src WebPerf, win limits.StatsWindow, includeDev bool) (
 	}
 	routes := map[string][]float64{}
 	for di, d := range loadedCur {
+		if !includeDev && !out.DevHidden {
+			for i := range d.N {
+				if d.Env.At(i) == "dev" {
+					out.DevHidden = true
+					break
+				}
+			}
+		}
 		perfRows(d, includeDev, func(i int, metric, _ string) {
 			if t, ok := trend[metric]; ok {
 				t[di] = append(t[di], d.Value[i])

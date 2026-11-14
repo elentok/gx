@@ -3211,6 +3211,11 @@ export interface StatsWebPerformance {
   build_strip?: StatsWebPerfBuildStrip;
   why_slow: StatsWebPerfWhySlow[];
   poor_inp: StatsWebPerfPoorINP;
+  /**
+   * DevHidden is true when include_dev is off and dev samples exist in the
+   * range.
+   */
+  dev_hidden: boolean;
 }
 /**
  * StatsWebPerfBuild is one build with its p75s over the selected range.

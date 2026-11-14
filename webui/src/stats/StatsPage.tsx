@@ -17,6 +17,7 @@ import type { Tone } from "../ui/tone"
 import { amounts, compact, costCardProps, sumNullable } from "./costCards"
 import { LimitBurnCards } from "./LimitBurnCards"
 import { parseRange, RANGES, useStats, type FetchStats, type Stats } from "./stats"
+import { WebPerformance, type PerfTab } from "./WebPerformance"
 
 const sum = (values: number[]) => values.reduce((a, v) => a + v, 0)
 const perDay = (values: number[]) =>
@@ -297,7 +298,13 @@ export function StatsPage({
   const [params, setParams] = useSearchParams()
   const range = parseRange(params.get("range"))
   const project = params.get("project") ?? ""
-  const { stats, failed, source, retry } = useStats({ range, project }, fetchStats, conn)
+  const includeDev = params.get("dev") === "1"
+  const perfTab: PerfTab = params.get("perf") === "route" ? "route" : "hard"
+  const { stats, failed, source, retry } = useStats(
+    { range, project, includeDev },
+    fetchStats,
+    conn,
+  )
   useFetchedReady({ failed, source })
   const { list } = useEpicList(fetchEpics, conn)
 
@@ -362,6 +369,14 @@ export function StatsPage({
           <Grilling stats={stats} />
           <Friction stats={stats} />
           <Launch stats={stats} />
+          <WebPerformance
+            data={stats.web_performance}
+            range={range}
+            tab={perfTab}
+            onTab={(t) => set("perf", t === "hard" ? "" : t)}
+            includeDev={includeDev}
+            onIncludeDev={(on) => set("dev", on ? "1" : "")}
+          />
         </>
       )}
     </DetailPage>

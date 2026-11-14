@@ -109,6 +109,9 @@ type StatsWebPerformance struct {
 	BuildStrip *StatsWebPerfBuildStrip `json:"build_strip"`
 	WhySlow    []StatsWebPerfWhySlow   `json:"why_slow"`
 	PoorINP    StatsWebPerfPoorINP     `json:"poor_inp"`
+	// DevHidden is true when include_dev is off and dev samples exist in the
+	// range.
+	DevHidden bool `json:"dev_hidden"`
 }
 
 // StatsWebPerfBuild is one build with its p75s over the selected range.

@@ -21,13 +21,16 @@ export interface StatsQuery {
   range: number
   /** Empty means every project. */
   project: string
+  /** Web performance counts dev samples too. */
+  includeDev: boolean
 }
 
 export type FetchStats = (query: StatsQuery) => Promise<Stats>
 
-export const fetchStats: FetchStats = async ({ range, project }) => {
+export const fetchStats: FetchStats = async ({ range, project, includeDev }) => {
   const params = new URLSearchParams({ range: String(range) })
   if (project) params.set("project", project)
+  if (includeDev) params.set("include_dev", "true")
   const res = await apiFetch(`/v1/stats?${params}`)
   if (!res.ok) throw new Error(`stats: HTTP ${res.status}`)
   return res.json()
@@ -50,13 +53,13 @@ export function useStats(
   fetcher: FetchStats = fetchStats,
   conn?: Connection,
 ): StatsState {
-  const { range, project } = query
+  const { range, project, includeDev } = query
   const { data, failed, source, retry } = useFetched(
     "stats",
-    () => fetcher({ range, project }),
+    () => fetcher({ range, project, includeDev }),
     conn,
     {
-      id: `${range}:${project}`,
+      id: `${range}:${project}:${includeDev}`,
       debounceMs: STATS_REFETCH_DEBOUNCE_MS,
     },
   )
