@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { useState } from "react"
 import { createMemoryRouter, Navigate, RouterProvider } from "react-router"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { ROUTE_NAMES } from "./routeNames"
@@ -1070,6 +1071,12 @@ function Ready() {
   return <p>ready</p>
 }
 
+// Ready only once the button is clicked, so a span stays open across other events.
+function Late() {
+  const [go, setGo] = useState(false)
+  return go ? <Ready key="late" /> : <button onClick={() => setGo(true)}>finish</button>
+}
+
 function renderSpans(initial: string) {
   const router = createMemoryRouter(
     [
@@ -1078,7 +1085,8 @@ function renderSpans(initial: string) {
       { path: "/tips", element: <Ready key="tips" /> },
       { path: "/e/*", element: <Ready key="e" /> },
       { path: "/slow", element: <p>slow</p> },
-      { path: "/old", element: <Navigate to="/tips" replace /> },
+      { path: "/settings/agents", element: <Navigate to="/tips" replace /> },
+      { path: "/stats", element: <Late /> },
       catchAllRoute,
     ],
     { initialEntries: [initial] },
@@ -1155,10 +1163,11 @@ test("a span carries the slowest apiFetch latency that overlapped it, and none w
   const router = renderSpans("/tips")
   await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
   expect(samples()[0]).not.toHaveProperty("api_latency")
+  await act(() => router.navigate("/stats"))
   const finish = noteApiRequest()
   await new Promise((r) => setTimeout(r, 20))
-  await act(() => router.navigate("/epics"))
   finish()
+  fireEvent.click(await screen.findByText("finish"))
   await waitFor(() => expect(sampled).toHaveBeenCalledTimes(2))
   expect(samples()[1].api_latency).toBeGreaterThanOrEqual(15)
 })
@@ -1195,22 +1204,60 @@ test("a span left before ready queues nothing, and the next one is not an app_re
   expect(samples()[0]).toMatchObject({ metric: "route_ready", route: "tips" })
 })
 
-test("hiding the page drops the open span", async () => {
+test("a tab switch keeps the open span, and pagehide drops it", async () => {
   const router = renderSpans("/tips")
   await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
-  await act(() => router.navigate("/slow"))
+  await act(() => router.navigate("/stats"))
   Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true })
   document.dispatchEvent(new Event("visibilitychange"))
   Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true })
-  await act(() => router.navigate("/tips"))
+  fireEvent.click(await screen.findByText("finish"))
   await waitFor(() => expect(sampled).toHaveBeenCalledTimes(2))
-  expect(samples().map((s) => s.route)).toEqual(["tips", "tips"])
+  expect(samples()[1]).toMatchObject({ metric: "route_ready", route: "stats" })
+
+  await act(() => router.navigate("/tips"))
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(3))
+  await act(() => router.navigate("/stats"))
+  fireEvent(window, new Event("pagehide"))
+  fireEvent.click(await screen.findByText("finish"))
+  await screen.findByText("ready")
+  expect(sampled).toHaveBeenCalledTimes(3)
+})
+
+test("a REPLACE that is not a known redirect starts its own span", async () => {
+  const router = renderSpans("/slow")
+  await screen.findByText("slow")
+  fireEvent.pointerDown(document.body)
+  await act(() => router.navigate("/epics", { replace: true }))
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  expect(samples()[0]).toMatchObject({ route: "epics", trigger: "click" })
+})
+
+test("a request made after ready is not kept for the next span", async () => {
+  const router = renderSpans("/tips")
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  noteApiRequest()
+  await new Promise((r) => setTimeout(r, 20))
+  await act(() => router.navigate("/epics"))
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(2))
+  expect(samples()[1]).not.toHaveProperty("api_latency")
+})
+
+test("a request pending from an earlier span is timed from this span's start", async () => {
+  const router = renderSpans("/slow")
+  await screen.findByText("slow")
+  const finish = noteApiRequest()
+  await new Promise((r) => setTimeout(r, 80))
+  await act(() => router.navigate("/tips"))
+  finish()
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  expect(samples()[0].api_latency).toBeLessThan(40)
 })
 
 test("a known redirect is one span for the final route", async () => {
   const router = renderSpans("/tips")
   await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
-  await act(() => router.navigate("/old"))
+  await act(() => router.navigate("/settings/agents"))
   await screen.findByText("ready")
   await waitFor(() => expect(sampled).toHaveBeenCalledTimes(2))
   expect(samples()[1]).toMatchObject({ metric: "route_ready", route: "tips" })

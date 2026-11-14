@@ -82,7 +82,8 @@ let apiRequests: ApiRequest[] = []
 /** apiFetch calls this when a request starts. Call the returned function when it settles. */
 export function noteApiRequest(): () => void {
   const request: ApiRequest = { start: performance.now() }
-  apiRequests.push(request)
+  // Between spans nothing reads the list, so a request is only kept while a span is open.
+  if (span && !span.done) apiRequests.push(request)
   return () => {
     request.end = performance.now()
   }
@@ -94,7 +95,8 @@ function slowestApiRequest(spanStart: number, spanEnd: number): number | undefin
   for (const r of apiRequests) {
     const end = r.end ?? spanEnd
     if (end < spanStart || r.start > spanEnd) continue
-    slowest = Math.max(slowest ?? 0, end - r.start)
+    // A request carried over from an earlier span only counts from this span's start.
+    slowest = Math.max(slowest ?? 0, end - Math.max(r.start, spanStart))
   }
   return slowest
 }
@@ -203,9 +205,18 @@ export function markReady(outcome: Outcome, dataSource: DataSource): void {
   }
 }
 
+// Pages that redirect with Navigate/replace (see routes.tsx). Only a REPLACE away from one of
+// these folds into the open span; any other REPLACE is its own navigation.
+function isKnownRedirectSource(pathname: string): boolean {
+  return (
+    pathname === "/settings/agents" || pathname.startsWith("/d/") || pathname.startsWith("/triage")
+  )
+}
+
 /** Starts a span per router navigation. Returns the cleanup. */
 export function trackRouter(router: Pick<DataRouter, "state" | "subscribe">): () => void {
   let key = router.state.location.key
+  let previousPath = router.state.location.pathname
   const routeOf = (state: DataRouter["state"]) => routeName(state.matches.at(-1)?.route.path)
 
   // The router is created before this runs, so the page's own load is the first span.
@@ -215,7 +226,9 @@ export function trackRouter(router: Pick<DataRouter, "state" | "subscribe">): ()
     if (state.navigation.state !== "idle" || state.location.key === key) return
     key = state.location.key
     const trigger = state.historyAction === "POP" ? "history" : (recentInput() ?? "programmatic")
-    begin(trigger, routeOf(state), state.historyAction === "REPLACE", true)
+    const redirect = state.historyAction === "REPLACE" && isKnownRedirectSource(previousPath)
+    previousPath = state.location.pathname
+    begin(trigger, routeOf(state), redirect, true)
   })
 
   const onInput = (trigger: Trigger) => () => {
@@ -226,9 +239,8 @@ export function trackRouter(router: Pick<DataRouter, "state" | "subscribe">): ()
   const abandon = () => {
     if (span && !span.done) span.done = true
   }
-  const onHide = () => {
-    if (document.visibilityState === "hidden") abandon()
-  }
+  // A tab switch only fires visibilitychange, and the load goes on: only leaving the page abandons.
+  const onHide = () => abandon()
   const onPageShow = (e: PageTransitionEvent) => {
     if (!e.persisted) return
     bfcache = true
@@ -236,14 +248,14 @@ export function trackRouter(router: Pick<DataRouter, "state" | "subscribe">): ()
   }
   document.addEventListener("pointerdown", onPointer, true)
   document.addEventListener("keydown", onKey, true)
-  document.addEventListener("visibilitychange", onHide)
+  window.addEventListener("pagehide", onHide)
   window.addEventListener("pageshow", onPageShow)
   return () => {
     unsubscribe()
     abandon()
     document.removeEventListener("pointerdown", onPointer, true)
     document.removeEventListener("keydown", onKey, true)
-    document.removeEventListener("visibilitychange", onHide)
+    window.removeEventListener("pagehide", onHide)
     window.removeEventListener("pageshow", onPageShow)
   }
 }
