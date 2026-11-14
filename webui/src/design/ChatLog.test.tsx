@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { Box } from "@chakra-ui/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
@@ -165,17 +166,21 @@ test("an interrupted message renders as a Turn interrupted separator", async () 
   expect(screen.queryByText("Context compacted")).toBeNull()
 })
 
-test("the Turn interrupted separator is dim like the compacted one", async () => {
+test("the Turn interrupted separator is dim, unlike a normal message", async () => {
   renderChat(
     [session()],
-    okChat(chatOf([msg({ kind: "interrupted" }), msg({ kind: "compacted" })])),
+    okChat(chatOf([msg({ text: "plain reply" }), msg({ kind: "interrupted" })])),
   )
-  const [interrupted, compacted] = await screen.findAllByRole("separator")
-  expect(interrupted.textContent).toBe("Turn interrupted")
-  const color = getComputedStyle(interrupted).color
+  const sep = await screen.findByRole("separator")
+  expect(sep.textContent).toBe("Turn interrupted")
+  const normal = getComputedStyle(screen.getByText("plain reply")).color
+  const { unmount } = renderThemed(<Box color="text.dim" data-testid="dim-ref" />)
+  const dim = getComputedStyle(screen.getByTestId("dim-ref")).color
+  unmount()
+  const color = getComputedStyle(sep).color
   expect(color).not.toBe("")
-  expect(color).toBe(getComputedStyle(compacted).color)
-  expect(interrupted.className).toBe(compacted.className)
+  expect(color).toBe(dim)
+  expect(color).not.toBe(normal)
 })
 
 test("an interrupted message in a Codex chat reads the same", async () => {

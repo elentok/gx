@@ -46,6 +46,7 @@ export function FixAgentDialog({
       <Box
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         aria-label="Fix it with an agent"
         bg="surface"
         borderWidth="1px"

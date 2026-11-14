@@ -66,6 +66,53 @@ func TestInstallCreatesAgentRootsAndCopiesFiles(t *testing.T) {
 	}
 }
 
+func reinstallDroppingSkill(t *testing.T, userFile string) (root string) {
+	t.Helper()
+	srcDir := t.TempDir()
+	root = t.TempDir()
+	manifestPath := filepath.Join(t.TempDir(), "skill.json")
+
+	keep := writeSourceFile(t, srcDir, "keep/SKILL.md", "keep")
+	bump := writeSourceFile(t, srcDir, "gx-bump/agents/openai.yaml", "x")
+	if _, err := Install(manifestPath, InstallRequest{
+		Source: "example/skill", AgentRoots: []string{root}, Files: []SourceFile{keep, bump},
+	}); err != nil {
+		t.Fatalf("first Install: %v", err)
+	}
+	if userFile != "" {
+		p := filepath.Join(root, userFile)
+		if err := os.WriteFile(p, []byte("mine"), 0644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+	if _, err := Install(manifestPath, InstallRequest{
+		Source: "example/skill", AgentRoots: []string{root}, Files: []SourceFile{keep},
+	}); err != nil {
+		t.Fatalf("reinstall: %v", err)
+	}
+	return root
+}
+
+func TestReinstallDroppingSkillPrunesEmptyFolderButNotRoot(t *testing.T) {
+	root := reinstallDroppingSkill(t, "")
+	if _, err := os.Stat(filepath.Join(root, "gx-bump")); !os.IsNotExist(err) {
+		t.Errorf("empty dropped skill folder left behind: err = %v", err)
+	}
+	if got := readFile(t, filepath.Join(root, "keep/SKILL.md")); got != "keep" {
+		t.Errorf("keep/SKILL.md = %q, want keep", got)
+	}
+}
+
+func TestReinstallDroppingSkillKeepsFolderWithUserFile(t *testing.T) {
+	root := reinstallDroppingSkill(t, "gx-bump/notes.md")
+	if got := readFile(t, filepath.Join(root, "gx-bump/notes.md")); got != "mine" {
+		t.Errorf("user file = %q, want mine", got)
+	}
+	if _, err := os.Stat(filepath.Join(root, "gx-bump/agents")); !os.IsNotExist(err) {
+		t.Errorf("empty agents folder left behind: err = %v", err)
+	}
+}
+
 func TestReinstallingUnchangedContentIsIdempotent(t *testing.T) {
 	srcDir := t.TempDir()
 	root := t.TempDir()
