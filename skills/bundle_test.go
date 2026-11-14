@@ -63,6 +63,7 @@ var requiredFiles = []string{
 	"gx-evolve/agents/openai.yaml",
 	"gx-triage-follow-ups/SKILL.md",
 	"gx-triage-follow-ups/agents/openai.yaml",
+	"gx-triage-follow-ups/old-epic-areas.txt",
 	"gx-gopls/SKILL.md",
 	"gx-playwright-cli/SKILL.md",
 	"gx-playwright-cli/README.md",
