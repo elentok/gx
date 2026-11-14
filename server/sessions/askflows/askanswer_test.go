@@ -82,6 +82,43 @@ func TestAskAnswer_AnswersKeyedByQuestionTextWithNotes(t *testing.T) {
 	}
 }
 
+func TestAskAnswer_OtherTextKeepsClickOrder(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		choices []string
+		want    string
+	}{
+		{"other in the middle", []string{"1", "other", "3"}, "S, XL, L"},
+		{"other first", []string{"other", "2"}, "XL, M"},
+		{"other last", []string{"1", "other"}, "S, XL"},
+		{"text without the other id goes last", []string{"1", "3"}, "S, L, XL"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f := startAskFixture(t, nil)
+			out := f.ask(t)
+			f.waitBlocked(t)
+			res := f.answer(t, wire.SessionAnswerRequest{Answers: []wire.SessionAnswer{
+				{Choice: "1"},
+				{Choices: tc.choices, Text: "XL"},
+				{Choice: "1"},
+			}})
+			if res.Refused {
+				t.Fatalf("answer refused: %+v", res)
+			}
+			f.waitIdle(t)
+			var got hookOutput
+			if err := json.Unmarshal([]byte(hookResult(t, out)), &got); err != nil {
+				t.Fatal(err)
+			}
+			if a := got.HookSpecificOutput.UpdatedInput.Answers["Which sizes?"]; a != tc.want {
+				t.Errorf("answer = %q, want %q", a, tc.want)
+			}
+		})
+	}
+}
+
 func TestAskAnswer_DismissDeniesWithTheExactReason(t *testing.T) {
 	t.Parallel()
 	f := startAskFixture(t, nil)

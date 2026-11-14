@@ -15,25 +15,25 @@ import (
 const dismissReason = "The user doesn't want to proceed with this question. Do not ask again. STOP and wait for the user to tell you how to proceed."
 
 // pickedIDs is the answer's chosen option ids as 0-based rows of the nOptions
-// numbered options, and whether it picked Other. The error says only that a
-// choice is no option; the caller names the question or dialog.
-func pickedIDs(a wire.SessionAnswer, nOptions int) (picks []int, other bool, err error) {
-	ids := a.Choices
-	if a.Choice != "" {
-		ids = append([]string{a.Choice}, ids...)
-	}
-	for _, id := range ids {
+// numbered options, whether it picked Other, and how many picks sat before
+// Other (all of them if none). The error says only that a choice is no option;
+// the caller names the question or dialog.
+func pickedIDs(a wire.SessionAnswer, nOptions int) (picks []int, other bool, otherAt int, err error) {
+	for _, id := range slices.DeleteFunc(append([]string{a.Choice}, a.Choices...), func(id string) bool { return id == "" }) {
 		if id == "other" {
-			other = true
+			other, otherAt = true, len(picks)
 			continue
 		}
 		n, err := strconv.Atoi(id)
 		if err != nil || n < 1 || n > nOptions {
-			return nil, false, fmt.Errorf("choice %q is not an option", id)
+			return nil, false, 0, fmt.Errorf("choice %q is not an option", id)
 		}
 		picks = append(picks, n-1)
+		if !other {
+			otherAt = len(picks)
+		}
 	}
-	return picks, other, nil
+	return picks, other, otherAt, nil
 }
 
 // answerClaudeDialog resolves the held AskUserQuestion call of a claude-dialog
@@ -106,7 +106,7 @@ func claudeUpdatedInput(held wire.AskHookRequest, answers []wire.SessionAnswer) 
 		for _, o := range q.Options {
 			cq.Options = append(cq.Options, option{o.Label, o.Description})
 		}
-		picks, other, err := pickedIDs(a, len(q.Options))
+		picks, other, otherAt, err := pickedIDs(a, len(q.Options))
 		if err != nil {
 			return nil, fmt.Sprintf("%v of question %d", err, i+1)
 		}
@@ -118,7 +118,7 @@ func claudeUpdatedInput(held wire.AskHookRequest, answers []wire.SessionAnswer) 
 			parts = append(parts, q.Options[p].Label)
 		}
 		if text != "" {
-			parts = append(parts, text)
+			parts = slices.Insert(parts, otherAt, text)
 		}
 		if len(parts) == 0 {
 			return nil, fmt.Sprintf("question %d needs an answer", i+1)

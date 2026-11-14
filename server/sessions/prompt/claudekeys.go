@@ -119,7 +119,7 @@ func dialogPicks(d claudeui.AskDialog, a wire.SessionAnswer) (picks []int, text 
 		return nil, "", badAnswer("the text has a line break or control character")
 	}
 	other := len(d.Options) - 1
-	picks, pickedOther, err := pickedIDs(a, other)
+	picks, pickedOther, _, err := pickedIDs(a, other)
 	if err != nil {
 		return nil, "", badAnswer(err.Error() + " of the dialog")
 	}
