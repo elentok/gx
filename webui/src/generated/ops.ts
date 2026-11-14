@@ -307,6 +307,39 @@ export interface HostedResolveResult {
   message?: string;
 }
 /**
+ * HostedRootSource says where a hosted-file root comes from. The values are
+ * literals because tygo cannot resolve constants from another package.
+ */
+export type HostedRootSource = string;
+export const HostedRootBuiltIn: HostedRootSource = "built-in";
+export const HostedRootConfig: HostedRootSource = "config";
+/**
+ * HostedRoot is one folder gx may host files from.
+ */
+export interface HostedRoot {
+  path: string;
+  source: HostedRootSource;
+}
+/**
+ * HostedRootRequest is the body of the add and remove calls.
+ */
+export interface HostedRootRequest {
+  /**
+   * Path is an absolute folder path.
+   */
+  path: string;
+}
+/**
+ * HostedRootsResult is the reply of the roots list, add and remove calls: every
+ * root afterwards, or a refusal.
+ */
+export interface HostedRootsResult {
+  roots?: HostedRoot[];
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+}
+/**
  * MaxHostedCandidates is how many candidates one resolve call accepts.
  */
 export const MaxHostedCandidates = 200;
@@ -318,7 +351,24 @@ export const ReasonTooManyCandidates = "too-many-candidates";
  * ReasonBadBase refuses a resolve call that names more than one base.
  */
 export const ReasonBadBase = "bad-base";
-export type Reason = typeof ReasonTooManyCandidates | typeof ReasonBadBase;
+/**
+ * Reasons an add refuses a folder.
+ */
+export const ReasonRootNotAbsolute = "not-absolute";
+export const ReasonRootIsSlash = "root-folder";
+export const ReasonRootIsHome = "home-folder";
+export const ReasonRootMissing = "missing-path";
+export const ReasonRootNotFolder = "not-a-folder";
+/**
+ * Reasons a remove refuses a folder.
+ */
+export const ReasonRootBuiltIn = "built-in-root";
+export const ReasonRootNotAdded = "not-a-configured-root";
+/**
+ * ReasonRootWriteFailed refuses an add or remove whose config write failed.
+ */
+export const ReasonRootWriteFailed = "write-failed";
+export type Reason = typeof ReasonTooManyCandidates | typeof ReasonBadBase | typeof ReasonRootNotAbsolute | typeof ReasonRootIsSlash | typeof ReasonRootIsHome | typeof ReasonRootMissing | typeof ReasonRootNotFolder | typeof ReasonRootBuiltIn | typeof ReasonRootNotAdded | typeof ReasonRootWriteFailed;
 
 //////////
 // source: restart.go

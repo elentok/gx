@@ -70,6 +70,27 @@ func (w *Web) ResolveHostedFiles(ctx context.Context, req ops.HostedResolveReque
 	return res, err
 }
 
+// HostedRoots lists every hosted-file root. A refusal is a result, not an error.
+func (w *Web) HostedRoots(ctx context.Context) (ops.HostedRootsResult, error) {
+	var res ops.HostedRootsResult
+	err := w.t.get(ctx, "/v1/hosted-files/roots", &res)
+	return res, err
+}
+
+// AddHostedRoot adds an extra hosted-file root. A refusal is a result, not an error.
+func (w *Web) AddHostedRoot(ctx context.Context, path string) (ops.HostedRootsResult, error) {
+	var res ops.HostedRootsResult
+	err := w.t.post(ctx, "/v1/hosted-files/roots/add", ops.HostedRootRequest{Path: path}, &res)
+	return res, err
+}
+
+// RemoveHostedRoot removes an extra hosted-file root. A refusal is a result, not an error.
+func (w *Web) RemoveHostedRoot(ctx context.Context, path string) (ops.HostedRootsResult, error) {
+	var res ops.HostedRootsResult
+	err := w.t.post(ctx, "/v1/hosted-files/roots/remove", ops.HostedRootRequest{Path: path}, &res)
+	return res, err
+}
+
 // ResetAuthenticator clears the authenticator and returns the new Setup code in the result.
 // A refusal is a result (Refused set), not an error.
 func (w *Web) ResetAuthenticator(ctx context.Context) (ops.WebInfo, error) {

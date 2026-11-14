@@ -66,6 +66,42 @@ func (HostedResolveResult) Refuse(reason, message string) HostedResolveResult {
 	return HostedResolveResult{Refused: true, Reason: reason, Message: message}
 }
 
+// HostedRootSource says where a hosted-file root comes from. The values are
+// literals because tygo cannot resolve constants from another package.
+type HostedRootSource string
+
+const (
+	HostedRootBuiltIn HostedRootSource = "built-in"
+	HostedRootConfig  HostedRootSource = "config"
+)
+
+// HostedRoot is one folder gx may host files from.
+type HostedRoot struct {
+	Path   string           `json:"path"`
+	Source HostedRootSource `json:"source"`
+}
+
+// HostedRootRequest is the body of the add and remove calls.
+type HostedRootRequest struct {
+	// Path is an absolute folder path.
+	Path string `json:"path"`
+}
+
+// HostedRootsResult is the reply of the roots list, add and remove calls: every
+// root afterwards, or a refusal.
+type HostedRootsResult struct {
+	Roots   []HostedRoot `json:"roots,omitempty"`
+	Refused bool         `json:"refused,omitempty"`
+	Reason  string       `json:"reason,omitempty"`
+	Message string       `json:"message,omitempty"`
+}
+
+// Refusal and Refuse let the CLI treat the payload as a Refusable.
+func (r HostedRootsResult) Refusal() (bool, string, string) { return r.Refused, r.Reason, r.Message }
+func (HostedRootsResult) Refuse(reason, message string) HostedRootsResult {
+	return HostedRootsResult{Refused: true, Reason: reason, Message: message}
+}
+
 // MaxHostedCandidates is how many candidates one resolve call accepts.
 const MaxHostedCandidates = 200
 
@@ -74,4 +110,16 @@ const (
 	ReasonTooManyCandidates = "too-many-candidates"
 	// ReasonBadBase refuses a resolve call that names more than one base.
 	ReasonBadBase = "bad-base"
+
+	// Reasons an add refuses a folder.
+	ReasonRootNotAbsolute = "not-absolute"
+	ReasonRootIsSlash     = "root-folder"
+	ReasonRootIsHome      = "home-folder"
+	ReasonRootMissing     = "missing-path"
+	ReasonRootNotFolder   = "not-a-folder"
+	// Reasons a remove refuses a folder.
+	ReasonRootBuiltIn  = "built-in-root"
+	ReasonRootNotAdded = "not-a-configured-root"
+	// ReasonRootWriteFailed refuses an add or remove whose config write failed.
+	ReasonRootWriteFailed = "write-failed"
 )

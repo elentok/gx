@@ -23,6 +23,9 @@ type hostedFiles struct{ s *Server }
 func (h hostedFiles) routes() []wire.Route {
 	return []wire.Route{
 		{Pattern: "POST /v1/hosted-files/resolve", Handler: h.resolve, Web: wire.WebWrite},
+		{Pattern: "GET /v1/hosted-files/roots", Handler: h.listRoots, Web: wire.WebRead},
+		{Pattern: "POST /v1/hosted-files/roots/add", Handler: h.addRoot, Web: wire.WebWrite},
+		{Pattern: "POST /v1/hosted-files/roots/remove", Handler: h.removeRoot, Web: wire.WebWrite},
 	}
 }
 
@@ -41,7 +44,7 @@ func (h hostedFiles) checker() *files.Checker {
 	}
 	c := &files.Checker{
 		BuiltinRoots: func() []string { return builtin },
-		// ExtraRoots stays unset until the extra-roots setting exists.
+		ExtraRoots:   h.extraRoots,
 		TempRoots:    files.DefaultTempRoots,
 		DeniedDirs:   func() []string { return denied },
 		TicketsStore: func() string { return cfg.TicketStore },

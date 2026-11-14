@@ -150,6 +150,7 @@ func changedKeys(old, next Settings) []string {
 		{"server.watch-config", old.WatchConfig, next.WatchConfig},
 		{"server.recently-finished", old.RecentlyFinished, next.RecentlyFinished},
 		{"server.web.allowed-hosts", old.WebAllowedHosts, next.WebAllowedHosts},
+		{"server.web.files.roots", old.WebFilesRoots, next.WebFilesRoots},
 		{"server.web.totp", old.WebTOTPOff, next.WebTOTPOff},
 		{"server.web.vi-escape", old.WebViEscape, next.WebViEscape},
 		{"server.web.leader-key-mac", old.WebLeaderKeyMac, next.WebLeaderKeyMac},

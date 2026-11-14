@@ -121,6 +121,9 @@ type Settings struct {
 	// literals and localhost, that the web listener accepts in Host.
 	WebAllowedHosts []string
 
+	// WebFilesRoots is config server.web.files.roots: extra hosted-file roots.
+	WebFilesRoots []string
+
 	// WebTOTPOff is config server.web.totp turned off. Inverted so a zero
 	// Settings keeps TOTP on.
 	WebTOTPOff bool
@@ -198,6 +201,7 @@ func FromConfig(cfg config.Config) Settings {
 		AgentsCodex:                 cfg.Agents.Codex,
 		AgentsDefaultHarness:        cfg.Agents.DefaultHarness,
 		WebAllowedHosts:             cfg.Server.Web.AllowedHosts,
+		WebFilesRoots:               cfg.Server.Web.Files.Roots,
 		WebTOTPOff:                  !cfg.Server.Web.TOTP,
 		WebViEscape:                 cfg.Server.Web.ViEscape,
 		WebLeaderKeyMac:             cfg.Server.Web.LeaderKeyMac,

@@ -90,8 +90,11 @@ type rawConfig struct {
 			DevDir      *string `json:"dev-dir"`
 
 			AllowedHosts []string `json:"allowed-hosts"`
-			TOTP         *bool    `json:"totp"`
-			ViEscape     *string  `json:"vi-escape"`
+			Files        *struct {
+				Roots []string `json:"roots"`
+			} `json:"files"`
+			TOTP     *bool   `json:"totp"`
+			ViEscape *string `json:"vi-escape"`
 
 			LeaderKeyMac *string `json:"leader-key-mac"`
 			LeaderKey    *string `json:"leader-key"`

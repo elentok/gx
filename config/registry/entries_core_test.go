@@ -40,6 +40,7 @@ func TestCoreEntries(t *testing.T) {
 		{key: Key("server", "web", "dev-frontend"), typ: TypeBool, section: SectionWebUI},
 		{key: Key("server", "web", "dev-dir"), typ: TypeString, section: SectionWebUI},
 		{key: Key("server", "web", "allowed-hosts"), typ: TypeStringList, section: SectionWebUI, risky: true},
+		{key: Key("server", "web", "files", "roots"), typ: TypeStringList, section: SectionWebUI, risky: true},
 		{key: Key("server", "web", "totp"), typ: TypeBool, section: SectionWebUI, risky: true},
 		{key: Key("server", "web", "vi-escape"), typ: TypeString, section: SectionKeybindings},
 		{key: Key("server", "web", "leader-key-mac"), typ: TypeString, section: SectionKeybindings},

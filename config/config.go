@@ -98,6 +98,13 @@ type ServerConfig struct {
 	Web WebConfig `json:"web"`
 }
 
+// WebFilesConfig configures hosted files.
+type WebFilesConfig struct {
+	// Roots are extra folders gx may host files from. The built-in roots
+	// (repos, worktrees, tickets store, temp folders) are never listed here.
+	Roots []string `json:"roots"`
+}
+
 // WebConfig configures the web UI listener.
 type WebConfig struct {
 	// Listen is the host:port to serve the web UI on; empty means off.
@@ -111,6 +118,8 @@ type WebConfig struct {
 	// AllowedHosts are host names, besides IP literals and localhost, the
 	// listener accepts in the Host header.
 	AllowedHosts []string `json:"allowed-hosts"`
+	// Files configures hosted files.
+	Files WebFilesConfig `json:"files"`
 	// TOTP is whether web login asks for a TOTP code. True when absent.
 	TOTP bool `json:"totp"`
 	// ViEscape is a key sequence (like "jk") that leaves insert mode in the
@@ -410,6 +419,9 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 		}
 		if w.AllowedHosts != nil {
 			cfg.Server.Web.AllowedHosts = w.AllowedHosts
+		}
+		if w.Files != nil && w.Files.Roots != nil {
+			cfg.Server.Web.Files.Roots = w.Files.Roots
 		}
 		if w.TOTP != nil {
 			cfg.Server.Web.TOTP = *w.TOTP

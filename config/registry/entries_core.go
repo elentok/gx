@@ -73,6 +73,9 @@ func coreEntries() []Entry {
 	add(SectionWebUI, risky(Entry{Key: Key("server", "web", "allowed-hosts"), Type: TypeStringList,
 		Description: "Host names the web page accepts requests for."},
 		"A wrong list can lock you out of the web page, and a broad one lets other sites reach it."))
+	add(SectionWebUI, risky(Entry{Key: Key("server", "web", "files", "roots"), Type: TypeStringList,
+		Description: "Extra folders the web page may host files from, besides repos, worktrees, the tickets store and temp folders."},
+		"Every file under a listed folder becomes readable by anyone who signs in to the web page."))
 	add(SectionWebUI, Entry{Key: Key("server", "web", "totp"), Type: TypeBool, Risky: true, RiskyOffOnly: true,
 		ConfirmText: "Turning off the one-time code lets anyone who can reach the web page sign in.",
 		Description: "Ask for a one-time code when signing in to the web page."})

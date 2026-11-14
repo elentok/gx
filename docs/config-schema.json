@@ -476,6 +476,19 @@
               "description": "Turn on Dev mode: gx runs its own Vite from the Dev checkout and serves the web UI from it.",
               "type": "boolean"
             },
+            "files": {
+              "additionalProperties": false,
+              "properties": {
+                "roots": {
+                  "description": "Extra folders the web page may host files from, besides repos, worktrees, the tickets store and temp folders.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            },
             "leader-key": {
               "default": "ctrl+e",
               "description": "The Leader key on other platforms, such as ctrl+e. Press it to see the chords. Empty turns chords off.",
