@@ -206,7 +206,7 @@ func (f *fixture) prepareStore(sc scenario, shape string, port int, configs []st
 		return err
 	}
 	if sc.HostFiles {
-		if err := f.setupHostFiles(shape); err != nil {
+		if err := (hostFilesFixture{f}).setup(shape); err != nil {
 			return fmt.Errorf("host files: %w", err)
 		}
 	}

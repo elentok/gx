@@ -53,7 +53,7 @@ export function FileLink({
           // `&&` outranks Markdown's own `& a` underline.
           css={{
             "&&": {
-              fontFamily: "{fonts.mono}",
+              fontFamily: "mono",
               fontSize: "0.9em",
               textDecoration: "underline dotted",
               textUnderlineOffset: "3px",

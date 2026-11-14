@@ -130,10 +130,10 @@ func (HostedRootsResult) Refuse(reason, message string) HostedRootsResult {
 const MaxHostedCandidates = 200
 
 const (
-	// ReasonTooManyCandidates refuses a resolve call with more than MaxHostedCandidates paths.
-	ReasonTooManyCandidates = "too-many-candidates"
-	// ReasonBadBase refuses a resolve call that names more than one base.
-	ReasonBadBase = "bad-base"
+	// ResolveReasonTooManyCandidates refuses a resolve call with more than MaxHostedCandidates paths.
+	ResolveReasonTooManyCandidates = "too-many-candidates"
+	// ResolveReasonBadBase refuses a resolve call that names more than one base.
+	ResolveReasonBadBase = "bad-base"
 
 	// ReasonPathNotAllowed refuses a url call for any path gx will not host or cannot link.
 	// One reason and one message, so the verb is no path oracle.
@@ -142,14 +142,14 @@ const (
 	ReasonHostNotAllowed = "host-not-allowed"
 
 	// Reasons an add refuses a folder.
-	ReasonRootNotAbsolute = "not-absolute"
-	ReasonRootIsSlash     = "root-folder"
-	ReasonRootIsHome      = "home-folder"
-	ReasonRootMissing     = "missing-path"
-	ReasonRootNotFolder   = "not-a-folder"
+	RootReasonNotAbsolute = "not-absolute"
+	RootReasonIsSlash     = "root-folder"
+	RootReasonIsHome      = "home-folder"
+	RootReasonMissing     = "missing-path"
+	RootReasonNotFolder   = "not-a-folder"
 	// Reasons a remove refuses a folder.
-	ReasonRootBuiltIn  = "built-in-root"
-	ReasonRootNotAdded = "not-a-configured-root"
-	// ReasonRootWriteFailed refuses an add or remove whose config write failed.
-	ReasonRootWriteFailed = "write-failed"
+	RootReasonBuiltIn  = "built-in-root"
+	RootReasonNotAdded = "not-a-configured-root"
+	// RootReasonWriteFailed refuses an add or remove whose config write failed.
+	RootReasonWriteFailed = "write-failed"
 )

@@ -175,12 +175,12 @@ func TestFilesRoots_RefusalsHaveDistinctReasons(t *testing.T) {
 		args   []string
 		reason string
 	}{
-		{"slash", []string{"add", "/"}, ops.ReasonRootIsSlash},
-		{"home", []string{"add", "~"}, ops.ReasonRootIsHome},
-		{"missing", []string{"add", filepath.Join(t.TempDir(), "nope")}, ops.ReasonRootMissing},
-		{"file", []string{"add", notFolder}, ops.ReasonRootNotFolder},
-		{"remove built-in", []string{"remove", builtin}, ops.ReasonRootBuiltIn},
-		{"remove unlisted", []string{"remove", sub}, ops.ReasonRootNotAdded},
+		{"slash", []string{"add", "/"}, ops.RootReasonIsSlash},
+		{"home", []string{"add", "~"}, ops.RootReasonIsHome},
+		{"missing", []string{"add", filepath.Join(t.TempDir(), "nope")}, ops.RootReasonMissing},
+		{"file", []string{"add", notFolder}, ops.RootReasonNotFolder},
+		{"remove built-in", []string{"remove", builtin}, ops.RootReasonBuiltIn},
+		{"remove unlisted", []string{"remove", sub}, ops.RootReasonNotAdded},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -216,10 +216,10 @@ func TestResolve_CandidateLimitAndTwoBases(t *testing.T) {
 	if res := f.resolve(t, ops.HostedResolveRequest{Candidates: many(200)}); res.Refused || len(res.Files) != 200 {
 		t.Errorf("200 candidates: refused=%v files=%d", res.Refused, len(res.Files))
 	}
-	if res := f.resolve(t, ops.HostedResolveRequest{Candidates: many(201)}); res.Reason != ops.ReasonTooManyCandidates {
+	if res := f.resolve(t, ops.HostedResolveRequest{Candidates: many(201)}); res.Reason != ops.ResolveReasonTooManyCandidates {
 		t.Errorf("201 candidates = %+v, want too-many-candidates", res)
 	}
-	if res := f.resolve(t, ops.HostedResolveRequest{Candidates: []string{"a"}, Project: "proj", Dir: f.repo}); res.Reason != ops.ReasonBadBase {
+	if res := f.resolve(t, ops.HostedResolveRequest{Candidates: []string{"a"}, Project: "proj", Dir: f.repo}); res.Reason != ops.ResolveReasonBadBase {
 		t.Errorf("two bases = %+v, want bad-base", res)
 	}
 }

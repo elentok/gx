@@ -78,9 +78,9 @@ func (h hostedFiles) removeRoot(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	reason, msg := ops.ReasonRootNotAdded, path+" is not a configured root"
+	reason, msg := ops.RootReasonNotAdded, path+" is not a configured root"
 	if slices.Contains(resolvedPaths(h.builtinRoots()), resolvedPath(path)) {
-		reason, msg = ops.ReasonRootBuiltIn, path+" is a built-in root; built-in roots are always on"
+		reason, msg = ops.RootReasonBuiltIn, path+" is a built-in root; built-in roots are always on"
 	}
 	wire.WriteJSON(w, ops.HostedRootsResult{}.Refuse(reason, msg))
 }
@@ -101,21 +101,21 @@ func decodeRootPath(w http.ResponseWriter, r *http.Request) (string, bool) {
 
 func (h hostedFiles) checkAddable(path string) (reason, msg string) {
 	if !filepath.IsAbs(path) {
-		return ops.ReasonRootNotAbsolute, "give an absolute folder path"
+		return ops.RootReasonNotAbsolute, "give an absolute folder path"
 	}
 	resolved := resolvedPath(path)
 	if resolved == string(filepath.Separator) {
-		return ops.ReasonRootIsSlash, "the whole disk cannot be a root"
+		return ops.RootReasonIsSlash, "the whole disk cannot be a root"
 	}
 	if home, err := config.DirsFrom(h.s.cfg.Env).Home(); err == nil && resolved == resolvedPath(home) {
-		return ops.ReasonRootIsHome, "the home folder itself cannot be a root; add a subfolder of it"
+		return ops.RootReasonIsHome, "the home folder itself cannot be a root; add a subfolder of it"
 	}
 	info, err := os.Stat(path)
 	switch {
 	case err != nil:
-		return ops.ReasonRootMissing, path + " does not exist"
+		return ops.RootReasonMissing, path + " does not exist"
 	case !info.IsDir():
-		return ops.ReasonRootNotFolder, path + " is not a folder"
+		return ops.RootReasonNotFolder, path + " is not a folder"
 	}
 	return "", ""
 }
@@ -134,11 +134,11 @@ func (h hostedFiles) writeRoots(w http.ResponseWriter, f func(cur []string) []st
 		change = settingsapi.Change{Key: filesRootsKey, Value: val}
 	}
 	if _, err := h.s.settingsWriter.Write(settingsapi.Target{}, []settingsapi.Change{change}); err != nil {
-		wire.WriteJSON(w, ops.HostedRootsResult{}.Refuse(ops.ReasonRootWriteFailed, err.Error()))
+		wire.WriteJSON(w, ops.HostedRootsResult{}.Refuse(ops.RootReasonWriteFailed, err.Error()))
 		return
 	}
 	if rr := h.s.settings.Reload(settings.TriggerWeb); rr.Refused {
-		wire.WriteJSON(w, ops.HostedRootsResult{}.Refuse(ops.ReasonRootWriteFailed, "saved, but the server could not apply it: "+rr.Message))
+		wire.WriteJSON(w, ops.HostedRootsResult{}.Refuse(ops.RootReasonWriteFailed, "saved, but the server could not apply it: "+rr.Message))
 		return
 	}
 	wire.WriteJSON(w, ops.HostedRootsResult{Roots: h.allRoots()})

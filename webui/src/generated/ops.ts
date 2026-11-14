@@ -307,6 +307,32 @@ export interface HostedResolveResult {
   message?: string;
 }
 /**
+ * HostedURLRequest is the POST /v1/hosted-files/url body behind `gx files url`.
+ */
+export interface HostedURLRequest {
+  /**
+   * Path is an absolute path; the client joins relative paths and "~/".
+   */
+  path: string;
+  /**
+   * Host replaces the host of the web URL; it must be an allowed host.
+   */
+  host?: string;
+  /**
+   * Raw asks for the raw link instead of the viewer link.
+   */
+  raw?: boolean;
+}
+/**
+ * HostedURLResult is the url reply: the link, or a refusal.
+ */
+export interface HostedURLResult {
+  url?: string;
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+}
+/**
  * HostedRootSource says where a hosted-file root comes from. The values are
  * literals because tygo cannot resolve constants from another package.
  */
@@ -344,31 +370,40 @@ export interface HostedRootsResult {
  */
 export const MaxHostedCandidates = 200;
 /**
- * ReasonTooManyCandidates refuses a resolve call with more than MaxHostedCandidates paths.
+ * ResolveReasonTooManyCandidates refuses a resolve call with more than MaxHostedCandidates paths.
  */
-export const ReasonTooManyCandidates = "too-many-candidates";
+export const ResolveReasonTooManyCandidates = "too-many-candidates";
 /**
- * ReasonBadBase refuses a resolve call that names more than one base.
+ * ResolveReasonBadBase refuses a resolve call that names more than one base.
  */
-export const ReasonBadBase = "bad-base";
+export const ResolveReasonBadBase = "bad-base";
+/**
+ * ReasonPathNotAllowed refuses a url call for any path gx will not host or cannot link.
+ * One reason and one message, so the verb is no path oracle.
+ */
+export const ReasonPathNotAllowed = "path-not-allowed";
+/**
+ * ReasonHostNotAllowed refuses a url call whose host is not an IP, localhost or an allowed host.
+ */
+export const ReasonHostNotAllowed = "host-not-allowed";
 /**
  * Reasons an add refuses a folder.
  */
-export const ReasonRootNotAbsolute = "not-absolute";
-export const ReasonRootIsSlash = "root-folder";
-export const ReasonRootIsHome = "home-folder";
-export const ReasonRootMissing = "missing-path";
-export const ReasonRootNotFolder = "not-a-folder";
+export const RootReasonNotAbsolute = "not-absolute";
+export const RootReasonIsSlash = "root-folder";
+export const RootReasonIsHome = "home-folder";
+export const RootReasonMissing = "missing-path";
+export const RootReasonNotFolder = "not-a-folder";
 /**
  * Reasons a remove refuses a folder.
  */
-export const ReasonRootBuiltIn = "built-in-root";
-export const ReasonRootNotAdded = "not-a-configured-root";
+export const RootReasonBuiltIn = "built-in-root";
+export const RootReasonNotAdded = "not-a-configured-root";
 /**
- * ReasonRootWriteFailed refuses an add or remove whose config write failed.
+ * RootReasonWriteFailed refuses an add or remove whose config write failed.
  */
-export const ReasonRootWriteFailed = "write-failed";
-export type Reason = typeof ReasonTooManyCandidates | typeof ReasonBadBase | typeof ReasonRootNotAbsolute | typeof ReasonRootIsSlash | typeof ReasonRootIsHome | typeof ReasonRootMissing | typeof ReasonRootNotFolder | typeof ReasonRootBuiltIn | typeof ReasonRootNotAdded | typeof ReasonRootWriteFailed;
+export const RootReasonWriteFailed = "write-failed";
+export type R = typeof ResolveReasonTooManyCandidates | typeof ResolveReasonBadBase | typeof ReasonPathNotAllowed | typeof ReasonHostNotAllowed | typeof RootReasonNotAbsolute | typeof RootReasonIsSlash | typeof RootReasonIsHome | typeof RootReasonMissing | typeof RootReasonNotFolder | typeof RootReasonBuiltIn | typeof RootReasonNotAdded | typeof RootReasonWriteFailed;
 
 //////////
 // source: restart.go

@@ -140,7 +140,11 @@ Promise.all([
 // made and committed): the repo files, the viewer mock, a second worktree with
 // a file of its own, the temp folder, the ticket body and the second origin. The
 // no-main-worktree shape ends by moving the repo off main, so no worktree has it.
-func (f *fixture) setupHostFiles(shape string) error {
+//
+// It lives on its own type so fixture stays under the sizeguard method limit.
+type hostFilesFixture struct{ *fixture }
+
+func (f hostFilesFixture) setup(shape string) error {
 	repo := filepath.Join(f.root, "repo")
 	pic, err := hostFilesPNG()
 	if err != nil {

@@ -98,7 +98,7 @@ func (h hostedFiles) resolve(w http.ResponseWriter, r *http.Request) {
 	}
 	var res ops.HostedResolveResult
 	if len(req.Candidates) > ops.MaxHostedCandidates {
-		res = res.Refuse(ops.ReasonTooManyCandidates, "too many paths: at most 200 per call")
+		res = res.Refuse(ops.ResolveReasonTooManyCandidates, "too many paths: at most 200 per call")
 		wire.WriteJSON(w, res)
 		return
 	}
@@ -109,7 +109,7 @@ func (h hostedFiles) resolve(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if n > 1 {
-		res = res.Refuse(ops.ReasonBadBase, "give at most one of a session, a project and a folder as the base")
+		res = res.Refuse(ops.ResolveReasonBadBase, "give at most one of a session, a project and a folder as the base")
 		wire.WriteJSON(w, res)
 		return
 	}

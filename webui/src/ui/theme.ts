@@ -174,4 +174,12 @@ export const themeConfig = defineConfig({
   },
 })
 
+/** Mermaid theme colours: a line colour that reads on both the light and the dark page. */
+export const mermaidThemeVariables = {
+  primaryColor: "#ddebf9",
+  primaryBorderColor: "#0969da",
+  primaryTextColor: "#0a3069",
+  lineColor: "#8b949e",
+}
+
 export const system = createSystem(defaultConfig, themeConfig)

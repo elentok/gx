@@ -1,3 +1,5 @@
+import { mermaidThemeVariables } from "../ui/theme"
+
 let nextId = 0
 let loaded: Promise<typeof import("mermaid").default> | undefined
 
@@ -9,12 +11,7 @@ function loadMermaid() {
       securityLevel: "strict",
       // Natural size, and a line colour that reads on both the light and the dark page.
       theme: "base",
-      themeVariables: {
-        primaryColor: "#ddebf9",
-        primaryBorderColor: "#0969da",
-        primaryTextColor: "#0a3069",
-        lineColor: "#8b949e",
-      },
+      themeVariables: mermaidThemeVariables,
       flowchart: { useMaxWidth: false },
     })
     return m.default
