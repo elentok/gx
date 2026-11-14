@@ -48,7 +48,7 @@ Token modes (`top-token`, `iframe-token`, both engines): style, image, classic a
 Findings to carry into the spec:
 - A cookie-only design breaks every hosted page that has an external file. Inline-only pages work.
 - Do not rely on the WebKit iframe behavior. It sends the cookie, but it is inconsistent (module scripts and `fetch` still lack it) and differs from the spec and from Chromium.
-- WebKit iframe: a hosted page can fire blind cookie-carrying GETs at `/v1/` (it cannot read replies). So `/v1/` GET handlers must not have side effects, and the Origin check on writes must stay strict, including rejecting `Origin: null`. Note the probe server's check (host equals Host, parse error means reject) rejects `null`; gx's check in `server/web/assets.go:28-48` should be confirmed to do the same.
+- WebKit iframe: a hosted page can fire blind cookie-carrying GETs at `/v1/` (it cannot read replies). So `/v1/` GET handlers must not have side effects, and the Origin check on writes must stay strict, including rejecting `Origin: null`. gx's `checkWriteRequest` (`server/web/assets.go`) already rejects a missing or `null` Origin, so this holds.
 - The `Sec-Fetch-Site: cross-site` plus `Origin: null` signature is easy to reject server-side on `/v1/` API paths as extra defense. Not tested in gx.
 
 ## If the cookie is not sent: ways to authorize asset requests
