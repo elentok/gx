@@ -97,6 +97,12 @@ type ReportReader interface {
 	ReadReport(path string) map[string]int64
 }
 
+// ContextReader is a Tool that also reads a page snapshot for each failing
+// test from Invocation.ReportFile.
+type ContextReader interface {
+	ReadContexts(path string) map[string]string
+}
+
 // Outcome is what a tool found in the output of one run.
 type Outcome struct {
 	// Units counts what ran (tests, files, ...). Zero means nothing ran.
@@ -111,6 +117,8 @@ type Outcome struct {
 	// TestDurations maps a test name (as in Tests) to its duration in
 	// milliseconds. A tool that does not time its tests leaves it nil.
 	TestDurations map[string]int64
+	// Contexts maps a failing test name (as in Tests) to its page snapshot.
+	Contexts map[string]string
 	// Listing holds one line per test of a list-only run. It is printed in
 	// place of "no tests ran".
 	Listing []string
@@ -251,6 +259,9 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	outcome := tool.Parse(out, exit)
 	if rr, ok := tool.(ReportReader); ok && plan.ReportFile != "" {
 		outcome.TestDurations = rr.ReadReport(plan.ReportFile)
+		if cr, ok := tool.(ContextReader); ok && exit != 0 {
+			outcome.Contexts = cr.ReadContexts(plan.ReportFile)
+		}
 		os.Remove(plan.ReportFile)
 	}
 	if exit != 0 {
@@ -380,10 +391,12 @@ func report(tool Tool, o Options, outcome Outcome, out []byte, e indexEntry) int
 		} else {
 			fmt.Fprintf(o.Out, "FAIL %s: %d failed in %s\n", tool.Name(), len(outcome.Failures), dur)
 			renderUnits(o.Out, outcome.Failures)
+			renderSnapshots(o.Out, outcome)
 			if re := tool.RerunArgs(o.Args, outcome.Failures); re != nil {
 				fmt.Fprintln(o.Out, rerunLine(tool.Name(), o.CDir, re))
 			}
 		}
+		renderSlowest(tool, o.Out, outcome.TestDurations)
 		fmt.Fprintln(o.Out, e.Log)
 		return ExitFail
 	case len(outcome.Listing) > 0:
@@ -391,7 +404,9 @@ func report(tool Tool, o Options, outcome Outcome, out []byte, e indexEntry) int
 	case outcome.Units == 0:
 		fmt.Fprintf(o.Out, "PASS %s: no tests ran in %s\n%s\n", tool.Name(), dur, e.Log)
 	default:
-		fmt.Fprintf(o.Out, "PASS %s: %s in %s\n%s\n", tool.Name(), outcome.Summary, dur, e.Log)
+		fmt.Fprintf(o.Out, "PASS %s: %s in %s\n", tool.Name(), outcome.Summary, dur)
+		renderSlowest(tool, o.Out, outcome.TestDurations)
+		fmt.Fprintln(o.Out, e.Log)
 	}
 	return ExitPass
 }

@@ -92,6 +92,51 @@ func (Playwright) Plan(env []string, dir string, args []string) (Invocation, err
 // report at path, keyed like Outcome.Tests. A missing or unreadable report
 // yields nil.
 func (Playwright) ReadReport(path string) map[string]int64 {
+	var durations map[string]int64
+	for _, sp := range readSpecs(path) {
+		if durations == nil {
+			durations = map[string]int64{}
+		}
+		durations[sp.key] += int64(math.Round(sp.ms))
+	}
+	return durations
+}
+
+// ReadContexts returns the text of each failing test's error-context.md,
+// keyed like Outcome.Tests, found through the attachments the JSON report
+// lists for the test's results. A test with no readable file is left out.
+func (Playwright) ReadContexts(path string) map[string]string {
+	var out map[string]string
+	for _, sp := range readSpecs(path) {
+		for _, a := range sp.attachments {
+			data, err := os.ReadFile(a)
+			if err != nil {
+				continue
+			}
+			if out == nil {
+				out = map[string]string{}
+			}
+			out[contextKey(sp.file, sp.name)] = string(data)
+		}
+	}
+	return out
+}
+
+// contextKey names a test for snapshot lookup by file base name: the line
+// reporter prints the file relative to the config dir ("e2e/a.e2e.ts"), the
+// JSON report relative to the test dir ("a.e2e.ts").
+func contextKey(file, name string) string { return filepath.Base(file) + "." + name }
+
+type reportSpec struct {
+	file, name  string
+	key         string
+	ms          float64
+	attachments []string // paths of error-context.md files
+}
+
+// readSpecs lists the tests of the JSON report at path; a missing or
+// unreadable report yields nil.
+func readSpecs(path string) []reportSpec {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
@@ -104,7 +149,10 @@ func (Playwright) ReadReport(path string) map[string]int64 {
 			Title string
 			File  string
 			Tests []struct {
-				Results []struct{ Duration float64 }
+				Results []struct {
+					Duration    float64
+					Attachments []struct{ Name, Path string }
+				}
 			}
 		}
 	}
@@ -112,21 +160,23 @@ func (Playwright) ReadReport(path string) map[string]int64 {
 	if json.Unmarshal(data, &rep) != nil {
 		return nil
 	}
-	var durations map[string]int64
+	var specs []reportSpec
 	var walk func(s suite, titles []string)
 	walk = func(s suite, titles []string) {
 		for _, sp := range s.Specs {
-			var ms float64
+			name := strings.Join(append(slices.Clone(titles), sp.Title), " › ")
+			r := reportSpec{file: sp.File, name: name, key: Unit{Location: sp.File, Name: name}.String()}
 			for _, t := range sp.Tests {
-				for _, r := range t.Results {
-					ms += r.Duration
+				for _, res := range t.Results {
+					r.ms += res.Duration
+					for _, a := range res.Attachments {
+						if a.Name == "error-context" && a.Path != "" {
+							r.attachments = append(r.attachments, a.Path)
+						}
+					}
 				}
 			}
-			if durations == nil {
-				durations = map[string]int64{}
-			}
-			name := strings.Join(append(slices.Clone(titles), sp.Title), " › ")
-			durations[Unit{Location: sp.File, Name: name}.String()] += int64(math.Round(ms))
+			specs = append(specs, r)
 		}
 		for _, c := range s.Suites {
 			walk(c, append(slices.Clone(titles), c.Title))
@@ -136,12 +186,46 @@ func (Playwright) ReadReport(path string) map[string]int64 {
 	for _, file := range rep.Suites {
 		walk(file, nil)
 	}
-	return durations
+	return specs
+}
+
+// locatorQuoted finds the quoted strings of a failure's Locator line.
+var locatorQuoted = regexp.MustCompile(`'([^']{2,})'|"([^"]{2,})"`)
+
+// snapshotExcerpt returns up to maxUnitLines lines of an error-context.md
+// snapshot that contain a string quoted in the failure's Locator line. A
+// failure with no Locator line or no matching snapshot line yields nil.
+func snapshotExcerpt(failure, snapshot string) []string {
+	var terms []string
+	for l := range strings.SplitSeq(failure, "\n") {
+		if rest, ok := strings.CutPrefix(strings.TrimSpace(l), "Locator:"); ok {
+			for _, m := range locatorQuoted.FindAllStringSubmatch(rest, -1) {
+				terms = append(terms, strings.ToLower(m[1]+m[2]))
+			}
+		}
+	}
+	var out []string
+	for l := range strings.SplitSeq(snapshot, "\n") {
+		if len(terms) == 0 {
+			break
+		}
+		low := strings.ToLower(l)
+		if slices.ContainsFunc(terms, func(t string) bool { return strings.Contains(low, t) }) {
+			out = append(out, strings.TrimRight(l, " \r"))
+			if len(out) == maxUnitLines {
+				break
+			}
+		}
+	}
+	return out
 }
 
 // flowNumbersToGrep replaces bare flow numbers (`disk.e2e.ts 69 70`) with one
-// -g pattern. Playwright matches -g against "[project] › file:line:col › title",
-// so a "^" anchor on the bare title never matches; "› " is the anchor instead.
+// -g pattern. Playwright matches -g against the project, file and title joined
+// by spaces, or by " › " in some versions, and never with ":line:col". A "^"
+// anchor on the bare title never matches, and a plain "› " misses the space
+// form, so the anchor is the file extension or "›" (see titleAnchor). A title
+// that merely contains "; 158. x" is not preceded by either.
 // A number after a value flag is that flag's value (`--workers 2`) and stays;
 // a number after a boolean flag (`--headed 69`) is a flow. Mixing bare numbers
 // with a caller's -g/--grep is an error rather than a second -g.
@@ -160,8 +244,11 @@ func flowNumbersToGrep(args []string) ([]string, error) {
 	if slices.ContainsFunc(args, isGrepFlag) {
 		return nil, fmt.Errorf("brief: bare flow numbers %s cannot be mixed with -g/--grep; use one or the other", strings.Join(nums, " "))
 	}
-	return append(out, "-g", `› (`+strings.Join(nums, "|")+`)\. `), nil
+	return append(out, "-g", titleAnchor+`(`+strings.Join(nums, "|")+`)\. `), nil
 }
+
+// titleAnchor precedes a test title in the string -g is matched against.
+const titleAnchor = `(?:\.tsx?|›) `
 
 // playwrightBoolFlags are the `playwright test` flags that take no value, so a
 // number after one is not its value. `--debug` counts: its optional mode is a
@@ -189,7 +276,7 @@ func isDigits(s string) bool {
 var (
 	// playwrightFailure matches the heading of a failure block, such as
 	// `  1) [chromium] › epics.e2e.ts:12:5 › 2. Epic looks right ───`.
-	playwrightFailure = regexp.MustCompile(`^\s+\d+\) (?:\[[^\]]+\] › )?(\S+?):\d+:\d+ › (.*?) ─+\s*$`)
+	playwrightFailure = regexp.MustCompile(`^\s+\d+\) (?:\[[^\]]+\] › )?(\S+?):\d+:\d+ › (.*?)(?: ─+)?\s*$`)
 	// playwrightTotals matches the counts that follow the failure blocks.
 	playwrightTotals = regexp.MustCompile(`^\s+(\d+) (failed|passed|flaky|skipped|did not run)\b`)
 	playwrightCode   = regexp.MustCompile(`^\s*>?\s*\d+ \|`)
@@ -289,5 +376,5 @@ func (Playwright) NarrowArgs(args []string, test string) []string {
 		return nil
 	}
 	re, _ := stripFlag(args, true, "g", "grep")
-	return append(re, "-g", "› "+regexp.QuoteMeta(test)+"$")
+	return append(re, "-g", titleAnchor+regexp.QuoteMeta(test)+"$")
 }

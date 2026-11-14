@@ -1,8 +1,10 @@
 package brief
 
 import (
+	"cmp"
 	"fmt"
 	"io"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -91,6 +93,39 @@ func renderUnitsMax(w io.Writer, units []Unit, maxFull int) {
 	}
 	if len(units) > maxFull {
 		fmt.Fprintf(w, "%d more failures are listed by name only; see the log for their text\n", len(units)-maxFull)
+	}
+}
+
+// maxSlowest is how many of the slowest tests renderSlowest prints.
+const maxSlowest = 5
+
+// renderSlowest prints the slowest tests, one `<seconds>s  <name>` line each,
+// for tools that report page snapshots (playwright). It prints nothing when
+// there are no durations.
+func renderSlowest(tool Tool, w io.Writer, durations map[string]int64) {
+	if _, ok := tool.(ContextReader); !ok || len(durations) == 0 {
+		return
+	}
+	names := slices.SortedFunc(maps.Keys(durations), func(a, b string) int {
+		return cmp.Or(cmp.Compare(durations[b], durations[a]), cmp.Compare(a, b))
+	})
+	for _, n := range names[:min(maxSlowest, len(names))] {
+		fmt.Fprintf(w, "%.1fs  %s\n", float64(durations[n])/1000, n)
+	}
+}
+
+// renderSnapshots prints, under each failure, the lines of its page snapshot
+// that match the failing locator. A failure without a snapshot prints nothing.
+func renderSnapshots(w io.Writer, o Outcome) {
+	for _, u := range o.Failures {
+		lines := snapshotExcerpt(u.Text, o.Contexts[contextKey(u.Location, u.Name)])
+		if len(lines) == 0 {
+			continue
+		}
+		fmt.Fprintf(w, "  snapshot for %s:\n", u.Name)
+		for _, l := range lines {
+			fmt.Fprintf(w, "    %s\n", l)
+		}
 	}
 }
 

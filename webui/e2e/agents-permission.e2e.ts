@@ -206,7 +206,9 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await expect(page.getByRole("button", { name: "Dismiss", exact: true })).toBeVisible()
   await expect(page.getByRole("button", { name: "Huh?" })).toHaveCount(0)
   await expect(page.getByRole("button", { name: "Answer in the terminal" })).toHaveCount(0)
-  await expect(failure(page)).toBeVisible()
+  // The question sheet has its own Dismiss and terminal buttons, so it covers
+  // the blocked notice (sheetCoversBlock in AgentChat).
+  await expect(failure(page)).toHaveCount(0)
 
   // Permission and plan cards: exact labels, nothing preselected, no Huh?.
   const wrapped = await cardOf("permission", "ask again for this command")

@@ -1,6 +1,8 @@
 package brief
 
 import (
+	"bytes"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -158,20 +160,27 @@ func TestPlaywrightPlan_BareFlowNumbersBecomeOneAnchoredGrep(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"test", "--reporter=line,json", "-c", playwrightConfig, "disk.e2e.ts", "--workers", "2", "-g", `› (69|70)\. `}
+	want := []string{"test", "--reporter=line,json", "-c", playwrightConfig, "disk.e2e.ts", "--workers", "2", "-g", `(?:\.tsx?|›) (69|70)\. `}
 	if !slices.Equal(inv.Argv, want) {
 		t.Errorf("argv = %v, want %v", inv.Argv, want)
 	}
-	// Playwright matches -g against "[project] › file:line:col › title", so a
-	// "^" anchor on the bare title never matches; the pattern must find a flow.
+	// Playwright matches -g against the project, file and title joined by
+	// spaces (no ":line:col"), or by " › " in other versions.
 	re := regexp.MustCompile(want[len(want)-1])
-	if !re.MatchString("[chromium] › disk.e2e.ts:9:1 › 69. Disk banner") || re.MatchString("[chromium] › disk.e2e.ts:9:1 › 169. Other") {
-		t.Errorf("pattern %q must match flow 69 and not 169", want[len(want)-1])
+	for _, s := range []string{"chromium disk.e2e.ts 69. Disk banner", "[chromium] › disk.e2e.ts:9:1 › 69. Disk banner"} {
+		if !re.MatchString(s) {
+			t.Errorf("pattern %q must match %q", re, s)
+		}
+	}
+	for _, s := range []string{"chromium disk.e2e.ts 169. Other", "chromium a.e2e.ts 157. x; 69. design y"} {
+		if re.MatchString(s) {
+			t.Errorf("pattern %q must not match %q", re, s)
+		}
 	}
 }
 
 func TestFlowNumbersToGrep(t *testing.T) {
-	const grep = `› (69)\. `
+	const grep = `(?:\.tsx?|›) (69)\. `
 	tests := []struct {
 		name    string
 		args    []string
@@ -235,6 +244,81 @@ func TestPlaywrightReadReport_KeysDurationsLikeFailureNames(t *testing.T) {
 	}
 	if (Playwright{}).ReadReport(filepath.Join(t.TempDir(), "missing.json")) != nil {
 		t.Error("a missing report must yield nil")
+	}
+}
+
+func runReport(o Outcome, exit int) string {
+	var buf bytes.Buffer
+	report(Playwright{}, Options{Out: &buf}, o, nil, indexEntry{Exit: exit, Log: "LOG"})
+	return buf.String()
+}
+
+func TestReport_PlaywrightPrintsTheSlowestFiveOnPassAndFail(t *testing.T) {
+	d := map[string]int64{}
+	for i := 1; i <= 7; i++ {
+		d[fmt.Sprintf("a.e2e.ts.%d. T", i)] = int64(i) * 1000
+	}
+	pass := runReport(Outcome{Units: 7, Summary: "7 tests", TestDurations: d}, 0)
+	want := "PASS playwright: 7 tests in 0s\n7.0s  a.e2e.ts.7. T\n6.0s  a.e2e.ts.6. T\n5.0s  a.e2e.ts.5. T\n4.0s  a.e2e.ts.4. T\n3.0s  a.e2e.ts.3. T\nLOG\n"
+	if pass != want {
+		t.Errorf("pass report:\n%s\nwant:\n%s", pass, want)
+	}
+	fail := runReport(Outcome{Failures: []Unit{{Location: "a.e2e.ts", Name: "7. T"}}, TestDurations: d}, 1)
+	if !strings.Contains(fail, "7.0s  a.e2e.ts.7. T\n") || !strings.HasSuffix(fail, "LOG\n") {
+		t.Errorf("fail report lacks the slowest tests:\n%s", fail)
+	}
+	few := runReport(Outcome{Units: 2, Summary: "2 tests", TestDurations: map[string]int64{"a.1": 500, "a.2": 1500}}, 0)
+	if strings.Count(few, "s  a.") != 2 || !strings.Contains(few, "1.5s  a.2\n0.5s  a.1\n") {
+		t.Errorf("fewer than five tests must all print:\n%s", few)
+	}
+	if none := runReport(Outcome{Units: 2, Summary: "2 tests"}, 0); strings.Contains(none, "s  ") {
+		t.Errorf("no durations must print no lines:\n%s", none)
+	}
+}
+
+func TestReport_PlaywrightPrintsMatchingSnapshotLinesOnFailureOnly(t *testing.T) {
+	text := "Error: expect(locator).toBeVisible()\nLocator: getByRole('region', { name: 'Session failure' })\nExpected: visible"
+	snapshot := "- main:\n  - button \"Dismiss\"\n  - region \"Session failure\"\n  - heading \"Other\""
+	u := Unit{Location: "e2e/a.e2e.ts", Name: "1. T", Text: text}
+	o := Outcome{Failures: []Unit{u}, Contexts: map[string]string{"a.e2e.ts.1. T": snapshot}}
+	got := runReport(o, 1)
+	if !strings.Contains(got, "    - region \"Session failure\"\n") || strings.Contains(got, "Other") || strings.Contains(got, "Dismiss") {
+		t.Errorf("snapshot excerpt wrong:\n%s", got)
+	}
+	if pass := runReport(Outcome{Units: 1, Summary: "1 tests", Contexts: o.Contexts}, 0); strings.Contains(pass, "Session failure") {
+		t.Errorf("a pass must print no snapshot:\n%s", pass)
+	}
+	o.Contexts = nil
+	if got := runReport(o, 1); strings.Contains(got, "snapshot") {
+		t.Errorf("no error-context.md must print no snapshot block:\n%s", got)
+	}
+}
+
+func TestPlaywrightParse_FailureHeadingWithoutRule(t *testing.T) {
+	out := "  1) [chromium] › e2e/a.e2e.ts:177:1 › 158. A very long title that fills the line \n\n    Error: boom\n\n  1 failed\n    [chromium] › e2e/a.e2e.ts:177:1 › 158. A very long title that fills the line\n"
+	got := Playwright{}.Parse([]byte(out), 1)
+	if len(got.Failures) != 1 || got.Failures[0].Text != "Error: boom" {
+		t.Errorf("failures = %+v, want one with its error text", got.Failures)
+	}
+}
+
+func TestPlaywrightReadContexts_ReadsTheAttachedErrorContext(t *testing.T) {
+	dir := t.TempDir()
+	ctx := filepath.Join(dir, "error-context.md")
+	if err := os.WriteFile(ctx, []byte("- region \"X\""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	report := fmt.Sprintf(`{"suites":[{"title":"a.e2e.ts","file":"a.e2e.ts","specs":[
+	  {"title":"1. T","file":"a.e2e.ts","tests":[{"results":[{"duration":1,"attachments":[{"name":"error-context","path":%q}]}]}]},
+	  {"title":"2. U","file":"a.e2e.ts","tests":[{"results":[{"duration":1,"attachments":[{"name":"error-context","path":%q}]}]}]}]}]}`,
+		ctx, filepath.Join(dir, "missing.md"))
+	path := filepath.Join(dir, "report.json")
+	if err := os.WriteFile(path, []byte(report), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := Playwright{}.ReadContexts(path)
+	if want := map[string]string{"a.e2e.ts.1. T": "- region \"X\""}; !maps.Equal(got, want) {
+		t.Errorf("contexts = %v, want %v", got, want)
 	}
 }
 
