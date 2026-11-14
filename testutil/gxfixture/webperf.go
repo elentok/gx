@@ -10,9 +10,9 @@ import (
 
 // seedWebPerf writes the scenario's samples through the store, each day's
 // batch received at noon of that past local day. The server loads them at start.
-func (f *fixture) seedWebPerf(days []spec.WebPerfDay) error {
+func seedWebPerf(stateDir string, days []spec.WebPerfDay) error {
 	now := time.Now()
-	store, err := webperf.Open(f.stateD, time.Now)
+	store, err := webperf.Open(stateDir, time.Now)
 	if err != nil {
 		return err
 	}

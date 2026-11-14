@@ -300,7 +300,7 @@ func (f *fixture) seedBeforeStart(sc scenario, shape string) error {
 		f.env = append(f.env, "GX_BUDGET_POLL_INTERVAL="+spendPollInterval)
 	}
 	if sc.WebPerf != nil {
-		if err := f.seedWebPerf(sc.WebPerf()); err != nil {
+		if err := seedWebPerf(f.stateD, sc.WebPerf()); err != nil {
 			return fmt.Errorf("seed web performance: %w", err)
 		}
 	}
