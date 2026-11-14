@@ -1,4 +1,5 @@
 import { chatOf, row, sessions, titleHeading } from "./agentsKit"
+import { draftPage } from "./draftKit"
 import { expect, nav, test } from "./fixture"
 import { goto } from "./sidebarKit"
 
@@ -165,6 +166,11 @@ test("Chords", async ({ page, start }) => {
       await expect(chordBox).toBeVisible({ timeout: 1_000 })
     }).toPass({ timeout: 10_000 })
   }
+  const draftIds = async () =>
+    (await fx.cli("designs", "drafts", "list"))
+      .split("\n")
+      .filter((l) => l.includes("\t"))
+      .map((l) => l.split("\t")[0]!.trim())
   const chordForm = page.getByRole("dialog", { name: "New session" })
   const chordProject = chordForm.getByRole("combobox", nav("Project"))
   await goto(page, "#/d/side:side-design")
@@ -190,10 +196,51 @@ test("Chords", async ({ page, start }) => {
   await expect(chordForm).toHaveCount(0)
   await openBox()
   await page.keyboard.press("d")
-  const chordDesignSlug = page.getByRole("dialog").getByRole("textbox", nav("Epic slug"))
-  await expect(chordDesignSlug).toBeVisible()
-  await page.keyboard.press("Escape")
-  await expect(chordDesignSlug).toHaveCount(0)
+  // d opens a draft page with the Prompt focused, and no dialog.
+  const draft = draftPage(page)
+  await expect(page).toHaveURL(/#\/drafts\/[^/]+$/)
+  await expect(draft.prompt).toBeFocused()
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+  expect(await draftIds()).toHaveLength(2)
+
+  // On the empty draft: Leader then x removes it at once and leaves for the Epics page.
+  await openBox()
+  await expect(chordBox.getByRole("menuitem", { name: /^x\s*Remove$/ })).toBeVisible()
+  await page.keyboard.press("x")
+  await expect(page).toHaveURL(/#\/epics$/)
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect.poll(draftIds).toHaveLength(1)
+  // The draft page is gone before the next chord reads the page it is on.
+  await expect(draft.prompt).toHaveCount(0)
+
+  // On a non-empty draft: r focuses the slug field; x asks first, Keep leaves it, Remove deletes it.
+  await openBox()
+  await page.keyboard.press("d")
+  await expect(page).toHaveURL(/#\/drafts\/[^/]+$/)
+  await expect(draft.prompt).toBeFocused()
+  await draft.prompt.fill("A chord idea.")
+  await expect.poll(draftIds).toHaveLength(2)
+  await openBox()
+  await page.keyboard.press("r")
+  await expect(draft.slug).toBeFocused()
+  // The pair sits inline in the page footer, not in a dialog.
+  const draftRemoveText = page.getByText("Remove this draft and its images?")
+  const draftRemove = draftRemoveText.locator("xpath=..")
+  await draft.prompt.focus()
+  await openBox()
+  await page.keyboard.press("x")
+  await expect(draftRemoveText).toBeVisible()
+  await draftRemove.getByRole("button", nav("Keep")).click()
+  await expect(draftRemoveText).toHaveCount(0)
+  await expect(page).toHaveURL(/#\/drafts\/[^/]+$/)
+  expect(await draftIds()).toHaveLength(2)
+  await openBox()
+  await page.keyboard.press("x")
+  await draftRemove.getByRole("button", nav("Remove")).click()
+  await expect(page).toHaveURL(/#\/epics$/)
+  await expect.poll(draftIds).toHaveLength(1)
+  await expect(sidebar.getByRole("link", { name: /Untitled design|A chord idea/ })).toHaveCount(0)
+  await expect(page.getByRole("heading", { name: "Epics", level: 1 })).toBeVisible()
 
   // On a live chat: Leader then x asks first with Keep focused, Keep leaves the chat, Remove deletes it.
   await goto(page, "#/epics")

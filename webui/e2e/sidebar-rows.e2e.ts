@@ -6,9 +6,9 @@ import { frameButton, goto, sidebarKit, stillMotion } from "./sidebarKit"
 // rows; split from the Workspaces flow so each stays inside its time limit.
 test("Sidebar rows", async ({ page, start }) => {
   test.setTimeout(120_000)
-  await start("workspaces")
+  const fx = await start("workspaces")
   await stillMotion(page)
-  const { sidebar, row, itemOf, nestedLinks, switcher, menuFocused, closeMenus, pick } =
+  const { sidebar, row, itemOf, nestedLinks, switcher, menuFocused, closeMenus, pick, rowMenu } =
     sidebarKit(page)
 
   // One global ring for keyboard focus: inset on a sidebar row, gap plus blue ring elsewhere, never after a click.
@@ -253,4 +253,77 @@ test("Sidebar rows", async ({ page, start }) => {
   ])
     await expect.poll(() => shown(button)).toBe(1)
   await phone.close()
+
+  // The seeded Design draft joins the Default rows: status "Draft" (never an agent word), a number under Alt that opens its page,
+  // and a row menu with Rename, Move to workspace and Remove only. It goes last because Remove deletes it.
+  await goto(page, "#/epics")
+  const draftIds = async () =>
+    (await fx.cli("designs", "drafts", "list"))
+      .split("\n")
+      .filter((l) => l.includes("\t"))
+      .map((l) => l.split("\t")[0]!.trim())
+  const seededDraft = row("ws-draft")
+  await expect(seededDraft).toBeVisible()
+  const draftHref = (await seededDraft.getAttribute("href"))!
+  const draftLink = sidebar.locator(`a[href="${draftHref}"]`)
+  await expect(draftLink).toContainText("Draft")
+  await expect(draftLink).not.toContainText(/Needs you|Working/)
+  const draftNumber = draftLink.locator("xpath=..").getByTestId("row-number")
+  await page.keyboard.down("Alt")
+  await expect(draftNumber).toHaveText(/^\d$/)
+  const draftKey = (await draftNumber.textContent())!
+  await page.keyboard.up("Alt")
+  await page.keyboard.press(`Alt+${draftKey}`)
+  await expect(page).toHaveURL(new RegExp(`${draftHref.slice(1)}$`))
+  await goto(page, "#/epics")
+  await rowMenu("ws-draft").click()
+  await menuFocused()
+  await expect(page.getByRole("menuitem")).toHaveText([/^Rename/, /^Move to workspace/, /^Remove/])
+  await closeMenus()
+
+  // Rename opens the chat popup for the slug: a bad slug is refused with the page field's message, an empty one clears it.
+  await rowMenu("ws-draft").click()
+  await page.getByRole("menuitem", nav("Rename")).click()
+  const renameDialog = page.getByRole("dialog", { name: "Rename draft" })
+  const slugField = renameDialog.getByRole("textbox", nav("Slug"))
+  await expect(slugField).toHaveValue("ws-draft")
+  await slugField.fill("Bad Slug")
+  await page.keyboard.press("Enter")
+  await expect(renameDialog).toContainText(
+    '"Bad Slug" is not a slug (want lowercase words joined by -)',
+  )
+  await slugField.fill("")
+  await page.keyboard.press("Enter")
+  await expect(renameDialog).toHaveCount(0)
+  await expect(seededDraft).toHaveCount(0)
+  await expect(draftLink).toBeVisible()
+  await expect(draftLink).toContainText("A draft in no workspace")
+
+  // Remove on a non-empty draft asks first; Keep leaves it, Remove deletes it.
+  const seeded = await draftIds()
+  expect(seeded).toHaveLength(1)
+  const removeDraft = page.getByRole("dialog", { name: /^Remove / })
+  await frameButton(draftLink).click()
+  await page.getByRole("menuitem", nav("Remove")).click()
+  await expect(removeDraft).toContainText("Its prompt and images are deleted.")
+  await removeDraft.getByRole("button", nav("Keep")).click()
+  await expect(removeDraft).toHaveCount(0)
+  expect(await draftIds()).toEqual(seeded)
+  await frameButton(draftLink).click()
+  await page.getByRole("menuitem", nav("Remove")).click()
+  await removeDraft.getByRole("button", nav("Remove")).click()
+  await expect(draftLink).toHaveCount(0)
+  await expect.poll(draftIds).toEqual([])
+
+  // An empty draft has nothing to lose: Remove acts at once with no modal.
+  await sidebar.getByRole("button", { name: "+ New", exact: true }).click()
+  await page.getByRole("menuitem", { name: /^New design/ }).click()
+  await expect(page).toHaveURL(/#\/drafts\/[^/]+$/)
+  await expect.poll(draftIds).toHaveLength(1)
+  const emptyLink = sidebar.getByRole("link", { name: /^Design draft Untitled design/ })
+  await frameButton(emptyLink).click()
+  await page.getByRole("menuitem", nav("Remove")).click()
+  await expect(emptyLink).toHaveCount(0)
+  await expect(removeDraft).toHaveCount(0)
+  await expect.poll(draftIds).toEqual([])
 })
