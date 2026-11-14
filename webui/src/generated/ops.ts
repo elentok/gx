@@ -126,13 +126,17 @@ export const ReasonDraftRevisionConflict = "revision-conflict";
  */
 export const ReasonDraftGone = "draft-gone";
 /**
+ * ReasonDraftUnknownWorkspace: a create named a workspace that does not exist; no draft was stored.
+ */
+export const ReasonDraftUnknownWorkspace = "unknown-workspace";
+/**
  * ReasonDraftNotEmpty: remove-if-empty found content, so the draft stays.
  */
 export const ReasonDraftNotEmpty = "draft-not-empty";
 /**
  * Refusal reasons of a New Design draft text save.
  */
-export type ReasonDraft = typeof ReasonDraftRevisionConflict | typeof ReasonDraftGone | typeof ReasonDraftNotEmpty;
+export type ReasonDraft = typeof ReasonDraftRevisionConflict | typeof ReasonDraftGone | typeof ReasonDraftUnknownWorkspace | typeof ReasonDraftNotEmpty;
 /**
  * DesignDraft is one New Design form kept on the server. Slug may be empty;
  * Images lists image ids the server alone writes.
@@ -178,6 +182,11 @@ export interface DesignDraftSaveRequest {
    * person did not make (the form moving a draft off a deleted project).
    */
   keep_edited_at?: boolean;
+  /**
+   * Workspace is the workspace a newly created draft joins. Read only when the
+   * request creates a draft (no ID); ignored on a save of an existing draft.
+   */
+  workspace?: string;
 }
 /**
  * DesignDraftTargetRequest sets a draft's slug and project. It is revision-free

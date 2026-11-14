@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
@@ -36,6 +37,18 @@ func (r rig) archive(t *testing.T, yes, dryRun bool, targets ...string) []wire.T
 		t.Fatal(err)
 	}
 	return res.Results
+}
+
+func TestArchive_DraftKeyRefused(t *testing.T) {
+	r := start(t, "done")
+	key := drafts.MemberKey("0123456789abcdef")
+	res := r.archive(t, true, false, key)
+	if res[0].Status != wire.TargetRefused || res[0].Reason != ops.ReasonCleanupUnknown {
+		t.Errorf("archive %s = %+v, want refused unknown", key, res[0])
+	}
+	if got := r.archived(t); len(got) != 0 {
+		t.Errorf("archived = %v, want nothing", got)
+	}
 }
 
 func (r rig) archived(t *testing.T) map[string]bool {

@@ -40,6 +40,7 @@ type Deps struct {
 type Workspaces interface {
 	Workspace(key string) string
 	SetMember(key, workspace string) error
+	Remove(key string) error
 }
 
 // Designs opens, cleans up and deletes the Design sessions of map epics.
@@ -75,15 +76,38 @@ func New(d Deps) *Designs {
 	if err := ds.MigrateNames(); err != nil && d.Log != nil {
 		d.Log.Warn("design drafts: name migration failed", "err", err)
 	}
-	if _, err := ds.SweepEmpty(); err != nil && d.Log != nil {
-		d.Log.Warn("design drafts: sweep failed", "err", err)
-	}
-	return &Designs{
+	s := &Designs{
 		log: d.Log, ticketStore: d.TicketStore, conversationsDir: d.ConversationsDir,
 		idx: d.Idx, projects: d.Projects, events: d.Events, guards: d.Guards,
 		chat: d.Chat, webURL: d.WebURL, workspaces: d.Workspaces,
 		onBranch: d.OnBranch,
 		drafts:   ds,
+	}
+	removed, err := ds.SweepEmpty()
+	if err != nil && d.Log != nil {
+		d.Log.Warn("design drafts: sweep failed", "err", err)
+	}
+	s.dropDrafts(removed...)
+	return s
+}
+
+// DraftExists reports whether a New Design draft with this id is stored.
+func (s *Designs) DraftExists(id string) bool {
+	_, err := s.drafts.Get(id)
+	return err == nil
+}
+
+// dropDrafts clears the workspace membership of deleted drafts. Every path that
+// deletes a draft goes through it, so none leaves a dead member. A nil
+// workspace store skips it.
+func (s *Designs) dropDrafts(ids ...string) {
+	if s.workspaces == nil {
+		return
+	}
+	for _, id := range ids {
+		if err := s.workspaces.Remove(drafts.MemberKey(id)); err != nil && s.log != nil {
+			s.log.Warn("drop draft membership", "draft", id, "err", err)
+		}
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -255,6 +256,20 @@ func TestSessionStatus_HolderDeathIsCrashed(t *testing.T) {
 	got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
 	if got.Exit != wire.SessionExitCrashed || !got.Unread.Unread {
 		t.Errorf("session = %+v, want exited crashed and unread", got)
+	}
+}
+
+func TestStop_DraftKeyRefused(t *testing.T) {
+	t.Parallel()
+	h := servertest.Start(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	res, err := h.Client.Sessions.Stop(ctx, drafts.MemberKey("0123456789abcdef"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Refused {
+		t.Errorf("stop of a draft key = %+v, want refused", res)
 	}
 }
 

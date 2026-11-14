@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/oneoff"
@@ -79,6 +80,9 @@ func (s *Store) holdTargetOf(addr string) (holdTarget, *wire.TargetResult) {
 	}
 	addr = strings.TrimSpace(addr)
 	dir := s.dir()
+	if _, isDraft := drafts.ParseMemberKey(addr); isDraft {
+		return refuse(wire.ReasonHoldNotHoldable, "a draft cannot be held")
+	}
 	if _, _, ok := tickets.ParseEpicAddress(addr); !ok {
 		return refuse(wire.ReasonHoldUnknown, string(ReasonUnknownKey))
 	}

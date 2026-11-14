@@ -503,6 +503,7 @@ func (s *Designs) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult,
 		if err := s.drafts.Delete(req.DraftID); err != nil {
 			s.log.Warn("delete started draft", "draft", req.DraftID, "err", err)
 		}
+		s.dropDrafts(req.DraftID)
 		if draftExisted {
 			if err := s.drafts.RecordStart(req.DraftID, addr); err != nil {
 				s.log.Warn("record draft start", "draft", req.DraftID, "err", err)

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
@@ -49,6 +50,28 @@ func TestWorkspacesRoutes_MoveTakesManyTargetsAndRefusesOneAlone(t *testing.T) {
 		if r.Target != want[i].Target || r.Status != want[i].Status || r.Reason != want[i].Reason {
 			t.Errorf("result %d = %+v, want %+v", i, r, want[i])
 		}
+	}
+}
+
+func TestWorkspacesRoutes_MoveDraft(t *testing.T) {
+	f, ctx := startMembership(t)
+	d, err := drafts.New(f.H.StateDir).Create("proj", "a-draft", "an idea")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := drafts.MemberKey(d.ID)
+	res, err := f.H.Client.Admin.MoveToWorkspace(ctx, "Bugs", key, drafts.MemberKey("ffffffffffffffff"))
+	if err != nil || len(res.Results) != 2 {
+		t.Fatalf("move = %+v, %v", res, err)
+	}
+	if r := res.Results[0]; r.Status != wire.TargetDone {
+		t.Errorf("existing draft = %+v, want done", r)
+	}
+	if r := res.Results[1]; r.Status != wire.TargetRefused || r.Reason != wire.ReasonWorkspaceUnknownKey {
+		t.Errorf("unknown draft = %+v, want unknown-key", r)
+	}
+	if got := f.H.Server.Workspaces().Workspace(key); got != "Bugs" {
+		t.Errorf("draft workspace = %q, want Bugs", got)
 	}
 }
 
@@ -206,11 +229,13 @@ func TestWorkspacesRoutes_SnapshotPlacesChatsDesignsAndFixAgents(t *testing.T) {
 
 type fakeDir struct {
 	designs  map[string]bool
+	drafts   map[string]bool
 	oneOffs  map[string]bool
 	sessions []wire.SessionInfo
 }
 
 func (d fakeDir) DesignExists(key string) bool { return d.designs[key] }
+func (d fakeDir) DraftExists(id string) bool   { return d.drafts[id] }
 func (d fakeDir) Sessions() []wire.SessionInfo { return d.sessions }
 func (d fakeDir) RootQueued(string) bool       { return false }
 func (d fakeDir) StopSession(string) error     { return nil }

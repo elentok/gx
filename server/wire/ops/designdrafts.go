@@ -8,6 +8,8 @@ const (
 	ReasonDraftRevisionConflict = "revision-conflict"
 	// ReasonDraftGone: the draft was deleted (or emptied) since the caller loaded it.
 	ReasonDraftGone = "draft-gone"
+	// ReasonDraftUnknownWorkspace: a create named a workspace that does not exist; no draft was stored.
+	ReasonDraftUnknownWorkspace = "unknown-workspace"
 	// ReasonDraftNotEmpty: remove-if-empty found content, so the draft stays.
 	ReasonDraftNotEmpty = "draft-not-empty"
 )
@@ -49,6 +51,9 @@ type DesignDraftSaveRequest struct {
 	// KeepEditedAt saves without moving the edited-at time, for a change the
 	// person did not make (the form moving a draft off a deleted project).
 	KeepEditedAt bool `json:"keep_edited_at,omitempty"`
+	// Workspace is the workspace a newly created draft joins. Read only when the
+	// request creates a draft (no ID); ignored on a save of an existing draft.
+	Workspace string `json:"workspace,omitempty"`
 }
 
 // DesignDraftTargetRequest sets a draft's slug and project. It is revision-free

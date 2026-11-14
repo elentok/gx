@@ -159,6 +159,122 @@ func TestDesignsOpenNew_DraftWorkspaceWins(t *testing.T) {
 	}
 }
 
+// membersFile is the raw text of the workspace store's file under the state dir.
+func (f designsFixture) membersFile(t *testing.T) string {
+	t.Helper()
+	var text string
+	err := filepath.WalkDir(f.h.StateDir, func(p string, d os.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && d.Name() == "workspaces.json" {
+			b, rerr := os.ReadFile(p)
+			text, err = string(b), rerr
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return text
+}
+
+// draftInWorkspace seeds a draft and moves it to a new workspace "A".
+func (f designsFixture) draftInWorkspace(t *testing.T, slug, idea string) *ops.DesignDraft {
+	t.Helper()
+	if _, err := f.h.Client.Admin.CreateWorkspace(f.ctx, "A"); err != nil && !strings.Contains(err.Error(), "already exists") {
+		t.Fatal(err)
+	}
+	d := f.seedDraft(t, "proj", slug, idea)
+	if err := f.h.Server.Workspaces().SetMember(drafts.MemberKey(d.ID), "A"); err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
+func (f designsFixture) wantNoMembership(t *testing.T, d *ops.DesignDraft) {
+	t.Helper()
+	key := drafts.MemberKey(d.ID)
+	if got := f.h.Server.Workspaces().Workspace(key); got != workspaces.DefaultName {
+		t.Errorf("workspace of %s = %q, want Default", key, got)
+	}
+	if strings.Contains(f.membersFile(t), d.ID) {
+		t.Errorf("members file still lists %s", d.ID)
+	}
+}
+
+func TestDesignsOpenNew_DropsDraftMembership(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	d := f.draftInWorkspace(t, "dropped", "an idea")
+	f.openFromDraft(t, "dropped", "an idea", d.ID)
+	f.wantNoMembership(t, d)
+	if got := f.h.Server.Workspaces().Workspace("proj:dropped"); got != "A" {
+		t.Errorf("design workspace = %q, want A", got)
+	}
+}
+
+func TestWebDesignDrafts_DeleteDropsMembership(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	byRoute := f.draftInWorkspace(t, "by-route", "an idea")
+	if _, err := f.h.Client.Sessions.DeleteDesignDraft(f.ctx, byRoute.ID); err != nil {
+		t.Fatal(err)
+	}
+	f.wantNoMembership(t, byRoute)
+
+	empty := f.draftInWorkspace(t, "", "")
+	res, err := f.h.Client.Sessions.RemoveDesignDraftIfEmpty(f.ctx, empty.ID)
+	if err != nil || !res.Deleted {
+		t.Fatalf("remove-if-empty = %+v, %v", res, err)
+	}
+	f.wantNoMembership(t, empty)
+
+	// The sweep that runs on a create removes other empty drafts.
+	swept := f.draftInWorkspace(t, "", "")
+	if _, err := f.h.Client.Sessions.SaveDesignDraft(f.ctx, ops.DesignDraftSaveRequest{Idea: "new text"}); err != nil {
+		t.Fatal(err)
+	}
+	f.wantNoMembership(t, swept)
+}
+
+func TestWebDesignDrafts_CreateJoinsWorkspace(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	if _, err := f.h.Client.Admin.CreateWorkspace(f.ctx, "A"); err != nil {
+		t.Fatal(err)
+	}
+	ws := f.h.Server.Workspaces()
+	save := func(req ops.DesignDraftSaveRequest) ops.DesignDraftSaveResult {
+		t.Helper()
+		res, err := f.h.Client.Sessions.SaveDesignDraft(f.ctx, req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+
+	joined := save(ops.DesignDraftSaveRequest{Idea: "one", Workspace: "A"})
+	if got := ws.Workspace(drafts.MemberKey(joined.Draft.ID)); got != "A" {
+		t.Errorf("created draft workspace = %q, want A", got)
+	}
+	if !strings.Contains(f.membersFile(t), joined.Draft.ID) {
+		t.Errorf("members file does not list %s", joined.Draft.ID)
+	}
+	for _, name := range []string{"", workspaces.DefaultName} {
+		d := save(ops.DesignDraftSaveRequest{Idea: "two " + name, Workspace: name}).Draft
+		f.wantNoMembership(t, d)
+	}
+
+	before, _ := f.h.Client.Sessions.DesignDrafts(f.ctx)
+	res := save(ops.DesignDraftSaveRequest{Idea: "three", Workspace: "Nope"})
+	after, _ := f.h.Client.Sessions.DesignDrafts(f.ctx)
+	if !res.Refused || res.Reason != ops.ReasonDraftUnknownWorkspace || len(after) != len(before) {
+		t.Errorf("unknown workspace = %+v, drafts %d -> %d, want refused and none stored", res, len(before), len(after))
+	}
+
+	other := f.seedDraft(t, "proj", "existing", "idea")
+	save(ops.DesignDraftSaveRequest{ID: other.ID, Idea: "edited", Revision: other.Revision, Workspace: "A"})
+	f.wantNoMembership(t, other)
+}
+
 func TestDesignsOpenNew_StartRecord(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)

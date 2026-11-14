@@ -46,6 +46,11 @@ func (d workspacesDirectory) DesignExists(key string) bool {
 	return ok && e.IsMap
 }
 
+// DraftExists reports whether a New Design draft with this id is stored.
+func (d workspacesDirectory) DraftExists(id string) bool {
+	return d.s.designs.DraftExists(id)
+}
+
 func (d workspacesDirectory) RootQueued(key string) bool {
 	root, err := queue.ParseRootRef(key)
 	return err == nil && d.s.queue.RootQueued(root)

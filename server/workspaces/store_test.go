@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -18,9 +19,11 @@ import (
 type fakeDesigns struct {
 	Directory
 	designs map[string]bool
+	drafts  map[string]bool
 }
 
 func (f fakeDesigns) DesignExists(key string) bool { return f.designs[key] }
+func (f fakeDesigns) DraftExists(id string) bool   { return f.drafts[id] }
 
 func open(t *testing.T, dir string, b *broker.Broker) *Store {
 	t.Helper()
@@ -123,6 +126,57 @@ func TestMembership(t *testing.T) {
 	}
 	if got := s.Workspace("p:a"); got != DefaultName {
 		t.Fatalf("after delete = %q", got)
+	}
+}
+
+func openWithDraft(t *testing.T, id string) *Store {
+	t.Helper()
+	d := fakeDesigns{designs: map[string]bool{"p:nav": true}, drafts: map[string]bool{id: true}}
+	s, err := Open(t.TempDir(), broker.New(0), func() Directory { return d })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Create("Bugs"); err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func TestStoreJoin_Draft(t *testing.T) {
+	const id = "0123456789abcdef"
+	s := openWithDraft(t, id)
+	key := drafts.MemberKey(id)
+	if err := s.Join(key, "Bugs"); err != nil {
+		t.Fatalf("join existing draft = %v", err)
+	}
+	if got := s.Workspace(key); got != "Bugs" {
+		t.Errorf("draft workspace = %q, want Bugs", got)
+	}
+	if err := s.Join(drafts.MemberKey("ffffffffffffffff"), "Bugs"); err != ReasonUnknownKey {
+		t.Errorf("join unknown draft = %v, want ReasonUnknownKey", err)
+	}
+}
+
+func TestDraftDefault(t *testing.T) {
+	const id = "0123456789abcdef"
+	s := openWithDraft(t, id)
+	if got := s.Workspace(drafts.MemberKey(id)); got != DefaultName {
+		t.Errorf("draft with no membership = %q, want Default", got)
+	}
+}
+
+func TestDelete_DraftMemberFallsToDefault(t *testing.T) {
+	const id = "0123456789abcdef"
+	s := openWithDraft(t, id)
+	key := drafts.MemberKey(id)
+	if err := s.Join(key, "Bugs"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Delete("Bugs"); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Workspace(key); got != DefaultName {
+		t.Errorf("draft after workspace delete = %q, want Default", got)
 	}
 }
 

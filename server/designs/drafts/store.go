@@ -487,7 +487,16 @@ const startsDir = "starts"
 
 // MemberKey is the one name of a draft's workspace membership. The "/" keeps it
 // from parsing as an epic address, and it is never a session id.
-func MemberKey(id string) string { return "draft/" + id }
+func MemberKey(id string) string { return memberPrefix + id }
+
+const memberPrefix = "draft/"
+
+// ParseMemberKey is MemberKey's inverse: the draft id of a member key, and
+// false for any other key.
+func ParseMemberKey(key string) (id string, ok bool) {
+	id, ok = strings.CutPrefix(key, memberPrefix)
+	return id, ok && id != ""
+}
 
 type startRecord struct {
 	Design    string    `json:"design"`

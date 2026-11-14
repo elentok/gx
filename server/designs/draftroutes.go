@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/imagestore"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
+	"github.com/elentok/gx/server/workspaces"
 )
 
 func (s *Designs) draftList(w http.ResponseWriter, _ *http.Request) {
@@ -48,7 +49,13 @@ func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
 		var d *ops.DesignDraft
 		if d, err = s.drafts.Create("", "", req.Idea); err == nil {
 			res = ops.DesignDraftSaveResult{Draft: d}
-			_, err = s.drafts.SweepEmpty(d.ID)
+			if refused := s.joinNewDraft(d.ID, req.Workspace); refused {
+				res = ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftUnknownWorkspace}
+			} else {
+				var removed []string
+				removed, err = s.drafts.SweepEmpty(d.ID)
+				s.dropDrafts(removed...)
+			}
 		}
 	} else {
 		res, err = s.drafts.Save(req.ID, req)
@@ -59,6 +66,22 @@ func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wire.WriteJSON(w, res)
+}
+
+// joinNewDraft puts a just-created draft in the named workspace. An empty or
+// Default name, or no workspace store, joins nothing. An unknown name deletes
+// the draft again and reports refused, so no draft is left behind.
+func (s *Designs) joinNewDraft(id, workspace string) (refused bool) {
+	if s.workspaces == nil || workspace == "" || workspace == workspaces.DefaultName {
+		return false
+	}
+	if err := s.workspaces.SetMember(drafts.MemberKey(id), workspace); err != nil {
+		if delErr := s.drafts.Delete(id); delErr != nil {
+			s.log.Warn("delete draft of unknown workspace", "draft", id, "err", delErr)
+		}
+		return true
+	}
+	return false
 }
 
 // withStarted adds the Design a gone draft was started as, when a Start record exists.
@@ -203,6 +226,9 @@ func (s *Designs) draftRemoveIfEmpty(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if res.Deleted {
+		s.dropDrafts(req.ID)
+	}
 	wire.WriteJSON(w, res)
 }
 
@@ -231,5 +257,6 @@ func (s *Designs) draftDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	s.dropDrafts(req.ID)
 	wire.WriteJSON(w, ops.DesignDraftSaveResult{Deleted: true})
 }

@@ -205,6 +205,28 @@ func TestDesignsImages_ListGet(t *testing.T) {
 	}
 }
 
+func TestDesignsDrafts_SaveWorkspaceFlagCreatesIntoWorkspace(t *testing.T) {
+	if newDraftsSaveCmd(Deps{}).Flags().Lookup("workspace") == nil {
+		t.Fatal("drafts save has no --workspace flag")
+	}
+	h := servertest.StartWithStore(t, t.TempDir())
+	ctx := context.Background()
+	if _, err := h.Client.Admin.CreateWorkspace(ctx, "A"); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runDraftsSave(ctx, h.Client, &out, true, ops.DesignDraftSaveRequest{Idea: "idea", Workspace: "A"}); err != nil {
+		t.Fatal(err)
+	}
+	var res ops.DesignDraftSaveResult
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil || res.Draft == nil {
+		t.Fatalf("save output = %q, %v", out.String(), err)
+	}
+	if got := h.Server.Workspaces().Workspace(drafts.MemberKey(res.Draft.ID)); got != "A" {
+		t.Errorf("created draft workspace = %q, want A", got)
+	}
+}
+
 func TestDesignsDrafts_SaveRevisionConflict(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir())
 	d, err := drafts.New(h.StateDir).Create("proj", "s", "idea")
