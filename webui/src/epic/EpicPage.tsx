@@ -31,6 +31,7 @@ import { postEpicMarkSeen } from "../epics/queue"
 import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list"
 import { Markdown } from "../markdown/Markdown"
 import { DetailPage } from "../page/DetailPage"
+import { FileLinkProvider, NoFileLinks } from "../files/FileLinkContext"
 import { PageHeader } from "../page/PageHeader"
 import { PageIcon } from "../page/PageIcon"
 import { Badge } from "../ui/badge/Badge"
@@ -328,7 +329,9 @@ function DescriptionLine({ summary }: { summary: string }) {
           whiteSpace="nowrap"
           color="inherit"
         >
-          <Markdown inline>{summary}</Markdown>
+          <NoFileLinks>
+            <Markdown inline>{summary}</Markdown>
+          </NoFileLinks>
         </chakra.button>
       </Popover.Trigger>
       <Portal>
@@ -520,7 +523,7 @@ function EpicPageBody({
   }, [unread, address])
 
   return (
-    <>
+    <FileLinkProvider base={{ project: address.split(":")[0] }}>
       {notFound ? (
         <EmptyState title="Epic not found">{address} does not exist.</EmptyState>
       ) : detail ? (
@@ -580,6 +583,6 @@ function EpicPageBody({
       ) : (
         <FullScreenLoader label="Loading epic" />
       )}
-    </>
+    </FileLinkProvider>
   )
 }

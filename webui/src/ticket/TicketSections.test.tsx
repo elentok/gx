@@ -1,6 +1,7 @@
-import { cleanup, screen } from "@testing-library/react"
+import { cleanup, screen, waitFor } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
-import { afterEach, expect, test } from "vitest"
+import { afterEach, describe, expect, test, vi } from "vitest"
+import { stubResolveFetch } from "../files/stubResolver"
 import canned from "../canned-detail.json"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type { DetailRun, RelatedTicket, TicketDetail } from "../generated/server"
@@ -146,6 +147,36 @@ test("Latest summary shows the agent's four parts and gx's own entry, labelled",
   expect(section.textContent).toContain("agent left")
   expect(section.textContent).toContain("Written by gx")
   expect(section.textContent).toContain("resent continue")
+})
+
+describe("file links", () => {
+  afterEach(() => vi.unstubAllGlobals())
+  const body = "See docs/plans/host-files.md, /etc/hosts and gone/x.md and .env"
+
+  test("the description links found paths, sends the project as base in one call, and leaves missing ones plain", async () => {
+    const { fetchFn, bodies } = stubResolveFetch(["docs/plans/host-files.md", "/etc/hosts"])
+    vi.stubGlobal("fetch", fetchFn)
+    renderTicket({ ...plain, body })
+    const section = await screen.findByRole("region", { name: "Description" })
+    await waitFor(() => expect(section.querySelectorAll("a")).toHaveLength(2))
+    expect([...section.querySelectorAll("a")].map((a) => a.textContent)).toEqual([
+      "docs/plans/host-files.md",
+      "/etc/hosts",
+    ])
+    expect(section.textContent).toContain("gone/x.md and .env")
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0].project).toBe("gx")
+  })
+
+  test("with no main worktree only absolute paths link", async () => {
+    const { fetchFn } = stubResolveFetch(["/etc/hosts"])
+    vi.stubGlobal("fetch", fetchFn)
+    renderTicket({ ...plain, body })
+    const section = await screen.findByRole("region", { name: "Description" })
+    await waitFor(() => expect(section.querySelectorAll("a")).toHaveLength(1))
+    expect(section.querySelector("a")?.textContent).toBe("/etc/hosts")
+    expect(section.textContent).toContain("docs/plans/host-files.md")
+  })
 })
 
 test("no Latest summary section without a summary", async () => {

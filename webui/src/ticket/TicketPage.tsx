@@ -2,6 +2,7 @@ import { Box } from "@chakra-ui/react"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
+import { FileLinkProvider } from "../files/FileLinkContext"
 import { fetchTicketScreen, type FetchScreen } from "../design/screen"
 import { ScreenModal } from "../design/ScreenModal"
 import { DetailPage } from "../page/DetailPage"
@@ -57,50 +58,52 @@ export function TicketPage({
 
   return (
     <DetailPage title={{ kind: "Ticket", name: detail?.title.trim() || address }}>
-      {notFound ? (
-        <EmptyState title="Ticket not found">{address} does not exist.</EmptyState>
-      ) : detail ? (
-        <>
-          <PageHeader title={detail.title} icon={<PageIcon kind="ticket" />} subtitle={address}>
-            <TicketHeader detail={detail} now={Date.now()} />
-            {verdict && (
-              <Box mt="2">
-                <VerdictLine text={verdict} />
+      <FileLinkProvider base={{ project: address.split(":")[0] }}>
+        {notFound ? (
+          <EmptyState title="Ticket not found">{address} does not exist.</EmptyState>
+        ) : detail ? (
+          <>
+            <PageHeader title={detail.title} icon={<PageIcon kind="ticket" />} subtitle={address}>
+              <TicketHeader detail={detail} now={Date.now()} />
+              {verdict && (
+                <Box mt="2">
+                  <VerdictLine text={verdict} />
+                </Box>
+              )}
+            </PageHeader>
+            {(detail.has_screen || agent) && (
+              <Box mt="2" display="flex" gap="2">
+                {detail.has_screen && (
+                  <Button emphasis="secondary" onClick={() => setShowScreen(true)}>
+                    Screen
+                  </Button>
+                )}
+                {agent && (
+                  <Button emphasis="secondary" onClick={() => navigate(`/agents/${agent.id}`)}>
+                    Goto agent
+                  </Button>
+                )}
               </Box>
             )}
-          </PageHeader>
-          {(detail.has_screen || agent) && (
-            <Box mt="2" display="flex" gap="2">
-              {detail.has_screen && (
-                <Button emphasis="secondary" onClick={() => setShowScreen(true)}>
-                  Screen
-                </Button>
-              )}
-              {agent && (
-                <Button emphasis="secondary" onClick={() => navigate(`/agents/${agent.id}`)}>
-                  Goto agent
-                </Button>
-              )}
-            </Box>
-          )}
-          {showScreen && (
-            <ScreenModal
-              target={address}
-              fetcher={fetchScreen}
-              onClose={() => setShowScreen(false)}
-            />
-          )}
-          <ActionCard detail={detail} sent={sent} onSent={setSent} refetch={refetch} />
-          {!detail.parse_error && (
-            <>
-              <TicketSections detail={detail} now={Date.now()} />
-              {!hasSections(detail) && !needsActionCard(detail, sent) && <NothingHere />}
-            </>
-          )}
-        </>
-      ) : (
-        <FullScreenLoader label="Loading ticket" />
-      )}
+            {showScreen && (
+              <ScreenModal
+                target={address}
+                fetcher={fetchScreen}
+                onClose={() => setShowScreen(false)}
+              />
+            )}
+            <ActionCard detail={detail} sent={sent} onSent={setSent} refetch={refetch} />
+            {!detail.parse_error && (
+              <>
+                <TicketSections detail={detail} now={Date.now()} />
+                {!hasSections(detail) && !needsActionCard(detail, sent) && <NothingHere />}
+              </>
+            )}
+          </>
+        ) : (
+          <FullScreenLoader label="Loading ticket" />
+        )}
+      </FileLinkProvider>
     </DetailPage>
   )
 }

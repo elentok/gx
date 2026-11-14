@@ -10,6 +10,7 @@ import type {
   SessionInfo,
   Workspace,
 } from "../generated/server"
+import { stubResolveFetch } from "../files/stubResolver"
 import { appRoutes } from "../routes"
 import type { FixAgent } from "./fixAgent"
 import { renderThemed } from "../ui/render"
@@ -969,6 +970,25 @@ test("a click on the description opens the full text and Escape closes it", asyn
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
     expect(screen.queryByTestId("description-popover")).toBeNull()
   })
+})
+
+test("the popover links a found path in the summary and the truncated trigger stays plain", async () => {
+  const { fetchFn, bodies } = stubResolveFetch(["docs/plans/host-files.md"])
+  vi.stubGlobal("fetch", fetchFn)
+  try {
+    const summary = "Plan in docs/plans/host-files.md, not gone/x.md"
+    render("/e/gx:blog-impl", [], "loop", { detail: { summary } })
+    const button = await descriptionButton()
+    expect(button.querySelector("a")).toBeNull()
+    fireEvent.click(button)
+    const popover = await screen.findByTestId("description-popover")
+    await waitFor(() => expect(popover.querySelectorAll("a")).toHaveLength(1))
+    expect(popover.querySelector("a")?.textContent).toBe("docs/plans/host-files.md")
+    expect(button.querySelector("a")).toBeNull()
+    expect(bodies[0].project).toBe("gx")
+  } finally {
+    vi.unstubAllGlobals()
+  }
 })
 
 test("Copy epic ID is the only menu item and copies project:name", async () => {

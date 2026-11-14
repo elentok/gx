@@ -1,6 +1,8 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react"
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test } from "vitest"
 import canned from "../canned-detail.json"
+import { FileLinkProvider } from "../files/FileLinkContext"
+import { stubResolver } from "../files/stubResolver"
 import type { TicketDetail } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { TicketReading } from "./TicketReading"
@@ -34,6 +36,22 @@ test("notes and earlier rounds are collapsed until tapped", () => {
   expect(screen.getByText("I compared both; Redis survives restarts.")).toBeTruthy()
   fireEvent.click(screen.getByRole("button", { name: /Earlier rounds/ }))
   expect(screen.getByText(/Which database\?/)).toBeTruthy()
+})
+
+test("the asker's text links a found path and leaves a missing one plain", async () => {
+  const { resolver } = stubResolver(["docs/plans/host-files.md"])
+  const detail: TicketDetail = {
+    ...base,
+    latest: { ...base.latest!, text: "Read docs/plans/host-files.md and gone/x.md first" },
+  }
+  const { container } = renderThemed(
+    <FileLinkProvider resolver={resolver}>
+      <TicketReading detail={detail} />
+    </FileLinkProvider>,
+  )
+  await waitFor(() => expect(container.querySelectorAll("a")).toHaveLength(1))
+  expect(container.querySelector("a")?.textContent).toBe("docs/plans/host-files.md")
+  expect(container.textContent).toContain("gone/x.md")
 })
 
 test("an answered round shows its thread read-only", () => {

@@ -30,6 +30,11 @@ export function useFileLinks() {
   return useContext(FileLinkCtx)
 }
 
+/** Keeps its children plain text inside a provider, e.g. a link cannot nest in a button. */
+export function NoFileLinks({ children }: { children: ReactNode }) {
+  return <FileLinkCtx.Provider value={null}>{children}</FileLinkCtx.Provider>
+}
+
 export type FileLinkProviderProps = {
   base?: ResolveBase
   /** Tests inject a stub; the default is the real client for `base`. */

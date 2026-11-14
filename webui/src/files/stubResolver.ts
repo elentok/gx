@@ -21,3 +21,23 @@ export function stubResolver(found: string[]) {
   }
   return { resolver, calls }
 }
+
+/**
+ * A fetch for the real resolver client: candidates in `found` are found, the rest missing.
+ * `bodies` collects the parsed request body of each resolve call, so a test can read the base.
+ */
+export function stubResolveFetch(found: string[]) {
+  const bodies: { project?: string; session?: string; candidates: string[] }[] = []
+  const fetchFn = async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (!String(url).endsWith("/v1/hosted-files/resolve")) return new Response("", { status: 404 })
+    const body = JSON.parse(String(init?.body))
+    bodies.push(body)
+    const files: HostedResolved[] = body.candidates.map((c: string) =>
+      found.includes(c)
+        ? { candidate: c, verdict: HostedFound, path: `/abs/${c.replace(/^\//, "")}` }
+        : { candidate: c, verdict: "missing" },
+    )
+    return new Response(JSON.stringify({ files }), { status: 200 })
+  }
+  return { fetchFn, bodies }
+}
