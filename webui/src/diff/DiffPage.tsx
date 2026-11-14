@@ -149,11 +149,13 @@ function FileNav({
   index,
   visible,
   onStep,
+  phone,
 }: {
   scope: string
   index: number
   visible: DiffFile[]
   onStep: (d: 1 | -1) => void
+  phone: boolean
 }) {
   const added = visible.reduce((n, f) => n + f.added, 0)
   const deleted = visible.reduce((n, f) => n + f.deleted, 0)
@@ -163,7 +165,13 @@ function FileNav({
     </Box>
   )
   return (
-    <Box data-testid="file-nav" display="flex" alignItems="center" gap="2">
+    <Box
+      data-testid="file-nav"
+      display="flex"
+      alignItems="center"
+      gap="2"
+      flexWrap={phone ? "wrap" : "nowrap"}
+    >
       <Button emphasis="secondary" disabled={visible.length === 0} onClick={() => onStep(-1)}>
         {hint("p")}
         Prev
@@ -177,9 +185,10 @@ function FileNav({
         fontSize="sm"
         color="text.muted"
         minW="0"
+        flexBasis={phone ? "100%" : "auto"}
         overflow="hidden"
         textOverflow="ellipsis"
-        whiteSpace="nowrap"
+        whiteSpace={phone ? "normal" : "nowrap"}
       >
         {`${scope} · ${visible.length === 0 ? "" : `${index + 1} of ${visible.length} · `}${visible.length} files · `}
         <Box as="span" color="tone.done.fg">{`+${added}`}</Box>{" "}
@@ -305,7 +314,7 @@ function FilesBrowser({
   )
   const right = (
     <Box minW="0">
-      <FileNav scope={scope} index={index} visible={order} onStep={step} />
+      <FileNav scope={scope} index={index} visible={order} onStep={step} phone={phone} />
       <Box data-testid="diff-area" data-view={view} data-file={selected} mt="4">
         {!selectedFile && order.length === 0 && (
           <Box data-testid="no-files" fontSize="sm" color="text.muted">
