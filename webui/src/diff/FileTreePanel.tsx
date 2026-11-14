@@ -4,7 +4,7 @@ import type { DiffFile } from "../generated/server"
 import { buildTree, filterFiles } from "./fileTree"
 
 const STATUS_TONE: Record<string, string> = {
-  A: "tone.running.fg",
+  A: "tone.done.fg",
   D: "tone.deadlocked.fg",
   R: "tone.waiting.fg",
 }
@@ -18,14 +18,14 @@ function ChangeBar({ added, deleted }: { added: number; deleted: number }) {
       aria-label={`+${added} −${deleted}`}
       role="img"
       display="flex"
-      w="40px"
+      w="48px"
       h="6px"
       flexShrink={0}
       borderRadius="3px"
       overflow="hidden"
       bg="border"
     >
-      <Box data-part="added" w={`${addPct}%`} bg="tone.running.fg" />
+      <Box data-part="added" w={`${addPct}%`} bg="tone.done.fg" />
       <Box data-part="deleted" w={`${total === 0 ? 0 : 100 - addPct}%`} bg="tone.deadlocked.fg" />
     </Box>
   )
@@ -46,6 +46,7 @@ export function FileFilter({ value, onChange }: { value: string; onChange: (v: s
       h="40px"
       px="3"
       fontSize="sm"
+      fontFamily="mono"
       bg="surface.raised"
       color="text"
       border="1px solid"
@@ -64,6 +65,7 @@ const rowProps = {
   minH: "32px",
   pr: "2",
   fontSize: "sm",
+  fontFamily: "mono",
   textAlign: "left",
 } as const
 
@@ -148,7 +150,7 @@ export function FileTree({
               data-testid="file-status"
               w="14px"
               fontFamily="mono"
-              fontWeight="600"
+              fontWeight="400"
               color={STATUS_TONE[letter] ?? "text.muted"}
             >
               {letter}

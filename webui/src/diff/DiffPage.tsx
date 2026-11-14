@@ -126,22 +126,35 @@ function Notice({
 
 function FileNav({
   index,
-  total,
+  visible,
   onStep,
 }: {
   index: number
-  total: number
+  visible: DiffFile[]
   onStep: (d: 1 | -1) => void
 }) {
+  const added = visible.reduce((n, f) => n + f.added, 0)
+  const deleted = visible.reduce((n, f) => n + f.deleted, 0)
+  const hint = (k: string) => (
+    <Box as="span" aria-hidden="true" fontFamily="mono" color="text.muted" mr="2">
+      {k}
+    </Box>
+  )
   return (
-    <Box data-testid="file-nav" display="flex" alignItems="center" gap="2">
+    <Box data-testid="file-nav" display="flex" flexWrap="wrap" alignItems="center" gap="2">
       <Button emphasis="secondary" onClick={() => onStep(-1)}>
+        {hint("p")}
         Prev
       </Button>
       <Button emphasis="secondary" onClick={() => onStep(1)}>
+        {hint("n")}
         Next
       </Button>
-      <Box as="span" fontSize="sm" color="text.muted">{`${index + 1} of ${total}`}</Box>
+      <Box as="span" fontSize="sm" color="text.muted">
+        {`${index + 1} of ${visible.length} · ${visible.length} files · `}
+        <Box as="span" color="tone.done.fg">{`+${added}`}</Box>{" "}
+        <Box as="span" color="tone.deadlocked.fg">{`−${deleted}`}</Box>
+      </Box>
     </Box>
   )
 }
@@ -227,7 +240,7 @@ function FilesBrowser({
   )
   const right = (
     <Box minW="0">
-      <FileNav index={index} total={order.length} onStep={step} />
+      <FileNav index={index} visible={order} onStep={step} />
       {/* The diff render ticket draws the selected file here. */}
       <Box data-testid="diff-area" data-view={view} data-file={selected} mt="4" />
     </Box>
