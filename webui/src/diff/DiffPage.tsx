@@ -26,7 +26,7 @@ import {
   type FetchDiffFiles,
   type FetchDiffPatch,
 } from "./api"
-import { CommitList, NarrowChip, narrowingLabel, TRUNCATED_TEXT } from "./CommitList"
+import { ALL_COMMITS, CommitList, NarrowChip, narrowingLabel, TRUNCATED_TEXT } from "./CommitList"
 import type { DiffView } from "./DiffBody"
 import { DiffFileCard, type PatchRange } from "./DiffFileCard"
 import { diffQuery, parseDiffUrl } from "./diffUrl"
@@ -143,10 +143,12 @@ function Notice({
 }
 
 function FileNav({
+  scope,
   index,
   visible,
   onStep,
 }: {
+  scope: string
   index: number
   visible: DiffFile[]
   onStep: (d: 1 | -1) => void
@@ -169,7 +171,7 @@ function FileNav({
         Next
       </Button>
       <Box as="span" fontSize="sm" color="text.muted">
-        {`${visible.length === 0 ? "" : `${index + 1} of ${visible.length} · `}${visible.length} files · `}
+        {`${scope} · ${visible.length === 0 ? "" : `${index + 1} of ${visible.length} · `}${visible.length} files · `}
         <Box as="span" color="tone.done.fg">{`+${added}`}</Box>{" "}
         <Box as="span" color="tone.deadlocked.fg">{`−${deleted}`}</Box>
       </Box>
@@ -217,12 +219,15 @@ function FilesBrowser({
   fetchCommitPatches,
   commits,
   commitList,
+  scope,
   emptyNotice,
   view,
   selectedPath,
   onSelect,
   phone,
 }: {
+  /** What the view is narrowed to, as the commit disclosure names it. */
+  scope: string
   files: DiffFile[]
   range: PatchRange
   fetchPatch: FetchDiffPatch
@@ -283,7 +288,7 @@ function FilesBrowser({
   )
   const right = (
     <Box minW="0">
-      <FileNav index={index} visible={order} onStep={step} />
+      <FileNav scope={scope} index={index} visible={order} onStep={step} />
       <Box data-testid="diff-area" data-view={view} data-file={selected} mt="4">
         {!selectedFile && order.length === 0 && (
           <Box data-testid="no-files" fontSize="sm" color="text.muted">
@@ -506,6 +511,7 @@ export function DiffPage({
       {!notice && fresh && "value" in fresh && fresh.value.kind === "files" && files ? (
         <FilesBrowser
           files={wanted ? narrowedFiles : fresh.value.files.files}
+          scope={chipLabel ?? ALL_COMMITS}
           commits={wanted ? narrowing : undefined}
           commitList={
             returned && (

@@ -4,6 +4,7 @@ import type { DiffCommit } from "../generated/server"
 import type { CommitGroup } from "./commitGroups"
 
 export const TRUNCATED_TEXT = "Showing the first 500 commits"
+export const ALL_COMMITS = "All commits"
 
 const sameShas = (a: string[], b: string[]) =>
   a.length === b.length && a.every((s) => b.includes(s))
@@ -161,7 +162,7 @@ export function CommitList({
           textAlign="right"
           color="tone.running.fg"
         >
-          {label ?? ""}
+          {label ?? ALL_COMMITS}
         </Box>
       </chakra.button>
       {open && (
@@ -178,7 +179,12 @@ export function CommitList({
             </Box>
           )}
           <Row active={!narrowing} onClick={() => onNarrow(undefined)}>
-            All commits
+            <Box as="span" flex="1">
+              {ALL_COMMITS}
+            </Box>
+            <Box as="span" fontSize="xs">
+              {count}
+            </Box>
           </Row>
           {groups.map((g) => {
             const shas = g.commits.map((c) => c.sha)

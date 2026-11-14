@@ -32,7 +32,7 @@ const disclosure = () => screen.findByTestId("commits-disclosure")
 const paths = () => screen.queryAllByTestId("tree-file").map((n) => n.textContent)
 const toggle = () =>
   within(screen.getByTestId("commits-disclosure")).getByRole("button", { expanded: false })
-const pick = (name: string) =>
+const pick = (name: string | RegExp) =>
   fireEvent.click(within(screen.getByTestId("commits-disclosure")).getByRole("button", { name }))
 
 test("collapsed it reads COMMITS BY TICKET (n); opened it starts with All commits", async () => {
@@ -40,10 +40,11 @@ test("collapsed it reads COMMITS BY TICKET (n); opened it starts with All commit
   const d = await disclosure()
   const header = toggle()
   expect(header.textContent).toContain("COMMITS BY TICKET (5)")
-  expect(within(d).queryByText("All commits")).toBeNull()
+  expect(screen.getByTestId("commits-narrowing").textContent).toBe("All commits")
+  expect(screen.getByTestId("file-nav").textContent).toContain("All commits · 1 of")
   fireEvent.click(header)
   const rows = within(d).getAllByRole("button").slice(1)
-  expect(rows[0].textContent).toBe("All commits")
+  expect(rows[0].textContent).toBe("All commits5")
   expect(rows[1].textContent).toContain("Add the thing")
 })
 
@@ -58,6 +59,7 @@ test("narrowing to a ticket, Design or Other commits filters the tree and sets t
   await waitFor(() => expect(paths()).toHaveLength(1))
   expect(screen.getByTestId("narrow-chip").textContent).toContain("Showing: Add the thing")
   expect(screen.getByTestId("commits-narrowing").textContent).toBe("Add the thing")
+  expect(screen.getByTestId("file-nav").textContent).toContain("Add the thing · ")
   pick("Design 1")
   await waitFor(() => expect(fetchFiles).toHaveBeenLastCalledWith("gx", "main", "dev", ["c1"]))
   pick("Other commits 1")
@@ -89,7 +91,7 @@ test("the chip's x and All commits restore the full tree", async () => {
   expect(router.state.location.search).not.toContain("commits=")
   pick("Add b")
   await waitFor(() => expect(paths()).toHaveLength(1))
-  pick("All commits")
+  pick(/^All commits/)
   await waitFor(() => expect(paths()).toHaveLength(full))
 })
 
