@@ -93,6 +93,49 @@ type Stats struct {
 	Launch     StatsLaunch     `json:"launch"`
 	Grilling   StatsGrilling   `json:"grilling"`
 	LimitBurn  StatsLimitBurns `json:"limit_burn"`
+
+	WebPerformance StatsWebPerformance `json:"web_performance"`
+}
+
+// StatsWebPerformance is the Web performance section. It is account-wide: the
+// project filter does not change it. Timings are milliseconds, CLS is unitless.
+// Nil values are absent (no samples, or no change to show).
+type StatsWebPerformance struct {
+	HardLoads     []StatsWebPerfCard  `json:"hard_loads"`
+	RouteChanges  []StatsWebPerfCard  `json:"route_changes"`
+	Trend         []StatsWebPerfTrend `json:"trend"`
+	SlowestRoutes []StatsWebPerfRoute `json:"slowest_routes"`
+}
+
+// StatsWebPerfCard is one metric on one tab. Status is good,
+// needs-improvement or poor, and empty with fewer than 20 samples or no
+// standard cutoff. ChangePct is the percent change of p75 against the
+// preceding equal window.
+type StatsWebPerfCard struct {
+	Metric    string   `json:"metric"`
+	Count     int      `json:"count"`
+	P75       *float64 `json:"p75"`
+	Status    string   `json:"status,omitempty"`
+	ChangePct *float64 `json:"change_pct"`
+}
+
+// StatsWebPerfPoint is one day of a trend: one point per entry of Stats.Days.
+type StatsWebPerfPoint struct {
+	P75   *float64 `json:"p75"`
+	Count int      `json:"count"`
+}
+
+// StatsWebPerfTrend is the daily p75 series of one metric, over both tabs.
+type StatsWebPerfTrend struct {
+	Metric string              `json:"metric"`
+	Days   []StatsWebPerfPoint `json:"days"`
+}
+
+// StatsWebPerfRoute is one route's p75 of route_ready.
+type StatsWebPerfRoute struct {
+	Route string  `json:"route"`
+	P75   float64 `json:"p75"`
+	Count int     `json:"count"`
 }
 
 // StatsGrilling is the Grilling section: words and questions per day of the

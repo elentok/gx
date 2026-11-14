@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/tickets/ticketmigrate"
+	"github.com/elentok/gx/webperf"
 )
 
 const (
@@ -63,6 +65,53 @@ func statsBuildOnce(b *testing.B, store string) time.Duration {
 	}
 	buildStats(statsInput{Epics: all, Days: 90, Now: time.Now()})
 	return time.Since(start)
+}
+
+// BenchmarkStats_WebPerformance reads the web performance section at cap-sized
+// data: 20,000 samples a day for 90 days. The first read parses every day file
+// and is reported as cold-ms; later reads hit the day cache.
+func BenchmarkStats_WebPerformance(b *testing.B) {
+	now := time.Now()
+	store, err := webperf.Open(b.TempDir(), time.Now)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(store.Close)
+	metrics := []string{"lcp", "inp", "cls", "fcp", "app_ready", "route_ready"}
+	routes := []string{"epics", "epic", "agents", "stats", "tips", "ticket"}
+	for d := range benchStampDaysSpread {
+		at := now.AddDate(0, 0, -d)
+		samples := make([]webperf.Sample, webperf.MaxPerDay)
+		for i := range samples {
+			samples[i] = webperf.Sample{
+				ID: fmt.Sprintf("%d", i), Session: fmt.Sprintf("s-%d", i/webperf.MaxPerSessionPerDay),
+				Metric: metrics[i%len(metrics)], Route: routes[i%len(routes)], Tab: "hard", Value: float64(i%4000 + 1), Env: "prod",
+			}
+		}
+		if _, _, err := store.Append(at, samples); err != nil {
+			b.Fatal(err)
+		}
+	}
+	read := func() time.Duration {
+		start := time.Now()
+		if _, err := buildWebPerformance(store, limits.NewStatsWindow(90, now), true); err != nil {
+			b.Fatal(err)
+		}
+		return time.Since(start)
+	}
+	// Seeding leaves a large heap behind; collect it so cold-ms is the read alone.
+	runtime.GC()
+	cold := read()
+	if cold > statsBuildBudget {
+		b.Errorf("cold web performance read took %v, budget %v", cold, statsBuildBudget)
+	}
+	b.ResetTimer()
+	b.ReportMetric(float64(cold.Milliseconds()), "cold-ms")
+	for range b.N {
+		if took := read(); took > statsBuildBudget {
+			b.Errorf("web performance read took %v, budget %v", took, statsBuildBudget)
+		}
+	}
 }
 
 // BenchmarkStats_Grilling reads and sums 2,000 conversation records, the

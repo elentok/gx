@@ -14,3 +14,7 @@ counted. Spend on cancelled and started-over tickets never shows, so chart total
 budget ledger. Charts sum ticket stamps only; epic stamps feed the epic page, so no work counts twice.
 This is hard to undo: every finishing path now stamps, and `gx tickets migrate` backfills the past
 from the logs once.
+
+## Amendment
+
+Account-wide sections with no ticket source read their own bounded store (web performance reads its 90-day sample files).

@@ -372,24 +372,30 @@ func (s *Store) OldestDay() (string, bool) {
 // size or mtime changed.
 func (s *Store) Day(day string) (*Day, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	past := day < dayOf(s.now())
 	cur := s.stat(day)
 	if c, ok := s.cache[day]; ok {
 		if c.final {
+			s.mu.Unlock()
 			return c.day, nil
 		}
 		if c.sig == cur {
 			c.final = past
+			s.mu.Unlock()
 			return c.day, nil
 		}
 	}
+	s.mu.Unlock()
+	// Parse outside the lock so several days load at once. Two callers may
+	// parse the same day; the last write wins and both results are equal.
 	samples, err := readSamples(s.path(day))
 	if err != nil {
 		return nil, err
 	}
 	d := buildDay(day, samples)
+	s.mu.Lock()
 	s.cache[day] = &cached{day: d, sig: cur, final: past}
+	s.mu.Unlock()
 	return d, nil
 }
 

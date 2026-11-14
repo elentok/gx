@@ -3193,6 +3193,53 @@ export interface Stats {
   launch: StatsLaunch;
   grilling: StatsGrilling;
   limit_burn: StatsLimitBurns;
+  web_performance: StatsWebPerformance;
+}
+/**
+ * StatsWebPerformance is the Web performance section. It is account-wide: the
+ * project filter does not change it. Timings are milliseconds, CLS is unitless.
+ * Nil values are absent (no samples, or no change to show).
+ */
+export interface StatsWebPerformance {
+  hard_loads: StatsWebPerfCard[];
+  route_changes: StatsWebPerfCard[];
+  trend: StatsWebPerfTrend[];
+  slowest_routes: StatsWebPerfRoute[];
+}
+/**
+ * StatsWebPerfCard is one metric on one tab. Status is good,
+ * needs-improvement or poor, and empty with fewer than 20 samples or no
+ * standard cutoff. ChangePct is the percent change of p75 against the
+ * preceding equal window.
+ */
+export interface StatsWebPerfCard {
+  metric: string;
+  count: number /* int */;
+  p75?: number /* float64 */;
+  status?: string;
+  change_pct?: number /* float64 */;
+}
+/**
+ * StatsWebPerfPoint is one day of a trend: one point per entry of Stats.Days.
+ */
+export interface StatsWebPerfPoint {
+  p75?: number /* float64 */;
+  count: number /* int */;
+}
+/**
+ * StatsWebPerfTrend is the daily p75 series of one metric, over both tabs.
+ */
+export interface StatsWebPerfTrend {
+  metric: string;
+  days: StatsWebPerfPoint[];
+}
+/**
+ * StatsWebPerfRoute is one route's p75 of route_ready.
+ */
+export interface StatsWebPerfRoute {
+  route: string;
+  p75: number /* float64 */;
+  count: number /* int */;
 }
 /**
  * StatsGrilling is the Grilling section: words and questions per day of the

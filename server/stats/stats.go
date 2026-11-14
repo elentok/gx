@@ -39,6 +39,7 @@ type Deps struct {
 	Tokens           Ledger
 	Burns            Burns
 	MapEpics         MapEpics
+	WebPerf          WebPerf
 }
 
 // Stats serves the stats payload.
@@ -58,6 +59,15 @@ func (s *Stats) read(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	includeDev := false
+	switch r.URL.Query().Get("include_dev") {
+	case "":
+	case "true":
+		includeDev = true
+	default:
+		http.Error(w, "include_dev must be true", http.StatusBadRequest)
+		return
+	}
 	project := r.URL.Query().Get("project")
 	all, err := ticketmigrate.LoadStoreEpics(s.TicketStore)
 	if err != nil {
@@ -75,8 +85,13 @@ func (s *Stats) read(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	wire.WriteJSON(w, buildStats(statsInput{
+	out := buildStats(statsInput{
 		Epics: all, Days: n, Project: project, Now: now, Ledger: led,
 		Records: recs, IsDesign: s.MapEpics.OnMapEpic, Burn: s.Burns.BurnStats(n, now),
-	}))
+	})
+	if out.WebPerformance, err = buildWebPerformance(s.WebPerf, limits.NewStatsWindow(n, now), includeDev); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	wire.WriteJSON(w, out)
 }

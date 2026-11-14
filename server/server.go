@@ -454,7 +454,7 @@ func New(cfg Config) (*Server, error) {
 	})
 	s.stats = stats.New(stats.Deps{
 		TicketStore: cfg.TicketStore, ConversationsDir: cfg.ConversationsDir,
-		Tokens: s.tokens, Burns: s.limits, MapEpics: tokenHost{s},
+		Tokens: s.tokens, Burns: s.limits, MapEpics: tokenHost{s}, WebPerf: s.webPerf,
 	})
 	s.tips = tips.New(tips.Deps{
 		Projects: func() []string {
