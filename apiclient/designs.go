@@ -62,6 +62,14 @@ func (s *designs) SaveDesignDraft(ctx context.Context, req ops.DesignDraftSaveRe
 	return res, err
 }
 
+// SetDesignDraftTarget writes a draft's slug and project without a revision.
+// A gone draft is a refused result, not an error.
+func (s *designs) SetDesignDraftTarget(ctx context.Context, req ops.DesignDraftTargetRequest) (ops.DesignDraftSaveResult, error) {
+	var res ops.DesignDraftSaveResult
+	err := s.t.post(ctx, "/v1/designs/drafts/target", req, &res)
+	return res, err
+}
+
 // AddDesignDraftImage saves one image, as its raw bytes, on a draft. A refusal
 // is a result (Refused set), not an error.
 func (s *designs) AddDesignDraftImage(ctx context.Context, id string, data []byte) (wire.SessionImageResult, error) {

@@ -36,18 +36,27 @@ type DesignDraftItem struct {
 	EditedAt   time.Time `json:"edited_at"`
 }
 
-// DesignDraftSaveRequest saves the text fields of a draft. Revision is the one
-// the caller last saw. It never carries the image list. ID names the draft on
-// the save route; the store takes the id separately.
+// DesignDraftSaveRequest saves the prompt of a draft. Revision is the one the
+// caller last saw. It carries neither the slug, the project nor the image
+// list: those have their own writes, so a stale save cannot overwrite them. ID
+// names the draft on the save route; the store takes the id separately.
 type DesignDraftSaveRequest struct {
 	ID       string `json:"id,omitempty"`
-	Project  string `json:"project"`
-	Slug     string `json:"slug"`
 	Idea     string `json:"idea"`
 	Revision int    `json:"revision"`
 	// KeepEditedAt saves without moving the edited-at time, for a change the
 	// person did not make (the form moving a draft off a deleted project).
 	KeepEditedAt bool `json:"keep_edited_at,omitempty"`
+}
+
+// DesignDraftTargetRequest sets a draft's slug and project. It is revision-free
+// and never bumps Revision. An empty Slug clears it. KeepEditedAt writes
+// without moving the edited-at time, as on the text save.
+type DesignDraftTargetRequest struct {
+	ID           string `json:"id"`
+	Project      string `json:"project"`
+	Slug         string `json:"slug"`
+	KeepEditedAt bool   `json:"keep_edited_at,omitempty"`
 }
 
 // DesignLastProject is the project the New design and New chat forms last

@@ -185,7 +185,7 @@ func TestDesignsDrafts_SaveRevisionConflict(t *testing.T) {
 		t.Fatal(d, err)
 	}
 	var out bytes.Buffer
-	req := ops.DesignDraftSaveRequest{ID: d.ID, Project: "proj", Idea: "new", Revision: d.Revision + 3}
+	req := ops.DesignDraftSaveRequest{ID: d.ID, Idea: "new", Revision: d.Revision + 3}
 	err = runDraftsSave(context.Background(), h.Client, &out, false, req)
 	if err == nil || !strings.Contains(err.Error(), ops.ReasonDraftRevisionConflict) {
 		t.Errorf("stale save: err = %v, want revision-conflict", err)
@@ -194,5 +194,26 @@ func TestDesignsDrafts_SaveRevisionConflict(t *testing.T) {
 	out.Reset()
 	if err := runDraftsSave(context.Background(), h.Client, &out, false, req); err != nil || !strings.Contains(out.String(), "revision 2") {
 		t.Errorf("save = %q, %v", out.String(), err)
+	}
+}
+
+func TestDesignsDrafts_SetWritesSlugAndProjectWithoutBumpingRevision(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir())
+	d, err := drafts.New(h.StateDir).Create("proj", "s", "idea")
+	if err != nil || d == nil {
+		t.Fatal(d, err)
+	}
+	var out bytes.Buffer
+	req := ops.DesignDraftTargetRequest{ID: d.ID, Project: "other", Slug: "new-slug"}
+	if err := runDraftsSet(context.Background(), h.Client, &out, false, req); err != nil || !strings.Contains(out.String(), "new-slug") {
+		t.Fatalf("set = %q, %v", out.String(), err)
+	}
+	got, err := drafts.New(h.StateDir).Get(d.ID)
+	if err != nil || got.Slug != "new-slug" || got.Project != "other" || got.Revision != d.Revision {
+		t.Fatalf("draft = %+v, %v", got, err)
+	}
+	req.ID = "0123456789abcdef"
+	if err := runDraftsSet(context.Background(), h.Client, &out, false, req); err == nil || !strings.Contains(err.Error(), ops.ReasonDraftGone) {
+		t.Errorf("missing draft: err = %v, want draft-gone", err)
 	}
 }

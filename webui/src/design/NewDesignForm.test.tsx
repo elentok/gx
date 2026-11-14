@@ -3,11 +3,11 @@ import { afterEach, expect, test, vi } from "vitest"
 import { MemoryRouter } from "react-router"
 import { ConnectionContext, type Connection } from "../connection"
 import { defaultProject } from "../workspaces/defaultProject"
-import type { DesignDraft, DesignDraftSaveRequest } from "../generated/server"
+import type { DesignDraft } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { DeviceContext, type Device } from "../useWide"
 import { WriteError } from "../useWrite"
-import type { DraftResult } from "./drafts"
+import type { DraftResult, SaveDraftBody } from "./drafts"
 import { ShellContext, type Shell } from "../shell/ShellContext"
 import type { OpenDesign } from "./open"
 import { NewDesignForm } from "./NewDesignForm"
@@ -35,7 +35,7 @@ function fakeDrafts(latest?: Partial<DesignDraft>, lastProject = "") {
     ...latest,
   }
   let revision = stored?.revision ?? 0
-  const save = vi.fn(async (body: DesignDraftSaveRequest): Promise<DraftResult> => {
+  const save = vi.fn(async (body: SaveDraftBody): Promise<DraftResult> => {
     revision++
     // Like the server: a save stamps a new edited-at unless asked to keep it.
     const edited_at = body.keep_edited_at ? (stored?.edited_at ?? "") : "stamped"
@@ -493,7 +493,7 @@ test("Start waits for a save in flight and sends the id it created; that save is
   const { client } = fakeDrafts()
   let release: () => void = () => {}
   const gate = new Promise<void>((r) => (release = r))
-  const save = vi.fn(async (body: DesignDraftSaveRequest): Promise<DraftResult> => {
+  const save = vi.fn(async (body: SaveDraftBody): Promise<DraftResult> => {
     await gate
     return {
       kind: "ok",
@@ -788,7 +788,7 @@ async function serverDown() {
   localStorage.clear()
   const base = fakeDrafts({ slug: "mine", idea: "my idea", project: "blog" })
   const down = { on: true }
-  const save = vi.fn(async (body: DesignDraftSaveRequest) => {
+  const save = vi.fn(async (body: SaveDraftBody) => {
     if (down.on) throw new WriteError("offline")
     return base.save(body)
   })

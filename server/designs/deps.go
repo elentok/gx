@@ -71,12 +71,16 @@ type Designs struct {
 
 // New builds Designs from d.
 func New(d Deps) *Designs {
+	ds := drafts.New(d.StateDir)
+	if err := ds.MigrateNames(); err != nil && d.Log != nil {
+		d.Log.Warn("design drafts: name migration failed", "err", err)
+	}
 	return &Designs{
 		log: d.Log, ticketStore: d.TicketStore, conversationsDir: d.ConversationsDir,
 		idx: d.Idx, projects: d.Projects, events: d.Events, guards: d.Guards,
 		chat: d.Chat, webURL: d.WebURL, workspaces: d.Workspaces,
 		onBranch: d.OnBranch,
-		drafts:   drafts.New(d.StateDir),
+		drafts:   ds,
 	}
 }
 

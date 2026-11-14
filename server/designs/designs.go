@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/imagestore"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
@@ -301,7 +302,7 @@ func (s *Designs) tryRebase(project, epic, worktree, excludeID string) error {
 
 var (
 	designTicketRe = regexp.MustCompile(`^\d+[[:alpha:]]?\d*$`)
-	designSlugRe   = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+	designSlugRe   = drafts.SlugRe
 )
 
 // openHandler serves designs open. web is the web mux's variant: New needs the

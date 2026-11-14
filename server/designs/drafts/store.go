@@ -33,6 +33,10 @@ var ErrNotFound = errors.New("draft not found")
 
 var idPattern = regexp.MustCompile(`^[0-9a-f]{16}$`)
 
+// SlugRe is the one slug rule: lowercase words joined by "-". server/designs
+// checks a design's slug with it too.
+var SlugRe = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
 // Store reads and writes drafts under <stateDir>/design-drafts. Each draft
 // lives in <id>/draft.json, with its images in <id>/images (written by the
 // image ops; the store reaches that folder by path only).
@@ -177,7 +181,7 @@ func (s *Store) Save(id string, req ops.DesignDraftSaveRequest) (ops.DesignDraft
 	if d.Revision != req.Revision {
 		return ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftRevisionConflict}, nil
 	}
-	d.Project, d.Slug, d.Idea = req.Project, req.Slug, req.Idea
+	d.Idea = req.Idea
 	d.Revision++
 	if !req.KeepEditedAt {
 		d.EditedAt = s.now().UTC()
@@ -187,6 +191,101 @@ func (s *Store) Save(id string, req ops.DesignDraftSaveRequest) (ops.DesignDraft
 	}
 	d.Label = Label(d.Slug, d.Idea)
 	return ops.DesignDraftSaveResult{Draft: d}, nil
+}
+
+// SetTarget writes the slug and the project under the draft's lock. It never
+// changes Revision, so a text save in flight does not conflict with it, and it
+// moves EditedAt unless keepEditedAt. An empty slug clears it. A missing draft
+// is a refused result.
+func (s *Store) SetTarget(id, project, slug string, keepEditedAt bool) (ops.DesignDraftSaveResult, error) {
+	if !idPattern.MatchString(id) {
+		return ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftGone}, nil
+	}
+	unlock := s.lock(id)
+	defer unlock()
+	d, err := s.Get(id)
+	if errors.Is(err, ErrNotFound) {
+		return ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftGone}, nil
+	}
+	if err != nil {
+		return ops.DesignDraftSaveResult{}, err
+	}
+	d.Project, d.Slug = project, slug
+	if !keepEditedAt {
+		d.EditedAt = s.now().UTC()
+	}
+	if err := s.write(d); err != nil {
+		return ops.DesignDraftSaveResult{}, err
+	}
+	d.Label = Label(d.Slug, d.Idea)
+	return ops.DesignDraftSaveResult{Draft: d}, nil
+}
+
+// MigrateNames folds the retired draft name into the record: it becomes the
+// slug when the slug is empty and the slugified name is a valid slug, else the
+// first line of the prompt. The name key is then dropped, so a second run
+// changes nothing. It runs once at server start, before any sweep.
+func (s *Store) MigrateNames() error {
+	entries, err := os.ReadDir(s.root)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			if err := s.migrateName(e.Name()); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (s *Store) migrateName(id string) error {
+	if !idPattern.MatchString(id) {
+		return nil
+	}
+	unlock := s.lock(id)
+	defer unlock()
+	b, err := os.ReadFile(s.record(id))
+	if err != nil {
+		return nil // unreadable or missing records are List's problem, not the migration's
+	}
+	var rec map[string]any
+	if json.Unmarshal(b, &rec) != nil {
+		return nil
+	}
+	raw, has := rec["name"]
+	if !has {
+		return nil
+	}
+	delete(rec, "name")
+	name, _ := raw.(string)
+	if name = strings.TrimSpace(name); name != "" {
+		slug, _ := rec["slug"].(string)
+		if cand := slugify(name); slug == "" && SlugRe.MatchString(cand) {
+			rec["slug"] = cand
+		} else {
+			idea, _ := rec["idea"].(string)
+			if idea != "" {
+				name += "\n" + idea
+			}
+			rec["idea"] = name
+		}
+	}
+	out, err := json.MarshalIndent(rec, "", "  ")
+	if err != nil {
+		return err
+	}
+	return writeAtomic(s.record(id), out)
+}
+
+var nonSlugRun = regexp.MustCompile(`[^a-z0-9]+`)
+
+func slugify(name string) string {
+	return strings.Trim(nonSlugRun.ReplaceAllString(strings.ToLower(name), "-"), "-")
 }
 
 func goneImage() wire.SessionImageResult {

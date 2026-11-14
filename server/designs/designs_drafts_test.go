@@ -6,10 +6,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/designs"
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire/ops"
@@ -48,7 +51,7 @@ func (f designsFixture) webGet(t *testing.T, path string, out any) {
 
 func (f designsFixture) webSave(t *testing.T, id string, rev int, idea string) ops.DesignDraftSaveResult {
 	t.Helper()
-	body := fmt.Sprintf(`{"id":%q,"project":"proj","slug":"s","idea":%q,"revision":%d}`, id, idea, rev)
+	body := fmt.Sprintf(`{"id":%q,"idea":%q,"revision":%d}`, id, idea, rev)
 	code, out := servertest.WebPostJSON(t, f.base+"/v1/designs/drafts/save", body, f.ck, "", servertest.JSONPost(f.base))
 	if code != http.StatusOK {
 		t.Fatalf("save = %d %s", code, out)
@@ -147,7 +150,7 @@ func TestWebDesignDrafts_SaveRefusals(t *testing.T) {
 	}
 
 	// The socket (CLI) call refuses the same way as the web call.
-	cli, err := f.h.Client.Sessions.SaveDesignDraft(f.ctx, ops.DesignDraftSaveRequest{ID: d.ID, Project: "proj", Idea: "x", Revision: d.Revision + 5})
+	cli, err := f.h.Client.Sessions.SaveDesignDraft(f.ctx, ops.DesignDraftSaveRequest{ID: d.ID, Idea: "x", Revision: d.Revision + 5})
 	if err != nil || !cli.Refused || cli.Reason != ops.ReasonDraftRevisionConflict {
 		t.Errorf("socket stale save = %+v, %v", cli, err)
 	}
@@ -167,7 +170,7 @@ func TestWebDesignDrafts_SaveWithoutIDCreates(t *testing.T) {
 	}
 	var items []ops.DesignDraftItem
 	f.webGet(t, "/v1/designs/drafts", &items)
-	if len(items) != 1 || items[0].ID != res.Draft.ID || items[0].Label != "s" || res.Draft.Label != "s" {
+	if len(items) != 1 || items[0].ID != res.Draft.ID || items[0].Label != "first words" || res.Draft.Label != "first words" {
 		t.Errorf("list = %+v, want the created draft with its label", items)
 	}
 
@@ -180,6 +183,73 @@ func TestWebDesignDrafts_SaveWithoutIDCreates(t *testing.T) {
 	f.webGet(t, "/v1/designs/drafts/read?id="+url.QueryEscape(empty.Draft.ID), &read)
 	if read.Draft == nil || read.Draft.Label != "Untitled design" {
 		t.Errorf("read = %+v, want the label", read)
+	}
+}
+
+func (f designsFixture) webTarget(t *testing.T, id, project, slug string) ops.DesignDraftSaveResult {
+	t.Helper()
+	body := fmt.Sprintf(`{"id":%q,"project":%q,"slug":%q}`, id, project, slug)
+	code, out := servertest.WebPostJSON(t, f.base+"/v1/designs/drafts/target", body, f.ck, "", servertest.JSONPost(f.base))
+	if code != http.StatusOK {
+		t.Fatalf("target = %d %s", code, out)
+	}
+	var res ops.DesignDraftSaveResult
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func TestWebDesignDrafts_TargetWriteIsRevisionFree(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	d := f.seedDraft(t, "proj", "old", "idea")
+
+	res := f.webTarget(t, d.ID, "other", "new")
+	if res.Refused || res.Draft == nil || res.Draft.Slug != "new" || res.Draft.Project != "other" || res.Draft.Revision != d.Revision {
+		t.Fatalf("target = %+v, want new slug and project at revision %d", res, d.Revision)
+	}
+	var last ops.DesignLastProject
+	f.webGet(t, "/v1/designs/drafts/last-project", &last)
+	if last.Project != "other" {
+		t.Errorf("last project = %q, want other", last.Project)
+	}
+
+	// A text save at the unchanged revision keeps the slug and project.
+	saved := f.webSave(t, d.ID, d.Revision, "edited")
+	if saved.Refused || saved.Draft == nil || saved.Draft.Slug != "new" || saved.Draft.Project != "other" || saved.Draft.Idea != "edited" {
+		t.Fatalf("save after target = %+v", saved)
+	}
+
+	if res := f.webTarget(t, d.ID, "other", ""); res.Draft == nil || res.Draft.Slug != "" {
+		t.Errorf("empty slug = %+v, want it cleared", res)
+	}
+	if res := f.webTarget(t, "0123456789abcdef", "p", "s"); !res.Refused || res.Reason != ops.ReasonDraftGone {
+		t.Errorf("target of a missing draft = %+v, want draft-gone", res)
+	}
+}
+
+func TestWebDesignDrafts_NameMigrationRunsAtStart(t *testing.T) {
+	t.Parallel()
+	state := t.TempDir()
+	d, err := drafts.New(state).Create("proj", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := filepath.Join(state, "design-drafts", d.ID, "draft.json")
+	old := fmt.Sprintf(`{"id":%q,"project":"proj","slug":"","name":"My Cool Idea","idea":"","images":[],"revision":1,"edited_at":"2026-01-01T00:00:00Z"}`, d.ID)
+	if err := os.WriteFile(rec, []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	designs.New(designs.Deps{StateDir: state})
+
+	got, err := drafts.New(state).Get(d.ID)
+	if err != nil || got.Slug != "my-cool-idea" {
+		t.Fatalf("draft after start = %+v, %v; want the name as slug", got, err)
+	}
+	if b, _ := os.ReadFile(rec); strings.Contains(string(b), `"name"`) {
+		t.Errorf("record still has a name key: %s", b)
 	}
 }
 

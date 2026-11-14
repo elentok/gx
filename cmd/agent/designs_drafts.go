@@ -18,7 +18,7 @@ import (
 // form keeps on the server. It calls the routes the form calls.
 func newDesignsDraftsCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "drafts", Short: "New Design drafts kept by the server", Args: cobra.NoArgs}
-	cmd.AddCommand(newDraftsListCmd(d), newDraftsShowCmd(d), newDraftsSaveCmd(d), newDraftsDeleteCmd(d), newDraftsLastProjectCmd(d), newDraftsImageCmd(d))
+	cmd.AddCommand(newDraftsListCmd(d), newDraftsShowCmd(d), newDraftsSaveCmd(d), newDraftsSetCmd(d), newDraftsDeleteCmd(d), newDraftsLastProjectCmd(d), newDraftsImageCmd(d))
 	return cmd
 }
 
@@ -348,8 +348,8 @@ func newDraftsSaveCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	var req ops.DesignDraftSaveRequest
 	cmd := &cobra.Command{
-		Use:   "save <id> --revision <n> [--project p] [--slug s] [--idea text|-] [--name n]",
-		Short: "save a draft's text fields against the revision you last saw",
+		Use:   "save <id> --revision <n> [--idea text|-]",
+		Short: "save a draft's prompt against the revision you last saw",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			idea, err := readIdea(req.Idea, c.InOrStdin())
@@ -365,9 +365,51 @@ func newDraftsSaveCmd(d Deps) *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVar(&req.Revision, "revision", 0, "the revision you last saw")
-	cmd.Flags().StringVar(&req.Project, "project", "", "project")
-	cmd.Flags().StringVar(&req.Slug, "slug", "", "slug")
 	cmd.Flags().StringVar(&req.Idea, "idea", "", "idea, or - to read it from stdin")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
+	return cmd
+}
+
+func runDraftsSet(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req ops.DesignDraftTargetRequest) error {
+	res, err := cl.Sessions.SetDesignDraftTarget(ctx, req)
+	return printDraftResult(w, jsonOut, res, err, func(res ops.DesignDraftSaveResult) error {
+		_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", res.Draft.ID, res.Draft.Project, res.Draft.Slug)
+		return err
+	})
+}
+
+// newDraftsSetCmd is `gx designs drafts set`: the revision-free write of a
+// draft's project and slug. Both flags are written as given, so an omitted
+// --slug clears the slug; an omitted --project keeps the draft's own.
+func newDraftsSetCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	var project, slug string
+	cmd := &cobra.Command{
+		Use:   "set <id> [--project p] [--slug s]",
+		Short: "set a draft's project and slug (an empty slug clears it)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			if !c.Flags().Changed("project") || !c.Flags().Changed("slug") {
+				cur, err := cl.Sessions.DesignDraft(c.Context(), args[0])
+				if err != nil || cur.Draft == nil {
+					return printDraftResult(c.OutOrStdout(), jsonOut, cur, err, func(ops.DesignDraftSaveResult) error { return nil })
+				}
+				if !c.Flags().Changed("project") {
+					project = cur.Draft.Project
+				}
+				if !c.Flags().Changed("slug") {
+					slug = cur.Draft.Slug
+				}
+			}
+			return runDraftsSet(c.Context(), cl, c.OutOrStdout(), jsonOut, ops.DesignDraftTargetRequest{ID: args[0], Project: project, Slug: slug})
+		},
+	}
+	cmd.Flags().StringVar(&project, "project", "", "project")
+	cmd.Flags().StringVar(&slug, "slug", "", "slug (empty clears it)")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
 	return cmd
 }

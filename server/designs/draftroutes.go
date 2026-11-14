@@ -46,11 +46,31 @@ func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
 	if req.ID == "" {
 		// The form's first save of a new draft has no id yet.
 		var d *ops.DesignDraft
-		if d, err = s.drafts.Create(req.Project, req.Slug, req.Idea); err == nil {
+		if d, err = s.drafts.Create("", "", req.Idea); err == nil {
 			res = ops.DesignDraftSaveResult{Draft: d}
 		}
 	} else {
 		res, err = s.drafts.Save(req.ID, req)
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	wire.WriteJSON(w, res)
+}
+
+// draftTarget serves POST /v1/designs/drafts/target: the revision-free write
+// of a draft's slug and project. A changed project is also the last project used.
+func (s *Designs) draftTarget(w http.ResponseWriter, r *http.Request) {
+	var req ops.DesignDraftTargetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	before, getErr := s.drafts.Get(req.ID)
+	res, err := s.drafts.SetTarget(req.ID, req.Project, req.Slug, req.KeepEditedAt)
+	if err == nil && res.Draft != nil && req.Project != "" && (getErr != nil || before.Project != req.Project) {
+		err = s.drafts.SetLastProject(req.Project)
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
