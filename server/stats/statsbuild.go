@@ -122,8 +122,11 @@ func (b *statsBuilder) addEpic(project string, e tickets.Epic) {
 		b.addWaiting(e)
 		// A map's merged_at is copied from its impl epic, so a map counts once,
 		// as a completed design, and not again as a merged epic.
-		if i := b.win.Bucket(e.CompletedAt); i >= 0 {
-			b.tp.DesignsCompleted[i]++
+		// An emptied charting map is stamped completed_at but never designed.
+		if step := tickets.DesignStep(e.DesignStep); step == tickets.StepBranch || step == tickets.StepDone {
+			if i := b.win.Bucket(e.CompletedAt); i >= 0 {
+				b.tp.DesignsCompleted[i]++
+			}
 		}
 	} else if i := b.win.Bucket(e.MergedAt); i >= 0 {
 		b.tp.EpicsMerged[i]++

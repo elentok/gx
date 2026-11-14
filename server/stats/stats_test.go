@@ -121,7 +121,8 @@ func TestStats_MapsCountAsDesignsCompletedNotEpicsMerged(t *testing.T) {
 	t.Parallel()
 	s := statsStore(t, func(store string) {
 		// A done map carries the merged_at copied from its impl epic.
-		rigs.WriteProjectEpic(t, store, "proj", "feat", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(3)+"\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
+		rigs.WriteProjectEpic(t, store, "proj", "feat", "---\nkind: map\nstatus: done\ndesign_step: done\ncompleted_at: "+statsStamp(3)+"\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
+		rigs.WriteProjectEpic(t, store, "proj", "emptied", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(5)+"\n---\n", nil)
 		rigs.WriteProjectEpic(t, store, "proj", "feat-impl", "---\nstatus: done\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
 		rigs.WriteProjectEpic(t, store, "proj", "open-map", "---\nkind: map\nstatus: open\n---\n", nil)
 		rigs.WriteProjectEpic(t, store, "proj", "an-area", "---\nkind: area\nstatus: done\ncompleted_at: "+statsStamp(4)+"\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
@@ -133,6 +134,7 @@ func TestStats_MapsCountAsDesignsCompletedNotEpicsMerged(t *testing.T) {
 		want   int
 	}{
 		{"area is not a completed design", s.Throughput.DesignsCompleted, 4, 0},
+		{"emptied charting map is not a completed design", s.Throughput.DesignsCompleted, 5, 0},
 		{"epics merged: impl only", s.Throughput.EpicsMerged, 1, 1},
 		{"epics merged: map completion is not a merge", s.Throughput.EpicsMerged, 3, 0},
 		{"designs completed: on completed_at", s.Throughput.DesignsCompleted, 3, 1},

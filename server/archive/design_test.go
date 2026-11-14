@@ -232,6 +232,43 @@ func TestArchiveDesign_StuckBeforeDoneWithoutImplArchivesOnceMerged(t *testing.T
 	}
 }
 
+// stampedChartingMap is an emptied charting map: completed_at set, no step, no tickets, no -impl.
+func stampedChartingMap(t *testing.T, opts ...func(*server.Config)) rig {
+	t.Helper()
+	r := startPair(t, "chart", true, opts...)
+	dir := filepath.Join(r.store, "proj", "foo")
+	if err := os.RemoveAll(filepath.Join(dir, "issues")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "ticket.md"), []byte("---\nkind: map\ncompleted_at: "+time.Now().UTC().Format(time.RFC3339)+"\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+func TestArchiveDesign_StampedChartingMapArchivesAlone(t *testing.T) {
+	r := stampedChartingMap(t)
+	if got := r.archive(t, false, false, "proj:foo")[0]; got.Status != wire.TargetDone {
+		t.Fatalf("archive = %+v, want done", got)
+	}
+	if r.epic(t, "foo").ArchivedAt.IsZero() {
+		t.Error("archived epic has no archived_at")
+	}
+}
+
+func TestArchiveDesign_StampedChartingMapWithLiveSessionNeedsYes(t *testing.T) {
+	r := stampedChartingMap(t)
+	// No startup cleanup runs for a map before done, so withDesignWorktree's wait would hang.
+	servertest.RunGitIn(t, r.Repo, "worktree", "add", "-q", "-b", "foo-design", filepath.Join(r.Repo, ".worktrees", "foo-design"))
+	servertest.RunGitIn(t, r.Repo, "branch", "foo-impl")
+	if res := r.Open(t, "proj:foo", false); res.Refused || res.Session == nil {
+		t.Fatalf("open = %+v", res)
+	}
+	if got := r.archive(t, false, false, "proj:foo")[0]; got.Reason != wire.ReasonNeedsYes {
+		t.Fatalf("archive = %+v, want needs-yes", got)
+	}
+}
+
 func TestArchiveDesign_MergedMapWithoutTicketsOrImplArchives(t *testing.T) {
 	r := startPair(t, "branch", true)
 	if err := os.RemoveAll(filepath.Join(r.store, "proj", "foo", "issues")); err != nil {

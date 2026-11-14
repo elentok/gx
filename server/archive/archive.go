@@ -229,7 +229,9 @@ func (a *Archive) checkArchivable(project, dir, base string, scan func(string) (
 	impl := base + tickets.ImplEpicSuffix
 	_, statErr := os.Stat(filepath.Join(dir, impl))
 	hasImpl := statErr == nil
-	if tickets.DesignStep(tickets.LoadEpicTicketMD(filepath.Join(dir, base)).DesignStep) != tickets.StepDone {
+	baseMD := tickets.LoadEpicTicketMD(filepath.Join(dir, base))
+	// A stamped completed_at archives at any step: an emptied charting map has no work to merge.
+	if baseMD.CompletedAt.IsZero() && tickets.DesignStep(baseMD.DesignStep) != tickets.StepDone {
 		// A Design stuck before done still archives once its work merged:
 		// the -impl epic, or the map itself when it has no -impl.
 		work := base
