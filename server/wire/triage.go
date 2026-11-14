@@ -12,9 +12,6 @@ type TriageChangedRequest struct {
 
 // Refusal reasons of the triage open route, beside the session ones.
 const (
-	// ReasonTriageApprove: the Triage waits at the approve step, where the page
-	// is the way on and no session runs.
-	ReasonTriageApprove = "triage-at-approve"
 	// ReasonTriageNoFollowUps: the project has no open follow-up to triage.
 	ReasonTriageNoFollowUps = "triage-no-follow-ups"
 	// ReasonTriagePhase: the record's step or the row's state does not allow a

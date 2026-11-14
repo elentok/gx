@@ -109,6 +109,11 @@ type EpicListRow struct {
 	StatusWords string      `json:"status_words,omitempty"`
 	// RingProgress is the ring fill in percent, 0 to 100.
 	RingProgress int `json:"ring_progress,omitempty"`
+	// StepLine is the second line of a Follow-ups card with a Triage under its
+	// pill, such as "Verifying 3 of 9"; RetryFailed is the failed rows a Write
+	// offers to retry (0: no "Retry failed" button).
+	StepLine    string `json:"step_line,omitempty"`
+	RetryFailed int    `json:"retry_failed,omitempty"`
 	// Reason is the line under the status words when there is something to say.
 	Reason  string       `json:"reason,omitempty"`
 	Actions []CardAction `json:"actions,omitempty"`

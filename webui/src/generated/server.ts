@@ -1227,6 +1227,13 @@ export interface EpicListRow {
    */
   ring_progress?: number /* int */;
   /**
+   * StepLine is the second line of a Follow-ups card with a Triage under its
+   * pill, such as "Verifying 3 of 9"; RetryFailed is the failed rows a Write
+   * offers to retry (0: no "Retry failed" button).
+   */
+  step_line?: string;
+  retry_failed?: number /* int */;
+  /**
    * Reason is the line under the status words when there is something to say.
    */
   reason?: string;
@@ -3737,11 +3744,6 @@ export interface TriageChangedRequest {
   project: string;
 }
 /**
- * ReasonTriageApprove: the Triage waits at the approve step, where the page
- * is the way on and no session runs.
- */
-export const ReasonTriageApprove = "triage-at-approve";
-/**
  * ReasonTriageNoFollowUps: the project has no open follow-up to triage.
  */
 export const ReasonTriageNoFollowUps = "triage-no-follow-ups";
@@ -3766,7 +3768,7 @@ export const ReasonTriageNoLive = "triage-no-live";
 /**
  * Refusal reasons of the triage open route, beside the session ones.
  */
-export type ReasonTriage = typeof ReasonTriageApprove | typeof ReasonTriageNoFollowUps | typeof ReasonTriagePhase | typeof ReasonTriageAnswer | typeof ReasonTriageAlreadyApproved | typeof ReasonTriageNoLive;
+export type ReasonTriage = typeof ReasonTriageNoFollowUps | typeof ReasonTriagePhase | typeof ReasonTriageAnswer | typeof ReasonTriageAlreadyApproved | typeof ReasonTriageNoLive;
 /**
  * TriageOpenRequest is the body of POST /v1/triage/open. New stops the
  * Triage's live session and starts a fresh one; State is the token of the live

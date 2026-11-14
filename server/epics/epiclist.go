@@ -147,7 +147,13 @@ func (s *Epics) cardList() (wire.EpicList, error) {
 				}
 			}
 		}
-		list.Epics = append(list.Epics, s.projectCards(project, epics, designs, rec, triageLive, qidx)...)
+		var done *triage.Record
+		if rec == nil {
+			if hist, err := triage.NewStore(dir).History(); err == nil && len(hist) > 0 {
+				done = hist[0]
+			}
+		}
+		list.Epics = append(list.Epics, s.projectCards(project, epics, designs, rec, done, triageLive, qidx)...)
 	}
 	list.RecentlyFinished = s.Settings.Load().RecentlyFinished
 	list.Epics = capFinishedOneOffs(list.Epics, list.RecentlyFinished)
@@ -165,7 +171,7 @@ func (s *Epics) cardList() (wire.EpicList, error) {
 // projectCards builds one project's cards: follow-ups, one-offs, loop and map
 // epics, then pending Design cards. A listed map's card shows its -impl epic,
 // so that epic gets no row of its own.
-func (s *Epics) projectCards(project string, epics []tickets.Epic, designs map[string]designActivity, rec *triage.Record, triageLive map[string]bool, qidx queueIndex) []wire.EpicListRow {
+func (s *Epics) projectCards(project string, epics []tickets.Epic, designs map[string]designActivity, rec, done *triage.Record, triageLive map[string]bool, qidx queueIndex) []wire.EpicListRow {
 	merged := map[string]bool{}
 	byName := map[string]tickets.Epic{}
 	for _, e := range epics {
@@ -187,7 +193,7 @@ func (s *Epics) projectCards(project string, epics []tickets.Epic, designs map[s
 
 	var rows []wire.EpicListRow
 	if fu, ok := byName[followUpsEpicName]; ok {
-		if row, ok := followUpsCard(project, fu, rec, triageLive[project]); ok {
+		if row, ok := followUpsCard(project, fu, rec, done, readyToQueue(project, done, epics, qidx), triageLive[project]); ok {
 			rows = append(rows, row)
 		}
 	}

@@ -136,19 +136,19 @@ func TestOpen_WebNewNeedsAFreshToken(t *testing.T) {
 	}
 }
 
-func TestOpen_RefusesAtApprove(t *testing.T) {
+func TestOpen_StartsAtQuestions(t *testing.T) {
 	f, store := startViewFixture(t)
 	rec := mustRec(store.Create())
-	rec.Step = "approve"
+	rec.Step = "questions"
 	if err := store.Save(rec); err != nil {
 		t.Fatal(err)
 	}
 	res := openTriage(t, f, wire.TriageOpenRequest{Project: "proj"})
-	if !res.Refused || res.Reason != wire.ReasonTriageApprove {
-		t.Fatalf("open = %+v, want %s", res, wire.ReasonTriageApprove)
+	if res.Refused || res.Session == nil {
+		t.Fatalf("open = %+v, want a session", res)
 	}
-	if live := f.Live(t); len(live) != 0 {
-		t.Fatalf("live sessions = %d, want none", len(live))
+	if live := f.Live(t); len(live) != 1 {
+		t.Fatalf("live sessions = %d, want one", len(live))
 	}
 }
 

@@ -29,9 +29,18 @@ func stays(t *testing.T, f *rigs.GrillingFixture, id string) bool {
 
 func TestStopFinished_IdleSessionAtAFinalStepIsStopped(t *testing.T) {
 	t.Parallel()
-	f, _ := rigs.StartTriageSession(t, "approve", false)
+	f, _ := rigs.StartTriageSession(t, "write", true)
 	rigs.EndTurn(t, f)
 	servertest.WaitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
+}
+
+func TestStopFinished_IdleSessionAtQuestionsIsKept(t *testing.T) {
+	t.Parallel()
+	f, _ := rigs.StartTriageSession(t, "questions", false)
+	rigs.EndTurn(t, f)
+	if !stays(t, f, f.ID) {
+		t.Fatal("an idle session at questions was stopped")
+	}
 }
 
 func TestStopFinished_NotFinalStepKeepsTheSession(t *testing.T) {
@@ -56,7 +65,7 @@ func TestStopFinished_WorkingSessionIsNeverStopped(t *testing.T) {
 
 func TestStopFinished_AnotherProjectsTriageSessionIsNotTouched(t *testing.T) {
 	t.Parallel()
-	f, _ := rigs.StartTriageSession(t, "approve", false)
+	f, _ := rigs.StartTriageSession(t, "write", true)
 	other, err := f.H.Client.Sessions.Create(f.Ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || other.Session == nil {
 		t.Fatalf("create = %+v, %v", other, err)

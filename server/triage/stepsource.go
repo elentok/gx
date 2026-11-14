@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/tickets"
 	triagerec "github.com/elentok/gx/triage"
 )
 
@@ -21,6 +22,11 @@ func (t *Triage) StopFinished(project string) {
 	}
 	rec, err := triagerec.NewStore(dir).LoadLive()
 	if err != nil || !triagerec.Final(rec) {
+		return
+	}
+	// A Questions session stays alive in every round state: the person may
+	// answer, object or ask for another round while it waits.
+	if rec != nil && rec.State == triagerec.StateLive && pageStep(rec.Step) == tickets.StepApprove {
 		return
 	}
 	infos, err := t.sessions()

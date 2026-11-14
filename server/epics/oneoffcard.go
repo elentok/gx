@@ -86,10 +86,10 @@ func capFinishedOneOffs(rows []wire.EpicListRow, limit int) []wire.EpicListRow {
 // followUpsCard is the one card of a project's follow-ups epic, absent when it
 // has no open follow-up and no live Triage. The epic itself never gets a plain
 // card. rec is the project's live Triage record (nil for none).
-func followUpsCard(project string, e tickets.Epic, rec *triage.Record, sessionLive bool) (wire.EpicListRow, bool) {
+func followUpsCard(project string, e tickets.Epic, rec, done *triage.Record, ready int, sessionLive bool) (wire.EpicListRow, bool) {
 	bugs, ideas, other := splitFollowUps(e)
 	live := rec != nil && rec.State == triage.StateLive
-	if bugs+ideas+other == 0 && !live {
+	if bugs+ideas+other == 0 && !live && ready == 0 {
 		return wire.EpicListRow{}, false
 	}
 	words := followUpWords(bugs, ideas, other)
@@ -97,12 +97,15 @@ func followUpsCard(project string, e tickets.Epic, rec *triage.Record, sessionLi
 		words = "0 left"
 	}
 	p := PlaceTriage(project, rec, sessionLive)
+	if !live && ready > 0 {
+		p = donePlacement(done.ReadyEpic, ready)
+	}
 	address := queue.RootRef{Project: project, Epic: followUpsEpicName}.String()
 	row := wire.EpicListRow{
 		Address: address, Project: project, Name: followUpsEpicName, Kind: wire.EpicKindLoop,
 		State: wire.EpicListFollowUps, Addresses: []string{address}, CardKind: wire.CardKindFollowUps,
 		Section: p.Section, StatePill: p.Pill, StatusWords: words,
-		Actions: []wire.CardAction{p.Action},
+		Actions: []wire.CardAction{p.Action}, StepLine: p.Line, RetryFailed: p.RetryFailed,
 	}
 	if live {
 		row.RingProgress = triagePercent(rec)
@@ -144,7 +147,7 @@ func followUpCount(project string, e tickets.Epic, rec *triage.Record, sessionLi
 	switch p := PlaceTriage(project, rec, sessionLive); {
 	case p.Section == wire.SectionNeedsYou:
 		c.Triage = wire.FollowUpTriageWaiting
-	case p.Pill == PillStopped:
+	case p.Stopped:
 		c.Triage = wire.FollowUpTriageStopped
 	default:
 		c.Triage = wire.FollowUpTriageRunning

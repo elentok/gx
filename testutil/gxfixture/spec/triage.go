@@ -86,6 +86,14 @@ func TriageScenario(shape string) (Scenario, bool) {
 						p.Questions = []triage.Question{{ID: fmt.Sprintf("q%d", i), Text: "Which epic should this go to?", Kind: triage.QuestionAsk, Options: []string{"ready-epic", "new map"}}}
 					}
 				})
+				// The agent saved these as the first round, so a round waits.
+				round := triage.Round{}
+				for _, r := range rec.Rows {
+					if r.Plan != nil {
+						round.Questions = append(round.Questions, r.Plan.Questions...)
+					}
+				}
+				rec.Rounds = []triage.Round{round}
 			}}}
 		})
 	case "b-review":
