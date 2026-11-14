@@ -88,7 +88,7 @@ func (s *Reconciler) stampMerged(root queue.RootRef, e tickets.Epic, repo, targe
 	}
 	added, deleted, err := rlmerge.EpicTrailerLines(repo, "refs/heads/"+e.Name, e.Name)
 	s.merger.stampMergedEpic(root, e, added, deleted, err)
-	base, tip := reflogRange(s.log, root, e, repo, target)
+	base, tip := rangeOf(s.log, root, e, repo, target, mergedByHand, "")
 	s.merger.StampEpicRange(root, e.Path, base, tip, "merged_at")
 	s.log.Info("epic merged outside the server", "root", root, "target", target)
 	removed, err = s.queue.RemoveRoot(root)

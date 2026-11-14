@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -209,7 +208,7 @@ func (s *Merger) mergeEpic(root queue.RootRef, one ralphloop.OneIteration, repo 
 		}
 	case e.PRNumber == 0 && s.NothingToMerge(project, epics, one, repo):
 		s.stampMergedEpic(root, e, 0, 0, nil)
-		rangeBase, rangeTip := reflogRange(s.log, root, e, repo, target)
+		rangeBase, rangeTip := rangeOf(s.log, root, e, repo, target, mergedByHand, "")
 		s.StampEpicRange(root, e.Path, rangeBase, rangeTip, "merged_at", "completed_at")
 		first = true
 	// An epic with a PR is merged on GitHub by a person, never here.
@@ -235,17 +234,11 @@ func (s *Merger) mergeEpic(root queue.RootRef, one ralphloop.OneIteration, repo 
 			added, removed, countErr = git.DiffLines(repo, trunkBefore, "refs/heads/"+target)
 		}
 		s.stampMergedEpic(root, e, added, removed, countErr)
-		rangeBase, rangeTip := "", ""
-		if revErr == nil {
-			tip, err := git.RevParse(repo, "refs/heads/"+target)
-			if err == nil {
-				rangeBase, rangeTip = trunkBefore, tip
-			}
-			revErr = err
-		}
 		if revErr != nil {
 			s.log.Warn("read merge range, stamping no range", "root", root, "err", revErr)
+			trunkBefore = ""
 		}
+		rangeBase, rangeTip := rangeOf(s.log, root, e, repo, target, mergedByGx, trunkBefore)
 		s.StampEpicRange(root, e.Path, rangeBase, rangeTip, "merged_at", "completed_at")
 		// On the settle group: it takes the worktree lock, which the merge must not wait on.
 		s.guards.GoSettle(func() { s.removeLeftoverWorktrees(repo, e) })
@@ -388,7 +381,8 @@ func (s *Merger) StampEpicRange(root queue.RootRef, epicPath, base, tip string, 
 		fields[k] = now
 	}
 	if base != "" && tip != "" && !tickets.IsMapEpic(epicPath) {
-		maps.Copy(fields, map[string]any{"range_base": base, "range_tip": tip})
+		fields["range_base"] = base
+		fields["range_tip"] = tip
 	}
 	if err := tickets.StampEpicFields(epicPath, fields); err != nil {
 		s.log.Warn("stamp epic", "root", root, "keys", keys, "err", err)
@@ -407,16 +401,50 @@ func (s *Merger) StampEpicRange(root queue.RootRef, epicPath, base, tip string, 
 	}
 }
 
-// reflogRange is the Epic range of an epic merged outside gx's own fast-forward,
-// for the caller to stamp with merged_at. The caller holds target's trunk lock.
-// No trailer commits on target is an empty range (base = tip = the target tip,
-// no reflog asked). A match gives its entry's base and tip. Any other refusal
-// gives no range, logged: a hand merge never gets a guessed range. A map epic
-// and a git error give no range too.
-func reflogRange(log *slog.Logger, root queue.RootRef, e tickets.Epic, repo, target string) (base, tip string) {
+// mergeStyle is how an epic's merge landed, which decides where its Epic range
+// comes from.
+type mergeStyle int
+
+const (
+	// mergedByGx is gx's own fast-forward: the range is the target's tip before
+	// the merge (the caller's before) to its tip now.
+	mergedByGx mergeStyle = iota
+	// mergedByHand is a merge outside gx, found in the target's reflog.
+	mergedByHand
+	// mergedByPR is a PR a person merged on GitHub.
+	mergedByPR
+)
+
+// rangeOf is the one place that decides an epic's Epic range, for the caller to
+// stamp with merged_at. The caller holds target's trunk lock. before is read
+// only by mergedByGx. A map epic and any failed read give no range, logged: a
+// merge that happened is still recorded, and a range is never guessed.
+func rangeOf(log *slog.Logger, root queue.RootRef, e tickets.Epic, repo, target string, style mergeStyle, before string) (base, tip string) {
 	if e.IsMap {
 		return "", ""
 	}
+	switch style {
+	case mergedByGx:
+		if before == "" {
+			return "", ""
+		}
+		tip, err := git.RevParse(repo, "refs/heads/"+target)
+		if err != nil {
+			log.Warn("read merge range, stamping no range", "root", root, "err", err)
+			return "", ""
+		}
+		return before, tip
+	case mergedByPR:
+		return prRange(log, root, e, repo, target)
+	}
+	return reflogRange(log, root, e, repo, target)
+}
+
+// reflogRange is the Epic range of an epic merged outside gx's own fast-forward.
+// No trailer commits on target is an empty range (base = tip = the target tip,
+// no reflog asked). A match gives its entry's base and tip. Any other refusal
+// gives no range, logged: a hand merge never gets a guessed range.
+func reflogRange(log *slog.Logger, root queue.RootRef, e tickets.Epic, repo, target string) (base, tip string) {
 	m, err := rlmerge.NewReflogMatcher(repo, target)
 	if err != nil {
 		log.Warn("read reflog, stamping no range", "root", root, "err", err)

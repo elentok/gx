@@ -69,12 +69,11 @@ func (s *Merger) stampAndDequeueMerged(root queue.RootRef, e tickets.Epic, repo,
 	if tickets.LoadEpicTicketMD(e.Path).MergedAt.IsZero() {
 		added, deleted, cerr := rlmerge.EpicTrailerLines(repo, "refs/heads/"+e.Name, e.Name)
 		s.stampMergedEpic(root, e, added, deleted, cerr)
-		base, tip := "", ""
-		if e.PRNumber == 0 {
-			base, tip = reflogRange(s.log, root, e, repo, target)
-		} else if !e.IsMap {
-			base, tip = prRange(s.log, root, e, repo, target)
+		style := mergedByHand
+		if e.PRNumber != 0 {
+			style = mergedByPR
 		}
+		base, tip := rangeOf(s.log, root, e, repo, target, style, "")
 		s.StampEpicRange(root, e.Path, base, tip, "merged_at")
 	}
 	unlock()

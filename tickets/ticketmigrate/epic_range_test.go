@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -30,9 +31,12 @@ func TestBackfillEpicRange_WalksLoopEpicsLiveAndArchivedOnly(t *testing.T) {
 	archived := writeRangeTicketMD(t, tickets.ArchiveDir(root), "old", "loop", "")
 
 	var asked []string
-	changes, err := BackfillEpicRange(root, func(e tickets.Epic) (string, string, bool, error) {
+	changes, err := BackfillEpicRange(root, func(e tickets.Epic) (*history.CommitRange, error) {
 		asked = append(asked, e.Name)
-		return "base-" + e.Name, "tip-" + e.Name, e.Name != "refused", nil
+		if e.Name == "refused" {
+			return nil, nil
+		}
+		return &history.CommitRange{Base: "base-" + e.Name, Tip: "tip-" + e.Name}, nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -71,9 +75,9 @@ func TestBackfillEpicRange_NoMergedEpicNeverAsks(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(p, "ticket.md"), []byte("---\nkind: loop\nstatus: open\n---\n# E\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := BackfillEpicRange(root, func(tickets.Epic) (string, string, bool, error) {
+	_, err := BackfillEpicRange(root, func(tickets.Epic) (*history.CommitRange, error) {
 		t.Error("asked about an unmerged epic")
-		return "", "", false, nil
+		return nil, nil
 	})
 	if err != nil {
 		t.Fatal(err)
