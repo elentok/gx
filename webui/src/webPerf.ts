@@ -58,6 +58,15 @@ function buildId(): string {
 export function enableQueue(): void {
   enabled = true
   listen()
+  for (const fn of whenEnabled.splice(0)) fn()
+}
+
+const whenEnabled: Array<() => void> = []
+
+/** Runs fn now if the queue is on, else when it turns on. */
+export function afterQueueEnabled(fn: () => void): void {
+  if (enabled) fn()
+  else whenEnabled.push(fn)
 }
 
 export function queueSample(input: WebPerfInput): void {

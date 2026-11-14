@@ -254,7 +254,7 @@ export function JumpPalette({ fetcher, active }: { fetcher?: FetchEpicList; acti
   )
   if (!open) return null
   return (
-    <Box ref={root} display="contents">
+    <Box ref={root} display="contents" data-gx-action="jump-menu">
       <Menu
         sections={sections}
         label="Jump to"

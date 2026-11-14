@@ -226,6 +226,7 @@ function RowFrame({
   return (
     <Box
       className="group"
+      data-gx-action="sidebar-row"
       data-selected={selected ? "" : undefined}
       position="relative"
       display="flex"

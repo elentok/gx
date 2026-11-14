@@ -18,6 +18,22 @@ export default defineConfig({
     react(),
     serviceWorkerPlugin(),
     {
+      // Gives webVitals.ts the build's chunk names, the allowlist for worst_chunk.
+      name: "gx-chunk-names",
+      generateBundle(_options, bundle) {
+        const names = new Set<string>()
+        for (const file of Object.values(bundle)) {
+          if (file.type === "chunk") names.add(file.name)
+        }
+        const list = JSON.stringify([...names].sort().join(","))
+        for (const file of Object.values(bundle)) {
+          if (file.type === "chunk" && file.name === "webVitals") {
+            file.code = file.code.replace(/"__GX_CHUNKS__"/, list)
+          }
+        }
+      },
+    },
+    {
       name: "canned-snapshot",
       configureServer(server) {
         server.middlewares.use("/v1/snapshot", (_req, res) => {

@@ -38,6 +38,7 @@ export function Button({
   }[emphasis]
   return (
     <chakra.button
+      data-gx-action="page-button"
       data-emphasis={emphasis}
       data-size={size}
       data-tone={tone}

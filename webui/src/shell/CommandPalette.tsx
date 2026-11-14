@@ -110,7 +110,7 @@ export function CommandPalette() {
 
   if (!open) return null
   return (
-    <Box ref={root} display="contents">
+    <Box ref={root} display="contents" data-gx-action="palette">
       <CommandList phone={phone} onClose={close} />
     </Box>
   )

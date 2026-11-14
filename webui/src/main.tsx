@@ -28,3 +28,8 @@ createRoot(document.getElementById("root")!).render(
     </ChakraProvider>
   </StrictMode>,
 )
+
+// The vitals chunk loads after first paint so it never delays the app.
+const loadWebVitals = () => void import("./webVitals").then((m) => m.startWebVitals())
+if ("requestIdleCallback" in window) requestIdleCallback(loadWebVitals, { timeout: 5000 })
+else setTimeout(loadWebVitals, 2000)

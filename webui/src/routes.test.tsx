@@ -1085,9 +1085,7 @@ function renderSpans(initial: string) {
 const samples = () => sampled.mock.calls.map(([s]) => s)
 
 test("the first span of a load is app_ready from navigation start, later ones route_ready", async () => {
-  vi.spyOn(performance, "getEntriesByType").mockReturnValue([
-    { type: "reload" } as unknown as PerformanceEntry,
-  ])
+  vi.spyOn(performance, "getEntriesByType").mockReturnValue([{ type: "reload" } as never])
   const router = renderSpans("/tips")
   await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
   expect(samples()[0]).toMatchObject({
