@@ -48,6 +48,7 @@ var routeVerbs = map[string]string{
 	"GET /v1/health":                            "server health",
 	"GET /v1/restart/check":                     "server restart-check",
 	"POST /v1/restart":                          "server restart-now",
+	"POST /v1/hosted-files/resolve":             "files resolve",
 	"POST /v1/budget/increase":                  "budget increase",
 	"POST /v1/afk":                              "afk",
 	"POST /v1/vimode":                           "vimode",

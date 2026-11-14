@@ -239,6 +239,88 @@ export interface DesignDraftSaveResult {
 }
 
 //////////
+// source: hostedfiles.go
+
+/**
+ * HostedKind is how the viewer shows a hosted file. The values are literals
+ * because tygo cannot resolve constants from another package.
+ */
+export const HostedKindMarkdown = "markdown";
+export const HostedKindMermaid = "mermaid";
+export const HostedKindHTML = "html";
+export const HostedKindImage = "image";
+export const HostedKindSVG = "svg";
+export const HostedKindPDF = "pdf";
+export const HostedKindCode = "code";
+export const HostedKindText = "text";
+export const HostedKindBinary = "binary";
+export type HostedKind = typeof HostedKindMarkdown | typeof HostedKindMermaid | typeof HostedKindHTML | typeof HostedKindImage | typeof HostedKindSVG | typeof HostedKindPDF | typeof HostedKindCode | typeof HostedKindText | typeof HostedKindBinary;
+/**
+ * HostedVerdict is the answer for one resolve candidate. Denied and out-of-root
+ * candidates are "missing": the route is no path oracle.
+ */
+export type HostedVerdict = string;
+export const HostedFound: HostedVerdict = "found";
+export const HostedMissing: HostedVerdict = "missing";
+/**
+ * HostedResolveRequest is the POST /v1/hosted-files/resolve body behind
+ * `gx files resolve`. At most one of Session, Project and Dir is set; with none,
+ * only absolute and "~/" candidates resolve.
+ */
+export interface HostedResolveRequest {
+  candidates: string[];
+  /**
+   * Session is a session id; its folder is the base.
+   */
+  session?: string;
+  /**
+   * Project is a project name; its main worktree is the base.
+   */
+  project?: string;
+  /**
+   * Dir is a folder base.
+   */
+  dir?: string;
+}
+/**
+ * HostedResolved is the answer for one candidate.
+ */
+export interface HostedResolved {
+  candidate: string;
+  verdict: HostedVerdict;
+  /**
+   * Path, Size, Kind and Modified are set only when the verdict is "found".
+   */
+  path?: string;
+  size?: number /* int64 */;
+  kind?: HostedKind;
+  modified?: string;
+}
+/**
+ * HostedResolveResult is the resolve reply: one entry per candidate, in request
+ * order, or a refusal.
+ */
+export interface HostedResolveResult {
+  files?: HostedResolved[];
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+}
+/**
+ * MaxHostedCandidates is how many candidates one resolve call accepts.
+ */
+export const MaxHostedCandidates = 200;
+/**
+ * ReasonTooManyCandidates refuses a resolve call with more than MaxHostedCandidates paths.
+ */
+export const ReasonTooManyCandidates = "too-many-candidates";
+/**
+ * ReasonBadBase refuses a resolve call that names more than one base.
+ */
+export const ReasonBadBase = "bad-base";
+export type Reason = typeof ReasonTooManyCandidates | typeof ReasonBadBase;
+
+//////////
 // source: restart.go
 
 export const ReasonRestartChanged = "changed";

@@ -62,6 +62,14 @@ func (w *Web) SetPassword(ctx context.Context, password string) (ops.WebLoginsRe
 	return res, err
 }
 
+// ResolveHostedFiles asks which candidate paths gx may host, against the base
+// the request names. A refusal is a result (Refused set), not an error.
+func (w *Web) ResolveHostedFiles(ctx context.Context, req ops.HostedResolveRequest) (ops.HostedResolveResult, error) {
+	var res ops.HostedResolveResult
+	err := w.t.post(ctx, "/v1/hosted-files/resolve", req, &res)
+	return res, err
+}
+
 // ResetAuthenticator clears the authenticator and returns the new Setup code in the result.
 // A refusal is a result (Refused set), not an error.
 func (w *Web) ResetAuthenticator(ctx context.Context) (ops.WebInfo, error) {

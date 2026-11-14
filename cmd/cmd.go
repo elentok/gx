@@ -14,6 +14,7 @@ import (
 	configcmd "github.com/elentok/gx/cmd/config"
 	"github.com/elentok/gx/cmd/doctor"
 	"github.com/elentok/gx/cmd/evolve"
+	"github.com/elentok/gx/cmd/files"
 	"github.com/elentok/gx/cmd/gitops"
 	"github.com/elentok/gx/cmd/limits"
 	"github.com/elentok/gx/cmd/project"
@@ -255,6 +256,7 @@ Run without a command to open the status UI.`,
 		limits.NewUsage(limits.Deps{Env: d.Env}),
 		limits.NewAFK(limits.Deps{Env: d.Env}),
 		schedules.New(schedules.Deps{Env: d.Env}),
+		files.New(files.Deps{Env: d.Env}),
 		limits.NewViMode(limits.Deps{Env: d.Env}),
 		gitops.NewMerge(d.gitopsDeps()),
 		gitops.NewCleanup(d.gitopsDeps()),

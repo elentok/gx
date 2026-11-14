@@ -79,6 +79,16 @@ func (c *Checker) Check(path string) (Hosted, bool) {
 	return Hosted{Path: resolved, Size: info.Size(), ModTime: info.ModTime()}, true
 }
 
+// InRoots reports whether dir, symlinks resolved, lies inside a builtin, extra
+// or temp root. A resolve base must pass it, so a base cannot reach out of them.
+func (c *Checker) InRoots(dir string) bool {
+	resolved := resolveAll([]string{dir})
+	if len(resolved) == 0 {
+		return false
+	}
+	return insideAny(resolved[0], resolveAll(call(c.BuiltinRoots), call(c.ExtraRoots), call(c.TempRoots)))
+}
+
 func (c *Checker) ownedTemp(resolved, tempRoot string, info os.FileInfo) bool {
 	uid, nlink, ok := c.stat(resolved, info)
 	if !ok || uid != c.UID || nlink != 1 {

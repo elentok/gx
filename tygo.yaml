@@ -39,6 +39,7 @@ packages:
     include_files:
       - cleanup.go
       - designdrafts.go
+      - hostedfiles.go
       - restart.go
       - schedules.go
       - settingspage.go
