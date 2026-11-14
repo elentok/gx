@@ -3,6 +3,7 @@ package webauth_test
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -141,6 +142,55 @@ func TestWebFilesToken_DiesWithItsLoginAndARestart(t *testing.T) {
 	}
 	if r := f2.noFollow(t, tok2, nil); r.StatusCode != http.StatusFound {
 		t.Errorf("token after web-password: status %d, want 302", r.StatusCode)
+	}
+}
+
+func TestWebFilesToken_DoesNotSurviveAServerRestart(t *testing.T) {
+	t.Parallel()
+	f := startTokenFixture(t)
+	tok := f.mint(t)
+	cookie := f.cookie
+	f.l.h.Restart(t)
+	hs, err := f.l.h.Client.Handshake(context.Background())
+	if err != nil || hs.WebURL == "" {
+		t.Fatalf("handshake %+v, %v", hs, err)
+	}
+	f.l.base = servertest.WebBase(hs.WebURL)
+	u, err := url.Parse(f.l.base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The cookie name carries the listener's port, which the new server may not reuse.
+	f.cookie = &http.Cookie{Name: cookie.Name[:strings.LastIndex(cookie.Name, "_")+1] + u.Port(), Value: cookie.Value}
+	r := f.noFollow(t, tok, nil)
+	if r.StatusCode != http.StatusFound || r.Header.Get("Location") != "/v1/files"+f.page {
+		t.Errorf("old token after a restart: status %d location %q, want 302 to the stable link", r.StatusCode, r.Header.Get("Location"))
+	}
+	fresh := f.mint(t)
+	if fresh == tok {
+		t.Error("stable link after a restart gave the old token back")
+	}
+	if resp, body := f.l.get(t, fresh, nil); resp.StatusCode != http.StatusOK || body != "<p>hi</p>\n" {
+		t.Errorf("renewed token: status %d body %q, want 200", resp.StatusCode, body)
+	}
+}
+
+func TestWebFilesToken_WrongHostIsRefusedBeforeTheTokenCheck(t *testing.T) {
+	t.Parallel()
+	f := startTokenFixture(t)
+	tok := f.mint(t)
+	req, err := http.NewRequest(http.MethodGet, f.l.base+tok, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Host = "evil.example"
+	resp, err := noFollowClient().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("valid token with a wrong Host: status %d, want 403", resp.StatusCode)
 	}
 }
 
