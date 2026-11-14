@@ -98,13 +98,13 @@ var flowSpecs = map[Flow]FlowSpec{
 		ContinueArg: func(mapAddr string) string { return mapAddr },
 	},
 	FlowTriage: {
-		Steps: []string{StepVerify, StepPlan, StepApprove, StepWrite, string(StepDone)},
+		Steps: []string{StepVerify, StepRoute, StepQuestions, StepWrite, string(StepDone)},
 		Labels: map[string]string{
-			StepVerify: "Verify", StepPlan: "Plan", StepApprove: "Approve",
+			StepVerify: "Verify", StepRoute: "Route", StepQuestions: "Questions",
 			StepWrite: "Write", string(StepDone): "Done",
 		},
 		Final:       []string{string(StepDone)},
-		NeedsPerson: []string{StepPlan, StepApprove},
+		NeedsPerson: []string{StepQuestions},
 		Skill:       "gx-triage-follow-ups",
 		ContinueArg: func(project string) string { return "--project " + project },
 	},

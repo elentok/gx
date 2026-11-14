@@ -36,7 +36,7 @@ func TestFlowSpec_Triage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"verify", "plan", "approve", "write", "done"}
+	want := []string{"verify", "route", "questions", "write", "done"}
 	if !slices.Equal(spec.Steps, want) {
 		t.Fatalf("steps = %v", spec.Steps)
 	}
@@ -48,7 +48,7 @@ func TestFlowSpec_Triage(t *testing.T) {
 	if !spec.IsFinal("done") || spec.IsFinal("write") {
 		t.Errorf("final = %v", spec.Final)
 	}
-	if !spec.StepNeedsPerson("plan") || !spec.StepNeedsPerson("approve") || spec.StepNeedsPerson("verify") {
+	if !spec.StepNeedsPerson("questions") || spec.StepNeedsPerson("route") || spec.StepNeedsPerson("write") || spec.StepNeedsPerson("verify") {
 		t.Errorf("needs person = %v", spec.NeedsPerson)
 	}
 	if spec.Skill != "gx-triage-follow-ups" || spec.ContinueArg("gx") != "--project gx" {
@@ -67,8 +67,15 @@ func TestFlow_RefusesUnknown(t *testing.T) {
 	if err := CheckFlowStep(FlowDesign, "verify"); err == nil {
 		t.Error("triage step accepted by design")
 	}
-	if err := CheckFlowStep(FlowTriage, "approve"); err != nil {
-		t.Error(err)
+	for _, s := range []string{"verify", "route", "questions", "write", "done"} {
+		if err := CheckFlowStep(FlowTriage, s); err != nil {
+			t.Error(err)
+		}
+	}
+	for _, s := range []string{"plan", "approve"} {
+		if err := CheckFlowStep(FlowTriage, s); err == nil {
+			t.Errorf("old step %q accepted", s)
+		}
 	}
 	if err := CheckFlowStep("nope", "done"); err == nil {
 		t.Error("unknown flow step accepted")

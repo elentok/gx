@@ -8,14 +8,25 @@ import (
 func TestTriageSkillAnchors(t *testing.T) {
 	skill := collapseSpace(readFile(t, "gx-triage-follow-ups/SKILL.md"))
 	for _, want := range []string{
-		"## 0. Link and detect the step", "## 1. Verify", "## 2. Plan", "## 3. Approve",
+		"## 0. Link and detect the step", "## 1. Verify", "## 2. Route", "## 3. Questions",
 		"## 4. Write", "## 5. Done", "## Prefer the correct fix",
-		"gx agent link --triage", "gx agent step", "gx agent model worker", "--fits",
+		"gx agent link --triage", "gx agent step <verify|route|questions|write|done>",
+		"gx agent model worker", "--fits", "Decided unless you object", "Write this plan?",
 		"`✅ <step>: <what was done>. Next: <what runs next>`",
-		"never grills", `"auto": true`, "cheap to reverse", "(../gx-local-tracker.md)",
+		"never grills outside the Questions step", "expensive to reverse",
+		"(old-epic-areas.txt)", "gx tickets triage oldepics", "decided by agent",
+		"(../gx-local-tracker.md)",
 	} {
-		if !strings.Contains(strings.ToLower(skill), strings.ToLower(want)) {
+		if n := strings.Count(strings.ToLower(skill), strings.ToLower(want)); n < 1 {
 			t.Errorf("triage skill lacks %q", want)
+		}
+	}
+	for _, gone := range []string{
+		"## 2. Plan", "## 3. Approve", `"auto": true`, "`quick`", "send-back", "`earlier`",
+		"more than 2 questions", "--kind map",
+	} {
+		if strings.Contains(skill, gone) {
+			t.Errorf("triage skill still has %q", gone)
 		}
 	}
 }

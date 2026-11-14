@@ -19,9 +19,10 @@ import (
 
 // stepGrowth is the padded median context growth of each design step. The
 // grill-findings through branch steps run as one block, so they share a value.
-// The Triage steps verify and write are estimates, not measurements: verify
-// reads each follow-up and its code, so it is sized like the design Review
-// step doubled; write drafts the resulting tickets, sized like Resolve
+// The Triage steps verify, route, questions and write are estimates, not
+// measurements: verify reads each follow-up and its code, so it is sized like
+// the design Review step doubled; route and questions only compare verdicts and
+// print rounds; write drafts the resulting tickets, sized like Resolve
 // tickets. Replace them with measured medians once Triage runs have data.
 // "done" is shared by both flows.
 var stepGrowth = map[string]int{
@@ -33,6 +34,8 @@ var stepGrowth = map[string]int{
 	string(tickets.StepCreateTickets):  80_000,
 	string(tickets.StepBranch):         80_000,
 	tickets.StepVerify:                 40_000,
+	tickets.StepRoute:                  30_000,
+	tickets.StepQuestions:              30_000,
 	tickets.StepWrite:                  50_000,
 	string(tickets.StepDone):           0,
 }
