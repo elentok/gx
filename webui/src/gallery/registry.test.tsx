@@ -4,7 +4,12 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import type { ReactElement } from "react"
-import { expect, it } from "vitest"
+import { ChakraProvider } from "@chakra-ui/react"
+import { renderToStaticMarkup } from "react-dom/server"
+import { describe, expect, it } from "vitest"
+import { ACTIONS } from "../gxActions"
+import { system } from "../ui/theme"
+import { webPerformanceFull, webPerformanceLow } from "./webPerformanceData"
 import config from "../../vite.config"
 import type { Health } from "../generated/server"
 import { TONES } from "../ui/tone"
@@ -197,6 +202,37 @@ it("shows the jump menu row kinds and every Design footer state of mock 09", () 
     "design-tablet-footer",
     "design-tablet-footer-countdown",
   ])
+})
+
+describe("WebPerformance gallery cases", () => {
+  const html = (label: string) => {
+    const node = galleryEntries
+      .find((e) => e.name === "WebPerformance")
+      ?.cases.find((c) => c.label === label)?.node
+    return renderToStaticMarkup(<ChakraProvider value={system}>{node}</ChakraProvider>)
+  }
+  const pressed = (h: string, tab: string) =>
+    new RegExp(`aria-pressed="true"[^>]*>${tab}<|${tab}[^>]*aria-pressed="true"`).test(h)
+
+  it("render the real section on the right tab", () => {
+    expect(html("hard-loads")).toContain('aria-labelledby="stats-web-performance"')
+    expect(html("hard-loads")).toContain('data-testid="perf-card-lcp"')
+    expect(pressed(html("route-changes"), "Route changes")).toBe(true)
+    expect(pressed(html("hard-loads"), "Hard loads")).toBe(true)
+  })
+
+  it("shows the low-samples state", () => {
+    expect(html("low-samples")).toContain("data-low")
+  })
+
+  it("only uses production action and chunk names", () => {
+    for (const data of [webPerformanceFull, webPerformanceLow]) {
+      const { top_actions, worst_chunk } = data.poor_inp
+      expect(top_actions.length).toBeGreaterThan(0)
+      for (const a of top_actions) expect(ACTIONS).toContain(a.action)
+      expect(worst_chunk).toBe("vendor")
+    }
+  })
 })
 
 it("keeps gallery.html out of the production build input", () => {

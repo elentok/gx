@@ -346,19 +346,19 @@ export const webPerformanceFull: StatsWebPerformance = {
     presentation_delay_p75: 83.8,
     top_actions: [
       {
-        action: "toggle-sidebar",
+        action: "sidebar-row",
         count: 13,
       },
       {
-        action: "open-command-menu",
+        action: "palette",
         count: 12,
       },
       {
-        action: "type-search",
+        action: "jump-menu",
         count: 10,
       },
     ],
-    worst_chunk: "vendor-charts",
+    worst_chunk: "vendor",
   },
 }
 
@@ -629,18 +629,18 @@ export const webPerformanceLow: StatsWebPerformance = {
     presentation_delay_p75: 88.5,
     top_actions: [
       {
-        action: "open-command-menu",
+        action: "palette",
         count: 3,
       },
       {
-        action: "toggle-sidebar",
+        action: "sidebar-row",
         count: 2,
       },
       {
-        action: "type-search",
+        action: "jump-menu",
         count: 2,
       },
     ],
-    worst_chunk: "epic-page",
+    worst_chunk: "vendor",
   },
 }

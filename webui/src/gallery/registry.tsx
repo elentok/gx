@@ -1,5 +1,5 @@
 import { Box, Menu, Text } from "@chakra-ui/react"
-import { useEffect, useMemo, useRef, type ComponentProps, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react"
 import { PageHeader } from "../page/PageHeader"
 import { PageIcon } from "../page/PageIcon"
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router"
@@ -9,6 +9,8 @@ import { designFooterEntries } from "./designFooterEntries"
 import { questionEntries } from "./questionEntries"
 import { shellEntries } from "./shellEntries"
 import { webPerformanceFull, webPerformanceLow } from "./webPerformanceData"
+import { WebPerformance, type PerfTab } from "../stats/WebPerformance"
+import type { StatsWebPerformance } from "../generated/server"
 import { ConnectionContext, type Connection } from "../connection"
 import { DraftSwitcher } from "../design/DraftSwitcher"
 import { DraftImages } from "../design/DraftImages"
@@ -504,19 +506,54 @@ const headerCase = (
   ),
 })
 
-// Until the section exists, each case shows its canned payload as text.
-const webPerformanceCase = (label: string, data: unknown): GalleryCase => ({
+const webPerformanceDays = [
+  "2026-11-08",
+  "2026-11-09",
+  "2026-11-10",
+  "2026-11-11",
+  "2026-11-12",
+  "2026-11-13",
+  "2026-11-14",
+]
+
+function WebPerformanceDemo({
+  data,
+  initialTab,
+}: {
+  data: StatsWebPerformance
+  initialTab: PerfTab
+}) {
+  const [tab, setTab] = useState<PerfTab>(initialTab)
+  const [includeDev, setIncludeDev] = useState(false)
+  return (
+    <WebPerformance
+      data={data}
+      days={webPerformanceDays}
+      range={7}
+      tab={tab}
+      onTab={setTab}
+      includeDev={includeDev}
+      onIncludeDev={setIncludeDev}
+    />
+  )
+}
+
+const webPerformanceCase = (
+  label: string,
+  data: StatsWebPerformance,
+  initialTab: PerfTab,
+): GalleryCase => ({
   label,
-  node: <pre>{JSON.stringify(data, null, 2)}</pre>,
+  node: <WebPerformanceDemo data={data} initialTab={initialTab} />,
 })
 
 export const galleryEntries: GalleryEntry[] = [
   {
     name: "WebPerformance",
     cases: [
-      webPerformanceCase("hard-loads", webPerformanceFull),
-      webPerformanceCase("route-changes", webPerformanceFull),
-      webPerformanceCase("low-samples", webPerformanceLow),
+      webPerformanceCase("hard-loads", webPerformanceFull, "hard"),
+      webPerformanceCase("route-changes", webPerformanceFull, "route"),
+      webPerformanceCase("low-samples", webPerformanceLow, "hard"),
     ],
   },
   {
