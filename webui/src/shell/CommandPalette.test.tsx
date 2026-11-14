@@ -39,7 +39,12 @@ function Where() {
 }
 
 function RenameProbe() {
-  return <p data-testid="renaming">{useRenameRequest()?.session.id ?? "none"}</p>
+  const request = useRenameRequest()
+  return (
+    <p data-testid="renaming">
+      {request ? ("session" in request ? request.session.id : "draft") : "none"}
+    </p>
+  )
 }
 
 const projects = ["alpha", "beta", "gamma"]

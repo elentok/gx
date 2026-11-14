@@ -1,17 +1,29 @@
 import { Box, Text } from "@chakra-ui/react"
+import { useEffect } from "react"
 import { forgetLast } from "../agents/lastAgent"
 import { isExited, postRemoveSession, removeSession } from "../agents/sessionWrites"
+import { deleteDraft, type DeleteDraft } from "../design/drafts"
 import { Button } from "../ui/button/Button"
 import { Modal } from "../ui/modal/Modal"
 import { useWrite } from "../useWrite"
-import { closeRemoveConfirm, useRemoveConfirmRequest } from "./removeConfirmOpen"
+import {
+  closeRemoveConfirm,
+  useRemoveConfirmRequest,
+  type DraftRemoveTarget,
+} from "./removeConfirmOpen"
+
+type Request = NonNullable<ReturnType<typeof useRemoveConfirmRequest>>
 
 /** Renders the Remove confirmation for the open request. */
 export function RemoveConfirmHost() {
   const request = useRemoveConfirmRequest()
-  const { run, pending } = useWrite()
   if (!request) return null
-  const { session, onRemoved } = request
+  if ("draft" in request) return <DraftRemove key={request.draft.id} {...request} />
+  return <SessionRemove {...request} />
+}
+
+function SessionRemove({ session, onRemoved }: Extract<Request, { session: unknown }>) {
+  const { run, pending } = useWrite()
   const name = session.name || session.id
   return (
     <Modal label={`Remove ${name}`} onClose={closeRemoveConfirm} maxW="sm">
@@ -37,6 +49,47 @@ export function RemoveConfirmHost() {
             })
           }}
         >
+          Remove
+        </Button>
+      </Box>
+    </Modal>
+  )
+}
+
+function DraftRemove({
+  draft,
+  onRemoved,
+  remove = deleteDraft,
+}: {
+  draft: DraftRemoveTarget
+  onRemoved: () => void
+  remove?: DeleteDraft
+}) {
+  const { run, pending } = useWrite()
+  const removeNow = () => {
+    closeRemoveConfirm()
+    void run(
+      async () => {
+        await remove(draft.id)
+        return {}
+      },
+      { onDone: onRemoved },
+    )
+  }
+  // An empty draft holds nothing to lose, so no question.
+  useEffect(() => {
+    if (draft.empty) removeNow()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  if (draft.empty) return null
+  return (
+    <Modal label={`Remove ${draft.label}`} onClose={closeRemoveConfirm} maxW="sm">
+      <Text>{`Remove ${draft.label}? Its prompt and images are deleted.`}</Text>
+      <Box display="flex" gap="2" justifyContent="flex-end">
+        <Button emphasis="secondary" onClick={closeRemoveConfirm} autoFocus>
+          Keep
+        </Button>
+        <Button tone="paused" disabled={pending} onClick={removeNow}>
           Remove
         </Button>
       </Box>

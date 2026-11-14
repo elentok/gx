@@ -4,6 +4,7 @@ import {
   CardKindDesign,
   HoldQueuedText,
   SectionOnHold,
+  type DesignDraftRow,
   type EpicListRow,
   ReasonNeedsYes,
   type HoldRequest,
@@ -13,7 +14,9 @@ import {
 } from "../generated/server"
 import { postTargetsTo, refusalOf, type StopSession } from "../design/open"
 import { useSessionManage } from "../agents/useSessionManage"
-import { renameEntry } from "../shell/renameOpen"
+import { readDraft } from "../design/drafts"
+import { openRemoveConfirm } from "../shell/removeConfirmOpen"
+import { draftRenameEntry, renameEntry } from "../shell/renameOpen"
 import { Button } from "../ui/button/Button"
 import { Modal } from "../ui/modal/Modal"
 import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu"
@@ -24,10 +27,10 @@ import { showToast, toaster } from "../ui/toaster"
 
 /** What the menu needs of a Design or epic card, a chat or a jump row. One-off, Follow-ups and Other get no menu. */
 export interface ItemRef {
-  /** The Design or epic address, or the chat's session id. */
+  /** The Design or epic address, the chat's session id, or the draft's workspace membership key. */
   key: string
   name: string
-  kind: "design" | "epic" | "chat"
+  kind: "design" | "epic" | "chat" | "draft"
   /** The workspace the item sits in. */
   workspace: string
   /** The epic (or the Design's -impl) holds a queue item. */
@@ -35,6 +38,8 @@ export interface ItemRef {
   held?: boolean
   /** A chat's session, for Stop and Remove. */
   session?: SessionInfo
+  /** A draft's row, for Rename and Remove. */
+  draft?: DesignDraftRow
 }
 
 /** The menu target of a Design or epic card; none for a card outside every workspace (One-off, Follow-ups, Other). */
@@ -202,6 +207,14 @@ function ArchiveDialog({
   )
 }
 
+/** Asks to remove a draft; one with no prompt, slug or images goes at once. A draft that cannot be read is asked about. */
+async function removeDraft(id: string, label: string, onRemoved: () => void) {
+  const res = await readDraft(id).catch(() => undefined)
+  const d = res?.kind === "ok" ? res.draft : undefined
+  const empty = !!d && !d.idea.trim() && !d.slug && d.images.length === 0
+  openRemoveConfirm({ draft: { id, label, empty }, onRemoved })
+}
+
 /** The Move, Remove and Hold sections of an item's menu, plus the dialogs they open. No item, no sections and no dialogs. */
 export function useItemActions(
   item: ItemRef | undefined,
@@ -217,6 +230,7 @@ export function useItemActions(
   const close = () => setDialog(undefined)
 
   const groups: MenuEntry[][] = []
+  if (item.kind === "draft" && item.draft) groups.push(draftRenameEntry(item.draft))
   if (workspaces.length > 0) {
     groups.push([
       {
@@ -243,7 +257,14 @@ export function useItemActions(
   const manageItems = [...(item.kind === "chat" ? renameEntry(item.session) : []), ...manage.items]
   if (item.kind === "chat" && manageItems.length > 0) groups.push(manageItems)
 
-  if (item.kind !== "chat") {
+  if (item.kind === "draft" && item.draft) {
+    const { id, label } = item.draft
+    groups.push([
+      { value: "remove", label: "Remove", onSelect: () => void removeDraft(id, label, onRemoved) },
+    ])
+  }
+
+  if (item.kind === "design" || item.kind === "epic") {
     const hold = () =>
       run(async () => {
         const res = await writers.hold(item.key)

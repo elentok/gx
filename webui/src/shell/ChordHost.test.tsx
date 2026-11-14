@@ -166,7 +166,12 @@ test("an empty Leader key means no box", () => {
 })
 
 function RenameProbe() {
-  return <p data-testid="renaming">{useRenameRequest()?.session.id ?? "none"}</p>
+  const request = useRenameRequest()
+  return (
+    <p data-testid="renaming">
+      {request ? ("session" in request ? request.session.id : "draft") : "none"}
+    </p>
+  )
 }
 
 function setupChats(path: string, sessions = [session("s1", "gamma"), session("s2", "gamma")]) {

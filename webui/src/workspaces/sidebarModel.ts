@@ -71,6 +71,8 @@ export interface SidebarRow {
   archivable?: boolean
   /** A chat's session, for its menu's Stop and Remove. */
   session?: SessionInfo
+  /** A draft's row, for its menu's Rename and Remove. */
+  draft?: DesignDraftRow
   /** A chat, or a Design with a session, has Unread; the title is drawn bold. */
   unread?: boolean
   agents: SidebarAgent[]
@@ -306,6 +308,7 @@ export function buildSidebar({
           href: draftHref(d.id),
           status,
           agents: [],
+          draft: d,
         },
         name: d.label,
         needsYou: false,

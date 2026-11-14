@@ -129,7 +129,7 @@ const draftRow = (over: Partial<DesignDraftRow> = {}): DesignDraftRow => ({
   ...over,
 })
 
-test("a draft row shows the icon, label and Draft with no dot, ring or menu; a snapshot update adds and removes it", async () => {
+test("a draft row shows the icon, label and Draft with no dot or ring; a snapshot update adds and removes it", async () => {
   const { setDrafts } = setup("desktop", "/")
   await body().findByRole("link", { name: /Blog/ })
   expect(body().queryByRole("img", { name: "Design draft" })).toBeNull()
@@ -141,11 +141,40 @@ test("a draft row shows the icon, label and Draft with no dot, ring or menu; a s
   expect(within(link).getByRole("img", { name: "Design draft" })).toBeTruthy()
   expect(within(link).queryByTestId("kind-dot")).toBeNull()
   expect(within(link).queryByRole("progressbar")).toBeNull()
-  expect(within(link.closest("li")!).queryByRole("button", { name: "More actions" })).toBeNull()
   expect(body().queryByRole("link", { name: /Elsewhere/ })).toBeNull()
 
   setDrafts([])
   await waitFor(() => expect(body().queryByRole("link", { name: /Checkout redesign/ })).toBeNull())
+})
+
+test("the draft row has a menu; removing the open draft from it navigates to /epics", async () => {
+  const fetchMock = vi.fn(async (u: unknown) => {
+    const url = String(u)
+    if (url.includes("/designs/drafts/read"))
+      return new Response(
+        JSON.stringify({
+          draft: { ...draftRow(), idea: "a prompt", images: [], revision: 1 },
+        }),
+        { status: 200 },
+      )
+    if (url.includes("/designs/drafts/delete"))
+      return new Response(JSON.stringify({ deleted: true }), { status: 200 })
+    return new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 })
+  })
+  const { setDrafts } = setup("desktop", "/drafts/d1")
+  vi.stubGlobal("fetch", fetchMock)
+  setDrafts([draftRow()])
+  const link = await body().findByRole("link", { name: /Checkout redesign/ })
+  fireEvent.click(within(link.closest("li")!).getByRole("button", { name: "More actions" }))
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }))
+  expect(
+    await screen.findByText("Remove Checkout redesign? Its prompt and images are deleted."),
+  ).toBeTruthy()
+  fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+  await waitFor(() => expect(screen.getByTestId("page-path").textContent).toBe("/epics"))
+  expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/designs/drafts/delete"))).toBe(
+    true,
+  )
 })
 
 test("rows show the name and status words; the open epic is current and stays collapsed", async () => {

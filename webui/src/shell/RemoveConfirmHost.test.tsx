@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
-import { afterEach, expect, test, vi } from "vitest"
+import { afterEach, describe, expect, test, vi } from "vitest"
 import { session } from "../agents/agentsTestKit"
+import type { DraftResult } from "../design/drafts"
 import { rowToken } from "../design/open"
 import { renderThemed } from "../ui/render"
 import { RemoveConfirmHost } from "./RemoveConfirmHost"
@@ -47,4 +48,37 @@ test("Remove calls the writer, then the opener's callback", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Remove" }))
   await waitFor(() => expect(onRemoved).toHaveBeenCalled())
   expect(postRemoveSession).toHaveBeenCalledExactlyOnceWith({ id: "s1", state: rowToken(live) })
+})
+
+describe("a draft request", () => {
+  const target = { id: "d1", label: "Checkout", empty: false }
+  const openDraft = (empty: boolean) => {
+    const remove = vi.fn(async () => ({ kind: "deleted" }) as DraftResult)
+    const onRemoved = vi.fn()
+    renderThemed(<RemoveConfirmHost />)
+    act(() => openRemoveConfirm({ draft: { ...target, empty }, onRemoved, remove }))
+    return { remove, onRemoved }
+  }
+
+  test("a non-empty draft asks; Keep removes nothing", () => {
+    const { remove } = openDraft(false)
+    expect(screen.getByText("Remove Checkout? Its prompt and images are deleted.")).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Keep" }))
+    expect(screen.queryByText(/Its prompt and images/)).toBeNull()
+    expect(remove).not.toHaveBeenCalled()
+  })
+
+  test("Remove deletes the draft and calls onRemoved", async () => {
+    const { remove, onRemoved } = openDraft(false)
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+    await waitFor(() => expect(onRemoved).toHaveBeenCalledTimes(1))
+    expect(remove).toHaveBeenCalledExactlyOnceWith("d1")
+  })
+
+  test("an empty draft is removed with no modal", async () => {
+    const { remove, onRemoved } = openDraft(true)
+    expect(screen.queryByRole("button", { name: "Keep" })).toBeNull()
+    await waitFor(() => expect(onRemoved).toHaveBeenCalledTimes(1))
+    expect(remove).toHaveBeenCalledExactlyOnceWith("d1")
+  })
 })

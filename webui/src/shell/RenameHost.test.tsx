@@ -1,9 +1,19 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
-import { afterEach, expect, test, vi } from "vitest"
+import { afterEach, describe, expect, test, vi } from "vitest"
 import { session } from "../agents/agentsTestKit"
+import { slugProblem } from "../design/draftSlug"
+import type { DraftResult } from "../design/drafts"
 import { renderThemed } from "../ui/render"
 import { RenameHost } from "./RenameHost"
 import { closeRename, openRename } from "./renameOpen"
+
+// The real check, observed: the popup and the page field must share it.
+const { slugProblemSpy } = vi.hoisted(() => ({ slugProblemSpy: vi.fn() }))
+vi.mock("../design/draftSlug", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../design/draftSlug")>()
+  slugProblemSpy.mockImplementation(real.slugProblem)
+  return { ...real, slugProblem: slugProblemSpy }
+})
 
 afterEach(() => {
   closeRename()
@@ -65,4 +75,73 @@ test("the auto-name line shows only when auto_name is set", () => {
   closeRename()
   open()
   expect(screen.queryByText("Automatic name from the terminal title")).toBeNull()
+})
+
+test("a session request still opens Rename chat with the Name field", () => {
+  open()
+  expect(screen.getByRole("dialog", { name: "Rename chat" })).toBeTruthy()
+  expect(field()).toBeTruthy()
+})
+
+describe("a draft request", () => {
+  const draft = { id: "d1", project: "p", slug: "old-slug" }
+  const slug = () => screen.getByRole("textbox", { name: "Slug" }) as HTMLInputElement
+  const openDraft = (saveFields = vi.fn(async () => ({ kind: "deleted" }) as DraftResult)) => {
+    renderThemed(<RenameHost />)
+    act(() => openRename({ draft, saveFields }))
+    return saveFields
+  }
+  const submit = () => fireEvent.submit(slug().closest("form")!)
+
+  test("opens titled Rename draft with the current slug and no auto-name line", () => {
+    openDraft()
+    expect(screen.getByRole("dialog", { name: "Rename draft" })).toBeTruthy()
+    expect(slug().value).toBe("old-slug")
+    expect(screen.queryByText(/Automatic name/)).toBeNull()
+  })
+
+  test("a valid slug is written once with the draft id and project, then closes", async () => {
+    const save = openDraft()
+    fireEvent.change(slug(), { target: { value: "new-slug" } })
+    submit()
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "Slug" })).toBeNull())
+    expect(save).toHaveBeenCalledExactlyOnceWith({ id: "d1", project: "p", slug: "new-slug" })
+  })
+
+  test("an empty submit is enabled and clears the slug", async () => {
+    const save = openDraft()
+    fireEvent.change(slug(), { target: { value: "" } })
+    expect((screen.getByRole("button", { name: "Rename" }) as HTMLButtonElement).disabled).toBe(
+      false,
+    )
+    submit()
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledExactlyOnceWith({ id: "d1", project: "p", slug: "" }),
+    )
+  })
+
+  test("an invalid slug shows the page field's message, writes nothing and stays open", () => {
+    const save = openDraft()
+    fireEvent.change(slug(), { target: { value: "Bad Slug" } })
+    submit()
+    expect(screen.getByRole("alert").textContent).toBe(slugProblem("Bad Slug"))
+    expect(save).not.toHaveBeenCalled()
+    expect(slug().value).toBe("Bad Slug")
+  })
+
+  test("validates through slugProblem, the page field's one check, for valid, invalid and empty", async () => {
+    openDraft()
+    for (const value of ["new-slug", "Bad Slug", ""]) {
+      slugProblemSpy.mockClear()
+      fireEvent.change(slug(), { target: { value } })
+      submit()
+      expect(slugProblemSpy).toHaveBeenCalledWith(value)
+    }
+  })
+
+  test("a gone draft shows a refusal and stays open", async () => {
+    openDraft(vi.fn(async () => ({ kind: "gone" }) as DraftResult))
+    submit()
+    expect((await screen.findByRole("alert")).textContent).toContain("no longer exists")
+  })
 })

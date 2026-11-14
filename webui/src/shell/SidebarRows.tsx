@@ -422,9 +422,8 @@ function MenuSlot({ number, children }: { number?: number; children: ReactNode }
   )
 }
 
-/** A draft has no item menu until its own actions exist. */
-const itemKind = (kind: SidebarRow["kind"]): ItemRef["kind"] | undefined =>
-  kind === "draft" ? undefined : kind === "chat" || kind === "design" ? kind : "epic"
+const itemKind = (kind: SidebarRow["kind"]): ItemRef["kind"] =>
+  kind === "chat" || kind === "design" || kind === "draft" ? kind : "epic"
 
 function Row({
   row,
@@ -441,7 +440,7 @@ function Row({
   const navigate = useNavigate()
   const nested = row.agents.length > 0
   const kind = itemKind(row.kind)
-  const item: ItemRef | undefined = kind && {
+  const item: ItemRef = {
     key: row.key,
     name: row.title,
     kind,
@@ -449,10 +448,11 @@ function Row({
     queued: row.queued,
     held: row.held,
     session: row.session,
+    draft: row.draft,
   }
-  // The removed chat's page is gone; leave it for the agents list, as the agent page does.
+  // The removed item's page is gone; leave it for the list, as the agent page does.
   const onRemoved = () => {
-    if (current) navigate("/agents")
+    if (current) navigate(kind === "draft" ? "/epics" : "/agents")
   }
   const sel = useSidebarSelect()
   const selecting = sel.state.on
@@ -522,7 +522,7 @@ function Row({
         </chakra.a>
         <Box flex="none">
           <MenuSlot number={row.number}>
-            {item && <ItemMenu item={item} workspaces={workspaces} onRemoved={onRemoved} roving />}
+            <ItemMenu item={item} workspaces={workspaces} onRemoved={onRemoved} roving />
           </MenuSlot>
         </Box>
       </RowFrame>
