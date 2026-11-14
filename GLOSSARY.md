@@ -647,6 +647,14 @@ fixes, or an area map epic for what needs deciding) or closed with a reason. A p
 plan once before anything is written. Like a Design, a Triage moves through steps in one or more
 sessions. _Avoid_: resolve follow-ups, follow-ups review.
 
+**Area** — a project's standing backlog of follow-ups that need deciding, grouped by subject (for
+example test health). An area never runs a Design itself. A Triage adds to it, and a Design starts
+from a theme of tickets picked out of it. A project has about a dozen. _Avoid_: area map epic (the
+old per-Triage map epics an area replaces).
+
+**Backlog** — the web page that lists a project's areas, each with its open ticket count and a Start
+Design button.
+
 **Flow** — the kind of stepped work a session runs: a Design or a Triage. Each flow has its own step
 list, final step and skill. _Avoid_: wizard (it implies a person clicking through screens), workflow.
 
