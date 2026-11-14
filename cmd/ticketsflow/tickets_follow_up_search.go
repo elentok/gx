@@ -55,9 +55,7 @@ func runTicketsFollowUpSearch(d Deps, project string, words []string, w io.Write
 func searchWords(words []string) []string {
 	var out []string
 	for _, w := range words {
-		if w = strings.ToLower(strings.TrimSpace(w)); w != "" {
-			out = append(out, w)
-		}
+		out = append(out, strings.Fields(strings.ToLower(w))...)
 	}
 	return out
 }

@@ -51,8 +51,8 @@ straight to step 3.
 
 Otherwise the candidates are the tickets of `<project>:follow-ups` and
 `<project>:follow-ups-archived` only. Find them with
-`gx tickets follow-up search --project <project> <words...>`: it matches any word in a title or
-`## Problem` and prints address, status and title per hit, plus the close reason for an archived
+`gx tickets follow-up search --project <project> <words...>`: it matches any of the words in a
+title or `## Problem` (a quoted phrase counts as separate words) and prints address, status and title per hit, plus the close reason for an archived
 hit. Never print the whole listings. When the finding names a failing test, search the candidates
 for that test name first. Judge each hit yourself, by title and `## Problem`: the same problem, not the same area.
 

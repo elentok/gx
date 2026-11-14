@@ -179,6 +179,33 @@ func TestExecute_TicketsFollowUpSearch_MatchesOpenAndArchivedWithReason(t *testi
 	}
 }
 
+func TestExecute_TicketsFollowUpSearch_SplitsArgumentsOnWhitespace(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	project := addProject(t, isolateTicketStore(t), "mine", repo)
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, tickets.FollowUpsEpic))
+	fu := filepath.Join(project, tickets.FollowUpsEpic, "issues")
+	if err := os.MkdirAll(fu, 0755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, fu, "05-a.md", "---\nid: \"05\"\nstatus: draft\ntype: research\n---\n\n# 05 — Alpha\n\n## Problem\n\nThe verify step is slow.\n")
+	testutil.WriteFile(t, fu, "06-b.md", "---\nid: \"06\"\nstatus: draft\ntype: research\n---\n\n# 06 — Beta\n\n## Problem\n\nEach ticket leaks.\n")
+	want := "mine:follow-ups/05  draft  Alpha\nmine:follow-ups/06  draft  Beta\n"
+
+	for _, args := range [][]string{{"verify ticket"}, {"verify", "ticket"}, {"  ", "verify  ticket"}} {
+		out, err := runIn(t, repo, append([]string{"tickets", "follow-up", "search"}, args...)...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if out != want {
+			t.Errorf("search %q = %q, want %q", args, out, want)
+		}
+	}
+
+	if _, err := runIn(t, repo, "tickets", "follow-up", "search", " ", ""); err == nil || !strings.Contains(err.Error(), "needs at least one word") {
+		t.Errorf("blank-only query err = %v, want needs at least one word", err)
+	}
+}
+
 func dirEntries(t *testing.T, dir string) string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)

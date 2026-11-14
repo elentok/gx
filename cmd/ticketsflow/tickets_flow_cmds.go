@@ -71,9 +71,9 @@ func newTicketsFollowUpCmd(d Deps) *cobra.Command {
 	var followUpProject string
 	followUpSearchCmd := &cobra.Command{
 		Use:   "search <words...>",
-		Short: "find open and archived follow-ups whose title or Problem mentions any word",
+		Short: "find open and archived follow-ups whose title or Problem mentions any of the words (a quoted phrase counts as separate words)",
 		Long: "Find open and archived follow-ups whose title or ## Problem mentions any of the words\n" +
-			"(case-insensitive, OR). Prints address, status and title per hit; an archived hit also\n" +
+			"(case-insensitive, OR). A quoted phrase counts as separate words. Prints address, status and title per hit; an archived hit also\n" +
 			"shows its close reason.",
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
