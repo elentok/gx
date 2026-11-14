@@ -280,7 +280,7 @@ func TestNoOldWords(t *testing.T) {
 		}
 		for _, m := range pathWords.FindAllString(rel, -1) {
 			if f := family(m); !note(f) {
-				t.Errorf("%s: old word %q in the file path", rel, f)
+				t.Errorf("%s: old word %q in the file path (rename it, or allow it in var allowed in oldwords/oldwords_test.go)", rel, f)
 			}
 		}
 		raw, err := os.ReadFile(filepath.Join("..", rel))
@@ -293,7 +293,7 @@ func TestNoOldWords(t *testing.T) {
 			}
 			for _, f := range oldWordFamilies(rel, line) {
 				if !note(f) {
-					t.Errorf("%s:%d: old word %q", rel, i+1, f)
+					t.Errorf("%s:%d: old word %q (rename it, or allow it in var allowed in oldwords/oldwords_test.go)", rel, i+1, f)
 				}
 			}
 		}
@@ -306,7 +306,7 @@ func TestNoOldWords(t *testing.T) {
 	for _, k := range keys {
 		for _, tok := range allowed[k].tokens {
 			if !used[k][tok] {
-				t.Errorf("allowed[%q]: token %q is unused; drop it (and the entry once no token is left)", k, tok)
+				t.Errorf("allowed[%q]: token %q is unused; drop it (and the entry once no token is left) in var allowed in oldwords/oldwords_test.go", k, tok)
 			}
 		}
 	}

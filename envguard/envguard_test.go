@@ -232,13 +232,16 @@ func scanTree(t *testing.T) map[site]int {
 	return found
 }
 
+// allowlistHint tells an agent which file to edit and that counts are exact.
+const allowlistHint = " The allowlist is var allowed in envguard/envguard_test.go; the count must match exactly (a higher count fails, a lower one must be written down too)."
+
 // compare returns one problem per site whose count differs from its allowance.
 func compare(found map[site]int, allow map[site]entry) []string {
 	var problems []string
 	for s, n := range found {
 		if n > allow[s].count {
 			problems = append(problems, fmt.Sprintf(
-				"%s: rule %s allows %d, found %d. Take the value from config or the caller instead of the process env.",
+				"%s: rule %s allows %d, found %d. Take the value from config or the caller instead of the process env."+allowlistHint,
 				s.file, s.rule, allow[s].count, n))
 		}
 	}
@@ -247,9 +250,9 @@ func compare(found map[site]int, allow map[site]entry) []string {
 		switch {
 		case got >= want.count:
 		case got == 0:
-			problems = append(problems, fmt.Sprintf("%s: rule %s allowlist says %d, found none; drop the entry", s.file, s.rule, want.count))
+			problems = append(problems, fmt.Sprintf("%s: rule %s allowlist says %d, found none; drop the entry."+allowlistHint, s.file, s.rule, want.count))
 		default:
-			problems = append(problems, fmt.Sprintf("%s: rule %s allowlist says %d, found %d; lower the count", s.file, s.rule, want.count, got))
+			problems = append(problems, fmt.Sprintf("%s: rule %s allowlist says %d, found %d; lower the count."+allowlistHint, s.file, s.rule, want.count, got))
 		}
 	}
 	sort.Strings(problems)
@@ -352,6 +355,11 @@ func TestCompare(t *testing.T) {
 			}
 			if !strings.Contains(got, c.wantContains) {
 				t.Fatalf("problems %q do not contain %q", got, c.wantContains)
+			}
+			for _, want := range []string{"envguard/envguard_test.go", "must match exactly"} {
+				if !strings.Contains(got, want) {
+					t.Fatalf("problems %q do not contain %q", got, want)
+				}
 			}
 		})
 	}

@@ -187,6 +187,9 @@ func countSleeps(src string) int {
 	return n
 }
 
+// allowlistHint tells an agent which file to edit and that counts are exact.
+const allowlistHint = " The allowlist is var allowed in sleepguard/sleepguard_test.go; the count must match exactly (a higher count fails, a lower one must be written down too)."
+
 // compare returns one problem per file whose count differs from its allowance.
 func compare(found, allow map[string]int) []string {
 	var problems []string
@@ -194,7 +197,7 @@ func compare(found, allow map[string]int) []string {
 		if n > allow[path] {
 			problems = append(problems, fmt.Sprintf(
 				"%s: allowed %d time.Sleep call(s), found %d. Replace the sleep with a condition wait (poll with a timeout). "+
-					"Only a negative wait (proving nothing happens) may be added to the allowlist, with a reason.",
+					"Only a negative wait (proving nothing happens) may be added to the allowlist, with a reason."+allowlistHint,
 				path, allow[path], n))
 		}
 	}
@@ -203,9 +206,9 @@ func compare(found, allow map[string]int) []string {
 		switch {
 		case got >= want:
 		case got == 0:
-			problems = append(problems, fmt.Sprintf("%s: allowlist says %d, found none; drop the entry", path, want))
+			problems = append(problems, fmt.Sprintf("%s: allowlist says %d, found none; drop the entry."+allowlistHint, path, want))
 		default:
-			problems = append(problems, fmt.Sprintf("%s: allowlist says %d, found %d; lower the count", path, want, got))
+			problems = append(problems, fmt.Sprintf("%s: allowlist says %d, found %d; lower the count."+allowlistHint, path, want, got))
 		}
 	}
 	sort.Strings(problems)
@@ -278,6 +281,11 @@ func TestCompare(t *testing.T) {
 			}
 			if !strings.Contains(got, c.wantContains) {
 				t.Fatalf("problems %q do not contain %q", got, c.wantContains)
+			}
+			for _, want := range []string{"sleepguard/sleepguard_test.go", "must match exactly"} {
+				if !strings.Contains(got, want) {
+					t.Fatalf("problems %q do not contain %q", got, want)
+				}
 			}
 		})
 	}
