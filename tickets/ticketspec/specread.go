@@ -70,6 +70,52 @@ func SpecListItem(section string, n int) (string, bool) {
 	return "", false
 }
 
+var specGroupRe = regexp.MustCompile(`\(stories (\d+) to (\d+)\)\s*$`)
+
+// SpecGroupBlock returns the block of the group heading whose `(stories A to
+// B)` range holds n, word for word: the heading and everything up to the next
+// group heading. A group heading is a line outside any list that ends in the
+// range; list lines and indented lines never count.
+func SpecGroupBlock(section string, n int) (string, bool) {
+	lines := strings.Split(section, "\n")
+	isHeading := func(l string) []string {
+		if strings.HasPrefix(l, " ") || strings.HasPrefix(l, "\t") || specItemRe.MatchString(l) ||
+			strings.HasPrefix(l, "- ") || strings.HasPrefix(l, "* ") {
+			return nil
+		}
+		return specGroupRe.FindStringSubmatch(l)
+	}
+	start := -1
+	for i, l := range lines {
+		m := isHeading(l)
+		if start >= 0 && m != nil {
+			return strings.TrimRight(strings.Join(lines[start:i], "\n"), "\n"), true
+		}
+		if m == nil || start >= 0 {
+			continue
+		}
+		var a, b int
+		fmt.Sscan(m[1], &a)
+		fmt.Sscan(m[2], &b)
+		if a <= n && n <= b {
+			start = i
+		}
+	}
+	if start < 0 {
+		return "", false
+	}
+	return strings.TrimRight(strings.Join(lines[start:], "\n"), "\n"), true
+}
+
+// SpecVerificationEntry returns story n's entry of a Verification section: a
+// numbered item n when there is one, else the group block holding n.
+func SpecVerificationEntry(section string, n int) (string, bool) {
+	if item, ok := SpecListItem(section, n); ok {
+		return item, true
+	}
+	return SpecGroupBlock(section, n)
+}
+
 // SpecMockLine returns the bullet of the section's `**Mock states**` list
 // whose fields (split on commas and middle dots) include state, word for word.
 func SpecMockLine(section, state string) (string, bool) {

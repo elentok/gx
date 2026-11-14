@@ -39,7 +39,7 @@ func BuildVerifyTickets(plan VerifyPlan, spec, specPath string) ([]VerifyTicket,
 		if text, ok = SpecListItem(stories, s.Story); !ok {
 			errs = append(errs, fmt.Errorf("story %d has no entry in ## User Stories of %s", s.Story, specPath))
 		}
-		if entry, ok = SpecListItem(verification, s.Story); !ok {
+		if entry, ok = SpecVerificationEntry(verification, s.Story); !ok {
 			errs = append(errs, fmt.Errorf("story %d has no entry in ## Verification of %s", s.Story, specPath))
 		}
 		return text, entry

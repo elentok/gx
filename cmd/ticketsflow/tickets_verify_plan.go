@@ -18,7 +18,12 @@ func newTicketsVerifyPlanCmd(d Deps) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "verify-plan <project:epic> --plan <plan.yaml> [--manifest <manifest.yaml>] | --table",
 		Short: "pack a verify plan into verify tickets, or print the estimate table",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `Each story's Verification entry is read from the spec's ## Verification section.
+A numbered item ("3. ...") wins. Otherwise the entry is the whole group block whose
+heading line (outside any list) ends in "(stories A to B)" with A <= story <= B. The
+block runs to the next group heading or the end of the section. A story with neither
+fails with "has no entry in ## Verification".`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			if table {
 				ticketspec.WriteEstimateTable(c.OutOrStdout())

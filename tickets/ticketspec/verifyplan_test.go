@@ -116,3 +116,55 @@ func TestVerifyPlan_ParseRejectsBadPlans(t *testing.T) {
 		t.Errorf("good plan: %v", err)
 	}
 }
+
+const groupedSpec = "## User Stories\n\n1. One\n2. Two\n3. Three\n4. Four\n\n## Verification\n\nAlpha (stories 1 to 3)\n\n- check a\n- check b\n\nBeta (stories 4 to 4)\n\n- check c\n"
+
+func buildBody(t *testing.T, spec string, nums ...int) (string, error) {
+	t.Helper()
+	var plan VerifyPlan
+	for _, n := range nums {
+		plan.Stories = append(plan.Stories, story(n, "", 0))
+	}
+	ts, err := BuildVerifyTickets(plan, spec, "docs/specs/x.md")
+	if err != nil {
+		return "", err
+	}
+	return ts[0].Body, nil
+}
+
+func TestVerifyBodies_GroupHeadingGivesWholeBlock(t *testing.T) {
+	t.Parallel()
+	body, err := buildBody(t, groupedSpec, 1, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Alpha (stories 1 to 3)\n\n- check a\n- check b", "Beta (stories 4 to 4)\n\n- check c"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q in:\n%s", want, body)
+		}
+	}
+	if strings.Contains(strings.SplitN(body, "## Story 4", 2)[0], "check c") {
+		t.Errorf("next group leaked into story 1:\n%s", body)
+	}
+}
+
+func TestVerifyBodies_NumberedItemBeatsGroup(t *testing.T) {
+	t.Parallel()
+	spec := strings.Replace(groupedSpec, "## Verification\n\n", "## Verification\n\n2. numbered two\n\n", 1)
+	body, err := buildBody(t, spec, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(body, "numbered two") || strings.Contains(body, "check a") {
+		t.Errorf("numbered item should win:\n%s", body)
+	}
+}
+
+func TestVerifyBodies_StoryOutsideGroupsFails(t *testing.T) {
+	t.Parallel()
+	spec := strings.Replace(groupedSpec, "(stories 4 to 4)", "(stories 9 to 9)", 1)
+	_, err := buildBody(t, spec, 4)
+	if err == nil || !strings.Contains(err.Error(), "story 4 has no entry in ## Verification") {
+		t.Fatalf("err = %v", err)
+	}
+}
