@@ -15,13 +15,25 @@ export function TicketHeader({ detail, now }: { detail: TicketDetail; now: numbe
   const values = statValues(detail, now)
   return (
     <>
-      <Box mt="2" display="flex" alignItems="center" gap="2">
-        <Button asChild emphasis="secondary" size="sm">
+      <Box mt="2" display="flex" flexWrap="wrap" alignItems="center" gap="2">
+        <Button
+          asChild
+          emphasis="secondary"
+          size="sm"
+          h="auto"
+          minH="32px"
+          py="1"
+          maxW="100%"
+          textAlign="left"
+          overflowWrap="anywhere"
+        >
           <a href={epicHref(detail.epic)}>Epic: {slugOf(detail.epic)}</a>
         </Button>
-        <Badge tone={tone}>{label}</Badge>
+        <Badge tone={tone} maxW="100%">
+          {label}
+        </Badge>
         {detail.waiting_label && (
-          <Badge tone="waiting" data-waiting-label>
+          <Badge tone="waiting" data-waiting-label maxW="100%">
             {detail.waiting_label}
           </Badge>
         )}
