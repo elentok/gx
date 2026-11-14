@@ -1,4 +1,5 @@
 import { PNG } from "./agentsKit"
+import { draftPage } from "./draftKit"
 import { expect, nav, swipe, test } from "./fixture"
 
 // 375 px is below the wide layout's 62em breakpoint.
@@ -84,55 +85,37 @@ test.describe("53. Phone, epic page", () => {
   })
 })
 
-test("41. Phone, New Design sheet", async ({ page, start }) => {
+test("41. Phone, Design draft page", async ({ page, start }) => {
   await start("ready")
-  await page.getByRole("button", nav("New Design")).click()
-  const dialog = page.getByRole("dialog", nav("New Design"))
-  await expect(dialog).toBeVisible()
-  // The panel has focus, so no text field raises the keyboard.
-  await expect(dialog).toBeFocused()
+  const d = draftPage(page)
+  await page.getByRole("button", nav("New design")).click()
+  await expect(page).toHaveURL(/#\/drafts\/[^/]+$/)
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(d.prompt).toBeFocused()
 
-  // A bottom sheet about 88% of the viewport high, with a grab handle.
-  // The dialog can be detached for a moment after it takes focus under load, so wait for a box rather than read it once.
-  let box: Awaited<ReturnType<typeof dialog.boundingBox>> = null
-  await expect.poll(async () => (box = await dialog.boundingBox())).not.toBeNull()
-  expect(box!.width).toBe(375)
-  expect(box!.y + box!.height).toBe(812)
-  expect(box!.height / 812).toBeGreaterThan(0.85)
-  expect(box!.height / 812).toBeLessThan(0.91)
-  await expect(dialog.getByTestId("grab-handle")).toBeVisible()
-
-  // Close is a text button at the right end of the top bar, above the idea box, and there is no "×".
-  const startBtn = dialog.getByRole("button", nav("Start design"))
-  const discardBtn = dialog.getByRole("button", nav("Discard"))
-  const closeBtn = dialog.getByRole("button", nav("Close"))
-  const close = (await closeBtn.boundingBox())!
-  const idea = await dialog.getByRole("textbox", nav("Rough idea")).boundingBox()
-  expect(close.y + close.height).toBeLessThanOrEqual(idea!.y)
-  await expect(closeBtn).toHaveText("Close")
-  expect(Math.abs(close.x + close.width - (box!.x + box!.width - 12))).toBeLessThanOrEqual(2)
-  await expect(dialog).not.toContainText("×")
-
-  // The footer is the paperclip, Discard, and Start design at its right edge, each at natural width.
-  await expect(startBtn).toBeVisible()
-  const footer = discardBtn.locator("xpath=..")
-  const clip = dialog.getByRole("button", nav("Add image"))
-  const [foot, d, s, c] = [
-    (await footer.boundingBox())!,
-    (await discardBtn.boundingBox())!,
-    (await startBtn.boundingBox())!,
+  // The page stack matches the desktop order: header, project and slug bar, Prompt, then the footer.
+  const clip = page.getByRole("button", nav("Add image"))
+  await expect(clip).toHaveCount(1)
+  await expect(d.start).toBeVisible()
+  const [head, slugBox, promptBox, foot, rm, s, c] = [
+    (await page.getByRole("heading", nav("Untitled design")).boundingBox())!,
+    (await d.slug.boundingBox())!,
+    (await d.prompt.boundingBox())!,
+    (await d.remove.locator("xpath=..").boundingBox())!,
+    (await d.remove.boundingBox())!,
+    (await d.start.boundingBox())!,
     (await clip.boundingBox())!,
   ]
+  expect(head.y + head.height).toBeLessThanOrEqual(slugBox.y)
+  expect(slugBox.y + slugBox.height).toBeLessThanOrEqual(promptBox.y)
+  expect(promptBox.y + promptBox.height).toBeLessThanOrEqual(foot.y)
+
+  // The footer is the paperclip, Remove, and Start design at its right edge, each at natural width.
   const pad = 12
-  expect(c.x).toBeCloseTo(foot.x + pad, 0)
-  expect(c.x + c.width).toBeLessThanOrEqual(d.x)
+  expect(c.x + c.width).toBeLessThanOrEqual(rm.x)
   expect(s.x + s.width).toBeCloseTo(foot.x + foot.width - pad, 0)
-  // No tile (the paperclip is the only Add image), no limits line, and with an empty draft no image row.
-  await expect(dialog.getByRole("button", nav("Add image"))).toHaveCount(1)
-  await expect(dialog.locator('[data-mock-part="image-line"]')).toHaveCount(0)
-  await expect(dialog.getByRole("button", { name: "Open image" })).toHaveCount(0)
   // Natural width: the label plus the button's padding, far short of the stretched half the footer once gave it.
-  const content = await startBtn.evaluate((el) => {
+  const content = await d.start.evaluate((el) => {
     const range = document.createRange()
     range.selectNodeContents(el)
     const cs = getComputedStyle(el)
@@ -146,15 +129,14 @@ test("41. Phone, New Design sheet", async ({ page, start }) => {
   })
   expect(s.width).toBeCloseTo(content, 0)
 
-  // With the idea empty the one-line hint shows above the footer, and Start keeps its width.
-  await dialog.getByRole("textbox", nav("Epic slug")).fill("phone-epic")
-  await expect(dialog.getByText("Saved")).toBeVisible()
-  const hint = dialog.getByText("Write an idea to start.")
+  // With the prompt empty the one-line hint shows above the footer, and Start keeps its width.
+  await expect(d.start).toBeDisabled()
+  const hint = page.getByText("Write a prompt first")
   await expect(hint).toBeVisible()
   const h = (await hint.boundingBox())!
-  const foot2 = (await footer.boundingBox())!
-  expect(h.y + h.height).toBeLessThanOrEqual(foot2.y)
-  expect((await startBtn.boundingBox())!.width).toBeCloseTo(s.width, 0)
+  expect(h.height).toBeLessThan(24)
+  expect(h.y + h.height).toBeLessThanOrEqual(foot.y)
+  expect((await d.start.boundingBox())!.width).toBeCloseTo(s.width, 0)
 
   // A file picked through the paperclip gets a thumbnail; a click opens the viewer and closing it starts no design.
   const starts: string[] = []
@@ -162,33 +144,21 @@ test("41. Phone, New Design sheet", async ({ page, start }) => {
   const chooser = page.waitForEvent("filechooser")
   await clip.click()
   await (await chooser).setFiles({ name: "picked.png", mimeType: "image/png", buffer: PNG })
-  const open = dialog.getByRole("button", { name: "Open image" })
+  const open = page.getByRole("button", { name: "Open image" })
   await expect(open).toHaveCount(1)
   await open.click()
   const closeViewer = page.getByRole("button", { name: /^Close ✕/ })
   await expect(closeViewer).toBeVisible()
   await closeViewer.click()
   await expect(closeViewer).toBeHidden()
-  await expect(dialog).toBeVisible()
-  await expect(page).toHaveURL(/#\/epics$/)
+  await expect(page).toHaveURL(/#\/drafts\/[^/]+$/)
   expect(starts).toEqual([])
 
-  // At 744px (tablet) Close is still at the right end of the top bar and the paperclip is still in the footer.
+  // At 744px (tablet) the paperclip is still before Remove.
   await page.setViewportSize({ width: 744, height: 1000 })
-  const wide = (await dialog.boundingBox())!
-  const closeAt = (await closeBtn.boundingBox())!
-  expect(Math.abs(closeAt.x + closeAt.width - (wide.x + wide.width - 12))).toBeLessThanOrEqual(2)
-  await expect(dialog).not.toContainText("×")
-  await expect(dialog.getByRole("button", nav("Add image"))).toHaveCount(1)
-  const [d2, c2] = [(await discardBtn.boundingBox())!, (await clip.boundingBox())!]
-  expect(c2.x + c2.width).toBeLessThanOrEqual(d2.x)
-  await page.setViewportSize({ width: 375, height: 812 })
-
-  // Tab keeps focus inside the dialog.
-  for (let i = 0; i < 12; i++) {
-    await page.keyboard.press("Tab")
-    expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true)
-  }
+  await expect(d.remove).toBeVisible()
+  const [rm2, c2] = [(await d.remove.boundingBox())!, (await clip.boundingBox())!]
+  expect(c2.x + c2.width).toBeLessThanOrEqual(rm2.x)
 })
 
 test("24. Phone, Design page", async ({ page, start }) => {

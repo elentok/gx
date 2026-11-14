@@ -220,7 +220,7 @@ test("a chat has no Archive item", async () => {
 test("a draft offers Rename, Move to workspace and Remove in that order, and posts the move with its key", async () => {
   const w = writers()
   const draft: ItemRef = {
-    key: "draft:d1",
+    key: "draft/d1",
     name: "Checkout",
     kind: "draft",
     workspace: "Work",
@@ -237,5 +237,5 @@ test("a draft offers Rename, Move to workspace and Remove in that order, and pos
   expect(labels()).toEqual(["Rename", "Move to workspace›", "Remove"])
   fireEvent.click(screen.getByRole("menuitem", { name: "Move to workspace" }))
   fireEvent.click(await screen.findByRole("menuitem", { name: "Default" }))
-  await waitFor(() => expect(w.move).toHaveBeenCalledExactlyOnceWith("draft:d1", "Default"))
+  await waitFor(() => expect(w.move).toHaveBeenCalledExactlyOnceWith("draft/d1", "Default"))
 })

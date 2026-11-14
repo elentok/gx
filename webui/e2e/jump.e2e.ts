@@ -1,8 +1,10 @@
 import { card, expect, menu, menuButton, nav, test } from "./fixture"
-import { goto } from "./sidebarKit"
+import { draftPage, renameDraft } from "./draftKit"
+import { goto, sidebarKit } from "./sidebarKit"
 
 test("22. Back link count, then the phone layout", async ({ page, start }) => {
   const fx = await start("united")
+  const { closeMenus, menuFocused, openSubmenu, row, rowMenu } = sidebarKit(page)
   const back = (n: number) => page.getByRole("button", nav(`Epics · ${n} need you`))
 
   // The footer badge counts every card that needs you, whichever page is open.
@@ -93,12 +95,105 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   await expect(palette).toHaveCount(0)
   await menuButton(page).click()
   await expect(menu(page).getByRole("menuitemcheckbox", nav("AFK"))).toBeChecked()
-  await page.keyboard.press("Escape")
+  await closeMenus()
 
   // Clicking the count text itself opens the Epics menu, whose Epics item opens the page.
   await back(9).getByText("9", { exact: true }).click()
+  await menuFocused()
   await page.getByRole("menuitem", { name: /^Epics/ }).click()
   await expect(page).toHaveURL(/#\/epics$/)
+
+  // Design drafts: New design from the Command palette makes one draft and opens its page, and the list has no draft rows.
+  const draftIds = async () =>
+    (await fx.cli("designs", "drafts", "list"))
+      .split("\n")
+      .filter((l) => l.includes("\t"))
+      .map((l) => l.split("\t")[0]!.trim())
+  const d = draftPage(page)
+  const newDraft = async (slug: string, prompt: string) => {
+    await page.keyboard.press("ControlOrMeta+p")
+    await expect(rows.first()).toHaveText(/^New design/)
+    await expect(rows.filter({ hasText: /^(Remove|Start design)/ })).toHaveCount(0)
+    await rows.first().click()
+    await expect(palette).toHaveCount(0)
+    await expect(page).toHaveURL(/#\/drafts\/[^/]+$/)
+    await expect(d.prompt).toBeFocused()
+    await d.prompt.fill(prompt)
+    await renameDraft(page, slug)
+    await expect(page.getByText("Saved")).toBeVisible()
+  }
+  await newDraft("near-draft", "A near idea.")
+  const nearUrl = page.url()
+  expect(await draftIds()).toHaveLength(1)
+  await newDraft("far-draft", "A far idea.")
+  expect(await draftIds()).toHaveLength(2)
+  await goto(page, "#/epics")
+
+  // Cmd/Ctrl+K with an empty filter lists the active workspace's drafts in a Design drafts section.
+  const jumpRow = (title: string) => jump.getByRole("option").filter({ hasText: title })
+  const drafts = jump.getByRole("group", nav("Design drafts"))
+  await page.keyboard.press("ControlOrMeta+k")
+  await expect(jump).toBeVisible()
+  await expect(drafts.getByRole("option")).toHaveText([/^far-draft/, /^near-draft/])
+  // The draft row has the icon, the label and "Draft", and its menu lists Rename, Move to workspace and Remove.
+  const near = jumpRow("near-draft")
+  await expect(near.getByRole("img", nav("Design draft"))).toBeVisible()
+  await expect(near).toContainText("Draft")
+  await near.getByRole("button", nav("More actions")).click()
+  await menuFocused()
+  await expect(page.getByRole("menuitem")).toHaveText([/^Rename/, /^Move to workspace/, /^Remove/])
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("menu")).toHaveCount(0)
+  // Escape closes the menu and the jump menu with it.
+  await expect(jump).toHaveCount(0)
+  await page.keyboard.press("ControlOrMeta+k")
+  await expect(jump).toBeVisible()
+
+  // A draft of another workspace is absent until a search, then shows under Other workspaces with the workspace name.
+  await fx.cli("server", "workspaces", "create", "scratch")
+  await jumpRow("far-draft").getByRole("button", nav("More actions")).click()
+  await menuFocused()
+  await openSubmenu(
+    page.getByRole("menuitem", nav("Move to workspace")),
+    page.getByRole("menuitem", nav("scratch")),
+  )
+  await page.getByRole("menuitem", nav("scratch")).click()
+  await expect
+    .poll(async () =>
+      JSON.parse(await fx.cli("server", "workspaces", "list", "--json")).workspaces.map(
+        (w: { name: string; members: number }) => `${w.name}:${w.members}`,
+      ),
+    )
+    .toContain("scratch:1")
+  await expect(jumpRow("far-draft")).toHaveCount(0)
+  await jump.getByRole("combobox").fill("far-dr")
+  await expect(jump.getByRole("group", nav("Other workspaces")).getByRole("option")).toHaveText([
+    /^far-draft.*scratch/,
+  ])
+
+  // Search finds a draft by its label and by its project name.
+  await jump.getByRole("combobox").fill("near-dr")
+  await expect(jumpRow("near-draft")).toBeVisible()
+  const project = (await fx.cli("designs", "drafts", "list")).split("\t")[1]!
+  await jump.getByRole("combobox").fill(project)
+  await expect(jumpRow("near-draft")).toBeVisible()
+
+  // Remove from the row menu names the draft and deletes it.
+  await jump.getByRole("combobox").fill("far-dr")
+  await jumpRow("far-draft").getByRole("button", nav("More actions")).click()
+  await menuFocused()
+  await page.getByRole("menuitem", nav("Remove")).click()
+  const confirm = page.getByRole("dialog", nav("Remove far-draft"))
+  await confirm.getByRole("button", nav("Remove")).click()
+  await expect(confirm).toHaveCount(0)
+  await expect.poll(draftIds).toHaveLength(1)
+
+  // Picking the draft row opens its page.
+  await expect(jump).toBeVisible()
+  await jump.getByRole("combobox").fill("near-dr")
+  await jumpRow("near-draft").click()
+  await expect(page).toHaveURL(nearUrl)
+  await goto(page, "#/epics")
 
   // Phone layout on the same settled scenario. 375 px is below the wide layout's 62em breakpoint.
   await page.setViewportSize({ width: 375, height: 812 })
@@ -129,6 +224,20 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   await goto(page, "#/d/demo:design-live")
   await page.getByRole("button", nav("Show sidebar")).click()
   await expect(back(9)).toBeVisible()
+  // The sidebar opens from the left edge over most of the phone and lists the draft row; Remove from its menu deletes the last draft.
+  const sidebar = page.getByRole("complementary", nav("Sidebar"))
+  await expect(row("near-draft")).toBeVisible()
+  await expect.poll(async () => (await sidebar.boundingBox())?.x).toBe(0)
+  expect((await sidebar.boundingBox())!.width).toBeGreaterThan(375 * 0.85)
+  await expect(row("near-draft")).toBeVisible()
+  await rowMenu("near-draft").click()
+  await page.getByRole("menuitem", nav("Remove")).click()
+  await page
+    .getByRole("dialog", nav("Remove near-draft"))
+    .getByRole("button", nav("Remove"))
+    .click()
+  await expect(row("near-draft")).toHaveCount(0)
+  await expect.poll(draftIds).toHaveLength(0)
   await page.getByRole("button", nav("Hide sidebar")).click()
   await expect(back(9)).toBeHidden()
 

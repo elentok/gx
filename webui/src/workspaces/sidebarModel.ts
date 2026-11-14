@@ -29,6 +29,9 @@ import type { Kind, Tone } from "../ui/tone"
 export const NEEDS_YOU = "Needs you"
 export const WORKING = "Working"
 export const DRAFT = "Draft"
+
+/** A draft's workspace member key; the server's drafts.MemberKey is its twin. */
+export const draftMemberKey = (id: string) => `draft/${id}`
 export const MAX_NUMBERED = 9
 
 export interface SidebarStatus {
@@ -302,7 +305,7 @@ export function buildSidebar({
       const status = draftStatus()
       return {
         item: {
-          key: `draft:${d.id}`,
+          key: draftMemberKey(d.id),
           kind: "draft",
           title: d.label,
           href: draftHref(d.id),

@@ -468,7 +468,7 @@ describe("buildSidebar Design drafts", () => {
     const s = buildSidebar(input)
     const beta = s.rows.find((r) => r.kind === "draft" && r.title === "Beta")
     expect(beta).toMatchObject({
-      key: "draft:d-beta",
+      key: "draft/d-beta",
       href: "#/drafts/d-beta",
       status: { words: "Draft", tone: "muted" },
       agents: [],

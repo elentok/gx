@@ -346,7 +346,7 @@ test("Move on a draft and a Design sends the draft's membership key with the Des
   fireEvent.click(await screen.findByRole("menuitem", { name: "Work" }))
   await waitFor(() => expect(ctl.calls).toHaveLength(1))
   expect(ctl.calls[0]!.url).toMatch(/\/v1\/workspaces\/move/)
-  expect(ctl.calls[0]!.body).toEqual({ name: "Work", targets: ["draft:d1", "p:shop"] })
+  expect(ctl.calls[0]!.body).toEqual({ name: "Work", targets: ["draft/d1", "p:shop"] })
 })
 
 test("bulk Remove on one empty draft still asks, and Remove deletes it", async () => {
