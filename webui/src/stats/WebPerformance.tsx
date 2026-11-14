@@ -41,7 +41,7 @@ export function formatPerfValue(metric: string, v: number): string {
 }
 
 function Change({ pct, range }: { pct: number | undefined; range: number }) {
-  if (pct === undefined) return <Text color="text.muted">—</Text>
+  if (pct == null) return <Text color="text.muted">—</Text>
   const rounded = Math.round(pct)
   const tone = rounded < 0 ? "tone.done.fg" : rounded > 0 ? "tone.deadlocked.fg" : "text.muted"
   return (
@@ -69,7 +69,7 @@ function MetricCard({ card, range }: { card: StatsWebPerfCard; range: number }) 
     >
       <Text color="text.muted">{LABELS[card.metric] ?? card.metric}</Text>
       <Text fontSize="2xl" fontWeight="600" opacity={low ? 0.55 : 1}>
-        {card.p75 === undefined ? "—" : formatPerfValue(card.metric, card.p75)}
+        {card.p75 == null ? "—" : formatPerfValue(card.metric, card.p75)}
       </Text>
       <Text color="text.muted">{card.count} samples</Text>
       {low ? (
@@ -187,7 +187,7 @@ export function WebPerformance({
           <WhySlow
             rows={data.why_slow}
             poor={data.poor_inp}
-            hasPrevious={data.build_strip?.previous !== undefined}
+            hasPrevious={data.build_strip?.previous != null}
           />
         </>
       )}

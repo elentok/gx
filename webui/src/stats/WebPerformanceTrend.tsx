@@ -57,7 +57,7 @@ function Trend({
   days: string[]
 }) {
   const points = trend?.days ?? []
-  const values = points.flatMap((p) => (p.p75 === undefined ? [] : [p.p75]))
+  const values = points.flatMap((p) => (p.p75 == null ? [] : [p.p75]))
   const n = points.length
   const x = (i: number) => (n <= 1 ? RIGHT : LEFT + ((RIGHT - LEFT) * i) / (n - 1))
   const lo = values.length ? Math.min(...values) : 0
@@ -66,7 +66,7 @@ function Trend({
   const y = (v: number) => BOTTOM - ((v - min) / (max - min)) * (BOTTOM - TOP)
   const step = n <= 1 ? 0 : (RIGHT - LEFT) / (n - 1)
   const low = points.flatMap((p, i) => (p.count < MIN_SAMPLES ? [i] : []))
-  const line = points.flatMap((p, i) => (p.p75 === undefined ? [] : [`${x(i)},${y(p.p75)}`]))
+  const line = points.flatMap((p, i) => (p.p75 == null ? [] : [`${x(i)},${y(p.p75)}`]))
   const last = points.length - 1
   return (
     <chakra.svg
@@ -105,7 +105,7 @@ function Trend({
         <polyline points={line.join(" ")} fill="none" stroke={ACCENT} strokeWidth="2" />
       )}
       {points.map((p, i) =>
-        p.p75 === undefined ? null : (
+        p.p75 == null ? null : (
           <circle
             key={i}
             data-testid="trend-point"

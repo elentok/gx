@@ -26,7 +26,7 @@ const CELLS = {
 const isBytes = (metric: string) => metric.endsWith("_bytes")
 
 function formatWhy(metric: string, v: number | undefined): string {
-  if (v === undefined) return "—"
+  if (v == null) return "—"
   return isBytes(metric) ? sizeText(v, "decimal") : `${Math.round(v)} ms`
 }
 
@@ -36,7 +36,7 @@ function buildLabel(b: StatsWebPerfBuild): string {
 }
 
 function Pct({ pct }: { pct: number | undefined }) {
-  if (pct === undefined) return <b>—</b>
+  if (pct == null) return <b>—</b>
   const rounded = Math.round(pct)
   const color = rounded < 0 ? "tone.done.fg" : rounded > 0 ? "tone.deadlocked.fg" : "text.muted"
   return (
@@ -111,7 +111,7 @@ function WhyRow({
       <td>{label}</td>
       <chakra.td textAlign="right">{low ? "not enough" : formatWhy(row.metric, row.p75)}</chakra.td>
       <chakra.td textAlign="right">
-        {hasPrevious && !low && row.change_pct !== undefined
+        {hasPrevious && !low && row.change_pct != null
           ? formatWhy(row.metric, row.previous_p75)
           : "—"}
       </chakra.td>

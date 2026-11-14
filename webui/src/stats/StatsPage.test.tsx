@@ -684,6 +684,48 @@ test("Why slow? is collapsed, then shows rows that dim under 20 samples and dash
   expect(poor).toContain("Worst-frame chunkapp.js")
 })
 
+test("JSON nulls from the server render as dashes, not 0%", async () => {
+  const nulls = (v: object) => v as never
+  renderStats(async () =>
+    perfStats({
+      hard_loads: [nulls(perfCard("lcp", 9, { p75: 3840, change_pct: null as never }))],
+      build_strip: nulls({
+        current: { build_id: "b-a91cdead", web_version: "1.0.0" },
+        previous: null,
+        lcp_change_pct: null,
+        inp_change_pct: null,
+        js_change_pct: null,
+      }),
+      trend: nulls([
+        {
+          metric: "lcp",
+          days: [
+            { count: 0, p75: null },
+            { count: 5, p75: 3800 },
+          ],
+        },
+      ]),
+    }),
+  )
+  const card = await screen.findByTestId("perf-card-lcp")
+  expect(card.textContent).not.toContain("%")
+  expect(card.textContent).toContain("—")
+  const strip = screen.getByTestId("perf-build-strip").textContent ?? ""
+  expect(strip).toContain("no earlier build in range")
+  expect(strip).not.toContain("%")
+  expect(screen.getAllByTestId("trend-point").length).toBe(1)
+})
+
+test("the trend picker goes back to LCP on a new render", async () => {
+  renderStats(async () => trendStats())
+  await screen.findByRole("img", { name: "daily p75 LCP" })
+  fireEvent.click(screen.getByRole("button", { name: "CLS" }))
+  expect(screen.getByRole("img", { name: "daily p75 CLS" })).toBeTruthy()
+  cleanup()
+  renderStats(async () => trendStats())
+  expect(await screen.findByRole("img", { name: "daily p75 LCP" })).toBeTruthy()
+})
+
 test("the poor-INP block dims with not enough below 20 poor samples", async () => {
   renderStats(async () =>
     buildStats({ poor_inp: { count: 6, top_actions: [], processing_p75: 100 } }),
