@@ -566,6 +566,27 @@ func TestPublishArchiveFailureNamesFollowUpAndKeepsTickets(t *testing.T) {
 	}
 }
 
+func TestPublishDoesNotCloseFollowUpsOnDryRunOrWithoutPromotions(t *testing.T) {
+	fail := func(addr, reason, note string, w io.Writer) error {
+		t.Errorf("CloseFollowUp called for %s", addr)
+		return nil
+	}
+	t.Run("dry run", func(t *testing.T) {
+		d, _, manifest := promoteFixture(t, "follow-ups/01", "")
+		d.CloseFollowUp = fail
+		if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest, "--dry-run"}, d); err != nil {
+			t.Fatalf("dry-run: %v", err)
+		}
+	})
+	t.Run("no promoted follow-ups", func(t *testing.T) {
+		d, _, manifest := setupPublish(t)
+		d.CloseFollowUp = fail
+		if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
+			t.Fatalf("publish: %v", err)
+		}
+	})
+}
+
 func TestPublishSecondRunSameDayJoinsExistingEpic(t *testing.T) {
 	d, project, manifest := promoteFixture(t, "follow-ups/01", "follow-ups/02")
 	epic := "mine:follow-ups-2026-11-12"

@@ -272,24 +272,36 @@ func (d Deps) fileWriter() func(string, []byte, os.FileMode) error {
 // every ticket is written as draft, checked, then all are opened in one pass at
 // the end. Any failure removes what this run wrote (and the epic, if it created
 // it), so a retry assigns the same IDs.
-func runTicketsPublish(d Deps, epicArg, manifestPath string, dryRun, jsonOut, allowClaimMisses, allowCheckMisses bool, w io.Writer) (err error) {
+func runTicketsPublish(d Deps, epicArg, manifestPath string, dryRun, jsonOut, allowClaimMisses, allowCheckMisses bool, w io.Writer) error {
+	plan, err := d.publishTickets(epicArg, manifestPath, dryRun, jsonOut, allowClaimMisses, allowCheckMisses, w)
+	if err != nil || plan == nil {
+		return err
+	}
+	// Follow-ups are archived after publishTickets returns, so its rollback and
+	// epic lock are gone: a failure here leaves the tickets in place. The archive
+	// only touches the follow-ups epic, so running it unlocked is safe.
+	return d.archivePromoted(plan)
+}
+
+// publishTickets does the whole publish up to printing the table. It returns a
+// nil plan for a dry run, which writes nothing. The plan is a local, not a named
+// result: a bare `return nil, err` would clear it before the rollback defers run.
+func (d Deps) publishTickets(epicArg, manifestPath string, dryRun, jsonOut, allowClaimMisses, allowCheckMisses bool, w io.Writer) (_ *publishPlan, err error) {
 	cwd, err := d.Getwd()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// One commit per run: it stamps {{commit}} and heads the lint report.
 	commit, err := shortHeadAt(cwd)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	projectDir, project, name, err := resolveEpicTarget(d.dirs(), cwd, epicArg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	epicPath := filepath.Join(projectDir, name)
 	resolve := followUpResolver(d, cwd, project)
-	// A failed archive keeps the published tickets, so it must not roll them back.
-	keepTickets := false
 
 	info, statErr := os.Stat(epicPath)
 	epicExists := statErr == nil && info.IsDir()
@@ -299,18 +311,18 @@ func runTicketsPublish(d Deps, epicArg, manifestPath string, dryRun, jsonOut, al
 	if epicExists {
 		var epic *tickets.Epic
 		if epic, unlock, err = ticketmove.LoadLockedEpic(epicPath); err != nil {
-			return err
+			return nil, err
 		}
 		defer func() { unlock() }()
 		if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, *epic, resolve); err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		if err := refuseTakenEpicName(projectDir, project, name); err != nil {
-			return err
+			return nil, err
 		}
 		if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, tickets.Epic{}, resolve); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -321,40 +333,40 @@ func runTicketsPublish(d Deps, epicArg, manifestPath string, dryRun, jsonOut, al
 	}
 	report, err := lintEpicClaims(d, cwd, commit, epicPath, manifestPath, lintOut)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if report.Refused() && !allowClaimMisses {
-		return &cmdbase.ExitError{Code: 1}
+		return nil, &cmdbase.ExitError{Code: 1}
 	}
 	printBundledAdvisories(lintOut, cwd, plan)
 
 	if dryRun {
-		return printPublished(w, plan.rows(), jsonOut)
+		return nil, printPublished(w, plan.rows(), jsonOut)
 	}
 
 	if !epicExists {
 		if err := runTicketsEpicAdd(d.dirs(), cwd, epicArg, tickets.KindLoop, string(schema.StatusDraft), "", io.Discard); err != nil {
-			return err
+			return nil, err
 		}
 		// Creating the epic may stamp a map's completion; that stamp stays on rollback.
 		defer func() {
-			if err != nil && !keepTickets {
+			if err != nil {
 				_ = os.RemoveAll(epicPath)
 			}
 		}()
 		var epic *tickets.Epic
 		if epic, unlock, err = ticketmove.LoadLockedEpic(epicPath); err != nil {
-			return err
+			return nil, err
 		}
 		defer func() { unlock() }()
 		if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, *epic, resolve); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	write := d.fileWriter()
 	defer func() {
-		if err != nil && !keepTickets {
+		if err != nil {
 			for _, t := range plan.Tickets {
 				_ = os.Remove(t.Path)
 			}
@@ -362,26 +374,24 @@ func runTicketsPublish(d Deps, epicArg, manifestPath string, dryRun, jsonOut, al
 	}()
 	for _, t := range plan.Tickets {
 		if err = write(t.Path, t.Draft, 0o644); err != nil {
-			return fmt.Errorf("writing ticket %s: %w", t.Path, err)
+			return nil, fmt.Errorf("writing ticket %s: %w", t.Path, err)
 		}
 	}
 	if err = validateNewTickets(projectDir, plan.paths()); err != nil {
-		return err
+		return nil, err
 	}
 	for _, t := range plan.Tickets {
 		if err = write(t.Path, t.Open, 0o644); err != nil {
-			return fmt.Errorf("opening ticket %s: %w", t.Path, err)
+			return nil, fmt.Errorf("opening ticket %s: %w", t.Path, err)
 		}
 	}
 	for _, t := range plan.Tickets {
 		ticketscmd.PingServer(d.Env, t.Path)
 	}
 	if err = printPublished(w, plan.rows(), jsonOut); err != nil {
-		return err
+		return nil, err
 	}
-	// Follow-ups are archived last: a failure here leaves the tickets in place.
-	keepTickets = true
-	return d.archivePromoted(plan)
+	return plan, nil
 }
 
 // archivePromoted closes each follow-up the plan promoted as `promoted`, noting
