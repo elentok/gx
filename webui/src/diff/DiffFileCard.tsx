@@ -2,13 +2,15 @@ import { Box, Spinner } from "@chakra-ui/react"
 import { useCallback, useEffect, useState } from "react"
 import type { DiffFile } from "../generated/server"
 import { Button } from "../ui/button/Button"
-import type { DiffBlobsBody, FetchDiffBlob, FetchDiffPatch } from "./api"
+import type { DiffBlobsBody, FetchDiffBlob, FetchDiffCommitPatches, FetchDiffPatch } from "./api"
 import { DiffBody, type DiffView } from "./DiffBody"
 import { BinaryBody, isBinaryFile } from "./ImageDiff"
 
 export type PatchRange = { project: string; firstSha: string; secondSha: string }
 
-type Patch = { key: string; text: string } | { key: string; failed: true }
+/** A whole-range patch has no label; a narrowed view has one part per commit, labelled by subject. */
+type PatchPart = { label?: string; text: string }
+type Patch = { key: string; parts: PatchPart[] } | { key: string; failed: true }
 
 const STATUS_TONE: Record<string, string> = { A: "done", D: "deadlocked" }
 
@@ -65,6 +67,8 @@ function Body({
   range,
   view,
   fetchPatch,
+  fetchCommitPatches,
+  commits,
   narrowed,
   loadBlobs,
 }: {
@@ -72,23 +76,48 @@ function Body({
   range: PatchRange
   view: DiffView
   fetchPatch: FetchDiffPatch
+  fetchCommitPatches?: FetchDiffCommitPatches
+  commits?: string[]
   narrowed: boolean
   loadBlobs: () => Promise<DiffBlobsBody>
 }) {
   const [nonce, setNonce] = useState(0)
   const [patch, setPatch] = useState<Patch>()
-  const key = `${range.project}\n${range.firstSha}\n${range.secondSha}\n${file.path}\n${nonce}`
+  const narrowKey = commits?.join(",") ?? ""
+  const key = `${range.project}\n${range.firstSha}\n${range.secondSha}\n${file.path}\n${narrowKey}\n${nonce}`
 
   useEffect(() => {
     let current = true
-    fetchPatch(range.project, range.firstSha, range.secondSha, file.path).then(
-      (text) => current && setPatch({ key, text }),
+    const load: Promise<PatchPart[]> =
+      commits && fetchCommitPatches
+        ? fetchCommitPatches(
+            range.project,
+            range.firstSha,
+            range.secondSha,
+            file.path,
+            commits,
+          ).then((ps) => ps.map((p) => ({ label: p.subject, text: p.patch })))
+        : fetchPatch(range.project, range.firstSha, range.secondSha, file.path).then((text) => [
+            { text },
+          ])
+    load.then(
+      (parts) => current && setPatch({ key, parts }),
       () => current && setPatch({ key, failed: true }),
     )
     return () => {
       current = false
     }
-  }, [fetchPatch, range.project, range.firstSha, range.secondSha, file.path, key])
+    // `commits` is covered by narrowKey, which the key carries.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    fetchPatch,
+    fetchCommitPatches,
+    range.project,
+    range.firstSha,
+    range.secondSha,
+    file.path,
+    key,
+  ])
 
   const fresh = patch?.key === key ? patch : undefined
   if (!fresh) {
@@ -109,14 +138,35 @@ function Body({
     )
   }
   return (
-    <DiffBody
-      patch={fresh.text}
-      view={view}
-      path={file.path}
-      large={!!file.large}
-      narrowed={narrowed}
-      loadBlobs={loadBlobs}
-    />
+    <>
+      {fresh.parts.map((part, i) => (
+        <Box key={i} data-testid={part.label === undefined ? undefined : "commit-patch"}>
+          {part.label !== undefined && (
+            <Box
+              data-testid="commit-patch-label"
+              px="3"
+              py="1"
+              fontSize="sm"
+              color="text.muted"
+              bg="surface.raised"
+              borderTop={i === 0 ? undefined : "1px solid"}
+              borderBottom="1px solid"
+              borderColor="border"
+            >
+              {part.label}
+            </Box>
+          )}
+          <DiffBody
+            patch={part.text}
+            view={view}
+            path={file.path}
+            large={!!file.large}
+            narrowed={narrowed}
+            loadBlobs={loadBlobs}
+          />
+        </Box>
+      ))}
+    </>
   )
 }
 
@@ -136,7 +186,8 @@ function Collapsed({ file, onLoad }: { file: DiffFile; onLoad: () => void }) {
 
 /**
  * One file's card. The parent keys it by path so only one is mounted at a time, which also resets
- * the loaded state when the file changes. `narrowed` is false until the commits view passes it.
+ * the loaded state when the file changes. `commits` narrows the card to those commits' own patches,
+ * which have no expand rows.
  */
 export function DiffFileCard(props: {
   file: DiffFile
@@ -144,9 +195,12 @@ export function DiffFileCard(props: {
   view: DiffView
   fetchPatch: FetchDiffPatch
   fetchBlob: FetchDiffBlob
+  fetchCommitPatches?: FetchDiffCommitPatches
+  commits?: string[]
   narrowed?: boolean
 }) {
-  const { file, range, fetchBlob, narrowed = false } = props
+  const { file, range, fetchBlob, commits } = props
+  const narrowed = props.narrowed || !!commits
   const [loaded, setLoaded] = useState(false)
   const loadBlobs = useCallback(
     () => fetchBlob(range.project, range.firstSha, range.secondSha, file.path),

@@ -1,12 +1,9 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
-import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
-import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type { DiffRange } from "../generated/server"
-import { appRoutes } from "../routes"
-import { renderThemed } from "../ui/render"
-import { type Device, DeviceContext } from "../useWide"
-import type { DiffFilesResult, FetchDiffFiles, FetchDiffPatch } from "./api"
+import type { Device } from "../useWide"
+import type { DiffFilesResult, FetchDiffCommitPatches, FetchDiffFiles, FetchDiffPatch } from "./api"
+import { COMMITS, filesForCommits, renderDiff } from "./renderDiff"
 
 afterEach(cleanup)
 
@@ -30,35 +27,27 @@ vi.mock("@pierre/diffs/react", () => ({
   },
 }))
 
+const noEpic = async () => ({ kind: "not-found" as const })
+
 function render(
   path: string,
   fetchFiles: FetchDiffFiles,
   device?: Device,
   fetchPatch: FetchDiffPatch = async (_p, _a, _b, path) => `patch of ${path}`,
+  extra: Parameters<typeof renderDiff>[1] = {},
 ) {
-  const state = {
-    snapshot: { sessions: [], pending: [] },
-    connected: true,
-    loadedOnce: true,
-    tick: 0,
-  }
-  const conn = {
-    getState: () => state as unknown as ConnectionState,
-    subscribe: () => () => {},
-    onEvent: () => () => {},
-    refresh: () => {},
-  } as unknown as Connection
-  const router = createMemoryRouter(appRoutes({ diffFiles: fetchFiles, diffPatch: fetchPatch }), {
-    initialEntries: [path],
-  })
-  renderThemed(
-    <DeviceContext.Provider value={device}>
-      <ConnectionContext.Provider value={conn}>
-        <RouterProvider router={router} />
-      </ConnectionContext.Provider>
-    </DeviceContext.Provider>,
+  return renderDiff(
+    path,
+    {
+      diffFiles: fetchFiles,
+      diffPatch: fetchPatch,
+      diffCommits: async () => ({ commits: [], truncated: false }),
+      epic: noEpic,
+      archivedEpic: noEpic,
+      ...extra,
+    },
+    device,
   )
-  return router
 }
 
 const base = () => screen.findByRole("textbox", { name: "Base ref" }) as Promise<HTMLInputElement>
@@ -73,7 +62,7 @@ test("the fields fill from the URL with ... between them", async () => {
   expect((await base()).value).toBe("main")
   expect(tip().value).toBe("dev")
   expect(screen.getByTestId("ref-bar").textContent).toContain("...")
-  expect(await screen.findByText("2 files")).toBeTruthy()
+  expect(await screen.findByText("0 commits · 2 files")).toBeTruthy()
 })
 
 test("Reload writes the URL and asks again with the typed refs; no polling", async () => {
@@ -308,4 +297,61 @@ test("split on desktop, unified on phone, and the switch changes the view and su
   fireEvent.click((await screen.findAllByTestId("tree-file"))[0])
   await screen.findByTestId("pierre")
   expect(style()).toBe("unified")
+})
+
+const NARROW = "/diff?project=gx&base=main&tip=dev&epic=gx:e-impl"
+const commitsOf = async () => ({ commits: COMMITS, truncated: false })
+const patchesOf = vi.fn<FetchDiffCommitPatches>(async (_p, _a, _b, path, shas) =>
+  COMMITS.filter((c) => shas.includes(c.sha) && c.files.includes(path)).map((c) => ({
+    sha: c.sha,
+    subject: c.subject,
+    patch: `${c.sha} of ${path}`,
+  })),
+)
+const narrowedRender = (path: string, over: Parameters<typeof renderDiff>[1] = {}) =>
+  render(path, filesForCommits, undefined, undefined, {
+    diffCommits: commitsOf,
+    diffCommitPatches: patchesOf,
+    ...over,
+  })
+
+test("a narrowed selected file shows one patch per commit in order, each under its subject, with no expand rows", async () => {
+  narrowedRender(`${NARROW}&commits=c2,c4&file=src%2Fa.go`)
+  await waitFor(() => expect(screen.getAllByTestId("pierre")).toHaveLength(2))
+  expect(screen.getAllByTestId("commit-patch-label").map((l) => l.textContent)).toEqual([
+    "Add a",
+    "Fix a",
+  ])
+  expect(screen.getAllByTestId("pierre").map((p) => p.getAttribute("data-patch"))).toEqual([
+    "c2 of src/a.go",
+    "c4 of src/a.go",
+  ])
+  expect(pierre.last?.options).not.toHaveProperty("loadDiffFiles")
+  expect(patchesOf).toHaveBeenLastCalledWith("gx", "a", "b", "src/a.go", ["c2", "c4"])
+})
+
+test("a narrowing that matches no returned commit shows an empty tree and says why", async () => {
+  const fetchFiles = vi.fn(filesForCommits)
+  render(`${NARROW}&commits=zzz`, fetchFiles, undefined, undefined, { diffCommits: commitsOf })
+  expect((await screen.findByTestId("narrow-notice")).textContent).toBe(
+    "No commits of this ticket in this range",
+  )
+  expect(screen.queryAllByTestId("tree-file")).toHaveLength(0)
+  expect(fetchFiles).not.toHaveBeenCalledWith("gx", "main", "dev", expect.anything())
+  cleanup()
+  render(`${NARROW}&commits=zzz`, fetchFiles, undefined, undefined, {
+    diffCommits: async () => ({ commits: COMMITS, truncated: true }),
+  })
+  expect((await screen.findByTestId("narrow-notice")).textContent).toBe(
+    "Showing the first 500 commits",
+  )
+})
+
+test("the narrowing survives a render from the URL and the header counts commits", async () => {
+  const fetchFiles = vi.fn(filesForCommits)
+  render(`${NARROW}&commits=c3`, fetchFiles, undefined, undefined, { diffCommits: commitsOf })
+  await waitFor(() => expect(screen.getAllByTestId("tree-file")).toHaveLength(1))
+  expect(fetchFiles).toHaveBeenCalledWith("gx", "main", "dev", ["c3"])
+  expect(screen.getByTestId("narrow-chip").textContent).toContain("Showing: Ticket 07")
+  expect(screen.getByText("gx:e-impl · 5 commits · 3 files")).toBeTruthy()
 })

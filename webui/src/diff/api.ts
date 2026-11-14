@@ -1,5 +1,12 @@
 import { apiFetch } from "../apiFetch"
-import type { DiffFiles, DiffPatch, DiffRange } from "../generated/server"
+import type {
+  DiffCommit,
+  DiffCommitPatch,
+  DiffCommits,
+  DiffFiles,
+  DiffPatch,
+  DiffRange,
+} from "../generated/server"
 
 // The Go DiffFiles embeds DiffRange, so the JSON is flat. The generated type nests it under
 // "DiffRange", which the server never sends.
@@ -10,11 +17,50 @@ export type DiffFilesResult =
   /** The server answered 400 and named the field that does not resolve. */
   | { kind: "unknown-ref"; side: "first" | "second" }
 
+/** `commits` narrows the list to the files those commits changed; it is left out for the whole range. */
 export type FetchDiffFiles = (
   project: string,
   first: string,
   second: string,
+  commits?: string[],
 ) => Promise<DiffFilesResult>
+
+export type FetchDiffCommits = (
+  project: string,
+  first: string,
+  second: string,
+) => Promise<{ commits: DiffCommit[]; truncated: boolean }>
+
+export const fetchDiffCommits: FetchDiffCommits = async (project, first, second) => {
+  const q = new URLSearchParams({ project, first, second })
+  const res = await apiFetch(`/v1/diff/commits?${q}`)
+  if (!res.ok) throw new Error(`diff commits: HTTP ${res.status}`)
+  const body: Omit<DiffCommits, "DiffRange"> = await res.json()
+  return { commits: body.commits ?? [], truncated: !!body.truncated }
+}
+
+/** One patch per selected commit, in commit order. */
+export type FetchDiffCommitPatches = (
+  project: string,
+  firstSha: string,
+  secondSha: string,
+  path: string,
+  commits: string[],
+) => Promise<DiffCommitPatch[]>
+
+export const fetchDiffCommitPatches: FetchDiffCommitPatches = async (
+  project,
+  first,
+  second,
+  path,
+  commits,
+) => {
+  const q = new URLSearchParams({ project, first, second, path, commits: commits.join(",") })
+  const res = await apiFetch(`/v1/diff/patch?${q}`)
+  if (!res.ok) throw new Error(`diff patch: HTTP ${res.status}`)
+  const body: DiffPatch = await res.json()
+  return body.commit_patches ?? []
+}
 
 /** The patch call gets the SHAs the file list resolved, so a moving branch cannot mix two ranges. */
 export type FetchDiffPatch = (
@@ -58,8 +104,9 @@ export const fetchDiffBlob: FetchDiffBlob = async (project, base, tip, path) => 
   return res.json()
 }
 
-export const fetchDiffFiles: FetchDiffFiles = async (project, first, second) => {
+export const fetchDiffFiles: FetchDiffFiles = async (project, first, second, commits) => {
   const q = new URLSearchParams({ project, first, second })
+  if (commits?.length) q.set("commits", commits.join(","))
   const res = await apiFetch(`/v1/diff/files?${q}`)
   if (res.status === 400) {
     const text = await res.text()

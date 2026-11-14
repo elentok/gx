@@ -1,7 +1,8 @@
 import { Box, chakra } from "@chakra-ui/react"
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router"
-import type { DiffFile } from "../generated/server"
+import { fetchArchivedEpicDetail, fetchEpicDetail, type FetchEpicDetail } from "../epic/detail"
+import type { DiffCommit, DiffFile } from "../generated/server"
 import { DetailPage } from "../page/DetailPage"
 import { PageHeader } from "../page/PageHeader"
 import { isTextTarget } from "../shell/keys"
@@ -14,12 +15,18 @@ import { useReadyWhen } from "../useReady"
 import {
   fetchDiffFiles,
   fetchDiffBlob,
+  fetchDiffCommitPatches,
+  fetchDiffCommits,
   fetchDiffPatch,
   type DiffFilesResult,
   type FetchDiffBlob,
+  type FetchDiffCommitPatches,
+  type FetchDiffCommits,
   type FetchDiffFiles,
   type FetchDiffPatch,
 } from "./api"
+import { CommitList, NarrowChip, narrowingLabel, TRUNCATED_TEXT } from "./CommitList"
+import { groupCommits } from "./commitGroups"
 import type { DiffView } from "./DiffBody"
 import { DiffFileCard, type PatchRange } from "./DiffFileCard"
 import { diffQuery, parseDiffUrl } from "./diffUrl"
@@ -206,6 +213,10 @@ function FilesBrowser({
   range,
   fetchPatch,
   fetchBlob,
+  fetchCommitPatches,
+  commits,
+  commitList,
+  emptyNotice,
   view,
   selectedPath,
   onSelect,
@@ -215,6 +226,11 @@ function FilesBrowser({
   range: PatchRange
   fetchPatch: FetchDiffPatch
   fetchBlob: FetchDiffBlob
+  fetchCommitPatches: FetchDiffCommitPatches
+  /** The SHAs the view is narrowed to, in range order. */
+  commits: string[] | undefined
+  commitList: ReactNode
+  emptyNotice: string | undefined
   view: DiffView
   selectedPath: string | undefined
   onSelect: (path: string) => void
@@ -251,8 +267,14 @@ function FilesBrowser({
   }
   const left = (
     <>
+      {commitList}
       <FileFilter value={filter} onChange={setFilter} />
       <FileTree files={files} filter={filter} selected={selected} onSelect={pick} />
+      {emptyNotice && (
+        <Box data-testid="narrow-notice" mt="3" fontSize="sm" color="text.muted">
+          {emptyNotice}
+        </Box>
+      )}
     </>
   )
   const right = (
@@ -267,6 +289,8 @@ function FilesBrowser({
             view={view}
             fetchPatch={fetchPatch}
             fetchBlob={fetchBlob}
+            fetchCommitPatches={fetchCommitPatches}
+            commits={commits}
           />
         )}
       </Box>
@@ -368,14 +392,51 @@ function noticeOf(
   return { notice: null, files: files.length }
 }
 
+type CommitsLoaded = {
+  key: string
+  value: { commits: DiffCommit[]; truncated: boolean } | null
+}
+
+/** Ticket titles by address: the epic's rows, or its archived detail when the epic is archived. */
+function useTicketTitles(
+  epic: string | undefined,
+  fetchEpic: FetchEpicDetail,
+  fetchArchived: FetchEpicDetail,
+) {
+  const [titles, setTitles] = useState<ReadonlyMap<string, string>>(new Map())
+  useEffect(() => {
+    if (!epic) return
+    let current = true
+    fetchEpic(epic)
+      .then((r) => (r.kind === "ok" ? r : fetchArchived(epic)))
+      .then((r) => {
+        if (current && r.kind === "ok")
+          setTitles(new Map(r.detail.rows.map((x) => [x.address, x.title])))
+      })
+      .catch(() => {})
+    return () => {
+      current = false
+    }
+  }, [epic, fetchEpic, fetchArchived])
+  return titles
+}
+
 export function DiffPage({
   fetchFiles = fetchDiffFiles,
   fetchPatch = fetchDiffPatch,
   fetchBlob = fetchDiffBlob,
+  fetchCommits = fetchDiffCommits,
+  fetchCommitPatches = fetchDiffCommitPatches,
+  fetchEpic = fetchEpicDetail,
+  fetchArchivedEpic = fetchArchivedEpicDetail,
 }: {
   fetchFiles?: FetchDiffFiles
   fetchPatch?: FetchDiffPatch
   fetchBlob?: FetchDiffBlob
+  fetchCommits?: FetchDiffCommits
+  fetchCommitPatches?: FetchDiffCommitPatches
+  fetchEpic?: FetchEpicDetail
+  fetchArchivedEpic?: FetchEpicDetail
 }) {
   const [params, setParams] = useSearchParams()
   const url = parseDiffUrl(params)
@@ -384,10 +445,58 @@ export function DiffPage({
   const [draft, setDraft] = useState({ first: url.first, second: url.second })
   const [nonce, setNonce] = useState(0)
   const [loaded, setLoaded] = useState<Loaded>()
+  const [commitsLoaded, setCommitsLoaded] = useState<CommitsLoaded>()
+  const [narrowedLoaded, setNarrowedLoaded] = useState<Loaded>()
 
   const { project, first, second } = url
   const key = `${project}\n${first}\n${second}\n${nonce}`
   const canFetch = !!project && !!first && !!second
+  const titles = useTicketTitles(url.epic, fetchEpic, fetchArchivedEpic)
+
+  useEffect(() => {
+    if (!canFetch) return
+    let current = true
+    fetchCommits(project, first, second).then(
+      (value) => current && setCommitsLoaded({ key, value }),
+      () => current && setCommitsLoaded({ key, value: null }),
+    )
+    return () => {
+      current = false
+    }
+  }, [fetchCommits, canFetch, project, first, second, key])
+
+  // Only commits the commit call returned can be narrowed to. Until it answers, the URL's SHAs
+  // are held back so the file call is not made with a set that may be dropped.
+  const freshCommits = commitsLoaded?.key === key ? commitsLoaded : undefined
+  const returned = freshCommits?.value ?? undefined
+  const commitsPending = !!url.commits && !freshCommits
+  const narrowing = useMemo(
+    () =>
+      returned
+        ? url.commits?.filter((s) => returned.commits.some((c) => c.sha === s))
+        : url.commits,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [returned, url.commits?.join(",")],
+  )
+  const emptyNarrowing = !!url.commits && !commitsPending && narrowing?.length === 0
+  const narrowKey = `${key}\n${narrowing?.join(",") ?? ""}`
+  const groups = useMemo(
+    () => (returned ? groupCommits(returned.commits, url.epic, titles) : []),
+    [returned, url.epic, titles],
+  )
+
+  useEffect(() => {
+    if (!canFetch || !narrowing?.length || commitsPending) return
+    let current = true
+    fetchFiles(project, first, second, narrowing).then(
+      (result) => current && setNarrowedLoaded({ key: narrowKey, result }),
+      () => current && setNarrowedLoaded({ key: narrowKey, failed: true }),
+    )
+    return () => {
+      current = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchFiles, canFetch, project, first, second, narrowKey, commitsPending])
 
   useEffect(() => {
     setDraft({ first, second })
@@ -420,7 +529,28 @@ export function DiffPage({
     if (e.key === "Enter") reload()
   }
 
-  const subtitle = [url.epic, files === null ? null : `${files} files`].filter(Boolean).join(" · ")
+  const narrowedFresh = narrowedLoaded?.key === narrowKey ? narrowedLoaded : undefined
+  const narrowedFiles =
+    narrowedFresh && "result" in narrowedFresh && narrowedFresh.result.kind === "files"
+      ? narrowedFresh.result.files.files
+      : []
+  const setNarrowing = (commits: string[] | undefined) => setParams(diffQuery({ ...url, commits }))
+  const chipLabel = narrowingLabel(groups, url.commits)
+  const emptyNotice = emptyNarrowing
+    ? returned?.truncated
+      ? TRUNCATED_TEXT
+      : "No commits of this ticket in this range"
+    : undefined
+
+  const subtitle = [
+    url.epic,
+    returned
+      ? `${returned.commits.length} ${returned.commits.length === 1 ? "commit" : "commits"}`
+      : null,
+    files === null ? null : `${files} files`,
+  ]
+    .filter(Boolean)
+    .join(" · ")
   return (
     <DetailPage title={{ kind: "Diff", name: url.epic }}>
       <PageHeader title="Diff" subtitle={subtitle} />
@@ -447,11 +577,26 @@ export function DiffPage({
         </Button>
         <ViewToggle view={view} onChange={setView} />
       </Box>
+      {chipLabel && <NarrowChip label={chipLabel} onClear={() => setNarrowing(undefined)} />}
       {notice}
       {canFetch && !fresh && !noRange && <FullScreenLoader label="Loading diff" />}
       {!notice && fresh && "result" in fresh && fresh.result.kind === "files" && files ? (
         <FilesBrowser
-          files={fresh.result.files.files}
+          files={url.commits ? narrowedFiles : fresh.result.files.files}
+          commits={url.commits ? narrowing : undefined}
+          commitList={
+            returned && (
+              <CommitList
+                groups={groups}
+                count={returned.commits.length}
+                truncated={returned.truncated}
+                narrowing={url.commits}
+                onNarrow={setNarrowing}
+              />
+            )
+          }
+          emptyNotice={emptyNotice}
+          fetchCommitPatches={fetchCommitPatches}
           range={{
             project,
             firstSha: fresh.result.files.first_sha,
