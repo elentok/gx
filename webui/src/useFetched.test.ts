@@ -8,7 +8,7 @@ const focus = () => act(() => void window.dispatchEvent(new Event("focus")))
 
 test("refetchOnFocus refetches when the window regains focus", async () => {
   const fetcher = vi.fn().mockResolvedValueOnce("one").mockResolvedValueOnce("two")
-  const { result } = renderHook(() => useFetched("k", fetcher, undefined, "", undefined, true))
+  const { result } = renderHook(() => useFetched("k", fetcher, undefined, { refetchOnFocus: true }))
   await waitFor(() => expect(result.current.data).toBe("one"))
   focus()
   await waitFor(() => expect(result.current.data).toBe("two"))

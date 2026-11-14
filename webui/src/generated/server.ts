@@ -1796,11 +1796,6 @@ export interface Snapshot {
    */
   disks?: DiskStatus[];
   /**
-   * ContextCeiling is the smart-zone token ceiling the sessions' context
-   * levels are measured against; filled in by the handler.
-   */
-  context_ceiling?: number /* int */;
-  /**
    * Health is the CPU, memory and disk meters; filled in by the handler.
    */
   health: Health;
@@ -2884,12 +2879,14 @@ export interface SessionInfo {
    */
   model_switched?: boolean;
   /**
-   * ContextTokens and ContextLevel are the context occupancy of a Claude or
-   * Codex session or a Queue agent, from its newest reply; both are absent
-   * while there is no reading.
+   * ContextTokens, ContextLevel and ContextCeiling are the context occupancy
+   * of a Claude or Codex session or a Queue agent, from its newest reply, and
+   * the smart-zone token ceiling the level is measured against; all are
+   * absent while there is no reading.
    */
   context_tokens?: number /* int */;
   context_level?: "green" | "yellow" | "orange" | "red";
+  context_ceiling?: number /* int */;
   /**
    * Usage is the current conversation's context split and cumulative token
    * accounting. EstimatedCost is absent for harnesses gx cannot price.

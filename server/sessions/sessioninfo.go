@@ -58,6 +58,7 @@ func (mg *Manager) SessionInfo(m Meta) wire.SessionInfo {
 	}
 	if tokens > 0 {
 		info.ContextTokens, info.ContextLevel = &tokens, agent.LevelForTokens(tokens)
+		info.ContextCeiling = agent.SmartZoneCeiling
 		info.Usage = mg.chat.ConversationUsage(cm)
 	}
 	info.ModelSwitched = chat.ModelSwitched(m.Model, info.Model)

@@ -10,6 +10,12 @@ export interface FetchedState<T> {
   retry: () => void
 }
 
+export interface FetchedOptions {
+  id?: string
+  debounceMs?: number
+  refetchOnFocus?: boolean
+}
+
 /**
  * Fetches on mount, whenever `id` changes and on server events, and keeps the last result in the page cache under `key`.
  * Data of another `id` is never shown: a changed `id` repaints from its own cache entry or returns null. A failed refetch keeps
@@ -19,9 +25,7 @@ export function useFetched<T>(
   key: string,
   fetcher: () => Promise<T>,
   conn?: Connection,
-  id = "",
-  debounceMs?: number,
-  refetchOnFocus = false,
+  { id = "", debounceMs, refetchOnFocus = false }: FetchedOptions = {},
 ): FetchedState<T> {
   const latest = useRef(fetcher)
   latest.current = fetcher

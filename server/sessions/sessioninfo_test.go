@@ -120,6 +120,9 @@ func TestSessionInfoContext_ClaudeReplyGivesCountAndLevel(t *testing.T) {
 	if info.ContextTokens == nil || *info.ContextTokens != 80000 || info.ContextLevel != agent.LevelYellow {
 		t.Errorf("context = %v/%q, want 80000/yellow", info.ContextTokens, info.ContextLevel)
 	}
+	if info.ContextCeiling != agent.SmartZoneCeiling {
+		t.Errorf("context ceiling = %d, want %d", info.ContextCeiling, agent.SmartZoneCeiling)
+	}
 }
 
 func TestSessionInfoUsage_ClaudeGivesContextSplitTotalsCostAndCompactions(t *testing.T) {

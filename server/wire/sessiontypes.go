@@ -77,11 +77,13 @@ type SessionInfo struct {
 	// ModelSwitched is set when Model is not the one the launch tier chose, so
 	// the person switched it by hand. Never set for a launch with no explicit model.
 	ModelSwitched bool `json:"model_switched,omitempty"`
-	// ContextTokens and ContextLevel are the context occupancy of a Claude or
-	// Codex session or a Queue agent, from its newest reply; both are absent
-	// while there is no reading.
-	ContextTokens *int               `json:"context_tokens,omitempty"`
-	ContextLevel  agent.ContextLevel `json:"context_level,omitempty"`
+	// ContextTokens, ContextLevel and ContextCeiling are the context occupancy
+	// of a Claude or Codex session or a Queue agent, from its newest reply, and
+	// the smart-zone token ceiling the level is measured against; all are
+	// absent while there is no reading.
+	ContextTokens  *int               `json:"context_tokens,omitempty"`
+	ContextLevel   agent.ContextLevel `json:"context_level,omitempty"`
+	ContextCeiling int                `json:"context_ceiling,omitempty"`
 	// Usage is the current conversation's context split and cumulative token
 	// accounting. EstimatedCost is absent for harnesses gx cannot price.
 	Usage *SessionUsage `json:"usage,omitempty"`

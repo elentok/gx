@@ -148,6 +148,9 @@ func TestQueueAgentRows_ReplyGivesCountAndLevel(t *testing.T) {
 	if *row.ContextTokens != 80000 || row.ContextLevel != agent.LevelYellow {
 		t.Errorf("context = %d/%q, want 80000/yellow", *row.ContextTokens, row.ContextLevel)
 	}
+	if row.ContextCeiling != agent.SmartZoneCeiling {
+		t.Errorf("context ceiling = %d, want %d", row.ContextCeiling, agent.SmartZoneCeiling)
+	}
 }
 
 func TestQueueAgentRows_HerdrAndHeadlessRunsAreAbsent(t *testing.T) {

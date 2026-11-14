@@ -37,7 +37,7 @@ export function useSettings(
   conn?: Connection,
   fetcher: FetchSettings = fetchSettings,
 ): FetchedState<SettingsReadResponse> {
-  return useFetched("settings", () => fetcher(target), conn, target, undefined, true)
+  return useFetched("settings", () => fetcher(target), conn, { id: target, refetchOnFocus: true })
 }
 
 export const setChange = (key: string, value: unknown): SettingChange => ({ key, value })

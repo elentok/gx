@@ -54,7 +54,7 @@ export function useCleanup(
     "cleanup",
     () => (project ? fetcher(project) : new Promise<CleanupReport>(() => {})),
     conn,
-    project,
+    { id: project },
   )
   return { report: project ? data : null, failed, retry }
 }

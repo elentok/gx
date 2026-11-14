@@ -50,12 +50,9 @@ export function useStats(
   conn?: Connection,
 ): StatsState {
   const { range, project } = query
-  const { data, failed, retry } = useFetched(
-    "stats",
-    () => fetcher({ range, project }),
-    conn,
-    `${range}:${project}`,
-    STATS_REFETCH_DEBOUNCE_MS,
-  )
+  const { data, failed, retry } = useFetched("stats", () => fetcher({ range, project }), conn, {
+    id: `${range}:${project}`,
+    debounceMs: STATS_REFETCH_DEBOUNCE_MS,
+  })
   return { stats: data, failed, retry }
 }

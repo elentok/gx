@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/brief"
-	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/webauth"
@@ -73,7 +72,6 @@ func (r rootRoutes) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Budget = s.budget.Status(time.Now())
 	snap.ExtraUsage = s.budget.ExtraUsageOn()
 	snap.Disks = s.disks.Listed()
-	snap.ContextCeiling = agent.SmartZoneCeiling
 	snap.Health = s.health.Current()
 	snap.Pending = s.explain.Pending()
 	snap.Epics = s.epics.EpicSummaries(snap.Tickets)

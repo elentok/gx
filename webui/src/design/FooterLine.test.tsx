@@ -1,6 +1,5 @@
 import { cleanup, fireEvent, screen, within } from "@testing-library/react"
 import { afterEach, expect, test } from "vitest"
-import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type { SessionInfo } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { WideContext } from "../useWide"
@@ -19,17 +18,11 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo =>
   }) as SessionInfo
 
 const render = (s: SessionInfo, o: { wide?: boolean; ceiling?: number } = {}) => {
-  const state = {
-    snapshot: { context_ceiling: "ceiling" in o ? o.ceiling : 200_000 },
-    connected: true,
-  } as unknown as ConnectionState
-  const conn = { getState: () => state, subscribe: () => () => {} } as unknown as Connection
+  const ceiling = "ceiling" in o ? o.ceiling : 200_000
   return renderThemed(
-    <ConnectionContext.Provider value={conn}>
-      <WideContext.Provider value={o.wide ?? true}>
-        <FooterLine session={s} />
-      </WideContext.Provider>
-    </ConnectionContext.Provider>,
+    <WideContext.Provider value={o.wide ?? true}>
+      <FooterLine session={{ ...s, context_ceiling: ceiling }} />
+    </WideContext.Provider>,
   )
 }
 

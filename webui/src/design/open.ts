@@ -26,7 +26,7 @@ export type InterruptSession = (body: SessionRequest) => Promise<SessionResult>
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 export const postJson =
-  <R extends SessionResult = SessionResult>(path: string) =>
+  <R extends object = SessionResult>(path: string) =>
   async (body: unknown): Promise<R> => {
     const res = await apiFetch(path, {
       method: "POST",
@@ -37,7 +37,7 @@ export const postJson =
   }
 
 /** A JSON answer, or a refusal; any other answer throws the server's plain-text body for the toast. */
-export async function readWrite<R extends SessionResult>(res: Response): Promise<R> {
+export async function readWrite<R extends object>(res: Response): Promise<R> {
   const text = await res.text().catch(() => "")
   let result: R | null = null
   try {
@@ -45,7 +45,8 @@ export async function readWrite<R extends SessionResult>(res: Response): Promise
   } catch {
     // Not JSON: an error body, handled below.
   }
-  if (result && (res.ok || result.refused)) return result
+  // `refused` is the only field read; a many-target envelope has none, so R is not constrained to it.
+  if (result && (res.ok || (result as { refused?: boolean }).refused)) return result
   throw new WriteError(text.trim() || `HTTP ${res.status}`)
 }
 
@@ -53,7 +54,8 @@ export const postOpenDesign: OpenDesign = postJson("/v1/designs/open")
 export const postDeleteDesign: DeleteDesign = postJson("/v1/designs/delete")
 /** POSTs to a many-target route: one result per target in the server's answer. */
 export async function postTargetsTo<Req>(path: string, body: Req): Promise<TargetResult[]> {
-  const res = await postJson<SessionResult & TargetsResult>(path)(body)
+  const res = await postJson<TargetsResult>(path)(body)
+  // A refused answer (HTTP 4xx with refused: true) carries no results.
   return res.results ?? []
 }
 

@@ -56,7 +56,7 @@ function render(
   )
 }
 
-const connState = { snapshot: { context_ceiling: 200_000 }, connected: true }
+const connState = { connected: true }
 const conn = { getState: () => connState, subscribe: () => () => {} } as unknown as Connection
 
 const box = () => screen.getByRole("textbox", { name: "Message" })
@@ -79,7 +79,9 @@ test("the footer shows the model, plus the badge once there is a count", () => {
   expect(screen.getByText("Claude Opus 4.7 · high")).toBeTruthy()
   expect(screen.queryByRole("button", { name: "Context" })).toBeNull()
   unmount()
-  render({ s: { ...session(), context_tokens: 70_000, context_level: "green" } })
+  render({
+    s: { ...session(), context_tokens: 70_000, context_level: "green", context_ceiling: 200_000 },
+  })
   expect(screen.getByRole("button", { name: "Context" }).textContent).toBe("70K")
 })
 

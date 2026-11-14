@@ -641,12 +641,9 @@ function Existing({
   const i = address.indexOf(":")
   const project = address.slice(0, i)
   const slug = address.slice(i + 1)
-  const { data, failed, retry } = useFetched(
-    "schedule",
-    () => fetchShow(project, slug),
-    conn,
-    address,
-  )
+  const { data, failed, retry } = useFetched("schedule", () => fetchShow(project, slug), conn, {
+    id: address,
+  })
   const [base, setBase] = useState<ScheduleForm>()
   const loaded = data && !data.refused ? formOf(data) : undefined
   const loadedKey = JSON.stringify(loaded)

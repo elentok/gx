@@ -77,6 +77,7 @@ func (q *Queue) queueAgentRow(t runs.TrackedRun) (wire.SessionInfo, bool) {
 	}
 	if tokens := q.host.ContextTokens(t.Agent, t.Cwd, t.Session.SessionID, info.Status.State); tokens > 0 {
 		info.ContextTokens, info.ContextLevel = &tokens, agent.LevelForTokens(tokens)
+		info.ContextCeiling = agent.SmartZoneCeiling
 	}
 	return info, true
 }
