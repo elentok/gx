@@ -25,6 +25,10 @@ type Config struct {
 	// The rerun after Retry succeeds.
 	FailBeforeMove []string `json:"fail_before_move,omitempty"`
 	FailAfterMove  []string `json:"fail_after_move,omitempty"`
+	// LegacyPlan makes Route save the version 1 plan (five actions, questions
+	// on two rows, no area) that the journey flow still drives. Flow 199
+	// replaces the journey and this knob goes with it.
+	LegacyPlan bool `json:"legacy_plan,omitempty"`
 }
 
 // The scripted refusals of the fail-once knobs. A row that already carries one
@@ -43,10 +47,6 @@ const (
 	triageMapEpic   = "triage-map"
 )
 
-// triageActions is the plan's action per row, in row order, so five rows cover
-// every action.
-var triageActions = []string{"ready", "map", "merge", "close", "keep"}
-
 // Project is the --project a prompt names.
 func Project(text string) string {
 	fields := strings.Fields(text)
@@ -63,6 +63,9 @@ type Player struct {
 	Config  Config
 	Project string
 	Dir     string
+	// Typed is a message the person typed into the session; empty for the
+	// skill prompt.
+	Typed string
 }
 
 // Next is the line telling the person how to continue after a step.
@@ -131,11 +134,16 @@ func (p *Player) Play() (string, error) {
 			return "", err
 		}
 	}
+	if p.Typed != "" {
+		return p.react(v.Record)
+	}
 	switch v.Next {
 	case triage.BranchVerify:
 		return p.verify(v.Record)
 	case triage.BranchRoute:
-		return p.plan(v.Record)
+		return p.route(v.Record)
+	case triage.BranchQuestions:
+		return p.questions(v.Record)
 	case triage.BranchWrite:
 		return p.write(v.Record)
 	case triage.BranchDone:
@@ -144,7 +152,7 @@ func (p *Player) Play() (string, error) {
 		}
 		return "✅ done: the follow-ups are triaged. Next: nothing, the Triage is over", nil
 	}
-	return "✅ approve: the plan is saved. Next: approve it in the web plan view", nil
+	return "✅ start: nothing to do yet. Next: " + p.Next(), nil
 }
 
 func (p *Player) verify(rec *triage.Record) (string, error) {
@@ -161,50 +169,6 @@ func (p *Player) verify(rec *triage.Record) (string, error) {
 		}
 	}
 	return fmt.Sprintf("✅ verify: saved %d verdicts. Next: %s", len(rows), p.Next()), nil
-}
-
-// triagePlanRows is the plan: one action per row from triageActions, two quick
-// questions on the first row and a design question on the second.
-func triagePlanRows(rec *triage.Record) []triage.PlanRow {
-	var plan []triage.PlanRow
-	for i, r := range rec.Rows {
-		row := triage.PlanRow{RowID: r.Address, Action: triageActions[i%len(triageActions)]}
-		switch row.Action {
-		case "ready":
-			row.Destination = triageReadyEpic
-		case "map":
-			row.Destination = triageMapEpic
-		case "merge":
-			row.Destination = rec.Rows[0].Address
-		case "close":
-			row.Destination = "obsolete"
-		}
-		switch i {
-		case 0:
-			row.Questions = []triage.Question{
-				{ID: "q1", Text: "Fix it in the parser or the caller?", Kind: triage.QuestionAsk, Options: []string{"parser", "caller"}, Default: "parser"},
-				{ID: "q2", Text: "Keep the old flag?", Kind: triage.QuestionAsk, Options: []string{"yes", "no"}, Default: "no"},
-			}
-		case 1:
-			row.Questions = []triage.Question{{ID: "d1", Text: "Which store should it use?", Kind: triage.QuestionDesign}}
-		}
-		plan = append(plan, row)
-	}
-	return plan
-}
-
-func (p *Player) plan(rec *triage.Record) (string, error) {
-	if _, err := p.gx("", "agent", "step", "route"); err != nil {
-		return "", err
-	}
-	body, err := json.Marshal(triagePlanRows(rec))
-	if err != nil {
-		return "", err
-	}
-	if _, err := p.triage(string(body), "plan"); err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("✅ plan: %d rows planned. Next: approve the plan in the web plan view", len(rec.Rows)), nil
 }
 
 // writeRow is one row's Write: the ordered verbs, each skipped when locate says

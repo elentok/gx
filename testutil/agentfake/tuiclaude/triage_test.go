@@ -23,3 +23,18 @@ func TestClassify_TriagePromptPlaysTriageAndAWorkerPromptIsUnchanged(t *testing.
 		t.Errorf("worker prompt = %v %q, want promptWorker p:epic/01", kind, address)
 	}
 }
+
+func TestClassify_ATypedMessageOfATriageSessionGoesToThePlayer(t *testing.T) {
+	t.Parallel()
+	var tu tui
+	if kind, _, _ := tu.classify("yes"); kind == promptTriage {
+		t.Errorf("typed message without a Triage session = %v, want it left alone", kind)
+	}
+	tu.triageProject = "p"
+	if kind, _, _ := tu.classify("yes"); kind != promptTriage {
+		t.Errorf("typed message of a Triage session = %v, want promptTriage", kind)
+	}
+	if kind, _, _ := tu.classify("/compact"); kind == promptTriage {
+		t.Errorf("slash command of a Triage session = %v, want it left alone", kind)
+	}
+}

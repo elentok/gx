@@ -20,8 +20,17 @@ The `triage` scenario seeds follow-ups of both categories and a Triage in the st
 (`start("triage", { shape })`; default `c-few`). Each shape is its own server start, because the sidebar badge sums every project of a
 workspace. Counts: `c-zero` (no open follow-up), `c-few` (3: 2 bugs and 1 idea across `demo` and `side`), `c-many` (45: 30 bugs, 15 ideas),
 `c-live` (a Triage waiting for Approve, 12 rows left), `c-named` (a named workspace, "triage ws", holding both projects). Triage pages:
-`verify` (45 rows, 31 verdicts saved, session running), `b-questions` (Approve, three open questions), `b-review` (Approve, no open
-question, five action groups, three rows changed), `writing` (session running, two failed rows: one before its move, one after), `result`
+`verify` (45 rows, 31 verdicts saved, session running), `route` (6 rows, verdicts saved, 3 areas seeded: the session plays Route, saves the
+plan and chains to Questions, so it settles on round 1 waiting with the new-area question first and three options), `route-12-areas` (12
+areas: no new-area question, the second row is filed under the closest area and listed under "Decided unless you object"),
+`route-no-area` (no area: the new-area question has two options), `questions` (plan saved, round 1 open: the new-area question waiting,
+one question answered and folded, a "Decided unless you object" list, 3 areas), `final-approval` (every round answered, the final "Write
+this plan?" waiting, session idle and alive). The page's step name comes from the record: a saved plan not yet approved is Questions.
+The fake agent of a live session reacts to these typed phrases (`triageplay.PhraseYes`, `PhraseMove`, `PhraseAnswer`, `PhraseObject`):
+`yes` approves; `Move row <n> to <area>` or `Move row <n> to ready` is a routing correction and reprints the changed summary lines;
+`Answer <question id>: <answer>` answers a question (the new-area question's id is `area-new`, its answers `Create tooling`,
+`File under <area>` and `Keep for later`); `Object to decision <n>` objects to the n-th line of the decided list. Any other text gets a
+one-line help reply. `writing` (session running, two failed rows: one before its move, one after), `result`
 (Done, two kept rows, a ready epic and a map epic), `stopped` (started from the CLI: no session, stopped at Plan). `journey` has
 follow-ups and no record, for the Triage journey flow. Records are written with the `triage` package; the `verify` and `writing`
 sessions are started with `gx server triage open`. Data: `testutil/gxfixture/spec/triage.go`.

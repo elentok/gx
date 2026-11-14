@@ -60,6 +60,9 @@ type tui struct {
 	seq                []byte
 	wheelUp, wheelDown int
 	design             DesignState
+	// triageProject is the project of the Triage session this fake runs; a
+	// plain typed message then goes to the Triage player.
+	triageProject string
 	// resume is the ticket a ratelimit or question-menu worker finishes on the
 	// next prompt, whatever that prompt says.
 	resume *PendingWork

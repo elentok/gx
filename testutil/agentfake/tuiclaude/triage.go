@@ -24,6 +24,14 @@ func IsTriagePrompt(text string) bool { return strings.HasPrefix(text, TriagePro
 // turn is busy, and the turn ends shortly after.
 func (t *tui) triageTurn(text string) error {
 	t.prompt = text
+	// A typed message of a live Triage session has no skill prefix: it goes to
+	// the player of the project the session started with.
+	typed := ""
+	if IsTriagePrompt(text) {
+		t.triageProject = triageplay.Project(text)
+	} else {
+		typed = text
+	}
 	cfg, _ := LoadWorkerConfig(t.pid.Cwd)
 	if err := t.setStatus(StatusBusy, ""); err != nil {
 		return err
@@ -32,8 +40,14 @@ func (t *tui) triageTurn(text string) error {
 	if err != nil {
 		return err
 	}
+	if typed != "" {
+		if err := AppendMessage(path, "user", typed); err != nil {
+			return err
+		}
+	}
+	project := t.triageProject
 	go func() {
-		p := triageplay.Player{Gx: cfg.Gx, Env: cfg.Env, Project: triageplay.Project(text), Dir: t.pid.Cwd}
+		p := triageplay.Player{Gx: cfg.Gx, Env: cfg.Env, Project: project, Dir: t.pid.Cwd, Typed: typed}
 		if cfg.Triage != nil {
 			p.Config = *cfg.Triage
 		}

@@ -230,7 +230,7 @@ func (t *tui) classify(text string) (promptKind, string, WorkerConfig) {
 	if IsDesignPrompt(text) || (t.design.Active && text != "" && !strings.HasPrefix(text, "/")) {
 		return promptDesign, "", WorkerConfig{}
 	}
-	if IsTriagePrompt(text) {
+	if IsTriagePrompt(text) || (t.triageProject != "" && text != "" && !strings.HasPrefix(text, "/")) {
 		return promptTriage, "", WorkerConfig{}
 	}
 	if address, cfg, ok := t.workerPrompt(text); ok {

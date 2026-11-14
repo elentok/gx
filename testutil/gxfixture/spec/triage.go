@@ -27,8 +27,27 @@ type TriageSeed struct {
 // mock states they stand for.
 var TriageShapes = []string{
 	"c-zero", "c-few", "c-many", "c-live", "c-named",
-	"verify", "b-questions", "b-review", "writing", "result", "stopped",
-	"journey", "b-group",
+	"verify", "route", "route-12-areas", "route-no-area", "questions", "final-approval",
+	"writing", "result", "stopped", "journey",
+}
+
+// triageAreaNames are the area epics a shape seeds, first n for n areas.
+var triageAreaNames = []string{
+	"parser", "sync", "webui", "cli", "server", "docs",
+	"build", "ci", "tests", "config", "storage", "auth",
+}
+
+// withAreas seeds the first n areas of triageAreaNames as area epics.
+func withAreas(sc *Scenario, n int) []string {
+	names := triageAreaNames[:n]
+	if sc.EpicMeta == nil {
+		sc.EpicMeta = map[string]string{}
+	}
+	for _, name := range names {
+		sc.Epics = append(sc.Epics, Epic{project, name, nil})
+		sc.EpicMeta[project+":"+name] = "status: open\nkind: area\n"
+	}
+	return names
 }
 
 // TriageScenario is the triage scenario in the given shape. Each shape is its
@@ -53,7 +72,10 @@ func TriageScenario(shape string) (Scenario, bool) {
 	case "c-live":
 		return with(func(sc *Scenario) {
 			sc.Epics = []Epic{followUps(project, 6, 6)}
-			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) { atApprove(rec, nil) }}}
+			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) {
+				planned(rec, nil)
+				rec.Step = tickets.StepQuestions
+			}}}
 		})
 	case "c-named":
 		return with(func(sc *Scenario) {
@@ -77,73 +99,38 @@ func TriageScenario(shape string) (Scenario, bool) {
 			}}}
 			sc.Steps = [][]string{open(project)}
 		})
-	case "b-questions":
+	case "route", "route-12-areas", "route-no-area":
+		// Verdicts saved and no plan: the session plays Route, which saves the plan.
 		return with(func(sc *Scenario) {
-			sc.Epics = []Epic{followUps(project, 3, 3)}
+			n := map[string]int{"route": 3, "route-12-areas": tickets.MaxAreas, "route-no-area": 0}[shape]
+			withAreas(sc, n)
+			sc.Epics = append(sc.Epics, followUps(project, 4, 2))
 			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) {
-				atApprove(rec, func(i int, p *triage.PlanRow) {
-					if i < 3 {
-						p.Questions = []triage.Question{{ID: fmt.Sprintf("q%d", i), Text: "Which epic should this go to?", Kind: triage.QuestionAsk, Options: []string{"ready-epic", "new map"}}}
-					}
-				})
-				// The agent saved these as the first round, so a round waits.
-				round := triage.Round{}
-				for _, r := range rec.Rows {
-					if r.Plan != nil {
-						round.Questions = append(round.Questions, r.Plan.Questions...)
-					}
+				for i := range rec.Rows {
+					rec.Rows[i].Verdict = triage.VerdictRelevant
 				}
-				rec.Rounds = []triage.Round{round}
+				rec.Step = tickets.StepRoute
 			}}}
+			sc.Steps = [][]string{open(project)}
 		})
-	case "b-review":
+	case "questions", "final-approval":
+		// The plan is saved and one round was started: it waits (questions) or
+		// every round is answered and the final card waits (final-approval).
 		return with(func(sc *Scenario) {
-			sc.Epics = []Epic{followUps(project, 5, 5)}
+			areas := withAreas(sc, 3)
+			sc.Epics = append(sc.Epics, followUps(project, 4, 2))
 			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) {
-				actions := []string{"ready", "ready", "map", "map", "merge", "merge", "close", "close", "keep", "keep"}
-				atApprove(rec, func(i int, p *triage.PlanRow) {
-					p.Action = actions[i]
-					switch p.Action {
-					case "ready", "map":
-						p.Destination = fmt.Sprintf("%s-epic", p.Action)
-					case "merge":
-						p.Destination = rec.Rows[0].Address
-					case "close":
-						p.Destination = "obsolete"
-					}
-				})
-				// Three rows the person changed from the plan.
-				rec.Rows[1].Person.Action = "close"
-				rec.Rows[3].Person.Action = "ready"
-				rec.Rows[5].Person.Action = "keep"
+				answered := shape == "final-approval"
+				atQuestions(rec, areas, answered)
 			}}}
-		})
-	case "b-group":
-		// The first three rows are one group; ungrouped they chain, each after the one before.
-		return with(func(sc *Scenario) {
-			sc.Epics = []Epic{followUps(project, 4, 0)}
-			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) {
-				atApprove(rec, func(i int, p *triage.PlanRow) {
-					if i >= 3 {
-						p.Action, p.Destination = "keep", ""
-						return
-					}
-					p.Estimate = "10K"
-					if i > 0 {
-						p.OverlapWith = []string{rec.Rows[i-1].Address}
-					}
-				})
-				for i := range rec.Rows[:3] {
-					rec.Rows[i].Group = rec.Rows[0].Address
-				}
-			}}}
+			sc.Steps = [][]string{open(project)}
 		})
 	case "writing":
 		return with(func(sc *Scenario) {
 			sc.Epics = []Epic{followUps(project, 6, 0)}
 			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) {
 				actions := []string{"ready", "ready", "map", "merge", "close", "keep"}
-				atApprove(rec, func(i int, p *triage.PlanRow) { p.Action = actions[i] })
+				planned(rec, func(i int, p *triage.PlanRow) { p.Action = actions[i] })
 				rec.Step = tickets.StepWrite
 				rec.Rows[0].Write = triage.WriteDone
 				rec.Rows[0].NewAddresses = []string{project + ":triage-ready/01"}
@@ -203,6 +190,7 @@ func TriageScenario(shape string) (Scenario, bool) {
 		return with(func(sc *Scenario) {
 			sc.Epics = []Epic{followUps(project, 3, 2)}
 			sc.TriageAgent = &triageplay.Config{
+				LegacyPlan:     true,
 				VerifyBatch:    3,
 				FailBeforeMove: []string{project + ":" + tickets.FollowUpsEpic + "/01", project + ":" + tickets.FollowUpsEpic + "/05"},
 				FailAfterMove:  []string{project + ":" + tickets.FollowUpsEpic + "/02"},
@@ -228,10 +216,48 @@ func followUps(project string, bugs, ideas int) Epic {
 	return e
 }
 
-// atApprove puts rec at the approve step with a verdict and a plan on every row
-// (all "ready" unless shape changes it).
-func atApprove(rec *triage.Record, shape func(i int, p *triage.PlanRow)) {
+// atQuestions puts rec at the questions step with the plan the fake Route
+// saves, the new area proposed (while there is room for it) and the first
+// round started: the new-area question and the first ask question. With
+// answered, every ask question is in a round and every round is answered.
+func atQuestions(rec *triage.Record, areas []string, answered bool) {
 	rec.Step = tickets.StepQuestions
+	plan := triageplay.RoutePlan(rec, areas)
+	for i := range rec.Rows {
+		p := plan[i]
+		rec.Rows[i].Verdict = triage.VerdictRelevant
+		rec.Rows[i].Plan = &p
+		rec.Rows[i].Fallback = p.Fallback
+	}
+	if len(areas) < tickets.MaxAreas {
+		rec.Areas = []triage.Area{{Name: triageplay.NewArea, Source: triage.AreaAgent, Confirmed: answered}}
+	}
+	rec.Decided = triageplay.Decisions(rec, areas)
+	round := triage.Round{Answers: map[string]string{}}
+	if len(areas) < tickets.MaxAreas {
+		q := triageplay.NewAreaQuestion(rec, areas)
+		round.Questions = append(round.Questions, q)
+		if answered {
+			round.Answers[q.ID] = q.Default
+		}
+	}
+	asks := rec.Unrounded()
+	for i, q := range asks {
+		if i > 0 && !answered {
+			break
+		}
+		round.Questions = append(round.Questions, q)
+		if i == 0 || answered {
+			round.Answers[q.ID] = q.Default
+		}
+	}
+	round.Answered = answered
+	rec.Rounds = []triage.Round{round}
+}
+
+// planned gives every row a verdict and a plan (all "ready" unless shape
+// changes it).
+func planned(rec *triage.Record, shape func(i int, p *triage.PlanRow)) {
 	for i := range rec.Rows {
 		row := &rec.Rows[i]
 		row.Verdict = triage.VerdictRelevant

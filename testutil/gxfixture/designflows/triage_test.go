@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/testutil/agentfake/triageplay"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/triage"
 )
 
 type triageWant struct {
@@ -34,8 +35,11 @@ func TestTriageScenario_EveryShapeShowsTheCardItNames(t *testing.T) {
 		{shape: "c-many", section: wire.SectionReadyToDesign, words: "30 bugs, 15 ideas", triage: wire.FollowUpTriageNone},
 		{shape: "c-live", section: wire.SectionNeedsYou, pill: "Needs you", words: "6 bugs, 6 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
 		{shape: "verify", section: wire.SectionDesigning, pill: "Verify", words: "30 bugs, 15 ideas", triage: wire.FollowUpTriageRunning, step: "verify", state: wire.TriageLive},
-		{shape: "b-questions", section: wire.SectionNeedsYou, pill: "Needs you", words: "3 bugs, 3 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
-		{shape: "b-review", section: wire.SectionNeedsYou, pill: "Needs you", words: "5 bugs, 5 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
+		{shape: "route", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
+		{shape: "route-12-areas", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
+		{shape: "route-no-area", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
+		{shape: "questions", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
+		{shape: "final-approval", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
 		{shape: "writing", section: wire.SectionDesigning, pill: "Write", words: "6 bugs", triage: wire.FollowUpTriageRunning, step: "write", state: wire.TriageLive},
 		{shape: "result", section: wire.SectionReadyToDesign, pill: "Done", words: "2 bugs", triage: wire.FollowUpTriageNone, state: wire.TriageDone},
 		{shape: "stopped", section: wire.SectionDesigning, pill: "Route", words: "4 bugs", triage: wire.FollowUpTriageStopped, step: "route", state: wire.TriageLive},
@@ -78,6 +82,43 @@ func TestTriageScenario_EveryShapeShowsTheCardItNames(t *testing.T) {
 			}
 			if v := r.triageView(t); v.State != w.state || (w.step != "" && currentStep(v) != w.step) {
 				t.Errorf("triage state %q step %q, want %q and %q", v.State, currentStep(v), w.state, w.step)
+			}
+		})
+	}
+}
+
+// The area-count variants of route differ in the new-area card: three options
+// with some area, two with none, and none at all (a decided filing) at 12.
+func TestTriageScenario_RouteVariantsShowTheNewAreaCardTheSpecNames(t *testing.T) {
+	t.Parallel()
+	for _, w := range []struct {
+		shape   string
+		options int // of the first question of round 1; zero: no new-area question
+		decided string
+	}{
+		{"route", 3, ""},
+		{"route-no-area", 2, ""},
+		{"route-12-areas", 0, "Which area does it go to?"},
+	} {
+		t.Run(w.shape, func(t *testing.T) {
+			t.Parallel()
+			r := startWith(t, "triage", nil, "--shape", w.shape)
+			var rec struct {
+				Rounds  []triage.Round   `json:"rounds"`
+				Decided []triage.Decided `json:"decided"`
+			}
+			if !testutil.Poll(40*time.Second, 500*time.Millisecond, func() bool {
+				rec.Rounds, rec.Decided = nil, nil
+				return json.Unmarshal([]byte(r.Gx(t, "tickets", "triage", "show", "--project", project, "--json")), &rec) == nil && len(rec.Rounds) > 0
+			}) {
+				t.Fatal("no round was saved")
+			}
+			first := rec.Rounds[0].Questions[0]
+			if got := first.ID == triageplay.NewAreaQuestionID; got != (w.options > 0) || (got && len(first.Options) != w.options) {
+				t.Errorf("first question %q with options %v, want a new-area question of %d options (0: none)", first.ID, first.Options, w.options)
+			}
+			if w.decided != "" && !slices.ContainsFunc(rec.Decided, func(d triage.Decided) bool { return d.Question == w.decided }) {
+				t.Errorf("decided = %+v, want %q", rec.Decided, w.decided)
 			}
 		})
 	}
