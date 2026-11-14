@@ -36,6 +36,9 @@ type located struct {
 	NewAddresses []string `json:"newAddresses,omitempty"`
 	HasAnswers   bool     `json:"hasAnswers"`
 	SeenAgain    bool     `json:"seenAgain"`
+	// Target is the epic, type and question text the row is written with, for
+	// a row that goes to an area or the ready epic.
+	Target *triage.WriteTarget `json:"target,omitempty"`
 
 	body string
 }
@@ -68,7 +71,7 @@ func resolvePromoted(project string, matches []match) (match, []string) {
 // locateRow finds the ticket first filed as the row's address: still in
 // follow-ups, moved into another epic (original_address survives a move) or
 // archived by close.
-func locateRow(projectDir string, row *triage.Row) (located, error) {
+func locateRow(projectDir string, rec *triage.Record, row *triage.Row) (located, error) {
 	addr, err := tickets.ParseAddress(row.Address, tickets.AddressContext{})
 	if err != nil {
 		return located{}, err
@@ -108,24 +111,12 @@ func locateRow(projectDir string, row *triage.Row) (located, error) {
 	case tickets.ArchivedFollowUpsEpic:
 		loc.Position = posArchived
 	}
-	lines := decisionLines(row)
+	if target, ok := rec.WriteTarget(row); ok {
+		loc.Target = &target
+	}
+	lines := rec.DecisionLines(row)
 	loc.HasAnswers = len(lines) == 0 || len(missingLines(schema.Section(found.Body, "Decisions"), lines)) == 0
 	return loc, nil
-}
-
-// decisionLines is the person's answers as body lines: those of earlier rounds,
-// then this round's in question order.
-func decisionLines(row *triage.Row) []string {
-	var out []string
-	for _, e := range row.Earlier {
-		out = append(out, fmt.Sprintf("- %s: %s", e.Text, e.Answer))
-	}
-	for _, q := range row.AllQuestions() {
-		if a, ok := row.Person.Answers[q.ID]; ok && strings.TrimSpace(a) != "" {
-			out = append(out, fmt.Sprintf("- %s: %s", q.Text, strings.TrimSpace(a)))
-		}
-	}
-	return out
 }
 
 func missingLines(section string, want []string) []string {
@@ -214,7 +205,7 @@ func newTriageLocateCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			loc, err := locateRow(t.store.ProjectDir(), r)
+			loc, err := locateRow(t.store.ProjectDir(), rec, r)
 			if err != nil {
 				return err
 			}
@@ -254,18 +245,18 @@ func newTriageAnswersCmd(d Deps) *cobra.Command {
 			"Lines already in the section are not added again. Prints \"written\" or \"already written\".",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			t, _, r, err := rowOf(d, project, row)
+			t, rec, r, err := rowOf(d, project, row)
 			if err != nil {
 				return err
 			}
-			loc, err := locateRow(t.store.ProjectDir(), r)
+			loc, err := locateRow(t.store.ProjectDir(), rec, r)
 			if err != nil {
 				return err
 			}
 			if loc.Position == posMissing {
 				return fmt.Errorf("no ticket found for %s", r.Address)
 			}
-			missing := missingLines(schema.Section(loc.body, "Decisions"), decisionLines(r))
+			missing := missingLines(schema.Section(loc.body, "Decisions"), rec.DecisionLines(r))
 			if len(missing) == 0 {
 				fmt.Fprintln(c.OutOrStdout(), "already written")
 				return nil
@@ -300,7 +291,7 @@ func newTriageSeenAgainCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			loc, err := locateRow(t.store.ProjectDir(), r)
+			loc, err := locateRow(t.store.ProjectDir(), rec, r)
 			if err != nil {
 				return err
 			}
@@ -410,13 +401,13 @@ func newTriageDropRowsCmd(d Deps) *cobra.Command {
 
 func newTriageEpicsCmd(d Deps) *cobra.Command {
 	var project, ready string
-	var maps []string
+	var maps, areas []string
 	var revision int
 	cmd := &cobra.Command{
 		Use:   "epics",
 		Short: "record the epics this Triage creates, before `gx tickets epic add` runs",
-		Long: "Usage: gx tickets triage epics [--ready <epic>] [--map <epic>]... [--revision <n>] [--project <p>]\n\n" +
-			"Record the ready epic and map epics (step write only). Prints one line per epic: \"<epic> known\"\n" +
+		Long: "Usage: gx tickets triage epics [--ready <epic>] [--map <epic>]... [--area <name>]... [--revision <n>] [--project <p>]\n\n" +
+			"Record the ready epic, map epics and areas (step write only). An area must be confirmed or from the table. Prints one line per epic: \"<epic> known\"\n" +
 			"when the record listed it before this call, else \"<epic> new\". An `epic add` that refuses an\n" +
 			"epic reported \"known\" is done; any other refusal fails the row with the verb's own text.",
 		Args: cobra.NoArgs,
@@ -429,12 +420,12 @@ func newTriageEpicsCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if _, err := t.store.RecordEpics(rec.ID, currentRevision(c, rec, revision), ready, maps); err != nil {
+			if _, err := t.store.RecordEpics(rec.ID, currentRevision(c, rec, revision), ready, maps, areas); err != nil {
 				return err
 			}
 			t.ping(d)
 			out := c.OutOrStdout()
-			for _, e := range append([]string{ready}, maps...) {
+			for _, e := range append(append([]string{ready}, maps...), areas...) {
 				if e == "" {
 					continue
 				}
@@ -451,6 +442,7 @@ func newTriageEpicsCmd(d Deps) *cobra.Command {
 	f.StringVar(&project, "project", "", "project (default: the cwd's)")
 	f.StringVar(&ready, "ready", "", "the ready epic")
 	f.StringArrayVar(&maps, "map", nil, "a map epic (repeatable)")
+	f.StringArrayVar(&areas, "area", nil, "an area epic (repeatable)")
 	f.IntVar(&revision, "revision", 0, "refuse unless the record is at this revision")
 	return cmd
 }

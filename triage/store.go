@@ -215,7 +215,8 @@ type Record struct {
 
 // ListsEpic reports whether the record names epic as one it creates.
 func (r *Record) ListsEpic(epic string) bool {
-	return epic != "" && (r.ReadyEpic == epic || slices.Contains(r.MapEpics, epic))
+	return epic != "" && (r.ReadyEpic == epic || slices.Contains(r.MapEpics, epic) ||
+		slices.ContainsFunc(r.Areas, func(a Area) bool { return a.Created && a.Name == epic }))
 }
 
 // LiveError is returned by Create when the project already has a live Triage.

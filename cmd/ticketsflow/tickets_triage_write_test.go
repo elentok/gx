@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/triage"
 )
 
 // triageAtWrite is a two-row Triage at step write; row 0 carries an answer.
@@ -28,11 +29,12 @@ func triageAtWrite(t *testing.T) (repo, project string, s triageShown) {
 }
 
 type locateOut struct {
-	Position     string   `json:"position"`
-	Address      string   `json:"address"`
-	NewAddresses []string `json:"newAddresses"`
-	HasAnswers   bool     `json:"hasAnswers"`
-	SeenAgain    bool     `json:"seenAgain"`
+	Position     string              `json:"position"`
+	Address      string              `json:"address"`
+	NewAddresses []string            `json:"newAddresses"`
+	HasAnswers   bool                `json:"hasAnswers"`
+	SeenAgain    bool                `json:"seenAgain"`
+	Target       *triage.WriteTarget `json:"target"`
 }
 
 func triageLocate(t *testing.T, repo string, args ...string) locateOut {
@@ -377,6 +379,76 @@ func TestTriageLastPass_RowStillPendingKeepsItLive(t *testing.T) {
 	}
 	if got := triageState(t, repo); got != "live" {
 		t.Errorf("state = %q, want live", got)
+	}
+}
+
+// editRecord changes the live record behind the CLI's back, standing in for
+// the verbs of earlier steps.
+func editRecord(t *testing.T, project string, fn func(*triage.Record)) {
+	t.Helper()
+	store := triage.NewStore(project)
+	rec, err := store.LoadLive()
+	if err != nil || rec == nil {
+		t.Fatalf("load live: %v", err)
+	}
+	fn(rec)
+	if err := store.Save(rec); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTriageEpics_AreaRecordedWhenConfirmedAndRefusedWhenNot(t *testing.T) {
+	repo, project, _ := triageAtWrite(t)
+	editRecord(t, project, func(rec *triage.Record) {
+		rec.Areas = []triage.Area{
+			{Name: "tbl", Source: triage.AreaTable},
+			{Name: "ag", Source: triage.AreaAgent},
+		}
+	})
+	if _, err := runIn(t, repo, "tickets", "triage", "epics", "--area", "ag"); err == nil {
+		t.Fatal("unconfirmed agent area accepted")
+	}
+	for _, want := range []string{"tbl new\n", "tbl known\n"} {
+		out, err := runIn(t, repo, "tickets", "triage", "epics", "--area", "tbl")
+		if err != nil || out != want {
+			t.Fatalf("got %q, %v; want %q", out, err, want)
+		}
+	}
+}
+
+func TestTriageAnswers_AgentDecisionsAreWrittenOnce(t *testing.T) {
+	repo, project, s := triageAtWrite(t)
+	row := s.Rows[0].Address
+	editRecord(t, project, func(rec *triage.Record) {
+		rec.Decided = []triage.Decided{{RowID: row, Question: "where?", Choice: "here"}}
+	})
+	for i := range 2 {
+		out, err := runIn(t, repo, "tickets", "triage", "answers", "--row", row)
+		want := map[int]string{0: "written\n", 1: "already written\n"}[i]
+		if err != nil || out != want {
+			t.Fatalf("run %d = %q, %v; want %q", i, out, err, want)
+		}
+	}
+	text := ticketText(t, followUpFile(project))
+	if n := strings.Count(text, "- where?: here (decided by agent)"); n != 1 {
+		t.Errorf("agent line appears %d times in:\n%s", n, text)
+	}
+}
+
+func TestTriageLocate_UnreachedRowGetsItsFallbackAreaAsGrilling(t *testing.T) {
+	repo, project, s := triageAtWrite(t)
+	row := s.Rows[1].Address
+	editRecord(t, project, func(rec *triage.Record) {
+		for i := range rec.Rows {
+			if rec.Rows[i].Address == row {
+				rec.Rows[i].Fallback = "area-fb"
+				rec.Rows[i].Questions = []triage.Question{{ID: "uq", Text: "unreached?", Kind: triage.QuestionAsk, Options: []string{"a", "b"}, Default: "a"}}
+			}
+		}
+	})
+	got := triageLocate(t, repo, "--row", row)
+	if got.Target == nil || got.Target.Epic != "area-fb" || got.Target.Type != "grilling" || !strings.Contains(got.Target.Question, "unreached?") {
+		t.Fatalf("target = %+v", got.Target)
 	}
 }
 

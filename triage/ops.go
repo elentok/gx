@@ -110,7 +110,7 @@ func (r *Row) complete(epics []tickets.Epic) bool {
 	if err != nil {
 		return true
 	}
-	if !followUpArchived(epics, from) {
+	if !followUpArchived(epics, from) && !movedIntoNew(epics, from, r.NewAddresses) {
 		return false
 	}
 	for _, s := range r.NewAddresses {
@@ -132,6 +132,29 @@ func followUpArchived(epics []tickets.Epic, from tickets.Address) bool {
 		for _, t := range e.Tickets {
 			if t.Identifier == from.ID || tickets.IsOriginal(t, from) {
 				return true
+			}
+		}
+	}
+	return false
+}
+
+// movedIntoNew reports whether the follow-up was moved (not archived): one of
+// the row's new tickets, outside follow-ups, carries it as its original
+// address. This is how a row moved into an area or a map epic finishes.
+func movedIntoNew(epics []tickets.Epic, from tickets.Address, newAddresses []string) bool {
+	for _, s := range newAddresses {
+		a, err := tickets.ParseAddress(s, tickets.AddressContext{})
+		if err != nil || a.Epic == tickets.FollowUpsEpic || a.Epic == tickets.ArchivedFollowUpsEpic {
+			continue
+		}
+		for _, e := range epics {
+			if e.Name != a.Epic {
+				continue
+			}
+			for _, t := range e.Tickets {
+				if t.Identifier == a.ID && len(t.OriginalAddress) > 0 && tickets.IsOriginal(t, from) {
+					return true
+				}
 			}
 		}
 	}
@@ -521,12 +544,27 @@ func (s *Store) SetLastPass(id string, revision int, complete bool) (*Record, er
 	})
 }
 
-// RecordEpics adds the ready epic (when non-empty) and map epics to the record.
-// A ready epic already recorded stays; naming another is refused.
-func (s *Store) RecordEpics(id string, revision int, ready string, maps []string) (*Record, error) {
+// RecordEpics adds the ready epic (when non-empty), map epics and area epics to
+// the record. A ready epic already recorded stays; naming another is refused.
+// An area must be a saved entry and confirmed (a table entry counts as
+// confirmed); it is marked created.
+func (s *Store) RecordEpics(id string, revision int, ready string, maps, areas []string) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
 		if err := requireStep(rec, "epics", tickets.StepWrite); err != nil {
 			return err
+		}
+		for _, name := range areas {
+			i := slices.IndexFunc(rec.Areas, func(a Area) bool { return a.Name == name })
+			if i < 0 {
+				return phaseErr("area %q is not in this triage", name)
+			}
+			if a := rec.Areas[i]; a.Source == AreaAgent && !a.Confirmed {
+				return phaseErr("area %q is an agent area the person has not confirmed", name)
+			}
+		}
+		for _, name := range areas {
+			i := slices.IndexFunc(rec.Areas, func(a Area) bool { return a.Name == name })
+			rec.Areas[i].Created = true
 		}
 		if ready != "" {
 			if rec.ReadyEpic != "" && rec.ReadyEpic != ready {
