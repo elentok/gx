@@ -1,4 +1,5 @@
 import { chakra, Flex, Text } from "@chakra-ui/react"
+import type { ReactNode } from "react"
 import type { HostedResolved } from "../generated/ops"
 import { sizeText } from "../health/formatBytes"
 import { FileHoverCardMedia, type PixelSize } from "./FileHoverCardMedia"
@@ -10,11 +11,13 @@ export function FilePreviewHeader({
   file,
   line,
   pixels,
+  missing,
 }: {
   path: string
   file?: HostedResolved
   line?: number
   pixels?: PixelSize
+  missing?: boolean
 }) {
   return (
     <Flex gap="3" justify="space-between" align="baseline" px="3" py="2" borderBottomWidth="1px">
@@ -22,12 +25,36 @@ export function FilePreviewHeader({
         <Text truncate>{path}</Text>
         {line ? <Text flexShrink={0}>:{line}</Text> : null}
       </Flex>
-      {file?.size !== undefined && (
+      {!missing && file?.size !== undefined && (
         <Text fontSize="xs" color="text.muted" flexShrink={0}>
           {sizeText(file.size, "binary")}
           {pixels ? ` · ${pixels.w}×${pixels.h}` : ""}
         </Text>
       )}
+    </Flex>
+  )
+}
+
+/** The dashed centred box the mock uses for a body with nothing to render. */
+function Placeholder({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <Flex
+      h="100%"
+      borderWidth="1px"
+      borderStyle="dashed"
+      borderRadius="md"
+      align="center"
+      justify="center"
+      textAlign="center"
+      p="2"
+      fontSize="sm"
+      color="text.muted"
+    >
+      <chakra.div>
+        <chakra.b color="text">{title}</chakra.b>
+        <br />
+        {children}
+      </chakra.div>
     </Flex>
   )
 }
@@ -72,22 +99,15 @@ export function FilePreviewBody({
         background: "linear-gradient(to bottom, transparent, {colors.surface.raised})",
       }}
     >
-      {body === "missing" && <Note>File not found. It may have been deleted or moved.</Note>}
+      {body === "missing" && (
+        <Placeholder title="File not found">It may have been deleted or moved.</Placeholder>
+      )}
       {body === "html" && (
-        <Flex direction="column" gap="2" align="flex-start">
-          <Note>
-            HTML page. No live preview. Pages run scripts, so they open only in the viewer.
-          </Note>
-          <chakra.span
-            fontSize="xs"
-            borderWidth="1px"
-            borderRadius="full"
-            px="2"
-            color="text.muted"
-          >
-            Sandboxed
-          </chakra.span>
-        </Flex>
+        <Placeholder title="HTML page">
+          No live preview. Pages run scripts, so they open only in the viewer.
+          <br />
+          <chakra.span color="tone.waiting.fg">Sandboxed</chakra.span>
+        </Placeholder>
       )}
       {body === "note" && <Note>No preview</Note>}
       {(body === "markdown" || body === "code" || body === "text") && (

@@ -116,6 +116,7 @@ describe("FileHoverCard", () => {
     await hover(link)
     expect(calls.filter((c) => c.fresh)).toEqual([{ candidates: ["/abs/docs/a.x"], fresh: true }])
     expect(card()?.textContent).toContain("File not found")
+    expect(card()?.textContent).not.toMatch(/\b(B|KB|MB)\b/)
     expect(link.hasAttribute("data-missing")).toBe(true)
   })
 

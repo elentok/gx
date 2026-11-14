@@ -32,7 +32,13 @@ export function FileLinkSheet({
   }
   return (
     <BottomSheet label={path} onClose={onClose} data-file-sheet="" bg="surface.raised" color="text">
-      <FilePreviewHeader path={path} file={file} line={line} pixels={pixels} />
+      <FilePreviewHeader
+        path={path}
+        file={file}
+        line={line}
+        pixels={pixels}
+        missing={ctx.isMissing(path)}
+      />
       <FilePreviewBody
         path={path}
         file={file}

@@ -48,7 +48,13 @@ export function FileHoverCard({
             boxShadow="lg"
             data-file-hover-card=""
           >
-            <FilePreviewHeader path={path} file={file} line={line} pixels={pixels} />
+            <FilePreviewHeader
+              path={path}
+              file={file}
+              line={line}
+              pixels={pixels}
+              missing={ctx.isMissing(path)}
+            />
             <FilePreviewBody
               path={path}
               file={file}
