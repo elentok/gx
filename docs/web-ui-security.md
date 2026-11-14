@@ -21,6 +21,13 @@ The web UI listener serves HTTPS only. A plain-HTTP request on the same port is 
 - **Host and Origin checks.** The listener checks the `Host` header against `server.web.allowed-hosts`
   and checks `Origin` and `Content-Type` on writes.
 - **Rate limit.** Wrong passwords, codes and Setup codes count toward a login rate limit.
+- **Headers on every response.** Every response carries `Content-Security-Policy: frame-ancestors
+  'none'`, `Referrer-Policy: same-origin` and `X-Content-Type-Options: nosniff`. Hosted-file responses
+  replace the first two (see "Hosted files").
+- **`connect-src` on hosted files.** Every file response carries `connect-src https://<request Host>`.
+  A hosted page cannot `fetch`, use XHR, open a WebSocket or EventSource, or send a beacon to another
+  site. Images, styles, scripts and navigation can still carry data out, and a CDN `<script src>` still
+  loads. A page that calls an outside API stops working.
 
 ## First-run setup
 
@@ -98,6 +105,76 @@ Three routes carry the images pasted into a session's Prompt box. All three need
 Removing an Exited session deletes its state folder, images included.
 
 CLI: `gx agents image add|get|rm`.
+
+## Hosted files
+
+gx shows files from the gx machine in the web UI. The viewer is a hash route, `/#/files<absolute path>`.
+`gx files url <path>` prints that link (`--raw` prints the raw link).
+
+### Routes
+
+- **Raw** (`GET /v1/files/<absolute path>`). Needs a signed-in web login (401 without it). It supports
+  Range. `?download=1` adds `Content-Disposition: attachment` and never redirects. A cookie request for
+  an HTML file answers `302` to the token route.
+- **Token** (`GET /v1/files/t/<token>/<absolute path>`). It serves any file under the token's folder, so
+  an HTML page can load its sibling files. It needs no cookie. Its responses add
+  `Access-Control-Allow-Origin: *`; no other route sends it.
+- A file whose path starts with a top-level folder named `t` has no raw link, and `gx files url`
+  refuses it.
+- Both routes are web-only (ADR 0028). The JSON routes live under `/v1/hosted-files/`: `gx files url`,
+  `gx files resolve` and `gx server files-roots list|add|remove`.
+
+### Roots and refusals
+
+- **Known roots.** Registered project repos, their worktrees, the tickets store, and the temp folders
+  (`/tmp`, `/private/tmp`, the server's `$TMPDIR`). They are read on each request, so a new worktree
+  needs no restart. `server.web.files.roots` adds extra folders. `gx server files-roots add|remove`
+  edits only that list. `add` refuses `/`, the home folder itself, a missing path and a non-folder.
+  A path under home but outside every root is refused.
+- **Deny list.** Any path segment (case-insensitive, on the requested and the symlink-resolved path)
+  that is `.env*`, `.git`, `.ssh`, `.aws`, `.npmrc`, `.netrc`, `.git-credentials`, `.gnupg`, `.kube`,
+  `.docker`, `.pgpass`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, or starts with `id_rsa`, `id_ed25519`,
+  `id_ecdsa` or `id_dsa` (a name ending in `.pub` is allowed). It applies to the raw, token and
+  resolve routes. It matters most for tokens, because a token for a file in a repo's top folder
+  covers the whole repo.
+- **gx's own folders.** The state, config, sessions and conversations folders are denied whole,
+  even inside a temp root or a repo. In the data folder everything is denied except the tickets store.
+- **Temp folders.** Under a temp root gx serves only a regular file that the gx user owns and that has
+  link count 1. Every folder between the temp root and the file must also be owned by the gx user.
+- **Path rules.** On the raw and token routes, a non-canonical path answers 404: `.` or `..`
+  segments (also percent-encoded), `%2F`, `%5C`, `//`, a backslash or a NUL byte. The `resolve` verb
+  joins and cleans its candidate, so `../sibling.md` works there. Every check failure gives the same
+  404, so a caller cannot tell which rule refused.
+
+### Token and login gate
+
+- The token holds the file's folder, an expiry of one hour and the id of the web login it was made for.
+  It is signed with a key that lives in memory, so a restart ends every token.
+- Each token request checks the login is still live. Signing out or revoking the login, or changing
+  the password or authenticator, ends its tokens.
+- A bad, expired or out-of-folder token answers `302` back to the raw link, which mints a fresh one
+  if the cookie is valid.
+- `/v1/files/t/` is the only `/v1/` prefix that works without a login. The gate hands such a request
+  to the token handler directly, so it never reaches another handler. The exemption stays behind the
+  source-IP and Host checks and does not renew the cookie.
+
+### Headers
+
+Every file response (200, 206, 302, 401 and 404, including the gate's 401) carries:
+
+- `Content-Security-Policy: sandbox allow-scripts; frame-ancestors 'self'; connect-src https://<request Host>`.
+  If the Host fails the allowed-hosts check, `connect-src` is `'none'`.
+- `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and `Cache-Control: private, no-store`.
+- No `Cross-Origin-Resource-Policy`, so token responses load from the page's opaque origin.
+
+The login cookie is not sent for sub-requests of a sandboxed page, and its `Origin` is `null`, so a
+hosted page cannot read gx's JSON routes or write to them.
+
+### Known gaps
+
+- A PDF keeps the sandbox, and a sandboxed PDF has no preview in the viewer. The viewer offers Raw and
+  Download.
+- Real iOS Safari and desktop Safari are untested. Playwright WebKit is the only evidence.
 
 ## Upgrade note: run migrate
 

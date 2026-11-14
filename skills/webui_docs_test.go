@@ -27,6 +27,11 @@ func TestWebUISecurityDocsKeepWarnings(t *testing.T) {
 		"gx tickets ask",
 		"gx tickets answer",
 		"gx tickets log",
+		"## Hosted files",
+		"connect-src",
+		"/v1/files/t/",
+		"server.web.files.roots",
+		"gx files url",
 	} {
 		if !strings.Contains(doc, phrase) {
 			t.Errorf("docs/web-ui-security.md is missing %q", phrase)

@@ -43,3 +43,5 @@ The API gains the verbs `ask`, `answer` and `log`, each with a matching CLI verb
 A route is web-only when it exists only on the web mux: the web auth and account routes and the public files a browser needs before login. A route the socket also serves is not web-only, even when the web mux asks it for the web login cookie. Web-only routes are listed in one place in `server`, and a test checks that list against the web mux. A CLI action with the same effect is a separate socket route with its own verb, because a local shell skips the browser's checks (cookie, password, TOTP code).
 
 A browser-only write behind the web login may be web-only.
+
+A route that streams a body to a browser is web-only too: the hosted-file raw route (`GET /v1/files/`) and token route (`GET /v1/files/t/`). Both are in `WebOnlyRoutes` (`server/webwire.go`), which `TestWeb_OnlyRoutesMatchTheMux` checks against the web mux, and in the allowlist `TestWeb_EverythingElseIs404` checks. The JSON routes under `/v1/hosted-files/` get verbs, and `routeVerbs` in `cmd/server_parity_test.go` maps them: `gx files url`, `gx files resolve` and `gx server files-roots list|add|remove`.

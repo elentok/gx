@@ -1244,12 +1244,14 @@ an hour.
 _Avoid_: token, setup token, invite code
 
 **Hosted file** — a file on the gx machine that the web UI shows to a logged-in person, through a
-gx link instead of a server the agent starts itself. Only files under a known root qualify.
+gx link instead of a server the agent starts itself. Only files under a known root qualify, and a
+file matching the deny list (`.env*`, `.git`, `.ssh`, private keys and so on) never does.
 _Avoid_: shared file, published file, served file
 
 **Known root** — a folder whose files gx may host: a registered project repo or one of its
-worktrees, the tickets store, or a system temp folder. In a temp folder, only files the gx user
-owns count.
+worktrees, the tickets store, a system temp folder, or a folder listed in the config list
+`server.web.files.roots`. In a temp folder, only files the gx user owns count. The deny list and
+gx's own folders stay refused inside any root.
 _Avoid_: allowed dir, whitelist, scope
 
 ## Commands and completion
