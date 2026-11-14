@@ -402,7 +402,7 @@ tickets is resolved. _Avoid_: "design session" for the map epic itself (a design
 session working on it); draft for a Not started Design (a draft is work set aside deliberately).
 
 **Design draft** — the server-side record of an idea being written before a Design exists: project,
-slug, idea, images and an optional name. Each press of New design creates one, as a row in the
+slug, idea and images. It has no name; its label comes from the slug or the idea. Each press of New design creates one, as a row in the
 active workspace's sidebar. It is not an epic and not a **Not started** Design; it becomes a map
 epic only at Start, and Remove deletes it. _Avoid_: New Design draft (the old name, from the New
 Design dialog); confusing it with the ticket status **Draft** (`RenderedStatus`, work its author
