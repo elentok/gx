@@ -67,7 +67,7 @@ func PRRange(dir string, m PRMerge) (r CommitRange, reason string, err error) {
 			return runs[0], "", nil
 		case 0:
 		default:
-			reason = "the PR's headlines match more than one commit run"
+			return CommitRange{}, "the PR's headlines match more than one commit run", nil
 		}
 	}
 	if len(parents) == 1 {

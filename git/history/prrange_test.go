@@ -120,6 +120,19 @@ func TestPRRange_RunFoundTwiceIsRefused(t *testing.T) {
 	}
 }
 
+func TestPRRange_RunFoundTwiceIsRefusedEvenWithSquashMark(t *testing.T) {
+	f := newPRFixture(t)
+	f.rebase(t, "add a", "add b")
+	testutil.MustGitExported(t, f.dir, "commit", "-q", "--allow-empty", "-m", "add a")
+	testutil.MustGitExported(t, f.dir, "commit", "-q", "--allow-empty", "-m", "add b")
+	testutil.MustGitExported(t, f.dir, "commit", "-q", "--allow-empty", "-m", "Other work (#7)")
+	m := revParse(t, f.dir, "HEAD")
+	got, reason := f.merge(t, PRMerge{MergeCommit: m, Headlines: prHeadlines, ForkPoint: f.fork})
+	if got != (CommitRange{}) || reason == "" {
+		t.Fatalf("got %v (%q), want no range and a reason", got, reason)
+	}
+}
+
 func TestPRRange_BranchGoneAndMergeCommitEmpty(t *testing.T) {
 	f := newPRFixture(t)
 	f.rebase(t, "add a", "add b")

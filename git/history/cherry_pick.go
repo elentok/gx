@@ -16,15 +16,15 @@ import (
 // ref whose key trailer value satisfies match. Other commits in ref's history
 // count for nothing.
 func TrailerLines(dir, ref, key string, match func(value string) bool) (added, removed int, err error) {
-	commits, err := trailerCommits(dir, ref, key)
+	commits, err := TrailerCommitsIn(dir, ref, key)
 	if err != nil {
 		return 0, 0, err
 	}
 	for _, c := range commits {
-		if !match(c.value) {
+		if !slices.ContainsFunc(c.Values, match) {
 			continue
 		}
-		out, _, err := run.Exec(dir, []string{"show", "--numstat", "--format=", c.sha})
+		out, _, err := run.Exec(dir, []string{"show", "--numstat", "--format=", c.SHA})
 		if err != nil {
 			return 0, 0, err
 		}
@@ -290,34 +290,15 @@ func TrailerPrefixCommit(dir, ref, key string, prefixes ...string) (string, erro
 // call per value being looked up. A commit with no such trailer contributes
 // nothing (the placeholder expands to an empty string, trimmed away here).
 func TrailerMap(dir, ref, key string) (map[string]string, error) {
-	commits, err := trailerCommits(dir, ref, key)
+	commits, err := TrailerCommitsIn(dir, ref, key)
 	if err != nil {
 		return nil, err
 	}
 	result := make(map[string]string, len(commits))
 	for _, c := range commits {
-		result[c.value] = c.sha
-	}
-	return result, nil
-}
-
-type trailerCommit struct{ sha, value string }
-
-// trailerCommits lists, newest first, every commit reachable from ref that has
-// a key trailer, with the trailer's value.
-func trailerCommits(dir, ref, key string) ([]trailerCommit, error) {
-	out, _, err := run.Exec(dir, []string{"log", "--format=%H %(trailers:key=" + key + ",valueonly)", ref})
-	if err != nil {
-		return nil, err
-	}
-	var result []trailerCommit
-	for line := range strings.SplitSeq(out, "\n") {
-		sha, value, found := strings.Cut(line, " ")
-		value = strings.TrimSpace(value)
-		if !found || value == "" {
-			continue
+		for _, v := range c.Values {
+			result[v] = c.SHA
 		}
-		result = append(result, trailerCommit{sha, value})
 	}
 	return result, nil
 }
