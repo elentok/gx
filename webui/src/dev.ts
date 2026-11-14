@@ -1,6 +1,5 @@
-import { useContext, useSyncExternalStore } from "react"
 import { postJSON } from "./auth/http"
-import { ConnectionContext, type ConnectionState } from "./connection"
+import { useSnapshotField } from "./connection"
 import type { DevRestartResult, DevStatus } from "./generated/server"
 import { postSettings, GLOBAL_TARGET, setChange } from "./settings/settingsApi"
 import { WriteError } from "./useWrite"
@@ -8,15 +7,9 @@ import { WriteError } from "./useWrite"
 export const DEV_FRONTEND_KEY = "server.web.dev-frontend"
 
 const NO_DEV: DevStatus = { state: "off", has_checkout: false }
-const noopSubscribe = () => () => {}
-const noState = (): ConnectionState | undefined => undefined
-
-// Many field tests render without a ConnectionContext, so a missing one (or a missing block)
-// reads as "no Dev checkout, off" instead of throwing.
+// A missing ConnectionContext (or block) reads as "no Dev checkout, off".
 export function useDev(): DevStatus {
-  const conn = useContext(ConnectionContext)
-  const state = useSyncExternalStore(conn?.subscribe ?? noopSubscribe, conn?.getState ?? noState)
-  return state?.snapshot?.dev ?? NO_DEV
+  return useSnapshotField((s) => s.dev) ?? NO_DEV
 }
 
 // A refusal throws a WriteError; the caller's guard toasts it.

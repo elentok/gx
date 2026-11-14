@@ -340,6 +340,17 @@ export function useConnectionContext(): Connection {
   return conn
 }
 
+const noopSubscribe = () => () => {}
+const noState = (): ConnectionState | undefined => undefined
+
+// Many field tests render without a ConnectionContext, so a missing context or snapshot reads as
+// undefined instead of throwing like useConnectionContext does. The caller adds its own fallback.
+export function useSnapshotField<T>(sel: (snap: Snapshot) => T): T | undefined {
+  const conn = useContext(ConnectionContext)
+  const state = useSyncExternalStore(conn?.subscribe ?? noopSubscribe, conn?.getState ?? noState)
+  return state?.snapshot ? sel(state.snapshot) : undefined
+}
+
 // crypto.randomUUID exists only in secure contexts (HTTPS or localhost), and the
 // web UI is often opened over plain HTTP from another device.
 function randomId(): string {

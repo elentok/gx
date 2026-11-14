@@ -1,8 +1,14 @@
+import { act, renderHook } from "@testing-library/react"
+import { createElement, type ReactNode } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { onSignedOut } from "./apiFetch"
 import {
   BACKOFF_MAX_MS,
+  ConnectionContext,
   createConnection,
+  useSnapshotField,
+  type Connection,
+  type ConnectionState,
   OFFLINE_DELAY_MS,
   RESYNC_EVENT,
   TICK_MS,
@@ -479,4 +485,52 @@ test("a 401 on the event stream fires the signed-out signal", async () => {
   conn.stop()
   off()
   vi.unstubAllGlobals()
+})
+
+function fakeConnection(initial: ConnectionState) {
+  let state = initial
+  const listeners = new Set<() => void>()
+  const conn = {
+    subscribe: (l: () => void) => {
+      listeners.add(l)
+      return () => listeners.delete(l)
+    },
+    getState: () => state,
+  } as unknown as Connection
+  const set = (next: ConnectionState) => {
+    state = next
+    listeners.forEach((l) => l())
+  }
+  return { conn, set }
+}
+
+const withConn =
+  (conn: Connection) =>
+  ({ children }: { children: ReactNode }) =>
+    createElement(ConnectionContext.Provider, { value: conn }, children)
+
+const stateOf = (snapshot: Snapshot | null) =>
+  ({ snapshot, connected: true }) as unknown as ConnectionState
+
+test("useSnapshotField is undefined without a ConnectionContext", () => {
+  const { result } = renderHook(() => useSnapshotField((s) => s.seq))
+  expect(result.current).toBeUndefined()
+})
+
+test("useSnapshotField is undefined while the snapshot is null", () => {
+  const { conn } = fakeConnection(stateOf(null))
+  const { result } = renderHook(() => useSnapshotField((s) => s.seq), {
+    wrapper: withConn(conn),
+  })
+  expect(result.current).toBeUndefined()
+})
+
+test("useSnapshotField follows a snapshot that changes after render", () => {
+  const { conn, set } = fakeConnection(stateOf(emptySnapshot(1)))
+  const { result } = renderHook(() => useSnapshotField((s) => s.seq), {
+    wrapper: withConn(conn),
+  })
+  expect(result.current).toBe(1)
+  act(() => set(stateOf(emptySnapshot(2))))
+  expect(result.current).toBe(2)
 })
