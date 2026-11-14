@@ -122,6 +122,36 @@ test("an -impl epic page has an Open design button that goes back to the Design"
   expect(await screen.findByRole("heading", { level: 1, name: /^blog$/ })).toBeTruthy()
 })
 
+const viewDiffHref = async () =>
+  (await screen.findByRole("link", { name: "View diff" })).getAttribute("href")
+
+test("an unmerged epic with commits ahead links View diff with the response's base and branch", async () => {
+  render("/e/gx:blog-impl", [], "loop", {
+    detail: { shows_view_diff: true, diff_base: "gx/other", diff_tip: "ralph-loop/blog-impl" },
+  })
+  expect(await viewDiffHref()).toBe(
+    "#/diff?project=gx&base=gx%2Fother&tip=ralph-loop%2Fblog-impl&epic=gx%3Ablog-impl",
+  )
+})
+
+test("an epic whose boolean is false shows no View diff", async () => {
+  render("/e/gx:blog-impl", [], "loop", { detail: { diff_base: "main", diff_tip: "b" } })
+  expect(await screen.findByRole("heading", { level: 1 })).toBeTruthy()
+  expect(screen.queryByRole("link", { name: "View diff" })).toBeNull()
+})
+
+test("a merged epic's link holds the stamped SHAs", async () => {
+  render("/e/gx:blog-impl", [], "loop", {
+    detail: { shows_view_diff: true, diff_base: "aaa111", diff_tip: "bbb222" },
+  })
+  expect(await viewDiffHref()).toBe("#/diff?project=gx&base=aaa111&tip=bbb222&epic=gx%3Ablog-impl")
+})
+
+test("a merged epic with no recorded range links with empty refs and the epic", async () => {
+  render("/e/gx:blog-impl", [], "loop", { detail: { shows_view_diff: true } })
+  expect(await viewDiffHref()).toBe("#/diff?project=gx&epic=gx%3Ablog-impl")
+})
+
 test("an -impl epic with no Design shows no partner button", async () => {
   render("/e/gx:solo-impl", [row("solo-impl")])
   await screen.findByRole("heading", { level: 1 })
@@ -1148,7 +1178,9 @@ test("opening an unread epic marks it seen; a read one posts nothing", async () 
   vi.stubGlobal("fetch", fetchMock)
   try {
     render("/e/gx:solo", [row("solo", { addresses: ["gx:solo"], unread: true })])
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/v1/epics/mark-seen", expect.anything()))
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/v1/epics/mark-seen", expect.anything()),
+    )
     cleanup()
     fetchMock.mockClear()
     render("/e/gx:calm", [row("calm", { addresses: ["gx:calm"] })])

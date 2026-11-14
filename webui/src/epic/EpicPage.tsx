@@ -23,6 +23,7 @@ import { useWorkspaces } from "../workspaces/useActiveWorkspace"
 import { EpicRing } from "./EpicRing"
 import { MergeButton, StashMergeButton } from "../epics/MergeButton"
 import { archiveHref, designHref, epicHref } from "../hrefs"
+import { ViewDiffLink } from "../diff/ViewDiffLink"
 import { formatDate } from "../formatDate"
 import { unarchiveWithToasts } from "../select/bulkWrites"
 import { QueueButton } from "../epics/QueueButton"
@@ -253,6 +254,9 @@ function EpicBar({
               </Button>
             </Box>
           )}
+          {detail.shows_view_diff && (
+            <ViewDiffLink epic={address} base={detail.diff_base} tip={detail.diff_tip} />
+          )}
           {detail.kind === "map" && <DesignSessionButton detail={detail} open={openDesign} />}
           {detail.queueable && (
             <QueueButton address={address} state={detail.state ?? ""} onQueued={onChanged} />
@@ -296,6 +300,9 @@ function ArchivedBar({ address, detail }: { address: string; detail: EpicDetail 
         >
           Open implementation epic
         </Button>
+      )}
+      {detail.shows_view_diff && (
+        <ViewDiffLink epic={address} base={detail.diff_base} tip={detail.diff_tip} />
       )}
       <Button tone="running" onClick={() => void unarchive()}>
         Unarchive

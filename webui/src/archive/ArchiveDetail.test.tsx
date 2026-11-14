@@ -85,6 +85,19 @@ test("shows the Archived stamp and Unarchive as the only action", async () => {
   }
 })
 
+test("the archived page shows View diff for a stamped epic and none for an empty one", async () => {
+  render(
+    "/archive/gx:blog-impl",
+    detail({ shows_view_diff: true, diff_base: "aaa", diff_tip: "bbb" }),
+  )
+  const link = await screen.findByRole("link", { name: "View diff" })
+  expect(link.getAttribute("href")).toBe("#/diff?project=gx&base=aaa&tip=bbb&epic=gx%3Ablog-impl")
+  cleanup()
+  render("/archive/gx:blog-impl", detail())
+  expect(await screen.findByTestId("archived-stamp")).toBeTruthy()
+  expect(screen.queryByRole("link", { name: "View diff" })).toBeNull()
+})
+
 test("ticket rows are plain text, not links", async () => {
   render("/archive/gx:blog-impl", detail())
   expect(await screen.findByText("title 01")).toBeTruthy()

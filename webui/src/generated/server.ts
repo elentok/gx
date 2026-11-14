@@ -386,6 +386,11 @@ export interface TicketDetail {
    */
   shows_view_diff?: boolean;
   /**
+   * DiffBase and DiffTip are the epic's refs the link opens; set with ShowsViewDiff.
+   */
+  diff_base?: string;
+  diff_tip?: string;
+  /**
    * Body is the whole body markdown, comments included.
    */
   body?: string;

@@ -164,6 +164,9 @@ type TicketDetail struct {
 	MapEpic bool `json:"map_epic"`
 	// ShowsViewDiff is set for a done, non-commitless ticket whose epic shows View diff.
 	ShowsViewDiff bool `json:"shows_view_diff,omitempty"`
+	// DiffBase and DiffTip are the epic's refs the link opens; set with ShowsViewDiff.
+	DiffBase string `json:"diff_base,omitempty"`
+	DiffTip  string `json:"diff_tip,omitempty"`
 	// Body is the whole body markdown, comments included.
 	Body string `json:"body,omitempty"`
 	// LatestSummary is unset when the body has no Iteration summaries entry.

@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react"
 import type { TicketDetail } from "../generated/server"
 import { epicHref } from "../hrefs"
+import { ViewDiffLink } from "../diff/ViewDiffLink"
 import { slugOf } from "../slug"
 import { StatLine } from "../page/StatLine"
 import { Arc } from "../ui/arc/Arc"
@@ -29,6 +30,14 @@ export function TicketHeader({ detail, now }: { detail: TicketDetail; now: numbe
         >
           <a href={epicHref(detail.epic)}>Epic: {slugOf(detail.epic)}</a>
         </Button>
+        {detail.shows_view_diff && (
+          <ViewDiffLink
+            epic={detail.epic}
+            base={detail.diff_base}
+            tip={detail.diff_tip}
+            commits={[detail.address]}
+          />
+        )}
         <Badge tone={tone} maxW="100%">
           {label}
         </Badge>
