@@ -70,6 +70,14 @@ func (w *Web) ResolveHostedFiles(ctx context.Context, req ops.HostedResolveReque
 	return res, err
 }
 
+// HostedURL asks for the viewer (or raw) link of a hosted file. A refusal is a
+// result (Refused set), not an error.
+func (w *Web) HostedURL(ctx context.Context, req ops.HostedURLRequest) (ops.HostedURLResult, error) {
+	var res ops.HostedURLResult
+	err := w.t.post(ctx, "/v1/hosted-files/url", req, &res)
+	return res, err
+}
+
 // HostedRoots lists every hosted-file root. A refusal is a result, not an error.
 func (w *Web) HostedRoots(ctx context.Context) (ops.HostedRootsResult, error) {
 	var res ops.HostedRootsResult

@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
@@ -24,7 +25,7 @@ type fixture struct {
 	repo string
 }
 
-func start(t *testing.T) fixture {
+func start(t *testing.T, opts ...func(*server.Config)) fixture {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "root", "")
@@ -37,7 +38,7 @@ func start(t *testing.T) fixture {
 			t.Fatal(err)
 		}
 	}
-	return fixture{h: servertest.StartWithStore(t, store, servertest.WithTestHolder()), repo: repo}
+	return fixture{h: servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithTestHolder()}, opts...)...), repo: repo}
 }
 
 // run runs `gx files <args>` with cwd as the caller's working folder.

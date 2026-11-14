@@ -152,6 +152,9 @@ func (w *Web) SetPassword(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// OffInfo is the refusal every web read gives while the web UI is off.
+func OffInfo() ops.WebInfo { return offInfo() }
+
 func offInfo() ops.WebInfo {
 	return ops.WebInfo{Refused: true, Reason: ops.ReasonWebOff, Message: "the web UI is off: set server.web.listen in the config and restart the server"}
 }

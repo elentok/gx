@@ -49,6 +49,7 @@ var routeVerbs = map[string]string{
 	"GET /v1/restart/check":                     "server restart-check",
 	"POST /v1/restart":                          "server restart-now",
 	"POST /v1/hosted-files/resolve":             "files resolve",
+	"POST /v1/hosted-files/url":                 "files url",
 	"GET /v1/hosted-files/roots":                "server files-roots list",
 	"POST /v1/hosted-files/roots/add":           "server files-roots add",
 	"POST /v1/hosted-files/roots/remove":        "server files-roots remove",

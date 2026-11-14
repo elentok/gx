@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -23,8 +25,72 @@ type Deps struct {
 // New builds `gx files`.
 func New(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "files", Short: "ask which files gx may host (asks the server)"}
-	cmd.AddCommand(newResolve(d))
+	cmd.AddCommand(newResolve(d), newURL(d))
 	return cmd
+}
+
+func newURL(d Deps) *cobra.Command {
+	var jsonOut, raw bool
+	var host string
+	cmd := &cobra.Command{
+		Use:   "url [--raw] [--host <host>] [--json] <path>",
+		Short: "print the link of a file gx may host; a relative path joins the current folder",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			path, err := clientPath(d, args[0])
+			if err != nil {
+				return err
+			}
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			res, err := cl.Web.HostedURL(ctx(c), ops.HostedURLRequest{Path: path, Host: host, Raw: raw})
+			return finishURL(c.OutOrStdout(), jsonOut, res, err)
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	cmd.Flags().BoolVar(&raw, "raw", false, "print the raw /v1/files link instead of the viewer link")
+	cmd.Flags().StringVar(&host, "host", "", "use this host in the link (an IP, localhost or an allowed host)")
+	return cmd
+}
+
+// clientPath makes arg absolute against the caller's folder; the server only
+// ever sees absolute paths.
+func clientPath(d Deps, arg string) (string, error) {
+	switch {
+	case arg == "~" || strings.HasPrefix(arg, "~/"):
+		home, err := d.Dirs().Home()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, arg[1:]), nil
+	case filepath.IsAbs(arg):
+		return filepath.Clean(arg), nil
+	}
+	cwd, err := getwd(d)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cwd, arg), nil
+}
+
+// finishURL prints the link, or the refusal. A server that is not running is a refusal.
+func finishURL(w io.Writer, jsonOut bool, res ops.HostedURLResult, err error) error {
+	switch {
+	case apiclient.IsNotRunning(err):
+		return fmt.Errorf("refused (%s): %s", wire.ReasonServerNotRunning, "no server is running; start it with `gx server start`")
+	case err != nil:
+		return fmt.Errorf("server read failed: %w", err)
+	}
+	if jsonOut {
+		return cmdbase.EncodeProvenanceRefusal(w, res, res.Refused)
+	}
+	if res.Refused {
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	_, err = fmt.Fprintln(w, res.URL)
+	return err
 }
 
 func newResolve(d Deps) *cobra.Command {

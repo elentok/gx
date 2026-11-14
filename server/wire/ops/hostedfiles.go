@@ -66,6 +66,30 @@ func (HostedResolveResult) Refuse(reason, message string) HostedResolveResult {
 	return HostedResolveResult{Refused: true, Reason: reason, Message: message}
 }
 
+// HostedURLRequest is the POST /v1/hosted-files/url body behind `gx files url`.
+type HostedURLRequest struct {
+	// Path is an absolute path; the client joins relative paths and "~/".
+	Path string `json:"path"`
+	// Host replaces the host of the web URL; it must be an allowed host.
+	Host string `json:"host,omitempty"`
+	// Raw asks for the raw link instead of the viewer link.
+	Raw bool `json:"raw,omitempty"`
+}
+
+// HostedURLResult is the url reply: the link, or a refusal.
+type HostedURLResult struct {
+	URL     string `json:"url,omitempty"`
+	Refused bool   `json:"refused,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+// Refusal and Refuse let the CLI treat the payload as a Refusable.
+func (r HostedURLResult) Refusal() (bool, string, string) { return r.Refused, r.Reason, r.Message }
+func (HostedURLResult) Refuse(reason, message string) HostedURLResult {
+	return HostedURLResult{Refused: true, Reason: reason, Message: message}
+}
+
 // HostedRootSource says where a hosted-file root comes from. The values are
 // literals because tygo cannot resolve constants from another package.
 type HostedRootSource string
@@ -110,6 +134,12 @@ const (
 	ReasonTooManyCandidates = "too-many-candidates"
 	// ReasonBadBase refuses a resolve call that names more than one base.
 	ReasonBadBase = "bad-base"
+
+	// ReasonPathNotAllowed refuses a url call for any path gx will not host or cannot link.
+	// One reason and one message, so the verb is no path oracle.
+	ReasonPathNotAllowed = "path-not-allowed"
+	// ReasonHostNotAllowed refuses a url call whose host is not an IP, localhost or an allowed host.
+	ReasonHostNotAllowed = "host-not-allowed"
 
 	// Reasons an add refuses a folder.
 	ReasonRootNotAbsolute = "not-absolute"

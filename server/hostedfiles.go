@@ -2,7 +2,9 @@ package server
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,7 +12,9 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server/files"
+	"github.com/elentok/gx/server/web"
 	"github.com/elentok/gx/server/webauth"
+	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
@@ -24,6 +28,7 @@ type hostedFiles struct{ s *Server }
 func (h hostedFiles) routes() []wire.Route {
 	return []wire.Route{
 		{Pattern: "POST /v1/hosted-files/resolve", Handler: h.resolve, Web: wire.WebWrite},
+		{Pattern: "POST /v1/hosted-files/url", Handler: h.url},
 		{Pattern: "GET /v1/hosted-files/roots", Handler: h.listRoots, Web: wire.WebRead},
 		{Pattern: "POST /v1/hosted-files/roots/add", Handler: h.addRoot, Web: wire.WebWrite},
 		{Pattern: "POST /v1/hosted-files/roots/remove", Handler: h.removeRoot, Web: wire.WebWrite},
@@ -124,6 +129,45 @@ func (h hostedFiles) resolve(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		res.Files = append(res.Files, out)
+	}
+	wire.WriteJSON(w, res)
+}
+
+// url answers `gx files url`. Socket-only: the web UI builds its own links.
+func (h hostedFiles) url(w http.ResponseWriter, r *http.Request) {
+	var req ops.HostedURLRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	var res ops.HostedURLResult
+	base := h.s.web.URL()
+	if base == "" {
+		off := web.OffInfo()
+		wire.WriteJSON(w, res.Refuse(off.Reason, off.Message))
+		return
+	}
+	if req.Host != "" {
+		if !webtls.HostAllowed(req.Host, h.s.settings.Load().WebAllowedHosts) {
+			wire.WriteJSON(w, res.Refuse(ops.ReasonHostNotAllowed, "that host is not allowed: use an IP, localhost or a name in server.web.allowed-hosts"))
+			return
+		}
+		u, err := neturl.Parse(base)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		base = "https://" + net.JoinHostPort(webtls.NormalizeHost(req.Host), u.Port())
+	}
+	hosted, ok := h.checker().Check(req.Path)
+	if !ok || !files.HasRawLink(hosted.Path) {
+		wire.WriteJSON(w, res.Refuse(ops.ReasonPathNotAllowed, "gx will not host that path"))
+		return
+	}
+	if req.Raw {
+		res.URL = files.RawURL(base, hosted.Path)
+	} else {
+		res.URL = files.ViewerURL(base, hosted.Path)
 	}
 	wire.WriteJSON(w, res)
 }
