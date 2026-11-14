@@ -137,6 +137,38 @@ func mustAddr(t *testing.T, s string) tickets.Address {
 	return a
 }
 
+func TestResolvePromoted(t *testing.T) {
+	promoted := tickets.Ticket{Identifier: "01", Body: "## Resolution\n\n- reason: promoted\n"}
+	plain := tickets.Ticket{Identifier: "02"}
+	moved := tickets.Ticket{Identifier: "05"}
+	later := tickets.Ticket{Identifier: "06"}
+	archive := tickets.ArchivedFollowUpsEpic
+
+	tests := []struct {
+		name      string
+		matches   []match
+		wantEpic  string
+		wantID    string
+		wantAddrs []string
+	}{
+		{"promoted archive plus outside", []match{{"ready-x", &moved}, {archive, &promoted}, {"ready-y", &later}}, archive, "01", []string{"p:ready-x/05", "p:ready-y/06"}},
+		{"promoted archive alone", []match{{archive, &promoted}}, archive, "01", nil},
+		{"outside alone keeps last", []match{{"ready-x", &moved}, {"ready-y", &later}}, "ready-y", "06", nil},
+		{"unpromoted archive plus outside keeps last", []match{{archive, &plain}, {"ready-x", &moved}}, "ready-x", "05", nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, addrs := resolvePromoted("p", tc.matches)
+			if got.epic != tc.wantEpic || got.ticket.Identifier != tc.wantID {
+				t.Errorf("picked %s/%s, want %s/%s", got.epic, got.ticket.Identifier, tc.wantEpic, tc.wantID)
+			}
+			if strings.Join(addrs, ",") != strings.Join(tc.wantAddrs, ",") {
+				t.Errorf("addresses = %v, want %v", addrs, tc.wantAddrs)
+			}
+		})
+	}
+}
+
 func TestTriageAnswers_RunTwiceWritesOnce(t *testing.T) {
 	repo, project, s := triageAtWrite(t)
 	row := s.Rows[0].Address

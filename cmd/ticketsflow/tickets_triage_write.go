@@ -40,6 +40,31 @@ type located struct {
 	body string
 }
 
+// match is a ticket that was first filed as a row's address.
+type match struct {
+	epic   string
+	ticket *tickets.Ticket
+}
+
+// resolvePromoted picks the match to report, matches being non-empty. A
+// promoted archived copy wins when matches exist outside the archive, and those
+// become the new addresses. Otherwise the last match wins.
+func resolvePromoted(project string, matches []match) (match, []string) {
+	var promoted *match
+	var others []string
+	for i, m := range matches {
+		if m.epic != tickets.ArchivedFollowUpsEpic {
+			others = append(others, tickets.Address{Project: project, Epic: m.epic, ID: m.ticket.Identifier}.String())
+		} else if tickets.IsPromoted(*m.ticket) {
+			promoted = &matches[i]
+		}
+	}
+	if promoted != nil && len(others) > 0 {
+		return *promoted, others
+	}
+	return matches[len(matches)-1], nil
+}
+
 // locateRow finds the ticket first filed as the row's address: still in
 // follow-ups, moved into another epic (original_address survives a move) or
 // archived by close.
@@ -52,43 +77,30 @@ func locateRow(projectDir string, row *triage.Row) (located, error) {
 	if err != nil {
 		return located{}, err
 	}
-	var found *tickets.Ticket
-	var foundEpic string
-	var promoted *tickets.Ticket // the archived copy, closed as promoted
-	var others []string          // matches outside the archive
+	var matches []match
 	for _, e := range epics {
 		for i, t := range e.Tickets {
 			atOrigin := e.Name == addr.Epic && t.Identifier == addr.ID && (len(t.OriginalAddress) == 0 || tickets.IsOriginal(t, addr))
 			if atOrigin || tickets.IsOriginal(t, addr) {
-				found, foundEpic = &e.Tickets[i], e.Name
-				if e.Name == tickets.ArchivedFollowUpsEpic {
-					if tickets.IsPromoted(t) {
-						promoted = &e.Tickets[i]
-					}
-				} else {
-					others = append(others, tickets.Address{Project: addr.Project, Epic: e.Name, ID: t.Identifier}.String())
-				}
+				matches = append(matches, match{epic: e.Name, ticket: &e.Tickets[i]})
 			}
 			if atOrigin {
 				break
 			}
 		}
 	}
-	if found == nil {
+	if len(matches) == 0 {
 		return located{Position: posMissing}, nil
 	}
-	if promoted != nil && len(others) > 0 {
-		found, foundEpic = promoted, tickets.ArchivedFollowUpsEpic
-	} else {
-		others = nil
-	}
+	chosen, newAddrs := resolvePromoted(addr.Project, matches)
+	found, foundEpic := chosen.ticket, chosen.epic
 	loc := located{
 		Position: posMoved,
 		Address:  tickets.Address{Project: addr.Project, Epic: foundEpic, ID: found.Identifier}.String(),
 		Path:     found.FilePath(),
 		body:     found.Body,
 
-		NewAddresses: others,
+		NewAddresses: newAddrs,
 	}
 	switch foundEpic {
 	case tickets.FollowUpsEpic:
