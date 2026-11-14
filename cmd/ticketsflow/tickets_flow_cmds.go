@@ -33,6 +33,7 @@ func Commands(d Deps) []*cobra.Command {
 		newTicketsEpicCmd(d),
 		newTicketsFilterRunLogCmd(d),
 		newTicketsTriageCmd(d),
+		newTicketsStartDesignCmd(d),
 	}
 }
 

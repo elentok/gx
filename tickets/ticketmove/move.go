@@ -107,10 +107,12 @@ func PlanMove(root string, a tickets.Address, src tickets.Ticket, dstEpic, slug 
 	}
 	var dst, srcEpic *tickets.Epic
 	for i := range epics {
-		switch epics[i].Name {
-		case dstEpic:
+		// Two ifs, not a switch: StartDesign's dry-run names the source as the
+		// target, and both lookups must fill.
+		if epics[i].Name == dstEpic {
 			dst = &epics[i]
-		case a.Epic:
+		}
+		if epics[i].Name == a.Epic {
 			srcEpic = &epics[i]
 		}
 	}
