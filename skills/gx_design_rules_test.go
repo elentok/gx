@@ -349,6 +349,8 @@ func TestGxGrillingKeepsLetteredOptionsOutOfYesNo(t *testing.T) {
 		"Word a `yes-no` question so that \"Yes\" is your recommended answer",
 		"Never mix lettered options into a `yes-no` question",
 		"the `➡️` line must start with the same word as `recommended`",
+		"do not use `yes-no`: use `type: options` with two labelled options",
+		"must all say the same thing",
 	} {
 		if !strings.Contains(text, normalizeSpace(want)) {
 			t.Errorf("gx-grilling/SKILL.md lacks %q", want)
