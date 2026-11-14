@@ -10,6 +10,7 @@ const item = (id: string, over = {}) => ({
   project: "gx",
   slug: id,
   idea: "",
+  label: id,
   image_count: 1,
   edited_at: new Date().toISOString(),
   ...over,
@@ -26,7 +27,6 @@ test("the menu loads on open, picks a draft and starts a new one", async () => {
       load={load}
       onPick={onPick}
       onNew={onNew}
-      onRename={() => {}}
       onDelete={async () => {}}
     />,
   )
@@ -50,7 +50,6 @@ test("an open menu dims the form behind it with a scrim", async () => {
       load={async () => [item("a")]}
       onPick={() => {}}
       onNew={() => {}}
-      onRename={() => {}}
       onDelete={async () => {}}
     />,
   )
@@ -68,7 +67,6 @@ test("choosing the open draft changes nothing", async () => {
       load={async () => [item("a")]}
       onPick={onPick}
       onNew={() => {}}
-      onRename={() => {}}
       onDelete={async () => {}}
     />,
   )

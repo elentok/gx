@@ -61,17 +61,37 @@ func (s *Store) lock(id string) func() {
 	return mu.Unlock
 }
 
+// isEmpty: no prompt, no images and no slug. The project never counts.
 func isEmpty(d *ops.DesignDraft) bool {
-	return d.Name == "" && d.Slug == "" && d.Idea == "" && len(d.Images) == 0
+	return d.Slug == "" && d.Idea == "" && len(d.Images) == 0
 }
 
-// Create stores a new draft at revision 1. A draft with nothing in it stores
-// nothing and returns nil.
-func (s *Store) Create(project, slug, idea, name string) (*ops.DesignDraft, error) {
-	d := &ops.DesignDraft{Project: project, Slug: slug, Idea: idea, Name: name, Images: []string{}}
-	if isEmpty(d) {
-		return nil, nil
+const (
+	labelWords    = 5
+	labelMaxRunes = 40
+	labelFallback = "Untitled design"
+)
+
+// Label is the one rule for a draft's display name: the slug, else the first
+// 5 words of the prompt cut at 40 characters, else "Untitled design".
+func Label(slug, prompt string) string {
+	if slug != "" {
+		return slug
 	}
+	words := strings.Fields(prompt)
+	if len(words) == 0 {
+		return labelFallback
+	}
+	if len(words) > labelWords {
+		words = words[:labelWords]
+	}
+	r := []rune(strings.Join(words, " "))
+	return string(r[:min(len(r), labelMaxRunes)])
+}
+
+// Create stores a new draft at revision 1. An empty draft is kept.
+func (s *Store) Create(project, slug, idea string) (*ops.DesignDraft, error) {
+	d := &ops.DesignDraft{Project: project, Slug: slug, Idea: idea, Images: []string{}}
 	var raw [8]byte
 	if _, err := rand.Read(raw[:]); err != nil {
 		return nil, err
@@ -84,6 +104,7 @@ func (s *Store) Create(project, slug, idea, name string) (*ops.DesignDraft, erro
 	if err := s.write(d); err != nil {
 		return nil, err
 	}
+	d.Label = Label(d.Slug, d.Idea)
 	return d, nil
 }
 
@@ -106,6 +127,7 @@ func (s *Store) Get(id string) (*ops.DesignDraft, error) {
 	if d.Images == nil {
 		d.Images = []string{}
 	}
+	d.Label = Label(d.Slug, d.Idea)
 	return &d, nil
 }
 
@@ -128,7 +150,7 @@ func (s *Store) List() ([]ops.DesignDraftItem, error) {
 			continue
 		}
 		items = append(items, ops.DesignDraftItem{
-			ID: d.ID, Project: d.Project, Slug: d.Slug, Idea: d.Idea, Name: d.Name,
+			ID: d.ID, Project: d.Project, Slug: d.Slug, Idea: d.Idea, Label: d.Label,
 			ImageCount: len(d.Images), EditedAt: d.EditedAt,
 		})
 	}
@@ -155,13 +177,7 @@ func (s *Store) Save(id string, req ops.DesignDraftSaveRequest) (ops.DesignDraft
 	if d.Revision != req.Revision {
 		return ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftRevisionConflict}, nil
 	}
-	d.Project, d.Slug, d.Idea, d.Name = req.Project, req.Slug, req.Idea, req.Name
-	if isEmpty(d) {
-		if err := os.RemoveAll(s.dir(id)); err != nil {
-			return ops.DesignDraftSaveResult{}, err
-		}
-		return ops.DesignDraftSaveResult{Deleted: true}, nil
-	}
+	d.Project, d.Slug, d.Idea = req.Project, req.Slug, req.Idea
 	d.Revision++
 	if !req.KeepEditedAt {
 		d.EditedAt = s.now().UTC()
@@ -169,6 +185,7 @@ func (s *Store) Save(id string, req ops.DesignDraftSaveRequest) (ops.DesignDraft
 	if err := s.write(d); err != nil {
 		return ops.DesignDraftSaveResult{}, err
 	}
+	d.Label = Label(d.Slug, d.Idea)
 	return ops.DesignDraftSaveResult{Draft: d}, nil
 }
 
@@ -277,7 +294,9 @@ func (s *Store) SetLastProject(project string) error {
 }
 
 func (s *Store) write(d *ops.DesignDraft) error {
-	b, err := json.MarshalIndent(d, "", "  ")
+	rec := *d
+	rec.Label = "" // computed on read, never stored
+	b, err := json.MarshalIndent(&rec, "", "  ")
 	if err != nil {
 		return err
 	}

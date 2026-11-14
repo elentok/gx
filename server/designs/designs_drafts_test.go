@@ -18,7 +18,7 @@ import (
 // seedDraft writes a draft straight into the store the server reads.
 func (f designsFixture) seedDraft(t *testing.T, project, slug, idea string) *ops.DesignDraft {
 	t.Helper()
-	d, err := drafts.New(f.h.StateDir).Create(project, slug, idea, "")
+	d, err := drafts.New(f.h.StateDir).Create(project, slug, idea)
 	if err != nil || d == nil {
 		t.Fatalf("seed draft = %+v, %v", d, err)
 	}
@@ -167,27 +167,38 @@ func TestWebDesignDrafts_SaveWithoutIDCreates(t *testing.T) {
 	}
 	var items []ops.DesignDraftItem
 	f.webGet(t, "/v1/designs/drafts", &items)
-	if len(items) != 1 || items[0].ID != res.Draft.ID {
-		t.Errorf("list = %+v, want the created draft", items)
+	if len(items) != 1 || items[0].ID != res.Draft.ID || items[0].Label != "s" || res.Draft.Label != "s" {
+		t.Errorf("list = %+v, want the created draft with its label", items)
+	}
+
+	var empty ops.DesignDraftSaveResult
+	code, out := servertest.WebPostJSON(t, f.base+"/v1/designs/drafts/save", `{"project":"proj"}`, f.ck, "", servertest.JSONPost(f.base))
+	if code != http.StatusOK || json.Unmarshal([]byte(out), &empty) != nil || empty.Draft == nil || empty.Draft.Label != "Untitled design" {
+		t.Fatalf("empty create = %d %s, want a kept draft", code, out)
+	}
+	var read ops.DesignDraftSaveResult
+	f.webGet(t, "/v1/designs/drafts/read?id="+url.QueryEscape(empty.Draft.ID), &read)
+	if read.Draft == nil || read.Draft.Label != "Untitled design" {
+		t.Errorf("read = %+v, want the label", read)
 	}
 }
 
-func TestWebDesignDrafts_EmptyingSaveDeletes(t *testing.T) {
+func TestWebDesignDrafts_EmptyingSaveKeeps(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
-	d, err := drafts.New(f.h.StateDir).Create("", "", "only the idea", "")
+	d, err := drafts.New(f.h.StateDir).Create("", "", "only the idea")
 	if err != nil || d == nil {
 		t.Fatal(d, err)
 	}
 	body := fmt.Sprintf(`{"id":%q,"revision":%d}`, d.ID, d.Revision)
 	code, out := servertest.WebPostJSON(t, f.base+"/v1/designs/drafts/save", body, f.ck, "", servertest.JSONPost(f.base))
-	if code != http.StatusOK || !strings.Contains(out, `"deleted":true`) {
+	if code != http.StatusOK || strings.Contains(out, `"deleted"`) || !strings.Contains(out, `"label":"Untitled design"`) {
 		t.Fatalf("emptying save = %d %s", code, out)
 	}
 	var items []ops.DesignDraftItem
 	f.webGet(t, "/v1/designs/drafts", &items)
-	if len(items) != 0 {
-		t.Errorf("list = %+v, want none", items)
+	if len(items) != 1 || items[0].Label != "Untitled design" {
+		t.Errorf("list = %+v, want the kept draft", items)
 	}
 }
 

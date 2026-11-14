@@ -17,7 +17,7 @@ import (
 
 func TestDesignsDrafts_ListShowDelete(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir())
-	d, err := drafts.New(h.StateDir).Create("proj", "a-slug", "the idea\nsecond line", "")
+	d, err := drafts.New(h.StateDir).Create("proj", "a-slug", "the idea\nsecond line")
 	if err != nil || d == nil {
 		t.Fatal(d, err)
 	}
@@ -94,7 +94,7 @@ func TestDesignsDrafts_LastProject(t *testing.T) {
 func TestDesignsDrafts_ImageAddRm(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir())
 	st := drafts.New(h.StateDir)
-	d, err := st.Create("proj", "s", "idea", "")
+	d, err := st.Create("proj", "s", "idea")
 	if err != nil || d == nil {
 		t.Fatal(d, err)
 	}
@@ -129,7 +129,7 @@ func TestDesignsDrafts_ImageAddRm(t *testing.T) {
 func TestDesignsDrafts_ImageGet(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir())
 	st := drafts.New(h.StateDir)
-	d, err := st.Create("proj", "s", "idea", "")
+	d, err := st.Create("proj", "s", "idea")
 	if err != nil || d == nil {
 		t.Fatal(d, err)
 	}
@@ -180,7 +180,7 @@ func TestDesignsImages_ListGet(t *testing.T) {
 
 func TestDesignsDrafts_SaveRevisionConflict(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir())
-	d, err := drafts.New(h.StateDir).Create("proj", "s", "idea", "")
+	d, err := drafts.New(h.StateDir).Create("proj", "s", "idea")
 	if err != nil || d == nil {
 		t.Fatal(d, err)
 	}

@@ -17,10 +17,11 @@ type DesignDraft struct {
 	Project  string    `json:"project"`
 	Slug     string    `json:"slug"`
 	Idea     string    `json:"idea"`
-	Name     string    `json:"name,omitempty"`
 	Images   []string  `json:"images"`
 	Revision int       `json:"revision"`
 	EditedAt time.Time `json:"edited_at"`
+	// Label is computed by the server on every read (never stored).
+	Label string `json:"label"`
 }
 
 // DesignDraftItem is one row of the draft list: the inputs of its label and
@@ -30,7 +31,7 @@ type DesignDraftItem struct {
 	Project    string    `json:"project"`
 	Slug       string    `json:"slug"`
 	Idea       string    `json:"idea"`
-	Name       string    `json:"name,omitempty"`
+	Label      string    `json:"label"`
 	ImageCount int       `json:"image_count"`
 	EditedAt   time.Time `json:"edited_at"`
 }
@@ -43,7 +44,6 @@ type DesignDraftSaveRequest struct {
 	Project  string `json:"project"`
 	Slug     string `json:"slug"`
 	Idea     string `json:"idea"`
-	Name     string `json:"name,omitempty"`
 	Revision int    `json:"revision"`
 	// KeepEditedAt saves without moving the edited-at time, for a change the
 	// person did not make (the form moving a draft off a deleted project).

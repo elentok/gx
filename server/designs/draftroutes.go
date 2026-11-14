@@ -46,8 +46,8 @@ func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
 	if req.ID == "" {
 		// The form's first save of a new draft has no id yet.
 		var d *ops.DesignDraft
-		if d, err = s.drafts.Create(req.Project, req.Slug, req.Idea, req.Name); err == nil {
-			res = ops.DesignDraftSaveResult{Draft: d, Deleted: d == nil}
+		if d, err = s.drafts.Create(req.Project, req.Slug, req.Idea); err == nil {
+			res = ops.DesignDraftSaveResult{Draft: d}
 		}
 	} else {
 		res, err = s.drafts.Save(req.ID, req)

@@ -192,13 +192,13 @@ func TestWebDesignDraftImages_DraftWithImageSurvivesEmptyingText(t *testing.T) {
 		t.Errorf("images = %v, want [%s]", got, up.ID)
 	}
 
-	// With the image gone too, the same save deletes the draft.
+	// With the image gone too, the same save still keeps the (now empty) draft.
 	f.removeDraftImage(t, d.ID, up.ID)
 	cur := f.readDraft(t, d.ID)
 	body = fmt.Sprintf(`{"id":%q,"project":"proj","slug":"","idea":"","revision":%d}`, d.ID, cur.Revision)
 	code, out = servertest.WebPostJSON(t, f.base+"/v1/designs/drafts/save", body, f.ck, "", servertest.JSONPost(f.base))
 	res = ops.DesignDraftSaveResult{}
-	if code != http.StatusOK || json.Unmarshal([]byte(out), &res) != nil || !res.Deleted {
-		t.Errorf("emptying a draft with no images = %d %s, want deleted", code, out)
+	if code != http.StatusOK || json.Unmarshal([]byte(out), &res) != nil || res.Deleted || res.Draft == nil {
+		t.Errorf("emptying a draft with no images = %d %s, want the draft kept", code, out)
 	}
 }

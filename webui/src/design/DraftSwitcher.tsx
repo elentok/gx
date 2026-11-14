@@ -13,7 +13,6 @@ interface Props {
   load: () => Promise<DesignDraftItem[]>
   onPick: (id: string) => void
   onNew: () => void
-  onRename: () => void
   /** Deletes a draft; the menu then drops its row. */
   onDelete: (id: string) => Promise<void>
   /** Starts with the menu open; the gallery shows it that way. */
@@ -46,7 +45,6 @@ export function DraftSwitcher({
   load,
   onPick,
   onNew,
-  onRename,
   onDelete,
   defaultOpen = false,
 }: Props) {
@@ -185,7 +183,7 @@ export function DraftSwitcher({
                       aria-label="Delete draft"
                       title="Delete draft"
                       onClick={() =>
-                        d.slug.trim() || d.idea.trim() || d.name || d.image_count > 0
+                        d.slug.trim() || d.idea.trim() || d.image_count > 0
                           ? setAsked(d.id)
                           : remove(d.id)
                       }
@@ -216,21 +214,6 @@ export function DraftSwitcher({
           >
             <span>
               <chakra.span aria-hidden>＋ </chakra.span>New draft
-            </span>
-          </chakra.button>
-          <chakra.button
-            type="button"
-            role="menuitem"
-            onClick={() => choose(onRename)}
-            {...rowStyle}
-            minH="0"
-            py="8px"
-            fontSize="12px"
-            color="text.dim"
-            bg="surface"
-          >
-            <span>
-              <chakra.span aria-hidden>✎</chakra.span>Name this draft
             </span>
           </chakra.button>
         </Box>

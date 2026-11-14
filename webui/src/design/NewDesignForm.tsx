@@ -188,19 +188,8 @@ function DraftForm({
     [focusFirst],
   )
   const autosave = useDraftAutosave({ drafts, initial, restored, projects, lastProject, slot })
-  const {
-    draft,
-    patch,
-    pickProject,
-    name,
-    saveName,
-    status,
-    banner,
-    bannerActions,
-    moved,
-    movedFrom,
-    imgs,
-  } = autosave
+  const { draft, patch, pickProject, status, banner, bannerActions, moved, movedFrom, imgs } =
+    autosave
   const { switchDraft, newDraft, deleteOther, loadDrafts } = useDraftSwitching({
     drafts,
     autosave,
@@ -208,8 +197,6 @@ function DraftForm({
     focusSlug: () => slugInput.current?.focus(),
   })
   const [confirming, setConfirming] = useState(false)
-  // The name field under the title row; `undefined` is closed.
-  const [naming, setNaming] = useState<string>()
   const { run, pending } = useDesignWrite()
   const fileInput = useRef<HTMLInputElement>(null)
   const attachIcon = useAttachIcon()
@@ -223,10 +210,6 @@ function DraftForm({
   const discard = () => {
     autosave.discard()
     onClose()
-  }
-  const commitName = (text: string) => {
-    setNaming(undefined)
-    saveName(text)
   }
 
   const submit = (e: FormEvent) => {
@@ -253,11 +236,9 @@ function DraftForm({
     )
   }
 
-  const hasWork = hasText(draft) || !!name || imgs.count > 0
-  // The title follows the name field while it is open.
-  const shownName = naming !== undefined ? naming.trim() || undefined : name
-  const label =
-    draft.slug || draft.idea || shownName ? draftLabel({ name: shownName, ...draft }) : draftLabel()
+  const hasWork = hasText(draft) || imgs.count > 0
+  // The server ships the label; the title shows the slug being typed, else the blank-draft title.
+  const label = draft.slug.trim() || draftLabel()
   const reason = startBlocker(draft, imgs)
 
   return (
@@ -277,7 +258,6 @@ function DraftForm({
           load={loadDrafts}
           onPick={switchDraft}
           onNew={newDraft}
-          onRename={() => setNaming(name ?? "")}
           onDelete={deleteOther}
         />
         <Box flex="1" />
@@ -308,32 +288,6 @@ function DraftForm({
           Close
         </chakra.button>
       </Box>
-      {naming !== undefined && (
-        <Box display="flex" alignItems="center" gap="2" px="3" pt="2" flexShrink="0">
-          <chakra.input
-            aria-label="Draft name"
-            autoComplete="off"
-            autoFocus
-            {...field}
-            flex="1"
-            minW="0"
-            h="34px"
-            px="3"
-            placeholder="Name this draft (optional)"
-            value={naming}
-            onChange={(e) => setNaming(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault()
-                commitName(naming)
-              }
-            }}
-          />
-          <Button type="button" emphasis="ghost" tone="muted" onClick={() => commitName(naming)}>
-            Done
-          </Button>
-        </Box>
-      )}
       <Box
         display="flex"
         alignItems="center"

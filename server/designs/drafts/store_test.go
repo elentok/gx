@@ -19,7 +19,7 @@ func newStore(t *testing.T) *Store {
 
 func mustCreate(t *testing.T, s *Store, idea string) *ops.DesignDraft {
 	t.Helper()
-	d, err := s.Create("proj", "", idea, "")
+	d, err := s.Create("proj", "", idea)
 	if err != nil || d == nil {
 		t.Fatalf("create: %v %v", d, err)
 	}
@@ -79,21 +79,52 @@ func TestSave_DeletedDraftIsGone(t *testing.T) {
 	}
 }
 
-func TestSave_EmptyingDeletesDraftAndImages(t *testing.T) {
+func TestSave_EmptyingKeepsTheDraft(t *testing.T) {
 	s := newStore(t)
 	d := mustCreate(t, s, "a")
-	if err := os.MkdirAll(s.ImagesDir(d.ID), 0o700); err != nil {
-		t.Fatal(err)
-	}
 	res, err := s.Save(d.ID, ops.DesignDraftSaveRequest{Project: "proj", Revision: d.Revision})
-	if err != nil || !res.Deleted {
-		t.Fatalf("want deleted, got %+v %v", res, err)
+	if err != nil || res.Deleted || res.Draft == nil || res.Draft.Revision != d.Revision+1 {
+		t.Fatalf("want kept draft, got %+v %v", res, err)
 	}
-	if _, err := os.Stat(s.dir(d.ID)); !os.IsNotExist(err) {
-		t.Fatalf("draft folder still there: %v", err)
+	if res.Draft.Label != "Untitled design" {
+		t.Errorf("label = %q", res.Draft.Label)
 	}
-	if _, err := s.Get(d.ID); err != ErrNotFound {
-		t.Fatalf("get after empty: %v", err)
+	if _, err := s.Get(d.ID); err != nil {
+		t.Fatalf("get after emptying: %v", err)
+	}
+}
+
+func TestIsEmpty(t *testing.T) {
+	cases := []struct {
+		name string
+		d    ops.DesignDraft
+		want bool
+	}{
+		{"nothing", ops.DesignDraft{}, true},
+		{"project only", ops.DesignDraft{Project: "p"}, true},
+		{"slug", ops.DesignDraft{Slug: "s"}, false},
+		{"prompt", ops.DesignDraft{Idea: "x"}, false},
+		{"image", ops.DesignDraft{Images: []string{"i"}}, false},
+	}
+	for _, c := range cases {
+		if got := isEmpty(&c.d); got != c.want {
+			t.Errorf("%s: isEmpty = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestLabel(t *testing.T) {
+	cases := []struct{ name, slug, prompt, want string }{
+		{"slug wins", "my-slug", "some prompt", "my-slug"},
+		{"first five words", "", "one two three four five six seven", "one two three four five"},
+		{"whitespace collapsed", "", "  a\n b   c ", "a b c"},
+		{"cut at 40", "", "aaaaaaaaaaaa bbbbbbbbbbbb cccccccccccc dddddddddddd", "aaaaaaaaaaaa bbbbbbbbbbbb cccccccccccc d"},
+		{"fallback", "", "  \n ", "Untitled design"},
+	}
+	for _, c := range cases {
+		if got := Label(c.slug, c.prompt); got != c.want {
+			t.Errorf("%s: Label = %q, want %q", c.name, got, c.want)
+		}
 	}
 }
 
@@ -110,15 +141,15 @@ func TestSave_KeepsImageList(t *testing.T) {
 	}
 }
 
-func TestCreate_EmptyStoresNothing(t *testing.T) {
+func TestCreate_EmptyIsKept(t *testing.T) {
 	s := newStore(t)
-	d, err := s.Create("proj", "", "", "")
-	if err != nil || d != nil {
+	d, err := s.Create("proj", "", "")
+	if err != nil || d == nil {
 		t.Fatalf("got %v %v", d, err)
 	}
 	items, _ := s.List()
-	if len(items) != 0 {
-		t.Fatalf("stored something: %v", items)
+	if len(items) != 1 || items[0].Label != "Untitled design" {
+		t.Fatalf("list = %+v", items)
 	}
 }
 

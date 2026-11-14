@@ -103,21 +103,9 @@ export const setLastProject: SetLastProject = async (project) => {
   await request(`${BASE}/last-project`, { project } satisfies DesignLastProject)
 }
 
-const MAX_LABEL = 40
-const LABEL_WORDS = 5
-
-type Labelled = Pick<DesignDraftItem, "name" | "slug" | "idea">
-
-/** The draft's row label: name, else slug, else the idea's first words; no draft is a blank new one. */
-export function draftLabel(d?: Labelled | null): string {
-  if (!d) return "New draft"
-  const name = d.name?.trim()
-  if (name) return name
-  const slug = d.slug.trim()
-  if (slug) return slug
-  const words = d.idea.trim().split(/\s+/).filter(Boolean).slice(0, LABEL_WORDS).join(" ")
-  if (!words) return "Untitled draft"
-  return words.length > MAX_LABEL ? `${words.slice(0, MAX_LABEL)}…` : words
+/** The draft's row label, as the server shipped it; no draft is a blank new one. */
+export function draftLabel(d?: Pick<DesignDraftItem, "label"> | null): string {
+  return d ? d.label : "New draft"
 }
 
 /** "just now", "N min ago", "N h ago", "N d ago". */

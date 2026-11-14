@@ -54,9 +54,6 @@ export function useDraftAutosave({
   const [status, setStatus] = useState<SaveStatus>(
     restored === "unsaved" ? "unsaved" : initial?.id && !restored ? "saved" : "none",
   )
-  const [name, setName] = useState(initial?.name)
-  // A name change is a text save even when the fields are unchanged.
-  const nameDirty = useRef(false)
 
   const latest = useRef(draft)
   // `synced` is the fields as the server last had them, so an unchanged form saves nothing. A restored entry never reached the server.
@@ -65,7 +62,6 @@ export function useDraftAutosave({
   const server = useRef({
     id: initial?.id || undefined,
     revision: initial?.revision ?? 0,
-    name: initial?.name,
     synced: restored
       ? ""
       : JSON.stringify(movedFrom !== undefined ? { ...draft, project: movedFrom } : draft),
@@ -106,14 +102,13 @@ export function useDraftAutosave({
     const s = server.current
     const fields = latest.current
     const key = JSON.stringify(fields)
-    if (key === s.synced && !nameDirty.current) return setStatus(s.id ? "saved" : "none")
-    if (!s.id && !fields.slug && !fields.idea && !s.name) return setStatus("none")
+    if (key === s.synced) return setStatus(s.id ? "saved" : "none")
+    if (!s.id && !fields.slug && !fields.idea) return setStatus("none")
     let res
     try {
       res = await drafts.save({
         id: s.id,
         ...fields,
-        name: s.name,
         revision: s.revision,
         ...(key === unedited.current && { keep_edited_at: true }),
       })
@@ -127,14 +122,11 @@ export function useDraftAutosave({
     if (res.kind === "ok") {
       unedited.current = undefined
       Object.assign(s, { id: res.draft.id, revision: res.draft.revision, synced: key })
-      nameDirty.current = false
       settle()
       return setStatus("saved")
     }
     if (res.kind === "deleted") {
-      Object.assign(s, { id: undefined, revision: 0, name: undefined, synced: key })
-      nameDirty.current = false
-      setName(undefined)
+      Object.assign(s, { id: undefined, revision: 0, synced: key })
       settle()
       return setStatus("none")
     }
@@ -145,7 +137,7 @@ export function useDraftAutosave({
   const stash = () => {
     const s = server.current
     const key = s.id ?? NEW_DRAFT_KEY
-    stashUnsaved(key, { revision: s.revision, ...latest.current, name: s.name })
+    stashUnsaved(key, { revision: s.revision, ...latest.current })
     if (!stashed.current.includes(key)) stashed.current.push(key)
   }
   /** The text reached the server, or Start or Discard took it over. */
@@ -186,12 +178,9 @@ export function useDraftAutosave({
       const next = { slug: theirs.slug, idea: theirs.idea, project: theirs.project }
       Object.assign(server.current, {
         revision: theirs.revision,
-        name: theirs.name,
         synced: JSON.stringify(next),
       })
       latest.current = next
-      nameDirty.current = false
-      setName(theirs.name)
       setDraft(next)
       imgs.reset(theirs.images)
       settle()
@@ -271,15 +260,6 @@ export function useDraftAutosave({
     patch({ project })
     drafts.setLastProject(project).catch(() => {})
   }
-  const saveName = (text: string) => {
-    const next = text.trim() || undefined
-    if (next === server.current.name) return
-    server.current.name = next
-    nameDirty.current = true
-    setName(next)
-    setStatus((cur) => (!blocked.current && server.current.id ? "saving" : cur))
-    flush()
-  }
   /** Discards the draft: stops saving and deletes it once an in-flight save has given a new draft its id. */
   const discard = () => {
     stopSaving()
@@ -311,15 +291,13 @@ export function useDraftAutosave({
     }
   }
 
-  // A name or images keep a draft with no text from being blank.
-  const hasContent = () => hasText(latest.current) || !!server.current.name || imgs.count > 0
+  // Images keep a draft with no text from being blank.
+  const hasContent = () => hasText(latest.current) || imgs.count > 0
 
   return {
     draft,
     patch,
     pickProject,
-    name,
-    saveName,
     status,
     banner,
     bannerActions,

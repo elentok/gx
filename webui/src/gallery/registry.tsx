@@ -156,6 +156,7 @@ const sampleDrafts = (n: number): DesignDraftItem[] =>
     project: ["gx", "blog", "dotfiles"][i % 3],
     slug: `epic-${i + 1}`,
     idea: "",
+    label: `epic-${i + 1}`,
     image_count: i % 4,
     edited_at: new Date(Date.now() - i * 5_400_000).toISOString(),
   }))
@@ -168,7 +169,6 @@ const SwitcherFrame = ({ drafts, open }: { drafts: DesignDraftItem[]; open?: boo
       load={async () => drafts}
       onPick={() => {}}
       onNew={() => {}}
-      onRename={() => {}}
       onDelete={async () => {}}
       defaultOpen={open}
     />

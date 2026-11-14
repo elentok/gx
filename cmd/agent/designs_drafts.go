@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
@@ -215,14 +214,7 @@ func runDraftsList(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonO
 		}{items})
 	}
 	for _, it := range items {
-		label := it.Name
-		if label == "" {
-			label = it.Slug
-		}
-		if label == "" {
-			label, _, _ = strings.Cut(strings.TrimSpace(it.Idea), "\n")
-		}
-		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d images\n", it.ID, it.Project, label, it.ImageCount); err != nil {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d images\n", it.ID, it.Project, it.Label, it.ImageCount); err != nil {
 			return err
 		}
 	}
@@ -376,7 +368,6 @@ func newDraftsSaveCmd(d Deps) *cobra.Command {
 	cmd.Flags().StringVar(&req.Project, "project", "", "project")
 	cmd.Flags().StringVar(&req.Slug, "slug", "", "slug")
 	cmd.Flags().StringVar(&req.Idea, "idea", "", "idea, or - to read it from stdin")
-	cmd.Flags().StringVar(&req.Name, "name", "", "name")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
 	return cmd
 }

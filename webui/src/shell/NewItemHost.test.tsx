@@ -120,6 +120,7 @@ describe("the project a new blank draft starts on", () => {
       project: "alpha",
       slug: "",
       idea: "hello",
+      label: "hello",
       images: [],
       revision: 1,
       edited_at: "",

@@ -7,7 +7,6 @@ export interface UnsavedEntry {
   project: string
   slug: string
   idea: string
-  name?: string
 }
 
 const KEY = "gx.newDesign.unsaved"
@@ -55,7 +54,7 @@ export async function saveUnsaved(
   save: SaveDraft,
 ): Promise<{ draft: DesignDraft; state: Restored } | undefined> {
   for (const [id, e] of Object.entries(readUnsaved())) {
-    const fields = { project: e.project, slug: e.slug, idea: e.idea, name: e.name }
+    const fields = { project: e.project, slug: e.slug, idea: e.idea }
     let state: Restored
     try {
       const res = await save({ id: id || undefined, ...fields, revision: e.revision })
@@ -67,6 +66,9 @@ export async function saveUnsaved(
     } catch {
       state = "unsaved"
     }
-    return { draft: { id, images: [], edited_at: "", ...fields, revision: e.revision }, state }
+    return {
+      draft: { id, images: [], edited_at: "", label: "", ...fields, revision: e.revision },
+      state,
+    }
   }
 }

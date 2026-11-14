@@ -166,19 +166,12 @@ test("26. New Design form", async ({ page, start }) => {
     await menu.getByRole("menuitem", { name: /beta/ }).click()
     await expect(fields(form).idea).toHaveValue("Second idea")
 
-    // Name this draft: the title reads the name.
-    await opener.click()
-    await menu.getByRole("menuitem", { name: /Name this draft/ }).click()
-    await form.getByRole("textbox", nav("Draft name")).fill("Launch plan")
-    await form.getByRole("button", nav("Done")).click()
-    await expect(opener).toHaveText(/^Launch plan/)
-    await expect(form.getByText("Saved")).toBeVisible()
-
     // Closing and reopening shows the most recently edited draft.
+    await expect(opener).toHaveText(/^beta/)
     await page.keyboard.press("Escape")
     await expect(form).toBeHidden()
     await openDialog(page)
-    await expect(opener).toHaveText(/^Launch plan/)
+    await expect(opener).toHaveText(/^beta/)
 
     // The trash on a row asks first, then removes the draft.
     await opener.click()

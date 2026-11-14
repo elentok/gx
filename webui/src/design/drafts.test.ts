@@ -33,20 +33,9 @@ const draft = {
 }
 const req = { id: "d1", project: "gx", slug: "", idea: "x", revision: 1 }
 
-test.each([
-  ["name wins", { name: " Big idea ", slug: "s", idea: "i" }, "Big idea"],
-  ["slug next", { slug: "my-slug", idea: "i" }, "my-slug"],
-  [
-    "first five words",
-    { slug: "", idea: "one two three four five six" },
-    "one two three four five",
-  ],
-  ["whitespace collapsed", { slug: "", idea: "  a \n b  " }, "a b"],
-  ["cut at 40 with ellipsis", { slug: "", idea: "a".repeat(45) }, `${"a".repeat(40)}…`],
-  ["blank idea", { slug: "", idea: "  " }, "Untitled draft"],
-  ["no draft", undefined, "New draft"],
-])("label: %s", (_, d, want) => {
-  expect(draftLabel(d && { ...d, slug: d.slug ?? "", idea: d.idea ?? "" })).toBe(want)
+test("label: the shipped label, or a blank new draft", () => {
+  expect(draftLabel({ label: "my-slug" })).toBe("my-slug")
+  expect(draftLabel()).toBe("New draft")
 })
 
 const now = new Date("2026-01-10T12:00:00Z")

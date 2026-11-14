@@ -92,8 +92,8 @@ var Scenarios = map[string]scenario{
 		}}},
 		Drafts: []spec.Draft{
 			{Project: project, Idea: "A dark mode for the settings page"},
-			{Project: project, Slug: "export-csv", Idea: "Export the stats table as CSV", Name: "Export CSV"},
-			{Project: project, Slug: "onboarding", Idea: "A first-run walkthrough", Name: "Onboarding", Images: 2},
+			{Project: project, Slug: "export-csv", Idea: "Export the stats table as CSV"},
+			{Project: project, Slug: "onboarding", Idea: "A first-run walkthrough", Images: 2},
 		},
 	},
 	// disk-low: an unqueued epic whose project cleans through the disk control files.

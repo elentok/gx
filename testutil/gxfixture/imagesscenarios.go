@@ -50,13 +50,13 @@ func seedDrafts(stateDir string, list []spec.Draft) error {
 	}
 	store := drafts.New(stateDir)
 	for _, d := range list {
-		saved, err := store.Create(d.Project, d.Slug, d.Idea, d.Name)
+		saved, err := store.Create(d.Project, d.Slug, d.Idea)
 		if err != nil {
 			return err
 		}
 		for range d.Images {
 			if res, err := store.AddImage(saved.ID, png); err != nil || res.Refused {
-				return fmt.Errorf("draft %q: image: %v %+v", d.Name, err, res)
+				return fmt.Errorf("draft %q: image: %v %+v", saved.Label, err, res)
 			}
 		}
 	}

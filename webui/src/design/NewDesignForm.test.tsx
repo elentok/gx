@@ -28,6 +28,7 @@ function fakeDrafts(latest?: Partial<DesignDraft>, lastProject = "") {
     project: "gx",
     slug: "",
     idea: "",
+    label: "",
     images: [],
     revision: 3,
     edited_at: "",
@@ -40,7 +41,7 @@ function fakeDrafts(latest?: Partial<DesignDraft>, lastProject = "") {
     const edited_at = body.keep_edited_at ? (stored?.edited_at ?? "") : "stamped"
     return {
       kind: "ok",
-      draft: { images: [], ...body, edited_at, id: body.id ?? "created", revision },
+      draft: { images: [], label: "", ...body, edited_at, id: body.id ?? "created", revision },
     }
   })
   const remove = vi.fn(async (): Promise<DraftResult> => ({ kind: "deleted" }))
@@ -297,7 +298,6 @@ test("typing shows Saving..., saves 800 ms after the last keystroke with the rev
     slug: "fresh",
     idea: "an idea!!",
     revision: 3,
-    name: undefined,
   })
   expect(screen.getByText("Saved")).toBeTruthy()
   expect(screen.queryByText("Saving...")).toBeNull()
@@ -338,13 +338,11 @@ test("a blank form shows no status and saves nothing, even when typed in and cle
   expect(save).not.toHaveBeenCalled()
 })
 
-test("the title is the name, else the slug, else the idea's first words", async () => {
-  await mount({}, { name: "Named", slug: "slug", idea: "words" })
-  expect(screen.getByText("Named", { selector: "span" })).toBeTruthy()
-  cleanup()
+test("the title is the slug, else the blank-draft title", async () => {
   await mount({}, { slug: "slug", idea: "words" })
+  expect(screen.getByText("slug", { selector: "span" })).toBeTruthy()
   type("Epic slug", "")
-  expect(screen.getByText("words", { selector: "span" })).toBeTruthy()
+  expect(screen.getByText("New draft", { selector: "span" })).toBeTruthy()
 })
 
 test("Close is a text button at the right end of the top bar, after the status, with no ×", async () => {
@@ -497,7 +495,10 @@ test("Start waits for a save in flight and sends the id it created; that save is
   const gate = new Promise<void>((r) => (release = r))
   const save = vi.fn(async (body: DesignDraftSaveRequest): Promise<DraftResult> => {
     await gate
-    return { kind: "ok", draft: { images: [], edited_at: "", ...body, id: "created", revision: 1 } }
+    return {
+      kind: "ok",
+      draft: { images: [], label: "", edited_at: "", ...body, id: "created", revision: 1 },
+    }
   })
   await mount({ open, drafts: { ...client, save } })
   type("Epic slug", "fresh")
@@ -556,7 +557,6 @@ async function refused(kind: "conflict" | "gone", theirs: Partial<DesignDraft> =
   const base = fakeDrafts({
     slug: "mine",
     idea: "my idea",
-    name: "Named",
     project: "blog",
     images: ["a.png"],
   })
@@ -567,6 +567,7 @@ async function refused(kind: "conflict" | "gone", theirs: Partial<DesignDraft> =
     project: "gx",
     slug: "theirs",
     idea: "their idea",
+    label: "theirs",
     images: ["b.png", "c.png"],
     revision: 9,
     edited_at: "",
@@ -578,7 +579,7 @@ async function refused(kind: "conflict" | "gone", theirs: Partial<DesignDraft> =
     .mockImplementationOnce(base.client.read)
   const view = await mount(
     { drafts: { ...base.client, save, read } },
-    { slug: "mine", idea: "my idea", name: "Named", project: "blog", images: ["a.png"] },
+    { slug: "mine", idea: "my idea", project: "blog", images: ["a.png"] },
   )
   type("Rough idea", "latest")
   await wait(800)
@@ -650,7 +651,6 @@ test("a gone refusal raises the gone banner; Keep as new draft saves a new draft
     slug: "mine",
     idea: "typed while gone",
     project: "blog",
-    name: "Named",
     revision: 0,
   })
   expect(screen.queryByText(GONE)).toBeNull()
@@ -832,7 +832,7 @@ test("the next open saves a fallback entry with its revision and clears it", asy
   vi.useFakeTimers()
   localStorage.setItem(
     UNSAVED_KEY,
-    JSON.stringify({ d1: { revision: 3, project: "blog", slug: "mine", idea: "kept", name: "N" } }),
+    JSON.stringify({ d1: { revision: 3, project: "blog", slug: "mine", idea: "kept" } }),
   )
   const { save } = await mount({}, { slug: "mine", idea: "old" })
   expect(save).toHaveBeenCalledWith({
@@ -840,7 +840,6 @@ test("the next open saves a fallback entry with its revision and clears it", asy
     project: "blog",
     slug: "mine",
     idea: "kept",
-    name: "N",
     revision: 3,
   })
   expect(localStorage.getItem(UNSAVED_KEY)).toBeNull()
@@ -956,6 +955,7 @@ function twoDrafts(aText: Partial<DesignDraft> = {}) {
     project: "gx",
     slug: "alpha",
     idea: "first idea",
+    label: "alpha",
     images: [],
     revision: 1,
     edited_at: new Date().toISOString(),
@@ -966,6 +966,7 @@ function twoDrafts(aText: Partial<DesignDraft> = {}) {
     project: "blog",
     slug: "beta",
     idea: "second idea",
+    label: "beta",
     images: [],
     revision: 1,
     edited_at: new Date(Date.now() - 3 * 3_600_000).toISOString(),
@@ -1040,34 +1041,6 @@ test("switching away from a blank saved draft deletes it and saves nothing", asy
   expect(save).not.toHaveBeenCalled()
 })
 
-test("Name this draft, Done: the label shows the name and the save carries it", async () => {
-  const { client, save } = twoDrafts()
-  await mount({ drafts: client })
-  await openMenu(/alpha/)
-  await pick("Name this draft")
-  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), {
-    target: { value: "Checkout" },
-  })
-  await act(async () => void click("Done"))
-  expect(screen.queryByRole("textbox", { name: "Draft name" })).toBeNull()
-  expect(screen.getByRole("button", { name: /Checkout/ })).toBeTruthy()
-  expect(save).toHaveBeenCalledWith(
-    expect.objectContaining({ id: "a", slug: "alpha", name: "Checkout" }),
-  )
-})
-
-test("the title follows the name field while typing, before Done", async () => {
-  await mount({ drafts: twoDrafts().client })
-  await openMenu(/alpha/)
-  await pick("Name this draft")
-  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), {
-    target: { value: "Check" },
-  })
-  expect(screen.getByRole("button", { name: /Check/ })).toBeTruthy()
-  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), { target: { value: "" } })
-  expect(screen.queryByRole("button", { name: /Check/ })).toBeNull()
-})
-
 test("a third draft typed and switched away from before the debounce fires is saved", async () => {
   vi.useFakeTimers()
   const { save } = await mount()
@@ -1084,50 +1057,46 @@ test("a saved draft shows Saved right after a switch, with no edit", async () =>
   expect(screen.getByText("Saved")).toBeTruthy()
 })
 
-test("a name on a blank draft saves it", async () => {
-  const { save } = await mount()
-  await openMenu(/New draft/)
-  await pick("Name this draft")
-  fireEvent.change(screen.getByRole("textbox", { name: "Draft name" }), {
-    target: { value: "Checkout" },
-  })
-  await act(async () => void click("Done"))
-  expect(save).toHaveBeenCalledWith(
-    expect.objectContaining({ name: "Checkout", slug: "", idea: "" }),
-  )
-})
+const imageOnly: Partial<DesignDraft> = {
+  slug: "",
+  idea: "",
+  label: "Untitled design",
+  images: ["x.png"],
+}
 
-test("switching away from a name-only draft keeps it", async () => {
-  const { client, remove } = twoDrafts({ slug: "", idea: "", name: "Checkout" })
+test("switching away from an image-only draft keeps it", async () => {
+  const { client, remove } = twoDrafts(imageOnly)
   await mount({ drafts: client })
-  await openMenu(/Checkout/)
+  await openMenu(/New draft/)
   await pick(/beta/)
   expect(remove).not.toHaveBeenCalled()
 })
 
-test("New draft on a name-only draft creates a new draft", async () => {
-  const { client } = twoDrafts({ slug: "", idea: "", name: "Checkout" })
+test("New draft on an image-only draft creates a new draft", async () => {
+  const { client } = twoDrafts(imageOnly)
   await mount({ drafts: client })
-  await openMenu(/Checkout/)
+  await openMenu(/New draft/)
   await pick("New draft")
-  expect(screen.queryByRole("button", { name: /Checkout/ })).toBeNull()
+  expect(screen.queryByRole("button", { name: /Untitled design/ })).toBeNull()
 })
 
-test("Discard on a name-only draft asks Keep or Discard", async () => {
-  const { client } = twoDrafts({ slug: "", idea: "", name: "Checkout" })
+test("Discard on an image-only draft asks Keep or Discard", async () => {
+  const { client } = twoDrafts(imageOnly)
   await mount({ drafts: client })
   click("Discard")
   expect(screen.getByText("Discard this draft and its images?")).toBeTruthy()
 })
 
-test("the row trash of a name-only draft asks first", async () => {
+test("the row trash of an image-only draft asks first", async () => {
   const { client, remove } = twoDrafts()
   const list = client.list
   await mount({
     drafts: {
       ...client,
       list: async () =>
-        (await list()).map((d) => (d.id === "b" ? { ...d, slug: "", idea: "", name: "Named" } : d)),
+        (await list()).map((d) =>
+          d.id === "b" ? { ...d, slug: "", idea: "", label: "Untitled design", image_count: 1 } : d,
+        ),
     },
   })
   await openMenu(/alpha/)

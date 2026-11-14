@@ -138,10 +138,13 @@ export interface DesignDraft {
   project: string;
   slug: string;
   idea: string;
-  name?: string;
   images: string[];
   revision: number /* int */;
   edited_at: string;
+  /**
+   * Label is computed by the server on every read (never stored).
+   */
+  label: string;
 }
 /**
  * DesignDraftItem is one row of the draft list: the inputs of its label and
@@ -152,7 +155,7 @@ export interface DesignDraftItem {
   project: string;
   slug: string;
   idea: string;
-  name?: string;
+  label: string;
   image_count: number /* int */;
   edited_at: string;
 }
@@ -166,7 +169,6 @@ export interface DesignDraftSaveRequest {
   project: string;
   slug: string;
   idea: string;
-  name?: string;
   revision: number /* int */;
   /**
    * KeepEditedAt saves without moving the edited-at time, for a change the

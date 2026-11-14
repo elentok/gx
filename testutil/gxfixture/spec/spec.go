@@ -339,8 +339,8 @@ type SessionSpec struct {
 
 // Draft is one seeded New Design draft: its text and how many images it holds.
 type Draft struct {
-	Project, Slug, Idea, Name string
-	Images                    int
+	Project, Slug, Idea string
+	Images              int
 }
 
 // CommandStep is one "/" command a seeded session runs. Output is the stdout
