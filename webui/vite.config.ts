@@ -12,6 +12,8 @@ import { serviceWorkerPlugin } from "./src/pwa/serviceWorkerPlugin"
 const webuiDir = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
+  // The Makefile passes the gx version; a plain build or the dev server reports "dev".
+  define: { __WEB_VERSION__: JSON.stringify(process.env.GX_WEB_VERSION || "dev") },
   plugins: [
     react(),
     serviceWorkerPlugin(),

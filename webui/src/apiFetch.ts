@@ -1,4 +1,5 @@
 import { clearPageCache } from "./pageCache"
+import { dropQueue } from "./webPerf"
 
 const signedOutListeners = new Set<() => void>()
 
@@ -11,6 +12,7 @@ export function onSignedOut(listener: () => void): () => void {
 /** Drops the cached pages (the snapshot cache included) and tells the auth gate. */
 export function signOut(): void {
   clearPageCache()
+  dropQueue()
   signedOutListeners.forEach((l) => l())
 }
 

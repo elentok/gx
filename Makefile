@@ -14,7 +14,7 @@ build: web-build
 
 # webui/dist is not committed; the Go embed falls back to a placeholder without it.
 web-build:
-	cd webui && pnpm install --frozen-lockfile && pnpm build
+	cd webui && pnpm install --frozen-lockfile && GX_WEB_VERSION=$(shell git describe --tags --always --dirty) pnpm build
 	touch webui/dist/.gitkeep # vite empties dist; the Go embed needs this file to compile
 
 # Serves the canned snapshot. Dev mode in gx runs its own Vite; this target is only the canned snapshot.
