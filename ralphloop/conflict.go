@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/supervise/startprompt"
 	"github.com/elentok/gx/ralphloop/ticketops"
+	"log/slog"
 	"strings"
 
 	"github.com/elentok/gx/agentrunner"
@@ -67,18 +68,9 @@ func cherryPickWithConflictResolution(d deps.Deps, p iterationParams, base, bran
 			if err != nil {
 				return merge.MergeResult{}, "", err
 			}
-			// The pre-pick HEAD is no longer known in this call; the merge
-			// lock's owner recorded it.
-			lockDir, err := mergeLockDirFor(d, p.ScratchDir, p.FeatureBranch)
+			lp.PickStart, err = recordedPrePickHead(d, p)
 			if err != nil {
 				return merge.MergeResult{}, "", err
-			}
-			owner, err := merge.ReadMergeLock(lockDir)
-			if err != nil {
-				return merge.MergeResult{}, "", fmt.Errorf("reading merge lock: %w", err)
-			}
-			if owner != nil {
-				lp.PickStart = owner.PrePickHead
 			}
 			res, err := merge.StampMerged(ld, lp)
 			return res, resolutionSessionID, err
@@ -116,6 +108,11 @@ func cherryPickWithConflictResolution(d deps.Deps, p iterationParams, base, bran
 	if res.Outcome != merge.Conflicted {
 		return res, "", nil
 	}
+	// A conflicted pick leaves HEAD where it was before the pick.
+	pickStart, err := d.RevParse(p.FeatureWorktree, "HEAD")
+	if err != nil {
+		return merge.MergeResult{}, "", fmt.Errorf("resolving %s before stamping the conflicted pick: %w", p.FeatureBranch, err)
+	}
 	// This call now owns the active sequencer state. Always clean it up on
 	// failure, otherwise the next merging serialized behind this one could
 	// mistake this ticket's CHERRY_PICK_HEAD for its own conflict.
@@ -146,9 +143,37 @@ func cherryPickWithConflictResolution(d deps.Deps, p iterationParams, base, bran
 		return merge.MergeResult{}, "", err
 	}
 
-	lp.PickStart = res.PickStart
+	lp.PickStart = pickStart
 	res, err = merge.StampMerged(ld, lp)
 	return res, resolutionSessionID, err
+}
+
+// recordedPrePickHead is the feature branch's HEAD before the pick being
+// resolved, for a reattach that never saw the pick start. The merge lock's
+// owner recorded it; a merge marker is the fallback. Empty (with a warning)
+// means StampMerged stamps HEAD only.
+func recordedPrePickHead(d deps.Deps, p iterationParams) (string, error) {
+	lockDir, err := mergeLockDirFor(d, p.ScratchDir, p.FeatureBranch)
+	if err != nil {
+		return "", err
+	}
+	owner, err := merge.ReadMergeLock(lockDir)
+	if err != nil {
+		return "", fmt.Errorf("reading merge lock: %w", err)
+	}
+	if owner != nil && owner.PrePickHead != "" {
+		return owner.PrePickHead, nil
+	}
+	marker, err := merge.ReadMergeMarker(lockDir)
+	if err != nil {
+		return "", fmt.Errorf("reading merge marker: %w", err)
+	}
+	if marker != nil && marker.PrePickHead != "" {
+		return marker.PrePickHead, nil
+	}
+	slog.Warn("no recorded pre-pick HEAD for a reattached conflict resolution; stamping the merged commit only",
+		"epic", p.FeatureBranch, "ticket", p.Ticket.Identifier)
+	return "", nil
 }
 
 // foreignCherryPick reports whether the cherry-pick in progress in the feature

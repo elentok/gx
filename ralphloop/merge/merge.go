@@ -79,9 +79,6 @@ type MergeResult struct {
 	SHA            string
 	TrailerValue   string
 	MetricsStamped bool
-	// PickStart is the feature branch's HEAD before the pick, set for
-	// Conflicted so the caller can stamp the resolved pick (MergeParams.PickStart).
-	PickStart string
 }
 
 // MergeDepsOf narrows d to what a merging needs.
@@ -124,7 +121,7 @@ func MergeTicket(d MergeDeps, lp MergeParams) (MergeResult, error) {
 		}
 		return MergeResult{Outcome: AlreadyApplied, SHA: sha, TrailerValue: mergeTrailerValue(lp), MetricsStamped: stamped}, nil
 	case Conflicted:
-		return MergeResult{Outcome: Conflicted, TrailerValue: mergeTrailerValue(lp), PickStart: start}, nil
+		return MergeResult{Outcome: Conflicted, TrailerValue: mergeTrailerValue(lp)}, nil
 	}
 	return StampMerged(d, lp)
 }
