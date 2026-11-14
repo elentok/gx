@@ -83,14 +83,6 @@ func (f *Forest) walk(root int, visit func(syshealth.Process)) {
 	}
 }
 
-// Descendants returns the rows whose ancestry reaches root, root excluded.
-func Descendants(procs []syshealth.Process, root int) []syshealth.Process {
-	return NewForest(procs).Descendants(root)
-}
-
-// Count is the number of descendants of root.
-func Count(procs []syshealth.Process, root int) int { return NewForest(procs).Count(root) }
-
 // Config is when a tree counts as a storm. A zero Threshold turns the watch off.
 type Config struct {
 	// Threshold is the descendant count above which a tree is a storm.
@@ -196,11 +188,6 @@ func (w *Watcher) poll(reader syshealth.ProcessReader) {
 // of uid (launchd, say) and that have more than threshold descendants outside
 // every tree under gxRoots. A terminal holding a gx tree counts only its own
 // other processes.
-func ForeignStorms(procs []syshealth.Process, uid int, gxRoots []int, threshold int) []Storm {
-	return NewForest(procs).ForeignStorms(uid, gxRoots, threshold)
-}
-
-// ForeignStorms is the package-level ForeignStorms over an already built forest.
 func (f *Forest) ForeignStorms(uid int, gxRoots []int, threshold int) []Storm {
 	gx := map[int]bool{}
 	for _, r := range gxRoots {

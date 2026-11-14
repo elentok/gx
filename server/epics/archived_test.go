@@ -106,6 +106,9 @@ func TestEpicDetail_ArchivedLoopEpicHasArchivedAtAndNoLiveDecoration(t *testing.
 	if d.ArchivedAt.IsZero() || d.Summary != "Did it." || d.Done != 1 || d.Total != 1 {
 		t.Errorf("detail = %+v, want the archived epic with archived_at", d)
 	}
+	if d.State != wire.EpicStateFinished {
+		t.Errorf("State = %q, want %q for an archived epic with every ticket done", d.State, wire.EpicStateFinished)
+	}
 	if d.Queueable || d.Queued || len(d.Actions) != 0 || d.PR != nil || len(d.Rows) != 1 || d.Rows[0].RenderedStatus != "done" {
 		t.Errorf("live decoration on an archived epic: %+v", d)
 	}

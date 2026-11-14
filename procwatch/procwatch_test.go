@@ -117,7 +117,7 @@ func (tr *fixture) waitDescendants(t *testing.T, n int) {
 	t.Helper()
 	waitFor(t, func() bool {
 		table, err := syshealth.DefaultProcess().Read()
-		return err == nil && Count(table.Processes, tr.root.Process.Pid) >= n
+		return err == nil && NewForest(table.Processes).Count(tr.root.Process.Pid) >= n
 	})
 }
 
@@ -161,7 +161,7 @@ func TestKill_KillsWholeTreeAndLeavesNoDescendants(t *testing.T) {
 	tr.requireAllGone(t)
 	waitFor(t, func() bool {
 		table, err := syshealth.DefaultProcess().Read()
-		return err == nil && Count(table.Processes, os.Getpid()) == 0
+		return err == nil && NewForest(table.Processes).Count(os.Getpid()) == 0
 	})
 }
 

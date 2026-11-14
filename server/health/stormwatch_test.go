@@ -73,7 +73,7 @@ func treePIDs(t *testing.T, root int) []int {
 		t.Fatal(err)
 	}
 	pids := []int{root}
-	for _, p := range procwatch.Descendants(table.Processes, root) {
+	for _, p := range procwatch.NewForest(table.Processes).Descendants(root) {
 		pids = append(pids, p.PID)
 	}
 	return pids

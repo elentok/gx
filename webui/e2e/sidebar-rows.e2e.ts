@@ -1,8 +1,6 @@
-import type { Locator, Page } from "@playwright/test"
+import type { Locator } from "@playwright/test"
 import { card, expect, nav, test, touch } from "./fixture"
-import { frameButton, sidebarKit, stillMotion } from "./sidebarKit"
-
-const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash)
+import { frameButton, goto, sidebarKit, stillMotion } from "./sidebarKit"
 
 // The sidebar rows over the `workspaces` scenario: focus ring, expand and collapse, Alt numbers, keyboard moves and tree
 // rows; split from the Workspaces flow so each stays inside its time limit.

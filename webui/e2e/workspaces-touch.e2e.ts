@@ -1,9 +1,7 @@
-import type { Locator, Page } from "@playwright/test"
+import type { Locator } from "@playwright/test"
 import { sessions } from "./agentsKit"
 import { blockEvents, expect, nav, swipe, test } from "./fixture"
-import { sidebarKit, stillMotion } from "./sidebarKit"
-
-const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash)
+import { goto, sidebarKit, stillMotion } from "./sidebarKit"
 
 // The sidebar at narrow widths and its footer over the `workspaces` scenario: swipes, the 744px and 390px shells, forms after
 // a menu closes, and the footer's sizes; split from the Workspaces flow so each stays inside its time limit.

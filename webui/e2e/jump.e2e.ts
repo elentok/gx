@@ -1,7 +1,5 @@
-import type { Page } from "@playwright/test"
 import { card, expect, menu, menuButton, nav, test } from "./fixture"
-
-const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash)
+import { goto } from "./sidebarKit"
 
 test("22. Back link count, then the phone layout", async ({ page, start }) => {
   const fx = await start("united")

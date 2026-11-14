@@ -22,14 +22,14 @@ func syntheticTable(n int) []syshealth.Process {
 func BenchmarkForeignStorms(b *testing.B) {
 	procs := syntheticTable(4000)
 	for b.Loop() {
-		ForeignStorms(procs, 0, []int{100}, 5)
+		NewForest(procs).ForeignStorms(0, []int{100}, 5)
 	}
 }
 
 func TestForeignStorms_LargeTableFindsChains(t *testing.T) {
 	t.Parallel()
 	procs := syntheticTable(4000)
-	if got := len(ForeignStorms(procs, 0, nil, 5)); got != 400 {
+	if got := len(NewForest(procs).ForeignStorms(0, nil, 5)); got != 400 {
 		t.Fatalf("storms = %d, want 400", got)
 	}
 }
@@ -55,7 +55,7 @@ func TestCount(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := Count(tt.procs, tt.root); got != tt.want {
+			if got := NewForest(tt.procs).Count(tt.root); got != tt.want {
 				t.Fatalf("Count = %d, want %d", got, tt.want)
 			}
 		})

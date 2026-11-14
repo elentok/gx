@@ -1,8 +1,6 @@
-import type { Page } from "@playwright/test"
 import { chatOf, row, sessions, titleHeading } from "./agentsKit"
 import { expect, nav, test } from "./fixture"
-
-const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash)
+import { goto } from "./sidebarKit"
 
 // The Leader key's Chord box over the `workspaces` scenario; split from the Workspaces flow so each stays inside its time limit.
 test("Chords", async ({ page, start }) => {

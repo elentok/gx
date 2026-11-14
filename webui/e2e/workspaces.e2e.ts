@@ -1,9 +1,6 @@
-import type { Page } from "@playwright/test"
 import { sessions } from "./agentsKit"
 import { card, expect, nav, sessionRows, test } from "./fixture"
-import { frameButton, sidebarKit, stillMotion } from "./sidebarKit"
-
-const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash)
+import { frameButton, goto, sidebarKit, stillMotion } from "./sidebarKit"
 
 // One journey over the `workspaces` scenario: the sidebar's rows follow the active workspace, and
 // Move, Remove and Hold work from every place an item shows.

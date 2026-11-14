@@ -1,6 +1,9 @@
 import type { Locator, Page } from "@playwright/test"
 import { expect, nav } from "./fixture"
 
+export const goto = (page: Page, hash: string) =>
+  page.evaluate((h) => (window.location.hash = h), hash)
+
 // Zero-length animations: menu closes and sidebar slides wait out their motion, and the flows check end states, not motion.
 export const stillMotion = (page: Page) =>
   page.addStyleTag({

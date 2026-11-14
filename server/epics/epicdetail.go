@@ -127,8 +127,7 @@ func (s *Epics) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e ticke
 func (s *Epics) buildLoopDetail(root queue.RootRef, e tickets.Epic, now time.Time) wire.EpicDetail {
 	d := wire.EpicDetail{
 		Address: root.String(), Kind: wire.EpicKindLoop, Summary: schema.Section(e.Body, "Summary"),
-		State: EpicStateFor(root, e, "", nil),
-		Done:  e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
+		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []wire.EpicDetailRow{},
 		Draft: e.Status == string(schema.StatusDraft),
 	}
 	for _, t := range e.Tickets {

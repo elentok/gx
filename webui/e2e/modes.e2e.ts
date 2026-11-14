@@ -1,7 +1,5 @@
-import type { Page } from "@playwright/test"
 import { expect, nav, test } from "./fixture"
-
-const goto = (page: Page, hash: string) => page.evaluate((h) => (window.location.hash = h), hash)
+import { goto } from "./sidebarKit"
 
 const SUMMARY =
   "Reach the sea by building a canal, a lock and a long harbour wall before the autumn storms."
