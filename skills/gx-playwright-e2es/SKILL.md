@@ -102,7 +102,7 @@ had a follow-up. A flake costs a minute per run and the reruns prove nothing new
 3. If it passes, say so in one line. Call it flaky only with that evidence, not after a single rerun
    you did not compare.
 
-Carry on with your own steps, and finish with `--check-failures` as
+Carry on with your own steps, and finish with `gx tickets set --check-failures` as
 [gx-failing-tests](../gx-failing-tests.md) says.
 
 ## Wait for the event, never for time

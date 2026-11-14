@@ -264,7 +264,9 @@ Set the shell call's time limit to 600000 ms (see the Tool names table in
 take about 4 minutes. Iterate with `gx brief go-test -run <Test>`, then run `gx check` once at the
 end. Do not run the package separately first.
 
-A ticket is committed only after a green `gx check`, or with `--check-failures` naming follow-ups.
+A ticket finishes only after a green `gx check`, or with
+`gx tickets set <addr> --iteration-status finished --check-failures <follow-ups>` naming one
+follow-up per failing test.
 Committing after a failed run and re-running `gx check` prints a skip (exit 3), which does not clear
 the failure: the finish gate still sees the failed run.
 
