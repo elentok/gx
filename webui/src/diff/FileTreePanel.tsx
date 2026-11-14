@@ -31,7 +31,30 @@ function ChangeBar({ added, deleted }: { added: number; deleted: number }) {
   )
 }
 
-export function FileFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function FileFilter({
+  value,
+  onChange,
+  count,
+}: {
+  value: string
+  onChange: (v: string) => void
+  count: number
+}) {
+  return (
+    <>
+      <Box
+        data-testid="files-heading"
+        mb="2"
+        fontSize="xs"
+        letterSpacing="0.04em"
+        color="text.muted"
+      >{`FILES (${count})`}</Box>
+      <FilterInput value={value} onChange={onChange} />
+    </>
+  )
+}
+
+function FilterInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <chakra.input
       data-testid="file-filter"
@@ -121,7 +144,7 @@ export function FileTree({
                 {row.expanded ? "▾" : "▸"}
               </Box>
               <Box as="span" flex="1" minW="0" overflow="hidden" textOverflow="ellipsis">
-                {row.name}
+                {`${row.name}/`}
               </Box>
               {dirCounts && (
                 <Box as="span" data-testid="dir-count" fontSize="xs">

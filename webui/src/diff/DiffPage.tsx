@@ -288,7 +288,7 @@ function FilesBrowser({
   const left = (
     <>
       {commitList}
-      <FileFilter value={filter} onChange={setFilter} />
+      <FileFilter value={filter} onChange={setFilter} count={filterFiles(files, filter).length} />
       <FileTree
         files={files}
         filter={filter}

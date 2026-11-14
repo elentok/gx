@@ -129,14 +129,7 @@ export function CommitList({
   const label = narrowingLabel(groups, narrowing)
   const isNarrowed = (shas: string[]) => !!narrowing && sameShas(shas, narrowing)
   return (
-    <Box
-      data-testid="commits-disclosure"
-      mb="3"
-      border="1px solid"
-      borderColor="border"
-      borderRadius="8px"
-      bg="surface.raised"
-    >
+    <Box data-testid="commits-disclosure" mb="3">
       <chakra.button
         type="button"
         aria-expanded={open}
@@ -146,7 +139,7 @@ export function CommitList({
         gap="2"
         w="100%"
         minH="36px"
-        px="3"
+        px="2"
         fontSize="xs"
         letterSpacing="0.04em"
         color="text.muted"
@@ -189,13 +182,14 @@ export function CommitList({
           {groups.map((g) => {
             const shas = g.commits.map((c) => c.sha)
             return (
-              <Box key={g.key}>
+              <Box key={g.key} mt="3">
                 <Row active={isNarrowed(shas)} onClick={() => onNarrow(shas)}>
                   <Box
                     as="span"
                     flex="1"
                     minW="0"
-                    fontWeight="600"
+                    fontSize="md"
+                    fontWeight="700"
                     color={g.kind === "design" ? "tone.design.fg" : "text"}
                   >
                     {g.label}
@@ -234,9 +228,9 @@ export function NarrowChip({ label, onClear }: { label: string; onClear: () => v
         pr="1"
         h="28px"
         border="1px solid"
-        borderColor="border"
+        borderColor="tone.running.fg"
         borderRadius="full"
-        color="text"
+        color="tone.running.fg"
       >
         {`Showing: ${label}`}
         <chakra.button
@@ -245,8 +239,10 @@ export function NarrowChip({ label, onClear }: { label: string; onClear: () => v
           onClick={onClear}
           w="22px"
           h="22px"
+          fontSize="lg"
+          lineHeight="1"
           borderRadius="full"
-          color="text.muted"
+          color="tone.running.fg"
         >
           ×
         </chakra.button>

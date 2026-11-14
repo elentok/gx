@@ -20,7 +20,7 @@ function Harness() {
   const [filter, setFilter] = useState("")
   return (
     <>
-      <FileFilter value={filter} onChange={setFilter} />
+      <FileFilter value={filter} onChange={setFilter} count={FILES.length} />
       <FileTree files={FILES} filter={filter} selected={undefined} onSelect={() => {}} />
     </>
   )
@@ -28,6 +28,12 @@ function Harness() {
 const paths = () => screen.queryAllByTestId("tree-file").map((e) => e.getAttribute("data-path"))
 const type = (v: string) =>
   fireEvent.change(screen.getByTestId("file-filter"), { target: { value: v } })
+
+test("heading counts the files and directory rows end with a slash", () => {
+  renderThemed(<Harness />)
+  expect(screen.getByTestId("files-heading").textContent).toBe("FILES (3)")
+  expect(screen.getByTestId("tree-dir").textContent).toContain("src/")
+})
 
 test("collapsing a directory hides its rows", () => {
   renderThemed(<Harness />)

@@ -123,7 +123,7 @@ export function BinaryBody({
           <ImageBox label="after" side={after} mime={mime} tone="done" />
         </Box>
         <Box mt="3" fontSize="sm" color="text.muted">
-          Image file. Shown as before and after, side by side.
+          {`Image file. Shown as before and after, side by side. Other binary files show "Binary file, 2.1 KB" only.`}
         </Box>
       </Box>
     )

@@ -137,6 +137,11 @@ test("an added png shows none before and the size after", async () => {
   })
   await screen.findByText("after: 2.1 KB")
   expect(screen.getByText("before: none")).toBeTruthy()
+  expect(
+    screen.getByText(
+      'Image file. Shown as before and after, side by side. Other binary files show "Binary file, 2.1 KB" only.',
+    ),
+  ).toBeTruthy()
   await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(1))
   expect(fetchPatch).not.toHaveBeenCalled()
 })
