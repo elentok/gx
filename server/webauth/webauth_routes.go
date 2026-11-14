@@ -71,11 +71,12 @@ type Gate struct {
 	now      func() time.Time
 	host     Host
 	renewed  sync.Map // map web login id -> time its cookie was last renewed
+	fileKey  []byte   // signs hosted-file tokens; lives in memory only
 }
 
 // NewGate returns the gate over cfg.Store.
 func NewGate(cfg Config) *Gate {
-	return &Gate{WebAuth: cfg.Store, cookie: cfg.Cookie, totpOn: cfg.TOTPOn, rootCert: cfg.RootCert, log: cfg.Log, now: cfg.Now, host: cfg.Host}
+	return &Gate{WebAuth: cfg.Store, cookie: cfg.Cookie, totpOn: cfg.TOTPOn, rootCert: cfg.RootCert, log: cfg.Log, now: cfg.Now, host: cfg.Host, fileKey: newFileKey()}
 }
 
 // RenewedCount counts the web logins the cookie renewal table remembers. It is for tests.
@@ -208,10 +209,18 @@ func (g *Gate) RequireLogin(next, fallback http.Handler) http.Handler {
 	})
 }
 
+// FileTokenPrefix is the one login-less path: the hosted-file token route.
+const FileTokenPrefix = "/v1/files/t/"
+
 // Deny serves what needs no login (the page and the assets) and answers 401
-// to everything else.
-func (g *Gate) Deny(mux http.Handler) http.Handler {
+// to everything else. The token route is the one /v1/ exemption; it goes
+// straight to tokens, never the mux.
+func (g *Gate) Deny(mux, tokens http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.EscapedPath(), FileTokenPrefix) {
+			tokens.ServeHTTP(w, r)
+			return
+		}
 		if g.host.IsWebRead(r) && !strings.HasPrefix(r.URL.Path, "/v1/") {
 			mux.ServeHTTP(w, r)
 			return

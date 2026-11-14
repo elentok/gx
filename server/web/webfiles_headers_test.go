@@ -66,6 +66,9 @@ func TestWebFiles_ContentTypeTable(t *testing.T) {
 	for name, c := range files {
 		writeFile(t, filepath.Join(dir, name), c.body)
 		resp, body := rawGet(t, f.base, "/v1/files"+dir+"/"+name, f.cookie)
+		if name == "a.html" {
+			resp, body = getHTML(t, f, dir+"/"+name)
+		}
 		if resp.StatusCode != 200 || body != c.body {
 			t.Errorf("%s: status %d body %q", name, resp.StatusCode, body)
 		}

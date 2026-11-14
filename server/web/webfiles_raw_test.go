@@ -137,7 +137,7 @@ func TestWebFiles_RawTicketMockServedDataSessionsNot(t *testing.T) {
 	f := startResolve(t, nil)
 	mock := filepath.Join(f.store, "proj", "epic-a", "mocks", "m.html")
 	writeFile(t, mock, "<p>mock</p>")
-	if resp, body := rawGet(t, f.base, "/v1/files"+mock, f.cookie); resp.StatusCode != 200 || body != "<p>mock</p>" {
+	if resp, body := getHTML(t, f, mock); resp.StatusCode != 200 || body != "<p>mock</p>" {
 		t.Errorf("mock: status %d body %q, want 200", resp.StatusCode, body)
 	}
 }

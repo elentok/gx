@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server/files"
+	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
@@ -26,6 +27,7 @@ func (h hostedFiles) routes() []wire.Route {
 		{Pattern: "GET /v1/hosted-files/roots", Handler: h.listRoots, Web: wire.WebRead},
 		{Pattern: "POST /v1/hosted-files/roots/add", Handler: h.addRoot, Web: wire.WebWrite},
 		{Pattern: "POST /v1/hosted-files/roots/remove", Handler: h.removeRoot, Web: wire.WebWrite},
+		{Pattern: "GET " + webauth.FileTokenPrefix, Web: wire.WebReadPrefix, WebHandler: h.token},
 		{Pattern: "GET /v1/files/", Web: wire.WebReadPrefix, WebHandler: h.raw},
 	}
 }

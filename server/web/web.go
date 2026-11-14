@@ -156,7 +156,14 @@ func (w *Web) Bind() {
 		Host:     authHost{w},
 	})
 	mux := w.handler()
-	protected := FileHeaders(allowed, w.auth.RequireLogin(mux, w.auth.Deny(mux)))
+	tokens := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if route, ok := FindRoute(w.host.Routes(), "GET "+webauth.FileTokenPrefix, wire.WebReadPrefix); ok {
+			route.WebHandler(rw, r)
+			return
+		}
+		http.NotFound(rw, r)
+	})
+	protected := FileHeaders(allowed, w.auth.RequireLogin(mux, w.auth.Deny(mux, tokens)))
 	w.srv = &http.Server{Handler: webtls.RequireHost(allowed, webtls.RedirectPlainHTTP(w.servePublicFirst(mux, protected)))}
 }
 
