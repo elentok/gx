@@ -1,0 +1,632 @@
+[
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "none",
+  "kind": "top",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/pdf/none",
+   "chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html",
+   "http://127.0.0.1:53914/pdf/none"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 0,
+   "title": "",
+   "ct": "application/pdf"
+  },
+  "shot": "shots/chromium-none-top.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "none",
+  "kind": "iframe",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe&src=/pdf/none",
+   "chrome-error://chromewebdata/"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/chromium-none-iframe.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "none",
+  "kind": "iframe_nosb",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe_nosb&src=/pdf/none",
+   "http://127.0.0.1:53914/pdf/none",
+   "chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html",
+   "http://127.0.0.1:53914/pdf/none"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/chromium-none-iframe_nosb.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "none",
+  "kind": "embed",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=embed&src=/pdf/none",
+   "http://127.0.0.1:53914/pdf/none",
+   "chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html",
+   "http://127.0.0.1:53914/pdf/none"
+  ],
+  "dom": {
+   "embeds": 1,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/chromium-none-embed.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "none",
+  "kind": "object",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=object&src=/pdf/none",
+   "http://127.0.0.1:53914/pdf/none",
+   "chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html",
+   "http://127.0.0.1:53914/pdf/none"
+  ],
+  "dom": {
+   "embeds": 1,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/chromium-none-object.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "sandbox",
+  "kind": "top",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/pdf/sandbox",
+   "chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html",
+   "http://127.0.0.1:53914/pdf/sandbox"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 0,
+   "title": "",
+   "ct": "application/pdf"
+  },
+  "shot": "shots/chromium-sandbox-top.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "sandbox",
+  "kind": "iframe",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe&src=/pdf/sandbox",
+   "chrome-error://chromewebdata/"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/chromium-sandbox-iframe.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "sandbox",
+  "kind": "iframe_nosb",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe_nosb&src=/pdf/sandbox",
+   "http://127.0.0.1:53914/pdf/sandbox",
+   "chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html",
+   "http://127.0.0.1:53914/pdf/sandbox"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/chromium-sandbox-iframe_nosb.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "sandbox",
+  "kind": "embed",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=embed&src=/pdf/sandbox",
+   "http://127.0.0.1:53914/pdf/sandbox",
+   "chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html",
+   "http://127.0.0.1:53914/pdf/sandbox"
+  ],
+  "dom": {
+   "embeds": 1,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/chromium-sandbox-embed.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "sandbox",
+  "kind": "object",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=object&src=/pdf/sandbox",
+   "http://127.0.0.1:53914/pdf/sandbox",
+   "chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html",
+   "http://127.0.0.1:53914/pdf/sandbox"
+  ],
+  "dom": {
+   "embeds": 1,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/chromium-sandbox-object.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "sandbox_fa",
+  "kind": "top",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/pdf/sandbox_fa",
+   "chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html",
+   "http://127.0.0.1:53914/pdf/sandbox_fa"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 0,
+   "title": "",
+   "ct": "application/pdf"
+  },
+  "shot": "shots/chromium-sandbox_fa-top.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "sandbox_fa",
+  "kind": "iframe",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe&src=/pdf/sandbox_fa",
+   "chrome-error://chromewebdata/"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/chromium-sandbox_fa-iframe.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "sandbox_dl",
+  "kind": "top",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/pdf/sandbox_dl",
+   "chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html",
+   "http://127.0.0.1:53914/pdf/sandbox_dl"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 0,
+   "title": "",
+   "ct": "application/pdf"
+  },
+  "shot": "shots/chromium-sandbox_dl-top.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "sandbox_dl",
+  "kind": "iframe",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe&src=/pdf/sandbox_dl",
+   "chrome-error://chromewebdata/"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/chromium-sandbox_dl-iframe.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "attachment",
+  "kind": "top",
+  "navErr": "Error: page.goto: Download is starting",
+  "downloads": [
+   "probe.pdf"
+  ],
+  "frames": [
+   "about:blank"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/chromium-attachment-top.png"
+ },
+ {
+  "engine": "chromium",
+  "version": "157.0.8103.15",
+  "variant": "attachment",
+  "kind": "iframe",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe&src=/pdf/attachment",
+   ""
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/chromium-attachment-iframe.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "none",
+  "kind": "top",
+  "navErr": "Error: page.goto: Download is starting",
+  "downloads": [
+   "none.pdf"
+  ],
+  "frames": [
+   "about:blank"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-none-top.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "none",
+  "kind": "iframe",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe&src=/pdf/none",
+   ""
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-none-iframe.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "none",
+  "kind": "iframe_nosb",
+  "navErr": null,
+  "downloads": [
+   "none.pdf"
+  ],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe_nosb&src=/pdf/none",
+   ""
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-none-iframe_nosb.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "none",
+  "kind": "embed",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=embed&src=/pdf/none"
+  ],
+  "dom": {
+   "embeds": 1,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-none-embed.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "none",
+  "kind": "object",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=object&src=/pdf/none"
+  ],
+  "dom": {
+   "embeds": 1,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-none-object.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "sandbox",
+  "kind": "top",
+  "navErr": "Error: page.goto: Download is starting",
+  "downloads": [
+   "sandbox.pdf"
+  ],
+  "frames": [
+   "about:blank"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-sandbox-top.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "sandbox",
+  "kind": "iframe",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe&src=/pdf/sandbox",
+   ""
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-sandbox-iframe.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "sandbox",
+  "kind": "iframe_nosb",
+  "navErr": null,
+  "downloads": [
+   "sandbox.pdf"
+  ],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe_nosb&src=/pdf/sandbox",
+   ""
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-sandbox-iframe_nosb.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "sandbox",
+  "kind": "embed",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=embed&src=/pdf/sandbox"
+  ],
+  "dom": {
+   "embeds": 1,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-sandbox-embed.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "sandbox",
+  "kind": "object",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=object&src=/pdf/sandbox"
+  ],
+  "dom": {
+   "embeds": 1,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-sandbox-object.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "sandbox_fa",
+  "kind": "top",
+  "navErr": "Error: page.goto: Download is starting",
+  "downloads": [
+   "sandbox_fa.pdf"
+  ],
+  "frames": [
+   "about:blank"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-sandbox_fa-top.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "sandbox_fa",
+  "kind": "iframe",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe&src=/pdf/sandbox_fa",
+   ""
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-sandbox_fa-iframe.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "sandbox_dl",
+  "kind": "top",
+  "navErr": "Error: page.goto: Download is starting",
+  "downloads": [
+   "sandbox_dl.pdf"
+  ],
+  "frames": [
+   "about:blank"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-sandbox_dl-top.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "sandbox_dl",
+  "kind": "iframe",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe&src=/pdf/sandbox_dl",
+   ""
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-sandbox_dl-iframe.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "attachment",
+  "kind": "top",
+  "navErr": "Error: page.goto: Download is starting",
+  "downloads": [
+   "probe.pdf"
+  ],
+  "frames": [
+   "about:blank"
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 0,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-attachment-top.png"
+ },
+ {
+  "engine": "webkit",
+  "version": "27.2",
+  "variant": "attachment",
+  "kind": "iframe",
+  "navErr": null,
+  "downloads": [],
+  "frames": [
+   "http://127.0.0.1:53914/parent?mode=iframe&src=/pdf/attachment",
+   ""
+  ],
+  "dom": {
+   "embeds": 0,
+   "iframes": 1,
+   "title": "",
+   "ct": "text/html"
+  },
+  "shot": "shots/webkit-attachment-iframe.png"
+ }
+]
