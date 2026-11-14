@@ -3,12 +3,17 @@ export type ViewerTarget = {
   heading?: string
 }
 
+/** An absolute path with each segment percent-encoded and the slashes kept. */
+export function encodePath(path: string): string {
+  return path.split("/").map(encodeURIComponent).join("/")
+}
+
 /**
  * The hash href of a file viewer link. The path is the canonical one the server
  * returned: `~/` and relative paths mean nothing in a URL.
  */
 export function viewerHref(path: string, target: ViewerTarget = {}): string {
-  const segments = path.split("/").map(encodeURIComponent).join("/")
+  const segments = encodePath(path)
   const query: string[] = []
   if (target.line) query.push(`line=${target.line}`)
   if (target.heading) query.push(`heading=${encodeURIComponent(target.heading)}`)

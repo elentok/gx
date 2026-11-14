@@ -116,9 +116,10 @@ test.each([
   ["/epics", "Epics · gx"],
   ["/stats", "Stats · gx"],
   ["/stats?range=7d&project=demo", "Stats · gx"],
+  ["/files/tmp/a.md", "a.md · File · gx"],
   ["/nonsense/here", "Epics · gx"],
 ])("%s sets the tab title %s", async (path, expected) => {
-  renderAt(path, okFor, undefined, undefined, { stats: pending })
+  renderAt(path, okFor, undefined, undefined, { stats: pending, fileResolve: pending })
   await waitFor(() => expect(title()).toBe(expected))
 })
 
@@ -1313,6 +1314,7 @@ test("every page route pattern has one of the 15 route names", () => {
       "diff",
       "epic",
       "epics",
+      "files",
       "schedule",
       "schedules",
       "settings",

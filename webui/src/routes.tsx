@@ -48,6 +48,7 @@ import type {
   FetchDiffFiles,
   FetchDiffPatch,
 } from "./diff/api"
+import type { FetchFileResolve } from "./files/FileViewerPage"
 
 const AgentsPage = lazy(() =>
   import("./agents/AgentsPage").then(({ AgentsPage }) => ({ default: AgentsPage })),
@@ -66,6 +67,9 @@ const DiffPage = lazy(() =>
 )
 const EpicPage = lazy(() =>
   import("./epic/EpicPage").then(({ EpicPage }) => ({ default: EpicPage })),
+)
+const FileViewerPage = lazy(() =>
+  import("./files/FileViewerPage").then(({ FileViewerPage }) => ({ default: FileViewerPage })),
 )
 const SchedulePage = lazy(() =>
   import("./schedules/SchedulePage").then(({ SchedulePage }) => ({ default: SchedulePage })),
@@ -263,6 +267,7 @@ export interface RouteFetchers {
   logins?: FetchLogins
   settings?: FetchSettings
   signOut?: () => void | Promise<void>
+  fileResolve?: FetchFileResolve
 }
 
 // An unknown path lands on /epics, which reports no span.
@@ -318,6 +323,8 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
       path: "/agents/*",
       element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} />,
     },
+    // The splat is the absolute path of the file, without its leading slash.
+    { path: "/files/*", element: <FileViewerPage fetchResolve={fetchers.fileResolve} /> },
     {
       path: "/stats",
       element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} />,

@@ -7,6 +7,7 @@ export const ROUTE_NAMES: Record<string, string> = {
   "/archive": "archive",
   "/archive/*": "archive-epic",
   "/agents/*": "agents",
+  "/files/*": "files",
   "/stats": "stats",
   "/cleanup": "cleanup",
   "/schedules": "schedules",

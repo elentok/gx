@@ -111,6 +111,7 @@ const READY_WIRING: Record<
   "/settings/certificate": "useFetched",
   "/settings/agents": "redirect",
   "/settings/*": "useReady",
+  "/files/*": "useFetched",
   "/d/*": "useDetailReady",
   "/drafts/:id": "useReadyWhen",
   "/triage/*": "useDetailReady",
