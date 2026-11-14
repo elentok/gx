@@ -18,6 +18,9 @@ const (
 	WebWrite
 	// WebPublic: a web-only route served with WebHandler before the login check.
 	WebPublic
+	// WebReadPrefix: a web-only GET behind the login, matched by path prefix
+	// on the raw escaped path and served with WebHandler. The pattern ends in "/".
+	WebReadPrefix
 )
 
 // Route is one endpoint a subsystem serves. The root server gathers them.

@@ -24,6 +24,7 @@ func TestWeb_OnlyRoutesMatchTheMux(t *testing.T) {
 	socket := server.RoutePatterns()
 	writes := server.WebWritePatterns()
 	served := append(slices.Clone(writes), server.WebPublicGetPatterns()...)
+	served = append(served, server.WebPrefixGetPatterns()...)
 	listed := map[string]bool{}
 	for _, route := range server.WebOnlyRoutes() {
 		listed[route.Pattern] = true

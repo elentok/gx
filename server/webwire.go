@@ -12,6 +12,9 @@ type WebOnlyRoute = web.OnlyRoute
 // WebPublicGetPatterns names every web-only "GET /path" the web mux serves.
 func WebPublicGetPatterns() []string { return web.PublicGetPatterns(assembleRoutes(nil)) }
 
+// WebPrefixGetPatterns names every web-only "GET /prefix/" the web mux serves.
+func WebPrefixGetPatterns() []string { return web.PrefixGetPatterns(assembleRoutes(nil)) }
+
 // WebOnlyRoutes lists the routes the web mux serves and the socket does not.
 func WebOnlyRoutes() []WebOnlyRoute { return web.OnlyRoutes(assembleRoutes(nil)) }
 

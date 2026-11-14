@@ -23,6 +23,9 @@ func RequireHost(allowed func() []string, next http.Handler) http.Handler {
 	})
 }
 
+// HostAllowed reports whether RequireHost would let hostport through.
+func HostAllowed(hostport string, allowed []string) bool { return hostAllowed(hostport, allowed) }
+
 func hostAllowed(hostport string, allowed []string) bool {
 	host := NormalizeHost(hostport)
 	if host == "" {

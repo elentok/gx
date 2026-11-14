@@ -26,6 +26,7 @@ func (h hostedFiles) routes() []wire.Route {
 		{Pattern: "GET /v1/hosted-files/roots", Handler: h.listRoots, Web: wire.WebRead},
 		{Pattern: "POST /v1/hosted-files/roots/add", Handler: h.addRoot, Web: wire.WebWrite},
 		{Pattern: "POST /v1/hosted-files/roots/remove", Handler: h.removeRoot, Web: wire.WebWrite},
+		{Pattern: "GET /v1/files/", Web: wire.WebReadPrefix, WebHandler: h.raw},
 	}
 }
 

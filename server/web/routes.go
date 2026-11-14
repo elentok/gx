@@ -47,11 +47,28 @@ func PublicGetPatterns(routes []wire.Route) []string {
 func OnlyRoutes(routes []wire.Route) []OnlyRoute {
 	var out []OnlyRoute
 	for _, r := range routes {
-		if r.Handler == nil && (r.Web == wire.WebWrite || r.Web == wire.WebPublic) {
+		if r.Handler == nil && (r.Web == wire.WebWrite || r.Web == wire.WebPublic || r.Web == wire.WebReadPrefix) {
 			out = append(out, OnlyRoute{Pattern: r.Pattern, Public: r.Web == wire.WebPublic})
 		}
 	}
 	return out
+}
+
+// PrefixGetPatterns names every web-only "GET /prefix/" the web mux serves.
+func PrefixGetPatterns(routes []wire.Route) []string {
+	return patternsOf(routesWithMode(routes, wire.WebReadPrefix))
+}
+
+// findPrefixRoute returns the prefix route that owns r. It matches the raw
+// escaped path, so an encoded separator never reaches a prefix by decoding.
+func findPrefixRoute(routes []wire.Route, r *http.Request) (wire.Route, bool) {
+	target := "GET " + r.URL.EscapedPath()
+	for _, route := range routesWithMode(routes, wire.WebReadPrefix) {
+		if strings.HasPrefix(target, route.Pattern) {
+			return route, true
+		}
+	}
+	return wire.Route{}, false
 }
 
 // WritePatterns names every "METHOD /path" write the web mux serves.
@@ -82,7 +99,7 @@ func FindRoute(routes []wire.Route, pattern string, modes ...wire.WebMode) (wire
 
 // serveRoute is the handler the web mux uses for a route.
 func serveRoute(r wire.Route) http.HandlerFunc {
-	if r.Web == wire.WebWrite && r.WebHandler != nil || r.Web == wire.WebPublic {
+	if r.Web == wire.WebWrite && r.WebHandler != nil || r.Web == wire.WebPublic || r.Web == wire.WebReadPrefix {
 		return r.WebHandler
 	}
 	return r.Handler

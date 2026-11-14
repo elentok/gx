@@ -22,6 +22,7 @@ type resolveFixture struct {
 	base   string
 	cookie *http.Cookie
 	repo   string // canonical path of the project's checkout
+	store  string // the tickets store
 }
 
 // startResolve starts a web server over a project "proj" whose repo holds
@@ -54,7 +55,7 @@ func startResolve(t *testing.T, uid *uint32) resolveFixture {
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
-	return resolveFixture{h: h, base: hs.WebURL, cookie: servertest.Login(t, h.StateDir, hs.WebURL), repo: repo}
+	return resolveFixture{h: h, base: hs.WebURL, cookie: servertest.Login(t, h.StateDir, hs.WebURL), repo: repo, store: store}
 }
 
 func (f resolveFixture) resolve(t *testing.T, req ops.HostedResolveRequest) ops.HostedResolveResult {
