@@ -2,7 +2,7 @@ import { Box, chakra, Text } from "@chakra-ui/react"
 import { useEffect, useRef, useState } from "react"
 import type { DesignDraftItem } from "../generated/server"
 import { Button } from "../ui/button/Button"
-import { draftLabel, timeAgo } from "./drafts"
+import { timeAgo } from "./drafts"
 
 interface Props {
   /** The open draft's title. */
@@ -169,7 +169,7 @@ export function DraftSwitcher({
                       minW="0"
                     >
                       <Text fontWeight="600" fontSize="14px" truncate maxW="100%">
-                        {draftLabel(d)}
+                        {d.label}
                       </Text>
                       <Text fontSize="12px" color="text.dim" truncate maxW="100%">
                         {d.project} ·{" "}

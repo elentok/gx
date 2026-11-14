@@ -21,10 +21,9 @@ export type DraftResult =
 
 export type ListDrafts = () => Promise<DesignDraftItem[]>
 export type ReadDraft = (id: string) => Promise<DraftResult>
-/** What the form saves: the text request plus the slug and project, which `saveDraft` writes apart from it. */
-export type SaveDraftBody = DesignDraftSaveRequest &
-  Pick<DesignDraftTargetRequest, "project" | "slug">
-export type SaveDraft = (body: SaveDraftBody) => Promise<DraftResult>
+export type SaveDraft = (body: DesignDraftSaveRequest) => Promise<DraftResult>
+export type SaveDraftFields = (body: DesignDraftTargetRequest) => Promise<DraftResult>
+export type CreateDraft = (workspace?: string) => Promise<string>
 export type DeleteDraft = (id: string) => Promise<DraftResult>
 export type GetLastProject = () => Promise<string>
 export type SetLastProject = (project: string) => Promise<void>
@@ -34,6 +33,7 @@ export interface DraftsClient {
   list: ListDrafts
   read: ReadDraft
   save: SaveDraft
+  saveFields: SaveDraftFields
   remove: DeleteDraft
   getLastProject: GetLastProject
   setLastProject: SetLastProject
@@ -84,28 +84,19 @@ export const listDrafts: ListDrafts = () => json<DesignDraftItem[]>(BASE)
 export const readDraft: ReadDraft = async (id) =>
   toResult(await json<DesignDraftSaveResult>(`${BASE}/read?id=${encodeURIComponent(id)}`))
 
-/**
- * The form saves all its fields in one call. The server keeps the slug and project apart from the
- * text so a stale text save cannot write them back: they go through the revision-free target write,
- * before the text save of an existing draft and after the creating save of a new one.
- */
-export const saveDraft: SaveDraft = async ({ project, slug, ...text }) => {
-  const setTarget = async (id: string) =>
-    toResult(
-      await json<DesignDraftSaveResult>(`${BASE}/target`, {
-        id,
-        project,
-        slug,
-        keep_edited_at: text.keep_edited_at,
-      } satisfies DesignDraftTargetRequest),
-    )
-  const saveText = async () => toResult(await json<DesignDraftSaveResult>(`${BASE}/save`, text))
-  if (!text.id) {
-    const created = await saveText()
-    return created.kind === "ok" && (project || slug) ? setTarget(created.draft.id) : created
-  }
-  const moved = await setTarget(text.id)
-  return moved.kind === "ok" ? saveText() : moved
+/** The text save, with its revision. The slug and project never travel with it, so a stale text save cannot write them back. */
+export const saveDraft: SaveDraft = async (body) =>
+  toResult(await json<DesignDraftSaveResult>(`${BASE}/save`, body))
+
+/** The revision-free write of the slug and project. */
+export const saveDraftFields: SaveDraftFields = async (body) =>
+  toResult(await json<DesignDraftSaveResult>(`${BASE}/target`, body))
+
+/** A new empty draft in `workspace`; its id is the page's address. */
+export const createDraft: CreateDraft = async (workspace) => {
+  const res = await saveDraft({ idea: "", revision: 0, ...(workspace ? { workspace } : {}) })
+  if (res.kind !== "ok") throw new WriteError("The draft was not created")
+  return res.draft.id
 }
 
 /** The most recent draft, or null when there is none (or it cannot be read). */
@@ -126,11 +117,6 @@ export const getLastProject: GetLastProject = async () =>
 
 export const setLastProject: SetLastProject = async (project) => {
   await request(`${BASE}/last-project`, { project } satisfies DesignLastProject)
-}
-
-/** The draft's row label, as the server shipped it; no draft is a blank new one. */
-export function draftLabel(d?: Pick<DesignDraftItem, "label"> | null): string {
-  return d ? d.label : "New draft"
 }
 
 /** "just now", "N min ago", "N h ago", "N d ago". */

@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { readRoundDraft, writeRoundDraft } from "../drafts"
 import {
+  createDraft,
   deleteDraft,
-  draftLabel,
   getLastProject,
   listDrafts,
   readDraft,
   saveDraft,
+  saveDraftFields,
   setLastProject,
   timeAgo,
 } from "./drafts"
@@ -31,12 +32,7 @@ const draft = {
   revision: 2,
   edited_at: "2026-01-01T00:00:00Z",
 }
-const req = { id: "d1", project: "gx", slug: "", idea: "x", revision: 1 }
-
-test("label: the shipped label, or a blank new draft", () => {
-  expect(draftLabel({ label: "my-slug" })).toBe("my-slug")
-  expect(draftLabel()).toBe("New draft")
-})
+const req = { id: "d1", idea: "x", revision: 1 }
 
 const now = new Date("2026-01-10T12:00:00Z")
 test.each([
@@ -52,33 +48,36 @@ test.each([
   expect(timeAgo(at, now)).toBe(want)
 })
 
-test("save writes the slug and project through the target route, then the text without them", async () => {
+const bodyOf = (f: ReturnType<typeof stub>) =>
+  JSON.parse((f.mock.calls[0][1] as RequestInit).body as string)
+
+test("the text save carries the revision and no slug or project", async () => {
   const f = stub({ draft })
-  expect(await saveDraft({ ...req, slug: "s", keep_edited_at: true })).toEqual({
+  expect(await saveDraft(req)).toEqual({ kind: "ok", draft })
+  expect(f.mock.calls[0][0]).toBe("/v1/designs/drafts/save")
+  expect(bodyOf(f)).toEqual(req)
+})
+
+test("saveFields writes the slug and project through the target route with no revision", async () => {
+  const f = stub({ draft })
+  expect(await saveDraftFields({ id: "d1", project: "gx", slug: "s" })).toEqual({
     kind: "ok",
     draft,
   })
-  expect(f.mock.calls.map((c) => c[0])).toEqual([
-    "/v1/designs/drafts/target",
-    "/v1/designs/drafts/save",
-  ])
-  const body = (i: number) => JSON.parse((f.mock.calls[i][1] as RequestInit).body as string)
-  expect(body(0)).toEqual({ id: "d1", project: "gx", slug: "s", keep_edited_at: true })
-  expect(body(1)).toEqual({ id: "d1", idea: "x", revision: 1, keep_edited_at: true })
+  expect(f).toHaveBeenCalledTimes(1)
+  expect(f.mock.calls[0][0]).toBe("/v1/designs/drafts/target")
+  expect(bodyOf(f)).toEqual({ id: "d1", project: "gx", slug: "s" })
 
-  // A draft that is gone stops at the target write; the text save is not sent.
-  const g = stub({ refused: true, reason: "draft-gone" })
-  expect(await saveDraft(req)).toEqual({ kind: "gone" })
-  expect(g).toHaveBeenCalledTimes(1)
+  stub({ refused: true, reason: "draft-gone" })
+  expect(await saveDraftFields({ id: "d1", project: "gx", slug: "" })).toEqual({ kind: "gone" })
+})
 
-  // A new draft is created by the text save first, then given its slug and project.
-  const h = stub({ draft })
-  await saveDraft({ ...req, id: undefined })
-  expect(h.mock.calls.map((c) => c[0])).toEqual([
-    "/v1/designs/drafts/save",
-    "/v1/designs/drafts/target",
-  ])
-  expect(JSON.parse((h.mock.calls[1][1] as RequestInit).body as string).id).toBe("d1")
+test("createDraft saves an empty draft in the workspace and returns its id", async () => {
+  const f = stub({ draft })
+  expect(await createDraft("w1")).toBe("d1")
+  expect(bodyOf(f)).toEqual({ idea: "", revision: 0, workspace: "w1" })
+  stub({ deleted: true })
+  await expect(createDraft()).rejects.toThrow()
 })
 
 test("save maps ok, deleted, conflict and gone to typed results", async () => {

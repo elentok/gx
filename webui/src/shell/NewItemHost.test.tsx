@@ -21,26 +21,18 @@ const epics = [
   { address: "gamma:other", project: "gamma" },
 ]
 
-function draftsBody(u: string, draft?: DesignDraft) {
-  if (!draft) return []
-  if (u.includes("/read")) return { draft }
-  if (u.includes("last-project")) return { project: "" }
-  return [{ ...draft, image_count: 0 }]
-}
-
-function mount(path: string, restored?: DesignDraft) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (url: string) => {
-      const u = String(url)
-      const body = u.includes("worktrees")
-        ? projects.map((project) => ({ project, root: `/${project}`, worktrees: [], tiers: {} }))
-        : u.includes("drafts")
-          ? draftsBody(u, restored)
-          : { epics, follow_ups: [], projects }
-      return new Response(JSON.stringify(body), { status: 200 })
-    }),
-  )
+/** `created` is what the server answers a draft save with. */
+function mount(path: string, created?: DesignDraft) {
+  const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
+    const u = String(url)
+    const body = u.includes("worktrees")
+      ? projects.map((project) => ({ project, root: `/${project}`, worktrees: [], tiers: {} }))
+      : u.includes("drafts")
+        ? { draft: created }
+        : { epics, follow_ups: [], projects }
+    return new Response(JSON.stringify(body), { status: 200 })
+  })
+  vi.stubGlobal("fetch", fetchMock)
   const state = {
     snapshot: { sessions: [session("s1", "gamma")] },
     connected: true,
@@ -60,6 +52,7 @@ function mount(path: string, restored?: DesignDraft) {
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   )
+  return { router, fetchMock }
 }
 
 const selected = async () =>
@@ -72,29 +65,16 @@ describe("the project a new blank draft starts on", () => {
     ["/e/beta:old-feat", "beta"],
     ["/d/gamma:other", "gamma"],
     ["/agents/s1", "gamma"],
-  ])("from %s both forms start on %s", async (path, want) => {
+  ])("from %s New chat starts on %s", async (path, want) => {
     mount(path)
-    act(() => openNewDesign())
-    await projectIs(want)
-    act(closeNewItem)
     act(openNewAgent)
     await projectIs(want)
   })
 
-  test.each(["/stats", "/settings"])("on %s the forms keep today's rule", async (path) => {
+  test.each(["/stats", "/settings"])("on %s New chat keeps today's rule", async (path) => {
     mount(path)
-    act(() => openNewDesign())
-    await projectIs("alpha")
-    act(closeNewItem)
     act(openNewAgent)
     await projectIs("alpha")
-  })
-
-  test("the one-project Epics filter wins over the first project where no page has one", async () => {
-    localStorage.setItem("gx.epics.project", JSON.stringify(["gamma"]))
-    mount("/epics")
-    act(() => openNewDesign())
-    await projectIs("gamma")
   })
 
   test("New chat uses the stored one-project Epics filter when the page has no project", async () => {
@@ -113,30 +93,25 @@ describe("the project a new blank draft starts on", () => {
     act(openNewAgent)
     await projectIs("alpha")
   })
+})
 
-  describe("a restored design draft keeps its own project", () => {
-    const restored: DesignDraft = {
-      id: "d1",
-      project: "alpha",
-      slug: "",
-      idea: "hello",
-      label: "hello",
-      images: [],
-      revision: 1,
-      edited_at: "",
-    }
-
-    test("over the route's project", async () => {
-      mount("/e/beta:feat", restored)
-      act(() => openNewDesign())
-      await projectIs("alpha")
-    })
-
-    test("over the Epics page's filtered project", async () => {
-      localStorage.setItem("gx.epics.project", JSON.stringify(["gamma"]))
-      mount("/epics", restored)
-      act(() => openNewDesign())
-      await projectIs("alpha")
-    })
+test("New design creates a draft and opens its page", async () => {
+  const created: DesignDraft = {
+    id: "d9",
+    project: "",
+    slug: "",
+    idea: "",
+    label: "Untitled design",
+    images: [],
+    revision: 1,
+    edited_at: "",
+  }
+  const { router, fetchMock } = mount("/epics", created)
+  act(() => openNewDesign())
+  await waitFor(() => expect(router.state.location.pathname).toBe("/drafts/d9"))
+  const call = fetchMock.mock.calls.find((c) => String(c[0]).endsWith("/drafts/save"))
+  expect(JSON.parse((call?.[1] as RequestInit).body as string)).toMatchObject({
+    idea: "",
+    revision: 0,
   })
 })

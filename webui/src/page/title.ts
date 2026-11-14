@@ -8,6 +8,7 @@ export type PageTitle = {
     | "Epic"
     | "Diff"
     | "Design"
+    | "Design draft"
     | "Triage"
     | "Ticket"
     | "Settings"

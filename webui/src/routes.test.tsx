@@ -1300,7 +1300,7 @@ test("a route name comes from the pattern, never the URL", async () => {
   expect(JSON.stringify(samples())).not.toMatch(/proj|secret|frag/)
 })
 
-test("every page route pattern has one of the 14 route names", () => {
+test("every page route pattern has one of the 15 route names", () => {
   for (const pattern of pageRoutePatterns()) expect(ROUTE_NAMES[pattern], pattern).toBeTruthy()
   expect([...new Set(Object.values(ROUTE_NAMES))].sort()).toEqual(
     [
@@ -1309,6 +1309,7 @@ test("every page route pattern has one of the 14 route names", () => {
       "archive-epic",
       "cleanup",
       "design",
+      "design-draft",
       "diff",
       "epic",
       "epics",

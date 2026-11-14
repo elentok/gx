@@ -15,7 +15,7 @@ export function DraftBanner({
           { text: "Load theirs", onClick: actions.loadTheirs },
           { text: "Keep mine", onClick: actions.keepMine },
         ]
-      : [{ text: "Keep as new draft", onClick: actions.keepAsNew }]
+      : []
   return (
     <Box
       role="alert"

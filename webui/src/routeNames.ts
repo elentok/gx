@@ -25,6 +25,7 @@ export const ROUTE_NAMES: Record<string, string> = {
   "/settings/agents": SETTINGS,
   "/settings/*": SETTINGS,
   "/d/*": "design",
+  "/drafts/:id": "design-draft",
   "/triage/*": "triage",
   "/t/*": "ticket",
   "/e/*": "epic",

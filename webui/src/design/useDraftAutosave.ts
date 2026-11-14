@@ -5,10 +5,9 @@ import { useConnectionContext, useConnectionState } from "../connection"
 import { defaultProject } from "../workspaces/defaultProject"
 import type { DraftsClient } from "./drafts"
 import { hasText, type Fields } from "./draftFields"
+import { slugProblem } from "./draftSlug"
 import { useDraftImages, type ImageSlot } from "./useDraftImages"
-import { clearUnsaved, NEW_DRAFT_KEY, stashUnsaved, type Restored } from "./unsaved"
-
-const MSG_NEEDS_TEXT = "Write the epic name or an idea first"
+import { clearUnsaved, stashUnsaved, type Restored } from "./unsaved"
 
 const AUTOSAVE_MS = 800
 const RETRY_MS = 5000
@@ -16,12 +15,15 @@ const RETRY_MS = 5000
 export type SaveStatus = "none" | "saving" | "saved" | "unsaved"
 export type Banner = "conflict" | "gone" | undefined
 
-/** `editing` saves; `starting` is Start in flight (a save then could recreate the draft Start is about to delete); `finished` is Start, Discard or a switch having taken the draft over. */
+/** `editing` saves; `starting` is Start in flight; `finished` is Start, Discard or a switch having taken the draft over. */
 type Phase = "editing" | "starting" | "finished"
 
+const targetKey = (d: Fields) => JSON.stringify({ slug: d.slug, project: d.project })
+
 /**
- * The open draft's text, its autosave and the images that share its id. The images live here because an
- * upload needs the draft saved first (`ensureDraft`) and a loaded copy replaces both.
+ * The open draft's fields, their autosave and the images that share its id. The prompt saves with the
+ * draft's revision; the slug and project have their own revision-free write, so a stale prompt save
+ * never carries them. One timer and one status cover both.
  */
 export function useDraftAutosave({
   drafts,
@@ -32,7 +34,7 @@ export function useDraftAutosave({
   slot,
 }: {
   drafts: DraftsClient
-  initial: DesignDraft | null
+  initial: DesignDraft
   restored?: Restored
   projects: string[]
   lastProject: string
@@ -41,52 +43,45 @@ export function useDraftAutosave({
   const { pathname } = useLocation()
   const sessions = useConnectionState(useConnectionContext()).snapshot?.sessions ?? []
   // A saved draft keeps its project; one whose project is gone is moved as a new draft would start.
-  const keptProject = initial && projects.includes(initial.project) ? initial.project : undefined
+  const keptProject = projects.includes(initial.project) ? initial.project : undefined
   const [draft, setDraft] = useState<Fields>(() => ({
-    slug: initial?.slug ?? "",
-    idea: initial?.idea ?? "",
+    slug: initial.slug,
+    idea: initial.idea,
     project: keptProject ?? defaultProject({ pathname, sessions, projects, lastProject }),
   }))
+  const [label, setLabel] = useState(initial.label)
   const [movedFrom] = useState(() =>
-    initial && !keptProject && initial.project ? initial.project : undefined,
+    !keptProject && initial.project ? initial.project : undefined,
   )
   const [moved, setMoved] = useState(movedFrom !== undefined)
   const [status, setStatus] = useState<SaveStatus>(
-    restored === "unsaved" ? "unsaved" : initial?.id && !restored ? "saved" : "none",
+    restored === "unsaved" ? "unsaved" : !restored && hasText(initial) ? "saved" : "none",
   )
 
   const latest = useRef(draft)
-  // `synced` is the fields as the server last had them, so an unchanged form saves nothing. A restored entry never reached the server.
-  // A moved draft starts out of sync, so its first save writes the new project; `unedited` is the fields as moved, which that save stamps without a new edited-at.
-  const unedited = useRef(movedFrom !== undefined ? JSON.stringify(draft) : undefined)
-  const server = useRef({
-    id: initial?.id || undefined,
-    revision: initial?.revision ?? 0,
-    synced: restored
-      ? ""
-      : JSON.stringify(movedFrom !== undefined ? { ...draft, project: movedFrom } : draft),
+  // `text` and `target` are what the server last had, so an unchanged field saves nothing. A restored
+  // prompt never reached the server. A moved draft starts out of sync, so its first save writes the
+  // new project; `unedited` is the target as moved, which that save stamps without a new edited-at.
+  const unedited = useRef(movedFrom !== undefined ? targetKey(draft) : undefined)
+  const server = useRef<{ id: string; revision: number; text?: string; target: string }>({
+    id: initial.id,
+    revision: initial.revision,
+    text: restored ? undefined : initial.idea,
+    target: targetKey(movedFrom !== undefined ? { ...draft, project: movedFrom } : draft),
   })
-  // Set after a failed save until one succeeds; a leave then keeps the text in localStorage.
+  // Set after a failed text save until one succeeds; a leave then keeps the text in localStorage.
   const failing = useRef(restored === "unsaved")
-  // Fallback keys this form wrote or inherited, cleared together once the text is settled.
-  const stashed = useRef<string[]>(restored ? [initial?.id ?? NEW_DRAFT_KEY] : [])
+  const stashed = useRef(!!restored)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const chain = useRef<Promise<void>>(Promise.resolve())
   const phase = useRef<Phase>("editing")
   // The banner's ref twin, so a flush in flight sees it before a render.
-  const blocked = useRef<Banner>(
-    restored === "conflict" || restored === "gone" ? restored : undefined,
-  )
+  const blocked = useRef<Banner>(restored === "conflict" ? restored : undefined)
   const [banner, setBanner] = useState<Banner>(blocked.current)
 
-  /** The draft's id for an image upload; a draft that has none yet is saved first, which needs some text. */
+  /** The draft's id for an image upload, once the saves in flight are done. */
   const ensureDraft = async () => {
     await chain.current
-    if (!server.current.id) {
-      flush()
-      await chain.current
-    }
-    if (!server.current.id) throw new Error(MSG_NEEDS_TEXT)
     return server.current.id
   }
   const imgs = useDraftImages({
@@ -97,53 +92,16 @@ export function useDraftAutosave({
     remove: drafts.removeImage,
   })
 
-  const persist = async () => {
-    if (phase.current !== "editing") return
-    const s = server.current
-    const fields = latest.current
-    const key = JSON.stringify(fields)
-    if (key === s.synced) return setStatus(s.id ? "saved" : "none")
-    if (!s.id && !fields.slug && !fields.idea) return setStatus("none")
-    let res
-    try {
-      res = await drafts.save({
-        id: s.id,
-        ...fields,
-        revision: s.revision,
-        ...(key === unedited.current && { keep_edited_at: true }),
-      })
-    } catch {
-      // The text stays in memory and is retried on the next keystroke and every RETRY_MS.
-      failing.current = true
-      stash()
-      return setStatus("unsaved")
-    }
-    failing.current = false
-    if (res.kind === "ok") {
-      unedited.current = undefined
-      Object.assign(s, { id: res.draft.id, revision: res.draft.revision, synced: key })
-      settle()
-      return setStatus("saved")
-    }
-    if (res.kind === "deleted") {
-      Object.assign(s, { id: undefined, revision: 0, synced: key })
-      settle()
-      return setStatus("none")
-    }
-    raise(res.kind)
-  }
-
-  /** Keeps the unsaved text in localStorage for the next open. */
+  /** Keeps the unsaved prompt in localStorage for the next open. */
   const stash = () => {
     const s = server.current
-    const key = s.id ?? NEW_DRAFT_KEY
-    stashUnsaved(key, { revision: s.revision, ...latest.current })
-    if (!stashed.current.includes(key)) stashed.current.push(key)
+    stashUnsaved(s.id, { revision: s.revision, idea: latest.current.idea })
+    stashed.current = true
   }
-  /** The text reached the server, or Start or Discard took it over. */
+  /** The prompt reached the server, or Start or Discard took it over. */
   const settle = () => {
-    clearUnsaved(...stashed.current)
-    stashed.current = []
+    if (stashed.current) clearUnsaved(server.current.id)
+    stashed.current = false
   }
 
   /** A refusal pauses autosave until the person picks a way out of the banner. */
@@ -153,9 +111,71 @@ export function useDraftAutosave({
     setBanner(kind)
     setStatus("none")
   }
+
+  /** Saves the prompt; false when it did not settle. */
+  const persistText = async () => {
+    const s = server.current
+    const idea = latest.current.idea
+    if (idea === s.text) return true
+    let res
+    try {
+      res = await drafts.save({ id: s.id, idea, revision: s.revision })
+    } catch {
+      // The text stays in memory and is retried on the next keystroke and every RETRY_MS.
+      failing.current = true
+      stash()
+      setStatus("unsaved")
+      return false
+    }
+    failing.current = false
+    if (res.kind === "ok") {
+      Object.assign(s, { revision: res.draft.revision, text: idea })
+      setLabel(res.draft.label)
+      settle()
+      return true
+    }
+    raise(res.kind === "conflict" ? "conflict" : "gone")
+    return false
+  }
+
+  /** Writes the slug and project; false when it did not settle. A slug that is not valid is never written. */
+  const persistFields = async () => {
+    const s = server.current
+    const fields = latest.current
+    const key = targetKey(fields)
+    if (key === s.target || slugProblem(fields.slug)) return true
+    let res
+    try {
+      res = await drafts.saveFields({
+        id: s.id,
+        project: fields.project,
+        slug: fields.slug,
+        ...(key === unedited.current && { keep_edited_at: true }),
+      })
+    } catch {
+      setStatus("unsaved")
+      return false
+    }
+    if (res.kind === "ok") {
+      unedited.current = undefined
+      s.target = key
+      setLabel(res.draft.label)
+      return true
+    }
+    raise("gone")
+    return false
+  }
+
+  const persist = async () => {
+    if (phase.current !== "editing") return
+    const textOk = await persistText()
+    const fieldsOk = await persistFields()
+    if (textOk && fieldsOk) setStatus(hasText(latest.current) || imgs.count > 0 ? "saved" : "none")
+  }
+
   /** Reads the server's copy; a draft that is gone raises the gone banner instead. */
   const readServer = async () => {
-    const res = await drafts.read(server.current.id!)
+    const res = await drafts.read(server.current.id)
     if (res.kind === "ok") return res.draft
     raise("gone")
   }
@@ -178,17 +198,14 @@ export function useDraftAutosave({
       const next = { slug: theirs.slug, idea: theirs.idea, project: theirs.project }
       Object.assign(server.current, {
         revision: theirs.revision,
-        synced: JSON.stringify(next),
+        text: theirs.idea,
+        target: targetKey(next),
       })
       latest.current = next
       setDraft(next)
+      setLabel(theirs.label)
       imgs.reset(theirs.images)
       settle()
-      resume()
-    },
-    keepAsNew: () => {
-      Object.assign(server.current, { id: undefined, revision: 0, synced: "" })
-      imgs.reset([])
       resume()
     },
   }
@@ -221,7 +238,7 @@ export function useDraftAutosave({
       if (
         phase.current !== "finished" &&
         (failing.current || blocked.current) &&
-        JSON.stringify(latest.current) !== server.current.synced
+        latest.current.idea !== server.current.text
       )
         stash()
       flush()
@@ -251,7 +268,9 @@ export function useDraftAutosave({
     const next = { ...draft, ...p }
     setDraft(next)
     latest.current = next
-    setStatus(!blocked.current && (next.slug || next.idea || server.current.id) ? "saving" : "none")
+    const s = server.current
+    const dirty = next.idea !== s.text || (targetKey(next) !== s.target && !slugProblem(next.slug))
+    if (!blocked.current && dirty) setStatus("saving")
     clearTimeout(timer.current)
     timer.current = setTimeout(flush, AUTOSAVE_MS)
   }
@@ -260,23 +279,20 @@ export function useDraftAutosave({
     patch({ project })
     drafts.setLastProject(project).catch(() => {})
   }
-  /** Discards the draft: stops saving and deletes it once an in-flight save has given a new draft its id. */
+  /** Discards the draft: stops saving and deletes it once an in-flight save is done. */
   const discard = () => {
     stopSaving()
     chain.current = chain.current
       .then(async () => {
-        if (server.current.id) await drafts.remove(server.current.id)
+        await drafts.remove(server.current.id)
       })
       .catch(() => {})
   }
   /** Runs Start's server call with saves held back; a result that is not `refused` finishes the draft. */
-  const start = async <T extends { refused?: unknown }>(
-    call: (draftId: string | undefined) => Promise<T>,
-  ) => {
+  const start = async <T extends { refused?: unknown }>(call: (draftId: string) => Promise<T>) => {
     phase.current = "starting"
     clearTimeout(timer.current)
     try {
-      // The draft id must be the one a save in flight is creating.
       await chain.current
       const res = await call(server.current.id)
       if (!res.refused) {
@@ -296,6 +312,7 @@ export function useDraftAutosave({
 
   return {
     draft,
+    label,
     patch,
     pickProject,
     status,
@@ -307,7 +324,7 @@ export function useDraftAutosave({
     discard,
     start,
     flush,
-    /** For the switching hook and the form: what a draft switch needs, without the refs behind it. */
+    /** For the switching hook: what a draft switch needs, without the refs behind it. */
     hasContent,
     stopSaving,
     takeOver,

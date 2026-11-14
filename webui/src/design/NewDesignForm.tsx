@@ -1,45 +1,47 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react"
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react"
+import { useNavigate, useParams } from "react-router"
 import { Button } from "../ui/button/Button"
-import { BottomSheet } from "../ui/modal/BottomSheet"
 import type { DesignDraft } from "../generated/server"
 import {
+  createDraft,
   deleteDraft,
-  draftLabel,
   getLastProject,
   listDrafts,
-  openLatest,
   readDraft,
   saveDraft,
+  saveDraftFields,
   setLastProject,
   type DraftsClient,
 } from "./drafts"
 import { removeDraftImage, uploadDraftImage } from "./draftImageApi"
 import { DraftImages } from "./DraftImages"
 import { AttachButton, imageFiles, useAttachIcon } from "./ComposerImages"
-import { DraftSlots, type DraftImages as DraftImagesState, type ImageSlot } from "./useDraftImages"
+import { DraftSlots, type DraftImages as DraftImagesState } from "./useDraftImages"
 import { useShell } from "../shell/ShellContext"
+import { DraftIcon } from "../shell/SidebarRows"
+import { useEpicList } from "../epics/list"
+import { DetailPage } from "../page/DetailPage"
+import { designHref } from "../hrefs"
 import { postOpenDesign, type OpenDesign } from "./open"
 import { saveUnsaved, type Restored } from "./unsaved"
-import { moveLegacyDraft } from "./legacyDraft"
 import { useDesignWrite } from "./SessionControls"
 import { useWide } from "../useWide"
 import { useViMode } from "../vimode"
 import { ModeText } from "../ui/expandable-text/ModeText"
 import type { ViMode } from "../ui/expandable-text/CodeEditor"
+import { DraftBanner } from "./DraftBanner"
+import { type Fields } from "./draftFields"
+import { slugProblem } from "./draftSlug"
+import { useDraftAutosave } from "./useDraftAutosave"
 
 const CodeEditor = lazy(() => import("../ui/expandable-text/CodeEditor"))
-import { useFocusFirstField } from "../ui/modal/useFocusFirstField"
-import { DraftSwitcher } from "./DraftSwitcher"
-import { DraftBanner } from "./DraftBanner"
-import { hasText, type Fields } from "./draftFields"
-import { useDraftAutosave } from "./useDraftAutosave"
-import { useDraftSwitching, type SwitchDraft } from "./useDraftSwitching"
 
 const realDrafts: DraftsClient = {
   list: listDrafts,
   read: readDraft,
   save: saveDraft,
+  saveFields: saveDraftFields,
   remove: deleteDraft,
   getLastProject,
   setLastProject,
@@ -49,8 +51,10 @@ const realDrafts: DraftsClient = {
 
 /** Why Start is unavailable, or undefined when it is ready. */
 function startBlocker(draft: Fields, imgs: DraftImagesState): string | undefined {
+  if (!draft.idea.trim()) return "Write a prompt first"
   if (!draft.slug.trim()) return "Name the epic to start."
-  if (!draft.idea.trim()) return "Write an idea to start."
+  const problem = slugProblem(draft.slug)
+  if (problem) return problem
   if (imgs.failed) return `Remove the failed ${imgs.failed === 1 ? "image" : "images"} first`
   if (imgs.uploading) return "Wait for the upload to finish"
 }
@@ -65,93 +69,81 @@ const field = {
   _placeholder: { color: "text.dim" },
 } as const
 
-const sheetProps = {
-  label: "New Design",
-  fillViewport: true,
-  desktop: { borderRadius: "lg", w: "720px", h: "520px" },
-  bg: "surface.raised",
-  p: "0",
-  gap: "0",
-  overflow: "hidden",
-} as const
+const PLACEHOLDER = "What is the problem? Who hits it? What does done look like?"
 
-interface FormProps {
-  projects: string[]
+interface PageProps {
+  /** The draft to open; the route's `:id` by default. */
+  id?: string
+  /** The projects to choose from; the epic list's by default. */
+  projects?: string[]
   open?: OpenDesign
   /** Runs with the new Design's address once its map exists; `startFailure` is why the session did not start. */
-  onStarted: (address: string, startFailure?: string) => void
-  /** Closing keeps the draft. */
-  onClose: () => void
+  onStarted?: (address: string, startFailure?: string) => void
   drafts?: DraftsClient
 }
 
-/** The New Design writing sheet: epic name and rough idea for a Design with no map yet. It opens on the latest server draft and autosaves it until Start or Discard. */
-export function NewDesignForm({ drafts = realDrafts, ...props }: FormProps) {
-  // `undefined` is still loading; `null` is no draft to open.
-  const [initial, setInitial] = useState<DesignDraft | null | undefined>()
-  const [restored, setRestored] = useState<Restored>()
-  // A new generation remounts the form on another draft.
-  const [generation, setGeneration] = useState(0)
-  const slots = useRef(new DraftSlots())
-  // The server's last project used; a server that cannot answer leaves the first project.
-  const [lastProject, setLast] = useState("")
-  const fetchLast = () => drafts.getLastProject().catch(() => "")
+interface Loaded {
+  draft: DesignDraft
+  restored?: Restored
+  lastProject: string
+}
+
+/** The Design draft page: the prompt, epic name and images of a Design with no map yet. It autosaves the draft until Start or Remove. */
+export function DraftPage({ drafts = realDrafts, ...props }: PageProps) {
+  const params = useParams()
+  const id = props.id ?? params.id ?? ""
+  const { list } = useEpicList()
+  const projects =
+    props.projects ??
+    [...new Set([...(list?.projects ?? []), ...(list?.epics ?? []).map((e) => e.project)])].sort()
+  // `undefined` is still loading; `null` is no such draft.
+  const [loaded, setLoaded] = useState<Loaded | null>()
   useEffect(() => {
     let live = true
     ;(async () => {
-      const last = await fetchLast()
+      const lastProject = await drafts.getLastProject().catch(() => "")
       const stuck = await saveUnsaved(drafts.save)
-      if (stuck) {
-        if (live) {
-          setLast(last)
-          setRestored(stuck.state)
-          setInitial(stuck.draft)
-        }
-        return
+      const mine = stuck?.draft.id === id ? stuck : undefined
+      const res = await drafts.read(id).catch(() => undefined)
+      let next: Loaded | null = null
+      if (res?.kind === "ok") {
+        // A prompt the server never took replaces its copy; its revision is the one the save was made on.
+        next = mine
+          ? {
+              draft: { ...res.draft, idea: mine.draft.idea, revision: mine.draft.revision },
+              restored: mine.state,
+              lastProject,
+            }
+          : { draft: res.draft, lastProject }
+      } else if (!res && mine) {
+        next = { draft: mine.draft, restored: mine.state, lastProject }
       }
-      await moveLegacyDraft(drafts.save)
-      const latest = await openLatest(drafts)
-      if (live) {
-        setLast(last)
-        setInitial(latest)
-      }
-    })().catch(() => live && setInitial(null))
+      if (live) setLoaded(next)
+    })().catch(() => live && setLoaded(null))
     return () => {
       live = false
     }
-    // The client is fixed for the form's life.
+    // The client is fixed for the page's life.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [id])
 
-  if (initial === undefined) {
+  if (!loaded) {
     return (
-      <BottomSheet {...sheetProps} onClose={props.onClose}>
-        <Box flex="1" display="flex" alignItems="center" justifyContent="center">
-          <Spinner />
+      <DetailPage title={{ kind: "Design draft" }}>
+        <Box display="flex" alignItems="center" justifyContent="center" py="10">
+          {loaded === undefined ? <Spinner /> : <Text color="text.dim">Draft not found</Text>}
         </Box>
-      </BottomSheet>
+      </DetailPage>
     )
-  }
-  const slot = slots.current.current(initial?.images)
-  const switchTo: SwitchDraft = async (next, leaving) => {
-    // An upload or failed tile stays with its draft, so returning finds it.
-    slots.current.switchTo(next, leaving)
-    // A blank draft starts on the project last picked, which this form may just have set.
-    if (!next) setLast(await fetchLast())
-    setRestored(undefined)
-    setInitial(next)
-    setGeneration((g) => g + 1)
   }
   return (
     <DraftForm
-      key={generation}
-      {...props}
+      key={loaded.draft.id}
+      projects={projects}
+      open={props.open}
+      onStarted={props.onStarted}
       drafts={drafts}
-      initial={initial}
-      lastProject={lastProject}
-      restored={restored}
-      slot={slot}
-      onSwitch={switchTo}
+      loaded={loaded}
     />
   )
 }
@@ -160,57 +152,38 @@ function DraftForm({
   projects,
   open = postOpenDesign,
   onStarted,
-  onClose,
   drafts,
-  initial,
-  lastProject,
-  restored,
-  slot,
-  onSwitch,
-}: FormProps & {
+  loaded: { draft: initial, restored, lastProject },
+}: Omit<PageProps, "id" | "projects"> & {
+  projects: string[]
   drafts: DraftsClient
-  initial: DesignDraft | null
-  lastProject: string
-  restored?: Restored
-  slot: ImageSlot
-  onSwitch: SwitchDraft
+  loaded: Loaded
 }) {
   const sheetMode = !useWide()
-  const workspace = useShell()?.workspace
+  const shell = useShell()
+  const workspace = shell?.workspace
+  const navigate = useNavigate()
   const slugInput = useRef<HTMLInputElement | null>(null)
-  const focusFirst = useFocusFirstField()
-  // Stable, so a re-render does not run the focus again.
-  const slugRef = useCallback(
-    (el: HTMLInputElement | null) => {
-      slugInput.current = el
-      focusFirst(el)
-    },
-    [focusFirst],
-  )
+  // An upload or failed tile stays with its draft.
+  const slot = useRef(new DraftSlots()).current.current(initial.images)
   const autosave = useDraftAutosave({ drafts, initial, restored, projects, lastProject, slot })
-  const { draft, patch, pickProject, status, banner, bannerActions, moved, movedFrom, imgs } =
-    autosave
-  const { switchDraft, newDraft, deleteOther, loadDrafts } = useDraftSwitching({
-    drafts,
-    autosave,
-    onSwitch,
-    focusSlug: () => slugInput.current?.focus(),
-  })
-  const [confirming, setConfirming] = useState(false)
+  const {
+    draft,
+    label,
+    patch,
+    pickProject,
+    status,
+    banner,
+    bannerActions,
+    moved,
+    movedFrom,
+    imgs,
+  } = autosave
   const { run, pending } = useDesignWrite()
   const fileInput = useRef<HTMLInputElement>(null)
   const attachIcon = useAttachIcon()
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
-
-  const close = () => {
-    autosave.flush()
-    onClose()
-  }
-  const discard = () => {
-    autosave.discard()
-    onClose()
-  }
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -230,247 +203,237 @@ function DraftForm({
       {
         onDone: (res) => {
           // With start_error the map exists though no session started; the Design page offers the retry.
-          onStarted(`${draft.project}:${slug}`, res.start_error)
+          const address = `${draft.project}:${slug}`
+          if (onStarted) onStarted(address, res.start_error)
+          else {
+            navigate(designHref(address).slice(1), { state: { startFailure: res.start_error } })
+            shell?.closeSliding()
+          }
         },
       },
     )
   }
 
-  const hasWork = hasText(draft) || imgs.count > 0
-  // The server ships the label; the title shows the slug being typed, else the blank-draft title.
-  const label = draft.slug.trim() || draftLabel()
   const reason = startBlocker(draft, imgs)
+  const slugError = slugProblem(draft.slug)
+  const reasonText = reason && (
+    <Text fontSize="12px" color="tone.waiting.fg">
+      {reason}
+    </Text>
+  )
 
   return (
-    <BottomSheet {...sheetProps} onClose={close} as="form" onSubmit={submit}>
+    <DetailPage fill title={{ kind: "Design draft", name: label }}>
       <Box
-        position="relative"
+        as="form"
+        onSubmit={submit}
+        flex="1"
+        minH="0"
         display="flex"
-        alignItems="center"
-        gap="2"
-        px="3"
-        pt="2"
-        flexShrink="0"
+        flexDirection="column"
+        bg="surface.raised"
+        borderRadius="lg"
+        overflow="hidden"
       >
-        <DraftSwitcher
-          label={label}
-          currentId={autosave.currentId()}
-          load={loadDrafts}
-          onPick={switchDraft}
-          onNew={newDraft}
-          onDelete={deleteOther}
-        />
-        <Box flex="1" />
-        {status !== "none" && (
-          <Text fontSize="xs" color="text.dim" flexShrink="0" whiteSpace="nowrap">
-            {status === "saved" && (
-              <chakra.span aria-hidden color="tone.done.fg">
-                ✓{" "}
-              </chakra.span>
-            )}
-            {status === "saving" ? "Saving..." : status === "unsaved" ? "Not saved" : "Saved"}
+        <Box display="flex" alignItems="center" gap="2" px="3" pt="3" flexShrink="0">
+          <DraftIcon />
+          <Text
+            as="h1"
+            fontSize="lg"
+            fontWeight="600"
+            color={draft.slug.trim() ? "text" : "text.dim"}
+            minW="0"
+            truncate
+          >
+            {label}
+          </Text>
+          <chakra.button
+            type="button"
+            aria-label="Rename"
+            title="Rename"
+            onClick={() => slugInput.current?.focus()}
+            color="text.dim"
+            h="32px"
+            w="32px"
+            flexShrink="0"
+            borderRadius="8px"
+            _hover={{ bg: "surface", color: "text" }}
+          >
+            ✎
+          </chakra.button>
+          <Box flex="1" />
+          {status !== "none" && (
+            <Text fontSize="xs" color="text.dim" flexShrink="0" whiteSpace="nowrap">
+              {status === "saved" && (
+                <chakra.span aria-hidden color="tone.done.fg">
+                  ✓{" "}
+                </chakra.span>
+              )}
+              {status === "saving" ? "Saving..." : status === "unsaved" ? "Not saved" : "Saved"}
+            </Text>
+          )}
+        </Box>
+        <Box
+          display="flex"
+          alignItems="center"
+          gap="2"
+          p="3"
+          borderBottomWidth="1px"
+          borderColor="border"
+          flexShrink="0"
+        >
+          {projects.length > 1 && (
+            <>
+              <chakra.select
+                aria-label="Project"
+                value={draft.project}
+                onChange={(e) => pickProject(e.target.value)}
+                fontSize="16px"
+                h="40px"
+                px="3"
+                borderRadius="8px"
+                bg="tone.running.bg"
+                color="tone.running.fg"
+                fontWeight="600"
+              >
+                {projects.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </chakra.select>
+              <Text color="text.dim" fontSize="lg">
+                /
+              </Text>
+            </>
+          )}
+          <chakra.input
+            aria-label="Epic slug"
+            aria-invalid={!!slugError}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            ref={slugInput}
+            {...field}
+            flex="1"
+            minW="0"
+            h="40px"
+            px="3"
+            fontWeight="600"
+            placeholder="my-epic"
+            value={draft.slug}
+            onChange={(e) => patch({ slug: e.target.value })}
+          />
+        </Box>
+        {slugError && (
+          <Text role="alert" fontSize="sm" color="tone.waiting.fg" px="3" pt="2" flexShrink="0">
+            {slugError}
           </Text>
         )}
-        <chakra.button
-          type="button"
-          aria-label="Close"
-          title="Close (keeps the draft)"
-          onClick={close}
-          color="text.dim"
-          fontSize="sm"
-          fontWeight="600"
-          h="36px"
-          px="2"
-          flexShrink="0"
-          borderRadius="8px"
-          _hover={{ bg: "surface", color: "text" }}
-        >
-          Close
-        </chakra.button>
-      </Box>
-      <Box
-        display="flex"
-        alignItems="center"
-        gap="2"
-        p="3"
-        borderBottomWidth="1px"
-        borderColor="border"
-        flexShrink="0"
-      >
-        {projects.length > 1 && (
-          <>
-            <chakra.select
-              aria-label="Project"
-              value={draft.project}
-              onChange={(e) => pickProject(e.target.value)}
-              fontSize="16px"
-              h="40px"
-              px="3"
-              borderRadius="8px"
-              bg="tone.running.bg"
-              color="tone.running.fg"
-              fontWeight="600"
-            >
-              {projects.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </chakra.select>
-            <Text color="text.dim" fontSize="lg">
-              /
-            </Text>
-          </>
+        {moved && (
+          <Text fontSize="sm" color="text.dim" px="3" pt="2" flexShrink="0">
+            {movedFrom} no longer exists; moved to {draft.project}
+          </Text>
         )}
-        <chakra.input
-          aria-label="Epic slug"
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          ref={slugRef}
-          {...field}
-          flex="1"
-          minW="0"
-          h="40px"
-          px="3"
-          fontWeight="600"
-          placeholder="my-epic"
-          value={draft.slug}
-          onChange={(e) => patch({ slug: e.target.value })}
-        />
-      </Box>
-      {moved && (
-        <Text fontSize="sm" color="text.dim" px="3" pt="2" flexShrink="0">
-          {movedFrom} no longer exists; moved to {draft.project}
-        </Text>
-      )}
-      {banner && <DraftBanner kind={banner} actions={bannerActions} />}
-      {viMode ? (
-        <Box
-          flex="1"
-          minH="0"
-          m="3"
-          display="flex"
-          flexDirection="column"
-          gap="1"
-          onPaste={(e) => {
-            const files = imageFiles(e.clipboardData?.files)
-            if (files.length === 0) return
-            e.preventDefault()
-            void imgs.addFiles(files)
-          }}
-        >
-          <Suspense fallback={<Spinner />}>
-            <CodeEditor
-              label="Rough idea"
-              value={draft.idea}
-              onChange={(idea) => patch({ idea })}
-              placeholder="What is the problem? Who hits it? What does done look like?"
-              selection={{ start: draft.idea.length, end: draft.idea.length }}
-              onSelectionChange={() => {}}
-              viMode
-              onModeChange={setViModeNow}
-              autoFocus={false}
-            />
-          </Suspense>
-          <ModeText mode={viModeNow} />
-        </Box>
-      ) : (
-        <chakra.textarea
-          aria-label="Rough idea"
-          name="design-idea"
-          autoComplete="off"
-          {...field}
-          flex="1"
-          minH="0"
-          m="3"
-          resize="none"
-          px="4"
-          py="3"
-          lineHeight="1.6"
-          placeholder="What is the problem? Who hits it? What does done look like?"
-          value={draft.idea}
-          onChange={(e) => patch({ idea: e.target.value })}
-          onPaste={(e) => {
-            const files = imageFiles(e.clipboardData?.files)
-            if (files.length === 0) return
-            e.preventDefault()
-            void imgs.addFiles(files)
-          }}
-        />
-      )}
-      <input
-        ref={fileInput}
-        type="file"
-        accept="image/*"
-        multiple
-        hidden
-        data-testid="image-input"
-        onChange={(e) => {
-          void imgs.addFiles(imageFiles(e.target.files))
-          e.target.value = ""
-        }}
-      />
-      <Box flexShrink="0" px="3">
-        <DraftImages state={imgs} />
-      </Box>
-      {sheetMode && reason && !confirming && (
-        <Text fontSize="12px" color="tone.waiting.fg" px="3" pb="2" flexShrink="0">
-          {reason}
-        </Text>
-      )}
-      <Box
-        display="flex"
-        alignItems="center"
-        gap="2"
-        p="3"
-        borderTopWidth="1px"
-        borderColor="border"
-        bg="surface"
-        flexShrink="0"
-      >
-        {confirming ? (
-          <>
-            <Text flex="1" fontSize="sm" color="tone.paused.fg" fontWeight="600">
-              Discard this draft and its images?
-            </Text>
-            <Button
-              type="button"
-              emphasis="ghost"
-              tone="muted"
-              onClick={() => setConfirming(false)}
-            >
-              Keep
-            </Button>
-            <Button type="button" tone="paused" onClick={discard}>
-              Discard
-            </Button>
-          </>
+        {banner && <DraftBanner kind={banner} actions={bannerActions} />}
+        {viMode ? (
+          <Box
+            flex="1"
+            minH="0"
+            m="3"
+            display="flex"
+            flexDirection="column"
+            gap="1"
+            onPaste={(e) => {
+              const files = imageFiles(e.clipboardData?.files)
+              if (files.length === 0) return
+              e.preventDefault()
+              void imgs.addFiles(files)
+            }}
+          >
+            <Suspense fallback={<Spinner />}>
+              <CodeEditor
+                label="Prompt"
+                value={draft.idea}
+                onChange={(idea) => patch({ idea })}
+                placeholder={PLACEHOLDER}
+                selection={{ start: draft.idea.length, end: draft.idea.length }}
+                onSelectionChange={() => {}}
+                viMode
+                onModeChange={setViModeNow}
+                autoFocus={false}
+              />
+            </Suspense>
+            <ModeText mode={viModeNow} />
+          </Box>
         ) : (
-          <>
-            {attachIcon && <AttachButton onClick={() => fileInput.current?.click()} />}
-            <Button
-              type="button"
-              emphasis="ghost"
-              tone="muted"
-              onClick={() => (hasWork ? setConfirming(true) : discard())}
-            >
-              Discard
-            </Button>
-            <Box flex="1" />
-            {!sheetMode && reason && (
-              <Text fontSize="12px" color="tone.waiting.fg">
-                {reason}
-              </Text>
-            )}
-            <Button type="submit" tone="running" disabled={pending || !!reason || !!banner}>
-              {pending && <Spinner size="sm" />}
-              Start design
-            </Button>
-          </>
+          <chakra.textarea
+            aria-label="Prompt"
+            name="design-idea"
+            autoComplete="off"
+            {...field}
+            flex="1"
+            minH="0"
+            m="3"
+            resize="none"
+            px="4"
+            py="3"
+            lineHeight="1.6"
+            placeholder={PLACEHOLDER}
+            value={draft.idea}
+            onChange={(e) => patch({ idea: e.target.value })}
+            onPaste={(e) => {
+              const files = imageFiles(e.clipboardData?.files)
+              if (files.length === 0) return
+              e.preventDefault()
+              void imgs.addFiles(files)
+            }}
+          />
         )}
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          data-testid="image-input"
+          onChange={(e) => {
+            void imgs.addFiles(imageFiles(e.target.files))
+            e.target.value = ""
+          }}
+        />
+        <Box flexShrink="0" px="3">
+          <DraftImages state={imgs} />
+        </Box>
+        {sheetMode && reason && (
+          <Box px="3" pb="2" flexShrink="0">
+            {reasonText}
+          </Box>
+        )}
+        <Box
+          display="flex"
+          alignItems="center"
+          gap="2"
+          p="3"
+          borderTopWidth="1px"
+          borderColor="border"
+          bg="surface"
+          flexShrink="0"
+        >
+          {attachIcon && <AttachButton onClick={() => fileInput.current?.click()} />}
+          {/* Item 10 wires Remove. */}
+          <Button type="button" emphasis="ghost" tone="muted">
+            Remove
+          </Button>
+          <Box flex="1" />
+          {!sheetMode && reasonText}
+          <Button type="submit" tone="running" disabled={pending || !!reason || !!banner}>
+            {pending && <Spinner size="sm" />}
+            Start design
+          </Button>
+        </Box>
       </Box>
-    </BottomSheet>
+    </DetailPage>
   )
 }

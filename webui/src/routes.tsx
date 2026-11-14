@@ -86,6 +86,10 @@ const TriagePage = lazy(() =>
   import("./triage/TriagePage").then(({ TriagePage }) => ({ default: TriagePage })),
 )
 
+const DraftPage = lazy(() =>
+  import("./design/NewDesignForm").then(({ DraftPage }) => ({ default: DraftPage })),
+)
+
 const accountPagesModule = () => import("./settings/AccountPages")
 const AuthenticatorPage = lazy(() =>
   accountPagesModule().then(({ AuthenticatorPage }) => ({ default: AuthenticatorPage })),
@@ -357,6 +361,7 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
     { path: "/settings/agents", element: <Navigate to={sectionPath("Agents")} replace /> },
     { path: "/settings/*", element: <UnknownSettingsPage /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
+    { path: "/drafts/:id", element: <DraftPage /> },
     { path: "/triage/*", element: <TriageRoute fetchers={fetchers} /> },
     {
       path: "/t/*",
