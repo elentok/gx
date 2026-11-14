@@ -153,7 +153,7 @@ export function CommitList({
           data-testid="commits-narrowing"
           flex="1"
           textAlign="right"
-          color="tone.running.fg"
+          color={label ? "tone.running.fg" : "text.faint"}
         >
           {label ?? ALL_COMMITS}
         </Box>
@@ -172,7 +172,7 @@ export function CommitList({
             </Box>
           )}
           <Row active={!narrowing} onClick={() => onNarrow(undefined)}>
-            <Box as="span" flex="1">
+            <Box as="span" flex="1" fontSize="md" fontWeight="700">
               {ALL_COMMITS}
             </Box>
             <Box as="span" fontSize="xs">
@@ -190,7 +190,7 @@ export function CommitList({
                     minW="0"
                     fontSize="md"
                     fontWeight="700"
-                    color={g.kind === "design" ? "tone.design.fg" : "text"}
+                    color={g.kind === "design" ? "kind.design.fg" : "text"}
                   >
                     {g.label}
                   </Box>
