@@ -1,6 +1,7 @@
 package ghfake
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -78,31 +79,93 @@ func (o *Origin) Fetches() []string { return o.lines("fetches") }
 // repo) on origin's trunk, which makes it a commit the branch head is not an
 // ancestor of, and marks the fake PR for branch MERGED with that commit. It
 // returns the squash commit's SHA.
+//
+// Its subject is "Squash <branch> (#<number>)", GitHub's mark of a squash;
+// SimulateUnmarkedSquashMerge leaves the mark off.
 func (o *Origin) SimulateSquashMerge(branch string) string {
 	o.t.Helper()
+	return o.simulate(branch, func(scratch string, number int) {
+		git(o.t, scratch, nil, "merge", "--squash", "FETCH_HEAD")
+		o.commit(scratch, "--allow-empty", "-m", fmt.Sprintf("Squash %s (#%d)", branch, number))
+	})
+}
+
+// SimulateUnmarkedSquashMerge is SimulateSquashMerge with a subject that has no
+// "(#<number>)" mark.
+func (o *Origin) SimulateUnmarkedSquashMerge(branch string) string {
+	o.t.Helper()
+	return o.simulate(branch, func(scratch string, _ int) {
+		git(o.t, scratch, nil, "merge", "--squash", "FETCH_HEAD")
+		o.commit(scratch, "--allow-empty", "-m", "Squash "+branch)
+	})
+}
+
+// SimulateMergeCommit puts a real merge commit of branch on origin's trunk, as
+// GitHub's "Create a merge commit" does, and marks the fake PR MERGED with it.
+func (o *Origin) SimulateMergeCommit(branch string) string {
+	o.t.Helper()
+	return o.simulate(branch, func(scratch string, number int) {
+		git(o.t, scratch, nil, "-c", "user.name=ghfake", "-c", "user.email=ghfake@example.com",
+			"merge", "-q", "--no-ff", "-m", fmt.Sprintf("Merge pull request #%d from %s", number, branch), "FETCH_HEAD")
+	})
+}
+
+// SimulateRebaseMerge replays branch's commits on origin's trunk with their own
+// headlines, as GitHub's "Rebase and merge" does, and marks the fake PR MERGED
+// with the last one. reword changes every headline, the case a headline match
+// cannot follow.
+func (o *Origin) SimulateRebaseMerge(branch string, reword bool) string {
+	o.t.Helper()
+	return o.simulate(branch, func(scratch string, _ int) {
+		revs := strings.Fields(git(o.t, scratch, nil, "rev-list", "--reverse", "--no-merges", o.Trunk+"..FETCH_HEAD"))
+		for _, rev := range revs {
+			git(o.t, scratch, nil, "cherry-pick", "--allow-empty", "--keep-redundant-commits", rev)
+			if reword {
+				subject := strings.TrimSpace(git(o.t, scratch, nil, "log", "-1", "--format=%s"))
+				o.commit(scratch, "--amend", "--allow-empty", "-m", "Reworded: "+subject)
+			}
+		}
+	})
+}
+
+// simulate clones trunk, fetches branch from the project repo as FETCH_HEAD, runs
+// land to put the merge on trunk, pushes it and marks the fake PR for branch
+// MERGED with trunk's new tip.
+func (o *Origin) simulate(branch string, land func(scratch string, prNumber int)) string {
+	o.t.Helper()
+	number := 0
+	o.GH.Update(func(s *State) {
+		for _, p := range s.PRs {
+			if p.Head == branch {
+				number = p.Number
+			}
+		}
+	})
+	if number == 0 {
+		o.t.Fatalf("no fake PR has head %q", branch)
+	}
 	scratch := filepath.Join(o.root, "scratch")
 	git(o.t, o.root, nil, "clone", "-q", "--branch", o.Trunk, o.Bare, scratch)
 	git(o.t, scratch, nil, "fetch", "-q", o.Local, branch)
-	git(o.t, scratch, nil, "merge", "--squash", "FETCH_HEAD")
-	git(o.t, scratch, nil, "-c", "user.name=ghfake", "-c", "user.email=ghfake@example.com",
-		"commit", "-q", "--allow-empty", "-m", "Squash "+branch)
+	land(scratch, number)
 	sha := strings.TrimSpace(git(o.t, scratch, nil, "rev-parse", "HEAD"))
 	git(o.t, scratch, []string{"GHFAKE_QUIET=1"}, "push", "-q", "origin", o.Trunk)
 	if err := os.RemoveAll(scratch); err != nil {
 		o.t.Fatal(err)
 	}
-	merged := false
 	o.GH.Update(func(s *State) {
 		for i := range s.PRs {
 			if s.PRs[i].Head == branch {
-				s.PRs[i].State, s.PRs[i].MergeCommit, merged = "MERGED", sha, true
+				s.PRs[i].State, s.PRs[i].MergeCommit = "MERGED", sha
 			}
 		}
 	})
-	if !merged {
-		o.t.Fatalf("SimulateSquashMerge: no fake PR has head %q", branch)
-	}
 	return sha
+}
+
+func (o *Origin) commit(dir string, args ...string) {
+	o.t.Helper()
+	git(o.t, dir, nil, append([]string{"-c", "user.name=ghfake", "-c", "user.email=ghfake@example.com", "commit", "-q"}, args...)...)
 }
 
 func git(t testing.TB, dir string, env []string, args ...string) string {

@@ -93,7 +93,7 @@ func (h prOpenHost) PRMerged(root queue.RootRef, p pr.HeadPR) {
 		h.s.log.Warn("stamp adopted merged PR", "root", root, "err", err)
 		return
 	}
-	if err := h.s.prWatch.Merged(prflow.Target{Project: root.Project, Epic: root.Epic, Dir: dir, Number: p.Number, URL: p.URL}); err != nil {
+	if err := h.s.prWatch.Merged(prflow.Target{Project: root.Project, Epic: root.Epic, Dir: dir, Number: p.Number, URL: p.URL}, p.MergeCommit); err != nil {
 		h.s.log.Warn("adopted merged PR", "root", root, "err", err)
 	}
 }

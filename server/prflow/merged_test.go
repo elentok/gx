@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/ghfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -50,6 +51,95 @@ func TestMerged_SquashMergeFastForwardsTrunkThenStamps(t *testing.T) {
 	if got := kinds(t, f); !slices.Equal(got, want) {
 		t.Errorf("activity = %v, want %v", got, want)
 	}
+}
+
+// twoCommitRig is an epic with a stamped PR 5 whose branch has two commits, not
+// yet merged. It returns trunk's tip, the PR's fork point.
+func twoCommitRig(t *testing.T) (*rigs.PRFlow, string) {
+	t.Helper()
+	f := openRig(t, "")
+	repo := f.Origin.Local
+	fork := gitRev(t, repo, "main")
+	servertest.RunGitIn(t, repo, "checkout", "-q", "epic-a")
+	testutil.WriteFile(t, repo, "second.txt", "2")
+	testutil.CommitAll(t, repo, "second")
+	servertest.RunGitIn(t, repo, "checkout", "-q", "main")
+	openPR(f)
+	f.StampPR(t, 5, prURL)
+	return f, fork
+}
+
+func gitRev(t *testing.T, repo, rev string) string {
+	t.Helper()
+	return strings.TrimSpace(servertest.GitOut(t, repo, "rev-parse", rev))
+}
+
+// wantRange asserts the epic is merged and stamped with base and tip; empty
+// both means merged with no range.
+func wantRange(t *testing.T, f *rigs.PRFlow, base, tip string) {
+	t.Helper()
+	e := tickets.LoadEpicAt(f.EpicDir())
+	if e.MergedAt.IsZero() {
+		t.Fatal("merged_at not stamped")
+	}
+	if e.RangeBase != base || e.RangeTip != tip {
+		t.Fatalf("range = %q..%q, want %q..%q", e.RangeBase, e.RangeTip, base, tip)
+	}
+}
+
+func TestMerged_MergeCommitStampsItsFirstParentAndItself(t *testing.T) {
+	f, fork := twoCommitRig(t)
+	m := f.Origin.SimulateMergeCommit("epic-a")
+	f.Tick(t)
+	wantRange(t, f, fork, m)
+}
+
+func TestMerged_SquashStampsItsParentAndItself(t *testing.T) {
+	f, fork := twoCommitRig(t)
+	m := f.Origin.SimulateSquashMerge("epic-a")
+	f.Tick(t)
+	wantRange(t, f, fork, m)
+}
+
+func TestMerged_SquashWithoutTheMarkStampsNoRange(t *testing.T) {
+	f, _ := twoCommitRig(t)
+	f.Origin.SimulateUnmarkedSquashMerge("epic-a")
+	f.Tick(t)
+	wantRange(t, f, "", "")
+}
+
+func TestMerged_RebaseStampsTheCommitBeforeTheRunAndItsLast(t *testing.T) {
+	f, fork := twoCommitRig(t)
+	last := f.Origin.SimulateRebaseMerge("epic-a", false)
+	f.Tick(t)
+	wantRange(t, f, fork, last)
+}
+
+func TestMerged_RebaseWithRewordedHeadlinesStampsNoRange(t *testing.T) {
+	f, _ := twoCommitRig(t)
+	f.Origin.SimulateRebaseMerge("epic-a", true)
+	f.Tick(t)
+	wantRange(t, f, "", "")
+}
+
+func TestMerged_MergeCommitSurvivesABlockedTrunkUpdateAndItsRetry(t *testing.T) {
+	f, fork := twoCommitRig(t)
+	clash := filepath.Join(f.Origin.Local, "second.txt")
+	if err := os.WriteFile(clash, []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m := f.Origin.SimulateMergeCommit("epic-a")
+	f.Tick(t)
+	if !tickets.LoadEpicAt(f.EpicDir()).MergedAt.IsZero() {
+		t.Fatal("stamped despite the dirty trunk")
+	}
+	// GitHub no longer reports the PR: the retry has only the activity log.
+	f.GH.Update(func(s *ghfake.State) { s.PRs[0].MergeCommit = "" })
+	if err := os.Remove(clash); err != nil {
+		t.Fatal(err)
+	}
+	f.Tick(t)
+	wantRange(t, f, fork, m)
 }
 
 func TestMerged_DirtyTrunkBlocksRetriesAndWritesOneEntry(t *testing.T) {

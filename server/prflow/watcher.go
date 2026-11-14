@@ -84,6 +84,8 @@ type View struct {
 	State   string // OPEN, MERGED or CLOSED
 	Draft   bool
 	HeadSHA string
+	// MergeCommit is GitHub's merge commit, set once the PR is MERGED.
+	MergeCommit string
 	// Rollup is GitHub's cheap rollup state for the head.
 	Rollup string
 	Checks pr.CheckCounts
@@ -337,7 +339,7 @@ func (w *Watcher) nextView(r pr.Runner, repo string, t Target, st pr.WatchState)
 	w.mu.Unlock()
 	failing := st.Rollup == "FAILURE" || st.Rollup == "ERROR"
 	detail := v.Number == 0 || v.HeadSHA != st.HeadSHA || v.Rollup != st.Rollup || failing
-	next := View{Number: t.Number, URL: t.URL, State: st.State, Draft: st.IsDraft, HeadSHA: st.HeadSHA,
+	next := View{Number: t.Number, URL: t.URL, State: st.State, Draft: st.IsDraft, HeadSHA: st.HeadSHA, MergeCommit: st.MergeCommit,
 		Rollup: st.Rollup, Mergeable: st.Mergeable, Checks: v.Checks, CI: v.CI, FailedChecks: v.FailedChecks,
 		HeadChecks: v.HeadChecks}
 	if detail {

@@ -11,7 +11,7 @@ import (
 func (w *Watcher) closeOrMerge(t Target, v View) (handled bool, err error) {
 	switch v.State {
 	case "MERGED":
-		return true, w.Merged(t)
+		return true, w.Merged(t, v.MergeCommit)
 	case "CLOSED":
 		return true, w.closed(t)
 	}
@@ -21,8 +21,10 @@ func (w *Watcher) closeOrMerge(t Target, v View) (handled bool, err error) {
 // Merged runs the merged path of t's PR: the one "PR merged" entry, the end of
 // the flow's tickets, then the Trunk update. It is also what an adopted merged
 // PR calls. The state comes from the PR, never from ancestry: a squash merge
-// leaves the head SHA off Trunk.
-func (w *Watcher) Merged(t Target) error {
+// leaves the head SHA off Trunk. mergeCommit is GitHub's merge commit (empty
+// when unknown); it goes into the entry because the Trunk update that reads it
+// is retried with no live View.
+func (w *Watcher) Merged(t Target, mergeCommit string) error {
 	// A person marked it merged: that path writes its own entries and retries
 	// the Trunk update, so a poll already in flight must not add a second set.
 	entries, _ := Read(t.Dir)
@@ -35,7 +37,7 @@ func (w *Watcher) Merged(t Target) error {
 		if err := tickets.ClearEpicFields(t.Dir, blockKindKey, blockReasonKey); err != nil {
 			return err
 		}
-		if err := Append(t.Dir, Entry{Kind: KindPRMerged, Detail: t.URL}); err != nil {
+		if err := Append(t.Dir, Entry{Kind: KindPRMerged, Detail: t.URL, MergeCommit: mergeCommit}); err != nil {
 			return err
 		}
 	}
@@ -48,7 +50,16 @@ func (w *Watcher) updateTrunk(t Target) error {
 	if !w.host.SyncTrunkAfterMerge(t) {
 		return nil
 	}
-	return Append(t.Dir, Entry{Kind: KindTrunkUpdated})
+	return AppendTrunkUpdated(t.Dir)
+}
+
+// AppendTrunkUpdated writes the "trunk updated" entry once. A retry that waited
+// on the Trunk lock while the merge stamped finds the entry already there.
+func AppendTrunkUpdated(epicDir string) error {
+	if entries, _ := Read(epicDir); hasKind(entries, KindTrunkUpdated) {
+		return nil
+	}
+	return Append(epicDir, Entry{Kind: KindTrunkUpdated})
 }
 
 // retryMerged retries the Trunk update of every epic whose "PR merged" entry is

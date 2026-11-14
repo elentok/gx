@@ -2,6 +2,7 @@ package merge
 
 import (
 	"fmt"
+	"log/slog"
 	"slices"
 
 	"github.com/elentok/gx/events"
@@ -9,6 +10,7 @@ import (
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop"
 	rlmerge "github.com/elentok/gx/ralphloop/merge"
+	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -70,6 +72,8 @@ func (s *Merger) stampAndDequeueMerged(root queue.RootRef, e tickets.Epic, repo,
 		base, tip := "", ""
 		if e.PRNumber == 0 {
 			base, tip = reflogRange(s.log, root, e, repo, target)
+		} else if !e.IsMap {
+			base, tip = prRange(s.log, root, e, repo, target)
 		}
 		s.StampEpicRange(root, e.Path, base, tip, "merged_at")
 	}
@@ -83,6 +87,46 @@ func (s *Merger) stampAndDequeueMerged(root queue.RootRef, e tickets.Epic, repo,
 		s.events.Publish(wire.EventQueueChanged, root.String())
 		s.events.Publish(wire.EventRootCompleted, root.String())
 	}
+}
+
+// prRange is the Epic range of a merged PR epic, by the merge style (see
+// history.PRRange). GitHub's merge commit comes from the PR activity log: the
+// Trunk update is retried with no live View, and a hand mark has none. Any
+// refusal or git failure gives no range, logged, and never stops the stamp.
+func prRange(log *slog.Logger, root queue.RootRef, e tickets.Epic, repo, target string) (base, tip string) {
+	m := history.PRMerge{Number: e.PRNumber}
+	entries, _ := prflow.Read(e.Path)
+	for _, en := range entries { // newest first
+		if en.Kind == prflow.KindPRMerged {
+			m.MergeCommit = en.MergeCommit
+			break
+		}
+	}
+	tipRef := "refs/heads/" + target
+	var err error
+	if m.TrunkTip, err = git.RevParse(repo, tipRef); err != nil {
+		log.Warn("read trunk tip, stamping no range", "root", root, "err", err)
+		return "", ""
+	}
+	// A gone branch leaves no headlines: rule 2 is skipped.
+	if branch := "refs/heads/" + e.Name; git.RefExists(repo, branch) {
+		if m.ForkPoint, err = git.MergeBase(repo, branch, tipRef); err == nil {
+			m.Headlines, err = history.Headlines(repo, m.ForkPoint+".."+branch)
+		}
+		if err != nil {
+			log.Warn("read PR headlines, stamping no range", "root", root, "err", err)
+			return "", ""
+		}
+	}
+	r, reason, err := history.PRRange(repo, m)
+	if err != nil {
+		log.Warn("classify PR merge, stamping no range", "root", root, "err", err)
+		return "", ""
+	}
+	if reason != "" {
+		log.Info("no range for merged PR", "root", root, "reason", reason)
+	}
+	return r.Base, r.Tip
 }
 
 // pauseTrunkUpdate stores p, with its notice only when the stored kind differs:

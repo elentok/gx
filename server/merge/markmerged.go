@@ -44,7 +44,7 @@ func (s *Merger) EpicMarkMerged(req wire.QueueRequest) (wire.QueueResult, error)
 	}
 	if pf, _ := config.ReadProjectFile(m.dir); pf.DeliveryIsPR() {
 		if s.syncTrunk(m.root, false) {
-			_ = prflow.Append(m.epic.Path, prflow.Entry{Kind: prflow.KindTrunkUpdated})
+			_ = prflow.AppendTrunkUpdated(m.epic.Path)
 			return wire.QueueResult{}, nil
 		}
 		fresh := tickets.LoadEpicAt(m.epic.Path)

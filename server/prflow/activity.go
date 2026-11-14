@@ -51,6 +51,8 @@ type Entry struct {
 	Checks   []string `json:"checks,omitempty"`
 	HeadSHA  string   `json:"head_sha,omitempty"`
 	TicketID string   `json:"ticket_id,omitempty"`
+	// MergeCommit is GitHub's merge commit of a merged PR (KindPRMerged).
+	MergeCommit string `json:"merge_commit,omitempty"`
 }
 
 // Append writes e as one whole line to the epic's activity log. A zero Time is

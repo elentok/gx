@@ -209,6 +209,16 @@ func TestMarkMerged_DirtyTrunkKeepsMergedAtEmptyUntilTheTrunkIsClean(t *testing.
 	}
 }
 
+func TestMarkMerged_RebaseOfAPREpicIsStampedByHeadlineWithNoMergeCommit(t *testing.T) {
+	f, fork := twoCommitRig(t)
+	last := f.Origin.SimulateRebaseMerge("epic-a", false)
+	f.GH.Update(func(s *ghfake.State) { s.PRs[0].State = "OPEN" })
+	if res := markMerged(t, f); res.Refused {
+		t.Fatalf("refused: %+v", res)
+	}
+	wantRange(t, f, fork, last)
+}
+
 // handMergedChatRig is handMergedRig with chat notices counted.
 func handMergedChatRig(t *testing.T) (*rigs.PRFlow, func(string) int) {
 	t.Helper()

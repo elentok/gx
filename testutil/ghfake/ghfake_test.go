@@ -148,3 +148,84 @@ func TestSquashMerge_LeavesHeadOffTrunkAndLogsPushesAndFetches(t *testing.T) {
 		t.Fatal("fetches log is empty after a fetch")
 	}
 }
+
+// twoCommitPR pushes a branch of two commits ("one", "two") with an open fake PR
+// #4, and returns a git runner in the project repo.
+func twoCommitPR(t *testing.T, o *ghfake.Origin, branch string) func(args ...string) string {
+	t.Helper()
+	git := func(args ...string) string {
+		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@t"}, args...)...)
+		cmd.Dir = o.Local
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	git("checkout", "-q", "-b", branch)
+	for _, name := range []string{"one", "two"} {
+		if err := os.WriteFile(filepath.Join(o.Local, name+".txt"), []byte(name), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		git("add", ".")
+		git("commit", "-q", "-m", name)
+	}
+	head := git("rev-parse", "HEAD")
+	git("push", "-q", "origin", branch)
+	o.GH.Update(func(s *ghfake.State) {
+		s.PRs = []ghfake.PR{{Number: 4, Head: branch, State: "OPEN", HeadSHA: head}}
+	})
+	return git
+}
+
+func TestSimulateMergeCommit_IsATwoParentMergeAndMarksThePRMerged(t *testing.T) {
+	o := ghfake.NewOrigin(t, "main")
+	git := twoCommitPR(t, o, "feat")
+	sha := o.SimulateMergeCommit("feat")
+	git("fetch", "-q", "origin")
+	if got := strings.Fields(git("rev-list", "--parents", "-n1", sha)); len(got) != 3 {
+		t.Fatalf("merge commit %v, want two parents", got)
+	}
+	if pr := o.GH.State().PRs[0]; pr.State != "MERGED" || pr.MergeCommit != sha {
+		t.Fatalf("pr = %+v, want MERGED at %s", pr, sha)
+	}
+}
+
+func TestSimulateRebaseMerge_ReplaysHeadlinesOrRewordsThem(t *testing.T) {
+	for _, reword := range []bool{false, true} {
+		o := ghfake.NewOrigin(t, "main")
+		git := twoCommitPR(t, o, "feat")
+		sha := o.SimulateRebaseMerge("feat", reword)
+		git("fetch", "-q", "origin")
+		want := "one\ntwo"
+		if reword {
+			want = "Reworded: one\nReworded: two"
+		}
+		if got := git("log", "--format=%s", "--reverse", "-2", "origin/main"); got != want {
+			t.Fatalf("reword=%v: headlines %q, want %q", reword, got, want)
+		}
+		if got := git("rev-parse", "origin/main"); got != sha {
+			t.Fatalf("reword=%v: origin/main = %s, want the last replayed commit %s", reword, got, sha)
+		}
+		if pr := o.GH.State().PRs[0]; pr.State != "MERGED" || pr.MergeCommit != sha {
+			t.Fatalf("pr = %+v, want MERGED at %s", pr, sha)
+		}
+	}
+}
+
+func TestSimulateSquashMerge_SubjectCarriesThePRNumberUnlessUnmarked(t *testing.T) {
+	for _, marked := range []bool{true, false} {
+		o := ghfake.NewOrigin(t, "main")
+		git := twoCommitPR(t, o, "feat")
+		want, sha := "Squash feat (#4)", ""
+		if marked {
+			sha = o.SimulateSquashMerge("feat")
+		} else {
+			want, sha = "Squash feat", o.SimulateUnmarkedSquashMerge("feat")
+		}
+		git("fetch", "-q", "origin")
+		if got := git("log", "-1", "--format=%s", sha); got != want {
+			t.Fatalf("marked=%v: subject %q, want %q", marked, got, want)
+		}
+	}
+}
