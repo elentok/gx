@@ -1,7 +1,15 @@
 import { renderHook } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { afterEach, expect, test, vi } from "vitest"
-import { type Device, DeviceContext, useDevice, useWide, WideContext } from "./useWide"
+import {
+  CannotHoverContext,
+  type Device,
+  DeviceContext,
+  useCannotHover,
+  useDevice,
+  useWide,
+  WideContext,
+} from "./useWide"
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -44,6 +52,27 @@ test("forced contexts win over the viewport", () => {
   expect(renderHook(useDevice, { wrapper: forcing({ device: "tablet" }) }).result.current).toBe(
     "tablet",
   )
+})
+
+test("useCannotHover follows (hover: none), the context wins, and it is false without matchMedia", () => {
+  expect(renderHook(useCannotHover).result.current).toBe(false)
+  const stubHover = (none: boolean) =>
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      matches: q === "(hover: none)" && none,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }))
+  stubHover(true)
+  expect(renderHook(useCannotHover).result.current).toBe(true)
+  const forced =
+    (value: boolean) =>
+    ({ children }: { children: ReactNode }) => (
+      <CannotHoverContext.Provider value={value}>{children}</CannotHoverContext.Provider>
+    )
+  expect(renderHook(useCannotHover, { wrapper: forced(false) }).result.current).toBe(false)
+  stubHover(false)
+  expect(renderHook(useCannotHover).result.current).toBe(false)
+  expect(renderHook(useCannotHover, { wrapper: forced(true) }).result.current).toBe(true)
 })
 
 test("without matchMedia the device is desktop", () => {

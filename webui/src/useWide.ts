@@ -46,3 +46,13 @@ export const useCoarsePointer = () => {
   const coarse = useMedia("(pointer: coarse)", false)
   return forced ?? coarse
 }
+
+/** Overrides whether the primary input can hover, so the gallery and tests can show the phone sheet with a mouse. */
+export const CannotHoverContext = createContext<boolean | undefined>(undefined)
+
+/** True when the primary input cannot hover (decision 10: `(hover: none)`, never a user-agent check). Without matchMedia (tests) it is false. */
+export const useCannotHover = () => {
+  const forced = useContext(CannotHoverContext)
+  const none = useMedia("(hover: none)", false)
+  return forced ?? none
+}
