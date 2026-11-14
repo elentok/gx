@@ -158,6 +158,16 @@ test("unavailable commits show an amber notice in the same area", async () => {
   editable()
 })
 
+test("a failed load shows Could not load the diff and keeps both ref fields editable", async () => {
+  render(OPEN, async () => {
+    throw new Error("down")
+  })
+  const n = await notice()
+  expect(n.textContent).toContain("Could not load the diff")
+  expect(n.getAttribute("data-tone")).toBe("deadlocked")
+  editable()
+})
+
 const named = (...paths: string[]): DiffFilesResult => ({
   kind: "files",
   files: { ...range(), files: paths.map((path) => ({ ...file, path })) },

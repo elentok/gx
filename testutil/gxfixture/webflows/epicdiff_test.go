@@ -313,6 +313,13 @@ func TestEpicDiffScenario_PR(t *testing.T) {
 	if gb != spec.EpicDiffGoneBase || gt != spec.EpicDiffMissingTip || hasObject(r.Repo(), gb) || hasObject(r.Repo(), gt) {
 		t.Errorf("gone epic range %q, %q; want the stamped SHAs, both absent", gb, gt)
 	}
+	// What the Diff page reads for each range: the kept one has files, the gone one has no commits.
+	if out := r.Gx(t, "server", "diff-files", "--project", "demo", kb, kt); !strings.Contains(out, "merge-base "+kb) || strings.Contains(out, "commits not available") {
+		t.Errorf("kept epic diff-files = %q, want a file list from its stamped base", out)
+	}
+	if out := r.Gx(t, "server", "diff-files", "--project", "demo", gb, gt); !strings.Contains(out, "commits not available") {
+		t.Errorf("gone epic diff-files = %q, want the commits-not-available text", out)
+	}
 
 	// A second read changes nothing.
 	for a, want := range stamped {

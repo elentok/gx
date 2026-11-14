@@ -255,3 +255,61 @@ func TestMergeRoot_StampsOnlyCompletedAtWhenTheMergePauses(t *testing.T) {
 
 	f.AssertStamps(t, false)
 }
+
+// stackedFixture is a schedFixture whose epic merges into the unmerged blocker
+// epic's branch, not into main.
+func stackedFixture(t *testing.T) *schedFixture {
+	t.Helper()
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {BlockedBy: []string{servertest.StackBlocker}}}, func(f *schedFixture, p *servertest.Turn, id string) {
+		commitWork(t, p, id)
+		f.EnableStackedAutoMerge(t)
+	})
+	f.StackOnBlocker(t)
+	return f
+}
+
+// Story 17 of the epic-diff spec: the stamp is the derived target's tip before
+// and after the merge, here the blocker's branch.
+func TestMergeRoot_StackedEpicStampsTheBlockersTipBeforeAndAfter(t *testing.T) {
+	t.Parallel()
+	f := stackedFixture(t)
+	main, blockerBefore := f.rev(t, "main"), f.rev(t, servertest.StackBlocker)
+
+	f.runEpic(t, wire.EventRootCompleted)
+
+	e := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
+	if got := f.rev(t, servertest.StackBlocker); got != f.rev(t, schedEpic) || got == blockerBefore {
+		t.Fatalf("blocker branch at %s, want the epic's tip %s, moved from %s", got, f.rev(t, schedEpic), blockerBefore)
+	}
+	if e.RangeBase != blockerBefore || e.RangeTip != f.rev(t, servertest.StackBlocker) {
+		t.Errorf("range = %q..%q, want %q..%q", e.RangeBase, e.RangeTip, blockerBefore, f.rev(t, servertest.StackBlocker))
+	}
+	if got := f.rev(t, "main"); got != main {
+		t.Errorf("main moved to %s", got)
+	}
+}
+
+// Story 23 of the epic-diff spec: squash-merging the blocker rewrites its
+// commits, but the stacked epic's stamp stays the one it took at its own merge.
+func TestMergeRoot_SquashMergingTheBlockerLeavesTheStackedEpicsStampUnchanged(t *testing.T) {
+	t.Parallel()
+	f := stackedFixture(t)
+	f.runEpic(t, wire.EventRootCompleted)
+	stamped := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
+	if stamped.RangeBase == "" || stamped.RangeTip == "" {
+		t.Fatalf("epic not stamped: %q..%q", stamped.RangeBase, stamped.RangeTip)
+	}
+
+	// Ancestry cannot see a squash, so the person marks the blocker merged.
+	f.Git(t, "merge", "--squash", servertest.StackBlocker)
+	testutil.CommitAll(t, f.Repo, "squash blocker")
+	if err := tickets.StampEpicFields(filepath.Join(f.Store, "proj", servertest.StackBlocker), map[string]any{"merged_at": time.Now().UTC()}); err != nil {
+		t.Fatal(err)
+	}
+	f.H.Server.Rescan()
+
+	got := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
+	if got.RangeBase != stamped.RangeBase || got.RangeTip != stamped.RangeTip {
+		t.Errorf("range = %q..%q after the squash, want %q..%q", got.RangeBase, got.RangeTip, stamped.RangeBase, stamped.RangeTip)
+	}
+}

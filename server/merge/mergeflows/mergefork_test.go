@@ -159,6 +159,40 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 	waitUntil(t, "the dependent to launch", func() bool { return f.others.Load() > 0 })
 }
 
+// Story 17 of the epic-diff spec on the Merge-ticket path: the epic is stacked
+// on a blocker whose branch moves on, the Merge ticket rebases onto the new
+// tip, and the stamp is that tip before and the epic's tip after.
+func TestMergeFork_StackedEpicStampsTheBlockersTipBeforeAndAfterItsMergeTicket(t *testing.T) {
+	t.Parallel()
+	var blockerMoved atomic.Value
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {BlockedBy: []string{servertest.StackBlocker}}}, func(f *schedFixture, p *servertest.Turn, id string) {
+		if isMergeTurn(p) {
+			gitOut(t, p.Cwd, "rebase", "-q", servertest.StackBlocker)
+			reportIteration(t, f.TicketFile(t, id), "finished")
+			return
+		}
+		commitWork(t, p, id)
+		f.EnableStackedAutoMerge(t)
+		tip := strings.TrimSpace(f.Git(t, "rev-parse", servertest.StackBlocker))
+		moved := strings.TrimSpace(f.Git(t, "commit-tree", tip+"^{tree}", "-p", tip, "-m", "blocker moves on"))
+		f.Git(t, "update-ref", "refs/heads/"+servertest.StackBlocker, moved)
+		blockerMoved.Store(moved)
+	})
+	f.StackOnBlocker(t)
+
+	f.RunEpic(t, wire.EventRootCompleted)
+
+	moved, _ := blockerMoved.Load().(string)
+	e := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
+	after := strings.TrimSpace(f.Git(t, "rev-parse", servertest.StackBlocker))
+	if len(f.mergeTicketFiles(t)) != 1 || after != strings.TrimSpace(f.Git(t, "rev-parse", schedEpic)) || after == moved {
+		t.Fatalf("blocker at %s, want the rebased epic tip, past %s, via one merge ticket", after, moved)
+	}
+	if e.RangeBase != moved || e.RangeTip != after {
+		t.Errorf("range = %q..%q, want %q..%q", e.RangeBase, e.RangeTip, moved, after)
+	}
+}
+
 // Story 59 of the pr-flow spec: delivery flips to pr while the Merge ticket runs.
 // The ticket finishes, but a pr project never merges locally, so the epic is
 // completed and left for a PR (Awaiting PR), with no second Merge ticket.

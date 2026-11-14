@@ -35,6 +35,37 @@ func CommitOnBranch(t *testing.T, repo, branch string) {
 	RunGitIn(t, repo, "checkout", "-q", "main")
 }
 
+// StackBlocker is the epic StackOnBlocker builds.
+const StackBlocker = "blocker"
+
+// StackOnBlocker stacks the fixture's epic on a done, unmerged StackBlocker
+// epic with one commit on its own branch. The project releases on-done, so
+// the epic's merge target is that branch. The fixture's ticket 01 must name
+// StackBlocker in BlockedBy. With auto-ff-merge on, a done blocker releases
+// its dependents only once merged, so the project starts with it off:
+// EnableStackedAutoMerge turns it on, from the epic's agent turn. Call
+// StackOnBlocker before queuing the epic.
+func (f *SchedFixture) StackOnBlocker(t *testing.T) {
+	t.Helper()
+	CommitOnBranch(t, f.Repo, StackBlocker)
+	WriteCompleteEpic(t, f.Store, StackBlocker)
+	f.writeStackedProject(t, "")
+	f.H.Server.Rescan()
+}
+
+// EnableStackedAutoMerge opts the stacked project in to auto-ff-merge.
+func (f *SchedFixture) EnableStackedAutoMerge(t *testing.T) {
+	t.Helper()
+	f.writeStackedProject(t, `"auto-ff-merge":true,`)
+}
+
+func (f *SchedFixture) writeStackedProject(t *testing.T, autoMerge string) {
+	t.Helper()
+	if err := WriteProjectRepo(f.Store, "proj", f.Repo, `,`+autoMerge+`"landing":"on-done"`); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func WaitUntil(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	WaitFor(t, 10*time.Second, what, cond)
