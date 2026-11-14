@@ -1,7 +1,16 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
-import { HostedFound, HostedKindMarkdown, type HostedResolved } from "../generated/ops"
+import {
+  HostedFound,
+  HostedKindBinary,
+  HostedKindCode,
+  HostedKindImage,
+  HostedKindMarkdown,
+  HostedKindPDF,
+  HostedKindSVG,
+  type HostedResolved,
+} from "../generated/ops"
 import { ConnectionContext, createConnection } from "../connection"
 import { appRoutes } from "../routes"
 import { renderThemed } from "../ui/render"
@@ -101,6 +110,83 @@ test("a failed resolve shows an error with Retry, not not-found", async () => {
   expect(screen.queryByText("File not found")).toBeNull()
   fireEvent.click(screen.getByRole("button", { name: "Retry" }))
   expect(await screen.findByText("No preview yet")).toBeTruthy()
+})
+
+const withKind = (p: string, kind: HostedResolved["kind"], size = 1000): HostedResolved => ({
+  ...found(p),
+  kind,
+  size,
+})
+
+// The page header has its own logo <img>, so pick the viewer's by its raw-route src.
+const rawImg = 'img[src^="/v1/files/"]'
+const findViewerImg = () =>
+  waitFor(() => {
+    const img = document.querySelector<HTMLElement>(rawImg)
+    if (!img) throw new Error("viewer image not rendered")
+    return img
+  })
+
+function expectNoSource() {
+  expect(screen.getByRole("link", { name: "Raw" })).toBeTruthy()
+  expect(screen.getByRole("link", { name: "Download" })).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Copy link" })).toBeTruthy()
+  expect(screen.queryByText("Source")).toBeNull()
+}
+
+test("an image is an <img> from the raw route and the bar gets its pixel size", async () => {
+  renderAt("/files/tmp/shot-1.png", async (p) => withKind(p, HostedKindImage, 212 * 1024))
+  const img = await findViewerImg()
+  expect(img.getAttribute("src")).toBe("/v1/files/tmp/shot-1.png")
+  Object.defineProperty(img, "naturalWidth", { value: 1280 })
+  Object.defineProperty(img, "naturalHeight", { value: 800 })
+  fireEvent.load(img)
+  expect(await screen.findByText(/212 KB · .* · 1280×800/)).toBeTruthy()
+})
+
+test("an image that fails to load shows the not-found page", async () => {
+  renderAt("/files/tmp/shot-1.png", async (p) => withKind(p, HostedKindImage))
+  fireEvent.error(await findViewerImg())
+  expect(await screen.findByText("File not found")).toBeTruthy()
+  expect(screen.queryByRole("link", { name: "Raw" })).toBeNull()
+})
+
+test("an SVG is shown through <img> only", async () => {
+  renderAt("/files/tmp/logo.svg", async (p) => withKind(p, HostedKindSVG))
+  const img = await findViewerImg()
+  expect(img.tagName).toBe("IMG")
+  expect(img.getAttribute("src")).toBe("/v1/files/tmp/logo.svg")
+  expect(document.querySelector("iframe, object, embed")).toBeNull()
+  expect(img.parentElement?.querySelector("svg")).toBeNull()
+})
+
+test("a 3 MB code file and a 3 MB image are too large", async () => {
+  for (const kind of [HostedKindCode, HostedKindImage] as const) {
+    renderAt("/files/tmp/big.log", async (p) => withKind(p, kind, 3 * 1024 * 1024))
+    expect(await screen.findByText("Too large to show")).toBeTruthy()
+    expect(screen.getByText("Files over 2 MB show no preview. Use Raw or Download.")).toBeTruthy()
+    expect(document.querySelector(rawImg)).toBeNull()
+    expectNoSource()
+    cleanup()
+  }
+})
+
+test("binary and PDF show their notes", async () => {
+  renderAt("/files/tmp/blob.bin", async (p) => withKind(p, HostedKindBinary))
+  expect(
+    await screen.findByText("No preview for this file type. Use Raw or Download."),
+  ).toBeTruthy()
+  expectNoSource()
+  cleanup()
+  renderAt("/files/tmp/doc.pdf", async (p) => withKind(p, HostedKindPDF))
+  expect(
+    await screen.findByText("PDFs open in the browser's PDF viewer. Use Raw or Download."),
+  ).toBeTruthy()
+  expectNoSource()
+  expect(document.querySelector("iframe, object, embed")).toBeNull()
+  expect(screen.getByRole("link", { name: "Download" }).getAttribute("href")).toBe(
+    "/v1/files/tmp/doc.pdf?download=1",
+  )
 })
 
 test("a pending resolve shows the spinner", async () => {

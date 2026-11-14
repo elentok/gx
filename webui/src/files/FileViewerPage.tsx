@@ -1,4 +1,5 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
+import { useState } from "react"
 import { useParams } from "react-router"
 import { copyText } from "../clipboard"
 import { formatAge } from "../epics/cardTime"
@@ -102,6 +103,31 @@ function NotFound() {
   )
 }
 
+function FoundView({ path, file }: { path: string; file: HostedResolved }) {
+  const [pixels, setPixels] = useState("")
+  const [imageFailed, setImageFailed] = useState(false)
+  if (imageFailed) {
+    return (
+      <>
+        <Bar path={path} meta="" found={false} />
+        <NotFound />
+      </>
+    )
+  }
+  const meta = [metaText(file), pixels].filter(Boolean).join(" · ")
+  return (
+    <>
+      <Bar path={path} meta={meta} found />
+      <ViewerBody
+        file={file}
+        path={path}
+        onImageLoad={(w, h) => setPixels(`${w}×${h}`)}
+        onImageError={() => setImageFailed(true)}
+      />
+    </>
+  )
+}
+
 export function FileViewerPage({
   fetchResolve = resolveOwnPath,
 }: {
@@ -138,10 +164,7 @@ export function FileViewerPage({
           bg="surface"
         >
           {data.verdict === HostedFound ? (
-            <>
-              <Bar path={path} meta={metaText(data)} found />
-              <ViewerBody file={data} />
-            </>
+            <FoundView key={path} path={path} file={data} />
           ) : (
             <>
               <Bar path={path} meta="" found={false} />
