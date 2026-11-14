@@ -1,5 +1,6 @@
 import { sessions } from "./agentsKit"
 import { card, expect, nav, sessionRows, test } from "./fixture"
+import { draftPage, renameDraft } from "./draftKit"
 import { frameButton, goto, sidebarKit, stillMotion } from "./sidebarKit"
 
 // One journey over the `workspaces` scenario: the sidebar's rows follow the active workspace, and
@@ -23,10 +24,21 @@ test("Workspaces", async ({ page, start }) => {
     jump,
   } = sidebarKit(page)
 
-  // The sidebar shows the Default workspace's rows on the Epics page.
+  // A second browser context on the same login: its sidebar follows the draft steps below with no reload.
+  const second = await page
+    .context()
+    .browser()!
+    .newContext({ ignoreHTTPSErrors: true, storageState: await page.context().storageState() })
+  const page2 = await second.newPage()
+  const side2 = sidebarKit(page2)
+  await page2.goto(page.url().split("#")[0]! + "#/epics")
+
+  // The sidebar shows the Default workspace's rows on the Epics page, the seeded draft (no membership) among them.
   await expect(page.getByRole("button", nav("Workspace: Default workspace"))).toBeVisible()
   await expect(row("ready-epic")).toBeVisible()
   await expect(row("ws-design")).toHaveCount(0)
+  await expect(row("ws-draft")).toBeVisible()
+  await expect(side2.row("ws-draft")).toBeVisible()
 
   // The footer's inbox button sums the project's follow-ups (2 bugs, 2 ideas); the popover line opens the Follow-ups card, section open and in view.
   const inbox = page.getByRole("button", { name: /^Follow-ups/ })
@@ -69,6 +81,7 @@ test("Workspaces", async ({ page, start }) => {
   await page.keyboard.press("Alt+Shift+2")
   await expect(page.getByRole("button", nav("Workspace: gx bugs"))).toBeVisible()
   await expect(row("ws-design")).toBeVisible()
+  await expect(row("ws-draft")).toHaveCount(0)
   await page.keyboard.press("Alt+Shift+1")
   await expect(page.getByRole("button", nav("Workspace: Default workspace"))).toBeVisible()
 
@@ -126,6 +139,20 @@ test("Workspaces", async ({ page, start }) => {
   // Move from an Epics page card is covered by the EpicCard tests; ws-impl-epic stays in gx bugs for the jump dialog.
   await goto(page, "#/epics")
 
+  // A draft row has the same Move; the second context's Default list loses it with no reload. A direct link to a draft of another workspace switches to it.
+  await pick("Default workspace")
+  const draftHref = (await row("ws-draft").getAttribute("href"))!
+  await moveTo(rowMenu("ws-draft"), "gx bugs")
+  await expect(row("ws-draft")).toHaveCount(0)
+  await expect(side2.row("ws-draft")).toHaveCount(0)
+  await pick("gx bugs")
+  await expect(row("ws-draft")).toBeVisible()
+  await pick("Default workspace")
+  await goto(page, draftHref)
+  await expect(page.getByRole("button", nav("Workspace: gx bugs"))).toBeVisible()
+  await expect(row("ws-draft")).toHaveAttribute("aria-current", "page")
+  await goto(page, "#/epics")
+
   // Jump dialog: Move from a row, then opening an item in another workspace switches the sidebar.
   const jumpRow = (title: string) => jump.getByRole("option").filter({ hasText: title }).first()
   const openJump = async (filter: string) => {
@@ -165,17 +192,31 @@ test("Workspaces", async ({ page, start }) => {
     JSON.parse(await fx.cli("server", "workspaces", "list", "--json")).workspaces.find(
       (w: { name: string }) => w.name === "research",
     ).members as number
-  const startDesign = async (slug: string) => {
-    const dialog = page.getByRole("dialog", nav("New Design"))
-    await dialog.getByRole("textbox", nav("Epic slug")).fill(slug)
-    await dialog.getByRole("textbox", nav("Rough idea")).fill("an idea")
-    await dialog.getByRole("button", nav("Start design")).click()
-    await expect(dialog).toHaveCount(0)
-  }
+  const d = draftPage(page)
+  await side2.pick("research")
   const before = await members()
   await sidebar.getByRole("button", { name: "+ New", exact: true }).click()
   await page.getByRole("menuitem", { name: /^New design/ }).click()
-  await startDesign("made-from-sidebar")
+  await expect(page).toHaveURL(/#\/drafts\/[^/]+$/)
+  await expect(d.prompt).toBeFocused()
+  // The new draft is a row in the active workspace and in no other; the second context, on the same workspace, shows it with no reload.
+  await expect(row("Untitled design")).toHaveCount(1)
+  await expect(side2.row("Untitled design")).toHaveCount(1)
+  await pick("Default workspace")
+  await expect(row("Untitled design")).toHaveCount(0)
+  await pick("research")
+  await d.prompt.fill("An idea.")
+  await renameDraft(page, "made-from-sidebar")
+  await expect(row("made-from-sidebar")).toHaveAttribute("href", /#\/drafts\//)
+  await expect(side2.row("made-from-sidebar")).toBeVisible()
+  // Start replaces the draft's row with the Design's, in the same workspace, in both contexts.
+  await d.start.click()
+  await expect(page).toHaveURL(/#\/d\/demo:made-from-sidebar$/)
+  for (const r of [row, side2.row]) {
+    await expect(r("made-from-sidebar")).toHaveCount(1)
+    await expect(r("made-from-sidebar")).toHaveAttribute("href", /#\/d\/demo:made-from-sidebar$/)
+    await expect(r("Untitled design")).toHaveCount(0)
+  }
   await expect.poll(members).toBe(before + 1)
   await goto(page, "#/epics")
   await sidebar.getByRole("button", { name: "+ New", exact: true }).click()
@@ -276,12 +317,16 @@ test("Workspaces", async ({ page, start }) => {
   await manage.getByRole("button", nav("Delete gx bugs")).click()
   const deleting = page.getByRole("dialog", nav("Delete gx bugs"))
   await expect(deleting).toContainText(/Its \d+ items? go(es)? back to the Default workspace/)
+  await expect(deleting).toContainText('including the draft "ws-draft"')
   await deleting.getByRole("button", nav("Keep")).click()
   await expect(names).toHaveCount(2)
+  await expect(row("ws-draft")).toHaveCount(0)
   await manage.getByRole("button", nav("Delete gx bugs")).click()
   await deleting.getByRole("button", nav("Delete")).click()
   await expect(names).toHaveCount(1)
   await manage.getByRole("button", nav("Close")).click()
+  // The deleted workspace's draft is in Default afterwards.
+  await expect(row("ws-draft")).toBeVisible()
 
   // CLI changes show in the open page without a reload; deleting the active workspace drops to Default.
   await pick("labs")
@@ -344,6 +389,15 @@ test("Workspaces", async ({ page, start }) => {
   await closeMenus()
   await fx.cli("server", "workspaces", "sort", "Default workspace", "needs-you")
 
+  // By status the draft sits in group "Draft", by project in its project's group.
+  const groupOf = (title: string) =>
+    row(title).locator("xpath=ancestor::li[1]/preceding-sibling::li[@data-part='group-header'][1]")
+  await fx.cli("server", "workspaces", "sort", "Default workspace", "status")
+  await expect(groupOf("ws-draft")).toHaveText("Draft")
+  await fx.cli("server", "workspaces", "sort", "Default workspace", "project")
+  await expect(groupOf("ws-draft")).toHaveText("demo")
+  await fx.cli("server", "workspaces", "sort", "Default workspace", "needs-you")
+
   // Rows reorder live and keyboard focus stays on the same row: the last row, which moves furthest when the order flips.
   const navRows = sidebar.locator("a[data-nav]")
   const last = navRows.last()
@@ -396,4 +450,5 @@ test("Workspaces", async ({ page, start }) => {
   // The wide shell replaces /settings with its first section, so the URL is either.
   await expect(page).toHaveURL(/#\/settings(\/s\/[\w-]+)?$/)
   await goto(page, "#/epics")
+  await second.close()
 })

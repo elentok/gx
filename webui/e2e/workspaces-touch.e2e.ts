@@ -1,5 +1,6 @@
 import type { Locator } from "@playwright/test"
 import { sessions } from "./agentsKit"
+import { draftPage } from "./draftKit"
 import { blockEvents, expect, nav, swipe, test } from "./fixture"
 import { goto, sidebarKit, stillMotion } from "./sidebarKit"
 
@@ -109,6 +110,17 @@ test("Workspaces touch", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/e\/demo:paused-epic$/)
   await expect(sidebar).toBeHidden()
 
+  // A draft of another workspace opens from the jump menu and the active workspace switches to its own.
+  await page.keyboard.press("ControlOrMeta+k")
+  await jump.getByRole("combobox").fill("ws-draft")
+  await jump.getByRole("option").filter({ hasText: "ws-draft" }).first().click()
+  await expect(page).toHaveURL(/#\/drafts\/[^/]+$/)
+  await page.getByRole("button", nav("Show sidebar")).click()
+  await expect(page.getByRole("button", nav("Workspace: Default workspace"))).toBeVisible()
+  await expect(row("ws-draft")).toHaveAttribute("aria-current", "page")
+  await row("ws-draft").click()
+  await expect(sidebar).toBeHidden()
+
   // A tap on a chat row opens it without the keyboard: the prompt is not the active element. The fixture page has no touch context, so a click stands in.
   await goto(page, "#/epics")
   await page.getByRole("button", nav("Show sidebar")).click()
@@ -207,11 +219,29 @@ test("Workspaces touch", async ({ page, start }) => {
   await expect(dialog.getByRole("textbox", nav("Name"))).toBeVisible()
   await expect(dialog.getByRole("textbox", nav("Name"))).toBeFocused()
   await closeDialog()
-  for (let n = 0; n < 4; n++) {
-    await newItem("New design")
-    await expect(dialog.getByRole("textbox", nav("Epic slug"))).toBeFocused()
-    await closeDialog()
+  // New design opens a draft page with the Prompt focused, and pressing it on an empty draft's page reuses that draft.
+  const draftIds = async () =>
+    (await fx.cli("designs", "drafts", "list"))
+      .split("\n")
+      .filter((l) => l.includes("\t"))
+      .map((l) => l.split("\t")[0]!.trim())
+  const seeded = await draftIds()
+  const d = draftPage(page)
+  const newDesign = async () => {
+    await sidebar.getByRole("button", { name: "+ New" }).click()
+    await page.getByRole("menuitem", { name: "New design" }).click()
+    await expect(page).toHaveURL(/#\/drafts\/[^/]+$/)
+    await expect(d.prompt).toBeFocused()
   }
+  await newDesign()
+  const emptyUrl = page.url()
+  await d.slug.focus()
+  await newDesign()
+  expect(page.url()).toBe(emptyUrl)
+  await expect.poll(draftIds).toHaveLength(seeded.length + 1)
+  // Leaving the empty draft by navigating removes it, so no draft carries over.
+  await goto(page, "#/epics")
+  await expect.poll(draftIds).toEqual(seeded)
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(sidebar).toBeVisible()
   for (const name of ["New chat", "New workspace…"]) {
@@ -222,19 +252,17 @@ test("Workspaces touch", async ({ page, start }) => {
   await page.setViewportSize({ width: 1280, height: 900 })
 
   // New chat and New design start on the page's project, then the Epics filter's single project, then the last used one.
-  // Every check opens a blank form: the previous one is closed with nothing typed, so no draft carries over.
+  // Every check opens a blank form or draft: the previous one is closed or left with nothing typed, so no draft carries over.
   const chatForm = page.getByRole("dialog", { name: "New session" })
-  const designForm = dialog.getByRole("textbox", nav("Epic slug"))
   const chatProject = chatForm.getByRole("combobox", nav("Project"))
-  const designProject = dialog.getByRole("combobox", nav("Project"))
   const formsShow = async (project: string) => {
     await newItem("New chat")
     await expect(chatProject).toHaveValue(project)
     await closeDialog()
-    await newItem("New design")
-    await expect(designForm).toBeVisible()
-    await expect(designProject).toHaveValue(project)
-    await closeDialog()
+    await newDesign()
+    await expect(d.project).toHaveValue(project)
+    await goto(page, "#/epics")
+    await expect.poll(draftIds).toEqual(seeded)
   }
   const sideChat = (await sessions(fx)).find((s) => s.project === "side" && !s.design)!
   await goto(page, "#/d/side:side-design")
@@ -257,21 +285,24 @@ test("Workspaces touch", async ({ page, start }) => {
   await expect(projectList).toHaveCount(0)
   await formsShow("side")
 
-  // With the filter cleared, a chat created in the second project becomes the last used one, which a Stats page form starts on.
+  // With the filter cleared, the last used project decides on a Stats page. The drafts above were made in "side", which made it the
+  // last used one; a chat created in "demo" takes that over.
   await page.getByRole("button", nav("Project")).click()
   await projectList.getByRole("button", nav("All projects")).click()
   await page.keyboard.press("Escape")
   await expect(projectList).toHaveCount(0)
   await goto(page, "#/stats")
   await newItem("New chat")
+  await expect(chatProject).toHaveValue("side")
+  await chatProject.click()
+  await page.getByRole("listbox", nav("Projects")).getByRole("option", nav("demo")).click()
   await expect(chatProject).toHaveValue("demo")
-  await chatProject.selectOption("side")
-  await chatForm.getByRole("textbox", nav("Name")).fill("side-made")
+  await chatForm.getByRole("textbox", nav("Name")).fill("demo-made")
   await chatForm.getByRole("textbox", nav("First prompt")).fill("hi")
   await chatForm.getByRole("button", nav("Create session")).click()
   await expect(chatForm).toHaveCount(0)
   await goto(page, "#/stats")
-  await formsShow("side")
+  await formsShow("demo")
 
   // The footer's boxes are one size with their icons centered, at 1280px and 390px, and the badges agree.
   const footer = sidebar.locator("footer")

@@ -208,10 +208,31 @@ function DraftForm({
   const renameFocus = () => slugInput.current?.focus()
   // The Chord host calls these through the registry, so it always sees the latest closures.
   const formRef = useRef<HTMLFormElement | null>(null)
-  const focusPrompt = () =>
+  const putFocus = () =>
     formRef.current
       ?.querySelector<HTMLElement>("textarea[name='design-idea'], [contenteditable='true']")
       ?.focus()
+  // The menu that started New design returns focus to its trigger a moment later, so for a short
+  // while focus that lands outside the form goes back to the Prompt until the person acts.
+  const stopHold = useRef<() => void>(() => {})
+  const focusPrompt = () => {
+    stopHold.current()
+    putFocus()
+    const back = (e: FocusEvent) => {
+      if (!formRef.current?.contains(e.target as Node)) putFocus()
+    }
+    const stop = () => {
+      clearTimeout(timer)
+      document.removeEventListener("focusin", back)
+      document.removeEventListener("pointerdown", stop, true)
+      document.removeEventListener("keydown", stop, true)
+    }
+    const timer = setTimeout(stop, 2000)
+    document.addEventListener("focusin", back)
+    document.addEventListener("pointerdown", stop, true)
+    document.addEventListener("keydown", stop, true)
+    stopHold.current = stop
+  }
   const actions = useRef({ remove: askRemove, rename: renameFocus, focusPrompt })
   actions.current = { remove: askRemove, rename: renameFocus, focusPrompt }
   useEffect(
@@ -230,6 +251,7 @@ function DraftForm({
   const focusWanted = (locationState as { focusPrompt?: boolean } | null)?.focusPrompt === true
   useEffect(() => {
     if (focusWanted) focusPrompt()
+    return () => stopHold.current()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationKey, focusWanted])
 

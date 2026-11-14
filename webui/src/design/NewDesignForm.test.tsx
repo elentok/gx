@@ -79,7 +79,9 @@ async function mount(
     pathname = "/drafts/d1",
     viMode = false,
     open = ok,
+    state,
   }: {
+    state?: unknown
     projects?: string[]
     device?: Device
     pathname?: string
@@ -102,7 +104,7 @@ async function mount(
     renderThemed(
       <DeviceContext.Provider value={device}>
         <ConnectionContext.Provider value={connection}>
-          <MemoryRouter initialEntries={[pathname]}>
+          <MemoryRouter initialEntries={[{ pathname, state }]}>
             <Routes>
               <Route path="/epics" element={<Where />} />
               <Route path="/d/*" element={<Where />} />
@@ -238,6 +240,21 @@ test("an invalid slug shows its problem and writes nothing; an empty one is writ
   type("Epic slug", "")
   await wait(800)
   expect(fake.saveFields).toHaveBeenCalledWith({ id: "d1", project: "gx", slug: "" })
+})
+
+test("a page opened by New design takes back focus that a closing menu returns to its trigger", async () => {
+  const trigger = document.createElement("button")
+  document.body.append(trigger)
+  await mount(fakeDrafts(), { state: { focusPrompt: true } })
+  const prompt = screen.getByRole("textbox", { name: "Prompt" })
+  expect(document.activeElement).toBe(prompt)
+  act(() => trigger.focus())
+  expect(document.activeElement).toBe(prompt)
+  // A key press ends the window: focus the person moves later stays where it goes.
+  fireEvent.keyDown(document.body, { key: "Tab" })
+  act(() => trigger.focus())
+  expect(document.activeElement).toBe(trigger)
+  trigger.remove()
 })
 
 test("Rename focuses the slug field", async () => {
