@@ -3,6 +3,7 @@ package merge
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -231,7 +232,18 @@ func (s *Merger) mergeEpic(root queue.RootRef, one ralphloop.OneIteration, repo 
 			added, removed, countErr = git.DiffLines(repo, trunkBefore, "refs/heads/"+target)
 		}
 		s.stampMergedEpic(root, e, added, removed, countErr)
-		s.StampEpic(root, e.Path, "merged_at", "completed_at")
+		rangeBase, rangeTip := "", ""
+		if revErr == nil {
+			tip, err := git.RevParse(repo, "refs/heads/"+target)
+			if err == nil {
+				rangeBase, rangeTip = trunkBefore, tip
+			}
+			revErr = err
+		}
+		if revErr != nil {
+			s.log.Warn("read merge range, stamping no range", "root", root, "err", revErr)
+		}
+		s.StampEpicRange(root, e.Path, rangeBase, rangeTip, "merged_at", "completed_at")
 		// On the settle group: it takes the worktree lock, which the merge must not wait on.
 		s.guards.GoSettle(func() { s.removeLeftoverWorktrees(repo, e) })
 		first = true
@@ -359,10 +371,21 @@ func (s *Merger) submitRetro(root queue.RootRef, projectDir string, e tickets.Ep
 // StampEpic stamps each of keys with now on the epic. A failed stamp is
 // logged, never fatal: the merge it records has already happened.
 func (s *Merger) StampEpic(root queue.RootRef, epicPath string, keys ...string) {
+	s.StampEpicRange(root, epicPath, "", "", keys...)
+}
+
+// StampEpicRange is StampEpic that also records the Epic range (the target's
+// tip before and after the merge) in the same write as keys. An empty base or
+// tip, or a map epic, stamps no range: a merge that happened is still
+// recorded. Callers warn about a tip they could not read.
+func (s *Merger) StampEpicRange(root queue.RootRef, epicPath, base, tip string, keys ...string) {
 	now := time.Now().UTC()
-	fields := make(map[string]any, len(keys))
+	fields := make(map[string]any, len(keys)+2)
 	for _, k := range keys {
 		fields[k] = now
+	}
+	if base != "" && tip != "" && !tickets.IsMapEpic(epicPath) {
+		maps.Copy(fields, map[string]any{"range_base": base, "range_tip": tip})
 	}
 	if err := tickets.StampEpicFields(epicPath, fields); err != nil {
 		s.log.Warn("stamp epic", "root", root, "keys", keys, "err", err)
@@ -395,18 +418,12 @@ func (s *Merger) stampMergedEpic(root queue.RootRef, e tickets.Epic, added, remo
 	if countErr != nil {
 		s.log.Warn("count merged lines", "root", root, "err", countErr)
 	} else {
-		s.stampLines(root, e.Path, added, removed)
+		err := tickets.StampEpicFields(e.Path, map[string]any{"lines_added": added, "lines_removed": removed})
+		if err != nil {
+			s.log.Warn("stamp epic lines", "root", root, "err", err)
+		}
 	}
 	s.stampTotals(root, e)
-}
-
-// stampLines records the lines the merge added to and removed from trunk. A
-// failed stamp is logged, never fatal, like stampEpic's.
-func (s *Merger) stampLines(root queue.RootRef, epicPath string, added, removed int) {
-	err := tickets.StampEpicFields(epicPath, map[string]any{"lines_added": added, "lines_removed": removed})
-	if err != nil {
-		s.log.Warn("stamp epic lines", "root", root, "err", err)
-	}
 }
 
 const (

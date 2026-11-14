@@ -2,12 +2,14 @@ package merge_test
 
 import (
 	"github.com/elentok/gx/server/wire"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 )
 
 // trunkFixture is a sched fixture whose project's trunk is develop, a branch
@@ -54,11 +56,17 @@ func TestTrunk_ExplicitBaseMovesOnlyTheStart(t *testing.T) {
 	f := trunkFixture(t, servertest.TicketOpts{Base: "release-1.2"}, func(_ *schedFixture, p *servertest.Turn, id string) { commitWork(t, p, id) })
 	f.Git(t, "branch", "release-1.2")
 	release := f.rev(t, "release-1.2")
+	developBefore := f.rev(t, "develop")
 
 	f.runEpic(t, wire.EventRootCompleted)
 
 	if body := servertest.ReadFile(t, f.TicketFile(t, "01")); !strings.Contains(body, "resolved_base: release-1.2@"+release) {
 		t.Errorf("ticket lacks resolved_base release-1.2@%s:\n%s", release, body)
+	}
+	// The range is the derived target's (develop), not the explicit base's.
+	md := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
+	if md.RangeBase != developBefore || md.RangeTip != f.rev(t, schedEpic) {
+		t.Errorf("range = %s..%s, want %s..%s", md.RangeBase, md.RangeTip, developBefore, f.rev(t, schedEpic))
 	}
 	if got := f.rev(t, "develop"); got != f.rev(t, schedEpic) {
 		t.Errorf("develop at %s, want the feature branch tip", got)

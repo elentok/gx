@@ -244,6 +244,31 @@ func TestEpicMerge_StampsLinesAddedAndRemovedFromTrunkBeforeToAfter(t *testing.T
 	}
 }
 
+func TestEpicMerge_StampsRangeFromTrunkTipBeforeToAfter(t *testing.T) {
+	t.Parallel()
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, _ string) {
+		testutil.WriteFile(t, p.Cwd, "README.md", "a\nb\nc\n")
+		testutil.CommitAll(t, p.Cwd, "rewrite readme")
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completedUnmerged(ctx, t, f)
+	before := strings.TrimSpace(f.Git(t, "rev-parse", "main"))
+
+	if res, err := f.H.Client.Tickets.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
+	}
+	after := strings.TrimSpace(f.Git(t, "rev-parse", "main"))
+	md := tickets.LoadEpicTicketMD(filepath.Join(f.Store, "proj", schedEpic))
+	if md.MergedAt.IsZero() || md.RangeBase != before || md.RangeTip != after || before == after {
+		t.Errorf("merged_at %v range %s..%s, want %s..%s", md.MergedAt, md.RangeBase, md.RangeTip, before, after)
+	}
+	raw := f.EpicMD(t)
+	if !strings.Contains(raw, "range_base: "+before) || !strings.Contains(raw, "range_tip: "+after) {
+		t.Errorf("ticket.md lacks the range keys:\n%s", raw)
+	}
+}
+
 // stampTicket rewrites the epic's ticket 01 once the server's own friction
 // stamp, which lands just after the done event, is on it.
 func stampTicket(t *testing.T, f *schedFixture, mutate func(*schema.Ticket)) {
