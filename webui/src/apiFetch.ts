@@ -1,4 +1,5 @@
 import { clearPageCache } from "./pageCache"
+import { noteSignedOut } from "./routeSpans"
 import { dropQueue } from "./webPerf"
 
 const signedOutListeners = new Set<() => void>()
@@ -13,6 +14,7 @@ export function onSignedOut(listener: () => void): () => void {
 export function signOut(): void {
   clearPageCache()
   dropQueue()
+  noteSignedOut()
   signedOutListeners.forEach((l) => l())
 }
 

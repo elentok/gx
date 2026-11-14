@@ -1,6 +1,10 @@
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
-import { createMemoryRouter, RouterProvider } from "react-router"
-import { afterEach, expect, test, vi } from "vitest"
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { createMemoryRouter, Navigate, RouterProvider } from "react-router"
+import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import { ROUTE_NAMES } from "./routeNames"
+import { hardLoadNavigationType, noteAuthScreen, resetRouteSpans, trackRouter } from "./routeSpans"
+import { useReady } from "./useReady"
+import { queueSample } from "./webPerf"
 import {
   ConnectionContext,
   createConnection,
@@ -8,12 +12,14 @@ import {
   type Connection,
   type ConnectionState,
 } from "./connection"
-import { appRoutes, type RouteFetchers } from "./routes"
+import { appRoutes, catchAllRoute, pageRoutePatterns, type RouteFetchers } from "./routes"
 import type { EpicDetail, EpicDetailRow, FetchEpicDetail } from "./epic/detail"
 import type { DiskStatus } from "./generated/server"
 import type { Snapshot } from "./snapshot"
 import type { DetailResult, FetchDetail, TicketDetail } from "./ticket/detail"
 import { renderThemed } from "./ui/render"
+
+vi.mock("./webPerf", () => ({ queueSample: vi.fn(), enableQueue: vi.fn(), dropQueue: vi.fn() }))
 
 afterEach(cleanup)
 
@@ -1037,4 +1043,180 @@ test("a cached snapshot with a disk renders the strip before the first fetch lan
   })
   renderAt("/epics", okFor, conn)
   expect(await screen.findByRole("button", { name: "Clean now" })).toBeTruthy()
+})
+
+// --- route spans ---
+
+const sampled = vi.mocked(queueSample)
+let stopTracking: (() => void) | undefined
+
+beforeEach(() => {
+  resetRouteSpans()
+  sampled.mockClear()
+})
+afterEach(() => {
+  stopTracking?.()
+  vi.restoreAllMocks()
+})
+
+function Ready() {
+  useReady("ready", "cache")
+  return <p>ready</p>
+}
+
+function renderSpans(initial: string) {
+  const router = createMemoryRouter(
+    [
+      // Keyed so each route remounts, as distinct page components do.
+      { path: "/epics", element: <Ready key="epics" /> },
+      { path: "/tips", element: <Ready key="tips" /> },
+      { path: "/e/*", element: <Ready key="e" /> },
+      { path: "/slow", element: <p>slow</p> },
+      { path: "/old", element: <Navigate to="/tips" replace /> },
+      catchAllRoute,
+    ],
+    { initialEntries: [initial] },
+  )
+  stopTracking = trackRouter(router)
+  render(<RouterProvider router={router} />)
+  return router
+}
+
+const samples = () => sampled.mock.calls.map(([s]) => s)
+
+test("the first span of a load is app_ready from navigation start, later ones route_ready", async () => {
+  vi.spyOn(performance, "getEntriesByType").mockReturnValue([
+    { type: "reload" } as unknown as PerformanceEntry,
+  ])
+  const router = renderSpans("/tips")
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  expect(samples()[0]).toMatchObject({
+    metric: "app_ready",
+    route: "tips",
+    tab: "hard",
+    navigation_type: "reload",
+    outcome: "ready",
+    data_source: "cache",
+  })
+  expect(samples()[0].trigger).toBeUndefined()
+  await act(() => router.navigate("/epics"))
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(2))
+  expect(samples()[1]).toMatchObject({ metric: "route_ready", route: "epics", tab: "route" })
+  vi.restoreAllMocks()
+})
+
+test("the trigger is the last input before the navigation, history for POP, else programmatic", async () => {
+  const router = renderSpans("/tips")
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  fireEvent.pointerDown(document.body)
+  await act(() => router.navigate("/epics"))
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(2))
+  fireEvent.keyDown(document.body, { key: "g" })
+  await act(() => router.navigate("/tips"))
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(3))
+  await act(() => router.navigate(-1))
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(4))
+  // The last key press is now older than the input window.
+  vi.spyOn(performance, "now").mockReturnValue(performance.now() + 60_000)
+  await act(() => router.navigate("/e/x"))
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(5))
+  // "route_ready" for a pointer, a key, a POP, and a navigate() with no input before it.
+  expect(
+    samples()
+      .slice(1)
+      .map((s) => s.trigger),
+  ).toEqual(["click", "keyboard", "history", "programmatic"])
+})
+
+test("a span left before ready queues nothing, and the next one is not an app_ready", async () => {
+  const router = renderSpans("/slow")
+  await screen.findByText("slow")
+  await act(() => router.navigate("/tips"))
+  await screen.findByText("ready")
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  expect(samples()[0]).toMatchObject({ metric: "route_ready", route: "tips" })
+})
+
+test("hiding the page drops the open span", async () => {
+  const router = renderSpans("/tips")
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  await act(() => router.navigate("/slow"))
+  Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true })
+  document.dispatchEvent(new Event("visibilitychange"))
+  Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true })
+  await act(() => router.navigate("/tips"))
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(2))
+  expect(samples().map((s) => s.route)).toEqual(["tips", "tips"])
+})
+
+test("a known redirect is one span for the final route", async () => {
+  const router = renderSpans("/tips")
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  await act(() => router.navigate("/old"))
+  await screen.findByText("ready")
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(2))
+  expect(samples()[1]).toMatchObject({ metric: "route_ready", route: "tips" })
+})
+
+test("the catch-all redirect queues nothing, on a load or later", async () => {
+  const router = renderSpans("/nope")
+  await screen.findByText("ready")
+  await act(() => router.navigate("/tips"))
+  await waitFor(() => expect(sampled).toHaveBeenCalled())
+  expect(samples()).toEqual([expect.objectContaining({ metric: "route_ready", route: "tips" })])
+  await act(() => router.navigate("/also-unknown"))
+  await waitFor(() => expect(router.state.location.pathname).toBe("/epics"))
+  await screen.findByText("ready")
+  expect(sampled).toHaveBeenCalledTimes(1)
+})
+
+test("a route name comes from the pattern, never the URL", async () => {
+  const router = renderSpans("/tips")
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  await act(() => router.navigate("/e/proj:epic/07?q=secret#frag"))
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(2))
+  expect(samples()[1].route).toBe("epic")
+  expect(JSON.stringify(samples())).not.toMatch(/proj|secret|frag/)
+})
+
+test("every page route pattern has one of the 14 route names", () => {
+  for (const pattern of pageRoutePatterns()) expect(ROUTE_NAMES[pattern], pattern).toBeTruthy()
+  expect([...new Set(Object.values(ROUTE_NAMES))].sort()).toEqual(
+    [
+      "agents",
+      "archive",
+      "archive-epic",
+      "cleanup",
+      "design",
+      "epic",
+      "epics",
+      "schedule",
+      "schedules",
+      "settings",
+      "stats",
+      "tips",
+      "ticket",
+      "triage",
+    ].sort(),
+  )
+})
+
+test("a bfcache restore reports back-forward-cache and drops the open span", async () => {
+  const router = renderSpans("/tips")
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  await act(() => router.navigate("/slow"))
+  fireEvent(window, Object.assign(new Event("pageshow"), { persisted: true }))
+  expect(hardLoadNavigationType()).toBe("back-forward-cache")
+  await act(() => router.navigate("/tips"))
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(2))
+  expect(samples().map((s) => s.metric)).toEqual(["app_ready", "route_ready"])
+})
+
+test("the first span after a sign-in or setup screen records nothing", async () => {
+  noteAuthScreen()
+  const router = renderSpans("/tips")
+  await screen.findByText("ready")
+  await act(() => router.navigate("/epics"))
+  await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
+  expect(samples()[0]).toMatchObject({ metric: "route_ready", route: "epics" })
 })

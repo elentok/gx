@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { onSignedOut } from "../apiFetch"
+import { noteAuthScreen } from "../routeSpans"
+import { enableQueue } from "../webPerf"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { CertContext } from "./cert"
 import { fetchAuthState, type AuthState } from "./authState"
@@ -20,8 +22,20 @@ export function AuthGate({
   // "unknown": the read failed (network or server error). The app mounts anyway so its Offline strip shows; the connection loop does the retrying.
   const [auth, setAuth] = useState<AuthState | "unknown" | null>(null)
 
+  // The queue turns on before the app renders, so the app's first span is not discarded.
+  // "unknown" counts as past the gate. Setup and sign-in drop this load's hard-load metrics.
   const refresh = useCallback(() => {
-    fetchState().then(setAuth, () => setAuth("unknown"))
+    fetchState().then(
+      (next) => {
+        if (next.state === "signed-in") enableQueue()
+        else noteAuthScreen()
+        setAuth(next)
+      },
+      () => {
+        enableQueue()
+        setAuth("unknown")
+      },
+    )
   }, [fetchState])
 
   useEffect(refresh, [refresh])

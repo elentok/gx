@@ -9,6 +9,7 @@ import {
   type RouteObject,
 } from "react-router"
 import type { AuthState } from "./auth/authState"
+import { noteCatchAll } from "./routeSpans"
 import { AppShell } from "./shell/AppShell"
 import type { FetchLogins } from "./settings/logins"
 import type { FetchSettings } from "./settings/settingsApi"
@@ -247,12 +248,25 @@ export interface RouteFetchers {
   signOut?: () => void | Promise<void>
 }
 
+// An unknown path lands on /epics, which reports no span.
+export const catchAllRoute: RouteObject = {
+  path: "*",
+  loader: () => {
+    noteCatchAll()
+    return redirect("/epics")
+  },
+}
+
 export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
   return [
     { element: <AppShell fetchEpicList={fetchers.epicList} />, children: pageRoutes(fetchers) },
-    { path: "*", loader: () => redirect("/epics") },
+    catchAllRoute,
   ]
 }
+
+/** Every page route pattern, so a test can check each one has a normalized name. */
+export const pageRoutePatterns = (): string[] =>
+  pageRoutes({}).flatMap((r) => (r.path ? [r.path] : []))
 
 function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
   const settingsPage = (

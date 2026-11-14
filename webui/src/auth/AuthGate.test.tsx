@@ -7,6 +7,10 @@ import { AuthGate } from "./AuthGate"
 import type { AuthState } from "./authState"
 import { useCert } from "./cert"
 import { TEST_CERT } from "./testCert"
+import { hardLoadDropped, resetRouteSpans } from "../routeSpans"
+import { enableQueue } from "../webPerf"
+
+vi.mock("../webPerf", () => ({ enableQueue: vi.fn(), queueSample: vi.fn(), dropQueue: vi.fn() }))
 
 const CertProbe = () => <p>cert:{useCert().cert?.cer_path}</p>
 
@@ -17,6 +21,8 @@ afterEach(() => {
 })
 beforeEach(() => {
   window.location.hash = ""
+  resetRouteSpans()
+  vi.mocked(enableQueue).mockClear()
 })
 
 const stateOf = (state: AuthState["state"]): AuthState => ({
@@ -151,4 +157,44 @@ test("sign out clears the page caches", async () => {
   await screen.findByText("the app")
   act(() => signOut())
   await waitFor(() => expect(sessionStorage.getItem("gx.page.stats")).toBeNull())
+})
+
+test("the sample queue is on before the app first renders when signed in", async () => {
+  let enabledAtRender: number | undefined
+  const Probe = () => {
+    enabledAtRender ??= vi.mocked(enableQueue).mock.calls.length
+    return <p>the app</p>
+  }
+  renderThemed(
+    <AuthGate fetchState={async () => stateOf("signed-in")}>
+      <Probe />
+    </AuthGate>,
+  )
+  await screen.findByText("the app")
+  expect(enabledAtRender).toBe(1)
+  expect(hardLoadDropped()).toBe(false)
+})
+
+test("a failed auth read counts as past the gate and turns the queue on", async () => {
+  renderGate(async () => {
+    throw new Error("offline")
+  })
+  await screen.findByText("the app")
+  expect(enableQueue).toHaveBeenCalledTimes(1)
+})
+
+test.each(["setup", "signed-out"] as const)(
+  "the %s screen leaves the queue off and drops the load's hard-load metrics",
+  async (state) => {
+    renderGate(async () => stateOf(state))
+    await screen.findByRole("button")
+    expect(enableQueue).not.toHaveBeenCalled()
+    expect(hardLoadDropped()).toBe(true)
+  },
+)
+
+test("nothing is queued while the auth state loads", async () => {
+  renderGate(() => new Promise(() => {}))
+  await act(async () => {})
+  expect(enableQueue).not.toHaveBeenCalled()
 })

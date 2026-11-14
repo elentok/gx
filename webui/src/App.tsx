@@ -10,6 +10,7 @@ import {
 import { pruneDrafts } from "./drafts"
 import { routeHashLinkClicks } from "./nav/hashLinks"
 import { createAppRouter } from "./routes"
+import { trackRouter } from "./routeSpans"
 import { NodeMissingToast } from "./NodeMissingToast"
 import { SkillsProblemToast } from "./SkillsProblemToast"
 import type { FetchDetail } from "./ticket/detail"
@@ -28,6 +29,7 @@ export function App({ deps, fetchDetail }: { deps?: ConnectionDeps; fetchDetail?
   usePruneDraftsOnLiveSnapshot(conn)
   const [router] = useState(() => createAppRouter(fetchDetail))
   useEffect(() => routeHashLinkClicks(router), [router])
+  useEffect(() => trackRouter(router), [router])
   return (
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />
