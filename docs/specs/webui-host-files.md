@@ -253,7 +253,7 @@ The mock widths are component widths. Flows run the desktop states with a 900px 
 
 Story entries:
 
-**The file route and its limits (stories 1 to 16)**
+The file route and its limits (stories 1 to 16, 71 to 71)
 
 - **Stories 1, 2, 11:** CLI: `gx files url docs/plans/host-files.md` from the repo prints an `https://` viewer link and exits 0. New flow "Hosted files, wide" (`host-files`, signed in): open the link, the viewer shows the Markdown (Mock state viewer-md). Open the raw link `/v1/files/<path>` in the same context: 200, `text/plain`. Go test (seam 2) for story 2: file routes exist only under `/v1/` (the route table has no file route outside `/v1/files/`, and a GET of `/files/<path>` or any non-`/v1/` path never returns file bytes), and the same `/v1/files/<path>` request without the cookie gives 401.
 - **Stories 3, 4, 5, 6:** Go test (seam 2) matrix: raw, token and `resolve` give the same 404 or `missing` for `..`, the outside symlink, a path in no root, `.env`, `.git/config`, `id_rsa`, `id_ed25519_work`, a mixed-case `.ENV`, `.netrc`, `.git-credentials`, `.gnupg/x`, `.kube/config`, `.docker/config.json`, `.pgpass`, `a.p12`, `a.pfx`, and a temp file with a foreign owner (injected); `keys/id_rsa.pub` is served. `resolve` with base `docs/` and candidate `../sibling.md` finds the sibling file (the path-form rule does not apply to it), and `./docs/plan.md` resolves. In the flow: the symlink and `.env` open the viewer page "File not found" (Mock state viewer-denied). CLI: `gx files url .env` exits non-zero with reason `path-not-allowed`; `gx files url` on the temp `shot-1.png` exits 0.
@@ -261,14 +261,14 @@ Story entries:
 - **Story 13:** Go test: `Range: bytes=0-9` on a text file gives 206 with `Content-Range`, on both routes.
 - **Stories 14, 15, 16, 71:** Go test: header table on 200, 206, 302, 401 (raw without cookie, from the gate) and 404 for both routes (CSP with sandbox, `frame-ancestors 'self'` and `connect-src https://<Host>`, `nosniff`, `no-referrer`, `no-store`; the same set on raw (SVG included) and on token HTML and assets); a UI page and a JSON response carry `frame-ancestors 'none'`, `same-origin` and `nosniff`; Content-Type table for HTML, CSS, JS, JSON, SVG, PNG, PDF, Markdown, an unknown text file and `blob.bin`. Story 15 relies on this table (the UI's `frame-ancestors 'none'` and the files' `'self'`); there is no flow check for framing from another origin.
 
-**File links in the web UI (stories 17 to 32)**
+File links in the web UI (stories 17 to 32, 78 to 78)
 
 - **Stories 17, 18, 19, 20, 23, 28, 30, 31, 78:** flow "Hosted files, wide": the session's chat shows links in the assistant message, the code span, the tool line, the prompt and the question card (Mock state chat-links). A path to a missing file and one to `.env` stay plain text. The flow counts `/v1/` requests: one `resolve` call per load and one per new message (the fake agent sends a new message). Vitest (seam 4): detector rules, including trimming, URLs and fences, and batching (duplicates are dropped first; 250 distinct candidates make two calls of at most 200; at most 2 calls are in flight at once). Go test: 201 candidates in one call answer `too-many-candidates`.
 - **Story 21, 22, 32:** flow "Hosted files, wide": the ticket page's relative path links against the main worktree and the absolute path links. A second project with no main worktree checked out shows only absolute and `~/` links (add the shape `no-main-worktree` to the scenario). The session link resolves relative paths against the session's folder, shown by a file that exists only in the second worktree.
 - **Stories 24, 25, 26, 27:** vitest (seam 4): `handler.go:42` becomes a link with line 42; `~/dev/gx/my notes.md` in a code span links and bare it does not; a fenced block and command output are plain; `https://example.com/a/b` is unchanged. The flow opens `handler.go:42`: the URL is `/#/files/<path>/handler.go?line=42` and the viewer marks line 42 (Mock state viewer-code).
 - **Story 29:** flow "Hosted files, wide": delete `notes/gone.md` after load, hover its link: the card says "File not found" and the link is dimmed with no underline (Mock states hover-missing and chat-links, part link-missing).
 
-**Preview and viewer (stories 33 to 53)**
+Preview and viewer (stories 33 to 53, 79 to 80)
 
 - **Stories 33, 35, 36, 37, 34:** flow "Hosted files, wide": hover each kind in turn: Markdown (Mock state hover-md), Mermaid (hover-mm), HTML placeholder with no frame in the card (hover-html), image (hover-img) and code at line 42 (hover-code). Hover `big.log` and `doc.pdf`: "no preview" bodies. Focus a link with the keyboard: the card opens; Escape closes it.
 - **Stories 38, 39:** new flow "Hosted files, phone" (`host-files`, 390px): tap a file link; the sheet shows with Open and Copy link (Mock state phone-tap). Copy link puts the viewer link on the clipboard, not a token or raw link. Open goes to the viewer. The same Copy link check in the wide viewer bar.
@@ -277,23 +277,23 @@ Story entries:
 - **Story 48:** flow "Hosted files, wide": `/#/files/<missing path>`, `/#/files/<path of .env>` and an out-of-root `/#/files/<path>` all show the same "File not found" page (Mock state viewer-denied).
 - **Stories 49, 50, 51, 52, 53, 79, 80:** flow "Hosted files, wide": in the Markdown file, the relative link opens the sibling file's viewer, the relative image loads through the raw route, the outside link is plain text, and its Mermaid fence renders. Story 79: the fragment link scrolls the viewer to the heading below the fold and the URL gains `heading=<slug>` without reloading the file. Story 80: `other.md#install` opens that file's viewer scrolled to its heading. A link is an `<a href>` (a Cmd-click opens a new tab; Back returns). Vitest link-context test (seam 4) for story 80: `other.md#install` is checked as `other.md` and renders a link with `heading=install`.
 
-**CLI and config (stories 54 to 63)**
+CLI and config (stories 54 to 63, 77 to 77)
 
 - **Stories 54, 55, 56, 57, 58, 77:** CLI checks: `gx files url docs/plans/host-files.md` prints `https://<host>/#/files/<percent-encoded abs path>` on the `gx server web-url` host (a path with a space shows `%20`; Copy link in the viewer gives the same form for the same file; vitest checks the builder for `line` and `heading`); `--raw` prints `/v1/files/...`; run from a subfolder, a relative path resolves against that folder; `--host localhost` and an allowed host succeed, `--host evil.example` exits non-zero with reason `host-not-allowed` (`--json`: `refused: true`); a missing path, `.env`, a folder and `/etc/passwd` exit non-zero with `path-not-allowed`.
 - **Story 59:** CLI check: `gx files resolve --json docs/plans/host-files.md notes/none.md .env` prints `found` with canonical path, size, kind and mtime for the first and `missing` for the others; with `--session <id>` relative paths resolve against the session folder; more than 200 paths answer `too-many-candidates`.
 - **Stories 60, 61, 62, 63:** CLI checks: `gx server files-roots add <tmp folder outside roots>` then `list` shows it with source `config`, built-ins show `built-in`, and a file in it is now hostable; restart the server and it stays. `add /`, `add ~`, `add <missing>` and `add <file>` are refused. `remove` of a built-in root and of an unlisted path are refused; `remove` of the added folder works and its files go back to 404.
 
-**Agent guidance (stories 64 to 68)**
+Agent guidance (stories 64 to 68)
 
 - **Stories 64, 65, 66, 67:** Go tests (seam 5) check the launch arguments. Manual check in a fixture Agents tab session, a Design session and a plain Codex chat: the launch command holds the files sentence (and the `gx tickets ask` text only for loop agents). A resumed Claude session holds it again. A resumed Codex session keeps it from launch.
 - **Story 68:** skills package checks (seam 5) find the one-line note in each of the four skills; `gx-ui-check` is unchanged.
 
-**Documentation (stories 69, 70)**
+Documentation (stories 69 to 70)
 
 - **Story 69:** read `docs/web-ui-security.md` for the "Hosted files" section (routes, roots, deny list, gx's own folders, token and gate exemption, temp rules, path rules, headers, the PDF and iOS gaps) and for the `connect-src` bullet in its list of changes.
 - **Story 70:** the route-table versus CLI-tree parity test passes and `TestWeb_EverythingElseIs404`'s allowlist lists the raw and token routes; ADR 0028 carries the amendment.
 
-**Added after review (stories 72 to 76)**
+Added after review (stories 72 to 76)
 
 - **Story 72:** Go test (seam 2): mint a token for a login, then each of sign-out, `web-revoke`, `web-password`, `web-reset` and `web-reset-authenticator` in turn: the token request answers 302 (a still-live login's token answers 200).
 - **Story 73:** Go test (seam 2): with gx's state folder inside a temp root, `web-auth.json`, a session transcript and a `web-tls` file answer the same 404 on raw, token and `resolve`. With the tickets store inside the data folder, a ticket mock is served while a file under `sessions/` gets 404.
