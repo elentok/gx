@@ -1,12 +1,14 @@
 package designs_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server/designs/drafts"
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/server/workspaces"
@@ -106,6 +108,30 @@ func TestDesignsOpenNew_EpicExistsKeepsTheDraft(t *testing.T) {
 	}
 	if got, _ := drafts.New(f.h.StateDir).LastProject(); got != "" {
 		t.Errorf("last project = %q, want unset", got)
+	}
+}
+
+func TestDesignsOpenNew_FromDraftStartFailureDeletesTheDraftAndKeepsTheEpic(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t, servertest.WithChatHarness("no-such-harness"), servertest.WithDefaultHarness("no-such-harness"))
+	d, names := f.draftWithImages(t)
+	res := f.openFromDraft(t, "fresh-idea", "an idea", d.ID)
+	if res.Refused || !res.EpicCreated || res.StartError == "" || res.Session != nil {
+		t.Fatalf("open = %+v, want epic_created with start_error and no refusal", res)
+	}
+	if _, err := drafts.New(f.h.StateDir).Get(d.ID); !errors.Is(err, drafts.ErrNotFound) {
+		t.Errorf("draft after failed start: err = %v, want ErrNotFound", err)
+	}
+	if _, err := os.Stat(drafts.New(f.h.StateDir).ImagesDir(d.ID)); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("draft image folder still there: %v", err)
+	}
+	if _, err := os.Stat(f.mapPath("fresh-idea")); err != nil {
+		t.Errorf("Design epic missing: %v", err)
+	}
+	for _, n := range names {
+		if _, err := os.Stat(filepath.Join(f.h.TicketStore, "proj", "fresh-idea", "images", n)); err != nil {
+			t.Errorf("image %s not in the epic: %v", n, err)
+		}
 	}
 }
 
