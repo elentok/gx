@@ -9,6 +9,7 @@ import { DetailPage } from "../page/DetailPage"
 import { openNewAgent } from "../shell/newItemOpen"
 import { Button } from "../ui/button/Button"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
+import { useReadyWhen } from "../useReady"
 import { useWide } from "../useWide"
 import { SessionView } from "./SessionView"
 
@@ -88,6 +89,11 @@ export function AgentsPage({
   const creating = justCreated && !listed && !graceOver
   const gone = !!selected && !!sessions && liveSnapshot && !listed && !creating
   useFocusReport(conn, listed ? selected : undefined, streams)
+  useReadyWhen(
+    !!sessions,
+    gone || (!selected && sessions?.length === 0) ? "empty" : "ready",
+    liveSnapshot ? "network" : "cache",
+  )
   useEffect(() => {
     if (!sessions || !liveSnapshot) return
     if (listed) writeLast(selected!)

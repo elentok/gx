@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react"
 import { useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail"
+import { useDetailReady } from "../useReady"
 import { EpicRing } from "../epic/EpicRing"
 import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list"
 import { PageIcon } from "../page/PageIcon"
@@ -56,7 +57,9 @@ function DesignBody({
 }) {
   const navigate = useNavigate()
   const conn = useConnectionContext()
-  const { detail, refetch } = useEpicDetail(address, conn, deps.fetchDetail)
+  const { detail, source, refetch } = useEpicDetail(address, conn, deps.fetchDetail)
+  // Not-found keeps the loader here, so it is not an empty outcome.
+  useDetailReady({ detail, notFound: false, source })
   const sessions = useConnectionState(conn).snapshot?.sessions ?? []
   const model = detail ? designModel(detail) : undefined
   const name = slugOf(address)

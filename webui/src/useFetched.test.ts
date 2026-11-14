@@ -3,7 +3,7 @@ import { beforeEach, expect, test, vi } from "vitest"
 import { markReady } from "./routeSpans"
 import { ROUTE_NAMES } from "./routeNames"
 import { useFetched } from "./useFetched"
-import { useFetchedReady } from "./useReady"
+import { useDetailReady, useFetchedReady } from "./useReady"
 
 vi.mock("./routeSpans", () => ({ markReady: vi.fn() }))
 
@@ -86,11 +86,14 @@ test("nothing fires while the first fetch is pending", () => {
 })
 
 // Every normalized route needs a decision. Add the new route here when ROUTE_NAMES grows.
-const READY_WIRING: Record<string, "useFetched" | "ready-streaming"> = {
+const READY_WIRING: Record<
+  string,
+  "useFetched" | "useDetailReady" | "useReadyWhen" | "useReady" | "redirect"
+> = {
   "/epics": "useFetched",
   "/archive": "useFetched",
-  "/archive/*": "ready-streaming",
-  "/agents/*": "ready-streaming",
+  "/archive/*": "useDetailReady",
+  "/agents/*": "useReadyWhen",
   "/stats": "useFetched",
   "/cleanup": "useFetched",
   "/schedules": "useFetched",
@@ -106,13 +109,32 @@ const READY_WIRING: Record<string, "useFetched" | "ready-streaming"> = {
   "/settings/password": "useFetched",
   "/settings/authenticator": "useFetched",
   "/settings/certificate": "useFetched",
-  "/settings/agents": "ready-streaming",
-  "/settings/*": "ready-streaming",
-  "/d/*": "ready-streaming",
-  "/triage/*": "ready-streaming",
-  "/t/*": "ready-streaming",
-  "/e/*": "ready-streaming",
+  "/settings/agents": "redirect",
+  "/settings/*": "useReady",
+  "/d/*": "useDetailReady",
+  "/triage/*": "useDetailReady",
+  "/t/*": "useDetailReady",
+  "/e/*": "useDetailReady",
 }
+
+test("a detail ends the span once: cache first, then the network answer adds nothing", () => {
+  const { rerender } = renderHook(
+    ({ s }) => useDetailReady({ detail: { a: 1 }, notFound: false, source: s }),
+    { initialProps: { s: "cache" as "cache" | "network" } },
+  )
+  rerender({ s: "network" })
+  expect(vi.mocked(markReady).mock.calls[0]).toEqual(["ready", "cache"])
+})
+
+test("a detail still loading fires nothing, not-found and empty end as empty", () => {
+  renderHook(() => useDetailReady({ detail: null, notFound: false, source: "cache" }))
+  expect(markReady).not.toHaveBeenCalled()
+  renderHook(() => useDetailReady({ detail: null, notFound: true, source: "network" }))
+  expect(markReady).toHaveBeenCalledWith("empty", "network")
+  vi.mocked(markReady).mockClear()
+  renderHook(() => useDetailReady({ detail: { a: 1 }, notFound: false, source: "network" }, true))
+  expect(markReady).toHaveBeenCalledWith("empty", "network")
+})
 
 test("every normalized route has a readiness case", () => {
   expect(Object.keys(READY_WIRING).sort()).toEqual(Object.keys(ROUTE_NAMES).sort())

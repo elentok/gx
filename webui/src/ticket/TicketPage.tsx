@@ -14,6 +14,7 @@ import { EmptyState } from "../ui/empty-state/EmptyState"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { ActionCard, needsActionCard } from "./ActionCard"
 import type { Sent } from "./answer"
+import { useDetailReady } from "../useReady"
 import { useTicketDetail, type FetchDetail } from "./detail"
 import { TicketHeader } from "./TicketHeader"
 import { hasSections, NothingHere, TicketSections } from "./TicketSections"
@@ -34,7 +35,8 @@ export function TicketPage({
   const snapshot = useConnectionState(conn).snapshot
   const navigate = useNavigate()
   const agent = snapshot?.sessions?.find((s) => s.ticket === address && !isExited(s))
-  const { detail, notFound, refetch } = useTicketDetail(address, conn, fetchDetail)
+  const { detail, notFound, source, refetch } = useTicketDetail(address, conn, fetchDetail)
+  useDetailReady({ detail, notFound, source })
   const verdict = verdictText(snapshot?.pending, address, detail?.stats?.launch_step)
   // The lock being taken emits no ticket event, so a page that shows the wait re-reads until it clears.
   const waiting = !!detail?.waiting_label

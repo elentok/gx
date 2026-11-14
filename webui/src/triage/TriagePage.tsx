@@ -41,6 +41,7 @@ import type { PostEpicWrite } from "../epics/queue"
 import { QuestionsView } from "./QuestionsView"
 import { ReviewView } from "./ReviewView"
 import { WriteView, rowsWritten } from "./WriteView"
+import { useDetailReady } from "../useReady"
 import { useTriage, type FetchTriage } from "./useTriage"
 
 /** The injected fetchers and actions the Triage page talks to the server through. */
@@ -311,7 +312,9 @@ function TriageBody({
                 keep={deps.keep}
               />
             )}
-            {live.some((s) => s.status.state !== "idle") && <RunningBanner phase={phase} view={view} />}
+            {live.some((s) => s.status.state !== "idle") && (
+              <RunningBanner phase={phase} view={view} />
+            )}
           </>
         )}
       />
@@ -330,7 +333,11 @@ export function TriagePage({ project, deps = {} }: { project: string; deps?: Tri
 // The body reads `useWide`, so it renders inside DetailPage's page mode.
 function TriagePageBody({ project, deps }: { project: string; deps: TriageDeps }) {
   const conn = useConnectionContext()
-  const { detail, notFound, refetch } = useTriage(project, conn, deps.fetchTriage)
+  const { detail, notFound, source, refetch } = useTriage(project, conn, deps.fetchTriage)
+  useDetailReady(
+    { detail, notFound, source },
+    detail?.state === TriageNone || detail?.state === TriageAbandoned,
+  )
   // An abandoned latest record is no Triage to work on; it stays in history.
   if (notFound || detail?.state === TriageNone || detail?.state === TriageAbandoned)
     return (

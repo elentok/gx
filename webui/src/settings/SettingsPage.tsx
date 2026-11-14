@@ -35,7 +35,7 @@ import { Button } from "../ui/button/Button"
 import { Chip } from "../ui/chip/Chip"
 import { Spinner } from "../ui/spinner/Spinner"
 import { useFetched, type FetchedState } from "../useFetched"
-import { useFetchedReady } from "../useReady"
+import { useFetchedReady, useReady } from "../useReady"
 import { useWrite } from "../useWrite"
 import {
   endsInDays,
@@ -730,6 +730,7 @@ export function WebLoginPage({
 
 /** The `/settings/*` catch-all: a settings URL nothing handles, so only the way back. */
 export function UnknownSettingsPage() {
+  useReady()
   return (
     <DetailPage title={{ kind: "Settings" }}>
       <Frame>

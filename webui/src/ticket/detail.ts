@@ -23,6 +23,8 @@ export const fetchDetail: FetchDetail = (address) =>
 export interface DetailState<T = TicketDetail> {
   detail: T | null
   notFound: boolean
+  /** Where the shown detail came from: the page cache seed, or a fetch. */
+  source: "cache" | "network"
   /** Re-reads the detail; call it after each POST. */
   refetch: () => void
 }
@@ -49,13 +51,17 @@ export function useDetail<T>(
   // Names the sessionStorage entry that repaints this page after a reload.
   cacheKey?: string,
 ): DetailState<T> {
-  const [state, setState] = useState<{ address: string; detail: T | null; notFound: boolean }>(
-    () => ({
-      address,
-      detail: cacheKey ? readPageCache<T>(cacheKey, address) : null,
-      notFound: false,
-    }),
-  )
+  const [state, setState] = useState<{
+    address: string
+    detail: T | null
+    notFound: boolean
+    source: "cache" | "network"
+  }>(() => ({
+    address,
+    detail: cacheKey ? readPageCache<T>(cacheKey, address) : null,
+    notFound: false,
+    source: "cache",
+  }))
   const latest = useRef(0)
   const current = useRef(address)
   current.current = address
@@ -71,8 +77,8 @@ export function useDetail<T>(
         if (cacheKey && r.kind === "ok") writePageCache(cacheKey, r.detail, address)
         setState(
           r.kind === "ok"
-            ? { address, detail: r.detail, notFound: false }
-            : { address, detail: null, notFound: true },
+            ? { address, detail: r.detail, notFound: false, source: "network" }
+            : { address, detail: null, notFound: true, source: "network" },
         )
       },
       () => {},
@@ -102,5 +108,10 @@ export function useDetail<T>(
 
   // Another ticket's detail must never show under this address while it loads.
   const mine = state.address === address
-  return { detail: mine ? state.detail : null, notFound: mine && state.notFound, refetch }
+  return {
+    detail: mine ? state.detail : null,
+    notFound: mine && state.notFound,
+    source: state.source,
+    refetch,
+  }
 }

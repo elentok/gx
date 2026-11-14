@@ -1,5 +1,6 @@
 import { useEffect } from "react"
 import { markReady, type DataSource, type Outcome } from "./routeSpans"
+import type { DetailState } from "./ticket/detail"
 import type { FetchedState } from "./useFetched"
 
 /**
@@ -20,9 +21,27 @@ export function useFetchedReady(
   { failed, source }: Pick<FetchedState<unknown>, "failed" | "source">,
   empty = false,
 ): void {
-  const settled = failed || source !== null
-  const outcome: Outcome = failed ? "error" : empty ? "empty" : "ready"
+  useReadyWhen(
+    failed || source !== null,
+    failed ? "error" : empty ? "empty" : "ready",
+    source ?? "network",
+  )
+}
+
+/** Ends the span once `settled`; for pages whose primary data is not a `useFetched` state. */
+export function useReadyWhen(settled: boolean, outcome: Outcome, dataSource: DataSource): void {
   useEffect(() => {
-    if (settled) markReady(outcome, source ?? "network")
-  }, [settled, outcome, source])
+    if (settled) markReady(outcome, dataSource)
+  }, [settled, outcome, dataSource])
+}
+
+/**
+ * Ends the span from a page's primary `useDetail` state: the first detail, or the not-found view.
+ * `empty` is the page's own "nothing to show" test, such as a triage with no state.
+ */
+export function useDetailReady(
+  { detail, notFound, source }: Pick<DetailState<unknown>, "detail" | "notFound" | "source">,
+  empty = false,
+): void {
+  useReadyWhen(notFound || detail !== null, notFound || empty ? "empty" : "ready", source)
 }

@@ -36,6 +36,7 @@ import { Badge } from "../ui/badge/Badge"
 import { Button } from "../ui/button/Button"
 import { EmptyState } from "../ui/empty-state/EmptyState"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
+import { useDetailReady } from "../useReady"
 import { useEpicDetail, type EpicDetail, type FetchEpicDetail } from "./detail"
 import type { FixAgent } from "./fixAgent"
 import { MoreStats } from "./MoreStats"
@@ -496,7 +497,8 @@ function EpicPageBody({
   const wide = useWide()
   const now = Date.now()
   const designLive = liveSessions(address, sessions).length > 0
-  const { detail, notFound, refetch } = useEpicDetail(address, conn, fetchDetail, readOnly)
+  const { detail, notFound, source, refetch } = useEpicDetail(address, conn, fetchDetail, readOnly)
+  useDetailReady({ detail, notFound, source })
   // The payload has no name field: the epic name is the address after the project.
   const name = slugOf(address)
   // A joined card lists both of its epics; the other one is the Design or its -impl epic.
