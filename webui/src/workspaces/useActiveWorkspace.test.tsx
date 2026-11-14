@@ -10,6 +10,7 @@ import { useActiveWorkspace } from "./useActiveWorkspace"
 afterEach(() => {
   cleanup()
   localStorage.clear()
+  list.epics = []
 })
 
 const list = { epics: [] as EpicListRow[], follow_ups: [] } as EpicList
@@ -94,6 +95,8 @@ test("picking a workspace stores it", async () => {
 test("picking a workspace on an item page sticks until another item is opened", async () => {
   list.epics = [epicRow("blog", "Main"), epicRow("ops", "Main"), epicRow("side", "Side")]
   const { router } = setup([MAIN, SIDE], "/e/demo:blog")
+  // The text can read "Main" before the route effect has stored it; a click in that gap loses to the item's workspace.
+  await waitFor(() => expect(localStorage.getItem(ACTIVE_KEY)).toBe("Main"))
   await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("Main"))
 
   act(() => screen.getByText("pick").click())
@@ -103,7 +106,6 @@ test("picking a workspace on an item page sticks until another item is opened", 
   await act(() => router.navigate("/e/demo:ops"))
   await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("Main"))
   expect(localStorage.getItem(ACTIVE_KEY)).toBe("Main")
-  list.epics = []
 })
 
 test("an agent opened before its placement is known stays pending and applies the epic's workspace once it arrives", async () => {
@@ -116,7 +118,6 @@ test("an agent opened before its placement is known stays pending and applies th
 
   await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("Side"))
   expect(localStorage.getItem(ACTIVE_KEY)).toBe("Side")
-  list.epics = []
 })
 
 test("an agent placed in Other leaves the workspace unchanged", async () => {
