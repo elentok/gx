@@ -401,10 +401,15 @@ has not Exited. A Design is **Not started** while its Destination is unconfirmed
 tickets is resolved. _Avoid_: "design session" for the map epic itself (a design session is the agent
 session working on it); draft for a Not started Design (a draft is work set aside deliberately).
 
-**New Design draft** — the server-side record of an idea being written in the New Design form: project,
-slug, idea, images and an optional name. It is not an epic and not a **Not started** Design; it
-becomes a map epic only at Start. _Avoid_: confusing it with the ticket status **Draft**
-(`RenderedStatus`, work its author set aside deliberately), or calling it a Not started Design.
+**Design draft** — the server-side record of an idea being written before a Design exists: project,
+slug, idea, images and an optional name. Each press of New design creates one, as a row in the
+active workspace's sidebar. It is not an epic and not a **Not started** Design; it becomes a map
+epic only at Start, and Discard deletes it. _Avoid_: New Design draft (the old name, from the New
+Design dialog); confusing it with the ticket status **Draft** (`RenderedStatus`, work its author
+set aside deliberately); calling it a Not started Design.
+
+**Design draft page** — the web page of one Design draft, where the person writes the prompt and
+presses Start design or Discard. It replaces the New Design dialog. _Avoid_: New Design form, dialog.
 
 **Epic card** — one card of the Epics page, rendered from one `/v1/epics` row: a progress ring, the
 title (the only link), a "project · time · status" line, a state pill and reason when the card needs
