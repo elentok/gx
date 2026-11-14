@@ -10,8 +10,8 @@ afterEach(cleanup)
 
 const STEPS: [string, string][] = [
   ["verify", "Verify"],
-  ["plan", "Plan"],
-  ["approve", "Approve"],
+  ["route", "Route"],
+  ["questions", "Questions"],
   ["write", "Write"],
   ["done", "Done"],
 ]
@@ -117,14 +117,12 @@ const onPhone = async (body: () => Promise<void>) => {
 test("the Verify header shows the title, the step summary, five steps with the first current, and the follow-ups link", async () => {
   render([session("working")])
   expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe("Triage: gx")
-  expect((await screen.findByTestId("page-header-subtitle")).textContent).toBe(
-    "Verify · 2 of 3 verdicts saved",
-  )
+  expect((await screen.findByTestId("page-header-subtitle")).textContent).toBe("Verify")
   const steps = document.querySelectorAll("[data-step]")
   expect([...steps].map((s) => s.getAttribute("data-step"))).toEqual([
     "verify",
-    "plan",
-    "approve",
+    "route",
+    "questions",
     "write",
     "done",
   ])
@@ -135,25 +133,13 @@ test("the Verify header shows the title, the step summary, five steps with the f
   expect(document.title).toBe("gx · Triage · gx")
 })
 
-test("the Approve subtitle names the shown view and its count", async () => {
-  const detail = viewOf({ steps: stepsAt(2), step_note: undefined, open_questions: 3 })
-  render([session("exited")], { triage: async () => ({ kind: "ok", detail }) })
-  const subtitle = await screen.findByTestId("page-header-subtitle")
-  expect(subtitle.textContent).toBe("Approve · Questions · 3 left")
-  fireEvent.click(screen.getByRole("button", { name: /^Review 3 rows/ }))
-  await waitFor(() =>
-    expect(screen.getByTestId("page-header-subtitle").textContent).toBe(
-      "Approve · Review · 3 rows",
-    ),
-  )
-})
-
-test("the strip names the verdicts saved while a session runs", async () => {
+test("no banner shows while a session runs, even with a step note", async () => {
   render([session("working")])
-  await screen.findByText(/Triage session running · verdicts saved 2 of 3/)
+  await screen.findByRole("heading", { level: 1 })
+  expect(screen.queryByText(/Triage session running/)).toBeNull()
 })
 
-test("at Write the strip counts rows written and Continue follows the session", async () => {
+test("at Write Continue follows the session", async () => {
   const rows = [
     { ...row(1), write_state: "done" },
     {
@@ -166,8 +152,7 @@ test("at Write the strip counts rows written and Continue follows the session", 
   ]
   const detail = viewOf({ steps: stepsAt(3), rows })
   render([session("working")], { triage: async () => ({ kind: "ok", detail }) })
-  await screen.findByText("Write session running · rows written 1 of 3")
-  screen.getByText("close: ticket is claimed, not draft or open")
+  await screen.findByText("close: ticket is claimed, not draft or open")
   expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(
     true,
   )
@@ -191,13 +176,12 @@ test("Continue is disabled while a session runs and enabled once it is stopped, 
   await waitFor(() => expect(openTriage).toHaveBeenCalledWith({ epic: "gx" }))
 })
 
-test("an idle session shows no running strip and Continue asks for a fresh session", async () => {
+test("an idle session's Continue asks for a fresh session", async () => {
   const openTriage = vi.fn(async () => ({}))
   const idle = session("idle")
   render([idle], { openTriage })
   const button = (await screen.findByRole("button", { name: "Continue" })) as HTMLButtonElement
   expect(button.disabled).toBe(false)
-  expect(screen.queryByText(/Triage session running/)).toBeNull()
   fireEvent.click(button)
   await waitFor(() =>
     expect(openTriage).toHaveBeenCalledWith({
@@ -208,21 +192,14 @@ test("an idle session shows no running strip and Continue asks for a fresh sessi
   )
 })
 
-test("at Approve the header has Approve and no Continue, and the Progress tree lists Questions and Review", async () => {
-  const detail = viewOf({
-    steps: stepsAt(2),
-    open_questions: 0,
-    action_counts: { ready: 2 },
-    revision: 3,
-  })
+test.each([1, 2])("at step %i the page is chat only, with Continue and no Approve", async (at) => {
+  const detail = viewOf({ steps: stepsAt(at), open_questions: 3 })
   render([session("idle")], { triage: async () => ({ kind: "ok", detail }) })
-  const header = (await screen.findByRole("button", { name: "Approve" })) as HTMLButtonElement
-  expect(header.disabled).toBe(false)
-  expect(screen.queryByRole("button", { name: "Continue" })).toBeNull()
-  expect(screen.getByRole("button", { name: "Approve and write" })).toBeTruthy()
-  const sub = document.querySelector('[data-step="approve"]')?.textContent ?? ""
-  expect(sub).toContain("Questions")
-  expect(sub).toContain("Review")
+  expect(
+    ((await screen.findByRole("button", { name: "Continue" })) as HTMLButtonElement).disabled,
+  ).toBe(false)
+  expect(screen.queryByRole("button", { name: /Approve/ })).toBeNull()
+  expect((await screen.findByTestId("page-header-subtitle")).textContent).toBe(STEPS[at][1])
 })
 
 test("with no session the header button reads Start", async () => {
@@ -246,6 +223,12 @@ test("on a phone there is no Progress panel", () =>
     render([session("working")])
     await screen.findByRole("heading", { level: 1 })
     expect(screen.queryByRole("region", { name: "Progress" })).toBeNull()
+    expect(screen.getByRole("button", { name: "Show progress steps" })).toBeTruthy()
+    fireEvent.click(document.querySelector('button[aria-haspopup="dialog"]:not([aria-label])')!)
+    const sheet = await screen.findByRole("dialog", { name: "Triage progress steps" })
+    expect(
+      [...sheet.querySelectorAll("[data-step]")].map((s) => s.getAttribute("data-step")),
+    ).toEqual(["verify", "route", "questions", "write", "done"])
   }))
 
 test("a wide page shows the Progress panel", async () => {

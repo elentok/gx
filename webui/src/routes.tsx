@@ -16,7 +16,7 @@ import type { FetchSettings } from "./settings/settingsApi"
 import { sectionPath } from "./settings/SettingsShell"
 import type { FetchChat } from "./design/chat"
 import type { DeleteDesign, OpenDesign, OpenFlow, ResumeSession, StopSession } from "./design/open"
-import type { AbandonTriage, ApproveTriage } from "./triage/api"
+import type { AbandonTriage } from "./triage/api"
 import type { FetchTriage } from "./triage/useTriage"
 import type { PostFocus } from "./design/focus"
 import type { PostAnswer, PostPrompt } from "./design/prompt"
@@ -222,7 +222,6 @@ function TriageRoute({ fetchers }: { fetchers: RouteFetchers }) {
         fetchScreen: fetchers.screen,
         focus: fetchers.focus,
         abandon: fetchers.abandonTriage,
-        approve: fetchers.approveTriage,
         fetchEpics: fetchers.epicList,
       }}
     />
@@ -231,7 +230,6 @@ function TriageRoute({ fetchers }: { fetchers: RouteFetchers }) {
 
 export interface RouteFetchers {
   abandonTriage?: AbandonTriage
-  approveTriage?: ApproveTriage
   triage?: FetchTriage
   openTriage?: OpenFlow
   openDesign?: OpenDesign

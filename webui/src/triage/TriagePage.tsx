@@ -3,15 +3,7 @@ import { useState } from "react"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { flowSession, liveFlowSessions } from "../design/view"
 import { stateToken, type OpenFlow, type ResumeSession, type StopSession } from "../design/open"
-import {
-  postAbandonTriage,
-  postOpenTriage,
-  type AbandonTriage,
-  type ApproveTriage,
-  type SendBackTriage,
-  type SaveTriageRow,
-  type TriageRowAction,
-} from "./api"
+import { postAbandonTriage, postOpenTriage, type AbandonTriage, type TriageRowAction } from "./api"
 import { useDesignWrite } from "../design/SessionControls"
 import type { FetchChat } from "../design/chat"
 import type { PostFocus } from "../design/focus"
@@ -26,7 +18,6 @@ import {
 } from "../generated/server"
 import { Modal } from "../ui/modal/Modal"
 import { TriageHistory } from "./History"
-import { ApproveShell, approveSubRows, useApprove, useApproveView } from "./ApproveShell"
 import { DetailPage } from "../page/DetailPage"
 import { PageIcon } from "../page/PageIcon"
 import { Button } from "../ui/button/Button"
@@ -38,9 +29,7 @@ import { useWide } from "../useWide"
 import { DoneQueue, DoneView } from "./DoneView"
 import type { FetchEpicList } from "../epics/list"
 import type { PostEpicWrite } from "../epics/queue"
-import { QuestionsView } from "./QuestionsView"
-import { ReviewView } from "./ReviewView"
-import { WriteView, rowsWritten } from "./WriteView"
+import { WriteView } from "./WriteView"
 import { useDetailReady } from "../useReady"
 import { useTriage, type FetchTriage } from "./useTriage"
 
@@ -56,9 +45,6 @@ export interface TriageDeps {
   fetchScreen?: FetchScreen
   focus?: PostFocus
   abandon?: AbandonTriage
-  approve?: ApproveTriage
-  sendBack?: SendBackTriage
-  saveRow?: SaveTriageRow
   retry?: TriageRowAction
   keep?: TriageRowAction
   fetchEpics?: FetchEpicList
@@ -66,7 +52,6 @@ export interface TriageDeps {
 }
 
 const FLOW = "triage"
-const APPROVE = "approve"
 const WRITE = "write"
 
 /**
@@ -100,38 +85,13 @@ function HeaderButton({
   )
 }
 
-type Phase = "approve" | "write" | "done" | "working"
+// Route and Questions count as working: chat only.
+type Phase = "write" | "done" | "working"
 
 function phaseOf(view: TriageView): Phase {
   if (view.state === TriageDone) return "done"
   const current = view.steps.find((s) => s.state === "current")?.step
-  return current === APPROVE ? "approve" : current === WRITE ? "write" : "working"
-}
-
-// The verdicts the Triage has saved so far, out of its rows.
-const verdictsSaved = (view: TriageView) =>
-  `${view.rows.filter((r) => r.verdict).length} of ${view.rows.length}`
-
-/** Shown above the chat while the Triage's session runs. */
-function RunningBanner({ phase, view }: { phase: Phase; view: TriageView }) {
-  return (
-    <Box
-      display="flex"
-      alignItems="center"
-      gap="2"
-      px="3"
-      py="2"
-      borderWidth="1px"
-      borderColor="tone.running.fg"
-      borderRadius="md"
-      fontSize="sm"
-    >
-      <Box aria-hidden w="8px" h="8px" borderRadius="full" bg="tone.running.fg" />
-      {phase === "write"
-        ? `Write session running · rows written ${rowsWritten(view)} of ${view.rows.length}`
-        : `Triage session running · verdicts saved ${verdictsSaved(view)}`}
-    </Box>
-  )
+  return current === WRITE ? "write" : "working"
 }
 
 /** Confirms Abandon. It writes nothing to tickets, so rows already written stay written. */
@@ -182,16 +142,7 @@ function TriageBody({
   refetch: () => void
 }) {
   const [abandoning, setAbandoning] = useState(false)
-  const approveView = useApproveView(view.revision, view.open_questions)
-  const approval = useApprove({
-    project,
-    view,
-    refetch,
-    approve: deps.approve,
-    carryReview: approveView.carryReview,
-  })
   const phase = phaseOf(view)
-  const atApprove = phase === "approve"
   const atWrite = phase === "write"
   const atDone = phase === "done"
   const { fetchChat, post, answer, open, stop, resume, fetchScreen, focus } = deps
@@ -254,27 +205,9 @@ function TriageBody({
           ) : undefined
         }
         headerButton={(session) =>
-          atDone ? null : atApprove ? (
-            <Button
-              tone="done"
-              disabled={!!approval.blocked || approval.pending}
-              onClick={approval.approve}
-            >
-              {approval.pending && <ChakraSpinner size="sm" />}
-              Approve
-            </Button>
-          ) : (
-            <HeaderButton project={project} session={session} open={deps.open} />
-          )
+          atDone ? null : <HeaderButton project={project} session={session} open={deps.open} />
         }
-        noContinue={atApprove}
-        stepRows={atApprove ? { [APPROVE]: approveSubRows(view, approveView.view) } : undefined}
         working={() => ({ step: model.current?.label })}
-        subtitleSuffix={
-          atApprove
-            ? ` · ${approveView.view === "questions" ? `Questions · ${view.open_questions} left` : `Review · ${view.rows.length} rows`}`
-            : view.step_note && ` · ${view.step_note}`
-        }
         metaLink={
           <chakra.a href={`#/e/${project}:follow-ups`} color="text.dim" textDecoration="underline">
             Triage of {project}:follow-ups ↗
@@ -282,26 +215,6 @@ function TriageBody({
         }
         chatTop={() => (
           <>
-            {atApprove && (
-              <ApproveShell
-                view={view}
-                shown={approveView.view}
-                onShow={approveView.setView}
-                approval={approval}
-                questions={
-                  <QuestionsView
-                    project={project}
-                    view={view}
-                    refetch={refetch}
-                    save={deps.saveRow}
-                    sendBack={deps.sendBack}
-                  />
-                }
-                review={
-                  <ReviewView project={project} view={view} refetch={refetch} save={deps.saveRow} />
-                }
-              />
-            )}
             {atDone && view.result && <DoneView result={view.result} />}
             {atWrite && (
               <WriteView
@@ -311,9 +224,6 @@ function TriageBody({
                 retry={deps.retry}
                 keep={deps.keep}
               />
-            )}
-            {live.some((s) => s.status.state !== "idle") && (
-              <RunningBanner phase={phase} view={view} />
             )}
           </>
         )}
