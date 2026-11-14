@@ -11,6 +11,7 @@ test("every part round-trips", () => {
     second: "feature/x y",
     epic: "gx:epic-a",
     commits: ["abc", "def"],
+    ticket: "gx:epic-a/03",
     file: "src/a b.ts",
   }
   expect(roundTrip(url)).toEqual(url)

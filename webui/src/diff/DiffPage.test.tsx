@@ -355,3 +355,13 @@ test("the narrowing survives a render from the URL and the header counts commits
   expect(screen.getByTestId("narrow-chip").textContent).toContain("Showing: Ticket 07")
   expect(screen.getByText("gx:e-impl · 5 commits · 3 files")).toBeTruthy()
 })
+
+test("a ticket key narrows to that ticket's commits and the chip names the ticket", async () => {
+  const fetchFiles = vi.fn(filesForCommits)
+  render(`${NARROW}&ticket=gx:e-impl/03`, fetchFiles, undefined, undefined, {
+    diffCommits: commitsOf,
+  })
+  await waitFor(() => expect(screen.getAllByTestId("tree-file")).toHaveLength(1))
+  expect(fetchFiles).toHaveBeenCalledWith("gx", "main", "dev", ["c2", "c4"])
+  expect(screen.getByTestId("narrow-chip").textContent).toContain("Showing: Ticket 03")
+})

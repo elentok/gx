@@ -10,19 +10,19 @@ export function ViewDiffLink({
   epic,
   base,
   tip,
-  commits,
+  ticket,
 }: {
   epic: string
   base?: string
   tip?: string
-  commits?: string[]
+  ticket?: string
 }) {
   const url: DiffUrl = {
     project: projectOf(epic),
     first: base ?? "",
     second: tip ?? "",
     epic,
-    commits,
+    ticket,
   }
   return (
     <Button asChild emphasis="secondary" size="sm">

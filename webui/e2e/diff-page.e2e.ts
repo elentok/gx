@@ -157,7 +157,8 @@ test("Diff page", async ({ page, start }) => {
   // Entry 5: a done ticket's page opens the epic's Diff page narrowed to it; the commitless one has no link.
   await go(page, `#/t/${EPIC}/01`)
   await page.getByRole("link", { name: "View diff" }).click()
-  await expect(page.getByTestId("narrow-chip")).toContainText("Showing: ")
+  await expect(page.getByTestId("narrow-chip")).toContainText("every-commit-stamped")
+  await expect(treeFiles(page)).toHaveCount(narrowed)
   await go(page, `#/t/${EPIC}/04`)
   await expect(page.getByRole("link", { name: /^Epic: / })).toBeVisible()
   await expect(page.getByRole("link", { name: "View diff" })).toHaveCount(0)

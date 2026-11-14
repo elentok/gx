@@ -58,7 +58,7 @@ async function renderTicket(detail: TicketDetail) {
 test("a done ticket links View diff narrowed to its address", async () => {
   await renderTicket(done)
   expect(screen.getByRole("link", { name: "View diff" }).getAttribute("href")).toBe(
-    "#/diff?project=gx&base=main&tip=ralph-loop%2Fdemo&epic=gx%3Ademo&commits=gx%3Ademo%2F12",
+    "#/diff?project=gx&base=main&tip=ralph-loop%2Fdemo&epic=gx%3Ademo&ticket=gx%3Ademo%2F12",
   )
 })
 

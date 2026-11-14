@@ -10,6 +10,8 @@ export interface DiffUrl {
   epic?: string
   /** Commit SHAs the view is narrowed to. */
   commits?: string[]
+  /** A ticket's canonical address; the view narrows to the returned commits that carry it. */
+  ticket?: string
   /** The selected file's path. */
   file?: string
 }
@@ -20,6 +22,7 @@ const KEYS = {
   second: "tip",
   epic: "epic",
   commits: "commits",
+  ticket: "ticket",
   file: "file",
 } as const
 
@@ -33,6 +36,7 @@ export function parseDiffUrl(params: URLSearchParams): DiffUrl {
   if (get(KEYS.epic)) out.epic = get(KEYS.epic)
   const commits = get(KEYS.commits).split(",").filter(Boolean)
   if (commits.length) out.commits = commits
+  if (get(KEYS.ticket)) out.ticket = get(KEYS.ticket)
   if (get(KEYS.file)) out.file = get(KEYS.file)
   return out
 }
@@ -46,6 +50,7 @@ export function diffQuery(url: DiffUrl): string {
   set(KEYS.second, url.second)
   set(KEYS.epic, url.epic)
   set(KEYS.commits, url.commits?.join(","))
+  set(KEYS.ticket, url.ticket)
   set(KEYS.file, url.file)
   return p.toString()
 }

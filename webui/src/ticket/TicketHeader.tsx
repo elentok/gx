@@ -35,7 +35,7 @@ export function TicketHeader({ detail, now }: { detail: TicketDetail; now: numbe
             epic={detail.epic}
             base={detail.diff_base}
             tip={detail.diff_tip}
-            commits={[detail.address]}
+            ticket={detail.address}
           />
         )}
         <Badge tone={tone} maxW="100%">

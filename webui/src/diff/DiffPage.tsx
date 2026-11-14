@@ -469,16 +469,22 @@ export function DiffPage({
   // are held back so the file call is not made with a set that may be dropped.
   const freshCommits = commitsLoaded?.key === key ? commitsLoaded : undefined
   const returned = freshCommits?.value ?? undefined
-  const commitsPending = !!url.commits && !freshCommits
-  const narrowing = useMemo(
+  const commitsPending = !!(url.commits || url.ticket) && !freshCommits
+  // A `ticket` key expands to the SHAs of the returned commits that carry that address.
+  const wanted = useMemo(
     () =>
-      returned
-        ? url.commits?.filter((s) => returned.commits.some((c) => c.sha === s))
-        : url.commits,
+      url.commits ??
+      (url.ticket
+        ? (returned?.commits ?? []).filter((c) => c.ticket === url.ticket).map((c) => c.sha)
+        : undefined),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [returned, url.commits?.join(",")],
+    [returned, url.commits?.join(","), url.ticket],
   )
-  const emptyNarrowing = !!url.commits && !commitsPending && narrowing?.length === 0
+  const narrowing = useMemo(
+    () => (returned ? wanted?.filter((s) => returned.commits.some((c) => c.sha === s)) : wanted),
+    [returned, wanted],
+  )
+  const emptyNarrowing = !!wanted && !commitsPending && narrowing?.length === 0
   const narrowKey = `${key}\n${narrowing?.join(",") ?? ""}`
   const groups = useMemo(
     () => (returned ? groupCommits(returned.commits, url.epic, titles) : []),
@@ -534,8 +540,9 @@ export function DiffPage({
     narrowedFresh && "result" in narrowedFresh && narrowedFresh.result.kind === "files"
       ? narrowedFresh.result.files.files
       : []
-  const setNarrowing = (commits: string[] | undefined) => setParams(diffQuery({ ...url, commits }))
-  const chipLabel = narrowingLabel(groups, url.commits)
+  const setNarrowing = (commits: string[] | undefined) =>
+    setParams(diffQuery({ ...url, ticket: undefined, commits }))
+  const chipLabel = narrowingLabel(groups, wanted)
   const emptyNotice = emptyNarrowing
     ? returned?.truncated
       ? TRUNCATED_TEXT
@@ -582,15 +589,15 @@ export function DiffPage({
       {canFetch && !fresh && !noRange && <FullScreenLoader label="Loading diff" />}
       {!notice && fresh && "result" in fresh && fresh.result.kind === "files" && files ? (
         <FilesBrowser
-          files={url.commits ? narrowedFiles : fresh.result.files.files}
-          commits={url.commits ? narrowing : undefined}
+          files={wanted ? narrowedFiles : fresh.result.files.files}
+          commits={wanted ? narrowing : undefined}
           commitList={
             returned && (
               <CommitList
                 groups={groups}
                 count={returned.commits.length}
                 truncated={returned.truncated}
-                narrowing={url.commits}
+                narrowing={wanted}
                 onNarrow={setNarrowing}
               />
             )
