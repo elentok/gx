@@ -60,6 +60,6 @@ test("the filter is case-insensitive and rebuilds the tree from the matches", ()
 test("a filter with no match says No files match", () => {
   renderThemed(<Harness />)
   type("zzz")
-  expect(screen.getByText("No files match")).toBeTruthy()
+  expect(screen.getByText('No files match "zzz".')).toBeTruthy()
   expect(paths()).toEqual([])
 })

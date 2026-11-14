@@ -94,7 +94,7 @@ export function FileTree({
   if (matches.length === 0) {
     return (
       <Box data-testid="file-tree" mt="2" px="2" py="3" fontSize="sm" color="text.muted">
-        No files match
+        {`No files match "${filter}".`}
       </Box>
     )
   }

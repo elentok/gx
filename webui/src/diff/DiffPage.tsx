@@ -160,16 +160,16 @@ function FileNav({
   )
   return (
     <Box data-testid="file-nav" display="flex" flexWrap="wrap" alignItems="center" gap="2">
-      <Button emphasis="secondary" onClick={() => onStep(-1)}>
+      <Button emphasis="secondary" disabled={visible.length === 0} onClick={() => onStep(-1)}>
         {hint("p")}
         Prev
       </Button>
-      <Button emphasis="secondary" onClick={() => onStep(1)}>
+      <Button emphasis="secondary" disabled={visible.length === 0} onClick={() => onStep(1)}>
         {hint("n")}
         Next
       </Button>
       <Box as="span" fontSize="sm" color="text.muted">
-        {`${index + 1} of ${visible.length} · ${visible.length} files · `}
+        {`${visible.length === 0 ? "" : `${index + 1} of ${visible.length} · `}${visible.length} files · `}
         <Box as="span" color="tone.done.fg">{`+${added}`}</Box>{" "}
         <Box as="span" color="tone.deadlocked.fg">{`−${deleted}`}</Box>
       </Box>
@@ -241,7 +241,10 @@ function FilesBrowser({
   const [tab, setTab] = useState<"files" | "diff">("files")
   const order = useMemo(() => treeOrder(filterFiles(files, filter)), [files, filter])
   const all = useMemo(() => treeOrder(files), [files])
-  const selected = all.find((f) => f.path === selectedPath)?.path ?? order[0]?.path ?? all[0]?.path
+  const selected =
+    filter !== "" && order.length === 0
+      ? undefined
+      : (all.find((f) => f.path === selectedPath)?.path ?? order[0]?.path ?? all[0]?.path)
   const index = order.findIndex((f) => f.path === selected)
   const selectedFile = all.find((f) => f.path === selected)
 
@@ -282,6 +285,11 @@ function FilesBrowser({
     <Box minW="0">
       <FileNav index={index} visible={order} onStep={step} />
       <Box data-testid="diff-area" data-view={view} data-file={selected} mt="4">
+        {!selectedFile && order.length === 0 && (
+          <Box data-testid="no-files" fontSize="sm" color="text.muted">
+            No files in this selection.
+          </Box>
+        )}
         {selectedFile && (
           <DiffFileCard
             key={selectedFile.path}

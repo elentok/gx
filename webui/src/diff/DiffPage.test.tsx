@@ -194,6 +194,19 @@ test("a filter narrows the counter and p/n do nothing while it has focus", async
   await waitFor(() => expect(counter()).toContain("2 of 2"))
 })
 
+test("a filter that matches nothing selects no file and says so", async () => {
+  render(OPEN, async () => TREE())
+  await screen.findByTestId("file-nav")
+  fireEvent.change(screen.getByTestId("file-filter"), { target: { value: "zzzz" } })
+  expect(counter()).toContain("0 files")
+  expect(counter()).not.toContain("0 of")
+  expect(screen.getByTestId("no-files").textContent).toBe("No files in this selection.")
+  expect(screen.getByTestId("file-tree").textContent).toBe('No files match "zzzz".')
+  expect(screen.queryByTestId("file-card-header")).toBeNull()
+  expect((screen.getByRole("button", { name: "Next" }) as HTMLButtonElement).disabled).toBe(true)
+  expect((screen.getByRole("button", { name: "Prev" }) as HTMLButtonElement).disabled).toBe(true)
+})
+
 test("the selected file is in the URL and a fresh render from that URL picks it", async () => {
   render(`${OPEN}&file=src%2Fb.go`, async () => TREE())
   await screen.findByTestId("file-nav")
