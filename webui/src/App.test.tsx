@@ -1,5 +1,5 @@
-import { act, waitFor } from "@testing-library/react"
-import { expect, test } from "vitest"
+import { act, fireEvent, screen, waitFor } from "@testing-library/react"
+import { afterEach, describe, expect, test, vi } from "vitest"
 import { App } from "./App"
 import { readRoundDraft, writeRoundDraft } from "./drafts"
 import type { Snapshot } from "./snapshot"
@@ -69,4 +69,106 @@ test("a live snapshot with a null session list renders and deletes no drafts", a
 
   await act(async () => release(unreadable))
   expect(readRoundDraft("a", "r")).toEqual({ n: 1 })
+})
+
+describe("the Backlog page", () => {
+  const backlog = {
+    projects: [
+      {
+        project: "gx",
+        workspaces: [],
+        areas: [
+          { address: "gx:web", name: "web", open: 3 },
+          { address: "gx:docs", name: "docs", open: 0 },
+          {
+            address: "gx:cli",
+            name: "cli",
+            open: 2,
+            unfinished: { map: "gx:cli-design", to_move: 1 },
+          },
+        ],
+      },
+      { project: "empty", workspaces: [], areas: [] },
+    ],
+  }
+
+  type Post = { url: string; body: unknown }
+  function renderBacklog(answer: (post: Post) => unknown) {
+    const posts: Post[] = []
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (!init?.method) return new Response(JSON.stringify(backlog))
+        const post = { url, body: JSON.parse(String(init.body)) }
+        posts.push(post)
+        return new Response(JSON.stringify(answer(post)))
+      }),
+    )
+    window.location.hash = "#/backlog"
+    renderThemed(
+      <App
+        deps={{
+          cache: { load: () => snapshotListing(), save: () => {} },
+          fetchSnapshot: async () => snapshotListing(),
+          openStream: () => new Promise(() => {}),
+        }}
+      />,
+    )
+    return posts
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    window.location.hash = ""
+  })
+
+  test("lists areas with open counts and disables Start Design at zero", async () => {
+    renderBacklog(() => ({}))
+
+    expect(await screen.findByText("3 open")).toBeTruthy()
+    expect(screen.queryByRole("region", { name: "empty" })).toBeNull()
+    const buttons = screen.getAllByRole("button", { name: "Start Design" })
+    expect(buttons.map((b) => (b as HTMLButtonElement).disabled)).toEqual([false, true, false])
+  })
+
+  test("Start posts the area and hint, and opens the chat", async () => {
+    const posts = renderBacklog(() => ({ session: { id: "chat-1" } }))
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Start Design" }))[0])
+    fireEvent.change(screen.getByLabelText("Hint"), { target: { value: " tidy " } })
+    fireEvent.click(screen.getByRole("button", { name: "Start" }))
+
+    await waitFor(() => expect(window.location.hash).toBe("#/agents/chat-1"))
+    expect(posts).toEqual([
+      {
+        url: "/v1/backlog/start-design",
+        body: { project: "gx", area: "gx:web", hint: "tidy" },
+      },
+    ])
+  })
+
+  test("a refusal shows its message and keeps the dialog", async () => {
+    renderBacklog(() => ({ refused: true, reason: "no-open-tickets", message: "Nothing to move." }))
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Start Design" }))[0])
+    fireEvent.click(screen.getByRole("button", { name: "Start" }))
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Nothing to move.")
+    expect(screen.getByRole("dialog")).toBeTruthy()
+    expect(window.location.hash).toBe("#/backlog")
+  })
+
+  test("Finish move posts the map without opening a chat", async () => {
+    const posts = renderBacklog(() => ({ address: "gx:cli-design" }))
+
+    fireEvent.click(await screen.findByRole("button", { name: "Finish move" }))
+
+    await waitFor(() => expect(posts).toHaveLength(1))
+    expect(posts[0]).toEqual({
+      url: "/v1/backlog/finish-move",
+      body: { project: "gx", area: "gx:cli", map: "gx:cli-design" },
+    })
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(window.location.hash).toBe("#/backlog")
+  })
 })

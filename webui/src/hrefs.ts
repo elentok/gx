@@ -36,6 +36,8 @@ export const archiveHref = (address: string) => `${ARCHIVE_HREF}/${address}`
 
 export const SCHEDULES_HREF = "#/schedules"
 
+export const BACKLOG_HREF = "#/backlog"
+
 export const STATS_HREF = "#/stats"
 
 export const CLEANUP_HREF = "#/cleanup"

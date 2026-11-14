@@ -36,6 +36,7 @@ import type {
   PostRunNow,
   PostSwitch,
 } from "./schedules/schedules"
+import type { FetchBacklog, PostFinishMove, PostStartDesign } from "./backlog/backlog"
 import { EpicsPage } from "./epics/EpicsPage"
 import type { FetchEpicList } from "./epics/list"
 import type { FetchCleanup, PostCleanup } from "./cleanup/cleanup"
@@ -71,6 +72,9 @@ const EpicPage = lazy(() =>
 )
 const FileViewerPage = lazy(() =>
   import("./files/FileViewerPage").then(({ FileViewerPage }) => ({ default: FileViewerPage })),
+)
+const BacklogPage = lazy(() =>
+  import("./backlog/BacklogPage").then(({ BacklogPage }) => ({ default: BacklogPage })),
 )
 const SchedulePage = lazy(() =>
   import("./schedules/SchedulePage").then(({ SchedulePage }) => ({ default: SchedulePage })),
@@ -245,6 +249,9 @@ export interface RouteFetchers {
   diffCommits?: FetchDiffCommits
   diffCommitPatches?: FetchDiffCommitPatches
   archived?: FetchArchived
+  backlog?: FetchBacklog
+  startDesign?: PostStartDesign
+  finishMove?: PostFinishMove
   schedules?: FetchSchedules
   switchSchedule?: PostSwitch
   scheduleShow?: FetchScheduleShow
@@ -341,6 +348,16 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
           fetchCleanup={fetchers.cleanup}
           postCleanup={fetchers.cleanupWrite}
           fetchEpics={fetchers.epicList}
+        />
+      ),
+    },
+    {
+      path: "/backlog",
+      element: (
+        <BacklogPage
+          fetchList={fetchers.backlog}
+          start={fetchers.startDesign}
+          finish={fetchers.finishMove}
         />
       ),
     },

@@ -101,7 +101,7 @@ test("the Epics icon opens a menu with Epics and Archive, and Archive navigates 
   await waitFor(() => expect(router.state.location.pathname).toBe("/archive"))
 })
 
-test("the Epics menu lists Scheduled prompts after a separator, and it navigates to /schedules", async () => {
+test("the Epics menu lists Backlog before the one separator and Scheduled prompts after it, and it navigates to /schedules", async () => {
   const router = setupWithRouter()
   fireEvent.click(screen.getByRole("button", { name: "Epics" }))
   const menu = await screen.findByRole("menu")
@@ -109,7 +109,7 @@ test("the Epics menu lists Scheduled prompts after a separator, and it navigates
   const names = Array.from(menu.querySelectorAll('[role="menuitem"],[role="separator"]')).map(
     (el) => (el.getAttribute("role") === "separator" ? "---" : el.textContent?.replace(/\d+$/, "")),
   )
-  expect(names).toEqual(["Epics", "Archive", "---", "Scheduled prompts"])
+  expect(names).toEqual(["Epics", "Archive", "Backlog", "---", "Scheduled prompts"])
   fireEvent.click(screen.getByRole("menuitem", { name: "Scheduled prompts" }))
   await waitFor(() => expect(router.state.location.pathname).toBe("/schedules"))
 })
