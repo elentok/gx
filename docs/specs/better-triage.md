@@ -166,19 +166,19 @@ Questions (stories 1 to 11)
 - Skill-applied rules (bugs first, scope-changing first, settled questions dropped) are checked by flow 199 on the `questions` shape, not by Go tests.
 - Mock states: b-questions-desktop, b-questions-phone, b-approve-desktop, b-approve-phone.
 
-Conversation and page (stories 12 to 23, 26)
+Conversation and page (stories 12 to 23, 26 to 26)
 - Flow: 199. Triage journey on shapes `verify`, `route`, `questions` and `final-approval`: Progress lists the five steps; the summary card appears after Route; a typed correction changes the summary lines; the round header reads "Round 1 of 3"; auto-advance chains Verify to Route and waits at Questions; the idle session is still alive at Questions.
 - Phone: 199 part at 390 px has no sideways scroll, the step line opens the steps sheet; flow 24 (Phone, Design page) still passes.
 - CLI: `gx tickets triage show` after a session kill reports the open round, and a new session reprints it and asks nothing answered. Approve with a stale revision is refused and a second approve is refused as "already approved". Go test of both.
 - Terminal: the skill, run in a plain session against the fixture, prints the same summary and cards as text and writes on yes (walked by hand, no new flow).
 - Mock states: b-verify-desktop, b-verify-phone, b-route-desktop, b-route-phone, b-questions-desktop, b-questions-phone, b-approve-desktop, b-approve-phone.
 
-Follow-ups card and badge (stories 24, 25, 27)
+Follow-ups card and badge (stories 24 to 25, 27 to 27)
 - Flow: 199. Triage journey checks the card in Needs you with the pill "Needs you" and the button Answer while a round waits (session live), "Write this plan?" and Review plan at the final card, Retry failed (N) on a failed Write, and the badge count unchanged.
 - Go test on the card builder covers each step and the live-session-while-waiting case.
 - Mock states: card-verify-desktop, card-route-desktop, card-questions-desktop, card-approve-desktop, card-write-desktop, card-done-desktop, card-questions-phone, card-approve-phone, card-write-phone, b-write-desktop, b-write-phone, b-done-desktop, b-done-phone.
 
-Abandon (story 28)
+Abandon (stories 28 to 28)
 - Flow: 199. Abandon at Route changes no ticket, creates no area (`gx tickets epics --areas` unchanged) and the card shows a plain Triage button. Go test that Abandon is offered at Verify, Route, Questions and not at Write.
 
 Areas (stories 29 to 33)
@@ -206,7 +206,7 @@ Records (stories 53 to 55)
 - Go tests: the loader reads a done, abandoned and live version 1 record; a live one at Verify continues with `quick` read as `ask`; one at Plan or Approve goes back to Route keeping verdicts and answers; one at Write offers only Abandon and reads "Waiting for you".
 - Flow: the pause-kind table test (ADR 0042) is unchanged; Design flows 50, 26 and 27 and the phone Design flows still pass.
 
-Mock states (the stored mock, `$(gx tickets root)/better-triage/mocks/06-conversation-page-look.html`; the mock holds 12 page states):
+**Mock states** (the stored mock, `$(gx tickets root)/better-triage/mocks/06-conversation-page-look.html`; the mock holds 12 page states and 9 card states):
 - `$(gx tickets root)/better-triage/mocks/06-conversation-page-look.html`, b-verify-desktop, 1120, scenario: triage shape `verify`, parts: sidebar, page-header, ring, chat, working-row, composer, progress
 - `$(gx tickets root)/better-triage/mocks/06-conversation-page-look.html`, b-verify-phone, 390, scenario: triage shape `verify`, parts: page-header, ring, step-line, chat, working-row, composer
 - `$(gx tickets root)/better-triage/mocks/06-conversation-page-look.html`, b-route-desktop, 1120, scenario: triage shape `route`, parts: sidebar, page-header, ring, chat, plan-summary, working-row, composer, progress
