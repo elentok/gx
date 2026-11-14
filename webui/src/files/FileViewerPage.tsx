@@ -7,6 +7,7 @@ import {
   HostedFound,
   HostedKindCode,
   HostedKindMarkdown,
+  HostedKindMermaid,
   HostedKindText,
   type HostedResolved,
 } from "../generated/ops"
@@ -134,7 +135,10 @@ function NotFound() {
 
 function isTextKind(file: HostedResolved): boolean {
   const text =
-    file.kind === HostedKindCode || file.kind === HostedKindText || file.kind === HostedKindMarkdown
+    file.kind === HostedKindCode ||
+    file.kind === HostedKindText ||
+    file.kind === HostedKindMarkdown ||
+    file.kind === HostedKindMermaid
   return text && !previewNote(file)
 }
 
@@ -159,11 +163,13 @@ function FoundView({
   path,
   file,
   line,
+  heading,
   fetchText,
 }: {
   path: string
   file: HostedResolved
   line?: number
+  heading?: string
   fetchText: FetchFileText
 }) {
   const [pixels, setPixels] = useState("")
@@ -186,7 +192,7 @@ function FoundView({
         meta={meta}
         found
         source={
-          file.kind === HostedKindMarkdown && isTextKind(file)
+          (file.kind === HostedKindMarkdown || file.kind === HostedKindMermaid) && isTextKind(file)
             ? { on: showSource, toggle: () => setShowSource((s) => !s) }
             : undefined
         }
@@ -196,6 +202,7 @@ function FoundView({
         path={path}
         text={body.text}
         line={line}
+        heading={heading}
         source={showSource}
         onImageLoad={(w, h) => setPixels(`${w}×${h}`)}
         onImageError={() => setImageFailed(true)}
@@ -216,6 +223,7 @@ export function FileViewerPage({
   // Only the kinds that show lines read `line`; a bad value means no mark.
   const [params] = useSearchParams()
   const line = Number(params.get("line") ?? NaN)
+  const heading = params.get("heading") ?? undefined
   const { data, failed, source, retry } = useFetched(
     "file-viewer",
     () => fetchResolve(path),
@@ -245,7 +253,14 @@ export function FileViewerPage({
           bg="surface"
         >
           {data.verdict === HostedFound ? (
-            <FoundView key={path} path={path} file={data} line={line} fetchText={fetchText} />
+            <FoundView
+              key={path}
+              path={path}
+              file={data}
+              line={line}
+              heading={heading}
+              fetchText={fetchText}
+            />
           ) : (
             <>
               <Bar path={path} meta="" found={false} />

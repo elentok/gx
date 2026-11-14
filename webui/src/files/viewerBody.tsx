@@ -4,6 +4,7 @@ import {
   HostedKindCode,
   HostedKindImage,
   HostedKindMarkdown,
+  HostedKindMermaid,
   HostedKindPDF,
   HostedKindSVG,
   HostedKindText,
@@ -13,6 +14,7 @@ import { Spinner } from "../ui/spinner/Spinner"
 import { CodeView } from "./CodeView"
 import { languageOf } from "./language"
 import { MarkdownView } from "./MarkdownView"
+import { MermaidView } from "./MermaidView"
 import { rawUrl } from "./rawUrl"
 import type { FileResolver } from "./resolve"
 
@@ -57,13 +59,16 @@ export function ViewerBody({
   path,
   text,
   line,
+  heading,
   source = false,
   resolver,
   onImageLoad,
   onImageError,
 }: {
-  /** Markdown only: show the raw text instead of the rendered file. */
+  /** Markdown and Mermaid only: show the raw text instead of the rendered file. */
   source?: boolean
+  /** Markdown only: slug of the heading to scroll to. */
+  heading?: string
   resolver?: FileResolver
   file: HostedResolved
   path: string
@@ -91,7 +96,13 @@ export function ViewerBody({
   }
   if (file.kind === HostedKindMarkdown) {
     if (text === undefined) return <Spinner label="Loading file" />
-    return <MarkdownView path={path} text={text} source={source} resolver={resolver} />
+    return (
+      <MarkdownView path={path} text={text} source={source} resolver={resolver} heading={heading} />
+    )
+  }
+  if (file.kind === HostedKindMermaid) {
+    if (text === undefined) return <Spinner label="Loading file" />
+    return <MermaidView text={text} source={source} />
   }
   if (file.kind === HostedKindCode || file.kind === HostedKindText) {
     if (text === undefined) return <Spinner label="Loading file" />

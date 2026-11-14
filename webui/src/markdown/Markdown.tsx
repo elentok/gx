@@ -4,6 +4,7 @@ import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { FileLink } from "../files/FileLink"
 import { useFileLinks, useFoundFile } from "../files/FileLinkContext"
+import { MermaidDiagram } from "../files/MermaidDiagram"
 import { detectPaths } from "../files/paths"
 import { rawUrl } from "../files/rawUrl"
 import { remarkFileCandidates } from "../files/remarkCandidates"
@@ -97,7 +98,13 @@ function candidateProps(props: object) {
   return { path, line: p["data-line"] ? Number(p["data-line"]) : undefined }
 }
 
-function buildComponents(epic: string | undefined, files: boolean): Components {
+const mermaidFence = /(?:^|\s)language-mermaid(?:\s|$)/
+
+function buildComponents(
+  epic: string | undefined,
+  files: boolean,
+  onDiagramSettled: (() => void) | undefined,
+): Components {
   const components: Components = {
     a: function MarkdownLink({ href, children }) {
       if (href && /^https?:\/\//i.test(href)) {
@@ -113,6 +120,18 @@ function buildComponents(epic: string | undefined, files: boolean): Components {
       return <>{children}</>
     },
   }
+  if (onDiagramSettled) {
+    // A diagram replaces the whole <pre>, so it gets no code-block box.
+    components.pre = function MarkdownPre({ node, children }) {
+      const first = node?.children[0]
+      const cls = first?.type === "element" ? first.properties.className : undefined
+      return Array.isArray(cls) && cls.includes("language-mermaid") ? (
+        <>{children}</>
+      ) : (
+        <pre>{children}</pre>
+      )
+    }
+  }
   if (files) {
     components.img = function MarkdownImage({ node: _node, src, alt }) {
       const ctx = useFileLinks()
@@ -126,6 +145,14 @@ function buildComponents(epic: string | undefined, files: boolean): Components {
       return <Candidate {...c}>{children}</Candidate>
     }
     components.code = function MarkdownCode({ node: _node, children, ...rest }) {
+      if (onDiagramSettled && mermaidFence.test(rest.className ?? "")) {
+        return (
+          <MermaidDiagram
+            source={String(children).replace(/\n$/, "")}
+            onSettled={onDiagramSettled}
+          />
+        )
+      }
       const c = candidateProps(rest)
       if (!c) return <code {...rest}>{children}</code>
       return (
@@ -149,10 +176,21 @@ export const Markdown = memo(function Markdown({
   epic,
   smallHeadings,
   inline,
+  onDiagramSettled,
   ...box
-}: { children: string; epic?: string; smallHeadings?: boolean; inline?: boolean } & BoxProps) {
+}: {
+  children: string
+  epic?: string
+  smallHeadings?: boolean
+  inline?: boolean
+  /** Set by the file viewer: ```mermaid fences render as diagrams, and this runs as each one settles. */
+  onDiagramSettled?: () => void
+} & BoxProps) {
   const files = useFileLinks() !== null
-  const components = useMemo(() => buildComponents(epic, files), [epic, files])
+  const components = useMemo(
+    () => buildComponents(epic, files, onDiagramSettled),
+    [epic, files, onDiagramSettled],
+  )
   return (
     <Box
       as={inline ? "span" : undefined}

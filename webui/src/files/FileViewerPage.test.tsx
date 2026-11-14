@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import {
@@ -259,4 +259,19 @@ test("a 404 on the raw fetch shows the not-found page", async () => {
 test("a pending resolve shows the spinner", async () => {
   renderAt("/files/tmp/a.md", () => new Promise(() => {}))
   expect(await screen.findByRole("status", { name: "Loading file" })).toBeTruthy()
+})
+
+test("changing only the heading scrolls without refetching the file", async () => {
+  const scroll = vi.fn()
+  Element.prototype.scrollIntoView = scroll
+  const resolve = vi.fn(async (p: string) => found(p))
+  const text = vi.fn(async () => "# Top\n\n## Install\n")
+  const router = renderAt("/files/Users/me/a.md", resolve, text)
+  await screen.findByRole("heading", { name: "Install" })
+  expect(scroll).not.toHaveBeenCalled()
+  await act(() => router.navigate("/files/Users/me/a.md?heading=install"))
+  await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1))
+  expect((scroll.mock.contexts[0] as HTMLElement).textContent).toBe("Install")
+  expect(resolve).toHaveBeenCalledTimes(1)
+  expect(text).toHaveBeenCalledTimes(1)
 })
