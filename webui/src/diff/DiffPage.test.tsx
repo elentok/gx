@@ -219,8 +219,9 @@ test("the selected file is in the URL and a fresh render from that URL picks it"
 
 test("on a phone the Files and Diff tabs show one pane each and picking a file opens Diff", async () => {
   render(OPEN, async () => TREE(), "phone")
-  const files = await screen.findByRole("tab", { name: "Files" })
+  const files = await screen.findByRole("tab", { name: "Files 3" })
   expect(screen.getByRole("tab", { name: "Diff" })).toBeTruthy()
+  expect(screen.queryByTestId("dir-count")).toBeNull()
   expect(screen.queryByTestId("file-nav")).toBeNull()
   fireEvent.click(files)
   fireEvent.click(screen.getAllByTestId("tree-file")[1])

@@ -74,7 +74,9 @@ export function FileTree({
   filter,
   selected,
   onSelect,
+  dirCounts = true,
 }: {
+  dirCounts?: boolean
   files: DiffFile[]
   filter: string
   selected: string | undefined
@@ -121,9 +123,11 @@ export function FileTree({
               <Box as="span" flex="1" minW="0" overflow="hidden" textOverflow="ellipsis">
                 {row.name}
               </Box>
-              <Box as="span" data-testid="dir-count" fontSize="xs">
-                {row.count}
-              </Box>
+              {dirCounts && (
+                <Box as="span" data-testid="dir-count" fontSize="xs">
+                  {row.count}
+                </Box>
+              )}
             </chakra.button>
           )
         }

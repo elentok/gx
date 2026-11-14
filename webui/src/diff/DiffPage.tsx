@@ -42,9 +42,11 @@ function RefInput({
   label,
   value,
   invalid,
+  phone,
   onChange,
   onKeyDown,
 }: {
+  phone: boolean
   label: string
   value: string
   invalid: boolean
@@ -61,10 +63,10 @@ function RefInput({
       spellCheck={false}
       autoCapitalize="off"
       autoCorrect="off"
-      flex="1 1 140px"
+      flex={phone ? "1 1 0" : "1 1 140px"}
       minW="0"
       h="40px"
-      px="3"
+      px={phone ? "2" : "3"}
       fontFamily="mono"
       fontSize="sm"
       bg="surface.raised"
@@ -161,7 +163,7 @@ function FileNav({
     </Box>
   )
   return (
-    <Box data-testid="file-nav" display="flex" flexWrap="wrap" alignItems="center" gap="2">
+    <Box data-testid="file-nav" display="flex" alignItems="center" gap="2">
       <Button emphasis="secondary" disabled={visible.length === 0} onClick={() => onStep(-1)}>
         {hint("p")}
         Prev
@@ -170,7 +172,15 @@ function FileNav({
         {hint("n")}
         Next
       </Button>
-      <Box as="span" fontSize="sm" color="text.muted">
+      <Box
+        as="span"
+        fontSize="sm"
+        color="text.muted"
+        minW="0"
+        overflow="hidden"
+        textOverflow="ellipsis"
+        whiteSpace="nowrap"
+      >
         {`${scope} · ${visible.length === 0 ? "" : `${index + 1} of ${visible.length} · `}${visible.length} files · `}
         <Box as="span" color="tone.done.fg">{`+${added}`}</Box>{" "}
         <Box as="span" color="tone.deadlocked.fg">{`−${deleted}`}</Box>
@@ -181,13 +191,15 @@ function FileNav({
 
 function Tabs({
   tab,
+  fileCount,
   onChange,
 }: {
   tab: "files" | "diff"
+  fileCount: number
   onChange: (t: "files" | "diff") => void
 }) {
   return (
-    <Box role="tablist" display="flex" gap="2" mt="4">
+    <Box role="tablist" display="flex" mt="4" borderBottom="1px solid" borderColor="border">
       {(["files", "diff"] as const).map((t) => (
         <chakra.button
           key={t}
@@ -198,13 +210,12 @@ function Tabs({
           flex="1"
           h="40px"
           fontSize="sm"
-          border="1px solid"
-          borderColor="border"
-          borderRadius="8px"
-          bg={t === tab ? "tone.running.bg" : "transparent"}
+          mb="-1px"
+          borderBottom="2px solid"
+          borderColor={t === tab ? "text" : "transparent"}
           color={t === tab ? "text" : "text.muted"}
         >
-          {t === "files" ? "Files" : "Diff"}
+          {t === "files" ? `Files ${fileCount}` : "Diff"}
         </chakra.button>
       ))}
     </Box>
@@ -278,7 +289,13 @@ function FilesBrowser({
     <>
       {commitList}
       <FileFilter value={filter} onChange={setFilter} />
-      <FileTree files={files} filter={filter} selected={selected} onSelect={pick} />
+      <FileTree
+        files={files}
+        filter={filter}
+        selected={selected}
+        onSelect={pick}
+        dirCounts={!phone}
+      />
       {emptyNotice && (
         <Box data-testid="narrow-notice" mt="3" fontSize="sm" color="text.muted">
           {emptyNotice}
@@ -313,7 +330,7 @@ function FilesBrowser({
   if (phone) {
     return (
       <>
-        <Tabs tab={tab} onChange={setTab} />
+        <Tabs tab={tab} fileCount={files.length} onChange={setTab} />
         <Box mt="4">{tab === "files" ? left : right}</Box>
       </>
     )
@@ -482,8 +499,16 @@ export function DiffPage({
   return (
     <DetailPage title={{ kind: "Diff", name: url.epic }}>
       <PageHeader title="Diff" subtitle={subtitle} />
-      <Box data-testid="ref-bar" mt="4" display="flex" flexWrap="wrap" alignItems="center" gap="2">
+      <Box
+        data-testid="ref-bar"
+        mt="4"
+        display="flex"
+        flexWrap={device === "phone" ? "nowrap" : "wrap"}
+        alignItems="center"
+        gap="2"
+      >
         <RefInput
+          phone={device === "phone"}
           label="Base ref"
           value={draft.first}
           invalid={invalid === "first"}
@@ -494,6 +519,7 @@ export function DiffPage({
           ...
         </Box>
         <RefInput
+          phone={device === "phone"}
           label="Tip ref"
           value={draft.second}
           invalid={invalid === "second"}
