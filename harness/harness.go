@@ -40,6 +40,9 @@ type LaunchOptions struct {
 	Cwd string
 	// NoSystemPrompt leaves the GX system prompt off a fresh Codex launch.
 	NoSystemPrompt bool
+	// FilesOnly gives a fresh Codex launch the files sentence alone instead of
+	// the loop prompt. Zero value keeps the loop prompt.
+	FilesOnly bool
 }
 
 // Command is what to run for a session.

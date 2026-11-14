@@ -289,7 +289,7 @@ func TestHeadless_StartLaunchesDetachedClaude(t *testing.T) {
 		"-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
 		"--session-id", s.SessionID, "--permission-mode", "auto", "--permission-prompt-tool", "stdio",
 		"--model", "opus", "--disallowedTools", agentrunner.LoopDisallowedTools,
-		"--append-system-prompt", gxharness.GXSystemPrompt,
+		"--append-system-prompt", gxharness.GXLoopPrompt,
 	}
 	if !slices.Equal(rec.Args, wantArgs) {
 		t.Errorf("args = %q\nwant %q", rec.Args, wantArgs)

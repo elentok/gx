@@ -227,6 +227,11 @@ func TestCodexHarness_LaunchAndResume(t *testing.T) {
 	if launch.Name != "codex" || !slices.Equal(launch.Args, []string{"--model", "m", "-c", wantPrompt}) {
 		t.Errorf("Launch = %+v, want codex --model m plus the developer_instructions flag, no session-id flag", launch)
 	}
+	filesOnly := h.Launch(harness.LaunchOptions{Args: []string{"--model", "m"}, FilesOnly: true})
+	wantFiles := "developer_instructions=" + harness.TOMLString(harness.GXFilesSentence)
+	if !slices.Equal(filesOnly.Args, []string{"--model", "m", "-c", wantFiles}) {
+		t.Errorf("FilesOnly Launch args = %q, want the files sentence alone", filesOnly.Args)
+	}
 	if strings.Contains(strings.Join(launch.Args, " "), "ignored") {
 		t.Errorf("Launch passed the session id: %v", launch.Args)
 	}

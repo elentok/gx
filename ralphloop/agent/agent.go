@@ -162,7 +162,7 @@ func AgentArgs(agent AgentKind, cwd, scratchDir, epicName, model, effort string,
 	if f := harness.GXSystemPromptFile(); f != "" {
 		args = append(args, "--append-system-prompt-file", f)
 	} else {
-		args = append(args, "--append-system-prompt", harness.GXSystemPrompt)
+		args = append(args, "--append-system-prompt", harness.GXLoopPrompt)
 	}
 	if model != "" {
 		args = append(args, "--model", model)

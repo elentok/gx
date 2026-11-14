@@ -128,7 +128,11 @@ const (
 func (codexHarness) Launch(opts LaunchOptions) Command {
 	args := slices.Clone(opts.Args)
 	if !opts.NoSystemPrompt {
-		args = append(args, "-c", "developer_instructions="+tomlString(GXSystemPromptFor(Codex)))
+		prompt := GXSystemPromptFor(Codex)
+		if opts.FilesOnly {
+			prompt = GXFilesSentence
+		}
+		args = append(args, "-c", "developer_instructions="+tomlString(prompt))
 	}
 	return codexCommand(args, opts.Env)
 }
