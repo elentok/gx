@@ -105,6 +105,59 @@ type StatsWebPerformance struct {
 	RouteChanges  []StatsWebPerfCard  `json:"route_changes"`
 	Trend         []StatsWebPerfTrend `json:"trend"`
 	SlowestRoutes []StatsWebPerfRoute `json:"slowest_routes"`
+	// BuildStrip is nil when no build has been seen.
+	BuildStrip *StatsWebPerfBuildStrip `json:"build_strip"`
+	WhySlow    []StatsWebPerfWhySlow   `json:"why_slow"`
+	PoorINP    StatsWebPerfPoorINP     `json:"poor_inp"`
+}
+
+// StatsWebPerfBuild is one build with its p75s over the selected range.
+type StatsWebPerfBuild struct {
+	BuildID    string   `json:"build_id"`
+	WebVersion string   `json:"web_version"`
+	LCPP75     *float64 `json:"lcp_p75"`
+	INPP75     *float64 `json:"inp_p75"`
+	JSP75      *float64 `json:"js_p75"`
+}
+
+// StatsWebPerfBuildStrip compares the current build (latest first seen in the
+// stored data) with the one first seen just before it. Previous is nil with no
+// earlier build. The changes are percents and nil when either build has fewer
+// than 20 samples of the metric.
+type StatsWebPerfBuildStrip struct {
+	Current      StatsWebPerfBuild  `json:"current"`
+	Previous     *StatsWebPerfBuild `json:"previous"`
+	LCPChangePct *float64           `json:"lcp_change_pct"`
+	INPChangePct *float64           `json:"inp_change_pct"`
+	JSChangePct  *float64           `json:"js_change_pct"`
+}
+
+// StatsWebPerfWhySlow is one Why slow? row. Metric is ttfb, api_latency,
+// js_bytes or css_bytes. Count is the current build's samples; the page dims
+// the row below 20. Zero transfer sizes are left out.
+type StatsWebPerfWhySlow struct {
+	Metric      string   `json:"metric"`
+	Count       int      `json:"count"`
+	P75         *float64 `json:"p75"`
+	PreviousP75 *float64 `json:"previous_p75"`
+	ChangePct   *float64 `json:"change_pct"`
+}
+
+// StatsWebPerfAction is one INP action name with its poor-sample count.
+type StatsWebPerfAction struct {
+	Action string `json:"action"`
+	Count  int    `json:"count"`
+}
+
+// StatsWebPerfPoorINP covers the poor (above 200 ms) INP samples of both tabs
+// over the range, all builds. The page dims everything but Count below 20.
+type StatsWebPerfPoorINP struct {
+	Count                int                  `json:"count"`
+	InputDelayP75        *float64             `json:"input_delay_p75"`
+	ProcessingP75        *float64             `json:"processing_p75"`
+	PresentationDelayP75 *float64             `json:"presentation_delay_p75"`
+	TopActions           []StatsWebPerfAction `json:"top_actions"`
+	WorstChunk           string               `json:"worst_chunk,omitempty"`
 }
 
 // StatsWebPerfCard is one metric on one tab. Status is good,

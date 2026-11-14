@@ -50,6 +50,7 @@ func newStats(n int) wire.Stats {
 		WebPerformance: wire.StatsWebPerformance{
 			HardLoads: []wire.StatsWebPerfCard{}, RouteChanges: []wire.StatsWebPerfCard{},
 			Trend: []wire.StatsWebPerfTrend{}, SlowestRoutes: []wire.StatsWebPerfRoute{},
+			WhySlow: []wire.StatsWebPerfWhySlow{}, PoorINP: wire.StatsWebPerfPoorINP{TopActions: []wire.StatsWebPerfAction{}},
 		},
 	}
 }

@@ -139,6 +139,7 @@ func buildWebPerformance(src WebPerf, win limits.StatsWindow, includeDev bool) (
 	out := wire.StatsWebPerformance{
 		HardLoads: []wire.StatsWebPerfCard{}, RouteChanges: []wire.StatsWebPerfCard{},
 		Trend: []wire.StatsWebPerfTrend{}, SlowestRoutes: []wire.StatsWebPerfRoute{},
+		WhySlow: []wire.StatsWebPerfWhySlow{}, PoorINP: wire.StatsWebPerfPoorINP{TopActions: []wire.StatsWebPerfAction{}},
 	}
 	if src == nil {
 		return out, nil
@@ -210,5 +211,5 @@ func buildWebPerformance(src WebPerf, win limits.StatsWindow, includeDev bool) (
 		return cmp.Or(cmp.Compare(b.P75, a.P75), cmp.Compare(a.Route, b.Route))
 	})
 	out.SlowestRoutes = out.SlowestRoutes[:min(len(out.SlowestRoutes), slowestRoutes)]
-	return out, nil
+	return out, buildWebPerfBuilds(src, win, includeDev, &out)
 }
