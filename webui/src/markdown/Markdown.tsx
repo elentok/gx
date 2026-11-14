@@ -103,6 +103,7 @@ const mermaidFence = /(?:^|\s)language-mermaid(?:\s|$)/
 function buildComponents(
   epic: string | undefined,
   files: boolean,
+  card: boolean,
   onDiagramSettled: (() => void) | undefined,
 ): Components {
   const components: Components = {
@@ -162,6 +163,13 @@ function buildComponents(
       )
     }
   }
+  if (card) {
+    // A preview card shows a relative image as its alt text: the image is not fetched there.
+    components.img = function CardImage({ node: _node, src, alt }) {
+      if (typeof src === "string" && /^https?:\/\//i.test(src)) return <img src={src} alt={alt} />
+      return <>{alt}</>
+    }
+  }
   return components
 }
 
@@ -177,6 +185,7 @@ export const Markdown = memo(function Markdown({
   smallHeadings,
   inline,
   onDiagramSettled,
+  card,
   ...box
 }: {
   children: string
@@ -185,11 +194,13 @@ export const Markdown = memo(function Markdown({
   inline?: boolean
   /** Set by the file viewer: ```mermaid fences render as diagrams, and this runs as each one settles. */
   onDiagramSettled?: () => void
+  /** A hover card body: relative images show their alt text. */
+  card?: boolean
 } & BoxProps) {
   const files = useFileLinks() !== null
   const components = useMemo(
-    () => buildComponents(epic, files, onDiagramSettled),
-    [epic, files, onDiagramSettled],
+    () => buildComponents(epic, files, !!card, onDiagramSettled),
+    [epic, files, card, onDiagramSettled],
   )
   return (
     <Box

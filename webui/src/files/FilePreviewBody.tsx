@@ -2,10 +2,14 @@ import { chakra, Flex, Text } from "@chakra-ui/react"
 import {
   type HostedResolved,
   HostedKindBinary,
+  HostedKindCode,
   HostedKindHTML,
+  HostedKindMarkdown,
   HostedKindPDF,
+  HostedKindText,
 } from "../generated/ops"
 import { sizeText } from "../health/formatBytes"
+import { FileHoverCardText } from "./FileHoverCardText"
 
 export const PREVIEW_MAX_BYTES = 2 * 1024 * 1024
 
@@ -20,12 +24,27 @@ export function previewState(file: HostedResolved, missing: boolean): PreviewSta
   return "other"
 }
 
-export function FilePreviewHeader({ path, file }: { path: string; file?: HostedResolved }) {
+function isTextPreview(file: HostedResolved): boolean {
+  return (
+    file.kind === HostedKindMarkdown || file.kind === HostedKindCode || file.kind === HostedKindText
+  )
+}
+
+export function FilePreviewHeader({
+  path,
+  file,
+  line,
+}: {
+  path: string
+  file?: HostedResolved
+  line?: number
+}) {
   return (
     <Flex gap="3" justify="space-between" align="baseline" px="3" py="2" borderBottomWidth="1px">
-      <Text fontFamily="mono" fontSize="xs" truncate title={path}>
-        {path}
-      </Text>
+      <Flex fontFamily="mono" fontSize="xs" minW="0" title={path}>
+        <Text truncate>{path}</Text>
+        {line ? <Text flexShrink={0}>:{line}</Text> : null}
+      </Flex>
       {file?.size !== undefined && (
         <Text fontSize="xs" color="text.muted" flexShrink={0}>
           {sizeText(file.size, "binary")}
@@ -44,7 +63,17 @@ function Note({ children }: { children: string }) {
 }
 
 /** The fixed 170px preview area with a fade at the bottom edge. The hover card and the sheet share it. */
-export function FilePreviewBody({ file, missing }: { file: HostedResolved; missing: boolean }) {
+export function FilePreviewBody({
+  path,
+  file,
+  missing,
+  line,
+}: {
+  path: string
+  file: HostedResolved
+  missing: boolean
+  line?: number
+}) {
   const state = previewState(file, missing)
   return (
     <chakra.div
@@ -60,7 +89,7 @@ export function FilePreviewBody({ file, missing }: { file: HostedResolved; missi
         bottom: 0,
         height: "28px",
         pointerEvents: "none",
-        background: "linear-gradient(to bottom, transparent, {colors.bg.panel})",
+        background: "linear-gradient(to bottom, transparent, {colors.surface.raised})",
       }}
     >
       {state === "missing" && <Note>File not found. It may have been deleted or moved.</Note>}
@@ -81,6 +110,9 @@ export function FilePreviewBody({ file, missing }: { file: HostedResolved; missi
         </Flex>
       )}
       {state === "none" && <Note>No preview</Note>}
+      {state === "other" && isTextPreview(file) && (
+        <FileHoverCardText path={path} file={file} line={line} />
+      )}
     </chakra.div>
   )
 }

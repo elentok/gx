@@ -33,11 +33,28 @@ export function FileHoverCard({
       <HoverCard.Trigger asChild>{children}</HoverCard.Trigger>
       <Portal>
         <HoverCard.Positioner>
-          <HoverCard.Content w="380px" p="0" overflow="hidden" data-file-hover-card="">
-            <FilePreviewHeader path={path} file={file} />
-            <FilePreviewBody file={file} missing={ctx.isMissing(path)} />
+          <HoverCard.Content
+            w="380px"
+            maxW="calc(100vw - 16px)"
+            p="0"
+            overflow="hidden"
+            bg="surface.raised"
+            color="text"
+            borderWidth="1px"
+            borderColor="border"
+            borderRadius="10px"
+            boxShadow="lg"
+            data-file-hover-card=""
+          >
+            <FilePreviewHeader path={path} file={file} line={line} />
+            <FilePreviewBody path={path} file={file} missing={ctx.isMissing(path)} line={line} />
             <chakra.div px="3" py="2" borderTopWidth="1px" textAlign="end" fontSize="sm">
-              <chakra.a href={viewerHref(path, { line, heading })} data-file-open="">
+              <chakra.a
+                href={viewerHref(path, { line, heading })}
+                data-file-open=""
+                color="tone.done.fg"
+                textDecoration="underline"
+              >
                 Open
               </chakra.a>
             </chakra.div>
