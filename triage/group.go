@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/elentok/gx/tickets"
 )
 
 // GroupLimitTokens is the combined estimate a group must stay under.
@@ -144,7 +146,7 @@ func (r *Record) dissolveGroup(group string) {
 // to chained rows by their overlapWith.
 func (s *Store) Ungroup(id string, revision int, address string) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
-		if err := requireStep(rec, "ungroup", "approve"); err != nil {
+		if err := requireStep(rec, "ungroup", tickets.StepQuestions); err != nil {
 			return err
 		}
 		row, err := rec.row(address)

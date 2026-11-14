@@ -45,7 +45,7 @@ func CanAbandon(live bool, step string, stopped bool) bool {
 	if !live {
 		return false
 	}
-	switch step {
+	switch pageStep(step) {
 	case tickets.StepVerify, tickets.StepPlan:
 		return true
 	case tickets.StepApprove:
@@ -167,7 +167,7 @@ func buildView(project string, rec *triagerec.Record, stopped bool) wire.TriageV
 	}
 	isLive := rec.State == triagerec.StateLive
 	v.ID, v.State, v.Revision, v.Round = rec.ID, wire.TriageState(rec.State), rec.Revision, rec.Round
-	v.Steps = steps(rec.Step)
+	v.Steps = steps(pageStep(rec.Step))
 	v.CanAbandon = CanAbandon(isLive, rec.Step, stopped)
 
 	orphans := rec.MergeOrphans()
@@ -207,6 +207,18 @@ func buildView(project string, rec *triagerec.Record, stopped bool) wire.TriageV
 	return v
 }
 
+// pageStep maps a version 2 step to the version 1 step the page still shows,
+// until the page tickets replace those views.
+func pageStep(step string) string {
+	switch step {
+	case tickets.StepRoute:
+		return tickets.StepPlan
+	case tickets.StepQuestions:
+		return tickets.StepApprove
+	}
+	return step
+}
+
 func steps(current string) []wire.MapStep {
 	out := make([]wire.MapStep, 0, len(flowSteps))
 	state := wire.MapStepDone
@@ -234,7 +246,7 @@ func progress(rec *triagerec.Record, total, verdicts, plans, written int) (strin
 		return float64(n) / float64(total)
 	}
 	idx, within, note := 0, 0.0, ""
-	switch rec.Step {
+	switch pageStep(rec.Step) {
 	case tickets.StepVerify:
 		within, note = frac(verdicts), fmt.Sprintf("%d of %d verdicts saved", verdicts, total)
 	case tickets.StepPlan:

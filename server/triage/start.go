@@ -66,7 +66,7 @@ func (t *Triage) open(req wire.TriageOpenRequest, web bool) (wire.SessionResult,
 		}
 		t.Changed(project)
 	}
-	if rec != nil && rec.Step == tickets.StepApprove {
+	if rec != nil && pageStep(rec.Step) == tickets.StepApprove {
 		return sessions.Refusal(wire.ReasonTriageApprove, "the Triage waits for approval on its page"), nil
 	}
 

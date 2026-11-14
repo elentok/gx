@@ -94,7 +94,7 @@ func TestView_RecordAtEachStep(t *testing.T) {
 	}
 
 	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrB, Verdict: "fixed"}))
-	q := triagerec.Question{ID: "q1", Text: "Which area?\nmore detail", Kind: triagerec.QuestionQuick, Options: []string{"x", "y"}, Default: "x"}
+	q := triagerec.Question{ID: "q1", Text: "Which area?\nmore detail", Kind: triagerec.QuestionAsk, Options: []string{"x", "y"}, Default: "x"}
 	rec = mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
 		{RowID: addrA, Action: "ready", Questions: []triagerec.Question{q}},
 		{RowID: addrB, Action: "close", Destination: "fixed already"},

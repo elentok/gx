@@ -129,8 +129,8 @@ func TestTriage_PlanSaveMovesToApproveAndDropsGoneRows(t *testing.T) {
 		t.Fatalf("plan: %v", err)
 	}
 	s := triageShow(t, repo)
-	if s.Next != "approve" || s.Step != "approve" {
-		t.Errorf("after plan next/step = %q/%q, want approve/approve", s.Next, s.Step)
+	if s.Next != "questions" || s.Step != "questions" {
+		t.Errorf("after plan next/step = %q/%q, want questions/questions", s.Next, s.Step)
 	}
 	for _, r := range s.Rows {
 		if r.Address == rows[1] && (r.Write != "gone" || r.Plan != nil) {
@@ -275,8 +275,8 @@ func TestTriage_ApproveRefusedWhileQuestionOpen(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "open") {
 		t.Errorf("approve with open question = %v, want refusal", err)
 	}
-	if got := triageShow(t, repo); got.Step != "approve" {
-		t.Errorf("step = %q, want approve", got.Step)
+	if got := triageShow(t, repo); got.Step != "questions" {
+		t.Errorf("step = %q, want questions", got.Step)
 	}
 }
 
@@ -335,8 +335,8 @@ func TestTriage_ShowNextAcrossTheVerifyStep(t *testing.T) {
 			t.Fatalf("verdict %s: %v", addr, err)
 		}
 	}
-	if s := triageShow(t, repo); s.Next != "plan" || s.Step != "plan" {
-		t.Errorf("after last verdict next/step = %q/%q, want plan/plan", s.Next, s.Step)
+	if s := triageShow(t, repo); s.Next != "route" || s.Step != "route" {
+		t.Errorf("after last verdict next/step = %q/%q, want route/route", s.Next, s.Step)
 	}
 }
 

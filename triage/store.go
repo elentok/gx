@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	// Version is the record format version.
-	Version = 1
+	// Version is the record format version. Load reads versions 1 and 2.
+	Version = 2
 
 	dirName    = ".triage"
 	markerName = "live"
@@ -50,24 +50,81 @@ const (
 	WriteGone    WriteState = "gone"
 )
 
-// QuestionKind separates a quick question from one that needs design thought.
+// QuestionKind says who settles a question: the agent (decide), the person
+// (ask), or the design that follows the triage (design).
 type QuestionKind string
 
 const (
-	QuestionQuick  QuestionKind = "quick"
+	QuestionDecide QuestionKind = "decide"
+	QuestionAsk    QuestionKind = "ask"
 	QuestionDesign QuestionKind = "design"
+
+	// legacyQuick is the version 1 name of ask; Load reads it as ask.
+	legacyQuick QuestionKind = "quick"
 )
 
-// Question is one question the agent asks the person about a row.
+// Question is one question about a row. Options and Default (the recommended
+// answer) are set on every question.
 type Question struct {
 	ID      string       `json:"id"`
+	RowID   string       `json:"rowId,omitempty"`
 	Text    string       `json:"text"`
 	Kind    QuestionKind `json:"kind"`
 	Options []string     `json:"options,omitempty"`
 	Default string       `json:"default,omitempty"`
-	// Auto marks a low-risk quick question the agent decided: Plan saves it
-	// answered with Default, and the person can still change the answer.
+	// Auto is a version 1 field: a low-risk quick question saved answered with
+	// Default. Version 2 records never write it.
 	Auto bool `json:"auto,omitempty"`
+}
+
+// Round is one saved set of questions with the person's answers. An objection
+// round is outside the 3-round cap.
+type Round struct {
+	Questions []Question        `json:"questions"`
+	Answers   map[string]string `json:"answers,omitempty"`
+	Answered  bool              `json:"answered,omitempty"`
+	Objection bool              `json:"objection,omitempty"`
+}
+
+// Decided is a question the agent settled itself, with the short reason.
+type Decided struct {
+	RowID    string `json:"rowId,omitempty"`
+	Question string `json:"question"`
+	Choice   string `json:"choice"`
+	Reason   string `json:"reason,omitempty"`
+	Objected bool   `json:"objected,omitempty"`
+}
+
+// Area sources.
+const (
+	AreaTable = "table"
+	AreaAgent = "agent"
+)
+
+// Area is a map epic area a row can go to.
+type Area struct {
+	Name      string `json:"name"`
+	Source    string `json:"source"`
+	Confirmed bool   `json:"confirmed,omitempty"`
+	Created   bool   `json:"created,omitempty"`
+}
+
+// MoveState is how far moving one old epic got.
+type MoveState string
+
+const (
+	MovePending MoveState = "pending"
+	MoveDone    MoveState = "done"
+	MoveFailed  MoveState = "failed"
+	MoveKept    MoveState = "kept"
+)
+
+// MoveUnit moves one old epic into a target area.
+type MoveUnit struct {
+	OldEpic   string    `json:"oldEpic"`
+	Area      string    `json:"area"`
+	State     MoveState `json:"state"`
+	LastError string    `json:"lastError,omitempty"`
 }
 
 // Answered is a question the person answered in an earlier round, as asked.
@@ -102,15 +159,16 @@ type Row struct {
 	Title    string `json:"title"`
 	Category string `json:"category,omitempty"`
 
-	Verdict              string       `json:"verdict,omitempty"`
-	Evidence             string       `json:"evidence,omitempty"`
-	Files                []string     `json:"files,omitempty"`
-	Questions            []Question   `json:"questions,omitempty"`
-	SuggestedDestination string       `json:"suggestedDestination,omitempty"`
-	Plan                 *PlanRow     `json:"plan,omitempty"`
-	Person               PersonFields `json:"person"`
-	// Earlier is what the person answered in the rounds before this one: sent
-	// back to the agent, the answers move here and the row is asked afresh.
+	Verdict              string     `json:"verdict,omitempty"`
+	Evidence             string     `json:"evidence,omitempty"`
+	Files                []string   `json:"files,omitempty"`
+	Questions            []Question `json:"questions,omitempty"`
+	SuggestedDestination string     `json:"suggestedDestination,omitempty"`
+	// Fallback is the area a ready row goes to when its own area is unusable.
+	Fallback string       `json:"fallback,omitempty"`
+	Plan     *PlanRow     `json:"plan,omitempty"`
+	Person   PersonFields `json:"person"`
+	// Earlier is a version 1 field, never written for a version 2 record.
 	Earlier []Answered `json:"earlier,omitempty"`
 	Write   WriteState `json:"write,omitempty"`
 	// NewAddresses are the tickets the row became. NewAddress is the single
@@ -132,9 +190,18 @@ type Record struct {
 	State     State     `json:"state"`
 	Step      string    `json:"step"`
 	Revision  int       `json:"revision"`
-	// Round counts the times the person sent the answers back to the agent.
-	Round int   `json:"round,omitempty"`
-	Rows  []Row `json:"rows"`
+	// Round is a version 1 field, never written for a version 2 record.
+	Round   int        `json:"round,omitempty"`
+	Rows    []Row      `json:"rows"`
+	Rounds  []Round    `json:"rounds,omitempty"`
+	Decided []Decided  `json:"decided,omitempty"`
+	Areas   []Area     `json:"areas,omitempty"`
+	Moves   []MoveUnit `json:"moves,omitempty"`
+	// Approved is set by the approve verb.
+	Approved bool `json:"approved,omitempty"`
+	// storedVersion is the version the record had on disk; zero for a record
+	// built in memory.
+	storedVersion int
 	// LastPassComplete is set when the last verify pass covered every row.
 	LastPassComplete bool   `json:"lastPassComplete,omitempty"`
 	Result           string `json:"result,omitempty"`
@@ -312,6 +379,7 @@ func (s *Store) saveLocked(rec *Record) error {
 		return ErrStaleRevision
 	}
 	next := *rec
+	next.Version = Version
 	next.Revision++
 	if err := s.write(&next); err != nil {
 		return err
@@ -348,7 +416,79 @@ func (s *Store) Load(id string) (*Record, error) {
 		}
 		r.NewAddress = ""
 	}
+	rec.upgrade()
 	return &rec, nil
+}
+
+// upgrade lifts a version 1 record to the version 2 shape in memory. Nothing
+// is written until the next Save.
+func (rec *Record) upgrade() {
+	rec.storedVersion = rec.Version
+	if rec.Version >= Version {
+		return
+	}
+	rec.Version = Version
+	for i := range rec.Rows {
+		for j := range rec.Rows[i].Questions {
+			q := &rec.Rows[i].Questions[j]
+			if q.Kind == legacyQuick {
+				q.Kind = QuestionAsk
+			}
+		}
+	}
+	if rec.State != StateLive {
+		return
+	}
+	switch rec.Step {
+	case tickets.StepPlan, tickets.StepApprove:
+		rec.backToRoute()
+	}
+}
+
+// LegacyWrite reports whether the record is a version 1 record that was at
+// write when loaded. Every write-step operation refuses it; only Abandon works.
+func (rec *Record) LegacyWrite() bool {
+	return rec.State == StateLive && rec.Step == tickets.StepWrite &&
+		rec.storedVersion > 0 && rec.storedVersion < Version
+}
+
+// backToRoute moves a version 1 record at plan or approve to route. Verdicts
+// stay, each given answer becomes an answered ask question, and the plan and
+// the person's edits are dropped.
+func (rec *Record) backToRoute() {
+	round := Round{Answers: map[string]string{}, Answered: true}
+	for i := range rec.Rows {
+		row := &rec.Rows[i]
+		var open []Question
+		for _, q := range row.AllQuestions() {
+			q.RowID = row.Address
+			if q.Kind == legacyQuick {
+				q.Kind = QuestionAsk
+			}
+			a := strings.TrimSpace(row.Person.Answers[q.ID])
+			if a == "" || q.Kind == QuestionDesign {
+				open = append(open, q)
+				continue
+			}
+			q.Auto = false
+			round.Questions = append(round.Questions, q)
+			round.Answers[q.ID] = a
+		}
+		for k, e := range row.Earlier {
+			id := fmt.Sprintf("earlier-%d", len(round.Questions)+k+1)
+			round.Questions = append(round.Questions, Question{ID: id, RowID: row.Address, Text: e.Text, Kind: QuestionAsk, Options: []string{e.Answer}, Default: e.Answer})
+			round.Answers[id] = e.Answer
+		}
+		row.Questions = open
+		row.Plan = nil
+		row.Person = PersonFields{}
+		row.Earlier = nil
+	}
+	if len(round.Questions) > 0 {
+		rec.Rounds = append(rec.Rounds, round)
+	}
+	rec.Round = 0
+	rec.Step = tickets.StepRoute
 }
 
 // LoadLive returns the project's live record, or nil when there is no Triage.

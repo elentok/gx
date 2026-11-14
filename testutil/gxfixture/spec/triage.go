@@ -83,7 +83,7 @@ func TriageScenario(shape string) (Scenario, bool) {
 			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) {
 				atApprove(rec, func(i int, p *triage.PlanRow) {
 					if i < 3 {
-						p.Questions = []triage.Question{{ID: fmt.Sprintf("q%d", i), Text: "Which epic should this go to?", Kind: triage.QuestionQuick, Options: []string{"ready-epic", "new map"}}}
+						p.Questions = []triage.Question{{ID: fmt.Sprintf("q%d", i), Text: "Which epic should this go to?", Kind: triage.QuestionAsk, Options: []string{"ready-epic", "new map"}}}
 					}
 				})
 			}}}

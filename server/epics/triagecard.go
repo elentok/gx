@@ -41,7 +41,7 @@ func PlaceTriage(project string, rec *triage.Record, sessionLive bool) TriagePla
 			Action: wire.CardAction{Kind: wire.CardActionOpen, Label: label, Target: project, Link: link}}
 	}
 	switch {
-	case rec.Step == tickets.StepApprove:
+	case rec.Step == tickets.StepApprove || rec.Step == tickets.StepQuestions:
 		return needsYou("Review plan")
 	case sessionLive:
 		return TriagePlacement{Section: wire.SectionDesigning,
@@ -73,13 +73,20 @@ func triagePercent(rec *triage.Record) int {
 	if rec.State == triage.StateDone {
 		return 100
 	}
-	idx := slices.Index(triageSteps, rec.Step)
+	step := rec.Step
+	switch step {
+	case tickets.StepRoute:
+		step = tickets.StepPlan
+	case tickets.StepQuestions:
+		step = tickets.StepApprove
+	}
+	idx := slices.Index(triageSteps, step)
 	if idx < 0 || len(rec.Rows) == 0 {
 		return max(idx, 0) * 25
 	}
 	handled := 0
 	for _, r := range rec.Rows {
-		switch rec.Step {
+		switch step {
 		case tickets.StepVerify:
 			if r.Verdict != "" {
 				handled++

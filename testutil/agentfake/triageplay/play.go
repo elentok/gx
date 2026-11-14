@@ -134,7 +134,7 @@ func (p *Player) Play() (string, error) {
 	switch v.Next {
 	case triage.BranchVerify:
 		return p.verify(v.Record)
-	case triage.BranchPlan:
+	case triage.BranchRoute:
 		return p.plan(v.Record)
 	case triage.BranchWrite:
 		return p.write(v.Record)
@@ -182,8 +182,8 @@ func triagePlanRows(rec *triage.Record) []triage.PlanRow {
 		switch i {
 		case 0:
 			row.Questions = []triage.Question{
-				{ID: "q1", Text: "Fix it in the parser or the caller?", Kind: triage.QuestionQuick, Options: []string{"parser", "caller"}, Default: "parser"},
-				{ID: "q2", Text: "Keep the old flag?", Kind: triage.QuestionQuick, Options: []string{"yes", "no"}, Default: "no"},
+				{ID: "q1", Text: "Fix it in the parser or the caller?", Kind: triage.QuestionAsk, Options: []string{"parser", "caller"}, Default: "parser"},
+				{ID: "q2", Text: "Keep the old flag?", Kind: triage.QuestionAsk, Options: []string{"yes", "no"}, Default: "no"},
 			}
 		case 1:
 			row.Questions = []triage.Question{{ID: "d1", Text: "Which store should it use?", Kind: triage.QuestionDesign}}

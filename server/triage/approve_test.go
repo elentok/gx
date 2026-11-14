@@ -73,11 +73,11 @@ func TestApprove_OpenQuestionIsRefused(t *testing.T) {
 	rec := mustRec(store.Create())
 	a, b := rec.Rows[0].Address, rec.Rows[1].Address
 	rec = mustRec(store.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{
-		Address: a, Questions: []triagerec.Question{{ID: "q1", Text: "which?", Kind: triagerec.QuestionQuick}},
+		Address: a, Questions: []triagerec.Question{{ID: "q1", Text: "which?", Kind: triagerec.QuestionAsk}},
 	}))
 	rec = mustRec(store.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: b}))
 	rec = mustRec(store.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
-		{RowID: a, Action: "ready", Questions: []triagerec.Question{{ID: "q1", Text: "which?", Kind: triagerec.QuestionQuick, Options: []string{"x", "y"}, Default: "x"}}},
+		{RowID: a, Action: "ready", Questions: []triagerec.Question{{ID: "q1", Text: "which?", Kind: triagerec.QuestionAsk, Options: []string{"x", "y"}, Default: "x"}}},
 		{RowID: b, Action: "ready"},
 	}, nil))
 	res := approve(t, f, approveReq(rec))
@@ -198,7 +198,7 @@ func TestSendBack_ReturnsToPlanKeepsTheAnswersAndStartsASession(t *testing.T) {
 		t.Fatalf("send back = %+v", res)
 	}
 	got, _ := store.LoadLive()
-	if got.Step != "plan" || got.Round != 1 || len(got.Rows[0].Earlier) != 1 || got.Rows[0].Earlier[0].Answer != "yes\nNote: why" {
+	if got.Step != "route" || got.Round != 1 || len(got.Rows[0].Earlier) != 1 || got.Rows[0].Earlier[0].Answer != "yes\nNote: why" {
 		t.Fatalf("record = step %s round %d earlier %+v", got.Step, got.Round, got.Rows[0].Earlier)
 	}
 	if live := f.Live(t); len(live) != 1 || live[0].Flow != "triage" {

@@ -139,6 +139,9 @@ func followUpArchived(epics []tickets.Epic, from tickets.Address) bool {
 }
 
 func requireStep(rec *Record, what string, steps ...string) error {
+	if rec.LegacyWrite() {
+		return phaseErr("%s is not allowed: this is a version 1 triage left at write; only abandon works", what)
+	}
 	if !slices.Contains(steps, rec.Step) {
 		return phaseErr("%s is not allowed at step %s", what, rec.Step)
 	}
@@ -167,7 +170,7 @@ func (r *Record) planPending() bool {
 }
 
 // SaveVerdict stores one row's verdict during Verify. When the last row has a
-// verdict (or is gone) the step moves to plan.
+// verdict (or is gone) the step moves to route.
 func (s *Store) SaveVerdict(id string, revision int, v Verdict) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
 		if err := requireStep(rec, "verdict save", tickets.StepVerify); err != nil {
@@ -194,18 +197,18 @@ func (s *Store) SaveVerdict(id string, revision int, v Verdict) (*Record, error)
 			row.SuggestedDestination = v.SuggestedDestination
 		}
 		if len(rec.PendingVerdicts()) == 0 {
-			rec.Step = tickets.StepPlan
+			rec.Step = tickets.StepRoute
 		}
 		return nil
 	})
 }
 
-// SavePlan stores plan rows during Plan, and marks rows found gone. Plan rows
+// SavePlan stores plan rows during Route, and marks rows found gone. Plan rows
 // for gone rows are left out. When every row that is not gone has a plan the
-// step moves to approve.
+// step moves to questions.
 func (s *Store) SavePlan(id string, revision int, plan []PlanRow, gone []string) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
-		if err := requireStep(rec, "plan save", tickets.StepPlan); err != nil {
+		if err := requireStep(rec, "plan save", tickets.StepRoute); err != nil {
 			return err
 		}
 		for _, addr := range gone {
@@ -236,16 +239,16 @@ func (s *Store) SavePlan(id string, revision int, plan []PlanRow, gone []string)
 		}
 		if !rec.planPending() {
 			rec.assignGroups()
-			rec.Step = tickets.StepApprove
+			rec.Step = tickets.StepQuestions
 		}
 		return nil
 	})
 }
 
-// SetPerson replaces a row's person fields. Allowed only at step approve.
+// SetPerson replaces a row's person fields. Allowed only at step questions.
 func (s *Store) SetPerson(id string, revision int, address string, f PersonFields) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
-		if err := requireStep(rec, "person fields", tickets.StepApprove); err != nil {
+		if err := requireStep(rec, "person fields", tickets.StepQuestions); err != nil {
 			return err
 		}
 		row, err := rec.row(address)
@@ -347,7 +350,7 @@ func (r *Row) AskedQuestions() []Question {
 // answer the person already gave stays.
 func applyAutoAnswers(row *Row, p PlanRow) {
 	for _, q := range p.Questions {
-		if !q.Auto || q.Kind != QuestionQuick || row.Person.Answers[q.ID] != "" {
+		if !q.Auto || q.Kind != QuestionAsk || row.Person.Answers[q.ID] != "" {
 			continue
 		}
 		if row.Person.Answers == nil {
@@ -374,7 +377,7 @@ func checkQuestions(row *Row, p PlanRow) error {
 		}
 	}
 	for _, q := range p.Questions {
-		if q.Kind != QuestionQuick {
+		if q.Kind != QuestionAsk {
 			continue
 		}
 		if q.Text == "" {
@@ -413,23 +416,27 @@ func (r *Record) OpenQuestions() int {
 	return n
 }
 
-// Approve moves the step from approve to write: a compare-and-set on the
-// revision. A step past approve is "already approved"; an unchanged step with
+// Approve moves the step from questions to write: a compare-and-set on the
+// revision. A step past questions is "already approved"; an unchanged step with
 // a changed revision is stale. Rows merged into a row that stopped being a
 // ready or map epic must be re-pointed first.
 func (s *Store) Approve(id string, revision int) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
+		if rec.LegacyWrite() {
+			return requireStep(rec, "approve")
+		}
 		switch rec.Step {
-		case tickets.StepApprove:
+		case tickets.StepQuestions:
 			if orphans := rec.MergeOrphans(); len(orphans) > 0 {
 				return phaseErr("approve is refused: %v merge into a row that is no longer a ready or map epic", orphans)
 			}
 			if n := rec.OpenQuestions(); n > 0 {
 				return phaseErr("approve is refused: %d questions are still open", n)
 			}
+			rec.Approved = true
 			rec.Step = tickets.StepWrite
 			return nil
-		case tickets.StepVerify, tickets.StepPlan:
+		case tickets.StepVerify, tickets.StepRoute:
 			return phaseErr("approve is not allowed at step %s", rec.Step)
 		}
 		return ErrAlreadyApproved
@@ -443,7 +450,7 @@ func (s *Store) Approve(id string, revision int) (*Record, error) {
 // destination and Keep for later.
 func (s *Store) SendBack(id string, revision int) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
-		if err := requireStep(rec, "send back", tickets.StepApprove); err != nil {
+		if err := requireStep(rec, "send back", tickets.StepQuestions); err != nil {
 			return err
 		}
 		if n := rec.OpenQuestions(); n > 0 {
@@ -464,7 +471,7 @@ func (s *Store) SendBack(id string, revision int) (*Record, error) {
 			row.Plan = nil
 		}
 		rec.Round++
-		rec.Step = tickets.StepPlan
+		rec.Step = tickets.StepRoute
 		return nil
 	})
 }
@@ -585,23 +592,30 @@ func (s *Store) KeepForLater(id string, revision int, address string) (*Record, 
 	})
 }
 
-// Abandon ends a live Triage that is not yet at write. It writes nothing to
-// tickets.
+// Abandon ends a live Triage that is not yet at write, or a version 1 Triage
+// left at write. It writes nothing to tickets.
 func (s *Store) Abandon(id string, revision int) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
-		if err := requireStep(rec, "abandon", tickets.StepVerify, tickets.StepPlan, tickets.StepApprove); err != nil {
-			return err
+		if !rec.LegacyWrite() {
+			if err := requireStep(rec, "abandon", tickets.StepVerify, tickets.StepRoute, tickets.StepQuestions); err != nil {
+				return err
+			}
 		}
 		rec.State = StateAbandoned
 		return nil
 	})
 }
 
-// finishIfDone makes a live record done when every row is done, kept or gone
-// and the last pass is complete.
+// finishIfDone makes a live record done when every row and every move unit is
+// done, kept or gone and the last pass is complete.
 func finishIfDone(rec *Record, projectDir string) {
 	if rec.State != StateLive || rec.Step != tickets.StepWrite || !rec.LastPassComplete {
 		return
+	}
+	for _, m := range rec.Moves {
+		if m.State != MoveDone && m.State != MoveKept {
+			return
+		}
 	}
 	var epics []tickets.Epic
 	loaded := false

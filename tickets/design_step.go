@@ -22,6 +22,8 @@ const (
 	StepVerify         = schema.StepVerify
 	StepPlan           = schema.StepPlan
 	StepApprove        = schema.StepApprove
+	StepRoute          = schema.StepRoute
+	StepQuestions      = schema.StepQuestions
 	StepWrite          = schema.StepWrite
 	FlowDesign         = schema.FlowDesign
 	FlowTriage         = schema.FlowTriage

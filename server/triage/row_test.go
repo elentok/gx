@@ -25,8 +25,8 @@ func toApprove(t *testing.T, store *triagerec.Store) (*triagerec.Record, string,
 		{RowID: a, Action: "ready"},
 		{RowID: b, Action: "merge", Destination: a},
 	}, nil))
-	if rec.Step != "approve" {
-		t.Fatalf("step = %s, want approve", rec.Step)
+	if rec.Step != "questions" {
+		t.Fatalf("step = %s, want questions", rec.Step)
 	}
 	return rec, a, b
 }
@@ -67,7 +67,7 @@ func toApproveAsking(t *testing.T, store *triagerec.Store) (*triagerec.Record, s
 	for _, addr := range []string{a, b} {
 		rec = mustRec(store.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addr}))
 	}
-	q := triagerec.Question{ID: "q1", Text: "Keep it?", Kind: triagerec.QuestionQuick, Options: []string{"yes", "no"}, Default: "no"}
+	q := triagerec.Question{ID: "q1", Text: "Keep it?", Kind: triagerec.QuestionAsk, Options: []string{"yes", "no"}, Default: "no"}
 	rec = mustRec(store.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
 		{RowID: a, Action: "ready", Questions: []triagerec.Question{q}},
 		{RowID: b, Action: "ready"},

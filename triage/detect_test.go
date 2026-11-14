@@ -16,15 +16,15 @@ func TestNext(t *testing.T) {
 		t.Fatalf("one row missing = %s", got)
 	}
 	rec, _ = s.SaveVerdict(rec.ID, rec.Revision, Verdict{Address: rowB})
-	if got := Next(rec); got != BranchPlan {
+	if got := Next(rec); got != BranchRoute {
 		t.Fatalf("verdicts in = %s", got)
 	}
 	rec, _ = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready"}}, nil)
-	if got := Next(rec); got != BranchPlan {
+	if got := Next(rec); got != BranchRoute {
 		t.Fatalf("plan incomplete = %s", got)
 	}
 	rec, _ = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowB, Action: "ready"}}, nil)
-	if got := Next(rec); got != BranchApprove {
+	if got := Next(rec); got != BranchQuestions {
 		t.Fatalf("plan saved = %s", got)
 	}
 	rec, _ = s.Approve(rec.ID, rec.Revision)
@@ -59,9 +59,11 @@ func TestFinal(t *testing.T) {
 	}{
 		{"no record", nil, true},
 		{"verify", live("verify", row(WritePending)), false},
-		{"plan", live("plan", row(WritePending)), false},
-		{"approve", live("approve", row(WritePending)), true},
+		{"route", live("route", row(WritePending)), false},
+		{"questions", live("questions", row(WritePending)), true},
 		{"write with a pending row", live("write", row(WriteDone), row(WritePending)), false},
+		{"write with a pending move", &Record{State: StateLive, Step: "write", Rows: []Row{row(WriteDone)}, Moves: []MoveUnit{{State: MovePending}}}, false},
+		{"write with a failed move", &Record{State: StateLive, Step: "write", Rows: []Row{row(WriteDone)}, Moves: []MoveUnit{{State: MoveFailed}}}, true},
 		{"write with a failed row", live("write", row(WriteDone), row(WriteFailed)), true},
 		{"done step", live("done"), true},
 		{"done record", &Record{State: StateDone, Step: "write", Rows: []Row{row(WritePending)}}, true},

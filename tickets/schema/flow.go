@@ -60,10 +60,14 @@ const (
 
 // Triage step names. "done" is shared with Design (StepDone).
 const (
-	StepVerify  = "verify"
+	StepVerify    = "verify"
+	StepRoute     = "route"
+	StepQuestions = "questions"
+	StepWrite     = "write"
+	// StepPlan and StepApprove are version 1 steps, kept for reading old records
+	// and the flowSpecs below.
 	StepPlan    = "plan"
 	StepApprove = "approve"
-	StepWrite   = "write"
 )
 
 // FlowSpec describes one Flow.

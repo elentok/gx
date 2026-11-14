@@ -120,7 +120,7 @@ func TestTriagePlayer_PlanCoversEveryActionWithThreeQuestions(t *testing.T) {
 	for _, p := range plan {
 		actions[p.Action] = true
 		for _, q := range p.Questions {
-			if q.Kind == triage.QuestionQuick {
+			if q.Kind == triage.QuestionAsk {
 				quick++
 			} else {
 				design++

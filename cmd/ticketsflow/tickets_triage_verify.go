@@ -52,7 +52,7 @@ func newTriageVerdictCmd(d Deps) *cobra.Command {
 			}
 			for i, q := range questions {
 				v.Questions = append(v.Questions, triage.Question{
-					ID: fmt.Sprintf("q%d", i+1), Text: q, Kind: triage.QuestionQuick,
+					ID: fmt.Sprintf("q%d", i+1), Text: q, Kind: triage.QuestionAsk,
 				})
 			}
 			saved, err := t.store.SaveVerdict(rec.ID, revision, v)
