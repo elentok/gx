@@ -4,11 +4,15 @@ import {
   HostedKindBinary,
   HostedKindCode,
   HostedKindHTML,
+  HostedKindImage,
   HostedKindMarkdown,
+  HostedKindMermaid,
   HostedKindPDF,
+  HostedKindSVG,
   HostedKindText,
 } from "../generated/ops"
 import { sizeText } from "../health/formatBytes"
+import { FileHoverCardMedia, type PixelSize } from "./FileHoverCardMedia"
 import { FileHoverCardText } from "./FileHoverCardText"
 
 export const PREVIEW_MAX_BYTES = 2 * 1024 * 1024
@@ -30,14 +34,22 @@ function isTextPreview(file: HostedResolved): boolean {
   )
 }
 
+function isMediaPreview(file: HostedResolved): boolean {
+  return (
+    file.kind === HostedKindMermaid || file.kind === HostedKindImage || file.kind === HostedKindSVG
+  )
+}
+
 export function FilePreviewHeader({
   path,
   file,
   line,
+  pixels,
 }: {
   path: string
   file?: HostedResolved
   line?: number
+  pixels?: PixelSize
 }) {
   return (
     <Flex gap="3" justify="space-between" align="baseline" px="3" py="2" borderBottomWidth="1px">
@@ -48,6 +60,7 @@ export function FilePreviewHeader({
       {file?.size !== undefined && (
         <Text fontSize="xs" color="text.muted" flexShrink={0}>
           {sizeText(file.size, "binary")}
+          {pixels ? ` · ${pixels.w}×${pixels.h}` : ""}
         </Text>
       )}
     </Flex>
@@ -68,11 +81,13 @@ export function FilePreviewBody({
   file,
   missing,
   line,
+  onPixelSize,
 }: {
   path: string
   file: HostedResolved
   missing: boolean
   line?: number
+  onPixelSize?: (size: PixelSize) => void
 }) {
   const state = previewState(file, missing)
   return (
@@ -112,6 +127,9 @@ export function FilePreviewBody({
       {state === "none" && <Note>No preview</Note>}
       {state === "other" && isTextPreview(file) && (
         <FileHoverCardText path={path} file={file} line={line} />
+      )}
+      {state === "other" && isMediaPreview(file) && (
+        <FileHoverCardMedia path={path} file={file} onPixelSize={onPixelSize} />
       )}
     </chakra.div>
   )

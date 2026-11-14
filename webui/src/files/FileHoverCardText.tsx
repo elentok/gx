@@ -20,30 +20,7 @@ export function FileHoverCardText({
   file: HostedResolved
   line?: number
 }) {
-  const markMissing = useFileLinks()?.markMissing
-  const [text, setText] = useState(() => previewCache.get<string>(path, file.modified))
-  useEffect(() => {
-    const cached = previewCache.get<string>(path, file.modified)
-    if (cached !== undefined) {
-      setText(cached)
-      return
-    }
-    let live = true
-    fetchRawText(path).then(
-      (got) => {
-        if (got === undefined) {
-          markMissing?.(path)
-          return
-        }
-        previewCache.set(path, file.modified, got)
-        if (live) setText(got)
-      },
-      () => {},
-    )
-    return () => {
-      live = false
-    }
-  }, [path, file.modified, markMissing])
+  const text = useCachedText(path, file)
 
   const holder = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -75,4 +52,33 @@ export function FileHoverCardText({
       <CodeView text={text} line={line} />
     </div>
   )
+}
+
+/** The file's text, from the page-life cache or one fetch. A 404 marks the file missing. */
+export function useCachedText(path: string, file: HostedResolved): string | undefined {
+  const markMissing = useFileLinks()?.markMissing
+  const [text, setText] = useState(() => previewCache.get<string>(path, file.modified))
+  useEffect(() => {
+    const cached = previewCache.get<string>(path, file.modified)
+    if (cached !== undefined) {
+      setText(cached)
+      return
+    }
+    let live = true
+    fetchRawText(path).then(
+      (got) => {
+        if (got === undefined) {
+          markMissing?.(path)
+          return
+        }
+        previewCache.set(path, file.modified, got)
+        if (live) setText(got)
+      },
+      () => {},
+    )
+    return () => {
+      live = false
+    }
+  }, [path, file.modified, markMissing])
+  return text
 }

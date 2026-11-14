@@ -1,6 +1,7 @@
 import { chakra, HoverCard, Portal } from "@chakra-ui/react"
-import type { ReactElement } from "react"
+import { type ReactElement, useState } from "react"
 import { useCoarsePointer } from "../useWide"
+import type { PixelSize } from "./FileHoverCardMedia"
 import { FilePreviewBody, FilePreviewHeader } from "./FilePreviewBody"
 import { useFileLinks } from "./FileLinkContext"
 import { viewerHref } from "./viewerUrl"
@@ -18,6 +19,7 @@ export function FileHoverCard({
   children: ReactElement
 }) {
   const ctx = useFileLinks()
+  const [pixels, setPixels] = useState<PixelSize>()
   const coarse = useCoarsePointer()
   const file = ctx?.byPath(path)
   if (coarse || !ctx || !file) return children
@@ -46,8 +48,14 @@ export function FileHoverCard({
             boxShadow="lg"
             data-file-hover-card=""
           >
-            <FilePreviewHeader path={path} file={file} line={line} />
-            <FilePreviewBody path={path} file={file} missing={ctx.isMissing(path)} line={line} />
+            <FilePreviewHeader path={path} file={file} line={line} pixels={pixels} />
+            <FilePreviewBody
+              path={path}
+              file={file}
+              missing={ctx.isMissing(path)}
+              line={line}
+              onPixelSize={setPixels}
+            />
             <chakra.div px="3" py="2" borderTopWidth="1px" textAlign="end" fontSize="sm">
               <chakra.a
                 href={viewerHref(path, { line, heading })}
