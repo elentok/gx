@@ -164,7 +164,7 @@ func (w *Web) Bind() {
 		http.NotFound(rw, r)
 	})
 	protected := FileHeaders(allowed, w.auth.RequireLogin(mux, w.auth.Deny(mux, tokens)))
-	w.srv = &http.Server{Handler: webtls.RequireHost(allowed, webtls.RedirectPlainHTTP(w.servePublicFirst(mux, protected)))}
+	w.srv = &http.Server{Handler: DefaultHeaders(webtls.RequireHost(allowed, webtls.RedirectPlainHTTP(w.servePublicFirst(mux, protected))))}
 }
 
 // URL is the web listener's base URL, or "" when it is off or failed to bind.

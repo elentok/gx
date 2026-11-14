@@ -16,6 +16,20 @@ func IsFileRoute(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.EscapedPath(), filesPrefix) || strings.HasPrefix(r.URL.Path, filesPrefix)
 }
 
+// DefaultHeaders sets the headers every web response carries. It is the
+// outermost handler and does not wrap the writer (the event stream needs
+// http.Flusher). FileHeaders runs later and Sets the file values over these, so
+// a file response keeps a single Content-Security-Policy.
+func DefaultHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Security-Policy", "frame-ancestors 'none'")
+		h.Set("Referrer-Policy", "same-origin")
+		h.Set("X-Content-Type-Options", "nosniff")
+		next.ServeHTTP(w, r)
+	})
+}
+
 // FileHeaders sets the security headers every hosted-file response carries. It
 // wraps the login gate so the gate's 401 carries them too. It sets no
 // Cross-Origin-Resource-Policy and no Access-Control-Allow-Origin.
