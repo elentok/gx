@@ -13,7 +13,6 @@ import {
 } from "../generated/server"
 import { postTargetsTo, refusalOf, type StopSession } from "../design/open"
 import { useSessionManage } from "../agents/useSessionManage"
-import type { RemoveSession } from "../agents/sessionWrites"
 import { renameEntry } from "../shell/renameOpen"
 import { Button } from "../ui/button/Button"
 import { Modal } from "../ui/modal/Modal"
@@ -71,9 +70,8 @@ export interface ItemWriters {
   unhold: (epic: string) => Promise<ItemWriteResult>
   /** One epic's archive; `dryRun` only asks what it would stop. */
   archive?: (epic: string, opts: { dryRun?: boolean; yes?: boolean }) => Promise<ItemWriteResult>
-  /** A chat's Stop and Remove; the agent page's defaults when absent. */
+  /** A chat's Stop; the agent page's default when absent. */
   stop?: StopSession
-  remove?: RemoveSession
 }
 
 /** Posts one target and unwraps its result: a refusal is `refused`, as `useWrite` reads it. */
@@ -214,10 +212,7 @@ export function useItemActions(
 ) {
   const { run, pending } = useWrite()
   const [dialog, setDialog] = useState<Dialog>()
-  const manage = useSessionManage(item?.session, onRemoved, {
-    stop: writers.stop,
-    remove: writers.remove,
-  })
+  const manage = useSessionManage(item?.session, onRemoved, { stop: writers.stop })
   if (!item) return { groups: [] as MenuEntry[][], dialogs: null as ReactNode }
   const close = () => setDialog(undefined)
 

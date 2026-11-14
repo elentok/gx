@@ -7,7 +7,22 @@ import { renderThemed } from "../ui/render"
 import { SessionActions } from "./SessionActions"
 import { exitedDesigns, postRemoveSession, removeSession } from "./sessionWrites"
 
-afterEach(cleanup)
+// The mock covers every import of the module; the postStopSession/postRemoveSession fetch test
+// below needs the real writer.
+const { mockRemove } = vi.hoisted(() => ({ mockRemove: vi.fn() }))
+vi.mock("./sessionWrites", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./sessionWrites")>()
+  return {
+    ...actual,
+    postRemoveSession: (...args: Parameters<typeof actual.postRemoveSession>) =>
+      mockRemove.getMockImplementation() ? mockRemove(...args) : actual.postRemoveSession(...args),
+  }
+})
+
+afterEach(() => {
+  cleanup()
+  mockRemove.mockReset()
+})
 
 const session = (over: Partial<SessionInfo> = {}): SessionInfo => ({
   id: "s-a",
@@ -34,11 +49,11 @@ const exited = (s: SessionInfo): SessionInfo => ({
 test("Remove on a live session is one call with the row token", async () => {
   const live = session()
   const stop = vi.fn()
-  const remove = vi.fn(async () => ({}))
+  mockRemove.mockResolvedValue({})
   const onRemoved = vi.fn()
   renderThemed(
     <>
-      <SessionActions session={live} onRemoved={onRemoved} stop={stop} remove={remove} />
+      <SessionActions session={live} onRemoved={onRemoved} stop={stop} />
       <RemoveConfirmHost />
     </>,
   )
@@ -47,7 +62,7 @@ test("Remove on a live session is one call with the row token", async () => {
   fireEvent.click(await screen.findByRole("button", { name: "Remove" }))
   await waitFor(() => expect(onRemoved).toHaveBeenCalled())
   expect(stop).not.toHaveBeenCalled()
-  expect(remove).toHaveBeenCalledExactlyOnceWith({ id: "s-a", state: rowToken(live) })
+  expect(mockRemove).toHaveBeenCalledExactlyOnceWith({ id: "s-a", state: rowToken(live) })
 })
 
 test.each([
@@ -107,13 +122,10 @@ test("Remove forgets the session as the Agents page's last agent, so the page do
   localStorage.setItem("gx.agents.last", "s-a")
   const live = session()
   const done = exited(live)
+  mockRemove.mockResolvedValue({ session: done })
   renderThemed(
     <>
-      <SessionActions
-        session={done}
-        onRemoved={() => {}}
-        remove={vi.fn(async () => ({ session: done }))}
-      />
+      <SessionActions session={done} onRemoved={() => {}} />
       <RemoveConfirmHost />
     </>,
   )

@@ -11,7 +11,7 @@ export function RemoveConfirmHost() {
   const request = useRemoveConfirmRequest()
   const { run, pending } = useWrite()
   if (!request) return null
-  const { session, onRemoved, remove = postRemoveSession } = request
+  const { session, onRemoved } = request
   const name = session.name || session.id
   return (
     <Modal label={`Remove ${name}`} onClose={closeRemoveConfirm} maxW="sm">
@@ -29,7 +29,7 @@ export function RemoveConfirmHost() {
           disabled={pending}
           onClick={() => {
             closeRemoveConfirm()
-            run(() => removeSession(session, { remove }), {
+            run(() => removeSession(session, { remove: postRemoveSession }), {
               onDone: () => {
                 forgetLast(session.id)
                 onRemoved()

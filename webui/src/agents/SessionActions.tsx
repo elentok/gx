@@ -8,7 +8,6 @@ import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu"
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
 import { useWide } from "../useWide"
 import { renameEntry } from "../shell/renameOpen"
-import { postRemoveSession, type RemoveSession } from "./sessionWrites"
 import { useSessionManage } from "./useSessionManage"
 
 /** The "⋯" menu: the Agent block, plus Stop (while live) and Remove for a session a person manages. */
@@ -16,13 +15,11 @@ export function SessionActions({
   session,
   onRemoved,
   stop = postStopSession,
-  remove = postRemoveSession,
   promote,
 }: {
   session: SessionInfo
   onRemoved: () => void
   stop?: StopSession
-  remove?: RemoveSession
   /** Adds "Promote to Design"; absent for a gx-driven agent. */
   promote?: {
     lastMessage?: string
@@ -34,7 +31,7 @@ export function SessionActions({
     onStale?: () => void
   }
 }) {
-  const manage = useSessionManage(session, onRemoved, { stop, remove })
+  const manage = useSessionManage(session, onRemoved, { stop })
   const promoteSend = usePromptSend({
     session,
     lastMessage: promote?.lastMessage,

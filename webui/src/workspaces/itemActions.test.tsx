@@ -2,12 +2,22 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { HoldQueuedText, ReasonNeedsYes, type Workspace } from "../generated/server"
 import { session } from "../agents/agentsTestKit"
+import { rowToken } from "../design/open"
 import { RemoveConfirmHost } from "../shell/RemoveConfirmHost"
 import { renderThemed } from "../ui/render"
 import { WideContext } from "../useWide"
 import { ItemMenu, postHold, type ItemRef, type ItemWriters } from "./itemActions"
 
-afterEach(cleanup)
+const { postRemoveSession } = vi.hoisted(() => ({ postRemoveSession: vi.fn() }))
+vi.mock("../agents/sessionWrites", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../agents/sessionWrites")>()),
+  postRemoveSession,
+}))
+
+afterEach(() => {
+  cleanup()
+  postRemoveSession.mockReset()
+})
 
 const workspaces: Workspace[] = [
   { name: "Default", default: true, members: 1 },
@@ -138,16 +148,12 @@ test("a live chat offers Rename, Stop and Remove; Stop posts the stop", async ()
 })
 
 test("an exited chat offers Rename and Remove; Remove asks first, then removes and reports", async () => {
-  const remove = vi.fn(async () => ({}))
+  postRemoveSession.mockResolvedValue({})
+  const item = chat("exited")
   const onRemoved = vi.fn()
   renderThemed(
     <WideContext.Provider value={true}>
-      <ItemMenu
-        item={chat("exited")}
-        workspaces={workspaces}
-        writers={writers({ remove })}
-        onRemoved={onRemoved}
-      />
+      <ItemMenu item={item} workspaces={workspaces} writers={writers()} onRemoved={onRemoved} />
       <RemoveConfirmHost />
     </WideContext.Provider>,
   )
@@ -156,9 +162,14 @@ test("an exited chat offers Rename and Remove; Remove asks first, then removes a
   expect(labels()).toEqual(["Move to workspace›", "Rename", "Remove"])
   fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }))
   expect((await screen.findByText("Remove talk? Its session is deleted.")).textContent).toBeTruthy()
-  expect(remove).not.toHaveBeenCalled()
+  expect(postRemoveSession).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole("button", { name: "Remove" }))
-  await waitFor(() => expect(remove).toHaveBeenCalledWith(expect.objectContaining({ id: "s3" })))
+  await waitFor(() =>
+    expect(postRemoveSession).toHaveBeenCalledExactlyOnceWith({
+      id: "s3",
+      state: rowToken(item.session!),
+    }),
+  )
   await waitFor(() => expect(onRemoved).toHaveBeenCalled())
 })
 
