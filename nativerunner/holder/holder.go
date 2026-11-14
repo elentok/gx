@@ -177,6 +177,8 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
 	cmd.Env = append(terminalEnv(os.Environ()), opts.Env...)
+	// One dir, two readers (see SetAskDir below). The child reads it from its
+	// env so the ask hook can leave its marker in dir/ask-holds.
 	cmd.Env = append(cmd.Env, harness.AskHoldDirEnv+"="+dir)
 	if opts.GXSession != "" {
 		cmd.Env = append(cmd.Env, AgentSessionEnv+"="+opts.GXSession)
@@ -198,6 +200,9 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		_ = tty.Close()
 		return err
 	}
+	// One dir, two readers (see AskHoldDirEnv above). The watcher runs in
+	// this process, whose own env does not carry the dir (only cmd.Env
+	// does), so it is told directly to look for the hook's marker.
 	if w, ok := watcher.(harness.AskDirSetter); ok {
 		w.SetAskDir(dir)
 	}
