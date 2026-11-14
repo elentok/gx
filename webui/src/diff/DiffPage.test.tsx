@@ -5,6 +5,7 @@ import { ConnectionContext, type Connection, type ConnectionState } from "../con
 import type { DiffRange } from "../generated/server"
 import { appRoutes } from "../routes"
 import { renderThemed } from "../ui/render"
+import { type Device, DeviceContext } from "../useWide"
 import type { DiffFilesResult, FetchDiffFiles } from "./api"
 
 afterEach(cleanup)
@@ -21,7 +22,7 @@ const files = (n: number, over: Partial<DiffRange> = {}): DiffFilesResult => ({
   files: { ...range(over), files: Array.from({ length: n }, () => file) },
 })
 
-function render(path: string, fetchFiles: FetchDiffFiles) {
+function render(path: string, fetchFiles: FetchDiffFiles, device?: Device) {
   const state = {
     snapshot: { sessions: [], pending: [] },
     connected: true,
@@ -38,9 +39,11 @@ function render(path: string, fetchFiles: FetchDiffFiles) {
     initialEntries: [path],
   })
   renderThemed(
-    <ConnectionContext.Provider value={conn}>
-      <RouterProvider router={router} />
-    </ConnectionContext.Provider>,
+    <DeviceContext.Provider value={device}>
+      <ConnectionContext.Provider value={conn}>
+        <RouterProvider router={router} />
+      </ConnectionContext.Provider>
+    </DeviceContext.Provider>,
   )
   return router
 }
@@ -151,6 +154,69 @@ test("unavailable commits show an amber notice in the same area", async () => {
   expect(n.textContent).toContain("Commits not available in this clone")
   expect(n.getAttribute("data-tone")).toBe("waiting")
   editable()
+})
+
+const named = (...paths: string[]): DiffFilesResult => ({
+  kind: "files",
+  files: { ...range(), files: paths.map((path) => ({ ...file, path })) },
+})
+const TREE = () => named("README.md", "src/a.go", "src/b.go") // tree order: a.go, b.go, README.md
+const counter = () => screen.getByTestId("file-nav").textContent
+const press = (key: string, target: Element = document.body) => fireEvent.keyDown(target, { key })
+
+test("n and p walk the visible rows with wrap-around and the counter follows", async () => {
+  const router = render(OPEN, async () => TREE())
+  await screen.findByTestId("file-nav")
+  expect(counter()).toContain("1 of 3")
+  press("n")
+  await waitFor(() => expect(counter()).toContain("2 of 3"))
+  expect(router.state.location.search).toContain("file=src%2Fb.go")
+  press("n")
+  press("n")
+  await waitFor(() => expect(counter()).toContain("1 of 3"))
+  press("p")
+  await waitFor(() => expect(counter()).toContain("3 of 3"))
+  fireEvent.click(screen.getByRole("button", { name: "Next" }))
+  await waitFor(() => expect(counter()).toContain("1 of 3"))
+})
+
+test("a filter narrows the counter and p/n do nothing while it has focus", async () => {
+  render(OPEN, async () => TREE())
+  await screen.findByTestId("file-nav")
+  const input = screen.getByTestId("file-filter")
+  fireEvent.change(input, { target: { value: "src" } })
+  expect(counter()).toContain("1 of 2")
+  press("n", input)
+  expect(counter()).toContain("1 of 2")
+  press("n")
+  await waitFor(() => expect(counter()).toContain("2 of 2"))
+})
+
+test("the selected file is in the URL and a fresh render from that URL picks it", async () => {
+  render(`${OPEN}&file=src%2Fb.go`, async () => TREE())
+  await screen.findByTestId("file-nav")
+  expect(counter()).toContain("2 of 3")
+  cleanup()
+  render(`${OPEN}&file=nope.go`, async () => TREE())
+  await screen.findByTestId("file-nav")
+  expect(counter()).toContain("1 of 3")
+})
+
+test("on a phone the Files and Diff tabs show one pane each and picking a file opens Diff", async () => {
+  render(OPEN, async () => TREE(), "phone")
+  const files = await screen.findByRole("tab", { name: "Files" })
+  expect(screen.getByRole("tab", { name: "Diff" })).toBeTruthy()
+  expect(screen.queryByTestId("file-nav")).toBeNull()
+  fireEvent.click(files)
+  fireEvent.click(screen.getAllByTestId("tree-file")[1])
+  expect(await screen.findByTestId("file-nav")).toBeTruthy()
+  expect(screen.queryByTestId("file-tree")).toBeNull()
+})
+
+test("desktop has no tabs", async () => {
+  render(OPEN, async () => TREE())
+  await screen.findByTestId("file-nav")
+  expect(screen.queryByRole("tab")).toBeNull()
 })
 
 test("the Split/Unified switch is in the ref bar", async () => {

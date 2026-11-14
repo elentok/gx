@@ -1,8 +1,12 @@
 import { Box, chakra } from "@chakra-ui/react"
-import { type KeyboardEvent, type ReactNode, useEffect, useState } from "react"
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router"
+import type { DiffFile } from "../generated/server"
 import { DetailPage } from "../page/DetailPage"
 import { PageHeader } from "../page/PageHeader"
+import { isTextTarget } from "../shell/keys"
+import { FileFilter, FileTree } from "./FileTreePanel"
+import { filterFiles, treeOrder } from "./fileTree"
 import { Button } from "../ui/button/Button"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { useDevice } from "../useWide"
@@ -116,6 +120,132 @@ function Notice({
       <Box mt="1" fontSize="sm" color="text.muted">
         {children}
       </Box>
+    </Box>
+  )
+}
+
+function FileNav({
+  index,
+  total,
+  onStep,
+}: {
+  index: number
+  total: number
+  onStep: (d: 1 | -1) => void
+}) {
+  return (
+    <Box data-testid="file-nav" display="flex" alignItems="center" gap="2">
+      <Button emphasis="secondary" onClick={() => onStep(-1)}>
+        Prev
+      </Button>
+      <Button emphasis="secondary" onClick={() => onStep(1)}>
+        Next
+      </Button>
+      <Box as="span" fontSize="sm" color="text.muted">{`${index + 1} of ${total}`}</Box>
+    </Box>
+  )
+}
+
+function Tabs({
+  tab,
+  onChange,
+}: {
+  tab: "files" | "diff"
+  onChange: (t: "files" | "diff") => void
+}) {
+  return (
+    <Box role="tablist" display="flex" gap="2" mt="4">
+      {(["files", "diff"] as const).map((t) => (
+        <chakra.button
+          key={t}
+          type="button"
+          role="tab"
+          aria-selected={t === tab}
+          onClick={() => onChange(t)}
+          flex="1"
+          h="40px"
+          fontSize="sm"
+          border="1px solid"
+          borderColor="border"
+          borderRadius="8px"
+          bg={t === tab ? "tone.running.bg" : "transparent"}
+          color={t === tab ? "text" : "text.muted"}
+        >
+          {t === "files" ? "Files" : "Diff"}
+        </chakra.button>
+      ))}
+    </Box>
+  )
+}
+
+function FilesBrowser({
+  files,
+  view,
+  selectedPath,
+  onSelect,
+  phone,
+}: {
+  files: DiffFile[]
+  view: DiffView
+  selectedPath: string | undefined
+  onSelect: (path: string) => void
+  phone: boolean
+}) {
+  const [filter, setFilter] = useState("")
+  const [tab, setTab] = useState<"files" | "diff">("files")
+  const order = useMemo(() => treeOrder(filterFiles(files, filter)), [files, filter])
+  const all = useMemo(() => treeOrder(files), [files])
+  const selected = all.find((f) => f.path === selectedPath)?.path ?? order[0]?.path ?? all[0]?.path
+  const index = order.findIndex((f) => f.path === selected)
+
+  const step = (d: 1 | -1) => {
+    if (order.length === 0) return
+    const from = index === -1 ? (d === 1 ? -1 : 0) : index
+    onSelect(order[(from + d + order.length) % order.length].path)
+  }
+  const stepRef = useRef(step)
+  stepRef.current = step
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || isTextTarget(e.target)) return
+      if (e.key === "n") stepRef.current(1)
+      else if (e.key === "p") stepRef.current(-1)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+
+  const pick = (path: string) => {
+    onSelect(path)
+    setTab("diff")
+  }
+  const left = (
+    <>
+      <FileFilter value={filter} onChange={setFilter} />
+      <FileTree files={files} filter={filter} selected={selected} onSelect={pick} />
+    </>
+  )
+  const right = (
+    <Box minW="0">
+      <FileNav index={index} total={order.length} onStep={step} />
+      {/* The diff render ticket draws the selected file here. */}
+      <Box data-testid="diff-area" data-view={view} data-file={selected} mt="4" />
+    </Box>
+  )
+  if (phone) {
+    return (
+      <>
+        <Tabs tab={tab} onChange={setTab} />
+        <Box mt="4">{tab === "files" ? left : right}</Box>
+      </>
+    )
+  }
+  return (
+    <Box mt="6" display="grid" gridTemplateColumns="300px minmax(0, 1fr)" gap="4">
+      <Box data-testid="diff-left" minW="0">
+        {left}
+      </Box>
+      {right}
     </Box>
   )
 }
@@ -271,9 +401,14 @@ export function DiffPage({ fetchFiles = fetchDiffFiles }: { fetchFiles?: FetchDi
       </Box>
       {notice}
       {canFetch && !fresh && !noRange && <FullScreenLoader label="Loading diff" />}
-      {!notice && fresh && files ? (
-        // The file tree, file view and commit list land here in later tickets.
-        <Box data-testid="diff-area" data-view={view} mt="6" />
+      {!notice && fresh && "result" in fresh && files ? (
+        <FilesBrowser
+          files={fresh.result.kind === "files" ? fresh.result.files.files : []}
+          view={view}
+          selectedPath={url.file}
+          onSelect={(file) => setParams(diffQuery({ ...url, file }))}
+          phone={device === "phone"}
+        />
       ) : null}
     </DetailPage>
   )
