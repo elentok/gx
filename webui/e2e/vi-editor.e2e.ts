@@ -697,3 +697,83 @@ test.describe("206. Inline vi box and big prompt box", () => {
     await expect(pill).toHaveCount(0)
   })
 })
+
+test.describe("207. Inline vi box in the Questions view", () => {
+  test.use({ viewport: { width: 1280, height: 900 } })
+
+  test("n and p stay text in INSERT; Esc keeps or leaves the box without closing the view; a text answer's Esc lands on its row and Cmd-Enter sends", async ({
+    page,
+    start,
+  }) => {
+    // Kept as e2e: vitest (PromptBox.test.tsx, QuestionSheet.test.tsx) cannot see the capture-phase
+    // window Esc handler in ChatLog, real focus after Esc, or a real server answer round trip.
+    test.setTimeout(120_000)
+    const viewButton = (name: RegExp) =>
+      page.getByRole("group", nav("View")).getByRole("button", { name })
+
+    // Part 1: the note box of Q8b.
+    const fixture = await start("design", { autoAdvanceDelay: "1h" })
+    await setViMode(fixture, page, true)
+    await expect(card(page, "design-epic")).toBeVisible()
+    await page.evaluate(() => (location.hash = "#/d/demo:design-epic"))
+    await page.getByRole("button", nav("Start design session")).click()
+    const questions = page.getByRole("group", nav("Questions"))
+    await questions.getByRole("button", { name: /SQLite/ }).click()
+    await questions.getByRole("button", nav("Note on question 8b")).click()
+    const note = questions.getByRole("textbox", { name: /Note text for question 8b/ })
+    const pill = questions.getByTestId("vi-mode-text")
+    await note.click()
+    await expect(note).toBeFocused()
+    await expect(pill).toHaveText("INSERT")
+    await page.keyboard.type("np")
+    await expect(note).toHaveText("np")
+    await expect(note).toBeFocused()
+    await expect(questions.getByRole("group", { name: /^Question .*8b of / })).toBeVisible()
+    // Esc in INSERT only leaves INSERT: the box keeps focus and the view stays.
+    await page.keyboard.press("Escape")
+    await expect(pill).toHaveText("NORMAL")
+    await expect(note).toBeFocused()
+    await expect(questions).toBeVisible()
+    await expect(viewButton(/^Questions/)).toHaveAttribute("aria-pressed", "true")
+    // Esc in NORMAL leaves the box; the Questions view stays open.
+    await page.keyboard.press("Escape")
+    await expect(note).not.toBeFocused()
+    await expect(questions).toBeVisible()
+    await expect(viewButton(/^Questions/)).toHaveAttribute("aria-pressed", "true")
+
+    // Part 2: a text question on a second fixture.
+    const second = await start("design-text", { autoAdvanceDelay: "1h" })
+    await setViMode(second, page, true)
+    await expect(card(page, "design-epic")).toBeVisible()
+    await page.evaluate(() => (location.hash = "#/d/demo:design-epic"))
+    await page.getByRole("button", nav("Start design session")).click()
+    // The first turn must finish before the sheet shows.
+    const working = page.getByRole("status").filter({ hasText: "Working:" })
+    await expect(working).toBeVisible()
+    await expect(working).toBeHidden({ timeout: 45_000 })
+    const sheet = page.getByRole("group", nav("Questions"))
+    await expect(sheet.getByText("Name the migration")).toBeVisible()
+    const answer = sheet.getByRole("textbox")
+    await expect(answer).toBeVisible()
+    await expect(sheet.getByTestId("vi-mode-text")).toHaveText("INSERT")
+    await answer.click()
+    await expect(answer).toBeFocused()
+    await page.keyboard.type("add_users")
+    await expect(answer).toHaveText("add_users")
+    await page.keyboard.press("Escape")
+    await expect(sheet.getByTestId("vi-mode-text")).toHaveText("NORMAL")
+    await page.keyboard.press("Escape")
+    await expect(answer).not.toBeFocused()
+    // The text question still has its "Huh?" button, so focus lands on it, inside the question's own row.
+    const row = sheet.getByRole("group", { name: /^Question .*13 of 1$/ })
+    await expect(row.getByRole("button", { name: "Huh?" })).toBeFocused()
+    await expect(viewButton(/^Questions/)).toHaveAttribute("aria-pressed", "true")
+    // The box has no submit of its own, so Cmd-Enter reaches the sheet and sends.
+    await answer.click()
+    await expect(answer).toBeFocused()
+    await expect(page.getByRole("button", nav("Send answers"))).toBeEnabled()
+    await page.keyboard.press("ControlOrMeta+Enter")
+    // The server takes the answers and the agent's next turn starts.
+    await expect(page.getByRole("status").filter({ hasText: "Working:" })).toBeVisible()
+  })
+})

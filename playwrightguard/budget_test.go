@@ -56,7 +56,7 @@ import (
 // the media query. It is its own flow because it needs a touch, 390px context the wide flow does not have.
 // Model switch flow (+1): the picker needs the server's model query and its refresh on open, the relaunch the fake
 // agent logs, the switch route's refusal and real keyboard focus; ModelPickerHost.test.tsx (vitest) covers each render alone.
-const maxFlows = 148
+const maxFlows = 149
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
