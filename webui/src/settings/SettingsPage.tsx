@@ -5,13 +5,7 @@ import { EmptyState } from "../ui/empty-state/EmptyState"
 import type { FetchEpicList } from "../epics/list"
 import { useEpicList } from "../epics/list"
 import { useDevice } from "../useWide"
-import type {
-  ModelAlias,
-  SettingsCategory,
-  SettingsEntry,
-  SettingsReadResponse,
-} from "../generated/server"
-import { fetchClaudeAliases } from "./aliasNote"
+import type { SettingsCategory, SettingsEntry, SettingsReadResponse } from "../generated/server"
 import {
   projectPath,
   ScopePicker,
@@ -402,7 +396,6 @@ interface SettingsPageProps {
   fetchList?: FetchLogins
   fetchSettings?: FetchSettings
   fetchEpics?: FetchEpicList
-  fetchAliases?: () => Promise<ModelAlias[]>
   signOut?: () => void | Promise<void>
 }
 
@@ -411,17 +404,11 @@ type Settings = FetchedState<SettingsReadResponse>
 /** What both pages read: the target's settings, the project names and a write that refreshes the settings. */
 function useSettingsTarget(
   project: string | undefined,
-  {
-    fetchSettings,
-    fetchEpics,
-    fetchAliases = fetchClaudeAliases,
-    postChanges = postSettings,
-  }: SettingsPageProps,
+  { fetchSettings, fetchEpics, postChanges = postSettings }: SettingsPageProps,
 ) {
   const target = project ?? GLOBAL_TARGET
   const settings = useSettings(target, undefined, fetchSettings)
   useFetchedReady(settings)
-  const aliases = useFetched("settings-claude-aliases", fetchAliases).data ?? undefined
   const { list } = useEpicList(fetchEpics)
   const projects = [...new Set(list?.epics.map((e) => e.project) ?? [])].sort()
   const onWrite: WriteSetting = async (changes) => {
@@ -429,7 +416,7 @@ function useSettingsTarget(
     if (!res.refused) settings.retry()
     return res
   }
-  return { settings, projects, onWrite, aliases }
+  return { settings, projects, onWrite }
 }
 
 /** The phone drill-down page of one section: back arrow, category breadcrumb, then the groups. */
@@ -438,13 +425,11 @@ function SectionPage({
   section,
   settings,
   onWrite,
-  aliases,
 }: {
   project?: string
   section: string
   settings: Settings
   onWrite: WriteSetting
-  aliases?: ModelAlias[]
 }) {
   const category = settings.data
     ? treeSections(settings.data.categories).find((s) => s.name === section)?.category
@@ -485,7 +470,6 @@ function SectionPage({
               pendingRestart={settings.data.pending_restart}
               repoChecksFile={settings.data.project?.repo_checks_file}
               onWrite={onWrite}
-              aliases={aliases}
             />
           </Box>
         </Frame>
@@ -504,7 +488,6 @@ function ShellPage({
   settings,
   projects,
   onWrite,
-  aliases,
   auth,
   signOut = signOutThisDevice,
 }: {
@@ -514,7 +497,6 @@ function ShellPage({
   settings: Settings
   projects: string[]
   onWrite: WriteSetting
-  aliases?: ModelAlias[]
   auth?: AuthState | null
   signOut?: () => void | Promise<void>
 }) {
@@ -538,7 +520,6 @@ function ShellPage({
           pendingRestart={settings.data.pending_restart}
           repoChecksFile={settings.data.project?.repo_checks_file}
           onWrite={onWrite}
-          aliases={aliases}
         />
       ) : (
         <Spinner label="Loading" />
@@ -552,7 +533,7 @@ function GlobalHomePage({ slug, ...props }: SettingsPageProps & { slug?: string 
   const { fetchAuth = fetchAuthState, fetchList = fetchLogins, signOut = signOutThisDevice } = props
   const auth = useFetched("settings-auth", fetchAuth)
   const logins = useFetched("settings-logins", fetchList)
-  const { settings, projects, onWrite, aliases } = useSettingsTarget(undefined, props)
+  const { settings, projects, onWrite } = useSettingsTarget(undefined, props)
   const wide = useDevice() !== "phone"
   const navigate = useNavigate()
   const res = settings.data ? resolveSection(settings.data, slug) : undefined
@@ -561,7 +542,7 @@ function GlobalHomePage({ slug, ...props }: SettingsPageProps & { slug?: string 
   if (wide && res && !section && res.first)
     return <Navigate to={sectionPath(res.first.slug)} replace />
   if (!wide && section)
-    return <SectionPage section={section} settings={settings} onWrite={onWrite} aliases={aliases} />
+    return <SectionPage section={section} settings={settings} onWrite={onWrite} />
   if (wide) {
     return (
       <ShellPage
@@ -570,7 +551,6 @@ function GlobalHomePage({ slug, ...props }: SettingsPageProps & { slug?: string 
         settings={settings}
         projects={projects}
         onWrite={onWrite}
-        aliases={aliases}
         auth={auth.data}
         signOut={signOut}
       />
@@ -604,7 +584,7 @@ function ProjectPage({
 }: SettingsPageProps & { project: string; slug?: string }) {
   const { fetchAuth = fetchAuthState, signOut = signOutThisDevice } = props
   const auth = useFetched("settings-auth", fetchAuth)
-  const { settings, projects, onWrite, aliases } = useSettingsTarget(project, props)
+  const { settings, projects, onWrite } = useSettingsTarget(project, props)
   const wide = useDevice() !== "phone"
   const navigate = useNavigate()
   const res = settings.data ? resolveSection(settings.data, slug) : undefined
@@ -620,15 +600,7 @@ function ProjectPage({
     )
   }
   if (!wide && section) {
-    return (
-      <SectionPage
-        project={project}
-        section={section}
-        settings={settings}
-        onWrite={onWrite}
-        aliases={aliases}
-      />
-    )
+    return <SectionPage project={project} section={section} settings={settings} onWrite={onWrite} />
   }
   if (!wide) {
     return (
@@ -655,7 +627,6 @@ function ProjectPage({
       settings={settings}
       projects={projects}
       onWrite={onWrite}
-      aliases={aliases}
       auth={auth.data}
       signOut={signOut}
     />

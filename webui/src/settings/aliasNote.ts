@@ -1,5 +1,6 @@
 import type { ModelAlias, SettingsEntry } from "../generated/server"
 import { apiFetch } from "../apiFetch"
+import { useFetched } from "../useFetched"
 
 /** The Claude model keys: agents.claude.model and the tier variants. Codex has no aliases. */
 const CLAUDE_MODEL_KEY = /^agents\.claude\.(?:[a-z]+\.)?model$/
@@ -14,6 +15,10 @@ export async function fetchClaudeAliases(): Promise<ModelAlias[]> {
     return []
   }
 }
+
+/** The Claude aliases, fetched once the caller mounts; undefined until they arrive. */
+export const useClaudeAliases = (): ModelAlias[] | undefined =>
+  useFetched("settings-claude-aliases", fetchClaudeAliases).data ?? undefined
 
 /** The note under a Claude model setting whose alias resolves to a model that is not the family's latest. */
 export function aliasNote(entry: SettingsEntry, aliases: ModelAlias[] | undefined): string | null {

@@ -1,7 +1,7 @@
-import { fireEvent, waitFor, within } from "@testing-library/react"
+import { act, fireEvent, waitFor, within } from "@testing-library/react"
 import { useState } from "react"
 import { MemoryRouter, Route, Routes } from "react-router"
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { SettingsEntry } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { DeviceContext } from "../useWide"
@@ -84,38 +84,57 @@ describe("lagging alias note", () => {
     { alias: "fable", id: "claude-fable-5-1", latest: "claude-fable-5-2" },
     { alias: "opus", id: "claude-opus-5-5", latest: "claude-opus-5-5" },
   ]
-  const notes = (rows: SettingsEntry[]) => {
-    const { queryAllByTestId } = renderThemed(
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ aliases })))
+  beforeEach(() => {
+    fetchMock.mockClear()
+    vi.stubGlobal("fetch", fetchMock)
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  const renderSection = (rows: SettingsEntry[], section: string) =>
+    renderThemed(
       <MemoryRouter initialEntries={["/settings"]}>
         <SettingsShellView
           entries={rows}
           categories={treeFromEntries(rows)}
           projects={[]}
-          section="Models"
+          section={section}
           totpOn
           onSignOut={() => {}}
           onWrite={async () => ({})}
-          aliases={aliases}
         />
       </MemoryRouter>,
     )
+  const notes = async (rows: SettingsEntry[]) => {
+    const { queryAllByTestId } = renderSection(rows, "Models")
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    await act(async () => {
+      await fetchMock.mock.results[0]?.value
+    })
     return queryAllByTestId("alias-note").map((n) => n.textContent)
   }
 
-  it("notes a Claude alias that resolves below the family's latest", () => {
-    expect(notes([model("agents.claude.model", "fable")])).toEqual([
+  it("notes a Claude alias that resolves below the family's latest", async () => {
+    const { findAllByTestId } = renderSection([model("agents.claude.model", "fable")], "Models")
+    expect((await findAllByTestId("alias-note")).map((n) => n.textContent)).toEqual([
       "fable resolves to claude-fable-5-1. claude-fable-5-2 is newer. Enter the full id to use it.",
     ])
   })
 
-  it("shows no note for a full id, a Codex model or an alias at the latest", () => {
+  it("shows no note for a full id, a Codex model or an alias at the latest", async () => {
     expect(
-      notes([
+      await notes([
         model("agents.claude.model", "claude-fable-5-1"),
         model("agents.claude.light.model", "opus"),
         model("agents.codex.model", "fable"),
       ]),
     ).toEqual([])
+  })
+
+  it("makes no models request outside the Models section", async () => {
+    const { findByText } = renderSection(entries, "Budget")
+    await findByText("Soft")
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
 

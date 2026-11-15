@@ -1,8 +1,8 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { Fragment, useState, type ReactNode } from "react"
 import { Link } from "react-router"
-import type { ModelAlias, SettingsCategory, SettingsEntry } from "../generated/server"
-import { aliasNote } from "./aliasNote"
+import type { SettingsCategory, SettingsEntry } from "../generated/server"
+import { aliasNote, useClaudeAliases } from "./aliasNote"
 import { SETTINGS_HREF } from "../hrefs"
 import { PageHeader } from "../page/PageHeader"
 import { PageIcon } from "../page/PageIcon"
@@ -17,6 +17,8 @@ import { SettingsRow, type WriteSetting } from "./SettingsRow"
 import { ChecksEditor } from "./ChecksEditor"
 import { ModelsTable } from "./ModelsTable"
 import { CHECKS_KEY } from "./checks"
+
+const MODELS_SECTION = "Models"
 
 export const projectPath = (project: string) => `/settings/p/${encodeURIComponent(project)}`
 
@@ -59,8 +61,6 @@ export interface ShellProps {
   onWrite: WriteSetting
   /** The project's repo holds .gx/checks.json, which wins over its checks setting. */
   repoChecksFile?: boolean
-  /** What each Claude alias resolves to, for the lagging-alias note in Models. */
-  aliases?: ModelAlias[]
 }
 
 const ACCOUNT = "Account"
@@ -303,16 +303,18 @@ const IdentityRow = ({ entry }: { entry: SettingsEntry }) => (
   </Box>
 )
 
-type RowProps = Pick<ShellProps, "project" | "pendingRestart" | "onWrite" | "aliases"> & {
+type RowProps = Pick<ShellProps, "project" | "pendingRestart" | "onWrite"> & {
   highlight?: string
+  /** A note under the entry's row, when it has one. */
+  noteFor?: (e: SettingsEntry) => string | null
 }
 
 /** Builds one row per entry; the dev-frontend key gets its wrapper, which supplies the lock reason. */
 const rowBuilder =
-  ({ pendingRestart, onWrite, project, highlight, aliases }: RowProps) =>
+  ({ pendingRestart, onWrite, project, highlight, noteFor }: RowProps) =>
   (e: SettingsEntry) => {
     const Row = e.key === DEV_FRONTEND_KEY ? DevFrontendRow : SettingsRow
-    const note = aliasNote(e, aliases)
+    const note = noteFor?.(e)
     return (
       <Fragment key={e.key}>
         <Row
@@ -333,13 +335,7 @@ const rowBuilder =
 
 type SectionBodyProps = Pick<
   ShellProps,
-  | "entries"
-  | "categories"
-  | "project"
-  | "pendingRestart"
-  | "onWrite"
-  | "repoChecksFile"
-  | "aliases"
+  "entries" | "categories" | "project" | "pendingRestart" | "onWrite" | "repoChecksFile"
 > & { section: string }
 
 /** The section's entries split by group: the response's group order, then any group the tree does not name. A group with no entry is absent. */
@@ -359,8 +355,22 @@ export function sectionGroups(
     .filter((g) => g.entries.length > 0)
 }
 
+/** The Models section. Only it reads the aliases, because the fetch starts a probe refresh. */
+function ModelsSectionBody(props: SectionBodyProps) {
+  const aliases = useClaudeAliases()
+  return <SectionRows {...props} noteFor={(e) => aliasNote(e, aliases)} />
+}
+
 /** One section's titled group blocks, or the Checks editor. Shared by the sidebar shell and the phone page. */
-export function SectionBody({
+export function SectionBody(props: SectionBodyProps) {
+  return props.section === MODELS_SECTION ? (
+    <ModelsSectionBody {...props} />
+  ) : (
+    <SectionRows {...props} />
+  )
+}
+
+function SectionRows({
   entries,
   categories,
   project,
@@ -368,9 +378,9 @@ export function SectionBody({
   pendingRestart,
   onWrite,
   repoChecksFile,
-  aliases,
-}: SectionBodyProps) {
-  const row = rowBuilder({ pendingRestart, onWrite, project, aliases })
+  noteFor,
+}: SectionBodyProps & Pick<RowProps, "noteFor">) {
+  const row = rowBuilder({ pendingRestart, onWrite, project, noteFor })
   const sectionEntries = entries.filter((e) => e.section === section)
   if (project !== undefined && sectionEntries.some((e) => e.key === CHECKS_KEY)) {
     return (

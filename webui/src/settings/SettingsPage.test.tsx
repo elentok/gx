@@ -143,6 +143,43 @@ describe("SettingsPage project scope", () => {
       expect(await findByRole("heading", { name: "Project" })).toBeTruthy()
     })
   })
+
+  it("requests the models route only on the Models section", async () => {
+    const fetchMock = vi.fn(async (url: unknown) => {
+      void url
+      return new Response(JSON.stringify({ aliases: [], epics: [] }))
+    })
+    vi.stubGlobal("fetch", fetchMock)
+    const modelsCalls = () =>
+      fetchMock.mock.calls.filter(([u]) => String(u).includes("/v1/sessions/models"))
+    try {
+      const entries = ["Project", "Models"].map((section) => ({
+        key: `k.${section}`,
+        path: ["k", section],
+        type: "string",
+        section,
+        category: section,
+        group: "",
+        description: `${section} row.`,
+        set: false,
+      }))
+      const fetchSettings = async () => ({
+        project: { name: "gx", repo_checks_file: false },
+        entries,
+        categories: treeFromEntries(entries),
+        redirects: {},
+      })
+      const project = renderAt("/settings/p/gx/s/project", fetchSettings)
+      expect(await project.findByRole("heading", { name: "Project" })).toBeTruthy()
+      expect(modelsCalls()).toHaveLength(0)
+      project.unmount()
+      const models = renderAt("/settings/p/gx/s/models", fetchSettings)
+      expect(await models.findByRole("heading", { name: "Models" })).toBeTruthy()
+      await waitFor(() => expect(modelsCalls()).toHaveLength(1))
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })
 
 describe("SettingsPage on a phone", () => {
