@@ -66,8 +66,11 @@ const openWith = async (page: Page, text: string, caret: number) => {
   await page.getByRole("button", nav("Note")).click()
   const field = page.getByRole("textbox", nav("Message"))
   await expect(field).toBeEnabled({ timeout: 45_000 })
-  await field.fill(text)
-  await field.evaluate((el: HTMLTextAreaElement, at) => el.setSelectionRange(at, at), caret)
+  // With vi on the field is the inline editor, which has no value to fill: type the text and walk the caret.
+  await field.click()
+  await page.keyboard.insertText(text)
+  await page.keyboard.press("ControlOrMeta+Home")
+  for (let i = 0; i < caret; i++) await page.keyboard.press("ArrowRight")
   await page.keyboard.press("ControlOrMeta+g")
   const dialog = page.getByRole("dialog", nav(MESSAGE))
   await expect(dialog.getByRole("textbox", nav(`${MESSAGE} text`))).toBeFocused()
@@ -215,6 +218,7 @@ test.describe("125. Vi editor: commands", () => {
     await page.keyboard.type("gg")
 
     const cursor = dialog.locator(".cm-cursor, .cm-fat-cursor").first()
+    await expect(cursor).toBeVisible()
     const before = (await cursor.boundingBox())!
     await page.keyboard.press("j")
     await expect.poll(() => head(editable)).toBeGreaterThan(0)
@@ -225,7 +229,7 @@ test.describe("125. Vi editor: commands", () => {
       .evaluate((l) => parseFloat(getComputedStyle(l).lineHeight))
     // The cursor element repaints after the selection changes, so wait for it to move.
     await expect
-      .poll(async () => Math.abs((await cursor.boundingBox())!.y - before.y - lineHeight))
+      .poll(async () => Math.abs(((await cursor.boundingBox())?.y ?? NaN) - before.y - lineHeight))
       .toBeLessThanOrEqual(2)
 
     // Lines a to d start at paragraph.length + 1 and are 11 characters apart.
@@ -434,6 +438,7 @@ test.describe("127. Vi editor: setting", () => {
 
     await fixture.cli("vimode", "off")
     await expect(mode).toHaveCount(0)
+    await expect(editable).toBeFocused()
     await same()
     // Without vi, Escape does nothing and `x` types a letter.
     await page.keyboard.press("Escape")
@@ -451,5 +456,244 @@ test.describe("127. Vi editor: setting", () => {
     await page.keyboard.press("x")
     // Vi `x` deletes the character under the caret instead of typing.
     expect(await editorText(editable)).toBe("hllo")
+  })
+})
+
+test.describe("206. Inline vi box and big prompt box", () => {
+  test.use({ viewport: { width: 1280, height: 900 } })
+
+  test("the Message box is a vi editor with a mode pill; Leader b doubles it in every page; Cmd-G hands it to the large editor and back; vi off gives the textarea back", async ({
+    page,
+    start,
+  }) => {
+    test.setTimeout(120_000)
+    const fixture = await start("workspaces")
+    await setViMode(fixture, page, true)
+    const sidebar = page.getByRole("complementary", nav("Sidebar"))
+    const chatRow = sidebar.locator("a[data-chat]").first()
+    await expect(chatRow).toBeVisible()
+    const chatHash = (await chatRow.getAttribute("href"))!
+    await chatRow.click()
+    const box = messageBox(page)
+    // The scroller is the text area itself; the editor around it also holds the vim panel.
+    const area = composer(page).locator(".cm-scroller")
+    const pill = composer(page).getByTestId("vi-mode-text")
+    const chordBox = page.getByRole("menu", nav("Chords"))
+    const leader = "ControlOrMeta+e"
+    const height = async () => {
+      await expect(area).toBeVisible()
+      return (await area.boundingBox())!.height
+    }
+    // The editor is `rows` lines plus 20px of padding; the big box doubles the rows, not the padding.
+    const PADDING = 20
+    const expectHeight = (want: number) =>
+      expect
+        .poll(async () => Math.abs((await height()) - want), { message: `want ${want}` })
+        .toBeLessThanOrEqual(TOLERANCE)
+    const dialog = page.getByRole("dialog", { name: /^Message to / })
+    const dialogText = dialog.getByRole("textbox", { name: /text$/ })
+    const dialogMode = dialog.getByTestId("vi-mode-text")
+
+    // Vi on: the Message box is the editor and the pill reads INSERT.
+    await expect(box).toBeVisible()
+    await expect(composer(page).locator("textarea")).toHaveCount(0)
+    await expect(pill).toHaveText("INSERT")
+    await box.click()
+    await expect(box).toBeFocused()
+
+    // Esc gives NORMAL, v VISUAL, Esc then i INSERT; typed text appears; dd empties it.
+    await page.keyboard.press("Escape")
+    await expect(pill).toHaveText("NORMAL")
+    await page.keyboard.press("v")
+    await expect(pill).toHaveText("VISUAL")
+    await page.keyboard.press("Escape")
+    await page.keyboard.press("i")
+    await expect(pill).toHaveText("INSERT")
+    await page.keyboard.type("hello world")
+    await expect(box).toHaveText("hello world")
+    await page.keyboard.press("Escape")
+    await page.keyboard.press("d")
+    await page.keyboard.press("d")
+    await expect(box).not.toContainText("hello")
+    await expect(pill).toHaveText("NORMAL")
+
+    // `/` opens the panel inside the box; `:q` says so and changes nothing else.
+    await page.keyboard.press("/")
+    await expect(composer(page).locator(".cm-vim-panel input")).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(composer(page).locator(".cm-vim-panel input")).toHaveCount(0)
+    await page.keyboard.press(":")
+    await page.keyboard.type("q")
+    await page.keyboard.press("Enter")
+    await expect(composer(page)).toContainText("Not an editor command")
+    await expect(pill).toHaveText("NORMAL")
+    await expect(box).not.toContainText("hello")
+
+    // With the chat Working, Esc in INSERT opens no confirm; the next Esc in NORMAL does.
+    await sidebar.getByRole("button", nav("Expand paused-epic")).click()
+    const working = sidebar
+      .getByRole("link", { name: /^(Fix agent )?paused-epic(?![\w-])/ })
+      .locator("xpath=ancestor::li[1]")
+      .locator("ul")
+      .getByRole("link")
+      .filter({ hasText: "Working" })
+    await working.click()
+    await expect(page.getByRole("status").filter({ hasText: /^Working/ })).toBeVisible()
+    await box.click()
+    await page.keyboard.press("i")
+    await expect(pill).toHaveText("INSERT")
+    const confirm = page.getByRole("alertdialog", nav("Interrupt the agent?"))
+    await page.keyboard.press("Escape")
+    await expect(pill).toHaveText("NORMAL")
+    await expect(confirm).toHaveCount(0)
+    await page.keyboard.press("Escape")
+    await expect(confirm).toBeVisible()
+    await confirm.getByRole("button", nav("Cancel")).click()
+    await expect(confirm).toHaveCount(0)
+
+    // Back to the idle chat. Leader then b in INSERT doubles the box; text, caret and mode stay.
+    await go(page, chatHash)
+    await expect(box).toBeVisible()
+    await box.click()
+    await page.keyboard.press("i")
+    await expect(pill).toHaveText("INSERT")
+    await page.keyboard.type("alpha beta gamma")
+    await expect(box).toHaveText("alpha beta gamma")
+    const small = await height()
+    const big = (small - PADDING) * 2 + PADDING
+    await expect.poll(() => editorSelection(box)).toEqual([16, 16])
+    await page.keyboard.press(leader)
+    await expect(chordBox.getByRole("menuitem", { name: /^b\s*Big prompt box/ })).toBeVisible()
+    await page.keyboard.press("b")
+    await expect(chordBox).toHaveCount(0)
+    await expectHeight(big)
+    await expect(box).toHaveText("alpha beta gamma")
+    await expect(pill).toHaveText("INSERT")
+    await expect(box).toBeFocused()
+    expect(await editorSelection(box)).toEqual([16, 16])
+    await page.keyboard.press(leader)
+    await expect(chordBox.getByRole("menuitem", { name: /^b\s*Normal prompt box/ })).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(chordBox).toHaveCount(0)
+
+    // A second page in the same context opens with the box already big, no reload.
+    const second = await page.context().newPage()
+    await second.goto(page.url())
+    await expect(messageBox(second)).toBeVisible()
+    await expect
+      .poll(async () =>
+        Math.abs((await composer(second).locator(".cm-scroller").boundingBox())!.height - big),
+      )
+      .toBeLessThanOrEqual(TOLERANCE)
+    await second.close()
+
+    // The large editor opens in INSERT. Leader then b over it changes nothing.
+    await page.keyboard.press("ControlOrMeta+g")
+    await expect(dialogText).toBeFocused()
+    await expect(dialogMode).toHaveText("INSERT")
+    await page.keyboard.press("Escape")
+    await expect(dialogMode).toHaveText("NORMAL")
+    await page.keyboard.press(leader)
+    await page.keyboard.press("b")
+    await expect(chordBox).toHaveCount(0)
+    await expect(dialog).toBeVisible()
+    await expect(dialogText).toHaveText("alpha beta gamma")
+    await expectHeight(big)
+    // Cmd-G closes it with the caret back in the box.
+    const caret = await editorSelection(dialogText)
+    await page.keyboard.press("ControlOrMeta+g")
+    await expect(dialog).toHaveCount(0)
+    await expect(box).toBeFocused()
+    await expect(pill).toHaveText("INSERT")
+    expect(await editorSelection(box)).toEqual(caret)
+
+    // From NORMAL the pill reads NORMAL after; the large editor still opens in INSERT.
+    await page.keyboard.press("Escape")
+    await expect(pill).toHaveText("NORMAL")
+    await page.keyboard.press("ControlOrMeta+g")
+    await expect(dialogMode).toHaveText("INSERT")
+    await page.keyboard.press("ControlOrMeta+g")
+    await expect(dialog).toHaveCount(0)
+    await expect(box).toBeFocused()
+    await expect(pill).toHaveText("NORMAL")
+    // From a VISUAL selection the pill reads NORMAL after and the selection is the caret.
+    await page.keyboard.press("0")
+    await page.keyboard.press("v")
+    await page.keyboard.press("e")
+    await expect(pill).toHaveText("VISUAL")
+    await expect
+      .poll(async () => {
+        const [a, b] = await editorSelection(box)
+        return a !== b
+      })
+      .toBe(true)
+    await page.keyboard.press("ControlOrMeta+g")
+    await expect(dialogMode).toHaveText("INSERT")
+    await page.keyboard.press("ControlOrMeta+g")
+    await expect(dialog).toHaveCount(0)
+    await expect(pill).toHaveText("NORMAL")
+    await expect(box).toBeFocused()
+    await expect
+      .poll(async () => {
+        const [a, b] = await editorSelection(box)
+        return a === b
+      })
+      .toBe(true)
+
+    // The focus ring shows while the editor has focus and is gone after blur.
+    const ring = () =>
+      area.evaluate((el) => {
+        for (let n = el.parentElement; n; n = n.parentElement)
+          if (getComputedStyle(n).boxShadow.includes("2px")) return true
+        return false
+      })
+    await expect.poll(ring).toBe(true)
+    await box.blur()
+    await expect(box).not.toBeFocused()
+    await expect.poll(ring).toBe(false)
+
+    // Sending with Cmd-Enter empties the box and the pill returns to INSERT.
+    await box.click()
+    await page.keyboard.press("Escape")
+    await expect(pill).toHaveText("NORMAL")
+    const sent = page.waitForRequest(
+      (r) => r.method() === "POST" && r.url().includes("/v1/sessions/prompt"),
+    )
+    await page.keyboard.press("ControlOrMeta+Enter")
+    await sent
+    await expect(box).not.toContainText("alpha")
+    await expect(pill).toHaveText("INSERT")
+    const busy = page.getByRole("status").filter({ hasText: /^Working/ })
+    await expect(busy).toBeHidden({ timeout: 45_000 })
+
+    // Touch at the same size: a textarea and no pill. A mouse at 390 px still shows the editor.
+    await box.click()
+    await page.keyboard.type("keep this text")
+    await expect(box).toHaveText("keep this text")
+    const phone = await page
+      .context()
+      .browser()!
+      .newContext({
+        ...touch,
+        ignoreHTTPSErrors: true,
+        viewport: { width: 1280, height: 900 },
+        storageState: await page.context().storageState(),
+      })
+    const touched = await phone.newPage()
+    await touched.goto(page.url())
+    await expect(composer(touched).locator("textarea")).toBeVisible()
+    await expect(composer(touched).getByTestId("vi-mode-text")).toHaveCount(0)
+    await phone.close()
+    await page.setViewportSize({ width: 390, height: 900 })
+    await expect(messageBox(page)).toBeVisible()
+    await expect(area).toBeVisible()
+    await expect(composer(page).locator("textarea")).toHaveCount(0)
+    await page.setViewportSize({ width: 1280, height: 900 })
+
+    // Vi off turns the box back into a textarea with the same text.
+    await fixture.cli("vimode", "off")
+    const plain = composer(page).locator("textarea")
+    await expect(plain).toHaveValue("keep this text")
+    await expect(pill).toHaveCount(0)
   })
 })

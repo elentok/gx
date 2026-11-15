@@ -357,7 +357,7 @@ test("Chords", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/agents$/)
   await expect.poll(() => fx.cli("agents", "list")).not.toContain(chordChat.id)
 
-  // Design page, Queue and a Queue agent: the box has c, d and s only, and x does nothing.
+  // Design page, Queue and a Queue agent: the box has c, d, s and b only, and x does nothing.
   // The palette lists no Rename chat there; its New chat row proves the filter ran.
   const expectNoRenameInPalette = async () => {
     await page.keyboard.press("ControlOrMeta+p")

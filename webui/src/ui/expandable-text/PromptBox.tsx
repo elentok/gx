@@ -114,7 +114,10 @@ function Field({
   const [selection, setSelection] = useState<Selection | null>(null)
 
   // With vi on and a fine pointer the box is a vi editor. Until its chunk has loaded the textarea stays.
-  const wantEditor = useViMode() && !useCoarsePointer()
+  // Both hooks run every render: `&&` would skip one when vi turns off and break the hook order.
+  const viOn = useViMode()
+  const coarse = useCoarsePointer()
+  const wantEditor = viOn && !coarse
   const [Editor, setEditor] = useState<typeof CodeEditor | null>(null)
   useEffect(() => {
     if (!wantEditor) return
@@ -149,8 +152,11 @@ function Field({
           focus: !!wrap.current?.contains(document.activeElement),
         }
   const shown = useRef(showEditor)
+  // A textarea that comes back from the editor must not autofocus: it would take focus from the large editor over it.
+  const swapped = useRef(false)
   if (shown.current !== showEditor) {
     shown.current = showEditor
+    swapped.current = true
     carry.current = read()
     editorSel.current = carry.current.sel
   }
@@ -255,7 +261,7 @@ function Field({
           bg="transparent"
           borderWidth="0"
           borderRadius="0"
-          autoFocus={autoFocus}
+          autoFocus={autoFocus && !swapped.current}
           rows={big ? (rows ?? 2) * 2 : rows}
           lineHeight="1.5"
           display="block"
