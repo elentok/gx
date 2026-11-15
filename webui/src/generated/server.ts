@@ -3073,6 +3073,18 @@ export interface SessionInfo {
   switching_model?: string;
   switching_effort?: string;
   /**
+   * SwitchingBack is set while the old model starts again after a failed
+   * switch; SwitchingModel is then the old model.
+   */
+  switching_back?: boolean;
+  /**
+   * SwitchFailedModel and SwitchFailedOld name a failed switch once the old
+   * model is idle again: the model it tried and the one the session is still
+   * on. Server memory only; the next switch clears them.
+   */
+  switch_failed_model?: string;
+  switch_failed_old?: string;
+  /**
    * HasHistory is true once the chat has a completed turn.
    */
   has_history?: boolean;

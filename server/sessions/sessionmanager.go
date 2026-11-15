@@ -155,6 +155,7 @@ type Prompter interface {
 	DetectDesignActionable(dir, id string, design chat.DesignRef)
 	SendAction(dir, label string, action []string)
 	CancelAutoAdvance(id, why string) bool
+	CancelAutoQueue(id, why string) bool
 	AutoAdvanceDeadline(id string) time.Time
 	AutoQueueDeadline(id string) time.Time
 }

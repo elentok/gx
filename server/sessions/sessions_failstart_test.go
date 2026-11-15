@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -94,6 +95,76 @@ func TestCreateSession_FailedHolderStartEndsCrashed(t *testing.T) {
 		t.Fatalf("snapshot = %+v, %v; want one session", snap.Sessions, err)
 	}
 	assertFailedStartEnded(ctx, t, h, holder, snap.Sessions[0].ID, nil)
+}
+
+// switchFailsAndRollsBack switches the idle session to model, lets the new agent
+// exit before it is idle, and brings the old agent back to idle.
+func switchFailsAndRollsBack(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan wire.Event, id, conv, model string) wire.SessionInfo {
+	t.Helper()
+	if res, err := h.Client.Sessions.Switch(ctx, wire.SessionSwitchRequest{ID: id, Model: model, Effort: "high"}); err != nil || res.Refused {
+		t.Fatalf("switch = %+v, %v", res, err)
+	}
+	waitForHolder(t, filepath.Join(h.SessionsDir, id))
+	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionExit, Code: 1}); err != nil {
+		t.Fatal(err)
+	}
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.SwitchingBack })
+	report(t, conv, agentfake.Control{State: "idle"})
+	return waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool {
+		return s.Status.State == wire.SessionIdle && s.SwitchFailedModel != ""
+	})
+}
+
+func TestSwitchSession_NewAgentExitingBeforeIdleRollsBackToTheOldRecord(t *testing.T) {
+	t.Parallel()
+	h, ctx, evs, id, conv := startIdleSwitchable(t)
+	before := readMeta(t, h, id)
+
+	got := switchFailsAndRollsBack(ctx, t, h, evs, id, conv, "opus")
+	if got.ID != id || got.SwitchFailedModel != "opus" || got.SwitchFailedOld != before["model"] || got.SwitchingModel != "" {
+		t.Errorf("session = %+v, want a failed switch to opus still on %v", got, before["model"])
+	}
+	after := readMeta(t, h, id)
+	for _, k := range []string{"model", "effort", "tier", "switched_by_hand", "switch_unconfirmed", "switch_prev", "conversation_id"} {
+		if !reflect.DeepEqual(after[k], before[k]) {
+			t.Errorf("meta[%s] = %v, want %v as before the switch", k, after[k], before[k])
+		}
+	}
+}
+
+func TestSwitchSession_FailedSwitchKeepsAnEarlierHandSwitch(t *testing.T) {
+	t.Parallel()
+	h, ctx, evs, id, conv := startIdleSwitchable(t)
+	if res, err := h.Client.Sessions.Switch(ctx, wire.SessionSwitchRequest{ID: id, Model: "opus", Effort: "high"}); err != nil || res.Refused {
+		t.Fatalf("first switch = %+v, %v", res, err)
+	}
+	waitForHolder(t, filepath.Join(h.SessionsDir, id))
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool {
+		return s.Status.State == wire.SessionIdle && s.SwitchingModel == "" && readMeta(t, h, id)["model"] == "opus"
+	})
+	before := readMeta(t, h, id)
+
+	got := switchFailsAndRollsBack(ctx, t, h, evs, id, conv, "sonnet")
+	if got.SwitchFailedModel != "sonnet" || got.SwitchFailedOld != "opus" {
+		t.Errorf("session = %+v, want a failed switch to sonnet still on opus", got)
+	}
+	after := readMeta(t, h, id)
+	if after["model"] != "opus" || after["switched_by_hand"] != true || !reflect.DeepEqual(after["switch_prev"], before["switch_prev"]) {
+		t.Errorf("meta = %v, want the record of the earlier hand switch %v", after, before)
+	}
+}
+
+func TestSwitchSession_FailedHolderStartAndFailedRollbackEndCrashed(t *testing.T) {
+	t.Parallel()
+	holder := newLinkedHolder(t)
+	h, ctx, _, id, _ := startIdleSwitchable(t, resumeOnStart, holder.opt)
+	holder.brk(t)
+
+	if res, err := h.Client.Sessions.Switch(ctx, wire.SessionSwitchRequest{ID: id, Model: "opus"}); err == nil {
+		t.Fatalf("switch = %+v, want an error", res)
+	}
+	assertFailedStartEnded(ctx, t, h, holder, id, readMeta(t, h, id)["run"])
 }
 
 func TestResumeSession_FailedHolderStartEndsCrashed(t *testing.T) {

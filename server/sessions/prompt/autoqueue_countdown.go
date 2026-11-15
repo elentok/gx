@@ -90,9 +90,9 @@ func (p *autoQueuer) queueAtCountdownEnd(id, project, mapName string) {
 	}
 }
 
-// cancelAutoQueue stops the session's countdown and tells the person why. It
+// CancelAutoQueue stops the session's countdown and tells the person why. It
 // reports whether one was running.
-func (p *autoQueuer) cancelAutoQueue(id, why string) bool {
+func (p *autoQueuer) CancelAutoQueue(id, why string) bool {
 	if !p.autoQueues.stop(id) {
 		return false
 	}
@@ -108,7 +108,7 @@ func (p *autoQueuer) cancelAutoQueueRoute(req wire.SessionRequest) (wire.Session
 	if res.Refused || err != nil {
 		return res, err
 	}
-	p.cancelAutoQueue(req.ID, "Auto-queue cancelled")
+	p.CancelAutoQueue(req.ID, "Auto-queue cancelled")
 	info := meta.Info()
 	if at := p.AutoQueueDeadline(req.ID); !at.IsZero() {
 		info.AutoQueueAt = &at

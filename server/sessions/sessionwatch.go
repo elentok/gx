@@ -93,6 +93,11 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 		mg.UpdateSessionMetaOrWarn(dir, id, func(m *Meta) bool { return m.Run == run && change(m) })
 	}
 	recordExit := func(exit string) {
+		// A switched agent that ends before idle has failed its switch.
+		if sw, ok := mg.switches.take(id, run); ok {
+			NewResumer(mg).failSwitch(dir, id, run, sw)
+			return
+		}
 		if time.Now().Before(crashUntil) {
 			exit = wire.SessionExitCrashed
 		}
@@ -177,7 +182,11 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 					// A switched agent that is idle is alive: the record takes the switch.
 					if st.State == wire.SessionIdle {
 						if sw, ok := mg.switches.take(id, run); ok {
-							mg.RecordSwitch(m, sw.model, sw.effort)
+							if sw.back {
+								mg.switches.setFailure(id, switchFailure{attempted: sw.attempted, old: sw.model})
+							} else {
+								mg.RecordSwitch(m, sw.model, sw.effort)
+							}
 						}
 					}
 					if st.Promptable() {

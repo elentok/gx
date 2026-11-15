@@ -18,13 +18,42 @@ import (
 type switchState struct {
 	run           int
 	model, effort string
+	// back marks the relaunch on the old record after a failed switch; model
+	// is then the old model and attempted the one that failed.
+	back      bool
+	attempted string
 }
+
+// switchFailure is the outcome of a failed switch, shown until the next one.
+type switchFailure struct{ attempted, old string }
 
 // switchStates keeps the running switches in memory only, so a crash leaves
 // no trace of one and the record stays the old one.
 type switchStates struct {
-	mu sync.Mutex
-	m  map[string]switchState
+	mu     sync.Mutex
+	m      map[string]switchState
+	failed map[string]switchFailure
+}
+
+func (s *switchStates) failure(id string) (switchFailure, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f, ok := s.failed[id]
+	return f, ok
+}
+
+// setFailure records a failed switch; the zero switchFailure clears it.
+func (s *switchStates) setFailure(id string, f switchFailure) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if f == (switchFailure{}) {
+		delete(s.failed, id)
+		return
+	}
+	if s.failed == nil {
+		s.failed = map[string]switchFailure{}
+	}
+	s.failed[id] = f
 }
 
 func (s *switchStates) set(id string, st switchState) {
@@ -88,12 +117,52 @@ func (rs *Resumer) SwitchSession(req wire.SessionSwitchRequest) (wire.SessionRes
 	launch := meta
 	m.RecordSwitch(&launch, req.Model, req.Effort)
 	if err := rs.startResumedHolderAs(dir, &meta, &launch, time.Time{}); err != nil {
-		m.switches.clear(req.ID)
-		m.endFailedStart(dir, &meta)
-		return wire.SessionResult{}, err
+		m.log.Warn("switch: new agent did not start", "session", req.ID, "err", err)
+		if err := rs.rollbackSwitchLocked(dir, &meta, req.Model); err != nil {
+			return wire.SessionResult{}, err
+		}
 	}
 	info := m.SessionInfo(meta)
 	return wire.SessionResult{Session: &info}, nil
+}
+
+// rollbackSwitchLocked relaunches the same conversation on the record as it
+// stands, which a switch only changes once its agent is idle, and notes that
+// the switch to attempted failed; the outcome shows once the old agent is
+// idle. A relaunch that fails too ends the session as a failed start does.
+// Switches 10 and 11 call it from their own triggers. The caller holds metaMu.
+func (rs *Resumer) rollbackSwitchLocked(dir string, meta *Meta, attempted string) error {
+	m := rs.mg
+	m.switches.clear(meta.ID)
+	m.switches.set(meta.ID, switchState{run: meta.Run + 1, model: meta.Model, effort: meta.Effort, back: true, attempted: attempted})
+	if err := rs.startResumedHolderAs(dir, meta, meta, time.Time{}); err != nil {
+		m.switches.clear(meta.ID)
+		m.endFailedStart(dir, meta)
+		return err
+	}
+	return nil
+}
+
+// failSwitch handles the exit of a switched agent that never reached idle. The
+// old record is relaunched; an exit of that relaunch ends the session crashed.
+func (rs *Resumer) failSwitch(dir, id string, run int, sw switchState) {
+	mg := rs.mg
+	if mg.Watches.IsStopped() {
+		return
+	}
+	mg.Watches.MetaMu.Lock()
+	defer mg.Watches.MetaMu.Unlock()
+	meta, err := ReadMeta(dir)
+	if err != nil || meta.Run != run || meta.Status.State == wire.SessionExited {
+		return
+	}
+	if sw.back {
+		mg.endFailedStart(dir, &meta)
+		return
+	}
+	if err := rs.rollbackSwitchLocked(dir, &meta, sw.model); err != nil {
+		mg.log.Warn("switch: old agent did not start", "session", id, "err", err)
+	}
 }
 
 // beginSwitch refuses a session that cannot switch. Otherwise it bumps the run,
@@ -126,7 +195,13 @@ func (rs *Resumer) beginSwitch(req wire.SessionSwitchRequest) (string, wire.Sess
 	if err := WriteMeta(dir, meta); err != nil {
 		return "", wire.SessionResult{}, fmt.Errorf("switch session %s: %w", req.ID, err)
 	}
+	m.switches.setFailure(req.ID, switchFailure{})
 	m.switches.set(req.ID, switchState{run: meta.Run + 1, model: req.Model, effort: req.Effort})
+	// An accepted switch stops both countdowns, as typing does; a refused one
+	// returned above and left them running.
+	const why = "Countdown stopped: you switched the model"
+	m.prompter.CancelAutoAdvance(req.ID, why)
+	m.prompter.CancelAutoQueue(req.ID, why)
 	return dir, wire.SessionResult{}, nil
 }
 

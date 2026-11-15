@@ -167,7 +167,7 @@ func (p *autoQueuer) setAutoQueue(req wire.AutoQueueRequest) (wire.SessionResult
 	if req.On {
 		p.startAutoQueue(req.ID, meta.Ticket)
 	} else {
-		p.cancelAutoQueue(req.ID, "Auto-queue switched off")
+		p.CancelAutoQueue(req.ID, "Auto-queue switched off")
 	}
 	p.events.Publish(wire.EventSessionChanged, req.ID)
 	if at := p.AutoQueueDeadline(req.ID); !at.IsZero() {

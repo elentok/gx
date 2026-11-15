@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -122,9 +123,9 @@ func TestResumeSession_CodexLaunchesCodexResume(t *testing.T) {
 
 // startIdleSwitchable is a fake session whose harness counts as a chat harness,
 // which is what a switch needs, brought to Idle.
-func startIdleSwitchable(t *testing.T) (*servertest.Harness, context.Context, <-chan wire.Event, string, string) {
+func startIdleSwitchable(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan wire.Event, string, string) {
 	t.Helper()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, servertest.WithChatHarness(string(agentfake.HarnessKind)))
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, append([]func(*server.Config){servertest.WithChatHarness(string(agentfake.HarnessKind))}, opts...)...)
 	waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })

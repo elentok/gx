@@ -70,7 +70,10 @@ func (mg *Manager) SessionInfo(m Meta) wire.SessionInfo {
 	}
 	info.HasHistory = tokens > 0
 	if sw, ok := mg.switches.get(m.ID); ok {
-		info.SwitchingModel, info.SwitchingEffort = sw.model, sw.effort
+		info.SwitchingModel, info.SwitchingEffort, info.SwitchingBack = sw.model, sw.effort, sw.back
+	}
+	if f, ok := mg.switches.failure(m.ID); ok {
+		info.SwitchFailedModel, info.SwitchFailedOld = f.attempted, f.old
 	}
 	mg.setLatestModel(&info, m.Harness)
 	info.ModelSwitched = m.SwitchedByHand || chat.ModelSwitched(m.Model, info.Model)

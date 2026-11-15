@@ -127,6 +127,14 @@ type SessionInfo struct {
 	// agent is idle or the run ends.
 	SwitchingModel  string `json:"switching_model,omitempty"`
 	SwitchingEffort string `json:"switching_effort,omitempty"`
+	// SwitchingBack is set while the old model starts again after a failed
+	// switch; SwitchingModel is then the old model.
+	SwitchingBack bool `json:"switching_back,omitempty"`
+	// SwitchFailedModel and SwitchFailedOld name a failed switch once the old
+	// model is idle again: the model it tried and the one the session is still
+	// on. Server memory only; the next switch clears them.
+	SwitchFailedModel string `json:"switch_failed_model,omitempty"`
+	SwitchFailedOld   string `json:"switch_failed_old,omitempty"`
 	// HasHistory is true once the chat has a completed turn.
 	HasHistory bool `json:"has_history,omitempty"`
 	// ContextTokens, ContextLevel and ContextCeiling are the context occupancy
