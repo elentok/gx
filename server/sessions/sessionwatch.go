@@ -185,7 +185,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 							if sw.back {
 								mg.switches.setFailure(id, switchFailure{attempted: sw.attempted, old: sw.model})
 							} else {
-								mg.RecordSwitch(m, sw.model, sw.effort)
+								recordSwitchNow(mg, m, sw.model, sw.effort)
 							}
 						}
 					}

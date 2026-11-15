@@ -12,7 +12,7 @@ import (
 // setLatestModel fills the latest-model fields of info from the cached model
 // list. It reads memory only: the cache, and the global agents settings. The
 // project's own overrides sit in a file, which is not read on every list.
-func (mg *Manager) setLatestModel(info *wire.SessionInfo, harnessName string) {
+func setLatestModel(mg *Manager, info *wire.SessionInfo, harnessName string) {
 	list, ok := mg.Models.Entries(harnessName)
 	if !ok {
 		return

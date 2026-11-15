@@ -74,7 +74,7 @@ func (mg *Manager) SessionInfo(m Meta) wire.SessionInfo {
 	if f, ok := mg.switches.failure(m.ID); ok {
 		info.SwitchFailedModel, info.SwitchFailedOld = f.attempted, f.old
 	}
-	mg.setLatestModel(&info, m.Harness)
+	setLatestModel(mg, &info, m.Harness)
 	info.ModelSwitched = m.SwitchedByHand || chat.ModelSwitched(m.Model, info.Model)
 	if at := mg.prompter.AutoAdvanceDeadline(m.ID); !at.IsZero() {
 		info.AutoAdvanceAt = &at

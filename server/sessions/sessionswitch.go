@@ -115,7 +115,7 @@ func (rs *Resumer) SwitchSession(req wire.SessionSwitchRequest) (wire.SessionRes
 		return Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s ended during the switch", req.ID)), nil
 	}
 	launch := meta
-	m.RecordSwitch(&launch, req.Model, req.Effort)
+	recordSwitchNow(m, &launch, req.Model, req.Effort)
 	override := &launchOverride{Model: launch.Model, Effort: launch.Effort, ByHand: launch.SwitchedByHand, SwitchedAt: launch.SwitchedAt}
 	if err := rs.startResumedHolderAs(dir, &meta, override, time.Time{}); err != nil {
 		m.log.Warn("switch: new agent did not start", "session", req.ID, "err", err)
@@ -230,10 +230,10 @@ func (rs *Resumer) SessionSwitchWrite(web bool) http.HandlerFunc {
 	}
 }
 
-// RecordSwitch applies a successful hand switch to meta with the session's
+// recordSwitchNow applies a successful hand switch to meta with the session's
 // harness, project and tier as configured now. It does not write the file: the
 // caller does once the new agent is alive.
-func (mg *Manager) RecordSwitch(meta *Meta, model, effort string) {
+func recordSwitchNow(mg *Manager, meta *Meta, model, effort string) {
 	tierModel, _ := agent.ResolveTier(mg.projects.AgentsConfig(meta.Project), agent.AgentFor(meta.Harness), meta.Tier)
 	list, _ := mg.Models.Entries(meta.Harness)
 	RecordSwitch(meta, model, effort, tierModel, list, time.Now())
