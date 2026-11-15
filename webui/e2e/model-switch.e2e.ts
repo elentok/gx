@@ -53,7 +53,7 @@ function stateToken(s: SessionInfo) {
 
 // The model picker over the `model-switch` scenario: an idle Codex chat on an outdated model and two idle Claude chats.
 test("205. Model switch", async ({ page, start }) => {
-  const fixture = await start("model-switch")
+  const fixture = await start("model-switch", { autoAdvanceDelay: "1h" })
   const fakes = fixture.modelFakes!
   const chats = (await sessions(fixture)).filter((s) => !s.design)
   const codex = chats.find((s) => s.harness === "codex")!
@@ -320,6 +320,73 @@ test("205. Model switch", async ({ page, start }) => {
   await expect(sessionMenu).toBeVisible()
   await expect(sessionMenu).not.toContainText("switched by hand")
   await page.keyboard.press("Escape")
+
+  // Story 43: a switch on the design session stops the auto-advance countdown and the auto-queue one. (The "Countdown
+  // stopped" text is an OS banner, so the page cannot show it: the countdown going away is what the flow sees.)
+  // A refused switch (a stale state token) leaves the countdown running.
+  await setBehaviour("opus", "")
+  const design = (await sessions(fixture)).find((s) => s.design)!
+  await go(page, "#/d/demo:switch-design")
+  const questions = page.getByRole("group", nav("Questions"))
+  await questions.getByRole("button", { name: /SQLite/ }).click()
+  await questions.getByRole("button", { name: /Yes/ }).click()
+  await page.getByRole("button", nav("Send answers")).click()
+  const advancing = page.getByText(/Continuing in/)
+  await expect(advancing).toBeVisible({ timeout: 30_000 })
+  // The route wants the page's Origin; a refusal is a 200 with `refused`.
+  const postSwitch = async (data: Record<string, string>) => {
+    const res = await page.request.post(new URL("/v1/sessions/switch", page.url()).href, {
+      data,
+      headers: { Origin: new URL(page.url()).origin },
+    })
+    const body = await res.text()
+    expect(res.ok(), body).toBe(true)
+    return JSON.parse(body) as { refused?: boolean }
+  }
+  const stale = await postSwitch({
+    id: design.id,
+    state: `${design.id}:idle:1`,
+    model: "claude-fable-5-2",
+    effort: "medium",
+  })
+  expect(stale.refused).toBe(true)
+  await expect(advancing).toBeVisible()
+  // The design chat's composer is off, so the chord has no focus to start from: the footer's model button opens the
+  // "Newer model" popover, whose button switches in one step.
+  const switchDesign = async () => {
+    await go(page, `#/agents/${design.id}`)
+    await composerForm.getByRole("button", { name: / · (low|medium|high|xhigh)$/ }).click()
+    await page.getByRole("button", nav("Switch to Claude Fable 5.2")).click()
+  }
+  await switchDesign()
+  await go(page, "#/d/demo:switch-design")
+  await expect(page.getByRole("region", nav("Chat"))).toContainText("Switched to Claude Fable 5.2.")
+  await expect(advancing).toHaveCount(0)
+
+  // The same with the auto-queue countdown: the session is on the newest model now, so no
+  // footer popover or chord offers a switch, and the route does it.
+  await page.getByRole("button", { name: /^Auto:/ }).click()
+  await page
+    .getByRole("dialog", nav("Auto"))
+    .getByRole("switch", { name: "Auto-queue off" })
+    .click()
+  await page.keyboard.press("Escape")
+  await fixture.cli("tickets", "set", "demo:switch-design", "--design-step", "branch")
+  const queuing = page.getByText(/Queuing switch-design in \d+s/)
+  await expect(queuing).toBeVisible()
+  await expect(async () => {
+    const idle = (await sessions(fixture)).find((s) => s.id === design.id)!
+    expect(idle.status.state).toBe("idle")
+    const res = await postSwitch({
+      id: idle.id,
+      state: stateToken(idle),
+      model: "opus",
+      effort: "medium",
+    })
+    expect(res.refused).toBeFalsy()
+  }).toPass({ timeout: 15_000 })
+  await go(page, "#/d/demo:switch-design")
+  await expect(queuing).toHaveCount(0)
 
   // Story 19: with the model query failing, only the current model is listed.
   await editFakes(fixture, (cfg) => {

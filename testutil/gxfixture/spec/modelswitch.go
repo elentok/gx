@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
 )
@@ -40,10 +41,14 @@ func modelSwitchModels() []agentfake.ProbeModel {
 func ModelSwitchScenario() scenario {
 	const designMap = "switch-design"
 	return scenario{
-		Codex:        true,
-		Chat:         true,
-		ModelFakes:   true,
-		Epics:        []epic{{project, designMap, nil}},
+		Codex:      true,
+		Chat:       true,
+		ModelFakes: true,
+		// The impl epic is what the auto-queue countdown queues once the design reaches its Branch step.
+		Epics: []epic{
+			{project, designMap, nil},
+			{project, designMap + "-impl", []ticket{{"01", "build", servertest.TicketOpts{}}}},
+		},
 		DesignSteps:  map[string]string{project + ":" + designMap: string(tickets.StepResolveTickets)},
 		OpenDesigns:  []string{project + ":" + designMap},
 		ProjectExtra: map[string]string{project: modelSwitchAgents},
