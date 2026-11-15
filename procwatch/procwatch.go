@@ -133,6 +133,9 @@ type Storm struct {
 	Names []NameCount
 	// Rule is the rule that fired: RuleStreak or RuleHardCeiling.
 	Rule string
+	// Limit is the process count the rule compared against: the threshold for
+	// RuleStreak, the effective hard ceiling for RuleHardCeiling.
+	Limit int
 }
 
 // NamesText renders Names as "sleep 14, sh 6".
@@ -232,13 +235,13 @@ func (w *Watcher) poll(reader syshealth.ProcessReader) {
 				continue
 			}
 			streaks[root] = w.streaks[root] + 1
-			rule := RuleStreak
+			rule, limit := RuleStreak, cfg.Threshold
 			if n > hard {
-				rule = RuleHardCeiling
+				rule, limit = RuleHardCeiling, hard
 			} else if streaks[root] < StreakLimit {
 				continue
 			}
-			w.Report(Storm{Root: root, Descendants: n, Names: forest.topNames(root), Rule: rule})
+			w.Report(Storm{Root: root, Descendants: n, Names: forest.topNames(root), Rule: rule, Limit: limit})
 		}
 		w.streaks = streaks
 	}

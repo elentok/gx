@@ -5,12 +5,18 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/procwatch"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
+
+var testStorm = procwatch.Storm{
+	Descendants: 812, Limit: 500, Rule: procwatch.RuleStreak,
+	Names: []procwatch.NameCount{{Name: "sleep", Count: 14}},
+}
 
 func countPauseEvents(t *testing.T, ticketPath, typ string) int {
 	t.Helper()
@@ -37,7 +43,7 @@ func TestStormStop_PausesProcessStormOnceWhicheverPathGetsThereFirst(t *testing.
 	}
 	stopper := h.Server.Budget().Stopper()
 
-	if err := stopper.StormStop(tracked, 812, 500, "streak", "sleep 14"); err != nil {
+	if err := stopper.StormStop(tracked, testStorm); err != nil {
 		t.Fatal(err)
 	}
 	// The run's own settle arrives after the kill path already paused it.
@@ -81,12 +87,12 @@ func TestStormStop_SettlePathFirstPausesOnceAndStartsNoRecovery(t *testing.T) {
 	stopper := h.Server.Budget().Stopper()
 
 	h.Server.Registry().MarkStop(tracked.Address, runs.Stop{
-		Kind: events.ProcessStorm, Reason: schema.ProcessStormReason(812, 500, "streak", "sleep 14"), CloseReason: ticketops.CloseProcessStorm,
+		Kind: events.ProcessStorm, Reason: schema.ProcessStormReason(testStorm), CloseReason: ticketops.CloseProcessStorm,
 	})
 	if stopping, err := stopper.SettleStop(tracked); err != nil || !stopping {
 		t.Fatalf("SettleStop = %v, %v", stopping, err)
 	}
-	if err := stopper.StormStop(tracked, 812, 500, "streak", "sleep 14"); err != nil {
+	if err := stopper.StormStop(tracked, testStorm); err != nil {
 		t.Fatal(err)
 	}
 	if n := countPauseEvents(t, ticketPath, ticketlog.EventPauseRepair); n != 1 {

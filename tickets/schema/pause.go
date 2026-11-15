@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/procwatch"
 )
 
 // PauseReason says why a ticket is Paused. It is the stored `pause_reason`
@@ -52,12 +53,12 @@ const (
 )
 
 // ProcessStormReason is the pause detail for a run the watchdog killed: what
-// happened and why gx waits for a person. rule is the watchdog rule that fired
-// and names the biggest process names in the tree, with counts.
-func ProcessStormReason(count, threshold int, rule, names string) string {
+// happened and why gx waits for a person. It names the rule that fired, the
+// limit that rule compared against and the biggest process names in the tree.
+func ProcessStormReason(st procwatch.Storm) string {
 	return fmt.Sprintf("The run's process tree grew to %d processes, over the threshold of %d (rule: %s), so gx stopped it. "+
 		"The tree held: %s. "+
-		"gx cannot recover alone: a retry would run the same code and storm again.", count, threshold, rule, names)
+		"gx cannot recover alone: a retry would run the same code and storm again.", st.Descendants, st.Limit, st.Rule, st.NamesText())
 }
 
 // PauseClass says what a person does about a pause: answer a question, or

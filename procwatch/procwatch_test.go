@@ -276,9 +276,11 @@ func TestWatcher_ReportCarriesTopNamesAndRule(t *testing.T) {
 		cfg   Config
 		polls int
 		rule  string
+		limit int
 	}{
-		{"tenth consecutive sample is the streak", Config{Threshold: 3}, StreakLimit, RuleStreak},
-		{"first sample over the ceiling is the hard ceiling", Config{Threshold: 3, HardThreshold: 10}, 1, RuleHardCeiling},
+		{"tenth consecutive sample is the streak", Config{Threshold: 3}, StreakLimit, RuleStreak, 3},
+		{"first sample over the ceiling is the hard ceiling", Config{Threshold: 3, HardThreshold: 10}, 1, RuleHardCeiling, 10},
+		{"a hard ceiling under the threshold reports the threshold", Config{Threshold: 20, HardThreshold: 5}, 1, RuleHardCeiling, 20},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -293,6 +295,9 @@ func TestWatcher_ReportCarriesTopNamesAndRule(t *testing.T) {
 			}
 			if got[0].Rule != tc.rule || !slices.Equal(got[0].Names, want) {
 				t.Errorf("report = rule %q names %v, want %q %v", got[0].Rule, got[0].Names, tc.rule, want)
+			}
+			if got[0].Limit != tc.limit {
+				t.Errorf("Limit = %d, want %d", got[0].Limit, tc.limit)
 			}
 			if text := got[0].NamesText(); text != "sleep 14, sh 6, a 2, b 2, c 2" {
 				t.Errorf("NamesText = %q", text)

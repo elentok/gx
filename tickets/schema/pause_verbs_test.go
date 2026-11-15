@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/procwatch"
 )
 
 func TestPauseRows_EveryKindHasARow(t *testing.T) {
@@ -108,8 +110,11 @@ func TestPauseProcessStorm(t *testing.T) {
 }
 
 func TestProcessStormReason(t *testing.T) {
-	got := ProcessStormReason(812, 500, "hard ceiling", "sleep 14, sh 6")
-	for _, want := range []string{"812", "500", "hard ceiling", "sleep 14, sh 6",
+	got := ProcessStormReason(procwatch.Storm{
+		Descendants: 812, Limit: 3000, Rule: procwatch.RuleHardCeiling,
+		Names: []procwatch.NameCount{{Name: "sleep", Count: 14}, {Name: "sh", Count: 6}},
+	})
+	for _, want := range []string{"812", "3000", "hard ceiling", "sleep 14, sh 6",
 		"cannot recover alone: a retry would run the same code and storm again"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("reason %q lacks %q", got, want)

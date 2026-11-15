@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/procwatch"
 	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -70,20 +71,20 @@ func (s *Stopper) pause(t TrackedRun, stop Stop) error {
 }
 
 // StormStop marks the run storm-stopped, then settles the stop: it stops the
-// session and pauses the ticket process-storm with count, threshold, the rule
-// and the top process names in the detail.
-func (s *Stopper) StormStop(t TrackedRun, count, threshold int, rule, names string) error {
-	s.MarkStorm(t.Address, count, threshold, rule, names)
+// session and pauses the ticket process-storm with the storm's count, limit,
+// rule and top process names in the detail.
+func (s *Stopper) StormStop(t TrackedRun, st procwatch.Storm) error {
+	s.MarkStorm(t.Address, st)
 	_, err := s.SettleStop(t)
 	return err
 }
 
 // MarkStorm marks the run storm-stopped without settling it, so a caller can
 // kill the tree first and the run's own settle already finds the mark.
-func (s *Stopper) MarkStorm(addr string, count, threshold int, rule, names string) {
+func (s *Stopper) MarkStorm(addr string, st procwatch.Storm) {
 	s.Registry.MarkStop(addr, Stop{
 		Kind:        events.ProcessStorm,
-		Reason:      schema.ProcessStormReason(count, threshold, rule, names),
+		Reason:      schema.ProcessStormReason(st),
 		CloseReason: ticketops.CloseProcessStorm,
 	})
 }
