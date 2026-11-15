@@ -21,11 +21,11 @@ test.describe("72. Design actions menu", () => {
     await page.evaluate(() => (location.hash = "#/d/demo:design-epic"))
     await expect(page.getByRole("group", nav("Questions"))).toBeVisible()
 
-    // The footer reads Add image, Note, Auto, Send left to right, with no separator and 6px above, 8px below.
+    // The footer reads Add image, Note, Auto, Send left to right, with no separator and 12px above, none below.
     const footer = page.getByRole("form", nav("Composer"))
     await expect(footer).toHaveCSS("border-top-width", "0px")
-    await expect(footer).toHaveCSS("padding-top", "6px")
-    await expect(footer).toHaveCSS("padding-bottom", "8px")
+    await expect(footer).toHaveCSS("padding-top", "12px")
+    await expect(footer).toHaveCSS("padding-bottom", "0px")
     const names = [/^Add image$/, /^Note$/, /^Auto:/, /^Send/]
     const xs: number[] = []
     for (const name of names) {

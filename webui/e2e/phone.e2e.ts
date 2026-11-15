@@ -271,13 +271,13 @@ test("24. Phone, Design page", async ({ page, start }) => {
   for (const c of centers) expect(c).toBeCloseTo(centers[0], 0)
   for (let i = 1; i < boxes.length; i++)
     expect(boxes[i].x).toBeGreaterThanOrEqual(boxes[i - 1].x + boxes[i - 1].width)
-  // The paperclip is at the left edge of the footer, which has no separator and 6px above, 8px below.
+  // The paperclip is at the left edge of the footer, which has no separator and 12px above, none below.
   const footer = page.getByRole("form", nav("Composer"))
   const footerBox = (await footer.boundingBox())!
   expect(boxes[0].x - footerBox.x).toBeLessThan(boxes[1].x - footerBox.x)
   await expect(footer).toHaveCSS("border-top-width", "0px")
-  await expect(footer).toHaveCSS("padding-top", "6px")
-  await expect(footer).toHaveCSS("padding-bottom", "8px")
+  await expect(footer).toHaveCSS("padding-top", "12px")
+  await expect(footer).toHaveCSS("padding-bottom", "0px")
 
   // Keyboard: a visual viewport 300px shorter while the question box is focused drops the top bar, title block
   // and images and leaves the tabs with the ⋯; restoring the viewport and leaving focus brings them back.

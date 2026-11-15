@@ -271,7 +271,7 @@ test.describe("14. Working row", () => {
     await expect(page.getByRole("group", nav("View"))).toHaveCount(0)
     await expect(page.getByRole("group", nav("Questions"))).toHaveCount(0)
     await expect(ring(page)).toHaveAttribute("data-tone", "running")
-    await expect(page.getByTestId("comet")).toBeVisible()
+    await expect(page.getByTestId("page-header-actions").getByTestId("comet")).toBeVisible()
 
     const id = (await fixture.cli("agents", "list")).split("\t")[0].trim()
     await fixture.cliEnv({ GX_AGENT_SESSION: id }, "agent", "step", "spec")
