@@ -37,7 +37,7 @@ func TestStormStop_PausesProcessStormOnceWhicheverPathGetsThereFirst(t *testing.
 	}
 	stopper := h.Server.Budget().Stopper()
 
-	if err := stopper.StormStop(tracked, 812, 500); err != nil {
+	if err := stopper.StormStop(tracked, 812, 500, "streak", "sleep 14"); err != nil {
 		t.Fatal(err)
 	}
 	// The run's own settle arrives after the kill path already paused it.
@@ -81,12 +81,12 @@ func TestStormStop_SettlePathFirstPausesOnceAndStartsNoRecovery(t *testing.T) {
 	stopper := h.Server.Budget().Stopper()
 
 	h.Server.Registry().MarkStop(tracked.Address, runs.Stop{
-		Kind: events.ProcessStorm, Reason: schema.ProcessStormReason(812, 500), CloseReason: ticketops.CloseProcessStorm,
+		Kind: events.ProcessStorm, Reason: schema.ProcessStormReason(812, 500, "streak", "sleep 14"), CloseReason: ticketops.CloseProcessStorm,
 	})
 	if stopping, err := stopper.SettleStop(tracked); err != nil || !stopping {
 		t.Fatalf("SettleStop = %v, %v", stopping, err)
 	}
-	if err := stopper.StormStop(tracked, 812, 500); err != nil {
+	if err := stopper.StormStop(tracked, 812, 500, "streak", "sleep 14"); err != nil {
 		t.Fatal(err)
 	}
 	if n := countPauseEvents(t, ticketPath, ticketlog.EventPauseRepair); n != 1 {

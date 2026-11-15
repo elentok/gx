@@ -251,6 +251,9 @@ test.describe("3. Pause reasons and recovery", () => {
       ["Retry", "Start over"],
       async () => {
         await expect(page.getByText(/cannot recover alone/).first()).toBeVisible()
+        // The card names the rule that fired and the biggest process names with counts.
+        await expect(page.getByText(/\(rule: (streak|hard ceiling)\)/).first()).toBeVisible()
+        await expect(page.getByText(/The tree held: \S+ \d+/).first()).toBeVisible()
         await retry(page)
         await cleared(page)
       },

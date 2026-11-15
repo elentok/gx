@@ -70,20 +70,20 @@ func (s *Stopper) pause(t TrackedRun, stop Stop) error {
 }
 
 // StormStop marks the run storm-stopped, then settles the stop: it stops the
-// session and pauses the ticket process-storm with count and threshold in the
-// detail. The watchdog's one entry point.
-func (s *Stopper) StormStop(t TrackedRun, count, threshold int) error {
-	s.MarkStorm(t.Address, count, threshold)
+// session and pauses the ticket process-storm with count, threshold, the rule
+// and the top process names in the detail.
+func (s *Stopper) StormStop(t TrackedRun, count, threshold int, rule, names string) error {
+	s.MarkStorm(t.Address, count, threshold, rule, names)
 	_, err := s.SettleStop(t)
 	return err
 }
 
 // MarkStorm marks the run storm-stopped without settling it, so a caller can
 // kill the tree first and the run's own settle already finds the mark.
-func (s *Stopper) MarkStorm(addr string, count, threshold int) {
+func (s *Stopper) MarkStorm(addr string, count, threshold int, rule, names string) {
 	s.Registry.MarkStop(addr, Stop{
 		Kind:        events.ProcessStorm,
-		Reason:      schema.ProcessStormReason(count, threshold),
+		Reason:      schema.ProcessStormReason(count, threshold, rule, names),
 		CloseReason: ticketops.CloseProcessStorm,
 	})
 }

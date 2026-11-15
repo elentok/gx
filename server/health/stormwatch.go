@@ -147,15 +147,17 @@ func (s *Health) stormFound(st procwatch.Storm) {
 
 	threshold := s.settings.Load().Watchdog.MaxTreeProcesses
 	stopper := s.stopper()
-	stopper.MarkStorm(t.Address, st.Descendants, threshold)
+	names := st.NamesText()
+	stopper.MarkStorm(t.Address, st.Descendants, threshold, st.Rule, names)
 	if err := (procwatch.Killer{}).Kill(st.Root); err != nil {
 		s.log.Error("process storm: kill tree", "ticket", t.Address, "root", st.Root, "err", err)
 	}
 	if _, err := stopper.SettleStop(t); err != nil {
 		s.log.Error("process storm: settle stop", "ticket", t.Address, "err", err)
 	}
-	s.log.Warn("process storm: run killed", "ticket", t.Address, "processes", st.Descendants, "threshold", threshold)
-	s.stormBanner(t.Address, st.Descendants, threshold)
+	s.log.Warn("process storm: run killed", "ticket", t.Address, "processes", st.Descendants, "threshold", threshold,
+		"rule", st.Rule, "names", names)
+	s.stormBanner(t.Address, st, threshold)
 }
 
 // stormSessionFound kills a session's tree. The session watch records the
@@ -165,14 +167,16 @@ func (s *Health) stormSessionFound(st procwatch.Storm, sess stormSession) {
 	if err := (procwatch.Killer{}).Kill(st.Root); err != nil {
 		s.log.Error("process storm: kill session tree", "session", sess.name, "root", st.Root, "err", err)
 	}
-	s.log.Warn("process storm: session killed", "session", sess.name, "processes", st.Descendants, "threshold", threshold)
-	s.stormBanner(sess.name, st.Descendants, threshold)
+	s.log.Warn("process storm: session killed", "session", sess.name, "processes", st.Descendants, "threshold", threshold,
+		"rule", st.Rule, "names", st.NamesText())
+	s.stormBanner(sess.name, st, threshold)
 }
 
-func (s *Health) stormBanner(name string, count, threshold int) {
+func (s *Health) stormBanner(name string, st procwatch.Storm, threshold int) {
 	note := osnotify.Notification{
 		Title: "Process storm stopped " + name,
-		Body:  fmt.Sprintf("%s was killed: its process tree had %d processes (limit %d).", name, count, threshold),
+		Body: fmt.Sprintf("%s was killed: its process tree had %d processes (limit %d, rule: %s). Biggest: %s.",
+			name, st.Descendants, threshold, st.Rule, st.NamesText()),
 		Group: stormBannerGroup,
 	}
 	if err := s.notifier.Notify(context.Background(), note); err != nil {

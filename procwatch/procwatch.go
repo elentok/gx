@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strings"
 	"syscall"
 	"time"
 
@@ -107,10 +108,54 @@ func (c Config) interval() time.Duration {
 	return c.Interval
 }
 
-// Storm is a root whose tree is over the threshold.
+// The rules that report a storm.
+const (
+	RuleStreak      = "streak"
+	RuleHardCeiling = "hard ceiling"
+)
+
+// TopNames is how many process names a Storm lists.
+const TopNames = 5
+
+// NameCount is how many processes of one Comm a tree holds.
+type NameCount struct {
+	Name  string
+	Count int
+}
+
+// Storm is a root whose tree is over the threshold. Names and Rule are set
+// only on reports to Watcher.Report.
 type Storm struct {
 	Root        int
 	Descendants int
+	// Names is the most common process names in the tree, at most TopNames,
+	// ordered by count and then name.
+	Names []NameCount
+	// Rule is the rule that fired: RuleStreak or RuleHardCeiling.
+	Rule string
+}
+
+// NamesText renders Names as "sleep 14, sh 6".
+func (s Storm) NamesText() string {
+	parts := make([]string, len(s.Names))
+	for i, n := range s.Names {
+		parts[i] = fmt.Sprintf("%s %d", n.Name, n.Count)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// topNames counts Comm over the descendants of root.
+func (f *Forest) topNames(root int) []NameCount {
+	counts := map[string]int{}
+	f.walk(root, func(p syshealth.Process) { counts[p.Comm]++ })
+	out := make([]NameCount, 0, len(counts))
+	for name, n := range counts {
+		out = append(out, NameCount{name, n})
+	}
+	slices.SortFunc(out, func(a, b NameCount) int {
+		return cmp.Or(cmp.Compare(b.Count, a.Count), cmp.Compare(a.Name, b.Name))
+	})
+	return out[:min(len(out), TopNames)]
 }
 
 // Watcher polls the process table and reports storms.
@@ -187,9 +232,13 @@ func (w *Watcher) poll(reader syshealth.ProcessReader) {
 				continue
 			}
 			streaks[root] = w.streaks[root] + 1
-			if n > hard || streaks[root] >= StreakLimit {
-				w.Report(Storm{Root: root, Descendants: n})
+			rule := RuleStreak
+			if n > hard {
+				rule = RuleHardCeiling
+			} else if streaks[root] < StreakLimit {
+				continue
 			}
+			w.Report(Storm{Root: root, Descendants: n, Names: forest.topNames(root), Rule: rule})
 		}
 		w.streaks = streaks
 	}

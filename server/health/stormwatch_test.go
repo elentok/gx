@@ -161,6 +161,31 @@ func TestStorm_TreeOverThresholdIsKilledWholeAndTicketPaused(t *testing.T) {
 	} else if n, _ := strconv.Atoi(count[1]); n < 4 {
 		t.Errorf("banner count = %d, want above the threshold of 3", n)
 	}
+	assertNamesAndRule(t, h, "process storm: run killed", "sleep 6", sent[0])
+}
+
+// assertNamesAndRule checks the banner and the server.log line msg both name
+// the rule and the biggest process name (the tree is sleepers under one sh).
+func assertNamesAndRule(t *testing.T, h *servertest.Harness, msg, wantName string, banner osnotify.Notification) {
+	t.Helper()
+	if !strings.Contains(banner.Body, "rule: streak") || !strings.Contains(banner.Body, "Biggest: ") || !strings.Contains(banner.Body, wantName) {
+		t.Errorf("banner body = %q, want the rule and a process name", banner.Body)
+	}
+	log, err := os.ReadFile(server.LogPath(h.StateDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var line string
+	for l := range strings.SplitSeq(string(log), "\n") {
+		if strings.Contains(l, msg) {
+			line = l
+		}
+	}
+	for _, want := range []string{`"rule":"streak"`, `"names":"`, wantName} {
+		if !strings.Contains(line, want) {
+			t.Errorf("log line %q lacks %q", line, want)
+		}
+	}
 }
 
 func TestStorm_TreeUnderThresholdIsLeftAlone(t *testing.T) {
@@ -229,6 +254,7 @@ func TestStorm_SessionTreeOverThresholdIsKilledWholeWithOneBanner(t *testing.T) 
 	if !regexp.MustCompile(`\b\d+ processes\b`).MatchString(sent[0].Body) {
 		t.Errorf("banner = %+v, want the process count", sent[0])
 	}
+	assertNamesAndRule(t, h, "process storm: session killed", "", sent[0])
 }
 
 func TestStorm_SessionTreeUnderThresholdIsLeftAlone(t *testing.T) {

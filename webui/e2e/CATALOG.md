@@ -182,7 +182,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 
 ### `pause.e2e.ts`
 
-- **Every pause reason recovers.** Also starts the `hung-pane-twice` scenario: the pause says the pane stopped taking keys twice, offers Retry and Start over, and Retry ends it. Also starts the `process-storm` scenario: the card is labelled "Too many processes", says gx cannot recover alone, offers Retry and Start over, and Retry ends the pause.
+- **Every pause reason recovers.** Also starts the `hung-pane-twice` scenario: the pause says the pane stopped taking keys twice, offers Retry and Start over, and Retry ends it. Also starts the `process-storm` scenario: the card is labelled "Too many processes", says gx cannot recover alone, names the rule that fired and the biggest process names with counts, offers Retry and Start over, and Retry ends the pause.
 - **Unknown skill.**
 - **A model-mismatch pause resumes on the worker tier.**
 - **Copy, start, and refuse a second agent.**

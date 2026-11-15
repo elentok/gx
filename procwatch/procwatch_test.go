@@ -256,6 +256,51 @@ func TestWatcher_StreakAndHardCeiling(t *testing.T) {
 	}
 }
 
+func TestWatcher_ReportCarriesTopNamesAndRule(t *testing.T) {
+	t.Parallel()
+	named := func(first, n int, comm string) []syshealth.Process {
+		out := kids(first, n, 10, me)
+		for i := range out {
+			out[i].Comm = comm
+		}
+		return out
+	}
+	// Seven names: sleep 14, sh 6, then ties at 2 (a, b, c), and 1 (d, e).
+	tree := concat([]syshealth.Process{row(1, 0, 0), row(10, 1, me)},
+		named(100, 14, "sleep"), named(200, 6, "sh"), named(300, 2, "c"), named(400, 2, "a"),
+		named(500, 2, "b"), named(600, 1, "e"), named(700, 1, "d"))
+	want := []NameCount{{"sleep", 14}, {"sh", 6}, {"a", 2}, {"b", 2}, {"c", 2}}
+
+	tests := []struct {
+		name  string
+		cfg   Config
+		polls int
+		rule  string
+	}{
+		{"tenth consecutive sample is the streak", Config{Threshold: 3}, StreakLimit, RuleStreak},
+		{"first sample over the ceiling is the hard ceiling", Config{Threshold: 3, HardThreshold: 10}, 1, RuleHardCeiling},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var got []Storm
+			w := &Watcher{Config: tc.cfg, Roots: func() []int { return []int{10} }, Report: func(s Storm) { got = append(got, s) }}
+			for range tc.polls {
+				w.poll(&tableReader{procs: tree})
+			}
+			if len(got) != 1 {
+				t.Fatalf("reports = %d, want 1", len(got))
+			}
+			if got[0].Rule != tc.rule || !slices.Equal(got[0].Names, want) {
+				t.Errorf("report = rule %q names %v, want %q %v", got[0].Rule, got[0].Names, tc.rule, want)
+			}
+			if text := got[0].NamesText(); text != "sleep 14, sh 6, a 2, b 2, c 2" {
+				t.Errorf("NamesText = %q", text)
+			}
+		})
+	}
+}
+
 func TestWatcher_ReportsSustainedStormAndSparesUnder(t *testing.T) {
 	big := startTree(t, "tree", 4)
 	small := startTree(t, "tree", 2)

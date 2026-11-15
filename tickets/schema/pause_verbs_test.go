@@ -108,8 +108,9 @@ func TestPauseProcessStorm(t *testing.T) {
 }
 
 func TestProcessStormReason(t *testing.T) {
-	got := ProcessStormReason(812, 500)
-	for _, want := range []string{"812", "500", "cannot recover alone"} {
+	got := ProcessStormReason(812, 500, "hard ceiling", "sleep 14, sh 6")
+	for _, want := range []string{"812", "500", "hard ceiling", "sleep 14, sh 6",
+		"cannot recover alone: a retry would run the same code and storm again"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("reason %q lacks %q", got, want)
 		}

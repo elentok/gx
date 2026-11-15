@@ -39,6 +39,12 @@ func TestProcessStormPausesTheTicketAndLeavesNoTree(t *testing.T) {
 		t.Fatalf("ticket is not paused process-storm:\n%s", r.epicTicketFile(t, "storm-epic"))
 	}
 	r.waitSleepers(t, "the killed tree is not gone", func(n int) bool { return n <= baseline })
+	ticket := r.epicTicketFile(t, "storm-epic")
+	for _, want := range []string{"(rule: streak)", "The tree held: "} {
+		if !strings.Contains(ticket, want) {
+			t.Errorf("pause text lacks %q:\n%s", want, ticket)
+		}
+	}
 }
 
 func TestSessionStormExitsTheSessionAndPausesNoTicket(t *testing.T) {
