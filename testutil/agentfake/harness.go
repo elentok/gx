@@ -34,6 +34,10 @@ type Harness struct {
 	Dir string
 }
 
+// SwitchesModels marks the fake as a model-switching harness, like Claude. The
+// no-resume fake is not one, so tests have a harness the switch refuses.
+func (h Harness) SwitchesModels() bool { return !h.NoResume }
+
 func (Harness) Launch(opts harness.LaunchOptions) harness.Command {
 	claude, _ := harness.Lookup(harness.Claude)
 	return programCommand(claude.Launch(opts), opts)

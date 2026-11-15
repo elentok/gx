@@ -196,6 +196,25 @@ func Register(kind agentrunner.Kind, h Harness) {
 	registered[kind] = h
 }
 
+// ModelSwitcher marks a registered harness whose sessions switch models like
+// Claude's. Test fakes that wrap Claude's launch implement it.
+type ModelSwitcher interface{ SwitchesModels() bool }
+
+// SwitchesModels says whether sessions of the named harness have a model list
+// and can switch models: Claude, Codex, and registered harnesses that say so.
+func SwitchesModels(name string) bool {
+	kind := agentrunner.Kind(name)
+	if kind == Claude || kind == Codex {
+		return true
+	}
+	h, ok := registered[kind]
+	if !ok {
+		return false
+	}
+	s, ok := h.(ModelSwitcher)
+	return ok && s.SwitchesModels()
+}
+
 // Lookup returns the harness for kind.
 func Lookup(kind agentrunner.Kind) (Harness, error) {
 	switch kind {

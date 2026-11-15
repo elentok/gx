@@ -43,10 +43,9 @@ func SessionModelsRead(mg *Manager, w http.ResponseWriter, r *http.Request) {
 }
 
 // hasModelList says whether sessions of harnessName can pick a model: Claude and
-// Codex, whatever the chat harness is. The picker and the switch share it.
-func hasModelList(harnessName string) bool {
-	return harnessName == string(harness.Claude) || harnessName == string(harness.Codex)
-}
+// Codex (and test fakes that say so), whatever the chat harness is. The picker
+// and the switch share it.
+func hasModelList(harnessName string) bool { return harness.SwitchesModels(harnessName) }
 
 // modelsResponse builds the reply from the cache's current list. Refreshing is
 // read last, so a read that started a refresh says so.

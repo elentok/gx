@@ -35,6 +35,28 @@ func TestVersionCompareIsNumeric(t *testing.T) {
 
 func e(value, id string) Entry { return Entry{Value: value, ID: id} }
 
+func TestResolve(t *testing.T) {
+	list := []Entry{
+		{Value: "fable", ID: "claude-fable-5-1"},
+		{Value: "claude-fable-5-1", ID: "claude-fable-5-1"},
+		{Value: "alias", ID: "only-id"},
+	}
+	tests := []struct {
+		name, value, wantValue string
+		ok                     bool
+	}{
+		{"value match", "fable", "fable", true},
+		{"id match", "only-id", "alias", true},
+		{"no match", "nope", "", false},
+	}
+	for _, tc := range tests {
+		e, ok := Resolve(list, tc.value)
+		if ok != tc.ok || (ok && e.Value != tc.wantValue) {
+			t.Errorf("%s: Resolve(%q) = %+v, %v; want value %q, ok %v", tc.name, tc.value, e, ok, tc.wantValue, tc.ok)
+		}
+	}
+}
+
 func TestLatest(t *testing.T) {
 	hidden := func(en Entry) Entry { en.Hidden = true; return en }
 	succ := func(en Entry, s string) Entry { en.Successor = s; return en }

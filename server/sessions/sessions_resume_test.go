@@ -121,11 +121,11 @@ func TestResumeSession_CodexLaunchesCodexResume(t *testing.T) {
 	}
 }
 
-// startIdleSwitchable is a fake session whose harness counts as a chat harness,
-// which is what a switch needs, brought to Idle.
+// startIdleSwitchable is a fake session brought to Idle. The chat harness stays
+// the default Claude: the switch gate follows the session's own harness.
 func startIdleSwitchable(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan wire.Event, string, string) {
 	t.Helper()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, append([]func(*server.Config){servertest.WithChatHarness(string(agentfake.HarnessKind))}, opts...)...)
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, opts...)
 	waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
@@ -199,10 +199,10 @@ func TestSwitchSession_Refusals(t *testing.T) {
 	}
 }
 
-// A harness without a chat reader is neither Claude nor Codex.
+// A harness that is neither Claude nor Codex has no model list.
 func TestSwitchSession_RefusesUnsupportedHarness(t *testing.T) {
 	t.Parallel()
-	h, ctx, evs, id, conv := startFakeSession(t)
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{Harness: string(agentfake.NoResumeHarnessKind)})
 	waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
