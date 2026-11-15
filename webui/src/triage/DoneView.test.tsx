@@ -42,6 +42,8 @@ test("groups and links render from the payload", () => {
   expect(container.querySelector('a[href="#/e/gx:ready-1"]')).toBeTruthy()
   expect(container.querySelector('a[href="#/t/gx:map-a/3"]')).toBeTruthy()
   screen.getByText("into gx:follow-ups/9")
+  for (const a of ["gx:follow-ups/4", "gx:follow-ups/6", "gx:follow-ups/7"])
+    expect(container.querySelector(`a[href="#/t/${a}"]`)).toBeTruthy()
 })
 
 test("without a ready epic the ready line has no queue", () => {

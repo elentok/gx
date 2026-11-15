@@ -38,13 +38,8 @@ export const READY_FOR_REVIEW_REASON = "Waiting for you to merge the PR on GitHu
 export const needsYouTone = (row: EpicListRow): Tone => PILL_TONE[row.state_pill ?? ""] ?? "waiting"
 
 /** A Follow-ups step pill (Verify, Route, ...) is running; only the waiting pills are amber. */
-const FOLLOWUPS_PILL_TONE: Record<string, Tone> = {
-  ...PILL_TONE,
-  "Waiting for you": "waiting",
-}
-
 export const followUpsTone = (row: EpicListRow): Tone =>
-  FOLLOWUPS_PILL_TONE[row.state_pill ?? ""] ?? "running"
+  PILL_TONE[row.state_pill ?? ""] ?? "running"
 
 export function ringTone(row: EpicListRow): Tone {
   if (row.card_kind === CardKindFollowUps && row.state_pill) {

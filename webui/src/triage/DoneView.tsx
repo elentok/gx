@@ -82,7 +82,6 @@ function GroupLine({ group, readyEpic }: { group: TriageResultGroup; readyEpic?:
 }
 
 function GroupRows({ group }: { group: TriageResultGroup }) {
-  if (group.action === "close" || group.action === "keep") return null
   return (
     <Box as="ul" listStyleType="none" display="flex" flexDirection="column" gap="1" pl="6">
       {group.items.map((i) => (

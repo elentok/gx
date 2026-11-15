@@ -54,6 +54,7 @@ func TestPlaceTriage(t *testing.T) {
 		{"questions, agent still printing", questions([]triage.Round{answered}, triage.Row{Questions: []triage.Question{q("z")}}), true, wire.SectionDesigning, "Questions", "Questions", 0, false, wire.CardActionContinue, "Continue", ""},
 		{"write, failed row, session", rec(tickets.StepWrite, true, row(triage.WriteFailed), row(triage.WriteDone)), true, wire.SectionDesigning, "Write", "1 of 2 written", 1, false, wire.CardActionContinue, "Continue", ""},
 		{"write, failed row, no session", rec(tickets.StepWrite, true, row(triage.WriteFailed), row(triage.WriteDone)), false, wire.SectionNeedsYou, "Write", "1 of 2 written", 1, false, wire.CardActionContinue, "Continue", ""},
+		{"write, kept row counts as written", rec(tickets.StepWrite, true, triage.Row{Person: triage.PersonFields{KeepForLater: true}}, row(triage.WriteDone)), true, wire.SectionDesigning, "Write", "2 of 2 written", 0, false, wire.CardActionContinue, "Continue", ""},
 		{"write, pending row, no session", rec(tickets.StepWrite, true, row(triage.WriteFailed), row(triage.WritePending)), false, wire.SectionDesigning, "Write", "0 of 2 written", 1, true, wire.CardActionContinue, "Continue", ""},
 		{"write, last pass incomplete", rec(tickets.StepWrite, false, row(triage.WriteDone)), false, wire.SectionDesigning, "Write", "1 of 1 written", 0, true, wire.CardActionContinue, "Continue", ""},
 		{"abandoned", &triage.Record{State: triage.StateAbandoned, Step: tickets.StepPlan}, false, wire.SectionReadyToDesign, "", "", 0, false, wire.CardActionTriage, "Triage", ""},
@@ -164,6 +165,9 @@ func TestEpicList_FollowUpsCardFollowsTheTriageLifetime(t *testing.T) {
 	}
 	if r.StepLine != "2 ready to queue" || r.Actions[0].Kind != wire.CardActionQueue || r.Actions[0].Label != "Queue" || r.Actions[0].Target != "proj:triage-ready" {
 		t.Errorf("done card: %+v", r)
+	}
+	if r.RingProgress != 100 {
+		t.Errorf("done card ring = %d, want 100", r.RingProgress)
 	}
 	if res, err := h.Client.Queue.Add(t.Context(), "proj:triage-ready", ""); err != nil || res.Refused {
 		t.Fatalf("queue add = %+v, %v", res, err)

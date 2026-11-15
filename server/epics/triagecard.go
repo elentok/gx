@@ -73,9 +73,11 @@ func PlaceTriage(project string, rec *triage.Record, sessionLive bool) TriagePla
 	case tickets.StepWrite:
 		written, failed, pending := 0, 0, false
 		for _, r := range rec.Rows {
-			switch r.Write {
-			case triage.WriteDone, triage.WriteGone:
+			if rowWritten(r) {
 				written++
+				continue
+			}
+			switch r.Write {
 			case triage.WriteFailed:
 				failed++
 			case triage.WritePending:
@@ -124,6 +126,12 @@ func readyToQueue(project string, done *triage.Record, epics []tickets.Epic, qid
 	return n
 }
 
+// rowWritten is a row the Write step has finished with: written, gone or kept
+// for later. It matches the Progress ring's written count.
+func rowWritten(r triage.Row) bool {
+	return r.Write == triage.WriteDone || r.Write == triage.WriteGone || r.Person.KeepForLater
+}
+
 // triagePercent is the ring: the steps passed plus the share of this step's rows
 // handled, over the four steps before Done. The Questions share is the answered
 // share of the open round.
@@ -158,7 +166,7 @@ func triagePercent(rec *triage.Record) int {
 					handled++
 				}
 			case tickets.StepWrite:
-				if r.Write == triage.WriteDone || r.Write == triage.WriteGone {
+				if rowWritten(r) {
 					handled++
 				}
 			}

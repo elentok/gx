@@ -117,6 +117,8 @@ func followUpsCard(project string, e tickets.Epic, rec, done *triage.Record, rea
 	}
 	if live {
 		row.RingProgress = triagePercent(rec)
+	} else if p.Pill == "Done" {
+		row.RingProgress = 100
 	}
 	return row, true
 }
