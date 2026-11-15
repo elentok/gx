@@ -64,7 +64,9 @@ const Chevron = () => (
 function LinkRow({ href, label, detail }: { href: string; label: string; detail?: ReactNode }) {
   return (
     <chakra.a href={href} {...rowProps}>
-      <Box flex="1">{label}</Box>
+      <Box flex="1" fontWeight="600">
+        {label}
+      </Box>
       {detail && (
         <Text fontSize="sm" color="text.muted">
           {detail}

@@ -265,14 +265,7 @@ function AccountNav({
             </AccountLink>
           )}
           <AccountLink href={`${SETTINGS_HREF}/certificate`}>Certificate</AccountLink>
-          <chakra.button
-            type="button"
-            onClick={onSignOut}
-            {...navLink}
-            pl="6"
-            color="tone.deadlocked.fg"
-            textAlign="left"
-          >
+          <chakra.button type="button" onClick={onSignOut} {...navLink} pl="6" textAlign="left">
             Sign out of this device
           </chakra.button>
         </>
@@ -284,9 +277,6 @@ function AccountNav({
 const AccountLink = ({ href, children }: { href: string; children: string }) => (
   <chakra.a href={href} {...navLink} pl="6">
     {children}
-    <Text aria-hidden color="text.dim">
-      ›
-    </Text>
   </chakra.a>
 )
 
