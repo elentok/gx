@@ -1254,6 +1254,20 @@ worktrees, the tickets store, a system temp folder, or a folder listed in the co
 gx's own folders stay refused inside any root.
 _Avoid_: allowed dir, whitelist, scope
 
+## Settings page
+
+**Settings category** — a labelled group of Settings sections in the settings sidebar and on the
+phone's Settings home, such as Agents or System. It holds no rows of its own.
+_Avoid_: page group, tab
+
+**Settings section** — one page of the settings page, listed under its Settings category, such as
+Models. It holds Settings groups.
+_Avoid_: page, panel
+
+**Settings group** — a titled block of rows inside a Settings section, such as Claude inside
+Models.
+_Avoid_: subsection, card
+
 ## Commands and completion
 
 **Command** — text at the start of a session's prompt that the harness runs itself instead of sending
