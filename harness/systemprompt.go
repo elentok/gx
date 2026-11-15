@@ -69,10 +69,14 @@ func WithGXSystemPrompt(args []string) []string {
 	return append(args, "--append-system-prompt", GXLoopPrompt)
 }
 
-// GXLoopPromptWithNote is GXLoopPrompt plus the one line that sends the agent
-// to its launch note file. One line, like the rest.
+// GXNoteSentence is the one line that sends the agent to its launch note file.
+func GXNoteSentence(noteFile string) string {
+	return "Before the skill's first step, read `" + noteFile + "` and treat it as part of your launch prompt."
+}
+
+// GXLoopPromptWithNote is GXLoopPrompt plus GXNoteSentence.
 func GXLoopPromptWithNote(noteFile string) string {
-	return GXLoopPrompt + " Before the skill's first step, read `" + noteFile + "` and treat it as part of your launch prompt."
+	return GXLoopPrompt + " " + GXNoteSentence(noteFile)
 }
 
 // WithPromptFile points claude args at file as the one system-prompt file,

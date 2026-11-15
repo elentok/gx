@@ -182,6 +182,27 @@ func TestCodexHarness_PlainChatArgsReachLaunchAndResume(t *testing.T) {
 	}
 }
 
+func TestCodexHarness_NoteFileSentenceIsOnLaunchOnlyAndOneLine(t *testing.T) {
+	t.Parallel()
+	h, err := harness.Lookup(harness.Codex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := harness.LaunchOptions{NoteFile: "/s/e/launch/01-note.md"}
+	want := "developer_instructions=" + harness.TOMLString(harness.GXSystemPromptFor(harness.Codex)+" "+harness.GXNoteSentence(opts.NoteFile))
+	launch := h.Launch(opts)
+	if !slices.Contains(launch.Args, want) {
+		t.Errorf("Launch args = %q, want %q", launch.Args, want)
+	}
+	if strings.Contains(want, `\n`) {
+		t.Errorf("value has a newline: %q", want)
+	}
+	resume, _ := h.Resume("abc", opts)
+	if strings.Contains(strings.Join(resume.Args, " "), "developer_instructions") {
+		t.Errorf("Resume args = %q, want no developer_instructions", resume.Args)
+	}
+}
+
 func TestCodexHarness_FilesOnlyLaunchCarriesTheSentenceAndResumeNothing(t *testing.T) {
 	t.Parallel()
 	h, err := harness.Lookup(harness.Codex)

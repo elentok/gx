@@ -58,6 +58,10 @@ type StartOptions struct {
 	// starting a new one; the session keeps that id. Only the pty runner
 	// resumes: headless, herdr and Codex ignore it and cold-start.
 	ResumeSessionID string
+	// NoteFile is the launch note file a fresh Codex agent is told to read, by
+	// a sentence in its developer instructions. Claude gets its note through
+	// the prompt file in Args instead.
+	NoteFile string
 }
 
 type Status struct {

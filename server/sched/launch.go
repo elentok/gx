@@ -158,19 +158,14 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 	ctx := one.Context
 	args := agent.AgentArgs(agentKind, cwd, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...)
 	args = harness.WritableDirectoryArgs(agentrunner.Kind(agentKind), args, l.Projects.AgentsConfig(ticket.Project).WritableDirectories, deps.SessionHomes.Claude, cwd)
-	// Claude gets the note through a file; Codex keeps it in the typed prompt
-	// until its own launch-note ticket lands.
 	prompt := srvrecovery.LaunchPrompt(agentKind, srvrecovery.LaunchSkill(t), ticket.String())
-	note := launchNote(t, cwd)
-	if agentKind == agent.AgentCodex {
-		if note != "" {
-			prompt += "\n\n" + note
-		}
-	} else {
-		var err error
-		if args, err = l.applyLaunchNote(ticket, note, args); err != nil {
-			return runs.Run{}, err
-		}
+	args, noteFile, err := l.applyLaunchNote(ticket, launchNote(t, cwd), agentKind == agent.AgentCodex, args)
+	if err != nil {
+		return runs.Run{}, err
+	}
+	if resumeID != "" {
+		// A resumed Codex keeps the sentence it was first launched with.
+		noteFile = ""
 	}
 	start := func() (agentrunner.Session, error) {
 		l.setLaunchStep(ticket.String(), runs.StepStartingAgent)
@@ -183,6 +178,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 			Args:            args,
 			Env:             agentEnv(l.Settings.Load().TabEnv, t, ticket, agentKind),
 			ResumeSessionID: resumeID,
+			NoteFile:        noteFile,
 		}, prompt, startprompt.Hooks{
 			OnNudge: func(attempt int, decision string) {
 				l.LogEvent(ticket, runlog.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})

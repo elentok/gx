@@ -153,7 +153,12 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 			}
 		}
 	}
-	agent, err := r.CLI.AgentStart(herdr.AgentStartOptions{Name: opts.Label, Kind: string(opts.Kind), Pane: tab.RootPaneID, AgentArgs: opts.Args})
+	agentArgs := opts.Args
+	if opts.Kind == harness.Codex && opts.NoteFile != "" {
+		// herdr Codex agents get no loop prompt, so the sentence travels alone.
+		agentArgs = append(slices.Clone(agentArgs), harness.CodexNoteArgs(opts.NoteFile)...)
+	}
+	agent, err := r.CLI.AgentStart(herdr.AgentStartOptions{Name: opts.Label, Kind: string(opts.Kind), Pane: tab.RootPaneID, AgentArgs: agentArgs})
 	adopted := false
 	if err != nil {
 		recovery, err := RecoverStart(err, opts.Label, opts.Cwd, tab.RootPaneID, !opts.NoAdopt, r.CLI.AgentExplain, r.CLI.AgentSendKeys)

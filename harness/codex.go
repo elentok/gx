@@ -135,8 +135,17 @@ func (codexHarness) Launch(opts LaunchOptions) Command {
 	if opts.FilesOnly {
 		prompt = GXFilesSentence
 	}
+	if opts.NoteFile != "" {
+		prompt += " " + GXNoteSentence(opts.NoteFile)
+	}
 	args = append(args, "-c", "developer_instructions="+tomlString(prompt))
 	return codexCommand(args, opts.Env)
+}
+
+// CodexNoteArgs is the Codex args that carry the launch note sentence alone,
+// for a runner that sets no loop prompt of its own (herdr).
+func CodexNoteArgs(noteFile string) []string {
+	return []string{"-c", "developer_instructions=" + tomlString(GXNoteSentence(noteFile))}
 }
 
 // Resume takes no rollout check: the caller verifies the rollout exists.

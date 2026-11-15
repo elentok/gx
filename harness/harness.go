@@ -41,6 +41,9 @@ type LaunchOptions struct {
 	// FilesOnly gives a fresh Codex launch the files sentence alone instead of
 	// the loop prompt. Zero value keeps the loop prompt.
 	FilesOnly bool
+	// NoteFile is the launch note file a fresh Codex launch is told to read:
+	// its sentence follows the prompt. Empty adds nothing. Resume ignores it.
+	NoteFile string
 }
 
 // Command is what to run for a session.

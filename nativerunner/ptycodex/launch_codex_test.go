@@ -11,8 +11,61 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/testutil/agentfake/codex"
 )
+
+const testNoteFile = "/store/e/launch/01-note.md"
+
+// launchedInstructions starts a Codex session with opts and returns the
+// developer_instructions value of its recorded launch argv ("" when absent).
+func launchedInstructions(t *testing.T, noteFile string) string {
+	t.Helper()
+	p, home := codexRunner(t)
+	s, err := p.Start(agentrunner.StartOptions{
+		Label: "e-01", Epic: "e", Cwd: realDir(t), Kind: gxharness.Codex,
+		Args:     gxharness.CodexArgs(gxharness.CodexArgsInput{}),
+		NoteFile: noteFile,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = p.Stop(s) })
+	st, err := p.Wait(s, []agentrunner.State{agentrunner.StateIdle}, 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	launches, err := codex.ReadCodexLaunches(home, st.SessionID)
+	if err != nil || len(launches) != 1 {
+		t.Fatalf("launches = %v, %v; want one", launches, err)
+	}
+	for i, a := range launches[0] {
+		if i > 0 && launches[0][i-1] == "-c" && strings.HasPrefix(a, "developer_instructions=") {
+			return strings.TrimPrefix(a, "developer_instructions=")
+		}
+	}
+	return ""
+}
+
+func TestPtyCodex_NoteFileSentenceFollowsTheLoopPrompt(t *testing.T) {
+	t.Parallel()
+	got := launchedInstructions(t, testNoteFile)
+	want := `"` + gxharness.GXSystemPromptFor(gxharness.Codex) + " " + gxharness.GXNoteSentence(testNoteFile) + `"`
+	if got != want {
+		t.Errorf("developer_instructions = %s; want %s", got, want)
+	}
+	if strings.Contains(got, "\n") {
+		t.Errorf("developer_instructions has a newline: %q", got)
+	}
+}
+
+func TestPtyCodex_NoNoteKeepsTheLoopPromptAlone(t *testing.T) {
+	t.Parallel()
+	got := launchedInstructions(t, "")
+	if want := `"` + gxharness.GXSystemPromptFor(gxharness.Codex) + `"`; got != want {
+		t.Errorf("developer_instructions = %s; want %s", got, want)
+	}
+}
 
 func TestPtyCodex_LaunchPromptIsDeliveredByTheRolloutsUserRecord(t *testing.T) {
 	t.Parallel()
