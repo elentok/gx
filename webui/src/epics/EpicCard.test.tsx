@@ -481,6 +481,60 @@ test.each([undefined, "#/triage/gx"])(
   },
 )
 
+const writeCard = (actions: EpicListRow["actions"]) =>
+  followUps({
+    section: "designing",
+    state_pill: "Write",
+    reason: "52 of 84 written",
+    ring_progress: 85,
+    actions,
+  })
+
+test("a Write card shows Retry failed small and secondary left of the main Continue", () => {
+  const retry = { kind: "open", label: "Retry failed (2)", target: "gx", link: "#/triage/gx" }
+  const cont = { kind: "continue", label: "Continue", target: "gx" }
+  const navigate = vi.fn()
+  const openTriage = vi.fn()
+  renderThemed(<EpicCard row={writeCard([retry, cont])} writes={{ navigate, openTriage }} />)
+  expect(text(screen.getByTestId("pill"))).toBe("Write")
+  expect(screen.getByText("52 of 84 written")).toBeTruthy()
+  expect(screen.getByText("85%")).toBeTruthy()
+  const buttons = screen.getAllByRole("button").filter((b) => /Retry|Continue/.test(text(b)))
+  expect(buttons.map(text)).toEqual(["Retry failed (2)", "Continue"])
+  expect(buttons[0].getAttribute("data-emphasis")).toBe("secondary")
+  expect(buttons[1].getAttribute("data-emphasis")).toBe("main")
+  fireEvent.click(buttons[0])
+  expect(navigate).toHaveBeenCalledWith("#/triage/gx")
+  expect(openTriage).not.toHaveBeenCalled()
+})
+
+test("a Write card without failed rows shows only Continue", () => {
+  renderThemed(
+    <EpicCard row={writeCard([{ kind: "continue", label: "Continue", target: "gx" }])} />,
+  )
+  expect(screen.queryByRole("button", { name: /Retry failed/ })).toBeNull()
+  expect(screen.getByRole("button", { name: "Continue" })).toBeTruthy()
+})
+
+test("Queue on a Done Follow-ups card queues the ready epic once and refetches", async () => {
+  const queue = vi.fn().mockResolvedValue({})
+  const onChanged = vi.fn()
+  const done = followUps({
+    state_pill: "Done",
+    reason: "39 ready to queue",
+    ring_progress: 100,
+    actions: [{ kind: "queue", label: "Queue", target: "gx:ready" }],
+  })
+  renderThemed(<EpicCard row={done} writes={{ queue }} onChanged={onChanged} />)
+  expect(text(screen.getByTestId("pill"))).toBe("Done")
+  expect(screen.getByText("100%")).toBeTruthy()
+  fireEvent.click(screen.getByRole("button", { name: "Queue" }))
+  await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1))
+  expect(queue).toHaveBeenCalledTimes(1)
+  expect(queue.mock.calls[0][0].address).toBe("gx:ready")
+  expect(followUpsTone(done)).toBe("running")
+})
+
 test("the ring of a Follow-ups Needs you card stays running while the pill is amber", () => {
   const row = followUps({ section: "needs-you", state_pill: "Needs you" })
   expect(ringTone(row)).toBe("running")

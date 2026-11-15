@@ -149,9 +149,12 @@ function ActionButtons({
   const startTriage = (project: string) =>
     run(() => openTriage({ epic: project }), { onDone: () => navigate(triageHref(project)) })
 
+  const mainIndex = row.card_kind === CardKindFollowUps ? footerActions(row).length - 1 : 0
+
   function button(a: CardAction, i: number) {
     const target = a.target ?? row.address
-    const emphasis = i === 0 ? "main" : "secondary"
+    // On a Follow-ups card the step button is last, with Retry failed small beside it.
+    const emphasis = i === mainIndex ? "main" : "secondary"
     if (a.kind === CardActionOpenPR) {
       return (
         <Button
