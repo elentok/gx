@@ -51,6 +51,9 @@ export interface SectionGroup {
   changed: number
 }
 
+/** Identity keys (a project's name and repo) never count: nobody edits them, yet the server marks them set. */
+export const isChanged = (e: SettingsEntry) => e.set && !e.identity
+
 /** Groups entries by section, sections and entries keeping the order the server sent. */
 export function groupBySection(entries: SettingsEntry[]): SectionGroup[] {
   const groups = new Map<string, SectionGroup>()
@@ -61,7 +64,7 @@ export function groupBySection(entries: SettingsEntry[]): SectionGroup[] {
       groups.set(e.section, g)
     }
     g.entries.push(e)
-    if (e.set) g.changed++
+    if (isChanged(e)) g.changed++
   }
   return [...groups.values()]
 }

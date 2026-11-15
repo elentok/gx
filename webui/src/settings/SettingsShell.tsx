@@ -8,7 +8,7 @@ import { PageIcon } from "../page/PageIcon"
 import { EmptyState } from "../ui/empty-state/EmptyState"
 import { useDevice } from "../useWide"
 import { Chip } from "../ui/chip/Chip"
-import { entryLabel, groupBySection, searchEntries, treeSections } from "./settingsApi"
+import { entryLabel, groupBySection, isChanged, searchEntries, treeSections } from "./settingsApi"
 import { CountChip, Group, GroupBlock, SearchBox } from "./parts"
 import { DEV_FRONTEND_KEY } from "../dev"
 import { DevFrontendRow } from "./DevFrontendRow"
@@ -328,7 +328,7 @@ export function SectionBody({
         g.name === "" ? (
           <Group key="">{g.entries.map(row)}</Group>
         ) : (
-          <GroupBlock key={g.name} title={g.name} changed={g.entries.filter((e) => e.set).length}>
+          <GroupBlock key={g.name} title={g.name} changed={g.entries.filter(isChanged).length}>
             {g.table ? (
               <ModelsTable agent={g.name} entries={g.entries} project={project} onWrite={onWrite} />
             ) : (

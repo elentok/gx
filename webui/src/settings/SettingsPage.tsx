@@ -169,12 +169,7 @@ export function SettingsHomeView({
 }) {
   const [query, setQuery] = useState("")
   const searching = query.trim() !== ""
-  const changed = new Map(
-    groupBySection(entries).map((g) => [
-      g.section,
-      g.entries.some((e) => e.identity) ? 0 : g.changed,
-    ]),
-  )
+  const changed = new Map(groupBySection(entries).map((g) => [g.section, g.changed]))
   const hits = searchEntries(entries, query)
   return (
     <Frame>

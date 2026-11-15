@@ -332,7 +332,11 @@ describe("SettingsShellView in a project", () => {
     p("checks", "Checks", { type: "checks", category: "Checks" }),
   ]
 
-  const renderProject = (section?: string, onWrite = vi.fn(async () => ({}))) => ({
+  const renderProject = (
+    section?: string,
+    onWrite = vi.fn(async () => ({})),
+    shown = projectEntries,
+  ) => ({
     onWrite,
     ...renderThemed(
       <MemoryRouter initialEntries={["/settings"]}>
@@ -341,8 +345,8 @@ describe("SettingsShellView in a project", () => {
             path="*"
             element={
               <SettingsShellView
-                entries={projectEntries}
-                categories={treeFromEntries(projectEntries)}
+                entries={shown}
+                categories={treeFromEntries(shown)}
                 projects={["gx"]}
                 project="gx"
                 section={section}
@@ -370,6 +374,15 @@ describe("SettingsShellView in a project", () => {
     const { getByRole } = renderProject("Project")
     expect(getByRole("link", { name: /^Project\s*2$/ })).toBeTruthy()
     expect(getByRole("button", { name: /Ralph loop\s*1$/ })).toBeTruthy()
+  })
+
+  it("shows no chip on the Repository group or the Project entry for set identity keys", () => {
+    const shown = projectEntries
+      .filter((e) => e.key !== "trunk" && e.key !== "landing")
+      .map((e) => (e.identity ? { ...e, set: true } : e))
+    const { getByRole, getByTestId } = renderProject("Project", undefined, shown)
+    expect(getByRole("link", { name: /^Project$/ })).toBeTruthy()
+    expect(getByTestId("group-Repository").textContent).not.toMatch(/\d+\s*$/)
   })
 
   it("shows the Repository group as read-only text with no control", () => {

@@ -72,6 +72,15 @@ test("groups entries by section in the order sent and counts the keys the file h
   ])
 })
 
+test("identity entries never count as changed", () => {
+  const groups = groupBySection([
+    { ...entry("name", "Project", true), identity: true },
+    { ...entry("repo", "Project", true), identity: true },
+    entry("budget", "Project", true),
+  ])
+  expect(groups.map((g) => g.changed)).toEqual([1])
+})
+
 test("search matches name, key path and description case-insensitively; blank matches nothing", () => {
   const es = [
     {
