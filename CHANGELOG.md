@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.51.1 - 2026-11-15
+
+- Added an inline vi mode to the prompt box. It has a mode pill and mode rules, Cmd-G hands the text to the large editor and back, and Esc rules cover every host (chat, Questions view, modal). A big prompt box chord is documented. Two bugs found by the new e2e flows are fixed: a hook-order crash when vi turned off, and the returning textarea taking focus from the large editor.
+- Added Restore on the Agents page for crashed and ended chats. The composer hint now reads "Exited. Restore it to send." The web Restore route works on any non-Queue session, not only design sessions, and no longer fails with "is not a stepped session".
+- Changed the "area" epic kind to "backlog". A migration rewrites existing `kind: area` epics, archive included.
+- Changed a Designing card to show as Working with a spinning ring while a subagent runs.
+- Fixed a pinned chat falling behind as its content grows. Streamed text, images and window resizes now keep it at the bottom, and only an upward scroll counts as leaving.
+- Fixed the lagging-alias note so it shows under a Models table.
+
 ## v0.51.0 - 2026-11-15
 
 - Added a model switch for idle chats. You can switch the model and effort from a picker (leader `m`) or from a footer popover that turns red when the model is outdated and offers a one-click switch. The picker warns about token cost and shows the matching tiers. gx shows switch progress and a failed switch in the chat, cancels a countdown on a switch, and rolls back a switch when the agent exits or the first message gets `model_not_found` (Claude and Codex). A restart in the middle of a switch keeps the old record. A hand switch is recorded and used in launch args, the session menu and the handoff.
