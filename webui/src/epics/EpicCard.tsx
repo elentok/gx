@@ -60,6 +60,7 @@ import {
   isReadyForReview,
   followUpsTone,
   needsYouTone,
+  ringArc,
   ringProgress,
   ringTone,
 } from "./ring"
@@ -318,6 +319,7 @@ export function EpicCard({
         <ProgressRing
           progress={ringProgress(row)}
           tone={ringTone(row)}
+          arc={ringArc(row)}
           kind={kind}
           label={ringLabel(row)}
           live={isLive(row)}

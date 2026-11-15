@@ -4,7 +4,7 @@ import { VerdictConcurrencyCap, type EpicListRow } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { toaster } from "../ui/toaster"
 import { EpicCard } from "./EpicCard"
-import { followUpsTone, ringTone } from "./ring"
+import { followUpsTone, ringArc, ringTone } from "./ring"
 
 afterEach(() => {
   cleanup()
@@ -623,6 +623,14 @@ test("a Follow-ups Needs you pill stays amber but a step pill does not", () => {
 test("the ring of a Follow-ups card is running with a pill and muted without", () => {
   expect(ringTone(followUps({ state_pill: "Route" }))).toBe("running")
   expect(ringTone(followUps({ state: "idle", state_pill: undefined }))).toBe("muted")
+})
+
+test("a Follow-ups card draws a teal arc at Write and Done, other cards keep their tone", () => {
+  const teal = "kind.implementation.fg"
+  expect(ringArc(followUps({ state_pill: "Write" }))).toBe(teal)
+  expect(ringArc(followUps({ state: "finished", state_pill: undefined }))).toBe(teal)
+  expect(ringArc(followUps({ state: "idle", state_pill: undefined }))).toBeUndefined()
+  expect(ringArc(row({ state: "finished" }))).toBeUndefined()
 })
 
 test("the Follow-ups title links to the Triage page and the ring shows the percent", () => {

@@ -52,6 +52,12 @@ export function ringTone(row: EpicListRow): Tone {
   return isLive(row) ? "running" : "muted"
 }
 
+/** The mock draws a Follow-ups card's arc teal (the implementation colour) at Write and Done too. */
+export const ringArc = (row: EpicListRow): string | undefined =>
+  row.card_kind === CardKindFollowUps && ringTone(row) !== "muted"
+    ? "kind.implementation.fg"
+    : undefined
+
 export const isCreatingTickets = (row: EpicListRow) =>
   row.status_words?.startsWith("Creating tickets") ?? false
 
