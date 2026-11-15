@@ -47,12 +47,11 @@ test.describe("199. Triage journey", () => {
     ])
     await expect(step(page, "verify", "current")).toBeVisible()
 
-    // Route: the summary card appears, round 1 waits with the new-area card first and three
-    // options, and a typed correction changes the summary lines.
+    // Route: round 1 waits with the new-area card first and three options. The plan summary is
+    // hidden at Questions (mock 06).
     await start("triage", { shape: "route" })
     await openTriage(page)
-    const summary = page.getByRole("region", nav("Plan summary"))
-    await expect(summary).toBeVisible()
+    await expect(page.getByRole("region", nav("Plan summary"))).toHaveCount(0)
     await expect(step(page, "questions", "current")).toBeVisible()
     await expect(page.getByText(/^Round 1 of 3/)).toBeVisible()
     const round = questionsOf(page)
@@ -60,9 +59,6 @@ test.describe("199. Triage journey", () => {
     await expect(round.getByRole("button", { name: /^Create tooling/ })).toBeVisible()
     await expect(round.getByRole("button", { name: /^File under parser/ })).toBeVisible()
     await expect(round.getByRole("button", { name: /^Keep for later/ })).toBeVisible()
-    await expect(summary.getByRole("button", { name: /^2\s*Ready/ })).toBeVisible()
-    await tell(page, "Move row 3 to ready")
-    await expect(summary.getByRole("button", { name: /^3\s*Ready/ })).toBeVisible()
 
     // No area seeded: the new-area card has two options.
     await start("triage", { shape: "route-no-area" })
@@ -146,7 +142,7 @@ test.describe("199. Triage journey", () => {
     // Route chains into Questions on its own, and the page waits there: no countdown, the session
     // idle and still alive.
     await expect(step(page, "questions", "current")).toBeVisible()
-    await expect(page.getByRole("region", nav("Plan summary"))).toBeVisible()
+    await expect(page.getByRole("region", nav("Plan summary"))).toHaveCount(0)
     await expect(page.getByText(/Triage session running/)).toHaveCount(0)
     await expect(page.getByText(/Continuing in/)).toHaveCount(0)
     await expect(

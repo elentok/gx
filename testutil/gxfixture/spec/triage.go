@@ -187,8 +187,8 @@ func TriageScenario(shape string) (Scenario, bool) {
 	case "verify":
 		return with(func(sc *Scenario) {
 			sc.Epics = []Epic{followUps(project, 30, 15)}
-			// One row per session leaves the rest pending, so the page stays at Verify.
-			sc.TriageAgent = &triageplay.Config{VerifyBatch: 1}
+			// One row per session leaves the rest pending, so the page stays at Verify. The session waits on the hold, so the page is read while Verify is working.
+			sc.TriageAgent = &triageplay.Config{VerifyBatch: 1, HoldAtStep: true}
 			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) {
 				for i := range rec.Rows[:31] {
 					rec.Rows[i].Verdict = triage.VerdictRelevant

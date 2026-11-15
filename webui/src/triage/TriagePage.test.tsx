@@ -406,7 +406,15 @@ test("a printed round shows the answered cards folded, the open card, the round 
       kind: "ok",
       detail: {
         conversation_id: "c1",
-        messages: [],
+        messages: [
+          {
+            id: "m1",
+            role: "agent",
+            kind: "text",
+            text: "I need your call on 5 things.\n\n❓ **Q1** - **Title 1**: Body 1?",
+            at: "",
+          },
+        ],
         questions: roundCards(cards as never),
         background: [],
       } as never,
@@ -423,6 +431,9 @@ test("a printed round shows the answered cards folded, the open card, the round 
   expect(document.querySelector("[data-part=answered-question]")?.textContent).toContain(
     "Q1 Title 1 → Alpha",
   )
+  // The printed question lines are the card's source, not chat text.
+  expect(screen.getByText("I need your call on 5 things.")).toBeTruthy()
+  expect(screen.queryByText(/Body 1\?/)).toBeNull()
   expect(screen.getByText("Question 4 of 5")).toBeTruthy()
   expect(screen.getByText("Title 4")).toBeTruthy()
   expect(screen.getByText("Body 4?")).toBeTruthy()

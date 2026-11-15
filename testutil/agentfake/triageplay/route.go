@@ -306,7 +306,8 @@ func questionCard(rec *triage.Record, n int, q triage.Question) string {
 	block = append(block, "options:")
 	block = append(block, opts...)
 	block = append(block, "```")
-	return fmt.Sprintf("%s%d** - **%s**: %s\n\n%s", grillround.Marker, n, titleOf(rec, q.RowID), q.Text, strings.Join(block, "\n"))
+	// The card's bold title is the question; the hint line names the row it is about.
+	return fmt.Sprintf("%s%d** - **%s**: Asked about %s\n\n%s", grillround.Marker, n, q.Text, titleOf(rec, q.RowID), strings.Join(block, "\n"))
 }
 
 // finalCard is the summary, the decided list and the one-question final round

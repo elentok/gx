@@ -289,6 +289,7 @@ function ChatBody({
         {!questions && (
           <ChatMessages
             chat={chat}
+            top={foldAnswered}
             head={logTop}
             tail={
               foldAnswered && hasRound ? (

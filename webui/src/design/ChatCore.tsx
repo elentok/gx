@@ -136,10 +136,13 @@ function Entry({
   m,
   showTools,
   sessionId,
+  hideAsks,
 }: {
   m: SessionChatMessage
   showTools: boolean
   sessionId: string
+  /** Drops the `❓ Q1 ...` lines: the docked round card shows them. */
+  hideAsks?: boolean
 }) {
   if (m.kind === "compacted") return <Separator>Context compacted</Separator>
   if (m.kind === "interrupted") return <Separator>Turn interrupted</Separator>
@@ -190,8 +193,15 @@ function Entry({
     )
   }
   if (m.kind === "output") return <CommandOutput text={m.text} />
-  return <Markdown fontSize="base">{m.text}</Markdown>
+  const text = hideAsks ? withoutAsks(m.text) : m.text
+  return text ? <Markdown fontSize="base">{text}</Markdown> : null
 }
+
+const withoutAsks = (text: string) =>
+  text
+    .split(/\n{2,}/)
+    .filter((part) => !part.startsWith("❓"))
+    .join("\n\n")
 
 // A run of tool calls, folded: the count in the summary, one line per call (shell commands, files) when opened.
 function ToolCalls({ m }: { m: SessionChatMessage }) {
@@ -364,10 +374,13 @@ export function WorkingRow({
 function ChatScroller({
   children,
   signal,
+  top,
 }: {
   children: ReactNode
   /** Changes whenever the content grows. */
   signal: unknown
+  /** A short chat sits at the top instead of the bottom. */
+  top?: boolean
 }) {
   const el = useRef<HTMLDivElement>(null)
   const stuck = useRef(true)
@@ -393,7 +406,7 @@ function ChatScroller({
       }}
     >
       {/* A short chat sits at the bottom, next to the composer; the spacer shrinks away once the chat scrolls. */}
-      <Box flex="1" aria-hidden />
+      {!top && <Box flex="1" aria-hidden />}
       {children}
     </Box>
   )
@@ -464,8 +477,11 @@ export function ChatMessages({
   head,
   session,
   tail,
+  top,
 }: {
   chat: SessionChatResponse
+  /** A short chat sits at the top (the Triage page), not next to the composer. */
+  top?: boolean
   /** The first entry of the log, above the messages. */
   head?: ReactNode
   /** Its model-switch phase ends the log as one system line. */
@@ -495,6 +511,7 @@ export function ChatMessages({
   return (
     <ChatScroller
       key={conversationId}
+      top={top}
       signal={`${messages.length}|${chat.background.length}|${busy}`}
     >
       {head}
@@ -511,7 +528,7 @@ export function ChatMessages({
         </Text>
       )}
       {messages.map((m, i) => (
-        <Entry key={m.id || i} m={m} showTools={showTools} sessionId={sessionId} />
+        <Entry key={m.id || i} m={m} showTools={showTools} sessionId={sessionId} hideAsks={top} />
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
       {tail}
