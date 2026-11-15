@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/server/devvite"
@@ -269,4 +270,7 @@ type Config struct {
 	// CommandListAge is how long a command list is served from the cache;
 	// zero means commandlist.DefaultMaxAge.
 	CommandListAge time.Duration
+	// Models is the model-list cache; nil builds the real one, which runs the
+	// real harness binaries. Tests set one with fake probes.
+	Models *commandlist.ModelCache
 }

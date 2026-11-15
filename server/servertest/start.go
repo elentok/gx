@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
@@ -107,6 +108,11 @@ func startWith(t *testing.T, store string, herdrDown bool, opts ...func(*server.
 	// The herdr runner's wait N defaults to 5s, which every launch's slash
 	// command prompt would sit out: the fake agent starts no turn.
 	h.cfg.RunnerWait = 100 * time.Millisecond
+	// No server test reads the real harness binaries for model lists.
+	noModels := func(context.Context, string, []string) ([]commandlist.Model, error) {
+		return []commandlist.Model{}, nil
+	}
+	h.cfg.Models = commandlist.NewModelCache(commandlist.ModelCacheDeps{Claude: noModels, Codex: noModels})
 	// The server's env is the process env plus the fake herdr, a poisoned home
 	// and a clean config dir of its own, so code that reads HOME where it should
 	// read CLAUDE_CONFIG_DIR trips the canary. The merge locks go under the
