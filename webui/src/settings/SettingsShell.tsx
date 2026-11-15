@@ -83,14 +83,26 @@ function Sidebar({
   query,
   onQuery,
 }: ShellProps & { query: string; onQuery: (q: string) => void }) {
-  const changed = new Map(groupBySection(entries).map((g) => [g.section, g.changed]))
+  const searching = query.trim() !== ""
+  // While searching, the chips count hits and only sections with hits are listed.
+  const counts = new Map(
+    searching
+      ? groupBySection(searchEntries(entries, query)).map((g) => [g.section, g.entries.length])
+      : groupBySection(entries).map((g) => [g.section, g.changed]),
+  )
+  const changed = counts
+  const shown = searching
+    ? categories
+        .map((c) => ({ ...c, sections: c.sections.filter((s) => (counts.get(s.name) ?? 0) > 0) }))
+        .filter((c) => c.sections.length > 0)
+    : categories
   const current = treeSections(categories).find((s) => s.name === section)?.category
   // A click's choice wins over the default (only the current category open) until the section changes.
   const [toggled, setToggled] = useState<Record<string, boolean>>({})
   useEffect(() => {
     if (current !== undefined) setToggled((t) => ({ ...t, [current]: true }))
   }, [current, section])
-  const isOpen = (name: string) => toggled[name] ?? name === current
+  const isOpen = (name: string) => searching || (toggled[name] ?? name === current)
   const toggle = (name: string) => setToggled((t) => ({ ...t, [name]: !isOpen(name) }))
   const heading = (name: string, count: number) => (
     <chakra.button
@@ -109,7 +121,7 @@ function Sidebar({
         <Caret open={isOpen(name)} />
         {name}
       </span>
-      {!isOpen(name) && count > 0 && <CountChip n={count} />}
+      {(searching || !isOpen(name)) && count > 0 && <CountChip n={count} />}
     </chakra.button>
   )
   return (
@@ -136,7 +148,7 @@ function Sidebar({
         ))}
       </chakra.select>
       <SearchBox value={query} onChange={onQuery} />
-      {categories.map((c) => (
+      {shown.map((c) => (
         <Fragment key={c.name}>
           {heading(
             c.name,
@@ -161,7 +173,7 @@ function Sidebar({
             ))}
         </Fragment>
       ))}
-      {project === undefined && (
+      {project === undefined && !searching && (
         <>
           {heading(ACCOUNT, 0)}
           {isOpen(ACCOUNT) && (
@@ -221,11 +233,11 @@ const IdentityRow = ({ entry }: { entry: SettingsEntry }) => (
   </Box>
 )
 
-type RowProps = Pick<ShellProps, "project" | "pendingRestart" | "onWrite">
+type RowProps = Pick<ShellProps, "project" | "pendingRestart" | "onWrite"> & { highlight?: string }
 
 /** Builds one row per entry; the dev-frontend key gets its wrapper, which supplies the lock reason. */
 const rowBuilder =
-  ({ pendingRestart, onWrite, project }: RowProps) =>
+  ({ pendingRestart, onWrite, project, highlight }: RowProps) =>
   (e: SettingsEntry) => {
     const Row = e.key === DEV_FRONTEND_KEY ? DevFrontendRow : SettingsRow
     return (
@@ -235,6 +247,7 @@ const rowBuilder =
         pendingRestart={pendingRestart?.includes(e.key) ?? false}
         onWrite={onWrite}
         project={project}
+        highlight={highlight}
       />
     )
   }
@@ -332,7 +345,6 @@ export function SettingsShellView(props: ShellProps) {
   const sections = treeSections(props.categories)
   const section = props.section ?? sections[0]?.name ?? ""
   const category = sections.find((s) => s.name === section)?.category
-  const row = rowBuilder(props)
   const hits = searchEntries(props.entries, query)
   const scopeName = props.project === undefined ? "global settings" : `project ${props.project}`
   return (
@@ -349,7 +361,16 @@ export function SettingsShellView(props: ShellProps) {
             {category}
           </Text>
         )}
-        <PageHeader title={searching ? "Search" : section} icon={<PageIcon kind="settings" />} />
+        <PageHeader
+          title={
+            searching && hits.length > 0
+              ? `${hits.length} results for "${query.trim()}"`
+              : searching
+                ? "Search"
+                : section
+          }
+          icon={<PageIcon kind="settings" />}
+        />
         {!searching && <SectionBody {...props} section={section} />}
         {searching && hits.length === 0 && (
           <EmptyState title="No settings match">
@@ -357,25 +378,55 @@ export function SettingsShellView(props: ShellProps) {
           </EmptyState>
         )}
         {searching && hits.length > 0 && (
-          <>
-            <Text
-              mt="4"
-              fontSize="xs"
-              letterSpacing="0.08em"
-              textTransform="uppercase"
-              color="text.muted"
-              px="3"
-            >
-              {hits.length} {hits.length === 1 ? "match" : "matches"} in {scopeName}
-            </Text>
-            {groupBySection(hits).map((g) => (
-              <Group key={g.section} label={g.section}>
-                {g.entries.map(row)}
-              </Group>
-            ))}
-          </>
+          <SearchResults {...props} hits={hits} query={query.trim()} />
         )}
       </Box>
     </Box>
+  )
+}
+
+/** Every hit, split by section (with its category as a breadcrumb) and then by group. Hits are ordinary rows, so Models keys are not tables. */
+function SearchResults({
+  hits,
+  query,
+  categories,
+  ...rest
+}: ShellProps & { hits: SettingsEntry[]; query: string }) {
+  const row = rowBuilder({ ...rest, highlight: query })
+  const categoryOf = new Map(treeSections(categories).map((s) => [s.name, s.category]))
+  return (
+    <>
+      {groupBySection(hits).map((g) => (
+        <Box key={g.section} mt="6" data-testid={`result-section-${g.section}`}>
+          <Box display="flex" alignItems="baseline" gap="2" px="1">
+            <Text as="h2" fontSize="md" fontWeight="700">
+              {g.section}
+            </Text>
+            <Text fontSize="xs" color="text.muted">
+              {categoryOf.get(g.section)}
+            </Text>
+          </Box>
+          {sectionGroups(categories, g.section, g.entries).map((grp) => (
+            <Box key={grp.name} mt="3">
+              {grp.name !== "" && (
+                <Text
+                  as="h3"
+                  fontSize="xs"
+                  letterSpacing="0.06em"
+                  textTransform="uppercase"
+                  color="text.muted"
+                  fontWeight="600"
+                  mb="1.5"
+                  px="1"
+                >
+                  {grp.name}
+                </Text>
+              )}
+              <Group>{grp.entries.map(row)}</Group>
+            </Box>
+          ))}
+        </Box>
+      ))}
+    </>
   )
 }

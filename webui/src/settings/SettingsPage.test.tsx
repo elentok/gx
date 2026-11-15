@@ -757,10 +757,15 @@ describe("Models table", () => {
   })
 
   it("search shows Models keys as ordinary rows with the full key path", () => {
-    const { getByLabelText, queryByText, getAllByText } = render(models)
+    const { getByLabelText, queryByText, getAllByText, container } = render(models)
     fireEvent.change(getByLabelText("Search settings"), { target: { value: "light" } })
     expect(queryByText("agents.claude.light.*")).toBeNull()
-    expect(getAllByText("agents.claude.light.model").length).toBeGreaterThan(0)
+    // The match is split into a <mark>, so compare whole-element text.
+    const keyPaths = getAllByText(
+      (_, el) => el?.tagName === "P" && el.textContent === "agents.claude.light.model",
+    )
+    expect(keyPaths.length).toBeGreaterThan(0)
+    expect(container.querySelector("table")).toBeNull()
   })
 
   describe("in a project", () => {

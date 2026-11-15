@@ -217,29 +217,64 @@ describe("SettingsShellView", () => {
     const type = (getByLabelText: (s: string) => HTMLElement, v: string) =>
       fireEvent.change(getByLabelText("Search settings"), { target: { value: v } })
 
+    // The match is split into a <mark>, so compare whole-element text.
+    const keyPath = (key: string) => (_: string, el: Element | null) =>
+      el?.tagName === "P" && el.textContent === key
+
     it("finds a key by name, key path or description word", () => {
       const { getByLabelText, getByText, queryByText } = renderShell("Budget")
       type(getByLabelText, "max agents")
-      expect(getByText("execution-queue.max-agents")).toBeTruthy()
+      expect(getByText(keyPath("execution-queue.max-agents"))).toBeTruthy()
       type(getByLabelText, "BUDGET.SOFT")
-      expect(getByText("budget.soft")).toBeTruthy()
-      expect(queryByText("execution-queue.max-agents")).toBeNull()
+      expect(getByText(keyPath("budget.soft"))).toBeTruthy()
+      expect(queryByText(keyPath("execution-queue.max-agents"))).toBeNull()
       type(getByLabelText, "scratch")
-      expect(getByText("scratch.thing")).toBeTruthy()
+      expect(getByText(keyPath("scratch.thing"))).toBeTruthy()
     })
 
-    it("groups hits under section headings, replaces the page, and clearing returns to the section", () => {
+    it("replaces the page with a counted heading, groups hits by section and group, and clearing restores the section", () => {
       const { container, getByLabelText, getByText, queryByText, getByRole } = renderShell("Budget")
       type(getByLabelText, "o")
-      expect(getByRole("heading", { name: "Search" })).toBeTruthy()
+      expect(getByRole("heading", { name: '3 results for "o"' })).toBeTruthy()
       const page = within(container.querySelector("[data-mock-part=page]") as HTMLElement)
-      expect(page.getByText("Execution queue")).toBeTruthy()
-      expect(page.getByText("Budget")).toBeTruthy()
-      expect(getByText("execution-queue.poll")).toBeTruthy()
+      expect(page.getByRole("heading", { level: 2, name: "Execution queue" })).toBeTruthy()
+      expect(page.getByRole("heading", { level: 2, name: "Budget" })).toBeTruthy()
+      expect(page.getAllByRole("heading", { level: 3, name: "Agent limits" })).toHaveLength(2)
+      // The category is a plain-text breadcrumb, not a heading.
+      expect(page.getAllByText("Ralph loop")).toHaveLength(2)
+      expect(page.queryByRole("heading", { name: "Ralph loop" })).toBeNull()
+      expect(page.getAllByTestId(/^result-section-/).map((s) => s.dataset.testid)).toEqual([
+        "result-section-Execution queue",
+        "result-section-Budget",
+      ])
       type(getByLabelText, "")
       expect(getByRole("heading", { name: "Budget" })).toBeTruthy()
       expect(queryByText("execution-queue.poll")).toBeNull()
       expect(getByText("budget.soft")).toBeTruthy()
+    })
+
+    it("highlights the match in the row name and key path", () => {
+      const { container, getByLabelText } = renderShell()
+      type(getByLabelText, "soft")
+      const marks = [...container.querySelectorAll("mark")].map((m) => m.textContent)
+      expect(marks.length).toBeGreaterThanOrEqual(2)
+      expect(new Set(marks.map((m) => m?.toLowerCase()))).toEqual(new Set(["soft"]))
+    })
+
+    it("shows hit counts in the sidebar, lists only categories with hits and restores it on clear", () => {
+      const { container, getByLabelText, getByRole, queryByRole } = renderShell("Budget")
+      const nav = within(container.querySelector("[data-mock-part=sidebar]") as HTMLElement)
+      type(getByLabelText, "scratch")
+      expect(queryByRole("button", { name: /Ralph loop/ })).toBeNull()
+      const cat = getByRole("button", { name: /Experiments/ })
+      expect(cat.getAttribute("aria-expanded")).toBe("true")
+      expect(cat.textContent).toContain("1")
+      expect(nav.getByRole("link", { name: /Scratch pad/ }).textContent).toContain("1")
+      type(getByLabelText, "")
+      expect(getByRole("button", { name: /Ralph loop/ })).toBeTruthy()
+      expect(getByRole("button", { name: /Experiments/ }).getAttribute("aria-expanded")).toBe(
+        "false",
+      )
     })
 
     it("shows an empty state when nothing matches", () => {

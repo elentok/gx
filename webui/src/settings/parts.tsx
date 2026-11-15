@@ -17,6 +17,26 @@ export const CountChip = ({ n, testId }: { n: number; testId?: string }) => (
   </chakra.span>
 )
 
+/** The text with each case-insensitive occurrence of the query wrapped in a <mark>. A blank query leaves it plain. */
+export function Highlight({ text, query }: { text: string; query?: string }) {
+  const q = query?.trim().toLowerCase() ?? ""
+  if (!q) return <>{text}</>
+  const parts: ReactNode[] = []
+  const lower = text.toLowerCase()
+  let from = 0
+  for (let at = lower.indexOf(q); at >= 0; at = lower.indexOf(q, from)) {
+    if (at > from) parts.push(text.slice(from, at))
+    parts.push(
+      <chakra.mark key={at} bg="tone.waiting.bg" color="inherit" borderRadius="2px">
+        {text.slice(at, at + q.length)}
+      </chakra.mark>,
+    )
+    from = at + q.length
+  }
+  parts.push(text.slice(from))
+  return <>{parts}</>
+}
+
 /** A section page block: a title bar with the changed-count chip (hidden at zero), then its rows. */
 export const GroupBlock = ({
   title,

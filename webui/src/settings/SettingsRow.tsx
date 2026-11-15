@@ -6,7 +6,7 @@ import { Chip } from "../ui/chip/Chip"
 import { Modal } from "../ui/modal/Modal"
 import { refusalText, useWrite } from "../useWrite"
 import { entryLabel, numberListHint, removeChange, setChange } from "./settingsApi"
-import { ChangedDot, inputProps, SaveStatus, Segmented, TagChip } from "./parts"
+import { ChangedDot, Highlight, inputProps, SaveStatus, Segmented, TagChip } from "./parts"
 
 function valueText(e: SettingsEntry): string {
   if (e.type === "secret") return e.set ? "Set" : "Not set"
@@ -352,6 +352,8 @@ export interface SettingsRowProps {
   project?: string
   /** Switches the control off and shows this reason beside it. */
   lockReason?: string
+  /** The active search query; its matches are highlighted in the name and key path. */
+  highlight?: string
 }
 
 export function SettingsRow({
@@ -360,6 +362,7 @@ export function SettingsRow({
   onWrite,
   project,
   lockReason,
+  highlight,
 }: SettingsRowProps) {
   const write = useWrite({ toastRefusal: false })
   const [draft, setDraft] = useState<string>()
@@ -412,7 +415,7 @@ export function SettingsRow({
       {/* No wrap: a long label wraps itself, so the reset link stays top-right on this row. */}
       <Box data-mock-part="title-row" display="flex" gap="2" alignItems="center">
         <Text fontWeight="600" minW="0">
-          {entryLabel(entry)}
+          <Highlight text={entryLabel(entry)} query={highlight} />
         </Text>
         {entry.set && entry.type !== "secret" && <ChangedDot />}
         {entry.risky && <Chip tone="waiting">Careful</Chip>}
@@ -516,7 +519,7 @@ export function SettingsRow({
         </Text>
       ))}
       <Text fontFamily="mono" fontSize="11px" color="text.dim">
-        {entry.key}
+        <Highlight text={entry.key} query={highlight} />
       </Text>
       {confirming && (
         <Modal
