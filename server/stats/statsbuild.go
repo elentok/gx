@@ -114,9 +114,11 @@ type statsBuilder struct {
 
 func (b *statsBuilder) addEpic(project string, e tickets.Epic) {
 	cost := b.impl
-	if e.IsArea {
-		// An area is no loop epic and no design: only its tickets count.
-	} else if e.IsMap {
+	switch {
+	case e.IsArea:
+		// An area is no loop epic and no design: its done tickets are neither
+		// merged nor costed.
+	case e.IsMap:
 		cost = b.design
 		cost.addMapRemainder(b.win, e)
 		b.addWaiting(e)
@@ -128,13 +130,15 @@ func (b *statsBuilder) addEpic(project string, e tickets.Epic) {
 				b.tp.DesignsCompleted[i]++
 			}
 		}
-	} else if i := b.win.Bucket(e.MergedAt); i >= 0 {
-		b.tp.EpicsMerged[i]++
-		if e.LinesAdded != nil {
-			b.tp.LinesAdded[i] += *e.LinesAdded
-		}
-		if e.LinesRemoved != nil {
-			b.tp.LinesRemoved[i] += *e.LinesRemoved
+	default:
+		if i := b.win.Bucket(e.MergedAt); i >= 0 {
+			b.tp.EpicsMerged[i]++
+			if e.LinesAdded != nil {
+				b.tp.LinesAdded[i] += *e.LinesAdded
+			}
+			if e.LinesRemoved != nil {
+				b.tp.LinesRemoved[i] += *e.LinesRemoved
+			}
 		}
 	}
 	for _, tk := range e.Tickets {
@@ -148,7 +152,7 @@ func (b *statsBuilder) addEpic(project string, e tickets.Epic) {
 // tickets are design work, not merged tickets.
 func (b *statsBuilder) addTicket(project string, e tickets.Epic, tk tickets.Ticket, cost costSeries) {
 	if tk.IsDone() {
-		if i := b.win.Bucket(tk.DoneAt); i >= 0 {
+		if i := b.win.Bucket(tk.DoneAt); i >= 0 && !e.IsArea {
 			cost[i].add(tk.TotalTokens, tk.ActualCost)
 			if !e.IsMap {
 				b.tp.TicketsMerged[i]++

@@ -16,7 +16,7 @@ import (
 // IsPaused is tickets.Epic.IsPaused, the rule shared with ralph-loop and the
 // Queue tab, except that map epics hold no work, so none of their tickets are.
 func IsPaused(e tickets.Epic, t tickets.Ticket) bool {
-	return !e.IsMap && !e.IsArea && e.IsPaused(t)
+	return e.HoldsLoopWork() && e.IsPaused(t)
 }
 
 // State is how far an epic can move.
@@ -38,7 +38,7 @@ const (
 // the epic summary both derive from it. A status it does not recognize counts as
 // paused, never as a cycle: a person has to look at it.
 func StateOf(e tickets.Epic) State {
-	if e.IsMap || e.IsArea {
+	if !e.HoldsLoopWork() {
 		return StateDone
 	}
 	state := StateDone

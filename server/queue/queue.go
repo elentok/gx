@@ -103,7 +103,7 @@ func (q *Queue) Attach(d QueueDeps) {
 // EpicQueueable reports whether an epic can be queued: an unqueued, unmerged
 // loop epic that still has an open ticket. The epic list shares this rule.
 func EpicQueueable(e tickets.Epic, queued bool) bool {
-	if e.IsMap || e.IsArea || queued || !e.MergedAt.IsZero() || e.QueueRefusal() != tickets.QueueRefusalNone {
+	if !e.HoldsLoopWork() || queued || !e.MergedAt.IsZero() || e.QueueRefusal() != tickets.QueueRefusalNone {
 		return false
 	}
 	return slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool { return t.Status == string(schema.StatusOpen) })

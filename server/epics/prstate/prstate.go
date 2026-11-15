@@ -23,7 +23,7 @@ func IsBlockKind(kind string) bool {
 // Blocked reports whether e is complete and unmerged with a PR-flow pause
 // stored on it.
 func Blocked(e tickets.Epic) bool {
-	return !e.IsMap && !e.IsArea && e.MergedAt.IsZero() && IsBlockKind(e.MergeBlockKind) && remaining(e) == ""
+	return e.HoldsLoopWork() && e.MergedAt.IsZero() && IsBlockKind(e.MergeBlockKind) && remaining(e) == ""
 }
 
 // Of is e's PR-flow state, or "" when it has none and the merge rules decide.
@@ -31,7 +31,7 @@ func Blocked(e tickets.Epic) bool {
 // block; Of returns "" for a blocked epic. A ci-fix or pr-text ticket that is
 // paused leaves the epic to the paused rules.
 func Of(e tickets.Epic, delivery string) wire.EpicState {
-	if e.IsMap || e.IsArea || !e.MergedAt.IsZero() {
+	if !e.HoldsLoopWork() || !e.MergedAt.IsZero() {
 		return ""
 	}
 	switch remaining(e) {

@@ -23,6 +23,22 @@ func TestEpic_IsCharting(t *testing.T) {
 	}
 }
 
+func TestEpic_HoldsLoopWork(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		e    Epic
+		want bool
+	}{
+		{"loop", Epic{}, true},
+		{"map", Epic{IsMap: true}, false},
+		{"area", Epic{IsArea: true}, false},
+	} {
+		if got := c.e.HoldsLoopWork(); got != c.want {
+			t.Errorf("%s = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 func TestEpic_QueueRefusal(t *testing.T) {
 	for _, c := range []struct {
 		name, status string

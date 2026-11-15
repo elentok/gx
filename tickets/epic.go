@@ -202,6 +202,12 @@ func (e Epic) TotalCount() int {
 	return len(e.Tickets)
 }
 
+// HoldsLoopWork reports whether the epic's tickets are loop work: false for a
+// wayfinder map (resolved by hand) and for an area (follow-ups, never scheduled).
+func (e Epic) HoldsLoopWork() bool {
+	return !e.IsMap && !e.IsArea
+}
+
 // IsCharting: a map whose Design has not started past the chart step.
 func (e Epic) IsCharting() bool {
 	return e.IsMap && (e.DesignStep == "" || e.DesignStep == string(schema.StepChart))
