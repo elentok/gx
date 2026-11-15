@@ -7,8 +7,9 @@ test("203. Schedules journey", async ({ page, start }) => {
   const switchOf = (name: string) => row(name).getByRole("switch")
   const banner = page.locator('[data-mock-part="off-banner"]')
 
-  // Menu: a separator after Archive, then Scheduled prompts.
+  // Menu: Backlog, a separator after Archive, then Scheduled prompts.
   await epicsButton(page).click()
+  await expect(page.getByRole("menuitem", { name: "Backlog", exact: true })).toBeVisible()
   const archive = page.getByRole("menuitem", { name: /^Archive/ })
   await expect(archive).toBeVisible()
   await expect(page.getByRole("separator")).toHaveCount(1)

@@ -41,7 +41,7 @@ function StartDialog({
   const { run, pending, refusal, error } = useWrite({ toastRefusal: false })
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    void run(() => start({ project, area: area.address, hint: hint.trim() || undefined }), {
+    void run(() => start({ project, area: area.name, hint: hint.trim() || undefined }), {
       onDone: (res) => res.session && navigate(agentPath(res.session.id)),
     })
   }
@@ -122,9 +122,11 @@ function AreaRow({
           flexShrink="0"
           disabled={pending}
           onClick={() =>
-            void run(() => finish({ project, area: area.address, map: move.map }), {
-              onDone: onChanged,
-            })
+            // The list names the map by address; the route takes its bare name.
+            void run(
+              () => finish({ project, area: area.name, map: move.map.slice(project.length + 1) }),
+              { onDone: onChanged },
+            )
           }
         >
           Finish move

@@ -1,11 +1,13 @@
 import type { Page } from "@playwright/test"
-import { card, expect, nav, section, test } from "./fixture"
+import { messageBox, sendButton } from "./agentsKit"
+import { card, epicsButton, expect, nav, section, test } from "./fixture"
 
 const step = (page: Page, name: string, state: string) =>
   page.locator(`li[data-step="${name}"][data-state="${state}"]`)
 
 const openTriage = (page: Page) => page.evaluate(() => (location.hash = "#/triage/demo"))
 const openEpics = (page: Page) => page.evaluate(() => (location.hash = "#/epics"))
+const openBacklog = (page: Page) => page.evaluate(() => (location.hash = "#/backlog"))
 
 // The round card's own group; the final "Write this plan?" card is one too.
 const questionsOf = (page: Page) => page.getByRole("group", nav("Questions"))
@@ -187,7 +189,7 @@ test.describe("199. Triage journey", () => {
     await page.getByRole("menuitem", { name: /demo/ }).click()
     await expect(page).toHaveURL(/#\/triage\/demo$/)
 
-    // Keep for later parks the rows that were headed for the new area; the next question is the
+    // Keep for later leaves the rows that were headed for the new area; the next question is the
     // bug's, then the idea's.
     await round1.getByRole("button", { name: /^Keep for later/ }).click()
     await expect(round1.getByText("Question 2 of 3")).toBeVisible()
@@ -371,6 +373,89 @@ test.describe("199. Triage journey", () => {
     await expect(inboxButton()).toBeVisible()
     await inboxButton().click()
     await expect(page.getByRole("menuitem", { name: /demo/ })).toBeVisible()
+    expect(await sideways(page)).toBe(false)
+
+    // Backlog: the Epics menu has the item, the sidebar has no row, and each area shows its open count.
+    await page.setViewportSize({ width: 1280, height: 800 })
+    const backlog = await start("triage", { shape: "backlog" })
+    await expect(page.getByRole("link", { name: /Backlog/ })).toHaveCount(0)
+    await epicsButton(page).click()
+    await page.getByRole("menuitem", { name: "Backlog", exact: true }).click()
+    await expect(page).toHaveURL(/#\/backlog$/)
+    // The sidebar lists epics too, so rows are scoped to the project's region.
+    const area = (name: string) =>
+      page
+        .getByRole("region", { name: "demo", exact: true })
+        .getByRole("listitem")
+        .filter({ hasText: new RegExp(`^${name}`) })
+    const startDesign = (name: string) => area(name).getByRole("button", { name: "Start Design" })
+    const startButton = (name: string) =>
+      page
+        .getByRole("dialog", nav(`Start Design for ${name}`))
+        .getByRole("button", { name: "Start", exact: true })
+    await expect(area("parser")).toContainText("11 open")
+    await expect(area("sync")).toContainText("5 open")
+    await expect(area("webui")).toContainText("0 open")
+    await expect(startDesign("webui")).toBeDisabled()
+
+    // The 5-ticket area: the chat prints the card with all five tickets, each with a reason.
+    const cards = () => page.getByText("Start this Design?")
+    const say = async (text: string) => {
+      // A turn typed while the session still works is lost.
+      await expect(page.getByText("Working", { exact: true })).toHaveCount(0)
+      await messageBox(page).fill(text)
+      await sendButton(page).click()
+    }
+    await startDesign("sync").click()
+    await startButton("sync").click()
+    await expect(page).toHaveURL(/#\/agents\//)
+    await expect(cards()).toHaveCount(1)
+    await expect(page.getByText(/^demo:sync\/\d+:/)).toHaveCount(5)
+    await expect(page.getByText(/same theme as the other sync tickets/)).toHaveCount(5)
+    // A live chat blocks Finish move on its area, so this one goes before the move.
+    await backlog.cli("agents", "remove", "--yes", page.url().split("/agents/")[1])
+
+    // The 11-ticket area: the dialog takes a hint, a typed edit reprints the card once, yes prints a link.
+    await openBacklog(page)
+    await startDesign("parser").click()
+    const dialog = page.getByRole("dialog", nav("Start Design for parser"))
+    await dialog.getByRole("textbox", { name: "Hint" }).fill("retry theme")
+    await startButton("parser").click()
+    await expect(page).toHaveURL(/#\/agents\//)
+    const chatUrl = page.url()
+    await expect(cards()).toHaveCount(1)
+    await say("drop 1")
+    await expect(cards()).toHaveCount(2)
+    await say("yes")
+    await expect(page.getByText("Created the Design")).toBeVisible()
+    const design = await backlog.cli("tickets", "show", "demo:parser-cleanup")
+    expect(design).toContain("kind: map")
+    expect(design).toContain("destination_unconfirmed: true")
+    expect(design).toContain("- demo:parser/11")
+    expect(design).not.toContain("- demo:parser/01")
+    // The area keeps the dropped ticket and the claimed one.
+    const left = await backlog.cli("tickets", "list", "demo:parser")
+    expect(left).toContain("parser-01")
+    expect(left).toContain("parser-12")
+
+    // A second Start Design click on that area opens the live chat.
+    await openBacklog(page)
+    await expect(area("parser")).toContainText("1 open")
+    await startDesign("parser").click()
+    await startButton("parser").click()
+    await expect(page).toHaveURL(chatUrl)
+
+    // Finish move completes the half-filled map with no new chat.
+    await openBacklog(page)
+    await area("sync").getByRole("button", { name: "Finish move" }).click()
+    await expect(area("sync").getByRole("button", { name: "Finish move" })).toHaveCount(0)
+    expect(await backlog.cli("tickets", "show", "demo:retry-work")).toContain("sync-04")
+    await expect(page).toHaveURL(/#\/backlog$/)
+
+    // Phone: the Start Design dialog is a sheet with no sideways scroll.
+    await page.setViewportSize({ width: 390, height: 844 })
+    await startDesign("sync").click()
+    await expect(page.getByRole("dialog", nav("Start Design for sync"))).toBeVisible()
     expect(await sideways(page)).toBe(false)
   })
 })

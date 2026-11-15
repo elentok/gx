@@ -142,7 +142,7 @@ describe("the Backlog page", () => {
     expect(posts).toEqual([
       {
         url: "/v1/backlog/start-design",
-        body: { project: "gx", area: "gx:web", hint: "tidy" },
+        body: { project: "gx", area: "web", hint: "tidy" },
       },
     ])
   })
@@ -166,7 +166,7 @@ describe("the Backlog page", () => {
     await waitFor(() => expect(posts).toHaveLength(1))
     expect(posts[0]).toEqual({
       url: "/v1/backlog/finish-move",
-      body: { project: "gx", area: "gx:cli", map: "gx:cli-design" },
+      body: { project: "gx", area: "cli", map: "cli-design" },
     })
     expect(screen.queryByRole("dialog")).toBeNull()
     expect(window.location.hash).toBe("#/backlog")
