@@ -3,6 +3,7 @@ package sessions_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -131,4 +132,119 @@ func TestSessionChatChanged_CodexRolloutGrowthPublishes(t *testing.T) {
 	if !codexEventWithin(evs, t, path, id, 5*time.Second) {
 		t.Fatal("no session-chat-changed event while the rollout grew")
 	}
+}
+
+// assistantAt is a Claude assistant line stamped now; extra adds JSON fields.
+func assistantAt(extra string) string {
+	return fmt.Sprintf(`{"type":"assistant","uuid":"a","timestamp":%q,"message":{"model":"<synthetic>","content":[{"type":"text","text":"x"}]}%s}`, time.Now().UTC().Format(time.RFC3339Nano), extra)
+}
+
+func apiErrorLine(code string) string {
+	return assistantAt(fmt.Sprintf(`,"isApiErrorMessage":true,"error":%q`, code))
+}
+
+// switchAndIdle switches an idle session to model and brings the new agent idle,
+// which leaves the switch unconfirmed.
+func switchAndIdle(t *testing.T, h *servertest.Harness, ctx context.Context, id, conv, model string) {
+	t.Helper()
+	if res, err := h.Client.Sessions.Switch(ctx, wire.SessionSwitchRequest{ID: id, Model: model}); err != nil || res.Refused {
+		t.Fatalf("switch = %+v, %v", res, err)
+	}
+	waitForHolder(t, filepath.Join(h.SessionsDir, id))
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitFor(t, func() bool {
+		return readMeta(t, h, id)["model"] == model && readMeta(t, h, id)["switch_unconfirmed"] == true
+	})
+}
+
+// startUnconfirmed is an idle fake session switched to opus, with its transcript path.
+func startUnconfirmed(t *testing.T) (*servertest.Harness, context.Context, <-chan wire.Event, string, string, string, map[string]any) {
+	t.Helper()
+	cfg := t.TempDir()
+	h, ctx, evs, id, conv := startIdleSwitchable(t, servertest.WithEnv("CLAUDE_CONFIG_DIR="+cfg))
+	before := readMeta(t, h, id)
+	switchAndIdle(t, h, ctx, id, conv, "opus")
+	return h, ctx, evs, id, conv, filepath.Join(cfg, "projects", "-repo", conv+".jsonl"), before
+}
+
+// turnWith runs one turn that writes lines.
+func turnWith(t *testing.T, h *servertest.Harness, ctx context.Context, id, conv, path string, lines ...string) {
+	t.Helper()
+	report(t, conv, agentfake.Control{State: "working"})
+	waitSessionState(ctx, t, h, id, wire.SessionWorking)
+	writeTranscript(t, path, append(lines, turnDurationLine)...)
+	report(t, conv, agentfake.Control{State: "idle"})
+}
+
+func TestSwitchConfirm_ModelNotFoundRollsBackToTheOldRecord(t *testing.T) {
+	t.Parallel()
+	h, ctx, evs, id, conv, path, before := startUnconfirmed(t)
+	turnWith(t, h, ctx, id, conv, path, apiErrorLine("model_not_found"))
+	waitFor(t, func() bool { return readMeta(t, h, id)["model"] == before["model"] })
+	waitForHolder(t, filepath.Join(h.SessionsDir, id))
+	report(t, conv, agentfake.Control{State: "idle"})
+	got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool {
+		return s.Status.State == wire.SessionIdle && s.SwitchingModel == "" && s.SwitchFailedModel != ""
+	})
+	meta := readMeta(t, h, id)
+	if meta["switch_unconfirmed"] != nil || meta["switched_by_hand"] != nil || meta["effort"] != before["effort"] || meta["switched_at"] == before["switched_at"] {
+		t.Errorf("meta after rollback = %v, want the record before the switch with a new switch time", meta)
+	}
+	if got.SwitchFailedModel != "opus" || got.SwitchFailedOld != before["model"] || got.Model == "<synthetic>" || got.Model != before["model"] || got.ModelSwitched {
+		t.Errorf("session = %+v, want the failed switch to opus and the old model %v shown", got, before["model"])
+	}
+}
+
+func TestSwitchConfirm_OtherFirstRepliesKeepTheSwitch(t *testing.T) {
+	t.Parallel()
+	// The code of the first reply's error; empty is a normal reply. The line is
+	// stamped after the switch, so it is built once the switch is made.
+	cases := map[string]string{
+		"reply":          "",
+		"rate limit":     "rate_limit",
+		"invalid":        "invalid_request",
+		"unknown":        "unknown",
+		"overloaded":     "overloaded",
+		"authentication": "authentication_error",
+	}
+	for name, code := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			h, ctx, _, id, conv, path, _ := startUnconfirmed(t)
+			line := assistantAt("")
+			if code != "" {
+				line = apiErrorLine(code)
+			}
+			turnWith(t, h, ctx, id, conv, path, line)
+			waitFor(t, func() bool { return readMeta(t, h, id)["switch_unconfirmed"] == nil })
+			meta := readMeta(t, h, id)
+			if meta["model"] != "opus" || meta["switched_by_hand"] != true {
+				t.Errorf("meta = %v, want the switch to opus kept", meta)
+			}
+		})
+	}
+}
+
+// A turn that reaches no model keeps the window open, and a second switch
+// rolls back to the last confirmed record rather than to the first switch.
+func TestSwitchConfirm_WindowStaysOpenAndSecondSwitchKeepsTheTarget(t *testing.T) {
+	t.Parallel()
+	h, ctx, _, id, conv, path, before := startUnconfirmed(t)
+	turnWith(t, h, ctx, id, conv, path, fmt.Sprintf(`{"type":"user","timestamp":%q,"message":{"content":"/clear"}}`, time.Now().UTC().Format(time.RFC3339Nano)))
+	waitSessionState(ctx, t, h, id, wire.SessionIdle)
+	time.Sleep(500 * time.Millisecond) // negative wait: the check runs within a poll of the turn's end line
+	if meta := readMeta(t, h, id); meta["switch_unconfirmed"] != true || meta["model"] != "opus" {
+		t.Fatalf("meta = %v, want the switch still unconfirmed", meta)
+	}
+	switchAndIdle(t, h, ctx, id, conv, "sonnet")
+	turnWith(t, h, ctx, id, conv, path, apiErrorLine("model_not_found"))
+	waitFor(t, func() bool { return readMeta(t, h, id)["model"] == before["model"] })
+}
+
+func TestSwitchConfirm_RestartBetweenIdleAndFirstMessageStillRollsBack(t *testing.T) {
+	t.Parallel()
+	h, _, _, id, _, path, before := startUnconfirmed(t)
+	writeTranscript(t, path, apiErrorLine("model_not_found"), turnDurationLine)
+	h.Restart(t)
+	waitFor(t, func() bool { return readMeta(t, h, id)["model"] == before["model"] })
 }

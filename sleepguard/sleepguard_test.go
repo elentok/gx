@@ -119,7 +119,7 @@ var allowed = map[string]int{
 	"server/server_test.go":                                            1,
 	"server/sessions/askflows/askfallback_test.go":                     1, // negative wait: no fallback card lists for a picker, a permission prompt or an unreadable layout
 	"server/sessions/retry_prompt_test.go":                             1, // negative wait: no second interrupt or prompt follows the retry
-	"server/sessions/sessionchatwatch_test.go":                         2,
+	"server/sessions/sessionchatwatch_test.go":                         3, // includes a negative wait: a turn that reaches no model leaves the switch unconfirmed
 	"server/sessions/sessioninterrupt_test.go":                         1, // negative wait: Codex gets no Ctrl+C after its Esc
 	"server/sessions/prompt/action_test.go":                            8, // includes a negative wait: a dropped rename hold types nothing
 	"server/sessions/prompt/promptflows/switch_countdown_test.go":      2, // negative waits: a countdown left running would end in the window

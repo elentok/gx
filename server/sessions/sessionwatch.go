@@ -135,7 +135,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 		}
 	}
 	defer endSettle()
-	seenBusy, sawIdle := false, !reconnect
+	seenBusy, sawIdle, attaching := false, !reconnect, reconnect
 	for {
 		msg, err := stream.Next()
 		if err != nil {
@@ -149,7 +149,7 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 			st := SessionStatusOf(msg.Status)
 			var prompt, signal string
 			var design chat.DesignRef
-			idleEdge := false
+			idleEdge, unconfirmed := false, false
 			// An idle whose turn start this watch did not see (an idle-to-busy
 			// edge) is not Live, e.g. a turn already running at connect.
 			live := seenBusy
@@ -199,6 +199,9 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 						}
 					}
 				}
+				// The first status of an attach also checks, so a restart between
+				// idle and the first message keeps the rollback.
+				unconfirmed = st.State == wire.SessionIdle && m.SwitchUnconfirmed && (idleEdge || attaching)
 				if msg.ConversationID != "" && msg.ConversationID != m.ConversationID {
 					mg.Conv.SaveTotals(m.ConvSession(), m.ConversationID)
 					harness.CarryEditorOverride(m.ConversationID, msg.ConversationID)
@@ -238,6 +241,14 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 				settle = cancel
 				mg.Watches.Start(func() { mg.prompter.SettleTurn(dir, id, mark, design, cancel) })
 			}
+			if unconfirmed {
+				if settle == nil {
+					settle = make(chan struct{})
+				}
+				cancel := settle
+				mg.Watches.Start(func() { NewResumer(mg).confirmSwitch(dir, id, run, cancel) })
+			}
+			attaching = false
 			if prompt != "" {
 				first.Start(signal, prompt)
 			}

@@ -57,6 +57,35 @@ func LastAPIError(path string) (e APIError, ok bool, err error) {
 	return e, ok, nil
 }
 
+// FirstAssistantAfter returns the first assistant line stamped after at. found
+// is false when there is none yet; isError says that line is an API error, and
+// e then carries its code. Lines with no parsable time never count.
+func FirstAssistantAfter(path string, at time.Time) (e APIError, isError, found bool, err error) {
+	err = tailScan(path, func(lines []string) bool {
+		found, isError, e = false, false, APIError{}
+		for _, raw := range slices.Backward(lines) {
+			var line apiErrorLine
+			if json.Unmarshal([]byte(raw), &line) != nil || line.Type != "assistant" {
+				continue
+			}
+			ts, perr := time.Parse(time.RFC3339Nano, line.Timestamp)
+			if perr != nil {
+				continue
+			}
+			if !ts.After(at) {
+				return true
+			}
+			found, isError = true, line.IsAPIError
+			e = APIError{Error: line.Error, Status: line.Status, Message: contentText(line.Message.Content), Timestamp: ts}
+		}
+		return false
+	})
+	if err != nil {
+		return APIError{}, false, false, err
+	}
+	return e, isError, found, nil
+}
+
 // contentText is a message's text: content is a string or a list of blocks.
 func contentText(content json.RawMessage) string {
 	var s string
