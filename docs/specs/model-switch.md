@@ -211,7 +211,7 @@ A verify ticket runs these against a temporary gx server with the new fixture sc
 44. Story 44: in a chat, click the plain footer model name (`footer-normal`). Added beyond the mock: the name keeps the plain look and gains a pointer cursor and a hover underline, so no Mock states line shows it. The picker opens. In a design session the plain name is text and a click does nothing.
 45. Story 45: open the popover in a chat and click "Choose another model". The picker opens. In a design session the popover has no such link. Added beyond the mock, so no Mock states line applies. Mock states `popover-open` for the rest.
 
-Mock states (stored mock `$(gx tickets root)/model-switch/mocks/04-picker-and-popover-look.html`; scenario is the new model switch scenario; story entries refer to these by state name):
+**Mock states** (stored mock `$(gx tickets root)/model-switch/mocks/04-picker-and-popover-look.html`; scenario is the new model switch scenario; story entries refer to these by state name):
 
 - `$(gx tickets root)/model-switch/mocks/04-picker-and-popover-look.html` · a-open · 760 px · Codex chat, idle, `{leader} m` pressed, outdated current model · picker-dialog, search, effort, key-hints
 - `$(gx tickets root)/model-switch/mocks/04-picker-and-popover-look.html` · a-changed · 760 px · same chat, "sol" typed, new model chosen · picker-dialog, search, effort, switch-button
