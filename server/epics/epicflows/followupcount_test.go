@@ -61,12 +61,12 @@ func TestEpicList_FollowUpCountCarriesTheSplitTheTriageStateAndWhatIsLeft(t *tes
 	}
 
 	rec, _ = rs.LoadLive()
-	rec.Step = tickets.StepApprove
+	rec.Step = tickets.StepQuestions
 	if err := rs.Save(rec); err != nil {
 		t.Fatal(err)
 	}
 	if c, _ = count(); c.Triage != wire.FollowUpTriageWaiting {
-		t.Errorf("at Approve: %+v, want waiting", c)
+		t.Errorf("at Questions: %+v, want waiting", c)
 	}
 
 	// Every follow-up written: a live Triage at zero stays listed.

@@ -236,7 +236,7 @@ test.describe("199. Triage journey", () => {
     await openEpics(page)
     const failedCard = card(page, "follow-ups")
     await expect(failedCard.getByRole("button", { name: /^Retry failed \(2\)/ })).toBeVisible()
-    await expect(failedCard.getByText("1 of 5 written")).toBeVisible()
+    await expect(failedCard.getByText("3 of 5 written")).toBeVisible()
     await failedCard.getByRole("button", nav("Continue")).click()
     await expect(page).toHaveURL(/#\/triage\/demo$/)
 
@@ -320,7 +320,7 @@ test.describe("199. Triage journey", () => {
     await expect(page.getByRole("link", nav("Open triage page →"))).toBeVisible()
     await openTriage(page)
     const ticketsBefore = await fixture.cli("tickets", "list", "demo:follow-ups")
-    // `gx tickets epics --areas` does not exist: the epic list's addresses stand for the areas.
+    // The epic list's addresses stand for the areas.
     const epicAddresses = async () =>
       (JSON.parse(await fixture.cli("server", "epics", "--json")).epics as { address: string }[])
         .map((e) => e.address)
