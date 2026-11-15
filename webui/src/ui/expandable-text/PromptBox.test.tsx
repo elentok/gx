@@ -1,16 +1,25 @@
+import { EditorView } from "@codemirror/view"
 import { getCM, Vim } from "@replit/codemirror-vim"
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { useState, type ReactNode } from "react"
 import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../../connection"
-import { WideContext } from "../../useWide"
+import { CoarsePointerContext, WideContext } from "../../useWide"
 import { renderThemed } from "../render"
 import { setBigPrompt } from "./bigPromptStore"
+import { preloadCodeEditor } from "./LargeEditor"
 import { PromptBox } from "./PromptBox"
 import { findLargeEditor, largeEditorText, typeInLargeEditor, viewOf } from "./testing"
 
+// Wraps the real preload so a test can count calls.
+vi.mock("./LargeEditor", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./LargeEditor")>()
+  return { ...original, preloadCodeEditor: vi.fn(original.preloadCodeEditor) }
+})
+
 afterEach(() => {
   cleanup()
+  vi.mocked(preloadCodeEditor).mockClear()
   setBigPrompt(false)
   localStorage.clear()
 })
@@ -203,7 +212,8 @@ test("Escape does not close the editor", () => {
   expect(screen.getByRole("dialog")).toBeTruthy()
 })
 
-function withVi(on: boolean, ui: ReactNode) {
+// The existing tests mean the textarea, so the pointer is coarse unless a test says otherwise.
+function withVi(on: boolean, ui: ReactNode, coarse = true) {
   const state = {
     snapshot: { sessions: [], vi_mode: on },
     connected: true,
@@ -217,7 +227,9 @@ function withVi(on: boolean, ui: ReactNode) {
   } as unknown as Connection
   return renderThemed(
     <WideContext.Provider value>
-      <ConnectionContext.Provider value={conn}>{ui}</ConnectionContext.Provider>
+      <CoarsePointerContext.Provider value={coarse}>
+        <ConnectionContext.Provider value={conn}>{ui}</ConnectionContext.Provider>
+      </CoarsePointerContext.Provider>
     </WideContext.Provider>,
   )
 }
@@ -451,4 +463,128 @@ test("$ opens the menu in the editor for Codex only", async () => {
   await openEditor("claude")
   await typeInLargeEditor(TITLE, "$co")
   expect(screen.queryByRole("listbox")).toBeNull()
+})
+
+// The inline vi editor.
+const isEditor = () => screen.getByRole("textbox", { name: "Note" }).tagName === "DIV"
+const inlineView = async () => {
+  await waitFor(() => expect(isEditor()).toBe(true))
+  return EditorView.findFromDOM(screen.getByRole("textbox", { name: "Note" }))!
+}
+
+function Live({ rows, fine }: { rows?: number; fine?: boolean }) {
+  const [coarse, setCoarse] = useState(!fine)
+  const [text, setText] = useState("hello world")
+  return (
+    <CoarsePointerContext.Provider value={coarse}>
+      <button onClick={() => setCoarse((c) => !c)}>flip</button>
+      <PromptBox
+        label="Note"
+        name="test-note"
+        title={TITLE}
+        rows={rows}
+        value={text}
+        onChange={setText}
+      />
+    </CoarsePointerContext.Provider>
+  )
+}
+
+test("vi off or a coarse pointer keeps the textarea; vi on with a fine pointer is an editor", async () => {
+  withVi(false, <Live />, false)
+  expect(field().tagName).toBe("TEXTAREA")
+  cleanup()
+  withVi(true, <Live />, true)
+  expect(field().tagName).toBe("TEXTAREA")
+  cleanup()
+  withVi(true, <Harness />, false)
+  await inlineView()
+  expect(document.querySelector("textarea")).toBeNull()
+})
+
+test("the chunk is preloaded only with vi on and a fine pointer", async () => {
+  withVi(false, <Harness />, false)
+  cleanup()
+  withVi(true, <Harness />, true)
+  expect(preloadCodeEditor).not.toHaveBeenCalled()
+  cleanup()
+  withVi(true, <Harness />, false)
+  expect(preloadCodeEditor).toHaveBeenCalled()
+  await inlineView()
+})
+
+test("a live swap keeps text, caret, selection and focus in both directions", async () => {
+  withVi(true, <Live />)
+  field().focus()
+  field().setSelectionRange(2, 7)
+  fireEvent.click(screen.getByText("flip"))
+  const view = await inlineView()
+  expect(view.state.doc.toString()).toBe("hello world")
+  const { from, to } = view.state.selection.main
+  expect([from, to]).toEqual([2, 7])
+  expect(view.hasFocus).toBe(true)
+  view.dispatch({ selection: { anchor: 1, head: 4 } })
+  fireEvent.click(screen.getByText("flip"))
+  expect(field().value).toBe("hello world")
+  expect([field().selectionStart, field().selectionEnd]).toEqual([1, 4])
+  expect(document.activeElement).toBe(field())
+})
+
+test("an unfocused box is still unfocused after the swap", async () => {
+  withVi(true, <Live />)
+  field().setSelectionRange(3, 3)
+  fireEvent.click(screen.getByText("flip"))
+  const view = await inlineView()
+  expect(view.hasFocus).toBe(false)
+  expect(view.state.selection.main.head).toBe(3)
+  fireEvent.click(screen.getByText("flip"))
+  expect(document.activeElement).not.toBe(field())
+})
+
+test.each([
+  [3, false, "3"],
+  [undefined, false, "2"],
+  [3, true, "6"],
+  [undefined, true, "4"],
+])("the inline editor is rows %s (big %s) lines tall: %s", async (rows, big, expected) => {
+  setBigPrompt(big)
+  withVi(true, <Live rows={rows} fine />)
+  const view = await inlineView()
+  expect(view.dom.parentElement!.style.getPropertyValue("--prompt-rows")).toBe(expected)
+})
+
+test("flipping big mode resizes the inline editor without remounting it", async () => {
+  withVi(true, <Live rows={3} fine />)
+  const view = await inlineView()
+  act(() => setBigPrompt(true))
+  expect(EditorView.findFromDOM(screen.getByRole("textbox", { name: "Note" }))).toBe(view)
+  expect(view.dom.parentElement!.style.getPropertyValue("--prompt-rows")).toBe("6")
+  expect(view.state.doc.toString()).toBe("hello world")
+})
+
+test("ZZ does nothing; :q and :wq say Not an editor command and keep the text", async () => {
+  withVi(true, <Live fine />)
+  const view = await inlineView()
+  const cm = getCM(view)!
+  act(() => void Vim.handleKey(cm, "<Esc>", "user"))
+  act(() => void Vim.handleKey(cm, "ZZ", "user"))
+  expect(view.state.doc.toString()).toBe("hello world")
+  for (const cmd of ["q", "wq"]) {
+    act(() => void Vim.handleEx(cm as Parameters<typeof Vim.handleEx>[0], cmd))
+    expect(view.dom.textContent).toContain("Not an editor command")
+    expect(view.state.doc.toString()).toBe("hello world")
+  }
+  expect(screen.queryByRole("dialog")).toBeNull()
+})
+
+test("/, ? and : open the panel inside the box", async () => {
+  withVi(true, <Live fine />)
+  const view = await inlineView()
+  const cm = getCM(view)!
+  for (const key of ["/", "?", ":"]) {
+    act(() => void Vim.handleKey(cm, "<Esc>", "user"))
+    act(() => void Vim.handleKey(cm, key, "user"))
+    expect(view.dom.querySelector(".cm-vim-panel input")).not.toBeNull()
+    act(() => void Vim.handleKey(cm, "<Esc>", "user"))
+  }
 })

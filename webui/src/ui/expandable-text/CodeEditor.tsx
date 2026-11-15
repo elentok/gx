@@ -3,7 +3,14 @@ import { Compartment, EditorState, Prec } from "@codemirror/state"
 import { drawSelection, EditorView, keymap, placeholder as placeholderExt } from "@codemirror/view"
 import { getCM, vim, Vim } from "@replit/codemirror-vim"
 import { Box } from "@chakra-ui/react"
-import { useEffect, useImperativeHandle, useRef, type MutableRefObject, type Ref } from "react"
+import {
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  type CSSProperties,
+  type MutableRefObject,
+  type Ref,
+} from "react"
 import type { MenuKey } from "../../commands/useCompletion"
 import type { Selection } from "./LargeEditor"
 import { useViEscape } from "../../vimode"
@@ -88,6 +95,17 @@ const theme = EditorView.theme({
   ".cm-placeholder": { color: "var(--chakra-colors-text-dim)" },
 })
 
+// The prompt box's look, after `theme`: the textarea's padding and line height, and a height of `--prompt-rows` lines that scrolls.
+// The panel sits under the scroller, so it grows the box instead of being clipped.
+const inlineTheme = EditorView.theme({
+  "&.cm-editor": { height: "auto" },
+  "&.cm-editor .cm-scroller": {
+    lineHeight: "1.5",
+    height: "calc(var(--prompt-rows) * 1.5em + 20px)",
+  },
+  "&.cm-editor .cm-content": { padding: "10px 46px 10px 12px" },
+})
+
 /** The first and last differing positions, so an outside edit keeps the caret where it was. */
 function diff(a: string, b: string) {
   let start = 0
@@ -119,6 +137,7 @@ export default function CodeEditor({
   caret,
   handle,
   autoFocus = true,
+  inline,
 }: {
   label: string
   value: string
@@ -144,6 +163,8 @@ export default function CodeEditor({
   handle?: Ref<CodeEditorHandle>
   /** Focus the editor when it mounts. Default true. */
   autoFocus?: boolean
+  /** Sit inside a prompt box: `rows` lines tall, no border. Fixed for the editor's life; `rows` applies live. */
+  inline?: { rows: number }
 }) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
@@ -255,6 +276,7 @@ export default function CodeEditor({
           placeholderExt(placeholder ?? ""),
           EditorView.contentAttributes.of({ "aria-label": label, "aria-multiline": "true" }),
           theme,
+          inline ? inlineTheme : [],
           // A click or tap forgets the stored column, so the next j starts from the clicked spot.
           EditorView.domEventHandlers({
             pointerdown: (_e, v) => {
@@ -319,6 +341,16 @@ export default function CodeEditor({
     }
   }, [value])
 
+  if (inline)
+    return (
+      <Box
+        ref={host}
+        style={{ "--prompt-rows": inline.rows } as CSSProperties}
+        overflow="hidden"
+        {...fieldLook}
+        bg="transparent"
+      />
+    )
   return (
     <Box
       ref={host}

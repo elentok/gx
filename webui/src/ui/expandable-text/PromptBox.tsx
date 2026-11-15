@@ -1,9 +1,19 @@
 import { Box, chakra, Text, Textarea } from "@chakra-ui/react"
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react"
 import { useCompletion, type CompletionConfig, type MenuKey } from "../../commands/useCompletion"
+import type CodeEditor from "./CodeEditor"
 import type { ViMode } from "./CodeEditor"
 import { useBigPrompt } from "./bigPromptStore"
-import { LargeEditor, type EditorMenu, type Selection } from "./LargeEditor"
+import { LargeEditor, preloadCodeEditor, type EditorMenu, type Selection } from "./LargeEditor"
+import { useCoarsePointer } from "../../useWide"
+import { useViMode } from "../../vimode"
 import { fieldLook } from "./look"
 import { isMac } from "../../platform"
 
@@ -98,8 +108,49 @@ function Field({
   footer,
 }: Omit<FieldProps, "completion"> & { menu?: Menu }) {
   const big = useBigPrompt()
+  const effectiveRows = big ? (rows ?? 2) * 2 : (rows ?? 2)
   const area = useRef<HTMLTextAreaElement>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
+
+  // With vi on and a fine pointer the box is a vi editor. Until its chunk has loaded the textarea stays.
+  const wantEditor = useViMode() && !useCoarsePointer()
+  const [Editor, setEditor] = useState<typeof CodeEditor | null>(null)
+  useEffect(() => {
+    if (!wantEditor) return
+    let live = true
+    Promise.resolve(preloadCodeEditor()).then((m) => live && m && setEditor(() => m.default))
+    return () => {
+      live = false
+    }
+  }, [wantEditor])
+  const showEditor = wantEditor && Editor !== null
+  // The swap carries the selection and focus. They are read during the render that swaps, while the old element is still in the DOM.
+  const wrap = useRef<HTMLDivElement>(null)
+  const editorSel = useRef<Selection>({ start: 0, end: 0 })
+  const carry = useRef<{ sel: Selection; focus: boolean } | null>(null)
+  const read = () =>
+    area.current
+      ? {
+          sel: { start: area.current.selectionStart, end: area.current.selectionEnd },
+          focus: document.activeElement === area.current,
+        }
+      : {
+          sel: editorSel.current,
+          focus: !!wrap.current?.contains(document.activeElement),
+        }
+  const shown = useRef(showEditor)
+  if (shown.current !== showEditor) {
+    shown.current = showEditor
+    carry.current = read()
+    editorSel.current = carry.current.sel
+  }
+  useLayoutEffect(() => {
+    const c = carry.current
+    if (showEditor || !c || !area.current) return
+    carry.current = null
+    area.current.setSelectionRange(c.sel.start, c.sel.end)
+    if (c.focus) area.current.focus()
+  }, [showEditor])
   useLayoutEffect(() => {
     // While the editor is open it places the caret itself.
     if (selection) return
@@ -108,11 +159,7 @@ function Field({
     menu!.pending.current = null
     area.current?.setSelectionRange(at, at)
   }, [value, menu, selection])
-  const open = () =>
-    setSelection({
-      start: area.current?.selectionStart ?? 0,
-      end: area.current?.selectionEnd ?? 0,
-    })
+  const open = () => setSelection(read().sel)
   // Focus and selection are set synchronously, inside the user's gesture and before the layer unmounts, so a phone keeps its keyboard.
   const close = (sel: Selection, refocus: boolean) => {
     if (refocus) {
@@ -150,36 +197,52 @@ function Field({
       boxShadow="inset 0 0 0 1px {colors.hairline}"
       css={{ "&:has(> textarea:focus-visible)": { boxShadow: `${ringShadow} !important` } }}
     >
-      <Textarea
-        ref={area}
-        {...fieldLook}
-        data-focus-ring="none"
-        size={size}
-        bg="transparent"
-        borderWidth="0"
-        borderRadius="0"
-        autoFocus={autoFocus}
-        rows={big ? (rows ?? 2) * 2 : rows}
-        lineHeight="1.5"
-        display="block"
-        pt="2.5"
-        pb="2.5"
-        ps="3"
-        pe="46px"
-        resize="none"
-        aria-label={label}
-        name={name}
-        autoComplete="off"
-        placeholder={placeholder}
-        disabled={disabled}
-        value={value}
-        onChange={(e) => {
-          menu?.onCursor(e.target.selectionStart)
-          onChange(e.target.value)
-        }}
-        onSelect={menu ? (e) => menu.onCursor(e.currentTarget.selectionStart) : undefined}
-        onKeyDown={onKeyDown}
-      />
+      {showEditor && Editor ? (
+        <Box ref={wrap}>
+          <Editor
+            inline={{ rows: effectiveRows }}
+            label={label}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            selection={carry.current?.sel ?? editorSel.current}
+            onSelectionChange={(s) => (editorSel.current = s)}
+            autoFocus={carry.current?.focus ?? false}
+            viMode
+          />
+        </Box>
+      ) : (
+        <Textarea
+          ref={area}
+          {...fieldLook}
+          data-focus-ring="none"
+          size={size}
+          bg="transparent"
+          borderWidth="0"
+          borderRadius="0"
+          autoFocus={autoFocus}
+          rows={big ? (rows ?? 2) * 2 : rows}
+          lineHeight="1.5"
+          display="block"
+          pt="2.5"
+          pb="2.5"
+          ps="3"
+          pe="46px"
+          resize="none"
+          aria-label={label}
+          name={name}
+          autoComplete="off"
+          placeholder={placeholder}
+          disabled={disabled}
+          value={value}
+          onChange={(e) => {
+            menu?.onCursor(e.target.selectionStart)
+            onChange(e.target.value)
+          }}
+          onSelect={menu ? (e) => menu.onCursor(e.currentTarget.selectionStart) : undefined}
+          onKeyDown={onKeyDown}
+        />
+      )}
       {(note !== undefined || footer) && (
         <Box px="3" pt="1" pb="1.5">
           {note !== undefined && (
