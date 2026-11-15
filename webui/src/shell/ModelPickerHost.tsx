@@ -1,4 +1,4 @@
-import { chakra, Text } from "@chakra-ui/react"
+import { chakra, Kbd, Text } from "@chakra-ui/react"
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { stateToken } from "../design/open"
@@ -19,6 +19,13 @@ import {
 
 /** How long to wait before asking again while the server still reads the list in the background. */
 const REFRESH_MS = 1500
+
+const KEY_HINTS = [
+  ["↑↓", "model"],
+  ["←→", "effort"],
+  ["↵", "switch"],
+  ["esc", "close"],
+] as const
 
 /** Renders the model picker for the open request. */
 export function ModelPickerHost() {
@@ -156,7 +163,7 @@ function ModelPicker({
         px="3.5"
         py="3"
         borderBottomWidth="1px"
-        borderColor="border.subtle"
+        borderColor="border"
       >
         <Text fontWeight="600">Switch model</Text>
         <Text fontSize="xs" color="text.dim">
@@ -183,7 +190,10 @@ function ModelPicker({
         mx="3.5"
         mt="2.5"
         px="3"
-        _disabled={{ borderColor: "border.subtle", opacity: 0.5 }}
+        // The blue border is the focus mark, as in the mock; the global ring would double it.
+        data-focus-ring="none"
+        _placeholder={{ color: "text.faint" }}
+        _disabled={{ borderColor: "border", opacity: 0.5 }}
       />
       {note && (
         <Text
@@ -193,9 +203,9 @@ function ModelPicker({
           px="2.5"
           py="2"
           borderRadius="6px"
-          fontSize="sm"
+          fontSize="12.5px"
           color="tone.waiting.fg"
-          bg="tone.waiting.bg"
+          bg="rgba(242, 184, 69, 0.12)"
         >
           {note}
         </Text>
@@ -258,7 +268,13 @@ function ModelPicker({
                       <chakra.span color="tone.paused.fg">newer available</chakra.span>
                     )}
                     {r.current && (
-                      <chakra.span color="text.dim" borderWidth="1px" borderRadius="4px" px="1.5">
+                      <chakra.span
+                        color="text.dim"
+                        borderWidth="1px"
+                        borderColor="border"
+                        borderRadius="4px"
+                        px="1.5"
+                      >
                         current
                       </chakra.span>
                     )}
@@ -278,7 +294,7 @@ function ModelPicker({
           px="3.5"
           py="2.5"
           borderTopWidth="1px"
-          borderColor="border.subtle"
+          borderColor="border"
         >
           <Text as="span" id="picker-effort" fontSize="xs" color="text.dim" w="48px">
             Effort
@@ -288,7 +304,7 @@ function ModelPicker({
             aria-labelledby="picker-effort"
             display="flex"
             borderWidth="1px"
-            borderColor="border.subtle"
+            borderColor="border"
             borderRadius="8px"
             overflow="hidden"
             opacity={blocked ? 0.5 : 1}
@@ -337,12 +353,34 @@ function ModelPicker({
         px="3.5"
         py="2.5"
         borderTopWidth="1px"
-        borderColor="border.subtle"
+        borderColor="border"
       >
         {!blocked && (
-          <Text as="span" fontSize="xs" color="text.faint" mr="auto">
-            ↑↓ model · ←→ effort · ↵ switch · esc close
-          </Text>
+          <chakra.span
+            display="flex"
+            flexWrap="wrap"
+            columnGap="2.5"
+            fontSize="xs"
+            color="text.faint"
+            mr="auto"
+          >
+            {KEY_HINTS.map(([key, label]) => (
+              <span key={key}>
+                <Kbd
+                  bg="transparent"
+                  color="text.muted"
+                  borderWidth="1px"
+                  borderColor="border"
+                  borderRadius="sm"
+                  px="1"
+                  fontSize="2xs"
+                >
+                  {key}
+                </Kbd>{" "}
+                {label}
+              </span>
+            ))}
+          </chakra.span>
         )}
         <Button type="button" emphasis="secondary" onClick={closeModelPicker}>
           {blocked ? "Close" : "Cancel"}
