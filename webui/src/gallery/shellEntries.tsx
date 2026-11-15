@@ -176,7 +176,7 @@ const chordBoxEntry: GalleryEntry = {
           <ChordBox
             leader="cmd+e"
             ctx={chordCtx}
-            chords={chordTable({ remove: () => {}, rename: () => {} })}
+            chords={chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })}
             onClose={() => {}}
           />
         </Frame>
@@ -189,7 +189,7 @@ const chordBoxEntry: GalleryEntry = {
           <ChordBox
             leader="cmd+e"
             ctx={{ path: "/" }}
-            chords={chordTable({ remove: () => {}, rename: () => {} })}
+            chords={chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })}
             onClose={() => {}}
           />
         </Frame>

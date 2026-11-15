@@ -56,7 +56,7 @@ test("lists the real chord table", () => {
     <ChordBox
       leader="cmd+e"
       ctx={ctx}
-      chords={chordTable({ remove: () => {}, rename: () => {} })}
+      chords={chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })}
       onClose={() => {}}
     />,
   )
@@ -65,6 +65,24 @@ test("lists the real chord table", () => {
     "dNew design",
     "sFocus sidebar",
   ])
+})
+
+test("lists Switch model on a chat's page and not on a design's", () => {
+  const session = {
+    id: "s-a",
+    status: { state: "idle" },
+  } as unknown as NonNullable<Parameters<typeof ChordBox>[0]["ctx"]["session"]>
+  const table = chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })
+  const labels = (c: Parameters<typeof ChordBox>[0]["ctx"]) => {
+    renderThemed(<ChordBox leader="cmd+e" ctx={c} chords={table} onClose={() => {}} />)
+    const out = screen.getAllByRole("menuitem").map((i) => i.textContent)
+    cleanup()
+    return out
+  }
+  expect(labels({ path: "/agents/s-a", session })).toContain("mSwitch model")
+  expect(labels({ path: "/agents/s-a", session: { ...session, flow: "design" } })).not.toContain(
+    "mSwitch model",
+  )
 })
 
 test("is on the layer stack while mounted", () => {

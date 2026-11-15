@@ -6,6 +6,7 @@ import { hasLayer } from "../ui/modal/layers"
 import { ChordBox } from "./ChordBox"
 import { draftPageActions } from "./draftPageActions"
 import { chordTable, draftIdOf, letterOf, matchesKey, useOpenChat, type Chord } from "./chords"
+import { openModelPicker } from "./modelPickerOpen"
 import { openRemoveConfirm } from "./removeConfirmOpen"
 import { openRename } from "./renameOpen"
 
@@ -53,6 +54,10 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
           const { session: s, ctx: c } = live.current
           if (draftIdOf(c.path)) draftPageActions()?.rename()
           else if (s) openRename({ session: s })
+        },
+        switchModel: () => {
+          const { session: s } = live.current
+          if (s) openModelPicker({ session: s })
         },
       }),
     [chords],

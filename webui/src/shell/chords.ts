@@ -109,13 +109,15 @@ export function useOpenChat(): { path: string; session: SessionInfo | undefined 
   return { path: pathname, session }
 }
 
-/** The chord table. `remove` and `rename` are the popup openers, handed in so this module does not depend on them. */
+/** The chord table. `remove`, `rename` and `switchModel` are the popup openers, handed in so this module does not depend on them. */
 export function chordTable({
   remove,
   rename,
+  switchModel,
 }: {
   remove: () => void
   rename: () => void
+  switchModel: () => void
 }): Chord[] {
   return [
     { key: "c", label: () => "New chat", run: openNewAgent, available: () => true },
@@ -132,6 +134,8 @@ export function chordTable({
       run: rename,
       available: canRenameHere,
     },
+    // Offered on the pages where Rename chat is, so the picker never opens for a Queue agent or a flow.
+    { key: "m", label: () => "Switch model", run: switchModel, available: canRename },
     {
       key: "x",
       label: ({ path, session: s }) =>
