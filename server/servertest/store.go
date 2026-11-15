@@ -86,6 +86,8 @@ type TicketOpts struct {
 	Result string
 	// Commitless writes commitless: true, a ticket that makes no commit.
 	Commitless bool
+	// Verified writes a "## Verified" section with these entries, omitted when empty.
+	Verified []schema.VerifiedEntry
 }
 
 // WriteTicketWith is WriteTicket with a type, a parent and several blockers. Unlike
@@ -191,6 +193,9 @@ func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) err
 	fm += "---\n\n# " + slug + "\n"
 	if opts.Result != "" {
 		fm += "\n## Result\n\n" + opts.Result + "\n"
+	}
+	for _, e := range opts.Verified {
+		fm = schema.AppendVerified(fm, e)
 	}
 	return os.WriteFile(filepath.Join(issues, id+"-"+slug+".md"), []byte(fm), 0o644)
 }

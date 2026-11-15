@@ -51,11 +51,38 @@ func TestLaunch_RelaunchPromptListsEarlierSummaries(t *testing.T) {
 			}
 			t.Cleanup(func() { fake.SetState(rigs.ResumeLabel, agentrunner.StateDone, "") })
 			servertest.WaitFor(t, 10*time.Second, "the ticket launches", func() bool { return len(fake.Prompts(rigs.ResumeLabel)) > 0 })
-			got := fake.Prompts(rigs.ResumeLabel)[0]
+			if got := fake.Prompts(rigs.ResumeLabel)[0]; strings.Contains(got, "## Iteration summaries") || strings.Contains(got, "\n") {
+				t.Errorf("typed prompt carries the note:\n%s", got)
+			}
+			noteFile := filepath.Join(store, "proj", "epic-a", "launch", "01-note.md")
+			note, err := os.ReadFile(noteFile)
+			if err != nil {
+				t.Fatalf("note file: %v", err)
+			}
 			for _, want := range []string{"## Iteration summaries", "sess-old (agent)", "wired the parser", "flaky fixture", "kept the table", "left: docs"} {
-				if !strings.Contains(got, want) {
-					t.Errorf("prompt lacks %q:\n%s", want, got)
+				if !strings.Contains(string(note), want) {
+					t.Errorf("note lacks %q:\n%s", want, note)
 				}
+			}
+			args := fake.Args(rigs.ResumeLabel)
+			var files []string
+			for i, a := range args {
+				if a == "--append-system-prompt" {
+					t.Errorf("inline prompt flag in %v", args)
+				}
+				if a == "--append-system-prompt-file" && i+1 < len(args) {
+					files = append(files, args[i+1])
+				}
+			}
+			if len(files) != 1 {
+				t.Fatalf("prompt files = %v, want exactly one", files)
+			}
+			prompt, err := os.ReadFile(files[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(prompt), noteFile) || strings.Contains(string(prompt), "\n") {
+				t.Errorf("prompt file should be one line naming %s:\n%s", noteFile, prompt)
 			}
 		})
 	}

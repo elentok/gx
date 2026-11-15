@@ -239,7 +239,7 @@ func (v recoveryVerbs) LaunchPrompt(address string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("no ticket %s", address)
 	}
-	return LaunchPrompt(v.rec.d.Harness.ResolveTicket(ref.Addr, ref.Ticket).Harness, LaunchSkill(ref.Ticket), InvestigatePrompt(ref.Ticket), address), nil
+	return LaunchPrompt(v.rec.d.Harness.ResolveTicket(ref.Addr, ref.Ticket).Harness, LaunchSkill(ref.Ticket), address), nil
 }
 
 // ticketCommitlessDone marks a ticket done with no commits of its own, for work

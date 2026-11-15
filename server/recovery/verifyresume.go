@@ -9,6 +9,10 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+// VerifyEveryStory opens every verify relaunch note: the lists adjust the
+// scope, they never narrow it to the listed stories.
+const VerifyEveryStory = "verify every story in the ticket; the lists below only adjust that"
+
 // VerifyResumeNote is what a relaunched verify agent is told on top of the
 // skill command: which recorded stories stand at head (skip them) and which
 // do not (check them again). A ticket with no Verified entries gets no note.
@@ -44,6 +48,7 @@ func VerifyResumeNote(t tickets.Ticket, head string) string {
 		}
 	}
 	var b strings.Builder
+	b.WriteString(VerifyEveryStory + "\n")
 	fmt.Fprintf(&b, "This is a relaunch. HEAD is %s. The ticket's ## Verified section records earlier verdicts.\n", head)
 	if len(skip) > 0 {
 		fmt.Fprintf(&b, "Skip these stories, checked at HEAD:\n%s\n", strings.Join(skip, "\n"))

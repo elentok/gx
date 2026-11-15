@@ -69,6 +69,33 @@ func WithGXSystemPrompt(args []string) []string {
 	return append(args, "--append-system-prompt", GXLoopPrompt)
 }
 
+// GXLoopPromptWithNote is GXLoopPrompt plus the one line that sends the agent
+// to its launch note file. One line, like the rest.
+func GXLoopPromptWithNote(noteFile string) string {
+	return GXLoopPrompt + " Before the skill's first step, read `" + noteFile + "` and treat it as part of your launch prompt."
+}
+
+// WithPromptFile points claude args at file as the one system-prompt file,
+// replacing whichever prompt flag they carry. Args with none get the flag.
+func WithPromptFile(args []string, file string) []string {
+	out := slices.Clone(args)
+	for i, a := range out {
+		switch a {
+		case "--append-system-prompt-file":
+			if i+1 < len(out) {
+				out[i+1] = file
+				return out
+			}
+		case "--append-system-prompt":
+			if i+1 < len(out) {
+				out[i], out[i+1] = "--append-system-prompt-file", file
+				return out
+			}
+		}
+	}
+	return append(out, "--append-system-prompt-file", file)
+}
+
 func hasPromptFlag(args []string) bool {
 	return slices.Contains(args, "--append-system-prompt") || slices.Contains(args, "--append-system-prompt-file")
 }

@@ -2,9 +2,11 @@ package spec
 
 import (
 	"slices"
+	"strconv"
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // RejectedFirstPrompt is a server-launched session whose agent rejects the
@@ -27,6 +29,19 @@ func stallEpic(name, behaviour string) scenario {
 	}
 }
 
+func longVerifyEpic() scenario {
+	var verified []schema.VerifiedEntry
+	for i := range 40 {
+		verified = append(verified, schema.VerifiedEntry{Story: strconv.Itoa(i + 1), Verdict: "pass", Commit: "deadbeef"})
+	}
+	const name = "long-verify-epic"
+	return scenario{
+		Epics:     []epic{{project, name, []ticket{{"01", "verify", servertest.TicketOpts{Type: "verify", Verified: verified}}}}},
+		Queue:     []string{project + ":" + name},
+		Behaviour: map[string]string{project + ":" + name + "/01": agentfake.BehaviourFinish},
+	}
+}
+
 var (
 	// StallVim: the agent goes idle without a report; a test toggles it into vim
 	// before the stall nudge arrives.
@@ -37,6 +52,10 @@ var (
 	// launch prompt is resent until it lands.
 	LateRegistry = withEnv(stallEpic("late-registry-epic", agentfake.BehaviourFinish),
 		agentfake.TUIRegistryDelayEnv+"=6s", "GX_LAUNCH_UNKNOWN_GRACE=20s")
+	// LongVerifyNote: a verify ticket with many recorded verdicts, so its
+	// relaunch note is far longer than the paste limit the fake TUI enforces.
+	// The skill runs only when the typed prompt stays the bare command.
+	LongVerifyNote = withEnv(longVerifyEpic(), agentfake.TUIPasteOverEnv+"=300")
 	// NoUserRecord: the agent stalls in a conversation with no user record.
 	NoUserRecord = stallEpic("no-record-epic", agentfake.BehaviourStallNoRecord)
 )

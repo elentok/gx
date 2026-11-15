@@ -594,6 +594,45 @@ func TestTUIClaude_LaunchRecordIsOnByDefaultAndWritesTheCommandAsTheFirstUserRec
 	}
 }
 
+func TestTUIClaude_PasteOverKnobMakesALongSkillPromptAPaste(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs, TUIPasteOverEnv+"=40")
+	f.waitStatus(StatusIdle, "")
+	f.typeLine("/gx-implement gx:epic/01\n\n" + strings.Repeat("long note ", 10))
+	f.waitFor("a user record", func() bool {
+		return slices.ContainsFunc(f.transcriptLines(), func(l string) bool { return strings.Contains(l, `"type":"user"`) })
+	})
+	content, skip := firstUserRecord(t, f)
+	if !strings.Contains(content, "<pasted_content>") || !skip || strings.Contains(content, "<command-name>") {
+		t.Fatalf("first record = %q (queueSkipSlashCommands %v)", content, skip)
+	}
+}
+
+func firstUserRecord(t *testing.T, f *tuiFake) (content string, skip bool) {
+	t.Helper()
+	var rec struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+		Skip bool `json:"queueSkipSlashCommands"`
+	}
+	if err := json.Unmarshal([]byte(f.transcriptLines()[0]), &rec); err != nil {
+		t.Fatal(err)
+	}
+	return rec.Message.Content, rec.Skip
+}
+
+func TestTUIClaude_PasteOverKnobLeavesAShortSkillPromptACommand(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs, TUIPasteOverEnv+"=40")
+	f.waitStatus(StatusIdle, "")
+	f.typeLine("/gx-implement gx:epic/01")
+	f.waitFor("a user record", func() bool {
+		return slices.ContainsFunc(f.transcriptLines(), func(l string) bool { return strings.Contains(l, `"type":"user"`) })
+	})
+	if content, _ := firstUserRecord(t, f); !strings.Contains(content, "<command-name>/gx-implement</command-name>") {
+		t.Fatalf("first record = %q", content)
+	}
+}
+
 func TestTUIClaude_ClearStillChangesTheSessionIDWhenArmed(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs)
 	f.waitStatus(StatusIdle, "")

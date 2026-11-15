@@ -74,6 +74,11 @@ const (
 	// TUILaunchRecordEnv makes a skill prompt's first transcript record the
 	// user record claude writes for the command. On by default; "0" turns it off.
 	TUILaunchRecordEnv = "GX_AGENTFAKE_TUI_LAUNCH_RECORD"
+	// TUIPasteOverEnv, a character count, makes a skill prompt longer than
+	// that a paste, as real claude takes a long typed input: the first user
+	// record is a <pasted_content> record with queueSkipSlashCommands, not the
+	// <command-name> record, so the skill never runs.
+	TUIPasteOverEnv = "GX_AGENTFAKE_TUI_PASTE_OVER"
 	// TUIPlainScreenEnv, set to "1", draws the plain "> " screen instead of the
 	// input box claudeui.InputBox recognises.
 	TUIPlainScreenEnv = "GX_AGENTFAKE_TUI_PLAIN_SCREEN"

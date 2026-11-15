@@ -262,6 +262,7 @@ var Scenarios = map[string]scenario{
 	"stall-leaves-i":           spec.StallLeavesI,
 	"late-registry":            spec.LateRegistry,
 	"no-user-record":           spec.NoUserRecord,
+	"long-verify-note":         spec.LongVerifyNote,
 	"vim-launch":               spec.VimLaunch,
 	"hung-pane-twice":          spec.HungPaneTwice,
 	"hung-pane-once":           spec.HungPaneOnce,

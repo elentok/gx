@@ -21,6 +21,7 @@ const (
 	stallITicket        = "demo:stall-i-epic/01"
 	lateRegistryTicket  = "demo:late-registry-epic/01"
 	noUserRecordTicket  = "demo:no-record-epic/01"
+	longVerifyTicket    = "demo:long-verify-epic/01"
 	skillPromptSnippet  = "/gx-implement"
 	nudgeEventWaitLimit = 60 * time.Second
 )
@@ -142,6 +143,16 @@ func TestLateRegistryScenario_TheLaunchPromptIsNudgedUntilATurnStarts(t *testing
 	r.waitEvents(t, lateRegistryTicket, string(events.PromptNudged))
 	// The ticket finishes only when a turn started once the registry filled.
 	r.WaitStatus(t, lateRegistryTicket, "done")
+	r.Stop(t)
+}
+
+// A long verify relaunch note must not reach the typed prompt: the fake TUI
+// takes a long typed skill prompt as a paste, and then the skill never runs
+// and the ticket never finishes.
+func TestLongVerifyNoteScenario_TheSkillRunsAsACommandNotAPaste(t *testing.T) {
+	t.Parallel()
+	r := start(t, "long-verify-note")
+	r.WaitStatus(t, longVerifyTicket, "done")
 	r.Stop(t)
 }
 

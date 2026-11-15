@@ -185,7 +185,7 @@ func (t *tui) skillPromptKnobs(text string) (bool, error) {
 		return false, nil
 	}
 	o := t.opts
-	if !o.unknownSkill && o.registryDelay == 0 && !o.noTurn && !o.launchRecord {
+	if !o.unknownSkill && o.registryDelay == 0 && !o.noTurn && !o.launchRecord && o.pasteOver == 0 {
 		return false, nil
 	}
 	skill, _, _ := strings.Cut(text, " ")
@@ -205,6 +205,9 @@ func (t *tui) skillPromptKnobs(text string) (bool, error) {
 		})
 	case t.opts.noTurn:
 		return true, nil
+	case t.opts.pasteOver > 0 && len(text) > t.opts.pasteOver:
+		// A paste is no command: the skill never runs and no turn follows.
+		return true, AppendEntry(path, "user", "<pasted_content>\n"+text+"\n</pasted_content>", map[string]any{"queueSkipSlashCommands": true})
 	case t.opts.launchRecord && t.commandOutput == nil:
 		// An armed command output writes the command line itself.
 		name := strings.TrimPrefix(skill, "/")

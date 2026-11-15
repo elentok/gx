@@ -69,6 +69,8 @@ type tuiOptions struct {
 	unknownSkill  bool
 	noTurn        bool
 	launchRecord  bool
+	// pasteOver, when positive, turns a skill prompt longer than it into a paste.
+	pasteOver int
 	// plainScreen draws the "> " screen instead of the input box (see TUIPlainScreenEnv).
 	plainScreen bool
 	// classifierOutage is how many more turns fail (see TUIClassifierOutageEnv).
@@ -135,6 +137,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	if vimFooter == "" && os.Getenv(TUIIgnoreEditorModeEnv) == "1" {
 		vimFooter = "-- INSERT --"
 	}
+	pasteOver, _ := strconv.Atoi(os.Getenv(TUIPasteOverEnv))
 	row, _ := LaunchModel(*model)
 	return tuiOptions{
 		hung:             hung,
@@ -155,6 +158,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		unknownSkill:     os.Getenv(TUIUnknownSkillEnv) == "1",
 		noTurn:           os.Getenv(TUINoTurnEnv) == "1",
 		launchRecord:     os.Getenv(TUILaunchRecordEnv) != "0",
+		pasteOver:        pasteOver,
 		model:            cmp.Or(ResolveClaudeModel(*model), ReportedModel),
 		modelRow:         row,
 		settings:         settings,

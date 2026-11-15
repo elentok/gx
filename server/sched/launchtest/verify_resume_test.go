@@ -67,7 +67,17 @@ func TestLaunch_VerifyRelaunchListsSkippedAndRecheckedStories(t *testing.T) {
 	if len(prompts) == 0 {
 		t.Fatal("no prompt delivered")
 	}
-	got := prompts[0]
+	if strings.Contains(prompts[0], "\n") {
+		t.Errorf("typed prompt carries the note:\n%s", prompts[0])
+	}
+	raw, err = os.ReadFile(filepath.Join(store, "proj", "epic-a", "launch", "01-note.md"))
+	if err != nil {
+		t.Fatalf("note file: %v", err)
+	}
+	got := string(raw)
+	if !strings.Contains(got, "verify every story in the ticket; the lists below only adjust that") {
+		t.Errorf("note lacks the verify-every-story sentence:\n%s", got)
+	}
 	skipAt, recheckAt := strings.Index(got, "Skip these stories"), strings.Index(got, "Re-check these stories")
 	if skipAt < 0 || recheckAt < skipAt {
 		t.Fatalf("prompt lacks skip then re-check groups:\n%s", got)

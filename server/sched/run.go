@@ -565,6 +565,7 @@ func (l *Launcher) settleRun(rc runContext, err error) {
 		l.Log.Warn("clean up agent", "ticket", ticketAddr, "err", cerr)
 	}
 	l.Events.Publish(wire.EventTicketDone, ticketAddr)
+	l.removeLaunchNote(addr)
 	l.Writer.StampFinished(addr, one.Ticket.Path, false)
 	l.OneOffs.NotifyResult(addr, one.Ticket.Path)
 	l.NotifyDone(addr, one.Ticket.Path)

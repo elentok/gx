@@ -27,6 +27,31 @@ func TestWithGXSystemPrompt_SkipsOnEitherFlag(t *testing.T) {
 	}
 }
 
+func TestWithPromptFile_ReplacesEitherFlag(t *testing.T) {
+	t.Parallel()
+	for name, in := range map[string][]string{
+		"file":   {"--x", "--append-system-prompt-file", "shared.md", "--y"},
+		"inline": {"--x", "--append-system-prompt", "text", "--y"},
+		"none":   {"--x", "--y"},
+	} {
+		got := harness.WithPromptFile(in, "mine.md")
+		if n := strings.Count(strings.Join(got, " "), "--append-system-prompt"); n != 1 || slices.Contains(got, "--append-system-prompt") || !slices.Contains(got, "mine.md") || slices.Contains(got, "shared.md") || slices.Contains(got, "text") {
+			t.Errorf("%s: args = %q, want one --append-system-prompt-file mine.md", name, got)
+		}
+	}
+}
+
+func TestGXLoopPromptWithNote_AddsOneLineNamingTheFile(t *testing.T) {
+	t.Parallel()
+	got := harness.GXLoopPromptWithNote("/s/note.md")
+	if !strings.HasPrefix(got, harness.GXLoopPrompt) || strings.Contains(got, "\n") {
+		t.Fatalf("prompt = %q", got)
+	}
+	if want := "read `/s/note.md` and treat it as part of your launch prompt."; !strings.HasSuffix(got, want) {
+		t.Errorf("prompt lacks %q", want)
+	}
+}
+
 func TestGXFilesSentence_IsTheSpecTextOnOneLine(t *testing.T) {
 	t.Parallel()
 	want := "To show the person a file you made (Markdown, HTML, a Mermaid diagram, a mock), never start your own HTTP server. Run `gx files url <path>` and send that link. gx hosts the file behind its web login. If the command refuses the path, save the file in the repo or a temp folder and run it again."

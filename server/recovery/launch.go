@@ -43,11 +43,9 @@ func LaunchSkill(t tickets.Ticket) string {
 	return implementSkill
 }
 
-// LaunchPrompt is the first prompt of an agent: the skill command, then the note.
-func LaunchPrompt(agentKind agent.AgentKind, skill, note, address string) string {
-	prompt := agent.SkillPrompt(agentKind, skill, address)
-	if note != "" {
-		prompt += "\n\n" + note
-	}
-	return prompt
+// LaunchPrompt is the first prompt of an agent: the skill command and the
+// ticket address. A launch note never rides in it: a long one makes Claude
+// Code take the typed keys as a paste (see the launcher's note file).
+func LaunchPrompt(agentKind agent.AgentKind, skill, address string) string {
+	return agent.SkillPrompt(agentKind, skill, address)
 }

@@ -72,8 +72,17 @@ func TestInvestigateLaunch_RunsDetachedAtTheFeatureBranchTipAndNamesTheMatchedEn
 	if branch := gitOut(t, p.Cwd, "branch", "--show-current"); branch != "" {
 		t.Errorf("investigate worktree is on branch %q, want detached", branch)
 	}
-	if !strings.Contains(p.Text, "Matched catalog entry: No catalog entry matched") {
-		t.Errorf("prompt = %q, want it to name the matched entry", p.Text)
+	// The launch note rides in a store file, not the typed prompt.
+	notes, err := filepath.Glob(filepath.Join(store, "proj", "*", "launch", "*-note.md"))
+	if err != nil || len(notes) != 1 {
+		t.Fatalf("note files = %v, %v; want one", notes, err)
+	}
+	note, err := os.ReadFile(notes[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(note), "Matched catalog entry: No catalog entry matched") {
+		t.Errorf("note = %q, want it to name the matched entry", note)
 	}
 }
 
