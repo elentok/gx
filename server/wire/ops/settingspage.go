@@ -16,6 +16,31 @@ type SettingsReadResponse struct {
 	Entries []SettingsEntry  `json:"entries"`
 	// PendingRestart lists the startup-only keys changed since the server started.
 	PendingRestart []string `json:"pending_restart,omitempty"`
+	// Categories is the page tree for the target: categories, sections and
+	// groups in page order. One holding no entry of the read is absent.
+	Categories []SettingsCategory `json:"categories"`
+	// Redirects maps a retired section slug to the slug that now holds its keys.
+	Redirects map[string]string `json:"redirects"`
+}
+
+// SettingsCategory is one category of the page tree and its sections.
+type SettingsCategory struct {
+	Name     string            `json:"name"`
+	Sections []SettingsSection `json:"sections"`
+}
+
+// SettingsSection is one section of the page tree and its groups.
+type SettingsSection struct {
+	Name   string          `json:"name"`
+	Slug   string          `json:"slug"`
+	Groups []SettingsGroup `json:"groups"`
+}
+
+// SettingsGroup is one group of a section. A Table group renders its entries
+// as a grid of tier rows and column columns.
+type SettingsGroup struct {
+	Name  string `json:"name"`
+	Table bool   `json:"table,omitempty"`
 }
 
 // SettingsProject is a project's identity and the facts the page shows
@@ -32,10 +57,15 @@ type SettingsProject struct {
 // SettingsEntry is one setting: what it is and what the target's file holds.
 type SettingsEntry struct {
 	// Key is the display key path; Path is its segments.
-	Key         string   `json:"key"`
-	Path        []string `json:"path"`
-	Type        string   `json:"type"`
-	Section     string   `json:"section"`
+	Key      string   `json:"key"`
+	Path     []string `json:"path"`
+	Type     string   `json:"type"`
+	Section  string   `json:"section"`
+	Category string   `json:"category"`
+	Group    string   `json:"group"`
+	// Tier and Column place a key of a table group (Models) in its table.
+	Tier        string   `json:"tier,omitempty"`
+	Column      string   `json:"column,omitempty"`
 	Description string   `json:"description"`
 	Enum        []string `json:"enum,omitempty"`
 	Min         *float64 `json:"min,omitempty"`

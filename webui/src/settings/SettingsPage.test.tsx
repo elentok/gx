@@ -70,6 +70,8 @@ describe("SettingsPage project scope", () => {
         path: ["trunk"],
         type: "string",
         section: "Project",
+        category: "Project",
+        group: "Repository",
         description: "Trunk.",
         set: false,
       },
@@ -77,6 +79,8 @@ describe("SettingsPage project scope", () => {
     const { findByRole } = renderAt("/settings/p/gx", async () => ({
       project: { name: "gx", repo_checks_file: false },
       entries,
+      categories: [],
+      redirects: {},
     }))
     expect(await findByRole("heading", { name: "Project" })).toBeTruthy()
   })
@@ -94,6 +98,8 @@ describe("SettingsPage on a phone", () => {
     path: [key],
     type: "string",
     section,
+    category: "",
+    group: "",
     description: `${key} text.`,
     set,
   })
@@ -181,6 +187,8 @@ describe("SettingsPage Dev checkout", () => {
         path: ["server", "web", "dev-frontend"],
         type: "bool",
         section: "Server",
+        category: "System",
+        group: "Runtime",
         description: "Dev.",
         set: false,
         default: false,
@@ -260,6 +268,8 @@ describe("SettingsHomeView", () => {
         path: ["budget", "soft"],
         type: "number",
         section: "Budget",
+        category: "Ralph loop",
+        group: "Spend limits",
         description: "Soft.",
         set: true,
       },
@@ -288,6 +298,8 @@ describe("SettingsHomeView", () => {
         path: ["budget", "soft"],
         type: "number",
         section: "Budget",
+        category: "Ralph loop",
+        group: "Spend limits",
         description: "Soft limit.",
         set: false,
       },
@@ -298,6 +310,8 @@ describe("SettingsHomeView", () => {
         path: ["trunk"],
         type: "string",
         section: "Project",
+        category: "Project",
+        group: "Repository",
         description: "Trunk branch.",
         set: false,
       },

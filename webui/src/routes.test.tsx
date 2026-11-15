@@ -141,7 +141,7 @@ test("/diff renders the Diff page through the lazy chunk and asks for the file l
 
 test("/settings/agents redirects to the Agents section", async () => {
   const { router } = renderAt("/settings/agents", okFor, undefined, undefined, {
-    settings: async () => ({ entries: [] }),
+    settings: async () => ({ entries: [], categories: [], redirects: {} }),
     authState: async () => ({ totp_on: false, setup_code_required: false }) as never,
     logins: async () => [],
   })
@@ -156,6 +156,8 @@ test("/settings lands on the first section and a section route shows that sectio
         path: ["execution-queue", "max-agents"],
         type: "number",
         section: "Execution queue",
+        category: "Ralph loop",
+        group: "Agent limits",
         description: "Live agents.",
         set: false,
       },
@@ -164,10 +166,14 @@ test("/settings lands on the first section and a section route shows that sectio
         path: ["budget", "soft"],
         type: "number",
         section: "Budget",
+        category: "Ralph loop",
+        group: "Spend limits",
         description: "Soft limit.",
         set: false,
       },
     ],
+    categories: [],
+    redirects: {},
   })
   const extra: RouteFetchers = {
     settings,

@@ -63,7 +63,37 @@ func (w *Writer) Read(t Target, pendingRestart []string) (ops.SettingsReadRespon
 		}
 		resp.Entries = append(resp.Entries, entry)
 	}
+	resp.Categories = buildTree(entries)
+	resp.Redirects = registry.RetiredSlugs()
 	return resp, nil
+}
+
+// buildTree is the registry tree cut down to the categories, sections and
+// groups that hold one of the entries.
+func buildTree(entries []registry.Entry) []ops.SettingsCategory {
+	used := map[registry.Place]bool{}
+	for _, e := range entries {
+		used[e.Place()] = true
+	}
+	out := []ops.SettingsCategory{}
+	for _, c := range registry.Tree() {
+		cat := ops.SettingsCategory{Name: string(c.Name), Sections: []ops.SettingsSection{}}
+		for _, s := range c.Sections {
+			sec := ops.SettingsSection{Name: s.Name.String(), Slug: s.Name.Slug(), Groups: []ops.SettingsGroup{}}
+			for _, g := range s.Groups {
+				if used[registry.Place{Category: c.Name, Section: s.Name, Group: g.Name}] {
+					sec.Groups = append(sec.Groups, ops.SettingsGroup{Name: g.Name, Table: g.Table})
+				}
+			}
+			if len(sec.Groups) > 0 {
+				cat.Sections = append(cat.Sections, sec)
+			}
+		}
+		if len(cat.Sections) > 0 {
+			out = append(out, cat)
+		}
+	}
+	return out
 }
 
 func buildEntry(e registry.Entry, project bool, targetDoc, globalDoc []byte) ops.SettingsEntry {
@@ -73,6 +103,7 @@ func buildEntry(e registry.Entry, project bool, targetDoc, globalDoc []byte) ops
 	}
 	out := ops.SettingsEntry{
 		Key: e.Key.String(), Path: e.Key, Type: typeName(e.Type), Section: e.Section.String(),
+		Category: string(e.Category), Group: e.Group, Tier: string(e.Tier), Column: string(e.Column),
 		Description: e.Description, Enum: e.Enum, Min: e.Min, Integer: e.Integer,
 		Restart: e.Restart, Risky: e.Risky, ConfirmText: e.ConfirmText, ReadOnly: e.ReadOnly, Identity: e.Identity,
 		Label: e.Label, RiskyOffOnly: e.RiskyOffOnly, Override: string(e.Override),

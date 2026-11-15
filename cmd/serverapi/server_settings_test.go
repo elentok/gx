@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -54,6 +55,12 @@ func TestServerSettings_JSONMatchesEndpointAndHidesSecrets(t *testing.T) {
 		keys := map[string]bool{}
 		for _, e := range got.Entries {
 			keys[e.Key] = true
+			if e.Category == "" || e.Section == "" || e.Group == "" {
+				t.Errorf("%s: %s lacks category/section/group: %+v", target, e.Key, e)
+			}
+		}
+		if len(got.Categories) == 0 || !reflect.DeepEqual(got.Redirects, registry.RetiredSlugs()) {
+			t.Errorf("%s: tree = %v, redirects = %v", target, got.Categories, got.Redirects)
 		}
 		for _, e := range registry.Default().All() {
 			if target == "global" && !e.ProjectOnly && !keys[e.Key.String()] {

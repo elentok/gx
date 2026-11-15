@@ -18,6 +18,8 @@ const entry = (key: string, section: string, set: boolean): SettingsEntry => ({
   path: key.split("."),
   type: "string",
   section,
+  category: "",
+  group: "",
   description: "",
   set,
 })

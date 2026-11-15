@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -232,5 +233,78 @@ func TestReadProjectChecksRepoFileFlag(t *testing.T) {
 	}
 	if !resp.Project.RepoChecksFile {
 		t.Error("repo file not flagged")
+	}
+}
+
+func TestReadCarriesTree(t *testing.T) {
+	t.Parallel()
+	w, _ := readFixture(t, `{}`, `{"name":"proj","repo":"REPO"}`)
+	resp, err := w.Read(Target{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range w.Registry.All() {
+		if e.ProjectOnly {
+			continue
+		}
+		got := entryByKey(t, resp, e.Key.String())
+		if got.Category != string(e.Category) || got.Section != e.Section.String() || got.Group != e.Group ||
+			got.Tier != string(e.Tier) || got.Column != string(e.Column) {
+			t.Errorf("%s placed at %+v", e.Key, got)
+		}
+	}
+	if !reflect.DeepEqual(resp.Redirects, registry.RetiredSlugs()) {
+		t.Errorf("redirects = %v", resp.Redirects)
+	}
+	var models *ops.SettingsSection
+	for _, c := range resp.Categories {
+		if c.Name == "Project" || c.Name == "Checks" {
+			t.Errorf("global read lists category %s", c.Name)
+		}
+		for i, s := range c.Sections {
+			if s.Name == "Models" {
+				models = &c.Sections[i]
+			}
+		}
+	}
+	if models == nil || len(models.Groups) == 0 {
+		t.Fatalf("no Models section in %+v", resp.Categories)
+	}
+	for _, g := range models.Groups {
+		if !g.Table {
+			t.Errorf("Models group %s is not a table", g.Name)
+		}
+	}
+	if tier := entryByKey(t, resp, "agents.claude.light.effort"); tier.Tier != "light" || tier.Column != "effort" {
+		t.Errorf("light effort = %s/%s", tier.Tier, tier.Column)
+	}
+}
+
+func TestReadProjectTreeIsProjectView(t *testing.T) {
+	t.Parallel()
+	w, _ := readFixture(t, `{}`, `{"name":"proj","repo":"REPO"}`)
+	resp, err := w.Read(Target{Project: "proj"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names, got []string
+	for _, c := range resp.Categories {
+		names = append(names, c.Name)
+		if c.Name == "Notifications" || c.Name == "Account" {
+			t.Errorf("project tree lists %s", c.Name)
+		}
+		for _, s := range c.Sections {
+			got = append(got, s.Name)
+		}
+	}
+	if len(names) < 2 || names[0] != "Project" || names[len(names)-1] != "Checks" {
+		t.Errorf("categories = %v, want Project first and Checks last", names)
+	}
+	var want []string
+	for _, s := range w.Registry.ProjectView() {
+		want = append(want, s.Section.String())
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("sections = %v, want %v", got, want)
 	}
 }

@@ -9,6 +9,8 @@ const entry = (value?: unknown): SettingsEntry => ({
   path: ["checks"],
   type: "json",
   section: "Checks",
+  category: "Checks",
+  group: "Checks",
   description: "Commands gx check runs.",
   set: value !== undefined,
   value,

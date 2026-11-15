@@ -11,6 +11,8 @@ const entry = (over: Partial<SettingsEntry>): SettingsEntry => ({
   path: ["execution-queue", "max-agents"],
   type: "number",
   section: "Execution queue",
+  category: "Ralph loop",
+  group: "Agent limits",
   description: "Live agents.",
   set: false,
   ...over,

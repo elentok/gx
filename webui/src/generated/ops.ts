@@ -693,6 +693,38 @@ export interface SettingsReadResponse {
    * PendingRestart lists the startup-only keys changed since the server started.
    */
   pending_restart?: string[];
+  /**
+   * Categories is the page tree for the target: categories, sections and
+   * groups in page order. One holding no entry of the read is absent.
+   */
+  categories: SettingsCategory[];
+  /**
+   * Redirects maps a retired section slug to the slug that now holds its keys.
+   */
+  redirects: { [key: string]: string};
+}
+/**
+ * SettingsCategory is one category of the page tree and its sections.
+ */
+export interface SettingsCategory {
+  name: string;
+  sections: SettingsSection[];
+}
+/**
+ * SettingsSection is one section of the page tree and its groups.
+ */
+export interface SettingsSection {
+  name: string;
+  slug: string;
+  groups: SettingsGroup[];
+}
+/**
+ * SettingsGroup is one group of a section. A Table group renders its entries
+ * as a grid of tier rows and column columns.
+ */
+export interface SettingsGroup {
+  name: string;
+  table?: boolean;
 }
 /**
  * SettingsProject is a project's identity and the facts the page shows
@@ -719,6 +751,13 @@ export interface SettingsEntry {
   path: string[];
   type: string;
   section: string;
+  category: string;
+  group: string;
+  /**
+   * Tier and Column place a key of a table group (Models) in its table.
+   */
+  tier?: string;
+  column?: string;
   description: string;
   enum?: string[];
   min?: number /* float64 */;
