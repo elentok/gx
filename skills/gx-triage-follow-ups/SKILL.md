@@ -91,7 +91,7 @@ One row per item with its action and destination:
 Routing, first match wins:
 
 1. Any `design` question → area, as `grilling`.
-2. Needs investigation but no decision → area, as `research`.
+2. Needs investigation but no decision → area, as `research`: set `"investigate": true` on the plan row.
 3. Otherwise → ready epic, as `implement`, with its `ask` questions answered in Questions.
 
 **Areas.** Use an existing area. Areas in the shipped [mapping table](old-epic-areas.txt) need no

@@ -141,6 +141,9 @@ type PlanRow struct {
 	Estimate string `json:"estimate,omitempty"`
 	// Fallback is the area a ready row goes to when its own area is unusable.
 	Fallback string `json:"fallback,omitempty"`
+	// Investigate marks an area row that needs investigation but no decision:
+	// it is written as a research ticket.
+	Investigate bool `json:"investigate,omitempty"`
 }
 
 // PersonFields are what the person decided for a row.

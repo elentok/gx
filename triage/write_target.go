@@ -25,13 +25,15 @@ type WriteTarget struct {
 // to an area or the ready epic; ok is false for any other action.
 //
 // A row whose ask questions no round reached goes to an area as a grilling
-// ticket: a ready row at once (to its fallback area), an area row only once the
-// ordinary rounds are used up.
+// ticket, a ready row to its fallback area. An area row with a design question
+// is grilling too; an area row marked investigate is research.
 func (r *Record) WriteTarget(row *Row) (t WriteTarget, ok bool) {
 	action, dest := row.Effective()
 	var unreached []string
 	for _, q := range row.AllQuestions() {
-		if q.Kind == QuestionAsk && !r.questionPlaced(q.ID) && strings.TrimSpace(row.Person.Answers[q.ID]) == "" {
+		kind := q.Kind
+		if (kind == QuestionAsk || (kind == QuestionDesign && action == ActionArea)) &&
+			!r.questionPlaced(q.ID) && strings.TrimSpace(row.Person.Answers[q.ID]) == "" {
 			unreached = append(unreached, fmt.Sprintf("- %s", q.Text))
 		}
 	}
@@ -43,16 +45,13 @@ func (r *Record) WriteTarget(row *Row) (t WriteTarget, ok bool) {
 		}
 	case ActionArea:
 		t.Epic = dest
-		if len(unreached) > 0 && r.ordinaryRounds() < MaxOrdinaryRounds {
-			unreached = nil
-		}
 	default:
 		return WriteTarget{}, false
 	}
 	switch {
 	case len(unreached) > 0:
 		t.Type, t.Question = TypeGrilling, strings.Join(unreached, "\n")
-	case row.Category == TypeResearch:
+	case action == ActionArea && row.Plan != nil && row.Plan.Investigate:
 		t.Type = TypeResearch
 	default:
 		t.Type = TypeImplement

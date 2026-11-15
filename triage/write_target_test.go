@@ -73,15 +73,33 @@ func TestWriteTarget(t *testing.T) {
 	if _, ok := rec.WriteTarget(&rec.Rows[3]); ok {
 		t.Fatal("close row has a target")
 	}
-	// an area row's questions are not asked; it only turns grilling after 3 rounds
-	if got, _ := rec.WriteTarget(&rec.Rows[0]); got.Type != TypeImplement || got.Epic != "area-x" {
-		t.Fatalf("area row before the rounds ran out = %+v", got)
+	// an area row with an unrounded ask is grilling and carries the question, whatever the round count
+	if got, _ := rec.WriteTarget(&rec.Rows[0]); got.Type != TypeGrilling || got.Epic != "area-x" || !strings.Contains(got.Question, "Q q1") {
+		t.Fatalf("unrounded area row = %+v", got)
 	}
 	for range MaxOrdinaryRounds {
 		rec.Rounds = append(rec.Rounds, Round{Questions: []Question{ask("other", "p:follow-ups/03")}})
 	}
-	if got, _ := rec.WriteTarget(&rec.Rows[0]); got.Type != TypeGrilling || got.Epic != "area-x" || !strings.Contains(got.Question, "Q q1") {
-		t.Fatalf("unreached area row = %+v", got)
+	if got, _ := rec.WriteTarget(&rec.Rows[0]); got.Type != TypeGrilling || !strings.Contains(got.Question, "Q q1") {
+		t.Fatalf("unrounded area row after the rounds = %+v", got)
+	}
+}
+
+func TestWriteTarget_AreaRowTypes(t *testing.T) {
+	rec := &Record{Rows: []Row{
+		{Address: "p:follow-ups/01", Plan: &PlanRow{Action: ActionArea, Destination: "area-x", Investigate: true}},
+		{Address: "p:follow-ups/02", Plan: &PlanRow{Action: ActionArea, Destination: "area-x"}},
+		{Address: "p:follow-ups/03", Plan: &PlanRow{Action: ActionArea, Destination: "area-x", Investigate: true},
+			Questions: []Question{{ID: "d1", RowID: "p:follow-ups/03", Text: "Which shape?", Kind: QuestionDesign}}},
+	}}
+	if got, _ := rec.WriteTarget(&rec.Rows[0]); got.Type != TypeResearch || got.Epic != "area-x" {
+		t.Fatalf("investigate row = %+v", got)
+	}
+	if got, _ := rec.WriteTarget(&rec.Rows[1]); got.Type != TypeImplement {
+		t.Fatalf("plain area row = %+v", got)
+	}
+	if got, _ := rec.WriteTarget(&rec.Rows[2]); got.Type != TypeGrilling || !strings.Contains(got.Question, "Which shape?") {
+		t.Fatalf("design row = %+v", got)
 	}
 }
 
