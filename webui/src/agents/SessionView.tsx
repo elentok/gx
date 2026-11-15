@@ -6,6 +6,7 @@ import { hasChat, useSessionChat, type FetchChat } from "../design/chat"
 import { FailureBanner, needsTranscript, visibleFailure } from "../design/FailureBanner"
 import { ScreenModal } from "../design/ScreenModal"
 import type { FetchScreen } from "../design/screen"
+import { switchRunning } from "../design/modelSwitch"
 import { designOf, isTriage, promptable } from "../design/view"
 import type { SessionInfo } from "../generated/server"
 import { designHref, triageHref } from "../hrefs"
@@ -138,6 +139,7 @@ function sendReason(s: SessionInfo, connected: boolean): string | undefined {
   if (!connected) return "Offline. Send turns on when gx reconnects."
   if (!hasChat(s.harness)) return "Sending works for Claude and Codex sessions only"
   if (state === "exited") return "Exited. Restore it in gx, Agents tab."
+  if (switchRunning(s)) return "Switching model. Send turns on when the new agent is idle."
   if (!promptable(s)) {
     return `${stateLabel(s)}. Send turns on when the session is idle.`
   }

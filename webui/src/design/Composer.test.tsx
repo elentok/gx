@@ -275,6 +275,18 @@ test("the composer is disabled while the session is Working", async () => {
   expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull()
 })
 
+test("the composer is disabled while a switch back runs, though the session is Idle", async () => {
+  render({
+    auto: { switching_model: "claude-opus-4-6", switching_back: true },
+    post: vi.fn<PostPrompt>(async () => ok),
+  })
+  const box = await openNote()
+  expect(box.disabled).toBe(true)
+  expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true)
+  expect(await screen.findByText("Switching back to Claude Opus 4.6…")).toBeTruthy()
+  expect(screen.getByTestId("footer-line").textContent).toContain("switching")
+})
+
 const expand = () => screen.getByLabelText("Open the note in a large editor")
 
 test("the box is 3 rows and has the expand button; no round: Message to the agent", async () => {

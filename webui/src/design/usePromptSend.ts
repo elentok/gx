@@ -2,6 +2,7 @@ import type { SessionInfo, SessionPromptRequest } from "../generated/server"
 import { ReasonStale } from "../ticket/answer"
 import { useWrite } from "../useWrite"
 import { postPrompt, type PostPrompt } from "./prompt"
+import { switchRunning } from "./modelSwitch"
 import { promptable } from "./view"
 
 /** The send call both composers share: one guarded prompt post that refetches the chat when the conversation moved. */
@@ -23,7 +24,8 @@ export function usePromptSend({
   toastRefusal: boolean
 }) {
   const { run: write, pending, refusal, error } = useWrite({ toastRefusal })
-  const enabled = connected && promptable(session) && !pending
+  // A rollback runs from Idle or Blocked, so the status alone cannot say the agent is not ready.
+  const enabled = connected && promptable(session) && !switchRunning(session) && !pending
   const send = (body: Partial<SessionPromptRequest>, onSent?: () => void) => {
     if (!enabled) return
     return write(

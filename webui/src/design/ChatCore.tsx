@@ -8,6 +8,8 @@ import type {
   SessionChatMessage,
   SessionChatResponse,
 } from "../generated/server"
+import type { SessionInfo } from "../generated/server"
+import { SwitchLine } from "./modelSwitch"
 import { ImageViewer } from "./ImageViewer"
 import { InFlightTools } from "./InFlightTools"
 import { sessionImageUrl } from "./sessionImages"
@@ -460,10 +462,13 @@ export function ChatMessages({
   sessionId,
   showTools = false,
   head,
+  session,
 }: {
   chat: SessionChatResponse
   /** The first entry of the log, above the messages. */
   head?: ReactNode
+  /** Its model-switch phase ends the log as one system line. */
+  session: SessionInfo
   /** Shows each folded run of tool calls; the Design page leaves them out. */
   showTools?: boolean
   busy: boolean
@@ -507,6 +512,7 @@ export function ChatMessages({
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
       {busy && working}
+      <SwitchLine session={session} />
     </ChatScroller>
   )
 }

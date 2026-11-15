@@ -1,9 +1,14 @@
 import { cleanup, fireEvent, screen, within } from "@testing-library/react"
+import { ChakraProvider } from "@chakra-ui/react"
+import type { ReactElement } from "react"
 import { afterEach, expect, test } from "vitest"
+import { system } from "../ui/theme"
+import { AppToaster } from "../ui/toaster"
 import type { SessionInfo } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { WideContext } from "../useWide"
 import { FooterLine } from "./FooterLine"
+import { SwitchLine } from "./modelSwitch"
 
 afterEach(cleanup)
 
@@ -190,4 +195,59 @@ test("the ring fills with the count and is full at or above the ceiling", () => 
 test("no ceiling, no badge", () => {
   render(session({ context_tokens: 70_000, context_level: "green" }), { ceiling: undefined })
   expect(badge()).toBeNull()
+})
+
+test("while a switch runs, the footer shows the target model and effort with a switching hint", () => {
+  render(session({ switching_model: "claude-opus-4-8", switching_effort: "max" }))
+  const footer = screen.getByTestId("footer-line")
+  expect(footer.textContent).toContain("Claude Opus 4.8 · max")
+  expect(footer.textContent).not.toContain("Opus 4.7")
+  expect(screen.getByTestId("switching-hint").textContent).toContain("switching")
+})
+
+test("a switch back shows the old model with the hint", () => {
+  render(session({ switching_model: "claude-opus-4-6", switching_back: true }))
+  expect(screen.getByTestId("footer-line").textContent).toContain("Claude Opus 4.6")
+  expect(screen.getByTestId("switching-hint")).toBeTruthy()
+})
+
+test("no hint when no switch runs", () => {
+  render(session())
+  expect(screen.queryByTestId("switching-hint")).toBeNull()
+})
+
+// The same tree as renderThemed, so a rerender keeps the component's state.
+const themed = (ui: ReactElement) => (
+  <ChakraProvider value={system}>
+    {ui}
+    <AppToaster />
+  </ChakraProvider>
+)
+const lineText = () => screen.getByTestId("switch-line").textContent
+
+test("the log line follows the phase: switching, then switched", () => {
+  const { rerender } = renderThemed(
+    <SwitchLine session={session({ switching_model: "claude-opus-4-8" })} />,
+  )
+  expect(lineText()).toBe("Switching to Claude Opus 4.8…")
+  rerender(themed(<SwitchLine session={session({ model: "claude-opus-4-8" })} />))
+  expect(lineText()).toBe("Switched to Claude Opus 4.8.")
+})
+
+test("a rollback shows the switching back line, then the failed line", () => {
+  const { rerender } = renderThemed(
+    <SwitchLine session={session({ switching_model: "claude-opus-4-7", switching_back: true })} />,
+  )
+  expect(lineText()).toBe("Switching back to Claude Opus 4.7…")
+  const failed = session({
+    switch_failed_model: "claude-opus-4-8",
+    switch_failed_old: "claude-opus-4-7",
+  })
+  rerender(themed(<SwitchLine session={failed} />))
+  expect(lineText()).toBe("Switch to Claude Opus 4.8 failed. Still on Claude Opus 4.7.")
+})
+
+test("no line when nothing switched", () => {
+  renderThemed(<SwitchLine session={session()} />)
+  expect(screen.queryByTestId("switch-line")).toBeNull()
 })

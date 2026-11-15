@@ -163,6 +163,7 @@ export function AgentChat({
           chat={chat}
           busy={busy}
           sessionId={session.id}
+          session={session}
           showTools
           working={<WorkingRow current={chat.current} others={chat.others} />}
         />

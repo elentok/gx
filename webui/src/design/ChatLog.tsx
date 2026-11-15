@@ -274,6 +274,7 @@ function ChatBody({
             head={logTop}
             busy={busy}
             sessionId={session.id}
+            session={session}
             working={
               step && (
                 <WorkingRow
