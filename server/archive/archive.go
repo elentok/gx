@@ -23,7 +23,9 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/archivekey"
 	"github.com/elentok/gx/tickets/oneoff"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketgit"
+	"github.com/elentok/gx/triage"
 )
 
 // DesignNotFinishedText is the refusal of a Design before its design step is done.
@@ -231,7 +233,7 @@ func (a *Archive) checkArchivable(project, dir, base string, scan func(string) (
 	hasImpl := statErr == nil
 	baseMD := tickets.LoadEpicTicketMD(filepath.Join(dir, base))
 	// A stamped completed_at archives at any step: an emptied charting map has no work to merge.
-	if baseMD.CompletedAt.IsZero() && tickets.DesignStep(baseMD.DesignStep) != tickets.StepDone {
+	if baseMD.CompletedAt.IsZero() && tickets.DesignStep(baseMD.DesignStep) != tickets.StepDone && !emptiedOldEpic(dir, base) {
 		// A Design stuck before done still archives once its work merged:
 		// the -impl epic, or the map itself when it has no -impl.
 		work := base
@@ -270,6 +272,22 @@ func (a *Archive) checkArchivable(project, dir, base string, scan func(string) (
 		return nil, false, refusal{wire.ReasonArchiveImplNotArchivable, errors.New("the -impl epic has tickets that are not done")}
 	}
 	return append(halves, half{epic: impl, key: implKey}), row.MergedToTrunk, nil
+}
+
+// emptiedOldEpic: a charting map an earlier Triage made that holds no open,
+// draft or claimed ticket. It has no work to merge, so archiving stamps it
+// complete instead of refusing it as unfinished.
+func emptiedOldEpic(dir, epic string) bool {
+	e := tickets.LoadEpic(dir, epic)
+	if !triage.IsOldEpic(e) {
+		return false
+	}
+	for _, tk := range e.Tickets {
+		if s := schema.Status(tk.Status); s != schema.StatusDone && s != schema.StatusCancelled {
+			return false
+		}
+	}
+	return true
 }
 
 const allKinds = workspaces.OwnSessions | workspaces.FixSessions | workspaces.DesignSessions
@@ -334,6 +352,11 @@ func (a *Archive) write(target, dir string, halves []half, name string, cleanup 
 		endCleanup()
 	}
 	defer a.timed(target, "rename, stamp and rekey")()
+	if emptiedOldEpic(dir, halves[0].epic) {
+		if err := tickets.StampEpicCompleted(dir, halves[0].epic, time.Now().UTC()); err != nil {
+			return err
+		}
+	}
 	archive := tickets.ArchiveDir(dir)
 	if err := os.MkdirAll(archive, 0o755); err != nil {
 		return err

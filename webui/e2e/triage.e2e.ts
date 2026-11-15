@@ -457,5 +457,67 @@ test.describe("199. Triage journey", () => {
     await startDesign("sync").click()
     await expect(page.getByRole("dialog", nav("Start Design for sync"))).toBeVisible()
     expect(await sideways(page)).toBe(false)
+
+    // Old epics: the Route summary lists the moves and the waiting epic; the table areas make
+    // no question of their own.
+    await page.setViewportSize({ width: 1280, height: 800 })
+    // A long countdown keeps Write waiting, so its view is read before the session writes.
+    const old = await start("triage", { shape: "old-epics", autoAdvanceDelay: "60s" })
+    await page.evaluate(() => (location.hash = "#/triage/gx"))
+    await expect(page.getByText("move test-flakes -> area test-health: 2 tickets")).toBeVisible()
+    await expect(
+      page.getByText("move agent-guidance -> area agent-guidance-and-skills: 1 tickets"),
+    ).toBeVisible()
+    await expect(
+      page.getByText("move ticket-authoring -> area ticket-authoring: 1 tickets"),
+    ).toBeVisible()
+    await expect(
+      page.getByText("waiting: stuck-ticket-watchdog holds claimed gx:stuck-ticket-watchdog/01"),
+    ).toBeVisible()
+    const oldRound = questionsOf(page)
+    await expect(oldRound.getByText("Question 1 of 3")).toBeVisible()
+    await expect(page.getByText('Create the area "tooling"?', { exact: true })).toBeVisible()
+    await expect(
+      oldRound.getByText(/test-health|agent-guidance-and-skills|ticket-authoring/),
+    ).toHaveCount(0)
+    await oldRound.getByRole("button", { name: /^Keep for later/ }).click()
+    await oldRound.getByRole("button", { name: /^parser/ }).click()
+    await oldRound.getByRole("button", { name: /^no/ }).click()
+    await sendAnswers(page)
+    await expect(page.getByText(/Write this plan\?/).first()).toBeVisible()
+    await questionsOf(page)
+      .getByRole("button", { name: /^Yes, write it/ })
+      .click()
+    await sendAnswers(page)
+    // The Write view counts the four old-epic move units with the six rows.
+    await expect(page.getByText("Write · 0 of 10 rows")).toBeVisible()
+    await expect(page.getByText(/^move test-flakes -> test-health$/)).toBeVisible()
+    await page.getByRole("button", nav("Continue Write")).click()
+    await expect(page.getByRole("region", nav("Triage result"))).toBeVisible()
+
+    // By CLI: an emptied epic is stamped with only done tickets; the claimed one stayed.
+    // An archived epic is out of `tickets show`; the archived list carries its stamp.
+    const archived: { name: string; completed_at?: string }[] = JSON.parse(
+      await old.cli("server", "epics", "archived", "--json"),
+    ).epics
+    for (const name of ["test-flakes", "agent-guidance", "scratch-ideas"]) {
+      expect(archived.find((e) => e.name === name)?.completed_at).toBeTruthy()
+    }
+    // Past charting, claimed, and named like its area: all stay, unstamped.
+    for (const name of ["tickets-cli", "stuck-ticket-watchdog", "ticket-authoring"]) {
+      expect(archived.find((e) => e.name === name)).toBeUndefined()
+      expect(await old.cli("tickets", "show", `gx:${name}`)).not.toContain("completed_at")
+    }
+    expect(await old.cli("tickets", "list", "gx:stuck-ticket-watchdog")).toContain(
+      "stuck-ticket-watchdog-01",
+    )
+    // A second Triage sees the claimed epic as waiting and plans no unit.
+    const oldEpicsLeft = await old.cli("tickets", "triage", "oldepics", "--project", "gx", "--json")
+    expect(oldEpicsLeft).toContain("stuck-ticket-watchdog")
+    expect(oldEpicsLeft).toMatch(/"waiting":\s*true/)
+    // A map past charting refuses the move.
+    await expect(old.cli("tickets", "move", "gx:tickets-cli/01", "gx:test-health")).rejects.toThrow(
+      /move-map-source[\s\S]*Design has started/,
+    )
   })
 })

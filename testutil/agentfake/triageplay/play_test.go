@@ -372,6 +372,18 @@ func TestTriagePlayer_WriteMovesAnOldEpicIntoItsAreaThenArchivesIt(t *testing.T)
 	}
 }
 
+func TestTriagePlayer_WriteSkipsTheMoveWhenTheAreaIsTheOldEpic(t *testing.T) {
+	t.Parallel()
+	rec := triage.Record{Step: tickets.StepWrite, Moves: []triage.MoveUnit{{OldEpic: "old", Area: "old", State: triage.MovePending}}}
+	s := newStub(t, Config{}, triage.BranchWrite, rec)
+	if _, err := s.player.Play(); err != nil {
+		t.Fatal(err)
+	}
+	if s.count(t, "tickets move") != 0 || s.count(t, "archive") != 0 || s.count(t, "--epic old --state done") != 1 {
+		t.Errorf("calls = %q, want no move or archive and a done unit", s.calls(t))
+	}
+}
+
 func TestTriagePlayer_WriteLeavesAnEpicWithAClaimedTicketAlone(t *testing.T) {
 	t.Parallel()
 	rec := triage.Record{Step: tickets.StepWrite, Moves: []triage.MoveUnit{{OldEpic: "held", Area: "tooling", State: triage.MovePending}}}

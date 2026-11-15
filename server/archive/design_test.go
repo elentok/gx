@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/triage"
 )
 
 // startPair is a store whose Design foo is at step, with a done foo-impl epic
@@ -279,6 +280,59 @@ func TestArchiveDesign_MergedMapWithoutTicketsOrImplArchives(t *testing.T) {
 	}
 	if got := r.archive(t, false, false, "proj:foo")[0]; got.Status != wire.TargetDone {
 		t.Fatalf("archive = %+v, want done", got)
+	}
+}
+
+// oldTriageMap is a charting map an earlier Triage made; withTicket leaves its one open ticket in place.
+func oldTriageMap(t *testing.T, note, withTicket bool) rig {
+	t.Helper()
+	r := startPair(t, "chart", true)
+	dir := filepath.Join(r.store, "proj", "foo")
+	if !withTicket {
+		if err := os.RemoveAll(filepath.Join(dir, "issues")); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		files, err := filepath.Glob(filepath.Join(dir, "issues", "*.md"))
+		if err != nil || len(files) == 0 {
+			t.Fatalf("no issue files: %v", err)
+		}
+		raw, err := os.ReadFile(files[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(files[0], []byte(strings.Replace(string(raw), "status: done", "status: open", 1)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	body := "---\nkind: map\n---\n# foo\n\n## Notes\n\n"
+	if note {
+		body += triage.OldEpicNote + "\n"
+	}
+	if err := os.WriteFile(filepath.Join(dir, "ticket.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+func TestArchiveDesign_EmptiedOldTriageMapIsStampedThenArchived(t *testing.T) {
+	r := oldTriageMap(t, true, false)
+	if got := r.archive(t, false, false, "proj:foo")[0]; got.Status != wire.TargetDone {
+		t.Fatalf("archive = %+v, want done", got)
+	}
+	if r.epic(t, "foo").CompletedAt.IsZero() {
+		t.Error("archived epic has no completed_at")
+	}
+}
+
+func TestArchiveDesign_OldTriageMapKeepingATicketOrWithoutTheNoteIsNotFinished(t *testing.T) {
+	for name, r := range map[string]rig{
+		"open ticket": oldTriageMap(t, true, true),
+		"no note":     oldTriageMap(t, false, false),
+	} {
+		if got := r.archive(t, false, false, "proj:foo")[0]; got.Reason != wire.ReasonArchiveNotFinished {
+			t.Errorf("%s: archive = %+v, want not-finished", name, got)
+		}
 	}
 }
 

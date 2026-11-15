@@ -335,6 +335,11 @@ func (p *Player) writeMove(u triage.MoveUnit) (moved bool, err error) {
 	if len(loc.Move) == 0 && len(loc.Claimed) > 0 {
 		return false, nil
 	}
+	// The table can name the old epic itself as its area; its tickets are home
+	// already and `tickets move` refuses a move into the same epic.
+	if u.Area == u.OldEpic {
+		return true, nil
+	}
 	area := p.Project + ":" + u.Area
 	if len(loc.Move) > 0 {
 		// A refusal means the area exists already; a real failure shows in the move.
