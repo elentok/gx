@@ -155,6 +155,9 @@ func (f *fixture) applyScenarioEnv(o opts, sc scenario) error {
 	if sc.UnknownSkill {
 		f.env = append(f.env, agentfake.TUIUnknownSkillEnv+"=1")
 	}
+	if sc.UnknownUntilInstalled {
+		f.env = append(f.env, agentfake.TUIUnknownUntilInstalledEnv+"=1")
+	}
 	for _, kv := range sc.Env {
 		f.env = append(f.env, strings.ReplaceAll(kv, spec.RootToken, f.root))
 	}

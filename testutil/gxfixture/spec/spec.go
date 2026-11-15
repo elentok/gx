@@ -171,6 +171,9 @@ type Scenario struct {
 	DropAskedAgent bool
 	// UnknownSkill makes the fake TUI agent reject every skill prompt as an unknown command.
 	UnknownSkill bool
+	// UnknownUntilInstalled makes the fake TUI agent reject a skill prompt until
+	// gx's skill refresh has installed the skill.
+	UnknownUntilInstalled bool
 	// Env is extra server environment, for the fake's knobs and the server's test hooks.
 	Env []string
 	// Restart points the server's restart at a fake gx binary (see restart.go).

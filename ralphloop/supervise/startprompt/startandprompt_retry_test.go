@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
@@ -147,6 +148,105 @@ func TestStartAndPrompt_AlwaysUnknownSkill_NamesSkillAndFix(t *testing.T) {
 	}
 	if len(kinds) != 2 {
 		t.Errorf("launch-failed kinds = %v, want two (resend, fresh-session retry)", kinds)
+	}
+}
+
+// learningRunner rejects launch prompts as an unknown skill until *known is set.
+type learningRunner struct {
+	agentrunner.Runner
+	known    *bool
+	launches *int
+}
+
+func (l learningRunner) PromptLaunch(_ context.Context, s agentrunner.Session, text string, _ func(string)) error {
+	*l.launches++
+	if !*l.known {
+		return fmt.Errorf("%w: %w: %q", agentrunner.ErrNotDelivered, agentrunner.ErrUnknownSkill, text)
+	}
+	return l.Prompt(s, text)
+}
+
+func launchWithRefresh(r agentrunner.Runner, refresh func() error, refreshed *[]error) error {
+	_, err := StartAndPrompt(context.Background(), r, agentrunner.StartOptions{Label: launchLabel, Epic: launchEpic, NoAdopt: true}, "/gx-implement gx:my-epic/01",
+		Hooks{RefreshSkills: refresh, OnRefresh: func(err error) { *refreshed = append(*refreshed, err) }})
+	return err
+}
+
+func TestStartAndPrompt_UnknownSkill_RefreshesThenStartsOnceMore(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakes.FakeDeps()
+	known, launches := false, 0
+	var refreshed []error
+	err := launchWithRefresh(learningRunner{d.Runner, &known, &launches}, func() error { known = true; return nil }, &refreshed)
+	if err != nil {
+		t.Fatalf("err = %v, want the launch to succeed after the refresh", err)
+	}
+	if launches != 3 || len(refreshed) != 1 || refreshed[0] != nil {
+		t.Errorf("launches = %d, refreshed = %v, want 3 and one clean refresh", launches, refreshed)
+	}
+}
+
+func TestStartAndPrompt_UnknownSkillAfterRefresh_PausesWithRefreshedHint(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakes.FakeDeps()
+	known, launches := false, 0
+	var refreshed []error
+	err := launchWithRefresh(learningRunner{d.Runner, &known, &launches}, func() error { return nil }, &refreshed)
+	var lf *LaunchFailure
+	if !errors.As(err, &lf) || lf.Kind != events.AgentPromptStalled {
+		t.Fatalf("err = %v, want agent_prompt_stalled LaunchFailure", err)
+	}
+	if !strings.Contains(err.Error(), "after gx refreshed") || !errors.Is(err, agentrunner.ErrUnknownSkill) {
+		t.Errorf("err = %v, want the refreshed hint and the launch error", err)
+	}
+	if launches != 3 || len(refreshed) != 1 {
+		t.Errorf("launches = %d, refreshes = %d, want 3 and 1", launches, len(refreshed))
+	}
+}
+
+func TestStartAndPrompt_RefreshError_SkipsRetryAndNamesBothErrors(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakes.FakeDeps()
+	known, launches := false, 0
+	var refreshed []error
+	refreshErr := errors.New("dev checkout is gone")
+	err := launchWithRefresh(learningRunner{d.Runner, &known, &launches}, func() error { return refreshErr }, &refreshed)
+	var lf *LaunchFailure
+	if !errors.As(err, &lf) || lf.Kind != events.AgentPromptStalled {
+		t.Fatalf("err = %v, want agent_prompt_stalled LaunchFailure", err)
+	}
+	if !errors.Is(err, agentrunner.ErrUnknownSkill) || !errors.Is(err, refreshErr) {
+		t.Errorf("err = %v, want both the launch and the refresh error", err)
+	}
+	if launches != 2 {
+		t.Errorf("launches = %d, want 2 (no retry after a failed refresh)", launches)
+	}
+}
+
+func TestSingleFlight_OverlappingCallsShareOneRun(t *testing.T) {
+	t.Parallel()
+	release := make(chan struct{})
+	started := make(chan struct{}, 2)
+	runs := 0
+	f := SingleFlight(func() error {
+		runs++
+		started <- struct{}{}
+		<-release
+		return errors.New("shared")
+	})
+	errs := make(chan error, 2)
+	go func() { errs <- f() }()
+	<-started
+	go func() { errs <- f() }()
+	time.Sleep(20 * time.Millisecond) // let the second call reach the wait
+	close(release)
+	for range 2 {
+		if err := <-errs; err == nil || err.Error() != "shared" {
+			t.Errorf("err = %v, want the shared result", err)
+		}
+	}
+	if runs != 1 {
+		t.Errorf("runs = %d, want 1", runs)
 	}
 }
 

@@ -82,6 +82,10 @@ type Config struct {
 	// ralphloop's 30s default.
 	GuardPoll time.Duration
 
+	// RefreshSkills reinstalls the skills after an agent launch ended with an
+	// unknown-skill error; nil means no refresh and no retry.
+	RefreshSkills func() error
+
 	// DropAskedAgent makes every run clean up after its agent asks, as a
 	// herdr-hosted run does. Test-only: gxfixture sets it, because a fixture
 	// has no herdr to exercise that path.

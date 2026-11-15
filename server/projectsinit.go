@@ -12,7 +12,7 @@ func (s *Server) projectsEnvOf() projects.Env {
 	c := &s.cfg
 	return projects.Env{
 		TicketStore: c.TicketStore, StateDir: c.StateDir, Env: c.Env, Migrations: c.Migrations,
-		MigrationFailurePollInterval: c.MigrationFailurePollInterval, Chat: c.Chat, GuardPoll: c.GuardPoll,
+		MigrationFailurePollInterval: c.MigrationFailurePollInterval, Chat: c.Chat, GuardPoll: c.GuardPoll, RefreshSkills: c.RefreshSkills,
 		InstallDeps: c.InstallDeps, RateLimitResetBuffer: c.RateLimitResetBuffer, RunnerWait: c.RunnerWait, Sleep: c.Sleep,
 	}
 }

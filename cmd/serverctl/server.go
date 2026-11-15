@@ -23,6 +23,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/projectlock"
+	"github.com/elentok/gx/ralphloop/supervise/startprompt"
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/disk"
@@ -318,7 +319,7 @@ func runServer(ctx context.Context, d Deps) error {
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, RunnerWait: cfg.RunnerWait, WebAddr: cfg.Server.Web.Listen, LogLevel: logLevel,
 		AutoAdvanceDelay: autoAdvanceDelay, CommandListAge: commandListAge, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.Env.Env,
 		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval, TokenPollInterval: tokenPollInterval, PromptGrace: promptGrace, RateLimitResetBuffer: rateLimitBuffer, GuardPoll: guardPoll, BudgetKillGrace: budgetKillGrace,
-		ProcessSource: processSource, DropAskedAgent: dropAskedAgent(os.Getenv), LateFinishScanHold: lateFinishScanHold(os.Getenv)})
+		ProcessSource: processSource, RefreshSkills: startprompt.SingleFlight(func() error { return skillscmd.Refresh(d.skillsDeps(), io.Discard) }), DropAskedAgent: dropAskedAgent(os.Getenv), LateFinishScanHold: lateFinishScanHold(os.Getenv)})
 	if err != nil {
 		return err
 	}
@@ -618,7 +619,7 @@ func runServerStartCmd(ctx context.Context, d Deps, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	skillscmd.Refresh(d.skillsDeps(), w)
+	_ = skillscmd.Refresh(d.skillsDeps(), w) // a problem is already printed as a warning
 	c, err := cmdbase.ServerClient(dirs)
 	if err != nil {
 		return err

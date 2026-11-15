@@ -67,8 +67,12 @@ type tuiOptions struct {
 	// knobs; see the TUI...Env consts.
 	registryDelay time.Duration
 	unknownSkill  bool
-	noTurn        bool
-	launchRecord  bool
+	// unknownUntilInstalled keeps a skill unknown until its SKILL.md is installed.
+	unknownUntilInstalled bool
+	// home is where the install puts skills, set at start-up.
+	home         string
+	noTurn       bool
+	launchRecord bool
 	// pasteOver, when positive, turns a skill prompt longer than it into a paste.
 	pasteOver int
 	// plainScreen draws the "> " screen instead of the input box (see TUIPlainScreenEnv).
@@ -140,28 +144,29 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	pasteOver, _ := strconv.Atoi(os.Getenv(TUIPasteOverEnv))
 	row, _ := LaunchModel(*model)
 	return tuiOptions{
-		hung:             hung,
-		vimFooter:        vimFooter,
-		wedged:           wedged,
-		plainScreen:      os.Getenv(TUIPlainScreenEnv) == "1",
-		classifierOutage: outageTurns(os.Getenv(TUIClassifierOutageEnv)),
-		sessionID:        *sessionID,
-		trust:            os.Getenv(TUITrustEnv) == "1",
-		dropKey:          os.Getenv(TUITrustDropKeyEnv) == "1",
-		noPidFile:        os.Getenv(TUINoPidFileEnv) == "1",
-		mouse:            os.Getenv(TUIMouseEnv) == "1",
-		draft:            os.Getenv(TUIDraftEnv),
-		clearLeavesI:     os.Getenv(TUIClearLeavesIEnv) == "1",
-		clearIgnored:     hung || os.Getenv(TUIClearIgnoredEnv) == "1",
-		redrawDelay:      redrawDelay,
-		registryDelay:    registryDelay,
-		unknownSkill:     os.Getenv(TUIUnknownSkillEnv) == "1",
-		noTurn:           os.Getenv(TUINoTurnEnv) == "1",
-		launchRecord:     os.Getenv(TUILaunchRecordEnv) != "0",
-		pasteOver:        pasteOver,
-		model:            cmp.Or(ResolveClaudeModel(*model), ReportedModel),
-		modelRow:         row,
-		settings:         settings,
+		hung:                  hung,
+		vimFooter:             vimFooter,
+		wedged:                wedged,
+		plainScreen:           os.Getenv(TUIPlainScreenEnv) == "1",
+		classifierOutage:      outageTurns(os.Getenv(TUIClassifierOutageEnv)),
+		sessionID:             *sessionID,
+		trust:                 os.Getenv(TUITrustEnv) == "1",
+		dropKey:               os.Getenv(TUITrustDropKeyEnv) == "1",
+		noPidFile:             os.Getenv(TUINoPidFileEnv) == "1",
+		mouse:                 os.Getenv(TUIMouseEnv) == "1",
+		draft:                 os.Getenv(TUIDraftEnv),
+		clearLeavesI:          os.Getenv(TUIClearLeavesIEnv) == "1",
+		clearIgnored:          hung || os.Getenv(TUIClearIgnoredEnv) == "1",
+		redrawDelay:           redrawDelay,
+		registryDelay:         registryDelay,
+		unknownSkill:          os.Getenv(TUIUnknownSkillEnv) == "1",
+		unknownUntilInstalled: os.Getenv(TUIUnknownUntilInstalledEnv) == "1",
+		noTurn:                os.Getenv(TUINoTurnEnv) == "1",
+		launchRecord:          os.Getenv(TUILaunchRecordEnv) != "0",
+		pasteOver:             pasteOver,
+		model:                 cmp.Or(ResolveClaudeModel(*model), ReportedModel),
+		modelRow:              row,
+		settings:              settings,
 	}, nil
 }
 
@@ -188,6 +193,7 @@ func runTUIClaude() (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	opts.home = home
 	ctlPath := TUIControlPath(home, opts.sessionID)
 	if err := os.MkdirAll(filepath.Dir(ctlPath), 0o755); err != nil {
 		return 0, err

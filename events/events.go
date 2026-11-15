@@ -88,6 +88,11 @@ const (
 	// epic branch onto its base (a conflict): the rebase was aborted and the
 	// ticket launched on the old tip. Reason holds the rebase error.
 	EpicRebaseSkipped Type = "epic-rebase-skipped"
+	// SkillsRefreshed is gx reinstalling the skills after a launch ended with an
+	// unknown-skill error; Reason holds the refresh error, empty on success.
+	SkillsRefreshed Type = "skills-refreshed"
+	// LaunchRetried is the one more start that follows a successful refresh.
+	LaunchRetried Type = "launch-retried"
 )
 
 // SlowLaunch is the claim-to-prompt time past which a launch counts as slow.

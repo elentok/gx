@@ -42,6 +42,7 @@ type Env struct {
 	MigrationFailurePollInterval time.Duration
 	Chat                         notify.ServerChatConfig
 	GuardPoll                    time.Duration
+	RefreshSkills                func() error
 	InstallDeps                  func(ctx context.Context, path, logDir string) ([]string, error)
 	RateLimitResetBuffer         time.Duration
 	RunnerWait                   time.Duration

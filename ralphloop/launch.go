@@ -140,6 +140,19 @@ func (p iterationParams) logLaunchFailed(label string, attempt int, kind events.
 	})
 }
 
+// logSkillsRefreshed appends a skills-refreshed event for a launch's skill
+// refresh, then a launch-retried one when the refresh worked.
+func (p iterationParams) logSkillsRefreshed(label string, refreshErr error) {
+	ev := runlog.Event{Type: string(events.SkillsRefreshed), Ticket: p.Ticket.Identifier, Label: label}
+	if refreshErr != nil {
+		ev.Reason = refreshErr.Error()
+	}
+	_ = runlog.AppendEvent(p.ScratchDir, p.FeatureBranch, ev)
+	if refreshErr == nil {
+		_ = runlog.AppendEvent(p.ScratchDir, p.FeatureBranch, runlog.Event{Type: string(events.LaunchRetried), Ticket: p.Ticket.Identifier, Label: label})
+	}
+}
+
 // logPromptNudged appends one prompt-nudged event for a nudge decision.
 func (p iterationParams) logPromptNudged(label string, attempt int, decision string) {
 	_ = runlog.AppendEvent(p.ScratchDir, p.FeatureBranch, runlog.Event{

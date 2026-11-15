@@ -183,7 +183,18 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 			OnNudge: func(attempt int, decision string) {
 				l.LogEvent(ticket, runlog.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
 			},
-			OnStarted: func() { l.setLaunchStep(ticket.String(), runs.StepSendingPrompt) },
+			OnStarted:     func() { l.setLaunchStep(ticket.String(), runs.StepSendingPrompt) },
+			RefreshSkills: deps.RefreshSkills,
+			OnRefresh: func(err error) {
+				ev := runlog.Event{Type: string(events.SkillsRefreshed), Label: label}
+				if err != nil {
+					ev.Reason = err.Error()
+				}
+				l.LogEvent(ticket, ev)
+				if err == nil {
+					l.LogEvent(ticket, runlog.Event{Type: string(events.LaunchRetried), Label: label})
+				}
+			},
 			// A name-taken failure is logged by the caller below.
 			OnFail: func(attempt int, kind events.Kind, err error) {
 				if kind == events.AgentPromptStalled {

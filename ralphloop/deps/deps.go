@@ -239,6 +239,9 @@ type Deps struct {
 	// GuardPoll is how often WaitIterationFinished ticks its guards (model,
 	// long ticket, verify cap) while the agent runs; zero means smartZonePollMs.
 	GuardPoll time.Duration
+	// RefreshSkills reinstalls the skills for a launch that ended with an
+	// unknown-skill error; nil means no refresh and no retry.
+	RefreshSkills func() error
 	// PauseTimer returns a channel that fires once the given duration has
 	// elapsed — one poll of a paused run's wait. It is a channel rather than
 	// a blocking sleep so the pause can select on an operator's cosmetic wake
@@ -278,6 +281,8 @@ type DepsOverrides struct {
 	RateLimitResetBuffer time.Duration
 	// GuardPoll is Deps.GuardPoll.
 	GuardPoll time.Duration
+	// RefreshSkills is Deps.RefreshSkills.
+	RefreshSkills func() error
 	// Finished tells the runner which sessions have reported their ticket
 	// finished (see herdrrunner.Runner.Finished). Nil means none.
 	Finished func(agentrunner.Session) bool
@@ -460,6 +465,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		Now:                  time.Now,
 		RateLimitResetBuffer: overrides.RateLimitResetBuffer,
 		GuardPoll:            overrides.GuardPoll,
+		RefreshSkills:        overrides.RefreshSkills,
 		PauseTimer:           time.After,
 	}
 }

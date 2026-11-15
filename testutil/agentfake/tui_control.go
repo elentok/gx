@@ -68,6 +68,10 @@ const (
 	// command: the pane draws "Unknown command: /<skill>" and the transcript
 	// gets a system record and no user record.
 	TUIUnknownSkillEnv = "GX_AGENTFAKE_TUI_UNKNOWN_SKILL"
+	// TUIUnknownUntilInstalledEnv, set to "1", makes a skill prompt an unknown
+	// command until $HOME/.claude/skills/<skill>/SKILL.md exists: a registry that
+	// learns the skill once gx has refreshed the install.
+	TUIUnknownUntilInstalledEnv = "GX_AGENTFAKE_TUI_UNKNOWN_UNTIL_INSTALLED"
 	// TUINoTurnEnv, set to "1", leaves the agent idle after a skill prompt: no
 	// turn, no transcript record.
 	TUINoTurnEnv = "GX_AGENTFAKE_TUI_NO_TURN"

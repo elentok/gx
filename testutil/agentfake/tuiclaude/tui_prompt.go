@@ -6,6 +6,7 @@ import (
 	"cmp"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -177,6 +178,12 @@ func (t *tui) modelErrorTurn(text string) error {
 	return t.setStatus(StatusIdle, "")
 }
 
+// skillInstalled reports whether the install put skill ("/name") in the home.
+func (o tuiOptions) skillInstalled(skill string) bool {
+	_, err := os.Stat(filepath.Join(o.home, ".claude", "skills", strings.TrimPrefix(skill, "/"), "SKILL.md"))
+	return err == nil
+}
+
 // skillPromptKnobs applies the launch-proof knobs to a skill prompt and reports
 // whether it handled the prompt. The launch-record knob only writes the user
 // record and leaves the rest to the normal path.
@@ -185,7 +192,7 @@ func (t *tui) skillPromptKnobs(text string) (bool, error) {
 		return false, nil
 	}
 	o := t.opts
-	if !o.unknownSkill && o.registryDelay == 0 && !o.noTurn && !o.launchRecord && o.pasteOver == 0 {
+	if !o.unknownSkill && !o.unknownUntilInstalled && o.registryDelay == 0 && !o.noTurn && !o.launchRecord && o.pasteOver == 0 {
 		return false, nil
 	}
 	skill, _, _ := strings.Cut(text, " ")
@@ -194,7 +201,7 @@ func (t *tui) skillPromptKnobs(text string) (bool, error) {
 		return false, err
 	}
 	switch {
-	case t.opts.unknownSkill || time.Since(t.started) < t.opts.registryDelay:
+	case t.opts.unknownSkill || time.Since(t.started) < t.opts.registryDelay || (t.opts.unknownUntilInstalled && !t.opts.skillInstalled(skill)):
 		t.notice = UnknownCommandText(skill)
 		t.draw()
 		return true, AppendLine(path, map[string]any{

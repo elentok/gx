@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
@@ -48,6 +49,42 @@ type Hooks struct {
 	// OnStarted is called on every attempt once Start returns and before the
 	// prompt is sent.
 	OnStarted func()
+	// RefreshSkills reinstalls the skills after the two attempts ended with an
+	// unknown-skill error; nil means no refresh and no retry. The launcher fills
+	// it, since this package sits below cmd/skills.
+	RefreshSkills func() error
+	// OnRefresh is called with the refresh result. A nil error means one more
+	// start follows.
+	OnRefresh func(err error)
+}
+
+// SingleFlight wraps fn so callers that overlap share one run and its result.
+func SingleFlight(fn func() error) func() error {
+	var mu sync.Mutex
+	var flight *struct {
+		done chan struct{}
+		err  error
+	}
+	return func() error {
+		mu.Lock()
+		if f := flight; f != nil {
+			mu.Unlock()
+			<-f.done
+			return f.err
+		}
+		f := &struct {
+			done chan struct{}
+			err  error
+		}{done: make(chan struct{})}
+		flight = f
+		mu.Unlock()
+		f.err = fn()
+		mu.Lock()
+		flight = nil
+		mu.Unlock()
+		close(f.done)
+		return f.err
+	}
 }
 
 // StartAndPrompt starts a session and sends its initial prompt. A prompt the
@@ -74,6 +111,7 @@ func StartAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.
 	}
 	hungPanes := 0
 	vimRelaunched := false
+	refreshed := false
 	for attempt := 1; ; attempt++ {
 		s, err := r.Start(opts)
 		if err != nil {
@@ -129,11 +167,25 @@ func StartAndPrompt(ctx context.Context, r agentrunner.Runner, opts agentrunner.
 			err = fmt.Errorf("%w: %w", err, stopErr)
 			return Launched{}, &LaunchFailure{Kind: events.AgentPromptStalled, Err: err}
 		}
-		if attempt == 2 {
+		if attempt >= 2 {
+			// gx installs a missing skill itself and starts once more; the
+			// refresh runs at most once per launch.
+			if errors.Is(err, agentrunner.ErrUnknownSkill) && !refreshed && hooks.RefreshSkills != nil {
+				refreshed = true
+				rerr := hooks.RefreshSkills()
+				if hooks.OnRefresh != nil {
+					hooks.OnRefresh(rerr)
+				}
+				if rerr != nil {
+					err = fmt.Errorf("%w; refreshing the skill install failed: %w", err, rerr)
+					return Launched{}, &LaunchFailure{Kind: events.AgentPromptStalled, Err: withSkillHint(err, prompt, false)}
+				}
+				continue
+			}
 			if hungPanes == 2 {
 				err = fmt.Errorf("pane stopped taking keys, twice: %w", err)
 			}
-			return Launched{}, &LaunchFailure{Kind: events.AgentPromptStalled, Err: withSkillHint(err, prompt)}
+			return Launched{}, &LaunchFailure{Kind: events.AgentPromptStalled, Err: withSkillHint(err, prompt, refreshed)}
 		}
 	}
 }
@@ -153,11 +205,14 @@ func stopForRelaunch(r agentrunner.Runner, s agentrunner.Session, label string) 
 // withSkillHint names the missing skill and the fix on an unknown-skill
 // failure: a missing skill does not appear by itself, so a bare Retry would hit
 // the same error. Any other error passes through unchanged.
-func withSkillHint(err error, prompt string) error {
+func withSkillHint(err error, prompt string, refreshed bool) error {
 	if !errors.Is(err, agentrunner.ErrUnknownSkill) {
 		return err
 	}
 	skill, _, _ := strings.Cut(prompt, " ")
+	if refreshed {
+		return fmt.Errorf("the agent does not know the skill %s even after gx refreshed the skill install: fix the install with `gx skills install --force-all`, then Retry: %w", skill, err)
+	}
 	return fmt.Errorf("the agent does not know the skill %s: install or refresh it with `gx skills install`, then Retry: %w", skill, err)
 }
 

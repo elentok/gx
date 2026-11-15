@@ -454,7 +454,7 @@ func dedupe(problems []string) []string {
 // never installed). It never forces and never fails its caller: a problem is
 // printed and recorded for the server to show, and a clean install clears
 // the record.
-func Refresh(d Deps, out io.Writer) {
+func Refresh(d Deps, out io.Writer) error {
 	problems := append([]string{refreshProblem(d, out)}, syncSources(d, skills.NewForcePolicy(), out)...)
 	problem := joinProblems(problems)
 	if problem != "" {
@@ -467,6 +467,10 @@ func Refresh(d Deps, out io.Writer) {
 	if err != nil {
 		fmt.Fprintf(out, "warning: record skill install result: %v\n", err)
 	}
+	if problem != "" {
+		return errors.New(problem)
+	}
+	return nil
 }
 
 func joinProblems(problems []string) string {

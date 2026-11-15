@@ -111,6 +111,13 @@ var Scenarios = map[string]scenario{
 		Queue:        []string{project + ":unknown-epic"},
 		UnknownSkill: true,
 	},
+	// unknown-skill-refresh: the agent knows the skill only once gx's refresh has
+	// installed it, so the launch ends with no pause.
+	"unknown-skill-refresh": {
+		Epics:                 []epic{{Project: project, Name: "refresh-epic", Tickets: []ticket{{ID: "01", Slug: "first", Opts: servertest.TicketOpts{}}}}},
+		Queue:                 []string{project + ":refresh-epic"},
+		UnknownUntilInstalled: true,
+	},
 	// chat-capture: a server whose Slack and Telegram posts land in the `chat_capture` file
 	// (see chat.go); the base of the notification checks. CLI Telegram sends do not reach it.
 	"chat-capture": {ChatCapture: true},

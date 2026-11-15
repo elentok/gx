@@ -370,6 +370,8 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 		OnNudge: func(attempt int, decision string) {
 			p.logPromptNudged(label, attempt, decision)
 		},
+		RefreshSkills: d.RefreshSkills,
+		OnRefresh:     func(err error) { p.logSkillsRefreshed(label, err) },
 	})
 
 	var launchFail *startprompt.LaunchFailure
