@@ -3,6 +3,7 @@ package tuiclaude
 import . "github.com/elentok/gx/testutil/agentfake"
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"strings"
@@ -29,6 +30,9 @@ func (t *tui) submit() error {
 	case StatusIdle:
 		if handled, err := t.skillPromptKnobs(text); handled || err != nil {
 			return err
+		}
+		if t.failsFirstMessage() && text != "" && !strings.HasPrefix(text, "/") {
+			return t.modelErrorTurn(text)
 		}
 		if w := t.resume; w != nil && text != "" {
 			t.resume = nil
@@ -125,6 +129,48 @@ func (t *tui) submit() error {
 		return t.setStatus(StatusBusy, "")
 	}
 	return nil
+}
+
+// failsFirstMessage reports whether the launch's model answers its first
+// message with an API error.
+func (t *tui) failsFirstMessage() bool {
+	b := t.opts.modelRow.Behaviour
+	return !t.modelErrored && (b == ModelNotFound || b == ModelError)
+}
+
+// modelErrorTurn answers the first message with the assistant line claude
+// writes for a failed API call (model <synthetic>), then goes idle again.
+func (t *tui) modelErrorTurn(text string) error {
+	t.modelErrored = true
+	code := cmp.Or(t.opts.modelRow.ErrorCode, "unknown")
+	if t.opts.modelRow.Behaviour == ModelNotFound {
+		code = "model_not_found"
+	}
+	path, err := t.transcriptPath()
+	if err != nil {
+		return err
+	}
+	if err := AppendMessage(path, "user", text); err != nil {
+		return err
+	}
+	if err := t.setStatus(StatusBusy, ""); err != nil {
+		return err
+	}
+	if err := AppendLine(path, map[string]any{
+		"type":              "assistant",
+		"timestamp":         time.Now().UTC().Format(time.RFC3339Nano),
+		"isApiErrorMessage": true,
+		"error":             code,
+		"apiErrorStatus":    nil,
+		"message": map[string]any{
+			"role":    "assistant",
+			"model":   "<synthetic>",
+			"content": []map[string]any{{"type": "text", "text": "API Error: " + code}},
+		},
+	}); err != nil {
+		return err
+	}
+	return t.setStatus(StatusIdle, "")
 }
 
 // skillPromptKnobs applies the launch-proof knobs to a skill prompt and reports

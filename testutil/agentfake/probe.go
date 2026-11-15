@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -42,6 +44,12 @@ type ProbeConfig struct {
 	Delay string `json:"delay,omitempty"`
 	// Fail makes the probe exit 1 without a reply.
 	Fail bool `json:"fail,omitempty"`
+	// Models is the model list both fakes answer the model query with; a later
+	// file replaces it when it has any. A fake with none sends no list.
+	Models []ProbeModel `json:"models,omitempty"`
+	// ModelsFail makes the model query fail while the commands probe still
+	// answers.
+	ModelsFail bool `json:"modelsFail,omitempty"`
 }
 
 func loadProbeConfig() (ProbeConfig, error) {
@@ -72,6 +80,10 @@ func loadProbeConfig() (ProbeConfig, error) {
 			cfg.Delay = layer.Delay
 		}
 		cfg.Fail = cfg.Fail || layer.Fail
+		if len(layer.Models) > 0 {
+			cfg.Models = layer.Models
+		}
+		cfg.ModelsFail = cfg.ModelsFail || layer.ModelsFail
 	}
 	return cfg, nil
 }
@@ -122,12 +134,30 @@ func RunClaudeProbe() (int, error) {
 	if commands == nil {
 		commands = []ProbeEntry{}
 	}
+	reply := map[string]any{"commands": commands, "agents": []any{}}
+	// One initialize reply carries both lists, so each launch is one query.
+	if cfg.Models != nil || cfg.ModelsFail {
+		if err := LogModelQuery("claude"); err != nil {
+			return 0, err
+		}
+	}
+	if cfg.Models != nil && !cfg.ModelsFail {
+		models := make([]map[string]any, 0, len(cfg.Models))
+		for _, m := range cfg.Models {
+			row := map[string]any{"value": m.Value, "resolvedModel": m.ID}
+			if m.Efforts != nil {
+				row["supportedEffortLevels"] = m.Efforts
+			}
+			models = append(models, row)
+		}
+		reply["models"] = models
+	}
 	out := json.NewEncoder(os.Stdout)
 	for _, line := range []any{
 		map[string]any{"type": "system", "subtype": "hook_started", "hook_name": "SessionStart:startup"},
 		map[string]any{"type": "control_response", "response": map[string]any{
 			"subtype": "success", "request_id": req.RequestID,
-			"response": map[string]any{"commands": commands, "agents": []any{}},
+			"response": reply,
 		}},
 	} {
 		if err := out.Encode(line); err != nil {
@@ -152,8 +182,9 @@ func RunCodexProbe() (int, error) {
 	sc := bufio.NewScanner(os.Stdin)
 	for sc.Scan() {
 		var req struct {
-			ID     *int   `json:"id"`
-			Method string `json:"method"`
+			ID     *int            `json:"id"`
+			Method string          `json:"method"`
+			Params json.RawMessage `json:"params"`
 		}
 		if json.Unmarshal(sc.Bytes(), &req) != nil || req.ID == nil {
 			continue
@@ -162,6 +193,43 @@ func RunCodexProbe() (int, error) {
 		case "initialize":
 			err = out.Encode(map[string]any{"id": *req.ID, "result": map[string]any{
 				"userAgent": "agentfake/0", "codexHome": "", "platformFamily": "unix", "platformOs": "macos"}})
+		case "model/list":
+			if err = LogModelQuery("codex"); err != nil {
+				return 0, err
+			}
+			if cfg.ModelsFail {
+				err = out.Encode(map[string]any{"id": *req.ID, "error": map[string]any{"code": -32000, "message": "fakecodex: model/list configured to fail"}})
+				break
+			}
+			var params struct {
+				Cursor string `json:"cursor"`
+			}
+			_ = json.Unmarshal(req.Params, &params)
+			page, _ := strconv.Atoi(strings.TrimPrefix(params.Cursor, "page-"))
+			rows, last := []map[string]any{}, 0
+			for _, m := range cfg.Models {
+				last = max(last, m.Page)
+				if m.Page != page {
+					continue
+				}
+				supported := []map[string]any{}
+				for _, e := range m.Efforts {
+					supported = append(supported, map[string]any{"reasoningEffort": e})
+				}
+				row := map[string]any{
+					"id": m.Value, "model": m.resolved(), "hidden": m.Hidden,
+					"defaultReasoningEffort": m.DefaultEffort, "supportedReasoningEfforts": supported,
+				}
+				if m.Upgrade != "" {
+					row["upgrade"] = m.Upgrade
+				}
+				rows = append(rows, row)
+			}
+			result := map[string]any{"data": rows}
+			if page < last {
+				result["nextCursor"] = "page-" + strconv.Itoa(page+1)
+			}
+			err = out.Encode(map[string]any{"id": *req.ID, "result": result})
 		case "skills/list":
 			fail, werr := cfg.wait()
 			if werr != nil {

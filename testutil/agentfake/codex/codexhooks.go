@@ -434,6 +434,17 @@ func (c *codexFake) submit(text string) error {
 		// The prompt vanishes: no user record, no turn.
 		return nil
 	}
+	if b := c.row.Behaviour; !c.modelErrored && text != "" && !strings.HasPrefix(text, "/") && (b == agentfake.ModelNotFound || b == agentfake.ModelError) {
+		c.modelErrored = true
+		code := cmp.Or(c.row.ErrorCode, "other")
+		if b == agentfake.ModelNotFound {
+			code = "model_not_found"
+		}
+		if err := c.startTurn(text); err != nil {
+			return err
+		}
+		return c.taskError(fmt.Sprintf("The %q model failed: %s", c.model, code), code)
+	}
 	if w := c.resumeWork; w != nil {
 		c.resumeWork = nil
 		if err := c.startTurn(text); err != nil {

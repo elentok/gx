@@ -16,6 +16,8 @@ type tui struct {
 	ack     io.Writer
 	opts    tuiOptions
 	started time.Time
+	// modelErrored is set once the first message got the model's API error.
+	modelErrored bool
 	// limitResetsAt, when set (Unix seconds), replaces the five-hour window's reset in the
 	// usage the statusLine reports, so a rate limit's reset is relative to when it was hit.
 	limitResetsAt int64

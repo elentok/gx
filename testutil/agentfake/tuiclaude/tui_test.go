@@ -64,7 +64,14 @@ type tuiFake struct {
 
 func startTUIFake(t *testing.T, args []string, env ...string) *tuiFake {
 	t.Helper()
-	f := &tuiFake{t: t, home: t.TempDir(), screen: &SyncBuffer{}, done: make(chan struct{})}
+	return startTUIFakeIn(t, t.TempDir(), args, env...)
+}
+
+// startTUIFakeIn is startTUIFake under a given HOME, so a relaunch shares the
+// first launch's files.
+func startTUIFakeIn(t *testing.T, home string, args []string, env ...string) *tuiFake {
+	t.Helper()
+	f := &tuiFake{t: t, home: home, screen: &SyncBuffer{}, done: make(chan struct{})}
 	f.cmd = exec.Command(os.Args[0], args...)
 	f.cmd.Dir = t.TempDir()
 	f.cmd.Env = append(os.Environ(), append(env, TUIEnv+"=1", "HOME="+f.home)...)

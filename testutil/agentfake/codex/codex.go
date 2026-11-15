@@ -52,6 +52,23 @@ func CodexArgsPath(codexHome, sessionID string) string {
 	return filepath.Join(codexHome, "agentfake", sessionID+".args")
 }
 
+// CodexLaunchLogPath logs the argv of every launch of sessionID, one JSON array
+// per line, where CodexArgsPath keeps only the last.
+func CodexLaunchLogPath(codexHome, sessionID string) string {
+	return filepath.Join(codexHome, "agentfake", sessionID+".launches")
+}
+
+// ReadCodexLaunches is the argv of each launch of sessionID, in order.
+func ReadCodexLaunches(codexHome, sessionID string) ([][]string, error) {
+	return agentfake.ReadLaunches(CodexLaunchLogPath(codexHome, sessionID))
+}
+
+// CodexReleasePath is the file whose existence releases a held launch (see
+// agentfake.ModelHold) of sessionID.
+func CodexReleasePath(codexHome, sessionID string) string {
+	return filepath.Join(codexHome, "agentfake", sessionID+".release")
+}
+
 // ReadCodexArgs is the argv the Codex fake running sessionID was started with.
 func ReadCodexArgs(codexHome, sessionID string) ([]string, error) {
 	data, err := os.ReadFile(CodexArgsPath(codexHome, sessionID))
@@ -78,6 +95,9 @@ type codexOptions struct {
 	resume string
 	// hooks are the inline `-c hooks.<Event>=...` commands by event.
 	hooks map[string][]codexHook
+	// model is --model/-m and effort is `-c model_reasoning_effort=`; empty
+	// when the launch gave none.
+	model, effort string
 }
 
 // parseCodexArgs accepts exactly the launch flags the Codex harness passes, so
@@ -91,14 +111,20 @@ func parseCodexArgs(args []string) (codexOptions, error) {
 		opts.resume, args = args[1], args[2:]
 	}
 	flags := flag.NewFlagSet("codex", flag.ContinueOnError)
-	for _, name := range []string{"sandbox", "s", "ask-for-approval", "a", "model", "m", "cd", "C"} {
+	for _, name := range []string{"sandbox", "s", "ask-for-approval", "a", "cd", "C"} {
 		flags.String(name, "", "")
+	}
+	for _, name := range []string{"model", "m"} {
+		flags.StringVar(&opts.model, name, "", "")
 	}
 	for _, name := range []string{"approve-for-me", "dangerously-bypass-hook-trust", "no-daemon"} {
 		flags.Bool(name, false, "")
 	}
 	flags.Func("c", "", func(setting string) error {
 		key, value, _ := strings.Cut(setting, "=")
+		if key == "model_reasoning_effort" {
+			opts.effort = strings.Trim(value, `"`)
+		}
 		event, isHook := strings.CutPrefix(key, "hooks.")
 		if !isHook {
 			return nil
@@ -180,6 +206,18 @@ func runCodex() (int, error) {
 	if err := os.WriteFile(CodexArgsPath(home, id), argv, 0o644); err != nil {
 		return 0, err
 	}
+	if err := agentfake.AppendLaunch(CodexLaunchLogPath(home, id), args); err != nil {
+		return 0, err
+	}
+	row, _ := agentfake.LaunchModel(opts.model)
+	switch row.Behaviour {
+	case agentfake.ModelExitAtStart:
+		return 1, fmt.Errorf("fakecodex: model %q exits at start", opts.model)
+	case agentfake.ModelHold:
+		if err := agentfake.WaitForRelease(CodexReleasePath(home, id), agentfake.HoldTimeout); err != nil {
+			return 0, err
+		}
+	}
 
 	dir := agentfake.ProgramDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -207,6 +245,9 @@ func runCodex() (int, error) {
 		hooks:   opts.hooks,
 		dialogs: codexDialogs(),
 		ctlPath: filepath.Join(dir, id+".ctl"),
+		model:   opts.model,
+		effort:  opts.effort,
+		row:     row,
 	}
 	c.box.Marker = codexMarker
 	c.box.Hung = agentfake.HangThisLaunch(os.Getenv(agentfake.TUIHangLaunchesEnv))
@@ -217,6 +258,12 @@ func runCodex() (int, error) {
 }
 
 type codexFake struct {
+	// model and effort are the launch's; row is the model list's row for model
+	// (zero for a normal launch); modelErrored is set once the first message got
+	// the row's error.
+	model, effort string
+	row           agentfake.ProbeModel
+	modelErrored  bool
 	// contextTokens, when set by an ActionUsage, is the last_token_usage input
 	// each finished turn reports instead of the per-turn default.
 	contextTokens int
@@ -432,6 +479,15 @@ func (c *codexFake) startTurn(prompt string) error {
 	turnID := fmt.Sprintf("%s-turn-%d", c.id, c.turns)
 	if err := c.writeLine("event_msg", map[string]any{"type": "task_started", "turn_id": turnID}); err != nil {
 		return err
+	}
+	if c.model != "" {
+		turnContext := map[string]any{"turn_id": turnID, "model": c.model}
+		if c.effort != "" {
+			turnContext["effort"] = c.effort
+		}
+		if err := c.writeLine("turn_context", turnContext); err != nil {
+			return err
+		}
 	}
 	msg := c.message("user", "input_text", prompt)
 	if len(c.turnImages) > 0 {

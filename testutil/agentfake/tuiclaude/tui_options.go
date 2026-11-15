@@ -75,6 +75,8 @@ type tuiOptions struct {
 	classifierOutage int
 	// model is --model, reported on every reply.
 	model string
+	// modelRow is the model list's row for --model; its zero value is a normal launch.
+	modelRow ProbeModel
 	// settings is --settings: inline JSON or a path to a JSON file.
 	settings string
 }
@@ -133,6 +135,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	if vimFooter == "" && os.Getenv(TUIIgnoreEditorModeEnv) == "1" {
 		vimFooter = "-- INSERT --"
 	}
+	row, _ := LaunchModel(*model)
 	return tuiOptions{
 		hung:             hung,
 		vimFooter:        vimFooter,
@@ -152,7 +155,8 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		unknownSkill:     os.Getenv(TUIUnknownSkillEnv) == "1",
 		noTurn:           os.Getenv(TUINoTurnEnv) == "1",
 		launchRecord:     os.Getenv(TUILaunchRecordEnv) != "0",
-		model:            cmp.Or(*model, ReportedModel),
+		model:            cmp.Or(ResolveClaudeModel(*model), ReportedModel),
+		modelRow:         row,
 		settings:         settings,
 	}, nil
 }
@@ -213,8 +217,19 @@ func runTUIClaude() (int, error) {
 	if err := os.WriteFile(TUIArgsPath(home, opts.sessionID), argv, 0o644); err != nil {
 		return 0, err
 	}
+	if err := AppendLaunch(TUILaunchLogPath(home, opts.sessionID), os.Args[1:]); err != nil {
+		return 0, err
+	}
 	if opts.model == StaleModel {
 		return 0, fmt.Errorf("agentfake: model %q is not available", opts.model)
+	}
+	if opts.modelRow.Behaviour == ModelExitAtStart {
+		return 1, fmt.Errorf("agentfake: model %q exits at start", opts.model)
+	}
+	if opts.modelRow.Behaviour == ModelHold {
+		if err := WaitForRelease(TUIReleasePath(home, opts.sessionID), HoldTimeout); err != nil {
+			return 0, err
+		}
 	}
 
 	now := time.Now()

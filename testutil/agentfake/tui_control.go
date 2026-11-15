@@ -265,6 +265,23 @@ func ReadTUIArgs(home, sessionID string) ([]string, error) {
 	return args, json.Unmarshal(data, &args)
 }
 
+// TUILaunchLogPath logs the argv of every launch of sessionID under home, one
+// JSON array per line, where TUIArgsPath keeps only the last.
+func TUILaunchLogPath(home, sessionID string) string {
+	return filepath.Join(home, ".claude", "agentfake", sessionID+".launches")
+}
+
+// ReadTUILaunches is the argv of each launch of sessionID under home, in order.
+func ReadTUILaunches(home, sessionID string) ([][]string, error) {
+	return ReadLaunches(TUILaunchLogPath(home, sessionID))
+}
+
+// TUIReleasePath is the file whose existence releases a held launch (see
+// ModelHold) of sessionID under home.
+func TUIReleasePath(home, sessionID string) string {
+	return filepath.Join(home, ".claude", "agentfake", sessionID+".release")
+}
+
 // ReportedModel is the model the TUI fake reports on its replies when it was
 // started without --model; StaleModel makes it exit at once, as claude does
 // for a model it no longer knows.
