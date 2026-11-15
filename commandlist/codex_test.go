@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -153,6 +154,98 @@ func TestProbeCodexSkills_Timeout(t *testing.T) {
 
 	start := time.Now()
 	_, err := ProbeCodexSkills(context.Background(), t.TempDir(), os.Environ())
+	if err == nil || !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("err = %v, want a timeout", err)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Fatalf("returned after %v, the child was not killed", elapsed)
+	}
+}
+
+const codexModelsPage1 = `{"id":2,"result":{"data":[` +
+	`{"id":"gpt-a","model":"gpt-a-resolved","hidden":false,"defaultReasoningEffort":"medium",` +
+	`"supportedReasoningEfforts":[{"reasoningEffort":"high","description":"x"},{"reasoningEffort":"low"}],"upgrade":"gpt-b"},` +
+	`{"id":"gpt-old","model":"gpt-old","hidden":true,"defaultReasoningEffort":"low","supportedReasoningEfforts":[],` +
+	`"upgrade":null,"upgradeInfo":{"model":"gpt-a"}}],"nextCursor":"c1"}}`
+
+const codexModelsPage2 = `{"id":3,"result":{"data":[` +
+	`{"id":"gpt-c","model":"gpt-c","hidden":false,"defaultReasoningEffort":"none","supportedReasoningEfforts":[],"upgrade":null}],` +
+	`"nextCursor":null}}`
+
+func TestProbeCodexModels_FollowsCursor(t *testing.T) {
+	// Each page is only sent after the previous reply, so the stub reads a
+	// request line before it answers.
+	logDir := stubCodex(t, `
+pwd -P > $LOG/cwd
+read l1; read l2; read l3
+echo "$l3" > $LOG/page1
+echo '`+codexModelsPage1+`'
+read l4
+echo "$l4" > $LOG/page2
+echo '`+codexModelsPage2+`'
+exec sleep 30
+`)
+	dir := t.TempDir()
+
+	got, err := ProbeCodexModels(context.Background(), dir, os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Model{
+		{Value: "gpt-a", ID: "gpt-a-resolved", Efforts: []string{"high", "low"}, DefaultEffort: "medium", Upgrade: "gpt-b"},
+		{Value: "gpt-old", ID: "gpt-old", Hidden: true, Efforts: []string{}, DefaultEffort: "low", Upgrade: "gpt-a"},
+		{Value: "gpt-c", ID: "gpt-c", Efforts: []string{}, DefaultEffort: "none"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	wantDir, _ := filepath.EvalSymlinks(dir)
+	if cwd := readTrim(t, filepath.Join(logDir, "cwd")); cwd != wantDir {
+		t.Errorf("cwd = %q, want %q", cwd, wantDir)
+	}
+	var p1, p2 struct {
+		Method string         `json:"method"`
+		Params map[string]any `json:"params"`
+	}
+	if err := json.Unmarshal([]byte(readTrim(t, filepath.Join(logDir, "page1"))), &p1); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(readTrim(t, filepath.Join(logDir, "page2"))), &p2); err != nil {
+		t.Fatal(err)
+	}
+	if p1.Method != "model/list" || p1.Params["includeHidden"] != true || p1.Params["cursor"] != nil {
+		t.Errorf("first page request = %+v", p1)
+	}
+	if p2.Method != "model/list" || p2.Params["includeHidden"] != true || p2.Params["cursor"] != "c1" {
+		t.Errorf("second page request = %+v", p2)
+	}
+}
+
+func TestProbeCodexModels_Failures(t *testing.T) {
+	cases := map[string]string{
+		"error reply":   `read a; read b; read c; echo '{"id":2,"error":{"message":"boom"}}'; exec sleep 30`,
+		"no reply":      `read a; read b; read c; exit 0`,
+		"error on page": `read a; read b; read c; echo '` + codexModelsPage1 + `'; read d; echo '{"id":3,"error":{"message":"late"}}'; exec sleep 30`,
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			stubCodex(t, body+"\n")
+			if _, err := ProbeCodexModels(context.Background(), t.TempDir(), os.Environ()); err == nil {
+				t.Fatal("want an error")
+			}
+		})
+	}
+}
+
+func TestProbeCodexModels_Timeout(t *testing.T) {
+	stubCodex(t, "exec sleep 30\n")
+	old := codexProbeTimeout
+	codexProbeTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { codexProbeTimeout = old })
+
+	start := time.Now()
+	_, err := ProbeCodexModels(context.Background(), t.TempDir(), os.Environ())
 	if err == nil || !strings.Contains(err.Error(), "timed out") {
 		t.Fatalf("err = %v, want a timeout", err)
 	}

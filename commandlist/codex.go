@@ -36,6 +36,23 @@ type codexReply struct {
 // ProbeCodexSkills asks `codex app-server` (run in dir with env) for the skills
 // it would offer after "$". Per-file load errors in the reply are ignored.
 func ProbeCodexSkills(ctx context.Context, dir string, env []string) ([]Entry, error) {
+	return runCodexAppServer(ctx, dir, env, func(send func(any) error, stdout io.Reader) ([]Entry, error) {
+		err := send(map[string]any{"jsonrpc": "2.0", "id": codexSkillsRequestID, "method": "skills/list",
+			"params": map[string]any{"cwds": []string{dir}, "forceReload": true}})
+		if err != nil {
+			return nil, err
+		}
+		return parseCodexSkills(stdout)
+	})
+}
+
+// runCodexAppServer starts `codex app-server` in dir with env, does the
+// initialize handshake and hands exchange a sender and the server's output.
+// The child is killed once exchange returns or the time limit ends. It is the
+// process start, timeout and kill-on-reply code the skills and model reads
+// share.
+func runCodexAppServer[T any](ctx context.Context, dir string, env []string, exchange func(send func(any) error, stdout io.Reader) (T, error)) (T, error) {
+	var zero T
 	ctx, cancel := context.WithTimeout(ctx, codexProbeTimeout)
 	defer cancel()
 
@@ -43,40 +60,43 @@ func ProbeCodexSkills(ctx context.Context, dir string, env []string) ([]Entry, e
 	cmd.Dir = dir
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("start codex app-server: %w", err)
+		return zero, fmt.Errorf("start codex app-server: %w", err)
 	}
-	// The child is killed once the reply is read (or the context ends).
 	defer func() {
 		cancel()
 		_ = cmd.Wait()
 	}()
 
-	requests := []any{
+	enc := json.NewEncoder(stdin)
+	send := func(msg any) error {
+		if err := enc.Encode(msg); err != nil {
+			return fmt.Errorf("write to codex app-server: %w", err)
+		}
+		return nil
+	}
+	handshake := []any{
 		map[string]any{"jsonrpc": "2.0", "id": 1, "method": "initialize",
 			"params": map[string]any{"clientInfo": map[string]any{"name": "gx", "version": "0"}}},
 		map[string]any{"jsonrpc": "2.0", "method": "initialized"},
-		map[string]any{"jsonrpc": "2.0", "id": codexSkillsRequestID, "method": "skills/list",
-			"params": map[string]any{"cwds": []string{dir}, "forceReload": true}},
 	}
-	enc := json.NewEncoder(stdin)
-	for _, r := range requests {
-		if err := enc.Encode(r); err != nil {
-			return nil, fmt.Errorf("write to codex app-server: %w", err)
+	for _, m := range handshake {
+		if err := send(m); err != nil {
+			return zero, err
 		}
 	}
 
-	entries, err := parseCodexSkills(stdout)
+	res, err := exchange(send, stdout)
 	if err != nil && ctx.Err() != nil {
-		return nil, fmt.Errorf("codex app-server timed out: %w", ctx.Err())
+		return zero, fmt.Errorf("codex app-server timed out: %w", ctx.Err())
 	}
-	return entries, err
+	return res, err
 }
 
 // parseCodexSkills reads JSON lines until the skills/list reply and returns its

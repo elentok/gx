@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -173,6 +174,68 @@ func TestProbeClaude_TimeoutKillsChild(t *testing.T) {
 	}
 	if d := time.Since(start); d > 10*time.Second {
 		t.Errorf("probe took %s, the hung child was not killed", d)
+	}
+}
+
+func TestProbeClaudeModels_Recorded(t *testing.T) {
+	out := stubClaude(t, "read line\ncat \"$STUB_REPLY\"\n")
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := commandlist.ProbeClaudeModels(context.Background(), dir, stubEnv(out))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 13 {
+		t.Fatalf("got %d models, want 13", len(got))
+	}
+	want := commandlist.Model{Value: "opus", ID: "claude-opus-5-5", Efforts: []string{"low", "medium", "high", "xhigh", "max"}}
+	if !reflect.DeepEqual(got[1], want) {
+		t.Errorf("row 1 = %+v, want %+v", got[1], want)
+	}
+	if pwd := strings.TrimSpace(readRecord(t, out, "pwd")); pwd != dir {
+		t.Errorf("cwd = %q, want %q", pwd, dir)
+	}
+	if args := strings.Fields(readRecord(t, out, "args")); !slices.Contains(args, "--no-session-persistence") {
+		t.Errorf("args %v lack --no-session-persistence", args)
+	}
+}
+
+func TestProbeClaudeModels_Rows(t *testing.T) {
+	reply := `{"type":"control_response","response":{"response":{"commands":[{"name":"x"}],"models":[` +
+		`{"value":"haiku","resolvedModel":"claude-haiku-4-5"},` +
+		`{"value":"orphan"},` +
+		`{"value":"opus","resolvedModel":"claude-opus-5-5","supportedEffortLevels":["max","low"]}]}}}`
+	out := stubClaude(t, "read line\nprintf '%s\\n' '"+reply+"'\n")
+
+	got, err := commandlist.ProbeClaudeModels(context.Background(), t.TempDir(), stubEnv(out))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []commandlist.Model{
+		{Value: "haiku", ID: "claude-haiku-4-5", Efforts: []string{}},
+		{Value: "opus", ID: "claude-opus-5-5", Efforts: []string{"max", "low"}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+}
+
+func TestProbeClaudeModels_Failures(t *testing.T) {
+	cases := map[string]string{
+		"no models array": `printf '%s\n' '{"type":"control_response","response":{"response":{"commands":[]}}}'`,
+		"no reply":        "exit 0",
+		"non-zero exit":   "exit 3",
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			out := stubClaude(t, "read line\n"+body+"\n")
+			if _, err := commandlist.ProbeClaudeModels(context.Background(), t.TempDir(), stubEnv(out)); err == nil {
+				t.Fatal("want an error")
+			}
+		})
 	}
 }
 

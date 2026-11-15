@@ -45,6 +45,19 @@ func ProbeClaude(ctx context.Context, dir string, env []string) ([]Entry, error)
 }
 
 func probeClaude(ctx context.Context, dir string, env []string, timeout time.Duration) ([]Entry, error) {
+	reply, err := runClaudeInitialize(ctx, dir, env, timeout, ParseClaudeReply)
+	if err != nil {
+		return nil, err
+	}
+	return Merge(reply, claudeBuiltins), nil
+}
+
+// runClaudeInitialize starts the short-lived claude process, sends the one
+// initialize request and returns what parse reads from the reply. It is the
+// process start, timeout and kill-on-reply code the command and model reads
+// share.
+func runClaudeInitialize[T any](ctx context.Context, dir string, env []string, timeout time.Duration, parse func(io.Reader) (T, error)) (T, error) {
+	var zero T
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -57,28 +70,28 @@ func probeClaude(ctx context.Context, dir string, env []string, timeout time.Dur
 	cmd.WaitDelay = time.Second
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("start claude: %w", err)
+		return zero, fmt.Errorf("start claude: %w", err)
 	}
 	if _, err := io.WriteString(stdin, claudeInitializeRequest+"\n"); err != nil {
 		cancel()
 		_ = cmd.Wait()
-		return nil, fmt.Errorf("write initialize request: %w", err)
+		return zero, fmt.Errorf("write initialize request: %w", err)
 	}
 
 	type result struct {
-		reply []Entry
+		reply T
 		err   error
 	}
 	done := make(chan result, 1)
 	go func() {
-		reply, err := ParseClaudeReply(stdout)
+		reply, err := parse(stdout)
 		done <- result{reply, err}
 	}()
 	var res result
@@ -95,16 +108,15 @@ func probeClaude(ctx context.Context, dir string, env []string, timeout time.Dur
 	waitErr := cmd.Wait()
 	if timedOut {
 		<-done
-		return nil, fmt.Errorf("claude probe timed out after %s", timeout)
+		return zero, fmt.Errorf("claude probe timed out after %s", timeout)
 	}
-	reply, readErr := res.reply, res.err
-	if readErr != nil {
-		if errors.Is(readErr, errNoReply) && waitErr != nil {
-			return nil, fmt.Errorf("claude probe failed: %w", waitErr)
+	if res.err != nil {
+		if errors.Is(res.err, errNoReply) && waitErr != nil {
+			return zero, fmt.Errorf("claude probe failed: %w", waitErr)
 		}
-		return nil, readErr
+		return zero, res.err
 	}
-	return Merge(reply, claudeBuiltins), nil
+	return res.reply, nil
 }
 
 // commandIn builds the command for program with env as its environment. The
