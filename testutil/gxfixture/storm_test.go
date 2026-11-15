@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -59,6 +61,38 @@ func TestSessionStormExitsTheSessionAndPausesNoTicket(t *testing.T) {
 	r.waitSleepers(t, "the killed tree is not gone", func(n int) bool { return n <= baseline })
 	if body := r.epicTicketFile(t, "storm-session-epic"); strings.Contains(body, "pause_reason") || !strings.Contains(body, "status: open") {
 		t.Errorf("the ticket changed:\n%s", body)
+	}
+}
+
+// raiseProcessCap lifts the soft process limit by extra (never above the hard
+// limit) for the test: scripts/proc-cap leaves 200 spare processes, fewer than
+// the burst tree needs. The limit goes back when the test ends.
+func raiseProcessCap(t *testing.T, extra uint64) {
+	t.Helper()
+	var lim unix.Rlimit
+	if err := unix.Getrlimit(unix.RLIMIT_NPROC, &lim); err != nil {
+		t.Fatal(err)
+	}
+	orig := lim
+	lim.Cur = min(lim.Cur+extra, lim.Max)
+	if err := unix.Setrlimit(unix.RLIMIT_NPROC, &lim); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = unix.Setrlimit(unix.RLIMIT_NPROC, &orig) })
+}
+
+func TestProcessBurstUnderDefaultLimitsIsNotKilledAndTheTicketFinishes(t *testing.T) {
+	raiseProcessCap(t, 400)
+	r := start(t, "process-burst")
+	r.waitSleepers(t, "the burst tree did not come up", func(n int) bool { return n >= agentfake.BurstDescendants })
+	if !testutil.Poll(60*time.Second, 200*time.Millisecond, func() bool {
+		body := r.epicTicketFile(t, "burst-epic")
+		return strings.Contains(body, "iteration_status: finished") || strings.Contains(body, "status: done")
+	}) {
+		t.Fatalf("the ticket did not finish:\n%s", r.epicTicketFile(t, "burst-epic"))
+	}
+	if body := r.epicTicketFile(t, "burst-epic"); strings.Contains(body, "pause_reason") {
+		t.Errorf("the ticket paused:\n%s", body)
 	}
 }
 

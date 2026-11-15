@@ -225,15 +225,24 @@ func TestStorm_ReloadingTheThresholdChangesTheBehaviour(t *testing.T) {
 // and returns the holder and agent pids.
 func startStormSession(t *testing.T, threshold int) (*servertest.Harness, context.Context, <-chan wire.Event, string, []int) {
 	t.Helper()
+	h, ctx, evs, id, pids, _ := startStormSessionWith(t, threshold, 0, 50*time.Millisecond)
+	return h, ctx, evs, id, pids
+}
+
+// startStormSessionWith is startStormSession with a hard ceiling (0 for none)
+// and a poll interval. It also returns the conversation, to send more controls.
+func startStormSessionWith(t *testing.T, threshold, hard int, interval time.Duration) (*servertest.Harness, context.Context, <-chan wire.Event, string, []int, string) {
+	t.Helper()
 	h, ctx, evs, id, conv := servertest.StartFakeSession(t, servertest.WithRealProcesses(), func(c *server.Config) {
 		c.Settings.Watchdog.MaxTreeProcesses = threshold
-		c.Settings.Watchdog.Interval = 50 * time.Millisecond
+		c.Settings.Watchdog.HardMaxTreeProcesses = hard
+		c.Settings.Watchdog.Interval = interval
 	})
 	c := servertest.WaitForHolder(t, filepath.Join(h.SessionsDir, id))
 	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionDescendants, Count: 6, Depth: 1}); err != nil {
 		t.Fatal(err)
 	}
-	return h, ctx, evs, id, []int{c.HolderPID(), c.ChildPID()}
+	return h, ctx, evs, id, []int{c.HolderPID(), c.ChildPID()}, conv
 }
 
 func TestStorm_SessionTreeOverThresholdIsKilledWholeWithOneBanner(t *testing.T) {
@@ -274,6 +283,39 @@ func TestStorm_SessionTreeUnderThresholdIsLeftAlone(t *testing.T) {
 			t.Error("session exited under the threshold")
 		}
 	}
+}
+
+// A session tree over the threshold for fewer than StreakLimit polls survives.
+func TestStorm_SessionSpikeUnderTheStreakLimitSurvives(t *testing.T) {
+	t.Parallel()
+	interval := 200 * time.Millisecond
+	h, _, _, _, pids, conv := startStormSessionWith(t, 3, 0, interval)
+	waitTreeSize(t, pids[1], 7)
+	// The spike ends well inside StreakLimit polls.
+	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionStopDescendants}); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Duration(procwatch.StreakLimit+3) * interval) // negative wait: a streak kill would land by now
+	if !anyAlive(pids) {
+		t.Error("a session whose tree spiked for under StreakLimit polls was killed")
+	}
+	if n := len(killBanners(h)); n != 0 {
+		t.Errorf("banners = %d, want none", n)
+	}
+}
+
+// A session tree over the hard ceiling dies on the first poll that sees it.
+func TestStorm_SessionOverTheHardCeilingDiesAtOnce(t *testing.T) {
+	t.Parallel()
+	interval := time.Second // a streak kill needs StreakLimit polls, ten times this
+	h, ctx, evs, id, pids, _ := startStormSessionWith(t, 3, 5, interval)
+
+	servertest.WaitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
+	testutil.WaitFor(t, 10*time.Second, "the session tree to be gone", func() bool { return !anyAlive(pids) })
+	testutil.WaitFor(t, 10*time.Second, "the hard-ceiling log line", func() bool {
+		log, err := os.ReadFile(server.LogPath(h.StateDir))
+		return err == nil && strings.Contains(string(log), `"rule":"hard ceiling"`) && strings.Contains(string(log), `"limit":5`)
+	})
 }
 
 func TestStorm_ForeignTreeIsNotifiedOnceAndLeftAlone(t *testing.T) {

@@ -57,6 +57,20 @@ var SessionStorm = scenario{
 	RealProcesses: true,
 }
 
+// BurstTicket is the ticket of the process-burst scenario.
+const BurstTicket = project + ":burst-epic/01"
+
+// ProcessBurst is one queued ticket whose agent forks agentfake.BurstDescendants
+// processes for agentfake.BurstHold under the default watchdog config: the
+// tree stays under the default limit, so nothing kills it and the ticket
+// finishes.
+var ProcessBurst = scenario{
+	Epics:         []epic{{project, "burst-epic", []ticket{{"01", "first", servertest.TicketOpts{}}}}},
+	Queue:         []string{project + ":burst-epic"},
+	Behaviour:     map[string]string{BurstTicket: agentfake.BehaviourBurst},
+	RealProcesses: true,
+}
+
 // OutsideStormCount is the size of the tree the outside-storm scenario starts.
 const OutsideStormCount = agentfake.StormDescendants
 

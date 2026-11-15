@@ -280,6 +280,7 @@ var Scenarios = map[string]scenario{
 	"dead-run-empty":           spec.DeadRunEmpty,
 	"dead-run-work":            spec.DeadRunWithWork,
 	"process-storm":            spec.ProcessStorm,
+	"process-burst":            spec.ProcessBurst,
 	"session-storm":            spec.SessionStorm,
 	"outside-storm":            spec.OutsideStorm,
 	"dead-many":                spec.DeadManyScenario(),

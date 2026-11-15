@@ -146,6 +146,10 @@ const (
 	// working, as a test command that forks out of control would. It never
 	// reports, so only a kill ends it.
 	BehaviourStorm = "storm"
+	// BehaviourBurst forks BurstDescendants processes for BurstHold, as a test
+	// run that forks a lot and ends, then finishes. Under the default watchdog
+	// limits nothing kills it.
+	BehaviourBurst = "burst"
 	// BehaviourUncheckedFinish is a verify agent that commits and reports
 	// finished with no "## Verified" entries. Told which units are unchecked
 	// (FinishBlockPrefix), it records them and reports finished again.
@@ -191,6 +195,13 @@ func uncheckedTurn(cfg WorkerConfig, address string) error {
 // StormDescendants is how many processes BehaviourStorm forks. A scenario sets
 // its watchdog threshold below it.
 const StormDescendants = 20
+
+// BurstDescendants and BurstHold are the size and length of a BehaviourBurst
+// tree. The hold spans more than one default watchdog poll.
+const (
+	BurstDescendants = 240
+	BurstHold        = 13 * time.Second
+)
 
 // stormHold bounds how long a storming agent lingers if nothing kills it.
 const stormHold = 5 * time.Minute
@@ -279,6 +290,13 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 		time.Sleep(stormHold)
 		tree.Stop()
 		return nil
+	case BehaviourBurst:
+		var tree DescendantTree
+		if err := tree.Start(BurstDescendants, 1); err != nil {
+			return err
+		}
+		time.Sleep(BurstHold)
+		tree.Stop()
 	case BehaviourBackgroundTask:
 		return nil
 	case BehaviourBackgroundDirty:
