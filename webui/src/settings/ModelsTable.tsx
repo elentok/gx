@@ -17,19 +17,33 @@ const unique = (values: (string | undefined)[]) => [
 /** The key pattern a table row stands for: its keys' shared path with a wildcard last segment. */
 const patternOf = (e: SettingsEntry) => `${e.path.slice(0, -1).join(".")}.*`
 
+const textOf = (v: unknown) => (v === undefined || v === null ? "" : String(v))
+
 function ModelCell({
   entry,
   agent,
+  project,
   onWrite,
 }: {
   entry: SettingsEntry
   agent: string
+  project: boolean
   onWrite: WriteSetting
 }) {
+  const phone = useDevice() === "phone"
   const write = useWrite({ toastRefusal: false })
   // A draft means the cell is open; closing drops it.
   const [draft, setDraft] = useState<string>()
-  const current = serverText(entry)
+  // In a project an unset key (or one hand-edited to "") shows what the global setting gives.
+  const current = project ? (entry.set ? textOf(entry.value) : "") : serverText(entry)
+  const inherited = project
+    ? textOf(entry.global_value) || textOf(entry.default) || `${agent} default`
+    : ""
+  const shown = project ? `global: ${inherited}` : `${agent} default`
+  const faint = current === ""
+  // An empty field in a project removes the key; in global scope it writes "".
+  const save = (value: unknown) =>
+    run(project && value === "" ? removeChange(entry.key) : setChange(entry.key, value))
   const { refused, text: errorText } = writeErrorText(write, entry.key)
   const run = (change: Parameters<WriteSetting>[0][number]) =>
     void write.run(() => onWrite([change]), { onDone: () => setDraft(undefined) })
@@ -39,9 +53,9 @@ function ModelCell({
       data-cell={entry.key}
       data-set={entry.set ? "true" : undefined}
       verticalAlign="top"
-      px="3"
+      px={phone ? "1.5" : "3"}
       py="2"
-      minW="140px"
+      minW={phone ? "0" : "140px"}
     >
       {draft === undefined ? (
         <Box
@@ -49,7 +63,7 @@ function ModelCell({
           alignItems="center"
           gap="2"
           minH="36px"
-          px="3"
+          px={phone ? "2" : "3"}
           borderWidth="1px"
           borderLeftWidth={entry.set ? "3px" : "1px"}
           borderColor={entry.set ? "tone.running.fg" : "border"}
@@ -63,17 +77,17 @@ function ModelCell({
             minW="0"
             fontFamily="mono"
             fontSize="13px"
-            fontStyle={current === "" ? "italic" : undefined}
-            color={current === "" ? "text.dim" : "text"}
+            fontStyle={faint ? "italic" : undefined}
+            color={faint ? "text.dim" : "text"}
             onClick={() => setDraft(current)}
           >
-            {current === "" ? `${agent} default` : current}
+            {faint ? shown : current}
           </chakra.button>
           {entry.set && (
             <chakra.button
               type="button"
               aria-label={`Reset ${entry.key}`}
-              title="Reset to default"
+              title={project ? "Use global value" : "Reset to default"}
               disabled={write.pending}
               color="tone.running.fg"
               onClick={() => run(removeChange(entry.key))}
@@ -93,7 +107,7 @@ function ModelCell({
             locked={false}
             cancellable
             setDraft={setDraft}
-            save={(value) => run(setChange(entry.key, value))}
+            save={save}
             remove={() => run(removeChange(entry.key))}
           />
         </Box>
@@ -111,10 +125,12 @@ function ModelCell({
 export function ModelsTable({
   agent,
   entries,
+  project,
   onWrite,
 }: {
   agent: string
   entries: SettingsEntry[]
+  project?: string
   onWrite: WriteSetting
 }) {
   const phone = useDevice() === "phone"
@@ -132,7 +148,7 @@ export function ModelsTable({
               <chakra.th
                 key={c}
                 textAlign="left"
-                px="3"
+                px={phone ? "2.5" : "3"}
                 py="1.5"
                 fontSize="11px"
                 fontWeight="600"
@@ -150,7 +166,13 @@ export function ModelsTable({
             const row = entries.filter((e) => e.tier === tier)
             return (
               <chakra.tr key={tier} borderTopWidth="1px" borderTopColor="hairline">
-                <chakra.th scope="row" textAlign="left" px="3.5" py="2" verticalAlign="top">
+                <chakra.th
+                  scope="row"
+                  textAlign="left"
+                  px={phone ? "2" : "3.5"}
+                  py="2"
+                  verticalAlign="top"
+                >
                   <Text fontWeight="600">{capitalized(tier)}</Text>
                   {!phone && row[0] && (
                     <Text fontFamily="mono" fontSize="11px" fontWeight="400" color="text.dim">
@@ -161,7 +183,13 @@ export function ModelsTable({
                 {columns.map((c) => {
                   const e = row.find((x) => x.column === c)
                   return e ? (
-                    <ModelCell key={c} entry={e} agent={agent} onWrite={onWrite} />
+                    <ModelCell
+                      key={c}
+                      entry={e}
+                      agent={agent}
+                      project={project !== undefined}
+                      onWrite={onWrite}
+                    />
                   ) : (
                     <td key={c} />
                   )

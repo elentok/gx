@@ -283,15 +283,32 @@ export function SectionBody({
       />
     )
   }
+  const groups = sectionGroups(categories, section, sectionEntries)
   return (
     <>
-      {sectionGroups(categories, section, sectionEntries).map((g) =>
+      {project !== undefined && groups.some((g) => g.table) && (
+        <Text
+          data-mock-part="override-note"
+          mt="2"
+          px="3"
+          py="1.5"
+          fontSize="13px"
+          color="text.muted"
+          bg="surface"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="8px"
+        >
+          Project overrides for {project}. An empty value uses the global setting.
+        </Text>
+      )}
+      {groups.map((g) =>
         g.name === "" ? (
           <Group key="">{g.entries.map(row)}</Group>
         ) : (
           <GroupBlock key={g.name} title={g.name} changed={g.entries.filter((e) => e.set).length}>
             {g.table ? (
-              <ModelsTable agent={g.name} entries={g.entries} onWrite={onWrite} />
+              <ModelsTable agent={g.name} entries={g.entries} project={project} onWrite={onWrite} />
             ) : (
               g.entries.map((e) =>
                 project !== undefined && e.identity ? (

@@ -637,6 +637,7 @@ describe("Models table", () => {
     entries: SettingsEntry[],
     onWrite = vi.fn(async () => ({}) as SettingsWriteResult),
     tableGroups = ["Claude", "Codex"],
+    project?: string,
   ) => {
     const categories = treeFromEntries(entries)
     for (const g of categories[0].sections[0].groups) g.table = tableGroups.includes(g.name)
@@ -646,6 +647,7 @@ describe("Models table", () => {
           entries={entries}
           categories={categories}
           projects={[]}
+          project={project}
           section="Models"
           totpOn
           onSignOut={() => {}}
@@ -759,5 +761,120 @@ describe("Models table", () => {
     fireEvent.change(getByLabelText("Search settings"), { target: { value: "light" } })
     expect(queryByText("agents.claude.light.*")).toBeNull()
     expect(getAllByText("agents.claude.light.model").length).toBeGreaterThan(0)
+  })
+
+  describe("in a project", () => {
+    const g = (over: Partial<SettingsEntry>) => ({ global_key: over.key, ...over })
+    const projectModels = [
+      m("claude", "light", "model", g({ key: "agents.claude.light.model", global_value: "haiku" })),
+      m("claude", "light", "effort", g({ key: "agents.claude.light.effort", default: "" })),
+      m(
+        "claude",
+        "standard",
+        "model",
+        g({ key: "agents.claude.model", set: true, value: "opus", global_value: "sonnet" }),
+      ),
+      m(
+        "claude",
+        "standard",
+        "effort",
+        g({ key: "agents.claude.effort", set: true, value: "", global_value: "high" }),
+      ),
+      m(
+        "claude",
+        "strongest",
+        "model",
+        g({ key: "agents.claude.strongest.model", default: "opus" }),
+      ),
+    ]
+    const renderProject = (onWrite = vi.fn(async () => ({}) as SettingsWriteResult)) =>
+      render(projectModels, onWrite, ["Claude"], "gx")
+
+    it("shows the override note under the title and no inherit rows or Override button", () => {
+      const { getByText, queryByText } = renderProject()
+      expect(
+        getByText("Project overrides for gx. An empty value uses the global setting."),
+      ).toBeTruthy()
+      expect(queryByText(/Uses the global value/)).toBeNull()
+      expect(queryByText(/^Override for/)).toBeNull()
+    })
+
+    it("does not show the note in the global view", () => {
+      const { queryByText } = render(projectModels)
+      expect(queryByText(/Project overrides for/)).toBeNull()
+    })
+
+    it("an unset cell shows the faint global effective value, falling back to Claude default", () => {
+      renderProject()
+      expect(cell("agents.claude.light.model").textContent).toContain("global: haiku")
+      expect(cell("agents.claude.strongest.model").textContent).toContain("global: opus")
+      expect(cell("agents.claude.light.effort").textContent).toContain("global: Claude default")
+      expect(cell("agents.claude.light.model").getAttribute("data-set")).toBeNull()
+    })
+
+    it("a cell holding a value has the amber edge and a Use global value reset that removes the key", async () => {
+      const { onWrite } = renderProject()
+      const set = cell("agents.claude.model")
+      expect(set.textContent).toContain("opus")
+      expect(set.getAttribute("data-set")).toBe("true")
+      fireEvent.click(within(set).getByTitle("Use global value"))
+      await act(async () => {})
+      expect(onWrite).toHaveBeenCalledWith([{ key: "agents.claude.model", remove: true }])
+    })
+
+    it("a cell set to an empty string shows the global value with the amber edge, counts, and resets", async () => {
+      const { onWrite, getByTestId } = renderProject()
+      const set = cell("agents.claude.effort")
+      expect(set.textContent).toContain("global: high")
+      expect(set.getAttribute("data-set")).toBe("true")
+      expect(getByTestId("group-count-Claude").textContent).toBe("2")
+      fireEvent.click(within(set).getByTitle("Use global value"))
+      await act(async () => {})
+      expect(onWrite).toHaveBeenCalledWith([{ key: "agents.claude.effort", remove: true }])
+    })
+
+    it("saving an empty field removes the key", async () => {
+      const { onWrite } = renderProject()
+      fireEvent.click(within(cell("agents.claude.model")).getByText("opus"))
+      const input = within(cell("agents.claude.model")).getByRole("textbox")
+      fireEvent.change(input, { target: { value: "" } })
+      fireEvent.keyDown(input, { key: "Enter" })
+      await act(async () => {})
+      expect(onWrite).toHaveBeenCalledWith([{ key: "agents.claude.model", remove: true }])
+    })
+
+    it("Enter writes a value, Escape discards, and a refusal shows the reason", async () => {
+      const { onWrite } = renderProject()
+      const light = () => cell("agents.claude.light.model")
+      fireEvent.click(within(light()).getByText("global: haiku"))
+      fireEvent.keyDown(within(light()).getByRole("textbox"), { key: "Escape" })
+      expect(within(light()).queryByRole("textbox")).toBeNull()
+      expect(onWrite).not.toHaveBeenCalled()
+      fireEvent.click(within(light()).getByText("global: haiku"))
+      const input = within(light()).getByRole("textbox")
+      fireEvent.change(input, { target: { value: "sonnet" } })
+      fireEvent.keyDown(input, { key: "Enter" })
+      await act(async () => {})
+      expect(onWrite).toHaveBeenCalledWith([{ key: "agents.claude.light.model", value: "sonnet" }])
+    })
+
+    it("a refused save keeps the cell open with the reason", async () => {
+      const refuse = vi.fn(
+        async () =>
+          ({
+            refused: true,
+            keys: ["agents.claude.strongest.model"],
+            reason: "bad",
+          }) as SettingsWriteResult,
+      )
+      const { getByText } = renderProject(refuse)
+      const strongest = () => cell("agents.claude.strongest.model")
+      fireEvent.click(within(strongest()).getByText("global: opus"))
+      fireEvent.change(within(strongest()).getByRole("textbox"), { target: { value: "x" } })
+      fireEvent.click(within(strongest()).getByRole("button", { name: "Save" }))
+      await act(async () => {})
+      expect(getByText("Not saved: bad")).toBeTruthy()
+      expect(within(strongest()).getByRole("textbox")).toBeTruthy()
+    })
   })
 })
