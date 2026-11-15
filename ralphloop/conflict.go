@@ -299,7 +299,7 @@ func reattachLiveConflictResolver(d deps.Deps, p iterationParams, live agentrunn
 	}
 	sessionID = agent.SessionID
 
-	launchParams := p.launchAndPromptParams(label, live.ID, "", p.FeatureWorktree, "", "")
+	launchParams := p.launchAndPromptParams(label, live.ID, "", p.FeatureWorktree)
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
 	if !supervise.AlreadyFinished(string(agent.State)) {
 		if err := supervise.WaitForFinish(d, launchParams, sessionID); err != nil {
@@ -388,7 +388,7 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 		}
 	}()
 
-	launchParams := p.launchAndPromptParams(label, l.ID, prompt, p.FeatureWorktree, "", "")
+	launchParams := p.launchAndPromptParams(label, l.ID, prompt, p.FeatureWorktree)
 	launchParams.Session = l.Session
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
 	switch {

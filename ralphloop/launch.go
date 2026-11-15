@@ -66,29 +66,26 @@ type iterationParams struct {
 // launchAndPromptParams builds the launchAndPrompt call for one pane in this
 // iteration (the iteration's own pane, or its conflict-resolution pane),
 // carrying over the smart-zone guardrail fields every pane in an iteration
-// shares. startEvent/finishEvent name the run-log event types logged when
-// the agent starts/finishes (see eventlog.go); pass "" for either to skip
-// logging that transition (the conflict-resolution pane logs conflict-hit/
-// conflict-resolved itself instead, around the generic start/finish here).
-func (p iterationParams) launchAndPromptParams(label, pane, prompt, sessionCwd, startEvent, finishEvent string) supervise.LaunchParams {
+// shares. It sets no StartEvent/FinishEvent, so no lifecycle event is logged
+// for these panes (the conflict-resolution pane logs conflict-hit/
+// conflict-resolved itself).
+func (p iterationParams) launchAndPromptParams(label, pane, prompt, sessionCwd string) supervise.LaunchParams {
 	return supervise.LaunchParams{
-		Label:       label,
-		Agent:       p.Agent,
-		Model:       p.Model,
-		Effort:      p.Effort,
-		Pane:        pane,
-		Prompt:      prompt,
-		SessionCwd:  sessionCwd,
-		SmartZone:   p.SmartZone,
-		Gate:        p.Gate,
-		Sink:        p.Sink,
-		Ticket:      p.Ticket.Identifier,
-		TicketPath:  p.Ticket.Path,
-		TicketData:  p.Ticket,
-		ScratchDir:  p.ScratchDir,
-		EpicName:    p.FeatureBranch,
-		StartEvent:  startEvent,
-		FinishEvent: finishEvent,
+		Label:      label,
+		Agent:      p.Agent,
+		Model:      p.Model,
+		Effort:     p.Effort,
+		Pane:       pane,
+		Prompt:     prompt,
+		SessionCwd: sessionCwd,
+		SmartZone:  p.SmartZone,
+		Gate:       p.Gate,
+		Sink:       p.Sink,
+		Ticket:     p.Ticket.Identifier,
+		TicketPath: p.Ticket.Path,
+		TicketData: p.Ticket,
+		ScratchDir: p.ScratchDir,
+		EpicName:   p.FeatureBranch,
 	}
 }
 

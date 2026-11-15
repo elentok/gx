@@ -4,9 +4,6 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/ralphloop/deps"
-	"github.com/elentok/gx/ralphloop/supervise"
-	"github.com/elentok/gx/ralphloop/ticketops"
 	"os"
 	"slices"
 	"strings"
@@ -15,9 +12,11 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/ralphloop/runlog"
-
+	"github.com/elentok/gx/ralphloop/supervise"
+	"github.com/elentok/gx/ralphloop/ticketops"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -264,7 +263,7 @@ func retryUnexecutedToolCallOnce(d deps.Deps, p iterationParams, path, pane, bas
 	}
 
 	retrySessionID := cmp.Or(status.SessionID, sessionID)
-	launchParams := p.launchAndPromptParams(label, pane, "", path, "", "")
+	launchParams := p.launchAndPromptParams(label, pane, "", path)
 	launchParams.VerifyCap = p.verifyCap
 	launchParams.Session = s
 	if err := supervise.PromptIdle(d, launchParams, unexecutedToolCallCorrection); err != nil {
@@ -290,7 +289,7 @@ func retryUnexecutedToolCallOnce(d deps.Deps, p iterationParams, path, pane, bas
 // the commits. waited is false when nothing was live.
 func waitOutLiveBackgroundTask(d deps.Deps, p iterationParams, path, pane, base, branch, sessionID string) (waited bool, ahead int, err error) {
 	label := worktree.IterationLabel(p.FeatureBranch, p.Ticket.Identifier)
-	lp := p.launchAndPromptParams(label, pane, "", path, "", "")
+	lp := p.launchAndPromptParams(label, pane, "", path)
 	lp.VerifyCap = p.verifyCap
 	if !supervise.BackgroundTaskLive(d, lp, sessionID) {
 		return false, 0, nil
@@ -347,7 +346,7 @@ const maxFinishBlocks = 2
 // new way into iteration-error from this work; the web's Retry and Start over
 // buttons are the ways out of it (ADR 0042). Tickets without ## Stories (and so the collect ticket) are never
 // blocked.
-func adoptReportBlockingUnchecked(d deps.Deps, p iterationParams, path, pane, sessionID string) (adopted bool, newSessionID string, err error) {
+func adoptReportBlockingUnchecked(d deps.Deps, p iterationParams, path, pane, sessionID string) (bool, string, error) {
 	for blocks := 0; ; blocks++ {
 		adopted, err := adoptAskingReport(p, path, pane, sessionID)
 		if err != nil || adopted {
@@ -361,7 +360,8 @@ func adoptReportBlockingUnchecked(d deps.Deps, p iterationParams, path, pane, se
 		if blocks >= maxFinishBlocks {
 			return false, sessionID, fmt.Errorf("verify ticket %s reported finished %d times with unchecked units: %s", p.Ticket.Identifier, blocks+1, list)
 		}
-		if sessionID, err = blockFinish(d, p, path, pane, sessionID, list); err != nil {
+		sessionID, err = blockFinish(d, p, path, pane, sessionID, list)
+		if err != nil {
 			return false, sessionID, err
 		}
 	}
@@ -370,16 +370,16 @@ func adoptReportBlockingUnchecked(d deps.Deps, p iterationParams, path, pane, se
 // uncheckedFinishUnits is the Stories units with no live Verified entry equal
 // to HEAD, when the ticket is a verify ticket whose current report is finished.
 func uncheckedFinishUnits(d deps.Deps, p iterationParams, path string) ([]string, error) {
-	current, err := schema.ParseTicket(p.Ticket.Path)
+	raw, err := os.ReadFile(p.Ticket.Path)
 	if err != nil {
 		return nil, fmt.Errorf("reading ticket %s for finish check: %w", p.Ticket.Path, err)
 	}
+	current, err := schema.ParseTicketFromRaw(string(raw), p.Ticket.Path)
+	if err != nil {
+		return nil, fmt.Errorf("parsing ticket %s for finish check: %w", p.Ticket.Path, err)
+	}
 	if current.Type != schema.TypeVerify || current.IterationStatus != schema.IterationStatusFinished {
 		return nil, nil
-	}
-	raw, err := os.ReadFile(p.Ticket.Path)
-	if err != nil {
-		return nil, fmt.Errorf("reading ticket %s body for finish check: %w", p.Ticket.Path, err)
 	}
 	body := schema.ParseBody(string(raw))
 	stories := schema.ParseStories(body)
@@ -422,7 +422,7 @@ func blockFinish(d deps.Deps, p iterationParams, path, pane, sessionID, list str
 		return sessionID, fmt.Errorf("clearing finished report of %s: %w", p.Ticket.Identifier, err)
 	}
 	p.logTicketEventReason(string(events.FinishBlocked), pane, sessionID, path, list)
-	lp := p.launchAndPromptParams(label, pane, "", path, "", "")
+	lp := p.launchAndPromptParams(label, pane, "", path)
 	lp.VerifyCap = p.verifyCap
 	lp.Session = s
 	msg := "You reported finished, but these units have no ## Verified entry at HEAD: " + list +
