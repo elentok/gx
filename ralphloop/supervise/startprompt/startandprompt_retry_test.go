@@ -7,12 +7,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
+	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/worktree"
 )
 
@@ -223,30 +223,21 @@ func TestStartAndPrompt_RefreshError_SkipsRetryAndNamesBothErrors(t *testing.T) 
 	}
 }
 
-func TestSingleFlight_OverlappingCallsShareOneRun(t *testing.T) {
+func TestLogRefresh_WritesRefreshedThenRetriedOnlyOnSuccess(t *testing.T) {
 	t.Parallel()
-	release := make(chan struct{})
-	started := make(chan struct{}, 2)
-	runs := 0
-	f := SingleFlight(func() error {
-		runs++
-		started <- struct{}{}
-		<-release
-		return errors.New("shared")
-	})
-	errs := make(chan error, 2)
-	go func() { errs <- f() }()
-	<-started
-	go func() { errs <- f() }()
-	time.Sleep(20 * time.Millisecond) // let the second call reach the wait
-	close(release)
-	for range 2 {
-		if err := <-errs; err == nil || err.Error() != "shared" {
-			t.Errorf("err = %v, want the shared result", err)
-		}
+	collect := func(err error) []runlog.Event {
+		var got []runlog.Event
+		LogRefresh("lbl", err, func(ev runlog.Event) { got = append(got, ev) })
+		return got
 	}
-	if runs != 1 {
-		t.Errorf("runs = %d, want 1", runs)
+	ok := collect(nil)
+	if len(ok) != 2 || ok[0].Type != string(events.SkillsRefreshed) || ok[0].Reason != "" ||
+		ok[1].Type != string(events.LaunchRetried) || ok[1].Label != "lbl" {
+		t.Errorf("success events = %+v", ok)
+	}
+	failed := collect(errors.New("boom"))
+	if len(failed) != 1 || failed[0].Type != string(events.SkillsRefreshed) || failed[0].Reason != "boom" {
+		t.Errorf("failure events = %+v", failed)
 	}
 }
 

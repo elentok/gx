@@ -80,11 +80,13 @@ func (p *Registry) TranscriptPath(cwd, sessionID string) (string, error) {
 
 // defaultDeps is ralphloop's default deps reading Config.Env's home dirs.
 func (p *Registry) DefaultDeps() deps.Deps {
-	o := deps.DepsOverrides{RunnerWait: p.cfg().RunnerWait, Finished: p.back.SessionFinished, RateLimitResetBuffer: p.cfg().RateLimitResetBuffer, GuardPoll: p.cfg().GuardPoll, RefreshSkills: p.cfg().RefreshSkills}
+	o := deps.DepsOverrides{RunnerWait: p.cfg().RunnerWait, Finished: p.back.SessionFinished, RateLimitResetBuffer: p.cfg().RateLimitResetBuffer, GuardPoll: p.cfg().GuardPoll}
 	o.Home, _ = p.EnvHome()
 	o.CodexHome, _ = p.CodexHome()
 	o.StateDir, _ = p.LockStateDir()
-	return deps.DefaultDepsWithOverrides(o)
+	d := deps.DefaultDepsWithOverrides(o)
+	d.RefreshSkills = p.cfg().RefreshSkills
+	return d
 }
 
 // lockStateDir is the gx state dir of Config.Env that merge locks live under.

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"sync"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
@@ -58,32 +57,17 @@ type Hooks struct {
 	OnRefresh func(err error)
 }
 
-// SingleFlight wraps fn so callers that overlap share one run and its result.
-func SingleFlight(fn func() error) func() error {
-	var mu sync.Mutex
-	var flight *struct {
-		done chan struct{}
-		err  error
+// LogRefresh writes the events for a launch's skill refresh through write: a
+// skills-refreshed one, then a launch-retried one when the refresh worked. Both
+// launch sites call it from their OnRefresh hook; write adds the ticket.
+func LogRefresh(label string, refreshErr error, write func(runlog.Event)) {
+	ev := runlog.Event{Type: string(events.SkillsRefreshed), Label: label}
+	if refreshErr != nil {
+		ev.Reason = refreshErr.Error()
 	}
-	return func() error {
-		mu.Lock()
-		if f := flight; f != nil {
-			mu.Unlock()
-			<-f.done
-			return f.err
-		}
-		f := &struct {
-			done chan struct{}
-			err  error
-		}{done: make(chan struct{})}
-		flight = f
-		mu.Unlock()
-		f.err = fn()
-		mu.Lock()
-		flight = nil
-		mu.Unlock()
-		close(f.done)
-		return f.err
+	write(ev)
+	if refreshErr == nil {
+		write(runlog.Event{Type: string(events.LaunchRetried), Label: label})
 	}
 }
 

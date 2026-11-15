@@ -5,6 +5,7 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/supervise"
+	"github.com/elentok/gx/ralphloop/supervise/startprompt"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -140,17 +141,12 @@ func (p iterationParams) logLaunchFailed(label string, attempt int, kind events.
 	})
 }
 
-// logSkillsRefreshed appends a skills-refreshed event for a launch's skill
-// refresh, then a launch-retried one when the refresh worked.
+// logSkillsRefreshed appends the events for a launch's skill refresh.
 func (p iterationParams) logSkillsRefreshed(label string, refreshErr error) {
-	ev := runlog.Event{Type: string(events.SkillsRefreshed), Ticket: p.Ticket.Identifier, Label: label}
-	if refreshErr != nil {
-		ev.Reason = refreshErr.Error()
-	}
-	_ = runlog.AppendEvent(p.ScratchDir, p.FeatureBranch, ev)
-	if refreshErr == nil {
-		_ = runlog.AppendEvent(p.ScratchDir, p.FeatureBranch, runlog.Event{Type: string(events.LaunchRetried), Ticket: p.Ticket.Identifier, Label: label})
-	}
+	startprompt.LogRefresh(label, refreshErr, func(ev runlog.Event) {
+		ev.Ticket = p.Ticket.Identifier
+		_ = runlog.AppendEvent(p.ScratchDir, p.FeatureBranch, ev)
+	})
 }
 
 // logPromptNudged appends one prompt-nudged event for a nudge decision.

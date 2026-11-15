@@ -281,8 +281,6 @@ type DepsOverrides struct {
 	RateLimitResetBuffer time.Duration
 	// GuardPoll is Deps.GuardPoll.
 	GuardPoll time.Duration
-	// RefreshSkills is Deps.RefreshSkills.
-	RefreshSkills func() error
 	// Finished tells the runner which sessions have reported their ticket
 	// finished (see herdrrunner.Runner.Finished). Nil means none.
 	Finished func(agentrunner.Session) bool
@@ -465,7 +463,6 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		Now:                  time.Now,
 		RateLimitResetBuffer: overrides.RateLimitResetBuffer,
 		GuardPoll:            overrides.GuardPoll,
-		RefreshSkills:        overrides.RefreshSkills,
 		PauseTimer:           time.After,
 	}
 }
