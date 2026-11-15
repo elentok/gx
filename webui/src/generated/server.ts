@@ -3060,6 +3060,11 @@ export interface SessionInfo {
    */
   latest_model?: string;
   /**
+   * LatestFamily is the family of LatestModel as the modelrules parse names
+   * it ("opus", "sol"), set with LatestModel.
+   */
+  latest_family?: string;
+  /**
    * LatestTiers holds tier names as strings: tygo prints a union element
    * type of a slice without parentheses, which types it wrongly.
    */

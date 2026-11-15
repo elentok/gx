@@ -22,6 +22,7 @@ func (mg *Manager) setLatestModel(info *wire.SessionInfo, harnessName string) {
 		return
 	}
 	info.LatestModel = latest
+	info.LatestFamily = latestFamily(list, latest)
 	info.LatestEffort = latestEffort(mg.chat.Models(), harnessName, latest, info.Effort)
 	if mg.settings == nil {
 		return
@@ -34,6 +35,20 @@ func (mg *Manager) setLatestModel(info *wire.SessionInfo, harnessName string) {
 			info.LatestTiers = append(info.LatestTiers, string(tier))
 		}
 	}
+}
+
+// latestFamily is the family of the latest model. latest may be an alias, so
+// it parses the resolved id of its list entry when there is one.
+func latestFamily(list []modelrules.Entry, latest string) string {
+	id := latest
+	for _, e := range list {
+		if e.Value == latest && e.ID != "" {
+			id = e.ID
+			break
+		}
+	}
+	family, _, _ := modelrules.ParseID(id)
+	return family
 }
 
 // latestEffort is the effort a switch to latest would run with.

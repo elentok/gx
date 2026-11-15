@@ -118,6 +118,9 @@ type SessionInfo struct {
 	// configured model is Model, and LatestEffort the effort a switch to
 	// LatestModel would run with; both are set with LatestModel only.
 	LatestModel string `json:"latest_model,omitempty"`
+	// LatestFamily is the family of LatestModel as the modelrules parse names
+	// it ("opus", "sol"), set with LatestModel.
+	LatestFamily string `json:"latest_family,omitempty"`
 	// LatestTiers holds tier names as strings: tygo prints a union element
 	// type of a slice without parentheses, which types it wrongly.
 	LatestTiers  []string `json:"latest_tiers,omitempty"`

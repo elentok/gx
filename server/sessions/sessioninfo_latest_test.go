@@ -101,40 +101,41 @@ func TestSessionInfo_LatestModel(t *testing.T) {
 		mg             *sessions.Manager
 		meta           sessions.Meta
 		wantLatest     string
+		wantFamily     string
 		wantTiers      []string
 		wantEffort     string
 		wantHasHistory bool
 	}{
 		"a Claude id with a newer id": {
 			latestManager(t, claudeList, nil, cwd, reply("claude-fable-5-1")), claude("", "xhigh"),
-			"claude-fable-5-2", []string{"worker", "strongest"}, "xhigh", true,
+			"claude-fable-5-2", "fable", []string{"worker", "strongest"}, "xhigh", true,
 		},
 		"a lagging alias gets the latest before any reply": {
 			latestManager(t, claudeList, nil, cwd), claude("fable", "max"),
-			"claude-fable-5-2", []string{"worker", "strongest"}, "xhigh", false,
+			"claude-fable-5-2", "fable", []string{"worker", "strongest"}, "xhigh", false,
 		},
 		"the latest model gets none": {
 			latestManager(t, claudeList, nil, cwd, reply("claude-fable-5-2")), claude("", "high"),
-			"", nil, "", true,
+			"", "", nil, "", true,
 		},
 		"an unparseable model gets none": {
 			latestManager(t, claudeList, nil, cwd, reply("mystery")), claude("", "high"),
-			"", nil, "", true,
+			"", "", nil, "", true,
 		},
 		"no list gets none": {
 			latestManager(t, nil, nil, cwd, reply("claude-fable-5-1")), claude("", "high"),
-			"", nil, "", true,
+			"", "", nil, "", true,
 		},
 		"codex takes the new model's default when the effort is not supported": {
 			latestManager(t, nil, codexList, cwd), sessions.Meta{Harness: "codex", Model: "gpt-6.1-terra", Effort: "low"},
-			"gpt-6.2-terra", []string{"worker"}, "high", false,
+			"gpt-6.2-terra", "terra", []string{"worker"}, "high", false,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			info := tc.mg.SessionInfo(tc.meta)
-			if info.LatestModel != tc.wantLatest || info.LatestEffort != tc.wantEffort || !slices.Equal(info.LatestTiers, tc.wantTiers) {
-				t.Errorf("latest/tiers/effort = %q/%v/%q, want %q/%v/%q", info.LatestModel, info.LatestTiers, info.LatestEffort, tc.wantLatest, tc.wantTiers, tc.wantEffort)
+			if info.LatestModel != tc.wantLatest || info.LatestFamily != tc.wantFamily || info.LatestEffort != tc.wantEffort || !slices.Equal(info.LatestTiers, tc.wantTiers) {
+				t.Errorf("latest/family/tiers/effort = %q/%q/%v/%q, want %q/%q/%v/%q", info.LatestModel, info.LatestFamily, info.LatestTiers, info.LatestEffort, tc.wantLatest, tc.wantFamily, tc.wantTiers, tc.wantEffort)
 			}
 			if info.HasHistory != tc.wantHasHistory {
 				t.Errorf("HasHistory = %v, want %v", info.HasHistory, tc.wantHasHistory)

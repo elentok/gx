@@ -265,7 +265,12 @@ test("no line when nothing switched", () => {
 })
 
 const outdated = (over: Partial<SessionInfo> = {}) =>
-  session({ latest_model: "claude-opus-4-8", latest_effort: "high", ...over })
+  session({
+    latest_model: "claude-opus-4-8",
+    latest_family: "opus",
+    latest_effort: "high",
+    ...over,
+  })
 const popover = () => screen.findByRole("dialog", { name: "Newer model" })
 const switchButton = (pop: HTMLElement) =>
   within(pop).getByRole("button", { name: /Switch to/ }) as HTMLButtonElement
@@ -277,6 +282,13 @@ test("an outdated model is a red button that opens the switch popover", async ()
   expect(pop.textContent).toContain("A newer Opus model is available")
   expect(pop.textContent).toContain("Keeps effort high. Only this session changes.")
   expect(switchButton(pop).textContent).toBe("Switch to Claude Opus 4.8")
+})
+
+test("the popover heading uses the server family, even with digits in it", async () => {
+  render(outdated({ latest_family: "o3" }))
+  fireEvent.click(screen.getByTestId("outdated-model"))
+  const pop = await popover()
+  expect(pop.textContent).toContain("A newer O3 model is available")
 })
 
 test("the switch button posts the latest model and the named effort", async () => {

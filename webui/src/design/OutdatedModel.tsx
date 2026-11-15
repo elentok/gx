@@ -6,14 +6,10 @@ import { openModelPicker, postSwitchSession } from "../shell/modelPickerOpen"
 import { Button } from "../ui/button/Button"
 import { useWrite } from "../useWrite"
 import { blockedNote, TokenCostWarning } from "./modelSwitch"
+import { LinkButton } from "./LinkButton"
 import { stateToken } from "./open"
 
-/** "GPT-6.1 Sol" -> "Sol": the server sends no family, so drop the brand and version words. */
-const family = (label: string) =>
-  label
-    .split(" ")
-    .filter((w) => w !== "Claude" && !/\d/.test(w))
-    .join(" ")
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /** The footer model name as a red button that opens the one-click switch to the latest model. */
 export function OutdatedModel({ session, text }: { session: SessionInfo; text: string }) {
@@ -84,7 +80,9 @@ export function OutdatedModel({ session, text }: { session: SessionInfo; text: s
             flexDirection="column"
             gap="2"
           >
-            <Text fontWeight="700">A newer {family(latestLabel)} model is available</Text>
+            <Text fontWeight="700">
+              A newer {capitalize(session.latest_family ?? "")} model is available
+            </Text>
             <Text color="text.dim">
               This session uses {current}. {latestLabel} replaces it.
             </Text>
@@ -115,19 +113,14 @@ export function OutdatedModel({ session, text }: { session: SessionInfo; text: s
               </Text>
             )}
             {!session.design && (
-              <chakra.button
-                type="button"
+              <LinkButton
                 alignSelf="flex-start"
-                borderWidth="0"
-                bg="transparent"
-                p="0"
                 color="text.dim"
                 textDecoration="underline"
-                cursor="pointer"
                 onClick={() => openModelPicker({ session })}
               >
                 Choose another model
-              </chakra.button>
+              </LinkButton>
             )}
           </Popover.Content>
         </Popover.Positioner>

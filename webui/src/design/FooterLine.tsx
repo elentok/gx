@@ -4,9 +4,8 @@ import type { SessionInfo } from "../generated/server"
 import { modelName } from "../modelName"
 import { agentDetails } from "./agentDetails"
 import { ContextBadge } from "./ContextBadge"
-import { openModelPicker } from "../shell/modelPickerOpen"
 import { switchRunning } from "./modelSwitch"
-import { OutdatedModel } from "./OutdatedModel"
+import { ModelName } from "./ModelName"
 
 /** The line inside a composer's box: the model on the left, the context badge on the right. */
 export function FooterLine({ session }: { session: SessionInfo }) {
@@ -33,26 +32,7 @@ export function FooterLine({ session }: { session: SessionInfo }) {
       color="text.dim"
     >
       <chakra.span truncate>
-        {session.latest_model && !switching ? (
-          <OutdatedModel session={session} text={text} />
-        ) : !session.design && !switching ? (
-          <chakra.button
-            type="button"
-            data-testid="model-name-button"
-            borderWidth="0"
-            bg="transparent"
-            p="0"
-            font="inherit"
-            color="inherit"
-            cursor="pointer"
-            _hover={{ textDecoration: "underline" }}
-            onClick={() => openModelPicker({ session })}
-          >
-            {text}
-          </chakra.button>
-        ) : (
-          text
-        )}
+        <ModelName session={session} text={text} switching={switching} />
         {switching && <chakra.span data-testid="switching-hint"> · switching</chakra.span>}
       </chakra.span>
       {tokens != null && level && ceiling && (
