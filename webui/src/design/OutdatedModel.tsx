@@ -90,7 +90,13 @@ export function OutdatedModel({ session, text }: { session: SessionInfo; text: s
               tone="running"
               disabled={!!blocked || pending}
               onClick={switchNow}
-              _disabled={{ bg: "surface", color: "text.dim", opacity: 1, cursor: "default" }}
+              _disabled={{
+                bg: "surface",
+                borderColor: "surface",
+                color: "text.dim",
+                opacity: 1,
+                cursor: "default",
+              }}
             >
               Switch to {latestLabel}
             </Button>

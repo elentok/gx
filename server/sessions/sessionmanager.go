@@ -133,7 +133,7 @@ func NewManager(d ManagerDeps) *Manager {
 	}
 	return &Manager{
 		Models: d.Models,
-		cfg: d.Cfg, log: d.Log, events: d.Events, projects: d.Projects,
+		cfg:    d.Cfg, log: d.Log, events: d.Events, projects: d.Projects,
 		settings: d.Settings, harness: d.Harness, idx: d.Idx, chat: d.Chat,
 		focus: d.Focus, afk: d.AFK, alerts: d.Alerts, queue: d.Queue, host: d.Host,
 		Watches: NewSessionWatches(), prompter: d.Prompter,
