@@ -513,6 +513,12 @@ func (s *Designs) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult,
 	if err := s.drafts.SetLastProject(req.Project); err != nil {
 		s.log.Warn("set last-used project", "project", req.Project, "err", err)
 	}
+	// The index must list the new epic before it gets a workspace member: a
+	// rescan's prune drops members of epics the index does not know, and one
+	// that scanned before createMap would drop this one.
+	if err := s.idx.Refresh(); err != nil {
+		s.log.Warn("refresh index before placing new design", "design", addr, "err", err)
+	}
 	if s.workspaces != nil {
 		// A draft's own workspace decides. Otherwise FromSession wins over the
 		// requested name; an unknown name is refused by SetMember and the Design
