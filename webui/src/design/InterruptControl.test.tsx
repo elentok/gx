@@ -39,11 +39,13 @@ test("Esc opens the confirm with Interrupt focused; Enter confirms once", async 
 test("Esc again closes the confirm, sends nothing and returns focus to the button", async () => {
   const { onInterrupt } = mount()
   esc()
-  await screen.findByRole("alertdialog")
+  const dialog = await screen.findByRole("alertdialog")
+  // Focus must be inside the confirm before Esc, or the key lands on the page.
+  await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true))
   fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
-  await waitFor(() => expect(confirm()).toBeNull())
+  await waitFor(() => expect(confirm()).toBeNull(), { timeout: 5000 })
   expect(onInterrupt).not.toHaveBeenCalled()
-  await waitFor(() => expect(document.activeElement).toBe(button()))
+  await waitFor(() => expect(document.activeElement).toBe(button()), { timeout: 5000 })
 })
 
 test("a click-opened confirm focuses Cancel", async () => {

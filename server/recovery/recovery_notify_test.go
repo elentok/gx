@@ -108,7 +108,9 @@ func resume(t *testing.T, h *servertest.Harness) {
 func waitRecoveryState(t *testing.T, h *servertest.Harness, want string) {
 	t.Helper()
 	var got wire.TicketInfo
-	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("the ticket stuck with recovery %q", want), func() bool {
+	// 30s like servertest.WaitStatus: the chain (pause, investigate ticket, its failed
+	// launch, its pause) takes ~1s alone and over 10s on a loaded machine.
+	servertest.WaitFor(t, 30*time.Second, fmt.Sprintf("the ticket stuck with recovery %q", want), func() bool {
 		snap, err := h.Client.Snapshot(context.Background())
 		if err != nil {
 			t.Fatal(err)
