@@ -110,6 +110,10 @@ func (p designPlacement) applyTo(row *wire.EpicListRow) {
 	row.WaitingSince, row.CountdownEndsAt, row.Actions = p.waitingSince, p.countdownEndsAt, p.actions
 }
 
+// StatusDelegating is the Designing card's words while a subagent works; the
+// client spins the ring for it.
+const StatusDelegating = "Working"
+
 // designPlacement is where a Design card sits and what it shows.
 type designPlacement struct {
 	section         wire.CardSection
@@ -146,6 +150,9 @@ func placeDesign(address string, act designActivity, notStarted bool, fallback t
 		p.actions = []wire.CardAction{{Kind: wire.CardActionAnswer, Label: "Answer", Target: address, Link: "#/d/" + address}}
 	default:
 		p.section = wire.SectionDesigning
+		if act.delegating {
+			p.statusWords = StatusDelegating
+		}
 		p.actions = []wire.CardAction{{Kind: wire.CardActionOpen, Label: "Open", Target: address}}
 	}
 	return p

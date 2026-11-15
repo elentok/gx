@@ -61,8 +61,13 @@ export const ringArc = (row: EpicListRow): string | undefined =>
 export const isCreatingTickets = (row: EpicListRow) =>
   row.status_words?.startsWith("Creating tickets") ?? false
 
+export const isDelegating = (row: EpicListRow) => row.status_words === "Working"
+
 export const isLive = (row: EpicListRow) =>
-  row.state === EpicListRunning || row.state === EpicListMerging || isCreatingTickets(row)
+  row.state === EpicListRunning ||
+  row.state === EpicListMerging ||
+  isCreatingTickets(row) ||
+  isDelegating(row)
 
 export const ringProgress = (row: EpicListRow) =>
   (row.ring_progress ?? (row.total ? (row.done / row.total) * 100 : 0)) / 100

@@ -16,9 +16,12 @@ type designActivity struct {
 	// askedAt), countdownAt is the deadline of its auto-advance. endedAt is when
 	// the newest Exited or failed session stopped.
 	running, asking bool
-	askedAt         time.Time
-	countdownAt     time.Time
-	endedAt         time.Time
+	// delegating: every running session is a turn ended while a background
+	// task (a subagent) still runs; nothing waits on the person.
+	delegating, active bool
+	askedAt            time.Time
+	countdownAt        time.Time
+	endedAt            time.Time
 }
 
 // designActivities folds the sessions into one designActivity per map address.
@@ -45,6 +48,11 @@ func (s *Epics) designActivities() map[string]designActivity {
 			}
 		default:
 			a.running = true
+			if info.Status.Background {
+				a.delegating = !a.active
+			} else {
+				a.active, a.delegating = true, false
+			}
 			if info.Actionable.Grilling {
 				a.asking = true
 				if info.StatusChangedAt.After(a.askedAt) {
