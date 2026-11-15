@@ -3,6 +3,7 @@ import { postJSON } from "../auth/http"
 import type { Connection } from "../connection"
 import type {
   SettingChange,
+  SettingsCategory,
   SettingsEntry,
   SettingsReadResponse,
   SettingsWriteRequest,
@@ -63,6 +64,40 @@ export function groupBySection(entries: SettingsEntry[]): SectionGroup[] {
     if (e.set) g.changed++
   }
   return [...groups.values()]
+}
+
+export interface TreeSection {
+  name: string
+  slug: string
+  category: string
+}
+
+/** The response's sections in page order, each with its category. */
+export const treeSections = (categories: SettingsCategory[]): TreeSection[] =>
+  categories.flatMap((c) =>
+    c.sections.map((s) => ({ name: s.name, slug: s.slug, category: c.name })),
+  )
+
+export interface SectionResolution {
+  /** The section the slug names. */
+  section?: TreeSection
+  /** Set when the slug is a retired one whose target the response holds. */
+  redirect?: string
+  /** The target's first section, where an unknown slug lands. */
+  first?: TreeSection
+}
+
+/** Finds the section for a URL slug. A current slug never redirects; a retired one points at its new slug when the target has it. */
+export function resolveSection(
+  data: Pick<SettingsReadResponse, "categories" | "redirects">,
+  slug: string | undefined,
+): SectionResolution {
+  const sections = treeSections(data.categories)
+  const section = sections.find((s) => s.slug === slug)
+  const first = sections[0]
+  if (section || slug === undefined) return { section, first }
+  const target = data.redirects?.[slug]
+  return { first, redirect: sections.some((s) => s.slug === target) ? target : undefined }
 }
 
 /** The row's display name: the registry's label, else the last path segment, spaced and capitalised. */

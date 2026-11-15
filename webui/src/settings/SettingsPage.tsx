@@ -5,22 +5,16 @@ import { EmptyState } from "../ui/empty-state/EmptyState"
 import type { FetchEpicList } from "../epics/list"
 import { useEpicList } from "../epics/list"
 import { useDevice } from "../useWide"
-import type { SettingsEntry, SettingsReadResponse } from "../generated/server"
-import {
-  GLOBAL_SECTIONS,
-  projectPath,
-  projectSections,
-  SectionBody,
-  sectionFromSlug,
-  sectionPath,
-  SettingsShellView,
-} from "./SettingsShell"
+import type { SettingsCategory, SettingsEntry, SettingsReadResponse } from "../generated/server"
+import { projectPath, SectionBody, sectionPath, SettingsShellView } from "./SettingsShell"
 import {
   entryLabel,
   GLOBAL_TARGET,
   groupBySection,
   postSettings,
+  resolveSection,
   searchEntries,
+  treeSections,
   useSettings,
   type FetchSettings,
   type PostSettings,
@@ -74,24 +68,27 @@ function LinkRow({ href, label, detail }: { href: string; label: string; detail?
   )
 }
 
-const sectionHref = (section: string, project?: string) => `#${sectionPath(section, project)}`
+const sectionHref = (slug: string, project?: string) => `#${sectionPath(slug, project)}`
 
 /** A phone search hit: opens the section page holding the row. */
 function HitRows({
   entries,
+  categories,
   query,
   project,
 }: {
   entries: SettingsEntry[]
+  categories: SettingsCategory[]
   query: string
   project?: string
 }) {
+  const sections = treeSections(categories)
   return groupBySection(searchEntries(entries, query)).map((g) => (
     <Group key={g.section} label={`${project ?? "Global"} · ${g.section}`}>
       {g.entries.map((e) => (
         <LinkRow
           key={e.key}
-          href={sectionHref(g.section, project)}
+          href={sectionHref(sections.find((s) => s.name === g.section)?.slug ?? "", project)}
           label={entryLabel(e)}
           detail={e.description}
         />
@@ -111,7 +108,12 @@ function ProjectHits({
 }) {
   const settings = useSettings(project, undefined, fetchSettings)
   return settings.data ? (
-    <HitRows entries={settings.data.entries} query={query} project={project} />
+    <HitRows
+      entries={settings.data.entries}
+      categories={settings.data.categories}
+      query={query}
+      project={project}
+    />
   ) : null
 }
 
@@ -120,6 +122,7 @@ export function SettingsHomeView({
   totpOn,
   authenticatorMissing = false,
   entries = [],
+  categories = [],
   projects = [],
   fetchSettings,
   onSignOut,
@@ -130,6 +133,8 @@ export function SettingsHomeView({
   authenticatorMissing?: boolean
   /** The global settings, for the section rows' changed chips and the search. */
   entries?: SettingsEntry[]
+  /** The global page tree; the section rows come from it. */
+  categories?: SettingsCategory[]
   projects?: string[]
   /** Reads each project's settings while searching. */
   fetchSettings?: FetchSettings
@@ -145,7 +150,7 @@ export function SettingsHomeView({
         <SearchBox value={query} onChange={setQuery} />
         {searching ? (
           <>
-            <HitRows entries={entries} query={query} />
+            <HitRows entries={entries} categories={categories} query={query} />
             {projects.map((p) => (
               <ProjectHits key={p} project={p} query={query} fetchSettings={fetchSettings} />
             ))}
@@ -175,12 +180,12 @@ export function SettingsHomeView({
               <LinkRow href={`${SETTINGS_HREF}/certificate`} label="Certificate" />
             </Group>
             <Group label="Global settings">
-              {GLOBAL_SECTIONS.map((s) => (
+              {treeSections(categories).map((s) => (
                 <LinkRow
-                  key={s}
-                  href={sectionHref(s)}
-                  label={s}
-                  detail={changedText(changed.get(s), "changed")}
+                  key={s.slug}
+                  href={sectionHref(s.slug)}
+                  label={s.name}
+                  detail={changedText(changed.get(s.name), "changed")}
                 />
               ))}
             </Group>
@@ -215,9 +220,11 @@ const changedText = (n: number | undefined, word: string) =>
 export function ProjectSectionsView({
   project,
   entries,
+  categories,
 }: {
   project: string
   entries: SettingsEntry[]
+  categories: SettingsCategory[]
 }) {
   return (
     <Frame>
@@ -228,16 +235,21 @@ export function ProjectSectionsView({
           Each setting uses the global value until you override it here.
         </Text>
         <Group label="Sections">
-          {groupBySection(entries).map((g) => (
-            <LinkRow
-              key={g.section}
-              href={sectionHref(g.section, project)}
-              label={g.section}
-              detail={
-                g.entries.some((e) => e.identity) ? undefined : changedText(g.changed, "overridden")
-              }
-            />
-          ))}
+          {treeSections(categories).map((s) => {
+            const g = groupBySection(entries).find((x) => x.section === s.name)
+            return (
+              <LinkRow
+                key={s.slug}
+                href={sectionHref(s.slug, project)}
+                label={s.name}
+                detail={
+                  g?.entries.some((e) => e.identity)
+                    ? undefined
+                    : changedText(g?.changed, "overridden")
+                }
+              />
+            )
+          })}
         </Group>
       </Box>
     </Frame>
@@ -533,11 +545,18 @@ function ShellPage({
           entries={settings.data.entries}
           projects={projects}
           project={project}
-          onScope={(next) =>
+          categories={settings.data.categories}
+          onScope={(next) => {
+            const target = next === GLOBAL_TARGET ? undefined : next
+            // The other scope may not hold this section; its page redirects an unknown slug to its first.
             navigate(
-              sectionPath(slug ?? GLOBAL_SECTIONS[0], next === GLOBAL_TARGET ? undefined : next),
+              slug
+                ? sectionPath(slug, target)
+                : target === undefined
+                  ? "/settings"
+                  : projectPath(target),
             )
-          }
+          }}
           section={section}
           totpOn={auth.totp_on}
           authenticatorMissing={auth.setup_code_required}
@@ -560,8 +579,11 @@ function GlobalHomePage({ slug, ...props }: SettingsPageProps & { slug?: string 
   const logins = useFetched("settings-logins", fetchList)
   const { settings, projects, onWrite } = useSettingsTarget(undefined, props)
   const wide = useDevice() !== "phone"
-  const section = sectionFromSlug(slug)
-  if (wide && !section) return <Navigate to={sectionPath(GLOBAL_SECTIONS[0])} replace />
+  const res = settings.data ? resolveSection(settings.data, slug) : undefined
+  if (res?.redirect) return <Navigate to={sectionPath(res.redirect)} replace />
+  const section = res?.section?.name
+  if (wide && res && !section && res.first)
+    return <Navigate to={sectionPath(res.first.slug)} replace />
   if (!wide && section)
     return <SectionPage section={section} settings={settings} onWrite={onWrite} />
   if (wide) {
@@ -583,6 +605,7 @@ function GlobalHomePage({ slug, ...props }: SettingsPageProps & { slug?: string 
         <SettingsHomeView
           loginCount={logins.data?.length}
           entries={settings.data?.entries}
+          categories={settings.data?.categories}
           projects={projects}
           fetchSettings={props.fetchSettings}
           totpOn={auth.data.totp_on}
@@ -606,10 +629,11 @@ function ProjectPage({
   const auth = useFetched("settings-auth", fetchAuth)
   const { settings, projects, onWrite } = useSettingsTarget(project, props)
   const wide = useDevice() !== "phone"
-  const sections = settings.data ? projectSections(settings.data.entries) : []
-  const section = sectionFromSlug(slug, sections)
-  if (wide && settings.data && !section)
-    return <Navigate to={sectionPath(sections[0], project)} replace />
+  const res = settings.data ? resolveSection(settings.data, slug) : undefined
+  if (res?.redirect) return <Navigate to={sectionPath(res.redirect, project)} replace />
+  const section = res?.section?.name
+  if (wide && res && !section && res.first)
+    return <Navigate to={sectionPath(res.first.slug, project)} replace />
   if (settings.failed) {
     return (
       <DetailPage title={{ kind: "Settings" }}>
@@ -624,7 +648,11 @@ function ProjectPage({
     return (
       <DetailPage title={{ kind: "Settings", name: project }}>
         {settings.data ? (
-          <ProjectSectionsView project={project} entries={settings.data.entries} />
+          <ProjectSectionsView
+            project={project}
+            entries={settings.data.entries}
+            categories={settings.data.categories}
+          />
         ) : (
           <Spinner label="Loading" />
         )}

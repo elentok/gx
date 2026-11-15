@@ -1,10 +1,12 @@
 import { fireEvent, waitFor, within } from "@testing-library/react"
+import { useState } from "react"
 import { MemoryRouter, Route, Routes } from "react-router"
 import { describe, expect, it, vi } from "vitest"
 import type { SettingsEntry } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { DeviceContext } from "../useWide"
-import { GLOBAL_SECTIONS, SettingsShellView } from "./SettingsShell"
+import { SettingsShellView } from "./SettingsShell"
+import { treeFromEntries } from "./testTree"
 
 const entry = (over: Partial<SettingsEntry>): SettingsEntry => ({
   key: "execution-queue.max-agents",
@@ -34,7 +36,15 @@ const entries = [
     description: "Soft limit.",
     default: 100,
   }),
-  entry({ key: "tui.theme", path: ["tui", "theme"], section: "TUI", description: "Theme." }),
+  entry({
+    key: "scratch.thing",
+    path: ["scratch", "thing"],
+    section: "Scratch pad",
+    category: "Experiments",
+    description: "Scratch.",
+    set: true,
+    value: 1,
+  }),
 ]
 
 const renderShell = (section?: string, onSignOut = () => {}, totpOn = true) =>
@@ -46,6 +56,7 @@ const renderShell = (section?: string, onSignOut = () => {}, totpOn = true) =>
           element={
             <SettingsShellView
               entries={entries}
+              categories={treeFromEntries(entries)}
               projects={["gx", "ripple"]}
               section={section}
               totpOn={totpOn}
@@ -69,6 +80,7 @@ describe("SettingsShellView", () => {
               element={
                 <SettingsShellView
                   entries={entries}
+                  categories={treeFromEntries(entries)}
                   projects={["gx"]}
                   totpOn
                   onSignOut={() => {}}
@@ -88,30 +100,80 @@ describe("SettingsShellView", () => {
     expect(getByRole("navigation")).toBeTruthy()
   })
 
-  it("lists exactly the seven sections, with no TUI or Global section", () => {
-    const { getByRole, queryByRole } = renderShell()
-    const nav = getByRole("navigation")
-    for (const s of GLOBAL_SECTIONS)
-      expect(getByRole("link", { name: new RegExp(`^${s}`) })).toBeTruthy()
-    expect(nav.textContent).toContain("Global")
-    expect(queryByRole("link", { name: /^TUI/ })).toBeNull()
-    expect(queryByRole("link", { name: /^Global/ })).toBeNull()
+  it("builds the sidebar from the response: a section the web never named shows up", () => {
+    const { getByRole } = renderShell("Scratch pad")
+    const link = getByRole("link", { name: /^Scratch pad/ })
+    expect(link.getAttribute("href")).toBe("/settings/s/scratch-pad")
   })
 
-  it("lists Keybindings right after Web UI", () => {
+  it("lists the categories in response order, then Account", () => {
     const { getByRole } = renderShell()
-    const links = Array.from(getByRole("navigation").querySelectorAll("a")).map((a) =>
-      (a.textContent ?? "").trim(),
+    const names = Array.from(getByRole("navigation").querySelectorAll("button")).map((b) =>
+      (b.textContent ?? "").replace(/[▾▸\d]/g, "").trim(),
     )
-    const webUI = links.findIndex((t) => t.startsWith("Web UI"))
-    expect(webUI).toBeGreaterThanOrEqual(0)
-    expect(links[webUI + 1]).toMatch(/^Keybindings/)
+    expect(names).toEqual(["Ralph loop", "Experiments", "Account"])
   })
 
-  it("shows a changed chip with the count of keys set in the file", () => {
-    const { getByRole } = renderShell()
+  it("starts only the current section's category open", () => {
+    const { getByRole, queryByRole } = renderShell("Budget")
+    expect(getByRole("link", { name: /^Budget$/ })).toBeTruthy()
+    expect(queryByRole("link", { name: /^Scratch pad/ })).toBeNull()
+    expect(queryByRole("link", { name: /Web logins/ })).toBeNull()
+  })
+
+  it("toggles a category on a heading click and keeps the choice", () => {
+    const { getByRole, queryByRole } = renderShell("Budget")
+    fireEvent.click(getByRole("button", { name: /^Experiments/ }))
+    expect(getByRole("link", { name: /^Scratch pad/ })).toBeTruthy()
+    fireEvent.click(getByRole("button", { name: /^Ralph loop/ }))
+    expect(queryByRole("link", { name: /^Budget$/ })).toBeNull()
+    expect(getByRole("link", { name: /^Scratch pad/ })).toBeTruthy()
+  })
+
+  it("opens the category of a section opened from a link", () => {
+    const Harness = () => {
+      const [section, setSection] = useState("Budget")
+      return (
+        <>
+          <button onClick={() => setSection("Scratch pad")}>go</button>
+          <SettingsShellView
+            entries={entries}
+            categories={treeFromEntries(entries)}
+            projects={[]}
+            section={section}
+            totpOn
+            onSignOut={() => {}}
+            onWrite={async () => ({})}
+          />
+        </>
+      )
+    }
+    const { getByRole, queryByRole } = renderThemed(
+      <MemoryRouter>
+        <Harness />
+      </MemoryRouter>,
+    )
+    expect(queryByRole("link", { name: /^Scratch pad/ })).toBeNull()
+    fireEvent.click(getByRole("button", { name: "go" }))
+    expect(getByRole("link", { name: /^Scratch pad/ })).toBeTruthy()
+  })
+
+  it("sums the changed counts on a collapsed category and counts per section in an open one", () => {
+    const { getByRole } = renderShell("Budget")
     expect(getByRole("link", { name: /^Execution queue\s*2$/ })).toBeTruthy()
     expect(getByRole("link", { name: /^Budget$/ })).toBeTruthy()
+    expect(getByRole("button", { name: /^Experiments\s*1$/ })).toBeTruthy()
+    fireEvent.click(getByRole("button", { name: /^Ralph loop/ }))
+    expect(getByRole("button", { name: /^Ralph loop\s*2$/ })).toBeTruthy()
+    fireEvent.click(getByRole("button", { name: /^Experiments/ }))
+    expect(getByRole("button", { name: /^Experiments$/ })).toBeTruthy()
+  })
+
+  it("shows the category as a breadcrumb that is not a heading", () => {
+    const { getByRole, getByText, queryByRole } = renderShell("Budget")
+    expect(getByRole("heading", { name: "Budget" })).toBeTruthy()
+    expect(getByText("Ralph loop", { selector: "p" })).toBeTruthy()
+    expect(queryByRole("heading", { name: "Ralph loop" })).toBeNull()
   })
 
   it("shows the section's rows read-only: label, description, key path and value", () => {
@@ -139,6 +201,7 @@ describe("SettingsShellView", () => {
   it("keeps the Account rows and their hrefs, and signs out", () => {
     const onSignOut = vi.fn()
     const { getByRole, getByText } = renderShell(undefined, onSignOut)
+    fireEvent.click(getByRole("button", { name: /Account/ }))
     for (const [name, href] of [
       ["Web logins", "#/settings/logins"],
       ["Password", "#/settings/password"],
@@ -161,8 +224,8 @@ describe("SettingsShellView", () => {
       type(getByLabelText, "BUDGET.SOFT")
       expect(getByText("budget.soft")).toBeTruthy()
       expect(queryByText("execution-queue.max-agents")).toBeNull()
-      type(getByLabelText, "theme")
-      expect(getByText("tui.theme")).toBeTruthy()
+      type(getByLabelText, "scratch")
+      expect(getByText("scratch.thing")).toBeTruthy()
     })
 
     it("groups hits under section headings, replaces the page, and clearing returns to the section", () => {
@@ -187,7 +250,9 @@ describe("SettingsShellView", () => {
   })
 
   it("has no Authenticator row while TOTP is off", () => {
-    const { queryByRole } = renderShell(undefined, () => {}, false)
+    const { getByRole, queryByRole } = renderShell(undefined, () => {}, false)
+    fireEvent.click(getByRole("button", { name: /Account/ }))
+    expect(getByRole("link", { name: /Certificate/ })).toBeTruthy()
     expect(queryByRole("link", { name: /Authenticator/ })).toBeNull()
   })
 })
@@ -196,24 +261,32 @@ describe("SettingsShellView in a project", () => {
   const p = (key: string, section: string, over: Partial<SettingsEntry> = {}) =>
     entry({ key, path: [key], section, description: `About ${key}.`, type: "string", ...over })
   const projectEntries = [
-    p("name", "Project", { read_only: true, identity: true, value: "gx" }),
+    p("name", "Project", { read_only: true, identity: true, value: "gx", category: "Project" }),
     p("repo", "Project", {
       read_only: true,
       identity: true,
       label: "Repository",
       value: "/Users/david/dev/gx",
+      category: "Project",
     }),
-    p("vcs", "Project", { read_only: true, identity: true, label: "VCS", value: "git" }),
-    p("trunk", "Project", { set: true, value: "main" }),
+    p("vcs", "Project", {
+      read_only: true,
+      identity: true,
+      label: "VCS",
+      value: "git",
+      category: "Project",
+    }),
+    p("trunk", "Project", { set: true, value: "main", category: "Project" }),
     p("landing", "Project", {
       type: "enum",
       enum: ["on-landed", "on-done"],
       set: true,
       value: "on-landed",
+      category: "Project",
     }),
-    p("auto-ff-merge", "Project", { type: "bool", value: false }),
+    p("auto-ff-merge", "Project", { type: "bool", value: false, category: "Project" }),
     p("project.max-agents", "Execution queue", { type: "number", set: true, value: 2 }),
-    p("checks", "Checks", { type: "checks" }),
+    p("checks", "Checks", { type: "checks", category: "Checks" }),
   ]
 
   const renderProject = (section?: string, onWrite = vi.fn(async () => ({}))) => ({
@@ -226,6 +299,7 @@ describe("SettingsShellView in a project", () => {
             element={
               <SettingsShellView
                 entries={projectEntries}
+                categories={treeFromEntries(projectEntries)}
                 projects={["gx"]}
                 project="gx"
                 section={section}
@@ -240,12 +314,19 @@ describe("SettingsShellView in a project", () => {
     ),
   })
 
-  it("lists Project, the overridable sections, then Checks, with chips counting keys in project.json", () => {
-    const { getByRole } = renderProject()
-    const names = Array.from(getByRole("navigation").querySelectorAll("a")).map(
-      (a) => a.textContent,
+  it("lists Project first, the categories holding a key, then Checks, and never Account", () => {
+    const { getByRole, queryByRole } = renderProject()
+    const names = Array.from(getByRole("navigation").querySelectorAll("button")).map((b) =>
+      (b.textContent ?? "").replace(/[▾▸\d]/g, "").trim(),
     )
-    expect(names).toEqual(["Project2", "Execution queue1", "Checks"])
+    expect(names).toEqual(["Project", "Ralph loop", "Checks"])
+    expect(queryByRole("button", { name: /Account/ })).toBeNull()
+  })
+
+  it("counts the keys in project.json on the category chip and on the section in an open category", () => {
+    const { getByRole } = renderProject("Project")
+    expect(getByRole("link", { name: /^Project\s*2$/ })).toBeTruthy()
+    expect(getByRole("button", { name: /Ralph loop\s*1$/ })).toBeTruthy()
   })
 
   it("shows Identity as read-only text with no control", () => {

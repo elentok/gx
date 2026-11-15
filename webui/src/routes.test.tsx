@@ -22,6 +22,7 @@ import {
 import { appRoutes, catchAllRoute, pageRoutePatterns, type RouteFetchers } from "./routes"
 import type { EpicDetail, EpicDetailRow, FetchEpicDetail } from "./epic/detail"
 import type { DiskStatus } from "./generated/server"
+import { treeFromEntries } from "./settings/testTree"
 import type { Snapshot } from "./snapshot"
 import type { DetailResult, FetchDetail, TicketDetail } from "./ticket/detail"
 import { renderThemed } from "./ui/render"
@@ -149,32 +150,29 @@ test("/settings/agents redirects to the Agents section", async () => {
 })
 
 test("/settings lands on the first section and a section route shows that section's rows", async () => {
-  const settings = async () => ({
-    entries: [
-      {
-        key: "execution-queue.max-agents",
-        path: ["execution-queue", "max-agents"],
-        type: "number",
-        section: "Execution queue",
-        category: "Ralph loop",
-        group: "Agent limits",
-        description: "Live agents.",
-        set: false,
-      },
-      {
-        key: "budget.soft",
-        path: ["budget", "soft"],
-        type: "number",
-        section: "Budget",
-        category: "Ralph loop",
-        group: "Spend limits",
-        description: "Soft limit.",
-        set: false,
-      },
-    ],
-    categories: [],
-    redirects: {},
-  })
+  const entries = [
+    {
+      key: "execution-queue.max-agents",
+      path: ["execution-queue", "max-agents"],
+      type: "number",
+      section: "Execution queue",
+      category: "Ralph loop",
+      group: "Agent limits",
+      description: "Live agents.",
+      set: false,
+    },
+    {
+      key: "budget.soft",
+      path: ["budget", "soft"],
+      type: "number",
+      section: "Budget",
+      category: "Ralph loop",
+      group: "Spend limits",
+      description: "Soft limit.",
+      set: false,
+    },
+  ]
+  const settings = async () => ({ entries, categories: treeFromEntries(entries), redirects: {} })
   const extra: RouteFetchers = {
     settings,
     authState: async () => ({ totp_on: true, setup_code_required: false }) as never,

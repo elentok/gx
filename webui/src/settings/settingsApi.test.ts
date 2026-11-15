@@ -7,11 +7,45 @@ import {
   numberListHint,
   postSettings,
   removeChange,
+  resolveSection,
   searchEntries,
   setChange,
+  treeSections,
 } from "./settingsApi"
 
 afterEach(() => vi.unstubAllGlobals())
+
+const tree = {
+  categories: [
+    { name: "Web UI", sections: [{ name: "Access", slug: "access", groups: [] }] },
+    { name: "System", sections: [{ name: "Watchdogs", slug: "watchdogs", groups: [] }] },
+  ],
+  redirects: { "web-ui": "access", "cpu-watchdog": "watchdogs" },
+}
+
+test("treeSections lists the sections in page order with their category", () => {
+  expect(treeSections(tree.categories)).toEqual([
+    { name: "Access", slug: "access", category: "Web UI" },
+    { name: "Watchdogs", slug: "watchdogs", category: "System" },
+  ])
+})
+
+test("resolveSection finds a current slug without redirecting, even when a redirect names it", () => {
+  const res = resolveSection({ ...tree, redirects: { access: "watchdogs" } }, "access")
+  expect(res.section?.name).toBe("Access")
+  expect(res.redirect).toBeUndefined()
+})
+
+test("resolveSection redirects a retired slug to the target the response holds", () => {
+  expect(resolveSection(tree, "cpu-watchdog").redirect).toBe("watchdogs")
+})
+
+test("resolveSection drops a redirect whose target the target lacks, and offers the first section", () => {
+  const projectTree = { ...tree, categories: tree.categories.slice(0, 1) }
+  const res = resolveSection(projectTree, "cpu-watchdog")
+  expect(res.redirect).toBeUndefined()
+  expect(res.first?.slug).toBe("access")
+})
 
 const entry = (key: string, section: string, set: boolean): SettingsEntry => ({
   key,

@@ -13,7 +13,7 @@ import {
   WebLoginPage,
   WebLoginsView,
 } from "./SettingsPage"
-import { GLOBAL_SECTIONS, sectionSlug } from "./SettingsShell"
+import { treeFromEntries } from "./testTree"
 import type { WebLoginEntry } from "./logins"
 
 const NOW = Date.parse("2026-10-30T12:00:00Z")
@@ -79,10 +79,67 @@ describe("SettingsPage project scope", () => {
     const { findByRole } = renderAt("/settings/p/gx", async () => ({
       project: { name: "gx", repo_checks_file: false },
       entries,
-      categories: [],
+      categories: treeFromEntries(entries),
       redirects: {},
     }))
     expect(await findByRole("heading", { name: "Project" })).toBeTruthy()
+  })
+
+  describe("retired slugs", () => {
+    const e = (section: string, category: string) => ({
+      key: `${section}.k`,
+      path: [section, "k"],
+      type: "string",
+      section,
+      category,
+      group: "",
+      description: `${section} row.`,
+      set: false,
+    })
+    const global = [e("Access", "Web UI"), e("Watchdogs", "System")]
+    const redirects = { "web-ui": "access", "cpu-watchdog": "watchdogs" }
+    const fetchTarget = async (target: string) => {
+      const entries = target === "gx" ? [e("Project", "Project"), e("Access", "Web UI")] : global
+      return { entries, categories: treeFromEntries(entries), redirects }
+    }
+    const conn = {
+      getState: () => "open",
+      subscribe: () => () => {},
+      onEvent: () => () => {},
+    } as unknown as Connection
+    const at = (path: string) =>
+      renderThemed(
+        <ConnectionContext.Provider value={conn}>
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>
+              <Route
+                path="/settings/s/:section"
+                element={<SettingsPage fetchSettings={fetchTarget as never} fetchAuth={authOn} />}
+              />
+              <Route
+                path="/settings/p/:project/s/:section"
+                element={<SettingsPage fetchSettings={fetchTarget as never} fetchAuth={authOn} />}
+              />
+            </Routes>
+          </MemoryRouter>
+        </ConnectionContext.Provider>,
+      )
+    const authOn = async () => ({ totp_on: false, setup_code_required: false }) as never
+
+    it("sends a retired global slug to the section that holds its keys", async () => {
+      const { findByRole } = at("/settings/s/cpu-watchdog")
+      expect(await findByRole("heading", { name: "Watchdogs" })).toBeTruthy()
+    })
+
+    it("sends a retired project slug to that section when the project has it", async () => {
+      const { findByRole } = at("/settings/p/gx/s/web-ui")
+      expect(await findByRole("heading", { name: "Access" })).toBeTruthy()
+    })
+
+    it("sends a retired project slug to the project's first section when it lacks the target", async () => {
+      const { findByRole } = at("/settings/p/gx/s/cpu-watchdog")
+      expect(await findByRole("heading", { name: "Project" })).toBeTruthy()
+    })
   })
 })
 
@@ -103,13 +160,13 @@ describe("SettingsPage on a phone", () => {
     description: `${key} text.`,
     set,
   })
-  const fetchSettings = async (target: string) =>
-    ({
-      entries:
-        target === "gx"
-          ? [entry("Project", "trunk"), entry("Budget", "cap", true), entry("Checks", "checks")]
-          : [entry("Budget", "soft")],
-    }) as never
+  const fetchSettings = async (target: string) => {
+    const entries =
+      target === "gx"
+        ? [entry("Project", "trunk"), entry("Budget", "cap", true), entry("Checks", "checks")]
+        : [entry("Budget", "soft")]
+    return { entries, categories: treeFromEntries(entries), redirects: {} } as never
+  }
   const fetchEpics = async () => ({ epics: [{ project: "gx" }] }) as never
   const renderAt = (path: string) =>
     renderThemed(
@@ -201,7 +258,12 @@ describe("SettingsPage Dev checkout", () => {
             <Route
               path="/settings/s/:section"
               element={
-                <SettingsPage fetchAuth={auth} fetchSettings={async () => ({ entries }) as never} />
+                <SettingsPage
+                  fetchAuth={auth}
+                  fetchSettings={async () =>
+                    ({ entries, categories: treeFromEntries(entries) }) as never
+                  }
+                />
               }
             />
           </Routes>
@@ -261,7 +323,7 @@ describe("SettingsHomeView", () => {
     expect(onSignOut).toHaveBeenCalledOnce()
   })
 
-  it("lists the seven global sections and the projects, with the changed count", () => {
+  it("lists the response's sections and the projects, with the changed count", () => {
     const entries = [
       {
         key: "budget.soft",
@@ -278,14 +340,12 @@ describe("SettingsHomeView", () => {
       <SettingsHomeView
         totpOn
         entries={entries}
+        categories={treeFromEntries(entries)}
         projects={["gx", "ripple"]}
         onSignOut={() => {}}
       />,
     )
-    for (const s of GLOBAL_SECTIONS)
-      expect(getByRole("link", { name: new RegExp(`^${s}`) }).getAttribute("href")).toBe(
-        `#/settings/s/${sectionSlug(s)}`,
-      )
+    expect(getByRole("link", { name: /^Budget/ }).getAttribute("href")).toBe("#/settings/s/budget")
     expect(getByRole("link", { name: /^Budget/ }).textContent).toContain("1 changed")
     expect(getByRole("link", { name: "gx" }).getAttribute("href")).toBe("#/settings/p/gx")
     expect(getByRole("link", { name: "ripple" })).toBeTruthy()
@@ -316,12 +376,15 @@ describe("SettingsHomeView", () => {
         set: false,
       },
     ]
-    const fetchSettings = async (target: string) =>
-      ({ entries: target === "gx" ? gx : [] }) as never
+    const fetchSettings = async (target: string) => {
+      const entries = target === "gx" ? gx : []
+      return { entries, categories: treeFromEntries(entries) } as never
+    }
     const { getByLabelText, findByRole, getByRole, queryByText } = renderThemed(
       <SettingsHomeView
         totpOn
         entries={global}
+        categories={treeFromEntries(global)}
         projects={["gx"]}
         fetchSettings={fetchSettings}
         onSignOut={() => {}}

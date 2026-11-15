@@ -1,14 +1,14 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { Link } from "react-router"
-import type { SettingsEntry } from "../generated/server"
+import type { SettingsCategory, SettingsEntry } from "../generated/server"
 import { SETTINGS_HREF } from "../hrefs"
 import { PageHeader } from "../page/PageHeader"
 import { PageIcon } from "../page/PageIcon"
 import { EmptyState } from "../ui/empty-state/EmptyState"
 import { useDevice } from "../useWide"
 import { Chip } from "../ui/chip/Chip"
-import { entryLabel, groupBySection, searchEntries } from "./settingsApi"
+import { entryLabel, groupBySection, searchEntries, treeSections } from "./settingsApi"
 import { Group, SearchBox } from "./parts"
 import { DEV_FRONTEND_KEY } from "../dev"
 import { DevFrontendRow } from "./DevFrontendRow"
@@ -16,39 +16,10 @@ import { SettingsRow, type WriteSetting } from "./SettingsRow"
 import { ChecksEditor } from "./ChecksEditor"
 import { CHECKS_KEY } from "./checks"
 
-/** The global sections, in sidebar order. */
-export const GLOBAL_SECTIONS = [
-  "Execution queue",
-  "Budget",
-  "Notifications",
-  "Server",
-  "Web UI",
-  "Keybindings",
-  "CPU watchdog",
-  "Process watchdog",
-  "Disk space",
-  "Agents",
-  "Models",
-  "Pull requests",
-  "Evolve and recovery",
-  "Ticket store",
-] as const
-
-export const sectionSlug = (section: string) => section.toLowerCase().replace(/[^a-z0-9]+/g, "-")
-
 export const projectPath = (project: string) => `/settings/p/${encodeURIComponent(project)}`
 
-export const sectionPath = (section: string, project?: string) =>
-  `${project === undefined ? "/settings" : projectPath(project)}/s/${sectionSlug(section)}`
-
-export const sectionFromSlug = (
-  slug: string | undefined,
-  sections: readonly string[] = GLOBAL_SECTIONS,
-) => sections.find((s) => sectionSlug(s) === slug)
-
-/** A project's sidebar sections in the order the server sent them: Project, the overridable ones, Checks. */
-export const projectSections = (entries: SettingsEntry[]) =>
-  groupBySection(entries).map((g) => g.section)
+export const sectionPath = (slug: string, project?: string) =>
+  `${project === undefined ? "/settings" : projectPath(project)}/s/${slug}`
 
 const NavLink = chakra(Link)
 
@@ -67,20 +38,6 @@ const navLink = {
   _hover: { bg: "surface.raised" },
 } as const
 
-const GroupLabel = ({ children }: { children: string }) => (
-  <Text
-    fontSize="11px"
-    letterSpacing="0.08em"
-    textTransform="uppercase"
-    color="text.muted"
-    mx="2"
-    mt="3"
-    mb="0.5"
-  >
-    {children}
-  </Text>
-)
-
 const CountChip = ({ n }: { n: number }) => (
   <chakra.span
     fontSize="11px"
@@ -97,12 +54,14 @@ const CountChip = ({ n }: { n: number }) => (
 
 export interface ShellProps {
   entries: SettingsEntry[]
+  /** The page tree from the read response: categories and sections in page order. */
+  categories: SettingsCategory[]
   projects: string[]
   /** The project on the page; global settings when absent. */
   project?: string
   /** Called with a picker value: "global" or a project name. */
   onScope?: (target: string) => void
-  /** The section on the page; the first section when absent. */
+  /** The section name on the page; the first section when absent. */
   section?: string
   totpOn: boolean
   authenticatorMissing?: boolean
@@ -114,8 +73,19 @@ export interface ShellProps {
   repoChecksFile?: boolean
 }
 
+const ACCOUNT = "Account"
+
+function Caret({ open }: { open: boolean }) {
+  return (
+    <Text as="span" aria-hidden color="text.dim" mr="1.5">
+      {open ? "▾" : "▸"}
+    </Text>
+  )
+}
+
 function Sidebar({
   entries,
+  categories,
   projects,
   project,
   onScope,
@@ -127,7 +97,34 @@ function Sidebar({
   onQuery,
 }: ShellProps & { query: string; onQuery: (q: string) => void }) {
   const changed = new Map(groupBySection(entries).map((g) => [g.section, g.changed]))
-  const sections = project === undefined ? GLOBAL_SECTIONS : projectSections(entries)
+  const current = treeSections(categories).find((s) => s.name === section)?.category
+  // A click's choice wins over the default (only the current category open) until the section changes.
+  const [toggled, setToggled] = useState<Record<string, boolean>>({})
+  useEffect(() => {
+    if (current !== undefined) setToggled((t) => ({ ...t, [current]: true }))
+  }, [current, section])
+  const isOpen = (name: string) => toggled[name] ?? name === current
+  const toggle = (name: string) => setToggled((t) => ({ ...t, [name]: !isOpen(name) }))
+  const heading = (name: string, count: number) => (
+    <chakra.button
+      key={name}
+      type="button"
+      aria-expanded={isOpen(name)}
+      onClick={() => toggle(name)}
+      {...navLink}
+      color="text.muted"
+      fontSize="xs"
+      letterSpacing="0.08em"
+      textTransform="uppercase"
+      textAlign="left"
+    >
+      <span>
+        <Caret open={isOpen(name)} />
+        {name}
+      </span>
+      {!isOpen(name) && count > 0 && <CountChip n={count} />}
+    </chakra.button>
+  )
   return (
     <chakra.nav data-mock-part="sidebar" display="grid" gap="0.5" alignSelf="start">
       <chakra.select
@@ -152,42 +149,56 @@ function Sidebar({
         ))}
       </chakra.select>
       <SearchBox value={query} onChange={onQuery} />
-      <GroupLabel>{project ?? "Global"}</GroupLabel>
-      {sections.map((s) => (
-        <NavLink
-          key={s}
-          to={sectionPath(s, project)}
-          {...navLink}
-          aria-current={s === section ? "page" : undefined}
-          {...(s === section && {
-            bg: "tone.running.bg",
-            color: "tone.running.fg",
-          })}
-        >
-          {s}
-          {(changed.get(s) ?? 0) > 0 && <CountChip n={changed.get(s) ?? 0} />}
-        </NavLink>
+      {categories.map((c) => (
+        <Fragment key={c.name}>
+          {heading(
+            c.name,
+            c.sections.reduce((n, s) => n + (changed.get(s.name) ?? 0), 0),
+          )}
+          {isOpen(c.name) &&
+            c.sections.map((s) => (
+              <NavLink
+                key={s.slug}
+                to={sectionPath(s.slug, project)}
+                {...navLink}
+                pl="6"
+                aria-current={s.name === section ? "page" : undefined}
+                {...(s.name === section && {
+                  bg: "tone.running.bg",
+                  color: "tone.running.fg",
+                })}
+              >
+                {s.name}
+                {(changed.get(s.name) ?? 0) > 0 && <CountChip n={changed.get(s.name) ?? 0} />}
+              </NavLink>
+            ))}
+        </Fragment>
       ))}
       {project === undefined && (
         <>
-          <GroupLabel>Account</GroupLabel>
-          <AccountLink href={`${SETTINGS_HREF}/logins`}>Web logins</AccountLink>
-          <AccountLink href={`${SETTINGS_HREF}/password`}>Password</AccountLink>
-          {totpOn && (
-            <AccountLink href={`${SETTINGS_HREF}/authenticator`}>
-              {authenticatorMissing ? "Add authenticator" : "Authenticator"}
-            </AccountLink>
+          {heading(ACCOUNT, 0)}
+          {isOpen(ACCOUNT) && (
+            <>
+              <AccountLink href={`${SETTINGS_HREF}/logins`}>Web logins</AccountLink>
+              <AccountLink href={`${SETTINGS_HREF}/password`}>Password</AccountLink>
+              {totpOn && (
+                <AccountLink href={`${SETTINGS_HREF}/authenticator`}>
+                  {authenticatorMissing ? "Add authenticator" : "Authenticator"}
+                </AccountLink>
+              )}
+              <AccountLink href={`${SETTINGS_HREF}/certificate`}>Certificate</AccountLink>
+              <chakra.button
+                type="button"
+                onClick={onSignOut}
+                {...navLink}
+                pl="6"
+                color="tone.deadlocked.fg"
+                textAlign="left"
+              >
+                Sign out of this device
+              </chakra.button>
+            </>
           )}
-          <AccountLink href={`${SETTINGS_HREF}/certificate`}>Certificate</AccountLink>
-          <chakra.button
-            type="button"
-            onClick={onSignOut}
-            {...navLink}
-            color="tone.deadlocked.fg"
-            textAlign="left"
-          >
-            Sign out of this device
-          </chakra.button>
         </>
       )}
     </chakra.nav>
@@ -195,7 +206,7 @@ function Sidebar({
 }
 
 const AccountLink = ({ href, children }: { href: string; children: string }) => (
-  <chakra.a href={href} {...navLink}>
+  <chakra.a href={href} {...navLink} pl="6">
     {children}
     <Text aria-hidden color="text.dim">
       ›
@@ -288,9 +299,9 @@ export function SettingsShellView(props: ShellProps) {
   const device = useDevice()
   const [query, setQuery] = useState("")
   const searching = query.trim() !== ""
-  const section =
-    props.section ??
-    (props.project === undefined ? GLOBAL_SECTIONS[0] : projectSections(props.entries)[0])
+  const sections = treeSections(props.categories)
+  const section = props.section ?? sections[0]?.name ?? ""
+  const category = sections.find((s) => s.name === section)?.category
   const row = rowBuilder(props)
   const hits = searchEntries(props.entries, query)
   const scopeName = props.project === undefined ? "global settings" : `project ${props.project}`
@@ -303,6 +314,11 @@ export function SettingsShellView(props: ShellProps) {
     >
       <Sidebar {...props} section={section} query={query} onQuery={setQuery} />
       <Box data-mock-part="page" maxW="720px">
+        {!searching && category && (
+          <Text fontSize="xs" letterSpacing="0.08em" textTransform="uppercase" color="text.muted">
+            {category}
+          </Text>
+        )}
         <PageHeader title={searching ? "Search" : section} icon={<PageIcon kind="settings" />} />
         {!searching && <SectionBody {...props} section={section} />}
         {searching && hits.length === 0 && (

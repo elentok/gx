@@ -370,7 +370,7 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
       element: <AuthenticatorPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} />,
     },
     { path: "/settings/certificate", element: <CertificatePage fetchAuth={fetchers.authState} /> },
-    { path: "/settings/agents", element: <Navigate to={sectionPath("Agents")} replace /> },
+    { path: "/settings/agents", element: <Navigate to={sectionPath("agents")} replace /> },
     { path: "/settings/*", element: <UnknownSettingsPage /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/drafts/:id", element: <DraftPage /> },
