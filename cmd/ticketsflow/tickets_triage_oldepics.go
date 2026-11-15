@@ -6,7 +6,6 @@ import (
 
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/triage"
 	"github.com/spf13/cobra"
 )
@@ -64,17 +63,10 @@ func listOldEpics(projectDir, project string, table map[string]map[string]string
 			continue
 		}
 		c := oldEpic{Epic: e.Name, Area: table[project][e.Name], Move: []string{}, Claimed: []string{}}
-		for _, tk := range e.Tickets {
-			addr := tickets.Address{Project: project, Epic: e.Name, ID: tk.Identifier}.String()
-			switch schema.Status(tk.Status) {
-			case schema.StatusOpen, schema.StatusDraft:
-				c.Move = append(c.Move, addr)
-			case schema.StatusClaimed:
-				c.Claimed = append(c.Claimed, addr)
-			}
-		}
-		c.Archive = len(c.Claimed) == 0
-		c.Waiting = len(c.Move) == 0 && len(c.Claimed) > 0
+		k := triage.ClassifyOldEpic(project, e)
+		c.Move, c.Claimed = k.Move, k.Claimed
+		c.Archive = k.CanArchive()
+		c.Waiting = k.Waiting()
 		out = append(out, c)
 	}
 	return out, nil

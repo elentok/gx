@@ -2,8 +2,6 @@ package triage
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -339,14 +337,7 @@ func (s *Store) SaveAreas(id string, revision int, areas []Area) (*Record, error
 
 // areaNames is the area epics on disk plus the areas this record saved.
 func (r *Record) areaNames(projectDir string) []string {
-	var names []string
-	if entries, err := os.ReadDir(projectDir); err == nil {
-		for _, e := range entries {
-			if e.IsDir() && !strings.HasPrefix(e.Name(), ".") && tickets.IsAreaEpic(filepath.Join(projectDir, e.Name())) {
-				names = append(names, e.Name())
-			}
-		}
-	}
+	names, _ := tickets.AreaNames(projectDir)
 	for _, a := range r.Areas {
 		if !slices.Contains(names, a.Name) {
 			names = append(names, a.Name)

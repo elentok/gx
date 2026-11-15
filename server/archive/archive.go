@@ -23,7 +23,6 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/archivekey"
 	"github.com/elentok/gx/tickets/oneoff"
-	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/triage"
 )
@@ -279,15 +278,7 @@ func (a *Archive) checkArchivable(project, dir, base string, scan func(string) (
 // complete instead of refusing it as unfinished.
 func emptiedOldEpic(dir, epic string) bool {
 	e := tickets.LoadEpic(dir, epic)
-	if !triage.IsOldEpic(e) {
-		return false
-	}
-	for _, tk := range e.Tickets {
-		if s := schema.Status(tk.Status); s != schema.StatusDone && s != schema.StatusCancelled {
-			return false
-		}
-	}
-	return true
+	return triage.IsOldEpic(e) && triage.ClassifyOldEpic("", e).Emptied()
 }
 
 const allKinds = workspaces.OwnSessions | workspaces.FixSessions | workspaces.DesignSessions

@@ -119,7 +119,7 @@ func PlanMove(root string, a tickets.Address, src tickets.Ticket, dstEpic, slug 
 	if dst == nil || srcEpic == nil {
 		return MovePlan{}, MoveRefusal(tickets.CodeUnknownEpic, "no epic %q in project %q", dstEpic, a.Project)
 	}
-	if !opts.Archive && srcEpic.IsMap && srcEpic.DesignStep != "" && srcEpic.DesignStep != string(schema.StepChart) {
+	if !opts.Archive && srcEpic.IsMap && !srcEpic.IsCharting() {
 		return MovePlan{}, MoveRefusal(tickets.CodeMoveMapSource, "epic %q is a map whose Design has started; its tickets cannot be moved out", a.Epic)
 	}
 	if t.Parent != nil {

@@ -324,6 +324,10 @@ func TestBacklog_AreasCountsAndUnfinishedMoves(t *testing.T) {
 			"05-e.md": rigs.IssueMD("05", "cancelled", "", "E"),
 		})
 		rigs.WriteEpicFiles(t, store, "bugs", area, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+		rigs.WriteEpicFiles(t, store, "gated", area, map[string]string{
+			"01-a.md": rigs.IssueMD("01", "claimed", "", "A"),
+			"02-b.md": rigs.IssueMD("02", "open", "blocked_by: \"01\"\n", "B"),
+		})
 		rigs.WriteEpicFiles(t, store, "partial", moveMap("", "ideas", "01", "02", "09"), map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
 		rigs.WriteEpicFiles(t, store, "work", loop, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
 		rigs.WriteProjectEpic(t, store, "noarea", "work", loop, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
@@ -355,6 +359,9 @@ func TestBacklog_AreasCountsAndUnfinishedMoves(t *testing.T) {
 	}
 	if a := areas["proj:bugs"]; a.Open != 1 || a.Unfinished != nil {
 		t.Errorf("proj:bugs = %+v, want open 1 and no unfinished move", a)
+	}
+	if a := areas["proj:gated"]; a.Open != 0 {
+		t.Errorf("proj:gated = %+v, want open 0: its only open ticket is blocked", a)
 	}
 	if len(byProject["proj"].Workspaces) == 0 {
 		t.Errorf("proj has no workspaces: %s", body)

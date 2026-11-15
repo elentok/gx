@@ -3,8 +3,6 @@ package triageplay
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -122,16 +120,7 @@ func (p *Player) areas() []string {
 	if err != nil || root == "" {
 		return nil
 	}
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		return nil
-	}
-	var names []string
-	for _, e := range entries {
-		if e.IsDir() && !strings.HasPrefix(e.Name(), ".") && tickets.IsAreaEpic(filepath.Join(root, e.Name())) {
-			names = append(names, e.Name())
-		}
-	}
+	names, _ := tickets.AreaNames(root)
 	return names
 }
 

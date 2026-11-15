@@ -19,6 +19,20 @@ func TestCreateEpic_WaitsForProjectMigration(t *testing.T) {
 	})
 }
 
+func TestAreaNames_ListsLiveAreasOnly(t *testing.T) {
+	root := t.TempDir()
+	for name, kind := range map[string]string{"ideas": "area", "work": "loop", "plan": "map", ".archive/old": "area"} {
+		writeFile(t, filepath.Join(root, name, "ticket.md"), "---\nkind: "+kind+"\nstatus: open\n---\n# x\n")
+	}
+	got, err := AreaNames(root)
+	if err != nil || len(got) != 1 || got[0] != "ideas" {
+		t.Errorf("AreaNames = %v, %v, want [ideas]", got, err)
+	}
+	if got, err := AreaNames(filepath.Join(root, "missing")); err != nil || len(got) != 0 {
+		t.Errorf("missing dir = %v, %v, want none", got, err)
+	}
+}
+
 func TestParseEpicFields_RefusesPRFields(t *testing.T) {
 	for _, key := range []string{"pr_number: 7", "pr_url: https://example.com/pr/7", "archived_at: 2026-01-02T03:04:05Z", "archived_workspace: w", "branch_name: foo", "range_base: abc", "range_tip: abc"} {
 		_, err := ParseEpicFields("kind: loop\n" + key + "\n")

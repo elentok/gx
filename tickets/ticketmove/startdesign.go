@@ -161,12 +161,22 @@ func moveOne(o StartDesignOpts, a tickets.Address) error {
 	return ApplyMove(plan)
 }
 
+// UnfinishedRunIDs is the one rule for a partial Start Design run: e is a
+// charting map with no completed_at whose Notes name area. It returns the
+// Notes ids.
+func UnfinishedRunIDs(e tickets.Epic, area string) ([]string, bool) {
+	notesArea, ids, ok := ParseStartDesignNotes(e.Body)
+	if !ok || notesArea != area || !e.IsCharting() || !e.CompletedAt.IsZero() {
+		return nil, false
+	}
+	return ids, true
+}
+
 // resumableIDs returns the Notes ids of an existing epic when it is this
 // verb's own unfinished run for area: a charting map with no completed_at
 // whose Notes name the area and list a ticket still in it.
 func resumableIDs(e, area tickets.Epic) ([]string, error) {
-	notesArea, ids, ok := ParseStartDesignNotes(e.Body)
-	if e.IsMap && (e.DesignStep == "" || e.DesignStep == string(schema.StepChart)) && e.CompletedAt.IsZero() && ok && notesArea == area.Name {
+	if ids, ok := UnfinishedRunIDs(e, area.Name); ok {
 		for _, id := range ids {
 			if _, still := ticketByID(area, id); still {
 				return ids, nil

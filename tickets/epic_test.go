@@ -5,6 +5,24 @@ import (
 	"time"
 )
 
+func TestEpic_IsCharting(t *testing.T) {
+	for _, c := range []struct {
+		isMap bool
+		step  string
+		want  bool
+	}{
+		{true, "", true},
+		{true, "chart", true},
+		{true, "spec", false},
+		{false, "", false},
+		{false, "chart", false},
+	} {
+		if got := (Epic{IsMap: c.isMap, DesignStep: c.step}).IsCharting(); got != c.want {
+			t.Errorf("map=%v step=%q = %v, want %v", c.isMap, c.step, got, c.want)
+		}
+	}
+}
+
 func TestEpic_QueueRefusal(t *testing.T) {
 	for _, c := range []struct {
 		name, status string

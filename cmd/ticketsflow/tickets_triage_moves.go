@@ -8,7 +8,6 @@ import (
 
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/triage"
 
 	"github.com/spf13/cobra"
@@ -39,16 +38,9 @@ func locateMove(projectDir, project, epic string) (moveLocated, error) {
 		}
 		out.Exists = true
 		out.Stamped = !e.CompletedAt.IsZero()
-		for _, tk := range e.Tickets {
-			addr := tickets.Address{Project: project, Epic: e.Name, ID: tk.Identifier}.String()
-			switch schema.Status(tk.Status) {
-			case schema.StatusOpen, schema.StatusDraft:
-				out.Move = append(out.Move, addr)
-			case schema.StatusClaimed:
-				out.Claimed = append(out.Claimed, addr)
-			}
-		}
-		out.Archive = len(out.Move) == 0 && len(out.Claimed) == 0
+		c := triage.ClassifyOldEpic(project, e)
+		out.Move, out.Claimed = c.Move, c.Claimed
+		out.Archive = len(c.Move) == 0 && c.CanArchive()
 	}
 	return out, nil
 }

@@ -7,7 +7,6 @@ import (
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketmove"
 )
 
@@ -68,10 +67,8 @@ func backlogAreas(project string, epics []tickets.Epic) []wire.BacklogArea {
 		}
 		a := wire.BacklogArea{Address: queue.RootRef{Project: project, Epic: e.Name}.String(), Name: e.Name}
 		inArea := map[string]bool{}
+		a.Open = e.OpenTicketCount()
 		for _, t := range e.Tickets {
-			if t.Status == string(schema.StatusDraft) || t.Status == string(schema.StatusOpen) {
-				a.Open++
-			}
 			inArea[t.DisplayNumber()] = true
 		}
 		a.Unfinished = unfinishedMove(project, e.Name, inArea, epics)
@@ -83,9 +80,8 @@ func backlogAreas(project string, epics []tickets.Epic) []wire.BacklogArea {
 // unfinishedMove finds the charting map of a partial Start Design run for area.
 func unfinishedMove(project, area string, inArea map[string]bool, epics []tickets.Epic) *wire.BacklogUnfinishedMove {
 	for _, m := range epics {
-		notesArea, ids, ok := ticketmove.ParseStartDesignNotes(m.Body)
-		if !ok || notesArea != area || !m.IsMap || !m.CompletedAt.IsZero() ||
-			(m.DesignStep != "" && m.DesignStep != string(schema.StepChart)) {
+		ids, ok := ticketmove.UnfinishedRunIDs(m, area)
+		if !ok {
 			continue
 		}
 		left := 0

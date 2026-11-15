@@ -202,6 +202,23 @@ func (e Epic) TotalCount() int {
 	return len(e.Tickets)
 }
 
+// IsCharting: a map whose Design has not started past the chart step.
+func (e Epic) IsCharting() bool {
+	return e.IsMap && (e.DesignStep == "" || e.DesignStep == string(schema.StepChart))
+}
+
+// OpenTicketCount is how many tickets are open or draft as rendered: a ticket
+// blocked on another is not open. Start Design needs at least one.
+func (e Epic) OpenTicketCount() int {
+	n := 0
+	for _, t := range e.Tickets {
+		if st := e.RenderedStatus(t); st == StatusOpen || st == StatusDraft {
+			n++
+		}
+	}
+	return n
+}
+
 // OpenCount is how many of the epic's tickets are not done — a ticket
 // rendering as waiting-for-children (see Epic.RenderedStatus) counts as open
 // here too, since its fork subtree is still outstanding work.

@@ -124,11 +124,11 @@ func CreateEpic(conversationsDir, projectDir, name string, fields EpicFields, bo
 		return "", err
 	}
 	if fields.Kind == KindArea {
-		n, err := countAreas(projectDir)
+		areas, err := AreaNames(projectDir)
 		if err != nil {
 			return "", err
 		}
-		if n >= MaxAreas {
+		if len(areas) >= MaxAreas {
 			return "", fmt.Errorf("project already has %d areas (the limit)", MaxAreas)
 		}
 	}
@@ -173,23 +173,23 @@ func CreateEpic(conversationsDir, projectDir, name string, fields EpicFields, bo
 	return epicPath, nil
 }
 
-// countAreas counts the live area epics under projectDir; dot directories such
-// as .archive are skipped.
-func countAreas(projectDir string) (int, error) {
+// AreaNames lists the live area epics under projectDir; dot directories such
+// as .archive are skipped. A missing projectDir has none.
+func AreaNames(projectDir string) ([]string, error) {
 	entries, err := os.ReadDir(projectDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return 0, nil
+			return nil, nil
 		}
-		return 0, err
+		return nil, err
 	}
-	n := 0
+	var names []string
 	for _, e := range entries {
 		if e.IsDir() && !strings.HasPrefix(e.Name(), ".") && IsAreaEpic(filepath.Join(projectDir, e.Name())) {
-			n++
+			names = append(names, e.Name())
 		}
 	}
-	return n, nil
+	return names, nil
 }
 
 // StampMapCompletion stamps the map at mapPath as completed at at: its

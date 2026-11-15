@@ -75,23 +75,13 @@ func (s *StartDesign) area(project, name string) (tickets.Epic, *wire.SessionRes
 	return tickets.Epic{}, &r
 }
 
-func openCount(e tickets.Epic) int {
-	n := 0
-	for _, t := range e.Tickets {
-		if st := e.RenderedStatus(t); st == tickets.StatusOpen || st == tickets.StatusDraft {
-			n++
-		}
-	}
-	return n
-}
-
 // Start starts the area's chat, or returns the live one.
 func (s *StartDesign) Start(req wire.StartDesignRequest) (wire.SessionResult, error) {
 	e, refused := s.area(req.Project, req.Area)
 	if refused != nil {
 		return *refused, nil
 	}
-	if openCount(e) == 0 {
+	if e.OpenTicketCount() == 0 {
 		return refusal(wire.ReasonStartDesignNoOpenTickets, fmt.Sprintf("%s has no open ticket", req.Area)), nil
 	}
 	checkout := s.host.TrunkCheckout(req.Project)

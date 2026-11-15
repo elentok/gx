@@ -9,7 +9,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/schema"
 	triagerec "github.com/elentok/gx/triage"
 )
 
@@ -121,18 +120,8 @@ func (t *Triage) waitingLines(project string) []string {
 		if !triagerec.IsOldEpic(e) {
 			continue
 		}
-		var claimed []string
-		movable := false
-		for _, tk := range e.Tickets {
-			switch schema.Status(tk.Status) {
-			case schema.StatusOpen, schema.StatusDraft:
-				movable = true
-			case schema.StatusClaimed:
-				claimed = append(claimed, tickets.Address{Project: project, Epic: e.Name, ID: tk.Identifier}.String())
-			}
-		}
-		if !movable && len(claimed) > 0 {
-			out = append(out, fmt.Sprintf("waiting: %s holds claimed %s", e.Name, strings.Join(claimed, ", ")))
+		if c := triagerec.ClassifyOldEpic(project, e); c.Waiting() {
+			out = append(out, c.WaitingLine(e.Name))
 		}
 	}
 	return out
