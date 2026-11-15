@@ -21,6 +21,13 @@ func TestTriageSkillAnchors(t *testing.T) {
 			t.Errorf("triage skill lacks %q", want)
 		}
 	}
+	if n := strings.Count(skill, "gx tickets triage open-round"); n != 1 {
+		t.Errorf("triage skill has open-round %d times, want once", n)
+	}
+	startDesign := collapseSpace(readFile(t, "gx-start-design/SKILL.md"))
+	if n := strings.Count(startDesign, `gx agent actionable "<reason>"`); n != 1 {
+		t.Errorf("gx-start-design has the actionable form %d times, want once", n)
+	}
 	for _, gone := range []string{
 		"## 2. Plan", "## 3. Approve", `"auto": true`, "`quick`", "send-back", "`earlier`",
 		"more than 2 questions", "--kind map",

@@ -38,6 +38,8 @@ quick fix only when the person asks for it, and then record the reason in the ti
    - Otherwise the first match: rows with no verdict → **Verify**; no plan saved → **Route**; plan
      saved, not approved → **Questions**; approved → **Write**; every row written → **Done**.
    - A live Triage found from a plain session is continued, never duplicated.
+   - A fresh session in Route or Questions runs `gx tickets triage open-round` and reprints the open
+     round, so it continues without asking again.
 3. Report each step with `gx agent step <verify|route|questions|write|done>` when it starts.
 
 Each step ends with one line, `✅ <step>: <what was done>. Next: <what runs next>`. Before chaining

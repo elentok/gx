@@ -372,7 +372,7 @@ says where the run is, so a `/clear`ed or a web session continues the same recor
     area's tickets and moves them in. Rerun it after a failure.
   - `locate --row <addr> [--seen-from <addr>]`: where the follow-up is now and what is already written.
   - `answers`, `seen-again`, `epics`, `write-state`, `last-pass`: the idempotent write-step verbs.
-  - `abandon` is refused once the step is `write`.
+
 ## Skill conventions
 
 Rules every gx skill follows when it names a model or launches a sub-agent:

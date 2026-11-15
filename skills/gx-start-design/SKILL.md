@@ -24,7 +24,7 @@ Read [gx-unslop](../gx-unslop/SKILL.md) before writing the reasons, and
    map name with `gx tickets epic next-name <project:name>`; use the name it prints.
 3. **Pick the tickets**: 8 to 14 that belong to the theme. An area with fewer than 8 open tickets
    proposes all of them.
-4. **Run `gx agent actionable`** so the session shows Actionable while it waits. Outside a gx session
+4. **Run `gx agent actionable "<reason>"`** so the session shows Actionable while it waits. Outside a gx session
    it does nothing.
 5. **Ask for approval** on one yes-no question card, "Start this Design?", in the format
    `gx-grilling` defines. Show the title, the map name and the numbered tickets (`1.`, `2.`, ...),

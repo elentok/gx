@@ -112,6 +112,7 @@ _Superseded by docs/specs/better-triage.md: the steps are now Verify, Route, Que
 
 **Skill.**
 - `gx-triage-follow-ups` runs `gx agent link --triage <project>` first. Success means web mode: Plan saves the rows and ends for the web plan view. Failure means chat mode: it prints the table in chat, asks the `quick` questions in one chat message, saves answers and edits through the person-field verb, and on "yes" runs Write in the same session. Both modes use the same record and verbs. It calls `gx agent step <verify|plan|write|done>` at each step.
+  _Superseded by docs/specs/better-triage.md: Route saves the plan rows, and the `quick` questions are replaced by the Questions step._
 - Step detection reads the record through a verb: no live Triage starts one, otherwise the first match of Verify rows with no verdict, then Plan, then Approve (plan saved, not yet approved: wait for the person, in chat mode ask for "yes"), then Write once approved, then Done. A live Triage found from a plain session is continued, not duplicated.
   _Superseded by docs/specs/better-triage.md: step detection is now verify, route, questions, write, done._
 - Unchanged: routing rules, "never grills", the correct-fix section, the `follow-ups-<date>` ready epic and map epics. The skill never queues the ready epic and points to the local tracker doc for verb syntax.
