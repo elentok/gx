@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -56,7 +57,13 @@ func TestWeb_CancelEndsAQueuedOneOffWithoutAStateToken(t *testing.T) {
 	if code != http.StatusOK || servertest.ReasonOf(t, body) != "" {
 		t.Fatalf("cancel = %d %s, want accepted", code, body)
 	}
-	if got := ticketStatus(t, store, queue.OneOffsArchivedEpic, "01-queued.md"); got != "cancelled" {
+	// The archive numbers its tickets in the order they move, and the start-up
+	// sweep may have archived "finished" first, so find the file by its slug.
+	files, err := filepath.Glob(store + "/proj/" + queue.OneOffsArchivedEpic + "/issues/*-queued.md")
+	if err != nil || len(files) != 1 {
+		t.Fatalf("archived queued one-off = %v (%v), want one file", files, err)
+	}
+	if got := ticketStatus(t, store, queue.OneOffsArchivedEpic, filepath.Base(files[0])); got != "cancelled" {
 		t.Errorf("status = %q, want cancelled", got)
 	}
 }
