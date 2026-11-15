@@ -14,7 +14,7 @@ import {
 import type { MenuKey } from "../../commands/useCompletion"
 import type { Selection } from "./LargeEditor"
 import { useViEscape } from "../../vimode"
-import { fieldLook } from "./look"
+import { fieldLook, PROMPT_BOX_ATTR } from "./look"
 
 export type ViMode = "INSERT" | "NORMAL" | "VISUAL"
 
@@ -106,6 +106,16 @@ const inlineTheme = EditorView.theme({
   "&.cm-editor .cm-content": { padding: "10px 46px 10px 12px" },
 })
 
+function lockExt(disabled: boolean) {
+  return disabled
+    ? [
+        EditorState.readOnly.of(true),
+        EditorView.editable.of(false),
+        EditorView.contentAttributes.of({ tabindex: "-1" }),
+      ]
+    : []
+}
+
 /** The first and last differing positions, so an outside edit keeps the caret where it was. */
 function diff(a: string, b: string) {
   let start = 0
@@ -163,8 +173,14 @@ export default function CodeEditor({
   handle?: Ref<CodeEditorHandle>
   /** Focus the editor when it mounts. Default true. */
   autoFocus?: boolean
-  /** Sit inside a prompt box: `rows` lines tall, no border. Fixed for the editor's life; `rows` applies live. */
-  inline?: { rows: number }
+  /** Sit inside a prompt box: `rows` lines tall, no border. Fixed for the editor's life; `rows` and `disabled` apply live. */
+  inline?: {
+    rows: number
+    /** The content element's `name`, which the page reads to tell boxes apart. */
+    name?: string
+    /** Read-only, dimmed and skipped by Tab. Applies live. */
+    disabled?: boolean
+  }
 }) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
@@ -191,6 +207,7 @@ export default function CodeEditor({
   const external = useRef(false)
   const viSlot = useRef(new Compartment())
   const stopVi = useRef<(() => void) | null>(null)
+  const lockSlot = useRef(new Compartment())
 
   // Turns the engine on: it starts in insert mode and reports every mode change.
   const startVi = (v: EditorView) => {
@@ -244,9 +261,15 @@ export default function CodeEditor({
             keymap.of([
               {
                 key: "Mod-Enter",
-                preventDefault: true,
-                stopPropagation: true,
-                run: () => (callbacks.current.onSubmit?.(), true),
+                // CodeMirror applies these flags even when `run` returns false, so the inline box (which may leave the key to the page) sets none; a handled key is still default-prevented.
+                preventDefault: !inline,
+                stopPropagation: !inline,
+                run: () => {
+                  const submit = callbacks.current.onSubmit
+                  if (!submit && inline) return false
+                  submit?.()
+                  return true
+                },
               },
               {
                 key: "Mod-g",
@@ -274,7 +297,14 @@ export default function CodeEditor({
           keymap.of([...defaultKeymap, ...historyKeymap]),
           EditorView.lineWrapping,
           placeholderExt(placeholder ?? ""),
-          EditorView.contentAttributes.of({ "aria-label": label, "aria-multiline": "true" }),
+          EditorView.contentAttributes.of({
+            "aria-label": label,
+            "aria-multiline": "true",
+            ...(inline
+              ? { [PROMPT_BOX_ATTR]: "", ...(inline.name ? { name: inline.name } : {}) }
+              : {}),
+          }),
+          lockSlot.current.of(lockExt(!!inline?.disabled)),
           theme,
           inline ? inlineTheme : [],
           // A click or tap forgets the stored column, so the next j starts from the clicked spot.
@@ -323,6 +353,16 @@ export default function CodeEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viMode])
 
+  const disabled = !!inline?.disabled
+  const firstLock = useRef(true)
+  useEffect(() => {
+    if (firstLock.current) {
+      firstLock.current = false
+      return
+    }
+    view.current?.dispatch({ effects: lockSlot.current.reconfigure(lockExt(disabled)) })
+  }, [disabled])
+
   useEffect(() => {
     const v = view.current
     if (!v) return
@@ -347,6 +387,8 @@ export default function CodeEditor({
         ref={host}
         style={{ "--prompt-rows": inline.rows } as CSSProperties}
         overflow="hidden"
+        data-focus-ring="none"
+        opacity={inline.disabled ? 0.5 : undefined}
         {...fieldLook}
         bg="transparent"
       />

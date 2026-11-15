@@ -14,7 +14,7 @@ import { useBigPrompt } from "./bigPromptStore"
 import { LargeEditor, preloadCodeEditor, type EditorMenu, type Selection } from "./LargeEditor"
 import { useCoarsePointer } from "../../useWide"
 import { useViMode } from "../../vimode"
-import { fieldLook } from "./look"
+import { fieldLook, PROMPT_BOX_ATTR } from "./look"
 import { isMac } from "../../platform"
 
 /** Runs `submit` on Cmd/Ctrl+Enter; plain Enter stays a newline. */
@@ -195,12 +195,17 @@ function Field({
       bg={raised}
       borderRadius={radius}
       boxShadow="inset 0 0 0 1px {colors.hairline}"
-      css={{ "&:has(> textarea:focus-visible)": { boxShadow: `${ringShadow} !important` } }}
+      css={{
+        "&:has(> textarea:focus-visible), &:has(.cm-editor.cm-focused)": {
+          boxShadow: `${ringShadow} !important`,
+        },
+      }}
     >
       {showEditor && Editor ? (
         <Box ref={wrap}>
           <Editor
-            inline={{ rows: effectiveRows }}
+            inline={{ rows: effectiveRows, name, disabled }}
+            onSubmit={onSubmit}
             label={label}
             value={value}
             onChange={onChange}
@@ -216,6 +221,7 @@ function Field({
           ref={area}
           {...fieldLook}
           data-focus-ring="none"
+          {...{ [PROMPT_BOX_ATTR]: "" }}
           size={size}
           bg="transparent"
           borderWidth="0"

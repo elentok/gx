@@ -472,7 +472,17 @@ const inlineView = async () => {
   return EditorView.findFromDOM(screen.getByRole("textbox", { name: "Note" }))!
 }
 
-function Live({ rows, fine }: { rows?: number; fine?: boolean }) {
+function Live({
+  rows,
+  fine,
+  onSubmit,
+  disabled,
+}: {
+  rows?: number
+  fine?: boolean
+  onSubmit?: () => void
+  disabled?: boolean
+}) {
   const [coarse, setCoarse] = useState(!fine)
   const [text, setText] = useState("hello world")
   return (
@@ -485,6 +495,8 @@ function Live({ rows, fine }: { rows?: number; fine?: boolean }) {
         rows={rows}
         value={text}
         onChange={setText}
+        onSubmit={onSubmit}
+        disabled={disabled}
       />
     </CoarsePointerContext.Provider>
   )
@@ -587,4 +599,74 @@ test("/, ? and : open the panel inside the box", async () => {
     expect(view.dom.querySelector(".cm-vim-panel input")).not.toBeNull()
     act(() => void Vim.handleKey(cm, "<Esc>", "user"))
   }
+})
+
+const modEnter = (el: Element) =>
+  fireEvent.keyDown(el, { key: "Enter", code: "Enter", keyCode: 13, ctrlKey: true })
+
+test("Mod-Enter submits in INSERT, NORMAL and VISUAL", async () => {
+  const onSubmit = vi.fn()
+  withVi(true, <Live fine onSubmit={onSubmit} />)
+  const view = await inlineView()
+  const cm = getCM(view)!
+  modEnter(view.contentDOM)
+  act(() => void Vim.handleKey(cm, "<Esc>", "user"))
+  modEnter(view.contentDOM)
+  act(() => void Vim.handleKey(cm, "v", "user"))
+  modEnter(view.contentDOM)
+  expect(onSubmit).toHaveBeenCalledTimes(3)
+  expect(view.state.doc.toString()).toBe("hello world")
+})
+
+test("Mod-Enter without onSubmit is left to the page", async () => {
+  const seen = vi.fn()
+  withVi(true, <Live fine />)
+  const view = await inlineView()
+  document.addEventListener("keydown", seen)
+  try {
+    modEnter(view.contentDOM)
+  } finally {
+    document.removeEventListener("keydown", seen)
+  }
+  expect(seen).toHaveBeenCalledTimes(1)
+})
+
+test("Tab is not handled by the inline editor", async () => {
+  withVi(true, <Live fine />)
+  const view = await inlineView()
+  const tab = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true })
+  view.contentDOM.dispatchEvent(tab)
+  expect(tab.defaultPrevented).toBe(false)
+  expect(view.state.doc.toString()).toBe("hello world")
+})
+
+test("a disabled inline editor is read-only, dimmed and skipped by Tab, and keeps its text", async () => {
+  withVi(true, <Live fine disabled />)
+  const view = await inlineView()
+  expect(view.state.readOnly).toBe(true)
+  expect(view.contentDOM.getAttribute("contenteditable")).toBe("false")
+  expect(view.contentDOM.getAttribute("tabindex")).toBe("-1")
+  expect(getComputedStyle(view.dom.parentElement!).opacity).toBe("0.5")
+  expect(view.state.doc.toString()).toBe("hello world")
+})
+
+test("the inline editor has the textarea's name, the marker, and the focus ring hooks", async () => {
+  withVi(true, <Live fine />)
+  const view = await inlineView()
+  expect(view.contentDOM.getAttribute("name")).toBe("test-note")
+  expect(view.contentDOM.hasAttribute("data-prompt-box")).toBe(true)
+  expect(view.dom.parentElement!.getAttribute("data-focus-ring")).toBe("none")
+  cleanup()
+  withVi(true, <Live />)
+  expect(field().hasAttribute("data-prompt-box")).toBe(true)
+})
+
+test("the box's css rings the box while the editor has focus", async () => {
+  withVi(true, <Live fine />)
+  await inlineView()
+  const css = Array.from(document.styleSheets)
+    .flatMap((s) => Array.from(s.cssRules))
+    .map((r) => r.cssText)
+    .join("\n")
+  expect(css).toContain(":has(.cm-editor.cm-focused)")
 })
