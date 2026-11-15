@@ -2,6 +2,7 @@ import { Box, chakra, Text, Textarea } from "@chakra-ui/react"
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { useCompletion, type CompletionConfig, type MenuKey } from "../../commands/useCompletion"
 import type { ViMode } from "./CodeEditor"
+import { useBigPrompt } from "./bigPromptStore"
 import { LargeEditor, type EditorMenu, type Selection } from "./LargeEditor"
 import { fieldLook } from "./look"
 import { isMac } from "../../platform"
@@ -96,6 +97,7 @@ function Field({
   note,
   footer,
 }: Omit<FieldProps, "completion"> & { menu?: Menu }) {
+  const big = useBigPrompt()
   const area = useRef<HTMLTextAreaElement>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
   useLayoutEffect(() => {
@@ -157,7 +159,7 @@ function Field({
         borderWidth="0"
         borderRadius="0"
         autoFocus={autoFocus}
-        rows={rows}
+        rows={big ? (rows ?? 2) * 2 : rows}
         lineHeight="1.5"
         display="block"
         pt="2.5"

@@ -5,10 +5,15 @@ import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../../connection"
 import { WideContext } from "../../useWide"
 import { renderThemed } from "../render"
+import { setBigPrompt } from "./bigPromptStore"
 import { PromptBox } from "./PromptBox"
 import { findLargeEditor, largeEditorText, typeInLargeEditor, viewOf } from "./testing"
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  setBigPrompt(false)
+  localStorage.clear()
+})
 
 const TITLE = "Note on Q2 - Pick"
 const expand = () => screen.getByLabelText("Open the note in a large editor")
@@ -64,6 +69,37 @@ test("the textarea gets value, rows, label, placeholder and disabled", () => {
   expect(area.rows).toBe(3)
   expect(area.placeholder).toBe("Type")
   expect(area.disabled).toBe(true)
+})
+
+test.each([
+  [2, 4],
+  [3, 6],
+  [5, 10],
+  [8, 16],
+  [undefined, 4],
+])("big mode doubles rows %s to %s", (rows, expected) => {
+  setBigPrompt(true)
+  renderThemed(
+    <PromptBox label="Note" name="n" title={TITLE} rows={rows} value="" onChange={() => {}} />,
+  )
+  expect(field().rows).toBe(expected)
+})
+
+test("a box with no rows keeps the browser default with big mode off", () => {
+  renderThemed(<PromptBox label="Note" name="n" title={TITLE} value="" onChange={() => {}} />)
+  expect(field().rows).toBe(2)
+})
+
+test("flipping big mode changes rows live and keeps text and focus", () => {
+  renderThemed(<Harness />)
+  const area = field()
+  fireEvent.change(area, { target: { value: "hello" } })
+  area.focus()
+  act(() => setBigPrompt(true))
+  expect(field()).toBe(area)
+  expect(area.rows).toBe(6)
+  expect(area.value).toBe("hello")
+  expect(document.activeElement).toBe(area)
 })
 
 test("typing calls onChange", () => {
