@@ -105,7 +105,7 @@ test("91. Removed session draft", async ({ page, start }) => {
   // The draft is written in a tab that is then closed.
   const tab = await freshVisit(page, `/#/agents/${exited.id}`)
   await messageBox(tab).fill("a draft for a dead session")
-  await expect(composer(tab).getByText("Exited. Restore it in gx, Agents tab.")).toBeVisible()
+  await expect(composer(tab).getByText("Exited. Restore it to send.")).toBeVisible()
   await expect.poll(stored).toBe("a draft for a dead session")
   await tab.close()
 

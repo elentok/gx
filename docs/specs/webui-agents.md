@@ -109,11 +109,11 @@ Failure notices
     that I can see what it waits on.
 31. As the person running gx, I want a Retry button on an auth failure's notice, so that I can send
     "continue" after I log in again.
-32. As the person running gx, I want no Restore or New session buttons on the Agents page, so that
-    the page offers only what it supports.
+32. As the person running gx, I want a Restore button but no New session button on the Agents page,
+    so that I can bring a crashed or ended session back without leaving the page.
 33. As the person running gx, I want a crashed or ended session to keep its chat, with a disabled
-    composer and the line "Exited. Restore it in gx, Agents tab.", so that I can read it and know
-    where to restore it.
+    composer and the line "Exited. Restore it to send.", so that I can read it and know
+    how to get it back.
 
 Composer and drafts
 
@@ -269,16 +269,17 @@ implementer's choice. The split:
   text), the Screen modal, and the composer slot.
 - Options the Agents page turns off: the question sheet and the Questions/Chat view toggle, the step
   Working row (the Agents page shows a plain "Working" row instead), `GxStopped`, the Done state that
-  hides the composer, and the failure notice's Restore and New session buttons.
+  hides the composer, and the failure notice's New session button.
 - The question sheet stays a slot in the shared view, so the later question-cards effort can turn it
   on for the Agents page without another split.
 - New on the Agents page: the "No messages yet" empty state when the chat read returns no messages,
   and, for a non-Claude session, the notice "Chat works for Claude sessions only." with a Show screen
   button that opens the existing `ScreenModal`. The design page keeps its own non-Claude text.
 - Failure notice on the Agents page: label and text, read-only. Buttons: Screen for stalled and
-  blocked, Retry for auth (a send of "continue" with the stale guard, as today). For crashed and
-  ended the chat stays, and the composer stays visible but disabled with the reason line "Exited.
-  Restore it in gx, Agents tab." Rate-limit shows the label "Rate limited" and the server's text
+  blocked, Retry for auth (a send of "continue" with the stale guard, as today), Restore for crashed
+  and ended (the same resume call as the design page; a refusal that no retry fixes hides it). For
+  crashed and ended the chat stays, and the composer stays visible but disabled with the reason line
+  "Exited. Restore it to send." Rate-limit shows the label "Rate limited" and the server's text
   (for example "resets at 5pm"), no buttons, and the not-promptable reason line "Rate limited. Send
   turns on when the session is idle."
 
@@ -294,7 +295,7 @@ Shared composer
   or Interrupt, and does nothing while the Note toggle hides the text box. Enter adds a newline. A phone (narrow layout) has no key send.
 - Reason line, Agents page: one line under the composer, in this order of precedence: offline
   ("Offline. Send turns on when gx reconnects."), non-Claude ("Sending works for Claude sessions
-  only"), Exited ("Exited. Restore it in gx, Agents tab."), not promptable ("<State>. Send turns on
+  only"), Exited ("Exited. Restore it to send."), not promptable ("<State>. Send turns on
   when the session is idle."), the last refusal reason in red, else "Draft saved in this browser"
   while a draft exists. A refusal on the Agents page shows inline, not as a toast. The design page
   keeps its toasts.
@@ -447,7 +448,7 @@ New flows to write, numbered after flow 71 (file name is the implementer's choic
   newline; at 390px only the button sends. On the design page: the key runs Send, runs Send answers
   (and opens the gaps popover with unanswered questions), and does nothing when the main button is
   Continue (empty box) or Interrupt.
-- 80 "Failure notices": crashed (Exited line, no Restore), stalled and blocked (Screen), auth (Retry),
+- 80 "Failure notices": crashed (Exited line, Restore), stalled and blocked (Screen), auth (Retry),
   rate-limit (label, text, no buttons, the "Rate limited" reason line).
 - 81 "Session without chat": the notice, Show screen opens the screen modal, the composer reason.
 - 82 "No messages yet".
@@ -524,8 +525,8 @@ Story entries:
 29. Flow 80: each failure's label and text.
 30. Flow 80: Screen on stalled and blocked opens the screen modal.
 31. Flow 80: Retry on auth sends "continue" (`gx agents chat <id>`).
-32. Flow 80: no Restore or New session button.
-33. Flow 80: the crashed session's chat and the "Exited. Restore it in gx, Agents tab." line.
+32. Flow 80: Restore on crashed and ended, no New session button.
+33. Flow 80: the crashed session's chat and the "Exited. Restore it to send." line.
 34. Flow 76. Mock state desktop-selected.
 35. Flows 76 and 77.
 36. Flow 77. Mock states desktop-working and phone-working.
@@ -629,7 +630,7 @@ sessions. The look check maps them to the `agents` scenario's groups and rows by
 
 ## Out of Scope
 
-- Stop, restore and interrupt from the Agents page, and the terminal view. v1 is list, chat, send and
+- Stop and interrupt from the Agents page, and the terminal view. v1 is list, chat, send and
   create.
 - Answering question cards (grilling rounds) on the Agents page. The shared chat view keeps a slot for
   the later effort.

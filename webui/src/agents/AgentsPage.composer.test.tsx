@@ -78,7 +78,7 @@ test("the reason line names each state in order", async () => {
     true,
     chatOf(chat()),
   )
-  expect(await screen.findByText("Exited. Restore it in gx, Agents tab.")).toBeTruthy()
+  expect(await screen.findByText("Exited. Restore it to send.")).toBeTruthy()
   cleanup()
   render(
     [session("s-4", "p", { status: { state: "rate-limited" } })],
@@ -216,7 +216,7 @@ test.each([
     kind: "crashed",
     over: { status: { state: "exited" }, exit: "crashed" },
     label: "Agent crashed",
-    buttons: [],
+    buttons: ["Restore"],
   },
   {
     kind: "blocked",
@@ -247,7 +247,6 @@ test.each([
     const banner = within(await screen.findByRole("region", { name: "Session failure" }))
     expect(banner.getByText(c.label)).toBeTruthy()
     expect(banner.queryAllByRole("button").map((b) => b.textContent)).toEqual(c.buttons)
-    expect(screen.queryByRole("button", { name: "Restore" })).toBeNull()
     expect(screen.queryByRole("button", { name: "New session" })).toBeNull()
     expect(screen.getByText("Chat works for Claude and Codex sessions only.")).toBeTruthy()
   },
@@ -316,16 +315,16 @@ const failureCases: {
     kind: "crashed",
     over: { status: { state: "exited" }, exit: "crashed" },
     label: "Agent crashed",
-    buttons: [],
-    reason: "Exited. Restore it in gx, Agents tab.",
+    buttons: ["Restore"],
+    reason: "Exited. Restore it to send.",
     sendOff: true,
   },
   {
     kind: "ended",
     over: { status: { state: "exited" }, exit: "clean" },
     label: "Session ended",
-    buttons: [],
-    reason: "Exited. Restore it in gx, Agents tab.",
+    buttons: ["Restore"],
+    reason: "Exited. Restore it to send.",
     sendOff: true,
   },
   {
@@ -372,7 +371,6 @@ test.each(failureCases)(
     expect(banner.getByText(c.label)).toBeTruthy()
     if (c.text) expect(banner.getByText(c.text)).toBeTruthy()
     expect(banner.queryAllByRole("button").map((b) => b.textContent)).toEqual(c.buttons)
-    expect(screen.queryByRole("button", { name: "Restore" })).toBeNull()
     expect(screen.queryByRole("button", { name: "New session" })).toBeNull()
     expect(screen.getByText("hello there")).toBeTruthy()
     await type("hi")

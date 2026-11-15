@@ -183,7 +183,7 @@ export function AgentChat({
             session={session}
             lastMessage={chat.messages.at(-1)?.id}
             onStale={refetch}
-            restore={false}
+            newSession={false}
             address=""
           />
         )}

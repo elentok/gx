@@ -118,8 +118,13 @@ test("155. Command output in the chat, cut at 12 lines", async ({ page, start })
 
   // The chat stays, the composer is off and says how to get the session back.
   await expect(page.getByText("hello", { exact: true })).toBeVisible()
-  await expect(composer(page).getByText("Exited. Restore it in gx, Agents tab.")).toBeVisible()
+  await expect(composer(page).getByText("Exited. Restore it to send.")).toBeVisible()
   await expect(sendButton(page)).toBeDisabled()
+
+  // Restore brings it back from the Agents page. New session is not offered here.
+  await expect(page.getByRole("button", { name: "New session", exact: true })).toHaveCount(0)
+  await page.getByRole("button", { name: "Restore", exact: true }).click()
+  await expect.poll(async () => (await infoOf(fixture, exiting.id)).status.state).not.toBe("exited")
 })
 
 test("155. Command output in the chat, design page; 159. /exit, design page", async ({

@@ -73,7 +73,7 @@ describe.each([true, false])("wide=%s", (wide) => {
   test("it is disabled with the exited reason for an exited session", async () => {
     open(session("s-1", "p", { status: { state: "exited" } }))
     expect(disabled(await findPromote())).toBe(true)
-    expect(screen.getAllByText("Exited. Restore it in gx, Agents tab.").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("Exited. Restore it to send.").length).toBeGreaterThan(0)
   })
 
   test("a pick posts promote with the last message and leaves the draft alone", async () => {

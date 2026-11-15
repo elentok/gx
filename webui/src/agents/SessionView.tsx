@@ -101,7 +101,7 @@ function NoChat({ session, fetchScreen }: { session: SessionInfo; fetchScreen?: 
   return (
     <>
       {failure && !needsTranscript(failure) && (
-        <FailureBanner failure={failure} session={session} restore={false} address="" />
+        <FailureBanner failure={failure} session={session} newSession={false} address="" />
       )}
       <Box
         display="flex"
@@ -138,7 +138,7 @@ function sendReason(s: SessionInfo, connected: boolean): string | undefined {
   const state = s.status.state
   if (!connected) return "Offline. Send turns on when gx reconnects."
   if (!hasChat(s.harness)) return "Sending works for Claude and Codex sessions only"
-  if (state === "exited") return "Exited. Restore it in gx, Agents tab."
+  if (state === "exited") return "Exited. Restore it to send."
   if (switchRunning(s)) return "Switching model. Send turns on when the new agent is idle."
   if (!promptable(s)) {
     return `${stateLabel(s)}. Send turns on when the session is idle.`

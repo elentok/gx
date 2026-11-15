@@ -426,8 +426,8 @@ test("a gx-raised Actionable shows no gx stopped", async () => {
 })
 
 const BUTTONS: [string, string[]][] = [
-  ["crashed", []],
-  ["ended", []],
+  ["crashed", ["Restore"]],
+  ["ended", ["Restore"]],
   ["auth", ["Retry"]],
   ["stalled", ["Screen"]],
   ["blocked", ["Screen"]],

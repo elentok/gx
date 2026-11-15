@@ -85,6 +85,7 @@ export function FailureBanner({
   address,
   open,
   restore: canRestore = true,
+  newSession: canNewSession = true,
   keys = postKeys,
   readPermission = fetchPermission,
 }: {
@@ -92,6 +93,8 @@ export function FailureBanner({
   session: SessionInfo
   /** Off drops Restore and New session. */
   restore?: boolean
+  /** Off drops only New session, which needs a flow address the Agents page does not have. */
+  newSession?: boolean
   /** The id of the last chat message the page saw, for Retry's stale guard. */
   lastMessage?: string
   post?: PostPrompt
@@ -159,6 +162,7 @@ export function FailureBanner({
   const buttons = [...(BUTTONS[failure.kind] ?? []), ...extra].filter(
     (name) =>
       (canRestore || (name !== "Restore" && name !== "New session")) &&
+      (canNewSession || name !== "New session") &&
       !(name === "Restore" && restoreHidden),
   )
   const inline = closable || answerable
