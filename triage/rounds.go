@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/elentok/gx/tickets"
@@ -227,7 +228,13 @@ func (s *Store) Object(id string, revision int, rowID, question string, options 
 		}
 		n := 0
 		for _, rd := range rec.Rounds {
-			n += len(rd.Questions)
+			for _, rq := range rd.Questions {
+				if k, ok := strings.CutPrefix(rq.ID, "obj-"); ok {
+					if v, err := strconv.Atoi(k); err == nil {
+						n = max(n, v)
+					}
+				}
+			}
 		}
 		q := Question{ID: fmt.Sprintf("obj-%d", n+1), RowID: rowID, Text: question, Kind: QuestionAsk, Options: options, Default: d.Choice}
 		if err := checkOptions("objection", q); err != nil {

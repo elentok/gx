@@ -127,6 +127,32 @@ func TestObjection_RoundHoldsAtMostSix(t *testing.T) {
 	}
 }
 
+func TestObjection_IdsStayUniqueAfterCorrectDropsQuestions(t *testing.T) {
+	s, rec := atApprove(t)
+	qa, qb := questions(rowA, "1"), questions(rowB, "2")
+	rec, err := s.SaveRound(rec.ID, rec.Revision, append(qa, qb...), false)
+	must(t, rec, err)
+	for _, row := range []string{rowA, rowB} {
+		rec, err = s.SaveDecision(rec.ID, rec.Revision, Decided{RowID: row, Question: "Keep?", Choice: "yes", Reason: "used"})
+		must(t, rec, err)
+	}
+	rec, err = s.Object(rec.ID, rec.Revision, rowB, "Keep?", []string{"yes", "no"})
+	must(t, rec, err)
+	rec, err = s.Correct(rec.ID, rec.Revision, rowA, ActionArea, "core", "")
+	must(t, rec, err)
+	rec, err = s.Object(rec.ID, rec.Revision, rowA, "Keep?", []string{"yes", "no"})
+	must(t, rec, err)
+	seen := map[string]bool{}
+	for _, rd := range rec.Rounds {
+		for _, q := range rd.Questions {
+			if seen[q.ID] {
+				t.Fatalf("question id %s is used twice", q.ID)
+			}
+			seen[q.ID] = true
+		}
+	}
+}
+
 func TestCorrect_ToAreaDropsUnansweredKeepsAnswers(t *testing.T) {
 	s, rec := atApprove(t)
 	rec, err := s.SaveRound(rec.ID, rec.Revision, questions(rowA, "1", "2"), false)

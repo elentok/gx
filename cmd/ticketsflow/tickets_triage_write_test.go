@@ -504,11 +504,19 @@ func triageAtRoute(t *testing.T, repo string) []string {
 	return rows
 }
 
+func writeAreaEpic(t *testing.T, project, name string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(project, name, "issues"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTicketFile(t, filepath.Join(project, name, "ticket.md"), "---\nkind: area\n---\n\n# "+name+"\n")
+}
+
 func TestTriageMoves_SavedPendingAndAWaitingEpicIsRefused(t *testing.T) {
 	repo, project := triageProjectDir(t)
 	writeOldEpic(t, project, "old-a", "", triagedNote, "open", "claimed")
 	writeOldEpic(t, project, "old-w", "", triagedNote, "claimed", "done")
-	writeOldEpic(t, project, "area-a", "", "")
+	writeAreaEpic(t, project, "area-a")
 	rows := triageAtRoute(t, repo)
 
 	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-w","area":"area-a"}]`, "tickets", "triage", "moves"); err == nil {
@@ -550,7 +558,7 @@ func TestTriageMoveLocate_ReadsTheStoreSoARerunSkipsWhatHappened(t *testing.T) {
 func TestTriageMoveState_SavesAtWriteRefusesBefore(t *testing.T) {
 	repo, project := triageProjectDir(t)
 	writeOldEpic(t, project, "old-a", "", triagedNote, "open")
-	writeOldEpic(t, project, "area-a", "", "")
+	writeAreaEpic(t, project, "area-a")
 	rows := triageAtRoute(t, repo)
 	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-a","area":"area-a"}]`, "tickets", "triage", "moves"); err != nil {
 		t.Fatal(err)

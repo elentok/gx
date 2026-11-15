@@ -166,13 +166,13 @@ func TestTriage_RowRefusals(t *testing.T) {
 	row := s.Rows[0].Address
 	rev := strconv.Itoa(s.Revision)
 
-	if _, err := runIn(t, repo, "tickets", "triage", "row", "--row", row, "--action", "map"); err == nil {
+	if _, err := runIn(t, repo, "tickets", "triage", "row", "--row", row, "--action", "close"); err == nil {
 		t.Error("row without --revision accepted")
 	}
-	if _, err := runIn(t, repo, "tickets", "triage", "row", "--row", row, "--action", "map", "--revision", "99"); err == nil {
+	if _, err := runIn(t, repo, "tickets", "triage", "row", "--row", row, "--action", "close", "--revision", "99"); err == nil {
 		t.Error("row with a stale revision accepted")
 	}
-	out, err := runIn(t, repo, "tickets", "triage", "row", "--row", row, "--action", "map", "--revision", rev)
+	out, err := runIn(t, repo, "tickets", "triage", "row", "--row", row, "--action", "close", "--revision", rev)
 	if err != nil || strings.TrimSpace(out) != strconv.Itoa(s.Revision+1) {
 		t.Fatalf("row save = %q, %v, want revision %d", out, err, s.Revision+1)
 	}
@@ -259,7 +259,7 @@ func TestTriage_ApproveAfterRowSaveWithOldRevisionIsStale(t *testing.T) {
 	repo := triageProject(t)
 	s := triageAtApprove(t, repo, false)
 	rev := strconv.Itoa(s.Revision)
-	if _, err := runIn(t, repo, "tickets", "triage", "row", "--row", s.Rows[0].Address, "--action", "map", "--revision", rev); err != nil {
+	if _, err := runIn(t, repo, "tickets", "triage", "row", "--row", s.Rows[0].Address, "--action", "close", "--revision", rev); err != nil {
 		t.Fatal(err)
 	}
 	_, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", rev)

@@ -482,7 +482,7 @@ func TestPlan_QuickQuestionsNeedOptionsAndADefault(t *testing.T) {
 
 func TestPlan_EveryVerdictQuestionComesBackInThePlan(t *testing.T) {
 	s, rec := project(t)
-	rec, err := s.SaveVerdict(rec.ID, rec.Revision, Verdict{Address: rowA, Verdict: VerdictRelevant, Questions: []Question{{ID: "q1", Text: "raw?", Kind: QuestionAsk}}})
+	rec, err := s.SaveVerdict(rec.ID, rec.Revision, Verdict{Address: rowA, Verdict: VerdictRelevant, Questions: []Question{{ID: "q1", Text: "raw?", Kind: QuestionAsk, Options: []string{"a", "b"}}}})
 	rec = must(t, rec, err)
 	rec, err = s.SaveVerdict(rec.ID, rec.Revision, Verdict{Address: rowB, Verdict: VerdictRelevant})
 	rec = must(t, rec, err)
@@ -532,8 +532,7 @@ func TestDesignQuestionsAreNotAskedAndDoNotBlockApprove(t *testing.T) {
 
 func TestSaveMoves_PendingAtRouteOnly(t *testing.T) {
 	s, rec := atPlan(t)
-	addTicket(t, s, "old", "01")
-	addTicket(t, s, "area", "01")
+	writeMoveEpics(t, s)
 	if _, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Area: "nowhere"}}); err == nil {
 		t.Fatal("unknown area accepted")
 	}
@@ -550,8 +549,7 @@ func TestSaveMoves_PendingAtRouteOnly(t *testing.T) {
 
 func atWriteWithMove(t *testing.T) (*Store, *Record) {
 	s, rec := atPlan(t)
-	addTicket(t, s, "old", "01")
-	addTicket(t, s, "area", "01")
+	writeMoveEpics(t, s)
 	rec, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Area: "area"}})
 	must(t, rec, err)
 	rec, err = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready"}, {RowID: rowB, Action: "close"}}, nil)
@@ -589,10 +587,54 @@ func TestMoveState_RetryKeepAndStep(t *testing.T) {
 	}
 }
 
-func TestMoveState_RefusedOutsideWrite(t *testing.T) {
-	s, rec := atPlan(t)
+func writeKindEpic(t *testing.T, s *Store, name, kind, body string) {
+	t.Helper()
+	tickettest.WriteFile(t, filepath.Join(s.ProjectDir(), name, "ticket.md"), "---\nkind: "+kind+"\n---\n\n# "+name+"\n"+body)
+}
+
+// writeMoveEpics makes the old Triage epic "old" and the area "area".
+func writeMoveEpics(t *testing.T, s *Store) {
+	t.Helper()
+	writeKindEpic(t, s, "old", "map", "\n## Notes\n\n"+OldEpicNote+" on 2026-10-01\n")
+	writeKindEpic(t, s, "area", "area", "")
 	addTicket(t, s, "old", "01")
 	addTicket(t, s, "area", "01")
+}
+
+func TestSaveMoves_RefusesANonAreaTargetAndANonCandidateOldEpic(t *testing.T) {
+	s, rec := atPlan(t)
+	writeMoveEpics(t, s)
+	writeKindEpic(t, s, "other-map", "map", "")
+	addTicket(t, s, "plain", "01")
+	for name, u := range map[string]MoveUnit{
+		"plain epic as area":   {OldEpic: "old", Area: "plain"},
+		"map as area":          {OldEpic: "old", Area: "other-map"},
+		"map without the note": {OldEpic: "other-map", Area: "area"},
+		"plain epic as old":    {OldEpic: "plain", Area: "area"},
+	} {
+		if _, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{u}); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}
+
+func TestSaveVerdict_RefusesABadQuestionKindOrAskOptions(t *testing.T) {
+	s, rec := project(t)
+	for name, q := range map[string]Question{
+		"empty kind":   {ID: "q1", Text: "t"},
+		"unknown kind": {ID: "q1", Text: "t", Kind: "quick"},
+		"ask no opts":  {ID: "q1", Text: "t", Kind: QuestionAsk},
+		"ask 5 opts":   {ID: "q1", Text: "t", Kind: QuestionAsk, Options: []string{"a", "b", "c", "d", "e"}},
+	} {
+		if _, err := s.SaveVerdict(rec.ID, rec.Revision, Verdict{Address: rowA, Questions: []Question{q}}); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}
+
+func TestMoveState_RefusedOutsideWrite(t *testing.T) {
+	s, rec := atPlan(t)
+	writeMoveEpics(t, s)
 	rec, _ = s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Area: "area"}})
 	if _, err := s.SaveMoveState(rec.ID, rec.Revision, "old", MoveDone, ""); err == nil {
 		t.Fatal("move state accepted at route")

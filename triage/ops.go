@@ -213,6 +213,16 @@ func (s *Store) SaveVerdict(id string, revision int, v Verdict) (*Record, error)
 				return phaseErr("unknown verdict %q", v.Verdict)
 			}
 			row.Verdict = v.Verdict
+			for _, q := range v.Questions {
+				switch q.Kind {
+				case QuestionDecide, QuestionAsk, QuestionDesign:
+				default:
+					return phaseErr("question %s has kind %q: want decide, ask or design", q.ID, q.Kind)
+				}
+				if q.Kind == QuestionAsk && (len(q.Options) < minOptions || len(q.Options) > maxOptions) {
+					return phaseErr("ask question %s needs %d to %d options, got %d", q.ID, minOptions, maxOptions, len(q.Options))
+				}
+			}
 			row.Evidence = v.Evidence
 			row.Files = v.Files
 			row.Questions = v.Questions
@@ -568,8 +578,11 @@ func (s *Store) SaveMoves(id string, revision int, units []MoveUnit) (*Record, e
 				return phaseErr("old epic %s has two move units", u.OldEpic)
 			}
 			inRecord := slices.ContainsFunc(rec.Areas, func(a Area) bool { return a.Name == u.Area })
-			if !inRecord && !slices.ContainsFunc(epics, func(e tickets.Epic) bool { return e.Name == u.Area }) {
-				return phaseErr("move unit %s: area %q is not an epic or an area of this triage", u.OldEpic, u.Area)
+			if !inRecord && !slices.ContainsFunc(epics, func(e tickets.Epic) bool { return e.Name == u.Area && e.IsArea }) {
+				return phaseErr("move unit %s: area %q is not an area epic or an area of this triage", u.OldEpic, u.Area)
+			}
+			if !slices.ContainsFunc(epics, func(e tickets.Epic) bool { return e.Name == u.OldEpic && IsOldEpic(e) }) {
+				return phaseErr("move unit %s: not an old Triage epic (a map or loop epic cannot be moved)", u.OldEpic)
 			}
 			out = append(out, MoveUnit{OldEpic: u.OldEpic, Area: u.Area, State: MovePending})
 		}
