@@ -1,5 +1,4 @@
 import { readFile } from "node:fs/promises"
-import { HUH_MESSAGE } from "../src/triage/questions"
 import {
   blockEvents,
   card,
@@ -11,7 +10,7 @@ import {
   test,
   toasts,
 } from "./fixture"
-import { expectOption } from "./question"
+import { expectOption, HUH_MESSAGE } from "./question"
 import { CACHE_PREFIX } from "../src/pwa/workerCore"
 
 // The PWA steps of flow 2 need a registered worker, which only registers with the fixture's untrusted root ignored.

@@ -1,5 +1,5 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useState } from "react"
+import { createContext, useContext, useState } from "react"
 import { Markdown } from "../markdown/Markdown"
 import { Question } from "../ui/question-sheet/Question"
 import {
@@ -10,6 +10,9 @@ import {
   type QuestionCard,
 } from "../ui/question-sheet/round"
 import { NoteBox } from "./NoteBox"
+
+/** True while the open round is the final "Write this plan?" approval: the card says so instead of counting. */
+export const FinalRoundContext = createContext(false)
 
 const MAX_DOTS = 6
 const NO_ANSWER: Answer = {}
@@ -35,6 +38,7 @@ export function RoundCard({
   index: number
   onIndex: (index: number) => void
 }) {
+  const final = useContext(FinalRoundContext)
   const k = Math.min(index, round.length - 1)
   const card = round[k]
   const answer = answers[card.label] ?? NO_ANSWER
@@ -60,7 +64,7 @@ export function RoundCard({
     >
       <Box display="flex" justifyContent="space-between" alignItems="center" fontSize="xs">
         <Text as="span" color="text.dim">
-          Question {k + 1} of {round.length}
+          {final ? "Final question" : `Question ${k + 1} of ${round.length}`}
         </Text>
         <Box display="flex" gap="1" alignItems="center">
           {round.slice(from, to).map((c, i) => {

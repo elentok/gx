@@ -1,5 +1,4 @@
 import type { Page } from "@playwright/test"
-import { HUH_MESSAGE } from "../src/triage/questions"
 import {
   card,
   epicsButton,
@@ -13,7 +12,7 @@ import {
   type Fixture,
 } from "./fixture"
 import { startDesign } from "./draftKit"
-import { expectOption } from "./question"
+import { expectOption, HUH_MESSAGE } from "./question"
 
 // The card's title opens the epic page, whose Start button starts the session and moves on.
 // The Design page before the start is reached by its route.

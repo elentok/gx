@@ -219,6 +219,7 @@ function TriageBody({
         actions={steppedActions}
         startLabel="Start"
         foldAnswered
+        finalRound={view.final_approval && model.current?.step === QUESTIONS}
         stepRows={round && { questions: <RoundRow round={round} /> }}
         subtitleSuffix={round && ` · ${roundLabel(round)}`}
         beforeRing={

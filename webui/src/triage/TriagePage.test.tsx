@@ -437,6 +437,40 @@ test("a printed round shows the answered cards folded, the open card, the round 
   expect(await screen.findByPlaceholderText("A note on this round")).toBeTruthy()
 })
 
+test("the final approval round reads Final question, drops the round label and has no Approve button", async () => {
+  const final = {
+    label: "1",
+    title: "Write this plan?",
+    body: "39 ready, 14 to areas, 31 closed. Nothing changes until you say yes.",
+    kind: "options",
+    options: [
+      { id: "yes", label: "Yes, write it" },
+      { id: "no", label: "No, keep talking" },
+    ],
+  }
+  render([session("working")], {
+    triage: async () => ({
+      kind: "ok",
+      detail: viewOf({ steps: stepsAt(2), final_approval: true }),
+    }),
+    chat: async () => ({
+      kind: "ok",
+      detail: {
+        conversation_id: "c1",
+        messages: [],
+        questions: roundCards([final] as never),
+        background: [],
+      } as never,
+    }),
+  } as RouteFetchers)
+  expect(await screen.findByText("Final question")).toBeTruthy()
+  expect(screen.queryByText(/Question 1 of 1/)).toBeNull()
+  expect(screen.getByRole("button", { name: "Yes, write it" })).toBeTruthy()
+  expect(screen.getByRole("button", { name: "No, keep talking" })).toBeTruthy()
+  expect(screen.getByTestId("page-header-subtitle").textContent).toBe("Questions")
+  expect(screen.queryByRole("button", { name: /Approve/ })).toBeNull()
+})
+
 const planRow = (n: number, action?: string, destination?: string) => ({
   ...row(n, "relevant"),
   action,
