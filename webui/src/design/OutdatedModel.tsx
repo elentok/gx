@@ -75,7 +75,7 @@ export function OutdatedModel({ session, text }: { session: SessionInfo; text: s
             boxShadow="lg"
             color="text"
             boxSizing="border-box"
-            w="72"
+            w="80"
             maxW="calc(100vw - 2rem)"
             p="3"
             fontSize="xs"
@@ -87,7 +87,10 @@ export function OutdatedModel({ session, text }: { session: SessionInfo; text: s
             <Text color="text.dim">
               This session uses {current}. {latestLabel} replaces it.
             </Text>
-            <Button tone="running" disabled={!!blocked || pending} onClick={switchNow}>
+            <Button tone="running" disabled={!!blocked || pending}
+              onClick={switchNow}
+              _disabled={{ bg: "surface", color: "text.dim", opacity: 1, cursor: "default" }}
+            >
               Switch to {latestLabel}
             </Button>
             <Text color="text.dim" data-testid="outdated-note">
