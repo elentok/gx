@@ -1,9 +1,9 @@
-import { readdir, readFile, writeFile } from "node:fs/promises"
+import { readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { Page } from "@playwright/test"
 import type { SessionInfo } from "../src/generated/server"
 import { expect, nav, test, type Fixture } from "./fixture"
-import { go, sessions } from "./agentsKit"
+import { go, moreActions, sessions } from "./agentsKit"
 
 const LEADER = "ControlOrMeta+e"
 
@@ -148,6 +148,12 @@ test("205. Model switch", async ({ page, start }) => {
   await expect(dialog).toHaveCount(0)
 
   // After a stop the note asks for a resume, and Switch stays disabled.
+  // The held launch is released first, so the stop ends a running agent and the session can resume later.
+  const [codexKey] = Object.keys(await launches(fakes.codex_dir))
+  await writeFile(join(fakes.codex_dir, `${codexKey}.release`), "")
+  await expect(async () => {
+    expect((await sessions(fixture)).find((s) => s.id === codex.id)!.status.state).toBe("idle")
+  }).toPass({ timeout: 20_000 })
   await fixture.cli("agents", "stop", codex.id)
   dialog = await openPicker(page, codex, 5)
   await expect(dialog.getByRole("status")).toHaveText("Resume the session to switch.")
@@ -176,6 +182,144 @@ test("205. Model switch", async ({ page, start }) => {
   await expect(dialog.getByText("Effort", { exact: true })).toHaveCount(0)
   await page.keyboard.press("Escape")
   await expect(dialog).toHaveCount(0)
+
+  await editFakes(fixture, (cfg) => {
+    for (const m of cfg.models) delete m.behaviour
+  })
+
+  // Stories 20, 21, 23: a held switch logs "Switching to", the footer shows the target with a hint and the box is
+  // disabled. After the release the log reads "Switched to" and the footer keeps the chosen model and effort.
+  const setBehaviour = (model: string, behaviour: string, errorCode?: string) =>
+    editFakes(fixture, (cfg) => {
+      for (const m of cfg.models) {
+        if (m.value === model) Object.assign(m, { behaviour, errorCode })
+      }
+    })
+  const startSwitch = async (session: SessionInfo, harness: "claude" | "codex", row: RegExp) => {
+    const picker = await openPicker(page, session, harness === "claude" ? 6 : 5)
+    await picker.getByRole("radio", { name: row }).click()
+    await picker.getByRole("button", nav("Switch")).click()
+    await expect(picker).toHaveCount(0)
+  }
+  const switchLine = page.getByTestId("switch-line")
+  const footer = page.getByTestId("footer-line")
+  // The prompt box is the Send button: it is off while a switch runs, with text typed.
+  const composerForm = page.getByRole("form", nav("Composer"))
+  const sendButton = composerForm.getByRole("button", { name: /^Send/ })
+  const boxOff = async () => {
+    await composerForm.getByRole("textbox").fill("hello")
+    await expect(sendButton).toBeDisabled()
+  }
+  const boxOn = async () => {
+    await composerForm.getByRole("textbox").fill("hello")
+    await expect(sendButton).toBeEnabled()
+  }
+  const agentModel = async (s: SessionInfo) =>
+    (await sessions(fixture)).find((x) => x.id === s.id)!.model
+  // The fake logs by its conversation id, which the session list does not show: the chat's log is the one that grows.
+  const lengths = async () =>
+    Object.fromEntries(
+      Object.entries(await launches(fakes.claude_dir)).map(([k, v]) => [k, v.length]),
+    )
+  let claudeKey = ""
+  const claudeLog = async () => (await launches(fakes.claude_dir))[claudeKey] ?? []
+
+  await setBehaviour("claude-fable-5-2", "hold")
+  const seen = await lengths()
+  await startSwitch(claude, "claude", /Fable 5\.2/)
+  await expect(async () => {
+    const grown = Object.entries(await lengths()).filter(([k, n]) => n > (seen[k] ?? 0))
+    expect(grown).toHaveLength(1)
+    claudeKey = grown[0][0]
+  }).toPass({ timeout: 15_000 })
+  await expect(switchLine).toHaveText("Switching to Claude Fable 5.2…")
+  await expect(footer).toContainText("Fable 5.2")
+  await expect(page.getByTestId("switching-hint")).toBeVisible()
+  await boxOff()
+  await writeFile(join(fakes.claude_dir, `${claudeKey}.release`), "")
+  await expect(switchLine).toHaveText("Switched to Claude Fable 5.2.")
+  await expect(page.getByTestId("switching-hint")).toHaveCount(0)
+  await expect(footer).toContainText(/Fable 5\.2 · (low|medium|high|xhigh)/)
+  await boxOn()
+  const oldModel = await agentModel(claude)
+  expect(oldModel).toContain("fable-5-2")
+
+  // Story 22 (a): the new process exits at start. The old model stays in the footer and in the agents list, the
+  // fake logs a relaunch with the old flags and the chat says so.
+  await setBehaviour("opus", "exit-at-start")
+  const before = (await claudeLog()).length
+  await startSwitch(claude, "claude", /Opus 5\.5/)
+  await expect(switchLine).toHaveText(
+    "Switch to Claude Opus 5.5 failed. Still on Claude Fable 5.2.",
+  )
+  await expect(footer).toContainText("Fable 5.2")
+  await expect(footer).not.toContainText("Opus 5.5")
+  expect(await agentModel(claude)).toBe(oldModel)
+  await expect(async () => {
+    const log = await claudeLog()
+    expect(log.length).toBe(before + 2)
+    expect(log[log.length - 1]).toContain("claude-fable-5-2")
+    expect(log[log.length - 2]).toContain("opus")
+  }).toPass({ timeout: 15_000 })
+  await boxOn()
+
+  // Story 22 (b): the first message gets model_not_found. The same checks hold.
+  // The old model's relaunch is held, so the box stays off while it runs.
+  const release = join(fakes.claude_dir, `${claudeKey}.release`)
+  const sendMessage = async (text: string) => {
+    await composerForm.getByRole("textbox").fill(text)
+    await sendButton.click()
+  }
+  await setBehaviour("opus", "model-not-found")
+  await startSwitch(claude, "claude", /Opus 5\.5/)
+  await expect(switchLine).toHaveText("Switched to Claude Opus 5.5.")
+  await rm(release, { force: true })
+  await setBehaviour("claude-fable-5-2", "hold")
+  await setBehaviour("fable", "hold")
+  await sendMessage("are you there?")
+  await expect(switchLine).toHaveText("Switching back to Claude fable…")
+  await boxOff()
+  await writeFile(release, "")
+  await expect(switchLine).toHaveText("Switch to Claude Opus 5.5 failed. Still on Claude fable.")
+  await expect(footer).toContainText("fable")
+  await expect(footer).not.toContainText("Opus 5.5")
+  expect(await agentModel(claude)).toContain("fable")
+  await expect(async () => {
+    expect((await claudeLog()).at(-1)).toContain("fable")
+  }).toPass({ timeout: 15_000 })
+  await boxOn()
+
+  // A fake error of another kind leaves the switch in place: no rollback line.
+  await setBehaviour("claude-fable-5-2", "")
+  await setBehaviour("opus", "error", "overloaded")
+  await startSwitch(claude, "claude", /Opus 5\.5/)
+  await expect(switchLine).toHaveText("Switched to Claude Opus 5.5.")
+  await sendMessage("still there?")
+  await expect(footer).toContainText("Opus 5.5")
+  await expect(switchLine).toHaveText("Switched to Claude Opus 5.5.")
+
+  // Story 22 (b) on Codex: the rollout's error form. The chat shows no error failure and the menu no "switched by hand".
+  await setBehaviour("gpt-5.4-codex", "")
+  await fixture.cli("agents", "resume", codex.id)
+  await setBehaviour("gpt-5.5-codex", "model-not-found")
+  await expect(async () => {
+    expect((await sessions(fixture)).find((s) => s.id === codex.id)!.status.state).toBe("idle")
+  }).toPass({ timeout: 20_000 })
+  await startSwitch(codex, "codex", /GPT-5\.5-Codex/)
+  await expect(footer).toContainText("GPT-5.5-Codex")
+  await sendMessage("are you there?")
+  await expect(switchLine).toHaveText(
+    "Switch to Codex GPT-5.5-Codex failed. Still on Codex GPT-5.4-Codex.",
+  )
+  await expect(footer).toContainText("GPT-5.4-Codex")
+  await boxOn()
+  await expect(page.getByText("Agent hit an error")).toHaveCount(0)
+  expect(await agentModel(codex)).toContain("5.4")
+  await moreActions(page).click()
+  const sessionMenu = page.getByRole("menu", nav("More actions"))
+  await expect(sessionMenu).toBeVisible()
+  await expect(sessionMenu).not.toContainText("switched by hand")
+  await page.keyboard.press("Escape")
 
   // Story 19: with the model query failing, only the current model is listed.
   await editFakes(fixture, (cfg) => {
