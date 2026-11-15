@@ -20,6 +20,7 @@ export const RING_KIND: Record<EpicListRow["card_kind"] & string, Kind> = {
 
 const PILL_TONE: Record<string, Tone> = {
   Question: "waiting",
+  "Needs you": "waiting",
   Permission: "waiting",
   Paused: "paused",
   Stopped: "paused",
@@ -39,7 +40,6 @@ export const needsYouTone = (row: EpicListRow): Tone => PILL_TONE[row.state_pill
 /** A Follow-ups step pill (Verify, Route, ...) is running; only the waiting pills are amber. */
 const FOLLOWUPS_PILL_TONE: Record<string, Tone> = {
   ...PILL_TONE,
-  "Needs you": "waiting",
   "Waiting for you": "waiting",
 }
 
@@ -47,7 +47,11 @@ export const followUpsTone = (row: EpicListRow): Tone =>
   FOLLOWUPS_PILL_TONE[row.state_pill ?? ""] ?? "running"
 
 export function ringTone(row: EpicListRow): Tone {
-  if (row.card_kind === CardKindFollowUps && row.state_pill) return followUpsTone(row)
+  if (row.card_kind === CardKindFollowUps && row.state_pill) {
+    // The mock draws the same teal ring in every state; only the pill and border turn amber.
+    const tone = followUpsTone(row)
+    return tone === "waiting" ? "running" : tone
+  }
   if (row.section === SectionNeedsYou) return needsYouTone(row)
   if (row.state === EpicListFinished || isReadyForReview(row)) return "done"
   return isLive(row) ? "running" : "muted"

@@ -460,6 +460,33 @@ test("a refused Triage stays on the page and says why", async () => {
   expect(navigate).not.toHaveBeenCalled()
 })
 
+test.each([undefined, "#/triage/gx"])(
+  "Answer (link %s) on a Needs you Follow-ups card opens the Triage page",
+  (link) => {
+    const openTriage = vi.fn()
+    const navigate = vi.fn()
+    const row = followUps({
+      section: "needs-you",
+      state_pill: "Needs you",
+      reason: "Round 1 · 2 questions left",
+      actions: [{ kind: "answer", label: "Answer", target: "gx", link }],
+    })
+    renderThemed(<EpicCard row={row} writes={{ openTriage, navigate }} />)
+    expect(screen.queryByRole("button", { name: "Continue" })).toBeNull()
+    expect(text(screen.getByTestId("pill"))).toBe("Needs you")
+    expect(screen.getByText("Round 1 · 2 questions left")).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Answer" }))
+    expect(navigate).toHaveBeenCalledWith("#/triage/gx")
+    expect(openTriage).not.toHaveBeenCalled()
+  },
+)
+
+test("the ring of a Follow-ups Needs you card stays running while the pill is amber", () => {
+  const row = followUps({ section: "needs-you", state_pill: "Needs you" })
+  expect(ringTone(row)).toBe("running")
+  expect(followUpsTone(row)).toBe("waiting")
+})
+
 test.each(["Review plan", "Review failures", "Open"])(
   "%s opens the Triage page without posting",
   (label) => {

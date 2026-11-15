@@ -208,7 +208,8 @@ function ActionButtons({
       [CardActionDesign]: () => startDesign(target),
       [CardActionContinue]: () => (followUps ? startTriage(target) : startDesign(target)),
       [CardActionOpen]: () => navigate(a.link ?? designHref(target)),
-      [CardActionAnswer]: () => navigate(a.link ?? ticketHref(target)),
+      [CardActionAnswer]: () =>
+        navigate(a.link ?? (followUps ? triageHref(target) : ticketHref(target))),
       [CardActionOpenTicket]: () => navigate(ticketHref(target)),
       [CardActionOpenEpic]: () => navigate(epicHref(target)),
       [CardActionTriage]: () => startTriage(target),
