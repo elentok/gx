@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.51.0 - 2026-11-15
+
+- Added a model switch for idle chats. You can switch the model and effort from a picker (leader `m`) or from a footer popover that turns red when the model is outdated and offers a one-click switch. The picker warns about token cost and shows the matching tiers. gx shows switch progress and a failed switch in the chat, cancels a countdown on a switch, and rolls back a switch when the agent exits or the first message gets `model_not_found` (Claude and Codex). A restart in the middle of a switch keeps the old record. A hand switch is recorded and used in launch args, the session menu and the handoff.
+- Added cached model lists for Claude and Codex. They refresh in the background and when the picker opens. A Models settings note says when a Claude alias lags.
+- Added a regrouped Settings page. A category sidebar replaces the flat list, each section is split into titled groups, and search results are grouped by section and group. Models are one table per agent with cell editing, also in a project view. Phones get a Settings home, drill-down and scoped search. The settings read response and CLI carry the category tree.
+- Reshaped Triage into a chat with five Follow-ups steps (Verify, Route, Questions, Write, Done). Question rounds show as cards, the saved Route plan shows as a read-only card, and the Write view is a round card with a progress bar, a fold line, and failed rows listed first. The Done page shows a Result card with a Queue epic button. Failed Follow-ups rows offer Retry and Keep for later. CLI verbs cover rounds, answers, corrections, objections and approval. The old Triage row, send-back and approve routes were removed.
+- Added the area epic kind with a 12-area cap and an `--areas` filter. Areas stay out of the queue, scheduler, Epics page, sidebar, Archive and Stats. The Write step files area rows as grilling or research tickets.
+- Added a Backlog page with a footer link, open counts, and a Start Design dialog. `gx` has a start-design verb that creates a charting map and moves an area's tickets into it, and you can run it again. Old triage-made area epics move into the Backlog with Retry and Keep.
+- Added Claude dialog cards for Fix sessions.
+- Changed the sidebar to sort chats by project under By project.
+- Fixed a launch-prompt stall, an investigate deadlock and a reused slug in design sessions.
+- Fixed a new Design losing its workspace when the index rescanned while it opened.
+- Fixed identity settings keys counting as changed.
+- Fixed the disabled Switch button style and the composer attach button, which is now icon-only.
+
 ## v0.50.0 - 2026-11-15
 
 - Added hosted files. File paths in chat text, tool lines, prompts, question cards, ticket pages and epic summaries are now links. A link opens a file viewer in the web UI. The viewer shows highlighted code with line numbers and the cited line, rendered Markdown and Mermaid with a Source toggle, images, SVG, PDF, a sandboxed HTML frame, and states for missing, binary and too-large files. A hover card previews Markdown, code, Mermaid and images. Phones get a bottom sheet instead.
