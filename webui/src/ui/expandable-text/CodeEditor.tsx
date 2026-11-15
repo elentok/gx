@@ -379,6 +379,16 @@ export default function CodeEditor({
     } finally {
       external.current = false
     }
+    // A submit empties the box from outside: back to INSERT. A user edit never gets here (the doc already matches).
+    // Seam: a Cmd-G round trip must not take this path; it is a later ticket.
+    if (inline && viMode && value === "") {
+      const cm = getCM(v)
+      if (cm?.state.vim && !cm.state.vim.insertMode) {
+        Vim.handleKey(cm, "<Esc>", "user")
+        Vim.handleKey(cm, "i", "mapping")
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
 
   if (inline)

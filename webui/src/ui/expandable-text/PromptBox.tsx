@@ -16,6 +16,7 @@ import { useCoarsePointer } from "../../useWide"
 import { useViMode } from "../../vimode"
 import { fieldLook, PROMPT_BOX_ATTR } from "./look"
 import { isMac } from "../../platform"
+import { ModeText } from "./ModeText"
 
 /** Runs `submit` on Cmd/Ctrl+Enter; plain Enter stays a newline. */
 export function submitOnCmdEnter(e: KeyboardEvent<HTMLTextAreaElement>, submit: () => void) {
@@ -124,6 +125,15 @@ function Field({
     }
   }, [wantEditor])
   const showEditor = wantEditor && Editor !== null
+  // Kept across blur and focus. The editor resets it itself when the parent empties the text.
+  const [mode, setMode] = useState<ViMode>("INSERT")
+  const onMode = menu?.onMode
+  useEffect(() => {
+    // While the large editor is open it reports its own mode.
+    if (!showEditor || selection) return
+    onMode?.(mode)
+    return () => onMode?.(null)
+  }, [onMode, showEditor, selection, mode])
   // The swap carries the selection and focus. They are read during the render that swaps, while the old element is still in the DOM.
   const wrap = useRef<HTMLDivElement>(null)
   const editorSel = useRef<Selection>({ start: 0, end: 0 })
@@ -153,12 +163,13 @@ function Field({
   }, [showEditor])
   useLayoutEffect(() => {
     // While the editor is open it places the caret itself.
-    if (selection) return
+    // The inline editor takes `pending` itself, as its `caret`.
+    if (selection || showEditor) return
     const at = menu?.pending.current
     if (at == null) return
     menu!.pending.current = null
     area.current?.setSelectionRange(at, at)
-  }, [value, menu, selection])
+  }, [value, menu, selection, showEditor])
   const open = () => setSelection(read().sel)
   // Focus and selection are set synchronously, inside the user's gesture and before the layer unmounts, so a phone keeps its keyboard.
   const close = (sel: Selection, refocus: boolean) => {
@@ -211,7 +222,13 @@ function Field({
             onChange={onChange}
             placeholder={placeholder}
             selection={carry.current?.sel ?? editorSel.current}
-            onSelectionChange={(s) => (editorSel.current = s)}
+            onSelectionChange={(s) => {
+              editorSel.current = s
+              menu?.onCursor(s.end)
+            }}
+            onMenuKey={menu?.onKeyDown}
+            caret={menu?.pending}
+            onModeChange={setMode}
             autoFocus={carry.current?.focus ?? false}
             viMode
           />
@@ -249,7 +266,7 @@ function Field({
           onKeyDown={onKeyDown}
         />
       )}
-      {(note !== undefined || footer) && (
+      {(note !== undefined || footer || wantEditor) && (
         <Box px="3" pt="1" pb="1.5">
           {note !== undefined && (
             <Text
@@ -263,7 +280,25 @@ function Field({
               {note?.text}
             </Text>
           )}
-          {footer}
+          {wantEditor ? (
+            <Box display="flex" alignItems="center" gap="2" minW="0">
+              <Box opacity={disabled ? 0.5 : undefined} data-disabled={disabled ? "" : undefined}>
+                <ModeText mode={mode} />
+              </Box>
+              {footer && (
+                <>
+                  <Box aria-hidden color="text.dim" flex="none">
+                    ·
+                  </Box>
+                  <Box flex="1" minW="0">
+                    {footer}
+                  </Box>
+                </>
+              )}
+            </Box>
+          ) : (
+            footer
+          )}
         </Box>
       )}
       {!selection && menu?.node}

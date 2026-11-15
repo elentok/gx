@@ -670,3 +670,127 @@ test("the box's css rings the box while the editor has focus", async () => {
     .join("\n")
   expect(css).toContain(":has(.cm-editor.cm-focused)")
 })
+
+// The mode pill and mode rules.
+function Pill({
+  footer,
+  note,
+  disabled,
+  completion,
+}: {
+  footer?: ReactNode
+  note?: { text: string; red?: boolean } | null
+  disabled?: boolean
+  completion?: boolean
+}) {
+  const [text, setText] = useState("hello")
+  return (
+    <>
+      <button onClick={() => setText("")}>submit</button>
+      <PromptBox
+        label="Note"
+        name="test-note"
+        title={TITLE}
+        value={text}
+        onChange={setText}
+        footer={footer}
+        note={note}
+        disabled={disabled}
+        completion={
+          completion ? { target: { sessionId: "s-pill" }, harness: "claude", fetcher } : undefined
+        }
+      />
+    </>
+  )
+}
+
+const pill = () => screen.getByRole("status")
+const pressKeys = (view: EditorView, ...keys: string[]) =>
+  act(() => keys.forEach((k) => void Vim.handleKey(getCM(view)!, k, "user")))
+
+test("the pill follows the mode and carries its tone", async () => {
+  withVi(true, <Pill />, false)
+  const view = await inlineView()
+  expect([pill().textContent, pill().dataset.tone]).toEqual(["INSERT", "done"])
+  pressKeys(view, "<Esc>")
+  expect([pill().textContent, pill().dataset.tone]).toEqual(["NORMAL", "running"])
+  pressKeys(view, "v")
+  expect([pill().textContent, pill().dataset.tone]).toEqual(["VISUAL", "waiting"])
+  pressKeys(view, "<Esc>", "i")
+  expect(pill().textContent).toBe("INSERT")
+  expect(view.contentDOM.closest("[data-vi-mode]")?.getAttribute("data-vi-mode")).toBe("INSERT")
+})
+
+test("the pill shows INSERT while the textarea stands in", () => {
+  withVi(true, <Pill />, false)
+  expect(field().tagName).toBe("TEXTAREA")
+  expect(pill().textContent).toBe("INSERT")
+})
+
+test("the pill comes before a separator and the footer; alone it has none", () => {
+  withVi(true, <Pill footer={<span>the footer</span>} />, false)
+  expect(pill().parentElement!.parentElement!.textContent).toBe("INSERT·the footer")
+  cleanup()
+  withVi(true, <Pill />, false)
+  expect(pill().parentElement!.parentElement!.textContent).toBe("INSERT")
+})
+
+test("a note and a red refusal stay above the pill line", () => {
+  withVi(true, <Pill note={{ text: "no way", red: true }} footer="f" />, false)
+  const text = screen.getByText("no way")
+  expect(text.compareDocumentPosition(pill()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+test("vi off or a coarse pointer has no pill", () => {
+  withVi(false, <Pill footer="f" />, false)
+  expect(screen.queryByRole("status")).toBeNull()
+  cleanup()
+  withVi(true, <Pill />, true)
+  expect(screen.queryByRole("status")).toBeNull()
+})
+
+test("a disabled box dims the pill and keeps its mode", async () => {
+  withVi(true, <Pill disabled />, false)
+  await inlineView()
+  expect(getComputedStyle(pill().parentElement!).opacity).toBe("0.5")
+  expect(pill().textContent).toBe("INSERT")
+})
+
+test("the mode survives blur and focus", async () => {
+  withVi(true, <Pill />, false)
+  const view = await inlineView()
+  pressKeys(view, "<Esc>")
+  act(() => view.contentDOM.blur())
+  act(() => view.focus())
+  expect(pill().textContent).toBe("NORMAL")
+})
+
+test("an outside clear returns to INSERT; a user dd does not", async () => {
+  withVi(true, <Pill />, false)
+  const view = await inlineView()
+  pressKeys(view, "<Esc>", "d", "d")
+  expect(view.state.doc.toString()).toBe("")
+  expect(pill().textContent).toBe("NORMAL")
+  cleanup()
+  withVi(true, <Pill />, false)
+  const again = await inlineView()
+  pressKeys(again, "<Esc>")
+  expect(pill().textContent).toBe("NORMAL")
+  fireEvent.click(screen.getByText("submit"))
+  expect(pill().textContent).toBe("INSERT")
+})
+
+test("the inline menu opens in INSERT only, and Escape closes it first", async () => {
+  withVi(true, <Pill completion />, false)
+  const view = await inlineView()
+  act(() => view.dispatch({ changes: { from: 0, to: 5, insert: "/co" }, selection: { anchor: 3 } }))
+  await waitFor(() => expect(options()).toHaveLength(2))
+  fireEvent.keyDown(view.contentDOM, { key: "Escape" })
+  expect(screen.queryByRole("listbox")).toBeNull()
+  expect(pill().textContent).toBe("INSERT")
+  pressKeys(view, "<Esc>")
+  expect(pill().textContent).toBe("NORMAL")
+  expect(screen.queryByRole("listbox")).toBeNull()
+  pressKeys(view, "v")
+  expect(screen.queryByRole("listbox")).toBeNull()
+})
