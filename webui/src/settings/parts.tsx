@@ -39,13 +39,19 @@ export const GroupBlock = ({
     <Box
       display="flex"
       alignItems="center"
+      justifyContent="space-between"
       gap="2"
       px="3.5"
       py="2"
-      borderBottomWidth="1px"
-      borderBottomColor="hairline"
+      bg="surface"
     >
-      <Text fontSize="sm" fontWeight="700">
+      <Text
+        fontSize="xs"
+        letterSpacing="0.06em"
+        textTransform="uppercase"
+        color="text.muted"
+        fontWeight="600"
+      >
         {title}
       </Text>
       {changed > 0 && <CountChip n={changed} testId={`group-count-${title}`} />}
