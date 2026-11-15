@@ -9,7 +9,9 @@ export const switchRunning = (s: SessionInfo) => !!s.switching_model
 /** Why a switch cannot run right now, or null when it can. The picker and the footer popover share it. */
 export function blockedNote(s: SessionInfo): string | null {
   if (s.status.state === "exited" || s.stopped) return "Resume the session to switch."
-  if (s.status.state !== "idle") return "The agent is working. Wait until it is idle to switch."
+  // A rollback can leave the state idle while the switch still runs.
+  if (s.status.state !== "idle" || switchRunning(s))
+    return "The agent is working. Wait until it is idle to switch."
   return null
 }
 

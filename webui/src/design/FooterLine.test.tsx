@@ -9,6 +9,7 @@ import { renderThemed } from "../ui/render"
 import { WideContext } from "../useWide"
 import { FooterLine } from "./FooterLine"
 import { SwitchLine } from "./modelSwitch"
+import { OutdatedModel } from "./OutdatedModel"
 
 const { posted, openPicker } = vi.hoisted(() => ({ posted: vi.fn(), openPicker: vi.fn() }))
 vi.mock("../shell/modelPickerOpen", () => ({
@@ -290,6 +291,18 @@ test("the switch button posts the latest model and the named effort", async () =
     model: "claude-opus-4-8",
     effort: "medium",
   })
+})
+
+test("a running switch disables the popover button even when the state is idle", async () => {
+  renderThemed(
+    <OutdatedModel
+      session={outdated({ switching_model: "claude-opus-4-6", switching_back: true })}
+      text="Claude Opus 4.7"
+    />,
+  )
+  fireEvent.click(screen.getByTestId("outdated-model"))
+  const pop = await popover()
+  expect(switchButton(pop).disabled).toBe(true)
 })
 
 test("an empty effort uses the default and keeps the button enabled", async () => {

@@ -140,13 +140,58 @@ describe("effort", () => {
     expect(screen.queryByRole("radio", { name: "xhigh" })).toBeNull()
   })
 
-  test("an unlisted effort falls to the route default, else the lowest level", () => {
-    const base = { id: "m", label: "m" as never, current: false, outdated: false }
-    expect(effortFor({ ...base, efforts: ["low", "xhigh"], defaultEffort: "xhigh" }, "high")).toBe(
+  test.each([
+    ["listed wanted is kept", ["low", "high"], undefined, "high", "claude", "high"],
+    ["route default wins", ["low", "xhigh"], "xhigh", "high", "claude", "xhigh"],
+    [
+      "Claude takes the nearest lower",
+      ["low", "medium", "xhigh"],
+      undefined,
+      "high",
+      "claude",
+      "medium",
+    ],
+    [
+      "Claude takes the lowest when none is lower",
+      ["high", "xhigh"],
+      undefined,
+      "low",
+      "claude",
+      "high",
+    ],
+    [
+      "Codex without a default takes the lowest",
+      ["medium", "high"],
+      undefined,
       "xhigh",
+      "codex",
+      "medium",
+    ],
+    ["empty wanted stays empty", ["low", "high"], "high", "", "claude", ""],
+    ["no effort control", [], undefined, "high", "claude", ""],
+  ])("effortFor: %s", (_n, efforts, defaultEffort, wanted, harness, want) => {
+    const base = { id: "m", label: "m" as never, current: false, outdated: false }
+    expect(effortFor({ ...base, efforts, defaultEffort }, wanted, harness)).toBe(want)
+  })
+
+  test("an empty session effort keeps Switch disabled and sends no effort until one is picked", async () => {
+    const switchModel = open({ effort: "" })
+    await screen.findByRole("radio", { name: /GPT-6.1-Sol/ })
+    expect(switchButton().disabled).toBe(true)
+    fireEvent.click(screen.getByRole("radio", { name: /GPT-6.1-Sol/ }))
+    expect(switchButton().disabled).toBe(false)
+    fireEvent.click(switchButton())
+    await waitFor(() => expect(switchModel).toHaveBeenCalledOnce())
+    expect(switchModel).toHaveBeenCalledExactlyOnceWith(
+      expect.not.objectContaining({ effort: expect.anything() }),
     )
-    expect(effortFor({ ...base, efforts: ["low", "xhigh"] }, "high")).toBe("low")
-    expect(effortFor({ ...base, efforts: [] }, "high")).toBe("")
+  })
+
+  test("a running switch blocks the picker even when the state is idle", async () => {
+    open({ switching_model: "gpt-5.5-sol", switching_back: true })
+    await screen.findByRole("radio", { name: /GPT-6.1-Sol/ })
+    expect(switchButton().disabled).toBe(true)
+    expect(screen.getByRole("status").textContent).toContain("working")
   })
 
   test("a model with no effort control shows none", async () => {

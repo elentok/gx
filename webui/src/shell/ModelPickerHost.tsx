@@ -88,7 +88,7 @@ function ModelPicker({
   // The choice survives a later list answer and a filter; it falls to the first match only when
   // the filter hides it.
   const selected = flat.find((r) => r.id === (choice ?? current?.id)) ?? flat[0]
-  const effort = selected ? effortFor(selected, wantedEffort) : ""
+  const effort = selected ? effortFor(selected, wantedEffort, session.harness) : ""
   const note = blockedNote(session)
   const blocked = note !== null
   const changed =

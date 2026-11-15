@@ -67,13 +67,21 @@ export function filterGroups(groups: PickerGroup[], query: string): PickerGroup[
     .filter((g) => g.rows.length > 0)
 }
 
+// Mirrors claudeEfforts in modelrules/modelrules.go.
+const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"]
+
 /**
- * The effort a model runs with: the wanted one when the model lists it, else the model's default
- * from the route, else the lowest listed level. Empty for a model with no effort control.
+ * The effort a model runs with, following modelrules.Effort: an empty wanted effort stays empty,
+ * a listed one is kept, else the route's `switch_effort`, else (Claude) the nearest lower level or
+ * the lowest listed one. Empty for a model with no effort control.
  */
-export function effortFor(row: PickerRow, wanted: string | undefined): string {
-  if (row.efforts.length === 0) return ""
-  if (wanted && row.efforts.includes(wanted)) return wanted
+export function effortFor(row: PickerRow, wanted: string | undefined, harness?: string): string {
+  if (row.efforts.length === 0 || !wanted) return ""
+  if (row.efforts.includes(wanted)) return wanted
   if (row.defaultEffort && row.efforts.includes(row.defaultEffort)) return row.defaultEffort
-  return row.efforts[0]
+  if (harness === "codex") return row.efforts[0]
+  const rank = (e: string) => CLAUDE_EFFORTS.indexOf(e)
+  const known = row.efforts.filter((e) => rank(e) >= 0).sort((a, b) => rank(a) - rank(b))
+  const lower = known.filter((e) => rank(e) < rank(wanted))
+  return lower.at(-1) ?? known[0] ?? row.efforts[0]
 }
