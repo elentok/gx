@@ -88,14 +88,43 @@ func TestLaunch_RelaunchPromptListsEarlierSummaries(t *testing.T) {
 	}
 }
 
+// A run where gx never stepped in says so.
+func TestFinish_GxEntryWentWrongNoneRecorded(t *testing.T) {
+	t.Parallel()
+	f := servertest.RetroFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.QueueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
+
+	raw, err := os.ReadFile(filepath.Join(f.Issues, "01-t.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := schema.ParseIterationSummaries(schema.ParseBody(string(raw)))
+	if len(got) != 1 || got[0].Label != "gx" {
+		t.Fatalf("summaries = %+v, want one gx entry", got)
+	}
+	if got[0].WentWrong != "none recorded" {
+		t.Errorf("gx entry went wrong = %q, want none recorded", got[0].WentWrong)
+	}
+}
+
 // An agent that finishes without a summary still finishes, and gx writes its
 // own entry listing what it did.
 func TestFinish_NoAgentSummaryStillFinishesAndGxWritesItsEntry(t *testing.T) {
 	t.Parallel()
 	f := servertest.RetroFixture(t)
 	scratch := filepath.Join(f.Store, "proj")
-	for _, typ := range []events.Type{events.PromptNudged, events.HumanRelaunch} {
-		if err := runlog.AppendEvent(scratch, servertest.SchedEpic, runlog.Event{Type: string(typ), Ticket: "01"}); err != nil {
+	for _, typ := range []events.Type{
+		events.PromptNudged, events.PromptNudged, events.HumanRelaunch, events.LaunchFailed,
+		events.RecoveryEscalated, events.FinishBlocked, events.SkillsRefreshed, events.LaunchRetried,
+	} {
+		ev := runlog.Event{Type: string(typ), Ticket: "01"}
+		if events.KindRequired(typ) {
+			ev.Kind = string(events.AgentPaneBusy)
+		}
+		if err := runlog.AppendEvent(scratch, servertest.SchedEpic, ev); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -115,9 +144,13 @@ func TestFinish_NoAgentSummaryStillFinishesAndGxWritesItsEntry(t *testing.T) {
 	if len(got) != 1 || got[0].Label != "gx" {
 		t.Fatalf("summaries = %+v, want one gx entry", got)
 	}
-	for _, want := range []string{"1 prompt resends", "1 relaunches"} {
+	for _, want := range []string{"2 prompt resends", "1 relaunches"} {
 		if !strings.Contains(got[0].Did, want) {
 			t.Errorf("gx entry did %q lacks %q", got[0].Did, want)
 		}
+	}
+	const wantWrong = "2 prompt resends, 1 relaunch, 1 launch failure, 1 recovery escalation, 1 finish block, 1 skill refresh, 1 skill retry"
+	if got[0].WentWrong != wantWrong {
+		t.Errorf("gx entry went wrong = %q, want %q", got[0].WentWrong, wantWrong)
 	}
 }

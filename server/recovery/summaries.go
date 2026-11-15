@@ -53,53 +53,100 @@ func RecordGxSummary(scratchDir string, addr tickets.Address, ticketPath, sessio
 				since = s.Time
 			}
 		}
+		c := countGxEvents(evs, addr.ID, since)
 		*body = schema.AppendIterationSummary(*body, schema.IterationSummary{
 			SessionID: cmp.Or(sessionID, "unknown"),
 			Time:      now,
 			Label:     GxSummaryLabel,
-			Did:       gxDid(evs, addr.ID, since),
-			WentWrong: "none recorded",
+			Did:       gxDid(c),
+			WentWrong: gxWentWrong(c),
 			Decisions: "none",
 			Left:      "none",
 		})
 	})
 }
 
-// gxDid describes the gx actions logged for ticket id after since.
-func gxDid(evs []runlog.Event, id string, since time.Time) string {
-	var resends, nudges, relaunches, holders int
+// gxCounts is how often gx acted on one ticket since a point in time.
+type gxCounts struct {
+	resends, nudges, relaunches, holders                          int
+	launchFailures, escalations, finishBlocks, refreshes, retries int
+}
+
+func countGxEvents(evs []runlog.Event, id string, since time.Time) gxCounts {
+	var c gxCounts
 	for _, ev := range evs {
 		if ev.Ticket != id || !ev.Time.After(since) {
 			continue
 		}
 		switch events.Type(ev.Type) {
 		case events.PromptNudged:
-			resends++
+			c.resends++
 		case events.Nudged, events.StallNudged:
-			nudges++
+			c.nudges++
 		case events.HumanRelaunch:
-			relaunches++
+			c.relaunches++
 		case events.IterationStarted:
 			if ev.Path == "resumed" {
-				relaunches++
+				c.relaunches++
 			}
 		case events.Reclaimed, events.StalePaneClosed:
-			holders++
+			c.holders++
+		case events.LaunchFailed:
+			c.launchFailures++
+		case events.RecoveryEscalated:
+			c.escalations++
+		case events.FinishBlocked:
+			c.finishBlocks++
+		case events.SkillsRefreshed:
+			c.refreshes++
+		case events.LaunchRetried:
+			c.retries++
 		}
 	}
-	var parts []string
-	for _, p := range []struct {
-		n    int
-		what string
-	}{
-		{resends, "prompt resends"}, {nudges, "nudges"}, {relaunches, "relaunches"}, {holders, "holder re-adoptions or closures"},
-	} {
+	return c
+}
+
+type countPart struct {
+	n    int
+	what string
+}
+
+func joinCounts(parts []countPart, none string) string {
+	var out []string
+	for _, p := range parts {
 		if p.n > 0 {
-			parts = append(parts, fmt.Sprintf("%d %s", p.n, p.what))
+			out = append(out, fmt.Sprintf("%d %s", p.n, p.what))
 		}
 	}
-	if len(parts) == 0 {
-		return "launched the agent and settled the run"
+	if len(out) == 0 {
+		return none
 	}
-	return strings.Join(parts, ", ")
+	return strings.Join(out, ", ")
+}
+
+// gxDid describes the gx actions logged for ticket id after since.
+func gxDid(c gxCounts) string {
+	return joinCounts([]countPart{
+		{c.resends, "prompt resends"}, {c.nudges, "nudges"}, {c.relaunches, "relaunches"}, {c.holders, "holder re-adoptions or closures"},
+	}, "launched the agent and settled the run")
+}
+
+// gxWentWrong lists how often gx had to step in; the singular forms differ
+// from the plural only where the count is one.
+func gxWentWrong(c gxCounts) string {
+	plural := func(n int, one, many string) string {
+		if n == 1 {
+			return one
+		}
+		return many
+	}
+	return joinCounts([]countPart{
+		{c.resends, plural(c.resends, "prompt resend", "prompt resends")},
+		{c.relaunches, plural(c.relaunches, "relaunch", "relaunches")},
+		{c.launchFailures, plural(c.launchFailures, "launch failure", "launch failures")},
+		{c.escalations, plural(c.escalations, "recovery escalation", "recovery escalations")},
+		{c.finishBlocks, plural(c.finishBlocks, "finish block", "finish blocks")},
+		{c.refreshes, plural(c.refreshes, "skill refresh", "skill refreshes")},
+		{c.retries, plural(c.retries, "skill retry", "skill retries")},
+	}, "none recorded")
 }
