@@ -6,6 +6,42 @@ import (
 	"github.com/elentok/gx/ralphloop/agent"
 )
 
+// ModelVersion is a parsed model version.
+type ModelVersion struct {
+	Major int `json:"major"`
+	Minor int `json:"minor"`
+}
+
+// SessionModelRow is one model the picker offers. ID is the full resolved id.
+// Family and Version are absent for an id that does not parse. Efforts is
+// empty for a model with no effort control. Latest is the resolved id of a
+// newer model of the family, and SwitchEffort the effort a switch to this row
+// would use.
+type SessionModelRow struct {
+	ID           string        `json:"id"`
+	Current      bool          `json:"current,omitempty"`
+	Family       string        `json:"family,omitempty"`
+	Version      *ModelVersion `json:"version,omitempty"`
+	Efforts      []string      `json:"efforts"`
+	Latest       string        `json:"latest,omitempty"`
+	SwitchEffort string        `json:"switch_effort,omitempty"`
+}
+
+// ModelAlias maps a Claude alias to its resolved id and that id's family latest.
+type ModelAlias struct {
+	Alias  string `json:"alias"`
+	ID     string `json:"id"`
+	Latest string `json:"latest,omitempty"`
+}
+
+// SessionModelsResponse is the model list of a session's harness, in the
+// harness's order. Refreshing is true while a background read is still running.
+type SessionModelsResponse struct {
+	Models     []SessionModelRow `json:"models"`
+	Aliases    []ModelAlias      `json:"aliases"`
+	Refreshing bool              `json:"refreshing"`
+}
+
 // SessionInfo is an interactive session on the wire: everything the Agents
 // tab shows.
 type SessionInfo struct {

@@ -25,7 +25,7 @@ func (c *Chat) commandsRead(w http.ResponseWriter, r *http.Request) {
 	bySession := id != "" && project == "" && dir == ""
 	byProject := id == "" && project != "" && dir != ""
 	if (kind != "/" && kind != "$") || bySession == byProject {
-		writeRefusal(w, refuse(wire.ReasonSessionBadRequest, "want kind / or $, and either session or project with dir"))
+		WriteRefusal(w, refuse(wire.ReasonSessionBadRequest, "want kind / or $, and either session or project with dir"))
 		return
 	}
 
@@ -39,7 +39,7 @@ func (c *Chat) commandsRead(w http.ResponseWriter, r *http.Request) {
 		}
 		var ok bool
 		if name, ok = c.commandHarness(meta.Harness); !ok {
-			writeRefusal(w, refuse(wire.ReasonPromptHarnessNotSupported, "this harness has no command list"))
+			WriteRefusal(w, refuse(wire.ReasonPromptHarnessNotSupported, "this harness has no command list"))
 			return
 		}
 		dir = meta.Dir
@@ -104,12 +104,12 @@ func writeCommandsFailure(w http.ResponseWriter, res wire.SessionResult, err err
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeRefusal(w, res)
+	WriteRefusal(w, res)
 }
 
-// writeRefusal answers with the refusal as JSON under a 4xx status, so a
+// WriteRefusal answers with the refusal as JSON under a 4xx status, so a
 // caller can read its reason.
-func writeRefusal(w http.ResponseWriter, res wire.SessionResult) {
+func WriteRefusal(w http.ResponseWriter, res wire.SessionResult) {
 	status := http.StatusBadRequest
 	if res.Reason == wire.ReasonSessionUnknown {
 		status = http.StatusNotFound

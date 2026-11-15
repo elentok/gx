@@ -2893,6 +2893,46 @@ export const StaleRowMessage = "changed, reselect";
 // source: sessiontypes.go
 
 /**
+ * ModelVersion is a parsed model version.
+ */
+export interface ModelVersion {
+  major: number /* int */;
+  minor: number /* int */;
+}
+/**
+ * SessionModelRow is one model the picker offers. ID is the full resolved id.
+ * Family and Version are absent for an id that does not parse. Efforts is
+ * empty for a model with no effort control. Latest is the resolved id of a
+ * newer model of the family, and SwitchEffort the effort a switch to this row
+ * would use.
+ */
+export interface SessionModelRow {
+  id: string;
+  current?: boolean;
+  family?: string;
+  version?: ModelVersion;
+  efforts: string[];
+  latest?: string;
+  switch_effort?: string;
+}
+/**
+ * ModelAlias maps a Claude alias to its resolved id and that id's family latest.
+ */
+export interface ModelAlias {
+  alias: string;
+  id: string;
+  latest?: string;
+}
+/**
+ * SessionModelsResponse is the model list of a session's harness, in the
+ * harness's order. Refreshing is true while a background read is still running.
+ */
+export interface SessionModelsResponse {
+  models: SessionModelRow[];
+  aliases: ModelAlias[];
+  refreshing: boolean;
+}
+/**
  * SessionInfo is an interactive session on the wire: everything the Agents
  * tab shows.
  */

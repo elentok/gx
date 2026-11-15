@@ -121,6 +121,7 @@ var routeVerbs = map[string]string{
 	"GET /v1/sessions/chat/archive":             "agents chat",
 	"GET /v1/sessions/screen":                   "agents screen",
 	"GET /v1/sessions/commands":                 "agents commands",
+	"GET /v1/sessions/models":                   "agents models",
 	"GET /v1/sessions/permission":               "agents permission",
 	"POST /v1/sessions/create":                  "agents create",
 	"POST /v1/sessions/keys":                    "agents keys",

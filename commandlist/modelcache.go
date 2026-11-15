@@ -108,6 +108,14 @@ func (c *ModelCache) Entries(harnessName string) (entries []modelrules.Entry, ok
 	return entries, true
 }
 
+// Refreshing reports whether a read of harnessName is running now.
+func (c *ModelCache) Refreshing(harnessName string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s := c.slots[harnessName]
+	return s != nil && s.running
+}
+
 // Refresh starts a background read of harnessName and returns at once. It does
 // nothing while that harness is already being read, or before Run.
 func (c *ModelCache) Refresh(harnessName string) {

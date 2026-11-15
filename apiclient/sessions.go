@@ -301,6 +301,13 @@ func (s *Sessions) Commands(ctx context.Context, id, project, dir, kind string) 
 	return res, err
 }
 
+// Models reads the model rows of a session's harness.
+func (s *Sessions) Models(ctx context.Context, id string) (wire.SessionModelsResponse, error) {
+	var res wire.SessionModelsResponse
+	err := s.t.get(ctx, "/v1/sessions/models?session="+url.QueryEscape(id), &res)
+	return res, err
+}
+
 // Permission reads the dialog a Blocked session waits on.
 func (s *Sessions) Permission(ctx context.Context, id string) (wire.SessionPermissionResponse, error) {
 	var res wire.SessionPermissionResponse

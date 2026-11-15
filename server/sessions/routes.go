@@ -46,6 +46,7 @@ func Routes(mg func() *Manager, rs func() *Resumer, q func() *queue.Queue) []wir
 			}
 			wire.WriteJSON(w, list)
 		}},
+		{Pattern: "GET /v1/sessions/models", Web: wire.WebRead, Handler: m(SessionModelsRead)},
 		{Pattern: "POST /v1/sessions/create", Web: wire.WebWrite, Handler: m((*Manager).SessionCreateWrite), WebHandler: m((*Manager).SessionCreateWeb)},
 		{Pattern: "POST /v1/sessions/stop", Web: wire.WebWrite, Handler: targets(stopTarget, false), WebHandler: targets(stopTarget, true)},
 		{Pattern: "POST /v1/sessions/remove", Web: wire.WebWrite, Handler: targets(removeTarget, false), WebHandler: targets(removeTarget, true)},

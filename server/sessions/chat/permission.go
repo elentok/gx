@@ -22,7 +22,7 @@ func (c *Chat) permissionRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if res.Refused {
-		writeRefusal(w, res)
+		WriteRefusal(w, res)
 		return
 	}
 	wire.WriteJSON(w, out)
