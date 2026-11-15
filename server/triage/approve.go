@@ -82,27 +82,6 @@ func (t *Triage) liveRecord(project string) (*triagerec.Store, *triagerec.Record
 	return store, rec, nil, nil
 }
 
-// approve wins the record's compare-and-set and only then starts the Write
-// session, so of two approves (web or chat) exactly one writes.
-func (t *Triage) approve(req wire.TriageApproveRequest) (wire.TriageEditResult, error) {
-	return t.editAndLaunch(req.Project, false, func(store *triagerec.Store, rec *triagerec.Record) (*triagerec.Record, error) {
-		saved, err := store.Approve(rec.ID, req.Revision)
-		if errors.Is(err, triagerec.ErrAlreadyApproved) {
-			return nil, refusal(wire.ReasonTriageAlreadyApproved, err.Error())
-		}
-		return saved, err
-	})
-}
-
-// sendBack returns the record to Plan with the person's answers kept, and starts
-// the session that asks again. Like approve, it wins the record's compare-and-set
-// first, so a double click makes one round.
-func (t *Triage) sendBack(req wire.TriageSendBackRequest) (wire.TriageEditResult, error) {
-	return t.editAndLaunch(req.Project, false, func(store *triagerec.Store, rec *triagerec.Record) (*triagerec.Record, error) {
-		return store.SendBack(rec.ID, req.Revision)
-	})
-}
-
 // retry sets a failed row pending and starts a Write session unless one is live.
 func (t *Triage) retry(req wire.TriageRowActionRequest) (wire.TriageEditResult, error) {
 	return t.editAndLaunch(req.Project, true, func(store *triagerec.Store, rec *triagerec.Record) (*triagerec.Record, error) {

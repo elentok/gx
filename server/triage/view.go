@@ -181,7 +181,7 @@ func buildView(project string, rec *triagerec.Record) wire.TriageView {
 		return v
 	}
 	isLive := rec.State == triagerec.StateLive
-	v.ID, v.State, v.Revision, v.Round = rec.ID, wire.TriageState(rec.State), rec.Revision, rec.Round
+	v.ID, v.State, v.Revision = rec.ID, wire.TriageState(rec.State), rec.Revision
 	v.Steps = steps(rec.Step)
 	v.LegacyWrite = rec.LegacyWrite()
 	v.CanAbandon = CanAbandon(isLive, rec.Step, v.LegacyWrite)
@@ -337,7 +337,7 @@ func wireQuestion(q triagerec.Question) wire.TriageQuestion {
 	title, body, _ := strings.Cut(q.Text, "\n")
 	return wire.TriageQuestion{
 		ID: q.ID, Title: title, Body: strings.TrimSpace(body), Kind: string(q.Kind),
-		Options: q.Options, Recommended: q.Default, Auto: q.Auto,
+		Options: q.Options, Recommended: q.Default,
 	}
 }
 

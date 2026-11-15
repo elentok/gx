@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -95,49 +94,6 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 		return err
 	}
 
-	var rowJSON, rowKeep bool
-	var rowAction, rowDest string
-	var rowAnswers []string
-	var rowRevision int
-	row := &cobra.Command{
-		Use:   "row <project> <address>",
-		Short: "save a row's action, destination, answers or Keep for later on the record revision read",
-		Args:  cobra.ExactArgs(2),
-		RunE: func(c *cobra.Command, args []string) error {
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
-			answers := map[string]string{}
-			for _, a := range rowAnswers {
-				id, text, ok := strings.Cut(a, "=")
-				if !ok {
-					return fmt.Errorf("--answer %q is not id=text", a)
-				}
-				answers[id] = text
-			}
-			cl, err := d.Dial()()
-			if err != nil {
-				return err
-			}
-			res, err := cl.Triage.SaveRow(ctx, wire.TriageRowRequest{
-				Project: args[0], Revision: rowRevision, Address: args[1], Action: rowAction,
-				Destination: rowDest, Answers: answers, KeepForLater: rowKeep,
-			})
-			if err != nil {
-				return fmt.Errorf("server write failed: %w", err)
-			}
-			return editOut(c, res, rowJSON)
-		},
-	}
-	row.Flags().BoolVar(&rowJSON, "json", false, "emit the structured result (or refusal) as JSON")
-	row.Flags().IntVar(&rowRevision, "revision", 0, "the record revision read")
-	row.Flags().StringVar(&rowAction, "action", "", "ready, map, merge, close or keep")
-	row.Flags().StringVar(&rowDest, "destination", "", "epic, new map epic name, or the row address merged into")
-	row.Flags().StringArrayVar(&rowAnswers, "answer", nil, "a question answer as id=text (repeatable)")
-	row.Flags().BoolVar(&rowKeep, "keep-for-later", false, "keep the follow-up for later")
-	cmd.AddCommand(row)
-
 	var ungroupJSON bool
 	var ungroupRevision int
 	ungroup := &cobra.Command{
@@ -189,58 +145,6 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 	abandon.Flags().BoolVar(&abandonJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	abandon.Flags().IntVar(&abandonRevision, "revision", 0, "the record revision read")
 	cmd.AddCommand(abandon)
-
-	var approveJSON bool
-	var approveRevision int
-	approve := &cobra.Command{
-		Use:   "approve <project>",
-		Short: "approve a project's Triage plan and start its Write session",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(c *cobra.Command, args []string) error {
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
-			cl, err := d.Dial()()
-			if err != nil {
-				return err
-			}
-			res, err := cl.Triage.Approve(ctx, wire.TriageApproveRequest{Project: args[0], Revision: approveRevision})
-			if err != nil {
-				return fmt.Errorf("server write failed: %w", err)
-			}
-			return editOut(c, res, approveJSON)
-		},
-	}
-	approve.Flags().BoolVar(&approveJSON, "json", false, "emit the structured result (or refusal) as JSON")
-	approve.Flags().IntVar(&approveRevision, "revision", 0, "the record revision read")
-	cmd.AddCommand(approve)
-
-	var sendBackJSON bool
-	var sendBackRevision int
-	sendBack := &cobra.Command{
-		Use:   "send-back <project>",
-		Short: "send a project's Triage answers back to the agent for a new round of questions",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(c *cobra.Command, args []string) error {
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
-			cl, err := d.Dial()()
-			if err != nil {
-				return err
-			}
-			res, err := cl.Triage.SendBack(ctx, wire.TriageSendBackRequest{Project: args[0], Revision: sendBackRevision})
-			if err != nil {
-				return fmt.Errorf("server send back failed: %w", err)
-			}
-			return editOut(c, res, sendBackJSON)
-		},
-	}
-	sendBack.Flags().BoolVar(&sendBackJSON, "json", false, "emit the structured result (or refusal) as JSON")
-	sendBack.Flags().IntVar(&sendBackRevision, "revision", 0, "the record revision read")
-	cmd.AddCommand(sendBack)
 
 	for _, verb := range []string{"retry", "keep"} {
 		var asJSON bool

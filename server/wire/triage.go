@@ -17,11 +17,6 @@ const (
 	// ReasonTriagePhase: the record's step or the row's state does not allow a
 	// row or abandon write, or the merge target is not a ready or map row.
 	ReasonTriagePhase = "triage-phase"
-	// ReasonTriageAnswer: an answer names no question of the row, or is not one
-	// of its question's options.
-	ReasonTriageAnswer = "triage-answer"
-	// ReasonTriageAlreadyApproved: the Triage was approved by another call.
-	ReasonTriageAlreadyApproved = "triage-already-approved"
 	// ReasonTriageNoLive: the project has no live Triage.
 	ReasonTriageNoLive = "triage-no-live"
 )
@@ -60,8 +55,6 @@ type TriageQuestion struct {
 	Kind        string   `json:"kind"`
 	Options     []string `json:"options,omitempty"`
 	Recommended string   `json:"recommended,omitempty"`
-	// Auto marks a low-risk question the agent decided: it holds its default as the answer until the person changes it.
-	Auto bool `json:"auto,omitempty"`
 }
 
 // TriageRow is one follow-up with everything the Triage learned about it.
@@ -98,37 +91,12 @@ type TriageRow struct {
 	OverlapWith []string `json:"overlap_with,omitempty"`
 }
 
-// TriageRowRequest is the body of POST /v1/triage/row. It replaces the row's
-// person fields; Revision is the record revision the web read. Destination is
-// an epic, a typed new map epic name, or the address of the row merged into.
-type TriageRowRequest struct {
-	Project      string            `json:"project"`
-	Revision     int               `json:"revision"`
-	Address      string            `json:"address"`
-	Action       string            `json:"action,omitempty"`
-	Destination  string            `json:"destination,omitempty"`
-	Answers      map[string]string `json:"answers,omitempty"`
-	KeepForLater bool              `json:"keep_for_later,omitempty"`
-}
-
 // TriageUngroupRequest is the body of POST /v1/triage/ungroup. It undoes the
 // group the row is in; Revision is the record revision the web read.
 type TriageUngroupRequest struct {
 	Project  string `json:"project"`
 	Revision int    `json:"revision"`
 	Address  string `json:"address"`
-}
-
-// TriageApproveRequest is the body of POST /v1/triage/approve.
-type TriageApproveRequest struct {
-	Project  string `json:"project"`
-	Revision int    `json:"revision"`
-}
-
-// TriageSendBackRequest is the body of POST /v1/triage/send-back.
-type TriageSendBackRequest struct {
-	Project  string `json:"project"`
-	Revision int    `json:"revision"`
 }
 
 // TriageRowActionRequest is the body of POST /v1/triage/retry and
@@ -235,7 +203,6 @@ type TriageView struct {
 	StepNote    string `json:"step_note,omitempty"`
 	RingPercent int    `json:"ring_percent"`
 	Revision    int    `json:"revision,omitempty"`
-	Round       int    `json:"round,omitempty"`
 	// OpenRound is nil when no saved round waits for an answer.
 	OpenRound *TriageOpenRound `json:"open_round,omitempty"`
 	// FinalApproval is true at Questions when no ask question is left and the

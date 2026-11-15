@@ -267,10 +267,12 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 		if len(args) == 0 {
 			continue
 		}
-		r.Gx(t, append([]string{"server", "triage", "row", project, row.Address, "--revision", fmt.Sprint(r.triageView(t).Revision)}, args...)...)
+		r.Gx(t, append([]string{"tickets", "triage", "row", "--project", project, "--row", row.Address, "--revision", fmt.Sprint(r.triageView(t).Revision)}, args...)...)
 	}
 	v = r.waitTriage(t, "no open question", func(v wire.TriageView) bool { return v.OpenQuestions == 0 })
-	r.Gx(t, "server", "triage", "approve", project, "--revision", fmt.Sprint(v.Revision))
+	r.Gx(t, "tickets", "triage", "approve", "--project", project, "--revision", fmt.Sprint(v.Revision))
+	// The CLI approve starts nothing: the chat runs Write itself, so open a session at step write.
+	r.Gx(t, "server", "triage", "open", project, "--new")
 
 	// The Write session leaves the scripted rows failed and the rest done: the
 	// first fails before its move and the second after it. The fifth is a keep

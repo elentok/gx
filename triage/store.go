@@ -72,9 +72,6 @@ type Question struct {
 	Kind    QuestionKind `json:"kind"`
 	Options []string     `json:"options,omitempty"`
 	Default string       `json:"default,omitempty"`
-	// Auto is a version 1 field: a low-risk quick question saved answered with
-	// Default. Version 2 records never write it.
-	Auto bool `json:"auto,omitempty"`
 }
 
 // Round is one saved set of questions with the person's answers. An objection
@@ -170,9 +167,7 @@ type Row struct {
 	Fallback string       `json:"fallback,omitempty"`
 	Plan     *PlanRow     `json:"plan,omitempty"`
 	Person   PersonFields `json:"person"`
-	// Earlier is a version 1 field, never written for a version 2 record.
-	Earlier []Answered `json:"earlier,omitempty"`
-	Write   WriteState `json:"write,omitempty"`
+	Write    WriteState   `json:"write,omitempty"`
 	// NewAddresses are the tickets the row became. NewAddress is the single
 	// address an older record stored; Load moves it into the list.
 	NewAddresses []string `json:"newAddresses,omitempty"`
@@ -185,20 +180,18 @@ type Row struct {
 
 // Record is one Triage.
 type Record struct {
-	Version   int       `json:"version"`
-	ID        string    `json:"id"`
-	StartedAt time.Time `json:"startedAt"`
-	Project   string    `json:"project"`
-	State     State     `json:"state"`
-	Step      string    `json:"step"`
-	Revision  int       `json:"revision"`
-	// Round is a version 1 field, never written for a version 2 record.
-	Round   int        `json:"round,omitempty"`
-	Rows    []Row      `json:"rows"`
-	Rounds  []Round    `json:"rounds,omitempty"`
-	Decided []Decided  `json:"decided,omitempty"`
-	Areas   []Area     `json:"areas,omitempty"`
-	Moves   []MoveUnit `json:"moves,omitempty"`
+	Version   int        `json:"version"`
+	ID        string     `json:"id"`
+	StartedAt time.Time  `json:"startedAt"`
+	Project   string     `json:"project"`
+	State     State      `json:"state"`
+	Step      string     `json:"step"`
+	Revision  int        `json:"revision"`
+	Rows      []Row      `json:"rows"`
+	Rounds    []Round    `json:"rounds,omitempty"`
+	Decided   []Decided  `json:"decided,omitempty"`
+	Areas     []Area     `json:"areas,omitempty"`
+	Moves     []MoveUnit `json:"moves,omitempty"`
 	// Approved is set by the approve verb.
 	Approved bool `json:"approved,omitempty"`
 	// storedVersion is the version the record had on disk; zero for a record
@@ -419,13 +412,28 @@ func (s *Store) Load(id string) (*Record, error) {
 		}
 		r.NewAddress = ""
 	}
-	rec.upgrade()
+	var earlier [][]Answered
+	if rec.Version < Version {
+		var legacy struct {
+			Rows []struct {
+				Earlier []Answered `json:"earlier"`
+			} `json:"rows"`
+		}
+		if err := json.Unmarshal(raw, &legacy); err != nil {
+			return nil, fmt.Errorf("reading triage %s: %w", id, err)
+		}
+		for _, r := range legacy.Rows {
+			earlier = append(earlier, r.Earlier)
+		}
+	}
+	rec.upgrade(earlier)
 	return &rec, nil
 }
 
 // upgrade lifts a version 1 record to the version 2 shape in memory. Nothing
-// is written until the next Save.
-func (rec *Record) upgrade() {
+// is written until the next Save. earlier holds each row's version 1
+// "earlier" answers, which Row no longer has a field for.
+func (rec *Record) upgrade(earlier [][]Answered) {
 	rec.storedVersion = rec.Version
 	if rec.Version >= Version {
 		return
@@ -444,7 +452,7 @@ func (rec *Record) upgrade() {
 	}
 	switch rec.Step {
 	case tickets.StepPlan, tickets.StepApprove:
-		rec.backToRoute()
+		rec.backToRoute(earlier)
 	}
 }
 
@@ -458,7 +466,7 @@ func (rec *Record) LegacyWrite() bool {
 // backToRoute moves a version 1 record at plan or approve to route. Verdicts
 // stay, each given answer becomes an answered ask question, and the plan and
 // the person's edits are dropped.
-func (rec *Record) backToRoute() {
+func (rec *Record) backToRoute(earlier [][]Answered) {
 	round := Round{Answers: map[string]string{}, Answered: true}
 	for i := range rec.Rows {
 		row := &rec.Rows[i]
@@ -473,11 +481,14 @@ func (rec *Record) backToRoute() {
 				open = append(open, q)
 				continue
 			}
-			q.Auto = false
 			round.Questions = append(round.Questions, q)
 			round.Answers[q.ID] = a
 		}
-		for k, e := range row.Earlier {
+		var rowEarlier []Answered
+		if i < len(earlier) {
+			rowEarlier = earlier[i]
+		}
+		for k, e := range rowEarlier {
 			id := fmt.Sprintf("earlier-%d", len(round.Questions)+k+1)
 			round.Questions = append(round.Questions, Question{ID: id, RowID: row.Address, Text: e.Text, Kind: QuestionAsk, Options: []string{e.Answer}, Default: e.Answer})
 			round.Answers[id] = e.Answer
@@ -485,12 +496,10 @@ func (rec *Record) backToRoute() {
 		row.Questions = open
 		row.Plan = nil
 		row.Person = PersonFields{}
-		row.Earlier = nil
 	}
 	if len(round.Questions) > 0 {
 		rec.Rounds = append(rec.Rounds, round)
 	}
-	rec.Round = 0
 	rec.Step = tickets.StepRoute
 }
 

@@ -27,13 +27,6 @@ func (s *Triage) Open(ctx context.Context, req wire.TriageOpenRequest) (wire.Ses
 	return res, err
 }
 
-// SaveRow stores a row's person fields. A refusal is a result, not an error.
-func (s *Triage) SaveRow(ctx context.Context, req wire.TriageRowRequest) (wire.TriageEditResult, error) {
-	var res wire.TriageEditResult
-	err := s.t.post(ctx, "/v1/triage/row", req, &res)
-	return res, err
-}
-
 // Ungroup undoes the group a row is in. A refusal is a result, not an error.
 func (s *Triage) Ungroup(ctx context.Context, req wire.TriageUngroupRequest) (wire.TriageEditResult, error) {
 	var res wire.TriageEditResult
@@ -45,22 +38,6 @@ func (s *Triage) Ungroup(ctx context.Context, req wire.TriageUngroupRequest) (wi
 func (s *Triage) Abandon(ctx context.Context, req wire.TriageAbandonRequest) (wire.TriageEditResult, error) {
 	var res wire.TriageEditResult
 	err := s.t.post(ctx, "/v1/triage/abandon", req, &res)
-	return res, err
-}
-
-// Approve approves project's Triage and starts its Write session. A refusal
-// is a result, not an error.
-func (s *Triage) Approve(ctx context.Context, req wire.TriageApproveRequest) (wire.TriageEditResult, error) {
-	var res wire.TriageEditResult
-	err := s.t.post(ctx, "/v1/triage/approve", req, &res)
-	return res, err
-}
-
-// SendBack returns project's Triage to Plan with the answers kept and starts the
-// session that asks again. A refusal is a result, not an error.
-func (s *Triage) SendBack(ctx context.Context, req wire.TriageSendBackRequest) (wire.TriageEditResult, error) {
-	var res wire.TriageEditResult
-	err := s.t.post(ctx, "/v1/triage/send-back", req, &res)
 	return res, err
 }
 

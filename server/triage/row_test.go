@@ -31,16 +31,6 @@ func toApprove(t *testing.T, store *triagerec.Store) (*triagerec.Record, string,
 	return rec, a, b
 }
 
-func saveRow(t *testing.T, f rigs.DesignsFixture, req wire.TriageRowRequest) wire.TriageEditResult {
-	t.Helper()
-	req.Project = "proj"
-	res, err := f.H.Client.Triage.SaveRow(f.Ctx, req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return res
-}
-
 func ungroup(t *testing.T, f rigs.DesignsFixture, revision int, address string) wire.TriageEditResult {
 	t.Helper()
 	res, err := f.H.Client.Triage.Ungroup(f.Ctx, wire.TriageUngroupRequest{Project: "proj", Revision: revision, Address: address})
@@ -57,67 +47,6 @@ func rowOf(v wire.TriageView, addr string) wire.TriageRow {
 		}
 	}
 	return wire.TriageRow{}
-}
-
-// toApproveAsking is toApprove with a yes/no quick question q1 on the first row.
-func toApproveAsking(t *testing.T, store *triagerec.Store) (*triagerec.Record, string) {
-	t.Helper()
-	rec := mustRec(store.Create())
-	a, b := rec.Rows[0].Address, rec.Rows[1].Address
-	for _, addr := range []string{a, b} {
-		rec = mustRec(store.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addr}))
-	}
-	q := triagerec.Question{ID: "q1", Text: "Keep it?", Kind: triagerec.QuestionAsk, Options: []string{"yes", "no"}, Default: "no"}
-	rec = mustRec(store.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
-		{RowID: a, Action: "ready", Fallback: "core", Questions: []triagerec.Question{q}},
-		{RowID: b, Action: "ready"},
-	}, nil))
-	return rec, a
-}
-
-func TestRow_AnAnswerMustBeAnOptionOfItsQuestion(t *testing.T) {
-	f, store := startViewFixture(t)
-	rec, a := toApproveAsking(t, store)
-	for name, answers := range map[string]map[string]string{
-		"not an option":    {"q1": "agree"},
-		"no such question": {"q9": "yes"},
-		"note on a stray":  {"q1": "agree\nNote: why"},
-	} {
-		res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Answers: answers})
-		if !res.Refused || res.Reason != wire.ReasonTriageAnswer {
-			t.Fatalf("%s: save = %+v, want refused with %s", name, res, wire.ReasonTriageAnswer)
-		}
-	}
-	for _, c := range []struct{ name, answer string }{
-		{"an option", "yes"},
-		{"an option and a note", "no\nNote: not until the rework lands"},
-		{"huh", wire.HuhMessage},
-	} {
-		res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Answers: map[string]string{"q1": c.answer}})
-		if res.Refused {
-			t.Fatalf("%s: save = %+v, want saved", c.name, res)
-		}
-		rec = mustRec(store.LoadLive())
-	}
-	if got := rowOf(show(t, f), a).Answers["q1"]; got != wire.HuhMessage {
-		t.Fatalf("answer = %q", got)
-	}
-}
-
-func TestRow_EditSavesAndTheViewShowsItChanged(t *testing.T) {
-	f, store := startViewFixture(t)
-	rec, a := toApproveAsking(t, store)
-	res := saveRow(t, f, wire.TriageRowRequest{
-		Revision: rec.Revision, Address: a, Action: "map", Destination: "new-epic", Answers: map[string]string{"q1": "yes"},
-	})
-	if res.Refused || res.Revision != rec.Revision+1 {
-		t.Fatalf("save = %+v", res)
-	}
-	v := show(t, f)
-	row := rowOf(v, a)
-	if row.Action != "map" || row.Destination != "new-epic" || !row.PersonChanged || row.Answers["q1"] != "yes" || v.ChangedRows != 1 {
-		t.Fatalf("row = %+v, changed rows = %d", row, v.ChangedRows)
-	}
 }
 
 func TestUngroup_UndoesAGroupLikeTheCLIAndRefusesAStaleRevision(t *testing.T) {
@@ -146,26 +75,6 @@ func TestUngroup_UndoesAGroupLikeTheCLIAndRefusesAStaleRevision(t *testing.T) {
 	}
 }
 
-func TestSaveRow_SwitchingAGroupedMemberToMapClearsItsGroup(t *testing.T) {
-	f, store := startViewFixture(t)
-	rec := mustRec(store.Create())
-	a, b := rec.Rows[0].Address, rec.Rows[1].Address
-	for _, addr := range []string{a, b} {
-		rec = mustRec(store.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addr}))
-	}
-	rec = mustRec(store.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
-		{RowID: a, Action: "ready", Estimate: "10K", OverlapWith: []string{b}},
-		{RowID: b, Action: "ready", Estimate: "10K", OverlapWith: []string{a}},
-	}, nil))
-	if res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Action: "map", Destination: "e"}); res.Refused {
-		t.Fatalf("save = %+v", res)
-	}
-	got := mustRec(store.LoadLive())
-	if got.Rows[0].Group != "" || got.Rows[1].Group != "" {
-		t.Fatalf("groups after switch = %q, %q, want none", got.Rows[0].Group, got.Rows[1].Group)
-	}
-}
-
 func TestView_GroupMembersShareTheMarkerAndUngroupedRowsShowTheirChain(t *testing.T) {
 	f, store := startViewFixture(t)
 	rec := mustRec(store.Create())
@@ -187,90 +96,6 @@ func TestView_GroupMembersShareTheMarkerAndUngroupedRowsShowTheirChain(t *testin
 	v = show(t, f)
 	if rowOf(v, a).Group != "" || len(rowOf(v, a).OverlapWith) != 1 || rowOf(v, a).OverlapWith[0] != b {
 		t.Fatalf("row a after ungroup = %+v", rowOf(v, a))
-	}
-}
-
-func TestRow_KeepForLaterSaves(t *testing.T) {
-	f, store := startViewFixture(t)
-	rec, a, _ := toApprove(t, store)
-	if res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, KeepForLater: true}); res.Refused {
-		t.Fatalf("save = %+v", res)
-	}
-	if got := rowOf(show(t, f), a).Action; got != "keep" {
-		t.Fatalf("action = %q, want keep", got)
-	}
-}
-
-func TestRow_SecondSaveOnOneRevisionIsRefused(t *testing.T) {
-	f, store := startViewFixture(t)
-	rec, a, b := toApprove(t, store)
-	if res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Action: "map", Destination: "e"}); res.Refused {
-		t.Fatalf("first save = %+v", res)
-	}
-	res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: b, Action: "close", Destination: "dup"})
-	if !res.Refused || res.Reason != wire.ReasonStale {
-		t.Fatalf("second save = %+v, want stale", res)
-	}
-	if rowOf(show(t, f), b).PersonChanged {
-		t.Fatal("the refused save was stored")
-	}
-}
-
-func TestRow_MergeIntoAcceptsOnlyReadyAndMapRows(t *testing.T) {
-	f, store := startViewFixture(t)
-	rec, a, b := toApprove(t, store)
-	// a is ready: merging b into it is accepted.
-	res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: b, Action: "merge", Destination: a})
-	if res.Refused {
-		t.Fatalf("merge into ready = %+v", res)
-	}
-	// a becomes close: a is no longer a target, and a cannot merge into b either.
-	res = saveRow(t, f, wire.TriageRowRequest{Revision: res.Revision, Address: a, Action: "merge", Destination: b})
-	if !res.Refused || res.Reason != wire.ReasonTriagePhase {
-		t.Fatalf("merge into a merge row = %+v, want refused", res)
-	}
-}
-
-func TestRow_RepointingATargetFlagsItsMergedRowsAndApproveWaits(t *testing.T) {
-	f, store := startViewFixture(t)
-	rec, a, b := toApprove(t, store)
-	res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Action: "close", Destination: "dup"})
-	if res.Refused {
-		t.Fatalf("save = %+v", res)
-	}
-	v := show(t, f)
-	if !rowOf(v, b).MergeOrphan || rowOf(v, a).MergeOrphan {
-		t.Fatalf("orphan flags: b=%v a=%v, want b only", rowOf(v, b).MergeOrphan, rowOf(v, a).MergeOrphan)
-	}
-	if _, err := store.Approve(rec.ID, res.Revision); err == nil {
-		t.Fatal("approve succeeded with an orphaned merge")
-	}
-	res = saveRow(t, f, wire.TriageRowRequest{Revision: res.Revision, Address: b, Action: "close", Destination: "dup"})
-	if res.Refused {
-		t.Fatalf("re-point = %+v", res)
-	}
-	if rowOf(show(t, f), b).MergeOrphan {
-		t.Fatal("b still flagged after re-pointing")
-	}
-	if _, err := store.Approve(rec.ID, res.Revision); err != nil {
-		t.Fatalf("approve after re-pointing: %v", err)
-	}
-}
-
-func TestRow_RefusedAtVerifyAndPlan(t *testing.T) {
-	f, store := startViewFixture(t)
-	rec := mustRec(store.Create())
-	a := rec.Rows[0].Address
-	res := saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Action: "close"})
-	if !res.Refused || res.Reason != wire.ReasonTriagePhase {
-		t.Fatalf("at verify = %+v", res)
-	}
-	for _, r := range rec.Rows {
-		rec = mustRec(store.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: r.Address}))
-	}
-	res = saveRow(t, f, wire.TriageRowRequest{Revision: rec.Revision, Address: a, Action: "close"})
-	if !res.Refused || res.Reason != wire.ReasonTriagePhase {
-		t.Fatalf("at plan = %+v", res)
 	}
 }
 

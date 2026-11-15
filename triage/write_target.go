@@ -74,9 +74,6 @@ func (r *Row) fallbackArea() string {
 // the questions the agent settled itself, as Decisions lines.
 func (r *Record) DecisionLines(row *Row) []string {
 	var out []string
-	for _, e := range row.Earlier {
-		out = append(out, fmt.Sprintf("- %s: %s", e.Text, e.Answer))
-	}
 	for _, rd := range r.Rounds {
 		for _, q := range rd.Questions {
 			if a := strings.TrimSpace(rd.Answers[q.ID]); q.RowID == row.Address && a != "" {

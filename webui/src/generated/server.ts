@@ -3753,22 +3753,13 @@ export const ReasonTriageNoFollowUps = "triage-no-follow-ups";
  */
 export const ReasonTriagePhase = "triage-phase";
 /**
- * ReasonTriageAnswer: an answer names no question of the row, or is not one
- * of its question's options.
- */
-export const ReasonTriageAnswer = "triage-answer";
-/**
- * ReasonTriageAlreadyApproved: the Triage was approved by another call.
- */
-export const ReasonTriageAlreadyApproved = "triage-already-approved";
-/**
  * ReasonTriageNoLive: the project has no live Triage.
  */
 export const ReasonTriageNoLive = "triage-no-live";
 /**
  * Refusal reasons of the triage open route, beside the session ones.
  */
-export type ReasonTriage = typeof ReasonTriageNoFollowUps | typeof ReasonTriagePhase | typeof ReasonTriageAnswer | typeof ReasonTriageAlreadyApproved | typeof ReasonTriageNoLive;
+export type ReasonTriage = typeof ReasonTriageNoFollowUps | typeof ReasonTriagePhase | typeof ReasonTriageNoLive;
 /**
  * TriageOpenRequest is the body of POST /v1/triage/open. New stops the
  * Triage's live session and starts a fresh one; State is the token of the live
@@ -3805,10 +3796,6 @@ export interface TriageQuestion {
   kind: string;
   options?: string[];
   recommended?: string;
-  /**
-   * Auto marks a low-risk question the agent decided: it holds its default as the answer until the person changes it.
-   */
-  auto?: boolean;
 }
 /**
  * TriageRow is one follow-up with everything the Triage learned about it.
@@ -3858,20 +3845,6 @@ export interface TriageRow {
   overlap_with?: string[];
 }
 /**
- * TriageRowRequest is the body of POST /v1/triage/row. It replaces the row's
- * person fields; Revision is the record revision the web read. Destination is
- * an epic, a typed new map epic name, or the address of the row merged into.
- */
-export interface TriageRowRequest {
-  project: string;
-  revision: number /* int */;
-  address: string;
-  action?: string;
-  destination?: string;
-  answers?: { [key: string]: string};
-  keep_for_later?: boolean;
-}
-/**
  * TriageUngroupRequest is the body of POST /v1/triage/ungroup. It undoes the
  * group the row is in; Revision is the record revision the web read.
  */
@@ -3879,20 +3852,6 @@ export interface TriageUngroupRequest {
   project: string;
   revision: number /* int */;
   address: string;
-}
-/**
- * TriageApproveRequest is the body of POST /v1/triage/approve.
- */
-export interface TriageApproveRequest {
-  project: string;
-  revision: number /* int */;
-}
-/**
- * TriageSendBackRequest is the body of POST /v1/triage/send-back.
- */
-export interface TriageSendBackRequest {
-  project: string;
-  revision: number /* int */;
 }
 /**
  * TriageRowActionRequest is the body of POST /v1/triage/retry and
@@ -4023,7 +3982,6 @@ export interface TriageView {
   step_note?: string;
   ring_percent: number /* int */;
   revision?: number /* int */;
-  round?: number /* int */;
   /**
    * OpenRound is nil when no saved round waits for an answer.
    */

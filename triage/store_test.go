@@ -134,7 +134,7 @@ func TestLoad_V1AtPlanOrApproveGoesBackToRoute(t *testing.T) {
 			if rec.Step != "route" || Next(rec) != BranchRoute || rec.LegacyWrite() {
 				t.Fatalf("step %s next %s", rec.Step, Next(rec))
 			}
-			if row.Verdict != "relevant" || row.Plan != nil || row.Person.Action != "" || len(row.Person.Answers) != 0 || rec.Round != 0 {
+			if row.Verdict != "relevant" || row.Plan != nil || row.Person.Action != "" || len(row.Person.Answers) != 0 {
 				t.Fatalf("verdict kept, plan and edits dropped: %+v", row)
 			}
 			if len(rec.Rounds) != 1 || !rec.Rounds[0].Answered || len(rec.Rounds[0].Questions) != 1 {

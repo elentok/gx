@@ -458,39 +458,6 @@ func (s *Store) Approve(id string, revision int) (*Record, error) {
 	})
 }
 
-// SendBack returns an approved-ready record to Plan with the person's answers
-// kept as Earlier rounds, so the agent can read them and ask again. Every
-// question must be answered first, so none is lost. Each row that is not gone
-// loses its plan and its verdict questions, and keeps the person's action,
-// destination and Keep for later.
-func (s *Store) SendBack(id string, revision int) (*Record, error) {
-	return s.modify(id, revision, func(rec *Record) error {
-		if err := requireStep(rec, "send back", tickets.StepQuestions); err != nil {
-			return err
-		}
-		if n := rec.OpenQuestions(); n > 0 {
-			return phaseErr("send back is refused: %d questions are still open", n)
-		}
-		for i := range rec.Rows {
-			row := &rec.Rows[i]
-			if row.gone() {
-				continue
-			}
-			for _, q := range row.AskedQuestions() {
-				if a := strings.TrimSpace(row.Person.Answers[q.ID]); a != "" {
-					row.Earlier = append(row.Earlier, Answered{Text: q.Text, Answer: a})
-				}
-			}
-			row.Person.Answers = nil
-			row.Questions = nil
-			row.Plan = nil
-		}
-		rec.Round++
-		rec.Step = tickets.StepRoute
-		return nil
-	})
-}
-
 // WriteRow stores per-row write state during Write. A successful state clears
 // the refusal text.
 func (s *Store) WriteRow(id string, revision int, address string, state WriteState, newAddresses []string, refusal string) (*Record, error) {
