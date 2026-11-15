@@ -87,7 +87,9 @@ export function OutdatedModel({ session, text }: { session: SessionInfo; text: s
             <Text color="text.dim">
               This session uses {current}. {latestLabel} replaces it.
             </Text>
-            <Button tone="running" disabled={!!blocked || pending}
+            <Button
+              tone="running"
+              disabled={!!blocked || pending}
               onClick={switchNow}
               _disabled={{ bg: "surface", color: "text.dim", opacity: 1, cursor: "default" }}
             >
