@@ -235,7 +235,7 @@ function Field({
       {showEditor && Editor ? (
         <Box ref={wrap}>
           <Editor
-            inline={{ rows: effectiveRows, name, disabled }}
+            inline={{ rows: effectiveRows, name, disabled, holdMode: !!selection }}
             onSubmit={onSubmit}
             label={label}
             value={value}
@@ -253,7 +253,6 @@ function Field({
             onModeChange={setMode}
             onToggle={disabled ? undefined : open}
             handle={editorHandle}
-            holdMode={!!selection}
             autoFocus={carry.current?.focus ?? false}
             viMode
           />

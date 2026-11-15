@@ -1,5 +1,5 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands"
-import { Compartment, EditorState, Prec } from "@codemirror/state"
+import { Compartment, EditorState, Prec, type Extension } from "@codemirror/state"
 import { drawSelection, EditorView, keymap, placeholder as placeholderExt } from "@codemirror/view"
 import { getCM, vim, Vim } from "@replit/codemirror-vim"
 import { Box } from "@chakra-ui/react"
@@ -10,6 +10,7 @@ import {
   type CSSProperties,
   type MutableRefObject,
   type Ref,
+  type RefObject,
 } from "react"
 import type { MenuKey } from "../../commands/useCompletion"
 import type { Selection } from "./LargeEditor"
@@ -118,6 +119,33 @@ function lockExt(disabled: boolean) {
     : []
 }
 
+/**
+ * A Compartment that is reconfigured when `dep` changes. The first run is the creation, so it is skipped.
+ * `before` and `after` bracket the reconfigure.
+ */
+function useSlot(
+  view: RefObject<EditorView | null>,
+  dep: unknown,
+  make: () => Extension,
+  around?: { before?: () => void; after?: (v: EditorView) => void },
+) {
+  const slot = useRef(new Compartment())
+  const first = useRef(true)
+  useEffect(() => {
+    if (first.current) {
+      first.current = false
+      return
+    }
+    const v = view.current
+    if (!v) return
+    around?.before?.()
+    v.dispatch({ effects: slot.current.reconfigure(make()) })
+    around?.after?.(v)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dep])
+  return slot.current
+}
+
 /** The first and last differing positions, so an outside edit keeps the caret where it was. */
 function diff(a: string, b: string) {
   let start = 0
@@ -149,7 +177,6 @@ export default function CodeEditor({
   caret,
   handle,
   autoFocus = true,
-  holdMode = false,
   inline,
 }: {
   label: string
@@ -176,11 +203,11 @@ export default function CodeEditor({
   handle?: Ref<CodeEditorHandle>
   /** Focus the editor when it mounts. Default true. */
   autoFocus?: boolean
-  /** Inline only: an outside edit to empty text does not reset the mode to INSERT (a large editor is editing the text). */
-  holdMode?: boolean
   /** Sit inside a prompt box: `rows` lines tall, no border. Fixed for the editor's life; `rows` and `disabled` apply live. */
   inline?: {
     rows: number
+    /** An outside edit to empty text does not reset the mode to INSERT (a large editor is editing the text). */
+    holdMode?: boolean
     /** The content element's `name`, which the page reads to tell boxes apart. */
     name?: string
     /** Read-only, dimmed and skipped by Tab. Applies live. */
@@ -210,9 +237,7 @@ export default function CodeEditor({
   const viEscape = useViEscape()
   mapEscape(viEscape)
   const external = useRef(false)
-  const viSlot = useRef(new Compartment())
   const stopVi = useRef<(() => void) | null>(null)
-  const lockSlot = useRef(new Compartment())
 
   // Turns the engine on: it starts in insert mode and reports every mode change.
   const startVi = (v: EditorView) => {
@@ -239,6 +264,16 @@ export default function CodeEditor({
       closers.delete(cm)
     }
   }
+
+  const viSlot = useSlot(view, viMode, () => (viMode ? vim() : []), {
+    before: () => {
+      stopVi.current?.()
+      stopVi.current = null
+    },
+    after: (v) => viMode && startVi(v),
+  })
+  const disabled = !!inline?.disabled
+  const lockSlot = useSlot(view, disabled, () => lockExt(disabled))
 
   useImperativeHandle(
     handle,
@@ -280,7 +315,7 @@ export default function CodeEditor({
             keymap.of([
               {
                 key: "Mod-Enter",
-                // CodeMirror applies these flags even when `run` returns false, so the inline box (which may leave the key to the page) sets none; a handled key is still default-prevented.
+                // Why the flags depend on `inline`: CodeMirror applies them even when `run` returns false, so the inline box (which may leave the key to the page) sets none; a handled key is still default-prevented.
                 preventDefault: !inline,
                 stopPropagation: !inline,
                 run: () => {
@@ -314,7 +349,7 @@ export default function CodeEditor({
               },
             }),
           ),
-          viSlot.current.of(viMode ? vim() : []),
+          viSlot.of(viMode ? vim() : []),
           // Draws the caret itself (vim does the same), in the text color so it shows on a dark surface.
           drawSelection(),
           history(),
@@ -329,7 +364,7 @@ export default function CodeEditor({
               ? { [PROMPT_BOX_ATTR]: "", ...(inline.name ? { name: inline.name } : {}) }
               : {}),
           }),
-          lockSlot.current.of(lockExt(!!inline?.disabled)),
+          lockSlot.of(lockExt(disabled)),
           theme,
           inline ? inlineTheme : [],
           // A click or tap forgets the stored column, so the next j starts from the clicked spot.
@@ -362,32 +397,6 @@ export default function CodeEditor({
     }
   }, [])
 
-  const firstVi = useRef(true)
-  useEffect(() => {
-    // The first run is the creation above.
-    if (firstVi.current) {
-      firstVi.current = false
-      return
-    }
-    const v = view.current
-    if (!v) return
-    stopVi.current?.()
-    stopVi.current = null
-    v.dispatch({ effects: viSlot.current.reconfigure(viMode ? vim() : []) })
-    if (viMode) startVi(v)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viMode])
-
-  const disabled = !!inline?.disabled
-  const firstLock = useRef(true)
-  useEffect(() => {
-    if (firstLock.current) {
-      firstLock.current = false
-      return
-    }
-    view.current?.dispatch({ effects: lockSlot.current.reconfigure(lockExt(disabled)) })
-  }, [disabled])
-
   useEffect(() => {
     const v = view.current
     if (!v) return
@@ -406,7 +415,7 @@ export default function CodeEditor({
     }
     // A submit empties the box from outside: back to INSERT. A user edit never gets here (the doc already matches).
     // Not during a Cmd-G round trip: the large editor may empty the text and the mode must survive it.
-    if (inline && viMode && value === "" && !holdMode) {
+    if (inline && viMode && value === "" && !inline.holdMode) {
       const cm = getCM(v)
       if (cm?.state.vim && !cm.state.vim.insertMode) {
         Vim.handleKey(cm, "<Esc>", "user")
