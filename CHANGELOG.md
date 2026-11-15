@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.51.2 - 2026-11-15
+
+- Changed long chats to mount fewer DOM nodes. The chat shows the newest 60 messages, and "Show earlier" adds 60 more. Tool-call lines mount only when you open the run. Markdown no longer re-parses on every file verdict batch.
+- Changed diff syntax highlighting to cover a short list of languages (TS/JS, Go, Python, Markdown, HTML, CSS, JSON, YAML, bash). This cuts the build from about 330 language chunks to a few.
+
 ## v0.51.1 - 2026-11-15
 
 - Added an inline vi mode to the prompt box. It has a mode pill and mode rules, Cmd-G hands the text to the large editor and back, and Esc rules cover every host (chat, Questions view, modal). A big prompt box chord is documented. Two bugs found by the new e2e flows are fixed: a hook-order crash when vi turned off, and the returning textarea taking focus from the large editor.
