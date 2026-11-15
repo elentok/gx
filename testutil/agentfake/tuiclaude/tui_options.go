@@ -102,6 +102,18 @@ func vimWedge(spec string) (footer string, wedged bool) {
 
 // parseTUIArgs accepts exactly the PTY runner's launch flags, so a new flag
 // fails the conformance suite instead of passing unseen.
+// pasteOverLimit reads a TUIPasteOverEnv spec: "<chars>", or
+// "<chars>:<n>:<counter file>" to paste only the first n launches that share
+// the counter file. A launch past n gets 0, which pastes nothing.
+func pasteOverLimit(spec string) int {
+	chars, rest, counted := strings.Cut(spec, ":")
+	limit, _ := strconv.Atoi(chars)
+	if counted && !HangThisLaunch(rest) {
+		return 0
+	}
+	return limit
+}
+
 func parseTUIArgs(args []string) (tuiOptions, error) {
 	fs := flag.NewFlagSet("claude", flag.ContinueOnError)
 	sessionID := fs.String("session-id", "", "")
@@ -143,7 +155,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	if vimFooter == "" && os.Getenv(TUIIgnoreEditorModeEnv) == "1" {
 		vimFooter = "-- INSERT --"
 	}
-	pasteOver, _ := strconv.Atoi(os.Getenv(TUIPasteOverEnv))
+	pasteOver := pasteOverLimit(os.Getenv(TUIPasteOverEnv))
 	row, _ := LaunchModel(*model)
 	return tuiOptions{
 		hung:                  hung,

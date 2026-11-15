@@ -85,7 +85,8 @@ const (
 	// TUIPasteOverEnv, a character count, makes a skill prompt longer than
 	// that a paste, as real claude takes a long typed input: the first user
 	// record is a <pasted_content> record with queueSkipSlashCommands, not the
-	// <command-name> record, so the skill never runs.
+	// <command-name> record, so the skill never runs. "<chars>:<n>:<counter
+	// file>" pastes only the first n launches that share the counter file.
 	TUIPasteOverEnv = "GX_AGENTFAKE_TUI_PASTE_OVER"
 	// TUIPlainScreenEnv, set to "1", draws the plain "> " screen instead of the
 	// input box claudeui.InputBox recognises.
