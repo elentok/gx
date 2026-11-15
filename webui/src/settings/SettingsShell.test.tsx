@@ -121,6 +121,36 @@ describe("lagging alias note", () => {
     ])
   })
 
+  it("notes the alias under a Models table, which has no row to carry it", async () => {
+    const rows = [
+      {
+        ...model("agents.claude.model", "fable"),
+        group: "Claude",
+        tier: "standard",
+        column: "model",
+      } as SettingsEntry,
+    ]
+    const categories = treeFromEntries(rows)
+    for (const g of categories[0].sections[0].groups) g.table = true
+    const { container, findAllByTestId } = renderThemed(
+      <MemoryRouter initialEntries={["/settings"]}>
+        <SettingsShellView
+          entries={rows}
+          categories={categories}
+          projects={[]}
+          section="Models"
+          totpOn
+          onSignOut={() => {}}
+          onWrite={async () => ({})}
+        />
+      </MemoryRouter>,
+    )
+    expect(container.querySelector("table")).not.toBeNull()
+    expect((await findAllByTestId("alias-note")).map((n) => n.textContent)).toEqual([
+      "fable resolves to claude-fable-5-1. claude-fable-5-2 is newer. Enter the full id to use it.",
+    ])
+  })
+
   it("shows no note for a full id, a Codex model or an alias at the latest", async () => {
     expect(
       await notes([

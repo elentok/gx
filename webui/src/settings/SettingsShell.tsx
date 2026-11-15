@@ -303,6 +303,12 @@ const IdentityRow = ({ entry }: { entry: SettingsEntry }) => (
   </Box>
 )
 
+const AliasNote = ({ children }: { children: ReactNode }) => (
+  <Text fontSize="xs" color="text.dim" px="3" pb="2" data-testid="alias-note">
+    {children}
+  </Text>
+)
+
 type RowProps = Pick<ShellProps, "project" | "pendingRestart" | "onWrite"> & {
   highlight?: string
   /** A note under the entry's row, when it has one. */
@@ -324,11 +330,7 @@ const rowBuilder =
           project={project}
           highlight={highlight}
         />
-        {note && (
-          <Text fontSize="xs" color="text.dim" px="3" pb="2" data-testid="alias-note">
-            {note}
-          </Text>
-        )}
+        {note && <AliasNote>{note}</AliasNote>}
       </Fragment>
     )
   }
@@ -417,7 +419,19 @@ function SectionRows({
         ) : (
           <GroupBlock key={g.name} title={g.name} changed={g.entries.filter(isChanged).length}>
             {g.table ? (
-              <ModelsTable agent={g.name} entries={g.entries} project={project} onWrite={onWrite} />
+              <>
+                <ModelsTable
+                  agent={g.name}
+                  entries={g.entries}
+                  project={project}
+                  onWrite={onWrite}
+                />
+                {/* A table has no row to carry a note: the lagging-alias notes sit under it. */}
+                {g.entries.map((e) => {
+                  const note = noteFor?.(e)
+                  return note ? <AliasNote key={e.key}>{note}</AliasNote> : null
+                })}
+              </>
             ) : (
               g.entries.map((e) =>
                 project !== undefined && e.identity ? (
