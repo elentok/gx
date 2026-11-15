@@ -177,6 +177,14 @@ func (s *Sessions) Rename(ctx context.Context, req wire.SessionRenameRequest) (w
 	return res, err
 }
 
+// Switch relaunches an Idle session's conversation with a new model and effort.
+// A refusal is a result (Refused set), not an error.
+func (s *Sessions) Switch(ctx context.Context, req wire.SessionSwitchRequest) (wire.SessionResult, error) {
+	var res wire.SessionResult
+	err := s.t.post(ctx, "/v1/sessions/switch", req, &res)
+	return res, err
+}
+
 // AddImage saves one Prompt image, as its raw bytes, in a live session's
 // state folder. A refusal is a result (Refused set), not an error.
 func (s *Sessions) AddImage(ctx context.Context, id string, data []byte) (wire.SessionImageResult, error) {

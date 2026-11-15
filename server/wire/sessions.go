@@ -28,6 +28,16 @@ const (
 	ReasonSessionBadName = "bad-name"
 )
 
+// SessionSwitchRequest is the body of POST /v1/sessions/switch. State is the web
+// token of SessionRequest. gx checks neither Model nor Effort: the harness
+// decides what is valid.
+type SessionSwitchRequest struct {
+	ID     string `json:"id"`
+	State  string `json:"state,omitempty"`
+	Model  string `json:"model"`
+	Effort string `json:"effort,omitempty"`
+}
+
 // SessionRenameRequest is the body of POST /v1/sessions/rename.
 type SessionRenameRequest struct {
 	ID   string `json:"id"`

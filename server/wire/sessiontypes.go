@@ -122,6 +122,11 @@ type SessionInfo struct {
 	// type of a slice without parentheses, which types it wrongly.
 	LatestTiers  []string `json:"latest_tiers,omitempty"`
 	LatestEffort string   `json:"latest_effort,omitempty"`
+	// SwitchingModel and SwitchingEffort are what a running switch relaunches
+	// the session with. They are server memory only and clear once the new
+	// agent is idle or the run ends.
+	SwitchingModel  string `json:"switching_model,omitempty"`
+	SwitchingEffort string `json:"switching_effort,omitempty"`
 	// HasHistory is true once the chat has a completed turn.
 	HasHistory bool `json:"has_history,omitempty"`
 	// ContextTokens, ContextLevel and ContextCeiling are the context occupancy

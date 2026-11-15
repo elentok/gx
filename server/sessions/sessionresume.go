@@ -76,13 +76,19 @@ func (rs *Resumer) resumeRefusal(meta Meta) wire.SessionResult {
 // conversation and watches it; an exit before crashUntil is crashed. The
 // caller holds metaMu.
 func (rs *Resumer) startResumedHolder(dir string, meta *Meta, crashUntil time.Time) error {
+	return rs.startResumedHolderAs(dir, meta, meta, crashUntil)
+}
+
+// startResumedHolderAs is startResumedHolder launching with launchMeta's flags
+// while saving meta; see startSessionHolderAs.
+func (rs *Resumer) startResumedHolderAs(dir string, meta, launchMeta *Meta, crashUntil time.Time) error {
 	if err := clearOldHolder(dir); err != nil {
 		return err
 	}
 	meta.Run++
 	meta.Status, meta.StatusChangedAt, meta.Exit, meta.Stopped = wire.SessionStatus{}, time.Now(), "", false
 	meta.RestoreCrashed = false
-	if err := rs.mg.startSessionHolder(dir, meta, 0, 0, true); err != nil {
+	if err := startSessionHolderAs(rs.mg, dir, meta, launchMeta, 0, 0, true); err != nil {
 		return err
 	}
 	id, run := meta.ID, meta.Run

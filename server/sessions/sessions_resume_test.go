@@ -1,6 +1,8 @@
 package sessions_test
 
 import (
+	"context"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -115,6 +117,114 @@ func TestResumeSession_CodexLaunchesCodexResume(t *testing.T) {
 	})
 	if len(args) < 4 || !slices.Equal(args[:4], []string{"resume", conv, "--cd", dir}) {
 		t.Errorf("codex args = %q, want to start with resume %s --cd %s", args, conv, dir)
+	}
+}
+
+// startIdleSwitchable is a fake session whose harness counts as a chat harness,
+// which is what a switch needs, brought to Idle.
+func startIdleSwitchable(t *testing.T) (*servertest.Harness, context.Context, <-chan wire.Event, string, string) {
+	t.Helper()
+	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, servertest.WithChatHarness(string(agentfake.HarnessKind)))
+	waitForHolder(t, filepath.Join(h.SessionsDir, id))
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	return h, ctx, evs, id, conv
+}
+
+func TestSwitchSession_RecordsOnlyOnceTheNewAgentIsIdle(t *testing.T) {
+	t.Parallel()
+	h, ctx, evs, id, conv := startIdleSwitchable(t)
+	before := readMeta(t, h, id)
+
+	res, err := h.Client.Sessions.Switch(ctx, wire.SessionSwitchRequest{ID: id, Model: "opus", Effort: "high"})
+	if err != nil || res.Refused || res.Session == nil {
+		t.Fatalf("switch = %+v, %v", res, err)
+	}
+	if s := res.Session; s.ID != id || s.Stopped || s.SwitchingModel != "opus" || s.SwitchingEffort != "high" {
+		t.Errorf("switch session = %+v, want %s not stopped, switching to opus high", s, id)
+	}
+	meta := readMeta(t, h, id)
+	if meta["model"] != before["model"] || meta["effort"] != before["effort"] || meta["switched_by_hand"] != nil || meta["stopped"] != nil {
+		t.Errorf("meta before idle = %v, want the old model %v, effort %v and flag", meta, before["model"], before["effort"])
+	}
+	if meta["conversation_id"] != conv || meta["run"] == before["run"] {
+		t.Errorf("meta before idle = %v, want conversation %s resumed in a new run", meta, conv)
+	}
+	if res, err := h.Client.Sessions.Switch(ctx, wire.SessionSwitchRequest{ID: id, Model: "sonnet"}); err != nil || !res.Refused || res.Reason != wire.ReasonSessionNotIdle {
+		t.Errorf("second switch = %+v, %v; want refused %s", res, err, wire.ReasonSessionNotIdle)
+	}
+
+	waitForHolder(t, filepath.Join(h.SessionsDir, id))
+	report(t, conv, agentfake.Control{State: "idle"})
+	got := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool {
+		return s.Status.State == wire.SessionIdle && s.SwitchingModel == "" && readMeta(t, h, id)["model"] == "opus"
+	})
+	meta = readMeta(t, h, id)
+	if meta["effort"] != "high" || meta["switched_by_hand"] != true || meta["switch_unconfirmed"] != true || got.SwitchingEffort != "" {
+		t.Errorf("meta after idle = %v, session %+v; want opus high recorded by hand", meta, got)
+	}
+}
+
+func TestSwitchSession_Refusals(t *testing.T) {
+	t.Parallel()
+	h, ctx, evs, id, conv := startIdleSwitchable(t)
+	req := wire.SessionSwitchRequest{ID: id, Model: "opus"}
+	before := readMeta(t, h, id)
+	for _, tc := range []struct {
+		name   string
+		req    wire.SessionSwitchRequest
+		reason string
+	}{
+		{"no model", wire.SessionSwitchRequest{ID: id}, wire.ReasonSessionBadRequest},
+		{"unknown session", wire.SessionSwitchRequest{ID: "nope", Model: "opus"}, wire.ReasonSessionUnknown},
+	} {
+		if res, err := h.Client.Sessions.Switch(ctx, tc.req); err != nil || !res.Refused || res.Reason != tc.reason {
+			t.Errorf("%s: switch = %+v, %v; want refused %s", tc.name, res, err, tc.reason)
+		}
+	}
+
+	report(t, conv, agentfake.Control{State: "working"})
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
+	if res, err := h.Client.Sessions.Switch(ctx, req); err != nil || !res.Refused || res.Reason != wire.ReasonSessionNotIdle {
+		t.Errorf("switch working = %+v, %v; want refused %s", res, err, wire.ReasonSessionNotIdle)
+	}
+
+	stopFakeSession(ctx, t, h, evs, id)
+	if res, err := h.Client.Sessions.Switch(ctx, req); err != nil || !res.Refused || res.Reason != wire.ReasonSessionNotLive {
+		t.Errorf("switch exited = %+v, %v; want refused %s", res, err, wire.ReasonSessionNotLive)
+	}
+	if m := readMeta(t, h, id); m["model"] != before["model"] || m["effort"] != before["effort"] || m["switched_by_hand"] != nil {
+		t.Errorf("meta after refusals = %v, want the model and effort of %v", m, before)
+	}
+}
+
+// A harness without a chat reader is neither Claude nor Codex.
+func TestSwitchSession_RefusesUnsupportedHarness(t *testing.T) {
+	t.Parallel()
+	h, ctx, evs, id, conv := startFakeSession(t)
+	waitForHolder(t, filepath.Join(h.SessionsDir, id))
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	if res, err := h.Client.Sessions.Switch(ctx, wire.SessionSwitchRequest{ID: id, Model: "opus"}); err != nil || !res.Refused || res.Reason != wire.ReasonSessionUnknownHarness {
+		t.Errorf("switch = %+v, %v; want refused %s", res, err, wire.ReasonSessionUnknownHarness)
+	}
+}
+
+// The web variant shares the interrupt route's token and Queue checks, which
+// run before the switch does anything.
+func TestSwitchSession_WebNeedsTheStateToken(t *testing.T) {
+	t.Parallel()
+	h, base, cookie, ctx, _, design, _ := startWebDesign(t)
+	waitForHolder(t, h.SessionsDir+"/"+design)
+	for _, tc := range []struct{ name, state, want string }{
+		{"no token", "", wire.ReasonStale},
+		{"stale token", "stale", wire.ReasonStale},
+		{"fresh token", sessionToken(ctx, t, h, design), wire.ReasonSessionBadRequest},
+	} {
+		code, body := webSessionWrite(t, base, cookie, "switch", design, tc.state)
+		if code != http.StatusOK || servertest.ReasonOf(t, body) != tc.want {
+			t.Errorf("web switch with %s = %d %s, want %s", tc.name, code, body, tc.want)
+		}
 	}
 }
 

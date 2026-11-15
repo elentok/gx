@@ -277,6 +277,13 @@ func (mg *Manager) makeSessionDir() (id, dir string, err error) {
 // saved size, else the loop default, and saves meta with the size it used.
 // The caller holds metaMu.
 func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, resume bool) error {
+	return startSessionHolderAs(mg, dir, meta, meta, cols, rows, resume)
+}
+
+// startSessionHolderAs is startSessionHolder with the launch flags taken from
+// launchMeta rather than the meta it saves, so a switch can run the new model
+// while the record keeps the old one until the new agent is alive.
+func startSessionHolderAs(mg *Manager, dir string, meta, launchMeta *Meta, cols, rows int, resume bool) error {
 	if cols <= 0 || rows <= 0 {
 		cols, rows = meta.Cols, meta.Rows
 	}
@@ -302,7 +309,7 @@ func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, re
 	}
 	opts := harness.LaunchOptions{
 		SessionID: meta.ConversationID,
-		Args:      launchArgs(meta, mg.settings.Load().AgentsClaudeArgs, codexRoots(mg, meta), harness.GXFilesPromptFile()),
+		Args:      launchArgs(launchMeta, mg.settings.Load().AgentsClaudeArgs, codexRoots(mg, meta), harness.GXFilesPromptFile()),
 		Env:       env,
 		Cwd:       meta.Dir,
 		// Only loop agents get the `gx tickets ask` text.

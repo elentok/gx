@@ -2359,6 +2359,17 @@ export const ReasonSessionBadName = "bad-name";
  */
 export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionHarnessMissing | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonSessionNotDesign | typeof ReasonSessionNameTaken | typeof ReasonSessionQueue | typeof ReasonSessionNotPlain | typeof ReasonSessionBadName;
 /**
+ * SessionSwitchRequest is the body of POST /v1/sessions/switch. State is the web
+ * token of SessionRequest. gx checks neither Model nor Effort: the harness
+ * decides what is valid.
+ */
+export interface SessionSwitchRequest {
+  id: string;
+  state?: string;
+  model: string;
+  effort?: string;
+}
+/**
  * SessionRenameRequest is the body of POST /v1/sessions/rename.
  */
 export interface SessionRenameRequest {
@@ -3054,6 +3065,13 @@ export interface SessionInfo {
    */
   latest_tiers?: string[];
   latest_effort?: string;
+  /**
+   * SwitchingModel and SwitchingEffort are what a running switch relaunches
+   * the session with. They are server memory only and clear once the new
+   * agent is idle or the run ends.
+   */
+  switching_model?: string;
+  switching_effort?: string;
   /**
    * HasHistory is true once the chat has a completed turn.
    */

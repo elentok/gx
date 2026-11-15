@@ -69,6 +69,9 @@ func (mg *Manager) SessionInfo(m Meta) wire.SessionInfo {
 		info.Usage = mg.chat.ConversationUsage(cm)
 	}
 	info.HasHistory = tokens > 0
+	if sw, ok := mg.switches.get(m.ID); ok {
+		info.SwitchingModel, info.SwitchingEffort = sw.model, sw.effort
+	}
 	mg.setLatestModel(&info, m.Harness)
 	info.ModelSwitched = m.SwitchedByHand || chat.ModelSwitched(m.Model, info.Model)
 	if at := mg.prompter.AutoAdvanceDeadline(m.ID); !at.IsZero() {

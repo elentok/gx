@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/tickets"
@@ -43,6 +44,28 @@ func TestLaunchArgs_FilesPromptReachesClaudeLaunchAndResume(t *testing.T) {
 	args := launchArgs(&Meta{Harness: "codex"}, nil, nil, testFilesPrompt)
 	if slices.Contains(args, "--append-system-prompt-file") {
 		t.Errorf("codex args %q carry a Claude prompt flag", args)
+	}
+}
+
+// A switch launches on a copy that took the switch, so the saved record keeps
+// the old flags and the copy's args hold the new model and effort once, even
+// over a configured --model.
+func TestLaunchArgs_SwitchedCopyLeavesTheRecordAlone(t *testing.T) {
+	t.Parallel()
+	meta := Meta{Harness: "claude", Tier: "worker", Model: "sonnet", Effort: "medium"}
+	launch := meta
+	RecordSwitch(&launch, "opus", "high", "sonnet", nil, time.Now())
+	got := launchArgs(&launch, []string{"--verbose", "--model", "x"}, nil, "")
+	if want := []string{"--verbose", "--model", "opus", "--effort", "high"}; !slices.Equal(got[:len(want)], want) {
+		t.Errorf("switched args = %q, want them to start with %q", got, want)
+	}
+	for _, flag := range []string{"--model", "--effort"} {
+		if n := strings.Count(strings.Join(got, " "), flag+" "); n != 1 {
+			t.Errorf("switched args = %q, want %s once, got %d", got, flag, n)
+		}
+	}
+	if meta.Model != "sonnet" || meta.Effort != "medium" || meta.SwitchedByHand || meta.SwitchPrev != nil {
+		t.Errorf("record = %+v, want it untouched by the copy's switch", meta)
 	}
 }
 

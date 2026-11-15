@@ -1,11 +1,158 @@
 package sessions
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/modelrules"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/server/wire"
 )
+
+// switchState is a hand switch whose new agent is not idle yet. run is the run
+// that agent will have.
+type switchState struct {
+	run           int
+	model, effort string
+}
+
+// switchStates keeps the running switches in memory only, so a crash leaves
+// no trace of one and the record stays the old one.
+type switchStates struct {
+	mu sync.Mutex
+	m  map[string]switchState
+}
+
+func (s *switchStates) set(id string, st switchState) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.m == nil {
+		s.m = map[string]switchState{}
+	}
+	s.m[id] = st
+}
+
+func (s *switchStates) get(id string) (switchState, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st, ok := s.m[id]
+	return st, ok
+}
+
+// take removes and returns the switch of id when its new agent is run.
+func (s *switchStates) take(id string, run int) (switchState, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st, ok := s.m[id]
+	if !ok || st.run != run {
+		return switchState{}, false
+	}
+	delete(s.m, id)
+	return st, true
+}
+
+func (s *switchStates) clear(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.m, id)
+}
+
+// SwitchSession relaunches an idle session's conversation with a new model and
+// effort. gx checks neither: the harness decides what is valid. It stops the old
+// agent without marking the session stopped and resumes the same conversation
+// under the new flags. The record keeps the old model and effort until the new
+// agent is idle (see watchSession), so a crash before that resumes on the old
+// flags. A new agent that exits first ends the session as a failed start does.
+func (rs *Resumer) SwitchSession(req wire.SessionSwitchRequest) (wire.SessionResult, error) {
+	m := rs.mg
+	dir, res, err := rs.beginSwitch(req)
+	if res.Refused || err != nil {
+		return res, err
+	}
+	rs.stopForRestart(dir, req.ID)
+	m.Watches.MetaMu.Lock()
+	defer m.Watches.MetaMu.Unlock()
+	meta, err := ReadMeta(dir)
+	if err != nil {
+		m.switches.clear(req.ID)
+		return wire.SessionResult{}, fmt.Errorf("switch session %s: %w", req.ID, err)
+	}
+	if meta.Status.State == wire.SessionExited {
+		m.switches.clear(req.ID)
+		return Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s ended during the switch", req.ID)), nil
+	}
+	launch := meta
+	m.RecordSwitch(&launch, req.Model, req.Effort)
+	if err := rs.startResumedHolderAs(dir, &meta, &launch, time.Time{}); err != nil {
+		m.switches.clear(req.ID)
+		m.endFailedStart(dir, &meta)
+		return wire.SessionResult{}, err
+	}
+	info := m.SessionInfo(meta)
+	return wire.SessionResult{Session: &info}, nil
+}
+
+// beginSwitch refuses a session that cannot switch. Otherwise it bumps the run,
+// which makes the old watch's exit a no-op, and notes the switch, all under one
+// lock so a second switch sees a starting session.
+func (rs *Resumer) beginSwitch(req wire.SessionSwitchRequest) (string, wire.SessionResult, error) {
+	m := rs.mg
+	m.Watches.MetaMu.Lock()
+	defer m.Watches.MetaMu.Unlock()
+	dir, meta, res, err := m.SessionDir(req.ID)
+	if res.Refused || err != nil {
+		return "", res, err
+	}
+	if req.Model == "" {
+		return "", Refusal(wire.ReasonSessionBadRequest, "model is required"), nil
+	}
+	if !m.settings.Load().HasChatReader(meta.Harness) {
+		return "", Refusal(wire.ReasonSessionUnknownHarness, fmt.Sprintf("harness %s cannot switch models", meta.Harness)), nil
+	}
+	if meta.Status.State == wire.SessionExited {
+		return "", Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s is not live", req.ID)), nil
+	}
+	if _, switching := m.switches.get(req.ID); switching || meta.Status.State != wire.SessionIdle {
+		return "", Refusal(wire.ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, meta.Info().Status.State)), nil
+	}
+	if _, err := holder.DialHolder(dir); err != nil {
+		return "", Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has no live agent", req.ID)), nil
+	}
+	meta.Run++
+	if err := WriteMeta(dir, meta); err != nil {
+		return "", wire.SessionResult{}, fmt.Errorf("switch session %s: %w", req.ID, err)
+	}
+	m.switches.set(req.ID, switchState{run: meta.Run + 1, model: req.Model, effort: req.Effort})
+	return dir, wire.SessionResult{}, nil
+}
+
+// SessionSwitchWrite serves POST /v1/sessions/switch. The web mux also checks
+// the state token and refuses a Queue agent.
+func (rs *Resumer) SessionSwitchWrite(web bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req wire.SessionSwitchRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		res, err := wire.SessionResult{}, error(nil)
+		if web {
+			res, err = rs.mg.checkInterruptWrite(wire.SessionRequest{ID: req.ID, State: req.State})
+		}
+		if err == nil && !res.Refused {
+			res, err = rs.SwitchSession(req)
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		wire.WriteJSON(w, res)
+	}
+}
 
 // RecordSwitch applies a successful hand switch to meta with the session's
 // harness, project and tier as configured now. It does not write the file: the

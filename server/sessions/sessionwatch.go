@@ -98,6 +98,8 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 		}
 		update(func(m *Meta) bool { return mg.recordSessionExit(m, exit) })
 	}
+	// A switch that never reached idle ends with its run.
+	defer mg.switches.take(id, run)
 	stream, err := mg.openSessionWatch(dir)
 	if err != nil {
 		if !mg.Watches.IsStopped() {
@@ -172,6 +174,12 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 					}
 					m.Status, m.StatusChangedAt = st, time.Now()
 					changed = true
+					// A switched agent that is idle is alive: the record takes the switch.
+					if st.State == wire.SessionIdle {
+						if sw, ok := mg.switches.take(id, run); ok {
+							mg.RecordSwitch(m, sw.model, sw.effort)
+						}
+					}
 					if st.Promptable() {
 						m.ReportedStep, m.ReportedTitle = "", ""
 					}

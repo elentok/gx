@@ -79,6 +79,8 @@ type Manager struct {
 	workspaces WorkspaceMembers
 	// rollouts answers whether Codex still has a rollout for a session.
 	rollouts codexRollouts
+	// switches are the hand switches that have not reached idle yet.
+	switches switchStates
 }
 
 // ManagerDeps is what the root hands NewManager. Each field is the Manager
