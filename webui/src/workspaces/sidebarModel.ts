@@ -187,7 +187,7 @@ interface Sortable<T> {
   name: string
   needsYou: boolean
   at: number | undefined
-  /** The project of a card (chats: CHATS_GROUP). */
+  /** The project of a card (chats: the session's project, else CHATS_GROUP). */
   project: string
   /** The status words. */
   words: string
@@ -294,7 +294,7 @@ export function buildSidebar({
         },
         name: s.name || s.id,
         needsYou: status.words === NEEDS_YOU,
-        project: CHATS_GROUP,
+        project: s.project || CHATS_GROUP,
         words: status.words,
         at: sessionAt(s),
       }

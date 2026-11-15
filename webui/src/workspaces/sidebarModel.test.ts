@@ -296,19 +296,19 @@ describe("buildSidebar", () => {
       expect(s.other.map((a) => a.id)).toEqual(["o2", "o1"])
     })
 
-    it("By project groups rows per project, chats last under Chats", () => {
+    it("By project groups rows and chats by their project", () => {
       const rows = [
         row("z:a", { project: "zed", name: "a" }),
         row("b:b", { project: "bee", name: "b" }),
         row("b:a", { project: "bee", name: "a" }),
       ]
-      const sessions = [session("c1", "p", { name: "chat" })]
+      const sessions = [session("c1", "bee", { name: "chat" })]
       const placements = [place("c1", "chat", { workspace: "Default" })]
       const s = buildSidebar({ ...base, rows, sessions, placements, sort: "project" })
       expect(s.rows.map((r) => [r.group, r.key])).toEqual([
         ["bee", "b:a"],
         ["bee", "b:b"],
-        ["Chats", "c1"],
+        ["bee", "c1"],
         ["zed", "z:a"],
       ])
     })
@@ -496,7 +496,7 @@ describe("buildSidebar Design drafts", () => {
     ["needs-you", ["Blog", "Alpha", "Beta", "Chat", "Mid"]],
     ["name", ["Alpha", "Beta", "Blog", "Chat", "Mid"]],
     ["activity", ["Mid", "Beta", "Alpha", "Chat", "Blog"]],
-    ["project", ["Chat", "Beta", "Blog", "Mid", "Alpha"]],
+    ["project", ["Beta", "Blog", "Chat", "Mid", "Alpha"]],
     ["status", ["Blog", "Chat", "Alpha", "Beta", "Mid"]],
   ])("sorts a draft under %s", (sort, expected) => {
     expect(titles(sort)).toEqual(expected)
