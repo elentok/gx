@@ -276,6 +276,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
 
 - `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners; `nativerunner/holder` — the pty holder process, its socket protocol and client (`nativerunner` imports it, never the reverse); `nativerunner/proctable` — the process table and holder-exit watcher (imports only the standard library)
 - `harness/` — what runs inside an interactive agent session
+- `modelrules/` — pure model-switch rules: `ParseID` (family and version), `Latest` (latest model of a family from the discovered list), `Effort` (effort carry-over); imports the standard library only
 - `herdr/` — herdr CLI/socket client
 - `runner/` — runs a child command with inherited stdio
 - `git/` — git operations
