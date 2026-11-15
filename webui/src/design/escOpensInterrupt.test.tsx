@@ -61,7 +61,7 @@ test("the Vi editor's own dialog and its layer do not count as on top", () => {
 
 test("an inline vi box never counts its dialog as own, in any mode", () => {
   const host = add(
-    '<div role="dialog"><div data-vi-mode="NORMAL"><div data-prompt-box></div></div></div>',
+    '<div role="dialog"><div data-vi-mode="NORMAL" data-vi-inline><div data-prompt-box></div></div></div>',
   )
   const box = host.querySelector("[data-prompt-box]")
   expect(escOpensInterrupt(box)).toBe(false)
@@ -71,7 +71,7 @@ test("an inline vi box never counts its dialog as own, in any mode", () => {
 
 test("an inline vi box yields to a layer in NORMAL", () => {
   render(<Layer />)
-  const host = add('<div data-vi-mode="NORMAL"><div data-prompt-box></div></div>')
+  const host = add('<div data-vi-mode="NORMAL" data-vi-inline><div data-prompt-box></div></div>')
   expect(escOpensInterrupt(host.querySelector("[data-prompt-box]"))).toBe(false)
 })
 

@@ -3,7 +3,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react"
 import type { SessionRoundCard } from "../generated/server"
 import { NO_SIDEBAR_SWIPE_ATTR } from "../shell/useSidebarSwipe"
 import { Button } from "../ui/button/Button"
-import { PROMPT_BOX_ATTR, PROMPT_BOX_SELECTOR } from "../ui/expandable-text/look"
+import { promptBoxNamed, PROMPT_BOX_SELECTOR } from "../ui/expandable-text/look"
 import { Question, QuestionDots } from "../ui/question-sheet/Question"
 import {
   isAnswered,
@@ -140,10 +140,7 @@ export function QuestionSheet({
   }
   const openNote = () => {
     const q = row.current?.children[index]
-    const find = () =>
-      q?.querySelector<HTMLElement>(
-        `textarea[name=question-note], [${PROMPT_BOX_ATTR}][name=question-note]`,
-      )
+    const find = () => q?.querySelector<HTMLElement>(promptBoxNamed("question-note"))
     if (!find()) q?.querySelector<HTMLElement>("button[data-note-toggle]")?.click()
     requestAnimationFrame(() => find()?.focus({ preventScroll: true }))
   }

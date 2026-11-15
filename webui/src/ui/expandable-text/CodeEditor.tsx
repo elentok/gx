@@ -420,6 +420,7 @@ export default function CodeEditor({
     return (
       <Box
         ref={host}
+        data-vi-inline=""
         style={{ "--prompt-rows": inline.rows } as CSSProperties}
         overflow="hidden"
         data-focus-ring="none"

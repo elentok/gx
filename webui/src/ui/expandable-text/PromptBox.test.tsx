@@ -7,19 +7,19 @@ import { ConnectionContext, type Connection, type ConnectionState } from "../../
 import { CoarsePointerContext, WideContext } from "../../useWide"
 import { renderThemed } from "../render"
 import { setBigPrompt } from "./bigPromptStore"
-import { preloadCodeEditor } from "./LargeEditor"
+import { loadCodeEditor } from "./LargeEditor"
 import { PromptBox } from "./PromptBox"
 import { findLargeEditor, largeEditorText, typeInLargeEditor, viewOf } from "./testing"
 
-// Wraps the real preload so a test can count calls.
+// Wraps the real loader so a test can count calls.
 vi.mock("./LargeEditor", async (importOriginal) => {
   const original = await importOriginal<typeof import("./LargeEditor")>()
-  return { ...original, preloadCodeEditor: vi.fn(original.preloadCodeEditor) }
+  return { ...original, loadCodeEditor: vi.fn(original.loadCodeEditor) }
 })
 
 afterEach(() => {
   cleanup()
-  vi.mocked(preloadCodeEditor).mockClear()
+  vi.mocked(loadCodeEditor).mockClear()
   setBigPrompt(false)
   localStorage.clear()
 })
@@ -518,11 +518,17 @@ test("the chunk is preloaded only with vi on and a fine pointer", async () => {
   withVi(false, <Harness />, false)
   cleanup()
   withVi(true, <Harness />, true)
-  expect(preloadCodeEditor).not.toHaveBeenCalled()
+  expect(loadCodeEditor).not.toHaveBeenCalled()
   cleanup()
   withVi(true, <Harness />, false)
-  expect(preloadCodeEditor).toHaveBeenCalled()
+  expect(loadCodeEditor).toHaveBeenCalled()
   await inlineView()
+})
+
+test("the inline vi host carries data-vi-inline", async () => {
+  withVi(true, <Harness />, false)
+  const view = await inlineView()
+  expect(view.dom.parentElement?.hasAttribute("data-vi-inline")).toBe(true)
 })
 
 test("a live swap keeps text, caret, selection and focus in both directions", async () => {

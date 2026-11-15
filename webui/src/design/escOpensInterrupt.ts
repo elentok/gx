@@ -1,4 +1,3 @@
-import { PROMPT_BOX_ATTR } from "../ui/expandable-text/look"
 import { hasLayer } from "../ui/modal/layers"
 
 // Anything open that takes Esc first. The completion menu's own handler has not run when we judge, so it is
@@ -17,9 +16,9 @@ const ON_TOP =
 export function escOpensInterrupt(target: EventTarget | null): boolean {
   const vi = target instanceof Element ? target.closest("[data-vi-mode]") : null
   if (vi && vi.getAttribute("data-vi-mode") !== "NORMAL") return false
-  // An inline box (the prompt-box marker) sits in someone else's dialog or sheet, which takes the Esc; only the
+  // An inline box (`data-vi-inline`) sits in someone else's dialog or sheet, which takes the Esc; only the
   // large editor owns its dialog.
-  const inline = !!vi?.querySelector(`[${PROMPT_BOX_ATTR}]`)
+  const inline = vi?.hasAttribute("data-vi-inline") ?? false
   const own = inline ? null : vi?.closest('[role="dialog"]')
   if ((!vi || inline) && hasLayer()) return false
   for (const el of document.querySelectorAll(ON_TOP)) if (el !== own) return false

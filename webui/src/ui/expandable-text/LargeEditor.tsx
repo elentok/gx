@@ -17,12 +17,9 @@ import { Button } from "../button/Button"
 import { BottomSheet } from "../modal/BottomSheet"
 import { Spinner } from "../spinner/Spinner"
 
-// Its own chunk: only this import pulls @codemirror/*.
-const loadCodeEditor = () => import("./CodeEditor")
+// Its own chunk: only this import pulls @codemirror/*. The inline editor and the large editor share it.
+export const loadCodeEditor = () => import("./CodeEditor")
 const CodeEditor = lazy(loadCodeEditor)
-
-/** Fetches the editor chunk, which the inline editor and the large editor share. */
-export const preloadCodeEditor = () => loadCodeEditor()
 
 export type Selection = { start: number; end: number }
 
