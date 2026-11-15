@@ -30,11 +30,12 @@ func (s CardSlot) isLiveBlocker() bool {
 }
 
 // slotApplies gates the slots that depend on the session, not only its class:
-// the dialog and Codex slots are for a plain chat with no ticket, on their harness.
+// the Claude dialog slot is for a Claude chat with no ticket, or a Fix agent
+// (which may carry one); the Codex slot is for a plain Codex chat with no ticket.
 func slotApplies(slot CardSlot, m Meta) bool {
 	switch slot {
 	case SlotClaudeDialog:
-		return m.Ticket == "" && m.Harness == string(harness.Claude)
+		return (m.Ticket == "" || m.FixOf != "") && m.Harness == string(harness.Claude)
 	case SlotCodexQuestion:
 		return m.Ticket == "" && m.Harness == string(harness.Codex)
 	}
@@ -57,7 +58,7 @@ var classSlots = map[SessionClass][]CardSlot{
 	ClassPlain:      {SlotLiveBlocker, SlotClaudeDialog, SlotCodexQuestion, SlotTicketAsk, SlotRound},
 	ClassFlow:       {SlotLiveBlocker, SlotTicketAsk, SlotRound},
 	ClassQueueAgent: {SlotTicketAsk},
-	ClassFixAgent:   {SlotLiveBlocker, SlotTicketAsk, SlotRound},
+	ClassFixAgent:   {SlotLiveBlocker, SlotClaudeDialog, SlotTicketAsk, SlotRound},
 }
 
 // askAddress is the ticket whose ask a session's chat lists: the run of a Queue

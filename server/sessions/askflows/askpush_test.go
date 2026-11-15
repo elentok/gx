@@ -95,15 +95,16 @@ func TestChatQuestionPush_NotSentWhileOpenOnScreen(t *testing.T) {
 	}
 }
 
-// A Fix agent is not a plain chat: a question dialog on its screen lists no
-// dialog card and sends no Question push. Its launch installs no ask hook, so
-// the dialog is the one the hookless fallback would otherwise turn into a card.
-func TestChatQuestionPush_FixSessionListsNoDialogCardAndSendsNone(t *testing.T) {
+// A Fix agent is not a plain chat: a question dialog on its screen lists a
+// dialog card (here the hookless fallback's) but sends no Question push.
+func TestChatQuestionPush_FixSessionListsDialogCardAndSendsNoPush(t *testing.T) {
 	t.Parallel()
 	r := startPushRigAs(t, wire.CreateSessionRequest{FixOf: "proj"}, nil, nil)
 	r.f.block(t, "input needed", agentfake.AskDialogRows("Which color?", "red", "blue"))
 	r.f.waitBlocked(t)
-	r.f.noCardFor(t)
+	if card := r.f.waitCard(t); card.Source != wire.CardSourceClaudeDialog {
+		t.Errorf("card source = %q, want %q", card.Source, wire.CardSourceClaudeDialog)
+	}
 	if got := r.questions(); got != 0 {
 		t.Errorf("Question pushes = %d, want none", got)
 	}

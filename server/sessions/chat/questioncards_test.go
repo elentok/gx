@@ -134,7 +134,7 @@ func TestClaudeDialogCard(t *testing.T) {
 
 	src := chat.CardSources{chat.SlotClaudeDialog: got}
 	for class, wantN := range map[chat.SessionClass]int{
-		chat.ClassPlain: 1, chat.ClassFlow: 0, chat.ClassQueueAgent: 0, chat.ClassFixAgent: 0,
+		chat.ClassPlain: 1, chat.ClassFlow: 0, chat.ClassQueueAgent: 0, chat.ClassFixAgent: 1,
 	} {
 		if n := len(chat.BuildCards(class, src)); n != wantN {
 			t.Errorf("class %v: %d cards, want %d", class, n, wantN)
@@ -189,7 +189,8 @@ func TestBuildCards_ClassTableAcrossSources(t *testing.T) {
 		{"flow without", chat.ClassFlow, noBlocker, []string{wire.CardSourceTicketAsk, wire.CardSourceRound}},
 		{"queue", chat.ClassQueueAgent, all, []string{wire.CardSourceTicketAsk}},
 		{"fix with a blocker", chat.ClassFixAgent, all, []string{wire.CardSourcePermission}},
-		{"fix without", chat.ClassFixAgent, noBlocker, []string{wire.CardSourceTicketAsk, wire.CardSourceRound}},
+		{"fix with a dialog", chat.ClassFixAgent, noBlocker, []string{wire.CardSourceClaudeDialog}},
+		{"fix without", chat.ClassFixAgent, withoutSlots(noBlocker, chat.SlotClaudeDialog, chat.SlotCodexQuestion), []string{wire.CardSourceTicketAsk, wire.CardSourceRound}},
 	}
 	for _, c := range cases {
 		if got := sources(chat.BuildCards(c.class, c.src)); !reflect.DeepEqual(got, c.want) {

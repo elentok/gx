@@ -72,6 +72,7 @@ func TestLaunchArgs(t *testing.T) {
 		{"claude-args hold both", Meta{Harness: "claude", Model: "opus", Effort: "high"}, []string{"--model", "x", "--effort", "low"}, []string{"--model", "x", "--effort", "low"}},
 		{"claude tier with remote control and design", Meta{Harness: "claude", Flow: tickets.FlowDesign, Model: "opus", RemoteControl: "p:l/1"}, nil,
 			[]string{"--disallowedTools", "AskUserQuestion", "--model", "opus", "--remote-control", "p:l/1"}},
+		{"claude fix gets the ask hook", Meta{Harness: "claude", FixOf: "gx:e/01"}, nil, nil},
 		{"codex light", Meta{Harness: "codex", Tier: "light", Model: "gpt-6-luna", Effort: "medium"}, claudeArgs, harness.CodexArgs(harness.CodexArgsInput{Model: "gpt-6-luna", Effort: "medium", WritableRoots: roots, QuestionTool: true})},
 		{"codex empty model", Meta{Harness: "codex", Effort: "high"}, nil, harness.CodexArgs(harness.CodexArgsInput{Effort: "high", WritableRoots: roots, QuestionTool: true})},
 		{"codex empty effort", Meta{Harness: "codex", Model: "gpt-6-astra"}, nil, harness.CodexArgs(harness.CodexArgsInput{Model: "gpt-6-astra", WritableRoots: roots, QuestionTool: true})},
@@ -163,7 +164,7 @@ func askHookInSettings(t *testing.T, args []string) bool {
 	return false
 }
 
-func TestLaunchArgs_ClaudeAskHookOnPlainLaunchOnly(t *testing.T) {
+func TestLaunchArgs_ClaudeAskHookOnPlainAndFixLaunchOnly(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name string
@@ -174,7 +175,7 @@ func TestLaunchArgs_ClaudeAskHookOnPlainLaunchOnly(t *testing.T) {
 		{"design", Meta{Harness: "claude", Flow: tickets.FlowDesign}, false},
 		{"triage", Meta{Harness: "claude", Flow: tickets.FlowTriage, FlowKey: "proj"}, false},
 		{"queue ticket", Meta{Harness: "claude", Ticket: "gx:e/01"}, false},
-		{"fix", Meta{Harness: "claude", FixOf: "gx:e/01"}, false},
+		{"fix", Meta{Harness: "claude", FixOf: "gx:e/01"}, true},
 	} {
 		if got := askHookInSettings(t, launchArgs(&tc.meta, []string{"--verbose"}, nil, testFilesPrompt)); got != tc.want {
 			t.Errorf("%s: ask hook installed = %v, want %v", tc.name, got, tc.want)
