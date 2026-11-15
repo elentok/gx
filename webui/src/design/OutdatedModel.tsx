@@ -88,11 +88,12 @@ export function OutdatedModel({ session, text }: { session: SessionInfo; text: s
             </Text>
             <Button
               tone="running"
+              h="34px"
               disabled={!!blocked || pending}
               onClick={switchNow}
               _disabled={{
                 bg: "hairline",
-                borderColor: "text.faint",
+                borderColor: "hairline",
                 color: "text.faint",
                 opacity: 1,
                 cursor: "default",
