@@ -17,7 +17,15 @@ import (
 // the write routes. It is a function, not a method, to keep Manager's method
 // count under its limit.
 func SessionModelsRead(mg *Manager, w http.ResponseWriter, r *http.Request) {
-	_, meta, res, err := mg.SessionDir(r.URL.Query().Get("session"))
+	q := r.URL.Query()
+	// The settings page has no session: "harness" alone reads that harness's list with no current model.
+	if h := q.Get("harness"); q.Get("session") == "" && (h == string(harness.Claude) || h == string(harness.Codex)) {
+		cache := mg.chat.Models()
+		cache.Refresh(h)
+		wire.WriteJSON(w, modelsResponse(cache, h, "", ""))
+		return
+	}
+	_, meta, res, err := mg.SessionDir(q.Get("session"))
 	if res.Refused || err != nil {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

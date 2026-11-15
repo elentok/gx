@@ -99,6 +99,27 @@ func (f designsFixture) modelsOnceListed(t *testing.T, id string, want int) wire
 	return res
 }
 
+func TestWebSessions_ModelsByHarnessNeedsNoSession(t *testing.T) {
+	t.Parallel()
+	f, _ := modelsServer(t, modelsClaude, nil)
+	var res wire.SessionModelsResponse
+	if !testutil.Poll(10*time.Second, 10*time.Millisecond, func() bool {
+		code, body := servertest.WebDoCookie(t, http.MethodGet, f.base+"/v1/sessions/models?harness=claude", f.ck)
+		if code != http.StatusOK {
+			t.Fatalf("code = %d, body %q", code, body)
+		}
+		if err := json.Unmarshal([]byte(body), &res); err != nil {
+			t.Fatalf("body %q: %v", body, err)
+		}
+		return len(res.Aliases) > 0
+	}) {
+		t.Fatalf("aliases = %+v", res.Aliases)
+	}
+	if res.Aliases[0] != (wire.ModelAlias{Alias: "opus", ID: "claude-opus-4-1", Latest: "claude-opus-4-5"}) {
+		t.Errorf("aliases = %+v", res.Aliases)
+	}
+}
+
 func TestWebSessions_ModelsListsVisibleResolvedRows(t *testing.T) {
 	t.Parallel()
 	f, _ := modelsServer(t, modelsClaude, nil)

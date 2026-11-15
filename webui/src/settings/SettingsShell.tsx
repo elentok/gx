@@ -1,7 +1,8 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { Fragment, useState, type ReactNode } from "react"
 import { Link } from "react-router"
-import type { SettingsCategory, SettingsEntry } from "../generated/server"
+import type { ModelAlias, SettingsCategory, SettingsEntry } from "../generated/server"
+import { aliasNote } from "./aliasNote"
 import { SETTINGS_HREF } from "../hrefs"
 import { PageHeader } from "../page/PageHeader"
 import { PageIcon } from "../page/PageIcon"
@@ -58,6 +59,8 @@ export interface ShellProps {
   onWrite: WriteSetting
   /** The project's repo holds .gx/checks.json, which wins over its checks setting. */
   repoChecksFile?: boolean
+  /** What each Claude alias resolves to, for the lagging-alias note in Models. */
+  aliases?: ModelAlias[]
 }
 
 const ACCOUNT = "Account"
@@ -300,28 +303,43 @@ const IdentityRow = ({ entry }: { entry: SettingsEntry }) => (
   </Box>
 )
 
-type RowProps = Pick<ShellProps, "project" | "pendingRestart" | "onWrite"> & { highlight?: string }
+type RowProps = Pick<ShellProps, "project" | "pendingRestart" | "onWrite" | "aliases"> & {
+  highlight?: string
+}
 
 /** Builds one row per entry; the dev-frontend key gets its wrapper, which supplies the lock reason. */
 const rowBuilder =
-  ({ pendingRestart, onWrite, project, highlight }: RowProps) =>
+  ({ pendingRestart, onWrite, project, highlight, aliases }: RowProps) =>
   (e: SettingsEntry) => {
     const Row = e.key === DEV_FRONTEND_KEY ? DevFrontendRow : SettingsRow
+    const note = aliasNote(e, aliases)
     return (
-      <Row
-        key={e.key}
-        entry={e}
-        pendingRestart={pendingRestart?.includes(e.key) ?? false}
-        onWrite={onWrite}
-        project={project}
-        highlight={highlight}
-      />
+      <Fragment key={e.key}>
+        <Row
+          entry={e}
+          pendingRestart={pendingRestart?.includes(e.key) ?? false}
+          onWrite={onWrite}
+          project={project}
+          highlight={highlight}
+        />
+        {note && (
+          <Text fontSize="xs" color="text.dim" px="3" pb="2" data-testid="alias-note">
+            {note}
+          </Text>
+        )}
+      </Fragment>
     )
   }
 
 type SectionBodyProps = Pick<
   ShellProps,
-  "entries" | "categories" | "project" | "pendingRestart" | "onWrite" | "repoChecksFile"
+  | "entries"
+  | "categories"
+  | "project"
+  | "pendingRestart"
+  | "onWrite"
+  | "repoChecksFile"
+  | "aliases"
 > & { section: string }
 
 /** The section's entries split by group: the response's group order, then any group the tree does not name. A group with no entry is absent. */
@@ -350,8 +368,9 @@ export function SectionBody({
   pendingRestart,
   onWrite,
   repoChecksFile,
+  aliases,
 }: SectionBodyProps) {
-  const row = rowBuilder({ pendingRestart, onWrite, project })
+  const row = rowBuilder({ pendingRestart, onWrite, project, aliases })
   const sectionEntries = entries.filter((e) => e.section === section)
   if (project !== undefined && sectionEntries.some((e) => e.key === CHECKS_KEY)) {
     return (

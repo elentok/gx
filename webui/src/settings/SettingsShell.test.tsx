@@ -69,6 +69,56 @@ const renderShell = (section?: string, onSignOut = () => {}, totpOn = true) =>
     </MemoryRouter>,
   )
 
+describe("lagging alias note", () => {
+  const model = (key: string, value: string) =>
+    entry({
+      key,
+      path: key.split("."),
+      section: "Models",
+      type: "string",
+      description: "Model.",
+      set: true,
+      value,
+    })
+  const aliases = [
+    { alias: "fable", id: "claude-fable-5-1", latest: "claude-fable-5-2" },
+    { alias: "opus", id: "claude-opus-5-5", latest: "claude-opus-5-5" },
+  ]
+  const notes = (rows: SettingsEntry[]) => {
+    const { queryAllByTestId } = renderThemed(
+      <MemoryRouter initialEntries={["/settings"]}>
+        <SettingsShellView
+          entries={rows}
+          categories={treeFromEntries(rows)}
+          projects={[]}
+          section="Models"
+          totpOn
+          onSignOut={() => {}}
+          onWrite={async () => ({})}
+          aliases={aliases}
+        />
+      </MemoryRouter>,
+    )
+    return queryAllByTestId("alias-note").map((n) => n.textContent)
+  }
+
+  it("notes a Claude alias that resolves below the family's latest", () => {
+    expect(notes([model("agents.claude.model", "fable")])).toEqual([
+      "fable resolves to claude-fable-5-1. claude-fable-5-2 is newer. Enter the full id to use it.",
+    ])
+  })
+
+  it("shows no note for a full id, a Codex model or an alias at the latest", () => {
+    expect(
+      notes([
+        model("agents.claude.model", "claude-fable-5-1"),
+        model("agents.claude.light.model", "opus"),
+        model("agents.codex.model", "fable"),
+      ]),
+    ).toEqual([])
+  })
+})
+
 describe("SettingsShellView", () => {
   it("keeps the sidebar at tablet width after a section click, in a 200px column", () => {
     const { getByRole } = renderThemed(

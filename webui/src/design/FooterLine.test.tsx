@@ -339,6 +339,21 @@ test("a chat popover links to the picker; a design popover does not", async () =
   expect(within(await popover()).queryByRole("button", { name: "Choose another model" })).toBeNull()
 })
 
+test("the popover names every matching tier and links to Models settings; no tier, no note", async () => {
+  const { unmount } = render(outdated({ latest_tiers: ["worker", "light"], design: true }))
+  fireEvent.click(screen.getByTestId("outdated-model"))
+  const note = within(await popover()).getByTestId("tiers-note")
+  expect(note.textContent).toContain("worker, light tiers")
+  expect(note.textContent).toContain("does not change Settings")
+  expect(
+    within(note).getByRole("link", { name: "Open Models settings" }).getAttribute("href"),
+  ).toBe("#/settings/s/models")
+  unmount()
+  render(outdated())
+  fireEvent.click(screen.getByTestId("outdated-model"))
+  expect(within(await popover()).queryByTestId("tiers-note")).toBeNull()
+})
+
 test("a plain chat name opens the picker; a plain design name is text", () => {
   const { unmount } = render(session())
   fireEvent.click(screen.getByTestId("model-name-button"))

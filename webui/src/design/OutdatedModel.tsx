@@ -1,5 +1,6 @@
 import { chakra, Popover, Portal, Text } from "@chakra-ui/react"
 import type { SessionInfo } from "../generated/server"
+import { SETTINGS_HREF } from "../hrefs"
 import { modelName } from "../modelName"
 import { openModelPicker, postSwitchSession } from "../shell/modelPickerOpen"
 import { Button } from "../ui/button/Button"
@@ -99,6 +100,15 @@ export function OutdatedModel({ session, text }: { session: SessionInfo; text: s
               {note}
             </Text>
             <TokenCostWarning session={session} />
+            {!!session.latest_tiers?.length && (
+              <Text color="text.dim" data-testid="tiers-note">
+                Settings use {current} for the {session.latest_tiers.join(", ")} tier
+                {session.latest_tiers.length > 1 ? "s" : ""}. The switch does not change Settings.{" "}
+                <chakra.a href={`${SETTINGS_HREF}/s/models`} textDecoration="underline">
+                  Open Models settings
+                </chakra.a>
+              </Text>
+            )}
             {!session.design && (
               <chakra.button
                 type="button"
