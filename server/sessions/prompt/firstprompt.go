@@ -327,7 +327,7 @@ func (f *firstPrompt) launchSource() func() (string, bool, error) {
 		f.log.Warn("first prompt proof skipped", "err", err)
 		return nil
 	}
-	return claudeui.NewRecordSource(func() (string, bool, error) {
+	return claudeui.NewSessionRecordSource(meta.ConversationID, func() (string, bool, error) {
 		_, err := os.Stat(path)
 		return path, err == nil, nil
 	})
@@ -338,14 +338,11 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string, source func(
 	if source == nil {
 		return nil
 	}
-	caps := claudeui.DefaultLaunchProofCaps
-	caps.Grace = cmp.Or(f.p.cfg.LaunchProofCaps.Grace, caps.Grace)
-	caps.UnknownGrace = cmp.Or(f.p.cfg.LaunchProofCaps.UnknownGrace, caps.UnknownGrace)
-	caps.Poll = cmp.Or(f.p.cfg.LaunchProofCaps.Poll, caps.Poll)
-	caps.ResendEvery = cmp.Or(f.p.cfg.LaunchProofCaps.ResendEvery, caps.ResendEvery)
+	caps := claudeui.DefaultLaunchProofCaps.WithOverrides(f.p.cfg.LaunchProofCaps)
 	p := claudeui.LaunchProof{
 		FirstUser:   source,
 		CheckPasted: true,
+		Working:     func() (bool, error) { err := run.CatchUp(); return run.TurnRunning(), err },
 		Pane: func() (string, error) {
 			rows, _, err := run.Holder().Screen(0)
 			return strings.Join(rows, "\n"), err

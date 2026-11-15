@@ -123,7 +123,7 @@ type Locator struct {
 }
 
 // Find returns the transcript path; ok is false while there is none, or while
-// the glob matches more than one file (an anomaly, as in FirstUserRecord).
+// the glob matches more than one file (an anomaly).
 func (l *Locator) Find() (string, bool, error) {
 	if l.found != "" {
 		return l.found, true, nil

@@ -72,18 +72,13 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 			return err
 		}
 		loc := &transcript.Locator{ProjectsDir: projects, Cwd: ss.cwd, SessionID: s.SessionID}
-		firstUser = claudeui.NewRecordSource(func() (string, bool, error) {
-			if loc.SessionID == "" {
-				return "", false, nil
-			}
-			return loc.Find()
-		})
+		firstUser = claudeui.NewSessionRecordSource(loc.SessionID, loc.Find)
 	}
 	if err := pr.Submit(text); err != nil {
 		return notDelivered(err)
 	}
 	if codex {
-		return p.proveCodexLaunch(ctx, pr, firstUser, text, onNudge)
+		return p.proveCodexLaunch(ctx, ss, pr, firstUser, text, onNudge)
 	}
 	proof := claudeui.LaunchProof{
 		FirstUser:   firstUser,
@@ -108,7 +103,7 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	if errors.Is(err, errPersonInput) {
 		// The person's keys end the resends; the transcript may still show the
 		// command from before they typed.
-		if content, ok, rerr := firstUser(); rerr != nil || !ok || !claudeui.Launched(content, text) {
+		if content, ok, rerr := firstUser(); rerr != nil || !ok || !claudeui.LaunchedBy(content, text) {
 			return fmt.Errorf("%w: %q: a person typed before the transcript showed the command", agentrunner.ErrDeliveryUnconfirmed, text)
 		}
 		return nil
@@ -161,9 +156,10 @@ func (p *Pty) codexFirstUser(ss *ptySession) func() (string, bool, error) {
 // proveCodexLaunch is the Claude proof over the rollout: the prompt counts as
 // delivered once the rollout holds a matching user record, and is resent in
 // the session while it does not.
-func (p *Pty) proveCodexLaunch(ctx context.Context, pr *ptyPrompter, firstUser func() (string, bool, error), text string, onNudge func(string)) error {
+func (p *Pty) proveCodexLaunch(ctx context.Context, ss *ptySession, pr *ptyPrompter, firstUser func() (string, bool, error), text string, onNudge func(string)) error {
 	proof := claudeui.LaunchProof{
 		FirstUser: firstUser,
+		Working:   func() (bool, error) { return p.turns().working(ss) },
 		Pane: func() (string, error) {
 			if err := pr.cancelled(); err != nil {
 				return "", err

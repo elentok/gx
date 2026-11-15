@@ -1,6 +1,7 @@
 package claudeui
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"strings"
@@ -55,6 +56,15 @@ type LaunchProofCaps struct {
 	ResendEvery  time.Duration
 }
 
+// WithOverrides returns c with every non-zero field of o replacing its own.
+func (c LaunchProofCaps) WithOverrides(o LaunchProofCaps) LaunchProofCaps {
+	c.Grace = cmp.Or(o.Grace, c.Grace)
+	c.UnknownGrace = cmp.Or(o.UnknownGrace, c.UnknownGrace)
+	c.Poll = cmp.Or(o.Poll, c.Poll)
+	c.ResendEvery = cmp.Or(o.ResendEvery, c.ResendEvery)
+	return c
+}
+
 // ErrPastedLaunch means the launch command reached the transcript as pasted
 // text, so the skill did not run.
 var ErrPastedLaunch = fmt.Errorf("%w: the launch command was pasted as plain text and the skill did not run", agentrunner.ErrNotDelivered)
@@ -105,8 +115,16 @@ func NewRecordSource(find func() (path string, ok bool, err error)) func() (stri
 	}
 }
 
-// Launched reports whether a person record's content is the launch command.
-func Launched(content, text string) bool { return launchedBy(content, text) }
+// NewSessionRecordSource is NewRecordSource for a session known by id: while
+// the id is empty there is no transcript to find, and find is not called.
+func NewSessionRecordSource(sessionID string, find func() (path string, ok bool, err error)) func() (string, bool, error) {
+	return NewRecordSource(func() (string, bool, error) {
+		if sessionID == "" {
+			return "", false, nil
+		}
+		return find()
+	})
+}
 
 func firstPerson(path string) (string, bool, error) {
 	msgs, _, err := transcript.ReadChat(path, "")
@@ -121,20 +139,21 @@ func firstPerson(path string) (string, bool, error) {
 	return "", false, nil
 }
 
-// LaunchRecordedIn is LaunchRecorded for a transcript at path. known is false
-// only when the transcript cannot be read; a readable one with no person
-// message is known and not recorded (the session never got its task).
+// LaunchRecordedIn reports whether the first person record of the transcript at
+// path is the launch command. known is false only when the transcript cannot be
+// read; a readable one with no person message is known and not recorded (the
+// session never got its task).
 func LaunchRecordedIn(path, text string) (recorded, known bool, err error) {
 	content, _, err := firstPerson(path)
 	if err != nil {
 		return false, false, err
 	}
-	return launchedBy(content, text), true, nil
+	return LaunchedBy(content, text), true, nil
 }
 
-// launchedBy reports whether a user record's content is the launch command:
+// LaunchedBy reports whether a user record's content is the launch command:
 // the command-name tag claude writes for a skill, or the typed text itself.
-func launchedBy(content, text string) bool {
+func LaunchedBy(content, text string) bool {
 	name, _, _ := strings.Cut(strings.TrimSpace(text), " ")
 	return strings.Contains(content, "<command-name>"+name+"</command-name>") ||
 		strings.HasPrefix(strings.TrimSpace(content), strings.TrimSpace(text))
@@ -158,7 +177,7 @@ func CheckLaunchDelivered(ctx context.Context, p LaunchProof, text string, caps 
 		if err != nil {
 			return fmt.Errorf("reading transcript: %w", err)
 		}
-		if ok && launchedBy(content, text) {
+		if ok && LaunchedBy(content, text) {
 			return nil
 		}
 		if ok && p.CheckPasted && strings.Contains(content, pastedMarker) && strings.Contains(content, strings.TrimSpace(text)) {

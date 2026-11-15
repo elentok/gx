@@ -300,10 +300,7 @@ func (r *Runner) PromptLaunch(ctx context.Context, s agentrunner.Session, text s
 	if codex {
 		return r.launchProved(ctx, s, text, turn, onNudge, r.codexFirstUser(s), false)
 	}
-	claudeFirst := claudeui.NewRecordSource(func() (string, bool, error) {
-		if s.SessionID == "" {
-			return "", false, nil
-		}
+	claudeFirst := claudeui.NewSessionRecordSource(s.SessionID, func() (string, bool, error) {
 		paths, err := transcript.FindByID(r.Home, s.SessionID)
 		if err != nil || len(paths) != 1 {
 			return "", false, err
@@ -360,11 +357,7 @@ func (r *Runner) launchProved(ctx context.Context, s agentrunner.Session, text s
 	seen := herdrErr == nil && (agent.AgentStatus == "working" || agent.AgentStatus == "blocked")
 
 	now, sleep := r.clock()
-	caps := claudeui.DefaultLaunchProofCaps
-	caps.Grace = cmp.Or(r.LaunchCaps.Grace, caps.Grace)
-	caps.UnknownGrace = cmp.Or(r.LaunchCaps.UnknownGrace, caps.UnknownGrace)
-	caps.Poll = cmp.Or(r.LaunchCaps.Poll, caps.Poll)
-	caps.ResendEvery = cmp.Or(r.LaunchCaps.ResendEvery, caps.ResendEvery)
+	caps := claudeui.DefaultLaunchProofCaps.WithOverrides(r.LaunchCaps)
 	proof := claudeui.LaunchProof{
 		FirstUser: firstUser,
 		// needSeen marks the Claude path, the only one with a pasted check.

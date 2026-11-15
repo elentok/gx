@@ -164,6 +164,40 @@ func TestCheckLaunchDelivered_WorkingAgentWithoutRecordGetsNoResendAndFailsAtGra
 	}
 }
 
+// TestCheckLaunchDelivered_NoResendIntoAWorkingAgentForEveryCaller gives each
+// launch path its own Working source, shaped as that caller reads its runner,
+// and expects no resend while the agent works and no record exists.
+func TestCheckLaunchDelivered_NoResendIntoAWorkingAgentForEveryCaller(t *testing.T) {
+	tests := []struct {
+		name        string
+		checkPasted bool
+		working     func() (bool, error)
+	}{
+		{"herdr runner", true, func() (bool, error) { return true, nil }},
+		{"PTY Claude", true, func() (bool, error) { return true, nil }},
+		{"PTY Codex", false, func() (bool, error) { return true, nil }},
+		{"first prompt", true, func() (bool, error) { return true, nil }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clock := time.Unix(1000, 0)
+			resends := 0
+			p := proofFor(&clock, &resends, func() (string, bool, error) { return "", false, nil })
+			p.CheckPasted = tt.checkPasted
+			p.Working = tt.working
+
+			err := claudeui.CheckLaunchDelivered(context.Background(), p, launchText, claudeui.DefaultLaunchProofCaps)
+
+			if !errors.Is(err, agentrunner.ErrNotDelivered) {
+				t.Fatalf("err = %v, want ErrNotDelivered at the grace end", err)
+			}
+			if resends != 0 {
+				t.Errorf("resends = %d, want none into a working agent", resends)
+			}
+		})
+	}
+}
+
 func TestCheckLaunchDelivered_PastedRecordIsItsOwnNotDeliveredError(t *testing.T) {
 	clock := time.Unix(1000, 0)
 	resends := 0
@@ -201,7 +235,7 @@ func TestNewRecordSource_ResumedTranscriptIgnoresItsEarlierLaunchRecord(t *testi
 		t.Fatal(err)
 	}
 	content, ok, err := source()
-	if err != nil || !ok || !claudeui.Launched(content, launchText) {
+	if err != nil || !ok || !claudeui.LaunchedBy(content, launchText) {
 		t.Fatalf("after the new send: %q %v %v; want the new record", content, ok, err)
 	}
 }
