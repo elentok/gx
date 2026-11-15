@@ -145,30 +145,61 @@ Run against a temporary gx server after the epic is built. Vi mode is turned on 
   - Scenario `design`, in the question's note box (Q8b, like flow 126): `n` and `p` typed in INSERT stay in the text; Esc in INSERT keeps the view and the box; Esc in NORMAL leaves the box and keeps the view open.
   - Scenario `design-text`, the text question Q13 "Name the migration" (its only question): the answer box shows the pill; Esc in NORMAL blurs the box and focuses the question's own row, and the view stays open; Cmd-Enter sends the answers.
 
-1. Stories 1 to 3, 5, 6, 33 to 35: flow A (editor with vi on, textarea after vi off, 390 px mouse, touch context) and vitest seam 1 for the live pointer change. Story 34: a vitest step that the named chunk-preload function (the implementer adds it as the seam) is called when vi is on and the pointer is not coarse, and not called with vi off or a coarse pointer.
-2. Story 2: vitest seam 1, one editor per call site; flow A and B cover the chat composer and answer boxes.
-3. Story 4: flow A touch step; vitest with the coarse-pointer override.
-4. Stories 7 to 11 (including 8): story 11 has vitest steps where the note, the red refusal note, the Codex `$` hint and the footer each render together with the pill. Mock states chat-insert, chat-normal, chat-visual, answer-normal and answer-insert-blurred. The verifier checks the pill's place (bottom left of the box's bottom line) and text only, not pixels. Vitest checks the tone.
-5. Stories 12 to 17: flow A (pill after each key, `dd` step, send step, `:q`); vitest seam 1 for blur and focus and outside clear.
-6. Stories 18 and 19: flow A (`/` and `:q` steps); vitest for the one-line growth.
-7. Stories 20, 21 and 52: flow A (Cmd-G steps, including: Esc to NORMAL, Cmd-G, close, the pill still reads NORMAL); vitest for caret, selection and mode.
-8. Stories 22 and 23: flow A (Cmd-Enter send); flow B (answers sent); vitest for the pass-through.
-9. Stories 24 and 25: vitest seam 1; the existing `agents-commands.e2e.ts` flows still pass with vi off.
-10. Stories 26 to 31: flow A (INSERT then NORMAL Esc on a Working chat); flow B (Esc in INSERT and NORMAL, `n` and `p`); vitest for the Modal and the dialog case, and for the design composer: Esc in NORMAL opens Interrupt on a Working design session and Esc in INSERT does not.
-11. Stories 32, 36 to 38, 51, 53: vitest seam 1 (escape sequence, read-only and dimmed, Tab and Shift-Tab leave the box, expand button place, accessible name and status role, the focus-ring rule and `data-focus-ring="none"` present, not a computed `box-shadow`). The ring's look (shown on focus, gone on blur) is checked in flow A, never against the mock.
-12. Stories 39 to 42: flow A (Leader then `b`, label flip, layer step); vitest for the chord table and label. Existing `chords.e2e.ts` still passes (the Chord box now has one more row on every page; update any step that counts rows).
-13. Stories 43 to 45, Mock state chat-normal-big: flow A height step (about double, within the usual 1 px tolerance of the row maths); vitest for the rows table and no remount. Mock state chat-normal-big shows 6 rows for a 3-row box.
-14. Stories 46 and 47, 50: flow A (second page in the same context, no reload); vitest for the store, blocked storage and the `storage` event.
-15. Stories 48 and 49: vitest (no Gear toggle; the large editor ignores big mode); `united.e2e.ts` flow 28 still passes with no new menu item.
+**Mock states**
 
-Mock states (all use the mock `$(gx tickets root)/prompt-box-vi-mode/mocks/02-inline-vi-mode-text-look.html`; the state is checked for the pill's place and text only):
+Every state uses the mock `$(gx tickets root)/prompt-box-vi-mode/mocks/02-inline-vi-mode-text-look.html`, is checked for the pill's place and text only, and is named by its first field.
 
-- `$(gx tickets root)/prompt-box-vi-mode/mocks/02-inline-vi-mode-text-look.html`, state chat-insert, width 480, scenario `workspaces` (the Default workspace's chat), parts: prompt-box, text, footer, mode-pill (INSERT), model, context, expand, send.
-- `$(gx tickets root)/prompt-box-vi-mode/mocks/02-inline-vi-mode-text-look.html`, state chat-normal, width 480, scenario `workspaces`, parts: prompt-box, text, footer, mode-pill (NORMAL), model, context, expand, send.
-- `$(gx tickets root)/prompt-box-vi-mode/mocks/02-inline-vi-mode-text-look.html`, state chat-visual, width 480, scenario `workspaces`, parts: prompt-box, text, footer, mode-pill (VISUAL), model, context, expand, send.
-- `$(gx tickets root)/prompt-box-vi-mode/mocks/02-inline-vi-mode-text-look.html`, state chat-normal-big, width 480, scenario `workspaces` with big mode on, parts: prompt-box (twice the rows), text, footer, mode-pill (NORMAL), model, context, expand, send.
-- `$(gx tickets root)/prompt-box-vi-mode/mocks/02-inline-vi-mode-text-look.html`, state answer-normal, width 480, scenario `design-text` (the Questions view's text answer box for Q13, no footer), parts: prompt-box, text, footer (pill alone), mode-pill (NORMAL), expand.
-- `$(gx tickets root)/prompt-box-vi-mode/mocks/02-inline-vi-mode-text-look.html`, state answer-insert-blurred, width 480, scenario `design-text`, parts: prompt-box (no focus ring), text, footer (pill alone), mode-pill (INSERT), expand.
+- chat-insert, width 480, scenario `workspaces` (the Default workspace's chat), parts: prompt-box, text, footer, mode-pill (INSERT), model, context, expand, send.
+- chat-normal, width 480, scenario `workspaces`, parts: prompt-box, text, footer, mode-pill (NORMAL), model, context, expand, send.
+- chat-visual, width 480, scenario `workspaces`, parts: prompt-box, text, footer, mode-pill (VISUAL), model, context, expand, send.
+- chat-normal-big, width 480, scenario `workspaces` with big mode on, parts: prompt-box (twice the rows), text, footer, mode-pill (NORMAL), model, context, expand, send.
+- answer-normal, width 480, scenario `design-text` (the Questions view's text answer box for Q13, no footer), parts: prompt-box, text, footer (pill alone), mode-pill (NORMAL), expand.
+- answer-insert-blurred, width 480, scenario `design-text`, parts: prompt-box (no focus ring), text, footer (pill alone), mode-pill (INSERT), expand.
+
+Editor choice and swap (stories 1 to 1, 3 to 3, 5 to 6, 33 to 35)
+- flow A (editor with vi on, textarea after vi off, 390 px mouse, touch context) and vitest seam 1 for the live pointer change. Story 34: a vitest step that the named chunk-preload function (the implementer adds it as the seam) is called when vi is on and the pointer is not coarse, and not called with vi off or a coarse pointer.
+
+Every call site (stories 2 to 2)
+- vitest seam 1, one editor per call site; flow A and B cover the chat composer and answer boxes.
+
+Touch (stories 4 to 4)
+- flow A touch step; vitest with the coarse-pointer override.
+
+Mode pill (stories 7 to 11)
+- story 11 has vitest steps where the note, the red refusal note, the Codex `$` hint and the footer each render together with the pill. Mock states chat-insert, chat-normal, chat-visual, answer-normal and answer-insert-blurred. The verifier checks the pill's place (bottom left of the box's bottom line) and text only, not pixels. Vitest checks the tone.
+
+Mode rules and keys (stories 12 to 17)
+- flow A (pill after each key, `dd` step, send step, `:q`); vitest seam 1 for blur and focus and outside clear.
+
+Ex line (stories 18 to 19)
+- flow A (`/` and `:q` steps); vitest for the one-line growth.
+
+Cmd-G handoff (stories 20 to 21, 52 to 52)
+- flow A (Cmd-G steps, including: Esc to NORMAL, Cmd-G, close, the pill still reads NORMAL); vitest for caret, selection and mode.
+
+Submit (stories 22 to 23)
+- flow A (Cmd-Enter send); flow B (answers sent); vitest for the pass-through.
+
+Completion menu (stories 24 to 25)
+- vitest seam 1; the existing `agents-commands.e2e.ts` flows still pass with vi off.
+
+Esc rule (stories 26 to 31)
+- flow A (INSERT then NORMAL Esc on a Working chat); flow B (Esc in INSERT and NORMAL, `n` and `p`); vitest for the Modal and the dialog case, and for the design composer: Esc in NORMAL opens Interrupt on a Working design session and Esc in INSERT does not.
+
+Small rules (stories 32 to 32, 36 to 38, 51 to 51, 53 to 53)
+- vitest seam 1 (escape sequence, read-only and dimmed, Tab and Shift-Tab leave the box, expand button place, accessible name and status role, the focus-ring rule and `data-focus-ring="none"` present, not a computed `box-shadow`). The ring's look (shown on focus, gone on blur) is checked in flow A, never against the mock.
+
+Chord (stories 39 to 42)
+- flow A (Leader then `b`, label flip, layer step); vitest for the chord table and label. Existing `chords.e2e.ts` still passes (the Chord box now has one more row on every page; update any step that counts rows).
+
+Big mode rows (stories 43 to 45)
+- flow A height step (about double, within the usual 1 px tolerance of the row maths); vitest for the rows table and no remount. Mock state chat-normal-big shows 6 rows for a 3-row box.
+
+Big mode store (stories 46 to 47, 50 to 50)
+- flow A (second page in the same context, no reload); vitest for the store, blocked storage and the `storage` event.
+
+No button, large editor (stories 48 to 49)
+- vitest (no Gear toggle; the large editor ignores big mode); `united.e2e.ts` flow 28 still passes with no new menu item.
 
 New flows or scenarios to write (these become implementation tickets): flow A and flow B above, in `vi-editor.e2e.ts`, plus the vitest tests of seam 1. Flow B uses two existing scenarios: `design-text` (`catalog/scenarios.go`; it scripts Q13 "Name the migration" through the `DesignTurnText` turn in `testutil/agentfake/design.go`) and `design` (the note box of Q8b). No new fixture scenario is needed.
 
@@ -194,3 +225,4 @@ New flows or scenarios to write (these become implementation tickets): flow A an
 - The earlier spec's rules stay: the vi mode setting is global on the server, vi off leaves Cmd-G as it is today, and `Escape` never closes the large editor.
 - The vim registry is global in the page, so registers and the last search are shared between boxes, as in vim.
 - The mock is a guide for the pill's place and text, not for pixels.
+
