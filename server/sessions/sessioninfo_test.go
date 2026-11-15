@@ -356,6 +356,13 @@ func TestSessionInfoModel_ModelSwitchedNote(t *testing.T) {
 			t.Errorf("%s: ModelSwitched = %v, want %v", name, got, tc.want)
 		}
 	}
+	// The by-hand flag makes the note true although the reply matches.
+	flagged := meta("sonnet")
+	flagged.SwitchedByHand = true
+	s := modelTestServer(t, "/work/proj", replyWithModel("claude-Sonnet-5-5"))
+	if !s.SessionInfo(flagged).ModelSwitched {
+		t.Error("flagged session: ModelSwitched = false, want true")
+	}
 }
 
 func TestContinueAction_ResetsEachHarnessItsOwnWay(t *testing.T) {

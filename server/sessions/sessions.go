@@ -375,12 +375,19 @@ func launchArgs(meta *Meta, claudeArgs, codexRoots []string, filesPromptFile str
 	if meta.IsStepped() {
 		args = agentrunner.WithDesignDisallowedTools(args)
 	}
-	// A configured flag wins over the tier for its knob.
-	if meta.Model != "" && !hasFlag(claudeArgs, "--model") {
-		args = append(args, "--model", meta.Model)
-	}
-	if meta.Effort != "" && !hasFlag(claudeArgs, "--effort") {
-		args = append(args, "--effort", meta.Effort)
+	// A configured flag wins over the tier for its knob, but not over a hand
+	// switch: that one drops the configured flag so exactly one remains.
+	for _, knob := range [][2]string{{"--model", meta.Model}, {"--effort", meta.Effort}} {
+		flag, value := knob[0], knob[1]
+		if value == "" {
+			continue
+		}
+		if meta.SwitchedByHand {
+			args = withoutFlag(args, flag)
+		} else if hasFlag(claudeArgs, flag) {
+			continue
+		}
+		args = append(args, flag, value)
 	}
 	if meta.RemoteControl != "" {
 		args = append(args, "--remote-control", meta.RemoteControl)
@@ -426,6 +433,22 @@ func hasFlag(args []string, flag string) bool {
 	return slices.ContainsFunc(args, func(a string) bool {
 		return a == flag || strings.HasPrefix(a, flag+"=")
 	})
+}
+
+// withoutFlag returns args without flag, in both the "flag value" and the
+// "flag=value" form. It never changes args.
+func withoutFlag(args []string, flag string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == flag:
+			i++ // the value goes too
+		case strings.HasPrefix(args[i], flag+"="):
+		default:
+			out = append(out, args[i])
+		}
+	}
+	return out
 }
 
 // endFailedStart saves a session whose holder did not start as Exited

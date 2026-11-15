@@ -97,6 +97,27 @@ func TestLaunchArgs(t *testing.T) {
 	}
 }
 
+func TestLaunchArgs_HandSwitchWinsOverConfiguredFlags(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name       string
+		meta       Meta
+		claudeArgs []string
+		want       []string
+	}{
+		{"two-word flags", Meta{Harness: "claude", SwitchedByHand: true, Model: "opus", Effort: "high"}, []string{"--model", "x", "--verbose", "--effort", "low"}, []string{"--verbose", "--model", "opus", "--effort", "high"}},
+		{"equals flags", Meta{Harness: "claude", SwitchedByHand: true, Model: "opus", Effort: "high"}, []string{"--model=x", "--effort=low"}, []string{"--model", "opus", "--effort", "high"}},
+		{"empty effort keeps the configured flag", Meta{Harness: "claude", SwitchedByHand: true, Model: "opus"}, []string{"--model", "x", "--effort", "low"}, []string{"--effort", "low", "--model", "opus"}},
+		{"without the flag a configured flag wins", Meta{Harness: "claude", Model: "opus", Effort: "high"}, []string{"--model", "x"}, []string{"--model", "x", "--effort", "high"}},
+	} {
+		want := append(slices.Clone(tc.want), harness.ClaudeAskHookArgs()...)
+		want = append(want, "--append-system-prompt-file", testFilesPrompt)
+		if got := launchArgs(&tc.meta, tc.claudeArgs, nil, testFilesPrompt); !slices.Equal(got, want) {
+			t.Errorf("%s: args = %v, want %v", tc.name, got, want)
+		}
+	}
+}
+
 // A plain Codex chat, new or resumed (both run launchArgs), turns the question
 // tool on and drops its guard. Every other Codex launch (conflict and doctor
 // agents among them run as a Queue ticket or a Fix session) keeps the guard

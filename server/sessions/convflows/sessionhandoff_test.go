@@ -2,6 +2,7 @@ package convflows_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -128,6 +129,47 @@ func TestChartingHandoff_NothingRestartsOutsideAStrongestDesignLaunch(t *testing
 		other.ID, other.Conv = id, conv
 		other.ContinueSession(t)
 		wantResetInPlace(t, other, "worker")
+	})
+}
+
+// A session switched by hand keeps its model: Continue and auto-advance type
+// the reset in place and never restart it, even on a map past charting.
+func TestChartingHandoff_HandSwitchedSessionIsNeverRestarted(t *testing.T) {
+	t.Parallel()
+	flag := func(t *testing.T, f rigs.HandoffFixture) {
+		t.Helper()
+		path := filepath.Join(f.H.SessionsDir, f.ID, "meta.json")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var meta map[string]any
+		if err := json.Unmarshal(data, &meta); err != nil {
+			t.Fatal(err)
+		}
+		meta["switched_by_hand"] = true
+		data, err = json.Marshal(meta)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Run("continue", func(t *testing.T) {
+		f := rigs.StartHandoff(t, "chart")
+		setMapStep(t, f.Store, "resolve-tickets")
+		flag(t, f)
+		f.ContinueSession(t)
+		wantResetInPlace(t, f, "strongest")
+	})
+	t.Run("auto-advance", func(t *testing.T) {
+		f := rigs.StartHandoff(t, "chart", servertest.WithAutoAdvanceDelay(200*time.Millisecond))
+		setMapStep(t, f.Store, "resolve-tickets")
+		flag(t, f)
+		writeAssistantMessage(t, filepath.Join(f.Cfg, "projects", "-repo", f.Conv+".jsonl"), runEndText)
+		rigs.EndTurn(t, &rigs.GrillingFixture{H: f.H, Ctx: f.Ctx, Evs: f.Evs, ID: f.ID, Conv: f.Conv})
+		wantResetInPlace(t, f, "strongest")
 	})
 }
 

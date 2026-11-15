@@ -28,8 +28,9 @@ func (rs *Resumer) StartContinue(dir string, meta Meta, label string, action []s
 // chartingHandoffDue reports whether action is the design Continue of a
 // strongest-tier session that gx launched for the design, on a map past
 // charting. Only a harness with a chat reader restarts, as only it has a design Continue.
+// A session switched by hand never restarts: its model is the person's choice.
 func (rs *Resumer) chartingHandoffDue(meta Meta, action []string) bool {
-	return meta.LaunchDesign && meta.IsDesign() &&
+	return meta.LaunchDesign && meta.IsDesign() && !meta.SwitchedByHand &&
 		rs.mg.settings.Load().HasChatReader(meta.Harness) &&
 		meta.Tier == agent.TierStrongest &&
 		slices.Equal(action, chat.ContinueAction(meta.FlowRef(), meta.Harness)) &&

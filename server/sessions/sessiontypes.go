@@ -31,6 +31,13 @@ type SessionCtx struct {
 	FlowKey string
 }
 
+// SwitchTarget is the model, effort and by-hand flag a rollback restores.
+type SwitchTarget struct {
+	Model  string `json:"model,omitempty"`
+	Effort string `json:"effort,omitempty"`
+	ByHand bool   `json:"by_hand,omitempty"`
+}
+
 // sessionMeta is what a session's state dir records about it.
 type Meta struct {
 	ID      string `json:"id"`
@@ -72,6 +79,15 @@ type Meta struct {
 	Tier   agent.Tier `json:"tier,omitempty"`
 	Model  string     `json:"model,omitempty"`
 	Effort string     `json:"effort,omitempty"`
+	// SwitchedByHand marks a Model and Effort the person chose, so launch args
+	// and the charting handoff keep them. All switch fields are omitted when
+	// empty, so an older record reads as "no switch pending".
+	SwitchedByHand bool `json:"switched_by_hand,omitempty"`
+	// SwitchPrev is the rollback target of an unconfirmed switch.
+	SwitchPrev *SwitchTarget `json:"switch_prev,omitempty"`
+	// SwitchUnconfirmed is set by a switch and cleared by the first model turn.
+	SwitchUnconfirmed bool      `json:"switch_unconfirmed,omitempty"`
+	SwitchedAt        time.Time `json:"switched_at,omitzero"`
 	// FirstPrompt waits for the ready report or the first Idle; it is cleared
 	// once typed or on exit.
 	FirstPrompt string `json:"first_prompt,omitempty"`
