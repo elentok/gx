@@ -277,13 +277,27 @@ func (mg *Manager) makeSessionDir() (id, dir string, err error) {
 // saved size, else the loop default, and saves meta with the size it used.
 // The caller holds metaMu.
 func (mg *Manager) startSessionHolder(dir string, meta *Meta, cols, rows int, resume bool) error {
-	return startSessionHolderAs(mg, dir, meta, meta, cols, rows, resume)
+	return mg.startSessionHolderAs(dir, meta, nil, cols, rows, resume)
 }
 
-// startSessionHolderAs is startSessionHolder with the launch flags taken from
-// launchMeta rather than the meta it saves, so a switch can run the new model
-// while the record keeps the old one until the new agent is alive.
-func startSessionHolderAs(mg *Manager, dir string, meta, launchMeta *Meta, cols, rows int, resume bool) error {
+// launchOverride is what a switch launches with in place of the saved record,
+// so the new agent runs the new model while the record keeps the old one until
+// that agent is idle. SwitchedAt is the switch's own launch time, not the
+// previous record's.
+type launchOverride struct {
+	Model, Effort string
+	ByHand        bool
+	SwitchedAt    time.Time
+}
+
+// startSessionHolderAs is startSessionHolder with the launch taken from
+// override (nil for none) rather than from the meta it saves.
+func (mg *Manager) startSessionHolderAs(dir string, meta *Meta, override *launchOverride, cols, rows int, resume bool) error {
+	launchMeta := *meta
+	if override != nil {
+		launchMeta.Model, launchMeta.Effort = override.Model, override.Effort
+		launchMeta.SwitchedByHand, launchMeta.SwitchedAt = override.ByHand, override.SwitchedAt
+	}
 	if cols <= 0 || rows <= 0 {
 		cols, rows = meta.Cols, meta.Rows
 	}
@@ -306,13 +320,13 @@ func startSessionHolderAs(mg *Manager, dir string, meta, launchMeta *Meta, cols,
 		// The SessionStart hook writes Codex's own session id here; without it
 		// the meta keeps gx's UUID and the chat misses the rollout.
 		env = append(slices.Clone(env), harness.CodexSessionEnv(dir)...)
-		if !meta.SwitchedAt.IsZero() {
-			env = append(env, harness.CodexSwitchedAtEnv+"="+meta.SwitchedAt.Format(time.RFC3339Nano))
+		if !launchMeta.SwitchedAt.IsZero() {
+			env = append(env, harness.CodexSwitchedAtEnv+"="+launchMeta.SwitchedAt.Format(time.RFC3339Nano))
 		}
 	}
 	opts := harness.LaunchOptions{
 		SessionID: meta.ConversationID,
-		Args:      launchArgs(launchMeta, mg.settings.Load().AgentsClaudeArgs, codexRoots(mg, meta), harness.GXFilesPromptFile()),
+		Args:      launchArgs(&launchMeta, mg.settings.Load().AgentsClaudeArgs, codexRoots(mg, meta), harness.GXFilesPromptFile()),
 		Env:       env,
 		Cwd:       meta.Dir,
 		// Only loop agents get the `gx tickets ask` text.

@@ -116,7 +116,8 @@ func (rs *Resumer) SwitchSession(req wire.SessionSwitchRequest) (wire.SessionRes
 	}
 	launch := meta
 	m.RecordSwitch(&launch, req.Model, req.Effort)
-	if err := rs.startResumedHolderAs(dir, &meta, &launch, time.Time{}); err != nil {
+	override := &launchOverride{Model: launch.Model, Effort: launch.Effort, ByHand: launch.SwitchedByHand, SwitchedAt: launch.SwitchedAt}
+	if err := rs.startResumedHolderAs(dir, &meta, override, time.Time{}); err != nil {
 		m.log.Warn("switch: new agent did not start", "session", req.ID, "err", err)
 		if err := rs.rollbackSwitchLocked(dir, &meta, req.Model); err != nil {
 			return wire.SessionResult{}, err
@@ -135,7 +136,7 @@ func (rs *Resumer) rollbackSwitchLocked(dir string, meta *Meta, attempted string
 	m := rs.mg
 	m.switches.clear(meta.ID)
 	m.switches.set(meta.ID, switchState{run: meta.Run + 1, model: meta.Model, effort: meta.Effort, back: true, attempted: attempted})
-	if err := rs.startResumedHolderAs(dir, meta, meta, time.Time{}); err != nil {
+	if err := rs.startResumedHolderAs(dir, meta, nil, time.Time{}); err != nil {
 		m.switches.clear(meta.ID)
 		m.endFailedStart(dir, meta)
 		return err
