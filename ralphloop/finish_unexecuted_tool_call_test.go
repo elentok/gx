@@ -35,6 +35,16 @@ func finishFixture(t *testing.T) (scratchDir, path string) {
 // that pauses the ticket is an outcome, not an error.
 func driveIteration(t *testing.T, d deps.Deps, scratchDir, path string, sink runlog.EventSink) FinishOutcome {
 	t.Helper()
+	out, err := driveIterationErr(t, d, scratchDir, path, sink)
+	if err != nil {
+		t.Fatalf("FinishIteration: %v", err)
+	}
+	return out
+}
+
+// driveIterationErr is driveIteration that hands back FinishIteration's error.
+func driveIterationErr(t *testing.T, d deps.Deps, scratchDir, path string, sink runlog.EventSink) (FinishOutcome, error) {
+	t.Helper()
 	one := OneIteration{
 		RepoDir: "/fake/repo", Epic: "epic", ScratchDir: scratchDir, Agent: agent.AgentClaude, Sink: sink,
 		Ticket: tickets.Ticket{Identifier: "01", Path: path},
@@ -51,11 +61,7 @@ func driveIteration(t *testing.T, d deps.Deps, scratchDir, path string, sink run
 	if err := WaitIterationFinished(d, one, w, s.Session); err != nil {
 		t.Fatalf("WaitIterationFinished: %v", err)
 	}
-	out, err := FinishIteration(d, one, w, s.ID)
-	if err != nil {
-		t.Fatalf("FinishIteration: %v", err)
-	}
-	return out
+	return FinishIteration(d, one, w, s.ID)
 }
 
 // retryThenMergeCommits makes CommitsAhead report zero for the finish checks

@@ -41,8 +41,12 @@ const (
 	VerifyCapStopped  Type = "verify-cap-stopped"
 	// Paused is a ticket paused for a person; the kind is the pause reason and
 	// its class says whether the person answers or repairs.
-	Paused                  Type = "paused"
-	Commitless              Type = "commitless"
+	Paused     Type = "paused"
+	Commitless Type = "commitless"
+	// FinishBlocked is a verify `finished` report that gx refused because some
+	// Stories units had no live Verified entry at HEAD; the unit list is the
+	// Reason. Additive: logs without it load unchanged.
+	FinishBlocked           Type = "finish-blocked"
 	DepsInstalled           Type = "deps-installed"
 	SchedulerScan           Type = "scheduler-scan"
 	NotificationsConfigured Type = "notifications-configured"

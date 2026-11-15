@@ -7,6 +7,9 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/supervise"
 	"github.com/elentok/gx/ralphloop/ticketops"
+	"os"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -34,8 +37,11 @@ func iterationSession(p iterationParams, pane string) agentrunner.Session {
 // identity through this shared completion path. A paused (answer) report is
 // adopted before any of that: see adoptAskingReport.
 func finishIteration(d deps.Deps, p iterationParams, path, pane, base, branch, sessionID string) error {
-	adopted, err := adoptAskingReport(p, path, pane, sessionID)
+	adopted, sessionID, err := adoptReportBlockingUnchecked(d, p, path, pane, sessionID)
 	if err != nil {
+		if errors.Is(err, supervise.ErrBlockedPanePaused) {
+			return nil
+		}
 		return err
 	}
 	if adopted && p.KeepAskedAgent {
@@ -326,6 +332,108 @@ func adoptCommitlessFinish(d deps.Deps, p iterationParams, path, pane, sessionID
 	}
 	p.logTicketEvent(string(events.Commitless), pane, sessionID, path)
 	return true, nil
+}
+
+// maxFinishBlocks caps how often one launch's verify `finished` is refused
+// and resent. The counter is a local of the finishIteration call, so Retry,
+// Start over and relaunch (each a new launch) start from zero.
+const maxFinishBlocks = 2
+
+// adoptReportBlockingUnchecked runs adoptAskingReport, and first refuses a
+// verify `finished` that leaves Stories units unchecked: it clears the
+// finished status, types the unit list to the live session and re-waits, up
+// to maxFinishBlocks times. Past the cap it returns an error naming the units,
+// which the scheduler turns into an iteration-error pause. That is the only
+// new way into iteration-error; the web's Retry and Start over end it (ADR
+// 0042). Tickets without ## Stories (and so the collect ticket) are never
+// blocked.
+func adoptReportBlockingUnchecked(d deps.Deps, p iterationParams, path, pane, sessionID string) (adopted bool, newSessionID string, err error) {
+	for blocks := 0; ; blocks++ {
+		adopted, err := adoptAskingReport(p, path, pane, sessionID)
+		if err != nil || adopted {
+			return adopted, sessionID, err
+		}
+		units, err := uncheckedFinishUnits(d, p, path)
+		if err != nil || len(units) == 0 {
+			return false, sessionID, err
+		}
+		list := strings.Join(units, ", ")
+		if blocks >= maxFinishBlocks {
+			return false, sessionID, fmt.Errorf("verify ticket %s reported finished %d times with unchecked units: %s", p.Ticket.Identifier, blocks+1, list)
+		}
+		if sessionID, err = blockFinish(d, p, path, pane, sessionID, list); err != nil {
+			return false, sessionID, err
+		}
+	}
+}
+
+// uncheckedFinishUnits is the Stories units with no live Verified entry equal
+// to HEAD, when the ticket is a verify ticket whose current report is finished.
+func uncheckedFinishUnits(d deps.Deps, p iterationParams, path string) ([]string, error) {
+	current, err := schema.ParseTicket(p.Ticket.Path)
+	if err != nil {
+		return nil, fmt.Errorf("reading ticket %s for finish check: %w", p.Ticket.Path, err)
+	}
+	if current.Type != schema.TypeVerify || current.IterationStatus != schema.IterationStatusFinished {
+		return nil, nil
+	}
+	raw, err := os.ReadFile(p.Ticket.Path)
+	if err != nil {
+		return nil, fmt.Errorf("reading ticket %s body for finish check: %w", p.Ticket.Path, err)
+	}
+	body := schema.ParseBody(string(raw))
+	stories := schema.ParseStories(body)
+	if len(stories) == 0 {
+		return nil, nil
+	}
+	head, err := d.RevParse(path, "HEAD")
+	if err != nil {
+		return nil, fmt.Errorf("reading HEAD for finish check: %w", err)
+	}
+	checked := map[string]bool{}
+	for _, e := range schema.ParseVerified(body) {
+		if e.Counts(head) {
+			checked[e.Story] = true
+		}
+	}
+	return slices.DeleteFunc(stories, func(s string) bool { return checked[s] }), nil
+}
+
+// blockFinish clears the finished report, resends the unchecked units as
+// plain typed text and waits for the agent's next finish.
+func blockFinish(d deps.Deps, p iterationParams, path, pane, sessionID, list string) (string, error) {
+	label := worktree.IterationLabel(p.FeatureBranch, p.Ticket.Identifier)
+	s, found, err := d.Runner.Find(label)
+	if err == nil && !found {
+		err = agentrunner.ErrNotFound
+	}
+	var status agentrunner.Status
+	if err == nil {
+		status, err = d.Runner.Status(s)
+	}
+	if err != nil {
+		return sessionID, fmt.Errorf("reading live agent state for %s before blocking finish: %w", label, err)
+	}
+	if !supervise.AlreadyFinished(string(status.State)) {
+		return sessionID, fmt.Errorf("verify ticket %s has unchecked units (%s) but its session is not idle", p.Ticket.Identifier, list)
+	}
+	sessionID = cmp.Or(status.SessionID, sessionID)
+	if err := schema.ClearIterationStatus(p.Ticket.Path); err != nil {
+		return sessionID, fmt.Errorf("clearing finished report of %s: %w", p.Ticket.Identifier, err)
+	}
+	p.logTicketEventReason(string(events.FinishBlocked), pane, sessionID, path, list)
+	lp := p.launchAndPromptParams(label, pane, "", path, "", "")
+	lp.VerifyCap = p.verifyCap
+	lp.Session = s
+	msg := "You reported finished, but these units have no ## Verified entry at HEAD: " + list +
+		". Check each one, add its entry to your ticket's ## Verified section, then report finished again."
+	if err := supervise.PromptIdle(d, lp, msg); err != nil {
+		return sessionID, fmt.Errorf("sending finish block to %s: %w", label, err)
+	}
+	if err := supervise.WaitForFinish(d, lp, sessionID); err != nil {
+		return sessionID, fmt.Errorf("waiting for %s to finish after finish block: %w", label, err)
+	}
+	return sessionID, nil
 }
 
 // adoptAskingReport honours an agent's `iteration_status: asking`
