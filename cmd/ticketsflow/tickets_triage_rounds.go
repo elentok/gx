@@ -222,10 +222,10 @@ func newTriageCorrectCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "correct",
 		Short: "save a routing correction for a row",
-		Long: "Usage: gx tickets triage correct --row <address> --action area|ready [--destination <area>]\n" +
-			"  [--fallback <area>] [--revision <n>] [--project <p>]\n\n" +
-			"Move a row to an area (--destination names it) or to ready (--fallback names the area it falls\n" +
-			"back to). A move to an area drops the row's unanswered questions and keeps its answers.",
+		Long: "Usage: gx tickets triage correct --row <address> --action backlog|ready [--destination <backlog>]\n" +
+			"  [--fallback <backlog>] [--revision <n>] [--project <p>]\n\n" +
+			"Move a row to a backlog (--destination names it) or to ready (--fallback names the backlog it falls\n" +
+			"back to). A move to a backlog drops the row's unanswered questions and keeps its answers.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return sf.save(c, d, func(st *triage.Store, rec *triage.Record, rev int) (*triage.Record, error) {
@@ -236,34 +236,34 @@ func newTriageCorrectCmd(d Deps) *cobra.Command {
 	sf.bind(cmd)
 	f := cmd.Flags()
 	f.StringVar(&row, "row", "", "the row's follow-up address")
-	f.StringVar(&action, "action", "", "the new action: area or ready")
-	f.StringVar(&destination, "destination", "", "the area to move to")
-	f.StringVar(&fallback, "fallback", "", "the fallback area of a ready row")
+	f.StringVar(&action, "action", "", "the new action: backlog or ready")
+	f.StringVar(&destination, "destination", "", "the backlog to move to")
+	f.StringVar(&fallback, "fallback", "", "the fallback backlog of a ready row")
 	return cmd
 }
 
-func newTriageAreaCmd(d Deps) *cobra.Command {
+func newTriageBacklogCmd(d Deps) *cobra.Command {
 	var sf saveFlags
 	var name, source string
 	var confirm bool
 	cmd := &cobra.Command{
-		Use:   "area",
-		Short: "save an area entry, or confirm an agent area",
-		Long: "Usage: gx tickets triage area --name <area> --source table|agent [--confirm] [--revision <n>]\n" +
+		Use:   "backlog",
+		Short: "save a backlog entry, or confirm an agent backlog",
+		Long: "Usage: gx tickets triage backlog --name <backlog> --source table|agent [--confirm] [--revision <n>]\n" +
 			"  [--project <p>]\n\n" +
-			"Save an area entry at step route or questions. An entry with a saved name replaces it. --confirm\n" +
-			"records the person's confirmation of an agent area; approve is refused while one is unconfirmed.",
+			"Save a backlog entry at step route or questions. An entry with a saved name replaces it. --confirm\n" +
+			"records the person's confirmation of an agent backlog; approve is refused while one is unconfirmed.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return sf.save(c, d, func(st *triage.Store, rec *triage.Record, rev int) (*triage.Record, error) {
-				return st.SaveAreas(rec.ID, rev, []triage.Area{{Name: name, Source: source, Confirmed: confirm}})
+				return st.SaveBacklogs(rec.ID, rev, []triage.Backlog{{Name: name, Source: source, Confirmed: confirm}})
 			})
 		},
 	}
 	sf.bind(cmd)
 	f := cmd.Flags()
-	f.StringVar(&name, "name", "", "the area epic's name")
+	f.StringVar(&name, "name", "", "the backlog epic's name")
 	f.StringVar(&source, "source", "", "table or agent")
-	f.BoolVar(&confirm, "confirm", false, "the person confirmed this area")
+	f.BoolVar(&confirm, "confirm", false, "the person confirmed this backlog")
 	return cmd
 }

@@ -50,14 +50,14 @@ func TestExecute_TicketsEpics_MapsFlagFiltersToWayfinderMapEpics(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsEpics_AreasFlagListsOnlyAreasAndMapsOmitThem(t *testing.T) {
+func TestExecute_TicketsEpics_BacklogsFlagListsOnlyBacklogsAndMapsOmitThem(t *testing.T) {
 	store := cmdtest.IsolateTicketStore(t)
 	repo := testutil.TempRepo(t)
 	project := cmdtest.AddProject(t, store, "mine", repo)
-	testutil.WriteFile(t, project, "area-epic/ticket.md", "---\nkind: area\nstatus: open\n---\n# area")
+	testutil.WriteFile(t, project, "backlog-epic/ticket.md", "---\nkind: backlog\nstatus: open\n---\n# backlog")
 	testutil.WriteFile(t, project, "map-epic/ticket.md", "---\nkind: map\nstatus: open\n---\n# map")
 
-	for _, tc := range []struct{ flag, want string }{{"--areas", "area-epic\n"}, {"--maps", "map-epic\n"}} {
+	for _, tc := range []struct{ flag, want string }{{"--backlogs", "backlog-epic\n"}, {"--maps", "map-epic\n"}} {
 		out, err := runIn(t, repo, "tickets", "epics", tc.flag)
 		if err != nil {
 			t.Fatalf("execute tickets epics %s: %v", tc.flag, err)

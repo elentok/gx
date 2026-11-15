@@ -25,13 +25,13 @@ esac
 `
 
 // scriptEnv is a player's scratch: the gx stub, its log and a project dir with
-// an area of n open tickets.
+// a backlog of n open tickets.
 type scriptEnv struct {
 	gx, dir, log string
 	env          []string
 }
 
-func newScript(t *testing.T, area string, open int) *scriptEnv {
+func newScript(t *testing.T, backlog string, open int) *scriptEnv {
 	t.Helper()
 	dir := t.TempDir()
 	s := &scriptEnv{gx: filepath.Join(dir, "gx"), dir: dir, log: filepath.Join(dir, "log")}
@@ -39,11 +39,11 @@ func newScript(t *testing.T, area string, open int) *scriptEnv {
 		t.Fatal(err)
 	}
 	store := filepath.Join(dir, "store")
-	issues := filepath.Join(store, "p", area, "issues")
+	issues := filepath.Join(store, "p", backlog, "issues")
 	if err := os.MkdirAll(issues, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(store, "p", area, "ticket.md"), []byte("---\nstatus: open\nkind: area\n---\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(store, "p", backlog, "ticket.md"), []byte("---\nstatus: open\nkind: backlog\n---\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	for i := 1; i <= open; i++ {
@@ -63,7 +63,7 @@ func (s *scriptEnv) calls(t *testing.T) string {
 	return string(raw)
 }
 
-func TestDesignPlayer_ProposesAllOfASmallAreaAndTheThemeOfALargeOne(t *testing.T) {
+func TestDesignPlayer_ProposesAllOfASmallBacklogAndTheThemeOfALargeOne(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ open, want int }{{5, 5}, {11, 11}, {20, maxDesignTickets}} {
 		s := newScript(t, "sync", tc.open)
@@ -103,7 +103,7 @@ func TestDesignPlayer_AnEditReprintsOnceAndYesCreatesAndLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(s.calls(t), "tickets start-design p:sync --map retry-work --title Tidy the sync area --ticket 01,03,04,05") {
+	if !strings.Contains(s.calls(t), "tickets start-design p:sync --map retry-work --title Tidy the sync backlog --ticket 01,03,04,05") {
 		t.Errorf("calls = %q, want the create verb with the four ids", s.calls(t))
 	}
 	if want := "http://web.test/#/d/p:retry-work"; !strings.Contains(text, want) {
@@ -115,8 +115,8 @@ func TestTriagePlayer_RouteListsTheOldEpicMoveAndTheWaitingEpic(t *testing.T) {
 	t.Parallel()
 	s := newScript(t, "tooling", 0)
 	oldEpics := filepath.Join(s.dir, "oldepics.json")
-	body := `[{"epic":"test-flakes","area":"test-health","move":["p:test-flakes/01"],"claimed":[]},` +
-		`{"epic":"stuck","area":"","move":[],"waiting":true,"claimed":["p:stuck/01"]}]`
+	body := `[{"epic":"test-flakes","backlog":"test-health","move":["p:test-flakes/01"],"claimed":[]},` +
+		`{"epic":"stuck","backlog":"","move":[],"waiting":true,"claimed":["p:stuck/01"]}]`
 	if err := os.WriteFile(oldEpics, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -129,12 +129,12 @@ func TestTriagePlayer_RouteListsTheOldEpicMoveAndTheWaitingEpic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"move test-flakes -> area test-health: 1 tickets", "waiting: stuck holds claimed p:stuck/01"}
+	want := []string{"move test-flakes -> backlog test-health: 1 tickets", "waiting: stuck holds claimed p:stuck/01"}
 	if strings.Join(lines, "|") != strings.Join(want, "|") {
 		t.Errorf("lines = %q, want the move and the waiting line", lines)
 	}
 	calls := s.calls(t)
-	if !strings.Contains(calls, "triage area --project p --name test-health --source "+triage.AreaTable) || !strings.Contains(calls, "triage moves --project p") {
-		t.Errorf("calls = %q, want the table area saved and the move unit", calls)
+	if !strings.Contains(calls, "triage backlog --project p --name test-health --source "+triage.BacklogTable) || !strings.Contains(calls, "triage moves --project p") {
+		t.Errorf("calls = %q, want the table backlog saved and the move unit", calls)
 	}
 }

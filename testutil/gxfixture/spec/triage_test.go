@@ -22,7 +22,7 @@ func TestHoldTriage_KeepsTheShapesKnobs(t *testing.T) {
 	}
 }
 
-func TestTriageScenario_BacklogSeedsThreeAreasAndAnUnfinishedMap(t *testing.T) {
+func TestTriageScenario_BacklogSeedsThreeBacklogsAndAnUnfinishedMap(t *testing.T) {
 	t.Parallel()
 	sc, ok := TriageScenario("backlog")
 	if !ok {
@@ -39,13 +39,13 @@ func TestTriageScenario_BacklogSeedsThreeAreasAndAnUnfinishedMap(t *testing.T) {
 	if open["parser"] != 11 || open["sync"] != 5 || open["webui"] != 0 {
 		t.Errorf("open tickets = %v, want parser 11, sync 5, webui 0", open)
 	}
-	area, ids, ok := ticketmove.ParseStartDesignNotes(sc.EpicBody[project+":retry-work"])
-	if !ok || area != "sync" || !slices.Contains(ids, "03") {
-		t.Errorf("map Notes = area %q ids %v, want sync with a ticket still in the area", area, ids)
+	backlog, ids, ok := ticketmove.ParseStartDesignNotes(sc.EpicBody[project+":retry-work"])
+	if !ok || backlog != "sync" || !slices.Contains(ids, "03") {
+		t.Errorf("map Notes = backlog %q ids %v, want sync with a ticket still in the backlog", backlog, ids)
 	}
 }
 
-func TestTriageScenario_OldEpicsSeedsNoAreaInProjectGx(t *testing.T) {
+func TestTriageScenario_OldEpicsSeedsNoBacklogInProjectGx(t *testing.T) {
 	t.Parallel()
 	sc, ok := TriageScenario("old-epics")
 	if !ok {
@@ -55,8 +55,8 @@ func TestTriageScenario_OldEpicsSeedsNoAreaInProjectGx(t *testing.T) {
 		if e.Project != oldEpicsProject {
 			t.Errorf("epic %s is in project %s, want %s", e.Name, e.Project, oldEpicsProject)
 		}
-		if meta := sc.EpicMeta[e.Project+":"+e.Name]; slices.Contains([]string{"status: open\nkind: area\n"}, meta) {
-			t.Errorf("epic %s is an area", e.Name)
+		if meta := sc.EpicMeta[e.Project+":"+e.Name]; slices.Contains([]string{"status: open\nkind: backlog\n"}, meta) {
+			t.Errorf("epic %s is a backlog", e.Name)
 		}
 	}
 	if len(sc.Triage) != 1 || len(sc.Steps) != 1 {

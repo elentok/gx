@@ -58,9 +58,9 @@ func TestFrontier_MapEpicHasNone(t *testing.T) {
 	assertNumbers(t, Frontier(epic), nil)
 }
 
-func TestFrontier_AreaHasNone(t *testing.T) {
+func TestFrontier_BacklogHasNone(t *testing.T) {
 	t.Parallel()
-	epic := tickets.Epic{IsArea: true, Tickets: []tickets.Ticket{{Number: 1, Status: "open"}}}
+	epic := tickets.Epic{IsBacklog: true, Tickets: []tickets.Ticket{{Number: 1, Status: "open"}}}
 	assertNumbers(t, Frontier(epic), nil)
 }
 

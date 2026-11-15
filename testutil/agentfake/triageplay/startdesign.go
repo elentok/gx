@@ -34,7 +34,7 @@ const maxDesignTickets = 14
 
 // DesignCard is the "Start this Design?" card the fake proposes.
 type DesignCard struct {
-	Project, Area, Map, Title string
+	Project, Backlog, Map, Title string
 	Tickets                   []DesignTicket
 }
 
@@ -55,10 +55,10 @@ type DesignPlayer struct {
 func (c *DesignCard) Text() string {
 	lines := []string{fmt.Sprintf("Start this Design?\n\nTitle: %s\nMap: %s\n", c.Title, c.Map)}
 	for i, t := range c.Tickets {
-		lines = append(lines, fmt.Sprintf("%d. %s: %s (same theme as the other %s tickets)", i+1, t.Address, t.Title, c.Area))
+		lines = append(lines, fmt.Sprintf("%d. %s: %s (same theme as the other %s tickets)", i+1, t.Address, t.Title, c.Backlog))
 	}
 	return strings.Join(lines, "\n") +
-		"\n\n```gx-question\ntype: yes-no\nrecommended: yes\nyes: Creates the map and moves these tickets into it.\nno: Leaves the area as it is.\n```"
+		"\n\n```gx-question\ntype: yes-no\nrecommended: yes\nyes: Creates the map and moves these tickets into it.\nno: Leaves the backlog as it is.\n```"
 }
 
 func (p *DesignPlayer) gx(args ...string) (string, error) {
@@ -77,35 +77,35 @@ func (p *DesignPlayer) gx(args ...string) (string, error) {
 	return strings.TrimSpace(stdout.String()), nil
 }
 
-// Propose reads the area the prompt names and returns the card and its text.
+// Propose reads the backlog the prompt names and returns the card and its text.
 func (p *DesignPlayer) Propose(prompt string) (*DesignCard, string, error) {
 	fields := strings.Fields(prompt)
 	if len(fields) < 2 {
-		return nil, "", fmt.Errorf("the prompt names no area")
+		return nil, "", fmt.Errorf("the prompt names no backlog")
 	}
-	project, area, ok := strings.Cut(fields[1], ":")
+	project, backlog, ok := strings.Cut(fields[1], ":")
 	if !ok {
-		return nil, "", fmt.Errorf("%q is not a project:area address", fields[1])
+		return nil, "", fmt.Errorf("%q is not a project:backlog address", fields[1])
 	}
 	root, err := p.gx("tickets", "root")
 	if err != nil {
 		return nil, "", err
 	}
-	epic := tickets.LoadEpic(root, area)
-	card := &DesignCard{Project: project, Area: area, Title: "Tidy the " + area + " area"}
+	epic := tickets.LoadEpic(root, backlog)
+	card := &DesignCard{Project: project, Backlog: backlog, Title: "Tidy the " + backlog + " backlog"}
 	for _, t := range epic.Tickets {
 		if st := epic.RenderedStatus(t); st != tickets.StatusOpen && st != tickets.StatusDraft {
 			continue
 		}
 		if len(card.Tickets) < maxDesignTickets {
-			card.Tickets = append(card.Tickets, DesignTicket{t.DisplayNumber(), project + ":" + area + "/" + t.DisplayNumber(), t.Title})
+			card.Tickets = append(card.Tickets, DesignTicket{t.DisplayNumber(), project + ":" + backlog + "/" + t.DisplayNumber(), t.Title})
 		}
 	}
 	if len(card.Tickets) == 0 {
-		return nil, "", fmt.Errorf("%s has no open ticket", area)
+		return nil, "", fmt.Errorf("%s has no open ticket", backlog)
 	}
 	// next-name prints project:name; the create verb takes the bare name.
-	next, err := p.gx("tickets", "epic", "next-name", project+":"+filepath.Base(area)+"-cleanup")
+	next, err := p.gx("tickets", "epic", "next-name", project+":"+filepath.Base(backlog)+"-cleanup")
 	if err != nil {
 		return nil, "", err
 	}
@@ -113,7 +113,7 @@ func (p *DesignPlayer) Propose(prompt string) (*DesignCard, string, error) {
 	if _, err := p.gx("agent", "actionable", "Start this Design?"); err != nil {
 		return nil, "", err
 	}
-	return card, "I chose one theme from the open tickets of " + area + ".\n\n" + card.Text(), nil
+	return card, "I chose one theme from the open tickets of " + backlog + ".\n\n" + card.Text(), nil
 }
 
 // React answers a typed message: yes creates the Design; anything else is an
@@ -136,7 +136,7 @@ func (p *DesignPlayer) create(card *DesignCard) (string, error) {
 	for i, t := range card.Tickets {
 		ids[i] = t.ID
 	}
-	address, err := p.gx("tickets", "start-design", card.Project+":"+card.Area, "--map", card.Map, "--title", card.Title, "--ticket", strings.Join(ids, ","))
+	address, err := p.gx("tickets", "start-design", card.Project+":"+card.Backlog, "--map", card.Map, "--title", card.Title, "--ticket", strings.Join(ids, ","))
 	if err != nil {
 		return "", err
 	}

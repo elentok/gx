@@ -41,8 +41,8 @@ func (h *fakeHost) CreateSession(req wire.CreateSessionRequest) (wire.SessionRes
 	return wire.SessionResult{Session: &wire.SessionInfo{ID: "new", Name: req.Name}}, nil
 }
 
-func area(name string, statuses ...string) tickets.Epic {
-	e := tickets.Epic{Name: name, IsArea: true}
+func backlog(name string, statuses ...string) tickets.Epic {
+	e := tickets.Epic{Name: name, IsBacklog: true}
 	for _, s := range statuses {
 		e.Tickets = append(e.Tickets, tickets.Ticket{Identifier: "01", Status: s})
 	}
@@ -51,8 +51,8 @@ func area(name string, statuses ...string) tickets.Epic {
 
 func newHost() *fakeHost {
 	return &fakeHost{trunk: "/trunk", epics: []tickets.Epic{
-		area("backlog", "open", "draft", "done"),
-		area("empty", "done"),
+		backlog("backlog", "open", "draft", "done"),
+		backlog("empty", "done"),
 		{Name: "loop", Tickets: []tickets.Ticket{{Identifier: "01", Status: "open"}}},
 	}}
 }
@@ -60,7 +60,7 @@ func newHost() *fakeHost {
 func TestStart_FlowlessWorkerSessionInTrunkWithSkillPrompt(t *testing.T) {
 	t.Parallel()
 	h := newHost()
-	res, err := startdesign.New(h).Start(wire.StartDesignRequest{Project: "proj", Area: "backlog", Hint: "the  retry\nwork"})
+	res, err := startdesign.New(h).Start(wire.StartDesignRequest{Project: "proj", Backlog: "backlog", Hint: "the  retry\nwork"})
 	if err != nil || res.Refused || res.Session == nil {
 		t.Fatalf("Start = %+v, %v", res, err)
 	}
@@ -84,7 +84,7 @@ func TestStart_SecondCallReturnsTheLiveChat(t *testing.T) {
 		{ID: "old", Name: "start-design-proj-backlog", Status: wire.SessionStatus{State: wire.SessionExited}},
 		{ID: "live", Name: "start-design-proj-backlog", Status: wire.SessionStatus{State: wire.SessionIdle}},
 	}
-	res, err := startdesign.New(h).Start(wire.StartDesignRequest{Project: "proj", Area: "backlog"})
+	res, err := startdesign.New(h).Start(wire.StartDesignRequest{Project: "proj", Backlog: "backlog"})
 	if err != nil || res.Refused || res.Session == nil || res.Session.ID != "live" {
 		t.Fatalf("Start = %+v, %v", res, err)
 	}
@@ -96,10 +96,10 @@ func TestStart_Refusals(t *testing.T) {
 		req    wire.StartDesignRequest
 		reason string
 	}{
-		"unknown project": {wire.StartDesignRequest{Project: "nope", Area: "backlog"}, wire.ReasonStartDesignUnknownProject},
-		"not an area":     {wire.StartDesignRequest{Project: "proj", Area: "loop"}, wire.ReasonStartDesignNotArea},
-		"missing epic":    {wire.StartDesignRequest{Project: "proj", Area: "ghost"}, wire.ReasonStartDesignNotArea},
-		"no open ticket":  {wire.StartDesignRequest{Project: "proj", Area: "empty"}, wire.ReasonStartDesignNoOpenTickets},
+		"unknown project": {wire.StartDesignRequest{Project: "nope", Backlog: "backlog"}, wire.ReasonStartDesignUnknownProject},
+		"not a backlog":     {wire.StartDesignRequest{Project: "proj", Backlog: "loop"}, wire.ReasonStartDesignNotBacklog},
+		"missing epic":    {wire.StartDesignRequest{Project: "proj", Backlog: "ghost"}, wire.ReasonStartDesignNotBacklog},
+		"no open ticket":  {wire.StartDesignRequest{Project: "proj", Backlog: "empty"}, wire.ReasonStartDesignNoOpenTickets},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -115,10 +115,10 @@ func TestStart_Refusals(t *testing.T) {
 	}
 }
 
-func TestFinishMove_RefusesNonAreaWithoutMoving(t *testing.T) {
+func TestFinishMove_RefusesNonBacklogWithoutMoving(t *testing.T) {
 	t.Parallel()
-	res, err := startdesign.New(newHost()).FinishMove(wire.FinishMoveRequest{Project: "proj", Area: "loop", Map: "m"})
-	if err != nil || !res.Refused || res.Reason != wire.ReasonStartDesignNotArea {
+	res, err := startdesign.New(newHost()).FinishMove(wire.FinishMoveRequest{Project: "proj", Backlog: "loop", Map: "m"})
+	if err != nil || !res.Refused || res.Reason != wire.ReasonStartDesignNotBacklog {
 		t.Errorf("FinishMove = %+v, %v", res, err)
 	}
 }

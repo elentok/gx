@@ -10,14 +10,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const oldEpicAreasFile = "gx-triage-follow-ups/old-epic-areas.txt"
+const oldEpicBacklogsFile = "gx-triage-follow-ups/old-epic-backlogs.txt"
 
-// oldEpic is one old triage-made area map epic the first Triage after the
-// change moves into areas.
+// oldEpic is one old triage-made backlog map epic the first Triage after the
+// change moves into backlogs.
 type oldEpic struct {
 	Epic string `json:"epic"`
-	// Area is the shipped table's area; empty when the epic is not in the table.
-	Area string `json:"area"`
+	// Backlog is the shipped table's backlog; empty when the epic is not in the table.
+	Backlog string `json:"backlog"`
 	// Move lists the open and draft tickets to move.
 	Move []string `json:"move"`
 	// Archive is true when no open, draft or claimed ticket would be left.
@@ -28,10 +28,10 @@ type oldEpic struct {
 	Claimed []string `json:"claimed"`
 }
 
-// shippedOldEpicAreas reads the table that ships with the skill:
-// project -> old epic -> area.
-func shippedOldEpicAreas() (map[string]map[string]string, error) {
-	data, err := skills.Bundle.ReadFile(oldEpicAreasFile)
+// shippedOldEpicBacklogs reads the table that ships with the skill:
+// project -> old epic -> backlog.
+func shippedOldEpicBacklogs() (map[string]map[string]string, error) {
+	data, err := skills.Bundle.ReadFile(oldEpicBacklogsFile)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func shippedOldEpicAreas() (map[string]map[string]string, error) {
 			continue
 		}
 		if len(f) != 3 {
-			return nil, fmt.Errorf("%s: want <project> <epic> <area>, got %q", oldEpicAreasFile, line)
+			return nil, fmt.Errorf("%s: want <project> <epic> <backlog>, got %q", oldEpicBacklogsFile, line)
 		}
 		if table[f[0]] == nil {
 			table[f[0]] = map[string]string{}
@@ -62,7 +62,7 @@ func listOldEpics(projectDir, project string, table map[string]map[string]string
 		if !triage.IsOldEpic(e) {
 			continue
 		}
-		c := oldEpic{Epic: e.Name, Area: table[project][e.Name], Move: []string{}, Claimed: []string{}}
+		c := oldEpic{Epic: e.Name, Backlog: table[project][e.Name], Move: []string{}, Claimed: []string{}}
 		k := triage.ClassifyOldEpic(project, e)
 		c.Move, c.Claimed = k.Move, k.Claimed
 		c.Archive = k.CanArchive()
@@ -77,10 +77,10 @@ func newTriageOldEpicsCmd(d Deps) *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "oldepics",
-		Short: "list the old triage-made area epics the first Triage must move into areas",
+		Short: "list the old triage-made backlog epics the first Triage must move into backlogs",
 		Long: "Usage: gx tickets triage oldepics [--project <p>] [--json]\n\n" +
 			"List the charting, unarchived map epics whose Notes say \"Triaged from follow-ups\", each with its\n" +
-			"open and draft tickets to move, its area from the shipped table (empty when not in it), whether it\n" +
+			"open and draft tickets to move, its backlog from the shipped table (empty when not in it), whether it\n" +
 			"can archive after the move, and, when nothing can move and a claimed ticket stays, a waiting flag.\n" +
 			"Prints an empty list when there are none. Read only.",
 		Args: cobra.NoArgs,
@@ -89,7 +89,7 @@ func newTriageOldEpicsCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			table, err := shippedOldEpicAreas()
+			table, err := shippedOldEpicBacklogs()
 			if err != nil {
 				return err
 			}
@@ -106,7 +106,7 @@ func newTriageOldEpicsCmd(d Deps) *cobra.Command {
 				case e.Waiting:
 					fmt.Fprintf(out, "waiting: %s holds claimed %s\n", e.Epic, strings.Join(e.Claimed, ", "))
 				default:
-					fmt.Fprintf(out, "%s  area=%s move=%d archive=%t\n", e.Epic, e.Area, len(e.Move), e.Archive)
+					fmt.Fprintf(out, "%s  backlog=%s move=%d archive=%t\n", e.Epic, e.Backlog, len(e.Move), e.Archive)
 				}
 			}
 			return nil

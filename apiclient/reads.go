@@ -158,7 +158,7 @@ func (r *Reads) EpicDetail(ctx context.Context, address string) (wire.EpicDetail
 	return d, err
 }
 
-// Backlog returns each project's areas with their open counts.
+// Backlog returns each project's epics with their open counts.
 func (r *Reads) Backlog(ctx context.Context) (wire.BacklogList, error) {
 	var l wire.BacklogList
 	err := r.t.get(ctx, "/v1/backlog", &l)

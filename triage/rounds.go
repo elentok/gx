@@ -17,11 +17,11 @@ const (
 	MaxOrdinaryRounds = 3
 )
 
-// Plan actions. ActionArea replaces the version 1 "map"; Store.upgrade
+// Plan actions. ActionBacklog replaces the version 1 "map"; Store.upgrade
 // rewrites old records, so no other code sees the old name.
 const (
 	ActionReady = "ready"
-	ActionArea  = "area"
+	ActionBacklog  = "backlog"
 	ActionClose = "close"
 	legacyMap   = "map"
 )
@@ -68,14 +68,14 @@ func (r *Record) questionPlaced(id string) bool {
 }
 
 // Unrounded lists the ask questions of rows that are not gone and not going to
-// an area that no round holds yet: the candidates for the next round.
+// a backlog that no round holds yet: the candidates for the next round.
 func (r *Record) Unrounded() []Question {
 	var out []Question
 	for _, row := range r.Rows {
 		if row.gone() {
 			continue
 		}
-		if action, _ := row.Effective(); action == ActionArea {
+		if action, _ := row.Effective(); action == ActionBacklog {
 			continue
 		}
 		for _, q := range row.AllQuestions() {
@@ -254,10 +254,10 @@ func (s *Store) Object(id string, revision int, rowID, question string, options 
 	})
 }
 
-// Correct moves a row to an area or to the ready epic after the person
-// corrected its routing. A move to an area drops the row's unanswered
+// Correct moves a row to a backlog or to the ready epic after the person
+// corrected its routing. A move to a backlog drops the row's unanswered
 // questions from every round and keeps the answers given. A move to ready
-// needs a fallback area; the row's ask questions then count as unrounded again.
+// needs a fallback backlog; the row's ask questions then count as unrounded again.
 func (s *Store) Correct(id string, revision int, address, action, destination, fallback string) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
 		if err := requireStep(rec, "routing correction", tickets.StepQuestions); err != nil {
@@ -271,23 +271,23 @@ func (s *Store) Correct(id string, revision int, address, action, destination, f
 			return phaseErr("row %s is gone", address)
 		}
 		switch action {
-		case ActionArea:
+		case ActionBacklog:
 			if destination == "" {
-				return phaseErr("a move to an area needs the area name")
+				return phaseErr("a move to a backlog needs the backlog name")
 			}
-			if err := rec.checkAreaCap(s.projectDir, destination); err != nil {
+			if err := rec.checkBacklogCap(s.projectDir, destination); err != nil {
 				return err
 			}
 			rec.dropUnanswered(address)
-			row.Person.Action, row.Person.Destination = ActionArea, destination
+			row.Person.Action, row.Person.Destination = ActionBacklog, destination
 		case ActionReady:
 			if fallback == "" {
-				return phaseErr("a move to ready needs a fallback area")
+				return phaseErr("a move to ready needs a fallback backlog")
 			}
 			row.Fallback = fallback
 			row.Person.Action, row.Person.Destination = ActionReady, ""
 		default:
-			return phaseErr("a routing correction goes to %q or ready, not %q", ActionArea, action)
+			return phaseErr("a routing correction goes to %q or ready, not %q", ActionBacklog, action)
 		}
 		if action != ActionReady && row.Group != "" {
 			rec.dissolveGroup(row.Group)
@@ -307,38 +307,38 @@ func (r *Record) dropUnanswered(address string) {
 	}
 }
 
-// SaveAreas stores area entries during Route, before the plan, and the
-// person's confirmation of an agent area during Questions. An entry with
+// SaveBacklogs stores backlog entries during Route, before the plan, and the
+// person's confirmation of an agent backlog during Questions. An entry with
 // the name of a saved one replaces it. A confirmed entry that would be a 13th
-// area is refused.
-func (s *Store) SaveAreas(id string, revision int, areas []Area) (*Record, error) {
+// backlog is refused.
+func (s *Store) SaveBacklogs(id string, revision int, backlogs []Backlog) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
-		if err := requireStep(rec, "area save", tickets.StepRoute, tickets.StepQuestions); err != nil {
+		if err := requireStep(rec, "backlog save", tickets.StepRoute, tickets.StepQuestions); err != nil {
 			return err
 		}
-		for _, a := range areas {
-			if a.Name == "" || (a.Source != AreaTable && a.Source != AreaAgent) {
-				return phaseErr("area %q needs a name and source table or agent", a.Name)
+		for _, a := range backlogs {
+			if a.Name == "" || (a.Source != BacklogTable && a.Source != BacklogAgent) {
+				return phaseErr("backlog %q needs a name and source table or agent", a.Name)
 			}
 			if a.Confirmed {
-				if err := rec.checkAreaCap(s.projectDir, a.Name); err != nil {
+				if err := rec.checkBacklogCap(s.projectDir, a.Name); err != nil {
 					return err
 				}
 			}
-			if i := slices.IndexFunc(rec.Areas, func(o Area) bool { return o.Name == a.Name }); i >= 0 {
-				rec.Areas[i] = a
+			if i := slices.IndexFunc(rec.Backlogs, func(o Backlog) bool { return o.Name == a.Name }); i >= 0 {
+				rec.Backlogs[i] = a
 			} else {
-				rec.Areas = append(rec.Areas, a)
+				rec.Backlogs = append(rec.Backlogs, a)
 			}
 		}
 		return nil
 	})
 }
 
-// areaNames is the area epics on disk plus the areas this record saved.
-func (r *Record) areaNames(projectDir string) []string {
-	names, _ := tickets.AreaNames(projectDir)
-	for _, a := range r.Areas {
+// backlogNames is the backlog epics on disk plus the backlogs this record saved.
+func (r *Record) backlogNames(projectDir string) []string {
+	names, _ := tickets.BacklogNames(projectDir)
+	for _, a := range r.Backlogs {
 		if !slices.Contains(names, a.Name) {
 			names = append(names, a.Name)
 		}
@@ -346,21 +346,21 @@ func (r *Record) areaNames(projectDir string) []string {
 	return names
 }
 
-// checkAreaCap refuses name when it would be a new area past the cap.
-func (r *Record) checkAreaCap(projectDir, name string) error {
-	names := r.areaNames(projectDir)
-	if !slices.Contains(names, name) && len(names) >= tickets.MaxAreas {
-		return phaseErr("area %q would be area %d: a project has at most %d areas", name, len(names)+1, tickets.MaxAreas)
+// checkBacklogCap refuses name when it would be a new backlog past the cap.
+func (r *Record) checkBacklogCap(projectDir, name string) error {
+	names := r.backlogNames(projectDir)
+	if !slices.Contains(names, name) && len(names) >= tickets.MaxBacklogs {
+		return phaseErr("backlog %q would be backlog %d: a project has at most %d backlogs", name, len(names)+1, tickets.MaxBacklogs)
 	}
 	return nil
 }
 
-// unconfirmedAreas lists the agent areas the person has not confirmed. A table
-// area counts as confirmed by the final card.
-func (r *Record) unconfirmedAreas() []string {
+// unconfirmedBacklogs lists the agent backlogs the person has not confirmed. A table
+// backlog counts as confirmed by the final card.
+func (r *Record) unconfirmedBacklogs() []string {
 	var out []string
-	for _, a := range r.Areas {
-		if a.Source == AreaAgent && !a.Confirmed {
+	for _, a := range r.Backlogs {
+		if a.Source == BacklogAgent && !a.Confirmed {
 			out = append(out, a.Name)
 		}
 	}

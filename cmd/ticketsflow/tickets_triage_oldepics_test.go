@@ -28,7 +28,7 @@ func writeOldEpic(t *testing.T, project, name, front, notes string, ticketStatus
 
 type oldEpicShown struct {
 	Epic    string   `json:"epic"`
-	Area    string   `json:"area"`
+	Backlog    string   `json:"backlog"`
 	Move    []string `json:"move"`
 	Archive bool     `json:"archive"`
 	Waiting bool     `json:"waiting"`
@@ -94,8 +94,8 @@ func TestTriageOldEpics_ShowsMoveArchiveAndWaiting(t *testing.T) {
 			t.Errorf("%s = %+v", name, m)
 		}
 	}
-	if by["movable"].Area != "" {
-		t.Errorf("an epic outside the table got area %q", by["movable"].Area)
+	if by["movable"].Backlog != "" {
+		t.Errorf("an epic outside the table got backlog %q", by["movable"].Backlog)
 	}
 }
 
@@ -107,20 +107,20 @@ func TestTriageOldEpics_EmptyListIsAnEmptyArray(t *testing.T) {
 	}
 }
 
-func TestOldEpicAreas_ShippedTableCoversTheInventory(t *testing.T) {
-	table, err := shippedOldEpicAreas()
+func TestOldEpicBacklogs_ShippedTableCoversTheInventory(t *testing.T) {
+	table, err := shippedOldEpicBacklogs()
 	if err != nil {
 		t.Fatal(err)
 	}
-	areas := []string{"test-health", "check-and-brief", "agent-guidance-and-skills", "ticket-authoring",
+	backlogs := []string{"test-health", "check-and-brief", "agent-guidance-and-skills", "ticket-authoring",
 		"tickets-store-and-cli", "agent-sessions-and-runners", "ralph-loop-and-recovery",
 		"epics-queue-and-merge", "server-performance-and-structure", "design-flow", "web-ui", "tui"}
 	if got := len(table["gx"]); got != 103 {
 		t.Errorf("gx entries = %d, want 103", got)
 	}
-	for epic, area := range table["gx"] {
-		if !slices.Contains(areas, area) {
-			t.Errorf("%s -> unknown area %q", epic, area)
+	for epic, backlog := range table["gx"] {
+		if !slices.Contains(backlogs, backlog) {
+			t.Errorf("%s -> unknown backlog %q", epic, backlog)
 		}
 	}
 	for epic, want := range map[string]string{
@@ -138,11 +138,11 @@ func TestOldEpicAreas_ShippedTableCoversTheInventory(t *testing.T) {
 	}
 }
 
-func TestTriageOldEpics_ReadsAreaFromTheTable(t *testing.T) {
+func TestTriageOldEpics_ReadsBacklogFromTheTable(t *testing.T) {
 	_, project := triageProjectDir(t)
 	writeOldEpic(t, project, "chat-cards", "", triagedNote, "open")
 	got, err := listOldEpics(project, "gx", map[string]map[string]string{"gx": {"chat-cards": "web-ui"}})
-	if err != nil || len(got) != 1 || got[0].Area != "web-ui" {
+	if err != nil || len(got) != 1 || got[0].Backlog != "web-ui" {
 		t.Fatalf("got %+v err %v", got, err)
 	}
 	if _, err := os.Stat(project); err != nil {

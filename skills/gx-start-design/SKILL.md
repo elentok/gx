@@ -1,16 +1,16 @@
 ---
 name: gx-start-design
 description: >-
-  Start Design: propose one Design theme from an area's open tickets, ask for approval on a question
+  Start Design: propose one Design theme from a backlog's open tickets, ask for approval on a question
   card, then create the charting map and move the approved tickets in. Run
-  `/gx-start-design <project:area> [hint]`. Manual.
+  `/gx-start-design <project:backlog> [hint]`. Manual.
 disable-model-invocation: true
 ---
 
 # gx Start Design
 
-`/gx-start-design <project:area> [hint]` picks one theme from the open tickets of an area and turns
-it into a Design. The first word is the area's address. Anything after it is the person's hint for
+`/gx-start-design <project:backlog> [hint]` picks one theme from the open tickets of a backlog and turns
+it into a Design. The first word is the backlog's address. Anything after it is the person's hint for
 the theme. This skill never writes tickets itself and never starts the Design.
 
 Read [gx-unslop](../gx-unslop/SKILL.md) before writing the reasons, and
@@ -18,11 +18,11 @@ Read [gx-unslop](../gx-unslop/SKILL.md) before writing the reasons, and
 
 ## Steps
 
-1. **Read the area's open tickets**: the draft and open ones. Use `gx tickets list <project:area>`
+1. **Read the backlog's open tickets**: the draft and open ones. Use `gx tickets list <project:backlog>`
    and `gx tickets show <addr>` for the ones you need. Skip done, claimed and paused tickets.
 2. **Choose one theme** that fits the hint, if there is one, and a title for it. Check the title's
    map name with `gx tickets epic next-name <project:name>`; use the name it prints.
-3. **Pick the tickets**: 8 to 14 that belong to the theme. An area with fewer than 8 open tickets
+3. **Pick the tickets**: 8 to 14 that belong to the theme. A backlog with fewer than 8 open tickets
    proposes all of them.
 4. **Run `gx agent actionable "<reason>"`** so the session shows Actionable while it waits. Outside a gx session
    it does nothing.
@@ -36,7 +36,7 @@ Read [gx-unslop](../gx-unslop/SKILL.md) before writing the reasons, and
 7. **On Yes**, call the create verb with the map name, the title and the ticket ids:
 
    ```
-   gx tickets start-design <project:area> --map <name> --title "<title>" --ticket <id>,<id>,...
+   gx tickets start-design <project:backlog> --map <name> --title "<title>" --ticket <id>,<id>,...
    ```
 
    If it fails after moving some tickets, run it again with the same `--map` and no `--ticket`: it
@@ -48,4 +48,4 @@ Read [gx-unslop](../gx-unslop/SKILL.md) before writing the reasons, and
 
 - One theme per card. Never mix themes to reach 14.
 - Never start the Design. The person does that from its page.
-- Use the `GLOSSARY.md` words: Design, area, charting map.
+- Use the `GLOSSARY.md` words: Design, backlog, charting map.

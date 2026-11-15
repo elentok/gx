@@ -4,7 +4,7 @@ import type { TriageRow, TriageView } from "../generated/server"
 import { ticketHref } from "../hrefs"
 
 const SHOWN = 3
-const AREA_ACTIONS = ["area"]
+const BACKLOG_ACTIONS = ["backlog"]
 
 type Tone = "done" | "running" | "muted"
 type Group = {
@@ -28,17 +28,17 @@ function closedSub(rows: TriageRow[]): string {
   return [...counts].map(([reason, n]) => `${n} ${reason}`).join(" · ")
 }
 
-/** The count lines, then one line per area, in the order the card shows them. */
+/** The count lines, then one line per backlog, in the order the card shows them. */
 function groupsOf(view: Pick<TriageView, "rows" | "ready_epic">): {
   lines: Group[]
-  areas: Group[]
+  backlogs: Group[]
 } {
   const live = view.rows.filter((r) => !r.gone)
   const lines: Group[] = []
   const add = (g: Omit<Group, "count">) =>
     g.rows.length > 0 && lines.push({ ...g, count: g.rows.length })
-  const area = byAction(live, ...AREA_ACTIONS)
-  const names = new Set(area.map((r) => r.destination ?? ""))
+  const backlog = byAction(live, ...BACKLOG_ACTIONS)
+  const names = new Set(backlog.map((r) => r.destination ?? ""))
   const closed = byAction(live, "close")
   add({
     key: "ready",
@@ -48,26 +48,26 @@ function groupsOf(view: Pick<TriageView, "rows" | "ready_epic">): {
     rows: byAction(live, "ready"),
   })
   add({
-    key: "area",
-    title: "To an area",
-    sub: `→ ${names.size} ${names.size === 1 ? "area" : "areas"}`,
+    key: "backlog",
+    title: "To a backlog",
+    sub: `→ ${names.size} ${names.size === 1 ? "backlog" : "backlogs"}`,
     tone: "running",
-    rows: area,
+    rows: backlog,
   })
   add({ key: "close", title: "Closed", sub: closedSub(closed), tone: "muted", rows: closed })
   add({ key: "merge", title: "Merged", tone: "muted", rows: byAction(live, "merge") })
   add({ key: "keep", title: "Kept for later", tone: "muted", rows: byAction(live, "keep") })
 
-  const perArea = new Map<string, TriageRow[]>()
-  for (const r of area)
-    perArea.set(r.destination ?? "", [...(perArea.get(r.destination ?? "") ?? []), r])
-  const areas = [...perArea].map(([name, rows]) => ({
-    key: `area:${name}`,
+  const perBacklog = new Map<string, TriageRow[]>()
+  for (const r of backlog)
+    perBacklog.set(r.destination ?? "", [...(perBacklog.get(r.destination ?? "") ?? []), r])
+  const backlogs = [...perBacklog].map(([name, rows]) => ({
+    key: `backlog:${name}`,
     count: rows.length,
-    title: name || "(no area)",
+    title: name || "(no backlog)",
     rows,
   }))
-  return { lines, areas }
+  return { lines, backlogs }
 }
 
 /** The plan has a saved action for every row. */
@@ -141,10 +141,10 @@ export function PlanSummary({
   openReady?: boolean
 }) {
   const [open, setOpen] = useState<string | undefined>(openReady ? "ready" : undefined)
-  const { lines, areas } = groupsOf(view)
+  const { lines, backlogs } = groupsOf(view)
   const total = lines.reduce((n, g) => n + g.count, 0)
   const toggle = (g: Group) => setOpen(open === g.key ? undefined : g.key)
-  const openGroup = [...lines, ...areas].find((g) => g.key === open)
+  const openGroup = [...lines, ...backlogs].find((g) => g.key === open)
   return (
     <Box
       role="region"
@@ -191,8 +191,8 @@ export function PlanSummary({
           </Box>
         </chakra.button>
       ))}
-      {areas.length > 0 && heading("Areas")}
-      {areas.map((g) => (
+      {backlogs.length > 0 && heading("Backlogs")}
+      {backlogs.map((g) => (
         <chakra.button
           key={g.key}
           type="button"

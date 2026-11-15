@@ -52,9 +52,9 @@ func newTriageMovesCmd(d Deps) *cobra.Command {
 		Use:   "moves",
 		Short: "save the old-epic move units read as JSON on stdin and print the new revision",
 		Long: "Usage: gx tickets triage moves [--revision <n>] [--project <p>]\n\n" +
-			"Read a JSON array on stdin: [{\"oldEpic\", \"area\"}] (step route only). Each unit is saved pending and\n" +
+			"Read a JSON array on stdin: [{\"oldEpic\", \"backlog\"}] (step route only). Each unit is saved pending and\n" +
 			"replaces the earlier list. Leave out an epic that holds a claimed ticket and nothing to move: the\n" +
-			"summary shows it as waiting. The area must be an epic of the project or an area of this triage.",
+			"summary shows it as waiting. The backlog must be an epic of the project or a backlog of this triage.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			t, err := resolveTriage(d, project)

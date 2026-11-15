@@ -14,11 +14,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// runTicketsStartDesign creates the map from the area's tickets (or carries on
+// runTicketsStartDesign creates the map from the backlog's tickets (or carries on
 // an unfinished run) and prints the map's address. active is the queued-or-live
 // check applied to each ticket.
-func runTicketsStartDesign(cfgDirs config.Dirs, cwd, areaArg, mapName, title string, ids []string, active func(tickets.Address) error, w io.Writer) error {
-	projectDir, project, area, err := resolveEpicTarget(cfgDirs, cwd, areaArg)
+func runTicketsStartDesign(cfgDirs config.Dirs, cwd, backlogArg, mapName, title string, ids []string, active func(tickets.Address) error, w io.Writer) error {
+	projectDir, project, backlog, err := resolveEpicTarget(cfgDirs, cwd, backlogArg)
 	if err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func runTicketsStartDesign(cfgDirs config.Dirs, cwd, areaArg, mapName, title str
 	}
 	name, err := ticketmove.StartDesign(ticketmove.StartDesignOpts{
 		ConversationsDir: records, ProjectDir: projectDir, Project: project,
-		Area: area, Map: mapName, Title: title, IDs: ids, Active: active,
+		Backlog: backlog, Map: mapName, Title: title, IDs: ids, Active: active,
 	})
 	if err != nil {
 		return err
@@ -50,9 +50,9 @@ func newTicketsStartDesignCmd(d Deps) *cobra.Command {
 	var mapName, title string
 	var ids []string
 	cmd := &cobra.Command{
-		Use:   "start-design <project:area>",
-		Short: "create a charting map from an area's tickets and move them in; rerun it after a failure",
-		Long: "Create a charting map (a Design) from tickets of an area and move them in.\n" +
+		Use:   "start-design <project:backlog>",
+		Short: "create a charting map from a backlog's tickets and move them in; rerun it after a failure",
+		Long: "Create a charting map (a Design) from tickets of a backlog and move them in.\n" +
 			"Every ticket is checked first, so a refusal writes nothing. After a failure,\n" +
 			"rerun with the same --map (with or without --ticket) to move the rest.",
 		Args: cobra.ExactArgs(1),
@@ -68,7 +68,7 @@ func newTicketsStartDesignCmd(d Deps) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&mapName, "map", "", "name of the new map (check it with `tickets epic next-name`)")
 	cmd.Flags().StringVar(&title, "title", "", "the approved title shown in the map (default: the map name)")
-	cmd.Flags().StringSliceVar(&ids, "ticket", nil, "ids of the area's tickets to move, comma-separated; empty on a rerun reads them from the map's Notes")
+	cmd.Flags().StringSliceVar(&ids, "ticket", nil, "ids of the backlog's tickets to move, comma-separated; empty on a rerun reads them from the map's Notes")
 	_ = cmd.MarkFlagRequired("map")
 	return cmd
 }

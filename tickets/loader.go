@@ -400,7 +400,7 @@ func loadEpicTicketMD(epic *Epic) {
 		return
 	}
 	epic.IsMap = wire.Kind == KindMap
-	epic.IsArea = wire.Kind == KindArea
+	epic.IsBacklog = wire.Kind == KindBacklog
 	epic.Status = wire.Status
 	epic.BlockedBy = wire.BlockedBy
 	epic.Base = wire.Base

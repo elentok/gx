@@ -77,7 +77,7 @@ describe("the Backlog page", () => {
       {
         project: "gx",
         workspaces: [],
-        areas: [
+        epics: [
           { address: "gx:web", name: "web", open: 3 },
           { address: "gx:docs", name: "docs", open: 0 },
           {
@@ -88,7 +88,7 @@ describe("the Backlog page", () => {
           },
         ],
       },
-      { project: "empty", workspaces: [], areas: [] },
+      { project: "empty", workspaces: [], epics: [] },
     ],
   }
 
@@ -122,7 +122,7 @@ describe("the Backlog page", () => {
     window.location.hash = ""
   })
 
-  test("lists areas with open counts and disables Start Design at zero", async () => {
+  test("lists backlogs with open counts and disables Start Design at zero", async () => {
     renderBacklog(() => ({}))
 
     expect(await screen.findByText("3 open")).toBeTruthy()
@@ -131,7 +131,7 @@ describe("the Backlog page", () => {
     expect(buttons.map((b) => (b as HTMLButtonElement).disabled)).toEqual([false, true, false])
   })
 
-  test("Start posts the area and hint, and opens the chat", async () => {
+  test("Start posts the backlog and hint, and opens the chat", async () => {
     const posts = renderBacklog(() => ({ session: { id: "chat-1" } }))
 
     fireEvent.click((await screen.findAllByRole("button", { name: "Start Design" }))[0])
@@ -142,7 +142,7 @@ describe("the Backlog page", () => {
     expect(posts).toEqual([
       {
         url: "/v1/backlog/start-design",
-        body: { project: "gx", area: "web", hint: "tidy" },
+        body: { project: "gx", backlog: "web", hint: "tidy" },
       },
     ])
   })
@@ -166,7 +166,7 @@ describe("the Backlog page", () => {
     await waitFor(() => expect(posts).toHaveLength(1))
     expect(posts[0]).toEqual({
       url: "/v1/backlog/finish-move",
-      body: { project: "gx", area: "cli", map: "cli-design" },
+      body: { project: "gx", backlog: "cli", map: "cli-design" },
     })
     expect(screen.queryByRole("dialog")).toBeNull()
     expect(window.location.hash).toBe("#/backlog")

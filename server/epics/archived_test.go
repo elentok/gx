@@ -42,7 +42,7 @@ func TestEpicDetail_ArchivedListOrdersNewestFirstAndJoinsAPair(t *testing.T) {
 		rigs.WriteEpicFiles(t, store, ".archive/design", archivedDesignFile("archived_at: 2026-02-15T10:00:00Z\n"), done)
 		rigs.WriteEpicFiles(t, store, ".archive/design-impl", archivedLoopFile("archived_at: 2026-02-15T10:00:00Z\n"), done)
 		rigs.WriteEpicFiles(t, store, "active", "---\nstatus: open\n---\n", done)
-		rigs.WriteEpicFiles(t, store, ".archive/an-area", archivedLoopFile("kind: area\narchived_at: 2026-03-05T10:00:00Z\n"), done)
+		rigs.WriteEpicFiles(t, store, ".archive/an-backlog", archivedLoopFile("kind: backlog\narchived_at: 2026-03-05T10:00:00Z\n"), done)
 	})
 
 	got := getArchivedList(t, h, base)

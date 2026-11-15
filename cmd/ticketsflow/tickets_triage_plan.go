@@ -159,7 +159,7 @@ func newTriageApproveCmd(d Deps) *cobra.Command {
 			"Move the step from questions to write if the record is still at --revision, and set the approved\n" +
 			"flag. Prints the new revision and \"write\". A step already past questions prints \"already\n" +
 			"approved\"; a changed revision at step questions is refused as stale. Refused while a question is\n" +
-			"open, an agent area is unconfirmed or a merge target is orphaned.",
+			"open, an agent backlog is unconfirmed or a merge target is orphaned.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			if !c.Flags().Changed("revision") {

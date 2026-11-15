@@ -45,36 +45,36 @@ export interface ArchivedEpicList {
 
 /**
  * BacklogList is the Backlog page's read model: each project with at least one
- * area, with the areas' open ticket counts. GET /v1/backlog.
+ * backlog, with the epics' open ticket counts. GET /v1/backlog.
  */
 export interface BacklogList {
   projects: BacklogProject[];
 }
 /**
- * BacklogProject is one project's areas. Workspaces are those a Follow-ups card
+ * BacklogProject is one project's epics. Workspaces are those a Follow-ups card
  * gets; the page filters by the active workspace.
  */
 export interface BacklogProject {
   project: string;
   workspaces: string[];
-  areas: BacklogArea[];
+  epics: BacklogEpic[];
 }
 /**
- * BacklogArea is one area. Open counts its draft and open tickets, the ones a
+ * BacklogEpic is one backlog. Open counts its draft and open tickets, the ones a
  * Start Design move can take.
  */
-export interface BacklogArea {
+export interface BacklogEpic {
   address: string;
   name: string;
   open: number /* int */;
   /**
-   * Unfinished is the area's unfinished Start Design move, when it has one.
+   * Unfinished is the backlog's unfinished Start Design move, when it has one.
    */
   unfinished?: BacklogUnfinishedMove;
 }
 /**
  * BacklogUnfinishedMove is a charting map from a partial Start Design run. Map
- * is its address; ToMove counts its listed tickets still in the area.
+ * is its address; ToMove counts its listed tickets still in the backlog.
  */
 export interface BacklogUnfinishedMove {
   map: string;
@@ -2346,7 +2346,7 @@ export const ReasonNotQueued = "not-queued";
 export const ReasonBadPosition = "bad-position";
 export const ReasonTicketLive = "ticket-live";
 export const ReasonMapEpic = "map-epic";
-export const ReasonAreaEpic = "area-epic";
+export const ReasonBacklogEpic = "backlog-epic";
 export const ReasonNoOpenTickets = "no-open-tickets";
 export const ReasonEpicDraft = "epic-draft";
 export const ReasonEpicNotOpen = "epic-not-open";
@@ -2364,7 +2364,7 @@ export const ReasonPROpenFailed = "pr-open-failed";
 /**
  * Refusal reasons of the queue writes. Stable: clients switch on them.
  */
-export type Reason = typeof ReasonServerNotRunning | typeof ReasonUnknownTicket | typeof ReasonInvestigateStop | typeof ReasonInvalidAddress | typeof ReasonInvalidAgent | typeof ReasonAlreadyQueued | typeof ReasonNotQueued | typeof ReasonBadPosition | typeof ReasonTicketLive | typeof ReasonMapEpic | typeof ReasonAreaEpic | typeof ReasonNoOpenTickets | typeof ReasonEpicDraft | typeof ReasonEpicNotOpen | typeof ReasonFollowUpsEpic | typeof ReasonAlreadyMerged | typeof ReasonMergePending | typeof ReasonNotComplete | typeof ReasonBranchMissing | typeof ReasonOneOffsEpic | typeof ReasonNotDirtyTrunk | typeof ReasonLocalAhead | typeof ReasonNeedsRebase | typeof ReasonHasPR | typeof ReasonPROpenFailed;
+export type Reason = typeof ReasonServerNotRunning | typeof ReasonUnknownTicket | typeof ReasonInvestigateStop | typeof ReasonInvalidAddress | typeof ReasonInvalidAgent | typeof ReasonAlreadyQueued | typeof ReasonNotQueued | typeof ReasonBadPosition | typeof ReasonTicketLive | typeof ReasonMapEpic | typeof ReasonBacklogEpic | typeof ReasonNoOpenTickets | typeof ReasonEpicDraft | typeof ReasonEpicNotOpen | typeof ReasonFollowUpsEpic | typeof ReasonAlreadyMerged | typeof ReasonMergePending | typeof ReasonNotComplete | typeof ReasonBranchMissing | typeof ReasonOneOffsEpic | typeof ReasonNotDirtyTrunk | typeof ReasonLocalAhead | typeof ReasonNeedsRebase | typeof ReasonHasPR | typeof ReasonPROpenFailed;
 /**
  * EventQueueChanged is emitted once per queue write; Address is the ticket it
  * touched. Clients re-read the queue on it.
@@ -3356,20 +3356,20 @@ export interface SessionResult {
 // source: startdesign.go
 
 export const ReasonStartDesignUnknownProject = "unknown-project";
-export const ReasonStartDesignNotArea = "not-area";
+export const ReasonStartDesignNotBacklog = "not-backlog";
 export const ReasonStartDesignNoOpenTickets = "no-open-tickets";
 export const ReasonStartDesignMoveFailed = "move-failed";
 /**
  * Refusal reasons of the start-design routes, beside the session ones.
  */
-export type ReasonStartDesign = typeof ReasonStartDesignUnknownProject | typeof ReasonStartDesignNotArea | typeof ReasonStartDesignNoOpenTickets | typeof ReasonStartDesignMoveFailed;
+export type ReasonStartDesign = typeof ReasonStartDesignUnknownProject | typeof ReasonStartDesignNotBacklog | typeof ReasonStartDesignNoOpenTickets | typeof ReasonStartDesignMoveFailed;
 /**
  * StartDesignRequest is the body of POST /v1/backlog/start-design. Hint is the
  * person's optional steer for the theme.
  */
 export interface StartDesignRequest {
   project: string;
-  area: string;
+  backlog: string;
   hint?: string;
 }
 /**
@@ -3378,7 +3378,7 @@ export interface StartDesignRequest {
  */
 export interface FinishMoveRequest {
   project: string;
-  area: string;
+  backlog: string;
   map: string;
 }
 /**
@@ -3945,7 +3945,7 @@ export interface TriageOpenRound {
  */
 export interface TriageMove {
   old_epic: string;
-  area: string;
+  backlog: string;
   state: string;
   last_error?: string;
   /**
@@ -3959,11 +3959,11 @@ export interface TriageMove {
  */
 export interface TriageSummary {
   /**
-   * Actions counts the rows that are not gone by action; Areas counts the rows
-   * that go to an area by area name.
+   * Actions counts the rows that are not gone by action; Backlogs counts the rows
+   * that go to a backlog by backlog name.
    */
   actions: { [key: string]: number /* int */};
-  areas: { [key: string]: number /* int */};
+  backlogs: { [key: string]: number /* int */};
   moves: TriageMove[];
   /**
    * Waiting lists "waiting: <epic> holds claimed <address>" lines: old epics

@@ -106,6 +106,10 @@ func init() {
 	Default.Register(Step{Name: "area-epic-kind", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
+	// backlog-epic-kind: the area epic kind was renamed backlog; rewrite kind: area.
+	Default.Register(Step{Name: "backlog-epic-kind", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return ticketmigrate.MigrateAreaToBacklogKind(e.Root)
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

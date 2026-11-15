@@ -102,30 +102,30 @@ func TestTicketsSet_EpicAddressValidatesAgainstTheEpicSchema(t *testing.T) {
 	}
 }
 
-func TestTicketsSet_AreaKindNeverChanges(t *testing.T) {
+func TestTicketsSet_BacklogKindNeverChanges(t *testing.T) {
 	d, ticketMD := setupEpicSetProject(t)
-	// A loop epic cannot become an area.
-	if err := execute(t, []string{"tickets", "set", "mine:e", "--kind=area"}, d); err == nil {
-		t.Fatal("loop to area: want a refusal")
+	// A loop epic cannot become a backlog.
+	if err := execute(t, []string{"tickets", "set", "mine:e", "--kind=backlog"}, d); err == nil {
+		t.Fatal("loop to backlog: want a refusal")
 	}
 	if raw, _ := os.ReadFile(ticketMD); string(raw) != epicTicketMD {
 		t.Errorf("ticket.md changed:\n%s", raw)
 	}
-	const area = "---\nkind: area\nstatus: open\n---\n\n# Area\n"
-	if err := os.WriteFile(ticketMD, []byte(area), 0o644); err != nil {
+	const backlog = "---\nkind: backlog\nstatus: open\n---\n\n# Backlog\n"
+	if err := os.WriteFile(ticketMD, []byte(backlog), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	for _, kind := range []string{"map", "loop"} {
 		if err := execute(t, []string{"tickets", "set", "mine:e", "--kind=" + kind}, d); err == nil {
-			t.Fatalf("area to %s: want a refusal", kind)
+			t.Fatalf("backlog to %s: want a refusal", kind)
 		}
 	}
-	if raw, _ := os.ReadFile(ticketMD); string(raw) != area {
+	if raw, _ := os.ReadFile(ticketMD); string(raw) != backlog {
 		t.Errorf("ticket.md changed:\n%s", raw)
 	}
 	// Re-stating the stored kind is not a change.
-	if err := execute(t, []string{"tickets", "set", "mine:e", "--kind=area", "--status=draft"}, d); err != nil {
-		t.Errorf("area to area: %v", err)
+	if err := execute(t, []string{"tickets", "set", "mine:e", "--kind=backlog", "--status=draft"}, d); err != nil {
+		t.Errorf("backlog to backlog: %v", err)
 	}
 }
 

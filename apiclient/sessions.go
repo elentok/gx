@@ -30,7 +30,7 @@ func (s *Sessions) FixAgent(ctx context.Context, req wire.FixAgentRequest) (wire
 	return res, err
 }
 
-// StartDesign starts the chat that proposes a Design theme for an area, or
+// StartDesign starts the chat that proposes a Design theme for a backlog, or
 // returns the live one. A refusal is a result (Refused set), not an error.
 func (s *Sessions) StartDesign(ctx context.Context, req wire.StartDesignRequest) (wire.SessionResult, error) {
 	var res wire.SessionResult

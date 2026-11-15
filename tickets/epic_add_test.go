@@ -19,16 +19,16 @@ func TestCreateEpic_WaitsForProjectMigration(t *testing.T) {
 	})
 }
 
-func TestAreaNames_ListsLiveAreasOnly(t *testing.T) {
+func TestBacklogNames_ListsLiveBacklogsOnly(t *testing.T) {
 	root := t.TempDir()
-	for name, kind := range map[string]string{"ideas": "area", "work": "loop", "plan": "map", ".archive/old": "area"} {
+	for name, kind := range map[string]string{"ideas": "backlog", "work": "loop", "plan": "map", ".archive/old": "backlog"} {
 		writeFile(t, filepath.Join(root, name, "ticket.md"), "---\nkind: "+kind+"\nstatus: open\n---\n# x\n")
 	}
-	got, err := AreaNames(root)
+	got, err := BacklogNames(root)
 	if err != nil || len(got) != 1 || got[0] != "ideas" {
-		t.Errorf("AreaNames = %v, %v, want [ideas]", got, err)
+		t.Errorf("BacklogNames = %v, %v, want [ideas]", got, err)
 	}
-	if got, err := AreaNames(filepath.Join(root, "missing")); err != nil || len(got) != 0 {
+	if got, err := BacklogNames(filepath.Join(root, "missing")); err != nil || len(got) != 0 {
 		t.Errorf("missing dir = %v, %v, want none", got, err)
 	}
 }
@@ -42,10 +42,10 @@ func TestParseEpicFields_RefusesPRFields(t *testing.T) {
 	}
 }
 
-func TestCreateEpic_ThirteenthAreaRefusesAndWritesNothing(t *testing.T) {
+func TestCreateEpic_ThirteenthBacklogRefusesAndWritesNothing(t *testing.T) {
 	root := t.TempDir()
 	conv := t.TempDir()
-	// Maps, loops and archived areas do not count toward the cap.
+	// Maps, loops and archived backlogs do not count toward the cap.
 	for _, name := range []string{"m", "l"} {
 		kind := KindMap
 		if name == "l" {
@@ -55,23 +55,23 @@ func TestCreateEpic_ThirteenthAreaRefusesAndWritesNothing(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	writeFile(t, filepath.Join(root, ".archive", "old", "ticket.md"), "---\nkind: area\nstatus: open\n---\n# old\n")
-	for i := 0; i < MaxAreas; i++ {
-		name := "area-" + string(rune('a'+i))
-		if _, err := CreateEpic(conv, root, name, EpicFields{Kind: KindArea, Status: "open"}, ""); err != nil {
-			t.Fatalf("area %d: %v", i+1, err)
+	writeFile(t, filepath.Join(root, ".archive", "old", "ticket.md"), "---\nkind: backlog\nstatus: open\n---\n# old\n")
+	for i := 0; i < MaxBacklogs; i++ {
+		name := "backlog-" + string(rune('a'+i))
+		if _, err := CreateEpic(conv, root, name, EpicFields{Kind: KindBacklog, Status: "open"}, ""); err != nil {
+			t.Fatalf("backlog %d: %v", i+1, err)
 		}
 	}
 
-	_, err := CreateEpic(conv, root, "one-too-many", EpicFields{Kind: KindArea, Status: "open"}, "")
-	if err == nil || !strings.Contains(err.Error(), "areas") {
-		t.Fatalf("err = %v, want the area-limit refusal", err)
+	_, err := CreateEpic(conv, root, "one-too-many", EpicFields{Kind: KindBacklog, Status: "open"}, "")
+	if err == nil || !strings.Contains(err.Error(), "backlogs") {
+		t.Fatalf("err = %v, want the backlog-limit refusal", err)
 	}
 	if _, statErr := os.Stat(filepath.Join(root, "one-too-many")); statErr == nil {
 		t.Error("refusal wrote an epic directory")
 	}
 	if _, err := CreateEpic(conv, root, "another-loop", EpicFields{Kind: KindLoop}, ""); err != nil {
-		t.Errorf("a loop at the area cap: %v", err)
+		t.Errorf("a loop at the backlog cap: %v", err)
 	}
 }
 

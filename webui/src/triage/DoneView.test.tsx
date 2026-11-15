@@ -11,7 +11,7 @@ const result: TriageResult = {
   ready_epic: "gx:ready-1",
   groups: [
     { action: "ready", items: [{ address: "gx:follow-ups/1", title: "a" }] },
-    { action: "area", items: [{ address: "gx:follow-ups/2", title: "b", target: "gx:map-a/3" }] },
+    { action: "backlog", items: [{ address: "gx:follow-ups/2", title: "b", target: "gx:map-a/3" }] },
     {
       action: "merge",
       items: [{ address: "gx:follow-ups/3", title: "c", target: "gx:follow-ups/9" }],
@@ -36,7 +36,7 @@ test("groups and links render from the payload", () => {
     screen.getByRole("region", { name })
   const line = (name: string) => screen.getByRole("region", { name }).firstElementChild
   expect(line("Ready epic")?.textContent).toBe("✓1 ready in gx:ready-1Queue epic")
-  expect(line("Map epics")?.textContent).toBe("✓1 to areas · map-a 1")
+  expect(line("Map epics")?.textContent).toBe("✓1 to backlogs · map-a 1")
   expect(line("Closed")?.textContent).toBe("✓3 closed · obsolete 2 · duplicate 1")
   expect(line("Kept for later")?.textContent).toBe("✓1 kept for later in follow-ups")
   expect(container.querySelector('a[href="#/e/gx:ready-1"]')).toBeTruthy()

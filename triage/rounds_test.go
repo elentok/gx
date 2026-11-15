@@ -138,7 +138,7 @@ func TestObjection_IdsStayUniqueAfterCorrectDropsQuestions(t *testing.T) {
 	}
 	rec, err = s.Object(rec.ID, rec.Revision, rowB, "Keep?", []string{"yes", "no"})
 	must(t, rec, err)
-	rec, err = s.Correct(rec.ID, rec.Revision, rowA, ActionArea, "core", "")
+	rec, err = s.Correct(rec.ID, rec.Revision, rowA, ActionBacklog, "core", "")
 	must(t, rec, err)
 	rec, err = s.Object(rec.ID, rec.Revision, rowA, "Keep?", []string{"yes", "no"})
 	must(t, rec, err)
@@ -153,13 +153,13 @@ func TestObjection_IdsStayUniqueAfterCorrectDropsQuestions(t *testing.T) {
 	}
 }
 
-func TestCorrect_ToAreaDropsUnansweredKeepsAnswers(t *testing.T) {
+func TestCorrect_ToBacklogDropsUnansweredKeepsAnswers(t *testing.T) {
 	s, rec := atApprove(t)
 	rec, err := s.SaveRound(rec.ID, rec.Revision, questions(rowA, "1", "2"), false)
 	must(t, rec, err)
 	rec = answerAll(t, s, rec, "1")
 	before := rec.Revision
-	rec, err = s.Correct(rec.ID, rec.Revision, rowA, ActionArea, "core", "")
+	rec, err = s.Correct(rec.ID, rec.Revision, rowA, ActionBacklog, "core", "")
 	must(t, rec, err)
 	if rec.Revision == before {
 		t.Fatal("the revision did not change")
@@ -171,8 +171,8 @@ func TestCorrect_ToAreaDropsUnansweredKeepsAnswers(t *testing.T) {
 	if _, _, ok := rec.OpenRound(); ok {
 		t.Fatal("round still open")
 	}
-	if _, err := s.Correct(rec.ID, rec.Revision, rowA, ActionArea, "", ""); err == nil {
-		t.Fatal("a move to an area without a name was accepted")
+	if _, err := s.Correct(rec.ID, rec.Revision, rowA, ActionBacklog, "", ""); err == nil {
+		t.Fatal("a move to a backlog without a name was accepted")
 	}
 }
 
@@ -184,10 +184,10 @@ func TestCorrect_ToReadyNeedsAFallbackAndQueuesTheAskQuestions(t *testing.T) {
 		must(t, rec, err)
 	}
 	q := askQ("q1", rowA)
-	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: ActionArea, Destination: "core", Questions: []Question{q}}, {RowID: rowB, Action: "close"}}, nil)
+	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: ActionBacklog, Destination: "core", Questions: []Question{q}}, {RowID: rowB, Action: "close"}}, nil)
 	must(t, rec, err)
 	if got := rec.Unrounded(); len(got) != 0 {
-		t.Fatalf("a row to an area has no candidates: %+v", got)
+		t.Fatalf("a row to a backlog has no candidates: %+v", got)
 	}
 	if _, err := s.Correct(rec.ID, rec.Revision, rowA, "ready", "", ""); err == nil {
 		t.Fatal("a move to ready without a fallback was accepted")
@@ -203,47 +203,47 @@ func TestCorrect_ToReadyNeedsAFallbackAndQueuesTheAskQuestions(t *testing.T) {
 	}
 }
 
-func writeArea(t *testing.T, s *Store, name string) {
+func writeBacklog(t *testing.T, s *Store, name string) {
 	t.Helper()
 	dir := filepath.Join(s.ProjectDir(), name)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "ticket.md"), []byte("---\nkind: area\n---\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "ticket.md"), []byte("---\nkind: backlog\n---\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestAreas_ThirteenthIsRefused(t *testing.T) {
+func TestBacklogs_ThirteenthIsRefused(t *testing.T) {
 	s, rec := atPlan(t)
 	for i := range 11 {
-		writeArea(t, s, fmt.Sprintf("area-%d", i))
+		writeBacklog(t, s, fmt.Sprintf("backlog-%d", i))
 	}
-	rec, err := s.SaveAreas(rec.ID, rec.Revision, []Area{{Name: "twelfth", Source: AreaAgent, Confirmed: true, Created: true}})
+	rec, err := s.SaveBacklogs(rec.ID, rec.Revision, []Backlog{{Name: "twelfth", Source: BacklogAgent, Confirmed: true, Created: true}})
 	must(t, rec, err)
-	if _, err := s.SaveAreas(rec.ID, rec.Revision, []Area{{Name: "thirteenth", Source: AreaAgent, Confirmed: true, Created: true}}); err == nil {
-		t.Fatal("a confirmed 13th area was accepted")
+	if _, err := s.SaveBacklogs(rec.ID, rec.Revision, []Backlog{{Name: "thirteenth", Source: BacklogAgent, Confirmed: true, Created: true}}); err == nil {
+		t.Fatal("a confirmed 13th backlog was accepted")
 	}
-	plan := []PlanRow{{RowID: rowA, Action: ActionArea, Destination: "thirteenth"}, {RowID: rowB, Action: "close"}}
+	plan := []PlanRow{{RowID: rowA, Action: ActionBacklog, Destination: "thirteenth"}, {RowID: rowB, Action: "close"}}
 	if _, err := s.SavePlan(rec.ID, rec.Revision, plan, nil); err == nil {
-		t.Fatal("a plan creating a 13th area was accepted")
+		t.Fatal("a plan creating a 13th backlog was accepted")
 	}
-	plan[0].Destination = "area-3"
+	plan[0].Destination = "backlog-3"
 	if _, err := s.SavePlan(rec.ID, rec.Revision, plan, nil); err != nil {
-		t.Fatalf("a plan into an existing area: %v", err)
+		t.Fatalf("a plan into an existing backlog: %v", err)
 	}
 }
 
-func TestApprove_UnconfirmedAgentAreaRefusedTableAreaAccepted(t *testing.T) {
+func TestApprove_UnconfirmedAgentBacklogRefusedTableBacklogAccepted(t *testing.T) {
 	s, rec := atPlan(t)
-	rec, err := s.SaveAreas(rec.ID, rec.Revision, []Area{{Name: "core", Source: AreaTable}, {Name: "new", Source: AreaAgent, Created: true}})
+	rec, err := s.SaveBacklogs(rec.ID, rec.Revision, []Backlog{{Name: "core", Source: BacklogTable}, {Name: "new", Source: BacklogAgent, Created: true}})
 	must(t, rec, err)
-	rec, err = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: ActionArea, Destination: "core"}, {RowID: rowB, Action: "close"}}, nil)
+	rec, err = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: ActionBacklog, Destination: "core"}, {RowID: rowB, Action: "close"}}, nil)
 	must(t, rec, err)
 	if _, err := s.Approve(rec.ID, rec.Revision); err == nil {
-		t.Fatal("approve accepted an unconfirmed agent area")
+		t.Fatal("approve accepted an unconfirmed agent backlog")
 	}
-	rec, err = s.SaveAreas(rec.ID, rec.Revision, []Area{{Name: "new", Source: AreaAgent, Confirmed: true, Created: true}})
+	rec, err = s.SaveBacklogs(rec.ID, rec.Revision, []Backlog{{Name: "new", Source: BacklogAgent, Confirmed: true, Created: true}})
 	must(t, rec, err)
 	if _, err := s.Approve(rec.ID, rec.Revision-1); !errors.Is(err, ErrStaleRevision) {
 		t.Fatalf("err = %v, want stale", err)

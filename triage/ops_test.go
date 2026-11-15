@@ -114,7 +114,7 @@ func TestPlan(t *testing.T) {
 	if _, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "bogus"}}, nil); err == nil {
 		t.Fatal("unknown action accepted")
 	}
-	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: ActionArea, Destination: "m"}}, nil)
+	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: ActionBacklog, Destination: "m"}}, nil)
 	must(t, rec, err)
 	if rec.Step != "route" || rec.Rows[0].Plan == nil || rec.Rows[0].Plan.Destination != "m" {
 		t.Fatalf("partial plan: %+v", rec)
@@ -139,7 +139,7 @@ func TestPersonFields(t *testing.T) {
 	if _, err := s.SetPerson(rec.ID, rec.Revision, rowA, PersonFields{Action: "bogus"}); err == nil {
 		t.Fatal("unknown action accepted")
 	}
-	rec, err := s.SetPerson(rec.ID, rec.Revision, rowA, PersonFields{Action: ActionArea, Destination: "d", Answers: map[string]string{"q": "a"}})
+	rec, err := s.SetPerson(rec.ID, rec.Revision, rowA, PersonFields{Action: ActionBacklog, Destination: "d", Answers: map[string]string{"q": "a"}})
 	must(t, rec, err)
 	if rec.Rows[0].Person.Destination != "d" || rec.Rows[0].Person.Answers["q"] != "a" {
 		t.Fatalf("person = %+v", rec.Rows[0].Person)
@@ -475,7 +475,7 @@ func TestPlan_QuickQuestionsNeedOptionsAndADefault(t *testing.T) {
 	s, rec := atPlan(t)
 	design := Question{ID: "d1", Text: "Which store?", Kind: QuestionDesign}
 	must(t, rec, nil)
-	if _, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: ActionArea, Destination: "m", Questions: []Question{good, design}}, {RowID: rowB, Action: "close"}}, nil); err != nil {
+	if _, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: ActionBacklog, Destination: "m", Questions: []Question{good, design}}, {RowID: rowB, Action: "close"}}, nil); err != nil {
 		t.Fatalf("a quick question with options and a design question: %v", err)
 	}
 }
@@ -498,11 +498,11 @@ func TestPlan_EveryVerdictQuestionComesBackInThePlan(t *testing.T) {
 	}
 }
 
-func TestPlan_ReadyRowWithAnAskQuestionNeedsAFallbackArea(t *testing.T) {
+func TestPlan_ReadyRowWithAnAskQuestionNeedsAFallbackBacklog(t *testing.T) {
 	s, rec := atPlan(t)
 	ask := Question{ID: "q1", Text: "Fix it where?", Kind: QuestionAsk, Options: []string{"parser", "caller"}, Default: "parser"}
 	if _, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Questions: []Question{ask}}, {RowID: rowB, Action: "close"}}, nil); err == nil {
-		t.Fatal("want the plan refused without a fallback area")
+		t.Fatal("want the plan refused without a fallback backlog")
 	}
 	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready", Fallback: "core", Questions: []Question{ask}}, {RowID: rowB, Action: "close"}}, nil)
 	rec = must(t, rec, err)
@@ -514,7 +514,7 @@ func TestPlan_ReadyRowWithAnAskQuestionNeedsAFallbackArea(t *testing.T) {
 func TestDesignQuestionsAreNotAskedAndDoNotBlockApprove(t *testing.T) {
 	s, rec := atPlan(t)
 	design := Question{ID: "d1", Text: "Which store?", Kind: QuestionDesign}
-	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: ActionArea, Destination: "m", Questions: []Question{design}}, {RowID: rowB, Action: "close"}}, nil)
+	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: ActionBacklog, Destination: "m", Questions: []Question{design}}, {RowID: rowB, Action: "close"}}, nil)
 	rec = must(t, rec, err)
 	if got := rec.Rows[0].AskedQuestions(); len(got) != 0 {
 		t.Fatalf("asked = %+v, want none", got)
@@ -533,10 +533,10 @@ func TestDesignQuestionsAreNotAskedAndDoNotBlockApprove(t *testing.T) {
 func TestSaveMoves_PendingAtRouteOnly(t *testing.T) {
 	s, rec := atPlan(t)
 	writeMoveEpics(t, s)
-	if _, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Area: "nowhere"}}); err == nil {
-		t.Fatal("unknown area accepted")
+	if _, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Backlog: "nowhere"}}); err == nil {
+		t.Fatal("unknown backlog accepted")
 	}
-	rec, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Area: "area", State: MoveDone}})
+	rec, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Backlog: "backlog", State: MoveDone}})
 	must(t, rec, err)
 	if len(rec.Moves) != 1 || rec.Moves[0].State != MovePending {
 		t.Fatalf("moves = %+v", rec.Moves)
@@ -550,7 +550,7 @@ func TestSaveMoves_PendingAtRouteOnly(t *testing.T) {
 func atWriteWithMove(t *testing.T) (*Store, *Record) {
 	s, rec := atPlan(t)
 	writeMoveEpics(t, s)
-	rec, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Area: "area"}})
+	rec, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Backlog: "backlog"}})
 	must(t, rec, err)
 	rec, err = s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "ready"}, {RowID: rowB, Action: "close"}}, nil)
 	must(t, rec, err)
@@ -592,25 +592,25 @@ func writeKindEpic(t *testing.T, s *Store, name, kind, body string) {
 	tickettest.WriteFile(t, filepath.Join(s.ProjectDir(), name, "ticket.md"), "---\nkind: "+kind+"\n---\n\n# "+name+"\n"+body)
 }
 
-// writeMoveEpics makes the old Triage epic "old" and the area "area".
+// writeMoveEpics makes the old Triage epic "old" and the backlog "backlog".
 func writeMoveEpics(t *testing.T, s *Store) {
 	t.Helper()
 	writeKindEpic(t, s, "old", "map", "\n## Notes\n\n"+OldEpicNote+" on 2026-10-01\n")
-	writeKindEpic(t, s, "area", "area", "")
+	writeKindEpic(t, s, "backlog", "backlog", "")
 	addTicket(t, s, "old", "01")
-	addTicket(t, s, "area", "01")
+	addTicket(t, s, "backlog", "01")
 }
 
-func TestSaveMoves_RefusesANonAreaTargetAndANonCandidateOldEpic(t *testing.T) {
+func TestSaveMoves_RefusesANonBacklogTargetAndANonCandidateOldEpic(t *testing.T) {
 	s, rec := atPlan(t)
 	writeMoveEpics(t, s)
 	writeKindEpic(t, s, "other-map", "map", "")
 	addTicket(t, s, "plain", "01")
 	for name, u := range map[string]MoveUnit{
-		"plain epic as area":   {OldEpic: "old", Area: "plain"},
-		"map as area":          {OldEpic: "old", Area: "other-map"},
-		"map without the note": {OldEpic: "other-map", Area: "area"},
-		"plain epic as old":    {OldEpic: "plain", Area: "area"},
+		"plain epic as backlog":   {OldEpic: "old", Backlog: "plain"},
+		"map as backlog":          {OldEpic: "old", Backlog: "other-map"},
+		"map without the note": {OldEpic: "other-map", Backlog: "backlog"},
+		"plain epic as old":    {OldEpic: "plain", Backlog: "backlog"},
 	} {
 		if _, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{u}); err == nil {
 			t.Errorf("%s: accepted", name)
@@ -635,7 +635,7 @@ func TestSaveVerdict_RefusesABadQuestionKindOrAskOptions(t *testing.T) {
 func TestMoveState_RefusedOutsideWrite(t *testing.T) {
 	s, rec := atPlan(t)
 	writeMoveEpics(t, s)
-	rec, _ = s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Area: "area"}})
+	rec, _ = s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{{OldEpic: "old", Backlog: "backlog"}})
 	if _, err := s.SaveMoveState(rec.ID, rec.Revision, "old", MoveDone, ""); err == nil {
 		t.Fatal("move state accepted at route")
 	}

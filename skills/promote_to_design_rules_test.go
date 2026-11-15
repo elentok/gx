@@ -49,7 +49,7 @@ func TestGxStartDesignSkill(t *testing.T) {
 		"fewer than 8 open tickets proposes all of them",
 		"numbered tickets",
 		"print the card again **once**",
-		"gx tickets start-design <project:area> --map <name> --title",
+		"gx tickets start-design <project:backlog> --map <name> --title",
 		"gx server web-url --json",
 		"/#/d/<project>:<map>",
 		"[gx-grilling](../gx-grilling/SKILL.md)",

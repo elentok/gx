@@ -22,17 +22,17 @@ type WriteTarget struct {
 }
 
 // WriteTarget gives the epic, ticket type and question text for a row that goes
-// to an area or the ready epic; ok is false for any other action.
+// to a backlog or the ready epic; ok is false for any other action.
 //
-// A row whose ask questions no round reached goes to an area as a grilling
-// ticket, a ready row to its fallback area. An area row with a design question
-// is grilling too; an area row marked investigate is research.
+// A row whose ask questions no round reached goes to a backlog as a grilling
+// ticket, a ready row to its fallback backlog. A backlog row with a design question
+// is grilling too; a backlog row marked investigate is research.
 func (r *Record) WriteTarget(row *Row) (t WriteTarget, ok bool) {
 	action, dest := row.Effective()
 	var unreached []string
 	for _, q := range row.AllQuestions() {
 		kind := q.Kind
-		if (kind == QuestionAsk || (kind == QuestionDesign && action == ActionArea)) &&
+		if (kind == QuestionAsk || (kind == QuestionDesign && action == ActionBacklog)) &&
 			!r.questionPlaced(q.ID) && strings.TrimSpace(row.Person.Answers[q.ID]) == "" {
 			unreached = append(unreached, fmt.Sprintf("- %s", q.Text))
 		}
@@ -41,9 +41,9 @@ func (r *Record) WriteTarget(row *Row) (t WriteTarget, ok bool) {
 	case ActionReady:
 		t.Epic = r.ReadyEpic
 		if len(unreached) > 0 {
-			t.Epic = row.fallbackArea()
+			t.Epic = row.fallbackBacklog()
 		}
-	case ActionArea:
+	case ActionBacklog:
 		t.Epic = dest
 	default:
 		return WriteTarget{}, false
@@ -51,7 +51,7 @@ func (r *Record) WriteTarget(row *Row) (t WriteTarget, ok bool) {
 	switch {
 	case len(unreached) > 0:
 		t.Type, t.Question = TypeGrilling, strings.Join(unreached, "\n")
-	case action == ActionArea && row.Plan != nil && row.Plan.Investigate:
+	case action == ActionBacklog && row.Plan != nil && row.Plan.Investigate:
 		t.Type = TypeResearch
 	default:
 		t.Type = TypeImplement
@@ -59,7 +59,7 @@ func (r *Record) WriteTarget(row *Row) (t WriteTarget, ok bool) {
 	return t, true
 }
 
-func (r *Row) fallbackArea() string {
+func (r *Row) fallbackBacklog() string {
 	if r.Fallback != "" {
 		return r.Fallback
 	}

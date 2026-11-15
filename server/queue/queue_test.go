@@ -111,8 +111,8 @@ func TestQueue_Refusals(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(store, "proj", "map-epic", "ticket.md"), []byte("---\nkind: map\nstatus: open\n---\n# Map\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	servertest.WriteTicket(t, store, "proj", "area-epic", "01", "followup", "")
-	if err := os.WriteFile(filepath.Join(store, "proj", "area-epic", "ticket.md"), []byte("---\nkind: area\nstatus: open\n---\n# Area\n"), 0o644); err != nil {
+	servertest.WriteTicket(t, store, "proj", "backlog-epic", "01", "followup", "")
+	if err := os.WriteFile(filepath.Join(store, "proj", "backlog-epic", "ticket.md"), []byte("---\nkind: backlog\nstatus: open\n---\n# Backlog\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	h := servertest.StartWithStore(t, store)
@@ -133,7 +133,7 @@ func TestQueue_Refusals(t *testing.T) {
 		{"remove unqueued", func() (wire.QueueResult, error) { return h.Client.Queue.Remove(ctx, "proj:epic-a/02") }, wire.ReasonNotQueued},
 		{"move unqueued", func() (wire.QueueResult, error) { return h.Client.Queue.Move(ctx, "proj:epic-a/02", 1) }, wire.ReasonNotQueued},
 		{"map epic", func() (wire.QueueResult, error) { return h.Client.Queue.Add(ctx, "proj:map-epic/01", "") }, wire.ReasonMapEpic},
-		{"area ticket", func() (wire.QueueResult, error) { return h.Client.Queue.Add(ctx, "proj:area-epic/01", "") }, wire.ReasonAreaEpic},
+		{"backlog ticket", func() (wire.QueueResult, error) { return h.Client.Queue.Add(ctx, "proj:backlog-epic/01", "") }, wire.ReasonBacklogEpic},
 		{"move out of range", func() (wire.QueueResult, error) { return h.Client.Queue.Move(ctx, "proj:epic-a/01", 2) }, wire.ReasonBadPosition},
 	}
 	for _, c := range cases {

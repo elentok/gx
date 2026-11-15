@@ -16,12 +16,12 @@ type StartDesignOpts struct {
 	// ProjectDir is the project's ticket directory; Project is its name.
 	ProjectDir string
 	Project    string
-	// Area is the epic the tickets leave; Map is the new map's name.
-	Area string
+	// Backlog is the epic the tickets leave; Map is the new map's name.
+	Backlog string
 	Map  string
 	// Title is the person-approved name shown in the map's body.
 	Title string
-	// IDs are the approved tickets' ids in Area. Empty on a rerun reads them
+	// IDs are the approved tickets' ids in Backlog. Empty on a rerun reads them
 	// from the map's Notes.
 	IDs []string
 	// Active refuses a ticket that is queued or live. The CLI passes the
@@ -30,38 +30,38 @@ type StartDesignOpts struct {
 }
 
 const (
-	notesAreaPrefix   = "Area: "
+	notesBacklogPrefix   = "Backlog: "
 	notesTicketPrefix = "- "
 )
 
-// StartDesignNotes renders the map's Notes section body: the area, then one
+// StartDesignNotes renders the map's Notes section body: the backlog, then one
 // address per line. ParseStartDesignNotes reads it back.
-func StartDesignNotes(project, area string, ids []string) string {
+func StartDesignNotes(project, backlog string, ids []string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s%s\n\nTickets chosen from this area:\n", notesAreaPrefix, area)
+	fmt.Fprintf(&b, "%s%s\n\nTickets chosen from this backlog:\n", notesBacklogPrefix, backlog)
 	for _, id := range ids {
-		fmt.Fprintf(&b, "%s%s\n", notesTicketPrefix, tickets.Address{Project: project, Epic: area, ID: id})
+		fmt.Fprintf(&b, "%s%s\n", notesTicketPrefix, tickets.Address{Project: project, Epic: backlog, ID: id})
 	}
 	return b.String()
 }
 
-// ParseStartDesignNotes returns the area and ticket ids a map's body names in
-// its Notes section. ok is false when the Notes hold no area line.
-func ParseStartDesignNotes(body string) (area string, ids []string, ok bool) {
+// ParseStartDesignNotes returns the backlog and ticket ids a map's body names in
+// its Notes section. ok is false when the Notes hold no backlog line.
+func ParseStartDesignNotes(body string) (backlog string, ids []string, ok bool) {
 	for line := range strings.SplitSeq(schema.Section(body, "Notes"), "\n") {
 		line = strings.TrimSpace(line)
-		if rest, found := strings.CutPrefix(line, notesAreaPrefix); found {
-			area, ok = strings.TrimSpace(rest), true
+		if rest, found := strings.CutPrefix(line, notesBacklogPrefix); found {
+			backlog, ok = strings.TrimSpace(rest), true
 		} else if rest, found := strings.CutPrefix(line, notesTicketPrefix); found {
 			if _, id, cut := strings.Cut(rest, "/"); cut {
 				ids = append(ids, strings.TrimSpace(id))
 			}
 		}
 	}
-	return area, ids, ok && area != ""
+	return backlog, ids, ok && backlog != ""
 }
 
-// StartDesign creates a charting map from tickets of an area and moves them in.
+// StartDesign creates a charting map from tickets of a backlog and moves them in.
 // Every ticket is dry-run first, so a refusal writes nothing. A failure while
 // moving leaves the moved tickets in the map; calling again with the same map
 // name carries on and creates no second map.
@@ -70,22 +70,22 @@ func StartDesign(o StartDesignOpts) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	var area, existing *tickets.Epic
+	var backlog, existing *tickets.Epic
 	for i := range epics {
 		switch epics[i].Name {
-		case o.Area:
-			area = &epics[i]
+		case o.Backlog:
+			backlog = &epics[i]
 		case o.Map:
 			existing = &epics[i]
 		}
 	}
-	if area == nil || !area.IsArea {
-		return "", MoveRefusal(tickets.CodeUnknownEpic, "no area %q in project %q", o.Area, o.Project)
+	if backlog == nil || !backlog.IsBacklog {
+		return "", MoveRefusal(tickets.CodeUnknownEpic, "no backlog %q in project %q", o.Backlog, o.Project)
 	}
 
 	ids := o.IDs
 	if existing != nil {
-		notesIDs, err := resumableIDs(*existing, *area)
+		notesIDs, err := resumableIDs(*existing, *backlog)
 		if err != nil {
 			return "", err
 		}
@@ -99,31 +99,31 @@ func StartDesign(o StartDesignOpts) (string, error) {
 
 	var todo []tickets.Ticket
 	for _, id := range ids {
-		t, found := ticketByID(*area, id)
+		t, found := ticketByID(*backlog, id)
 		switch {
 		case found:
 			todo = append(todo, t)
 		case existing == nil:
-			return "", MoveRefusal(tickets.CodeUnknownTicket, "no ticket %s in area %q", id, o.Area)
+			return "", MoveRefusal(tickets.CodeUnknownTicket, "no ticket %s in backlog %q", id, o.Backlog)
 		}
 	}
 
-	// PlanMove needs an existing target epic. The area stands in for a map that
+	// PlanMove needs an existing target epic. The backlog stands in for a map that
 	// is not created yet: the refusals do not depend on the target, and the
 	// plan is dropped.
 	for _, t := range todo {
-		a := tickets.Address{Project: o.Project, Epic: o.Area, ID: t.DisplayNumber()}
+		a := tickets.Address{Project: o.Project, Epic: o.Backlog, ID: t.DisplayNumber()}
 		if err := o.Active(a); err != nil {
 			return "", err
 		}
-		if _, err := PlanMove(o.ProjectDir, a, t, o.Area, "", MoveOpts{}); err != nil {
+		if _, err := PlanMove(o.ProjectDir, a, t, o.Backlog, "", MoveOpts{}); err != nil {
 			return "", err
 		}
 	}
 
 	if existing == nil {
-		body := fmt.Sprintf("# %s\n\n## Destination\n\nA provisional Destination for the %q theme of the %q area. The Design confirms or replaces it.\n\n## Notes\n\n%s",
-			o.Title, o.Title, o.Area, StartDesignNotes(o.Project, o.Area, ids))
+		body := fmt.Sprintf("# %s\n\n## Destination\n\nA provisional Destination for the %q theme of the %q backlog. The Design confirms or replaces it.\n\n## Notes\n\n%s",
+			o.Title, o.Title, o.Backlog, StartDesignNotes(o.Project, o.Backlog, ids))
 		if _, err := tickets.CreateEpic(o.ConversationsDir, o.ProjectDir, o.Map,
 			tickets.EpicFields{Kind: "map", Status: string(schema.StatusOpen), DestinationUnconfirmed: true}, body); err != nil {
 			return "", err
@@ -131,8 +131,8 @@ func StartDesign(o StartDesignOpts) (string, error) {
 	}
 
 	for _, t := range todo {
-		if err := moveOne(o, tickets.Address{Project: o.Project, Epic: o.Area, ID: t.DisplayNumber()}); err != nil {
-			return "", fmt.Errorf("moving %s:%s/%s into %s (rerun to carry on): %w", o.Project, o.Area, t.DisplayNumber(), o.Map, err)
+		if err := moveOne(o, tickets.Address{Project: o.Project, Epic: o.Backlog, ID: t.DisplayNumber()}); err != nil {
+			return "", fmt.Errorf("moving %s:%s/%s into %s (rerun to carry on): %w", o.Project, o.Backlog, t.DisplayNumber(), o.Map, err)
 		}
 	}
 	return o.Map, nil
@@ -140,8 +140,8 @@ func StartDesign(o StartDesignOpts) (string, error) {
 
 // moveOne moves one ticket with both epics locked, re-reading it under the lock.
 func moveOne(o StartDesignOpts, a tickets.Address) error {
-	areaPath, mapPath := filepath.Join(o.ProjectDir, o.Area), filepath.Join(o.ProjectDir, o.Map)
-	unlock, err := LockEpics(areaPath, mapPath)
+	backlogPath, mapPath := filepath.Join(o.ProjectDir, o.Backlog), filepath.Join(o.ProjectDir, o.Map)
+	unlock, err := LockEpics(backlogPath, mapPath)
 	if err != nil {
 		return err
 	}
@@ -149,8 +149,8 @@ func moveOne(o StartDesignOpts, a tickets.Address) error {
 	if err := o.Active(a); err != nil {
 		return err
 	}
-	area := tickets.LoadEpic(o.ProjectDir, o.Area)
-	src, found := ticketByID(area, a.ID)
+	backlog := tickets.LoadEpic(o.ProjectDir, o.Backlog)
+	src, found := ticketByID(backlog, a.ID)
 	if !found {
 		return nil // already moved by an earlier run
 	}
@@ -162,28 +162,28 @@ func moveOne(o StartDesignOpts, a tickets.Address) error {
 }
 
 // UnfinishedRunIDs is the one rule for a partial Start Design run: e is a
-// charting map with no completed_at whose Notes name area. It returns the
+// charting map with no completed_at whose Notes name backlog. It returns the
 // Notes ids.
-func UnfinishedRunIDs(e tickets.Epic, area string) ([]string, bool) {
-	notesArea, ids, ok := ParseStartDesignNotes(e.Body)
-	if !ok || notesArea != area || !e.IsCharting() || !e.CompletedAt.IsZero() {
+func UnfinishedRunIDs(e tickets.Epic, backlog string) ([]string, bool) {
+	notesBacklog, ids, ok := ParseStartDesignNotes(e.Body)
+	if !ok || notesBacklog != backlog || !e.IsCharting() || !e.CompletedAt.IsZero() {
 		return nil, false
 	}
 	return ids, true
 }
 
 // resumableIDs returns the Notes ids of an existing epic when it is this
-// verb's own unfinished run for area: a charting map with no completed_at
-// whose Notes name the area and list a ticket still in it.
-func resumableIDs(e, area tickets.Epic) ([]string, error) {
-	if ids, ok := UnfinishedRunIDs(e, area.Name); ok {
+// verb's own unfinished run for backlog: a charting map with no completed_at
+// whose Notes name the backlog and list a ticket still in it.
+func resumableIDs(e, backlog tickets.Epic) ([]string, error) {
+	if ids, ok := UnfinishedRunIDs(e, backlog.Name); ok {
 		for _, id := range ids {
-			if _, still := ticketByID(area, id); still {
+			if _, still := ticketByID(backlog, id); still {
 				return ids, nil
 			}
 		}
 	}
-	return nil, fmt.Errorf("epic %q already exists and is not an unfinished move from area %q", e.Name, area.Name)
+	return nil, fmt.Errorf("epic %q already exists and is not an unfinished move from backlog %q", e.Name, backlog.Name)
 }
 
 func ticketByID(e tickets.Epic, id string) (tickets.Ticket, bool) {

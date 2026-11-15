@@ -26,7 +26,7 @@ const viewOf = (rows: TriageRow[]): TriageView =>
     action_counts: {},
     changed_rows: 0,
     destinations: [],
-    epic_actions: ["ready", "area"],
+    epic_actions: ["ready", "backlog"],
     can_abandon: false,
     history: [],
   }) as TriageView
@@ -102,18 +102,18 @@ test("a failed move unit posts Retry and Keep for later once with the revision a
   const view = viewOf([])
   view.summary = {
     actions: {},
-    areas: {},
+    backlogs: {},
     waiting: [],
     moves: [
       {
         old_epic: "b",
-        area: "web",
+        backlog: "web",
         state: "failed",
         last_error: "boom",
         can_retry: true,
         can_keep: true,
       },
-      { old_epic: "d", area: "ops", state: "pending" },
+      { old_epic: "d", backlog: "ops", state: "pending" },
     ],
   }
   render(<WriteView project="gx" view={view} refetch={() => {}} retry={retry} keep={keep} />)
@@ -130,13 +130,13 @@ test("move units are rows with state and error, and count in x of y", () => {
   const view = viewOf([rowOf(1, { write_state: "done" })])
   view.summary = {
     actions: {},
-    areas: {},
+    backlogs: {},
     waiting: [],
     moves: [
-      { old_epic: "a", area: "web", state: "done" },
-      { old_epic: "b", area: "web", state: "failed", last_error: "design session is live" },
-      { old_epic: "c", area: "ops", state: "kept" },
-      { old_epic: "d", area: "ops", state: "pending" },
+      { old_epic: "a", backlog: "web", state: "done" },
+      { old_epic: "b", backlog: "web", state: "failed", last_error: "design session is live" },
+      { old_epic: "c", backlog: "ops", state: "kept" },
+      { old_epic: "d", backlog: "ops", state: "pending" },
     ],
   }
   render(<WriteView project="gx" view={view} refetch={() => {}} />)

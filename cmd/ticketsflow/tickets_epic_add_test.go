@@ -30,7 +30,7 @@ func TestRunTicketsEpicAdd_CreatesEpics(t *testing.T) {
 		{"mine:m", "map", "draft", "", []string{"kind: map", "status: draft", "# m"}},
 		{"mine:l", "loop", "open", "", []string{"kind: loop", "status: open"}},
 		{"bare", "loop", "open", "# Title\n\nwords\n", []string{"kind: loop", "# Title", "words"}},
-		{"mine:a", "area", "open", "", []string{"kind: area", "status: open"}},
+		{"mine:a", "backlog", "open", "", []string{"kind: backlog", "status: open"}},
 		{"mine:p", "loop", "draft", "---\ndestination_unconfirmed: true\n---\n\n# P\n", []string{"destination_unconfirmed: true", "# P"}},
 	} {
 		var out bytes.Buffer
@@ -56,17 +56,17 @@ func TestRunTicketsEpicAdd_CreatesEpics(t *testing.T) {
 	}
 }
 
-func TestRunTicketsEpicAdd_ThirteenthAreaIsRefused(t *testing.T) {
+func TestRunTicketsEpicAdd_ThirteenthBacklogIsRefused(t *testing.T) {
 	cwd, project := setupEpicAddProject(t)
-	for i := 0; i < tickets.MaxAreas; i++ {
-		arg := "mine:area-" + string(rune('a'+i))
-		if err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, arg, "area", "open", "", &bytes.Buffer{}); err != nil {
+	for i := 0; i < tickets.MaxBacklogs; i++ {
+		arg := "mine:backlog-" + string(rune('a'+i))
+		if err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, arg, "backlog", "open", "", &bytes.Buffer{}); err != nil {
 			t.Fatalf("%s: %v", arg, err)
 		}
 	}
-	err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, "mine:extra", "area", "open", "", &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "areas") {
-		t.Fatalf("err = %v, want the area-limit refusal", err)
+	err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, "mine:extra", "backlog", "open", "", &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "backlogs") {
+		t.Fatalf("err = %v, want the backlog-limit refusal", err)
 	}
 	if _, statErr := os.Stat(filepath.Join(project, "extra")); statErr == nil {
 		t.Error("refusal wrote an epic directory")

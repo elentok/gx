@@ -48,16 +48,16 @@ func TestExecute_TicketsValidate_EpicWithoutTicketsValidatesAsEpic(t *testing.T)
 	}
 }
 
-func TestExecute_TicketsValidate_AreaEpicValidatesClean(t *testing.T) {
+func TestExecute_TicketsValidate_BacklogEpicValidatesClean(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "a", "ticket.md")
 	cmdtest.WriteEpicTicket(t, dir, "a", "01-first.md", cmdtest.TicketFrontmatter("01", ""))
-	cmdtest.WriteTicketFile(t, path, "---\nkind: area\nstatus: open\n---\n# Area\n")
+	cmdtest.WriteTicketFile(t, path, "---\nkind: backlog\nstatus: open\n---\n# Backlog\n")
 
 	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
 	if err := execute(t, []string{"tickets", "validate", path}, d); err != nil {
-		t.Fatalf("a project holding an area should validate: %v", err)
+		t.Fatalf("a project holding a backlog should validate: %v", err)
 	}
 }
 

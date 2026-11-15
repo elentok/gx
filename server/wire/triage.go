@@ -174,7 +174,7 @@ type TriageOpenRound struct {
 // failed or kept.
 type TriageMove struct {
 	OldEpic   string `json:"old_epic"`
-	Area      string `json:"area"`
+	Backlog      string `json:"backlog"`
 	State     string `json:"state"`
 	LastError string `json:"last_error,omitempty"`
 	// CanRetry and CanKeep post to the row calls with OldEpic as the address.
@@ -184,10 +184,10 @@ type TriageMove struct {
 
 // TriageSummary is the plan summary the web shows, built from record rows.
 type TriageSummary struct {
-	// Actions counts the rows that are not gone by action; Areas counts the rows
-	// that go to an area by area name.
+	// Actions counts the rows that are not gone by action; Backlogs counts the rows
+	// that go to a backlog by backlog name.
 	Actions map[string]int `json:"actions"`
-	Areas   map[string]int `json:"areas"`
+	Backlogs   map[string]int `json:"backlogs"`
 	Moves   []TriageMove   `json:"moves"`
 	// Waiting lists "waiting: <epic> holds claimed <address>" lines: old epics
 	// with nothing to move and a claimed ticket.

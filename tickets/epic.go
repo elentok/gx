@@ -12,12 +12,12 @@ import (
 // never runs it and `tickets set` may claim and close its tickets directly.
 const KindMap = "map"
 
-// KindArea is the ticket.md `kind:` of an area epic: it holds follow-ups that
+// KindBacklog is the ticket.md `kind:` of a backlog epic: it holds follow-ups that
 // need deciding and never runs a Design. Its kind never changes.
-const KindArea = "area"
+const KindBacklog = "backlog"
 
-// MaxAreas is the most live area epics one project may have.
-const MaxAreas = 12
+// MaxBacklogs is the most live backlog epics one project may have.
+const MaxBacklogs = 12
 
 // The epics a person files follow-ups into, live and archived. Neither is
 // schedulable work, so neither can be queued.
@@ -61,12 +61,12 @@ func IsMapEpic(epicPath string) bool {
 	return epic.IsMap
 }
 
-// IsAreaEpic reports whether the epic at epicPath is an area, without loading
-// its tickets: its ticket.md says kind: area.
-func IsAreaEpic(epicPath string) bool {
+// IsBacklogEpic reports whether the epic at epicPath is a backlog, without loading
+// its tickets: its ticket.md says kind: backlog.
+func IsBacklogEpic(epicPath string) bool {
 	epic := Epic{Path: epicPath}
 	loadEpicTicketMD(&epic)
-	return epic.IsArea
+	return epic.IsBacklog
 }
 
 // LoadEpicTicketMD reads the epic at epicPath's ticket.md, without loading
@@ -84,7 +84,7 @@ type Epic struct {
 	Name    string
 	Path    string
 	IsMap   bool   // a wayfinder map: ticket.md says kind: map
-	IsArea  bool   // an area: ticket.md says kind: area
+	IsBacklog  bool   // a backlog: ticket.md says kind: backlog
 	Body    string // ticket.md's body
 	Tickets []Ticket
 
@@ -203,9 +203,9 @@ func (e Epic) TotalCount() int {
 }
 
 // HoldsLoopWork reports whether the epic's tickets are loop work: false for a
-// wayfinder map (resolved by hand) and for an area (follow-ups, never scheduled).
+// wayfinder map (resolved by hand) and for a backlog (follow-ups, never scheduled).
 func (e Epic) HoldsLoopWork() bool {
-	return !e.IsMap && !e.IsArea
+	return !e.IsMap && !e.IsBacklog
 }
 
 // IsCharting: a map whose Design has not started past the chart step.

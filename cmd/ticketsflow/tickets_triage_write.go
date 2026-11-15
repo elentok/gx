@@ -37,7 +37,7 @@ type located struct {
 	HasAnswers   bool     `json:"hasAnswers"`
 	SeenAgain    bool     `json:"seenAgain"`
 	// Target is the epic, type and question text the row is written with, for
-	// a row that goes to an area or the ready epic.
+	// a row that goes to a backlog or the ready epic.
 	Target *triage.WriteTarget `json:"target,omitempty"`
 
 	body string
@@ -401,13 +401,13 @@ func newTriageDropRowsCmd(d Deps) *cobra.Command {
 
 func newTriageEpicsCmd(d Deps) *cobra.Command {
 	var project, ready string
-	var maps, areas []string
+	var maps, backlogs []string
 	var revision int
 	cmd := &cobra.Command{
 		Use:   "epics",
 		Short: "record the epics this Triage creates, before `gx tickets epic add` runs",
-		Long: "Usage: gx tickets triage epics [--ready <epic>] [--map <epic>]... [--area <name>]... [--revision <n>] [--project <p>]\n\n" +
-			"Record the ready epic, map epics and areas (step write only). An area must be confirmed or from the table. Prints one line per epic: \"<epic> known\"\n" +
+		Long: "Usage: gx tickets triage epics [--ready <epic>] [--map <epic>]... [--backlog <name>]... [--revision <n>] [--project <p>]\n\n" +
+			"Record the ready epic, map epics and backlogs (step write only). A backlog must be confirmed or from the table. Prints one line per epic: \"<epic> known\"\n" +
 			"when the record listed it before this call, else \"<epic> new\". An `epic add` that refuses an\n" +
 			"epic reported \"known\" is done; any other refusal fails the row with the verb's own text.",
 		Args: cobra.NoArgs,
@@ -420,12 +420,12 @@ func newTriageEpicsCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if _, err := t.store.RecordEpics(rec.ID, currentRevision(c, rec, revision), ready, maps, areas); err != nil {
+			if _, err := t.store.RecordEpics(rec.ID, currentRevision(c, rec, revision), ready, maps, backlogs); err != nil {
 				return err
 			}
 			t.ping(d)
 			out := c.OutOrStdout()
-			for _, e := range append(append([]string{ready}, maps...), areas...) {
+			for _, e := range append(append([]string{ready}, maps...), backlogs...) {
 				if e == "" {
 					continue
 				}
@@ -442,7 +442,7 @@ func newTriageEpicsCmd(d Deps) *cobra.Command {
 	f.StringVar(&project, "project", "", "project (default: the cwd's)")
 	f.StringVar(&ready, "ready", "", "the ready epic")
 	f.StringArrayVar(&maps, "map", nil, "a map epic (repeatable)")
-	f.StringArrayVar(&areas, "area", nil, "an area epic (repeatable)")
+	f.StringArrayVar(&backlogs, "backlog", nil, "a backlog epic (repeatable)")
 	f.IntVar(&revision, "revision", 0, "refuse unless the record is at this revision")
 	return cmd
 }

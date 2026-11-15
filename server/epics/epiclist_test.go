@@ -44,7 +44,7 @@ func TestEpicList_SectionRules(t *testing.T) {
 		rigs.WriteEpicFiles(t, store, "designing-done", mapMD, done)
 		rigs.WriteEpicFiles(t, store, "waiting", mapMD, open)
 		rigs.WriteEpicFiles(t, store, "mapdone", "---\nstatus: open\nkind: map\ncompleted_at: 2026-01-03T11:00:00Z\n---\n", done)
-		rigs.WriteEpicFiles(t, store, "an-area", "---\nstatus: open\nkind: area\n---\n", open)
+		rigs.WriteEpicFiles(t, store, "an-backlog", "---\nstatus: open\nkind: backlog\n---\n", open)
 		for _, hidden := range []string{"one-offs", "follow-ups", "work-archived", "follow-ups-archived", "one-offs-archived"} {
 			rigs.WriteEpicFiles(t, store, hidden, loop, open)
 		}
@@ -308,30 +308,30 @@ func TestEpicList_OneOffCardsAndTheFinishedCap(t *testing.T) {
 	}
 }
 
-func TestBacklog_AreasCountsAndUnfinishedMoves(t *testing.T) {
+func TestBacklog_BacklogsCountsAndUnfinishedMoves(t *testing.T) {
 	t.Parallel()
 	loop := "---\nstatus: open\n---\n"
-	area := "---\nstatus: open\nkind: area\n---\n"
-	moveMap := func(extra, areaName string, ids ...string) string {
-		return "---\nstatus: open\nkind: map\n" + extra + "---\n\n## Notes\n\n" + ticketmove.StartDesignNotes("proj", areaName, ids)
+	backlog := "---\nstatus: open\nkind: backlog\n---\n"
+	moveMap := func(extra, backlogName string, ids ...string) string {
+		return "---\nstatus: open\nkind: map\n" + extra + "---\n\n## Notes\n\n" + ticketmove.StartDesignNotes("proj", backlogName, ids)
 	}
 	h, base := rigs.StartEpicDetail(t, func(store string) {
-		rigs.WriteEpicFiles(t, store, "ideas", area, map[string]string{
+		rigs.WriteEpicFiles(t, store, "ideas", backlog, map[string]string{
 			"01-a.md": rigs.IssueMD("01", "draft", "", "A"),
 			"02-b.md": rigs.IssueMD("02", "open", "", "B"),
 			"03-c.md": rigs.IssueMD("03", "claimed", "", "C"),
 			"04-d.md": rigs.IssueMD("04", "done", "", "D"),
 			"05-e.md": rigs.IssueMD("05", "cancelled", "", "E"),
 		})
-		rigs.WriteEpicFiles(t, store, "bugs", area, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
-		rigs.WriteEpicFiles(t, store, "gated", area, map[string]string{
+		rigs.WriteEpicFiles(t, store, "bugs", backlog, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+		rigs.WriteEpicFiles(t, store, "gated", backlog, map[string]string{
 			"01-a.md": rigs.IssueMD("01", "claimed", "", "A"),
 			"02-b.md": rigs.IssueMD("02", "open", "blocked_by: \"01\"\n", "B"),
 		})
 		rigs.WriteEpicFiles(t, store, "partial", moveMap("", "ideas", "01", "02", "09"), map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
 		rigs.WriteEpicFiles(t, store, "work", loop, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
-		rigs.WriteProjectEpic(t, store, "noarea", "work", loop, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
-		rigs.WriteProjectEpic(t, store, "stale", "ideas", area, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+		rigs.WriteProjectEpic(t, store, "nobacklog", "work", loop, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+		rigs.WriteProjectEpic(t, store, "stale", "ideas", backlog, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
 		rigs.WriteProjectEpic(t, store, "stale", "completed", moveMap("completed_at: 2026-01-03T11:00:00Z\n", "ideas", "01"), map[string]string{"01-a.md": rigs.IssueMD("01", "done", "", "A")})
 		rigs.WriteProjectEpic(t, store, "stale", "later", moveMap("design_step: spec\n", "ideas", "01"), map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
 	})
@@ -347,39 +347,39 @@ func TestBacklog_AreasCountsAndUnfinishedMoves(t *testing.T) {
 	for _, p := range got.Projects {
 		byProject[p.Project] = p
 	}
-	if _, ok := byProject["noarea"]; ok || len(byProject) != 2 {
+	if _, ok := byProject["nobacklog"]; ok || len(byProject) != 2 {
 		t.Errorf("projects = %v, want proj and stale only: %s", slices.Collect(maps.Keys(byProject)), body)
 	}
-	areas := map[string]wire.BacklogArea{}
-	for _, a := range byProject["proj"].Areas {
-		areas[a.Address] = a
+	epics := map[string]wire.BacklogEpic{}
+	for _, a := range byProject["proj"].Epics {
+		epics[a.Address] = a
 	}
-	if a := areas["proj:ideas"]; a.Open != 2 || a.Unfinished == nil || *a.Unfinished != (wire.BacklogUnfinishedMove{Map: "proj:partial", ToMove: 2}) {
+	if a := epics["proj:ideas"]; a.Open != 2 || a.Unfinished == nil || *a.Unfinished != (wire.BacklogUnfinishedMove{Map: "proj:partial", ToMove: 2}) {
 		t.Errorf("proj:ideas = %+v, want open 2 and unfinished proj:partial with 2 to move", a)
 	}
-	if a := areas["proj:bugs"]; a.Open != 1 || a.Unfinished != nil {
+	if a := epics["proj:bugs"]; a.Open != 1 || a.Unfinished != nil {
 		t.Errorf("proj:bugs = %+v, want open 1 and no unfinished move", a)
 	}
-	if a := areas["proj:gated"]; a.Open != 0 {
+	if a := epics["proj:gated"]; a.Open != 0 {
 		t.Errorf("proj:gated = %+v, want open 0: its only open ticket is blocked", a)
 	}
 	if len(byProject["proj"].Workspaces) == 0 {
 		t.Errorf("proj has no workspaces: %s", body)
 	}
-	if a := byProject["stale"].Areas[0]; a.Unfinished != nil {
+	if a := byProject["stale"].Epics[0]; a.Unfinished != nil {
 		t.Errorf("stale:ideas = %+v, a completed or past-charting map must not count", a)
 	}
 }
 
-func TestBacklog_LeavesTheEpicsListWithoutAreas(t *testing.T) {
+func TestBacklog_LeavesTheEpicsListWithoutBacklogs(t *testing.T) {
 	t.Parallel()
 	h, base := rigs.StartEpicDetail(t, func(store string) {
-		rigs.WriteEpicFiles(t, store, "ideas", "---\nstatus: open\nkind: area\n---\n", map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+		rigs.WriteEpicFiles(t, store, "ideas", "---\nstatus: open\nkind: backlog\n---\n", map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
 	})
 	code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/epics")
 	for _, r := range rigs.GetEpicList(t, code, body).Epics {
 		if strings.Contains(r.Address, "ideas") {
-			t.Errorf("Epics page lists the area: %+v", r)
+			t.Errorf("Epics page lists the backlog: %+v", r)
 		}
 	}
 }

@@ -14,20 +14,20 @@ import (
 	"github.com/elentok/gx/triage"
 )
 
-// NewArea is the area the fake Route proposes when there is room for one.
-const NewArea = "tooling"
+// NewBacklog is the backlog the fake Route proposes when there is room for one.
+const NewBacklog = "tooling"
 
-// NewAreaQuestionID is the id of the new-area confirmation question.
-const NewAreaQuestionID = "area-new"
+// NewBacklogQuestionID is the id of the new-backlog confirmation question.
+const NewBacklogQuestionID = "backlog-new"
 
 // The phrases a typed message may use; anything else gets a one-line reply.
 // They are listed in webui/e2e/CATALOG.md.
 const (
 	// PhraseYes answers the final "Write this plan?" card.
 	PhraseYes = "yes"
-	// PhraseMove is a routing correction: "Move row <n> to <area>" or "Move
+	// PhraseMove is a routing correction: "Move row <n> to <backlog>" or "Move
 	// row <n> to ready", with n counting the rows from 1.
-	PhraseMove = "Move row <n> to <area|ready>"
+	PhraseMove = "Move row <n> to <backlog|ready>"
 	// PhraseAnswer answers a question of the open round.
 	PhraseAnswer = "Answer <question id>: <answer>"
 	// PhraseObject objects to the n-th self-decided answer, counting from 1.
@@ -41,15 +41,15 @@ var (
 )
 
 // RoutePlan is the plan the fake Route saves: per six rows a ready row with an
-// ask question, a row to the new area (or the closest one) with a design
-// question, a row to an existing area, a ready row with an ask question, a
-// close and a keep. areas are the existing area epics.
-func RoutePlan(rec *triage.Record, areas []string) []triage.PlanRow {
-	closest := NewArea
-	if len(areas) > 0 {
-		closest = areas[0]
+// ask question, a row to the new backlog (or the closest one) with a design
+// question, a row to an existing backlog, a ready row with an ask question, a
+// close and a keep. backlogs are the existing backlog epics.
+func RoutePlan(rec *triage.Record, backlogs []string) []triage.PlanRow {
+	closest := NewBacklog
+	if len(backlogs) > 0 {
+		closest = backlogs[0]
 	}
-	propose := len(areas) < tickets.MaxAreas
+	propose := len(backlogs) < tickets.MaxBacklogs
 	var plan []triage.PlanRow
 	for i, r := range rec.Rows {
 		row := triage.PlanRow{RowID: r.Address}
@@ -61,15 +61,15 @@ func RoutePlan(rec *triage.Record, areas []string) []triage.PlanRow {
 		case 0:
 			ready("10K", triage.Question{ID: fmt.Sprintf("q%d", i+1), Text: "Fix it in the parser or the caller?", Kind: triage.QuestionAsk, Options: []string{"parser", "caller"}, Default: "parser"})
 		case 1:
-			row.Action, row.Destination = triage.ActionArea, closest
+			row.Action, row.Destination = triage.ActionBacklog, closest
 			if propose {
-				row.Destination = NewArea
+				row.Destination = NewBacklog
 			}
 			row.Questions = []triage.Question{{ID: fmt.Sprintf("d%d", i+1), Text: "Which store should it use?", Kind: triage.QuestionDesign}}
 		case 2:
-			row.Action, row.Destination = triage.ActionArea, closest
-			if len(areas) > 1 {
-				row.Destination = areas[1]
+			row.Action, row.Destination = triage.ActionBacklog, closest
+			if len(backlogs) > 1 {
+				row.Destination = backlogs[1]
 			}
 		case 3:
 			ready("12K", triage.Question{ID: fmt.Sprintf("q%d", i+1), Text: "Keep the old flag?", Kind: triage.QuestionAsk, Options: []string{"yes", "no"}, Default: "no"})
@@ -84,29 +84,29 @@ func RoutePlan(rec *triage.Record, areas []string) []triage.PlanRow {
 }
 
 // Decisions are the answers the fake settles itself: a small one on the first
-// row and, at the area cap, the filing of the second row under the closest area.
-func Decisions(rec *triage.Record, areas []string) []triage.Decided {
+// row and, at the backlog cap, the filing of the second row under the closest backlog.
+func Decisions(rec *triage.Record, backlogs []string) []triage.Decided {
 	if len(rec.Rows) == 0 {
 		return nil
 	}
 	out := []triage.Decided{{RowID: rec.Rows[0].Address, Question: "Rename the helper while there?", Choice: "yes", Reason: "it is a one-line change"}}
-	if len(areas) >= tickets.MaxAreas && len(rec.Rows) > 1 {
-		out = append(out, triage.Decided{RowID: rec.Rows[1].Address, Question: "Which area does it go to?", Choice: areas[0], Reason: "12 areas exist, so it is filed under the closest one"})
+	if len(backlogs) >= tickets.MaxBacklogs && len(rec.Rows) > 1 {
+		out = append(out, triage.Decided{RowID: rec.Rows[1].Address, Question: "Which backlog does it go to?", Choice: backlogs[0], Reason: "12 backlogs exist, so it is filed under the closest one"})
 	}
 	return out
 }
 
-// NewAreaQuestion confirms the new area: create it, file under the closest
-// area (when one exists) or keep for later.
-func NewAreaQuestion(rec *triage.Record, areas []string) triage.Question {
-	create := "Create " + NewArea
-	q := triage.Question{ID: NewAreaQuestionID, Text: fmt.Sprintf("Create the area %q?", NewArea), Kind: triage.QuestionAsk, Default: create, Options: []string{create}}
-	if len(areas) > 0 {
-		q.Options = append(q.Options, "File under "+areas[0])
+// NewBacklogQuestion confirms the new backlog: create it, file under the closest
+// backlog (when one exists) or keep for later.
+func NewBacklogQuestion(rec *triage.Record, backlogs []string) triage.Question {
+	create := "Create " + NewBacklog
+	q := triage.Question{ID: NewBacklogQuestionID, Text: fmt.Sprintf("Create the backlog %q?", NewBacklog), Kind: triage.QuestionAsk, Default: create, Options: []string{create}}
+	if len(backlogs) > 0 {
+		q.Options = append(q.Options, "File under "+backlogs[0])
 	}
 	q.Options = append(q.Options, "Keep for later")
 	for _, r := range rec.Rows {
-		if r.Plan != nil && r.Plan.Action == triage.ActionArea && r.Plan.Destination == NewArea {
+		if r.Plan != nil && r.Plan.Action == triage.ActionBacklog && r.Plan.Destination == NewBacklog {
 			q.RowID = r.Address
 			break
 		}
@@ -114,41 +114,41 @@ func NewAreaQuestion(rec *triage.Record, areas []string) triage.Question {
 	return q
 }
 
-// areas lists the area epics of the player's project.
-func (p *Player) areas() []string {
+// backlogs lists the backlog epics of the player's project.
+func (p *Player) backlogs() []string {
 	root, err := p.gx("", "tickets", "root")
 	if err != nil || root == "" {
 		return nil
 	}
-	names, _ := tickets.AreaNames(root)
+	names, _ := tickets.BacklogNames(root)
 	return names
 }
 
-func closestArea(areas []string) string {
-	if len(areas) > 0 {
-		return areas[0]
+func closestBacklog(backlogs []string) string {
+	if len(backlogs) > 0 {
+		return backlogs[0]
 	}
-	return NewArea
+	return NewBacklog
 }
 
-// route saves the area proposal and the plan, then prints the summary card.
+// route saves the backlog proposal and the plan, then prints the summary card.
 func (p *Player) route(rec *triage.Record) (string, error) {
 	if _, err := p.gx("", "agent", "step", tickets.StepRoute); err != nil {
 		return "", err
 	}
-	areas := p.areas()
-	if len(areas) < tickets.MaxAreas {
-		if _, err := p.triage("", "area", "--name", NewArea, "--source", triage.AreaAgent); err != nil {
+	backlogs := p.backlogs()
+	if len(backlogs) < tickets.MaxBacklogs {
+		if _, err := p.triage("", "backlog", "--name", NewBacklog, "--source", triage.BacklogAgent); err != nil {
 			return "", err
 		}
 	}
 	// The move units are saved at the Route step, so before the plan, which
 	// moves the record on to Questions.
-	moveLines, err := p.oldEpicMoves(areas)
+	moveLines, err := p.oldEpicMoves(backlogs)
 	if err != nil {
 		return "", err
 	}
-	body, err := json.Marshal(RoutePlan(rec, areas))
+	body, err := json.Marshal(RoutePlan(rec, backlogs))
 	if err != nil {
 		return "", err
 	}
@@ -174,17 +174,17 @@ func (p *Player) route(rec *triage.Record) (string, error) {
 }
 
 // oldEpicMoves plans the old epics' moves as the skill does: each epic with
-// tickets to move goes to its table area (the closest area when the table has
+// tickets to move goes to its table backlog (the closest backlog when the table has
 // none) and an epic that only holds claimed tickets is a "waiting" line. It
 // returns the card's lines.
-func (p *Player) oldEpicMoves(areas []string) ([]string, error) {
+func (p *Player) oldEpicMoves(backlogs []string) ([]string, error) {
 	out, err := p.triage("", "oldepics", "--json")
 	if err != nil || out == "" {
 		return nil, err
 	}
 	var list []struct {
 		Epic    string   `json:"epic"`
-		Area    string   `json:"area"`
+		Backlog    string   `json:"backlog"`
 		Move    []string `json:"move"`
 		Waiting bool     `json:"waiting"`
 		Claimed []string `json:"claimed"`
@@ -200,20 +200,20 @@ func (p *Player) oldEpicMoves(areas []string) ([]string, error) {
 			lines = append(lines, fmt.Sprintf("waiting: %s holds claimed %s", e.Epic, strings.Join(e.Claimed, ", ")))
 			continue
 		}
-		area := e.Area
-		if area == "" {
-			area = closestArea(areas)
-		} else if !seen[area] && !slices.Contains(areas, area) {
-			seen[area] = true
-			if _, err := p.triage("", "area", "--name", area, "--source", triage.AreaTable); err != nil {
+		backlog := e.Backlog
+		if backlog == "" {
+			backlog = closestBacklog(backlogs)
+		} else if !seen[backlog] && !slices.Contains(backlogs, backlog) {
+			seen[backlog] = true
+			if _, err := p.triage("", "backlog", "--name", backlog, "--source", triage.BacklogTable); err != nil {
 				return nil, err
 			}
 		}
 		if len(e.Move) == 0 {
 			continue
 		}
-		units = append(units, triage.MoveUnit{OldEpic: e.Epic, Area: area})
-		lines = append(lines, fmt.Sprintf("move %s -> area %s: %d tickets", e.Epic, area, len(e.Move)))
+		units = append(units, triage.MoveUnit{OldEpic: e.Epic, Backlog: backlog})
+		lines = append(lines, fmt.Sprintf("move %s -> backlog %s: %d tickets", e.Epic, backlog, len(e.Move)))
 	}
 	if len(units) == 0 {
 		return lines, nil
@@ -229,15 +229,15 @@ func (p *Player) oldEpicMoves(areas []string) ([]string, error) {
 func bucket(r triage.Row) string {
 	action, dest := r.Effective()
 	switch action {
-	case triage.ActionArea:
-		return "area " + dest
+	case triage.ActionBacklog:
+		return "backlog " + dest
 	case "ready":
 		return "ready epic"
 	}
 	return action
 }
 
-// summaryLines is the summary card: the rows per action and per area. With
+// summaryLines is the summary card: the rows per action and per backlog. With
 // only, just those buckets, zero counts included.
 func summaryLines(rec *triage.Record, only []string) []string {
 	counts := map[string]int{}
@@ -337,9 +337,9 @@ func (p *Player) questions(rec *triage.Record) (string, error) {
 	if _, err := p.gx("", "agent", "step", tickets.StepQuestions); err != nil {
 		return "", err
 	}
-	areas := p.areas()
+	backlogs := p.backlogs()
 	if len(rec.Decided) == 0 {
-		for _, d := range Decisions(rec, areas) {
+		for _, d := range Decisions(rec, backlogs) {
 			if _, err := p.triage("", "decide", "--row", d.RowID, "--question", d.Question, "--choice", d.Choice, "--reason", d.Reason); err != nil {
 				return "", err
 			}
@@ -359,7 +359,7 @@ func (p *Player) questions(rec *triage.Record) (string, error) {
 			ordinary++
 		}
 	}
-	qs := p.nextRound(rec, areas)
+	qs := p.nextRound(rec, backlogs)
 	if len(qs) == 0 || ordinary >= triage.MaxOrdinaryRounds {
 		return finalCard(rec), nil
 	}
@@ -378,16 +378,16 @@ func (p *Player) questions(rec *triage.Record) (string, error) {
 	return printRound(v.Record, i, open), nil
 }
 
-// nextRound is the next round's questions: the new-area one first, then the
+// nextRound is the next round's questions: the new-backlog one first, then the
 // ask questions no round holds, bugs before ideas, at most one round's worth.
-func (p *Player) nextRound(rec *triage.Record, areas []string) []triage.Question {
+func (p *Player) nextRound(rec *triage.Record, backlogs []string) []triage.Question {
 	var qs []triage.Question
 	placed := slices.ContainsFunc(rec.Rounds, func(rd triage.Round) bool {
-		return slices.ContainsFunc(rd.Questions, func(q triage.Question) bool { return q.ID == NewAreaQuestionID })
+		return slices.ContainsFunc(rd.Questions, func(q triage.Question) bool { return q.ID == NewBacklogQuestionID })
 	})
-	unconfirmed := slices.ContainsFunc(rec.Areas, func(a triage.Area) bool { return a.Source == triage.AreaAgent && !a.Confirmed })
+	unconfirmed := slices.ContainsFunc(rec.Backlogs, func(a triage.Backlog) bool { return a.Source == triage.BacklogAgent && !a.Confirmed })
 	if unconfirmed && !placed {
-		qs = append(qs, NewAreaQuestion(rec, areas))
+		qs = append(qs, NewBacklogQuestion(rec, backlogs))
 	}
 	asks := rec.Unrounded()
 	category := func(address string) int {
@@ -477,12 +477,12 @@ func (p *Player) react(rec *triage.Record) (string, error) {
 		return reply, err
 	}
 	text := strings.TrimSpace(p.Typed)
-	areas := p.areas()
+	backlogs := p.backlogs()
 	switch m := moveRe.FindStringSubmatch(text); {
 	case strings.EqualFold(text, PhraseYes):
 		return p.approve(rec)
 	case m != nil:
-		return p.move(rec, areas, m[1], m[2])
+		return p.move(rec, backlogs, m[1], m[2])
 	case answerRe.MatchString(text):
 		m := answerRe.FindStringSubmatch(text)
 		return p.answer(rec, m[1], strings.TrimSpace(m[2]))
@@ -500,15 +500,15 @@ func (p *Player) approve(rec *triage.Record) (string, error) {
 }
 
 // move is a routing correction, saved right after the reply.
-func (p *Player) move(rec *triage.Record, areas []string, n, to string) (string, error) {
+func (p *Player) move(rec *triage.Record, backlogs []string, n, to string) (string, error) {
 	i, _ := strconv.Atoi(n)
 	if i < 1 || i > len(rec.Rows) {
 		return fmt.Sprintf("There is no row %s.", n), nil
 	}
 	row := rec.Rows[i-1]
-	args := []string{"correct", "--row", row.Address, "--action", triage.ActionArea, "--destination", to}
+	args := []string{"correct", "--row", row.Address, "--action", triage.ActionBacklog, "--destination", to}
 	if to == "ready" {
-		args = []string{"correct", "--row", row.Address, "--action", "ready", "--fallback", closestArea(areas)}
+		args = []string{"correct", "--row", row.Address, "--action", "ready", "--fallback", closestBacklog(backlogs)}
 	}
 	if _, err := p.triage("", args...); err != nil {
 		return "", err
@@ -530,15 +530,15 @@ func (p *Player) move(rec *triage.Record, areas []string, n, to string) (string,
 	return reply, nil
 }
 
-// answer saves the answer to a question of the open round. The new-area
-// answer also settles the area; a round that is now answered chains to the
+// answer saves the answer to a question of the open round. The new-backlog
+// answer also settles the backlog; a round that is now answered chains to the
 // next round or the final card.
 func (p *Player) answer(rec *triage.Record, id, answer string) (string, error) {
 	if _, err := p.triage("", "answer", "--question", id, "--answer", answer); err != nil {
 		return "", err
 	}
-	if id == NewAreaQuestionID {
-		if err := p.settleNewArea(rec, answer); err != nil {
+	if id == NewBacklogQuestionID {
+		if err := p.settleNewBacklog(rec, answer); err != nil {
 			return "", err
 		}
 	}
@@ -552,17 +552,17 @@ func (p *Player) answer(rec *triage.Record, id, answer string) (string, error) {
 	return p.questions(v.Record)
 }
 
-// settleNewArea acts on the new-area answer, then confirms the area entry:
-// approve is refused while an agent area is unconfirmed, and Write creates
-// an area only when a row goes to it.
-func (p *Player) settleNewArea(rec *triage.Record, answer string) error {
+// settleNewBacklog acts on the new-backlog answer, then confirms the backlog entry:
+// approve is refused while an agent backlog is unconfirmed, and Write creates
+// a backlog only when a row goes to it.
+func (p *Player) settleNewBacklog(rec *triage.Record, answer string) error {
 	for _, r := range rec.Rows {
-		if _, dest := r.Effective(); dest != NewArea {
+		if _, dest := r.Effective(); dest != NewBacklog {
 			continue
 		}
 		switch {
 		case strings.HasPrefix(answer, "File under "):
-			if _, err := p.triage("", "correct", "--row", r.Address, "--action", triage.ActionArea, "--destination", strings.TrimPrefix(answer, "File under ")); err != nil {
+			if _, err := p.triage("", "correct", "--row", r.Address, "--action", triage.ActionBacklog, "--destination", strings.TrimPrefix(answer, "File under ")); err != nil {
 				return err
 			}
 		case answer == "Keep for later":
@@ -575,7 +575,7 @@ func (p *Player) settleNewArea(rec *triage.Record, answer string) error {
 			}
 		}
 	}
-	_, err := p.triage("", "area", "--name", NewArea, "--source", triage.AreaAgent, "--confirm")
+	_, err := p.triage("", "backlog", "--name", NewBacklog, "--source", triage.BacklogAgent, "--confirm")
 	return err
 }
 

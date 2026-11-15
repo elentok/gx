@@ -562,17 +562,17 @@ func TestTriage_DecideAndObjectListTheDecisionWithTheObjectedFlag(t *testing.T) 
 	}
 }
 
-func TestTriage_AnUnconfirmedAgentAreaRefusesApproveUntilConfirmed(t *testing.T) {
+func TestTriage_AnUnconfirmedAgentBacklogRefusesApproveUntilConfirmed(t *testing.T) {
 	repo := triageProject(t)
 	triageAtApprove(t, repo, false)
-	if _, err := runIn(t, repo, "tickets", "triage", "area", "--name", "ui", "--source", "agent"); err != nil {
-		t.Fatalf("area: %v", err)
+	if _, err := runIn(t, repo, "tickets", "triage", "backlog", "--name", "ui", "--source", "agent"); err != nil {
+		t.Fatalf("backlog: %v", err)
 	}
 	cur := triageShow(t, repo)
 	if _, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(cur.Revision)); err == nil || !strings.Contains(err.Error(), "not confirmed") {
-		t.Fatalf("approve with an unconfirmed area = %v, want refusal", err)
+		t.Fatalf("approve with an unconfirmed backlog = %v, want refusal", err)
 	}
-	if _, err := runIn(t, repo, "tickets", "triage", "area", "--name", "ui", "--source", "agent", "--confirm"); err != nil {
+	if _, err := runIn(t, repo, "tickets", "triage", "backlog", "--name", "ui", "--source", "agent", "--confirm"); err != nil {
 		t.Fatal(err)
 	}
 	cur = triageShow(t, repo)
@@ -581,11 +581,11 @@ func TestTriage_AnUnconfirmedAgentAreaRefusesApproveUntilConfirmed(t *testing.T)
 	}
 }
 
-func TestTriage_CorrectMovesARowToAnArea(t *testing.T) {
+func TestTriage_CorrectMovesARowToAnBacklog(t *testing.T) {
 	repo := triageProject(t)
 	s := triageAtApprove(t, repo, false)
 	row := s.Rows[0].Address
-	if _, err := runIn(t, repo, "tickets", "triage", "correct", "--row", row, "--action", "area", "--destination", "ui"); err != nil {
+	if _, err := runIn(t, repo, "tickets", "triage", "correct", "--row", row, "--action", "backlog", "--destination", "ui"); err != nil {
 		t.Fatalf("correct: %v", err)
 	}
 	if _, err := runIn(t, repo, "tickets", "triage", "correct", "--row", row, "--action", "bogus"); err == nil {

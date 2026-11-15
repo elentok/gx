@@ -29,17 +29,17 @@ type TriageSeed struct {
 // mock states they stand for.
 var TriageShapes = []string{
 	"c-zero", "c-few", "c-many", "c-live", "c-named",
-	"verify", "route", "route-12-areas", "route-no-area", "questions", "final-approval",
+	"verify", "route", "route-12-backlogs", "route-no-backlog", "questions", "final-approval",
 	"writing", "result", "stopped", "journey", "backlog", "old-epics",
 }
 
-// oldEpicsProject is the project of the old-epics shape: the shipped area
+// oldEpicsProject is the project of the old-epics shape: the shipped backlog
 // table is keyed by project and old-epic slug.
 const oldEpicsProject = "gx"
 
-// areaEpic is an area with n open tickets (draft and open alternating), from
+// backlogEpic is a backlog with n open tickets (draft and open alternating), from
 // id first on, and claimed more that are not open.
-func areaEpic(sc *Scenario, name string, first, n, claimed int) {
+func backlogEpic(sc *Scenario, name string, first, n, claimed int) {
 	e := Epic{Project: project, Name: name}
 	add := func(opts servertest.TicketOpts) {
 		id := fmt.Sprintf("%02d", first+len(e.Tickets))
@@ -56,28 +56,28 @@ func areaEpic(sc *Scenario, name string, first, n, claimed int) {
 		add(servertest.TicketOpts{Status: "claimed", ClaimedAt: time.Now().UTC().Format(time.RFC3339)})
 	}
 	sc.Epics = append(sc.Epics, e)
-	sc.EpicMeta[project+":"+name] = "status: open\nkind: area\n"
+	sc.EpicMeta[project+":"+name] = "status: open\nkind: backlog\n"
 }
 
-// backlogScenario seeds three areas with 11, 5 and 0 open tickets and, in the
+// backlogScenario seeds three backlogs with 11, 5 and 0 open tickets and, in the
 // five-ticket one, a half-filled charting map for "Finish move".
 func backlogScenario(sc *Scenario) {
 	sc.EpicMeta = map[string]string{}
 	sc.EpicBody = map[string]string{}
-	areaEpic(sc, "parser", 1, 11, 1)
+	backlogEpic(sc, "parser", 1, 11, 1)
 	// Tickets 01 and 02 already moved into the map; 03 and 04 are still here.
-	areaEpic(sc, "sync", 3, 5, 0)
-	areaEpic(sc, "webui", 1, 0, 0)
+	backlogEpic(sc, "sync", 3, 5, 0)
+	backlogEpic(sc, "webui", 1, 0, 0)
 	mapAddr := project + ":retry-work"
 	sc.Epics = append(sc.Epics, Epic{project, "retry-work", []Ticket{
 		{"01", "moved-01", servertest.TicketOpts{}}, {"02", "moved-02", servertest.TicketOpts{}},
 	}})
 	sc.EpicMeta[mapAddr] = "status: open\nkind: map\ndestination_unconfirmed: true\n"
-	sc.EpicBody[mapAddr] = "# Retry work\n\n## Destination\n\nA provisional Destination for the \"Retry work\" theme of the \"sync\" area.\n\n## Notes\n\n" +
+	sc.EpicBody[mapAddr] = "# Retry work\n\n## Destination\n\nA provisional Destination for the \"Retry work\" theme of the \"sync\" backlog.\n\n## Notes\n\n" +
 		ticketmove.StartDesignNotes(project, "sync", []string{"01", "02", "03", "04"})
 }
 
-// oldEpicsScenario seeds old triage-made maps in project gx and no area, plus
+// oldEpicsScenario seeds old triage-made maps in project gx and no backlog, plus
 // a follow-up epic so a Triage starts and its Route plans the moves.
 func oldEpicsScenario(sc *Scenario, open func(string) []string) {
 	sc.EpicMeta = map[string]string{}
@@ -111,21 +111,21 @@ func oldEpicsScenario(sc *Scenario, open func(string) []string) {
 	sc.Steps = [][]string{open(oldEpicsProject)}
 }
 
-// triageAreaNames are the area epics a shape seeds, first n for n areas.
-var triageAreaNames = []string{
+// triageBacklogNames are the backlog epics a shape seeds, first n for n backlogs.
+var triageBacklogNames = []string{
 	"parser", "sync", "webui", "cli", "server", "docs",
 	"build", "ci", "tests", "config", "storage", "auth",
 }
 
-// withAreas seeds the first n areas of triageAreaNames as area epics.
-func withAreas(sc *Scenario, n int) []string {
-	names := triageAreaNames[:n]
+// withBacklogs seeds the first n backlogs of triageBacklogNames as backlog epics.
+func withBacklogs(sc *Scenario, n int) []string {
+	names := triageBacklogNames[:n]
 	if sc.EpicMeta == nil {
 		sc.EpicMeta = map[string]string{}
 	}
 	for _, name := range names {
 		sc.Epics = append(sc.Epics, Epic{project, name, nil})
-		sc.EpicMeta[project+":"+name] = "status: open\nkind: area\n"
+		sc.EpicMeta[project+":"+name] = "status: open\nkind: backlog\n"
 	}
 	return names
 }
@@ -196,11 +196,11 @@ func TriageScenario(shape string) (Scenario, bool) {
 			}}}
 			sc.Steps = [][]string{open(project)}
 		})
-	case "route", "route-12-areas", "route-no-area":
+	case "route", "route-12-backlogs", "route-no-backlog":
 		// Verdicts saved and no plan: the session plays Route, which saves the plan.
 		return with(func(sc *Scenario) {
-			n := map[string]int{"route": 3, "route-12-areas": tickets.MaxAreas, "route-no-area": 0}[shape]
-			withAreas(sc, n)
+			n := map[string]int{"route": 3, "route-12-backlogs": tickets.MaxBacklogs, "route-no-backlog": 0}[shape]
+			withBacklogs(sc, n)
 			sc.Epics = append(sc.Epics, followUps(project, 4, 2))
 			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) {
 				for i := range rec.Rows {
@@ -214,11 +214,11 @@ func TriageScenario(shape string) (Scenario, bool) {
 		// The plan is saved and one round was started: it waits (questions) or
 		// every round is answered and the final card waits (final-approval).
 		return with(func(sc *Scenario) {
-			areas := withAreas(sc, 3)
+			backlogs := withBacklogs(sc, 3)
 			sc.Epics = append(sc.Epics, followUps(project, 4, 2))
 			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) {
 				answered := shape == "final-approval"
-				atQuestions(rec, areas, answered)
+				atQuestions(rec, backlogs, answered)
 			}}}
 			sc.Steps = [][]string{open(project)}
 		})
@@ -229,7 +229,7 @@ func TriageScenario(shape string) (Scenario, bool) {
 			// session waits on the hold so it does not write them.
 			sc.TriageAgent = &triageplay.Config{HoldAtStep: true}
 			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) {
-				actions := []string{"ready", "ready", "area", "merge", "close", "keep"}
+				actions := []string{"ready", "ready", "backlog", "merge", "close", "keep"}
 				planned(rec, func(i int, p *triage.PlanRow) {
 					p.Action = actions[i]
 					// A merge names the row it duplicates and a close names its reason.
@@ -277,7 +277,7 @@ func TriageScenario(shape string) (Scenario, bool) {
 				}
 				rec.Rows = append(rec.Rows,
 					moved(1, "ready", ready+"/01"), moved(2, "ready", ready+"/02"),
-					moved(3, "area", mapEpic+"/01"), moved(4, "close", ""),
+					moved(3, "backlog", mapEpic+"/01"), moved(4, "close", ""),
 				)
 				rec.State, rec.Step = triage.StateDone, string(tickets.StepDone)
 				rec.LastPassComplete = true
@@ -295,7 +295,7 @@ func TriageScenario(shape string) (Scenario, bool) {
 			}}}
 		})
 	case "journey":
-		// Verify takes two sessions, no area exists, and the plan's ready rows are 01 and 04: at Write the first fails once before its move and the fourth once after it.
+		// Verify takes two sessions, no backlog exists, and the plan's ready rows are 01 and 04: at Write the first fails once before its move and the fourth once after it.
 		return with(func(sc *Scenario) {
 			sc.Epics = []Epic{followUps(project, 3, 2)}
 			sc.TriageAgent = &triageplay.Config{
@@ -325,25 +325,25 @@ func followUps(project string, bugs, ideas int) Epic {
 }
 
 // atQuestions puts rec at the questions step with the plan the fake Route
-// saves, the new area proposed (while there is room for it) and the first
-// round started: the new-area question and the first ask question. With
+// saves, the new backlog proposed (while there is room for it) and the first
+// round started: the new-backlog question and the first ask question. With
 // answered, every ask question is in a round and every round is answered.
-func atQuestions(rec *triage.Record, areas []string, answered bool) {
+func atQuestions(rec *triage.Record, backlogs []string, answered bool) {
 	rec.Step = tickets.StepQuestions
-	plan := triageplay.RoutePlan(rec, areas)
+	plan := triageplay.RoutePlan(rec, backlogs)
 	for i := range rec.Rows {
 		p := plan[i]
 		rec.Rows[i].Verdict = triage.VerdictRelevant
 		rec.Rows[i].Plan = &p
 		rec.Rows[i].Fallback = p.Fallback
 	}
-	if len(areas) < tickets.MaxAreas {
-		rec.Areas = []triage.Area{{Name: triageplay.NewArea, Source: triage.AreaAgent, Confirmed: answered}}
+	if len(backlogs) < tickets.MaxBacklogs {
+		rec.Backlogs = []triage.Backlog{{Name: triageplay.NewBacklog, Source: triage.BacklogAgent, Confirmed: answered}}
 	}
-	rec.Decided = triageplay.Decisions(rec, areas)
+	rec.Decided = triageplay.Decisions(rec, backlogs)
 	round := triage.Round{Answers: map[string]string{}}
-	if len(areas) < tickets.MaxAreas {
-		q := triageplay.NewAreaQuestion(rec, areas)
+	if len(backlogs) < tickets.MaxBacklogs {
+		q := triageplay.NewBacklogQuestion(rec, backlogs)
 		round.Questions = append(round.Questions, q)
 		if answered {
 			round.Answers[q.ID] = q.Default

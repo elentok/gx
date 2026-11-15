@@ -12,7 +12,7 @@
 // --shape <fresh|stale|past-reset|one-window> picks the seeded limits state of the limits scenario (default fresh).
 // --shape <normal|short|empty> picks the seeded budget ledger of the spend scenario (default normal).
 // --shape <menu|few-days|stale|past-reset|stats> picks the seeded limit history of the limit-burn scenario (default menu).
-// --shape <c-zero|c-few|c-many|c-live|c-named|verify|route|route-12-areas|route-no-area|questions|final-approval|writing|result|stopped|journey|backlog|old-epics> picks the Triage state of the triage scenario (default c-few).
+// --shape <c-zero|c-few|c-many|c-live|c-named|verify|route|route-12-backlogs|route-no-backlog|questions|final-approval|writing|result|stopped|journey|backlog|old-epics> picks the Triage state of the triage scenario (default c-few).
 // --shape <list|all-off|empty|page|paused|missing-project> picks the Schedules and Last runs of the schedules scenario (default list).
 // --shape <merged|running|unstamped|empty|missing-sha|pr|backfill> picks the Epic ranges and branches of the epic-diff scenario (default merged).
 // --shape <running|off|installing|starting|down|no-checkout> picks the Dev mode state of the dev-mode scenario (default running).

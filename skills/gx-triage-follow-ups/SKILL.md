@@ -2,7 +2,7 @@
 name: gx-triage-follow-ups
 description: >-
   Empty a project's `follow-ups` epic: verify each item against the code, route every item to the
-  ready epic or an area, ask the person only what they must decide, and close what is fixed or
+  ready epic or a backlog, ask the person only what they must decide, and close what is fixed or
   obsolete. Manual; the steps are Verify, Route, Questions, Write and Done. Runs under the gx server
   (web) or in a plain terminal (chat). Never grills outside the Questions step.
 disable-model-invocation: true
@@ -66,8 +66,8 @@ exist, suggest the correct one. Report: (1) verdict `relevant`, `fixed` or `obso
 questions. Tag each question with one of `decide` (you pick), `ask` (the person picks from options) or
 `design` (an open trade-off). Every question has 2–4 concrete options and a recommended answer. A
 question is `ask` when its answer changes scope, a user-visible behaviour or contract (UI, CLI, a
-config key, a skill rule), routing (ready epic or area), or is expensive to reverse; otherwise it is
-`decide`. (4) a suggested destination: the ready epic as `implement`, or an area as `grilling` or
+config key, a skill rule), routing (ready epic or backlog), or is expensive to reverse; otherwise it is
+`decide`. (4) a suggested destination: the ready epic as `implement`, or a backlog as `grilling` or
 `research`. If you cannot decide, say `relevant`. Under 300 words."
 
 The main session may overrule a tag. You save each verdict the moment its subagent returns, with
@@ -88,35 +88,35 @@ One row per item with its action and destination:
 - **close (reason)** — `fixed` or `obsolete`, with the evidence.
 - **merge into X** — a duplicate of X.
 - **ready epic** — `follow-ups-<date>` (Write may add a `-2` suffix), as `implement`.
-- **area Y** — as `grilling` or `research`.
+- **backlog Y** — as `grilling` or `research`.
 
 Routing, first match wins:
 
-1. Any `design` question → area, as `grilling`.
-2. Needs investigation but no decision → area, as `research`: set `"investigate": true` on the plan row.
+1. Any `design` question → backlog, as `grilling`.
+2. Needs investigation but no decision → backlog, as `research`: set `"investigate": true` on the plan row.
 3. Otherwise → ready epic, as `implement`, with its `ask` questions answered in Questions.
 
-**Areas.** Use an existing area. Areas in the shipped [mapping table](old-epic-areas.txt) need no
-question. Propose a new area only when none fits, and confirm it with the first question of the round
-(`gx tickets triage area`): three options (create it, file under the closest named area, keep for
-later), or two options when no area exists. At 12 areas make no proposal and ask no question: file
-under the closest area and list it under "Decided unless you object". Areas are not map epics.
+**Backlogs.** Use an existing backlog. Backlogs in the shipped [mapping table](old-epic-backlogs.txt) need no
+question. Propose a new backlog only when none fits, and confirm it with the first question of the round
+(`gx tickets triage backlog`): three options (create it, file under the closest named backlog, keep for
+later), or two options when no backlog exists. At 12 backlogs make no proposal and ask no question: file
+under the closest backlog and list it under "Decided unless you object". Backlogs are not map epics.
 
 **Old epics.** Call `gx tickets triage oldepics` once and plan the moves (`gx tickets triage moves`):
-the tickets per area, the epics to archive, and a "waiting: <epic> holds claimed <address>" line for
+the tickets per backlog, the epics to archive, and a "waiting: <epic> holds claimed <address>" line for
 each epic that still holds a claimed ticket.
 
 Record which ready-epic items touch overlapping files (`overlapWith`); they get chained by
 `blocked_by` in Write, oldest first. Save an `estimate` (such as `10K`) for every ready-epic row,
 taken from `gx tickets verify-plan --table` evidence. Ready rows that overlap are grouped when their
-estimates sum to under 45K; a row without an estimate is never grouped, and an area row is never
+estimates sum to under 45K; a row without an estimate is never grouped, and a backlog row is never
 grouped. `gx tickets triage row --ungroup` undoes a group.
 
-When the plan is saved, print the summary card: counts per action and per area. Print a group's
+When the plan is saved, print the summary card: counts per action and per backlog. Print a group's
 follow-ups only on request. A typed correction is saved right after the reply
 (`gx tickets triage correct`) and the changed summary lines are reprinted. Routing corrections:
-- to an area: drop that row's unanswered questions;
-- to the ready epic: add its `ask` questions to the next round and pick a fallback area at once.
+- to a backlog: drop that row's unanswered questions;
+- to the ready epic: add its `ask` questions to the next round and pick a fallback backlog at once.
 
 Then chain to Questions.
 
@@ -126,7 +126,7 @@ Questions always runs after Route, because it hosts the final approval. With no 
 shows only the "Decided unless you object" list and the final card.
 
 **Rounds.** At most 6 questions per round and at most 3 rounds. Order: bugs (`category: bug`) before
-ideas, scope-changing questions first within each, a new-area question first of all. Group by
+ideas, scope-changing questions first within each, a new-backlog question first of all. Group by
 follow-up and drop settled questions. Save the round before it prints (`gx tickets triage round`);
 gx refuses more than 6 questions and a fourth non-objection round, but the order and the dropping are
 yours. The person's answers are saved with `gx tickets triage answer`. The round is printed as its
@@ -137,7 +137,7 @@ answers per follow-up (save each with `gx tickets triage decide`). An objection 
 question in its own round (`gx tickets triage object`, `round --objection`), outside the cap, at most
 6, started by the person typing it.
 
-A follow-up no round reached goes to its area as a `grilling` ticket with its questions in the ticket.
+A follow-up no round reached goes to its backlog as a `grilling` ticket with its questions in the ticket.
 
 **Final card.** "Write this plan?" On yes call `gx tickets triage approve --revision <n>` and run Write
 in this same session. After a stale refusal, reprint the summary and ask again. If it prints "already
@@ -154,7 +154,7 @@ Record the epics (`gx tickets triage epics`), then run each row with the tracker
 action ask `gx tickets triage locate` (for a move unit, `move-locate`), and do only what it says is
 not yet done, so a re-run after a `/clear` repeats nothing.
 
-Order: create an area on first need (`gx tickets triage area`), then the follow-up rows, then the
+Order: create a backlog on first need (`gx tickets triage backlog`), then the follow-up rows, then the
 old-epic move units (`gx tickets triage move-state` saves each result), then the last pass.
 
 Per row, in this order:
@@ -165,7 +165,7 @@ Per row, in this order:
 3. `gx tickets move <addr> <epic>` or `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it|promoted
    --note ...`. A move renumbers the ticket. Capture the printed address, use it for every later
    command and save it with `--new-address`.
-4. `gx tickets set <new-addr> --type ... --status open`. Steps 3 and 4 are for area and close rows;
+4. `gx tickets set <new-addr> --type ... --status open`. Steps 3 and 4 are for backlog and close rows;
    ready-epic rows are published (below). Only `implement` tickets go to the ready epic: the queue
    does not run `research` tickets.
 
@@ -194,7 +194,7 @@ After `publish`, save each published row's new address with `gx tickets triage w
 ticket exists and the follow-up is archived: check `gx tickets triage locate` first, and save `failed`
 instead.
 
-An area ticket gets a `## Question` built from its open questions (`gx tickets section <new-addr>
+A backlog ticket gets a `## Question` built from its open questions (`gx tickets section <new-addr>
 Question -`). Save each row's result with `gx tickets triage write-state`. One failed row never stops
 the others: save it `failed` with the verb's refusal text unchanged.
 
@@ -207,5 +207,5 @@ After every row, run `gx tickets close --sweep [project]`, then `gx tickets tria
 report what is left, if anything; a ticket the user held back stays and the run isn't done. Report
 the step with `gx agent step done`.
 
-Finish with `✅ done: ...`: counts per action, the ready epic's address, each area's tickets, and any
+Finish with `✅ done: ...`: counts per action, the ready epic's address, each backlog's tickets, and any
 failed rows. Finish with zero background shells.

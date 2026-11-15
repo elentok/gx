@@ -1,5 +1,5 @@
 // Package startdesign serves the Backlog's Start Design: a plain chat that
-// proposes a Design theme for an area, and the "finish the move" that carries
+// proposes a Design theme for a backlog, and the "finish the move" that carries
 // on an unfinished move into a charting map. It sits above server/sessions:
 // the root hands it a Host that creates the session.
 package startdesign
@@ -46,55 +46,55 @@ func refusal(reason, msg string) wire.SessionResult {
 	return wire.SessionResult{Refused: true, Reason: reason, Message: msg}
 }
 
-// SessionName is the fixed name of the chat for an area. It is the
-// one-chat-per-area guard, as the Fix agent's name is for a ticket.
-func SessionName(project, area string) string { return "start-design-" + project + "-" + area }
+// SessionName is the fixed name of the chat for a backlog. It is the
+// one-chat-per-backlog guard, as the Fix agent's name is for a ticket.
+func SessionName(project, backlog string) string { return "start-design-" + project + "-" + backlog }
 
-// Prompt is the chat's first prompt: the area address, then the hint on one line.
-func Prompt(harnessName, project, area, hint string) string {
-	arg := project + ":" + area
+// Prompt is the chat's first prompt: the backlog address, then the hint on one line.
+func Prompt(harnessName, project, backlog, hint string) string {
+	arg := project + ":" + backlog
 	if h := strings.Join(strings.Fields(hint), " "); h != "" {
 		arg += " " + h
 	}
 	return harness.SkillCommand(harnessName, Skill, arg)
 }
 
-// area finds the area epic of project, or the refusal.
-func (s *StartDesign) area(project, name string) (tickets.Epic, *wire.SessionResult) {
+// backlog finds the backlog epic of project, or the refusal.
+func (s *StartDesign) backlog(project, name string) (tickets.Epic, *wire.SessionResult) {
 	epics, err := s.host.Epics(project)
 	if err != nil {
 		r := refusal(wire.ReasonStartDesignUnknownProject, fmt.Sprintf("no project %s", project))
 		return tickets.Epic{}, &r
 	}
 	for _, e := range epics {
-		if e.Name == name && e.IsArea {
+		if e.Name == name && e.IsBacklog {
 			return e, nil
 		}
 	}
-	r := refusal(wire.ReasonStartDesignNotArea, fmt.Sprintf("%s is not an area of %s", name, project))
+	r := refusal(wire.ReasonStartDesignNotBacklog, fmt.Sprintf("%s is not a backlog of %s", name, project))
 	return tickets.Epic{}, &r
 }
 
-// Start starts the area's chat, or returns the live one.
+// Start starts the backlog's chat, or returns the live one.
 func (s *StartDesign) Start(req wire.StartDesignRequest) (wire.SessionResult, error) {
-	e, refused := s.area(req.Project, req.Area)
+	e, refused := s.backlog(req.Project, req.Backlog)
 	if refused != nil {
 		return *refused, nil
 	}
 	if e.OpenTicketCount() == 0 {
-		return refusal(wire.ReasonStartDesignNoOpenTickets, fmt.Sprintf("%s has no open ticket", req.Area)), nil
+		return refusal(wire.ReasonStartDesignNoOpenTickets, fmt.Sprintf("%s has no open ticket", req.Backlog)), nil
 	}
 	checkout := s.host.TrunkCheckout(req.Project)
 	if checkout == "" {
 		return refusal(wire.ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", req.Project)), nil
 	}
-	name := SessionName(req.Project, req.Area)
+	name := SessionName(req.Project, req.Backlog)
 	res, err := s.host.CreateSession(wire.CreateSessionRequest{
 		Project:    req.Project,
 		Dir:        checkout,
 		Name:       name,
 		UniqueName: true,
-		Prompt:     Prompt(s.host.LaunchHarness(req.Project), req.Project, req.Area, req.Hint),
+		Prompt:     Prompt(s.host.LaunchHarness(req.Project), req.Project, req.Backlog, req.Hint),
 		Tier:       agent.TierWorker,
 	})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonSessionNameTaken {
@@ -119,7 +119,7 @@ func (s *StartDesign) FinishMove(req wire.FinishMoveRequest) (wire.FinishMoveRes
 	fail := func(reason, msg string) (wire.FinishMoveResult, error) {
 		return wire.FinishMoveResult{Refused: true, Reason: reason, Message: msg}, nil
 	}
-	if _, refused := s.area(req.Project, req.Area); refused != nil {
+	if _, refused := s.backlog(req.Project, req.Backlog); refused != nil {
 		return fail(refused.Reason, refused.Message)
 	}
 	dir, err := s.host.ProjectDir(req.Project)
@@ -128,7 +128,7 @@ func (s *StartDesign) FinishMove(req wire.FinishMoveRequest) (wire.FinishMoveRes
 	}
 	name, err := ticketmove.StartDesign(ticketmove.StartDesignOpts{
 		ConversationsDir: s.host.ConversationsDir(), ProjectDir: dir, Project: req.Project,
-		Area: req.Area, Map: req.Map, Title: req.Map, Active: s.host.Active,
+		Backlog: req.Backlog, Map: req.Map, Title: req.Map, Active: s.host.Active,
 	})
 	if err != nil {
 		return fail(wire.ReasonStartDesignMoveFailed, err.Error())

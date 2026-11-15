@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/tickets/ticketmove"
 )
 
-// Backlog serves the Backlog page: per project with an area, its areas with
+// Backlog serves the Backlog page: per project with a backlog, its epics with
 // their open counts and any unfinished Start Design move.
 func (s *Epics) Backlog(w http.ResponseWriter, _ *http.Request) {
 	list, err := s.cardList()
@@ -31,8 +31,8 @@ func (s *Epics) Backlog(w http.ResponseWriter, _ *http.Request) {
 		if err != nil {
 			continue
 		}
-		if areas := backlogAreas(project, epics); len(areas) > 0 {
-			out.Projects = append(out.Projects, wire.BacklogProject{Project: project, Workspaces: workspacesOf(project), Areas: areas})
+		if bl := backlogEpics(project, epics); len(bl) > 0 {
+			out.Projects = append(out.Projects, wire.BacklogProject{Project: project, Workspaces: workspacesOf(project), Epics: bl})
 		}
 	}
 	wire.WriteJSON(w, out)
@@ -59,34 +59,34 @@ func (s *Epics) projectWorkspaces(rows []wire.EpicListRow) func(project string) 
 	}
 }
 
-func backlogAreas(project string, epics []tickets.Epic) []wire.BacklogArea {
-	var areas []wire.BacklogArea
-	for _, e := range epics {
-		if !e.IsArea {
+func backlogEpics(project string, all []tickets.Epic) []wire.BacklogEpic {
+	var out []wire.BacklogEpic
+	for _, e := range all {
+		if !e.IsBacklog {
 			continue
 		}
-		a := wire.BacklogArea{Address: queue.RootRef{Project: project, Epic: e.Name}.String(), Name: e.Name}
-		inArea := map[string]bool{}
+		a := wire.BacklogEpic{Address: queue.RootRef{Project: project, Epic: e.Name}.String(), Name: e.Name}
+		inBacklog := map[string]bool{}
 		a.Open = e.OpenTicketCount()
 		for _, t := range e.Tickets {
-			inArea[t.DisplayNumber()] = true
+			inBacklog[t.DisplayNumber()] = true
 		}
-		a.Unfinished = unfinishedMove(project, e.Name, inArea, epics)
-		areas = append(areas, a)
+		a.Unfinished = unfinishedMove(project, e.Name, inBacklog, all)
+		out = append(out, a)
 	}
-	return areas
+	return out
 }
 
-// unfinishedMove finds the charting map of a partial Start Design run for area.
-func unfinishedMove(project, area string, inArea map[string]bool, epics []tickets.Epic) *wire.BacklogUnfinishedMove {
+// unfinishedMove finds the charting map of a partial Start Design run for backlog.
+func unfinishedMove(project, backlog string, inBacklog map[string]bool, epics []tickets.Epic) *wire.BacklogUnfinishedMove {
 	for _, m := range epics {
-		ids, ok := ticketmove.UnfinishedRunIDs(m, area)
+		ids, ok := ticketmove.UnfinishedRunIDs(m, backlog)
 		if !ok {
 			continue
 		}
 		left := 0
 		for _, id := range ids {
-			if inArea[id] {
+			if inBacklog[id] {
 				left++
 			}
 		}

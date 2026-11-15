@@ -38,8 +38,8 @@ func TestTriageScenario_EveryShapeShowsTheCardItNames(t *testing.T) {
 		{shape: "c-live", section: wire.SectionNeedsYou, pill: "Needs you", words: "6 bugs, 6 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
 		{shape: "verify", section: wire.SectionDesigning, pill: "Verify", words: "30 bugs, 15 ideas", triage: wire.FollowUpTriageRunning, step: "verify", state: wire.TriageLive},
 		{shape: "route", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
-		{shape: "route-12-areas", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
-		{shape: "route-no-area", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
+		{shape: "route-12-backlogs", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
+		{shape: "route-no-backlog", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
 		{shape: "questions", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
 		{shape: "final-approval", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
 		{shape: "writing", section: wire.SectionDesigning, pill: "Write", words: "6 bugs", triage: wire.FollowUpTriageRunning, step: "write", state: wire.TriageLive, labels: []string{"Retry failed (2)", "Continue"}},
@@ -98,18 +98,18 @@ func TestTriageScenario_EveryShapeShowsTheCardItNames(t *testing.T) {
 	}
 }
 
-// The area-count variants of route differ in the new-area card: three options
-// with some area, two with none, and none at all (a decided filing) at 12.
-func TestTriageScenario_RouteVariantsShowTheNewAreaCardTheSpecNames(t *testing.T) {
+// The backlog-count variants of route differ in the new-backlog card: three options
+// with some backlog, two with none, and none at all (a decided filing) at 12.
+func TestTriageScenario_RouteVariantsShowTheNewBacklogCardTheSpecNames(t *testing.T) {
 	t.Parallel()
 	for _, w := range []struct {
 		shape   string
-		options int // of the first question of round 1; zero: no new-area question
+		options int // of the first question of round 1; zero: no new-backlog question
 		decided string
 	}{
 		{"route", 3, ""},
-		{"route-no-area", 2, ""},
-		{"route-12-areas", 0, "Which area does it go to?"},
+		{"route-no-backlog", 2, ""},
+		{"route-12-backlogs", 0, "Which backlog does it go to?"},
 	} {
 		t.Run(w.shape, func(t *testing.T) {
 			t.Parallel()
@@ -125,8 +125,8 @@ func TestTriageScenario_RouteVariantsShowTheNewAreaCardTheSpecNames(t *testing.T
 				t.Fatal("no round was saved")
 			}
 			first := rec.Rounds[0].Questions[0]
-			if got := first.ID == triageplay.NewAreaQuestionID; got != (w.options > 0) || (got && len(first.Options) != w.options) {
-				t.Errorf("first question %q with options %v, want a new-area question of %d options (0: none)", first.ID, first.Options, w.options)
+			if got := first.ID == triageplay.NewBacklogQuestionID; got != (w.options > 0) || (got && len(first.Options) != w.options) {
+				t.Errorf("first question %q with options %v, want a new-backlog question of %d options (0: none)", first.ID, first.Options, w.options)
 			}
 			if w.decided != "" && !slices.ContainsFunc(rec.Decided, func(d triage.Decided) bool { return d.Question == w.decided }) {
 				t.Errorf("decided = %+v, want %q", rec.Decided, w.decided)
@@ -236,20 +236,20 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 	r.Gx(t, "server", "triage", "open", project)
 
 	// Verify takes two sessions: the fake saves three verdicts per session. With
-	// no area seeded, Route proposes one and round 1 waits on three questions.
+	// no backlog seeded, Route proposes one and round 1 waits on three questions.
 	v := r.waitTriage(t, "Route to end at Questions", func(v wire.TriageView) bool {
 		return currentStep(v) == "questions" && v.OpenRound != nil
 	})
 	if v.OpenRound.Questions != 3 {
-		t.Errorf("round 1 holds %d questions, want the new-area question and two asks", v.OpenRound.Questions)
+		t.Errorf("round 1 holds %d questions, want the new-backlog question and two asks", v.OpenRound.Questions)
 	}
 
 	// Answer the round and approve with the CLI. A person approving before the
 	// session ends would also see the countdown advance that session into Write.
 	r.waitNoSession(t)
 	rev := func() string { return fmt.Sprint(r.triageView(t).Revision) }
-	r.Gx(t, "tickets", "triage", "answer", "--project", project, "--question", triageplay.NewAreaQuestionID, "--answer", "Create "+triageplay.NewArea)
-	r.Gx(t, "tickets", "triage", "area", "--project", project, "--name", triageplay.NewArea, "--source", "agent", "--confirm")
+	r.Gx(t, "tickets", "triage", "answer", "--project", project, "--question", triageplay.NewBacklogQuestionID, "--answer", "Create "+triageplay.NewBacklog)
+	r.Gx(t, "tickets", "triage", "backlog", "--project", project, "--name", triageplay.NewBacklog, "--source", "agent", "--confirm")
 	for _, id := range []string{"q1", "q4"} {
 		r.Gx(t, "tickets", "triage", "answer", "--project", project, "--question", id, "--answer", "parser")
 	}
@@ -258,7 +258,7 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 	r.Gx(t, "server", "triage", "open", project, "--new")
 
 	// The Write session leaves the scripted rows failed: the first fails before
-	// its move and the fourth after it. The row filed under the new area is
+	// its move and the fourth after it. The row filed under the new backlog is
 	// written without a move.
 	failedRows := map[string]string{
 		project + ":follow-ups/01": triageplay.RefusalBeforeMove,

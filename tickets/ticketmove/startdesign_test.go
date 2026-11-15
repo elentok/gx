@@ -16,16 +16,16 @@ func startDesignFixture(t *testing.T, statuses ...string) StartDesignOpts {
 	t.Helper()
 	proj := filepath.Join(t.TempDir(), "proj")
 	tickettest.WriteFile(t, filepath.Join(proj, "project.json"), "{}")
-	tickettest.WriteFile(t, filepath.Join(proj, "area", "ticket.md"), "---\nstatus: open\nkind: area\n---\n\n# area\n")
+	tickettest.WriteFile(t, filepath.Join(proj, "backlog", "ticket.md"), "---\nstatus: open\nkind: backlog\n---\n\n# backlog\n")
 	var ids []string
 	for i, st := range statuses {
 		id := fmt.Sprintf("%02d", i+1)
 		ids = append(ids, id)
-		tickettest.WriteFile(t, filepath.Join(proj, "area", "issues", id+"-t.md"),
+		tickettest.WriteFile(t, filepath.Join(proj, "backlog", "issues", id+"-t.md"),
 			"---\nid: \""+id+"\"\nstatus: "+st+"\ntype: implement\noriginal_address: p:follow-ups/"+id+"\n---\n\n# "+id+"\n")
 	}
 	return StartDesignOpts{
-		ConversationsDir: t.TempDir(), ProjectDir: proj, Project: "proj", Area: "area",
+		ConversationsDir: t.TempDir(), ProjectDir: proj, Project: "proj", Backlog: "backlog",
 		Map: "theme", Title: "Theme", IDs: ids,
 		Active: func(tickets.Address) error { return nil },
 	}
@@ -41,8 +41,8 @@ func TestStartDesign_RefusalWritesNothing(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(o.ProjectDir, "theme")); !os.IsNotExist(err) {
 		t.Errorf("map was created: %v", err)
 	}
-	if got := len(tickets.LoadEpic(o.ProjectDir, "area").Tickets); got != 3 {
-		t.Errorf("area holds %d tickets, want 3", got)
+	if got := len(tickets.LoadEpic(o.ProjectDir, "backlog").Tickets); got != 3 {
+		t.Errorf("backlog holds %d tickets, want 3", got)
 	}
 }
 
@@ -59,16 +59,16 @@ func TestStartDesign_CreatesChartingMap(t *testing.T) {
 	if strings.Contains(m.Body, "Triaged from follow-ups") {
 		t.Errorf("notes carry the old-epic phrase: %s", m.Body)
 	}
-	area, ids, ok := ParseStartDesignNotes(m.Body)
-	if !ok || area != "area" || strings.Join(ids, ",") != "01,02" {
-		t.Errorf("notes parsed to %q %v %v", area, ids, ok)
+	backlog, ids, ok := ParseStartDesignNotes(m.Body)
+	if !ok || backlog != "backlog" || strings.Join(ids, ",") != "01,02" {
+		t.Errorf("notes parsed to %q %v %v", backlog, ids, ok)
 	}
 	b, err := os.ReadFile(m.Tickets[0].Path)
 	if err != nil || !strings.Contains(string(b), "original_address: p:follow-ups/01") {
 		t.Errorf("original_address lost: %s, %v", b, err)
 	}
-	if left := tickets.LoadEpic(o.ProjectDir, "area").Tickets; len(left) != 1 {
-		t.Errorf("area holds %d tickets, want 1", len(left))
+	if left := tickets.LoadEpic(o.ProjectDir, "backlog").Tickets; len(left) != 1 {
+		t.Errorf("backlog holds %d tickets, want 1", len(left))
 	}
 }
 
@@ -101,8 +101,8 @@ func TestStartDesign_RerunAfterFailure(t *testing.T) {
 			if got := len(tickets.LoadEpic(o.ProjectDir, "theme").Tickets); got != 3 {
 				t.Errorf("map holds %d tickets, want 3", got)
 			}
-			if got := len(tickets.LoadEpic(o.ProjectDir, "area").Tickets); got != 0 {
-				t.Errorf("area holds %d tickets, want 0", got)
+			if got := len(tickets.LoadEpic(o.ProjectDir, "backlog").Tickets); got != 0 {
+				t.Errorf("backlog holds %d tickets, want 0", got)
 			}
 		})
 	}
@@ -112,17 +112,17 @@ func TestStartDesign_RefusesForeignExistingEpic(t *testing.T) {
 	o := startDesignFixture(t, "open")
 	tickettest.WriteFile(t, filepath.Join(o.ProjectDir, "theme", "ticket.md"), "---\nstatus: open\nkind: map\n---\n\n# theme\n")
 	if _, err := StartDesign(o); err == nil {
-		t.Fatal("want a refusal: the map does not name this area")
+		t.Fatal("want a refusal: the map does not name this backlog")
 	}
 }
 
 func TestParseStartDesignNotes(t *testing.T) {
 	body := "# m\n\n## Notes\n\n" + StartDesignNotes("p", "a", []string{"03", "04a"})
-	area, ids, ok := ParseStartDesignNotes(body)
-	if !ok || area != "a" || strings.Join(ids, ",") != "03,04a" {
-		t.Errorf("got %q %v %v", area, ids, ok)
+	backlog, ids, ok := ParseStartDesignNotes(body)
+	if !ok || backlog != "a" || strings.Join(ids, ",") != "03,04a" {
+		t.Errorf("got %q %v %v", backlog, ids, ok)
 	}
 	if _, _, ok := ParseStartDesignNotes("# m\n\n## Notes\n\nnothing\n"); ok {
-		t.Error("notes without an area line parsed")
+		t.Error("notes without a backlog line parsed")
 	}
 }

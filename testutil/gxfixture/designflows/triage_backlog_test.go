@@ -24,15 +24,15 @@ func TestTriageScenario_OldEpicsRouteListsTheMovesButNotTheOthers(t *testing.T) 
 	}
 	got := map[string]string{}
 	for _, m := range v.Summary.Moves {
-		got[m.OldEpic] = m.Area
+		got[m.OldEpic] = m.Backlog
 	}
 	if len(v.Summary.Waiting) != 1 || !strings.Contains(v.Summary.Waiting[0], "stuck-ticket-watchdog") {
 		t.Errorf("waiting = %v, want the epic holding a claimed ticket", v.Summary.Waiting)
 	}
 	want := map[string]string{"test-flakes": "test-health", "agent-guidance": "agent-guidance-and-skills", "ticket-authoring": "ticket-authoring"}
-	for epic, area := range want {
-		if got[epic] != area {
-			t.Errorf("move of %s = %q, want %q", epic, got[epic], area)
+	for epic, backlog := range want {
+		if got[epic] != backlog {
+			t.Errorf("move of %s = %q, want %q", epic, got[epic], backlog)
 		}
 	}
 	for _, never := range []string{"tickets-cli", "gx-check", "stuck-ticket-watchdog"} {

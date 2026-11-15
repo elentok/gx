@@ -3,7 +3,7 @@ package wire
 // Refusal reasons of the start-design routes, beside the session ones.
 const (
 	ReasonStartDesignUnknownProject = "unknown-project"
-	ReasonStartDesignNotArea        = "not-area"
+	ReasonStartDesignNotBacklog        = "not-backlog"
 	ReasonStartDesignNoOpenTickets  = "no-open-tickets"
 	ReasonStartDesignMoveFailed     = "move-failed"
 )
@@ -12,7 +12,7 @@ const (
 // person's optional steer for the theme.
 type StartDesignRequest struct {
 	Project string `json:"project"`
-	Area    string `json:"area"`
+	Backlog    string `json:"backlog"`
 	Hint    string `json:"hint,omitempty"`
 }
 
@@ -20,7 +20,7 @@ type StartDesignRequest struct {
 // unfinished move into the named charting map.
 type FinishMoveRequest struct {
 	Project string `json:"project"`
-	Area    string `json:"area"`
+	Backlog    string `json:"backlog"`
 	Map     string `json:"map"`
 }
 

@@ -138,34 +138,34 @@ func TestRoutePlan_CoversEveryActionWithThreeQuestions(t *testing.T) {
 	if len(actions) != 4 || ask != 2 || design != 1 {
 		t.Errorf("actions %v, %d ask and %d design questions, want 4, 2 and 1", actions, ask, design)
 	}
-	if got := plan[1].Destination; got != NewArea {
-		t.Errorf("row 2 goes to %q, want the new area %q", got, NewArea)
+	if got := plan[1].Destination; got != NewBacklog {
+		t.Errorf("row 2 goes to %q, want the new backlog %q", got, NewBacklog)
 	}
 }
 
-func TestRoutePlan_AtTheAreaCapFilesUnderTheClosestArea(t *testing.T) {
+func TestRoutePlan_AtTheBacklogCapFilesUnderTheClosestBacklog(t *testing.T) {
 	t.Parallel()
-	areas := make([]string, tickets.MaxAreas)
-	for i := range areas {
-		areas[i] = string(rune('a' + i))
+	backlogs := make([]string, tickets.MaxBacklogs)
+	for i := range backlogs {
+		backlogs[i] = string(rune('a' + i))
 	}
-	plan := RoutePlan(&triage.Record{Rows: rows(2)}, areas)
+	plan := RoutePlan(&triage.Record{Rows: rows(2)}, backlogs)
 	if got := plan[1].Destination; got != "a" {
-		t.Errorf("row 2 goes to %q, want the closest area a", got)
+		t.Errorf("row 2 goes to %q, want the closest backlog a", got)
 	}
-	if q := NewAreaQuestion(&triage.Record{Rows: rows(2)}, areas); len(q.Options) != 3 {
+	if q := NewBacklogQuestion(&triage.Record{Rows: rows(2)}, backlogs); len(q.Options) != 3 {
 		t.Errorf("options = %v, want create, file under and keep", q.Options)
 	}
 }
 
-func TestNewAreaQuestion_WithNoAreaOffersTwoOptions(t *testing.T) {
+func TestNewBacklogQuestion_WithNoBacklogOffersTwoOptions(t *testing.T) {
 	t.Parallel()
-	if q := NewAreaQuestion(&triage.Record{Rows: rows(2)}, nil); len(q.Options) != 2 || q.Default != q.Options[0] {
+	if q := NewBacklogQuestion(&triage.Record{Rows: rows(2)}, nil); len(q.Options) != 2 || q.Default != q.Options[0] {
 		t.Errorf("question = %+v, want two options and the first recommended", q)
 	}
 }
 
-func TestTriagePlayer_RouteSavesTheAreaAndThePlanAndPrintsTheCard(t *testing.T) {
+func TestTriagePlayer_RouteSavesTheBacklogAndThePlanAndPrintsTheCard(t *testing.T) {
 	t.Parallel()
 	s := newStub(t, Config{}, triage.BranchRoute, triage.Record{Rows: rows(6)})
 	msg, err := s.player.Play()
@@ -178,8 +178,8 @@ func TestTriagePlayer_RouteSavesTheAreaAndThePlanAndPrintsTheCard(t *testing.T) 
 	if s.count(t, "agent step questions") != 1 {
 		t.Errorf("calls = %q, want Route to chain into Questions", s.calls(t))
 	}
-	if s.count(t, "triage area --project p --name "+NewArea+" --source agent") != 1 || s.count(t, "triage plan") != 1 {
-		t.Errorf("calls = %q, want one area save and one plan save", s.calls(t))
+	if s.count(t, "triage backlog --project p --name "+NewBacklog+" --source agent") != 1 || s.count(t, "triage plan") != 1 {
+		t.Errorf("calls = %q, want one backlog save and one plan save", s.calls(t))
 	}
 }
 
@@ -236,8 +236,8 @@ func TestTriagePlayer_TypedMessagesRunTheirVerbs(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct{ typed, call string }{
 		{"yes", "triage approve --project p --revision 7"},
-		{"Move row 2 to webui", "triage correct --project p --row p:follow-ups/02 --action area --destination webui"},
-		{"Move row 2 to ready", "triage correct --project p --row p:follow-ups/02 --action ready --fallback " + NewArea},
+		{"Move row 2 to webui", "triage correct --project p --row p:follow-ups/02 --action backlog --destination webui"},
+		{"Move row 2 to ready", "triage correct --project p --row p:follow-ups/02 --action ready --fallback " + NewBacklog},
 		{"Answer q2: b", "triage answer --project p --question q2 --answer b"},
 		{"Object to decision 1", "triage object --project p --row p:follow-ups/01 --question Rename? --option yes --option something else"},
 	} {
@@ -265,7 +265,7 @@ func TestTriagePlayer_ARoundPromptAnswersItsLinesAndRunsItsNote(t *testing.T) {
 	// q1 is answered already, so only q2 is saved.
 	for _, call := range []string{
 		"triage answer --project p --question q2 --answer b",
-		"triage correct --project p --row p:follow-ups/02 --action area --destination webui",
+		"triage correct --project p --row p:follow-ups/02 --action backlog --destination webui",
 	} {
 		if s.count(t, call) != 1 {
 			t.Errorf("calls = %q, want %q once", s.calls(t), call)
@@ -290,15 +290,15 @@ func TestTriagePlayer_TheFinalCardYesApproves(t *testing.T) {
 	}
 }
 
-func TestTriagePlayer_AnsweringTheNewAreaQuestionConfirmsTheArea(t *testing.T) {
+func TestTriagePlayer_AnsweringTheNewBacklogQuestionConfirmsTheBacklog(t *testing.T) {
 	t.Parallel()
 	s := newStub(t, Config{}, triage.BranchQuestions, questionsRecord())
-	s.player.Typed = "Answer " + NewAreaQuestionID + ": Create " + NewArea
+	s.player.Typed = "Answer " + NewBacklogQuestionID + ": Create " + NewBacklog
 	if _, err := s.player.Play(); err != nil {
 		t.Fatal(err)
 	}
-	if s.count(t, "triage area --project p --name "+NewArea+" --source agent --confirm") != 1 {
-		t.Errorf("calls = %q, want the area confirmed", s.calls(t))
+	if s.count(t, "triage backlog --project p --name "+NewBacklog+" --source agent --confirm") != 1 {
+		t.Errorf("calls = %q, want the backlog confirmed", s.calls(t))
 	}
 }
 
@@ -356,25 +356,25 @@ func TestTriagePlayer_FailAfterMoveKeepsTheNewAddress(t *testing.T) {
 	}
 }
 
-func TestTriagePlayer_WriteMovesAnOldEpicIntoItsAreaThenArchivesIt(t *testing.T) {
+func TestTriagePlayer_WriteMovesAnOldEpicIntoItsBacklogThenArchivesIt(t *testing.T) {
 	t.Parallel()
-	rec := triage.Record{Step: tickets.StepWrite, Moves: []triage.MoveUnit{{OldEpic: "old", Area: "tooling", State: triage.MovePending}}}
+	rec := triage.Record{Step: tickets.StepWrite, Moves: []triage.MoveUnit{{OldEpic: "old", Backlog: "tooling", State: triage.MovePending}}}
 	s := newStub(t, Config{}, triage.BranchWrite, rec)
 	if _, err := s.player.Play(); err != nil {
 		t.Fatal(err)
 	}
-	if s.count(t, "tickets epic add p:tooling --kind area") != 1 ||
+	if s.count(t, "tickets epic add p:tooling --kind backlog") != 1 ||
 		s.count(t, "tickets move p:old/01 p:tooling") != 1 || s.count(t, "tickets move p:old/02 p:tooling") != 1 {
-		t.Errorf("calls = %q, want the area and both tickets moved", s.calls(t))
+		t.Errorf("calls = %q, want the backlog and both tickets moved", s.calls(t))
 	}
 	if s.count(t, "server epics archive p:old --yes") != 1 || s.count(t, "--epic old --state done") != 1 {
 		t.Errorf("calls = %q, want the archive and a done unit", s.calls(t))
 	}
 }
 
-func TestTriagePlayer_WriteSkipsTheMoveWhenTheAreaIsTheOldEpic(t *testing.T) {
+func TestTriagePlayer_WriteSkipsTheMoveWhenTheBacklogIsTheOldEpic(t *testing.T) {
 	t.Parallel()
-	rec := triage.Record{Step: tickets.StepWrite, Moves: []triage.MoveUnit{{OldEpic: "old", Area: "old", State: triage.MovePending}}}
+	rec := triage.Record{Step: tickets.StepWrite, Moves: []triage.MoveUnit{{OldEpic: "old", Backlog: "old", State: triage.MovePending}}}
 	s := newStub(t, Config{}, triage.BranchWrite, rec)
 	if _, err := s.player.Play(); err != nil {
 		t.Fatal(err)
@@ -386,7 +386,7 @@ func TestTriagePlayer_WriteSkipsTheMoveWhenTheAreaIsTheOldEpic(t *testing.T) {
 
 func TestTriagePlayer_WriteLeavesAnEpicWithAClaimedTicketAlone(t *testing.T) {
 	t.Parallel()
-	rec := triage.Record{Step: tickets.StepWrite, Moves: []triage.MoveUnit{{OldEpic: "held", Area: "tooling", State: triage.MovePending}}}
+	rec := triage.Record{Step: tickets.StepWrite, Moves: []triage.MoveUnit{{OldEpic: "held", Backlog: "tooling", State: triage.MovePending}}}
 	s := newStub(t, Config{}, triage.BranchWrite, rec)
 	if _, err := s.player.Play(); err != nil {
 		t.Fatal(err)

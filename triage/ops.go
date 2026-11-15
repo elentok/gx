@@ -18,9 +18,9 @@ const (
 
 // EpicActions are the plan actions whose row goes to an epic; a merge may only
 // target a row with one of them.
-var EpicActions = []string{ActionReady, ActionArea}
+var EpicActions = []string{ActionReady, ActionBacklog}
 
-var planActions = []string{ActionReady, ActionArea, "merge", ActionClose, "keep"}
+var planActions = []string{ActionReady, ActionBacklog, "merge", ActionClose, "keep"}
 
 // ErrAlreadyApproved is returned by Approve when the step is past approve.
 var ErrAlreadyApproved = errors.New("already approved")
@@ -139,7 +139,7 @@ func followUpArchived(epics []tickets.Epic, from tickets.Address) bool {
 
 // movedIntoNew reports whether the follow-up was moved (not archived): one of
 // the row's new tickets, outside follow-ups, carries it as its original
-// address. This is how a row moved into an area or a map epic finishes.
+// address. This is how a row moved into a backlog or a map epic finishes.
 func movedIntoNew(epics []tickets.Epic, from tickets.Address, newAddresses []string) bool {
 	for _, s := range newAddresses {
 		a, err := tickets.ParseAddress(s, tickets.AddressContext{})
@@ -270,14 +270,14 @@ func (s *Store) SavePlan(id string, revision int, plan []PlanRow, gone []string)
 					p.Fallback = row.Fallback
 				}
 				if p.Fallback == "" && slices.ContainsFunc(p.Questions, func(q Question) bool { return q.Kind == QuestionAsk }) {
-					return phaseErr("row %s: a ready row with an ask question needs a fallback area", p.RowID)
+					return phaseErr("row %s: a ready row with an ask question needs a fallback backlog", p.RowID)
 				}
 			}
-			if p.Action == ActionArea {
+			if p.Action == ActionBacklog {
 				if p.Destination == "" {
-					return phaseErr("row %s: a row to an area needs the area name", p.RowID)
+					return phaseErr("row %s: a row to a backlog needs the backlog name", p.RowID)
 				}
-				if err := rec.checkAreaCap(s.projectDir, p.Destination); err != nil {
+				if err := rec.checkBacklogCap(s.projectDir, p.Destination); err != nil {
 					return err
 				}
 			}
@@ -454,8 +454,8 @@ func (s *Store) Approve(id string, revision int) (*Record, error) {
 			if _, open, ok := rec.OpenRound(); ok {
 				return phaseErr("approve is refused: %d questions of a saved round are still open", len(open))
 			}
-			if areas := rec.unconfirmedAreas(); len(areas) > 0 {
-				return phaseErr("approve is refused: areas %v are not confirmed", areas)
+			if backlogs := rec.unconfirmedBacklogs(); len(backlogs) > 0 {
+				return phaseErr("approve is refused: backlogs %v are not confirmed", backlogs)
 			}
 			rec.Approved = true
 			rec.Step = tickets.StepWrite
@@ -520,27 +520,27 @@ func (s *Store) SetLastPass(id string, revision int, complete bool) (*Record, er
 	})
 }
 
-// RecordEpics adds the ready epic (when non-empty), map epics and area epics to
+// RecordEpics adds the ready epic (when non-empty), map epics and backlog epics to
 // the record. A ready epic already recorded stays; naming another is refused.
-// An area must be a saved entry and confirmed (a table entry counts as
+// A backlog must be a saved entry and confirmed (a table entry counts as
 // confirmed); it is marked created.
-func (s *Store) RecordEpics(id string, revision int, ready string, maps, areas []string) (*Record, error) {
+func (s *Store) RecordEpics(id string, revision int, ready string, maps, backlogs []string) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
 		if err := requireStep(rec, "epics", tickets.StepWrite); err != nil {
 			return err
 		}
-		for _, name := range areas {
-			i := slices.IndexFunc(rec.Areas, func(a Area) bool { return a.Name == name })
+		for _, name := range backlogs {
+			i := slices.IndexFunc(rec.Backlogs, func(a Backlog) bool { return a.Name == name })
 			if i < 0 {
-				return phaseErr("area %q is not in this triage", name)
+				return phaseErr("backlog %q is not in this triage", name)
 			}
-			if a := rec.Areas[i]; a.Source == AreaAgent && !a.Confirmed {
-				return phaseErr("area %q is an agent area the person has not confirmed", name)
+			if a := rec.Backlogs[i]; a.Source == BacklogAgent && !a.Confirmed {
+				return phaseErr("backlog %q is an agent backlog the person has not confirmed", name)
 			}
 		}
-		for _, name := range areas {
-			i := slices.IndexFunc(rec.Areas, func(a Area) bool { return a.Name == name })
-			rec.Areas[i].Created = true
+		for _, name := range backlogs {
+			i := slices.IndexFunc(rec.Backlogs, func(a Backlog) bool { return a.Name == name })
+			rec.Backlogs[i].Created = true
 		}
 		if ready != "" {
 			if rec.ReadyEpic != "" && rec.ReadyEpic != ready {
@@ -558,8 +558,8 @@ func (s *Store) RecordEpics(id string, revision int, ready string, maps, areas [
 }
 
 // SaveMoves stores the old-epic move units during Route, each pending. It
-// replaces the earlier list. The target area must be an epic of the project or
-// an area entry of the record, and an epic may have one unit.
+// replaces the earlier list. The target backlog must be an epic of the project or
+// a backlog entry of the record, and an epic may have one unit.
 func (s *Store) SaveMoves(id string, revision int, units []MoveUnit) (*Record, error) {
 	return s.modify(id, revision, func(rec *Record) error {
 		if err := requireStep(rec, "move units", tickets.StepRoute); err != nil {
@@ -571,20 +571,20 @@ func (s *Store) SaveMoves(id string, revision int, units []MoveUnit) (*Record, e
 		}
 		var out []MoveUnit
 		for _, u := range units {
-			if u.OldEpic == "" || u.Area == "" {
-				return phaseErr("a move unit needs the old epic and the area")
+			if u.OldEpic == "" || u.Backlog == "" {
+				return phaseErr("a move unit needs the old epic and the backlog")
 			}
 			if slices.ContainsFunc(out, func(o MoveUnit) bool { return o.OldEpic == u.OldEpic }) {
 				return phaseErr("old epic %s has two move units", u.OldEpic)
 			}
-			inRecord := slices.ContainsFunc(rec.Areas, func(a Area) bool { return a.Name == u.Area })
-			if !inRecord && !slices.ContainsFunc(epics, func(e tickets.Epic) bool { return e.Name == u.Area && e.IsArea }) {
-				return phaseErr("move unit %s: area %q is not an area epic or an area of this triage", u.OldEpic, u.Area)
+			inRecord := slices.ContainsFunc(rec.Backlogs, func(a Backlog) bool { return a.Name == u.Backlog })
+			if !inRecord && !slices.ContainsFunc(epics, func(e tickets.Epic) bool { return e.Name == u.Backlog && e.IsBacklog }) {
+				return phaseErr("move unit %s: backlog %q is not a backlog epic or a backlog of this triage", u.OldEpic, u.Backlog)
 			}
 			if !slices.ContainsFunc(epics, func(e tickets.Epic) bool { return e.Name == u.OldEpic && IsOldEpic(e) }) {
 				return phaseErr("move unit %s: not an old Triage epic (a map or loop epic cannot be moved)", u.OldEpic)
 			}
-			out = append(out, MoveUnit{OldEpic: u.OldEpic, Area: u.Area, State: MovePending})
+			out = append(out, MoveUnit{OldEpic: u.OldEpic, Backlog: u.Backlog, State: MovePending})
 		}
 		rec.Moves = out
 		return nil

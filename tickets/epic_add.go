@@ -68,16 +68,16 @@ func ParseEpicFields(yamlPart string) (EpicFields, error) {
 	return f, nil
 }
 
-// validate checks the values: kind is map, loop or area, status is draft or open
+// validate checks the values: kind is map, loop or backlog, status is draft or open
 // (either may be empty, meaning not given).
 func (f EpicFields) validate() error {
 	if !f.CreatedAt.IsZero() {
 		return errors.New("created_at is server-stamped and cannot be set")
 	}
 	switch f.Kind {
-	case "", KindMap, KindLoop, KindArea:
+	case "", KindMap, KindLoop, KindBacklog:
 	default:
-		return fmt.Errorf("kind %q; want map, loop or area", f.Kind)
+		return fmt.Errorf("kind %q; want map, loop or backlog", f.Kind)
 	}
 	switch schema.Status(f.Status) {
 	case "", schema.StatusOpen, schema.StatusDraft:
@@ -111,7 +111,7 @@ func CreateEpic(conversationsDir, projectDir, name string, fields EpicFields, bo
 		body = text
 	}
 	if fields.Kind == "" {
-		return "", errors.New("kind is required (map, loop or area)")
+		return "", errors.New("kind is required (map, loop or backlog)")
 	}
 	if fields.Status == "" {
 		fields.Status = string(schema.StatusDraft)
@@ -123,13 +123,13 @@ func CreateEpic(conversationsDir, projectDir, name string, fields EpicFields, bo
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", err
 	}
-	if fields.Kind == KindArea {
-		areas, err := AreaNames(projectDir)
+	if fields.Kind == KindBacklog {
+		backlogs, err := BacklogNames(projectDir)
 		if err != nil {
 			return "", err
 		}
-		if len(areas) >= MaxAreas {
-			return "", fmt.Errorf("project already has %d areas (the limit)", MaxAreas)
+		if len(backlogs) >= MaxBacklogs {
+			return "", fmt.Errorf("project already has %d backlogs (the limit)", MaxBacklogs)
 		}
 	}
 
@@ -173,9 +173,9 @@ func CreateEpic(conversationsDir, projectDir, name string, fields EpicFields, bo
 	return epicPath, nil
 }
 
-// AreaNames lists the live area epics under projectDir; dot directories such
+// BacklogNames lists the live backlog epics under projectDir; dot directories such
 // as .archive are skipped. A missing projectDir has none.
-func AreaNames(projectDir string) ([]string, error) {
+func BacklogNames(projectDir string) ([]string, error) {
 	entries, err := os.ReadDir(projectDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -185,7 +185,7 @@ func AreaNames(projectDir string) ([]string, error) {
 	}
 	var names []string
 	for _, e := range entries {
-		if e.IsDir() && !strings.HasPrefix(e.Name(), ".") && IsAreaEpic(filepath.Join(projectDir, e.Name())) {
+		if e.IsDir() && !strings.HasPrefix(e.Name(), ".") && IsBacklogEpic(filepath.Join(projectDir, e.Name())) {
 			names = append(names, e.Name())
 		}
 	}

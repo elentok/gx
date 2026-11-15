@@ -92,14 +92,14 @@ type Decided struct {
 	Objected bool   `json:"objected,omitempty"`
 }
 
-// Area sources.
+// Backlog sources.
 const (
-	AreaTable = "table"
-	AreaAgent = "agent"
+	BacklogTable = "table"
+	BacklogAgent = "agent"
 )
 
-// Area is a map epic area a row can go to.
-type Area struct {
+// Backlog is a map epic backlog a row can go to.
+type Backlog struct {
 	Name      string `json:"name"`
 	Source    string `json:"source"`
 	Confirmed bool   `json:"confirmed,omitempty"`
@@ -116,10 +116,10 @@ const (
 	MoveKept    MoveState = "kept"
 )
 
-// MoveUnit moves one old epic into a target area.
+// MoveUnit moves one old epic into a target backlog.
 type MoveUnit struct {
 	OldEpic   string    `json:"oldEpic"`
-	Area      string    `json:"area"`
+	Backlog      string    `json:"backlog"`
 	State     MoveState `json:"state"`
 	LastError string    `json:"lastError,omitempty"`
 }
@@ -139,9 +139,9 @@ type PlanRow struct {
 	OverlapWith []string   `json:"overlapWith,omitempty"`
 	// Estimate is the row's size estimate for a ready row, such as "12K".
 	Estimate string `json:"estimate,omitempty"`
-	// Fallback is the area a ready row goes to when its own area is unusable.
+	// Fallback is the backlog a ready row goes to when its own backlog is unusable.
 	Fallback string `json:"fallback,omitempty"`
-	// Investigate marks an area row that needs investigation but no decision:
+	// Investigate marks a backlog row that needs investigation but no decision:
 	// it is written as a research ticket.
 	Investigate bool `json:"investigate,omitempty"`
 }
@@ -166,7 +166,7 @@ type Row struct {
 	Files                []string   `json:"files,omitempty"`
 	Questions            []Question `json:"questions,omitempty"`
 	SuggestedDestination string     `json:"suggestedDestination,omitempty"`
-	// Fallback is the area a ready row goes to when its own area is unusable.
+	// Fallback is the backlog a ready row goes to when its own backlog is unusable.
 	Fallback string       `json:"fallback,omitempty"`
 	Plan     *PlanRow     `json:"plan,omitempty"`
 	Person   PersonFields `json:"person"`
@@ -193,7 +193,7 @@ type Record struct {
 	Rows      []Row      `json:"rows"`
 	Rounds    []Round    `json:"rounds,omitempty"`
 	Decided   []Decided  `json:"decided,omitempty"`
-	Areas     []Area     `json:"areas,omitempty"`
+	Backlogs     []Backlog     `json:"backlogs,omitempty"`
 	Moves     []MoveUnit `json:"moves,omitempty"`
 	// Approved is set by the approve verb.
 	Approved bool `json:"approved,omitempty"`
@@ -212,7 +212,7 @@ type Record struct {
 // ListsEpic reports whether the record names epic as one it creates.
 func (r *Record) ListsEpic(epic string) bool {
 	return epic != "" && (r.ReadyEpic == epic || slices.Contains(r.MapEpics, epic) ||
-		slices.ContainsFunc(r.Areas, func(a Area) bool { return a.Created && a.Name == epic }))
+		slices.ContainsFunc(r.Backlogs, func(a Backlog) bool { return a.Created && a.Name == epic }))
 }
 
 // LiveError is returned by Create when the project already has a live Triage.
@@ -451,10 +451,10 @@ func (rec *Record) upgrade(earlier [][]Answered) {
 			}
 		}
 		if row.Plan != nil && row.Plan.Action == legacyMap {
-			row.Plan.Action = ActionArea
+			row.Plan.Action = ActionBacklog
 		}
 		if row.Person.Action == legacyMap {
-			row.Person.Action = ActionArea
+			row.Person.Action = ActionBacklog
 		}
 	}
 	if rec.State != StateLive {

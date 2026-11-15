@@ -183,7 +183,7 @@ func newTicketsSetCmd(d Deps) *cobra.Command {
 	_ = cmd.Flags().MarkHidden("exported-at")
 
 	// Epic address only (project:epic): the settable epic fields.
-	cmd.Flags().String("kind", "", "epic only: set kind (map, loop or area; never to or from area)")
+	cmd.Flags().String("kind", "", "epic only: set kind (map, loop or backlog; never to or from backlog)")
 	cmd.Flags().String("destination-unconfirmed", "", "epic only: set destination_unconfirmed (true/false)")
 	cmd.Flags().String("design-step", "", "map epic only: set design_step ("+strings.Join(tickets.DesignStepNames(), ", ")+")")
 	cmd.Flags().Bool("allow-backward", false, "map epic only: allow --design-step to move to an earlier step")

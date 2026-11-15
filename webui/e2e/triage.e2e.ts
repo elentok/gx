@@ -27,7 +27,7 @@ const sideways = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
 
 test.describe("199. Triage journey", () => {
-  test("Progress, the round, the card and the badge, Abandon, areas, Write, Done and the phone", async ({
+  test("Progress, the round, the card and the badge, Abandon, backlogs, Write, Done and the phone", async ({
     page,
     start,
   }) => {
@@ -47,7 +47,7 @@ test.describe("199. Triage journey", () => {
     ])
     await expect(step(page, "verify", "current")).toBeVisible()
 
-    // Route: round 1 waits with the new-area card first and three options. The plan summary is
+    // Route: round 1 waits with the new-backlog card first and three options. The plan summary is
     // hidden at Questions (mock 06).
     await start("triage", { shape: "route" })
     await openTriage(page)
@@ -60,19 +60,19 @@ test.describe("199. Triage journey", () => {
     await expect(round.getByRole("button", { name: /^File under parser/ })).toBeVisible()
     await expect(round.getByRole("button", { name: /^Keep for later/ })).toBeVisible()
 
-    // No area seeded: the new-area card has two options.
-    await start("triage", { shape: "route-no-area" })
+    // No backlog seeded: the new-backlog card has two options.
+    await start("triage", { shape: "route-no-backlog" })
     await openTriage(page)
     await expect(questionsOf(page).getByRole("button", { name: /^Create tooling/ })).toBeVisible()
     await expect(questionsOf(page).getByRole("button", { name: /^Keep for later/ })).toBeVisible()
     await expect(questionsOf(page).getByRole("button", { name: /^File under/ })).toHaveCount(0)
 
-    // 12 areas: no new-area card; the row is listed under "Decided unless you object".
-    await start("triage", { shape: "route-12-areas" })
+    // 12 backlogs: no new-backlog card; the row is listed under "Decided unless you object".
+    await start("triage", { shape: "route-12-backlogs" })
     await openTriage(page)
     await expect(page.getByText("Decided unless you object")).toBeVisible()
-    await expect(page.getByText(/Which area does it go to\?/)).toBeVisible()
-    await expect(page.getByText(/Create the area/)).toHaveCount(0)
+    await expect(page.getByText(/Which backlog does it go to\?/)).toBeVisible()
+    await expect(page.getByText(/Create the backlog/)).toHaveCount(0)
     await expect(questionsOf(page).getByRole("button", { name: /^Create tooling/ })).toHaveCount(0)
 
     // A round waits with a live session: the card says "Needs you" with Answer, the badge counts
@@ -102,7 +102,7 @@ test.describe("199. Triage journey", () => {
     await tell(page, "Object to decision 1")
     await expect(questionsOf(page).getByText(/Rename the helper while there\?/)).toBeVisible()
 
-    // The journey: no area exists, Verify takes two sessions.
+    // The journey: no backlog exists, Verify takes two sessions.
     const fixture = await start("triage", {
       shape: "journey",
       autoAdvanceDelay: "3s",
@@ -150,7 +150,7 @@ test.describe("199. Triage journey", () => {
     ).toBeEnabled()
     await expect(page.getByText(/exited/i)).toHaveCount(0)
 
-    // Round 1: the new-area card comes first, then the bug's question, then the idea's. A design
+    // Round 1: the new-backlog card comes first, then the bug's question, then the idea's. A design
     // question and a decided one are never asked.
     const round1 = questionsOf(page)
     await expect(page.getByText(/^Round 1 of 3/)).toBeVisible()
@@ -185,7 +185,7 @@ test.describe("199. Triage journey", () => {
     await page.getByRole("menuitem", { name: /demo/ }).click()
     await expect(page).toHaveURL(/#\/triage\/demo$/)
 
-    // Keep for later leaves the rows that were headed for the new area; the next question is the
+    // Keep for later leaves the rows that were headed for the new backlog; the next question is the
     // bug's, then the idea's.
     await round1.getByRole("button", { name: /^Keep for later/ }).click()
     await expect(round1.getByText("Question 2 of 3")).toBeVisible()
@@ -265,7 +265,7 @@ test.describe("199. Triage journey", () => {
     ).toBeVisible()
     await expect(result.getByRole("region", nav("Closed"))).toBeVisible()
 
-    // No area row anywhere after the Triage.
+    // No backlog row anywhere after the Triage.
     await openEpics(page)
     await section(page, "Ready to design")
     await expect(page.getByText("tooling")).toHaveCount(0)
@@ -302,7 +302,7 @@ test.describe("199. Triage journey", () => {
     await tab.close()
 
     // History and Abandon: a second Triage starts from the card, and Abandon changes no ticket
-    // and no area.
+    // and no backlog.
     await openEpics(page)
     const again = await section(page, "Ready to design")
     await again.getByRole("button", nav("Triage")).click()
@@ -320,7 +320,7 @@ test.describe("199. Triage journey", () => {
     await expect(page.getByRole("link", nav("Open triage page →"))).toBeVisible()
     await openTriage(page)
     const ticketsBefore = await fixture.cli("tickets", "list", "demo:follow-ups")
-    // The epic list's addresses stand for the areas.
+    // The epic list's addresses stand for the backlogs.
     const epicAddresses = async () =>
       (JSON.parse(await fixture.cli("server", "epics", "--json")).epics as { address: string }[])
         .map((e) => e.address)
@@ -375,30 +375,30 @@ test.describe("199. Triage journey", () => {
     await expect(page.getByRole("menuitem", { name: /demo/ })).toBeVisible()
     expect(await sideways(page)).toBe(false)
 
-    // Backlog: the Epics menu has the item, the sidebar has no row, and each area shows its open count.
+    // Backlog: the Epics menu has the item, the sidebar has no row, and each backlog shows its open count.
     await page.setViewportSize({ width: 1280, height: 800 })
-    const backlog = await start("triage", { shape: "backlog" })
+    const fx = await start("triage", { shape: "backlog" })
     await expect(page.getByRole("link", { name: /Backlog/ })).toHaveCount(0)
     await epicsButton(page).click()
     await page.getByRole("menuitem", { name: "Backlog", exact: true }).click()
     await expect(page).toHaveURL(/#\/backlog$/)
     // The sidebar lists epics too, so rows are scoped to the project's region.
-    const area = (name: string) =>
+    const backlog = (name: string) =>
       page
         .getByRole("region", { name: "demo", exact: true })
         .getByRole("listitem")
         .filter({ hasText: new RegExp(`^${name}`) })
-    const startDesign = (name: string) => area(name).getByRole("button", { name: "Start Design" })
+    const startDesign = (name: string) => backlog(name).getByRole("button", { name: "Start Design" })
     const startButton = (name: string) =>
       page
         .getByRole("dialog", nav(`Start Design for ${name}`))
         .getByRole("button", { name: "Start", exact: true })
-    await expect(area("parser")).toContainText("11 open")
-    await expect(area("sync")).toContainText("5 open")
-    await expect(area("webui")).toContainText("0 open")
+    await expect(backlog("parser")).toContainText("11 open")
+    await expect(backlog("sync")).toContainText("5 open")
+    await expect(backlog("webui")).toContainText("0 open")
     await expect(startDesign("webui")).toBeDisabled()
 
-    // The 5-ticket area: the chat prints the card with all five tickets, each with a reason.
+    // The 5-ticket backlog: the chat prints the card with all five tickets, each with a reason.
     const cards = () => page.getByText("Start this Design?")
     const say = async (text: string) => {
       // A turn typed while the session still works is lost.
@@ -412,10 +412,10 @@ test.describe("199. Triage journey", () => {
     await expect(cards()).toHaveCount(1)
     await expect(page.getByText(/^demo:sync\/\d+:/)).toHaveCount(5)
     await expect(page.getByText(/same theme as the other sync tickets/)).toHaveCount(5)
-    // A live chat blocks Finish move on its area, so this one goes before the move.
-    await backlog.cli("agents", "remove", "--yes", page.url().split("/agents/")[1])
+    // A live chat blocks Finish move on its backlog, so this one goes before the move.
+    await fx.cli("agents", "remove", "--yes", page.url().split("/agents/")[1])
 
-    // The 11-ticket area: the dialog takes a hint, a typed edit reprints the card once, yes prints a link.
+    // The 11-ticket backlog: the dialog takes a hint, a typed edit reprints the card once, yes prints a link.
     await openBacklog(page)
     await startDesign("parser").click()
     const dialog = page.getByRole("dialog", nav("Start Design for parser"))
@@ -428,28 +428,28 @@ test.describe("199. Triage journey", () => {
     await expect(cards()).toHaveCount(2)
     await say("yes")
     await expect(page.getByText("Created the Design")).toBeVisible()
-    const design = await backlog.cli("tickets", "show", "demo:parser-cleanup")
+    const design = await fx.cli("tickets", "show", "demo:parser-cleanup")
     expect(design).toContain("kind: map")
     expect(design).toContain("destination_unconfirmed: true")
     expect(design).toContain("- demo:parser/11")
     expect(design).not.toContain("- demo:parser/01")
-    // The area keeps the dropped ticket and the claimed one.
-    const left = await backlog.cli("tickets", "list", "demo:parser")
+    // The backlog keeps the dropped ticket and the claimed one.
+    const left = await fx.cli("tickets", "list", "demo:parser")
     expect(left).toContain("parser-01")
     expect(left).toContain("parser-12")
 
-    // A second Start Design click on that area opens the live chat.
+    // A second Start Design click on that backlog opens the live chat.
     await openBacklog(page)
-    await expect(area("parser")).toContainText("1 open")
+    await expect(backlog("parser")).toContainText("1 open")
     await startDesign("parser").click()
     await startButton("parser").click()
     await expect(page).toHaveURL(chatUrl)
 
     // Finish move completes the half-filled map with no new chat.
     await openBacklog(page)
-    await area("sync").getByRole("button", { name: "Finish move" }).click()
-    await expect(area("sync").getByRole("button", { name: "Finish move" })).toHaveCount(0)
-    expect(await backlog.cli("tickets", "show", "demo:retry-work")).toContain("sync-04")
+    await backlog("sync").getByRole("button", { name: "Finish move" }).click()
+    await expect(backlog("sync").getByRole("button", { name: "Finish move" })).toHaveCount(0)
+    expect(await fx.cli("tickets", "show", "demo:retry-work")).toContain("sync-04")
     await expect(page).toHaveURL(/#\/backlog$/)
 
     // Phone: the Start Design dialog is a sheet with no sideways scroll.
@@ -458,25 +458,25 @@ test.describe("199. Triage journey", () => {
     await expect(page.getByRole("dialog", nav("Start Design for sync"))).toBeVisible()
     expect(await sideways(page)).toBe(false)
 
-    // Old epics: the Route summary lists the moves and the waiting epic; the table areas make
+    // Old epics: the Route summary lists the moves and the waiting epic; the table backlogs make
     // no question of their own.
     await page.setViewportSize({ width: 1280, height: 800 })
     // A long countdown keeps Write waiting, so its view is read before the session writes.
     const old = await start("triage", { shape: "old-epics", autoAdvanceDelay: "60s" })
     await page.evaluate(() => (location.hash = "#/triage/gx"))
-    await expect(page.getByText("move test-flakes -> area test-health: 2 tickets")).toBeVisible()
+    await expect(page.getByText("move test-flakes -> backlog test-health: 2 tickets")).toBeVisible()
     await expect(
-      page.getByText("move agent-guidance -> area agent-guidance-and-skills: 1 tickets"),
+      page.getByText("move agent-guidance -> backlog agent-guidance-and-skills: 1 tickets"),
     ).toBeVisible()
     await expect(
-      page.getByText("move ticket-authoring -> area ticket-authoring: 1 tickets"),
+      page.getByText("move ticket-authoring -> backlog ticket-authoring: 1 tickets"),
     ).toBeVisible()
     await expect(
       page.getByText("waiting: stuck-ticket-watchdog holds claimed gx:stuck-ticket-watchdog/01"),
     ).toBeVisible()
     const oldRound = questionsOf(page)
     await expect(oldRound.getByText("Question 1 of 3")).toBeVisible()
-    await expect(page.getByText('Create the area "tooling"?', { exact: true })).toBeVisible()
+    await expect(page.getByText('Create the backlog "tooling"?', { exact: true })).toBeVisible()
     await expect(
       oldRound.getByText(/test-health|agent-guidance-and-skills|ticket-authoring/),
     ).toHaveCount(0)
@@ -503,7 +503,7 @@ test.describe("199. Triage journey", () => {
     for (const name of ["test-flakes", "agent-guidance", "scratch-ideas"]) {
       expect(archived.find((e) => e.name === name)?.completed_at).toBeTruthy()
     }
-    // Past charting, claimed, and named like its area: all stay, unstamped.
+    // Past charting, claimed, and named like its backlog: all stay, unstamped.
     for (const name of ["tickets-cli", "stuck-ticket-watchdog", "ticket-authoring"]) {
       expect(archived.find((e) => e.name === name)).toBeUndefined()
       expect(await old.cli("tickets", "show", `gx:${name}`)).not.toContain("completed_at")

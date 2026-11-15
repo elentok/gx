@@ -123,8 +123,8 @@ func (s *Merger) loadMergeEpic(req wire.QueueRequest) (mergeEpicRef, error) {
 	if e.IsMap {
 		return mergeEpicRef{}, refuseMerge(wire.ReasonMapEpic, root.String()+" is a map epic; its tickets are resolved by hand")
 	}
-	if e.IsArea {
-		return mergeEpicRef{}, refuseMerge(wire.ReasonAreaEpic, root.String()+" is an area; it never merges")
+	if e.IsBacklog {
+		return mergeEpicRef{}, refuseMerge(wire.ReasonBacklogEpic, root.String()+" is a backlog; it never merges")
 	}
 	if !root.Mergeable() {
 		return mergeEpicRef{}, refuseMerge(wire.ReasonOneOffsEpic, root.String()+" is the one-offs inbox; it never merges")

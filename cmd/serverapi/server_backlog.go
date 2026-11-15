@@ -11,12 +11,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newServerBacklogCmd lists the areas the Backlog page shows.
+// newServerBacklogCmd lists the epics the Backlog page shows.
 func newServerBacklogCmd(d Deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "backlog",
-		Short: "list each project's areas with their open ticket counts and unfinished Start Design moves",
+		Short: "list each project's epics with their open ticket counts and unfinished Start Design moves",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			return cmdbase.ServerRead(d.Dial(), c.Context(), jsonOut, c.OutOrStdout(),
@@ -30,11 +30,11 @@ func newServerBacklogCmd(d Deps) *cobra.Command {
 	return cmd
 }
 
-// printBacklog writes one line per area: address, open count, then the
+// printBacklog writes one line per backlog: address, open count, then the
 // unfinished move's map and count to move, or "-".
 func printBacklog(w io.Writer, l wire.BacklogList) error {
 	for _, p := range l.Projects {
-		for _, a := range p.Areas {
+		for _, a := range p.Epics {
 			move := "-"
 			if a.Unfinished != nil {
 				move = fmt.Sprintf("%s (%d to move)", a.Unfinished.Map, a.Unfinished.ToMove)

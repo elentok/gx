@@ -8,7 +8,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// OldEpicNote is the Notes text of an area epic an earlier Triage made.
+// OldEpicNote is the Notes text of a backlog epic an earlier Triage made.
 const OldEpicNote = "Triaged from follow-ups"
 
 // IsOldEpic: a map, still charting, whose Notes say it was triaged from
@@ -19,7 +19,7 @@ func IsOldEpic(e tickets.Epic) bool {
 
 // OldEpicTickets sorts an old epic's tickets by what Triage does with them.
 type OldEpicTickets struct {
-	// Move: open and draft tickets, addresses. They move into an area.
+	// Move: open and draft tickets, addresses. They move into a backlog.
 	Move []string
 	// Claimed: addresses. A claimed ticket holds the archive.
 	Claimed []string

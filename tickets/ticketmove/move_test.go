@@ -37,13 +37,13 @@ func TestPlanMove_SourceKinds(t *testing.T) {
 		{"map charting", "kind: map\ndesign_step: chart\n", false, false},
 		{"map past chart", "kind: map\ndesign_step: spec\n", false, true},
 		{"map past chart archived", "kind: map\ndesign_step: spec\n", true, false},
-		{"area", "kind: area\n", false, false},
+		{"backlog", "kind: backlog\n", false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
 			tickettest.WriteFile(t, filepath.Join(root, "src", "ticket.md"), "---\nstatus: open\n"+tc.meta+"---\n\n# src\n")
 			tickettest.WriteFile(t, filepath.Join(root, "src", "issues", "01-a.md"), tk)
-			tickettest.WriteFile(t, filepath.Join(root, "dst", "ticket.md"), "---\nstatus: open\nkind: area\n---\n\n# dst\n")
+			tickettest.WriteFile(t, filepath.Join(root, "dst", "ticket.md"), "---\nstatus: open\nkind: backlog\n---\n\n# dst\n")
 			tickettest.WriteFile(t, filepath.Join(root, "other", "issues", "01-b.md"),
 				"---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by:\n  - src/01\n---\n\n# b\n")
 
@@ -71,12 +71,12 @@ func TestPlanMove_SourceKinds(t *testing.T) {
 	}
 }
 
-func TestPlanMove_IntoArea(t *testing.T) {
+func TestPlanMove_IntoBacklog(t *testing.T) {
 	root := t.TempDir()
 	tickettest.WriteFile(t, filepath.Join(root, "src", "issues", "01-a.md"), "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n\n# 01\n")
-	tickettest.WriteFile(t, filepath.Join(root, "area", "ticket.md"), "---\nstatus: open\nkind: area\n---\n\n# area\n")
-	plan, err := planFrom(t, root, "src", "area", MoveOpts{})
-	if err != nil || plan.To.Epic != "area" {
+	tickettest.WriteFile(t, filepath.Join(root, "backlog", "ticket.md"), "---\nstatus: open\nkind: backlog\n---\n\n# backlog\n")
+	plan, err := planFrom(t, root, "src", "backlog", MoveOpts{})
+	if err != nil || plan.To.Epic != "backlog" {
 		t.Fatalf("plan = %+v, err = %v", plan, err)
 	}
 }

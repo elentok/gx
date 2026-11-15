@@ -397,19 +397,19 @@ func editRecord(t *testing.T, project string, fn func(*triage.Record)) {
 	}
 }
 
-func TestTriageEpics_AreaRecordedWhenConfirmedAndRefusedWhenNot(t *testing.T) {
+func TestTriageEpics_BacklogRecordedWhenConfirmedAndRefusedWhenNot(t *testing.T) {
 	repo, project, _ := triageAtWrite(t)
 	editRecord(t, project, func(rec *triage.Record) {
-		rec.Areas = []triage.Area{
-			{Name: "tbl", Source: triage.AreaTable},
-			{Name: "ag", Source: triage.AreaAgent},
+		rec.Backlogs = []triage.Backlog{
+			{Name: "tbl", Source: triage.BacklogTable},
+			{Name: "ag", Source: triage.BacklogAgent},
 		}
 	})
-	if _, err := runIn(t, repo, "tickets", "triage", "epics", "--area", "ag"); err == nil {
-		t.Fatal("unconfirmed agent area accepted")
+	if _, err := runIn(t, repo, "tickets", "triage", "epics", "--backlog", "ag"); err == nil {
+		t.Fatal("unconfirmed agent backlog accepted")
 	}
 	for _, want := range []string{"tbl new\n", "tbl known\n"} {
-		out, err := runIn(t, repo, "tickets", "triage", "epics", "--area", "tbl")
+		out, err := runIn(t, repo, "tickets", "triage", "epics", "--backlog", "tbl")
 		if err != nil || out != want {
 			t.Fatalf("got %q, %v; want %q", out, err, want)
 		}
@@ -435,19 +435,19 @@ func TestTriageAnswers_AgentDecisionsAreWrittenOnce(t *testing.T) {
 	}
 }
 
-func TestTriageLocate_UnreachedRowGetsItsFallbackAreaAsGrilling(t *testing.T) {
+func TestTriageLocate_UnreachedRowGetsItsFallbackBacklogAsGrilling(t *testing.T) {
 	repo, project, s := triageAtWrite(t)
 	row := s.Rows[1].Address
 	editRecord(t, project, func(rec *triage.Record) {
 		for i := range rec.Rows {
 			if rec.Rows[i].Address == row {
-				rec.Rows[i].Fallback = "area-fb"
+				rec.Rows[i].Fallback = "backlog-fb"
 				rec.Rows[i].Questions = []triage.Question{{ID: "uq", Text: "unreached?", Kind: triage.QuestionAsk, Options: []string{"a", "b"}, Default: "a"}}
 			}
 		}
 	})
 	got := triageLocate(t, repo, "--row", row)
-	if got.Target == nil || got.Target.Epic != "area-fb" || got.Target.Type != "grilling" || !strings.Contains(got.Target.Question, "unreached?") {
+	if got.Target == nil || got.Target.Epic != "backlog-fb" || got.Target.Type != "grilling" || !strings.Contains(got.Target.Question, "unreached?") {
 		t.Fatalf("target = %+v", got.Target)
 	}
 }
@@ -504,28 +504,28 @@ func triageAtRoute(t *testing.T, repo string) []string {
 	return rows
 }
 
-func writeAreaEpic(t *testing.T, project, name string) {
+func writeBacklogEpic(t *testing.T, project, name string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Join(project, name, "issues"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeTicketFile(t, filepath.Join(project, name, "ticket.md"), "---\nkind: area\n---\n\n# "+name+"\n")
+	writeTicketFile(t, filepath.Join(project, name, "ticket.md"), "---\nkind: backlog\n---\n\n# "+name+"\n")
 }
 
 func TestTriageMoves_SavedPendingAndAWaitingEpicIsRefused(t *testing.T) {
 	repo, project := triageProjectDir(t)
 	writeOldEpic(t, project, "old-a", "", triagedNote, "open", "claimed")
 	writeOldEpic(t, project, "old-w", "", triagedNote, "claimed", "done")
-	writeAreaEpic(t, project, "area-a")
+	writeBacklogEpic(t, project, "backlog-a")
 	rows := triageAtRoute(t, repo)
 
-	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-w","area":"area-a"}]`, "tickets", "triage", "moves"); err == nil {
+	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-w","backlog":"backlog-a"}]`, "tickets", "triage", "moves"); err == nil {
 		t.Fatal("an epic with a claimed ticket and nothing to move got a unit")
 	}
-	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-a","area":"missing"}]`, "tickets", "triage", "moves"); err == nil {
-		t.Fatal("an unknown area was accepted")
+	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-a","backlog":"missing"}]`, "tickets", "triage", "moves"); err == nil {
+		t.Fatal("an unknown backlog was accepted")
 	}
-	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-a","area":"area-a"}]`, "tickets", "triage", "moves"); err != nil {
+	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-a","backlog":"backlog-a"}]`, "tickets", "triage", "moves"); err != nil {
 		t.Fatalf("moves: %v", err)
 	}
 	plan := `[{"rowId":"` + rows[0] + `","action":"ready"},{"rowId":"` + rows[1] + `","action":"ready"}]`
@@ -558,9 +558,9 @@ func TestTriageMoveLocate_ReadsTheStoreSoARerunSkipsWhatHappened(t *testing.T) {
 func TestTriageMoveState_SavesAtWriteRefusesBefore(t *testing.T) {
 	repo, project := triageProjectDir(t)
 	writeOldEpic(t, project, "old-a", "", triagedNote, "open")
-	writeAreaEpic(t, project, "area-a")
+	writeBacklogEpic(t, project, "backlog-a")
 	rows := triageAtRoute(t, repo)
-	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-a","area":"area-a"}]`, "tickets", "triage", "moves"); err != nil {
+	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-a","backlog":"backlog-a"}]`, "tickets", "triage", "moves"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := runIn(t, repo, "tickets", "triage", "move-state", "--epic", "old-a", "--state", "done"); err == nil {

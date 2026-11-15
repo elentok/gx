@@ -67,7 +67,7 @@ func UpdateEpicFields(ticketPath string, u EpicUpdate) error {
 	if u.Kind != nil {
 		fields.Kind = *u.Kind
 		if fields.Kind == "" {
-			return fmt.Errorf("kind cannot be empty (map, loop or area)")
+			return fmt.Errorf("kind cannot be empty (map, loop or backlog)")
 		}
 	}
 	if u.Status != nil {
@@ -94,8 +94,8 @@ func UpdateEpicFields(ticketPath string, u EpicUpdate) error {
 	return editEpicTicketMD(ticketPath, func(mapping *yaml.Node, _ *string) error {
 		if u.Kind != nil {
 			stored := effectiveKind(mapping, nil)
-			if *u.Kind != stored && (*u.Kind == KindArea || stored == KindArea) {
-				return fmt.Errorf("an epic's kind cannot change to or from area (this epic is kind: %s)", stored)
+			if *u.Kind != stored && (*u.Kind == KindBacklog || stored == KindBacklog) {
+				return fmt.Errorf("an epic's kind cannot change to or from backlog (this epic is kind: %s)", stored)
 			}
 		}
 		if u.DesignStep != nil || u.CompletedAt != nil {

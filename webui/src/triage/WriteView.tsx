@@ -170,7 +170,7 @@ function MoveRow({
           {move.state}
         </Chip>
         <Text>
-          move {move.old_epic} -&gt; {move.area}
+          move {move.old_epic} -&gt; {move.backlog}
         </Text>
       </Box>
       {failed && move.last_error && (
@@ -235,7 +235,7 @@ export function WriteView({
   )
   const unitEl = (m: TriageMove) => (
     <MoveRow
-      key={`${m.old_epic}:${m.area}`}
+      key={`${m.old_epic}:${m.backlog}`}
       project={project}
       revision={view.revision ?? 0}
       move={m}

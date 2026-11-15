@@ -15,7 +15,7 @@ import { Chip } from "../ui/chip/Chip"
 
 const TITLES: Record<string, string> = {
   ready: "Ready epic",
-  area: "Map epics",
+  backlog: "Map epics",
   merge: "Merged",
   close: "Closed",
   keep: "Kept for later",
@@ -36,14 +36,14 @@ function closedCounts(group: TriageResultGroup): string {
   return [...counts].map(([reason, n]) => `${reason} ${n}`).join(" · ")
 }
 
-/** Moved rows counted by the area (epic name) they went to. */
-function areaCounts(group: TriageResultGroup): string {
+/** Moved rows counted by the backlog (epic name) they went to. */
+function backlogCounts(group: TriageResultGroup): string {
   const counts = new Map<string, number>()
   for (const i of group.items) {
-    const area = (i.target ?? "").replace(/\/[^/]*$/, "").replace(/^[^:]*:/, "")
-    counts.set(area, (counts.get(area) ?? 0) + 1)
+    const backlog = (i.target ?? "").replace(/\/[^/]*$/, "").replace(/^[^:]*:/, "")
+    counts.set(backlog, (counts.get(backlog) ?? 0) + 1)
   }
-  return [...counts].map(([area, n]) => `${area} ${n}`).join(" · ")
+  return [...counts].map(([backlog, n]) => `${backlog} ${n}`).join(" · ")
 }
 
 /** The line text of a group: its count and what happened to the rows. */
@@ -62,10 +62,10 @@ function GroupLine({ group, readyEpic }: { group: TriageResultGroup; readyEpic?:
           {readyEpic && <> in {link(epicHref(readyEpic), readyEpic)}</>}
         </>
       )
-    case "area":
+    case "backlog":
       return (
         <>
-          {count("to areas")} · {areaCounts(group)}
+          {count("to backlogs")} · {backlogCounts(group)}
         </>
       )
     case "merge":
@@ -91,7 +91,7 @@ function GroupRows({ group }: { group: TriageResultGroup }) {
             {i.title}
           </Text>
           {i.target &&
-            (group.action === "area" ? (
+            (group.action === "backlog" ? (
               link(ticketHref(i.target), `→ ${i.target}`)
             ) : (
               <Text as="span" color="text.dim">

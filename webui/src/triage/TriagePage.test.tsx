@@ -41,7 +41,7 @@ const viewOf = (over: Partial<TriageView> = {}): TriageView => ({
   action_counts: {},
   changed_rows: 0,
   destinations: [],
-  epic_actions: ["ready", "area"],
+  epic_actions: ["ready", "backlog"],
   can_abandon: false,
   history: [],
   ...over,
@@ -317,7 +317,7 @@ test("history lists past Triages in the order sent, read-only, with epic links",
     ready_epic: "gx:ready-1",
     groups: [
       { action: "ready", items: [{ address: "gx:follow-ups/1", title: "a" }] },
-      { action: "area", items: [{ address: "gx:follow-ups/2", title: "b", target: "gx:map-a/3" }] },
+      { action: "backlog", items: [{ address: "gx:follow-ups/2", title: "b", target: "gx:map-a/3" }] },
       { action: "close", items: [{ address: "gx:follow-ups/4", title: "c" }] },
     ],
   }
@@ -450,7 +450,7 @@ test("the final approval round reads Final question, drops the round label and h
   const final = {
     label: "1",
     title: "Write this plan?",
-    body: "39 ready, 14 to areas, 31 closed. Nothing changes until you say yes.",
+    body: "39 ready, 14 to backlogs, 31 closed. Nothing changes until you say yes.",
     kind: "options",
     options: [
       { id: "yes", label: "Yes, write it" },
@@ -491,8 +491,8 @@ const planView = (rows: ReturnType<typeof planRow>[]) =>
 
 const planRows = () => [
   ...[1, 2, 3, 4, 5].map((n) => planRow(n, "ready")),
-  planRow(6, "area", "test-flakes"),
-  planRow(7, "area", "ralph-loop"),
+  planRow(6, "backlog", "test-flakes"),
+  planRow(7, "backlog", "ralph-loop"),
   planRow(8, "close", "fixed"),
   planRow(9, "close", "obsolete"),
   planRow(10, "merge", "gx:follow-ups/1"),
@@ -505,7 +505,7 @@ const emptyChat = async () => ({
   detail: { conversation_id: "c1", messages: [], questions: [], background: [] } as never,
 })
 
-test("after Route the Chat holds a read-only plan card with counts, areas and collapsed groups", async () => {
+test("after Route the Chat holds a read-only plan card with counts, backlogs and collapsed groups", async () => {
   render([session("working")], {
     triage: async () => ({ kind: "ok", detail: planView(planRows()) }),
     chat: emptyChat,
@@ -519,7 +519,7 @@ test("after Route the Chat holds a read-only plan card with counts, areas and co
   expect(card.textContent).toContain("Plan · 11 follow-ups")
   expect(card.textContent).toContain("read-only")
   expect(card.textContent).toContain("5Ready→ follow-ups-2026-11-14")
-  expect(card.textContent).toContain("2To an area→ 2 areas")
+  expect(card.textContent).toContain("2To a backlog→ 2 backlogs")
   expect(card.textContent).toContain("2Closed1 fixed · 1 obsolete")
   expect(card.textContent).toContain("1Merged")
   expect(card.textContent).toContain("1Kept for later")

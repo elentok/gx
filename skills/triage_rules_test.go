@@ -14,7 +14,7 @@ func TestTriageSkillAnchors(t *testing.T) {
 		"gx agent model worker", "--fits", "Decided unless you object", "Write this plan?",
 		"`✅ <step>: <what was done>. Next: <what runs next>`",
 		"never grills outside the Questions step", "expensive to reverse",
-		"(old-epic-areas.txt)", "gx tickets triage oldepics", "decided by agent",
+		"(old-epic-backlogs.txt)", "gx tickets triage oldepics", "decided by agent",
 		"(../gx-local-tracker.md)",
 	} {
 		if n := strings.Count(strings.ToLower(skill), strings.ToLower(want)); n < 1 {

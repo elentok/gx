@@ -125,7 +125,7 @@ func TestStats_MapsCountAsDesignsCompletedNotEpicsMerged(t *testing.T) {
 		rigs.WriteProjectEpic(t, store, "proj", "emptied", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(5)+"\n---\n", nil)
 		rigs.WriteProjectEpic(t, store, "proj", "feat-impl", "---\nstatus: done\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
 		rigs.WriteProjectEpic(t, store, "proj", "open-map", "---\nkind: map\nstatus: open\n---\n", nil)
-		rigs.WriteProjectEpic(t, store, "proj", "an-area", "---\nkind: area\nstatus: done\ncompleted_at: "+statsStamp(4)+"\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
+		rigs.WriteProjectEpic(t, store, "proj", "an-backlog", "---\nkind: backlog\nstatus: done\ncompleted_at: "+statsStamp(4)+"\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
 	})("?range=30")
 	for _, c := range []struct {
 		name   string
@@ -133,7 +133,7 @@ func TestStats_MapsCountAsDesignsCompletedNotEpicsMerged(t *testing.T) {
 		day    int
 		want   int
 	}{
-		{"area is not a completed design", s.Throughput.DesignsCompleted, 4, 0},
+		{"backlog is not a completed design", s.Throughput.DesignsCompleted, 4, 0},
 		{"emptied charting map is not a completed design", s.Throughput.DesignsCompleted, 5, 0},
 		{"epics merged: impl only", s.Throughput.EpicsMerged, 1, 1},
 		{"epics merged: map completion is not a merge", s.Throughput.EpicsMerged, 3, 0},
@@ -442,10 +442,10 @@ func TestStats_TokensAndSpendSplitDesignAndImplementation(t *testing.T) {
 	}
 }
 
-func TestStats_AreaDoneTicketsAreNotMergedOrCosted(t *testing.T) {
+func TestStats_BacklogDoneTicketsAreNotMergedOrCosted(t *testing.T) {
 	t.Parallel()
 	s := statsStore(t, func(store string) {
-		rigs.WriteProjectEpic(t, store, "proj", "an-area", "---\nkind: area\nstatus: open\n---\n", map[string]string{
+		rigs.WriteProjectEpic(t, store, "proj", "an-backlog", "---\nkind: backlog\nstatus: open\n---\n", map[string]string{
 			"01-a.md": rigs.IssueMD("01", "done", "done_at: "+statsStamp(2)+"\ntotal_tokens: 50\nactual_cost: 0.5\n", "A"),
 		})
 	})("?range=30")

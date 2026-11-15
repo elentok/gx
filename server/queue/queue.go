@@ -178,7 +178,7 @@ func (q *Queue) Write(address string, mutate func(items []wire.QueueItem) ([]wir
 
 // mapEpicRefusal refuses to queue a ticket of a map epic: a map's tickets are
 // decisions a person resolves by hand, never scheduled work.
-// An area's tickets are refused the same way, with ReasonAreaEpic.
+// A backlog's tickets are refused the same way, with ReasonBacklogEpic.
 func (q *Queue) mapEpicRefusal(address string) *wire.QueueResult {
 	a, err := tickets.ParseQueuedAddress(address)
 	if err != nil {
@@ -193,8 +193,8 @@ func (q *Queue) mapEpicRefusal(address string) *wire.QueueResult {
 	switch {
 	case tickets.IsMapEpic(epicPath):
 		r = Refusal(wire.ReasonMapEpic, address+" is in a map epic; its tickets are resolved by hand, not scheduled")
-	case tickets.IsAreaEpic(epicPath):
-		r = Refusal(wire.ReasonAreaEpic, address+" is in an area; its tickets are follow-ups, not scheduled")
+	case tickets.IsBacklogEpic(epicPath):
+		r = Refusal(wire.ReasonBacklogEpic, address+" is in a backlog; its tickets are follow-ups, not scheduled")
 	default:
 		return nil
 	}
@@ -298,8 +298,8 @@ func (q *Queue) refusal(t queueTarget) *wire.QueueResult {
 	switch {
 	case e.IsMap:
 		r = Refusal(wire.ReasonMapEpic, t.address+" is a map epic; its tickets are resolved by hand, not scheduled")
-	case e.IsArea:
-		r = Refusal(wire.ReasonAreaEpic, t.address+" is an area; its tickets are follow-ups, not scheduled")
+	case e.IsBacklog:
+		r = Refusal(wire.ReasonBacklogEpic, t.address+" is a backlog; its tickets are follow-ups, not scheduled")
 	case !e.MergedAt.IsZero():
 		r = Refusal(wire.ReasonAlreadyMerged, t.address+" is already merged")
 	case e.QueueRefusal() == tickets.QueueRefusalFollowUps:

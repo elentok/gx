@@ -176,16 +176,16 @@ conversation history.
   flat, never-run `draft`/`open` ticket to another epic of the same project and rewrites every
   `blocked_by`/`base` reference to it. It refuses a ticket with run history, a `parent` or fork
   children, one queued or live on the server, and a map-epic source whose Design has started
-  (`design_step` past `chart`; a charting map is a valid source). An area is a valid source and
+  (`design_step` past `chart`; a charting map is a valid source). A backlog is a valid source and
   target, and a map target is allowed.
   Prose mentions of the old address are not rewritten; the files that hold one are listed as
   warnings. Use `--dry-run` first.
 - **Close a follow-up**: `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it|promoted
   [--note ...]` — see "Follow-ups".
-- **Create or edit an epic**: `gx tickets epic add <project:epic> --kind map|loop|area --status
-  draft|open [--body -]` creates the epic's `ticket.md`. An `area` epic is a project's standing
-  backlog: its status is `open`, a project has at most 12, `gx tickets epics --areas` lists them, the
-  queue refuses one, and `gx tickets set --kind` cannot change a kind to or from `area`. It refuses a taken name: an existing epic,
+- **Create or edit an epic**: `gx tickets epic add <project:epic> --kind map|loop|backlog --status
+  draft|open [--body -]` creates the epic's `ticket.md`. An `backlog` epic is a project's standing
+  backlog: its status is `open`, a project has at most 12, `gx tickets epics --backlogs` lists them, the
+  queue refuses one, and `gx tickets set --kind` cannot change a kind to or from `backlog`. It refuses a taken name: an existing epic,
   a branch of that name, or a name an earlier, merged epic used (its `Ralph-Loop-Ticket` trailers
   are on trunk). `publish` refuses a taken name the same way when it creates the epic.
   `gx tickets epic next-name <project:base>` prints the first free name of `base`, `base-2`,
@@ -345,7 +345,7 @@ says where the run is, so a `/clear`ed or a web session continues the same recor
 
 - **Record state**: `live`, `done` or `abandoned`. One live record per project.
 - **Version**: 2. **Step**, detected by `gx tickets triage show`: `start` (no live record), `verify` (a
-  row has no verdict), `route` (rows and areas are chosen), `questions` (rounds of questions, then
+  row has no verdict), `route` (rows and backlogs are chosen), `questions` (rounds of questions, then
   the approval), `write` (approved), `done`.
 - **Row write state**, set during write: `pending`, `done`, `failed` or `gone`.
 - **Every verb takes `--project <p>`** (default: the cwd's project). Write verbs take `--revision <n>`; a
@@ -355,21 +355,21 @@ says where the run is, so a `/clear`ed or a web session continues the same recor
   - `verdict --row <addr> [--verdict relevant|fixed|obsolete] [--evidence ..] [--file ..] [--question ..]
     [--destination ..] | --gone`: save one verdict.
   - `plan [--gone <addr>]` (rows as JSON on stdin), `row --row <addr> --revision <n> ...` (the person's
-    edits), `area --name <area> --source table|agent [--confirm]` (an area entry, step route or
-    questions), `correct --row <addr> --action area|ready` (a routing correction).
+    edits), `backlog --name <backlog> --source table|agent [--confirm]` (a backlog entry, step route or
+    questions), `correct --row <addr> --action backlog|ready` (a routing correction).
   - `round [--objection]` (questions as JSON on stdin, saved before they are printed; at most 6 per
     round, a fourth ordinary round is refused), `answer --question <id> --answer <text>`, `decide
     --row <addr> --question <text> --choice <text>` (a question the agent settled itself), `object
     --row <addr> --question <text> --option <text>...` (the person's objection to a decision),
     `open-round [--json]` (the first round with unanswered questions; a fresh session reprints it).
-  - `oldepics [--json]`: the old triage-made map epics to move into areas (read only), then `moves`
+  - `oldepics [--json]`: the old triage-made map epics to move into backlogs (read only), then `moves`
     (step route, JSON on stdin), `move-state`, `move-locate`: the move units.
   - `approve --revision <n>`: step questions only. A step already past questions prints "already
     approved"; a changed revision is refused as stale. It is also refused while a question is open,
-    an agent area is unconfirmed or a merge target is orphaned.
+    an agent backlog is unconfirmed or a merge target is orphaned.
   - `abandon`: allowed at verify, route and questions.
-  - Start Design is `gx tickets start-design <project:area>`: it creates a charting map from an
-    area's tickets and moves them in. Rerun it after a failure.
+  - Start Design is `gx tickets start-design <project:backlog>`: it creates a charting map from an
+    backlog's tickets and moves them in. Rerun it after a failure.
   - `locate --row <addr> [--seen-from <addr>]`: where the follow-up is now and what is already written.
   - `answers`, `seen-again`, `epics`, `write-state`, `last-pass`: the idempotent write-step verbs.
 

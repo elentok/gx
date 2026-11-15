@@ -313,7 +313,7 @@ func (p *Player) write(rec *triage.Record) (string, error) {
 }
 
 // writeMove is one old-epic unit's Write, as the skill's "Old epics" section
-// says: move what move-locate lists into the area (created when missing), then
+// says: move what move-locate lists into the backlog (created when missing), then
 // archive the emptied epic, which stamps it. A unit whose epic holds a claimed
 // ticket is left pending (moved is false) and its claimed ticket stays.
 func (p *Player) writeMove(u triage.MoveUnit) (moved bool, err error) {
@@ -335,18 +335,18 @@ func (p *Player) writeMove(u triage.MoveUnit) (moved bool, err error) {
 	if len(loc.Move) == 0 && len(loc.Claimed) > 0 {
 		return false, nil
 	}
-	// The table can name the old epic itself as its area; its tickets are home
+	// The table can name the old epic itself as its backlog; its tickets are home
 	// already and `tickets move` refuses a move into the same epic.
-	if u.Area == u.OldEpic {
+	if u.Backlog == u.OldEpic {
 		return true, nil
 	}
-	area := p.Project + ":" + u.Area
+	backlog := p.Project + ":" + u.Backlog
 	if len(loc.Move) > 0 {
-		// A refusal means the area exists already; a real failure shows in the move.
-		_, _ = p.gx("", "tickets", "epic", "add", area, "--kind", "area", "--status", "open")
+		// A refusal means the backlog exists already; a real failure shows in the move.
+		_, _ = p.gx("", "tickets", "epic", "add", backlog, "--kind", "backlog", "--status", "open")
 	}
 	for _, addr := range loc.Move {
-		if _, err := p.gx("", "tickets", "move", addr, area); err != nil {
+		if _, err := p.gx("", "tickets", "move", addr, backlog); err != nil {
 			return false, err
 		}
 	}

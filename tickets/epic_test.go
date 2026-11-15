@@ -31,7 +31,7 @@ func TestEpic_HoldsLoopWork(t *testing.T) {
 	}{
 		{"loop", Epic{}, true},
 		{"map", Epic{IsMap: true}, false},
-		{"area", Epic{IsArea: true}, false},
+		{"backlog", Epic{IsBacklog: true}, false},
 	} {
 		if got := c.e.HoldsLoopWork(); got != c.want {
 			t.Errorf("%s = %v, want %v", c.name, got, c.want)

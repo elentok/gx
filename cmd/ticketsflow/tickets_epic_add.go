@@ -71,7 +71,7 @@ func newTicketsEpicCmd(d Deps) *cobra.Command {
 	var kind, status, body string
 	addCmd := &cobra.Command{
 		Use:   "add <project:epic>",
-		Short: "create an epic's ticket.md (kind map, loop or area, status draft or open)",
+		Short: "create an epic's ticket.md (kind map, loop or backlog, status draft or open)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			cwd, err := d.Getwd()
@@ -86,7 +86,7 @@ func newTicketsEpicCmd(d Deps) *cobra.Command {
 			return runTicketsEpicAdd(d.dirs(), cwd, args[0], kind, status, body, c.OutOrStdout())
 		},
 	}
-	addCmd.Flags().StringVar(&kind, "kind", "", "map, loop or area (required unless the body's frontmatter sets it)")
+	addCmd.Flags().StringVar(&kind, "kind", "", "map, loop or backlog (required unless the body's frontmatter sets it)")
 	addCmd.Flags().StringVar(&status, "status", "", "draft or open (default draft)")
 	addCmd.Flags().StringVar(&body, "body", "", "epic body, or - to read it from stdin; its frontmatter may set kind, status, destination_unconfirmed")
 	nextNameCmd := &cobra.Command{
@@ -138,7 +138,7 @@ func newTicketsEpicSetCmd(d Deps) *cobra.Command {
 			return ticketscmd.RunEpicSet(d.dirs(), c, path, c.OutOrStdout(), d.Getwd, d.Dial())
 		},
 	}
-	cmd.Flags().String("kind", "", "set kind (map, loop or area; never to or from area)")
+	cmd.Flags().String("kind", "", "set kind (map, loop or backlog; never to or from backlog)")
 	cmd.Flags().String("status", "", "set status (draft or open)")
 	cmd.Flags().String("destination-unconfirmed", "", "set destination_unconfirmed (true/false)")
 	cmd.Flags().String("blocked-by", "", "set blocked_by (comma-separated whole-epic tokens, e.g. other or project:other)")

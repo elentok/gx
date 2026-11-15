@@ -40,7 +40,7 @@ func show(t *testing.T, f rigs.DesignsFixture) wire.TriageView {
 
 func TestView_ExposesTheActionsThatTakeAnEpic(t *testing.T) {
 	f, _ := startViewFixture(t)
-	if got, want := show(t, f).EpicActions, []string{"ready", "area"}; !slices.Equal(got, want) {
+	if got, want := show(t, f).EpicActions, []string{"ready", "backlog"}; !slices.Equal(got, want) {
 		t.Fatalf("epic_actions = %v, want %v", got, want)
 	}
 }
@@ -62,13 +62,13 @@ func stepStates(v wire.TriageView) string {
 	return out
 }
 
-func TestView_DoneResultGroupsAreaRows(t *testing.T) {
+func TestView_DoneResultGroupsBacklogRows(t *testing.T) {
 	f, s := startViewFixture(t)
 	rec := mustRec(s.Create())
 	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrA, Verdict: "relevant"}))
 	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrB, Verdict: "fixed"}))
 	rec = mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
-		{RowID: addrA, Action: triagerec.ActionArea, Destination: "core"},
+		{RowID: addrA, Action: triagerec.ActionBacklog, Destination: "core"},
 		{RowID: addrB, Action: triagerec.ActionClose},
 	}, nil))
 	rec = mustRec(s.Approve(rec.ID, rec.Revision))
@@ -81,14 +81,14 @@ func TestView_DoneResultGroupsAreaRows(t *testing.T) {
 		t.Fatalf("no result: %+v", v)
 	}
 	for _, g := range v.Result.Groups {
-		if g.Action == triagerec.ActionArea {
+		if g.Action == triagerec.ActionBacklog {
 			if len(g.Items) != 1 {
-				t.Fatalf("area group = %+v", g)
+				t.Fatalf("backlog group = %+v", g)
 			}
 			return
 		}
 	}
-	t.Fatalf("no area group in %+v", v.Result.Groups)
+	t.Fatalf("no backlog group in %+v", v.Result.Groups)
 }
 
 func TestView_NoRecordIsNone(t *testing.T) {
@@ -124,7 +124,7 @@ func TestView_RecordAtEachStep(t *testing.T) {
 	}
 
 	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrB, Verdict: "fixed"}))
-	q := triagerec.Question{ID: "q1", Text: "Which area?\nmore detail", Kind: triagerec.QuestionAsk, Options: []string{"x", "y"}, Default: "x"}
+	q := triagerec.Question{ID: "q1", Text: "Which backlog?\nmore detail", Kind: triagerec.QuestionAsk, Options: []string{"x", "y"}, Default: "x"}
 	rec = mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
 		{RowID: addrA, Action: "ready", Fallback: "core", Questions: []triagerec.Question{q}},
 		{RowID: addrB, Action: "close", Destination: "fixed already"},
@@ -133,7 +133,7 @@ func TestView_RecordAtEachStep(t *testing.T) {
 	if v.StepNote != "" || v.RingPercent != 50 || stepStates(v) != "ddctt" || v.OpenQuestions != 1 || v.ActionCounts["ready"] != 1 || v.ActionCounts["close"] != 1 {
 		t.Fatalf("approve: %+v", v)
 	}
-	if got := v.Rows[0].Questions[0]; got.Title != "Which area?" || got.Body != "more detail" || got.Recommended != "x" {
+	if got := v.Rows[0].Questions[0]; got.Title != "Which backlog?" || got.Body != "more detail" || got.Recommended != "x" {
 		t.Fatalf("question = %+v", got)
 	}
 
@@ -175,7 +175,7 @@ func TestView_DesignQuestionsTravelAndAreNotAsked(t *testing.T) {
 	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrB, Verdict: "relevant"}))
 	design := triagerec.Question{ID: "d1", Text: "Which store?", Kind: triagerec.QuestionDesign}
 	mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
-		{RowID: addrA, Action: triagerec.ActionArea, Destination: "core", Questions: []triagerec.Question{design}},
+		{RowID: addrA, Action: triagerec.ActionBacklog, Destination: "core", Questions: []triagerec.Question{design}},
 		{RowID: addrB, Action: "close"},
 	}, nil))
 	v := show(t, f)
@@ -306,7 +306,7 @@ func TestView_OpenRoundAndFinalApproval(t *testing.T) {
 	if v := show(t, f); v.FinalApproval || v.OpenRound != nil {
 		t.Fatalf("route: %+v", v)
 	}
-	q := triagerec.Question{ID: "q1", RowID: addrA, Text: "Which area?", Kind: triagerec.QuestionAsk, Options: []string{"x", "y"}, Default: "x"}
+	q := triagerec.Question{ID: "q1", RowID: addrA, Text: "Which backlog?", Kind: triagerec.QuestionAsk, Options: []string{"x", "y"}, Default: "x"}
 	rec = mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
 		{RowID: addrA, Action: "ready", Fallback: "core", Questions: []triagerec.Question{q}},
 		{RowID: addrB, Action: "close"},
@@ -363,11 +363,11 @@ func TestView_SummaryCountsMovesAndWaiting(t *testing.T) {
 	rec := mustRec(s.Create())
 	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrA, Verdict: "relevant"}))
 	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrB, Verdict: "relevant"}))
-	rec = mustRec(s.SaveAreas(rec.ID, rec.Revision, []triagerec.Area{{Name: "core", Source: triagerec.AreaAgent}}))
-	rec = mustRec(s.SaveMoves(rec.ID, rec.Revision, []triagerec.MoveUnit{{OldEpic: "movable", Area: "core"}}))
+	rec = mustRec(s.SaveBacklogs(rec.ID, rec.Revision, []triagerec.Backlog{{Name: "core", Source: triagerec.BacklogAgent}}))
+	rec = mustRec(s.SaveMoves(rec.ID, rec.Revision, []triagerec.MoveUnit{{OldEpic: "movable", Backlog: "core"}}))
 	v := show(t, f)
 	wantWait := "waiting: stuck holds claimed proj:stuck/10"
-	if m := v.Summary.Moves; len(m) != 1 || m[0].OldEpic != "movable" || m[0].Area != "core" || m[0].State != "pending" {
+	if m := v.Summary.Moves; len(m) != 1 || m[0].OldEpic != "movable" || m[0].Backlog != "core" || m[0].State != "pending" {
 		t.Fatalf("moves = %+v", m)
 	}
 	if w := v.Summary.Waiting; len(w) != 1 || w[0] != wantWait {
@@ -375,11 +375,11 @@ func TestView_SummaryCountsMovesAndWaiting(t *testing.T) {
 	}
 
 	mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
-		{RowID: addrA, Action: triagerec.ActionArea, Destination: "core"},
+		{RowID: addrA, Action: triagerec.ActionBacklog, Destination: "core"},
 		{RowID: addrB, Action: "close"},
 	}, nil))
 	v = show(t, f)
-	if v.Summary.Actions["area"] != 1 || v.Summary.Actions["close"] != 1 || v.Summary.Areas["core"] != 1 {
+	if v.Summary.Actions["backlog"] != 1 || v.Summary.Actions["close"] != 1 || v.Summary.Backlogs["core"] != 1 {
 		t.Fatalf("summary = %+v", v.Summary)
 	}
 }

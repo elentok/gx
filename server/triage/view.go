@@ -169,7 +169,7 @@ func buildView(project string, rec *triagerec.Record) wire.TriageView {
 		EpicActions: triagerec.EpicActions,
 		History:     []wire.TriageHistoryItem{},
 		Summary: &wire.TriageSummary{
-			Actions: map[string]int{}, Areas: map[string]int{}, Moves: []wire.TriageMove{}, Waiting: []string{},
+			Actions: map[string]int{}, Backlogs: map[string]int{}, Moves: []wire.TriageMove{}, Waiting: []string{},
 		},
 	}
 	if rec == nil {
@@ -187,7 +187,7 @@ func buildView(project string, rec *triagerec.Record) wire.TriageView {
 	for _, m := range rec.Moves {
 		can := CanRetryMove(isLive, rec.Step, m)
 		v.Summary.Moves = append(v.Summary.Moves, wire.TriageMove{
-			OldEpic: m.OldEpic, Area: m.Area, State: string(m.State), LastError: m.LastError,
+			OldEpic: m.OldEpic, Backlog: m.Backlog, State: string(m.State), LastError: m.LastError,
 			CanRetry: can, CanKeep: can,
 		})
 	}
@@ -210,8 +210,8 @@ func buildView(project string, rec *triagerec.Record) wire.TriageView {
 		}
 		if action, dest := r.Effective(); action != "" {
 			v.Summary.Actions[action]++
-			if action == triagerec.ActionArea && dest != "" {
-				v.Summary.Areas[dest]++
+			if action == triagerec.ActionBacklog && dest != "" {
+				v.Summary.Backlogs[dest]++
 			}
 		}
 		if r.Verdict != "" {
@@ -342,7 +342,7 @@ func wireQuestion(q triagerec.Question) wire.TriageQuestion {
 // resultOf groups the settled rows of rec by their action. A row counts once
 // it is written or kept.
 func resultOf(rec *triagerec.Record) wire.TriageResult {
-	order := []string{triagerec.ActionReady, triagerec.ActionArea, "merge", triagerec.ActionClose, "keep"}
+	order := []string{triagerec.ActionReady, triagerec.ActionBacklog, "merge", triagerec.ActionClose, "keep"}
 	by := map[string][]wire.TriageResultItem{}
 	res := wire.TriageResult{Groups: []wire.TriageResultGroup{}}
 	for _, r := range rec.Rows {
@@ -352,7 +352,7 @@ func resultOf(rec *triagerec.Record) wire.TriageResult {
 		}
 		item := wire.TriageResultItem{Address: r.Address, Title: r.Title}
 		switch row.Action {
-		case triagerec.ActionReady, triagerec.ActionArea:
+		case triagerec.ActionReady, triagerec.ActionBacklog:
 			item.Target = epicOf(r.FirstAddress())
 			if row.Action == triagerec.ActionReady && res.ReadyEpic == "" {
 				res.ReadyEpic = item.Target
