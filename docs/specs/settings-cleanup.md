@@ -387,17 +387,17 @@ New flows and scenarios to write (these become implementation tickets):
 
 **Mock states** (11 approved). The fixture is the `settings` scenario for every state (extended as above).
 
-- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, state `desktop-sidebar`, width 900, scenario `settings`, parts: sidebar, scope-picker, search.
-- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, state `desktop-sidebar-account`, width 900, scenario `settings`, parts: sidebar, scope-picker, search, sign-out.
-- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, state `phone-home`, width 390, scenario `settings`, parts: phone-home, sign-out.
-- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, state `phone-section`, width 390, scenario `settings`, parts: phone-section, group-cpu, group-process.
-- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, state `project-scope`, width 900, scenario `settings`, parts: sidebar, scope-picker, search, override-note.
-- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, state `section-with-groups`, width 900, scenario `settings`, parts: sidebar, scope-picker, search, group-agent-limits, group-waiting-and-stalled-agents.
-- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, state `search-results`, width 900, scenario `settings`, parts: sidebar, scope-picker, search.
-- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/03-models-section-mock.html`, state `desktop-global`, width 900, scenario `settings`, parts: sidebar, group-claude, group-codex, tier-light, tier-standard, tier-strongest, cell.
-- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/03-models-section-mock.html`, state `desktop-project`, width 900, scenario `settings`, parts: sidebar, override-note, group-claude, group-codex, tier-light, tier-standard, tier-strongest, cell.
-- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/03-models-section-mock.html`, state `phone-global`, width 390, scenario `settings`, parts: group-claude, tier-light, tier-standard, tier-strongest, cell.
-- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/03-models-section-mock.html`, state `phone-project`, width 390, scenario `settings`, parts: group-claude, tier-light, tier-standard, tier-strongest, cell.
+- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, `desktop-sidebar`, width 900, scenario `settings`, parts: sidebar, scope-picker, search.
+- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, `desktop-sidebar-account`, width 900, scenario `settings`, parts: sidebar, scope-picker, search, sign-out.
+- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, `phone-home`, width 390, scenario `settings`, parts: phone-home, sign-out.
+- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, `phone-section`, width 390, scenario `settings`, parts: phone-section, group-cpu, group-process.
+- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, `project-scope`, width 900, scenario `settings`, parts: sidebar, scope-picker, search, override-note.
+- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, `section-with-groups`, width 900, scenario `settings`, parts: sidebar, scope-picker, search, group-agent-limits, group-waiting-and-stalled-agents.
+- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/02-sidebar-layout-mock.html`, `search-results`, width 900, scenario `settings`, parts: sidebar, scope-picker, search.
+- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/03-models-section-mock.html`, `desktop-global`, width 900, scenario `settings`, parts: sidebar, group-claude, group-codex, tier-light, tier-standard, tier-strongest, cell.
+- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/03-models-section-mock.html`, `desktop-project`, width 900, scenario `settings`, parts: sidebar, override-note, group-claude, group-codex, tier-light, tier-standard, tier-strongest, cell.
+- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/03-models-section-mock.html`, `phone-global`, width 390, scenario `settings`, parts: group-claude, tier-light, tier-standard, tier-strongest, cell.
+- `/Users/david/.local/share/gx/tickets/gx/settings-cleanup/mocks/03-models-section-mock.html`, `phone-project`, width 390, scenario `settings`, parts: group-claude, tier-light, tier-standard, tier-strongest, cell.
 
 ## Out of Scope
 
