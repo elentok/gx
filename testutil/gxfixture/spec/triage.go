@@ -283,14 +283,13 @@ func TriageScenario(shape string) (Scenario, bool) {
 			}}}
 		})
 	case "journey":
-		// Verify takes two sessions; at Write the first and fifth rows fail once before their move and the second once after it.
+		// Verify takes two sessions, no area exists, and the plan's ready rows are 01 and 04: at Write the first fails once before its move and the fourth once after it.
 		return with(func(sc *Scenario) {
 			sc.Epics = []Epic{followUps(project, 3, 2)}
 			sc.TriageAgent = &triageplay.Config{
-				LegacyPlan:     true,
 				VerifyBatch:    3,
-				FailBeforeMove: []string{project + ":" + tickets.FollowUpsEpic + "/01", project + ":" + tickets.FollowUpsEpic + "/05"},
-				FailAfterMove:  []string{project + ":" + tickets.FollowUpsEpic + "/02"},
+				FailBeforeMove: []string{project + ":" + tickets.FollowUpsEpic + "/01"},
+				FailAfterMove:  []string{project + ":" + tickets.FollowUpsEpic + "/04"},
 			}
 		})
 	}

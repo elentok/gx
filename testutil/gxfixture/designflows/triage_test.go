@@ -235,51 +235,34 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 	r := startWith(t, "triage", nil, "--shape", "journey", "--auto-advance-delay", "100ms")
 	r.Gx(t, "server", "triage", "open", project)
 
-	// Verify takes two sessions: the fake saves three verdicts per session.
-	verified := func(v wire.TriageView) int {
-		n := 0
-		for _, row := range v.Rows {
-			if row.Verdict != "" {
-				n++
-			}
-		}
-		return n
-	}
-	r.waitTriage(t, "the first Verify batch", func(v wire.TriageView) bool { return verified(v) == 3 })
-	v := r.waitTriage(t, "Route to end at Questions", func(v wire.TriageView) bool { return currentStep(v) == "questions" && v.OpenQuestions == 2 })
-	if verified(v) != 5 || len(v.ActionCounts) != 5 {
-		t.Errorf("at Approve: %d verdicts and action groups %v, want 5 and all five actions", verified(v), v.ActionCounts)
+	// Verify takes two sessions: the fake saves three verdicts per session. With
+	// no area seeded, Route proposes one and round 1 waits on three questions.
+	v := r.waitTriage(t, "Route to end at Questions", func(v wire.TriageView) bool {
+		return currentStep(v) == "questions" && v.OpenRound != nil
+	})
+	if v.OpenRound.Questions != 3 {
+		t.Errorf("round 1 holds %d questions, want the new-area question and two asks", v.OpenRound.Questions)
 	}
 
-	// Answer every open question, then approve. Plan's session prints its run-end
-	// line after the last save: a person approving before it ends would also
-	// see the countdown advance that session into Write.
+	// Answer the round and approve with the CLI. A person approving before the
+	// session ends would also see the countdown advance that session into Write.
 	r.waitNoSession(t)
-	for _, row := range v.Rows {
-		var args []string
-		for _, q := range row.Questions {
-			answer := "ok" // a design question takes any text; a quick one needs one of its options
-			if len(q.Options) > 0 {
-				answer = q.Options[0]
-			}
-			args = append(args, "--answer", q.ID+"="+answer)
-		}
-		if len(args) == 0 {
-			continue
-		}
-		r.Gx(t, append([]string{"tickets", "triage", "row", "--project", project, "--row", row.Address, "--revision", fmt.Sprint(r.triageView(t).Revision)}, args...)...)
+	rev := func() string { return fmt.Sprint(r.triageView(t).Revision) }
+	r.Gx(t, "tickets", "triage", "answer", "--project", project, "--question", triageplay.NewAreaQuestionID, "--answer", "Create "+triageplay.NewArea)
+	r.Gx(t, "tickets", "triage", "area", "--project", project, "--name", triageplay.NewArea, "--source", "agent", "--confirm")
+	for _, id := range []string{"q1", "q4"} {
+		r.Gx(t, "tickets", "triage", "answer", "--project", project, "--question", id, "--answer", "parser")
 	}
-	v = r.waitTriage(t, "no open question", func(v wire.TriageView) bool { return v.OpenQuestions == 0 })
-	r.Gx(t, "tickets", "triage", "approve", "--project", project, "--revision", fmt.Sprint(v.Revision))
+	r.Gx(t, "tickets", "triage", "approve", "--project", project, "--revision", rev())
 	// The CLI approve starts nothing: the chat runs Write itself, so open a session at step write.
 	r.Gx(t, "server", "triage", "open", project, "--new")
 
-	// The Write session leaves the scripted rows failed and the rest done: the
-	// first fails before its move and the second after it. The fifth is a keep
-	// in the plan, so its scripted failure never fires.
+	// The Write session leaves the scripted rows failed: the first fails before
+	// its move and the fourth after it. The row filed under the new area is
+	// written without a move.
 	failedRows := map[string]string{
 		project + ":follow-ups/01": triageplay.RefusalBeforeMove,
-		project + ":follow-ups/02": triageplay.RefusalAfterMove,
+		project + ":follow-ups/04": triageplay.RefusalAfterMove,
 	}
 	v = r.waitTriage(t, "the Write session to end", func(v wire.TriageView) bool {
 		failed, written := 0, 0

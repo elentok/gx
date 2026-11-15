@@ -248,6 +248,41 @@ func TestTriagePlayer_TypedMessagesRunTheirVerbs(t *testing.T) {
 	}
 }
 
+func TestTriagePlayer_ARoundPromptAnswersItsLinesAndRunsItsNote(t *testing.T) {
+	t.Parallel()
+	s := newStub(t, Config{}, triage.BranchQuestions, questionsRecord())
+	s.player.Typed = "Q1 - row: a\nQ2 - row: b\n\nNote:\nMove row 2 to webui"
+	if _, err := s.player.Play(); err != nil {
+		t.Fatal(err)
+	}
+	// q1 is answered already, so only q2 is saved.
+	for _, call := range []string{
+		"triage answer --project p --question q2 --answer b",
+		"triage correct --project p --row p:follow-ups/02 --action area --destination webui",
+	} {
+		if s.count(t, call) != 1 {
+			t.Errorf("calls = %q, want %q once", s.calls(t), call)
+		}
+	}
+	if s.count(t, "triage answer --project p --question q1") != 0 {
+		t.Errorf("calls = %q, want the answered q1 left alone", s.calls(t))
+	}
+}
+
+func TestTriagePlayer_TheFinalCardYesApproves(t *testing.T) {
+	t.Parallel()
+	rec := questionsRecord()
+	rec.Rounds[0].Answers["q2"] = "b"
+	s := newStub(t, Config{}, triage.BranchQuestions, rec)
+	s.player.Typed = "Q1 - Write this plan?: Yes, write it"
+	if _, err := s.player.Play(); err != nil {
+		t.Fatal(err)
+	}
+	if s.count(t, "triage approve --project p --revision 7") != 1 {
+		t.Errorf("calls = %q, want one approve", s.calls(t))
+	}
+}
+
 func TestTriagePlayer_AnsweringTheNewAreaQuestionConfirmsTheArea(t *testing.T) {
 	t.Parallel()
 	s := newStub(t, Config{}, triage.BranchQuestions, questionsRecord())

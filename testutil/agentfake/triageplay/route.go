@@ -144,9 +144,6 @@ func closestArea(areas []string) string {
 
 // route saves the area proposal and the plan, then prints the summary card.
 func (p *Player) route(rec *triage.Record) (string, error) {
-	if p.Config.LegacyPlan {
-		return p.legacyPlan(rec)
-	}
 	if _, err := p.gx("", "agent", "step", tickets.StepRoute); err != nil {
 		return "", err
 	}
@@ -234,49 +231,6 @@ func (p *Player) oldEpicMoves(areas []string) ([]string, error) {
 	}
 	_, err = p.triage(string(body), "moves")
 	return lines, err
-}
-
-// legacyPlan is Route as the journey flow still expects it: one action per row
-// from a fixed list, two ask questions on the first row and a design question
-// on the second.
-func (p *Player) legacyPlan(rec *triage.Record) (string, error) {
-	if _, err := p.gx("", "agent", "step", tickets.StepPlan); err != nil {
-		return "", err
-	}
-	actions := []string{"ready", "map", "merge", "close", "keep"}
-	var plan []triage.PlanRow
-	for i, r := range rec.Rows {
-		row := triage.PlanRow{RowID: r.Address, Action: actions[i%len(actions)]}
-		switch row.Action {
-		case "ready":
-			row.Destination = triageReadyEpic
-		case "map":
-			row.Destination = triageMapEpic
-		case "merge":
-			row.Destination = rec.Rows[0].Address
-		case "close":
-			row.Destination = "obsolete"
-		}
-		switch i {
-		case 0:
-			row.Fallback = NewArea
-			row.Questions = []triage.Question{
-				{ID: "q1", Text: "Fix it in the parser or the caller?", Kind: triage.QuestionAsk, Options: []string{"parser", "caller"}, Default: "parser"},
-				{ID: "q2", Text: "Keep the old flag?", Kind: triage.QuestionAsk, Options: []string{"yes", "no"}, Default: "no"},
-			}
-		case 1:
-			row.Questions = []triage.Question{{ID: "d1", Text: "Which store should it use?", Kind: triage.QuestionDesign}}
-		}
-		plan = append(plan, row)
-	}
-	body, err := json.Marshal(plan)
-	if err != nil {
-		return "", err
-	}
-	if _, err := p.triage(string(body), "plan"); err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("✅ plan: %d rows planned. Next: approve the plan in the web plan view", len(rec.Rows)), nil
 }
 
 func bucket(r triage.Row) string {
@@ -448,8 +402,76 @@ func (p *Player) nextRound(rec *triage.Record, areas []string) []triage.Question
 	return qs
 }
 
+// roundLineRe is one answered question line of the prompt the page sends for a
+// round: "Q<label> - <title>: <answer>". An unanswered one reads "(unanswered)".
+var roundLineRe = regexp.MustCompile(`^Q(\d+) - .*: (.+)$`)
+
+// noteMarker starts the round's note, which is how a person types a phrase
+// while a round is open.
+const noteMarker = "\n\nNote:\n"
+
+// reactRound answers a round the page sent: each answered line, then the note
+// as a typed phrase. ok is false for a message that is no round prompt.
+func (p *Player) reactRound(rec *triage.Record) (string, bool, error) {
+	body, note, _ := strings.Cut(strings.TrimSpace(p.Typed), noteMarker)
+	var replies []string
+	found := false
+	for line := range strings.SplitSeq(body, "\n") {
+		m := roundLineRe.FindStringSubmatch(strings.TrimSpace(line))
+		if m == nil || m[2] == "(unanswered)" {
+			continue
+		}
+		found = true
+		n, _ := strconv.Atoi(m[1])
+		reply, err := p.answerLine(rec, n, m[2])
+		if err != nil {
+			return "", true, err
+		}
+		replies = append(replies, reply)
+	}
+	if !found && note == "" {
+		return "", false, nil
+	}
+	if note != "" {
+		v, err := p.show()
+		if err != nil {
+			return "", true, err
+		}
+		p.Typed = note
+		reply, err := p.react(v.Record)
+		if err != nil {
+			return "", true, err
+		}
+		replies = append(replies, reply)
+	}
+	return strings.Join(replies, "\n\n"), true, nil
+}
+
+// answerLine answers question n of the open round with a chosen label; with no
+// open round it is the final "Write this plan?" card.
+func (p *Player) answerLine(rec *triage.Record, n int, label string) (string, error) {
+	i, _, open := rec.OpenRound()
+	if !open {
+		if label == "Yes, write it" {
+			return p.approve(rec)
+		}
+		return "Nothing is written until you say yes.", nil
+	}
+	qs := rec.Rounds[i].Questions
+	if n < 1 || n > len(qs) {
+		return fmt.Sprintf("There is no question %d.", n), nil
+	}
+	if rec.Rounds[i].Answers[qs[n-1].ID] != "" {
+		return "", nil
+	}
+	return p.answer(rec, qs[n-1].ID, label)
+}
+
 // react answers a typed message.
 func (p *Player) react(rec *triage.Record) (string, error) {
+	if reply, ok, err := p.reactRound(rec); ok || err != nil {
+		return reply, err
+	}
 	text := strings.TrimSpace(p.Typed)
 	areas := p.areas()
 	switch m := moveRe.FindStringSubmatch(text); {
