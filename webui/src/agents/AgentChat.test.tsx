@@ -461,6 +461,13 @@ test("a tools entry shows its count and each call", async () => {
   }
   render(session(), chat({ messages: [tools] }))
   expect(await screen.findByText(/2 tool calls · last: Read/)).toBeTruthy()
+  // Closed, the lines are not mounted (a long chat has hundreds); opening the run mounts them.
+  expect(screen.queryByText("Bash: ls -la")).toBeNull()
+  const details = screen.getByTestId("tool-calls") as HTMLDetailsElement
+  act(() => {
+    details.open = true
+    details.dispatchEvent(new Event("toggle"))
+  })
   expect(screen.getByText("Bash: ls -la")).toBeTruthy()
   expect(screen.getByText("Read: /x/a.go")).toBeTruthy()
 })

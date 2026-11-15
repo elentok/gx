@@ -29,15 +29,27 @@ export type FileLinkContextValue = {
 }
 
 const FileLinkCtx = createContext<FileLinkContextValue | null>(null)
+// Whether links are on at all. The value above changes with every verdict batch, so a component that only
+// needs to know "links on or off" (Markdown) reads this stable flag and does not re-parse on each batch.
+const FileLinksOnCtx = createContext(false)
 
 /** Null without a provider: callers then render exactly as before. */
 export function useFileLinks() {
   return useContext(FileLinkCtx)
 }
 
+/** True inside a provider (and outside a NoFileLinks). Unlike useFileLinks it never changes with verdicts. */
+export function useFileLinksOn() {
+  return useContext(FileLinksOnCtx)
+}
+
 /** Keeps its children plain text inside a provider, e.g. a link cannot nest in a button. */
 export function NoFileLinks({ children }: { children: ReactNode }) {
-  return <FileLinkCtx.Provider value={null}>{children}</FileLinkCtx.Provider>
+  return (
+    <FileLinksOnCtx.Provider value={false}>
+      <FileLinkCtx.Provider value={null}>{children}</FileLinkCtx.Provider>
+    </FileLinksOnCtx.Provider>
+  )
 }
 
 export type FileLinkProviderProps = {
@@ -136,7 +148,11 @@ export function FileLinkProvider({
       file,
     }
   }, [register, verdicts, missing, markMissing, recheck, file])
-  return <FileLinkCtx.Provider value={value}>{children}</FileLinkCtx.Provider>
+  return (
+    <FileLinksOnCtx.Provider value={true}>
+      <FileLinkCtx.Provider value={value}>{children}</FileLinkCtx.Provider>
+    </FileLinksOnCtx.Provider>
+  )
 }
 
 /** Registers a candidate while the caller is mounted and returns its verdict if found. */

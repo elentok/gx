@@ -1,6 +1,6 @@
 import { type ReactNode, useMemo } from "react"
 import { FileLink } from "./FileLink"
-import { useFileLinks, useFoundFile } from "./FileLinkContext"
+import { useFileLinksOn, useFoundFile } from "./FileLinkContext"
 import { detectPaths, type PathCandidate } from "./paths"
 
 function Candidate({ hit, text }: { hit: PathCandidate; text: string }) {
@@ -16,7 +16,7 @@ function Candidate({ hit, text }: { hit: PathCandidate; text: string }) {
 
 /** Plain text in which the paths the server found become file links. Everything else stays text. */
 export function LinkedText({ children }: { children: string }) {
-  const active = useFileLinks() !== null
+  const active = useFileLinksOn()
   const hits = useMemo(() => (active ? detectPaths(children) : []), [active, children])
   if (hits.length === 0) return <>{children}</>
   const parts: ReactNode[] = []

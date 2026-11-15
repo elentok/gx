@@ -67,6 +67,14 @@ describe("file links in the chat", () => {
       </FileLinkProvider>,
     )
     await settle()
+    // The tool lines mount when their run is opened.
+    expect(hrefs(container)).toHaveLength(2)
+    const details = container.querySelector("[data-testid=tool-calls]") as HTMLDetailsElement
+    act(() => {
+      details.open = true
+      details.dispatchEvent(new Event("toggle"))
+    })
+    await settle()
     const wanted = "#/files/abs/server/files/handler.go"
     expect(hrefs(container)).toEqual([wanted, wanted, wanted, wanted])
     expect(container.textContent).toContain("nope/x.go")

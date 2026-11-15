@@ -26,6 +26,9 @@ const KIND_NAMES: Record<string, string> = {
 
 const MAX_THUMBS = 3
 
+/** How many of the newest messages a chat mounts; "Show earlier" adds this many more. */
+const CHAT_WINDOW = 60
+
 // Layout by tile count (thumbnails plus the "+N" tile): the first of three takes the left column; four make a square.
 const GRID_LAYOUT: Record<
   number,
@@ -223,40 +226,51 @@ const withoutAsks = (text: string) =>
     .join("\n\n")
 
 // A run of tool calls, folded: the count in the summary, one line per call (shell commands, files) when opened.
+// The lines mount only once the run is opened: a closed <details> still keeps its children in the DOM, and a
+// long chat has hundreds of calls (each line also queues file lookups).
 function ToolCalls({ m }: { m: SessionChatMessage }) {
+  const [open, setOpen] = useState(false)
   const calls = m.calls ?? []
   const n = m.tool_count ?? calls.length
   return (
-    <Box as="details" fontSize="xs" color="text.dim" data-testid="tool-calls">
+    <Box
+      as="details"
+      fontSize="xs"
+      color="text.dim"
+      data-testid="tool-calls"
+      onToggle={(e) => setOpen((e.currentTarget as unknown as HTMLDetailsElement).open)}
+    >
       <Box as="summary" cursor="pointer">
         {n === 1 ? "1 tool call" : `${n} tool calls`}
         {m.last_tool ? ` · last: ${m.last_tool}` : ""}
       </Box>
-      <Box
-        as="ul"
-        listStyleType="none"
-        m="0"
-        mt="1"
-        p="0"
-        fontFamily="mono"
-        display="flex"
-        flexDirection="column"
-        gap="0.5"
-      >
-        {calls.map((c, i) => (
-          <Box
-            as="li"
-            key={i}
-            whiteSpace="pre-wrap"
-            wordBreak="break-all"
-            borderInlineStart="2px solid"
-            borderColor="border"
-            px="2.5"
-          >
-            <LinkedText>{c}</LinkedText>
-          </Box>
-        ))}
-      </Box>
+      {open && (
+        <Box
+          as="ul"
+          listStyleType="none"
+          m="0"
+          mt="1"
+          p="0"
+          fontFamily="mono"
+          display="flex"
+          flexDirection="column"
+          gap="0.5"
+        >
+          {calls.map((c, i) => (
+            <Box
+              as="li"
+              key={i}
+              whiteSpace="pre-wrap"
+              wordBreak="break-all"
+              borderInlineStart="2px solid"
+              borderColor="border"
+              px="2.5"
+            >
+              <LinkedText>{c}</LinkedText>
+            </Box>
+          ))}
+        </Box>
+      )}
     </Box>
   )
 }
@@ -537,8 +551,18 @@ export function ChatMessages({
     decoded?.sessionId === sessionId && decoded.conversationId === conversationId
       ? decoded.messages
       : chat.messages
+  // Only the newest messages are mounted: a long chat is 100k+ DOM nodes otherwise. "Show earlier" grows the
+  // window; a new conversation starts small again.
+  const windowKey = `${sessionId}|${conversationId}`
+  const [more, setMore] = useState<{ key: string; limit: number }>({
+    key: windowKey,
+    limit: CHAT_WINDOW,
+  })
+  const limit = more.key === windowKey ? more.limit : CHAT_WINDOW
+  const hiddenCount = Math.max(0, messages.length - limit)
+  const shownMessages = hiddenCount > 0 ? messages.slice(hiddenCount) : messages
   return (
-    <ChatScroller key={`${sessionId}|${conversationId}`} top={top}>
+    <ChatScroller key={windowKey} top={top}>
       {head}
       {messages.length === 0 && (
         <CodexNotices
@@ -552,8 +576,24 @@ export function ChatMessages({
           Earlier messages hidden
         </Text>
       )}
-      {messages.map((m, i) => (
-        <Entry key={m.id || i} m={m} showTools={showTools} sessionId={sessionId} hideAsks={top} />
+      {hiddenCount > 0 && (
+        <Box alignSelf="center">
+          <Button
+            emphasis="secondary"
+            onClick={() => setMore({ key: windowKey, limit: limit + CHAT_WINDOW })}
+          >
+            Show {Math.min(hiddenCount, CHAT_WINDOW)} earlier messages ({hiddenCount} hidden)
+          </Button>
+        </Box>
+      )}
+      {shownMessages.map((m, i) => (
+        <Entry
+          key={m.id || hiddenCount + i}
+          m={m}
+          showTools={showTools}
+          sessionId={sessionId}
+          hideAsks={top}
+        />
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
       {tail}

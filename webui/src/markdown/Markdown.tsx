@@ -3,7 +3,7 @@ import { memo, type ReactNode, useMemo } from "react"
 import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { FileLink } from "../files/FileLink"
-import { useFileLinks, useFoundFile } from "../files/FileLinkContext"
+import { useFileLinks, useFileLinksOn, useFoundFile } from "../files/FileLinkContext"
 import { MermaidDiagram } from "../files/MermaidDiagram"
 import { detectPaths } from "../files/paths"
 import { rawUrl } from "../files/rawUrl"
@@ -197,7 +197,8 @@ export const Markdown = memo(function Markdown({
   /** A hover card body: relative images show their alt text. */
   card?: boolean
 } & BoxProps) {
-  const files = useFileLinks() !== null
+  // Not useFileLinks(): its value changes with every verdict batch and would re-parse every message.
+  const files = useFileLinksOn()
   const components = useMemo(
     () => buildComponents(epic, files, !!card, onDiagramSettled),
     [epic, files, card, onDiagramSettled],
