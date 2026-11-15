@@ -1,5 +1,5 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { Fragment, useEffect, useState } from "react"
+import { Fragment, useState, type ReactNode } from "react"
 import { Link } from "react-router"
 import type { SettingsCategory, SettingsEntry } from "../generated/server"
 import { SETTINGS_HREF } from "../hrefs"
@@ -119,26 +119,64 @@ function Sidebar({
       ? groupBySection(searchEntries(entries, query)).map((g) => [g.section, g.entries.length])
       : groupBySection(entries).map((g) => [g.section, g.changed]),
   )
-  const changed = counts
   const shown = searching
     ? categories
         .map((c) => ({ ...c, sections: c.sections.filter((s) => (counts.get(s.name) ?? 0) > 0) }))
         .filter((c) => c.sections.length > 0)
     : categories
   const current = treeSections(categories).find((s) => s.name === section)?.category
-  // A click's choice wins over the default (only the current category open) until the section changes.
-  const [toggled, setToggled] = useState<Record<string, boolean>>({})
-  useEffect(() => {
-    if (current !== undefined) setToggled((t) => ({ ...t, [current]: true }))
-  }, [current, section])
-  const isOpen = (name: string) => searching || (toggled[name] ?? name === current)
-  const toggle = (name: string) => setToggled((t) => ({ ...t, [name]: !isOpen(name) }))
-  const heading = (name: string, count: number) => (
+  // Only the user's clicks are stored; they win over the default (the current category open) until the section changes.
+  const [overrides, setOverrides] = useState<{ section?: string; open: Record<string, boolean> }>({
+    open: {},
+  })
+  const open = overrides.section === section ? overrides.open : {}
+  const isOpen = (name: string) => searching || (open[name] ?? name === current)
+  const toggle = (name: string) =>
+    setOverrides({ section, open: { ...open, [name]: !isOpen(name) } })
+  return (
+    <chakra.nav data-mock-part="sidebar" display="grid" gap="0.5" alignSelf="start">
+      <ScopePicker projects={projects} project={project} onScope={onScope} />
+      <SearchBox value={query} onChange={onQuery} />
+      <CategoryNav
+        categories={shown}
+        counts={counts}
+        project={project}
+        section={section}
+        searching={searching}
+        isOpen={isOpen}
+        toggle={toggle}
+      />
+      {project === undefined && !searching && (
+        <AccountNav
+          isOpen={isOpen(ACCOUNT)}
+          onToggle={() => toggle(ACCOUNT)}
+          totpOn={totpOn}
+          authenticatorMissing={authenticatorMissing}
+          onSignOut={onSignOut}
+        />
+      )}
+    </chakra.nav>
+  )
+}
+
+function NavHeading({
+  name,
+  count,
+  open,
+  showCount,
+  onToggle,
+}: {
+  name: string
+  count: number
+  open: boolean
+  showCount: boolean
+  onToggle: () => void
+}) {
+  return (
     <chakra.button
-      key={name}
       type="button"
-      aria-expanded={isOpen(name)}
-      onClick={() => toggle(name)}
+      aria-expanded={open}
+      onClick={onToggle}
       {...navLink}
       color="text.muted"
       fontSize="xs"
@@ -147,69 +185,99 @@ function Sidebar({
       textAlign="left"
     >
       <span>
-        <Caret open={isOpen(name)} />
+        <Caret open={open} />
         {name}
       </span>
-      {(searching || !isOpen(name)) && count > 0 && <CountChip n={count} />}
+      {showCount && count > 0 && <CountChip n={count} />}
     </chakra.button>
   )
+}
+
+/** The collapsible categories and their section links; `counts` are changed counts, or hit counts while searching. */
+function CategoryNav({
+  categories,
+  counts,
+  project,
+  section,
+  searching,
+  isOpen,
+  toggle,
+}: {
+  categories: SettingsCategory[]
+  counts: Map<string, number>
+  project?: string
+  section?: string
+  searching: boolean
+  isOpen: (name: string) => boolean
+  toggle: (name: string) => void
+}) {
+  return categories.map((c) => (
+    <Fragment key={c.name}>
+      <NavHeading
+        name={c.name}
+        count={c.sections.reduce((n, s) => n + (counts.get(s.name) ?? 0), 0)}
+        open={isOpen(c.name)}
+        showCount={searching || !isOpen(c.name)}
+        onToggle={() => toggle(c.name)}
+      />
+      {isOpen(c.name) &&
+        c.sections.map((s) => (
+          <NavLink
+            key={s.slug}
+            to={sectionPath(s.slug, project)}
+            {...navLink}
+            pl="6"
+            aria-current={s.name === section ? "page" : undefined}
+            {...(s.name === section && {
+              bg: "tone.running.bg",
+              color: "tone.running.fg",
+            })}
+          >
+            {s.name}
+            {(counts.get(s.name) ?? 0) > 0 && <CountChip n={counts.get(s.name) ?? 0} />}
+          </NavLink>
+        ))}
+    </Fragment>
+  ))
+}
+
+/** The global-only Account block: links to the account pages and sign out. */
+function AccountNav({
+  isOpen,
+  onToggle,
+  totpOn,
+  authenticatorMissing,
+  onSignOut,
+}: Pick<ShellProps, "totpOn" | "authenticatorMissing" | "onSignOut"> & {
+  isOpen: boolean
+  onToggle: () => void
+}) {
   return (
-    <chakra.nav data-mock-part="sidebar" display="grid" gap="0.5" alignSelf="start">
-      <ScopePicker projects={projects} project={project} onScope={onScope} />
-      <SearchBox value={query} onChange={onQuery} />
-      {shown.map((c) => (
-        <Fragment key={c.name}>
-          {heading(
-            c.name,
-            c.sections.reduce((n, s) => n + (changed.get(s.name) ?? 0), 0),
-          )}
-          {isOpen(c.name) &&
-            c.sections.map((s) => (
-              <NavLink
-                key={s.slug}
-                to={sectionPath(s.slug, project)}
-                {...navLink}
-                pl="6"
-                aria-current={s.name === section ? "page" : undefined}
-                {...(s.name === section && {
-                  bg: "tone.running.bg",
-                  color: "tone.running.fg",
-                })}
-              >
-                {s.name}
-                {(changed.get(s.name) ?? 0) > 0 && <CountChip n={changed.get(s.name) ?? 0} />}
-              </NavLink>
-            ))}
-        </Fragment>
-      ))}
-      {project === undefined && !searching && (
+    <>
+      <NavHeading name={ACCOUNT} count={0} open={isOpen} showCount={false} onToggle={onToggle} />
+      {isOpen && (
         <>
-          {heading(ACCOUNT, 0)}
-          {isOpen(ACCOUNT) && (
-            <>
-              <AccountLink href={`${SETTINGS_HREF}/logins`}>Web logins</AccountLink>
-              <AccountLink href={`${SETTINGS_HREF}/password`}>Password</AccountLink>
-              {totpOn && (
-                <AccountLink href={`${SETTINGS_HREF}/authenticator`}>
-                  {authenticatorMissing ? "Add authenticator" : "Authenticator"}
-                </AccountLink>
-              )}
-              <AccountLink href={`${SETTINGS_HREF}/certificate`}>Certificate</AccountLink>
-              <chakra.button
-                type="button"
-                onClick={onSignOut}
-                {...navLink}
-                pl="6"
-                color="tone.deadlocked.fg"
-                textAlign="left"
-              >
-                Sign out of this device
-              </chakra.button>
-            </>
+          <AccountLink href={`${SETTINGS_HREF}/logins`}>Web logins</AccountLink>
+          <AccountLink href={`${SETTINGS_HREF}/password`}>Password</AccountLink>
+          {totpOn && (
+            <AccountLink href={`${SETTINGS_HREF}/authenticator`}>
+              {authenticatorMissing ? "Add authenticator" : "Authenticator"}
+            </AccountLink>
           )}
+          <AccountLink href={`${SETTINGS_HREF}/certificate`}>Certificate</AccountLink>
+          <chakra.button
+            type="button"
+            onClick={onSignOut}
+            {...navLink}
+            pl="6"
+            color="tone.deadlocked.fg"
+            textAlign="left"
+          >
+            Sign out of this device
+          </chakra.button>
         </>
       )}
-    </chakra.nav>
+    </>
   )
 }
 
@@ -402,40 +470,57 @@ function SearchResults({
   ...rest
 }: ShellProps & { hits: SettingsEntry[]; query: string }) {
   const row = rowBuilder({ ...rest, highlight: query })
-  const categoryOf = new Map(treeSections(categories).map((s) => [s.name, s.category]))
+  return <SectionResults hits={hits} categories={categories} renderHit={(e) => row(e)} />
+}
+
+/** Hits split by section (with its category as a breadcrumb) and then by group; the caller renders each hit. Shared by the shell and the phone home. */
+export function SectionResults({
+  hits,
+  categories,
+  renderHit,
+}: {
+  hits: SettingsEntry[]
+  categories: SettingsCategory[]
+  /** `slug` is the hit's section slug. */
+  renderHit: (entry: SettingsEntry, slug: string) => ReactNode
+}) {
+  const sections = treeSections(categories)
   return (
     <>
-      {groupBySection(hits).map((g) => (
-        <Box key={g.section} mt="6" data-testid={`result-section-${g.section}`}>
-          <Box display="flex" alignItems="baseline" gap="2" px="1">
-            <Text as="h2" fontSize="md" fontWeight="700">
-              {g.section}
-            </Text>
-            <Text fontSize="xs" color="text.muted">
-              {categoryOf.get(g.section)}
-            </Text>
-          </Box>
-          {sectionGroups(categories, g.section, g.entries).map((grp) => (
-            <Box key={grp.name} mt="3">
-              {grp.name !== "" && (
-                <Text
-                  as="h3"
-                  fontSize="xs"
-                  letterSpacing="0.06em"
-                  textTransform="uppercase"
-                  color="text.muted"
-                  fontWeight="600"
-                  mb="1.5"
-                  px="1"
-                >
-                  {grp.name}
-                </Text>
-              )}
-              <Group>{grp.entries.map(row)}</Group>
+      {groupBySection(hits).map((g) => {
+        const section = sections.find((s) => s.name === g.section)
+        return (
+          <Box key={g.section} mt="6" data-testid={`result-section-${g.section}`}>
+            <Box display="flex" alignItems="baseline" gap="2" px="1">
+              <Text as="h2" fontSize="md" fontWeight="700">
+                {g.section}
+              </Text>
+              <Text fontSize="xs" color="text.muted">
+                {section?.category}
+              </Text>
             </Box>
-          ))}
-        </Box>
-      ))}
+            {sectionGroups(categories, g.section, g.entries).map((grp) => (
+              <Box key={grp.name} mt="3">
+                {grp.name !== "" && (
+                  <Text
+                    as="h3"
+                    fontSize="xs"
+                    letterSpacing="0.06em"
+                    textTransform="uppercase"
+                    color="text.muted"
+                    fontWeight="600"
+                    mb="1.5"
+                    px="1"
+                  >
+                    {grp.name}
+                  </Text>
+                )}
+                <Group>{grp.entries.map((e) => renderHit(e, section?.slug ?? ""))}</Group>
+              </Box>
+            ))}
+          </Box>
+        )
+      })}
     </>
   )
 }

@@ -1,6 +1,6 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { useState } from "react"
-import type { SettingsEntry } from "../generated/server"
+import type { SettingChange, SettingsEntry } from "../generated/server"
 import { useWrite } from "../useWrite"
 import { useDevice } from "../useWide"
 import { removeChange, setChange } from "./settingsApi"
@@ -41,12 +41,12 @@ function ModelCell({
     : ""
   const shown = project ? `global: ${inherited}` : `${agent} default`
   const faint = current === ""
+  const { refused, text: errorText } = writeErrorText(write, entry.key)
+  const run = (change: SettingChange) =>
+    void write.run(() => onWrite([change]), { onDone: () => setDraft(undefined) })
   // An empty field in a project removes the key; in global scope it writes "".
   const save = (value: unknown) =>
     run(project && value === "" ? removeChange(entry.key) : setChange(entry.key, value))
-  const { refused, text: errorText } = writeErrorText(write, entry.key)
-  const run = (change: Parameters<WriteSetting>[0][number]) =>
-    void write.run(() => onWrite([change]), { onDone: () => setDraft(undefined) })
   return (
     <Box
       as="td"

@@ -10,7 +10,7 @@ import {
   projectPath,
   ScopePicker,
   SectionBody,
-  sectionGroups,
+  SectionResults,
   sectionPath,
   SettingsShellView,
 } from "./SettingsShell"
@@ -83,68 +83,10 @@ const homePath = (picked: string) => {
   return project === undefined ? "/settings" : projectPath(project)
 }
 
-/** A phone search hit's section: its name with the category beside it, then its groups of hit links. */
-function HitRows({
-  entries,
-  categories,
-  query,
-  project,
-}: {
-  entries: SettingsEntry[]
-  categories: SettingsCategory[]
-  query: string
-  project?: string
-}) {
-  const sections = treeSections(categories)
-  return groupBySection(searchEntries(entries, query)).map((g) => {
-    const section = sections.find((s) => s.name === g.section)
-    return (
-      <Box key={g.section} mt="6" data-testid={`result-section-${g.section}`}>
-        <Box display="flex" alignItems="baseline" gap="2" px="1">
-          <Text as="h2" fontSize="md" fontWeight="700">
-            {g.section}
-          </Text>
-          <Text fontSize="xs" color="text.muted">
-            {section?.category}
-          </Text>
-        </Box>
-        {sectionGroups(categories, g.section, g.entries).map((grp) => (
-          <Box key={grp.name} mt="3">
-            {grp.name !== "" && (
-              <Text
-                as="h3"
-                fontSize="xs"
-                letterSpacing="0.06em"
-                textTransform="uppercase"
-                color="text.muted"
-                fontWeight="600"
-                mb="1.5"
-                px="1"
-              >
-                {grp.name}
-              </Text>
-            )}
-            <Group>
-              {grp.entries.map((e) => (
-                <LinkRow
-                  key={e.key}
-                  href={sectionHref(section?.slug ?? "", project)}
-                  label={entryLabel(e)}
-                  detail={e.description}
-                />
-              ))}
-            </Group>
-          </Box>
-        ))}
-      </Box>
-    )
-  })
-}
-
 /** The phone Settings home: scope picker, search, then every category with its sections as tiles. Account only in global scope. */
 export function SettingsHomeView({
   loginCount,
-  totpOn,
+  totpOn = false,
   authenticatorMissing = false,
   entries = [],
   categories = [],
@@ -154,7 +96,8 @@ export function SettingsHomeView({
   onSignOut,
 }: {
   loginCount?: number
-  totpOn: boolean
+  /** Account props: only the global home shows the Account block, so project pages omit them. */
+  totpOn?: boolean
   /** TOTP is on but the saved secret was cleared, so the row adds one instead of resetting it. */
   authenticatorMissing?: boolean
   /** The picked scope's settings, for the tiles' changed chips and the search. */
@@ -165,7 +108,7 @@ export function SettingsHomeView({
   /** The picked project; global settings when absent. */
   project?: string
   onScope?: (target: string) => void
-  onSignOut: () => void
+  onSignOut?: () => void
 }) {
   const [query, setQuery] = useState("")
   const searching = query.trim() !== ""
@@ -186,7 +129,18 @@ export function SettingsHomeView({
               “{query.trim()}”.
             </EmptyState>
           ) : (
-            <HitRows entries={entries} categories={categories} query={query} project={project} />
+            <SectionResults
+              hits={hits}
+              categories={categories}
+              renderHit={(e, slug) => (
+                <LinkRow
+                  key={e.key}
+                  href={sectionHref(slug, project)}
+                  label={entryLabel(e)}
+                  detail={e.description}
+                />
+              )}
+            />
           )
         ) : (
           <>
@@ -656,8 +610,6 @@ function ProjectPage({
             entries={settings.data.entries}
             categories={settings.data.categories}
             onScope={(next) => navigate(homePath(next))}
-            totpOn={false}
-            onSignOut={() => {}}
           />
         ) : (
           <Spinner label="Loading" />
