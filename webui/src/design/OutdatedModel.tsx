@@ -91,9 +91,9 @@ export function OutdatedModel({ session, text }: { session: SessionInfo; text: s
               disabled={!!blocked || pending}
               onClick={switchNow}
               _disabled={{
-                bg: "surface",
-                borderColor: "surface",
-                color: "text.dim",
+                bg: "hairline",
+                borderColor: "text.faint",
+                color: "text.faint",
                 opacity: 1,
                 cursor: "default",
               }}
