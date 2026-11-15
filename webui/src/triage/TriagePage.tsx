@@ -30,7 +30,7 @@ import { useWide } from "../useWide"
 import { DoneQueue, DoneView } from "./DoneView"
 import type { FetchEpicList } from "../epics/list"
 import type { PostEpicWrite } from "../epics/queue"
-import { WriteView } from "./WriteView"
+import { WriteView, writtenLine } from "./WriteView"
 import { PlanSummary, planSaved } from "./PlanSummary"
 import { useDetailReady } from "../useReady"
 import { useTriage, type FetchTriage } from "./useTriage"
@@ -220,7 +220,11 @@ function TriageBody({
         startLabel="Start"
         foldAnswered
         finalRound={view.final_approval && model.current?.step === QUESTIONS}
-        stepRows={round && { questions: <RoundRow round={round} /> }}
+        stepRows={
+          atWrite
+            ? { write: writtenLine(view) }
+            : round && { questions: <RoundRow round={round} /> }
+        }
         subtitleSuffix={round && ` · ${roundLabel(round)}`}
         beforeRing={
           atDone && view.result?.ready_epic ? (
