@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/agentfake/codex"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
@@ -128,6 +129,9 @@ func (f *fixture) applyScenarioEnv(o opts, sc scenario) error {
 			return err
 		}
 		f.env = append(f.env, agentfake.CommandsFileEnv+"="+path)
+	}
+	if sc.ModelFakes {
+		f.env = append(f.env, agentfake.ModelQueryLogEnv+"="+filepath.Join(f.root, "model-queries.jsonl"))
 	}
 	stallThreshold := o.stallThreshold
 	if stallThreshold == "" {
@@ -247,8 +251,17 @@ func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts m
 	if sc.Migrate {
 		res.MigrateDir = f.migrateDir()
 	}
-	if sc.Commands != nil {
+	if sc.Commands != nil && len(sc.Commands.Entries) > 0 {
 		res.FeatureWorktree = filepath.Join(f.root, "repo", ".worktrees", "feature")
+	}
+	if sc.ModelFakes {
+		home := filepath.Join(f.root, "home")
+		res.ModelFakes = &spec.ModelFakesOutput{
+			FakeConfig: filepath.Join(f.root, "agentfake-commands.json"),
+			QueryLog:   filepath.Join(f.root, "model-queries.jsonl"),
+			ClaudeDir:  filepath.Dir(agentfake.TUILaunchLogPath(home, "x")),
+			CodexDir:   filepath.Dir(codex.CodexLaunchLogPath(filepath.Join(home, ".codex"), "x")),
+		}
 	}
 	res.HostFiles = f.hostFiles
 	if cwd, err := os.Getwd(); err == nil {

@@ -728,6 +728,10 @@ var Scenarios = map[string]scenario{
 	// the Agents tab holds a Claude, a Codex and a model-switched Claude session.
 	// Start it with --fakecodex for codex on PATH. See spec.DefaultHarnessScenario.
 	"default-harness": spec.DefaultHarnessScenario(),
+	// model-switch: in demo, an idle Codex chat on an outdated model, an idle Claude chat on a
+	// lagging alias, a chat with no turns and a design session, over fake model lists.
+	// Start it with --fakecodex. See spec.ModelSwitchScenario.
+	"model-switch": spec.ModelSwitchScenario(),
 
 	// settings: a config with non-default values, three projects and a pending
 	// restart. See spec.SettingsScenario.

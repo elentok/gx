@@ -198,6 +198,9 @@ type Scenario struct {
 	OutsideTree int
 	// Commands is what the fakes' list probes answer; nil leaves them empty.
 	Commands *agentfake.ProbeConfig
+	// ModelFakes logs the fakes' model queries and prints where the fakes' config and
+	// per-session launch and release files are (Output.ModelFakes).
+	ModelFakes bool
 	// Codex installs the fake codex on PATH without the --fakecodex flag, for a
 	// scenario that runs a Codex session.
 	Codex bool

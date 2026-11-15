@@ -87,6 +87,22 @@ type Output struct {
 	FeatureWorktree string `json:"feature_worktree,omitempty"`
 	// HostFiles is the host-files scenario's paths; nil elsewhere.
 	HostFiles *HostFilesOutput `json:"host_files,omitempty"`
+	// ModelFakes is the model-switch scenario's fake files; nil elsewhere.
+	ModelFakes *ModelFakesOutput `json:"model_fakes,omitempty"`
+}
+
+// ModelFakesOutput names what a model-switch flow reads and writes. The fakes
+// keep per-session files named <session id>.launches (every launch's argv) and
+// <session id>.release (a held launch waits until it exists) in ClaudeDir and
+// CodexDir.
+type ModelFakesOutput struct {
+	// FakeConfig is the JSON file the fakes read the model lists and per-model
+	// behaviours (agentfake.ProbeModel.Behaviour) from; rewrite it to change them.
+	FakeConfig string `json:"fake_config"`
+	// QueryLog gets one JSON line per model query.
+	QueryLog  string `json:"query_log"`
+	ClaudeDir string `json:"claude_dir"`
+	CodexDir  string `json:"codex_dir"`
 }
 
 // ShellEnv is the output as `export` lines a shell can source: the CLI env, then

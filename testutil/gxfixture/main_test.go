@@ -19,7 +19,7 @@ import (
 var smokeScenarios = []string{
 	"check-lock", "design-branch", "design-defaulted", "design-error", "design-guard",
 	"design-mixed", "design-plain", "design-text", "design-working", "edge",
-	"long-running", "mixed", "model-mismatch", "restart-launchd", "ready",
+	"long-running", "mixed", "model-mismatch", "model-switch", "restart-launchd", "ready",
 }
 
 func TestScenarios_StartAnswerAndStop(t *testing.T) {
