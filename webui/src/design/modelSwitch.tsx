@@ -6,6 +6,13 @@ import { modelName } from "../modelName"
 /** A switch (or the switch back after a failure) is running: the server holds the model it relaunches with. */
 export const switchRunning = (s: SessionInfo) => !!s.switching_model
 
+/** Why a switch cannot run right now, or null when it can. The picker and the footer popover share it. */
+export function blockedNote(s: SessionInfo): string | null {
+  if (s.status.state === "exited" || s.stopped) return "Resume the session to switch."
+  if (s.status.state !== "idle") return "The agent is working. Wait until it is idle to switch."
+  return null
+}
+
 const label = (s: SessionInfo, id: string | undefined) => modelName(id ?? "", s.harness)
 
 type Seen = { sessionId: string; model: string; back: boolean }

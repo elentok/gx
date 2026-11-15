@@ -1,6 +1,7 @@
 import { chakra, Kbd, Text } from "@chakra-ui/react"
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react"
 import { useConnectionContext, useConnectionState } from "../connection"
+import { blockedNote } from "../design/modelSwitch"
 import { stateToken } from "../design/open"
 import type { SessionInfo, SessionModelsResponse } from "../generated/server"
 import { Button } from "../ui/button/Button"
@@ -40,13 +41,6 @@ export function ModelPickerHost() {
       switchModel={request.switchModel}
     />
   )
-}
-
-/** Why the picker cannot switch right now, or null when it can. */
-function blockedNote(s: SessionInfo): string | null {
-  if (s.status.state === "exited" || s.stopped) return "Resume the session to switch."
-  if (s.status.state !== "idle") return "The agent is working. Wait until it is idle to switch."
-  return null
 }
 
 function useModels(sessionId: string, fetchModels: FetchModels) {

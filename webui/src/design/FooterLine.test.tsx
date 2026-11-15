@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, screen, within } from "@testing-library/react"
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { ChakraProvider } from "@chakra-ui/react"
 import type { ReactElement } from "react"
-import { afterEach, expect, test } from "vitest"
+import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { system } from "../ui/theme"
 import { AppToaster } from "../ui/toaster"
 import type { SessionInfo } from "../generated/server"
@@ -10,6 +10,16 @@ import { WideContext } from "../useWide"
 import { FooterLine } from "./FooterLine"
 import { SwitchLine } from "./modelSwitch"
 
+const { posted, openPicker } = vi.hoisted(() => ({ posted: vi.fn(), openPicker: vi.fn() }))
+vi.mock("../shell/modelPickerOpen", () => ({
+  postSwitchSession: posted,
+  openModelPicker: openPicker,
+}))
+
+beforeEach(() => {
+  posted.mockReset().mockResolvedValue({})
+  openPicker.mockReset()
+})
 afterEach(cleanup)
 
 const session = (over: Partial<SessionInfo> = {}): SessionInfo =>
@@ -19,6 +29,7 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo =>
     model: "claude-opus-4-7",
     effort: "high",
     status: { state: "idle" },
+    status_changed_at: "2026-01-01T00:00:00Z",
     ...over,
   }) as SessionInfo
 
@@ -250,4 +261,75 @@ test("a rollback shows the switching back line, then the failed line", () => {
 test("no line when nothing switched", () => {
   renderThemed(<SwitchLine session={session()} />)
   expect(screen.queryByTestId("switch-line")).toBeNull()
+})
+
+const outdated = (over: Partial<SessionInfo> = {}) =>
+  session({ latest_model: "claude-opus-4-8", latest_effort: "high", ...over })
+const popover = () => screen.findByRole("dialog", { name: "Newer model" })
+const switchButton = (pop: HTMLElement) =>
+  within(pop).getByRole("button", { name: /Switch to/ }) as HTMLButtonElement
+
+test("an outdated model is a red button that opens the switch popover", async () => {
+  render(outdated())
+  fireEvent.click(screen.getByTestId("outdated-model"))
+  const pop = await popover()
+  expect(pop.textContent).toContain("A newer Opus model is available")
+  expect(pop.textContent).toContain("Keeps effort high. Only this session changes.")
+  expect(switchButton(pop).textContent).toBe("Switch to Claude Opus 4.8")
+})
+
+test("the switch button posts the latest model and the named effort", async () => {
+  render(outdated({ latest_effort: "medium" }))
+  fireEvent.click(screen.getByTestId("outdated-model"))
+  const pop = await popover()
+  expect(pop.textContent).toContain("Changes effort to medium")
+  fireEvent.click(switchButton(pop))
+  await waitFor(() => expect(posted).toHaveBeenCalledOnce())
+  expect(posted.mock.calls[0][0]).toMatchObject({
+    id: "s-a",
+    model: "claude-opus-4-8",
+    effort: "medium",
+  })
+})
+
+test("an empty effort uses the default and keeps the button enabled", async () => {
+  render(outdated({ latest_effort: "", effort: "" }))
+  fireEvent.click(screen.getByTestId("outdated-model"))
+  const pop = await popover()
+  expect(pop.textContent).toContain("Uses the model's default effort.")
+  expect(switchButton(pop).disabled).toBe(false)
+})
+
+test("a busy agent disables the button and a stopped one asks for a resume", async () => {
+  const { unmount } = render(outdated({ status: { state: "running" } } as Partial<SessionInfo>))
+  fireEvent.click(screen.getByTestId("outdated-model"))
+  let pop = await popover()
+  expect(pop.textContent).toContain("Wait until it is idle")
+  expect(switchButton(pop).disabled).toBe(true)
+  unmount()
+  render(outdated({ stopped: true }))
+  fireEvent.click(screen.getByTestId("outdated-model"))
+  pop = await popover()
+  expect(pop.textContent).toContain("Resume the session to switch.")
+})
+
+test("a chat popover links to the picker; a design popover does not", async () => {
+  const { unmount } = render(outdated())
+  fireEvent.click(screen.getByTestId("outdated-model"))
+  fireEvent.click(within(await popover()).getByRole("button", { name: "Choose another model" }))
+  expect(openPicker).toHaveBeenCalledOnce()
+  unmount()
+  render(outdated({ design: true }))
+  fireEvent.click(screen.getByTestId("outdated-model"))
+  expect(within(await popover()).queryByRole("button", { name: "Choose another model" })).toBeNull()
+})
+
+test("a plain chat name opens the picker; a plain design name is text", () => {
+  const { unmount } = render(session())
+  fireEvent.click(screen.getByTestId("model-name-button"))
+  expect(openPicker).toHaveBeenCalledOnce()
+  unmount()
+  render(session({ design: true }))
+  expect(screen.queryByTestId("model-name-button")).toBeNull()
+  expect(screen.queryByTestId("outdated-model")).toBeNull()
 })
