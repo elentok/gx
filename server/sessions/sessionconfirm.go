@@ -3,6 +3,7 @@ package sessions
 import (
 	"time"
 
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/transcript"
@@ -19,53 +20,58 @@ const confirmSettlePoll = 50 * time.Millisecond
 // or is not available to the account. Claude does not exit on it.
 const modelNotFound = "model_not_found"
 
-// confirmSwitch decides an unconfirmed Claude switch by the first assistant line
-// after the switch time. model_not_found rolls the switch back; any other line
-// confirms it; none keeps the window open. cancel ends the wait when the
-// session turns busy, since the check runs again when that turn ends.
+// confirmSwitch decides an unconfirmed switch by the first reply after the
+// switch time: Claude's first assistant line, Codex's first task_complete.
+// model_not_found rolls the switch back; any other reply confirms it; none
+// keeps the window open. cancel ends the wait when the session turns busy,
+// since the check runs again when that turn ends.
 func (rs *Resumer) confirmSwitch(dir, id string, run int, cancel <-chan struct{}) {
 	mg := rs.mg
 	meta, err := ReadMeta(dir)
-	if err != nil || meta.Run != run || !meta.SwitchUnconfirmed || meta.Harness == string(harness.Codex) {
+	if err != nil || meta.Run != run || !meta.SwitchUnconfirmed {
 		return
 	}
-	path, ok := mg.chat.ClaudeTranscript(id, meta.ChatMeta())
+	isCodex := meta.Harness == string(harness.Codex)
+	var path string
+	var ok bool
+	if isCodex {
+		path, ok = mg.chat.CodexRollout(meta.ChatMeta())
+	} else {
+		path, ok = mg.chat.ClaudeTranscript(id, meta.ChatMeta())
+	}
 	if !ok {
 		return
 	}
-	deadline := time.NewTimer(confirmSettleTimeout)
-	defer deadline.Stop()
-	tick := time.NewTicker(confirmSettlePoll)
-	defer tick.Stop()
-wait:
-	for {
-		if ended, err := transcript.TurnEnded(path); err != nil || ended {
-			break
-		}
-		select {
-		case <-cancel:
-			return
-		case <-mg.Watches.Stop:
-			return
-		case <-deadline.C:
-			break wait
-		case <-tick.C:
-		}
+	if !isCodex && !rs.settleClaudeTurn(path, cancel) {
+		return
 	}
 	mg.Watches.MetaMu.Lock()
 	meta, err = ReadMeta(dir)
-	if err != nil || meta.Run != run || !meta.SwitchUnconfirmed || meta.Status.State != wire.SessionIdle {
+	// Codex reports a failed first turn as Blocked, a clean one as Idle.
+	state := meta.Status.State
+	inState := state == wire.SessionIdle || (isCodex && state == wire.SessionBlocked)
+	if err != nil || meta.Run != run || !meta.SwitchUnconfirmed || !inState {
 		mg.Watches.MetaMu.Unlock()
 		return
 	}
-	e, isErr, found, err := transcript.FirstAssistantAfter(path, meta.SwitchedAt)
+	var notFound, found bool
+	if isCodex {
+		var kind string
+		kind, found, err = codexsession.FirstTurnEndAfter(path, meta.SwitchedAt)
+		notFound = kind == codexsession.ModelNotFound
+	} else {
+		var e transcript.APIError
+		var isErr bool
+		e, isErr, found, err = transcript.FirstAssistantAfter(path, meta.SwitchedAt)
+		notFound = isErr && e.Error == modelNotFound
+	}
 	if err != nil {
 		mg.log.Warn("switch: read first reply", "session", id, "err", err)
 	}
 	switch {
 	case err != nil || !found:
 		mg.Watches.MetaMu.Unlock()
-	case isErr && e.Error == modelNotFound && meta.SwitchPrev != nil:
+	case notFound && meta.SwitchPrev != nil:
 		rs.rollbackUnconfirmed(dir, meta)
 	default:
 		meta.SwitchUnconfirmed, meta.SwitchPrev = false, nil
@@ -76,6 +82,29 @@ wait:
 			return
 		}
 		mg.events.Publish(wire.EventSessionChanged, id)
+	}
+}
+
+// settleClaudeTurn waits for the end-of-turn line of the transcript at path. It
+// returns false when cancel or a stop ended the wait.
+func (rs *Resumer) settleClaudeTurn(path string, cancel <-chan struct{}) bool {
+	deadline := time.NewTimer(confirmSettleTimeout)
+	defer deadline.Stop()
+	tick := time.NewTicker(confirmSettlePoll)
+	defer tick.Stop()
+	for {
+		if ended, err := transcript.TurnEnded(path); err != nil || ended {
+			return true
+		}
+		select {
+		case <-cancel:
+			return false
+		case <-rs.mg.Watches.Stop:
+			return false
+		case <-deadline.C:
+			return true
+		case <-tick.C:
+		}
 	}
 }
 

@@ -57,12 +57,14 @@ func resetPassed(limit RateLimit, now time.Time) bool {
 // LastTurnErrorIn returns the error sessionID's newest turn ended in, launched
 // in cwd, read from the Codex home directory. A later turn start or clean
 // completion clears it, so ok=false means the session is not in an error.
-func LastTurnErrorIn(home, cwd, sessionID string) (reading TurnErrorReading, ok bool, err error) {
+// A model_not_found turn that ended at or before switchedAt is a rolled-back
+// switch's failure and does not count; a zero switchedAt skips that rule.
+func LastTurnErrorIn(home, cwd, sessionID string, switchedAt time.Time) (reading TurnErrorReading, ok bool, err error) {
 	if cwd == "" || sessionID == "" {
 		return TurnErrorReading{}, false, nil
 	}
 	err = walkSessionFiles(home, sessionID, func(path string) error {
-		value, valid, readErr := readTurnError(path, cwd, sessionID)
+		value, valid, readErr := readTurnError(path, cwd, sessionID, switchedAt)
 		if readErr != nil {
 			return readErr
 		}
@@ -77,7 +79,7 @@ func LastTurnErrorIn(home, cwd, sessionID string) (reading TurnErrorReading, ok 
 	return reading, ok, nil
 }
 
-func readTurnError(path, cwd, sessionID string) (reading TurnErrorReading, ok bool, err error) {
+func readTurnError(path, cwd, sessionID string, switchedAt time.Time) (reading TurnErrorReading, ok bool, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return TurnErrorReading{}, false, err
@@ -106,6 +108,9 @@ func readTurnError(path, cwd, sessionID string) (reading TurnErrorReading, ok bo
 			e := line.Payload.Error
 			ok = e.Message != "" || len(e.Info) > 0
 			reading.Error = TurnError{Message: e.Message, Kind: errorKind(e.Info)}
+			if ok && reading.Error.Kind == ModelNotFound && !switchedAt.IsZero() && !line.Timestamp.After(switchedAt) {
+				ok = false
+			}
 		case "token_count":
 			primary, secondary := line.Payload.RateLimits.Primary, line.Payload.RateLimits.Secondary
 			if hasQuotaData(primary) || hasQuotaData(secondary) {

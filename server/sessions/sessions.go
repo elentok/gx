@@ -306,6 +306,9 @@ func startSessionHolderAs(mg *Manager, dir string, meta, launchMeta *Meta, cols,
 		// The SessionStart hook writes Codex's own session id here; without it
 		// the meta keeps gx's UUID and the chat misses the rollout.
 		env = append(slices.Clone(env), harness.CodexSessionEnv(dir)...)
+		if !meta.SwitchedAt.IsZero() {
+			env = append(env, harness.CodexSwitchedAtEnv+"="+meta.SwitchedAt.Format(time.RFC3339Nano))
+		}
 	}
 	opts := harness.LaunchOptions{
 		SessionID: meta.ConversationID,

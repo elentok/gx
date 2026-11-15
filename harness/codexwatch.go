@@ -24,6 +24,8 @@ type codexWatcher struct {
 	sessionFile string
 	// home is the Codex home the rollouts live under; "" reads none.
 	home string
+	// switchedAt is the last model switch's time; zero when never switched.
+	switchedAt time.Time
 	// startup reports a startup dialog on screen.
 	startup func() bool
 
@@ -81,7 +83,7 @@ func (w *codexWatcher) errorStatus() Status {
 	if w.home == "" || payload.SessionID == "" {
 		return status
 	}
-	reading, ok, err := codexsession.LastTurnErrorIn(w.home, payload.Cwd, payload.SessionID)
+	reading, ok, err := codexsession.LastTurnErrorIn(w.home, payload.Cwd, payload.SessionID, w.switchedAt)
 	if err != nil || !ok {
 		return status
 	}

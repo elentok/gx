@@ -41,6 +41,10 @@ const (
 	CodexSessionStartCommand = `[ -n "$GX_CODEX_SESSION_FILE" ] && cat > "$GX_CODEX_SESSION_FILE.tmp" && mv "$GX_CODEX_SESSION_FILE.tmp" "$GX_CODEX_SESSION_FILE"`
 )
 
+// CodexSwitchedAtEnv carries the time of the session's last model switch (RFC
+// 3339) to the holder's watcher, which ignores a model_not_found turn older than it.
+const CodexSwitchedAtEnv = "GX_CODEX_SWITCHED_AT"
+
 // CodexSessionEnv is the env a Codex launch carries so the hooks find the agent
 // dir. Every launch path takes it from here.
 func CodexSessionEnv(agentDir string) []string {
@@ -160,6 +164,7 @@ func (h codexHarness) Watch(_ int, _ time.Time, scr Screen, _ <-chan struct{}) (
 		return scr != nil && h.StartupScreen(scr.ScrollbackTail(startupScrollback), scr.Rows()).Dialog != NoDialog
 	})
 	w.home = codexHomeFrom(os.Environ())
+	w.switchedAt, _ = time.Parse(time.RFC3339Nano, os.Getenv(CodexSwitchedAtEnv))
 	return w, nil
 }
 

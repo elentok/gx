@@ -60,6 +60,23 @@ func (c *Chat) ReportedCodexTurn(m Meta) codexsession.TurnModel {
 	return turn
 }
 
+// CodexRollout is the rollout file of a Codex session's conversation.
+func (c *Chat) CodexRollout(m Meta) (string, bool) {
+	home, err := c.src.CodexHome()
+	if err != nil {
+		return "", false
+	}
+	lookup := codexsession.RolloutPathIn
+	if c.rolloutPath != nil {
+		lookup = c.rolloutPath
+	}
+	path, ok, err := lookup(home, m.ConversationID)
+	if err != nil {
+		c.log.Warn("find codex rollout", "session", m.ID, "err", err)
+	}
+	return path, ok && err == nil
+}
+
 // ReportedCodex is ReportedCodexTurn plus the context tokens of the rollout's
 // newest token_count (zero while there is no rollout or reading), behind one
 // rollout path lookup. Callers wanting both use it, not the two reads apart.
