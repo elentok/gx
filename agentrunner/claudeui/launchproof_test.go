@@ -3,11 +3,14 @@ package claudeui_test
 import (
 	"context"
 	"errors"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 const launchText = "/gx-implement gx:epic/20"
@@ -124,5 +127,98 @@ func TestCheckLaunchDelivered(t *testing.T) {
 				t.Errorf("took %s, want at most %s", since(), tt.wantMaxElapsed)
 			}
 		})
+	}
+}
+
+// proofFor is a LaunchProof on a fake clock that checks for pasted records.
+func proofFor(clock *time.Time, resends *int, first func() (string, bool, error)) claudeui.LaunchProof {
+	return claudeui.LaunchProof{
+		FirstUser:   first,
+		CheckPasted: true,
+		Pane:        func() (string, error) { return "> ", nil },
+		Resend:      func() error { *resends++; return nil },
+		Now:         func() time.Time { return *clock },
+		Sleep:       func(d time.Duration) { *clock = clock.Add(d) },
+	}
+}
+
+func TestCheckLaunchDelivered_WorkingAgentWithoutRecordGetsNoResendAndFailsAtGrace(t *testing.T) {
+	start := time.Unix(1000, 0)
+	clock := start
+	resends := 0
+	p := proofFor(&clock, &resends, func() (string, bool, error) { return "", false, nil })
+	p.Working = func() (bool, error) { return true, nil }
+	var reported []claudeui.NudgeDecision
+	p.Report = func(d claudeui.NudgeDecision) { reported = append(reported, d) }
+
+	err := claudeui.CheckLaunchDelivered(context.Background(), p, launchText, claudeui.DefaultLaunchProofCaps)
+
+	if !errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("err = %v, want ErrNotDelivered at the grace end", err)
+	}
+	if resends != 0 || len(reported) != 0 {
+		t.Errorf("resends = %d, reported = %v; want none while working", resends, reported)
+	}
+	if got := clock.Sub(start); got < claudeui.DefaultLaunchProofCaps.Grace {
+		t.Errorf("ended after %s, want the grace clock to keep running to %s", got, claudeui.DefaultLaunchProofCaps.Grace)
+	}
+}
+
+func TestCheckLaunchDelivered_PastedRecordIsItsOwnNotDeliveredError(t *testing.T) {
+	clock := time.Unix(1000, 0)
+	resends := 0
+	pasted := "<pasted_content>\n" + launchText + "\n</pasted_content>"
+	p := proofFor(&clock, &resends, func() (string, bool, error) { return pasted, true, nil })
+
+	err := claudeui.CheckLaunchDelivered(context.Background(), p, launchText, claudeui.DefaultLaunchProofCaps)
+
+	if !errors.Is(err, claudeui.ErrPastedLaunch) || !errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("err = %v, want ErrPastedLaunch wrapping ErrNotDelivered", err)
+	}
+	if _, hung := errors.AsType[*claudeui.HungPaneError](err); hung {
+		t.Errorf("err = %v, must not be a hung pane", err)
+	}
+	if !strings.Contains(err.Error(), "the launch command was pasted as plain text and the skill did not run") {
+		t.Errorf("err = %q, want the pasted wording", err)
+	}
+	p.CheckPasted = false
+	if err := claudeui.CheckLaunchDelivered(context.Background(), p, launchText, claudeui.DefaultLaunchProofCaps); errors.Is(err, claudeui.ErrPastedLaunch) {
+		t.Errorf("err = %v, want no pasted check when CheckPasted is off", err)
+	}
+}
+
+func TestNewRecordSource_ResumedTranscriptIgnoresItsEarlierLaunchRecord(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.jsonl")
+	if err := agentfake.AppendMessage(path, "user", launchText); err != nil {
+		t.Fatal(err)
+	}
+	source := claudeui.NewRecordSource(func() (string, bool, error) { return path, true, nil })
+
+	if content, ok, err := source(); err != nil || ok {
+		t.Fatalf("before the new send: %q %v %v; want the old record not to count", content, ok, err)
+	}
+	if err := agentfake.AppendMessage(path, "user", launchText); err != nil {
+		t.Fatal(err)
+	}
+	content, ok, err := source()
+	if err != nil || !ok || !claudeui.Launched(content, launchText) {
+		t.Fatalf("after the new send: %q %v %v; want the new record", content, ok, err)
+	}
+}
+
+func TestNewRecordSource_FreshSessionCountsZero(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.jsonl")
+	exists := false
+	source := claudeui.NewRecordSource(func() (string, bool, error) { return path, exists, nil })
+
+	if _, ok, _ := source(); ok {
+		t.Fatal("record before the transcript exists")
+	}
+	exists = true
+	if err := agentfake.AppendMessage(path, "user", launchText); err != nil {
+		t.Fatal(err)
+	}
+	if content, ok, err := source(); err != nil || !ok || content != launchText {
+		t.Fatalf("got %q %v %v; want the first record", content, ok, err)
 	}
 }

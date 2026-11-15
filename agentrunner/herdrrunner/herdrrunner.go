@@ -23,6 +23,7 @@ import (
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/proccap"
 	"github.com/elentok/gx/syshealth"
+	"github.com/elentok/gx/transcript"
 )
 
 // pollInterval spaces AgentWait retries when herdr answers a wait with a
@@ -299,7 +300,16 @@ func (r *Runner) PromptLaunch(ctx context.Context, s agentrunner.Session, text s
 	if codex {
 		return r.launchProved(ctx, s, text, turn, onNudge, r.codexFirstUser(s), false)
 	}
-	claudeFirst := func() (string, bool, error) { return claudeui.FirstUserRecord(r.Home, s.SessionID) }
+	claudeFirst := claudeui.NewRecordSource(func() (string, bool, error) {
+		if s.SessionID == "" {
+			return "", false, nil
+		}
+		paths, err := transcript.FindByID(r.Home, s.SessionID)
+		if err != nil || len(paths) != 1 {
+			return "", false, err
+		}
+		return paths[0], true, nil
+	})
 	return r.launchProved(ctx, s, text, turn, onNudge, claudeFirst, true)
 }
 
@@ -357,6 +367,12 @@ func (r *Runner) launchProved(ctx context.Context, s agentrunner.Session, text s
 	caps.ResendEvery = cmp.Or(r.LaunchCaps.ResendEvery, caps.ResendEvery)
 	proof := claudeui.LaunchProof{
 		FirstUser: firstUser,
+		// needSeen marks the Claude path, the only one with a pasted check.
+		CheckPasted: needSeen,
+		Working: func() (bool, error) {
+			st, err := r.herdrStatus(s)
+			return st.State == agentrunner.StateWorking, err
+		},
 		Pane: func() (string, error) {
 			text, err := ReadPaneRecent(r.CLI)(s.ID)
 			return text, mapNotFound(err)

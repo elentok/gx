@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -18,7 +19,6 @@ import (
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/transcript"
 )
 
 var (
@@ -299,6 +299,7 @@ func (f *firstPrompt) deliverSlash(prompt string) error {
 	if run.State() == wire.SessionBlocked {
 		return errSessionBlocked
 	}
+	source := f.launchSource() // counts before the first send
 	if err := run.Step(0, prompt); err != nil {
 		return err
 	}
@@ -307,25 +308,34 @@ func (f *firstPrompt) deliverSlash(prompt string) error {
 		return errNudgeCancelled
 	default:
 	}
-	return f.proveDelivered(run, prompt)
+	return f.proveDelivered(run, prompt, source)
 }
 
-// proveDelivered checks that a claude session's slash prompt reached its
-// transcript, resending while it did not. Other harnesses write no such
-// transcript, so they keep the unchecked send.
-func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
+// launchSource counts a claude session's person records now; nil for other harnesses.
+func (f *firstPrompt) launchSource() func() (string, bool, error) {
 	meta, err := sessions.ReadMeta(f.dir)
 	if err != nil || (meta.Harness != "" && meta.Harness != string(harness.Claude)) {
 		return nil
 	}
 	// Claude slugs its resolved cwd, so a symlinked session dir needs resolving.
-	cwd, err := filepath.EvalSymlinks(meta.Dir)
-	if err != nil {
-		cwd = meta.Dir
+	cwd := meta.Dir
+	if real, err := filepath.EvalSymlinks(cwd); err == nil {
+		cwd = real
 	}
 	path, err := f.p.projects.TranscriptPath(cwd, meta.ConversationID)
 	if err != nil {
 		f.log.Warn("first prompt proof skipped", "err", err)
+		return nil
+	}
+	return claudeui.NewRecordSource(func() (string, bool, error) {
+		_, err := os.Stat(path)
+		return path, err == nil, nil
+	})
+}
+
+// proveDelivered checks that a claude slash prompt reached its transcript.
+func (f *firstPrompt) proveDelivered(run *actionRun, prompt string, source func() (string, bool, error)) error {
+	if source == nil {
 		return nil
 	}
 	caps := claudeui.DefaultLaunchProofCaps
@@ -334,18 +344,8 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 	caps.Poll = cmp.Or(f.p.cfg.LaunchProofCaps.Poll, caps.Poll)
 	caps.ResendEvery = cmp.Or(f.p.cfg.LaunchProofCaps.ResendEvery, caps.ResendEvery)
 	p := claudeui.LaunchProof{
-		FirstUser: func() (string, bool, error) {
-			msgs, _, err := transcript.ReadChat(path, "")
-			if err != nil {
-				return "", false, err
-			}
-			for _, m := range msgs {
-				if m.Role == transcript.ChatRolePerson {
-					return m.Text, true, nil
-				}
-			}
-			return "", false, nil
-		},
+		FirstUser:   source,
+		CheckPasted: true,
 		Pane: func() (string, error) {
 			rows, _, err := run.Holder().Screen(0)
 			return strings.Join(rows, "\n"), err
@@ -374,7 +374,7 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string) error {
 		}
 		stop()
 	}()
-	err = claudeui.CheckLaunchDelivered(ctx, p, prompt, caps)
+	err := claudeui.CheckLaunchDelivered(ctx, p, prompt, caps)
 	if errors.Is(err, context.Canceled) {
 		select {
 		case <-f.cancel:

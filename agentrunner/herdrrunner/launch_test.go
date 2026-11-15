@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -52,18 +53,71 @@ func startLaunch(t *testing.T) (*herdrrunner.Runner, *herdrfake.State, agentrunn
 		Poll: 5 * time.Millisecond, ResendEvery: 100 * time.Millisecond,
 	}
 	s.SessionID = "sess-1"
+	launchAgents.Store(t, launchAgent{state: state, label: s.Label})
+	t.Cleanup(func() { launchAgents.Delete(t) })
 	return r, state, s, r.Home
 }
 
+// launchAgents is the fake state and label startLaunch made for each test.
+var launchAgents sync.Map
+
+type launchAgent struct {
+	state *herdrfake.State
+	label string
+}
+
+// writeFirstUser makes the launch record land once the trace shows the prompt
+// call, so after the proof's pre-send count, as a real send does.
 func writeFirstUser(t *testing.T, home, content string) {
 	t.Helper()
+	a, _ := launchAgents.Load(t)
+	la := a.(launchAgent)
+	done := make(chan struct{})
+	t.Cleanup(func() { <-done })
+	go func() {
+		defer close(done)
+		tick := time.NewTicker(2 * time.Millisecond)
+		defer tick.Stop()
+		timeout := time.After(2 * time.Second)
+		for {
+			select {
+			case <-timeout:
+				return
+			case <-tick.C:
+			}
+			for _, e := range la.state.Trace() {
+				if len(e.Argv) >= 2 && e.Argv[0] == "agent" && e.Argv[1] == "prompt" {
+					appendUser(home, "u1", content)
+					return
+				}
+			}
+		}
+	}()
+}
+
+func appendUser(home, uuid, content string) {
 	path := filepath.Join(home, ".claude", "projects", "proj", "sess-1.jsonl")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
+		return
 	}
-	line := `{"type":"user","uuid":"u0","timestamp":"2026-01-01T10:00:00Z","message":{"content":"` + content + `"}}` + "\n"
-	if err := os.WriteFile(path, []byte(line), 0o644); err != nil {
-		t.Fatal(err)
+	line := `{"type":"user","uuid":"` + uuid + `","timestamp":"2026-01-01T10:00:00Z","message":{"content":"` + content + `"}}` + "\n"
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = f.WriteString(line)
+}
+
+// A resumed session's old record equal to the command never proves a new launch.
+func TestPromptLaunch_ResumedTranscriptsOldLaunchRecordIsNotTheProof(t *testing.T) {
+	r, _, s, home := startLaunch(t)
+	appendUser(home, "u0", launchRecord)
+
+	err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil)
+
+	if !errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("PromptLaunch = %v, want ErrNotDelivered", err)
 	}
 }
 

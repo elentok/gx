@@ -40,6 +40,18 @@ func (t ptyTurn) promptSlash(pr *ptyPrompter, text string) error {
 	return nil
 }
 
+// working reports whether the agent shows a running turn right now.
+func (t ptyTurn) working(ss *ptySession) (bool, error) {
+	resp, err := ss.holder.StatusReply()
+	if err != nil {
+		return false, t.p.died(ss, err)
+	}
+	if w := resp.WatchedView(); w != nil {
+		return w.Status.State == harness.Working && !w.Status.Background, nil
+	}
+	return resp.Program == "working" || (resp.Claude != nil && resp.Claude.Status == harness.ClaudeBusy), nil
+}
+
 // awaitNotBusy waits up to N for claude to stop being busy and returns the
 // Turn to send against. A prompt typed into a busy claude is only queued, so
 // its next idle edge would pass for delivery. A background task alone is not

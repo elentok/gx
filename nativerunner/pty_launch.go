@@ -66,6 +66,18 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	var firstUser func() (string, bool, error)
 	if codex {
 		firstUser = p.codexFirstUser(ss)
+	} else {
+		projects, err := harness.ClaudeProjectsDirIn(p.Env)
+		if err != nil {
+			return err
+		}
+		loc := &transcript.Locator{ProjectsDir: projects, Cwd: ss.cwd, SessionID: s.SessionID}
+		firstUser = claudeui.NewRecordSource(func() (string, bool, error) {
+			if loc.SessionID == "" {
+				return "", false, nil
+			}
+			return loc.Find()
+		})
 	}
 	if err := pr.Submit(text); err != nil {
 		return notDelivered(err)
@@ -73,13 +85,10 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	if codex {
 		return p.proveCodexLaunch(ctx, pr, firstUser, text, onNudge)
 	}
-	projects, err := harness.ClaudeProjectsDirIn(p.Env)
-	if err != nil {
-		return err
-	}
-	loc := &transcript.Locator{ProjectsDir: projects, Cwd: ss.cwd, SessionID: s.SessionID}
 	proof := claudeui.LaunchProof{
-		FirstUser: func() (string, bool, error) { return claudeui.FirstUserRecordAt(loc) },
+		FirstUser:   firstUser,
+		CheckPasted: true,
+		Working:     func() (bool, error) { return p.turns().working(ss) },
 		Pane: func() (string, error) {
 			if err := pr.cancelled(); err != nil {
 				return "", err
@@ -99,7 +108,7 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	if errors.Is(err, errPersonInput) {
 		// The person's keys end the resends; the transcript may still show the
 		// command from before they typed.
-		if ok, rerr := claudeui.LaunchRecordedAt(loc, text); rerr != nil || !ok {
+		if content, ok, rerr := firstUser(); rerr != nil || !ok || !claudeui.Launched(content, text) {
 			return fmt.Errorf("%w: %q: a person typed before the transcript showed the command", agentrunner.ErrDeliveryUnconfirmed, text)
 		}
 		return nil

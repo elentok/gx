@@ -150,6 +150,39 @@ func TestStartAndPrompt_AlwaysUnknownSkill_NamesSkillAndFix(t *testing.T) {
 	}
 }
 
+// pastedRunner rejects every launch prompt as pasted plain text.
+type pastedRunner struct {
+	agentrunner.Runner
+	launches *int
+}
+
+func (p pastedRunner) PromptLaunch(_ context.Context, _ agentrunner.Session, text string, _ func(string)) error {
+	*p.launches++
+	return fmt.Errorf("%w: %q", claudeui.ErrPastedLaunch, text)
+}
+
+func TestStartAndPrompt_PastedLaunchCommand_RelaunchesOnceThenPausesPromptStalled(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakes.FakeDeps()
+	launches := 0
+
+	res := launchOn(t, pastedRunner{Runner: d.Runner, launches: &launches})
+
+	assertLaunchFailure(t, res.err, events.AgentPromptStalled)
+	if launches != 2 {
+		t.Errorf("launch prompts = %d, want 2 (one relaunch)", launches)
+	}
+	if !strings.Contains(res.err.Error(), "the launch command was pasted as plain text and the skill did not run") {
+		t.Errorf("err = %q, want the pasted wording", res.err)
+	}
+	if _, hung := errors.AsType[*claudeui.HungPaneError](res.err); hung {
+		t.Errorf("err = %v, must not count as a hung pane", res.err)
+	}
+	if len(res.nudges) != 0 {
+		t.Errorf("nudges = %v, want none", res.nudges)
+	}
+}
+
 func TestStartAndPrompt_LaunchPromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakes.FakeDeps()

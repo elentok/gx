@@ -20,12 +20,20 @@ const UnknownCommandMarker = "Unknown command:"
 // LaunchProof decides whether a launch command reached the agent. Its inputs
 // are small funcs so a runner wires its own and a test fakes them.
 //
-// The proof is the session transcript: the command is delivered once its first
-// user record is the launch command. The pane only shortens the wait.
+// The proof is the session transcript: the command is delivered once the first
+// user record written after the caller's pre-send count (see NewRecordSource)
+// is the launch command. The pane only shortens the wait.
 type LaunchProof struct {
-	// FirstUser returns the content of the transcript's first user record;
-	// ok is false while there is none.
+	// FirstUser returns the content of the first user record written after
+	// the caller's count taken before the first send; ok is false while there
+	// is none.
 	FirstUser func() (content string, ok bool, err error)
+	// Working reports whether the runner shows the agent working; nil means
+	// never. While it does the proof sends no resend.
+	Working func() (bool, error)
+	// CheckPasted (Claude only) fails a record that wraps the command in
+	// Claude Code's pasted-content tag with ErrPastedLaunch.
+	CheckPasted bool
 	// Pane returns the current pane text.
 	Pane func() (string, error)
 	// Resend types the launch prompt again in the same session.
@@ -47,6 +55,12 @@ type LaunchProofCaps struct {
 	ResendEvery  time.Duration
 }
 
+// ErrPastedLaunch means the launch command reached the transcript as pasted
+// text, so the skill did not run.
+var ErrPastedLaunch = fmt.Errorf("%w: the launch command was pasted as plain text and the skill did not run", agentrunner.ErrNotDelivered)
+
+const pastedMarker = "<pasted_content"
+
 // DefaultLaunchProofCaps resend for about 30 seconds.
 var DefaultLaunchProofCaps = LaunchProofCaps{
 	Grace:        30 * time.Second,
@@ -55,31 +69,44 @@ var DefaultLaunchProofCaps = LaunchProofCaps{
 	ResendEvery:  3 * time.Second,
 }
 
-// FirstUserRecord is the text of the first person message of the transcript of
-// sessionID under home; ok is false until the transcript exists and has one.
-func FirstUserRecord(home, sessionID string) (string, bool, error) {
-	if sessionID == "" {
-		return "", false, nil
+// NewRecordSource returns a LaunchProof.FirstUser over the transcript that
+// find locates. It counts the person records there now, so call it before the
+// first send: the source then returns the first record written after that
+// count. A fresh session counts 0; a resumed one keeps its old records out of
+// the proof.
+func NewRecordSource(find func() (path string, ok bool, err error)) func() (string, bool, error) {
+	texts := func() ([]string, error) {
+		path, ok, err := find()
+		if err != nil || !ok {
+			return nil, err
+		}
+		msgs, _, err := transcript.ReadChat(path, "")
+		if err != nil {
+			return nil, err
+		}
+		var out []string
+		for _, m := range msgs {
+			if m.Role == transcript.ChatRolePerson {
+				out = append(out, m.Text)
+			}
+		}
+		return out, nil
 	}
-	paths, err := transcript.FindByID(home, sessionID)
-	if err != nil || len(paths) != 1 {
-		return "", false, err
+	before := 0
+	if old, err := texts(); err == nil {
+		before = len(old)
 	}
-	return firstPerson(paths[0])
+	return func() (string, bool, error) {
+		all, err := texts()
+		if err != nil || len(all) <= before {
+			return "", false, err
+		}
+		return all[before], true, nil
+	}
 }
 
-// FirstUserRecordAt is FirstUserRecord for a session whose projects dir and
-// cwd are known: loc checks the direct path and globs only as a fallback.
-func FirstUserRecordAt(loc *transcript.Locator) (string, bool, error) {
-	if loc.SessionID == "" {
-		return "", false, nil
-	}
-	path, ok, err := loc.Find()
-	if err != nil || !ok {
-		return "", false, err
-	}
-	return firstPerson(path)
-}
+// Launched reports whether a person record's content is the launch command.
+func Launched(content, text string) bool { return launchedBy(content, text) }
 
 func firstPerson(path string) (string, bool, error) {
 	msgs, _, err := transcript.ReadChat(path, "")
@@ -94,13 +121,6 @@ func firstPerson(path string) (string, bool, error) {
 	return "", false, nil
 }
 
-// LaunchRecorded reports whether the transcript of sessionID under home
-// already shows text as its first user record.
-func LaunchRecorded(home, sessionID, text string) (bool, error) {
-	content, ok, err := FirstUserRecord(home, sessionID)
-	return ok && launchedBy(content, text), err
-}
-
 // LaunchRecordedIn is LaunchRecorded for a transcript at path. known is false
 // only when the transcript cannot be read; a readable one with no person
 // message is known and not recorded (the session never got its task).
@@ -110,12 +130,6 @@ func LaunchRecordedIn(path, text string) (recorded, known bool, err error) {
 		return false, false, err
 	}
 	return launchedBy(content, text), true, nil
-}
-
-// LaunchRecordedAt is LaunchRecorded over a Locator.
-func LaunchRecordedAt(loc *transcript.Locator, text string) (bool, error) {
-	content, ok, err := FirstUserRecordAt(loc)
-	return ok && launchedBy(content, text), err
 }
 
 // launchedBy reports whether a user record's content is the launch command:
@@ -129,7 +143,8 @@ func launchedBy(content, text string) bool {
 // CheckLaunchDelivered returns nil once the transcript shows text as the first
 // user record, and agentrunner.ErrNotDelivered when the grace ends first. It
 // resends text only while the transcript lacks the command, never after it
-// shows it, so a command never runs twice. A cancelled ctx ends the loop within
+// shows it, and never while the agent is working, so a command never runs
+// twice. A cancelled ctx ends the loop within
 // one poll with the context error, not a delivery failure.
 func CheckLaunchDelivered(ctx context.Context, p LaunchProof, text string, caps LaunchProofCaps) error {
 	start := p.Now()
@@ -145,6 +160,9 @@ func CheckLaunchDelivered(ctx context.Context, p LaunchProof, text string, caps 
 		}
 		if ok && launchedBy(content, text) {
 			return nil
+		}
+		if ok && p.CheckPasted && strings.Contains(content, pastedMarker) && strings.Contains(content, strings.TrimSpace(text)) {
+			return fmt.Errorf("%w: %q", ErrPastedLaunch, text)
 		}
 
 		pane, err := p.Pane()
@@ -167,9 +185,16 @@ func CheckLaunchDelivered(ctx context.Context, p LaunchProof, text string, caps 
 			return fmt.Errorf("%w: %q: no user record after %s", agentrunner.ErrNotDelivered, text, caps.Grace)
 		}
 
+		working := false
+		if p.Working != nil {
+			if working, err = p.Working(); err != nil {
+				return fmt.Errorf("reading agent state: %w", err)
+			}
+		}
 		if lastSend.IsZero() || now.Sub(lastSend) >= caps.ResendEvery {
-			// The first pass is the caller's own send; only later passes resend.
-			if !lastSend.IsZero() {
+			// The first pass is the caller's own send; only later passes
+			// resend, and never into a working agent.
+			if !lastSend.IsZero() && !working {
 				if err := p.Resend(); err != nil {
 					return fmt.Errorf("resending launch prompt: %w", err)
 				}

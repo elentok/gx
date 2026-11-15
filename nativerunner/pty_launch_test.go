@@ -99,6 +99,37 @@ func TestPty_LaunchPromptLateRegistryIsResentThenStartsATurn(t *testing.T) {
 	}
 }
 
+func TestPty_LaunchPromptPastedAsPlainTextIsItsOwnNotDeliveredError(t *testing.T) {
+	t.Parallel()
+	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour}, agentfake.TUIPasteOverEnv+"=5")
+	var decisions []string
+
+	err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", func(d string) { decisions = append(decisions, d) })
+
+	if !errors.Is(err, claudeui.ErrPastedLaunch) || !errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("PromptLaunch = %v; want ErrPastedLaunch wrapping ErrNotDelivered", err)
+	}
+	if _, hung := errors.AsType[*claudeui.HungPaneError](err); hung {
+		t.Errorf("PromptLaunch = %v; must not be a hung pane", err)
+	}
+	if len(decisions) != 0 {
+		t.Errorf("decisions = %v; want none", decisions)
+	}
+}
+
+func TestPty_LaunchPromptThatLandsAtOnceLogsNoNudge(t *testing.T) {
+	t.Parallel()
+	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: 50 * time.Millisecond})
+	var decisions []string
+
+	if err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", func(d string) { decisions = append(decisions, d) }); err != nil {
+		t.Fatalf("PromptLaunch = %v; want nil", err)
+	}
+	if len(decisions) != 0 {
+		t.Errorf("decisions = %v; want no prompt-nudged for a launch whose record lands", decisions)
+	}
+}
+
 func TestPty_LaunchPromptIsDeliveredWithoutWaitingForATranscript(t *testing.T) {
 	t.Parallel()
 	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour})
