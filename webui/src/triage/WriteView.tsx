@@ -99,29 +99,42 @@ function WriteRow({
   return (
     <Box
       display="flex"
-      flexDirection="column"
-      gap="1"
-      p="3"
-      my="1"
-      borderWidth="1px"
-      borderColor="tone.deadlocked.fg"
-      bg="tone.deadlocked.bg"
-      borderRadius="md"
+      flexWrap="wrap"
+      alignItems="center"
+      justifyContent="space-between"
+      gap="2"
+      py="2"
+      borderBottomWidth="1px"
+      borderColor="border"
     >
-      {name}
-      {row.refusal && (
-        <Text fontFamily="mono" color="tone.deadlocked.fg">
-          {row.refusal}
-        </Text>
-      )}
+      <Box display="flex" flexDirection="column" minW="0" flex="1 1 200px">
+        <Box display="flex" alignItems="baseline" gap="2" flexWrap="wrap">
+          <Text color="tone.deadlocked.fg" aria-label="failed">
+            ×
+          </Text>
+          <Text fontFamily="mono" title={row.title}>
+            {row.address}
+          </Text>
+          {row.new_addresses?.map((a) => (
+            <Text key={a} color="text.dim">
+              → {a}
+            </Text>
+          ))}
+        </Box>
+        {row.refusal && (
+          <Text fontSize="sm" color="text.muted" overflowWrap="anywhere">
+            {row.refusal}
+          </Text>
+        )}
+      </Box>
       <Box display="flex" gap="2">
         {row.can_retry && (
-          <Button disabled={pending} onClick={() => act(retry)}>
+          <Button size="sm" emphasis="secondary" disabled={pending} onClick={() => act(retry)}>
             Retry
           </Button>
         )}
         {row.can_keep && (
-          <Button emphasis="ghost" disabled={pending} onClick={() => act(keep)}>
+          <Button size="sm" emphasis="secondary" disabled={pending} onClick={() => act(keep)}>
             Keep for later
           </Button>
         )}
@@ -191,17 +204,43 @@ export function WriteView({
   )
   const unitEl = (m: TriageMove) => <MoveRow key={`${m.old_epic}:${m.area}`} move={m} />
   return (
-    <Box display="flex" flexDirection="column">
-      <Text fontWeight="700" pb="1">
-        Write · {rowsWritten(view)} of {rowsTotal(view)} rows
-      </Text>
+    <Box
+      display="flex"
+      flexDirection="column"
+      p="3"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="xl"
+      bg="surface.raised"
+    >
+      <Box display="flex" alignItems="center" gap="3" pb="2">
+        <Text fontWeight="700" whiteSpace="nowrap">
+          Write · {rowsWritten(view)} of {rowsTotal(view)} rows
+        </Text>
+        <Box flex="1" h="2" borderRadius="full" bg="border" overflow="hidden">
+          <Box
+            h="100%"
+            bg="tone.done.fg"
+            style={{ width: `${(100 * rowsWritten(view)) / Math.max(rowsTotal(view), 1)}%` }}
+          />
+        </Box>
+      </Box>
       {view.rows.filter(isFailed).map(rowEl)}
       {unitList.filter((m) => m.state === "failed").map(unitEl)}
       {view.rows.filter((r) => !isFailed(r) && !isWritten(r)).map(rowEl)}
       {unitList.filter((m) => m.state !== "failed" && m.state !== "done").map(unitEl)}
       {folded > 0 && (
         <>
-          <Button emphasis="ghost" onClick={() => setOpen(!open)} aria-expanded={open}>
+          <Button
+            emphasis="ghost"
+            tone="muted"
+            alignSelf="flex-start"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+          >
+            <Text as="span" color="tone.done.fg" mr="2" aria-hidden="true">
+              ✓
+            </Text>
             {folded} more rows written
           </Button>
           {open && (
