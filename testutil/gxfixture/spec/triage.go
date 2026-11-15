@@ -225,9 +225,21 @@ func TriageScenario(shape string) (Scenario, bool) {
 	case "writing":
 		return with(func(sc *Scenario) {
 			sc.Epics = []Epic{followUps(project, 6, 0)}
+			// The scene is the page mid-Write with three rows still pending: the
+			// session waits on the hold so it does not write them.
+			sc.TriageAgent = &triageplay.Config{HoldAtStep: true}
 			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) {
 				actions := []string{"ready", "ready", "map", "merge", "close", "keep"}
-				planned(rec, func(i int, p *triage.PlanRow) { p.Action = actions[i] })
+				planned(rec, func(i int, p *triage.PlanRow) {
+					p.Action = actions[i]
+					// A merge names the row it duplicates and a close names its reason.
+					switch p.Action {
+					case "merge":
+						p.Destination = rec.Rows[0].Address
+					case "close":
+						p.Destination = "stale"
+					}
+				})
 				rec.Step = tickets.StepWrite
 				rec.Rows[0].Write = triage.WriteDone
 				rec.Rows[0].NewAddresses = []string{project + ":triage-ready/01"}
