@@ -9,7 +9,7 @@ import {
 } from "react"
 import { useCompletion, type CompletionConfig, type MenuKey } from "../../commands/useCompletion"
 import type CodeEditor from "./CodeEditor"
-import type { ViMode } from "./CodeEditor"
+import type { CodeEditorHandle, ViMode } from "./CodeEditor"
 import { useBigPrompt } from "./bigPromptStore"
 import { LargeEditor, preloadCodeEditor, type EditorMenu, type Selection } from "./LargeEditor"
 import { useCoarsePointer } from "../../useWide"
@@ -171,11 +171,18 @@ function Field({
     area.current?.setSelectionRange(at, at)
   }, [value, menu, selection, showEditor])
   const open = () => setSelection(read().sel)
+  const editorHandle = useRef<CodeEditorHandle>(null)
   // Focus and selection are set synchronously, inside the user's gesture and before the layer unmounts, so a phone keeps its keyboard.
   const close = (sel: Selection, refocus: boolean) => {
     if (refocus) {
       area.current?.focus()
       area.current?.setSelectionRange(sel.start, sel.end)
+      // The inline editor keeps its own mode; VISUAL comes back as NORMAL with a caret.
+      if (editorHandle.current) {
+        const collapse = mode === "VISUAL"
+        editorSel.current = collapse ? { start: sel.end, end: sel.end } : sel
+        editorHandle.current.restore(sel, collapse)
+      }
     }
     setSelection(null)
   }
@@ -223,12 +230,17 @@ function Field({
             placeholder={placeholder}
             selection={carry.current?.sel ?? editorSel.current}
             onSelectionChange={(s) => {
+              // The large editor owns the selection and the menu cursor while it is open.
+              if (selection) return
               editorSel.current = s
               menu?.onCursor(s.end)
             }}
             onMenuKey={menu?.onKeyDown}
-            caret={menu?.pending}
+            caret={selection ? undefined : menu?.pending}
             onModeChange={setMode}
+            onToggle={disabled ? undefined : open}
+            handle={editorHandle}
+            holdMode={!!selection}
             autoFocus={carry.current?.focus ?? false}
             viMode
           />

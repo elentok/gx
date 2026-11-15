@@ -794,3 +794,103 @@ test("the inline menu opens in INSERT only, and Escape closes it first", async (
   pressKeys(view, "v")
   expect(screen.queryByRole("listbox")).toBeNull()
 })
+
+// Cmd-G hands the inline box to the large editor and back.
+const openKey = (view: EditorView) =>
+  fireEvent.keyDown(view.contentDOM, { key: "g", ctrlKey: true })
+const done = () => fireEvent.click(screen.getByText("Done"))
+const closed = () => waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+
+test("the key opens the large editor in INSERT from every inline mode, with the selection", async () => {
+  withVi(true, <Pill />, false)
+  const view = await inlineView()
+  openKey(view)
+  await findLargeEditor(TITLE)
+  expect(largeEditorText(TITLE)).toBe("hello")
+  expect(viewOf(TITLE).dom.parentElement?.getAttribute("data-vi-mode")).toBe("INSERT")
+  done()
+  await closed()
+  pressKeys(view, "<Esc>", "0", "v", "l", "l")
+  openKey(view)
+  await findLargeEditor(TITLE)
+  const { from, to } = viewOf(TITLE).state.selection.main
+  expect(to - from).toBeGreaterThan(0)
+  expect(viewOf(TITLE).dom.parentElement?.getAttribute("data-vi-mode")).toBe("INSERT")
+})
+
+test("a disabled inline box opens nothing on the key", async () => {
+  withVi(true, <Pill disabled />, false)
+  const view = await inlineView()
+  openKey(view)
+  expect(screen.queryByRole("dialog")).toBeNull()
+})
+
+test("closing keeps the inline mode: NORMAL stays NORMAL, INSERT stays INSERT", async () => {
+  withVi(true, <Pill />, false)
+  const view = await inlineView()
+  pressKeys(view, "<Esc>")
+  openKey(view)
+  await findLargeEditor(TITLE)
+  pressKeys(viewOf(TITLE), "<Esc>")
+  done()
+  await closed()
+  expect(pill().textContent).toBe("NORMAL")
+  expect(view.hasFocus).toBe(true)
+  pressKeys(view, "i")
+  openKey(view)
+  await findLargeEditor(TITLE)
+  pressKeys(viewOf(TITLE), "<Esc>")
+  done()
+  await closed()
+  expect(pill().textContent).toBe("INSERT")
+})
+
+test("VISUAL comes back as NORMAL with a caret", async () => {
+  withVi(true, <Pill />, false)
+  const view = await inlineView()
+  pressKeys(view, "<Esc>", "0", "v", "l", "l")
+  openKey(view)
+  await findLargeEditor(TITLE)
+  done()
+  await closed()
+  expect(pill().textContent).toBe("NORMAL")
+  const { from, to } = view.state.selection.main
+  expect(from).toBe(to)
+})
+
+test("a large editor that empties the text does not reset the box to INSERT", async () => {
+  withVi(true, <Pill />, false)
+  const view = await inlineView()
+  pressKeys(view, "<Esc>")
+  openKey(view)
+  await typeInLargeEditor(TITLE, "")
+  done()
+  await closed()
+  expect(view.state.doc.toString()).toBe("")
+  expect(pill().textContent).toBe("NORMAL")
+})
+
+test("after a round trip a real submit that empties the box returns to INSERT", async () => {
+  withVi(true, <Pill />, false)
+  const view = await inlineView()
+  pressKeys(view, "<Esc>")
+  openKey(view)
+  await findLargeEditor(TITLE)
+  done()
+  await closed()
+  fireEvent.click(screen.getByText("submit"))
+  expect(pill().textContent).toBe("INSERT")
+})
+
+test("the menu follows the large editor while open, then the inline mode", async () => {
+  withVi(true, <Pill completion />, false)
+  const view = await inlineView()
+  pressKeys(view, "<Esc>")
+  openKey(view)
+  await typeInLargeEditor(TITLE, "/co")
+  await waitFor(() => expect(options()).toHaveLength(2))
+  done()
+  await closed()
+  expect(pill().textContent).toBe("NORMAL")
+  expect(screen.queryByRole("listbox")).toBeNull()
+})

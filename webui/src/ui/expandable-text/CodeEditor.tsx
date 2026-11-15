@@ -28,6 +28,8 @@ const VI_MODE_ATTR = "data-vi-mode"
 export type CodeEditorHandle = {
   /** Sends vi Escape and keeps focus in the editor. */
   escape: () => void
+  /** Focuses the editor and puts the selection back. `leaveVisual` first sends vi Escape, so VISUAL comes back as NORMAL with a caret at the selection's end. */
+  restore: (selection: Selection, leaveVisual: boolean) => void
 }
 
 // The vim registry is module-level, so ZZ finds its editor's callback through the view it fires in.
@@ -147,6 +149,7 @@ export default function CodeEditor({
   caret,
   handle,
   autoFocus = true,
+  holdMode = false,
   inline,
 }: {
   label: string
@@ -173,6 +176,8 @@ export default function CodeEditor({
   handle?: Ref<CodeEditorHandle>
   /** Focus the editor when it mounts. Default true. */
   autoFocus?: boolean
+  /** Inline only: an outside edit to empty text does not reset the mode to INSERT (a large editor is editing the text). */
+  holdMode?: boolean
   /** Sit inside a prompt box: `rows` lines tall, no border. Fixed for the editor's life; `rows` and `disabled` apply live. */
   inline?: {
     rows: number
@@ -243,6 +248,20 @@ export default function CodeEditor({
         const cm = v && getCM(v)
         if (cm) Vim.handleKey(cm, "<Esc>", "user")
         v?.focus()
+      },
+      restore(sel, leaveVisual) {
+        const v = view.current
+        if (!v) return
+        const cm = getCM(v)
+        const max = v.state.doc.length
+        v.focus()
+        if (leaveVisual && cm) Vim.handleKey(cm, "<Esc>", "user")
+        const end = Math.min(sel.end, max)
+        v.dispatch({
+          selection: leaveVisual
+            ? { anchor: end }
+            : { anchor: Math.min(sel.start, max), head: end },
+        })
       },
     }),
     [],
@@ -380,8 +399,8 @@ export default function CodeEditor({
       external.current = false
     }
     // A submit empties the box from outside: back to INSERT. A user edit never gets here (the doc already matches).
-    // Seam: a Cmd-G round trip must not take this path; it is a later ticket.
-    if (inline && viMode && value === "") {
+    // Not during a Cmd-G round trip: the large editor may empty the text and the mode must survive it.
+    if (inline && viMode && value === "" && !holdMode) {
       const cm = getCM(v)
       if (cm?.state.vim && !cm.state.vim.insertMode) {
         Vim.handleKey(cm, "<Esc>", "user")
