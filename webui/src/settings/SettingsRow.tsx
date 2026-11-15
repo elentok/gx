@@ -23,7 +23,7 @@ function displayValue(v: unknown): string {
 export type WriteSetting = (changes: SettingChange[]) => Promise<SettingsWriteResult>
 
 /** What a control needs: the entry, the draft it shows and how to change or save it. */
-interface ControlProps {
+export interface ControlProps {
   entry: SettingsEntry
   draft: string
   dirty: boolean
@@ -49,7 +49,17 @@ const draftValue = (type: string, draft: string): unknown => {
   return type === "number" && text !== "" && !Number.isNaN(Number(text)) ? Number(text) : text
 }
 
-function TextControl({ entry, draft, dirty, invalid, pending, setDraft, save }: ControlProps) {
+/** Input, Save and Cancel for a text-like entry. Enter saves and Escape cancels, for the row or cell that holds it only. */
+export function TextControl({
+  entry,
+  draft,
+  dirty,
+  invalid,
+  pending,
+  setDraft,
+  save,
+  cancellable,
+}: ControlProps & { cancellable?: boolean }) {
   return (
     <>
       <chakra.input
@@ -60,6 +70,10 @@ function TextControl({ entry, draft, dirty, invalid, pending, setDraft, save }: 
         inputMode={entry.type === "number" ? "decimal" : undefined}
         borderColor={invalid ? "tone.deadlocked.fg" : "border"}
         onChange={(e) => setDraft(e.currentTarget.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && dirty && !pending) save(draftValue(entry.type, draft))
+          if (e.key === "Escape") setDraft(undefined)
+        }}
         {...rowInput}
       />
       {HINTS[entry.type] && (
@@ -74,7 +88,7 @@ function TextControl({ entry, draft, dirty, invalid, pending, setDraft, save }: 
       >
         Save
       </Button>
-      {dirty && (
+      {(dirty || cancellable) && (
         <Button size="sm" emphasis="ghost" tone="muted" onClick={() => setDraft(undefined)}>
           Cancel
         </Button>
@@ -265,7 +279,20 @@ const CONTROLS: Record<string, (p: ControlProps) => ReactNode> = {
   enum: EnumControl,
 }
 
-const serverText = (e: SettingsEntry) => {
+/** The "Not saved: why" text of a write's refusal when it names this key (or no key), else of its error. */
+export function writeErrorText(write: ReturnType<typeof useWrite>, key: string) {
+  // useWrite keeps the refusal as a Refusable; every write here returns a SettingsWriteResult.
+  const refusal = write.refusal as SettingsWriteResult | undefined
+  const refused = refusal !== undefined && (!refusal.keys?.length || refusal.keys.includes(key))
+  const text = refused
+    ? `Not saved: ${refusalText(refusal)}`
+    : write.error
+      ? `Not saved: ${write.error}`
+      : undefined
+  return { refused, text }
+}
+
+export const serverText = (e: SettingsEntry) => {
   const v = e.set ? e.value : e.default
   return v === undefined || v === null ? "" : String(v)
 }
@@ -348,13 +375,7 @@ export function SettingsRow({
   const current = serverText(entry)
   const shown = draft ?? current
   const dirty = shown !== current
-  // useWrite keeps the refusal as a Refusable; every write here returns a SettingsWriteResult.
-  const refusal = write.refusal as SettingsWriteResult | undefined
-  const refused =
-    refusal !== undefined && (!refusal.keys?.length || refusal.keys.includes(entry.key))
-  const errorText = refused
-    ? `Not saved: ${refusalText(refusal)}`
-    : write.error && `Not saved: ${write.error}`
+  const { refused, text: errorText } = writeErrorText(write, entry.key)
 
   const [confirming, setConfirming] = useState<SettingChange>()
   const run = (change: SettingChange) => {

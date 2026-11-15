@@ -1,4 +1,4 @@
-import { act, fireEvent, waitFor } from "@testing-library/react"
+import { act, fireEvent, waitFor, within } from "@testing-library/react"
 import type { ComponentProps } from "react"
 import { MemoryRouter, Route, Routes } from "react-router"
 import { describe, expect, it, vi } from "vitest"
@@ -15,7 +15,7 @@ import {
 } from "./SettingsPage"
 import { SettingsShellView } from "./SettingsShell"
 import { treeFromEntries } from "./testTree"
-import type { SettingsEntry } from "../generated/server"
+import type { SettingsEntry, SettingsWriteResult } from "../generated/server"
 import type { WebLoginEntry } from "./logins"
 
 const NOW = Date.parse("2026-10-30T12:00:00Z")
@@ -603,5 +603,161 @@ describe("section page group blocks", () => {
     )
     expect(getByTestId("group-Repository").textContent).toContain("read-only")
     expect(getByTestId("group-Delivery")).toBeTruthy()
+  })
+})
+
+describe("Models table", () => {
+  const m = (agent: string, tier: string, column: string, over: Partial<SettingsEntry> = {}) => {
+    const path = tier === "standard" ? ["agents", agent, column] : ["agents", agent, tier, column]
+    return {
+      key: path.join("."),
+      path,
+      type: "string",
+      section: "Models",
+      category: "Agents",
+      group: agent === "claude" ? "Claude" : "Codex",
+      tier,
+      column,
+      description: `${agent} ${tier} ${column}`,
+      set: false,
+      ...over,
+    } as SettingsEntry
+  }
+  const models = [
+    m("claude", "light", "model", { default: "haiku" }),
+    m("claude", "light", "effort", { default: "" }),
+    m("claude", "standard", "model", { set: true, value: "opus", default: "sonnet" }),
+    m("claude", "standard", "effort", { default: "high" }),
+    m("claude", "strongest", "model", { default: "opus" }),
+    m("claude", "strongest", "effort", { default: "max" }),
+    m("codex", "light", "model", { default: "mini" }),
+    m("codex", "light", "effort", { set: true, value: "", default: "low" }),
+  ]
+  const render = (
+    entries: SettingsEntry[],
+    onWrite = vi.fn(async () => ({}) as SettingsWriteResult),
+    tableGroups = ["Claude", "Codex"],
+  ) => {
+    const categories = treeFromEntries(entries)
+    for (const g of categories[0].sections[0].groups) g.table = tableGroups.includes(g.name)
+    const view = renderThemed(
+      <MemoryRouter initialEntries={["/settings"]}>
+        <SettingsShellView
+          entries={entries}
+          categories={categories}
+          projects={[]}
+          section="Models"
+          totpOn
+          onSignOut={() => {}}
+          onWrite={onWrite}
+        />
+      </MemoryRouter>,
+    )
+    return { ...view, onWrite }
+  }
+  const cell = (key: string) => document.querySelector(`[data-cell="${key}"]`) as HTMLElement
+
+  it("renders a table group as rows Light, Standard, Strongest with the key pattern", () => {
+    const { getByTestId } = render(models)
+    const claude = getByTestId("group-Claude")
+    expect(within(claude).getByText("Light")).toBeTruthy()
+    expect(within(claude).getByText("Standard")).toBeTruthy()
+    expect(within(claude).getByText("Strongest")).toBeTruthy()
+    expect(within(claude).getByText("Model")).toBeTruthy()
+    expect(within(claude).getByText("Effort")).toBeTruthy()
+    expect(within(claude).getByText("agents.claude.light.*")).toBeTruthy()
+    expect(within(claude).getByText("agents.claude.*")).toBeTruthy()
+    expect(within(claude).getByText("agents.claude.strongest.*")).toBeTruthy()
+    expect(getByTestId("group-count-Claude").textContent).toBe("1")
+    expect(getByTestId("group-count-Codex").textContent).toBe("1")
+  })
+
+  it("a group the registry does not mark as a table renders as rows", () => {
+    const { getByTestId, queryByText } = render(models, undefined, ["Codex"])
+    expect(queryByText("agents.claude.light.*")).toBeNull()
+    expect(getByTestId("group-Claude").textContent).toContain("claude light model")
+  })
+
+  it("shows a default plainly and an empty effective value as faint Claude default", () => {
+    render(models)
+    const missing = cell("agents.claude.light.model")
+    expect(missing.textContent).toContain("haiku")
+    expect(missing.getAttribute("data-set")).toBeNull()
+    const empty = cell("agents.claude.light.effort")
+    expect(empty.textContent).toContain("Claude default")
+    expect(empty.getAttribute("data-set")).toBeNull()
+    expect(within(empty).queryByRole("button", { name: /reset/i })).toBeNull()
+  })
+
+  it("a key set to an empty string shows Codex default with the amber edge and a reset", async () => {
+    const { onWrite } = render(models)
+    const set = cell("agents.codex.light.effort")
+    expect(set.textContent).toContain("Codex default")
+    expect(set.getAttribute("data-set")).toBe("true")
+    fireEvent.click(within(set).getByRole("button", { name: /reset/i }))
+    await act(async () => {})
+    expect(onWrite).toHaveBeenCalledWith([{ key: "agents.codex.light.effort", remove: true }])
+  })
+
+  it("a click opens the editor; Enter saves and the cell closes", async () => {
+    const { onWrite } = render(models)
+    fireEvent.click(within(cell("agents.claude.light.model")).getByText("haiku"))
+    const input = within(cell("agents.claude.light.model")).getByRole("textbox")
+    fireEvent.change(input, { target: { value: "sonnet" } })
+    fireEvent.keyDown(input, { key: "Enter" })
+    await act(async () => {})
+    expect(onWrite).toHaveBeenCalledWith([{ key: "agents.claude.light.model", value: "sonnet" }])
+    expect(within(cell("agents.claude.light.model")).queryByRole("textbox")).toBeNull()
+  })
+
+  it("Escape and Cancel close the cell without writing", () => {
+    const { onWrite } = render(models)
+    fireEvent.click(within(cell("agents.claude.light.model")).getByText("haiku"))
+    fireEvent.keyDown(within(cell("agents.claude.light.model")).getByRole("textbox"), {
+      key: "Escape",
+    })
+    expect(within(cell("agents.claude.light.model")).queryByRole("textbox")).toBeNull()
+    fireEvent.click(within(cell("agents.claude.strongest.model")).getByText("opus"))
+    fireEvent.click(
+      within(cell("agents.claude.strongest.model")).getByRole("button", { name: "Cancel" }),
+    )
+    expect(within(cell("agents.claude.strongest.model")).queryByRole("textbox")).toBeNull()
+    expect(onWrite).not.toHaveBeenCalled()
+  })
+
+  it("saving an empty field writes an empty string", async () => {
+    const { onWrite } = render(models)
+    fireEvent.click(within(cell("agents.claude.model")).getByText("opus"))
+    const input = within(cell("agents.claude.model")).getByRole("textbox")
+    fireEvent.change(input, { target: { value: "" } })
+    fireEvent.keyDown(input, { key: "Enter" })
+    await act(async () => {})
+    expect(onWrite).toHaveBeenCalledWith([{ key: "agents.claude.model", value: "" }])
+  })
+
+  it("a refused save keeps the cell open with the draft and the reason under it", async () => {
+    const onWrite = vi.fn(
+      async () =>
+        ({
+          refused: true,
+          keys: ["agents.claude.light.model"],
+          reason: "unknown model",
+        }) as SettingsWriteResult,
+    )
+    const { getByText } = render(models, onWrite)
+    fireEvent.click(within(cell("agents.claude.light.model")).getByText("haiku"))
+    const input = within(cell("agents.claude.light.model")).getByRole("textbox") as HTMLInputElement
+    fireEvent.change(input, { target: { value: "nope" } })
+    fireEvent.click(within(cell("agents.claude.light.model")).getByRole("button", { name: "Save" }))
+    await act(async () => {})
+    expect(input.value).toBe("nope")
+    expect(getByText("Not saved: unknown model")).toBeTruthy()
+  })
+
+  it("search shows Models keys as ordinary rows with the full key path", () => {
+    const { getByLabelText, queryByText, getAllByText } = render(models)
+    fireEvent.change(getByLabelText("Search settings"), { target: { value: "light" } })
+    expect(queryByText("agents.claude.light.*")).toBeNull()
+    expect(getAllByText("agents.claude.light.model").length).toBeGreaterThan(0)
   })
 })

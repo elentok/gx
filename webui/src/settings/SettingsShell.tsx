@@ -14,6 +14,7 @@ import { DEV_FRONTEND_KEY } from "../dev"
 import { DevFrontendRow } from "./DevFrontendRow"
 import { SettingsRow, type WriteSetting } from "./SettingsRow"
 import { ChecksEditor } from "./ChecksEditor"
+import { ModelsTable } from "./ModelsTable"
 import { CHECKS_KEY } from "./checks"
 
 export const projectPath = (project: string) => `/settings/p/${encodeURIComponent(project)}`
@@ -249,13 +250,14 @@ function sectionGroups(
   section: string,
   sectionEntries: SettingsEntry[],
 ) {
-  const named =
-    categories
-      .flatMap((c) => c.sections)
-      .find((s) => s.name === section)
-      ?.groups.map((g) => g.name) ?? []
+  const tree = categories.flatMap((c) => c.sections).find((s) => s.name === section)?.groups ?? []
+  const named = tree.map((g) => g.name)
   return [...new Set([...named, ...sectionEntries.map((e) => e.group)])]
-    .map((name) => ({ name, entries: sectionEntries.filter((e) => e.group === name) }))
+    .map((name) => ({
+      name,
+      table: tree.find((g) => g.name === name)?.table ?? false,
+      entries: sectionEntries.filter((e) => e.group === name),
+    }))
     .filter((g) => g.entries.length > 0)
 }
 
@@ -288,8 +290,16 @@ export function SectionBody({
           <Group key="">{g.entries.map(row)}</Group>
         ) : (
           <GroupBlock key={g.name} title={g.name} changed={g.entries.filter((e) => e.set).length}>
-            {g.entries.map((e) =>
-              project !== undefined && e.identity ? <IdentityRow key={e.key} entry={e} /> : row(e),
+            {g.table ? (
+              <ModelsTable agent={g.name} entries={g.entries} onWrite={onWrite} />
+            ) : (
+              g.entries.map((e) =>
+                project !== undefined && e.identity ? (
+                  <IdentityRow key={e.key} entry={e} />
+                ) : (
+                  row(e)
+                ),
+              )
             )}
           </GroupBlock>
         ),

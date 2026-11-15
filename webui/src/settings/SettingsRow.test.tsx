@@ -58,6 +58,19 @@ describe("SettingsRow", () => {
     expect(input.value).toBe("a")
   })
 
+  it("Enter saves the draft and Escape restores the saved value", async () => {
+    const { getByRole, onWrite } = setup(entry({ type: "string", set: true, value: "a" }))
+    const input = getByRole("textbox") as HTMLInputElement
+    fireEvent.change(input, { target: { value: "b" } })
+    fireEvent.keyDown(input, { key: "Escape" })
+    expect(input.value).toBe("a")
+    fireEvent.change(input, { target: { value: "c" } })
+    fireEvent.keyDown(input, { key: "Enter" })
+    await flush()
+    expect(onWrite).toHaveBeenCalledTimes(1)
+    expect(onWrite).toHaveBeenCalledWith([{ key: "execution-queue.max-agents", value: "c" }])
+  })
+
   it("shows a unit hint beside duration and size fields", () => {
     expect(setup(entry({ type: "duration" })).getByText("e.g. 30s, 5m, 2h")).toBeTruthy()
     expect(setup(entry({ type: "size" })).getByText("e.g. 50G")).toBeTruthy()
