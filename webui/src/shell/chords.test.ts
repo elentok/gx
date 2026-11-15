@@ -10,6 +10,7 @@ import {
   matchesKey,
   parseKey,
 } from "./chords"
+import { getBigPrompt, setBigPrompt } from "../ui/expandable-text/bigPromptStore"
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -187,10 +188,34 @@ describe("chord table c and d", () => {
       ["c", "New chat", true],
       ["d", "New design", true],
       ["s", "Focus sidebar", true],
+      ["b", "Big prompt box", true],
       ["r", "Rename chat", false],
       ["m", "Switch model", false],
       ["x", "Remove chat", false],
     ])
+  })
+})
+
+describe("chord table b", () => {
+  afterEach(() => setBigPrompt(false))
+  const b = () =>
+    chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} }).find(
+      (c) => c.key === "b",
+    )!
+
+  it("is offered on every page", () => {
+    for (const path of ["/agents/s1", "/drafts/d1", "/designs/x", "/epics", "/agents"]) {
+      expect(b().available({ path })).toBe(true)
+    }
+  })
+
+  it("flips the store and relabels", () => {
+    expect(b().label({ path: "/" })).toBe("Big prompt box")
+    b().run()
+    expect(getBigPrompt()).toBe(true)
+    expect(b().label({ path: "/" })).toBe("Normal prompt box")
+    b().run()
+    expect(getBigPrompt()).toBe(false)
   })
 })
 

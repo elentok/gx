@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
+import { setBigPrompt } from "../ui/expandable-text/bigPromptStore"
 import { hasLayer } from "../ui/modal/layers"
 import { renderThemed } from "../ui/render"
 import { ChordBox } from "./ChordBox"
@@ -64,7 +65,25 @@ test("lists the real chord table", () => {
     "cNew chat",
     "dNew design",
     "sFocus sidebar",
+    "bBig prompt box",
   ])
+})
+
+test("labels the b row Normal prompt box after big mode is on, and has no Gear control", () => {
+  const table = chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })
+  const open = () => {
+    renderThemed(<ChordBox leader="cmd+e" ctx={ctx} chords={table} onClose={() => {}} />)
+    const out = screen.getAllByRole("menuitem").map((i) => i.textContent)
+    cleanup()
+    return out
+  }
+  try {
+    setBigPrompt(true)
+    expect(open()).toContain("bNormal prompt box")
+    expect(screen.queryByRole("button")).toBeNull()
+  } finally {
+    setBigPrompt(false)
+  }
 })
 
 test("lists Switch model on a chat's page and not on a design's", () => {

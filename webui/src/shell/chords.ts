@@ -3,6 +3,7 @@ import { canManage, isChat } from "../agents/sessionWrites"
 import { useConnectionContext, useConnectionState } from "../connection"
 import type { SessionInfo } from "../generated/server"
 import { isMac } from "../platform"
+import { getBigPrompt, toggleBigPrompt } from "../ui/expandable-text/bigPromptStore"
 import { focusSidebar } from "./focusSidebar"
 import { startNewDesign } from "../design/newDesign"
 import { openNewAgent } from "./newItemOpen"
@@ -128,6 +129,12 @@ export function chordTable({
       available: () => true,
     },
     { key: "s", label: () => "Focus sidebar", run: focusSidebar, available: () => true },
+    {
+      key: "b",
+      label: () => (getBigPrompt() ? "Normal prompt box" : "Big prompt box"),
+      run: toggleBigPrompt,
+      available: () => true,
+    },
     {
       key: "r",
       label: ({ path }) => (draftIdOf(path) ? "Rename" : "Rename chat"),

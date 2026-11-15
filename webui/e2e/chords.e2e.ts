@@ -372,7 +372,7 @@ test("Chords", async ({ page, start }) => {
   for (const hash of ["#/d/side:side-design", queueAgentHash]) {
     await goto(page, hash)
     await openBox()
-    await expect(chordBox.getByRole("menuitem")).toHaveCount(3)
+    await expect(chordBox.getByRole("menuitem")).toHaveCount(4)
     await expect(chordBox.getByRole("menuitem", { name: /^x/ })).toHaveCount(0)
     await expect(chordBox.getByRole("menuitem", { name: /^r/ })).toHaveCount(0)
     await page.keyboard.press("x")

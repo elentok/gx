@@ -6,7 +6,8 @@ import { ConnectionContext, type Connection, type ConnectionState } from "../con
 import { Modal } from "../ui/modal/Modal"
 import { renderThemed } from "../ui/render"
 import { ChordHost } from "./ChordHost"
-import type { Chord } from "./chords"
+import { getBigPrompt, setBigPrompt } from "../ui/expandable-text/bigPromptStore"
+import { chordTable, type Chord } from "./chords"
 import { registerDraftPage } from "./draftPageActions"
 import { closeRename, useRenameRequest } from "./renameOpen"
 
@@ -147,6 +148,36 @@ test("with a layer open the Leader key opens nothing", () => {
   )
   leaderKey()
   expect(box()).toBeNull()
+})
+
+describe("Leader then b", () => {
+  const table = () => chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })
+  afterEach(() => setBigPrompt(false))
+
+  test("flips big mode from a focused textarea and the text stays", () => {
+    setup(table(), "ctrl+e", <textarea aria-label="Message" />)
+    const field = screen.getByLabelText("Message") as HTMLTextAreaElement
+    field.focus()
+    fireEvent.change(field, { target: { value: "hi" } })
+    leaderKey(field)
+    fireEvent.keyDown(field, { code: "KeyB", key: "b" })
+    expect(getBigPrompt()).toBe(true)
+    expect(field.value).toBe("hi")
+  })
+
+  test("does nothing with a layer open", () => {
+    setup(
+      table(),
+      "ctrl+e",
+      <Modal label="Over" onClose={() => {}}>
+        <p>body</p>
+      </Modal>,
+    )
+    leaderKey()
+    press("KeyB")
+    expect(box()).toBeNull()
+    expect(getBigPrompt()).toBe(false)
+  })
 })
 
 test("the box stays open with no timer", () => {
