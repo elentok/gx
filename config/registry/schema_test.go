@@ -68,7 +68,7 @@ func TestGeneratedSchemas(t *testing.T) {
 func TestSchemaFollowsRegistry(t *testing.T) {
 	changed := registry.New(registry.Entry{
 		Key: registry.Key("budget", "soft-limit"), Type: registry.TypeNumber,
-		Section: registry.SectionBudget, Description: "edited",
+		Category: registry.CategoryRalphLoop, Section: registry.SectionBudget, Group: "Spend limits", Description: "edited",
 	})
 	if string(changed.ConfigSchema(configDefaults(t))) == string(registry.Default().ConfigSchema(configDefaults(t))) {
 		t.Fatal("a changed registry produced the same schema")

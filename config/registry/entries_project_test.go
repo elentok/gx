@@ -8,7 +8,16 @@ func TestProjectView(t *testing.T) {
 	for _, ps := range view {
 		order = append(order, ps.Section)
 	}
-	want := []Section{SectionProject, SectionExecutionQueue, SectionDiskSpace, SectionAgents, SectionModels, SectionPullRequests, SectionEvolveRecovery, SectionChecks}
+	want := []Section{SectionProject, SectionAgents, SectionModels, SectionExecutionQueue, SectionPullRequests, SectionEvolveRecovery, SectionDiskSpace, SectionChecks}
+	if view[0].Category != CategoryProject || view[len(view)-1].Category != CategoryChecks {
+		t.Errorf("project view must start in Project and end in Checks: %v ... %v", view[0].Category, view[len(view)-1].Category)
+	}
+	for _, ps := range view {
+		if ps.Section == SectionDiskSpace && (len(ps.Entries) != 1 || ps.Entries[0].Group != "Cleanup" ||
+			ps.Entries[0].Key.String() != "disk-space.cleanup-command") {
+			t.Errorf("disk space in project view = %+v", ps.Entries)
+		}
+	}
 	if len(order) != len(want) {
 		t.Fatalf("sections = %v, want %v", order, want)
 	}
@@ -117,16 +126,11 @@ func TestExclusionsHaveReasons(t *testing.T) {
 
 func TestCoverage(t *testing.T) {
 	r := Default()
-	for _, s := range Sections() {
-		if len(r.InSection(s)) == 0 {
-			t.Errorf("section %v has no entries", s)
-		}
-	}
 	for _, e := range r.All() {
 		if !e.ProjectOverridable {
 			continue
 		}
-		if len(e.ProjectPath()) == 0 || !e.Section.IsGlobal() {
+		if len(e.ProjectPath()) == 0 || e.Category == CategoryProject || e.Category == CategoryChecks {
 			t.Errorf("%v: no project placement", e.Key)
 		}
 	}

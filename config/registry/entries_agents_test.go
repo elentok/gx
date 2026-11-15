@@ -19,10 +19,6 @@ func TestAgentsEntries(t *testing.T) {
 	cases := []want{
 		{key: Key("agents", "default-harness"), typ: TypeEnum, section: a, projectOv: true},
 		{key: Key("agents", "restore-sessions-on-start"), typ: TypeBool, section: a},
-		{key: Key("agents", "banners", "enabled"), typ: TypeBool, section: a},
-		{key: Key("agents", "sounds", "enabled"), typ: TypeBool, section: a},
-		{key: Key("agents", "sounds", "done"), typ: TypeString, section: a},
-		{key: Key("agents", "sounds", "attention"), typ: TypeString, section: a},
 		{key: Key("agents", "claude-args"), typ: TypeStringList, section: a},
 		{key: Key("agents", "writable-directories"), typ: TypeStringList, section: a, projectOv: true},
 		{key: Key("agents", "fix-agent-remote-control"), typ: TypeBool, section: a},
@@ -48,6 +44,20 @@ func TestAgentsEntries(t *testing.T) {
 				parts := append(append([]string{"agents", agent}, tier...), knob)
 				cases = append(cases, want{key: Key(parts...), typ: TypeString, section: SectionModels, projectOv: true})
 			}
+		}
+	}
+	// The Standard tier stands for the key without a tier prefix.
+	tiers := map[string]Tier{"agents.claude.model": TierStandard, "agents.claude.effort": TierStandard,
+		"agents.claude.light.model": TierLight, "agents.claude.strongest.effort": TierStrongest,
+		"agents.codex.model": TierStandard, "agents.codex.light.effort": TierLight, "agents.codex.strongest.model": TierStrongest}
+	for k, tier := range tiers {
+		e, _ := r.Lookup(Key(strings.Split(k, ".")...))
+		col := ColumnModel
+		if strings.HasSuffix(k, "effort") {
+			col = ColumnEffort
+		}
+		if e.Tier != tier || e.Column != col {
+			t.Errorf("%s: tier/column = %q/%q, want %q/%q", k, e.Tier, e.Column, tier, col)
 		}
 	}
 	if got := len(r.All()); got != len(cases) {

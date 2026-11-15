@@ -2,6 +2,8 @@
 // that config can import it; it must not import config.
 package registry
 
+import "sort"
+
 // ValueType is the kind of value a setting holds.
 type ValueType int
 
@@ -17,54 +19,6 @@ const (
 	TypeSecret
 	TypeChecks
 )
-
-// Section groups entries on the settings page. "Global" is not a section.
-type Section int
-
-// Global sections come first, in page order; project-only sections follow.
-const (
-	SectionExecutionQueue Section = iota
-	SectionBudget
-	SectionNotifications
-	SectionServer
-	SectionWebUI
-	SectionKeybindings
-	SectionCPUWatchdog
-	SectionProcessWatchdog
-	SectionDiskSpace
-	SectionAgents
-	SectionModels
-	SectionPullRequests
-	SectionEvolveRecovery
-	SectionTicketStore
-	SectionProject
-	SectionChecks
-)
-
-var sectionNames = [...]string{
-	"Execution queue", "Budget", "Notifications", "Server", "Web UI",
-	"Keybindings", "CPU watchdog", "Process watchdog", "Disk space", "Agents", "Models",
-	"Pull requests", "Evolve and recovery", "Ticket store", "Project", "Checks",
-}
-
-func (s Section) String() string {
-	if s < 0 || int(s) >= len(sectionNames) {
-		return "unknown"
-	}
-	return sectionNames[s]
-}
-
-// IsGlobal reports whether the section is one of the global sections.
-func (s Section) IsGlobal() bool { return s >= SectionExecutionQueue && s <= SectionTicketStore }
-
-// Sections returns every section in order.
-func Sections() []Section {
-	out := make([]Section, len(sectionNames))
-	for i := range out {
-		out[i] = Section(i)
-	}
-	return out
-}
 
 // OverrideMode is how a project row relates to its global key.
 type OverrideMode string
@@ -89,8 +43,14 @@ type Entry struct {
 	Min         *float64 // a number's minimum
 	Integer     bool     // a number must be whole
 	Description string
-	Section     Section
-	Enum        []string // allowed values of a TypeEnum
+	// Category, Section and Group place the entry on the settings page.
+	Category Category
+	Section  Section
+	Group    string
+	// Tier and Column place a key of a table group (Models) in its table.
+	Tier   Tier
+	Column Column
+	Enum   []string // allowed values of a TypeEnum
 	// CheckString, when set, checks a TypeString value. It returns a short
 	// sentence the page shows after "Not saved: ", or nil.
 	CheckString func(string) error
@@ -121,6 +81,9 @@ type Entry struct {
 	Identity bool
 }
 
+// Place is where the entry sits on the page.
+func (e Entry) Place() Place { return Place{e.Category, e.Section, e.Group} }
+
 // ProjectPath is the key path in project.json.
 func (e Entry) ProjectPath() KeyPath {
 	if len(e.ProjectKey) > 0 {
@@ -148,21 +111,17 @@ type Registry struct {
 	entries []Entry
 }
 
-// New builds a registry with entries sorted stably by section, keeping the
-// given order within a section.
+// New builds a registry with entries sorted stably by category, section and
+// group in tree order, keeping the given order within a group.
 func New(entries ...Entry) *Registry {
-	var out []Entry
-	for _, s := range Sections() {
-		for _, e := range entries {
-			if e.Section == s {
-				out = append(out, e)
-			}
-		}
-	}
+	out := append([]Entry(nil), entries...)
+	sort.SliceStable(out, func(i, j int) bool {
+		return placeIndex(out[i].Place()) < placeIndex(out[j].Place())
+	})
 	return &Registry{entries: out}
 }
 
-// All returns every entry in section order.
+// All returns every entry in page order.
 func (r *Registry) All() []Entry { return append([]Entry(nil), r.entries...) }
 
 // Lookup finds an entry by key path.
@@ -196,33 +155,28 @@ func Default() *Registry {
 	return New(all...)
 }
 
-// ProjectSection is one section of a project's view.
+// ProjectSection is one section of a project's view. Entries are in page
+// order, so a group with no overridable key never appears.
 type ProjectSection struct {
-	Section Section
-	Entries []Entry
+	Category Category
+	Section  Section
+	Entries  []Entry
 }
 
-// ProjectView groups the entries that apply to a project: Project first, then
-// each other section that holds one, Checks last. Notifications never shows.
+// ProjectView groups the entries that apply to a project by section, in tree
+// order: Project first, Checks last. A section or category with no applicable
+// key is left out.
 func (r *Registry) ProjectView() []ProjectSection {
-	order := []Section{SectionProject}
-	for _, s := range Sections() {
-		if s != SectionProject && s != SectionChecks && s != SectionNotifications {
-			order = append(order, s)
-		}
-	}
-	order = append(order, SectionChecks)
 	var out []ProjectSection
-	for _, s := range order {
-		var es []Entry
-		for _, e := range r.InSection(s) {
-			if e.AppliesToProject() {
-				es = append(es, e)
-			}
+	for _, e := range r.entries {
+		if !e.AppliesToProject() {
+			continue
 		}
-		if len(es) > 0 {
-			out = append(out, ProjectSection{Section: s, Entries: es})
+		if n := len(out); n > 0 && out[n-1].Section == e.Section {
+			out[n-1].Entries = append(out[n-1].Entries, e)
+			continue
 		}
+		out = append(out, ProjectSection{Category: e.Category, Section: e.Section, Entries: []Entry{e}})
 	}
 	return out
 }

@@ -39,7 +39,8 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
 A new config key must reach the settings page or be excluded with a reason:
 
 1. Add its entry in `config/registry`, or an exclusion entry (with a reason) in
-   `config/registry/exclusions.go`.
+   `config/registry/exclusions.go`. The entry names its category, section and group; they must
+   exist in the tree in `config/registry/tree.go`.
 2. Regenerate the schemas:
    `go test ./config/registry -run TestGeneratedSchemas -update`.
 3. Run the guard: `go test ./config -run TestSettingsGuard`. It names any key missing from the
