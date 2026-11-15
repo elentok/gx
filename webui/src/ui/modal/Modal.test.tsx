@@ -1,6 +1,11 @@
 import { ChakraProvider } from "@chakra-ui/react"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { EditorView } from "@codemirror/view"
+import { getCM, Vim } from "@replit/codemirror-vim"
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { ConnectionContext, type Connection, type ConnectionState } from "../../connection"
+import { CoarsePointerContext } from "../../useWide"
+import { PromptBox } from "../expandable-text/PromptBox"
 import { renderThemed } from "../render"
 import { system } from "../theme"
 import { Modal } from "./Modal"
@@ -163,6 +168,50 @@ describe("Modal", () => {
         </Modal>,
       )
       expect(() => fireEvent.keyDown(screen.getByRole("dialog"), { key: "Tab" })).not.toThrow()
+    })
+  })
+
+  describe("with an inline vi box", () => {
+    async function mountVi() {
+      const state = {
+        snapshot: { sessions: [], vi_mode: true },
+        connected: true,
+        loadedOnce: true,
+        tick: 0,
+      } as unknown as ConnectionState
+      const conn = {
+        getState: () => state,
+        subscribe: () => () => {},
+        onEvent: () => () => {},
+      } as unknown as Connection
+      const onClose = vi.fn()
+      renderThemed(
+        <CoarsePointerContext.Provider value={false}>
+          <ConnectionContext.Provider value={conn}>
+            <Modal label="Thing" onClose={onClose}>
+              <PromptBox label="Note" name="note" title="Note" value="" onChange={() => {}} />
+            </Modal>
+          </ConnectionContext.Provider>
+        </CoarsePointerContext.Provider>,
+      )
+      const box = () => screen.getByRole("textbox", { name: "Note" })
+      await waitFor(() => expect(box().tagName).toBe("DIV"))
+      const view = EditorView.findFromDOM(box())!
+      return { onClose, view, cm: getCM(view)! }
+    }
+
+    it("stays open on Escape in INSERT", async () => {
+      const { onClose, view } = await mountVi()
+      fireEvent.keyDown(view.contentDOM, { key: "Escape" })
+      expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it("closes on Escape in NORMAL", async () => {
+      const { onClose, view, cm } = await mountVi()
+      act(() => void Vim.handleKey(cm, "<Esc>", "user"))
+      expect(view.dom.parentElement!.getAttribute("data-vi-mode")).toBe("NORMAL")
+      fireEvent.keyDown(view.contentDOM, { key: "Escape" })
+      expect(onClose).toHaveBeenCalledTimes(1)
     })
   })
 

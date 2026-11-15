@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { CoarsePointerContext, WideContext } from "../../useWide"
 import { renderThemed } from "../render"
+import { setBigPrompt } from "./bigPromptStore"
 import { LargeEditor } from "./LargeEditor"
 
 const vi_state = vi.hoisted(() => ({
@@ -18,13 +19,15 @@ vi.mock("./CodeEditor", async () => {
     default: ({
       onModeChange,
       handle,
+      inline,
     }: {
       onModeChange: (m: string) => void
       handle: React.Ref<{ escape: () => void }>
+      inline?: { rows: number }
     }) => {
       useImperativeHandle(handle, () => ({ escape: vi_state.escape }), [])
       return (
-        <div data-testid="fake-editor">
+        <div data-testid="fake-editor" data-inline-rows={inline?.rows}>
           {["NORMAL", "VISUAL"].map((m) => (
             <button key={m} data-testid={`fake-mode-${m}`} onClick={() => onModeChange(m)} />
           ))}
@@ -142,6 +145,18 @@ describe("vi mode text and bar", () => {
     observer.disconnect()
     expect(mutations).toBe(2)
     expect(status.textContent).toBe("VISUAL")
+  })
+
+  test("big prompt mode leaves the large editor's size alone", async () => {
+    setBigPrompt(true)
+    try {
+      await setup({ wide: true, coarse: false })
+      // Only the inline editor gets a row count; the large one fills its panel.
+      expect(screen.getByTestId("fake-editor").hasAttribute("data-inline-rows")).toBe(false)
+    } finally {
+      setBigPrompt(false)
+      localStorage.clear()
+    }
   })
 
   test("vi off: no status region and no Esc", async () => {

@@ -213,9 +213,9 @@ test("Escape does not close the editor", () => {
 })
 
 // The existing tests mean the textarea, so the pointer is coarse unless a test says otherwise.
-function withVi(on: boolean, ui: ReactNode, coarse = true) {
+function withVi(on: boolean, ui: ReactNode, coarse = true, escape = "") {
   const state = {
-    snapshot: { sessions: [], vi_mode: on },
+    snapshot: { sessions: [], vi_mode: on, vi_escape: escape },
     connected: true,
     loadedOnce: true,
     tick: 0,
@@ -569,6 +569,18 @@ test.each([
   withVi(true, <Live rows={rows} fine />)
   const view = await inlineView()
   expect(view.dom.parentElement!.style.getPropertyValue("--prompt-rows")).toBe(expected)
+})
+
+test("the escape sequence takes the inline box from INSERT to NORMAL", async () => {
+  withVi(true, <Harness />, false, "jk")
+  const view = await inlineView()
+  const host = view.dom.parentElement!
+  const cm = getCM(view)!
+  expect(host.getAttribute("data-vi-mode")).toBe("INSERT")
+  act(() => void Vim.handleKey(cm, "j", "user"))
+  act(() => void Vim.handleKey(cm, "k", "user"))
+  expect(host.getAttribute("data-vi-mode")).toBe("NORMAL")
+  expect(view.state.doc.toString()).toBe("")
 })
 
 test("flipping big mode resizes the inline editor without remounting it", async () => {
