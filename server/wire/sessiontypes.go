@@ -77,6 +77,17 @@ type SessionInfo struct {
 	// ModelSwitched is set when Model is not the one the launch tier chose, so
 	// the person switched it by hand. Never set for a launch with no explicit model.
 	ModelSwitched bool `json:"model_switched,omitempty"`
+	// LatestModel is the latest model of Model's family, set only when a newer
+	// one is listed. LatestTiers are the tiers of the session's harness whose
+	// configured model is Model, and LatestEffort the effort a switch to
+	// LatestModel would run with; both are set with LatestModel only.
+	LatestModel string `json:"latest_model,omitempty"`
+	// LatestTiers holds tier names as strings: tygo prints a union element
+	// type of a slice without parentheses, which types it wrongly.
+	LatestTiers  []string `json:"latest_tiers,omitempty"`
+	LatestEffort string   `json:"latest_effort,omitempty"`
+	// HasHistory is true once the chat has a completed turn.
+	HasHistory bool `json:"has_history,omitempty"`
 	// ContextTokens, ContextLevel and ContextCeiling are the context occupancy
 	// of a Claude or Codex session or a Queue agent, from its newest reply, and
 	// the smart-zone token ceiling the level is measured against; all are

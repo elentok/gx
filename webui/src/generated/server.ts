@@ -3002,6 +3002,23 @@ export interface SessionInfo {
    */
   model_switched?: boolean;
   /**
+   * LatestModel is the latest model of Model's family, set only when a newer
+   * one is listed. LatestTiers are the tiers of the session's harness whose
+   * configured model is Model, and LatestEffort the effort a switch to
+   * LatestModel would run with; both are set with LatestModel only.
+   */
+  latest_model?: string;
+  /**
+   * LatestTiers holds tier names as strings: tygo prints a union element
+   * type of a slice without parentheses, which types it wrongly.
+   */
+  latest_tiers?: string[];
+  latest_effort?: string;
+  /**
+   * HasHistory is true once the chat has a completed turn.
+   */
+  has_history?: boolean;
+  /**
    * ContextTokens, ContextLevel and ContextCeiling are the context occupancy
    * of a Claude or Codex session or a Queue agent, from its newest reply, and
    * the smart-zone token ceiling the level is measured against; all are

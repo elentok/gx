@@ -68,6 +68,8 @@ func (mg *Manager) SessionInfo(m Meta) wire.SessionInfo {
 		info.ContextCeiling = agent.SmartZoneCeiling
 		info.Usage = mg.chat.ConversationUsage(cm)
 	}
+	info.HasHistory = tokens > 0
+	mg.setLatestModel(&info, m.Harness)
 	info.ModelSwitched = m.SwitchedByHand || chat.ModelSwitched(m.Model, info.Model)
 	if at := mg.prompter.AutoAdvanceDeadline(m.ID); !at.IsZero() {
 		info.AutoAdvanceAt = &at
