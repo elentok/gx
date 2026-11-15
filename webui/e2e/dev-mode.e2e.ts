@@ -102,8 +102,8 @@ test("Dev mode (menu flip, status journey, settings row, PWA)", async ({ page, s
   expect(await devKey(fixture)).toBe(false)
 
   // Settings row: the switch turns Dev mode back on with no confirm dialog.
-  await go(page, "#/settings/s/server")
-  await page.getByRole("switch", { name: /dev.frontend/i }).click()
+  await go(page, "#/settings/s/display-and-development")
+  await page.getByRole("switch", { name: "Dev mode" }).click()
   await expect(page.getByRole("dialog")).toHaveCount(0)
   await expect.poll(() => devKey(fixture)).toBe(true)
 

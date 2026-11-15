@@ -29,6 +29,15 @@ async function saveText(page: Page, label: string, value: string) {
 // Rows keep their own "Saved" note for a moment, so more than one can show at once.
 const saved = (page: Page) => page.getByRole("status").filter({ hasText: "Saved" }).first()
 
+/** The number on a group's changed chip; a group with no changed row has no chip. */
+const groupCount = async (page: Page, group: string) => {
+  const chip = page.getByTestId(`group-count-${group}`)
+  return (await chip.count()) === 0 ? 0 : Number(await chip.innerText())
+}
+
+/** A Models cell: its first button opens it, and its input shows while open. */
+const cell = (page: Page, key: string) => page.locator(`[data-cell="${key}"]`)
+
 const noSideScroll = async (page: Page) => {
   await expect
     .poll(() =>
@@ -45,9 +54,19 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   await go(page, globalHash("execution-queue"), "Execution queue")
   const before = await fixture.globalConfig()
 
-  // A number and a duration reach config.json with the other keys intact.
+  // The sidebar lists the six global categories (Project and Checks hold project-only keys).
+  const categories = page.locator('[data-mock-part="sidebar"] button[aria-expanded]')
+  await expect(categories).toHaveCount(6)
+  for (const name of ["Agents", "Ralph loop", "Notifications", "Web UI", "System", "Account"]) {
+    await expect(categories.filter({ hasText: name })).toHaveCount(1)
+  }
+
+  // A number and a duration reach config.json with the other keys intact; a newly set key raises its group's chip by one.
+  const waitingGroup = "Waiting and stalled agents"
+  const chipBefore = await groupCount(page, waitingGroup)
   await saveText(page, "Max released agents", "5")
   await saveText(page, "Waiting slot grace", "20s")
+  await expect.poll(() => groupCount(page, waitingGroup)).toBe(chipBefore + 1)
   const after = await fixture.globalConfig()
   expect(after["execution-queue"]["max-released-agents"]).toBe(5)
   expect(after["execution-queue"]["waiting-slot-grace"]).toBe("20s")
@@ -67,7 +86,9 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   expect((await fixture.globalConfig())["execution-queue"]["waiting-slot-grace"]).toBe("20s")
 
   // Reset removes the key from the file.
+  // The group lists Waiting slot grace before Max released agents, and both are set.
   await page
+    .getByTestId(`group-${waitingGroup}`)
     .getByRole("button", { name: /^Reset to default/ })
     .first()
     .click()
@@ -78,6 +99,10 @@ test("200. Settings page, global journey", async ({ page, start }) => {
 
   // Secrets: the read response and the page carry the state, never the value.
   await go(page, globalHash("notifications"), "Notifications")
+  // Banners and sounds sit in the Desktop group.
+  const desktop = page.getByTestId("group-Desktop")
+  await expect(desktop.getByRole("switch", { name: "OS banners" })).toBeVisible()
+  await expect(desktop.getByRole("switch", { name: "Sounds" })).toBeVisible()
   const body = await page.evaluate(async () => (await fetch("/v1/settings?target=global")).text())
   expect(body).toContain("notifications.slack.webhook-url")
   expect(body).not.toContain("fixture-bot-token")
@@ -99,9 +124,57 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   await saveText(page, "Runner wait", "45s")
   await expect(page.getByText("Restart needed to apply").first()).toBeVisible()
 
-  // Keybindings: the two Leader keys and vi escape live here, vi escape no longer in Web UI.
-  await go(page, globalHash("web-ui"), "Web UI")
+  // Access holds the listen address, the allowed hosts and the one-time code switch.
+  await go(page, globalHash("access"), "Access")
+  await expect(page.getByTestId("group-Network").getByText("Listen address").first()).toBeVisible()
+  await expect(page.getByTestId("group-Network").getByText("Allowed hosts").first()).toBeVisible()
+  await expect(
+    page.getByTestId("group-Sign-in").getByRole("switch", { name: "Require one-time code" }),
+  ).toBeVisible()
   await expect(text(page, "Vi escape sequence")).toHaveCount(0)
+
+  // Display and development, Watchdogs and the Models cells have their own sections.
+  await go(page, globalHash("display-and-development"), "Display and development")
+  await expect(page.getByRole("switch", { name: "Dev mode" })).toBeVisible()
+  await go(page, globalHash("watchdogs"), "Watchdogs")
+  await expect(page.getByTestId("group-CPU")).toBeVisible()
+  await expect(page.getByTestId("group-Process")).toBeVisible()
+
+  // A Models cell: Enter saves, Escape discards, an empty save writes "", reset removes the key.
+  await go(page, globalHash("models"), "Models")
+  const strongest = cell(page, "agents.claude.strongest.model")
+  const strongestModel = async () => (await fixture.globalConfig()).agents?.claude?.strongest?.model
+  expect(await strongestModel()).toBeUndefined()
+  await strongest.getByRole("button").first().click()
+  // gx's own default for this cell is opus, so the typed values differ from it.
+  await strongest.getByRole("textbox").fill("sonnet")
+  await strongest.getByRole("textbox").press("Enter")
+  await expect.poll(strongestModel).toBe("sonnet")
+  await strongest.getByRole("button", { name: "sonnet", exact: true }).click()
+  await strongest.getByRole("textbox").fill("haiku")
+  await strongest.getByRole("textbox").press("Escape")
+  await expect(strongest.getByRole("textbox")).toHaveCount(0)
+  await expect(strongest.getByRole("button", { name: "sonnet", exact: true })).toBeVisible()
+  expect(await strongestModel()).toBe("sonnet")
+  await strongest.getByRole("button", { name: "sonnet", exact: true }).click()
+  await strongest.getByRole("textbox").fill("")
+  await strongest.getByRole("textbox").press("Enter")
+  await expect.poll(strongestModel).toBe("")
+  await expect(strongest.getByRole("button", { name: "Claude default" })).toBeVisible()
+  await strongest.getByRole("button", { name: "Reset agents.claude.strongest.model" }).click()
+  await expect.poll(strongestModel).toBeUndefined()
+  await expect(strongest).not.toHaveAttribute("data-set", "true")
+  await expect(strongest.getByRole("button", { name: "opus", exact: true })).toBeVisible()
+
+  // The retired slugs land on the sections that took over their keys.
+  await go(page, globalHash("web-ui"), "Access")
+  await expect(page).toHaveURL(/#\/settings\/s\/access$/)
+  await go(page, globalHash("cpu-watchdog"), "Watchdogs")
+  await go(page, globalHash("access"), "Access")
+  await go(page, globalHash("process-watchdog"), "Watchdogs")
+  await expect(page).toHaveURL(/#\/settings\/s\/watchdogs$/)
+
+  // Keybindings: the two Leader keys and vi escape live here.
   await go(page, globalHash("keybindings"), "Keybindings")
   await expect(text(page, "Leader key (Mac)")).toBeVisible()
   await expect(text(page, "Leader key (other platforms)")).toBeVisible()
@@ -198,15 +271,18 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   await mac.close()
   await other.close()
 
-  // The phone layout has no sideways scroll on the home, a section and the project list.
+  // The phone layout has no sideways scroll on a section, the home and the project's section list.
   await page.setViewportSize({ width: 390, height: 844 })
   await noSideScroll(page)
-  await page.getByRole("link", { name: "‹ Settings" }).click()
+  await page.getByRole("link", { name: "Back to Settings" }).click()
   await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible()
+  const scope = page.getByRole("combobox", { name: "Settings scope" })
+  await expect(scope).toBeVisible()
   await expect(page.getByRole("link", { name: /^Budget/ })).toBeVisible()
   await noSideScroll(page)
-  await page.getByRole("link", { name: "demo", exact: true }).click()
-  await expect(page.getByRole("heading", { name: "demo", exact: true })).toBeVisible()
+  await scope.selectOption("demo")
+  await expect(page).toHaveURL(/#\/settings\/p\/demo$/)
+  await expect(page.getByText("Account", { exact: true })).toHaveCount(0)
   await noSideScroll(page)
   await page.getByRole("link", { name: /^Checks/ }).click()
   await expect(page.getByRole("heading", { name: "Checks", exact: true })).toBeVisible()
@@ -215,6 +291,32 @@ test("200. Settings page, global journey", async ({ page, start }) => {
 
 test("201. Settings page, project journey", async ({ page, start }) => {
   const fixture = await start("settings")
+
+  // The project tree starts with Project, ends with Checks and has no Notifications or Account.
+  await go(page, projectHash("plain", "execution-queue"), "Execution queue")
+  const categories = page.locator('[data-mock-part="sidebar"] button[aria-expanded]')
+  await expect(categories.first()).toContainText("Project")
+  await expect(categories.last()).toContainText("Checks")
+  await expect(categories.filter({ hasText: "Notifications" })).toHaveCount(0)
+  await expect(categories.filter({ hasText: "Account" })).toHaveCount(0)
+
+  // A key the project does not set shows the global value and an Override button.
+  await expect(page.getByText("Max agents per epic").first()).toBeVisible()
+  await expect(page.getByText("Uses the global value").first()).toBeVisible()
+  await expect(page.getByRole("button", { name: "Override for plain" }).first()).toBeVisible()
+
+  // The Project section's Repository and Delivery groups: read-only facts, and editable rows that reach project.json.
+  await go(page, projectHash("demo", "project"), "Project")
+  await expect(page.getByTestId("group-Repository")).toBeVisible()
+  await expect(page.getByTestId("group-Delivery")).toBeVisible()
+  await saveText(page, "Trunk", "develop")
+  expect((await fixture.projectConfig("demo")).trunk).toBe("develop")
+  const autoFf = (await fixture.projectConfig("demo"))["auto-ff-merge"]
+  await page.getByRole("switch", { name: "Auto ff merge" }).click()
+  await expect
+    .poll(async () => (await fixture.projectConfig("demo"))["auto-ff-merge"])
+    .not.toBe(autoFf)
+
   await go(page, projectHash("demo", "execution-queue"), "Execution queue")
 
   // Override a cap for the project, then go back to the global value.
@@ -253,4 +355,28 @@ test("201. Settings page, project journey", async ({ page, start }) => {
   await save(page).click()
   await expect.poll(async () => (await fixture.projectConfig("demo")).checks.format).toBeDefined()
   expect((await fixture.projectConfig("demo")).checks.test.full).toBe("true")
+
+  // Models: a project cell sets and resets against project.json, and an empty save removes the key.
+  await go(page, projectHash("demo", "models"), "Models")
+  const model = async (tier: string) =>
+    (await fixture.projectConfig("demo")).agents?.claude?.[tier]?.model
+  const light = cell(page, "agents.claude.light.model")
+  expect(await model("light")).toBeUndefined()
+  await light.getByRole("button").first().click()
+  await light.getByRole("textbox").fill("haiku")
+  await light.getByRole("textbox").press("Enter")
+  await expect.poll(() => model("light")).toBe("haiku")
+  await light.getByRole("button", { name: "Reset agents.claude.light.model" }).click()
+  await expect.poll(() => model("light")).toBeUndefined()
+  const strongest = cell(page, "agents.claude.strongest.model")
+  expect(await model("strongest")).toBe("opus")
+  await strongest.getByRole("button", { name: "opus", exact: true }).click()
+  await strongest.getByRole("textbox").fill("")
+  await strongest.getByRole("textbox").press("Enter")
+  await expect.poll(() => model("strongest")).toBeUndefined()
+
+  // Retired slugs land on the project's first section.
+  await go(page, projectHash("demo", "cpu-watchdog"), "Project")
+  await go(page, projectHash("demo", "execution-queue"), "Execution queue")
+  await go(page, projectHash("demo", "web-ui"), "Project")
 })

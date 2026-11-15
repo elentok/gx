@@ -22,7 +22,7 @@ var labels = map[string]string{
 	"watchdog.max-tree-processes":      "Max processes per agent",
 	"watchdog.interval":                "Check interval",
 	"watchdog.ulimit-headroom":         "Process headroom",
-	"agents.default-harness":           "Default agent",
+	"agents.default-harness":           "Default harness",
 	"agents.restore-sessions-on-start": "Restore sessions on start",
 	"agents.banners.enabled":           "OS banners",
 	"agents.sounds.enabled":            "Sounds",
