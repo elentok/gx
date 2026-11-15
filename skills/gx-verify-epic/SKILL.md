@@ -181,8 +181,10 @@ never fixes, never commits, never judges scope and never opens tickets.
 ### Verified section
 
 After each story, also append one entry to the `## Verified` section of your own ticket, in the
-format `- <story> — <verdict> @ <commit>`, where `<commit>` is `git rev-parse HEAD`. Rewrite the
-whole section each time with `gx tickets section <addr> "Verified" -`, keeping the earlier entries.
+format `- <story> — <verdict> @ <commit>`, where `<commit>` is `git rev-parse HEAD`. Copy
+`<story>` from the unit key in the ticket's `## Stories` section (one key per numbered story and
+per Mock states line), and never edit `## Stories`. Rewrite the whole `## Verified` section each
+time with `gx tickets section <addr> "Verified" -`, keeping the earlier entries.
 
 On a relaunch, start from that section. An entry counts only when its commit equals the current
 HEAD: trust it and skip that story. Re-check every other story, including entries marked

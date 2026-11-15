@@ -10,10 +10,10 @@ import (
 	"github.com/elentok/gx/config"
 )
 
-func TestDefault_BacklogEpicKindStepIsLastAndRewritesAreaKind(t *testing.T) {
+func TestDefault_VerifyStoriesStepIsLastAndBacklogEpicKindRewritesAreaKind(t *testing.T) {
 	names := Default.Names()
-	if got := names[len(names)-1]; got != "backlog-epic-kind" {
-		t.Fatalf("last step = %q, want backlog-epic-kind", got)
+	if got := names[len(names)-1]; got != "verify-stories" {
+		t.Fatalf("last step = %q, want verify-stories", got)
 	}
 	root := t.TempDir()
 	epic := filepath.Join(root, "e", "ticket.md")

@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func story(n int, group string, flows int, states ...string) PlanStory {
@@ -130,6 +132,31 @@ func buildBody(t *testing.T, spec string, nums ...int) (string, error) {
 		return "", err
 	}
 	return ts[0].Body, nil
+}
+
+func TestVerifyBodies_StoriesSectionListsEveryUnitCollectHasNone(t *testing.T) {
+	t.Parallel()
+	spec := groupedSpec + "\n**Mock states**\n\n- m1\n"
+	lone, err := BuildVerifyTickets(VerifyPlan{Stories: []PlanStory{story(1, "", 0, "m1"), story(4, "", 0)}}, spec, "docs/specs/x.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := schema.ParseStories(lone[0].Body)
+	if want := []string{"Story 1", "Story 4", "Mock states: m1"}; !slices.Equal(got, want) {
+		t.Errorf("units = %q, want %q\n%s", got, want, lone[0].Body)
+	}
+	parts, err := BuildVerifyTickets(VerifyPlan{Stories: []PlanStory{story(1, "", 7), story(4, "", 1)}}, groupedSpec, "x.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parts) != 3 {
+		t.Fatalf("want two parts and a collect, got %d", len(parts))
+	}
+	for _, p := range parts {
+		if has, collect := schema.HasSection(p.Body, schema.StoriesHeading), p.Slug == "verify-collect"; has == collect {
+			t.Errorf("%s: has ## Stories = %v", p.Slug, has)
+		}
+	}
 }
 
 func TestVerifyBodies_GroupHeadingGivesWholeBlock(t *testing.T) {

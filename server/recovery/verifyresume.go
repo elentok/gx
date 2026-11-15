@@ -24,8 +24,10 @@ func VerifyResumeNote(t tickets.Ticket, head string) string {
 	if err != nil {
 		return ""
 	}
-	entries := schema.ParseVerified(schema.ParseBody(string(raw)))
-	if len(entries) == 0 {
+	body := schema.ParseBody(string(raw))
+	entries := schema.ParseVerified(body)
+	units := schema.ParseStories(body)
+	if len(entries) == 0 && len(units) == 0 {
 		return ""
 	}
 	// The latest entry per story wins.
@@ -38,13 +40,20 @@ func VerifyResumeNote(t tickets.Ticket, head string) string {
 		latest[e.Story] = e
 	}
 	var skip, recheck []string
+	// With a ## Stories section the ticket owns the unit list, so a trimmed
+	// ## Verified cannot shrink what is re-checked.
+	if len(units) > 0 {
+		order = units
+	}
 	for _, s := range order {
-		e := latest[s]
-		line := fmt.Sprintf("- %s (%s @ %s)", e.Story, e.Verdict, e.Commit)
-		if e.Counts(head) {
-			skip = append(skip, line)
-		} else {
-			recheck = append(recheck, line)
+		e, ok := latest[s]
+		switch {
+		case !ok:
+			recheck = append(recheck, "- "+s)
+		case e.Counts(head):
+			skip = append(skip, fmt.Sprintf("- %s (%s @ %s)", e.Story, e.Verdict, e.Commit))
+		default:
+			recheck = append(recheck, fmt.Sprintf("- %s (%s @ %s)", e.Story, e.Verdict, e.Commit))
 		}
 	}
 	var b strings.Builder

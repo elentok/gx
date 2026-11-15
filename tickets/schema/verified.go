@@ -18,7 +18,7 @@ const (
 
 // OptionalSections are headings a ticket may lack until the first entry is
 // written; reading one that is missing yields nothing instead of an error.
-var OptionalSections = []string{IterationSummaryHeading}
+var OptionalSections = []string{IterationSummaryHeading, StoriesHeading}
 
 // IsOptionalSection reports whether heading is on OptionalSections.
 func IsOptionalSection(heading string) bool {

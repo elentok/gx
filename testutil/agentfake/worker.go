@@ -330,7 +330,16 @@ func writeNotes(cfg WorkerConfig, address string) error {
 	if err != nil {
 		return err
 	}
-	verified := schema.AppendVerified("", schema.VerifiedEntry{Story: "Story 1: the fake story", Verdict: "pass", Commit: strings.TrimSpace(string(head))})
+	key := "Story 1: the fake story"
+	show := exec.Command(cfg.Gx, "tickets", "show", address, "--section", schema.StoriesHeading)
+	show.Env = append(os.Environ(), cfg.Env...)
+	if out, err := show.Output(); err == nil {
+		// The ticket owns its unit keys; a verify agent copies one.
+		if units := schema.ParseStories(schema.SetSection("", schema.StoriesHeading, string(out))); len(units) > 0 {
+			key = units[len(units)-1]
+		}
+	}
+	verified := schema.AppendVerified("", schema.VerifiedEntry{Story: key, Verdict: "pass", Commit: strings.TrimSpace(string(head))})
 	summary := schema.AppendIterationSummary("", schema.IterationSummary{
 		SessionID: "fake-session", Time: time.Now(), Label: "agent",
 		Did: "Verified the fake story.", WentWrong: "Nothing.", Decisions: "None.", Left: "Nothing.",

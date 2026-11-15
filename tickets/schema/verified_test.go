@@ -24,9 +24,21 @@ func TestVerifiedRoundTrip(t *testing.T) {
 	}
 }
 
+func TestParseStories_StrictLines(t *testing.T) {
+	body := SetSection(oldBody, StoriesHeading, StoriesSection([]string{StoryKey(3), MockStatesKey("empty  state"), StoryKey(14)})+
+		"\n- story 4\n- Story 0\n- Story 5 extra\n-Story 6\nStory 7\n- Mock states:")
+	want := []string{"Story 3", "Mock states: empty state", "Story 14"}
+	if got := ParseStories(body); !reflect.DeepEqual(got, want) {
+		t.Fatalf("ParseStories = %q, want %q", got, want)
+	}
+	if got := ParseStories(oldBody); got != nil {
+		t.Fatalf("body without the section = %q", got)
+	}
+}
+
 func TestIsOptionalSection(t *testing.T) {
-	if !IsOptionalSection("Iteration summaries") {
-		t.Error("Iteration summaries should be optional")
+	if !IsOptionalSection("Iteration summaries") || !IsOptionalSection("Stories") {
+		t.Error("Iteration summaries and Stories should be optional")
 	}
 	if IsOptionalSection("Spec deviations") {
 		t.Error("Spec deviations should not be optional")

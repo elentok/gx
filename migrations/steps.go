@@ -110,6 +110,11 @@ func init() {
 	Default.Register(Step{Name: "backlog-epic-kind", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return ticketmigrate.MigrateAreaToBacklogKind(e.Root)
 	}})
+	// verify-stories: the ## Stories section is optional. A ticket without it
+	// stays valid, so there is nothing to rewrite. Never rename this step.
+	Default.Register(Step{Name: "verify-stories", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

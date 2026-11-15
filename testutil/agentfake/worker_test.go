@@ -79,6 +79,22 @@ func TestWorkTicket_NotesWritesVerifiedAndSummaryBeforeFinishing(t *testing.T) {
 	}
 }
 
+func TestWorkTicket_NotesCopyTheUnitKeyFromTheStoriesSection(t *testing.T) {
+	cfg, gxLog := WorkerEnv(t)
+	cfg.Behaviour = map[string]string{"p:e/01": BehaviourNotes}
+	script := "#!/bin/sh\necho \"$@\" >> " + gxLog + "\n" +
+		"if [ \"$2\" = show ]; then printf -- '- Story 2\\n- Mock states: empty\\n'; exit 0; fi\ncat >> " + gxLog + "\n"
+	if err := os.WriteFile(cfg.Gx, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := WorkTicket(cfg, "p:e/01"); err != nil {
+		t.Fatal(err)
+	}
+	if log := readLog(t, gxLog); !strings.Contains(log, "tickets section p:e/01 Verified -\n- Mock states: empty — pass @ ") {
+		t.Errorf("Verified entry lacks the Mock unit key:\n%s", log)
+	}
+}
+
 func TestWorkTicket_FailCommitsAndReportsNothing(t *testing.T) {
 	cfg, gxLog := WorkerEnv(t)
 	cfg.Behaviour = map[string]string{"p:e/01": BehaviourFail}

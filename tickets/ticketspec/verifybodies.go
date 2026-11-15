@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // VerifyTicket is a packed entry with its body.
@@ -67,11 +69,13 @@ func BuildVerifyTickets(plan VerifyPlan, spec, specPath string) ([]VerifyTicket,
 			if e.Note != "" {
 				fmt.Fprintf(&b, "\nNote: %s\n", e.Note)
 			}
-			var states []string
+			var states, units []string
+			var blocks strings.Builder
 			for _, n := range e.Stories {
+				units = append(units, schema.StoryKey(n))
 				s := byNumber[n]
 				text, entry := lookup(s)
-				fmt.Fprintf(&b, "\n## Story %d (estimate %s)\n\nStory:\n\n%s\n\nVerification:\n\n%s\n",
+				fmt.Fprintf(&blocks, "\n## Story %d (estimate %s)\n\nStory:\n\n%s\n\nVerification:\n\n%s\n",
 					n, tokensK(storyTokens(s)), fence(text), fence(entry))
 				for _, m := range s.MockStates {
 					if !slices.Contains(states, m) {
@@ -80,15 +84,18 @@ func BuildVerifyTickets(plan VerifyPlan, spec, specPath string) ([]VerifyTicket,
 				}
 			}
 			if len(states) > 0 {
-				b.WriteString("\n## Mock states\n")
+				blocks.WriteString("\n## Mock states\n")
 				for _, m := range states {
+					units = append(units, schema.MockStatesKey(m))
 					line, ok := SpecMockLine(verification, m)
 					if !ok {
 						errs = append(errs, fmt.Errorf("mock state %q has no line in the Mock states list of %s", m, specPath))
 					}
-					fmt.Fprintf(&b, "\n(estimate %s)\n\n%s\n", tokensK(MockStateTokens), fence(line))
+					fmt.Fprintf(&blocks, "\n(estimate %s)\n\n%s\n", tokensK(MockStateTokens), fence(line))
 				}
 			}
+			fmt.Fprintf(&b, "\n## Stories\n\n%s\n", schema.StoriesSection(units))
+			b.WriteString(blocks.String())
 		}
 		if (lone || e.Slug == "verify-collect") && outOfScope != "" {
 			fmt.Fprintf(&b, "\n## Out of Scope\n\n%s\n", EscapePlaceholders(outOfScope))
