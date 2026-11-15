@@ -53,7 +53,11 @@ function stateToken(s: SessionInfo) {
 
 // The model picker over the `model-switch` scenario: an idle Codex chat on an outdated model and two idle Claude chats.
 test("205. Model switch", async ({ page, start }) => {
-  const fixture = await start("model-switch", { autoAdvanceDelay: "1h" })
+  // The server matches a session's model against the global tiers only, so the lagging alias is set there too.
+  const fixture = await start("model-switch", {
+    autoAdvanceDelay: "1h",
+    config: { "agents.claude.model": "fable", "agents.codex.model": "gpt-5.4-codex" },
+  })
   const fakes = fixture.modelFakes!
   const chats = (await sessions(fixture)).filter((s) => !s.design)
   const codex = chats.find((s) => s.harness === "codex")!
@@ -321,6 +325,101 @@ test("205. Model switch", async ({ page, start }) => {
   await expect(sessionMenu).not.toContainText("switched by hand")
   await page.keyboard.press("Escape")
 
+  // Stories 25, 33, 34: a chat on the lagging `fable` alias shows the footer name red at once; a chat on the latest
+  // model and a chat on an unparseable id show it plain. (An empty model list is a server rule: modelrules tests.)
+  await setBehaviour("gpt-5.5-codex", "")
+  await setBehaviour("opus", "")
+  const outdated = page.getByTestId("outdated-model")
+  await go(page, `#/agents/${claudeFresh.id}`)
+  await expect(outdated).toBeVisible({ timeout: 15_000 })
+  // Story 31: the chat with no turns shows no token warning in the picker.
+  const warning = page.getByTestId("token-cost-warning")
+  dialog = await openPicker(page, claudeFresh, 6)
+  await expect(warning).toHaveCount(0)
+  await page.keyboard.press("Escape")
+  await startSwitch(claudeFresh, "claude", /Fable 5\.2/)
+  await expect(footer).toContainText("Fable 5.2")
+  await expect(outdated).toHaveCount(0)
+  await startSwitch(claudeFresh, "claude", /mystery-model/)
+  await expect(footer).toContainText("mystery-model")
+  await expect(outdated).toHaveCount(0)
+  await expect(page.getByTestId("model-name-button")).toBeVisible()
+
+  // Stories 44, 45: the plain name in a chat opens the picker; the red popover's "Choose another model" does too.
+  await page.getByTestId("model-name-button").click()
+  await expect(page.getByRole("dialog", nav("Switch model"))).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("dialog", nav("Switch model"))).toHaveCount(0)
+  await go(page, `#/agents/${codex.id}`)
+  await outdated.click()
+  const popover = page.getByRole("dialog", nav("Newer model"))
+  await expect(popover).toBeVisible()
+  await popover.getByRole("button", nav("Choose another model")).click()
+  await expect(page.getByRole("dialog", nav("Switch model"))).toBeVisible()
+  await page.keyboard.press("Escape")
+
+  // Stories 17, 18: the history chat shows the token warning in the picker and the popover with the same text,
+  // and Switch works with it visible (the popover switch below).
+  dialog = await openPicker(page, codex, 5)
+  await expect(dialog.getByTestId("token-cost-warning")).toHaveText(
+    "Changing the model costs tokens. The whole chat is sent again at the new model's price.",
+  )
+  await page.keyboard.press("Escape")
+  await outdated.click()
+  await expect(popover.getByTestId("token-cost-warning")).toHaveText(
+    "Changing the model costs tokens. The whole chat is sent again at the new model's price.",
+  )
+  await page.keyboard.press("Escape")
+
+  // Story 30: on a stopped session the popover button is disabled with the resume note.
+  await fixture.cli("agents", "stop", codex.id)
+  await go(page, `#/agents/${codex.id}`)
+  await outdated.click()
+  await expect(popover.getByTestId("outdated-note")).toHaveText("Resume the session to switch.")
+  await expect(popover.getByRole("button", nav("Switch to Codex GPT-5.5-Codex"))).toBeDisabled()
+  await page.keyboard.press("Escape")
+  await fixture.cli("agents", "resume", codex.id)
+  await expect(async () => {
+    expect((await sessions(fixture)).find((s) => s.id === codex.id)!.status.state).toBe("idle")
+  }).toPass({ timeout: 20_000 })
+
+  // Stories 26, 27: the popover says what the switch does with the effort, and its button runs the switch.
+  await go(page, `#/agents/${codex.id}`)
+  // The page keeps re-rendering while the resumed agent settles, which can close the popover under the click.
+  await expect(async () => {
+    if (!(await popover.isVisible())) await outdated.click()
+    await expect(popover.getByTestId("outdated-note")).toHaveText(/^(Keeps|Changes) effort \w+\./, {
+      timeout: 1_000,
+    })
+    await popover
+      .getByRole("button", nav("Switch to Codex GPT-5.5-Codex"))
+      .click({ timeout: 2_000 })
+  }).toPass({ timeout: 20_000 })
+  await expect(footer).toContainText("GPT-5.5-Codex")
+  await expect(async () => {
+    const logs = Object.values(await launches(fakes.codex_dir))
+    expect(logs.some((l) => l.at(-1)?.includes("gpt-5.5-codex"))).toBe(true)
+  }).toPass({ timeout: 15_000 })
+
+  // Stories 28, 29, 41: the design session's popover names its tier and links to the Models settings; the switch
+  // leaves Settings alone, and the Models section notes the lagging alias but not a Codex model.
+  const design0 = (await sessions(fixture)).find((s) => s.design)!
+  await go(page, `#/agents/${design0.id}`)
+  await outdated.click()
+  await expect(popover.getByTestId("tiers-note")).toContainText(
+    /Settings use .* for the .* tiers?\./,
+  )
+  await expect(popover.getByTestId("tiers-note")).toContainText(
+    "This switch does not change Settings.",
+  )
+  await expect(popover.getByRole("button", nav("Choose another model"))).toHaveCount(0)
+  // The popover re-mounts while the design session's state ticks, so a stability-checked click never lands.
+  await popover.getByRole("link", nav("Open Models settings")).dispatchEvent("click")
+  await expect(page).toHaveURL(/#\/settings\/s\/models/)
+  const notes = page.getByTestId("alias-note")
+  await expect(notes.first()).toContainText("fable resolves to claude-fable-5-1")
+  await expect(page.getByText("gpt-5.4-codex resolves")).toHaveCount(0)
+
   // Story 43: a switch on the design session stops the auto-advance countdown and the auto-queue one. (The "Countdown
   // stopped" text is an OS banner, so the page cannot show it: the countdown going away is what the flow sees.)
   // A refused switch (a stale state token) leaves the countdown running.
@@ -362,6 +461,8 @@ test("205. Model switch", async ({ page, start }) => {
   await go(page, "#/d/demo:switch-design")
   await expect(page.getByRole("region", nav("Chat"))).toContainText("Switched to Claude Fable 5.2.")
   await expect(advancing).toHaveCount(0)
+  // Story 29: the switch changed the session only, not Settings.
+  expect((await fixture.cli("config", "get", "agents.claude.model")).trim()).toBe("fable")
 
   // The same with the auto-queue countdown: the session is on the newest model now, so no
   // footer popover or chord offers a switch, and the route does it.
@@ -394,6 +495,6 @@ test("205. Model switch", async ({ page, start }) => {
   })
   dialog = await openPicker(page, claudeFresh, 1)
   await expect(dialog.getByRole("radiogroup", nav("Model")).getByRole("radio")).toHaveText(
-    /^Claude fable\s*current$/,
+    /^Claude mystery-model\s*current$/,
   )
 })
