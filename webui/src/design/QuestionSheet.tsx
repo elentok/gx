@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react"
 import type { SessionRoundCard } from "../generated/server"
 import { NO_SIDEBAR_SWIPE_ATTR } from "../shell/useSidebarSwipe"
 import { Button } from "../ui/button/Button"
+import { PROMPT_BOX_ATTR, PROMPT_BOX_SELECTOR } from "../ui/expandable-text/look"
 import { Question, QuestionDots } from "../ui/question-sheet/Question"
 import {
   isAnswered,
@@ -110,7 +111,7 @@ export function QuestionSheet({
   useEffect(() => {
     if (!toFocus) return
     row.current?.children[toFocus.index]
-      ?.querySelector<HTMLElement>("button[data-answer], textarea")
+      ?.querySelector<HTMLElement>(`button[data-answer], ${PROMPT_BOX_SELECTOR}`)
       ?.focus({ preventScroll: true })
   }, [toFocus])
 
@@ -131,7 +132,10 @@ export function QuestionSheet({
   }
   const openNote = () => {
     const q = row.current?.children[index]
-    const find = () => q?.querySelector<HTMLTextAreaElement>("textarea[name=question-note]")
+    const find = () =>
+      q?.querySelector<HTMLElement>(
+        `textarea[name=question-note], [${PROMPT_BOX_ATTR}][name=question-note]`,
+      )
     if (!find()) q?.querySelector<HTMLElement>("button[data-note-toggle]")?.click()
     requestAnimationFrame(() => find()?.focus({ preventScroll: true }))
   }
@@ -146,7 +150,7 @@ export function QuestionSheet({
       return
     }
     if (e.metaKey || e.ctrlKey || e.altKey) return
-    if (t.closest("textarea, input")) {
+    if (t.closest(`${PROMPT_BOX_SELECTOR}, input`)) {
       if (e.key === "Escape") {
         e.preventDefault()
         e.stopPropagation()

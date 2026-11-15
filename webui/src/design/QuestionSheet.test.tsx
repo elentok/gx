@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { useState } from "react"
-import { afterEach, describe, expect, test } from "vitest"
+import { afterEach, describe, expect, test, vi } from "vitest"
 import type { SessionRoundCard } from "../generated/server"
 import { NO_SIDEBAR_SWIPE_ATTR } from "../shell/useSidebarSwipe"
 import { typeInLargeEditor } from "../ui/expandable-text/testing"
@@ -9,7 +9,13 @@ import { Question } from "../ui/question-sheet/Question"
 import { allAnswered, type Answers } from "../ui/question-sheet/round"
 import { QuestionSheet } from "./QuestionSheet"
 
-afterEach(cleanup)
+const vi_state = vi.hoisted(() => ({ on: false }))
+vi.mock("../vimode", () => ({ useViMode: () => vi_state.on, useViEscape: () => "" }))
+
+afterEach(() => {
+  cleanup()
+  vi_state.on = false
+})
 
 test("an options row shows letter, label, muted id and the consequence line", () => {
   renderThemed(
@@ -358,6 +364,24 @@ describe("keyboard", () => {
     expect(document.activeElement).toBe(answer(0, 0))
     key("N")
     await waitFor(() => expect(document.activeElement).toBe(note))
+  })
+
+  test("vi on: N focuses the inline note editor; n, p and Cmd+Enter act in it, not on the sheet", async () => {
+    vi_state.on = true
+    renderThemed(<Harness />)
+    answer(0, 0).focus()
+    key("N")
+    await waitFor(() => {
+      const el = document.activeElement as HTMLElement
+      expect(el.matches("[data-prompt-box][name=question-note]")).toBe(true)
+    })
+    const note = document.activeElement
+    key("n")
+    key("p")
+    expect(document.activeElement).toBe(note)
+    key("Enter", { metaKey: true })
+    expect(document.body.getAttribute("data-sent")).toBe("1")
+    document.body.removeAttribute("data-sent")
   })
 
   test("Cmd+Enter presses Send answers, also from a text box", async () => {

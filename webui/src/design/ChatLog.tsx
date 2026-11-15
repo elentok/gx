@@ -21,6 +21,7 @@ import { AnsweredQuestions } from "./AnsweredQuestions"
 import { QuestionSheet } from "./QuestionSheet"
 import { RoundCard } from "./RoundCard"
 import { isAnswered } from "../ui/question-sheet/round"
+import { PROMPT_BOX_SELECTOR } from "../ui/expandable-text/look"
 import { type RoundDraft, useRoundDraft } from "./roundDraft"
 
 // The sheet and the composer share the round's answers (see useRoundDraft: they survive a reload).
@@ -266,7 +267,9 @@ function ChatBody({
       if (e.key !== "Escape" || document.querySelector(LAYERS)) return
       // Esc in a sheet text box only leaves the box (the sheet moves focus); it does not close the view.
       if (
-        (e.target as HTMLElement | null)?.closest?.("[aria-label=Questions] :is(textarea, input)")
+        (e.target as HTMLElement | null)?.closest?.(
+          `[aria-label=Questions] :is(${PROMPT_BOX_SELECTOR}, input)`,
+        )
       )
         return
       onQuestions(false)
