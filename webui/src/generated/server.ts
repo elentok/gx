@@ -4023,9 +4023,6 @@ export interface TriageView {
   step_note?: string;
   ring_percent: number /* int */;
   revision?: number /* int */;
-  /**
-   * Round counts the times the answers were sent back to the agent.
-   */
   round?: number /* int */;
   /**
    * OpenRound is nil when no saved round waits for an answer.

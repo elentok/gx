@@ -71,6 +71,8 @@ export interface SteppedPageProps {
   ticketRows?: ReactNode
   /** Sub-rows under any step (Triage: Questions and Review under Approve). */
   stepRows?: StepRows
+  /** Shows each answered card of a round as one line in the chat. */
+  foldAnswered?: boolean
   /** The step offers no Continue: the person acts on the page itself. */
   noContinue?: boolean
   // Design only.
@@ -135,6 +137,7 @@ export function SteppedPage({
   logTop,
   ticketRows,
   stepRows,
+  foldAnswered,
   noContinue,
   designMenu,
   menuItems,
@@ -165,7 +168,8 @@ export function SteppedPage({
   // that session and round only. The message list and the impl link both read it.
   const viewKey = `${session?.id}|${roundKeyOf(chat)}`
   const hasRound = chatty && roundOf(chat).length > 0
-  const questions = hasRound && (toggle?.key === viewKey ? toggle.on : true)
+  // A flow that folds answers always shows the chat with the card docked: no Questions view.
+  const questions = hasRound && !foldAnswered && (toggle?.key === viewKey ? toggle.on : true)
   useFocusReport(conn, session?.id, connState.streams, actions.focus)
   const menu = (onOpenChange?: (open: boolean) => void) => (
     <DesignActionsMenu
@@ -290,6 +294,7 @@ export function SteppedPage({
             logTop={compact ? undefined : logTop}
             tabsMenu={compact && hasRound ? menu(setMenuHeld) : undefined}
             questions={questions}
+            foldAnswered={foldAnswered}
             onQuestions={(on) => setToggle({ key: viewKey, on })}
             actions={{
               address,

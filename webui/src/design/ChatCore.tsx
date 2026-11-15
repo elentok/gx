@@ -463,12 +463,15 @@ export function ChatMessages({
   showTools = false,
   head,
   session,
+  tail,
 }: {
   chat: SessionChatResponse
   /** The first entry of the log, above the messages. */
   head?: ReactNode
   /** Its model-switch phase ends the log as one system line. */
   session: SessionInfo
+  /** Entries after the messages, before the working row. */
+  tail?: ReactNode
   /** Shows each folded run of tool calls; the Design page leaves them out. */
   showTools?: boolean
   busy: boolean
@@ -511,6 +514,7 @@ export function ChatMessages({
         <Entry key={m.id || i} m={m} showTools={showTools} sessionId={sessionId} />
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
+      {tail}
       {busy && working}
       <SwitchLine session={session} />
     </ChatScroller>

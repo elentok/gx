@@ -235,8 +235,7 @@ type TriageView struct {
 	StepNote    string `json:"step_note,omitempty"`
 	RingPercent int    `json:"ring_percent"`
 	Revision    int    `json:"revision,omitempty"`
-	// Round counts the times the answers were sent back to the agent.
-	Round int `json:"round,omitempty"`
+	Round       int    `json:"round,omitempty"`
 	// OpenRound is nil when no saved round waits for an answer.
 	OpenRound *TriageOpenRound `json:"open_round,omitempty"`
 	// FinalApproval is true at Questions when no ask question is left and the

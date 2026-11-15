@@ -1,9 +1,10 @@
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type { MapStep, SessionInfo, TriageView } from "../generated/server"
 import { appRoutes, type RouteFetchers } from "../routes"
+import { roundCards } from "../design/roundFixture"
 import { renderThemed } from "../ui/render"
 
 afterEach(cleanup)
@@ -382,4 +383,53 @@ test("a done Triage with a ready epic orders the header Queue button, ring, menu
   const menu = screen.getByRole("button", { name: "More actions" })
   expect(queue.compareDocumentPosition(ring) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(ring.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+test("a printed round shows the answered cards folded, the open card, the round header and the composer", async () => {
+  const cards = [1, 2, 3, 4, 5].map((n) => ({
+    label: String(n),
+    title: `Title ${n}`,
+    body: `Body ${n}?`,
+    kind: "options",
+    options: [
+      { id: "a", label: "Alpha" },
+      { id: "b", label: "Beta" },
+    ],
+  }))
+  render([session("working")], {
+    triage: async () => ({
+      kind: "ok",
+      detail: viewOf({
+        steps: stepsAt(2),
+        open_round: { number: 1, questions: 5, answered: 3 },
+      }),
+    }),
+    chat: async () => ({
+      kind: "ok",
+      detail: {
+        conversation_id: "c1",
+        messages: [],
+        questions: roundCards(cards as never),
+        background: [],
+      } as never,
+    }),
+  } as RouteFetchers)
+  const sheet = await screen.findByRole("group", { name: "Questions" })
+  const alphas = [...sheet.querySelectorAll<HTMLElement>("button[data-answer]")].filter((b) =>
+    b.textContent?.includes("Alpha"),
+  )
+  for (const b of alphas.slice(0, 3)) fireEvent.click(b)
+  await waitFor(() =>
+    expect(document.querySelectorAll("[data-part=answered-question]").length).toBe(3),
+  )
+  expect(document.querySelector("[data-part=answered-question]")?.textContent).toContain(
+    "Q1 Title 1 → Alpha",
+  )
+  expect(screen.getByLabelText("Question 4 of 5")).toBeTruthy()
+  expect(screen.getByTestId("page-header-subtitle").textContent).toBe("Questions · round 1 of 3")
+  expect(screen.getAllByText("Round 1 of 3 · 3 of 5 answered").length).toBeGreaterThan(0)
+  const note = screen.getByRole("button", { name: "Note" }) as HTMLButtonElement
+  expect(note.disabled).toBe(false)
+  fireEvent.click(note)
+  expect(await screen.findByPlaceholderText("A note on this round")).toBeTruthy()
 })

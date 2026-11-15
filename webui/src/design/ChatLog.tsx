@@ -17,6 +17,7 @@ import {
   type FailureActions,
 } from "./FailureBanner"
 import type { PostAnswer, PostPrompt } from "./prompt"
+import { AnsweredQuestions } from "./AnsweredQuestions"
 import { QuestionSheet } from "./QuestionSheet"
 import { isAnswered } from "../ui/question-sheet/round"
 import { type RoundDraft, useRoundDraft } from "./roundDraft"
@@ -36,7 +37,9 @@ function ChatTail({
   onQuestions,
   roundDraft,
   autoMenu,
+  foldAnswered,
 }: {
+  foldAnswered?: boolean
   session: SessionInfo
   chat: SessionChatResponse
   connected: boolean
@@ -68,7 +71,7 @@ function ChatTail({
       minH="0"
       gap="3"
     >
-      {round.length > 0 && questions && (
+      {round.length > 0 && (questions || foldAnswered) && (
         <QuestionSheet
           round={round}
           answers={answers}
@@ -219,9 +222,12 @@ function ChatBody({
   autoMenu,
   logTop,
   tabsMenu,
+  foldAnswered,
 }: {
   logTop?: ReactNode
   tabsMenu?: ReactNode
+  /** Shows each answered card of the round as one line after the messages. */
+  foldAnswered?: boolean
   session: SessionInfo
   roundKey: string
   chat: SessionChatResponse
@@ -259,19 +265,26 @@ function ChatBody({
   return (
     <FileLinkProvider base={{ session: session.id }} recheckKey={chat.messages.at(-1)?.id}>
       <Box display="flex" flexDirection="column" gap="3" flex="1" minH="0">
-        {hasRound && (
+        {hasRound && !foldAnswered && (
           <ViewToggle
             answered={round.filter((c) => isAnswered(roundDraft.draft.answers[c.label])).length}
             total={round.length}
             questions={questions}
             onQuestions={onQuestions}
             menu={tabsMenu}
+            roundDraft={roundDraft}
+            autoMenu={autoMenu}
           />
         )}
         {!questions && (
           <ChatMessages
             chat={chat}
             head={logTop}
+            tail={
+              foldAnswered && hasRound ? (
+                <AnsweredQuestions round={round} answers={roundDraft.draft.answers} />
+              ) : undefined
+            }
             busy={busy}
             sessionId={session.id}
             session={session}
@@ -309,6 +322,7 @@ function ChatBody({
           onQuestions={onQuestions}
           roundDraft={roundDraft}
           autoMenu={autoMenu}
+          foldAnswered={foldAnswered}
         />
       </Box>
     </FileLinkProvider>
@@ -335,6 +349,7 @@ function ChatLog({
   onQuestions: (on: boolean) => void
   logTop?: ReactNode
   tabsMenu?: ReactNode
+  foldAnswered?: boolean
 }) {
   const conn = useConnectionContext()
   const connected = useConnectionState(conn).connected
@@ -370,7 +385,9 @@ export function DesignChat({
   onQuestions,
   logTop,
   tabsMenu,
+  foldAnswered,
 }: {
+  foldAnswered?: boolean
   /** The ⋯ menu in the view tabs row (keyboard layout). */
   tabsMenu?: ReactNode
   /** The first entry of the Chat view's log. */
@@ -424,6 +441,7 @@ export function DesignChat({
       onQuestions={onQuestions}
       logTop={logTop}
       tabsMenu={tabsMenu}
+      foldAnswered={foldAnswered}
     />
   )
 }

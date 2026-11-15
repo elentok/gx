@@ -14,6 +14,7 @@ import {
   TriageDone,
   TriageNone,
   type SessionInfo,
+  type TriageOpenRound,
   type TriageView,
 } from "../generated/server"
 import { Modal } from "../ui/modal/Modal"
@@ -85,6 +86,24 @@ function HeaderButton({
   )
 }
 
+const QUESTIONS = "questions"
+// Rounds past the cap are the objection rounds.
+const ROUND_CAP = 3
+
+function roundLabel(r: TriageOpenRound) {
+  return r.number > ROUND_CAP ? "Objection round" : `round ${r.number} of ${ROUND_CAP}`
+}
+
+/** The sub-row under the Questions step. */
+function RoundRow({ round }: { round: TriageOpenRound }) {
+  const label = roundLabel(round)
+  return (
+    <Text fontSize="xs" color="text.dim" pl="24px">
+      {label[0].toUpperCase() + label.slice(1)} · {round.answered} of {round.questions} answered
+    </Text>
+  )
+}
+
 // Route and Questions count as working: chat only.
 type Phase = "write" | "done" | "working"
 
@@ -152,6 +171,7 @@ function TriageBody({
   const sessions = useConnectionState(conn).snapshot?.sessions ?? []
   const live = liveFlowSessions(FLOW, project, sessions)
   const model = triageModel({ key: project, steps: view.steps, ringPercent: view.ring_percent })
+  const round = model.current?.step === QUESTIONS ? view.open_round : undefined
   return (
     <>
       {abandoning && (
@@ -195,6 +215,9 @@ function TriageBody({
         current={flowSession(FLOW, project, sessions)}
         actions={steppedActions}
         startLabel="Start"
+        foldAnswered
+        stepRows={round && { questions: <RoundRow round={round} /> }}
+        subtitleSuffix={round && ` · ${roundLabel(round)}`}
         beforeRing={
           atDone && view.result?.ready_epic ? (
             <DoneQueue
