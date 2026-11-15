@@ -21,7 +21,9 @@ import (
 // Usage is a single assistant turn's token accounting, as recorded in a
 // transcript line's message.usage.
 type Usage struct {
-	Model                    string
+	Model string
+	// At is the assistant line's time, zero when it has none or it does not parse.
+	At                       time.Time
 	InputTokens              int
 	OutputTokens             int
 	CacheReadInputTokens     int
@@ -270,7 +272,7 @@ func LastAssistantReading(path string) (Usage, bool, error) {
 		return Usage{}, false, err
 	}
 	if nonzero {
-		reading.Model = newest.Model
+		reading.Model, reading.At = newest.Model, newest.At
 		return reading, true, nil
 	}
 	return newest, true, nil
@@ -340,8 +342,10 @@ func parseLine(raw string) (transcriptLine, bool) {
 }
 
 func usageFromLine(line transcriptLine) Usage {
+	at, _ := time.Parse(time.RFC3339Nano, line.Timestamp)
 	return Usage{
 		Model:                    line.Message.Model,
+		At:                       at,
 		InputTokens:              line.Message.Usage.InputTokens,
 		OutputTokens:             line.Message.Usage.OutputTokens,
 		CacheReadInputTokens:     line.Message.Usage.CacheReadInputTokens,

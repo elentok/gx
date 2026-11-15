@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
+	"time"
 )
 
 // TurnModel is the model and reasoning effort of a rollout's newest turn.
 type TurnModel struct {
 	Model  string
 	Effort string
+	// At is the turn_context line's time, zero when it has none.
+	At time.Time
 }
 
 // ReadTurnModel reads the newest `turn_context` line of the rollout at path.
@@ -25,8 +28,9 @@ func ReadTurnModel(path string) (m TurnModel, ok bool, err error) {
 	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 	for scanner.Scan() {
 		var line struct {
-			Type    string `json:"type"`
-			Payload struct {
+			Type      string `json:"type"`
+			Timestamp string `json:"timestamp"`
+			Payload   struct {
 				Model  string `json:"model"`
 				Effort string `json:"effort"`
 			} `json:"payload"`
@@ -34,7 +38,8 @@ func ReadTurnModel(path string) (m TurnModel, ok bool, err error) {
 		if json.Unmarshal(scanner.Bytes(), &line) != nil || line.Type != "turn_context" || line.Payload.Model == "" {
 			continue
 		}
-		m, ok = TurnModel{Model: line.Payload.Model, Effort: line.Payload.Effort}, true
+		at, _ := time.Parse(time.RFC3339Nano, line.Timestamp)
+		m, ok = TurnModel{Model: line.Payload.Model, Effort: line.Payload.Effort, At: at}, true
 	}
 	if err := scanner.Err(); err != nil {
 		return TurnModel{}, false, err

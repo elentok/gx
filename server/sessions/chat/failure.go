@@ -49,21 +49,8 @@ func (c *Chat) ReportedModelAndContext(m Meta) (model string, tokens int) {
 		turn, tokens := c.ReportedCodex(m)
 		return turn.Model, tokens
 	}
-	if m.Harness != string(harness.Claude) {
-		return m.Model, 0
-	}
-	path, ok := c.ClaudeTranscript(m.ID, m)
-	if !ok {
-		return m.Model, 0
-	}
-	usage, err := c.reportedUsage.Read(path, func(p string) (transcript.Usage, error) {
-		usage, _, err := transcript.LastAssistantReading(p)
-		return usage, err
-	})
-	if err != nil {
-		c.log.Warn("read reported model", "session", m.ID, "err", err)
-	}
-	return cmp.Or(usage.Model, m.Model), usage.Occupancy()
+	turn, tokens := c.ReportedClaudeTurn(m)
+	return turn.Model, tokens
 }
 
 // ReportedCodexTurn is the model and effort on the newest turn of a Codex
@@ -104,7 +91,48 @@ func (c *Chat) ReportedCodex(m Meta) (codexsession.TurnModel, int) {
 	if err != nil {
 		c.log.Warn("read codex context tokens", "session", m.ID, "err", err)
 	}
-	return codexsession.TurnModel{Model: cmp.Or(turn.Model, m.Model), Effort: cmp.Or(turn.Effort, m.Effort)}, tokens
+	return codexsession.TurnModel{Model: cmp.Or(turn.Model, m.Model), Effort: cmp.Or(turn.Effort, m.Effort), At: turn.At}, tokens
+}
+
+// ShownModel is the model and effort a session shows. Until a turn newer than
+// switchedAt reports in, they are the record's (saved), since the reported ones
+// still describe the model before the switch. After that the reported model
+// shows, and the reported effort where the harness reports one (Codex), else the
+// record's. A zero switchedAt, or a reading with no time, shows the reported
+// ones as before.
+func ShownModel(saved, reported codexsession.TurnModel, switchedAt time.Time, reportsEffort bool) codexsession.TurnModel {
+	if switchedAt.IsZero() {
+		return reported
+	}
+	if !reported.At.After(switchedAt) {
+		return saved
+	}
+	if !reportsEffort {
+		reported.Effort = saved.Effort
+	}
+	return reported
+}
+
+// ReportedClaudeTurn is the model and time of a Claude session's newest
+// assistant message (the saved model, no time, before a reply), plus the
+// context tokens, from the one cached transcript read.
+func (c *Chat) ReportedClaudeTurn(m Meta) (codexsession.TurnModel, int) {
+	saved := codexsession.TurnModel{Model: m.Model, Effort: m.Effort}
+	if m.Harness != string(harness.Claude) {
+		return saved, 0
+	}
+	path, ok := c.ClaudeTranscript(m.ID, m)
+	if !ok {
+		return saved, 0
+	}
+	usage, err := c.reportedUsage.Read(path, func(p string) (transcript.Usage, error) {
+		usage, _, err := transcript.LastAssistantReading(p)
+		return usage, err
+	})
+	if err != nil {
+		c.log.Warn("read reported model", "session", m.ID, "err", err)
+	}
+	return codexsession.TurnModel{Model: cmp.Or(usage.Model, m.Model), Effort: m.Effort, At: usage.At}, usage.Occupancy()
 }
 
 // ModelSwitched reports that the model shown is not the one the launch tier

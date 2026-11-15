@@ -49,12 +49,19 @@ func (mg *Manager) SessionInfo(m Meta) wire.SessionInfo {
 	cm := m.ChatMeta()
 	info := m.Info()
 	var tokens int
-	if m.Harness == string(harness.Codex) {
-		var turn codexsession.TurnModel
+	var turn codexsession.TurnModel
+	isCodex := m.Harness == string(harness.Codex)
+	if isCodex {
 		turn, tokens = mg.chat.ReportedCodex(cm)
 		info.Model, info.Effort = turn.Model, turn.Effort
 	} else {
-		info.Model, tokens = mg.chat.ReportedModelAndContext(cm)
+		turn, tokens = mg.chat.ReportedClaudeTurn(cm)
+		info.Model = turn.Model
+	}
+	if !m.SwitchedAt.IsZero() {
+		saved := codexsession.TurnModel{Model: m.Model, Effort: m.Effort}
+		shown := chat.ShownModel(saved, turn, m.SwitchedAt, isCodex)
+		info.Model, info.Effort = shown.Model, shown.Effort
 	}
 	if tokens > 0 {
 		info.ContextTokens, info.ContextLevel = &tokens, agent.LevelForTokens(tokens)
