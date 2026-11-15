@@ -13,7 +13,7 @@ import (
 // list. It reads memory only: the cache, and the global agents settings. The
 // project's own overrides sit in a file, which is not read on every list.
 func (mg *Manager) setLatestModel(info *wire.SessionInfo, harnessName string) {
-	list, ok := mg.chat.Models().Entries(harnessName)
+	list, ok := mg.Models.Entries(harnessName)
 	if !ok {
 		return
 	}
@@ -23,7 +23,7 @@ func (mg *Manager) setLatestModel(info *wire.SessionInfo, harnessName string) {
 	}
 	info.LatestModel = latest
 	info.LatestFamily = latestFamily(list, latest)
-	info.LatestEffort = latestEffort(mg.chat.Models(), harnessName, latest, info.Effort)
+	info.LatestEffort = latestEffort(mg.Models, harnessName, latest, info.Effort)
 	if mg.settings == nil {
 		return
 	}

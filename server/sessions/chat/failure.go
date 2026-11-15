@@ -14,6 +14,11 @@ import (
 
 const stalledLabel = "No progress for 15 min"
 
+// SavedTurn is the model and effort the session's record holds, with no time.
+func (m Meta) SavedTurn() codexsession.TurnModel {
+	return codexsession.TurnModel{Model: m.Model, Effort: m.Effort}
+}
+
 // StatusFailure is the failure that status alone decides.
 func (m Meta) StatusFailure() *wire.SessionFailure {
 	switch m.Status.State {
@@ -81,7 +86,7 @@ func (c *Chat) CodexRollout(m Meta) (string, bool) {
 // newest token_count (zero while there is no rollout or reading), behind one
 // rollout path lookup. Callers wanting both use it, not the two reads apart.
 func (c *Chat) ReportedCodex(m Meta) (codexsession.TurnModel, int) {
-	saved := codexsession.TurnModel{Model: m.Model, Effort: m.Effort}
+	saved := m.SavedTurn()
 	home, err := c.src.CodexHome()
 	if err != nil {
 		return saved, 0
@@ -134,7 +139,7 @@ func ShownModel(saved, reported codexsession.TurnModel, switchedAt time.Time, re
 // assistant message (the saved model, no time, before a reply), plus the
 // context tokens, from the one cached transcript read.
 func (c *Chat) ReportedClaudeTurn(m Meta) (codexsession.TurnModel, int) {
-	saved := codexsession.TurnModel{Model: m.Model, Effort: m.Effort}
+	saved := m.SavedTurn()
 	if m.Harness != string(harness.Claude) {
 		return saved, 0
 	}

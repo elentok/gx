@@ -1,9 +1,7 @@
 package chat
 
 import (
-	"context"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -91,9 +89,6 @@ type Deps struct {
 	Config Config
 	Source Source
 	Log    *slog.Logger
-	// Models is the model-list cache; nil builds the real one. Tests pass one
-	// with fake probes.
-	Models *commandlist.ModelCache
 }
 
 // Chat reads session transcripts, command lists, permission dialogs and
@@ -109,8 +104,6 @@ type Chat struct {
 	transcripts TranscriptPaths
 	// commandLists caches the harnesses' command lists.
 	commandLists *commandlist.Cache
-	// models caches the harnesses' model lists; Run keeps them fresh.
-	models *commandlist.ModelCache
 	// authFailures caches whether each transcript ends in an auth error.
 	authFailures AuthFailures
 	// reportedUsage caches each transcript's newest reply model and context usage.
@@ -135,24 +128,11 @@ func New(d Deps) *Chat {
 	if d.Config.DialogFallbackDelay == 0 {
 		d.Config.DialogFallbackDelay = DefaultDialogFallbackDelay
 	}
-	if d.Models == nil {
-		// The server's own working directory; a failed lookup leaves the probes in
-		// the process's directory, which is the same place.
-		dir, _ := os.Getwd()
-		d.Models = commandlist.NewModelCache(commandlist.ModelCacheDeps{Dir: dir, Env: d.Config.Env, Log: d.Log})
-	}
 	return &Chat{
 		cfg: d.Config, src: d.Source, log: d.Log,
 		commandLists: commandlist.NewCache(d.Config.CommandListAge, nil),
-		models:       d.Models,
 	}
 }
-
-// Models is the model-list cache. Callers read it and ask it to refresh.
-func (c *Chat) Models() *commandlist.ModelCache { return c.models }
-
-// RunModels keeps the model lists fresh until ctx ends, then returns.
-func (c *Chat) RunModels(ctx context.Context) { c.models.Run(ctx) }
 
 // ReadSnapshot reads the chat at path, as the page would see it. sessionDir is
 // the session's state dir.

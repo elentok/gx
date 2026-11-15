@@ -476,7 +476,7 @@ func New(cfg Config) (*Server, error) {
 			StallThreshold: cfg.StallThreshold, CommandListAge: cfg.CommandListAge,
 			Env: cfg.Env, StateDir: cfg.StateDir, DialogFallbackDelay: cfg.DialogFallbackDelay,
 		},
-		Source: chatSource{s}, Log: log, Models: cfg.Models,
+		Source: chatSource{s}, Log: log,
 	})
 	// The Manager copies projects, harness and sessionChat, so it comes after them.
 	s.designs = designs.New(s.designsDeps())
@@ -671,7 +671,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	sweepDone := make(chan struct{})
 	go func() { defer close(sweepDone); s.sessions.Conv.SweepDesignCounts() }()
 	modelsDone := make(chan struct{})
-	go func() { defer close(modelsDone); s.sessionChat.RunModels(freshCtx) }()
+	go func() { defer close(modelsDone); s.sessions.Models.Run(freshCtx) }()
 	progressDone := make(chan struct{})
 	go func() { defer close(progressDone); s.progress.Run(freshCtx) }()
 	prWatchDone := make(chan struct{})

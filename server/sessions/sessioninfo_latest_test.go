@@ -73,7 +73,8 @@ func latestManager(t *testing.T, claude, codex []commandlist.Model, cwd string, 
 	})
 	log := slog.New(slog.DiscardHandler)
 	return sessions.NewManager(sessions.ManagerDeps{
-		Chat:     chat.New(chat.Deps{Config: chat.Config{Env: []string{"CLAUDE_CONFIG_DIR=" + cfgDir}}, Source: infoSource{t.TempDir()}, Models: cache, Log: log}),
+		Chat:     chat.New(chat.Deps{Config: chat.Config{Env: []string{"CLAUDE_CONFIG_DIR=" + cfgDir}}, Source: infoSource{t.TempDir()}, Log: log}),
+		Models:   cache,
 		Prompter: sessprompt.New(sessprompt.Deps{Log: log}),
 		Settings: set,
 	})

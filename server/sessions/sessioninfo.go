@@ -59,8 +59,7 @@ func (mg *Manager) SessionInfo(m Meta) wire.SessionInfo {
 		info.Model = turn.Model
 	}
 	if !m.SwitchedAt.IsZero() {
-		saved := codexsession.TurnModel{Model: m.Model, Effort: m.Effort}
-		shown := chat.ShownModel(saved, turn, m.SwitchedAt, isCodex)
+		shown := chat.ShownModel(cm.SavedTurn(), turn, m.SwitchedAt, isCodex)
 		info.Model, info.Effort = shown.Model, shown.Effort
 	}
 	if tokens > 0 {

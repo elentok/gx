@@ -18,30 +18,34 @@ import (
 // count under its limit.
 func SessionModelsRead(mg *Manager, w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	// The settings page has no session: "harness" alone reads that harness's list with no current model.
-	if h := q.Get("harness"); q.Get("session") == "" && (h == string(harness.Claude) || h == string(harness.Codex)) {
-		cache := mg.chat.Models()
-		cache.Refresh(h)
-		wire.WriteJSON(w, modelsResponse(cache, h, "", ""))
-		return
-	}
-	_, meta, res, err := mg.SessionDir(q.Get("session"))
-	if res.Refused || err != nil {
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+	harnessName, shown, effort := q.Get("harness"), "", ""
+	// The settings page has no session: "harness" alone reads that harness's
+	// list with no current model.
+	if q.Get("session") != "" || !hasModelList(harnessName) {
+		_, meta, res, err := mg.SessionDir(q.Get("session"))
+		if res.Refused || err != nil {
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			chat.WriteRefusal(w, res)
 			return
 		}
-		chat.WriteRefusal(w, res)
-		return
+		if !hasModelList(meta.Harness) {
+			chat.WriteRefusal(w, Refusal(wire.ReasonPromptHarnessNotSupported, "this harness has no model list"))
+			return
+		}
+		info := mg.SessionInfo(meta)
+		harnessName, shown, effort = meta.Harness, info.Model, info.Effort
 	}
-	if meta.Harness != string(harness.Claude) && meta.Harness != string(harness.Codex) {
-		chat.WriteRefusal(w, Refusal(wire.ReasonPromptHarnessNotSupported, "this harness has no model list"))
-		return
-	}
-	cache := mg.chat.Models()
-	cache.Refresh(meta.Harness)
-	info := mg.SessionInfo(meta)
-	wire.WriteJSON(w, modelsResponse(cache, meta.Harness, info.Model, info.Effort))
+	mg.Models.Refresh(harnessName)
+	wire.WriteJSON(w, modelsResponse(mg.Models, harnessName, shown, effort))
+}
+
+// hasModelList says whether sessions of harnessName can pick a model: Claude and
+// Codex, whatever the chat harness is. The picker and the switch share it.
+func hasModelList(harnessName string) bool {
+	return harnessName == string(harness.Claude) || harnessName == string(harness.Codex)
 }
 
 // modelsResponse builds the reply from the cache's current list. Refreshing is

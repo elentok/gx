@@ -64,26 +64,27 @@ type Entry struct {
 	Successor string // the successor the harness names, or ""
 }
 
+// Resolve finds the entry a launch value names: by Value first, then by ID.
+func Resolve(list []Entry, value string) (*Entry, bool) {
+	for i := range list {
+		if list[i].Value == value {
+			return &list[i], true
+		}
+	}
+	for i := range list {
+		if list[i].ID == value {
+			return &list[i], true
+		}
+	}
+	return nil, false
+}
+
 // Latest returns the latest model of the family of model, as a launch value.
 // ok is false ("none") for every doubt: no family, no list, or model already
 // the latest.
 func Latest(model string, list []Entry) (value string, ok bool) {
 	resolved := model
-	var cur *Entry
-	for i := range list {
-		if list[i].Value == model {
-			cur = &list[i]
-			break
-		}
-	}
-	if cur == nil {
-		for i := range list {
-			if list[i].ID == model {
-				cur = &list[i]
-				break
-			}
-		}
-	}
+	cur, _ := Resolve(list, model)
 	if cur != nil && cur.ID != "" {
 		resolved = cur.ID
 	}

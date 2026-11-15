@@ -33,6 +33,8 @@ func newManager(s *Server) *sessions.Manager {
 		Prompter: s.prompt,
 		Designs:  s.designs,
 		Rollouts: sessionHost{s},
+		Models:   s.cfg.Models,
+		Env:      s.cfg.Env,
 
 		Workspaces: s.workspaces,
 	})

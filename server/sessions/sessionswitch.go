@@ -179,7 +179,7 @@ func (rs *Resumer) beginSwitch(req wire.SessionSwitchRequest) (string, wire.Sess
 	if req.Model == "" {
 		return "", Refusal(wire.ReasonSessionBadRequest, "model is required"), nil
 	}
-	if !m.settings.Load().HasChatReader(meta.Harness) {
+	if !hasModelList(meta.Harness) {
 		return "", Refusal(wire.ReasonSessionUnknownHarness, fmt.Sprintf("harness %s cannot switch models", meta.Harness)), nil
 	}
 	if meta.Status.State == wire.SessionExited {
@@ -234,7 +234,7 @@ func (rs *Resumer) SessionSwitchWrite(web bool) http.HandlerFunc {
 // caller does once the new agent is alive.
 func (mg *Manager) RecordSwitch(meta *Meta, model, effort string) {
 	tierModel, _ := agent.ResolveTier(mg.projects.AgentsConfig(meta.Project), agent.AgentFor(meta.Harness), meta.Tier)
-	list, _ := mg.chat.Models().Entries(meta.Harness)
+	list, _ := mg.Models.Entries(meta.Harness)
 	RecordSwitch(meta, model, effort, tierModel, list, time.Now())
 }
 
@@ -266,10 +266,8 @@ func sameModel(list []modelrules.Entry, a, b string) bool {
 // resolvedModelID is the resolved id of a launch value, or the value itself
 // when the list does not know it.
 func resolvedModelID(list []modelrules.Entry, value string) string {
-	for _, e := range list {
-		if e.Value == value && e.ID != "" {
-			return e.ID
-		}
+	if e, ok := modelrules.Resolve(list, value); ok && e.ID != "" {
+		return e.ID
 	}
 	return value
 }

@@ -2,8 +2,10 @@ package sessions
 
 import (
 	"log/slog"
+	"os"
 	"time"
 
+	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop/notify"
@@ -81,6 +83,8 @@ type Manager struct {
 	rollouts codexRollouts
 	// switches are the hand switches that have not reached idle yet.
 	switches switchStates
+	// Models caches the harnesses' model lists; Serve runs it to keep them fresh.
+	Models *commandlist.ModelCache
 }
 
 // ManagerDeps is what the root hands NewManager. Each field is the Manager
@@ -102,6 +106,10 @@ type ManagerDeps struct {
 	Prompter Prompter
 	Designs  designCleaner
 	Rollouts codexRollouts
+	// Models may be nil, which builds the real cache; tests pass one with fake probes.
+	Models *commandlist.ModelCache
+	// Env is the environment the real cache's probes run with.
+	Env []string
 	// Workspaces may be nil, which skips placing web creates.
 	Workspaces WorkspaceMembers
 }
@@ -114,7 +122,17 @@ type WorkspaceMembers interface {
 // NewManager builds the Manager from d.
 func NewManager(d ManagerDeps) *Manager {
 	maps := &MapEpics{projects: d.Projects}
+	if d.Models == nil {
+		// The probes run in the server's own working directory. A failed lookup
+		// leaves Dir empty, which runs them in the process's directory.
+		dir, err := os.Getwd()
+		if err != nil && d.Log != nil {
+			d.Log.Warn("model probes: working directory unknown", "err", err)
+		}
+		d.Models = commandlist.NewModelCache(commandlist.ModelCacheDeps{Dir: dir, Env: d.Env, Log: d.Log})
+	}
 	return &Manager{
+		Models: d.Models,
 		cfg: d.Cfg, log: d.Log, events: d.Events, projects: d.Projects,
 		settings: d.Settings, harness: d.Harness, idx: d.Idx, chat: d.Chat,
 		focus: d.Focus, afk: d.AFK, alerts: d.Alerts, queue: d.Queue, host: d.Host,
