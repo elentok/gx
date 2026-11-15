@@ -285,8 +285,6 @@ function ChatBody({
             questions={questions}
             onQuestions={onQuestions}
             menu={tabsMenu}
-            roundDraft={roundDraft}
-            autoMenu={autoMenu}
           />
         )}
         {!questions && (
