@@ -157,6 +157,26 @@ test.describe("3. Pause reasons and recovery", () => {
     )
   })
 
+  // A verify agent that reports finished with an unchecked story is told twice, then the ticket pauses
+  // iteration-error naming the story. Retry ends the pause and starts the count again, so the same
+  // agent is blocked twice more and pauses again.
+  test("a verify finish with an unchecked story pauses", async ({ page, start }) => {
+    test.setTimeout(150_000)
+    await recover(
+      { page, start },
+      "verify-unchecked",
+      "unchecked-epic",
+      "unchecked units: Story 1",
+      ["Retry", "Start over"],
+      async () => {
+        await retry(page)
+        await cleared(page)
+        await expect(page.getByText("unchecked units: Story 1").first()).toBeVisible(gateWait)
+        await expect(recovery(page)).toBeVisible(gateWait)
+      },
+    )
+  })
+
   // 70, 64, 28: a live Claude task. Keep waiting lifts the pause (the short hold cap pauses it again),
   // and Retry keeps the commits and ends it.
   test("a live task recovers", async ({ page, start }) => {

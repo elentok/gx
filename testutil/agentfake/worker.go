@@ -146,7 +146,47 @@ const (
 	// working, as a test command that forks out of control would. It never
 	// reports, so only a kill ends it.
 	BehaviourStorm = "storm"
+	// BehaviourUncheckedFinish is a verify agent that commits and reports
+	// finished with no "## Verified" entries. Told which units are unchecked
+	// (FinishBlockPrefix), it records them and reports finished again.
+	BehaviourUncheckedFinish = "unchecked-finish"
+	// BehaviourUncheckedForever is BehaviourUncheckedFinish that never records:
+	// each block message gets another finished report.
+	BehaviourUncheckedForever = "unchecked-forever"
 )
+
+// FinishBlockPrefix starts the message the server types when it refuses a
+// verify finish that leaves units unchecked.
+const FinishBlockPrefix = "You reported finished, but these units have no ## Verified entry"
+
+// UncheckedAddress is the ticket whose behaviour is one of the unchecked-finish
+// ones, for a block message that names no address.
+func UncheckedAddress(cfg WorkerConfig) (string, bool) {
+	for address, b := range cfg.Behaviour {
+		if b == BehaviourUncheckedFinish || b == BehaviourUncheckedForever {
+			return address, true
+		}
+	}
+	return "", false
+}
+
+// uncheckedTurn is the unchecked-finish behaviours' turn. The first one commits
+// and reports finished with nothing recorded; a later one (the committed file
+// is the sign of the first) answers the block message.
+func uncheckedTurn(cfg WorkerConfig, address string) error {
+	if !FileExists(doneFileName(address)) {
+		if err := commitWork(address); err != nil {
+			return err
+		}
+		return reportFinished(cfg, address, true)
+	}
+	if cfg.Behaviour[address] == BehaviourUncheckedFinish {
+		if err := writeNotes(cfg, address); err != nil {
+			return err
+		}
+	}
+	return reportFinished(cfg, address, true)
+}
 
 // StormDescendants is how many processes BehaviourStorm forks. A scenario sets
 // its watchdog threshold below it.
@@ -201,6 +241,8 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 	switch cfg.Behaviour[address] {
 	case BehaviourFail:
 		return nil
+	case BehaviourUncheckedFinish, BehaviourUncheckedForever:
+		return uncheckedTurn(cfg, address)
 	case BehaviourAsk:
 		return askQuestion(cfg, address, askBody)
 	case BehaviourAskOptions:
@@ -307,8 +349,12 @@ func refuseThenAsk(cfg WorkerConfig, address string) error {
 	return askQuestion(cfg, address, askBody)
 }
 
+func doneFileName(address string) string {
+	return "done-" + strings.NewReplacer(":", "-", "/", "-").Replace(address) + ".txt"
+}
+
 func commitWork(address string) error {
-	name := "done-" + strings.NewReplacer(":", "-", "/", "-").Replace(address) + ".txt"
+	name := doneFileName(address)
 	if err := os.WriteFile(name, []byte("done\n"), 0o644); err != nil {
 		return err
 	}

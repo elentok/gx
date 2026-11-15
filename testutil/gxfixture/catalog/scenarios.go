@@ -283,6 +283,7 @@ var Scenarios = map[string]scenario{
 	"holder-unreachable":       spec.HolderUnreachable,
 	"codex-drops-prompt":       spec.CodexDropsPrompt,
 	"verify-notes":             spec.VerifyNotes,
+	"verify-unchecked":         spec.VerifyUnchecked,
 	"summary-notes":            spec.SummaryNotes,
 	"map-evolve":               spec.MapEvolve,
 	"classifier-outage":        spec.ClassifierOutage,

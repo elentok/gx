@@ -183,6 +183,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 ### `pause.e2e.ts`
 
 - **Every pause reason recovers.** Also starts the `hung-pane-twice` scenario: the pause says the pane stopped taking keys twice, offers Retry and Start over, and Retry ends it. Also starts the `process-storm` scenario: the card is labelled "Too many processes", says gx cannot recover alone, names the rule that fired and the biggest process names with counts, offers Retry and Start over, and Retry ends the pause.
+- **A verify finish with an unchecked story pauses** (scenario `verify-unchecked`): the agent reports finished without recording its story and again after each block message; the pause says "unchecked units: Story 1", offers Retry and Start over, and Retry ends it until the agent is blocked twice more and the pause returns.
 - **Unknown skill.**
 - **A model-mismatch pause resumes on the worker tier.**
 - **Copy, start, and refuse a second agent.**

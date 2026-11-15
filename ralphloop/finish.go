@@ -344,8 +344,8 @@ const maxFinishBlocks = 2
 // finished status, types the unit list to the live session and re-waits, up
 // to maxFinishBlocks times. Past the cap it returns an error naming the units,
 // which the scheduler turns into an iteration-error pause. That is the only
-// new way into iteration-error; the web's Retry and Start over end it (ADR
-// 0042). Tickets without ## Stories (and so the collect ticket) are never
+// new way into iteration-error from this work; the web's Retry and Start over
+// buttons are the ways out of it (ADR 0042). Tickets without ## Stories (and so the collect ticket) are never
 // blocked.
 func adoptReportBlockingUnchecked(d deps.Deps, p iterationParams, path, pane, sessionID string) (adopted bool, newSessionID string, err error) {
 	for blocks := 0; ; blocks++ {

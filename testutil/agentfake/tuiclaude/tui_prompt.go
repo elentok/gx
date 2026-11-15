@@ -260,6 +260,14 @@ func (t *tui) classify(text string) (promptKind, string, WorkerConfig) {
 // a fake that runs in a worktree carrying a worker config, and returns the
 // ticket address and that config.
 func (t *tui) workerPrompt(text string) (string, WorkerConfig, bool) {
+	if strings.HasPrefix(text, FinishBlockPrefix) {
+		cfg, err := LoadWorkerConfig(t.pid.Cwd)
+		if err != nil {
+			return "", WorkerConfig{}, false
+		}
+		address, ok := UncheckedAddress(cfg)
+		return address, cfg, ok
+	}
 	fields := strings.Fields(text)
 	if len(fields) < 2 || !strings.HasPrefix(fields[0], "/") {
 		return "", WorkerConfig{}, false

@@ -20,6 +20,14 @@ var (
 	// VerifyNotes: a verify ticket whose agent writes a "## Verified" entry for its
 	// story and an iteration summary; gx adds its own summary entry at the end.
 	VerifyNotes = notesEpic("verify-epic", servertest.TicketOpts{Type: "verify"})
+	// VerifyUnchecked: a verify ticket whose agent reports finished with its story
+	// unchecked and, told so, reports finished again without recording it. The
+	// server blocks twice, then pauses iteration-error naming the story.
+	VerifyUnchecked = func() scenario {
+		sc := notesEpic("unchecked-epic", servertest.TicketOpts{Type: "verify", Stories: []string{"Story 1"}})
+		sc.Behaviour = map[string]string{project + ":unchecked-epic/01": agentfake.BehaviourUncheckedForever}
+		return sc
+	}()
 	// SummaryNotes: an implement ticket whose agent writes an iteration summary, so
 	// the ticket detail shows the "Latest summary" block once it finishes.
 	SummaryNotes = notesEpic("summary-epic", servertest.TicketOpts{})

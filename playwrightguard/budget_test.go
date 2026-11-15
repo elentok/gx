@@ -56,7 +56,10 @@ import (
 // the media query. It is its own flow because it needs a touch, 390px context the wide flow does not have.
 // Model switch flow (+1): the picker needs the server's model query and its refresh on open, the relaunch the fake
 // agent logs, the switch route's refusal and real keyboard focus; ModelPickerHost.test.tsx (vitest) covers each render alone.
-const maxFlows = 149
+// Verify finish block flow (+1): the pause after two refused finishes and Retry's fresh count need the
+// server's finish path, a fake agent that keeps reporting finished and the recovery card in a real browser;
+// ralphloop/finish_block_test.go and server/sched/launchtest/finish_block_test.go cover the rule alone.
+const maxFlows = 150
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

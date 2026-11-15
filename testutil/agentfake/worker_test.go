@@ -95,6 +95,36 @@ func TestWorkTicket_NotesCopyTheUnitKeyFromTheStoriesSection(t *testing.T) {
 	}
 }
 
+func TestWorkTicket_UncheckedFinishRecordsOnlyAfterTheBlockMessage(t *testing.T) {
+	for behaviour, wantRecord := range map[string]bool{BehaviourUncheckedFinish: true, BehaviourUncheckedForever: false} {
+		t.Run(behaviour, func(t *testing.T) {
+			cfg, gxLog := WorkerEnv(t)
+			cfg.Behaviour = map[string]string{"p:e/01": behaviour}
+			if addr, ok := UncheckedAddress(cfg); !ok || addr != "p:e/01" {
+				t.Fatalf("UncheckedAddress = %q, %v", addr, ok)
+			}
+			if err := WorkTicket(cfg, "p:e/01"); err != nil {
+				t.Fatal(err)
+			}
+			first := readLog(t, gxLog)
+			if strings.Contains(first, "Verified") || !strings.Contains(first, "--iteration-status finished") {
+				t.Errorf("first turn gx calls = %q, want a finished report and no Verified entry", first)
+			}
+			before := CommitCount(t)
+			if err := WorkTicket(cfg, "p:e/01"); err != nil {
+				t.Fatal(err)
+			}
+			if got := CommitCount(t); got != before {
+				t.Errorf("commits = %d after the block message, want %d", got, before)
+			}
+			second := strings.TrimPrefix(readLog(t, gxLog), first)
+			if recorded := strings.Contains(second, "Verified"); recorded != wantRecord || !strings.Contains(second, "--iteration-status finished") {
+				t.Errorf("second turn gx calls = %q, want recorded=%v and a finished report", second, wantRecord)
+			}
+		})
+	}
+}
+
 func TestWorkTicket_FailCommitsAndReportsNothing(t *testing.T) {
 	cfg, gxLog := WorkerEnv(t)
 	cfg.Behaviour = map[string]string{"p:e/01": BehaviourFail}

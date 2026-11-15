@@ -88,6 +88,8 @@ type TicketOpts struct {
 	Commitless bool
 	// Verified writes a "## Verified" section with these entries, omitted when empty.
 	Verified []schema.VerifiedEntry
+	// Stories writes a "## Stories" section listing these unit keys, omitted when empty.
+	Stories []string
 }
 
 // WriteTicketWith is WriteTicket with a type, a parent and several blockers. Unlike
@@ -193,6 +195,9 @@ func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) err
 	fm += "---\n\n# " + slug + "\n"
 	if opts.Result != "" {
 		fm += "\n## Result\n\n" + opts.Result + "\n"
+	}
+	if len(opts.Stories) > 0 {
+		fm = schema.SetSection(fm, schema.StoriesHeading, schema.StoriesSection(opts.Stories))
 	}
 	for _, e := range opts.Verified {
 		fm = schema.AppendVerified(fm, e)
