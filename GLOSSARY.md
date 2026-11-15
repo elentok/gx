@@ -1147,6 +1147,21 @@ only the open-on-screen rule skips it. Distinct from **Chat** and **Banner**.
 **AFK mode** — a person-set, machine-wide state in which interactive session events also go to
 **Chat**, for a person away from the machine. It adds a surface; it never silences banners.
 
+**Rest period** — a time when gx tells the person to stop using it: a **Bedtime** or a **Break**.
+The server owns it, so every open browser and phone shows the **Rest screen** at once. Banner, Push,
+Chat and sound stay quiet during it, and gx never sends the held-back events later. Agents keep
+working. The person can end it early with "Unlock anyway", which takes effort. _Avoid_: lock,
+lockdown (gx already has the Server lock, the Check lock and the merge lock).
+
+**Bedtime** — a **Rest period** that covers a daily time range the person sets, such as 22:00 to
+08:00, in the server machine's time zone.
+
+**Break** — a short **Rest period** that starts after a stretch of active work, such as 5 minutes
+after 55 minutes.
+
+**Rest screen** — the full-screen view the web UI shows during a **Rest period**: a mascot image, a
+message and the time it ends. The TUI never shows it.
+
 **Destination** — a chat transport plus its target (a Telegram chat id or a Slack webhook URL). The
 unit of chat batching, gating and muting: two projects with the same target share one destination.
 A `project.json` `notifications` block replaces the global one whole; with no override a project
