@@ -105,6 +105,82 @@ func TestModelSwitchScenario_SeedsTheSessionsAndNamesTheFakeFiles(t *testing.T) 
 	r.Stop(t)
 }
 
+// Story 35: an effort the new model lacks is replaced, so the launch is valid.
+func TestModelSwitchScenario_ReplacesAnEffortTheModelLacks(t *testing.T) {
+	t.Parallel()
+	r := start(t, "model-switch")
+	var claudeID, codexID string
+	for _, s := range r.sessions(t) {
+		switch {
+		case s.Design:
+		case s.Harness == "codex":
+			codexID = s.ID
+		case claudeID == "":
+			claudeID = s.ID
+		}
+	}
+	home := r.Home()
+	claudeConv, codexConv := r.conversationID(t, claudeID), r.conversationID(t, codexID)
+	claudeLaunches := func() ([][]string, error) { return agentfake.ReadTUILaunches(home, claudeConv) }
+	codexLaunches := func() ([][]string, error) { return codex.ReadCodexLaunches(filepath.Join(home, ".codex"), codexConv) }
+
+	// switchEffort is the effort the server says a switch to model would run
+	// with, given the session's current effort.
+	switchEffort := func(t *testing.T, id, model string) string {
+		t.Helper()
+		var res struct {
+			Models []struct {
+				ID           string `json:"id"`
+				SwitchEffort string `json:"switch_effort"`
+			} `json:"models"`
+		}
+		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "models", id, "--json")), &res); err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range res.Models {
+			if m.ID == model {
+				return m.SwitchEffort
+			}
+		}
+		t.Fatalf("models of %s has no row for %s", id, model)
+		return ""
+	}
+
+	t.Run("claude takes the nearest lower level", func(t *testing.T) {
+		r.waitIdle(t, claudeID, 1, claudeLaunches)
+		// opus lists xhigh; claude-opus-4-6 lists low, medium and high only.
+		r.Gx(t, "agents", "switch", claudeID, "opus", "--effort", "xhigh")
+		r.waitIdle(t, claudeID, 2, claudeLaunches)
+		want := switchEffort(t, claudeID, "claude-opus-4-6")
+		if want != "high" {
+			t.Fatalf("switch effort = %q, want high", want)
+		}
+		r.Gx(t, "agents", "switch", claudeID, "claude-opus-4-6", "--effort", want)
+		launches := r.waitIdle(t, claudeID, 3, claudeLaunches)
+		if got := flagValue(launches[2], "--effort"); got != "high" {
+			t.Fatalf("switch launch = %v, want --effort high", launches[2])
+		}
+	})
+
+	t.Run("codex takes the model default", func(t *testing.T) {
+		r.waitIdle(t, codexID, 1, codexLaunches)
+		// The CLI sends the effort as given, so xhigh puts the session on an
+		// effort gpt-6-mini (low, medium, high; default low) does not list.
+		r.Gx(t, "agents", "switch", codexID, "gpt-5.5-codex", "--effort", "xhigh")
+		r.waitIdle(t, codexID, 2, codexLaunches)
+		want := switchEffort(t, codexID, "gpt-6-mini")
+		if want != "low" {
+			t.Fatalf("switch effort = %q, want low", want)
+		}
+		r.Gx(t, "agents", "switch", codexID, "gpt-6-mini", "--effort", want)
+		launches := r.waitIdle(t, codexID, 3, codexLaunches)
+		if got := strings.Join(launches[2], " "); !strings.Contains(got, `model_reasoning_effort="low"`) {
+			t.Fatalf("switch launch = %v, want effort low", launches[2])
+		}
+	})
+	r.Stop(t)
+}
+
 func TestModelSwitchScenario_SwitchesAndRollsBackEachKind(t *testing.T) {
 	t.Parallel()
 	r := start(t, "model-switch")
