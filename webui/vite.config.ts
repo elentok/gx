@@ -1,5 +1,5 @@
 /// <reference types="vitest/config" />
-import { dirname } from "node:path"
+import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
@@ -14,6 +14,10 @@ const webuiDir = dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   // The Makefile passes the gx version; a plain build or the dev server reports "dev".
   define: { __WEB_VERSION__: JSON.stringify(process.env.GX_WEB_VERSION || "dev") },
+  resolve: {
+    // Pierre imports every Shiki grammar through this entry; swap in the short list.
+    alias: [{ find: /^shiki\/langs$/, replacement: join(webuiDir, "src/diff/shikiLangs.ts") }],
+  },
   plugins: [
     react(),
     serviceWorkerPlugin(),

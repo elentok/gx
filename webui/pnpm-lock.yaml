@@ -187,6 +187,9 @@ importers:
       '@replit/codemirror-vim':
         specifier: ^6.4.0
         version: 6.4.0(@codemirror/commands@6.11.1)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/view@6.43.15)
+      '@shikijs/langs':
+        specifier: 4.6.0
+        version: 4.6.0
       highlight.js:
         specifier: ^11.12.0
         version: 11.12.0
