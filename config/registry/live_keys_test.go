@@ -19,7 +19,7 @@ notifications.telegram.bot-token notifications.telegram.chat-id notifications.sl
 server.tab-env server.log-retention server.watch-config server.recently-finished
 server.web.allowed-hosts server.web.files.roots server.web.totp server.web.vi-escape server.web.leader-key-mac server.web.leader-key server.web.dev-frontend server.web.dev-dir
 cpu-watchdog.enabled cpu-watchdog.threshold-percent cpu-watchdog.sustain cpu-watchdog.cooldown
-watchdog.max-tree-processes watchdog.interval watchdog.ulimit-headroom
+watchdog.max-tree-processes watchdog.hard-max-tree-processes watchdog.interval watchdog.ulimit-headroom
 disk-space.warn-below disk-space.clean-below disk-space.cleanup-command
 agents.default-harness agents.writable-directories
 agents.claude.model agents.claude.effort agents.claude.light.model agents.claude.light.effort

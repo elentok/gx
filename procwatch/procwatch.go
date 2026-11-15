@@ -8,6 +8,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"math"
 	"slices"
 	"syscall"
 	"time"
@@ -17,6 +18,10 @@ import (
 
 // DefaultInterval is how often the process table is read.
 const DefaultInterval = 10 * time.Second
+
+// StreakLimit is how many polls in a row a root must be over Threshold before
+// it is reported. A tree over HardThreshold is reported at once.
+const StreakLimit = 10
 
 // Forest is a process table indexed once: by pid and by parent. Build it once
 // per table read and ask it about every root, so a poll costs O(N) rather than
@@ -87,6 +92,10 @@ func (f *Forest) walk(root int, visit func(syshealth.Process)) {
 type Config struct {
 	// Threshold is the descendant count above which a tree is a storm.
 	Threshold int
+	// HardThreshold is the count above which a tree is reported on the first
+	// sample, with no streak. A value below Threshold means Threshold; zero
+	// means no ceiling.
+	HardThreshold int
 	// Interval is the time between polls; zero means DefaultInterval.
 	Interval time.Duration
 }
@@ -123,6 +132,7 @@ type Watcher struct {
 	Reader syshealth.ProcessReader
 
 	noticed map[int]bool // foreign roots over the threshold at the last poll
+	streaks map[int]int  // consecutive polls over the threshold, per watched root
 }
 
 func (w *Watcher) config() Config {
@@ -166,11 +176,22 @@ func (w *Watcher) poll(reader syshealth.ProcessReader) {
 	}
 	forest := NewForest(table.Processes)
 	if w.Report != nil {
+		hard := math.MaxInt
+		if cfg.HardThreshold > 0 {
+			hard = max(cfg.HardThreshold, cfg.Threshold)
+		}
+		streaks := make(map[int]int, len(roots))
 		for _, root := range roots {
-			if n := forest.Count(root); n > cfg.Threshold {
+			n := forest.Count(root)
+			if n <= cfg.Threshold {
+				continue
+			}
+			streaks[root] = w.streaks[root] + 1
+			if n > hard || streaks[root] >= StreakLimit {
 				w.Report(Storm{Root: root, Descendants: n})
 			}
 		}
+		w.streaks = streaks
 	}
 	if w.Foreign != nil {
 		over := map[int]bool{}

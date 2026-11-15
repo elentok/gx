@@ -117,9 +117,10 @@ type rawConfig struct {
 		Cooldown         *string  `json:"cooldown"`
 	} `json:"cpu-watchdog"`
 	Watchdog *struct {
-		MaxTreeProcesses *int    `json:"max-tree-processes"`
-		Interval         *string `json:"interval"`
-		UlimitHeadroom   *int    `json:"ulimit-headroom"`
+		MaxTreeProcesses     *int    `json:"max-tree-processes"`
+		HardMaxTreeProcesses *int    `json:"hard-max-tree-processes"`
+		Interval             *string `json:"interval"`
+		UlimitHeadroom       *int    `json:"ulimit-headroom"`
 	} `json:"watchdog"`
 	DiskSpace *struct {
 		WarnBelow      *string  `json:"warn-below"`

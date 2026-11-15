@@ -20,6 +20,7 @@ var labels = map[string]string{
 	"cpu-watchdog.threshold-percent":   "CPU threshold (% of one core)",
 	"cpu-watchdog.sustain":             "Sustain time",
 	"watchdog.max-tree-processes":      "Max processes per agent",
+	"watchdog.hard-max-tree-processes": "Hard max processes per agent",
 	"watchdog.interval":                "Check interval",
 	"watchdog.ulimit-headroom":         "Process headroom",
 	"agents.default-harness":           "Default harness",

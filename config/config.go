@@ -494,6 +494,9 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 		if w.MaxTreeProcesses != nil && *w.MaxTreeProcesses > 0 {
 			cfg.Watchdog.MaxTreeProcesses = *w.MaxTreeProcesses
 		}
+		if w.HardMaxTreeProcesses != nil && *w.HardMaxTreeProcesses > 0 {
+			cfg.Watchdog.HardMaxTreeProcesses = *w.HardMaxTreeProcesses
+		}
 		if w.Interval != nil {
 			if d, err := time.ParseDuration(*w.Interval); err == nil && d > 0 {
 				cfg.Watchdog.Interval = d

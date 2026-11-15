@@ -122,6 +122,8 @@ func coreEntries() []Entry {
 	proc := system(SectionWatchdogs, "Process")
 	add(proc, Entry{Key: Key("watchdog", "max-tree-processes"), Type: TypeNumber, Min: minOf(1), Integer: true,
 		Description: "The most processes one agent's tree may hold before the watchdog stops the agent."})
+	add(proc, Entry{Key: Key("watchdog", "hard-max-tree-processes"), Type: TypeNumber, Min: minOf(1), Integer: true,
+		Description: "The process count above which the watchdog stops an agent on the first sample, with no wait. The larger of this and the max above applies."})
 	add(proc, dur(Key("watchdog", "interval"), "How often the watchdog counts each agent's processes. Default: 1s."))
 	add(proc, Entry{Key: Key("watchdog", "ulimit-headroom"), Type: TypeNumber, Min: minOf(1), Integer: true,
 		Description: "How many processes above your current count an agent may start. The cap is fixed when an agent launches, so restart the agent if legitimate forks start failing."})

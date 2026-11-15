@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"sync"
 	"syscall"
@@ -196,7 +197,66 @@ func runWatcher(t *testing.T, w *Watcher) {
 	t.Cleanup(func() { cancel(); <-done })
 }
 
-func TestWatcher_ReportsOverThresholdEachPollAndSparesUnder(t *testing.T) {
+func TestWatcher_StreakAndHardCeiling(t *testing.T) {
+	t.Parallel()
+	root := row(10, 1, me)
+	over := concat([]syshealth.Process{row(1, 0, 0), root}, kids(11, 5, 10, me))
+	under := concat([]syshealth.Process{row(1, 0, 0), root}, kids(11, 3, 10, me))
+	huge := concat([]syshealth.Process{row(1, 0, 0), root}, kids(11, 20, 10, me))
+	away := []syshealth.Process{row(1, 0, 0)}
+	seq := func(n int, t []syshealth.Process) [][]syshealth.Process {
+		out := make([][]syshealth.Process, n)
+		for i := range out {
+			out[i] = t
+		}
+		return out
+	}
+	join := func(parts ...[][]syshealth.Process) [][]syshealth.Process {
+		var out [][]syshealth.Process
+		for _, p := range parts {
+			out = append(out, p...)
+		}
+		return out
+	}
+	tests := []struct {
+		name  string
+		cfg   Config
+		polls [][]syshealth.Process
+		want  []int // poll indexes (0-based) that report
+	}{
+		{"tenth consecutive sample reports", Config{Threshold: 3}, seq(10, over), []int{9}},
+		{"nine over report nothing", Config{Threshold: 3}, seq(9, over), nil},
+		{"a sample at the limit resets the streak", Config{Threshold: 3},
+			join(seq(9, over), seq(1, under), seq(9, over)), nil},
+		{"a root that left starts again", Config{Threshold: 3},
+			join(seq(9, over), seq(1, away), seq(9, over)), nil},
+		{"over the hard ceiling reports at once", Config{Threshold: 3, HardThreshold: 10}, seq(1, huge), []int{0}},
+		{"between limit and ceiling waits for the streak", Config{Threshold: 3, HardThreshold: 10}, seq(9, over), nil},
+		{"ceiling below the limit is the limit", Config{Threshold: 30, HardThreshold: 10}, seq(1, huge), nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			reader := &tableReader{}
+			var got []int
+			var polled int
+			w := &Watcher{
+				Config: tc.cfg,
+				Roots:  func() []int { return []int{10} },
+				Report: func(Storm) { got = append(got, polled) },
+			}
+			for i, p := range tc.polls {
+				polled, reader.procs = i, p
+				w.poll(reader)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("reports at polls %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestWatcher_ReportsSustainedStormAndSparesUnder(t *testing.T) {
 	big := startTree(t, "tree", 4)
 	small := startTree(t, "tree", 2)
 	big.waitDescendants(t, 4)
@@ -223,7 +283,7 @@ func TestWatcher_ReportsOverThresholdEachPollAndSparesUnder(t *testing.T) {
 		t.Fatalf("tree at the threshold was reported: %v", storms)
 	}
 	if storms[big.root.Process.Pid] < 3 {
-		t.Fatalf("storm not reported each poll: %v", storms)
+		t.Fatalf("sustained storm not reported: %v", storms)
 	}
 	if err := syscall.Kill(small.root.Process.Pid, 0); err != nil {
 		t.Fatalf("tree under threshold was touched: %v", err)

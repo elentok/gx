@@ -161,6 +161,7 @@ func changedKeys(old, next Settings) []string {
 		{"recovery.follow-ups", old.RecoverySettings.FollowUps, next.RecoverySettings.FollowUps},
 		{"recovery.notify-hold", old.RecoverySettings.NotifyHold, next.RecoverySettings.NotifyHold},
 		{"watchdog.max-tree-processes", old.Watchdog.MaxTreeProcesses, next.Watchdog.MaxTreeProcesses},
+		{"watchdog.hard-max-tree-processes", old.Watchdog.HardMaxTreeProcesses, next.Watchdog.HardMaxTreeProcesses},
 		{"watchdog.interval", old.Watchdog.Interval, next.Watchdog.Interval},
 		{"watchdog.ulimit-headroom", old.Watchdog.UlimitHeadroom, next.Watchdog.UlimitHeadroom},
 		{"subscription.suppress-extra-usage-warning", old.SuppressExtraUsageWarning, next.SuppressExtraUsageWarning},

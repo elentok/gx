@@ -10,7 +10,7 @@ import (
 
 func TestParseWatchdog(t *testing.T) {
 	def := DefaultWatchdogConfig()
-	if def != (WatchdogConfig{MaxTreeProcesses: 200, Interval: time.Second, UlimitHeadroom: 1000}) {
+	if def != (WatchdogConfig{MaxTreeProcesses: 500, HardMaxTreeProcesses: 1000, Interval: time.Second, UlimitHeadroom: 1000}) {
 		t.Fatalf("default = %+v", def)
 	}
 	for _, tc := range []struct {
@@ -19,8 +19,10 @@ func TestParseWatchdog(t *testing.T) {
 	}{
 		{"absent", `{}`, def},
 		{"set", `{"watchdog":{"max-tree-processes":50,"interval":"250ms","ulimit-headroom":10}}`,
-			WatchdogConfig{MaxTreeProcesses: 50, Interval: 250 * time.Millisecond, UlimitHeadroom: 10}},
-		{"non-positive", `{"watchdog":{"max-tree-processes":0,"interval":"-1s","ulimit-headroom":-5}}`, def},
+			WatchdogConfig{MaxTreeProcesses: 50, HardMaxTreeProcesses: 1000, Interval: 250 * time.Millisecond, UlimitHeadroom: 10}},
+		{"hard set", `{"watchdog":{"hard-max-tree-processes":2500}}`,
+			WatchdogConfig{MaxTreeProcesses: 500, HardMaxTreeProcesses: 2500, Interval: time.Second, UlimitHeadroom: 1000}},
+		{"non-positive", `{"watchdog":{"max-tree-processes":0,"hard-max-tree-processes":-1,"interval":"-1s","ulimit-headroom":-5}}`, def},
 		{"bad duration", `{"watchdog":{"interval":"soon"}}`, def},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -59,9 +61,10 @@ func TestWatchdogSchema(t *testing.T) {
 		typ string
 		def any
 	}{
-		"max-tree-processes": {"integer", float64(200)},
-		"ulimit-headroom":    {"integer", float64(1000)},
-		"interval":           {"string", nil},
+		"max-tree-processes":      {"integer", float64(500)},
+		"hard-max-tree-processes": {"integer", float64(1000)},
+		"ulimit-headroom":         {"integer", float64(1000)},
+		"interval":                {"string", nil},
 	} {
 		p, ok := props[key]
 		if !ok {

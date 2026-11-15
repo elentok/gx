@@ -586,12 +586,18 @@
     "watchdog": {
       "additionalProperties": false,
       "properties": {
+        "hard-max-tree-processes": {
+          "default": 1000,
+          "description": "The process count above which the watchdog stops an agent on the first sample, with no wait. The larger of this and the max above applies.",
+          "minimum": 1,
+          "type": "integer"
+        },
         "interval": {
           "description": "How often the watchdog counts each agent's processes. Default: 1s.",
           "type": "string"
         },
         "max-tree-processes": {
-          "default": 200,
+          "default": 500,
           "description": "The most processes one agent's tree may hold before the watchdog stops the agent.",
           "minimum": 1,
           "type": "integer"

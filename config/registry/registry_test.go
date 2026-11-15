@@ -235,7 +235,7 @@ func TestPlacementPinsTable(t *testing.T) {
 	pin("System/Disk space/Thresholds", "disk-space.warn-below", "disk-space.clean-below")
 	pin("System/Disk space/Cleanup", "disk-space.cleanup-command")
 	pin("System/Watchdogs/CPU", "cpu-watchdog.enabled", "cpu-watchdog.threshold-percent", "cpu-watchdog.sustain", "cpu-watchdog.cooldown")
-	pin("System/Watchdogs/Process", "watchdog.max-tree-processes", "watchdog.interval", "watchdog.ulimit-headroom")
+	pin("System/Watchdogs/Process", "watchdog.max-tree-processes", "watchdog.hard-max-tree-processes", "watchdog.interval", "watchdog.ulimit-headroom")
 	pin("Project/Project/Repository", "name", "repo", "vcs")
 	pin("Project/Project/Delivery", "trunk", "landing", "delivery", "auto-ff-merge", "auto-pr")
 	pin("Checks/Checks/Checks", "checks")

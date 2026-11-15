@@ -31,10 +31,10 @@ func TestConfigReload_WatchdogKeysApply(t *testing.T) {
 	}
 
 	servertest.WriteConfig(t, path, store, map[string]any{"watchdog": map[string]any{
-		"max-tree-processes": 50, "interval": "2s", "ulimit-headroom": 10,
+		"max-tree-processes": 50, "hard-max-tree-processes": 2000, "interval": "2s", "ulimit-headroom": 10,
 	}})
 	res := reload(t, h)
-	for _, key := range []string{"watchdog.max-tree-processes", "watchdog.interval", "watchdog.ulimit-headroom"} {
+	for _, key := range []string{"watchdog.max-tree-processes", "watchdog.hard-max-tree-processes", "watchdog.interval", "watchdog.ulimit-headroom"} {
 		if !slices.Contains(res.Changed, key) {
 			t.Errorf("reload = %+v, want %s changed", res, key)
 		}

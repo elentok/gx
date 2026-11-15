@@ -54,6 +54,7 @@ func TestCoreEntries(t *testing.T) {
 		{key: Key("cpu-watchdog", "sustain"), typ: TypeDuration, section: SectionWatchdogs},
 		{key: Key("cpu-watchdog", "cooldown"), typ: TypeDuration, section: SectionWatchdogs},
 		{key: Key("watchdog", "max-tree-processes"), typ: TypeNumber, section: SectionWatchdogs},
+		{key: Key("watchdog", "hard-max-tree-processes"), typ: TypeNumber, section: SectionWatchdogs},
 		{key: Key("watchdog", "interval"), typ: TypeDuration, section: SectionWatchdogs},
 		{key: Key("watchdog", "ulimit-headroom"), typ: TypeNumber, section: SectionWatchdogs},
 		{key: Key("disk-space", "warn-below"), typ: TypeSize, section: SectionDiskSpace},

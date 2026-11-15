@@ -61,7 +61,7 @@ func (s *Health) KeepStormWatched(ctx context.Context) {
 	w := &procwatch.Watcher{
 		Settings: func() procwatch.Config {
 			wd := s.settings.Load().Watchdog
-			return procwatch.Config{Threshold: wd.MaxTreeProcesses, Interval: wd.Interval}
+			return procwatch.Config{Threshold: wd.MaxTreeProcesses, HardThreshold: wd.HardMaxTreeProcesses, Interval: wd.Interval}
 		},
 		Roots:   s.stormRoots,
 		Report:  s.stormFound,

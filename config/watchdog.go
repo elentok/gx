@@ -8,6 +8,10 @@ type WatchdogConfig struct {
 	// MaxTreeProcesses is the process count in one agent's tree above which
 	// the watchdog stops that agent.
 	MaxTreeProcesses int `json:"max-tree-processes"`
+	// HardMaxTreeProcesses is the count above which the watchdog stops an
+	// agent on the first sample. The effective ceiling is the larger of this
+	// and MaxTreeProcesses.
+	HardMaxTreeProcesses int `json:"hard-max-tree-processes"`
 	// Interval is how often the watchdog counts.
 	Interval time.Duration `json:"-"`
 	// UlimitHeadroom is how many processes above the user's current count an
@@ -17,5 +21,5 @@ type WatchdogConfig struct {
 
 // DefaultWatchdogConfig is watchdog's default.
 func DefaultWatchdogConfig() WatchdogConfig {
-	return WatchdogConfig{MaxTreeProcesses: 200, Interval: time.Second, UlimitHeadroom: 1000}
+	return WatchdogConfig{MaxTreeProcesses: 500, HardMaxTreeProcesses: 1000, Interval: time.Second, UlimitHeadroom: 1000}
 }
