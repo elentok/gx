@@ -481,6 +481,31 @@ test.each([undefined, "#/triage/gx"])(
   },
 )
 
+test.each([
+  ["Round 1 · 2 questions left", "Answer"],
+  ["Write this plan?", "Review plan"],
+])(
+  "at a phone width the %s card shows the pill, the line and one wrapping button",
+  (reason, label) => {
+    window.innerWidth = 390
+    renderThemed(
+      <EpicCard
+        row={followUps({
+          section: "needs-you",
+          state_pill: "Needs you",
+          reason,
+          actions: [{ kind: "answer", label, target: "gx", link: "#/triage/gx" }],
+        })}
+      />,
+    )
+    expect(text(screen.getByTestId("pill"))).toBe("Needs you")
+    expect(screen.getByTestId("reason").textContent).toBe(reason)
+    expect(within(screen.getByTestId("footer")).getAllByRole("button")).toHaveLength(1)
+    expect(screen.getByRole("button", { name: label })).toBeTruthy()
+    expect(getComputedStyle(screen.getByTestId("footer")).flexWrap).toBe("wrap")
+  },
+)
+
 const writeCard = (actions: EpicListRow["actions"]) =>
   followUps({
     section: "designing",
