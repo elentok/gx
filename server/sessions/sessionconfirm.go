@@ -16,9 +16,61 @@ const confirmSettleTimeout = 2 * time.Second
 
 const confirmSettlePoll = 50 * time.Millisecond
 
-// modelNotFound is the error code of a reply from a model that does not exist
-// or is not available to the account. Claude does not exit on it.
-const modelNotFound = "model_not_found"
+// firstReplyReader reads the first reply after a switch for one harness.
+type firstReplyReader interface {
+	// Path finds the transcript or rollout to read.
+	Path(mg *Manager, id string, meta Meta) (string, bool)
+	// Settle waits until the turn's last lines are written. It returns false
+	// when cancel or a stop ended the wait.
+	Settle(rs *Resumer, path string, cancel <-chan struct{}) bool
+	// StateOK reports whether a session in state may be checked.
+	StateOK(state string) bool
+	// FirstReply reads the first reply stamped after at. found is false while
+	// there is none.
+	FirstReply(path string, at time.Time) (notFound, found bool, err error)
+}
+
+func firstReplyReaderFor(h string) firstReplyReader {
+	if h == string(harness.Codex) {
+		return codexReplyReader{}
+	}
+	return claudeReplyReader{}
+}
+
+type claudeReplyReader struct{}
+
+func (claudeReplyReader) Path(mg *Manager, id string, meta Meta) (string, bool) {
+	return mg.chat.ClaudeTranscript(id, meta.ChatMeta())
+}
+
+func (claudeReplyReader) Settle(rs *Resumer, path string, cancel <-chan struct{}) bool {
+	return rs.settleClaudeTurn(path, cancel)
+}
+
+func (claudeReplyReader) StateOK(state string) bool { return state == wire.SessionIdle }
+
+func (claudeReplyReader) FirstReply(path string, at time.Time) (notFound, found bool, err error) {
+	e, isErr, found, err := transcript.FirstAssistantAfter(path, at)
+	return isErr && e.Error == transcript.ModelNotFound, found, err
+}
+
+type codexReplyReader struct{}
+
+func (codexReplyReader) Path(mg *Manager, _ string, meta Meta) (string, bool) {
+	return mg.chat.CodexRollout(meta.ChatMeta())
+}
+
+func (codexReplyReader) Settle(*Resumer, string, <-chan struct{}) bool { return true }
+
+// StateOK: Codex reports a failed first turn as Blocked, a clean one as Idle.
+func (codexReplyReader) StateOK(state string) bool {
+	return state == wire.SessionIdle || state == wire.SessionBlocked
+}
+
+func (codexReplyReader) FirstReply(path string, at time.Time) (notFound, found bool, err error) {
+	kind, found, err := codexsession.FirstTurnEndAfter(path, at)
+	return kind == transcript.ModelNotFound, found, err
+}
 
 // confirmSwitch decides an unconfirmed switch by the first reply after the
 // switch time: Claude's first assistant line, Codex's first task_complete.
@@ -31,58 +83,57 @@ func (rs *Resumer) confirmSwitch(dir, id string, run int, cancel <-chan struct{}
 	if err != nil || meta.Run != run || !meta.SwitchUnconfirmed {
 		return
 	}
-	isCodex := meta.Harness == string(harness.Codex)
-	var path string
-	var ok bool
-	if isCodex {
-		path, ok = mg.chat.CodexRollout(meta.ChatMeta())
-	} else {
-		path, ok = mg.chat.ClaudeTranscript(id, meta.ChatMeta())
-	}
-	if !ok {
+	reader := firstReplyReaderFor(meta.Harness)
+	path, ok := reader.Path(mg, id, meta)
+	if !ok || !reader.Settle(rs, path, cancel) {
 		return
 	}
-	if !isCodex && !rs.settleClaudeTurn(path, cancel) {
-		return
+	switch verdict, rb := rs.decideSwitch(dir, id, run, reader, path); verdict {
+	case verdictConfirmed:
+		mg.events.Publish(wire.EventSessionChanged, id)
+	case verdictRollBack:
+		rs.finishRollback(dir, id, rb)
 	}
+}
+
+type switchVerdict int
+
+const (
+	verdictNone switchVerdict = iota
+	verdictConfirmed
+	verdictRollBack
+)
+
+// decideSwitch reads the first reply under metaMu and applies the locked half
+// of the verdict: it saves a confirmation, or starts a rollback.
+func (rs *Resumer) decideSwitch(dir, id string, run int, reader firstReplyReader, path string) (switchVerdict, rollback) {
+	mg := rs.mg
 	mg.Watches.MetaMu.Lock()
-	meta, err = ReadMeta(dir)
-	// Codex reports a failed first turn as Blocked, a clean one as Idle.
-	state := meta.Status.State
-	inState := state == wire.SessionIdle || (isCodex && state == wire.SessionBlocked)
-	if err != nil || meta.Run != run || !meta.SwitchUnconfirmed || !inState {
-		mg.Watches.MetaMu.Unlock()
-		return
+	defer mg.Watches.MetaMu.Unlock()
+	meta, err := ReadMeta(dir)
+	if err != nil || meta.Run != run || !meta.SwitchUnconfirmed || !reader.StateOK(meta.Status.State) {
+		return verdictNone, rollback{}
 	}
-	var notFound, found bool
-	if isCodex {
-		var kind string
-		kind, found, err = codexsession.FirstTurnEndAfter(path, meta.SwitchedAt)
-		notFound = kind == codexsession.ModelNotFound
-	} else {
-		var e transcript.APIError
-		var isErr bool
-		e, isErr, found, err = transcript.FirstAssistantAfter(path, meta.SwitchedAt)
-		notFound = isErr && e.Error == modelNotFound
-	}
+	notFound, found, err := reader.FirstReply(path, meta.SwitchedAt)
 	if err != nil {
 		mg.log.Warn("switch: read first reply", "session", id, "err", err)
 	}
 	switch {
 	case err != nil || !found:
-		mg.Watches.MetaMu.Unlock()
+		return verdictNone, rollback{}
 	case notFound && meta.SwitchPrev != nil:
-		rs.rollbackUnconfirmed(dir, meta)
-	default:
-		meta.SwitchUnconfirmed, meta.SwitchPrev = false, nil
-		err := WriteMeta(dir, meta)
-		mg.Watches.MetaMu.Unlock()
-		if err != nil {
-			mg.log.Warn("switch: confirm", "session", id, "err", err)
-			return
+		rb, ok := rs.beginRollback(dir, meta)
+		if !ok {
+			return verdictNone, rollback{}
 		}
-		mg.events.Publish(wire.EventSessionChanged, id)
+		return verdictRollBack, rb
 	}
+	meta.SwitchUnconfirmed, meta.SwitchPrev = false, nil
+	if err := WriteMeta(dir, meta); err != nil {
+		mg.log.Warn("switch: confirm", "session", id, "err", err)
+		return verdictNone, rollback{}
+	}
+	return verdictConfirmed, rollback{}
 }
 
 // settleClaudeTurn waits for the end-of-turn line of the transcript at path. It
@@ -108,22 +159,32 @@ func (rs *Resumer) settleClaudeTurn(path string, cancel <-chan struct{}) bool {
 	}
 }
 
-// rollbackUnconfirmed relaunches the conversation on the record from before an
-// unconfirmed switch, with a new switch time so the failed turn reads as older.
-// The caller holds metaMu and meta is the saved record; it is released here
-// while the old agent stops. The state is set at detection so the prompt box
-// is disabled meanwhile.
-func (rs *Resumer) rollbackUnconfirmed(dir string, meta Meta) {
+// rollback is the model switched away from and the record to return to.
+type rollback struct {
+	attempted string
+	prev      SwitchTarget
+}
+
+// beginRollback bumps the run and registers the pending switch back, with the
+// state set at detection so the prompt box is disabled meanwhile. The caller
+// holds metaMu and meta is the saved record.
+func (rs *Resumer) beginRollback(dir string, meta Meta) (rollback, bool) {
 	mg := rs.mg
-	id, attempted, prev := meta.ID, meta.Model, *meta.SwitchPrev
+	rb := rollback{attempted: meta.Model, prev: *meta.SwitchPrev}
 	meta.Run++
 	if err := WriteMeta(dir, meta); err != nil {
-		mg.Watches.MetaMu.Unlock()
-		mg.log.Warn("switch: roll back", "session", id, "err", err)
-		return
+		mg.log.Warn("switch: roll back", "session", meta.ID, "err", err)
+		return rollback{}, false
 	}
-	mg.switches.set(id, switchState{run: meta.Run + 1, model: prev.Model, effort: prev.Effort, back: true, attempted: attempted})
-	mg.Watches.MetaMu.Unlock()
+	mg.switches.set(meta.ID, switchState{run: meta.Run + 1, model: rb.prev.Model, effort: rb.prev.Effort, back: true, attempted: rb.attempted})
+	return rb, true
+}
+
+// finishRollback relaunches the conversation on the record from before an
+// unconfirmed switch, with a new switch time so the failed turn reads as older.
+// It runs without metaMu while the old agent stops.
+func (rs *Resumer) finishRollback(dir, id string, rb rollback) {
+	mg := rs.mg
 	rs.stopForRestart(dir, id)
 	mg.Watches.MetaMu.Lock()
 	defer mg.Watches.MetaMu.Unlock()
@@ -132,9 +193,10 @@ func (rs *Resumer) rollbackUnconfirmed(dir string, meta Meta) {
 		mg.switches.clear(id)
 		return
 	}
+	prev := rb.prev
 	meta.Model, meta.Effort, meta.SwitchedByHand = prev.Model, prev.Effort, prev.ByHand
 	meta.SwitchUnconfirmed, meta.SwitchPrev, meta.SwitchedAt = false, nil, time.Now()
-	if err := rs.rollbackSwitchLocked(dir, &meta, attempted); err != nil {
+	if err := rs.rollbackSwitchLocked(dir, &meta, rb.attempted); err != nil {
 		mg.log.Warn("switch: old agent did not start", "session", id, "err", err)
 	}
 }

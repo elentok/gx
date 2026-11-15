@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/transcript"
 )
 
 func TestLastTurnErrorIn_ClassifiesUsageLimitFromTheNewestSample(t *testing.T) {
@@ -101,7 +103,7 @@ func TestFirstTurnEndAfter(t *testing.T) {
 		{"nothing yet", "", "", false},
 		{"turn still running", started, "", false},
 		{"older completion ignored", done("2026-11-01T11:00:00Z", `"model_not_found"`), "", false},
-		{"model_not_found", started + done("2026-11-01T12:01:00Z", `"model_not_found"`), ModelNotFound, true},
+		{"model_not_found", started + done("2026-11-01T12:01:00Z", `"model_not_found"`), transcript.ModelNotFound, true},
 		{"other error", started + done("2026-11-01T12:01:00Z", `"rate_limit_exceeded"`), "rate_limit_exceeded", true},
 		{"clean completion", started + clean, "", true},
 	} {

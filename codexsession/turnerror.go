@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"os"
 	"time"
+
+	"github.com/elentok/gx/transcript"
 )
 
 // usageLimitKind is Codex's error-info name for a hit usage limit. It is not
@@ -108,7 +110,7 @@ func readTurnError(path, cwd, sessionID string, switchedAt time.Time) (reading T
 			e := line.Payload.Error
 			ok = e.Message != "" || len(e.Info) > 0
 			reading.Error = TurnError{Message: e.Message, Kind: errorKind(e.Info)}
-			if ok && reading.Error.Kind == ModelNotFound && !switchedAt.IsZero() && !line.Timestamp.After(switchedAt) {
+			if ok && reading.Error.Kind == transcript.ModelNotFound && !switchedAt.IsZero() && !line.Timestamp.After(switchedAt) {
 				ok = false
 			}
 		case "token_count":

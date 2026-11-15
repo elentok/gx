@@ -17,6 +17,10 @@ type APIError struct {
 	Timestamp time.Time
 }
 
+// ModelNotFound is the error kind of a reply from a model that does not exist
+// or is not available to the account. Neither Claude nor Codex exits on it.
+const ModelNotFound = "model_not_found"
+
 // RateLimited reports whether e is a rate or usage limit.
 func (e APIError) RateLimited() bool {
 	return e.Error == "rate_limit" || e.Status == 429

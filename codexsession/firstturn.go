@@ -7,10 +7,6 @@ import (
 	"time"
 )
 
-// ModelNotFound is the error kind of a turn on a model that does not exist or
-// is not available to the account. Codex does not exit on it.
-const ModelNotFound = "model_not_found"
-
 // FirstTurnEndAfter reads the rollout at path for the first task_complete
 // stamped after at. found is false while there is none, a turn still running
 // included. kind is the turn's error kind, "" for a clean completion. Lines

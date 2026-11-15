@@ -201,10 +201,10 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 				}
 				// The first status of an attach also checks, so a restart between
 				// idle and the first message keeps the rollback.
-				// Codex reports a failed first turn as Blocked, so that edge checks too.
-				codexBlocked := st.State == wire.SessionBlocked && m.Harness == string(harness.Codex)
-				checkState := st.State == wire.SessionIdle || codexBlocked
-				unconfirmed = m.SwitchUnconfirmed && checkState && (idleEdge || (codexBlocked && changed) || attaching)
+				// A harness may also check on a non-idle state it allows (Codex's
+				// Blocked), on its edge.
+				unconfirmed = m.SwitchUnconfirmed && firstReplyReaderFor(m.Harness).StateOK(st.State) &&
+					(idleEdge || (st.State != wire.SessionIdle && changed) || attaching)
 				if msg.ConversationID != "" && msg.ConversationID != m.ConversationID {
 					mg.Conv.SaveTotals(m.ConvSession(), m.ConversationID)
 					harness.CarryEditorOverride(m.ConversationID, msg.ConversationID)
