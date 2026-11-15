@@ -7,6 +7,21 @@ import (
 	"github.com/elentok/gx/tickets/ticketmove"
 )
 
+func TestHoldTriage_KeepsTheShapesKnobs(t *testing.T) {
+	t.Parallel()
+	for _, shape := range []string{"verify", "route"} {
+		sc, _ := TriageScenario(shape)
+		want := 0
+		if sc.TriageAgent != nil {
+			want = sc.TriageAgent.VerifyBatch
+		}
+		HoldTriage(&sc)
+		if !sc.TriageAgent.HoldAtStep || sc.TriageAgent.VerifyBatch != want {
+			t.Errorf("%s: config = %+v, want HoldAtStep with VerifyBatch %d", shape, *sc.TriageAgent, want)
+		}
+	}
+}
+
 func TestTriageScenario_BacklogSeedsThreeAreasAndAnUnfinishedMap(t *testing.T) {
 	t.Parallel()
 	sc, ok := TriageScenario("backlog")

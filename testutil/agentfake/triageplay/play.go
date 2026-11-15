@@ -29,6 +29,9 @@ type Config struct {
 	// on two rows, no area) that the journey flow still drives. Flow 199
 	// replaces the journey and this knob goes with it.
 	LegacyPlan bool `json:"legacy_plan,omitempty"`
+	// HoldAtStep makes the session wait for the worker's Hold file before it
+	// plays its step, so the page stays at the step the record is on.
+	HoldAtStep bool `json:"hold_at_step,omitempty"`
 }
 
 // The scripted refusals of the fail-once knobs. A row that already carries one

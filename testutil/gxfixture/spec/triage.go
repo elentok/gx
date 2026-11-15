@@ -130,6 +130,17 @@ func withAreas(sc *Scenario, n int) []string {
 	return names
 }
 
+// HoldTriage makes the scenario's Triage session wait for the hold file before
+// it plays its step, so a `--hold` run stays at the shape's step.
+func HoldTriage(sc *Scenario) {
+	cfg := triageplay.Config{}
+	if sc.TriageAgent != nil {
+		cfg = *sc.TriageAgent
+	}
+	cfg.HoldAtStep = true
+	sc.TriageAgent = &cfg
+}
+
 // TriageScenario is the triage scenario in the given shape. Each shape is its
 // own server start: the sidebar badge sums every project of a workspace.
 func TriageScenario(shape string) (Scenario, bool) {

@@ -69,6 +69,9 @@ func run(args []string) (err error) {
 	}
 	if sc.TriageShaped {
 		sc, _ = spec.TriageScenario(shape)
+		if o.hold {
+			spec.HoldTriage(&sc)
+		}
 	}
 	if sc.SchedulesShaped {
 		sc, _ = spec.SchedulesScenario(shape)

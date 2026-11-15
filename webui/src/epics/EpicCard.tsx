@@ -256,6 +256,7 @@ export function EpicCard({
       ? `Next run starts in ${seconds}s`
       : (launchOrVerdictText(row.launch_step, row.verdict, row.reason) ??
         row.reason ??
+        row.step_line ??
         (isReadyForReview(row) ? READY_FOR_REVIEW_REASON : undefined))
   const hasButtons = footerActions(row).length > 0
   const tone = needsYou ? needsYouTone(row) : undefined

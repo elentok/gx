@@ -51,6 +51,9 @@ func (t *tui) triageTurn(text string) error {
 		if cfg.Triage != nil {
 			p.Config = *cfg.Triage
 		}
+		if p.Config.HoldAtStep {
+			WaitHold(cfg)
+		}
 		msg, err := p.Play()
 		if err != nil {
 			msg = fmt.Sprintf("Error: %v\n\n✅ triage: stopped on an error. Next: %s", err, p.Next())

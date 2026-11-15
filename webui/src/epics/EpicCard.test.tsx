@@ -494,7 +494,7 @@ test.each(["Verify", "Route"])(
         row={followUps({
           section: "designing",
           state_pill: pill,
-          reason: "Verifying 51 of 84",
+          step_line: "Verifying 51 of 84",
           ring_progress: 20,
         })}
       />,
