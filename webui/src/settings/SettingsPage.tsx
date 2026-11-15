@@ -502,6 +502,7 @@ function SectionPage({
             <PageHeader title={section} icon={<PageIcon kind="settings" />} />
             <SectionBody
               entries={settings.data.entries}
+              categories={settings.data.categories}
               project={project}
               section={section}
               pendingRestart={settings.data.pending_restart}

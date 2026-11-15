@@ -259,7 +259,15 @@ describe("SettingsShellView", () => {
 
 describe("SettingsShellView in a project", () => {
   const p = (key: string, section: string, over: Partial<SettingsEntry> = {}) =>
-    entry({ key, path: [key], section, description: `About ${key}.`, type: "string", ...over })
+    entry({
+      key,
+      path: [key],
+      section,
+      group: over.identity ? "Repository" : section === "Project" ? "Delivery" : "Agent limits",
+      description: `About ${key}.`,
+      type: "string",
+      ...over,
+    })
   const projectEntries = [
     p("name", "Project", { read_only: true, identity: true, value: "gx", category: "Project" }),
     p("repo", "Project", {
@@ -329,9 +337,9 @@ describe("SettingsShellView in a project", () => {
     expect(getByRole("button", { name: /Ralph loop\s*1$/ })).toBeTruthy()
   })
 
-  it("shows Identity as read-only text with no control", () => {
-    const { container, getByText } = renderProject("Project")
-    const identity = getByText("Identity").nextElementSibling as HTMLElement
+  it("shows the Repository group as read-only text with no control", () => {
+    const { container, getByTestId } = renderProject("Project")
+    const identity = getByTestId("group-Repository")
     expect(identity.textContent).toContain("/Users/david/dev/gx")
     expect(identity.querySelectorAll("input, button, select")).toHaveLength(0)
     expect(within(identity).getAllByText(/read-only/)).toHaveLength(3)

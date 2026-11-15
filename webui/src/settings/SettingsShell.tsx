@@ -9,7 +9,7 @@ import { EmptyState } from "../ui/empty-state/EmptyState"
 import { useDevice } from "../useWide"
 import { Chip } from "../ui/chip/Chip"
 import { entryLabel, groupBySection, searchEntries, treeSections } from "./settingsApi"
-import { Group, SearchBox } from "./parts"
+import { CountChip, Group, GroupBlock, SearchBox } from "./parts"
 import { DEV_FRONTEND_KEY } from "../dev"
 import { DevFrontendRow } from "./DevFrontendRow"
 import { SettingsRow, type WriteSetting } from "./SettingsRow"
@@ -37,20 +37,6 @@ const navLink = {
   cursor: "pointer",
   _hover: { bg: "surface.raised" },
 } as const
-
-const CountChip = ({ n }: { n: number }) => (
-  <chakra.span
-    fontSize="11px"
-    fontWeight="600"
-    px="7px"
-    py="1px"
-    borderRadius="full"
-    bg="tone.running.bg"
-    color="tone.running.fg"
-  >
-    {n}
-  </chakra.span>
-)
 
 export interface ShellProps {
   entries: SettingsEntry[]
@@ -254,12 +240,29 @@ const rowBuilder =
 
 type SectionBodyProps = Pick<
   ShellProps,
-  "entries" | "project" | "pendingRestart" | "onWrite" | "repoChecksFile"
+  "entries" | "categories" | "project" | "pendingRestart" | "onWrite" | "repoChecksFile"
 > & { section: string }
 
-/** One section's rows: Identity and Merging, the Checks editor, or plain rows. Shared by the sidebar shell and the phone page. */
+/** The section's entries split by group: the response's group order, then any group the tree does not name. A group with no entry is absent. */
+function sectionGroups(
+  categories: SettingsCategory[],
+  section: string,
+  sectionEntries: SettingsEntry[],
+) {
+  const named =
+    categories
+      .flatMap((c) => c.sections)
+      .find((s) => s.name === section)
+      ?.groups.map((g) => g.name) ?? []
+  return [...new Set([...named, ...sectionEntries.map((e) => e.group)])]
+    .map((name) => ({ name, entries: sectionEntries.filter((e) => e.group === name) }))
+    .filter((g) => g.entries.length > 0)
+}
+
+/** One section's titled group blocks, or the Checks editor. Shared by the sidebar shell and the phone page. */
 export function SectionBody({
   entries,
+  categories,
   project,
   section,
   pendingRestart,
@@ -268,20 +271,6 @@ export function SectionBody({
 }: SectionBodyProps) {
   const row = rowBuilder({ pendingRestart, onWrite, project })
   const sectionEntries = entries.filter((e) => e.section === section)
-  if (project !== undefined && sectionEntries.some((e) => e.identity)) {
-    return (
-      <>
-        <Group label="Identity">
-          {sectionEntries
-            .filter((e) => e.identity)
-            .map((e) => (
-              <IdentityRow key={e.key} entry={e} />
-            ))}
-        </Group>
-        <Group label="Merging">{sectionEntries.filter((e) => !e.identity).map(row)}</Group>
-      </>
-    )
-  }
   if (project !== undefined && sectionEntries.some((e) => e.key === CHECKS_KEY)) {
     return (
       <ChecksEditor
@@ -292,7 +281,21 @@ export function SectionBody({
       />
     )
   }
-  return <Group>{sectionEntries.map(row)}</Group>
+  return (
+    <>
+      {sectionGroups(categories, section, sectionEntries).map((g) =>
+        g.name === "" ? (
+          <Group key="">{g.entries.map(row)}</Group>
+        ) : (
+          <GroupBlock key={g.name} title={g.name} changed={g.entries.filter((e) => e.set).length}>
+            {g.entries.map((e) =>
+              project !== undefined && e.identity ? <IdentityRow key={e.key} entry={e} /> : row(e),
+            )}
+          </GroupBlock>
+        ),
+      )}
+    </>
+  )
 }
 
 export function SettingsShellView(props: ShellProps) {

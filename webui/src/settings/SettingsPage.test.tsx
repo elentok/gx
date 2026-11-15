@@ -13,7 +13,9 @@ import {
   WebLoginPage,
   WebLoginsView,
 } from "./SettingsPage"
+import { SettingsShellView } from "./SettingsShell"
 import { treeFromEntries } from "./testTree"
+import type { SettingsEntry } from "../generated/server"
 import type { WebLoginEntry } from "./logins"
 
 const NOW = Date.parse("2026-10-30T12:00:00Z")
@@ -534,5 +536,72 @@ describe("WebLoginPage", () => {
     fireEvent.click(getByText("Sign out"))
     await waitFor(() => expect(signOut).toHaveBeenCalledOnce())
     expect(revoke).not.toHaveBeenCalled()
+  })
+})
+
+describe("section page group blocks", () => {
+  const e = (over: Partial<SettingsEntry>): SettingsEntry => ({
+    key: "execution-queue.max-agents",
+    path: ["execution-queue", "max-agents"],
+    type: "number",
+    section: "Execution queue",
+    category: "Ralph loop",
+    group: "Agent limits",
+    description: "Live agents.",
+    set: false,
+    ...over,
+  })
+  const render = (entries: SettingsEntry[], project?: string, section = "Execution queue") =>
+    renderThemed(
+      <MemoryRouter initialEntries={["/settings"]}>
+        <SettingsShellView
+          entries={entries}
+          categories={treeFromEntries(entries)}
+          projects={[]}
+          project={project}
+          section={section}
+          totpOn
+          onSignOut={() => {}}
+          onWrite={async () => ({})}
+        />
+      </MemoryRouter>,
+    )
+
+  it("titles each group in server order, with a chip counting set keys and none at zero", () => {
+    const { getByTestId, queryByTestId, getAllByText } = render([
+      e({ set: true, value: 3 }),
+      e({ key: "execution-queue.b", path: ["execution-queue", "b"], set: true, value: 1 }),
+      e({
+        key: "execution-queue.wait",
+        path: ["execution-queue", "wait"],
+        group: "Waiting and stalled agents",
+        description: "Wait.",
+      }),
+    ])
+    expect(getByTestId("group-Agent limits").textContent).toContain("Agent limits")
+    expect(getByTestId("group-count-Agent limits").textContent).toBe("2")
+    expect(getByTestId("group-Waiting and stalled agents")).toBeTruthy()
+    expect(queryByTestId("group-count-Waiting and stalled agents")).toBeNull()
+    expect(getAllByText("Wait.")).toHaveLength(1)
+  })
+
+  it("keeps the title of a one-key group", () => {
+    const { getByTestId } = render([e({ group: "Location" })])
+    expect(getByTestId("group-Location").textContent).toContain("Location")
+  })
+
+  it("shows the Project section of a project as read-only Repository and Delivery groups", () => {
+    const p = (key: string, group: string, over: Partial<SettingsEntry> = {}) =>
+      e({ key, path: [key], section: "Project", category: "Project", group, ...over })
+    const { getByTestId } = render(
+      [
+        p("name", "Repository", { identity: true, read_only: true, value: "gx" }),
+        p("trunk", "Delivery", { value: "main" }),
+      ],
+      "gx",
+      "Project",
+    )
+    expect(getByTestId("group-Repository").textContent).toContain("read-only")
+    expect(getByTestId("group-Delivery")).toBeTruthy()
   })
 })

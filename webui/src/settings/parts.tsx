@@ -2,6 +2,58 @@ import { Box, chakra, Text } from "@chakra-ui/react"
 import type { ReactNode } from "react"
 import { SETTINGS_HREF } from "../hrefs"
 
+export const CountChip = ({ n, testId }: { n: number; testId?: string }) => (
+  <chakra.span
+    data-testid={testId}
+    fontSize="11px"
+    fontWeight="600"
+    px="7px"
+    py="1px"
+    borderRadius="full"
+    bg="tone.running.bg"
+    color="tone.running.fg"
+  >
+    {n}
+  </chakra.span>
+)
+
+/** A section page block: a title bar with the changed-count chip (hidden at zero), then its rows. */
+export const GroupBlock = ({
+  title,
+  changed,
+  children,
+}: {
+  title: string
+  changed: number
+  children: ReactNode
+}) => (
+  <Box
+    mt="6"
+    borderWidth="1px"
+    borderColor="border"
+    borderRadius="lg"
+    bg="surface.raised"
+    overflow="hidden"
+    data-testid={`group-${title}`}
+  >
+    <Box
+      display="flex"
+      alignItems="center"
+      gap="2"
+      px="3.5"
+      py="2"
+      borderBottomWidth="1px"
+      borderBottomColor="hairline"
+    >
+      <Text fontSize="sm" fontWeight="700">
+        {title}
+      </Text>
+      {changed > 0 && <CountChip n={changed} testId={`group-count-${title}`} />}
+    </Box>
+    {children}
+  </Box>
+)
+
 export const Group = ({ label, children }: { label?: string; children: ReactNode }) => (
   <Box mt="6">
     {label && (
