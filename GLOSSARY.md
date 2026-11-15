@@ -816,11 +816,14 @@ Explicit `ViewStateChanged` emissions remain supported for specialized timing ne
 
 **Leader key** — the one key that says the next key is a gx action. In the TUI it works while an
 embedded terminal has focus, and pressing it twice sends it to the session. In the web UI it opens
-the **Chord box**, even while the person is typing in a text field.
+the **Chord box**, even while the person is typing in a text field, and `b` after it toggles the
+**big prompt box**.
 _Avoid_: prefix key, escape key.
 
 **Chord box** — the small box at the bottom right that lists the keys that may follow the **Leader
-key**, each with what it does. It lists only the chords that work on the open page.
+key**, each with what it does. It lists only the chords that work on the open page, except the big
+prompt box chord (Leader then `b`), which shows on every page; its label names what it will do
+("Big prompt box" or "Normal prompt box").
 _Avoid_: which-key, hint popup.
 
 **Copy mode** — a mode of an embedded terminal where keys move a cursor through the session's
@@ -1176,6 +1179,17 @@ _Avoid_: layout, chrome
 disk space of the gx server's machine. Each icon shows a state; its popover shows the values. The
 name comes from the macOS menu bar.
 _Avoid_: status area, indicators bar
+
+**Prompt box** — the text field where the person writes to an agent or answers a question: the chat
+composer, the design composer and note, the answer boxes, the deny note, the start-over reason and
+the schedule prompt. It is a textarea, or, with vi mode on and a pointer that is not coarse, an
+inline vi box with a **mode pill**. The **big prompt box** setting (Leader then `b`) doubles every
+prompt box's rows.
+_Avoid_: input, composer (that is one kind of prompt box), text area
+
+**Large editor** — the full-size vi editor a **Prompt box** opens with its expand button or
+Cmd/Ctrl-G. It ignores the **big prompt box** setting.
+_Avoid_: big editor, editor sheet, modal editor
 
 **Device type** — which of three layouts the web UI uses, chosen by viewport width alone: phone
 (below 640px), tablet (640 to 992px) or desktop (from 992px). A resized desktop window gets the
