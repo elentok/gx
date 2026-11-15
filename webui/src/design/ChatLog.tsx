@@ -231,10 +231,13 @@ function ChatBody({
   onQuestions,
   autoMenu,
   logTop,
+  logTail,
   tabsMenu,
   foldAnswered,
 }: {
   logTop?: ReactNode
+  /** After the messages, before the answered lines. */
+  logTail?: ReactNode
   tabsMenu?: ReactNode
   /** Shows each answered card of the round as one line after the messages. */
   foldAnswered?: boolean
@@ -292,9 +295,13 @@ function ChatBody({
             top={foldAnswered}
             head={logTop}
             tail={
-              foldAnswered && hasRound ? (
-                <AnsweredQuestions round={round} answers={roundDraft.draft.answers} />
-              ) : undefined
+              <>
+                {/* The scroller is a flex column: without this the card shrinks to a clipped strip. */}
+                {logTail && <Box flexShrink="0">{logTail}</Box>}
+                {foldAnswered && hasRound && (
+                  <AnsweredQuestions round={round} answers={roundDraft.draft.answers} />
+                )}
+              </>
             }
             busy={busy}
             sessionId={session.id}
@@ -359,6 +366,7 @@ function ChatLog({
   questions: boolean
   onQuestions: (on: boolean) => void
   logTop?: ReactNode
+  logTail?: ReactNode
   tabsMenu?: ReactNode
   foldAnswered?: boolean
 }) {
@@ -395,10 +403,13 @@ export function DesignChat({
   questions,
   onQuestions,
   logTop,
+  logTail,
   tabsMenu,
   foldAnswered,
 }: {
   foldAnswered?: boolean
+  /** Entries after the Chat view's messages. */
+  logTail?: ReactNode
   /** The ⋯ menu in the view tabs row (keyboard layout). */
   tabsMenu?: ReactNode
   /** The first entry of the Chat view's log. */
@@ -451,6 +462,7 @@ export function DesignChat({
       questions={questions}
       onQuestions={onQuestions}
       logTop={logTop}
+      logTail={logTail}
       tabsMenu={tabsMenu}
       foldAnswered={foldAnswered}
     />

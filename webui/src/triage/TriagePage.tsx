@@ -242,9 +242,9 @@ function TriageBody({
             Triage of {project}:follow-ups ↗
           </chakra.a>
         }
+        logTail={showPlan ? <PlanSummary view={view} openReady={finalCard} /> : undefined}
         chatTop={() => (
           <>
-            {showPlan && <PlanSummary view={view} openReady={finalCard} />}
             {atDone && view.result && (
               <DoneView
                 result={view.result}

@@ -173,14 +173,17 @@ export function Progress({
   model,
   rows,
   stepRows,
+  flush,
 }: {
   model: SteppedModel
   rows?: ReactNode
   stepRows?: StepRows
+  /** The column behind it paints the background. */
+  flush?: boolean
 }) {
   // A panel like the Designs sidebar, only as tall as its steps.
   return (
-    <Box bg="surface.raised" px="3" py="4">
+    <Box bg={flush ? undefined : "surface.raised"} px="3" py="4">
       <Steps model={model} rows={rows} stepRows={stepRows} />
     </Box>
   )

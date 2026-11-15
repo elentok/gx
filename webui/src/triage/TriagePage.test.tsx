@@ -499,9 +499,16 @@ const planRows = () => [
   planRow(11, "keep"),
 ]
 
+// The plan card sits in the chat log, so these tests need a chat to exist.
+const emptyChat = async () => ({
+  kind: "ok" as const,
+  detail: { conversation_id: "c1", messages: [], questions: [], background: [] } as never,
+})
+
 test("after Route the Chat holds a read-only plan card with counts, areas and collapsed groups", async () => {
   render([session("working")], {
     triage: async () => ({ kind: "ok", detail: planView(planRows()) }),
+    chat: emptyChat,
   })
   const card = await screen.findByRole("region", { name: "Plan summary" })
   expect(
@@ -530,6 +537,7 @@ test("the plan card re-renders its counts after a triage-changed event", async (
   let rows = planRows()
   const { emit } = render([session("working")], {
     triage: async () => ({ kind: "ok", detail: planView(rows) }),
+    chat: emptyChat,
   })
   const card = await screen.findByRole("region", { name: "Plan summary" })
   expect(card.textContent).toContain("5Ready")
@@ -561,6 +569,7 @@ test("the final card shows the plan card with the Ready group open", async () =>
   const final = { ...planView(planRows()), steps: stepsAt(2), final_approval: true }
   render([session("working")], {
     triage: async () => ({ kind: "ok", detail: final }),
+    chat: emptyChat,
   })
   const card = await screen.findByRole("region", { name: "Plan summary" })
   expect(within(card).getByRole("group", { name: "Group: Ready 5" })).toBeTruthy()

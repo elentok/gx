@@ -68,6 +68,8 @@ export interface SteppedPageProps {
   chatTop?: (ctx: { questions: boolean }) => ReactNode
   /** The first entry of the Chat view's log (absent in the Questions view). */
   logTop?: ReactNode
+  /** After the Chat view's messages (Triage's plan card, under the agent's lead-in). */
+  logTail?: ReactNode
   // Design only.
   ticketRows?: ReactNode
   /** Sub-rows under any step (Triage: Questions and Review under Approve). */
@@ -138,6 +140,7 @@ export function SteppedPage({
   metaLink,
   chatTop,
   logTop,
+  logTail,
   ticketRows,
   stepRows,
   foldAnswered,
@@ -268,7 +271,7 @@ export function SteppedPage({
         display="grid"
         gridTemplateColumns={sideColumn ? "minmax(0, 1fr) 300px" : "1fr"}
         gridTemplateRows={"minmax(0, 1fr)"}
-        gap="4"
+        gap={progressColumn ? "0" : "4"}
         flex="1"
         minH="0"
       >
@@ -284,6 +287,7 @@ export function SteppedPage({
           gap="3"
           gridRow={1}
           gridColumn={1}
+          pr={progressColumn && sideColumn ? "4" : undefined}
         >
           {chatTop?.({ questions })}
           <FinalRoundContext.Provider value={!!finalRound}>
@@ -297,6 +301,7 @@ export function SteppedPage({
               nextTitle={model?.nextTitle}
               working={working(session)}
               logTop={compact ? undefined : logTop}
+              logTail={logTail}
               tabsMenu={compact && hasRound ? menu(setMenuHeld) : undefined}
               questions={questions}
               foldAnswered={foldAnswered}
@@ -318,13 +323,19 @@ export function SteppedPage({
             gridColumn={2}
             minH="0"
             overflowY="auto"
-            // Triage's column spans the page height with its own border; a Design's panel is only as tall as its steps.
-            bg={progressColumn ? "surface.raised" : undefined}
-            borderWidth={progressColumn ? "1px" : undefined}
-            borderColor="border"
-            borderRadius={progressColumn ? "md" : undefined}
+            // Triage's column is flush: full page height, a hairline on its left, no card. A Design's panel is only as tall as its steps.
+            bg={progressColumn ? "sidebar" : undefined}
+            borderLeftWidth={progressColumn ? "1px" : undefined}
+            borderColor="hairline"
           >
-            {model && <Progress model={model} rows={ticketRows} stepRows={stepRows} />}
+            {model && (
+              <Progress
+                model={model}
+                rows={ticketRows}
+                stepRows={stepRows}
+                flush={progressColumn}
+              />
+            )}
             {footer && <Box mt="4">{footer}</Box>}
           </Box>
         )}

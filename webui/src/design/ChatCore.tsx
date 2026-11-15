@@ -194,7 +194,26 @@ function Entry({
   }
   if (m.kind === "output") return <CommandOutput text={m.text} />
   const text = hideAsks ? withoutAsks(m.text) : m.text
-  return text ? <Markdown fontSize="base">{text}</Markdown> : null
+  if (!text) return null
+  // The Triage chat (hideAsks) labels the agent's messages, as the mock does.
+  if (!hideAsks) return <Markdown fontSize="base">{text}</Markdown>
+  return (
+    <Box>
+      <Text
+        fontSize="11px"
+        textTransform="uppercase"
+        letterSpacing="0.08em"
+        color="text.dim"
+        mb="1"
+        lineHeight="1.2"
+      >
+        Triage agent
+      </Text>
+      <Markdown fontSize="base" color="text.muted">
+        {text}
+      </Markdown>
+    </Box>
+  )
 }
 
 const withoutAsks = (text: string) =>
@@ -385,7 +404,8 @@ function ChatScroller({
   const el = useRef<HTMLDivElement>(null)
   const stuck = useRef(true)
   useLayoutEffect(() => {
-    if (el.current && stuck.current) el.current.scrollTop = el.current.scrollHeight
+    // A top chat starts at its first message: the docked card sits outside the scroller.
+    if (el.current && stuck.current && !top) el.current.scrollTop = el.current.scrollHeight
   }, [signal])
   return (
     <Box

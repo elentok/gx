@@ -159,14 +159,18 @@ func (p *Player) route(rec *triage.Record) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	card := strings.Join(append(summaryLines(v.Record, nil), moveLines...), "\n")
+	lines := append(summaryLines(v.Record, nil), moveLines...)
+	for i, l := range lines {
+		lines[i] = "- " + l
+	}
+	card := strings.Join(lines, "\n")
 	// Route chains to Questions in the same session; the round is the last
 	// thing printed, with no run-end line.
 	next, err := p.questions(v.Record)
 	if err != nil {
 		return "", err
 	}
-	return "Verify is done. Here is the plan I made. Tell me if a group is wrong.\n\nRoute summary:\n" + card + "\n\n" + next, nil
+	return "Verify is done. Here is the plan I made. Tell me if a group is wrong.\n\nRoute summary:\n\n" + card + "\n\n" + next, nil
 }
 
 // oldEpicMoves plans the old epics' moves as the skill does: each epic with
@@ -271,9 +275,9 @@ func decidedText(rec *triage.Record) string {
 	if len(rec.Decided) == 0 {
 		return ""
 	}
-	lines := []string{"Decided unless you object:"}
-	for i, d := range rec.Decided {
-		lines = append(lines, fmt.Sprintf("%d. %s: %s -> %s (%s)", i+1, titleOf(rec, d.RowID), d.Question, d.Choice, d.Reason))
+	lines := []string{"Decided unless you object:", ""}
+	for _, d := range rec.Decided {
+		lines = append(lines, fmt.Sprintf("- %s: %s -> %s (%s)", titleOf(rec, d.RowID), d.Question, d.Choice, d.Reason))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -318,8 +322,12 @@ func finalCard(rec *triage.Record) string {
 	for _, rd := range rec.Rounds {
 		answered += len(rd.Answers)
 	}
-	return fmt.Sprintf("All %d answered. These I decided unless you object:\n", answered) +
-		strings.Join(summaryLines(rec, nil), "\n") + "\n\n" + decidedText(rec) + "\n\n" +
+	lines := summaryLines(rec, nil)
+	for i, l := range lines {
+		lines[i] = "- " + l
+	}
+	return fmt.Sprintf("All %d answered. These I decided unless you object:\n\n", answered) +
+		strings.Join(lines, "\n") + "\n\n" + decidedText(rec) + "\n\n" +
 		fmt.Sprintf("%s1** - **Write this plan?**: Nothing changes until you say yes.\n\n%s", grillround.Marker, block)
 }
 

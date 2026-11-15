@@ -189,6 +189,10 @@ test.describe("199. Triage journey", () => {
     // bug's, then the idea's.
     await round1.getByRole("button", { name: /^Keep for later/ }).click()
     await expect(round1.getByText("Question 2 of 3")).toBeVisible()
+    // The answered card folds to one line in the chat.
+    await expect(page.locator("[data-part=answered-question]")).toHaveText(
+      /^✓ Q1 .* → Keep for later/,
+    )
     await expect(round1.getByText(/Fix it in the parser or the caller\?/)).toBeVisible()
     await round1.getByRole("button", { name: /^parser/ }).click()
     await expect(round1.getByText("Question 3 of 3")).toBeVisible()
