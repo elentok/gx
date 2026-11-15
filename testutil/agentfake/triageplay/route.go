@@ -166,7 +166,7 @@ func (p *Player) route(rec *triage.Record) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "Route summary:\n" + card + "\n\n" + next, nil
+	return "Verify is done. Here is the plan I made. Tell me if a group is wrong.\n\nRoute summary:\n" + card + "\n\n" + next, nil
 }
 
 // oldEpicMoves plans the old epics' moves as the skill does: each epic with
@@ -286,7 +286,8 @@ func printRound(rec *triage.Record, i int, _ []triage.Question) string {
 	for n, q := range rec.Rounds[i].Questions {
 		cards = append(cards, questionCard(rec, n+1, q))
 	}
-	return strings.Join(cards, "\n\n") + "\n\n" + decidedText(rec)
+	return fmt.Sprintf("I need your call on %d things. The rest I decided.\n\n", len(cards)) +
+		strings.Join(cards, "\n\n") + "\n\n" + decidedText(rec)
 }
 
 // questionCard prints one question in the round format the chat parser turns
@@ -312,7 +313,12 @@ func questionCard(rec *triage.Record, n int, q triage.Question) string {
 // "Write this plan?" in the round format, so the page shows it as the final card.
 func finalCard(rec *triage.Record) string {
 	block := "```gx-question\ntype: options\nrecommended: a\noptions:\n  - id: a\n    label: \"Yes, write it\"\n  - id: b\n    label: \"No, keep talking\"\n```"
-	return "Final summary:\n" + strings.Join(summaryLines(rec, nil), "\n") + "\n\n" + decidedText(rec) + "\n\n" +
+	answered := 0
+	for _, rd := range rec.Rounds {
+		answered += len(rd.Answers)
+	}
+	return fmt.Sprintf("All %d answered. These I decided unless you object:\n", answered) +
+		strings.Join(summaryLines(rec, nil), "\n") + "\n\n" + decidedText(rec) + "\n\n" +
 		fmt.Sprintf("%s1** - **Write this plan?**: Nothing changes until you say yes.\n\n%s", grillround.Marker, block)
 }
 

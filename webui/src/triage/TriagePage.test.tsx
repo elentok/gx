@@ -536,3 +536,21 @@ test("no plan card while a row has no plan yet", async () => {
   await screen.findByRole("heading", { level: 1 })
   expect(screen.queryByRole("region", { name: "Plan summary" })).toBeNull()
 })
+
+test("no plan card at Questions", async () => {
+  const questions = { ...planView(planRows()), steps: stepsAt(2) }
+  render([session("working")], {
+    triage: async () => ({ kind: "ok", detail: questions }),
+  })
+  await screen.findByRole("heading", { level: 1 })
+  expect(screen.queryByRole("region", { name: "Plan summary" })).toBeNull()
+})
+
+test("the final card shows the plan card with the Ready group open", async () => {
+  const final = { ...planView(planRows()), steps: stepsAt(2), final_approval: true }
+  render([session("working")], {
+    triage: async () => ({ kind: "ok", detail: final }),
+  })
+  const card = await screen.findByRole("region", { name: "Plan summary" })
+  expect(within(card).getByRole("group", { name: "Group: Ready 5" })).toBeTruthy()
+})

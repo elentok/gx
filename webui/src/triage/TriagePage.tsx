@@ -26,7 +26,7 @@ import { ProgressRing } from "../ui/progress-ring/ProgressRing"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { triageModel } from "../stepped/model"
 import { SteppedPage } from "../stepped/SteppedPage"
-import { useWide } from "../useWide"
+import { useDevice, useWide } from "../useWide"
 import { DoneQueue, DoneView } from "./DoneView"
 import type { FetchEpicList } from "../epics/list"
 import type { PostEpicWrite } from "../epics/queue"
@@ -173,8 +173,13 @@ function TriageBody({
   const live = liveFlowSessions(FLOW, project, sessions)
   const model = triageModel({ key: project, steps: view.steps, ringPercent: view.ring_percent })
   const round = model.current?.step === QUESTIONS ? view.open_round : undefined
-  // From Route on, while the plan is saved; before that only the working row shows.
-  const showPlan = phase === "working" && model.current?.step !== "verify" && planSaved(view)
+  const phone = useDevice() === "phone"
+  const step = model.current?.step
+  // At Route, and again at the final card with the Ready rows open (not on a phone, where it would push
+  // the question below the fold). Questions show only their round: the mock has no plan card there.
+  const finalCard = !!view.final_approval && step === QUESTIONS
+  const showPlan =
+    phase === "working" && planSaved(view) && (step === "route" || (finalCard && !phone))
   return (
     <>
       {abandoning && (
@@ -219,7 +224,8 @@ function TriageBody({
         actions={steppedActions}
         startLabel="Start"
         foldAnswered
-        finalRound={view.final_approval && model.current?.step === QUESTIONS}
+        finalRound={finalCard}
+        progressColumn
         stepRows={
           atWrite
             ? { write: writtenLine(view) }
@@ -237,7 +243,7 @@ function TriageBody({
         }
         chatTop={() => (
           <>
-            {showPlan && <PlanSummary view={view} />}
+            {showPlan && <PlanSummary view={view} openReady={finalCard} />}
             {atDone && view.result && (
               <DoneView
                 result={view.result}

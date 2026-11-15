@@ -132,8 +132,15 @@ function GroupList({ group }: { group: Group }) {
 }
 
 /** The saved plan as counts. Read-only: the person corrects a group by typing in the composer. */
-export function PlanSummary({ view }: { view: Pick<TriageView, "rows" | "ready_epic"> }) {
-  const [open, setOpen] = useState<string>()
+export function PlanSummary({
+  view,
+  openReady,
+}: {
+  view: Pick<TriageView, "rows" | "ready_epic">
+  /** Starts with the Ready group's rows listed, as the final card shows them. */
+  openReady?: boolean
+}) {
+  const [open, setOpen] = useState<string | undefined>(openReady ? "ready" : undefined)
   const { lines, areas } = groupsOf(view)
   const total = lines.reduce((n, g) => n + g.count, 0)
   const toggle = (g: Group) => setOpen(open === g.key ? undefined : g.key)

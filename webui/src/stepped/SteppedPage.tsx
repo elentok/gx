@@ -76,6 +76,8 @@ export interface SteppedPageProps {
   foldAnswered?: boolean
   /** The open round is the final approval: its card reads "Final question". */
   finalRound?: boolean
+  /** The Progress column fills the page height with its own border. */
+  progressColumn?: boolean
   // Design only.
   designMenu?: DesignMenu
   /** Extra items for the ⋯ menu, beside Copy ID. */
@@ -140,6 +142,7 @@ export function SteppedPage({
   stepRows,
   foldAnswered,
   finalRound,
+  progressColumn,
   designMenu,
   menuItems,
   footer,
@@ -315,6 +318,11 @@ export function SteppedPage({
             gridColumn={2}
             minH="0"
             overflowY="auto"
+            // Triage's column spans the page height with its own border; a Design's panel is only as tall as its steps.
+            bg={progressColumn ? "surface.raised" : undefined}
+            borderWidth={progressColumn ? "1px" : undefined}
+            borderColor="border"
+            borderRadius={progressColumn ? "md" : undefined}
           >
             {model && <Progress model={model} rows={ticketRows} stepRows={stepRows} />}
             {footer && <Box mt="4">{footer}</Box>}
