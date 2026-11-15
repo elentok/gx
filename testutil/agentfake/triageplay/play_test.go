@@ -220,7 +220,7 @@ func TestTriagePlayer_QuestionsWithNothingLeftPrintsTheFinalCard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(msg, "Write this plan?") || s.count(t, "triage round") != 0 {
+	if !strings.Contains(msg, "**Write this plan?**") || !strings.Contains(msg, "Yes, write it") || s.count(t, "triage round") != 0 {
 		t.Errorf("message = %q, calls = %q, want the final card and no round", msg, s.calls(t))
 	}
 }

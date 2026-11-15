@@ -365,8 +365,12 @@ func questionCard(rec *triage.Record, n int, q triage.Question) string {
 	return fmt.Sprintf("%s%d** - **%s**: %s\n\n%s", grillround.Marker, n, titleOf(rec, q.RowID), q.Text, strings.Join(block, "\n"))
 }
 
+// finalCard is the summary, the decided list and the one-question final round
+// "Write this plan?" in the round format, so the page shows it as the final card.
 func finalCard(rec *triage.Record) string {
-	return "Final summary:\n" + strings.Join(summaryLines(rec, nil), "\n") + "\n\n" + decidedText(rec) + "\n\nWrite this plan?"
+	block := "```gx-question\ntype: options\nrecommended: a\noptions:\n  - id: a\n    label: \"Yes, write it\"\n  - id: b\n    label: \"No, keep talking\"\n```"
+	return "Final summary:\n" + strings.Join(summaryLines(rec, nil), "\n") + "\n\n" + decidedText(rec) + "\n\n" +
+		fmt.Sprintf("%s1** - **Write this plan?**: Nothing changes until you say yes.\n\n%s", grillround.Marker, block)
 }
 
 // questions plays Questions: it reprints an open round, else saves and prints
