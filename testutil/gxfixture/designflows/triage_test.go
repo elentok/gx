@@ -25,6 +25,8 @@ type triageWant struct {
 	triage  wire.FollowUpTriage
 	step    string // current step of `server triage show`, empty without a Triage
 	state   wire.TriageState
+	// labels are the card's action labels in order; nil skips the check.
+	labels []string
 }
 
 func TestTriageScenario_EveryShapeShowsTheCardItNames(t *testing.T) {
@@ -40,8 +42,8 @@ func TestTriageScenario_EveryShapeShowsTheCardItNames(t *testing.T) {
 		{shape: "route-no-area", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
 		{shape: "questions", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
 		{shape: "final-approval", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
-		{shape: "writing", section: wire.SectionDesigning, pill: "Write", words: "6 bugs", triage: wire.FollowUpTriageRunning, step: "write", state: wire.TriageLive},
-		{shape: "result", section: wire.SectionReadyToDesign, pill: "Done", words: "2 bugs", triage: wire.FollowUpTriageNone, state: wire.TriageDone},
+		{shape: "writing", section: wire.SectionDesigning, pill: "Write", words: "6 bugs", triage: wire.FollowUpTriageRunning, step: "write", state: wire.TriageLive, labels: []string{"Retry failed (2)", "Continue"}},
+		{shape: "result", section: wire.SectionReadyToDesign, pill: "Done", words: "2 bugs", triage: wire.FollowUpTriageNone, state: wire.TriageDone, labels: []string{"Queue"}},
 		{shape: "stopped", section: wire.SectionDesigning, pill: "Route", words: "4 bugs", triage: wire.FollowUpTriageStopped, step: "route", state: wire.TriageLive},
 		{shape: "journey", section: wire.SectionReadyToDesign, words: "3 bugs, 2 ideas", triage: wire.FollowUpTriageNone},
 	} {
@@ -76,6 +78,15 @@ func TestTriageScenario_EveryShapeShowsTheCardItNames(t *testing.T) {
 			}
 			if card.StatusWords != w.words {
 				t.Errorf("words = %q, want %q", card.StatusWords, w.words)
+			}
+			if w.labels != nil {
+				var got []string
+				for _, a := range card.Actions {
+					got = append(got, a.Label)
+				}
+				if !slices.Equal(got, w.labels) {
+					t.Errorf("action labels = %q, want %q", got, w.labels)
+				}
 			}
 			if w.state == "" {
 				return

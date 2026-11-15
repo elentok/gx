@@ -101,11 +101,19 @@ func followUpsCard(project string, e tickets.Epic, rec, done *triage.Record, rea
 		p = donePlacement(done.ReadyEpic, ready)
 	}
 	address := queue.RootRef{Project: project, Epic: followUpsEpicName}.String()
+	actions := []wire.CardAction{p.Action}
+	if p.RetryFailed > 0 {
+		retry := wire.CardAction{
+			Kind: wire.CardActionOpen, Label: fmt.Sprintf("Retry failed (%d)", p.RetryFailed),
+			Target: project, Link: "#/triage/" + project,
+		}
+		actions = []wire.CardAction{retry, p.Action}
+	}
 	row := wire.EpicListRow{
 		Address: address, Project: project, Name: followUpsEpicName, Kind: wire.EpicKindLoop,
 		State: wire.EpicListFollowUps, Addresses: []string{address}, CardKind: wire.CardKindFollowUps,
 		Section: p.Section, StatePill: p.Pill, StatusWords: words,
-		Actions: []wire.CardAction{p.Action}, StepLine: p.Line, RetryFailed: p.RetryFailed,
+		Actions: actions, StepLine: p.Line, RetryFailed: p.RetryFailed,
 	}
 	if live {
 		row.RingProgress = triagePercent(rec)
