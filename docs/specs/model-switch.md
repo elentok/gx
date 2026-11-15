@@ -38,7 +38,7 @@ One switch action, two entry points.
 19. As a chat user, I want the picker to show only the current model when model discovery failed, so that the failure does not break the dialog.
 20. As a chat user, I want the chat to log "Switching to <model>…" and the footer to show the target with a "switching" hint, so that I see progress.
 21. As a chat user, I want the prompt box disabled until the new agent is idle, and the log line to become "Switched to <model>.", so that I know when I can type.
-22. As a chat user, I want a failed switch to leave the old model running and log "Switch to <model> failed. Still on <old model>.", so that a bad model does not cost me the session.
+22. As a chat user, I want a failed switch, whether the process exits at start or my first message gets `model_not_found`, to leave the old model running and log "Switch to <model> failed. Still on <old model>.", so that a bad model does not cost me the session.
 23. As a chat user, I want the footer to show the chosen model and effort right after the switch, so that it does not show the old model until my next message.
 24. As a gx user, I want a server crash during a switch to leave the old model in the record, so that a resume works.
 25. As a chat or design user, I want the footer model name red, bold and dotted-underlined when a newer model of its family exists, so that I notice an outdated model.
@@ -98,8 +98,9 @@ One switch action, two entry points.
 - One server action serves the picker and the popover. It takes the session, a model and an effort. The implementer picks its route and verb names.
 - Allowed only when the session is idle with a live holder. Any other state is refused. The web disables the controls in those states, with the busy note, or "Resume the session to switch." for stopped and exited sessions.
 - The switch stops the idle session and relaunches the same conversation (a resume, not a fresh conversation) with new launch flags, using the existing stop and holder start path. The conversation id and the gx session do not change.
-- The record (model, effort, tier) changes only after the new launch is alive. Alive means the agent reaches idle. The new process exiting before that is a failed switch. The alive rule is fixed from map ticket 08 before the spec is final. gx adds no check of the model name: the harness decides what is valid.
-- A failed switch relaunches with the old flags, keeps the old record and logs "Switch to <model> failed. Still on <old model>." If the old relaunch fails too, the session ends as any failed start does.
+- The record (model, effort, tier) changes only after the new launch is alive. Alive means the agent reaches idle. The new process exiting before that is a failed switch (a crash or other failed start).
+- A bad model does not exit in either harness: idle is reached at launch for good and bad models alike, and the error shows only on the first message (map ticket 08). So a switch is also failed when the first message after it ends in `model_not_found`: the Claude transcript error line (`error: model_not_found`) or the Codex rollout `task_complete` with `model_not_found` (the Blocked error). That is the only error that rolls back. Any other error leaves the switch in place. gx adds no check of the model name and no discovery-list check: the harness decides what is valid. The first message is spent and the person resends it.
+- A failed switch relaunches with the old flags, keeps (or restores) the old record, clears a "switched by hand" flag the switch set, and logs "Switch to <model> failed. Still on <old model>." If the old relaunch fails too, the session ends as any failed start does. After a rollback the `model_not_found` turn must not feed the shown-model rule: the footer uses the restored record's model, not the bad model from that turn.
 - A server crash mid-switch leaves the old record, so a resume uses the old flags.
 - A successful switch keeps the tier and sets the record's model and effort. It also sets a stored "switched by hand" flag (the implementer picks the field name). Picking the tier's own model again clears the flag. The tier's model is compared as configured, and a Claude alias counts as equal to its resolved id. A session with no tier never clears the flag.
 - The session menu shows the flag OR the old launch-versus-reported comparison (`chat.ModelSwitched`).
@@ -152,7 +153,7 @@ One switch action, two entry points.
 - Highest seam: the gx fixture server with fake agents, through the web e2e flows and the server session API. The fake `claude` and `codex` must answer the model query (a list for each harness, with a lagging alias, a hidden model, a model without effort and an unparseable id), log their launch args and report a model in the transcript or rollout. The fixture scenario is new. The implementer picks its name.
 - Go table tests: id parsing and latest rule (successor wins, highest version wins, alias never trusted, hidden ignored, unparseable gives nothing), effort carry-over, launch args with and without the flag (prior art: `sessionlaunchargs_test.go`).
 - Go tests for refresh: not started twice, failed refresh keeps the last list.
-- Go tests for the switch: success records after alive; failure keeps the record and relaunches with the old flags; refused when not idle; the flag set and cleared; handoff leaves a flagged session alone. Prior art: the existing resume and handoff tests in `server/sessions`.
+- Go tests for the switch: success records after alive; failure (exit at start, or `model_not_found` at the first message) keeps the record and relaunches with the old flags; other errors do not roll back; refused when not idle; the flag set and cleared; handoff leaves a flagged session alone. Prior art: the existing resume and handoff tests in `server/sessions`.
 - Vitest: picker keys and filter, ordering and groups, disabled states, footer red state, popover notes and the token warning rules. Prior art: the context badge tests.
 - Flow budget: add steps to existing flows on the same scenario where possible (see `skills/gx-playwright-e2es`). A new flow only where a real round trip needs it.
 
@@ -181,7 +182,7 @@ A verify ticket runs these against a temporary gx server with the new fixture sc
 19. Story 19: make the fake model query fail. The picker lists only the current model.
 20. Story 20: start a switch with a held fake agent. The log shows "Switching to <model>…" and the footer shows the target with "switching".
 21. Story 21: the prompt box is disabled during the hold. After release the log reads "Switched to <model>." and the box works.
-22. Story 22: make the fake agent exit at start for the new model. Mock states `a-failed`. The fake log shows a relaunch with the old flags. `gx agents list` shows the old model.
+22. Story 22: (a) make the fake agent exit at start for the new model; (b) make the fake agent reach idle, then answer the first message with `model_not_found` (Claude transcript line and Codex rollout form). Mock states `a-failed`. In both the fake log shows a relaunch with the old flags, `gx agents list` shows the old model, and the footer shows the old model. A fake error of another kind leaves the switch in place.
 23. Story 23: after a successful switch and before any new turn, the footer, the red compare and the popover use the record's model and effort. After the next turn they use the reported model.
 24. Story 24: kill the server mid-switch (held launch), then restart it. The record and the resume flags are the old ones.
 25. Story 25: Mock states `footer-red` and `footer-normal`.
@@ -211,7 +212,7 @@ Mock states (stored mock `$(gx tickets root)/model-switch/mocks/04-picker-and-po
 - `$(gx tickets root)/model-switch/mocks/04-picker-and-popover-look.html` · a-open · 760 px · Codex chat, idle, `{leader} m` pressed, outdated current model · picker-dialog, search, effort, key-hints
 - `$(gx tickets root)/model-switch/mocks/04-picker-and-popover-look.html` · a-changed · 760 px · same chat, "sol" typed, new model chosen · picker-dialog, search, effort, switch-button
 - `$(gx tickets root)/model-switch/mocks/04-picker-and-popover-look.html` · a-busy · 390 px · Codex chat with the agent working, picker open · picker-dialog, busy-note
-- `$(gx tickets root)/model-switch/mocks/04-picker-and-popover-look.html` · a-failed · 390 px · Codex chat after a failed switch (fake agent exits at start) · fail-line
+- `$(gx tickets root)/model-switch/mocks/04-picker-and-popover-look.html` · a-failed · 390 px · Codex chat after a failed switch (fake agent exits at start, or answers the first message with `model_not_found`) · fail-line
 - `$(gx tickets root)/model-switch/mocks/04-picker-and-popover-look.html` · popover-open · 760 px · chat, idle, outdated model, popover open · model-name, popover
 - `$(gx tickets root)/model-switch/mocks/04-picker-and-popover-look.html` · popover-settings · 390 px · design session whose worker tier names the outdated model, popover open · model-name, popover, settings-link
 - `$(gx tickets root)/model-switch/mocks/04-picker-and-popover-look.html` · popover-busy · 390 px · chat with the agent working, popover open · popover, switch-disabled
