@@ -36,8 +36,8 @@ func modelSwitchModels() []agentfake.ProbeModel {
 // ModelSwitchScenario is the world of the model-switch flows: in demo, whose
 // tiers name models of the fake lists, an idle Codex chat with history on the
 // outdated model, an idle Claude chat with history on the lagging alias, a
-// chat with no turns and a design session. Flows reach the busy and stopped
-// states themselves.
+// chat with no turns, a Working Claude chat on the lagging alias and a design
+// session. Flows reach the stopped state and the held switch themselves.
 func ModelSwitchScenario() scenario {
 	const designMap = "switch-design"
 	return scenario{
@@ -57,6 +57,9 @@ func ModelSwitchScenario() scenario {
 			{Project: project, Harness: "codex", Prompt: "hello", Read: true},
 			{Project: project, Prompt: "hello", Read: true},
 			{Project: project},
+			// Last, so the flows that take the first Claude chats are unaffected. It is
+			// outdated (lagging alias) and Working, for the busy popover note.
+			{Project: project, Prompt: agentfake.ChatSlowMarker + " a long turn"},
 		},
 	}
 }

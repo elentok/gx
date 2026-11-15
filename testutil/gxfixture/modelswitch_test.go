@@ -85,7 +85,7 @@ func TestModelSwitchScenario_SeedsTheSessionsAndNamesTheFakeFiles(t *testing.T) 
 			t.Errorf("%s: %v", name, err)
 		}
 	}
-	var claudeChats, codexChats, design int
+	var claudeChats, codexChats, design, working int
 	for _, s := range r.sessions(t) {
 		switch {
 		case s.Design:
@@ -95,12 +95,17 @@ func TestModelSwitchScenario_SeedsTheSessionsAndNamesTheFakeFiles(t *testing.T) 
 		default:
 			claudeChats++
 		}
-		if s.Status.State != wire.SessionIdle && !s.Design {
-			t.Errorf("session %s is %s, want idle", s.ID, s.Status.State)
+		if s.Design {
+			continue
+		}
+		if s.Status.State == wire.SessionWorking {
+			working++
+		} else if s.Status.State != wire.SessionIdle {
+			t.Errorf("session %s is %s, want idle or working", s.ID, s.Status.State)
 		}
 	}
-	if claudeChats != 2 || codexChats != 1 || design != 1 {
-		t.Errorf("claude chats = %d, codex chats = %d, design sessions = %d; want 2, 1, 1", claudeChats, codexChats, design)
+	if claudeChats != 3 || codexChats != 1 || design != 1 || working != 1 {
+		t.Errorf("claude chats = %d, codex chats = %d, design sessions = %d, working = %d; want 3, 1, 1, 1", claudeChats, codexChats, design, working)
 	}
 	r.Stop(t)
 }

@@ -62,6 +62,7 @@ test("205. Model switch", async ({ page, start }) => {
   const chats = (await sessions(fixture)).filter((s) => !s.design)
   const codex = chats.find((s) => s.harness === "codex")!
   const [claude, claudeFresh] = chats.filter((s) => s.harness !== "codex")
+  const claudeWorking = chats.find((s) => s.harness !== "codex" && s.status.state === "working")!
   await page.setViewportSize({ width: 1280, height: 800 })
 
   // Stories 1, 3, 8 to 12: the chord opens the picker with the filter focused. It lists only Codex's own
@@ -377,6 +378,15 @@ test("205. Model switch", async ({ page, start }) => {
   await outdated.click()
   await expect(popover.getByTestId("outdated-note")).toHaveText("Resume the session to switch.")
   await expect(popover.getByRole("button", nav("Switch to Codex GPT-5.5-Codex"))).toBeDisabled()
+  await page.keyboard.press("Escape")
+
+  // Story 30: while the agent works (the fixture's slow Claude chat) the popover button is disabled with the wait note.
+  await go(page, `#/agents/${claudeWorking.id}`)
+  await outdated.click()
+  await expect(popover.getByTestId("outdated-note")).toHaveText(
+    "The agent is working. Wait until it is idle to switch.",
+  )
+  await expect(popover.getByRole("button", nav("Switch to Claude Fable 5.2"))).toBeDisabled()
   await page.keyboard.press("Escape")
   await fixture.cli("agents", "resume", codex.id)
   await expect(async () => {
