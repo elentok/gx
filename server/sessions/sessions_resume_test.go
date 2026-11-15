@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -163,6 +164,32 @@ func TestSwitchSession_RecordsOnlyOnceTheNewAgentIsIdle(t *testing.T) {
 	meta = readMeta(t, h, id)
 	if meta["effort"] != "high" || meta["switched_by_hand"] != true || meta["switch_unconfirmed"] != true || got.SwitchingEffort != "" {
 		t.Errorf("meta after idle = %v, session %+v; want opus high recorded by hand", meta, got)
+	}
+}
+
+// A server that dies while the new agent is not yet idle leaves the old model
+// and effort in the record, with nothing marked as switched, so a resume
+// launches on the old flags (story 24).
+func TestSwitchSession_RestartMidSwitchKeepsTheOldRecord(t *testing.T) {
+	t.Parallel()
+	h, ctx, _, id, _ := startIdleSwitchable(t)
+	before := readMeta(t, h, id)
+
+	if res, err := h.Client.Sessions.Switch(ctx, wire.SessionSwitchRequest{ID: id, Model: "opus", Effort: "high"}); err != nil || res.Refused {
+		t.Fatalf("switch = %+v, %v", res, err)
+	}
+	waitForHolder(t, filepath.Join(h.SessionsDir, id))
+	h.Restart(t)
+
+	after := readMeta(t, h, id)
+	for _, k := range []string{"model", "effort", "tier", "switched_by_hand", "switch_unconfirmed", "switch_prev", "switched_at", "conversation_id"} {
+		if !reflect.DeepEqual(after[k], before[k]) {
+			t.Errorf("meta[%s] = %v after the restart, want %v as before the switch", k, after[k], before[k])
+		}
+	}
+	snap := waitForSnapshot(ctx, t, h, id, func(wire.SessionInfo) bool { return true })
+	if snap.SwitchingModel != "" || snap.SwitchingEffort != "" {
+		t.Errorf("session = %+v after the restart, want no switch pending", snap)
 	}
 }
 
