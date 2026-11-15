@@ -10,25 +10,24 @@ import (
 // is the outdated model (its list row names an upgrade).
 const (
 	LaggingClaudeAlias = "fable"
-	OutdatedCodexModel = "gpt-5.4"
+	OutdatedCodexModel = "gpt-5.4-codex"
 )
 
 const modelSwitchAgents = `,"agents":{` +
 	`"claude":{"model":"` + LaggingClaudeAlias + `","effort":"medium","light":{"model":"haiku"},"strongest":{"model":"opus","effort":"high"}},` +
-	`"codex":{"model":"` + OutdatedCodexModel + `","effort":"medium","light":{"model":"gpt-6-mini"},"strongest":{"model":"gpt-5.5","effort":"high"}}}`
+	`"codex":{"model":"` + OutdatedCodexModel + `","effort":"medium","light":{"model":"gpt-6-mini"},"strongest":{"model":"gpt-5.5-codex","effort":"high"}}}`
 
-// modelSwitchModels is the one list both fakes answer the model query with:
-// the Claude rows, then the Codex rows the Claude list does not already have.
+// modelSwitchModels is the one config both fakes read: each answers its model
+// query with its own harness's rows only.
 func modelSwitchModels() []agentfake.ProbeModel {
-	models := agentfake.DefaultClaudeModels()
-	seen := map[string]bool{}
-	for _, m := range models {
-		seen[m.Value] = true
+	var models []agentfake.ProbeModel
+	for _, m := range agentfake.DefaultClaudeModels() {
+		m.Harness = "claude"
+		models = append(models, m)
 	}
 	for _, m := range agentfake.DefaultCodexModels() {
-		if !seen[m.Value] {
-			models = append(models, m)
-		}
+		m.Harness = "codex"
+		models = append(models, m)
 	}
 	return models
 }

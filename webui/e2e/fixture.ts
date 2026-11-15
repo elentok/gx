@@ -65,6 +65,8 @@ interface FixtureOutput {
   dev_control_file?: string
   /** Only the `host-files` scenario prints its paths. */
   host_files?: HostFiles
+  /** Only the `model-switch` scenario prints its fake files. */
+  model_fakes?: ModelFakes
 }
 
 /** The `host-files` scenario's paths (`testutil/gxfixture/spec/hostfiles.go`). */
@@ -172,6 +174,16 @@ export interface Fixture {
   readonly devControlFile: string
   /** The `host-files` scenario's repo, worktree and temp paths. Undefined elsewhere. */
   readonly hostFiles?: HostFiles
+  /** The `model-switch` scenario's fake files (`testutil/gxfixture/spec/output.go`). Undefined elsewhere. */
+  readonly modelFakes?: ModelFakes
+}
+
+/** The `model-switch` scenario's fake files: the config the fakes read, and a launch log dir per harness. */
+export interface ModelFakes {
+  fake_config: string
+  query_log: string
+  claude_dir: string
+  codex_dir: string
 }
 
 /** The value after `--name` in an argv, or undefined. */
@@ -290,6 +302,7 @@ async function startFixture(
     codexSessionsDir: out.codex_sessions_dir ?? "",
     devControlFile: out.dev_control_file ?? "",
     hostFiles: out.host_files,
+    modelFakes: out.model_fakes,
     async cli(...args) {
       // A CLI call that blocks would otherwise eat the whole test timeout with no hint of which call hung.
       try {

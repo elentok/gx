@@ -169,10 +169,10 @@ func TestModelSwitchScenario_SwitchesAndRollsBackEachKind(t *testing.T) {
 			t.Fatalf("rollback launch = %v, want the old --model %s and effort medium", launches[2], spec.OutdatedCodexModel)
 		}
 
-		r.Gx(t, "agents", "switch", codexID, "gpt-5.5", "--effort", "high")
+		r.Gx(t, "agents", "switch", codexID, "gpt-5.5-codex", "--effort", "high")
 		launches = r.waitIdle(t, codexID, 4, codexLaunches)
-		if flagValue(launches[3], "--model") != "gpt-5.5" || !strings.Contains(strings.Join(launches[3], " "), `model_reasoning_effort="high"`) {
-			t.Fatalf("switch launch = %v, want --model gpt-5.5 and effort high", launches[3])
+		if flagValue(launches[3], "--model") != "gpt-5.5-codex" || !strings.Contains(strings.Join(launches[3], " "), `model_reasoning_effort="high"`) {
+			t.Fatalf("switch launch = %v, want --model gpt-5.5-codex and effort high", launches[3])
 		}
 	})
 	r.Stop(t)

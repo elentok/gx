@@ -142,8 +142,9 @@ func RunClaudeProbe() (int, error) {
 		}
 	}
 	if cfg.Models != nil && !cfg.ModelsFail {
-		models := make([]map[string]any, 0, len(cfg.Models))
-		for _, m := range cfg.Models {
+		rows := modelsFor(cfg.Models, "claude")
+		models := make([]map[string]any, 0, len(rows))
+		for _, m := range rows {
 			row := map[string]any{"value": m.Value, "resolvedModel": m.ID}
 			if m.Efforts != nil {
 				row["supportedEffortLevels"] = m.Efforts
@@ -207,7 +208,7 @@ func RunCodexProbe() (int, error) {
 			_ = json.Unmarshal(req.Params, &params)
 			page, _ := strconv.Atoi(strings.TrimPrefix(params.Cursor, "page-"))
 			rows, last := []map[string]any{}, 0
-			for _, m := range cfg.Models {
+			for _, m := range modelsFor(cfg.Models, "codex") {
 				last = max(last, m.Page)
 				if m.Page != page {
 					continue

@@ -387,6 +387,10 @@ test("Chords", async ({ page, start }) => {
     await openBox()
     await expect(chordBox.getByRole("menuitem", { name: /^c\s*New chat/ })).toBeVisible()
     await expect(chordBox.getByRole("menuitem", { name: /^r/ })).toHaveCount(0)
+    // Switch model is a chat page chord: no row, and the key opens no picker.
+    await expect(chordBox.getByRole("menuitem", { name: /^m/ })).toHaveCount(0)
+    await page.keyboard.press("m")
+    await expect(page.getByRole("dialog")).toHaveCount(0)
     await page.keyboard.press("Escape")
     await expect(chordBox).toHaveCount(0)
   }

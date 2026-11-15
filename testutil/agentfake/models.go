@@ -45,6 +45,20 @@ type ProbeModel struct {
 	Behaviour string `json:"behaviour,omitempty"`
 	// ErrorCode is the error a ModelError launch answers with.
 	ErrorCode string `json:"errorCode,omitempty"`
+	// Harness limits the row to one fake's model query ("claude" or "codex");
+	// empty is both. A launch still finds the row either way.
+	Harness string `json:"harness,omitempty"`
+}
+
+// modelsFor is the rows the fake of harness answers its model query with.
+func modelsFor(models []ProbeModel, harness string) []ProbeModel {
+	var out []ProbeModel
+	for _, m := range models {
+		if m.Harness == "" || m.Harness == harness {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 func (m ProbeModel) resolved() string {
@@ -99,16 +113,17 @@ func DefaultClaudeModels() []ProbeModel {
 
 // DefaultCodexModels is the Codex list the model-switch flows use: two
 // versions of a family where upgrade names the newer, a family with no
-// successor, a hidden model, an unparseable id and a second page.
+// successor, a hidden model, an unparseable id and a second page. The ids
+// have the shape modelrules.ParseID reads, which needs a name after the version.
 func DefaultCodexModels() []ProbeModel {
 	efforts := []string{"low", "medium", "high"}
 	return []ProbeModel{
-		{Value: "gpt-5.4", ID: "gpt-5.4", Efforts: efforts, DefaultEffort: "medium", Upgrade: "gpt-5.5"},
-		{Value: "gpt-5.5", ID: "gpt-5.5", Efforts: efforts, DefaultEffort: "medium"},
+		{Value: "gpt-5.4-codex", ID: "gpt-5.4-codex", Efforts: efforts, DefaultEffort: "medium", Upgrade: "gpt-5.5-codex"},
+		{Value: "gpt-5.5-codex", ID: "gpt-5.5-codex", Efforts: efforts, DefaultEffort: "medium"},
 		{Value: "gpt-6-mini", ID: "gpt-6-mini", Efforts: efforts, DefaultEffort: "low"},
 		{Value: "gpt-5.3-hidden", ID: "gpt-5.3-hidden", Efforts: efforts, DefaultEffort: "medium", Hidden: true},
 		{Value: "mystery", ID: "mystery-model", Efforts: efforts, DefaultEffort: "medium"},
-		{Value: "gpt-5.6", ID: "gpt-5.6", Efforts: efforts, DefaultEffort: "medium", Page: 1},
+		{Value: "gpt-5.6-codex", ID: "gpt-5.6-codex", Efforts: efforts, DefaultEffort: "medium", Page: 1},
 	}
 }
 

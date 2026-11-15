@@ -70,13 +70,13 @@ func TestCodexProbe_AnswersTheModelQueryOverPagesAndLogsIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if old, ok := modelByValue(got, "gpt-5.4"); !ok || old.Upgrade != "gpt-5.5" {
-		t.Errorf("gpt-5.4 = %+v, %v; want upgrade gpt-5.5", old, ok)
+	if old, ok := modelByValue(got, "gpt-5.4-codex"); !ok || old.Upgrade != "gpt-5.5-codex" {
+		t.Errorf("gpt-5.4-codex = %+v, %v; want upgrade gpt-5.5-codex", old, ok)
 	}
 	if hidden, ok := modelByValue(got, "gpt-5.3-hidden"); !ok || !hidden.Hidden {
 		t.Errorf("hidden = %+v, %v", hidden, ok)
 	}
-	if _, ok := modelByValue(got, "gpt-5.6"); !ok {
+	if _, ok := modelByValue(got, "gpt-5.6-codex"); !ok {
 		t.Errorf("second page missing from %v", got)
 	}
 

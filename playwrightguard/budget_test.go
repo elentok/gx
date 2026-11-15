@@ -54,7 +54,9 @@ import (
 // Hosted files phone flow (+1): the bottom sheet needs the real (hover: none) media query, a touch tap and the
 // clipboard in a real browser; FileLinkSheet.test.tsx (vitest) covers the sheet for a forced rule but cannot see
 // the media query. It is its own flow because it needs a touch, 390px context the wide flow does not have.
-const maxFlows = 146
+// Model switch flow (+1): the picker needs the server's model query and its refresh on open, the relaunch the fake
+// agent logs, the switch route's refusal and real keyboard focus; ModelPickerHost.test.tsx (vitest) covers each render alone.
+const maxFlows = 147
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
