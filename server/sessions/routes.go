@@ -29,10 +29,7 @@ func Routes(mg func() *Manager, rs func() *Resumer, q func() *queue.Queue) []wir
 		return func(id string, _ bool) (wire.SessionResult, error) { return m.StopSession(wire.SessionRequest{ID: id}) }
 	}
 	removeTarget := func(m *Manager) func(string, bool) (wire.SessionResult, error) { return m.RemoveTarget }
-	designWeb := func(do func() func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) { mg().SessionWriteDesignWeb(do())(w, r) }
-	}
-	interruptWeb := func(do func() func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
+	nonQueueWeb := func(do func() func(wire.SessionRequest) (wire.SessionResult, error)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) { mg().SessionWriteInterruptWeb(do())(w, r) }
 	}
 	interrupt := func() func(wire.SessionRequest) (wire.SessionResult, error) { return mg().InterruptSession }
@@ -69,10 +66,10 @@ func Routes(mg func() *Manager, rs func() *Resumer, q func() *queue.Queue) []wir
 		{Pattern: "POST /v1/sessions/ask-hold", Handler: m((*Manager).AskHoldWrite)},
 		{Pattern: "POST /v1/sessions/link", Handler: res((*Resumer).SessionLinkWrite)},
 		{Pattern: "POST /v1/sessions/step", Handler: res((*Resumer).SessionStepWrite)},
-		{Pattern: "POST /v1/sessions/resume", Web: wire.WebWrite, Handler: write(resume), WebHandler: designWeb(resume)},
+		{Pattern: "POST /v1/sessions/resume", Web: wire.WebWrite, Handler: write(resume), WebHandler: nonQueueWeb(resume)},
 		{Pattern: "POST /v1/sessions/switch", Web: wire.WebWrite,
 			Handler:    func(w http.ResponseWriter, r *http.Request) { rs().SessionSwitchWrite(false)(w, r) },
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { rs().SessionSwitchWrite(true)(w, r) }},
-		{Pattern: "POST /v1/sessions/interrupt", Web: wire.WebWrite, Handler: write(interrupt), WebHandler: interruptWeb(interrupt)},
+		{Pattern: "POST /v1/sessions/interrupt", Web: wire.WebWrite, Handler: write(interrupt), WebHandler: nonQueueWeb(interrupt)},
 	}
 }

@@ -33,8 +33,9 @@ func TestWebSessions_StopAndRestoreNeedAFreshTokenOnADesignSession(t *testing.T)
 			t.Errorf("stop with %s = %d %+v, want %s", tc.name, code, res, tc.want)
 		}
 	}
-	if code, body := webSessionWrite(t, base, cookie, "resume", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || servertest.ReasonOf(t, body) != wire.ReasonSessionNotDesign {
-		t.Errorf("restore of a plain session = %d %s, want not-design-session", code, body)
+	// Restore is open to any non-Queue session (the Agents page offers it), so a plain one is not refused as not-design-session.
+	if code, body := webSessionWrite(t, base, cookie, "resume", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || servertest.ReasonOf(t, body) == wire.ReasonSessionNotDesign {
+		t.Errorf("restore of a plain session = %d %s, want it not refused as not-design-session", code, body)
 	}
 
 	if code, res := webTargetWrite(t, base, cookie, "stop", design, rowToken(ctx, t, h, design), false); code != http.StatusOK || res.Refused() {
