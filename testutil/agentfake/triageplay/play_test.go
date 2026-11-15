@@ -19,6 +19,13 @@ const stubGx = `#!/bin/sh
 echo "$@" >> "$LOG"
 case "$*" in
   *"triage show"*) cat "$SHOW" ;;
+  *"move-locate --project p --epic held"*) echo '{"move":[],"claimed":["p:held/01"],"archive":false}' ;;
+  *"triage move-locate"*)
+    if [ "$(grep -c 'triage move-locate' "$LOG")" -le 1 ]; then
+      echo '{"move":["p:old/01","p:old/02"],"claimed":[],"archive":false}'
+    else
+      echo '{"move":[],"claimed":[],"archive":true}'
+    fi ;;
   *"triage locate"*) echo '{"position":"follow-ups","address":"p:follow-ups/01"}' ;;
   *"tickets move"*) echo '{"to":"p:triage-ready/01"}' ;;
   *"triage epics"*) echo 'p:triage-ready known' ;;
@@ -346,5 +353,33 @@ func TestTriagePlayer_FailAfterMoveKeepsTheNewAddress(t *testing.T) {
 	}
 	if s.count(t, "tickets move") != 1 || s.count(t, "--state failed --refusal "+RefusalAfterMove+" --new-address p:triage-ready/01") != 1 {
 		t.Errorf("calls = %q, want the move, then a failed row with the new address", s.calls(t))
+	}
+}
+
+func TestTriagePlayer_WriteMovesAnOldEpicIntoItsAreaThenArchivesIt(t *testing.T) {
+	t.Parallel()
+	rec := triage.Record{Step: tickets.StepWrite, Moves: []triage.MoveUnit{{OldEpic: "old", Area: "tooling", State: triage.MovePending}}}
+	s := newStub(t, Config{}, triage.BranchWrite, rec)
+	if _, err := s.player.Play(); err != nil {
+		t.Fatal(err)
+	}
+	if s.count(t, "tickets epic add p:tooling --kind area") != 1 ||
+		s.count(t, "tickets move p:old/01 p:tooling") != 1 || s.count(t, "tickets move p:old/02 p:tooling") != 1 {
+		t.Errorf("calls = %q, want the area and both tickets moved", s.calls(t))
+	}
+	if s.count(t, "server epics archive p:old --yes") != 1 || s.count(t, "--epic old --state done") != 1 {
+		t.Errorf("calls = %q, want the archive and a done unit", s.calls(t))
+	}
+}
+
+func TestTriagePlayer_WriteLeavesAnEpicWithAClaimedTicketAlone(t *testing.T) {
+	t.Parallel()
+	rec := triage.Record{Step: tickets.StepWrite, Moves: []triage.MoveUnit{{OldEpic: "held", Area: "tooling", State: triage.MovePending}}}
+	s := newStub(t, Config{}, triage.BranchWrite, rec)
+	if _, err := s.player.Play(); err != nil {
+		t.Fatal(err)
+	}
+	if s.count(t, "tickets move") != 0 || s.count(t, "archive") != 0 || s.count(t, "move-state") != 0 {
+		t.Errorf("calls = %q, want no move, archive or state", s.calls(t))
 	}
 }

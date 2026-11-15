@@ -286,10 +286,74 @@ func (p *Player) write(rec *triage.Record) (string, error) {
 		}
 		done++
 	}
+	for _, u := range rec.Moves {
+		if u.State == triage.MoveDone || u.State == triage.MoveKept {
+			continue
+		}
+		moved, err := p.writeMove(u)
+		if err != nil {
+			failed++
+			if _, err := p.triage("", "move-state", "--epic", u.OldEpic, "--state", "failed", "--error", err.Error()); err != nil {
+				return "", err
+			}
+			continue
+		}
+		if !moved {
+			continue
+		}
+		if _, err := p.triage("", "move-state", "--epic", u.OldEpic, "--state", "done"); err != nil {
+			return "", err
+		}
+		done++
+	}
 	if err := p.lastPass(len(ready) > 0); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("✅ write: %d rows written, %d failed. Next: retry or keep the failed rows in the web plan view", done, failed), nil
+}
+
+// writeMove is one old-epic unit's Write, as the skill's "Old epics" section
+// says: move what move-locate lists into the area (created when missing), then
+// archive the emptied epic, which stamps it. A unit whose epic holds a claimed
+// ticket is left pending (moved is false) and its claimed ticket stays.
+func (p *Player) writeMove(u triage.MoveUnit) (moved bool, err error) {
+	locate := func() (loc struct {
+		Move    []string `json:"move"`
+		Claimed []string `json:"claimed"`
+		Archive bool     `json:"archive"`
+	}, err error) {
+		out, err := p.triage("", "move-locate", "--epic", u.OldEpic)
+		if err != nil {
+			return loc, err
+		}
+		return loc, json.Unmarshal([]byte(out), &loc)
+	}
+	loc, err := locate()
+	if err != nil {
+		return false, err
+	}
+	if len(loc.Move) == 0 && len(loc.Claimed) > 0 {
+		return false, nil
+	}
+	area := p.Project + ":" + u.Area
+	if len(loc.Move) > 0 {
+		// A refusal means the area exists already; a real failure shows in the move.
+		_, _ = p.gx("", "tickets", "epic", "add", area, "--kind", "area", "--status", "open")
+	}
+	for _, addr := range loc.Move {
+		if _, err := p.gx("", "tickets", "move", addr, area); err != nil {
+			return false, err
+		}
+	}
+	if loc, err = locate(); err != nil {
+		return false, err
+	}
+	if loc.Archive {
+		if _, err := p.gx("", "server", "epics", "archive", p.Project+":"+u.OldEpic, "--yes"); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
 }
 
 // recordEpics records the epics and creates the ones the record did not list
