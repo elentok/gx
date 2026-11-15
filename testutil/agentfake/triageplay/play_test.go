@@ -187,19 +187,19 @@ func questionsRecord() triage.Record {
 	}
 }
 
-func TestTriagePlayer_QuestionsReprintsTheOpenRoundWithoutSavingAnother(t *testing.T) {
+func TestTriagePlayer_QuestionsReprintsTheWholeOpenRoundWithoutSavingAnother(t *testing.T) {
 	t.Parallel()
 	s := newStub(t, Config{}, triage.BranchQuestions, questionsRecord())
 	msg, err := s.player.Play()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(msg, "Q q2") || strings.Contains(msg, "Q q1") || !strings.Contains(msg, "Decided unless you object:") || grillround.RunEndLine.MatchString(msg) {
-		t.Errorf("message = %q, want only the waiting question and the decided list, no run-end line", msg)
+	if !strings.Contains(msg, "Q q2") || !strings.Contains(msg, "Q q1") || !strings.Contains(msg, "Decided unless you object:") || grillround.RunEndLine.MatchString(msg) {
+		t.Errorf("message = %q, want the whole round, answered question too, and the decided list, no run-end line", msg)
 	}
 	segs := grillround.Segments(msg)
-	if len(segs) != 1 {
-		t.Fatalf("segments = %q, want one round-card question", segs)
+	if len(segs) != 2 {
+		t.Fatalf("segments = %q, want one round-card question per question of the round", segs)
 	}
 	_, blocks := grillround.SplitFences(segs[0])
 	q, err := ticketlog.ParseQuestionBlock(blocks[0])

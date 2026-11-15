@@ -414,18 +414,21 @@ test("a printed round shows the answered cards folded, the open card, the round 
       } as never,
     }),
   } as RouteFetchers)
-  const sheet = await screen.findByRole("group", { name: "Questions" })
-  const alphas = [...sheet.querySelectorAll<HTMLElement>("button[data-answer]")].filter((b) =>
-    b.textContent?.includes("Alpha"),
-  )
-  for (const b of alphas.slice(0, 3)) fireEvent.click(b)
+  // A pick moves the card on, so each of the three picks is Alpha on the next question.
+  for (let n = 1; n <= 3; n++) {
+    await screen.findByText(`Question ${n} of 5`)
+    fireEvent.click(screen.getByRole("button", { name: "Alpha" }))
+  }
   await waitFor(() =>
     expect(document.querySelectorAll("[data-part=answered-question]").length).toBe(3),
   )
   expect(document.querySelector("[data-part=answered-question]")?.textContent).toContain(
     "Q1 Title 1 → Alpha",
   )
-  expect(screen.getByLabelText("Question 4 of 5")).toBeTruthy()
+  expect(screen.getByText("Question 4 of 5")).toBeTruthy()
+  expect(screen.getByText("Title 4")).toBeTruthy()
+  expect(screen.getByText("Body 4?")).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Add a note…" })).toBeTruthy()
   expect(screen.getByTestId("page-header-subtitle").textContent).toBe("Questions · round 1 of 3")
   expect(screen.getAllByText("Round 1 of 3 · 3 of 5 answered").length).toBeGreaterThan(0)
   const note = screen.getByRole("button", { name: "Note" }) as HTMLButtonElement

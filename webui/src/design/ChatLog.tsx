@@ -19,6 +19,7 @@ import {
 import type { PostAnswer, PostPrompt } from "./prompt"
 import { AnsweredQuestions } from "./AnsweredQuestions"
 import { QuestionSheet } from "./QuestionSheet"
+import { RoundCard } from "./RoundCard"
 import { isAnswered } from "../ui/question-sheet/round"
 import { type RoundDraft, useRoundDraft } from "./roundDraft"
 
@@ -71,7 +72,16 @@ function ChatTail({
       minH="0"
       gap="3"
     >
-      {round.length > 0 && (questions || foldAnswered) && (
+      {round.length > 0 && foldAnswered && !questions && (
+        <RoundCard
+          round={round}
+          answers={answers}
+          onAnswers={setAnswers}
+          index={draft.index}
+          onIndex={setIndex}
+        />
+      )}
+      {round.length > 0 && questions && (
         <QuestionSheet
           round={round}
           answers={answers}

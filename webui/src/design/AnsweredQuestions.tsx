@@ -27,11 +27,23 @@ export function AnsweredQuestions({
   return (
     <Box display="flex" flexDirection="column" gap="1" data-part="answered-question-list">
       {done.map((c) => (
-        <Text key={c.label} fontSize="sm" color="text.muted" data-part="answered-question">
+        <Text
+          key={c.label}
+          fontSize="sm"
+          color="text.muted"
+          bg="surface.raised"
+          borderRadius="8px"
+          px="2.5"
+          py="1.5"
+          data-part="answered-question"
+        >
           <Text as="span" aria-hidden color="tone.done.fg">
             ✓
           </Text>{" "}
-          {nameOf(c)} {c.title} → {chosen(c, answers)}
+          {nameOf(c)} {c.title} →{" "}
+          <Text as="b" color="text">
+            {chosen(c, answers)}
+          </Text>
         </Text>
       ))}
     </Box>

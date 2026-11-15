@@ -335,11 +335,12 @@ func decidedText(rec *triage.Record) string {
 	return strings.Join(lines, "\n")
 }
 
-// printRound is a saved round as the agent prints it: the questions waiting,
+// printRound is a saved round as the agent prints it: every question of the
+// round, answered or not, so the card counts "k of n" over the whole round,
 // then the decided list. The turn ends on it.
-func printRound(rec *triage.Record, _ int, open []triage.Question) string {
+func printRound(rec *triage.Record, i int, _ []triage.Question) string {
 	var cards []string
-	for n, q := range open {
+	for n, q := range rec.Rounds[i].Questions {
 		cards = append(cards, questionCard(rec, n+1, q))
 	}
 	return strings.Join(cards, "\n\n") + "\n\n" + decidedText(rec)
