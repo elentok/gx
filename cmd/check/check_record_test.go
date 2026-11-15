@@ -342,7 +342,7 @@ func TestCheck_SlowTestRerunNodeTools(t *testing.T) {
 		{
 			"playwright", "a.e2e.ts.7. slow",
 			`{"suites":[{"title":"a.e2e.ts","file":"a.e2e.ts","specs":[{"title":"7. slow","file":"a.e2e.ts","tests":[{"results":[{"duration":DUR}]}]}]}]}`,
-			[]string{"-g", `› 7\. slow$`},
+			[]string{"-g", `(?:\.tsx?|›) 7\. slow$`},
 		},
 	} {
 		t.Run(c.tool, func(t *testing.T) {
