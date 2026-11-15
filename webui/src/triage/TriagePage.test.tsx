@@ -436,3 +436,71 @@ test("a printed round shows the answered cards folded, the open card, the round 
   fireEvent.click(note)
   expect(await screen.findByPlaceholderText("A note on this round")).toBeTruthy()
 })
+
+const planRow = (n: number, action?: string, destination?: string) => ({
+  ...row(n, "relevant"),
+  action,
+  destination,
+})
+
+const planView = (rows: ReturnType<typeof planRow>[]) =>
+  viewOf({ steps: stepsAt(1), rows, ready_epic: "follow-ups-2026-11-14" })
+
+const planRows = () => [
+  ...[1, 2, 3, 4, 5].map((n) => planRow(n, "ready")),
+  planRow(6, "area", "test-flakes"),
+  planRow(7, "map", "ralph-loop"),
+  planRow(8, "close", "fixed"),
+  planRow(9, "close", "obsolete"),
+  planRow(10, "merge", "gx:follow-ups/1"),
+  planRow(11, "keep"),
+]
+
+test("after Route the Chat holds a read-only plan card with counts, areas and collapsed groups", async () => {
+  render([session("working")], {
+    triage: async () => ({ kind: "ok", detail: planView(planRows()) }),
+  })
+  const card = await screen.findByRole("region", { name: "Plan summary" })
+  expect(
+    within(screen.getByRole("region", { name: "Chat" })).getByRole("region", {
+      name: "Plan summary",
+    }),
+  ).toBe(card)
+  expect(card.textContent).toContain("Plan · 11 follow-ups")
+  expect(card.textContent).toContain("read-only")
+  expect(card.textContent).toContain("5Ready→ follow-ups-2026-11-14")
+  expect(card.textContent).toContain("2To an area→ 2 areas")
+  expect(card.textContent).toContain("2Closed1 fixed · 1 obsolete")
+  expect(card.textContent).toContain("1Merged")
+  expect(card.textContent).toContain("1Kept for later")
+  expect(card.textContent).toContain("test-flakes1")
+  expect(card.querySelector("a")).toBeNull()
+  fireEvent.click(within(card).getByRole("button", { name: /5 Ready/ }))
+  const group = await within(card).findByRole("group", { name: "Group: Ready 5" })
+  expect(group.querySelectorAll("a").length).toBe(3)
+  expect(group.querySelector("a")?.getAttribute("href")).toBe("#/t/gx:follow-ups/1")
+  fireEvent.click(within(group).getByRole("button", { name: "2 more" }))
+  expect(group.querySelectorAll("a").length).toBe(5)
+})
+
+test("the plan card re-renders its counts after a triage-changed event", async () => {
+  let rows = planRows()
+  const { emit } = render([session("working")], {
+    triage: async () => ({ kind: "ok", detail: planView(rows) }),
+  })
+  const card = await screen.findByRole("region", { name: "Plan summary" })
+  expect(card.textContent).toContain("5Ready")
+  rows = rows.map((r, i) => (i === 0 ? { ...r, action: "keep" } : r))
+  emit("gx")
+  await waitFor(() => expect(card.textContent).toContain("4Ready"))
+})
+
+test("no plan card while a row has no plan yet", async () => {
+  const rows = planRows()
+  rows[0] = planRow(1)
+  render([session("working")], {
+    triage: async () => ({ kind: "ok", detail: planView(rows) }),
+  })
+  await screen.findByRole("heading", { level: 1 })
+  expect(screen.queryByRole("region", { name: "Plan summary" })).toBeNull()
+})

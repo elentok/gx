@@ -31,6 +31,7 @@ import { DoneQueue, DoneView } from "./DoneView"
 import type { FetchEpicList } from "../epics/list"
 import type { PostEpicWrite } from "../epics/queue"
 import { WriteView } from "./WriteView"
+import { PlanSummary, planSaved } from "./PlanSummary"
 import { useDetailReady } from "../useReady"
 import { useTriage, type FetchTriage } from "./useTriage"
 
@@ -172,6 +173,8 @@ function TriageBody({
   const live = liveFlowSessions(FLOW, project, sessions)
   const model = triageModel({ key: project, steps: view.steps, ringPercent: view.ring_percent })
   const round = model.current?.step === QUESTIONS ? view.open_round : undefined
+  // From Route on, while the plan is saved; before that only the working row shows.
+  const showPlan = phase === "working" && model.current?.step !== "verify" && planSaved(view)
   return (
     <>
       {abandoning && (
@@ -238,6 +241,7 @@ function TriageBody({
         }
         chatTop={() => (
           <>
+            {showPlan && <PlanSummary view={view} />}
             {atDone && view.result && <DoneView result={view.result} />}
             {atWrite && (
               <WriteView
