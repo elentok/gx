@@ -4,7 +4,7 @@ import { modelName } from "../modelName"
 import { openModelPicker, postSwitchSession } from "../shell/modelPickerOpen"
 import { Button } from "../ui/button/Button"
 import { useWrite } from "../useWrite"
-import { blockedNote } from "./modelSwitch"
+import { blockedNote, TokenCostWarning } from "./modelSwitch"
 import { stateToken } from "./open"
 
 /** "GPT-6.1 Sol" -> "Sol": the server sends no family, so drop the brand and version words. */
@@ -98,6 +98,7 @@ export function OutdatedModel({ session, text }: { session: SessionInfo; text: s
             <Text color="text.dim" data-testid="outdated-note">
               {note}
             </Text>
+            <TokenCostWarning session={session} />
             {!session.design && (
               <chakra.button
                 type="button"

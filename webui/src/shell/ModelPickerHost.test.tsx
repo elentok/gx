@@ -200,6 +200,24 @@ describe("switching", () => {
   })
 })
 
+describe("token cost warning", () => {
+  const WARNING =
+    "Changing the model costs tokens. The whole chat is sent again at the new model's price."
+
+  test("a chat with history shows it and the Switch button stays enabled", async () => {
+    open({ has_history: true })
+    expect(await screen.findByText(WARNING)).toBeTruthy()
+    fireEvent.click(await screen.findByRole("radio", { name: /GPT-6.1-Sol/ }))
+    expect(switchButton().disabled).toBe(false)
+  })
+
+  test("a chat with no turns shows nothing", async () => {
+    open()
+    await screen.findByRole("radio", { name: /GPT-6.1-Sol/ })
+    expect(screen.queryByText(WARNING)).toBeNull()
+  })
+})
+
 describe("not switchable now", () => {
   test("a working agent disables everything and says why", async () => {
     open({ status: { state: "working" } })

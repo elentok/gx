@@ -43,6 +43,19 @@ export function useSwitchLine(s: SessionInfo): { text: string; red: boolean } | 
   }
 }
 
+export const TOKEN_COST_WARNING =
+  "Changing the model costs tokens. The whole chat is sent again at the new model's price."
+
+/** The token cost warning for a chat with history. The picker and the footer popover share it; it never blocks a switch. */
+export function TokenCostWarning({ session }: { session: SessionInfo }) {
+  if (!session.has_history) return null
+  return (
+    <Text color="text.dim" fontSize="xs" data-testid="token-cost-warning">
+      {TOKEN_COST_WARNING}
+    </Text>
+  )
+}
+
 /** The centered system line at the end of a chat log. It is not part of the transcript. */
 export function SwitchLine({ session }: { session: SessionInfo }) {
   const line = useSwitchLine(session)

@@ -1,7 +1,7 @@
 import { chakra, Kbd, Text } from "@chakra-ui/react"
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react"
 import { useConnectionContext, useConnectionState } from "../connection"
-import { blockedNote } from "../design/modelSwitch"
+import { blockedNote, TokenCostWarning } from "../design/modelSwitch"
 import { stateToken } from "../design/open"
 import type { SessionInfo, SessionModelsResponse } from "../generated/server"
 import { Button } from "../ui/button/Button"
@@ -203,6 +203,11 @@ function ModelPicker({
         >
           {note}
         </Text>
+      )}
+      {session.has_history && (
+        <chakra.div mx="3.5" mt="2.5">
+          <TokenCostWarning session={session} />
+        </chakra.div>
       )}
       <chakra.div role="radiogroup" aria-label="Model" overflowY="auto" px="1.5" py="2">
         {shown.length === 0 && (

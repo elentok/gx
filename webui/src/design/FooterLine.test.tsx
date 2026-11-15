@@ -313,6 +313,21 @@ test("a busy agent disables the button and a stopped one asks for a resume", asy
   expect(pop.textContent).toContain("Resume the session to switch.")
 })
 
+const WARNING =
+  "Changing the model costs tokens. The whole chat is sent again at the new model's price."
+
+test("the popover warns about the token cost only for a chat with history, and still switches", async () => {
+  const { unmount } = render(outdated({ has_history: true }))
+  fireEvent.click(screen.getByTestId("outdated-model"))
+  const pop = await popover()
+  expect(pop.textContent).toContain(WARNING)
+  expect(switchButton(pop).disabled).toBe(false)
+  unmount()
+  render(outdated())
+  fireEvent.click(screen.getByTestId("outdated-model"))
+  expect((await popover()).textContent).not.toContain("costs tokens")
+})
+
 test("a chat popover links to the picker; a design popover does not", async () => {
   const { unmount } = render(outdated())
   fireEvent.click(screen.getByTestId("outdated-model"))
