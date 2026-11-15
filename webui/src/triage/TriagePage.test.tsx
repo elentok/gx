@@ -348,7 +348,7 @@ test("a done Triage with no ready epic shows no Queue epic button", async () => 
   })
   render([], { triage: async () => ({ kind: "ok", detail }) })
   await screen.findByRole("button", { name: "More actions" })
-  expect(screen.queryByRole("button", { name: "Queue epic" })).toBeNull()
+  expect(screen.queryByRole("button", { name: "Queue it" })).toBeNull()
 })
 
 test("a done Triage with a ready epic puts the Queue button on the ready line, not in the header", async () => {
@@ -378,7 +378,7 @@ test("a done Triage with a ready epic puts the Queue button on the ready line, n
     triage: async () => ({ kind: "ok", detail }),
     epicList: async () => ({ epics: [ready], follow_ups: [] }) as never,
   })
-  const queue = await screen.findByRole("button", { name: "Queue epic" })
+  const queue = await screen.findByRole("button", { name: "Queue it" })
   expect(screen.getByRole("region", { name: "Ready epic" }).contains(queue)).toBe(true)
   expect(screen.queryByRole("button", { name: "Continue" })).toBeNull()
 })

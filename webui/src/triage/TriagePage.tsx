@@ -213,6 +213,7 @@ function TriageBody({
           <ProgressRing
             progress={view.ring_percent / 100}
             tone="running"
+            arc={atDone ? "kind.implementation.fg" : undefined}
             kind="followups"
             label={size === "compact" ? "" : `${view.ring_percent}%`}
             size={size}

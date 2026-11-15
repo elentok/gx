@@ -86,7 +86,7 @@ function renderQueue(
 
 test("a ready row shows Queue and posts the queue add once", async () => {
   const { queue } = renderQueue(async () => ({ epics: [listRow("ready")] }))
-  const button = await screen.findByRole("button", { name: "Queue epic" })
+  const button = await screen.findByRole("button", { name: "Queue it" })
   fireEvent.click(button)
   fireEvent.click(button)
   await waitFor(() => expect(queue).toHaveBeenCalledTimes(1))
@@ -97,7 +97,7 @@ test("a queued row shows the queued word, with no Queue button, and follows a ch
   let state = "queued"
   const { emit } = renderQueue(async () => ({ epics: [listRow(state)] }))
   await screen.findByText("queued")
-  expect(screen.queryByRole("button", { name: "Queue epic" })).toBeNull()
+  expect(screen.queryByRole("button", { name: "Queue it" })).toBeNull()
   state = "running"
   emit()
   await screen.findByText("running", undefined, { timeout: 2000 })

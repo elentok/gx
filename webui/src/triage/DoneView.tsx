@@ -169,8 +169,8 @@ export function DoneQueue({
         address={epic}
         state={row.state}
         post={queue}
-        label="Queue epic"
-        tone="done"
+        label="Queue it"
+        tone="running"
         pendingLabel="Queueing…"
         onDone={retry}
       />

@@ -278,11 +278,11 @@ test.describe("199. Triage journey", () => {
     const actions = page.getByTestId("page-header-actions")
     const readyLine = (p: Page) =>
       p.getByRole("region", nav("Triage result")).getByRole("region", nav("Ready epic"))
-    const queue = readyLine(page).getByRole("button", nav("Queue epic"))
+    const queue = readyLine(page).getByRole("button", nav("Queue it"))
     await expect(queue).toBeVisible()
     await queue.click()
     await expect.poll(queued).toContain("triage-ready")
-    await expect(page.getByRole("button", nav("Queue epic"))).toHaveCount(0)
+    await expect(page.getByRole("button", nav("Queue it"))).toHaveCount(0)
     // The chip text moves on (queued, running, finished) while the suite loads, so match the states, never a captured word.
     const queuedChip = (p: Page) =>
       readyLine(p)
@@ -292,12 +292,12 @@ test.describe("199. Triage journey", () => {
 
     // The queued state survives a reload, and a second tab shows it too.
     await page.reload()
-    await expect(page.getByRole("button", nav("Queue epic"))).toHaveCount(0)
+    await expect(page.getByRole("button", nav("Queue it"))).toHaveCount(0)
     await expect(queuedChip(page)).toBeVisible()
     const tab = await page.context().newPage()
     await tab.goto(page.url())
     await expect(tab.getByRole("region", nav("Triage result"))).toBeVisible()
-    await expect(tab.getByRole("button", nav("Queue epic"))).toHaveCount(0)
+    await expect(tab.getByRole("button", nav("Queue it"))).toHaveCount(0)
     await expect(queuedChip(tab)).toBeVisible()
     await tab.close()
 

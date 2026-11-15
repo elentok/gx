@@ -41,6 +41,8 @@ interface Props {
   size?: keyof typeof SIZES
   // A white comet circles the ring while the work is live.
   live?: boolean
+  // A color token for the arc in place of the tone's.
+  arc?: string
 }
 
 export function ProgressRing({
@@ -50,6 +52,7 @@ export function ProgressRing({
   label = "",
   size = "md",
   live = false,
+  arc,
 }: Props) {
   const { px, stroke, font, badge } = SIZES[size]
   const r = (px - stroke) / 2
@@ -78,7 +81,7 @@ export function ProgressRing({
             cx={c}
             cy={c}
             r={r}
-            stroke={`tone.${tone}.fg`}
+            stroke={arc ?? `tone.${tone}.fg`}
             strokeLinecap="round"
             pathLength={100}
             strokeDasharray={`${clamped * 100} 100`}

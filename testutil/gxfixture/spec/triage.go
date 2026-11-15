@@ -229,7 +229,7 @@ func TriageScenario(shape string) (Scenario, bool) {
 			// session waits on the hold so it does not write them.
 			sc.TriageAgent = &triageplay.Config{HoldAtStep: true}
 			sc.Triage = []TriageSeed{{project, func(rec *triage.Record) {
-				actions := []string{"ready", "ready", "map", "merge", "close", "keep"}
+				actions := []string{"ready", "ready", "area", "merge", "close", "keep"}
 				planned(rec, func(i int, p *triage.PlanRow) {
 					p.Action = actions[i]
 					// A merge names the row it duplicates and a close names its reason.
@@ -277,7 +277,7 @@ func TriageScenario(shape string) (Scenario, bool) {
 				}
 				rec.Rows = append(rec.Rows,
 					moved(1, "ready", ready+"/01"), moved(2, "ready", ready+"/02"),
-					moved(3, "map", mapEpic+"/01"), moved(4, "close", ""),
+					moved(3, "area", mapEpic+"/01"), moved(4, "close", ""),
 				)
 				rec.State, rec.Step = triage.StateDone, string(tickets.StepDone)
 				rec.LastPassComplete = true
