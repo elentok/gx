@@ -208,6 +208,27 @@ func TestView_FailedRowsOfferKeepAndRetry(t *testing.T) {
 	}
 }
 
+func TestCanRetryMove(t *testing.T) {
+	cases := []struct {
+		name  string
+		live  bool
+		step  string
+		state triagerec.MoveState
+		want  bool
+	}{
+		{"failed at write", true, "write", triagerec.MoveFailed, true},
+		{"pending at write", true, "write", triagerec.MovePending, false},
+		{"kept at write", true, "write", triagerec.MoveKept, false},
+		{"failed at route", true, "route", triagerec.MoveFailed, false},
+		{"failed, not live", false, "write", triagerec.MoveFailed, false},
+	}
+	for _, c := range cases {
+		if got := triage.CanRetryMove(c.live, c.step, triagerec.MoveUnit{State: c.state}); got != c.want {
+			t.Errorf("%s: CanRetryMove = %v", c.name, got)
+		}
+	}
+}
+
 func TestOfferRules(t *testing.T) {
 	row := func(w triagerec.WriteState, newAddr string, keep bool) triagerec.Row {
 		var addrs []string

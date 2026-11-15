@@ -3948,6 +3948,11 @@ export interface TriageMove {
   area: string;
   state: string;
   last_error?: string;
+  /**
+   * CanRetry and CanKeep post to the row calls with OldEpic as the address.
+   */
+  can_retry?: boolean;
+  can_keep?: boolean;
 }
 /**
  * TriageSummary is the plan summary the web shows, built from record rows.

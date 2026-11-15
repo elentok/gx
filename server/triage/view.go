@@ -40,6 +40,13 @@ func CanRetry(live bool, step string, r triagerec.Row) bool {
 	return live && step == tickets.StepWrite && r.Write == triagerec.WriteFailed
 }
 
+// CanRetryMove is whether a move unit offers Retry and Keep for later: it
+// failed at write. Both offers share one rule because the store accepts both
+// for any failed unit.
+func CanRetryMove(live bool, step string, m triagerec.MoveUnit) bool {
+	return live && step == tickets.StepWrite && m.State == triagerec.MoveFailed
+}
+
 // CanAbandon is whether the Triage offers Abandon: at verify, route and
 // questions, never at write, except for a version 1 record at write, where it
 // is the only action.
@@ -189,8 +196,10 @@ func buildView(project string, rec *triagerec.Record) wire.TriageView {
 		v.OpenRound, v.FinalApproval = openRound(rec)
 	}
 	for _, m := range rec.Moves {
+		can := CanRetryMove(isLive, rec.Step, m)
 		v.Summary.Moves = append(v.Summary.Moves, wire.TriageMove{
 			OldEpic: m.OldEpic, Area: m.Area, State: string(m.State), LastError: m.LastError,
+			CanRetry: can, CanKeep: can,
 		})
 	}
 

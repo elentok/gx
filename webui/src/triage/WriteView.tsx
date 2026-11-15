@@ -143,8 +143,25 @@ function WriteRow({
   )
 }
 
-/** An old-epic move unit as a row of the list. It has no Retry or Keep for later: the wire has no unit calls yet. */
-function MoveRow({ move }: { move: TriageMove }) {
+/** An old-epic move unit as a row of the list. Its Retry and Keep for later use the row calls with the old epic as the address. */
+function MoveRow({
+  project,
+  revision,
+  move,
+  retry,
+  keep,
+  refetch,
+}: {
+  project: string
+  revision: number
+  move: TriageMove
+  retry: TriageRowAction
+  keep: TriageRowAction
+  refetch: () => void
+}) {
+  const { run, pending } = useWrite()
+  const act = (call: TriageRowAction) =>
+    run(() => call({ project, revision, address: move.old_epic }), { onDone: refetch })
   const failed = move.state === "failed"
   return (
     <Box display="flex" flexDirection="column" py="2" borderBottomWidth="1px" borderColor="border">
@@ -165,6 +182,20 @@ function MoveRow({ move }: { move: TriageMove }) {
         <Text fontSize="sm" color="text.muted">
           kept for later
         </Text>
+      )}
+      {(move.can_retry || move.can_keep) && (
+        <Box display="flex" gap="2" pt="1">
+          {move.can_retry && (
+            <Button size="sm" emphasis="secondary" disabled={pending} onClick={() => act(retry)}>
+              Retry
+            </Button>
+          )}
+          {move.can_keep && (
+            <Button size="sm" emphasis="secondary" disabled={pending} onClick={() => act(keep)}>
+              Keep for later
+            </Button>
+          )}
+        </Box>
       )}
     </Box>
   )
@@ -202,7 +233,17 @@ export function WriteView({
       refetch={refetch}
     />
   )
-  const unitEl = (m: TriageMove) => <MoveRow key={`${m.old_epic}:${m.area}`} move={m} />
+  const unitEl = (m: TriageMove) => (
+    <MoveRow
+      key={`${m.old_epic}:${m.area}`}
+      project={project}
+      revision={view.revision ?? 0}
+      move={m}
+      retry={retry}
+      keep={keep}
+      refetch={refetch}
+    />
+  )
   return (
     <Box
       display="flex"

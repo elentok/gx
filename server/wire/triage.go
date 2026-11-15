@@ -177,6 +177,9 @@ type TriageMove struct {
 	Area      string `json:"area"`
 	State     string `json:"state"`
 	LastError string `json:"last_error,omitempty"`
+	// CanRetry and CanKeep post to the row calls with OldEpic as the address.
+	CanRetry bool `json:"can_retry,omitempty"`
+	CanKeep  bool `json:"can_keep,omitempty"`
 }
 
 // TriageSummary is the plan summary the web shows, built from record rows.

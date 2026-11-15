@@ -96,6 +96,36 @@ test("failed rows come first and written rows fold", () => {
   screen.getByText("gx:follow-ups/1")
 })
 
+test("a failed move unit posts Retry and Keep for later once with the revision and the old epic", async () => {
+  const retry = vi.fn().mockResolvedValue({})
+  const keep = vi.fn().mockResolvedValue({})
+  const view = viewOf([])
+  view.summary = {
+    actions: {},
+    areas: {},
+    waiting: [],
+    moves: [
+      {
+        old_epic: "b",
+        area: "web",
+        state: "failed",
+        last_error: "boom",
+        can_retry: true,
+        can_keep: true,
+      },
+      { old_epic: "d", area: "ops", state: "pending" },
+    ],
+  }
+  render(<WriteView project="gx" view={view} refetch={() => {}} retry={retry} keep={keep} />)
+  expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(1)
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }))
+  await waitFor(() => expect(retry).toHaveBeenCalledTimes(1))
+  expect(retry).toHaveBeenCalledWith({ project: "gx", revision: 7, address: "b" })
+  fireEvent.click(screen.getByRole("button", { name: "Keep for later" }))
+  await waitFor(() => expect(keep).toHaveBeenCalledTimes(1))
+  expect(keep).toHaveBeenCalledWith({ project: "gx", revision: 7, address: "b" })
+})
+
 test("move units are rows with state and error, and count in x of y", () => {
   const view = viewOf([rowOf(1, { write_state: "done" })])
   view.summary = {
