@@ -8,12 +8,20 @@ const loginIds = async (fixture: Fixture) =>
     .filter(Boolean)
     .map((line) => line.split(/\s+/)[0])
 
+/** Account is a collapsed sidebar category: expand it before clicking its entries. */
+async function openAccountCategory(page: Page) {
+  const category = page.getByRole("button", { name: /^Account/ })
+  await category.click()
+  await expect(category).toHaveAttribute("aria-expanded", "true")
+}
+
 const loginRows = (page: Page) => page.locator('a[href^="#/settings/logins/"]')
 
 async function openWebLogins(page: Page) {
   await menuButton(page).click()
   await page.getByRole("menuitem", nav("More settings...")).click()
   await expect(page).toHaveURL(/#\/settings\/s\//)
+  await openAccountCategory(page)
   await page.getByRole("link", { name: /^Web logins/ }).click()
   await expect(page.getByRole("heading", { name: "Web logins" })).toBeVisible()
 }
@@ -36,6 +44,7 @@ async function openAccountPage(page: Page, link: RegExp) {
   await menuButton(page).click()
   await page.getByRole("menuitem", nav("More settings...")).click()
   await expect(page).toHaveURL(/#\/settings\/s\//)
+  await openAccountCategory(page)
   await page.getByRole("link", { name: link }).click()
 }
 
@@ -88,6 +97,7 @@ test("107. Sign out of this device (+111 CLI revoke)", async ({ page, start }) =
 
   await menuButton(page).click()
   await page.getByRole("menuitem", nav("More settings...")).click()
+  await openAccountCategory(page)
   await page.getByRole("button", { name: "Sign out of this device" }).click()
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible()
   expect(await loginIds(fixture)).toHaveLength(3)
@@ -124,7 +134,7 @@ test("108. Change password", async ({ page, start }) => {
   await page.locator('[data-mock-part="new-password"] input').fill(newPassword)
   await page.locator('[data-mock-part="new-password-again"] input').fill(newPassword)
   await page.getByRole("button", { name: "Change password" }).click()
-  await expect(page).toHaveURL(/#\/settings\/s\/execution-queue$/)
+  await expect(page).toHaveURL(/#\/settings\/s\/agents$/)
 
   await openWebLogins(page)
   await expect(loginRows(page)).toHaveCount(1)

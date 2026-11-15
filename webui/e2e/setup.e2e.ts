@@ -101,6 +101,9 @@ test("101. Setup and login with TOTP off", async ({ page, start }) => {
   await signedIn(page)
 
   await page.evaluate(() => (window.location.hash = "#/settings"))
+  const account = page.getByRole("button", { name: /^Account/ })
+  await account.click()
+  await expect(account).toHaveAttribute("aria-expanded", "true")
   await expect(page.getByRole("link", { name: /^Password/ })).toBeVisible()
   await expect(page.getByRole("link", { name: /^Authenticator/ })).toHaveCount(0)
 

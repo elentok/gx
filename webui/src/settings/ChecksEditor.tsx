@@ -283,11 +283,17 @@ export function ChecksEditor({
           py="2"
           borderRadius="md"
         >
-          Showing the active checks from .gx/checks.json. Edit that file in the repo to change
-          these commands.
+          Showing the active checks from .gx/checks.json. Edit that file in the repo to change these
+          commands.
         </Text>
       )}
-      <chakra.fieldset disabled={repoChecksFile} data-mock-part="checks-editor" display="grid" gap="2" minW="0">
+      <chakra.fieldset
+        disabled={repoChecksFile}
+        data-mock-part="checks-editor"
+        display="grid"
+        gap="2"
+        minW="0"
+      >
         {CHECK_KINDS.map((kind) => (
           <KindCard
             key={kind}

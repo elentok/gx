@@ -20,7 +20,8 @@ export function barFill(limits: UsageLimits | undefined, now: number) {
   if (live.length === 0) return { percent: MIN_FILL, tone: barTone(0), whole: 0, which: "5h" }
   const five = limits?.five_hour
   let top = live[0]
-  for (const w of live) if (wholePercent(w.used_percentage) > wholePercent(top.used_percentage)) top = w
+  for (const w of live)
+    if (wholePercent(w.used_percentage) > wholePercent(top.used_percentage)) top = w
   const whole = wholePercent(top.used_percentage)
   return {
     percent: Math.min(100, Math.max(MIN_FILL, whole)),

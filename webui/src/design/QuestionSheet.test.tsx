@@ -306,7 +306,8 @@ describe("keyboard", () => {
       </>
     )
   }
-  const q = (k: number) => document.querySelectorAll<HTMLElement>(`[role=group][aria-label$=" of 2"]`)[k]
+  const q = (k: number) =>
+    document.querySelectorAll<HTMLElement>(`[role=group][aria-label$=" of 2"]`)[k]
   const answer = (k: number, i: number) => q(k).querySelectorAll<HTMLElement>("[data-answer]")[i]
   const key = (k: string, init: KeyboardEventInit = {}) =>
     fireEvent.keyDown(document.activeElement ?? document.body, { key: k, ...init })
