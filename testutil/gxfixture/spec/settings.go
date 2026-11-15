@@ -9,8 +9,11 @@ const NotesNotifications = `"notifications": { "telegram":{"bot-token":"notes-to
 // SettingsScenario is the Settings page fixture: a config with a non-default
 // value in every section (a risky key left at default, Telegram set, Slack
 // not), three projects, and one running and one waiting agent so the
-// default-harness switch notice shows counts. demo holds the overrides, notes
-// a hand-written notifications block, plain nothing.
+// default-harness switch notice shows counts. The config also holds non-default
+// Models tiers (Codex light effort set to ""), watchdog keys and extra
+// Execution queue keys. demo holds the overrides (including Models tier keys,
+// one set to "") and a checks entry, notes a hand-written notifications block,
+// plain nothing.
 func SettingsScenario() scenario {
 	// The seed appends "checks":{} unless NoCheckConfig, which would duplicate
 	// demo's key, so every project spells its own.
@@ -29,7 +32,9 @@ func SettingsScenario() scenario {
 		ProjectExtra: map[string]string{
 			project: `,"max-agents":1,"evolve":false,` +
 				`"execution-queue":{"max-agents-per-epic":2},` +
-				`"agents":{"sounds":{"enabled":false}},` +
+				`"agents":{"sounds":{"enabled":false},` +
+				`"claude":{"model":"sonnet","strongest":{"model":"opus"}},` +
+				`"codex":{"light":{"model":"gpt-5.5-mini","effort":""}}},` +
 				`"disk-space":{"cleanup-command":["true"]},` +
 				`"checks":{"test":{"full":"true","limits":{"slow":{"go":"5s","vitest":"7s"}}}}`,
 			"notes": `,` + NotesNotifications + noChecks,
@@ -48,6 +53,22 @@ func SettingsScenario() scenario {
 			"agents.sounds.enabled=false",
 			"recovery.notify-hold=30m",
 			"ticket-store.commit-debounce=5",
+			"execution-queue.max-agents-per-epic=3",
+			"execution-queue.max-one-off-agents=2",
+			"cpu-watchdog.threshold-percent=40",
+			"cpu-watchdog.sustain=45s",
+			"cpu-watchdog.cooldown=20m",
+			"watchdog.max-tree-processes=300",
+			"watchdog.interval=2s",
+			"watchdog.ulimit-headroom=1500",
+			// Models tiers: Claude light.effort stays unset (no gx default); Codex
+			// light.effort is "" so the cell shows the agent's own default.
+			"agents.claude.light.model=haiku",
+			"agents.claude.strongest.effort=max",
+			"agents.claude.model=opus",
+			"agents.codex.model=gpt-5.5",
+			"agents.codex.strongest.effort=xhigh",
+			"agents.codex.light.effort=\"\"",
 		},
 		// agent-runner is startup-only, so changing it leaves a pending restart.
 		Steps: [][]string{

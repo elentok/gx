@@ -58,6 +58,32 @@ func TestSettingsScenario(t *testing.T) {
 		t.Error("server.web.dev-frontend (Dev mode) is set, want its default")
 	}
 
+	for key, want := range map[string]any{
+		"execution-queue.max-agents-per-epic": 3.0,
+		"execution-queue.max-one-off-agents":  2.0,
+		"cpu-watchdog.threshold-percent":      40.0,
+		"cpu-watchdog.sustain":                "45s",
+		"cpu-watchdog.cooldown":               "20m",
+		"watchdog.max-tree-processes":         300.0,
+		"watchdog.interval":                   "2s",
+		"watchdog.ulimit-headroom":            1500.0,
+		"agents.claude.model":                 "opus",
+		"agents.claude.light.model":           "haiku",
+		"agents.claude.strongest.effort":      "max",
+		"agents.codex.model":                  "gpt-5.5",
+		"agents.codex.strongest.effort":       "xhigh",
+		"agents.codex.light.effort":           "",
+	} {
+		parts := strings.Split(key, ".")
+		got, ok := section(parts[:len(parts)-1]...)[parts[len(parts)-1]]
+		if !ok || got != want {
+			t.Errorf("config %s = %v (set=%v), want %v", key, got, ok, want)
+		}
+	}
+	if _, ok := section("agents", "claude", "light")["effort"]; ok {
+		t.Error("agents.claude.light.effort is set, want it unset")
+	}
+
 	store := filepath.Join(r.Root(), "data", "gx", "tickets")
 	project := func(name string) (string, map[string]any) {
 		body, err := os.ReadFile(filepath.Join(store, name, "project.json"))
@@ -79,6 +105,18 @@ func TestSettingsScenario(t *testing.T) {
 	}
 	if demo["evolve"] != false {
 		t.Errorf("demo evolve = %v, want false", demo["evolve"])
+	}
+	demoAgents, _ := demo["agents"].(map[string]any)
+	claude, _ := demoAgents["claude"].(map[string]any)
+	codexLight, _ := demoAgents["codex"].(map[string]any)["light"].(map[string]any)
+	if claude["model"] != "sonnet" {
+		t.Errorf("demo agents.claude.model = %v, want sonnet", claude["model"])
+	}
+	if effort, ok := codexLight["effort"]; !ok || effort != "" {
+		t.Errorf("demo agents.codex.light.effort = %v (set=%v), want \"\"", effort, ok)
+	}
+	if demoAgents["sounds"] == nil {
+		t.Error("demo agents lost sounds")
 	}
 	slow := demo["checks"].(map[string]any)["test"].(map[string]any)["limits"].(map[string]any)["slow"]
 	if m, ok := slow.(map[string]any); !ok || len(m) < 2 {
