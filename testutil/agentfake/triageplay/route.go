@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/triage"
 )
@@ -336,12 +337,31 @@ func decidedText(rec *triage.Record) string {
 
 // printRound is a saved round as the agent prints it: the questions waiting,
 // then the decided list. The turn ends on it.
-func printRound(rec *triage.Record, index int, open []triage.Question) string {
-	lines := []string{fmt.Sprintf("Round %d, %d waiting:", index+1, len(open))}
+func printRound(rec *triage.Record, _ int, open []triage.Question) string {
+	var cards []string
 	for n, q := range open {
-		lines = append(lines, fmt.Sprintf("%d. [%s] %s: %s (%s; recommended: %s)", n+1, q.ID, titleOf(rec, q.RowID), q.Text, strings.Join(q.Options, " | "), q.Default))
+		cards = append(cards, questionCard(rec, n+1, q))
 	}
-	return strings.Join(lines, "\n") + "\n\n" + decidedText(rec)
+	return strings.Join(cards, "\n\n") + "\n\n" + decidedText(rec)
+}
+
+// questionCard prints one question in the round format the chat parser turns
+// into a round card. Option ids are letters; the recommended one is the
+// question's default.
+func questionCard(rec *triage.Record, n int, q triage.Question) string {
+	block := []string{"```gx-question", "type: options"}
+	var opts []string
+	for i, o := range q.Options {
+		id := string(rune('a' + i))
+		if o == q.Default {
+			block = append(block, "recommended: "+id)
+		}
+		opts = append(opts, fmt.Sprintf("  - id: %s\n    label: %q", id, o))
+	}
+	block = append(block, "options:")
+	block = append(block, opts...)
+	block = append(block, "```")
+	return fmt.Sprintf("%s%d** - **%s**: %s\n\n%s", grillround.Marker, n, titleOf(rec, q.RowID), q.Text, strings.Join(block, "\n"))
 }
 
 func finalCard(rec *triage.Record) string {

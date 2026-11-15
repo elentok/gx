@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/ticketlog"
 	"github.com/elentok/gx/triage"
 )
 
@@ -193,8 +194,17 @@ func TestTriagePlayer_QuestionsReprintsTheOpenRoundWithoutSavingAnother(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(msg, "[q2]") || strings.Contains(msg, "[q1]") || !strings.Contains(msg, "Decided unless you object:") || grillround.RunEndLine.MatchString(msg) {
+	if !strings.Contains(msg, "Q q2") || strings.Contains(msg, "Q q1") || !strings.Contains(msg, "Decided unless you object:") || grillround.RunEndLine.MatchString(msg) {
 		t.Errorf("message = %q, want only the waiting question and the decided list, no run-end line", msg)
+	}
+	segs := grillround.Segments(msg)
+	if len(segs) != 1 {
+		t.Fatalf("segments = %q, want one round-card question", segs)
+	}
+	_, blocks := grillround.SplitFences(segs[0])
+	q, err := ticketlog.ParseQuestionBlock(blocks[0])
+	if err != nil || q.Kind != ticketlog.QuestionOptions || q.Recommended != "a" || len(q.Options) != 2 {
+		t.Errorf("block = %+v, %v, want an options question recommending a", q, err)
 	}
 	if s.count(t, "triage round") != 0 {
 		t.Errorf("calls = %q, want no new round", s.calls(t))
