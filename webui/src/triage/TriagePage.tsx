@@ -226,15 +226,6 @@ function TriageBody({
             : round && { questions: <RoundRow round={round} /> }
         }
         subtitleSuffix={round && ` · ${roundLabel(round)}`}
-        beforeRing={
-          atDone && view.result?.ready_epic ? (
-            <DoneQueue
-              epic={view.result.ready_epic}
-              fetchEpics={deps.fetchEpics}
-              queue={deps.queue}
-            />
-          ) : undefined
-        }
         headerButton={(session) =>
           atDone ? null : <HeaderButton project={project} session={session} open={deps.open} />
         }
@@ -247,7 +238,20 @@ function TriageBody({
         chatTop={() => (
           <>
             {showPlan && <PlanSummary view={view} />}
-            {atDone && view.result && <DoneView result={view.result} />}
+            {atDone && view.result && (
+              <DoneView
+                result={view.result}
+                queue={
+                  view.result.ready_epic ? (
+                    <DoneQueue
+                      epic={view.result.ready_epic}
+                      fetchEpics={deps.fetchEpics}
+                      queue={deps.queue}
+                    />
+                  ) : undefined
+                }
+              />
+            )}
             {atWrite && (
               <WriteView
                 project={project}

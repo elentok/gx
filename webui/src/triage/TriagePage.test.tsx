@@ -351,7 +351,7 @@ test("a done Triage with no ready epic shows no Queue epic button", async () => 
   expect(screen.queryByRole("button", { name: "Queue epic" })).toBeNull()
 })
 
-test("a done Triage with a ready epic orders the header Queue button, ring, menu", async () => {
+test("a done Triage with a ready epic puts the Queue button on the ready line, not in the header", async () => {
   const detail = viewOf({
     state: "done",
     steps: stepsAt(5),
@@ -379,10 +379,8 @@ test("a done Triage with a ready epic orders the header Queue button, ring, menu
     epicList: async () => ({ epics: [ready], follow_ups: [] }) as never,
   })
   const queue = await screen.findByRole("button", { name: "Queue epic" })
-  const ring = screen.getByRole("img", { name: "Follow-ups" })
-  const menu = screen.getByRole("button", { name: "More actions" })
-  expect(queue.compareDocumentPosition(ring) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  expect(ring.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByRole("region", { name: "Ready epic" }).contains(queue)).toBe(true)
+  expect(screen.queryByRole("button", { name: "Continue" })).toBeNull()
 })
 
 test("a printed round shows the answered cards folded, the open card, the round header and the composer", async () => {

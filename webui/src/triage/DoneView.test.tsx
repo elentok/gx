@@ -29,14 +29,24 @@ const result: TriageResult = {
 }
 
 test("groups and links render from the payload", () => {
-  const { container } = renderThemed(<DoneView result={result} />)
+  const { container } = renderThemed(
+    <DoneView result={result} queue={<button>Queue epic</button>} />,
+  )
   for (const name of ["Ready epic", "Map epics", "Merged", "Closed", "Kept for later"])
     screen.getByRole("region", { name })
+  const line = (name: string) => screen.getByRole("region", { name }).firstElementChild
+  expect(line("Ready epic")?.textContent).toBe("✓1 ready in gx:ready-1Queue epic")
+  expect(line("Map epics")?.textContent).toBe("✓1 to areas · map-a 1")
+  expect(line("Closed")?.textContent).toBe("✓3 closed · obsolete 2 · duplicate 1")
+  expect(line("Kept for later")?.textContent).toBe("✓1 kept for later in follow-ups")
   expect(container.querySelector('a[href="#/e/gx:ready-1"]')).toBeTruthy()
-  expect(container.querySelector('a[href="#/e/gx:map-a"]')).toBeTruthy()
-  screen.getByText("obsolete 2 · duplicate 1")
-  screen.getByText(/Stay in follow-ups, the Triage still ends done/)
+  expect(container.querySelector('a[href="#/t/gx:map-a/3"]')).toBeTruthy()
   screen.getByText("into gx:follow-ups/9")
+})
+
+test("without a ready epic the ready line has no queue", () => {
+  renderThemed(<DoneView result={{ ...result, ready_epic: undefined }} />)
+  expect(screen.queryByRole("button")).toBeNull()
 })
 
 const listRow = (state: string): EpicListRow =>
