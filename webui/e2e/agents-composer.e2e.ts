@@ -33,10 +33,9 @@ test("76. Send and draft", async ({ page, start }) => {
   await expect(page.getByText("a draft to keep", { exact: true })).toBeVisible()
   await expect.poll(() => fixture.cli("agents", "chat", idle.id)).toContain("a draft to keep")
 
-  // Add image is an icon-only 44px paperclip on a tablet and a phone, labelled on desktop.
+  // Add image is an icon-only 44px paperclip at every width.
   const add = composer(page).getByRole("button", { name: "Add image" })
-  await expect(add).toContainText("Add")
-  for (const width of [744, 390]) {
+  for (const width of [1280, 744, 390]) {
     await page.setViewportSize({ width, height: 800 })
     await expect(add).not.toContainText("Add")
     await expect(add).toHaveCSS("width", "44px")

@@ -35,7 +35,16 @@ export async function openNewAgent(page: Page, project?: string) {
   await add.click()
   await page.getByRole("menuitem", { name: /^New chat/ }).click()
   await expect(newForm(page)).toBeVisible()
-  if (project) await projectSelect(page).selectOption(project)
+  if (project) await pickProject(page, project)
+}
+
+/** The Project field is a searchable combobox: focusing opens its list, and the option click picks. */
+export async function pickProject(page: Page, project: string) {
+  await projectSelect(page).click()
+  await newForm(page)
+    .getByRole("listbox", { name: "Projects" })
+    .getByRole("option", { name: project, exact: true })
+    .click()
 }
 
 // A hash change keeps the page, since the fixture fails a test whose page reloaded.
