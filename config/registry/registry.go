@@ -115,9 +115,13 @@ type Registry struct {
 // group in tree order, keeping the given order within a group.
 func New(entries ...Entry) *Registry {
 	out := append([]Entry(nil), entries...)
-	sort.SliceStable(out, func(i, j int) bool {
-		return placeIndex(out[i].Place()) < placeIndex(out[j].Place())
-	})
+	pos := func(e Entry) int {
+		if i, ok := placeOrder[e.Place()]; ok {
+			return i
+		}
+		return len(placeOrder)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return pos(out[i]) < pos(out[j]) })
 	return &Registry{entries: out}
 }
 

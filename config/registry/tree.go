@@ -138,30 +138,19 @@ func Tree() []CategoryDef {
 	return out
 }
 
-// placeIndex is the position of a placement in the tree, for ordering. A
-// placement missing from the tree sorts last; the guard test names it.
-func placeIndex(p Place) int {
-	const width = 1000
-	idx := len(tree) * width * width
-	for ci, c := range tree {
-		if c.Name != p.Category {
-			continue
-		}
-		idx = (ci*width + len(c.Sections)) * width
-		for si, s := range c.Sections {
-			if s.Name != p.Section {
-				continue
-			}
-			idx = (ci*width+si)*width + len(s.Groups)
-			for gi, g := range s.Groups {
-				if g.Name == p.Group {
-					idx = (ci*width+si)*width + gi
-				}
+// placeOrder maps each placement in the tree to its position in the flat leaf
+// order. A placement missing from the map sorts last; the guard test names it.
+var placeOrder = func() map[Place]int {
+	m := map[Place]int{}
+	for _, c := range tree {
+		for _, s := range c.Sections {
+			for _, g := range s.Groups {
+				m[Place{c.Name, s.Name, g.Name}] = len(m)
 			}
 		}
 	}
-	return idx
-}
+	return m
+}()
 
 // RetiredSlugs maps a section slug that no longer exists to the slug of the
 // section that now holds its keys.

@@ -122,16 +122,8 @@ func placementProblems(r *Registry) []string {
 }
 
 func inTree(p Place) bool {
-	for _, c := range Tree() {
-		for _, s := range c.Sections {
-			for _, g := range s.Groups {
-				if (Place{c.Name, s.Name, g.Name}) == p {
-					return true
-				}
-			}
-		}
-	}
-	return false
+	_, ok := placeOrder[p]
+	return ok
 }
 
 func TestPlacementGuard(t *testing.T) {
