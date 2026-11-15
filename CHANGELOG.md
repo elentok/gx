@@ -1,8 +1,26 @@
 # Changelog
 
-## v0.49.7 - 2026-11-13
+## v0.50.0 - 2026-11-15
 
+- Added hosted files. File paths in chat text, tool lines, prompts, question cards, ticket pages and epic summaries are now links. A link opens a file viewer in the web UI. The viewer shows highlighted code with line numbers and the cited line, rendered Markdown and Mermaid with a Source toggle, images, SVG, PDF, a sandboxed HTML frame, and states for missing, binary and too-large files. A hover card previews Markdown, code, Mermaid and images. Phones get a bottom sheet instead.
+- Added `gx files resolve` and `gx files url`, `gx server files-roots` verbs and an extra roots config key to control which directories can be hosted. The raw file route supports Range requests, downloads and PDFs, and the web server now sends security headers on every route. Sessions that are not loop sessions are now told how to link files.
+- Added a Diff page that shows a whole epic's changes. It has a file tree with filter and file keys, split and unified views, large and generated file handling, expandable context, image diffs, a commit list grouped by ticket, and narrowing to one ticket. View diff links appear on epic pages, archived epic pages and done tickets.
+- Added an Epic range that gx records when it merges an epic, with a backfill of merged epics at server start-up. Every commit of a ticket's pick now carries a `Ralph-Loop-Ticket` trailer.
+- Added design drafts to the sidebar. A draft is a row with its own icon and page, with Rename, Move and Remove in its menu. New design is one action from every entry point. Empty drafts are removed automatically, and bulk Move and Remove work on drafts. Drafts also appear in the jump palette.
+- Added a Web performance section to Stats. It reports web vitals (with poor-sample attribution), TTFB, blocking API latency and transfer bytes, a daily p75 trend, slowest routes, a build strip and a Why slow table. `gx server stats` prints the same data.
+- Added a Rename chat chord, a Command palette action and a rename popup in the chat menu. Renaming a Working or Idle agent sends `/rename`. A rename on a Blocked chat is held until the chat unblocks.
+- Added a context usage popover with token usage details, and model names for both chat tier pickers.
+- Added settings for global and project agent writable directories, and a list of active repo checks in project settings.
+- Changed the web UI to load each route as a lazy chunk.
+- Changed `gx tickets draft` to say when it falls back to `rg` because gopls failed.
+- Changed the ticket header row to wrap so the paused badge fits on mobile.
 - Removed the opt-in loopback TCP listener and the `server.tcp-listen` setting. The unix socket is now the only API entry. An old `tcp-listen` key in a config file is ignored.
+- Fixed reused epic names pausing every merge.
+- Fixed Codex chat history not clearing right away, and showed Codex's "Unrecognized command" as a Send failed card.
+- Fixed yes-no question cards recommending the wrong label, and the Other text order in answers.
+- Fixed verify-plan group headings that list several story ranges, and the read of a missing optional section, which is now empty instead of an error.
+- Fixed the triage ungroup action to use its own request and route.
+- Fixed the store check not firing when fsnotify is off. It now runs from the poll ticker.
 
 ## v0.49.6 - 2026-11-13
 
