@@ -411,6 +411,54 @@ test("a new conversation sticks the scroller to the bottom again, even after the
   }
 })
 
+test("the scroller follows content that grows without a new message, until the reader scrolls up", async () => {
+  const sets: [Element, number][] = []
+  let top = 0
+  let height = 1000
+  let grew: () => void = () => {}
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(cb: () => void) {
+        grew = cb
+      }
+      observe() {}
+      disconnect() {}
+    },
+  )
+  vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(() => height)
+  vi.spyOn(HTMLElement.prototype, "scrollTop", "get").mockImplementation(() => top)
+  vi.spyOn(HTMLElement.prototype, "scrollTop", "set").mockImplementation(function (
+    this: Element,
+    v: number,
+  ) {
+    top = v
+    sets.push([this, v])
+  })
+  try {
+    const fetchChat = vi.fn<FetchChat>(async () => ({
+      kind: "ok",
+      detail: chatOf([msg({ text: "streaming" })]),
+    }))
+    renderChat([session()], fetchChat)
+    await screen.findByText("streaming")
+    const scroller = sets.at(-1)![0]
+    sets.length = 0
+    height = 1400
+    grew()
+    expect(sets.at(-1)?.[1]).toBe(1400)
+    top = 0
+    fireEvent.scroll(scroller)
+    sets.length = 0
+    height = 1800
+    grew()
+    expect(sets).toEqual([])
+  } finally {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  }
+})
+
 test("a new conversation drops a decoded archive", async () => {
   const archive = vi.fn(
     async (_url: string) =>

@@ -389,24 +389,29 @@ export function WorkingRow({
   )
 }
 
-// The messages scroll alone. They open at the newest one and follow new ones until the reader scrolls up.
-function ChatScroller({
-  children,
-  signal,
-  top,
-}: {
-  children: ReactNode
-  /** Changes whenever the content grows. */
-  signal: unknown
-  /** A short chat sits at the top instead of the bottom. */
-  top?: boolean
-}) {
+// The messages scroll alone. They open at the newest one and follow the content as it grows (a new message,
+// streamed text, a folded tool run, an image that loads) until the reader scrolls up.
+function ChatScroller({ children, top }: { children: ReactNode; top?: boolean }) {
   const el = useRef<HTMLDivElement>(null)
+  const inner = useRef<HTMLDivElement>(null)
   const stuck = useRef(true)
+  // The last scrollTop seen. Our own pins fire their scroll events a frame later, when the content may have
+  // grown past the 80px slack (a message, the Working row): only a scroll that moves up is the reader leaving.
+  const lastTop = useRef(0)
   useLayoutEffect(() => {
-    // A top chat starts at its first message: the docked card sits outside the scroller.
-    if (el.current && stuck.current && !top) el.current.scrollTop = el.current.scrollHeight
-  }, [signal])
+    const pin = () => {
+      // A top chat starts at its first message: the docked card sits outside the scroller.
+      if (!el.current || !stuck.current || top) return
+      el.current.scrollTop = el.current.scrollHeight
+      lastTop.current = el.current.scrollTop
+    }
+    pin()
+    // The scroller's own box never grows with its content: watch the wrapper inside it.
+    if (!inner.current || typeof ResizeObserver === "undefined") return
+    const ro = new ResizeObserver(pin)
+    ro.observe(inner.current)
+    return () => ro.disconnect()
+  }, [top])
   return (
     <Box
       ref={el}
@@ -419,15 +424,19 @@ function ChatScroller({
       lineHeight="1.65"
       display="flex"
       flexDirection="column"
-      gap="3"
       onScroll={(e) => {
         const t = e.currentTarget
-        stuck.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80
+        const gap = t.scrollHeight - t.scrollTop - t.clientHeight
+        if (gap < 80) stuck.current = true
+        else if (t.scrollTop < lastTop.current) stuck.current = false
+        lastTop.current = t.scrollTop
       }}
     >
-      {/* A short chat sits at the bottom, next to the composer; the spacer shrinks away once the chat scrolls. */}
-      {!top && <Box flex="1" aria-hidden />}
-      {children}
+      <Box ref={inner} flex="1 0 auto" display="flex" flexDirection="column" gap="3">
+        {/* A short chat sits at the bottom, next to the composer; the spacer shrinks away once the chat scrolls. */}
+        {!top && <Box flex="1" aria-hidden />}
+        {children}
+      </Box>
     </Box>
   )
 }
@@ -529,11 +538,7 @@ export function ChatMessages({
       ? decoded.messages
       : chat.messages
   return (
-    <ChatScroller
-      key={conversationId}
-      top={top}
-      signal={`${messages.length}|${chat.background.length}|${busy}`}
-    >
+    <ChatScroller key={`${sessionId}|${conversationId}`} top={top}>
       {head}
       {messages.length === 0 && (
         <CodexNotices

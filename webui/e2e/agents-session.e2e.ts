@@ -94,6 +94,15 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(page.getByText(REPLY)).toHaveCount(11)
   await expect(newest).not.toBeInViewport()
   await scrollTo(page, "hello", false)
+  // Content that grows with no new message (a narrower window re-wraps the text) keeps a pinned chat at the bottom.
+  const wordy = `wordy ${"lorem ipsum dolor sit amet ".repeat(24)}`.trim()
+  await ask(fixture, idle.id, wordy)
+  await expect(page.getByText(REPLY)).toHaveCount(12)
+  await expect(page.getByText(REPLY).last()).toBeInViewport()
+  await page.setViewportSize({ width: 360, height: 560 })
+  await expect(page.getByText(REPLY).last()).toBeInViewport()
+  await page.setViewportSize({ width: 1280, height: 560 })
+  await expect(page.getByText(REPLY).last()).toBeInViewport()
 
   // A failed chat read keeps the chat; the next event refetches it.
   let failing = true
