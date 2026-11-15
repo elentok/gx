@@ -344,7 +344,7 @@ test("the popover names every matching tier and links to Models settings; no tie
   fireEvent.click(screen.getByTestId("outdated-model"))
   const note = within(await popover()).getByTestId("tiers-note")
   expect(note.textContent).toContain("worker, light tiers")
-  expect(note.textContent).toContain("does not change Settings")
+  expect(note.textContent).toContain("This switch does not change Settings")
   expect(
     within(note).getByRole("link", { name: "Open Models settings" }).getAttribute("href"),
   ).toBe("#/settings/s/models")

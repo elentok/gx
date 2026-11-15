@@ -103,10 +103,15 @@ export function OutdatedModel({ session, text }: { session: SessionInfo; text: s
             {!!session.latest_tiers?.length && (
               <Text color="text.dim" data-testid="tiers-note">
                 Settings use {current} for the {session.latest_tiers.join(", ")} tier
-                {session.latest_tiers.length > 1 ? "s" : ""}. The switch does not change Settings.{" "}
-                <chakra.a href={`${SETTINGS_HREF}/s/models`} textDecoration="underline">
+                {session.latest_tiers.length > 1 ? "s" : ""}.{" "}
+                <chakra.a
+                  href={`${SETTINGS_HREF}/s/models`}
+                  color="tone.running.fg"
+                  textDecoration="underline"
+                >
                   Open Models settings
                 </chakra.a>
+                . This switch does not change Settings.
               </Text>
             )}
             {!session.design && (
