@@ -73,6 +73,21 @@ func TestGXLoopPrompt_AskThenFilesOnOneLine(t *testing.T) {
 	}
 }
 
+func TestGXLoopPrompt_TellsClaudeToWaitForTheNotice(t *testing.T) {
+	t.Parallel()
+	if harness.GXSystemPrompt != harness.GXAskText+" "+harness.GXWaitSentence {
+		t.Error("GXSystemPrompt is not the ask text then the wait sentence")
+	}
+	if strings.ContainsAny(harness.GXWaitSentence, "\r\n") {
+		t.Error("GXWaitSentence contains a newline")
+	}
+	for _, want := range []string{"completion notice", "ListAgents"} {
+		if !strings.Contains(harness.GXLoopPrompt, want) {
+			t.Errorf("GXLoopPrompt lacks %q", want)
+		}
+	}
+}
+
 // The harness adds no prompt by itself: its caller's args carry the flag, and
 // launch and resume both pass them on.
 func TestClaudeLaunchAndResume_PromptComesFromTheArgs(t *testing.T) {
@@ -149,8 +164,11 @@ func TestGXSystemPromptFor_Codex(t *testing.T) {
 	if strings.ContainsAny(got, "\r\n") {
 		t.Errorf("codex prompt contains a newline: %q", got)
 	}
-	if want := strings.Replace(harness.GXSystemPrompt, "AskUserQuestion", "request_user_input", 1) + " " + harness.GXFilesSentence; got != want {
-		t.Errorf("codex prompt is not the loop prompt with the tool renamed in the ask part")
+	if want := strings.Replace(harness.GXAskText, "AskUserQuestion", "request_user_input", 1) + " " + harness.GXFilesSentence; got != want {
+		t.Errorf("codex prompt is not the ask text with the tool renamed, then the files sentence")
+	}
+	if strings.Contains(got, harness.GXWaitSentence) {
+		t.Error("codex prompt carries the wait sentence")
 	}
 	if harness.GXSystemPromptFor(harness.Claude) != harness.GXLoopPrompt {
 		t.Error("claude prompt changed")

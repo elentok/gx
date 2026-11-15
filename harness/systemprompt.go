@@ -10,12 +10,20 @@ import (
 	"github.com/elentok/gx/agentrunner"
 )
 
+// GXAskText is the ask part of the loop prompt, shared by Claude and Codex.
+// One line: herdr refuses launch arguments that contain a newline
+// (invalid_agent_argument).
+const GXAskText = "Never use the AskUserQuestion tool. To ask a person, run `gx tickets ask`. Do these steps in order. 1. Commit what is green. Work already done is not discarded while the question waits. 2. Run `gx tickets ask <addr> --body -` with the body on stdin. The body has two sections. `## Question`: a one-line plain-text summary first (no markdown, at most 120 characters), then optional detail. A person should be able to answer in one pass without reading the diff. When the answer is yes or no, or a pick from 2 to 6 choices, end the detail with a fenced ```gx-question block (YAML: `type: yes-no` with optional `yes:` and `no:` consequences, or `type: options` with `options:` entries of `id` and `label`; optional `recommended:`), so the person gets buttons instead of a text box. `## Handoff`: required and non-empty. Name the files you touched, the decisions you made and why, and what you do with each answer. 3. End your turn. The agent keeps its worktree, pane and slot while it waits. After `gx tickets ask`, end your turn. The person's reply reaches you as a new message, in this session or in a fresh one that starts from your handoff. If the reply leaves anything unclear, or you need more, run `gx tickets ask` again. Never end a turn with a question in plain text and no `ask` call. No one is told, and the ticket stalls."
+
+// GXWaitSentence is Claude only: Claude gets a completion notice when a
+// background task ends. Codex gets none, so the line would stall it.
+const GXWaitSentence = "After you start a background task, wait for its completion notice. Do not poll the task and do not call `ListAgents` in a loop."
+
 // GXSystemPrompt is the text gx appends to the system prompt of every Claude
 // loop (ticket) agent, on launch and on resume. skills/gx-local-tracker.md
 // carries the same text between its gx-system-prompt markers; a test keeps
-// the two equal. The text is one line: herdr refuses launch arguments that
-// contain a newline (invalid_agent_argument).
-const GXSystemPrompt = "Never use the AskUserQuestion tool. To ask a person, run `gx tickets ask`. Do these steps in order. 1. Commit what is green. Work already done is not discarded while the question waits. 2. Run `gx tickets ask <addr> --body -` with the body on stdin. The body has two sections. `## Question`: a one-line plain-text summary first (no markdown, at most 120 characters), then optional detail. A person should be able to answer in one pass without reading the diff. When the answer is yes or no, or a pick from 2 to 6 choices, end the detail with a fenced ```gx-question block (YAML: `type: yes-no` with optional `yes:` and `no:` consequences, or `type: options` with `options:` entries of `id` and `label`; optional `recommended:`), so the person gets buttons instead of a text box. `## Handoff`: required and non-empty. Name the files you touched, the decisions you made and why, and what you do with each answer. 3. End your turn. The agent keeps its worktree, pane and slot while it waits. After `gx tickets ask`, end your turn. The person's reply reaches you as a new message, in this session or in a fresh one that starts from your handoff. If the reply leaves anything unclear, or you need more, run `gx tickets ask` again. Never end a turn with a question in plain text and no `ask` call. No one is told, and the ticket stalls."
+// the two equal.
+const GXSystemPrompt = GXAskText + " " + GXWaitSentence
 
 // GXFilesSentence tells an agent how to show the person a file. One line, the
 // same for Claude and Codex.
@@ -28,7 +36,7 @@ const GXLoopPrompt = GXSystemPrompt + " " + GXFilesSentence
 // Codex's with its own name for the question tool in the ask part.
 func GXSystemPromptFor(kind agentrunner.Kind) string {
 	if kind == Codex {
-		return strings.Replace(GXSystemPrompt, "AskUserQuestion", CodexQuestionTool, 1) + " " + GXFilesSentence
+		return strings.Replace(GXAskText, "AskUserQuestion", CodexQuestionTool, 1) + " " + GXFilesSentence
 	}
 	return GXLoopPrompt
 }
