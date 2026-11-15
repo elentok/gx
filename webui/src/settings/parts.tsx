@@ -84,6 +84,7 @@ export const Group = ({ label, children }: { label?: string; children: ReactNode
   <Box mt="6">
     {label && (
       <Text
+        as="h2"
         fontSize="xs"
         letterSpacing="0.08em"
         textTransform="uppercase"

@@ -70,6 +70,35 @@ function Caret({ open }: { open: boolean }) {
   )
 }
 
+/** The Global / project select above the sidebar and the phone home. */
+export const ScopePicker = ({
+  projects,
+  project,
+  onScope,
+}: Pick<ShellProps, "projects" | "project" | "onScope">) => (
+  <chakra.select
+    data-mock-part="scope-picker"
+    aria-label="Settings scope"
+    w="100%"
+    h="40px"
+    px="3"
+    borderWidth="1px"
+    borderColor="border"
+    borderRadius="8px"
+    bg="surface.raised"
+    color="text"
+    value={project ?? "global"}
+    onChange={(e) => onScope?.(e.target.value)}
+  >
+    <option value="global">Global settings</option>
+    {projects.map((p) => (
+      <option key={p} value={p}>
+        Project: {p}
+      </option>
+    ))}
+  </chakra.select>
+)
+
 function Sidebar({
   entries,
   categories,
@@ -126,27 +155,7 @@ function Sidebar({
   )
   return (
     <chakra.nav data-mock-part="sidebar" display="grid" gap="0.5" alignSelf="start">
-      <chakra.select
-        data-mock-part="scope-picker"
-        aria-label="Settings scope"
-        w="100%"
-        h="40px"
-        px="3"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="8px"
-        bg="surface.raised"
-        color="text"
-        value={project ?? "global"}
-        onChange={(e) => onScope?.(e.target.value)}
-      >
-        <option value="global">Global settings</option>
-        {projects.map((p) => (
-          <option key={p} value={p}>
-            Project: {p}
-          </option>
-        ))}
-      </chakra.select>
+      <ScopePicker projects={projects} project={project} onScope={onScope} />
       <SearchBox value={query} onChange={onQuery} />
       {shown.map((c) => (
         <Fragment key={c.name}>
@@ -258,7 +267,7 @@ type SectionBodyProps = Pick<
 > & { section: string }
 
 /** The section's entries split by group: the response's group order, then any group the tree does not name. A group with no entry is absent. */
-function sectionGroups(
+export function sectionGroups(
   categories: SettingsCategory[],
   section: string,
   sectionEntries: SettingsEntry[],

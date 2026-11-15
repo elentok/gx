@@ -6,7 +6,14 @@ import type { FetchEpicList } from "../epics/list"
 import { useEpicList } from "../epics/list"
 import { useDevice } from "../useWide"
 import type { SettingsCategory, SettingsEntry, SettingsReadResponse } from "../generated/server"
-import { projectPath, SectionBody, sectionPath, SettingsShellView } from "./SettingsShell"
+import {
+  projectPath,
+  ScopePicker,
+  SectionBody,
+  sectionGroups,
+  sectionPath,
+  SettingsShellView,
+} from "./SettingsShell"
 import {
   entryLabel,
   GLOBAL_TARGET,
@@ -42,7 +49,7 @@ import {
   type LoginWrite,
   type WebLoginEntry,
 } from "./logins"
-import { BackLink, Frame, Group, rowProps, SearchBox } from "./parts"
+import { BackLink, CountChip, Frame, Group, rowProps, SearchBox } from "./parts"
 import type { WriteSetting } from "./SettingsRow"
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -70,7 +77,13 @@ function LinkRow({ href, label, detail }: { href: string; label: string; detail?
 
 const sectionHref = (slug: string, project?: string) => `#${sectionPath(slug, project)}`
 
-/** A phone search hit: opens the section page holding the row. */
+const scopeProject = (picked: string) => (picked === GLOBAL_TARGET ? undefined : picked)
+const homePath = (picked: string) => {
+  const project = scopeProject(picked)
+  return project === undefined ? "/settings" : projectPath(project)
+}
+
+/** A phone search hit's section: its name with the category beside it, then its groups of hit links. */
 function HitRows({
   entries,
   categories,
@@ -83,40 +96,52 @@ function HitRows({
   project?: string
 }) {
   const sections = treeSections(categories)
-  return groupBySection(searchEntries(entries, query)).map((g) => (
-    <Group key={g.section} label={`${project ?? "Global"} · ${g.section}`}>
-      {g.entries.map((e) => (
-        <LinkRow
-          key={e.key}
-          href={sectionHref(sections.find((s) => s.name === g.section)?.slug ?? "", project)}
-          label={entryLabel(e)}
-          detail={e.description}
-        />
-      ))}
-    </Group>
-  ))
+  return groupBySection(searchEntries(entries, query)).map((g) => {
+    const section = sections.find((s) => s.name === g.section)
+    return (
+      <Box key={g.section} mt="6" data-testid={`result-section-${g.section}`}>
+        <Box display="flex" alignItems="baseline" gap="2" px="1">
+          <Text as="h2" fontSize="md" fontWeight="700">
+            {g.section}
+          </Text>
+          <Text fontSize="xs" color="text.muted">
+            {section?.category}
+          </Text>
+        </Box>
+        {sectionGroups(categories, g.section, g.entries).map((grp) => (
+          <Box key={grp.name} mt="3">
+            {grp.name !== "" && (
+              <Text
+                as="h3"
+                fontSize="xs"
+                letterSpacing="0.06em"
+                textTransform="uppercase"
+                color="text.muted"
+                fontWeight="600"
+                mb="1.5"
+                px="1"
+              >
+                {grp.name}
+              </Text>
+            )}
+            <Group>
+              {grp.entries.map((e) => (
+                <LinkRow
+                  key={e.key}
+                  href={sectionHref(section?.slug ?? "", project)}
+                  label={entryLabel(e)}
+                  detail={e.description}
+                />
+              ))}
+            </Group>
+          </Box>
+        ))}
+      </Box>
+    )
+  })
 }
 
-function ProjectHits({
-  project,
-  query,
-  fetchSettings,
-}: {
-  project: string
-  query: string
-  fetchSettings?: FetchSettings
-}) {
-  const settings = useSettings(project, undefined, fetchSettings)
-  return settings.data ? (
-    <HitRows
-      entries={settings.data.entries}
-      categories={settings.data.categories}
-      query={query}
-      project={project}
-    />
-  ) : null
-}
-
+/** The phone Settings home: scope picker, search, then every category with its sections as tiles. Account only in global scope. */
 export function SettingsHomeView({
   loginCount,
   totpOn,
@@ -124,133 +149,98 @@ export function SettingsHomeView({
   entries = [],
   categories = [],
   projects = [],
-  fetchSettings,
+  project,
+  onScope,
   onSignOut,
 }: {
   loginCount?: number
   totpOn: boolean
   /** TOTP is on but the saved secret was cleared, so the row adds one instead of resetting it. */
   authenticatorMissing?: boolean
-  /** The global settings, for the section rows' changed chips and the search. */
+  /** The picked scope's settings, for the tiles' changed chips and the search. */
   entries?: SettingsEntry[]
-  /** The global page tree; the section rows come from it. */
+  /** The picked scope's page tree; the tiles come from it. */
   categories?: SettingsCategory[]
   projects?: string[]
-  /** Reads each project's settings while searching. */
-  fetchSettings?: FetchSettings
+  /** The picked project; global settings when absent. */
+  project?: string
+  onScope?: (target: string) => void
   onSignOut: () => void
 }) {
   const [query, setQuery] = useState("")
   const searching = query.trim() !== ""
-  const changed = new Map(groupBySection(entries).map((g) => [g.section, g.changed]))
+  const changed = new Map(
+    groupBySection(entries).map((g) => [
+      g.section,
+      g.entries.some((e) => e.identity) ? 0 : g.changed,
+    ]),
+  )
+  const hits = searchEntries(entries, query)
   return (
     <Frame>
       <Box data-mock-part="page">
         <PageHeader title="Settings" icon={<PageIcon kind="settings" />} />
+        <Box mt="2">
+          <ScopePicker projects={projects} project={project} onScope={onScope} />
+        </Box>
         <SearchBox value={query} onChange={setQuery} />
         {searching ? (
-          <>
-            <HitRows entries={entries} categories={categories} query={query} />
-            {projects.map((p) => (
-              <ProjectHits key={p} project={p} query={query} fetchSettings={fetchSettings} />
-            ))}
-            {projects.length === 0 && searchEntries(entries, query).length === 0 && (
-              <EmptyState title="No settings match">Nothing matches “{query.trim()}”.</EmptyState>
-            )}
-          </>
+          hits.length === 0 ? (
+            <EmptyState title="No settings match">
+              Nothing in {project === undefined ? "global settings" : `project ${project}`} matches
+              “{query.trim()}”.
+            </EmptyState>
+          ) : (
+            <HitRows entries={entries} categories={categories} query={query} project={project} />
+          )
         ) : (
           <>
-            <Group label="Security">
-              <LinkRow
-                href={LOGINS_HREF}
-                label="Web logins"
-                detail={
-                  loginCount === undefined
-                    ? undefined
-                    : `${loginCount} ${loginCount === 1 ? "device" : "devices"}`
-                }
-              />
-              <LinkRow href={`${SETTINGS_HREF}/password`} label="Change password" />
-              {totpOn && (
-                <LinkRow
-                  href={`${SETTINGS_HREF}/authenticator`}
-                  label={authenticatorMissing ? "Add authenticator" : "Reset authenticator"}
-                />
-              )}
-              <LinkRow href={`${SETTINGS_HREF}/certificate`} label="Certificate" />
-            </Group>
-            <Group label="Global settings">
-              {treeSections(categories).map((s) => (
-                <LinkRow
-                  key={s.slug}
-                  href={sectionHref(s.slug)}
-                  label={s.name}
-                  detail={changedText(changed.get(s.name), "changed")}
-                />
-              ))}
-            </Group>
-            {projects.length > 0 && (
-              <Group label="Projects">
-                {projects.map((p) => (
-                  <LinkRow key={p} href={`#${projectPath(p)}`} label={p} />
+            {categories.map((c) => (
+              <Group key={c.name} label={c.name}>
+                {c.sections.map((s) => (
+                  <LinkRow
+                    key={s.slug}
+                    href={sectionHref(s.slug, project)}
+                    label={s.name}
+                    detail={
+                      changed.get(s.name) ? <CountChip n={changed.get(s.name) ?? 0} /> : undefined
+                    }
+                  />
                 ))}
               </Group>
+            ))}
+            {project === undefined && (
+              <Group label="Account">
+                <LinkRow
+                  href={LOGINS_HREF}
+                  label="Web logins"
+                  detail={
+                    loginCount === undefined
+                      ? undefined
+                      : `${loginCount} ${loginCount === 1 ? "device" : "devices"}`
+                  }
+                />
+                <LinkRow href={`${SETTINGS_HREF}/password`} label="Password" />
+                {totpOn && (
+                  <LinkRow
+                    href={`${SETTINGS_HREF}/authenticator`}
+                    label={authenticatorMissing ? "Add authenticator" : "Authenticator"}
+                  />
+                )}
+                <LinkRow href={`${SETTINGS_HREF}/certificate`} label="Certificate" />
+                <chakra.button
+                  type="button"
+                  data-mock-part="sign-out"
+                  onClick={onSignOut}
+                  {...rowProps}
+                  color="tone.deadlocked.fg"
+                >
+                  Sign out of this device
+                </chakra.button>
+              </Group>
             )}
-            <Group>
-              <chakra.button
-                type="button"
-                onClick={onSignOut}
-                {...rowProps}
-                color="tone.deadlocked.fg"
-              >
-                Sign out of this device
-              </chakra.button>
-            </Group>
           </>
         )}
-      </Box>
-    </Frame>
-  )
-}
-
-const changedText = (n: number | undefined, word: string) =>
-  n ? <Chip tone="running">{`${n} ${word}`}</Chip> : undefined
-
-/** A phone project's list of sections, each with how many of its keys the project overrides. */
-export function ProjectSectionsView({
-  project,
-  entries,
-  categories,
-}: {
-  project: string
-  entries: SettingsEntry[]
-  categories: SettingsCategory[]
-}) {
-  return (
-    <Frame>
-      <Box data-mock-part="page">
-        <BackLink />
-        <PageHeader title={project} icon={<PageIcon kind="settings" />} />
-        <Text mt="2" fontSize="sm" color="text.muted">
-          Each setting uses the global value until you override it here.
-        </Text>
-        <Group label="Sections">
-          {treeSections(categories).map((s) => {
-            const g = groupBySection(entries).find((x) => x.section === s.name)
-            return (
-              <LinkRow
-                key={s.slug}
-                href={sectionHref(s.slug, project)}
-                label={s.name}
-                detail={
-                  g?.entries.some((e) => e.identity)
-                    ? undefined
-                    : changedText(g?.changed, "overridden")
-                }
-              />
-            )
-          })}
-        </Group>
       </Box>
     </Frame>
   )
@@ -478,7 +468,7 @@ function useSettingsTarget(
   return { settings, projects, onWrite }
 }
 
-/** The phone page of one section. */
+/** The phone drill-down page of one section: back arrow, category breadcrumb, then the groups. */
 function SectionPage({
   project,
   section,
@@ -490,16 +480,37 @@ function SectionPage({
   settings: Settings
   onWrite: WriteSetting
 }) {
+  const category = settings.data
+    ? treeSections(settings.data.categories).find((s) => s.name === section)?.category
+    : undefined
   return (
     <DetailPage title={{ kind: "Settings", name: section }}>
       {settings.data ? (
         <Frame>
           <Box data-mock-part="page">
-            <BackLink
-              href={project === undefined ? SETTINGS_HREF : `#${projectPath(project)}`}
-              label={project ?? "Settings"}
-            />
-            <PageHeader title={section} icon={<PageIcon kind="settings" />} />
+            <Box display="flex" alignItems="center" gap="1">
+              <chakra.a
+                href={project === undefined ? SETTINGS_HREF : `#${projectPath(project)}`}
+                aria-label={project === undefined ? "Back to Settings" : `Back to ${project}`}
+                display="inline-flex"
+                alignItems="center"
+                justifyContent="center"
+                w="8"
+                h="8"
+                fontSize="lg"
+                fontWeight="600"
+                color="text.muted"
+                _hover={{ color: "text" }}
+              >
+                ‹
+              </chakra.a>
+              <Box flex="1" minW="0">
+                <PageHeader title={section} icon={<PageIcon kind="settings" />} />
+              </Box>
+            </Box>
+            <Text data-testid="breadcrumb" mt="2" px="3" fontSize="sm" color="text.muted">
+              {category}
+            </Text>
             <SectionBody
               entries={settings.data.entries}
               categories={settings.data.categories}
@@ -548,15 +559,8 @@ function ShellPage({
           project={project}
           categories={settings.data.categories}
           onScope={(next) => {
-            const target = next === GLOBAL_TARGET ? undefined : next
             // The other scope may not hold this section; its page redirects an unknown slug to its first.
-            navigate(
-              slug
-                ? sectionPath(slug, target)
-                : target === undefined
-                  ? "/settings"
-                  : projectPath(target),
-            )
+            navigate(slug ? sectionPath(slug, scopeProject(next)) : homePath(next))
           }}
           section={section}
           totpOn={auth.totp_on}
@@ -580,6 +584,7 @@ function GlobalHomePage({ slug, ...props }: SettingsPageProps & { slug?: string 
   const logins = useFetched("settings-logins", fetchList)
   const { settings, projects, onWrite } = useSettingsTarget(undefined, props)
   const wide = useDevice() !== "phone"
+  const navigate = useNavigate()
   const res = settings.data ? resolveSection(settings.data, slug) : undefined
   if (res?.redirect) return <Navigate to={sectionPath(res.redirect)} replace />
   const section = res?.section?.name
@@ -608,7 +613,7 @@ function GlobalHomePage({ slug, ...props }: SettingsPageProps & { slug?: string 
           entries={settings.data?.entries}
           categories={settings.data?.categories}
           projects={projects}
-          fetchSettings={props.fetchSettings}
+          onScope={(next) => navigate(homePath(next))}
           totpOn={auth.data.totp_on}
           authenticatorMissing={auth.data.setup_code_required}
           onSignOut={() => void signOut()}
@@ -630,6 +635,7 @@ function ProjectPage({
   const auth = useFetched("settings-auth", fetchAuth)
   const { settings, projects, onWrite } = useSettingsTarget(project, props)
   const wide = useDevice() !== "phone"
+  const navigate = useNavigate()
   const res = settings.data ? resolveSection(settings.data, slug) : undefined
   if (res?.redirect) return <Navigate to={sectionPath(res.redirect, project)} replace />
   const section = res?.section?.name
@@ -649,10 +655,14 @@ function ProjectPage({
     return (
       <DetailPage title={{ kind: "Settings", name: project }}>
         {settings.data ? (
-          <ProjectSectionsView
+          <SettingsHomeView
             project={project}
+            projects={projects}
             entries={settings.data.entries}
             categories={settings.data.categories}
+            onScope={(next) => navigate(homePath(next))}
+            totpOn={false}
+            onSignOut={() => {}}
           />
         ) : (
           <Spinner label="Loading" />

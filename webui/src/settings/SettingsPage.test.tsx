@@ -157,7 +157,7 @@ describe("SettingsPage on a phone", () => {
     path: [key],
     type: "string",
     section,
-    category: "",
+    category: section === "Budget" ? "Ralph loop" : section,
     group: "",
     description: `${key} text.`,
     set,
@@ -200,30 +200,78 @@ describe("SettingsPage on a phone", () => {
       </ConnectionContext.Provider>,
     )
 
-  it("shows the home with the global sections and the project", async () => {
-    const { findByRole, getByRole } = renderAt("/settings")
-    expect(await findByRole("link", { name: "gx" })).toBeTruthy()
+  it("shows the picker and search, then the global categories as headings with section tiles and Account", async () => {
+    const { findByRole, getByRole, getByLabelText } = renderAt("/settings")
+    expect(await findByRole("link", { name: /^Budget/ })).toBeTruthy()
+    expect(getByLabelText("Settings scope")).toBeTruthy()
+    expect(getByLabelText("Search settings")).toBeTruthy()
+    expect(getByRole("heading", { name: "Ralph loop" })).toBeTruthy()
+    expect(getByRole("heading", { name: "Account" })).toBeTruthy()
     expect(getByRole("link", { name: "Web logins" })).toBeTruthy()
-    expect(getByRole("link", { name: /^Budget/ })).toBeTruthy()
+    expect(getByRole("link", { name: "Password" })).toBeTruthy()
+    expect(getByRole("link", { name: "Certificate" })).toBeTruthy()
+    expect(getByRole("button", { name: "Sign out of this device" })).toBeTruthy()
   })
 
-  it("opens a global section page whose back link returns home", async () => {
-    const { findByRole, getByRole } = renderAt("/settings/s/budget")
-    expect(await findByRole("heading", { name: "Budget" })).toBeTruthy()
-    expect(getByRole("link", { name: "‹ Settings" }).getAttribute("href")).toBe("#/settings")
+  it("has no Projects list; picking a project navigates to its home", async () => {
+    const { findByRole, getByLabelText, queryByRole } = renderAt("/settings")
+    await findByRole("link", { name: /^Budget/ })
+    expect(queryByRole("link", { name: "gx" })).toBeNull()
+    fireEvent.change(getByLabelText("Settings scope"), { target: { value: "gx" } })
+    await waitFor(() =>
+      expect((getByLabelText("Settings scope") as HTMLSelectElement).value).toBe("gx"),
+    )
+    expect(await findByRole("link", { name: "Project" })).toBeTruthy()
   })
 
-  it("opens a project's section list, and a section whose back link returns to it", async () => {
-    const list = renderAt("/settings/p/gx")
-    expect(await list.findByRole("heading", { name: "gx" })).toBeTruthy()
-    expect(list.getByRole("link", { name: /^Budget/ }).textContent).toContain("1 overridden")
-    expect(list.getByRole("link", { name: "Checks" }).getAttribute("href")).toBe(
+  it("a project home shows its tree, Project first and Checks last, and no Account", async () => {
+    const { findByRole, getByRole, getAllByRole, queryByRole } = renderAt("/settings/p/gx")
+    await findByRole("link", { name: "Project" })
+    const names = getAllByRole("link").map((l) => l.textContent)
+    expect(names[0]).toBe("Project›")
+    expect(names.at(-1)).toBe("Checks›")
+    expect(getByRole("link", { name: /^Budget/ }).textContent).toContain("1")
+    expect(getByRole("link", { name: "Checks" }).getAttribute("href")).toBe(
       "#/settings/p/gx/s/checks",
     )
-    list.unmount()
+    expect(queryByRole("heading", { name: "Account" })).toBeNull()
+    expect(queryByRole("button", { name: "Sign out of this device" })).toBeNull()
+  })
+
+  it("opens a global section with a back arrow home and its category as plain text", async () => {
+    const { findByRole, getByRole, getByTestId, queryByRole } = renderAt("/settings/s/budget")
+    expect(await findByRole("heading", { name: "Budget" })).toBeTruthy()
+    expect(getByRole("link", { name: "Back to Settings" }).getAttribute("href")).toBe("#/settings")
+    expect(getByTestId("breadcrumb").textContent).toBe("Ralph loop")
+    expect(queryByRole("heading", { name: "Ralph loop" })).toBeNull()
+  })
+
+  it("a project section's back arrow returns to the project home", async () => {
     const section = renderAt("/settings/p/gx/s/budget")
     expect(await section.findByRole("heading", { name: "Budget" })).toBeTruthy()
-    expect(section.getByRole("link", { name: "‹ gx" }).getAttribute("href")).toBe("#/settings/p/gx")
+    expect(section.getByRole("link", { name: "Back to gx" }).getAttribute("href")).toBe(
+      "#/settings/p/gx",
+    )
+  })
+
+  it("searches only the picked scope, and a hit links to its section", async () => {
+    const { findByRole, getByLabelText, getByRole, queryByRole, queryByText } =
+      renderAt("/settings")
+    await findByRole("link", { name: /^Budget/ })
+    fireEvent.change(getByLabelText("Search settings"), { target: { value: "soft" } })
+    expect(getByRole("link", { name: /soft/i }).getAttribute("href")).toBe("#/settings/s/budget")
+    expect(queryByText(/Global ·/)).toBeNull()
+    fireEvent.change(getByLabelText("Search settings"), { target: { value: "trunk" } })
+    expect(queryByRole("link", { name: /trunk/i })).toBeNull()
+  })
+
+  it("on a project home the search lists that project's hits as links into the project", async () => {
+    const { findByRole, getByLabelText, getByRole } = renderAt("/settings/p/gx")
+    await findByRole("link", { name: "Project" })
+    fireEvent.change(getByLabelText("Search settings"), { target: { value: "trunk" } })
+    expect(getByRole("link", { name: /trunk/i }).getAttribute("href")).toBe(
+      "#/settings/p/gx/s/project",
+    )
   })
 })
 
@@ -319,13 +367,13 @@ describe("SettingsHomeView", () => {
     )
     expect(getByRole("link", { name: /Web logins/ }).textContent).toContain("4 devices")
     expect(getByRole("link", { name: /Web logins/ }).getAttribute("href")).toBe("#/settings/logins")
-    for (const name of ["Change password", "Reset authenticator", "Certificate"])
+    for (const name of ["Password", "Authenticator", "Certificate"])
       expect(getByRole("link", { name })).toBeTruthy()
     fireEvent.click(getByText("Sign out of this device"))
     expect(onSignOut).toHaveBeenCalledOnce()
   })
 
-  it("lists the response's sections and the projects, with the changed count", () => {
+  it("lists the response's sections with a chevron and the changed count, and no project list", () => {
     const entries = [
       {
         key: "budget.soft",
@@ -338,7 +386,7 @@ describe("SettingsHomeView", () => {
         set: true,
       },
     ]
-    const { getByRole } = renderThemed(
+    const { getByRole, queryByRole } = renderThemed(
       <SettingsHomeView
         totpOn
         entries={entries}
@@ -348,12 +396,12 @@ describe("SettingsHomeView", () => {
       />,
     )
     expect(getByRole("link", { name: /^Budget/ }).getAttribute("href")).toBe("#/settings/s/budget")
-    expect(getByRole("link", { name: /^Budget/ }).textContent).toContain("1 changed")
-    expect(getByRole("link", { name: "gx" }).getAttribute("href")).toBe("#/settings/p/gx")
-    expect(getByRole("link", { name: "ripple" })).toBeTruthy()
+    expect(getByRole("link", { name: /^Budget/ }).textContent).toBe("Budget1›")
+    expect(queryByRole("link", { name: "gx" })).toBeNull()
+    expect(queryByRole("link", { name: "ripple" })).toBeNull()
   })
 
-  it("searches the global settings and each project, and a hit opens its section", async () => {
+  it("searches the given scope only, grouped by section then group, and a hit opens its section", () => {
     const global = [
       {
         key: "budget.soft",
@@ -378,25 +426,38 @@ describe("SettingsHomeView", () => {
         set: false,
       },
     ]
-    const fetchSettings = async (target: string) => {
-      const entries = target === "gx" ? gx : []
-      return { entries, categories: treeFromEntries(entries) } as never
-    }
-    const { getByLabelText, findByRole, getByRole, queryByText } = renderThemed(
+    const { getByLabelText, getByRole, queryByText, queryByRole, getByTestId, unmount } =
+      renderThemed(
+        <SettingsHomeView
+          totpOn
+          entries={global}
+          categories={treeFromEntries(global)}
+          projects={["gx"]}
+          onSignOut={() => {}}
+        />,
+      )
+    fireEvent.change(getByLabelText("Search settings"), { target: { value: "soft" } })
+    expect(getByRole("link", { name: /Soft/ }).getAttribute("href")).toBe("#/settings/s/budget")
+    expect(getByRole("heading", { name: "Budget" })).toBeTruthy()
+    expect(getByRole("heading", { name: "Spend limits" })).toBeTruthy()
+    expect(getByTestId("result-section-Budget").textContent).toContain("Ralph loop")
+    expect(queryByText(/Global ·/)).toBeNull()
+    expect(queryByText("Sign out of this device")).toBeNull()
+    fireEvent.change(getByLabelText("Search settings"), { target: { value: "trunk" } })
+    expect(queryByRole("link", { name: /Trunk/ })).toBeNull()
+    unmount()
+    const project = renderThemed(
       <SettingsHomeView
         totpOn
-        entries={global}
-        categories={treeFromEntries(global)}
+        project="gx"
+        entries={gx}
+        categories={treeFromEntries(gx)}
         projects={["gx"]}
-        fetchSettings={fetchSettings}
         onSignOut={() => {}}
       />,
     )
-    fireEvent.change(getByLabelText("Search settings"), { target: { value: "soft" } })
-    expect(getByRole("link", { name: /Soft/ }).getAttribute("href")).toBe("#/settings/s/budget")
-    expect(queryByText("Sign out of this device")).toBeNull()
-    fireEvent.change(getByLabelText("Search settings"), { target: { value: "trunk" } })
-    expect((await findByRole("link", { name: /Trunk/ })).getAttribute("href")).toBe(
+    fireEvent.change(project.getByLabelText("Search settings"), { target: { value: "trunk" } })
+    expect(project.getByRole("link", { name: /Trunk/ }).getAttribute("href")).toBe(
       "#/settings/p/gx/s/project",
     )
   })
