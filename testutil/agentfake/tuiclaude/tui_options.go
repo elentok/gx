@@ -69,6 +69,8 @@ type tuiOptions struct {
 	unknownSkill  bool
 	// unknownUntilInstalled keeps a skill unknown until its SKILL.md is installed.
 	unknownUntilInstalled bool
+	// unknownUntilFile keeps a skill unknown until this file exists, "" for no such wait.
+	unknownUntilFile string
 	// home is where the install puts skills, set at start-up.
 	home         string
 	noTurn       bool
@@ -161,6 +163,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		registryDelay:         registryDelay,
 		unknownSkill:          os.Getenv(TUIUnknownSkillEnv) == "1",
 		unknownUntilInstalled: os.Getenv(TUIUnknownUntilInstalledEnv) == "1",
+		unknownUntilFile:      os.Getenv(TUIUnknownUntilFileEnv),
 		noTurn:                os.Getenv(TUINoTurnEnv) == "1",
 		launchRecord:          os.Getenv(TUILaunchRecordEnv) != "0",
 		pasteOver:             pasteOver,

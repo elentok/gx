@@ -105,11 +105,12 @@ var Scenarios = map[string]scenario{
 		DiskLow: true,
 	},
 	// unknown-skill: a queued epic whose agent rejects every skill prompt as an
-	// unknown command, so the ticket pauses as agent_prompt_stalled.
+	// unknown command, refresh or not, until a flow calls learnSkill (it creates
+	// the file the env names), so the ticket pauses as agent_prompt_stalled.
 	"unknown-skill": {
-		Epics:        []epic{{Project: project, Name: "unknown-epic", Tickets: []ticket{{ID: "01", Slug: "first", Opts: servertest.TicketOpts{}}}}},
-		Queue:        []string{project + ":unknown-epic"},
-		UnknownSkill: true,
+		Epics: []epic{{Project: project, Name: "unknown-epic", Tickets: []ticket{{ID: "01", Slug: "first", Opts: servertest.TicketOpts{}}}}},
+		Queue: []string{project + ":unknown-epic"},
+		Env:   []string{agentfake.TUIUnknownUntilFileEnv + "=" + spec.RootToken + "/disk/skill-known"},
 	},
 	// unknown-skill-refresh: the agent knows the skill only once gx's refresh has
 	// installed it, so the launch ends with no pause.

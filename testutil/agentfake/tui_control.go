@@ -72,6 +72,10 @@ const (
 	// command until $HOME/.claude/skills/<skill>/SKILL.md exists: a registry that
 	// learns the skill once gx has refreshed the install.
 	TUIUnknownUntilInstalledEnv = "GX_AGENTFAKE_TUI_UNKNOWN_UNTIL_INSTALLED"
+	// TUIUnknownUntilFileEnv, a path, makes a skill prompt an unknown command
+	// until that file exists: a registry that stays broken however often gx
+	// refreshes, until a test fixes it.
+	TUIUnknownUntilFileEnv = "GX_AGENTFAKE_TUI_UNKNOWN_UNTIL_FILE"
 	// TUINoTurnEnv, set to "1", leaves the agent idle after a skill prompt: no
 	// turn, no transcript record.
 	TUINoTurnEnv = "GX_AGENTFAKE_TUI_NO_TURN"

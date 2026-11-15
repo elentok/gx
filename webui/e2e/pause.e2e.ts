@@ -280,17 +280,20 @@ test.describe("3. Pause reasons and recovery", () => {
     )
   })
 
+  // The fake agent rejects the skill however often gx refreshes, so the pause says gx already
+  // refreshed. Once the fake knows the skill, Retry (which refreshes again) ends the pause.
   test("Unknown skill", async ({ page, start }) => {
-    await start("unknown-skill")
+    const fixture = await start("unknown-skill")
     await page.evaluate((hash) => (location.hash = hash), "#/t/demo:unknown-epic/01")
 
-    // The agent rejects the skill on both sessions, so the pause appears on its own.
     await expect(page.getByText("Could not start the agent").first()).toBeVisible({
       timeout: 60_000,
     })
     await expect(page.getByText(/does not know the skill \/gx-implement/).first()).toBeVisible()
+    await expect(page.getByText(/even after gx refreshed the skill install/).first()).toBeVisible()
     await expect(page.getByText(/gx skills install/).first()).toBeVisible()
 
+    await fixture.learnSkill()
     await recovery(page).getByRole("button", nav("Retry")).click()
     await expect(page.getByText("Could not start the agent")).toHaveCount(0)
   })

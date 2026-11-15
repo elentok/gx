@@ -94,6 +94,8 @@ export interface Fixture {
   setDiskFree(size: string): Promise<void>
   /** Sets what the next cleanup does: a size string frees to it, `fail` fails, empty does nothing. Set it before free. */
   setDiskClean(behaviour: string): Promise<void>
+  /** Makes the `unknown-skill` scenario's fake agent know every skill from now on. */
+  learnSkill(): Promise<void>
   /** Sets the fake CPU and memory the server reads, space-separated pairs such as `cpu=75 mem=85`. */
   setHealth(values: string): Promise<void>
   /** Replaces the fake process table the popover's cause lists read: `proc`, `hidden` and `busy` lines. */
@@ -331,6 +333,7 @@ async function startFixture(
     },
     setDiskFree: (size) => writeControl(out.disk_dir, "free", size),
     setDiskClean: (behaviour) => writeControl(out.disk_dir, "clean", behaviour),
+    learnSkill: () => writeControl(out.disk_dir, "skill-known", ""),
     setHealth: (values) => writeControl(out.health_dir, "system", values),
     setProcesses: (lines) => writeControl(out.health_dir, "processes", lines),
     setRestartControl: (name, value) => writeControl(restartDir(out), name, value),
