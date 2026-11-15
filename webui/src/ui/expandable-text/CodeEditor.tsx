@@ -302,10 +302,16 @@ export default function CodeEditor({
               },
             ]),
           ),
-          // Before vim, so Escape closes an open menu before it leaves insert mode.
+          // Before vim, so Escape closes an open menu before it leaves insert mode. Esc in INSERT and VISUAL
+          // belongs to vim alone: stop it here, judged by the mode before vim changes it, and still let vim and
+          // the menu run.
           Prec.highest(
             EditorView.domEventHandlers({
-              keydown: (e) => callbacks.current.onMenuKey?.(e) ?? false,
+              keydown: (e, v) => {
+                const mode = v.dom.parentElement?.getAttribute(VI_MODE_ATTR)
+                if (e.key === "Escape" && mode && mode !== "NORMAL") e.stopPropagation()
+                return callbacks.current.onMenuKey?.(e) ?? false
+              },
             }),
           ),
           viSlot.current.of(viMode ? vim() : []),

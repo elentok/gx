@@ -45,6 +45,8 @@ const Slide = memo(function Slide({
       role="group"
       aria-label={`Question ${card.label} of ${count}`}
       aria-hidden={k !== index}
+      tabIndex={-1}
+      outline="none"
     >
       <Question
         big={big}
@@ -121,7 +123,13 @@ export function QuestionSheet({
   const focusAnswer = (k: number) => {
     const all = answersOf(k)
     const el = all.find((b) => b.getAttribute("aria-pressed") === "true") ?? all[0]
-    el?.focus({ preventScroll: true })
+    if (el) el.focus({ preventScroll: true })
+    // A text question has no button: blur the box and land on the question's own row.
+    else {
+      const slide = row.current?.children[k] as HTMLElement | undefined
+      ;(document.activeElement as HTMLElement | null)?.blur()
+      slide?.focus({ preventScroll: true })
+    }
   }
   const move = (to: number, first: boolean) => {
     setOpen(true)

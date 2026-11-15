@@ -366,6 +366,25 @@ describe("keyboard", () => {
     await waitFor(() => expect(document.activeElement).toBe(note))
   })
 
+  test("Esc in a text question's box (no answer button) blurs it and focuses the question's row", () => {
+    function TextHarness() {
+      const [answers, setAnswers] = useState<Answers>({})
+      return (
+        <QuestionSheet
+          round={[card({ label: "1", kind: "text", title: "A" })]}
+          answers={answers}
+          onAnswers={(u) => setAnswers(u)}
+          mode="plain"
+        />
+      )
+    }
+    renderThemed(<TextHarness />)
+    const box = document.querySelector<HTMLElement>("textarea")!
+    box.focus()
+    key("Escape")
+    expect(document.activeElement).toBe(screen.getByRole("group", { name: "Question 1 of 1" }))
+  })
+
   test("vi on: N focuses the inline note editor; n, p and Cmd+Enter act in it, not on the sheet", async () => {
     vi_state.on = true
     renderThemed(<Harness />)

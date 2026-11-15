@@ -201,6 +201,24 @@ describe("vi on", () => {
     document.body.removeEventListener("keydown", seen)
     expect(seen).toHaveBeenCalled()
   })
+
+  test("Esc in INSERT and VISUAL is stopped before the page; the next one in NORMAL is not", () => {
+    const { view, keys } = mount(true, { start: 0, end: 0 }, "abc")
+    const seen = vi.fn()
+    const esc = () =>
+      view.contentDOM.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+      )
+    document.body.addEventListener("keydown", seen)
+    esc() // INSERT -> NORMAL
+    expect(seen).not.toHaveBeenCalled()
+    keys("v")
+    esc() // VISUAL -> NORMAL
+    expect(seen).not.toHaveBeenCalled()
+    esc() // NORMAL
+    document.body.removeEventListener("keydown", seen)
+    expect(seen).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe("vi off", () => {
