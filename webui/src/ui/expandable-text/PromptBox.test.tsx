@@ -876,6 +876,25 @@ test("VISUAL comes back as NORMAL with a caret", async () => {
   expect(from).toBe(to)
 })
 
+test("the caret is a bar in INSERT and a block in NORMAL", async () => {
+  // jsdom has no layout; give every range a box so vim's cursor layer can draw.
+  const rect = { left: 10, right: 18, top: 0, bottom: 16, width: 8, height: 16, x: 10, y: 0 }
+  const list = Object.assign([rect], { item: () => rect }) as unknown as DOMRectList
+  vi.spyOn(Range.prototype, "getClientRects").mockReturnValue(list)
+  vi.spyOn(Range.prototype, "getBoundingClientRect").mockReturnValue(rect as DOMRect)
+  withVi(true, <Pill />, false)
+  const view = await inlineView()
+  const block = () => view.scrollDOM.querySelector(".cm-vimCursorLayer .cm-fat-cursor")
+  const bar = () =>
+    view.scrollDOM.querySelector(".cm-cursorLayer:not(.cm-vimCursorLayer) .cm-cursor")
+  await waitFor(() => expect(bar()).not.toBeNull())
+  expect(block()).toBeNull()
+  pressKeys(view, "<Esc>")
+  await waitFor(() => expect(block()).not.toBeNull())
+  pressKeys(view, "i")
+  await waitFor(() => expect(block()).toBeNull())
+})
+
 test("a large editor that empties the text does not reset the box to INSERT", async () => {
   withVi(true, <Pill />, false)
   const view = await inlineView()

@@ -5,6 +5,7 @@ import canned from "../canned-detail.json"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type { TicketDetail } from "../generated/server"
 import { appRoutes } from "../routes"
+import { expectViEditor, viConnection } from "../ui/expandable-text/testing"
 import { renderThemed } from "../ui/render"
 import type { FetchDetail } from "./detail"
 
@@ -38,14 +39,14 @@ const conn = {
   onEvent: () => () => {},
 } as unknown as Connection
 
-function renderTicket(current: () => TicketDetail) {
+function renderTicket(current: () => TicketDetail, connection: Connection = conn) {
   const fetchDetail: FetchDetail = async () => ({ kind: "ok", detail: current() })
   const router = createMemoryRouter(
     appRoutes({ ticket: fetchDetail, epicList: async () => ({ epics: [], follow_ups: [] }) }),
     { initialEntries: ["/t/gx:demo/12"] },
   )
   return renderThemed(
-    <ConnectionContext.Provider value={conn}>
+    <ConnectionContext.Provider value={connection}>
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   )
@@ -226,6 +227,12 @@ test("Merge again posts to the merge route", async () => {
     "/v1/tickets/merge",
     { address: "gx:demo/12", state: "tok-3" },
   ])
+})
+
+test("with vi mode on the Start over reason is an editor, not a textarea", async () => {
+  renderTicket(() => repair(["retry", "start-over"]), viConnection())
+  fireEvent.click(await screen.findByRole("button", { name: "Start over" }))
+  await expectViEditor("Reason")
 })
 
 test("Start over asks for a reason first and never sends branch deletion", async () => {

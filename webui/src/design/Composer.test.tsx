@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
 import { clearCommandListCache } from "../commands/useCommandList"
-import { typeInLargeEditor } from "../ui/expandable-text/testing"
+import { expectViEditor, typeInLargeEditor } from "../ui/expandable-text/testing"
 import { DeviceContext, WideContext } from "../useWide"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type {
@@ -107,9 +107,14 @@ function render(opts: {
   rows?: EpicDetailRow[]
   steps?: MapStep[]
   wide?: boolean
+  vi?: boolean
 }) {
   const state = {
-    snapshot: { sessions: [session(opts.state, opts.background, opts.auto)] },
+    snapshot: {
+      sessions: [session(opts.state, opts.background, opts.auto)],
+      vi_mode: opts.vi ?? false,
+      vi_escape: "",
+    },
     connected: opts.connected ?? true,
     loadedOnce: true,
     tick: 0,
@@ -288,6 +293,12 @@ test("the composer is disabled while a switch back runs, though the session is I
 })
 
 const expand = () => screen.getByLabelText("Open the note in a large editor")
+
+test("with vi mode on the composer message is an editor, not a textarea", async () => {
+  render({ vi: true })
+  fireEvent.click(await screen.findByRole("button", { name: "Note" }))
+  await expectViEditor("Message")
+})
 
 test("the box is 3 rows and has the expand button; no round: Message to the agent", async () => {
   const scrollIntoView = vi.fn()

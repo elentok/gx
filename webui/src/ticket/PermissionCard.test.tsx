@@ -3,7 +3,8 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import canned from "../canned-detail.json"
 import type { PermissionCard as Card, TicketDetail } from "../generated/server"
-import { typeInLargeEditor } from "../ui/expandable-text/testing"
+import { ConnectionContext } from "../connection"
+import { expectViEditor, typeInLargeEditor, viConnection } from "../ui/expandable-text/testing"
 import { renderThemed } from "../ui/render"
 import { system } from "../ui/theme"
 import { PermissionCard } from "./PermissionCard"
@@ -61,6 +62,15 @@ test("the deny note has an expand button; its editor shares the text and pending
     true,
   )
   release()
+})
+
+test("with vi mode on the deny note is an editor, not a textarea", async () => {
+  renderThemed(
+    <ConnectionContext.Provider value={viConnection()}>
+      <PermissionCard detail={withCard(card)} post={ok} />
+    </ConnectionContext.Provider>,
+  )
+  await expectViEditor("Note for Deny (optional)")
 })
 
 test("renders nothing without a pending prompt", () => {

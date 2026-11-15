@@ -4,6 +4,7 @@ import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type { ScheduleRunNowResult, ScheduleShowResult, SchedulesResult } from "../generated/server"
 import { appRoutes } from "../routes"
+import { expectViEditor, viConnection } from "../ui/expandable-text/testing"
 import { renderThemed } from "../ui/render"
 import type { PostCreate, PostDelete, PostEdit, PostRunNow, PostSwitch } from "./schedules"
 
@@ -79,6 +80,7 @@ function renderAt(
     switchTo?: PostSwitch
     remove?: PostDelete
   } = {},
+  connection: Connection = conn,
 ) {
   sessionStorage.clear()
   const router = createMemoryRouter(
@@ -95,7 +97,7 @@ function renderAt(
     { initialEntries: [path] },
   )
   renderThemed(
-    <ConnectionContext.Provider value={conn}>
+    <ConnectionContext.Provider value={connection}>
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   )
@@ -114,6 +116,12 @@ test("a new Schedule shows Create, a project select and the shared PromptBox", a
   expect(screen.getByRole("option", { name: "Default" })).toBeTruthy()
   expect(screen.getByRole("button", { name: "Mon" }).getAttribute("aria-pressed")).toBe("true")
   expect(screen.getByRole("button", { name: "Sat" }).getAttribute("aria-pressed")).toBe("false")
+})
+
+test("with vi mode on the Prompt is an editor, not a textarea", async () => {
+  renderAt("/schedules/new", {}, viConnection())
+  await screen.findByRole("button", { name: "Create" })
+  await expectViEditor("Prompt")
 })
 
 test("Create blocks on an empty form with inline errors and posts nothing", async () => {
