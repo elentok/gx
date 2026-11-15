@@ -15,7 +15,7 @@ import { Chip } from "../ui/chip/Chip"
 
 const TITLES: Record<string, string> = {
   ready: "Ready epic",
-  map: "Map epics",
+  area: "Map epics",
   merge: "Merged",
   close: "Closed",
   keep: "Kept for later",
@@ -62,7 +62,7 @@ function GroupLine({ group, readyEpic }: { group: TriageResultGroup; readyEpic?:
           {readyEpic && <> in {link(epicHref(readyEpic), readyEpic)}</>}
         </>
       )
-    case "map":
+    case "area":
       return (
         <>
           {count("to areas")} · {areaCounts(group)}
@@ -92,7 +92,7 @@ function GroupRows({ group }: { group: TriageResultGroup }) {
             {i.title}
           </Text>
           {i.target &&
-            (group.action === "map" ? (
+            (group.action === "area" ? (
               link(ticketHref(i.target), `→ ${i.target}`)
             ) : (
               <Text as="span" color="text.dim">

@@ -18,10 +18,9 @@ const (
 
 // EpicActions are the plan actions whose row goes to an epic; a merge may only
 // target a row with one of them.
-var EpicActions = []string{"ready", ActionArea, "map"}
+var EpicActions = []string{ActionReady, ActionArea}
 
-// Plan actions. "map" is the version 1 name of area and stays readable.
-var planActions = []string{"ready", ActionArea, "map", "merge", "close", "keep"}
+var planActions = []string{ActionReady, ActionArea, "merge", ActionClose, "keep"}
 
 // ErrAlreadyApproved is returned by Approve when the step is past approve.
 var ErrAlreadyApproved = errors.New("already approved")
@@ -256,7 +255,7 @@ func (s *Store) SavePlan(id string, revision int, plan []PlanRow, gone []string)
 			if err := checkQuestions(row, p); err != nil {
 				return err
 			}
-			if p.Action == "ready" {
+			if p.Action == ActionReady {
 				if p.Fallback == "" {
 					p.Fallback = row.Fallback
 				}
@@ -310,7 +309,7 @@ func (s *Store) SetPerson(id string, revision int, address string, f PersonField
 				return err
 			}
 		}
-		if action, _ := row.Effective(); action != "ready" && row.Group != "" {
+		if action, _ := row.Effective(); action != ActionReady && row.Group != "" {
 			rec.dissolveGroup(row.Group)
 		}
 		return nil

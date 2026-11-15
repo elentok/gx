@@ -18,17 +18,6 @@ const PillNeedsYou = "Needs you"
 // triageSteps are the five steps of the ring, in order; Done is the last.
 var triageSteps = []string{tickets.StepVerify, tickets.StepRoute, tickets.StepQuestions, tickets.StepWrite, "done"}
 
-// ringStep maps a legacy step onto the step list of the ring.
-func ringStep(step string) string {
-	switch step {
-	case tickets.StepPlan:
-		return tickets.StepRoute
-	case tickets.StepApprove:
-		return tickets.StepQuestions
-	}
-	return step
-}
-
 // TriagePlacement is where the Follow-ups card sits and what it shows. A zero
 // Section means the plain card: no live Triage.
 type TriagePlacement struct {
@@ -61,7 +50,7 @@ func PlaceTriage(project string, rec *triage.Record, sessionLive bool) TriagePla
 		Section: wire.SectionDesigning,
 		Action:  wire.CardAction{Kind: wire.CardActionContinue, Label: "Continue", Target: project},
 	}
-	switch ringStep(rec.Step) {
+	switch rec.Step {
 	case tickets.StepVerify:
 		handled := 0
 		for _, r := range rec.Rows {
@@ -142,7 +131,7 @@ func triagePercent(rec *triage.Record) int {
 	if rec.State == triage.StateDone {
 		return 100
 	}
-	step := ringStep(rec.Step)
+	step := rec.Step
 	idx := slices.Index(triageSteps, step)
 	handled, total := 0, len(rec.Rows)
 	if step == tickets.StepQuestions {

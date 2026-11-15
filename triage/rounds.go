@@ -18,9 +18,14 @@ const (
 	MaxOrdinaryRounds = 3
 )
 
-// ActionArea is the plan action for a row that goes to an area epic. It
-// replaces the version 1 "map", which stays readable in old records.
-const ActionArea = "area"
+// Plan actions. ActionArea replaces the version 1 "map"; Store.upgrade
+// rewrites old records, so no other code sees the old name.
+const (
+	ActionReady = "ready"
+	ActionArea  = "area"
+	ActionClose = "close"
+	legacyMap   = "map"
+)
 
 func (rd *Round) unanswered() []Question {
 	var out []Question
@@ -71,7 +76,7 @@ func (r *Record) Unrounded() []Question {
 		if row.gone() {
 			continue
 		}
-		if action, _ := row.Effective(); action == ActionArea || action == "map" {
+		if action, _ := row.Effective(); action == ActionArea {
 			continue
 		}
 		for _, q := range row.AllQuestions() {
@@ -270,16 +275,16 @@ func (s *Store) Correct(id string, revision int, address, action, destination, f
 			}
 			rec.dropUnanswered(address)
 			row.Person.Action, row.Person.Destination = ActionArea, destination
-		case "ready":
+		case ActionReady:
 			if fallback == "" {
 				return phaseErr("a move to ready needs a fallback area")
 			}
 			row.Fallback = fallback
-			row.Person.Action, row.Person.Destination = "ready", ""
+			row.Person.Action, row.Person.Destination = ActionReady, ""
 		default:
 			return phaseErr("a routing correction goes to %q or ready, not %q", ActionArea, action)
 		}
-		if action != "ready" && row.Group != "" {
+		if action != ActionReady && row.Group != "" {
 			rec.dissolveGroup(row.Group)
 		}
 		return nil

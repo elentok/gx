@@ -28,7 +28,7 @@ func parseEstimate(s string) (tokens int, ok bool) {
 // groupable reports whether a row may join a group: a ready-epic row. Map
 // rows never group.
 func (r *Row) groupable() bool {
-	return !r.gone() && r.Plan != nil && r.Plan.Action == "ready"
+	return !r.gone() && r.Plan != nil && r.Plan.Action == ActionReady
 }
 
 // assignGroups marks the rows that Plan proposes to promote as one ticket:

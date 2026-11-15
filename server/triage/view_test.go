@@ -40,7 +40,7 @@ func show(t *testing.T, f rigs.DesignsFixture) wire.TriageView {
 
 func TestView_ExposesTheActionsThatTakeAnEpic(t *testing.T) {
 	f, _ := startViewFixture(t)
-	if got, want := show(t, f).EpicActions, []string{"ready", "area", "map"}; !slices.Equal(got, want) {
+	if got, want := show(t, f).EpicActions, []string{"ready", "area"}; !slices.Equal(got, want) {
 		t.Fatalf("epic_actions = %v, want %v", got, want)
 	}
 }
@@ -60,6 +60,35 @@ func stepStates(v wire.TriageView) string {
 		out += string(s.State)[:1]
 	}
 	return out
+}
+
+func TestView_DoneResultGroupsAreaRows(t *testing.T) {
+	f, s := startViewFixture(t)
+	rec := mustRec(s.Create())
+	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrA, Verdict: "relevant"}))
+	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrB, Verdict: "fixed"}))
+	rec = mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
+		{RowID: addrA, Action: triagerec.ActionArea, Destination: "core"},
+		{RowID: addrB, Action: triagerec.ActionClose},
+	}, nil))
+	rec = mustRec(s.Approve(rec.ID, rec.Revision))
+	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrA, triagerec.WriteDone, nil, ""))
+	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrB, triagerec.WriteDone, nil, ""))
+	mustRec(s.SetLastPass(rec.ID, rec.Revision, true))
+
+	v := show(t, f)
+	if v.Result == nil {
+		t.Fatalf("no result: %+v", v)
+	}
+	for _, g := range v.Result.Groups {
+		if g.Action == triagerec.ActionArea {
+			if len(g.Items) != 1 {
+				t.Fatalf("area group = %+v", g)
+			}
+			return
+		}
+	}
+	t.Fatalf("no area group in %+v", v.Result.Groups)
 }
 
 func TestView_NoRecordIsNone(t *testing.T) {
@@ -146,7 +175,7 @@ func TestView_DesignQuestionsTravelAndAreNotAsked(t *testing.T) {
 	rec = mustRec(s.SaveVerdict(rec.ID, rec.Revision, triagerec.Verdict{Address: addrB, Verdict: "relevant"}))
 	design := triagerec.Question{ID: "d1", Text: "Which store?", Kind: triagerec.QuestionDesign}
 	mustRec(s.SavePlan(rec.ID, rec.Revision, []triagerec.PlanRow{
-		{RowID: addrA, Action: "map", Questions: []triagerec.Question{design}},
+		{RowID: addrA, Action: triagerec.ActionArea, Destination: "core", Questions: []triagerec.Question{design}},
 		{RowID: addrB, Action: "close"},
 	}, nil))
 	v := show(t, f)

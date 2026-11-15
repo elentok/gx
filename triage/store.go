@@ -440,11 +440,18 @@ func (rec *Record) upgrade(earlier [][]Answered) {
 	}
 	rec.Version = Version
 	for i := range rec.Rows {
-		for j := range rec.Rows[i].Questions {
-			q := &rec.Rows[i].Questions[j]
+		row := &rec.Rows[i]
+		for j := range row.Questions {
+			q := &row.Questions[j]
 			if q.Kind == legacyQuick {
 				q.Kind = QuestionAsk
 			}
+		}
+		if row.Plan != nil && row.Plan.Action == legacyMap {
+			row.Plan.Action = ActionArea
+		}
+		if row.Person.Action == legacyMap {
+			row.Person.Action = ActionArea
 		}
 	}
 	if rec.State != StateLive {

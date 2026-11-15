@@ -353,7 +353,7 @@ func wireQuestion(q triagerec.Question) wire.TriageQuestion {
 // resultOf groups the settled rows of rec by their action. A row counts once
 // it is written or kept.
 func resultOf(rec *triagerec.Record) wire.TriageResult {
-	order := []string{"ready", "map", "merge", "close", "keep"}
+	order := []string{triagerec.ActionReady, triagerec.ActionArea, "merge", triagerec.ActionClose, "keep"}
 	by := map[string][]wire.TriageResultItem{}
 	res := wire.TriageResult{Groups: []wire.TriageResultGroup{}}
 	for _, r := range rec.Rows {
@@ -363,14 +363,14 @@ func resultOf(rec *triagerec.Record) wire.TriageResult {
 		}
 		item := wire.TriageResultItem{Address: r.Address, Title: r.Title}
 		switch row.Action {
-		case "ready", "map":
+		case triagerec.ActionReady, triagerec.ActionArea:
 			item.Target = epicOf(r.FirstAddress())
-			if row.Action == "ready" && res.ReadyEpic == "" {
+			if row.Action == triagerec.ActionReady && res.ReadyEpic == "" {
 				res.ReadyEpic = item.Target
 			}
 		case "merge":
 			item.Target = row.Destination
-		case "close":
+		case triagerec.ActionClose:
 			item.Reason = row.Destination
 		}
 		by[row.Action] = append(by[row.Action], item)

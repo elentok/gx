@@ -11,7 +11,7 @@ const result: TriageResult = {
   ready_epic: "gx:ready-1",
   groups: [
     { action: "ready", items: [{ address: "gx:follow-ups/1", title: "a" }] },
-    { action: "map", items: [{ address: "gx:follow-ups/2", title: "b", target: "gx:map-a/3" }] },
+    { action: "area", items: [{ address: "gx:follow-ups/2", title: "b", target: "gx:map-a/3" }] },
     {
       action: "merge",
       items: [{ address: "gx:follow-ups/3", title: "c", target: "gx:follow-ups/9" }],

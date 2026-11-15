@@ -41,7 +41,7 @@ const viewOf = (over: Partial<TriageView> = {}): TriageView => ({
   action_counts: {},
   changed_rows: 0,
   destinations: [],
-  epic_actions: ["ready", "map"],
+  epic_actions: ["ready", "area"],
   can_abandon: false,
   history: [],
   ...over,
@@ -317,7 +317,7 @@ test("history lists past Triages in the order sent, read-only, with epic links",
     ready_epic: "gx:ready-1",
     groups: [
       { action: "ready", items: [{ address: "gx:follow-ups/1", title: "a" }] },
-      { action: "map", items: [{ address: "gx:follow-ups/2", title: "b", target: "gx:map-a/3" }] },
+      { action: "area", items: [{ address: "gx:follow-ups/2", title: "b", target: "gx:map-a/3" }] },
       { action: "close", items: [{ address: "gx:follow-ups/4", title: "c" }] },
     ],
   }
@@ -481,7 +481,7 @@ const planView = (rows: ReturnType<typeof planRow>[]) =>
 const planRows = () => [
   ...[1, 2, 3, 4, 5].map((n) => planRow(n, "ready")),
   planRow(6, "area", "test-flakes"),
-  planRow(7, "map", "ralph-loop"),
+  planRow(7, "area", "ralph-loop"),
   planRow(8, "close", "fixed"),
   planRow(9, "close", "obsolete"),
   planRow(10, "merge", "gx:follow-ups/1"),

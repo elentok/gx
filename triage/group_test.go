@@ -28,7 +28,7 @@ func TestSavePlan_SmallOverlappingReadyRowsBecomeOneGroup(t *testing.T) {
 
 func TestSetPerson_GroupedRowSwitchedAwayFromReadyLeavesItsGroup(t *testing.T) {
 	for name, f := range map[string]PersonFields{
-		"map":            {Action: "map", Destination: "m"},
+		"area":           {Action: ActionArea, Destination: "m"},
 		"keep for later": {KeepForLater: true},
 	} {
 		s, _ := atPlan(t)
@@ -60,7 +60,7 @@ func TestSavePlan_ChainsInsteadOfGrouping(t *testing.T) {
 			{RowID: rowB, Action: "ready", Estimate: "15K", OverlapWith: []string{rowA}},
 		},
 		"a map row": {
-			{RowID: rowA, Action: "map", Destination: "m", Estimate: "5K", OverlapWith: []string{rowB}},
+			{RowID: rowA, Action: ActionArea, Destination: "m", Estimate: "5K", OverlapWith: []string{rowB}},
 			{RowID: rowB, Action: "ready", Estimate: "5K", OverlapWith: []string{rowA}},
 		},
 		"no overlap": {

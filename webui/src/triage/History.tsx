@@ -4,7 +4,7 @@ import type { TriageHistoryItem, TriageResult } from "../generated/server"
 // The result groups' actions, with the word each count carries.
 const COUNT_LABELS: [string, string][] = [
   ["ready", "ready"],
-  ["map", "map"],
+  ["area", "map"],
   ["merge", "merged"],
   ["close", "closed"],
   ["keep", "kept"],
@@ -22,7 +22,7 @@ const epicOf = (target: string) => target.replace(/\/[^/]*$/, "")
 const mapEpics = (result: TriageResult) => [
   ...new Set(
     (result.groups ?? [])
-      .filter((g) => g.action === "map")
+      .filter((g) => g.action === "area")
       .flatMap((g) => g.items.flatMap((i) => (i.target ? [epicOf(i.target)] : []))),
   ),
 ]

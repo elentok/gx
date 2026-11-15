@@ -26,7 +26,7 @@ const viewOf = (rows: TriageRow[]): TriageView =>
     action_counts: {},
     changed_rows: 0,
     destinations: [],
-    epic_actions: ["ready", "map"],
+    epic_actions: ["ready", "area"],
     can_abandon: false,
     history: [],
   }) as TriageView

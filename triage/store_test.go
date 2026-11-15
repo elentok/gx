@@ -160,7 +160,7 @@ func TestLoad_V1DoneAndAbandonedStayReadOnlyHistory(t *testing.T) {
 				t.Fatalf("History = %+v, %v", h, err)
 			}
 			rec := h[0]
-			if rec.Step != "plan" || rec.Rows[0].Plan == nil || rec.Rows[0].Plan.Action != "map" || len(rec.Rounds) != 0 {
+			if rec.Step != "plan" || rec.Rows[0].Plan == nil || rec.Rows[0].Plan.Action != ActionArea || rec.Rows[0].Person.Action != ActionReady || len(rec.Rounds) != 0 {
 				t.Fatalf("history record changed: step %s row %+v", rec.Step, rec.Rows[0])
 			}
 		})

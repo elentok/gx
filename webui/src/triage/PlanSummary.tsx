@@ -4,7 +4,7 @@ import type { TriageRow, TriageView } from "../generated/server"
 import { ticketHref } from "../hrefs"
 
 const SHOWN = 3
-const AREA_ACTIONS = ["area", "map"]
+const AREA_ACTIONS = ["area"]
 
 type Tone = "done" | "running" | "muted"
 type Group = {

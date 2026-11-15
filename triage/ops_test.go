@@ -114,7 +114,7 @@ func TestPlan(t *testing.T) {
 	if _, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "bogus"}}, nil); err == nil {
 		t.Fatal("unknown action accepted")
 	}
-	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "map", Destination: "m"}}, nil)
+	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: ActionArea, Destination: "m"}}, nil)
 	must(t, rec, err)
 	if rec.Step != "route" || rec.Rows[0].Plan == nil || rec.Rows[0].Plan.Destination != "m" {
 		t.Fatalf("partial plan: %+v", rec)
@@ -139,7 +139,7 @@ func TestPersonFields(t *testing.T) {
 	if _, err := s.SetPerson(rec.ID, rec.Revision, rowA, PersonFields{Action: "bogus"}); err == nil {
 		t.Fatal("unknown action accepted")
 	}
-	rec, err := s.SetPerson(rec.ID, rec.Revision, rowA, PersonFields{Action: "map", Destination: "d", Answers: map[string]string{"q": "a"}})
+	rec, err := s.SetPerson(rec.ID, rec.Revision, rowA, PersonFields{Action: ActionArea, Destination: "d", Answers: map[string]string{"q": "a"}})
 	must(t, rec, err)
 	if rec.Rows[0].Person.Destination != "d" || rec.Rows[0].Person.Answers["q"] != "a" {
 		t.Fatalf("person = %+v", rec.Rows[0].Person)
@@ -475,7 +475,7 @@ func TestPlan_QuickQuestionsNeedOptionsAndADefault(t *testing.T) {
 	s, rec := atPlan(t)
 	design := Question{ID: "d1", Text: "Which store?", Kind: QuestionDesign}
 	must(t, rec, nil)
-	if _, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "map", Questions: []Question{good, design}}, {RowID: rowB, Action: "close"}}, nil); err != nil {
+	if _, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: ActionArea, Destination: "m", Questions: []Question{good, design}}, {RowID: rowB, Action: "close"}}, nil); err != nil {
 		t.Fatalf("a quick question with options and a design question: %v", err)
 	}
 }
@@ -514,7 +514,7 @@ func TestPlan_ReadyRowWithAnAskQuestionNeedsAFallbackArea(t *testing.T) {
 func TestDesignQuestionsAreNotAskedAndDoNotBlockApprove(t *testing.T) {
 	s, rec := atPlan(t)
 	design := Question{ID: "d1", Text: "Which store?", Kind: QuestionDesign}
-	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: "map", Questions: []Question{design}}, {RowID: rowB, Action: "close"}}, nil)
+	rec, err := s.SavePlan(rec.ID, rec.Revision, []PlanRow{{RowID: rowA, Action: ActionArea, Destination: "m", Questions: []Question{design}}, {RowID: rowB, Action: "close"}}, nil)
 	rec = must(t, rec, err)
 	if got := rec.Rows[0].AskedQuestions(); len(got) != 0 {
 		t.Fatalf("asked = %+v, want none", got)

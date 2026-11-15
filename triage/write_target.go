@@ -36,12 +36,12 @@ func (r *Record) WriteTarget(row *Row) (t WriteTarget, ok bool) {
 		}
 	}
 	switch action {
-	case "ready":
+	case ActionReady:
 		t.Epic = r.ReadyEpic
 		if len(unreached) > 0 {
 			t.Epic = row.fallbackArea()
 		}
-	case ActionArea, "map":
+	case ActionArea:
 		t.Epic = dest
 		if len(unreached) > 0 && r.ordinaryRounds() < MaxOrdinaryRounds {
 			unreached = nil
