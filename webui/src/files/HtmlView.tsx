@@ -15,15 +15,17 @@ export function HtmlView({ path, text, source }: { path: string; text?: string; 
     return <CodeView text={text} language={languageOf(path)} />
   }
   return (
-    <Box display="flex" flexDirection="column" height="100%" minHeight="240px">
+    <Box display="flex" flexDirection="column">
       <Text px="4" py="2" fontSize="12px" color="text.muted">
         Sandboxed page, scripts allowed, no access to gx
       </Text>
+      {/* The parents have no fixed height, so a flex or % height collapses to the minimum.
+          Size the frame from the viewport instead. */}
       <iframe
         sandbox="allow-scripts"
         title={path.split("/").pop()}
         src={rawUrl(path)}
-        style={{ flex: 1, width: "100%", minHeight: "240px", border: 0 }}
+        style={{ width: "100%", height: "calc(100dvh - 200px)", minHeight: "480px", border: 0 }}
       />
     </Box>
   )
