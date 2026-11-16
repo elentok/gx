@@ -12,11 +12,8 @@ type ModelVersion struct {
 	Minor int `json:"minor"`
 }
 
-// SessionModelRow is one model the picker offers. ID is the full resolved id.
-// Family and Version are absent for an id that does not parse. Efforts is
-// empty for a model with no effort control. Latest is the resolved id of a
-// newer model of the family, and SwitchEffort the effort a switch to this row
-// would use.
+// SessionModelRow is one model the picker offers, by full resolved ID. Latest is
+// a newer model of the family; SwitchEffort is the effort a switch would use.
 type SessionModelRow struct {
 	ID           string        `json:"id"`
 	Current      bool          `json:"current,omitempty"`
@@ -53,8 +50,7 @@ type SessionInfo struct {
 	Project  string `json:"project"`
 	Dir      string `json:"dir"`
 	Harness  string `json:"harness"`
-	// Ticket is the Session ticket's address.
-	Ticket string `json:"ticket,omitempty"`
+	Ticket   string `json:"ticket,omitempty"`
 	// Design marks a session whose ticket is on a map epic: a gx-design run.
 	// It is true exactly when Flow is "design".
 	Design bool `json:"design,omitempty"`
@@ -84,20 +80,17 @@ type SessionInfo struct {
 	Stopped    bool              `json:"stopped,omitempty"`
 	Unread     SessionUnread     `json:"unread"`
 	Actionable SessionActionable `json:"actionable"`
-	// AutoAdvance is the session's auto-advance switch; on unless the person
-	// turned it off.
-	AutoAdvance bool `json:"auto_advance"`
-	// AutoAdvanceAt is when the running countdown sends the Continue; unset
-	// with none running.
+	// AutoAdvance is on unless the person turned it off; AutoAdvanceAt is when
+	// the running countdown sends the Continue.
+	AutoAdvance   bool       `json:"auto_advance"`
 	AutoAdvanceAt *time.Time `json:"auto_advance_at,omitempty"`
 	// AutoQueue is the session's auto-queue switch; off unless the person turned
 	// it on. AutoQueueAt is when the running countdown ends; unset with none
 	// running.
 	AutoQueue   bool       `json:"auto_queue"`
 	AutoQueueAt *time.Time `json:"auto_queue_at,omitempty"`
-	// ReportedStep is the Design step the agent says it is running, and
-	// ReportedTitle the ticket it is on during Resolve tickets. Both clear when
-	// the session goes idle.
+	// ReportedStep and ReportedTitle (the ticket during Resolve tickets) clear
+	// when the session goes idle.
 	ReportedStep  string `json:"reported_step,omitempty"`
 	ReportedTitle string `json:"reported_title,omitempty"`
 	// Failure is set while the session is in one of the failure states.
@@ -117,9 +110,7 @@ type SessionInfo struct {
 	// one is listed. LatestTiers are the tiers of the session's harness whose
 	// configured model is Model, and LatestEffort the effort a switch to
 	// LatestModel would run with; both are set with LatestModel only.
-	LatestModel string `json:"latest_model,omitempty"`
-	// LatestFamily is the family of LatestModel as the modelrules parse names
-	// it ("opus", "sol"), set with LatestModel.
+	LatestModel  string `json:"latest_model,omitempty"`
 	LatestFamily string `json:"latest_family,omitempty"`
 	// LatestTiers holds tier names as strings: tygo prints a union element
 	// type of a slice without parentheses, which types it wrongly.
@@ -152,8 +143,7 @@ type SessionInfo struct {
 	Usage *SessionUsage `json:"usage,omitempty"`
 }
 
-// SessionUsage is the token accounting shown beside an interactive session's
-// composer. The three context fields are disjoint request-input categories.
+// SessionUsage is the token accounting shown beside a session's composer.
 type SessionUsage struct {
 	InputTokens         int      `json:"input_tokens,omitempty"`
 	CacheReadTokens     int      `json:"cache_read_tokens,omitempty"`
@@ -172,8 +162,7 @@ type SessionUsage struct {
 	Totals         *SessionTokenTotals `json:"totals,omitempty"`
 }
 
-// SessionTokenTotals has disjoint input categories. Reasoning is a subset of output.
-// Pointers preserve the difference between an unreported field and a reported zero.
+// SessionTokenTotals: pointers tell unreported from zero.
 type SessionTokenTotals struct {
 	InputTokens         *int64 `json:"input_tokens,omitempty"`
 	CacheReadTokens     *int64 `json:"cache_read_tokens,omitempty"`
@@ -184,8 +173,7 @@ type SessionTokenTotals struct {
 
 // SessionStatus is a Session status.
 type SessionStatus struct {
-	State string `json:"state"`
-	// Kind and Message are what a Blocked session waits on.
+	State      string `json:"state"`
 	Kind       string `json:"kind,omitempty"`
 	Message    string `json:"message,omitempty"`
 	Background bool   `json:"background,omitempty"`
@@ -214,19 +202,16 @@ type SessionActionable struct {
 	Action   []string `json:"action,omitempty"`
 	Target   string   `json:"target,omitempty"`
 	GxRaised bool     `json:"gx_raised,omitempty"`
-	// Images are the ids of Prompt images a failed send did not paste; running
-	// the Action pastes them before its one prompt.
+	// Images are Prompt image ids a failed send did not paste.
 	Images []string `json:"images,omitempty"`
 	// Grilling marks the Actionable of a gx-design grilling round, so clients
 	// do not match its Reason text.
 	Grilling bool `json:"grilling,omitempty"`
-	// Derived marks an Actionable the server computed from the last assistant
-	// turn of a Design session. The next idle recomputes it.
+	// Derived marks one the server computed from a Design session's last turn.
 	Derived bool `json:"derived,omitempty"`
 }
 
-// SessionActionableQueue is the Kind of an Actionable whose Action is a queue
-// action on Target, not prompts.
+// SessionActionableQueue is the Kind of an Actionable that queues Target.
 const SessionActionableQueue = "queue"
 
 // IsQueue reports whether the Action queues Target's epic instead of sending
@@ -235,16 +220,14 @@ func (a SessionActionable) IsQueue() bool {
 	return a.Kind == SessionActionableQueue && a.Target != ""
 }
 
-// MarkActionableRequest is the body of `gx agent actionable`: the caller's
-// session, why it needs the person and its optional Action.
+// MarkActionableRequest is the body of `gx agent actionable`.
 type MarkActionableRequest struct {
 	ID     string   `json:"id"`
 	Reason string   `json:"reason"`
 	Action []string `json:"action,omitempty"`
 }
 
-// LinkSessionRequest is the body of `gx agent link`: the caller's session
-// and its Session ticket's address.
+// LinkSessionRequest is the body of `gx agent link`.
 type LinkSessionRequest struct {
 	ID     string `json:"id"`
 	Ticket string `json:"ticket,omitempty"`
@@ -254,8 +237,7 @@ type LinkSessionRequest struct {
 	FlowKey string `json:"flow_key,omitempty"`
 }
 
-// ReportStepRequest is the body of `gx agent step`: the caller's session, the
-// Design step it is running and, during Resolve tickets, the ticket's title.
+// ReportStepRequest is the body of `gx agent step`.
 type ReportStepRequest struct {
 	ID    string `json:"id"`
 	Step  string `json:"step"`
@@ -286,10 +268,8 @@ type CreateSessionRequest struct {
 	Cols    int    `json:"cols,omitempty"`
 	Rows    int    `json:"rows,omitempty"`
 
-	// MadeWorktree marks Dir as a worktree gx made, as Worktree does.
-	MadeWorktree bool `json:"made_worktree,omitempty"`
-	// RebaseNote is saved in the meta as RebaseNote.
-	RebaseNote string `json:"rebase_note,omitempty"`
+	MadeWorktree bool   `json:"made_worktree,omitempty"`
+	RebaseNote   string `json:"rebase_note,omitempty"`
 	// Tier is the model tier; empty means worker.
 	Tier agent.Tier `json:"tier,omitempty"`
 }
@@ -300,8 +280,7 @@ type SessionResult struct {
 	Refused bool         `json:"refused,omitempty"`
 	Reason  string       `json:"reason,omitempty"`
 	Message string       `json:"message,omitempty"`
-	// Client is the TUI a focus request went to; empty with no TUI connected.
-	Client string `json:"client,omitempty"`
+	Client  string       `json:"client,omitempty"`
 	// EpicCreated and StartError report a New Design open that wrote the map
 	// epic but whose session did not start: the Design exists, Refused is false.
 	EpicCreated bool   `json:"epic_created,omitempty"`
