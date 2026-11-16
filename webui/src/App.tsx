@@ -10,6 +10,7 @@ import {
 import { pruneDrafts } from "./drafts"
 import { routeHashLinkClicks } from "./nav/hashLinks"
 import { useRestHeartbeat } from "./rest"
+import { RestScreen } from "./RestScreen"
 import { createAppRouter } from "./routes"
 import { trackRouter } from "./routeSpans"
 import { NodeMissingToast } from "./NodeMissingToast"
@@ -41,6 +42,7 @@ export function App({ deps, fetchDetail }: { deps?: ConnectionDeps; fetchDetail?
     <ConnectionContext.Provider value={conn}>
       <RestHeartbeat />
       <RouterProvider router={router} />
+      <RestScreen />
       <SkillsProblemToast />
       <NodeMissingToast />
     </ConnectionContext.Provider>
