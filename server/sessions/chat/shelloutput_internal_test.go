@@ -29,7 +29,7 @@ func newShellOutputFixture(t *testing.T, kind, notification string) *shellOutput
 	src.meta = Meta{ID: "s1", Harness: "claude", Dir: testCwd, ConversationID: testConv, Flow: FlowRef{Flow: tickets.FlowDesign, Key: "gx:epic/03"}}
 	c := claudeChat(src, config)
 	computes := &atomic.Int32{}
-	c.shellOutputRead = func(p string) (ShellOutput, error) {
+	c.reads.shellOutput = func(p string) (ShellOutput, error) {
 		computes.Add(1)
 		return readShellOutput(p)
 	}

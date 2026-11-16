@@ -46,12 +46,12 @@ func (r *readCounts) all() map[string]int {
 // countReads wraps the three per-file readers of c with counters.
 func countReads(c *Chat) *readCounts {
 	r := &readCounts{n: map[string]int{}}
-	c.shellOutputRead = func(p string) (ShellOutput, error) { r.add(p); return readShellOutput(p) }
-	c.readSubagentFile = func(p string) (transcript.SubagentDetails, error) {
+	c.reads.shellOutput = func(p string) (ShellOutput, error) { r.add(p); return readShellOutput(p) }
+	c.reads.subagent = func(p string) (transcript.SubagentDetails, error) {
 		r.add(p)
 		return transcript.ReadSubagentFile(p)
 	}
-	c.readCodexChild = func(p string) (codexChild, error) { r.add(p); return readCodexChild(p) }
+	c.reads.codexChild = func(p string) (codexChild, error) { r.add(p); return readCodexChild(p) }
 	return r
 }
 

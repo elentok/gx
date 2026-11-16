@@ -1,8 +1,6 @@
 package chat
 
 import (
-	"time"
-
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/transcript"
 )
@@ -33,7 +31,7 @@ func readCodexChild(path string) (codexChild, error) {
 
 // codexChildPath finds a child's rollout by its thread id, once per id.
 func (c *Chat) codexChildPath(threadID string, meta Meta) (string, bool) {
-	return c.transcripts.Resolve(threadID, meta.Status.State, time.Now(), c.cfg.TranscriptMissTTL, func() (string, bool) {
+	return c.transcripts.Resolve(threadID, meta.Status.State, c.clock(), c.cfg.TranscriptMissTTL, func() (string, bool) {
 		home, err := c.src.CodexHome()
 		if err != nil {
 			c.log.Warn("codex home", "session", meta.ID, "err", err)
@@ -59,34 +57,23 @@ func (c *Chat) codexChildPath(threadID string, meta Meta) (string, bool) {
 // it changes: the records belong to the cached snapshot.
 func (c *Chat) withCodexChildren(records []transcript.TaskRecord, meta Meta) []transcript.TaskRecord {
 	compute := readCodexChild
-	if c.readCodexChild != nil {
-		compute = c.readCodexChild
+	if c.reads.codexChild != nil {
+		compute = c.reads.codexChild
 	}
-	var out []transcript.TaskRecord
-	for i, r := range records {
-		if r.Kind != transcript.TaskKindSubagent || r.ID == "" {
-			continue
-		}
-		path, ok := c.codexChildPath(r.ID, meta)
-		if !ok {
-			continue
-		}
-		d, err := c.codexChildren.Read(path, compute)
-		if err != nil || d == (codexChild{}) {
-			continue
-		}
-		if out == nil {
-			out = make([]transcript.TaskRecord, len(records))
-			copy(out, records)
-		}
-		r.Tokens = d.Tokens
-		if d.Model != "" {
-			r.Model = d.Model
-		}
-		out[i] = r
-	}
-	if out == nil {
-		return records
-	}
-	return out
+	return enrichTasks(records, enrichSpec[codexChild]{
+		cache: &c.codexChildren, compute: compute,
+		path: func(r transcript.TaskRecord) (string, bool) {
+			if r.Kind != transcript.TaskKindSubagent || r.ID == "" {
+				return "", false
+			}
+			return c.codexChildPath(r.ID, meta)
+		},
+		usable: func(d codexChild) bool { return d != (codexChild{}) },
+		merge: func(r *transcript.TaskRecord, d codexChild) {
+			r.Tokens = d.Tokens
+			if d.Model != "" {
+				r.Model = d.Model
+			}
+		},
+	})
 }

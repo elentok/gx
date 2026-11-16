@@ -26,37 +26,27 @@ func subagentFilePath(r transcript.TaskRecord, parentPath string) string {
 // It copies what it changes: the records belong to the cached snapshot.
 func (c *Chat) withSubagentDetails(records []transcript.TaskRecord, parentPath string) []transcript.TaskRecord {
 	compute := transcript.ReadSubagentFile
-	if c.readSubagentFile != nil {
-		compute = c.readSubagentFile
+	if c.reads.subagent != nil {
+		compute = c.reads.subagent
 	}
-	var out []transcript.TaskRecord
-	for i, r := range records {
-		if r.Kind != transcript.TaskKindSubagent || r.ID == "" || r.UsageFinal {
-			continue
-		}
-		path := subagentFilePath(r, parentPath)
-		if path == "" {
-			continue
-		}
-		d, err := c.subagentFiles.Read(path, compute)
-		if err != nil || d == (transcript.SubagentDetails{}) {
-			continue
-		}
-		if out == nil {
-			out = make([]transcript.TaskRecord, len(records))
-			copy(out, records)
-		}
-		r.Tokens, r.ToolCalls = d.Tokens, d.ToolCalls
-		if d.Model != "" {
-			r.Model = d.Model
-		}
-		if r.End == nil {
-			r.CurrentCall = d.CurrentCall
-		}
-		out[i] = r
-	}
-	if out == nil {
-		return records
-	}
-	return out
+	return enrichTasks(records, enrichSpec[transcript.SubagentDetails]{
+		cache: &c.subagentFiles, compute: compute,
+		path: func(r transcript.TaskRecord) (string, bool) {
+			if r.Kind != transcript.TaskKindSubagent || r.ID == "" || r.UsageFinal {
+				return "", false
+			}
+			p := subagentFilePath(r, parentPath)
+			return p, p != ""
+		},
+		usable: func(d transcript.SubagentDetails) bool { return d != (transcript.SubagentDetails{}) },
+		merge: func(r *transcript.TaskRecord, d transcript.SubagentDetails) {
+			r.Tokens, r.ToolCalls = d.Tokens, d.ToolCalls
+			if d.Model != "" {
+				r.Model = d.Model
+			}
+			if r.End == nil {
+				r.CurrentCall = d.CurrentCall
+			}
+		},
+	})
 }

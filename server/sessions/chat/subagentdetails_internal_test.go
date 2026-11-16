@@ -29,7 +29,7 @@ func newSubagentFixture(t *testing.T, launch, notification string) *subagentFixt
 	src.meta = Meta{ID: "s1", Harness: "claude", Dir: testCwd, ConversationID: testConv, Flow: FlowRef{Flow: tickets.FlowDesign, Key: "gx:epic/03"}}
 	c := claudeChat(src, config)
 	reads := &atomic.Int32{}
-	c.readSubagentFile = func(p string) (transcript.SubagentDetails, error) {
+	c.reads.subagent = func(p string) (transcript.SubagentDetails, error) {
 		reads.Add(1)
 		return transcript.ReadSubagentFile(p)
 	}

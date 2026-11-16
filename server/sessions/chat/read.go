@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/chatreader"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/wire"
@@ -100,21 +101,11 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 		default:
 			out.Messages, out.Truncated = snap.Msgs, snap.Truncated
 			out.Next = snap.Next
-			records := snap.Records
-			if kind == harness.Codex {
-				records = c.withCodexChildren(records, meta)
-			} else {
-				records = c.withSubagentDetails(c.withShellOutputs(records), path)
-			}
-			out.Tasks = AssembleTasks(records, meta, c.clock())
+			var open []transcript.InFlightTool
+			out.Tasks, open = c.tasksFor(snap, kind, meta, path)
 			out.Questions = c.Cards(dir, meta, snap)
 			out.Unreadable, out.CodexVersion = snap.Unreadable, snap.CodexVersion
-			// Shell and Agent calls are in tasks for harnesses that get the list.
-			hasList := kind != harness.Codex || hasExecShape(snap.CodexVersion)
-			for _, t := range snap.InFlight {
-				if hasList && (t.Kind == transcript.InFlightShell || t.Kind == transcript.InFlightAgent) {
-					continue
-				}
+			for _, t := range open {
 				tool := wire.SessionInFlightTool{Kind: t.Kind, Label: t.Label}
 				if out.Current == nil {
 					out.Current = &tool
@@ -125,4 +116,25 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	wire.WriteJSON(w, out)
+}
+
+// tasksFor assembles the task list of a snapshot and returns the open calls
+// that are not in it. Shell and Agent calls are tasks for harnesses that get
+// the list.
+func (c *Chat) tasksFor(snap Snapshot, kind agentrunner.Kind, meta Meta, path string) ([]wire.SessionTask, []transcript.InFlightTool) {
+	records := snap.Records
+	if kind == harness.Codex {
+		records = c.withCodexChildren(records, meta)
+	} else {
+		records = c.withSubagentDetails(c.withShellOutputs(records), path)
+	}
+	hasList := kind != harness.Codex || hasExecShape(snap.CodexVersion)
+	var open []transcript.InFlightTool
+	for _, t := range snap.InFlight {
+		if hasList && (t.Kind == transcript.InFlightShell || t.Kind == transcript.InFlightAgent) {
+			continue
+		}
+		open = append(open, t)
+	}
+	return AssembleTasks(records, meta, c.clock()), open
 }

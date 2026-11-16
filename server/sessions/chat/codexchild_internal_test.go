@@ -11,6 +11,27 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
+func TestCodexChildPath_MissExpiresWhenTheTestClockMoves(t *testing.T) {
+	t.Parallel()
+	c := claudeChat(newFakeSource(), t.TempDir())
+	c.cfg.TranscriptMissTTL = time.Minute
+	now := time.Now()
+	c.now = func() time.Time { return now }
+	lookups := 0
+	c.rolloutPath = func(string, string) (string, bool, error) { lookups++; return "", false, nil }
+
+	c.codexChildPath("th", Meta{})
+	c.codexChildPath("th", Meta{})
+	if lookups != 1 {
+		t.Fatalf("lookups inside the TTL = %d, want 1", lookups)
+	}
+	now = now.Add(2 * time.Minute)
+	c.codexChildPath("th", Meta{})
+	if lookups != 2 {
+		t.Errorf("lookups after the TTL = %d, want 2", lookups)
+	}
+}
+
 func TestRead_CodexSubagentRowsTakeDetailsFromTheChildRollout(t *testing.T) {
 	t.Parallel()
 	f := newCodexFixture(t)
@@ -21,7 +42,7 @@ func TestRead_CodexSubagentRowsTakeDetailsFromTheChildRollout(t *testing.T) {
 		lookups.Add(1)
 		return codexsession.RolloutPathIn(home, id)
 	}
-	c.readCodexChild = func(p string) (codexChild, error) {
+	c.reads.codexChild = func(p string) (codexChild, error) {
 		parses.Add(1)
 		return readCodexChild(p)
 	}

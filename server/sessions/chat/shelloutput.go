@@ -100,34 +100,24 @@ func safeShellOutputPath(p string) bool {
 // withShellOutputs returns records with each shell's output details filled.
 // It copies what it changes: the records belong to the cached snapshot.
 func (c *Chat) withShellOutputs(records []transcript.TaskRecord) []transcript.TaskRecord {
-	var out []transcript.TaskRecord
-	for i, r := range records {
-		if r.Kind != transcript.TaskKindShell || !safeShellOutputPath(r.OutputPath) {
-			continue
-		}
-		compute := readShellOutput
-		if c.shellOutputRead != nil {
-			compute = c.shellOutputRead
-		}
-		o, err := c.shellOutputs.Read(r.OutputPath, compute)
-		if err != nil || o.MTime.IsZero() {
-			continue
-		}
-		if out == nil {
-			out = make([]transcript.TaskRecord, len(records))
-			copy(out, records)
-		}
-		r.OutputBytes, r.LastLine = o.Size, o.LastLine
-		if r.ExitCode == nil {
-			r.ExitCode = o.ExitCode
-		}
-		if r.End == nil && o.Outcome != "" {
-			r.Trailer = &transcript.TaskEnd{At: o.MTime, Outcome: o.Outcome}
-		}
-		out[i] = r
+	compute := readShellOutput
+	if c.reads.shellOutput != nil {
+		compute = c.reads.shellOutput
 	}
-	if out == nil {
-		return records
-	}
-	return out
+	return enrichTasks(records, enrichSpec[ShellOutput]{
+		cache: &c.shellOutputs, compute: compute,
+		path: func(r transcript.TaskRecord) (string, bool) {
+			return r.OutputPath, r.Kind == transcript.TaskKindShell && safeShellOutputPath(r.OutputPath)
+		},
+		usable: func(o ShellOutput) bool { return !o.MTime.IsZero() },
+		merge: func(r *transcript.TaskRecord, o ShellOutput) {
+			r.OutputBytes, r.LastLine = o.Size, o.LastLine
+			if r.ExitCode == nil {
+				r.ExitCode = o.ExitCode
+			}
+			if r.End == nil && o.Outcome != "" {
+				r.Trailer = &transcript.TaskEnd{At: o.MTime, Outcome: o.Outcome}
+			}
+		},
+	})
 }
