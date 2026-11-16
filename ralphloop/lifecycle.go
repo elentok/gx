@@ -481,6 +481,11 @@ func nudgeIfStalled(d deps.Deps, in *supervise.PersonInput, o OneIteration, w It
 	if supervise.BackgroundTaskLive(d, p, sessionID) {
 		return false, true, nil
 	}
+	// A limit can land during the stall delay: the agent is idle because it is
+	// limited, not stalled. Back to the wait loop, which holds on it.
+	if _, limited, _, _ := supervise.RunnerRateLimit(d, p); limited {
+		return false, true, nil
+	}
 	text := stallNudgeText(d, o, w, s)
 	err = d.Runner.Prompt(s, text)
 	// A hung pane matches ErrInputNotEmpty too, but a retry types into the

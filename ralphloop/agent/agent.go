@@ -75,6 +75,10 @@ const PRTextSkill = "gx-pr-text"
 // CIFixSkill is the skill launched for type: ci-fix tickets.
 const CIFixSkill = "gx-ci-fix"
 
+// MergeSkill is the skill launched for type: merge tickets. It carries its
+// flag: the prompt appends the ticket address (same form as server/recovery).
+const MergeSkill = "gx-merge --ticket"
+
 // LaunchSkill is the skill an iteration on t starts under: workerSkill,
 // unless t's type routes it to its own skill.
 func LaunchSkill(t tickets.Ticket, workerSkill string) string {
@@ -87,6 +91,8 @@ func LaunchSkill(t tickets.Ticket, workerSkill string) string {
 		return PRTextSkill
 	case t.Type == string(schema.TypeCIFix):
 		return CIFixSkill
+	case t.Type == string(schema.TypeMerge):
+		return MergeSkill
 	}
 	return workerSkill
 }

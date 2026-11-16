@@ -107,6 +107,39 @@ func TestWaitIterationFinished_RateLimitHoldsUntilResetPlusBuffer(t *testing.T) 
 	}
 }
 
+// A limit that lands during the stall delay holds the idle, unreported merge
+// agent: no stall nudge is typed before the hold, and it is not left to pause.
+func TestWaitIterationFinished_RateLimitedIdleAgentIsNotNudged(t *testing.T) {
+	d, r, one, sleeps := stallNudgeFixture(t, "", 2*time.Minute)
+	one.Ticket.Type = "merge"
+	now := rateLimitClock
+	d.Now = func() time.Time { return now }
+	d.Sleep = func(dur time.Duration) {
+		*sleeps = append(*sleeps, dur)
+		now = now.Add(dur)
+		if dur == one.StallNudgeDelay {
+			r.SetRateLimit("iter-01", now.Add(30*time.Second))
+		}
+	}
+	d.Runner = &promptHookRunner{Runner: r, onPrompt: func(n int) {
+		r.SetRateLimit("iter-01", time.Time{})
+		front := "---\nid: \"01\"\nstatus: claimed\ntype: implement\niteration_status: finished\n---\n# A\n"
+		if err := os.WriteFile(one.Ticket.Path, []byte(front), 0o644); err != nil {
+			t.Error(err)
+		}
+	}}
+	waitStallFixture(t, d, one)
+	if got := r.Prompts("iter-01"); !slices.Equal(got, []string{"continue"}) {
+		t.Errorf("prompts = %q, want one continue and no stall nudge", got)
+	}
+	if n := eventsOfType(t, one, events.StallNudged); n != 0 {
+		t.Errorf("stall-nudged events = %d, want 0", n)
+	}
+	if n := eventsOfType(t, one, events.PausedRateLimit); n != 1 {
+		t.Errorf("paused-rate-limit events = %d, want 1", n)
+	}
+}
+
 func TestWaitIterationFinished_RateLimitPastResetContinuesAtOnce(t *testing.T) {
 	d, r, one, sleeps, _ := rateLimitFixture(t, func(r *runnerfake.Runner) {
 		r.SetRateLimit("iter-01", rateLimitClock.Add(-time.Hour))

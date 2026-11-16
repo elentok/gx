@@ -17,6 +17,12 @@ func TestLaunchSkill_CIFixTicketsRunGxCIFix(t *testing.T) {
 	}
 }
 
+func TestLaunchSkill_MergeTicketsRunGxMerge(t *testing.T) {
+	if got := LaunchSkill(tickets.Ticket{Type: "merge"}, DefaultWorkerSkill); got != "gx-merge --ticket" {
+		t.Fatalf("LaunchSkill(merge) = %q, want gx-merge --ticket", got)
+	}
+}
+
 func TestLaunchSkill_PRTextTicketsRunGxPRText(t *testing.T) {
 	if got := LaunchSkill(tickets.Ticket{Type: "pr-text"}, DefaultWorkerSkill); got != "gx-pr-text" {
 		t.Fatalf("LaunchSkill(pr-text) = %q, want gx-pr-text", got)
