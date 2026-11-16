@@ -72,7 +72,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"investigate", "gx-investigate/SKILL.md", []string{
 			"`gx check`", "**Write files with Write, in their own call.**", "never end on an \"Open question\"",
 		}},
-		{"to-tickets", "gx-to-tickets/SKILL.md", []string{"iteration hint", "`gx brief`", "`go_symbol_references`", "verified at {{commit}}", "not verified", "Generated files", "`make web-types`", "Test environment", "@vitest-environment", "Playwright filters", "Mock path", "must fail to compile or fail", "Examples against the helper"}},
+		{"to-tickets", "gx-to-tickets/SKILL.md", []string{"iteration hint", "`gx brief`", "`go_symbol_references`", "verified at {{commit}}", "not verified", "Generated files", "`make web-types`", "Test environment", "@vitest-environment", "Playwright filters", "Mock path", "must fail to compile or fail", "Examples against the helper", "`gx brief -C webui vitest <paths>`", "`gx brief -C webui tsc`"}},
 		{"to-tickets bundled and implement-only seams", "gx-to-tickets/SKILL.md", []string{"Every `implement` ticket", "5 or more"}},
 		{"to-tickets lint", "gx-to-tickets/SKILL.md", []string{"lint-claims", "--allow-claim-misses", "name a symbol"}},
 		{"to-tickets estimate", "gx-to-tickets/SKILL.md", []string{"1.12", "1.28", "0.83", "60K"}},

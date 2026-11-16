@@ -182,6 +182,8 @@ section silent.
 
 A seam may name the narrow `gx brief` command (e.g. `gx brief go-test -run 'TestX' ./pkg`) as an
 iteration hint. It is not the end-of-ticket check: that is always `gx check`.
+Write web commands as `gx brief -C webui vitest <paths>` and `gx brief -C webui tsc`; never `cd` plus
+`npx`, `npx`, or bare `pnpm exec` (denied). Vitest paths are `webui`-relative in the command, not repo-root.
 For a package near a `sizeguard` limit, name its line cap in Test seams.
 
 For a ticket that changes **skill text**, the seam is one shared test file per skill area (extend the
