@@ -5,11 +5,15 @@ import (
 	"github.com/elentok/gx/server/servertest/rigs"
 	"math"
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/rest"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tokenledger"
@@ -585,5 +589,83 @@ func TestStats_FrictionWithoutPersonEndingsHasNoHeadlines(t *testing.T) {
 	}
 	if got := s.Friction.PausesByReason[0]; got == nil || len(got) != 0 {
 		t.Errorf("empty day = %v, want {}", got)
+	}
+}
+
+func TestStats_MentalHealthCountsRestRecordsPerLocalDay(t *testing.T) {
+	t.Parallel()
+	h, base := rigs.StartEpicDetail(t, func(string) {})
+	// Written in UTC, so bucketing by the UTC day would misplace it.
+	nearMidnight := statsNoon(2).Add(-11*time.Hour - 30*time.Minute).UTC()
+	recs := []rest.Record{
+		{Kind: rest.RecordBreakStart, Time: statsNoon(1)},
+		{Kind: rest.RecordBreakStart, Time: statsNoon(1).Add(time.Hour)},
+		{Kind: rest.RecordBreakDropped, Time: statsNoon(1).Add(2 * time.Hour), Started: statsNoon(1).Add(time.Hour)},
+		{Kind: rest.RecordUnlock, Time: statsNoon(1), Rest: rest.KindBreak},
+		{Kind: rest.RecordUnlock, Time: statsNoon(1), Rest: rest.KindBedtime},
+		{Kind: rest.RecordUnlock, Time: statsNoon(1), Rest: rest.KindBedtime},
+		{Kind: rest.RecordBreakStart, Time: nearMidnight},
+		{Kind: rest.RecordBreakStart, Time: statsNoon(20)},
+	}
+	dir := filepath.Join(h.StateDir, rest.RecordsDirName)
+	byFile := map[string][]string{}
+	for _, r := range recs {
+		line, err := json.Marshal(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f := r.Time.Format("2006-01-02") + ".jsonl"
+		byFile[f] = append(byFile[f], string(line))
+	}
+	for f, lines := range byFile {
+		if err := os.WriteFile(filepath.Join(dir, f), []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	get := func(query string) wire.Stats {
+		code, body := servertest.WebDo(t, h, http.MethodGet, base+"/v1/stats"+query)
+		if code != http.StatusOK {
+			t.Fatalf("GET /v1/stats%s = %d: %s", query, code, body)
+		}
+		var s wire.Stats
+		if err := json.Unmarshal([]byte(body), &s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	s := get("?range=7&project=nope")
+	m := s.MentalHealth
+	if len(m.BreakStarts) != 7 || len(m.BreakUnlocks) != 7 || len(m.BedtimeUnlocks) != 7 {
+		t.Fatalf("series lengths = %d/%d/%d, want 7", len(m.BreakStarts), len(m.BreakUnlocks), len(m.BedtimeUnlocks))
+	}
+	if got := statsAt(t, s, m.BreakStarts, 1); got != 1 {
+		t.Errorf("break starts day 1 = %d, want 1 (two starts minus one dropped)", got)
+	}
+	if got := statsAt(t, s, m.BreakUnlocks, 1); got != 1 {
+		t.Errorf("break unlocks day 1 = %d, want 1", got)
+	}
+	if got := statsAt(t, s, m.BedtimeUnlocks, 1); got != 2 {
+		t.Errorf("bedtime unlocks day 1 = %d, want 2", got)
+	}
+	if got := statsAt(t, s, m.BreakStarts, 2); got != 1 {
+		t.Errorf("break starts day 2 = %d, want 1 (local day, not UTC day)", got)
+	}
+	if slices.Max(m.BreakStarts) > 1 {
+		t.Errorf("day 20 start leaked into range 7: %v", m.BreakStarts)
+	}
+	month := get("?range=30")
+	if got := statsAt(t, month, month.MentalHealth.BreakStarts, 20); got != 1 {
+		t.Errorf("break starts day 20 in range 30 = %d, want 1", got)
+	}
+}
+
+func TestStats_MentalHealthIsZeroFilledWithoutRecords(t *testing.T) {
+	t.Parallel()
+	s := statsStore(t, func(string) {})("?range=7")
+	m := s.MentalHealth
+	for name, series := range map[string][]int{"starts": m.BreakStarts, "break": m.BreakUnlocks, "bed": m.BedtimeUnlocks} {
+		if series == nil || len(series) != 7 || slices.Max(series) != 0 {
+			t.Errorf("%s = %v, want 7 zeros", name, series)
+		}
 	}
 }

@@ -483,6 +483,7 @@ func New(cfg Config) (*Server, error) {
 	s.stats = stats.New(stats.Deps{
 		TicketStore: cfg.TicketStore, ConversationsDir: cfg.ConversationsDir,
 		Tokens: s.tokens, Burns: s.limits, MapEpics: tokenHost{s}, WebPerf: s.webPerf,
+		Rest: s.rest.Records(),
 	})
 	s.diff = diff.New(diff.Deps{TicketStore: cfg.TicketStore, Epics: s.projects.EpicsWithArchived})
 	s.tips = tips.New(tips.Deps{

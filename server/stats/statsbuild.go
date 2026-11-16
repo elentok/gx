@@ -48,6 +48,7 @@ func newStats(n int) wire.Stats {
 			Days: make([]wire.StatsAmount, n), StepMedianMs: map[string]int64{},
 		},
 		WebPerformance: wire.NewStatsWebPerformance(),
+		MentalHealth:   wire.NewStatsMentalHealth(n),
 	}
 }
 

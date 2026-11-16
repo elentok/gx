@@ -60,6 +60,7 @@ const statsOf = (over: Partial<Stats["throughput"]> = {}, extra: Partial<Stats> 
     codex_5h: { days: [], sum: 0, average: 0 },
     codex_weekly: { days: [], sum: 0, average: 0 },
   },
+  mental_health: { break_starts: [0, 0, 0], break_unlocks: [0, 0, 0], bedtime_unlocks: [0, 0, 0] },
   web_performance: {
     hard_loads: [],
     route_changes: [],

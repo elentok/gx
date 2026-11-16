@@ -3601,6 +3601,20 @@ export interface Stats {
   grilling: StatsGrilling;
   limit_burn: StatsLimitBurns;
   web_performance: StatsWebPerformance;
+  mental_health: StatsMentalHealth;
+}
+/**
+ * StatsMentalHealth is the Mental health section. It is account-wide: the
+ * project filter does not change it. Every series has one entry per label in
+ * Days.
+ */
+export interface StatsMentalHealth {
+  /**
+   * BreakStarts is Break starts minus dropped Breaks, on the day of the start.
+   */
+  break_starts: number /* int */[];
+  break_unlocks: number /* int */[];
+  bedtime_unlocks: number /* int */[];
 }
 /**
  * StatsWebPerformance is the Web performance section. It is account-wide: the

@@ -95,6 +95,22 @@ type Stats struct {
 	LimitBurn  StatsLimitBurns `json:"limit_burn"`
 
 	WebPerformance StatsWebPerformance `json:"web_performance"`
+	MentalHealth   StatsMentalHealth   `json:"mental_health"`
+}
+
+// StatsMentalHealth is the Mental health section. It is account-wide: the
+// project filter does not change it. Every series has one entry per label in
+// Days.
+type StatsMentalHealth struct {
+	// BreakStarts is Break starts minus dropped Breaks, on the day of the start.
+	BreakStarts    []int `json:"break_starts"`
+	BreakUnlocks   []int `json:"break_unlocks"`
+	BedtimeUnlocks []int `json:"bedtime_unlocks"`
+}
+
+// NewStatsMentalHealth is the empty section: n zeros per series, never null.
+func NewStatsMentalHealth(n int) StatsMentalHealth {
+	return StatsMentalHealth{BreakStarts: make([]int, n), BreakUnlocks: make([]int, n), BedtimeUnlocks: make([]int, n)}
 }
 
 // NewStatsWebPerformance is the empty section: every list is empty, not nil,

@@ -40,6 +40,7 @@ type Deps struct {
 	Burns            Burns
 	MapEpics         MapEpics
 	WebPerf          WebPerf
+	Rest             RestRecords
 }
 
 // Stats serves the stats payload.
@@ -90,6 +91,10 @@ func (s *Stats) read(w http.ResponseWriter, r *http.Request) {
 		Records: recs, IsDesign: s.MapEpics.OnMapEpic, Burn: s.Burns.BurnStats(n, now),
 	})
 	if out.WebPerformance, err = buildWebPerformance(s.WebPerf, limits.NewStatsWindow(n, now), includeDev); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if out.MentalHealth, err = buildMentalHealth(s.Rest, limits.NewStatsWindow(n, now)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
