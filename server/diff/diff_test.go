@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
@@ -15,6 +16,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 )
 
 const project = "proj"
@@ -32,6 +34,13 @@ func mustGit(t *testing.T, dir string, args ...string) string {
 // given epics (epic name to branch_name; empty means no branch_name).
 func start(t *testing.T, epics map[string]string) (*servertest.Harness, string) {
 	t.Helper()
+	return startStamped(t, epics, "")
+}
+
+// startStamped is start with every epic stamped as merged with the range
+// sha..sha, before the server loads the store. Empty sha stamps nothing.
+func startStamped(t *testing.T, epics map[string]string, sha string) (*servertest.Harness, string) {
+	t.Helper()
 	store := t.TempDir()
 	repo := testutil.TempRepo(t)
 	for name, branch := range epics {
@@ -39,6 +48,16 @@ func start(t *testing.T, epics map[string]string) (*servertest.Harness, string) 
 		if branch != "" {
 			md := "---\nstatus: open\nbranch_name: " + branch + "\n---\n# E\n"
 			if err := os.WriteFile(filepath.Join(store, project, name, "ticket.md"), []byte(md), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if sha != "" {
+		for name := range epics {
+			err := tickets.StampEpicFields(filepath.Join(store, project, name), map[string]any{
+				"merged_at": time.Now().UTC(), "range_base": sha, "range_tip": sha,
+			})
+			if err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -124,9 +143,9 @@ func TestDiffRoutesNoCommonHistoryIsAResult(t *testing.T) {
 
 func TestDiffRoutesMissingCommitsAreNotAvailable(t *testing.T) {
 	t.Parallel()
-	h, _ := start(t, map[string]string{"epic": ""})
-	ctx := context.Background()
 	missing := strings.Repeat("ab", 20)
+	h, _ := startStamped(t, map[string]string{"epic": ""}, missing)
+	ctx := context.Background()
 
 	files, err := h.Client.Reads.DiffFiles(ctx, project, missing, "main", nil)
 	if err != nil || !files.CommitsUnavailable {
@@ -143,6 +162,26 @@ func TestDiffRoutesMissingCommitsAreNotAvailable(t *testing.T) {
 	blob, err := h.Client.Reads.DiffBlob(ctx, project, missing, missing, "a.txt")
 	if err != nil || !blob.CommitsUnavailable {
 		t.Errorf("blob = %+v, err %v; want commits_unavailable", blob, err)
+	}
+}
+
+func TestDiffRoutesMistypedSHAIsUnknownRef(t *testing.T) {
+	t.Parallel()
+	h, _ := start(t, map[string]string{"epic": ""})
+	ctx := context.Background()
+	missing := strings.Repeat("ab", 20)
+
+	if _, err := h.Client.Reads.DiffFiles(ctx, project, missing, "main", nil); err == nil ||
+		!strings.Contains(err.Error(), "400") || !strings.Contains(err.Error(), "Unknown ref") {
+		t.Errorf("files err = %v, want 400 Unknown ref", err)
+	}
+	if _, err := h.Client.Reads.DiffCommits(ctx, project, "main", missing); err == nil ||
+		!strings.Contains(err.Error(), "400") || !strings.Contains(err.Error(), "Unknown ref") {
+		t.Errorf("commits err = %v, want 400 Unknown ref", err)
+	}
+	if _, err := h.Client.Reads.DiffBlob(ctx, project, missing, missing, "a.txt"); err == nil ||
+		!strings.Contains(err.Error(), "400") {
+		t.Errorf("blob err = %v, want 400", err)
 	}
 }
 

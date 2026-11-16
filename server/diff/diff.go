@@ -62,10 +62,26 @@ func (d *Diff) repoDir(w http.ResponseWriter, r *http.Request) (project, dir str
 	return project, dir, true
 }
 
-// rangeOf resolves the typed refs. unavailable means a SHA-shaped ref names a
+// stamped reports whether sha is the RangeBase or RangeTip of one of the
+// project's epics: a commit that may have been pruned after the merge.
+func (d *Diff) stamped(project, sha string) (bool, error) {
+	epics, err := d.Epics(project)
+	if err != nil {
+		return false, err
+	}
+	for _, e := range epics {
+		if sha != "" && (sha == e.RangeBase || sha == e.RangeTip) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// rangeOf resolves the typed refs. unavailable means a stamped SHA names a
 // commit that is not in the clone: the caller answers with the distinct
-// "commits not available" result. ok is false once an error response is written.
-func rangeOf(w http.ResponseWriter, dir string, r *http.Request) (rng rangediff.Range, unavailable, ok bool) {
+// "commits not available" result. Any other missing ref, a mistyped SHA
+// included, is a 400. ok is false once an error response is written.
+func (d *Diff) rangeOf(w http.ResponseWriter, project, dir string, r *http.Request) (rng rangediff.Range, unavailable, ok bool) {
 	q := r.URL.Query()
 	rng, err := rangediff.Resolve(dir, q.Get("first"), q.Get("second"))
 	var unknown *rangediff.UnknownRefError
@@ -74,7 +90,14 @@ func rangeOf(w http.ResponseWriter, dir string, r *http.Request) (rng rangediff.
 		return rng, false, true
 	case errors.As(err, &unknown):
 		if rangediff.IsObjectID(unknown.Ref) {
-			return rangediff.Range{}, true, true
+			stamped, serr := d.stamped(project, unknown.Ref)
+			if serr != nil {
+				http.Error(w, serr.Error(), http.StatusInternalServerError)
+				return rangediff.Range{}, false, false
+			}
+			if stamped {
+				return rangediff.Range{}, true, true
+			}
 		}
 		http.Error(w, "Unknown ref: "+unknown.Side.String(), http.StatusBadRequest)
 	default:
@@ -97,7 +120,7 @@ func (d *Diff) resolve(w http.ResponseWriter, r *http.Request) (req request, ok 
 	if !ok {
 		return request{}, false
 	}
-	req.rng, req.unavailable, ok = rangeOf(w, req.dir, r)
+	req.rng, req.unavailable, ok = d.rangeOf(w, req.project, req.dir, r)
 	return req, ok
 }
 
@@ -249,7 +272,7 @@ func (d *Diff) Commits(w http.ResponseWriter, r *http.Request) {
 // Blob serves GET /v1/diff/blob?project=&base=&tip=&path=. base and tip are the
 // SHAs the file list echoed; typed refs are never accepted here.
 func (d *Diff) Blob(w http.ResponseWriter, r *http.Request) {
-	_, dir, ok := d.repoDir(w, r)
+	project, dir, ok := d.repoDir(w, r)
 	if !ok {
 		return
 	}
@@ -261,6 +284,17 @@ func (d *Diff) Blob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !rangediff.CommitsAvailable(dir, base, tip) {
+		for _, sha := range []string{base, tip} {
+			stamped, err := d.stamped(project, sha)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if !stamped && !rangediff.CommitsAvailable(dir, sha, sha) {
+				http.Error(w, "Unknown commit: "+sha, http.StatusBadRequest)
+				return
+			}
+		}
 		out.CommitsUnavailable = true
 		wire.WriteJSON(w, out)
 		return
