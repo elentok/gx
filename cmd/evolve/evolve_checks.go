@@ -3,6 +3,7 @@ package evolve
 import (
 	"fmt"
 	"io"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -199,6 +200,40 @@ func laterPass(later []check.Record, index []brief.IndexEntry, rec check.Record,
 	return ""
 }
 
+// runIncidentMinTests: a failing run with more failed tests than this, all
+// passing in one later run, prints as one run-level incident, not per-test flakes.
+// The JSON keeps one FlakeRow per test.
+const runIncidentMinTests = 5
+
+// groupFlakes groups rows sharing a failing and passing run, in first-seen order.
+func groupFlakes(rows []FlakeRow) [][]FlakeRow {
+	var groups [][]FlakeRow
+	idx := map[string]int{}
+	for _, f := range rows {
+		key := f.FailingRun + "\x00" + f.PassingRun
+		i, ok := idx[key]
+		if !ok {
+			i = len(groups)
+			idx[key] = i
+			groups = append(groups, nil)
+		}
+		groups[i] = append(groups[i], f)
+	}
+	return groups
+}
+
+// flakePackages lists the distinct packages of a group's tests, sorted. A test
+// name is `pkg.TestName[/sub]`.
+func flakePackages(g []FlakeRow) []string {
+	set := map[string]bool{}
+	for _, f := range g {
+		// Package paths contain slashes, so cut at the first ".Test", not at "/".
+		name, _, _ := strings.Cut(f.Test, ".Test")
+		set[name] = true
+	}
+	return slices.Sorted(maps.Keys(set))
+}
+
 func printEpicChecks(w io.Writer, table InputsTable) error {
 	for _, s := range table.Slower {
 		if _, err := fmt.Fprintf(w, "\nslower: %s %ds vs baseline %ds (median of %d full runs, run %s)",
@@ -206,8 +241,19 @@ func printEpicChecks(w io.Writer, table InputsTable) error {
 			return err
 		}
 	}
-	for _, f := range table.Flakes {
-		if _, err := fmt.Fprintf(w, "\nflake: %s failed in %s, passed in %s (tree %s)", f.Test, f.FailingRun, f.PassingRun, f.TreeID); err != nil {
+	for _, g := range groupFlakes(table.Flakes) {
+		var err error
+		if len(g) > runIncidentMinTests {
+			_, err = fmt.Fprintf(w, "\nrun-level incident: %d tests failed in %s, passed in %s (tree %s), packages %s, first %s",
+				len(g), g[0].FailingRun, g[0].PassingRun, g[0].TreeID, strings.Join(flakePackages(g), ", "), g[0].Test)
+		} else {
+			for _, f := range g {
+				if _, err = fmt.Fprintf(w, "\nflake: %s failed in %s, passed in %s (tree %s)", f.Test, f.FailingRun, f.PassingRun, f.TreeID); err != nil {
+					return err
+				}
+			}
+		}
+		if err != nil {
 			return err
 		}
 	}

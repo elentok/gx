@@ -154,6 +154,55 @@ func TestEvolveInputs_FlakeRow(t *testing.T) {
 	}
 }
 
+func TestEvolveInputs_FlakeGrouping(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name      string
+		failed    int
+		wantLines int
+		wantText  string
+	}{
+		{"run-level incident", runIncidentMinTests + 1, 1, "run-level incident: 6 tests failed in r1, passed in pass-log (tree t1), packages pkg/a, pkg/b, first pkg/a.Test0"},
+		{"at threshold stays per test", runIncidentMinTests, runIncidentMinTests, "flake: pkg/a.Test0 failed in r1, passed in pass-log (tree t1)"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f, data := checksFixture(t)
+			var tests []string
+			var entryTests []string
+			for i := range tc.failed {
+				pkg := "pkg/a"
+				if i%2 == 1 {
+					pkg = "pkg/b"
+				}
+				tests = append(tests, fmt.Sprintf("%s.Test%d", pkg, i))
+			}
+			entryTests = tests
+			failing := check.Record{Run: "r1", Time: claimBase.Format(time.RFC3339), Scope: "changed",
+				Branch: "ralph-loop/epic-item-02", TreeID: "t1",
+				Kinds: []check.KindRecord{{Kind: "test", Status: check.StatusFail, Failed: tests}}}
+			writeJSONL(t, filepath.Join(data, "check", "proj.jsonl"), []check.Record{failing})
+			writeJSONL(t, filepath.Join(data, "brief", "index.jsonl"), []brief.IndexEntry{{
+				Time: claimBase.Add(time.Minute).Format(time.RFC3339), TreeID: "t1",
+				Tests: entryTests, Log: "/logs/pass-log.log"}})
+			table := inputsTable(t, f)
+			if len(table.Flakes) != tc.failed {
+				t.Fatalf("json flakes = %d, want one per test (%d)", len(table.Flakes), tc.failed)
+			}
+			var out bytes.Buffer
+			if err := printEpicChecks(&out, table); err != nil {
+				t.Fatal(err)
+			}
+			if n := strings.Count(out.String(), "\nflake: ") + strings.Count(out.String(), "\nrun-level incident: "); n != tc.wantLines {
+				t.Errorf("lines = %d, want %d:\n%s", n, tc.wantLines, out.String())
+			}
+			if !strings.Contains(out.String(), tc.wantText) {
+				t.Errorf("output lacks %q:\n%s", tc.wantText, out.String())
+			}
+		})
+	}
+}
+
 func TestEvolveInputs_FlakeSkipsRecordWithNoTree(t *testing.T) {
 	t.Parallel()
 	f, data := checksFixture(t)
