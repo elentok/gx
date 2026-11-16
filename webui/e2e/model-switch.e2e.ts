@@ -398,9 +398,12 @@ test("205. Model switch", async ({ page, start }) => {
   // The page keeps re-rendering while the resumed agent settles, which can close the popover under the click.
   await expect(async () => {
     if (!(await popover.isVisible())) await outdated.click()
-    await expect(popover.getByTestId("outdated-note")).toHaveText(/^(Keeps|Changes) effort \w+\./, {
-      timeout: 1_000,
-    })
+    await expect(popover.getByTestId("outdated-note")).toHaveText(
+      "Keeps effort medium. Only this session changes.",
+      {
+        timeout: 1_000,
+      },
+    )
     await popover
       .getByRole("button", nav("Switch to Codex GPT-5.5-Codex"))
       .click({ timeout: 2_000 })
@@ -473,6 +476,17 @@ test("205. Model switch", async ({ page, start }) => {
   await expect(advancing).toHaveCount(0)
   // Story 29: the switch changed the session only, not Settings.
   expect((await fixture.cli("config", "get", "agents.claude.model")).trim()).toBe("fable")
+
+  // Story 44: on a design session already on the newest model the footer name is plain text, so a click opens no picker.
+  await go(page, `#/agents/${design.id}`)
+  await expect(footer).toContainText("Fable 5.2")
+  await expect(page.getByTestId("model-name-button")).toHaveCount(0)
+  await footer
+    .getByText(/Fable 5\.2/)
+    .first()
+    .click()
+  await expect(page.getByRole("dialog", nav("Switch model"))).toHaveCount(0)
+  await go(page, "#/d/demo:switch-design")
 
   // The same with the auto-queue countdown: the session is on the newest model now, so no
   // footer popover or chord offers a switch, and the route does it.
