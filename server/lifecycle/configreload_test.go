@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -153,15 +152,7 @@ func TestStart_RemovedTCPListenKeyIsIgnored(t *testing.T) {
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
 
 	ctx := context.Background()
-	hc := &http.Client{Transport: &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-		var d net.Dialer
-		return d.DialContext(ctx, "unix", server.SocketPath(h.StateDir))
-	}}}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://gx/v1/handshake", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp, err := hc.Do(req)
+	resp, err := h.RawGet(ctx, "/v1/handshake")
 	if err != nil {
 		t.Fatal(err)
 	}

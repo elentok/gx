@@ -3,8 +3,6 @@ package serverflows_test
 import (
 	"bufio"
 	"context"
-	"net"
-	"net/http"
 	"strconv"
 	"strings"
 	"testing"
@@ -17,20 +15,13 @@ import (
 func TestEventsStream_IdleStreamGetsHeartbeatComment(t *testing.T) {
 	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.SSEHeartbeat = 20 * time.Millisecond })
-	sock := server.SocketPath(h.StateDir)
-	hc := &http.Client{Transport: &http.Transport{
-		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, "unix", sock)
-		},
-	}}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://gx/v1/events?since="+strconv.FormatUint(snap.Seq, 10), nil)
-	resp, err := hc.Do(req)
+	resp, err := h.RawGet(ctx, "/v1/events?since="+strconv.FormatUint(snap.Seq, 10))
 	if err != nil {
 		t.Fatal(err)
 	}

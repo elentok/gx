@@ -20,6 +20,9 @@
 package servertest
 
 import (
+	"context"
+	"net"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -30,6 +33,22 @@ import (
 	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
+
+// RawGet sends GET http://gx<path> over the server's unix socket, bypassing
+// apiclient, so a test can see the raw wire bytes or read a stream line by
+// line. The caller closes the response body.
+func (h *Harness) RawGet(ctx context.Context, path string) (*http.Response, error) {
+	hc := &http.Client{Transport: &http.Transport{
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "unix", server.SocketPath(h.StateDir))
+		},
+	}}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://gx"+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	return hc.Do(req)
+}
 
 // Harness is a running test server.
 type Harness struct {
