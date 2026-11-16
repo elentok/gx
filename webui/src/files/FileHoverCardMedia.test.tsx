@@ -107,11 +107,25 @@ describe("FileHoverCardMedia", () => {
     expect(container.querySelector("svg")).toBeNull()
   })
 
-  it("marks the link missing when the image fails", async () => {
+  it("marks the link missing when the image fails and the raw URL is a 404", async () => {
+    fakeFetch(404)
     const { container, getByTestId } = await show(file(HostedKindImage))
     fireEvent.error(container.querySelector("img") as HTMLImageElement)
+    await settle()
     expect(getByTestId("missing").textContent).toBe("true")
   })
+
+  it.each([200, 500])(
+    "shows No preview and keeps the link when the image fails with %i",
+    async (status) => {
+      fakeFetch(status)
+      const { container, getByTestId } = await show(file(HostedKindImage))
+      fireEvent.error(container.querySelector("img") as HTMLImageElement)
+      await settle()
+      expect(container.textContent).toContain("No preview")
+      expect(getByTestId("missing").textContent).toBe("false")
+    },
+  )
 
   it("marks the link missing on a 404 for Mermaid", async () => {
     fakeFetch(404)

@@ -1,5 +1,5 @@
-import { chakra } from "@chakra-ui/react"
-import { useEffect } from "react"
+import { chakra, Text } from "@chakra-ui/react"
+import { useEffect, useState } from "react"
 import { type HostedResolved, HostedKindMermaid } from "../generated/ops"
 import { useFileLinks } from "./FileLinkContext"
 import { useCachedText } from "./FileHoverCardText"
@@ -28,6 +28,14 @@ export function FileHoverCardMedia({
   return <ImageBody path={path} file={file} onPixelSize={onPixelSize} />
 }
 
+export function Note({ children }: { children: string }) {
+  return (
+    <Text fontSize="sm" color="text.muted">
+      {children}
+    </Text>
+  )
+}
+
 function MermaidBody({ path, file }: { path: string; file: HostedResolved }) {
   const text = useCachedText(path, file)
   if (text === undefined) return null
@@ -44,10 +52,21 @@ function ImageBody({
   onPixelSize?: (size: PixelSize) => void
 }) {
   const markMissing = useFileLinks()?.markMissing
+  const [failed, setFailed] = useState(false)
   const known = cachedPixelSize(path, file.modified)
   useEffect(() => {
     if (known) onPixelSize?.(known)
   }, [known, onPixelSize])
+  // Only a 404 means the file is gone; a corrupt image or a 5xx keeps the link live.
+  const onError = () => {
+    setFailed(true)
+    fetch(rawUrl(path))
+      .then((res) => {
+        if (res.status === 404) markMissing?.(path)
+      })
+      .catch(() => {})
+  }
+  if (failed) return <Note>No preview</Note>
   return (
     <chakra.img
       src={rawUrl(path)}
@@ -63,7 +82,7 @@ function ImageBody({
         previewCache.set(`${path}\0px`, file.modified, { w, h })
         onPixelSize?.({ w, h })
       }}
-      onError={() => markMissing?.(path)}
+      onError={onError}
     />
   )
 }

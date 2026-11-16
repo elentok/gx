@@ -2,7 +2,7 @@ import { chakra, Flex, Text } from "@chakra-ui/react"
 import type { ReactNode } from "react"
 import type { HostedResolved } from "../generated/ops"
 import { sizeText } from "../health/formatBytes"
-import { FileHoverCardMedia, type PixelSize } from "./FileHoverCardMedia"
+import { FileHoverCardMedia, Note, type PixelSize } from "./FileHoverCardMedia"
 import { FileHoverCardText } from "./FileHoverCardText"
 import { previewVerdict } from "./viewerBody"
 
@@ -56,14 +56,6 @@ function Placeholder({ title, children }: { title: string; children: ReactNode }
         {children}
       </chakra.div>
     </Flex>
-  )
-}
-
-function Note({ children }: { children: string }) {
-  return (
-    <Text fontSize="sm" color="text.muted">
-      {children}
-    </Text>
   )
 }
 
