@@ -134,19 +134,25 @@ func gxDid(c gxCounts) string {
 // gxWentWrong lists how often gx had to step in; the singular forms differ
 // from the plural only where the count is one.
 func gxWentWrong(c gxCounts) string {
-	plural := func(n int, one, many string) string {
-		if n == 1 {
-			return one
-		}
-		return many
+	rows := []struct {
+		n         int
+		one, many string
+	}{
+		{c.resends, "prompt resend", "prompt resends"},
+		{c.relaunches, "relaunch", "relaunches"},
+		{c.launchFailures, "launch failure", "launch failures"},
+		{c.escalations, "recovery escalation", "recovery escalations"},
+		{c.finishBlocks, "finish block", "finish blocks"},
+		{c.refreshes, "skill refresh", "skill refreshes"},
+		{c.retries, "skill retry", "skill retries"},
 	}
-	return joinCounts([]countPart{
-		{c.resends, plural(c.resends, "prompt resend", "prompt resends")},
-		{c.relaunches, plural(c.relaunches, "relaunch", "relaunches")},
-		{c.launchFailures, plural(c.launchFailures, "launch failure", "launch failures")},
-		{c.escalations, plural(c.escalations, "recovery escalation", "recovery escalations")},
-		{c.finishBlocks, plural(c.finishBlocks, "finish block", "finish blocks")},
-		{c.refreshes, plural(c.refreshes, "skill refresh", "skill refreshes")},
-		{c.retries, plural(c.retries, "skill retry", "skill retries")},
-	}, "none recorded")
+	parts := make([]countPart, len(rows))
+	for i, r := range rows {
+		what := r.many
+		if r.n == 1 {
+			what = r.one
+		}
+		parts[i] = countPart{r.n, what}
+	}
+	return joinCounts(parts, "none recorded")
 }
