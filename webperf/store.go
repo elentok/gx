@@ -158,7 +158,7 @@ func (s *Store) sweepLoop() {
 	}
 }
 
-func dayOf(t time.Time) string { return t.Format(DayLayout) }
+func dayOf(t time.Time) string { return t.Local().Format(DayLayout) }
 
 func (s *Store) path(day string) string { return filepath.Join(s.dir, day+fileExt) }
 

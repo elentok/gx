@@ -11,6 +11,9 @@ import (
 
 var zone = time.FixedZone("test", 2*3600)
 
+// The store names day files by local day; pin it so the suite does not depend on the machine zone.
+func init() { time.Local = zone }
+
 func at(y int, m time.Month, d, h int) time.Time { return time.Date(y, m, d, h, 0, 0, 0, zone) }
 
 func fnow(t time.Time) func() time.Time { return func() time.Time { return t } }
@@ -60,6 +63,27 @@ func TestAppend_WritesOneFilePerReceiveDayInPrivateMode(t *testing.T) {
 	if di.Mode().Perm() != 0o700 {
 		t.Fatalf("dir mode %v", di.Mode().Perm())
 	}
+}
+
+func TestAppend_NamesFileByLocalDayForNonLocalTime(t *testing.T) {
+	setLocal(t, time.FixedZone("west", -8*3600))
+	dir := t.TempDir()
+	received := time.Date(2026, 11, 15, 2, 30, 0, 0, time.UTC) // 2026-11-14 18:30 local
+	s := open(t, dir, received)
+	if _, _, err := s.Append(received, []Sample{smp("s", "1", 1)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dayFile(dir, "2026-11-14")); err != nil {
+		t.Fatalf("want file for the local day: %v", err)
+	}
+}
+
+// setLocal swaps time.Local for the test and restores it on cleanup.
+func setLocal(t *testing.T, loc *time.Location) {
+	t.Helper()
+	old := time.Local
+	time.Local = loc
+	t.Cleanup(func() { time.Local = old })
 }
 
 func countLines(b []byte) int {
