@@ -48,9 +48,10 @@ stop and fix the ticket's frontmatter before doing anything else.
 - Derive reviewer scope from ticket statuses now: list the epic's tickets with their statuses and
   count them (M tickets besides this one). Don't reuse a scope written into an older prompt or
   ticket body.
-- Collect the **known spec deviations**: read each of this epic's other tickets with
-  `gx tickets show <addr>` (only this epic's; skip this code-review ticket) and gather the bullets
-  under its `## Spec deviations` section (also check `## Comments` and handoff notes for older
+- Collect the **known spec deviations** in one call:
+  `gx tickets show <epic> --section "Spec deviations"`, optionally with `--tickets 31-46`. A
+  hand-built loop over `gx tickets show` is not needed. Use only this epic's tickets (skip this
+  code-review ticket) and gather the bullets under each `## Spec deviations` section (also check `## Comments` and handoff notes for older
   tickets that recorded one there). Join them into one short list, each line prefixed with its
   ticket address. If there are none, the list is empty.
 
