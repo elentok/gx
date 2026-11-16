@@ -3,7 +3,7 @@ import { useState } from "react"
 import { describe, expect, it, vi } from "vitest"
 import { renderThemed } from "../ui/render"
 import { MarkdownView } from "./MarkdownView"
-import { stubResolver } from "./stubResolver"
+import { stubResolver } from "./stubResolver.testutil"
 
 const settle = () => act(async () => {})
 const FILE = "/repo/docs/guide.md"

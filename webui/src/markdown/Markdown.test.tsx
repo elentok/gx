@@ -2,7 +2,7 @@ import { act } from "@testing-library/react"
 import { useState } from "react"
 import { describe, expect, it } from "vitest"
 import { FileLinkProvider } from "../files/FileLinkContext"
-import { stubResolver } from "../files/stubResolver"
+import { stubResolver } from "../files/stubResolver.testutil"
 import { renderThemed } from "../ui/render"
 import { Markdown } from "./Markdown"
 

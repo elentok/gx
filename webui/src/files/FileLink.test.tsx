@@ -4,7 +4,7 @@ import { renderThemed } from "../ui/render"
 import { FileLink } from "./FileLink"
 import { FileLinkProvider, useFileLinks } from "./FileLinkContext"
 import { LinkedText } from "./LinkedText"
-import { stubResolver } from "./stubResolver"
+import { stubResolver } from "./stubResolver.testutil"
 
 const settle = () => act(async () => {})
 

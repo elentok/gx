@@ -2,6 +2,8 @@
 
 **Web UI: format with `cd webui && pnpm format <files>` (Biome). Never run prettier or `npx`.**
 
+Web UI: name test-only helpers `*.testutil.ts(x)` (e.g. `diff/renderDiff.testutil.tsx`), never plain `.ts` beside production code.
+
 ## Reading files
 
 The harness elides the middle of a long `Read` ("... (N lines omitted)"), and code you did not see

@@ -1,7 +1,7 @@
 import { cleanup, screen, waitFor } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, describe, expect, test, vi } from "vitest"
-import { stubResolveFetch } from "../files/stubResolver"
+import { stubResolveFetch } from "../files/stubResolver.testutil"
 import canned from "../canned-detail.json"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type { DetailRun, RelatedTicket, TicketDetail } from "../generated/server"

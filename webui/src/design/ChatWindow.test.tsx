@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 import { FileLinkProvider } from "../files/FileLinkContext"
-import { stubResolver } from "../files/stubResolver"
+import { stubResolver } from "../files/stubResolver.testutil"
 import type { SessionChatMessage, SessionChatResponse, SessionInfo } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { ChatMessages } from "./ChatCore"

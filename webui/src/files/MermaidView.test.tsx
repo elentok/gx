@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { renderThemed } from "../ui/render"
 import { MarkdownView } from "./MarkdownView"
 import { MermaidView } from "./MermaidView"
-import { stubResolver } from "./stubResolver"
+import { stubResolver } from "./stubResolver.testutil"
 
 const mocks = vi.hoisted(() => ({
   factory: vi.fn(),

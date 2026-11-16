@@ -10,7 +10,7 @@ import type {
   SessionInfo,
   Workspace,
 } from "../generated/server"
-import { stubResolveFetch } from "../files/stubResolver"
+import { stubResolveFetch } from "../files/stubResolver.testutil"
 import { appRoutes } from "../routes"
 import type { FixAgent } from "./fixAgent"
 import { renderThemed } from "../ui/render"

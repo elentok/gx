@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, screen } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { FileLinkProvider } from "../../files/FileLinkContext"
-import { stubResolver } from "../../files/stubResolver"
+import { stubResolver } from "../../files/stubResolver.testutil"
 import { renderThemed as render } from "../render"
 import { Question } from "./Question"
 import type { QuestionCard } from "./round"
