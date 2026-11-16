@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -42,8 +41,16 @@ func TestStart_CapsThePaneBeforeTheAgentStarts(t *testing.T) {
 
 const launchText = "/gx-implement gx:epic/01"
 
+type launchFixture struct {
+	t       *testing.T
+	r       *herdrrunner.Runner
+	state   *herdrfake.State
+	session agentrunner.Session
+	home    string
+}
+
 // startLaunch is a Claude session whose transcripts live under a temp home.
-func startLaunch(t *testing.T) (*herdrrunner.Runner, *herdrfake.State, agentrunner.Session, string) {
+func startLaunch(t *testing.T) *launchFixture {
 	t.Helper()
 	r, state, s := startAgent(t, "claude", nil)
 	r.Home = t.TempDir()
@@ -53,27 +60,15 @@ func startLaunch(t *testing.T) (*herdrrunner.Runner, *herdrfake.State, agentrunn
 		Poll: 5 * time.Millisecond, ResendEvery: 100 * time.Millisecond,
 	}
 	s.SessionID = "sess-1"
-	launchAgents.Store(t, launchAgent{state: state, label: s.Label})
-	t.Cleanup(func() { launchAgents.Delete(t) })
-	return r, state, s, r.Home
-}
-
-// launchAgents is the fake state and label startLaunch made for each test.
-var launchAgents sync.Map
-
-type launchAgent struct {
-	state *herdrfake.State
-	label string
+	return &launchFixture{t: t, r: r, state: state, session: s, home: r.Home}
 }
 
 // writeFirstUser makes the launch record land once the trace shows the prompt
 // call, so after the proof's pre-send count, as a real send does.
-func writeFirstUser(t *testing.T, home, content string) {
-	t.Helper()
-	a, _ := launchAgents.Load(t)
-	la := a.(launchAgent)
+func (f *launchFixture) writeFirstUser(content string) {
+	f.t.Helper()
 	done := make(chan struct{})
-	t.Cleanup(func() { <-done })
+	f.t.Cleanup(func() { <-done })
 	go func() {
 		defer close(done)
 		tick := time.NewTicker(2 * time.Millisecond)
@@ -85,9 +80,9 @@ func writeFirstUser(t *testing.T, home, content string) {
 				return
 			case <-tick.C:
 			}
-			for _, e := range la.state.Trace() {
+			for _, e := range f.state.Trace() {
 				if len(e.Argv) >= 2 && e.Argv[0] == "agent" && e.Argv[1] == "prompt" {
-					appendUser(home, "u1", content)
+					appendUser(f.home, "u1", content)
 					return
 				}
 			}
@@ -111,10 +106,10 @@ func appendUser(home, uuid, content string) {
 
 // A resumed session's old record equal to the command never proves a new launch.
 func TestPromptLaunch_ResumedTranscriptsOldLaunchRecordIsNotTheProof(t *testing.T) {
-	r, _, s, home := startLaunch(t)
-	appendUser(home, "u0", launchRecord)
+	f := startLaunch(t)
+	appendUser(f.home, "u0", launchRecord)
 
-	err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil)
+	err := agentrunner.PromptLaunch(context.Background(), f.r, f.session, launchText, nil)
 
 	if !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("PromptLaunch = %v, want ErrNotDelivered", err)
@@ -124,27 +119,27 @@ func TestPromptLaunch_ResumedTranscriptsOldLaunchRecordIsNotTheProof(t *testing.
 const launchRecord = `<command-name>/gx-implement</command-name>\n<command-args>gx:epic/01</command-args>`
 
 func TestPromptLaunch_WorkingAndTranscriptAgreeIsDeliveredOnce(t *testing.T) {
-	r, state, s, home := startLaunch(t)
-	writeFirstUser(t, home, launchRecord)
-	if err := state.SlashStartsTurn(s.Label); err != nil {
+	f := startLaunch(t)
+	f.writeFirstUser(launchRecord)
+	if err := f.state.SlashStartsTurn(f.session.Label); err != nil {
 		t.Fatal(err)
 	}
-	if err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil); err != nil {
+	if err := agentrunner.PromptLaunch(context.Background(), f.r, f.session, launchText, nil); err != nil {
 		t.Fatalf("PromptLaunch = %v, want nil", err)
 	}
-	if got, _ := state.Received(s.Label); !slices.Equal(got, []string{launchText}) {
+	if got, _ := f.state.Received(f.session.Label); !slices.Equal(got, []string{launchText}) {
 		t.Fatalf("received = %q, want one send", got)
 	}
 }
 
 func TestPromptLaunch_NeverWorkingIsTheStalledPromptError(t *testing.T) {
-	r, state, s, home := startLaunch(t)
+	f := startLaunch(t)
 	// Even a transcript showing the command does not outvote herdr.
-	writeFirstUser(t, home, launchRecord)
-	if err := state.StallAgent(s.Label); err != nil {
+	f.writeFirstUser(launchRecord)
+	if err := f.state.StallAgent(f.session.Label); err != nil {
 		t.Fatal(err)
 	}
-	err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil)
+	err := agentrunner.PromptLaunch(context.Background(), f.r, f.session, launchText, nil)
 	if !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("PromptLaunch = %v, want ErrNotDelivered", err)
 	}
@@ -154,51 +149,51 @@ func TestPromptLaunch_NeverWorkingIsTheStalledPromptError(t *testing.T) {
 }
 
 func TestPromptLaunch_WorkingWithoutTranscriptIsNotDelivered(t *testing.T) {
-	r, state, s, _ := startLaunch(t)
-	if err := state.SlashStartsTurn(s.Label); err != nil {
+	f := startLaunch(t)
+	if err := f.state.SlashStartsTurn(f.session.Label); err != nil {
 		t.Fatal(err)
 	}
-	if err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
+	if err := agentrunner.PromptLaunch(context.Background(), f.r, f.session, launchText, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("PromptLaunch = %v, want ErrNotDelivered", err)
 	}
 }
 
 func TestPromptLaunch_TurnPassedUnseenNeedsTheTranscript(t *testing.T) {
-	r, state, s, home := startLaunch(t)
-	if err := state.FastTurn(s.Label); err != nil {
+	f := startLaunch(t)
+	if err := f.state.FastTurn(f.session.Label); err != nil {
 		t.Fatal(err)
 	}
-	if err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
+	if err := agentrunner.PromptLaunch(context.Background(), f.r, f.session, launchText, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("PromptLaunch without a transcript = %v, want ErrNotDelivered", err)
 	}
 
-	r, state, s, home = startLaunch(t)
-	writeFirstUser(t, home, launchRecord)
-	if err := state.FastTurn(s.Label); err != nil {
+	f = startLaunch(t)
+	f.writeFirstUser(launchRecord)
+	if err := f.state.FastTurn(f.session.Label); err != nil {
 		t.Fatal(err)
 	}
-	if err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil); err != nil {
+	if err := agentrunner.PromptLaunch(context.Background(), f.r, f.session, launchText, nil); err != nil {
 		t.Fatalf("PromptLaunch with a transcript = %v, want nil", err)
 	}
 }
 
 func TestPromptLaunch_UnknownCommandOnThePaneIsNotDelivered(t *testing.T) {
-	r, state, s, _ := startLaunch(t)
-	if err := state.SetPaneText(s.Label, "Unknown command: /gx-implement"); err != nil {
+	f := startLaunch(t)
+	if err := f.state.SetPaneText(f.session.Label, "Unknown command: /gx-implement"); err != nil {
 		t.Fatal(err)
 	}
-	if err := agentrunner.PromptLaunch(context.Background(), r, s, launchText, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
+	if err := agentrunner.PromptLaunch(context.Background(), f.r, f.session, launchText, nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("PromptLaunch = %v, want ErrNotDelivered", err)
 	}
 }
 
 // A slash command that is not a launch prompt keeps the single-send rule.
 func TestPrompt_ClaudeSlashCommandIsStillSentOnce(t *testing.T) {
-	r, state, s, _ := startLaunch(t)
-	if err := r.Prompt(s, "/status"); err != nil {
+	f := startLaunch(t)
+	if err := f.r.Prompt(f.session, "/status"); err != nil {
 		t.Fatalf("Prompt(/status) = %v, want nil", err)
 	}
-	if got, _ := state.Received(s.Label); !slices.Equal(got, []string{"/status"}) {
+	if got, _ := f.state.Received(f.session.Label); !slices.Equal(got, []string{"/status"}) {
 		t.Fatalf("received = %q, want one send", got)
 	}
 }
