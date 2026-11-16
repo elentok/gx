@@ -366,6 +366,53 @@ test("a task row opens to its details line and a Codex row shows only what it ca
   expect(screen.queryByText(/no output yet/)).toBeNull()
 })
 
+const openTaskList = async (tasks: import("../generated/server").SessionTask[]) => {
+  renderChat([session()], okChat(chatOf([], { tasks })))
+  fireEvent.click(await screen.findByRole("button", { name: /of \d+ tasks done/ }))
+  return screen.getByRole("list", { name: "Tasks" })
+}
+
+test("an open shell row shows its command in a capped block with Show all", async () => {
+  const command = Array.from({ length: 16 }, (_, i) => `echo ${i + 1}`).join("\n")
+  const list = await openTaskList([
+    { kind: "shell", label: "echo", started_at: ago(0), command },
+    { kind: "shell", label: "short", started_at: ago(0), command: "ls\npwd" },
+    { kind: "shell", label: "bare", started_at: ago(0) },
+    { kind: "monitor", label: "watch", started_at: ago(0), command: "tail -f log" },
+  ])
+  expect(screen.queryByTestId("task-command")).toBeNull()
+  fireEvent.click(within(list).getByRole("button", { name: /echo/ }))
+  const block = screen.getByTestId("task-command")
+  expect(block.textContent).toContain("echo 5")
+  expect(block.textContent).not.toContain("echo 6")
+  expect(screen.getByTestId("task-command-more").textContent).toBe("# …11 more lines")
+  fireEvent.click(screen.getByRole("button", { name: "Show all (16 lines)" }))
+  expect(screen.getByTestId("task-command").textContent).toContain("echo 16")
+  expect(screen.queryByTestId("task-command-more")).toBeNull()
+  expect(screen.queryByRole("button", { name: /Show all/ })).toBeNull()
+
+  fireEvent.click(within(list).getByRole("button", { name: /short/ }))
+  expect(screen.getAllByTestId("task-command").length).toBe(2)
+  expect(screen.queryAllByTestId("task-command-more").length).toBe(0)
+  expect(within(list).queryAllByRole("button", { name: /bare/ }).length).toBe(0)
+  fireEvent.click(within(list).getByRole("button", { name: /watch/ }))
+  expect(screen.getAllByTestId("task-command").length).toBe(2)
+})
+
+test("a python -c command shows its script body", async () => {
+  const list = await openTaskList([
+    {
+      kind: "shell",
+      label: "python3 -c …",
+      started_at: ago(0),
+      command: "python3 -c 'import json\nprint(1)'",
+    },
+    { kind: "shell", label: "other", started_at: ago(0) },
+  ])
+  fireEvent.click(within(list).getByRole("button", { name: /python3/ }))
+  expect(screen.getByTestId("task-command").textContent).toBe("import jsonprint(1)")
+})
+
 test("an older Codex turn names its agent call in flight", async () => {
   const current = { kind: "agent", label: "survey" }
   renderChat(

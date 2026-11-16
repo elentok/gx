@@ -1,6 +1,9 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { tokenStyles } from "../files/tokenStyles"
 import type { SessionTask } from "../generated/server"
+import { Button } from "../ui/button/Button"
+import { commandBlock } from "./taskCommand"
 import {
   elapsedText,
   kindWord,
@@ -57,6 +60,90 @@ function StatusMark({ mark }: { mark: TaskMark }) {
 
 const HOVER_BG = "rgba(255,255,255,.03)"
 
+const COMMAND_LINE_LIMIT = 5
+
+/** Read-only command text, lightly highlighted once the lazy highlighter loads. */
+function TaskCommand({ command }: { command: string }) {
+  const { text, language } = useMemo(() => commandBlock(command), [command])
+  const lines = text.split("\n")
+  const [expanded, setExpanded] = useState(false)
+  const [clipped, setClipped] = useState(false)
+  const [html, setHtml] = useState<{ text: string; language: string; lines: string[] }>()
+  const body = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    let live = true
+    void import("../files/highlight").then(
+      (m) => {
+        const out = m.highlightLines(text, language)
+        if (live && out) setHtml({ text, language, lines: out })
+      },
+      () => {},
+    )
+    return () => {
+      live = false
+    }
+  }, [text, language])
+
+  const cut = !expanded && lines.length > COMMAND_LINE_LIMIT
+  // jsdom has no layout, so this only fires in a browser: a long single line wrapped past five rows.
+  useLayoutEffect(() => {
+    const el = body.current
+    setClipped(!expanded && !!el && el.scrollHeight > el.clientHeight)
+  }, [expanded, text, html])
+
+  const shown = html && html.text === text && html.language === language ? html.lines : undefined
+  const visible = cut ? lines.slice(0, COMMAND_LINE_LIMIT) : lines
+  return (
+    <Box
+      data-testid="task-command"
+      minW="0"
+      mt="6px"
+      mb="2px"
+      bg="surface"
+      border="1px solid"
+      borderColor="border"
+      borderRadius="8px"
+      px="10px"
+      py="8px"
+      fontFamily="mono"
+      fontSize="12px"
+      lineHeight="1.5"
+      color="text.dim"
+      whiteSpace="pre-wrap"
+      wordBreak="break-all"
+      overflowWrap="anywhere"
+      css={tokenStyles}
+    >
+      <Box
+        ref={body}
+        maxH={expanded ? undefined : "7.5em"}
+        overflow={expanded ? undefined : "hidden"}
+      >
+        {visible.map((src, i) => (
+          <Box
+            key={i}
+            minH="1.5em"
+            {...(shown
+              ? { dangerouslySetInnerHTML: { __html: shown[i] ?? "" } }
+              : { children: src || undefined })}
+          />
+        ))}
+      </Box>
+      {cut && (
+        <Box data-testid="task-command-more" color="text.faint" fontStyle="italic">
+          {`# …${lines.length - COMMAND_LINE_LIMIT} more lines`}
+        </Box>
+      )}
+      {(cut || clipped) && (
+        <Button size="sm" emphasis="ghost" tone="running" onClick={() => setExpanded(true)}>
+          {`Show all (${lines.length} lines)`}
+        </Button>
+      )}
+    </Box>
+  )
+}
+
 function TaskRow({
   task,
   now,
@@ -71,6 +158,8 @@ function TaskRow({
   const mark = taskMark(task)
   const fin = mark !== "running"
   const details = taskDetails(task, now)
+  const blockCommand = task.kind === "shell" || task.kind === "call" ? task.command : undefined
+  const expandable = !!details || !!blockCommand
   const header = (
     <>
       <StatusMark mark={mark} />
@@ -118,7 +207,7 @@ function TaskRow({
       mx={open ? "-2" : undefined}
       my={open ? "0.5" : undefined}
     >
-      {details ? (
+      {expandable ? (
         <chakra.button
           type="button"
           aria-expanded={open}
@@ -133,21 +222,25 @@ function TaskRow({
       ) : (
         <Box {...grid}>{header}</Box>
       )}
-      {details && open && (
-        <Box
-          fontSize="xs"
-          color="text.faint"
-          pl="24px"
-          overflowWrap="anywhere"
-          data-testid="task-details"
-        >
-          {details.command && (
-            <Text as="span" fontFamily="mono" color="text.dim">
-              {details.command}
-              <br />
-            </Text>
+      {open && (details || blockCommand) && (
+        <Box pl="24px" minW="0">
+          {details && (
+            <Box
+              fontSize="xs"
+              color="text.faint"
+              overflowWrap="anywhere"
+              data-testid="task-details"
+            >
+              {details.command && (
+                <Text as="span" fontFamily="mono" color="text.dim">
+                  {details.command}
+                  <br />
+                </Text>
+              )}
+              {details.text}
+            </Box>
           )}
-          {details.text}
+          {blockCommand && <TaskCommand command={blockCommand} />}
         </Box>
       )}
     </Box>

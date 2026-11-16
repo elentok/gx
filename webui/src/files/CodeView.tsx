@@ -1,22 +1,12 @@
 import { Box } from "@chakra-ui/react"
 import { useEffect, useRef, useState } from "react"
+import { tokenStyles } from "./tokenStyles"
 
 /** The cited line as a 1-based line number, or undefined when it names no line of `total`. */
 function citedLine(line: number | undefined, total: number): number | undefined {
   if (line === undefined || !Number.isInteger(line) || line < 1 || line > total) return undefined
   return line
 }
-
-const tokenStyles = {
-  "& .hljs-keyword, & .hljs-built_in, & .hljs-type, & .hljs-literal, & .hljs-selector-tag": {
-    color: "tone.running.fg",
-  },
-  "& .hljs-string, & .hljs-regexp, & .hljs-addition": { color: "tone.done.fg" },
-  "& .hljs-number, & .hljs-symbol, & .hljs-attr, & .hljs-attribute": { color: "tone.waiting.fg" },
-  "& .hljs-title, & .hljs-function, & .hljs-section": { color: "chart.purple" },
-  "& .hljs-comment, & .hljs-quote, & .hljs-meta": { color: "text.faint", fontStyle: "italic" },
-  "& .hljs-deletion": { color: "tone.paused.fg" },
-} as const
 
 /**
  * Numbered source lines, highlighted once the lazy highlighter loads. Props in, DOM out: the
