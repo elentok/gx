@@ -220,6 +220,32 @@ func TestWeb_WebPerformanceStoresValidSamplesAndDropsTheRest(t *testing.T) {
 	}
 }
 
+func TestWeb_WebPerformanceKeepsAttributionPerMetricAndLooseVersion(t *testing.T) {
+	t.Parallel()
+	h, base := servertest.StartWeb(t)
+	cookie := servertest.Login(t, h.StateDir, base)
+	url := base + "/v1/web-performance"
+	body := strings.Replace(perfBatch(1,
+		perfSample("inp", "inp", 300, `,"input_delay":10,"lcp_load_delay":7`),
+		perfSample("lcp", "lcp", 3000, `,"lcp_load_delay":8,"input_delay":9,"action":"x"`),
+		`{"id":"zero","metric":"lcp","value":1,"ts":0}`,
+	), `"web_version":"1.0"`, `"web_version":"v1.2.3+5-gabc/x"`, 1)
+	code, out := servertest.WebPostJSON(t, url, body, cookie, "", servertest.JSONPost(base))
+	if code != http.StatusOK || !strings.Contains(out, `"stored":2`) || !strings.Contains(out, `"dropped":1`) {
+		t.Fatalf("status %d body %q, want 2 stored and 1 dropped", code, out)
+	}
+	lines := perfDayLines(t, h.StateDir)
+	if len(lines) != 2 {
+		t.Fatalf("%d stored lines, want 2: %v", len(lines), lines)
+	}
+	if !strings.Contains(lines[0], `"input_delay":10`) || strings.Contains(lines[0], "lcp_load_delay") || !strings.Contains(lines[0], `v1.2.3+5-gabc/x`) {
+		t.Errorf("poor INP kept the wrong fields: %s", lines[0])
+	}
+	if !strings.Contains(lines[1], `"lcp_load_delay":8`) || strings.Contains(lines[1], "input_delay") || strings.Contains(lines[1], `"action"`) {
+		t.Errorf("poor LCP kept the wrong fields: %s", lines[1])
+	}
+}
+
 func TestWeb_WebPerformanceRefusesAndRejects(t *testing.T) {
 	t.Parallel()
 	h, base := servertest.StartWeb(t)

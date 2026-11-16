@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/wire"
@@ -159,8 +161,14 @@ func goodToken(s string, required bool) bool {
 	return len(s) <= webPerfMaxString && webPerfToken.MatchString(s)
 }
 
+// goodVersion is looser than goodToken: a `git describe` version may hold `+`
+// or `/`, and dropping every sample of that build would lose its data.
+func goodVersion(s string) bool {
+	return len(s) <= webPerfMaxString && !strings.ContainsFunc(s, unicode.IsControl)
+}
+
 // convert validates one sample and returns the stored form. Attribution is
-// kept only on a poor inp or lcp.
+// kept per metric: a poor inp keeps the inp fields, a poor lcp the lcp fields.
 func (s *webPerfSample) convert(b *webPerfBody, received time.Time) (webperf.Sample, bool) {
 	enumOK := func(name, v string) bool { return v == "" || slices.Contains(webPerfEnums[name], v) }
 	if !slices.Contains(webPerfMetrics, s.Metric) || s.Value == nil || !finite(s.Value) ||
@@ -168,7 +176,7 @@ func (s *webPerfSample) convert(b *webPerfBody, received time.Time) (webperf.Sam
 		!enumOK("outcome", s.Outcome) || !enumOK("trigger", s.Trigger) || !enumOK("data_source", s.DataSource) ||
 		!enumOK("env", s.Env) || !enumOK("navigation_type", s.NavigationType) || !enumOK("tab", s.Tab) ||
 		!enumOK("interaction_type", s.InteractionType) ||
-		!goodToken(b.Session, true) || !goodToken(s.ID, true) || !goodToken(b.BuildID, false) || !goodToken(b.WebVersion, false) ||
+		!goodToken(b.Session, true) || !goodToken(s.ID, true) || !goodToken(b.BuildID, false) || !goodVersion(b.WebVersion) ||
 		!goodToken(s.Action, false) || !goodToken(s.WorstChunk, false) {
 		return webperf.Sample{}, false
 	}
@@ -186,10 +194,11 @@ func (s *webPerfSample) convert(b *webPerfBody, received time.Time) (webperf.Sam
 		Tab: s.Tab, Timestamp: s.Timestamp, Outcome: s.Outcome, Trigger: s.Trigger, DataSource: s.DataSource,
 		TTFB: s.TTFB, APILatency: s.APILatency, JSBytes: s.JSBytes, CSSBytes: s.CSSBytes,
 	}
-	poor := s.Metric == "inp" && *s.Value > webperf.PoorINP || s.Metric == "lcp" && *s.Value > webperf.PoorLCP
-	if poor {
+	switch {
+	case s.Metric == "inp" && *s.Value > webperf.PoorINP:
 		sm.InputDelay, sm.Processing, sm.PresentationDelay = s.InputDelay, s.Processing, s.PresentationDelay
 		sm.InteractionType, sm.Action, sm.WorstChunk, sm.WorstFrame = s.InteractionType, s.Action, s.WorstChunk, s.WorstFrame
+	case s.Metric == "lcp" && *s.Value > webperf.PoorLCP:
 		sm.LCPLoadDelay, sm.LCPLoadDuration, sm.LCPRenderDelay = s.LCPLoadDelay, s.LCPLoadDuration, s.LCPRenderDelay
 	}
 	return sm, true
