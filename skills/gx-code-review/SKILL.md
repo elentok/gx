@@ -116,6 +116,8 @@ Every subagent gets the shared review file's path from above.
   Flag the tension instead."
 - The brief: "Report findings as a list — file, line/hunk, summary, severity, suggested fix. Under
   500 words."
+- The test-gap rule: "Open verify tickets own test gaps. Report a missing test only when no open verify
+  ticket covers that story."
 
 **Spec subagent** (exactly one, whatever the configured skill list holds) also gets:
 
@@ -128,6 +130,8 @@ Every subagent gets the shared review file's path from above.
   the implementation looks wrong. Quote the spec line — or the ticket address and line — for each
   finding. Under 400 words of findings, plus a last line `Covered: <addresses reviewed> of <M>`
   that is not counted in the cap."
+- The test-gap rule: "Open verify tickets own test gaps. Report a missing test only when no open verify
+  ticket covers that story."
 
 When the epic has more than about 12 tickets, split the Spec axis across several Spec subagents
 by ticket-address range (about 12 tickets each), each with the same brief for its own range. They go
@@ -187,6 +191,9 @@ neighbours in the same area into one ticket: each ticket pays the full start-up 
 session, which costs more than a few lines of change. Follow gx-to-tickets's own
 process, skipping its step 5 (quiz the user) since this runs unattended — publish the drafted
 breakdown directly, same as any other unattended `gx-to-tickets` run.
+
+Write each fix-ticket body from the consultant's verified facts. Do not re-run greps or `sed -n`
+reads to check them again.
 
 The fix-ticket rules (verified "Where to look" paths, real ticket ids, chained `--blocked-by` for
 tickets that share a file, acceptance wording checked against existing tests) are in
