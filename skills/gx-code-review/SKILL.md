@@ -49,8 +49,9 @@ stop and fix the ticket's frontmatter before doing anything else.
   count them (M tickets besides this one). Don't reuse a scope written into an older prompt or
   ticket body.
 - Collect the **known spec deviations** in one call:
-  `gx tickets show <epic> --section "Spec deviations"`, optionally with `--tickets 31-46`. A
-  hand-built loop over `gx tickets show` is not needed. Use only this epic's tickets (skip this
+  `gx tickets show <epic> --section "Spec deviations"`, optionally with `--tickets 31-46`. Pass the
+  full list on, not a truncated view: no `| head`, and no loop whose output is cut ("N lines
+  omitted"). A hand-built loop over `gx tickets show` is not needed. Use only this epic's tickets (skip this
   code-review ticket) and gather the bullets under each `## Spec deviations` section (also check `## Comments` and handoff notes for older
   tickets that recorded one there). Join them into one short list, each line prefixed with its
   ticket address. If there are none, the list is empty.
@@ -124,8 +125,9 @@ Every subagent gets the shared review file's path from above.
 
 - The path of the spec resolved in step 1 — `docs/specs/<epic-slug>.md` (or the legacy `spec.md`), or
   the list of ticket addresses that stand in for it.
-- The known spec deviations list from step 1, with: "These narrowings were deliberate. Don't report
-  them as missing or wrong; only report one if the diff contradicts what the deviation says."
+- The known spec deviations list from step 1, with: "These are claims to check, not exclusions.
+  Verify each deviation against the code before skipping it. Report a stale or wrong one as a
+  finding."
 - The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour
   in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where
   the implementation looks wrong. Quote the spec line — or the ticket address and line — for each
@@ -161,7 +163,8 @@ address list) from step 1, the review file paths from step 3, and, for a finding
 re-run searches the reviewers already ran. Ask it to:
 
 - Treat a finding that only restates a known spec deviation as **rejected** (reason: deliberate
-  deviation, with the ticket address).
+  deviation, with the ticket address), but only after checking the deviation against the code. Keep
+  a finding that says a deviation is stale or wrong.
 
 - Consolidate duplicate findings raised by more than one reviewer, across axes as well as within one.
 - Read the two axes against each other: a quality finding on code the Spec axis flags as scope creep

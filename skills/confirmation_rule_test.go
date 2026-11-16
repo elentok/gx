@@ -22,6 +22,16 @@ func TestToTicketsSharedRegistryFileAnchors(t *testing.T) {
 	)
 }
 
+func TestCodeReviewSpecDeviationsAreClaimsToCheckAnchors(t *testing.T) {
+	checkAnchors(t, "gx-code-review/SKILL.md",
+		"`gx tickets show <epic> --section \"Spec deviations\"`",
+		"Pass the full list on, not a truncated view",
+		"These are claims to check, not exclusions",
+		"Verify each deviation against the code before skipping it",
+		"Report a stale or wrong one as a finding",
+	)
+}
+
 func TestImplementDiffCheckAnchors(t *testing.T) {
 	checkAnchors(t, "gx-implement/SKILL.md",
 		"## Check the diff against the ticket",
