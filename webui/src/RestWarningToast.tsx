@@ -54,6 +54,7 @@ export function RestWarningToast() {
         : `Your Break starts at ${time} and lasts ${breakMinutes} minutes.`,
       persistent: true,
       card: true,
+      placement: "top-end",
       onClose: () => {
         if (active.current === kind) closed.current = true
       },

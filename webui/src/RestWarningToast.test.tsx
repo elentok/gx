@@ -69,6 +69,21 @@ test("bedtime warning text", async () => {
   expect(screen.getByText("Wrap up what you are doing.")).toBeTruthy()
 })
 
+// The runtime toast carries `placement`; the public type omits it.
+const placementOfFirst = () =>
+  (toaster.getVisibleToasts()[0] as { placement?: string } | undefined)?.placement
+
+test("break and bedtime warnings sit top-right", async () => {
+  setup(brk(14, 55))
+  await screen.findByText("Break in 2 minutes")
+  expect(placementOfFirst()).toBe("top-end")
+  cleanup()
+  toaster.remove()
+  setup({ kind: "bedtime", start: at(22, 0) }, 10)
+  await screen.findByText("Bedtime starts at 22:00 (in 10 minutes)")
+  expect(placementOfFirst()).toBe("top-end")
+})
+
 test("clock time prints in the snapshot zone, not the browser zone", async () => {
   setup(brk(14, 55), 2, { zone: "Asia/Tokyo", zone_offset_seconds: 9 * 3600 })
   expect(await screen.findByText("Your Break starts at 23:55 and lasts 5 minutes.")).toBeTruthy()

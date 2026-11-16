@@ -17,6 +17,8 @@ export interface ToastSpec {
   actions?: { label: string; onClick: () => void }[]
   /** A raised card with an amber left edge instead of a filled alert; the close button stays. */
   card?: boolean
+  /** Overrides the toaster's default placement for this toast only. */
+  placement?: "top-end"
   /** Runs when the toast starts closing, from the close button or a dismiss. */
   onClose?: () => void
 }
@@ -30,11 +32,13 @@ export function showToast({
   persistent,
   actions,
   card,
+  placement,
   onClose,
 }: ToastSpec) {
   // Chakra spreads these over its defaults, so an undefined id or duration would erase them.
   toaster.create({
     ...(id && { id }),
+    ...(placement && { placement }),
     ...(persistent && { duration: Infinity }),
     ...((actions || card) && { meta: { actions, card } }),
     ...(onClose && {
