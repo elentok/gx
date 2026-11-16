@@ -55,6 +55,10 @@ run it in parallel with `gx brief go-test`: a racing build makes every package f
   freezes the workers until you delete the file named by `hold_file`.
 - Each run is its own isolated server and state. Start one per flow.
 - Resolve `gx tickets root` before any `cd`. It fails with "not inside a git repo" from `$TMPDIR`.
+  Resolve it before you source the fixture env too: the env changes `HOME` and `XDG_*`, so `gx
+  tickets root` then points at the fixture's empty state.
+- The build takes about 2 minutes. Redirect the run's stdout to `fx.json` and wait for it with:
+  `until [ -s fx.json ]; do sleep 2; done; cat fx.json`. (Use the `--env` file the same way.)
 - To run `gx` against the fixture from the shell, pass `--env` and source the output. It prints
   `export` lines instead of the JSON: the `env` entries, plus `GXF_WEB_URL`, `GXF_GX`,
   `GXF_DISK_DIR`, `GXF_HEALTH_DIR`, `GXF_HOLD_FILE`, `GXF_STATE_DIR`, `GXF_SOCKET` and `GXF_LOG_FILE`. Redirect the background run's stdout to a file,
@@ -85,6 +89,8 @@ The JSON line has these fields:
 - `worktree`: the directory the fixture was started from. To tell your fixture from a sibling
   worktree's, compare it with your own `pwd`; never kill one that names another worktree. `--env`
   exports it as `GXF_WORKTREE`. It is the checkout, not the demo repo.
+- `pid`: the fixture's own process id. `--env` exports it as `GXF_PID`. Stop the fixture with
+  `go run ./testutil/gxfixture stop <scenario|pid>` (see step 3).
 - `repo`: the fixture's demo repo (`<root>/repo`). `--env` exports it as `GXF_REPO`.
 - `log_file`: the server's combined stdout and stderr. A failed cleanup command shows up there as
   `disk cleanup command failed`, with the command's exit code and output tail. Read it when the UI
@@ -100,7 +106,14 @@ because requests a worker answers bypass `page.route`. A check that needs the wo
 of that config whose `contextOptions.serviceWorkers` is `"allow"`:
 `playwright-cli -s=<browser_session> open --config=<copy>.json`.
 
-1. Set the `cookie_name` cookie to `cookie`, then open `web_url` once. In a Playwright script use
+1. Set the `cookie_name` cookie to `cookie`, then open `web_url` once. With the `--env` output
+   sourced:
+   ```
+   playwright-cli -s=$GXF_BROWSER_SESSION open about:blank
+   playwright-cli -s=$GXF_BROWSER_SESSION cookie-set "${GXF_WEB_COOKIE%%=*}" "${GXF_WEB_COOKIE#*=}" --domain=127.0.0.1 --path=/ --secure
+   playwright-cli -s=$GXF_BROWSER_SESSION goto "$GXF_WEB_URL"
+   ```
+   Run each line as its own call. In a Playwright script use
    `waitUntil: "domcontentloaded"`: the page keeps a live connection, so `load` can time out. A flow
    that types a TOTP code uses the `nextTotpCode()` helper in `webui/e2e/fixture.ts`. It waits for a
    TOTP step the server has not accepted yet, because a code works once per step.
@@ -127,8 +140,10 @@ of that config whose `contextOptions.serviceWorkers` is `"allow"`:
 
 ## 3. Stop the fixture
 
-Send SIGTERM to the fixture process (stop the background task). It shuts down the server and its
-agents and removes its state. Stop it even when the flow failed.
+Run `go run ./testutil/gxfixture stop <scenario|pid>` (the pid is `GXF_PID`), or stop the background
+task. It sends SIGTERM, and the fixture shuts down the server and its agents and removes its state.
+`stop` only ends a fixture started from your own worktree and refuses a sibling's. Never use
+`pkill -f gxfixture`: it matches every worktree's fixture. Stop it even when the flow failed.
 
 ## How the fixture behaves
 

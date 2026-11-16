@@ -2,6 +2,7 @@ package spec
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -76,6 +77,8 @@ type Output struct {
 	// Worktree is the directory the fixture was started from, so an agent can tell
 	// its own fixture from a sibling worktree's.
 	Worktree string `json:"worktree,omitempty"`
+	// PID is the fixture's own process id; `gxfixture stop <pid>` ends it.
+	PID int `json:"pid"`
 	// Repo is the demo repo (`<root>/repo`); Worktree is the checkout, not this.
 	Repo string `json:"repo,omitempty"`
 	// OutsideTreePID is the root of the process tree an OutsideTree scenario
@@ -150,6 +153,9 @@ func (o Output) ShellEnv() string {
 	}
 	if o.Worktree != "" {
 		export("GXF_WORKTREE", o.Worktree)
+	}
+	if o.PID != 0 {
+		export("GXF_PID", strconv.Itoa(o.PID))
 	}
 	if o.Repo != "" {
 		export("GXF_REPO", o.Repo)

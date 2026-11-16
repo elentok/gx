@@ -9,12 +9,20 @@ type opts struct {
 	mockDir, shape                              string
 	configs                                     []string
 	hold, shellEnv, hideCodex                   bool
+	// stop is the name or pid after the `stop` subcommand; empty when not stopping.
+	stop string
 }
 
 // parseArgs reads the flags and the positional scenario name. It does not look
 // the scenario up, so it needs no registry and touches nothing.
 func parseArgs(args []string) (opts, error) {
 	var o opts
+	if len(args) > 0 && args[0] == "stop" {
+		if len(args) != 2 {
+			return opts{}, fmt.Errorf("usage: gxfixture stop <name|pid>")
+		}
+		return opts{stop: args[1]}, nil
+	}
 	bools := map[string]*bool{"--hide-codex": &o.hideCodex, "--hold": &o.hold, "--env": &o.shellEnv}
 	values := map[string]*string{
 		"--auto-advance-delay": &o.autoAdvance,

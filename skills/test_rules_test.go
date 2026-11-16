@@ -53,6 +53,8 @@ func TestPlaywrightE2esSkillIsWired(t *testing.T) {
 
 func TestGxUICheckBlocksWorkersByDefault(t *testing.T) {
 	checkAnchors(t, "gx-ui-check/SKILL.md", "`serviceWorkers: \"block\"`", "bypass `page.route`")
+	checkAnchors(t, "gx-ui-check/SKILL.md", "gxfixture stop <scenario|pid>", "`GXF_PID`", "Never use `pkill -f gxfixture`",
+		"until [ -s fx.json ]", "$GXF_WEB_COOKIE", "Resolve it before you source the fixture env")
 }
 
 func TestGxImplementTestRules(t *testing.T) {

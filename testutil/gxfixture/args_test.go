@@ -28,6 +28,8 @@ func TestParseArgs(t *testing.T) {
 		{name: "last positional wins", args: []string{"ready", "mixed"}, want: opts{scenario: "mixed"}},
 		{name: "unknown name is kept for the lookup", args: []string{"nope"}, want: opts{scenario: "nope"}},
 		{name: "no args", args: nil, want: opts{}},
+		{name: "stop by name", args: []string{"stop", "ready"}, want: opts{stop: "ready"}},
+		{name: "stop needs a target", args: []string{"stop"}, wantErr: "usage: gxfixture stop <name|pid>"},
 		{name: "missing value", args: []string{"ready", "--gx"}, wantErr: "--gx needs a value"},
 		{name: "missing config value", args: []string{"--config"}, wantErr: "--config needs a value"},
 		{name: "missing shape value", args: []string{"--shape"}, wantErr: "--shape needs a value"},

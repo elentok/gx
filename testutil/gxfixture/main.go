@@ -17,6 +17,7 @@
 // --shape <merged|running|unstamped|empty|missing-sha|pr|backfill> picks the Epic ranges and branches of the epic-diff scenario (default merged).
 // --shape <running|off|installing|starting|down|no-checkout> picks the Dev mode state of the dev-mode scenario (default running).
 // --shape <main-worktree|no-main-worktree> picks whether demo's trunk is checked out in the host-files scenario (default main-worktree).
+// `gxfixture stop <scenario|pid>` sends SIGTERM to a fixture started from the same worktree and refuses another worktree's.
 // --env prints `export` lines (see Output.ShellEnv) instead of the JSON, so a shell can source them.
 // --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
 // --mock-dir <path> serves that directory over loopback HTTP and reports its base URL as mock_url.
@@ -59,6 +60,9 @@ func run(args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	if o.stop != "" {
+		return runStop(o.stop)
+	}
 	sc, ok := catalog.Scenarios[o.scenario]
 	if !ok {
 		return fmt.Errorf("unknown scenario %q; known: %s", o.scenario, strings.Join(catalog.Names(), ", "))
@@ -100,6 +104,11 @@ func run(args []string) (err error) {
 	if root, err = filepath.EvalSymlinks(root); err != nil {
 		return err
 	}
+	removePid, err := writePidFile(root, o.scenario)
+	if err != nil {
+		return err
+	}
+	defer removePid()
 	gxBin, binDir, codex, err := installBinaries(root, o, sc)
 	if err != nil {
 		return err
