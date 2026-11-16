@@ -32,6 +32,9 @@ func TestGroupCriteriaMisses(t *testing.T) {
 			[]string{"`### From follow-ups/02` group has no `- [ ]` item"}},
 		"short heading matches canonical member": {from, body("\n### From follow-ups/02\n\n- [ ] b\n\n### From follow-ups/01\n\n- [ ] a\n"), nil},
 		"single from is not a group":             {from[:1], body("- [ ] plain\n"), nil},
+		"fenced comment does not end the group":  {from, body("\n### From follow-ups/01\n\n- [ ] a\n\n### From follow-ups/02\n\n```sh\n# comment\n```\n\n- [ ] b\n"), nil},
+		"real heading ends the group": {from, body("\n### From follow-ups/01\n\n- [ ] a\n\n### From follow-ups/02\n\n## Next\n\n- [ ] b\n"),
+			[]string{"`### From mine:follow-ups/02` group has no `- [ ]` item"}},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {

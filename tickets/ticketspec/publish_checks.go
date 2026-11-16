@@ -33,6 +33,7 @@ func PublishShapeMisses(ticketType, body string, window int) []string {
 var (
 	groupHeadingRE = regexp.MustCompile(`^###\s+From\s+(\S+)\s*$`)
 	checkboxRE     = regexp.MustCompile(`^\s*- \[[ xX]\]`)
+	anyHeadingRE   = regexp.MustCompile(`^#{1,6} `)
 )
 
 // GroupCriteriaMisses returns one miss per member of from that has no
@@ -47,11 +48,19 @@ func GroupCriteriaMisses(from []string, body string, canon func(string) string) 
 	hasHeading := map[string]bool{}
 	hasItem := map[string]bool{}
 	current := ""
+	inFence := false
 	for line := range strings.SplitSeq(schema.Section(body, "Acceptance criteria"), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
 		if m := groupHeadingRE.FindStringSubmatch(line); m != nil {
 			current = canon(m[1])
 			hasHeading[current] = true
-		} else if strings.HasPrefix(line, "#") {
+		} else if anyHeadingRE.MatchString(line) {
 			current = ""
 		} else if current != "" && checkboxRE.MatchString(line) {
 			hasItem[current] = true
