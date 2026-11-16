@@ -8,7 +8,6 @@ import type {
   RestUnlockRequest,
   RestWarning,
 } from "./generated/server"
-import { guarded } from "./ui/reportWriteFailure"
 import { WriteError } from "./useWrite"
 
 export const HEARTBEAT_INTERVAL_MS = 60_000
@@ -55,7 +54,8 @@ export function useHeartbeat(on: boolean): void {
     const tick = () => {
       if (!input) return
       input = false
-      guarded(postRestActive())
+      // Silent on failure: a background call the person never made must not toast.
+      postRestActive().catch(() => {})
     }
     const start = () => {
       if (timer === undefined) timer = setInterval(tick, HEARTBEAT_INTERVAL_MS)
