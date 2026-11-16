@@ -2,6 +2,7 @@ import { Box, chakra, Text } from "@chakra-ui/react"
 import { useState } from "react"
 import type { StatsWebPerfRoute, StatsWebPerfTrend } from "../generated/server"
 import { Button } from "../ui/button/Button"
+import { formatPerf, perfUnit } from "./formatPerf"
 
 export const MIN_SAMPLES = 20
 
@@ -21,11 +22,6 @@ const LEFT = 56
 const RIGHT = 630
 const TOP = 16
 const BOTTOM = 166
-
-function formatTick(metric: string, v: number): string {
-  if (metric === "cls") return v.toFixed(2)
-  return v >= 1000 ? `${+(v / 1000).toFixed(2)} s` : `${Math.round(v)} ms`
-}
 
 // Two even gaps of a round size (1, 2, 5 × 10^n) that cover [lo, hi].
 function niceRange(lo: number, hi: number): { min: number; max: number; ticks: number[] } {
@@ -97,7 +93,7 @@ function Trend({
         <g key={v}>
           <line x1={LEFT} x2={RIGHT} y1={y(v)} y2={y(v)} stroke="currentColor" opacity={0.25} />
           <text x={LEFT - 6} y={y(v) + 3} fontSize="11" textAnchor="end" fill="currentColor">
-            {formatTick(metric, v)}
+            {formatPerf(v, perfUnit(metric))}
           </text>
         </g>
       ))}
@@ -141,7 +137,6 @@ export function WebPerformanceTrend({
 }) {
   const [metric, setMetric] = useState("lcp")
   const label = TREND_METRICS.find((m) => m.id === metric)?.label ?? metric
-  const top = [...routes].sort((a, b) => b.p75 - a.p75).slice(0, 5)
   return (
     <Box
       data-mock-part="trend-and-routes"
@@ -180,7 +175,7 @@ export function WebPerformanceTrend({
         <Text fontSize="xs" color="text.muted" mb="2">
           route changes, by p75
         </Text>
-        {top.length === 0 ? (
+        {routes.length === 0 ? (
           <Text color="text.muted">—</Text>
         ) : (
           <Box overflowX="auto">
@@ -193,7 +188,7 @@ export function WebPerformanceTrend({
                 </tr>
               </thead>
               <tbody>
-                {top.map((r) => {
+                {routes.map((r) => {
                   const lowRow = r.count < MIN_SAMPLES
                   return (
                     <chakra.tr
@@ -207,7 +202,7 @@ export function WebPerformanceTrend({
                         {r.route}
                       </chakra.td>
                       <chakra.td textAlign="right" py="1.5" px="2">
-                        {formatTick("route_ready", r.p75)}
+                        {formatPerf(r.p75, "ms")}
                       </chakra.td>
                       <chakra.td textAlign="right" py="1.5" px="2">
                         {lowRow ? `${r.count} · not enough` : r.count}

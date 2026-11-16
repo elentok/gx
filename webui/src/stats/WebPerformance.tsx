@@ -5,11 +5,10 @@ import { Button } from "../ui/button/Button"
 import { Chip } from "../ui/chip/Chip"
 import type { Tone } from "../ui/tone"
 import { BuildStrip, WhySlow } from "./WebPerformanceBuild"
-import { WebPerformanceTrend } from "./WebPerformanceTrend"
+import { formatPerf, perfUnit } from "./formatPerf"
+import { MIN_SAMPLES, WebPerformanceTrend } from "./WebPerformanceTrend"
 
 export type PerfTab = "hard" | "route"
-
-const MIN_SAMPLES = 20
 
 const LABELS: Record<string, string> = {
   lcp: "LCP",
@@ -35,11 +34,6 @@ const STATUS: Record<string, { label: string; tone: Tone }> = {
   poor: { label: "poor", tone: "deadlocked" },
 }
 
-export function formatPerfValue(metric: string, v: number): string {
-  if (metric === "cls") return v.toFixed(2)
-  return v >= 1000 ? `${(v / 1000).toFixed(2)} s` : `${Math.round(v)} ms`
-}
-
 function Change({ pct, range }: { pct: number | undefined; range: number }) {
   if (pct == null) return <Text color="text.muted">—</Text>
   const rounded = Math.round(pct)
@@ -55,7 +49,7 @@ function Change({ pct, range }: { pct: number | undefined; range: number }) {
 function MetricCard({ card, range }: { card: StatsWebPerfCard; range: number }) {
   const low = card.count < MIN_SAMPLES
   const status = !low && card.status ? STATUS[card.status] : undefined
-  const noThreshold = !low && !status && !(card.metric in { lcp: 1, inp: 1, cls: 1, fcp: 1 })
+  const noThreshold = !low && !status && !card.has_threshold
   return (
     <Box
       data-testid={`perf-card-${card.metric}`}
@@ -69,7 +63,7 @@ function MetricCard({ card, range }: { card: StatsWebPerfCard; range: number }) 
     >
       <Text color="text.muted">{LABELS[card.metric] ?? card.metric}</Text>
       <Text fontSize="2xl" fontWeight="600" opacity={low ? 0.55 : 1}>
-        {card.p75 == null ? "—" : formatPerfValue(card.metric, card.p75)}
+        {card.p75 == null ? "—" : formatPerf(card.p75, perfUnit(card.metric))}
       </Text>
       <Text color="text.muted">{card.count} samples</Text>
       {low ? (

@@ -199,6 +199,8 @@ type StatsWebPerfCard struct {
 	P75       *float64 `json:"p75"`
 	Status    string   `json:"status,omitempty"`
 	ChangePct *float64 `json:"change_pct"`
+	// HasThreshold is true when the metric has a standard good/poor cutoff.
+	HasThreshold bool `json:"has_threshold"`
 }
 
 // StatsWebPerfPoint is one day of a trend: one point per entry of Stats.Days.

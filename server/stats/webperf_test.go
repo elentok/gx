@@ -135,6 +135,19 @@ func TestStats_WebPerformanceCardsCarryP75StatusAndChange(t *testing.T) {
 		t.Errorf("app_ready status = %q, want none", app.Status)
 	}
 
+	for _, c := range []struct {
+		cards  []wire.StatsWebPerfCard
+		metric string
+		want   bool
+	}{
+		{wp.HardLoads, "lcp", true}, {wp.HardLoads, "inp", true}, {wp.HardLoads, "cls", true},
+		{wp.HardLoads, "fcp", true}, {wp.HardLoads, "app_ready", false}, {wp.RouteChanges, "route_ready", false},
+	} {
+		if got := perfCard(t, c.cards, c.metric).HasThreshold; got != c.want {
+			t.Errorf("%s has_threshold = %v, want %v", c.metric, got, c.want)
+		}
+	}
+
 	cls := perfCard(t, wp.HardLoads, "cls")
 	if cls.Count != 0 || cls.P75 != nil {
 		t.Errorf("cls with no samples = %+v", cls)

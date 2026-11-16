@@ -7,6 +7,7 @@ export const webPerformanceFull: StatsWebPerformance = {
   hard_loads: [
     {
       metric: "lcp",
+      has_threshold: true,
       count: 70,
       p75: 3764,
       status: "needs-improvement",
@@ -14,6 +15,7 @@ export const webPerformanceFull: StatsWebPerformance = {
     },
     {
       metric: "inp",
+      has_threshold: true,
       count: 28,
       p75: 462.2,
       status: "needs-improvement",
@@ -21,6 +23,7 @@ export const webPerformanceFull: StatsWebPerformance = {
     },
     {
       metric: "cls",
+      has_threshold: true,
       count: 28,
       p75: 0.1414,
       status: "needs-improvement",
@@ -28,6 +31,7 @@ export const webPerformanceFull: StatsWebPerformance = {
     },
     {
       metric: "fcp",
+      has_threshold: true,
       count: 42,
       p75: 1772,
       status: "good",
@@ -35,6 +39,7 @@ export const webPerformanceFull: StatsWebPerformance = {
     },
     {
       metric: "app_ready",
+      has_threshold: false,
       count: 42,
       p75: 2169.6,
       change_pct: 18.0157,
@@ -43,12 +48,14 @@ export const webPerformanceFull: StatsWebPerformance = {
   route_changes: [
     {
       metric: "route_ready",
+      has_threshold: false,
       count: 56,
       p75: 1725,
       change_pct: -26.7609,
     },
     {
       metric: "inp",
+      has_threshold: true,
       count: 28,
       p75: 418.52,
       status: "needs-improvement",
@@ -56,6 +63,7 @@ export const webPerformanceFull: StatsWebPerformance = {
     },
     {
       metric: "cls",
+      has_threshold: true,
       count: 28,
       p75: 0.1971,
       status: "needs-improvement",
@@ -366,26 +374,31 @@ export const webPerformanceLow: StatsWebPerformance = {
   hard_loads: [
     {
       metric: "lcp",
+      has_threshold: true,
       count: 9,
       p75: 3839,
     },
     {
       metric: "inp",
+      has_threshold: true,
       count: 6,
       p75: 460.64,
     },
     {
       metric: "cls",
+      has_threshold: true,
       count: 6,
       p75: 0.1302,
     },
     {
       metric: "fcp",
+      has_threshold: true,
       count: 9,
       p75: 2071.2,
     },
     {
       metric: "app_ready",
+      has_threshold: false,
       count: 9,
       p75: 1771.8,
     },
@@ -393,16 +406,19 @@ export const webPerformanceLow: StatsWebPerformance = {
   route_changes: [
     {
       metric: "route_ready",
+      has_threshold: false,
       count: 6,
       p75: 1519.5,
     },
     {
       metric: "inp",
+      has_threshold: true,
       count: 6,
       p75: 559.44,
     },
     {
       metric: "cls",
+      has_threshold: true,
       count: 6,
       p75: 0.2682,
     },

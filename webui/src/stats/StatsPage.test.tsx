@@ -425,7 +425,7 @@ const perfCard = (
   metric: string,
   count: number,
   over: Partial<Stats["web_performance"]["hard_loads"][number]> = {},
-) => ({ metric, count, ...over })
+) => ({ metric, count, has_threshold: ["lcp", "inp", "cls", "fcp"].includes(metric), ...over })
 
 const perfStats = (wp: Partial<Stats["web_performance"]> = {}) =>
   statsOf({}, { web_performance: { ...statsOf().web_performance, ...wp } })
@@ -464,6 +464,23 @@ test("the Web performance cards show value, pill, the server's change and the de
   expect(fcp.textContent).toContain("not enough samples")
   expect(fcp.textContent).not.toContain("good")
   expect(fcp.dataset.low).toBe("true")
+})
+
+test("a card's has_threshold flag decides whether it says there is no standard threshold", async () => {
+  renderStats(async () =>
+    perfStats({
+      hard_loads: [
+        perfCard("lcp", 412, { p75: 2310, has_threshold: false }),
+        perfCard("app_ready", 412, { p75: 1840, has_threshold: true }),
+      ],
+    }),
+  )
+  expect((await screen.findByTestId("perf-card-lcp")).textContent).toContain(
+    "no standard threshold",
+  )
+  expect(screen.getByTestId("perf-card-app_ready").textContent).not.toContain(
+    "no standard threshold",
+  )
 })
 
 test("a project filter leaves the Web performance values unchanged and the scope text says so", async () => {
@@ -556,8 +573,8 @@ const trendStats = () =>
         ],
         slowest_routes: [
           { route: "ticket", p75: 780, count: 141 },
-          { route: "stats", p75: 610, count: 6 },
           { route: "epic", p75: 640, count: 212 },
+          { route: "stats", p75: 610, count: 6 },
         ],
       },
     },
@@ -587,7 +604,7 @@ test("the trend picker shows one metric with its own unit and is not in the URL"
   }
 })
 
-test("the slowest routes table sorts by p75 and dims routes under 20 samples", async () => {
+test("the slowest routes table keeps the server's order and dims routes under 20 samples", async () => {
   renderStats(async () => trendStats())
   const table = await screen.findByTestId("slowest-routes")
   expect([...table.querySelectorAll("tbody tr")].map((r) => r.getAttribute("data-testid"))).toEqual(

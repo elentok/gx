@@ -3704,6 +3704,10 @@ export interface StatsWebPerfCard {
   p75?: number /* float64 */;
   status?: string;
   change_pct?: number /* float64 */;
+  /**
+   * HasThreshold is true when the metric has a standard good/poor cutoff.
+   */
+  has_threshold: boolean;
 }
 /**
  * StatsWebPerfPoint is one day of a trend: one point per entry of Stats.Days.

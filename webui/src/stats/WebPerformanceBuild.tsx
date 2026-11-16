@@ -5,10 +5,9 @@ import type {
   StatsWebPerfPoorINP,
   StatsWebPerfWhySlow,
 } from "../generated/server"
-import { sizeText } from "../health/formatBytes"
 import { Collapsible } from "../ticket/Collapsible"
-
-const MIN_SAMPLES = 20
+import { formatPerf, type PerfUnit, perfUnit } from "./formatPerf"
+import { MIN_SAMPLES } from "./WebPerformanceTrend"
 
 const ROWS: { metric: string; label: string }[] = [
   { metric: "ttfb", label: "TTFB" },
@@ -23,12 +22,8 @@ const CELLS = {
   "& th": { fontWeight: "400", color: "var(--chakra-colors-text-muted)" },
 }
 
-const isBytes = (metric: string) => metric.endsWith("_bytes")
-
-function formatWhy(metric: string, v: number | undefined): string {
-  if (v == null) return "—"
-  return isBytes(metric) ? sizeText(v, "decimal") : `${Math.round(v)} ms`
-}
+const formatOptional = (v: number | undefined, unit: PerfUnit) =>
+  v == null ? "—" : formatPerf(v, unit)
 
 // build_id looks like "b-7c2e55"; the label shows the first four hash characters.
 function buildLabel(b: StatsWebPerfBuild): string {
@@ -109,10 +104,12 @@ function WhyRow({
       opacity={low ? 0.55 : 1}
     >
       <td>{label}</td>
-      <chakra.td textAlign="right">{low ? "not enough" : formatWhy(row.metric, row.p75)}</chakra.td>
+      <chakra.td textAlign="right">
+        {low ? "not enough" : formatOptional(row.p75, perfUnit(row.metric))}
+      </chakra.td>
       <chakra.td textAlign="right">
         {hasPrevious && !low && row.change_pct != null
-          ? formatWhy(row.metric, row.previous_p75)
+          ? formatOptional(row.previous_p75, perfUnit(row.metric))
           : "—"}
       </chakra.td>
     </chakra.tr>
@@ -138,7 +135,7 @@ function PoorInp({ poor }: { poor: StatsWebPerfPoorINP }) {
               {phases.map(([label, v]) => (
                 <tr key={label}>
                   <td>{label}</td>
-                  <chakra.td textAlign="right">{formatWhy("ms", v)}</chakra.td>
+                  <chakra.td textAlign="right">{formatOptional(v, "ms")}</chakra.td>
                 </tr>
               ))}
               {poor.top_actions.slice(0, 3).map((a) => (

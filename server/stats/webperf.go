@@ -159,6 +159,7 @@ func buildWebPerformance(src WebPerf, win limits.StatsWindow, includeDev bool) (
 		for i, m := range metrics {
 			vals := cur[perfKey{tab, m}]
 			card := wire.StatsWebPerfCard{Metric: m, Count: len(vals), P75: p75(vals)}
+			_, card.HasThreshold = cutoffs[m]
 			card.Status = statusOf(m, card.P75, card.Count)
 			card.ChangePct = pctChange(vals, prev[perfKey{tab, m}])
 			out[i] = card
