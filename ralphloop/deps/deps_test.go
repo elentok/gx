@@ -33,7 +33,7 @@ func stubBin(t *testing.T, name string, logPath string, exitCode int) string {
 // prints "boom" first, as a failing package manager would.
 func writeStub(t *testing.T, dir, name, logPath string, exitCode int) {
 	t.Helper()
-	script := "#!/bin/sh\necho \"cwd=$(pwd) CI=$CI $0 $*\" >> " + logPath + "\n"
+	script := "#!/bin/sh\necho \"cwd=$(pwd) CI=$CI nice=$(nice) $0 $*\" >> " + logPath + "\n"
 	if exitCode != 0 {
 		script += "echo boom\n"
 	}

@@ -157,7 +157,13 @@ func runInstall(ctx context.Context, dir string, command []string, pathEnv strin
 			return nil, err
 		}
 	}
-	cmd := exec.CommandContext(ctx, name, command[1:]...)
+	args := command[1:]
+	// Two installs at once still burst the CPU; run them at low priority.
+	if nicePath, err := exec.LookPath("nice"); err == nil {
+		args = append([]string{"-n", "10", name}, args...)
+		name = nicePath
+	}
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "CI=true")
 	// A killed manager's children can keep the output pipe open; don't wait on them.

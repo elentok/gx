@@ -3,7 +3,9 @@ package deps
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -116,6 +118,35 @@ func TestInstallDependencies_EachManager_RunsExpectedCommand(t *testing.T) {
 				t.Errorf("invocations = %v, want exactly one", got)
 			}
 		})
+	}
+}
+
+func TestInstallDependencies_NiceOnPath_RunsManagerNiced(t *testing.T) {
+	t.Parallel()
+	if _, err := exec.LookPath("nice"); err != nil {
+		t.Skip("nice not on PATH")
+	}
+	repo := installRepo(t, map[string]string{"package.json": pkgJSON, "package-lock.json": "{}"}, nil)
+	binDir, logPath := stubManagers(t, 0, "npm")
+
+	if _, err := installDependenciesWith(repo, binDir, ""); err != nil {
+		t.Fatalf("installDependenciesWith() error = %v", err)
+	}
+	got := readLog(t, logPath)
+	if len(got) != 1 {
+		t.Fatalf("invocations = %v, want exactly one", got)
+	}
+	var niceValue int
+	for field := range strings.FieldsSeq(got[0]) {
+		if v, ok := strings.CutPrefix(field, "nice="); ok {
+			niceValue, _ = strconv.Atoi(v)
+		}
+	}
+	if niceValue < 10 {
+		t.Errorf("manager nice value = %d, want >= 10 (log %q)", niceValue, got[0])
+	}
+	if !strings.HasSuffix(got[0], " ci") {
+		t.Errorf("manager args lost: %q", got[0])
 	}
 }
 
