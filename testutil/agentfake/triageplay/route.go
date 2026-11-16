@@ -184,7 +184,7 @@ func (p *Player) oldEpicMoves(backlogs []string) ([]string, error) {
 	}
 	var list []struct {
 		Epic    string   `json:"epic"`
-		Backlog    string   `json:"backlog"`
+		Backlog string   `json:"backlog"`
 		Move    []string `json:"move"`
 		Waiting bool     `json:"waiting"`
 		Claimed []string `json:"claimed"`

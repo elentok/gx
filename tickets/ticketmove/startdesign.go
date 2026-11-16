@@ -18,7 +18,7 @@ type StartDesignOpts struct {
 	Project    string
 	// Backlog is the epic the tickets leave; Map is the new map's name.
 	Backlog string
-	Map  string
+	Map     string
 	// Title is the person-approved name shown in the map's body.
 	Title string
 	// IDs are the approved tickets' ids in Backlog. Empty on a rerun reads them
@@ -30,8 +30,8 @@ type StartDesignOpts struct {
 }
 
 const (
-	notesBacklogPrefix   = "Backlog: "
-	notesTicketPrefix = "- "
+	notesBacklogPrefix = "Backlog: "
+	notesTicketPrefix  = "- "
 )
 
 // StartDesignNotes renders the map's Notes section body: the backlog, then one

@@ -119,7 +119,7 @@ const (
 // MoveUnit moves one old epic into a target backlog.
 type MoveUnit struct {
 	OldEpic   string    `json:"oldEpic"`
-	Backlog      string    `json:"backlog"`
+	Backlog   string    `json:"backlog"`
 	State     MoveState `json:"state"`
 	LastError string    `json:"lastError,omitempty"`
 }
@@ -193,7 +193,7 @@ type Record struct {
 	Rows      []Row      `json:"rows"`
 	Rounds    []Round    `json:"rounds,omitempty"`
 	Decided   []Decided  `json:"decided,omitempty"`
-	Backlogs     []Backlog     `json:"backlogs,omitempty"`
+	Backlogs  []Backlog  `json:"backlogs,omitempty"`
 	Moves     []MoveUnit `json:"moves,omitempty"`
 	// Approved is set by the approve verb.
 	Approved bool `json:"approved,omitempty"`

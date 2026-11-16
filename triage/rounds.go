@@ -20,10 +20,10 @@ const (
 // Plan actions. ActionBacklog replaces the version 1 "map"; Store.upgrade
 // rewrites old records, so no other code sees the old name.
 const (
-	ActionReady = "ready"
-	ActionBacklog  = "backlog"
-	ActionClose = "close"
-	legacyMap   = "map"
+	ActionReady   = "ready"
+	ActionBacklog = "backlog"
+	ActionClose   = "close"
+	legacyMap     = "map"
 )
 
 func (rd *Round) unanswered() []Question {

@@ -97,7 +97,7 @@ func TestStart_Refusals(t *testing.T) {
 		reason string
 	}{
 		"unknown project": {wire.StartDesignRequest{Project: "nope", Backlog: "backlog"}, wire.ReasonStartDesignUnknownProject},
-		"not a backlog":     {wire.StartDesignRequest{Project: "proj", Backlog: "loop"}, wire.ReasonStartDesignNotBacklog},
+		"not a backlog":   {wire.StartDesignRequest{Project: "proj", Backlog: "loop"}, wire.ReasonStartDesignNotBacklog},
 		"missing epic":    {wire.StartDesignRequest{Project: "proj", Backlog: "ghost"}, wire.ReasonStartDesignNotBacklog},
 		"no open ticket":  {wire.StartDesignRequest{Project: "proj", Backlog: "empty"}, wire.ReasonStartDesignNoOpenTickets},
 	} {

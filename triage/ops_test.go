@@ -607,10 +607,10 @@ func TestSaveMoves_RefusesANonBacklogTargetAndANonCandidateOldEpic(t *testing.T)
 	writeKindEpic(t, s, "other-map", "map", "")
 	addTicket(t, s, "plain", "01")
 	for name, u := range map[string]MoveUnit{
-		"plain epic as backlog":   {OldEpic: "old", Backlog: "plain"},
-		"map as backlog":          {OldEpic: "old", Backlog: "other-map"},
-		"map without the note": {OldEpic: "other-map", Backlog: "backlog"},
-		"plain epic as old":    {OldEpic: "plain", Backlog: "backlog"},
+		"plain epic as backlog": {OldEpic: "old", Backlog: "plain"},
+		"map as backlog":        {OldEpic: "old", Backlog: "other-map"},
+		"map without the note":  {OldEpic: "other-map", Backlog: "backlog"},
+		"plain epic as old":     {OldEpic: "plain", Backlog: "backlog"},
 	} {
 		if _, err := s.SaveMoves(rec.ID, rec.Revision, []MoveUnit{u}); err == nil {
 			t.Errorf("%s: accepted", name)

@@ -81,12 +81,12 @@ func LoadEpicTicketMD(epicPath string) Epic {
 // epic is counted regardless of which files exist inside it (ticket.md,
 // spec.md, only issues/, or nothing yet).
 type Epic struct {
-	Name    string
-	Path    string
-	IsMap   bool   // a wayfinder map: ticket.md says kind: map
-	IsBacklog  bool   // a backlog: ticket.md says kind: backlog
-	Body    string // ticket.md's body
-	Tickets []Ticket
+	Name      string
+	Path      string
+	IsMap     bool   // a wayfinder map: ticket.md says kind: map
+	IsBacklog bool   // a backlog: ticket.md says kind: backlog
+	Body      string // ticket.md's body
+	Tickets   []Ticket
 
 	// HasTicketMD is true when the epic has its ticket.md entry file, whose
 	// frontmatter supplies Status, BlockedBy, Base and timing. An epic

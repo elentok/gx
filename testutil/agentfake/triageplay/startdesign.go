@@ -35,7 +35,7 @@ const maxDesignTickets = 14
 // DesignCard is the "Start this Design?" card the fake proposes.
 type DesignCard struct {
 	Project, Backlog, Map, Title string
-	Tickets                   []DesignTicket
+	Tickets                      []DesignTicket
 }
 
 // DesignTicket is one proposed ticket of a card.

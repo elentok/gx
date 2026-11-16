@@ -383,7 +383,8 @@ test.describe("199. Triage journey", () => {
         .getByRole("region", { name: "demo", exact: true })
         .getByRole("listitem")
         .filter({ hasText: new RegExp(`^${name}`) })
-    const startDesign = (name: string) => backlog(name).getByRole("button", { name: "Start Design" })
+    const startDesign = (name: string) =>
+      backlog(name).getByRole("button", { name: "Start Design" })
     const startButton = (name: string) =>
       page
         .getByRole("dialog", nav(`Start Design for ${name}`))

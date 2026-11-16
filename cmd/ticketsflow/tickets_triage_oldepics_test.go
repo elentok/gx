@@ -28,7 +28,7 @@ func writeOldEpic(t *testing.T, project, name, front, notes string, ticketStatus
 
 type oldEpicShown struct {
 	Epic    string   `json:"epic"`
-	Backlog    string   `json:"backlog"`
+	Backlog string   `json:"backlog"`
 	Move    []string `json:"move"`
 	Archive bool     `json:"archive"`
 	Waiting bool     `json:"waiting"`

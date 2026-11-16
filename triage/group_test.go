@@ -28,7 +28,7 @@ func TestSavePlan_SmallOverlappingReadyRowsBecomeOneGroup(t *testing.T) {
 
 func TestSetPerson_GroupedRowSwitchedAwayFromReadyLeavesItsGroup(t *testing.T) {
 	for name, f := range map[string]PersonFields{
-		"backlog":           {Action: ActionBacklog, Destination: "m"},
+		"backlog":        {Action: ActionBacklog, Destination: "m"},
 		"keep for later": {KeepForLater: true},
 	} {
 		s, _ := atPlan(t)

@@ -57,7 +57,9 @@ test("202. Context badge (stories 1 to 28)", async ({ page, start }) => {
   // Stories 10, 13, 5, 4: the popover, then a usage line grows the count and the ring with no reload.
   const before = await fillOf(page)
   await badge(page).click()
-  await expect(page.getByRole("dialog", { name: "Context usage" })).toContainText(/40K\s*of 130K smart zone/)
+  await expect(page.getByRole("dialog", { name: "Context usage" })).toContainText(
+    /40K\s*of 130K smart zone/,
+  )
   await badge(page).click()
   await expect(page.getByRole("dialog", { name: "Context usage" })).toHaveCount(0)
   // The server announces transcript growth only while a session works, so the line lands as part of a turn.
@@ -66,7 +68,9 @@ test("202. Context badge (stories 1 to 28)", async ({ page, start }) => {
   await expect(badge(page)).toHaveText("70K")
   await expect.poll(() => fillOf(page)).toBeGreaterThan(before)
   await badge(page).click()
-  await expect(page.getByRole("dialog", { name: "Context usage" })).toContainText(/70K\s*of 130K smart zone/)
+  await expect(page.getByRole("dialog", { name: "Context usage" })).toContainText(
+    /70K\s*of 130K smart zone/,
+  )
   await badge(page).click()
   await expect(page.getByRole("dialog", { name: "Context usage" })).toHaveCount(0)
 
@@ -123,7 +127,9 @@ test("202. Context badge (stories 1 to 28)", async ({ page, start }) => {
   await open(plain.find((s) => s.harness === "codex" && s.context_tokens === 90_000)!)
   await expect(badge(page)).toHaveText("90K")
   await badge(page).click()
-  await expect(page.getByRole("dialog", { name: "Context usage" })).toContainText(/90K\s*of 130K smart zone/)
+  await expect(page.getByRole("dialog", { name: "Context usage" })).toContainText(
+    /90K\s*of 130K smart zone/,
+  )
   await badge(page).click()
   await expect(page.getByRole("dialog", { name: "Context usage" })).toHaveCount(0)
 
