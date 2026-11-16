@@ -22,6 +22,7 @@ const (
 	CodeSectionRequired   = "section-required"
 	CodeStatusOverride    = "status-override"
 	CodeTypeOverride      = "type-override"
+	CodeDuplicateFollowUp = "duplicate-follow-up"   // `follow-up add` of a title an open follow-up has (--force files it anyway)
 	CodeEpicJSON          = "epic-json-unsupported" // `tickets show --json` on an epic
 	CodeDuplicateTicket   = "duplicate-ticket"      // `tickets add` of a title a live sibling under the same parent has
 

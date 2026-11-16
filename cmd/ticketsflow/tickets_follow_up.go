@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/elentok/gx/cmd/ticketref"
 	ticketscmd "github.com/elentok/gx/cmd/tickets"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -18,7 +19,7 @@ import (
 // files one writes the same shape. The ticket is always draft + research; a
 // body asking for anything else is refused. Every check runs before anything
 // is written.
-func runTicketsFollowUpAdd(d Deps, epicPath, body, category string, jsonOut bool, w io.Writer) error {
+func runTicketsFollowUpAdd(d Deps, epicPath, body, category string, force, jsonOut bool, w io.Writer) error {
 	if filepath.Base(filepath.Clean(epicPath)) != tickets.FollowUpsEpic {
 		return &tickets.AddressError{Code: tickets.CodeNotFollowUpsEpic, Msg: "follow-up add targets a " + tickets.FollowUpsEpic + " epic, not " + filepath.Base(epicPath)}
 	}
@@ -70,6 +71,14 @@ func runTicketsFollowUpAdd(d Deps, epicPath, body, category string, jsonOut bool
 		return &tickets.AddressError{Code: tickets.CodeSectionRequired, Msg: "a follow-up needs a non-empty " + strings.Join(missing, ", ") + " section"}
 	}
 
+	if !force {
+		if dup, err := openFollowUpWithTitle(epicPath, tickets.BodyTitle(text, "")); err != nil {
+			return err
+		} else if dup != "" {
+			return &tickets.AddressError{Code: tickets.CodeDuplicateFollowUp, Msg: fmt.Sprintf("%s is an open follow-up with this title; add to it instead, or pass --force to file it anyway", dup)}
+		}
+	}
+
 	fm.Status = string(schema.StatusDraft)
 	fm.Type = string(schema.TypeResearch)
 	path, _, err := ticketscmd.CreateTicket(epicPath, "", followUpSlug(text), &text, fm)
@@ -78,6 +87,36 @@ func runTicketsFollowUpAdd(d Deps, epicPath, body, category string, jsonOut bool
 	}
 	ticketscmd.PingServer(d.Env, path)
 	return ticketscmd.PrintTicketRef(path, jsonOut, w)
+}
+
+// openFollowUpWithTitle returns the address of an open (not done or
+// cancelled) follow-up in the epic at epicPath whose title equals title,
+// ignoring case and surrounding space, or "". An empty title never matches,
+// and a follow-ups epic that does not exist yet has no duplicates.
+func openFollowUpWithTitle(epicPath, title string) (string, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return "", nil
+	}
+	root := filepath.Dir(filepath.Clean(epicPath))
+	epics, err := tickets.Load(root)
+	if err != nil {
+		return "", err
+	}
+	for _, e := range epics {
+		if e.Name != tickets.FollowUpsEpic {
+			continue
+		}
+		for _, s := range e.Tickets {
+			if s.Status == string(schema.StatusDone) || s.Status == string(schema.StatusCancelled) {
+				continue
+			}
+			if strings.EqualFold(strings.TrimSpace(s.Title), title) {
+				return ticketref.TicketLabel(s.Path), nil
+			}
+		}
+	}
+	return "", nil
 }
 
 var slugUnsafeRe = regexp.MustCompile(`[^a-z0-9]+`)

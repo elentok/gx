@@ -46,6 +46,7 @@ func newTicketsFollowUpCmd(d Deps) *cobra.Command {
 	var followUpBody string
 	var followUpJSON bool
 	var followUpCategory string
+	var followUpForce bool
 	followUpAddCmd := &cobra.Command{
 		Use:   "add <project:epic>",
 		Short: "file one follow-up (draft, research) into a follow-ups epic, enforcing the follow-up format",
@@ -63,11 +64,12 @@ func newTicketsFollowUpCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTicketsFollowUpAdd(d, epicPath, body, followUpCategory, followUpJSON, c.OutOrStdout())
+			return runTicketsFollowUpAdd(d, epicPath, body, followUpCategory, followUpForce, followUpJSON, c.OutOrStdout())
 		},
 	}
 	followUpAddCmd.Flags().StringVar(&followUpBody, "body", "-", "follow-up body, or - to read it from stdin")
 	followUpAddCmd.Flags().StringVar(&followUpCategory, "category", "", "bug or idea (alternative to category: in the body frontmatter)")
+	followUpAddCmd.Flags().BoolVar(&followUpForce, "force", false, "file it even when an open follow-up has the same title")
 	followUpAddCmd.Flags().BoolVar(&followUpJSON, "json", false, "emit {address, path} JSON")
 	followUpCmd.AddCommand(followUpAddCmd)
 	var followUpProject string

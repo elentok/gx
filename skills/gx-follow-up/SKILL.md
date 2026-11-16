@@ -94,7 +94,10 @@ for that test name first. Judge each hit yourself, by title and `## Problem`: th
   ...
   ```
 
-  If the verb refuses, fix
+  Put the exact failing test or check name in the title. The verb refuses
+  (`duplicate-follow-up`) a title an open follow-up already has and prints that address: treat it as
+  the "open ticket" outcome above and append "seen again" there. `--force` files it anyway; use it
+  only when the problem is genuinely different. If the verb refuses otherwise, fix
   the gap its code names and retry. Never fall back to a plain `gx tickets add`.
 
 ## 4. Report

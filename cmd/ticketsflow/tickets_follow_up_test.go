@@ -119,6 +119,64 @@ func TestExecute_TicketsFollowUpAdd_Refusals(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsFollowUpAdd_RefusesAnOpenDuplicateTitle(t *testing.T) {
+	repo, project := setupShowProject(t)
+	body := "---\ncategory: idea\n---\n\n# TestSizeguard fails\n\n" + followUpSections
+	add := func(title string, extra ...string) (string, error) {
+		b := strings.Replace(body, "TestSizeguard fails", title, 1)
+		return runIn(t, repo, append([]string{"tickets", "follow-up", "add", "mine:follow-ups", "--body", b}, extra...)...)
+	}
+
+	first, err := add("TestSizeguard fails")
+	if err != nil {
+		t.Fatal(err)
+	}
+	existing := strings.TrimSpace(first)
+
+	_, err = add("  testsizeguard FAILS ")
+	var ae *tickets.AddressError
+	if !errors.As(err, &ae) || ae.Code != tickets.CodeDuplicateFollowUp {
+		t.Fatalf("err = %v, want code %s", err, tickets.CodeDuplicateFollowUp)
+	}
+	if !strings.Contains(ae.Msg, existing) || !strings.Contains(ae.Msg, "--force") {
+		t.Errorf("message %q does not name %s and --force", ae.Msg, existing)
+	}
+
+	// A different title is not a duplicate.
+	if _, err := add("TestOther fails"); err != nil {
+		t.Fatalf("different title: %v", err)
+	}
+
+	// --force files the duplicate.
+	out, err := add("TestSizeguard fails", "--force")
+	if err != nil {
+		t.Fatalf("--force: %v", err)
+	}
+	if got := strings.TrimSpace(out); got == existing {
+		t.Errorf("--force printed the existing address %s", got)
+	}
+
+	// A done or cancelled follow-up does not block the title.
+	for _, status := range []string{"done", "cancelled"} {
+		title := "TestClosed " + status
+		out, err := add(title)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := cmdtest.AddedPath(t, filepath.Join(project, "follow-ups"), out)
+		data, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(strings.Replace(string(data), "status: draft", "status: "+status, 1)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := add(title); err != nil {
+			t.Errorf("%s follow-up blocked the title: %v", status, err)
+		}
+	}
+}
+
 func TestExecute_TicketsFollowUpAdd_ReportsEveryMissingSection(t *testing.T) {
 	repo, _ := setupShowProject(t)
 	_, err := runIn(t, repo, "tickets", "follow-up", "add", "mine:follow-ups", "--body", "---\ncategory: bug\n---\n\n## Problem\n\np\n")
