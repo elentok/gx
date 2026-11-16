@@ -194,6 +194,35 @@ func TestWebFilesToken_WrongHostIsRefusedBeforeTheTokenCheck(t *testing.T) {
 	}
 }
 
+func TestWebFilesToken_OnlyGetAndHeadServe(t *testing.T) {
+	t.Parallel()
+	f := startTokenFixture(t)
+	tok := f.mint(t)
+	do := func(method string) *http.Response {
+		req, err := http.NewRequest(method, f.l.base+tok, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := noFollowClient().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp
+	}
+	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
+		resp := do(m)
+		if resp.StatusCode != http.StatusMethodNotAllowed || resp.Header.Get("Allow") != "GET, HEAD" {
+			t.Errorf("%s: status %d Allow %q, want 405 with GET, HEAD", m, resp.StatusCode, resp.Header.Get("Allow"))
+		}
+	}
+	for _, m := range []string{http.MethodGet, http.MethodHead} {
+		if resp := do(m); resp.StatusCode != http.StatusOK {
+			t.Errorf("%s: status %d, want 200", m, resp.StatusCode)
+		}
+	}
+}
+
 func TestWebFilesToken_LoginLessSurface(t *testing.T) {
 	t.Parallel()
 	f := startTokenFixture(t)

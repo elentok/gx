@@ -51,6 +51,11 @@ func (h hostedFiles) raw(w http.ResponseWriter, r *http.Request) {
 // does not cover answers 302 to the stable raw link, which mints a fresh token
 // when the cookie is valid and answers 401 when not.
 func (h hostedFiles) token(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	rest := strings.TrimPrefix(r.URL.EscapedPath(), webauth.FileTokenPrefix)
 	tokenStr, escaped, ok := strings.Cut(rest, "/")
