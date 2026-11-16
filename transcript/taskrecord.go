@@ -65,6 +65,9 @@ type TaskRecord struct {
 	OutputBytes int64
 	LastLine    string
 	Model       string
+	// UsageFinal is set when a final notification's <usage> filled Tokens and
+	// ToolCalls; the subagent's file is not read then.
+	UsageFinal  bool
 	Tokens      int
 	ToolCalls   int
 	CurrentCall string

@@ -190,11 +190,10 @@ func applyNotification(text string, at time.Time, byTask map[string]*TaskRecord)
 		r.OutputPath = p
 	}
 	if r.Kind == TaskKindSubagent {
-		if n, err := strconv.Atoi(tagValue(text, "subagent_tokens")); err == nil {
-			r.Tokens = n
-		}
-		if n, err := strconv.Atoi(tagValue(text, "tool_uses")); err == nil {
-			r.ToolCalls = n
+		tokens, tokErr := strconv.Atoi(tagValue(text, "subagent_tokens"))
+		calls, callErr := strconv.Atoi(tagValue(text, "tool_uses"))
+		if tokErr == nil && callErr == nil {
+			r.Tokens, r.ToolCalls, r.UsageFinal = tokens, calls, true
 		}
 	}
 	if r.End != nil && r.End.Source == TaskEndNotification {

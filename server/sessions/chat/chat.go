@@ -123,6 +123,10 @@ type Chat struct {
 	shellOutputs FileCache[ShellOutput]
 	// shellOutputRead replaces readShellOutput; tests count computes with it.
 	shellOutputRead func(path string) (ShellOutput, error)
+	// subagentFiles caches each Claude subagent transcript's details.
+	subagentFiles FileCache[transcript.SubagentDetails]
+	// readSubagentFile replaces transcript.ReadSubagentFile; tests count reads with it.
+	readSubagentFile func(path string) (transcript.SubagentDetails, error)
 	// rolloutPath replaces codexsession.RolloutPathIn; tests count lookups with it.
 	rolloutPath func(home, conversationID string) (string, bool, error)
 	// dialogWaits times how long each session has waited on "input needed".
