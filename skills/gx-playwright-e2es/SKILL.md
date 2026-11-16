@@ -120,7 +120,7 @@ had a follow-up. A flake costs a minute per run and the reruns prove nothing new
 
 **Fix:** when a flow fails at a step before or outside your own steps:
 
-1. Rerun that flow **once** on your change, with `gx brief -C webui playwright`.
+1. Rerun that flow **once** on your change, with `gx brief -C webui playwright <file> <flow number>`.
 2. If it fails the same way, file it with [gx-follow-up](../gx-follow-up/SKILL.md) (wording in
    [gx-flake-tickets](../gx-flake-tickets.md)) and stop iterating on it. Do not add `--workers`,
    `--repeat-each` or a clean-worktree baseline.

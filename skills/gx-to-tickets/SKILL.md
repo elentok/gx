@@ -203,7 +203,7 @@ For every seam file, state what the agent cannot guess:
   `// @vitest-environment node`). A seam that checks the DOM (`data-state`, roles) in a node-environment
   file cannot be met; name a DOM-environment file or say to add one.
 - **Playwright filters**: give a `-g` pattern that matches the full test title. Check it with
-  `gx brief -C webui playwright` on the flow numbers. A `^` anchor finds no tests, because Playwright
+  `gx brief -C webui playwright <file> <flow numbers>`. A `^` anchor finds no tests, because Playwright
   matches `-g` against the full title, which starts with the project and file prefix.
 - **Playwright skill**: when the seams include a Playwright file, tell the agent to load
   `gx-playwright-e2es` (its rules on waits before state reads and on `-g` filters).

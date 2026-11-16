@@ -21,7 +21,8 @@ const playwrightConfig = "e2e/playwright.config.ts"
 const playwrightUsage = `usage: gx brief -C webui playwright [file.e2e.ts] [flow numbers...] [playwright test flags]
   gx brief -C webui playwright disk.e2e.ts 76 77   run flows 76 and 77 of disk.e2e.ts
   Bare numbers become one -g filter on "N. " titles; do not mix them with -g.
-  List flow titles: gx brief -C webui playwright --list disk.e2e.ts`
+  List flow titles: gx brief -C webui playwright --list disk.e2e.ts
+  A run that names no test file is refused; --all runs the whole suite.`
 
 // buildWeb builds the web UI. It is a variable so tests do not run make.
 var buildWeb = func(env []string, root string) error {
@@ -48,6 +49,11 @@ func (Playwright) Plan(env []string, dir string, args []string) (Invocation, err
 	if slices.ContainsFunc(args, func(a string) bool { return a == "--help" || a == "-h" }) {
 		return Invocation{}, errors.New(playwrightUsage)
 	}
+	all := slices.Contains(args, "--all")
+	if !all && !slices.Contains(args, "--list") && !slices.ContainsFunc(args, func(a string) bool { return strings.HasSuffix(a, ".e2e.ts") }) {
+		return Invocation{}, errors.New("brief: name a test file (gx brief -C webui playwright disk.e2e.ts 76), or pass --all to run the whole suite")
+	}
+	args = slices.DeleteFunc(slices.Clone(args), func(a string) bool { return a == "--all" })
 	bin, err := findNodeBin(dir, "playwright")
 	if err != nil {
 		return Invocation{}, err

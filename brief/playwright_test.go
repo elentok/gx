@@ -151,6 +151,35 @@ func TestPlaywrightPlan_HelpPrintsUsageInsteadOfRunningTheSuite(t *testing.T) {
 	}
 }
 
+func TestPlaywrightPlan_NoTestFileIsRefusedUnlessAllOrList(t *testing.T) {
+	dir := playwrightDir(t, true)
+	os.MkdirAll(filepath.Join(dir, "dist"), 0o755)
+	os.WriteFile(filepath.Join(dir, "dist", "index.html"), nil, 0o644)
+
+	for _, args := range [][]string{nil, {"--workers", "2"}} {
+		_, err := Playwright{}.Plan(nil, dir, args)
+		if err == nil || !strings.Contains(err.Error(), "--all") {
+			t.Errorf("args %v: err = %v, want a refusal naming --all", args, err)
+		}
+	}
+
+	inv, err := Playwright{}.Plan(nil, dir, []string{"--all"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"test", "--reporter=line,json", "-c", playwrightConfig}; !slices.Equal(inv.Argv, want) {
+		t.Errorf("--all argv = %v, want %v", inv.Argv, want)
+	}
+
+	inv, err = Playwright{}.Plan(nil, dir, []string{"--list"})
+	if err != nil {
+		t.Fatalf("--list: %v", err)
+	}
+	if !slices.Contains(inv.Argv, "--list") {
+		t.Errorf("--list argv = %v, want --list kept", inv.Argv)
+	}
+}
+
 func TestPlaywrightPlan_BareFlowNumbersBecomeOneAnchoredGrep(t *testing.T) {
 	dir := playwrightDir(t, true)
 	os.MkdirAll(filepath.Join(dir, "dist"), 0o755)
@@ -215,7 +244,7 @@ func TestPlaywrightPlan_BuildsWebOnlyWhenDistIsMissing(t *testing.T) {
 	buildWeb = func(env []string, root string) error { builtAt, builtEnv = root, env; return nil }
 
 	env := []string{"PATH=/fake/bin"}
-	if _, err := (Playwright{}).Plan(env, dir, nil); err != nil {
+	if _, err := (Playwright{}).Plan(env, dir, []string{"a.e2e.ts"}); err != nil {
 		t.Fatal(err)
 	}
 	if builtAt != filepath.Dir(dir) {
