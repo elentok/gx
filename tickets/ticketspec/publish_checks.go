@@ -3,7 +3,6 @@ package ticketspec
 import (
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -48,15 +47,11 @@ func GroupCriteriaMisses(from []string, body string, canon func(string) string) 
 	hasHeading := map[string]bool{}
 	hasItem := map[string]bool{}
 	current := ""
-	inFence := false
-	for line := range strings.SplitSeq(schema.Section(body, "Acceptance criteria"), "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			inFence = !inFence
+	for fl := range fenceLines(schema.Section(body, "Acceptance criteria")) {
+		if fl.InFence {
 			continue
 		}
-		if inFence {
-			continue
-		}
+		line := fl.Text
 		if m := groupHeadingRE.FindStringSubmatch(line); m != nil {
 			current = canon(m[1])
 			hasHeading[current] = true

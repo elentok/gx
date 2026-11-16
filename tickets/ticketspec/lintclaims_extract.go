@@ -78,17 +78,9 @@ func ExtractClaims(body string, topDirs []string) []Claim {
 // wraps each copied Verification entry in one, and those spans must be linted.
 func stripFences(text string) string {
 	var out []string
-	inFence, keep := false, false
-	for _, line := range strings.Split(text, "\n") {
-		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "```") {
-			if !inFence {
-				keep = strings.TrimSpace(strings.TrimPrefix(trimmed, "```")) == "text"
-			}
-			inFence = !inFence
-			continue
-		}
-		if !inFence || keep {
-			out = append(out, line)
+	for fl := range fenceLines(text) {
+		if !fl.InFence || fl.Info == "text" {
+			out = append(out, fl.Text)
 		}
 	}
 	return strings.Join(out, "\n")

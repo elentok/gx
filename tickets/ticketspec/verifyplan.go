@@ -172,22 +172,21 @@ func formatK(n int) string {
 
 // WriteEstimateTable prints every estimate verify-plan uses.
 func WriteEstimateTable(w io.Writer) {
+	collectLine := fmt.Sprintf("%-18s %s + %s/part\n", "collect estimate", formatK(VerifyCollectBaseTokens), formatK(VerifyCollectPartTokens))
 	rows := []struct {
 		name   string
 		tokens int
+		after  string // printed after the row
 	}{
-		{"web flow", WebFlowTokens},
-		{"CLI check", CLICheckTokens},
-		{"Go test run", GoTestRunTokens},
-		{"skill quote", SkillQuoteTokens},
-		{"mock state", MockStateTokens},
-		{"part base", VerifyPartBaseTokens},
-		{"split limit", SplitLimitTokens},
+		{"web flow", WebFlowTokens, ""},
+		{"CLI check", CLICheckTokens, ""},
+		{"Go test run", GoTestRunTokens, ""},
+		{"skill quote", SkillQuoteTokens, ""},
+		{"mock state", MockStateTokens, ""},
+		{"part base", VerifyPartBaseTokens, collectLine},
+		{"split limit", SplitLimitTokens, ""},
 	}
 	for _, r := range rows {
-		fmt.Fprintf(w, "%-18s %dK\n", r.name, r.tokens/1000)
-		if r.name == "part base" {
-			fmt.Fprintf(w, "%-18s %s + %s/part\n", "collect estimate", formatK(VerifyCollectBaseTokens), formatK(VerifyCollectPartTokens))
-		}
+		fmt.Fprintf(w, "%-18s %dK\n%s", r.name, r.tokens/1000, r.after)
 	}
 }
