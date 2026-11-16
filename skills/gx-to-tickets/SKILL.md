@@ -517,7 +517,7 @@ For a ticket that changes gx CLI code, write its Run lines as `go run . <cmd>`: 
 
 - Mock file: `<full path>`
 - States: `<state name>` at `<width>`, ...
-- Parts this ticket builds: ...
+- Parts this ticket builds: ..., each with a line of styling facts: colours, casing, placement, tokens
 - Fixture scenario: `<gxfixture scenario>`
 
 (Only on an implement ticket that builds part of a stored mock. A UI ticket that builds no mock
@@ -534,10 +534,10 @@ part has no `## Mock check`. A fix ticket for a look or layout finding also gets
 **Flake and timeout tickets** follow [gx-flake-tickets](../gx-flake-tickets.md): the acceptance
 criterion names one exact `-run '^TestX$'` and one `-count`.
 
-**Mock check rules** (for the `## Mock check` section above). Name the gxfixture scenario for every
-mock state in `## Mock check`. If no scenario exists for a state, add an implement ticket that
-creates it, and make it block every ticket that checks that state. Read "Fixture-unrenderable
-states" in `webui/e2e/CATALOG.md` first: never list a fixture-unrenderable state in `## Mock check`.
+**Mock check rules.** Name the gxfixture scenario for every mock state. If none exists, add an
+implement ticket that creates it, and make it block every ticket that checks that state. Read
+"Fixture-unrenderable states" in `webui/e2e/CATALOG.md` first: never list a fixture-unrenderable
+state in `## Mock check`. Read the mock HTML and add one styling facts line for each part.
 
 ### Frontmatter fields
 

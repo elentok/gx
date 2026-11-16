@@ -86,6 +86,8 @@ func TestMockRulesAnchors(t *testing.T) {
 			"`gx tickets ask`",
 			"\"Fixture-unrenderable states\" in `webui/e2e/CATALOG.md`",
 			"record it `unchecked` under `## Spec deviations` and finish without asking",
+			"Read the mock HTML styling for the parts you build before you write any code",
+			"Run the mock check before the final `gx check`, not after it",
 		}},
 		{"catalog", "../webui/e2e/CATALOG.md", []string{
 			"## Fixture-unrenderable states",
@@ -118,6 +120,8 @@ func TestMockRulesAnchors(t *testing.T) {
 			"at most 4 mock states per implement ticket",
 			"never list a fixture-unrenderable state",
 			"checks the first 4 states",
+			"- Parts this ticket builds: ..., each with a line of styling facts: colours, casing, placement, tokens",
+			"add one styling facts line for each part",
 		}},
 		{"verify-epic", "gx-verify-epic/SKILL.md", []string{
 			"**Mock states lines.**",

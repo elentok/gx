@@ -181,6 +181,12 @@ irreversible.
 If the ticket has a `## Mock check` section, run it before you report finished. Find it by that
 heading. It lists the mock file, the states with their widths, the parts and the fixture scenario.
 
+- Read the mock HTML styling for the parts you build before you write any code: colours, casing,
+  placement and token names. Code against those facts, so styling gaps do not show up after the
+  build.
+- Run the mock check before the final `gx check`, not after it. Fixes from the mock check then
+  go in before the one `gx check` run.
+
 - The map's mock directory is `$(gx tickets root)/<map>/mocks/`, where `<map>` is the ticket's epic
   name minus `-impl`.
 - Run the steps in [gx-ui-check/MOCK-CHECK.md](../gx-ui-check/MOCK-CHECK.md) for each listed state and
