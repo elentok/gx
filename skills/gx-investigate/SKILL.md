@@ -136,6 +136,10 @@ commit to gotchas.md yourself. Don't re-explain what the linked commit already d
 cite a ticket: tickets get archived and renumbered, and the tracker isn't on every machine. For a
 bug that isn't fixed yet, the line itself carries the symptom, cause and recovery.
 
+Edit `skills/gx-investigate/gotchas.md` in the gx repo checkout, never the installed copy under
+`~/.claude/skills` or `~/.agents/skills`. gx treats an edited installed file as a conflict: it
+refuses to refresh skills and shows "gx could not install its skills" on every restart.
+
 ## Old words in old logs
 
 <!-- old-words:begin -->
