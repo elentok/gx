@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
@@ -22,6 +23,13 @@ import (
 // latestManager is a Manager whose model cache holds the claude and codex
 // lists, read by fake probes. A nil list leaves that harness with no list.
 func latestManager(t *testing.T, claude, codex []commandlist.Model, cwd string, lines ...string) *sessions.Manager {
+	t.Helper()
+	return latestManagerIn(t, "", claude, codex, cwd, lines...)
+}
+
+// latestManagerIn is latestManager over the ticket store at store, so a
+// session's project can carry a project.json.
+func latestManagerIn(t *testing.T, store string, claude, codex []commandlist.Model, cwd string, lines ...string) *sessions.Manager {
 	t.Helper()
 	cfgDir := t.TempDir()
 	if len(lines) > 0 {
@@ -77,7 +85,37 @@ func latestManager(t *testing.T, claude, codex []commandlist.Model, cwd string, 
 		Models:   cache,
 		Prompter: sessprompt.New(sessprompt.Deps{Log: log}),
 		Settings: set,
+		Projects: projects.NewRegistry(func() projects.Env { return projects.Env{TicketStore: store} }, log, nil, set, nil, nil),
 	})
+}
+
+func TestSessionInfo_LatestTiersFollowProjectOverride(t *testing.T) {
+	t.Parallel()
+	claudeList := []commandlist.Model{
+		{Value: "claude-fable-5-1", ID: "claude-fable-5-1", Efforts: []string{"high"}},
+		{Value: "claude-fable-5-2", ID: "claude-fable-5-2", Efforts: []string{"high"}},
+		{Value: "claude-haiku-5-1", ID: "claude-haiku-5-1", Efforts: []string{"low"}},
+	}
+	store := t.TempDir()
+	dir := filepath.Join(store, "proj")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	override := `{"name":"proj","agents":{"claude":{"model":"claude-haiku-5-1","strongest":{"model":"claude-haiku-5-1"}}}}`
+	if err := os.WriteFile(filepath.Join(dir, "project.json"), []byte(override), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	const cwd = "/work/proj"
+	mg := latestManagerIn(t, store, claudeList, nil, cwd)
+	meta := sessions.Meta{Harness: "claude", Dir: cwd, ConversationID: "conv", Model: "claude-fable-5-1", Project: "proj"}
+
+	if got := mg.SessionInfo(meta).LatestTiers; len(got) != 0 {
+		t.Errorf("LatestTiers with a project override = %v, want none (the override moved the tiers off this model)", got)
+	}
+	meta.Project = ""
+	if got := mg.SessionInfo(meta).LatestTiers; !slices.Equal(got, []string{"strongest"}) {
+		t.Errorf("LatestTiers without a project = %v, want [strongest] from the global settings", got)
+	}
 }
 
 func TestSessionInfo_LatestModel(t *testing.T) {

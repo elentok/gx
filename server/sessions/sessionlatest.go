@@ -2,7 +2,6 @@ package sessions
 
 import (
 	"github.com/elentok/gx/commandlist"
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/modelrules"
 	"github.com/elentok/gx/ralphloop/agent"
@@ -10,8 +9,8 @@ import (
 )
 
 // setLatestModel fills the latest-model fields of info from the cached model
-// list. It reads memory only: the cache, and the global agents settings. The
-// project's own overrides sit in a file, which is not read on every list.
+// list. Tiers come from the project's agents config, so a project.json override
+// applies, as it does for the hand-switch flag. That reads the project file.
 func setLatestModel(mg *Manager, info *wire.SessionInfo, harnessName string) {
 	list, ok := mg.Models.Entries(harnessName)
 	if !ok {
@@ -24,11 +23,10 @@ func setLatestModel(mg *Manager, info *wire.SessionInfo, harnessName string) {
 	info.LatestModel = latest
 	info.LatestFamily = latestFamily(list, latest)
 	info.LatestEffort = latestEffort(mg.Models, harnessName, latest, info.Effort)
-	if mg.settings == nil {
+	if mg.projects == nil {
 		return
 	}
-	set := mg.settings.Load()
-	agents := config.AgentsConfig{Claude: set.AgentsClaude, Codex: set.AgentsCodex}
+	agents := mg.projects.AgentsConfig(info.Project)
 	kind := agent.AgentFor(harnessName)
 	for _, tier := range agent.AllTiers {
 		if configured, _ := agent.ResolveTier(agents, kind, tier); sameModel(list, configured, info.Model) {
