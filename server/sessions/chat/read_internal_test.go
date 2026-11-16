@@ -919,6 +919,17 @@ func TestAssembleTasks_OnlyTheOpenGroup(t *testing.T) {
 	if got := taskLabels(AssembleTasks([]transcript.TaskRecord{a, done, cDone, d}, meta, now)); !reflect.DeepEqual(got, []string{"d"}) {
 		t.Errorf("new group = %v", got)
 	}
+	// A new group of two tasks counts anew: both rows, none finished ("0 of 2").
+	e := taskRec(transcript.TaskKindShell, "e", 4*time.Minute+40*time.Second)
+	got := AssembleTasks([]transcript.TaskRecord{a, done, cDone, d, e}, meta, now)
+	if !reflect.DeepEqual(taskLabels(got), []string{"d", "e"}) {
+		t.Fatalf("new group of two = %v", taskLabels(got))
+	}
+	for _, g := range got {
+		if g.Finished {
+			t.Errorf("%s finished in a fresh group", g.Label)
+		}
+	}
 }
 
 func TestAssembleTasks_RunningSubagentHoldsTheGroupOpen(t *testing.T) {

@@ -10,11 +10,19 @@ const rowOf = (page: Page, label: string) =>
 /** The elapsed text is the last cell of a row's header. */
 const elapsed = (page: Page, label: string) => rowOf(page, label).locator("button > span").last()
 
-/** The labels and kinds of every row, in order. */
+/** The kind and label of every row, in order; the ticking elapsed cell (the last span) is left out. */
 const rowsOf = (page: Page) =>
   list(page)
     .getByRole("listitem")
-    .evaluateAll((els) => els.map((e) => e.querySelector("button")?.textContent ?? ""))
+    .evaluateAll((els) =>
+      els.map((e) => {
+        const spans = [...(e.querySelector("button")?.querySelectorAll(":scope > span") ?? [])]
+        return spans
+          .slice(0, -1)
+          .map((s) => s.textContent)
+          .join("|")
+      }),
+    )
 const noSideScroll = (page: Page) =>
   expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
