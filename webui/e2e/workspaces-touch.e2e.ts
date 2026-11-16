@@ -253,7 +253,7 @@ test("Workspaces touch", async ({ page, start }) => {
 
   // New chat and New design start on the page's project, then the Epics filter's single project, then the last used one.
   // Every check opens a blank form or draft: the previous one is closed or left with nothing typed, so no draft carries over.
-  const chatForm = page.getByRole("dialog", { name: "New session" })
+  const chatForm = page.getByRole("dialog", { name: "New chat" })
   const chatProject = chatForm.getByRole("combobox", nav("Project"))
   const formsShow = async (project: string) => {
     await newItem("New chat")
@@ -299,7 +299,7 @@ test("Workspaces touch", async ({ page, start }) => {
   await expect(chatProject).toHaveValue("demo")
   await chatForm.getByRole("textbox", nav("Name")).fill("demo-made")
   await chatForm.getByRole("textbox", nav("First prompt")).fill("hi")
-  await chatForm.getByRole("button", nav("Create session")).click()
+  await chatForm.getByRole("button", nav("Create chat")).click()
   await expect(chatForm).toHaveCount(0)
   await goto(page, "#/stats")
   await formsShow("demo")

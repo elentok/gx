@@ -55,7 +55,7 @@ function EmptyState({ empty, onNew }: { empty: boolean; onNew: () => void }) {
         )}
       </Text>
       <Button type="button" emphasis="secondary" size="sm" onClick={onNew}>
-        New session
+        New chat
       </Button>
     </Box>
   )

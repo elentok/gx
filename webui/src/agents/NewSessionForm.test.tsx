@@ -111,7 +111,7 @@ const options = () =>
   list()
     .queryAllByRole("option")
     .map((o) => o.textContent)
-const submit = () => fireEvent.click(screen.getByRole("button", { name: "Create session" }))
+const submit = () => fireEvent.click(screen.getByRole("button", { name: "Create chat" }))
 
 test("fields and defaults: project prefilled, worktree is the project root", async () => {
   mount({ path: "/e/blog:x" })
@@ -122,7 +122,7 @@ test("fields and defaults: project prefilled, worktree is the project root", asy
   expect(wt.value).toBe("Project root")
   for (const name of ["Name", "First prompt"])
     expect(screen.getByRole("textbox", { name })).toBeTruthy()
-  for (const name of ["Cancel", "Create session"])
+  for (const name of ["Cancel", "Create chat"])
     expect(screen.getByRole("button", { name })).toBeTruthy()
 })
 
@@ -452,7 +452,7 @@ test("submit is disabled offline", async () => {
   mount({ connected: false })
   await ready()
   expect(
-    (screen.getByRole("button", { name: "Create session" }) as HTMLButtonElement).disabled,
+    (screen.getByRole("button", { name: "Create chat" }) as HTMLButtonElement).disabled,
   ).toBe(true)
 })
 

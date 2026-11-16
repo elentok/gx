@@ -247,7 +247,7 @@ test.each([
     const banner = within(await screen.findByRole("region", { name: "Session failure" }))
     expect(banner.getByText(c.label)).toBeTruthy()
     expect(banner.queryAllByRole("button").map((b) => b.textContent)).toEqual(c.buttons)
-    expect(screen.queryByRole("button", { name: "New session" })).toBeNull()
+    expect(screen.queryByRole("button", { name: "New chat" })).toBeNull()
     expect(screen.getByText("Chat works for Claude and Codex sessions only.")).toBeTruthy()
   },
 )
@@ -371,7 +371,7 @@ test.each(failureCases)(
     expect(banner.getByText(c.label)).toBeTruthy()
     if (c.text) expect(banner.getByText(c.text)).toBeTruthy()
     expect(banner.queryAllByRole("button").map((b) => b.textContent)).toEqual(c.buttons)
-    expect(screen.queryByRole("button", { name: "New session" })).toBeNull()
+    expect(screen.queryByRole("button", { name: "New chat" })).toBeNull()
     expect(screen.getByText("hello there")).toBeTruthy()
     await type("hi")
     if (c.reason) expect(screen.getByText(c.reason)).toBeTruthy()

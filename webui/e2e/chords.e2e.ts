@@ -171,7 +171,7 @@ test("Chords", async ({ page, start }) => {
       .split("\n")
       .filter((l) => l.includes("\t"))
       .map((l) => l.split("\t")[0]!.trim())
-  const chordForm = page.getByRole("dialog", { name: "New session" })
+  const chordForm = page.getByRole("dialog", { name: "New chat" })
   const chordProject = chordForm.getByRole("combobox", nav("Project"))
   await goto(page, "#/d/side:side-design")
   await expect(page.getByRole("heading", { name: /side-design/ }).first()).toBeVisible()
@@ -248,7 +248,7 @@ test("Chords", async ({ page, start }) => {
   await page.keyboard.press("c")
   await chordForm.getByRole("textbox", nav("Name")).fill("chord-chat")
   await chordForm.getByRole("textbox", nav("First prompt")).fill("hi")
-  await chordForm.getByRole("button", nav("Create session")).click()
+  await chordForm.getByRole("button", nav("Create chat")).click()
   await expect(chordForm).toHaveCount(0)
   const chordChat = (await sessions(fx)).find((s) => s.name === "chord-chat")!
   const chordChatUrl = new RegExp(`#/agents/${chordChat.id}$`)
@@ -320,7 +320,7 @@ test("Chords", async ({ page, start }) => {
   await page.keyboard.press("c")
   await chordForm.getByRole("textbox", nav("Name")).fill("refuse-chat")
   await chordForm.getByRole("textbox", nav("First prompt")).fill("hi")
-  await chordForm.getByRole("button", nav("Create session")).click()
+  await chordForm.getByRole("button", nav("Create chat")).click()
   await expect(chordForm).toHaveCount(0)
   const refuseChat = (await sessions(fx)).find((s) => s.name === "refuse-chat")!
   await goto(page, `#/agents/${refuseChat.id}`)

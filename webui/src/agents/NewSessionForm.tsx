@@ -187,7 +187,7 @@ export function NewSessionForm({
   const failure = refusal ? refusalText(refusal) : error
   return (
     <BottomSheet
-      label="New session"
+      label="New chat"
       onClose={onClose}
       fillViewport
       desktop={{ borderRadius: "lg", w: "460px" }}
@@ -208,7 +208,7 @@ export function NewSessionForm({
           textTransform="uppercase"
           letterSpacing="0.02em"
         >
-          New session
+          New chat
         </Text>
         <chakra.button
           type="button"
@@ -340,7 +340,7 @@ export function NewSessionForm({
         </Button>
         <Button type="submit" disabled={pending || !connected || !picked}>
           {pending && <Spinner size="sm" />}
-          Create session
+          Create chat
         </Button>
       </Box>
     </BottomSheet>

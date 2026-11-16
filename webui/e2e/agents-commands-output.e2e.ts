@@ -122,7 +122,7 @@ test("155. Command output in the chat, cut at 12 lines", async ({ page, start })
   await expect(sendButton(page)).toBeDisabled()
 
   // Restore brings it back from the Agents page. New session is not offered here.
-  await expect(page.getByRole("button", { name: "New session", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "New chat", exact: true })).toHaveCount(0)
   await page.getByRole("button", { name: "Restore", exact: true }).click()
   await expect.poll(async () => (await infoOf(fixture, exiting.id)).status.state).not.toBe("exited")
 })
@@ -165,6 +165,6 @@ test("155. Command output in the chat, design page; 159. /exit, design page", as
   await expect.poll(async () => (await infoOf(fixture, design.id)).status.state).toBe("exited")
 
   await expect(page.getByRole("button", { name: "Restore", exact: true })).toBeVisible()
-  await expect(page.getByRole("button", { name: "New session", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "New chat", exact: true })).toBeVisible()
   await expect(page.getByText("carry on", { exact: true })).toBeVisible()
 })

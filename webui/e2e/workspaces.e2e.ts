@@ -221,7 +221,7 @@ test("Workspaces", async ({ page, start }) => {
   await goto(page, "#/epics")
   await sidebar.getByRole("button", { name: "+ New", exact: true }).click()
   await page.getByRole("menuitem", { name: /^New chat/ }).click()
-  await page.getByRole("button", { name: "Create session" }).click()
+  await page.getByRole("button", { name: "Create chat" }).click()
   await expect(sidebar.getByRole("img", nav("Chat"))).toHaveCount(1)
   await expect.poll(members).toBe(before + 2)
   // Later steps expect Default's chat alone, since deleting this workspace moves its items there.

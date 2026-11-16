@@ -26,7 +26,7 @@ export const row = (page: Page, s: SessionInfo) => page.locator(`a[href$="/agent
 export const sidebar = (page: Page) =>
   page.getByRole("complementary", { name: "Sidebar", exact: true })
 
-/** Opens the New session form from the footer "+ New" menu ("New chat"), sliding the sidebar open first on a phone. */
+/** Opens the New chat form from the footer "+ New" menu ("New chat"), sliding the sidebar open first on a phone. */
 export async function openNewAgent(page: Page, project?: string) {
   const show = page.getByRole("button", { name: "Show sidebar", exact: true })
   const add = sidebar(page).getByRole("button", { name: "+ New", exact: true })
@@ -214,14 +214,14 @@ export const moreActions = (page: Page) =>
 
 export const titleHeading = (page: Page) => page.getByRole("heading", { level: 1 })
 
-export const newForm = (page: Page) => page.getByRole("dialog", { name: "New session" })
+export const newForm = (page: Page) => page.getByRole("dialog", { name: "New chat" })
 export const projectSelect = (page: Page) =>
   newForm(page).getByRole("combobox", { name: "Project" })
 export const worktreeBox = (page: Page) => newForm(page).getByRole("combobox", { name: "Worktree" })
 export const promptBox = (page: Page) =>
   newForm(page).getByRole("textbox", { name: "First prompt" })
 export const createButton = (page: Page) =>
-  newForm(page).getByRole("button", { name: "Create session" })
+  newForm(page).getByRole("button", { name: "Create chat" })
 
 export const created = async (fixture: Fixture, before: SessionInfo[]) => {
   const known = new Set(before.map((s) => s.id))

@@ -70,10 +70,10 @@ test("phone: a round shows the sheet beside the banner, with no sideways scroll"
   )
 })
 
-test("phone: the empty panel's New session button opens the form as a sheet", async () => {
+test("phone: the empty panel's New chat button opens the form as a sheet", async () => {
   stubNewSession()
   render([session("s-1", "gx", { name: "plain" })], "/agents", true, entryOptions, false)
-  fireEvent.click(screen.getByRole("button", { name: "New session" }))
-  const form = await screen.findByRole("dialog", { name: "New session" })
+  fireEvent.click(screen.getByRole("button", { name: "New chat" }))
+  const form = await screen.findByRole("dialog", { name: "New chat" })
   expect(within(form).getByTestId("grab-handle")).toBeTruthy()
 })
