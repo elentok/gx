@@ -493,42 +493,18 @@ export interface RestartCheckReport {
 /**
  * ScheduleRunStatus is where one Last runs row stands.
  */
-export type ScheduleRunStatus = string;
+export const ScheduleRunStatusQueued = "queued";
+export const ScheduleRunStatusRunning = "running";
+export const ScheduleRunStatusFinished = "finished";
+export const ScheduleRunStatusRanLate = "ran-late";
+export const ScheduleRunStatusPaused = "paused";
+export const ScheduleRunStatusCancelled = "cancelled";
+export const ScheduleRunStatusSkipped = "skipped";
 /**
  * The closed set of Last runs statuses. The values are literals because tygo
  * cannot resolve constants from another package.
  */
-export const ScheduleRunQueued: ScheduleRunStatus = "queued";
-/**
- * The closed set of Last runs statuses. The values are literals because tygo
- * cannot resolve constants from another package.
- */
-export const ScheduleRunRunning: ScheduleRunStatus = "running";
-/**
- * The closed set of Last runs statuses. The values are literals because tygo
- * cannot resolve constants from another package.
- */
-export const ScheduleRunFinished: ScheduleRunStatus = "finished";
-/**
- * The closed set of Last runs statuses. The values are literals because tygo
- * cannot resolve constants from another package.
- */
-export const ScheduleRunRanLate: ScheduleRunStatus = "ran-late";
-/**
- * The closed set of Last runs statuses. The values are literals because tygo
- * cannot resolve constants from another package.
- */
-export const ScheduleRunPaused: ScheduleRunStatus = "paused";
-/**
- * The closed set of Last runs statuses. The values are literals because tygo
- * cannot resolve constants from another package.
- */
-export const ScheduleRunCancelled: ScheduleRunStatus = "cancelled";
-/**
- * The closed set of Last runs statuses. The values are literals because tygo
- * cannot resolve constants from another package.
- */
-export const ScheduleRunSkipped: ScheduleRunStatus = "skipped";
+export type ScheduleRunStatus = typeof ScheduleRunStatusQueued | typeof ScheduleRunStatusRunning | typeof ScheduleRunStatusFinished | typeof ScheduleRunStatusRanLate | typeof ScheduleRunStatusPaused | typeof ScheduleRunStatusCancelled | typeof ScheduleRunStatusSkipped;
 /**
  * ScheduleRun is one row of a Schedule's Last runs: a One-off, or a skipped set time.
  */
@@ -550,6 +526,15 @@ export const ScheduleReasonProjectReadOnly = "project-read-only";
  * that changes the project.
  */
 export type ScheduleReason = typeof ScheduleReasonUnknown | typeof ScheduleReasonInvalidProject | typeof ScheduleReasonProjectReadOnly;
+export const ScheduleRunNowReasonPreviousRunStarted = "previous-run-started";
+export const ScheduleRunNowReasonPreviousRunNeedsAttention = "previous-run-needs-attention";
+export const ScheduleRunNowReasonUnknownProject = "unknown-project";
+/**
+ * Reasons a Run now is refused. The values are literals because tygo cannot
+ * resolve constants from another package; server/schedules and server/wire
+ * own the same strings.
+ */
+export type ScheduleRunNowReason = typeof ScheduleRunNowReasonPreviousRunStarted | typeof ScheduleRunNowReasonPreviousRunNeedsAttention | typeof ScheduleRunNowReasonUnknownProject;
 /**
  * ScheduleInfo is one Schedule as the list and show results carry it.
  */

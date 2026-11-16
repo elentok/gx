@@ -23,15 +23,20 @@ export interface RunOptions<R> {
 /**
  * Runs one write at a time and tells the person how it went: a pending flag for the button's
  * spinner, an error or refusal toast, and a success toast when the caller asks for one. The
- * refusal and the failure text are also returned so a caller can show them inline.
+ * refusal and the failure text are also returned so a caller can show them inline. `Refused` types
+ * the returned refusal, for a caller whose result carries more than the base fields.
  */
-export function useWrite({ toastRefusal = true }: { toastRefusal?: boolean } = {}) {
+export function useWrite<Refused extends Refusable = Refusable>({
+  toastRefusal = true,
+}: {
+  toastRefusal?: boolean
+} = {}) {
   const [pending, setPending] = useState(false)
   const inFlight = useRef(false)
-  const [refusal, setRefusal] = useState<Refusable>()
+  const [refusal, setRefusal] = useState<Refused>()
   const [error, setError] = useState<string>()
 
-  async function run<R extends Refusable>(
+  async function run<R extends Refused>(
     call: () => Promise<R>,
     { onDone, success }: RunOptions<R> = {},
   ) {

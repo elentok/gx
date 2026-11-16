@@ -1,6 +1,6 @@
 import { cleanup, screen } from "@testing-library/react"
 import { afterEach, expect, test } from "vitest"
-import type { ScheduleRun } from "../generated/server"
+import type { ScheduleRun, ScheduleRunStatus } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { LastRuns } from "./LastRuns"
 
@@ -19,7 +19,7 @@ const run = (over: Partial<ScheduleRun>): ScheduleRun => ({
 })
 
 test("every status renders its word", () => {
-  const words: Record<string, string> = {
+  const words: Record<ScheduleRunStatus, string> = {
     finished: "Finished",
     "ran-late": "Ran late",
     skipped: "Skipped",
@@ -28,7 +28,8 @@ test("every status renders its word", () => {
     queued: "Queued",
     cancelled: "Cancelled",
   }
-  renderThemed(<LastRuns runs={Object.keys(words).map((status) => run({ status }))} />)
+  const statuses = Object.keys(words) as ScheduleRunStatus[]
+  renderThemed(<LastRuns runs={statuses.map((status) => run({ status }))} />)
   for (const w of Object.values(words)) expect(screen.getByText(w)).toBeTruthy()
   expect(screen.getByText("Last 10 runs.")).toBeTruthy()
 })

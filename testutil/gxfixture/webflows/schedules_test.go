@@ -77,8 +77,8 @@ func TestSchedulesScenario_PageShapesSeedLastRuns(t *testing.T) {
 		shape  string
 		status []ops.ScheduleRunStatus
 	}{
-		{"page", []ops.ScheduleRunStatus{ops.ScheduleRunFinished, ops.ScheduleRunFinished, ops.ScheduleRunRanLate, ops.ScheduleRunSkipped}},
-		{"paused", []ops.ScheduleRunStatus{ops.ScheduleRunPaused, ops.ScheduleRunFinished, ops.ScheduleRunFinished, ops.ScheduleRunRanLate, ops.ScheduleRunSkipped}},
+		{"page", []ops.ScheduleRunStatus{ops.ScheduleRunStatusFinished, ops.ScheduleRunStatusFinished, ops.ScheduleRunStatusRanLate, ops.ScheduleRunStatusSkipped}},
+		{"paused", []ops.ScheduleRunStatus{ops.ScheduleRunStatusPaused, ops.ScheduleRunStatusFinished, ops.ScheduleRunStatusFinished, ops.ScheduleRunStatusRanLate, ops.ScheduleRunStatusSkipped}},
 	} {
 		t.Run(w.shape, func(t *testing.T) {
 			t.Parallel()
@@ -92,15 +92,15 @@ func TestSchedulesScenario_PageShapesSeedLastRuns(t *testing.T) {
 					t.Errorf("run %d status = %q, want %q", i, run.Status, w.status[i])
 				}
 				switch run.Status {
-				case ops.ScheduleRunSkipped:
+				case ops.ScheduleRunStatusSkipped:
 					if run.Reason != "late" || run.Address != "" {
 						t.Errorf("skip row %+v", run)
 					}
-				case ops.ScheduleRunFinished, ops.ScheduleRunRanLate:
+				case ops.ScheduleRunStatusFinished, ops.ScheduleRunStatusRanLate:
 					if run.Result == "" || run.Address == "" {
 						t.Errorf("finished row without a Result line or address: %+v", run)
 					}
-				case ops.ScheduleRunPaused:
+				case ops.ScheduleRunStatusPaused:
 					if run.Address == "" {
 						t.Errorf("paused row without a ticket address: %+v", run)
 					}

@@ -1,10 +1,10 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import type { ScheduleRun } from "../generated/server"
+import type { ScheduleRun, ScheduleRunStatus } from "../generated/server"
 import { ticketHref } from "../hrefs"
 import type { Tone } from "../ui/tone"
 import { formatNextRun } from "./format"
 
-const STATUS: Record<string, { word: string; tone: Tone }> = {
+const STATUS = {
   finished: { word: "Finished", tone: "done" },
   "ran-late": { word: "Ran late", tone: "paused" },
   skipped: { word: "Skipped", tone: "muted" },
@@ -12,13 +12,10 @@ const STATUS: Record<string, { word: string; tone: Tone }> = {
   running: { word: "Running", tone: "running" },
   queued: { word: "Queued", tone: "muted" },
   cancelled: { word: "Cancelled", tone: "muted" },
-}
+} satisfies Record<ScheduleRunStatus, { word: string; tone: Tone }>
 
 export function LastRunRow({ run }: { run: ScheduleRun }) {
-  const status = STATUS[run.status] ?? {
-    word: run.status,
-    tone: "muted" as Tone,
-  }
+  const status = STATUS[run.status]
   const skipped = run.status === "skipped"
   const text = skipped ? run.reason_text || run.reason : run.result
   return (

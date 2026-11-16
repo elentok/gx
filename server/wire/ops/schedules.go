@@ -6,13 +6,13 @@ type ScheduleRunStatus string
 // The closed set of Last runs statuses. The values are literals because tygo
 // cannot resolve constants from another package.
 const (
-	ScheduleRunQueued    ScheduleRunStatus = "queued"
-	ScheduleRunRunning   ScheduleRunStatus = "running"
-	ScheduleRunFinished  ScheduleRunStatus = "finished"
-	ScheduleRunRanLate   ScheduleRunStatus = "ran-late"
-	ScheduleRunPaused    ScheduleRunStatus = "paused"
-	ScheduleRunCancelled ScheduleRunStatus = "cancelled"
-	ScheduleRunSkipped   ScheduleRunStatus = "skipped"
+	ScheduleRunStatusQueued    ScheduleRunStatus = "queued"
+	ScheduleRunStatusRunning   ScheduleRunStatus = "running"
+	ScheduleRunStatusFinished  ScheduleRunStatus = "finished"
+	ScheduleRunStatusRanLate   ScheduleRunStatus = "ran-late"
+	ScheduleRunStatusPaused    ScheduleRunStatus = "paused"
+	ScheduleRunStatusCancelled ScheduleRunStatus = "cancelled"
+	ScheduleRunStatusSkipped   ScheduleRunStatus = "skipped"
 )
 
 // ScheduleRun is one row of a Schedule's Last runs: a One-off, or a skipped set time.
@@ -33,6 +33,15 @@ const (
 	ScheduleReasonUnknown         = "unknown-schedule"
 	ScheduleReasonInvalidProject  = "invalid-project"
 	ScheduleReasonProjectReadOnly = "project-read-only"
+)
+
+// Reasons a Run now is refused. The values are literals because tygo cannot
+// resolve constants from another package; server/schedules and server/wire
+// own the same strings.
+const (
+	ScheduleRunNowReasonPreviousRunStarted        = "previous-run-started"
+	ScheduleRunNowReasonPreviousRunNeedsAttention = "previous-run-needs-attention"
+	ScheduleRunNowReasonUnknownProject            = "unknown-project"
 )
 
 // ScheduleInfo is one Schedule as the list and show results carry it.

@@ -40,17 +40,17 @@ func TestLastRuns_StatusTable(t *testing.T) {
 		opts     servertest.TicketOpts
 		want     ops.ScheduleRunStatus
 	}{
-		{"01", "one-offs", servertest.TicketOpts{ScheduledFor: sched}, ops.ScheduleRunQueued},
-		{"02", "one-offs", servertest.TicketOpts{ScheduledFor: sched, ClaimedAt: ts(9, 0, 5)}, ops.ScheduleRunQueued},
-		{"03", "one-offs", servertest.TicketOpts{Status: "claimed", ScheduledFor: sched, ClaimedAt: ts(9, 0, 5)}, ops.ScheduleRunRunning},
-		{"04", "one-offs-archived", servertest.TicketOpts{Status: "done", ScheduledFor: sched, CreatedAt: ts(9, 0, 60)}, ops.ScheduleRunFinished},
-		{"05", "one-offs-archived", servertest.TicketOpts{Status: "done", ScheduledFor: sched, CreatedAt: ts(9, 1, 1)}, ops.ScheduleRunRanLate},
-		{"06", "one-offs", servertest.TicketOpts{Status: "claimed", ScheduledFor: sched, CreatedAt: ts(9, 30, 0)}, ops.ScheduleRunRunning},
-		{"07", "one-offs", servertest.TicketOpts{Status: "done"}, ops.ScheduleRunFinished},
-		{"08", "one-offs", servertest.TicketOpts{PauseReason: "question"}, ops.ScheduleRunPaused},
-		{"09", "one-offs", servertest.TicketOpts{Status: "needs-answer"}, ops.ScheduleRunPaused}, // oldword:ok legacy status input
-		{"10", "one-offs", servertest.TicketOpts{Status: "needs-repair"}, ops.ScheduleRunPaused}, // oldword:ok legacy status input
-		{"11", "one-offs-archived", servertest.TicketOpts{Status: "cancelled", CancelledAt: ts(9, 5, 0)}, ops.ScheduleRunCancelled},
+		{"01", "one-offs", servertest.TicketOpts{ScheduledFor: sched}, ops.ScheduleRunStatusQueued},
+		{"02", "one-offs", servertest.TicketOpts{ScheduledFor: sched, ClaimedAt: ts(9, 0, 5)}, ops.ScheduleRunStatusQueued},
+		{"03", "one-offs", servertest.TicketOpts{Status: "claimed", ScheduledFor: sched, ClaimedAt: ts(9, 0, 5)}, ops.ScheduleRunStatusRunning},
+		{"04", "one-offs-archived", servertest.TicketOpts{Status: "done", ScheduledFor: sched, CreatedAt: ts(9, 0, 60)}, ops.ScheduleRunStatusFinished},
+		{"05", "one-offs-archived", servertest.TicketOpts{Status: "done", ScheduledFor: sched, CreatedAt: ts(9, 1, 1)}, ops.ScheduleRunStatusRanLate},
+		{"06", "one-offs", servertest.TicketOpts{Status: "claimed", ScheduledFor: sched, CreatedAt: ts(9, 30, 0)}, ops.ScheduleRunStatusRunning},
+		{"07", "one-offs", servertest.TicketOpts{Status: "done"}, ops.ScheduleRunStatusFinished},
+		{"08", "one-offs", servertest.TicketOpts{PauseReason: "question"}, ops.ScheduleRunStatusPaused},
+		{"09", "one-offs", servertest.TicketOpts{Status: "needs-answer"}, ops.ScheduleRunStatusPaused}, // oldword:ok legacy status input
+		{"10", "one-offs", servertest.TicketOpts{Status: "needs-repair"}, ops.ScheduleRunStatusPaused}, // oldword:ok legacy status input
+		{"11", "one-offs-archived", servertest.TicketOpts{Status: "cancelled", CancelledAt: ts(9, 5, 0)}, ops.ScheduleRunStatusCancelled},
 	}
 	// Ten rows is the cap, so the eleven cases go through two rigs.
 	for _, group := range [][]int{{0, 5}, {5, len(cases)}} {
@@ -94,7 +94,7 @@ func TestLastRuns_OnlyNewestTenAndRunNowAndSkipShapes(t *testing.T) {
 		t.Errorf("newest row = %+v, want the Run now", got[0])
 	}
 	last := got[9]
-	if last.Status != ops.ScheduleRunSkipped || last.Address != "" || last.Reason != schedules.ReasonLate {
+	if last.Status != ops.ScheduleRunStatusSkipped || last.Address != "" || last.Reason != schedules.ReasonLate {
 		t.Errorf("oldest kept row = %+v, want the skip", last)
 	}
 	if last.ReasonText != "Past the 2 h Late limit." {
@@ -119,7 +119,7 @@ func TestLastRuns_TwoMachinesShareOneOffsButNotSkips(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 3 || got[0].Status != ops.ScheduleRunSkipped {
+	if len(got) != 3 || got[0].Status != ops.ScheduleRunStatusSkipped {
 		t.Errorf("machine b rows = %+v, want its skip first then both One-offs", got)
 	}
 }

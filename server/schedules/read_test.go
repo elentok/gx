@@ -80,7 +80,7 @@ func TestSchedulesRead_ShowReturnsEveryFieldAndTheLastRuns(t *testing.T) {
 	if res.Prompt != "check the logs" || s.LateLimitHours != 3 || s.Harness != "" || s.DefaultHarness != "claude" || s.UpdatedAt == "" || s.NextRun == "" {
 		t.Errorf("show = %+v", res)
 	}
-	if len(res.LastRuns) != 1 || res.LastRuns[0].Status != ops.ScheduleRunSkipped || res.LastRuns[0].Reason != schedules.ReasonLate {
+	if len(res.LastRuns) != 1 || res.LastRuns[0].Status != ops.ScheduleRunStatusSkipped || res.LastRuns[0].Reason != schedules.ReasonLate {
 		t.Errorf("last runs = %+v", res.LastRuns)
 	}
 }

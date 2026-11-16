@@ -64,7 +64,7 @@ func LastRuns(ticketStore string, st *State, k Key, lateLimitHours float64) ([]o
 			run: ops.ScheduleRun{
 				ScheduledFor:     sk.SetTime.Format(time.RFC3339),
 				CreatedAt:        sk.LoggedAt.Format(time.RFC3339),
-				Status:           ops.ScheduleRunSkipped,
+				Status:           ops.ScheduleRunStatusSkipped,
 				Reason:           sk.Reason,
 				ReasonText:       skipText(sk.Reason, lateLimitHours),
 				AttentionAddress: sk.Blocking,
@@ -106,18 +106,18 @@ func oneOffRow(project, epic string, t tickets.Ticket) lastRow {
 func oneOffStatus(t tickets.Ticket) ops.ScheduleRunStatus {
 	switch t.RawStatus() {
 	case tickets.StatusClaimed:
-		return ops.ScheduleRunRunning
+		return ops.ScheduleRunStatusRunning
 	case tickets.StatusDone:
 		if !t.ScheduledFor.IsZero() && t.CreatedAt.Sub(t.ScheduledFor) > lateAfter {
-			return ops.ScheduleRunRanLate
+			return ops.ScheduleRunStatusRanLate
 		}
-		return ops.ScheduleRunFinished
+		return ops.ScheduleRunStatusFinished
 	case tickets.StatusPausedAnswer, tickets.StatusPausedRepair:
-		return ops.ScheduleRunPaused
+		return ops.ScheduleRunStatusPaused
 	case tickets.StatusCancelled:
-		return ops.ScheduleRunCancelled
+		return ops.ScheduleRunStatusCancelled
 	default:
-		return ops.ScheduleRunQueued
+		return ops.ScheduleRunStatusQueued
 	}
 }
 

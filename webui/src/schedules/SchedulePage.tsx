@@ -2,11 +2,15 @@ import { Box, chakra, Text } from "@chakra-ui/react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useNavigate } from "react-router"
 import { useConnectionContext } from "../connection"
-import type {
-  ScheduleInfo,
-  ScheduleRun,
-  ScheduleRunNowResult,
-  ScheduleShowResult,
+import {
+  ScheduleRunNowReasonPreviousRunNeedsAttention,
+  ScheduleRunNowReasonPreviousRunStarted,
+  ScheduleRunNowReasonUnknownProject,
+  type ScheduleInfo,
+  type ScheduleRun,
+  type ScheduleRunNowReason,
+  type ScheduleRunNowResult,
+  type ScheduleShowResult,
 } from "../generated/server"
 import { ticketHref } from "../hrefs"
 import { DetailPage } from "../page/DetailPage"
@@ -125,12 +129,17 @@ interface ExistingTools {
   refetch: () => void
 }
 
-function RunNowRefusal({ refusal, project }: { refusal: Refusable; project: string }) {
-  const attention = (refusal as ScheduleRunNowResult).attention_address
-  let text = refusalText(refusal)
-  if (refusal.reason === "previous-run-started") text = "previous run started"
-  else if (refusal.reason === "previous-run-needs-attention") text = "previous run needs attention"
-  else if (refusal.reason === "unknown-project") text = `no project ${project} in the ticket store`
+const RUN_NOW_TEXT = {
+  [ScheduleRunNowReasonPreviousRunStarted]: () => "previous run started",
+  [ScheduleRunNowReasonPreviousRunNeedsAttention]: () => "previous run needs attention",
+  [ScheduleRunNowReasonUnknownProject]: (project: string) =>
+    `no project ${project} in the ticket store`,
+} satisfies Record<ScheduleRunNowReason, (project: string) => string>
+
+function RunNowRefusal({ refusal, project }: { refusal: ScheduleRunNowResult; project: string }) {
+  const attention = refusal.attention_address
+  const reasonText = RUN_NOW_TEXT[refusal.reason as ScheduleRunNowReason]
+  const text = reasonText ? reasonText(project) : refusalText(refusal)
   return (
     <Text role="alert" color="tone.error.fg" fontSize="14px" mt="2">
       {text}
@@ -153,7 +162,7 @@ function ScheduleHeader({
   existing: { project: string; slug: string }
   tools: ExistingTools
 }) {
-  const runWrite = useWrite({ toastRefusal: false })
+  const runWrite = useWrite<ScheduleRunNowResult>({ toastRefusal: false })
   const switchWrite = useWrite()
   const [answered, setAnswered] = useState<boolean>()
   useEffect(() => setAnswered(undefined), [tools.info.switch])
