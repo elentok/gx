@@ -35,6 +35,9 @@ type LaunchProof struct {
 	// CheckPasted (Claude only) fails a record that wraps the command in
 	// Claude Code's pasted-content tag with ErrPastedLaunch.
 	CheckPasted bool
+	// UnknownMarker is the pane text that says the agent does not know the
+	// skill; empty means Claude's UnknownCommandMarker.
+	UnknownMarker string
 	// Pane returns the current pane text.
 	Pane func() (string, error)
 	// Resend types the launch prompt again in the same session.
@@ -169,6 +172,7 @@ func CheckLaunchDelivered(ctx context.Context, p LaunchProof, text string, caps 
 	start := p.Now()
 	var lastSend time.Time
 	var unknownAt time.Time
+	marker := cmp.Or(p.UnknownMarker, UnknownCommandMarker)
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -189,11 +193,11 @@ func CheckLaunchDelivered(ctx context.Context, p LaunchProof, text string, caps 
 			return fmt.Errorf("reading pane: %w", err)
 		}
 		now := p.Now()
-		if unknownAt.IsZero() && strings.Contains(pane, UnknownCommandMarker) {
+		if unknownAt.IsZero() && strings.Contains(pane, marker) {
 			unknownAt = now
 		}
 		if !unknownAt.IsZero() && now.Sub(unknownAt) >= caps.UnknownGrace {
-			return fmt.Errorf("%w: %w: %q: %s", agentrunner.ErrNotDelivered, agentrunner.ErrUnknownSkill, text, UnknownCommandMarker)
+			return fmt.Errorf("%w: %w: %q: %s", agentrunner.ErrNotDelivered, agentrunner.ErrUnknownSkill, text, marker)
 		}
 		if now.Sub(start) >= caps.Grace {
 			// The command still sits in the input and never reached the

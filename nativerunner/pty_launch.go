@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/codexui"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
@@ -158,8 +159,9 @@ func (p *Pty) codexFirstUser(ss *ptySession) func() (string, bool, error) {
 // the session while it does not.
 func (p *Pty) proveCodexLaunch(ctx context.Context, ss *ptySession, pr *ptyPrompter, firstUser func() (string, bool, error), text string, onNudge func(string)) error {
 	proof := claudeui.LaunchProof{
-		FirstUser: firstUser,
-		Working:   func() (bool, error) { return p.turns().working(ss) },
+		FirstUser:     firstUser,
+		UnknownMarker: codexui.UnknownCommandMarker,
+		Working:       func() (bool, error) { return p.turns().working(ss) },
 		Pane: func() (string, error) {
 			if err := pr.cancelled(); err != nil {
 				return "", err

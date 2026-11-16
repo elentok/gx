@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/codexui"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -427,11 +428,31 @@ func (c *codexFake) workerPrompt(text string) (string, agentfake.WorkerConfig, b
 	return fields[len(fields)-1], cfg, true
 }
 
+// codexSkillUnknown reports whether the unknown-skill knobs reject the "$"
+// skill prompt text.
+func codexSkillUnknown(text string) bool {
+	if os.Getenv(CodexUnknownSkillEnv) == "1" {
+		return true
+	}
+	if os.Getenv(CodexUnknownUntilInstalledEnv) != "1" {
+		return false
+	}
+	skill, _, _ := strings.Cut(strings.TrimPrefix(text, "$"), " ")
+	home := harness.LookupEnv(os.Environ(), "HOME")
+	_, err := os.Stat(filepath.Join(home, ".agents", "skills", skill, "SKILL.md"))
+	return err != nil
+}
+
 // submit starts the turn a typed prompt asks for. A skill prompt does the
 // ticket's work as the worker config says.
 func (c *codexFake) submit(text string) error {
 	if os.Getenv(CodexDropPromptEnv) == "1" && strings.HasPrefix(text, "$") {
 		// The prompt vanishes: no user record, no turn.
+		return nil
+	}
+	if strings.HasPrefix(text, "$") && codexSkillUnknown(text) {
+		skill, _, _ := strings.Cut(text, " ")
+		fmt.Fprintf(c.out, "\r\n%s '%s'. Type \"/\" for a list of supported commands.\r\n", codexui.UnknownCommandMarker, skill)
 		return nil
 	}
 	if b := c.row.Behaviour; !c.modelErrored && text != "" && !strings.HasPrefix(text, "/") && (b == agentfake.ModelNotFound || b == agentfake.ModelError) {

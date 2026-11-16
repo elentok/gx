@@ -3,6 +3,8 @@ package ptycodex
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/codexui"
 	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/testutil/agentfake/codex"
 )
@@ -75,6 +78,46 @@ func TestPtyCodex_LaunchPromptIsDeliveredByTheRolloutsUserRecord(t *testing.T) {
 
 	if err := p.PromptLaunch(context.Background(), s, "$gx-implement x/1", nil); err != nil {
 		t.Fatalf("PromptLaunch = %v; want nil once the rollout holds the prompt", err)
+	}
+}
+
+func TestPtyCodex_UnknownSkillLaunchFailsFastWithErrUnknownSkill(t *testing.T) {
+	t.Parallel()
+	p, _ := codexRunner(t, codex.CodexUnknownSkillEnv+"=1")
+	p.LaunchCaps = claudeui.LaunchProofCaps{Grace: time.Minute, UnknownGrace: 200 * time.Millisecond, ResendEvery: time.Hour}
+	s := startCodex(t, p, realDir(t))
+
+	start := time.Now()
+	err := p.PromptLaunch(context.Background(), s, "$gx-implement x/1", nil)
+
+	if !errors.Is(err, agentrunner.ErrUnknownSkill) || !strings.Contains(err.Error(), codexui.UnknownCommandMarker) {
+		t.Fatalf("PromptLaunch = %v; want ErrUnknownSkill naming %q", err, codexui.UnknownCommandMarker)
+	}
+	if elapsed := time.Since(start); elapsed > 10*time.Second {
+		t.Errorf("PromptLaunch took %v; want seconds", elapsed)
+	}
+}
+
+func TestPtyCodex_UnknownUntilInstalledSkillLaunchesOnceInstalled(t *testing.T) {
+	t.Parallel()
+	p, codexHome := codexRunner(t, codex.CodexUnknownUntilInstalledEnv+"=1")
+	p.LaunchCaps = claudeui.LaunchProofCaps{Grace: time.Minute, UnknownGrace: 200 * time.Millisecond, ResendEvery: time.Hour}
+	s := startCodex(t, p, realDir(t))
+
+	if err := p.PromptLaunch(context.Background(), s, "$gx-implement x/1", nil); !errors.Is(err, agentrunner.ErrUnknownSkill) {
+		t.Fatalf("first PromptLaunch = %v; want ErrUnknownSkill", err)
+	}
+	skillDir := filepath.Join(filepath.Dir(codexHome), ".agents", "skills", "gx-implement")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# skill\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p.LaunchCaps = claudeui.LaunchProofCaps{Grace: 10 * time.Second, UnknownGrace: 5 * time.Second, ResendEvery: time.Hour}
+
+	if err := p.PromptLaunch(context.Background(), s, "$gx-implement x/1", nil); err != nil {
+		t.Fatalf("PromptLaunch after the install = %v; want nil", err)
 	}
 }
 

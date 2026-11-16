@@ -28,6 +28,16 @@ const CodexIDEnv = "GX_AGENTFAKE_CODEX_ID"
 // it writes no user record and starts no turn.
 const CodexDropPromptEnv = "GX_AGENTFAKE_CODEX_DROP_PROMPT"
 
+// CodexUnknownSkillEnv, set to "1", makes every "$" skill prompt an unknown
+// command: the pane draws `Unrecognized command '$gx-…'` and the rollout gets
+// no user record and no turn.
+const CodexUnknownSkillEnv = "GX_AGENTFAKE_CODEX_UNKNOWN_SKILL"
+
+// CodexUnknownUntilInstalledEnv, set to "1", does the same until
+// $HOME/.agents/skills/<skill>/SKILL.md exists: a registry that learns the
+// skill once gx has refreshed the install.
+const CodexUnknownUntilInstalledEnv = "GX_AGENTFAKE_CODEX_UNKNOWN_UNTIL_INSTALLED"
+
 // CodexVersion is the Codex release the fake imitates; a test fixes it.
 const CodexVersion = "0.166.0"
 

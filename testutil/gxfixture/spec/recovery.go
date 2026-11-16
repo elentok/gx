@@ -45,6 +45,14 @@ var (
 	// launch proof from the rollout fails.
 	CodexDropsPrompt = recoveryEpic("codex-drop-epic", servertest.TicketOpts{Agent: "codex"}, true,
 		codex.CodexDropPromptEnv+"=1")
+	// CodexUnknownSkill: the Codex fake rejects every skill prompt as an
+	// unknown command, so the ticket pauses as agent_prompt_stalled.
+	CodexUnknownSkill = recoveryEpic("codex-unknown-epic", servertest.TicketOpts{Agent: "codex"}, true,
+		codex.CodexUnknownSkillEnv+"=1")
+	// CodexUnknownSkillRefresh: the Codex fake knows the skill only once gx's
+	// refresh has installed it, so the launch ends with no pause.
+	CodexUnknownSkillRefresh = recoveryEpic("codex-refresh-epic", servertest.TicketOpts{Agent: "codex"}, true,
+		codex.CodexUnknownUntilInstalledEnv+"=1")
 	// LiveTaskGate: the Claude agent ends its turn on a background task that has
 	// an output file and a running child process, so the ticket pauses on the
 	// live-task gate.
