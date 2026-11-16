@@ -82,11 +82,7 @@ func ReadInFlightTools(path string) ([]InFlightTool, error) {
 	}
 	defer f.Close()
 
-	type open struct {
-		id   string
-		tool InFlightTool
-	}
-	var calls []open
+	var t inFlightTracker
 	err = ForEachLine(f, func(lineBytes []byte) {
 		raw := strings.TrimSpace(string(lineBytes))
 		if raw == "" {
@@ -96,29 +92,54 @@ func ReadInFlightTools(path string) ([]InFlightTool, error) {
 		if json.Unmarshal([]byte(raw), &line) != nil || line.IsSidechain {
 			return
 		}
-		if line.isRealUserTurn() {
-			calls = calls[:0]
-			return
-		}
-		for _, b := range line.contentBlocks() {
-			switch {
-			case line.Type == "assistant" && b.Type == "tool_use" && b.ID != "":
-				var in map[string]any
-				_ = json.Unmarshal(b.Input, &in)
-				calls = append(calls, open{b.ID, NewInFlightTool(b.Name, in)})
-			case line.Type == "user" && b.Type == "tool_result":
-				if i := slices.IndexFunc(calls, func(c open) bool { return c.id == b.ToolUseID }); i >= 0 {
-					calls = slices.Delete(calls, i, i+1)
-				}
-			}
-		}
+		t.feed(line.Type, line.Message.Content)
 	})
 	if err != nil {
 		return nil, err
 	}
-	out := make([]InFlightTool, 0, len(calls))
-	for _, c := range slices.Backward(calls) {
+	return t.result(), nil
+}
+
+// inFlightTracker follows the open tool calls of the current turn over the
+// non-sidechain lines of a transcript. ReadTaskRecords shares it so one scan
+// yields both.
+type inFlightTracker struct {
+	calls []openCall
+}
+
+type openCall struct {
+	id   string
+	tool InFlightTool
+}
+
+// feed takes one non-sidechain line's type and message.content.
+func (t *inFlightTracker) feed(lineType string, content json.RawMessage) {
+	if lineType == "user" {
+		var s string
+		if json.Unmarshal(content, &s) == nil {
+			t.calls = t.calls[:0]
+			return
+		}
+	}
+	for _, b := range decodeContentBlocks(content) {
+		switch {
+		case lineType == "assistant" && b.Type == "tool_use" && b.ID != "":
+			var in map[string]any
+			_ = json.Unmarshal(b.Input, &in)
+			t.calls = append(t.calls, openCall{b.ID, NewInFlightTool(b.Name, in)})
+		case lineType == "user" && b.Type == "tool_result":
+			if i := slices.IndexFunc(t.calls, func(c openCall) bool { return c.id == b.ToolUseID }); i >= 0 {
+				t.calls = slices.Delete(t.calls, i, i+1)
+			}
+		}
+	}
+}
+
+// result lists the open calls newest first.
+func (t *inFlightTracker) result() []InFlightTool {
+	out := make([]InFlightTool, 0, len(t.calls))
+	for _, c := range slices.Backward(t.calls) {
 		out = append(out, c.tool)
 	}
-	return out, nil
+	return out
 }

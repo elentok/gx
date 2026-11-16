@@ -98,15 +98,16 @@ func Loader(kind agentrunner.Kind, ref FlowRef, sessionDir string, final bool) f
 			snap.InFlight, snap.Records = rollout.InFlight, rollout.Records
 			return snap, nil
 		}
-		if snap.InFlight, err = transcript.ReadInFlightTools(path); err != nil {
-			return Snapshot{}, err
-		}
-		if snap.Records, err = transcript.ReadTaskRecords(path); err != nil {
+		if snap.Records, snap.InFlight, err = readClaudeTasks(path); err != nil {
 			return Snapshot{}, err
 		}
 		return snap, nil
 	}
 }
+
+// readClaudeTasks is one scan for the task records and the open calls. A
+// variable so a test can count the scans.
+var readClaudeTasks = transcript.ReadTaskRecords
 
 // execShapeSince is the first Codex version whose rollouts record exec cells.
 const execShapeSince = "0.144.1"

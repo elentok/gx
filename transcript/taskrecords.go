@@ -45,20 +45,23 @@ type taskRecordResult struct {
 	OutputFile       string `json:"outputFile"`
 }
 
-// ReadTaskRecords parses the parent transcript at path into Bash task records:
-// background shells and foreground calls. Sidechain lines are skipped. The
-// records hold parse results only; the clock-based rules run at assembly.
-func ReadTaskRecords(path string) ([]TaskRecord, error) {
+// ReadTaskRecords parses the parent transcript at path into task records:
+// background shells, subagents and foreground calls. Sidechain lines are
+// skipped. The records hold parse results only; the clock-based rules run at
+// assembly. The same scan also returns the current turn's open calls, exactly
+// as ReadInFlightTools lists them.
+func ReadTaskRecords(path string) ([]TaskRecord, []InFlightTool, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return nil, err
+		return nil, nil, err
 	}
 	defer f.Close()
 
 	var recs []*TaskRecord
+	var open inFlightTracker
 	byUse := map[string]*TaskRecord{}
 	byTask := map[string]*TaskRecord{}
 
@@ -66,6 +69,13 @@ func ReadTaskRecords(path string) ([]TaskRecord, error) {
 		var l taskRecordLine
 		if json.Unmarshal(b, &l) != nil || l.IsSidechain {
 			return
+		}
+		if l.Type == "assistant" || l.Type == "user" {
+			var m struct {
+				Content json.RawMessage `json:"content"`
+			}
+			_ = json.Unmarshal(l.Message, &m)
+			open.feed(l.Type, m.Content)
 		}
 		ts, tsErr := time.Parse(time.RFC3339Nano, l.Timestamp)
 		if tsErr != nil {
@@ -79,7 +89,7 @@ func ReadTaskRecords(path string) ([]TaskRecord, error) {
 				case "Monitor":
 					r.Kind = TaskKindMonitor
 				case "Agent", "Task":
-					r.Kind, r.Command = TaskKindSubagent, u.Prompt
+					r.Kind = TaskKindSubagent
 				default:
 					if u.RunInBackground {
 						r.Kind = TaskKindShell
@@ -157,13 +167,13 @@ func ReadTaskRecords(path string) ([]TaskRecord, error) {
 		}
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	out := make([]TaskRecord, len(recs))
 	for i, r := range recs {
 		out[i] = *r
 	}
-	return out, nil
+	return out, open.result(), nil
 }
 
 // applyNotification ends the shell a final task-notification names. A
@@ -234,8 +244,7 @@ func usableOutputPath(p string) string {
 type taskUse struct {
 	toolUseInput
 	name            string
-	RunInBackground bool   `json:"run_in_background"`
-	Prompt          string `json:"prompt"`
+	RunInBackground bool `json:"run_in_background"`
 }
 
 // taskToolUses reads the Bash, Monitor and Agent (or legacy Task) launches of

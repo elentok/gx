@@ -28,9 +28,6 @@ type subagentLine struct {
 	} `json:"message"`
 }
 
-// subagentTokens is one API message's share of the total.
-func subagentTokens(inputTokens, outputTokens int) int { return inputTokens + outputTokens }
-
 // ReadSubagentFile reads a subagents/agent-<id>.jsonl. Every line of it is
 // marked sidechain, so unlike the parent readers it keeps them. A missing file
 // has no details.
@@ -59,7 +56,8 @@ func ReadSubagentFile(path string) (SubagentDetails, error) {
 			}
 			if id := l.Message.ID; id != "" && !seenMessages[id] {
 				seenMessages[id] = true
-				out.Tokens += subagentTokens(l.Message.Usage.Input, l.Message.Usage.Output)
+				// Input plus output only: cache tokens are left out of the total.
+				out.Tokens += l.Message.Usage.Input + l.Message.Usage.Output
 			}
 		}
 		for _, blk := range decodeContentBlocks(l.Message.Content) {

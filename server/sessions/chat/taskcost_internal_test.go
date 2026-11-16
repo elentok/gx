@@ -334,3 +334,27 @@ func TestTaskCost_ClockPastMonitorTimeoutChangesTheRowAndParsesNothing(t *testin
 	}
 	wantReads(t, e, map[string]int{shellFile: 1})
 }
+
+// Not parallel: it swaps the package's task-scan variable.
+func TestLoader_ClaudeScansTheTranscriptOnceForTasksAndOpenCalls(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.jsonl")
+	line := costUse("Bash", "b1", 0, `{"command":"sleep 5"}`)
+	if err := os.WriteFile(path, []byte(line+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scans := 0
+	orig := readClaudeTasks
+	readClaudeTasks = func(p string) ([]transcript.TaskRecord, []transcript.InFlightTool, error) {
+		scans++
+		return orig(p)
+	}
+	t.Cleanup(func() { readClaudeTasks = orig })
+
+	snap, err := Loader(harness.Claude, FlowRef{}, t.TempDir(), false)(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scans != 1 || len(snap.Records) != 1 || len(snap.InFlight) != 1 {
+		t.Errorf("scans = %d, records = %d, open calls = %d; want 1, 1, 1", scans, len(snap.Records), len(snap.InFlight))
+	}
+}

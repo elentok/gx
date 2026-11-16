@@ -60,7 +60,8 @@ type TaskRecord struct {
 	Command  string
 	ExitCode *int
 	// OutputPath is a shell's output file, as the launch result or the final
-	// notification names it. It is recorded here and not read yet.
+	// notification names it; withShellOutputs reads a shell's, subagentFilePath
+	// a subagent's.
 	OutputPath  string
 	OutputBytes int64
 	LastLine    string

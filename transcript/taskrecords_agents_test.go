@@ -72,6 +72,9 @@ func TestReadTaskRecords_AsyncSubagent(t *testing.T) {
 	if r.Kind != TaskKindSubagent || r.ID != "ag1" || r.Label != "explore" || r.Model != "opus-5" || r.OutputPath != "/x/tasks/ag1.output" || !r.StartedAt.Equal(mustParseTime(t0)) {
 		t.Fatalf("rec = %+v", r)
 	}
+	if r.Command != "" {
+		t.Errorf("the subagent prompt reached Command: %q", r.Command)
+	}
 	if r.End != nil {
 		t.Errorf("interim ended it: %+v", r.End)
 	}

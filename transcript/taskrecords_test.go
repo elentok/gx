@@ -3,6 +3,7 @@ package transcript
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -36,7 +37,7 @@ func turnEndLine(ts string) string {
 
 func readRecords(t *testing.T, lines ...string) []TaskRecord {
 	t.Helper()
-	recs, err := ReadTaskRecords(writeTranscript(t, lines...))
+	recs, _, err := ReadTaskRecords(writeTranscript(t, lines...))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,8 +226,33 @@ func TestReadTaskRecords_SidechainAndMissingFile(t *testing.T) {
 	if recs := readRecords(t, side); len(recs) != 0 {
 		t.Errorf("recs = %+v", recs)
 	}
-	recs, err := ReadTaskRecords(filepath.Join(t.TempDir(), "none.jsonl"))
-	if recs != nil || err != nil {
-		t.Errorf("missing file = %v, %v", recs, err)
+	recs, open, err := ReadTaskRecords(filepath.Join(t.TempDir(), "none.jsonl"))
+	if recs != nil || open != nil || err != nil {
+		t.Errorf("missing file = %v, %v, %v", recs, open, err)
+	}
+}
+
+func TestReadTaskRecords_OpenCallsMatchReadInFlightTools(t *testing.T) {
+	t.Parallel()
+	path := writeTranscript(t,
+		`{"type":"user","message":{"content":"earlier prompt"}}`,
+		bashUseLine("old", t0, `{"command":"echo old"}`),
+		`{"type":"user","message":{"content":"go"}}`,
+		bashUseLine("a", t0, `{"command":"sleep 1"}`),
+		bashUseLine("b", t0, `{"command":"make","run_in_background":true}`),
+		`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"g","name":"Grep","input":{"pattern":"foo"}}]}}`,
+		`{"isSidechain":true,"type":"assistant","message":{"content":[{"type":"tool_use","id":"s","name":"Bash","input":{"command":"x"}}]}}`,
+		`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"a","content":"ok"}]}}`,
+	)
+	want, err := ReadInFlightTools(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, got, err := ReadTaskRecords(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(want) != 2 || !slices.Equal(got, want) {
+		t.Errorf("open calls = %+v, want %+v (two calls)", got, want)
 	}
 }
