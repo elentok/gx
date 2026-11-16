@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -128,13 +129,26 @@ func TestHostFiles_ChatAndTicketHoldTheLinks(t *testing.T) {
 	r := start(t, "host-files")
 	hf := r.HostFiles
 	var list []wire.SessionInfo
-	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil || len(list) != 1 {
-		t.Fatalf("sessions = %d, %v, want 1", len(list), err)
+	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &list); err != nil || len(list) != 2 {
+		t.Fatalf("sessions = %d, %v, want 2", len(list), err)
 	}
-	var chat wire.SessionChatResponse
-	if err := json.Unmarshal([]byte(r.Gx(t, "agents", "chat", list[0].ID, "--json")), &chat); err != nil {
-		t.Fatal(err)
+	chatOf := func(dir string) wire.SessionChatResponse {
+		t.Helper()
+		i := slices.IndexFunc(list, func(si wire.SessionInfo) bool { return si.Dir == dir })
+		if i < 0 {
+			t.Fatalf("no session in %s: %+v", dir, list)
+		}
+		var c wire.SessionChatResponse
+		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "chat", list[i].ID, "--json")), &c); err != nil {
+			t.Fatal(err)
+		}
+		return c
 	}
+	second := chatOf(hf.SecondWorktree)
+	if !slices.ContainsFunc(second.Messages, func(m wire.SessionChatMessage) bool { return strings.Contains(m.Text, hf.SecondOnly) }) {
+		t.Errorf("the feature worktree's chat never names %s: %+v", hf.SecondOnly, second.Messages)
+	}
+	chat := chatOf(hf.Repo)
 	var all []string
 	var calls []string
 	var prompt bool
@@ -175,10 +189,23 @@ func TestHostFiles_NoMainWorktreeShapeChecksOutTrunkNowhere(t *testing.T) {
 	if got := gitOut(t, hf.Repo, "branch", "--show-current"); got == "main" || got == "" {
 		t.Errorf("repo branch = %q, want a branch other than main", got)
 	}
-	if list := gitOut(t, hf.Repo, "worktree", "list"); strings.Contains(list, "[main]") {
+	if bare := gitOut(t, hf.Repo, "rev-parse", "--is-bare-repository"); bare != "false" {
+		t.Errorf("checkout is bare = %q", bare)
+	}
+	if bare := gitOut(t, filepath.Join(r.Root(), "repo"), "rev-parse", "--is-bare-repository"); bare != "true" {
+		t.Errorf("project repo is bare = %q, want true", bare)
+	}
+	list := gitOut(t, hf.Repo, "worktree", "list")
+	if strings.Contains(list, "[main]") {
 		t.Errorf("a worktree has main checked out:\n%s", list)
+	}
+	if !strings.Contains(list, hf.SecondWorktree) {
+		t.Errorf("worktrees:\n%s\nwant %s", list, hf.SecondWorktree)
 	}
 	if _, err := os.Stat(filepath.Join(hf.SecondWorktree, hf.SecondOnly)); err != nil {
 		t.Errorf("second worktree file: %v", err)
+	}
+	if out := r.Gx(t, "files", "resolve", "--project", "demo", "docs/plans/host-files.md"); strings.Contains(out, "found") {
+		t.Errorf("a trunk base resolved a relative path:\n%s", out)
 	}
 }

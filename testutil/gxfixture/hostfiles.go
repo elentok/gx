@@ -179,22 +179,9 @@ func (f hostFilesFixture) setup(shape string) error {
 			return err
 		}
 	}
-	second := filepath.Join(repo, ".worktrees", "feature")
-	if err := f.git(repo, "worktree", "add", "-b", "feature", second); err != nil {
+	repo, second, err := f.layoutWorktrees(repo, shape)
+	if err != nil {
 		return err
-	}
-	if err := os.WriteFile(filepath.Join(second, hostFilesSecondOnly), []byte("# Only here\n"), 0o644); err != nil {
-		return err
-	}
-	for _, args := range [][]string{{"add", hostFilesSecondOnly}, {"commit", "-m", "only in the feature worktree"}} {
-		if err := f.git(second, args...); err != nil {
-			return err
-		}
-	}
-	if shape == "no-main-worktree" {
-		if err := f.git(repo, "switch", "-c", "elsewhere"); err != nil {
-			return err
-		}
 	}
 	temp := filepath.Join(f.root, "shots")
 	if err := os.MkdirAll(temp, 0o755); err != nil {
@@ -210,6 +197,44 @@ func (f hostFilesFixture) setup(shape string) error {
 	}
 	f.hostFiles = &spec.HostFilesOutput{Repo: repo, SecondWorktree: second, SecondOnly: hostFilesSecondOnly, TempDir: temp, OtherOrigin: other, Ticket: addr}
 	return nil
+}
+
+// layoutWorktrees adds the feature worktree, which alone holds hostFilesSecondOnly,
+// and returns the checkout the repo's files are read from and the feature worktree.
+// In the no-main-worktree shape the project's repo becomes a bare repo with its
+// worktrees as siblings, none on main, so ticketgit.TrunkCheckout finds no trunk
+// checkout; the returned checkout is then the "elsewhere" worktree, not the repo.
+func (f hostFilesFixture) layoutWorktrees(repo, shape string) (checkout, second string, err error) {
+	checkout, second = repo, filepath.Join(repo, ".worktrees", "feature")
+	if shape == "no-main-worktree" {
+		gitDir, aside := filepath.Join(repo, ".git"), repo+".aside"
+		for _, step := range []func() error{
+			func() error { return os.Rename(gitDir, aside) },
+			func() error { return os.RemoveAll(repo) },
+			func() error { return os.Rename(aside, repo) },
+			func() error { return f.git(repo, "config", "--bool", "core.bare", "true") },
+		} {
+			if err := step(); err != nil {
+				return "", "", err
+			}
+		}
+		checkout, second = repo+"-elsewhere", repo+"-feature"
+		if err := f.git(repo, "worktree", "add", "-b", "elsewhere", checkout, "main"); err != nil {
+			return "", "", err
+		}
+	}
+	if err := f.git(repo, "worktree", "add", "-b", "feature", second, "main"); err != nil {
+		return "", "", err
+	}
+	if err := os.WriteFile(filepath.Join(second, hostFilesSecondOnly), []byte("# Only here\n"), 0o644); err != nil {
+		return "", "", err
+	}
+	for _, args := range [][]string{{"add", hostFilesSecondOnly}, {"commit", "-m", "only in the feature worktree"}} {
+		if err := f.git(second, args...); err != nil {
+			return "", "", err
+		}
+	}
+	return checkout, second, nil
 }
 
 // hostFilesChat is the chat the scenario appends to the session's transcript:
@@ -236,6 +261,28 @@ func (f sessionSeeder) hostFilesChat() []string {
 		line("assistant", "links", text(links)),
 		line("assistant", "round", text(round)),
 	}
+}
+
+// hostFilesSecondText is the second session's message; it names a file only
+// the feature worktree has.
+const hostFilesSecondText = "I added " + hostFilesSecondOnly + " in this worktree."
+
+// seedHostFilesSecondChat appends one message to the feature-worktree session
+// and waits until the chat shows it.
+func (f sessionSeeder) seedHostFilesSecondChat(id, harness string) error {
+	if harness == "codex" {
+		return fmt.Errorf("host-files chat is Claude only")
+	}
+	raw, _ := json.Marshal(map[string]any{
+		"type": "assistant", "uuid": "hf-second", "timestamp": "2026-01-01T10:00:00Z",
+		"message": map[string]any{"content": []map[string]any{{"type": "text", "text": hostFilesSecondText}}},
+	})
+	if err := f.appendChatLines(id, harness, []string{string(raw)}); err != nil {
+		return err
+	}
+	return f.waitFor(id, "the second worktree's message", func(_ wire.SessionInfo, c wire.SessionChatResponse) bool {
+		return slices.ContainsFunc(c.Messages, func(m wire.SessionChatMessage) bool { return strings.Contains(m.Text, hostFilesSecondOnly) })
+	})
 }
 
 // seedHostFilesChat appends the host-files messages and waits until the chat

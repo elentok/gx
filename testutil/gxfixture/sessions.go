@@ -113,7 +113,11 @@ func (f sessionSeeder) settledControlFiles() []string {
 
 func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 	before, codexBefore := f.settledControlFiles(), f.codexIDs()
-	id, err := f.createSession(s.Project, f.repoDir(sc, s.Project), s.Prompt, s.Harness)
+	dir := f.repoDir(sc, s.Project)
+	if s.HostFilesSecond {
+		dir = f.hostFiles.SecondWorktree
+	}
+	id, err := f.createSession(s.Project, dir, s.Prompt, s.Harness)
 	if err != nil {
 		return err
 	}
@@ -252,6 +256,9 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 	}
 	if s.HostFilesChat {
 		return f.seedHostFilesChat(id, s.Harness)
+	}
+	if s.HostFilesSecond {
+		return f.seedHostFilesSecondChat(id, s.Harness)
 	}
 	return nil
 }
@@ -414,6 +421,9 @@ func (f sessionSeeder) codexIDs() []string {
 
 // repoDir is the repo root the project's sessions run in.
 func (f sessionSeeder) repoDir(sc scenario, project string) string {
+	if f.hostFiles != nil {
+		return f.hostFiles.Repo
+	}
 	if slices.Contains(sc.OwnRepos, project) {
 		return filepath.Join(f.root, project+"-repo")
 	}

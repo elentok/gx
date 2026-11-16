@@ -1,7 +1,17 @@
 import { rm } from "node:fs/promises"
 import { join } from "node:path"
-import { expect, test, touch } from "./fixture"
+import { expect, test, touch, type Fixture } from "./fixture"
 import { ask, go } from "./agentsKit"
+
+// The id of the session that runs in dir.
+async function sessionIn(fixture: Fixture, dir: string): Promise<string> {
+  const list: { id: string; dir: string }[] = JSON.parse(
+    await fixture.cli("agents", "list", "--json"),
+  )
+  const found = list.find((s) => s.dir === dir)
+  if (!found) throw new Error(`no session in ${dir}`)
+  return found.id
+}
 
 test("204. Hosted files, wide", async ({ page, start }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
@@ -84,7 +94,7 @@ test("204. Hosted files, wide", async ({ page, start }) => {
   await second.close()
 
   // Step 4: links in the chat.
-  const sessionId = (await fixture.cli("agents", "list")).split("\n")[0].split("\t")[0]
+  const sessionId = await sessionIn(fixture, hf.repo)
   await go(page, `#/agents/${sessionId}`)
   await expect(page.getByText("Which file next?").first()).toBeVisible()
   const resolves: string[] = []
@@ -285,12 +295,16 @@ test("204. Hosted files, wide", async ({ page, start }) => {
   const copied = await page.evaluate(() => navigator.clipboard.readText())
   expect(copied).toBe(link)
 
-  // A second start in the same test works; the absolute path still links on the other shape.
-  // Its relative path should not link (no checked-out trunk), but the fixture repo is not bare,
-  // so the project base still resolves: see the ticket's Spec deviations.
+  // A second start in the same test works. In the bare layout no worktree has trunk checked out:
+  // the absolute path still links, the relative one in the ticket does not, and a session in the
+  // second worktree links the file only that worktree has.
   const bare = await start("host-files", { shape: "no-main-worktree" })
-  await go(page, `#/t/${bare.hostFiles!.ticket}`)
-  await expect(ticketLink(join(bare.hostFiles!.repo, ".scratch/flow.mmd"))).toBeVisible()
+  const bareFiles = bare.hostFiles!
+  await go(page, `#/t/${bareFiles.ticket}`)
+  await expect(ticketLink(join(bareFiles.repo, ".scratch/flow.mmd"))).toBeVisible()
+  await expect(ticketLink("docs/plans/host-files.md")).toHaveCount(0)
+  await go(page, `#/agents/${await sessionIn(bare, bareFiles.second_worktree)}`)
+  await expect(page.getByRole("link", { name: bareFiles.second_only, exact: true })).toBeVisible()
 })
 
 // The bottom sheet needs the real (hover: none) media query, so this flow gets its own touch context.
@@ -306,7 +320,7 @@ test.describe("205. Hosted files, phone", () => {
     await go(page, "#/")
     expect(await page.evaluate(() => matchMedia("(hover: none)").matches)).toBe(true)
 
-    const sessionId = (await fixture.cli("agents", "list")).split("\n")[0].split("\t")[0]
+    const sessionId = await sessionIn(fixture, hf.repo)
     await go(page, `#/agents/${sessionId}`)
     await expect(page.getByText("I wrote the plan to")).toBeVisible()
     const message = page

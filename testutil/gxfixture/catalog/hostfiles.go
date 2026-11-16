@@ -15,6 +15,8 @@ func hostFilesScenario() scenario {
 		Epics: []epic{{Project: project, Name: spec.HostFilesEpic, Tickets: []ticket{
 			{ID: spec.HostFilesTicket, Slug: "links", Opts: servertest.TicketOpts{}},
 		}}},
-		Sessions: []sessionSpec{{Project: project, Prompt: "hello", Read: true, HostFilesChat: true}},
+		Sessions: []sessionSpec{{Project: project, Prompt: "hello", Read: true, HostFilesChat: true},
+			{Project: project, Prompt: "hello", HostFilesSecond: true},
+		},
 	}
 }

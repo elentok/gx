@@ -348,6 +348,9 @@ type SessionSpec struct {
 	Interrupted bool
 	// HostFilesChat appends the host-files scenario's link messages to the chat.
 	HostFilesChat bool
+	// HostFilesSecond runs the session in the host-files feature worktree and
+	// appends a message naming the file only that worktree has.
+	HostFilesSecond bool
 	// Rejected says the agent rejects the first prompt (see Scenario.UnknownSkill):
 	// the session is settled once it raises the Unknown command Actionable.
 	Rejected bool
