@@ -15,14 +15,33 @@ export interface ToastSpec {
   persistent?: boolean
   /** Buttons under the text; each click also dismisses the toast. */
   actions?: { label: string; onClick: () => void }[]
+  /** A raised card with an amber left edge instead of a filled alert; the close button stays. */
+  card?: boolean
+  /** Runs when the toast starts closing, from the close button or a dismiss. */
+  onClose?: () => void
 }
 
-export function showToast({ type, title, link, description, id, persistent, actions }: ToastSpec) {
+export function showToast({
+  type,
+  title,
+  link,
+  description,
+  id,
+  persistent,
+  actions,
+  card,
+  onClose,
+}: ToastSpec) {
   // Chakra spreads these over its defaults, so an undefined id or duration would erase them.
   toaster.create({
     ...(id && { id }),
     ...(persistent && { duration: Infinity }),
-    ...(actions && { meta: { actions } }),
+    ...((actions || card) && { meta: { actions, card } }),
+    ...(onClose && {
+      onStatusChange: ({ status }: { status: string }) => {
+        if (status === "unmounted") onClose()
+      },
+    }),
     type,
     title,
     description: link ? <Link href={link.href}>{link.label}</Link> : description,
@@ -36,21 +55,24 @@ export function AppToaster() {
       <Toaster toaster={toaster} insetInline={{ mdDown: "4" }}>
         {(toast) => {
           const actions = toast.meta?.actions as ToastSpec["actions"]
+          const card = toast.meta?.card as boolean | undefined
+          const raised = !!actions || !!card
           // A toast with buttons is a raised card like the Dev popover, not a filled alert.
           return (
             <Toast.Root
               width={{ md: actions ? "320px" : "sm" }}
-              {...(actions && {
+              {...(raised && {
                 bg: "surface.raised",
                 color: "text",
                 borderWidth: "1px",
                 borderColor: "border",
               })}
+              {...(card && { borderLeftWidth: "3px", borderLeftColor: "tone.waiting.fg" })}
             >
-              {!actions && <Toast.Indicator />}
+              {!raised && <Toast.Indicator />}
               <div>
                 {toast.title && (
-                  <Toast.Title {...(actions && { fontWeight: "700", fontSize: "14px" })}>
+                  <Toast.Title {...(raised && { fontWeight: "700", fontSize: "14px" })}>
                     {toast.title}
                   </Toast.Title>
                 )}
