@@ -44,6 +44,9 @@ type Snapshot struct {
 	Round     []wire.SessionRoundCard
 	Next      *wire.SessionNext
 	Tasks     []transcript.BackgroundTaskMarker
+	// Records are the parsed tasks of the Task group; AssembleTasks turns them
+	// into rows on every read.
+	Records []transcript.TaskRecord
 	// InFlight is the current turn's unanswered tool calls, newest first.
 	InFlight []transcript.InFlightTool
 	// Unreadable and CodexVersion are set for a Codex rollout gx cannot read.

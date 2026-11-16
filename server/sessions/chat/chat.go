@@ -37,6 +37,8 @@ type Meta struct {
 	Status         wire.SessionStatus
 	Exit           string
 	RestoreCrashed bool
+	// RunStartedAt is when the current run began, as on wire.SessionInfo.
+	RunStartedAt time.Time
 }
 
 // Source is what the chat needs from the sessions that own the metas.
@@ -121,6 +123,15 @@ type Chat struct {
 	rolloutPath func(home, conversationID string) (string, bool, error)
 	// dialogWaits times how long each session has waited on "input needed".
 	dialogWaits dialogWaits
+	// now is the clock of the task assembler; nil means time.Now. Tests move it.
+	now func() time.Time
+}
+
+func (c *Chat) clock() time.Time {
+	if c.now != nil {
+		return c.now()
+	}
+	return time.Now()
 }
 
 // New builds a Chat.

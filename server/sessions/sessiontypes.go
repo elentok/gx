@@ -190,6 +190,7 @@ func (m Meta) ChatMeta() chat.Meta {
 		ID: m.ID, Harness: m.Harness, Project: m.Project, Dir: m.Dir, Ticket: m.Ticket, FixOf: m.FixOf, RunTicket: m.RunTicket,
 		Flow: m.FlowRef(), ConversationID: m.ConversationID, Model: m.Model, Effort: m.Effort,
 		Status: m.Status, Exit: m.Exit, RestoreCrashed: m.RestoreCrashed,
+		RunStartedAt: cmp.Or(m.RestoredAt, m.CreatedAt),
 	}
 }
 

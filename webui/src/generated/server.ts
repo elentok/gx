@@ -2630,6 +2630,10 @@ export interface SessionChatResponse {
   next?: SessionNext;
   background: SessionBackgroundTask[];
   /**
+   * Tasks is the open Task group, ordered by start; absent when none is open.
+   */
+  tasks?: SessionTask[];
+  /**
    * Current is the newest tool call in flight and Others the older ones,
    * newest first; both are absent when nothing is in flight.
    */
@@ -2991,6 +2995,32 @@ export interface SessionBackgroundTask {
   kind: string; // transcript.BackgroundTaskShell, ...Monitor or ...Agent
   label: string;
   started_at: string;
+}
+/**
+ * SessionTask is one task of the Task group the agent waits on. Kind is
+ * transcript.TaskKindShell, ...Monitor, ...Subagent or ...Call. Times are
+ * time.RFC3339. A finished task with NoDuration has no FinishedAt: an exited
+ * session, an earlier run or the age-out ended it. Outcome is success, failure
+ * or killed, empty for none. The rest are details by kind.
+ */
+export interface SessionTask {
+  kind: string;
+  label: string;
+  started_at: string;
+  finished?: boolean;
+  finished_at?: string;
+  outcome?: string;
+  no_duration?: boolean;
+  command?: string;
+  exit_code?: number /* int */;
+  output_bytes?: number /* int64 */;
+  last_line?: string;
+  model?: string;
+  tokens?: number /* int */;
+  tool_calls?: number /* int */;
+  current_call?: string;
+  event_count?: number /* int */;
+  last_event_at?: string;
 }
 /**
  * SessionInFlightTool is a tool call the agent is running right now. Kind is

@@ -10,11 +10,13 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
 
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -621,5 +623,187 @@ func TestPoll_UnchangedTranscriptPublishesNothing(t *testing.T) {
 	case ev := <-f.src.published:
 		t.Fatalf("published %v for an unchanged transcript", ev)
 	default:
+	}
+}
+
+var taskT0 = time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+
+func taskRec(kind, label string, start time.Duration) transcript.TaskRecord {
+	return transcript.TaskRecord{Kind: kind, Label: label, StartedAt: taskT0.Add(start)}
+}
+
+func (r taskRecEnd) end(at time.Duration, outcome string) transcript.TaskRecord {
+	r.rec.End = &transcript.TaskEnd{At: taskT0.Add(at), Outcome: outcome, Source: transcript.TaskEndNotification}
+	return r.rec
+}
+
+type taskRecEnd struct{ rec transcript.TaskRecord }
+
+func taskLabels(rows []wire.SessionTask) []string {
+	var out []string
+	for _, r := range rows {
+		out = append(out, r.Label)
+	}
+	return out
+}
+
+func TestAssembleTasks_RulesInOrder(t *testing.T) {
+	t.Parallel()
+	meta := Meta{RunStartedAt: taskT0.Add(-time.Hour)}
+	now := taskT0.Add(10 * time.Minute)
+	run := taskRec(transcript.TaskKindShell, "run", 0)
+
+	endedOK := taskRecEnd{taskRec(transcript.TaskKindShell, "ok", time.Minute)}.end(2*time.Minute, "success")
+	stopped := taskRecEnd{taskRec(transcript.TaskKindShell, "stopped", time.Minute)}.end(3*time.Minute, "stopped")
+
+	callTurnEnd := taskRec(transcript.TaskKindCall, "call", time.Minute)
+	callTurnEnd.TurnEnd = taskT0.Add(4 * time.Minute)
+
+	trailer := taskRec(transcript.TaskKindShell, "trailer", time.Minute)
+	trailer.Trailer = &transcript.TaskEnd{At: taskT0.Add(5 * time.Minute), Outcome: "failure"}
+
+	monitor := taskRec(transcript.TaskKindMonitor, "mon", time.Minute)
+	monitor.Timeout = 3 * time.Minute
+
+	stoppedMonitor := taskRecEnd{monitor}.end(2*time.Minute, "stopped")
+	stoppedMonitor.Label = "mon-stopped"
+
+	got := AssembleTasks([]transcript.TaskRecord{run, endedOK, stopped, callTurnEnd, trailer, monitor, stoppedMonitor}, meta, now)
+	want := map[string]wire.SessionTask{
+		"run":         {Kind: "shell"},
+		"ok":          {Kind: "shell", Finished: true, Outcome: "success", FinishedAt: taskT0.Add(2 * time.Minute).Format(time.RFC3339)},
+		"stopped":     {Kind: "shell", Finished: true, Outcome: "killed", FinishedAt: taskT0.Add(3 * time.Minute).Format(time.RFC3339)},
+		"call":        {Kind: "call", Finished: true, FinishedAt: taskT0.Add(4 * time.Minute).Format(time.RFC3339)},
+		"trailer":     {Kind: "shell", Finished: true, Outcome: "failure", FinishedAt: taskT0.Add(5 * time.Minute).Format(time.RFC3339)},
+		"mon":         {Kind: "monitor", Finished: true, FinishedAt: taskT0.Add(4 * time.Minute).Format(time.RFC3339)},
+		"mon-stopped": {Kind: "monitor", Finished: true, Outcome: "killed", FinishedAt: taskT0.Add(2 * time.Minute).Format(time.RFC3339)},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("rows = %v", taskLabels(got))
+	}
+	for _, g := range got {
+		w := want[g.Label]
+		w.Label, w.StartedAt = g.Label, g.StartedAt
+		if !reflect.DeepEqual(g, w) {
+			t.Errorf("%s = %+v, want %+v", g.Label, g, w)
+		}
+	}
+}
+
+func TestAssembleTasks_NoDurationRules(t *testing.T) {
+	t.Parallel()
+	now := taskT0.Add(3 * time.Hour)
+	// Grouping end of a no-duration row: start+cap for age-out, RunStartedAt for
+	// an earlier run, and an exited session closes its group. So only an aged-out
+	// row can share a group with a running task; the others leave no group.
+	old := taskRec(transcript.TaskKindShell, "old", 0)
+	for _, tc := range []struct {
+		name string
+		meta Meta
+	}{
+		{"exited", Meta{Status: wire.SessionStatus{State: wire.SessionExited}}},
+		{"earlier run", Meta{RunStartedAt: taskT0.Add(time.Hour)}},
+	} {
+		if got := AssembleTasks([]transcript.TaskRecord{old}, tc.meta, now); got != nil {
+			t.Errorf("%s: want a closed group, got %v", tc.name, taskLabels(got))
+		}
+	}
+	run := taskRec(transcript.TaskKindShell, "run", time.Hour+30*time.Minute)
+	got := AssembleTasks([]transcript.TaskRecord{old, run}, Meta{}, now)
+	if len(got) != 2 || !got[0].Finished || !got[0].NoDuration || got[0].FinishedAt != "" || got[0].Outcome != "" || got[1].Finished {
+		t.Errorf("aged out: rows = %+v", got)
+	}
+}
+
+func TestAssembleTasks_ForegroundCallWithoutTurnEndRuns(t *testing.T) {
+	t.Parallel()
+	call := taskRec(transcript.TaskKindCall, "call", 0)
+	got := AssembleTasks([]transcript.TaskRecord{call}, Meta{RunStartedAt: taskT0.Add(-time.Hour)}, taskT0.Add(time.Minute))
+	if len(got) != 1 || got[0].Finished {
+		t.Fatalf("rows = %+v", got)
+	}
+	// An earlier run closes it with no duration, like a background task.
+	got = AssembleTasks([]transcript.TaskRecord{call}, Meta{RunStartedAt: taskT0.Add(time.Minute)}, taskT0.Add(2*time.Minute))
+	if got != nil {
+		t.Fatalf("rows = %+v", got)
+	}
+}
+
+// The group of a no-duration row ends at start+cap for age-out and at
+// RunStartedAt for an earlier run: a task starting after that opens a new group
+// and the older rows drop out.
+func TestAssembleTasks_OnlyTheOpenGroup(t *testing.T) {
+	t.Parallel()
+	meta := Meta{RunStartedAt: taskT0.Add(-time.Hour)}
+	a := taskRecEnd{taskRec(transcript.TaskKindShell, "a", 0)}.end(time.Minute, "success")
+	b := taskRec(transcript.TaskKindShell, "b", 2*time.Minute)
+	c := taskRec(transcript.TaskKindShell, "c", 3*time.Minute)
+	now := taskT0.Add(5 * time.Minute)
+
+	if got := taskLabels(AssembleTasks([]transcript.TaskRecord{c, a, b}, meta, now)); !reflect.DeepEqual(got, []string{"b", "c"}) {
+		t.Errorf("open group = %v", got)
+	}
+	done := taskRecEnd{b}.end(3*time.Minute, "success")
+	cDone := taskRecEnd{c}.end(4*time.Minute, "failure")
+	if got := AssembleTasks([]transcript.TaskRecord{a, done, cDone}, meta, now); got != nil {
+		t.Errorf("last task finished: rows = %v", taskLabels(got))
+	}
+	// A finished task of the open group stays listed while another runs.
+	overlap := taskRecEnd{b}.end(4*time.Minute, "success")
+	if got := taskLabels(AssembleTasks([]transcript.TaskRecord{a, overlap, c}, meta, now)); !reflect.DeepEqual(got, []string{"b", "c"}) {
+		t.Errorf("finished sibling = %v", got)
+	}
+	// A later task starting after the group ended opens a new one.
+	d := taskRec(transcript.TaskKindMonitor, "d", 4*time.Minute+30*time.Second)
+	if got := taskLabels(AssembleTasks([]transcript.TaskRecord{a, done, cDone, d}, meta, now)); !reflect.DeepEqual(got, []string{"d"}) {
+		t.Errorf("new group = %v", got)
+	}
+}
+
+func TestAssembleTasks_RunningSubagentHoldsTheGroupOpen(t *testing.T) {
+	t.Parallel()
+	meta := Meta{RunStartedAt: taskT0.Add(-time.Hour)}
+	shell := taskRecEnd{taskRec(transcript.TaskKindShell, "sh", 0)}.end(time.Minute, "success")
+	agent := taskRec(transcript.TaskKindSubagent, "agent", time.Second)
+	got := AssembleTasks([]transcript.TaskRecord{shell, agent}, meta, taskT0.Add(5*time.Minute))
+	if !reflect.DeepEqual(taskLabels(got), []string{"sh", "agent"}) {
+		t.Errorf("rows = %v", taskLabels(got))
+	}
+}
+
+// A read after a Monitor's timeout changes the row with no re-parse: the cache
+// serves the same records and only the clock moves.
+func TestChatRead_TasksFollowTheClockWithoutReparse(t *testing.T) {
+	t.Parallel()
+	f := newClaudeFixture(t)
+	f.src.meta.RunStartedAt = taskT0.Add(-time.Hour)
+	writeLines(t, f.path, `{"type":"user","message":{"role":"user","content":"hi"}}`)
+	var nowNanos atomic.Int64
+	nowNanos.Store(taskT0.Add(time.Minute).UnixNano())
+	c := claudeChat(f.src, f.config)
+	c.now = func() time.Time { return time.Unix(0, nowNanos.Load()).UTC() }
+	f.srv = serveChat(t, f.src, c)
+
+	loads := 0
+	mon := taskRec(transcript.TaskKindMonitor, "mon", 0)
+	mon.Timeout = 5 * time.Minute
+	_, err := c.chats.Read(f.path, harness.Claude, false, func(string) (Snapshot, error) {
+		loads++
+		return Snapshot{Records: []transcript.TaskRecord{mon}}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := f.chat(t, "/v1/sessions/chat").Tasks; len(got) != 1 || got[0].Finished {
+		t.Fatalf("before the timeout: %+v", got)
+	}
+	nowNanos.Store(taskT0.Add(6 * time.Minute).UnixNano())
+	// The timeout closes the only task, so the group is gone.
+	if got := f.chat(t, "/v1/sessions/chat").Tasks; got != nil {
+		t.Fatalf("after the timeout: %+v", got)
+	}
+	if loads != 1 {
+		t.Fatalf("parsed %d times", loads)
 	}
 }

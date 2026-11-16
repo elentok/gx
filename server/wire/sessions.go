@@ -130,6 +130,8 @@ type SessionChatResponse struct {
 	Questions  []QuestionCard          `json:"questions"`
 	Next       *SessionNext            `json:"next"`
 	Background []SessionBackgroundTask `json:"background"`
+	// Tasks is the open Task group, ordered by start; absent when none is open.
+	Tasks []SessionTask `json:"tasks,omitempty"`
 	// Current is the newest tool call in flight and Others the older ones,
 	// newest first; both are absent when nothing is in flight.
 	Current *SessionInFlightTool  `json:"current,omitempty"`
@@ -433,6 +435,31 @@ type SessionBackgroundTask struct {
 	Kind      string `json:"kind"` // transcript.BackgroundTaskShell, ...Monitor or ...Agent
 	Label     string `json:"label"`
 	StartedAt string `json:"started_at"`
+}
+
+// SessionTask is one task of the Task group the agent waits on. Kind is
+// transcript.TaskKindShell, ...Monitor, ...Subagent or ...Call. Times are
+// time.RFC3339. A finished task with NoDuration has no FinishedAt: an exited
+// session, an earlier run or the age-out ended it. Outcome is success, failure
+// or killed, empty for none. The rest are details by kind.
+type SessionTask struct {
+	Kind        string `json:"kind"`
+	Label       string `json:"label"`
+	StartedAt   string `json:"started_at"`
+	Finished    bool   `json:"finished,omitempty"`
+	FinishedAt  string `json:"finished_at,omitempty"`
+	Outcome     string `json:"outcome,omitempty"`
+	NoDuration  bool   `json:"no_duration,omitempty"`
+	Command     string `json:"command,omitempty"`
+	ExitCode    *int   `json:"exit_code,omitempty"`
+	OutputBytes int64  `json:"output_bytes,omitempty"`
+	LastLine    string `json:"last_line,omitempty"`
+	Model       string `json:"model,omitempty"`
+	Tokens      int    `json:"tokens,omitempty"`
+	ToolCalls   int    `json:"tool_calls,omitempty"`
+	CurrentCall string `json:"current_call,omitempty"`
+	EventCount  int    `json:"event_count,omitempty"`
+	LastEventAt string `json:"last_event_at,omitempty"`
 }
 
 // SessionInFlightTool is a tool call the agent is running right now. Kind is
