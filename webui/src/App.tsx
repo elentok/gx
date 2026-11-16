@@ -9,6 +9,7 @@ import {
 } from "./connection"
 import { pruneDrafts } from "./drafts"
 import { routeHashLinkClicks } from "./nav/hashLinks"
+import { useRestHeartbeat } from "./rest"
 import { createAppRouter } from "./routes"
 import { trackRouter } from "./routeSpans"
 import { NodeMissingToast } from "./NodeMissingToast"
@@ -24,6 +25,12 @@ function usePruneDraftsOnLiveSnapshot(conn: Connection) {
   }, [snapshot, liveSnapshot])
 }
 
+// The hook reads the connection context, so it mounts inside the provider.
+function RestHeartbeat() {
+  useRestHeartbeat()
+  return null
+}
+
 export function App({ deps, fetchDetail }: { deps?: ConnectionDeps; fetchDetail?: FetchDetail }) {
   const conn = useConnection(deps)
   usePruneDraftsOnLiveSnapshot(conn)
@@ -32,6 +39,7 @@ export function App({ deps, fetchDetail }: { deps?: ConnectionDeps; fetchDetail?
   useEffect(() => trackRouter(router), [router])
   return (
     <ConnectionContext.Provider value={conn}>
+      <RestHeartbeat />
       <RouterProvider router={router} />
       <SkillsProblemToast />
       <NodeMissingToast />
