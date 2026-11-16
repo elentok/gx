@@ -10,7 +10,7 @@ A chat can be renamed from the web UI in three ways:
 - the "Rename chat" Command palette action,
 - a Rename item in the ⋯ menu of the chat's sidebar row and of the chat page.
 
-Each opens a small popup that shows the current name, selected. Enter renames the chat in gx and, when the chat's agent can take it, sends the agent's own `/rename <name>` to Claude or Codex, so the name matches in the agent's own session list and survives resume. Esc cancels. An empty name or a name with a line break disables Enter.
+Each opens a small popup that shows the current name, selected and focused on wide screens only (at phone width the popup follows the shared no-autofocus pattern, so the keyboard stays closed). Enter renames the chat in gx and, when the chat's agent can take it, sends the agent's own `/rename <name>` to Claude or Codex, so the name matches in the agent's own session list and survives resume. Esc cancels. An empty name or a name with a line break disables Enter.
 
 What happens to the agent depends on the Session status:
 
@@ -26,7 +26,7 @@ The new name wins over the terminal title from then on, as a typed `/rename` doe
 2. As a person with a chat open, I want a "Rename chat" action in the Command palette, so that I can find rename by name when I forget the chord.
 3. As a person looking at the sidebar, I want a Rename item in a chat row's ⋯ menu, so that I can rename a chat without opening it first.
 4. As a person on a chat page, I want a Rename item in the page's ⋯ menu, so that I can rename the chat I am reading.
-5. As a person, I want the popup to open with the current name already selected, so that I can type a new name at once or edit a few letters of the old one.
+5. As a person, I want the popup to open with the current name already selected (on wide screens only; at phone width the popup does not autofocus), so that I can type a new name at once or edit a few letters of the old one.
 6. As a person, I want Enter to rename the chat, so that renaming is one keystroke after typing.
 7. As a person, I want Esc to close the popup and change nothing, so that I can back out safely.
 8. As a person, I want Enter disabled for an empty name, so that I cannot wipe a chat's name by mistake.
@@ -56,7 +56,7 @@ The new name wins over the terminal title from then on, as a typed `/rename` doe
 32. As a person, I want the chord and palette action to rename the chat open on the current page, so that I never rename a chat I cannot see.
 33. As a person typing in the Message box, I want `{leader} r` to work as the other chords do, so that I do not have to click out first.
 34. As a phone user, I want the Rename item and popup to work at 390 px, so that I can rename from my phone.
-35. As a person, I want the popup to keep working with the keyboard only (focus in the field on open, Tab reaches Rename and Cancel), so that mouse-free use stays possible.
+35. As a person, I want the popup to keep working with the keyboard only (focus in the field on open on wide screens only, Tab reaches Rename and Cancel), so that mouse-free use stays possible.
 36. As a person scripting gx, I want a `gx agents rename` verb that renames a chat, so that the CLI mirrors the web UI as the server API rule asks.
 37. As a person who still types `/rename <name>` in the Message box, I want that to keep working as today, so that the new feature breaks no habit.
 38. As a person, I want a rename the server refuses (unknown chat, a Design session, a Queue agent, a Fix agent, a bad name) to show its reason in the popup and keep my text, so that I can fix and retry.
@@ -85,7 +85,7 @@ The new name wins over the terminal title from then on, as a typed `/rename` doe
   - The watcher follows the status stream the server already keeps, not a poll of its own, and it ends when the hold is released or dropped.
   - The existing `SendAction` flow is not reused for the hold: it stops when the session goes Blocked and sends only from Idle, which is the opposite of what the hold needs. The hold is a new mechanism, not a flag on `SendAction`.
   - The hold is not shown in the UI and not in the snapshot.
-- **Web UI: one popup.** A single rename popup component takes the chat and is opened from three entry points. It starts with the current name selected, focus in the field, Enter submits, Esc cancels, and Enter is disabled for an empty name or a name with a line break. A refusal from the verb shows in the popup and keeps the typed text. When the chat's current name is an automatic name (auto-name flag set), the popup shows a muted line saying so, such as "Automatic name from the terminal title". The flag is `auto_name`. It is added to the session snapshot type and the generated web types, and both a terminal-title rename and a pin publish it through the session-changed event. The component follows the existing popup and dialog patterns of the web UI (focus handling, the phone sheet).
+- **Web UI: one popup.** A single rename popup component takes the chat and is opened from three entry points. On wide screens it starts with the current name selected and focus in the field; at phone width it follows the shared no-autofocus pattern, so the keyboard stays closed. Enter submits, Esc cancels, and Enter is disabled for an empty name or a name with a line break. A refusal from the verb shows in the popup and keeps the typed text. When the chat's current name is an automatic name (auto-name flag set), the popup shows a muted line saying so, such as "Automatic name from the terminal title". The flag is `auto_name`. It is added to the session snapshot type and the generated web types, and both a terminal-title rename and a pin publish it through the session-changed event. The component follows the existing popup and dialog patterns of the web UI (focus handling, the phone sheet).
 - **Entry points.**
   - The ⋯ menu: a Rename item in the chat's session menu (the one the sidebar row and the chat page share), shown for a chat only. A Design session, a Queue agent and a Fix agent do not get it.
   - The Leader chord: `r`, labelled "Rename chat", available only on the page of an open chat. It is absent from the Chord box elsewhere.
@@ -101,7 +101,7 @@ The new name wins over the terminal title from then on, as a typed `/rename` doe
 - **Server seam: the prompt package's existing test seam** (`sessionprompt_test.go`, `send_internal_test.go`, `action_test.go`, with the fake holder the neighbouring tests use). Cases: Working, Idle, Starting, Rate-limited and Exited each; Blocked then closing into Working, into Idle, into Starting, into Rate-limited and into Exited; two renames while Blocked (latest wins); a restart of the chat while held; a Codex "Unrecognized command" raising "Send failed"; refusals for a Design session, a Queue agent, a Fix agent, an empty name and a line break; an unchanged pinned name; an unchanged automatic name (pinned and sent); a chat that turns Blocked between the request and the send; a rename against a composer send; two sends on one chat in a row.
 - The hold is in memory only, so no restart test is needed for it.
 - **Route and CLI seam: the `cmd/serverapi` verb tests and the route-table-versus-CLI diff test** for the new verb and its `--json` output.
-- **Web unit seam: vitest for the popup** (selected current name, Enter, Esc, disabled states, refusal shown with text kept) and for the chord and menu rules (availability per page kind, label), next to the existing chord, `SessionActions` and Command palette tests.
+- **Web unit seam: vitest for the popup** (selected current name on wide screens only, Enter, Esc, disabled states, refusal shown with text kept) and for the chord and menu rules (availability per page kind, label), next to the existing chord, `SessionActions` and Command palette tests.
 - **Playwright: extend, do not add.** Per the repo rule, no new flow unless a server round trip or layout needs it. The round trip does need it, so the Chords flow (scenario `workspaces`) and the sidebar-row and ⋯ menu coverage gain steps. The implementer fits them in the existing flows within the `playwrightguard` flow budget (`gx-playwright-e2es` rules apply: wait before state reads, no reload).
 - Prior art: `renameCommandArg` tests for the name rule, the Stop and Remove menu tests for menu items, the Chords flow's `x` step for a chord that acts on the open chat.
 
@@ -113,7 +113,7 @@ Run these against a temporary gx server after the epic is built. The `workspaces
 2. Story 2: flow Chords or the palette step: open the Command palette on a chat page, type "Rename", the "Rename chat" action opens the popup. Extend the existing flow.
 3. Story 3: flow Sidebar rows (`sidebar-rows.e2e.ts`) or Workspaces: open ⋯ on a chat's sidebar row, choose Rename, the popup opens. Extend.
 4. Story 4: flow Workspaces or `agents-session.e2e.ts`: the chat page's ⋯ menu has Rename and it opens the popup. Extend.
-5. Story 5: vitest for the popup (selection) and the flow in story 1 asserts the field holds the current name selected.
+5. Story 5: vitest for the popup (selection, wide screens only) and the flow in story 1 asserts the field holds the current name selected at a wide viewport.
 6. Story 6: flow in story 1: type a new name, Enter; the sidebar row, the page header and `gx agents list` show it.
 7. Story 7: popup vitest plus a flow step: Esc closes it, the name is unchanged in `gx agents list`.
 8. Story 8: popup vitest: Enter is disabled for an empty name. Flow step: the Rename button is disabled.
@@ -137,13 +137,13 @@ Run these against a temporary gx server after the epic is built. The `workspaces
 26. Story 26: Go test: the name is written to the session meta. CLI check: the restart helper in `restart-helpers.ts`, then `gx agents list` shows the name.
 27. Story 27: Go test with a failing send raises "Send failed" with the command in its action. Go only.
 28. Story 28: Go test with a Codex pane that draws "Unrecognized command": the "Send failed" card is raised (the existing `checkCodexKnownCommand` test seam).
-29. Story 29: Go tests: the verb refuses a Design session and a Queue agent. Flow: the Design page's and the Queue agent's ⋯ menu have no Rename.
+29. Story 29: Go tests: the verb refuses a Design session and a Queue agent. Vitest: the Design page's and the Queue agent's ⋯ menu have no Rename (`Rename is offered for %s: %s` and `a Queue agent has no Rename item` in `webui/src/agents/SessionActions.test.tsx`; the workspace item menus are in `webui/src/workspaces/itemActions.test.tsx`).
 30. Story 30: flow Chords: on a Design page, a Queue agent page and a Fix agent page the Chord box shows no `r` row, pressing `r` does nothing, and the palette lacks "Rename chat". Extend the existing "c and d only" step.
 31. Story 31: same flow: the epics page and the agents list show no `r` row.
 32. Story 32: flow: with two chats in the sidebar, open one and rename by chord and by palette; the open one is renamed, the other is not.
 33. Story 33: flow: type a draft in the Message box, press the Leader key then `r`; the popup opens and the draft stays.
 34. Story 34: flow `workspaces-touch.e2e.ts` or `phone.e2e.ts` at 390 px: Rename from the ⋯ menu, the popup fits the viewport with no sideways scroll, rename works.
-35. Story 35: flow step: popup field has focus on open; Tab reaches Rename and Cancel; Enter and Esc work from the keyboard.
+35. Story 35: flow step: at a wide viewport the popup field has focus on open (not at phone width); Tab reaches Rename and Cancel; Enter and Esc work from the keyboard.
 36. Story 36: CLI check: `gx agents rename <chat> <name> --json` prints the result and exits 0; with a Design id it prints the refusal reason and exits non-zero as the other refused verbs do. The route-table-versus-CLI-tree test passes.
 37. Story 37: existing flow `agents-commands-send.e2e.ts` and Go `renameCommandArg` tests still pass: typing `/rename <name>` in the Message box renames the chat as before.
 38. Story 38: popup vitest and a flow step: a refusal reason shows in the popup and the text stays.
