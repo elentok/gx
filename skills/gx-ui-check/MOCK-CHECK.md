@@ -3,6 +3,8 @@
 Compare a built page with the stored mock it came from. gx-implement and gx-verify-epic follow these
 steps. The browser commands come from [gx-playwright-cli](../gx-playwright-cli/SKILL.md).
 
+Change files with a file edit (Edit) or file write (Write) only, never `sed -i`, `cat >`, `cat >>` or a heredoc. Write the file first, then use it (for section text, write a file and pipe it with `gx tickets section ... -`). Run one command per call, because a blocked call runs nothing.
+
 ## Steps
 
 1. Resolve the mock directory first: `mocks=$(gx tickets root)/<map>/mocks`. Do it before any `cd`;

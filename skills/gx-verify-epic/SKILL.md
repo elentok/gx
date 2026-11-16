@@ -16,6 +16,8 @@ See [gx-local-tracker.md](../gx-local-tracker.md) for the `verify` ticket type.
 
 Run `gx tickets validate <addr>` on the ticket first. If it fails, stop and fix its frontmatter.
 
+Change files with a file edit (Edit) or file write (Write) only, never `sed -i`, `cat >`, `cat >>` or a heredoc. Write the file first, then use it (for section text, write a file and pipe it with `gx tickets section ... -`). Run one command per call, because a blocked call runs nothing.
+
 ## Roles
 
 Every verify ticket keeps `type: verify` and has one of three roles. The body names it with a

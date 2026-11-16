@@ -14,6 +14,8 @@ catalog is `webui/e2e/CATALOG.md`, the same file the Playwright suite (`make web
 agents and the suite check the same flows. Read the catalog entry for the flow you run, not the whole
 file. Read [gx-playwright-cli](../gx-playwright-cli/SKILL.md) for the browser commands.
 
+Change files with a file edit (Edit) or file write (Write) only, never `sed -i`, `cat >`, `cat >>` or a heredoc. Write the file first, then use it (for section text, write a file and pipe it with `gx tickets section ... -`). Run one command per call, because a blocked call runs nothing.
+
 ## 0. Preflight the browser
 
 Before building the UI or starting a fixture, run `playwright-cli -s=preflight open about:blank`,

@@ -14,6 +14,8 @@ The one route for filing a follow-up, for a person and for every skill. The form
 `category`, `draft` + `research`, routing) lives in [gx-local-tracker.md](../gx-local-tracker.md)
 "Follow-ups"; read it there, don't restate it here. This skill owns the procedure.
 
+Change files with a file edit (Edit) or file write (Write) only, never `sed -i`, `cat >`, `cat >>` or a heredoc. Write the file first, then use it (for section text, write a file and pipe it with `gx tickets section ... -`). Run one command per call, because a blocked call runs nothing.
+
 ## Inputs
 
 A person runs `/gx-follow-up` or asks in passing; the finding comes from the conversation. A calling

@@ -12,6 +12,8 @@ var inlinedSummaryFormat = []string{
 	`gx tickets section <addr> "Iteration summaries" -`,
 }
 
+var editOnlyRule = []string{"`sed -i`", "Write the file first", "one command per call"}
+
 func TestCheckRulesAnchors(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -31,6 +33,14 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"implement known failures", "gx-implement/SKILL.md", []string{"--known-failures", "--check-failures"}},
 		{"implement edit-only", "gx-implement/SKILL.md", []string{"`sed -i`", "write the file first"}},
 		{"code-review edit-only", "gx-code-review/SKILL.md", []string{"file edit (Edit) or file write (Write) only", "`sed -i`", "`cat >`", "Write the file first"}},
+		{"verify edit-only", "gx-verify/SKILL.md", editOnlyRule},
+		{"merge edit-only", "gx-merge/SKILL.md", editOnlyRule},
+		{"resolving-merge-conflicts edit-only", "gx-resolving-merge-conflicts/SKILL.md", editOnlyRule},
+		{"ui-check edit-only", "gx-ui-check/SKILL.md", editOnlyRule},
+		{"mock-check edit-only", "gx-ui-check/MOCK-CHECK.md", editOnlyRule},
+		{"follow-up edit-only", "gx-follow-up/SKILL.md", editOnlyRule},
+		{"flake tickets edit-only", "gx-flake-tickets.md", editOnlyRule},
+		{"verify-epic edit-only", "gx-verify-epic/SKILL.md", editOnlyRule},
 		{"code-review shared diff", "gx-code-review/SKILL.md", []string{
 			"### Shared review file", "scratchpad", "verify a suspicion", "### Size gate", "50 changed lines",
 		}},

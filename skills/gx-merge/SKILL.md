@@ -21,6 +21,8 @@ never assume "main".
 Run every step without asking the person anything. Each stop condition below
 reports and ends the run; none waits for a reply.
 
+Change files with a file edit (Edit) or file write (Write) only, never `sed -i`, `cat >`, `cat >>` or a heredoc. Write the file first, then use it (for section text, write a file and pipe it with `gx tickets section ... -`). Run one command per call, because a blocked call runs nothing.
+
 ## Modes
 
 - **Manual** — `/gx-merge <branch>`. Runs Steps 1–5, including the final

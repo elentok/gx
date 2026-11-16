@@ -8,6 +8,8 @@ description:
 
 Run cheap, targeted verification for changed files. `gx check` does the work.
 
+Change files with a file edit (Edit) or file write (Write) only, never `sed -i`, `cat >`, `cat >>` or a heredoc. Write the file first, then use it (for section text, write a file and pipe it with `gx tickets section ... -`). Run one command per call, because a blocked call runs nothing.
+
 ## Workflow
 
 1. Select the mode. The caller names it:

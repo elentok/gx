@@ -3,6 +3,8 @@ name: gx-resolving-merge-conflicts
 description: "Use when you need to resolve an in-progress git merge/rebase conflict."
 ---
 
+Change files with a file edit (Edit) or file write (Write) only, never `sed -i`, `cat >`, `cat >>` or a heredoc. Write the file first, then use it (for section text, write a file and pipe it with `gx tickets section ... -`). Run one command per call, because a blocked call runs nothing.
+
 1. **See the current state** of the merge/rebase. Check git history, and the conflicting files.
    Run `gx brief conflicts`: one call lists the operation, every unmerged file and its conflict
    marker line numbers. Don't hand-build a status command.
