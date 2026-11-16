@@ -119,17 +119,15 @@ export function QuestionSheet({
 
   const answersOf = (k: number) =>
     Array.from(row.current?.children[k]?.querySelectorAll<HTMLElement>("button[data-answer]") ?? [])
-  // The selected answer of question k, else its first one.
+  const focusRow = (k: number) =>
+    (row.current?.children[k] as HTMLElement | undefined)?.focus({ preventScroll: true })
+  // The selected answer of question k, else its first one. A text question has no
+  // button, so focus lands on the question's own row (which takes focus off the box).
   const focusAnswer = (k: number) => {
     const all = answersOf(k)
     const el = all.find((b) => b.getAttribute("aria-pressed") === "true") ?? all[0]
     if (el) el.focus({ preventScroll: true })
-    // A text question has no button: blur the box and land on the question's own row.
-    else {
-      const slide = row.current?.children[k] as HTMLElement | undefined
-      ;(document.activeElement as HTMLElement | null)?.blur()
-      slide?.focus({ preventScroll: true })
-    }
+    else focusRow(k)
   }
   const move = (to: number, first: boolean) => {
     setOpen(true)
