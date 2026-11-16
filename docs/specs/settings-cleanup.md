@@ -116,7 +116,7 @@ two more: Project (first) and Checks (last, a one-section category).
 | Notifications | Notifications | Desktop | `agents.banners.enabled`, `agents.sounds.{enabled,done,attention}` |
 | | | Telegram | `notifications.telegram.{bot-token,chat-id}` |
 | | | Slack | `notifications.slack.webhook-url` |
-| Web UI | Access | Network | `server.web.listen`, `server.web.allowed-hosts` |
+| Web UI | Access | Network | `server.web.listen`, `server.web.allowed-hosts`, `server.web.files.roots` |
 | | | Sign-in | `server.web.totp` |
 | | Keybindings | Leader key | `server.web.leader-key-mac`, `server.web.leader-key` |
 | | | Editors | `server.web.vi-escape` |
@@ -317,7 +317,7 @@ Per story:
 3. Execution queue, Budget, Pull requests and Evolve and recovery are under Ralph loop. Mock states: `section-with-groups`.
 4. Watchdogs is one section with CPU and Process groups. Mock states: `phone-section`.
 5. `agents.banners.enabled` and `agents.sounds.*` appear under Notifications, Desktop, and not under Agents. Flow: extended 200.
-6. Access holds Network (`server.web.listen`, `server.web.allowed-hosts`). Flow: extended 200.
+6. Access holds Network (`server.web.listen`, `server.web.allowed-hosts`, `server.web.files.roots`). Flow: extended 200.
 7. `server.web.totp` is in Web UI, Access, Sign-in; Account does not list it. Flow: extended 200.
 8. Keybindings and Display and development are under Web UI. Flow: extended 200.
 9. Server, Ticket store, Disk space and Watchdogs are under System. Flow: extended 200.
