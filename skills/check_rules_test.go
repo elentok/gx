@@ -33,6 +33,8 @@ func TestCheckRulesAnchors(t *testing.T) {
 		}},
 		{"implement guards kind", "gx-implement/SKILL.md", []string{"`gx check --kind guards`"}},
 		{"implement known failures", "gx-implement/SKILL.md", []string{"--known-failures", "--check-failures"}},
+		{"implement go run", "gx-implement/SKILL.md", []string{"go run ."}},
+		{"to-tickets go run", "gx-to-tickets/SKILL.md", []string{"go run ."}},
 		{"implement edit-only", "gx-implement/SKILL.md", []string{"`sed -i`", "write the file first"}},
 		{"code-review edit-only", "gx-code-review/SKILL.md", []string{"file edit (Edit) or file write (Write) only", "`sed -i`", "`cat >`", "Write the file first"}},
 		{"verify edit-only", "gx-verify/SKILL.md", editOnlyRule},

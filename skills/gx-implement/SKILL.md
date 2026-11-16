@@ -244,6 +244,9 @@ Use [gx-tdd](../gx-tdd/SKILL.md) where possible, at pre-agreed seams. Every decl
 real assertion; if one cannot be observed, pause the ticket with `gx tickets ask`, naming the seam, instead of finishing
 (see "When only a person can answer").
 
+**Hand-running changed gx CLI code: use `go run . <cmd>`, not the installed `gx`.** The installed
+binary is older than the worktree and shows old behaviour.
+
 **Bug fixes: confirm red on the old code first (mutation check).** Write the regression test, run
 it against the unfixed code, and see it fail for the bug's reason (not a harness error or timeout).
 Only then apply the fix and see it go green. A test that passes before the fix proves nothing:

@@ -22,6 +22,11 @@ Issues live as local markdown files outside the repo. There is no `.scratch/` di
 
 See `~/.dotfiles/core/ai/skills/setup-elentok-skills/issue-tracker-local.md`.
 
+### Hand-running changed gx code
+
+The installed `gx` binary is older than the worktree, so it shows old behaviour. When a ticket
+changes gx CLI code, hand-run the command with `go run . <cmd>`, not the installed `gx`.
+
 ### Domain docs
 
 Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.

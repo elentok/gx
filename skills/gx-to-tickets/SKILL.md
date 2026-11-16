@@ -502,8 +502,8 @@ implementation list.
 
 (Or, when no automated seam applies: `none — <rationale>`.)
 
-If the implementing agent drops or changes a seam named here, it must log that under
-`## Spec deviations`, with the reason.
+If the implementing agent drops or changes a seam named here, it must log that under `## Spec deviations`, with the reason.
+For a ticket that changes gx CLI code, write its Run lines as `go run . <cmd>`: the installed `gx` is stale.
 
 ## Where to look
 
