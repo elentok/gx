@@ -149,7 +149,7 @@ the ticket title during `resolve-tickets`.
    the map body (Destination, Decisions so far) and each closed ticket's title and resolution gist,
    not full ticket bodies. Also seed it with the list of stored mocks under `<root>/<map>/mocks/`.
    The spec is where the map's gaps first show, so tell the subagent to sort
-   every fact the map never decided:
+   every fact the map never decided. When you hand the spec to the person, give its path as a `gx files url <path>` link, and never start an HTTP server:
    - **Implementer's choice** (a name, a config key, an internal marker only): the spec says the
      implementer picks it, and moves on.
    - **Design question** (behaviour, scope, parity, which runners or harnesses it covers): the
@@ -218,7 +218,7 @@ the ticket title during `resolve-tickets`.
    - Then `git -C <worktree> worktree remove <tmp-dir>` and set `--design-step branch`.
    - Step 8 removes neither the design worktree nor the `<epic>-design` branch: the server does,
      once it sees the Design is past Branch.
-9. **Otherwise** → report the `<epic>-impl` slug and stop. Launch it from the TUI Queue tab.
+9. **Otherwise** → report the `<epic>-impl` slug and stop. Launch it from the TUI Queue tab. Give the spec or mock path as a `gx files url <path>` link, and never start an HTTP server.
 
 ## Researching existing UI behavior
 
