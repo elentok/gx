@@ -169,11 +169,11 @@ Entry N verifies story N unless a heading names a group. Flow names are catalog 
 
 **Mock states**
 
-- `$(gx tickets root)/gx/bg-progress/mocks/03-task-list-look.html`, state `collapsed`, 640px, fixture scenario `bg-progress` (Claude shape, 3 of 7 tasks done); parts: working-row, summary.
-- `$(gx tickets root)/gx/bg-progress/mocks/03-task-list-look.html`, state `expanded`, 640px, fixture scenario `bg-progress` (Claude shape, 3 of 7 tasks done, one row open); parts: working-row, summary, task-list, task-row, status, kind, label, elapsed, details, command.
-- `$(gx tickets root)/gx/bg-progress/mocks/03-task-list-look.html`, state `expanded-phone`, 360px, fixture scenario `bg-progress` (Claude shape, 3 of 7 tasks done); parts: working-row, summary, task-list, task-row, status, kind, label, elapsed, details, command.
-- `$(gx tickets root)/gx/bg-progress/mocks/03-task-list-look.html`, state `codex-fewer-fields`, 640px, fixture scenario `bg-progress` (Codex shape, 1 of 3 tasks done); parts: working-row, summary, task-list, task-row, status, kind, label, elapsed, details.
-- `$(gx tickets root)/gx/bg-progress/mocks/03-task-list-look.html`, state `single-task`, 640px, fixture scenario `bg-progress` (single-task shape); parts: working-row, task-list, task-row, status, kind, label, elapsed, details, command.
+- `$(gx tickets root)/gx/bg-progress/mocks/03-task-list-look.html`, collapsed, 640px, fixture scenario `bg-progress` (Claude shape, 3 of 7 tasks done); parts: working-row, summary.
+- `$(gx tickets root)/gx/bg-progress/mocks/03-task-list-look.html`, expanded, 640px, fixture scenario `bg-progress` (Claude shape, 3 of 7 tasks done, one row open); parts: working-row, summary, task-list, task-row, status, kind, label, elapsed, details, command.
+- `$(gx tickets root)/gx/bg-progress/mocks/03-task-list-look.html`, expanded-phone, 360px, fixture scenario `bg-progress` (Claude shape, 3 of 7 tasks done); parts: working-row, summary, task-list, task-row, status, kind, label, elapsed, details, command.
+- `$(gx tickets root)/gx/bg-progress/mocks/03-task-list-look.html`, codex-fewer-fields, 640px, fixture scenario `bg-progress` (Codex shape, 1 of 3 tasks done); parts: working-row, summary, task-list, task-row, status, kind, label, elapsed, details.
+- `$(gx tickets root)/gx/bg-progress/mocks/03-task-list-look.html`, single-task, 640px, fixture scenario `bg-progress` (single-task shape); parts: working-row, task-list, task-row, status, kind, label, elapsed, details, command.
 
 New scenarios to write: `bg-progress` with the shapes named above, for the Claude fixture transcripts (shell, Monitor, timed-out Monitor, subagent, foreground call, timed-out call, no-end call) and the Codex fixture rollouts (new shape with and without `item_completed`, old shape, subagent). These become implementation tickets.
 
