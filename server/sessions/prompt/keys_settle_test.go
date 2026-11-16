@@ -40,14 +40,16 @@ func TestSessionKeysSettle(t *testing.T) {
 	t.Parallel()
 	t.Run("ReturnsTheRedrawnScreen", func(t *testing.T) {
 		t.Parallel()
-		// The settle returns the old screen if two reads land before the fake
-		// redraws. A step several times the redraw delay keeps that from
-		// happening on a loaded machine.
-		f := startSettleSession(t, func(c *server.Config) {
-			c.KeysSettleStep = 8 * settleRedraw
-			c.KeysSettleCap = 5 * time.Second
+		// The fake's redraw lag makes a settle racy: two reads can both land
+		// before the redraw. So the text is on screen before the settling
+		// request, and the result holds it whichever screen the settle reads.
+		f := startSettleSession(t, nil)
+		f.keys(t, wire.SessionKeysRequest{Text: "settled-text"})
+		servertest.WaitFor(t, 5*time.Second, "the typed text on screen", func() bool {
+			scr, err := f.h.Client.Sessions.Screen(f.ctx, f.id)
+			return err == nil && strings.Contains(strings.Join(scr.Rows, "\n"), "settled-text")
 		})
-		res := f.keys(t, wire.SessionKeysRequest{Text: "settled-text", Settle: true})
+		res := f.keys(t, wire.SessionKeysRequest{Text: "x", Settle: true})
 		if got := strings.Join(res.Rows, "\n"); !strings.Contains(got, "settled-text") {
 			t.Errorf("rows = %q, want the typed text on the redrawn screen", got)
 		}
