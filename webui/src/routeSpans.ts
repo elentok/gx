@@ -172,8 +172,12 @@ export function hardLoadNavigationType(): NavigationType | undefined {
   )
 }
 
-/** apiFetch calls this when a request starts. Call the returned function when it settles. */
-export function noteApiRequest(): () => void {
+/**
+ * apiFetch calls this when a request starts. Call the returned function when it settles.
+ * A side fetch (sidebar list, live stream) is not primary data, so it records nothing.
+ */
+export function noteApiRequest(side = false): () => void {
+  if (side) return () => {}
   const request: ApiRequest = { start: performance.now() }
   tracker.requestStarted(request)
   return () => {

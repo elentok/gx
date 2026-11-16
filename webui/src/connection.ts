@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore } from "react"
-import { apiFetch } from "./apiFetch"
+import { apiFetchSide } from "./apiFetch"
 import { fetchSnapshot, type Snapshot } from "./snapshot"
 import type { SnapshotCache } from "./snapshotCache"
 
@@ -41,7 +41,7 @@ export const RELOAD_EVENT = "reload"
 // The server's heartbeat is an SSE comment line, which EventSource never surfaces, so
 // the stream is read as raw text: any chunk, comment or event, proves the link is alive.
 async function openEventStream(url: string, signal: AbortSignal): Promise<AsyncIterable<string>> {
-  const res = await apiFetch(url, { signal, headers: { Accept: "text/event-stream" } })
+  const res = await apiFetchSide(url, { signal, headers: { Accept: "text/event-stream" } })
   if (!res.ok || !res.body) throw new Error(`events: HTTP ${res.status}`)
   const body = res.body
   return (async function* () {

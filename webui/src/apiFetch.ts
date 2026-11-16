@@ -19,8 +19,17 @@ export function signOut(): void {
 }
 
 /** Every web API call goes through here, so a 401 signs the page out in one place. */
-export async function apiFetch(...args: Parameters<typeof fetch>): Promise<Response> {
-  const done = noteApiRequest()
+export function apiFetch(...args: Parameters<typeof fetch>): Promise<Response> {
+  return request(false, args)
+}
+
+/** Like apiFetch for a side fetch (sidebar list, live stream): it never counts as blocking API latency. */
+export function apiFetchSide(...args: Parameters<typeof fetch>): Promise<Response> {
+  return request(true, args)
+}
+
+async function request(side: boolean, args: Parameters<typeof fetch>): Promise<Response> {
+  const done = noteApiRequest(side)
   try {
     const res = await fetch(...args)
     if (res.status === 401) signOut()

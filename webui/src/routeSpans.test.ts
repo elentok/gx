@@ -4,6 +4,7 @@ import {
   hardLoadNavigationType,
   markReady,
   noteAuthScreen,
+  noteApiRequest,
   noteCatchAll,
   noteSignedOut,
   resetRouteSpans,
@@ -57,6 +58,25 @@ test("hard load reports app_ready from navigation start", () => {
   stop()
   expect(samples()).toHaveLength(1)
   expect(samples()[0]).toMatchObject({ metric: "app_ready", tab: "hard" })
+})
+
+test("a side fetch that outlasts the main fetch does not change api_latency", () => {
+  vi.useFakeTimers()
+  try {
+    const { router } = fakeRouter("/epics")
+    const stop = trackRouter(router)
+    const doneMain = noteApiRequest()
+    const doneSide = noteApiRequest(true)
+    vi.advanceTimersByTime(100)
+    doneMain()
+    vi.advanceTimersByTime(900)
+    markReady("ready", "network")
+    doneSide()
+    stop()
+    expect(samples()[0].api_latency).toBe(100)
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 test("soft route reports route_ready once, the first useReady call wins", () => {
