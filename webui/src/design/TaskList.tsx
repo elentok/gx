@@ -1,7 +1,16 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { useEffect, useState } from "react"
 import type { SessionTask } from "../generated/server"
-import { elapsedText, kindWord, orderTasks, taskMark, taskSummary, type TaskMark } from "./taskRows"
+import {
+  elapsedText,
+  kindWord,
+  orderTasks,
+  taskDetails,
+  taskKey,
+  taskMark,
+  taskSummary,
+  type TaskMark,
+} from "./taskRows"
 
 const GLYPH: Record<Exclude<TaskMark, "running">, string> = {
   done: "✓",
@@ -46,19 +55,24 @@ function StatusMark({ mark }: { mark: TaskMark }) {
   )
 }
 
-function TaskRow({ task, now }: { task: SessionTask; now: number }) {
+const HOVER_BG = "rgba(255,255,255,.03)"
+
+function TaskRow({
+  task,
+  now,
+  open,
+  onToggle,
+}: {
+  task: SessionTask
+  now: number
+  open: boolean
+  onToggle: () => void
+}) {
   const mark = taskMark(task)
   const fin = mark !== "running"
-  return (
-    <Box
-      role="listitem"
-      display="grid"
-      gridTemplateColumns="14px 62px minmax(0, 1fr) auto"
-      columnGap="2.5"
-      alignItems="baseline"
-      py="0.5"
-      color={fin ? "text.dim" : "text.muted"}
-    >
+  const details = taskDetails(task, now)
+  const header = (
+    <>
       <StatusMark mark={mark} />
       <Text as="span" fontSize="xs" color="text.faint">
         {kindWord(task.kind)}
@@ -84,6 +98,58 @@ function TaskRow({ task, now }: { task: SessionTask; now: number }) {
       >
         {elapsedText(task, now)}
       </Text>
+    </>
+  )
+  const grid = {
+    display: "grid",
+    gridTemplateColumns: "14px 62px minmax(0, 1fr) auto",
+    columnGap: "2.5",
+    alignItems: "baseline",
+    w: "100%",
+  } as const
+  return (
+    <Box
+      role="listitem"
+      py="0.5"
+      color={fin ? "text.dim" : "text.muted"}
+      borderRadius="md"
+      bg={open ? HOVER_BG : undefined}
+      px={open ? "2" : undefined}
+      mx={open ? "-2" : undefined}
+      my={open ? "0.5" : undefined}
+    >
+      {details ? (
+        <chakra.button
+          type="button"
+          aria-expanded={open}
+          onClick={onToggle}
+          cursor="pointer"
+          textAlign="left"
+          color="inherit"
+          {...grid}
+        >
+          {header}
+        </chakra.button>
+      ) : (
+        <Box {...grid}>{header}</Box>
+      )}
+      {details && open && (
+        <Box
+          fontSize="xs"
+          color="text.faint"
+          pl="24px"
+          overflowWrap="anywhere"
+          data-testid="task-details"
+        >
+          {details.command && (
+            <Text as="span" fontFamily="mono" color="text.dim">
+              {details.command}
+              <br />
+            </Text>
+          )}
+          {details.text}
+        </Box>
+      )}
     </Box>
   )
 }
@@ -94,6 +160,13 @@ export function TaskList({ tasks }: { tasks?: SessionTask[] }) {
   const anyRunning = list.some((t) => !t.finished)
   const [now, setNow] = useState(() => Date.now())
   const [open, setOpen] = useState(false)
+  const [openRows, setOpenRows] = useState<ReadonlySet<string>>(new Set())
+  const toggleRow = (key: string) =>
+    setOpenRows((s) => {
+      const next = new Set(s)
+      if (!next.delete(key)) next.add(key)
+      return next
+    })
   useEffect(() => {
     if (!anyRunning) return
     setNow(Date.now())
@@ -103,9 +176,18 @@ export function TaskList({ tasks }: { tasks?: SessionTask[] }) {
   if (list.length === 0) return null
   const rows = (
     <Box role="list" aria-label="Tasks" display="flex" flexDirection="column" fontSize="sm">
-      {orderTasks(list).map((t, i) => (
-        <TaskRow key={i} task={t} now={now} />
-      ))}
+      {orderTasks(list).map((t, i) => {
+        const key = taskKey(t)
+        return (
+          <TaskRow
+            key={`${key}|${i}`}
+            task={t}
+            now={now}
+            open={openRows.has(key)}
+            onToggle={() => toggleRow(key)}
+          />
+        )
+      })}
     </Box>
   )
   if (list.length === 1) return rows

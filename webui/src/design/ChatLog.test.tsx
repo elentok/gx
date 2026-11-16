@@ -335,6 +335,37 @@ test("the task list shows the tasks under the chat", async () => {
   expect(within(list).getByRole("img", { name: "done" })).toBeTruthy()
 })
 
+test("a task row opens to its details line and a Codex row shows only what it carries", async () => {
+  renderChat(
+    [session()],
+    okChat(
+      chatOf([], {
+        tasks: [
+          { kind: "shell", label: "cargo test", started_at: ago(0) },
+          {
+            kind: "shell",
+            label: "git status",
+            started_at: ago(0),
+            finished: true,
+            outcome: "success",
+            exit_code: 0,
+          },
+        ],
+      }),
+    ),
+  )
+  fireEvent.click(await screen.findByRole("button", { name: /1 of 2 tasks done/ }))
+  const list = screen.getByRole("list", { name: "Tasks" })
+  expect(within(list).getAllByRole("button").length).toBe(1)
+  const row = within(list).getByRole("button", { name: /git status/ })
+  expect(row.getAttribute("aria-expanded")).toBe("false")
+  expect(screen.queryByText("exit 0")).toBeNull()
+  fireEvent.click(row)
+  expect(row.getAttribute("aria-expanded")).toBe("true")
+  expect(screen.getByText("exit 0")).toBeTruthy()
+  expect(screen.queryByText(/no output yet/)).toBeNull()
+})
+
 test("an older Codex turn names its agent call in flight", async () => {
   const current = { kind: "agent", label: "survey" }
   renderChat(

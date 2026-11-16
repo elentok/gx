@@ -1,4 +1,5 @@
 import type { SessionTask } from "../generated/server"
+import { sizeText } from "../health/formatBytes"
 
 export type TaskMark = "running" | "done" | "failed" | "killed" | "finished"
 
@@ -50,6 +51,61 @@ export function kindWord(kind: string): string {
 /** Running rows first, then the finished ones; each group keeps the server's launch order. */
 export function orderTasks(tasks: SessionTask[]): SessionTask[] {
   return [...tasks.filter((t) => !t.finished), ...tasks.filter((t) => t.finished)]
+}
+
+/** "412", "4.2k", "41k", "1.2M". */
+export function tokenText(n: number): string {
+  if (n < 1000) return String(n)
+  if (n < 10_000) return `${(n / 1000).toFixed(1)}k`
+  if (n < 1_000_000) return `${Math.round(n / 1000)}k`
+  return `${(n / 1_000_000).toFixed(1)}M`
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
+
+const LAST_LINE_MAX = 80
+
+function lastLineText(line: string): string {
+  const one = line.replace(/\s+/g, " ").trim()
+  return `last: ${one.length > LAST_LINE_MAX ? `${one.slice(0, LAST_LINE_MAX - 1)}…` : one}`
+}
+
+/** What an open row shows under its label: an optional monospace command (Monitor) and a text line. Undefined when the entry has nothing to show. */
+export function taskDetails(
+  t: SessionTask,
+  now: number,
+): { command?: string; text: string } | undefined {
+  const running = !t.finished
+  const parts: string[] = []
+  let command: string | undefined
+  const exit = t.exit_code === undefined ? undefined : `exit ${t.exit_code}`
+  const size =
+    t.output_bytes === undefined ? undefined : `${sizeText(t.output_bytes, "decimal")} output`
+  if (t.kind === "shell") {
+    if (!running && exit) parts.push(exit)
+    if (size) parts.push(size)
+    if (running && t.last_line) parts.push(lastLineText(t.last_line))
+  } else if (t.kind === "call") {
+    if (!running && exit) parts.push(exit)
+  } else if (t.kind === "subagent") {
+    if (t.model) parts.push(t.model)
+    if (t.tokens) parts.push(`${tokenText(t.tokens)} tokens`)
+    if (t.tool_calls) parts.push(plural(t.tool_calls, "tool call"))
+    if (running && t.current_call) parts.push(`now: ${t.current_call}`)
+  } else if (t.kind === "monitor") {
+    const n = t.event_count ?? 0
+    parts.push(plural(n, "event"))
+    if (n > 0 && t.last_event_at) {
+      parts.push(`last ${formatElapsed(now - Date.parse(t.last_event_at))} ago`)
+    }
+    if (t.command && t.command !== t.label) command = t.command
+  }
+  if (parts.length === 0) return undefined
+  return { command, text: parts.join(" · ") }
+}
+
+export function taskKey(t: SessionTask): string {
+  return `${t.started_at}|${t.kind}|${t.label}`
 }
 
 export function taskSummary(tasks: SessionTask[], now: number) {
