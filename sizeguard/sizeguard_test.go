@@ -242,6 +242,9 @@ func measure(files map[string]string) ([]measurement, []string) {
 	return out, problems
 }
 
+// exceptionsHint tells an agent which file holds the allowlist.
+const exceptionsHint = " The allowlist is var exceptions in sizeguard/sizeguard_test.go."
+
 // check returns one problem per breach or bad exception entry.
 func check(files map[string]string, allow map[string]exception) []string {
 	ms, problems := measure(files)
@@ -252,10 +255,10 @@ func check(files map[string]string, allow map[string]exception) []string {
 		if e, ok := allow[m.key]; ok {
 			switch {
 			case m.size <= m.def:
-				problems = append(problems, fmt.Sprintf("%s: exception entry is not needed (%s is %d, default limit is %d): drop the entry.", m.key, m.measure, m.size, m.def))
+				problems = append(problems, fmt.Sprintf("%s: exception entry is not needed (%s is %d, default limit is %d): drop the entry."+exceptionsHint, m.key, m.measure, m.size, m.def))
 				continue
 			case e.limit > m.size:
-				problems = append(problems, fmt.Sprintf("%s: exception limit %d is above the current %s %d: lower the limit.", m.key, e.limit, m.measure, m.size))
+				problems = append(problems, fmt.Sprintf("%s: exception limit %d is above the current %s %d: lower the limit."+exceptionsHint, m.key, e.limit, m.measure, m.size))
 				continue
 			}
 			limit = e.limit
@@ -275,7 +278,7 @@ func check(files map[string]string, allow map[string]exception) []string {
 	sort.Strings(keys)
 	for _, k := range keys {
 		if !seen[k] {
-			problems = append(problems, fmt.Sprintf("%s: exception entry matches nothing: drop the entry.", k))
+			problems = append(problems, fmt.Sprintf("%s: exception entry matches nothing: drop the entry."+exceptionsHint, k))
 		}
 		if !slices.Contains(reasons, allow[k].reason) {
 			problems = append(problems, fmt.Sprintf("%s: exception reason %q is not one of %v.", k, allow[k].reason, reasons))
@@ -460,9 +463,9 @@ func TestCheck_Exceptions(t *testing.T) {
 		want  []string // empty: no problems
 	}{
 		{"entry matching the size passes", over, map[string]exception{"p/long.go": {1200, reasonCohesive}}, nil},
-		{"entry above the current size", over, map[string]exception{"p/long.go": {1300, reasonCohesive}}, []string{"p/long.go", "lower the limit", "1300", "1200"}},
-		{"entry under the default", map[string]string{"p/short.go": src("x", 10)}, map[string]exception{"p/short.go": {1100, reasonCohesive}}, []string{"p/short.go", "drop the entry", "10", "1000"}},
-		{"entry for nothing", over, map[string]exception{"gone/x.go": {1100, reasonCohesive}}, []string{"gone/x.go", "drop the entry"}},
+		{"entry above the current size", over, map[string]exception{"p/long.go": {1300, reasonCohesive}}, []string{"p/long.go", "lower the limit", "1300", "1200", "sizeguard/sizeguard_test.go"}},
+		{"entry under the default", map[string]string{"p/short.go": src("x", 10)}, map[string]exception{"p/short.go": {1100, reasonCohesive}}, []string{"p/short.go", "drop the entry", "10", "1000", "sizeguard/sizeguard_test.go"}},
+		{"entry for nothing", over, map[string]exception{"gone/x.go": {1100, reasonCohesive}}, []string{"gone/x.go", "drop the entry", "sizeguard/sizeguard_test.go"}},
 		{"unknown reason", over, map[string]exception{"p/long.go": {1200, "because"}}, []string{"p/long.go", "reason"}},
 		{"entry below the size still fails", over, map[string]exception{"p/long.go": {1100, reasonCohesive}}, []string{"p/long.go", "lines 1200, limit 1100, over by 100", "Split"}},
 		{"package entry", many("big", 51, 1, ".go"), map[string]exception{"big:files": {51, reasonGenerated}}, nil},
