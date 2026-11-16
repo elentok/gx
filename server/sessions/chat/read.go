@@ -100,7 +100,7 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 		default:
 			out.Messages, out.Truncated = snap.Msgs, snap.Truncated
 			out.Next, out.Background = snap.Next, snap.Background(time.Now())
-			out.Tasks = AssembleTasks(snap.Records, meta, c.clock())
+			out.Tasks = AssembleTasks(c.withShellOutputs(snap.Records), meta, c.clock())
 			out.Questions = c.Cards(dir, meta, snap)
 			out.Unreadable, out.CodexVersion = snap.Unreadable, snap.CodexVersion
 			for i, t := range snap.InFlight {

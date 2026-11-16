@@ -119,6 +119,10 @@ type Chat struct {
 	codexTotals  FileCache[codexsession.ContextUsage]
 	// codexQuestions caches the open question tool call of each rollout.
 	codexQuestions FileCache[codexQuestionRead]
+	// shellOutputs caches each Claude shell's output file details.
+	shellOutputs FileCache[ShellOutput]
+	// shellOutputRead replaces readShellOutput; tests count computes with it.
+	shellOutputRead func(path string) (ShellOutput, error)
 	// rolloutPath replaces codexsession.RolloutPathIn; tests count lookups with it.
 	rolloutPath func(home, conversationID string) (string, bool, error)
 	// dialogWaits times how long each session has waited on "input needed".
