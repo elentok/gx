@@ -7,7 +7,7 @@ import { renderThemed } from "../ui/render"
 import { DeviceContext, type Device } from "../useWide"
 import type { DraftResult, DraftsClient } from "./drafts"
 import type { OpenDesign } from "./open"
-import { DraftPage } from "./NewDesignForm"
+import { DraftPage } from "./DraftPage"
 import { designHref } from "../hrefs"
 
 afterEach(() => {

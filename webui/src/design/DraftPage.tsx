@@ -1,7 +1,8 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
+import { DraftHeader, field } from "./DraftHeader"
+import { DraftFooter } from "./DraftFooter"
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react"
 import { useLocation, useNavigate, useParams } from "react-router"
-import { Button } from "../ui/button/Button"
 import type { DesignDraft } from "../generated/server"
 import {
   createDraft,
@@ -17,11 +18,9 @@ import {
 } from "./drafts"
 import { removeDraftImage, uploadDraftImage } from "./draftImageApi"
 import { DraftImages } from "./DraftImages"
-import { AttachButton, imageFiles, useAttachIcon } from "./ComposerImages"
+import { imageFiles, useAttachIcon } from "./ComposerImages"
 import { DraftSlots, type DraftImages as DraftImagesState } from "./useDraftImages"
 import { useShell } from "../shell/ShellContext"
-import { DraftIcon } from "../shell/SidebarRows"
-import { MascotToggle } from "../shell/MascotToggle"
 import { useEpicList } from "../epics/list"
 import { DetailPage } from "../page/DetailPage"
 import { designHref } from "../hrefs"
@@ -64,16 +63,6 @@ function startBlocker(draft: Fields, imgs: DraftImagesState): string | undefined
   if (imgs.failed) return `Remove the failed ${imgs.failed === 1 ? "image" : "images"} first`
   if (imgs.uploading) return "Wait for the upload to finish"
 }
-
-const field = {
-  fontSize: "16px",
-  color: "text",
-  bg: "surface.raised",
-  borderWidth: "1px",
-  borderColor: "hairline",
-  borderRadius: "8px",
-  _placeholder: { color: "text.dim" },
-} as const
 
 const PLACEHOLDER = "What is the problem? Who hits it? What does done look like?"
 
@@ -304,110 +293,18 @@ function DraftForm({
         flexDirection="column"
         overflow="hidden"
       >
-        <Box display="flex" alignItems="center" gap="2" px="3" pt="3" flexShrink="0">
-          <MascotToggle />
-          <DraftIcon />
-          <Text
-            as="h1"
-            fontSize="lg"
-            fontWeight="600"
-            color={draft.slug.trim() ? "text" : "text.dim"}
-            minW="0"
-            truncate
-          >
-            {label}
-          </Text>
-          <chakra.button
-            type="button"
-            aria-label="Rename"
-            title="Rename"
-            onClick={renameFocus}
-            color="text.dim"
-            h="32px"
-            w="32px"
-            flexShrink="0"
-            borderRadius="8px"
-            _hover={{ bg: "surface", color: "text" }}
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M3 13l.6-3 6.9-6.9a1.3 1.3 0 0 1 1.8 0l.6.6a1.3 1.3 0 0 1 0 1.8L6 12.4z" />
-            </svg>
-          </chakra.button>
-          <Box flex="1" />
-          {status !== "none" && (
-            <Text fontSize="xs" color="text.dim" flexShrink="0" whiteSpace="nowrap">
-              {status === "saved" && (
-                <chakra.span aria-hidden color="tone.done.fg">
-                  ✓{" "}
-                </chakra.span>
-              )}
-              {status === "saving" ? "Saving..." : status === "unsaved" ? "Not saved" : "Saved"}
-            </Text>
-          )}
-        </Box>
-        <Box
-          display="flex"
-          alignItems="center"
-          gap="2"
-          p="3"
-          borderBottomWidth="1px"
-          borderColor="hairline"
-          flexShrink="0"
-        >
-          {projects.length > 1 && (
-            <>
-              <chakra.select
-                aria-label="Project"
-                value={draft.project}
-                onChange={(e) => pickProject(e.target.value)}
-                fontSize="16px"
-                h="40px"
-                px="3"
-                borderRadius="8px"
-                bg="tone.running.bg"
-                color="tone.running.fg"
-                fontWeight="600"
-              >
-                {projects.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </chakra.select>
-              <Text color="text.dim" fontSize="lg">
-                /
-              </Text>
-            </>
-          )}
-          <chakra.input
-            aria-label="Epic slug"
-            aria-invalid={!!slugError}
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            ref={slugInput}
-            {...field}
-            flex="1"
-            minW="0"
-            h="40px"
-            px="3"
-            fontWeight="600"
-            placeholder="my-epic"
-            value={draft.slug}
-            onChange={(e) => patch({ slug: e.target.value })}
-          />
-        </Box>
+        <DraftHeader
+          label={label}
+          project={draft.project}
+          projects={projects}
+          slug={draft.slug}
+          slugError={slugError}
+          slugInput={slugInput}
+          status={status}
+          onRename={renameFocus}
+          onPickProject={pickProject}
+          onSlug={(slug) => patch({ slug })}
+        />
         {slugError && (
           <Text role="alert" fontSize="sm" color="tone.waiting.fg" px="3" pt="2" flexShrink="0">
             {slugError}
@@ -493,48 +390,17 @@ function DraftForm({
             {reasonText}
           </Box>
         )}
-        <Box
-          display="flex"
-          alignItems="center"
-          gap="2"
-          p="3"
-          borderTopWidth="1px"
-          borderColor="hairline"
-          bg="surface.raised"
-          flexShrink="0"
-        >
-          {confirming ? (
-            <>
-              <Text fontSize="sm" flex="1" minW="0" color="tone.paused.fg" fontWeight="600">
-                Remove this draft and its images?
-              </Text>
-              <Button
-                type="button"
-                emphasis="ghost"
-                tone="muted"
-                onClick={() => setConfirming(false)}
-              >
-                Keep
-              </Button>
-              <Button type="button" tone="paused" onClick={removeNow}>
-                Remove
-              </Button>
-            </>
-          ) : (
-            <>
-              {attachIcon && <AttachButton onClick={() => fileInput.current?.click()} />}
-              <Button type="button" emphasis="ghost" tone="muted" onClick={askRemove}>
-                Remove
-              </Button>
-              <Box flex="1" />
-              {!sheetMode && reasonText}
-              <Button type="submit" tone="running" disabled={pending || !!reason || !!banner}>
-                {pending && <Spinner size="sm" />}
-                Start design
-              </Button>
-            </>
-          )}
-        </Box>
+        <DraftFooter
+          confirming={confirming}
+          canAttach={attachIcon}
+          reasonText={!sheetMode && reasonText}
+          startDisabled={pending || !!reason || !!banner}
+          pending={pending}
+          onAttach={() => fileInput.current?.click()}
+          onAskRemove={askRemove}
+          onKeep={() => setConfirming(false)}
+          onRemove={removeNow}
+        />
       </Box>
     </DetailPage>
   )

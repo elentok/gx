@@ -98,7 +98,7 @@ const TriagePage = lazy(() =>
 )
 
 const DraftPage = lazy(() =>
-  import("./design/NewDesignForm").then(({ DraftPage }) => ({ default: DraftPage })),
+  import("./design/DraftPage").then(({ DraftPage }) => ({ default: DraftPage })),
 )
 
 const accountPagesModule = () => import("./settings/AccountPages")
