@@ -82,14 +82,15 @@ export function useSelectApi(
   const stateRef = useRef(state)
   stateRef.current = state
   // A run's moved rows leave the list only on a later refetch, after afterRun ran on the old rows.
-  // The flag stays up until a prune changes something, so an unrelated list update in between does not eat it.
+  // The moved rows can leave on several refetches (epics before drafts), so the flag stays up until select
+  // mode ends or the user changes the selection.
   const runPending = useRef(false)
   // A row that leaves the list leaves the selection.
   useEffect(() => {
     if (!loaded) return
     const next = prune(stateRef.current, rows, runPending.current)
     if (next === stateRef.current) return
-    runPending.current = false
+    if (!next.on) runPending.current = false
     setState(next)
   }, [loaded, rows])
   const ownsKeyRef = useRef(ownsKey)
@@ -116,11 +117,23 @@ export function useSelectApi(
         runPending.current = false
         setState(leave)
       },
-      toggle: (key) => setState((s) => toggle(s, key)),
-      toggleGroup: (group) => setState((s) => toggleGroup(s, rows, group)),
+      toggle: (key) => {
+        runPending.current = false
+        setState((s) => toggle(s, key))
+      },
+      toggleGroup: (group) => {
+        runPending.current = false
+        setState((s) => toggleGroup(s, rows, group))
+      },
       groupState: (group) => groupState(state, rows, group),
-      selectAll: () => setState((s) => selectAll(s, rows)),
-      selectNone: () => setState(selectNone),
+      selectAll: () => {
+        runPending.current = false
+        setState((s) => selectAll(s, rows))
+      },
+      selectNone: () => {
+        runPending.current = false
+        setState(selectNone)
+      },
       nameOf: (key) => names.get(key) ?? key,
       afterRun: () => {
         runPending.current = true

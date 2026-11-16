@@ -47,14 +47,9 @@ test("Bulk actions", async ({ page, start }) => {
   // The moved rows leave the Default workspace's list.
   await expect(sidebar.getByRole("link", nav("bulk-done Not started"))).toHaveCount(0)
   await expect(sidebar.getByRole("link", { name: /bulk-draft/ })).toHaveCount(0)
-  // The mode ends when nothing is selected any more, but the draft leaves on a later refetch than the epics, so it can
-  // stay on with "0 selected" (see Spec deviations): leave it either way.
-  await expect(count.or(sidebar.getByRole("button", nav("Select")))).toBeVisible()
-  if (await count.isVisible()) {
-    await expect(count).toHaveText("0 selected")
-    await done.click()
-  }
+  // The mode ends by itself when nothing is selected any more, without clicking Done.
   await expect(bar).toHaveCount(0)
+  await expect(sidebar.getByRole("button", nav("Select"))).toBeVisible()
   // The CLI shows the Designs in the target workspace, and the draft is still a draft.
   const movedTo = JSON.parse(
     await fx.cli("server", "workspaces", "list", "--json"),

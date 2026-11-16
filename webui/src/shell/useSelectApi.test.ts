@@ -26,6 +26,31 @@ test("a run that moves every selected row out of the list ends the mode once the
   expect(result.current.state).toEqual({ on: false, keys: [] })
 })
 
+test("a run whose rows leave on two refetches still ends the mode on the later one", () => {
+  const { result, rerender } = setup([row("a"), row("b"), row("draft")])
+  act(() => result.current.enter())
+  act(() => result.current.selectAll())
+  act(() => result.current.afterRun())
+  // The epics leave first, the draft one refetch later.
+  rerender({ rows: [row("draft")] })
+  expect(result.current.state).toEqual({ on: true, keys: ["draft"] })
+  rerender({ rows: [] })
+
+  expect(result.current.state).toEqual({ on: false, keys: [] })
+})
+
+test("a user's selection change drops a pending run end", () => {
+  const { result, rerender } = setup([row("a"), row("b")])
+  act(() => result.current.enter())
+  act(() => result.current.toggle("a"))
+  act(() => result.current.afterRun())
+  act(() => result.current.toggle("b"))
+  rerender({ rows: [row("b")] })
+  rerender({ rows: [] })
+
+  expect(result.current.state).toEqual({ on: true, keys: [] })
+})
+
 test("a run's pending end does not carry into the next select session", () => {
   const { result, rerender } = setup([row("a")])
   act(() => result.current.enter())
