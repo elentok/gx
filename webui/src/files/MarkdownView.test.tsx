@@ -1,6 +1,6 @@
 import { act } from "@testing-library/react"
 import { useState } from "react"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { renderThemed } from "../ui/render"
 import { MarkdownView } from "./MarkdownView"
 import { stubResolver } from "./stubResolver"
@@ -65,6 +65,27 @@ describe("MarkdownView", () => {
     expect(container.querySelector("a")?.getAttribute("href")).toBe(
       `#/files${FILE}?heading=install`,
     )
+  })
+
+  it("scrolls to the heading again when the same fragment link is clicked twice", async () => {
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+    const stub = stubResolver([])
+    const { container } = renderThemed(
+      <MarkdownView
+        path={FILE}
+        text={"# Install\n\n[x](#install)"}
+        source={false}
+        resolver={stub.resolver}
+        heading="install"
+      />,
+    )
+    await settle()
+    const before = scroll.mock.calls.length
+    const link = container.querySelector("a") as HTMLElement
+    await act(async () => link.click())
+    await act(async () => link.click())
+    expect(scroll.mock.calls.length - before).toBe(2)
   })
 
   it("loads a relative image through the raw route", async () => {
