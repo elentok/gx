@@ -647,6 +647,7 @@ var Scenarios = map[string]scenario{
 	// schedules: Schedules and their Last runs in the shape --shape names (default list).
 	// run swaps in spec.SchedulesScenario(shape).
 	"schedules": {SchedulesShaped: true},
+	"rest":      {RestShaped: true},
 	// epic-diff: real git history and stored epics for the Diff page, in the shape --shape
 	// names (default merged). run swaps in spec.EpicDiffScenario(shape).
 	"epic-diff": {EpicDiffShaped: true},

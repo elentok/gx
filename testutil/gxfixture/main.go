@@ -76,6 +76,9 @@ func run(args []string) (err error) {
 	if sc.SchedulesShaped {
 		sc, _ = spec.SchedulesScenario(shape)
 	}
+	if sc.RestShaped {
+		sc, _ = spec.RestScenario(shape)
+	}
 	if sc.EpicDiffShaped {
 		sc, _ = spec.EpicDiffScenario(shape)
 	}

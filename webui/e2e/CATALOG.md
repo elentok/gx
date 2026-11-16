@@ -52,6 +52,15 @@ first: Finished, Finished, Ran late and a Skipped set time (reason `late`); `pau
 `missing-project` has one Schedule, on, in a store folder with no `project.json`. The machine id is fixed (`fixture1`) so the
 seeded One-offs carry the server's Dedupe key. Data: `testutil/gxfixture/spec/schedules.go`; the files and state are written by
 `testutil/gxfixture/seedschedules.go`.
+The `rest` scenario starts a server with the Rest feature configured and a Rest period or warning in force
+(`start("rest", { shape })`; default `bedtime`). Every time is relative to the server start. The master toggle is on in all
+shapes. `bedtime`: Bedtime on, range from one hour ago to one hour ahead (local `HH:MM`), so a Bedtime period is in force.
+`break`: Break on (Work time 55, Break time 5), a Break ending 4 minutes 37 seconds after the start with the mock's message
+"Fifty-five minutes in a row? The agents will survive without you." and sub-message "Stand up, drink some water, look at
+something far away.", and its `break-start` record. `break-warning`: Break on, work count 53 (two below Work time), last
+active minute now, no Rest period. `bedtime-warning`: Bedtime on, start 10 minutes ahead, no Rest period. Data:
+`testutil/gxfixture/spec/rest.go`; the state file `rest.json` and the records under `rest-records/` in the state dir are
+written by `testutil/gxfixture/seedrest.go` through the server's own runner (only the Break text is patched afterwards).
 The `epic-diff` scenario seeds real git history and stored epics in the project `demo` for the Diff page
 (`start("epic-diff", { shape })`; default `merged`). Shapes: `merged` is the merged `widgets-impl` (map `widgets`, merged, no
 range) with a stamped Epic range of 15 commits over tickets 01 (every commit stamped `demo:<epic>/<id>`), 02 (legacy

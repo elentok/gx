@@ -265,6 +265,12 @@ type Scenario struct {
 	// SchedulesShaped marks the schedules scenario, whose whole content comes
 	// from the --shape value (SchedulesScenario).
 	SchedulesShaped bool
+	// Rest seeds the persisted Rest state and records before the server starts
+	// (see RestScenario).
+	Rest *RestSeed
+	// RestShaped marks the rest scenario, whose whole content comes from the
+	// --shape value (RestScenario).
+	RestShaped bool
 	// EpicDiffShaped marks the epic-diff scenario, whose whole content comes
 	// from the --shape value (EpicDiffScenario).
 	EpicDiffShaped bool

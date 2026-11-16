@@ -309,6 +309,9 @@ func (f *fixture) seedBeforeStart(sc scenario, shape string) error {
 	if err := seedSchedules(f, sc); err != nil {
 		return fmt.Errorf("seed schedules: %w", err)
 	}
+	if err := seedRest(f, sc); err != nil {
+		return fmt.Errorf("seed rest: %w", err)
+	}
 	if sc.PromptGrace != "" {
 		f.env = append(f.env, "GX_PROMPT_GRACE="+sc.PromptGrace)
 	}
