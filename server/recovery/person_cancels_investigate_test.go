@@ -52,6 +52,32 @@ func TestPersonVerb_StartOverCancelsTheOpenInvestigateChild(t *testing.T) {
 	wantChildStatus(t, child, schema.StatusCancelled)
 }
 
+// writeEpicInvestigate writes a parent-less investigate ticket, as recovery's
+// epic-level one is.
+func writeEpicInvestigate(t *testing.T, ticketPath, name, status string) string {
+	t.Helper()
+	dir := filepath.Dir(ticketPath)
+	testutil.WriteFile(t, dir, name, "---\nid: \""+name[:3]+"\"\nstatus: "+status+"\ntype: investigate\n---\n\n# epic investigate\n")
+	return filepath.Join(dir, name)
+}
+
+func TestPersonVerb_StartOverCancelsTheEpicLevelInvestigate(t *testing.T) {
+	t.Parallel()
+	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
+	epicLevel := writeEpicInvestigate(t, ticketPath, "90x-epic-investigate.md", "paused")
+	done := writeEpicInvestigate(t, ticketPath, "91x-done-investigate.md", "done")
+	otherChild := filepath.Join(filepath.Dir(ticketPath), "02a-other.md")
+	testutil.WriteFile(t, filepath.Dir(ticketPath), "02-second.md", "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n\n# 02\n")
+	testutil.WriteFile(t, filepath.Dir(ticketPath), "02a-other.md", "---\nid: \"02a\"\nparent: \"02\"\nstatus: open\ntype: investigate\n---\n\n# 02a\n")
+	res, err := h.Client.Admin.Repair(context.Background(), "start-over", wire.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
+	if err != nil || res.Refused {
+		t.Fatalf("start-over = %+v, %v; want started over", res, err)
+	}
+	wantChildStatus(t, epicLevel, schema.StatusCancelled)
+	wantChildStatus(t, done, schema.StatusDone)
+	wantChildStatus(t, otherChild, schema.StatusOpen)
+}
+
 func TestInvestigateVerb_MergeLeavesItsOwnTicket(t *testing.T) {
 	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)

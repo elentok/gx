@@ -90,13 +90,19 @@ func (o *Ops) awaitRunSettled(addr string) bool {
 }
 
 // CancelInvestigateChild is a person's recovery verb withdrawing ref's
-// unfinished investigate child, stopping its live agent, so an old investigation
-// does not act after the person. Investigate's own verbs never call it.
+// unfinished investigate child and the epic's unfinished epic-level (parent-less)
+// investigate tickets, stopping their live agents, so an old investigation
+// does not act after the person and a paused epic-level one cannot deadlock the
+// epic again. Investigate's own verbs never call it.
 func (o *Ops) CancelInvestigateChild(ref queue.TicketRef, source string) error {
 	forks := ref.Epic.ForkParents()
 	for _, t := range ref.Epic.Tickets {
+		// A person answering or retrying an investigate ticket must not cancel it.
+		if t.Type != string(schema.TypeInvestigate) || isTerminal(t.Status) || t.Identifier == ref.Ticket.Identifier {
+			continue
+		}
 		parent, ok := forks.Of(t)
-		if !ok || parent.Identifier != ref.Ticket.Identifier || t.Type != string(schema.TypeInvestigate) || isTerminal(t.Status) {
+		if ok && parent.Identifier != ref.Ticket.Identifier || !ok && t.Parent != nil {
 			continue
 		}
 		addr := tickets.Address{Project: ref.Addr.Project, Epic: ref.Addr.Epic, ID: t.Identifier}
