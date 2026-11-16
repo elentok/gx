@@ -43,6 +43,46 @@ func TestExecute_TicketsList_IsHiddenAliasOfShow(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsShow_BriefListsTicketsOnly(t *testing.T) {
+	repo, _ := cmdtest.SetupShowProject(t)
+
+	full, err := runIn(t, repo, "tickets", "show", "mine:epic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, cmd := range []string{"show", "list"} {
+		out, err := runIn(t, repo, "tickets", cmd, "mine:epic", "--brief")
+		if err != nil {
+			t.Fatalf("%s --brief: %v", cmd, err)
+		}
+		if strings.Contains(out, "tickets:") || strings.Contains(out, "path:") {
+			t.Errorf("%s --brief printed the epic body:\n%s", cmd, out)
+		}
+		lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
+		if got, want := len(lines), strings.Count(full[strings.Index(full, "tickets:\n"):], "\n")-1; got != want {
+			t.Errorf("%s --brief printed %d lines, want %d:\n%s", cmd, got, want, out)
+		}
+		if !strings.Contains(out, "mine:epic/06  open  implement  Hello\n") {
+			t.Errorf("%s --brief output = %q", cmd, out)
+		}
+		for _, l := range lines {
+			if !strings.HasPrefix(l, "mine:epic/") {
+				t.Errorf("non-ticket line %q", l)
+			}
+		}
+	}
+
+	for _, args := range [][]string{
+		{"tickets", "show", "mine:epic", "--brief", "--json"},
+		{"tickets", "show", "mine:epic", "--brief", "--section", "x"},
+		{"tickets", "show", "mine:epic/06", "--brief"},
+	} {
+		if _, err := runIn(t, repo, args...); err == nil {
+			t.Errorf("%v: want an error", args)
+		}
+	}
+}
+
 func TestExecute_TicketsShow_PrintsAgentWhenSet(t *testing.T) {
 	repo, project := cmdtest.SetupShowProject(t)
 	testutil.WriteFile(t, filepath.Join(project, "epic", "issues"), "07-pinned.md",

@@ -153,6 +153,8 @@ conversation history.
   work as input when the epic is implied). Read it with `gx tickets show <addr>`; given an epic
   address (`project:epic`, or a bare `epic` in the cwd project) `show` prints the epic's `ticket.md`
   (frontmatter and body) followed by its tickets, one `id  status  title` line each (no `--json`).
+  `--brief` prints only the ticket lines, `address  status  type  title`, with no epic body (epic
+  address only; not with `--json` or `--section`). Use it instead of piping through `head`.
   An all-numeric bare argument resolves as a ticket ID, so an epic named like `2024` needs its
   `project:epic` form. Change a body section with `gx tickets section <addr> <heading> <content|->`
   (empty content is refused; `--clear` blanks a section; without content it prints the section),

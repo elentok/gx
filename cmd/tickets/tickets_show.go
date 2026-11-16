@@ -38,7 +38,7 @@ type ticketShowJSON struct {
 // of every ticket of an epic that has it, each under a line naming the ticket.
 // A single ticket without the section is an error; --section and --json are
 // kept apart by the command's flag definitions.
-func runTicketsShow(dirs config.Dirs, cwd, addr string, jsonOut bool, section, only string, w io.Writer) error {
+func runTicketsShow(dirs config.Dirs, cwd, addr string, jsonOut, brief bool, section, only string, w io.Writer) error {
 	filter, err := parseTicketNumbers(only)
 	if err != nil {
 		return err
@@ -56,11 +56,14 @@ func runTicketsShow(dirs config.Dirs, cwd, addr string, jsonOut bool, section, o
 			if section != "" {
 				return showEpicSection(dirs, cwd, project, epic, section, filter, w)
 			}
-			return showEpic(dirs, cwd, project, epic, w)
+			return showEpic(dirs, cwd, project, epic, brief, w)
 		}
 	}
 	if err != nil {
 		return err
+	}
+	if brief {
+		return errors.New("--brief only applies to an epic address")
 	}
 	if filter != nil {
 		return errors.New("--tickets only applies to an epic address")
@@ -171,7 +174,8 @@ func parseEpicArg(s string) (project, epic string, ok bool) {
 }
 
 // showEpic prints the epic's ticket.md verbatim, then one line per ticket.
-func showEpic(dirs config.Dirs, cwd, project, name string, w io.Writer) error {
+// With brief it prints only the ticket lines, each with its type.
+func showEpic(dirs config.Dirs, cwd, project, name string, brief bool, w io.Writer) error {
 	root, project, path, err := resolveEpic(dirs, cwd, project, name)
 	if err != nil {
 		return err
@@ -185,16 +189,22 @@ func showEpic(dirs config.Dirs, cwd, project, name string, w io.Writer) error {
 		return err
 	}
 	var out strings.Builder
-	fmt.Fprintf(&out, "%s:%s\npath: %s\n%s", project, name, path, entry)
-	if len(entry) > 0 && entry[len(entry)-1] != '\n' {
-		out.WriteString("\n")
+	if !brief {
+		fmt.Fprintf(&out, "%s:%s\npath: %s\n%s", project, name, path, entry)
+		if len(entry) > 0 && entry[len(entry)-1] != '\n' {
+			out.WriteString("\n")
+		}
+		out.WriteString("\ntickets:\n")
 	}
-	out.WriteString("\ntickets:\n")
 	for _, epic := range epics {
 		if epic.Name != name {
 			continue
 		}
 		for _, t := range epic.Tickets {
+			if brief {
+				fmt.Fprintf(&out, "%s:%s/%s  %s  %s  %s\n", project, name, t.Identifier, t.Status, t.Type, t.Title)
+				continue
+			}
 			fmt.Fprintf(&out, "%s  %s  %s\n", t.Identifier, t.Status, t.Title)
 		}
 	}
