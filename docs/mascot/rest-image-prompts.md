@@ -1,8 +1,8 @@
 # Rest screen mascot images: Codex prompts
 
 Two images, one per Rest period kind. Each has two variants: a transparent one and a scene one.
-Only the scene variant ships if the design stays on "square scene, edges fade into the page"
-(the Mental health design picked this). The transparent variants are the fallback.
+The Mental health design picked "square scene, edges fade into the page", and the scene variants
+shipped. The transparent prompts were never generated and are kept only as a fallback.
 
 Attach `webui/public/gx-menu-mascot.png` as the style reference for every prompt.
 Output size: 1024×1024. Save the PNGs as shown below, then downscale to 640×640 for the repo.
@@ -15,7 +15,7 @@ blue glow accents.
 
 ## Bedtime (asleep in pyjamas)
 
-Files: `webui/public/gx-rest-bedtime.png` (scene), `webui/public/gx-rest-bedtime-transparent.png`.
+File: `webui/public/gx-rest-bedtime.png` (scene, shipped).
 
 Transparent:
 
@@ -34,7 +34,7 @@ Scene:
 
 ## Break (meditating)
 
-Files: `webui/public/gx-rest-break.png` (scene), `webui/public/gx-rest-break-transparent.png`.
+File: `webui/public/gx-rest-break.png` (scene, shipped).
 
 Transparent:
 
