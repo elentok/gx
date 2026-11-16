@@ -1,5 +1,11 @@
 package registry
 
+// Smallest accepted Break settings, shared with config's parser.
+const (
+	MinMentalHealthWorkMinutes  = 3
+	MinMentalHealthBreakMinutes = 1
+)
+
 func minOf(v float64) *float64 { return &v }
 
 // coreEntries lists the Ralph loop, Notifications, Web UI and System keys.
@@ -74,7 +80,7 @@ func coreEntries() []Entry {
 		Description: "Enable mental health breaks: the bedtime and work-break rules below."})
 	bedtime := mh("Bedtime")
 	add(bedtime, Entry{Key: Key("mental-health", "bedtime", "enabled"), Type: TypeBool,
-		Description: "Stop agents from starting during the bedtime window."})
+		Description: "Show the Rest screen during the bedtime window and keep notifications quiet."})
 	add(bedtime, Entry{Key: Key("mental-health", "bedtime", "start"), Type: TypeString, CheckString: checkClock,
 		Description: "When bedtime starts, as a 24-hour time such as 22:00."})
 	add(bedtime, Entry{Key: Key("mental-health", "bedtime", "end"), Type: TypeString, CheckString: checkClock,
@@ -84,9 +90,9 @@ func coreEntries() []Entry {
 	brk := mh("Break")
 	add(brk, Entry{Key: Key("mental-health", "break", "enabled"), Type: TypeBool,
 		Description: "Ask for a break after a stretch of work."})
-	add(brk, Entry{Key: Key("mental-health", "break", "work-minutes"), Type: TypeNumber, Min: minOf(3), Integer: true,
+	add(brk, Entry{Key: Key("mental-health", "break", "work-minutes"), Type: TypeNumber, Min: minOf(MinMentalHealthWorkMinutes), Integer: true,
 		Description: "Minutes of work before a break. At least 3."})
-	add(brk, Entry{Key: Key("mental-health", "break", "break-minutes"), Type: TypeNumber, Min: minOf(1), Integer: true,
+	add(brk, Entry{Key: Key("mental-health", "break", "break-minutes"), Type: TypeNumber, Min: minOf(MinMentalHealthBreakMinutes), Integer: true,
 		Description: "Minutes the break lasts. At least 1."})
 	add(brk, Entry{Key: Key("mental-health", "break", "message"), Type: TypeString,
 		Description: "The message shown during a break. Empty uses the built-in messages."})

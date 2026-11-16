@@ -33,12 +33,6 @@ type MentalHealthBreak struct {
 	Message      string `json:"message"`
 }
 
-// Smallest accepted values, shared with the registry entries' minimums.
-const (
-	minMentalHealthWorkMinutes  = 3
-	minMentalHealthBreakMinutes = 1
-)
-
 // DefaultMentalHealthConfig is the default: everything off.
 func DefaultMentalHealthConfig() MentalHealthConfig {
 	return MentalHealthConfig{
@@ -92,10 +86,10 @@ func applyMentalHealth(cfg MentalHealthConfig, raw *rawMentalHealth) (MentalHeal
 		if b.Enabled != nil {
 			cfg.Break.Enabled = *b.Enabled
 		}
-		if b.WorkMinutes != nil && *b.WorkMinutes >= minMentalHealthWorkMinutes {
+		if b.WorkMinutes != nil && *b.WorkMinutes >= registry.MinMentalHealthWorkMinutes {
 			cfg.Break.WorkMinutes = *b.WorkMinutes
 		}
-		if b.BreakMinutes != nil && *b.BreakMinutes >= minMentalHealthBreakMinutes {
+		if b.BreakMinutes != nil && *b.BreakMinutes >= registry.MinMentalHealthBreakMinutes {
 			cfg.Break.BreakMinutes = *b.BreakMinutes
 		}
 		if b.Message != nil {

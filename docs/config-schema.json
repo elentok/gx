@@ -351,7 +351,7 @@
           "properties": {
             "enabled": {
               "default": false,
-              "description": "Stop agents from starting during the bedtime window.",
+              "description": "Show the Rest screen during the bedtime window and keep notifications quiet.",
               "type": "boolean"
             },
             "end": {

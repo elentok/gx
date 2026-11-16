@@ -69,14 +69,14 @@ func (e *engine) reconcile() {
 		e.s.UnlockedKind = ""
 		e.s.QuietUntil = time.Time{}
 	}
-	if e.cfg.Enabled && b.Enabled && inBedtime(b, e.now) && !e.bedtimeUnlocked() &&
+	if e.cfg.Enabled && b.Enabled && inBedtime(b, e.now) && !bedtimeUnlocked(e.s, e.now) &&
 		(e.s.Period == nil || e.s.Period.Kind == KindBreak) {
 		e.startBedtime()
 	}
 }
 
-func (e *engine) bedtimeUnlocked() bool {
-	return e.s.UnlockedKind == KindBedtime && e.now.Before(e.s.QuietUntil)
+func bedtimeUnlocked(s State, now time.Time) bool {
+	return s.UnlockedKind == KindBedtime && now.Before(s.QuietUntil)
 }
 
 // startBedtime drops a running Break, with a record that cancels its start.
@@ -90,7 +90,7 @@ func (e *engine) startBedtime() {
 
 // counting is true while an active minute would count.
 func (e *engine) counting() bool {
-	return e.cfg.Enabled && e.cfg.Break.Enabled && e.s.Period == nil && !e.bedtimeUnlocked()
+	return e.cfg.Enabled && e.cfg.Break.Enabled && e.s.Period == nil && !bedtimeUnlocked(e.s, e.now)
 }
 
 func (e *engine) active() {
@@ -165,21 +165,21 @@ func (e *engine) view() View {
 }
 
 // nextBedtimeStart is when Bedtime next starts, after any unlocked Bedtime.
-func (e *engine) nextBedtimeStart() (time.Time, bool) {
-	if !e.cfg.Enabled || !e.cfg.Bedtime.Enabled {
+func nextBedtimeStart(cfg config.MentalHealthConfig, s State, now time.Time) (time.Time, bool) {
+	if !cfg.Enabled || !cfg.Bedtime.Enabled {
 		return time.Time{}, false
 	}
-	from := e.now
-	if e.bedtimeUnlocked() {
-		from = e.s.QuietUntil
+	from := now
+	if bedtimeUnlocked(s, now) {
+		from = s.QuietUntil
 	}
-	return nextClock(from, e.cfg.Bedtime.Start), true
+	return nextClock(from, cfg.Bedtime.Start), true
 }
 
 // warning picks the one warning to show. A Break warning only exists when its
 // start is before the next Bedtime start, so it is always the earlier one.
 func (e *engine) warning() *Warning {
-	bedStart, hasBed := e.nextBedtimeStart()
+	bedStart, hasBed := nextBedtimeStart(e.cfg, e.s, e.now)
 	if w := e.breakWarning(bedStart, hasBed); w != nil {
 		return w
 	}
