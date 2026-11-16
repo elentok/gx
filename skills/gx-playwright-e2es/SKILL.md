@@ -56,6 +56,31 @@ After you write or edit a flow, run `gx brief go-test ./playwrightguard` before 
 It checks the rules above (state read before an `expect`, flow budget) in seconds. A browser run
 takes 20-55 s, and `gx check` finds the same failures only at the end.
 
+## Routes and labels
+
+`webui/e2e/CATALOG.md` has a "Routes and labels" table. Check it before you guess a route or a label.
+
+## Faking the platform
+
+`isMac()` in `webui/src/platform.ts` reads `navigator.userAgentData.platform` first and
+`navigator.platform` second. An init script that sets only `navigator.platform` fails on Chromium.
+Set both:
+
+```ts
+await page.addInitScript(() => {
+  Object.defineProperty(navigator, "platform", { get: () => "MacIntel" })
+  Object.defineProperty(navigator, "userAgentData", { get: () => ({ platform: "macOS" }) })
+})
+```
+
+## Stacked status roles and re-sorting sidebar rows
+
+- Each row shows its own "Saved" element with `role="status"`, so the elements stack and
+  `getByRole('status')` fails in strict mode. Scope the locator to one row first, for example
+  `row.getByRole('status')`.
+- A rename re-sorts the sidebar rows, so `.first()` can point at another chat afterwards. Locate a
+  chat row by `a[href$="/agents/<id>"]`.
+
 ## Update the flow when the UI change was on purpose
 
 **Why:** flow 22 kept expecting a transparent background after the amber pill was accepted. It failed

@@ -110,6 +110,23 @@ JSON file at `config_file` and run `gx server reload-config`; explain then reads
 Retries are off. Locators use roles and visible text, plus `data-testid` `pill` and `reason` on
 Epics page cards. The helpers `section` and `card` in `fixture.ts` find a section (expanding it) and a card.
 
+## Routes and labels
+
+The routes are in `webui/src/routes.tsx` (`pageRoutes`). There is no separate Queue page: an epic is queued with the Queue button on its card on `/epics`.
+
+| Route | Page | Main labels |
+| --- | --- | --- |
+| `/epics` | Epics | heading "Epics"; "Filter epics", "Workspace" and "Project" controls; Queue button on a card; "More actions" menu button |
+| `/archive` | Archive | |
+| `/agents/*` | Agents (the splat is the session label) | |
+| `/backlog` | Backlog | |
+| `/schedules` | Schedules | |
+| `/stats` | Stats | |
+| `/cleanup` | Cleanup | |
+| `/settings` | Settings | |
+| `/triage/*` | Triage | |
+| `/diff` | Diff | |
+
 ## Fixture-unrenderable states
 
 These states cannot be screenshotted by design, so a ticket's `## Mock check` never lists them
