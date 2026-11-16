@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -89,7 +90,8 @@ var mentionRe = regexp.MustCompile(`(?i)(?:\bticket\s+#?|#)(\d+[a-z]?)\b`)
 
 // mentionWarnings flags live sibling tickets the body names that t does not
 // wait on, directly or transitively (parent edges and fork subtrees included):
-// the scheduler may then run t before the ticket it relies on lands.
+// the scheduler may then run t before the ticket it relies on lands. A fork
+// child of t is skipped: its parent edge already ties it to t.
 func (g *projectGraph) mentionWarnings(epic string, t Ticket) []Warning {
 	self := nodeKey(epic, t)
 	var covered map[string]bool
@@ -97,7 +99,7 @@ func (g *projectGraph) mentionWarnings(epic string, t Ticket) []Warning {
 	var warnings []Warning
 	for _, m := range mentionRe.FindAllStringSubmatch(t.Body, -1) {
 		key, err := g.resolve(epic, m[1])
-		if err != nil || key == self || seen[key] || g.tickets[key].IsTerminal() {
+		if err != nil || key == self || seen[key] || g.tickets[key].IsTerminal() || slices.Contains(g.children[self], key) {
 			continue
 		}
 		seen[key] = true

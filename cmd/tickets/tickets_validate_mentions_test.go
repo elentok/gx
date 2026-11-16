@@ -65,6 +65,15 @@ func TestExecute_TicketsValidate_BodyMentionStaysQuiet(t *testing.T) {
 			t.Errorf("validate = %v, stderr %q, want clean pass", err, stderr)
 		}
 	})
+	t.Run("names its own fork child", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		path := cmdtest.WriteEpicTicket(t, dir, "e", "02-b.md", frontmatter("02", "", "Filed the fix as ticket 02a."))
+		cmdtest.WriteEpicTicket(t, dir, "e", "02a-c.md", frontmatter("02a", "parent: \"02\"\n", "Fix."))
+		if stderr, err := validateStderr(t, path); err != nil || stderr != "" {
+			t.Errorf("validate = %v, stderr %q, want clean pass", err, stderr)
+		}
+	})
 	t.Run("done ticket skipped", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
