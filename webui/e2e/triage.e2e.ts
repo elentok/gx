@@ -55,7 +55,7 @@ test.describe("199. Triage journey", () => {
     await expect(step(page, "questions", "current")).toBeVisible()
     await expect(page.getByText(/^Round 1 of 3/)).toBeVisible()
     const round = questionsOf(page)
-    await expect(round.getByText("Question 1 of 3")).toBeVisible()
+    await expect(round.getByRole("group", { name: "Question 1 of 3" })).toBeVisible()
     await expect(round.getByRole("button", { name: /^Create tooling/ })).toBeVisible()
     await expect(round.getByRole("button", { name: /^File under parser/ })).toBeVisible()
     await expect(round.getByRole("button", { name: /^Keep for later/ })).toBeVisible()
@@ -98,7 +98,6 @@ test.describe("199. Triage journey", () => {
     await expect(inboxButton().locator("span")).toHaveText("6")
     await final.getByRole("button", nav("Review plan")).click()
     await expect(page).toHaveURL(/#\/triage\/demo$/)
-    await expect(page.getByText("Final question")).toBeVisible()
     await tell(page, "Object to decision 1")
     await expect(questionsOf(page).getByText(/Rename the helper while there\?/)).toBeVisible()
 
@@ -154,7 +153,7 @@ test.describe("199. Triage journey", () => {
     // question and a decided one are never asked.
     const round1 = questionsOf(page)
     await expect(page.getByText(/^Round 1 of 3/)).toBeVisible()
-    await expect(round1.getByText("Question 1 of 3")).toBeVisible()
+    await expect(round1.getByRole("group", { name: "Question 1 of 3" })).toBeVisible()
     await expect(page.getByText("Decided unless you object")).toBeVisible()
     await expect(page.getByText(/Rename the helper while there\?/)).toBeVisible()
     await expect(page.getByText("Which store should it use?")).toHaveCount(0)
@@ -188,20 +187,16 @@ test.describe("199. Triage journey", () => {
     // Keep for later leaves the rows that were headed for the new backlog; the next question is the
     // bug's, then the idea's.
     await round1.getByRole("button", { name: /^Keep for later/ }).click()
-    await expect(round1.getByText("Question 2 of 3")).toBeVisible()
-    // The answered card folds to one line in the chat.
-    await expect(page.locator("[data-part=answered-question]")).toHaveText(
-      /^✓ Q1 .* → Keep for later/,
-    )
+    await expect(round1.getByRole("group", { name: "Question 2 of 3" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Questions (1 of 3)" })).toBeVisible()
     await expect(round1.getByText(/Fix it in the parser or the caller\?/)).toBeVisible()
     await round1.getByRole("button", { name: /^parser/ }).click()
-    await expect(round1.getByText("Question 3 of 3")).toBeVisible()
+    await expect(round1.getByRole("group", { name: "Question 3 of 3" })).toBeVisible()
     await expect(round1.getByText(/Keep the old flag\?/)).toBeVisible()
     await round1.getByRole("button", { name: /^no/ }).click()
     await sendAnswers(page)
 
     // The final card. Nothing is written until the yes.
-    await expect(page.getByText("Final question")).toBeVisible()
     await expect(page.getByText(/Write this plan\?/).first()).toBeVisible()
     await expect(step(page, "write", "todo")).toBeVisible()
     await openEpics(page)
@@ -475,7 +470,7 @@ test.describe("199. Triage journey", () => {
       page.getByText("waiting: stuck-ticket-watchdog holds claimed gx:stuck-ticket-watchdog/01"),
     ).toBeVisible()
     const oldRound = questionsOf(page)
-    await expect(oldRound.getByText("Question 1 of 3")).toBeVisible()
+    await expect(oldRound.getByRole("group", { name: "Question 1 of 3" })).toBeVisible()
     await expect(page.getByText('Create the backlog "tooling"?', { exact: true })).toBeVisible()
     await expect(
       oldRound.getByText(/test-health|agent-guidance-and-skills|ticket-authoring/),

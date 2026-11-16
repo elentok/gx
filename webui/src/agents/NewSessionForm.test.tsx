@@ -451,9 +451,9 @@ test("Cmd+Enter does not submit; Enter with the menu closed adds a newline", asy
 test("submit is disabled offline", async () => {
   mount({ connected: false })
   await ready()
-  expect(
-    (screen.getByRole("button", { name: "Create chat" }) as HTMLButtonElement).disabled,
-  ).toBe(true)
+  expect((screen.getByRole("button", { name: "Create chat" }) as HTMLButtonElement).disabled).toBe(
+    true,
+  )
 })
 
 test("Harness posts codex when picked", async () => {

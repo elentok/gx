@@ -3,7 +3,6 @@ import { useState, type ReactNode } from "react"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { DesignChat } from "../design/ChatLog"
 import { hasChat, roundKeyOf, roundOf, useSessionChat, type FetchChat } from "../design/chat"
-import { FinalRoundContext } from "../design/RoundCard"
 import { useFocusReport, type PostFocus } from "../design/focus"
 import type { DeleteDesign, OpenFlow, ResumeSession, StopSession } from "../design/open"
 import type { PostAnswer, PostPrompt } from "../design/prompt"
@@ -74,10 +73,6 @@ export interface SteppedPageProps {
   ticketRows?: ReactNode
   /** Sub-rows under any step (Triage: Questions and Review under Approve). */
   stepRows?: StepRows
-  /** Shows each answered card of a round as one line in the chat. */
-  foldAnswered?: boolean
-  /** The open round is the final approval: its card reads "Final question". */
-  finalRound?: boolean
   /** The Progress column fills the page height with its own border. */
   progressColumn?: boolean
   // Design only.
@@ -143,8 +138,6 @@ export function SteppedPage({
   logTail,
   ticketRows,
   stepRows,
-  foldAnswered,
-  finalRound,
   progressColumn,
   designMenu,
   menuItems,
@@ -175,8 +168,7 @@ export function SteppedPage({
   // that session and round only. The message list and the impl link both read it.
   const viewKey = `${session?.id}|${roundKeyOf(chat)}`
   const hasRound = chatty && roundOf(chat).length > 0
-  // A flow that folds answers always shows the chat with the card docked: no Questions view.
-  const questions = hasRound && !foldAnswered && (toggle?.key === viewKey ? toggle.on : true)
+  const questions = hasRound && (toggle?.key === viewKey ? toggle.on : true)
   useFocusReport(conn, session?.id, connState.streams, actions.focus)
   const menu = (onOpenChange?: (open: boolean) => void) => (
     <DesignActionsMenu
@@ -290,30 +282,27 @@ export function SteppedPage({
           pr={progressColumn && sideColumn ? "4" : undefined}
         >
           {chatTop?.({ questions })}
-          <FinalRoundContext.Provider value={!!finalRound}>
-            <DesignChat
-              session={session}
-              chat={chat}
-              refetch={refetchChat}
-              post={actions.post}
-              answer={actions.answer}
-              done={model?.done}
-              nextTitle={model?.nextTitle}
-              working={working(session)}
-              logTop={compact ? undefined : logTop}
-              logTail={logTail}
-              tabsMenu={compact && hasRound ? menu(setMenuHeld) : undefined}
-              questions={questions}
-              foldAnswered={foldAnswered}
-              onQuestions={(on) => setToggle({ key: viewKey, on })}
-              actions={{
-                address,
-                open: actions.open,
-                resume: actions.resume,
-                fetchScreen: actions.fetchScreen,
-              }}
-            />
-          </FinalRoundContext.Provider>
+          <DesignChat
+            session={session}
+            chat={chat}
+            refetch={refetchChat}
+            post={actions.post}
+            answer={actions.answer}
+            done={model?.done}
+            nextTitle={model?.nextTitle}
+            working={working(session)}
+            logTop={compact ? undefined : logTop}
+            logTail={logTail}
+            tabsMenu={compact && hasRound ? menu(setMenuHeld) : undefined}
+            questions={questions}
+            onQuestions={(on) => setToggle({ key: viewKey, on })}
+            actions={{
+              address,
+              open: actions.open,
+              resume: actions.resume,
+              fetchScreen: actions.fetchScreen,
+            }}
+          />
         </Box>
         {stepsInline && (
           <Box

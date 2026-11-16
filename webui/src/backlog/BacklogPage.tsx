@@ -124,7 +124,8 @@ function BacklogRow({
           onClick={() =>
             // The list names the map by address; the route takes its bare name.
             void run(
-              () => finish({ project, backlog: backlog.name, map: move.map.slice(project.length + 1) }),
+              () =>
+                finish({ project, backlog: backlog.name, map: move.map.slice(project.length + 1) }),
               { onDone: onChanged },
             )
           }

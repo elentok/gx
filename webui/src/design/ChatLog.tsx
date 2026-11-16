@@ -17,9 +17,7 @@ import {
   type FailureActions,
 } from "./FailureBanner"
 import type { PostAnswer, PostPrompt } from "./prompt"
-import { AnsweredQuestions } from "./AnsweredQuestions"
 import { QuestionSheet } from "./QuestionSheet"
-import { RoundCard } from "./RoundCard"
 import { isAnswered } from "../ui/question-sheet/round"
 import { PROMPT_BOX_SELECTOR } from "../ui/expandable-text/look"
 import { type RoundDraft, useRoundDraft } from "./roundDraft"
@@ -39,9 +37,7 @@ function ChatTail({
   onQuestions,
   roundDraft,
   autoMenu,
-  foldAnswered,
 }: {
-  foldAnswered?: boolean
   session: SessionInfo
   chat: SessionChatResponse
   connected: boolean
@@ -73,15 +69,6 @@ function ChatTail({
       minH="0"
       gap="3"
     >
-      {round.length > 0 && foldAnswered && !questions && (
-        <RoundCard
-          round={round}
-          answers={answers}
-          onAnswers={setAnswers}
-          index={draft.index}
-          onIndex={setIndex}
-        />
-      )}
       {round.length > 0 && questions && (
         <QuestionSheet
           round={round}
@@ -234,14 +221,11 @@ function ChatBody({
   logTop,
   logTail,
   tabsMenu,
-  foldAnswered,
 }: {
   logTop?: ReactNode
   /** After the messages, before the answered lines. */
   logTail?: ReactNode
   tabsMenu?: ReactNode
-  /** Shows each answered card of the round as one line after the messages. */
-  foldAnswered?: boolean
   session: SessionInfo
   roundKey: string
   chat: SessionChatResponse
@@ -281,7 +265,7 @@ function ChatBody({
   return (
     <FileLinkProvider base={{ session: session.id }} recheckKey={chat.messages.at(-1)?.id}>
       <Box display="flex" flexDirection="column" gap="3" flex="1" minH="0">
-        {hasRound && !foldAnswered && (
+        {hasRound && (
           <ViewToggle
             answered={round.filter((c) => isAnswered(roundDraft.draft.answers[c.label])).length}
             total={round.length}
@@ -293,15 +277,11 @@ function ChatBody({
         {!questions && (
           <ChatMessages
             chat={chat}
-            top={foldAnswered}
             head={logTop}
             tail={
               <>
                 {/* The scroller is a flex column: without this the card shrinks to a clipped strip. */}
                 {logTail && <Box flexShrink="0">{logTail}</Box>}
-                {foldAnswered && hasRound && (
-                  <AnsweredQuestions round={round} answers={roundDraft.draft.answers} />
-                )}
               </>
             }
             busy={busy}
@@ -341,7 +321,6 @@ function ChatBody({
           onQuestions={onQuestions}
           roundDraft={roundDraft}
           autoMenu={autoMenu}
-          foldAnswered={foldAnswered}
         />
       </Box>
     </FileLinkProvider>
@@ -369,7 +348,6 @@ function ChatLog({
   logTop?: ReactNode
   logTail?: ReactNode
   tabsMenu?: ReactNode
-  foldAnswered?: boolean
 }) {
   const conn = useConnectionContext()
   const connected = useConnectionState(conn).connected
@@ -406,9 +384,7 @@ export function DesignChat({
   logTop,
   logTail,
   tabsMenu,
-  foldAnswered,
 }: {
-  foldAnswered?: boolean
   /** Entries after the Chat view's messages. */
   logTail?: ReactNode
   /** The ⋯ menu in the view tabs row (keyboard layout). */
@@ -465,7 +441,6 @@ export function DesignChat({
       logTop={logTop}
       logTail={logTail}
       tabsMenu={tabsMenu}
-      foldAnswered={foldAnswered}
     />
   )
 }

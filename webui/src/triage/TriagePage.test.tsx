@@ -317,7 +317,10 @@ test("history lists past Triages in the order sent, read-only, with epic links",
     ready_epic: "gx:ready-1",
     groups: [
       { action: "ready", items: [{ address: "gx:follow-ups/1", title: "a" }] },
-      { action: "backlog", items: [{ address: "gx:follow-ups/2", title: "b", target: "gx:map-a/3" }] },
+      {
+        action: "backlog",
+        items: [{ address: "gx:follow-ups/2", title: "b", target: "gx:map-a/3" }],
+      },
       { action: "close", items: [{ address: "gx:follow-ups/4", title: "c" }] },
     ],
   }
@@ -383,7 +386,7 @@ test("a done Triage with a ready epic puts the Queue button on the ready line, n
   expect(screen.queryByRole("button", { name: "Continue" })).toBeNull()
 })
 
-test("a printed round shows the answered cards folded, the open card, the round header and the composer", async () => {
+test("a printed round opens in the design flow's Questions tab with the question sheet, the round header and the composer", async () => {
   const cards = [1, 2, 3, 4, 5].map((n) => ({
     label: String(n),
     title: `Title ${n}`,
@@ -420,33 +423,23 @@ test("a printed round shows the answered cards folded, the open card, the round 
       } as never,
     }),
   } as RouteFetchers)
-  // A pick moves the card on, so each of the three picks is Alpha on the next question.
+  // A pick moves the sheet on, so each of the three picks is Alpha on the next question.
   for (let n = 1; n <= 3; n++) {
-    await screen.findByText(`Question ${n} of 5`)
+    await screen.findByRole("button", { name: `Question ${n}`, current: "step" })
     fireEvent.click(screen.getByRole("button", { name: "Alpha" }))
   }
-  await waitFor(() =>
-    expect(document.querySelectorAll("[data-part=answered-question]").length).toBe(3),
-  )
-  expect(document.querySelector("[data-part=answered-question]")?.textContent).toContain(
-    "Q1 Title 1 → Alpha",
-  )
-  // The printed question lines are the card's source, not chat text.
-  expect(screen.getByText("I need your call on 5 things.")).toBeTruthy()
-  expect(screen.queryByText(/Body 1\?/)).toBeNull()
-  expect(screen.getByText("Question 4 of 5")).toBeTruthy()
-  expect(screen.getByText("Title 4")).toBeTruthy()
+  expect(await screen.findByRole("button", { name: "Questions (3 of 5)" })).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Chat" })).toBeTruthy()
+  expect(screen.getByText("3 of 5 answered")).toBeTruthy()
+  expect(screen.getByText("Q4 - Title 4")).toBeTruthy()
   expect(screen.getByText("Body 4?")).toBeTruthy()
-  expect(screen.getByRole("button", { name: "Add a note…" })).toBeTruthy()
   expect(screen.getByTestId("page-header-subtitle").textContent).toBe("Questions · round 1 of 3")
-  expect(screen.getAllByText("Round 1 of 3 · 3 of 5 answered").length).toBeGreaterThan(0)
-  const note = screen.getByRole("button", { name: "Note" }) as HTMLButtonElement
-  expect(note.disabled).toBe(false)
-  fireEvent.click(note)
-  expect(await screen.findByPlaceholderText("A note on this round")).toBeTruthy()
+  // The Chat tab shows the agent's message as printed.
+  fireEvent.click(screen.getByRole("button", { name: "Chat" }))
+  expect(await screen.findByText("I need your call on 5 things.")).toBeTruthy()
 })
 
-test("the final approval round reads Final question, drops the round label and has no Approve button", async () => {
+test("the final approval round drops the round label and has no Approve button", async () => {
   const final = {
     label: "1",
     title: "Write this plan?",
@@ -472,9 +465,7 @@ test("the final approval round reads Final question, drops the round label and h
       } as never,
     }),
   } as RouteFetchers)
-  expect(await screen.findByText("Final question")).toBeTruthy()
-  expect(screen.queryByText(/Question 1 of 1/)).toBeNull()
-  expect(screen.getByRole("button", { name: "Yes, write it" })).toBeTruthy()
+  expect(await screen.findByRole("button", { name: "Yes, write it" })).toBeTruthy()
   expect(screen.getByRole("button", { name: "No, keep talking" })).toBeTruthy()
   expect(screen.getByTestId("page-header-subtitle").textContent).toBe("Questions")
   expect(screen.queryByRole("button", { name: /Approve/ })).toBeNull()

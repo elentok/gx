@@ -224,8 +224,6 @@ function TriageBody({
         current={flowSession(FLOW, project, sessions)}
         actions={steppedActions}
         startLabel="Start"
-        foldAnswered
-        finalRound={finalCard}
         progressColumn
         stepRows={
           atWrite

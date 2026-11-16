@@ -139,13 +139,10 @@ function Entry({
   m,
   showTools,
   sessionId,
-  hideAsks,
 }: {
   m: SessionChatMessage
   showTools: boolean
   sessionId: string
-  /** Drops the `❓ Q1 ...` lines: the docked round card shows them. */
-  hideAsks?: boolean
 }) {
   if (m.kind === "compacted") return <Separator>Context compacted</Separator>
   if (m.kind === "interrupted") return <Separator>Turn interrupted</Separator>
@@ -196,34 +193,9 @@ function Entry({
     )
   }
   if (m.kind === "output") return <CommandOutput text={m.text} />
-  const text = hideAsks ? withoutAsks(m.text) : m.text
-  if (!text) return null
-  // The Triage chat (hideAsks) labels the agent's messages, as the mock does.
-  if (!hideAsks) return <Markdown fontSize="base">{text}</Markdown>
-  return (
-    <Box>
-      <Text
-        fontSize="11px"
-        textTransform="uppercase"
-        letterSpacing="0.08em"
-        color="text.dim"
-        mb="1"
-        lineHeight="1.2"
-      >
-        Triage agent
-      </Text>
-      <Markdown fontSize="base" color="text.muted">
-        {text}
-      </Markdown>
-    </Box>
-  )
+  if (!m.text) return null
+  return <Markdown fontSize="base">{m.text}</Markdown>
 }
-
-const withoutAsks = (text: string) =>
-  text
-    .split(/\n{2,}/)
-    .filter((part) => !part.startsWith("❓"))
-    .join("\n\n")
 
 // A run of tool calls, folded: the count in the summary, one line per call (shell commands, files) when opened.
 // The lines mount only once the run is opened: a closed <details> still keeps its children in the DOM, and a
@@ -405,7 +377,7 @@ export function WorkingRow({
 
 // The messages scroll alone. They open at the newest one and follow the content as it grows (a new message,
 // streamed text, a folded tool run, an image that loads) until the reader scrolls up.
-function ChatScroller({ children, top }: { children: ReactNode; top?: boolean }) {
+function ChatScroller({ children }: { children: ReactNode }) {
   const el = useRef<HTMLDivElement>(null)
   const inner = useRef<HTMLDivElement>(null)
   const stuck = useRef(true)
@@ -414,8 +386,7 @@ function ChatScroller({ children, top }: { children: ReactNode; top?: boolean })
   const lastTop = useRef(0)
   useLayoutEffect(() => {
     const pin = () => {
-      // A top chat starts at its first message: the docked card sits outside the scroller.
-      if (!el.current || !stuck.current || top) return
+      if (!el.current || !stuck.current) return
       el.current.scrollTop = el.current.scrollHeight
       lastTop.current = el.current.scrollTop
     }
@@ -425,7 +396,7 @@ function ChatScroller({ children, top }: { children: ReactNode; top?: boolean })
     const ro = new ResizeObserver(pin)
     ro.observe(inner.current)
     return () => ro.disconnect()
-  }, [top])
+  }, [])
   return (
     <Box
       ref={el}
@@ -448,7 +419,7 @@ function ChatScroller({ children, top }: { children: ReactNode; top?: boolean })
     >
       <Box ref={inner} flex="1 0 auto" display="flex" flexDirection="column" gap="3">
         {/* A short chat sits at the bottom, next to the composer; the spacer shrinks away once the chat scrolls. */}
-        {!top && <Box flex="1" aria-hidden />}
+        <Box flex="1" aria-hidden />
         {children}
       </Box>
     </Box>
@@ -520,11 +491,8 @@ export function ChatMessages({
   head,
   session,
   tail,
-  top,
 }: {
   chat: SessionChatResponse
-  /** A short chat sits at the top (the Triage page), not next to the composer. */
-  top?: boolean
   /** The first entry of the log, above the messages. */
   head?: ReactNode
   /** Its model-switch phase ends the log as one system line. */
@@ -562,7 +530,7 @@ export function ChatMessages({
   const hiddenCount = Math.max(0, messages.length - limit)
   const shownMessages = hiddenCount > 0 ? messages.slice(hiddenCount) : messages
   return (
-    <ChatScroller key={windowKey} top={top}>
+    <ChatScroller key={windowKey}>
       {head}
       {messages.length === 0 && (
         <CodexNotices
@@ -587,13 +555,7 @@ export function ChatMessages({
         </Box>
       )}
       {shownMessages.map((m, i) => (
-        <Entry
-          key={m.id || hiddenCount + i}
-          m={m}
-          showTools={showTools}
-          sessionId={sessionId}
-          hideAsks={top}
-        />
+        <Entry key={m.id || hiddenCount + i} m={m} showTools={showTools} sessionId={sessionId} />
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
       {tail}
