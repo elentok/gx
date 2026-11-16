@@ -73,23 +73,26 @@ type Designs struct {
 
 // New builds Designs from d.
 func New(d Deps) *Designs {
-	ds := drafts.New(d.StateDir)
-	if err := ds.MigrateNames(); err != nil && d.Log != nil {
-		d.Log.Warn("design drafts: name migration failed", "err", err)
-	}
-	s := &Designs{
+	return &Designs{
 		log: d.Log, ticketStore: d.TicketStore, conversationsDir: d.ConversationsDir,
 		idx: d.Idx, projects: d.Projects, events: d.Events, guards: d.Guards,
 		chat: d.Chat, webURL: d.WebURL, workspaces: d.Workspaces,
 		onBranch: d.OnBranch,
-		drafts:   ds,
+		drafts:   drafts.New(d.StateDir),
 	}
-	removed, err := ds.SweepEmpty()
-	if err != nil && d.Log != nil {
-		d.Log.Warn("design drafts: sweep failed", "err", err)
+}
+
+// Startup migrates draft names, sweeps empty drafts and drops their workspace
+// membership. The server calls it once at start; New deletes nothing.
+func (s *Designs) Startup() {
+	if err := s.drafts.MigrateNames(); err != nil && s.log != nil {
+		s.log.Warn("design drafts: name migration failed", "err", err)
+	}
+	removed, err := s.drafts.SweepEmpty()
+	if err != nil && s.log != nil {
+		s.log.Warn("design drafts: sweep failed", "err", err)
 	}
 	s.dropDrafts(removed...)
-	return s
 }
 
 // DraftExists reports whether a New Design draft with this id is stored.
@@ -113,13 +116,13 @@ func (s *Designs) dropDrafts(ids ...string) {
 			}
 		}
 	}
-	s.publishDrafts()
+	publishDrafts(s.events)
 }
 
 // publishDrafts announces that the draft rows changed.
-func (s *Designs) publishDrafts() {
-	if s.events != nil {
-		s.events.Publish(wire.EventDesignDraftsChanged, "")
+func publishDrafts(events *broker.Broker) {
+	if events != nil {
+		events.Publish(wire.EventDesignDraftsChanged, "")
 	}
 }
 

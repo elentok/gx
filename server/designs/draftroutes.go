@@ -56,7 +56,7 @@ func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
 				removed, err = s.drafts.SweepEmpty(d.ID)
 				s.dropDrafts(removed...)
 				if len(removed) == 0 { // a sweep that removed drafts already announced the change
-					s.publishDrafts()
+					publishDrafts(s.events)
 				}
 			}
 		}
@@ -66,7 +66,7 @@ func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
 		res = s.withStarted(res, req.ID)
 		// The label, not the text: typing past the fifth word changes no row.
 		if err == nil && getErr == nil && res.Draft != nil && res.Draft.Label != before.Label {
-			s.publishDrafts()
+			publishDrafts(s.events)
 		}
 	}
 	if err != nil {
@@ -118,7 +118,7 @@ func (s *Designs) draftTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if getErr == nil && res.Draft != nil && (before.Slug != res.Draft.Slug || before.Project != res.Draft.Project) {
-		s.publishDrafts()
+		publishDrafts(s.events)
 	}
 	wire.WriteJSON(w, res)
 }

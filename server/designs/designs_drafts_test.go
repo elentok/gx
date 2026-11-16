@@ -430,7 +430,7 @@ func TestWebDesignDrafts_NameMigrationRunsAtStart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	designs.New(designs.Deps{StateDir: state})
+	designs.New(designs.Deps{StateDir: state}).Startup()
 
 	got, err := drafts.New(state).Get(d.ID)
 	if err != nil || got.Slug != "my-cool-idea" {
@@ -530,7 +530,7 @@ func TestWebDesignDrafts_SweepOnCreateAndRestart(t *testing.T) {
 	}
 
 	// A restart has no live lease: the empty drafts go, the others stay.
-	designs.New(designs.Deps{StateDir: f.h.StateDir})
+	designs.New(designs.Deps{StateDir: f.h.StateDir}).Startup()
 	store := drafts.New(f.h.StateDir)
 	for _, id := range []string{leased.ID, created.Draft.ID} {
 		if _, err := store.Get(id); err != drafts.ErrNotFound {
@@ -554,9 +554,22 @@ func TestWebDesignDrafts_RestartSweepKeepsAMigratedNameOnlyDraft(t *testing.T) {
 	if err := os.WriteFile(rec, []byte(old), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	designs.New(designs.Deps{StateDir: state})
+	designs.New(designs.Deps{StateDir: state}).Startup()
 	if got, err := drafts.New(state).Get(d.ID); err != nil || got.Slug != "named" {
 		t.Fatalf("name-only draft after start = %+v, %v; want it kept with its slug", got, err)
+	}
+}
+
+func TestDesignsNew_DeletesNothing(t *testing.T) {
+	t.Parallel()
+	state := t.TempDir()
+	d, err := drafts.New(state).Create("proj", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	designs.New(designs.Deps{StateDir: state})
+	if _, err := drafts.New(state).Get(d.ID); err != nil {
+		t.Fatalf("empty draft after New alone: %v, want kept", err)
 	}
 }
 
