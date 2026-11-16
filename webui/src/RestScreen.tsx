@@ -7,13 +7,13 @@ import { isUnlockSentence, postRestUnlock, useRestState } from "./rest"
 // Above the modal token (1400) and the toast layer, so no sheet or modal shows over it.
 const REST_Z_INDEX = 2000
 
-// The screen is always dark, whatever theme the person chose.
-const PAGE = "#0a0d11"
-const FG = "#e6edf3"
-const DIM = "#8b98a5"
-const ACCENT = "#4da3ff"
+// Colors are the dark-only rest.* theme tokens.
+const PAGE = "rest.page"
+const FG = "rest.fg"
+const DIM = "rest.dim"
+const ACCENT = "rest.accent"
 
-const MASK = "radial-gradient(circle at center, #000 52%, transparent 71%)"
+const MASK = "radial-gradient(circle at center, black 52%, transparent 71%)"
 
 // Everything else in the body goes inert, which covers the app and any modal portalled to the body.
 function useInertPage(screen: HTMLElement | null) {
@@ -67,7 +67,7 @@ function TimeBlock({
       <Text
         data-part="time"
         m="6px 0"
-        fontFamily="ui-monospace, monospace"
+        fontFamily="mono"
         fontWeight="700"
         fontSize={big ? "56px" : "40px"}
         letterSpacing={big ? "2px" : undefined}
@@ -219,8 +219,8 @@ function UnlockSection({
             value={text}
             onChange={(e) => setText(e.target.value)}
             autoFocus
-            bg="#0d1117"
-            borderColor="#30363d"
+            bg="rest.input.bg"
+            borderColor="rest.input.border"
             borderRadius="6px"
             color={FG}
             h="auto"
@@ -229,7 +229,7 @@ function UnlockSection({
             textAlign="left"
           />
           {refusal && (
-            <Text role="alert" color="#ff7b72" fontSize="12px" m="6px 0 0">
+            <Text role="alert" color="rest.error" fontSize="12px" m="6px 0 0">
               {refusal}
             </Text>
           )}
@@ -237,10 +237,10 @@ function UnlockSection({
             mt="8px"
             onClick={submit}
             disabled={!enabled || busy}
-            bg={enabled ? "#b4472f" : "#222a33"}
-            color={enabled ? "#fff" : DIM}
+            bg={enabled ? "rest.unlock.bg" : "rest.unlock.offBg"}
+            color={enabled ? "rest.unlock.fg" : DIM}
             border="1px solid"
-            borderColor={enabled ? "#b4472f" : "#30363d"}
+            borderColor={enabled ? "rest.unlock.bg" : "rest.input.border"}
             borderRadius="6px"
             h="auto"
             p="7px 12px"

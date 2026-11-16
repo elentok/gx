@@ -124,6 +124,20 @@ export const themeConfig = defineConfig({
         tone: toneTokens,
         kind: kindTokens,
         chat: { value: "#ec6fa8" },
+        // The Rest screen is always dark, whatever theme the person chose.
+        rest: {
+          page: { value: "#0a0d11" },
+          fg: { value: "#e6edf3" },
+          dim: { value: "#8b98a5" },
+          accent: { value: "#4da3ff" },
+          error: { value: "#ff7b72" },
+          input: { bg: { value: "#0d1117" }, border: { value: "#30363d" } },
+          unlock: {
+            bg: { value: "#b4472f" },
+            fg: { value: "#ffffff" },
+            offBg: { value: "#222a33" },
+          },
+        },
         // Day-chart series: Claude blue, Codex purple, then the group colors. Not the harness
         // colors, which are orange and green.
         chart: {
