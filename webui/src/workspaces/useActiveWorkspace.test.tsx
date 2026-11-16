@@ -84,6 +84,8 @@ test("a workspaces-changed refresh that removes the active workspace drops to De
 
 test("picking a workspace stores it", async () => {
   setup([MAIN, SIDE])
+  // Cause: the text reads "Main" on the commit before the persist effect has stored it and marked the route applied; a click in that gap is overwritten by that effect.
+  await waitFor(() => expect(localStorage.getItem(ACTIVE_KEY)).toBe("Main"))
   await waitFor(() => expect(screen.getByTestId("active").textContent).toBe("Main"))
 
   act(() => screen.getByText("pick").click())
