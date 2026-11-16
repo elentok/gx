@@ -46,9 +46,16 @@ function LimitBurnCard({
       title={title}
       days={days}
       partial={partial}
-      headline={`${points(burn.sum)} pts`}
-      small={`${points(burn.average)} pts/day${partial ? ` · ${startLabel(burn.start_day!)}` : ""}`}
-      series={[{ key: "burn", label: "Burn", tone: "muted", color, values }]}
+      headline={
+        <>
+          {points(burn.sum)}{" "}
+          <Text as="span" fontSize="xs" fontWeight="normal" color="text.muted">
+            quota percentage points
+          </Text>
+        </>
+      }
+      small={`${points(burn.average)} quota percentage points/day${partial ? ` · ${startLabel(burn.start_day!)}` : ""}`}
+      series={[{ key: "burn", label: "Quota percentage points", tone: "muted", color, values }]}
       dayNotes={dayNotes}
       hideLegend
       footer={
@@ -63,7 +70,9 @@ function LimitBurnCard({
               color="text.muted"
             >
               {showPace ? (
-                <span>7-day average: {points(burn.forecast!.pace)} points a day</span>
+                <span>
+                  7-day average: {points(burn.forecast!.pace)} quota percentage points a day
+                </span>
               ) : (
                 <span />
               )}

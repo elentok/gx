@@ -57,8 +57,8 @@ test("renders four cards with sum headline and daily average", () => {
   ])
     expect(screen.getByText(t)).toBeTruthy()
   const text = card("Codex weekly burn").textContent
-  expect(text).toContain("72 pts")
-  expect(text).toContain("9 pts/day")
+  expect(text).toContain("72 quota percentage points")
+  expect(text).toContain("9 quota percentage points/day")
 })
 
 test("the burn cards have no legend row", () => {
@@ -69,7 +69,7 @@ test("the burn cards have no legend row", () => {
 test("weekly cards show the 7-day pace line and the forecast", () => {
   render(burns())
   const text = card("Claude weekly burn").textContent
-  expect(text).toContain("7-day average: 9 points a day")
+  expect(text).toContain("7-day average: 9 quota percentage points a day")
   expect(text).toContain("~72% at reset")
 })
 
