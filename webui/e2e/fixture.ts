@@ -250,7 +250,8 @@ async function startFixture(
     process.env.GX_E2E_GXFIXTURE!,
     [
       "--gx",
-      process.env.GX_E2E_GX!,
+      // The scenarios that read the real process table need the cgo build (see global-setup.ts).
+      /-(storm|burst)$/.test(scenario) ? process.env.GX_E2E_GX_CGO! : process.env.GX_E2E_GX!,
       "--fakeclaude",
       process.env.GX_E2E_FAKECLAUDE!,
       ...(fakecodex ? ["--fakecodex", process.env.GX_E2E_FAKECODEX!] : ["--hide-codex"]),

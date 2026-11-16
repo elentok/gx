@@ -47,17 +47,31 @@ export default function globalSetup() {
   // One fixed dir per worktree, overwritten each run, so nothing leaks into $TMPDIR.
   const dir = join(webuiDir, ".e2e-bin")
   mkdirSync(dir, { recursive: true })
-  const build = (out: string, pkg: string, tags: string[] = [], ldflags: string[] = []) => {
+  const build = (
+    out: string,
+    pkg: string,
+    tags: string[] = [],
+    ldflags: string[] = [],
+    cgo = "0",
+  ) => {
     const path = join(dir, out)
     // Without cgo fsnotify watches with kqueue: the cgo FSEvents watcher misses events on some test machines.
     execFileSync("go", ["build", ...tags, ...ldflags, "-o", path, pkg], {
       cwd: repoRoot,
       stdio: "inherit",
-      env: { ...process.env, CGO_ENABLED: "0" },
+      env: { ...process.env, CGO_ENABLED: cgo },
     })
     return path
   }
   process.env.GX_E2E_GX = build("gx", "github.com/elentok/gx", ["-tags", "gxfixture"])
+  // macOS reads the process table through cgo only, so the storm watchdog is blind in the build above.
+  process.env.GX_E2E_GX_CGO = build(
+    "gx-cgo",
+    "github.com/elentok/gx",
+    ["-tags", "gxfixture"],
+    [],
+    "1",
+  )
   // A second build with another version: the restart flows land on it to show a new build.
   process.env.GX_E2E_GX_NEXT = build(
     "gx-next",
