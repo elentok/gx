@@ -10,3 +10,7 @@ and candidates, so check them before drafting. Never write them from recall.
 3. If a constraint (for example "do not export X") could make the goal unreachable, because the
    large files are all methods on or users of X, put the export decision in the ticket, or ask the
    person while authoring. Never leave it for the implementer to find out.
+
+A prefactor ticket is also the fix when more than about 3 tickets add entries to one registry file
+(see "Explore the codebase" in [SKILL.md](SKILL.md)). It splits the registration so each ticket
+edits its own file.

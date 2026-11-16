@@ -10,6 +10,18 @@ func TestImplementNoConfirmationOfOwnRecommendationAnchors(t *testing.T) {
 	)
 }
 
+func TestToTicketsSharedRegistryFileAnchors(t *testing.T) {
+	checkAnchors(t, "gx-to-tickets/SKILL.md",
+		"add entries to one registry file",
+		"chain those tickets with `blocked_by`",
+		"longer than about 3, add a prefactor ticket",
+		"(prefactor-tickets.md)",
+	)
+	checkAnchors(t, "gx-to-tickets/prefactor-tickets.md",
+		"more than about 3 tickets add entries to one registry file",
+	)
+}
+
 func TestImplementDiffCheckAnchors(t *testing.T) {
 	checkAnchors(t, "gx-implement/SKILL.md",
 		"## Check the diff against the ticket",

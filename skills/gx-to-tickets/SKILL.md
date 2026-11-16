@@ -90,15 +90,13 @@ Triage publishes into the epic it already made).
 
 If you have not already explored the codebase, do so to understand the current state of the code.
 Ticket titles and descriptions should use the project's domain glossary vocabulary, and respect ADRs
-in the area you're touching.
+in the area you're touching. Use no separate explore or draft subagent: you write the plan, and the writers (step 4d) explore.
 
-Use no separate explore or draft subagent: you write the plan, and the writers (step 4d) explore.
-
-Look for opportunities to prefactor the code to make the implementation easier. "Make the change
-easy, then make the easy change."
-
-If a ticket will move code out of a package or free N lines or files (a prefactor or make-room
-ticket), read [prefactor-tickets.md](prefactor-tickets.md) before drafting it.
+Look for opportunities to prefactor the code: "Make the change easy, then make the easy change."
+If a ticket will move code out of a package or free N lines or files, read
+[prefactor-tickets.md](prefactor-tickets.md) before drafting it. Tickets that add entries to one registry file (for example `testutil/gxfixture/catalog/scenarios.go`)
+conflict at cherry-pick. Name that file in each ticket and chain those tickets with `blocked_by`. If
+the chain would be longer than about 3, add a prefactor ticket first that splits the registration.
 
 ### 3. Draft vertical slices
 
