@@ -221,23 +221,22 @@ func planPublish(epicPath, manifestPath, commit string, allowCheckMisses bool, e
 			}
 			t.BlockedBy = append(t.BlockedBy, schema.TicketID(ref))
 		}
-		origins := []string{address.String()}
 		var from []string
-		if len(e.From) > 0 {
-			origins = origins[:0]
-			for _, raw := range e.From {
-				canon, err := resolve(raw)
-				if err != nil {
-					fromErrs = append(fromErrs, fmt.Errorf("%s: %w", e.Slug, err))
-					continue
-				}
-				if _, seen := plan.Promoted[canon]; !seen {
-					plan.PromotedOrder = append(plan.PromotedOrder, canon)
-				}
-				plan.Promoted[canon] = append(plan.Promoted[canon], address.String())
-				origins = append(origins, canon)
-				from = append(from, canon)
+		for _, raw := range e.From {
+			canon, err := resolve(raw)
+			if err != nil {
+				fromErrs = append(fromErrs, fmt.Errorf("%s: %w", e.Slug, err))
+				continue
 			}
+			if _, seen := plan.Promoted[canon]; !seen {
+				plan.PromotedOrder = append(plan.PromotedOrder, canon)
+			}
+			plan.Promoted[canon] = append(plan.Promoted[canon], address.String())
+			from = append(from, canon)
+		}
+		origins := from
+		if len(e.From) == 0 {
+			origins = []string{address.String()}
 		}
 		t.StampCreated(now, origins...)
 		rendered := ticketspec.RenderManifestBody(e.Body, bodyIDs)
@@ -304,20 +303,21 @@ func (d Deps) fileWriter() func(string, []byte, os.FileMode) error {
 // the end. Any failure removes what this run wrote (and the epic, if it created
 // it), so a retry assigns the same IDs.
 func runTicketsPublish(d Deps, epicArg, manifestPath string, dryRun, jsonOut, allowClaimMisses, allowCheckMisses bool, w io.Writer) error {
-	plan, err := d.publishTickets(epicArg, manifestPath, dryRun, jsonOut, allowClaimMisses, allowCheckMisses, w)
-	if err != nil || plan == nil {
+	archive, err := d.publishTickets(epicArg, manifestPath, dryRun, jsonOut, allowClaimMisses, allowCheckMisses, w)
+	if err != nil || archive == nil {
 		return err
 	}
 	// Follow-ups are archived after publishTickets returns, so its rollback and
 	// epic lock are gone: a failure here leaves the tickets in place. The archive
 	// only touches the follow-ups epic, so running it unlocked is safe.
-	return d.archivePromoted(plan)
+	return archive()
 }
 
-// publishTickets does the whole publish up to printing the table. It returns a
-// nil plan for a dry run, which writes nothing. The plan is a local, not a named
-// result: a bare `return nil, err` would clear it before the rollback defers run.
-func (d Deps) publishTickets(epicArg, manifestPath string, dryRun, jsonOut, allowClaimMisses, allowCheckMisses bool, w io.Writer) (_ *publishPlan, err error) {
+// publishTickets does the whole publish up to printing the table. It returns
+// the step that archives the promoted follow-ups, or nil for a dry run, which
+// writes nothing. The plan is a local, not a named result: a bare
+// `return nil, err` would clear it before the rollback defers run.
+func (d Deps) publishTickets(epicArg, manifestPath string, dryRun, jsonOut, allowClaimMisses, allowCheckMisses bool, w io.Writer) (_ func() error, err error) {
 	cwd, err := d.Getwd()
 	if err != nil {
 		return nil, err
@@ -422,7 +422,7 @@ func (d Deps) publishTickets(epicArg, manifestPath string, dryRun, jsonOut, allo
 	if err = printPublished(w, plan.rows(), jsonOut); err != nil {
 		return nil, err
 	}
-	return plan, nil
+	return func() error { return d.archivePromoted(plan) }, nil
 }
 
 // archivePromoted closes each follow-up the plan promoted as `promoted`, noting

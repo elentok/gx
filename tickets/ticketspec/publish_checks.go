@@ -37,9 +37,9 @@ var (
 
 // GroupCriteriaMisses returns one miss per member of from that has no
 // "### From <address>" group with a checkbox under "## Acceptance criteria".
-// A list of fewer than two members is not a group and has no misses. canon
-// maps an address to its canonical form; members and headings are compared
-// after it, so a short heading matches a canonical member.
+// A list of fewer than two members is not a group and has no misses. from must
+// already be canonical; canon maps a heading address to its canonical form, so
+// a short heading matches a canonical member.
 func GroupCriteriaMisses(from []string, body string, canon func(string) string) []string {
 	if len(from) < 2 {
 		return nil
@@ -59,10 +59,10 @@ func GroupCriteriaMisses(from []string, body string, canon func(string) string) 
 	}
 	var misses []string
 	for _, member := range from {
-		switch c := canon(member); {
-		case !hasHeading[c]:
+		switch {
+		case !hasHeading[member]:
 			misses = append(misses, fmt.Sprintf("no `### From %s` group under ## Acceptance criteria", member))
-		case !hasItem[c]:
+		case !hasItem[member]:
 			misses = append(misses, fmt.Sprintf("`### From %s` group has no `- [ ]` item", member))
 		}
 	}

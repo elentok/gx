@@ -587,6 +587,38 @@ func TestPublishDoesNotCloseFollowUpsOnDryRunOrWithoutPromotions(t *testing.T) {
 	})
 }
 
+func TestPublishTicketsReturnsArchiveStepOnlyForRealRun(t *testing.T) {
+	var closed []string
+	run := func(dryRun bool) func() error {
+		d, _, manifest := promoteFixture(t, "follow-ups/01", "")
+		d.CloseFollowUp = func(addr, reason, note string, w io.Writer) error {
+			closed = append(closed, addr)
+			return nil
+		}
+		archive, err := d.publishTickets("mine:e", manifest, dryRun, false, false, false, io.Discard)
+		if err != nil {
+			t.Fatalf("publishTickets(dryRun=%v): %v", dryRun, err)
+		}
+		return archive
+	}
+	if run(true) != nil {
+		t.Error("dry run returned an archive function")
+	}
+	archive := run(false)
+	if archive == nil {
+		t.Fatal("real run returned no archive function")
+	}
+	if len(closed) != 0 {
+		t.Fatalf("closed %v before archive ran", closed)
+	}
+	if err := archive(); err != nil {
+		t.Fatal(err)
+	}
+	if len(closed) != 1 || closed[0] != "mine:follow-ups/01" {
+		t.Errorf("closed = %v, want [mine:follow-ups/01]", closed)
+	}
+}
+
 func TestPublishSecondRunSameDayJoinsExistingEpic(t *testing.T) {
 	d, project, manifest := promoteFixture(t, "follow-ups/01", "follow-ups/02")
 	epic := "mine:follow-ups-2026-11-12"
