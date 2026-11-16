@@ -1,4 +1,5 @@
 import { Box, Text, chakra } from "@chakra-ui/react"
+import { useDevice } from "../useWide"
 import type { TriageHistoryItem, TriageResult } from "../generated/server"
 
 // The result groups' actions, with the word each count carries.
@@ -40,38 +41,35 @@ const epicLink = (epic: string, label: string) => (
 
 /** The past Triages, read-only and newest first (the server sends them in that order). */
 export function TriageHistory({ items }: { items: TriageHistoryItem[] }) {
-  if (items.length === 0) return null
+  const phone = useDevice() === "phone"
+  if (items.length === 0 || phone) return null
   return (
     <Box
       as="section"
       aria-label="Past Triages"
       display="flex"
       flexDirection="column"
-      gap="2"
+      gap="3"
       fontSize="sm"
+      p="4"
     >
       <Text fontWeight="semibold">Past Triages</Text>
       <Box as="ul" listStyleType="none" display="flex" flexDirection="column" gap="2">
         {items.map((item) => (
-          <Box
-            as="li"
-            key={item.id}
-            data-history-item={item.id}
-            display="flex"
-            flexWrap="wrap"
-            alignItems="center"
-            columnGap="3"
-            rowGap="1"
-          >
-            <time dateTime={item.started_at}>{new Date(item.started_at).toLocaleString()}</time>
-            <Text as="span" color="text.dim">
-              {countsLine(item.result)}
-            </Text>
-            <Text as="span" fontWeight="medium">
-              {item.state}
-            </Text>
-            {item.result.ready_epic && epicLink(item.result.ready_epic, "ready epic")}
-            {mapEpics(item.result).map((epic) => epicLink(epic, "map epic"))}
+          <Box as="li" key={item.id} data-history-item={item.id}>
+            <details>
+              <summary style={{ cursor: "pointer" }}>
+                <time dateTime={item.started_at}>{new Date(item.started_at).toLocaleString()}</time>{" "}
+                <Text as="span" fontWeight="medium">
+                  {item.state}
+                </Text>
+              </summary>
+              <Box display="flex" flexDirection="column" gap="1" pt="2" pb="1" pl="4">
+                <Text color="text.dim">{countsLine(item.result)}</Text>
+                {item.result.ready_epic && epicLink(item.result.ready_epic, "ready epic")}
+                {mapEpics(item.result).map((epic) => epicLink(epic, "map epic"))}
+              </Box>
+            </details>
           </Box>
         ))}
       </Box>
