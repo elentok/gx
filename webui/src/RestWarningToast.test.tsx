@@ -4,11 +4,11 @@ import { ConnectionContext, type Connection, type ConnectionState } from "./conn
 import type { RestWarning } from "./generated/server"
 import { RestWarningToast } from "./RestWarningToast"
 import { renderThemed } from "./ui/render"
-import { toaster } from "./ui/toaster"
+import { topToaster } from "./ui/toaster"
 
 afterEach(() => {
   cleanup()
-  toaster.remove()
+  topToaster.remove()
 })
 
 // UTC instants, so the expected text never depends on the zone of the test process.
@@ -60,7 +60,7 @@ test("break warning shows start and length from the snapshot", async () => {
   setup(brk(14, 55))
   expect(await screen.findByText("Break in 2 minutes")).toBeTruthy()
   expect(screen.getByText("Your Break starts at 14:55 and lasts 5 minutes.")).toBeTruthy()
-  expect(toaster.getVisibleToasts()[0]?.duration).toBe(Infinity)
+  expect(topToaster.getVisibleToasts()[0]?.duration).toBe(Infinity)
 })
 
 test("bedtime warning text", async () => {
@@ -69,19 +69,18 @@ test("bedtime warning text", async () => {
   expect(screen.getByText("Wrap up what you are doing.")).toBeTruthy()
 })
 
-// The runtime toast carries `placement`; the public type omits it.
-const placementOfFirst = () =>
-  (toaster.getVisibleToasts()[0] as { placement?: string } | undefined)?.placement
+// The rendered group is what the browser positions, so read it, not the toast object.
+const groupOf = (el: HTMLElement) => el.closest<HTMLElement>('[data-part="group"]')
 
-test("break and bedtime warnings sit top-right", async () => {
+test("break and bedtime warnings render in the top-right group", async () => {
   setup(brk(14, 55))
-  await screen.findByText("Break in 2 minutes")
-  expect(placementOfFirst()).toBe("top-end")
+  const title = await screen.findByText("Break in 2 minutes")
+  expect(groupOf(title)?.dataset.placement).toBe("top-end")
   cleanup()
-  toaster.remove()
+  topToaster.remove()
   setup({ kind: "bedtime", start: at(22, 0) }, 10)
-  await screen.findByText("Bedtime starts at 22:00 (in 10 minutes)")
-  expect(placementOfFirst()).toBe("top-end")
+  const bedtime = await screen.findByText("Bedtime starts at 22:00 (in 10 minutes)")
+  expect(groupOf(bedtime)?.dataset.placement).toBe("top-end")
 })
 
 test("clock time prints in the snapshot zone, not the browser zone", async () => {
@@ -104,25 +103,25 @@ test("moved start updates the toast in place", async () => {
   await screen.findByText("Break in 2 minutes")
   set(brk(14, 56))
   expect(await screen.findByText("Your Break starts at 14:56 and lasts 5 minutes.")).toBeTruthy()
-  expect(toaster.getVisibleToasts()).toHaveLength(1)
+  expect(topToaster.getVisibleToasts()).toHaveLength(1)
 })
 
 test("warning leaving the snapshot removes the toast; none without a warning", async () => {
   const set = setup(brk(14, 55))
   await screen.findByText("Break in 2 minutes")
   set(undefined)
-  await waitFor(() => expect(toaster.getVisibleToasts()).toHaveLength(0))
+  await waitFor(() => expect(topToaster.getVisibleToasts()).toHaveLength(0))
 })
 
 test("no warning, no toast", () => {
   setup()
-  expect(toaster.getVisibleToasts()).toHaveLength(0)
+  expect(topToaster.getVisibleToasts()).toHaveLength(0)
 })
 
 test("a closed toast stays closed until a new warning", async () => {
   const set = setup(brk(14, 55))
   await screen.findByText("Break in 2 minutes")
-  act(() => toaster.dismiss(toaster.getVisibleToasts()[0]!.id))
+  act(() => topToaster.dismiss(topToaster.getVisibleToasts()[0]!.id))
   await waitFor(() => expect(screen.queryByText("Break in 2 minutes")).toBeNull())
 
   set(brk(14, 56))

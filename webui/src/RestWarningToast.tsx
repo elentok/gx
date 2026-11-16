@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 import { RestKindBedtime } from "./generated/server"
 import { useRestState } from "./rest"
-import { showToast, toaster } from "./ui/toaster"
+import { showToast, topToaster } from "./ui/toaster"
 
 const toastId = (kind: string) => `rest-warning-${kind}`
 
@@ -37,7 +37,7 @@ export function RestWarningToast() {
   const active = useRef<string | undefined>(undefined)
 
   useEffect(() => {
-    if (active.current && active.current !== kind) toaster.remove(toastId(active.current))
+    if (active.current && active.current !== kind) topToaster.remove(toastId(active.current))
     if (active.current !== kind) closed.current = false
     active.current = kind
     if (!kind || !start || lead === undefined || closed.current) return
