@@ -170,7 +170,7 @@ Conversation and page (stories 12 to 23, 26 to 26)
 - Flow: 199. Triage journey on shapes `verify`, `route`, `questions` and `final-approval`: Progress lists the five steps; the summary card appears after Route; a typed correction changes the summary lines; the round header reads "Round 1 of 3"; auto-advance chains Verify to Route and waits at Questions; the idle session is still alive at Questions.
 - Phone: 199 part at 390 px has no sideways scroll, the step line opens the steps sheet; flow 24 (Phone, Design page) still passes.
 - CLI: `gx tickets triage show` after a session kill reports the open round, and a new session reprints it and asks nothing answered. Approve with a stale revision is refused and a second approve is refused as "already approved". Go test of both.
-- Terminal: the skill, run in a plain session against the fixture, prints the same summary and cards as text and writes on yes (walked by hand, no new flow).
+- Terminal: the fixture's fake agent does not read the skill, so no flow replays a terminal session. Two kinds of check stand in for it. The Go tests in `skills/triage_rules_test.go` (`TestTriageSkillAnchors` and the others) pin the skill text. CLI checks on the `final-approval` shape cover the verbs: `gx agent link --triage demo` refuses outside a session, `gx tickets triage show` reports the step and revision, an approve with a stale revision is refused, and a second approve is refused as "already approved".
 - Mock states: b-verify-desktop, b-verify-phone, b-route-desktop, b-route-phone, b-questions-desktop, b-questions-phone, b-approve-desktop, b-approve-phone.
 
 Follow-ups card and badge (stories 24 to 25, 27 to 27)
