@@ -129,8 +129,10 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 		return cleanupscan.ScanEpic(a.d.TicketStore, repo, name)
 	}
 
-	base, asImpl := a.resolveBase(project, epic)
-	halves, onTrunk, err := a.checkArchivable(project, dir, base, scan)
+	base, asImpl, halves := resolveHalves(project, epic,
+		func(d string) bool { return a.d.DesignExists(project + ":" + d) },
+		func(impl string) bool { _, err := os.Stat(filepath.Join(dir, impl)); return err == nil })
+	halves, onTrunk, err := a.checkArchivable(project, dir, halves, scan)
 	if r, ok := errors.AsType[refusal](err); ok {
 		return refuse(r.reason, r.Error())
 	}
@@ -167,12 +169,19 @@ func (a *Archive) one(target string, yes, dryRun bool) (wire.TargetResult, error
 	return out, nil
 }
 
-// resolveBase maps a target given as the -impl address onto its Design's row.
-func (a *Archive) resolveBase(project, epic string) (base string, asImpl bool) {
-	if d, ok := strings.CutSuffix(epic, tickets.ImplEpicSuffix); ok && a.d.DesignExists(project+":"+d) {
-		return d, true
+// resolveHalves maps a target given as the -impl address onto its Design's row
+// and lists the row's halves: the base, then its -impl epic when the base is a
+// Design that has one. The caller says what a Design and an -impl epic are on its side.
+func resolveHalves(project, epic string, isDesign, hasImpl func(name string) bool) (base string, asImpl bool, halves []half) {
+	base = epic
+	if d, ok := strings.CutSuffix(epic, tickets.ImplEpicSuffix); ok && isDesign(d) {
+		base, asImpl = d, true
 	}
-	return epic, false
+	halves = []half{{epic: base, key: project + ":" + base}}
+	if impl := base + tickets.ImplEpicSuffix; isDesign(base) && hasImpl(impl) {
+		halves = append(halves, half{epic: impl, key: project + ":" + impl})
+	}
+	return base, asImpl, halves
 }
 
 // newAddress is the row's address after a rename, or "" when the name is kept.
@@ -201,10 +210,10 @@ func writeFailed(target, newAddr string, err error) (wire.TargetResult, error) {
 	return wire.TargetResult{}, err
 }
 
-// checkArchivable applies the refusal rules to base's row and returns its
-// halves and whether its merge is on trunk. A refusal comes back as a refusal error.
-func (a *Archive) checkArchivable(project, dir, base string, scan func(string) (*cleanupscan.EpicScan, error)) ([]half, bool, error) {
-	halves := []half{{epic: base, key: project + ":" + base}}
+// checkArchivable applies the refusal rules to the row of halves[0] and returns
+// its halves and whether its merge is on trunk. A refusal comes back as a refusal error.
+func (a *Archive) checkArchivable(project, dir string, halves []half, scan func(string) (*cleanupscan.EpicScan, error)) ([]half, bool, error) {
+	base := halves[0].epic
 	queued := func(key, reason, msg string) error {
 		if a.d.RootQueued(key) {
 			return refusal{reason, errors.New(msg)}
@@ -228,8 +237,7 @@ func (a *Archive) checkArchivable(project, dir, base string, scan func(string) (
 		return halves, row.MergedToTrunk, nil
 	}
 	impl := base + tickets.ImplEpicSuffix
-	_, statErr := os.Stat(filepath.Join(dir, impl))
-	hasImpl := statErr == nil
+	hasImpl := len(halves) > 1
 	baseMD := tickets.LoadEpicTicketMD(filepath.Join(dir, base))
 	// A stamped completed_at archives at any step: an emptied charting map has no work to merge.
 	if baseMD.CompletedAt.IsZero() && tickets.DesignStep(baseMD.DesignStep) != tickets.StepDone && !emptiedOldEpic(dir, base) {
@@ -270,7 +278,7 @@ func (a *Archive) checkArchivable(project, dir, base string, scan func(string) (
 	if row == nil || !row.AllDone {
 		return nil, false, refusal{wire.ReasonArchiveImplNotArchivable, errors.New("the -impl epic has tickets that are not done")}
 	}
-	return append(halves, half{epic: impl, key: implKey}), row.MergedToTrunk, nil
+	return halves, row.MergedToTrunk, nil
 }
 
 // emptiedOldEpic: a charting map an earlier Triage made that holds no open,

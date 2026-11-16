@@ -54,16 +54,13 @@ func (a *Archive) unarchiveOne(target string) (wire.TargetResult, error) {
 	archiveDir := tickets.ArchiveDir(dir)
 
 	// A target given as the -impl address of an archived pair resolves to its Design.
-	base, asImpl := epic, false
-	if d, ok := strings.CutSuffix(epic, tickets.ImplEpicSuffix); ok && archived[d] && tickets.LoadEpicTicketMD(filepath.Join(archiveDir, d)).IsMap {
-		base, asImpl = d, true
-	}
+	base, asImpl, halves := resolveHalves(project, epic,
+		func(d string) bool {
+			return archived[d] && tickets.LoadEpicTicketMD(filepath.Join(archiveDir, d)).IsMap
+		},
+		func(impl string) bool { return archived[impl] })
 	if !archived[base] {
 		return unknown("no such archived epic")
-	}
-	halves := []half{{epic: base}}
-	if impl := base + tickets.ImplEpicSuffix; archived[impl] && tickets.LoadEpicTicketMD(filepath.Join(archiveDir, base)).IsMap {
-		halves = append(halves, half{epic: impl})
 	}
 	head := tickets.LoadEpicTicketMD(filepath.Join(archiveDir, base))
 	name := freeNameIn(dir, base, len(halves) > 1)
