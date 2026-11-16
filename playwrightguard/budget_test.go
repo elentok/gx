@@ -62,7 +62,10 @@ import (
 // Rest screen flows (+2): the Break countdown and unlock are a real server round trip seen by two
 // pages at once, and the part order and mascot size need real layout at 900px and 375px;
 // RestScreen.test.tsx and the Go rest tests cover each rule alone but cannot see either.
-const maxFlows = 152
+// Task list flow (+1): the chat read from fixture transcripts and rollouts to the page, the same rows on the Design and
+// Agents pages, a real clock ticking with no request, and layout at 390px need a real server and browser;
+// TaskList.test.tsx (vitest) covers summary, order, marks, formats, tick, details and command alone but cannot see them.
+const maxFlows = 153
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
