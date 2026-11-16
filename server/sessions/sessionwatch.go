@@ -173,8 +173,11 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 						mg.raiseUnread(m)
 						mg.TriggerBanner(m.ID, unreadSound(st.State), "")
 					}
-					// The released dialog is gone once the session leaves Blocked.
-					if prev.State == wire.SessionBlocked && st.State != wire.SessionBlocked {
+					// The released dialog is gone once the turn ends. Not on any
+					// other exit from Blocked: the hook ending passes through a
+					// busy status before Claude's own dialog shows as Blocked
+					// again, and that dialog must stay released.
+					if prev.State == wire.SessionBlocked && st.State == wire.SessionIdle {
 						mg.ForgetReleasedAsks(m.ID)
 					}
 					m.Status, m.StatusChangedAt = st, time.Now()

@@ -9,7 +9,17 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/agentfake"
 )
+
+// waitHookExit waits until the hook that wrote out has ended.
+func waitHookExit(t *testing.T, out string) {
+	t.Helper()
+	servertest.WaitFor(t, 10*time.Second, "the hook to exit", func() bool {
+		_, err := os.Stat(out + agentfake.AskExitSuffix)
+		return err == nil
+	})
+}
 
 func (f askFixture) answer(t *testing.T, req wire.SessionAnswerRequest) wire.SessionResult {
 	t.Helper()
@@ -141,12 +151,20 @@ func TestAskAnswer_DismissDeniesWithTheExactReason(t *testing.T) {
 func TestAskAnswer_ReleasePrintsNothingAndClearsTheCard(t *testing.T) {
 	t.Parallel()
 	f := startAskFixture(t, nil)
-	out := f.ask(t)
+	// The released dialog stays open on Claude's terminal, so the session stays
+	// Blocked and nothing forgets the release.
+	out := f.askLeavingDialog(t)
 	f.waitBlocked(t)
 	if res := f.answer(t, wire.SessionAnswerRequest{Release: true}); res.Refused {
 		t.Fatalf("release refused: %+v", res)
 	}
-	f.waitIdle(t)
+	waitHookExit(t, out)
+	// Wait past the fixture's 300ms dialog fallback delay, so a card that
+	// wrongly listed would be listed by the check below.
+	servertest.WaitFor(t, 10*time.Second, "the dialog to wait past the fallback delay", func() bool {
+		s := f.info(t)
+		return s.Status.State == wire.SessionBlocked && s.Status.Message == "input needed" && time.Since(s.StatusChangedAt) > 400*time.Millisecond
+	})
 	if b, _ := os.ReadFile(out); len(b) != 0 {
 		t.Errorf("hook printed %q, want nothing", b)
 	}
@@ -154,8 +172,7 @@ func TestAskAnswer_ReleasePrintsNothingAndClearsTheCard(t *testing.T) {
 		t.Errorf("cards after release = %+v, want none", cards)
 	}
 	// The same dialog asked again is released at once and shows no card.
-	f.ask(t)
-	f.waitIdle(t)
+	waitHookExit(t, f.askLeavingDialog(t))
 	if cards := f.cards(t); len(cards) != 0 {
 		t.Errorf("cards for the released id = %+v, want none", cards)
 	}

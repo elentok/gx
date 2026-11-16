@@ -154,6 +154,18 @@ func (f askFixture) ask(t *testing.T) (hookOut string) {
 // as real claude does while it works on the answer.
 func (f askFixture) askWith(t *testing.T, continueTurn bool) (hookOut string) {
 	t.Helper()
+	return f.askCall(t, continueTurn, nil)
+}
+
+// askLeavingDialog is ask where a hook that ends without an answer leaves the
+// session on Claude's own dialog for the first question, as real claude does.
+func (f askFixture) askLeavingDialog(t *testing.T) (hookOut string) {
+	t.Helper()
+	return f.askCall(t, false, agentfake.AskDialogRows("Which color?", "red", "blue"))
+}
+
+func (f askFixture) askCall(t *testing.T, continueTurn bool, dialog []string) (hookOut string) {
+	t.Helper()
 	hookOut = filepath.Join(t.TempDir(), "hook.out")
 	opts := func(labels ...string) []agentfake.AskOption {
 		var out []agentfake.AskOption
@@ -162,7 +174,7 @@ func (f askFixture) askWith(t *testing.T, continueTurn bool) (hookOut string) {
 		}
 		return out
 	}
-	call := &agentfake.AskCall{ToolUseID: "toolu_ask", OutFile: hookOut, ContinueTurn: continueTurn, Questions: []agentfake.AskQuestion{
+	call := &agentfake.AskCall{ToolUseID: "toolu_ask", OutFile: hookOut, ContinueTurn: continueTurn, Dialog: dialog, Questions: []agentfake.AskQuestion{
 		{Header: "Color", Question: "Which color?", Options: opts("red", "blue")},
 		{Header: "Sizes", Question: "Which sizes?", MultiSelect: true, Options: opts("S", "M", "L")},
 		{Header: "Ship", Question: "Ship it?", Options: opts("yes", "no")},
