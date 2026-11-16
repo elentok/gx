@@ -71,6 +71,33 @@ func renderUnitsMax(w io.Writer, units []Unit, maxFull int) {
 // renderUnitsWith is renderUnitsMax that also calls after(unit) right below the
 // text of each unit shown with text. Units listed by name only get no call.
 func renderUnitsWith(w io.Writer, units []Unit, maxFull int, after func(Unit)) {
+	renderUnitsText(w, units, maxFull, after, limitText)
+}
+
+// sharedCause returns the text every unit failed with, when there are more
+// units than fit with text and they all fail alike.
+func sharedCause(units []Unit, maxFull int) (string, bool) {
+	if len(units) <= maxFull || units[0].Text == "" {
+		return "", false
+	}
+	for _, u := range units {
+		if u.Text != units[0].Text || u.Kind != KindTest {
+			return "", false
+		}
+	}
+	return units[0].Text, true
+}
+
+// renderUnitsText is renderUnitsWith with the text lines of a unit chosen by
+// the caller; gx brief failures passes an untrimmed one.
+func renderUnitsText(w io.Writer, units []Unit, maxFull int, after func(Unit), text func(string) []string) {
+	if cause, ok := sharedCause(units, maxFull); ok {
+		fmt.Fprintf(w, "%d tests failed with the same cause:\n", len(units))
+		for _, l := range text(cause) {
+			fmt.Fprintf(w, "  %s\n", l)
+		}
+		return
+	}
 	units, counts := collapseUnits(units)
 	prev := ""
 	for i, u := range units {
@@ -97,7 +124,7 @@ func renderUnitsWith(w io.Writer, units []Unit, maxFull int, after func(Unit)) {
 			continue
 		}
 		fmt.Fprintf(w, "  %s\n", head)
-		for _, l := range limitText(u.Text) {
+		for _, l := range text(u.Text) {
 			fmt.Fprintf(w, "    %s\n", l)
 		}
 		if after != nil {
@@ -166,17 +193,82 @@ func collapseUnits(units []Unit) ([]Unit, []int) {
 	return out, counts
 }
 
-// limitText returns at most maxUnitLines lines, each cut at maxLineChars, with
-// a notice line wherever text was cut.
+// assertionLine matches the line that says what a test asserted: a Go
+// file_test.go:NN: line, or a vitest assertion error or Expected/Received line.
+var assertionLine = regexp.MustCompile(`[\w.-]+_test\.go:\d+:|AssertionError|^\s*(Expected|Received)\b`)
+
+// actWarningStart and actWarningEnd bracket the React act() warning block,
+// which spans blank lines and a code sample.
+const (
+	actWarningStart = "not wrapped in act("
+	actWarningEnd   = "wrap-tests-with-act"
+)
+
+// isJSONLogLine reports whether l is a structured server-log line.
+func isJSONLogLine(l string) bool {
+	l = strings.TrimSpace(l)
+	return strings.HasPrefix(l, `{"`) && (strings.Contains(l, `"level"`) || strings.Contains(l, `"msg"`))
+}
+
+// DropNoise removes server-log JSON lines and React act() warning blocks,
+// which bury the failing assertion. The full text stays in the log.
+func DropNoise(lines []string) []string {
+	var out []string
+	inAct := false
+	for _, l := range lines {
+		switch {
+		case inAct:
+			inAct = !strings.Contains(l, actWarningEnd)
+		case strings.Contains(l, actWarningStart):
+			inAct = !strings.Contains(l, actWarningEnd)
+		case isJSONLogLine(l):
+		default:
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// maxContextLines is how many lines follow the assertion line.
+const maxContextLines = 3
+
+// focus drops log noise and starts at the assertion line when there is one.
+func focus(lines []string) (_ []string, found bool) {
+	lines = DropNoise(lines)
+	if i := slices.IndexFunc(lines, assertionLine.MatchString); i >= 0 {
+		return lines[i:], true
+	}
+	return lines, false
+}
+
+// TrimTail applies the failure-report trimming to the last lines of a log:
+// noise goes, and a tail that holds an assertion line shrinks to it plus
+// maxContextLines. Any other tail keeps all its lines.
+func TrimTail(lines []string) []string {
+	lines, found := focus(lines)
+	if found {
+		lines = lines[:min(len(lines), 1+maxContextLines)]
+	}
+	return lines
+}
+
+// limitText drops log noise, then returns the assertion line and at most
+// maxContextLines after it. Text without an assertion line gets its first
+// maxUnitLines. Each line is cut at maxLineChars, with a notice line wherever
+// text was cut.
 func limitText(text string) []string {
 	if text == "" {
 		return nil
 	}
-	lines := strings.Split(text, "\n")
+	lines, found := focus(strings.Split(text, "\n"))
+	limit := maxUnitLines
+	if found {
+		limit = 1 + maxContextLines
+	}
 	var out []string
 	for i, l := range lines {
-		if i == maxUnitLines {
-			out = append(out, fmt.Sprintf("[%d more lines cut, search the log]", len(lines)-maxUnitLines))
+		if i == limit {
+			out = append(out, fmt.Sprintf("[%d more lines cut, search the log]", len(lines)-limit))
 			break
 		}
 		if r := []rune(l); len(r) > maxLineChars {
@@ -215,8 +307,20 @@ func rawHead(w io.Writer, out []byte) {
 	}
 }
 
+// maxRerunChars caps the rerun command; a run with many failures would
+// otherwise print a name filter of thousands of characters.
+const maxRerunChars = 1000
+
 // rerunLine builds the copy-ready command that re-runs only the failures.
 func rerunLine(tool string, cDir string, args []string) string {
+	line := fullRerunLine(tool, cDir, args)
+	if len(line) > maxRerunChars {
+		return "too many failing tests to list a re-run command; use `gx brief failures <log> <test>` for one"
+	}
+	return line
+}
+
+func fullRerunLine(tool string, cDir string, args []string) string {
 	parts := []string{"gx", "brief"}
 	if cDir != "" {
 		parts = append(parts, "-C", shellQuote(cDir))

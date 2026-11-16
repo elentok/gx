@@ -52,10 +52,11 @@ the test file select flows (playwright disk.e2e.ts 76 77); -g is passed through.
 conflicts lists the unmerged files of an in-progress merge or rebase with the
 line numbers of their conflict markers (exit 1 while any remain, 0 when none).
 
-failures [log] prints every failing test of a brief log with its first lines, the
-whole list instead of the first few. Without a log path it reads the latest
-failed run (exit 1 while the log holds failures, 0 when none). Use it instead
-of rg over the log.
+failures [log [test]] prints every failing test of a brief log with its full
+text, untrimmed. Without a log path it reads the latest failed run (exit 1
+while the log holds failures, 0 when none). With a test name it prints only
+that failure and the command that re-runs it. Use it instead of rg over the
+log.
 
 go-clean-cache waits until no Go build runs, then runs go clean -cache. Use it
 instead of calling go clean -cache, which breaks running builds.
@@ -136,11 +137,14 @@ func runBrief(c *cobra.Command, d Deps, args []string) error {
 		if err != nil {
 			return err
 		}
-		logPath := ""
+		var logPath, test string
 		if len(args) > 1 {
 			logPath = args[1]
 		}
-		if code := brief.Failures(dataDir, logPath, c.OutOrStdout()); code != brief.ExitPass {
+		if len(args) > 2 {
+			test = args[2]
+		}
+		if code := brief.Failures(dataDir, logPath, test, c.OutOrStdout()); code != brief.ExitPass {
 			return &cmdbase.ExitError{Code: code}
 		}
 		return nil

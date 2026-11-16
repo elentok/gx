@@ -47,6 +47,30 @@ func TestBrief_FailuresListsEveryFailureOfTheLatestFailedRun(t *testing.T) {
 	}
 }
 
+func TestBrief_FailuresWithATestNamePrintsOneExcerptAndTheRerunLine(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	testutil.WriteFile(t, dir, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
+	testutil.WriteFile(t, dir, "a_test.go", "package tiny\n\nimport \"testing\"\n\n"+
+		"func TestOne(t *testing.T) { t.Errorf(\"cause one\") }\n"+
+		"func TestTwo(t *testing.T) { t.Errorf(\"cause two\") }\n")
+	runOut, _ := runBriefCmd(t, dir, "go-test", "./...")
+	log := lastLine(runOut)
+
+	out, code := runBriefCmd(t, dir, "failures", log, "TestTwo")
+	if code != 1 || !strings.Contains(out, "cause two") || strings.Contains(out, "cause one") {
+		t.Fatalf("exit = %d, want only TestTwo:\n%s", code, out)
+	}
+	if !strings.Contains(out, "re-run only the failing tests: gx brief go-test") || !strings.Contains(out, "TestTwo") {
+		t.Errorf("no rerun line:\n%s", out)
+	}
+
+	out, code = runBriefCmd(t, dir, "failures", log, "TestNope")
+	if code != 2 || !strings.Contains(out, "TestNope") {
+		t.Errorf("unknown test: exit = %d, out:\n%s", code, out)
+	}
+}
+
 func TestBrief_FailuresWithoutAFailedRunCannotRun(t *testing.T) {
 	t.Parallel()
 	out, code := runBriefCmd(t, t.TempDir(), "failures")

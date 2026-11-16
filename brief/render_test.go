@@ -2,6 +2,7 @@ package brief
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -30,11 +31,11 @@ func TestRenderUnits_CollapsesIdenticalUnitsWithACount(t *testing.T) {
 func TestRenderUnits_NamesOnlyUnitsGetFileLine(t *testing.T) {
 	var units []Unit
 	for i := range maxFullUnits + 1 {
-		units = append(units, Unit{Location: "pkg", Name: "Test" + string(rune('A'+i)), Text: "    z_test.go:42: boom"})
+		units = append(units, Unit{Location: "pkg", Name: "Test" + string(rune('A'+i)), Text: fmt.Sprintf("    z_test.go:%d: boom", 42+i)})
 	}
 	var w bytes.Buffer
 	renderUnits(&w, units)
-	if want := "  TestF z_test.go:42\n1 more failures"; !strings.Contains(w.String(), want) {
+	if want := "  TestF z_test.go:47\n1 more failures"; !strings.Contains(w.String(), want) {
 		t.Errorf("names-only unit lacks file:line, want %q in:\n%s", want, w.String())
 	}
 }
@@ -79,5 +80,57 @@ func TestRawHead_FallsBackToTheTail(t *testing.T) {
 	rawHead(&w, []byte(strings.Join(lines, "\n")+"\n"))
 	if !strings.Contains(w.String(), "the last line") || strings.Contains(w.String(), "cut") {
 		t.Errorf("tail fallback lost the last line or cut it:\n%s", w.String())
+	}
+}
+
+func TestRenderUnits_GoFailureDropsJSONLogLinesAndShowsAssertionFirst(t *testing.T) {
+	var text strings.Builder
+	for i := range 10 {
+		fmt.Fprintf(&text, "{\"level\":\"info\",\"msg\":\"request %d\"}\n", i)
+	}
+	text.WriteString("a_test.go:42: got 1, want 2\nctx 1\nctx 2\nctx 3\nctx 4")
+	var w bytes.Buffer
+	renderUnits(&w, []Unit{{Location: "pkg", Name: "TestA", Text: text.String()}})
+	want := "pkg\n  TestA\n    a_test.go:42: got 1, want 2\n    ctx 1\n    ctx 2\n    ctx 3\n    [1 more lines cut, search the log]\n"
+	if w.String() != want {
+		t.Errorf("renderUnits = %q, want %q", w.String(), want)
+	}
+}
+
+func TestRenderUnits_VitestFailureDropsActWarnings(t *testing.T) {
+	text := "Warning: An update to Foo inside a test was not wrapped in act(...).\n\n" +
+		"When testing, code that causes React state updates should be wrapped into act(...):\n\n" +
+		"act(() => {\n  /* fire events that update state */\n});\n\n" +
+		"This ensures that you're testing the behavior. Learn more at https://reactjs.org/link/wrap-tests-with-act\n" +
+		"AssertionError: expected 1 to be 2\nExpected: 2\nReceived: 1"
+	var w bytes.Buffer
+	renderUnits(&w, []Unit{{Location: "a.test.ts", Name: "t", Text: text}})
+	want := "a.test.ts\n  t\n    AssertionError: expected 1 to be 2\n    Expected: 2\n    Received: 1\n"
+	if w.String() != want {
+		t.Errorf("renderUnits = %q, want %q", w.String(), want)
+	}
+}
+
+func TestRenderUnits_ManyFailuresWithOneCauseShowTheCauseOnce(t *testing.T) {
+	var units []Unit
+	for i := range 100 {
+		units = append(units, Unit{Location: "a.test.ts", Name: fmt.Sprintf("test %d", i), Text: "ReferenceError: foo is not defined"})
+	}
+	var w bytes.Buffer
+	renderUnits(&w, units)
+	want := "100 tests failed with the same cause:\n  ReferenceError: foo is not defined\n"
+	if w.String() != want {
+		t.Errorf("renderUnits = %q, want %q", w.String(), want)
+	}
+}
+
+func TestRerunLine_IsCappedInLength(t *testing.T) {
+	var units []Unit
+	for i := range 100 {
+		units = append(units, Unit{Location: "a.test.ts", Name: fmt.Sprintf("test number %d", i), Text: "x"})
+	}
+	got := rerunLine("vitest", "", Vitest{}.RerunArgs(nil, units))
+	if len(got) > maxRerunChars+200 || strings.Contains(got, "test number 50") {
+		t.Errorf("rerun hint not capped (%d chars): %.200s", len(got), got)
 	}
 }

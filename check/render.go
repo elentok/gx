@@ -3,6 +3,8 @@ package check
 import (
 	"fmt"
 	"strings"
+
+	"github.com/elentok/gx/brief"
 )
 
 // Render is the text `gx check` prints and writes to the summary file: the
@@ -34,7 +36,7 @@ func (r Result) Render() string {
 		for _, name := range k.Failures {
 			fmt.Fprintf(&b, "  %s\n", name)
 		}
-		for _, line := range k.Tail {
+		for _, line := range brief.TrimTail(k.Tail) {
 			fmt.Fprintf(&b, "  %s\n", line)
 		}
 	}

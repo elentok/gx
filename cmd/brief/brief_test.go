@@ -429,8 +429,8 @@ func TestBrief_GoTestFailures(t *testing.T) {
 	if !strings.Contains(out, "example.com/tiny/a\n") {
 		t.Errorf("no package heading:\n%s", out)
 	}
-	if !strings.Contains(out, "long line 9") || strings.Contains(out, "long line 10") {
-		t.Errorf("TestLong is not limited to 10 lines:\n%s", out)
+	if !strings.Contains(out, "long line 3") || strings.Contains(out, "long line 4") {
+		t.Errorf("TestLong is not limited to the assertion line plus 3:\n%s", out)
 	}
 	if !strings.Contains(out, "more lines cut") {
 		t.Errorf("no cut notice for lines:\n%s", out)
