@@ -2,12 +2,8 @@ import { Box, Spinner as ChakraSpinner, Text } from "@chakra-ui/react"
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { Button } from "../ui/button/Button"
 import { fetchArchive } from "./chat"
-import type {
-  SessionBackgroundTask,
-  SessionChatImage,
-  SessionChatMessage,
-  SessionChatResponse,
-} from "../generated/server"
+import { TaskList } from "./TaskList"
+import type { SessionChatImage, SessionChatMessage, SessionChatResponse } from "../generated/server"
 import { ImageViewer } from "./ImageViewer"
 import { InFlightTools } from "./InFlightTools"
 import { sessionImageUrl } from "./sessionImages"
@@ -15,12 +11,6 @@ import { LinkedText } from "../files/LinkedText"
 import { Markdown } from "../markdown/Markdown"
 
 // The part of the chat both the Design page and the Agents page show: the scrolling messages and the working row.
-
-const KIND_NAMES: Record<string, string> = {
-  shell: "shell",
-  monitor: "Monitor",
-  agent: "subagent",
-}
 
 const MAX_THUMBS = 3
 
@@ -289,52 +279,6 @@ function CommandOutput({ text }: { text: string }) {
   )
 }
 
-function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {
-  return (
-    <Box
-      role="list"
-      aria-label="Running in background"
-      display="flex"
-      flexWrap="wrap"
-      gap="2"
-      fontSize="xs"
-      color="text.muted"
-    >
-      {tasks.map((t, i) => (
-        <Box
-          key={i}
-          role="listitem"
-          border="1px solid"
-          borderColor="border"
-          borderRadius="md"
-          px="2"
-          py="0.5"
-        >
-          {KIND_NAMES[t.kind] ?? t.kind}: {t.label}
-        </Box>
-      ))}
-    </Box>
-  )
-}
-
-const KIND_PLURALS: Record<string, string> = {
-  shell: "shells",
-  monitor: "monitors",
-  agent: "subagents",
-}
-
-/** "2 subagents, 1 shell": what the turn waits on besides the model, by task kind. */
-export function backgroundSummary(tasks: SessionBackgroundTask[]): string {
-  const counts = new Map<string, number>()
-  for (const t of tasks) counts.set(t.kind, (counts.get(t.kind) ?? 0) + 1)
-  return [...counts]
-    .map(
-      ([kind, n]) =>
-        `${n} ${n === 1 ? (KIND_NAMES[kind] ?? kind) : (KIND_PLURALS[kind] ?? `${kind}s`)}`,
-    )
-    .join(", ")
-}
-
 export interface WorkingStep {
   step?: string
   title?: string
@@ -344,11 +288,9 @@ export interface WorkingStep {
 export function WorkingRow({
   step,
   title,
-  background = [],
   current,
   others,
-}: WorkingStep &
-  Pick<SessionChatResponse, "current" | "others"> & { background?: SessionBackgroundTask[] }) {
+}: WorkingStep & Pick<SessionChatResponse, "current" | "others">) {
   return (
     <Box role="status" display="flex" alignItems="center" gap="2" fontSize="sm" color="text.muted">
       <ChakraSpinner size="sm" />
@@ -361,13 +303,6 @@ export function WorkingRow({
           {current && " · "}
         </Text>
         {current && <InFlightTools current={current} others={others} />}
-        {background.length > 0 && (
-          <Text
-            as="span"
-            flexShrink="0"
-            whiteSpace="pre"
-          >{` · waiting on ${backgroundSummary(background)}`}</Text>
-        )}
       </Text>
     </Box>
   )
@@ -479,7 +414,7 @@ function CodexNotices({
   )
 }
 
-/** The scrolling messages, the background strip and, while the agent works, the caller's working row. */
+/** The scrolling messages, the task list and, while the agent works, the caller's working row. */
 export function ChatMessages({
   chat,
   busy,
@@ -555,9 +490,9 @@ export function ChatMessages({
       {shownMessages.map((m, i) => (
         <Entry key={m.id || hiddenCount + i} m={m} showTools={showTools} sessionId={sessionId} />
       ))}
-      {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
       {tail}
       {busy && working}
+      <TaskList tasks={chat.tasks} />
       {end}
     </ChatScroller>
   )

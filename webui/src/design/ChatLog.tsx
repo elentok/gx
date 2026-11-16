@@ -5,6 +5,7 @@ import type { SessionChatResponse, SessionInfo } from "../generated/server"
 import { FileLinkProvider } from "../files/FileLinkContext"
 import { hasChat, roundKeyOf, roundOf } from "./chat"
 import { ChatMessages, WorkingRow, type WorkingStep } from "./ChatCore"
+import { TaskList } from "./TaskList"
 import type { AutoMenuState } from "./AutoMenu"
 import { Composer } from "./Composer"
 import { FooterLine } from "./FooterLine"
@@ -288,26 +289,13 @@ function ChatBody({
             busy={busy}
             sessionId={session.id}
             end={<SwitchLine session={session} />}
-            working={
-              step && (
-                <WorkingRow
-                  {...step}
-                  background={chat.background}
-                  current={chat.current}
-                  others={chat.others}
-                />
-              )
-            }
+            working={step && <WorkingRow {...step} current={chat.current} others={chat.others} />}
           />
         )}
         {questions && busy && step && (
-          <WorkingRow
-            {...step}
-            background={chat.background}
-            current={chat.current}
-            others={chat.others}
-          />
+          <WorkingRow {...step} current={chat.current} others={chat.others} />
         )}
+        {questions && <TaskList tasks={chat.tasks} />}
         <ChatTail
           session={session}
           chat={chat}

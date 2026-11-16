@@ -82,6 +82,7 @@ export const themeConfig = defineConfig({
         "0%, 60%, 100%": { transform: "translateY(0)", opacity: 0.5 },
         "30%": { transform: "translateY(-2px)", opacity: 1 },
       },
+      taskPulse: { "50%": { opacity: 0.35 } },
       inboxDrop: {
         "0%": { transform: "translateY(-3px)", opacity: 0 },
         "30%": { opacity: 1 },

@@ -310,21 +310,30 @@ test("an idle session shows no working row", async () => {
   expect(screen.queryByText(/Working:/)).toBeNull()
 })
 
-test("the background strip lists running tasks", async () => {
+test("the task list shows the tasks under the chat", async () => {
   renderChat(
     [session()],
     okChat(
       chatOf([], {
-        background: [
+        tasks: [
           { kind: "shell", label: "make web-test", started_at: ago(0) },
-          { kind: "agent", label: "survey", started_at: ago(0) },
+          {
+            kind: "subagent",
+            label: "survey",
+            started_at: ago(0),
+            finished: true,
+            outcome: "success",
+          },
         ],
       }),
     ),
   )
-  const strip = await screen.findByRole("list", { name: "Running in background" })
-  expect(within(strip).getByText("shell: make web-test")).toBeTruthy()
-  expect(within(strip).getByText("subagent: survey")).toBeTruthy()
+  const toggle = await screen.findByRole("button", { name: /1 of 2 tasks done/ })
+  expect(toggle.getAttribute("aria-expanded")).toBe("false")
+  fireEvent.click(toggle)
+  const list = screen.getByRole("list", { name: "Tasks" })
+  expect(within(list).getByText("make web-test")).toBeTruthy()
+  expect(within(list).getByRole("img", { name: "done" })).toBeTruthy()
 })
 
 test("a busy turn names the tool in flight", async () => {
@@ -338,23 +347,16 @@ test("a busy turn names the tool in flight", async () => {
   )
 })
 
-test("a busy turn names the background tasks it waits on, also in the Questions view", async () => {
-  const background = [
-    { kind: "shell", label: "make test", started_at: ago(0) },
-    { kind: "agent", label: "survey", started_at: ago(0) },
-    { kind: "agent", label: "audit", started_at: ago(0) },
-  ]
+test("a busy turn keeps the tasks out of the Working row, also in the Questions view", async () => {
+  const tasks = [{ kind: "shell", label: "make test", started_at: ago(0) }]
   const working = [session({ status: { state: "working" } })]
-  renderChat(working, okChat(chatOf([msg({ text: "hi" })], { background })))
-  await waitFor(() =>
-    expect(screen.getByRole("status").textContent).toBe(
-      "Working · waiting on 1 shell, 2 subagents",
-    ),
-  )
+  renderChat(working, okChat(chatOf([msg({ text: "hi" })], { tasks })))
+  await screen.findByRole("list", { name: "Tasks" })
+  expect(screen.getByRole("status").textContent).toBe("Working")
   cleanup()
-  renderChat(working, roundChat({ background }))
+  renderChat(working, roundChat({ tasks }))
   await screen.findByRole("group", { name: "Questions" })
-  expect(screen.getByRole("status").textContent).toBe("Working · waiting on 1 shell, 2 subagents")
+  expect(screen.getByRole("list", { name: "Tasks" })).toBeTruthy()
 })
 
 test("an event for the session refetches and a new conversation replaces the chat", async () => {

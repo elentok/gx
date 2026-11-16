@@ -51,7 +51,7 @@ test("a Triage session links to its project's triage page and a plain one does n
   expect(screen.queryByRole("link", { name: /Open triage page/ })).toBeNull()
 })
 
-test("renders messages, the truncation note and the background strip", async () => {
+test("renders messages, the truncation note and the task list", async () => {
   render(
     [session("s-1", "p")],
     "/agents/s-1",
@@ -59,13 +59,13 @@ test("renders messages, the truncation note and the background strip", async () 
     chatOf(
       chat({
         truncated: true,
-        background: [{ kind: "shell", label: "tail -f" }] as SessionChatResponse["background"],
+        tasks: [{ kind: "shell", label: "tail -f", started_at: new Date().toISOString() }],
       }),
     ),
   )
   expect(await screen.findByText("hello there")).toBeTruthy()
   expect(screen.getByText("Earlier messages hidden")).toBeTruthy()
-  expect(screen.getByRole("list", { name: "Running in background" })).toBeTruthy()
+  expect(screen.getByRole("list", { name: "Tasks" })).toBeTruthy()
 })
 
 test("a busy session shows a plain Working row, and an empty chat says so", async () => {

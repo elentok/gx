@@ -7,7 +7,7 @@ afterEach(cleanup)
 
 const row = () => screen.getByRole("status").textContent
 
-test("the row reads step, title, current tool, then background tasks", () => {
+test("the row reads step, title, current tool and the count of the others", () => {
   renderThemed(
     <WorkingRow
       step="Spec"
@@ -17,12 +17,9 @@ test("the row reads step, title, current tool, then background tasks", () => {
         { kind: "agent", label: "a" },
         { kind: "search", label: "b" },
       ]}
-      background={[{ kind: "shell", label: "x", started_at: new Date().toISOString() }]}
     />,
   )
-  expect(row()).toBe(
-    "Working: Spec · first · running shell: make test (+2 more) · waiting on 1 shell",
-  )
+  expect(row()).toBe("Working: Spec · first · running shell: make test (+2 more)")
 })
 
 test.each([
