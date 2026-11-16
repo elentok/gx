@@ -1,6 +1,7 @@
 package check
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -203,7 +204,7 @@ func TestCheck_StagedRestagesFilesFormatRewrote(t *testing.T) {
 	if left := gitOut(t, repo, "diff", "--", "a.go"); strings.TrimSpace(left) != "" {
 		t.Errorf("working tree differs from the index:\n%s", left)
 	}
-	if !strings.Contains(out, "re-staged 1 files") {
+	if !strings.Contains(out, "re-staged 1 file: a.go that format rewrote") {
 		t.Errorf("output lacks the re-stage note:\n%s", out)
 	}
 }
@@ -214,11 +215,30 @@ func TestCheck_ChangedRunReportsFormatRewriteWithoutStaging(t *testing.T) {
 	testutil.WriteFile(t, repo, "a.go", "package a\n")
 
 	out, _ := runCheckCmd(t, repo, "--kind", "format")
-	if !strings.Contains(out, "format changed 1 files in the working tree") {
+	if !strings.Contains(out, "format changed 1 file: a.go in the working tree") {
 		t.Errorf("output:\n%s", out)
 	}
 	if staged := gitOut(t, repo, "diff", "--cached", "--name-only"); strings.TrimSpace(staged) != "" {
 		t.Errorf("staged: %q", staged)
+	}
+}
+
+func TestCheck_FormatRewriteNoteListsTenPathsThenCountsTheRest(t *testing.T) {
+	repo := checkRepo(t, `{}`)
+	fakeTools(t, map[string]string{"gofmt": `shift; for f in "$@"; do echo "// formatted" >> "$f"; done`}, "gofmt")
+	var want []string
+	for i := 0; i < 12; i++ {
+		name := fmt.Sprintf("f%02d.go", i)
+		testutil.WriteFile(t, repo, name, "package a\n")
+		if i < 10 {
+			want = append(want, name)
+		}
+	}
+
+	out, _ := runCheckCmd(t, repo, "--kind", "format")
+	note := "format changed 12 files: " + strings.Join(want, ", ") + " and 2 more in the working tree"
+	if !strings.Contains(out, note) {
+		t.Errorf("want %q in:\n%s", note, out)
 	}
 }
 

@@ -469,7 +469,7 @@ func (r *runner) afterFormat(before map[string]string, res *KindResult) {
 	}
 	sort.Strings(changed)
 	if r.mode != ModeStaged {
-		res.Notes = append(res.Notes, fmt.Sprintf("format changed %d files in the working tree, nothing staged", len(changed)))
+		res.Notes = append(res.Notes, "format changed "+describeFiles(changed)+" in the working tree, nothing staged")
 		return
 	}
 	for _, batch := range chunkFiles(changed, r.limit) {
@@ -479,5 +479,23 @@ func (r *runner) afterFormat(before map[string]string, res *KindResult) {
 			return
 		}
 	}
-	res.Notes = append(res.Notes, fmt.Sprintf("re-staged %d files that format rewrote", len(changed)))
+	res.Notes = append(res.Notes, "re-staged "+describeFiles(changed)+" that format rewrote")
+}
+
+const maxNamedFiles = 10
+
+// describeFiles renders "1 file: a" or "N files: a, b, ... and M more" from
+// sorted paths.
+func describeFiles(files []string) string {
+	noun := "files"
+	if len(files) == 1 {
+		noun = "file"
+	}
+	named := files
+	more := ""
+	if len(files) > maxNamedFiles {
+		named = files[:maxNamedFiles]
+		more = fmt.Sprintf(" and %d more", len(files)-maxNamedFiles)
+	}
+	return fmt.Sprintf("%d %s: %s%s", len(files), noun, strings.Join(named, ", "), more)
 }
