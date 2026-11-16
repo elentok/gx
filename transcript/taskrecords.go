@@ -37,6 +37,12 @@ type taskRecordLine struct {
 type taskRecordResult struct {
 	BackgroundTaskID string `json:"backgroundTaskId"`
 	StoppedTaskID    string `json:"task_id"`
+	MonitorTaskID    string `json:"taskId"`
+	TimeoutMs        *int64 `json:"timeoutMs"`
+	AgentID          string `json:"agentId"`
+	Status           string `json:"status"`
+	ResolvedModel    string `json:"resolvedModel"`
+	OutputFile       string `json:"outputFile"`
 }
 
 // ReadTaskRecords parses the parent transcript at path into Bash task records:
@@ -67,10 +73,17 @@ func ReadTaskRecords(path string) ([]TaskRecord, error) {
 		}
 		switch l.Type {
 		case "assistant":
-			for id, u := range bashToolUses(l.Message) {
+			for id, u := range taskToolUses(l.Message) {
 				r := &TaskRecord{Kind: TaskKindCall, Label: u.label(), StartedAt: ts, Command: u.Command}
-				if u.RunInBackground {
-					r.Kind = TaskKindShell
+				switch u.name {
+				case "Monitor":
+					r.Kind = TaskKindMonitor
+				case "Agent", "Task":
+					r.Kind, r.Command = TaskKindSubagent, u.Prompt
+				default:
+					if u.RunInBackground {
+						r.Kind = TaskKindShell
+					}
 				}
 				byUse[id] = r
 				recs = append(recs, r)
@@ -80,7 +93,9 @@ func ReadTaskRecords(path string) ([]TaskRecord, error) {
 				return
 			}
 			for _, r := range recs {
-				if r.Kind == TaskKindCall && r.End == nil && r.TurnEnd.IsZero() {
+				// A subagent with an id is async or already answered.
+				foreground := r.Kind == TaskKindCall || (r.Kind == TaskKindSubagent && r.ID == "")
+				if foreground && r.End == nil && r.TurnEnd.IsZero() {
 					r.TurnEnd = ts
 				}
 			}
@@ -108,13 +123,27 @@ func ReadTaskRecords(path string) ([]TaskRecord, error) {
 					continue
 				}
 				switch {
+				case r.Kind == TaskKindMonitor:
+					if res.TimeoutMs != nil && res.MonitorTaskID != "" {
+						r.Timeout = time.Duration(*res.TimeoutMs) * time.Millisecond
+						byTask[res.MonitorTaskID] = r
+					}
+				case r.Kind == TaskKindSubagent && res.Status == "async_launched":
+					r.ID, r.Model = res.AgentID, res.ResolvedModel
+					r.OutputPath = usableOutputPath(res.OutputFile)
+					if res.AgentID != "" {
+						byTask[res.AgentID] = r
+					}
 				case res.BackgroundTaskID != "":
 					r.Kind = TaskKindShell
 					byTask[res.BackgroundTaskID] = r
 					if p := outputPathText.FindStringSubmatch(item.text); p != nil {
 						r.OutputPath = p[1]
 					}
-				case r.Kind == TaskKindCall && r.End == nil:
+				case (r.Kind == TaskKindCall || r.Kind == TaskKindSubagent) && r.End == nil:
+					if res.AgentID != "" {
+						r.ID = res.AgentID
+					}
 					end := &TaskEnd{At: ts, Outcome: TaskOutcomeSuccess, Source: TaskEndToolResult}
 					if item.isError {
 						end.Outcome = TaskOutcomeFailure
@@ -144,12 +173,29 @@ func applyNotification(text string, at time.Time, byTask map[string]*TaskRecord)
 		return
 	}
 	r := byTask[tagValue(text, "task-id")]
-	outcome, ok := notificationKill[tagValue(text, "status")]
-	if r == nil || !ok {
+	if r == nil {
 		return
 	}
-	if p := tagValue(text, "output-file"); p != "" {
+	outcome, ok := notificationKill[tagValue(text, "status")]
+	if !ok {
+		// A Monitor event notice. The expiry notice lands after the timeout, so
+		// the time test leaves it out, not its text.
+		if r.Kind == TaskKindMonitor && r.Timeout > 0 && at.Before(r.StartedAt.Add(r.Timeout)) {
+			r.EventCount++
+			r.LastEventAt = at
+		}
+		return
+	}
+	if p := usableOutputPath(tagValue(text, "output-file")); p != "" {
 		r.OutputPath = p
+	}
+	if r.Kind == TaskKindSubagent {
+		if n, err := strconv.Atoi(tagValue(text, "subagent_tokens")); err == nil {
+			r.Tokens = n
+		}
+		if n, err := strconv.Atoi(tagValue(text, "tool_uses")); err == nil {
+			r.ToolCalls = n
+		}
 	}
 	if r.End != nil && r.End.Source == TaskEndNotification {
 		return
@@ -178,27 +224,43 @@ func tagValue(s, tag string) string {
 	return strings.TrimSpace(v)
 }
 
-type bashUse struct {
-	toolUseInput
-	RunInBackground bool `json:"run_in_background"`
+// usableOutputPath drops the directory-only path some results carry.
+func usableOutputPath(p string) string {
+	if strings.HasSuffix(p, "/") {
+		return ""
+	}
+	return p
 }
 
-func bashToolUses(message json.RawMessage) map[string]bashUse {
+type taskUse struct {
+	toolUseInput
+	name            string
+	RunInBackground bool   `json:"run_in_background"`
+	Prompt          string `json:"prompt"`
+}
+
+// taskToolUses reads the Bash, Monitor and Agent (or legacy Task) launches of
+// an assistant message by tool_use id.
+func taskToolUses(message json.RawMessage) map[string]taskUse {
 	var m struct {
 		Content []struct {
 			Type  string  `json:"type"`
 			ID    string  `json:"id"`
 			Name  string  `json:"name"`
-			Input bashUse `json:"input"`
+			Input taskUse `json:"input"`
 		} `json:"content"`
 	}
 	if json.Unmarshal(message, &m) != nil {
 		return nil
 	}
-	out := map[string]bashUse{}
+	out := map[string]taskUse{}
 	for _, c := range m.Content {
-		if c.Type == "tool_use" && c.Name == "Bash" {
-			out[c.ID] = c.Input
+		switch c.Name {
+		case "Bash", "Monitor", "Agent", "Task":
+			if c.Type == "tool_use" {
+				c.Input.name = c.Name
+				out[c.ID] = c.Input
+			}
 		}
 	}
 	return out

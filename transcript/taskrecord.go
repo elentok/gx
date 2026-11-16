@@ -39,7 +39,9 @@ type TaskEnd struct {
 // (turn end, timeout, session state), never their verdicts, so a cached record
 // stays valid as time passes.
 type TaskRecord struct {
-	Kind      string
+	Kind string
+	// ID is a subagent's agent id; empty while no line names it.
+	ID        string
 	Label     string
 	StartedAt time.Time
 

@@ -77,7 +77,7 @@ func resolveTask(r transcript.TaskRecord, meta Meta, now time.Time) taskState {
 	switch {
 	case r.End != nil:
 		finish(r.End.At, taskOutcome(r.End.Outcome))
-	case r.Kind == transcript.TaskKindCall && !r.TurnEnd.IsZero():
+	case (r.Kind == transcript.TaskKindCall || r.Kind == transcript.TaskKindSubagent) && !r.TurnEnd.IsZero():
 		finish(r.TurnEnd, "")
 	case r.Trailer != nil:
 		finish(r.Trailer.At, taskOutcome(r.Trailer.Outcome))

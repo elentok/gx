@@ -630,6 +630,55 @@ func TestRead_TasksListShellsAndCallsOfAClaudeSession(t *testing.T) {
 	}
 }
 
+func TestRead_TasksListMonitorsAndSubagents(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	ts := func(ago time.Duration) string { return now.Add(-ago).Format(time.RFC3339Nano) }
+	use := func(name, id string, ago time.Duration, input string) string {
+		return fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"content":[{"type":"tool_use","id":%q,"name":%q,"input":%s}]}}`, ts(ago), id, name, input)
+	}
+	result := func(id string, ago time.Duration, res string) string {
+		return fmt.Sprintf(`{"type":"user","timestamp":%q,"message":{"content":[{"type":"tool_result","tool_use_id":%q,"content":"ok"}]},"toolUseResult":%s}`, ts(ago), id, res)
+	}
+	note := func(task, status string, ago time.Duration) string {
+		body := "<task-notification>\n<task-id>" + task + "</task-id>\n"
+		if status != "" {
+			body += "<status>" + status + "</status>\n"
+		}
+		body += "<summary>s</summary>\n</task-notification>"
+		return fmt.Sprintf(`{"type":"queue-operation","operation":"enqueue","timestamp":%q,"content":%q}`, ts(ago), body)
+	}
+	agent := []string{
+		use("Agent", "a1", 5*time.Minute, `{"description":"explore","prompt":"p"}`),
+		result("a1", 5*time.Minute, `{"status":"async_launched","agentId":"ag1","resolvedModel":"m","outputFile":"/o/ag1.output"}`),
+	}
+	monitor := []string{
+		use("Monitor", "m1", 4*time.Minute, `{"command":"tail","description":"watch","timeout_ms":600000}`),
+		result("m1", 4*time.Minute, `{"taskId":"mon1","timeoutMs":600000}`),
+		note("mon1", "", 3*time.Minute),
+	}
+
+	f := newClaudeFixture(t)
+	writeLines(t, f.path, append(append([]string{}, agent...), monitor...)...)
+	got := f.chat(t, "/v1/sessions/chat").Tasks
+	if labels := taskLabels(got); !reflect.DeepEqual(labels, []string{"explore", "watch"}) {
+		t.Fatalf("tasks = %v", labels)
+	}
+	if got[0].Kind != "subagent" || got[0].Model != "m" || got[0].Finished || got[1].Kind != "monitor" || got[1].EventCount != 1 || got[1].Finished {
+		t.Errorf("rows = %+v", got)
+	}
+
+	// The subagent alone holds the group; its final notice clears it.
+	writeLines(t, f.path, append(append([]string{}, agent...), note("ag1", "", time.Minute))...)
+	if got := f.chat(t, "/v1/sessions/chat").Tasks; len(got) != 1 {
+		t.Errorf("running subagent = %v", taskLabels(got))
+	}
+	writeLines(t, f.path, append(append([]string{}, agent...), note("ag1", "completed", time.Minute))...)
+	if got := f.chat(t, "/v1/sessions/chat").Tasks; len(got) != 0 {
+		t.Errorf("after final notice = %v", taskLabels(got))
+	}
+}
+
 func parseAgo(s string) time.Duration {
 	d, err := time.ParseDuration(s)
 	if err != nil {
