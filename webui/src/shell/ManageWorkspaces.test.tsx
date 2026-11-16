@@ -137,6 +137,7 @@ const draft = (id: string, label: string, workspace: string): DesignDraftRow => 
   slug: "",
   edited_at: "2026-05-01T10:00:00Z",
   workspace,
+  member_key: `draft/${id}`,
 })
 
 test("delete names the draft members by label, and only the deleted workspace's", () => {

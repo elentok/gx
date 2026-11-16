@@ -256,6 +256,7 @@ test("a draft in the selection is listed as skipped after the Archive confirm", 
     slug: "",
     edited_at: "2026-05-01T10:00:00Z",
     workspace: "Default",
+    member_key: "draft/d1",
   }
   setup(dryOnly, [draft])
   await selectRows("Blog", "Untitled design")

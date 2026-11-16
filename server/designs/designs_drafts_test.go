@@ -134,6 +134,11 @@ func TestWebDesignDrafts_Snapshot(t *testing.T) {
 	if r := rows[prompted.ID]; r.Label != "one two three four five" || r.Workspace != "A" {
 		t.Errorf("prompt row = %+v", r)
 	}
+	for _, d := range []*ops.DesignDraft{slugged, prompted} {
+		if got := rows[d.ID].MemberKey; got != drafts.MemberKey(d.ID) {
+			t.Errorf("MemberKey = %q, want %q", got, drafts.MemberKey(d.ID))
+		}
+	}
 	b, _ := json.Marshal(snap.DesignDrafts)
 	if strings.Contains(string(b), `"idea"`) || strings.Contains(string(b), "secret") || strings.Contains(string(b), `"images"`) {
 		t.Errorf("rows leak the prompt or images: %s", b)

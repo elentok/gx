@@ -4338,6 +4338,10 @@ export interface DesignDraftRow {
   slug: string;
   edited_at: string;
   workspace: string;
+  /**
+   * MemberKey is the workspace membership key of this draft.
+   */
+  member_key: string;
 }
 /**
  * ProjectWorktrees is one project in the /v1/projects/worktrees payload: its

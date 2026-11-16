@@ -439,6 +439,7 @@ describe("buildSidebar Design drafts", () => {
     slug: id,
     edited_at: "2026-01-02T00:00:00Z",
     workspace: "Default",
+    member_key: `draft/${id}`,
     ...over,
   })
   const drafts = [

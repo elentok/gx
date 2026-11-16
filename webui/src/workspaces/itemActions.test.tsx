@@ -242,6 +242,7 @@ test("a draft offers Rename, Move to workspace and Remove in that order, and pos
       slug: "checkout",
       edited_at: "2026-01-02T00:00:00Z",
       workspace: "Work",
+      member_key: "draft/d1",
     },
   }
   await open(draft, w)
@@ -263,6 +264,7 @@ const draftRow: ItemRef = {
     slug: "",
     edited_at: "2026-01-02T00:00:00Z",
     workspace: "Work",
+    member_key: "draft/d1",
   },
 }
 const stored = (idea: string) => ({

@@ -73,8 +73,24 @@ describe("resolveActive", () => {
 
 describe("draft routes", () => {
   const drafts = [
-    { id: "d1", label: "Landing", project: "p", slug: "", edited_at: "", workspace: "Ops" },
-    { id: "d2", label: "Gone", project: "p", slug: "", edited_at: "", workspace: "Deleted" },
+    {
+      id: "d1",
+      label: "Landing",
+      project: "p",
+      slug: "",
+      edited_at: "",
+      workspace: "Ops",
+      member_key: "draft/d1",
+    },
+    {
+      id: "d2",
+      label: "Gone",
+      project: "p",
+      slug: "",
+      edited_at: "",
+      workspace: "Deleted",
+      member_key: "draft/d2",
+    },
   ]
   const resolveDraft = (route: string) =>
     resolveActive({ route, rows, placements, drafts, workspaces, stored: "Main" })

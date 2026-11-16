@@ -27,7 +27,6 @@ import { epicRow, Menu, type ListRowData, type ListSection } from "../nav/JumpMe
 import { useWide } from "../useWide"
 import {
   cardStatus,
-  draftMemberKey,
   draftStatus,
   sessionStatus,
   type SidebarStatus,
@@ -88,14 +87,14 @@ function agentRow(
 function draftRow(d: DesignDraftRow, subtitle: string, workspaces: Workspace[]): ListRowData {
   const status = draftStatus()
   const item: ItemRef = {
-    key: draftMemberKey(d.id),
+    key: d.member_key,
     name: d.label,
     kind: "draft",
     workspace: d.workspace,
     draft: d,
   }
   return {
-    key: draftMemberKey(d.id),
+    key: d.member_key,
     title: d.label,
     subtitle,
     href: draftHref(d.id),

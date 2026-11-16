@@ -212,6 +212,7 @@ test("Hold with a draft and a Design selected holds only the Design and toasts t
         slug: "",
         edited_at: "2026-05-01T10:00:00Z",
         workspace: "Default",
+        member_key: "draft/d1",
       },
     ],
   )

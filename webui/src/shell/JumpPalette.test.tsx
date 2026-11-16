@@ -75,6 +75,7 @@ const draft = (id: string, label: string, workspace: string, project = "p"): Des
   slug: "",
   edited_at: "2026-01-01T00:00:00Z",
   workspace,
+  member_key: `draft/${id}`,
 })
 const drafts = [
   draft("d1", "Kitchen sketch", "Default", "homes"),

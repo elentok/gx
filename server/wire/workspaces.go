@@ -18,6 +18,8 @@ type DesignDraftRow struct {
 	Slug      string    `json:"slug"`
 	EditedAt  time.Time `json:"edited_at"`
 	Workspace string    `json:"workspace"`
+	// MemberKey is the workspace membership key of this draft.
+	MemberKey string `json:"member_key"`
 }
 
 // ProjectWorktrees is one project in the /v1/projects/worktrees payload: its

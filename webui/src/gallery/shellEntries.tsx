@@ -81,6 +81,7 @@ const state = {
         slug: "checkout-redesign",
         edited_at: "2026-05-01T10:00:00Z",
         workspace: "Default",
+        member_key: "draft/d1",
       },
     ],
     sessions: [
@@ -319,6 +320,7 @@ const manageCase = (label: string, step: (root: HTMLElement) => boolean) => ({
                 slug: "",
                 edited_at: "2026-05-01T10:00:00Z",
                 workspace: "Work",
+                member_key: "draft/d2",
               },
             ]}
             onClose={() => {}}

@@ -126,6 +126,7 @@ const draftRow = (over: Partial<DesignDraftRow> = {}): DesignDraftRow => ({
   slug: "checkout-redesign",
   edited_at: "2026-01-02T00:00:00Z",
   workspace: "Default",
+  member_key: "draft/d1",
   ...over,
 })
 

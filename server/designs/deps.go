@@ -138,9 +138,10 @@ func (s *Designs) DraftRows(workspace func(key string) string) []wire.DesignDraf
 	}
 	rows := make([]wire.DesignDraftRow, 0, len(items))
 	for _, it := range items {
+		key := drafts.MemberKey(it.ID)
 		rows = append(rows, wire.DesignDraftRow{
 			ID: it.ID, Label: it.Label, Project: it.Project, Slug: it.Slug,
-			EditedAt: it.EditedAt, Workspace: workspace(drafts.MemberKey(it.ID)),
+			EditedAt: it.EditedAt, Workspace: workspace(key), MemberKey: key,
 		})
 	}
 	return rows

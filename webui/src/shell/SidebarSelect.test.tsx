@@ -334,6 +334,7 @@ const draft: DesignDraftRow = {
   slug: "",
   edited_at: "2026-05-01T10:00:00Z",
   workspace: "Default",
+  member_key: "draft/d1",
 }
 const bar = () => within(document.querySelector("[data-part='select-bar']") as HTMLElement)
 
