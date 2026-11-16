@@ -1,4 +1,4 @@
-import { cleanup, screen } from "@testing-library/react"
+import { cleanup, screen, waitFor } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "./connection"
@@ -208,7 +208,8 @@ test.each(cases)(
 
     g.release()
     await screen.findByText(content)
-    expect(ready).toHaveBeenCalledTimes(1)
+    // markReady runs in a passive effect, which can land after the text is found.
+    await waitFor(() => expect(ready).toHaveBeenCalledTimes(1))
     expect(ready.mock.calls[0]?.[0]).toBe(outcome)
     expect(paintedAtReady).toBe(true)
   },
@@ -218,6 +219,6 @@ test("a page whose primary fetch fails ends its span as an error", async () => {
   ready.mockImplementation(() => {})
   renderPage("/tips", { tips: async () => Promise.reject(new Error("boom")), epicList: never })
   await screen.findByRole("button", { name: "Retry" })
-  expect(ready).toHaveBeenCalledTimes(1)
+  await waitFor(() => expect(ready).toHaveBeenCalledTimes(1))
   expect(ready.mock.calls[0]?.[0]).toBe("error")
 })

@@ -1,4 +1,4 @@
-import { act, cleanup } from "@testing-library/react"
+import { act, cleanup, waitFor } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
@@ -105,12 +105,12 @@ test("reports on open, on visibility change and on a session switch", async () =
   setVisibility("visible")
   const focus = vi.fn<PostFocus>(async () => ({}))
   const { update } = render(focus)
-  await vi.waitFor(() =>
+  await waitFor(() =>
     expect(focus).toHaveBeenCalledWith({ client: "tab-1", focused: true, session: "s-a" }),
   )
 
   act(() => setVisibility("hidden"))
-  await vi.waitFor(() =>
+  await waitFor(() =>
     expect(focus).toHaveBeenLastCalledWith({ client: "tab-1", focused: false, session: "s-a" }),
   )
 
@@ -121,7 +121,7 @@ test("reports on open, on visibility change and on a session switch", async () =
       } as ConnectionState["snapshot"],
     }),
   )
-  await vi.waitFor(() =>
+  await waitFor(() =>
     expect(focus).toHaveBeenLastCalledWith({ client: "tab-1", focused: false, session: "s-b" }),
   )
   setVisibility("visible")
@@ -131,7 +131,7 @@ test("leaving the Design page reports no focus and no session", async () => {
   setVisibility("visible")
   const focus = vi.fn<PostFocus>(async () => ({}))
   const { update, router } = render(focus)
-  await vi.waitFor(() =>
+  await waitFor(() =>
     expect(focus).toHaveBeenLastCalledWith({ client: "tab-1", focused: true, session: "s-a" }),
   )
 
@@ -142,13 +142,13 @@ test("leaving the Design page reports no focus and no session", async () => {
       } as ConnectionState["snapshot"],
     }),
   )
-  await vi.waitFor(() =>
+  await waitFor(() =>
     expect(focus).toHaveBeenLastCalledWith({ client: "tab-1", focused: true, session: "s-b" }),
   )
   expect(focus).not.toHaveBeenCalledWith({ client: "tab-1", focused: false, session: "" })
 
   await act(() => router.navigate("/"))
-  await vi.waitFor(() =>
+  await waitFor(() =>
     expect(focus).toHaveBeenLastCalledWith({ client: "tab-1", focused: false, session: "" }),
   )
 })
