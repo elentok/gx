@@ -14,20 +14,27 @@ import (
 // ticket body with content, under the per-ticket lock, and prints the ticket's
 // address. Blank content is refused unless clear is set: an empty stdin (a
 // probe piped through head, a failed upstream command) must not wipe a section.
-func runTicketsSection(d Deps, path, heading, content string, clear, jsonOut bool, w io.Writer) error {
+func runTicketsSection(d Deps, path, heading, content string, clear, appendTo, jsonOut bool, w io.Writer) error {
+	if clear && appendTo {
+		return fmt.Errorf("--append and --clear cannot be combined")
+	}
 	if strings.TrimSpace(content) == "" && !clear {
 		return fmt.Errorf("refusing to blank section %q: content is empty (pass --clear to blank it on purpose)", heading)
+	}
+	setSection, setEpicSection := schema.SetSection, tickets.SetEpicSection
+	if appendTo {
+		setSection, setEpicSection = schema.AppendSection, tickets.AppendEpicSection
 	}
 	if ticketref.IsEpicTicketMD(path) {
 		// An epic's frontmatter is not a ticket's, so it is edited in place
 		// rather than parsed as a Ticket.
-		if err := tickets.SetEpicSection(path, heading, content); err != nil {
+		if err := setEpicSection(path, heading, content); err != nil {
 			return err
 		}
 		return PrintTicketRef(path, jsonOut, w)
 	}
 	err := schema.UpdateTicketWithBody(path, func(_ *schema.Ticket, body *string) {
-		*body = schema.SetSection(*body, heading, content)
+		*body = setSection(*body, heading, content)
 	})
 	if err != nil {
 		return err

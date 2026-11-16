@@ -180,6 +180,15 @@ func SetEpicSection(ticketPath, heading, content string) error {
 	})
 }
 
+// AppendEpicSection is SetEpicSection that keeps the section's existing text
+// and adds content after it.
+func AppendEpicSection(ticketPath, heading, content string) error {
+	return editEpicTicketMD(ticketPath, func(_ *yaml.Node, body *string) error {
+		*body = schema.AppendSection(*body, heading, content)
+		return nil
+	})
+}
+
 // editEpicTicketMD runs edit on ticket.md's frontmatter mapping and body under
 // the ticket lock, then writes the result atomically. The YAML node tree is
 // edited in place so keys the edit does not name survive untouched.

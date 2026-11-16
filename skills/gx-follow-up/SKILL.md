@@ -60,12 +60,8 @@ for that test name first. Judge each hit yourself, by title and `## Problem`: th
 
 - **No match** → file it (step 3).
 - **An open ticket** → file nothing. Append a dated "seen again" entry naming the new source to its
-  `## Evidence`:
-  1. Read it: `gx tickets section <addr> Evidence` (read-only; the first line is the ticket's
-     address and title, not part of the section).
-  2. Write the existing text plus the new entry to a file.
-  3. Replace it: `gx tickets section <addr> Evidence - < file`. Empty content is refused;
-     only `--clear` blanks a section.
+  `## Evidence` with `gx tickets section --append <addr> Evidence -` (entry on stdin; flags come
+  first). It keeps the existing text. Empty content is refused.
 - **An archived `fixed` ticket** → file a regression: a new follow-up whose `## Source` and
   `## Evidence` cite the archived address.
 - **Any other archived ticket** (`obsolete`, `duplicate`, `not-worth-it`, `promoted`) → drop it. File nothing;

@@ -92,6 +92,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 			"weaken or loosen an assertion", "unresolved product bug", "say so before finishing", "never only in the final message",
 		}},
 		{"follow-up", "gx-follow-up/SKILL.md", []string{"search the candidates for that test name first"}},
+		{"follow-up seen again", "gx-follow-up/SKILL.md", []string{"gx tickets section --append <addr> Evidence -"}},
 		{"evolve", "gx-evolve/SKILL.md", []string{
 			"### Check rows", "### Launch rows", "`slower:`", "`flake:`", "](../gx-follow-up/SKILL.md)", "Category `bug`", "Category `idea`",
 		}},

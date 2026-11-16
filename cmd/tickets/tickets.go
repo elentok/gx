@@ -104,12 +104,13 @@ func newTicketsAddCmd(d Deps) *cobra.Command {
 }
 
 func newTicketsSectionCmd(d Deps) *cobra.Command {
-	var sectionJSON, sectionClear bool
+	var sectionJSON, sectionClear, sectionAppend bool
 	cmd := &cobra.Command{
 		Use:   "section <addr|path> <heading> [<content|->]",
 		Short: "print (2 args) or replace/append (3 args) one ## section of a ticket's body; content from the argument or stdin (-)",
 		Long: "With <addr> and <heading> only, prints the section (same as show --section).\n" +
 			"With content, replaces or appends the section; empty or whitespace-only content is refused.\n" +
+			"With --append, the content is added to the end of the section after a blank line (a missing section is created).\n" +
 			"To blank a section on purpose: gx tickets section --clear <addr> <heading>.",
 		Args: func(c *cobra.Command, args []string) error {
 			if sectionClear {
@@ -135,11 +136,12 @@ func newTicketsSectionCmd(d Deps) *cobra.Command {
 					return err
 				}
 			}
-			return runTicketsSection(d, path, args[1], content, sectionClear, sectionJSON, c.OutOrStdout())
+			return runTicketsSection(d, path, args[1], content, sectionClear, sectionAppend, sectionJSON, c.OutOrStdout())
 		},
 	}
 	cmd.Flags().BoolVar(&sectionJSON, "json", false, "emit {address, path} JSON")
 	cmd.Flags().BoolVar(&sectionClear, "clear", false, "blank the section (takes no content)")
+	cmd.Flags().BoolVar(&sectionAppend, "append", false, "add the content to the end of the section, after a blank line, keeping the existing text")
 	// Content is free text that often starts with "-" (a markdown list), so
 	// flags must come before the positional args.
 	cmd.Flags().SetInterspersed(false)

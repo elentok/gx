@@ -37,3 +37,13 @@ func SetSection(body, heading, content string) string {
 	}
 	return strings.Join(lines[:start], "") + section + rest
 }
+
+// AppendSection adds content to the end of the "## heading" section, after one
+// blank line, keeping the existing text. A missing section is created.
+func AppendSection(body, heading, content string) string {
+	old := Section(body, heading)
+	if old == "" {
+		return SetSection(body, heading, content)
+	}
+	return SetSection(body, heading, old+"\n\n"+strings.Trim(content, "\n"))
+}
