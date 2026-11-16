@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useLayoutEffect } from "react"
 import { useLocation, useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { useEpicList } from "../epics/list"
@@ -55,17 +55,17 @@ export function useNewDesignContext() {
       closeSliding?.()
     },
   }
-  // Written during render so a chord pressed right after a navigation sees the new page.
-  setNewDesignContext(next)
-  useEffect(() => () => dropNewDesignContext(next), [next])
-}
-
-export function setNewDesignContext(ctx: NewDesignContext) {
-  context = ctx
-}
-
-export function dropNewDesignContext(ctx: NewDesignContext) {
-  if (context === ctx) context = null
+  // A layout effect runs before the browser handles the next key, so a chord pressed right
+  // after a navigation sees the new page without writing module state during render.
+  useLayoutEffect(() => {
+    context = next
+  })
+  useLayoutEffect(
+    () => () => {
+      context = null
+    },
+    [],
+  )
 }
 
 /**

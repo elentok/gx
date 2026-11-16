@@ -1,31 +1,40 @@
+import { renderHook, type RenderHookResult } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { registerDraftPage } from "../shell/draftPageActions"
-import {
-  dropNewDesignContext,
-  setNewDesignContext,
-  startNewDesign,
-  type NewDesignContext,
-} from "./newDesign"
+import { startNewDesign, useNewDesignContext } from "./newDesign"
 
-const showToast = vi.hoisted(() => vi.fn())
-vi.mock("../ui/toaster", () => ({ showToast }))
+const h = vi.hoisted(() => ({ showToast: vi.fn(), pathname: "/" }))
+const showToast = h.showToast
+vi.mock("../ui/toaster", () => ({ showToast: h.showToast }))
 
 const open = vi.fn()
+vi.mock("react-router", () => ({
+  useLocation: () => ({ pathname: h.pathname }),
+  useNavigate: () => (href: string) => open(href),
+}))
+vi.mock("../connection", () => ({
+  useConnectionContext: () => ({}),
+  useConnectionState: () => ({
+    snapshot: {
+      sessions: [{ id: "s1", project: "chatproj" }],
+      design_drafts: [{ id: "d1", project: "draftproj" }],
+    },
+  }),
+}))
+vi.mock("../epics/list", () => ({
+  useEpicList: () => ({
+    list: { projects: ["alpha", "chatproj", "last"], epics: [{ project: "draftproj" }] },
+  }),
+}))
+vi.mock("../shell/ShellContext", () => ({ useShell: () => ({ workspace: "w1" }) }))
+
 const create = vi.fn(async () => "d9")
 const client = () => ({ create, getLastProject: async () => "last" })
 
-let ctx: NewDesignContext
-const mountAt = (pathname: string, over: Partial<NewDesignContext> = {}) => {
-  ctx = {
-    pathname,
-    sessions: [{ id: "s1", project: "chatproj" }],
-    drafts: [{ id: "d1", project: "draftproj" }],
-    projects: ["alpha", "chatproj", "draftproj", "last"],
-    workspace: "w1",
-    open,
-    ...over,
-  }
-  setNewDesignContext(ctx)
+let mounted: RenderHookResult<void, unknown> | undefined
+const mountAt = (pathname: string) => {
+  h.pathname = pathname
+  mounted = renderHook(() => useNewDesignContext())
 }
 
 beforeEach(() => {
@@ -34,8 +43,22 @@ beforeEach(() => {
   showToast.mockClear()
 })
 afterEach(() => {
-  dropNewDesignContext(ctx)
+  mounted?.unmount()
+  mounted = undefined
   localStorage.clear()
+})
+
+test("the context follows a navigation and is cleared on unmount", async () => {
+  mountAt("/agents/s1")
+  h.pathname = "/drafts/d1"
+  mounted?.rerender()
+  await startNewDesign(client())
+  expect(create).toHaveBeenCalledWith({ workspace: "w1", project: "draftproj" })
+  mounted?.unmount()
+  mounted = undefined
+  create.mockClear()
+  await startNewDesign(client())
+  expect(create).not.toHaveBeenCalled()
 })
 
 const page = (empty: boolean) => {
