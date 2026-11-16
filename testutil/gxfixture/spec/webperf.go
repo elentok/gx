@@ -147,7 +147,15 @@ func WebPerfFull() []WebPerfDay {
 			g.inp(build(), "prod", "route", 80, 600)
 			g.cls(build(), "prod", "route", 0.3)
 		}
-		for i := range 8 {
+		// The last 3 days are busy, so the lcp trend has days on both sides of 20.
+		if ago <= 2 {
+			for range 12 {
+				g.lcp(build(), "prod", 1400, 4400)
+			}
+		}
+		// The first 5 routes get 2 samples a day and the last 2 get 1, so
+		// over 14 days some routes reach 20 samples and some stay under.
+		for i := range 12 {
 			r := i % len(perfRoutes)
 			// Later routes are slower, so the slowest-routes list has an order.
 			g.ready(build(), "prod", "route_ready", "route", perfRoutes[r], 300, 1800+float64(r)*400)
