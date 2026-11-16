@@ -2,7 +2,7 @@ import { Box, Button, Input, Text } from "@chakra-ui/react"
 import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react"
 import { createPortal } from "react-dom"
 import { RestKindBedtime, RestKindBreak } from "./generated/server"
-import { isUnlockSentence, postRestUnlock, useRestState } from "./rest"
+import { isUnlockSentence, postRestUnlock, useRestState, type RestState } from "./rest"
 
 // Above the modal token (1400) and the toast layer, so no sheet or modal shows over it.
 const REST_Z_INDEX = 2000
@@ -174,15 +174,21 @@ function useUnlockDraft() {
 function UnlockSection({
   buttonLabel,
   draft: { open, setOpen, text, setText },
+  demo,
 }: {
   buttonLabel: string
   draft: ReturnType<typeof useUnlockDraft>
+  demo: boolean
 }) {
   const [refusal, setRefusal] = useState<string>()
   const [busy, setBusy] = useState(false)
   const enabled = isUnlockSentence(text)
 
   const submit = async () => {
+    if (demo) {
+      setRefusal("Demo only: nothing was unlocked.")
+      return
+    }
     setBusy(true)
     try {
       setRefusal(await postRestUnlock(text))
@@ -255,8 +261,11 @@ function UnlockSection({
   )
 }
 
-export function RestScreen() {
-  const { period, now, rule } = useRestState()
+// `demo` replaces the server state, for the /rest/* demo routes. Unlock does nothing there, and
+// `onExit` adds a way out, since the screen blocks the rest of the page.
+export function RestScreen({ demo, onExit }: { demo?: RestState; onExit?: () => void } = {}) {
+  const live = useRestState()
+  const { period, now, rule } = demo ?? live
   const [screen, setScreen] = useState<HTMLElement | null>(null)
   const isBreak = period?.kind === RestKindBreak
   const seconds = useCountdown(period?.end, now, isBreak)
@@ -300,12 +309,30 @@ export function RestScreen() {
         {isBreak && <BreakView period={period} rule={rule} seconds={seconds ?? 0} />}
         <UnlockSection
           draft={draft}
+          demo={!!demo}
           buttonLabel={
             isBreak
               ? "Unlock until the end of this Break"
               : `Unlock until ${rule?.bedtime_end ?? ""}`
           }
         />
+        {onExit && (
+          <Text
+            as="a"
+            data-part="demo-exit"
+            role="button"
+            tabIndex={0}
+            mt="22px"
+            color={DIM}
+            fontSize="13px"
+            textDecoration="underline"
+            cursor="pointer"
+            onClick={onExit}
+            onKeyDown={(e: ReactKeyboardEvent) => e.key === "Enter" && onExit()}
+          >
+            Exit demo
+          </Text>
+        )}
       </Box>
     </Box>,
     document.body,

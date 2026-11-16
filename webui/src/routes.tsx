@@ -1,4 +1,6 @@
 import { Text } from "@chakra-ui/react"
+import { RestKindBedtime, RestKindBreak } from "./generated/server"
+import { RestDemoPage } from "./RestDemoPage"
 import { lazy } from "react"
 import {
   createHashRouter,
@@ -366,6 +368,8 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
     { path: "/schedules/new", element: <ScheduleRoute fetchers={fetchers} /> },
     // A Schedule's address holds a colon (project:slug), so it arrives as the splat.
     { path: "/schedules/*", element: <ScheduleRoute fetchers={fetchers} /> },
+    { path: "/rest/break", element: <RestDemoPage kind={RestKindBreak} /> },
+    { path: "/rest/bedtime", element: <RestDemoPage kind={RestKindBedtime} /> },
     { path: "/tips", element: <TipsPage fetchTips={fetchers.tips} /> },
     { path: "/settings", element: settingsPage },
     { path: "/settings/s/:section", element: settingsPage },
