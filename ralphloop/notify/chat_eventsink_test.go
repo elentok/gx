@@ -587,6 +587,37 @@ func TestChatEventSink_EmptyQueue_FlushSendsNothing(t *testing.T) {
 	}
 }
 
+type quietFlag struct{ on atomic.Bool }
+
+func (q *quietFlag) Quiet() bool { return q.on.Load() }
+
+// A quiet sink drops new events and ones queued before it went quiet, flush
+// and close included, and never asks the gate, so the budget stays untouched.
+func TestChatEventSink_Quiet_DropsNewAndQueuedEventsWithoutTouchingTheGate(t *testing.T) {
+	t.Parallel()
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
+	q := &quietFlag{}
+	sink.quiet = q
+
+	sendTestMessage(sink, "queued before", notifyKindEpicComplete)
+	gateBefore, err := os.ReadFile(sink.gateStatePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q.on.Store(true)
+	sendTestMessage(sink, "arrives while quiet", notifyKindEpicComplete)
+	sink.flush()
+	sink.Close() // waits for any in-flight send
+
+	if got := transport.snapshot(); len(got) != 0 {
+		t.Errorf("sent = %v, want none while quiet", got)
+	}
+	gateAfter, _ := os.ReadFile(sink.gateStatePath)
+	if string(gateAfter) != string(gateBefore) {
+		t.Errorf("gate state changed while quiet:\nbefore %s\nafter  %s", gateBefore, gateAfter)
+	}
+}
+
 // TestChatEventSink_Close_FlushesQueuedMessageSynchronously pins ticket 06's
 // flush-on-close seam: Close sends the queue's one message before returning,
 // with no need to poll like the async sendRaw path.

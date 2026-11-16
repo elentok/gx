@@ -85,6 +85,8 @@ type chatEventSink struct {
 	// gateStatePath is the notification state file the gate reads and writes;
 	// empty makes every gate call fail.
 	gateStatePath string
+	// quiet drops events before the gate sees them; nil means never.
+	quiet Quieter
 	// gateKey is the destination's key in the notification state; empty means
 	// the transport name, i.e. the global destination.
 	gateKey string
@@ -328,6 +330,9 @@ func (s *chatEventSink) flush() {
 	if s.flushMidpointHook != nil {
 		s.flushMidpointHook()
 	}
+	if s.isQuiet() {
+		return
+	}
 	result, err := s.gate(notifyKindBatch, epicSource(s.epicName), !allRequeued(items))
 	if err != nil {
 		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
@@ -362,7 +367,7 @@ func allRequeued(items []batchedMessage) bool {
 // exit right after Close returns.
 func (s *chatEventSink) closeFlush(deadline time.Time) {
 	items := s.emptyQueue()
-	if len(items) == 0 {
+	if len(items) == 0 || s.isQuiet() {
 		return
 	}
 	result, err := s.gate(notifyKindBatch, epicSource(s.epicName), true)
@@ -565,6 +570,9 @@ func (s *chatEventSink) sendMessage(msg chatMessage, source, ticketIdentifier st
 }
 
 func (s *chatEventSink) sendItem(item batchedMessage, source, ticketIdentifier string) {
+	if s.isQuiet() {
+		return
+	}
 	notifyKind := item.kind
 	result, err := s.gate(notifyKind, source, false)
 	if err != nil {

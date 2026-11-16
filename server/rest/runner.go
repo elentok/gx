@@ -74,6 +74,13 @@ func (r *Runner) View() View {
 	return Step(Input{State: r.state, Config: r.cfg(), Now: r.now(), Event: Event{Kind: EventTick}}).View
 }
 
+// Quiet is the one predicate Banner, sound and Chat ask: see State.Quiet.
+func (r *Runner) Quiet() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.state.Quiet(r.cfg(), r.now())
+}
+
 // Active counts one active minute.
 func (r *Runner) Active() (Result, error) { return r.apply(Event{Kind: EventActive}) }
 

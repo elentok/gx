@@ -26,7 +26,16 @@ type ServerChatConfig struct {
 	FlushInterval time.Duration
 	// ProgressInterval replaces the Progress message interval; zero means the real one.
 	ProgressInterval time.Duration
+	// Quiet, when set and true, drops chat events on entry and at flush. It is
+	// a seam, not a setting: a reload does not touch it. An interface rather
+	// than a func so the config stays comparable.
+	Quiet Quieter
 }
+
+// Quieter is the predicate that silences chat.
+type Quieter interface{ Quiet() bool }
+
+func (s *chatEventSink) isQuiet() bool { return s.quiet != nil && s.quiet.Quiet() }
 
 // ServerChat is the chat sink a server owns: one batcher and one gate per
 // destination (transport + target), shared by every project, so a notification
@@ -151,6 +160,7 @@ func newServerChatSink(style mrkdwnStyle, transport chatTransport, seams ServerC
 	// sink decorates a noop and carries no scratch dir or epic of its own.
 	s := newChatEventSink(runlog.NoopEventSink{}, style, transport, "", "")
 	s.gateStatePath = seams.GateStatePath
+	s.quiet = seams.Quiet
 	interval := seams.FlushInterval
 	if interval <= 0 {
 		interval = batchFlushInterval

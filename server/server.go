@@ -190,9 +190,13 @@ func New(cfg Config) (*Server, error) {
 	if cfg.Runner == nil {
 		return nil, errors.New("server: Config.Runner is required: the server builds no default runner")
 	}
+	// s is built far below; the predicate reads the Rest runner through it.
+	var s *Server
+	quiet := func() bool { return s != nil && s.rest != nil && s.rest.Quiet() }
 	if cfg.Notifier == nil {
 		cfg.Notifier = osnotify.NewSystemNotifier()
 	}
+	cfg.Notifier = quietNotifier{next: cfg.Notifier, quiet: quiet}
 	if cfg.ProcessSource == nil {
 		cfg.ProcessSource = syshealth.DefaultProcess()
 	}
@@ -268,12 +272,12 @@ func New(cfg Config) (*Server, error) {
 	if restClock == nil {
 		restClock = time.Now
 	}
-	var s *Server
 	restRunner, err := rest.Open(cfg.StateDir, events, func() config.MentalHealthConfig { return s.settings.Load().MentalHealth }, restClock)
 	if err != nil {
 		lock.Release()
 		return nil, fmt.Errorf("load rest state: %w", err)
 	}
+	cfg.Chat.Quiet = restRunner
 	viMode, err := queue.OpenViMode(cfg.StateDir, events)
 	if err != nil {
 		lock.Release()
@@ -412,6 +416,7 @@ func New(cfg Config) (*Server, error) {
 	if s.cfg.Player == nil {
 		s.cfg.Player = sound.NewSystemPlayer(log)
 	}
+	s.cfg.Player = quietPlayer{next: s.cfg.Player, quiet: quiet}
 	s.writer = newTicketWriter(s)
 	s.recovery = newRecovery(s)
 	// Built once the fields they copy are set; they and rec reach each other through s.

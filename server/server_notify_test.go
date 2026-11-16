@@ -9,16 +9,20 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -99,6 +103,89 @@ func chatServerFlushing(t *testing.T, soft, hard float64, flush time.Duration) (
 		return append([]string(nil), bodies...)
 	}
 	return s, wait
+}
+
+type recNotifier struct{ n atomic.Int32 }
+
+func (r *recNotifier) Notify(context.Context, osnotify.Notification) error {
+	r.n.Add(1)
+	return nil
+}
+
+type recPlayer struct{ n atomic.Int32 }
+
+func (p *recPlayer) Play(context.Context, config.AgentsSoundsConfig, sound.Name) { p.n.Add(1) }
+
+func TestQuiet_RestPeriodSilencesBannerSoundAndChatTogether(t *testing.T) {
+	t.Parallel()
+	var posts atomic.Int32
+	arrived := make(chan struct{}, 8)
+	hook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		posts.Add(1)
+		arrived <- struct{}{}
+	}))
+	t.Cleanup(hook.Close)
+	herdr := herdrfake.NewState(t)
+	herdr.Forbid()
+	_, herdrEnv := herdrfake.StartStateEnv(t, herdr)
+	stateDir, err := os.MkdirTemp("", "gx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(stateDir) })
+	mh := config.DefaultMentalHealthConfig()
+	mh.Enabled = true
+	mh.Bedtime.Enabled = true
+	mh.Bedtime.Start, mh.Bedtime.End = "22:00", "06:00"
+	var clockMu sync.Mutex
+	now := time.Date(2026, 1, 5, 12, 0, 0, 0, time.Local)
+	setNow := func(t time.Time) {
+		clockMu.Lock()
+		defer clockMu.Unlock()
+		now = t
+	}
+	clock := func() time.Time {
+		clockMu.Lock()
+		defer clockMu.Unlock()
+		return now
+	}
+	notifier, player := &recNotifier{}, &recPlayer{}
+	s, err := New(Config{Runner: runnerfake.NewRunner(), Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: t.TempDir(),
+		Notifier: notifier, Player: player, RestClock: clock,
+		Settings: Settings{MentalHealth: mh,
+			Chat: notify.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: 20 * time.Millisecond}},
+		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	send := func() {
+		_ = s.cfg.Notifier.Notify(t.Context(), osnotify.Notification{Title: "t"})
+		s.cfg.Player.Play(t.Context(), config.AgentsSoundsConfig{}, sound.Done)
+		s.chat.SessionAlert("p", nil, "name", "done", "body", true)
+	}
+
+	send() // outside a Rest period all three go out
+	select {
+	case <-arrived:
+	case <-time.After(10 * time.Second):
+		t.Fatal("no chat post outside Rest")
+	}
+	if notifier.n.Load() != 1 || player.n.Load() != 1 || posts.Load() != 1 {
+		t.Fatalf("outside Rest: banners=%d sounds=%d chat=%d, want 1 each", notifier.n.Load(), player.n.Load(), posts.Load())
+	}
+
+	setNow(time.Date(2026, 1, 5, 23, 0, 0, 0, time.Local))
+	if _, err := s.rest.Tick(); err != nil {
+		t.Fatal(err)
+	}
+	if !s.rest.Quiet() {
+		t.Fatal("bedtime should be quiet")
+	}
+	send()
+	s.chat.Close() // flushes what was queued
+	if notifier.n.Load() != 1 || player.n.Load() != 1 || posts.Load() != 1 {
+		t.Errorf("during Rest: banners=%d sounds=%d chat=%d, want still 1 each", notifier.n.Load(), player.n.Load(), posts.Load())
+	}
 }
 
 func TestServerNotices_RestartSendsOneServerLevelMessage(t *testing.T) {
