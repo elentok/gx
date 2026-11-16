@@ -1983,6 +1983,11 @@ export interface Snapshot {
    */
   afk?: boolean;
   /**
+   * Rest is the Rest engine's status; filled in by the handler. A pointer so
+   * a client built before it, or a canned snapshot, may leave it out.
+   */
+  rest?: RestStatus;
+  /**
    * ViMode is set while the web UI's vi mode is on; filled in by the handler.
    * Missing means off.
    */
@@ -2376,6 +2381,104 @@ export const EventQueueChanged = "queue-changed";
 export const QueueModeRunning = "running";
 export const QueueModePaused = "paused";
 export type QueueMode = typeof QueueModeRunning | typeof QueueModePaused;
+
+//////////
+// source: rest.go
+
+/**
+ * RestStatus is the Rest engine as a client shows it: one value for the
+ * snapshot and for every Rest route.
+ */
+export interface RestStatus {
+  /**
+   * Enabled is the master toggle. Off means no Rest period and no warning.
+   */
+  enabled: boolean;
+  /**
+   * Counting is true while an active minute would count.
+   */
+  counting: boolean;
+  /**
+   * WorkCount is the number of active minutes counted toward the next Break.
+   */
+  work_count: number /* int */;
+  /**
+   * Now is the server's time, so a countdown never uses the browser clock.
+   */
+  now: string;
+  /**
+   * Zone is the server's IANA zone name, empty when the server runs in an
+   * unnamed local zone. ZoneOffsetSeconds is its offset at Now and is always
+   * set; clock times print in the server's zone with Zone, or with the offset
+   * when Zone is empty.
+   */
+  zone?: string;
+  zone_offset_seconds: number /* int */;
+  rule: RestRule;
+  period?: RestPeriod;
+  warning?: RestWarning;
+}
+/**
+ * RestRule holds the values the rule note prints.
+ */
+export interface RestRule {
+  work_minutes: number /* int */;
+  break_minutes: number /* int */;
+  bedtime_start: string;
+  bedtime_end: string;
+}
+/**
+ * RestPeriod is the running Rest period.
+ */
+export interface RestPeriod {
+  /**
+   * Kind is RestKindBreak or RestKindBedtime.
+   */
+  kind: string;
+  start: string;
+  end: string;
+  message: string;
+  sub_message?: string;
+}
+/**
+ * RestWarning is the one upcoming Rest period.
+ */
+export interface RestWarning {
+  kind: string;
+  start: string;
+  /**
+   * BreakMinutes is the Break length, set for a Break warning.
+   */
+  break_minutes?: number /* int */;
+}
+export const RestKindBreak = "break";
+export const RestKindBedtime = "bedtime";
+/**
+ * Kinds of Rest period.
+ */
+export type RestKindB = typeof RestKindBreak | typeof RestKindBedtime;
+/**
+ * RestUnlockRequest carries the typed unlock sentence.
+ */
+export interface RestUnlockRequest {
+  sentence: string;
+}
+/**
+ * RestResult is the Rest status after a write. A refused write changes nothing
+ * and has a stable Reason.
+ */
+export interface RestResult {
+  status: RestStatus;
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+}
+export const ReasonRestSentenceMismatch = "sentence-mismatch";
+export const ReasonRestNoPeriod = "no-rest-period";
+/**
+ * Refusal reasons of an unlock. Clients match on them.
+ */
+export type ReasonRest = typeof ReasonRestSentenceMismatch | typeof ReasonRestNoPeriod;
 
 //////////
 // source: sessions.go

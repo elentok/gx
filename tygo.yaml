@@ -21,6 +21,7 @@ packages:
       - limitsstore.go
       - migrate.go
       - queue.go
+      - rest.go
       - sessions.go
       - sessiontypes.go
       - startdesign.go

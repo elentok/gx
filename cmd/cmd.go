@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/cmd/gitops"
 	"github.com/elentok/gx/cmd/limits"
 	"github.com/elentok/gx/cmd/project"
+	"github.com/elentok/gx/cmd/rest"
 	"github.com/elentok/gx/cmd/schedules"
 	"github.com/elentok/gx/cmd/serverapi"
 	"github.com/elentok/gx/cmd/serverctl"
@@ -255,6 +256,7 @@ Run without a command to open the status UI.`,
 		limits.New(limits.Deps{Env: d.Env}),
 		limits.NewUsage(limits.Deps{Env: d.Env}),
 		limits.NewAFK(limits.Deps{Env: d.Env}),
+		rest.New(rest.Deps{Env: d.Env}),
 		schedules.New(schedules.Deps{Env: d.Env}),
 		files.New(files.Deps{Env: d.Env}),
 		limits.NewViMode(limits.Deps{Env: d.Env}),

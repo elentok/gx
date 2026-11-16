@@ -113,6 +113,9 @@ type Snapshot struct {
 	// AFK is set while AFK mode sends session banners to chat too; filled in by
 	// the handler.
 	AFK bool `json:"afk,omitempty"`
+	// Rest is the Rest engine's status; filled in by the handler. A pointer so
+	// a client built before it, or a canned snapshot, may leave it out.
+	Rest *RestStatus `json:"rest,omitempty"`
 	// ViMode is set while the web UI's vi mode is on; filled in by the handler.
 	// Missing means off.
 	ViMode bool `json:"vi_mode,omitempty"`

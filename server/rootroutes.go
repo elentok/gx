@@ -78,6 +78,8 @@ func (r rootRoutes) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.RecentlyFinished = epics.RecentlyFinished(s.idx.Loaded(), s.settings.Load().RecentlyFinished)
 	snap.Mode = s.queue.Mode()
 	snap.AFK = s.afk.IsOn()
+	rest := s.rest.Status()
+	snap.Rest = &rest
 	snap.ViMode = s.viMode.IsOn()
 	web := s.settings.Load()
 	snap.ViEscape = web.WebViEscape

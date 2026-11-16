@@ -21,6 +21,7 @@ import (
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
+	"github.com/elentok/gx/server/rest"
 	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/server/schedules"
 	"github.com/elentok/gx/server/sessions"
@@ -58,6 +59,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		index.Routes(func() *index.Index { return s.idx }, func() <-chan struct{} { return s.migrator.Done() }),
 		projects.Routes(func() *projects.Registry { return s.projects }, func() *projects.Migrator { return s.migrator }, func() *projects.Checks { return s.checks }),
 		queue.Routes(func() *queue.Queue { return s.queue }, func() *queue.OneOffs { return s.oneOffs }, func() *queue.AFK { return s.afk }, func() *queue.ViMode { return s.viMode }),
+		rest.Routes(func() *rest.Runner { return s.rest }),
 		workspaces.Routes(func() *workspaces.Store { return s.workspaces }, func() []wire.Workspace { ws, _ := s.workspacesWithNeedsYou(); return ws }),
 		harnesschoice.Routes(func() *harnesschoice.Harness { return s.harness }),
 		settingsapi.Routes(func() *settingsapi.Writer { return s.settingsWriter }, func() []string { return s.settings.Status().PendingRestart }, func() wire.ReloadResult { return s.settings.Reload(settings.TriggerWeb) }),
