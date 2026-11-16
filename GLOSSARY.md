@@ -258,6 +258,10 @@ iteration — distinct from the pane-level **Reclaim** (see The Server), which d
 a whole. A subagent's (sidechain) background task is never a signal about its parent iteration.
 Claude-only; Codex iterations have no equivalent signal.
 
+**Task group** — the run of tasks an agent waits on together, as the session chat shows them: background
+tasks and foreground tool calls in flight. A group starts when a task starts while no other task runs,
+and ends when its last task finishes. Finished tasks stay listed in their group until it ends.
+
 **`status` / `iteration_status`** — a ticket's status splits across two fields with different
 owners. **`status`** is gx-owned and is the sole scheduling authority (the six `RenderedStatus`
 values above). **`iteration_status`** is agent-owned and reports on the current claim alone
