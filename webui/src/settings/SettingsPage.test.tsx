@@ -14,7 +14,7 @@ import {
   WebLoginsView,
 } from "./SettingsPage"
 import { SettingsShellView } from "./SettingsShell"
-import { treeFromEntries } from "./testTree"
+import { treeFromEntries } from "../test-utils/settingsTree"
 import type { SettingsEntry } from "../generated/server"
 import type { WebLoginEntry } from "./logins"
 

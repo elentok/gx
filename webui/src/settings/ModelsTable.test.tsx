@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router"
 import { describe, expect, it, vi } from "vitest"
 import { renderThemed } from "../ui/render"
 import { SettingsShellView } from "./SettingsShell"
-import { treeFromEntries } from "./testTree"
+import { treeFromEntries } from "../test-utils/settingsTree"
 import type { SettingsEntry, SettingsWriteResult } from "../generated/server"
 
 describe("Models table", () => {

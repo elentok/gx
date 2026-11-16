@@ -6,7 +6,7 @@ import type { SettingsEntry } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { DeviceContext } from "../useWide"
 import { SettingsShellView } from "./SettingsShell"
-import { treeFromEntries } from "./testTree"
+import { treeFromEntries } from "../test-utils/settingsTree"
 
 const entry = (over: Partial<SettingsEntry>): SettingsEntry => ({
   key: "execution-queue.max-agents",

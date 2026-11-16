@@ -22,7 +22,7 @@ import {
 import { appRoutes, catchAllRoute, pageRoutePatterns, type RouteFetchers } from "./routes"
 import type { EpicDetail, EpicDetailRow, FetchEpicDetail } from "./epic/detail"
 import type { DiskStatus } from "./generated/server"
-import { treeFromEntries } from "./settings/testTree"
+import { treeFromEntries } from "./test-utils/settingsTree"
 import type { Snapshot } from "./snapshot"
 import type { DetailResult, FetchDetail, TicketDetail } from "./ticket/detail"
 import { renderThemed } from "./ui/render"
