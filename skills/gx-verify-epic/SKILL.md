@@ -135,6 +135,9 @@ gx check --full
 - Do not wrap it in `scripts/proc-cap`. `gx check` already caps its own test processes, and the
   header of `scripts/proc-cap` says not to wrap `gx check`.
 - Wait for the harness to say the background task ended. Do not start a Monitor for it.
+- While it runs, start no other test, build or e2e run: they collide with it over processes and the
+  Playwright results folder, and cause false failures. Do not `sleep` and poll. Do nothing until the
+  "background task ended" notice.
 - A failing check is a result to read. Send it through the failing-tests rule. Never run the check
   again because it failed.
 

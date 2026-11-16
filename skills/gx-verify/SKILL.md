@@ -28,6 +28,9 @@ Change files with a file edit (Edit) or file write (Write) only, never `sed -i`,
 
    For a failing test, follow [gx-failing-tests](../gx-failing-tests.md).
 
+   While a `gx check` runs in the background, start no other test, build or e2e run until it ends
+   (see [gx-verify-epic](../gx-verify-epic/SKILL.md)).
+
 ## Boundaries
 
 - Do not run whole-repo build, lint, format, or test commands unless the user explicitly asks.

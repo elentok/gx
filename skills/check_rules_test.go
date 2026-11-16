@@ -65,6 +65,12 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"verify-epic", "gx-verify-epic/SKILL.md", []string{
 			"gx check --full", "](../gx-failing-tests.md)", "git merge-base main HEAD", "pre-existing, <follow-up addr>",
 		}},
+		{"verify-epic no other runs during background check", "gx-verify-epic/SKILL.md", []string{
+			"start no other test, build or e2e run", "Do not `sleep` and poll",
+		}},
+		{"verify points to background rule", "gx-verify/SKILL.md", []string{
+			"start no other test, build or e2e run", "](../gx-verify-epic/SKILL.md)",
+		}},
 		{"verify-epic look fix mock check", "gx-verify-epic/SKILL.md", []string{
 			"look or layout", "`## Mock check` section", "mock path plus the width",
 		}},
