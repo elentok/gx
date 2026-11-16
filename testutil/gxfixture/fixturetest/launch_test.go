@@ -1,6 +1,7 @@
 package fixturetest
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -8,6 +9,19 @@ import (
 	"testing"
 	"time"
 )
+
+func TestCapParallel(t *testing.T) {
+	f := flag.Lookup("test.parallel")
+	orig := f.Value.String()
+	t.Cleanup(func() { _ = f.Value.Set(orig) })
+	for _, c := range []struct{ in, want string }{{"16", "4"}, {"2", "2"}, {"4", "4"}} {
+		_ = f.Value.Set(c.in)
+		capParallel(4)
+		if got := f.Value.String(); got != c.want {
+			t.Errorf("parallel %s capped to %s, want %s", c.in, got, c.want)
+		}
+	}
+}
 
 // acquireAsync starts an acquire and returns a channel that yields its release.
 func acquireAsync(t *testing.T, dir string, slots int) <-chan func() {

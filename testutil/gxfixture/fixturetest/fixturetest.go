@@ -19,6 +19,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -69,6 +70,7 @@ func Run(m *testing.M, setup func() (teardown func(), err error)) int {
 		}
 	}
 	flag.Parse() // test.run is unset until flags are parsed
+	capParallel(maxParallelTests)
 	if setup != nil {
 		teardown, err := setup()
 		if teardown != nil {
@@ -80,6 +82,25 @@ func Run(m *testing.M, setup func() (teardown func(), err error)) int {
 		}
 	}
 	return m.Run()
+}
+
+// maxParallelTests caps how many tests run at once in a fixture package. Each
+// running fixture keeps a server and agents alive, so the default (GOMAXPROCS)
+// exhausted the process limit under load. The launch slots only throttle
+// startup, not fixtures that are already running.
+const maxParallelTests = 4
+
+// capParallel lowers -test.parallel to max; a lower value the caller passed
+// is kept. Call it after flag.Parse and before m.Run.
+func capParallel(max int) {
+	f := flag.Lookup("test.parallel")
+	if f == nil {
+		return
+	}
+	if n, err := strconv.Atoi(f.Value.String()); err == nil && n <= max {
+		return
+	}
+	_ = f.Value.Set(strconv.Itoa(max))
 }
 
 // Running is a started fixture.
