@@ -29,7 +29,10 @@ func newTicketsDraftCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runDraft(cwd, d.Env.Env, planPath, manifestPath, noGopls, c.OutOrStdout())
+			return runDraft(draftOptions{
+				Cwd: cwd, Env: d.Env.Env, PlanPath: planPath, ManifestPath: manifestPath,
+				Finder: finderOptions{NoGopls: noGopls},
+			}, c.OutOrStdout())
 		},
 	}
 	c.Flags().StringVar(&planPath, "plan", "", "the draft plan (YAML)")
@@ -38,11 +41,21 @@ func newTicketsDraftCmd(d Deps) *cobra.Command {
 	return c
 }
 
+// draftOptions is everything one draft run needs besides its output writer.
+type draftOptions struct {
+	Cwd          string
+	Env          []string
+	PlanPath     string
+	ManifestPath string
+	Finder       finderOptions
+}
+
 // runDraft renders every ticket of the plan. A re-run keeps the agent's parts
 // of an existing body, and deletes the body file of a slug the plan dropped.
 // It then checks the plan's names against the checkout at cwd and exits
 // non-zero when any is missing; the files are written either way.
-func runDraft(cwd string, env []string, planPath, manifestPath string, noGopls bool, w io.Writer) error {
+func runDraft(o draftOptions, w io.Writer) error {
+	cwd, env, planPath, manifestPath := o.Cwd, o.Env, o.PlanPath, o.ManifestPath
 	start := time.Now()
 	data, err := os.ReadFile(planPath)
 	if err != nil {
@@ -60,7 +73,7 @@ func runDraft(cwd string, env []string, planPath, manifestPath string, noGopls b
 	if err != nil {
 		return err
 	}
-	finder := newCallerFinder(root, commit, env, noGopls)
+	finder := newCallerFinder(root, commit, env, o.Finder)
 	misses, callers := draftMisses(&plan, root, finder)
 	for i := range plan.Tickets {
 		plan.Tickets[i].Callers = callers

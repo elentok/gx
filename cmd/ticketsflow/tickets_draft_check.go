@@ -97,9 +97,14 @@ type callerFinder struct {
 	rgFallbacks  int
 }
 
-func newCallerFinder(root, commit string, env []string, noGopls bool) *callerFinder {
+// finderOptions are the caller-search settings a run chooses up front.
+type finderOptions struct {
+	NoGopls bool
+}
+
+func newCallerFinder(root, commit string, env []string, opts finderOptions) *callerFinder {
 	_, err := exec.LookPath("gopls")
-	return &callerFinder{root: root, commit: commit, env: env, gopls: err == nil && !noGopls}
+	return &callerFinder{root: root, commit: commit, env: env, gopls: err == nil && !opts.NoGopls}
 }
 
 // goplsNote is the one-line notice that gopls failed and rg stood in, or "".
