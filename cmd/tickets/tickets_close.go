@@ -57,7 +57,7 @@ func runTicketsClose(d Deps, addr, reason, note string, w io.Writer) error {
 	}
 	root := filepath.Dir(filepath.Dir(filepath.Dir(src.Path)))
 
-	if err := refuseIfActive(d.dirs(), d.Dial(), a); err != nil {
+	if err := RefuseIfActive(d.dirs(), d.Dial(), a); err != nil {
 		return err
 	}
 

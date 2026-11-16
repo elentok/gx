@@ -56,7 +56,7 @@ func runTicketsMove(d Deps, addr, target, slug string, dryRun, jsonOut bool, w i
 	}
 	defer unlock()
 
-	if err := refuseIfActive(d.dirs(), d.Dial(), a); err != nil {
+	if err := RefuseIfActive(d.dirs(), d.Dial(), a); err != nil {
 		return err
 	}
 
@@ -76,14 +76,9 @@ func runTicketsMove(d Deps, addr, target, slug string, dryRun, jsonOut bool, w i
 	return printMove(w, plan, jsonOut, "")
 }
 
-// refuseIfActive refuses a ticket that is queued or has a live iteration. A
+// RefuseIfActive refuses a ticket that is queued or has a live iteration. A
 // reachable server answers; otherwise the persisted queue and run files do, and
 // if those can't be read either the move is refused rather than guessed.
-func refuseIfActive(dirs config.Dirs, dial func() (*apiclient.Client, error), a tickets.Address) error {
-	return RefuseIfActive(dirs, dial, a)
-}
-
-// RefuseIfActive is the queued-or-live check of `gx tickets move`.
 func RefuseIfActive(dirs config.Dirs, dial func() (*apiclient.Client, error), a tickets.Address) error {
 	active, err := activeAddresses(dirs, dial)
 	if err != nil {
