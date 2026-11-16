@@ -260,7 +260,7 @@ Claude-only; Codex iterations have no equivalent signal.
 
 **Task group** — the run of tasks an agent waits on together, as the session chat shows them: background
 tasks and foreground tool calls in flight. A group starts when a task starts while no other task runs,
-and ends when its last task finishes. Finished tasks stay listed in their group until it ends.
+and ends when its last task finishes. Finished tasks stay listed in their group until it ends. A persistent Monitor does not hold a group open, and a running subagent does.
 
 **`status` / `iteration_status`** — a ticket's status splits across two fields with different
 owners. **`status`** is gx-owned and is the sole scheduling authority (the six `RenderedStatus`

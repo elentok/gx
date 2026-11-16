@@ -36,7 +36,7 @@ One quiet, read-only task list under the Working row, on both the Design page an
 11. As a person, I want finished tasks to stay in the list with their duration and outcome until the whole group is done, so that I can see what already ran.
 12. As a person, I want the list to clear when the group's last task finishes, so that old tasks do not pile up on screen.
 13. As a person, I want a new group to start when a task starts while nothing else runs, so that each wave of waiting is shown on its own.
-14. As a person, I want a failed shell row to read "exit 2 · 12s", so that I see the exit code and how long it ran together.
+14. As a person, I want a failed shell row to read "exit 2 · 12s" and a killed row to read "killed · 12s", so that I see the exit code or the kill and how long it ran together.
 15. As a person, I want an expanded shell row to show the output size and the last output line, so that I can tell whether it is still producing output.
 16. As a person, I want an expanded shell or foreground row to show its command with light highlighting for bash and python, so that a long command is readable.
 17. As a person, I want a long command capped at about five lines with "Show all (N lines)", so that one command cannot take over the chat.
@@ -46,7 +46,7 @@ One quiet, read-only task list under the Working row, on both the Design page an
 21. As a person, I want an expanded Monitor row to show the watched command, "N events" and how long ago the last event was, so that I can tell whether the watch is alive.
 22. As a person, I want a persistent Monitor to stay listed as a running row without holding the group open, so that a watcher that never ends does not keep the list on screen forever.
 23. As a person, I want a task that was moved to the background after a timeout to show the time it really started, so that its elapsed time is not short by the timeout.
-24. As a person, I want a task with no recorded end to show as finished without an outcome, so that gx never shows a made-up success or failure.
+24. As a person, I want a task with no recorded end to show as finished without an outcome only by a stated rule (a Claude shell whose output file has an exit trailer, a subagent or Monitor past the age-out cap, a Codex or foreground task by the rules under Groups and states), so that gx never shows a made-up success or failure and never ends a task that still runs.
 25. As a person using Codex 0.144.1 or later, I want the same list with fewer fields (label, time, exit code where known), so that Codex sessions are not left out.
 26. As a person using an older Codex, I want the in-flight labels I have today, so that nothing gets worse.
 27. As a person using Codex, I want a Codex subagent row to show its model and token total from its own rollout, so that I can see what it costs.
@@ -63,25 +63,27 @@ One quiet, read-only task list under the Working row, on both the Design page an
 ## Implementation Decisions
 
 **Wire and web**
-- The chat read response carries one ordered task list for the session. It replaces the old background list and the in-flight tool list for the web. Each entry has the kind (shell, monitor, subagent, foreground call), the label, `started_at`, the finish time and outcome when known, the group it belongs to, and the kind's detail fields. The exact field names are the implementer's choice.
+- The chat read response carries one ordered task list for the session. It replaces the old background list and the in-flight tool list for the web. Each entry has the kind (shell, monitor, subagent, foreground call), the label, `started_at`, the finish time and outcome when known, and the kind's detail fields. The read returns only the open group's tasks plus a running persistent Monitor row, so an entry carries no group field. The exact field names are the implementer's choice.
 - Detail fields per kind. Shell: output size, last output line, exit code, command. Foreground call: command, exit code. Subagent: model, token total, tool-call count, current call. Monitor: watched command, event count, last-event time. Codex rows carry only the fields the rollout has: label, time, command, exit code where the end line has it.
-- The browser derives the summary ("N of M tasks done", progress bar, "longest") and the row order from the list. "Longest" is the longest elapsed time among running tasks. M counts every listed task, a running persistent Monitor included. The bar is done over total.
+- The browser derives the summary ("N of M tasks done", progress bar, "longest") and the row order from the list. "Longest" is the longest elapsed time among running tasks. M counts every listed task except a running persistent Monitor, which is also left out of N, the bar and "longest". The bar is done over total. A persistent Monitor row shows after the group's rows, or alone.
 - The browser ticks elapsed time every second from `started_at` for running rows. Finished rows show a fixed duration (finish minus start). The tick re-renders only; it sends no request.
-- The component replaces `BackgroundStrip` and the Working row's "waiting on N" text and the foreground in-flight text. The Working row keeps its own step text. Both pages get the list through the shared chat component.
-- Look follows the approved mock (see Mock states). The summary line is closed by default. One task alone renders as a row with no summary line. A failed row's time reads "exit N · duration". A task finished with no outcome shows a muted neutral mark that is neither a check nor a cross, and no outcome text. The implementer picks the glyph.
+- The component replaces `BackgroundStrip` and the Working row's "waiting on N" text. The list holds foreground shell and Agent calls only. The Working row keeps the in-flight label of the newest other foreground call (for example "Working · Edit store.go"), as in the mock, so one-row groups do not flicker on every Read or Edit. Older Codex versions keep today's full in-flight text. Both pages get the list through the shared chat component.
+- Look follows the approved mock (see Mock states). The summary line is closed by default. One task alone renders as a row with no summary line. A failed row's time reads "exit N · duration" and a killed row's reads "killed · duration", both with the cross. A task finished with no outcome shows a muted neutral mark that is neither a check nor a cross, and no outcome text. The implementer picks the glyph.
 - Command highlighting covers bash and python only, with a cap of about five lines and "Show all (N lines)". The language is the implementer's call from the command text (python for a `python -c` or heredoc script, otherwise bash).
 - Read-only: no stop button, no output link.
 
 **Groups and states (derived, no stored state)**
 - A group is derived from the task start and finish times on every read. It starts when a task starts while no other task runs. It ends when its last task finishes. Finished tasks of the open group stay listed. When the group ends the list clears.
-- A persistent Monitor does not hold a group open. With only a persistent Monitor left, its running row stays listed on its own (no summary line). It stays until the agent stops it.
+- A persistent Monitor does not hold a group open and does not count as "something running" for the group-start rule. With only a persistent Monitor left, its running row stays listed on its own (no summary line). It stays until the agent stops it, or until its session's agent process has exited: then every task of that session shows as finished with no outcome. How a persistent Monitor looks and ends is not yet known (research ticket 08); this section is amended when it closes.
 - A running subagent holds the group open. Its own background tasks are not listed or counted.
 - Finish time and duration come from the transcript. Claude background task: the transcript time of the matching `<task-notification>` line. Foreground call: the time of its `tool_result` line. Duration is finish minus start. The output file's exit trailer is used for the exit code and output details, never for time.
-- No recorded end: a foreground call or a Codex task with no matched end shows as finished with no outcome when the turn ends, with its duration measured to the turn end. A Claude background task that still has no notification stays running, as it does today, until it passes the existing age-out cap for outstanding tasks, and then shows as finished with no outcome and no duration. A persistent Monitor never ages out. Reason: finishing a task that still runs would state a falsehood, and the existing outstanding rule already carries this cap.
+- No recorded end, one rule for both harnesses. A foreground call with no result shows as finished with no outcome when the turn ends, with its duration measured to the turn end. Every other task (Claude or Codex) with no matched end stays running until the age-out cap for outstanding tasks, then shows as finished with no outcome and no duration. Exceptions: a Claude shell whose output file has the exit trailer (`[exited with code N]`, `[killed]`) counts as finished even with no notification, with the outcome from the trailer and the finish time from the file's change time. A persistent Monitor never ages out. Reason: finishing a task that still runs would state a falsehood, and Codex unified-exec processes outlive their cell and the turn. This deviates from map tickets 04 and 06, which finished such tasks at turn end.
+- Claude end lines: only a final notification with a `<status>`, or a `TaskStop` result matched by its structured task id, ends a task. The finish time is the `enqueue` line time of that notification. A Monitor event notification and a subagent interim notification carry the task id but only count; they never end it. `killed` and `stopped` show the cross with the text "killed".
+- The age-out and gating of the shared outstanding-task reader (used by ralph-loop finish gating, `harness/claudepid.go` and `backgroundtask`) do not change. The persistent Monitor exemption applies only to the list.
 - Outcome: success, failure and killed come from the notification status, the exit code or the `is_error` flag of a `tool_result`. Failed and killed rows show the cross.
 
 **Claude reader**
-- Start time is the transcript time of the launching `tool_use` line. This holds for a call moved to the background on timeout. The late result line is never used for start. A subagent starts at its Agent launch `tool_use` line. A Monitor starts at its `tool_use` line.
+- Start time is the transcript time of the launching `tool_use` line. This holds for a call moved to the background on timeout. The late result line is never used for start. A subagent starts at its Agent launch `tool_use` line. A foreground (sync) Agent call also shows as a subagent row, with label and time only until a parent-transcript line names its agent id, when its details line appears. A Monitor starts at its `tool_use` line.
 - A shell's output file is found by the exact path in the launching result or notification, never a glob on the session id (the directory can carry the id the task launched under, which differs after a resume).
 - A shell row reads its output file for size, last line and the exit trailer (`[exited with code N]`, `[killed]`).
 - A Monitor row has no output file. Its event count is the number of its notification lines. The row shows no output size.
@@ -92,8 +94,9 @@ One quiet, read-only task list under the Working row, on both the Design page an
 **Codex reader**
 - Source: the session rollout only. No app-server connection and no process-tree check.
 - Codex 0.144.1 and later (read from the rollout's own recorded Codex version) get the full list from the `exec` / `wait` shape. Older versions keep today's in-flight labels and get no list.
-- A row starts at the timestamp of its tool call line. A yielded `exec` cell finishes at its `wait` poll's "Script completed" line or at the `item_completed` line where the version has one (0.147.0 and later), whichever is earlier. Exit code and duration show only where an end line carries them.
+- A row starts at the timestamp of its tool call line. A yielded `exec` cell that returns no `session_id` finishes at its `wait` poll's "Script completed" line or at the `item_completed` line where the version has one (0.147.0 and later), whichever is earlier. Exit code and duration show only where an end line carries them.
 - Up to a few commands overlap, so a start is matched to its end by cell or process id where it exists, and otherwise by command text and time.
+- A command that returns a `session_id` is still alive: it ends at the `write_stdin` poll output carrying its `exit_code`, or at `item_completed`. A Codex subagent ends at its `SubAgentActivity` `completed` event or a `wait_agent` output with `completed`.
 - A subagent row reads the child rollout for its model and token total.
 - The in-flight reader learns the new shape so that the Working row and the list agree.
 
@@ -135,8 +138,8 @@ Entry N verifies story N unless a heading names a group. Flow names are catalog 
 10. Mock state "expanded": running rows come before finished rows, and finished rows are dimmed.
 11. New flow: a task finishes while another runs; its row stays in the list with a fixed duration and its outcome.
 12. New flow: the last task finishes and the list clears. Chat read: no tasks.
-13. New flow: after a group clears, a new task starts and a new group opens with "0 of 1" counted anew (a group of one shows no summary line).
-14. Mock state "expanded": the failed shell row reads "exit 2 · 12s". Chat read: that entry has exit code 2.
+13. New flow: after a group clears, two tasks start and a new group opens with "0 of 2" counted anew. A separate one-task case shows no summary line.
+14. Mock state "expanded": the failed shell row reads "exit 2 · 12s" and a killed row reads "killed · 12s". Chat read: the failed entry has exit code 2.
 15. Mock state "expanded": the expanded shell row shows the output size and last line. New fixture: an output file that grows between two reads and the details line follows.
 16. Mock state "expanded": the command shows lightly highlighted, bash and python.
 17. Mock state "expanded": a 16-line command shows five lines and "Show all (16 lines)", which expands to all lines.
@@ -146,7 +149,7 @@ Entry N verifies story N unless a heading names a group. Flow names are catalog 
 21. Mock state "expanded": the Monitor row reads the watched command, "N events" and last-event age.
 22. New flow: a persistent Monitor with every other task finished. The group clears and the Monitor row stays alone, running, without a summary line.
 23. New fixture: a shell moved to the background after a timeout. Chat read: `started_at` is the launching line time, not the result line time.
-24. New fixture: a foreground call with no result and a finished turn. The row is finished with a neutral mark and no outcome text. Chat read: no outcome, duration to the turn end.
+24. New fixture: a foreground call with no result and a finished turn. The row is finished with a neutral mark and no outcome text. Chat read: no outcome, duration to the turn end. Same fixture group: a Claude background task past the age-out cap, a Codex task with no matched end that stays running, and a Claude shell whose output file has the exit trailer but whose notification is missing (finished, outcome from the trailer).
 25. Mock state "codex-fewer-fields": the Codex rows show label, time and exit code only where known. Chat read on a fixture Codex 0.144.1 or later rollout: the same list.
 26. New fixture: a Codex rollout from a version before 0.144.1. Chat read: no list entries. The Working row keeps today's in-flight label (existing flow "75. Read a session" shape on Codex).
 27. New fixture: a Codex subagent with a child rollout. Chat read: the entry has model and token total.
@@ -169,6 +172,11 @@ Entry N verifies story N unless a heading names a group. Flow names are catalog 
 - `$(gx tickets root)/gx/bg-progress/mocks/03-task-list-look.html`, state `single-task`, 640px, fixture scenario `bg-progress` (single-task shape); parts: working-row, task-list, task-row, status, kind, label, elapsed, details, command.
 
 New scenarios to write: `bg-progress` with the shapes named above, for the Claude fixture transcripts (shell, Monitor, persistent Monitor, subagent, foreground call, timed-out call, no-end call) and the Codex fixture rollouts (new shape with and without `item_completed`, old shape, subagent). These become implementation tickets.
+
+## Self-decided design questions
+
+- Persistent Monitor in the counts: left out of N, M, the bar, "longest" and the group-start rule. Reason: it never ends, so counting it would stop the bar filling and the group clearing.
+- Codex and Claude no-end rules: one shared rule. Reason: Codex processes outlive the turn, so ending them at turn end would be wrong.
 
 ## Out of Scope
 
