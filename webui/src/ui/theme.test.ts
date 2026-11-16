@@ -5,6 +5,10 @@ import { KINDS, TONES } from "./tone"
 const tokens = themeConfig.theme!.tokens!
 
 describe("theme", () => {
+  it("defines the surface.hover token used by task rows", () => {
+    expect(system.token("colors.surface.hover")).toBeTruthy()
+  })
+
   it.each(TONES)("has fg and bg tokens for tone %s", (tone) => {
     const entry = (tokens.colors as Record<string, any>).tone[tone]
     expect(entry.fg.value).toBeTruthy()

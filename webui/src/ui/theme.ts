@@ -104,6 +104,7 @@ export const themeConfig = defineConfig({
         surface: {
           DEFAULT: { value: "#0a0d11" },
           raised: { value: "#141920" },
+          hover: { value: "rgba(255, 255, 255, 0.03)" },
         },
         sidebar: {
           DEFAULT: { value: "#11161d" },
