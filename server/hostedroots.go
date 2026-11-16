@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/config/registry"
+	"github.com/elentok/gx/server/files"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/settingsapi"
 	"github.com/elentok/gx/server/wire"
@@ -27,9 +28,8 @@ func (h hostedFiles) listRoots(w http.ResponseWriter, _ *http.Request) {
 
 // builtinRoots lists the roots the checker always allows.
 func (h hostedFiles) builtinRoots() []string {
-	c := h.checker()
 	var out []string
-	for _, p := range append(c.BuiltinRoots(), c.TempRoots()...) {
+	for _, p := range append(h.projectRoots(), files.DefaultTempRoots()...) {
 		if p != "" && !slices.Contains(out, p) {
 			out = append(out, p)
 		}
@@ -79,7 +79,8 @@ func (h hostedFiles) removeRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reason, msg := ops.RootReasonNotAdded, path+" is not a configured root"
-	if slices.Contains(resolvedPaths(h.builtinRoots()), resolvedPath(path)) {
+	resolved := files.Resolve(path)
+	if slices.ContainsFunc(h.builtinRoots(), func(r string) bool { return files.Resolve(r) == resolved }) {
 		reason, msg = ops.RootReasonBuiltIn, path+" is a built-in root; built-in roots are always on"
 	}
 	wire.WriteJSON(w, ops.HostedRootsResult{}.Refuse(reason, msg))
@@ -103,11 +104,11 @@ func (h hostedFiles) checkAddable(path string) (reason, msg string) {
 	if !filepath.IsAbs(path) {
 		return ops.RootReasonNotAbsolute, "give an absolute folder path"
 	}
-	resolved := resolvedPath(path)
+	resolved := files.Resolve(path)
 	if resolved == string(filepath.Separator) {
 		return ops.RootReasonIsSlash, "the whole disk cannot be a root"
 	}
-	if home, err := config.DirsFrom(h.s.cfg.Env).Home(); err == nil && resolved == resolvedPath(home) {
+	if home, err := config.DirsFrom(h.s.cfg.Env).Home(); err == nil && resolved == files.Resolve(home) {
 		return ops.RootReasonIsHome, "the home folder itself cannot be a root; add a subfolder of it"
 	}
 	info, err := os.Stat(path)
@@ -142,19 +143,4 @@ func (h hostedFiles) writeRoots(w http.ResponseWriter, f func(cur []string) []st
 		return
 	}
 	wire.WriteJSON(w, ops.HostedRootsResult{Roots: h.allRoots()})
-}
-
-func resolvedPath(p string) string {
-	if r, err := filepath.EvalSymlinks(p); err == nil {
-		return r
-	}
-	return filepath.Clean(p)
-}
-
-func resolvedPaths(ps []string) []string {
-	out := make([]string, len(ps))
-	for i, p := range ps {
-		out[i] = resolvedPath(p)
-	}
-	return out
 }

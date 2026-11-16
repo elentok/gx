@@ -20,7 +20,7 @@ func (w *Web) Info(rw http.ResponseWriter, _ *http.Request) {
 // leaf live. A bad Host header or token is turned away before this runs.
 func (w *Web) NewRoot(rw http.ResponseWriter, _ *http.Request) {
 	if w.ln == nil {
-		wire.WriteJSON(rw, offInfo())
+		wire.WriteJSON(rw, OffInfo())
 		return
 	}
 	if err := w.certs.NewRoot(); err != nil {
@@ -37,7 +37,7 @@ func (w *Web) NewRoot(rw http.ResponseWriter, _ *http.Request) {
 // answers with the new Setup code. The socket is the only way in.
 func (w *Web) Reset(rw http.ResponseWriter, _ *http.Request) {
 	if w.ln == nil {
-		wire.WriteJSON(rw, offInfo())
+		wire.WriteJSON(rw, OffInfo())
 		return
 	}
 	removed, err := w.auth.WebReset()
@@ -56,7 +56,7 @@ func (w *Web) Reset(rw http.ResponseWriter, _ *http.Request) {
 // holds no TOTP secret.
 func (w *Web) ResetAuthenticator(rw http.ResponseWriter, _ *http.Request) {
 	if w.ln == nil {
-		wire.WriteJSON(rw, offInfo())
+		wire.WriteJSON(rw, OffInfo())
 		return
 	}
 	removed, _, err := w.auth.ClearAuthenticator()
@@ -85,7 +85,7 @@ func (w *Web) addResetCode(info *ops.WebInfo) {
 }
 
 func offLogins() ops.WebLoginsResult {
-	off := offInfo()
+	off := OffInfo()
 	return ops.WebLoginsResult{Refused: true, Reason: off.Reason, Message: off.Message}
 }
 
@@ -153,15 +153,13 @@ func (w *Web) SetPassword(rw http.ResponseWriter, r *http.Request) {
 }
 
 // OffInfo is the refusal every web read gives while the web UI is off.
-func OffInfo() ops.WebInfo { return offInfo() }
-
-func offInfo() ops.WebInfo {
+func OffInfo() ops.WebInfo {
 	return ops.WebInfo{Refused: true, Reason: ops.ReasonWebOff, Message: "the web UI is off: set server.web.listen in the config and restart the server"}
 }
 
 func (w *Web) info() ops.WebInfo {
 	if w.ln == nil {
-		return offInfo()
+		return OffInfo()
 	}
 	skipped := w.certs.Skipped()
 	info := ops.WebInfo{

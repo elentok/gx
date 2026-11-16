@@ -41,7 +41,7 @@ func (h hostedFiles) routes() []wire.Route {
 // worktrees once instead of per candidate.
 func (h hostedFiles) checker() *files.Checker {
 	cfg := h.s.cfg
-	builtin := append(h.worktreePaths(), cfg.TicketStore)
+	builtin := h.projectRoots()
 	denied := []string{cfg.StateDir, cfg.SessionsDir, cfg.ConversationsDir}
 	if cfg.ConfigPath != "" {
 		denied = append(denied, filepath.Dir(cfg.ConfigPath))
@@ -62,6 +62,11 @@ func (h hostedFiles) checker() *files.Checker {
 		c.DataDir = func() string { return data }
 	}
 	return c
+}
+
+// projectRoots lists the worktrees of every project repo and the tickets store.
+func (h hostedFiles) projectRoots() []string {
+	return append(h.worktreePaths(), h.s.cfg.TicketStore)
 }
 
 // worktreePaths lists every checked-out worktree of every project repo. A bare

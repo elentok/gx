@@ -3,6 +3,7 @@ package web
 import (
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/elentok/gx/server/webtls"
@@ -61,20 +62,10 @@ func rebuildHost(hostport string) string {
 	if strings.Contains(host, ":") {
 		host = "[" + host + "]"
 	}
-	if _, port, err := net.SplitHostPort(hostport); err == nil && isNumeric(port) {
-		return host + ":" + port
-	}
-	return host
-}
-
-func isNumeric(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return false
+	if _, port, err := net.SplitHostPort(hostport); err == nil {
+		if _, err := strconv.Atoi(port); err == nil {
+			return host + ":" + port
 		}
 	}
-	return true
+	return host
 }

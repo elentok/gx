@@ -13,7 +13,7 @@ import (
 // check, so a wrong Host answers 403 even without a cookie.
 func RequireHost(allowed func() []string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !hostAllowed(r.Host, allowed()) {
+		if !HostAllowed(r.Host, allowed()) {
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = w.Write([]byte("403: this host is not allowed; add it to server.web.allowed-hosts.\n"))
@@ -24,9 +24,7 @@ func RequireHost(allowed func() []string, next http.Handler) http.Handler {
 }
 
 // HostAllowed reports whether RequireHost would let hostport through.
-func HostAllowed(hostport string, allowed []string) bool { return hostAllowed(hostport, allowed) }
-
-func hostAllowed(hostport string, allowed []string) bool {
+func HostAllowed(hostport string, allowed []string) bool {
 	host := NormalizeHost(hostport)
 	if host == "" {
 		return false

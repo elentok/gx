@@ -35,7 +35,8 @@ type Checker struct {
 	// UID is the gx user id that must own temp files and their folders.
 	UID uint32
 
-	// statOverride lets tests simulate a foreign owner on a single folder.
+	// Test seam: statOverride lets tests simulate a foreign owner on a single
+	// folder. Group it with Config.HostedFilesUID.
 	statOverride func(path string, info os.FileInfo) (uid uint32, nlink uint64, ok bool)
 }
 
@@ -156,14 +157,18 @@ func resolveAll(lists ...[]string) []string {
 			if p == "" {
 				continue
 			}
-			p = filepath.Clean(p)
-			if r, err := filepath.EvalSymlinks(p); err == nil {
-				p = r
-			}
-			out = append(out, p)
+			out = append(out, Resolve(p))
 		}
 	}
 	return out
+}
+
+// Resolve resolves symlinks in p. A path that does not exist keeps its cleaned form.
+func Resolve(p string) string {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return filepath.Clean(p)
 }
 
 func containing(path string, roots []string) (string, bool) {

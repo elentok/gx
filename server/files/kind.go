@@ -11,22 +11,46 @@ import (
 	"github.com/elentok/gx/server/wire/ops"
 )
 
-var kindByExt = map[string]ops.HostedKind{
-	".md": ops.HostedKindMarkdown, ".markdown": ops.HostedKindMarkdown,
-	".mmd": ops.HostedKindMermaid, ".mermaid": ops.HostedKindMermaid,
-	".html": ops.HostedKindHTML, ".htm": ops.HostedKindHTML,
-	".png": ops.HostedKindImage, ".jpg": ops.HostedKindImage, ".jpeg": ops.HostedKindImage,
-	".gif": ops.HostedKindImage, ".webp": ops.HostedKindImage, ".avif": ops.HostedKindImage,
-	".bmp": ops.HostedKindImage, ".ico": ops.HostedKindImage,
-	".svg": ops.HostedKindSVG,
-	".pdf": ops.HostedKindPDF,
-	".txt": ops.HostedKindText, ".log": ops.HostedKindText,
+// extInfo is what a known extension decides. An empty contentType means
+// text/plain (see ContentType).
+type extInfo struct {
+	kind        ops.HostedKind
+	contentType string
 }
 
-var codeExts = []string{
-	".go", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".rb", ".rs", ".java", ".kt",
-	".c", ".h", ".cc", ".cpp", ".hpp", ".cs", ".swift", ".php", ".lua", ".sh", ".bash", ".zsh",
-	".fish", ".css", ".scss", ".json", ".yaml", ".yml", ".toml", ".xml", ".sql", ".vue", ".svelte",
+// extTable is a fixed table, not the host's MIME database, so the answer is
+// the same on every machine.
+var extTable = buildExtTable()
+
+func buildExtTable() map[string]extInfo {
+	t := map[string]extInfo{}
+	add := func(kind ops.HostedKind, contentType string, exts ...string) {
+		for _, e := range exts {
+			t[e] = extInfo{kind, contentType}
+		}
+	}
+	const charset = "; charset=utf-8"
+	add(ops.HostedKindMarkdown, "", ".md", ".markdown")
+	add(ops.HostedKindMermaid, "", ".mmd", ".mermaid")
+	add(ops.HostedKindHTML, "text/html"+charset, ".html", ".htm")
+	add(ops.HostedKindImage, "image/png", ".png")
+	add(ops.HostedKindImage, "image/jpeg", ".jpg", ".jpeg")
+	add(ops.HostedKindImage, "image/gif", ".gif")
+	add(ops.HostedKindImage, "image/webp", ".webp")
+	add(ops.HostedKindImage, "image/avif", ".avif")
+	add(ops.HostedKindImage, "image/bmp", ".bmp")
+	add(ops.HostedKindImage, "image/x-icon", ".ico")
+	add(ops.HostedKindSVG, "image/svg+xml", ".svg")
+	add(ops.HostedKindPDF, "application/pdf", ".pdf")
+	add(ops.HostedKindText, "", ".txt", ".log")
+	add(ops.HostedKindCode, "text/css"+charset, ".css")
+	add(ops.HostedKindCode, "text/javascript"+charset, ".js", ".mjs")
+	add(ops.HostedKindCode, "application/json", ".json")
+	add(ops.HostedKindCode, "",
+		".go", ".ts", ".tsx", ".jsx", ".cjs", ".py", ".rb", ".rs", ".java", ".kt",
+		".c", ".h", ".cc", ".cpp", ".hpp", ".cs", ".swift", ".php", ".lua", ".sh", ".bash", ".zsh",
+		".fish", ".scss", ".yaml", ".yml", ".toml", ".xml", ".sql", ".vue", ".svelte")
+	return t
 }
 
 // sniffLen is how many leading bytes decide text or binary for an unknown extension.
@@ -37,13 +61,8 @@ const sniffLen = 8192
 // route reuses this one decision for its content type.
 func KindOf(path string) ops.HostedKind {
 	ext := strings.ToLower(filepath.Ext(path))
-	if k, ok := kindByExt[ext]; ok {
-		return k
-	}
-	for _, c := range codeExts {
-		if c == ext {
-			return ops.HostedKindCode
-		}
+	if e, ok := extTable[ext]; ok {
+		return e.kind
 	}
 	return sniffKind(path)
 }

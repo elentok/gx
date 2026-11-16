@@ -38,9 +38,9 @@ type Config struct {
 	// tests fake it.
 	ViteLauncher devvite.Launcher
 
-	// HostedFilesUID is the gx user id that must own hosted temp files; nil
-	// means this process's user. Test-only: a test sets another id to see a
-	// foreign-owned temp file refused.
+	// Test seam (with files.Checker.statOverride): HostedFilesUID is the gx
+	// user id that must own hosted temp files; nil means this process's user.
+	// A test sets another id to see a foreign-owned temp file refused.
 	HostedFilesUID *uint32
 
 	StateDir    string
