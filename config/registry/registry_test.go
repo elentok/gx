@@ -160,7 +160,7 @@ func TestTreeOrderAndModelsTables(t *testing.T) {
 	for _, c := range Tree() {
 		cats = append(cats, c.Name)
 	}
-	want := []Category{CategoryProject, CategoryAgents, CategoryRalphLoop, CategoryNotifications, CategoryWebUI, CategorySystem, CategoryChecks}
+	want := []Category{CategoryProject, CategoryAgents, CategoryRalphLoop, CategoryNotifications, CategoryMentalHealth, CategoryWebUI, CategorySystem, CategoryChecks}
 	if !slices.Equal(cats, want) {
 		t.Fatalf("categories = %v, want %v", cats, want)
 	}
@@ -236,6 +236,9 @@ func TestPlacementPinsTable(t *testing.T) {
 	pin("System/Disk space/Cleanup", "disk-space.cleanup-command")
 	pin("System/Watchdogs/CPU", "cpu-watchdog.enabled", "cpu-watchdog.threshold-percent", "cpu-watchdog.sustain", "cpu-watchdog.cooldown")
 	pin("System/Watchdogs/Process", "watchdog.max-tree-processes", "watchdog.hard-max-tree-processes", "watchdog.interval", "watchdog.ulimit-headroom")
+	pin("Mental health/Mental health/General", "mental-health.enabled")
+	pin("Mental health/Mental health/Bedtime", "mental-health.bedtime.enabled", "mental-health.bedtime.start", "mental-health.bedtime.end", "mental-health.bedtime.message")
+	pin("Mental health/Mental health/Break", "mental-health.break.enabled", "mental-health.break.work-minutes", "mental-health.break.break-minutes", "mental-health.break.message")
 	pin("Project/Project/Repository", "name", "repo", "vcs")
 	pin("Project/Project/Delivery", "trunk", "landing", "delivery", "auto-ff-merge", "auto-pr")
 	pin("Checks/Checks/Checks", "checks")

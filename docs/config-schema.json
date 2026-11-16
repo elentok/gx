@@ -343,6 +343,71 @@
     "log": {
       "description": "TUI only, not shown on the web page"
     },
+    "mental-health": {
+      "additionalProperties": false,
+      "properties": {
+        "bedtime": {
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "default": false,
+              "description": "Stop agents from starting during the bedtime window.",
+              "type": "boolean"
+            },
+            "end": {
+              "default": "07:00",
+              "description": "When bedtime ends, as a 24-hour time such as 07:00. It must differ from the start.",
+              "type": "string"
+            },
+            "message": {
+              "default": "That's enough AI for today. Go to sleep and come back tomorrow at {end}.",
+              "description": "The message shown during bedtime. {end} becomes the end time.",
+              "type": "string"
+            },
+            "start": {
+              "default": "22:00",
+              "description": "When bedtime starts, as a 24-hour time such as 22:00.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "break": {
+          "additionalProperties": false,
+          "properties": {
+            "break-minutes": {
+              "default": 5,
+              "description": "Minutes the break lasts. At least 1.",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "enabled": {
+              "default": false,
+              "description": "Ask for a break after a stretch of work.",
+              "type": "boolean"
+            },
+            "message": {
+              "default": "",
+              "description": "The message shown during a break. Empty uses the built-in messages.",
+              "type": "string"
+            },
+            "work-minutes": {
+              "default": 55,
+              "description": "Minutes of work before a break. At least 3.",
+              "minimum": 3,
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "enabled": {
+          "default": false,
+          "description": "Enable mental health breaks: the bedtime and work-break rules below.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
     "name-aliases": {
       "description": "TUI only, not shown on the web page"
     },

@@ -105,6 +105,10 @@ type Settings struct {
 	// command. Zero thresholds mean off, so hand-built Settings stay off.
 	DiskSpace config.DiskSpaceConfig
 
+	// MentalHealth is config mental-health: the bedtime and break rules. Zero
+	// means off.
+	MentalHealth config.MentalHealthConfig
+
 	// RecentlyFinished is config server.recently-finished: how many completed
 	// epics the snapshot lists. Zero lists none; the config layer supplies
 	// config.DefaultRecentlyFinished when the key is unset.
@@ -191,6 +195,7 @@ func FromConfig(cfg config.Config) Settings {
 		CPUWatchdog:                 cfg.CPUWatchdog,
 		Watchdog:                    cfg.Watchdog,
 		DiskSpace:                   cfg.DiskSpace,
+		MentalHealth:                cfg.MentalHealth,
 		RecentlyFinished:            cfg.Server.RecentlyFinished,
 		NoChecksGrace:               cfg.PR.NoChecksGrace,
 		CIFixSkills:                 cfg.Skills.CIFix,

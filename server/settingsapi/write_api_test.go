@@ -105,6 +105,27 @@ func TestWriteRefusalNamesKeyAndWritesNothing(t *testing.T) {
 	}
 }
 
+func TestWriteMentalHealthEqualTimesRefused(t *testing.T) {
+	f := startAPI(t, nil)
+	before := f.read(t, f.config)
+	res := f.set(t, "", val("mental-health.bedtime.start", `"07:00"`))
+	if !res.Refused || len(res.Keys) != 1 || res.Keys[0] != "mental-health.bedtime.start" ||
+		!strings.Contains(res.Reason, "mental-health.bedtime.end") {
+		t.Fatalf("equal start: %+v", res)
+	}
+	// Each change is checked alone first, so a swap in one request is refused too.
+	res = f.set(t, "", val("mental-health.bedtime.start", `"07:00"`), val("mental-health.bedtime.end", `"22:00"`))
+	if !res.Refused {
+		t.Fatalf("swap in one request: %+v", res)
+	}
+	if got := f.read(t, f.config); got != before {
+		t.Fatalf("file changed:\n%s\nwas:\n%s", got, before)
+	}
+	if res := f.set(t, "", val("mental-health.bedtime.start", `"23:00"`)); res.Refused {
+		t.Fatalf("valid start refused: %+v", res)
+	}
+}
+
 func TestWriteSpinWindowDuration(t *testing.T) {
 	f := startAPI(t, nil)
 	if res := f.set(t, "", val("execution-queue.waiting-slot-grace", `"5mm"`)); !res.Refused {

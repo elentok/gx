@@ -21,6 +21,8 @@ server.web.allowed-hosts server.web.files.roots server.web.totp server.web.vi-es
 cpu-watchdog.enabled cpu-watchdog.threshold-percent cpu-watchdog.sustain cpu-watchdog.cooldown
 watchdog.max-tree-processes watchdog.hard-max-tree-processes watchdog.interval watchdog.ulimit-headroom
 disk-space.warn-below disk-space.clean-below disk-space.cleanup-command
+mental-health.enabled mental-health.bedtime.enabled mental-health.bedtime.start mental-health.bedtime.end mental-health.bedtime.message
+mental-health.break.enabled mental-health.break.work-minutes mental-health.break.break-minutes mental-health.break.message
 agents.default-harness agents.writable-directories
 agents.claude.model agents.claude.effort agents.claude.light.model agents.claude.light.effort
 agents.claude.strongest.model agents.claude.strongest.effort

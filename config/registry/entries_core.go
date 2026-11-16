@@ -69,6 +69,28 @@ func coreEntries() []Entry {
 	add(Place{CategoryNotifications, SectionNotifications, "Slack"}, Entry{Key: Key("notifications", "slack", "webhook-url"), Type: TypeSecret,
 		Description: "The Slack webhook address that receives notifications."})
 
+	mh := func(g string) Place { return Place{CategoryMentalHealth, SectionMentalHealth, g} }
+	add(mh("General"), Entry{Key: Key("mental-health", "enabled"), Type: TypeBool,
+		Description: "Enable mental health breaks: the bedtime and work-break rules below."})
+	bedtime := mh("Bedtime")
+	add(bedtime, Entry{Key: Key("mental-health", "bedtime", "enabled"), Type: TypeBool,
+		Description: "Stop agents from starting during the bedtime window."})
+	add(bedtime, Entry{Key: Key("mental-health", "bedtime", "start"), Type: TypeString, CheckString: checkClock,
+		Description: "When bedtime starts, as a 24-hour time such as 22:00."})
+	add(bedtime, Entry{Key: Key("mental-health", "bedtime", "end"), Type: TypeString, CheckString: checkClock,
+		Description: "When bedtime ends, as a 24-hour time such as 07:00. It must differ from the start."})
+	add(bedtime, Entry{Key: Key("mental-health", "bedtime", "message"), Type: TypeString,
+		Description: "The message shown during bedtime. {end} becomes the end time."})
+	brk := mh("Break")
+	add(brk, Entry{Key: Key("mental-health", "break", "enabled"), Type: TypeBool,
+		Description: "Ask for a break after a stretch of work."})
+	add(brk, Entry{Key: Key("mental-health", "break", "work-minutes"), Type: TypeNumber, Min: minOf(3), Integer: true,
+		Description: "Minutes of work before a break. At least 3."})
+	add(brk, Entry{Key: Key("mental-health", "break", "break-minutes"), Type: TypeNumber, Min: minOf(1), Integer: true,
+		Description: "Minutes the break lasts. At least 1."})
+	add(brk, Entry{Key: Key("mental-health", "break", "message"), Type: TypeString,
+		Description: "The message shown during a break. Empty uses the built-in messages."})
+
 	network := web(SectionAccess, "Network")
 	add(network, risky(Entry{Key: Key("server", "web", "listen"), Type: TypeString, Restart: true,
 		Description: "The address the web page is served on."},

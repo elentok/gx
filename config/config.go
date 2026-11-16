@@ -51,6 +51,7 @@ type Config struct {
 	CPUWatchdog           CPUWatchdogConfig    `json:"cpu-watchdog"`
 	Watchdog              WatchdogConfig       `json:"watchdog"`
 	DiskSpace             DiskSpaceConfig      `json:"disk-space"`
+	MentalHealth          MentalHealthConfig   `json:"mental-health"`
 	// AgentRunner is auto, herdr, headless or pty. It is validated when the
 	// server starts, not here, so a bad value never breaks the TUI.
 	AgentRunner string `json:"agent-runner"`
@@ -157,6 +158,7 @@ func defaultWith(dataDir func() (string, error)) Config {
 		CPUWatchdog:           DefaultCPUWatchdogConfig(),
 		Watchdog:              DefaultWatchdogConfig(),
 		DiskSpace:             DefaultDiskSpaceConfig(),
+		MentalHealth:          DefaultMentalHealthConfig(),
 		AgentRunner:           "auto",
 		RunnerWait:            agentrunner.DefaultN,
 		Evolve:                EvolveOff,
@@ -509,6 +511,12 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 	if d := raw.DiskSpace; d != nil {
 		var err error
 		if cfg.DiskSpace, err = applyDiskSpace(cfg.DiskSpace, d.WarnBelow, d.CleanBelow, d.CleanupCommand); err != nil {
+			return cfg, err
+		}
+	}
+	if m := raw.MentalHealth; m != nil {
+		var err error
+		if cfg.MentalHealth, err = applyMentalHealth(cfg.MentalHealth, m); err != nil {
 			return cfg, err
 		}
 	}

@@ -121,6 +121,22 @@ func checkLeaderKey(s string) error {
 	return nil
 }
 
+// IsClock reports whether s is a 24-hour HH:MM time such as 07:30.
+func IsClock(s string) bool {
+	if len(s) != 5 || s[2] != ':' {
+		return false
+	}
+	t, err := time.Parse("15:04", s)
+	return err == nil && t.Format("15:04") == s
+}
+
+func checkClock(s string) error {
+	if !IsClock(s) {
+		return errors.New("Use a 24-hour time such as 07:30.")
+	}
+	return nil
+}
+
 func decode(raw json.RawMessage, v any, reason string) error {
 	if string(raw) == "null" || json.Unmarshal(raw, v) != nil {
 		return errors.New(reason)

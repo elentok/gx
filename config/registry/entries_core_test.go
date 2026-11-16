@@ -60,6 +60,15 @@ func TestCoreEntries(t *testing.T) {
 		{key: Key("disk-space", "warn-below"), typ: TypeSize, section: SectionDiskSpace},
 		{key: Key("disk-space", "clean-below"), typ: TypeSize, section: SectionDiskSpace},
 		{key: Key("disk-space", "cleanup-command"), typ: TypeStringList, section: SectionDiskSpace, projectOv: true},
+		{key: Key("mental-health", "enabled"), typ: TypeBool, section: SectionMentalHealth},
+		{key: Key("mental-health", "bedtime", "enabled"), typ: TypeBool, section: SectionMentalHealth},
+		{key: Key("mental-health", "bedtime", "start"), typ: TypeString, section: SectionMentalHealth},
+		{key: Key("mental-health", "bedtime", "end"), typ: TypeString, section: SectionMentalHealth},
+		{key: Key("mental-health", "bedtime", "message"), typ: TypeString, section: SectionMentalHealth},
+		{key: Key("mental-health", "break", "enabled"), typ: TypeBool, section: SectionMentalHealth},
+		{key: Key("mental-health", "break", "work-minutes"), typ: TypeNumber, section: SectionMentalHealth},
+		{key: Key("mental-health", "break", "break-minutes"), typ: TypeNumber, section: SectionMentalHealth},
+		{key: Key("mental-health", "break", "message"), typ: TypeString, section: SectionMentalHealth},
 	}
 	if got := len(r.All()); got != len(cases) {
 		t.Fatalf("entries = %d, want %d", got, len(cases))

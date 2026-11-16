@@ -127,6 +127,7 @@ type rawConfig struct {
 		CleanBelow     *string  `json:"clean-below"`
 		CleanupCommand []string `json:"cleanup-command"`
 	} `json:"disk-space"`
+	MentalHealth *rawMentalHealth `json:"mental-health"`
 }
 
 // rawTierConfig is a tier as written in the file: a nil field is an absent key.

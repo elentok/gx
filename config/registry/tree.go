@@ -14,6 +14,7 @@ const (
 	CategoryAgents        Category = "Agents"
 	CategoryRalphLoop     Category = "Ralph loop"
 	CategoryNotifications Category = "Notifications"
+	CategoryMentalHealth  Category = "Mental health"
 	CategoryWebUI         Category = "Web UI"
 	CategorySystem        Category = "System"
 	CategoryChecks        Category = "Checks"
@@ -28,6 +29,7 @@ const (
 	SectionPullRequests   Section = "Pull requests"
 	SectionEvolveRecovery Section = "Evolve and recovery"
 	SectionNotifications  Section = "Notifications"
+	SectionMentalHealth   Section = "Mental health"
 	SectionAccess         Section = "Access"
 	SectionKeybindings    Section = "Keybindings"
 	SectionDisplayDev     Section = "Display and development"
@@ -112,6 +114,9 @@ var tree = []CategoryDef{
 	}},
 	{CategoryNotifications, []SectionDef{
 		{SectionNotifications, groups("Desktop", "Telegram", "Slack")},
+	}},
+	{CategoryMentalHealth, []SectionDef{
+		{SectionMentalHealth, groups("General", "Bedtime", "Break")},
 	}},
 	{CategoryWebUI, []SectionDef{
 		{SectionAccess, groups("Network", "Sign-in")},
