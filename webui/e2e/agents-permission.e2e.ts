@@ -406,7 +406,6 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await expect(sidebar(page).getByText(/held|pending|rename.*waiting/i)).toHaveCount(0)
   await expect(failure(page).getByText(/held|pending|rename.*waiting/i)).toHaveCount(0)
   await expect.poll(() => readSince(fixture, held.conv, before)).toBe("")
-  expect(await readSince(fixture, held.conv, before)).toBe("")
   await noticeButton(page, "Allow once").click()
   await leavesBlocked(fixture, held.s.id)
   await expect.poll(() => readSince(fixture, held.conv, before)).toContain("/rename held-name")
