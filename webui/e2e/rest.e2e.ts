@@ -35,7 +35,7 @@ function expectOrder(tops: number[]) {
 
 async function restPeriod(fixture: { cli: (...args: string[]) => Promise<string> }) {
   const out = JSON.parse(await fixture.cli("rest", "--json"))
-  return (out.status ?? out).period
+  return out.status.period
 }
 
 test("206. Rest screen, Break (R1)", async ({ page, start }) => {
@@ -87,16 +87,17 @@ test("207. Rest screen, Bedtime (R2)", async ({ page, start }) => {
   await expect(restDialog(page)).toBeVisible()
   await expect(part(page, "time-label")).toHaveText("Back at")
   await expect(part(page, "time")).toHaveText(/^\d\d:\d\d$/)
-  await expect(part(page, "message")).not.toHaveText("")
   expect((await restPeriod(fixture)).kind).toBe("bedtime")
 
-  // The default Bedtime message has no sub-message, so it is not in the order here.
+  // The server splits the default message into a message and a sub-message that names the End time.
+  await expect(part(page, "message")).toHaveText("That's enough AI for today.")
+  await expect(part(page, "submessage")).toHaveText(
+    `Go to sleep and come back tomorrow at ${await part(page, "time").innerText()}.`,
+  )
+
   await page.setViewportSize({ width: 375, height: 812 })
   await expect(part(page, "mascot-image")).toBeVisible()
-  const narrow = await layout(
-    page,
-    PARTS.filter((n) => n !== "submessage"),
-  )
+  const narrow = await layout(page, PARTS)
   expectOrder(narrow.tops)
 
   const other = await freshVisit(page, "#/")
