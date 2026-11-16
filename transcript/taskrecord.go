@@ -55,8 +55,11 @@ type TaskRecord struct {
 	Trailer *TaskEnd
 
 	// Details by kind; zero values are absent.
-	Command     string
-	ExitCode    *int
+	Command  string
+	ExitCode *int
+	// OutputPath is a shell's output file, as the launch result or the final
+	// notification names it. It is recorded here and not read yet.
+	OutputPath  string
 	OutputBytes int64
 	LastLine    string
 	Model       string

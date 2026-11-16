@@ -111,6 +111,9 @@ func Loader(kind agentrunner.Kind, ref FlowRef, sessionDir string, final bool) f
 		if snap.InFlight, err = transcript.ReadInFlightTools(path); err != nil {
 			return Snapshot{}, err
 		}
+		if snap.Records, err = transcript.ReadTaskRecords(path); err != nil {
+			return Snapshot{}, err
+		}
 		return snap, nil
 	}
 }

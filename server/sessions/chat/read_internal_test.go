@@ -582,6 +582,62 @@ func TestRead_BackgroundListsLiveTasksAndDropsAgedOutOnes(t *testing.T) {
 	}
 }
 
+func TestRead_TasksListShellsAndCallsOfAClaudeSession(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	ts := func(ago time.Duration) string { return now.Add(-ago).Format(time.RFC3339Nano) }
+	use := func(id, ago, input string) string {
+		return fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"content":[{"type":"tool_use","id":%q,"name":"Bash","input":%s}]}}`, ts(parseAgo(ago)), id, input)
+	}
+	launched := func(id, task, ago string) string {
+		return fmt.Sprintf(`{"type":"user","timestamp":%q,"message":{"content":[{"type":"tool_result","tool_use_id":%q,"content":"Output is being written to: /o/%s.output"}]},"toolUseResult":{"backgroundTaskId":%q}}`, ts(parseAgo(ago)), id, task, task)
+	}
+	done := func(task, ago string) string {
+		body := "<task-notification>\n<task-id>" + task + "</task-id>\n<status>completed</status>\n<summary>done (exit code 0)</summary>\n</task-notification>"
+		return fmt.Sprintf(`{"type":"queue-operation","operation":"enqueue","timestamp":%q,"content":%q}`, ts(parseAgo(ago)), body)
+	}
+	lines := []string{
+		use("u1", "5m", `{"command":"make","description":"build","run_in_background":true}`),
+		launched("u1", "b1", "5m"),
+		use("u2", "4m", `{"command":"lint","description":"lint","run_in_background":true}`),
+		launched("u2", "b2", "4m"),
+		done("b1", "2m"),
+		use("u3", "1m", `{"command":"sleep 30","description":"wait"}`),
+	}
+
+	f := newClaudeFixture(t)
+	writeLines(t, f.path, lines...)
+	got := f.chat(t, "/v1/sessions/chat").Tasks
+	if labels := taskLabels(got); !reflect.DeepEqual(labels, []string{"build", "lint", "wait"}) {
+		t.Fatalf("tasks = %v", labels)
+	}
+	if !got[0].Finished || got[0].Outcome != "success" || got[0].FinishedAt == "" || got[1].Finished || got[2].Kind != "call" || got[2].Finished {
+		t.Errorf("rows = %+v", got)
+	}
+
+	// Once the last task ends the group closes.
+	writeLines(t, f.path, append(lines, done("b2", "30s"), `{"type":"system","subtype":"turn_duration","timestamp":"`+ts(10*time.Second)+`"}`)...)
+	if got := f.chat(t, "/v1/sessions/chat").Tasks; len(got) != 0 {
+		t.Errorf("after the last task = %v", taskLabels(got))
+	}
+
+	// An exited session keeps no running rows.
+	f = newClaudeFixture(t)
+	f.src.meta.Status.State = wire.SessionExited
+	writeLines(t, f.path, lines...)
+	if got := f.chat(t, "/v1/sessions/chat").Tasks; len(got) != 0 {
+		t.Errorf("exited session = %v", taskLabels(got))
+	}
+}
+
+func parseAgo(s string) time.Duration {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		panic(err)
+	}
+	return d
+}
+
 func TestRead_InFlightCarriesUnmatchedCalls(t *testing.T) {
 	t.Parallel()
 	prompt := `{"type":"user","message":{"content":"go"}}`
