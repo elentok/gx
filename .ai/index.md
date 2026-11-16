@@ -123,7 +123,8 @@ A new route needs all of these. A missing one fails a test, not the build:
 
 Server tests: build fixtures with `servertest.WriteTicketWith` (`server/servertest/store.go`)
 instead of hand-written helpers. A web test that needs a project repo also needs
-`SetProjectRepoNoAutoMerge`; `newFFFixture` does not provide one.
+`SetProjectRepoNoAutoMerge`; `newFFFixture` does not provide one. Rig traps:
+[server-test-rigs.md](server-test-rigs.md).
 
 `servertest` fake agents idle without sending a report. New idle-path or finish-path behaviour (a
 stall nudge, say) makes every fake agent hang until the test times out. Give it an off switch that
