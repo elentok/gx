@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
 )
 
@@ -14,11 +15,13 @@ import (
 // runlog.ReadEvents, the same decoding the scheduler itself uses) and
 // prints only the events matching ticketFilter/eventFilter as pretty-printed
 // JSON blocks, in file order. Both filters are optional and AND together;
-// with neither, every event is printed. epicPath must already be a resolved
+// with neither, every event is printed, except scheduler-scan events: they
+// fire every pass and bury the real ones, so they show only with showScans or
+// an explicit --event scheduler-scan. epicPath must already be a resolved
 // epic directory (see ticketref.ResolveEpicArg) — a missing epic directory is an
 // error, but a missing run-log.jsonl (an epic that hasn't started yet) is
 // not: it prints a short message and returns nil so callers see exit 0.
-func runTicketsFilterRunLog(epicPath, ticketFilter string, eventFilter []string, w io.Writer) error {
+func runTicketsFilterRunLog(epicPath, ticketFilter string, eventFilter []string, showScans bool, w io.Writer) error {
 	epicPath = filepath.Clean(epicPath)
 
 	info, err := os.Stat(epicPath)
@@ -29,7 +32,7 @@ func runTicketsFilterRunLog(epicPath, ticketFilter string, eventFilter []string,
 	scratchDir := filepath.Dir(epicPath)
 	epicName := filepath.Base(epicPath)
 
-	events, ok, err := runlog.ReadEvents(scratchDir, epicName)
+	logged, ok, err := runlog.ReadEvents(scratchDir, epicName)
 	if err != nil {
 		return err
 	}
@@ -43,11 +46,14 @@ func runTicketsFilterRunLog(epicPath, ticketFilter string, eventFilter []string,
 		wantEvents[t] = true
 	}
 
-	for _, ev := range events {
+	for _, ev := range logged {
 		if ticketFilter != "" && ev.Ticket != ticketFilter {
 			continue
 		}
 		if len(wantEvents) > 0 && !wantEvents[ev.Type] {
+			continue
+		}
+		if len(wantEvents) == 0 && !showScans && ev.Type == string(events.SchedulerScan) {
 			continue
 		}
 		data, err := json.MarshalIndent(ev, "", "  ")

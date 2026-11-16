@@ -36,26 +36,10 @@ stdout in that case.`,
 // need) and either prints its path or, with grepPattern set, filters its
 // lines.
 func runClaudeSessionPath(d Deps, sessionID, grepPattern string) error {
-	home, err := d.UserHomeDir()
+	path, err := findSessionTranscript(d, sessionID)
 	if err != nil {
-		return fmt.Errorf("resolve home directory: %w", err)
+		return err
 	}
-
-	matches, err := transcript.FindByID(home, sessionID)
-	if err != nil {
-		return fmt.Errorf("search for session %s: %w", sessionID, err)
-	}
-	if len(matches) == 0 {
-		return fmt.Errorf("no transcript found for session %s", sessionID)
-	}
-	if len(matches) > 1 {
-		for _, m := range matches {
-			fmt.Fprintln(d.Stderr, m)
-		}
-		return fmt.Errorf("session %s matched %d transcripts, expected exactly one", sessionID, len(matches))
-	}
-
-	path := matches[0]
 	if grepPattern == "" {
 		fmt.Fprintln(d.Stdout, path)
 		return nil
@@ -69,6 +53,30 @@ func runClaudeSessionPath(d Deps, sessionID, grepPattern string) error {
 		fmt.Fprintln(d.Stdout, line)
 	}
 	return nil
+}
+
+// findSessionTranscript returns the one transcript path for sessionID. Several
+// matches are listed on stderr and are an error.
+func findSessionTranscript(d Deps, sessionID string) (string, error) {
+	home, err := d.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve home directory: %w", err)
+	}
+
+	matches, err := transcript.FindByID(home, sessionID)
+	if err != nil {
+		return "", fmt.Errorf("search for session %s: %w", sessionID, err)
+	}
+	if len(matches) == 0 {
+		return "", fmt.Errorf("no transcript found for session %s", sessionID)
+	}
+	if len(matches) > 1 {
+		for _, m := range matches {
+			fmt.Fprintln(d.Stderr, m)
+		}
+		return "", fmt.Errorf("session %s matched %d transcripts, expected exactly one", sessionID, len(matches))
+	}
+	return matches[0], nil
 }
 
 // grepFileLines returns path's lines matching pattern as a case-insensitive

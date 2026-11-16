@@ -32,6 +32,7 @@ func Commands(d Deps) []*cobra.Command {
 		newTicketsFollowUpCmd(d),
 		newTicketsEpicCmd(d),
 		newTicketsFilterRunLogCmd(d),
+		newTicketsPausedCmd(d),
 		newTicketsTriageCmd(d),
 		newTicketsStartDesignCmd(d),
 	}
@@ -89,11 +90,13 @@ func newTicketsFollowUpCmd(d Deps) *cobra.Command {
 func newTicketsFilterRunLogCmd(d Deps) *cobra.Command {
 	var filterTicket string
 	var filterEvents []string
+	var filterScans bool
 	cmd := ticketref.NewEpicScopedCmd(d.Env, "filter-run-log <epic>",
 		"print an epic's run-log.jsonl events, filtered by ticket/event type",
 		func(epicPath string, _ []string, out io.Writer) error {
-			return runTicketsFilterRunLog(epicPath, filterTicket, filterEvents, out)
+			return runTicketsFilterRunLog(epicPath, filterTicket, filterEvents, filterScans, out)
 		})
+	cmd.Flags().BoolVar(&filterScans, "scans", false, "include scheduler-scan events (hidden by default)")
 	cmd.Flags().StringVar(&filterTicket, "ticket", "", "only events for this ticket id")
 	cmd.Flags().StringArrayVar(&filterEvents, "event", nil, "only events of this type (repeatable)")
 	return cmd

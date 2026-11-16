@@ -30,7 +30,7 @@ func TestRunTicketsFilterRunLog_FiltersByTicket(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	if err := runTicketsFilterRunLog(epicDir, "01", nil, &buf); err != nil {
+	if err := runTicketsFilterRunLog(epicDir, "01", nil, false, &buf); err != nil {
 		t.Fatalf("runTicketsFilterRunLog: %v", err)
 	}
 
@@ -59,7 +59,7 @@ func TestRunTicketsFilterRunLog_FiltersByEvent(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	if err := runTicketsFilterRunLog(epicDir, "", []string{"paused", "scheduler-scan"}, &buf); err != nil {
+	if err := runTicketsFilterRunLog(epicDir, "", []string{"paused", "scheduler-scan"}, false, &buf); err != nil {
 		t.Fatalf("runTicketsFilterRunLog: %v", err)
 	}
 
@@ -69,6 +69,32 @@ func TestRunTicketsFilterRunLog_FiltersByEvent(t *testing.T) {
 	}
 	if !strings.Contains(out, "paused") || !strings.Contains(out, "scheduler-scan") {
 		t.Errorf("output = %s, want both paused and scheduler-scan events", out)
+	}
+}
+
+func TestRunTicketsFilterRunLog_HidesSchedulerScansUnlessAsked(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempRepo(t)
+	epicDir := filepath.Join(repoDir, ".scratch", "widget-epic")
+	writeRunLog(t, epicDir, []string{
+		`{"time":"2026-01-01T00:01:00Z","type":"paused","ticket":"01"}`,
+		`{"time":"2026-01-01T00:02:00Z","type":"scheduler-scan","ticket":""}`,
+	})
+
+	var hidden bytes.Buffer
+	if err := runTicketsFilterRunLog(epicDir, "", nil, false, &hidden); err != nil {
+		t.Fatalf("runTicketsFilterRunLog: %v", err)
+	}
+	if !strings.Contains(hidden.String(), "paused") || strings.Contains(hidden.String(), "scheduler-scan") {
+		t.Errorf("default output = %s, want paused only", hidden.String())
+	}
+
+	var shown bytes.Buffer
+	if err := runTicketsFilterRunLog(epicDir, "", nil, true, &shown); err != nil {
+		t.Fatalf("runTicketsFilterRunLog: %v", err)
+	}
+	if !strings.Contains(shown.String(), "paused") || !strings.Contains(shown.String(), "scheduler-scan") {
+		t.Errorf("--scans output = %s, want both events", shown.String())
 	}
 }
 
@@ -83,7 +109,7 @@ func TestRunTicketsFilterRunLog_CombinesTicketAndEventFilters(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	if err := runTicketsFilterRunLog(epicDir, "01", []string{"paused"}, &buf); err != nil {
+	if err := runTicketsFilterRunLog(epicDir, "01", []string{"paused"}, false, &buf); err != nil {
 		t.Fatalf("runTicketsFilterRunLog: %v", err)
 	}
 
@@ -100,7 +126,7 @@ func TestRunTicketsFilterRunLog_NoRunLogYet(t *testing.T) {
 	testutil.Mkdir(t, epicDir)
 
 	var buf bytes.Buffer
-	if err := runTicketsFilterRunLog(epicDir, "", nil, &buf); err != nil {
+	if err := runTicketsFilterRunLog(epicDir, "", nil, false, &buf); err != nil {
 		t.Fatalf("runTicketsFilterRunLog: %v", err)
 	}
 
@@ -115,7 +141,7 @@ func TestRunTicketsFilterRunLog_MissingEpicErrors(t *testing.T) {
 	epicDir := filepath.Join(repoDir, ".scratch", "no-such-epic")
 
 	var buf bytes.Buffer
-	err := runTicketsFilterRunLog(epicDir, "", nil, &buf)
+	err := runTicketsFilterRunLog(epicDir, "", nil, false, &buf)
 	if err == nil {
 		t.Fatal("runTicketsFilterRunLog: want error for missing epic, got nil")
 	}
