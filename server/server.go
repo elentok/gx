@@ -545,14 +545,11 @@ func New(cfg Config) (*Server, error) {
 	mux := http.NewServeMux()
 	// The rescan steps run in this order after every store scan.
 	s.idx.OnRescan(s.rec.ScanParentDefects)
-	s.idx.OnRescan(func() {
-		if hold := cfg.LateFinishScanHold; hold != "" {
-			if _, err := os.Stat(hold); err == nil {
-				return
-			}
-		}
-		s.rec.ScanLateFinishes()
-	})
+	scanLateFinishes := s.rec.ScanLateFinishes
+	if cfg.WrapLateFinishScan != nil {
+		scanLateFinishes = cfg.WrapLateFinishScan(scanLateFinishes)
+	}
+	s.idx.OnRescan(scanLateFinishes)
 	s.idx.OnRescan(s.oneOffs.Sweep)
 	s.idx.OnRescan(s.designs.ScanCleanups)
 	s.idx.OnRescan(s.triage.ScanRevisions)
