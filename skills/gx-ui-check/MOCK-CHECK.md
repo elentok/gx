@@ -27,6 +27,11 @@ Change files with a file edit (Edit) or file write (Write) only, never `sed -i`,
    - State selector: `[data-mock-state=<s>]`
 
    gx-implement compares by the part selector, gx-verify-epic by the state selector.
+
+   Mock files have single lines of inline CSS and markup up to about 40 KB, and some embed base64
+   images. A plain `rg -n` or `cat` prints whole lines and floods the context. Search a mock with
+   `rg -o '.{0,80}PATTERN.{0,80}' <mock>`, or pipe the output through `cut -c1-200`. Read library
+   facts from the research docs, not from the mock.
 5. Locate the same part on the built page. You choose how: roles, visible text or a CSS selector.
 6. Resize the viewport to the state's width before each state. Screenshot the mock and the built
    page at that width, at device scale factor 1, cropped to the selector. Never take a full page at retina scale.

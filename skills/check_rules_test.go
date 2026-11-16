@@ -42,6 +42,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"resolving-merge-conflicts edit-only", "gx-resolving-merge-conflicts/SKILL.md", editOnlyRule},
 		{"ui-check edit-only", "gx-ui-check/SKILL.md", editOnlyRule},
 		{"mock-check edit-only", "gx-ui-check/MOCK-CHECK.md", editOnlyRule},
+		{"mock-check bounded search", "gx-ui-check/MOCK-CHECK.md", []string{"`rg -o '.{0,80}PATTERN.{0,80}' <mock>`"}},
 		{"follow-up edit-only", "gx-follow-up/SKILL.md", editOnlyRule},
 		{"flake tickets edit-only", "gx-flake-tickets.md", editOnlyRule},
 		{"verify-epic edit-only", "gx-verify-epic/SKILL.md", editOnlyRule},
