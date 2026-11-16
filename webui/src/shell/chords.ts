@@ -129,6 +129,7 @@ export function chordTable({
       available: () => true,
     },
     { key: "s", label: () => "Focus sidebar", run: focusSidebar, available: () => true },
+    // Global on purpose: the big prompt box toggle works on every page (see GLOSSARY, prompt-box-vi-mode spec).
     {
       key: "b",
       label: () => (getBigPrompt() ? "Normal prompt box" : "Big prompt box"),
