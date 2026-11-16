@@ -293,8 +293,26 @@ test("the Grilling section sits between Cost and effort and Friction", async () 
     "stats-friction",
     "stats-launch",
     "stats-web-performance",
+    "stats-mental-health",
   ])
   expect(screen.getByText("Questions asked")).toBeTruthy()
+})
+
+test("the Mental health card totals Breaks and unlocks and splits unlocks in the legend", async () => {
+  const mh = { break_starts: [2, 3, 1], break_unlocks: [1, 0, 1], bedtime_unlocks: [0, 2, 0] }
+  renderStats(async () => statsOf({}, { mental_health: mh }))
+  const text = await cardText("Breaks and unlocks")
+  expect(text).toContain("6 Breaks · 4 unlocks")
+  expect(text).toContain("2.0/day Breaks · 1.3/day unlocks · 2 Break, 2 Bedtime")
+  expect(text).toContain("ignores the project filter")
+  expect(text).toContain("Break unlocks")
+  expect(text).toContain("Bedtime unlocks")
+})
+
+test("the Mental health card ignores the project filter", async () => {
+  const mh = { break_starts: [1, 1, 1], break_unlocks: [0, 0, 0], bedtime_unlocks: [0, 0, 0] }
+  renderStats(async () => statsOf({}, { mental_health: mh }), "/stats?project=gx")
+  expect(await cardText("Breaks and unlocks")).toContain("3 Breaks · 0 unlocks")
 })
 
 test("the Grilling cards skip no-data days in the total and average and hatch them", async () => {

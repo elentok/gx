@@ -103,6 +103,38 @@ function Throughput({ stats }: { stats: Stats }) {
   )
 }
 
+function MentalHealth({ stats }: { stats: Stats }) {
+  const { days, mental_health: m } = stats
+  const unlocks = sum(m.break_unlocks) + sum(m.bedtime_unlocks)
+  const perDayUnlocks = m.break_unlocks.map((v, i) => v + (m.bedtime_unlocks[i] ?? 0))
+  return (
+    <Section id="stats-mental-health" title="Mental health" tone="waiting">
+      <StatCard
+        title="Breaks and unlocks"
+        days={days}
+        chart="side-by-side"
+        headline={`${sum(m.break_starts)} Breaks · ${unlocks} unlocks`}
+        small={`${perDay(m.break_starts)}/day Breaks · ${perDay(perDayUnlocks)}/day unlocks · ${sum(m.break_unlocks)} Break, ${sum(m.bedtime_unlocks)} Bedtime · ignores the project filter`}
+        series={[
+          { key: "breaks", label: "Breaks", tone: "done", values: m.break_starts },
+          {
+            key: "break-unlocks",
+            label: "Break unlocks",
+            tone: "waiting",
+            values: m.break_unlocks,
+          },
+          {
+            key: "bedtime-unlocks",
+            label: "Bedtime unlocks",
+            tone: "deadlocked",
+            values: m.bedtime_unlocks,
+          },
+        ]}
+      />
+    </Section>
+  )
+}
+
 function Cost({ stats, project }: { stats: Stats; project: string }) {
   return (
     <Section id="stats-cost" title="Cost and effort" tone="waiting">
@@ -378,6 +410,7 @@ export function StatsPage({
             includeDev={includeDev}
             onIncludeDev={(on) => set("dev", on ? "1" : "")}
           />
+          <MentalHealth stats={stats} />
         </>
       )}
     </DetailPage>

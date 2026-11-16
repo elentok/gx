@@ -140,6 +140,7 @@ const statsAnswer = {
   friction: { pause_reasons: [], pauses_by_reason: [], run_events: [], pause_endings: [] },
   launch: { count: 0, target_ms: 15000, days: [], step_median_ms: {} },
   grilling: { words: [], questions: [] },
+  mental_health: { break_starts: [0], break_unlocks: [0], bedtime_unlocks: [0] },
   limit_burn: {
     claude_5h: { days: [], sum: 0, average: 0 },
     claude_weekly: { days: [], sum: 0, average: 0 },

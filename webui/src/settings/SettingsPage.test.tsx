@@ -688,6 +688,64 @@ describe("section page group blocks", () => {
     expect(getByTestId("group-Location").textContent).toContain("Location")
   })
 
+  describe("Mental health section", () => {
+    const m = (key: string, group: string, over: Partial<SettingsEntry> = {}): SettingsEntry =>
+      e({
+        key: `mental-health.${key}`,
+        path: ["mental-health", ...key.split(".")],
+        section: "Mental health",
+        category: "Mental health",
+        group,
+        type: "string",
+        ...over,
+      })
+    const entries = [
+      m("enabled", "General", { type: "bool", value: true, set: true }),
+      m("bedtime.start", "Bedtime", { value: "22:00", set: true }),
+      m("bedtime.end", "Bedtime", { value: "07:00", set: true }),
+      m("break.work-minutes", "Break", { type: "number", value: 50, set: true }),
+    ]
+
+    it("shows the General, Bedtime and Break groups and no unlock or Break counter", () => {
+      const { getByTestId, queryByText } = render(entries, undefined, "Mental health")
+      for (const g of ["General", "Bedtime", "Break"])
+        expect(getByTestId(`group-${g}`)).toBeTruthy()
+      expect(queryByText(/unlock/i)).toBeNull()
+      expect(queryByText(/\d+\s+breaks?\b/i)).toBeNull()
+    })
+
+    it("shows the refusal of a save and keeps the draft", async () => {
+      const onWrite = vi.fn(async () => ({
+        refused: true,
+        keys: ["mental-health.bedtime.start"],
+        reason: "must differ from mental-health.bedtime.end",
+      }))
+      const { getByTestId, getByText, getAllByRole } = renderThemed(
+        <MemoryRouter initialEntries={["/settings"]}>
+          <SettingsShellView
+            entries={entries}
+            categories={treeFromEntries(entries)}
+            projects={[]}
+            section="Mental health"
+            totpOn
+            onSignOut={() => {}}
+            onWrite={onWrite}
+          />
+        </MemoryRouter>,
+      )
+      const input = within(getByTestId("group-Bedtime")).getAllByRole(
+        "textbox",
+      )[0] as HTMLInputElement
+      expect(getAllByRole("textbox").length).toBeGreaterThan(0)
+      fireEvent.change(input, { target: { value: "07:00" } })
+      fireEvent.keyDown(input, { key: "Enter" })
+      await waitFor(() =>
+        expect(getByText("Not saved: must differ from mental-health.bedtime.end")).toBeTruthy(),
+      )
+      expect(input.value).toBe("07:00")
+    })
+  })
+
   it("shows the Project section of a project as read-only Repository and Delivery groups", () => {
     const p = (key: string, group: string, over: Partial<SettingsEntry> = {}) =>
       e({ key, path: [key], section: "Project", category: "Project", group, ...over })
