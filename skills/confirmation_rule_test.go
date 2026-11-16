@@ -9,3 +9,10 @@ func TestImplementNoConfirmationOfOwnRecommendationAnchors(t *testing.T) {
 		"Ask only for a real fork",
 	)
 }
+
+func TestImplementDiffCheckAnchors(t *testing.T) {
+	checkAnchors(t, "gx-implement/SKILL.md",
+		"## Check the diff against the ticket",
+		"`Went wrong: Nothing` is allowed only when `## Spec deviations` is empty",
+	)
+}

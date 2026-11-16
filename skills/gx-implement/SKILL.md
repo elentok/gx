@@ -310,6 +310,13 @@ Don't re-run the test to get raw output.
 
 Claiming already writes `status: claimed` for you — never write it yourself.
 
+## Check the diff against the ticket
+
+Before the commit and the iteration summary, compare the final diff and tests with the ticket's
+acceptance criteria and Test seams. Every criterion or seam not met as written gets an entry under
+`## Spec deviations`. `Went wrong: Nothing` is allowed only when `## Spec deviations` is empty and
+nothing failed.
+
 Before you report `finished`, append your entry to `## Iteration summaries`
 ([format](../gx-local-tracker.md#iteration-summaries), inlined here so you need not look it up):
 a `### <session id> — <RFC 3339 time from date -u +%Y-%m-%dT%H:%M:%SZ> — agent` heading, then four

@@ -567,6 +567,7 @@ Every iteration agent, of any ticket type, appends one entry to its own ticket's
 summaries` section before it reports `finished`. The entry is a `### <session id> — <RFC 3339 time> —
 agent` heading and four bullets: `Did`, `Went wrong`, `Decisions`, `Left`, one line each. Rewrite the
 whole section with `gx tickets section <addr> "Iteration summaries" -`, keeping the earlier entries.
+`Went wrong: Nothing` is allowed only when the ticket's `## Spec deviations` is empty and nothing failed.
 gx appends its own entry, labelled `gx`, listing what it did (resends, relaunches, a re-adopted
 holder, a nudge). A missing summary never blocks finishing or pauses the ticket. A relaunched
 session's prompt lists the earlier summaries; read them before you start.
