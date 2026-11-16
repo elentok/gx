@@ -71,12 +71,12 @@ func TestTicketsPaused_SummarisesPauseEventsWorktreeAndPane(t *testing.T) {
 	cl := pausedServer(t,
 		wire.TicketDetail{
 			Address: "proj:epic/03", Title: "Do the thing", Status: "paused",
-			PauseReason: "needs-answer", PauseLabel: "Needs an answer", PauseText: "which base?",
+			PauseReason: "self-reported", PauseLabel: "Self reported", PauseText: "which base?",
 		},
 		[]runlog.Event{
 			{Type: string(events.IterationStarted), Ticket: "03"},
 			{Type: string(events.SchedulerScan)},
-			{Type: string(events.Paused), Ticket: "03", Reason: "needs-answer"},
+			{Type: string(events.Paused), Ticket: "03", Reason: "self-reported"},
 		},
 		[]wire.IterationInfo{
 			{Address: "proj:epic/03", Pane: "pane-7", Worktree: "/wt/epic-03", Branch: "ralph-loop/epic"},
@@ -90,7 +90,7 @@ func TestTicketsPaused_SummarisesPauseEventsWorktreeAndPane(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"Needs an answer", "needs-answer", "which base?",
+		"Self reported", "self-reported", "which base?",
 		"iteration-started", "paused",
 		"/wt/epic-03", "ralph-loop/epic", "pane-7",
 	} {
