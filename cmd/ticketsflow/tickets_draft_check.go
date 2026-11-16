@@ -20,11 +20,9 @@ const (
 	goplsTimeout = 8 * time.Second
 )
 
-// draftMisses is one line per path, test pattern, flow id or symbol the plan
-// names that the checkout at root lacks. It also fills each ticket's Callers.
-// The judgment checks (what a change hides, which side wins, signature fallout)
-// are the agent's: nothing here claims one.
-func draftMisses(plan *ticketspec.DraftPlan, root string, finder *callerFinder) []string {
+// claimMisses runs the claim lint on each ticket's rendered body, keyed by
+// BodyFileName.
+func claimMisses(plan *ticketspec.DraftPlan, root string, bodies map[string]string) []string {
 	env := ticketspec.LintEnv{
 		Root:    root,
 		GoTests: ticketspec.LoadGoTestNames(root),
@@ -33,14 +31,20 @@ func draftMisses(plan *ticketspec.DraftPlan, root string, finder *callerFinder) 
 	}
 	var misses []string
 	for _, t := range plan.Tickets {
-		body := ticketspec.RenderDraftBody(t, plan.Scenario, "x", "x")
-		for _, m := range ticketspec.ClaimMisses(body, env) {
+		for _, m := range ticketspec.ClaimMisses(bodies[t.BodyFileName()], env) {
 			misses = append(misses, t.Slug+": "+m)
 		}
 	}
+	return misses
+}
 
+// draftMisses is one line per symbol, helper, make target or Playwright
+// pattern the plan names that the checkout at root lacks, plus the callers of
+// every plan symbol. The judgment checks (what a change hides, which side
+// wins, signature fallout) are the agent's: nothing here claims one.
+func draftMisses(plan *ticketspec.DraftPlan, root string, finder *callerFinder) (misses []string, callers map[string]string) {
 	symbols := planSymbols(plan)
-	callers := map[string]string{}
+	callers = map[string]string{}
 	rgOK := true
 	if _, err := exec.LookPath("rg"); err != nil {
 		rgOK = false
@@ -60,11 +64,8 @@ func draftMisses(plan *ticketspec.DraftPlan, root string, finder *callerFinder) 
 			callers[s] = text
 		}
 	}
-	for i := range plan.Tickets {
-		plan.Tickets[i].Callers = callers
-	}
-	misses = append(misses, draftFacts(plan, root, finder, rgOK)...)
-	return misses
+	misses = append(misses, draftFacts(plan, root, finder, factsOptions{rg: rgOK})...)
+	return misses, callers
 }
 
 // planSymbols is every entry and changed symbol of the plan, once.
@@ -85,6 +86,11 @@ type callerFinder struct {
 	env          []string
 	gopls        bool
 	noRemote     bool
+	// goplsDeadline is one time budget for every gopls call of the run, set
+	// at the first call. refs caches output by definition, so symbols that
+	// share a declaration cost one process.
+	goplsDeadline time.Time
+	refs          map[position]string
 	// goplsFailure is the first gopls failure of the run; rgFallbacks counts
 	// the symbols answered by rg after it.
 	goplsFailure string
@@ -134,7 +140,7 @@ func (f *callerFinder) callers(symbol string) (string, bool) {
 	name := symbol[strings.LastIndex(symbol, ".")+1:]
 	if f.gopls {
 		if pos, ok := f.goDefinition(name); ok {
-			out, err := f.goplsReferences(pos)
+			out, err := f.cachedReferences(pos)
 			if err == nil {
 				return fmt.Sprintf("verified at %s: %s", f.commit, f.summarize(refLines(out))), true
 			}
@@ -154,9 +160,12 @@ func (f *callerFinder) callers(symbol string) (string, bool) {
 // goplsReferences prefers the shared daemon. When the daemon cannot be dialed
 // (seen even unsandboxed) it runs in-process and stays there for the rest of
 // the run, so the dial failure is paid once.
-func (f *callerFinder) goplsReferences(pos string) (string, error) {
+func (f *callerFinder) goplsReferences(pos position) (string, error) {
+	if f.goplsDeadline.IsZero() {
+		f.goplsDeadline = time.Now().Add(goplsTimeout)
+	}
 	run := func(args ...string) (string, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), goplsTimeout)
+		ctx, cancel := context.WithDeadline(context.Background(), f.goplsDeadline)
 		defer cancel()
 		out, err := f.command(ctx, "gopls", args...).CombinedOutput()
 		if ctx.Err() != nil {
@@ -165,34 +174,64 @@ func (f *callerFinder) goplsReferences(pos string) (string, error) {
 		return string(out), err
 	}
 	if !f.noRemote {
-		out, err := run("-remote=auto", "references", pos)
+		out, err := run("-remote=auto", "references", pos.String())
 		if err == nil {
 			return out, nil
 		}
 		f.noRemote = true
 	}
-	return run("references", pos)
+	return run("references", pos.String())
 }
 
-func defRe(name string) *regexp.Regexp {
-	return regexp.MustCompile(`^(?:func\s+(?:\([^)]*\)\s*)?|type\s+|var\s+|const\s+)(` + regexp.QuoteMeta(name) + `)\b`)
+// cachedReferences runs gopls once per declaration.
+func (f *callerFinder) cachedReferences(pos position) (string, error) {
+	if out, ok := f.refs[pos]; ok {
+		return out, nil
+	}
+	out, err := f.goplsReferences(pos)
+	if err == nil {
+		if f.refs == nil {
+			f.refs = map[position]string{}
+		}
+		f.refs[pos] = out
+	}
+	return out, err
 }
 
-// goDefinition returns the file:line:col of the Go declaration of name.
-func (f *callerFinder) goDefinition(name string) (string, bool) {
-	re := defRe(name)
-	cmd := f.command(context.Background(), "rg", "-n", "--no-heading", "-g", "*.go", "-e", strings.TrimPrefix(re.String(), "^"), ".")
+// position is a source location, 1-based.
+type position struct {
+	file      string
+	line, col int
+}
+
+func (p position) String() string { return fmt.Sprintf("%s:%d:%d", p.file, p.line, p.col) }
+
+// defPattern matches the head of a Go declaration of name, unanchored so rg
+// can use it; defRe anchors the same pattern to the line start.
+func defPattern(name string) string {
+	return `(?:func\s+(?:\([^)]*\)\s*)?|type\s+|var\s+|const\s+)(` + regexp.QuoteMeta(name) + `)\b`
+}
+
+// goDefinition returns the position of the Go declaration of name.
+func (f *callerFinder) goDefinition(name string) (position, bool) {
+	pattern := defPattern(name)
+	re := regexp.MustCompile("^" + pattern)
+	cmd := f.command(context.Background(), "rg", "-n", "--no-heading", "-g", "*.go", "-e", pattern, ".")
 	out, _ := cmd.Output()
 	for l := range strings.SplitSeq(string(out), "\n") {
 		parts := strings.SplitN(l, ":", 3)
 		if len(parts) < 3 {
 			continue
 		}
+		line, err := strconv.Atoi(parts[1])
+		if err != nil {
+			continue
+		}
 		if m := re.FindStringSubmatchIndex(parts[2]); m != nil {
-			return fmt.Sprintf("%s:%s:%d", strings.TrimPrefix(parts[0], "./"), parts[1], m[2]+1), true
+			return position{strings.TrimPrefix(parts[0], "./"), line, m[2] + 1}, true
 		}
 	}
-	return "", false
+	return position{}, false
 }
 
 // rgLines is the file:line of every word match of name.

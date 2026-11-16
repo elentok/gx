@@ -61,7 +61,10 @@ func runDraft(cwd string, env []string, planPath, manifestPath string, noGopls b
 		return err
 	}
 	finder := newCallerFinder(root, commit, env, noGopls)
-	misses := draftMisses(&plan, root, finder)
+	misses, callers := draftMisses(&plan, root, finder)
+	for i := range plan.Tickets {
+		plan.Tickets[i].Callers = callers
+	}
 	dir := filepath.Dir(manifestPath)
 	rows := make([]ticketspec.ManifestRow, 0, len(plan.Tickets))
 	bodies := map[string]string{}
@@ -73,6 +76,7 @@ func runDraft(cwd string, env []string, planPath, manifestPath string, noGopls b
 		bodies[t.BodyFileName()] = ticketspec.RenderDraftBody(t, plan.Scenario, what, accept)
 		rows = append(rows, ticketspec.ManifestRow{Slug: t.Slug, Type: t.Type, BlockedBy: t.BlockedBy, Window: t.Window, Body: t.BodyFileName()})
 	}
+	misses = append(claimMisses(&plan, root, bodies), misses...)
 
 	existing, err := os.ReadFile(manifestPath)
 	if err != nil && !os.IsNotExist(err) {

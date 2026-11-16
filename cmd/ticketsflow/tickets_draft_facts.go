@@ -20,10 +20,16 @@ var (
 
 // Only mechanical facts are printed here. Each is a lookup, never a verdict.
 
+// factsOptions says which lookups draftFacts may run.
+type factsOptions struct {
+	// rg is false when rg is not on PATH, which skips the helper and field lookups.
+	rg bool
+}
+
 // draftFacts fills each ticket's SeamFacts, Consumers and FieldTests and
 // returns one miss per Makefile target, helper or Playwright pattern that does
 // not check out.
-func draftFacts(plan *ticketspec.DraftPlan, root string, finder *callerFinder, rgOK bool) []string {
+func draftFacts(plan *ticketspec.DraftPlan, root string, finder *callerFinder, opts factsOptions) []string {
 	var misses []string
 	var targets map[string]bool
 	for i := range plan.Tickets {
@@ -58,7 +64,7 @@ func draftFacts(plan *ticketspec.DraftPlan, root string, finder *callerFinder, r
 				misses = append(misses, t.Slug+": "+line)
 			}
 		}
-		if !rgOK {
+		if !opts.rg {
 			continue
 		}
 		for _, h := range t.Helpers {
@@ -155,12 +161,8 @@ func (f *callerFinder) helperFact(symbol string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	parts := strings.Split(pos, ":")
-	var line int
-	if _, err := fmt.Sscanf(parts[1], "%d", &line); err != nil {
-		return "", false
-	}
-	data, err := os.ReadFile(filepath.Join(f.root, parts[0]))
+	line := pos.line
+	data, err := os.ReadFile(filepath.Join(f.root, pos.file))
 	if err != nil {
 		return "", false
 	}
@@ -174,7 +176,7 @@ func (f *callerFinder) helperFact(symbol string) (string, bool) {
 		text = strings.Join(doc, " ")
 	}
 	decl := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(src[line-1]), "{"))
-	return fmt.Sprintf("helper `%s` at %s:%d: `%s`; comment: %s", symbol, parts[0], line, decl, text), true
+	return fmt.Sprintf("helper `%s` at %s:%d: `%s`; comment: %s", symbol, pos.file, line, decl, text), true
 }
 
 // fieldConsumers lists every line that mentions the field name, and the

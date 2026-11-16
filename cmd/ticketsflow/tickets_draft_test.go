@@ -399,6 +399,21 @@ func TestTicketsDraft_GoplsFailureNotedOnceAndStopsGopls(t *testing.T) {
 	}
 }
 
+func TestTicketsDraft_SymbolsSharingADeclarationShareOneGoplsCall(t *testing.T) {
+	plan := strings.Replace(factsPlan, "entry_symbols: [runAlpha]", "entry_symbols: [runAlpha, pkg.runAlpha, runBeta]", 1)
+	d, planPath, manifest := draftSetup(t, plan)
+	factsFixture(t, d)
+	onlyTools(t, true, "rg", "git")
+	log := loggingGopls(t, "echo \"$PWD/cmd/sym.go:8:22-30\"\n")
+	if out, err := draftOut(t, d, planPath, manifest); err != nil {
+		t.Fatalf("draft: %v\n%s", err, out)
+	}
+	symbols := 4 // runAlpha, pkg.runAlpha, runBeta, AlphaFn
+	if n := goplsCalls(t, log); n == 0 || n >= symbols {
+		t.Errorf("gopls called %d times for %d symbols, want fewer but not none", n, symbols)
+	}
+}
+
 func TestTicketsDraft_NoGoplsFlagSkipsGoplsSilently(t *testing.T) {
 	d, plan, manifest := draftSetup(t, factsPlan)
 	factsFixture(t, d)
