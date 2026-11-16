@@ -125,6 +125,8 @@ test("Bulk actions", async ({ page, start }) => {
   // The live Design is not finished and the draft is no epic, so the bar leaves both out of the dialog.
   await expect(archive).toContainText("Archive 2 epics?")
   await expect(archive).not.toContainText("Untitled design")
+  // The skipped toast appears only after the confirm, which would archive epics that entry 22 needs.
+  // src/shell/SidebarBulkArchive.test.tsx covers it.
   for (const name of ["bulk-merged", "bulk-done-solo"])
     await expect(archive.getByRole("listitem").filter({ hasText: name })).toHaveCount(1)
   await expect(archive.getByRole("listitem")).toHaveCount(2)

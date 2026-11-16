@@ -8,6 +8,7 @@ import {
   ProgressDone,
   SectionFinished,
   SectionImplementing,
+  type DesignDraftRow,
   type EpicListRow,
 } from "../generated/server"
 import { renderThemed } from "../ui/render"
@@ -55,7 +56,7 @@ const rows = [
 type Call = { dry_run?: boolean; yes?: boolean; targets: string[] }
 type Reply = (body: Call) => unknown
 
-function setup(reply: Reply) {
+function setup(reply: Reply, drafts: DesignDraftRow[] = []) {
   const calls: Call[] = []
   vi.stubGlobal(
     "fetch",
@@ -73,6 +74,7 @@ function setup(reply: Reply) {
       workspaces: [{ name: "Default", default: true, members: 0 }],
       sessions: [],
       placements: [],
+      design_drafts: drafts,
     },
     connected: true,
     loadedOnce: true,
@@ -244,4 +246,29 @@ test("several epics not on trunk share one warning, and the list scrolls above t
   expect(
     buttons?.previousElementSibling && getComputedStyle(buttons.previousElementSibling).overflowY,
   ).toBe("auto")
+})
+
+test("a draft in the selection is listed as skipped after the Archive confirm", async () => {
+  const draft: DesignDraftRow = {
+    id: "d1",
+    label: "Untitled design",
+    project: "p",
+    slug: "",
+    edited_at: "2026-05-01T10:00:00Z",
+    workspace: "Default",
+  }
+  setup(dryOnly, [draft])
+  await selectRows("Blog", "Untitled design")
+  fireEvent.click(bar().getByRole("button", { name: "Archive 1 of 2" }))
+  fireEvent.click(
+    within(await screen.findByRole("dialog")).getByRole("button", { name: "Archive" }),
+  )
+  await waitFor(() =>
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Not run on some rows",
+        description: "Untitled design: can't be archived",
+      }),
+    ),
+  )
 })
