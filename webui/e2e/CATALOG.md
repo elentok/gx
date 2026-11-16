@@ -122,7 +122,7 @@ worker outcome maps to ticket status, why fixture CLI writes land late, how to s
 and "read `test-results/**/error-context.md` first on a locator failure".
 
 The suite is capped by `maxFlows` in `playwrightguard/budget_test.go`, which equals the number of
-`test(` calls in `*.e2e.ts` (144). Before you add a flow, add a step to a flow on the same scenario
+`test(` calls in `*.e2e.ts` (152). Before you add a flow, add a step to a flow on the same scenario
 (see `skills/gx-playwright-e2es`) and keep this file and `maxFlows` in step with the code.
 
 A flow's title starts with its plan number. A flow that absorbed others lists their numbers in its
@@ -224,6 +224,10 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **`disk.e2e.ts`:** **76. Disk banner and Clean now (and 78. Clean now fails)**; **77. Disk hold.**
 - **`check-lock.e2e.ts`:** the waiting label and holder show, then clear.
 - **`checks.e2e.ts` 67. Set up checks, save to repo (and 68. save to project.json, 69. refused commit, 70. phone).**
+
+## Rest screen (`rest`)
+
+- **`rest.e2e.ts`:** **206. Rest screen, Break (R1)** (shape `break`: the Rest screen shows an `mm:ss` countdown and a second page of the same server shows the same message; at 900px the mascot, message, sub-message, label, time, rule note and "Unlock anyway" are in order and the app behind is inert, at 375px the same order with a smaller mascot; "Unlock anyway" opens the input with its hint, a matching sentence enables the button, the click clears both pages and `gx rest --json` shows no period; `#/stats?range=7` shows one Break and one Break unlock in "Mental health"); **207. Rest screen, Bedtime (R2)** (shape `bedtime`: "Back at" with the End time, `gx rest --json` shows the Bedtime period, the same order at 375px without a sub-message, a second page shows the same screen, and an unlock clears both and the period).
 
 ## Editor (`vi-editor`)
 

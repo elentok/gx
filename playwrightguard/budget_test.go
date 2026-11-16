@@ -59,7 +59,10 @@ import (
 // Verify finish block flow (+1): the pause after two refused finishes and Retry's fresh count need the
 // server's finish path, a fake agent that keeps reporting finished and the recovery card in a real browser;
 // ralphloop/finish_block_test.go and server/sched/launchtest/finish_block_test.go cover the rule alone.
-const maxFlows = 150
+// Rest screen flows (+2): the Break countdown and unlock are a real server round trip seen by two
+// pages at once, and the part order and mascot size need real layout at 900px and 375px;
+// RestScreen.test.tsx and the Go rest tests cover each rule alone but cannot see either.
+const maxFlows = 152
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
