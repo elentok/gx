@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -41,6 +42,45 @@ func TestAskCmd_ConfirmsTheRecordedQuestion(t *testing.T) {
 	}
 	if got := out.String(); !strings.Contains(got, "p:e/01") || !strings.Contains(got, "Pick a look") {
 		t.Errorf("output = %q; want the address and the question summary", got)
+	}
+}
+
+func TestAskCmd_RefusesLongSummaryBeforeTheServerAndSavesTheBody(t *testing.T) {
+	var d Deps
+	d.NewClient = func() (*apiclient.Client, error) {
+		t.Fatal("server dialed for an over-long summary")
+		return nil, nil
+	}
+	body := "## Question\n" + strings.Repeat("x", 130) + "\n\n## Handoff\nnothing yet"
+	c := NewAskCmd(d)
+	c.SetArgs([]string{"p:e/01", "--body", body})
+	c.SilenceUsage = true
+	err := c.Execute()
+	if err == nil {
+		t.Fatal("over-long summary accepted")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "max 120") {
+		t.Errorf("error = %q; want the limit", msg)
+	}
+	_, rest, ok := strings.Cut(msg, "saved to ")
+	if !ok {
+		t.Fatalf("error = %q; want a saved body path", msg)
+	}
+	path := strings.Fields(rest)[0]
+	saved, rerr := os.ReadFile(path)
+	if rerr != nil {
+		t.Fatal(rerr)
+	}
+	t.Cleanup(func() { _ = os.Remove(path) })
+	if string(saved) != body {
+		t.Errorf("saved body = %q; want the original", saved)
+	}
+}
+
+func TestAskCmd_HelpStatesTheSummaryLimit(t *testing.T) {
+	if long := NewAskCmd(Deps{}).Long; !strings.Contains(long, "120") {
+		t.Errorf("Long = %q; want the 120-character limit", long)
 	}
 }
 

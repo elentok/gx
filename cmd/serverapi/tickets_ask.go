@@ -3,6 +3,8 @@ package serverapi
 import (
 	"context"
 	"fmt"
+	"os"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 
@@ -20,10 +22,17 @@ func NewAskCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ask <project:epic/NN>",
 		Short: "record a question on a ticket and pause it as asking",
-		Args:  cobra.ExactArgs(1),
+		Long: fmt.Sprintf(`Record a question on a ticket and pause it as asking.
+
+The body needs two sections: "## Question" (a one-line plain-text summary, at
+most %d characters, then optional detail) and "## Handoff" (non-empty).`, ticketlog.MaxQuestionSummary),
+		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			text, err := cmdbase.ReadBodyArg(d.Stdin, body)
 			if err != nil {
+				return err
+			}
+			if err := refuseLongSummary(args[0], text); err != nil {
 				return err
 			}
 			err = cmdbase.ServerQueueWrite(d.Dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (wire.QueueResult, error) {
@@ -41,6 +50,25 @@ func NewAskCmd(d Deps) *cobra.Command {
 	cmd.Flags().StringVar(&body, "body", "-", "## Question and ## Handoff sections, or - to read them from stdin")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	return cmd
+}
+
+// refuseLongSummary stops an over-long summary before the server call. A refusal
+// loses the body, so it is saved to a file the caller can resend after fixing line one.
+func refuseLongSummary(addr, text string) error {
+	q := ticketlog.ParseQuestionLenient(text)
+	if !q.SummaryTooLong() {
+		return nil
+	}
+	f, err := os.CreateTemp("", "gx-ask-*.md")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err := f.WriteString(text); err != nil {
+		return err
+	}
+	return fmt.Errorf("question summary is %d characters, max %d; body saved to %s\nshorten its first line, then run: gx tickets ask %s --body - < %s",
+		utf8.RuneCountInString(q.Summary), ticketlog.MaxQuestionSummary, f.Name(), addr, f.Name())
 }
 
 // NewAnswerCmd is `gx tickets answer`: a person's reply to a paused
