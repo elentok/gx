@@ -49,7 +49,10 @@ local, at least two hours ahead, and each switched-on Schedule's baseline is the
 has three Schedules: "Weather check" (every day, two times) and "Morning PR digest" (weekdays) on, "Weekly cleanup report"
 (Sunday) off. `all-off` has the same three, all off. `empty` has none. `page` has "Weather check" on with four Last runs, newest
 first: Finished, Finished, Ran late and a Skipped set time (reason `late`); `paused` adds a paused One-off above them.
-`missing-project` has one Schedule, on, in a store folder with no `project.json`. The machine id is fixed (`fixture1`) so the
+`missing-project` has one Schedule, on, in a store folder with no `project.json`. `restart` has "Weather check" on with one set
+time two minutes ahead (the only shape whose time can fire) and the bare-server control script: `server kill`, `server start`
+and `server pid` in the output's `migrate_dir` (`GXF_MIGRATE_DIR`), so a flow can stop the server across the set time and
+start it again; the fixture and its temp dir stay alive meanwhile. The machine id is fixed (`fixture1`) so the
 seeded One-offs carry the server's Dedupe key. Data: `testutil/gxfixture/spec/schedules.go`; the files and state are written by
 `testutil/gxfixture/seedschedules.go`.
 The `rest` scenario starts a server with the Rest feature configured and a Rest period or warning in force

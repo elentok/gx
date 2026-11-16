@@ -30,7 +30,7 @@ type ScheduleSeed struct {
 }
 
 // SchedulesShapes are the --shape names of the schedules scenario.
-var SchedulesShapes = []string{"list", "all-off", "empty", "page", "paused", "missing-project"}
+var SchedulesShapes = []string{"list", "all-off", "empty", "page", "paused", "missing-project", "restart"}
 
 var (
 	everyDay = []time.Weekday{time.Sunday, time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday, time.Saturday}
@@ -39,7 +39,9 @@ var (
 
 // SchedulesScenario is the schedules scenario in the given shape. Every set time
 // is at least two hours ahead of now (local time), so the timer never fires
-// during a flow.
+// during a flow. The restart shape is the exception: its set time is two minutes
+// ahead, and a flow stops and starts the bare server across it with the control
+// script (MigrateDir/server).
 func SchedulesScenario(shape string) (Scenario, bool) {
 	now := time.Now()
 	ahead := func(hours ...int) []string {
@@ -69,6 +71,11 @@ func SchedulesScenario(shape string) (Scenario, bool) {
 		g := weather
 		g.Project = SchedulesGhost
 		sc.Schedules = []ScheduleSeed{g}
+	case "restart":
+		w := weather
+		w.Times = []string{now.Add(2 * time.Minute).Format("15:04")}
+		sc.Schedules = []ScheduleSeed{w}
+		sc.Migrate, sc.ServerStops = true, true
 	default:
 		return Scenario{}, false
 	}

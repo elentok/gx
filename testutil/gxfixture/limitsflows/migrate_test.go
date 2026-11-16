@@ -166,3 +166,20 @@ func TestMigrateScenarios_ServerStopsWithTheFixtureAfterARestart(t *testing.T) {
 		return exec.Command("kill", "-0", pid).Run() != nil
 	})
 }
+
+func TestSchedulesRestartShape_ServerStopsAndStartsWithTheFixtureAlive(t *testing.T) {
+	t.Parallel()
+	r := startWith(t, "schedules", nil, "--shape", "restart")
+	waitUntil(t, "the server to answer", r.up)
+	r.serverCtl(t, "kill")
+	if r.up() {
+		t.Fatal("server still answers after kill")
+	}
+	for _, p := range []string{r.Root(), filepath.Join(r.Root(), "bin", "gx")} {
+		if _, err := os.Stat(p); err != nil {
+			t.Fatalf("after the server stopped: %v", err)
+		}
+	}
+	r.serverCtl(t, "start")
+	waitUntil(t, "the restarted server to answer", r.up)
+}
