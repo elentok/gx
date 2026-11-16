@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/transcript"
 )
@@ -92,8 +93,14 @@ func Loader(kind agentrunner.Kind, ref FlowRef, sessionDir string, final bool) f
 		snap := SnapshotOf(read, kind, ref, final)
 		// Codex has no background markers: its Background flag comes from the status.
 		if kind == harness.Codex {
-			if snap.InFlight, err = codexsession.ReadInFlightTools(path); err != nil {
+			execShape := hasExecShape(read.CodexVersion)
+			if snap.InFlight, err = codexsession.ReadInFlightTools(path, execShape); err != nil {
 				return Snapshot{}, err
+			}
+			if execShape {
+				if snap.Records, err = codexsession.ReadTasks(path); err != nil {
+					return Snapshot{}, err
+				}
 			}
 			return snap, nil
 		}
@@ -116,6 +123,16 @@ func Loader(kind agentrunner.Kind, ref FlowRef, sessionDir string, final bool) f
 		}
 		return snap, nil
 	}
+}
+
+// execShapeSince is the first Codex version whose rollouts record exec cells.
+const execShapeSince = "0.144.1"
+
+// hasExecShape reports whether a rollout of this Codex version has exec cells.
+// An empty version means the old shape. The gate lives here because codexsession
+// cannot import nativerunner.
+func hasExecShape(version string) bool {
+	return version != "" && nativerunner.CompareVersions(version, execShapeSince) >= 0
 }
 
 // SnapshotOf turns one read of a conversation into what the chat serves.

@@ -73,14 +73,16 @@ type chatRolloutLine struct {
 	Ordinal   *int   `json:"ordinal"`
 	Type      string `json:"type"`
 	Payload   struct {
-		Type       string `json:"type"`
-		Reason     string `json:"reason"`
-		Role       string `json:"role"`
-		Name       string `json:"name"`
-		CallID     string `json:"call_id"`
-		Arguments  string `json:"arguments"`
-		Input      string `json:"input"`
-		CLIVersion string `json:"cli_version"`
+		Type      string `json:"type"`
+		Reason    string `json:"reason"`
+		Role      string `json:"role"`
+		Name      string `json:"name"`
+		CallID    string `json:"call_id"`
+		Arguments string `json:"arguments"`
+		Input     string `json:"input"`
+		// Output is a JSON string in the real lines.
+		Output     json.RawMessage `json:"output"`
+		CLIVersion string          `json:"cli_version"`
 		Content    []struct {
 			Type string `json:"type"`
 			Text string `json:"text"`

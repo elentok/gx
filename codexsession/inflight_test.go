@@ -1,6 +1,8 @@
 package codexsession
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -53,7 +55,71 @@ func TestReadInFlightTools(t *testing.T) {
 			if err := os.WriteFile(path, []byte(strings.Join(tc.lines, "\n")+"\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			got, err := ReadInFlightTools(path)
+			got, err := ReadInFlightTools(path, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("got %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestReadInFlightTools_ExecShape(t *testing.T) {
+	t.Parallel()
+	started := `{"type":"event_msg","payload":{"type":"task_started"}}`
+	exec := func(id, input string) string {
+		in, _ := json.Marshal(input)
+		return `{"type":"response_item","payload":{"type":"custom_tool_call","name":"exec","call_id":"` + id + `","input":` + string(in) + `}}`
+	}
+	out := func(id string, texts ...string) string {
+		var items []map[string]string
+		for _, s := range texts {
+			items = append(items, map[string]string{"type": "input_text", "text": s})
+		}
+		b, _ := json.Marshal(items)
+		s, _ := json.Marshal(string(b))
+		return `{"type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"` + id + `","output":` + string(s) + `}}`
+	}
+	wait := func(id string, cell int) string {
+		return fmt.Sprintf(`{"type":"response_item","payload":{"type":"function_call","name":"wait","call_id":%q,"arguments":"{\"cell_id\":%d}"}}`, id, cell)
+	}
+	waitOut := func(id, text string) string {
+		return `{"type":"response_item","payload":{"type":"function_call_output","call_id":"` + id + `","output":"` + text + `"}}`
+	}
+	plan := `{"type":"response_item","payload":{"type":"function_call","name":"update_plan","call_id":"u","arguments":"{}"}}`
+	run := `tools.exec_command({cmd:"make"})`
+	label := func(l string) transcript.InFlightTool { return transcript.InFlightTool{Kind: "shell", Label: l} }
+
+	for _, tc := range []struct {
+		name  string
+		lines []string
+		want  []transcript.InFlightTool
+	}{
+		{"open exec shows its command", []string{started, exec("a", run)}, []transcript.InFlightTool{label("make")}},
+		{"exec without a command stays exec", []string{started, exec("a", "await tools.write_stdin({session_id:1})")},
+			[]transcript.InFlightTool{{Kind: "other", Label: "exec"}}},
+		{"yielded cell stays, its wait adds nothing", []string{started, exec("a", run), out("a", "Script running with cell ID 3"), wait("w", 3)},
+			[]transcript.InFlightTool{label("make")}},
+		{"wait still running keeps it", []string{started, exec("a", run), out("a", "Script running with cell ID 3"), wait("w", 3), waitOut("w", "Script running with cell ID 3")},
+			[]transcript.InFlightTool{label("make")}},
+		{"wait completed ends it", []string{started, exec("a", run), out("a", "Script running with cell ID 3"), wait("w", 3), waitOut("w", "Script completed")},
+			[]transcript.InFlightTool{}},
+		{"session cell is a background process", []string{started, exec("a", run), out("a", "Script completed", `{"session_id":9}`)},
+			[]transcript.InFlightTool{}},
+		{"other calls keep their label", []string{started, exec("a", run), plan},
+			[]transcript.InFlightTool{{Kind: "other", Label: "update_plan"}, label("make")}},
+		{"wait of an unknown cell is labelled as before", []string{started, wait("w", 4)},
+			[]transcript.InFlightTool{{Kind: "other", Label: "wait"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "rollout.jsonl")
+			if err := os.WriteFile(path, []byte(strings.Join(tc.lines, "\n")+"\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			got, err := ReadInFlightTools(path, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -66,7 +132,7 @@ func TestReadInFlightTools(t *testing.T) {
 
 func TestReadInFlightTools_MissingFile(t *testing.T) {
 	t.Parallel()
-	got, err := ReadInFlightTools(filepath.Join(t.TempDir(), "none.jsonl"))
+	got, err := ReadInFlightTools(filepath.Join(t.TempDir(), "none.jsonl"), false)
 	if err != nil || len(got) != 0 {
 		t.Errorf("got %v, %v, want nothing", got, err)
 	}

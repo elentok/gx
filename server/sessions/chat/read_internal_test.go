@@ -279,6 +279,68 @@ func TestRead_InFlightCarriesCodexCalls(t *testing.T) {
 	}
 }
 
+func TestHasExecShape(t *testing.T) {
+	t.Parallel()
+	for version, want := range map[string]bool{
+		"": false, "0.144.0": false, "0.143.9": false, "0.144.1": true, "0.166.0-alpha.5.1": true, "1.0.0": true,
+	} {
+		if got := hasExecShape(version); got != want {
+			t.Errorf("hasExecShape(%q) = %v, want %v", version, got, want)
+		}
+	}
+}
+
+// codexExecRollout is a rollout with a yielded exec cell that a wait poll has
+// not finished, so the cell is running at the time of the read.
+func codexExecRollout(version string) []string {
+	now := time.Now().UTC()
+	ts := func(ago time.Duration) string { return now.Add(-ago).Format(time.RFC3339Nano) }
+	texts := func(ss ...string) string {
+		var items []map[string]string
+		for _, s := range ss {
+			items = append(items, map[string]string{"type": "input_text", "text": s})
+		}
+		b, _ := json.Marshal(items)
+		s, _ := json.Marshal(string(b))
+		return string(s)
+	}
+	return []string{
+		fmt.Sprintf(`{"timestamp":%q,"type":"session_meta","payload":{"cli_version":%q}}`, ts(time.Minute), version),
+		fmt.Sprintf(`{"timestamp":%q,"type":"event_msg","payload":{"type":"task_started"}}`, ts(50*time.Second)),
+		fmt.Sprintf(`{"timestamp":%q,"type":"response_item","payload":{"type":"custom_tool_call","name":"exec","call_id":"c1","input":"const r = await tools.exec_command({cmd:\"make test\"});"}}`, ts(40*time.Second)),
+		fmt.Sprintf(`{"timestamp":%q,"type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"c1","output":%s}}`, ts(30*time.Second), texts("Script running with cell ID 7")),
+		fmt.Sprintf(`{"timestamp":%q,"type":"response_item","payload":{"type":"function_call","name":"wait","call_id":"w1","arguments":"{\"cell_id\":7}"}}`, ts(20*time.Second)),
+	}
+}
+
+func TestRead_CodexExecCellIsATaskAndTheWorkingRow(t *testing.T) {
+	t.Parallel()
+	f := newCodexFixture(t)
+	writeLines(t, f.path, codexExecRollout("0.144.1")...)
+	got := f.chat(t, "/v1/sessions/chat")
+	if len(got.Tasks) != 1 || got.Tasks[0].Kind != "shell" || got.Tasks[0].Label != "make test" || got.Tasks[0].Finished {
+		t.Errorf("tasks = %+v, want one running shell row labelled make test", got.Tasks)
+	}
+	if got.Current == nil || got.Current.Kind != "shell" || got.Current.Label != "make test" || len(got.Others) != 0 {
+		t.Errorf("current/others = %+v/%+v, want shell make test and no others", got.Current, got.Others)
+	}
+}
+
+func TestRead_CodexBeforeExecShapeHasNoTasks(t *testing.T) {
+	t.Parallel()
+	for _, version := range []string{"", "0.144.0"} {
+		f := newCodexFixture(t)
+		writeLines(t, f.path, codexExecRollout(version)...)
+		got := f.chat(t, "/v1/sessions/chat")
+		if len(got.Tasks) != 0 {
+			t.Errorf("version %q: tasks = %+v, want none", version, got.Tasks)
+		}
+		if got.Current == nil || got.Current.Label != "wait" || got.Current.Kind != "other" {
+			t.Errorf("version %q: current = %+v, want the old wait label", version, got.Current)
+		}
+	}
+}
+
 func TestRead_CodexTurnsWithoutMessagesAreUnreadable(t *testing.T) {
 	t.Parallel()
 	f := newCodexFixture(t)
