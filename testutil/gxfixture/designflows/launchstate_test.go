@@ -145,18 +145,19 @@ func TestToolsScenario_ChatListsTheCallsInFlight(t *testing.T) {
 		t.Errorf("third session is not a design session: %+v", list[2])
 	}
 
-	// A single call is Current alone; the newest of several is Current and the
-	// older ones follow newest first.
-	for i, wantOthers := range []int{0, 2, 0} {
-		chat := r.waitChat(t, list[i].ID, func(c wire.SessionChatResponse) bool { return c.Current != nil })
-		if chat.Current.Kind != transcript.InFlightShell && wantOthers == 0 {
-			t.Errorf("session %d current = %+v, want the shell call", i, chat.Current)
-		}
+	// Shell and Agent calls are tasks. Sessions 0 and 2 have only a shell, so
+	// neither Current nor Others holds anything; session 1 keeps the search as
+	// Current and the Read as the one other call.
+	for i, wantOthers := range []int{0, 1, 0} {
+		chat := r.waitChat(t, list[i].ID, func(c wire.SessionChatResponse) bool { return len(c.Tasks) > 0 })
 		if len(chat.Others) != wantOthers {
 			t.Errorf("session %d others = %+v, want %d", i, chat.Others, wantOthers)
 		}
-		if wantOthers > 0 && (chat.Current.Kind != transcript.InFlightSearch || chat.Others[0].Kind != transcript.InFlightAgent || chat.Others[1].Kind != transcript.InFlightShell) {
-			t.Errorf("session %d current %+v others %+v, want search, then agent, shell", i, chat.Current, chat.Others)
+		if wantOthers == 0 && chat.Current != nil {
+			t.Errorf("session %d current = %+v, want none", i, chat.Current)
+		}
+		if wantOthers > 0 && (chat.Current == nil || chat.Current.Kind != transcript.InFlightSearch || chat.Others[0].Kind != transcript.InFlightOther) {
+			t.Errorf("session %d current %+v others %+v, want search, then other", i, chat.Current, chat.Others)
 		}
 	}
 }

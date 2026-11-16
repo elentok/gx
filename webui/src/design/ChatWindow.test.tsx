@@ -20,7 +20,6 @@ const chatOf = (count: number): SessionChatResponse => ({
   conversation_id: "c1",
   messages: Array.from({ length: count }, (_, i) => msg(i + 1)),
   questions: [],
-  background: [],
 })
 
 const shown = (c: HTMLElement) => c.textContent?.match(/message number \d+/g) ?? []

@@ -56,7 +56,6 @@ const chatOf = (
   conversation_id: "c1",
   messages,
   questions: roundCards(round),
-  background: [],
   ...over,
 })
 
@@ -336,7 +335,7 @@ test("the task list shows the tasks under the chat", async () => {
   expect(within(list).getByRole("img", { name: "done" })).toBeTruthy()
 })
 
-test("a busy turn names the tool in flight", async () => {
+test("an older Codex turn names its agent call in flight", async () => {
   const current = { kind: "agent", label: "survey" }
   renderChat(
     [session({ status: { state: "working" } })],

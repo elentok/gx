@@ -126,7 +126,10 @@ test("75. Read a session", async ({ page, start }) => {
     .poll(async () => JSON.stringify(await chatOf(toolsFixture, tools[0].id)), { timeout: 60_000 })
     .toContain("make test")
   await go(page, `#/agents/${tools[0].id}`)
-  await expect(row).toHaveText("Working · running shell: make test")
+  await expect(row).toHaveText("Working")
+  await expect(page.getByRole("list", nav("Tasks")).getByRole("listitem")).toHaveText([
+    /shell\s*make test/,
+  ])
   await expect(row.getByRole("button")).toHaveCount(0)
   // A Working chat renames too: /rename reaches its input while the turn runs, and the session stays Working.
   const toolsConv = (await chatOf(toolsFixture, tools[0].id)).conversation_id
@@ -138,17 +141,14 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(renameDialog).toHaveCount(0)
   await expect(titleHeading(page)).toContainText("busy-renamed")
   await expect.poll(() => toolsFixture.input(toolsConv)).toContain("/rename busy-renamed")
-  await expect(row).toHaveText("Working · running shell: make test")
+  await expect(row).toHaveText("Working")
   await go(page, `#/agents/${tools[1].id}`)
   await expect(row).toContainText("searching: InFlightTool")
-  const more = row.getByRole("button", { name: "(+2 more)" })
+  const more = row.getByRole("button", { name: "(+1 more)" })
   await expect(more).toBeVisible()
   const popover = page.getByLabel("Other tools in flight")
   await more.hover()
-  await expect(popover.getByRole("listitem")).toHaveText([
-    /sub-agent\s*Survey the sessions code/,
-    /shell\s*make test/,
-  ])
+  await expect(popover.getByRole("listitem")).toHaveText([/tool\s*Read/])
   await page.mouse.move(0, 0)
   await expect(popover).toHaveCount(0)
   // Tab to the button opens it; Escape closes it.
@@ -254,7 +254,7 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(more).toBeVisible()
   await more.dispatchEvent("click")
   await expect(popover).toBeVisible()
-  await expect(popover.getByRole("listitem")).toHaveCount(2)
+  await expect(popover.getByRole("listitem")).toHaveCount(1)
   // A phone has no key: the tooltip does not name Esc and Esc opens nothing.
   await expect(interrupt).toBeVisible()
   await expect(interrupt).not.toHaveAttribute("title", /Esc/)

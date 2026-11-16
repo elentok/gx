@@ -23,6 +23,7 @@ func ToolsScenario() scenario {
 			{Project: project, Prompt: "hello", Control: inFlight(
 				shell,
 				agentfake.ToolCall{Name: "Agent", Input: map[string]any{"description": "Survey the sessions code", "subagent_type": "Explore"}},
+				agentfake.ToolCall{Name: "Read", Input: map[string]any{"file_path": "server/sessions/chat/read.go"}},
 				agentfake.ToolCall{Name: "Grep", Input: map[string]any{"pattern": "InFlightTool"}},
 			)},
 			{Project: project, Prompt: "hello", Link: project + ":" + mapAddr, Control: inFlight(shell)},

@@ -52,7 +52,6 @@ const chat = (over: Partial<SessionChatResponse> = {}): SessionChatResponse => (
     },
   ],
   questions: [],
-  background: [],
   ...over,
 })
 
@@ -94,7 +93,7 @@ test("a busy session shows a plain Working row", async () => {
   expect(await screen.findByText("Working")).toBeTruthy()
 })
 
-test("a busy session names the tool in flight", async () => {
+test("an older Codex session names its shell call in flight", async () => {
   render(
     session({ status: { state: "working" } }),
     chat({

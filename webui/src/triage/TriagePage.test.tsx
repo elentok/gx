@@ -419,7 +419,6 @@ test("a printed round opens in the design flow's Questions tab with the question
           },
         ],
         questions: roundCards(cards as never),
-        background: [],
       } as never,
     }),
   } as RouteFetchers)
@@ -461,7 +460,6 @@ test("the final approval round drops the round label and has no Approve button",
         conversation_id: "c1",
         messages: [],
         questions: roundCards([final] as never),
-        background: [],
       } as never,
     }),
   } as RouteFetchers)
@@ -493,7 +491,7 @@ const planRows = () => [
 // The plan card sits in the chat log, so these tests need a chat to exist.
 const emptyChat = async () => ({
   kind: "ok" as const,
-  detail: { conversation_id: "c1", messages: [], questions: [], background: [] } as never,
+  detail: { conversation_id: "c1", messages: [], questions: [] } as never,
 })
 
 test("after Route the Chat holds a read-only plan card with counts, backlogs and collapsed groups", async () => {

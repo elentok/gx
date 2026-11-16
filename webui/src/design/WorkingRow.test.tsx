@@ -7,7 +7,7 @@ afterEach(cleanup)
 
 const row = () => screen.getByRole("status").textContent
 
-test("the row reads step, title, current tool and the count of the others", () => {
+test("the row reads step, title, current tool (an older Codex shell call here) and the count of the others", () => {
   renderThemed(
     <WorkingRow
       step="Spec"

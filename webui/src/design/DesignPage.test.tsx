@@ -296,7 +296,7 @@ test("the countdown keeps running after Close dialog", async () => {
     {
       chat: async () => ({
         kind: "ok",
-        detail: { conversation_id: "c1", messages: [], questions: [], background: [] },
+        detail: { conversation_id: "c1", messages: [], questions: [] },
       }),
     },
   )
@@ -570,7 +570,7 @@ test("confirming Delete calls the route and goes to the Epics page", async () =>
 const chatFetcher: RouteFetchers = {
   chat: async () => ({
     kind: "ok",
-    detail: { conversation_id: "c1", messages: [], questions: [], background: [] },
+    detail: { conversation_id: "c1", messages: [], questions: [] },
   }),
 }
 
@@ -605,7 +605,6 @@ test("the map-image strip is the first entry of the chat log, ahead of the messa
           },
         ],
         questions: [],
-        background: [],
       },
     }),
   }
@@ -661,7 +660,6 @@ const roundChat = (round: unknown[] | null): RouteFetchers => ({
       conversation_id: "c1",
       messages: [],
       questions: roundCards(round as SessionRoundCard[] | null),
-      background: [],
     } as never,
   }),
 })

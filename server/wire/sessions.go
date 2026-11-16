@@ -118,8 +118,7 @@ type SessionTranscriptResponse struct {
 // session of a harness that has no chat; its Messages stay empty. Truncated
 // says earlier messages were cut to fit maxChatMessages. Questions holds the
 // cards the person has not answered, among them a Grilling round the agent
-// ended its last turn with; Next is the run-end line of that turn; Background
-// lists the shells, Monitors and subagents still running.
+// ended its last turn with; Next is the run-end line of that turn.
 type SessionChatResponse struct {
 	ConversationID string               `json:"conversation_id"`
 	Messages       []SessionChatMessage `json:"messages"`
@@ -127,9 +126,8 @@ type SessionChatResponse struct {
 	Truncated      bool                 `json:"truncated,omitempty"`
 	// Questions lists the Question cards the session shows, live blocker first;
 	// never null.
-	Questions  []QuestionCard          `json:"questions"`
-	Next       *SessionNext            `json:"next"`
-	Background []SessionBackgroundTask `json:"background"`
+	Questions []QuestionCard `json:"questions"`
+	Next      *SessionNext   `json:"next"`
 	// Tasks is the open Task group, ordered by start; absent when none is open.
 	Tasks []SessionTask `json:"tasks,omitempty"`
 	// Current is the newest tool call in flight and Others the older ones,
@@ -428,13 +426,6 @@ type QuestionCard struct {
 // SessionNext is the Actionable a gx-design run-end line raises.
 type SessionNext struct {
 	Action SessionActionable `json:"action"`
-}
-
-// SessionBackgroundTask is a shell, Monitor or subagent still running.
-type SessionBackgroundTask struct {
-	Kind      string `json:"kind"` // transcript.BackgroundTaskShell, ...Monitor or ...Agent
-	Label     string `json:"label"`
-	StartedAt string `json:"started_at"`
 }
 
 // SessionTask is one task of the Task group the agent waits on. Kind is

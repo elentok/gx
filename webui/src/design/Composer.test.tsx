@@ -63,7 +63,6 @@ const chatOf = ({
     },
   ],
   questions: roundCards(round),
-  background: [],
   ...over,
 })
 

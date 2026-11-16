@@ -204,7 +204,7 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 		// server shows it Working with the calls in flight.
 		if control.Action == agentfake.ActionToolUse {
 			if err := f.waitFor(id, "Working with a tool in flight", func(si wire.SessionInfo, chat wire.SessionChatResponse) bool {
-				return si.Status.State == wire.SessionWorking && chat.Current != nil
+				return si.Status.State == wire.SessionWorking && (chat.Current != nil || len(chat.Tasks) > 0)
 			}); err != nil {
 				return err
 			}

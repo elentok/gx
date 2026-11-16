@@ -37,14 +37,12 @@ type cacheEntry struct {
 	chat  Snapshot
 }
 
-// Snapshot is everything one read of a transcript yields. Tasks keeps the
-// unresolved markers, which age out at request time.
+// Snapshot is everything one read of a transcript yields.
 type Snapshot struct {
 	Msgs      []wire.SessionChatMessage
 	Truncated bool
 	Round     []wire.SessionRoundCard
 	Next      *wire.SessionNext
-	Tasks     []transcript.BackgroundTaskMarker
 	// Records are the parsed tasks of the Task group; AssembleTasks turns them
 	// into rows on every read.
 	Records []transcript.TaskRecord
@@ -91,7 +89,6 @@ func Loader(kind agentrunner.Kind, ref FlowRef, sessionDir string, final bool) f
 			return Snapshot{}, err
 		}
 		snap := SnapshotOf(read, kind, ref, final)
-		// Codex has no background markers: its Background flag comes from the status.
 		if kind == harness.Codex {
 			execShape := hasExecShape(read.CodexVersion)
 			rollout, err := codexsession.ReadRollout(path, execShape)
@@ -100,17 +97,6 @@ func Loader(kind agentrunner.Kind, ref FlowRef, sessionDir string, final bool) f
 			}
 			snap.InFlight, snap.Records = rollout.InFlight, rollout.Records
 			return snap, nil
-		}
-		// A zero now keeps every unresolved marker fresh; the cache serves the
-		// read later, so ageing out waits for the request.
-		reading, err := transcript.ReadBackgroundTasks(path, transcript.BackgroundTaskAgedOutCap, time.Time{})
-		if err != nil {
-			return Snapshot{}, err
-		}
-		for _, mk := range reading.Markers {
-			if mk.Status != transcript.BackgroundTaskResolved {
-				snap.Tasks = append(snap.Tasks, mk)
-			}
 		}
 		if snap.InFlight, err = transcript.ReadInFlightTools(path); err != nil {
 			return Snapshot{}, err
@@ -157,15 +143,4 @@ func SnapshotOf(read chatreader.Result, kind agentrunner.Kind, ref FlowRef, fina
 		snap.Msgs = append(snap.Msgs, wire.SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool, Calls: m.Calls, Images: images})
 	}
 	return snap
-}
-
-// Background lists the tasks still within their cap at now.
-func (c Snapshot) Background(now time.Time) []wire.SessionBackgroundTask {
-	out := []wire.SessionBackgroundTask{}
-	for _, mk := range c.Tasks {
-		if now.Sub(mk.StartedAt) <= mk.Cap {
-			out = append(out, wire.SessionBackgroundTask{Kind: mk.Kind, Label: mk.Label, StartedAt: mk.StartedAt.Format(time.RFC3339)})
-		}
-	}
-	return out
 }

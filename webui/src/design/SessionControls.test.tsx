@@ -61,7 +61,6 @@ const chat: SessionChatResponse = {
   conversation_id: "c",
   messages: [],
   questions: [],
-  background: [],
   truncated: false,
 } as unknown as SessionChatResponse
 const ok: SessionResult = { session: session("new") }

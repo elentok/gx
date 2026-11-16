@@ -2614,8 +2614,7 @@ export interface SessionTranscriptResponse {
  * session of a harness that has no chat; its Messages stay empty. Truncated
  * says earlier messages were cut to fit maxChatMessages. Questions holds the
  * cards the person has not answered, among them a Grilling round the agent
- * ended its last turn with; Next is the run-end line of that turn; Background
- * lists the shells, Monitors and subagents still running.
+ * ended its last turn with; Next is the run-end line of that turn.
  */
 export interface SessionChatResponse {
   conversation_id: string;
@@ -2628,7 +2627,6 @@ export interface SessionChatResponse {
    */
   questions: QuestionCard[];
   next?: SessionNext;
-  background: SessionBackgroundTask[];
   /**
    * Tasks is the open Task group, ordered by start; absent when none is open.
    */
@@ -2989,14 +2987,6 @@ export interface SessionNext {
   action: SessionActionable;
 }
 /**
- * SessionBackgroundTask is a shell, Monitor or subagent still running.
- */
-export interface SessionBackgroundTask {
-  kind: string; // transcript.BackgroundTaskShell, ...Monitor or ...Agent
-  label: string;
-  started_at: string;
-}
-/**
  * SessionTask is one task of the Task group the agent waits on. Kind is
  * transcript.TaskKindShell, ...Monitor, ...Subagent or ...Call. Times are
  * time.RFC3339. A finished task with NoDuration has no FinishedAt: an exited
@@ -3093,11 +3083,8 @@ export interface ModelVersion {
   minor: number /* int */;
 }
 /**
- * SessionModelRow is one model the picker offers. ID is the full resolved id.
- * Family and Version are absent for an id that does not parse. Efforts is
- * empty for a model with no effort control. Latest is the resolved id of a
- * newer model of the family, and SwitchEffort the effort a switch to this row
- * would use.
+ * SessionModelRow is one model the picker offers, by full resolved ID. Latest is
+ * a newer model of the family; SwitchEffort is the effort a switch would use.
  */
 export interface SessionModelRow {
   id: string;
@@ -3140,9 +3127,6 @@ export interface SessionInfo {
   project: string;
   dir: string;
   harness: string;
-  /**
-   * Ticket is the Session ticket's address.
-   */
   ticket?: string;
   /**
    * Design marks a session whose ticket is on a map epic: a gx-design run.
@@ -3190,14 +3174,10 @@ export interface SessionInfo {
   unread: SessionUnread;
   actionable: SessionActionable;
   /**
-   * AutoAdvance is the session's auto-advance switch; on unless the person
-   * turned it off.
+   * AutoAdvance is on unless the person turned it off; AutoAdvanceAt is when
+   * the running countdown sends the Continue.
    */
   auto_advance: boolean;
-  /**
-   * AutoAdvanceAt is when the running countdown sends the Continue; unset
-   * with none running.
-   */
   auto_advance_at?: string;
   /**
    * AutoQueue is the session's auto-queue switch; off unless the person turned
@@ -3207,9 +3187,8 @@ export interface SessionInfo {
   auto_queue: boolean;
   auto_queue_at?: string;
   /**
-   * ReportedStep is the Design step the agent says it is running, and
-   * ReportedTitle the ticket it is on during Resolve tickets. Both clear when
-   * the session goes idle.
+   * ReportedStep and ReportedTitle (the ticket during Resolve tickets) clear
+   * when the session goes idle.
    */
   reported_step?: string;
   reported_title?: string;
@@ -3241,10 +3220,6 @@ export interface SessionInfo {
    * LatestModel would run with; both are set with LatestModel only.
    */
   latest_model?: string;
-  /**
-   * LatestFamily is the family of LatestModel as the modelrules parse names
-   * it ("opus", "sol"), set with LatestModel.
-   */
   latest_family?: string;
   /**
    * LatestTiers holds tier names as strings: tygo prints a union element
@@ -3291,8 +3266,7 @@ export interface SessionInfo {
   usage?: SessionUsage;
 }
 /**
- * SessionUsage is the token accounting shown beside an interactive session's
- * composer. The three context fields are disjoint request-input categories.
+ * SessionUsage is the token accounting shown beside a session's composer.
  */
 export interface SessionUsage {
   input_tokens?: number /* int */;
@@ -3314,8 +3288,7 @@ export interface SessionUsage {
   totals?: SessionTokenTotals;
 }
 /**
- * SessionTokenTotals has disjoint input categories. Reasoning is a subset of output.
- * Pointers preserve the difference between an unreported field and a reported zero.
+ * SessionTokenTotals: pointers tell unreported from zero.
  */
 export interface SessionTokenTotals {
   input_tokens?: number /* int64 */;
@@ -3329,9 +3302,6 @@ export interface SessionTokenTotals {
  */
 export interface SessionStatus {
   state: string;
-  /**
-   * Kind and Message are what a Blocked session waits on.
-   */
   kind?: string;
   message?: string;
   background?: boolean;
@@ -3357,8 +3327,7 @@ export interface SessionActionable {
   target?: string;
   gx_raised?: boolean;
   /**
-   * Images are the ids of Prompt images a failed send did not paste; running
-   * the Action pastes them before its one prompt.
+   * Images are Prompt image ids a failed send did not paste.
    */
   images?: string[];
   /**
@@ -3367,19 +3336,16 @@ export interface SessionActionable {
    */
   grilling?: boolean;
   /**
-   * Derived marks an Actionable the server computed from the last assistant
-   * turn of a Design session. The next idle recomputes it.
+   * Derived marks one the server computed from a Design session's last turn.
    */
   derived?: boolean;
 }
 /**
- * SessionActionableQueue is the Kind of an Actionable whose Action is a queue
- * action on Target, not prompts.
+ * SessionActionableQueue is the Kind of an Actionable that queues Target.
  */
 export const SessionActionableQueue = "queue";
 /**
- * MarkActionableRequest is the body of `gx agent actionable`: the caller's
- * session, why it needs the person and its optional Action.
+ * MarkActionableRequest is the body of `gx agent actionable`.
  */
 export interface MarkActionableRequest {
   id: string;
@@ -3387,8 +3353,7 @@ export interface MarkActionableRequest {
   action?: string[];
 }
 /**
- * LinkSessionRequest is the body of `gx agent link`: the caller's session
- * and its Session ticket's address.
+ * LinkSessionRequest is the body of `gx agent link`.
  */
 export interface LinkSessionRequest {
   id: string;
@@ -3401,8 +3366,7 @@ export interface LinkSessionRequest {
   flow_key?: string;
 }
 /**
- * ReportStepRequest is the body of `gx agent step`: the caller's session, the
- * Design step it is running and, during Resolve tickets, the ticket's title.
+ * ReportStepRequest is the body of `gx agent step`.
  */
 export interface ReportStepRequest {
   id: string;
@@ -3448,13 +3412,7 @@ export interface CreateSessionRequest {
   harness?: string;
   cols?: number /* int */;
   rows?: number /* int */;
-  /**
-   * MadeWorktree marks Dir as a worktree gx made, as Worktree does.
-   */
   made_worktree?: boolean;
-  /**
-   * RebaseNote is saved in the meta as RebaseNote.
-   */
   rebase_note?: string;
   /**
    * Tier is the model tier; empty means worker.
@@ -3469,9 +3427,6 @@ export interface SessionResult {
   refused?: boolean;
   reason?: string;
   message?: string;
-  /**
-   * Client is the TUI a focus request went to; empty with no TUI connected.
-   */
   client?: string;
   /**
    * EpicCreated and StartError report a New Design open that wrote the map

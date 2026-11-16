@@ -279,6 +279,20 @@ func TestRead_InFlightCarriesCodexCalls(t *testing.T) {
 	}
 }
 
+func TestRead_InFlightOmitsCodexShellsWhenTheSessionGetsTheList(t *testing.T) {
+	t.Parallel()
+	f := newCodexFixture(t)
+	writeLines(t, f.path,
+		`{"ordinal":0,"type":"session_meta","payload":{"cli_version":"0.144.1"}}`,
+		`{"ordinal":1,"type":"event_msg","payload":{"type":"task_started"}}`,
+		`{"ordinal":2,"type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"a","arguments":"{\"cmd\":\"one\"}"}}`,
+	)
+	got := f.chat(t, "/v1/sessions/chat")
+	if got.Current != nil || len(got.Others) != 0 {
+		t.Errorf("current/others = %+v/%+v, want neither", got.Current, got.Others)
+	}
+}
+
 func TestHasExecShape(t *testing.T) {
 	t.Parallel()
 	for version, want := range map[string]bool{
@@ -321,8 +335,8 @@ func TestRead_CodexExecCellIsATaskAndTheWorkingRow(t *testing.T) {
 	if len(got.Tasks) != 1 || got.Tasks[0].Kind != "shell" || got.Tasks[0].Label != "make test" || got.Tasks[0].Finished {
 		t.Errorf("tasks = %+v, want one running shell row labelled make test", got.Tasks)
 	}
-	if got.Current == nil || got.Current.Kind != "shell" || got.Current.Label != "make test" || len(got.Others) != 0 {
-		t.Errorf("current/others = %+v/%+v, want shell make test and no others", got.Current, got.Others)
+	if got.Current != nil || len(got.Others) != 0 {
+		t.Errorf("current/others = %+v/%+v, want neither: the shell is a task", got.Current, got.Others)
 	}
 }
 
@@ -609,41 +623,6 @@ func TestRead_RoundWinsOverTheRunEndLine(t *testing.T) {
 	}
 }
 
-func TestRead_BackgroundListsLiveTasksAndDropsAgedOutOnes(t *testing.T) {
-	t.Parallel()
-	now := time.Now().UTC()
-	ts := func(ago time.Duration) string { return now.Add(-ago).Format(time.RFC3339Nano) }
-	launch := func(use, input, result string) []string {
-		return []string{
-			fmt.Sprintf(`{"type":"assistant","uuid":"a-%s","timestamp":%q,"message":{"content":[{"type":"tool_use","id":%q,"name":"X","input":%s}]}}`, use, ts(time.Minute), use, input),
-			fmt.Sprintf(`{"type":"user","uuid":"r-%s","timestamp":%q,"toolUseResult":%s,"message":{"content":[{"type":"tool_result","tool_use_id":%q,"content":"ok"}]}}`, use, ts(time.Minute), result, use),
-		}
-	}
-	long := strings.Repeat("x", 80)
-	var lines []string
-	lines = append(lines, launch("t1", `{"command":"`+long+`","description":""}`, `{"backgroundTaskId":"b1"}`)...)
-	lines = append(lines, launch("t2", `{"description":"watch the logs","command":"tail -f"}`, `{"taskId":"m1","timeoutMs":3600000}`)...)
-	lines = append(lines, launch("t3", `{"description":"survey code"}`, `{"status":"async_launched","agentId":"g1"}`)...)
-	old := launch("t4", `{"description":"stale"}`, `{"backgroundTaskId":"b4"}`)
-	for i := range old {
-		old[i] = strings.ReplaceAll(old[i], ts(time.Minute), ts(3*time.Hour))
-	}
-	lines = append(lines, old...)
-
-	got := chatOf(t, lines...)
-	var seen []string
-	for _, b := range got.Background {
-		seen = append(seen, b.Kind+":"+b.Label)
-	}
-	want := "shell:" + long[:60] + ",monitor:watch the logs,agent:survey code"
-	if strings.Join(seen, ",") != want {
-		t.Errorf("background = %v, want %s", seen, want)
-	}
-	if got.Background[0].StartedAt == "" {
-		t.Error("background task has no started_at")
-	}
-}
-
 func TestRead_TasksListShellsAndCallsOfAClaudeSession(t *testing.T) {
 	t.Parallel()
 	now := time.Now().UTC()
@@ -752,24 +731,39 @@ func parseAgo(s string) time.Duration {
 func TestRead_InFlightCarriesUnmatchedCalls(t *testing.T) {
 	t.Parallel()
 	prompt := `{"type":"user","message":{"content":"go"}}`
-	use := func(id, cmd string) string {
-		return fmt.Sprintf(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":%q,"name":"Bash","input":{"command":%q}}]}}`, id, cmd)
+	call := func(id, name, input string) string {
+		return fmt.Sprintf(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":%q,"name":%q,"input":%s}]}}`, id, name, input)
 	}
+	use := func(id, pattern string) string { return call(id, "Grep", `{"pattern":`+fmt.Sprintf("%q", pattern)+`}`) }
 	result := func(id string) string {
 		return fmt.Sprintf(`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":%q,"content":"ok"}]}}`, id)
 	}
+	edit := call("b", "Edit", `{"file_path":"/x/two.go"}`)
 
-	got := chatOf(t, prompt, use("a", "one"), use("b", "two"), use("c", "three"), result("a"))
-	if got.Current == nil || got.Current.Kind != "shell" || got.Current.Label != "three" {
-		t.Errorf("current = %+v, want shell three", got.Current)
+	got := chatOf(t, prompt, use("a", "one"), edit, use("c", "three"), result("a"))
+	if got.Current == nil || got.Current.Kind != "search" || got.Current.Label != "three" {
+		t.Errorf("current = %+v, want search three", got.Current)
 	}
-	if len(got.Others) != 1 || got.Others[0].Label != "two" {
-		t.Errorf("others = %+v, want [two]", got.Others)
+	if len(got.Others) != 1 || got.Others[0].Kind != "other" {
+		t.Errorf("others = %+v, want one other call", got.Others)
 	}
 
 	got = chatOf(t, prompt, use("a", "one"), result("a"))
 	if got.Current != nil || got.Others != nil {
 		t.Errorf("current/others = %+v/%+v, want neither", got.Current, got.Others)
+	}
+
+	// Shell and Agent calls live in tasks, not in current or others.
+	stamped := func(id, name, input string) string {
+		at := time.Now().UTC().Add(-time.Minute).Format(time.RFC3339Nano)
+		return strings.Replace(call(id, name, input), `{"type":"assistant",`, `{"type":"assistant","timestamp":"`+at+`",`, 1)
+	}
+	got = chatOf(t, prompt, stamped("s", "Bash", `{"command":"make","description":"build"}`), stamped("g", "Agent", `{"description":"survey"}`))
+	if got.Current != nil || got.Others != nil {
+		t.Errorf("current/others = %+v/%+v, want neither", got.Current, got.Others)
+	}
+	if labels := taskLabels(got.Tasks); !reflect.DeepEqual(labels, []string{"build", "survey"}) {
+		t.Errorf("tasks = %v, want the Bash and Agent calls", labels)
 	}
 }
 

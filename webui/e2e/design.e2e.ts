@@ -308,13 +308,14 @@ test.describe("14. Working row", () => {
     await expect(row).toHaveCount(0)
     await expect(page.getByRole("button", { name: /^(Send|Continue)/ }).first()).toBeVisible()
 
-    // The design chat's row names a shell call in flight.
+    // A shell call in flight is a task, not Working row text.
     await start("agents-tools")
     await expect(card(page, "design-epic")).toBeVisible()
     await page.evaluate(() => (location.hash = "#/d/demo:design-epic"))
-    await expect(page.getByRole("status").filter({ hasText: "Working" })).toContainText(
-      "running shell: make test",
+    await expect(page.getByRole("status").filter({ hasText: "Working" })).not.toContainText(
+      "running shell",
     )
+    await expect(page.getByRole("list", nav("Tasks"))).toContainText("make test")
   })
 })
 

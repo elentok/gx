@@ -37,7 +37,6 @@ const chatOf = (messages: SessionChatMessage[]): SessionChatResponse => ({
   conversation_id: "c1",
   messages,
   questions: [],
-  background: [],
 })
 
 const settle = () => act(async () => {})

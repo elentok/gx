@@ -87,7 +87,7 @@ function render(focus: PostFocus) {
       }),
       chat: async () => ({
         kind: "ok",
-        detail: { conversation_id: "c1", messages: [], questions: [], background: [] },
+        detail: { conversation_id: "c1", messages: [], questions: [] },
       }),
       focus,
     }),

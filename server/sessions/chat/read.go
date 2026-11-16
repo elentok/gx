@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/elentok/gx/chatreader"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/transcript"
 )
 
 // readable resolves a read's session id, or answers the refusal or error and
@@ -66,7 +66,7 @@ func (c *Chat) archiveRead(w http.ResponseWriter, r *http.Request) {
 	snap := SnapshotOf(read, harness.Codex, meta.Flow, c.src.StepFinal(meta.Flow))
 	wire.WriteJSON(w, wire.SessionChatResponse{
 		ConversationID: meta.ConversationID, Messages: snap.Msgs, Truncated: snap.Truncated,
-		Questions: SessionCards(meta, snap.Round), Next: snap.Next, Background: []wire.SessionBackgroundTask{},
+		Questions: SessionCards(meta, snap.Round), Next: snap.Next,
 		Failure:    c.Failure(meta),
 		Unreadable: snap.Unreadable, CodexVersion: snap.CodexVersion,
 	})
@@ -78,7 +78,7 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	out := wire.SessionChatResponse{ConversationID: meta.ConversationID, Messages: []wire.SessionChatMessage{}, Background: []wire.SessionBackgroundTask{}, Questions: c.Cards(dir, meta, Snapshot{}), Failure: c.Failure(meta)}
+	out := wire.SessionChatResponse{ConversationID: meta.ConversationID, Messages: []wire.SessionChatMessage{}, Questions: c.Cards(dir, meta, Snapshot{}), Failure: c.Failure(meta)}
 	if !c.src.HasChatReader(meta.Harness) {
 		out.Unsupported = true
 		wire.WriteJSON(w, out)
@@ -99,7 +99,7 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 			return
 		default:
 			out.Messages, out.Truncated = snap.Msgs, snap.Truncated
-			out.Next, out.Background = snap.Next, snap.Background(time.Now())
+			out.Next = snap.Next
 			records := snap.Records
 			if kind == harness.Codex {
 				records = c.withCodexChildren(records, meta)
@@ -109,9 +109,14 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 			out.Tasks = AssembleTasks(records, meta, c.clock())
 			out.Questions = c.Cards(dir, meta, snap)
 			out.Unreadable, out.CodexVersion = snap.Unreadable, snap.CodexVersion
-			for i, t := range snap.InFlight {
+			// Shell and Agent calls are in tasks for harnesses that get the list.
+			hasList := kind != harness.Codex || hasExecShape(snap.CodexVersion)
+			for _, t := range snap.InFlight {
+				if hasList && (t.Kind == transcript.InFlightShell || t.Kind == transcript.InFlightAgent) {
+					continue
+				}
 				tool := wire.SessionInFlightTool{Kind: t.Kind, Label: t.Label}
-				if i == 0 {
+				if out.Current == nil {
 					out.Current = &tool
 				} else {
 					out.Others = append(out.Others, tool)
