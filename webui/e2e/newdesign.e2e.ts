@@ -66,6 +66,7 @@ test("26. New Design form", async ({ page, start }) => {
   await page.getByRole("menuitem", { name: /^New design/ }).click()
   await expect(page).toHaveURL(new RegExp(`#/drafts/${first}$`))
   expect(await draftIds()).toEqual([first])
+  await expect(d.prompt).toBeFocused()
 
   // A second context opens the Epics page and presses New design: its sweep leaves this open, leased empty draft alone, and its own draft is a second one.
   const other = await page
