@@ -190,10 +190,11 @@ func TestSchedulesRunNow_TheScheduleTierPinsTheRunsFirstLaunch(t *testing.T) {
 	t.Parallel()
 	r := start(t, 2, "09:00")
 	store := schedrec.NewStore(r.h.TicketStore)
-	sc, err := store.Get(r.key.Project, r.key.Slug)
+	it, err := store.Get(r.key.Project, r.key.Slug)
 	if err != nil {
 		t.Fatal(err)
 	}
+	sc := it.Schedule
 	sc.Tier = "strongest"
 	if _, err := store.Update(r.key.Project, r.key.Slug, sc); err != nil {
 		t.Fatal(err)

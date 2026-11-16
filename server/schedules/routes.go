@@ -3,7 +3,6 @@ package schedules
 import (
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	schedrec "github.com/elentok/gx/schedules"
@@ -67,7 +66,7 @@ func (s *Schedules) listRead(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Schedules) showRead(w http.ResponseWriter, r *http.Request) {
 	project, slug := r.URL.Query().Get("project"), r.URL.Query().Get("slug")
-	sc, err := s.Store.Get(project, slug)
+	it, err := s.Store.Get(project, slug)
 	switch {
 	case errors.Is(err, schedrec.ErrNotFound):
 		wire.WriteJSON(w, refusedShow(ops.ScheduleReasonUnknown, "no schedule "+project+":"+slug))
@@ -79,11 +78,7 @@ func (s *Schedules) showRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	registered, err := s.registered(sc)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	sc := it.Schedule
 	runs, err := LastRuns(s.TicketStore, s.State, Key{Project: sc.Project, Slug: sc.Slug}, sc.LateLimitHours)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -92,26 +87,11 @@ func (s *Schedules) showRead(w http.ResponseWriter, r *http.Request) {
 	if runs == nil {
 		runs = []ops.ScheduleRun{}
 	}
-	wire.WriteJSON(w, ops.ScheduleShowResult{Schedule: s.info(sc, registered, s.now()), Prompt: sc.Prompt, LastRuns: runs})
+	wire.WriteJSON(w, ops.ScheduleShowResult{Schedule: s.info(sc, it.Registered, s.now()), Prompt: sc.Prompt, LastRuns: runs})
 }
 
 func refusedShow(reason, msg string) ops.ScheduleShowResult {
 	return ops.ScheduleShowResult{Refused: true, Reason: reason, Message: msg, LastRuns: []ops.ScheduleRun{}}
-}
-
-// registered reports whether sc's project directory has a project.json; Get
-// does not say, so it takes the listing.
-func (s *Schedules) registered(sc schedrec.Schedule) (bool, error) {
-	items, err := s.Store.List()
-	if err != nil {
-		return false, err
-	}
-	for _, it := range items {
-		if it.Project == sc.Project && it.Slug == sc.Slug {
-			return it.Registered, nil
-		}
-	}
-	return false, nil
 }
 
 func (s *Schedules) info(sc schedrec.Schedule, registered bool, now time.Time) ops.ScheduleInfo {
@@ -121,10 +101,7 @@ func (s *Schedules) info(sc schedrec.Schedule, registered bool, now time.Time) o
 		DefaultHarness: s.DefaultHarness(sc.Project), LateLimitHours: sc.LateLimitHours,
 		Switch: on, ProjectFound: registered, UpdatedAt: sc.UpdatedAt.Format(time.RFC3339),
 	}
-	info.Days = make([]string, len(sc.Days))
-	for i, d := range sc.Days {
-		info.Days[i] = strings.ToLower(d.String()[:3])
-	}
+	info.Days = schedrec.FormatDays(sc.Days)
 	if info.Times == nil {
 		info.Times = []string{}
 	}

@@ -171,6 +171,45 @@ func TestLoad_UnknownFutureKeyStillLoads(t *testing.T) {
 	}
 }
 
+func TestGet_ReportsRegistered(t *testing.T) {
+	st, dir := newStore(t)
+	if _, err := st.Create("proj", valid()); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "gone", ".schedules", "a.md")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "---\nversion: 1\nname: A\ndays: [2]\ntimes: [\"10:00\"]\nlate_limit_hours: 2\n---\nHi\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		project, slug string
+		want          bool
+	}{{"proj", "nightly-report", true}, {"gone", "a", false}} {
+		it, err := st.Get(c.project, c.slug)
+		if err != nil || it.Registered != c.want {
+			t.Fatalf("Get(%s) = %+v, %v; want Registered=%v", c.project, it, err, c.want)
+		}
+	}
+}
+
+func TestDays_FormatParseRoundTrip(t *testing.T) {
+	all := []time.Weekday{time.Sunday, time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday, time.Saturday}
+	names := FormatDays(all)
+	if !reflect.DeepEqual(names, []string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}) {
+		t.Fatalf("FormatDays = %v", names)
+	}
+	got, err := ParseDays(names)
+	if err != nil || !reflect.DeepEqual(got, all) {
+		t.Fatalf("ParseDays = %v, %v", got, err)
+	}
+	if _, err := ParseDays([]string{"funday"}); err == nil {
+		t.Fatal("want error for an unknown day")
+	}
+}
+
 func TestList_UnregisteredProjectDirectory(t *testing.T) {
 	st, dir := newStore(t)
 	path := filepath.Join(dir, "gone", ".schedules", "a.md")

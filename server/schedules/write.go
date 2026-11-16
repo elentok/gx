@@ -5,16 +5,12 @@ import (
 	"errors"
 	"net/http"
 	"slices"
-	"strings"
-	"time"
 
 	schedrec "github.com/elentok/gx/schedules"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
 )
-
-var dayNames = []string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
 
 // WriteRoutes lists the write routes. The getter is called per request.
 func WriteRoutes(get func() *Schedules) []wire.Route {
@@ -39,18 +35,6 @@ func writeHandler[Req, Res any](w http.ResponseWriter, r *http.Request, fn func(
 		return
 	}
 	wire.WriteJSON(w, res)
-}
-
-func parseDays(names []string) ([]time.Weekday, error) {
-	days := make([]time.Weekday, 0, len(names))
-	for _, n := range names {
-		i := slices.Index(dayNames, strings.ToLower(strings.TrimSpace(n)))
-		if i < 0 {
-			return nil, errors.New("invalid day " + n)
-		}
-		days = append(days, time.Weekday(i))
-	}
-	return days, nil
 }
 
 func (s *Schedules) registeredProject(project string) (bool, error) {
@@ -86,7 +70,7 @@ func (s *Schedules) create(req ops.ScheduleCreateRequest) (ops.ScheduleShowResul
 	if !ok {
 		return refusedShow(schedrec.ReasonInvalidProject, "no project "+project), nil
 	}
-	days, err := parseDays(req.Days)
+	days, err := schedrec.ParseDays(req.Days)
 	if err != nil {
 		return refusedShow(schedrec.ReasonNoDays, err.Error()), nil
 	}
@@ -104,23 +88,25 @@ func (s *Schedules) create(req ops.ScheduleCreateRequest) (ops.ScheduleShowResul
 	if err := s.State.Enable(Key{Project: created.Project, Slug: created.Slug}, created.CreatedAt); err != nil {
 		return ops.ScheduleShowResult{}, err
 	}
-	return s.written(created)
+	it, err := s.Store.Get(project, created.Slug)
+	if err != nil {
+		return ops.ScheduleShowResult{}, err
+	}
+	return s.written(it)
 }
 
 func (s *Schedules) edit(req ops.ScheduleEditRequest) (ops.ScheduleShowResult, error) {
 	if req.NewProject != nil && *req.NewProject != "" && *req.NewProject != req.Project {
 		return refusedShow(ops.ScheduleReasonProjectReadOnly, "the project of a Schedule cannot change"), nil
 	}
-	sc, err := s.Store.Get(req.Project, req.Slug)
+	it, reason, msg, err := s.getOrRefuse(req.Project, req.Slug)
 	switch {
-	case errors.Is(err, schedrec.ErrNotFound):
-		return refusedShow(ops.ScheduleReasonUnknown, "no schedule "+req.Project+":"+req.Slug), nil
 	case err != nil:
-		if res, handled := refusalOf(err); handled {
-			return res, nil
-		}
 		return ops.ScheduleShowResult{}, err
+	case reason != "":
+		return refusedShow(reason, msg), nil
 	}
+	sc := it.Schedule
 	if req.Name != nil {
 		sc.Name = *req.Name
 	}
@@ -128,7 +114,7 @@ func (s *Schedules) edit(req ops.ScheduleEditRequest) (ops.ScheduleShowResult, e
 		sc.Prompt = *req.Prompt
 	}
 	if req.Days != nil {
-		days, err := parseDays(req.Days)
+		days, err := schedrec.ParseDays(req.Days)
 		if err != nil {
 			return refusedShow(schedrec.ReasonNoDays, err.Error()), nil
 		}
@@ -156,24 +142,21 @@ func (s *Schedules) edit(req ops.ScheduleEditRequest) (ops.ScheduleShowResult, e
 	if err := s.State.Advance(Key{Project: updated.Project, Slug: updated.Slug}, updated.UpdatedAt); err != nil {
 		return ops.ScheduleShowResult{}, err
 	}
-	return s.written(updated)
+	return s.written(schedrec.Item{Schedule: updated, Registered: it.Registered})
 }
 
 // switchTo writes only this machine's state, never the Schedule file. Turning
 // on sets the baseline to now, so time spent off never runs; turning off
 // leaves a queued run alone.
 func (s *Schedules) switchTo(req ops.ScheduleSwitchRequest) (ops.ScheduleShowResult, error) {
-	sc, err := s.Store.Get(req.Project, req.Slug)
+	it, reason, msg, err := s.getOrRefuse(req.Project, req.Slug)
 	switch {
-	case errors.Is(err, schedrec.ErrNotFound):
-		return refusedShow(ops.ScheduleReasonUnknown, "no schedule "+req.Project+":"+req.Slug), nil
 	case err != nil:
-		if res, handled := refusalOf(err); handled {
-			return res, nil
-		}
 		return ops.ScheduleShowResult{}, err
+	case reason != "":
+		return refusedShow(reason, msg), nil
 	}
-	k := Key{Project: sc.Project, Slug: sc.Slug}
+	k := Key{Project: it.Project, Slug: it.Slug}
 	if req.On {
 		err = s.State.Enable(k, s.now())
 	} else {
@@ -182,7 +165,7 @@ func (s *Schedules) switchTo(req ops.ScheduleSwitchRequest) (ops.ScheduleShowRes
 	if err != nil {
 		return ops.ScheduleShowResult{}, err
 	}
-	return s.written(sc)
+	return s.written(it)
 }
 
 // remove deletes the Schedule file, then runs one check so this machine's own
@@ -207,20 +190,16 @@ func (s *Schedules) remove(req ops.ScheduleDeleteRequest) (ops.ScheduleDeleteRes
 
 // runNow starts one run of the Schedule at once, whatever the switch says.
 func (s *Schedules) runNow(req ops.ScheduleRunNowRequest) (ops.ScheduleRunNowResult, error) {
-	sc, err := s.Store.Get(req.Project, req.Slug)
+	it, reason, msg, err := s.getOrRefuse(req.Project, req.Slug)
 	switch {
-	case errors.Is(err, schedrec.ErrNotFound):
-		return ops.ScheduleRunNowResult{Refused: true, Reason: ops.ScheduleReasonUnknown, Message: "no schedule " + req.Project + ":" + req.Slug}, nil
 	case err != nil:
 		return ops.ScheduleRunNowResult{}, err
+	case reason != "":
+		return ops.ScheduleRunNowResult{Refused: true, Reason: reason, Message: msg}, nil
 	}
-	registered, err := s.registered(sc)
-	if err != nil {
-		return ops.ScheduleRunNowResult{}, err
-	}
-	res, err := s.RunNow(sc, registered)
+	res, err := s.RunNow(it.Schedule, it.Registered)
 	if err == nil && !res.Refused {
-		s.publish(sc.Project, sc.Slug)
+		s.publish(it.Project, it.Slug)
 	}
 	return res, err
 }
@@ -232,13 +211,9 @@ func (s *Schedules) publish(project, slug string) {
 }
 
 // written publishes schedules-changed and returns the Schedule's show payload.
-func (s *Schedules) written(sc schedrec.Schedule) (ops.ScheduleShowResult, error) {
-	s.publish(sc.Project, sc.Slug)
-	registered, err := s.registered(sc)
-	if err != nil {
-		return ops.ScheduleShowResult{}, err
-	}
-	return ops.ScheduleShowResult{Schedule: s.info(sc, registered, s.now()), Prompt: sc.Prompt, LastRuns: []ops.ScheduleRun{}}, nil
+func (s *Schedules) written(it schedrec.Item) (ops.ScheduleShowResult, error) {
+	s.publish(it.Project, it.Slug)
+	return ops.ScheduleShowResult{Schedule: s.info(it.Schedule, it.Registered, s.now()), Prompt: it.Prompt, LastRuns: []ops.ScheduleRun{}}, nil
 }
 
 // refusalOf maps a schedrec refusal to a result.
@@ -247,4 +222,20 @@ func refusalOf(err error) (ops.ScheduleShowResult, bool) {
 		return refusedShow(reason, err.Error()), true
 	}
 	return ops.ScheduleShowResult{}, false
+}
+
+// getOrRefuse loads a Schedule. A missing Schedule or a schedrec refusal
+// comes back as a (reason, message) pair for the handler to map to its result
+// type; any other failure is err.
+func (s *Schedules) getOrRefuse(project, slug string) (it schedrec.Item, reason, message string, err error) {
+	it, err = s.Store.Get(project, slug)
+	switch {
+	case errors.Is(err, schedrec.ErrNotFound):
+		return it, ops.ScheduleReasonUnknown, "no schedule " + project + ":" + slug, nil
+	case err != nil:
+		if r := schedrec.ReasonOf(err); r != "" {
+			return it, r, err.Error(), nil
+		}
+	}
+	return it, "", "", err
 }

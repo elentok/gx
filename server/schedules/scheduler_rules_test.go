@@ -19,10 +19,11 @@ import (
 func (r *rig) edit(t *testing.T, clock *rigs.SchedulesClock, times ...string) {
 	t.Helper()
 	st := schedrec.NewStore(r.h.TicketStore).WithClock(clock.Now)
-	s, err := st.Get(r.key.Project, r.key.Slug)
+	it, err := st.Get(r.key.Project, r.key.Slug)
 	if err != nil {
 		t.Fatal(err)
 	}
+	s := it.Schedule
 	s.Times = times
 	if _, err := st.Update(r.key.Project, r.key.Slug, s); err != nil {
 		t.Fatal(err)

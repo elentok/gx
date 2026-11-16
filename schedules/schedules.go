@@ -219,11 +219,41 @@ func (st *Store) Create(project string, s Schedule) (Schedule, error) {
 }
 
 // Get reads one Schedule.
-func (st *Store) Get(project, slug string) (Schedule, error) {
-	if _, err := st.projectDir(project); err != nil {
-		return Schedule{}, err
+func (st *Store) Get(project, slug string) (Item, error) {
+	pdir, err := st.projectDir(project)
+	if err != nil {
+		return Item{}, err
 	}
-	return readFile(st.path(project, slug), slug)
+	s, err := readFile(st.path(project, slug), slug)
+	if err != nil {
+		return Item{}, err
+	}
+	_, statErr := os.Stat(filepath.Join(pdir, "project.json"))
+	return Item{Schedule: s, Registered: statErr == nil}, nil
+}
+
+var dayNames = []string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
+
+// FormatDays names days as three-letter lowercase abbreviations.
+func FormatDays(days []time.Weekday) []string {
+	out := make([]string, len(days))
+	for i, d := range days {
+		out[i] = dayNames[d]
+	}
+	return out
+}
+
+// ParseDays is the inverse of FormatDays.
+func ParseDays(names []string) ([]time.Weekday, error) {
+	days := make([]time.Weekday, 0, len(names))
+	for _, n := range names {
+		i := slices.Index(dayNames, strings.ToLower(strings.TrimSpace(n)))
+		if i < 0 {
+			return nil, errors.New("invalid day " + n)
+		}
+		days = append(days, time.Weekday(i))
+	}
+	return days, nil
 }
 
 // Update replaces the editable fields of an existing Schedule. The slug and
@@ -234,10 +264,11 @@ func (st *Store) Update(project, slug string, s Schedule) (Schedule, error) {
 	if s.Project != "" && s.Project != project && s.Project != ProjectNameOf(filepath.Join(st.dir, project)) {
 		return Schedule{}, refuse(ReasonInvalidProject, "project cannot change")
 	}
-	old, err := st.Get(project, slug)
+	got, err := st.Get(project, slug)
 	if err != nil {
 		return Schedule{}, err
 	}
+	old := got.Schedule
 	if err := Validate(&s); err != nil {
 		return Schedule{}, err
 	}
