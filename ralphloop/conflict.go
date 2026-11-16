@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/merge"
+	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/ralphloop/runlog"
 
 	"github.com/elentok/gx/ralphloop/worktree"
@@ -322,6 +323,7 @@ func reattachLiveConflictResolver(d deps.Deps, p iterationParams, live agentrunn
 	if err := ticketops.MarkChildDone(childPath, sessionID); err != nil {
 		return "", fmt.Errorf("marking conflict-resolution ticket %s done: %w", childPath, err)
 	}
+	stampConflictChildMetrics(d, p, sessionID, childPath)
 
 	return sessionID, nil
 }
@@ -419,6 +421,7 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 	if err := ticketops.MarkChildDone(childPath, sessionID); err != nil {
 		return "", fmt.Errorf("marking conflict-resolution ticket %s done: %w", childPath, err)
 	}
+	stampConflictChildMetrics(d, p, sessionID, childPath)
 
 	return sessionID, nil
 }
@@ -439,4 +442,13 @@ func pauseConflictResolutionChildRepair(p iterationParams, childPath, childID, l
 		Type: events.Paused, Kind: events.IterationError, Reason: reason, Repair: state,
 	})
 	return fmt.Errorf("%w: %s: %s", errConflictResolutionUnresolved, childID, reason)
+}
+
+// stampConflictChildMetrics records the resolver session's tokens and elapsed
+// time on its done child ticket so calibration sees the cost. Best effort: an
+// unreadable transcript must not block the sequencer.
+func stampConflictChildMetrics(d deps.Deps, p iterationParams, sessionID, childPath string) {
+	if _, _, err := metrics.WriteMergedMetrics(d.SessionHomes, p.Agent, p.FeatureWorktree, sessionID, childPath); err != nil {
+		slog.Warn("stamping conflict-resolution metrics", "ticket", childPath, "err", err)
+	}
 }

@@ -2,10 +2,14 @@ package ralphloop
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/elentok/gx/ralphloop/metrics"
 
 	"github.com/elentok/gx/ralphloop/ticketops"
 
@@ -62,89 +66,104 @@ func TestConflictResolutionHandoff(t *testing.T) {
 
 	for _, tc := range cases {
 		for _, path := range []string{"fresh", "reattached"} {
-			t.Run(path+"/"+tc.name, func(t *testing.T) {
-				t.Parallel()
-				d, _, _ := fakes.FakeDeps()
-				p := conflictParams(t, t.TempDir())
-				label := worktree.ConflictLabel(p.Ticket.Identifier)
-				issuesDir := filepath.Join(p.ScratchDir, "main", "issues")
-				childPath := filepath.Join(issuesDir, childFile)
-				if err := os.MkdirAll(issuesDir, 0755); err != nil {
-					t.Fatalf("MkdirAll: %v", err)
-				}
-				parent := "---\nid: \"03\"\nstatus: claimed\ntype: implement\n---\n# C\n"
-				if err := os.WriteFile(filepath.Join(issuesDir, "03-c.md"), []byte(parent), 0644); err != nil {
-					t.Fatalf("WriteFile: %v", err)
-				}
-
-				inProgress := true
-				d.CherryPickInProgress = func(string) (bool, error) { return inProgress, nil }
-				worked := false
-				agentWorks := func() {
-					if worked {
-						return
+			for _, readable := range []bool{true, false} {
+				t.Run(fmt.Sprintf("%s/%s/transcript=%v", path, tc.name, readable), func(t *testing.T) {
+					t.Parallel()
+					d, _, _ := fakes.FakeDeps()
+					p := conflictParams(t, t.TempDir())
+					home := t.TempDir()
+					d.SessionHomes = metrics.SessionHomes{Claude: home}
+					if readable {
+						fixture.WriteFakeTranscript(t, home, p.FeatureWorktree, "sess-pane-"+worktree.ConflictLabel(p.Ticket.Identifier), time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+							[3]any{"claude-sonnet-5", 1000, 49000},
+							[3]any{"claude-sonnet-5", 1000, 59000},
+						)
 					}
-					worked = true
-					child, err := findConflictResolutionChildTicket(p)
-					if err != nil {
-						t.Errorf("finding child: %v", err)
-						return
+					label := worktree.ConflictLabel(p.Ticket.Identifier)
+					issuesDir := filepath.Join(p.ScratchDir, "main", "issues")
+					childPath := filepath.Join(issuesDir, childFile)
+					if err := os.MkdirAll(issuesDir, 0755); err != nil {
+						t.Fatalf("MkdirAll: %v", err)
 					}
-					tc.edit(t, child)
-					inProgress = tc.stillConflicted
-				}
-
-				var err error
-				if path == "fresh" {
-					fakes.OnRunnerPrompt(d, func(agentrunner.Session, string) error {
-						agentWorks()
-						return nil
-					})
-					_, err = resolveCherryPickConflict(d, p)
-					var loadErr error
-					if childPath, loadErr = loadChild(p); loadErr != nil {
-						t.Fatal(loadErr)
-					}
-				} else {
-					if err := os.WriteFile(childPath, []byte(childFrontmatter), 0644); err != nil {
+					parent := "---\nid: \"03\"\nstatus: claimed\ntype: implement\n---\n# C\n"
+					if err := os.WriteFile(filepath.Join(issuesDir, "03-c.md"), []byte(parent), 0644); err != nil {
 						t.Fatalf("WriteFile: %v", err)
 					}
-					fakes.HostLiveAgent(t, d, label)
-					fakes.FakeRunner(d).SetState(label, agentrunner.StateWorking, "")
-					fakes.OnRunnerWait(d, func(s agentrunner.Session) {
-						if s.Label == label {
-							agentWorks()
-							fakes.FakeRunner(d).SetState(label, agentrunner.StateIdle, "")
+
+					inProgress := true
+					d.CherryPickInProgress = func(string) (bool, error) { return inProgress, nil }
+					worked := false
+					agentWorks := func() {
+						if worked {
+							return
 						}
-					})
-					live, found, findErr := d.Runner.Find(label)
-					if findErr != nil || !found {
-						t.Fatalf("Find(%s) = found %v, err %v", label, found, findErr)
+						worked = true
+						child, err := findConflictResolutionChildTicket(p)
+						if err != nil {
+							t.Errorf("finding child: %v", err)
+							return
+						}
+						tc.edit(t, child)
+						inProgress = tc.stillConflicted
 					}
-					_, err = reattachLiveConflictResolver(d, p, live)
-				}
 
-				if tc.stillConflicted {
-					if err == nil {
-						t.Fatal("handoff succeeded with the cherry-pick still conflicted")
+					var err error
+					if path == "fresh" {
+						fakes.OnRunnerPrompt(d, func(agentrunner.Session, string) error {
+							agentWorks()
+							return nil
+						})
+						_, err = resolveCherryPickConflict(d, p)
+						var loadErr error
+						if childPath, loadErr = loadChild(p); loadErr != nil {
+							t.Fatal(loadErr)
+						}
+					} else {
+						if err := os.WriteFile(childPath, []byte(childFrontmatter), 0644); err != nil {
+							t.Fatalf("WriteFile: %v", err)
+						}
+						fakes.HostLiveAgent(t, d, label)
+						fakes.FakeRunner(d).SetState(label, agentrunner.StateWorking, "")
+						fakes.OnRunnerWait(d, func(s agentrunner.Session) {
+							if s.Label == label {
+								agentWorks()
+								fakes.FakeRunner(d).SetState(label, agentrunner.StateIdle, "")
+							}
+						})
+						live, found, findErr := d.Runner.Find(label)
+						if findErr != nil || !found {
+							t.Fatalf("Find(%s) = found %v, err %v", label, found, findErr)
+						}
+						_, err = reattachLiveConflictResolver(d, p, live)
 					}
-					if path == "fresh" && !tc.wantFreshErr(err) {
-						t.Errorf("err = %v, want the unresolved sentinel", err)
-					}
-				} else if err != nil {
-					t.Fatalf("handoff: %v", err)
-				}
 
-				child := fixture.MustParse(t, childPath)
-				if tc.stillConflicted && path == "fresh" {
-					fakes.AssertPaused(t, child, schema.PauseClassRepair, "")
-				} else if child.Status != tc.wantChild {
-					t.Errorf("child status = %q, want %q", child.Status, tc.wantChild)
-				}
-				if tc.wantChild == schema.StatusDone && len(child.SessionIDs) != 1 {
-					t.Errorf("child session_ids = %v, want the resolver's session", child.SessionIDs)
-				}
-			})
+					if tc.stillConflicted {
+						if err == nil {
+							t.Fatal("handoff succeeded with the cherry-pick still conflicted")
+						}
+						if path == "fresh" && !tc.wantFreshErr(err) {
+							t.Errorf("err = %v, want the unresolved sentinel", err)
+						}
+					} else if err != nil {
+						t.Fatalf("handoff: %v", err)
+					}
+
+					child := fixture.MustParse(t, childPath)
+					if tc.stillConflicted && path == "fresh" {
+						fakes.AssertPaused(t, child, schema.PauseClassRepair, "")
+					} else if child.Status != tc.wantChild {
+						t.Errorf("child status = %q, want %q", child.Status, tc.wantChild)
+					}
+					if tc.wantChild == schema.StatusDone && len(child.SessionIDs) != 1 {
+						t.Errorf("child session_ids = %v, want the resolver's session", child.SessionIDs)
+					}
+					stamped := child.ElapsedTime > 0 && child.ActualContextWindow > 0 && child.TotalTokens != nil && *child.TotalTokens > 0
+					if want := tc.wantChild == schema.StatusDone && readable; stamped != want {
+						t.Errorf("child stamped = %v (elapsed_time=%d actual_context_window=%d total_tokens=%v), want %v",
+							stamped, child.ElapsedTime, child.ActualContextWindow, child.TotalTokens, want)
+					}
+				})
+			}
 		}
 	}
 }
