@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -450,7 +451,34 @@ func (f sessionSeeder) waitFor(id, what string, ok func(wire.SessionInfo, wire.S
 			return nil
 		}
 	}
-	return fmt.Errorf("session %s never reached %s", id, what)
+	msg := fmt.Sprintf("session %s never reached %s", id, what)
+	if tail := holderErrTail(f.root, id, holderErrTailLines); tail != "" {
+		msg += "\nholder.err (last lines):\n" + tail
+	}
+	return errors.New(msg)
+}
+
+const holderErrTailLines = 20
+
+// holderErrTail returns the last n lines of the holder.err in the agent dir
+// whose path contains the session id, or "" when there is none or it is empty.
+func holderErrTail(root, id string, n int) string {
+	var tail string
+	_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if entry.IsDir() && entry.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		if entry.IsDir() || entry.Name() != holder.HolderErrFile || !strings.Contains(path, id) {
+			return nil
+		}
+		lines := strings.Split(holder.HolderErrText(filepath.Dir(path)), "\n")
+		tail = strings.Join(lines[max(0, len(lines)-n):], "\n")
+		return filepath.SkipAll
+	})
+	return strings.TrimSpace(tail)
 }
 
 // createSession starts a session in dir and returns its id. The harness is
