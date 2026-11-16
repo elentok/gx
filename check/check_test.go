@@ -322,6 +322,31 @@ func TestRunGoStepRetriesLostCache(t *testing.T) {
 	}
 }
 
+func TestRunFullFormatFailsOnDriftWithoutWriting(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	const drifted = "package pkg\nfunc  A( ) {}\n"
+	testutil.WriteFile(t, repo, "pkg/a.go", drifted)
+	testutil.CommitAll(t, repo, "drift")
+	res, err := Run(Options{Dir: repo, DataDir: t.TempDir(), Mode: ModeFull, Kinds: []string{"format"}, Env: []string{"PATH=" + os.Getenv("PATH")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	k := res.Kinds[0]
+	if res.Exit != ExitFail || k.Status != StatusFail {
+		t.Fatalf("exit %d, kind %+v", res.Exit, k)
+	}
+	if !slices.ContainsFunc(k.Failures, func(f string) bool { return strings.Contains(f, "pkg/a.go") }) {
+		t.Errorf("failures do not name the file: %q", k.Failures)
+	}
+	got, err := os.ReadFile(filepath.Join(repo, "pkg/a.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != drifted {
+		t.Errorf("full format rewrote the file:\n%s", got)
+	}
+}
+
 func TestRunFailingBatchFailsTheKind(t *testing.T) {
 	repo := repoWithChecks(t, `{"format":"for f in {files}; do test \"$f\" != 'three.txt' || exit 1; done"}`)
 	for _, n := range []string{"one.txt", "two.txt", "three.txt", "four.txt"} {

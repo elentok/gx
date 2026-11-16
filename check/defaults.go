@@ -32,6 +32,9 @@ type step struct {
 	argv    []string     // arguments of name, or of the brief tool
 	brief   brief.Tool   // set when the step runs in-process through brief
 	install *installNeed // run first when set
+	// listsDrift marks a tool that prints the drifted files and exits 0
+	// (gofmt -l, shfmt -l): any output fails the step.
+	listsDrift bool
 }
 
 type stepResult struct {
@@ -184,6 +187,15 @@ func (r *runner) defaultSteps(kind string) (steps []step, notes []string) {
 	}
 	switch kind {
 	case "format":
+		if r.mode == ModeFull {
+			n := len(steps)
+			files("shfmt", []string{"-l"}, g.shell)
+			files("gofmt", []string{"-l"}, g.golang)
+			for i := n; i < len(steps); i++ {
+				steps[i].listsDrift = true
+			}
+			break
+		}
 		files("shfmt", []string{"-w"}, g.shell)
 		files("gofmt", []string{"-w"}, g.golang)
 	case "lint":
@@ -233,11 +245,19 @@ func (r *runner) jsSteps(kind string, p *jsPackage) ([]step, string) {
 	}
 	switch kind {
 	case "format":
+		full := r.mode == ModeFull
 		if has("@biomejs/biome") {
-			return run("biome", []string{"format", "--write", "--no-errors-on-unmatched"}, p.files), ""
+			args := []string{"format", "--write", "--no-errors-on-unmatched"}
+			if full {
+				args = []string{"format", "--no-errors-on-unmatched"}
+			}
+			return run("biome", args, p.files), ""
 		}
 		if !has("prettier") && len(p.files) > 0 {
 			return nil, r.rel(p.dir) + ": no biome or prettier"
+		}
+		if full {
+			return runner("prettier", []string{"--check"}, p.files), ""
 		}
 		return runner("prettier", []string{"--write"}, p.files), ""
 	case "lint":
@@ -366,8 +386,21 @@ func (r *runner) runStep(kind string, s step, log io.Writer) stepResult {
 		cmd := exec.Command(exe, s.argv...)
 		cmd.Dir = s.dir
 		cmd.Env = r.childEnv(kind)
-		cmd.Stdout, cmd.Stderr = log, log
-		return stepResult{failed: cmd.Run() != nil}
+		if !s.listsDrift {
+			cmd.Stdout, cmd.Stderr = log, log
+			return stepResult{failed: cmd.Run() != nil}
+		}
+		var out bytes.Buffer
+		cmd.Stdout, cmd.Stderr = io.MultiWriter(log, &out), log
+		failed := cmd.Run() != nil
+		sr := stepResult{failed: failed}
+		for f := range strings.Lines(out.String()) {
+			if f = strings.TrimSpace(f); f != "" {
+				sr.failed = true
+				sr.failures = append(sr.failures, "needs formatting: "+f)
+			}
+		}
+		return sr
 	}
 	fmt.Fprintf(log, "$ gx brief %s %s\n", s.brief.Name(), strings.Join(s.argv, " "))
 	exit, outcome := brief.RunOutcome(s.brief, brief.Options{Dir: s.dir, Args: s.argv, DataDir: r.dataDir, StateDir: r.stateDir, Out: log, Env: r.childEnv(kind), CheckRun: r.runID, CheckKind: kind})
