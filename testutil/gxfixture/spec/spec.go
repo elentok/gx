@@ -169,6 +169,10 @@ type Scenario struct {
 	// DropAskedAgent forces the server to clean up an asking agent, as a
 	// herdr-hosted run does (see keepworktree.go).
 	DropAskedAgent bool
+	// FastPacing caps the server's ralphloop pacing waits and shortens its
+	// index and claim poll (GX_FAST_PACING), for a scenario whose flow waits on
+	// several launches in a row.
+	FastPacing bool
 	// UnknownSkill makes the fake TUI agent reject every skill prompt as an unknown command.
 	UnknownSkill bool
 	// UnknownUntilInstalled makes the fake TUI agent reject a skill prompt until

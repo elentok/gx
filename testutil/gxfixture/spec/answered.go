@@ -13,6 +13,7 @@ var AnswerQueued = scenario{
 	Queue:          []string{project + ":queued-answer-epic"},
 	Behaviour:      map[string]string{project + ":queued-answer-epic/01": agentfake.BehaviourWriteAsk},
 	DropAskedAgent: true,
+	FastPacing:     true,
 }
 
 // AnswerFinished is a ticket that asked and whose agent is gone. A resume
@@ -25,6 +26,7 @@ var AnswerFinished = scenario{
 	Queue:          []string{project + ":finished-answer-epic"},
 	Behaviour:      map[string]string{project + ":finished-answer-epic/01": agentfake.BehaviourAskEmptyFinish},
 	DropAskedAgent: true,
+	FastPacing:     true,
 	Hold:           true,
 	// The rescan would otherwise adopt the late finish before the answer arrives.
 	HoldLateFinishScan: true,
