@@ -23,6 +23,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"failing tests", "gx-failing-tests.md", []string{
 			"3 times", "git merge-base", "flake", "pre-existing failure", "branch fault",
 			"30 changed lines or fewer in at most 2 files", "](gx-follow-up/SKILL.md)", "--check-failures",
+			"More than 10 failing tests", "## Many failures at once", "one grouped follow-up", "--workers=2",
 		}},
 		{"ui-check build order and repo path", "gx-ui-check/SKILL.md", []string{"make web-build", "GXF_REPO"}},
 		{"flake tickets", "gx-flake-tickets.md", []string{"`uptime`", "shared state", "`-run '^TestX$' -count=20`"}},
