@@ -1,7 +1,13 @@
 import { useEffect } from "react"
 import { apiFetch } from "./apiFetch"
 import { useConnectionContext, useConnectionState } from "./connection"
-import type { RestPeriod, RestRule, RestWarning } from "./generated/server"
+import type {
+  RestPeriod,
+  RestResult,
+  RestRule,
+  RestUnlockRequest,
+  RestWarning,
+} from "./generated/server"
 import { guarded } from "./ui/reportWriteFailure"
 import { WriteError } from "./useWrite"
 
@@ -14,6 +20,26 @@ export async function postRestActive(): Promise<void> {
   const res = await apiFetch("/v1/rest/active", { method: "POST" })
   if (!res.ok)
     throw new WriteError((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`)
+}
+
+// Same pattern the server checks. The server stays the judge; this only enables the button.
+const UNLOCK_SENTENCE = /^\s*i['’]m\s+.+?\s+and\s+i['’]m\s+addicted\s+to\s+ai\s*$/i
+
+export function isUnlockSentence(text: string): boolean {
+  return UNLOCK_SENTENCE.test(text)
+}
+
+// Returns the refusal message, or undefined when the unlock went through.
+export async function postRestUnlock(sentence: string): Promise<string | undefined> {
+  const res = await apiFetch("/v1/rest/unlock", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sentence } satisfies RestUnlockRequest),
+  })
+  if (!res.ok)
+    throw new WriteError((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`)
+  const result = (await res.json()) as RestResult
+  return result.refused ? result.message || result.reason || "Unlock refused" : undefined
 }
 
 // Input only sets a flag. The once-a-minute timer runs while the tab is visible, and sends a

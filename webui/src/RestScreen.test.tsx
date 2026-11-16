@@ -1,8 +1,12 @@
-import { act, cleanup, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "./connection"
+import { isUnlockSentence, postRestUnlock } from "./rest"
 import { RestScreen } from "./RestScreen"
 import { renderThemed } from "./ui/render"
+
+vi.mock("./rest", async (orig) => ({ ...(await orig<object>()), postRestUnlock: vi.fn() }))
+const postUnlock = vi.mocked(postRestUnlock)
 
 afterEach(() => {
   cleanup()
@@ -162,6 +166,64 @@ test("the countdown timer is cleared when the screen leaves", () => {
   cleanup()
   expect(vi.getTimerCount()).toBe(0)
   vi.useRealTimers()
+})
+
+test.each([
+  ["I'm Dana and I'm addicted to AI", true],
+  ["i’m  Dana   AND i’m ADDICTED to ai ", true],
+  ["I'm and I'm addicted to AI", false],
+  ["I'm Dana and I'm addicted to AI!", false],
+  ["", false],
+])("isUnlockSentence(%j) is %s", (text, ok) => {
+  expect(isUnlockSentence(text)).toBe(ok)
+})
+
+const typeSentence = (value: string) =>
+  fireEvent.change(screen.getByLabelText("Unlock sentence"), { target: { value } })
+const unlockButton = () =>
+  document.querySelector("[data-part=unlock-box] button") as HTMLButtonElement
+
+test("Unlock anyway opens the box with the hint and a Bedtime button label", () => {
+  setup(bedtime)
+  expect(part("unlock-box")).toBeNull()
+  fireEvent.click(part("unlock-link")!)
+  expect(part("unlock-box")!.textContent).toContain(
+    "Type exactly: I'm [anything] and I'm addicted to AI",
+  )
+  expect(unlockButton().textContent).toBe("Unlock until 07:00")
+  expect(unlockButton().disabled).toBe(true)
+  typeSentence("I'm Dana and I'm addicted to AI")
+  expect(unlockButton().disabled).toBe(false)
+})
+
+test("a Break button reads until the end of this Break", () => {
+  vi.useFakeTimers({ now: new Date("2026-11-16T10:00:00Z") })
+  setupBreak(breakPeriod, "2026-11-16T10:00:00Z")
+  fireEvent.click(part("unlock-link")!)
+  expect(unlockButton().textContent).toBe("Unlock until the end of this Break")
+})
+
+test("the button posts the sentence and a refusal shows with the text kept", async () => {
+  postUnlock.mockResolvedValue("type the sentence")
+  setup(bedtime)
+  fireEvent.click(part("unlock-link")!)
+  typeSentence("I'm Dana and I'm addicted to AI")
+  await act(async () => fireEvent.click(unlockButton()))
+  expect(postUnlock).toHaveBeenCalledWith("I'm Dana and I'm addicted to AI")
+  expect(screen.getByRole("alert").textContent).toBe("type the sentence")
+  expect((screen.getByLabelText("Unlock sentence") as HTMLInputElement).value).toBe(
+    "I'm Dana and I'm addicted to AI",
+  )
+})
+
+test("typing in the unlock box reaches the input while keys outside stay blocked", () => {
+  setup(bedtime)
+  fireEvent.click(part("unlock-link")!)
+  const input = screen.getByLabelText("Unlock sentence")
+  const seen = vi.fn()
+  input.addEventListener("keydown", seen)
+  fireEvent.keyDown(input, { key: "a" })
+  expect(seen).toHaveBeenCalled()
 })
 
 test("the screen leaves and the page is live again when the period ends", () => {

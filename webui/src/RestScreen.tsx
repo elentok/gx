@@ -1,8 +1,8 @@
-import { Box, Text } from "@chakra-ui/react"
-import { useEffect, useMemo, useState } from "react"
+import { Box, Button, Input, Text } from "@chakra-ui/react"
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react"
 import { createPortal } from "react-dom"
 import { RestKindBedtime, RestKindBreak } from "./generated/server"
-import { useRestState } from "./rest"
+import { isUnlockSentence, postRestUnlock, useRestState } from "./rest"
 
 // Above the modal token (1400) and the toast layer, so no sheet or modal shows over it.
 const REST_Z_INDEX = 2000
@@ -152,8 +152,88 @@ function BreakView({ seconds }: { seconds: number }) {
   )
 }
 
+function UnlockSection({ buttonLabel }: { buttonLabel: string }) {
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState("")
+  const [refusal, setRefusal] = useState<string>()
+  const [busy, setBusy] = useState(false)
+  const enabled = isUnlockSentence(text)
+
+  const submit = async () => {
+    setBusy(true)
+    try {
+      setRefusal(await postRestUnlock(text))
+    } catch (e) {
+      setRefusal(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Box data-part="unlock" mt="22px">
+      <Text
+        as="a"
+        data-part="unlock-link"
+        role="button"
+        tabIndex={0}
+        color={DIM}
+        fontSize="13px"
+        textDecoration="underline"
+        cursor="pointer"
+        onClick={() => setOpen(true)}
+        onKeyDown={(e: ReactKeyboardEvent) => e.key === "Enter" && setOpen(true)}
+      >
+        Unlock anyway
+      </Text>
+      {open && (
+        <Box data-part="unlock-box" mt="10px" maxW="380px" textAlign="center">
+          <Text color={DIM} fontSize="13px" m="0 0 6px">
+            Type exactly: <i>I'm [anything] and I'm addicted to AI</i>
+          </Text>
+          <Input
+            aria-label="Unlock sentence"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            autoFocus
+            bg="#0d1117"
+            borderColor="#30363d"
+            borderRadius="6px"
+            color={FG}
+            h="auto"
+            p="8px 10px"
+            fontSize="inherit"
+            textAlign="left"
+          />
+          {refusal && (
+            <Text role="alert" color="#ff7b72" fontSize="12px" m="6px 0 0">
+              {refusal}
+            </Text>
+          )}
+          <Button
+            mt="8px"
+            onClick={submit}
+            disabled={!enabled || busy}
+            bg={enabled ? "#b4472f" : "#222a33"}
+            color={enabled ? "#fff" : DIM}
+            border="1px solid"
+            borderColor={enabled ? "#b4472f" : "#30363d"}
+            borderRadius="6px"
+            h="auto"
+            p="7px 12px"
+            fontWeight="inherit"
+            fontSize="inherit"
+          >
+            {buttonLabel}
+          </Button>
+        </Box>
+      )}
+    </Box>
+  )
+}
+
 export function RestScreen() {
-  const { period, now } = useRestState()
+  const { period, now, rule } = useRestState()
   const [screen, setScreen] = useState<HTMLElement | null>(null)
   const isBreak = period?.kind === RestKindBreak
   const seconds = useCountdown(period?.end, now, isBreak)
@@ -190,18 +270,13 @@ export function RestScreen() {
         />
         {period.kind === RestKindBedtime && <BedtimeView />}
         {isBreak && <BreakView seconds={seconds ?? 0} />}
-        <Box data-part="unlock" mt="22px">
-          <Text
-            as="a"
-            data-part="unlock-link"
-            color={DIM}
-            fontSize="13px"
-            textDecoration="underline"
-            cursor="pointer"
-          >
-            Unlock anyway
-          </Text>
-        </Box>
+        <UnlockSection
+          buttonLabel={
+            isBreak
+              ? "Unlock until the end of this Break"
+              : `Unlock until ${rule?.bedtime_end ?? ""}`
+          }
+        />
       </Box>
     </Box>,
     document.body,
