@@ -92,6 +92,14 @@ func TestGxDesignAsksThroughGrillingRoundsNotTicketsAsk(t *testing.T) {
 	}
 }
 
+func TestGxDesignRecommendedIsOptionID(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+	want := collapseSpace("`recommended` must be the option's `id` exactly as written")
+	if !strings.Contains(text, want) {
+		t.Errorf("gx-design/SKILL.md lacks %q", want)
+	}
+}
+
 func TestGxDesignChartStepReadsInitialPromptImages(t *testing.T) {
 	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
 	start := strings.Index(text, "The map has no `## Destination`")

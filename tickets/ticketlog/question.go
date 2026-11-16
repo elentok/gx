@@ -178,9 +178,11 @@ func applyBlock(q *Question, block string) error {
 			return fmt.Errorf("recommended %q is not yes or no", b.Recommended)
 		}
 	case QuestionOptions:
-		if err := checkOptions(b.Options, b.Recommended); err != nil {
+		rec, err := checkOptions(b.Options, b.Recommended)
+		if err != nil {
 			return err
 		}
+		b.Recommended = rec
 	case QuestionText:
 		if len(b.Options) > 0 || b.Recommended != "" {
 			return errors.New("text question must not have options or recommended")
@@ -210,22 +212,35 @@ func checkLinks(links []QuestionLink) error {
 	return nil
 }
 
-func checkOptions(opts []QuestionOption, recommended string) error {
+// checkOptions validates opts and returns the recommended id as it is written
+// in opts.
+func checkOptions(opts []QuestionOption, recommended string) (string, error) {
 	if len(opts) < minOptions || len(opts) > maxOptions {
-		return fmt.Errorf("options question needs %d to %d options, got %d", minOptions, maxOptions, len(opts))
+		return "", fmt.Errorf("options question needs %d to %d options, got %d", minOptions, maxOptions, len(opts))
 	}
 	seen := map[string]bool{}
 	for _, o := range opts {
 		if o.ID == "" || o.Label == "" {
-			return errors.New("every option needs an id and a label")
+			return "", errors.New("every option needs an id and a label")
 		}
 		if seen[o.ID] {
-			return fmt.Errorf("duplicate option id %q", o.ID)
+			return "", fmt.Errorf("duplicate option id %q", o.ID)
 		}
 		seen[o.ID] = true
 	}
-	if recommended != "" && !seen[recommended] {
-		return fmt.Errorf("recommended %q is not an option id", recommended)
+	if recommended == "" || seen[recommended] {
+		return recommended, nil
 	}
-	return nil
+	// A label letter ("A") for an id "a" is a common slip: accept it when
+	// exactly one id matches under case-folding.
+	match, n := "", 0
+	for _, o := range opts {
+		if strings.EqualFold(o.ID, recommended) {
+			match, n = o.ID, n+1
+		}
+	}
+	if n != 1 {
+		return "", fmt.Errorf("recommended %q is not an option id", recommended)
+	}
+	return match, nil
 }

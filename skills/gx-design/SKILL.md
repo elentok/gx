@@ -67,7 +67,8 @@ prose gets no card, so the person sees only the chat and gx never marks the sess
 The `gx-question` block is YAML with a `type` key (`yes-no` or `options`), never JSON and never
 free fields such as `id`, `question` or `recommendation`. The format is in
 [gx-local-tracker.md](../gx-local-tracker.md) "The question block". A block with unknown fields
-does not parse and the question loses its buttons.
+does not parse and the question loses its buttons. In an `options` block, `recommended` must be the
+option's `id` exactly as written (for example `a`, not the label's letter `A`).
 
 The questions must be the last thing in the turn: no tool call, and no text, after them. The UI can
 hide earlier text of a turn once later tool calls or text follow it, so questions printed before a

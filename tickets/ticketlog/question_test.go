@@ -56,6 +56,22 @@ func TestParseQuestion_Kinds(t *testing.T) {
 	}
 }
 
+func TestParseQuestionStrict_RecommendedCaseFold(t *testing.T) {
+	two := "type: options\noptions:\n  - {id: a, label: A}\n  - {id: b, label: B}\n"
+	q, err := ParseQuestionStrict(questionBody("Q?", two+"recommended: A\n"))
+	if err != nil || q.Recommended != "a" {
+		t.Fatalf("got %+v, %v", q, err)
+	}
+	ambiguous := "type: options\noptions:\n  - {id: a, label: A}\n  - {id: A, label: B}\n"
+	if _, err := ParseQuestionStrict(questionBody("Q?", ambiguous+"recommended: \"a\"\n")); err != nil {
+		t.Fatalf("exact match must win: %v", err)
+	}
+	three := "type: options\noptions:\n  - {id: ab, label: A}\n  - {id: aB, label: B}\n"
+	if _, err := ParseQuestionStrict(questionBody("Q?", three+"recommended: AB\n")); err == nil || !strings.Contains(err.Error(), "not an option id") {
+		t.Fatalf("ambiguous case-fold must error, got %v", err)
+	}
+}
+
 func TestParseQuestion_Links(t *testing.T) {
 	body := questionBody("Which one?", "type: yes-no\nlinks:\n  - label: Mock\n    url: https://claude.ai/artifact/abc\n")
 	for name, q := range map[string]Question{"lenient": ParseQuestionLenient(body)} {
