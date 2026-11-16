@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil"
 )
 
 const diskGB = 1_000_000_000
@@ -115,6 +116,17 @@ func TestDiskStatus_OffThresholdPrintsOff(t *testing.T) {
 
 func TestDiskClean_PrintsFreedAndFreeAfterAndRefusalFails(t *testing.T) {
 	h := startDiskStatusServer(t, config.DiskSpaceConfig{WarnBelow: 20 * diskGB, CleanBelow: 10 * diskGB})
+
+	// d-low is below CleanBelow, so the watcher starts its own clean, and a
+	// clean-now request is refused while that one runs. It ends once LastClean is set.
+	testutil.WaitFor(t, 10*time.Second, "the automatic clean to end", func() bool {
+		rep, err := h.Client.Admin.DiskStatus(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		low := diskByID(rep.Disks, "d-low")
+		return low != nil && !low.Cleaning && low.LastClean != ""
+	})
 
 	var out bytes.Buffer
 	if err := runDiskClean(context.Background(), h.Client, &out, "d-low", false); err != nil {
