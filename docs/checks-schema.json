@@ -92,6 +92,9 @@
     "format": {
       "$ref": "#/definitions/check"
     },
+    "guards": {
+      "$ref": "#/definitions/check"
+    },
     "lint": {
       "$ref": "#/definitions/check"
     },

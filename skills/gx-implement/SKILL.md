@@ -260,6 +260,10 @@ touched plus their direct importers (see `.ai/index.md` "Testing") — not the f
 Run Go tests with `gx brief go-test`, not raw `go test`. While iterating, always pass
 `-timeout 60s` and `-run <pattern>` to `gx brief go-test`, and run one package per call.
 
+After you add lines to a package near its `sizeguard` limit, or add a wait, run
+`gx check --kind guards` first (seconds). It runs the size, sleep, env, old-word and Playwright
+guards, which otherwise fail only at the end of `gx check`.
+
 Before every commit, and before `--iteration-status finished`, run `gx check` once (changed files).
 It is the only package-wide run. Run it in the foreground, unpiped: no `tail`, no background.
 Set the shell call's time limit to 600000 ms (see the Tool names table in

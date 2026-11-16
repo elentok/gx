@@ -182,6 +182,7 @@ section silent.
 
 A seam may name the narrow `gx brief` command (e.g. `gx brief go-test -run 'TestX' ./pkg`) as an
 iteration hint. It is not the end-of-ticket check: that is always `gx check`.
+For a package near a `sizeguard` limit, name its line cap in Test seams.
 
 For a ticket that changes **skill text**, the seam is one shared test file per skill area (extend the
 existing one, e.g. `skills/mock_rules_test.go`), and each phrase is asserted once. Name the anchors as

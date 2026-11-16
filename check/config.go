@@ -16,7 +16,7 @@ import (
 )
 
 // Kinds lists the check kinds in output order.
-var Kinds = []string{"format", "lint", "typecheck", "test"}
+var Kinds = []string{"format", "lint", "typecheck", "guards", "test"}
 
 // RepoConfigPath is the repo-relative config file.
 const RepoConfigPath = ".gx/checks.json"

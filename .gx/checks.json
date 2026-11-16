@@ -1,12 +1,17 @@
 {
-  "test": {
-    "full": "GX_TEST_E2E=1 scripts/test.sh",
+  "guards": {
+    "full": "gx brief go-test ./sleepguard ./envguard ./oldwords ./playwrightguard ./sizeguard",
+    "changed": "gx brief go-test -run '^TestNoNewSleeps$' ./sleepguard",
     "always": [
-      "gx brief go-test -run '^TestNoNewSleeps$' ./sleepguard",
       "gx brief go-test -run '^TestNoEnvReads$' ./envguard",
       "gx brief go-test -run '^TestNoOldWords$' ./oldwords",
       "gx brief go-test ./playwrightguard",
-      "gx brief go-test ./sizeguard",
+      "gx brief go-test ./sizeguard"
+    ]
+  },
+  "test": {
+    "full": "GX_TEST_E2E=1 scripts/test.sh",
+    "always": [
       "gx brief go-test -run '^TestSchemaSnapshot$' ./migrations"
     ],
     "limits": {

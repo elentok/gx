@@ -21,6 +21,7 @@ var DefaultLine = map[string]string{
 	"format":    "gofmt / biome (or prettier) on changed files",
 	"lint":      "go vet / eslint on changed files",
 	"typecheck": "go build / tsc on changed packages",
+	"guards":    "none (set a command in .gx/checks.json)",
 	"test":      "go test / vitest on changed packages",
 }
 
@@ -30,6 +31,7 @@ var scriptNames = map[string][]string{
 	"format":    {"format", "fmt"},
 	"lint":      {"lint"},
 	"typecheck": {"typecheck", "type-check", "tsc"},
+	"guards":    {"guards"},
 	"test":      {"test"},
 }
 

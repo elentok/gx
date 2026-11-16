@@ -352,7 +352,8 @@ Keep a Go source file under about 1000 lines. When one grows past that, move a c
 declarations into a new file in the same package (for example `server/sessionstate.go` out of
 `server/sessions.go`). Moves only: don't change behaviour in the same commit.
 
-`sizeguard` (a test-only package) fails when a limit is passed; never raise a limit. A per-file or
+`sizeguard` (a test-only package) fails when a limit is passed; never raise a limit. Run
+`gx check --kind guards` (seconds) after adding lines or waits to see it, with the other guards. A per-file or
 per-type breach is fixed by splitting. The package measures (files, source lines, test lines, `Test`
 funcs) are totals over the whole directory, so splitting a file cannot lower them (a new file adds
 header lines): trim tests or move code to another package. Take the fix from sizeguard's line

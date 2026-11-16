@@ -41,9 +41,11 @@ const (
 
 // Reasons are the only reasons an exception entry may give.
 const (
-	reasonGenerated  = "generated"
-	reasonCohesive   = "cohesive type"
-	reasonTableData  = "table data"
+	reasonGenerated = "generated"
+	reasonCohesive  = "cohesive type"
+	reasonTableData = "table data"
+	// countNote says how sizes are counted; the headroom is the limit minus the size, so "over by K" is the least a fix must free.
+	countNote        = "Every line counts, blank and comment lines included. Headroom is the limit minus the size, so a fix must free at least the over-by amount."
 	splitInstruction = "Split it, do not raise the limit. See .ai/index.md (File size)."
 	// A package total counts every file in the directory, so splitting a file cannot lower it.
 	packageInstruction = "A package total: splitting a file cannot lower it. Trim tests or move code to another package; do not raise the limit. See .ai/index.md (File size)."
@@ -259,7 +261,7 @@ func check(files map[string]string, allow map[string]exception) []string {
 			limit = e.limit
 		}
 		if m.size > limit {
-			msg := fmt.Sprintf("%s: %s %d, limit %d, over by %d. %s", m.name, m.measure, m.size, limit, m.size-limit, instructionFor(m.measure))
+			msg := fmt.Sprintf("%s: %s %d, limit %d, over by %d. %s %s", m.name, m.measure, m.size, limit, m.size-limit, countNote, instructionFor(m.measure))
 			if len(m.parts) > 0 {
 				msg += breakdown(m.parts)
 			}
@@ -364,7 +366,7 @@ func TestCheck_Breaches(t *testing.T) {
 		files map[string]string
 		want  []string // every substring must appear in one message
 	}{
-		{"too many files", many("big", 51, 1, ".go"), []string{"big: files 51, limit 50, over by 1", "move code to another package"}},
+		{"too many files", many("big", 51, 1, ".go"), []string{"big: files 51, limit 50, over by 1", "move code to another package", "blank and comment lines included", "Headroom is the limit minus the size"}},
 		{"too many source lines", many("big", 6, 751, ".go"), []string{"big: source lines 4506, limit 4500, over by 6", "move code to another package"}},
 		{"too many test lines", many("big", 6, 834, "_test.go"), []string{"big: test lines 5004, limit 5000, over by 4", "splitting a file cannot lower it"}},
 		{"too many Test funcs", map[string]string{"big/a_test.go": tests("x", 181)}, []string{"big: Test funcs 181, limit 180, over by 1", "Trim tests"}},
