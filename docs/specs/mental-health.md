@@ -15,7 +15,7 @@ During a Rest period every open browser and phone shows the **Rest screen**: a m
 
 The person can end a Rest period early with "Unlock anyway". It asks them to type "I'm <anything> and I'm addicted to AI". gx counts Breaks and unlocks per day and shows them on the Stats page.
 
-A toast warns before each Rest period: 10 minutes before Bedtime and 2 minutes before a Break.
+A web toast (the web UI toaster, not the TUI Toast) warns before each Rest period: 10 minutes before Bedtime and 2 minutes before a Break.
 
 A new "Mental health" section of the settings page holds a master toggle "Enable mental health breaks", a Bedtime group and a Break group. Everything is off by default.
 
@@ -84,13 +84,13 @@ The implementer picks the file name, the field names and the event name.
 
 **Bedtime.** A Bedtime period exists while the local time is inside the range and the feature and Bedtime are on. It ends at the End time. When Bedtime starts, a Break that is due or running is dropped, the work count resets, and a dropped running Break writes a record that cancels its start record. A Break warning is not raised when the predicted Break start falls at or after the next Bedtime start.
 
-**Warnings.** The snapshot carries at most one warning. A Bedtime warning exists from 10 minutes before the start until it starts. A Break warning exists once the work count is two minutes below Work time and no Rest period runs, and it ends when the count resets. Work time must be at least 3 minutes, so the Break warning always fits; Break length must be at least 1 minute. The web UI shows each warning as a toast in every open browser, using the existing toaster. The texts are "Break in 2 minutes" with "Your Break starts at 14:55 and lasts 5 minutes.", and "Bedtime starts at 22:00 (in 10 minutes)" with "Wrap up what you are doing." A dismissed toast stays dismissed in that browser until a new warning appears. No Banner, Chat or sound goes with a warning.
+**Warnings.** The snapshot carries at most one warning. A Bedtime warning exists from 10 minutes before the start until it starts. A Break warning exists once the work count is two minutes below Work time and no Rest period runs, and it ends when the count resets. Work time must be at least 3 minutes, so the Break warning always fits; Break length must be at least 1 minute. The web UI shows each warning as a web toast (the web UI toaster, not the TUI Toast) in every open browser, using the existing toaster. The snapshot carries the predicted start time and recomputes it on each active minute, because an idle minute moves the start. The toast updates its text in place when the time moves, and a moved time is not a new warning. The texts are "Break in 2 minutes" with "Your Break starts at 14:55 and lasts 5 minutes.", and "Bedtime starts at 22:00 (in 10 minutes)" with "Wrap up what you are doing." A dismissed toast stays dismissed in that browser until a new warning appears (a warning that ended and came back after a reset). No Banner, Chat or sound goes with a warning.
 
 **Unlock.** The server checks the sentence with the regexp `^\s*i['’]m\s+.+?\s+and\s+i['’]m\s+addicted\s+to\s+ai\s*$` (case-insensitive). A match ends the current Rest period, sets "quiet until" to its original end, restarts the work count, and writes an unlock record tagged Break or Bedtime. An unlocked Bedtime stays off until its end time, even if the range is edited. A wrong sentence is a refusal result with a stable reason, as ADR 0028 says.
 
-**Records.** An append-only store in the state dir holds one record per Break start, one per dropped Break (which cancels that start) and one per unlock, each with a time and the kind. Bedtime starts are not recorded. There is no retention setting.
+**Records.** An append-only store in the state dir holds one record per Break start, one per dropped Break (which cancels that start) and one per unlock, each with a time and the kind. Bedtime starts are not recorded. There is no retention setting: a write prunes records older than 90 days, the longest Stats range, so the store stays bounded as ADR 0041's amendment requires.
 
-**Settings changes.** Settings apply without a restart, on a settings page save and on `gx server reload-config`. A change that ends a condition ends the Rest period at once: the master toggle off, or the Break or Bedtime toggle off for its own kind, or a Bedtime range that no longer holds the current time. Turning Bedtime on inside the range starts it at once. Turning the master toggle off also clears the work count.
+**Settings changes.** Settings apply without a restart, on a settings page save and on `gx server reload-config`. A change that ends a condition ends the Rest period at once: the master toggle off, or the Break or Bedtime toggle off for its own kind, or a Bedtime range that no longer holds the current time. Turning Bedtime on inside the range starts it at once. Turning the master toggle off, or only Break off, also clears the work count, so turning Break back on starts a fresh count.
 
 **Config keys and settings page.** The implementer picks the key names. The registry gets a new "Mental health" category and section with three groups: General (master toggle), Bedtime (toggle, Start, End, Message) and Break (toggle, Work time, Break length, Message). Follow the steps in `.ai/index.md` "Adding a config key": registry entries, regenerate the schemas, run the settings guard. Start and End are text in 24-hour `HH:MM` form with a per-key check. The settings write path refuses a save that leaves Start equal to End, through the existing before-write hook, and config load reports equal times as it reports other bad values, naming the keys. The page gets no new control type. All keys are global only, off by default, with defaults 55 and 5 minutes, Start 22:00 and End 07:00, and the Bedtime message above.
 
@@ -146,10 +146,10 @@ A good test checks what a person or script sees: the snapshot, the route and CLI
 
 ## Verification
 
-Run against a temporary gx server after the epic is built. Scenario `rest` has these shapes, each its own server start (new, listed below): `bedtime` (Bedtime on, range from one hour ago to one hour ahead, master on), `break` (Break on, a Break running that ends in 4 minutes 37 seconds, with the message from the mock), `break-warning` (Break on, work count two minutes below Work time, last active minute now) and `bedtime-warning` (Bedtime on, start 10 minutes ahead). Verb checks use `gx rest` verbs with the fixture's `env`.
+Run against a temporary gx server after the epic is built. Scenario `rest` has these shapes, each its own server start (new, listed below): `bedtime` (Bedtime on, range from one hour ago to one hour ahead, master on), `break` (Break on, a Break running that ends in 4 minutes 37 seconds, with the message from the mock, and a Break start record for that Break), `break-warning` (Break on, work count two minutes below Work time, last active minute now) and `bedtime-warning` (Bedtime on, start 10 minutes ahead). Verb checks use `gx rest` verbs with the fixture's `env`.
 
 1. Go test (seam 1): a fresh server has no Rest period and an empty Rest block however long the clock runs. CLI check: `gx rest --json` on a fresh fixture shows the feature off.
-2. Flow R1 (`break`): set the master toggle off in the config file and run `gx server reload-config`; the Rest screen leaves at once and `gx rest --json` shows no Rest period. Go test (seam 1): no active minute counts while the master toggle is off.
+2. CLI check (`break` start): set the master toggle off in the config file and run `gx server reload-config`; `gx rest --json` shows no Rest period. Vitest (seam 3): the Rest screen leaves when the snapshot shows no Rest period, including after a reload. Go test (seam 1): no active minute counts while the master toggle is off, and turning only Break off clears the work count.
 3. Go test (seam 1): with Bedtime on and Break off, active minutes do not start a Break; with Break on and Bedtime off, the range does not start Bedtime.
 4. Settings page in the `rest` scenario: the "Mental health" section has the General, Bedtime and Break groups. `go test ./config -run TestSettingsGuard` passes.
 5. Go test (seam 1): a range 22:00 to 07:00 is a Rest period at 23:30 and at 06:00, and not at 12:00.
@@ -158,9 +158,9 @@ Run against a temporary gx server after the epic is built. Scenario `rest` has t
 8. Go test (seam 1): the Rest block's time zone is the server's local zone (a fake clock and a fixed zone).
 9. Flow R2 (`bedtime`) and Mock states `bedtime-desktop`: the default message appears with the End time. Go test: a custom message with `{end}` is rendered.
 10. Go test (seam 1) and Mock states `bedtime-warning`: the warning exists from 10 minutes before the start, with the exact start time, and no Banner, Chat or sound goes with it.
-11. Flow R2: with Bedtime off and the clock inside the range, turn it on in the config file and reload; the Rest screen appears with no grace period.
+11. Go test (seam 1) and CLI check (own start with Bedtime off and the clock inside the range): turn Bedtime on in the config file and reload; `gx rest --json` shows a Bedtime period with no grace period.
 12. Vitest (seam 3): the router and its inputs stay mounted under the Rest screen, and a typed draft is still there after it leaves.
-13. Flow R1: with the Rest screen up, Tab and Cmd-K reach nothing underneath (`inert`, key guard). Vitest (seam 3): the key guard.
+13. Vitest (seam 3): with the Rest screen up, Tab and Cmd-K reach nothing underneath (`inert`, key guard).
 14. Vitest (seam 3): the heartbeat hook counts typing, clicks and scrolling and nothing else. Go test: a heartbeat in a minute makes that minute active.
 15. Go test (seam 1): two clients active in the same minute count once, in different minutes count twice. CLI check: `gx rest active` twice in one fake minute raises the work count by one.
 16. Go test (seam 1): TUI activity (focus reports, session input) does not change the work count.
@@ -171,7 +171,7 @@ Run against a temporary gx server after the epic is built. Scenario `rest` has t
 21. Go test (seam 1): a Break due at Bedtime start is dropped, a running Break is dropped with its cancelling record, the work count is zero after Bedtime, and no Break warning is raised for a start after Bedtime starts.
 22. Go test (seam 1): the built-in message is chosen at the Break start from the built-in list (seeded random source), stays the same for all clients, and survives a restart. Mock states `break-desktop`.
 23. Go test (seam 1): a custom Break message is used when set and is split at the first sentence end.
-24. Flow R1 (`break`): the countdown shows `mm:ss` and falls without a reload. Mock states `break-desktop`. Vitest: the countdown uses the server time from the snapshot.
+24. Flow R1 (`break`): the countdown shows `mm:ss`. Vitest (fake timers): the countdown falls without a reload and uses the server time from the snapshot. Mock states `break-desktop`.
 25. Flow R2 (`bedtime`) and Mock states `bedtime-desktop`.
 26. Mock states `bedtime-desktop`, `break-desktop`. Vitest (seam 3): each kind shows its own image, and the radial mask style is set.
 27. Flow R1 at 375 px: Mock states `break-phone`; flow R2 at 375 px: Mock states `bedtime-phone`.
@@ -188,7 +188,7 @@ Run against a temporary gx server after the epic is built. Scenario `rest` has t
 38. Go test (seam 1): the stats section counts Break starts less dropped ones, Break unlocks and Bedtime unlocks per local day. Flow R1 after an unlock: the Stats page shows a "Mental health" section whose day shows one Break and one Break unlock.
 39. Vitest (seam 3): the settings page has no counter for unlocks or Breaks.
 40. Go test (seam 1): restart the server mid-Break and mid-unlock; the Rest period, its message and the quiet-until time are the same.
-41. Go test (seam 1): the Banner, sound and Chat paths all read the one predicate (a test that flips it shows all three go quiet). Code review: no other outbound notifier is constructed outside the three decorated seams.
+41. Go test (seam 1): the Banner, sound and Chat paths all read the one predicate (a test that flips it shows all three go quiet). Go guard test: it fails when `osnotify.NewSystemNotifier`, `sound.NewSystemPlayer` or a chat transport is built outside the server's construction seam.
 42. Shell check: `webui/public/gx-rest-bedtime.png` and `gx-rest-break.png` exist and are 640 by 640 PNG files; `docs/mascot/rest-image-prompts.md` exists.
 
 **Mock states**

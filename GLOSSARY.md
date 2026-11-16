@@ -1128,7 +1128,7 @@ below.)
 **TUI** — Queue tab state, driven by `reduceLiveEvent`. Everything gx knows shows up here.
 
 **Toast** — transient in-TUI feedback (`ui/notify`). Only meaningful while someone is looking at the
-screen.
+screen. The web UI has its own toaster for web toasts, such as the Rest period warning. That is not this Toast.
 
 **Chat** — the outbound Slack/Telegram surface (the wrapper sinks). Deliberately a small, fixed
 subset of run events, for a person away from the terminal. The word **push** is retired for this
