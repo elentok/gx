@@ -16,13 +16,13 @@ const (
 	historyMarker = " [history]"
 )
 
-// OptionalSections are headings a ticket may lack until the first entry is
+// optionalSections are headings a ticket may lack until the first entry is
 // written; reading one that is missing yields nothing instead of an error.
-var OptionalSections = []string{IterationSummaryHeading, StoriesHeading}
+var optionalSections = []string{IterationSummaryHeading, StoriesHeading}
 
-// IsOptionalSection reports whether heading is on OptionalSections.
+// IsOptionalSection reports whether heading is on optionalSections.
 func IsOptionalSection(heading string) bool {
-	return slices.Contains(OptionalSections, heading)
+	return slices.Contains(optionalSections, heading)
 }
 
 // VerifiedEntry is one "## Verified" bullet: a story, the verdict reached and

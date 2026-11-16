@@ -209,6 +209,9 @@ func onlyMergeTicketsRemain(e tickets.Epic) bool {
 	return merging
 }
 
+// NoClaims is a claimedAt func for callers with no live claims.
+func NoClaims(string) (time.Time, bool) { return time.Time{}, false }
+
 // EpicStateFor is the one place that decides an epic's state. Running needs a
 // claimed, non-paused ticket that has a server claim time.
 func EpicStateFor(root queue.RootRef, e tickets.Epic, delivery string, claimedAt func(string) (time.Time, bool)) wire.EpicState {

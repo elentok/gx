@@ -118,7 +118,7 @@ func (s *Epics) ArchivedDetail(w http.ResponseWriter, r *http.Request) {
 	d.ArchivedAt = archived[i].ArchivedAt
 	if d.Kind == wire.EpicKindLoop {
 		// An archived epic runs nothing, so no ticket has a claim.
-		d.State = EpicStateFor(root, archived[i], "", func(string) (time.Time, bool) { return time.Time{}, false })
+		d.State = EpicStateFor(root, archived[i], "", NoClaims)
 	}
 	wire.WriteJSON(w, d)
 }

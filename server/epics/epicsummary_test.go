@@ -28,6 +28,14 @@ func repairPausedTicket(n string) tickets.Ticket { return pausedTicket(n, schema
 // answerPausedTicket is paused with an answer-class reason.
 func answerPausedTicket(n string) tickets.Ticket { return pausedTicket(n, schema.PauseZeroCommit) }
 
+func TestNoClaims_ReportsNoClaimForAnyAddress(t *testing.T) {
+	for _, addr := range []string{"", "gx:e/1", "anything"} {
+		if at, ok := NoClaims(addr); ok || !at.IsZero() {
+			t.Fatalf("NoClaims(%q) = %v, %v; want zero, false", addr, at, ok)
+		}
+	}
+}
+
 func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 	t.Parallel()
 	root := queue.RootRef{Project: "proj", Epic: "epic"}
