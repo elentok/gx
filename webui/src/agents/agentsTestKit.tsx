@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
-import { afterEach, beforeEach, vi } from "vitest"
+import { afterEach, beforeAll, beforeEach, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type { SessionInfo } from "../generated/server"
 import type { SessionChatResponse } from "../generated/server"
@@ -32,6 +32,8 @@ export const focusPosts: { session: string }[] = []
 
 // Call once at the top of each AgentsPage test file: it registers the shared cleanup and fetch stub.
 export function useAgentsPageHooks() {
+  // The route lazy-loads AgentsPage; under load the first import can outlast a findBy timeout, so load it before any test runs.
+  beforeAll(() => import("./AgentsPage"))
   afterEach(() => {
     closeNewItem()
     cleanup()
