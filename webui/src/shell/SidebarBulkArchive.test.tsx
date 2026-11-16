@@ -113,10 +113,10 @@ const dryOnly = (b: Call) =>
     ? { results: b.targets.map((t) => fits(t)) }
     : { results: b.targets.map((t) => ({ target: t, status: "done" })) }
 
-test("the button reads n of m and fits only finished loop epics and finished Designs", async () => {
+test("the button fits every selected epic and Design, like the row menu", async () => {
   setup(dryOnly)
   await selectRows("Blog", "Shop", "Mid")
-  expect(bar().getByRole("button", { name: "Archive 2 of 3" })).toBeTruthy()
+  expect(bar().getByRole("button", { name: "Archive 3" })).toBeTruthy()
 })
 
 test("Archive posts a dry run first and confirms even with no live Session and no warning", async () => {

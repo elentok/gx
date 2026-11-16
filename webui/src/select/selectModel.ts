@@ -105,12 +105,8 @@ const RULES: Record<SelectAction, (r: SelectRow) => Verdict> = {
     if (!r.session) return "not an agent"
     return canManage(r.session) ? undefined : "managed by the queue"
   },
-  archive: (r) =>
-    r.kind === "epic" || r.kind === "design"
-      ? r.archivable
-        ? undefined
-        : "unfinished"
-      : "can't be archived",
+  // Like the row menu, the server's dry run decides which epics are finished enough.
+  archive: (r) => (r.kind === "epic" || r.kind === "design" ? undefined : "can't be archived"),
   unarchive: (r) => (r.kind === "archived" ? undefined : "not archived"),
 }
 

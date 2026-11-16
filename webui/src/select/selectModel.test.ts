@@ -151,10 +151,10 @@ describe("fit rules", () => {
     expect(fits("remove")).toEqual(["chat", "a-live", "a-exited"])
   })
 
-  it("Archive fits finished loop epics and done Designs", () => {
-    expect(fits("archive")).toEqual(["fin"])
-    expect(fit("archive", on("epic"), rows).skipped).toEqual([
-      { key: "epic", reason: "unfinished" },
+  it("Archive fits epics and Designs; the server's dry run refuses unfinished ones", () => {
+    expect(fits("archive")).toEqual(["epic", "design", "queued", "held", "fin"])
+    expect(fit("archive", on("chat"), rows).skipped).toEqual([
+      { key: "chat", reason: "can't be archived" },
     ])
   })
 
@@ -168,7 +168,7 @@ describe("fit rules", () => {
 })
 
 describe("labels", () => {
-  const rows = [r("a", { archivable: true }), r("b", { archivable: true }), r("c")]
+  const rows = [r("a"), r("b"), r("c", { kind: "chat" })]
 
   it("says n of m when some rows are skipped", () => {
     expect(countLabel("archive", fit("archive", on("a", "b", "c"), rows))).toBe("Archive 2 of 3")
@@ -180,7 +180,7 @@ describe("labels", () => {
 
   it("lists each skipped row with its reason", () => {
     expect(skipLines(fit("archive", on("a", "c"), rows), (k) => k.toUpperCase())).toEqual([
-      "C: unfinished",
+      "C: can't be archived",
     ])
   })
 })
