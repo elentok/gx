@@ -2,18 +2,20 @@ package prompt
 
 import "sync"
 
-// typingLocks is one lock per chat, keyed by session id. A typer holds it for
-// one clear, type and Enter, never for a turn, so two typers never interleave
-// their keys in one input box. It is a field of Prompt and lockTyping a plain
-// function, so Prompt's method count stays under the sizeguard limit.
+// typingLocks is one lock per chat, held for one clear, type and Enter, so two
+// typers never interleave keys. Forgetting a chat is safe mid-typing.
 type typingLocks struct {
 	mu    sync.Mutex
 	chats map[string]chan struct{}
 }
 
-// lockTyping waits for the chat's typing lock. It gives up with
-// ErrServerStopping when the server stops and with errNudgeCancelled when
-// cancel closes. The returned func releases the lock.
+// ForgetSession drops a gone session's typing lock and rename slot.
+func ForgetSession(p *Prompt, id string) {
+	p.typingLocks.forget(id)
+	p.renames.forget(id)
+}
+
+// lockTyping waits for the chat's lock. The returned func releases it.
 func lockTyping(p *Prompt, id string, cancel <-chan struct{}) (func(), error) {
 	ch := p.typingLocks.slot(id)
 	var stop <-chan struct{}
@@ -30,16 +32,20 @@ func lockTyping(p *Prompt, id string, cancel <-chan struct{}) (func(), error) {
 	}
 }
 
+func (l *typingLocks) forget(id string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.chats, id)
+}
+
 func (l *typingLocks) slot(id string) chan struct{} {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.chats == nil {
 		l.chats = map[string]chan struct{}{}
 	}
-	ch, ok := l.chats[id]
-	if !ok {
-		ch = make(chan struct{}, 1)
-		l.chats[id] = ch
+	if l.chats[id] == nil {
+		l.chats[id] = make(chan struct{}, 1)
 	}
-	return ch
+	return l.chats[id]
 }

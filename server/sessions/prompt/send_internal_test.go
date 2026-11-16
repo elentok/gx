@@ -275,6 +275,29 @@ func TestRenameSlots_EmptyRequestSupersedesAParkedOne(t *testing.T) {
 	}
 }
 
+func TestForgetSession_DropsLockAndRenameSlotEvenWhileTyping(t *testing.T) {
+	p := newLockPrompt()
+	release, err := lockTyping(p, "s1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.renames.put("s1", "/rename A")
+
+	ForgetSession(p, "s1")
+	ForgetSession(p, "never-used")
+	release() // the typer still holds its own channel reference
+
+	p.typingLocks.mu.Lock()
+	_, hasLock := p.typingLocks.chats["s1"]
+	p.typingLocks.mu.Unlock()
+	p.renames.mu.Lock()
+	_, hasSlot := p.renames.chats["s1"]
+	p.renames.mu.Unlock()
+	if hasLock || hasSlot {
+		t.Errorf("after forget: lock entry %v, rename slot %v, want both gone", hasLock, hasSlot)
+	}
+}
+
 // A chat that turns Blocked between the request and the send keeps its
 // command held and gets the hold watcher the request path would have started.
 func TestFinishRename_BlockedAtSendKeepsTheCommandAndClaimsTheWatcher(t *testing.T) {

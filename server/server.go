@@ -525,7 +525,10 @@ func New(cfg Config) (*Server, error) {
 	s.sessions = newManager(s)
 	s.archive = newArchive(s)
 	s.sessions.Maps.OnDesignStart = s.clearHold
-	s.sessions.OnSessionGone = s.dropSessionMember
+	s.sessions.OnSessionGone = func(id string) {
+		s.dropSessionMember(id)
+		sessprompt.ForgetSession(s.prompt, id)
+	}
 	s.designs.GiveSessions(s.sessions)
 	s.prompt.GiveSessions(s.sessions)
 	s.triage.GiveSessions(s.sessions)
