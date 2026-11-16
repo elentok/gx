@@ -96,4 +96,7 @@ type DesignDraftSaveResult struct {
 	Draft   *DesignDraft `json:"draft,omitempty"`
 	// Started is the Design address ("project:epic") a gone draft was started as.
 	Started string `json:"started,omitempty"`
+	// LabelChanged is set by a text save that changed the draft's list label.
+	// Server-side only: it never goes on the wire.
+	LabelChanged bool `json:"-"`
 }

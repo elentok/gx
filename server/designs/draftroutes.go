@@ -61,11 +61,10 @@ func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		before, getErr := s.drafts.Get(req.ID)
 		res, err = s.drafts.Save(req.ID, req)
 		res = s.withStarted(res, req.ID)
 		// The label, not the text: typing past the fifth word changes no row.
-		if err == nil && getErr == nil && res.Draft != nil && res.Draft.Label != before.Label {
+		if err == nil && res.LabelChanged {
 			publishDrafts(s.events)
 		}
 	}

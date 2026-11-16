@@ -191,6 +191,7 @@ func (s *Store) Save(id string, req ops.DesignDraftSaveRequest) (ops.DesignDraft
 	if d.Revision != req.Revision {
 		return ops.DesignDraftSaveResult{Refused: true, Reason: ops.ReasonDraftRevisionConflict}, nil
 	}
+	oldLabel := Label(d.Slug, d.Idea)
 	d.Idea = req.Idea
 	d.Revision++
 	if !req.KeepEditedAt {
@@ -200,7 +201,7 @@ func (s *Store) Save(id string, req ops.DesignDraftSaveRequest) (ops.DesignDraft
 		return ops.DesignDraftSaveResult{}, err
 	}
 	d.Label = Label(d.Slug, d.Idea)
-	return ops.DesignDraftSaveResult{Draft: d}, nil
+	return ops.DesignDraftSaveResult{Draft: d, LabelChanged: d.Label != oldLabel}, nil
 }
 
 // SetTarget writes the slug and/or the project under the draft's lock; a nil
@@ -382,7 +383,15 @@ func (s *Store) Delete(id string) error {
 	}
 	unlock := s.lock(id)
 	defer unlock()
+	s.dropLease(id)
 	return os.RemoveAll(s.dir(id))
+}
+
+// dropLease forgets a deleted draft's lease so the map does not grow.
+func (s *Store) dropLease(id string) {
+	s.leaseMu.Lock()
+	defer s.leaseMu.Unlock()
+	delete(s.leases, id)
 }
 
 // DeleteIfEmpty deletes a draft only while it is still empty, judged under the
@@ -408,6 +417,7 @@ func (s *Store) DeleteIfEmpty(id string) (ops.DesignDraftSaveResult, error) {
 	if err := os.RemoveAll(s.dir(id)); err != nil {
 		return ops.DesignDraftSaveResult{}, err
 	}
+	s.dropLease(id)
 	return ops.DesignDraftSaveResult{Deleted: true}, nil
 }
 

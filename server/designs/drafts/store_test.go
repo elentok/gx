@@ -555,3 +555,42 @@ func TestStartRecord(t *testing.T) {
 		t.Errorf("record file still there: %v", err)
 	}
 }
+
+func TestSave_ReportsLabelChangeOnlyWhenFirstWordsChange(t *testing.T) {
+	s := newStore(t)
+	d := mustCreate(t, s, "one two three four five")
+	same, err := s.Save(d.ID, ops.DesignDraftSaveRequest{Idea: "one two three four five six", Revision: d.Revision})
+	if err != nil || same.Draft == nil || same.LabelChanged {
+		t.Fatalf("typing past the label changed it: %+v %v", same, err)
+	}
+	changed, err := s.Save(d.ID, ops.DesignDraftSaveRequest{Idea: "other words", Revision: same.Draft.Revision})
+	if err != nil || !changed.LabelChanged {
+		t.Fatalf("new first words kept the label: %+v %v", changed, err)
+	}
+}
+
+func TestLeaseIsDroppedWhenTheDraftGoes(t *testing.T) {
+	s := newStore(t)
+	leaseOf := func(id string) bool {
+		s.leaseMu.Lock()
+		defer s.leaseMu.Unlock()
+		_, ok := s.leases[id]
+		return ok
+	}
+	del, empty, swept := mustCreate(t, s, "a"), mustCreate(t, s, ""), mustCreate(t, s, "")
+	for _, d := range []*ops.DesignDraft{del, empty, swept} {
+		if _, err := s.Lease(d.ID); err != nil || !leaseOf(d.ID) {
+			t.Fatalf("lease %s: %v", d.ID, err)
+		}
+	}
+	if err := s.Delete(del.ID); err != nil || leaseOf(del.ID) {
+		t.Errorf("Delete kept the lease: %v", err)
+	}
+	if res, err := s.DeleteIfEmpty(empty.ID); err != nil || !res.Deleted || leaseOf(empty.ID) {
+		t.Errorf("DeleteIfEmpty kept the lease: %+v %v", res, err)
+	}
+	s.now = func() time.Time { return time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC) } // past LeaseTTL
+	if removed, err := s.SweepEmpty(); err != nil || len(removed) != 1 || leaseOf(swept.ID) {
+		t.Errorf("SweepEmpty kept the lease: %v %v", removed, err)
+	}
+}
