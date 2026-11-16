@@ -119,10 +119,12 @@ func dialogPicks(d claudeui.AskDialog, a wire.SessionAnswer) (picks []int, text 
 		return nil, "", badAnswer("the text has a line break or control character")
 	}
 	other := len(d.Options) - 1
-	picks, pickedOther, _, err := pickedIDs(a, other)
+	picks, err = pickedIDs(a, other)
 	if err != nil {
 		return nil, "", badAnswer(err.Error() + " of the dialog")
 	}
+	pickedOther := slices.Contains(picks, pickOther)
+	picks = slices.DeleteFunc(picks, func(p int) bool { return p == pickOther })
 	if pickedOther || text != "" {
 		picks = append(picks, other)
 	}
