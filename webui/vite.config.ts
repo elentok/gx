@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
-import { dirname, join } from "node:path"
+import { readdirSync } from "node:fs"
+import { basename, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
@@ -11,9 +12,25 @@ import { serviceWorkerPlugin } from "./src/pwa/serviceWorkerPlugin"
 
 const webuiDir = dirname(fileURLToPath(import.meta.url))
 
+// Chunk names are known only after bundling, but a chunk is named after its entry module or
+// manualChunks group. The basenames of the source files plus "vendor" are a superset, and
+// webVitals.ts only uses it as the allowlist for worst_chunk.
+function chunkNames(): string {
+  const names = new Set(["vendor"])
+  for (const file of readdirSync(join(webuiDir, "src"), { recursive: true, encoding: "utf8" })) {
+    if (/\.tsx?$/.test(file) && !/\.(test|d)\.tsx?$/.test(file)) {
+      names.add(basename(file).replace(/\.tsx?$/, ""))
+    }
+  }
+  return [...names].sort().join(",")
+}
+
 export default defineConfig({
   // The Makefile passes the gx version; a plain build or the dev server reports "dev".
-  define: { __WEB_VERSION__: JSON.stringify(process.env.GX_WEB_VERSION || "dev") },
+  define: {
+    __WEB_VERSION__: JSON.stringify(process.env.GX_WEB_VERSION || "dev"),
+    __GX_CHUNKS__: JSON.stringify(chunkNames()),
+  },
   resolve: {
     // Pierre imports every Shiki grammar through this entry; swap in the short list.
     alias: [{ find: /^shiki\/langs$/, replacement: join(webuiDir, "src/diff/shikiLangs.ts") }],
@@ -21,22 +38,6 @@ export default defineConfig({
   plugins: [
     react(),
     serviceWorkerPlugin(),
-    {
-      // Gives webVitals.ts the build's chunk names, the allowlist for worst_chunk.
-      name: "gx-chunk-names",
-      generateBundle(_options, bundle) {
-        const names = new Set<string>()
-        for (const file of Object.values(bundle)) {
-          if (file.type === "chunk") names.add(file.name)
-        }
-        const list = JSON.stringify([...names].sort().join(","))
-        for (const file of Object.values(bundle)) {
-          if (file.type === "chunk" && file.name === "webVitals") {
-            file.code = file.code.replace(/"__GX_CHUNKS__"/, list)
-          }
-        }
-      },
-    },
     {
       name: "canned-snapshot",
       configureServer(server) {

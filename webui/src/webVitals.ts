@@ -10,18 +10,14 @@ import {
   type LCPMetricWithAttribution,
 } from "web-vitals/attribution"
 import { actionName } from "./gxActions"
-import { hardLoadDropped, hardLoadNavigationType } from "./routeSpans"
+import { hardLoadDropped, hardLoadNavigationType, toNavigationType } from "./routeSpans"
 import { afterQueueEnabled, queueSample, type WebPerfInput } from "./webPerf"
 
 const POOR_INP_MS = 200
 const POOR_LCP_MS = 2500
 
-// vite.config.ts replaces this placeholder with the build's chunk names. The dev server leaves it,
-// and its sources never match a chunk file, so every frame reports "other" there.
-const CHUNK_LIST = "__GX_CHUNKS__"
-const CHUNKS: ReadonlySet<string> = new Set(
-  CHUNK_LIST.startsWith("__") ? [] : CHUNK_LIST.split(","),
-)
+// vite.config.ts defines __GX_CHUNKS__ as the allowlist of chunk names.
+const CHUNKS: ReadonlySet<string> = new Set(__GX_CHUNKS__.split(","))
 
 type Metric = INPMetricWithAttribution | LCPMetricWithAttribution | CLSMetric | FCPMetric
 
@@ -48,17 +44,7 @@ function worstFrame(
 function navigationType(metric: Metric, hard: boolean): WebPerfInput["navigation_type"] {
   if (!hard) return undefined
   if (hardLoadNavigationType() === "back-forward-cache") return "back-forward-cache"
-  switch (metric.navigationType) {
-    case "navigate":
-    case "reload":
-    case "back-forward":
-    case "back-forward-cache":
-      return metric.navigationType
-    case "prerender":
-      return "navigate"
-    default:
-      return undefined
-  }
+  return toNavigationType(metric.navigationType)
 }
 
 /** Builds the sample for a metric, or undefined when it must not be sent. */
