@@ -5,6 +5,7 @@ package backgroundtask
 
 import (
 	"errors"
+	"os"
 	"slices"
 	"sync"
 	"time"
@@ -84,6 +85,41 @@ type Reader struct {
 
 	mu    sync.Mutex
 	known map[string]string
+	// last is the newest parse per session id. An idle poll then costs one
+	// stat instead of a whole-transcript parse.
+	last map[string]cachedReading
+}
+
+type cachedReading struct {
+	path    string
+	size    int64
+	modTime time.Time
+	reading transcript.BackgroundTaskReading
+}
+
+// parse reads the transcript at path, serving the cached parse while the file's
+// size and mtime are unchanged and no marker has aged out since.
+func (rd *Reader) parse(sessionID, path string, now time.Time) (transcript.BackgroundTaskReading, error) {
+	fi, statErr := os.Stat(path)
+	if statErr == nil {
+		rd.mu.Lock()
+		c, ok := rd.last[sessionID]
+		rd.mu.Unlock()
+		if ok && c.path == path && c.size == fi.Size() && c.modTime.Equal(fi.ModTime()) &&
+			(c.reading.ValidUntil.IsZero() || !now.After(c.reading.ValidUntil)) {
+			return c.reading, nil
+		}
+	}
+	tr, err := transcript.ReadBackgroundTasks(path, transcript.BackgroundTaskAgedOutCap, now)
+	if err == nil && statErr == nil && tr.FileStatus == "" {
+		rd.mu.Lock()
+		if rd.last == nil {
+			rd.last = map[string]cachedReading{}
+		}
+		rd.last[sessionID] = cachedReading{path: path, size: fi.Size(), modTime: fi.ModTime(), reading: tr}
+		rd.mu.Unlock()
+	}
+	return tr, err
 }
 
 // Read returns the reading for sessionID. A Codex session has no transcript,
@@ -105,7 +141,7 @@ func (rd *Reader) read(sessionID string) (transcript.BackgroundTaskReading, erro
 	path, cached := rd.known[sessionID]
 	rd.mu.Unlock()
 	if cached {
-		tr, err := transcript.ReadBackgroundTasks(path, transcript.BackgroundTaskAgedOutCap, now())
+		tr, err := rd.parse(sessionID, path, now())
 		if err == nil && tr.FileStatus != transcript.BackgroundTaskUnsupported {
 			return tr, nil
 		}
@@ -117,7 +153,7 @@ func (rd *Reader) read(sessionID string) (transcript.BackgroundTaskReading, erro
 	if len(paths) != 1 {
 		return transcript.BackgroundTaskReading{}, errors.New("transcript not found or ambiguous")
 	}
-	tr, err := transcript.ReadBackgroundTasks(paths[0], transcript.BackgroundTaskAgedOutCap, now())
+	tr, err := rd.parse(sessionID, paths[0], now())
 	if err != nil {
 		return tr, err
 	}

@@ -140,6 +140,10 @@ type BackgroundTaskReading struct {
 	// agent that ended its turn to wait, and the pane can still read idle
 	// while that new turn runs short tool calls. Past cap it reads false.
 	AwaitingTurnEnd bool
+	// ValidUntil is the last instant at which this reading still holds for an
+	// unchanged file: after it a marker or AwaitingTurnEnd ages out. Zero means
+	// time cannot change the reading.
+	ValidUntil time.Time
 }
 
 // backgroundTaskLine is the subset of a transcript JSONL line
@@ -407,6 +411,14 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 	}
 
 	reading := BackgroundTaskReading{AwaitingTurnEnd: awaitingTurnEnd && now.Sub(lastResolvedAt) <= cap}
+	expireAt := func(t time.Time) {
+		if reading.ValidUntil.IsZero() || t.Before(reading.ValidUntil) {
+			reading.ValidUntil = t
+		}
+	}
+	if reading.AwaitingTurnEnd {
+		expireAt(lastResolvedAt.Add(cap))
+	}
 	for _, taskID := range order {
 		m := markers[taskID]
 		status := BackgroundTaskOutstandingFresh
@@ -415,6 +427,8 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 			status = BackgroundTaskResolved
 		case now.Sub(m.startedAt) > m.cap:
 			status = BackgroundTaskOutstandingAgedOut
+		default:
+			expireAt(m.startedAt.Add(m.cap))
 		}
 		reading.Markers = append(reading.Markers, BackgroundTaskMarker{
 			TaskID:    taskID,
