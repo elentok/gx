@@ -161,10 +161,16 @@ test("the Rest screen hides itself when the countdown reaches zero", () => {
 
 test("the countdown timer is cleared when the screen leaves", () => {
   vi.useFakeTimers({ now: new Date("2026-11-16T10:00:00Z") })
+  const set = vi.spyOn(globalThis, "setInterval")
+  const clear = vi.spyOn(globalThis, "clearInterval")
   setupBreak(breakPeriod, "2026-11-16T10:00:00Z")
-  expect(vi.getTimerCount()).toBeGreaterThan(0)
+  expect(set).toHaveBeenCalled()
   cleanup()
-  expect(vi.getTimerCount()).toBe(0)
+  // Every interval the screen started has been cleared. Focusing the dialog leaves an unrelated
+  // one-shot timer, so the raw timer count is not zero.
+  expect(clear).toHaveBeenCalledTimes(set.mock.calls.length)
+  set.mockRestore()
+  clear.mockRestore()
   vi.useRealTimers()
 })
 
@@ -224,6 +230,37 @@ test("typing in the unlock box reaches the input while keys outside stay blocked
   input.addEventListener("keydown", seen)
   fireEvent.keyDown(input, { key: "a" })
   expect(seen).toHaveBeenCalled()
+})
+
+test("the dialog takes focus and Tab inside the screen is not blocked", () => {
+  setup(bedtime)
+  const dialog = document.querySelector("[role=dialog]") as HTMLElement
+  expect(document.activeElement).toBe(dialog)
+  const tab = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true })
+  dialog.dispatchEvent(tab)
+  expect(tab.defaultPrevented).toBe(false)
+  expect(part("unlock-link")!.getAttribute("tabindex")).toBe("0")
+})
+
+test("each kind shows its own image and the radial mask", () => {
+  const update = setup(bedtime)
+  const image = () => part("mascot-image") as HTMLElement
+  expect(image().className).toBeTruthy()
+  expect(getComputedStyle(image()).backgroundImage).toContain("gx-rest-bedtime.png")
+  expect(image().style.maskImage).toContain("radial-gradient")
+  update({ ...breakPeriod, end: "2999-01-01T00:00:00Z" })
+  expect(getComputedStyle(image()).backgroundImage).toContain("gx-rest-break.png")
+  expect(image().style.maskImage).toContain("radial-gradient")
+})
+
+test("a typed Unlock draft is still there when the input leaves and comes back", () => {
+  const update = setup(bedtime)
+  fireEvent.click(part("unlock-link")!)
+  typeSentence("I'm Dana and")
+  update(undefined)
+  expect(screen.queryByLabelText("Unlock sentence")).toBeNull()
+  update(bedtime)
+  expect((screen.getByLabelText("Unlock sentence") as HTMLInputElement).value).toBe("I'm Dana and")
 })
 
 test("the screen leaves and the page is live again when the period ends", () => {

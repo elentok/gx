@@ -44,30 +44,55 @@ function useKeyGuard(screen: HTMLElement | null) {
   }, [screen])
 }
 
-function BedtimeView() {
-  const { period, rule } = useRestState()
-  if (!period) return null
+type Period = NonNullable<ReturnType<typeof useRestState>["period"]>
+type Rule = ReturnType<typeof useRestState>["rule"]
+
+function TimeBlock({
+  period,
+  label,
+  time,
+  note,
+  big,
+}: {
+  period: Period
+  label: string
+  time: string | undefined
+  note?: string
+  big?: boolean
+}) {
   return (
     <>
       <Message message={period.message} subMessage={period.sub_message} />
-      <TimeLabel>Back at</TimeLabel>
+      <TimeLabel>{label}</TimeLabel>
       <Text
         data-part="time"
         m="6px 0"
         fontFamily="ui-monospace, monospace"
         fontWeight="700"
-        fontSize="40px"
+        fontSize={big ? "56px" : "40px"}
+        letterSpacing={big ? "2px" : undefined}
         lineHeight="1"
-        color={ACCENT}
+        color={big ? undefined : ACCENT}
       >
-        {rule?.bedtime_end}
+        {time}
       </Text>
-      {rule && (
+      {note && (
         <Text data-part="rule-note" color={DIM} fontSize="12px" m="0">
-          Bedtime {rule.bedtime_start} – {rule.bedtime_end}
+          {note}
         </Text>
       )}
     </>
+  )
+}
+
+function BedtimeView({ period, rule }: { period: Period; rule: Rule }) {
+  return (
+    <TimeBlock
+      period={period}
+      label="Back at"
+      time={rule?.bedtime_end}
+      note={rule && `Bedtime ${rule.bedtime_start} – ${rule.bedtime_end}`}
+    />
   )
 }
 
@@ -125,36 +150,34 @@ function TimeLabel({ children }: { children: string }) {
   )
 }
 
-function BreakView({ seconds }: { seconds: number }) {
-  const { period, rule } = useRestState()
-  if (!period) return null
+function BreakView({ period, rule, seconds }: { period: Period; rule: Rule; seconds: number }) {
   return (
-    <>
-      <Message message={period.message} subMessage={period.sub_message} />
-      <TimeLabel>Break ends in</TimeLabel>
-      <Text
-        data-part="time"
-        m="6px 0"
-        fontFamily="ui-monospace, monospace"
-        fontWeight="700"
-        fontSize="56px"
-        letterSpacing="2px"
-        lineHeight="1"
-      >
-        {formatCountdown(seconds)}
-      </Text>
-      {rule && (
-        <Text data-part="rule-note" color={DIM} fontSize="12px" m="0">
-          Break · {rule.break_minutes} minutes after {rule.work_minutes} minutes of work
-        </Text>
-      )}
-    </>
+    <TimeBlock
+      period={period}
+      label="Break ends in"
+      time={formatCountdown(seconds)}
+      note={
+        rule && `Break · ${rule.break_minutes} minutes after ${rule.work_minutes} minutes of work`
+      }
+      big
+    />
   )
 }
 
-function UnlockSection({ buttonLabel }: { buttonLabel: string }) {
+// Held by RestScreen, which stays mounted while the screen is hidden, so a draft survives it.
+function useUnlockDraft() {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState("")
+  return { open, setOpen, text, setText }
+}
+
+function UnlockSection({
+  buttonLabel,
+  draft: { open, setOpen, text, setText },
+}: {
+  buttonLabel: string
+  draft: ReturnType<typeof useUnlockDraft>
+}) {
   const [refusal, setRefusal] = useState<string>()
   const [busy, setBusy] = useState(false)
   const enabled = isUnlockSentence(text)
@@ -239,6 +262,9 @@ export function RestScreen() {
   const seconds = useCountdown(period?.end, now, isBreak)
   useInertPage(screen)
   useKeyGuard(screen)
+  const draft = useUnlockDraft()
+  // Focus on the page body would make the key guard block Tab, so take focus first.
+  useEffect(() => void screen?.focus(), [screen])
   if (!period || (isBreak && !seconds)) return null
   return createPortal(
     <Box
@@ -246,6 +272,8 @@ export function RestScreen() {
       role="dialog"
       aria-modal="true"
       aria-label="Rest"
+      tabIndex={-1}
+      outline="none"
       position="fixed"
       inset="0"
       zIndex={REST_Z_INDEX}
@@ -268,9 +296,10 @@ export function RestScreen() {
           backgroundPosition="center"
           style={{ maskImage: MASK, WebkitMaskImage: MASK }}
         />
-        {period.kind === RestKindBedtime && <BedtimeView />}
-        {isBreak && <BreakView seconds={seconds ?? 0} />}
+        {period.kind === RestKindBedtime && <BedtimeView period={period} rule={rule} />}
+        {isBreak && <BreakView period={period} rule={rule} seconds={seconds ?? 0} />}
         <UnlockSection
+          draft={draft}
           buttonLabel={
             isBreak
               ? "Unlock until the end of this Break"
