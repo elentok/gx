@@ -26,18 +26,16 @@ var (
 	_ sessions.FirstPrompt = (*firstPrompt)(nil)
 )
 
-// signalFirstIdle names the fallback in the debug line when no ready report
-// came before the first Idle.
-const signalFirstIdle = "first Idle"
-
-// holderPollInterval is how often a holder-backed prompt waits between turn
-// checks.
-const holderPollInterval = 50 * time.Millisecond
+const (
+	// signalFirstIdle names the fallback in the debug line when no ready report came before the first Idle.
+	signalFirstIdle = "first Idle"
+	// holderPollInterval is how often a holder-backed prompt waits between turn checks.
+	holderPollInterval = 50 * time.Millisecond
+	// clearInputHint ends a reason when the input may still hold gx's text.
+	clearInputHint = " Clear the input first."
+)
 
 var errNudgeCancelled = errors.New("nudge cancelled: person input")
-
-// clearInputHint ends a reason when the input may still hold gx's text.
-const clearInputHint = " Clear the input first."
 
 // firstPrompt follows one session's first prompt from the watch stream: it
 // decides when to type, types in the background, and cancels the remaining
@@ -540,13 +538,7 @@ func (p *holderPrompter) InputEmpty() (bool, bool, error) {
 	if err != nil {
 		return false, false, err
 	}
-	switch state {
-	case harness.InputEmpty:
-		return true, true, nil
-	case harness.InputNotEmpty:
-		return false, true, nil
-	}
-	return false, false, nil
+	return state == harness.InputEmpty, state == harness.InputEmpty || state == harness.InputNotEmpty, nil
 }
 
 // PromptHead is the start of a prompt for a log line.
