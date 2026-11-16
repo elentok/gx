@@ -248,6 +248,7 @@ func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts m
 	res.DevControlFile = f.devControl
 	res.ChatCapture = f.chatCapture
 	res.Transcripts = transcripts
+	res.TaskFiles = f.taskFiles
 	if sc.LimitBurn {
 		res.CodexSessionsDir = filepath.Join(f.root, "home", ".codex", "sessions")
 	}

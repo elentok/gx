@@ -151,6 +151,16 @@ func (f sessionSeeder) seedInterrupted(id string, harness string) error {
 // appendChatLines appends transcript lines to the session's Claude transcript or
 // Codex rollout, once the harness has reported its conversation id.
 func (f sessionSeeder) appendChatLines(id, harness string, lines []string) error {
+	path, err := f.chatFilePath(id, harness)
+	if err != nil {
+		return err
+	}
+	return appendLines(path, lines)
+}
+
+// chatFilePath is the session's Claude transcript or Codex rollout, once the
+// harness has reported its conversation id.
+func (f sessionSeeder) chatFilePath(id, harness string) (string, error) {
 	dir := filepath.Join(f.root, "data", "gx", "sessions", id)
 	var meta sessions.Meta
 	var path string
@@ -172,9 +182,14 @@ func (f sessionSeeder) appendChatLines(id, harness string, lines []string) error
 			}
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("session %s: no chat file (conversation %q): %v", id, meta.ConversationID, err)
+			return "", fmt.Errorf("session %s: no chat file (conversation %q): %v", id, meta.ConversationID, err)
 		}
 	}
+	return path, nil
+}
+
+// appendLines appends lines to the file at path.
+func appendLines(path string, lines []string) error {
 	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err

@@ -84,6 +84,20 @@ range of epics with a run log and no pick (`bf-nocommit-impl`, `bf-second-nocomm
 `bf-pull-y-impl` (one entry), `bf-spread-impl` (spread over two entries), `bf-twice-impl` (merged twice), the map `bf-exact-a`,
 `bf-nolog-impl` (no run log) and `bf-offtrunk-impl` (commits not on trunk) get none.
 The names are constants in `testutil/gxfixture/spec/epicdiff.go`, `epicdiffpr.go` and `epicdiffbackfill.go`; the commits are made by `GitSetup` there.
+The `bg-progress` scenario seeds one Working Claude Design session of the map `design-epic` (so it opens on the Design page and
+the Agents page) whose transcript and task files hold background tasks (`start("bg-progress", { shape })`; default `claude`).
+All times are offsets before the seed time. Output keys: `transcripts[<shape>]` is the session's transcript, `taskFiles` has
+`growing-output`. Shapes: `claude` is 7 tasks, 3 done: the subagent "Survey the sessions code" (6 min ago, runs throughout, with a
+model, 4720 tokens, 3 tool calls and an open Grep), `make lint` (success), a 16-line bash script (failed, exit 2, 12 s), `sleep 900`
+(killed by TaskStop, 12 s), a python heredoc call that moved to the background after its timeout (running, started at its
+launching line), a Monitor with six events and the foreground `make test`. `single-task` is one running shell with a 16-line
+command. `subagent-with-inner-task` is one running subagent whose own file launches a shell the parent never names; append the
+subagent's final notification to `transcripts["subagent-with-inner-task"]` to end it. `many` is 50 tasks: the anchor subagent, 29
+running and 20 finished shells with about 2 KB of output each. `timed-out-shell` is one running call whose `tool_use` was 9 min ago
+and whose moved-to-background result was 2 min ago. `growing-output` is one running shell whose output file has three lines; append
+lines to `taskFiles["growing-output"]`, then `\n[exited with code 0]\n` to finish it. The shapes `codex`, `old-codex`, `exited` and
+`no-end` are named but not built yet (the fixture refuses them). The session's creation is set an hour back so no seeded task
+reads as one of an earlier run. Data: `testutil/gxfixture/spec/bgprogress.go` and `bglines.go`; the seeder is `bgprogress.go`.
 The `dev-mode` scenario runs a Dev checkout (`server.web.dev-dir`, with `webui/package.json`) against the fake `pnpm`
 (`testutil/vitefake`), first on the server's PATH, in the state its shape names (`start("dev-mode", { shape })`; default `running`).
 The snapshot Dev block (`GET /v1/snapshot`) shows: `off` (key off, valid checkout), `installing` (key on, stale `node_modules`, install

@@ -15,6 +15,7 @@
 // --shape <c-zero|c-few|c-many|c-live|c-named|verify|route|route-12-backlogs|route-no-backlog|questions|final-approval|writing|result|stopped|journey|backlog|old-epics> picks the Triage state of the triage scenario (default c-few).
 // --shape <list|all-off|empty|page|paused|missing-project> picks the Schedules and Last runs of the schedules scenario (default list).
 // --shape <merged|running|unstamped|empty|missing-sha|pr|backfill> picks the Epic ranges and branches of the epic-diff scenario (default merged).
+// --shape <claude|single-task|subagent-with-inner-task|many|timed-out-shell|growing-output> picks the background tasks of the bg-progress scenario (default claude).
 // --shape <running|off|installing|starting|down|no-checkout> picks the Dev mode state of the dev-mode scenario (default running).
 // --shape <main-worktree|no-main-worktree> picks whether demo's trunk is checked out in the host-files scenario (default main-worktree).
 // `gxfixture stop <scenario|pid>` sends SIGTERM to a fixture started from the same worktree and refuses another worktree's.
@@ -85,6 +86,12 @@ func run(args []string) (err error) {
 	}
 	if sc.EpicDiffShaped {
 		sc, _ = spec.EpicDiffScenario(shape)
+	}
+	if sc.BgProgressShaped {
+		var built bool
+		if sc, built = spec.BgProgressScenario(shape); !built {
+			return fmt.Errorf("bg-progress shape %q: shape not built yet", shape)
+		}
 	}
 	if sc.LimitBurn && shape == "live" {
 		sc = limitBurnLive()
@@ -224,6 +231,8 @@ type fixture struct {
 	codex bool
 	// keyedTranscripts are the transcript paths of the sessions that set SessionSpec.Key.
 	keyedTranscripts map[string]string
+	// taskFiles are the task output files of Output.TaskFiles, by name.
+	taskFiles map[string]string
 	// restarted is true once the server exited on a web restart: the fixture stays up
 	// for the server that restart started, and stops that one at shutdown.
 	restarted bool

@@ -55,6 +55,8 @@ interface FixtureOutput {
   ratelimit_release_file?: string
   /** The `limit-burn` live shape's four Claude transcript paths, keyed queue, one_off, design and other; the `context-window` scenario's keyed sessions (green, yellow, orange, red, compact). */
   transcripts?: Record<string, string>
+  /** The `bg-progress` scenario's task output files a flow grows, by name (`growing-output`). */
+  task_files?: Record<string, string>
   /** The held Codex worker's sessions dir; only the `limit-burn` scenario prints it. */
   codex_sessions_dir?: string
   /** Only the restart scenarios have the fake restart binary's control dir. */
@@ -170,6 +172,8 @@ export interface Fixture {
   releaseRateLimit(): Promise<void>
   /** The `limit-burn` live shape's transcript paths by cost group (queue, one_off, design, other) and the `context-window` scenario's by session key (green, yellow, orange, red, compact); append usage lines to them. Empty elsewhere. */
   readonly transcripts: Record<string, string>
+  /** The `bg-progress` scenario's task output files by name; append lines to the `growing-output` one, then `\n[exited with code 0]\n` to end its shell. Empty elsewhere. */
+  readonly taskFiles: Record<string, string>
   /** The `limit-burn` scenario's Codex sessions dir; append a `token_count` line to its rollout to make the usage scan save a Codex sample. Empty elsewhere. */
   readonly codexSessionsDir: string
   /** The `dev-mode` scenario's fake pnpm control file; write `{"vite":"crash"}` to take Vite down. Empty elsewhere. */
@@ -302,6 +306,7 @@ async function startFixture(
     releaseCheckLock: () => rm(out.check_waiting_file ?? "", { force: true }),
     releaseRateLimit: () => writeFile(out.ratelimit_release_file ?? "", ""),
     transcripts: out.transcripts ?? {},
+    taskFiles: out.task_files ?? {},
     codexSessionsDir: out.codex_sessions_dir ?? "",
     devControlFile: out.dev_control_file ?? "",
     hostFiles: out.host_files,

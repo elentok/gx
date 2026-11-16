@@ -62,6 +62,8 @@ type Output struct {
 	// queue, one_off, design and other, plus the sessions that set SessionSpec.Key;
 	// the directories may not exist yet.
 	Transcripts map[string]string `json:"transcripts,omitempty"`
+	// TaskFiles are the bg-progress scenario's task output files a flow grows, by name.
+	TaskFiles map[string]string `json:"task_files,omitempty"`
 	// CodexSessionsDir holds the held Codex worker's rollout in the limit-burn
 	// scenario; empty elsewhere.
 	CodexSessionsDir string `json:"codex_sessions_dir,omitempty"`

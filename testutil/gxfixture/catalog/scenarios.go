@@ -651,6 +651,10 @@ var Scenarios = map[string]scenario{
 	// epic-diff: real git history and stored epics for the Diff page, in the shape --shape
 	// names (default merged). run swaps in spec.EpicDiffScenario(shape).
 	"epic-diff": {EpicDiffShaped: true},
+	// bg-progress: a Working Claude Design session whose transcript and task files hold
+	// background tasks, in the shape --shape names (default claude). run swaps in
+	// spec.BgProgressScenario(shape).
+	"bg-progress": {BgProgressShaped: true},
 	// dev-mode: a Dev checkout and a fake pnpm in the state --shape names (default running).
 	"dev-mode": {DevMode: true},
 	// dirty-trunk: a complete epic whose merge is paused because trunk's checkout

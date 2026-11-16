@@ -278,6 +278,9 @@ type Scenario struct {
 	// EpicDiffShaped marks the epic-diff scenario, whose whole content comes
 	// from the --shape value (EpicDiffScenario).
 	EpicDiffShaped bool
+	// BgProgressShaped marks the bg-progress scenario, whose whole content comes
+	// from the --shape value (BgProgressScenario).
+	BgProgressShaped bool
 	// DevMode seeds a Dev checkout and the fake pnpm in the state the --shape
 	// value names (default running); see DevModeShapes and devmode.go.
 	DevMode bool
@@ -363,6 +366,10 @@ type SessionSpec struct {
 	Key string
 	// NoTranscript deletes the session's transcript file once it is seeded.
 	NoTranscript bool
+	// BgSeed writes the session's background tasks into its transcript and task
+	// files; BgTasks is the task count the chat read must then show.
+	BgSeed  func(now time.Time, p BgPaths) BgSeed
+	BgTasks int
 }
 
 // Draft is one seeded New Design draft: its text and how many images it holds.

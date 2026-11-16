@@ -261,6 +261,9 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 	if s.HostFilesSecond {
 		return f.seedHostFilesSecondChat(id, s.Harness)
 	}
+	if s.BgSeed != nil {
+		return f.seedBgProgress(id, s)
+	}
 	return nil
 }
 
