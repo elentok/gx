@@ -1,3 +1,4 @@
+// Package oneoff holds the names and file layout of one-off tickets.
 package oneoff
 
 import (

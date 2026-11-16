@@ -1,3 +1,4 @@
+// Package ops holds the request and result types of the server's ticket and project operations.
 package ops
 
 // EventCleanupSizeChanged is emitted when a worktree's disk size lands; the

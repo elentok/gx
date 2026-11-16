@@ -1,3 +1,4 @@
+// Package startprompt launches an agent and sends its first prompt.
 package startprompt
 
 import (

@@ -1,3 +1,4 @@
+// Package badge renders badge variants and badge buttons for the terminal UI.
 package badge
 
 import (

@@ -1,3 +1,4 @@
+// Package rows is the Queue tab's row model.
 package rows
 
 import (
