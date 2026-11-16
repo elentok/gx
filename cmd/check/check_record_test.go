@@ -342,12 +342,17 @@ func TestCheck_SlowTestRerunNodeTools(t *testing.T) {
 		{
 			"playwright", "a.e2e.ts.7. slow",
 			`{"suites":[{"title":"a.e2e.ts","file":"a.e2e.ts","specs":[{"title":"7. slow","file":"a.e2e.ts","tests":[{"results":[{"duration":DUR}]}]}]}]}`,
-			[]string{"-g", `(?:\.tsx?|›) 7\. slow$`},
+			[]string{"--all", "-g", `(?:\.tsx?|›) 7\. slow$`},
 		},
 	} {
 		t.Run(c.tool, func(t *testing.T) {
 			cmdtest.PrependPath(t, cmdtest.SharedGx(t))
-			repo, data := registeredCheckRepo(t, `{"test":{"full":"gx brief -C webui `+c.tool+`","limits":{"slow":{"`+c.tool+`":"1s"},"suite":"1m"}}}`)
+			// A bare playwright run is refused, so the full run names --all.
+			full := "gx brief -C webui " + c.tool
+			if c.tool == "playwright" {
+				full += " --all"
+			}
+			repo, data := registeredCheckRepo(t, `{"test":{"full":"`+full+`","limits":{"slow":{"`+c.tool+`":"1s"},"suite":"1m"}}}`)
 			testutil.WriteFile(t, repo, "webui/e2e/playwright.config.ts", "")
 			testutil.WriteFile(t, repo, "webui/dist/index.html", "")
 			testutil.CommitAll(t, repo, "web")
