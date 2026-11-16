@@ -42,6 +42,22 @@ steps. The browser commands come from [gx-playwright-cli](../gx-playwright-cli/S
    missing or do not decode. Fix each reported line (a state you did not see becomes `unchecked`)
    before you report.
 
+## Projects without the gx fixture
+
+Check first: `[ -d testutil/gxfixture ]`. If it is missing, this is not the gx repo, and
+`go run ./testutil/gxfixture` cannot work. That is not a tool failure and not a question for a person.
+
+- Do not run the steps above. Do not run `testutil/mockcheck`.
+- If the project has a dev server you can start from its `package.json` scripts, start it as a
+  background shell call. Use `pnpm run <script>`, never `npx`. Drive it with `playwright-cli`, screenshot
+  each listed part (viewport width of its state, device scale factor 1, cropped), and read the PNGs.
+  Report what you saw. There is no mock to compare against, because only the fixture serves mock
+  files. Compare with the ticket's description instead.
+- Report each state as `skipped: no gx fixture` (add what you saw when you drove the app). Never write
+  `pass`: nothing was compared with a mock.
+- Skipped states do not block `finished`.
+- The project's own e2e suite is not a mock check. It stays in gx-verify.
+
 ## What wins
 
 - The mock wins on layout, spacing, sizes, colours and type.

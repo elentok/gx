@@ -199,6 +199,9 @@ heading. It lists the mock file, the states with their widths, the parts and the
   deviations` and finish without asking. It does not block `finished`.
 - Fix each look difference. A difference kept on purpose goes under `## Spec deviations` (below),
   with the reason.
+- Not the gx repo (no `testutil/gxfixture`)? The fixture-based check cannot run, and that is not a
+  question for a person. Follow "Projects without the gx fixture" in MOCK-CHECK.md, report the
+  states `skipped: no gx fixture` and finish.
 - A named mock file that is missing is a check that cannot run. Follow "When only a person can
   answer": commit what is green, run `gx tickets ask` naming the missing file, end your turn. Never
   report a check that did not run.
