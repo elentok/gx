@@ -251,7 +251,8 @@ func TestBrief_GoTestArgs(t *testing.T) {
 	proj := evalSymlinks(t, t.TempDir())
 
 	_, code := runBriefCmd(t, t.TempDir(), "-C", proj, "go-test", "-v", "-run", "TestX", "-count=1", "./a", "./b")
-	if code != 0 {
+	// The fake go runs no tests, so the -run filter matches nothing and fails.
+	if code != 1 {
 		t.Fatalf("exit = %d", code)
 	}
 	raw, err := os.ReadFile(rec)
@@ -284,6 +285,18 @@ func TestBrief_NoTestsRan(t *testing.T) {
 
 	out, code := runBriefCmd(t, dir, "go-test", "./...")
 	if code != 0 || !strings.Contains(out, "no tests ran") {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+}
+
+func TestBrief_RunFilterMatchingNothingFails(t *testing.T) {
+	dir := t.TempDir()
+	testutil.WriteFile(t, dir, "go.mod", "module example.com/empty\n\ngo 1.21\n")
+	testutil.WriteFile(t, dir, "x.go", "package empty\n")
+	testutil.WriteFile(t, dir, "x_test.go", "package empty\n\nimport \"testing\"\n\nfunc TestReal(t *testing.T) {}\n")
+
+	out, code := runBriefCmd(t, dir, "go-test", "-run", "^TestNope$", "./...")
+	if code != 1 || !strings.Contains(out, "-run '^TestNope$' matched no tests") {
 		t.Fatalf("exit = %d, out:\n%s", code, out)
 	}
 }

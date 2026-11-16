@@ -290,6 +290,24 @@ func (GoTest) NarrowArgs(args []string, test string) []string {
 	return withRunPattern(args, strings.Join(levels, "/"))
 }
 
+// RunFilter returns the caller's last -run pattern, or "" when there is none.
+func (GoTest) RunFilter(args []string) string {
+	rest, _ := splitArgs(args)
+	pattern := ""
+	for i := 0; i < len(rest); i++ {
+		name, val, hasValue := strings.Cut(strings.TrimLeft(rest[i], "-"), "=")
+		if !strings.HasPrefix(rest[i], "-") || name != "run" {
+			continue
+		}
+		if !hasValue && i+1 < len(rest) {
+			i++
+			val = rest[i]
+		}
+		pattern = val
+	}
+	return pattern
+}
+
 // withRunPattern replaces any -run of the caller with pattern.
 func withRunPattern(args []string, pattern string) []string {
 	rest, tail := splitArgs(args)

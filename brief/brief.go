@@ -400,6 +400,9 @@ func report(tool Tool, o Options, outcome Outcome, out []byte, e indexEntry) int
 		return ExitFail
 	case len(outcome.Listing) > 0:
 		fmt.Fprintf(o.Out, "LIST %s: %d tests\n%s\n%s\n", tool.Name(), len(outcome.Listing), strings.Join(outcome.Listing, "\n"), e.Log)
+	case outcome.Units == 0 && runFilter(tool, o.Args) != "":
+		fmt.Fprintf(o.Out, "FAIL %s: -run '%s' matched no tests in %s\n%s\n", tool.Name(), runFilter(tool, o.Args), dur, e.Log)
+		return ExitFail
 	case outcome.Units == 0:
 		fmt.Fprintf(o.Out, "PASS %s: no tests ran in %s\n%s\n", tool.Name(), dur, e.Log)
 	default:
@@ -408,6 +411,20 @@ func report(tool Tool, o Options, outcome Outcome, out []byte, e indexEntry) int
 		fmt.Fprintln(o.Out, e.Log)
 	}
 	return ExitPass
+}
+
+// RunFilterer is a Tool whose -run filter that matches nothing is a failure
+// instead of "no tests ran".
+type RunFilterer interface {
+	// RunFilter returns the caller's -run pattern, or "" when there is none.
+	RunFilter(args []string) string
+}
+
+func runFilter(tool Tool, args []string) string {
+	if rf, ok := tool.(RunFilterer); ok {
+		return rf.RunFilter(args)
+	}
+	return ""
 }
 
 func cantRun(w io.Writer, msg string) int {

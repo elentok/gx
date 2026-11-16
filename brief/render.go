@@ -86,7 +86,11 @@ func renderUnitsWith(w io.Writer, units []Unit, maxFull int, after func(Unit)) {
 			head += fmt.Sprintf(" (x%d)", counts[i])
 		}
 		if i >= maxFull {
-			if loc := goFileLine.FindString(u.Text); loc != "" {
+			re := goFileLine
+			if u.Kind == KindBuildFailed {
+				re = goBuildFileLine
+			}
+			if loc := re.FindString(u.Text); loc != "" {
 				head += " " + loc
 			}
 			fmt.Fprintf(w, "  %s\n", head)
@@ -140,6 +144,10 @@ func renderSnapshot(w io.Writer, o Outcome, u Unit) {
 
 // goFileLine finds the first file:line of a Go test failure in its output.
 var goFileLine = regexp.MustCompile(`[\w.-]+_test\.go:\d+`)
+
+// goBuildFileLine finds the first file:line of a compiler error, which can be
+// in any .go file, not only a test file.
+var goBuildFileLine = regexp.MustCompile(`[\w.-]+\.go:\d+`)
 
 // collapseUnits merges units that repeat another one exactly, as -count=N
 // does, and returns how many times each kept unit occurred. A repeat joins the

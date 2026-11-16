@@ -39,6 +39,21 @@ func TestRenderUnits_NamesOnlyUnitsGetFileLine(t *testing.T) {
 	}
 }
 
+func TestRenderUnits_ManyBuildFailuresEachShowFileLine(t *testing.T) {
+	var units []Unit
+	for i := range maxFullUnits + 3 {
+		pkg := "example.com/p" + string(rune('a'+i))
+		units = append(units, Unit{Location: pkg, Name: pkg, Kind: KindBuildFailed, Text: "./x.go:" + string(rune('1'+i)) + ":5: undefined: foo"})
+	}
+	var w bytes.Buffer
+	renderUnits(&w, units)
+	for i := range units {
+		if want := "x.go:" + string(rune('1'+i)); !strings.Contains(w.String(), want) {
+			t.Errorf("no %q for unit %d in:\n%s", want, i, w.String())
+		}
+	}
+}
+
 func TestGoTestParse_CountRunsKeepOneRunsText(t *testing.T) {
 	var out strings.Builder
 	for range 2 {
