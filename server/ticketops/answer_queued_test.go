@@ -29,6 +29,7 @@ type launchFake struct {
 	mu      sync.Mutex
 	budget  *wire.QueueResult
 	settled []string
+	merged  []tickets.Address
 }
 
 func (l *launchFake) BudgetRefusal() (wire.QueueResult, bool) {
@@ -40,7 +41,11 @@ func (l *launchFake) BudgetRefusal() (wire.QueueResult, bool) {
 
 func (l *launchFake) HostingDeps(tickets.Address) deps.Deps { return deps.Deps{} }
 
-func (l *launchFake) CompleteMergedRoot(tickets.Address) {}
+func (l *launchFake) CompleteMergedRoot(addr tickets.Address) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.merged = append(l.merged, addr)
+}
 
 func (l *launchFake) ResettleWaiting(t runs.TrackedRun) error {
 	l.mu.Lock()

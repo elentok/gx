@@ -2,6 +2,8 @@ package ticketops_test
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,12 +11,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/worktree"
+	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/harness"
+	"github.com/elentok/gx/server/index"
+	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/ticketops"
+	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/runnerfake"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
 
@@ -291,5 +304,66 @@ func TestCancel_CascadesToNonTerminalDescendants(t *testing.T) {
 		if stamped := strings.Contains(string(data), "cancelled_at:"); stamped != (want == "cancelled") {
 			t.Errorf("%s cancelled_at stamped = %v:\n%s", filepath.Base(p), stamped, data)
 		}
+	}
+}
+
+type noBack struct{}
+
+func (noBack) SessionFinished(agentrunner.Session) bool { return false }
+func (noBack) BusyAddresses() []string                  { return nil }
+
+type noHost struct{}
+
+func (noHost) ListSessions() ([]wire.SessionInfo, error) { return nil, nil }
+func (noHost) FreshTicket(tickets.Address) (tickets.Epic, tickets.Ticket, bool) {
+	return tickets.Epic{}, tickets.Ticket{}, false
+}
+
+// Cancelling may remove the last ticket not done, so the epic check runs once
+// the cancel is written. A one-off has no epic to complete.
+func TestCancel_CallsCompleteMergedRootAfterCancelling(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, epic string
+		want       int
+	}{{"epic ticket", "epic-a", 1}, {"one-off", queue.OneOffsEpic, 0}} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			store := t.TempDir()
+			servertest.WriteTicket(t, store, "proj", tc.epic, "01", "first", "")
+			servertest.SetProjectRepo(t, store, "proj", t.TempDir())
+			log := slog.New(slog.NewTextHandler(io.Discard, nil))
+			set := &settings.Holder{}
+			set.Store(&settings.Settings{})
+			reg, _, err := runs.Open(t.TempDir(), log)
+			if err != nil {
+				t.Fatal(err)
+			}
+			idx := index.New(store, broker.New(8), log)
+			projs := projects.NewRegistry(func() projects.Env { return projects.Env{TicketStore: store} }, log, idx, set, nil, noBack{})
+			launch := &launchFake{}
+			ops := ticketops.New(ticketops.Deps{
+				Writer:   ticketwrite.New(ticketwrite.Deps{Log: log, Index: idx, Projects: projs, Registry: reg}),
+				Registry: reg,
+				Index:    idx,
+				Projects: projs,
+				Launch:   launch,
+				Events:   broker.New(8),
+				Log:      log,
+				Harness: harness.New(harness.Deps{Config: harness.Config{Runner: runnerfake.NewRunner()},
+					Host: noHost{}, Log: log, Index: idx, Projects: projs, Registry: reg, Settings: set}),
+			})
+
+			addr := "proj:" + tc.epic + "/01"
+			if res, err := ops.Cancel(wire.QueueRequest{Address: addr}); err != nil || res.Refused {
+				t.Fatalf("cancel = %+v, %v", res, err)
+			}
+			if len(launch.merged) != tc.want {
+				t.Fatalf("CompleteMergedRoot calls = %v, want %d", launch.merged, tc.want)
+			}
+			if tc.want == 1 && launch.merged[0].String() != addr {
+				t.Errorf("CompleteMergedRoot(%v), want %s", launch.merged[0], addr)
+			}
+		})
 	}
 }

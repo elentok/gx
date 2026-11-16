@@ -44,6 +44,9 @@ func (o *Ops) Cancel(req wire.QueueRequest) (wire.QueueResult, error) {
 		}
 		if ref.Addr.Epic == queue.OneOffsEpic {
 			o.d.Index.Rescan()
+		} else {
+			// The cancelled ticket may have been the last one not done.
+			o.d.Launch.CompleteMergedRoot(ref.Addr)
 		}
 		return wire.QueueResult{}, nil
 	})
