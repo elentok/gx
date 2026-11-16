@@ -259,6 +259,22 @@ test("a rollback shows the switching back line, then the failed line", () => {
   expect(lineText()).toBe("Switch to Claude Opus 4.8 failed. Still on Claude Opus 4.7.")
 })
 
+test("the rollback lines name the model the footer shows, not the launch alias", () => {
+  const { rerender } = renderThemed(
+    <SwitchLine
+      session={session({ model: "claude-opus-4-6", switching_model: "opus", switching_back: true })}
+    />,
+  )
+  expect(lineText()).toBe("Switching back to Claude Opus 4.6…")
+  const failed = session({
+    model: "claude-opus-4-6",
+    switch_failed_model: "claude-opus-4-8",
+    switch_failed_old: "opus",
+  })
+  rerender(themed(<SwitchLine session={failed} />))
+  expect(lineText()).toBe("Switch to Claude Opus 4.8 failed. Still on Claude Opus 4.6.")
+})
+
 test("no line when nothing switched", () => {
   renderThemed(<SwitchLine session={session()} />)
   expect(screen.queryByTestId("switch-line")).toBeNull()

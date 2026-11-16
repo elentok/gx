@@ -30,13 +30,14 @@ export function useSwitchLine(s: SessionInfo): { text: string; red: boolean } | 
   }, [running, s.id, model, back])
   if (running) {
     return {
-      text: back ? `Switching back to ${label(s, model)}…` : `Switching to ${label(s, model)}…`,
+      // The back target is the launch value, which can be an alias; the footer shows s.model.
+      text: back ? `Switching back to ${label(s, s.model)}…` : `Switching to ${label(s, model)}…`,
       red: false,
     }
   }
   if (s.switch_failed_model) {
     return {
-      text: `Switch to ${label(s, s.switch_failed_model)} failed. Still on ${label(s, s.switch_failed_old)}.`,
+      text: `Switch to ${label(s, s.switch_failed_model)} failed. Still on ${label(s, s.model)}.`,
       red: true,
     }
   }

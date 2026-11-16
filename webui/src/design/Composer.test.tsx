@@ -282,7 +282,7 @@ test("the composer is disabled while the session is Working", async () => {
 
 test("the composer is disabled while a switch back runs, though the session is Idle", async () => {
   render({
-    auto: { switching_model: "claude-opus-4-6", switching_back: true },
+    auto: { model: "claude-opus-4-6", switching_model: "claude-opus-4-6", switching_back: true },
     post: vi.fn<PostPrompt>(async () => ok),
   })
   const box = await openNote()
