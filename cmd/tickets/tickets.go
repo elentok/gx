@@ -124,7 +124,7 @@ func newTicketsSectionCmd(d Deps) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				return runTicketsShow(d.dirs(), cwd, args[0], false, false, args[1], "", c.OutOrStdout())
+				return runTicketsShow(d.dirs(), cwd, args[0], showOptions{Section: args[1]}, c.OutOrStdout())
 			}
 			path, err := ticketref.ResolveTicketRef(d.dirs(), d.Getwd, args[0])
 			if err != nil {
@@ -136,7 +136,8 @@ func newTicketsSectionCmd(d Deps) *cobra.Command {
 					return err
 				}
 			}
-			return runTicketsSection(d, path, args[1], content, sectionClear, sectionAppend, sectionJSON, c.OutOrStdout())
+			opts := sectionOptions{Clear: sectionClear, Append: sectionAppend, JSON: sectionJSON}
+			return runTicketsSection(d, path, args[1], content, opts, c.OutOrStdout())
 		},
 	}
 	cmd.Flags().BoolVar(&sectionJSON, "json", false, "emit {address, path} JSON")
@@ -145,6 +146,7 @@ func newTicketsSectionCmd(d Deps) *cobra.Command {
 	// Content is free text that often starts with "-" (a markdown list), so
 	// flags must come before the positional args.
 	cmd.Flags().SetInterspersed(false)
+	cmd.MarkFlagsMutuallyExclusive("append", "clear")
 	return cmd
 }
 
@@ -192,7 +194,8 @@ func newTicketsShowCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTicketsShow(d.dirs(), cwd, args[0], showJSON, showBrief, showSection, showTickets, c.OutOrStdout())
+			opts := showOptions{JSON: showJSON, Brief: showBrief, Section: showSection, Tickets: showTickets}
+			return runTicketsShow(d.dirs(), cwd, args[0], opts, c.OutOrStdout())
 		},
 	}
 	cmd.Flags().BoolVar(&showJSON, "json", false, "emit structured JSON instead of text")

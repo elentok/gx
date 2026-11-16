@@ -188,7 +188,7 @@ func TestRunTicketsSection_WritesAndPrintsAddress(t *testing.T) {
 	cmdtest.WriteTicket(t, path, "01", "open", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsSection(testDeps(t, nil, nil, nil), path, "Notes", "hello\n", false, false, false, &stdout); err != nil {
+	if err := runTicketsSection(testDeps(t, nil, nil, nil), path, "Notes", "hello\n", sectionOptions{}, &stdout); err != nil {
 		t.Fatalf("runTicketsSection: %v", err)
 	}
 	raw, _ := os.ReadFile(path)
@@ -209,12 +209,12 @@ func TestRunTicketsSection_BlankContentRefusedUnlessCleared(t *testing.T) {
 		_, issuesDir := newAddEpic(t)
 		path := filepath.Join(issuesDir, "01-a.md")
 		cmdtest.WriteTicket(t, path, "01", "open", "implement")
-		if err := runTicketsSection(testDeps(t, nil, nil, nil), path, "Notes", "keep me\n", false, false, false, io.Discard); err != nil {
+		if err := runTicketsSection(testDeps(t, nil, nil, nil), path, "Notes", "keep me\n", sectionOptions{}, io.Discard); err != nil {
 			t.Fatalf("seed: %v", err)
 		}
 		before, _ := os.ReadFile(path)
 
-		err := runTicketsSection(testDeps(t, nil, nil, nil), path, "Notes", blank, false, false, false, io.Discard)
+		err := runTicketsSection(testDeps(t, nil, nil, nil), path, "Notes", blank, sectionOptions{}, io.Discard)
 		if err == nil || !strings.Contains(err.Error(), "--clear") {
 			t.Errorf("blank %q: err = %v, want a refusal naming --clear", blank, err)
 		}
@@ -222,7 +222,7 @@ func TestRunTicketsSection_BlankContentRefusedUnlessCleared(t *testing.T) {
 			t.Errorf("blank %q changed the ticket:\n%s", blank, after)
 		}
 
-		if err := runTicketsSection(testDeps(t, nil, nil, nil), path, "Notes", "", true, false, false, io.Discard); err != nil {
+		if err := runTicketsSection(testDeps(t, nil, nil, nil), path, "Notes", "", sectionOptions{Clear: true}, io.Discard); err != nil {
 			t.Fatalf("clear: %v", err)
 		}
 		if after, _ := os.ReadFile(path); strings.Contains(string(after), "keep me") {
@@ -239,10 +239,10 @@ func TestRunTicketsSection_Append(t *testing.T) {
 	d := testDeps(t, nil, nil, nil)
 
 	// A missing section is created with the appended content.
-	if err := runTicketsSection(d, path, "Evidence", "first\n", false, true, false, io.Discard); err != nil {
+	if err := runTicketsSection(d, path, "Evidence", "first\n", sectionOptions{Append: true}, io.Discard); err != nil {
 		t.Fatalf("append to missing: %v", err)
 	}
-	if err := runTicketsSection(d, path, "Evidence", "second\n", false, true, false, io.Discard); err != nil {
+	if err := runTicketsSection(d, path, "Evidence", "second\n", sectionOptions{Append: true}, io.Discard); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 	raw, _ := os.ReadFile(path)
@@ -254,12 +254,12 @@ func TestRunTicketsSection_Append(t *testing.T) {
 	}
 
 	before := raw
-	err := runTicketsSection(d, path, "Evidence", " \n", false, true, false, io.Discard)
+	err := runTicketsSection(d, path, "Evidence", " \n", sectionOptions{Append: true}, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "--clear") {
 		t.Errorf("blank append: err = %v, want a refusal naming --clear", err)
 	}
-	err = runTicketsSection(d, path, "Evidence", "", true, true, false, io.Discard)
-	if err == nil || !strings.Contains(err.Error(), "--append") {
+	err = execute(t, []string{"tickets", "section", "--append", "--clear", path, "Evidence"}, d)
+	if err == nil || !strings.Contains(err.Error(), "[append clear]") {
 		t.Errorf("--append --clear: err = %v, want a refusal", err)
 	}
 	if after, _ := os.ReadFile(path); string(after) != string(before) {

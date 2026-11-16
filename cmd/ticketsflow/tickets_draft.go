@@ -31,7 +31,7 @@ func newTicketsDraftCmd(d Deps) *cobra.Command {
 			}
 			return runDraft(draftOptions{
 				Cwd: cwd, Env: d.Env.Env, PlanPath: planPath, ManifestPath: manifestPath,
-				Finder: finderOptions{NoGopls: noGopls},
+				NoGopls: noGopls,
 			}, c.OutOrStdout())
 		},
 	}
@@ -47,7 +47,7 @@ type draftOptions struct {
 	Env          []string
 	PlanPath     string
 	ManifestPath string
-	Finder       finderOptions
+	NoGopls      bool
 }
 
 // runDraft renders every ticket of the plan. A re-run keeps the agent's parts
@@ -55,9 +55,8 @@ type draftOptions struct {
 // It then checks the plan's names against the checkout at cwd and exits
 // non-zero when any is missing; the files are written either way.
 func runDraft(o draftOptions, w io.Writer) error {
-	cwd, env, planPath, manifestPath := o.Cwd, o.Env, o.PlanPath, o.ManifestPath
 	start := time.Now()
-	data, err := os.ReadFile(planPath)
+	data, err := os.ReadFile(o.PlanPath)
 	if err != nil {
 		return err
 	}
@@ -65,7 +64,7 @@ func runDraft(o draftOptions, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	root, err := git.Toplevel(cwd)
+	root, err := git.Toplevel(o.Cwd)
 	if err != nil {
 		return err
 	}
@@ -73,12 +72,12 @@ func runDraft(o draftOptions, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	finder := newCallerFinder(root, commit, env, o.Finder)
+	finder := newCallerFinder(root, commit, o.Env, o.NoGopls)
 	misses, callers := draftMisses(&plan, root, finder)
 	for i := range plan.Tickets {
 		plan.Tickets[i].Callers = callers
 	}
-	dir := filepath.Dir(manifestPath)
+	dir := filepath.Dir(o.ManifestPath)
 	rows := make([]ticketspec.ManifestRow, 0, len(plan.Tickets))
 	bodies := map[string]string{}
 	for _, t := range plan.Tickets {
@@ -91,7 +90,7 @@ func runDraft(o draftOptions, w io.Writer) error {
 	}
 	misses = append(claimMisses(&plan, root, bodies), misses...)
 
-	existing, err := os.ReadFile(manifestPath)
+	existing, err := os.ReadFile(o.ManifestPath)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -104,7 +103,7 @@ func runDraft(o draftOptions, w io.Writer) error {
 			return err
 		}
 	}
-	if err := os.WriteFile(manifestPath, out, 0o644); err != nil {
+	if err := os.WriteFile(o.ManifestPath, out, 0o644); err != nil {
 		return err
 	}
 	for _, name := range removed {

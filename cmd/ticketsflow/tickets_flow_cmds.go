@@ -64,7 +64,7 @@ func newTicketsFollowUpCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTicketsFollowUpAdd(d, epicPath, body, followUpCategory, followUpForce, followUpJSON, c.OutOrStdout())
+			return runTicketsFollowUpAdd(d, epicPath, body, followUpCategory, followUpAddOptions{Force: followUpForce, JSON: followUpJSON}, c.OutOrStdout())
 		},
 	}
 	followUpAddCmd.Flags().StringVar(&followUpBody, "body", "-", "follow-up body, or - to read it from stdin")

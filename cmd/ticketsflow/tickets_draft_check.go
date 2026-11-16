@@ -64,7 +64,7 @@ func draftMisses(plan *ticketspec.DraftPlan, root string, finder *callerFinder) 
 			callers[s] = text
 		}
 	}
-	misses = append(misses, draftFacts(plan, root, finder, factsOptions{rg: rgOK})...)
+	misses = append(misses, draftFacts(plan, root, finder, rgOK)...)
 	return misses, callers
 }
 
@@ -97,14 +97,9 @@ type callerFinder struct {
 	rgFallbacks  int
 }
 
-// finderOptions are the caller-search settings a run chooses up front.
-type finderOptions struct {
-	NoGopls bool
-}
-
-func newCallerFinder(root, commit string, env []string, opts finderOptions) *callerFinder {
+func newCallerFinder(root, commit string, env []string, noGopls bool) *callerFinder {
 	_, err := exec.LookPath("gopls")
-	return &callerFinder{root: root, commit: commit, env: env, gopls: err == nil && !opts.NoGopls}
+	return &callerFinder{root: root, commit: commit, env: env, gopls: err == nil && !noGopls}
 }
 
 // goplsNote is the one-line notice that gopls failed and rg stood in, or "".

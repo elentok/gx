@@ -10,19 +10,25 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+// sectionOptions are the flags of `gx tickets section`. The command keeps
+// Append and Clear apart (MarkFlagsMutuallyExclusive).
+type sectionOptions struct {
+	Clear  bool
+	Append bool
+	JSON   bool
+}
+
 // runTicketsSection replaces (or appends) the "## heading" section of path's
 // ticket body with content, under the per-ticket lock, and prints the ticket's
-// address. Blank content is refused unless clear is set: an empty stdin (a
+// address. Blank content is refused unless Clear is set: an empty stdin (a
 // probe piped through head, a failed upstream command) must not wipe a section.
-func runTicketsSection(d Deps, path, heading, content string, clear, appendTo, jsonOut bool, w io.Writer) error {
-	if clear && appendTo {
-		return fmt.Errorf("--append and --clear cannot be combined")
-	}
-	if strings.TrimSpace(content) == "" && !clear {
+func runTicketsSection(d Deps, path, heading, content string, opts sectionOptions, w io.Writer) error {
+	jsonOut := opts.JSON
+	if strings.TrimSpace(content) == "" && !opts.Clear {
 		return fmt.Errorf("refusing to blank section %q: content is empty (pass --clear to blank it on purpose)", heading)
 	}
 	setSection, setEpicSection := schema.SetSection, tickets.SetEpicSection
-	if appendTo {
+	if opts.Append {
 		setSection, setEpicSection = schema.AppendSection, tickets.AppendEpicSection
 	}
 	if ticketref.IsEpicTicketMD(path) {

@@ -10,7 +10,6 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
-	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/wire"
 )
@@ -66,7 +65,7 @@ func fetchPausedSummary(ctx context.Context, cl *apiclient.Client, address strin
 
 	s := pausedSummary{Detail: detail}
 	for _, ev := range history.Events {
-		if ev.Type != string(events.SchedulerScan) {
+		if !isSchedulerScan(ev.Type) {
 			s.Events = append(s.Events, ev)
 		}
 	}

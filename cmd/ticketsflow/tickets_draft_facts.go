@@ -20,16 +20,11 @@ var (
 
 // Only mechanical facts are printed here. Each is a lookup, never a verdict.
 
-// factsOptions says which lookups draftFacts may run.
-type factsOptions struct {
-	// rg is false when rg is not on PATH, which skips the helper and field lookups.
-	rg bool
-}
-
 // draftFacts fills each ticket's SeamFacts, Consumers and FieldTests and
 // returns one miss per Makefile target, helper or Playwright pattern that does
-// not check out.
-func draftFacts(plan *ticketspec.DraftPlan, root string, finder *callerFinder, opts factsOptions) []string {
+// not check out. rgOK is false when rg is not on PATH, which skips the helper
+// and field lookups.
+func draftFacts(plan *ticketspec.DraftPlan, root string, finder *callerFinder, rgOK bool) []string {
 	var misses []string
 	var targets map[string]bool
 	for i := range plan.Tickets {
@@ -64,7 +59,7 @@ func draftFacts(plan *ticketspec.DraftPlan, root string, finder *callerFinder, o
 				misses = append(misses, t.Slug+": "+line)
 			}
 		}
-		if !opts.rg {
+		if !rgOK {
 			continue
 		}
 		for _, h := range t.Helpers {

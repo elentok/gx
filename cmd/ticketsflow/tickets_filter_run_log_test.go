@@ -19,6 +19,16 @@ func writeRunLog(t *testing.T, epicDir string, lines []string) {
 	}
 }
 
+func TestIsSchedulerScan(t *testing.T) {
+	t.Parallel()
+	if !isSchedulerScan("scheduler-scan") {
+		t.Error("scheduler-scan: want true, so paused and filter-run-log hide it")
+	}
+	if isSchedulerScan("iteration-started") {
+		t.Error("iteration-started: want false, so it is kept")
+	}
+}
+
 func TestRunTicketsFilterRunLog_FiltersByTicket(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)

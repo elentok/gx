@@ -29,6 +29,14 @@ type ticketShowJSON struct {
 	Body      string   `json:"body"`
 }
 
+// showOptions are the flags of `gx tickets show`.
+type showOptions struct {
+	JSON    bool
+	Brief   bool
+	Section string
+	Tickets string
+}
+
 // runTicketsShow resolves addr (full or short form) against the cwd project
 // and prints the ticket. Short forms are expanded before anything is
 // printed; an address that names nothing is refused with an
@@ -38,8 +46,9 @@ type ticketShowJSON struct {
 // of every ticket of an epic that has it, each under a line naming the ticket.
 // A single ticket without the section is an error; --section and --json are
 // kept apart by the command's flag definitions.
-func runTicketsShow(dirs config.Dirs, cwd, addr string, jsonOut, brief bool, section, only string, w io.Writer) error {
-	filter, err := parseTicketNumbers(only)
+func runTicketsShow(dirs config.Dirs, cwd, addr string, opts showOptions, w io.Writer) error {
+	jsonOut, brief, section := opts.JSON, opts.Brief, opts.Section
+	filter, err := parseTicketNumbers(opts.Tickets)
 	if err != nil {
 		return err
 	}

@@ -14,12 +14,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// followUpAddOptions are the flags of `gx tickets follow-up add`.
+type followUpAddOptions struct {
+	Force bool
+	JSON  bool
+}
+
 // runTicketsFollowUpAdd files one follow-up into the follow-ups epic at
 // epicPath, enforcing the one fixed follow-up format so every skill that
 // files one writes the same shape. The ticket is always draft + research; a
 // body asking for anything else is refused. Every check runs before anything
 // is written.
-func runTicketsFollowUpAdd(d Deps, epicPath, body, category string, force, jsonOut bool, w io.Writer) error {
+func runTicketsFollowUpAdd(d Deps, epicPath, body, category string, opts followUpAddOptions, w io.Writer) error {
 	if filepath.Base(filepath.Clean(epicPath)) != tickets.FollowUpsEpic {
 		return &tickets.AddressError{Code: tickets.CodeNotFollowUpsEpic, Msg: "follow-up add targets a " + tickets.FollowUpsEpic + " epic, not " + filepath.Base(epicPath)}
 	}
@@ -71,7 +77,7 @@ func runTicketsFollowUpAdd(d Deps, epicPath, body, category string, force, jsonO
 		return &tickets.AddressError{Code: tickets.CodeSectionRequired, Msg: "a follow-up needs a non-empty " + strings.Join(missing, ", ") + " section"}
 	}
 
-	if !force {
+	if !opts.Force {
 		if dup, err := openFollowUpWithTitle(epicPath, tickets.BodyTitle(text, "")); err != nil {
 			return err
 		} else if dup != "" {
@@ -86,7 +92,7 @@ func runTicketsFollowUpAdd(d Deps, epicPath, body, category string, force, jsonO
 		return err
 	}
 	ticketscmd.PingServer(d.Env, path)
-	return ticketscmd.PrintTicketRef(path, jsonOut, w)
+	return ticketscmd.PrintTicketRef(path, opts.JSON, w)
 }
 
 // openFollowUpWithTitle returns the address of an open (not done or

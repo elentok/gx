@@ -11,6 +11,12 @@ import (
 	"github.com/elentok/gx/ralphloop/runlog"
 )
 
+// isSchedulerScan reports whether an event type is the every-pass scheduler
+// scan, which `paused` and `filter-run-log` both hide by default.
+func isSchedulerScan(eventType string) bool {
+	return eventType == string(events.SchedulerScan)
+}
+
 // runTicketsFilterRunLog reads epicPath's run-log.jsonl (via
 // runlog.ReadEvents, the same decoding the scheduler itself uses) and
 // prints only the events matching ticketFilter/eventFilter as pretty-printed
@@ -53,7 +59,7 @@ func runTicketsFilterRunLog(epicPath, ticketFilter string, eventFilter []string,
 		if len(wantEvents) > 0 && !wantEvents[ev.Type] {
 			continue
 		}
-		if len(wantEvents) == 0 && !showScans && ev.Type == string(events.SchedulerScan) {
+		if len(wantEvents) == 0 && !showScans && isSchedulerScan(ev.Type) {
 			continue
 		}
 		data, err := json.MarshalIndent(ev, "", "  ")
