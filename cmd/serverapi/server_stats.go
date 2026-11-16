@@ -27,7 +27,7 @@ func newServerStatsCmd(d Deps) *cobra.Command {
 				func(ctx context.Context, cl *apiclient.Client) (wire.Stats, error) {
 					return cl.Reads.Stats(ctx, days, project, includeDev)
 				},
-				func(w io.Writer, s wire.Stats) error { return printStatsDev(w, s, includeDev) })
+				func(w io.Writer, s wire.Stats) error { return printStats(w, s, includeDev) })
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
@@ -37,9 +37,7 @@ func newServerStatsCmd(d Deps) *cobra.Command {
 	return cmd
 }
 
-func printStats(w io.Writer, s wire.Stats) error { return printStatsDev(w, s, false) }
-
-func printStatsDev(w io.Writer, s wire.Stats, includeDev bool) error {
+func printStats(w io.Writer, s wire.Stats, includeDev bool) error {
 	if _, err := fmt.Fprintln(w, "date\ttickets_merged\tepics_merged\tdesigns_completed"); err != nil {
 		return err
 	}

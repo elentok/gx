@@ -67,7 +67,7 @@ func TestServerStats_TextAndJSONCarryLaunch(t *testing.T) {
 	med, share := int64(12500), 0.75
 	s := wire.Stats{Launch: wire.StatsLaunch{Count: 4, MedianMs: &med, ShareUnderTgt: &share, TargetMs: 15000}}
 	var text bytes.Buffer
-	if err := printStats(&text, s); err != nil {
+	if err := printStats(&text, s, false); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"12.5s", "75%"} {
@@ -118,7 +118,7 @@ func TestServerStats_TextEndsWithWebPerformanceBlock(t *testing.T) {
 		LCPChangePct: f64(12.5),
 	}
 	var buf bytes.Buffer
-	if err := printStats(&buf, s); err != nil {
+	if err := printStats(&buf, s, false); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -139,7 +139,7 @@ func TestServerStats_TextEndsWithWebPerformanceBlock(t *testing.T) {
 
 func TestServerStats_NoWebPerformanceSamplesIsOneLine(t *testing.T) {
 	var buf bytes.Buffer
-	if err := printStats(&buf, wire.Stats{}); err != nil {
+	if err := printStats(&buf, wire.Stats{}, false); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
