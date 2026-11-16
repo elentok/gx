@@ -9,6 +9,14 @@ import (
 // kept for good: a recorded session never goes away.
 const recordedMissTTL = 15 * time.Second
 
+// oldRunAge is how long after its start a run counts as old: one that finished
+// long ago never gains a transcript, so its miss is trusted for
+// oldRecordedMissTTL and it skips the all-dirs glob.
+const (
+	oldRunAge          = 6 * time.Hour
+	oldRecordedMissTTL = time.Hour
+)
+
 // recordedCache remembers sessionRecorded answers. Every snapshot asks once per
 // ticket, and each miss globs every project dir, which is too slow to repeat.
 type recordedCache struct {
@@ -17,8 +25,9 @@ type recordedCache struct {
 }
 
 type recordedEntry struct {
-	found bool
-	at    time.Time
+	found   bool
+	at      time.Time
+	missTTL time.Duration
 }
 
 // lookup returns the cached answer and whether it is still valid.
@@ -29,17 +38,17 @@ func (c *recordedCache) lookup(key string, now time.Time) (found, ok bool) {
 	if !hit {
 		return false, false
 	}
-	if e.found || now.Sub(e.at) < recordedMissTTL {
+	if e.found || now.Sub(e.at) < e.missTTL {
 		return e.found, true
 	}
 	return false, false
 }
 
-func (c *recordedCache) store(key string, found bool, now time.Time) {
+func (c *recordedCache) store(key string, found bool, now time.Time, missTTL time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.entries == nil {
 		c.entries = map[string]recordedEntry{}
 	}
-	c.entries[key] = recordedEntry{found: found, at: now}
+	c.entries[key] = recordedEntry{found: found, at: now, missTTL: missTTL}
 }

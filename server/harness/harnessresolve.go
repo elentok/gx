@@ -193,17 +193,26 @@ func (h *Harness) EarlierRunHarness(addr tickets.Address) string {
 }
 
 func (h *Harness) sessionRecorded(r runlog.IterationSession) bool {
+	return h.sessionRecordedAt(r, time.Now())
+}
+
+func (h *Harness) sessionRecordedAt(r runlog.IterationSession, now time.Time) bool {
 	key := string(r.Agent) + "\x00" + r.Cwd + "\x00" + r.Session
-	now := time.Now()
 	if found, ok := h.recorded.lookup(key, now); ok {
 		return found
 	}
-	found := h.sessionRecordedUncached(r)
-	h.recorded.store(key, found, now)
+	old := !r.Started.IsZero() && now.Sub(r.Started) > oldRunAge
+	found := h.sessionRecordedUncached(r, old)
+	missTTL := recordedMissTTL
+	if old {
+		missTTL = oldRecordedMissTTL
+	}
+	h.recorded.store(key, found, now, missTTL)
 	return found
 }
 
-func (h *Harness) sessionRecordedUncached(r runlog.IterationSession) bool {
+// sessionRecordedUncached skips the all-dirs glob for an old run.
+func (h *Harness) sessionRecordedUncached(r runlog.IterationSession, old bool) bool {
 	switch r.Agent {
 	case agent.AgentClaude:
 		home, err := h.projects.EnvHome()
@@ -216,6 +225,9 @@ func (h *Harness) sessionRecordedUncached(r runlog.IterationSession) bool {
 			if _, err := os.Stat(transcript.PathIn(home, r.Cwd, r.Session)); err == nil {
 				return true
 			}
+		}
+		if old {
+			return false
 		}
 		found, err := transcript.FindByID(home, r.Session)
 		return err == nil && len(found) > 0

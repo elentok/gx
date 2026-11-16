@@ -285,6 +285,8 @@ type IterationSession struct {
 	Session string
 	Cwd     string
 	Agent   agent.AgentKind
+	// Started is the iteration-started event's time.
+	Started time.Time
 }
 
 // IterationSessions lists identifier's recorded iteration sessions, newest
@@ -300,7 +302,7 @@ func IterationSessions(evs []Event, identifier string) []IterationSession {
 		if agentKind == "" {
 			agentKind = agent.AgentClaude
 		}
-		out = append(out, IterationSession{Session: ev.AgentSession, Cwd: ev.Cwd, Agent: agentKind})
+		out = append(out, IterationSession{Session: ev.AgentSession, Cwd: ev.Cwd, Agent: agentKind, Started: ev.Time})
 	}
 	return out
 }
