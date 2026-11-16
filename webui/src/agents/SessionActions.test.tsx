@@ -5,19 +5,14 @@ import type { SessionInfo } from "../generated/server"
 import { RemoveConfirmHost } from "../shell/RemoveConfirmHost"
 import { renderThemed } from "../ui/render"
 import { SessionActions } from "./SessionActions"
-import { exitedDesigns, postRemoveSession, removeSession } from "./sessionWrites"
+import { exitedDesigns, removeSession } from "./sessionWrites"
 
-// The mock covers every import of the module; the postStopSession/postRemoveSession fetch test
-// below needs the real writer.
+// The postStopSession/postRemoveSession fetch test below loads the real writer with vi.importActual.
 const { mockRemove } = vi.hoisted(() => ({ mockRemove: vi.fn() }))
-vi.mock("./sessionWrites", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./sessionWrites")>()
-  return {
-    ...actual,
-    postRemoveSession: (...args: Parameters<typeof actual.postRemoveSession>) =>
-      mockRemove.getMockImplementation() ? mockRemove(...args) : actual.postRemoveSession(...args),
-  }
-})
+vi.mock("./sessionWrites", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./sessionWrites")>()),
+  postRemoveSession: mockRemove,
+}))
 
 afterEach(() => {
   cleanup()
@@ -93,6 +88,8 @@ test("Stop sends the row token", async () => {
 })
 
 test("postStopSession and postRemoveSession send one target; remove confirms with yes", async () => {
+  const { postRemoveSession } =
+    await vi.importActual<typeof import("./sessionWrites")>("./sessionWrites")
   const fetched: { url: string; body: unknown }[] = []
   vi.stubGlobal(
     "fetch",
