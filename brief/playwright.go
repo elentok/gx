@@ -122,6 +122,29 @@ func (Playwright) ReadContexts(path string) map[string]string {
 	return out
 }
 
+// ReadRefs returns each failing test's "file:line" and the path of its
+// error-context.md, as the JSON report lists them, keyed like Outcome.Tests.
+func (Playwright) ReadRefs(path string) map[string]FailureRef {
+	var out map[string]FailureRef
+	for _, sp := range readSpecs(path) {
+		ref := FailureRef{}
+		if sp.line > 0 {
+			ref.Line = fmt.Sprintf("%s:%d", sp.file, sp.line)
+		}
+		if len(sp.attachments) > 0 {
+			ref.Context = sp.attachments[0]
+		}
+		if ref == (FailureRef{}) {
+			continue
+		}
+		if out == nil {
+			out = map[string]FailureRef{}
+		}
+		out[contextKey(sp.file, sp.name)] = ref
+	}
+	return out
+}
+
 // contextKey names a test for snapshot lookup by file base name: the line
 // reporter prints the file relative to the config dir ("e2e/a.e2e.ts"), the
 // JSON report relative to the test dir ("a.e2e.ts").
@@ -130,6 +153,7 @@ func contextKey(file, name string) string { return filepath.Base(file) + "." + n
 type reportSpec struct {
 	file, name  string
 	key         string
+	line        int
 	ms          float64
 	attachments []string // paths of error-context.md files
 }
@@ -148,6 +172,7 @@ func readSpecs(path string) []reportSpec {
 		Specs  []struct {
 			Title string
 			File  string
+			Line  int
 			Tests []struct {
 				Results []struct {
 					Duration    float64
@@ -165,7 +190,7 @@ func readSpecs(path string) []reportSpec {
 	walk = func(s suite, titles []string) {
 		for _, sp := range s.Specs {
 			name := strings.Join(append(slices.Clone(titles), sp.Title), " › ")
-			r := reportSpec{file: sp.File, name: name, key: Unit{Location: sp.File, Name: name}.String()}
+			r := reportSpec{file: sp.File, line: sp.Line, name: name, key: Unit{Location: sp.File, Name: name}.String()}
 			for _, t := range sp.Tests {
 				for _, res := range t.Results {
 					r.ms += res.Duration

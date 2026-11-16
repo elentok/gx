@@ -101,7 +101,14 @@ type ReportReader interface {
 // test from Invocation.ReportFile.
 type ContextReader interface {
 	ReadContexts(path string) map[string]string
+	// ReadRefs maps a failing test to where to look: its source line and the
+	// path of its error-context.md.
+	ReadRefs(path string) map[string]FailureRef
 }
+
+// FailureRef locates a failing test: Line is "file:line" of the flow, Context
+// the path of its error-context.md. Either can be empty.
+type FailureRef struct{ Line, Context string }
 
 // Outcome is what a tool found in the output of one run.
 type Outcome struct {
@@ -119,6 +126,9 @@ type Outcome struct {
 	TestDurations map[string]int64
 	// Contexts maps a failing test name (as in Tests) to its page snapshot.
 	Contexts map[string]string
+	// Refs maps a failing test name (as in Tests) to its source line and
+	// error-context.md path.
+	Refs map[string]FailureRef
 	// Listing holds one line per test of a list-only run. It is printed in
 	// place of "no tests ran".
 	Listing []string
@@ -261,6 +271,7 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 		outcome.TestDurations = rr.ReadReport(plan.ReportFile)
 		if cr, ok := tool.(ContextReader); ok && exit != 0 {
 			outcome.Contexts = cr.ReadContexts(plan.ReportFile)
+			outcome.Refs = cr.ReadRefs(plan.ReportFile)
 		}
 		os.Remove(plan.ReportFile)
 	}

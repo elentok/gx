@@ -159,6 +159,13 @@ func renderSlowest(tool Tool, w io.Writer, durations map[string]int64) {
 // renderSnapshot prints the lines of u's page snapshot that match the failing
 // locator. A failure without a snapshot prints nothing.
 func renderSnapshot(w io.Writer, o Outcome, u Unit) {
+	ref := o.Refs[contextKey(u.Location, u.Name)]
+	if ref.Line != "" {
+		fmt.Fprintf(w, "  at: %s\n", ref.Line)
+	}
+	if ref.Context != "" {
+		fmt.Fprintf(w, "  error-context: %s\n", ref.Context)
+	}
 	lines := snapshotExcerpt(u.Text, o.Contexts[contextKey(u.Location, u.Name)])
 	if len(lines) == 0 {
 		return

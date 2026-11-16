@@ -189,6 +189,7 @@ func TestFlowNumbersToGrep(t *testing.T) {
 	}{
 		{"number after a boolean flag is a flow", []string{"--headed", "69"}, []string{"--headed", "-g", grep}, false},
 		{"number after a value flag stays", []string{"--workers", "2"}, []string{"--workers", "2"}, false},
+		{"file path plus one number", []string{"agents-session.e2e.ts", "75"}, []string{"agents-session.e2e.ts", "-g", `(?:\.tsx?|›) (75)\. `}, false},
 		{"no numbers leaves args alone", []string{"a.e2e.ts", "-g", "x"}, []string{"a.e2e.ts", "-g", "x"}, false},
 		{"numbers mixed with -g", []string{"69", "-g", "x"}, nil, true},
 		{"numbers mixed with --grep", []string{"--grep", "x", "69"}, nil, true},
@@ -291,6 +292,38 @@ func TestReport_PlaywrightPrintsMatchingSnapshotLinesOnFailureOnly(t *testing.T)
 	o.Contexts = nil
 	if got := runReport(o, 1); strings.Contains(got, "snapshot") {
 		t.Errorf("no error-context.md must print no snapshot block:\n%s", got)
+	}
+}
+
+func TestReport_PlaywrightPrintsErrorContextPathAndLine(t *testing.T) {
+	u := Unit{Location: "e2e/a.e2e.ts", Name: "1. T", Text: "Error: boom"}
+	o := Outcome{Failures: []Unit{u}, Refs: map[string]FailureRef{
+		"a.e2e.ts.1. T": {Line: "a.e2e.ts:12", Context: "test-results/x/error-context.md"},
+	}}
+	got := runReport(o, 1)
+	for _, want := range []string{"  at: a.e2e.ts:12\n", "  error-context: test-results/x/error-context.md\n"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q:\n%s", want, got)
+		}
+	}
+	o.Refs = nil
+	if got := runReport(o, 1); strings.Contains(got, "error-context:") {
+		t.Errorf("no refs must print no error-context line:\n%s", got)
+	}
+}
+
+func TestPlaywrightReadRefs_ListsLineAndAttachment(t *testing.T) {
+	dir := t.TempDir()
+	report := `{"suites":[{"title":"a.e2e.ts","file":"a.e2e.ts","specs":[
+	  {"title":"1. T","file":"a.e2e.ts","line":12,"tests":[{"results":[{"duration":1,"attachments":[{"name":"error-context","path":"/x/error-context.md"}]}]}]}]}]}`
+	path := filepath.Join(dir, "report.json")
+	if err := os.WriteFile(path, []byte(report), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := Playwright{}.ReadRefs(path)
+	want := map[string]FailureRef{"a.e2e.ts.1. T": {Line: "a.e2e.ts:12", Context: "/x/error-context.md"}}
+	if !maps.Equal(got, want) {
+		t.Errorf("refs = %v, want %v", got, want)
 	}
 }
 
