@@ -11,13 +11,23 @@ afterEach(() => {
   toaster.remove()
 })
 
+// UTC instants, so the expected text never depends on the zone of the test process.
 function at(h: number, m: number): string {
-  return new Date(2026, 0, 5, h, m).toISOString()
+  return new Date(Date.UTC(2026, 0, 5, h, m)).toISOString()
 }
 
-function setup(warning?: RestWarning) {
+type Zone = { zone?: string; zone_offset_seconds: number }
+const utc: Zone = { zone: "UTC", zone_offset_seconds: 0 }
+
+// `now` is `lead` minutes before the warning start, as the server sends it.
+function snap(warning: RestWarning | undefined, lead: number, zone: Zone) {
+  const now = warning ? new Date(Date.parse(warning.start) - lead * 60000).toISOString() : at(0, 0)
+  return { rest: { counting: true, warning, now, ...zone } }
+}
+
+function setup(warning?: RestWarning, lead = 2, zone: Zone = utc) {
   let state = {
-    snapshot: { rest: { counting: true, warning } },
+    snapshot: snap(warning, lead, zone),
     connected: true,
   } as unknown as ConnectionState
   const subs = new Set<() => void>()
@@ -34,7 +44,7 @@ function setup(warning?: RestWarning) {
     act(() => {
       state = {
         ...state,
-        snapshot: { rest: { counting: true, warning: next } },
+        snapshot: snap(next, lead, zone),
       } as unknown as ConnectionState
       subs.forEach((fn) => fn())
     })
@@ -54,9 +64,24 @@ test("break warning shows start and length from the snapshot", async () => {
 })
 
 test("bedtime warning text", async () => {
-  setup({ kind: "bedtime", start: at(22, 0) })
+  setup({ kind: "bedtime", start: at(22, 0) }, 10)
   expect(await screen.findByText("Bedtime starts at 22:00 (in 10 minutes)")).toBeTruthy()
   expect(screen.getByText("Wrap up what you are doing.")).toBeTruthy()
+})
+
+test("clock time prints in the snapshot zone, not the browser zone", async () => {
+  setup(brk(14, 55), 2, { zone: "Asia/Tokyo", zone_offset_seconds: 9 * 3600 })
+  expect(await screen.findByText("Your Break starts at 23:55 and lasts 5 minutes.")).toBeTruthy()
+})
+
+test("clock time uses the offset when the snapshot has no zone name", async () => {
+  setup({ kind: "bedtime", start: at(22, 0) }, 10, { zone_offset_seconds: -5 * 3600 })
+  expect(await screen.findByText("Bedtime starts at 17:00 (in 10 minutes)")).toBeTruthy()
+})
+
+test("lead minutes follow start minus now", async () => {
+  setup(brk(14, 55), 3)
+  expect(await screen.findByText("Break in 3 minutes")).toBeTruthy()
 })
 
 test("moved start updates the toast in place", async () => {

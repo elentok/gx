@@ -83,6 +83,9 @@ export type RestState = {
   rule?: RestRule
   // The server's clock from the snapshot, so a countdown never uses the browser's.
   now?: string
+  // The server's zone: clock times print in it, with the offset when the zone has no name.
+  zone?: string
+  zoneOffsetSeconds?: number
 }
 
 export function useRestState(): RestState {
@@ -93,6 +96,8 @@ export function useRestState(): RestState {
     warning: rest?.warning,
     rule: rest?.rule,
     now: rest?.now,
+    zone: rest?.zone,
+    zoneOffsetSeconds: rest?.zone_offset_seconds,
   }
 }
 
