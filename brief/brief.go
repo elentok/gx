@@ -90,6 +90,9 @@ type Invocation struct {
 	// tool that is a ReportReader reads it for test durations; the file is
 	// then removed.
 	ReportFile string
+	// Dir is the child's working directory when the tool chose one other than
+	// the directory it was planned for; empty keeps that directory.
+	Dir string
 }
 
 // ReportReader is a Tool that times its tests from Invocation.ReportFile.
@@ -230,6 +233,13 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	if plan.Note != "" {
 		fmt.Fprintln(o.Out, plan.Note)
 	}
+	runDir := dir
+	if plan.Dir != "" {
+		runDir = plan.Dir
+		if rel, err := filepath.Rel(dir, runDir); err == nil {
+			o.CDir = filepath.Join(o.CDir, rel)
+		}
+	}
 
 	start := time.Now()
 	logDir := filepath.Join(o.DataDir, "brief")
@@ -248,7 +258,7 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	run := func() ([]byte, int, error) {
 		releaseGate := registerGoBuild(tool, o.StateDir)
 		defer releaseGate()
-		return execute(plan.Bin, plan.Argv, dir, withDefaults(o.Env, plan.Env), logFile, hang)
+		return execute(plan.Bin, plan.Argv, runDir, withDefaults(o.Env, plan.Env), logFile, hang)
 	}
 	out, exit, err := run()
 	cacheLost := false

@@ -134,3 +134,10 @@ func TestRerunLine_IsCappedInLength(t *testing.T) {
 		t.Errorf("rerun hint not capped (%d chars): %.200s", len(got), got)
 	}
 }
+
+func TestRerunLine_NamesTheWebuiDir(t *testing.T) {
+	got := rerunLine("playwright", "webui", []string{"epics.e2e.ts"})
+	if want := "re-run only the failing tests: gx brief -C webui playwright epics.e2e.ts"; got != want {
+		t.Errorf("rerunLine = %q, want %q", got, want)
+	}
+}

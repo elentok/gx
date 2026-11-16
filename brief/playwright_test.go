@@ -412,3 +412,25 @@ func TestPlaywrightPlan_RefusesADirWithoutTheConfig(t *testing.T) {
 		t.Errorf("err = %v, want advice to use -C webui", err)
 	}
 }
+
+func TestPlaywrightPlan_FromTheRepoRootUsesWebui(t *testing.T) {
+	web := playwrightDir(t, true)
+	root := filepath.Dir(web)
+	os.MkdirAll(filepath.Join(web, "dist"), 0o755)
+	os.WriteFile(filepath.Join(web, "dist", "index.html"), nil, 0o644)
+	buildWeb = func([]string, string) error { t.Fatal("built although webui/dist/index.html exists"); return nil }
+
+	inv, err := Playwright{}.Plan(nil, root, []string{"epics.e2e.ts"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(web, "node_modules", ".bin", "playwright"); inv.Bin != want {
+		t.Errorf("bin = %q, want %q", inv.Bin, want)
+	}
+	if want := []string{"test", "--reporter=line,json", "-c", playwrightConfig, "epics.e2e.ts"}; !slices.Equal(inv.Argv, want) {
+		t.Errorf("argv = %v, want %v", inv.Argv, want)
+	}
+	if inv.Dir != web {
+		t.Errorf("dir = %q, want %q", inv.Dir, web)
+	}
+}

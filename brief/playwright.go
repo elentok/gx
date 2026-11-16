@@ -49,6 +49,18 @@ func (Playwright) Plan(env []string, dir string, args []string) (Invocation, err
 	if slices.ContainsFunc(args, func(a string) bool { return a == "--help" || a == "-h" }) {
 		return Invocation{}, errors.New(playwrightUsage)
 	}
+	// From the repo root the binary, config and dist live under webui/.
+	runDir := ""
+	if !slices.ContainsFunc(args, func(a string) bool {
+		return a == "-c" || a == "--config" || strings.HasPrefix(a, "--config=")
+	}) {
+		if _, err := os.Stat(filepath.Join(dir, playwrightConfig)); err != nil {
+			web := filepath.Join(dir, "webui")
+			if _, err := os.Stat(filepath.Join(web, playwrightConfig)); err == nil {
+				dir, runDir = web, web
+			}
+		}
+	}
 	all := slices.Contains(args, "--all")
 	if !all && !slices.Contains(args, "--list") && !slices.ContainsFunc(args, func(a string) bool { return strings.HasSuffix(a, ".e2e.ts") }) {
 		return Invocation{}, errors.New("brief: name a test file (gx brief -C webui playwright disk.e2e.ts 76), or pass --all to run the whole suite")
@@ -90,7 +102,7 @@ func (Playwright) Plan(env []string, dir string, args []string) (Invocation, err
 	}
 	return Invocation{
 		Bin: bin, Argv: append(argv, rest...), Note: note,
-		Env: []string{"PLAYWRIGHT_JSON_OUTPUT_NAME=" + report}, ReportFile: report,
+		Env: []string{"PLAYWRIGHT_JSON_OUTPUT_NAME=" + report}, ReportFile: report, Dir: runDir,
 	}, nil
 }
 
