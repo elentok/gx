@@ -8,6 +8,7 @@ import { ChatMessages, WorkingRow, type WorkingStep } from "./ChatCore"
 import type { AutoMenuState } from "./AutoMenu"
 import { Composer } from "./Composer"
 import { FooterLine } from "./FooterLine"
+import { SwitchLine } from "./modelSwitch"
 import {
   FailureBanner,
   GxStopped,
@@ -286,7 +287,7 @@ function ChatBody({
             }
             busy={busy}
             sessionId={session.id}
-            session={session}
+            end={<SwitchLine session={session} />}
             working={
               step && (
                 <WorkingRow

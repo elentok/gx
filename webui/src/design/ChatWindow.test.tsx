@@ -2,13 +2,11 @@ import { act, cleanup, fireEvent, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 import { FileLinkProvider } from "../files/FileLinkContext"
 import { stubResolver } from "../files/stubResolver.testutil"
-import type { SessionChatMessage, SessionChatResponse, SessionInfo } from "../generated/server"
+import type { SessionChatMessage, SessionChatResponse } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { ChatMessages } from "./ChatCore"
 
 afterEach(cleanup)
-
-const sess = { id: "s1", harness: "claude" } as SessionInfo
 
 const msg = (n: number): SessionChatMessage => ({
   id: `m${n}`,
@@ -30,7 +28,7 @@ const shown = (c: HTMLElement) => c.textContent?.match(/message number \d+/g) ??
 describe("the chat window", () => {
   it("mounts only the newest messages and grows on request", () => {
     const { container } = renderThemed(
-      <ChatMessages chat={chatOf(150)} busy={false} sessionId="s1" session={sess} />,
+      <ChatMessages chat={chatOf(150)} busy={false} sessionId="s1" />,
     )
     expect(shown(container)).toHaveLength(60)
     expect(container.textContent).toContain("message number 150")
@@ -44,7 +42,7 @@ describe("the chat window", () => {
 
   it("shows a short chat whole, with no button", () => {
     const { container } = renderThemed(
-      <ChatMessages chat={chatOf(60)} busy={false} sessionId="s1" session={sess} />,
+      <ChatMessages chat={chatOf(60)} busy={false} sessionId="s1" />,
     )
     expect(shown(container)).toHaveLength(60)
     expect(screen.queryByRole("button", { name: /earlier messages/ })).toBeNull()
@@ -61,7 +59,6 @@ describe("the chat window", () => {
           }}
           busy={false}
           sessionId="s1"
-          session={sess}
         />
       </FileLinkProvider>,
     )

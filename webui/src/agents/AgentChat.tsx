@@ -5,6 +5,7 @@ import { sheetCardsOf } from "../design/chat"
 import { FileLinkProvider } from "../files/FileLinkContext"
 import { FailureBanner, visibleFailure } from "../design/FailureBanner"
 import { postAnswer, type PostAnswer } from "../design/prompt"
+import { SwitchLine } from "../design/modelSwitch"
 import { QuestionSheet } from "../design/QuestionSheet"
 import { useRoundDraft } from "../design/roundDraft"
 import {
@@ -163,7 +164,7 @@ export function AgentChat({
           chat={chat}
           busy={busy}
           sessionId={session.id}
-          session={session}
+          end={<SwitchLine session={session} />}
           showTools
           working={<WorkingRow current={chat.current} others={chat.others} />}
         />

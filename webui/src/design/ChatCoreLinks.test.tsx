@@ -4,13 +4,11 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { FileLinkProvider } from "../files/FileLinkContext"
 import type { ResolveBase } from "../files/resolve"
 import { stubResolver } from "../files/stubResolver.testutil"
-import type { SessionChatMessage, SessionChatResponse, SessionInfo } from "../generated/server"
+import type { SessionChatMessage, SessionChatResponse } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { ChatMessages } from "./ChatCore"
 
 afterEach(cleanup)
-
-const sess = { id: "s1", harness: "claude" } as SessionInfo
 
 const bases: ResolveBase[] = []
 vi.mock("../files/resolve", async (orig) => {
@@ -63,7 +61,7 @@ describe("file links in the chat", () => {
     const { resolver } = stubResolver(["server/files/handler.go"])
     const { container } = renderThemed(
       <FileLinkProvider resolver={resolver}>
-        <ChatMessages chat={chatOf(base)} busy={false} sessionId="s1" session={sess} showTools />
+        <ChatMessages chat={chatOf(base)} busy={false} sessionId="s1" showTools />
       </FileLinkProvider>,
     )
     await settle()
@@ -87,7 +85,7 @@ describe("file links in the chat", () => {
     const { resolver } = stubResolver(["server/files/handler.go"])
     const { container } = renderThemed(
       <FileLinkProvider resolver={resolver}>
-        <ChatMessages chat={chatOf(base)} busy={false} sessionId="s1" session={sess} />
+        <ChatMessages chat={chatOf(base)} busy={false} sessionId="s1" />
       </FileLinkProvider>,
     )
     await settle()
@@ -103,7 +101,7 @@ describe("file links in the chat", () => {
       append = () => set([...msgs, msg("m6", { text: "also new/file.go" })])
       return (
         <FileLinkProvider resolver={resolver} recheckKey={msgs.at(-1)?.id}>
-          <ChatMessages chat={chatOf(msgs)} busy={false} sessionId="s1" session={sess} showTools />
+          <ChatMessages chat={chatOf(msgs)} busy={false} sessionId="s1" showTools />
         </FileLinkProvider>
       )
     }
