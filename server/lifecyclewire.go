@@ -84,3 +84,12 @@ func (h reloadHost) PruneLogsIfRetentionChanged(old, next Settings) {
 }
 
 func (h reloadHost) KickGuards() { h.s.guards.Kick() }
+
+func (h reloadHost) ApplyRest(old, next Settings) {
+	if old.MentalHealth == next.MentalHealth {
+		return
+	}
+	if _, err := h.s.rest.SettingsChanged(); err != nil {
+		h.s.log.Error("rest engine settings change failed", "err", err)
+	}
+}

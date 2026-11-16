@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/server"
@@ -20,6 +22,52 @@ func WithAlerts(banners, sounds bool) func(*server.Config) {
 	return func(c *server.Config) {
 		c.Settings.AgentsBanners = banners
 		c.Settings.AgentsSounds.Enabled = sounds
+	}
+}
+
+// WithMentalHealth sets the Mental health settings.
+func WithMentalHealth(m config.MentalHealthConfig) func(*server.Config) {
+	return func(c *server.Config) { c.Settings.MentalHealth = m }
+}
+
+// RestClock is a fake clock for the Rest engine. It is safe for concurrent use.
+type RestClock struct {
+	mu   sync.Mutex
+	t    time.Time
+	tick func()
+}
+
+// NewRestClock starts the clock at t.
+func NewRestClock(t time.Time) *RestClock { return &RestClock{t: t} }
+
+// Now is the clock's time.
+func (c *RestClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.t
+}
+
+// Advance moves the clock forward by d and runs one Rest tick, without waiting.
+func (c *RestClock) Advance(d time.Duration) {
+	c.mu.Lock()
+	c.t = c.t.Add(d)
+	tick := c.tick
+	c.mu.Unlock()
+	if tick != nil {
+		tick()
+	}
+}
+
+// WithRestClock gives the Rest engine the fake clock and binds the clock's
+// Advance to the engine's tick.
+func WithRestClock(c *RestClock) func(*server.Config) {
+	return func(cfg *server.Config) {
+		cfg.RestClock = c.Now
+		cfg.RestTick = func(tick func()) {
+			c.mu.Lock()
+			c.tick = tick
+			c.mu.Unlock()
+		}
 	}
 }
 

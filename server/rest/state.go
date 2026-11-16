@@ -62,12 +62,12 @@ const (
 // Record is one entry for the append-only store. Bedtime starts are not
 // recorded.
 type Record struct {
-	Kind RecordKind
-	Time time.Time
+	Kind RecordKind `json:"kind"`
+	Time time.Time  `json:"time"`
 	// Started is the start time of the Break a RecordBreakDropped cancels.
-	Started time.Time
+	Started time.Time `json:"started,omitzero"`
 	// Rest is the kind of Rest period a RecordUnlock ended.
-	Rest Kind
+	Rest Kind `json:"rest,omitempty"`
 }
 
 // Warning is the one upcoming Rest period the person is warned about. A moved

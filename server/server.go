@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/server/prflow"
 	"github.com/elentok/gx/server/queue"
 	srvrecovery "github.com/elentok/gx/server/recovery"
+	"github.com/elentok/gx/server/rest"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/server/schedules"
@@ -125,6 +126,7 @@ type Server struct {
 
 	queue      *queue.Queue
 	afk        *queue.AFK
+	rest       *rest.Runner
 	viMode     *queue.ViMode
 	workspaces *workspaces.Store
 	oneOffs    *queue.OneOffs
@@ -262,12 +264,21 @@ func New(cfg Config) (*Server, error) {
 		lock.Release()
 		return nil, fmt.Errorf("load afk mode: %w", err)
 	}
+	restClock := cfg.RestClock
+	if restClock == nil {
+		restClock = time.Now
+	}
+	var s *Server
+	restRunner, err := rest.Open(cfg.StateDir, events, func() config.MentalHealthConfig { return s.settings.Load().MentalHealth }, restClock)
+	if err != nil {
+		lock.Release()
+		return nil, fmt.Errorf("load rest state: %w", err)
+	}
 	viMode, err := queue.OpenViMode(cfg.StateDir, events)
 	if err != nil {
 		lock.Release()
 		return nil, fmt.Errorf("load vi mode: %w", err)
 	}
-	var s *Server
 	wsStore, err := workspaces.Open(cfg.StateDir, events, func() workspaces.Directory { return workspacesDirectory{s} })
 	if err != nil {
 		lock.Release()
@@ -329,6 +340,7 @@ func New(cfg Config) (*Server, error) {
 
 		queue:  q,
 		afk:    afk,
+		rest:   restRunner,
 		viMode: viMode,
 
 		workspaces: wsStore,
@@ -419,6 +431,12 @@ func New(cfg Config) (*Server, error) {
 	})
 	s.settings.Store(&cfg.Settings)
 	s.settings.SetAppliers(lifecycle.ReloadAppliers(reloadHost{s}))
+	if err := s.rest.Start(); err != nil {
+		s.log.Error("rest engine start failed", "err", err)
+	}
+	if cfg.RestTick != nil {
+		cfg.RestTick(func() { _, _ = s.rest.Tick() })
+	}
 	s.cleanup = cleanup.New(cleanup.Deps{TicketStore: cfg.TicketStore, Env: cfg.Env, Events: events,
 		Sessions:     func() ([]wire.SessionInfo, error) { return s.sessions.ListSessions() },
 		SubmitOneOff: s.oneOffs.Submit,
@@ -759,6 +777,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	recordShutdown("chat-close")
 	s.chat.Close()
 	s.webPerf.Close()
+	s.rest.Close()
 	_ = os.Remove(SocketPath(s.cfg.StateDir))
 	s.log.Info("server stopped")
 	_ = s.logf.Close()
@@ -793,6 +812,9 @@ func recordShutdown(step string) {
 // Settings is the settings subsystem, for tests that reach its seams from
 // outside the package.
 func (s *Server) Settings() *settings.Holder { return &s.settings }
+
+// Rest is the live Rest engine, for tests.
+func (s *Server) Rest() *rest.Runner { return s.rest }
 
 // ResumerOf is s's session resumer, for tests that drive a restart directly. A
 // function, not a method, to stay under Server's method limit.

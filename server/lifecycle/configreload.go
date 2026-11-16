@@ -18,6 +18,8 @@ type ReloadHost interface {
 	// ApplyDevMode tells the Vite supervisor the desired state; it returns at once.
 	ApplyDevMode(old, next settings.Settings)
 	KickGuards()
+	// ApplyRest delivers a changed mental-health setting to the Rest engine.
+	ApplyRest(old, next settings.Settings)
 }
 
 // ReloadAppliers is the root's registration. The order is the apply order:
@@ -35,6 +37,7 @@ func ReloadAppliers(h ReloadHost) settings.Appliers {
 			h.ApplyWatchConfig,
 			func(old, next settings.Settings) func() { h.ApplyDevMode(old, next); return nil },
 			func(old, next settings.Settings) func() { h.PruneLogsIfRetentionChanged(old, next); return nil },
+			func(old, next settings.Settings) func() { h.ApplyRest(old, next); return nil },
 			func(settings.Settings, settings.Settings) func() { h.KickGuards(); return nil },
 		},
 	}

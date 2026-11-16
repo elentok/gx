@@ -48,6 +48,10 @@ type AFKResult struct {
 // EventAFKChanged announces that AFK mode was switched.
 const EventAFKChanged = "afk-changed"
 
+// EventRestChanged announces that the Rest engine's state or view changed, so
+// clients refetch it.
+const EventRestChanged = "rest-changed"
+
 // ViModeRequest sets vi mode; a nil On toggles it.
 type ViModeRequest struct {
 	On *bool `json:"on,omitempty"`
