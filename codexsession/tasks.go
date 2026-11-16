@@ -2,7 +2,6 @@ package codexsession
 
 import (
 	"encoding/json"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -121,122 +120,13 @@ func parseRolloutTime(s string) (time.Time, bool) {
 	return t, err == nil
 }
 
-// ReadTasks returns one shell record per exec cell that runs a command, oldest
-// first. It reads the whole rollout: a command outlives its turn. A cell with no
-// matched end keeps a nil End; the assembler's no-end rules decide the rest.
-// Ends match exactly, by call id, cell id or session id.
+// ReadTasks returns one record per exec cell that runs a command and per
+// spawn_agent call, oldest first. It reads the whole rollout: a command outlives
+// its turn. A row with no matched end keeps a nil End; the assembler's no-end
+// rules decide the rest. Ends match exactly, by call id, cell id, session id or
+// thread id, except an item_completed line, which has no call id and matches by
+// process id, then by command text and time.
 func ReadTasks(path string) ([]transcript.TaskRecord, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	defer f.Close()
-
-	type cell struct {
-		rec      *transcript.TaskRecord
-		commands int
-	}
-	var cells []*cell
-	byCall := map[string]*cell{}
-	byCellID := map[string]*cell{}
-	byWait := map[string]*cell{}
-	bySession := map[string]*cell{}
-	pollSession := map[string]string{} // call id of a write_stdin cell -> its session id
-
-	end := func(c *cell, at time.Time, outcome string, code *int) {
-		if c.rec.End != nil {
-			return
-		}
-		if code != nil {
-			outcome = transcript.TaskOutcomeSuccess
-			if *code != 0 {
-				outcome = transcript.TaskOutcomeFailure
-			}
-		}
-		c.rec.End = &transcript.TaskEnd{At: at, Outcome: outcome, Source: transcript.TaskEndToolResult}
-		c.rec.ExitCode = code
-	}
-
-	err = transcript.ForEachLine(f, func(raw []byte) {
-		var line chatRolloutLine
-		if json.Unmarshal(raw, &line) != nil || line.Type != "response_item" {
-			return
-		}
-		p := line.Payload
-		ts, ok := parseRolloutTime(line.Timestamp)
-		if !ok {
-			return
-		}
-		switch p.Type {
-		case "custom_tool_call":
-			if p.Name != "exec" {
-				return
-			}
-			if strings.Contains(p.Input, execCall) {
-				command := execCommand(p.Input)
-				rec := &transcript.TaskRecord{
-					Kind:      transcript.TaskKindShell,
-					Label:     transcript.NewInFlightTool("exec_command", map[string]any{"cmd": command}).Label,
-					StartedAt: ts,
-					Command:   command,
-				}
-				c := &cell{rec: rec, commands: strings.Count(p.Input, execCall)}
-				cells = append(cells, c)
-				byCall[p.CallID] = c
-			} else if strings.Count(p.Input, writeStdinCall) == 1 {
-				if m := sessionRE.FindStringSubmatch(p.Input); m != nil {
-					pollSession[p.CallID] = m[1]
-				}
-			}
-		case "custom_tool_call_output":
-			out := parseCellOutput(p.Output)
-			if c := byCall[p.CallID]; c != nil {
-				if id, ok := out.cellID(); ok {
-					byCellID[id] = c
-					return
-				}
-				outcome, ended := out.scriptEnd()
-				if !ended {
-					return
-				}
-				code := out.exitCode()
-				if sid, ok := out.sessionID(); ok && code == nil {
-					bySession[sid] = c
-					return
-				}
-				if c.commands != 1 {
-					code = nil
-				}
-				end(c, ts, outcome, code)
-			} else if sid, ok := pollSession[p.CallID]; ok {
-				_, stillAlive := out.sessionID()
-				if code := out.exitCode(); code != nil && !stillAlive && bySession[sid] != nil {
-					end(bySession[sid], ts, "", code)
-				}
-			}
-		case "function_call":
-			if p.Name == "wait" {
-				if c := byCellID[waitCellID(p.Arguments)]; c != nil {
-					byWait[p.CallID] = c
-				}
-			}
-		case "function_call_output":
-			if c := byWait[p.CallID]; c != nil {
-				if outcome, ended := parseCellOutput(p.Output).scriptEnd(); ended {
-					end(c, ts, outcome, nil)
-				}
-			}
-		}
-	})
-	if err != nil {
-		return nil, err
-	}
-	out := make([]transcript.TaskRecord, len(cells))
-	for i, c := range cells {
-		out[i] = *c.rec
-	}
-	return out, nil
+	r, err := ReadRollout(path, true)
+	return r.Records, err
 }

@@ -130,6 +130,29 @@ func TestReadInFlightTools_ExecShape(t *testing.T) {
 	}
 }
 
+func TestReadInFlightTools_ItemCompletedEndsTheCommand(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "rollout.jsonl")
+	lines := []string{
+		`{"timestamp":"` + at(0) + `","type":"event_msg","payload":{"type":"task_started"}}`,
+		execLine(1, "a", `tools.exec_command({cmd:"make"})`),
+		cellOut(2, "a", "Script running with cell ID 7"),
+		execLine(3, "b", `tools.exec_command({cmd:"sleep 99"})`),
+		commandItem(10, 2, "5", "make", 0, "ok"),
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadInFlightTools(path, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []transcript.InFlightTool{{Kind: "shell", Label: "sleep 99"}}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+}
+
 func TestReadInFlightTools_MissingFile(t *testing.T) {
 	t.Parallel()
 	got, err := ReadInFlightTools(filepath.Join(t.TempDir(), "none.jsonl"), false)

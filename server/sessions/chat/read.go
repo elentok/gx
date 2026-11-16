@@ -100,7 +100,13 @@ func (c *Chat) read(w http.ResponseWriter, r *http.Request) {
 		default:
 			out.Messages, out.Truncated = snap.Msgs, snap.Truncated
 			out.Next, out.Background = snap.Next, snap.Background(time.Now())
-			out.Tasks = AssembleTasks(c.withSubagentDetails(c.withShellOutputs(snap.Records), path), meta, c.clock())
+			records := snap.Records
+			if kind == harness.Codex {
+				records = c.withCodexChildren(records, meta)
+			} else {
+				records = c.withSubagentDetails(c.withShellOutputs(records), path)
+			}
+			out.Tasks = AssembleTasks(records, meta, c.clock())
 			out.Questions = c.Cards(dir, meta, snap)
 			out.Unreadable, out.CodexVersion = snap.Unreadable, snap.CodexVersion
 			for i, t := range snap.InFlight {

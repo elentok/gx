@@ -161,6 +161,134 @@ func TestReadTasks_SessionCellEndsAtTheWriteStdinPoll(t *testing.T) {
 	wantEnd(t, got[0], 11, transcript.TaskOutcomeFailure, intp(130))
 }
 
+// commandItem is an item_completed / CommandExecution line; startedSec is the
+// item's own start, which can differ from the call line's time.
+func commandItem(sec, startedSec int, processID, command string, code int, output string) string {
+	argv, _ := json.Marshal([]string{"/bin/zsh", "-lc", command})
+	out, _ := json.Marshal(output)
+	return fmt.Sprintf(`{"timestamp":%q,"type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","id":"exec-1","process_id":%q,"command":%s,"status":"completed","exit_code":%d,"duration":{"secs":0,"nanos":5542},"aggregated_output":%s},"started_at_ms":%d,"completed_at_ms":%d}}`,
+		at(sec), processID, argv, code, out, tasksT0.Add(time.Duration(startedSec)*time.Second).UnixMilli(), tasksT0.Add(time.Duration(sec)*time.Second).UnixMilli())
+}
+
+func TestReadTasks_ItemCompletedEndsACommandRow(t *testing.T) {
+	t.Parallel()
+	got := readTasks(t,
+		execLine(1, "a", `tools.exec_command({cmd:"make"})`),
+		cellOut(2, "a", "Script running with cell ID 7"),
+		commandItem(60, 2, "111", "make", 2, "building\nboom\n"),
+		waitCall(90, "w1", 7),
+		waitOut(91, "w1", "Script completed"),
+	)
+	wantEnd(t, got[0], 60, transcript.TaskOutcomeFailure, intp(2))
+	if got[0].OutputBytes != int64(len("building\nboom\n")) || got[0].LastLine != "boom" {
+		t.Errorf("output = %d bytes, last line %q", got[0].OutputBytes, got[0].LastLine)
+	}
+}
+
+func TestReadTasks_ItemCompletedMatching(t *testing.T) {
+	t.Parallel()
+	t.Run("process id beats command text", func(t *testing.T) {
+		t.Parallel()
+		got := readTasks(t,
+			execLine(1, "a", `tools.exec_command({cmd:"srv"})`),
+			cellOut(2, "a", "Script completed", `{"session_id":42}`),
+			execLine(3, "b", `tools.exec_command({cmd:"srv"})`),
+			commandItem(10, 2, "42", "srv", 0, "ok\n"),
+		)
+		wantEnd(t, got[0], 10, transcript.TaskOutcomeSuccess, intp(0))
+		if got[1].End != nil {
+			t.Errorf("second row ended: %+v", got[1].End)
+		}
+	})
+	t.Run("latest open row starting by the item start wins", func(t *testing.T) {
+		t.Parallel()
+		got := readTasks(t,
+			execLine(1, "a", `tools.exec_command({cmd:"go test"})`),
+			execLine(5, "b", `tools.exec_command({cmd:"go test"})`),
+			execLine(30, "c", `tools.exec_command({cmd:"go test"})`),
+			commandItem(40, 5, "9", "go test", 0, ""),
+		)
+		if got[0].End != nil || got[2].End != nil {
+			t.Errorf("wrong rows ended: %+v / %+v", got[0].End, got[2].End)
+		}
+		wantEnd(t, got[1], 40, transcript.TaskOutcomeSuccess, intp(0))
+	})
+	t.Run("ended rows, other commands and multi-command scripts are not matched", func(t *testing.T) {
+		t.Parallel()
+		got := readTasks(t,
+			execLine(1, "a", `tools.exec_command({cmd:"one"})`),
+			cellOut(2, "a", "Script completed"),
+			execLine(3, "b", `tools.exec_command({cmd:"two"}); tools.exec_command({cmd:"three"})`),
+			commandItem(10, 3, "1", "one", 7, ""),
+			commandItem(11, 3, "2", "two", 7, ""),
+			commandItem(12, 3, "3", "nothing", 7, ""),
+		)
+		wantEnd(t, got[0], 2, "", nil)
+		if got[1].End != nil {
+			t.Errorf("multi-command row ended: %+v", got[1].End)
+		}
+	})
+}
+
+func subagentLines() []string {
+	spawn := fmt.Sprintf(`{"timestamp":%q,"type":"response_item","payload":{"type":"function_call","name":"spawn_agent","call_id":"sp1","arguments":"{\"task_name\":\"review\",\"message\":\"enc\"}"}}`, at(1))
+	return []string{spawn, waitOut(2, "sp1", `{"task_name":"/root/review"}`)}
+}
+
+func subActivity(sec int, kind, id, thread string) string {
+	return fmt.Sprintf(`{"timestamp":%q,"type":"event_msg","payload":{"type":"item_completed","item":{"type":"SubAgentActivity","kind":%q,"id":%q,"agent_thread_id":%q,"agent_path":"/root/review","model":"gpt-x"}}}`, at(sec), kind, id, thread)
+}
+
+func agentWaitCall(sec int, id, name string) string {
+	return fmt.Sprintf(`{"timestamp":%q,"type":"response_item","payload":{"type":"function_call","name":%q,"call_id":%q,"arguments":"{}"}}`, at(sec), name, id)
+}
+
+func TestReadTasks_SubagentRows(t *testing.T) {
+	t.Parallel()
+	started := subActivity(3, "started", "sp1", "th1")
+	t.Run("label, thread and model; the call output ends nothing", func(t *testing.T) {
+		t.Parallel()
+		got := readTasks(t, append(subagentLines(), started)...)
+		r := got[0]
+		if len(got) != 1 || r.Kind != transcript.TaskKindSubagent || r.Label != "review" || r.ID != "th1" || r.Model != "gpt-x" || r.End != nil || !r.StartedAt.Equal(tasksT0.Add(time.Second)) {
+			t.Errorf("got %+v", got)
+		}
+	})
+	t.Run("without a started event only label and time", func(t *testing.T) {
+		t.Parallel()
+		got := readTasks(t, subagentLines()...)
+		if got[0].ID != "" || got[0].Model != "" || got[0].Label != "review" {
+			t.Errorf("got %+v", got[0])
+		}
+	})
+	t.Run("completed event ends it", func(t *testing.T) {
+		t.Parallel()
+		got := readTasks(t, append(subagentLines(), started, subActivity(50, "completed", "subagent-completed-x", "th1"))...)
+		wantEnd(t, got[0], 50, "", nil)
+	})
+	t.Run("wait_agent naming it completed ends it, a plain wait does not", func(t *testing.T) {
+		t.Parallel()
+		got := readTasks(t, append(subagentLines(), started,
+			agentWaitCall(10, "w1", "wait_agent"), waitOut(11, "w1", `{"message":"Wait completed.","timed_out":false}`),
+			agentWaitCall(20, "w2", "wait_agent"), waitOut(21, "w2", `{"status":{"th1":{"completed":"done"}}}`),
+			subActivity(50, "completed", "subagent-completed-x", "th1"),
+		)...)
+		wantEnd(t, got[0], 21, "", nil)
+		plain := readTasks(t, append(subagentLines(), started,
+			agentWaitCall(10, "w1", "wait_agent"), waitOut(11, "w1", `{"message":"Wait completed.","timed_out":false}`))...)
+		if plain[0].End != nil {
+			t.Errorf("plain wait ended it: %+v", plain[0].End)
+		}
+	})
+	t.Run("list_agents names it by path", func(t *testing.T) {
+		t.Parallel()
+		got := readTasks(t, append(subagentLines(), started,
+			agentWaitCall(10, "l1", "list_agents"),
+			waitOut(12, "l1", `{"agents":[{"agent_name":"/root/review","agent_status":{"completed":"x"}}]}`))...)
+		wantEnd(t, got[0], 12, "", nil)
+	})
+}
+
 func TestReadTasks_MissingFile(t *testing.T) {
 	t.Parallel()
 	got, err := ReadTasks(filepath.Join(t.TempDir(), "none.jsonl"))

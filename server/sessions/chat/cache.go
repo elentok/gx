@@ -94,14 +94,11 @@ func Loader(kind agentrunner.Kind, ref FlowRef, sessionDir string, final bool) f
 		// Codex has no background markers: its Background flag comes from the status.
 		if kind == harness.Codex {
 			execShape := hasExecShape(read.CodexVersion)
-			if snap.InFlight, err = codexsession.ReadInFlightTools(path, execShape); err != nil {
+			rollout, err := codexsession.ReadRollout(path, execShape)
+			if err != nil {
 				return Snapshot{}, err
 			}
-			if execShape {
-				if snap.Records, err = codexsession.ReadTasks(path); err != nil {
-					return Snapshot{}, err
-				}
-			}
+			snap.InFlight, snap.Records = rollout.InFlight, rollout.Records
 			return snap, nil
 		}
 		// A zero now keeps every unresolved marker fresh; the cache serves the
