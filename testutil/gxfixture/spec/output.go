@@ -76,6 +76,8 @@ type Output struct {
 	// Worktree is the directory the fixture was started from, so an agent can tell
 	// its own fixture from a sibling worktree's.
 	Worktree string `json:"worktree,omitempty"`
+	// Repo is the demo repo (`<root>/repo`); Worktree is the checkout, not this.
+	Repo string `json:"repo,omitempty"`
 	// OutsideTreePID is the root of the process tree an OutsideTree scenario
 	// started outside gx; empty elsewhere.
 	OutsideTreePID int `json:"outside_tree_pid,omitempty"`
@@ -148,6 +150,9 @@ func (o Output) ShellEnv() string {
 	}
 	if o.Worktree != "" {
 		export("GXF_WORKTREE", o.Worktree)
+	}
+	if o.Repo != "" {
+		export("GXF_REPO", o.Repo)
 	}
 	if o.FeatureWorktree != "" {
 		export("GXF_FEATURE_WORKTREE", o.FeatureWorktree)

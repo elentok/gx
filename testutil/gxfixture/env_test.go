@@ -173,6 +173,13 @@ func TestShellEnv_ExportsWorktreeWhenSet(t *testing.T) {
 	}
 }
 
+func TestShellEnv_ExportsRepoWhenSet(t *testing.T) {
+	got := spec.Output{Repo: "/r/repo"}.ShellEnv()
+	if want := "export GXF_REPO='/r/repo'\n"; !strings.Contains(got, want) {
+		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
+	}
+}
+
 func TestShellEnv_ExportsBrowserSessionWhenSet(t *testing.T) {
 	got := spec.Output{BrowserSession: "wt-1"}.ShellEnv()
 	if want := "export GXF_BROWSER_SESSION='wt-1'\n"; !strings.Contains(got, want) {

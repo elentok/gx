@@ -36,6 +36,9 @@ One command builds and starts the scenario, from the repo root. The `gx` binary 
 go run ./testutil/gxfixture [--hold] <scenario>
 ```
 
+`make web-build` must finish before any Go test or `go run ./testutil/gxfixture` starts. Never
+run it in parallel with `gx brief go-test`: a racing build makes every package fail to build.
+
 - Do not run `go build` by hand. The fixture builds `gx` with `-tags gxfixture` (the `agents`
   scenario needs it for `fakecodex`) and `fakeclaude` into its own temp dir, so sibling worktree
   sessions never overwrite each other's binaries or kill each other's fixtures.
@@ -81,7 +84,8 @@ The JSON line has these fields:
   `open` fails to launch, see "Open parameters" in gx-playwright-cli (`--browser=chromium`).
 - `worktree`: the directory the fixture was started from. To tell your fixture from a sibling
   worktree's, compare it with your own `pwd`; never kill one that names another worktree. `--env`
-  exports it as `GXF_WORKTREE`.
+  exports it as `GXF_WORKTREE`. It is the checkout, not the demo repo.
+- `repo`: the fixture's demo repo (`<root>/repo`). `--env` exports it as `GXF_REPO`.
 - `log_file`: the server's combined stdout and stderr. A failed cleanup command shows up there as
   `disk cleanup command failed`, with the command's exit code and output tail. Read it when the UI
   shows a failure you cannot explain. `--env` exports it as `GXF_LOG_FILE`.

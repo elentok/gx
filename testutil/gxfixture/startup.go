@@ -267,6 +267,7 @@ func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts m
 		}
 	}
 	res.HostFiles = f.hostFiles
+	res.Repo = filepath.Join(f.root, "repo")
 	if cwd, err := os.Getwd(); err == nil {
 		res.BrowserSession = filepath.Base(cwd)
 		res.Worktree = cwd
