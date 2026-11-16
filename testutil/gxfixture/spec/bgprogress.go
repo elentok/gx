@@ -2,6 +2,7 @@ package spec
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/elentok/gx/testutil/agentfake"
@@ -9,7 +10,7 @@ import (
 )
 
 // BgProgressShapes are the --shape names of the bg-progress scenario; the first
-// is the default. The ones in bgBuilders are built; the rest are not yet.
+// is the default.
 var BgProgressShapes = []string{
 	"claude", "codex", "old-codex", "single-task", "exited", "no-end",
 	"subagent-with-inner-task", "many", "timed-out-shell", "growing-output",
@@ -45,29 +46,95 @@ var bgBuilders = map[string]struct {
 	"growing-output":           {1, bgGrowing},
 }
 
-// BgProgressScenario is the bg-progress scenario in the given shape: one
-// Working Claude Design session of design-epic whose transcript and task files
-// hold the shape's tasks. False when the shape is not built yet.
+// BgProgressScenario is the bg-progress scenario in the given shape: Claude and
+// Codex sessions whose transcripts and task files hold the shape's tasks. The
+// single-session shapes are one Working Claude Design session of design-epic.
+// False for a name that is not a shape.
 func BgProgressScenario(shape string) (Scenario, bool) {
-	b, ok := bgBuilders[shape]
-	if !ok {
+	const mapAddr = project + ":design-epic"
+	var sessions []SessionSpec
+	if b, ok := bgBuilders[shape]; ok {
+		sessions = []SessionSpec{bgClaudeSession(mapAddr, shape, agentfake.ChatSlowMarker+" background tasks", b.tasks, bgSeed(b.build, nil))}
+	} else if m, ok := bgMulti[shape]; ok {
+		sessions = m(mapAddr)
+	} else {
 		return Scenario{}, false
 	}
-	const mapAddr = project + ":design-epic"
 	return Scenario{
 		Epics:       []Epic{{Project: project, Name: "design-epic"}},
 		DesignSteps: map[string]string{mapAddr: string(tickets.StepResolveTickets)},
 		Chat:        true,
-		Sessions: []SessionSpec{{
-			Project: project, Prompt: agentfake.ChatSlowMarker + " background tasks", Link: mapAddr, Key: shape,
-			BgTasks: b.tasks,
-			BgSeed: func(now time.Time, p BgPaths) BgSeed {
-				l := newBgLines(now, p)
-				b.build(l)
-				return l.seed()
-			},
-		}},
+		Codex:       slices.ContainsFunc(sessions, func(s SessionSpec) bool { return s.Harness == "codex" }),
+		Sessions:    sessions,
 	}, true
+}
+
+// bgSeed is a session's BgSeed func for a builder; adjust sets the seed's own fields.
+func bgSeed(build func(b *bgLines), adjust func(*BgSeed)) func(time.Time, BgPaths) BgSeed {
+	return func(now time.Time, p BgPaths) BgSeed {
+		l := newBgLines(now, p)
+		build(l)
+		seed := l.seed()
+		if adjust != nil {
+			adjust(&seed)
+		}
+		return seed
+	}
+}
+
+func bgClaudeSession(mapAddr, key, prompt string, tasks int, seed func(time.Time, BgPaths) BgSeed) SessionSpec {
+	return SessionSpec{Project: project, Prompt: prompt, Link: mapAddr, Key: key, BgTasks: tasks, BgSeed: seed}
+}
+
+// bgCodexSession is a Codex session; a version rewrites the rollout's cli_version.
+func bgCodexSession(key string, tasks int, build func(b *bgLines), adjust func(*BgSeed)) SessionSpec {
+	return SessionSpec{
+		Project: project, Harness: "codex", Prompt: "background tasks", Key: key, BgTasks: tasks,
+		BgSeed: bgSeed(build, adjust),
+	}
+}
+
+// Keys of the sessions the multi-session shapes seed, in Output.Transcripts.
+const (
+	BgKeyExitedClaude = "exited-claude"
+	BgKeyExitedCodex  = "exited-codex"
+	BgKeyNoEndClaude  = "no-end-claude"
+	BgKeyNoEndCodex   = "no-end-codex"
+)
+
+// Codex versions the shapes rewrite a rollout to: the first predates
+// item_completed lines, the second predates the exec cell shape.
+const (
+	bgCodexCellVersion = "0.145.0"
+	bgCodexOldVersion  = "0.143.0"
+)
+
+func bgVersion(v string) func(*BgSeed) { return func(s *BgSeed) { s.Version = v } }
+
+// bgMulti maps a shape of a Codex session, or of more than one, to its sessions.
+var bgMulti = map[string]func(mapAddr string) []SessionSpec{
+	"codex": func(string) []SessionSpec {
+		return []SessionSpec{
+			bgCodexSession("codex-items", 3, bgCodex(true, "00000000-0000-4000-8000-0000000000c2"), nil),
+			bgCodexSession("codex-cells", 3, bgCodex(false, "00000000-0000-4000-8000-0000000000c3"), bgVersion(bgCodexCellVersion)),
+		}
+	},
+	"old-codex": func(string) []SessionSpec {
+		return []SessionSpec{bgCodexSession("old-codex", 0, bgOldCodex, func(s *BgSeed) { s.Version, s.Working = bgCodexOldVersion, true })}
+	},
+	"exited": func(mapAddr string) []SessionSpec {
+		claude := bgClaudeSession(mapAddr, BgKeyExitedClaude, "background tasks", 0, bgSeed(bgExitedClaude, nil))
+		claude.Crash = true
+		codex := bgCodexSession(BgKeyExitedCodex, 0, bgExitedCodex, nil)
+		codex.Crash = true
+		return []SessionSpec{claude, codex}
+	},
+	// The Claude session is the second one so the Monitor's 20 s are not spent
+	// seeding the Codex session.
+	"no-end": func(mapAddr string) []SessionSpec {
+		claude := bgClaudeSession(mapAddr, BgKeyNoEndClaude, "background tasks", 5, bgSeed(bgNoEndClaude, func(s *BgSeed) { s.Age = BgNoEndAge }))
+		return []SessionSpec{bgCodexSession(BgKeyNoEndCodex, 1, bgNoEndCodex, nil), claude}
+	},
 }
 
 const (

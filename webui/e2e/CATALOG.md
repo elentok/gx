@@ -95,9 +95,20 @@ command. `subagent-with-inner-task` is one running subagent whose own file launc
 subagent's final notification to `transcripts["subagent-with-inner-task"]` to end it. `many` is 50 tasks: the anchor subagent, 29
 running and 20 finished shells with about 2 KB of output each. `timed-out-shell` is one running call whose `tool_use` was 9 min ago
 and whose moved-to-background result was 2 min ago. `growing-output` is one running shell whose output file has three lines; append
-lines to `taskFiles["growing-output"]`, then `\n[exited with code 0]\n` to finish it. The shapes `codex`, `old-codex`, `exited` and
-`no-end` are named but not built yet (the fixture refuses them). The session's creation is set an hour back so no seeded task
-reads as one of an earlier run. Data: `testutil/gxfixture/spec/bgprogress.go` and `bglines.go`; the seeder is `bgprogress.go`.
+lines to `taskFiles["growing-output"]`, then `\n[exited with code 0]\n` to finish it. `codex` is two Codex sessions (the
+fixture puts the fake codex on PATH), each 3 tasks, 1 done: a done `make build`, a yielded `make test-long` an open `wait` polls
+and a subagent "review" whose child rollout gives its model and 3210 tokens; the first session is Codex 0.166.0 (the done command
+ends by its `item_completed` line: exit 0, with output), the second is rewritten to 0.145.0 (the command ends by its `Script
+completed` output: no exit code). `old-codex` is one Codex session rewritten to 0.143.0 with an open `exec_command` call: no tasks,
+and the Working row labels `make old`. `exited` is a Claude session (a running shell, Monitor and subagent) and a Codex session (a
+yielded cell that never ended), both Exited: no open group; `transcripts["exited-claude"]` and `transcripts["exited-codex"]` are
+their files, and after `gx agents resume <id>` a launch appended to one runs while the old tasks stay finished. `no-end` is a Codex
+session with a yielded cell and a Claude session whose group holds: a 3 h old shell (past the 2 h age-out: finished, no outcome, no
+duration), a running shell 90 min old that keeps the group open, a `make verify` call with no result (finished at its turn end),
+a shell whose output ends `[exited with code 3]` (finished, exit 3, at the file's mtime) and a Monitor launched 5 s ago with a 20 s
+timeout and one event, which turns finished with no outcome once the timeout passes. The Claude session is created a few hours back
+(the other sessions an hour) so no seeded task reads as one of an earlier run. Data: `testutil/gxfixture/spec/bgprogress.go`,
+`bgcodex.go` and `bglines.go`; the seeder is `bgprogress.go`.
 The `dev-mode` scenario runs a Dev checkout (`server.web.dev-dir`, with `webui/package.json`) against the fake `pnpm`
 (`testutil/vitefake`), first on the server's PATH, in the state its shape names (`start("dev-mode", { shape })`; default `running`).
 The snapshot Dev block (`GET /v1/snapshot`) shows: `off` (key off, valid checkout), `installing` (key on, stale `node_modules`, install

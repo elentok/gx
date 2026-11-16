@@ -270,25 +270,16 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 // recordTranscript notes the Claude session's transcript path under its Key, and
 // removes the file for a NoTranscript session.
 func (f sessionSeeder) recordTranscript(id string, s sessionSpec) error {
-	raw, err := f.cli("agents", "chat", id, "--json")
-	if err != nil {
-		return fmt.Errorf("chat %s: %w\n%s", id, err, raw)
+	var path string
+	var err error
+	if s.Harness == "codex" {
+		path, err = f.chatFilePath(id, s.Harness)
+	} else {
+		path, err = f.claudeTranscriptPath(id)
 	}
-	var chat wire.SessionChatResponse
-	if err := json.Unmarshal(raw, &chat); err != nil || chat.ConversationID == "" {
-		return fmt.Errorf("session %s has no conversation id in %s", id, raw)
-	}
-	var si wire.SessionInfo
-	list, err := apiclient.New(server.SocketPath(f.stateD)).Sessions.List(context.Background())
 	if err != nil {
 		return err
 	}
-	i := slices.IndexFunc(list, func(x wire.SessionInfo) bool { return x.ID == id })
-	if i < 0 {
-		return fmt.Errorf("session %s is not listed", id)
-	}
-	si = list[i]
-	path := transcript.PathIn(filepath.Join(f.root, "home"), si.Dir, chat.ConversationID)
 	if s.Key != "" {
 		if f.keyedTranscripts == nil {
 			f.keyedTranscripts = map[string]string{}
@@ -301,6 +292,26 @@ func (f sessionSeeder) recordTranscript(id string, s sessionSpec) error {
 		}
 	}
 	return nil
+}
+
+func (f sessionSeeder) claudeTranscriptPath(id string) (string, error) {
+	raw, err := f.cli("agents", "chat", id, "--json")
+	if err != nil {
+		return "", fmt.Errorf("chat %s: %w\n%s", id, err, raw)
+	}
+	var chat wire.SessionChatResponse
+	if err := json.Unmarshal(raw, &chat); err != nil || chat.ConversationID == "" {
+		return "", fmt.Errorf("session %s has no conversation id in %s", id, raw)
+	}
+	list, err := apiclient.New(server.SocketPath(f.stateD)).Sessions.List(context.Background())
+	if err != nil {
+		return "", err
+	}
+	i := slices.IndexFunc(list, func(x wire.SessionInfo) bool { return x.ID == id })
+	if i < 0 {
+		return "", fmt.Errorf("session %s is not listed", id)
+	}
+	return transcript.PathIn(filepath.Join(f.root, "home"), list[i].Dir, chat.ConversationID), nil
 }
 
 // controlSender sends a control to the fake of the session just created. The

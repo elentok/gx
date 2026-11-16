@@ -9,8 +9,9 @@ import (
 )
 
 // BgPaths are the folders a bg-progress seed writes into: the tasks folder
-// holds shell output files and subagent symlinks, Subagents the subagent files.
-type BgPaths struct{ Tasks, Subagents string }
+// holds shell output files and subagent symlinks, Subagents the subagent files,
+// Rollouts the Codex home's sessions folder (child rollouts go there).
+type BgPaths struct{ Tasks, Subagents, Rollouts string }
 
 // BgFile is one file the seeder writes. A Link makes Path a symlink to Link.
 // Key records Path in Output.TaskFiles under that name.
@@ -24,6 +25,14 @@ type BgFile struct {
 type BgSeed struct {
 	Lines []string
 	Files []BgFile
+	// Version, when set, is written as the Codex rollout's cli_version.
+	Version string
+	// Age is how long before the seed the session was created; zero is the
+	// seeder's default. A task that starts before the run began reads as one of
+	// an earlier run, so a seed with old tasks asks for a longer age.
+	Age time.Duration
+	// Working makes the seeder also wait for the chat read's Working row.
+	Working bool
 }
 
 type bgEntry struct {
