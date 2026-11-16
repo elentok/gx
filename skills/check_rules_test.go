@@ -107,7 +107,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"evolve", "gx-evolve/SKILL.md", []string{
 			"### Check rows", "### Launch rows", "`slower:`", "`flake:`", "](../gx-follow-up/SKILL.md)", "Category `bug`", "Category `idea`",
 		}},
-		{"index", "../.ai/index.md", []string{"Verify with `gx check` in the foreground, unpiped"}},
+		{"index", "../.ai/index.md", []string{"Verify with `gx check` in the foreground, unpiped", "## Shell is zsh", "${=var}"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) { checkAnchors(t, c.path, c.wants...) })

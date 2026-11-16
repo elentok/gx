@@ -11,6 +11,12 @@ gets edited blind. Read a whole file only when it is under 150 lines. Otherwise 
 then `Read` with `offset` and `limit` around the match. Use line numbers or symbols the ticket
 already names.
 
+## Shell is zsh
+
+An unquoted `$var` is not split into words in zsh, so `for p in "35 29"; do set -- $p` and
+`P="playwright-cli -s=x"; $P open` fail. Use an array: `args=(a b); cmd "${args[@]}"`. Or split
+on purpose with `${=var}`.
+
 ## Agent skills
 
 ### Issue tracker
