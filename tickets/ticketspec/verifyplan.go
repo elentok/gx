@@ -133,7 +133,7 @@ func PackVerifyPlan(plan VerifyPlan) []VerifyEntry {
 		out = append(out, e)
 	}
 	if len(out) > 1 {
-		collect := VerifyEntry{Slug: "verify-collect", Type: "verify", ExpectedContextWindow: VerifyCollectTokens}
+		collect := VerifyEntry{Slug: "verify-collect", Type: "verify", ExpectedContextWindow: collectTokens(len(out))}
 		for _, e := range out {
 			collect.BlockedBy = append(collect.BlockedBy, e.Slug)
 		}
@@ -162,6 +162,14 @@ func groupUnits(stories []PlanStory) [][]PlanStory {
 	return units
 }
 
+// formatK prints tokens in thousands, keeping one decimal only when needed.
+func formatK(n int) string {
+	if n%1000 == 0 {
+		return fmt.Sprintf("%dK", n/1000)
+	}
+	return fmt.Sprintf("%.1fK", float64(n)/1000)
+}
+
 // WriteEstimateTable prints every estimate verify-plan uses.
 func WriteEstimateTable(w io.Writer) {
 	rows := []struct {
@@ -174,10 +182,12 @@ func WriteEstimateTable(w io.Writer) {
 		{"skill quote", SkillQuoteTokens},
 		{"mock state", MockStateTokens},
 		{"part base", VerifyPartBaseTokens},
-		{"collect estimate", VerifyCollectTokens},
 		{"split limit", SplitLimitTokens},
 	}
 	for _, r := range rows {
 		fmt.Fprintf(w, "%-18s %dK\n", r.name, r.tokens/1000)
+		if r.name == "part base" {
+			fmt.Fprintf(w, "%-18s %s + %s/part\n", "collect estimate", formatK(VerifyCollectBaseTokens), formatK(VerifyCollectPartTokens))
+		}
 	}
 }

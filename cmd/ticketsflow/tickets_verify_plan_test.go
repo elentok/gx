@@ -50,7 +50,7 @@ func TestVerifyPlan_TablePrintsEstimates(t *testing.T) {
 		t.Fatalf("--table: %v", err)
 	}
 	wantLines(t, out, "web flow", "6K", "CLI check", "3K", "Go test run", "4K", "skill quote", "2K",
-		"mock state", "14K", "part base", "15K", "collect estimate", "30K", "split limit", "60K")
+		"mock state", "14K", "part base", "15K", "collect estimate", "20K + 3.5K/part", "split limit", "60K")
 }
 
 func TestVerifyPlan_PrintsEntries(t *testing.T) {
@@ -58,7 +58,7 @@ func TestVerifyPlan_PrintsEntries(t *testing.T) {
 	if err := execute(t, []string{"tickets", "verify-plan", "mine:demo-impl", "--plan", plan}, d); err != nil {
 		t.Fatalf("verify-plan: %v", err)
 	}
-	wantLines(t, publishOut(d), "verify-part-1: window=63K", "over budget", "verify-part-2:", "verify-collect: window=30K blocked_by=verify-part-1,verify-part-2")
+	wantLines(t, publishOut(d), "verify-part-1: window=63K", "over budget", "verify-part-2:", "verify-collect: window=27K blocked_by=verify-part-1,verify-part-2")
 }
 
 func TestVerifyPlan_BadPlanFails(t *testing.T) {

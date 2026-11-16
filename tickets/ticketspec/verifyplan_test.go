@@ -41,12 +41,29 @@ func TestVerifyPlan_PackOverLimitGivesPartsAndCollect(t *testing.T) {
 		t.Fatalf("slugs = %v", got)
 	}
 	c := es[2]
-	if !slices.Equal(c.BlockedBy, []string{"verify-part-1", "verify-part-2"}) || c.ExpectedContextWindow != VerifyCollectTokens {
-		t.Errorf("collect = %+v", c)
+	if !slices.Equal(c.BlockedBy, []string{"verify-part-1", "verify-part-2"}) || c.ExpectedContextWindow != 27_000 {
+		t.Errorf("collect = %+v, want window 27000", c)
 	}
 	for _, p := range es[:2] {
 		if len(p.BlockedBy) != 0 || p.ExpectedContextWindow == 0 {
 			t.Errorf("part = %+v", p)
+		}
+	}
+}
+
+func TestVerifyPlan_CollectWindowScalesWithParts(t *testing.T) {
+	t.Parallel()
+	for parts, want := range map[int]int{2: 27_000, 3: 30_500, 4: 34_000} {
+		var stories []PlanStory
+		for i := 1; i <= parts; i++ {
+			stories = append(stories, story(i, "", 8))
+		}
+		es := PackVerifyPlan(VerifyPlan{Stories: stories})
+		if len(es) != parts+1 {
+			t.Fatalf("%d stories: %d entries, want %d", parts, len(es), parts+1)
+		}
+		if got := es[parts].ExpectedContextWindow; got != want {
+			t.Errorf("%d parts: collect window = %d, want %d", parts, got, want)
 		}
 	}
 }

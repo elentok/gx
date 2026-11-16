@@ -16,8 +16,15 @@ const (
 	SkillQuoteTokens     = 2_000
 	MockStateTokens      = 14_000 // includes seeding, fixture start and web-build for the state
 	VerifyPartBaseTokens = 15_000 // fixture start and the ticket read
-	VerifyCollectTokens  = 30_000
+
+	// The collect ticket reads every part's report: a base plus a cost per part.
+	VerifyCollectBaseTokens = 20_000
+	VerifyCollectPartTokens = 3_500
 )
+
+func collectTokens(parts int) int {
+	return VerifyCollectBaseTokens + parts*VerifyCollectPartTokens
+}
 
 // FallbackPrefixTokens stands in for a ticket's prefix when none was stamped.
 const FallbackPrefixTokens = 48_000
