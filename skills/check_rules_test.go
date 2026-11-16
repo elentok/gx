@@ -63,6 +63,9 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"verify-epic", "gx-verify-epic/SKILL.md", []string{
 			"gx check --full", "](../gx-failing-tests.md)", "git merge-base main HEAD", "pre-existing, <follow-up addr>",
 		}},
+		{"verify-epic look fix mock check", "gx-verify-epic/SKILL.md", []string{
+			"look or layout", "`## Mock check` section", "mock path plus the width",
+		}},
 		{"verify-epic verified", "gx-verify-epic/SKILL.md", []string{
 			"### Verified section", "`## Verified`", "`- <story> — <verdict> @ <commit>`", "equals the current HEAD",
 		}},

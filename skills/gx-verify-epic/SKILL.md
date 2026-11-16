@@ -264,6 +264,10 @@ gets a row too, labelled `Mock <state> <width>`. Columns:
 - A finding outside the epic's scope goes to gx-follow-up ([gx-follow-up](../gx-follow-up/SKILL.md),
   unattended), not to a fix ticket. Judge it against the `## Out of Scope` section in your own
   ticket: a finding that section covers is out of scope. The table names each follow-up.
+- A fix ticket for a finding about look or layout (a difference from the mock) must carry a
+  `## Mock check` section: the mock path plus the width to check, in the format of `## Mock check`
+  in [gx-to-tickets](../gx-to-tickets/SKILL.md) (Mock file, States at width, Parts, Fixture
+  scenario). Without it the implementing agent never opens the mock or a browser.
 
 **Next round.** Open `Round: N+1` when there are fix tickets, or when the inline fix's rerun failed
 or touched code of other passed stories. Only a fix round raises N.

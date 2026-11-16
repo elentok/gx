@@ -521,7 +521,7 @@ For a ticket that changes gx CLI code, write its Run lines as `go run . <cmd>`: 
 - Fixture scenario: `<gxfixture scenario>`
 
 (Only on an implement ticket that builds part of a stored mock. A UI ticket that builds no mock
-part has no `## Mock check`.)
+part has no `## Mock check`. A fix ticket for a look or layout finding also gets this section.)
 
 ## Acceptance criteria
 
