@@ -292,6 +292,7 @@ test.describe("3. Pause reasons and recovery", () => {
     await expect(page.getByText(/does not know the skill \/gx-implement/).first()).toBeVisible()
     await expect(page.getByText(/even after gx refreshed the skill install/).first()).toBeVisible()
     await expect(page.getByText(/gx skills install/).first()).toBeVisible()
+    await expect(recovery(page).getByRole("button")).toHaveText([/^Retry$/, /^Start over$/])
 
     await fixture.learnSkill()
     await recovery(page).getByRole("button", nav("Retry")).click()
