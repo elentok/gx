@@ -124,9 +124,9 @@ func TestClaudeDialogCard(t *testing.T) {
 	}
 	other := wire.QuestionCardOption{ID: "other", Label: "Other", Text: true}
 	want := []wire.QuestionCardQuestion{
-		{Kind: "options", Label: "Scope", Title: "Which scope?", Options: []wire.QuestionCardOption{{ID: "1", Label: "A", Description: "first"}, {ID: "2", Label: "B", Description: "second"}, other}},
-		{Kind: "multi-select", Label: "Extras", Title: "Which extras?", Options: []wire.QuestionCardOption{{ID: "1", Label: "X", Description: "x desc"}, other}},
-		{Kind: "options", Label: "Ship", Title: "Ship it?", Options: []wire.QuestionCardOption{{ID: "1", Label: "Yes"}, other}},
+		{Kind: "options", Label: "1", Title: "Scope: Which scope?", Options: []wire.QuestionCardOption{{ID: "1", Label: "A", Description: "first"}, {ID: "2", Label: "B", Description: "second"}, other}},
+		{Kind: "multi-select", Label: "2", Title: "Extras: Which extras?", Options: []wire.QuestionCardOption{{ID: "1", Label: "X", Description: "x desc"}, other}},
+		{Kind: "options", Label: "3", Title: "Ship: Ship it?", Options: []wire.QuestionCardOption{{ID: "1", Label: "Yes"}, other}},
 	}
 	if !reflect.DeepEqual(got[0].Questions, want) {
 		t.Errorf("questions = %+v, want %+v", got[0].Questions, want)

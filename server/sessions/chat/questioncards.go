@@ -108,7 +108,7 @@ const CodexFreeTextID = "other"
 func CodexQuestionCard(q codexsession.OpenQuestion) []wire.QuestionCard {
 	qs := make([]wire.QuestionCardQuestion, len(q.Questions))
 	for i, it := range q.Questions {
-		cq := wire.QuestionCardQuestion{Kind: "options", Label: it.Header, Title: it.Question}
+		cq := wire.QuestionCardQuestion{Kind: "options", Label: strconv.Itoa(i + 1), Title: headed(it.Header, it.Question)}
 		for j, o := range it.Options {
 			cq.Options = append(cq.Options, wire.QuestionCardOption{ID: strconv.Itoa(j + 1), Label: o.Label, Description: o.Description})
 		}
@@ -118,13 +118,22 @@ func CodexQuestionCard(q codexsession.OpenQuestion) []wire.QuestionCard {
 	return []wire.QuestionCard{{Source: wire.CardSourceCodex, ID: q.CallID, Questions: qs}}
 }
 
+// headed prefixes a question with its short header ("Approach: Which rows?"),
+// since the card's Label is the question number and no longer carries it.
+func headed(header, question string) string {
+	if header == "" {
+		return question
+	}
+	return header + ": " + question
+}
+
 // ClaudeDialogCard is a held AskUserQuestion call as a Question card. Its id is
 // the tool_use_id; an option's id is its 1-based position, and every question
 // ends in an "Other" row the person types into.
 func ClaudeDialogCard(req wire.AskHookRequest) []wire.QuestionCard {
 	qs := make([]wire.QuestionCardQuestion, len(req.Questions))
 	for i, it := range req.Questions {
-		cq := wire.QuestionCardQuestion{Kind: "options", Label: it.Header, Title: it.Question}
+		cq := wire.QuestionCardQuestion{Kind: "options", Label: strconv.Itoa(i + 1), Title: headed(it.Header, it.Question)}
 		if it.MultiSelect {
 			cq.Kind = "multi-select"
 		}

@@ -231,7 +231,7 @@ func TestAskHook_HeldQuestionIsADialogCardAndBlocksTheSessionWhileHeld(t *testin
 	for i, want := range []struct {
 		title, label, kind string
 		options            []string
-	}{{"Which color?", "Color", "options", []string{"red", "blue", "Other"}}, {"Which sizes?", "Sizes", "multi-select", []string{"S", "M", "L", "Other"}}, {"Ship it?", "Ship", "options", []string{"yes", "no", "Other"}}} {
+	}{{"Color: Which color?", "1", "options", []string{"red", "blue", "Other"}}, {"Sizes: Which sizes?", "2", "multi-select", []string{"S", "M", "L", "Other"}}, {"Ship: Ship it?", "3", "options", []string{"yes", "no", "Other"}}} {
 		q := cards[0].Questions[i]
 		var labels []string
 		for _, o := range q.Options {
