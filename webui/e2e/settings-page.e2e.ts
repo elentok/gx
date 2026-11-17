@@ -49,15 +49,40 @@ const noSideScroll = async (page: Page) => {
 }
 
 test("200. Settings page, global journey", async ({ page, start }) => {
+  // A config that still holds the removed `agent-runner: herdr` reads as auto, with a notice under the row.
+  // This start comes first so the `reloads: 1` below still guards the reload at the end.
+  await start("herdr-config")
+  await go(page, globalHash("agents"), "Agents")
+  await expect(
+    page.getByRole("note").filter({
+      hasText: "agent-runner: herdr was removed; using auto (PTY). Edit the config to drop it.",
+    }),
+  ).toBeVisible()
+  // The runner control is a segmented group: one button per enum value, none for herdr.
+  const runner = page.getByRole("group", { name: "Agent runner", exact: true })
+  await expect(runner.getByRole("button")).toHaveText(["auto", "headless", "pty"])
+  await expect(runner.getByRole("button", { name: "auto", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  )
+
   // The reload at the end re-reads config.json through the page.
   const fixture: Fixture = await start("settings", { reloads: 1 })
   await go(page, globalHash("execution-queue"), "Execution queue")
   const before = await fixture.globalConfig()
 
-  // The sidebar lists the six global categories (Project and Checks hold project-only keys).
+  // The sidebar lists the seven global categories (Project and Checks hold project-only keys).
   const categories = page.locator('[data-mock-part="sidebar"] button[aria-expanded]')
-  await expect(categories).toHaveCount(6)
-  for (const name of ["Agents", "Ralph loop", "Notifications", "Web UI", "System", "Account"]) {
+  await expect(categories).toHaveCount(7)
+  for (const name of [
+    "Agents",
+    "Ralph loop",
+    "Notifications",
+    "Mental health",
+    "Web UI",
+    "System",
+    "Account",
+  ]) {
     await expect(categories.filter({ hasText: name })).toHaveCount(1)
   }
 

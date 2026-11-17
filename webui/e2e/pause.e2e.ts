@@ -21,7 +21,7 @@ const stuck = (page: Page) => page.getByText("Paused · Agent stuck", { exact: t
 // Resume needs ticket 08, which Start over consumes.
 test.describe("3. Pause reasons and recovery", () => {
   test("every pause reason recovers", async ({ page, start }) => {
-    test.setTimeout(120_000)
+    test.setTimeout(240_000)
     const fixture = await start("paused")
     await fixture.cli("server", "queue", "add", "demo:paused-epic")
 
@@ -113,6 +113,30 @@ test.describe("3. Pause reasons and recovery", () => {
       await page.getByRole("button", nav("Allow once")).click()
     })
     await expect(stuck(page)).toHaveCount(0)
+
+    // The snapshot carries no herdr health fields: the keys are herdr_unavailable and herdr_text.
+    // The word "herdr" itself is not asserted absent: the next scenario's pause text names it.
+    const snapshot = await page.evaluate(async () => (await fetch("/v1/snapshot")).text())
+    expect(snapshot).not.toContain('"herdr_unavailable"')
+    expect(snapshot).not.toContain('"herdr_text"')
+    await expect(page.getByText(/herdr unavailable/i)).toHaveCount(0)
+
+    // A ticket a removed herdr runner left with commits pauses as a handle mismatch; Retry resumes it on PTY.
+    const leftover = await start("herdr-leftover-work")
+    await openTicket(page, "01", "herdr-work-epic")
+    await expect(page.getByText("Session mismatch").first()).toBeVisible(gateWait)
+    await expect(page.getByText(/runner was removed/).first()).toBeVisible(gateWait)
+    await expect(recovery(page).getByRole("button")).toHaveText(
+      [/^Retry(\s*Recommended)?$/, /^Start over(\s*Recommended)?$/],
+      gateWait,
+    )
+    await recovery(page).getByRole("button", nav("Retry")).click()
+    await expect(recovery(page)).toHaveCount(0, { timeout: 30_000 })
+    await expect
+      .poll(() => leftover.cli("server", "tickets", "history", "demo:herdr-work-epic/01"), {
+        timeout: 150_000,
+      })
+      .toContain("iteration-started")
   })
 
   // Each recovery scenario is its own server and its own test, so the scenarios wait in parallel.
