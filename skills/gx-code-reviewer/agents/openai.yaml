@@ -1,0 +1,5 @@
+interface:
+  display_name: "Code Reviewer"
+  short_description: "Review changed code against project guidelines and for bugs"
+policy:
+  allow_implicit_invocation: false

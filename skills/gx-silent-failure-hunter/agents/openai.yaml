@@ -1,0 +1,5 @@
+interface:
+  display_name: "Silent Failure Hunter"
+  short_description: "Review changed error handling for silent failures"
+policy:
+  allow_implicit_invocation: false

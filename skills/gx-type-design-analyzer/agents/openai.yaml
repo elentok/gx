@@ -1,0 +1,5 @@
+interface:
+  display_name: "Type Design Analyzer"
+  short_description: "Review changed types for encapsulation and invariants"
+policy:
+  allow_implicit_invocation: false

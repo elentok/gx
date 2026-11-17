@@ -13,3 +13,6 @@ gx-prototype        mattpocock/skills  skills/engineering/prototype         LICE
 gx-wayfinder        mattpocock/skills  skills/engineering/wayfinder         LICENSE        5beb35b  merge
 gx-to-spec          mattpocock/skills  skills/engineering/to-spec           LICENSE        5beb35b  merge
 gx-thermo-nuclear-code-quality-review  cursor/plugins  cursor-team-kit/skills/thermo-nuclear-code-quality-review  cursor-team-kit/LICENSE  eb4db2b  merge
+gx-code-reviewer          anthropics/claude-plugins-official  plugins/pr-review-toolkit/agents/code-reviewer.md          plugins/pr-review-toolkit/LICENSE  fd30cee  port
+gx-silent-failure-hunter  anthropics/claude-plugins-official  plugins/pr-review-toolkit/agents/silent-failure-hunter.md  plugins/pr-review-toolkit/LICENSE  fd30cee  port
+gx-type-design-analyzer   anthropics/claude-plugins-official  plugins/pr-review-toolkit/agents/type-design-analyzer.md   plugins/pr-review-toolkit/LICENSE  fd30cee  port

@@ -1,0 +1,10 @@
+# gx-type-design-analyzer
+
+Ported from [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official),
+path `plugins/pr-review-toolkit/agents/type-design-analyzer.md`. Author: Anthropic. Licensed under
+Apache-2.0, see `LICENSE`.
+
+gx changed this skill: it is a skill, not an agent (no `model`, `color` or `tools` keys, and
+`disable-model-invocation: true`). It reads the shared review files from `gx-code-review` instead of
+running a diff, starts with a skip step, drops the numeric ratings and output template, reports only
+confirmed findings in a short list, and hands them back to the caller.
