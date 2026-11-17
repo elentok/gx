@@ -1,5 +1,7 @@
 # PTY as the default agent runner
 
+> The herdr runner described here was removed by ADR [0048](../adr/0048-herdr-is-a-multiplexer-not-an-agent-runner.md).
+
 ## Problem Statement
 
 gx hosts its Queue agents on herdr by default. `agent-runner: auto` picks herdr when herdr answers,

@@ -2,6 +2,9 @@
 
 > Amends ADR [0043](0043-auto-picks-the-pty-runner.md): its rule that a Codex ticket on a native
 > runner runs on herdr.
+>
+> Superseded by ADR [0048](0048-herdr-is-a-multiplexer-not-an-agent-runner.md): the herdr runner is
+> removed, so its clause that herdr hosts Codex goes.
 
 Codex runs on the PTY runner under `agent-runner: auto`, `pty` and `headless`. The headless runner
 hosts only Claude, so a Codex launch under `headless` runs on the PTY runner too. herdr hosts Codex

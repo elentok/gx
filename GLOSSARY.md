@@ -266,12 +266,9 @@ and ends when its last task finishes. Finished tasks stay listed in their group 
 owners. **`status`** is gx-owned and is the sole scheduling authority (the six `RenderedStatus`
 values above). **`iteration_status`** is agent-owned and reports on the current claim alone
 (`working` / `asking` / `finished`, or absent — gx clears it on every claim and reclaim, so
-a report is never readable outside the claim that produced it). Not to be confused with **herdr's
-`agent_status`** (`idle`/`done`/`blocked`, on the pane payload, `herdr/agent.go`) — the two names
-collided during design specifically because both describe "what is the agent up to," which is why
-`iteration_status` was picked instead of the more obvious `agent_status`: it names what the field
-describes (the current iteration's state) rather than who wrote it, and can't be confused with
-herdr's field in the one file that holds both. See ADR 0019.
+a report is never readable outside the claim that produced it). `iteration_status` was picked
+instead of the more obvious `agent_status` because it names what the field describes (the current
+iteration's state) rather than who wrote it. See ADR 0019.
 
 **Adopt** — the verb for gx accepting an `iteration_status` report and acting on it: seeing
 `asking` and writing `status: paused` with reason `self-reported`, or seeing `finished` and
@@ -355,14 +352,16 @@ sends it back to work, and the result of an action just taken. It can show on a 
 ## Agent Runners
 
 **Agent runner** — the thing that hosts one agent session for an iteration: it starts the agent,
-takes its prompts, and reports whether it is working, idle or blocked. herdr is one agent runner.
+takes its prompts, and reports whether it is working, idle or blocked. There are two: the headless
+runner and the PTY runner, both hosted by `gx server` itself. A person can watch an agent read-only
+and act on it with one-shot prompt, interrupt and answer verbs. A PTY Queue agent can also be
+opened: read-only first, and typing only after a confirm.
 An iteration keeps the agent runner that started it; changing the setting affects only new launches.
-_Avoid_: "runner" alone, "backend", "run".
+_Avoid_: "runner" alone, "backend", "run", "native agent runner".
 
 **Harness** — the agent program a session runs: claude or codex. Separate
 from the agent runner that hosts it: the runner decides how a session is hosted, the harness decides
-what runs inside it. claude and codex both run on the PTY runner; herdr hosts codex only under
-`agent-runner: herdr`. Say "agent harness" in full where "test harness" could be meant. _Avoid_:
+what runs inside it. claude and codex both run on the PTY runner. Say "agent harness" in full where "test harness" could be meant. _Avoid_:
 "kind", "agent kind", "provider".
 
 **Default harness** — the harness every new agent runs unless one launch names another. It has a
@@ -372,12 +371,7 @@ the harness of an earlier run of the same ticket, then the Default harness. The 
 "follows default" (nothing set it), "pinned" (frontmatter or queue item set it) or "keeps <harness>
 (ran before)". A running session keeps the harness it started with.
 
-**Native agent runner** — any agent runner that `gx server` hosts itself, with no external
-multiplexer. There are two: the headless runner and the PTY runner. A person can watch a native
-agent read-only and act on it with one-shot prompt, interrupt and answer verbs. A PTY Queue agent can also be opened: read-only first, and typing only after a confirm. _Avoid_: "herdr-free runner" (describes what it lacks, not what it is).
-
-**Session** — one agent hosted by an agent runner, identified by its label. Replaces herdr's
-tab, pane and workspace triple as what ralph-loop holds on to. _Avoid_: "pane", "tab" outside herdr.
+**Session** — one agent hosted by an agent runner, identified by its label.
 
 **Stale holder** — a leftover agent that holds a ticket's label when gx launches for that ticket:
 no live run tracks it, and it is idle or done. gx closes it and launches fresh; it never adopts it.
@@ -485,11 +479,11 @@ is the sibling of Auto-advance; on its own it starts nothing.
 **Action** — the prompts an agent attaches to an Actionable it raised, which gx can send into the
 session on the person's request (e.g. clear, then run the next design step).
 
-**Headless runner** — the native agent runner that drives claude through its non-interactive,
+**Headless runner** — the agent runner that drives claude through its non-interactive,
 structured-event mode. It hosts Claude only: a Codex launch under `agent-runner: headless` runs on
 the PTY runner. Never picked automatically; a person sets `agent-runner: headless` by hand.
 
-**PTY runner** — the native agent runner that drives interactive claude or codex on a terminal gx
+**PTY runner** — the agent runner that drives interactive claude or codex on a terminal gx
 owns. The default: `agent-runner: auto` picks it whenever the Default harness is on PATH. Queue
 agents, Design agents and the Fix agent run on it (ADR 0044).
 
@@ -581,13 +575,12 @@ It holds no scheduler state of its own and never starts agents. _Avoid_: loop re
 in-process ralph-loop it replaced).
 
 **Server indicator** — the colored icon on the right of the title row that shows the server's
-state on every view: green when up, red with `server down`, yellow with `read-only — restart` or
-`herdr unavailable`; nothing before the first probe. On narrow rows the words shorten, then drop;
+state on every view: green when up, red with `server down`, yellow with `read-only — restart`; nothing before the first probe. On narrow rows the words shorten, then drop;
 the icon never drops. When down, the Queue tab is cleared and offers to start the server; the
 Tickets tab still reads markdown.
 
 **Launch** — the server starting an iteration: claim the ticket, create the worktree, open the
-herdr tab and start the agent. _Avoid_: spawn (retired), start (ambiguous with `gx server start`).
+start the agent. _Avoid_: spawn (retired), start (ambiguous with `gx server start`).
 
 **Launch time** — how long a **Launch** took: from the claim to the launch prompt being delivered.
 Only a launch that reaches prompt delivered has one; it is written as a `launch-timed` run-log event.
@@ -598,8 +591,9 @@ prompt. The four steps add up to the **Launch time**.
 
 **Reclaim** — the server, after a restart, taking back an iteration whose pane is still live and
 owned (found by its recorded handle). A handle that no longer matches pauses the ticket
-with reason `handle-mismatch`. Replaces **Reattach** and Re-adopt; there is no prompt. A surviving herdr pane alone
-is not a reclaim — the handle must match. _Avoid_: Reattach / Reattach signal, Live (queue sense),
+with reason `handle-mismatch`. A run recorded under a runner that no longer exists is a gone agent:
+an empty claim reopens, and a claim with work pauses `handle-mismatch`. Replaces **Reattach** and
+Re-adopt; there is no prompt. _Avoid_: Reattach / Reattach signal, Live (queue sense),
 re-adopt, "has a pane".
 
 **Base** / **Target** — a ticket's **base** is the branch its work starts from; its **target** is
@@ -966,7 +960,7 @@ filetree updates under the user). The exception is a **mutation** run this way �
 which reports its outcome like every other mutation: `notify.Success("committed")` plus the
 repo-mutated signal. Errors always surface loudly.
 
-**Split launch** — the program opens in a split (tmux, kitty with remote control, herdr, or Ghostty on macOS 1.3.0+) and the TUI keeps running beside it. Here
+**Split launch** — the program opens in a split (tmux, kitty with remote control, herdr (a terminal multiplexer), or Ghostty on macOS 1.3.0+) and the TUI keeps running beside it. Here
 a toast (`"opened <app> split: …"`) _is_ shown, because it is the only signal that the program
 launched and where it went.
 
@@ -1236,9 +1230,7 @@ _Avoid_: dev directory, source dir
 ## Web workspaces
 
 **Workspace** — a named theme the person creates to group what they work on now: Designs, epics and
-chats (agents follow their epic), for example "gx bugs" or "research". An item is in exactly one workspace, and each workspace keeps its own Sort. In the web UI this
-meaning wins. herdr's workspace (a multiplexer window, see **Session**) is the other meaning, and
-herdr support is being phased out.
+chats (agents follow their epic), for example "gx bugs" or "research". An item is in exactly one workspace, and each workspace keeps its own Sort.
 _Avoid_: group, board, project (a project is a registered repo)
 
 **Manage workspaces** — the dialog, opened from the switcher, that lists workspaces in order. The

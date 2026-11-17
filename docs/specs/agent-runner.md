@@ -1,5 +1,7 @@
 # Agent runner: a herdr-free way to run ralph-loop agents
 
+> The herdr runner described here was removed by ADR [0048](../adr/0048-herdr-is-a-multiplexer-not-an-agent-runner.md).
+
 Source: wayfinder map `agent-runner` (tickets 01-09). Decision tags like `[T05]` point to the map
 ticket that settled the point. ADR: 0031 (two native agent runners).
 

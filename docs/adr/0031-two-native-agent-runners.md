@@ -2,6 +2,9 @@
 
 > Superseded in part by ADR [0043](0043-auto-picks-the-pty-runner.md): `auto` now picks the PTY
 > runner, and headless is picked only by hand.
+>
+> Superseded by ADR [0048](0048-herdr-is-a-multiplexer-not-an-agent-runner.md): the herdr runner is
+> removed.
 
 Some organizations block herdr, so `gx server` hosts claude agents itself. We build two native agent
 runners behind the same agent runner interface: the **headless runner** (`claude -p` stream-json)
