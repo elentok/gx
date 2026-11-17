@@ -27,7 +27,8 @@ var requiredFiles = []string{
 	"gx-failing-tests.md",
 	"gx-flake-tickets.md",
 	"gx-handoff.md",
-	"gx-test-guidelines.md",
+	"gx-test-guidelines/SKILL.md",
+	"gx-go-tests/SKILL.md",
 	"gx-to-tickets/SKILL.md",
 	"gx-to-tickets/LICENSE",
 	"gx-to-tickets/README.md",
@@ -265,6 +266,8 @@ func parseFrontmatter(t *testing.T, raw string) skillFrontmatter {
 var wantInvocationPolicy = map[string]bool{
 	"gx-to-tickets":                false,
 	"gx-tdd":                       false,
+	"gx-test-guidelines":           false,
+	"gx-go-tests":                  false,
 	"gx-implement":                 true,
 	"gx-resolving-merge-conflicts": false,
 	"gx-investigate":               false,

@@ -5,7 +5,7 @@ description: Rules for writing and reviewing gx's Playwright e2e flows (`webui/e
 
 # Playwright e2e rules
 
-The generic test rules are in [gx-test-guidelines.md](../gx-test-guidelines.md). This skill adds the
+The generic test rules are in [gx-test-guidelines](../gx-test-guidelines/SKILL.md). This skill adds the
 Playwright-specific ones. Flow conventions are in `webui/e2e/CATALOG.md` and `.ai/index.md`
 ("Testing"). To drive the UI by hand, use [gx-ui-check](../gx-ui-check/SKILL.md), not this skill.
 

@@ -5,16 +5,19 @@ import (
 	"testing"
 )
 
-func TestTestGuidelinesHeadings(t *testing.T) {
-	text := readFile(t, "gx-test-guidelines.md")
+// checkRuleHeadings fails when the skill has no `##` rule heading or when a
+// rule lacks a Why or Fix line.
+func checkRuleHeadings(t *testing.T, path string) {
+	t.Helper()
+	text := readFile(t, path)
 	var headings []string
 	for _, line := range strings.Split(text, "\n") {
 		if strings.HasPrefix(line, "## ") {
 			headings = append(headings, strings.TrimPrefix(line, "## "))
 		}
 	}
-	if len(headings) != 11 {
-		t.Fatalf("gx-test-guidelines.md has %d rule headings, want 11: %q", len(headings), headings)
+	if len(headings) == 0 {
+		t.Fatalf("%s has no rule headings", path)
 	}
 	for _, h := range headings {
 		section := text[strings.Index(text, "## "+h):]
@@ -23,16 +26,32 @@ func TestTestGuidelinesHeadings(t *testing.T) {
 		}
 		for _, part := range []string{"**Why:**", "**Fix:**"} {
 			if !strings.Contains(section, part) {
-				t.Errorf("rule %q lacks %s", h, part)
+				t.Errorf("%s: rule %q lacks %s", path, h, part)
 			}
 		}
 	}
 }
 
+func TestTestGuidelinesHeadings(t *testing.T) {
+	checkRuleHeadings(t, "gx-test-guidelines/SKILL.md")
+}
+
+func TestGoTestsSkill(t *testing.T) {
+	checkRuleHeadings(t, "gx-go-tests/SKILL.md")
+	checkAnchors(t, "gx-go-tests/SKILL.md",
+		"(../gx-test-guidelines/SKILL.md)",
+		"## Readiness signal",
+		"## State files",
+		"## Process limits",
+		"## Cleanups",
+		"## Wire fields",
+	)
+}
+
 func TestTestReviewSkill(t *testing.T) {
 	checkAnchors(t, "gx-test-review/SKILL.md",
 		"## 1. Skip when no test file changed",
-		"(../gx-test-guidelines.md)",
+		"(../gx-test-guidelines/SKILL.md)",
 		".ai/index.md",
 		"(../gx-code-review/SKILL.md)",
 		"consultant triage",
@@ -46,7 +65,7 @@ func TestTestReviewSkill(t *testing.T) {
 }
 
 func TestPlaywrightE2esSkillIsWired(t *testing.T) {
-	checkAnchors(t, "gx-playwright-e2es/SKILL.md", "(../gx-test-guidelines.md)", "(../gx-ui-check/SKILL.md)")
+	checkAnchors(t, "gx-playwright-e2es/SKILL.md", "(../gx-test-guidelines/SKILL.md)", "(../gx-ui-check/SKILL.md)")
 	checkAnchors(t, "gx-to-tickets/SKILL.md", "gx-playwright-e2es")
 	checkAnchors(t, "gx-test-review/SKILL.md", "(../gx-playwright-e2es/SKILL.md)")
 }
@@ -59,7 +78,7 @@ func TestGxUICheckBlocksWorkersByDefault(t *testing.T) {
 
 func TestGxImplementTestRules(t *testing.T) {
 	checkAnchors(t, "gx-implement/SKILL.md",
-		"(../gx-test-guidelines.md)",
+		"(../gx-test-guidelines/SKILL.md)",
 		"before you write the first one",
 		"Before `--iteration-status finished`, check each new or changed test",
 		"pause with `gx tickets ask`",
@@ -68,7 +87,7 @@ func TestGxImplementTestRules(t *testing.T) {
 		"changed-file `gx check`",
 		"`gx-playwright-e2es`",
 	)
-	checkAnchors(t, "../.ai/index.md", "`gx check --full`", "skills/gx-test-guidelines.md", "GOMAXPROCS", "claudeenv", "envguard")
+	checkAnchors(t, "../.ai/index.md", "`gx check --full`", "skills/gx-test-guidelines/SKILL.md", "GOMAXPROCS", "claudeenv", "envguard")
 	checkAnchors(t, "../.ai/index.md", "start it with `run_in_background` from the first call", "TaskStop")
 }
 
@@ -100,10 +119,12 @@ func TestFailingFlowReadsErrorContextFirst(t *testing.T) {
 
 func TestTestGuidelinesKeepGxOnlyRulesInIndex(t *testing.T) {
 	checkAnchors(t, "../.ai/index.md", "GOMAXPROCS", "claudeenv.In(home)", "envguard/envguard_test.go")
-	guidelines := normalizeSpace(readFile(t, "gx-test-guidelines.md"))
-	for _, bad := range []string{"GOMAXPROCS", "claudeenv", "envguard"} {
-		if strings.Contains(guidelines, bad) {
-			t.Errorf("gx-test-guidelines.md holds gx-only term %q", bad)
+	for _, path := range []string{"gx-test-guidelines/SKILL.md", "gx-go-tests/SKILL.md"} {
+		text := normalizeSpace(readFile(t, path))
+		for _, bad := range []string{"GOMAXPROCS", "claudeenv", "envguard"} {
+			if strings.Contains(text, bad) {
+				t.Errorf("%s holds gx-only term %q", path, bad)
+			}
 		}
 	}
 }

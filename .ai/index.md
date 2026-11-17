@@ -69,7 +69,7 @@ A new config key must reach the settings page or be excluded with a reason:
   (`testutil/gxfixture/tuiflows`, driven through `testutil/vtterm`). `make test` shares one CPU budget between its steps, half the cores by
   default; set `GX_TEST_CPUS=<n>` to change it. Every `gx brief go-test` run caps itself the same
   way (GOMAXPROCS at two fifths of that budget) unless the environment already sets GOMAXPROCS.
-- Test-writing rules shared with other projects are in `skills/gx-test-guidelines.md`. The rules
+- Test-writing rules shared with other projects are in `skills/gx-test-guidelines/SKILL.md`. The rules
   below are gx-only.
 - **Default to no new Playwright flow.** Cover render and component logic with vitest and server
   rules with Go tests. A flow needs a real server round trip, browser layout, or a multi-page
