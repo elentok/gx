@@ -39,7 +39,7 @@ async function openStats(
 // the Go shaping tests), 183 (tokens and spend by group, StatsPage.test.tsx). Also covers 182 phone.
 test("184. Live token ledger (and 182. Stats limit burn, phone)", async ({ page, start }) => {
   test.setTimeout(120_000)
-  const fixture = await start("limit-burn", { shape: "live" })
+  const fixture = await start("limit-burn", { shape: "live", reloads: 1 })
   const groups = { queue: "Queue", design: "Design", one_off: "One-off", other: "Other" }
   const append = async (tokens: number) => {
     for (const path of Object.values(fixture.transcripts)) {
@@ -78,7 +78,7 @@ test("184. Live token ledger (and 182. Stats limit burn, phone)", async ({ page,
     Object.values(groups).every((g) => t[g] - before[g] === 250_000),
   )
 
-  // Navigate by hash: a page reload fails the suite.
+  // Navigate by hash: the one reload this flow declares comes later, before the Web performance counts.
   await page.evaluate(() => (location.hash = "#/stats?range=30"))
   const tokens = costCard(page, /^Tokens/)
   await tokens.waitFor()
@@ -128,7 +128,14 @@ test("184. Live token ledger (and 182. Stats limit burn, phone)", async ({ page,
       by(wp.hard_loads, "inp") + by(wp.route_changes, "inp"),
     ]
   }
+  // The fixture's first load lands on "/", which redirects to /epics and uses up the hard span, so no app_ready is
+  // ever queued. Reload on the stats route (the one declared reload) to get a real hard load.
+  await page.evaluate(() => (location.hash = "#/stats?range=30"))
+  await page.reload()
+  await expect(page.getByRole("region", nav("Web performance"))).toBeVisible()
   const perfBefore = await perfCounts()
+  const perfNames = ["lcp", "fcp", "cls", "app_ready", "inp"]
+  const describeCounts = (counts: number[]) => perfNames.map((n, i) => `${n}=${counts[i]}`).join(" ")
   // An element with a gx action name gives INP a target.
   await page.locator("[data-gx-action]:visible").first().click()
   // Hide by hand: the queue flush and web-vitals both listen for visibilitychange on document.
@@ -138,8 +145,17 @@ test("184. Live token ledger (and 182. Stats limit burn, phone)", async ({ page,
     document.dispatchEvent(new Event("visibilitychange"))
   })
   await expect
-    .poll(async () => (await perfCounts()).every((n, i) => n > perfBefore[i]), { timeout: 60_000 })
-    .toBe(true)
+    .poll(
+      async () => {
+        const after = await perfCounts()
+        const flat = perfNames.filter((_, i) => after[i] <= perfBefore[i])
+        return flat.length === 0
+          ? "all rose"
+          : `flat: ${flat.join(", ")}; before: ${describeCounts(perfBefore)}; after: ${describeCounts(after)}`
+      },
+      { timeout: 60_000 },
+    )
+    .toBe("all rose")
   await page.evaluate(() => {
     Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true })
     Object.defineProperty(document, "hidden", { value: false, configurable: true })
@@ -155,9 +171,13 @@ test("184. Live token ledger (and 182. Stats limit burn, phone)", async ({ page,
 
   const dev = perf.getByRole("checkbox", { name: "Include dev" })
   await expect(dev).not.toBeChecked()
-  await dev.check()
+  // The box is driven by the URL and the router commits it after the click, so check()/uncheck() would read it
+  // while it still shows the old state. Click, then assert with a retrying expect.
+  await dev.click()
+  await expect(dev).toBeChecked()
   await expect(page).toHaveURL(/[?&]dev=1/)
-  await dev.uncheck()
+  await dev.click()
+  await expect(dev).not.toBeChecked()
   await expect(page).not.toHaveURL(/dev=1/)
 
   const card = (m: string) => perf.getByTestId(`perf-card-${m}`)

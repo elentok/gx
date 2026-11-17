@@ -4,7 +4,7 @@ Run with `make web-e2e`. Each flow starts its own fixture server (`testutil/gxfi
 `web_url` once, already signed in: the fixture finishes the web setup and `fixture.ts` adds the
 `cookie_name` cookie to the browser. The `web-setup`, `web-login` and `web-logins` scenarios start
 signed out or with extra web logins. `nextTotpCode()` returns a code for a new TOTP step, and
-`start(scenario, { config: { "server.web.totp": "false" } })` runs without TOTP. It never reloads the page. The suite fails if a page reloads. Service workers are blocked by default (a worker's answers bypass `page.route`); `epics.e2e.ts` allows them with `--ignore-certificate-errors` for the PWA steps of flow 2, because a worker does not register against the fixture's untrusted root.
+`start(scenario, { config: { "server.web.totp": "false" } })` runs without TOTP. It never reloads the page unless the flow declares it (`reloads: n`). The suite fails if a page reloads more than declared. Service workers are blocked by default (a worker's answers bypass `page.route`); `epics.e2e.ts` allows them with `--ignore-certificate-errors` for the PWA steps of flow 2, because a worker does not register against the fixture's untrusted root.
 The `limits` scenario seeds the limits state: `start("limits", { shape })` takes `fresh` (default),
 `stale`, `past-reset` or `one-window`. The `spend` scenario seeds the budget ledger
 (`start("spend", { shape })` takes `normal` (default), `short` or `empty`) and holds one fake agent
@@ -270,7 +270,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 
 ## Stats, health, disk and checks (`stats`, `health`, `disk`, `check-lock`, `checks`)
 
-- **`stats.e2e.ts`:** **184. Live token ledger (and 182. Stats limit burn, phone)** (also: web performance counts rise after a click and a hidden page, the Web performance region sits after Launch, the Include dev toggle round trip, and the Hard loads and Route changes tabs with their cards); **57. Stats, Grilling section, phone.**
+- **`stats.e2e.ts`:** **184. Live token ledger (and 182. Stats limit burn, phone)** (declares one reload, on the stats route, so the Web performance counts start from a real hard load; also: web performance counts rise after a click and a hidden page, the Web performance region sits after Launch, the Include dev toggle round trip, and the Hard loads and Route changes tabs with their cards); **57. Stats, Grilling section, phone.**
 - **`health.e2e.ts` 81. Tray popover (and 82. Tray offline).**
 - **`disk.e2e.ts`:** **76. Disk banner and Clean now (and 78. Clean now fails)**; **77. Disk hold.**
 - **`check-lock.e2e.ts`:** the waiting label and holder show, then clear.
