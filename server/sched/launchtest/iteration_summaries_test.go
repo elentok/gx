@@ -2,6 +2,7 @@ package launchtest_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,7 +50,12 @@ func TestLaunch_RelaunchPromptListsEarlierSummaries(t *testing.T) {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
 			t.Cleanup(func() { fake.Finish(rigs.ResumeLabel) })
-			servertest.WaitFor(t, 10*time.Second, "the ticket launches", func() bool { return len(fake.Prompts(rigs.ResumeLabel)) > 0 })
+			servertest.WaitState(t, 10*time.Second, "the ticket launches", func() (bool, string) {
+				logged, _, err := runlog.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+				prompts := fake.Prompts(rigs.ResumeLabel)
+				return len(prompts) > 0, fmt.Sprintf("run log (err %v): %+v\nruns: %+v\nprompts %s: %q\nserver log tail:\n%s",
+					err, logged, h.Server.Runs(), rigs.ResumeLabel, prompts, h.LogTail(30))
+			})
 			if got := fake.Prompts(rigs.ResumeLabel)[0]; strings.Contains(got, "## Iteration summaries") || strings.Contains(got, "\n") {
 				t.Errorf("typed prompt carries the note:\n%s", got)
 			}

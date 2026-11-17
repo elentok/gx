@@ -3,6 +3,7 @@ package servertest
 import (
 	"cmp"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -42,17 +43,46 @@ func WaitForHolder(t *testing.T, dir string) *holder.HolderClient {
 // the caller just waited for sends no further event.
 func WaitForSession(ctx context.Context, t *testing.T, h *Harness, evs <-chan wire.Event, id string, ok func(wire.SessionInfo) bool) wire.SessionInfo {
 	t.Helper()
+	s, failure := waitForSession(ctx, h, evs, id, ok)
+	if failure != "" {
+		t.Fatal(failure)
+	}
+	return s
+}
+
+// waitForSession is WaitForSession returning the failure text instead of
+// failing: the text names the last entry read for the session and the server
+// log tail, which is all a timeout leaves of a cause nobody has found.
+func waitForSession(ctx context.Context, h *Harness, evs <-chan wire.Event, id string, ok func(wire.SessionInfo) bool) (wire.SessionInfo, string) {
+	last := "(no entry for the session in the snapshot)"
+	giveUp := func(why string) (wire.SessionInfo, string) {
+		return wire.SessionInfo{}, fmt.Sprintf("%s\nlast session entry read: %s\nserver log tail:\n%s", why, last, h.LogTail(30))
+	}
 	for {
 		snap, err := h.Client.Snapshot(ctx)
 		if err != nil {
-			t.Fatal(err)
+			return giveUp(fmt.Sprintf("snapshot for session %q: %v", id, err))
 		}
 		for _, s := range snap.Sessions {
-			if s.ID == id && ok(s) {
-				return s
+			if s.ID != id {
+				continue
+			}
+			last = fmt.Sprintf("status=%+v actionable=%+v auto-advance=%+v", s.Status, s.Actionable, s.AutoAdvance)
+			if ok(s) {
+				return s, ""
 			}
 		}
-		WaitForEvent(ctx, t, evs, wire.EventSessionChanged, id)
+		for typed := false; !typed; {
+			select {
+			case ev, open := <-evs:
+				if !open {
+					return giveUp(fmt.Sprintf("event stream ended before %s %q", wire.EventSessionChanged, id))
+				}
+				typed = ev.Type == wire.EventSessionChanged && ev.Address == id
+			case <-ctx.Done():
+				return giveUp(fmt.Sprintf("no %s event for %q: %v", wire.EventSessionChanged, id, ctx.Err()))
+			}
+		}
 	}
 }
 

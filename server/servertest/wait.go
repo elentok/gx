@@ -2,6 +2,8 @@ package servertest
 
 import (
 	"context"
+	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -19,6 +21,28 @@ func WaitFor(t *testing.T, timeout time.Duration, what string, cond func() bool)
 	if !Poll(timeout, cond) {
 		t.Fatalf("timed out waiting for %s", what)
 	}
+}
+
+// WaitState is WaitFor for a wait whose cause of failure is unknown: state
+// returns whether the wait is over and the state it read, and the failure
+// prints the last state read, so the first sighting names what the wait saw.
+func WaitState(t testing.TB, timeout time.Duration, what string, state func() (done bool, read string)) {
+	t.Helper()
+	var last string
+	if !Poll(timeout, func() bool {
+		done, read := state()
+		last = read
+		return done
+	}) {
+		t.Fatalf("timed out waiting for %s; last state read:\n%s", what, last)
+	}
+}
+
+// LogTail is the last n lines of the server log, for failure messages.
+func (h *Harness) LogTail(n int) string {
+	data, _ := os.ReadFile(server.LogPath(h.StateDir))
+	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	return strings.Join(lines[max(0, len(lines)-n):], "\n")
 }
 
 // Poll is WaitFor without the failure: it reports whether cond held in time.

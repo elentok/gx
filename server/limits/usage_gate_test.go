@@ -2,6 +2,7 @@ package limits_test
 
 import (
 	"context"
+	"fmt"
 	"github.com/elentok/gx/server/servertest/rigs"
 	"strings"
 	"testing"
@@ -62,9 +63,11 @@ func TestUsageGate_HoldsClaudeClaimsOnly(t *testing.T) {
 				servertest.WaitFor(t, 10*time.Second, "the claude ticket claims", func() bool { return len(pty.Prompts("epic-a-iter-01")) > 0 })
 				return
 			}
-			servertest.WaitFor(t, 10*time.Second, "the claude ticket explains the gate", func() bool {
+			servertest.WaitState(t, 10*time.Second, "the claude ticket explains the gate", func() (bool, string) {
 				ex, err := h.Client.Reads.Explain(ctx, "proj:epic-a/01")
-				return err == nil && strings.Contains(ex.Verdict, c.want)
+				read := fmt.Sprintf("want verdict containing %q\nlast verdict: %q (err %v)\nusage sample: %+v\nprompts epic-a-iter-01: %q\nprompts epic-b-iter-01: %q\nruns: %+v",
+					c.want, ex.Verdict, err, c.rec, pty.Prompts("epic-a-iter-01"), pty.Prompts("epic-b-iter-01"), h.Server.Runs())
+				return err == nil && strings.Contains(ex.Verdict, c.want), read
 			})
 			if n := len(pty.Prompts("epic-a-iter-01")); n != 0 {
 				t.Errorf("claude ticket got %d prompts while gated", n)

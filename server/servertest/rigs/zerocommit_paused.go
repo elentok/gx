@@ -2,8 +2,11 @@ package rigs
 
 import (
 	"context"
+	"fmt"
 	"github.com/elentok/gx/server/servertest"
+	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -134,7 +137,9 @@ func (p ZeroCommitPaused) Adopted(t *testing.T) string {
 	return reason
 }
 
-// StaysPaused gives a scan time to act, then checks it did not.
+// StaysPaused gives a scan time to act, then checks it did not. A failure
+// prints the ticket file, the history events and the server log tail: the
+// server adopted a ticket it should not have, and nobody has found why.
 func (p ZeroCommitPaused) StaysPaused(t *testing.T) {
 	t.Helper()
 	time.Sleep(200 * time.Millisecond) // negative wait: a few 50ms polls
@@ -142,18 +147,25 @@ func (p ZeroCommitPaused) StaysPaused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tk.Status == schema.StatusDone {
-		t.Errorf("status = done, want left alone")
-	}
 	hist, err := p.H.Client.Reads.History(context.Background(), "proj:epic-a/01")
 	if err != nil {
 		t.Fatal(err)
 	}
+	var problems []string
+	if tk.Status == schema.StatusDone {
+		problems = append(problems, "status = done, want left alone")
+	}
 	for _, e := range hist.Events {
 		if e.Type == string(events.LateFinishAdopted) {
-			t.Errorf("history has %s: %s", e.Type, e.Reason)
+			problems = append(problems, fmt.Sprintf("history has %s: %s", e.Type, e.Reason))
 		}
 	}
+	if len(problems) == 0 {
+		return
+	}
+	body, _ := os.ReadFile(p.TicketPath)
+	t.Errorf("%s\nticket file:\n%s\nhistory events: %+v\nserver log tail:\n%s",
+		strings.Join(problems, "; "), body, hist.Events, p.H.LogTail(30))
 }
 
 func PausedAt(p ZeroCommitPaused) string { return p.Pause.Time.UTC().Format(time.RFC3339) }
