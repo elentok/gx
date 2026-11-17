@@ -56,7 +56,17 @@ jobs:
         # give concurrency-sensitive tests (e.g. pause/resume against a permit cap)
         # more room to legitimately run long; 2m and 5m both timed out on tests
         # that pass reliably (and fast) locally.
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/xdg-data
         run: make test
+
+      - name: Upload go test JSON
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: go-test-json-${{ matrix.os }}
+          path: ${{ runner.temp }}/xdg-data/gx/brief/*-go-test.log
+          if-no-files-found: ignore
 
       - name: Build
         run: go build ./...
@@ -85,6 +95,9 @@ jobs:
           pnpm exec playwright install --with-deps chromium
 
       - name: Web e2e
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/xdg-data
+          GX_BRIEF_KEEP_REPORT: "1"
         run: make web-e2e
 
       - name: Upload traces
@@ -93,4 +106,12 @@ jobs:
         with:
           name: web-e2e-traces
           path: webui/test-results
+          if-no-files-found: ignore
+
+      - name: Upload Playwright JSON report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-json
+          path: ${{ runner.temp }}/xdg-data/gx/brief/*-playwright.json
           if-no-files-found: ignore

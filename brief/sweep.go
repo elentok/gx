@@ -45,7 +45,7 @@ func sweep(logDir string, now time.Time) {
 		return
 	}
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".log") {
+		if e.IsDir() || !(strings.HasSuffix(e.Name(), ".log") || strings.HasSuffix(e.Name(), ".json")) {
 			continue
 		}
 		if info, err := e.Info(); err == nil && info.ModTime().Before(cutoff) {

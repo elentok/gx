@@ -167,6 +167,9 @@ const (
 	// EnvCheckHang is the hang limit as a Go duration. `gx brief go-test` kills
 	// the run when a test runs longer; unset means nothing is watched.
 	EnvCheckHang = "GX_CHECK_HANG"
+	// EnvKeepReport set to 1 keeps the report of a failing run next to its
+	// log as <log stem>.json. Off by default to spare the data dir.
+	EnvKeepReport = "GX_BRIEF_KEEP_REPORT"
 )
 
 // IndexEntry is one line of index.jsonl.
@@ -282,6 +285,9 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 		if cr, ok := tool.(ContextReader); ok && exit != 0 {
 			outcome.Contexts = cr.ReadContexts(plan.ReportFile)
 			outcome.Refs = cr.ReadRefs(plan.ReportFile)
+		}
+		if keep, _ := envValue(o.Env, EnvKeepReport); keep == "1" && exit != 0 {
+			_ = os.Rename(plan.ReportFile, strings.TrimSuffix(logPath, ".log")+".json")
 		}
 		os.Remove(plan.ReportFile)
 	}
