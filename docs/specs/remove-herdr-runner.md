@@ -88,8 +88,9 @@ default, and the docs and skills say so.
     herdr option, so that every rig runs on PTY or `runnerfake`.
 25. As a maintainer, I want the tests that script shared behaviour through the herdr fake moved to
     `runnerfake` or the PTY rig, so that the behaviour stays covered without herdr.
-26. As a maintainer, I want the production wait-loop tests that pin herdr status quirks kept only
-    where no PTY or `runnerfake` test covers the assertion, so that coverage does not drop.
+26. As a maintainer, I want the wait-loop code kept as it is (none of it is herdr-only) with its six
+    herdr comments reworded, and the five herdr-based production tests deleted or ported as listed
+    in Implementation Decisions, so that coverage does not drop.
 27. As a maintainer, I want the `herdr-e2e` CI job, `make e2e` and the `e2e/` suite removed, so that
     CI has no herdr-only job.
 28. As a maintainer, I want the TUI behaviour that only the e2e suite covered tested without herdr,
@@ -260,8 +261,26 @@ Tracker
 - Prior art: `server/sched/launchtest/reclaim_reopen_test`, `events/legacy.go` tests,
   `migrations` schema guard, `ui/agents/attach_test.go`, `nativerunner/holder/holderattach_test.go`,
   `ui/app/server_stream_test.go`, and the old `e2e/` `vtTerm` tests.
-- Rewrite, do not drop, tests of shared behaviour (list in the inventory, Q4). For the production
-  wait-loop tests, keep an assertion only if no PTY or `runnerfake` test already covers it.
+- Rewrite, do not drop, tests of shared behaviour (list in the inventory, Q4).
+- Wait-loop (map ticket 07): no logic in `ralphloop/supervise/waitforfinish.go` or
+  `waitforfinish_recovery.go` is herdr-only; all of it runs through the `Runner` interface. Keep it
+  all, including the premature-idle-during-compact gate (Claude's pid status can read idle mid
+  `/compact` on PTY too). Reword the comments at `waitforfinish.go:29,224,551,635,674` and
+  `waitforfinish_recovery.go:92-94` ("herdr" becomes "the runner"; the blocked-pane note names
+  claude's pid status `waiting` and points to `gx claude doctor`).
+  - Delete `ProductionSlowCompactRegression` (herdr nudge/Enter bug; PTY has `PromptNudged`),
+    `ProductionSlowButSuccessfulCompactRegression` (covered by `TranscriptConfirmsLateCompaction`,
+    `TimeoutCompletionKeepsTheExpiredEvent`, `TimeoutPathIsNotDoublePaced`) and
+    `ProductionPrematureIdlePaneNeverConfirms` (covered by `EscalatesAfterTwoConsecutiveGatedGiveUps`,
+    `GatedGiveUpDeniesAPaneIdleToEveryPollKind`, `GenuineStuckCompactFailsAfterExtendedWait`).
+  - Port `ProductionCodexBlockedAtCompactSubmission` to `runnerfake`: a Codex agent whose `Prompt`
+    fails with a blocked error; assert recovered=false, no error, `SmartZoneRecoveryFailed`, no pause,
+    no resume. Drop the port only if the `FailedFinishUpPromptIsBestEffort` test is extended to cover it.
+  - Port `ProductionPrematureIdlePaneRecovery` as one end-to-end `WaitForFinish` test on `runnerfake`
+    with `BlipRunner`: the boundary arrives late, the finish-up prompt is refused until then, and the
+    run ends with `compactGateConfirmed`.
+  - Delete the herdrfake `TestMain`, its helpers (`agentResult`, `parseUntil`, `useFakeClock`,
+    `writeOccupancyTranscript`, `appendCompactBoundaryLine`, `withProcessEnv`) and `herdrfake.ClaudeCompact`.
 - Run tests capped with `scripts/proc-cap`.
 
 ## Verification
@@ -337,8 +356,10 @@ checks below. No stored mock exists, so there is no Mock states list.
     server rig packages pass.
 25. Moved tests. Checks: the rewrite list tests in the inventory pass on `runnerfake` or PTY with no
     herdr import (`go list -deps` of each shows no `herdrfake`).
-26. Wait-loop tests. Checks: `go test ./ralphloop/supervise/...` passes. The implementer records in
-    the ticket which herdr-quirk assertions were dropped and which test covers the rest.
+26. Wait-loop tests. Checks: `go test ./ralphloop/supervise/...` passes; `rg -i herdr
+    ralphloop/supervise` prints nothing; `waitforfinish_production_test.go` and
+    `waitforfinish_production_recovery_test.go` are gone; a `runnerfake` test covers the Codex
+    `/compact` prompt blocked case and one covers the end-to-end premature-idle compact flow.
 27. CI. Checks: `make test` runs the real-binary suite; `gh workflow` config has no `e2e` step;
     `.ai/index.md` no longer lists `go test ./e2e/...`.
 28. TUI coverage ports. Checks: the in-process ports each exist and pass: holder `TERM`/`COLORTERM`
