@@ -118,7 +118,8 @@ test("New design renders no dialog, creates a draft, opens its page and closes t
   expect(closeSliding).toHaveBeenCalledTimes(1)
   expect(router.state.location.state).toEqual({ focusPrompt: true })
   const call = fetchMock.mock.calls.find((c) => String(c[0]).endsWith("/drafts/save"))
-  expect(JSON.parse((call?.[1] as RequestInit).body as string)).toMatchObject({
+  const init = call?.[1] as RequestInit | undefined
+  expect(JSON.parse(String(init?.body))).toMatchObject({
     idea: "",
     revision: 0,
   })

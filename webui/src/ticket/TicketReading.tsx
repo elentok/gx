@@ -2,6 +2,7 @@ import { Box, Text } from "@chakra-ui/react"
 import type { DetailRound, TicketDetail } from "../generated/server"
 import { Markdown } from "../markdown/Markdown"
 import { Card } from "../ui/card/Card"
+import { withKeys } from "../uniqueKeys"
 import { isAnsweredRound, type Sent } from "./answer"
 import { AnswerResult } from "./AnswerResult"
 import { Collapsible } from "./Collapsible"
@@ -60,8 +61,8 @@ export function TicketReading({
           )}
           {detail.chat.length > 0 && (
             <Box display="flex" flexDirection="column" gap="2">
-              {detail.chat.map((m, i) => (
-                <Card key={i}>
+              {withKeys(detail.chat, (m) => `${m.from}|${m.text}`).map(({ item: m, key }) => (
+                <Card key={key}>
                   <Label>{m.from}</Label>
                   <Text>{m.text}</Text>
                 </Card>

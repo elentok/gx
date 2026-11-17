@@ -59,12 +59,10 @@ const Click = ({ label, children }: { label: string; children: ReactNode }) => {
 }
 
 function Footer({
-  device,
   answers,
   open = false,
   countdown = false,
 }: {
-  device: Device
   answers: number
   open?: boolean
   countdown?: boolean
@@ -90,9 +88,7 @@ const footerCase = (
   answers: number,
   opts: { open?: boolean; countdown?: boolean; note?: boolean; width?: string } = {},
 ) => {
-  const footer = (
-    <Footer device={device} answers={answers} open={opts.open} countdown={opts.countdown} />
-  )
+  const footer = <Footer answers={answers} open={opts.open} countdown={opts.countdown} />
   return {
     label,
     node: (

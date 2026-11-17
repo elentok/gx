@@ -1,22 +1,25 @@
 import { cleanup, screen, within } from "@testing-library/react"
+import type { ReactElement, ReactNode } from "react"
 import { afterEach, expect, test } from "vitest"
 import { renderThemed } from "../ui/render"
 import { galleryEntries } from "./registry"
 
 afterEach(cleanup)
 
+// Every EpicPage case node is one element; renderThemed wants the element type.
+const el = (node: ReactNode) => node as ReactElement
+
 const cases = galleryEntries.find((e) => e.name === "EpicPage")?.cases ?? []
 
 test.each(cases.map((c) => [c.label, c.node] as const))(
   "the %s epic page renders",
   async (_label, node) => {
-    renderThemed(<>{node}</>)
+    renderThemed(el(node))
     expect(await screen.findByRole("heading", { level: 1 })).toBeTruthy()
   },
 )
 
-const renderCase = (label: string) =>
-  renderThemed(<>{cases.find((c) => c.label === label)?.node}</>)
+const renderCase = (label: string) => renderThemed(el(cases.find((c) => c.label === label)?.node))
 
 test("the cancelled card case reads cancelled", async () => {
   renderCase("cancelled card")
@@ -56,7 +59,7 @@ test("the PageHeader gallery cases render", () => {
     "no meta bar",
   ])
   for (const c of headers) {
-    const { getByRole, unmount } = renderThemed(<>{c.node}</>)
+    const { getByRole, unmount } = renderThemed(el(c.node))
     expect(getByRole("heading", { level: 1 }).textContent).toBe("slow-tests-impl")
     unmount()
   }
@@ -65,7 +68,7 @@ test("the PageHeader gallery cases render", () => {
 test("the jump menu rows and Design footer cases render", () => {
   for (const name of ["JumpMenuRows", "DesignFooter"]) {
     for (const c of galleryEntries.find((e) => e.name === name)?.cases ?? []) {
-      const { container, unmount } = renderThemed(<>{c.node}</>)
+      const { container, unmount } = renderThemed(el(c.node))
       expect(container.textContent, `${name} ${c.label}`).not.toBe("")
       unmount()
     }
@@ -73,6 +76,6 @@ test("the jump menu rows and Design footer cases render", () => {
 })
 
 test("the needs-repair dialog case opens the fix dialog", async () => {
-  renderThemed(<>{cases.find((c) => c.label === "needs-repair dialog")?.node}</>)
+  renderThemed(el(cases.find((c) => c.label === "needs-repair dialog")?.node))
   expect(await screen.findByRole("dialog")).toBeTruthy()
 })

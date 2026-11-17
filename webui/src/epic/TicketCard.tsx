@@ -1,5 +1,5 @@
 import { Box, chakra, Link, Text } from "@chakra-ui/react"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { useNavigate } from "react-router"
 import { ticketHref } from "../hrefs"
 import { useWide } from "../useWide"
@@ -78,7 +78,7 @@ function Check() {
 
 function Dot({ row }: { row: EpicDetailRow }) {
   const tone = toneOf(row)
-  let mark
+  let mark: ReactNode
   if (isRunning(row)) mark = <Spinner />
   else if (isFolded(row) && !isCancelled(row)) mark = <Check />
   else

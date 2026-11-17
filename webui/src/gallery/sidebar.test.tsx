@@ -1,4 +1,5 @@
 import { cleanup, screen, waitFor } from "@testing-library/react"
+import type { ReactElement } from "react"
 import { afterEach, expect, test } from "vitest"
 import { renderThemed } from "../ui/render"
 import { galleryEntries } from "./registry"
@@ -13,7 +14,7 @@ const render = (entry: string, label: string) => {
     .find((e) => e.name === entry)
     ?.cases.find((c) => c.label === label)?.node
   expect(node, `${entry} ${label}`).toBeTruthy()
-  renderThemed(<>{node}</>)
+  renderThemed(node as ReactElement)
 }
 
 test.each(["desktop, docked", "tablet, slide-over open", "phone, slide-over open"])(

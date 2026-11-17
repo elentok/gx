@@ -147,8 +147,8 @@ it("shows the jump menu rows in every case the spec lists", () => {
 it("shows the Tray busy and critical cases in the mock's meter states", () => {
   const cases = galleryEntries.find((e) => e.name === "Tray")?.cases ?? []
   const states = (label: string) => {
-    const health = (cases.find((c) => c.label === label)?.node as ReactElement<{ health: Health }>)
-      .props.health
+    const node = cases.find((c) => c.label === label)?.node as ReactElement<{ health: Health }>
+    const health = node.props.health
     return [health.cpu.state, health.memory.state, health.disk.state]
   }
   expect(states("busy")).toEqual(["high", "normal", "high"])

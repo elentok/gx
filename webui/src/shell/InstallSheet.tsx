@@ -3,6 +3,9 @@ import type { ReactNode } from "react"
 import type { InstallMode } from "../pwa/install"
 import { BottomSheet } from "../ui/modal/BottomSheet"
 
+// The step lists are static, so a step's place is its identity.
+const STEP_KEYS = ["first", "second", "third"]
+
 type SheetMode = Exclude<InstallMode, "prompt" | "none">
 
 const COPY: Record<SheetMode, { intro: string; steps: ReactNode[] }> = {
@@ -63,7 +66,7 @@ export function InstallSheet({ mode, onClose }: { mode: SheetMode; onClose: () =
         {steps.map((step, i) => (
           <Box
             as="li"
-            key={i}
+            key={STEP_KEYS[i]}
             display="flex"
             gap="3"
             alignItems="center"

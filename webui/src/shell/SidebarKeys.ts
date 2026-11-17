@@ -1,4 +1,10 @@
-import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react"
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type RefObject,
+} from "react"
 import { useNavigate, type NavigateFunction } from "react-router"
 import { FOCUS_PROMPT_STATE } from "../agents/promptFocus"
 import { isTextTarget } from "./keys"
@@ -130,15 +136,15 @@ export function useSidebarKeys(aside: RefObject<HTMLElement | null>, shell: Shel
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [sidebarOpen, toggle])
-  const focusStop = () => {
+  const focusStop = useCallback(() => {
     const all = aside.current ? items(aside.current) : []
     ;(all.find((i) => i.tabIndex === 0) ?? all[0])?.focus()
-  }
+  }, [aside])
   useEffect(() => {
     if (!focusOnOpen.current || !sidebarOpen) return
     focusOnOpen.current = false
     focusStop()
-  }, [sidebarOpen, aside])
+  }, [sidebarOpen, focusStop])
   // The `s` chord: focus the sidebar, opening it first when it is closed.
   const onFocusRequest = useRef(() => {})
   onFocusRequest.current = () => {

@@ -1,7 +1,8 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useState } from "react"
+import { useId, useState } from "react"
 import type { SettingsEntry, SettingsWriteResult } from "../generated/server"
 import { Button } from "../ui/button/Button"
+import { withKeys } from "../uniqueKeys"
 import { refusalText, useWrite } from "../useWrite"
 import {
   CHECK_KINDS,
@@ -30,13 +31,16 @@ const TextInput = ({
   value,
   onChange,
   wide = false,
+  id,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
   wide?: boolean
+  id?: string
 }) => (
   <chakra.input
+    id={id}
     type="text"
     aria-label={label}
     value={value}
@@ -68,8 +72,12 @@ function AlwaysList({
       <Text fontSize="13px" color="text.muted">
         Also run on every non-full run:
       </Text>
-      {items.map((item, i) => (
-        <TagChip key={i} label={item} onRemove={() => onChange(items.filter((_, j) => j !== i))} />
+      {withKeys(items, (item) => item).map(({ item, index, key }) => (
+        <TagChip
+          key={key}
+          label={item}
+          onRemove={() => onChange(items.filter((_, j) => j !== index))}
+        />
       ))}
       <chakra.input
         type="text"
@@ -133,12 +141,15 @@ const LimitField = ({
   label: string
   value: string
   onChange: (v: string) => void
-}) => (
-  <chakra.label display="grid" gap="1" fontSize="11px" color="text.muted">
-    {label}
-    <TextInput wide label={`${label} limit`} value={value} onChange={onChange} />
-  </chakra.label>
-)
+}) => {
+  const id = useId()
+  return (
+    <chakra.label htmlFor={id} display="grid" gap="1" fontSize="11px" color="text.muted">
+      {label}
+      <TextInput id={id} wide label={`${label} limit`} value={value} onChange={onChange} />
+    </chakra.label>
+  )
+}
 
 function KindCard({
   kind,

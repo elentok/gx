@@ -1,5 +1,6 @@
 import { Box, chakra, Text, type BoxProps } from "@chakra-ui/react"
 import type { ReactNode } from "react"
+import { withKeys } from "../uniqueKeys"
 import {
   CardActionCreatePR,
   CardActionMarkMerged,
@@ -194,10 +195,10 @@ export function PrActivity({ entries }: { entries?: PRActivityEntry[] }) {
         PR activity <Chip>{entries.length === 1 ? "1 entry" : `${entries.length} entries`}</Chip>
       </Box>
       <Box as="ul" listStyleType="none" m="0" p="0" display="flex" flexDirection="column">
-        {entries.map((e, i) => (
+        {withKeys(entries, (e) => JSON.stringify(e)).map(({ item: e, key }) => (
           <Box
             as="li"
-            key={i}
+            key={key}
             display="grid"
             gridTemplateColumns="64px 14px 1fr"
             gap="10px"

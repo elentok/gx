@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { leaderKeyOf } from "../leaderKey"
@@ -12,13 +12,6 @@ import { openRename } from "./renameOpen"
 
 const MODIFIER_KEYS = new Set(["Control", "Meta", "Alt", "Shift"])
 const BOX = '[role="menu"][aria-label="Chords"]'
-
-// A ref that always holds the latest value, for the once-mounted listener.
-function useLatest<T>(value: T) {
-  const ref = useRef(value)
-  ref.current = value
-  return ref
-}
 
 /**
  * Owns the Chord box: one capture-phase keydown listener opens it on the Leader key and, while it
@@ -34,12 +27,13 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
 
   const [open, setOpen] = useState(false)
   // The listener is mounted once and reads everything at event time.
-  const live = useLatest({ leader, ctx, session, navigate })
+  const live = useRef({ leader, ctx, session, navigate })
+  live.current = { leader, ctx, session, navigate }
   const openRef = useRef(false)
-  const close = () => {
+  const close = useCallback(() => {
     openRef.current = false
     setOpen(false)
-  }
+  }, [])
 
   const table = useMemo(
     () =>
@@ -62,7 +56,8 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
       }),
     [chords],
   )
-  const tableRef = useLatest(table)
+  const tableRef = useRef(table)
+  tableRef.current = table
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -105,10 +100,13 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
       document.removeEventListener("pointerdown", onPointer, true)
       window.removeEventListener("blur", onBlur)
     }
-  }, [])
+  }, [close])
 
   // A page change closes the box with no action.
-  useEffect(close, [pathname])
+  useEffect(() => {
+    void pathname
+    close()
+  }, [pathname, close])
 
   if (!open) return null
   return <ChordBox leader={leader} ctx={ctx} chords={table} onClose={close} />

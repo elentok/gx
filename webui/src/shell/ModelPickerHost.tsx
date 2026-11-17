@@ -47,6 +47,8 @@ function useModels(sessionId: string, fetchModels: FetchModels) {
   const [models, setModels] = useState<SessionModelsResponse | null>(null)
   const [refreshNo, setRefreshNo] = useState(0)
   useEffect(() => {
+    // A bump of refreshNo is the re-read trigger.
+    void refreshNo
     let live = true
     let timer: ReturnType<typeof setTimeout> | undefined
     void fetchModels(sessionId).then((res) => {
@@ -124,16 +126,23 @@ function ModelPicker({
   }
   const onKeyDown = (e: KeyboardEvent) => {
     if (blocked) return
-    const step: Record<string, () => void> = {
-      ArrowUp: () => move(-1),
-      ArrowDown: () => move(1),
-      ArrowLeft: () => moveEffort(-1),
-      ArrowRight: () => moveEffort(1),
+    switch (e.key) {
+      case "ArrowUp":
+        move(-1)
+        break
+      case "ArrowDown":
+        move(1)
+        break
+      case "ArrowLeft":
+        moveEffort(-1)
+        break
+      case "ArrowRight":
+        moveEffort(1)
+        break
+      default:
+        return
     }
-    const act = step[e.key]
-    if (!act) return
     e.preventDefault()
-    act()
   }
 
   return (

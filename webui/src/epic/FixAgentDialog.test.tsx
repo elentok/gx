@@ -22,7 +22,7 @@ test("focusTopDialog called from outside the dialog moves focus into the FixAgen
         path: "/",
         element: (
           <>
-            <button>outside</button>
+            <button type="button">outside</button>
             <FixAgentDialog prompt="fix it" request={{} as FixAgentRequest} onClose={() => {}} />
           </>
         ),

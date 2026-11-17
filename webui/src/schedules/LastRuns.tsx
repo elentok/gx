@@ -1,6 +1,7 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import type { ScheduleRun, ScheduleRunStatus } from "../generated/server"
 import { ticketHref } from "../hrefs"
+import { withKeys } from "../uniqueKeys"
 import type { Tone } from "../ui/tone"
 import { formatNextRun } from "./format"
 
@@ -75,8 +76,8 @@ export function LastRuns({ runs }: { runs: ScheduleRun[] }) {
       </Text>
       <Box minW="0">
         <Box as="ul" data-mock-part="last-runs" m="0" p="0">
-          {runs.map((r, i) => (
-            <LastRunRow key={`${r.address}|${r.scheduled_for}|${i}`} run={r} />
+          {withKeys(runs, (r) => `${r.address}|${r.scheduled_for}`).map(({ item: r, key }) => (
+            <LastRunRow key={key} run={r} />
           ))}
         </Box>
         <Text color="text.muted" fontSize="13px" mt="1">

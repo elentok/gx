@@ -1,5 +1,6 @@
 import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react"
 import { copyText } from "../clipboard"
+import { withKeys } from "../uniqueKeys"
 import { GxMenu, menuGroups } from "../ui/menu/Menu"
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
 import { Fragment, useEffect, useMemo, useState } from "react"
@@ -171,7 +172,11 @@ function StatsLine({
   designLive: boolean
 }) {
   // The server's wall clock is as of the fetch, so a running epic adds the time since then.
-  const fetchedAt = useMemo(() => Date.now(), [detail])
+  // A new detail object is the trigger to take a new fetch time.
+  const fetchedAt = useMemo(() => {
+    void detail
+    return Date.now()
+  }, [detail])
   const wallClock =
     detail.state === "running" && detail.wall_clock !== undefined
       ? detail.wall_clock + Math.max(0, (now - fetchedAt) / 1000)
@@ -189,8 +194,8 @@ function StatsLine({
       overflow="hidden"
       textOverflow="ellipsis"
     >
-      {parts.map((p, i) => (
-        <Fragment key={i}>
+      {withKeys(parts, (p) => p.text).map(({ item: p, index: i, key }) => (
+        <Fragment key={key}>
           {i > 0 && " · "}
           {p.tone || p.bright ? (
             <Text as="span" color={p.tone ? `tone.${p.tone}.fg` : "text.muted"}>

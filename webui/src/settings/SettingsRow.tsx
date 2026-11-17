@@ -4,6 +4,7 @@ import type { SettingChange, SettingsEntry, SettingsWriteResult } from "../gener
 import { Button } from "../ui/button/Button"
 import { Chip } from "../ui/chip/Chip"
 import { Modal } from "../ui/modal/Modal"
+import { withKeys } from "../uniqueKeys"
 import { refusalText, useWrite } from "../useWrite"
 import { entryLabel, numberListHint, removeChange, setChange } from "./settingsApi"
 import { ChangedDot, Highlight, inputProps, SaveStatus, Segmented, TagChip } from "./parts"
@@ -169,12 +170,12 @@ function ListControl({ entry, pending, save }: ControlProps) {
             Empty list
           </Text>
         )}
-        {items.map((item, i) => (
+        {withKeys(items, String).map(({ item, index, key }) => (
           <TagChip
-            key={i}
+            key={key}
             label={String(item)}
             disabled={pending}
-            onRemove={() => save(items.filter((_, j) => j !== i))}
+            onRemove={() => save(items.filter((_, j) => j !== index))}
           />
         ))}
       </Box>

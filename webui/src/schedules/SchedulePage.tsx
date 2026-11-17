@@ -168,8 +168,13 @@ function ScheduleHeader({
   const runWrite = useWrite<ScheduleRunNowResult>({ toastRefusal: false })
   const switchWrite = useWrite()
   const [answered, setAnswered] = useState<boolean>()
-  useEffect(() => setAnswered(undefined), [tools.info.switch])
-  const on = answered ?? tools.info.switch
+  const serverSwitch = tools.info.switch
+  // A new server value drops the local answer.
+  useEffect(() => {
+    void serverSwitch
+    setAnswered(undefined)
+  }, [serverSwitch])
+  const on = answered ?? serverSwitch
   const runNow = () =>
     void runWrite.run(() => tools.runNow(existing.project, existing.slug), {
       onDone: tools.refetch,
@@ -258,6 +263,15 @@ function DeleteSchedule({
   )
 }
 
+/** One id per row of an editable list, so typing in a row never changes its React key. Remove a row with `ids.current.splice(i, 1)` in the same handler. */
+function useRowIds(length: number) {
+  const ids = useRef<string[]>([])
+  const next = useRef(0)
+  while (ids.current.length < length) ids.current.push(`row-${next.current++}`)
+  ids.current.length = length
+  return ids
+}
+
 function Editor({
   base,
   setBase,
@@ -281,6 +295,7 @@ function Editor({
   const navigate = useNavigate()
   const write = useWrite()
   const [form, setForm] = useState(base)
+  const timeIds = useRowIds(form.times.length)
   const [tried, setTried] = useState(false)
   const set = (patch: Partial<ScheduleForm>) => {
     setForm((f) => ({ ...f, ...patch }))
@@ -407,7 +422,7 @@ function Editor({
       >
         <Box data-mock-part="times" display="flex" flexWrap="wrap" gap="2" alignItems="center">
           {form.times.map((t, i) => (
-            <Box key={i} display="flex" alignItems="center" gap="1">
+            <Box key={timeIds.current[i]} display="flex" alignItems="center" gap="1">
               <chakra.input
                 {...field}
                 aria-label={`Time ${i + 1}`}
@@ -427,7 +442,10 @@ function Editor({
                 size="sm"
                 tone="muted"
                 aria-label={`Remove time ${i + 1}`}
-                onClick={() => set({ times: form.times.filter((_, j) => j !== i) })}
+                onClick={() => {
+                  timeIds.current.splice(i, 1)
+                  set({ times: form.times.filter((_, j) => j !== i) })
+                }}
               >
                 ×
               </Button>
@@ -679,9 +697,12 @@ function Existing({
   const [base, setBase] = useState<ScheduleForm>()
   const loaded = data && !data.refused ? formOf(data) : undefined
   const loadedKey = JSON.stringify(loaded)
+  // Runs when the loaded content changes (the key), not on every new object of equal content.
+  const latestLoaded = useRef(loaded)
+  latestLoaded.current = loaded
   useEffect(() => {
-    if (loaded) setBase(loaded)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void loadedKey
+    if (latestLoaded.current) setBase(latestLoaded.current)
   }, [loadedKey])
   if (i < 0 || failed)
     return (
