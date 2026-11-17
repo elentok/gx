@@ -94,6 +94,8 @@ export interface Fixture {
   cliEnvInput(extra: Record<string, string>, input: string, ...args: string[]): Promise<string>
   /** Lets the workers frozen by `start(scenario, { hold: true })` finish. */
   release(): Promise<void>
+  /** Waits until the exit-after-ask fake agent (`answer-queued`, `answer-finished`) has exited. */
+  waitAgentGone(): Promise<void>
   /** Sets the free space the server reads from the fake disk, a size string such as `15G`. */
   setDiskFree(size: string): Promise<void>
   /** Sets what the next cleanup does: a size string frees to it, `fail` fails, empty does nothing. Set it before free. */
@@ -342,6 +344,18 @@ async function startFixture(
     cliEnvInput: (extra, input, ...args) => runWithInput(out.gx, args, { ...env, ...extra }, input),
     async release() {
       await rm(out.hold_file, { force: true })
+    },
+    async waitAgentGone() {
+      await expect
+        .poll(
+          () =>
+            stat(`${out.hold_file}.exited`).then(
+              () => true,
+              () => false,
+            ),
+          { timeout: 90_000 },
+        )
+        .toBe(true)
     },
     setDiskFree: (size) => writeControl(out.disk_dir, "free", size),
     setDiskClean: (behaviour) => writeControl(out.disk_dir, "clean", behaviour),

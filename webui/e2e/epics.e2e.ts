@@ -34,13 +34,14 @@ test("2. Epic looks right", async ({ page, start, context }) => {
   await expect(page.getByTestId("stats-line")).toHaveText("Not queued · $0.00 · 0s agent time")
   // mixed-epic has no summary, so the header draws no description line.
   await expect(page.getByTestId("page-header-line")).toHaveCount(0)
-  // The ⋯ menu holds Copy epic ID, Move to workspace and Hold, and the copy is <project>:<name>.
+  // The ⋯ menu holds Copy epic ID, Move to workspace, Hold and Archive, and the copy is <project>:<name>.
   await page.getByTestId("page-header-actions").getByRole("button", nav("More actions")).click()
   const menu = page.getByRole("menu", nav("More actions"))
   await expect(menu.getByRole("menuitem")).toHaveText([
     /^Copy epic ID/,
     /^Move to workspace/,
     "Hold",
+    "Archive",
   ])
   await expect(menu.getByRole("menuitem", { name: /^Copy epic ID/ })).toContainText(
     "demo:mixed-epic",
@@ -142,7 +143,8 @@ test("2. Epic looks right", async ({ page, start, context }) => {
 
   // 40: answering an agent that is gone queues the ticket; the card's status line says so.
   await test.step("agent question: answer to a gone agent reads Queued", async () => {
-    await start("answer-queued")
+    const queued = await start("answer-queued")
+    await queued.waitAgentGone()
     await page.evaluate((hash) => (location.hash = hash), "#/t/demo:queued-answer-epic/01")
     const form = page.getByRole("form", { name: "Answer" })
     await form.getByRole("textbox").fill("go on")
@@ -163,6 +165,7 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     // Cut the page off from the server so the form stays on screen while the ticket moves on.
     const unblock = await blockEvents(page)
     await context.setOffline(true)
+    await finished.waitAgentGone()
     await finished.cli("server", "tickets", "resume", addr)
     await expect
       .poll(

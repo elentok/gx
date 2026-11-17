@@ -218,7 +218,7 @@ func TestLaunchdInstall_WritesCrashOnlyKeepAliveAndRunAtLoad(t *testing.T) {
 func TestLaunchdInstall_WritesInstallingShellsEnvironment(t *testing.T) {
 	a, _ := newTestAgent(t)
 	a.environ = launchdEnviron(func(key string) string {
-		return map[string]string{"PATH": "/opt/homebrew/bin:/usr/bin", "HERDR_SOCKET_PATH": "/h/herdr.sock"}[key]
+		return map[string]string{"PATH": "/opt/homebrew/bin:/usr/bin", "OTHER_SOCKET_PATH": "/h/other.sock"}[key]
 	})
 
 	if err := a.Install(); err != nil {
@@ -239,7 +239,7 @@ func TestLaunchdInstall_WritesInstallingShellsEnvironment(t *testing.T) {
 
 func TestLaunchdEnviron_KeepsOnlyPath(t *testing.T) {
 	got := launchdEnviron(func(key string) string {
-		return map[string]string{"PATH": "/p", "HERDR_SOCKET_PATH": "/s", "HERDR_PANE_ID": "w:p1"}[key]
+		return map[string]string{"PATH": "/p", "OTHER_SOCKET_PATH": "/s", "OTHER_PANE_ID": "w:p1"}[key]
 	})
 	want := map[string]string{"PATH": "/p"}
 	if !reflect.DeepEqual(got, want) {
