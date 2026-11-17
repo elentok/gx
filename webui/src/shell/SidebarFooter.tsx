@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 import { useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { useEpicList } from "../epics/list"
-import type { Workspace } from "../generated/server"
+import type { Snapshot, Workspace } from "../generated/server"
 import { STATS_HREF } from "../hrefs"
 import { GxMenu, type MenuEntry } from "../ui/menu/Menu"
 import { Tray } from "../ui/tray/Tray"
@@ -15,6 +15,7 @@ import {
   badgeWaiting,
   inWorkspace,
 } from "../workspaces/followUpsBadge"
+import { METERS } from "../ui/tray/meters"
 import { useDevice } from "../useWide"
 import { FooterButton, footerHover, interactiveStyle } from "./FooterButton"
 import { GearMenu } from "./GearMenu"
@@ -114,19 +115,68 @@ function EpicsMenu({ needsYou }: { needsYou: number }) {
   )
 }
 
-function Indicator({
-  label,
-  tone,
-  children,
-}: {
-  label: string
+/** One problem the status button reports: what it is, and why it appeared. */
+interface Problem {
+  key: string
+  title: string
+  detail: string
   tone: "waiting" | "paused" | "muted"
-  children: ReactNode
-}) {
+  icon: ReactNode
+  href?: string
+}
+
+/** The one footer button for the warning, paused and offline states. Its menu says why each one appeared. */
+const highMeters = (health: NonNullable<Snapshot["health"]>) => {
+  const names = METERS.filter(({ key }) => ["high", "critical"].includes(health[key].state)).map(
+    ({ key, name }) => `${name} is ${health[key].state}.`,
+  )
+  return names.join(" ")
+}
+
+function StatusMenu({ problems }: { problems: Problem[] }) {
+  const navigate = useNavigate()
+  const shell = useShell()
+  if (problems.length === 0) return null
+  const top = problems[0]
+  const label = problems.map((p) => p.title).join("; ")
+  const items: MenuEntry[] = problems.map((p) => ({
+    value: p.key,
+    label: (
+      <Box as="span" display="flex" alignItems="center" gap="3" minW="240px" maxW="300px">
+        <Box as="span" flex="none" color={`tone.${p.tone}.fg`}>
+          {p.icon}
+        </Box>
+        <Box as="span" display="flex" flexDirection="column" whiteSpace="normal">
+          <Text as="span">{p.title}</Text>
+          <Text as="span" fontSize="xs" fontWeight="400" color="text.muted">
+            {p.detail}
+          </Text>
+        </Box>
+      </Box>
+    ),
+    onSelect: () => {
+      if (!p.href) return
+      navigate(p.href)
+      shell?.closeSliding()
+    },
+  }))
   return (
-    <FooterButton as="div" role="img" title={label} aria-label={label} color={`tone.${tone}.fg`}>
-      {children}
-    </FooterButton>
+    <GxMenu
+      placement="top-end"
+      trigger={
+        <FooterButton
+          title={label}
+          aria-label={label}
+          data-part="status"
+          color={`tone.${top.tone}.fg`}
+          cursor="pointer"
+          {...footerHover}
+        >
+          {top.icon}
+        </FooterButton>
+      }
+      items={items}
+    />
   )
 }
 
@@ -267,23 +317,31 @@ export function SidebarFooter({
     )
   const needsYou = snapshot?.needs_you_total ?? 0
   const desktop = useDevice() === "desktop"
-  const indicators = [
-    unhealthy && (
-      <Indicator key="health" label="System health is high or critical" tone="waiting">
-        <WarningIcon />
-      </Indicator>
-    ),
-    snapshot?.mode === "paused" && (
-      <Indicator key="paused" label="Server queue is paused" tone="paused">
-        <PausedIcon />
-      </Indicator>
-    ),
-    !connected && (
-      <Indicator key="offline" label="Disconnected from the server" tone="muted">
-        <OfflineIcon />
-      </Indicator>
-    ),
-  ].filter(Boolean)
+  const candidates: (Problem | false)[] = [
+    !connected && {
+      key: "offline",
+      title: "Disconnected from the server",
+      detail: "The sidebar shows the last data it received. It reconnects on its own.",
+      tone: "muted" as const,
+      icon: <OfflineIcon />,
+    },
+    snapshot?.mode === "paused" && {
+      key: "paused",
+      title: "Server queue is paused",
+      detail: "No new tickets start until the queue resumes.",
+      tone: "paused" as const,
+      icon: <PausedIcon />,
+    },
+    unhealthy && {
+      key: "health",
+      title: "System health is high or critical",
+      detail: `${highMeters(health)} Open Stats and health for details.`,
+      tone: "waiting" as const,
+      icon: <WarningIcon />,
+      href: STATS_HREF,
+    },
+  ]
+  const problems = candidates.filter((p): p is Problem => !!p)
   return (
     <Box
       as="footer"
@@ -296,13 +354,6 @@ export function SidebarFooter({
       borderTopWidth="1px"
       borderColor="border"
     >
-      {/* At the 280px sidebar the optional indicators cannot share the row without shrinking a box, so they take a line above it. */}
-      {desktop && indicators.length > 0 && (
-        <Box display="flex" flexWrap="wrap" gap="1" data-part="indicators">
-          {indicators}
-        </Box>
-      )}
-      {/* Off desktop the boxes keep their size; when the row is too narrow for them all, the indicators and the menu wrap together. */}
       <Box display="flex" alignItems="center" gap="1" flexWrap={desktop ? "nowrap" : "wrap"}>
         <GxMenu
           placement="top-start"
@@ -339,13 +390,16 @@ export function SidebarFooter({
         <Box flex="1" />
         <EpicsMenu needsYou={needsYou} />
         <FollowUpsButton workspace={activeWorkspace?.name} />
-        <FooterLink href={STATS_HREF} label="Stats and health">
-          <StatsIcon />
-        </FooterLink>
+        {/* At the 280px sidebar only four boxes fit, so the status button takes the Stats link's place while it shows. */}
+        {!(desktop && problems.length > 0) && (
+          <FooterLink href={STATS_HREF} label="Stats and health">
+            <StatsIcon />
+          </FooterLink>
+        )}
         {health && <Tray health={health} connected={connected} />}
         <LimitsTray conn={conn} />
         <Box display="flex" alignItems="center" gap="1" flex="none" ml="auto">
-          {!desktop && indicators}
+          <StatusMenu problems={problems} />
           <GearMenu activeWorkspace={activeWorkspace} />
         </Box>
       </Box>

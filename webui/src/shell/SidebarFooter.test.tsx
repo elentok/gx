@@ -35,21 +35,17 @@ function setup(
   )
 }
 
-const warning = () => screen.queryByTitle("System health is high or critical")
-const paused = () => screen.queryByTitle("Server queue is paused")
-const offline = () => screen.queryByTitle("Disconnected from the server")
+const status = () => document.querySelector<HTMLElement>('[data-part="status"]')
 
-test("warning, paused and disconnected icons hide when they do not apply", () => {
+test("the status button hides when nothing is wrong", () => {
   setup({
     mode: "running",
     health: { cpu: meter("normal"), memory: meter("normal"), disk: meter("normal") },
   })
-  expect(warning()).toBeNull()
-  expect(paused()).toBeNull()
-  expect(offline()).toBeNull()
+  expect(status()).toBeNull()
 })
 
-test("warning, paused and disconnected icons show with their tooltips when they apply", () => {
+test("the status button lists every problem and opens a menu saying why", async () => {
   setup(
     {
       mode: "paused",
@@ -57,14 +53,18 @@ test("warning, paused and disconnected icons show with their tooltips when they 
     },
     false,
   )
-  expect(warning()).not.toBeNull()
-  expect(paused()).not.toBeNull()
-  expect(offline()).not.toBeNull()
+  const button = status()!
+  expect(button.getAttribute("title")).toContain("System health is high or critical")
+  expect(button.getAttribute("title")).toContain("Server queue is paused")
+  expect(button.getAttribute("title")).toContain("Disconnected from the server")
+  fireEvent.click(button)
+  expect(await screen.findByText("memory is critical.", { exact: false })).toBeTruthy()
+  expect(screen.getByText(/No new tickets start/)).toBeTruthy()
 })
 
 test("Dev mode alone adds no indicator to the footer", () => {
   setup({ mode: "running", dev: { state: "running", has_checkout: true } })
-  expect(document.querySelector('[data-part="indicators"]')).toBeNull()
+  expect(status()).toBeNull()
   expect(document.querySelector('[data-part="dev-pill"]')).toBeNull()
 })
 
@@ -321,9 +321,6 @@ test("every footer box is present with its label", () => {
   )
   expect(screen.getByRole("button", { name: /^Epics/ })).toBeTruthy()
   expect(screen.getByRole("button", { name: /^Follow-ups/ })).toBeTruthy()
-  expect(screen.getByRole("link", { name: "Stats and health" })).toBeTruthy()
   expect(screen.getByRole("button", { name: "Menu" })).toBeTruthy()
-  expect(screen.getByTitle("System health is high or critical")).toBeTruthy()
-  expect(screen.getByTitle("Server queue is paused")).toBeTruthy()
-  expect(screen.getByTitle("Disconnected from the server")).toBeTruthy()
+  expect(status()).not.toBeNull()
 })

@@ -1,4 +1,4 @@
-import { Box, Text } from "@chakra-ui/react"
+import { Box, Spinner, Text } from "@chakra-ui/react"
 import { useEffect, useState } from "react"
 import type { Health, HealthReport } from "../generated/server"
 import { METERS } from "../ui/tray/meters"
@@ -32,7 +32,7 @@ export function HealthPopover({
     return () => clearInterval(tick)
   }, [])
 
-  if (!received) return connected ? null : <SnapshotRows health={health} />
+  if (!received) return connected ? <Loading /> : <SnapshotRows health={health} />
   const { report, at } = received
   const { cpu, memory } = report
   const pressure = memory.pressure ? ` · macOS pressure: ${memory.pressure}` : ""
@@ -111,6 +111,15 @@ export function HealthPopover({
       >
         {connected ? footer(report, at, now) : offlineFooter(at, now)}
       </Text>
+    </Box>
+  )
+}
+
+// Shown until the first report arrives.
+function Loading() {
+  return (
+    <Box py="5" display="flex" justifyContent="center" data-part="loading">
+      <Spinner size="sm" aria-label="Loading system health" />
     </Box>
   )
 }
