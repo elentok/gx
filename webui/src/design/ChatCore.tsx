@@ -332,6 +332,8 @@ function ChatScroller({ children }: { children: ReactNode }) {
     if (!inner.current || typeof ResizeObserver === "undefined") return
     const ro = new ResizeObserver(pin)
     ro.observe(inner.current)
+    // The box shrinks when the strip under it grows (the Working row): keep the bottom in view.
+    if (el.current) ro.observe(el.current)
     return () => ro.disconnect()
   }, [])
   return (
@@ -350,7 +352,8 @@ function ChatScroller({ children }: { children: ReactNode }) {
         const t = e.currentTarget
         const gap = t.scrollHeight - t.scrollTop - t.clientHeight
         if (gap < 80) stuck.current = true
-        else if (t.scrollTop < lastTop.current && t.scrollHeight >= lastHeight.current) stuck.current = false
+        else if (t.scrollTop < lastTop.current && t.scrollHeight >= lastHeight.current)
+          stuck.current = false
         lastTop.current = t.scrollTop
         lastHeight.current = t.scrollHeight
       }}
@@ -419,7 +422,7 @@ function CodexNotices({
   )
 }
 
-/** The scrolling messages, the task list and, while the agent works, the caller's working row. */
+/** The scrolling messages, then, below them and outside the scroll, the task list and the caller's working row. */
 export function ChatMessages({
   chat,
   busy,
@@ -468,37 +471,44 @@ export function ChatMessages({
   const hiddenCount = Math.max(0, messages.length - limit)
   const shownMessages = hiddenCount > 0 ? messages.slice(hiddenCount) : messages
   return (
-    <ChatScroller key={windowKey}>
-      {head}
-      {messages.length === 0 && (
-        <CodexNotices
-          chat={chat}
-          sessionId={sessionId}
-          onDecoded={(m) => setDecoded({ sessionId, conversationId, messages: m })}
-        />
-      )}
-      {chat.truncated && (
-        <Text fontSize="xs" color="text.dim" textAlign="center">
-          Earlier messages hidden
-        </Text>
-      )}
-      {hiddenCount > 0 && (
-        <Box alignSelf="center">
-          <Button
-            emphasis="secondary"
-            onClick={() => setMore({ key: windowKey, limit: limit + CHAT_WINDOW })}
-          >
-            Show {Math.min(hiddenCount, CHAT_WINDOW)} earlier messages ({hiddenCount} hidden)
-          </Button>
+    <>
+      <ChatScroller key={windowKey}>
+        {head}
+        {messages.length === 0 && (
+          <CodexNotices
+            chat={chat}
+            sessionId={sessionId}
+            onDecoded={(m) => setDecoded({ sessionId, conversationId, messages: m })}
+          />
+        )}
+        {chat.truncated && (
+          <Text fontSize="xs" color="text.dim" textAlign="center">
+            Earlier messages hidden
+          </Text>
+        )}
+        {hiddenCount > 0 && (
+          <Box alignSelf="center">
+            <Button
+              emphasis="secondary"
+              onClick={() => setMore({ key: windowKey, limit: limit + CHAT_WINDOW })}
+            >
+              Show {Math.min(hiddenCount, CHAT_WINDOW)} earlier messages ({hiddenCount} hidden)
+            </Button>
+          </Box>
+        )}
+        {shownMessages.map((m, i) => (
+          <Entry key={m.id || hiddenCount + i} m={m} showTools={showTools} sessionId={sessionId} />
+        ))}
+        {tail}
+        {end}
+      </ChatScroller>
+      {/* Outside the scroller: the Working row and tasks come and go without moving the messages. */}
+      {(busy && working) || (chat.tasks?.length ?? 0) > 0 ? (
+        <Box flexShrink="0" display="flex" flexDirection="column" gap="3">
+          {busy && working}
+          <TaskList tasks={chat.tasks} />
         </Box>
-      )}
-      {shownMessages.map((m, i) => (
-        <Entry key={m.id || hiddenCount + i} m={m} showTools={showTools} sessionId={sessionId} />
-      ))}
-      {tail}
-      {busy && working}
-      <TaskList tasks={chat.tasks} />
-      {end}
-    </ChatScroller>
+      ) : null}
+    </>
   )
 }
