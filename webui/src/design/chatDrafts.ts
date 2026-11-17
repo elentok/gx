@@ -2,6 +2,7 @@ import {
   ReasonDraftGone,
   ReasonDraftRevisionConflict,
   type ChatDraft,
+  type ChatDraftCreateRequest,
   type ChatDraftReadRequest,
   type ChatDraftResult,
   type ChatDraftSaveRequest,
@@ -25,13 +26,42 @@ export type ChatStartOutcome =
 
 /** The chat draft calls the page makes; the prop defaults to the real ones. */
 export interface ChatDraftsClient {
+  /** Makes a draft and gives its id; a refusal throws with the server's reason. */
+  create: (init: NewChatDraft) => Promise<string>
   read: (id: string) => Promise<ChatDraftOutcome>
   save: (body: ChatDraftSaveRequest) => Promise<ChatDraftOutcome>
   remove: (id: string) => Promise<ChatDraftOutcome>
   start: (id: string) => Promise<ChatStartOutcome>
 }
 
+/** What a new chat draft starts with; the brief is empty and the other settings take the server's defaults. */
+export interface NewChatDraft {
+  project: string
+  workspace?: string
+  harness?: string
+  folder?: string
+}
+
 const BASE = "/v1/agents/drafts"
+
+async function createDraft(init: NewChatDraft): Promise<string> {
+  const body: ChatDraftCreateRequest = {
+    project: init.project,
+    workspace: init.workspace,
+    harness: init.harness ?? "",
+    folder: init.folder ?? "",
+    brief: "",
+    name: "",
+    model: "",
+    effort: "",
+    worktree: "",
+    from_session: "",
+  }
+  const r = await json<ChatDraftResult>(`${BASE}/create`, body)
+  if (r.refused) throw new WriteError(r.message || r.reason || "Draft refused")
+  if (!r.draft) throw new WriteError("Empty draft answer")
+  return r.draft.id
+}
 
 function toResult(r: ChatDraftResult): ChatDraftOutcome {
   if (r.refused) {
@@ -57,6 +87,7 @@ function toStart(r: ChatDraftResult): ChatStartOutcome {
 }
 
 export const realChatDrafts: ChatDraftsClient = {
+  create: createDraft,
   start: async (id) => toStart(await json<ChatDraftResult>(`${BASE}/start`, { id })),
   read: (id) => call("read", { id }),
   save: (body) => call("save", body),

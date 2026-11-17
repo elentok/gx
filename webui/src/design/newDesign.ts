@@ -2,13 +2,14 @@ import { useLayoutEffect } from "react"
 import { useLocation, useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { useEpicList } from "../epics/list"
-import type { DesignDraftRow, SessionInfo } from "../generated/server"
-import { draftHref } from "../hrefs"
+import { ChatDraftFolderSource, type DesignDraftRow, type SessionInfo } from "../generated/server"
+import { chatDraftHref, draftHref } from "../hrefs"
 import { FOCUS_PROMPT_STATE } from "../agents/promptFocus"
-import { draftPageActions } from "../shell/draftPageActions"
+import { chatDraftPageActions, draftPageActions } from "../shell/draftPageActions"
 import { useShell } from "../shell/ShellContext"
 import { showToast } from "../ui/toaster"
 import { defaultProject } from "../workspaces/defaultProject"
+import { realChatDrafts, type ChatDraftsClient } from "./chatDrafts"
 import { createDraft, getLastProject, type CreateDraft } from "./drafts"
 import { moveLegacyDraft } from "./legacyDraft"
 
@@ -87,10 +88,51 @@ export async function startNewDesign(client: NewDesignClient = realClient) {
     const id = await client.create({ workspace: ctx.workspace, project })
     ctx.open(draftHref(id).slice(1))
   } catch (e) {
-    showToast({
-      type: "error",
-      title: "Could not create the draft",
-      description: e instanceof Error ? e.message : undefined,
+    toastCreateFailed(e)
+  }
+}
+
+function toastCreateFailed(e: unknown) {
+  showToast({
+    type: "error",
+    title: "Could not create the draft",
+    description: e instanceof Error ? e.message : undefined,
+  })
+}
+
+export interface NewChatDraftClient {
+  create: ChatDraftsClient["create"]
+  getLastProject: () => Promise<string>
+}
+
+const realChatClient: NewChatDraftClient = {
+  create: realChatDrafts.create,
+  getLastProject,
+}
+
+/**
+ * The New chat draft action. On an empty chat draft page it only focuses the brief; anywhere
+ * else it makes an empty draft in the rule-order project and opens it.
+ */
+export async function startNewChatDraft(client: NewChatDraftClient = realChatClient) {
+  const ctx = context
+  if (!ctx) return
+  const page = chatDraftPageActions()
+  if (page?.isEmpty()) {
+    page.focusBrief()
+    return
+  }
+  try {
+    const lastProject = await client.getLastProject().catch(() => "")
+    const project = defaultProject({ ...ctx, lastProject })
+    const id = await client.create({
+      workspace: ctx.workspace,
+      project,
+      harness: "claude",
+      folder: ChatDraftFolderSource,
     })
+    ctx.open(chatDraftHref(id).slice(1))
+  } catch (e) {
+    toastCreateFailed(e)
   }
 }

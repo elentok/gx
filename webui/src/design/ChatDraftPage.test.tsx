@@ -47,7 +47,7 @@ function fakeDrafts(over: Partial<ChatDraft> = {}) {
   const start = vi.fn(
     async (): Promise<ChatStartOutcome> => ({ kind: "started", session: "sess-9" }),
   )
-  const client: ChatDraftsClient = { read, save, remove, start }
+  const client: ChatDraftsClient = { create: vi.fn(async () => "c2"), read, save, remove, start }
   return { client, read, save, remove, start, stored }
 }
 

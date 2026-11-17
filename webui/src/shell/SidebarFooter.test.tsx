@@ -9,7 +9,8 @@ import { SidebarFooter } from "./SidebarFooter"
 afterEach(cleanup)
 
 const startNewDesign = vi.hoisted(() => vi.fn())
-vi.mock("../design/newDesign", () => ({ startNewDesign }))
+const startNewChatDraft = vi.hoisted(() => vi.fn())
+vi.mock("../design/newDesign", () => ({ startNewDesign, startNewChatDraft }))
 
 const meter = (state: string) => ({ level: 1, state, read_at: "" })
 
@@ -79,8 +80,16 @@ test("the + New menu lists the three items and New workspace calls its prop", as
   const onNewWorkspace = vi.fn()
   setup({}, true, onNewWorkspace)
   fireEvent.click(screen.getByRole("button", { name: "+ New" }))
-  expect(await screen.findByRole("menuitem", { name: "New design" })).toBeTruthy()
-  expect(screen.getByRole("menuitem", { name: "New chat" })).toBeTruthy()
+  await screen.findByRole("menuitem", { name: "New design" })
+  expect(screen.getAllByRole("menuitem").map((el) => el.textContent)).toEqual([
+    "New design",
+    "New chat",
+    "New chat draft",
+    "New workspace…",
+  ])
+  fireEvent.click(screen.getByRole("menuitem", { name: "New chat draft" }))
+  await waitFor(() => expect(startNewChatDraft).toHaveBeenCalledTimes(1))
+  fireEvent.click(screen.getByRole("button", { name: "+ New" }))
   fireEvent.click(screen.getByRole("menuitem", { name: "New workspace…" }))
   await waitFor(() => expect(onNewWorkspace).toHaveBeenCalled())
 })

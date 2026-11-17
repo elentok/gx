@@ -1,7 +1,7 @@
 import { renderHook, type RenderHookResult } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
-import { registerDraftPage } from "../shell/draftPageActions"
-import { startNewDesign, useNewDesignContext } from "./newDesign"
+import { registerChatDraftPage, registerDraftPage } from "../shell/draftPageActions"
+import { startNewChatDraft, startNewDesign, useNewDesignContext } from "./newDesign"
 
 const h = vi.hoisted(() => ({ showToast: vi.fn(), pathname: "/" }))
 const showToast = h.showToast
@@ -99,6 +99,57 @@ describe("create versus reuse", () => {
     await startNewDesign(client())
     expect(create).toHaveBeenCalledTimes(1)
     expect(open).toHaveBeenCalledWith("/drafts/d9")
+  })
+})
+
+describe("startNewChatDraft", () => {
+  const chatCreate = vi.fn(async (_init: unknown) => "c9")
+  const chatClient = () => ({ create: chatCreate, getLastProject: async () => "last" })
+  beforeEach(() => chatCreate.mockClear())
+
+  test("creates one empty draft in the workspace and opens its page", async () => {
+    mountAt("/epics")
+    await startNewChatDraft(chatClient())
+    expect(chatCreate).toHaveBeenCalledTimes(1)
+    expect(chatCreate).toHaveBeenCalledWith({
+      workspace: "w1",
+      project: "last",
+      harness: "claude",
+      folder: "source",
+    })
+    expect(open).toHaveBeenCalledWith("/chat-drafts/c9")
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  test("on an empty chat draft page it focuses the brief and creates nothing", async () => {
+    mountAt("/chat-drafts/c1")
+    const focusBrief = vi.fn()
+    const off = registerChatDraftPage({ isEmpty: () => true, focusBrief })
+    await startNewChatDraft(chatClient())
+    off()
+    expect(focusBrief).toHaveBeenCalledTimes(1)
+    expect(chatCreate).not.toHaveBeenCalled()
+    expect(open).not.toHaveBeenCalled()
+  })
+
+  test("on a chat draft page with a brief it creates a draft", async () => {
+    mountAt("/chat-drafts/c1")
+    const off = registerChatDraftPage({ isEmpty: () => false, focusBrief: vi.fn() })
+    await startNewChatDraft(chatClient())
+    off()
+    expect(chatCreate).toHaveBeenCalledTimes(1)
+  })
+
+  test("a failed create toasts the reason and opens nothing", async () => {
+    mountAt("/epics")
+    chatCreate.mockRejectedValueOnce(new Error("no such project"))
+    await startNewChatDraft(chatClient())
+    expect(open).not.toHaveBeenCalled()
+    expect(showToast).toHaveBeenCalledWith({
+      type: "error",
+      title: "Could not create the draft",
+      description: "no such project",
+    })
   })
 })
 

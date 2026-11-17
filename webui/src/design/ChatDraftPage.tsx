@@ -1,7 +1,10 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
-import { lazy, Suspense, useEffect, useState, type FormEvent } from "react"
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react"
 import { useNavigate, useParams } from "react-router"
 import type { FetchWorktrees } from "../agents/newSession"
+import { usePromptFocus } from "../agents/promptFocus"
+import { registerChatDraftPage } from "../shell/draftPageActions"
+import { PROMPT_BOX_SELECTOR } from "../ui/expandable-text/look"
 import type { ChatDraft } from "../generated/server"
 import { agentPath } from "../hrefs"
 import { DetailPage } from "../page/DetailPage"
@@ -115,6 +118,21 @@ function ChatDraftForm({
   const claimHeader = shell?.claimHeader
   useEffect(() => claimHeader?.(), [claimHeader])
 
+  const formRef = useRef<HTMLDivElement>(null)
+  const focusBrief = () => formRef.current?.querySelector<HTMLElement>(PROMPT_BOX_SELECTOR)?.focus()
+  // New chat draft opens this page asking for the brief's focus, and on an empty page it asks again.
+  usePromptFocus(formRef)
+  const pageState = useRef({ empty: !brief.trim(), focusBrief })
+  pageState.current = { empty: !brief.trim(), focusBrief }
+  useEffect(
+    () =>
+      registerChatDraftPage({
+        isEmpty: () => pageState.current.empty,
+        focusBrief: () => pageState.current.focusBrief(),
+      }),
+    [],
+  )
+
   const removeNow = () => {
     remove()
     navigate("/epics", { state: { note: REMOVED_NOTE } })
@@ -129,6 +147,7 @@ function ChatDraftForm({
     <DetailPage fill title={{ kind: "Chat draft", name: facts.label }}>
       <Box
         as="form"
+        ref={formRef}
         onSubmit={submit}
         flex="1"
         minH="0"

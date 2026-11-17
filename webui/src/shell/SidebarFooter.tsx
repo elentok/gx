@@ -18,7 +18,7 @@ import {
 import { useDevice } from "../useWide"
 import { FooterButton, footerHover, interactiveStyle } from "./FooterButton"
 import { GearMenu } from "./GearMenu"
-import { startNewDesign } from "../design/newDesign"
+import { startNewChatDraft, startNewDesign } from "../design/newDesign"
 import { openNewAgent } from "./newItemOpen"
 import { useShell } from "./ShellContext"
 
@@ -327,6 +327,11 @@ export function SidebarFooter({
           items={[
             { value: "design", label: "New design", onSelect: () => void startNewDesign() },
             { value: "agent", label: "New chat", onSelect: openNewAgent },
+            {
+              value: "chat-draft",
+              label: "New chat draft",
+              onSelect: () => void startNewChatDraft(),
+            },
             { kind: "separator" },
             { value: "workspace", label: "New workspace…", onSelect: onNewWorkspace },
           ]}
