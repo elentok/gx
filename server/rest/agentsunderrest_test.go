@@ -41,7 +41,7 @@ func TestServer_AgentsKeepWorkingUnderRest(t *testing.T) {
 			h := servertest.StartWithStore(t, store,
 				servertest.WithRunnerFor(fake, func(string, string) agentrunner.Runner { return fake }),
 				servertest.WithRestClock(clock), servertest.WithMentalHealth(tc.cfg))
-			t.Cleanup(func() { fake.SetState(rigs.ResumeLabel, agentrunner.StateDone, "") })
+			t.Cleanup(func() { fake.Finish(rigs.ResumeLabel) })
 
 			if res, err := h.Client.Queue.Add(context.Background(), rigs.QueueRowTicket, "claude"); err != nil || res.Refused {
 				t.Fatalf("add: %+v, %v", res, err)

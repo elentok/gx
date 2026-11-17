@@ -34,7 +34,7 @@ func TestLaunch_StaleHolderIsClosedAndTheLaunchRetried(t *testing.T) {
 		t.Run(string(state), func(t *testing.T) {
 			spy, holder := spyWithHolder(t, state)
 			h := launchOne(t, spy, wire.EventIterationStarted)
-			t.Cleanup(func() { spy.SetState(holderLabel, agentrunner.StateDone, "") })
+			t.Cleanup(func() { spy.Finish(holderLabel) })
 			closed := ofType(runLog(t, h), events.StalePaneClosed)
 			if len(closed) != 1 || closed[0].Pane != holder.ID || closed[0].Reason != string(state) || closed[0].Ticket != "01" {
 				t.Errorf("stale-pane-closed events = %+v, want one for %s, %s", closed, holder.ID, state)

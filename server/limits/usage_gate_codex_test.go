@@ -43,9 +43,7 @@ func TestUsageGate_CodexSampleHoldsCodexClaimsOnlyAndItsOverrideLiftsThem(t *tes
 		withCodexUsageSample(t, rec))
 	t.Cleanup(func() {
 		for _, label := range []string{"epic-a-iter-01", "epic-b-iter-01"} {
-			if len(pty.Prompts(label)) > 0 {
-				pty.SetState(label, agentrunner.StateDone, "")
-			}
+			pty.Finish(label)
 		}
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

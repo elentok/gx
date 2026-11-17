@@ -20,7 +20,7 @@ func TestLaunchTimed_ADeliveredLaunchLogsOneEventWhoseStepsSumToTheTotal(t *test
 	t.Parallel()
 	spy := &launchSpy{Runner: runnerfake.NewRunner()}
 	h := launchOne(t, spy, wire.EventIterationStarted)
-	t.Cleanup(func() { spy.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
+	t.Cleanup(func() { spy.Finish("epic-a-iter-01") })
 	timed := ofType(runLog(t, h), events.LaunchTimed)
 	if len(timed) != 1 {
 		t.Fatalf("launch-timed = %+v, want one", timed)
@@ -51,7 +51,7 @@ func TestLaunchTimed_ASlowInstallCountsInTheDepsStep(t *testing.T) {
 			}
 		}
 	})
-	t.Cleanup(func() { fake.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
+	t.Cleanup(func() { fake.Finish("epic-a-iter-01") })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)

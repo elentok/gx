@@ -374,7 +374,7 @@ func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
 		t.Fatalf("runs = %+v, want one recorded as fake", runs)
 	}
 	// End the agent's turn so its run settles before the harness tears down.
-	t.Cleanup(func() { fake.SetState(runs[0].Session.Label, agentrunner.StateDone, "") })
+	t.Cleanup(func() { fake.Finish(runs[0].Session.Label) })
 	if _, ok, _ := fake.Find(runs[0].Session.Label); !ok {
 		t.Error("the agent was not started on the configured runner")
 	}

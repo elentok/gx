@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
@@ -65,7 +64,7 @@ func TestLaunch_TypedPromptIsOnlySkillAndAddress(t *testing.T) {
 			fake := runnerfake.NewRunner()
 			h := servertest.StartWithStore(t, store, servertest.WithRunner(rigs.NewNamedFake(fake, "pty")))
 			addTicket(t, h, agentName)
-			t.Cleanup(func() { fake.SetState(rigs.ResumeLabel, agentrunner.StateDone, "") })
+			t.Cleanup(func() { fake.Finish(rigs.ResumeLabel) })
 			servertest.WaitFor(t, 10*time.Second, "the ticket launches", func() bool { return len(fake.Prompts(rigs.ResumeLabel)) > 0 })
 
 			if got := fake.Prompts(rigs.ResumeLabel)[0]; got != want {

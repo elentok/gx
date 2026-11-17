@@ -51,7 +51,7 @@ func StartQueueRows(t *testing.T, runner string) (*servertest.Harness, NamedFake
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	fake := NewNamedFake(runnerfake.NewRunner(), runner)
 	h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(fake, func(string, string) agentrunner.Runner { return fake }))
-	t.Cleanup(func() { fake.SetState(ResumeLabel, agentrunner.StateDone, "") })
+	t.Cleanup(func() { fake.Finish(ResumeLabel) })
 	if res, err := h.Client.Queue.Add(context.Background(), QueueRowTicket, "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}

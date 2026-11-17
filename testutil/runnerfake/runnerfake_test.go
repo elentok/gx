@@ -260,3 +260,38 @@ func TestRateLimitAndHealth(t *testing.T) {
 		t.Fatalf("Healthy = %v, want %v", err, down)
 	}
 }
+
+func TestFinish(t *testing.T) {
+	t.Run("never started label does nothing", func(t *testing.T) {
+		r := NewRunner()
+		r.Finish("ghost")
+	})
+	t.Run("live session moves to done", func(t *testing.T) {
+		r := NewRunner()
+		s := start(t, r, "a")
+		r.Finish("a")
+		if st := status(t, r, s); st.State != agentrunner.StateDone {
+			t.Fatalf("state = %q, want done", st.State)
+		}
+		if _, err := r.Wait(s, []agentrunner.State{agentrunner.StateDone}, time.Second); err != nil {
+			t.Fatalf("Wait: %v", err)
+		}
+	})
+	t.Run("stopped session does nothing", func(t *testing.T) {
+		r := NewRunner()
+		s := start(t, r, "a")
+		if err := r.Stop(s); err != nil {
+			t.Fatal(err)
+		}
+		r.Finish("a")
+	})
+	t.Run("SetState on a missing label still panics", func(t *testing.T) {
+		r := NewRunner()
+		defer func() {
+			if recover() == nil {
+				t.Fatal("SetState on a missing label did not panic")
+			}
+		}()
+		r.SetState("ghost", agentrunner.StateDone, "")
+	})
+}

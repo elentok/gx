@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
@@ -41,7 +40,7 @@ func TestLaunch_NoNoteKeepsSharedPromptAndRemovesStaleFiles(t *testing.T) {
 	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	t.Cleanup(func() { fake.SetState(rigs.ResumeLabel, agentrunner.StateDone, "") })
+	t.Cleanup(func() { fake.Finish(rigs.ResumeLabel) })
 	servertest.WaitFor(t, 10*time.Second, "the ticket launches", func() bool { return len(fake.Prompts(rigs.ResumeLabel)) > 0 })
 
 	for _, p := range stale {

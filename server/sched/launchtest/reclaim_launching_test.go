@@ -86,7 +86,7 @@ func TestRunner_LaunchWritesALaunchingEntryBeforeTheAgentStartsAndFlipsIt(t *tes
 	t.Parallel()
 	spy := &launchSpy{Runner: runnerfake.NewRunner()}
 	h := launchOne(t, spy, wire.EventIterationStarted)
-	t.Cleanup(func() { spy.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
+	t.Cleanup(func() { spy.Finish("epic-a-iter-01") })
 	spy.mu.Lock()
 	atStart := spy.atStart
 	spy.mu.Unlock()

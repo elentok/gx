@@ -29,7 +29,7 @@ func TestRateLimitHold_StopsNewClaimsOfThatHarnessOnly(t *testing.T) {
 	pty := rigs.NewNamedFake(runnerfake.NewRunner(), "pty")
 	h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(pty, func(string, string) agentrunner.Runner { return pty }),
 		func(c *server.Config) { c.MaxAgents = 4 })
-	t.Cleanup(func() { pty.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
+	t.Cleanup(func() { pty.Finish("epic-a-iter-01") })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {

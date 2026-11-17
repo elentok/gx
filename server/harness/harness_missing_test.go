@@ -10,7 +10,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -44,7 +43,7 @@ func TestClaimHold_HarnessMissingHoldsTicket(t *testing.T) {
 			pty := rigs.NewNamedFake(runnerfake.NewRunner(), "pty")
 			opts := append([]func(*server.Config){servertest.WithRunner(pty)}, tc.options...)
 			h := servertest.StartWithStore(t, store, opts...)
-			t.Cleanup(func() { pty.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
+			t.Cleanup(func() { pty.Finish("epic-a-iter-01") })
 			h.Programs.Missing(tc.missing)
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()

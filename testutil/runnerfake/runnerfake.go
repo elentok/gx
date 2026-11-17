@@ -393,6 +393,23 @@ func (r *Runner) SetState(label string, state agentrunner.State, reason string) 
 	r.notify()
 }
 
+// Finish moves the live session label to done and does nothing when no
+// session has that label. Cleanups use it: a launch that failed leaves no
+// session, and SetState would panic there and end the test binary.
+func (r *Runner) Finish(label string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, ss := range r.sessions {
+		if ss.Label == label {
+			ss.status.State = agentrunner.StateDone
+			ss.status.BlockedReason, ss.status.Error = "", ""
+			ss.status.Pending = nil
+			r.notify()
+			return
+		}
+	}
+}
+
 // SetErrored makes label blocked on an agent error: Status reports
 // StateBlocked with Error text and no BlockedReason, as a Codex turn that
 // ended in an error does. SetState clears it.

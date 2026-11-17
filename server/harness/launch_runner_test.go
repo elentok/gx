@@ -40,8 +40,8 @@ func TestLaunchRunner_CodexRunsOnPty(t *testing.T) {
 				return nil
 			}))
 			t.Cleanup(func() {
-				fakes[tc.codexOn].SetState("epic-a-iter-01", agentrunner.StateDone, "")
-				configured.SetState("epic-b-iter-01", agentrunner.StateDone, "")
+				fakes[tc.codexOn].Finish("epic-a-iter-01")
+				configured.Finish("epic-b-iter-01")
 			})
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()

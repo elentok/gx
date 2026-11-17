@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/servertest"
@@ -49,7 +48,7 @@ func TestLaunch_RelaunchPromptListsEarlierSummaries(t *testing.T) {
 			if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
-			t.Cleanup(func() { fake.SetState(rigs.ResumeLabel, agentrunner.StateDone, "") })
+			t.Cleanup(func() { fake.Finish(rigs.ResumeLabel) })
 			servertest.WaitFor(t, 10*time.Second, "the ticket launches", func() bool { return len(fake.Prompts(rigs.ResumeLabel)) > 0 })
 			if got := fake.Prompts(rigs.ResumeLabel)[0]; strings.Contains(got, "## Iteration summaries") || strings.Contains(got, "\n") {
 				t.Errorf("typed prompt carries the note:\n%s", got)

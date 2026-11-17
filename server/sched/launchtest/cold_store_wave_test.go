@@ -48,7 +48,7 @@ func TestColdStoreWave_SixTicketsOfOneEpicInstallOneAtATime(t *testing.T) {
 	})
 	t.Cleanup(func() {
 		for i := 1; i <= tickets; i++ {
-			fake.SetState(fmt.Sprintf("epic-a-iter-%02d", i), "done", "")
+			fake.Finish(fmt.Sprintf("epic-a-iter-%02d", i))
 		}
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

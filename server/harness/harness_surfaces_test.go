@@ -154,9 +154,7 @@ func startSplitRunners(t *testing.T, store string, extra ...func(*server.Config)
 	servertest.WriteConfig(t, path, store, nil)
 	t.Cleanup(func() {
 		for _, r := range []*runnerfake.Runner{claude, pty} {
-			if len(r.Prompts("epic-a-iter-01")) > 0 {
-				r.SetState("epic-a-iter-01", agentrunner.StateDone, "")
-			}
+			r.Finish("epic-a-iter-01")
 		}
 	})
 	return h, claude, pty, path

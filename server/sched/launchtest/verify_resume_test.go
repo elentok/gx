@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
@@ -61,7 +60,7 @@ func TestLaunch_VerifyRelaunchListsSkippedAndRecheckedStories(t *testing.T) {
 			break
 		}
 	}
-	t.Cleanup(func() { fake.SetState(rigs.ResumeLabel, agentrunner.StateDone, "") })
+	t.Cleanup(func() { fake.Finish(rigs.ResumeLabel) })
 
 	prompts := fake.Prompts(rigs.ResumeLabel)
 	if len(prompts) == 0 {

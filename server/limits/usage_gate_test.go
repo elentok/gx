@@ -46,9 +46,7 @@ func TestUsageGate_HoldsClaudeClaimsOnly(t *testing.T) {
 				withUsageSample(t, c.rec))
 			t.Cleanup(func() {
 				for _, label := range []string{"epic-a-iter-01", "epic-b-iter-01"} {
-					if len(pty.Prompts(label)) > 0 {
-						pty.SetState(label, agentrunner.StateDone, "")
-					}
+					pty.Finish(label)
 				}
 			})
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -85,11 +83,7 @@ func TestUsageGate_OverrideLetsAClaudeTicketClaim(t *testing.T) {
 	h := servertest.StartWithStore(t, store,
 		servertest.WithRunnerFor(pty, func(string, string) agentrunner.Runner { return pty }),
 		withUsageSample(t, rec))
-	t.Cleanup(func() {
-		if len(pty.Prompts("epic-a-iter-01")) > 0 {
-			pty.SetState("epic-a-iter-01", agentrunner.StateDone, "")
-		}
-	})
+	t.Cleanup(func() { pty.Finish("epic-a-iter-01") })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
@@ -120,11 +114,7 @@ func TestUsageGate_LiftsAtResetWithNoNewSample(t *testing.T) {
 	h := servertest.StartWithStore(t, store,
 		servertest.WithRunnerFor(pty, func(string, string) agentrunner.Runner { return pty }),
 		withUsageSample(t, rec))
-	t.Cleanup(func() {
-		if len(pty.Prompts("epic-a-iter-01")) > 0 {
-			pty.SetState("epic-a-iter-01", agentrunner.StateDone, "")
-		}
-	})
+	t.Cleanup(func() { pty.Finish("epic-a-iter-01") })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {

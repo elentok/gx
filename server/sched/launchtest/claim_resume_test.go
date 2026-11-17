@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/worktree"
@@ -83,7 +82,7 @@ func claimOpen(t *testing.T, runner string, agent string, answered, rollout bool
 			break
 		}
 	}
-	t.Cleanup(func() { fake.SetState(rigs.ResumeLabel, agentrunner.StateDone, "") })
+	t.Cleanup(func() { fake.Finish(rigs.ResumeLabel) })
 	logged, _, err := runlog.ReadEvents(filepath.Join(store, "proj"), "epic-a")
 	if err != nil {
 		t.Fatal(err)
