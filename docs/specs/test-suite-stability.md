@@ -95,8 +95,8 @@ Vitest
 44. As a developer, I want the ScreenModal Refresh test to wait until the button is enabled before it clicks, so that a click on a disabled button is not silently lost.
 45. As a developer, I want the InterruptControl test to keep its focus wait and drop the 5 s overrides, so that it uses the repo's global wait.
 46. As a developer, I want the menu's focus-settle timer to return a disposer that the menu calls on unmount, so that no timer outlives jsdom.
-47. As a developer, I want every product module with a module-level timer to export a cancel/disposer, and `test-setup.ts` to call all of them after each test, so that a leaked timer cannot fail a run with every test green. The rule "a product timer needs a disposer" is also in `gx-vitest-tests` and `gx-test-review`.
-47a. As a maintainer, I want a Vitest guard that fails when a module-level timer has no disposer registered, so that a new leaked timer cannot be added.
+47. As a developer, I want every product module with a module-level timer to export a disposer that `test-setup.ts` calls after each test, so that a leaked timer cannot fail a run with every test green. The only module-level timer today is `idleTimer` in `webui/src/webPerf.ts`. The menu's timer is function-local and is covered by story 46. The rule "a product timer needs a disposer" is also in `gx-vitest-tests` and `gx-test-review`.
+47a. As a maintainer, I want a runtime check in `test-setup.ts` that fails a test when a timer it created is still pending after cleanup, so that a new leaked timer, module-level or not, cannot be added.
 48. As a developer, I want a unit test showing the timer count is zero after a menu item is picked and the menu unmounts, so that the leak stays fixed.
 
 Shared skills
@@ -119,7 +119,7 @@ Review
 Guards
 
 60. As a maintainer, I want the Biome linter on in `gx check` and CI with `recommended` plus the `react` and `test` domains, so that hook misuse, index keys, untyped buttons and focused tests fail early.
-61. As a maintainer, I want every enabled Biome rule to run as an error, `noNonNullAssertion` off with a comment, all ~760 warnings and ~270 errors fixed in the epic, and the check to fail on any diagnostic, so that the linter ships with zero findings.
+61. As a maintainer, I want the Biome linter to keep its default severities, `noNonNullAssertion` off with a comment, all findings (about 270 errors, 99 warnings and 25 infos) fixed in the epic, and `gx check` to fail on any diagnostic of any severity, so that the linter ships with zero findings.
 62. As a maintainer, I want a rules test that fails on Playwright fixed sleeps (`waitForTimeout`), so that clock waits do not return.
 63. As a maintainer, I want a rules test that fails on a fake `SetState` cleanup with no liveness check, so that the cleanup panic does not return.
 64. As a maintainer, I want guards to have no allowlist and to ship green, so that an exemption list cannot grow.
@@ -195,8 +195,8 @@ Vitest
 - ScreenModal: wait for the first load to show, then click.
 - InterruptControl: keep the focus wait, drop the 5 s overrides.
 - Menu timer: the focus-settle function returns a disposer. The menu calls it on unmount.
-- Timer disposers (story 47): every product module with a module-level timer exports a cancel/disposer and registers it with a small `registerTimerDisposer` helper. `test-setup.ts` runs all registered disposers after each test. The menu module's `cancelFocusWindow()` is the first. The implementer finds the others with `rg -n "^(export )?(let|var) \w+.*(Timeout|Timer|Interval)|^(setTimeout|setInterval)\(" webui/src -g '!*.test.*' -g '!*.spec.*'` and lists them in the PR.
-- Timer guard (story 47a): a Vitest guard reads the non-test files under `webui/src` and fails when a file has a column-0 `let` or `var` whose name or type mentions `Timeout`, `Timer` or `Interval`, or a column-0 `setTimeout`/`setInterval` call, and does not call `registerTimerDisposer`. It has no allowlist and ships green. A timer that is not at module level is not caught by the guard and is left to `gx-test-review`.
+- Timer disposers (story 47): every product module with a module-level timer exports a disposer and registers it with a small `registerTimerDisposer` helper. `test-setup.ts` runs all registered disposers after each test. Today the only module-level timer is `idleTimer` in `webui/src/webPerf.ts`; it gets the first disposer. The menu timer is function-local and is covered by story 46.
+- Timer guard (story 47a): `test-setup.ts` wraps `setTimeout` and `setInterval` and records each timer a test creates with its creation stack. In `afterEach`, after React Testing Library cleanup and the registered disposers, it fails the test if a recorded timer is still pending, and prints where the timer was created. It catches function-local timers, timers kept in a Map or object, and `window.setTimeout`. It has no allowlist and ships green. Pending timers that a test creates and clears itself are not flagged.
 - Closed without a test change: the ArchivePage and RestartDialog "spinner" and "once" tests (no repro), webui-flakes/01 (obsolete), test-health/03 (stale), follow-ups/518 (fixed).
 
 Skills
@@ -213,15 +213,15 @@ Skills
 
 Guards
 
-- Biome linter: `recommended` plus the `react` and `test` domains, run in `gx check` and CI. Every enabled rule runs as an error (the config sets severity `error`, and the check also passes `--error-on-warnings`), and the check fails on any diagnostic. A trial found 270 errors and 760 warnings. `noNonNullAssertion` is off with a comment. Every other finding, warnings included, is fixed in the epic. No ratchet.
+- Biome linter: `recommended` plus the `react` and `test` domains, run in `gx check` and CI. The config keeps Biome's default severities. The `gx check` lint step runs Biome with the JSON reporter at `--diagnostic-level=info` and fails if it lists any diagnostic of any severity, so infos count too. A trial on Biome 2.6.6 with `noNonNullAssertion` off found 270 errors, 99 warnings and 25 infos. `noNonNullAssertion` is off with a comment. Every other finding, warnings included, is fixed in the epic. No ratchet.
 - Go rules tests (the `envguard` pattern, run in `gx check`): Playwright fixed sleeps, and fake `SetState` cleanups with no liveness check. The implementer picks whether they extend an existing guard package. Neither has an allowlist. Both ship green.
-- Left to review: Go `time.Sleep`, negative Playwright assertions with no positive barrier, one-time `evaluate` reads, Vitest waits on the wrong fetch, and leaked timers that are not module-level (module-level timers have the Vitest guard of story 47a).
+- Left to review: Go `time.Sleep`, negative Playwright assertions with no positive barrier, one-time `evaluate` reads, Vitest waits on the wrong fetch, and leaked timers in non-Vitest code (Vitest timers have the runtime check of story 47a).
 
 Measurement
 
 - New index fields: attempt, a failure signature of about 200 characters, load at start and end, process count at start and end, origin (release or agent). Stable test names as in story 66.
 - `attempt` comes from `gx check`'s rerun flag. For a manual run it comes from the last index line with the same `tree_id` and args (one more than that line's attempt). `origin` comes from an env var, `GX_CHECK_ORIGIN=release`, set by `/gx-bump`. No value means `agent`.
-- The headline is the first-attempt pass rate of full `gx check --full` runs on trunk. Guard tests are excluded by category: guard packages, rules tests under `skills/`, and the lint step. The categories live in one list that the measurement command reads. The list names the existing guards (`sizeguard`, `sleepguard`, `oldwords`, `envguard`) and the new ones: the Biome lint step, the Playwright fixed-sleep rule, the `SetState` cleanup rule, the portable-skill rule, the `gx-only-e2es` rules test, the route-header test, the timer-disposer guard and `playwrightguard`. A pass on rerun counts as a failure. The same-tree fail-then-pass list per test is the diagnostic.
+- The headline is the first-attempt pass rate of full `gx check --full` runs on trunk. Guard tests are excluded by category: guard packages, rules tests under `skills/`, and the lint step. The categories live in one list that the measurement command reads. The list names the existing guards (`sizeguard`, `sleepguard`, `oldwords`, `envguard`) and the new ones: the Biome lint step, the Playwright fixed-sleep rule, the `SetState` cleanup rule, the portable-skill rule, the `gx-only-e2es` rules test, the route-header test, the pending-timer check and `playwrightguard`. A pass on rerun counts as a failure. The same-tree fail-then-pass list per test is the diagnostic.
 - Numbers are computed when read, from the index and `gx check` records. No new store or dashboard. A short script or a `gx brief` view prints the headline and the list. The implementer picks which.
 - Slow tests no longer count as failures in the headline. A Vitest run that exits 1 with all tests green is recorded as a failed entry with a signature (for example the unhandled error text).
 - The first impl ticket records the baseline (109 of 111 full runs failed) before any fix.
@@ -252,7 +252,7 @@ Seams (existing ones, highest first):
 
 - `gx check --full` on trunk, as measured by the `gx brief` index. This is the proof of the epic.
 - Go package tests at each fixed behaviour: the Codex question tests (8 existing), the store-commit debounce test, `storecommit`, the launch and nudge tests, the budget tests, the pid watcher tests, the fixture package tests.
-- Vitest files for each fixed Vitest group, the timer-disposer guard, the page-header test over the routes, the service worker precache test, the menu timer test, and the Stats page test that the "Include dev" checkbox stays mounted across a filter-change refetch (render the page with no cache for the new id, hold the second fetch pending, click, assert the same element is still connected, then resolve the fetch). Prior art: the Stats page tests and the `useFetched` tests.
+- Vitest files for each fixed Vitest group, the pending-timer check in `test-setup.ts`, the page-header test over the routes, the service worker precache test, the menu timer test, and the Stats page test that the "Include dev" checkbox stays mounted across a filter-change refetch (render the page with no cache for the new id, hold the second fetch pending, click, assert the same element is still connected, then resolve the fetch). Prior art: the Stats page tests and the `useFetched` tests.
 - Playwright flows 152, 88, 117, 102, 24, 22, 184, 199, 155, 159, 72b, 158, 160, settings 200, menu 117, dev-mode and epics 2.
 - Rules tests in `skills/` and the guard packages for the skills, the guards and the index line.
 
@@ -293,8 +293,8 @@ Vitest (stories 42 to 48)
 
 - Flows: none.
 - Checks: `gx brief -C webui vitest src/epic src/routes src/ui` exits 0. Ten loaded full Vitest runs print no `Errors` line. The new timer-count test passes.
-- Story 47: `rg -n "^(export )?(let|var) \w+.*(Timeout|Timer|Interval)|^(setTimeout|setInterval)\(" webui/src -g '!*.test.*' -g '!*.spec.*'` lists the module-level timers. The PR lists them, each has an exported disposer, and `test-setup.ts` calls all of them in `afterEach`.
-- Story 47a: `gx brief -C webui vitest src/timers` (the timer guard) exits 0 on trunk. Removing a `registerTimerDisposer` call in a scratch copy makes it exit 1 and name the file.
+- Story 47: `rg -n "^(export )?(let|var) \w+.*(Timeout|Timer|Interval)|^(setTimeout|setInterval)\(" webui/src -g '!*.test.*' -g '!*.spec.*'` lists only `webPerf.ts` `idleTimer`. It has an exported disposer, and `test-setup.ts` calls it in `afterEach`.
+- Story 47a: `gx brief -C webui vitest` exits 0 on trunk. A scratch test that starts a `setTimeout` and never clears it makes the run exit 1 and print the creation site.
 
 Shared skills and review (stories 49 to 59)
 
@@ -308,7 +308,7 @@ Shared skills and review (stories 49 to 59)
 Guards (stories 60 to 64)
 
 - Flows: none.
-- Checks: `gx check` runs Biome lint and exits 0 on trunk, and `pnpm exec biome lint` in `webui` prints no error and no warning. Adding a `waitForTimeout` or a raw `SetState` cleanup in a scratch copy makes the matching rules test exit 1 and name the file.
+- Checks: `gx check` runs Biome lint and exits 0 on trunk, and `pnpm exec biome lint --diagnostic-level=info` in `webui` prints no diagnostic of any severity. A scratch `useTemplate` finding makes `gx check` exit 1. Adding a `waitForTimeout` or a raw `SetState` cleanup in a scratch copy makes the matching rules test exit 1 and name the file.
 
 Measurement (stories 65 to 73)
 
