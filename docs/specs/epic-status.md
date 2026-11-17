@@ -191,30 +191,30 @@ new steps to write. There is no new flow: the new checks are extra steps in exis
 Steps to add below). The verify ticket runs these against a temporary gx server. Whether a color or
 word looks right on screen is judged in that run, not before.
 
-Stories 1 and 2 (ring colors on card and sidebar)
+Stories 1 and 2 (ring colors on card and sidebar) (stories 1 to 2)
 - Run: `bg-progress` flow with the added steps (a working Design and a working Implementation on
   `/epics` and in the sidebar); `epics.e2e.ts` "2. Epic looks right".
 - Check: the Design card's and row's arc is the Design purple, the Implementation's is blue, the
   comet is white on both.
 
-Story 3 (Design header ring)
+Story 3 (Design header ring) (stories 3 to 3)
 - Run: `bg-progress` flow with the added steps, Design page at 1440px; `design.e2e.ts` "the
   Progress region and the ring show each step in turn".
 - Check: with the session in a turn the header ring is purple with the comet.
 
-Story 4 (Epic header ring)
+Story 4 (Epic header ring) (stories 4 to 4)
 - Run: the vitest `EpicPage` test for a running epic and for Writing PR text and Fixing CI;
   `design.e2e.ts` "Header shape"; the `pr-flow-ci-failing` scenario inside `united.e2e.ts` "16.
   Needs you" for Fixing CI.
 - Check: blue ring with the comet in all three; layout unchanged at 1440px and 375px.
 
-Stories 5 and 6 (Design words)
+Stories 5 and 6 (Design words) (stories 5 to 6)
 - Run: `bg-progress` flow with the added steps for one step by running UI; the other steps by the
   Go server tests.
 - Check: the words match the map for the reported step, then the map's step, then "Designing";
   the card ends with "...", the sidebar does not.
 
-Stories 7 to 12 (Implementation words)
+Stories 7 to 12 (Implementation words) (stories 7 to 12)
 - Run: the Go server table tests and the vitest sidebar and card tests. No browser flow: the word
   for each claimed kind is a server rule.
 - Check: for each claimed kind (verify, code-review, conflict-resolution, trunk-conflict, other),
@@ -222,20 +222,20 @@ Stories 7 to 12 (Implementation words)
   later phase (Verifying); an epic with only a claimed ordinary or fix ticket reads "Implementing";
   merge-only reads "Merging".
 
-Stories 13 and 14 (Writing PR text and Fixing CI)
+Stories 13 and 14 (Writing PR text and Fixing CI) (stories 13 to 14)
 - Run: the `pr-flow-ci-failing` scenario inside `united.e2e.ts` "16. Needs you" for the Fixing CI
   state; the Go row test and vitest for Writing PR text.
 - Check: blue spinning ring in card and sidebar row; the sidebar reads "Fixing CI" with no attempt
   count; the card keeps "Fixing CI (attempt N of M)" and shows no "...".
 - Check: GET `/v1/epics` row for the epic has the working flag and the expected words.
 
-Stories 15 and 16 (Starting and the one rule)
+Stories 15 and 16 (Starting and the one rule) (stories 15 to 16)
 - Run: `newdesign.e2e.ts` "27. Design a not-started Design" up to the launch; the `bg-progress`
   scenario (a Working Design session with a subagent).
 - Check: while the session starts, card, sidebar row and Design header spin purple with a Design
   word; with a subagent running and the session idle the card and the sidebar both show the word.
 
-Story 17 (Create tickets)
+Story 17 (Create tickets) (stories 17 to 17)
 - Run: the Go server table tests (idle, countdown and no session, with and without an `-impl`
   epic) and the vitest card and sidebar tests. No browser flow.
 - Check: sidebar "Creating tickets"; card "Creating tickets (N so far)..." with N growing; purple
@@ -243,34 +243,34 @@ Story 17 (Create tickets)
   with "No design session is running", Continue and no count (the visible change); a countdown
   with an `-impl` epic stays working.
 
-Story 18 (joined card at Branch)
+Story 18 (joined card at Branch) (stories 18 to 18)
 - Run: the Go server table tests (joined row) and the vitest arc case for the joined row. No
   browser flow: the Auto-advance flow sits in the countdown at Branch, which wins over working.
 - Check: at Branch with the session working and the `-impl` epic not running, the card shows a
   purple ring and "Branching". Once the `-impl` epic runs, the ring is blue and the words are
   Implementation words.
 
-Stories 19 to 21 (dots and sorting)
+Stories 19 to 21 (dots and sorting) (stories 19 to 21)
 - Run: the vitest sidebar model tests (Needs you sort, By status sort, dots).
 - Check: no "..." in any sidebar row; the Needs you sort is Needs you first, then by name, as
   before; in By status, one group per working word ("Working" included) sits where "Working" sat,
   in alphabetical order, after Needs you and ahead of the rest; a working "Designing" row and an
   idle "Designing" row do not share a group by accident.
 
-Story 22 (unchanged states)
+Story 22 (unchanged states) (stories 22 to 22)
 - Run: `epics.e2e.ts` flows 2, 6 and 7; `Workspaces` flow; the vitest ring and sidebar tests.
 - Check: for each unchanged state (Needs you, paused, done, grey, Ready for review) the ring's tone
   and arc attribute and the words equal the values the same test asserts before the change; the
   comet is white. No screenshots, since those flows take none.
 
-Story 23 (other kinds)
+Story 23 (other kinds) (stories 23 to 23)
 - Run: `Workspaces` flow (Chats, Fix agents), `agents-sidebar.e2e.ts` "73. Agents sidebar"; the
   vitest `EpicCard` and ring tests for One-off and Follow-ups rows.
 - Check: One-off and Follow-ups cards keep their words and ring (the Follow-ups arc is teal today);
   Chats, Fix agents and Queue
   agents still read "Working" with a blue ring.
 
-Stories 24 and 25 (live updates)
+Stories 24 and 25 (live updates) (stories 24 to 25)
 - Run: `bg-progress` flow with the added steps, using `fixture.controlClaude` (or the `ask`
   helper) to start and end a turn on the Design session, with the page open.
 - Check: card, sidebar row and Design header change within the same page, with no reload (the
