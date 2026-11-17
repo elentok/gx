@@ -106,6 +106,7 @@ func capParallel(max int) {
 // Running is a started fixture.
 type Running struct {
 	cmd     *exec.Cmd
+	stderr  *syncBuffer
 	stopped bool
 	spec.Output
 }
@@ -127,6 +128,14 @@ func StartWith(t *testing.T, scenario string, env []string, flags ...string) *Ru
 // that outlives one test.
 func Launch(t *testing.T, register func(func()), scenario string, env []string, flags ...string) *Running {
 	t.Helper()
+	// Registered before LaunchProc registers the kill, so it runs after it
+	// (cleanups are last-in first-out) and sees the complete stderr.
+	var r *Running
+	register(func() {
+		if r != nil {
+			r.logStderrIfFailed(t)
+		}
+	})
 	r, err := LaunchProc(register, scenario, env, flags...)
 	if err != nil {
 		t.Fatal(err)
@@ -205,7 +214,8 @@ func launchProc(register func(func()), scenario string, env []string, flags ...s
 	args := append([]string{"--gx", GxBin, "--fakeclaude", FakeBin, "--fakegh", FakeGHBin}, flags...)
 	cmd := exec.Command(FixtureBin, append(args, scenario)...)
 	cmd.Env = append(os.Environ(), env...)
-	cmd.Stderr = os.Stderr
+	r := &Running{cmd: cmd, stderr: &syncBuffer{}}
+	cmd.Stderr = r.stderr
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -213,23 +223,80 @@ func launchProc(register func(func()), scenario string, env []string, flags ...s
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	r := &Running{cmd: cmd}
 	register(r.Kill)
 	// A fixture that never prints its line would hang the test until the
 	// runner's per-test limit kills it with no diagnosis. SIGQUIT makes it dump
-	// its goroutines to stderr, so the next occurrence names the stuck step.
+	// its goroutines to its stderr buffer, so the next occurrence names the stuck step.
 	timer := time.AfterFunc(startTimeout, func() { _ = cmd.Process.Signal(syscall.SIGQUIT) })
 	line, err := bufio.NewReader(stdout).ReadBytes('\n')
-	if !timer.Stop() {
-		return r, fmt.Errorf("fixture printed no output line within %s; its goroutine dump is on stderr", startTimeout)
+	timedOut := !timer.Stop()
+	if timedOut || err != nil {
+		r.Kill() // the process must be reaped before its stderr is complete
 	}
-	if err != nil {
-		return r, fmt.Errorf("no output line: %v", err)
+	switch {
+	case timedOut:
+		return r, fmt.Errorf("fixture printed no output line within %s; stderr tail:\n%s", startTimeout, r.StderrTail(stderrTailLines))
+	case err != nil:
+		return r, fmt.Errorf("no output line: %v\nstderr tail:\n%s", err, r.StderrTail(stderrTailLines))
 	}
 	if err := json.Unmarshal(line, &r.Output); err != nil {
-		return r, fmt.Errorf("output is not JSON: %v\n%s", err, line)
+		r.Kill()
+		return r, fmt.Errorf("output is not JSON: %v\n%s\nstderr tail:\n%s", err, line, r.StderrTail(stderrTailLines))
 	}
 	return r, nil
+}
+
+// stderrTailLines is how many of a fixture's last stderr lines an error carries.
+const stderrTailLines = 40
+
+// syncBuffer is a bytes buffer the child writes and the test reads at once.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// Stderr is everything the fixture has written to stderr so far.
+func (r *Running) Stderr() string { return r.stderr.String() }
+
+// StderrTail is the last n lines of the fixture's stderr.
+func (r *Running) StderrTail(n int) string {
+	lines := strings.Split(strings.TrimRight(r.Stderr(), "\n"), "\n")
+	return strings.Join(lines[max(0, len(lines)-n):], "\n")
+}
+
+// stderrReporter is the part of a test logStderrIfFailed needs.
+type stderrReporter interface {
+	Failed() bool
+	Logf(format string, args ...any)
+}
+
+// logStderrIfFailed logs the fixture's stderr when the test failed, and nothing otherwise.
+func (r *Running) logStderrIfFailed(t stderrReporter) {
+	if !t.Failed() {
+		return
+	}
+	if s := r.Stderr(); s != "" {
+		t.Logf("fixture stderr:\n%s", s)
+	}
+}
+
+// AttachStderr logs the fixture's stderr in t's failure. Call it in a test that
+// uses a fixture a TestMain started, which has no test of its own.
+func (r *Running) AttachStderr(t *testing.T) {
+	t.Helper()
+	t.Cleanup(func() { r.logStderrIfFailed(t) })
 }
 
 // Kill is the cleanup for a fixture its test did not stop.
@@ -237,6 +304,7 @@ func (r *Running) Kill() {
 	if r.stopped {
 		return
 	}
+	r.stopped = true
 	// SIGTERM lets the fixture stop its server and holders; a kill orphans them.
 	_ = r.cmd.Process.Signal(syscall.SIGTERM)
 	done := make(chan struct{})

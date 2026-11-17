@@ -109,6 +109,7 @@ func sharedBlocked(t *testing.T) *running {
 	if blocked == nil {
 		t.Skip("the agents-blocked fixture is not running: -run skipped the Blocked tests")
 	}
+	blocked.AttachStderr(t)
 	return blocked
 }
 

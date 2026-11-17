@@ -48,6 +48,7 @@ func sharedWorkspaces(t *testing.T) *running {
 	if workspaces == nil {
 		t.Skip("the workspaces fixture is not running: -run skipped the Workspaces tests")
 	}
+	workspaces.AttachStderr(t)
 	return workspaces
 }
 
