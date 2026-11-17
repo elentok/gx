@@ -88,7 +88,7 @@ default, and the docs and skills say so.
     herdr option, so that every rig runs on PTY or `runnerfake`.
 25. As a maintainer, I want the tests that script shared behaviour through the herdr fake moved to
     `runnerfake` or the PTY rig, so that the behaviour stays covered without herdr.
-26. As a maintainer, I want the wait-loop code kept as it is (none of it is herdr-only) with its six
+26. As a maintainer, I want the wait-loop code kept as it is (none of it is herdr-only) with its
     herdr comments reworded, and the five herdr-based production tests deleted or ported as listed
     in Implementation Decisions, so that coverage does not drop.
 27. As a maintainer, I want the `herdr-e2e` CI job, `make e2e` and the `e2e/` suite removed, so that
@@ -126,14 +126,19 @@ Config and runner selection
 
 - One normaliser lives in `agentrunner`. It maps `herdr` to `auto` and returns a "deprecated" flag
   the caller logs as a warning. `Select`, `ValidateSetting`, the settings API and the settings reload
-  all call it. The settings registry enum, `docs/config-schema.json` and the config text drop
+  all call it. It rewrites `config.Config.AgentRunner` from `herdr` to `auto` when the config is
+  parsed, so the reload's restart-needed comparison against the startup config never sees `herdr`
+  on one side only. The settings registry enum, `docs/config-schema.json` and the config text drop
   `herdr`, and the schema is regenerated.
 - `ChoiceHerdr`, the herdr ping timeout and probe, the "(or set agent-runner: herdr)" hint, and the
   herdr case in the runner builder are deleted.
 - The warning is logged once at start and once on each reload that reads `herdr`. Its text is one
   line: `agent-runner: herdr was removed; using auto (PTY). Edit the config to drop it.`
-- The settings page shows `auto` for a stored `agent-runner: herdr`, with the same warning. The
-  settings API stores a `herdr` write as `auto`.
+- The settings page shows `auto` for a stored `agent-runner: herdr`, with the same warning.
+  `settingsapi.Read` passes the value through the normaliser, and a new per-entry `notice` field in
+  the settings read response carries the warning. The page shows it under the Runner select. The web
+  client types are regenerated and a `SettingsPage.test.tsx` case is added. The settings API stores a
+  `herdr` write as `auto` and returns the warning in `ops.SettingsWriteResult.Notices`.
 
 Leftover runs
 
@@ -266,8 +271,14 @@ Tracker
   `waitforfinish_recovery.go` is herdr-only; all of it runs through the `Runner` interface. Keep it
   all, including the premature-idle-during-compact gate (Claude's pid status can read idle mid
   `/compact` on PTY too). Reword the comments at `waitforfinish.go:29,224,551,635,674` and
-  `waitforfinish_recovery.go:92-94` ("herdr" becomes "the runner"; the blocked-pane note names
-  claude's pid status `waiting` and points to `gx claude doctor`).
+  `waitforfinish_recovery.go:92-96` ("herdr" becomes "the runner"). The blocked-pane note says the
+  gate rests on the runner's blocked state (PTY Claude: pid status `waiting`; headless: a pending
+  permission request) and that `gx claude doctor` checks it; lines 95-96 no longer name the
+  blocked-form runbook or `gx doctor --check-blocked-form`. The other herdr hits in
+  `ralphloop/supervise` are comment rewords too: `launch.go:13,14,32,164`,
+  `waitforfinish_compact_test.go:68,132` and `startprompt/startandprompt_retry_test.go:83`. Keep
+  `SessionOrDefault` (its `Pane` fallback is still used by `launchAndPromptParams`) and
+  `AlreadyFinished` (called by `finish.go`, `conflict.go` and `startprompt`).
   - Delete `ProductionSlowCompactRegression` (herdr nudge/Enter bug; PTY has `PromptNudged`),
     `ProductionSlowButSuccessfulCompactRegression` (covered by `TranscriptConfirmsLateCompaction`,
     `TimeoutCompletionKeepsTheExpiredEvent`, `TimeoutPathIsNotDoublePaced`) and
@@ -275,11 +286,12 @@ Tracker
     `GatedGiveUpDeniesAPaneIdleToEveryPollKind`, `GenuineStuckCompactFailsAfterExtendedWait`).
   - Port `ProductionCodexBlockedAtCompactSubmission` to `runnerfake`: a Codex agent whose `Prompt`
     fails with a blocked error; assert recovered=false, no error, `SmartZoneRecoveryFailed`, no pause,
-    no resume. Drop the port only if the `FailedFinishUpPromptIsBestEffort` test is extended to cover it.
+    no resume. Name it `TestRecoverSmartZoneBreach_CodexBlockedAtCompactSubmission`.
   - Port `ProductionPrematureIdlePaneRecovery` as one end-to-end `WaitForFinish` test on `runnerfake`
     with `BlipRunner`: the boundary arrives late, the finish-up prompt is refused until then, and the
     run ends with `compactGateConfirmed`.
-  - Delete the herdrfake `TestMain`, its helpers (`agentResult`, `parseUntil`, `useFakeClock`,
+  - Move the `TestMain` into a new `ralphloop/supervise/main_test.go` without
+    `herdrfake.RunHelperProcess()`, keeping its `fakes.StateDir` setup and `goleak` check. Delete its helpers (`agentResult`, `parseUntil`, `useFakeClock`,
     `writeOccupancyTranscript`, `appendCompactBoundaryLine`, `withProcessEnv`) and `herdrfake.ClaudeCompact`.
 - Run tests capped with `scripts/proc-cap`.
 
@@ -301,13 +313,16 @@ checks below. No stored mock exists, so there is no Mock states list.
    write: a fixture config with `agent-runner: herdr`.
 4. Warning. Checks: the server log from story 3 holds one warning naming the removed herdr runner,
    with the text given above.
-5. Reload parity. Checks: with the server running, set `agent-runner: herdr` through
-   `gx server settings-set` and the settings API; both succeed, the API stores `auto`, and the reload
-   log shows the warning, not a rejection.
-6. Settings choices. Flows: the catalog's settings flow. Checks: the generated
+5. Reload parity. Checks: (a) with the server running, `gx server settings-set agent-runner herdr`
+   and a `PUT /v1/settings` of `herdr` both succeed, `config.json` then holds `auto`, and each write
+   result carries the warning as a notice. (b) A hand edit of `config.json` to `herdr` triggers a
+   reload that is not refused, and the reload log holds the warning. (c) A test: a server started on
+   `herdr` that reloads `herdr` or `auto` reports no pending restart for `agent-runner`.
+6. Settings choices. Flows: `settings-page.e2e.ts` 200 "Settings page, global journey", extended
+   with a step on a config holding `agent-runner: herdr`. Checks: the generated
    `docs/config-schema.json` enum for `agent-runner` lists no `herdr`. The `agent-runner` setting in
    the web settings page shows no herdr choice. With `agent-runner: herdr` stored, the page shows
-   `auto` and the warning.
+   `auto` and the warning notice under the select; `SettingsPage.test.tsx` covers the notice.
 7. Empty leftover claim. New scenario to write: `herdr-leftover-empty`, a ticket claimed with
    runner `herdr` in the run registry, a clean worktree, server restarted. Checks: after restart the
    ticket's log holds `claim-reopened` and the ticket starts on PTY.
@@ -339,8 +354,10 @@ checks below. No stored mock exists, so there is no Mock states list.
     PTY scenarios added there for name-taken and prompt-stalled if missing. Checks: `agent_name_taken`,
     `agent_prompt_stalled` and `handle-mismatch` pauses still appear and recover.
 16. Recovery rules. Checks: `go test ./recovery` passes; `rg -i herdr recovery/` prints nothing.
-17. Doctor. Checks: `go run . doctor --check-blocked-form` exits non-zero as an unknown flag;
-    `go run . doctor` still prints `HERDR_ENV`.
+17. Doctor. Run from the worktree. Checks: `go run . doctor --check-blocked-form x` fails with
+    `unknown doctor flag`; `go run . doctor --help` does not mention it; `ls
+    docs/runbooks/blocked-form-regression-check.md` fails; `rg -n 'blocked-form' ralphloop cmd
+    docs/runbooks` prints nothing; `go run . doctor` still prints `HERDR_ENV`.
 18. Split launch. Checks: `go test ./cmd/term ./ui/terminalrun ./ui` pass; manually or in the
     real-binary suite, `gx term` still builds the herdr split command.
 19. Worktrees tab launch. Flows: none (TUI). Checks: `go test ./ui/worktrees/...` pass, and the
@@ -358,7 +375,8 @@ checks below. No stored mock exists, so there is no Mock states list.
     herdr import (`go list -deps` of each shows no `herdrfake`).
 26. Wait-loop tests. Checks: `go test ./ralphloop/supervise/...` passes; `rg -i herdr
     ralphloop/supervise` prints nothing; `waitforfinish_production_test.go` and
-    `waitforfinish_production_recovery_test.go` are gone; a `runnerfake` test covers the Codex
+    `waitforfinish_production_recovery_test.go` are gone; `rg -l 'func TestMain'
+    ralphloop/supervise/*_test.go` finds `main_test.go`; a `runnerfake` test covers the Codex
     `/compact` prompt blocked case and one covers the end-to-end premature-idle compact flow.
 27. CI. Checks: `make test` runs the real-binary suite; `gh workflow` config has no `e2e` step;
     `.ai/index.md` no longer lists `go test ./e2e/...`.
@@ -385,7 +403,7 @@ checks below. No stored mock exists, so there is no Mock states list.
     outside history docs; `go build ./...` exits 0.
 
 New flows or scenarios to write (each becomes an implementation ticket): fixture config with
-`agent-runner: herdr`; scenarios `herdr-leftover-empty` and `herdr-leftover-work`; a fixture store
+`agent-runner: herdr` (also a step in flow 200); scenarios `herdr-leftover-empty` and `herdr-leftover-work`; a fixture store
 with an `agent_pane_busy` ticket; a fixture run log with removed kinds and types; and an extension of
 the existing paused-ticket recovery flow for the story 8 ticket. The implementer picks flow numbers
 after the highest in `webui/e2e/CATALOG.md`.
