@@ -167,6 +167,12 @@ test("the settings and the brief render and Start is enabled", async () => {
   expect(startButton().disabled).toBe(false)
 })
 
+test("only tiers with a resolved model are offered as models", async () => {
+  await mount(fakeDrafts())
+  const values = Array.from((control("Model") as HTMLSelectElement).options).map((o) => o.value)
+  expect(values).toEqual(["", "opus"])
+})
+
 test.each([
   ["Project", "other", { project: "other" }],
   ["Folder", "trunk", { folder: "trunk" }],

@@ -74,12 +74,15 @@ export function ChatDraftSettings({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const harness = (settings.harness === "codex" ? "codex" : "claude") as Harness
+  const harness: Harness = settings.harness === "codex" ? "codex" : "claude"
   const current = trees.find((p) => p.project === settings.project)
   const projects = trees.map((p) => ({ value: p.project, label: p.project }))
+  // A tier the server gave no model is not offered: its id is not a model name.
   const models = [
     { value: "", label: "Default" },
-    ...tierOptions(current, harness).map((t) => ({ value: t.model ?? t.id, label: t.label })),
+    ...tierOptions(current, harness).flatMap((t) =>
+      t.model ? [{ value: t.model, label: t.label }] : [],
+    ),
   ]
   const efforts = [
     { value: "", label: "Default" },

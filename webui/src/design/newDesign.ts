@@ -128,7 +128,7 @@ export async function startNewChatDraft(client: NewChatDraftClient = realChatCli
     const id = await client.create({
       workspace: ctx.workspace,
       project,
-      harness: "claude",
+      harness: "",
       folder: ChatDraftFolderSource,
     })
     ctx.open(chatDraftHref(id).slice(1))

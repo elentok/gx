@@ -114,7 +114,7 @@ describe("startNewChatDraft", () => {
     expect(chatCreate).toHaveBeenCalledWith({
       workspace: "w1",
       project: "last",
-      harness: "claude",
+      harness: "",
       folder: "source",
     })
     expect(open).toHaveBeenCalledWith("/chat-drafts/c9")
