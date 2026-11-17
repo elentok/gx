@@ -41,6 +41,9 @@ func StartWithStore(t *testing.T, store string, opts ...func(*server.Config)) *H
 // holder sockets below it.
 const shortTempRoot = "/tmp"
 
+// PollInterval is the poll the harness gives every test server.
+const PollInterval = 200 * time.Millisecond
+
 func startWith(t *testing.T, store string, opts ...func(*server.Config)) *Harness {
 	t.Helper()
 	// Unix socket paths are capped near 100 bytes; t.TempDir() can exceed that,
@@ -128,7 +131,7 @@ func startWith(t *testing.T, store string, opts ...func(*server.Config)) *Harnes
 	// Short polls so a test that waits for a tick gets it in milliseconds. Setting
 	// PollInterval also turns off keepFresh's 15s backstop, so tests no longer
 	// depend on store watch events arriving.
-	h.cfg.PollInterval = 200 * time.Millisecond
+	h.cfg.PollInterval = PollInterval
 	h.cfg.BudgetPollInterval = 100 * time.Millisecond
 	h.cfg.ChatPollInterval = 100 * time.Millisecond
 	h.cfg.GuardPoll = 200 * time.Millisecond

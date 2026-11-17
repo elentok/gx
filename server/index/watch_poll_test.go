@@ -35,11 +35,8 @@ func TestKeepFresh_OnPollRunsEachTickWhenWatchIsDisabled(t *testing.T) {
 	testutil.WaitFor(t, 5*time.Second, "several polls", func() bool { return polls.Load() >= 3 })
 }
 
-func TestKeepFresh_OnPollNeverRunsWithALiveWatch(t *testing.T) {
+func TestKeepFresh_OnPollRunsEachTickWithALiveWatch(t *testing.T) {
 	t.Parallel()
 	polls := runKeepFresh(t, false)
-	time.Sleep(150 * time.Millisecond)
-	if n := polls.Load(); n != 0 {
-		t.Fatalf("OnPoll ran %d times with a live watch", n)
-	}
+	testutil.WaitFor(t, 5*time.Second, "several polls", func() bool { return polls.Load() >= 3 })
 }

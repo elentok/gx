@@ -36,8 +36,8 @@ type WatchConfig struct {
 	// OnStoreChange runs for every watch event outside .git, relevant to the
 	// index or not: the store commit loop wants them all.
 	OnStoreChange func()
-	// OnPoll runs after each poll rescan while there is no live watch, so
-	// changes that produce no event are still noticed at the poll rate.
+	// OnPoll runs after each poll rescan, live watch or not, so changes whose
+	// event was lost are still noticed at the poll rate.
 	OnPoll func()
 }
 
@@ -91,7 +91,7 @@ func (i *Index) KeepFresh(ctx context.Context, cfg WatchConfig) {
 			return
 		case <-ticker.C:
 			i.Rescan()
-			if events == nil && cfg.OnPoll != nil {
+			if cfg.OnPoll != nil {
 				cfg.OnPoll()
 			}
 		case ev := <-events:

@@ -79,6 +79,7 @@ type Loop struct {
 	done  chan struct{}
 	kick  chan struct{} // Touch signals here; coalesces
 	check chan struct{} // Check signals here; coalesces
+	rearm chan struct{} // SetSettings signals here; coalesces
 	// fallback is how often the loop checks for changes nobody reported.
 	fallback time.Duration
 
@@ -147,7 +148,7 @@ func startWith(dir string, o Options, fallback time.Duration) (*Loop, error) {
 		l.refs++
 		return l, nil
 	}
-	l := &Loop{dir: dir, env: o.Env, debounce: o.Debounce, fallback: fallback, kick: make(chan struct{}, 1), check: make(chan struct{}, 1), refs: 1, stop: make(chan struct{}), done: make(chan struct{}),
+	l := &Loop{dir: dir, env: o.Env, debounce: o.Debounce, fallback: fallback, kick: make(chan struct{}, 1), check: make(chan struct{}, 1), rearm: make(chan struct{}, 1), refs: 1, stop: make(chan struct{}), done: make(chan struct{}),
 		pushRemote: o.PushRemote, onError: o.OnError, pushKick: make(chan struct{}, 1), pushStop: make(chan struct{}), pushDone: make(chan struct{})}
 	reg[dir] = l
 	go l.run()
@@ -175,11 +176,16 @@ func (l *Loop) Stop() {
 
 // SetSettings changes the debounce and push remote of the running loop, for a
 // config reload. The loop keeps running, so Immediate commits are never lost
-// to a restart; the new debounce applies from the next change.
+// to a restart. A pending quiet timer is re-armed with the new debounce, so it
+// applies even when no further event comes.
 func (l *Loop) SetSettings(debounce time.Duration, pushRemote string) {
 	l.settingsMu.Lock()
-	defer l.settingsMu.Unlock()
 	l.debounce, l.pushRemote = debounce, pushRemote
+	l.settingsMu.Unlock()
+	select {
+	case l.rearm <- struct{}{}:
+	default:
+	}
 }
 
 func (l *Loop) settings() (debounce time.Duration, pushRemote string) {
@@ -271,6 +277,10 @@ func (l *Loop) run() {
 			check()
 		case <-l.check:
 			check()
+		case <-l.rearm:
+			if quiet != nil {
+				restart()
+			}
 		case <-quiet:
 			quiet, lastSig = nil, ""
 			_ = l.commit("")

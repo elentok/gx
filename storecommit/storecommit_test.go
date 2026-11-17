@@ -249,6 +249,19 @@ func TestSetSettings_NextCommitUsesNewDebounceAndRemote(t *testing.T) {
 	}
 }
 
+func TestSetSettings_RearmsAPendingQuietTimer(t *testing.T) {
+	dir := t.TempDir()
+	l, err := StartWith(dir, Options{Debounce: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Stop()
+	write(t, dir, "a.md", "x")
+	l.Touch()
+	l.SetSettings(100*time.Millisecond, "")
+	waitForCommit(t, dir)
+}
+
 func TestPush_FailureIsReportedAndDoesNotBlockCommits(t *testing.T) {
 	dir := t.TempDir()
 	failed := make(chan error, 4)

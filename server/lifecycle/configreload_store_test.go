@@ -11,6 +11,21 @@ import (
 	"github.com/elentok/gx/server/servertest"
 )
 
+const (
+	storeCommitReloadedDebounce = time.Second
+	storeCommitWait             = 10 * time.Second
+)
+
+// A lost watch event is noticed one poll later and committed one debounce
+// after that. The test server polls at servertest.PollInterval (not the 15s
+// production backstop), so this sum must stay well under the wait.
+func TestConfigReload_StoreCommitDebounceHasWaitMargin(t *testing.T) {
+	t.Parallel()
+	if sum := servertest.PollInterval + storeCommitReloadedDebounce; sum >= storeCommitWait/2 {
+		t.Fatalf("poll interval + debounce = %v, want under half of the %v wait", sum, storeCommitWait)
+	}
+}
+
 // A changed commit-debounce is reported and applied to the running store
 // commit loop: an edit is committed after the new, short debounce.
 func TestConfigReload_StoreCommitDebounceApplies(t *testing.T) {
@@ -29,7 +44,7 @@ func TestConfigReload_StoreCommitDebounceApplies(t *testing.T) {
 	before := storeLog(t, store)
 
 	servertest.WriteConfig(t, path, store, map[string]any{
-		"ticket-store": map[string]any{"path": store, "commit-debounce": 1},
+		"ticket-store": map[string]any{"path": store, "commit-debounce": int(storeCommitReloadedDebounce / time.Second)},
 	})
 	if res := reload(t, h); res.Refused || !slices.Contains(res.Changed, "ticket-store.commit-debounce") {
 		t.Fatalf("reload = %+v, want commit-debounce changed", res)
@@ -37,5 +52,5 @@ func TestConfigReload_StoreCommitDebounceApplies(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(store, "edit.md"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	servertest.WaitFor(t, 10*time.Second, "a commit after the reloaded debounce", func() bool { return storeLog(t, store) != before })
+	servertest.WaitFor(t, storeCommitWait, "a commit after the reloaded debounce", func() bool { return storeLog(t, store) != before })
 }
