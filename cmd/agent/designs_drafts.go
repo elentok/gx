@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
 	"github.com/spf13/cobra"
@@ -18,7 +19,7 @@ import (
 // form keeps on the server. It calls the routes the form calls.
 func newDesignsDraftsCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "drafts", Short: "New Design drafts kept by the server", Args: cobra.NoArgs}
-	cmd.AddCommand(newDraftsListCmd(d), newDraftsShowCmd(d), newDraftsSaveCmd(d), newDraftsSetCmd(d), newDraftsDeleteCmd(d), newDraftsRemoveIfEmptyCmd(d), newDraftsLeaseCmd(d), newDraftsLastProjectCmd(d), newDraftsImageCmd(d))
+	cmd.AddCommand(newDraftsListCmd(d), newDraftsShowCmd(d), newDraftsSaveCmd(d), newDraftsCreateCmd(d), newDraftsSetCmd(d), newDraftsDeleteCmd(d), newDraftsRemoveIfEmptyCmd(d), newDraftsLeaseCmd(d), newDraftsLastProjectCmd(d), newDraftsImageCmd(d))
 	return cmd
 }
 
@@ -406,6 +407,42 @@ func newDraftsSaveCmd(d Deps) *cobra.Command {
 	cmd.Flags().IntVar(&req.Revision, "revision", 0, "the revision you last saw")
 	cmd.Flags().StringVar(&req.Idea, "idea", "", "idea, or - to read it from stdin")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
+	return cmd
+}
+
+// newDraftsCreateCmd is `gx designs drafts create`: a draft with its project,
+// slug and idea in one call. It joins the workspace of GX_AGENT_SESSION.
+func newDraftsCreateCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	var req ops.DesignDraftCreateRequest
+	cmd := &cobra.Command{
+		Use:   "create --project <p> --slug <s> --idea text|-",
+		Short: "save a New Design draft and print its id",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			idea, err := readIdea(req.Idea, c.InOrStdin())
+			if err != nil {
+				return err
+			}
+			req.Idea = idea
+			req.FromSession = os.Getenv(holder.AgentSessionEnv)
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			res, err := cl.Sessions.CreateDesignDraft(c.Context(), req)
+			return printDraftResult(c.OutOrStdout(), jsonOut, res, err, func(res ops.DesignDraftSaveResult) error {
+				_, err := fmt.Fprintln(c.OutOrStdout(), res.Draft.ID)
+				return err
+			})
+		},
+	}
+	cmd.Flags().StringVar(&req.Project, "project", "", "project of the Design")
+	cmd.Flags().StringVar(&req.Slug, "slug", "", "slug of the Design")
+	cmd.Flags().StringVar(&req.Idea, "idea", "", "idea, or - to read it from stdin")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
+	_ = cmd.MarkFlagRequired("project")
+	_ = cmd.MarkFlagRequired("slug")
 	return cmd
 }
 

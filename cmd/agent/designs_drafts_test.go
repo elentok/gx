@@ -9,10 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
+	"github.com/elentok/gx/server/workspaces"
 )
 
 func TestDesignsDrafts_ListShowDelete(t *testing.T) {
@@ -224,6 +227,70 @@ func TestDesignsDrafts_SaveWithWorkspaceCreatesIntoWorkspace(t *testing.T) {
 	}
 	if got := h.Server.Workspaces().Workspace(drafts.MemberKey(res.Draft.ID)); got != "A" {
 		t.Errorf("created draft workspace = %q, want A", got)
+	}
+}
+
+func draftsCreateArgs(extra ...string) []string {
+	return append([]string{"designs", "drafts", "create", "--idea", "-"}, extra...)
+}
+
+func TestDesignsDrafts_CreateReadsIdeaFromStdinInSourceWorkspace(t *testing.T) {
+	f := rigs.StartDesigns(t)
+	chat := chatIn(t, f, "A")
+	t.Setenv(holder.AgentSessionEnv, chat)
+	var out bytes.Buffer
+	if err := execute(t, draftsCreateArgs("--project", "proj", "--slug", "a-slug"), draftsCmdDeps(f, "the idea\n", &out)); err != nil {
+		t.Fatal(err)
+	}
+	id := strings.TrimSpace(out.String())
+	d, err := drafts.New(f.H.StateDir).Get(id)
+	if err != nil || d == nil || d.Project != "proj" || d.Slug != "a-slug" || strings.TrimSpace(d.Idea) != "the idea" {
+		t.Fatalf("draft %q = %+v, %v", id, d, err)
+	}
+	if got := f.H.Server.Workspaces().Workspace(drafts.MemberKey(id)); got != "A" {
+		t.Errorf("draft workspace = %q, want A", got)
+	}
+}
+
+func TestDesignsDrafts_CreateJSONHasID(t *testing.T) {
+	f := rigs.StartDesigns(t)
+	t.Setenv(holder.AgentSessionEnv, "")
+	var out bytes.Buffer
+	if err := execute(t, draftsCreateArgs("--project", "proj", "--slug", "s", "--json"), draftsCmdDeps(f, "idea", &out)); err != nil {
+		t.Fatal(err)
+	}
+	var res ops.DesignDraftSaveResult
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil || res.Draft == nil || res.Draft.ID == "" {
+		t.Fatalf("--json output = %q, %v", out.String(), err)
+	}
+	if got := f.H.Server.Workspaces().Workspace(drafts.MemberKey(res.Draft.ID)); got != workspaces.DefaultName {
+		t.Errorf("no session: workspace = %q, want Default", got)
+	}
+}
+
+func TestDesignsDrafts_CreateRefusals(t *testing.T) {
+	t.Setenv(holder.AgentSessionEnv, "")
+	big := strings.Repeat("a", wire.MaxSessionPromptBytes+1)
+	cases := map[string]struct {
+		args  []string
+		stdin string
+		want  string
+	}{
+		"too long":   {draftsCreateArgs("--project", "p", "--slug", "s"), big, wire.ReasonPromptTextTooLong},
+		"bad slug":   {draftsCreateArgs("--project", "p", "--slug", "Not A Slug"), "idea", "refused"},
+		"no slug":    {draftsCreateArgs("--project", "p"), "idea", "slug"},
+		"no project": {draftsCreateArgs("--slug", "s"), "idea", "project"},
+	}
+	for name, c := range cases {
+		f := rigs.StartDesigns(t)
+		var out bytes.Buffer
+		err := execute(t, c.args, draftsCmdDeps(f, c.stdin, &out))
+		if err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%s: err = %v, want %q", name, err, c.want)
+		}
+		if items, _ := f.H.Client.Sessions.DesignDrafts(context.Background()); len(items) != 0 {
+			t.Errorf("%s: stored %d drafts", name, len(items))
+		}
 	}
 }
 

@@ -354,3 +354,90 @@ func TestWebDesignDrafts_SaveRedirect(t *testing.T) {
 		t.Errorf("save started = %+v", res)
 	}
 }
+
+func (f designsFixture) createDraft(t *testing.T, req ops.DesignDraftCreateRequest) ops.DesignDraftSaveResult {
+	t.Helper()
+	res, err := f.h.Client.Sessions.CreateDesignDraft(f.ctx, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func TestWebDesignDrafts_CreateRouteJoinsSourceWorkspace(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	if _, err := f.h.Client.Admin.CreateWorkspace(f.ctx, "A"); err != nil {
+		t.Fatal(err)
+	}
+	chat, err := f.h.Client.Sessions.Create(f.ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir()})
+	if err != nil || chat.Session == nil {
+		t.Fatalf("create chat = %+v, %v", chat, err)
+	}
+	if res, err := f.h.Client.Admin.MoveToWorkspace(f.ctx, "A", chat.Session.ID); err != nil || res.Results[0].Refused() {
+		t.Fatalf("move chat = %+v, %v", res, err)
+	}
+	design := f.openNew(t, "source-design", "idea")
+	if res, err := f.h.Client.Admin.MoveToWorkspace(f.ctx, "A", "proj:source-design"); err != nil || res.Results[0].Refused() {
+		t.Fatalf("move design = %+v, %v", res, err)
+	}
+	ws := f.h.Server.Workspaces()
+	for name, from := range map[string]string{"chat": chat.Session.ID, "design": design.Session.ID} {
+		res := f.createDraft(t, ops.DesignDraftCreateRequest{Project: "proj", Slug: "from-" + name, Idea: "the idea", FromSession: from})
+		if res.Refused || res.Draft == nil || res.Draft.Project != "proj" || res.Draft.Slug != "from-"+name || res.Draft.Idea != "the idea" {
+			t.Fatalf("%s: create = %+v", name, res)
+		}
+		if got := ws.Workspace(drafts.MemberKey(res.Draft.ID)); got != "A" {
+			t.Errorf("%s: draft workspace = %q, want A", name, got)
+		}
+	}
+	for _, from := range []string{"", "no-such-session"} {
+		d := f.createDraft(t, ops.DesignDraftCreateRequest{Project: "proj", Slug: "stays-default", Idea: "x", FromSession: from}).Draft
+		f.wantNoMembership(t, d)
+	}
+}
+
+func TestWebDesignDrafts_CreateRoutePublishesDraftEvent(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	f.wantDraftEvents(t, "create", 1, func() {
+		f.createDraft(t, ops.DesignDraftCreateRequest{Project: "proj", Slug: "evented", Idea: "idea"})
+	})
+}
+
+func TestWebDesignDrafts_CreateRouteRefusals(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	cases := map[string]struct {
+		req    ops.DesignDraftCreateRequest
+		reason string
+	}{
+		"too long":      {ops.DesignDraftCreateRequest{Project: "p", Slug: "s", Idea: strings.Repeat("a", wire.MaxSessionPromptBytes+1)}, wire.ReasonPromptTextTooLong},
+		"empty idea":    {ops.DesignDraftCreateRequest{Project: "p", Slug: "s", Idea: " \n"}, "idea"},
+		"blank project": {ops.DesignDraftCreateRequest{Project: " ", Slug: "s", Idea: "i"}, "project"},
+		"bad slug":      {ops.DesignDraftCreateRequest{Project: "p", Slug: "Bad Slug", Idea: "i"}, "not a slug"},
+		"missing slug":  {ops.DesignDraftCreateRequest{Project: "p", Idea: "i"}, "not a slug"},
+	}
+	for name, c := range cases {
+		res := f.createDraft(t, c.req)
+		if !res.Refused || res.Draft != nil || !strings.Contains(res.Reason, c.reason) {
+			t.Errorf("%s: result = %+v, want refused with %q", name, res, c.reason)
+		}
+	}
+	if items, err := f.h.Client.Sessions.DesignDrafts(f.ctx); err != nil || len(items) != 0 {
+		t.Errorf("drafts after refusals = %v, %v, want none", items, err)
+	}
+}
+
+func TestDesignsOpenNew_CreatedDraftIdeaBecomesInitialPrompt(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	d := f.createDraft(t, ops.DesignDraftCreateRequest{Project: "proj", Slug: "made-by-verb", Idea: "stored idea"}).Draft
+	if res := f.openFromDraft(t, "made-by-verb", "stored idea", d.ID); res.Refused || res.Session == nil {
+		t.Fatalf("open = %+v", res)
+	}
+	got, err := os.ReadFile(f.mapPath("made-by-verb"))
+	if err != nil || !strings.Contains(string(got), "## Initial prompt\n\nstored idea") {
+		t.Errorf("map = %q, %v", got, err)
+	}
+}

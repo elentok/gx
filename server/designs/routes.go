@@ -38,6 +38,10 @@ func Routes(get func() *Designs) []wire.Route {
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftSave(w, r) },
 		},
 		{
+			Pattern: "POST /v1/designs/drafts/create",
+			Handler: func(w http.ResponseWriter, r *http.Request) { draftCreate(get(), w, r) },
+		},
+		{
 			Pattern: "POST /v1/designs/drafts/target",
 			Web:     wire.WebWrite,
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftTarget(w, r) },

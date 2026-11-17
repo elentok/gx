@@ -3,6 +3,7 @@ package designs
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -73,6 +74,46 @@ func (s *Designs) draftSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wire.WriteJSON(w, res)
+}
+
+// draftCreate serves POST /v1/designs/drafts/create: a draft with a project,
+// slug and idea in one call, joining the workspace of FromSession. Unlike the
+// form's first save it makes no empty draft, so it runs no SweepEmpty. A plain
+// function, not a method: Designs sits at its method-count limit.
+func draftCreate(s *Designs, w http.ResponseWriter, r *http.Request) {
+	var req ops.DesignDraftCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	refuse := func(reason string) {
+		wire.WriteJSON(w, ops.DesignDraftSaveResult{Refused: true, Reason: reason})
+	}
+	switch {
+	case len(req.Idea) > wire.MaxSessionPromptBytes:
+		refuse(wire.ReasonPromptTextTooLong)
+		return
+	case strings.TrimSpace(req.Idea) == "":
+		refuse("idea must not be empty")
+		return
+	case strings.TrimSpace(req.Project) == "":
+		refuse("project must not be blank")
+		return
+	case !drafts.SlugRe.MatchString(req.Slug):
+		refuse(fmt.Sprintf("%q is not a slug (want lowercase words joined by -)", req.Slug))
+		return
+	}
+	d, err := s.drafts.Create(req.Project, req.Slug, req.Idea)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if s.workspaces != nil && req.FromSession != "" {
+		// An unknown session resolves to Default, which joins nothing.
+		s.joinNewDraft(d.ID, s.workspaces.WorkspaceOfSession(req.FromSession))
+	}
+	publishDrafts(s.events)
+	wire.WriteJSON(w, ops.DesignDraftSaveResult{Draft: d})
 }
 
 // joinNewDraft puts a just-created draft in the named workspace. An empty or

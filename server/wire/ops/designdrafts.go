@@ -56,6 +56,16 @@ type DesignDraftSaveRequest struct {
 	Workspace string `json:"workspace,omitempty"`
 }
 
+// DesignDraftCreateRequest creates a draft with its project, slug and idea.
+// FromSession names the session whose workspace the draft joins; an unknown
+// or empty one leaves it in Default.
+type DesignDraftCreateRequest struct {
+	Project     string `json:"project"`
+	Slug        string `json:"slug"`
+	Idea        string `json:"idea"`
+	FromSession string `json:"from_session,omitempty"`
+}
+
 // DesignDraftTargetRequest sets a draft's slug and/or project. It is
 // revision-free and never bumps Revision. Only a present field is written; a
 // present empty Slug clears it, a present blank Project is refused.
