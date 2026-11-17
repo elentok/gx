@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.51.5 - 2026-11-17
+
+- Changed the web chat so the Working row and task list sit below the scroller.
+- Fixed a swallowed Enter on chat send. gx now presses it again after 3 seconds, not after the 45 second grace.
+
 ## v0.51.4 - 2026-11-17
 
 - Fixed the web chat losing auto-scroll when content shrinks.
