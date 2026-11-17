@@ -44,18 +44,17 @@ test.describe("117. Limits block", () => {
     const fixture = await start("limits", { shape: "fresh" })
     await expect(bar(page, "C")).toHaveText("C")
     await expect(bar(page, "X")).toHaveText("X")
-    await expect(bar(page, "C")).toHaveAttribute("data-tone", "done")
-    await expect(bar(page, "C")).toHaveAttribute("data-percent", "34")
+    // The bar shows the tighter window: the fresh shape's weekly 81 beats its 5h 34.
+    await expect(bar(page, "C")).toHaveAttribute("data-tone", "waiting")
+    await expect(bar(page, "C")).toHaveAttribute("data-percent", "81")
     await openMenu(page)
     await expect(row(page, "5h limit").getByText("34%")).toBeVisible()
 
     await report(fixture, payload(55, 96))
     await expect(row(page, "5h limit").getByText("55%")).toBeVisible()
     await expect(row(page, "Weekly limit").getByText("96%")).toBeVisible()
-
-    await report(fixture, payload(85, 90))
-    await expect(bar(page, "C")).toHaveAttribute("data-tone", "waiting")
-    await expect(bar(page, "C")).toHaveAttribute("data-percent", "85")
+    await expect(bar(page, "C")).toHaveAttribute("data-tone", "deadlocked")
+    await expect(bar(page, "C")).toHaveAttribute("data-percent", "96")
   })
 })
 
