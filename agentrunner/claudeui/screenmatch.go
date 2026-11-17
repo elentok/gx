@@ -53,13 +53,23 @@ var trustAnchors = []string{
 
 const trustYes = "Yes, I trust this folder"
 
+// addDirAnchors both show on claude's "Adding a new directory" dialog, which
+// every launch with --add-dir raises for a directory the session hasn't
+// worked in.
+var addDirAnchors = []string{
+	"Adding a new directory",
+	addDirYes,
+}
+
+const addDirYes = "Yes, add it"
+
 // TrustKey is the key that moves the trust dialog in rows toward trusting:
 // Enter once the ❯ cursor is on the trust option, else Down. Claude selects
 // "No, exit" first, so a bare Enter would quit it.
 func TrustKey(rows []string) string {
 	for _, row := range rows {
 		if strings.Contains(row, "❯") {
-			if Matches(Normalize(row), trustYes) {
+			if n := Normalize(row); Matches(n, trustYes) || Matches(n, addDirYes) {
 				return "\r"
 			}
 			break
@@ -83,10 +93,17 @@ const (
 
 // ClassifyStartup reads a pre-session screen's normalized text.
 func ClassifyStartup(text string) Startup {
-	for _, a := range trustAnchors {
+	if matchesAll(text, trustAnchors) || matchesAll(text, addDirAnchors) {
+		return StartupTrust
+	}
+	return StartupNoSession
+}
+
+func matchesAll(text string, anchors []string) bool {
+	for _, a := range anchors {
 		if !Matches(text, a) {
-			return StartupNoSession
+			return false
 		}
 	}
-	return StartupTrust
+	return true
 }

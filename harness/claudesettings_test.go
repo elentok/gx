@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -90,5 +91,24 @@ func TestMergeClaudeSettings_EqualsForm(t *testing.T) {
 	vals := settingsValues(got)
 	if len(vals) != 1 || len(got) != 2 || decode(t, vals[0])["a"] != float64(1) {
 		t.Errorf("got %q", got)
+	}
+}
+
+func TestMergeClaudeSettings_AddDirsBecomeAdditionalDirectories(t *testing.T) {
+	args := MergeClaudeSettings([]string{"--add-dir", "/a", "--add-dir", "/b", "--add-dir", "/a"})
+	i := slices.Index(args, "--settings")
+	if i < 0 {
+		t.Fatalf("no --settings in %v", args)
+	}
+	var got struct {
+		Permissions struct {
+			AdditionalDirectories []string `json:"additionalDirectories"`
+		} `json:"permissions"`
+	}
+	if err := json.Unmarshal([]byte(args[i+1]), &got); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got.Permissions.AdditionalDirectories, []string{"/a", "/b"}) {
+		t.Errorf("additionalDirectories = %v", got.Permissions.AdditionalDirectories)
 	}
 }

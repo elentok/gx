@@ -44,6 +44,7 @@ func MergeClaudeSettings(args []string) []string {
 		}
 	}
 	merged["editorMode"] = EditorModeNormal
+	trustAddedDirs(merged, out)
 	data, _ := json.Marshal(merged)
 	flag := []string{settingsFlag, string(data)}
 	if at < 0 {
@@ -123,4 +124,31 @@ func containsJSON(list []any, e any) bool {
 		got, _ := json.Marshal(x)
 		return string(got) == string(want)
 	})
+}
+
+// trustAddedDirs lists every --add-dir directory in args as a settings
+// additionalDirectories entry, so claude treats it as configured rather than
+// asking about it on each new session.
+func trustAddedDirs(merged map[string]any, args []string) {
+	var dirs []any
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "--add-dir" && !containsJSON(dirs, args[i+1]) {
+			dirs = append(dirs, args[i+1])
+		}
+	}
+	if len(dirs) == 0 {
+		return
+	}
+	perms, _ := merged["permissions"].(map[string]any)
+	if perms == nil {
+		perms = map[string]any{}
+		merged["permissions"] = perms
+	}
+	cur, _ := perms["additionalDirectories"].([]any)
+	for _, d := range dirs {
+		if !containsJSON(cur, d) {
+			cur = append(cur, d)
+		}
+	}
+	perms["additionalDirectories"] = cur
 }

@@ -76,6 +76,8 @@ func TestClassifyStartup(t *testing.T) {
 		{"trust dialog at 160 cols", screenFixture(t, "trust-w160"), StartupTrust},
 		{"startup banner, no pid file yet", screenFixture(t, "startup-w250"), StartupNoSession},
 		{"blank screen", ScreenText(nil, []string{"", ""}), StartupNoSession},
+		{"add-dir dialog", Normalize("Adding a new directory:\n/Users/x/Library/pnpm\nThis session hasn't worked here before.\nNo, exit\n❯ Yes, add it"), StartupTrust},
+		{"prompt quoting add-dir anchor", Normalize("❯ reply with: Yes, add it"), StartupNoSession},
 		{"prompt quoting one anchor", Normalize("❯ reply with: Yes, I trust this folder"), StartupNoSession},
 	}
 	for _, c := range cases {
@@ -104,6 +106,8 @@ func TestTrustKey(t *testing.T) {
 	}{
 		{"recorded dialog, cursor on No, exit", recorded, "\x1b[B"},
 		{"cursor moved to the trust option", onYes, "\r"},
+		{"add-dir dialog, cursor on yes", "Adding a new directory:\n  No, exit\n❯ Yes, add it", "\r"},
+		{"add-dir dialog, cursor on no", "Adding a new directory:\n❯ No, exit\n  Yes, add it", "\x1b[B"},
 		{"no cursor drawn yet", "Quick safety check", "\x1b[B"},
 	}
 	for _, c := range cases {
