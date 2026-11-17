@@ -65,7 +65,7 @@ func TestEpicList_JoinedCardPhases(t *testing.T) {
 		ring      int
 	}{
 		{"designing", []string{"proj:designing"}, wire.CardKindDesign, "Designing", 37},
-		{"creating", []string{"proj:creating", "proj:creating-impl"}, wire.CardKindDesign, "Creating tickets (3 so far)...", 0},
+		{"creating", []string{"proj:creating", "proj:creating-impl"}, wire.CardKindDesign, "Designing", 75},
 		{"building", []string{"proj:building-impl", "proj:building"}, wire.CardKindImplementation, "Not started", 33},
 		{"queued-done", []string{"proj:queued-done-impl", "proj:queued-done"}, wire.CardKindImplementation, "Not started", 33},
 		{"orphan-impl", []string{"proj:orphan-impl"}, wire.CardKindImplementation, "Not started", 33},
