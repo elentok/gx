@@ -177,6 +177,13 @@ func runProgram() (int, error) {
 	if !ok {
 		return 0, errors.New("agentfake: --session-id or --resume is required")
 	}
+	if s := os.Getenv(ProgramStartDelayEnv); s != "" {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return 0, err
+		}
+		time.Sleep(d)
+	}
 	if term.IsTerminal(os.Stdin.Fd()) {
 		if _, err := term.MakeRaw(os.Stdin.Fd()); err != nil {
 			return 0, err

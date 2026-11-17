@@ -39,6 +39,20 @@ func TestSendProgramControl_WaitsUntilTheProgramOpenedItsFIFO(t *testing.T) {
 	p.WaitStatus(harness.Status{State: harness.Working})
 }
 
+func TestSendProgramControl_WaitsForTheStartDelay(t *testing.T) {
+	const delay = 500 * time.Millisecond
+	conv := NewConversationID(t)
+	cmd := Harness{}.Launch(harness.LaunchOptions{SessionID: conv})
+	start := time.Now()
+	p := HoldProgram(t, cmd, conv, ProgramStartDelayEnv+"=500ms")
+
+	p.report("working", "", "")
+	p.WaitStatus(harness.Status{State: harness.Working})
+	if got := time.Since(start); got < delay {
+		t.Errorf("control acked after %v; want the FIFO and ready file to appear only after the %v start delay", got, delay)
+	}
+}
+
 func TestHarness_WatchFollowsProgramReportsThroughHolder(t *testing.T) {
 	conv := NewConversationID(t)
 	cmd := Harness{}.Launch(harness.LaunchOptions{SessionID: conv})

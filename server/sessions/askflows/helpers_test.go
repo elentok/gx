@@ -26,6 +26,5 @@ var (
 	waitFor          = servertest.Await
 	startFakeSession = servertest.StartFakeSession
 	waitForHolder    = servertest.WaitForHolder
-	waitForScreen    = servertest.WaitForScreen
 	waitForSession   = servertest.WaitForSession
 )

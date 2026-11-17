@@ -5,26 +5,38 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/agentfake"
 
 	"github.com/elentok/gx/nativerunner/holder"
 )
 
 func TestSessionScreen_LiveReturnsHolderRows(t *testing.T) {
 	t.Parallel()
-	h, ctx, _, id, _ := startFakeSession(t)
+	h, ctx, _, id, conv := startFakeSession(t, servertest.WithEnv(agentfake.ProgramStartDelayEnv+"=1s"))
 	holder := waitForHolder(t, filepath.Join(h.SessionsDir, id))
+	// The ack returns once the fake reads input; the tty echo of keys typed
+	// earlier proves nothing.
+	servertest.Report(t, conv, agentfake.Control{State: "idle"})
 	if err := holder.SendKeys("typed-on-screen"); err != nil {
 		t.Fatal(err)
 	}
-	waitForScreen(t, holder, "typed-on-screen")
 
-	res, err := h.Client.Sessions.Screen(ctx, id)
-	if err != nil {
-		t.Fatal(err)
+	var got string
+	if !servertest.Poll(10*time.Second, func() bool {
+		res, err := h.Client.Sessions.Screen(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got = strings.Join(res.Rows, "\n")
+		return strings.Contains(got, "typed-on-screen")
+	}) {
+		t.Fatalf("rows = %q, want the typed text", got)
 	}
-	if got := strings.Join(res.Rows, "\n"); !strings.Contains(got, "typed-on-screen") || strings.Contains(got, "\x1b") {
+	if strings.Contains(got, "\x1b") {
 		t.Errorf("rows = %q, want the plain holder screen", got)
 	}
 }

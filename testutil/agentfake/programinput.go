@@ -21,6 +21,11 @@ const ProgramDraftEnv = "GX_AGENTFAKE_PROGRAM_DRAFT"
 // typed before it are dropped, as claude drops them.
 const ProgramReadyDelayEnv = "GX_AGENTFAKE_PROGRAM_READY_DELAY"
 
+// ProgramStartDelayEnv is a Go duration the program waits before it enters raw
+// mode and opens its control FIFO. The tty echoes and queues keys typed in
+// that time, and the program reads them once it starts.
+const ProgramStartDelayEnv = "GX_AGENTFAKE_PROGRAM_START_DELAY"
+
 // ProgramInsertNoMarkerEnv, set to "1", puts the input box in vim INSERT mode
 // without drawing the "-- INSERT --" footer row.
 const ProgramInsertNoMarkerEnv = "GX_AGENTFAKE_PROGRAM_INSERT_NO_MARKER"
