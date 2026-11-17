@@ -62,6 +62,14 @@ func (s *designs) SaveDesignDraft(ctx context.Context, req ops.DesignDraftSaveRe
 	return res, err
 }
 
+// CreateChatDraft saves a chat draft. A refusal is a result (Refused set), not
+// an error.
+func (s *designs) CreateChatDraft(ctx context.Context, req ops.ChatDraftCreateRequest) (ops.ChatDraftResult, error) {
+	var res ops.ChatDraftResult
+	err := s.t.post(ctx, "/v1/agents/drafts/create", req, &res)
+	return res, err
+}
+
 // SetDesignDraftTarget writes a draft's slug and project without a revision.
 // A gone draft is a refused result, not an error.
 func (s *designs) SetDesignDraftTarget(ctx context.Context, req ops.DesignDraftTargetRequest) (ops.DesignDraftSaveResult, error) {

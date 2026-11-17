@@ -166,6 +166,7 @@ var routeVerbs = map[string]string{
 	"GET /v1/designs/drafts":                    "designs drafts list",
 	"GET /v1/designs/drafts/read":               "designs drafts show",
 	"POST /v1/designs/drafts/save":              "designs drafts save",
+	"POST /v1/agents/drafts/create":             "agents drafts create",
 	"POST /v1/designs/drafts/target":            "designs drafts set",
 	"POST /v1/designs/drafts/delete":            "designs drafts delete",
 	"POST /v1/designs/drafts/remove-if-empty":   "designs drafts remove-if-empty",

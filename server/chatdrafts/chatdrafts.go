@@ -268,6 +268,7 @@ func (c *ChatDrafts) remove(w http.ResponseWriter, r *http.Request) {
 func Routes(get func() *ChatDrafts) []wire.Route {
 	return []wire.Route{
 		{Pattern: "POST /v1/agents/drafts/create", Web: wire.WebWrite,
+			Handler:    func(w http.ResponseWriter, r *http.Request) { get().create(w, r) },
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().create(w, r) }},
 		{Pattern: "POST /v1/agents/drafts/read", Web: wire.WebWrite,
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().read(w, r) }},
