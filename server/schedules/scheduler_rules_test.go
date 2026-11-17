@@ -173,7 +173,7 @@ func TestSchedulerRules_ScheduledRunsUseTheOneOffCapNotThePerRootCap(t *testing.
 	t.Parallel()
 	fake := runnerfake.NewRunner()
 	h, clock := seedCapRig(t, 2, fake)
-	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/90", Runner: "herdr"})
+	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/90", Runner: "pty"})
 
 	clock.Set(at(9, 0).Add(30 * time.Second))
 	rigs.WaitForAgentKinds(t, fake, "01", "02")

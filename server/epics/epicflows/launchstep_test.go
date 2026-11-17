@@ -25,7 +25,7 @@ func TestEpicList_CapHeldEpicCarriesTheCapLine(t *testing.T) {
 		c.MaxAgents = 1
 	})
 	servertest.RegisterTurn(h)
-	h.Server.Registry().PutRun("proj:busy", runs.Run{Address: "proj:busy/00", Runner: "herdr"})
+	h.Server.Registry().PutRun("proj:busy", runs.Run{Address: "proj:busy/00", Runner: "pty"})
 	if res, err := h.Client.Queue.Add(t.Context(), "proj:held/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}

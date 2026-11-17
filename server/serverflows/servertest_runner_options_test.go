@@ -64,37 +64,3 @@ func TestServertest_WithRunnerForRoutesTheRunToFn(t *testing.T) {
 		t.Errorf("configured runner holds %d sessions, want 0", len(ss))
 	}
 }
-
-// Whatever the order of the options, a runner choice beats WithHerdr and the
-// harness still has its fake herdr.
-func TestServertest_RunnerChoiceBeatsWithHerdrInEveryOrder(t *testing.T) {
-	t.Parallel()
-	herdr := servertest.WithHerdr(servertest.HerdrIsTheSubject)
-	cases := map[string]func(fake *runnerfake.Runner) []func(*server.Config){
-		"runner first": func(f *runnerfake.Runner) []func(*server.Config) {
-			return []func(*server.Config){servertest.WithRunner(f), herdr}
-		},
-		"herdr first": func(f *runnerfake.Runner) []func(*server.Config) {
-			return []func(*server.Config){herdr, servertest.WithRunner(f)}
-		},
-		"runner-for first": func(f *runnerfake.Runner) []func(*server.Config) {
-			return []func(*server.Config){servertest.WithRunnerFor(f, func(string, string) agentrunner.Runner { return f }), herdr}
-		},
-		"herdr then runner-for": func(f *runnerfake.Runner) []func(*server.Config) {
-			return []func(*server.Config){herdr, servertest.WithRunnerFor(f, func(string, string) agentrunner.Runner { return f })}
-		},
-	}
-	for name, mk := range cases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			fake := runnerfake.NewRunner()
-			h := startRunnerOptions(t, mk(fake)...)
-			if h.Herdr == nil {
-				t.Fatal("h.Herdr is nil")
-			}
-			if got := launchOnRunners(t, h, fake); got != fake {
-				t.Fatalf("launched on %v, want the fake", got)
-			}
-		})
-	}
-}

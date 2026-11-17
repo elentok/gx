@@ -27,7 +27,6 @@ type (
 	headlessFake = servertest.HeadlessFake
 	renamedFake  = servertest.RenamedFake
 	slackHook    = rigs.SlackHook
-	herdrNamed   = servertest.HerdrNamed
 	codexNamed   = servertest.CodexNamed
 	ptyNamed     = servertest.PtyNamed
 	answerEnv    = rigs.AnswerEnv
@@ -139,7 +138,6 @@ var (
 	answerEvents           = rigs.AnswerEvents
 	stateOf                = rigs.StateOf
 	mustFind               = rigs.MustFind
-	registerLiveAgent      = rigs.RegisterLiveAgent
 	restartUnder           = rigs.RestartUnder
 	liveUnder              = rigs.LiveUnder
 	liveUnderOther         = rigs.LiveUnderOther

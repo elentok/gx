@@ -27,7 +27,7 @@ func (fakeHarnessHost) FreshTicket(tickets.Address) (tickets.Epic, tickets.Ticke
 	return tickets.Epic{}, tickets.Ticket{}, false
 }
 
-// routingServer is configured with headless and can also build herdr and pty;
+// routingServer is configured with headless and can also build pty;
 // RunnerFor hands out one runner per (runner, project) pair.
 func routingServer(adjust ...func(*harnesschoice.Config)) (*harnesschoice.Harness, *namedRunner) {
 	built := map[[2]string]*namedRunner{}
@@ -35,7 +35,7 @@ func routingServer(adjust ...func(*harnesschoice.Config)) (*harnesschoice.Harnes
 	cfg := harnesschoice.Config{
 		Runner: configured,
 		RunnerFor: func(runner, project string) agentrunner.Runner {
-			if runner != "herdr" && runner != "headless" && runner != "pty" {
+			if runner != "headless" && runner != "pty" {
 				return nil
 			}
 			key := [2]string{runner, project}
@@ -55,7 +55,6 @@ func TestRunnerForRun_PicksTheRunsOwnRunner(t *testing.T) {
 	t.Parallel()
 	s, _ := routingServer()
 	for _, tc := range []struct{ saved, want string }{
-		{"herdr", "herdr"},
 		{"headless", "headless"},
 		{"pty", "pty"},
 	} {
@@ -64,12 +63,15 @@ func TestRunnerForRun_PicksTheRunsOwnRunner(t *testing.T) {
 			t.Errorf("runner %q: got %+v, want %s for proj", tc.saved, r, tc.want)
 		}
 	}
+	if r := s.RunnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: ""}); r != nil {
+		t.Errorf("empty runner name: got %v, want nil", r)
+	}
 }
 
 func TestRunnerForRun_UnbuildableRunnerIsNil(t *testing.T) {
 	t.Parallel()
 	s, _ := routingServer()
-	for _, name := range []string{"tmux", ""} {
+	for _, name := range []string{"tmux", "herdr", ""} {
 		if r := s.RunnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: name}); r != nil {
 			t.Errorf("runner %q: got %v, want nil", name, r)
 		}
@@ -124,7 +126,7 @@ func TestRunnerForRun_FallsBackToTheConfiguredRunnerByName(t *testing.T) {
 	if r := s.RunnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: "headless"}); r != agentrunner.Runner(configured) {
 		t.Errorf("got %v, want the configured runner", r)
 	}
-	if r := s.RunnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: "herdr"}); r != nil {
-		t.Errorf("herdr run under headless with no RunnerFor: got %v, want nil", r)
+	if r := s.RunnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: ""}); r != nil {
+		t.Errorf("run with no runner name: want nil, got %v", r)
 	}
 }

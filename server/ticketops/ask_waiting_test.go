@@ -13,38 +13,27 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// An ask from a herdr-hosted Claude or Codex run cannot be answered live:
-// the ticket pauses, the session closes and the run leaves the registry.
-func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
+// An ask from a Codex run off the PTY runner cannot be answered live: the
+// ticket pauses, the session closes and the run leaves the registry.
+func TestAsk_NonPtyCodexClosesSession(t *testing.T) {
 	t.Parallel()
-	cases := []struct {
-		name, agent string
-		wrap        func(*turnRunner) agentrunner.Runner
-	}{
-		{"herdr claude", "claude", func(r *turnRunner) agentrunner.Runner { return herdrNamed{TurnRunner: r} }},
-		{"herdr codex", "codex", func(r *turnRunner) agentrunner.Runner { return herdrNamed{TurnRunner: r} }},
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	ticketPath := store + "/proj/epic-a/issues/01-first.md"
+	turn := newTurnRunner(func(_, _ string) { reportIteration(t, ticketPath, "asking") })
+	fake := servertest.CodexNamed{TurnRunner: turn}
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "codex"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
 	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			store, repo := t.TempDir(), testutil.TempRepo(t)
-			servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-			servertest.SetProjectRepo(t, store, "proj", repo)
-			ticketPath := store + "/proj/epic-a/issues/01-first.md"
-			turn := newTurnRunner(func(_, _ string) { reportIteration(t, ticketPath, "asking") })
-			fake := c.wrap(turn)
-			h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
-			if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", c.agent); err != nil || res.Refused {
-				t.Fatalf("add: %+v, %v", res, err)
-			}
-			waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
-			waitFor(t, func() bool { return len(h.Server.Runs()) == 0 })
-			if _, ok, err := fake.Find("epic-a-iter-01"); err != nil || ok {
-				t.Errorf("session still live: ok=%v err=%v", ok, err)
-			}
-			if data, _ := os.ReadFile(filepath.Join(h.StateDir, "runs.json")); strings.Contains(string(data), `"waiting_since"`) {
-				t.Errorf("run marked waiting:\n%s", data)
-			}
-		})
+	waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 0 })
+	if _, ok, err := fake.Find("epic-a-iter-01"); err != nil || ok {
+		t.Errorf("session still live: ok=%v err=%v", ok, err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(h.StateDir, "runs.json")); strings.Contains(string(data), `"waiting_since"`) {
+		t.Errorf("run marked waiting:\n%s", data)
 	}
 }
 

@@ -45,7 +45,7 @@ func agentDir(t *testing.T, root, label string, touched time.Time) string {
 	return dir
 }
 
-func TestPrune_HeadlessDirsArePrunedUnderAHerdrConfig(t *testing.T) {
+func TestPrune_HeadlessDirsArePrunedUnderAPtyConfig(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -64,7 +64,7 @@ func TestPrune_HeadlessDirsArePrunedUnderAHerdrConfig(t *testing.T) {
 	paused := agentDir(t, root, "epic-a-iter-01", expired)
 	fresh := agentDir(t, root, "fresh", time.Now())
 
-	configured := newRenamedFake("herdr", nativerunner.VerdictLive)
+	configured := newRenamedFake("pty", nativerunner.VerdictLive)
 	servertest.StartWithStore(t, store, servertest.WithRunnerFor(configured, func(name, project string) agentrunner.Runner {
 		if name == "headless" && project == "proj" {
 			return &nativerunner.Headless{Root: root, Procs: noProcs{}}

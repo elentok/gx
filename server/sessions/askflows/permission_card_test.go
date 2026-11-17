@@ -159,25 +159,6 @@ func TestPermissionCard_NotApprovablePromptShowsTheHint(t *testing.T) {
 	}
 }
 
-func TestPermissionCard_HerdrHostedShowsTheHint(t *testing.T) {
-	t.Parallel()
-	h, _ := startBlockedClaimed(t, true, &agentrunner.Pending{ID: "req-3", Tool: "Bash"})
-	var d wire.TicketDetail
-	waitFor(t, func() bool {
-		var err error
-		if d, err = h.Client.Reads.Detail(context.Background(), answerAddr); err != nil {
-			t.Fatal(err)
-		}
-		return d.Permission != nil
-	})
-	if d.Permission.Hint != "Approve it in the TUI" || d.Permission.RequestID != "" {
-		t.Errorf("permission = %+v", d.Permission)
-	}
-	if slices.Contains(d.Actions, wire.ActionApprove) {
-		t.Errorf("actions = %v, want no approve", d.Actions)
-	}
-}
-
 func TestPermissionCard_NoCardWhenNotBlocked(t *testing.T) {
 	t.Parallel()
 	h, _ := startBlockedClaimed(t, false, nil)

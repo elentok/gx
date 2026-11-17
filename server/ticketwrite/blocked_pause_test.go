@@ -114,7 +114,7 @@ func TestBlockedPause_UsageLimitErrorHoldsInsteadOfPausing(t *testing.T) {
 func TestBlockedPause_LiftsWhenAgentLeavesBlocked(t *testing.T) {
 	t.Parallel()
 	exits := map[string]agentrunner.State{"working": agentrunner.StateWorking, "idle": agentrunner.StateIdle}
-	for _, runner := range []string{"herdr", "pty", "codex"} {
+	for _, runner := range []string{"pty", "codex"} {
 		for name, state := range exits {
 			t.Run(runner+"/"+name, func(t *testing.T) {
 				h, ticketPath, turn := servertest.StartBlockable(t, runner)

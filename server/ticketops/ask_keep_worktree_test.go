@@ -18,13 +18,13 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// unnamedRunner is the fake with an empty runner name, which keepsAskedAgent
-// treats as non-keeping (the same as herdr).
-type unnamedRunner struct{ *runnerfake.Runner }
+// headlessRunner is the fake named headless: a Codex agent on it is
+// non-keeping, since keepsAskedAgent keeps Codex only on the PTY runner.
+type headlessRunner struct{ *runnerfake.Runner }
 
-func (unnamedRunner) Name() string { return "" }
+func (headlessRunner) Name() string { return "headless" }
 
-// A non-keeping runner drops its agent session on an
+// A non-keeping runner (a Codex agent off the PTY runner) drops its agent session on an
 // ask but keeps the iteration worktree, so the relaunch finds the agent's
 // uncommitted work. The pause holds no permit: a second ticket claims.
 func TestAsk_NonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testing.T) {
@@ -34,7 +34,7 @@ func TestAsk_NonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := runnerfake.NewRunner()
-	h := servertest.StartWithStore(t, store, servertest.WithRunner(unnamedRunner{fake}), func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(headlessRunner{fake}), func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond
 		c.MaxAgentsPerRoot = 1
 	})
@@ -51,7 +51,7 @@ func TestAsk_NonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testing.T) {
 	const label = "epic-a-iter-01"
 	t.Cleanup(func() { fake.StopAll() })
 
-	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	// The launch prompt flips the fake to working; end the turn only after it.
@@ -75,7 +75,7 @@ func TestAsk_NonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testing.T) {
 
 	// The ask releases the session, and the second ticket claims the freed permit.
 	waitFor(t, func() bool { _, ok, _ := fake.Find(label); return !ok })
-	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/02", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/02", "codex"); err != nil || res.Refused {
 		t.Fatalf("add 02: %+v, %v", res, err)
 	}
 	waitFor(t, func() bool { _, ok, _ := fake.Find("epic-a-iter-02"); return ok })
@@ -121,7 +121,7 @@ func TestAsk_CommitlessOnNonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testi
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Type: "investigate"})
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := runnerfake.NewRunner()
-	h := servertest.StartWithStore(t, store, servertest.WithRunner(unnamedRunner{fake}), func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(headlessRunner{fake}), func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -129,7 +129,7 @@ func TestAsk_CommitlessOnNonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testi
 	const label = "epic-a-iter-01"
 	t.Cleanup(func() { fake.StopAll() })
 
-	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	waitFor(t, func() bool { return len(fake.Prompts(label)) > 0 })

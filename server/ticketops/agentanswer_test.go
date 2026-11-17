@@ -7,14 +7,8 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
-
-// herdrFake is a fake that reports itself as the herdr runner.
-type herdrFake struct{ *runnerfake.Runner }
-
-func (herdrFake) Name() string { return string(agentrunner.ChoiceHerdr) }
 
 func bashPending(id string) *agentrunner.Pending {
 	return &agentrunner.Pending{ID: id, Tool: "Bash", Input: json.RawMessage(`{"command":"ls"}`), Description: "list files"}
@@ -25,31 +19,28 @@ func TestAgentAnswer_RequestIDRefusalsLogNothing(t *testing.T) {
 	cases := []struct {
 		name   string
 		setup  func(e answerEnv)
-		wrap   func(*runnerfake.Runner) agentrunner.Runner
 		reason string
 	}{
-		{"not blocked", func(e answerEnv) {}, nil, wire.ReasonNotBlocked},
-		{"request changed", func(e answerEnv) { e.Fake.SetPending(answerLabel, bashPending("req-2")) }, nil, wire.ReasonRequestChanged},
+		{"not blocked", func(e answerEnv) {}, wire.ReasonNotBlocked},
+		{"request changed", func(e answerEnv) { e.Fake.SetPending(answerLabel, bashPending("req-2")) }, wire.ReasonRequestChanged},
 		{"plan approval", func(e answerEnv) {
 			e.Fake.SetPending(answerLabel, &agentrunner.Pending{ID: "req-1", Tool: "ExitPlanMode", NotApprovable: true})
-		}, nil, wire.ReasonNotApprovable},
+		}, wire.ReasonNotApprovable},
 		{"ask user question", func(e answerEnv) {
 			e.Fake.SetPending(answerLabel, &agentrunner.Pending{ID: "req-1", Tool: "AskUserQuestion", NotApprovable: true})
-		}, nil, wire.ReasonNotApprovable},
-		{"herdr hosted", func(e answerEnv) { e.Fake.SetPending(answerLabel, bashPending("req-1")) },
-			func(f *runnerfake.Runner) agentrunner.Runner { return herdrFake{f} }, wire.ReasonNotApprovable},
+		}, wire.ReasonNotApprovable},
 		{"not delivered", func(e answerEnv) {
 			e.Fake.SetPending(answerLabel, bashPending("req-1"))
 			e.Fake.SetAnswerErr(answerLabel, agentrunner.ErrNotDelivered)
-		}, nil, wire.ReasonNotDelivered},
+		}, wire.ReasonNotDelivered},
 		{"agent gone", func(e answerEnv) {
 			e.Fake.SetPending(answerLabel, bashPending("req-1"))
 			e.Fake.SetAnswerErr(answerLabel, agentrunner.SessionDied("claude exited"))
-		}, nil, wire.ReasonAgentGone},
+		}, wire.ReasonAgentGone},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			e := startAnswerEnv(t, c.wrap)
+			e := startAnswerEnv(t, nil)
 			c.setup(e)
 			res := e.Answer(t, wire.QueueRequest{Decision: "allow", RequestID: "req-1"})
 			if !res.Refused || res.Reason != c.reason {

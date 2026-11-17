@@ -17,7 +17,6 @@ const (
 type (
 	headlessFake = servertest.HeadlessFake
 	renamedFake  = servertest.RenamedFake
-	herdrNamed   = servertest.HerdrNamed
 	ptyNamed     = servertest.PtyNamed
 	turnRunner   = servertest.TurnRunner
 	answerEnv    = rigs.AnswerEnv

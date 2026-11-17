@@ -11,8 +11,8 @@ import (
 )
 
 // Two harnesses side by side each launch an agent through their own fake
-// herdr: Start changes no process env, so the fakes do not collide.
-func TestServertest_ParallelHarnessesEachDriveAHerdrLaunch(t *testing.T) {
+// PTY runner: Start changes no process env, so the fakes do not collide.
+func TestServertest_ParallelHarnessesEachDriveAPtyLaunch(t *testing.T) {
 	t.Parallel()
 	for i := range 2 {
 		t.Run("harness"+strconv.Itoa(i), func(t *testing.T) {
@@ -40,7 +40,7 @@ func TestServertest_ParallelHarnessesEachDriveAHerdrLaunch(t *testing.T) {
 					t.Errorf("prompt address = %q, want proj:epic-a/01", p.Address)
 				}
 			case <-ctx.Done():
-				t.Fatal("no agent prompt reached this harness's herdr")
+				t.Fatal("no agent prompt reached this harness's PTY runner")
 			}
 		})
 	}

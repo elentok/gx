@@ -43,33 +43,29 @@ func TestRetry_BlockedPaneWithALiveAgentPrompts(t *testing.T) {
 	}
 }
 
-// Retry on a blocked pause with a live PTY or herdr agent ends the pause once,
+// Retry on a blocked pause with a live PTY agent ends the pause once,
 // interrupts the agent and sends one retry prompt; the unblock watch seeing the
 // agent leave blocked afterwards adds neither a second end nor a second prompt.
 func TestRetry_BlockedPauseOnAQuestionMenuInterruptsAndPrompts(t *testing.T) {
 	t.Parallel()
-	for _, runner := range []string{"pty", "herdr"} {
-		t.Run(runner, func(t *testing.T) {
-			h, ticketPath, turn := startBlockable(t, runner)
-			turn.SetState("epic-a-iter-01", agentrunner.StateBlocked, "waiting on a prompt")
-			waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
-			waitFor(t, func() bool { return runsJSONHas(h, `"waiting_since"`) })
-			before := len(turn.Prompts("epic-a-iter-01"))
+	h, ticketPath, turn := startBlockable(t, "pty")
+	turn.SetState("epic-a-iter-01", agentrunner.StateBlocked, "waiting on a prompt")
+	waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
+	waitFor(t, func() bool { return runsJSONHas(h, `"waiting_since"`) })
+	before := len(turn.Prompts("epic-a-iter-01"))
 
-			if res, err := h.Client.Tickets.Retry(t.Context(), answerAddr, false); err != nil || res.Refused {
-				t.Fatalf("retry = %+v, %v", res, err)
-			}
-			waitStatus(t, ticketPath, schema.StatusClaimed)
-			waitFor(t, func() bool { return !runsJSONHas(h, `"waiting_since"`) })
-			// Negative wait: a second interrupt or prompt would show once the watch has run.
-			time.Sleep(300 * time.Millisecond)
-			if got := turn.Interrupts("epic-a-iter-01"); got != 1 {
-				t.Errorf("interrupts = %d; want 1", got)
-			}
-			if got := len(turn.Prompts("epic-a-iter-01")) - before; got != 1 {
-				t.Errorf("retry prompts = %d; want 1", got)
-			}
-		})
+	if res, err := h.Client.Tickets.Retry(t.Context(), answerAddr, false); err != nil || res.Refused {
+		t.Fatalf("retry = %+v, %v", res, err)
+	}
+	waitStatus(t, ticketPath, schema.StatusClaimed)
+	waitFor(t, func() bool { return !runsJSONHas(h, `"waiting_since"`) })
+	// Negative wait: a second interrupt or prompt would show once the watch has run.
+	time.Sleep(300 * time.Millisecond)
+	if got := turn.Interrupts("epic-a-iter-01"); got != 1 {
+		t.Errorf("interrupts = %d; want 1", got)
+	}
+	if got := len(turn.Prompts("epic-a-iter-01")) - before; got != 1 {
+		t.Errorf("retry prompts = %d; want 1", got)
 	}
 }
 
