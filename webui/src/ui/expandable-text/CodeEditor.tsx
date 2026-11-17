@@ -361,7 +361,12 @@ export default function CodeEditor({
             "aria-label": label,
             "aria-multiline": "true",
             ...(inline
-              ? { [PROMPT_BOX_ATTR]: "", ...(inline.name ? { name: inline.name } : {}) }
+              ? {
+                  [PROMPT_BOX_ATTR]: "",
+                  // No iOS AutoFill (contact) bar over the keyboard.
+                  autocomplete: "off",
+                  ...(inline.name ? { name: inline.name } : {}),
+                }
               : {}),
           }),
           lockSlot.of(lockExt(disabled)),
