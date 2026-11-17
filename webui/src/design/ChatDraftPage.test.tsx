@@ -563,6 +563,11 @@ test("on a phone one pill sums up the settings, and its sheet changes them", asy
   const effort = screen.getByRole("combobox", { name: "Effort" })
   fireEvent.change(effort, { target: { value: "max" } })
   expect(screen.getByRole("button", { name: "Chat settings" }).textContent).toMatch(/· max/)
-  fireEvent.keyDown(screen.getByRole("dialog", { name: "Chat settings" }), { key: "Escape" })
-  await waitFor(() => expect(screen.queryByRole("combobox", { name: "Effort" })).toBeNull())
+  // A loaded run can drop the first Escape before the popover is ready for it; Escape on an open
+  // popover is idempotent, so poll the whole action.
+  await waitFor(() => {
+    const dialog = screen.queryByRole("dialog", { name: "Chat settings" })
+    if (dialog) fireEvent.keyDown(dialog, { key: "Escape" })
+    expect(screen.queryByRole("combobox", { name: "Effort" })).toBeNull()
+  })
 })

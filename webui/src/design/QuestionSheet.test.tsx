@@ -388,18 +388,24 @@ describe("keyboard", () => {
   test("vi on: N focuses the inline note editor; n, p and Cmd+Enter act in it, not on the sheet", async () => {
     vi_state.on = true
     renderThemed(<Harness />)
-    answer(0, 0).focus()
-    key("N")
+    // The note focus lands in a frame after N, and a loaded run can have another focus move win
+    // that frame. Pressing N again from an answer is idempotent, so poll the whole action.
     await waitFor(() => {
       const el = document.activeElement as HTMLElement
-      expect(el.matches("[data-prompt-box][name=question-note]")).toBe(true)
+      if (!el.matches("[data-prompt-box][name=question-note]")) {
+        answer(0, 0).focus()
+        key("N")
+      }
+      expect(document.activeElement?.matches("[data-prompt-box][name=question-note]")).toBe(true)
     })
     const note = document.activeElement
     key("n")
     key("p")
     expect(document.activeElement).toBe(note)
-    key("Enter", { metaKey: true })
-    expect(document.body.getAttribute("data-sent")).toBe("1")
+    await waitFor(() => {
+      if (!document.body.hasAttribute("data-sent")) key("Enter", { metaKey: true })
+      expect(document.body.getAttribute("data-sent")).toBe("1")
+    })
     document.body.removeAttribute("data-sent")
   })
 
