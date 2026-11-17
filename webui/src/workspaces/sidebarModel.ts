@@ -107,7 +107,7 @@ const isCard = (r: EpicListRow) =>
 
 export function cardStatus(r: EpicListRow): SidebarStatus {
   if (r.section === SectionNeedsYou) return { words: NEEDS_YOU, tone: "waiting" }
-  if (isLive(r)) return { words: WORKING, tone: "running" }
+  if (isLive(r)) return { words: r.working_word || WORKING, tone: "running" }
   return { words: r.status_words ?? "", tone: "muted" }
 }
 
@@ -115,14 +115,6 @@ export function sessionStatus(s: SessionInfo): SidebarStatus {
   if (isActionable(s)) return { words: NEEDS_YOU, tone: "waiting" }
   if (s.status.state === SessionWorking) return { words: WORKING, tone: "running" }
   return { words: stateLabel(s), tone: "muted" }
-}
-
-/** A Design's agent works in its own session, not the queue: a working session reads as Working. */
-function designStatus(r: EpicListRow, sessions: SessionInfo[]): SidebarStatus {
-  const status = cardStatus(r)
-  if (status.tone === "waiting" || status.tone === "running") return status
-  const working = sessions.some((s) => s.status.state === SessionWorking && !s.status.background)
-  return working ? { words: WORKING, tone: "running" } : status
 }
 
 const agentRow = (s: SessionInfo): SidebarAgent => ({
@@ -148,7 +140,7 @@ function cardRow(
     kind,
     title: r.name,
     href: kind === "design" ? designHref(r.address) : titleHref(r),
-    status: kind === "design" ? designStatus(r, sessions) : cardStatus(r),
+    status: cardStatus(r),
     ring: ringProgress(r),
     ...(held ? { held: true } : {}),
     ...(r.queued ? { queued: true } : {}),
@@ -168,10 +160,13 @@ const sortOf = (sort: string | undefined): Sort =>
 
 export const CHATS_GROUP = "Chats"
 
-/** Needs you, then Working, then the rest by their words. */
-const statusRank = (words: string) => (words === NEEDS_YOU ? 0 : words === WORKING ? 1 : 2)
-const cmpStatus = (a: string, b: string) =>
-  statusRank(a) - statusRank(b) || a.toLowerCase().localeCompare(b.toLowerCase())
+/** Needs you, then every working row (by the flag, never the word), then idle rows. */
+const statusRank = (e: { words: string; working: boolean }) =>
+  e.words === NEEDS_YOU ? 0 : e.working ? 1 : 2
+const cmpStatus = (
+  a: { words: string; working: boolean },
+  b: { words: string; working: boolean },
+) => statusRank(a) - statusRank(b) || a.words.toLowerCase().localeCompare(b.words.toLowerCase())
 
 const time = (iso: string | undefined): number | undefined => {
   const t = iso ? Date.parse(iso) : NaN
@@ -192,6 +187,8 @@ interface Sortable<T> {
   project: string
   /** The status words. */
   words: string
+  /** True when the row is working (a card's flag, a session's working state). */
+  working: boolean
 }
 
 /** Array.sort is stable, so ties keep server order. */
@@ -202,7 +199,7 @@ function sortBy<T>(sort: Sort, entries: Sortable<T>[]): T[] {
     if (sort === SortName) return byName(a, b)
     if (sort === SortProject)
       return a.project.toLowerCase().localeCompare(b.project.toLowerCase()) || byName(a, b)
-    if (sort === SortStatus) return cmpStatus(a.words, b.words) || byName(a, b)
+    if (sort === SortStatus) return cmpStatus(a, b) || byName(a, b)
     if (sort === SortActivity) {
       if (a.at === undefined || b.at === undefined)
         return a.at === b.at ? byName(a, b) : a.at === undefined ? 1 : -1
@@ -262,6 +259,7 @@ export function buildSidebar({
         at: sessionAt(s),
         project: "",
         words: sessionStatus(s).words,
+        working: s.status.state === SessionWorking,
       })),
     )
   const cardEntry = (r: EpicListRow, held: boolean): Sortable<SidebarRow> => {
@@ -273,6 +271,7 @@ export function buildSidebar({
       needsYou: row.status.words === NEEDS_YOU,
       project: r.project,
       words: row.status.words,
+      working: isLive(r),
       at: newest([time(r.last_activity_at), ...ss.map(sessionAt)]),
     }
   }
@@ -298,6 +297,7 @@ export function buildSidebar({
         needsYou: status.words === NEEDS_YOU,
         project: s.project || CHATS_GROUP,
         words: status.words,
+        working: status.tone === "running",
         at: sessionAt(s),
       }
     })
@@ -319,6 +319,7 @@ export function buildSidebar({
         needsYou: false,
         project: d.project,
         words: status.words,
+        working: false,
         at: time(d.edited_at),
       }
     })
@@ -339,6 +340,7 @@ export function buildSidebar({
         needsYou: false,
         project: d.project,
         words: status.words,
+        working: false,
         at: time(d.edited_at),
       }
     })

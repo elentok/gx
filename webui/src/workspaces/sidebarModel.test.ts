@@ -45,15 +45,33 @@ const place = (
 ): SessionPlacement => ({ session, kind, ...extra })
 
 describe("buildSidebar", () => {
-  it("a Design row reads Working while its own session works", () => {
-    const rows = [row("p:d", { card_kind: CardKindDesign, section: SectionDesigning })]
-    const working = session("d1", "p", { status: { state: "working" } } as never)
+  it("a Design row reads the server's flag and word, never its sessions", () => {
     const placements = [place("d1", "epic", { epic: "p:d" })]
-    const s = buildSidebar({ ...base, rows, sessions: [working], placements })
-    expect(s.rows[0].status).toEqual({ words: "Working", tone: "running" })
+    const working = session("d1", "p", { status: { state: "working" } } as never)
+    const design: Partial<EpicListRow> = {
+      card_kind: CardKindDesign,
+      section: SectionDesigning,
+      status_words: "Designing",
+    }
+    const idleRow = [row("p:d", design)]
+    const s = buildSidebar({ ...base, rows: idleRow, sessions: [working], placements })
+    expect(s.rows[0].status).toEqual({ words: "Designing", tone: "muted" })
+    const flagged = [row("p:d", { ...design, working: true, working_word: "Charting" })]
     const idle = session("d1", "p", { status: { state: "idle" } } as never)
-    const s2 = buildSidebar({ ...base, rows, sessions: [idle], placements })
-    expect(s2.rows[0].status.tone).not.toBe("running")
+    const s2 = buildSidebar({ ...base, rows: flagged, sessions: [idle], placements })
+    expect(s2.rows[0].status).toEqual({ words: "Charting", tone: "running" })
+  })
+
+  it("a working card shows its bare working word", () => {
+    const rows = [
+      row("p:a", { working: true, working_word: "Fixing CI" }),
+      row("p:b", { working: true, working_word: "Writing PR text" }),
+    ]
+    const s = buildSidebar({ ...base, rows, sessions: [], placements: [] })
+    expect(s.rows.map((r) => r.status)).toEqual([
+      { words: "Fixing CI", tone: "running" },
+      { words: "Writing PR text", tone: "running" },
+    ])
   })
 
   it("marks a chat, a Design and a server-flagged epic unread; a Queue agent never is", () => {
@@ -325,6 +343,27 @@ describe("buildSidebar", () => {
         ["Needs you", "p:b"],
         ["Blocked", "p:c"],
         ["Idle", "p:a"],
+      ])
+    })
+
+    it("By status ranks every working row together, by flag not word", () => {
+      const rows = [
+        row("p:idle", { status_words: "Designing" }),
+        row("p:wd", { working: true, working_word: "Designing" }),
+        row("p:ch", { working: true, working_word: "Charting" }),
+        row("p:w", { working: true }),
+        row("p:n", { section: SectionNeedsYou }),
+      ]
+      const sessions = [session("c1", "p", { name: "chat", status: { state: "working" } } as never)]
+      const placements = [place("c1", "chat", { workspace: "Default" })]
+      const s = buildSidebar({ ...base, rows, sessions, placements, sort: "status" })
+      expect(s.rows.map((r) => [r.group, r.key])).toEqual([
+        ["Needs you", "p:n"],
+        ["Charting", "p:ch"],
+        ["Designing", "p:wd"],
+        ["Working", "c1"],
+        ["Working", "p:w"],
+        ["Designing", "p:idle"],
       ])
     })
 
