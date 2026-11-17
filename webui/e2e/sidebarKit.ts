@@ -18,10 +18,10 @@ export const frameButton = (link: Locator) =>
 // Sidebar helpers shared by the Workspaces, Workspaces touch and Sidebar rows flows.
 export const sidebarKit = (page: Page) => {
   const sidebar = page.getByRole("complementary", nav("Sidebar"))
-  // A Fix agent's link is named "Fix agent <name>" and a draft's "Design draft <label>": their icons carry the label.
+  // A Fix agent's link is named "Fix agent <name>" and a draft's "Design draft <label>" or "Chat draft <label>": their icons carry the label.
   const row = (title: string) =>
     sidebar.getByRole("link", {
-      name: new RegExp(`^(Fix agent |Design draft )?${title}(?![\\w-])`),
+      name: new RegExp(`^(Fix agent |Design draft |Chat draft )?${title}(?![\\w-])`),
     })
   const itemOf = (title: string) => row(title).locator("xpath=ancestor::li[1]")
   const nestedLinks = (title: string) => itemOf(title).locator("ul").getByRole("link")

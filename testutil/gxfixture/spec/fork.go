@@ -53,6 +53,7 @@ func ChatDraftScenario() scenario {
 	return scenario{
 		Epics:     []epic{{project, "chat-draft-epic", []ticket{{"01", "first", servertest.TicketOpts{}}}}},
 		ForkHooks: true,
+		Codex:     true,
 		ChatDrafts: []ChatDraft{
 			{Project: project, Name: "claude-draft", Harness: "claude", Model: StrongestModel, Effort: "max",
 				Folder: ops.ChatDraftFolderSource, Brief: BriefForkClaude, Workspace: WorkspaceFork},

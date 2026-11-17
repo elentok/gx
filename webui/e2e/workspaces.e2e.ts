@@ -220,7 +220,7 @@ test("Workspaces", async ({ page, start }) => {
   await expect.poll(members).toBe(before + 1)
   await goto(page, "#/epics")
   await sidebar.getByRole("button", { name: "+ New", exact: true }).click()
-  await page.getByRole("menuitem", { name: /^New chat/ }).click()
+  await page.getByRole("menuitem", { name: "New chat", exact: true }).click()
   await page.getByRole("button", { name: "Create chat" }).click()
   await expect(sidebar.getByRole("img", nav("Chat"))).toHaveCount(1)
   await expect.poll(members).toBe(before + 2)
@@ -229,6 +229,71 @@ test("Workspaces", async ({ page, start }) => {
   await fx.cli("agents", "stop", madeId)
   await fx.cli("agents", "remove", madeId)
   await expect(sidebar.getByRole("img", nav("Chat"))).toHaveCount(0)
+  await goto(page, "#/epics")
+
+  // Fork drafts: a chat draft and a Design draft made from a chat and from a Design session sit in the source's workspace and no other.
+  const live = await sessions(fx)
+  const designSource = live.find((s) => s.design && s.flow_key === "demo:ws-design")!
+  // The chat is the one the sidebar shows in Default: the one-off agents of the scenario cannot join a workspace.
+  await pick("Default workspace")
+  const chatHref = (await sidebar.locator("a[data-chat]").first().getAttribute("href"))!
+  const chatSource = live.find((s) => s.id === chatHref.split("/agents/")[1])!
+  await fx.cli("server", "workspaces", "move", chatSource.id, "gx bugs")
+  await fx.cliEnvInput(
+    { GX_AGENT_SESSION: chatSource.id },
+    "From the chat.",
+    "agents",
+    "drafts",
+    "create",
+    "--project",
+    chatSource.project,
+    "--name",
+    "fork-chat-draft",
+    "--brief",
+    "-",
+  )
+  await fx.cliEnvInput(
+    { GX_AGENT_SESSION: designSource.id },
+    "From the design.",
+    "designs",
+    "drafts",
+    "create",
+    "--project",
+    "demo",
+    "--slug",
+    "fork-design-draft",
+    "--idea",
+    "-",
+  )
+  await pick("gx bugs")
+  await expect(row("fork-chat-draft")).toBeVisible()
+  await expect(row("fork-design-draft")).toBeVisible()
+  for (const other of ["Default workspace", "research"]) {
+    await pick(other)
+    await expect(row("fork-chat-draft")).toHaveCount(0)
+    await expect(row("fork-design-draft")).toHaveCount(0)
+  }
+  // Move on the chat draft's row takes it to research; the second context, on research, follows with no reload.
+  await pick("gx bugs")
+  await moveTo(rowMenu("fork-chat-draft"), "research")
+  await expect(row("fork-chat-draft")).toHaveCount(0)
+  await pick("research")
+  await expect(row("fork-chat-draft")).toBeVisible()
+  await expect(side2.row("fork-chat-draft")).toBeVisible()
+  // Clean up so the later steps keep their counts.
+  // A chat draft's row menu has Move only, so its page removes it (Remove, then the footer's confirm).
+  await row("fork-chat-draft").click()
+  await page.getByRole("button", nav("Remove")).click()
+  await page.getByRole("button", nav("Remove")).click()
+  await expect(row("fork-chat-draft")).toHaveCount(0)
+  await expect(side2.row("fork-chat-draft")).toHaveCount(0)
+  await pick("gx bugs")
+  await rowMenu("fork-design-draft").click()
+  await page.getByRole("menuitem", nav("Remove")).click()
+  await page.getByRole("dialog").getByRole("button", nav("Remove")).click()
+  await expect(row("fork-design-draft")).toHaveCount(0)
+  await fx.cli("server", "workspaces", "move", chatSource.id, "Default workspace")
+  await pick("research")
   await goto(page, "#/epics")
 
   // Hold from an Epics card: the row moves to the collapsed On hold section.

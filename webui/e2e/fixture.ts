@@ -69,6 +69,8 @@ interface FixtureOutput {
   host_files?: HostFiles
   /** Only the `model-switch` scenario prints its fake files. */
   model_fakes?: ModelFakes
+  /** The server's `GX_FORK_HOOK_DIR`; only the scenarios with `ForkHooks` print it. */
+  fork_hook_dir?: string
 }
 
 /** The `host-files` scenario's paths (`testutil/gxfixture/spec/hostfiles.go`). */
@@ -144,6 +146,10 @@ export interface Fixture {
   patchProjectConfig(project: string, patch: Record<string, unknown>): Promise<void>
   /** The argv of every fake claude launch, oldest first. A relaunch of a session moves its entry to the end. */
   launches(): Promise<string[][]>
+  /** The argv of every fake codex launch of one session, oldest first. */
+  codexLaunches(session: string): Promise<string[][]>
+  /** Arms (true) or disarms the fork draft failure hook `name` (`save-fail` or `start-fail`). */
+  forkHook(name: "save-fail" | "start-fail", armed: boolean): Promise<void>
   /** Everything the fake claude of a conversation (the chat's `conversation_id`) read off its terminal, raw; empty before it read any. */
   input(conversation: string): Promise<string>
   /** Sends a control (`agentfake.Control`, JSON field names) to the fake claude of a conversation and waits until it handled it. */
@@ -400,6 +406,19 @@ async function startFixture(
       return Promise.all(
         ordered.map(async ({ n }) => JSON.parse(await readFile(join(dir, n), "utf8")) as string[]),
       )
+    },
+    async codexLaunches(session) {
+      const log = join(env.HOME!, ".codex", "agentfake", `${session}.launches`)
+      const text = await readFile(log, "utf8").catch(() => "")
+      return text
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as string[])
+    },
+    async forkHook(name, armed) {
+      const file = join(out.fork_hook_dir!, name)
+      if (armed) await writeFile(file, "")
+      else await rm(file, { force: true })
     },
     async input(conversation) {
       return readFile(join(env.HOME!, ".claude", "agentfake", `${conversation}.in`), "utf8").catch(

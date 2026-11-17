@@ -65,7 +65,11 @@ import (
 // Task list flow (+1): the chat read from fixture transcripts and rollouts to the page, the same rows on the Design and
 // Agents pages, a real clock ticking with no request, and layout at 390px need a real server and browser;
 // TaskList.test.tsx (vitest) covers summary, order, marks, formats, tick, details and command alone but cannot see them.
-const maxFlows = 153
+//
+// Chat draft page flow (+1): the Start round trip to a new chat on the draft's exact model and effort, the redirect and
+// the failed Start with its leftover worktree need a real server, the fixture's fake agents and a real page;
+// DraftPage.test.tsx (vitest) and the Go Start tests cover each rule alone.
+const maxFlows = 154
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
