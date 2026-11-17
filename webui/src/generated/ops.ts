@@ -882,6 +882,11 @@ export interface SettingsEntry {
    */
   override?: string;
   /**
+   * Notice is a warning the page shows under the row, such as a removed value
+   * that is read as another.
+   */
+  notice?: string;
+  /**
    * Set: the target's file holds the key. Absent means the default (or the
    * global value, in a project) applies.
    */

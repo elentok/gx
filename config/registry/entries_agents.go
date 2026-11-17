@@ -11,7 +11,7 @@ var (
 )
 
 func runnerChoices() []string {
-	return []string{string(agentrunner.ChoiceAuto), string(agentrunner.ChoiceHerdr),
+	return []string{string(agentrunner.ChoiceAuto),
 		string(agentrunner.ChoiceHeadless), string(agentrunner.ChoicePTY)}
 }
 
@@ -60,7 +60,7 @@ func agentsEntries() []Entry {
 	add(agents("Launch"), Entry{Key: Key("agents", "writable-directories"), Type: TypeStringList, ProjectOverridable: true, Override: OverrideAdd,
 		Description: "Additional directories agents may write. Project directories are added to the global list. Supports ~/ paths; relative paths use the agent's working directory. Applies on launch or resume. Default: ~/Library/pnpm."})
 	add(agents("Runner"), Entry{Key: Key("agent-runner"), Type: TypeEnum, Enum: runnerChoices(), Restart: true,
-		Description: "How gx runs agents: auto picks for you, or choose herdr, headless or pty."})
+		Description: "How gx runs agents: auto picks for you, or choose headless or pty."})
 	add(agents("Runner"), Entry{Key: Key("runner-wait"), Type: TypeDuration, Restart: true,
 		Description: "How long an agent runner waits on its guards before giving up."})
 

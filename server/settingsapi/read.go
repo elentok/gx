@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/config/registry"
@@ -112,6 +113,9 @@ func buildEntry(e registry.Entry, project bool, targetDoc, globalDoc []byte) ops
 	out.Set = set
 	if set && !e.WriteOnly() {
 		out.Value = raw
+		if e.Key.String() == agentRunnerKey {
+			out.Value, out.Notice = normaliseRunnerValue(raw)
+		}
 	}
 	if v, ok := config.DefaultValue(e.Key); ok {
 		out.Default, _ = json.Marshal(v)
@@ -127,6 +131,20 @@ func buildEntry(e registry.Entry, project bool, targetDoc, globalDoc []byte) ops
 		}
 	}
 	return out
+}
+
+// normaliseRunnerValue shows a stored herdr as auto, with the warning.
+func normaliseRunnerValue(raw json.RawMessage) (json.RawMessage, string) {
+	var s string
+	if json.Unmarshal(raw, &s) != nil {
+		return raw, ""
+	}
+	n, deprecated := agentrunner.Normalise(s)
+	if !deprecated {
+		return raw, ""
+	}
+	v, _ := json.Marshal(n)
+	return v, agentrunner.HerdrRemovedWarning
 }
 
 // globalValue is the current effective value of the global key a project

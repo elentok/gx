@@ -74,6 +74,7 @@ func (w *Writer) Write(t Target, changes []Change) (Result, error) {
 			return Result{}, err
 		}
 	}
+	changes, notices := normaliseChanges(changes)
 	out, err := Apply(w.Registry, scope, doc, changes)
 	if err != nil {
 		return Result{}, err
@@ -91,7 +92,7 @@ func (w *Writer) Write(t Target, changes []Change) (Result, error) {
 		return Result{}, err
 	}
 
-	res := Result{Values: savedValues(changes)}
+	res := Result{Values: savedValues(changes), Notices: notices}
 	if w.Hooks != nil {
 		if n := w.Hooks.After(t, changes); n != "" {
 			res.Notices = append(res.Notices, n)

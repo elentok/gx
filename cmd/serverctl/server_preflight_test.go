@@ -12,6 +12,21 @@ import (
 	"github.com/elentok/gx/agentrunner"
 )
 
+func TestPreflightAgentRunnerWarnsOnceWhenDeprecated(t *testing.T) {
+	found := func(string) (string, error) { return "/bin/x", nil }
+	logPath := filepath.Join(t.TempDir(), "state", "server.log")
+	if _, err := preflightAgentRunner("auto", true, "", agentrunner.Probe{LookPath: found}, logPath); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(data), agentrunner.HerdrRemovedWarning); n != 1 {
+		t.Fatalf("warning logged %d times, want 1: %s", n, data)
+	}
+}
+
 func TestPreflightAgentRunner(t *testing.T) {
 	found := func(string) (string, error) { return "/bin/x", nil }
 	missing := func(string) (string, error) { return "", errors.New("not found") }
@@ -27,7 +42,7 @@ func TestPreflightAgentRunner(t *testing.T) {
 		wantLevel string
 	}{
 		{"bad value", "tmux", "", agentrunner.Probe{LookPath: found, PingHerdr: up}, `invalid agent-runner "tmux"`, "ERROR"},
-		{"explicit herdr down", "herdr", "", agentrunner.Probe{LookPath: found, PingHerdr: down}, "herdr is unavailable", "ERROR"},
+		{"herdr reads as auto even with herdr down", "herdr", "", agentrunner.Probe{LookPath: found, PingHerdr: down}, "", "INFO"},
 		{"headless without claude", "headless", "", agentrunner.Probe{LookPath: missing, PingHerdr: up}, "claude is not on PATH", "ERROR"},
 		{"auto picks pty", "auto", "", agentrunner.Probe{LookPath: found, PingHerdr: up}, "", "INFO"},
 		{"auto without claude", "auto", "", agentrunner.Probe{LookPath: missing, PingHerdr: up}, "agent-runner: herdr", "ERROR"},
@@ -43,7 +58,7 @@ func TestPreflightAgentRunner(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logPath := filepath.Join(t.TempDir(), "state", "server.log")
-			_, err := preflightAgentRunner(tt.setting, tt.harness, tt.probe, logPath)
+			_, err := preflightAgentRunner(tt.setting, false, tt.harness, tt.probe, logPath)
 			if tt.wantErr == "" {
 				if err != nil {
 					t.Fatalf("err = %v, want nil", err)

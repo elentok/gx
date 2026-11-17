@@ -31,11 +31,15 @@ var LiveProbe = agentrunner.Probe{
 // preflightAgentRunner resolves the agent-runner setting before the server
 // starts. The server log is only opened inside server.New, so the outcome is
 // appended to logPath directly; on error the caller exits without serving.
-func preflightAgentRunner(setting, defaultHarness string, p agentrunner.Probe, logPath string) (agentrunner.Choice, error) {
+// deprecated is config.AgentRunnerDeprecated: the file said herdr.
+func preflightAgentRunner(setting string, deprecated bool, defaultHarness string, p agentrunner.Probe, logPath string) (agentrunner.Choice, error) {
 	choice, err := agentrunner.Select(setting, defaultHarness, p)
 	_ = os.MkdirAll(filepath.Dir(logPath), 0o700)
 	if f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); ferr == nil {
 		log := slog.New(slog.NewJSONHandler(f, nil))
+		if deprecated {
+			log.Warn(agentrunner.HerdrRemovedWarning)
+		}
 		if err != nil {
 			log.Error("agent-runner preflight failed", "setting", setting, "err", err)
 		} else {

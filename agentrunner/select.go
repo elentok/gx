@@ -60,6 +60,7 @@ func checkDefaultHarness(p Probe, harness string) error {
 // harness on PATH; headless hosts only claude. Auto picks PTY and never pings
 // herdr. An explicit herdr with herdr down is an error, not a fallback.
 func Select(setting, defaultHarness string, p Probe) (Choice, error) {
+	setting, _ = Normalise(setting)
 	if err := ValidateSetting(setting); err != nil {
 		return "", err
 	}
@@ -91,6 +92,7 @@ func Select(setting, defaultHarness string, p Probe) (Choice, error) {
 // ValidateSetting checks setting against the allowed values without probing
 // the machine.
 func ValidateSetting(setting string) error {
+	setting, _ = Normalise(setting)
 	switch Choice(setting) {
 	case "", ChoiceAuto, ChoiceHerdr, ChoiceHeadless, ChoicePTY:
 		return nil

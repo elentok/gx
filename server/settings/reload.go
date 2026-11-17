@@ -66,6 +66,9 @@ func (h *Holder) reloadLocked() (wire.ReloadResult, func()) {
 	}
 
 	old := h.Load()
+	if cfg.AgentRunnerDeprecated {
+		h.opts.Log.Warn(agentrunner.HerdrRemovedWarning)
+	}
 	next := reloadableSettings(*old, FromConfig(cfg))
 	pending := h.startupOnlyChanges(cfg)
 	h.history.addPending(pending)

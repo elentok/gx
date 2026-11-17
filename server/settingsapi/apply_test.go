@@ -2,9 +2,11 @@ package settingsapi
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config/registry"
 )
 
@@ -119,6 +121,34 @@ func TestApplyGlobalValidateSettingRefusal(t *testing.T) {
 	out, err := Apply(reg, ScopeGlobal, []byte(`{}`), []Change{set(`"bogus"`, "agent-runner")})
 	if out != nil || err == nil || !strings.Contains(err.Error(), "agent-runner") {
 		t.Fatalf("out=%q err=%v", out, err)
+	}
+}
+
+func TestApplyHerdrRunnerIsStoredAsAuto(t *testing.T) {
+	reg := registry.Default()
+	out, err := Apply(reg, ScopeGlobal, []byte(`{}`), []Change{set(`"herdr"`, "agent-runner")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), `"agent-runner": "auto"`) || strings.Contains(string(out), "herdr") {
+		t.Fatalf("saved doc = %s, want agent-runner auto", out)
+	}
+	if _, err := Apply(reg, ScopeGlobal, []byte(`{}`), []Change{set(`"tmux"`, "agent-runner")}); err == nil {
+		t.Fatal("tmux accepted, want refusal")
+	}
+}
+
+func TestWriteHerdrRunnerNoticeAndSavedValue(t *testing.T) {
+	w := newWriter(filepath.Join(t.TempDir(), "config.json"))
+	res, err := w.Write(Target{}, []Change{set(`"herdr"`, "agent-runner")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Notices) != 1 || res.Notices[0] != agentrunner.HerdrRemovedWarning {
+		t.Errorf("notices = %v", res.Notices)
+	}
+	if got := string(res.Values["agent-runner"]); got != `"auto"` {
+		t.Errorf("saved value = %s, want \"auto\"", got)
 	}
 }
 

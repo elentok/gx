@@ -36,6 +36,7 @@ func parseSize(s string) (int64, error) {
 
 // Apply returns the new file bytes, or a *Refusal and no bytes.
 func Apply(reg *registry.Registry, scope Scope, doc []byte, changes []Change) ([]byte, error) {
+	changes, _ = normaliseChanges(changes)
 	for _, c := range changes {
 		if err := checkChange(reg, scope, c); err != nil {
 			return nil, err
@@ -64,6 +65,34 @@ func Apply(reg *registry.Registry, scope Scope, doc []byte, changes []Change) ([
 		return nil, refuse(reasonOf(err), keys...)
 	}
 	return out, nil
+}
+
+const agentRunnerKey = "agent-runner"
+
+// normaliseChanges stores a removed agent-runner value (herdr) as auto. It
+// returns the warning when it did, and never edits the caller's slice.
+func normaliseChanges(changes []Change) ([]Change, []string) {
+	var notices []string
+	out := changes
+	for i, c := range changes {
+		if c.Remove || c.Key.String() != agentRunnerKey {
+			continue
+		}
+		var s string
+		if json.Unmarshal(c.Value, &s) != nil {
+			continue
+		}
+		n, deprecated := agentrunner.Normalise(s)
+		if !deprecated {
+			continue
+		}
+		if &out[0] == &changes[0] {
+			out = append([]Change(nil), changes...)
+		}
+		out[i].Value, _ = json.Marshal(n)
+		notices = append(notices, agentrunner.HerdrRemovedWarning)
+	}
+	return out, notices
 }
 
 func reasonOf(err error) string {

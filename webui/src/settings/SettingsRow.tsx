@@ -503,7 +503,7 @@ export function SettingsRow({
         </Text>
       )}
       <SaveStatus errorText={errorText || undefined} saved={saved} />
-      {notices.map((n) => (
+      {[...(entry.notice ? [entry.notice] : []), ...notices].map((n) => (
         <Text
           key={n}
           data-mock-part="switch-notice"

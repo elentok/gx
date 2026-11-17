@@ -52,6 +52,16 @@ func TestLoadMissingUsesDefaults(t *testing.T) {
 	}
 }
 
+func TestParseHerdrAgentRunnerReadsAsAuto(t *testing.T) {
+	cfg, err := Parse([]byte(`{"agent-runner":"herdr"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AgentRunner != "auto" || !cfg.AgentRunnerDeprecated {
+		t.Errorf("AgentRunner = %q, deprecated %v; want auto, true", cfg.AgentRunner, cfg.AgentRunnerDeprecated)
+	}
+}
+
 func TestLoadAgentRunner(t *testing.T) {
 	tmp := t.TempDir()
 	prev := userConfigDirFn

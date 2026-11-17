@@ -683,6 +683,22 @@ describe("section page group blocks", () => {
     expect(getAllByText("Wait.")).toHaveLength(1)
   })
 
+  it("shows an entry's notice under its row, and none for an entry without one", () => {
+    const runner = e({
+      key: "agent-runner",
+      path: ["agent-runner"],
+      type: "enum",
+      enum: ["auto", "headless", "pty"],
+      value: "auto",
+      set: true,
+      notice: "agent-runner: herdr was removed; using auto (PTY). Edit the config to drop it.",
+    })
+    const { getAllByRole } = render([runner, e({ description: "Live agents." })])
+    const notes = getAllByRole("note")
+    expect(notes).toHaveLength(1)
+    expect(notes[0]?.textContent).toContain("herdr was removed")
+  })
+
   it("keeps the title of a one-key group", () => {
     const { getByTestId } = render([e({ group: "Location" })])
     expect(getByTestId("group-Location").textContent).toContain("Location")

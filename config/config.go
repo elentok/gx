@@ -52,9 +52,12 @@ type Config struct {
 	Watchdog              WatchdogConfig       `json:"watchdog"`
 	DiskSpace             DiskSpaceConfig      `json:"disk-space"`
 	MentalHealth          MentalHealthConfig   `json:"mental-health"`
-	// AgentRunner is auto, herdr, headless or pty. It is validated when the
-	// server starts, not here, so a bad value never breaks the TUI.
+	// AgentRunner is auto, headless or pty. It is validated when the
+	// server starts, not here, so a bad value never breaks the TUI. A stored
+	// herdr is read as auto.
 	AgentRunner string `json:"agent-runner"`
+	// AgentRunnerDeprecated is true when the file said herdr, so callers can warn.
+	AgentRunnerDeprecated bool `json:"-"`
 	// RunnerWait is N, the wait every runner bounds its guards by. Read from
 	// the "runner-wait" key as a Go duration string.
 	RunnerWait time.Duration `json:"-"`
@@ -442,7 +445,7 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 		cfg.Server.TabEnv = raw.Server.TabEnv
 	}
 	if raw.AgentRunner != nil {
-		cfg.AgentRunner = *raw.AgentRunner
+		cfg.AgentRunner, cfg.AgentRunnerDeprecated = agentrunner.Normalise(*raw.AgentRunner)
 	}
 	if raw.RunnerWait != nil {
 		if d, err := time.ParseDuration(*raw.RunnerWait); err == nil && d > 0 {

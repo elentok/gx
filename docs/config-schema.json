@@ -8,10 +8,9 @@
     },
     "agent-runner": {
       "default": "auto",
-      "description": "How gx runs agents: auto picks for you, or choose herdr, headless or pty.",
+      "description": "How gx runs agents: auto picks for you, or choose headless or pty.",
       "enum": [
         "auto",
-        "herdr",
         "headless",
         "pty"
       ],

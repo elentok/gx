@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/config/registry"
 	"github.com/elentok/gx/server/wire/ops"
@@ -105,6 +106,25 @@ func TestReadGlobalHidesSecretsAndShowsChatID(t *testing.T) {
 	for _, e := range w.Registry.All() {
 		if !e.ProjectOnly && !hasKey(resp, e.Key.String()) {
 			t.Errorf("global read misses %s", e.Key)
+		}
+	}
+}
+
+func TestReadHerdrRunnerShowsAutoWithNotice(t *testing.T) {
+	t.Parallel()
+	w, _ := readFixture(t, `{"agent-runner":"herdr"}`, `{}`)
+	resp, err := w.Read(Target{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range resp.Entries {
+		switch {
+		case e.Key == "agent-runner":
+			if string(e.Value) != `"auto"` || e.Notice != agentrunner.HerdrRemovedWarning {
+				t.Errorf("agent-runner = %s, notice %q", e.Value, e.Notice)
+			}
+		case e.Notice != "":
+			t.Errorf("%s has notice %q", e.Key, e.Notice)
 		}
 	}
 }

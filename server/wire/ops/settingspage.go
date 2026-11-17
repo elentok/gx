@@ -83,6 +83,9 @@ type SettingsEntry struct {
 	// Override is how a project row relates to its global key: "cap",
 	// "follows-global", or absent for a value that replaces the global one.
 	Override string `json:"override,omitempty"`
+	// Notice is a warning the page shows under the row, such as a removed value
+	// that is read as another.
+	Notice string `json:"notice,omitempty"`
 	// Set: the target's file holds the key. Absent means the default (or the
 	// global value, in a project) applies.
 	Set bool `json:"set"`
