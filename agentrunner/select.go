@@ -59,23 +59,17 @@ func checkDefaultHarness(p Probe, harness string) error {
 // harness on PATH; headless hosts only claude. Auto picks PTY and never pings
 // herdr.
 func Select(setting, defaultHarness string, p Probe) (Choice, error) {
-	setting, _ = Normalise(setting)
 	if err := ValidateSetting(setting); err != nil {
 		return "", err
 	}
+	setting, _ = Normalise(setting)
 	c := Choice(setting)
 	switch c {
-	case "", ChoiceAuto:
+	case "", ChoiceAuto, ChoicePTY:
 		if err := checkDefaultHarness(p, defaultHarness); err != nil {
 			return "", err
 		}
 		return ChoicePTY, nil
-	}
-	if c == ChoicePTY {
-		if err := checkDefaultHarness(p, defaultHarness); err != nil {
-			return "", err
-		}
-		return c, nil
 	}
 	if err := CheckHarness(p, "claude"); err != nil {
 		return "", fmt.Errorf("agent-runner %s needs claude: %w", c, err)

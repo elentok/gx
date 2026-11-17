@@ -73,26 +73,34 @@ const agentRunnerKey = "agent-runner"
 // returns the warning when it did, and never edits the caller's slice.
 func normaliseChanges(changes []Change) ([]Change, []string) {
 	var notices []string
-	out := changes
-	for i, c := range changes {
+	out := append([]Change(nil), changes...)
+	for i, c := range out {
 		if c.Remove || c.Key.String() != agentRunnerKey {
 			continue
 		}
-		var s string
-		if json.Unmarshal(c.Value, &s) != nil {
+		v, notice := normaliseRunnerValue(c.Value)
+		if notice == "" {
 			continue
 		}
-		n, deprecated := agentrunner.Normalise(s)
-		if !deprecated {
-			continue
-		}
-		if &out[0] == &changes[0] {
-			out = append([]Change(nil), changes...)
-		}
-		out[i].Value, _ = json.Marshal(n)
-		notices = append(notices, agentrunner.HerdrRemovedWarning)
+		out[i].Value = v
+		notices = append(notices, notice)
 	}
 	return out, notices
+}
+
+// normaliseRunnerValue maps a stored herdr to auto. The notice is empty when
+// raw needed no change.
+func normaliseRunnerValue(raw json.RawMessage) (json.RawMessage, string) {
+	var s string
+	if json.Unmarshal(raw, &s) != nil {
+		return raw, ""
+	}
+	n, deprecated := agentrunner.Normalise(s)
+	if !deprecated {
+		return raw, ""
+	}
+	v, _ := json.Marshal(n)
+	return v, agentrunner.HerdrRemovedWarning
 }
 
 func reasonOf(err error) string {
