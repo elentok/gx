@@ -305,6 +305,9 @@ func startBudgetRuns(t *testing.T, n int, grace time.Duration) (*servertest.Harn
 		live, _ := fake.List("epic-a")
 		return len(live) >= n
 	})
+	// The budget kill skips Launching runs and no later poll comes, so a poll
+	// while one is still launching would never stop it.
+	servertest.WaitFor(t, 10*time.Second, "no launching runs", func() bool { return h.Server.Budget().LaunchingRuns() == 0 })
 	return h, fake, &over, labels
 }
 
