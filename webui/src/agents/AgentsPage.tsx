@@ -6,6 +6,7 @@ import type { FetchChat } from "../design/chat"
 import { useFocusReport } from "../design/focus"
 import type { FetchScreen } from "../design/screen"
 import { DetailPage } from "../page/DetailPage"
+import { StateHeader } from "../page/StateHeader"
 import { openNewAgent } from "../shell/newItemOpen"
 import { Button } from "../ui/button/Button"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
@@ -106,12 +107,22 @@ export function AgentsPage({
   return (
     <DetailPage title={{ kind: "Agents" }} fill>
       {!sessions ? (
-        <FullScreenLoader label="Loading agents" />
+        <>
+          <StateHeader title="Agents" />
+          <FullScreenLoader label="Loading agents" />
+        </>
       ) : (
         <Box as="main" flex="1" minH="0" minW="0">
-          {creating && <FullScreenLoader label="Creating chat…" />}
-          {gone && <GoneNotice id={selected!} />}
-          {!selected && <EmptyState empty={sessions.length === 0} onNew={openNewAgent} />}
+          {!session && (
+            <Box h="100%" display="flex" flexDirection="column">
+              <StateHeader title="Agents" />
+              <Box flex="1" minH="0">
+                {creating && <FullScreenLoader label="Creating chat…" />}
+                {gone && <GoneNotice id={selected!} />}
+                {!selected && <EmptyState empty={sessions.length === 0} onNew={openNewAgent} />}
+              </Box>
+            </Box>
+          )}
           {session && (
             <SessionView session={session} fetchChat={fetchChat} fetchScreen={fetchScreen} />
           )}

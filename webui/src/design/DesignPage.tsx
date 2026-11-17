@@ -8,6 +8,7 @@ import { EpicRing } from "../epic/EpicRing"
 import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list"
 import { PageIcon } from "../page/PageIcon"
 import { DetailPage } from "../page/DetailPage"
+import { StateHeader } from "../page/StateHeader"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import type { FetchChat } from "./chat"
 import type { PostFocus } from "./focus"
@@ -162,9 +163,15 @@ function DesignPageBody({
   return (
     <>
       {failed ? (
-        <Text color="text.muted">Could not load Designs</Text>
+        <>
+          <StateHeader title={slugOf(address)} />
+          <Text color="text.muted">Could not load Designs</Text>
+        </>
       ) : !list ? (
-        <FullScreenLoader label="Loading Designs" />
+        <>
+          <StateHeader title={slugOf(address)} />
+          <FullScreenLoader label="Loading Designs" />
+        </>
       ) : (
         <DesignBody
           address={address}

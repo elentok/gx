@@ -21,6 +21,7 @@ import { Modal } from "../ui/modal/Modal"
 import { TriageHistory } from "./History"
 import { DetailPage } from "../page/DetailPage"
 import { PageIcon } from "../page/PageIcon"
+import { StateHeader } from "../page/StateHeader"
 import { Button } from "../ui/button/Button"
 import { ProgressRing } from "../ui/progress-ring/ProgressRing"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
@@ -293,10 +294,17 @@ function TriagePageBody({ project, deps }: { project: string; deps: TriageDeps }
   if (notFound || detail?.state === TriageNone || detail?.state === TriageAbandoned)
     return (
       <Box display="flex" flexDirection="column" gap="4">
+        <StateHeader title={`Triage: ${project}`} />
         <Text color="text.muted">No Triage for {project}</Text>
         {detail && <TriageHistory items={detail.history} />}
       </Box>
     )
-  if (!detail) return <FullScreenLoader label="Loading Triage" />
+  if (!detail)
+    return (
+      <>
+        <StateHeader title={`Triage: ${project}`} />
+        <FullScreenLoader label="Loading Triage" />
+      </>
+    )
   return <TriageBody project={project} view={detail} deps={deps} refetch={refetch} />
 }

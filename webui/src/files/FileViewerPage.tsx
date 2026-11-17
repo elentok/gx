@@ -14,6 +14,9 @@ import {
 } from "../generated/ops"
 import { sizeText } from "../health/formatBytes"
 import { DetailPage } from "../page/DetailPage"
+import { StateHeader } from "../page/StateHeader"
+import { useClaimHeader } from "../page/useClaimHeader"
+import { MascotToggle } from "../shell/MascotToggle"
 import { Button } from "../ui/button/Button"
 import { Spinner } from "../ui/spinner/Spinner"
 import { showToast } from "../ui/toaster"
@@ -78,6 +81,7 @@ function Bar({
   /** Markdown only: the Source toggle. */
   source?: { on: boolean; toggle: () => void }
 }) {
+  useClaimHeader()
   return (
     <Box
       data-testid="viewer-bar"
@@ -90,6 +94,7 @@ function Bar({
       borderBottomWidth="1px"
       borderColor="border"
     >
+      <MascotToggle />
       <Text
         flex="1"
         minW="140px"
@@ -255,17 +260,24 @@ export function FileViewerPage({
     },
   )
   useFetchedReady({ failed, source })
+  const fileName = path.split("/").pop() || path
   return (
     <DetailPage title={{ kind: "File", name: path.split("/").pop() }}>
       {failed ? (
-        <Box mt="6" display="flex" alignItems="center" gap="3">
-          <Text color="text.muted">Could not load file</Text>
-          <Button emphasis="ghost" onClick={retry}>
-            Retry
-          </Button>
-        </Box>
+        <>
+          <StateHeader title={fileName} />
+          <Box mt="6" display="flex" alignItems="center" gap="3">
+            <Text color="text.muted">Could not load file</Text>
+            <Button emphasis="ghost" onClick={retry}>
+              Retry
+            </Button>
+          </Box>
+        </>
       ) : !data ? (
-        <Spinner label="Loading file" />
+        <>
+          <StateHeader title={fileName} />
+          <Spinner label="Loading file" />
+        </>
       ) : (
         <Box
           borderWidth="1px"

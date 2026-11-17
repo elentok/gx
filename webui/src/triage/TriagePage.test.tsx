@@ -136,7 +136,7 @@ test("the Verify header shows the title, the step summary, five steps with the f
 
 test("no banner shows while a session runs, even with a step note", async () => {
   render([session("working")])
-  await screen.findByRole("heading", { level: 1 })
+  await screen.findByTestId("page-header-subtitle")
   expect(screen.queryByText(/Triage session running/)).toBeNull()
 })
 
@@ -213,7 +213,7 @@ test("with no session the header button reads Start", async () => {
 test("a triage-changed event for the project refetches the view", async () => {
   const triage = vi.fn(async () => ({ kind: "ok" as const, detail: viewOf() }))
   const { emit } = render([session("working")], { triage })
-  await screen.findByRole("heading", { level: 1 })
+  await screen.findByTestId("page-header-subtitle")
   const calls = triage.mock.calls.length
   emit("gx")
   await waitFor(() => expect(triage.mock.calls.length).toBeGreaterThan(calls))
@@ -222,7 +222,7 @@ test("a triage-changed event for the project refetches the view", async () => {
 test("on a phone there is no Progress panel", () =>
   onPhone(async () => {
     render([session("working")])
-    await screen.findByRole("heading", { level: 1 })
+    await screen.findByTestId("page-header-subtitle")
     expect(screen.queryByRole("region", { name: "Progress" })).toBeNull()
     expect(screen.getByRole("button", { name: "Show progress steps" })).toBeTruthy()
     fireEvent.click(document.querySelector('button[aria-haspopup="dialog"]:not([aria-label])')!)
@@ -234,7 +234,7 @@ test("on a phone there is no Progress panel", () =>
 
 test("a wide page shows the Progress panel", async () => {
   render([session("working")])
-  await screen.findByRole("heading", { level: 1 })
+  await screen.findByTestId("page-header-subtitle")
   expect(screen.queryByRole("region", { name: "Progress" })).toBeTruthy()
 })
 
@@ -541,7 +541,7 @@ test("no plan card while a row has no plan yet", async () => {
   render([session("working")], {
     triage: async () => ({ kind: "ok", detail: planView(rows) }),
   })
-  await screen.findByRole("heading", { level: 1 })
+  await screen.findByTestId("page-header-subtitle")
   expect(screen.queryByRole("region", { name: "Plan summary" })).toBeNull()
 })
 
@@ -550,7 +550,7 @@ test("no plan card at Questions", async () => {
   render([session("working")], {
     triage: async () => ({ kind: "ok", detail: questions }),
   })
-  await screen.findByRole("heading", { level: 1 })
+  await screen.findByTestId("page-header-subtitle")
   expect(screen.queryByRole("region", { name: "Plan summary" })).toBeNull()
 })
 

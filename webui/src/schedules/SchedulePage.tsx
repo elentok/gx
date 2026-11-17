@@ -15,6 +15,9 @@ import {
 import { ticketHref } from "../hrefs"
 import { DetailPage } from "../page/DetailPage"
 import { HeaderLink } from "../page/HeaderLink"
+import { StateHeader } from "../page/StateHeader"
+import { useClaimHeader } from "../page/useClaimHeader"
+import { MascotToggle } from "../shell/MascotToggle"
 import { Button } from "../ui/button/Button"
 import { PromptBox } from "../ui/expandable-text/PromptBox"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
@@ -274,6 +277,7 @@ function Editor({
   postCreateFn: PostCreate
   postEditFn: PostEdit
 }) {
+  useClaimHeader()
   const navigate = useNavigate()
   const write = useWrite()
   const [form, setForm] = useState(base)
@@ -320,7 +324,8 @@ function Editor({
   const choices = projects.includes(form.project) ? projects : [form.project, ...projects]
   return (
     <Box>
-      <Box data-mock-part="back-link" pt="4">
+      <Box data-mock-part="back-link" pt="4" display="flex" alignItems="center" gap="10px">
+        <MascotToggle />
         <chakra.a href="#/schedules" color="text.muted" fontSize="14px" _hover={{ color: "text" }}>
           ← Scheduled prompts
         </chakra.a>
@@ -620,8 +625,20 @@ function Fresh({
   const { data, failed, source } = useFetched("schedules", fetchList, conn)
   useFetchedReady({ failed, source })
   const [base, setBase] = useState(newForm)
-  if (failed) return <Text mt="6">Could not load the projects</Text>
-  if (!data) return <FullScreenLoader label="Loading Schedule" />
+  if (failed)
+    return (
+      <>
+        <StateHeader title="Scheduled prompts" />
+        <Text mt="6">Could not load the projects</Text>
+      </>
+    )
+  if (!data)
+    return (
+      <>
+        <StateHeader title="Scheduled prompts" />
+        <FullScreenLoader label="Loading Schedule" />
+      </>
+    )
   const defaultHarness = data.schedules.find((s) => s.default_harness)?.default_harness ?? ""
   return (
     <Editor
@@ -666,10 +683,17 @@ function Existing({
     if (loaded) setBase(loaded)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedKey])
-  if (i < 0 || failed) return <Text mt="6">Could not load the Schedule</Text>
+  if (i < 0 || failed)
+    return (
+      <>
+        <StateHeader title="Scheduled prompts" />
+        <Text mt="6">Could not load the Schedule</Text>
+      </>
+    )
   if (data?.refused)
     return (
       <Box>
+        <StateHeader title="Scheduled prompts" />
         <Box pt="4">
           <HeaderLink href="#/schedules">← Scheduled prompts</HeaderLink>
         </Box>
@@ -678,7 +702,13 @@ function Existing({
         </Text>
       </Box>
     )
-  if (!data || !base) return <FullScreenLoader label="Loading Schedule" />
+  if (!data || !base)
+    return (
+      <>
+        <StateHeader title="Scheduled prompts" />
+        <FullScreenLoader label="Loading Schedule" />
+      </>
+    )
   return (
     <Editor
       key={address}

@@ -201,7 +201,8 @@ test("Copy design ID copies the address and shows it as the subtitle, with no se
 
 test("the title row holds the Design name and More actions, with no picker or state label", async () => {
   render([map("a"), map("b")], [session("a", { status: { state: "working" } })])
-  const title = await screen.findByRole("heading", { level: 1 })
+  await screen.findByRole("button", { name: "More actions" })
+  const title = screen.getByRole("heading", { level: 1 })
   expect(title.textContent).toBe("a")
   expect(within(title).queryByRole("button")).toBeNull()
   expect(screen.queryByRole("link", { name: /^←/ })).toBeNull()
@@ -641,7 +642,7 @@ test("a Design with no map images shows no strip", async () => {
   const mapImages = vi.fn(async () => ({ kind: "ok" as const, detail: [] }))
   render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...chatFetcher, mapImages })
   await waitFor(() => expect(mapImages).toHaveBeenCalled())
-  await screen.findByRole("heading", { level: 1 })
+  await screen.findByRole("button", { name: "More actions" })
   expect(screen.queryByLabelText("Images")).toBeNull()
 })
 
@@ -708,7 +709,7 @@ const moreIn = (el: HTMLElement) => within(el).queryByRole("button", { name: "Mo
 async function renderRound(round: unknown[] | null = [askCard]) {
   const mapImages = async () => ({ kind: "ok" as const, detail: [{ id: "a.png" }] })
   render([map("a")], [session("a")], "/d/gx:a", detailOf(), { ...roundChat(round), mapImages })
-  await screen.findByRole("heading", { level: 1 })
+  await screen.findByRole("button", { name: "More actions" })
   if (round) await screen.findByRole("group", { name: "View" })
   else await screen.findByRole("button", { name: "Note" })
 }

@@ -1,8 +1,9 @@
 import { Box, Heading } from "@chakra-ui/react"
-import { type ReactNode, useEffect } from "react"
+import type { ReactNode } from "react"
 import { MascotToggle } from "../shell/MascotToggle"
 import { useShell } from "../shell/ShellContext"
 import { useWide } from "../useWide"
+import { useClaimHeader } from "./useClaimHeader"
 
 /** The one header every page uses: icon, title, subtitle, actions, then an optional meta bar. It owns the room above it, since the page container has no top padding. */
 export function PageHeader({
@@ -33,8 +34,7 @@ export function PageHeader({
   const wide = useWide()
   // Inside the shell the mascot toggle leads the header; a page icon beside it reads as a second toggle.
   const shell = useShell()
-  const claimHeader = shell?.claimHeader
-  useEffect(() => claimHeader?.(), [claimHeader])
+  useClaimHeader()
   const h1 = (
     <Heading
       as="h1"
