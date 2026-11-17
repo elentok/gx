@@ -35,12 +35,23 @@ export function cacheNameFor(buildId: string): string {
 
 // Fetch everything before opening the cache, so one failed asset leaves no
 // half-set cache behind; the shell goes in last, after the assets it loads.
+// Each body is read as its fetch returns: a service worker in Chrome serves
+// bodies left unread only a few at a time, which made the install take
+// seconds (docs/research/test-service-worker-activation.md).
 export async function precache(deps: LifecycleDeps): Promise<void> {
   const fetched = await Promise.all(
     deps.urls.map(async (path) => {
       const url = deps.origin + path
-      const response = await deps.fetch(url, { cache: "reload" })
-      if (response.status !== 200) throw new Error(`precache ${url}: status ${response.status}`)
+      const fetchedResponse = await deps.fetch(url, { cache: "reload" })
+      if (fetchedResponse.status !== 200) {
+        throw new Error(`precache ${url}: status ${fetchedResponse.status}`)
+      }
+      const bytes = await fetchedResponse.arrayBuffer()
+      const response = new Response(bytes, {
+        status: fetchedResponse.status,
+        statusText: fetchedResponse.statusText,
+        headers: fetchedResponse.headers,
+      })
       return { url, response }
     }),
   )

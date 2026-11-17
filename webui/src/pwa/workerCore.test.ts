@@ -223,6 +223,25 @@ describe("service worker lifecycle", () => {
     )
   })
 
+  it("reads every response body before it opens the cache", async () => {
+    const { caches } = namedCaches()
+    const responses: Response[] = []
+    const tracking: Fetch = async (url) => {
+      const res = await body(url)
+      responses.push(res)
+      return res
+    }
+    let unreadAtOpen = -1
+    const open = caches.open.bind(caches)
+    caches.open = async (name: string) => {
+      unreadAtOpen = responses.filter((r) => !r.bodyUsed).length
+      return open(name)
+    }
+    await precache(deps(caches, tracking))
+    expect(responses).toHaveLength(urls.length)
+    expect(unreadAtOpen).toBe(0)
+  })
+
   it("fails the install and leaves no cache when an asset fetch fails", async () => {
     const { all, caches } = namedCaches()
     const failing: Fetch = async (url) =>
