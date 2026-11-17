@@ -2,7 +2,6 @@ package sched_test
 
 import (
 	"context"
-	"errors"
 	"maps"
 	"os"
 	"path/filepath"
@@ -15,9 +14,11 @@ import (
 	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/queue"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -165,37 +166,26 @@ func TestExplain_ForkChildNamesItsUndoneParent(t *testing.T) {
 
 func TestReads_IterationsAndQueue(t *testing.T) {
 	t.Parallel()
-	store := t.TempDir()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
-	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(strings.Replace(string(raw), "status: open", "status: claimed", 1)), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject))
-	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		if argv[2] != "epic-a-iter-01" && argv[2] != "pane-1" {
-			return nil, herdrfake.Identities{}, errors.New("agent not found")
-		}
-		return map[string]any{"agent": map[string]any{
-			"pane_id": "pane-1", "workspace_id": "ws-1", "tab_id": "tab-1", "agent_status": "working",
-			"agent_session": map[string]any{"value": "sess-1"},
-		}}, herdrfake.Identities{}, nil
-	})
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store)
+	h.LeavePtyRun(t, store, repo, epicA01, true, nil)
+	h.Restart(t)
 	ctx := context.Background()
 
-	its, err := h.Client.Reads.Iterations(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(its) != 1 || its[0].Address != "proj:epic-a/01" || its[0].Pane != "pane-1" ||
+	var its []wire.IterationInfo
+	waitFor(t, func() bool {
+		var err error
+		its, err = h.Client.Reads.Iterations(ctx)
+		return err == nil && len(its) == 1
+	})
+	wantAgent := queue.AgentIDPrefix + runs.IterationLabel("proj:epic-a/01")
+	if its[0].Address != "proj:epic-a/01" || its[0].Runner != "pty" || its[0].QueueAgent != wantAgent ||
 		its[0].Branch != "ralph-loop/epic-a-item-01" || !strings.HasSuffix(its[0].Worktree, "epic-a-item-01") ||
-		!strings.HasSuffix(its[0].Transcript, "sess-1.jsonl") {
-		t.Errorf("iterations = %+v", its)
+		!strings.HasSuffix(its[0].Transcript, ".jsonl") {
+		t.Errorf("iterations = %+v, want pty agent %s", its, wantAgent)
 	}
 
 	q, err := h.Client.Queue.List(ctx)

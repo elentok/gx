@@ -30,7 +30,7 @@ func TestSlotRelease_QueuedRootClaimsAfterGrace(t *testing.T) {
 		c.WaitingSlotGrace = time.Minute
 		c.MaxReleasedAgents = 5
 	})
-	wtPath, _ := leaveIteration(t, h, store, repo, "herdr")
+	wtPath, _ := leaveIteration(t, h, store, repo, "fake")
 	if _, err := fake.Start(agentrunner.StartOptions{Label: "epic-a-iter-01", Cwd: wtPath}); err != nil {
 		t.Fatal(err)
 	}

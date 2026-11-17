@@ -2,15 +2,16 @@ package sched_test
 
 import (
 	"context"
-	"github.com/elentok/gx/server/runs"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -22,15 +23,14 @@ func TestReclaim_FinishedReportSettlesAWorkingPane(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject))
-	registerLiveAgent(h)
-	working := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "working", "state_change_seq": 1}}
-	for _, verb := range []string{"get", "wait"} {
-		h.Herdr.Register("agent", verb, func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-			return working, herdrfake.Identities{}, nil
-		})
+	fake := servertest.NewHeadlessFake(nativerunner.VerdictLive)
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
+	wtPath, ticketPath := leaveIteration(t, h, store, repo, "fake")
+	if _, err := fake.Start(agentrunner.StartOptions{Label: "epic-a-iter-01", Cwd: wtPath}); err != nil {
+		t.Fatal(err)
 	}
-	_, ticketPath := leaveIteration(t, h, store, repo, "herdr")
+	fake.SetState("epic-a-iter-01", agentrunner.StateWorking, "")
+	asHeadlessRun(t, h)
 	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
 		tk.IterationStatus = schema.IterationStatusFinished
 		tk.IterationFinishedAt = time.Now()
@@ -93,8 +93,6 @@ func TestPauseStuckFinishedClaims(t *testing.T) {
 	}
 	past := finishedAt.Add(time.Hour)
 
-	// A run with no Runner means herdr, and the snapshot that follows
-	// TicketChanged asks the forbidding herdr fake for `agent get`.
 	reclaim()
 	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/01", Runner: "pty"})
 	h.Server.Registry().MarkSettling("proj:epic-a/01")

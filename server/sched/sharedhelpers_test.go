@@ -36,7 +36,6 @@ var (
 	markWaiting             = servertest.MarkWaiting
 	newRenamedFake          = servertest.NewRenamedFake
 	ofType                  = servertest.OfType
-	registerLiveAgent       = rigs.RegisterLiveAgent
 	restartUnder            = rigs.RestartUnder
 	runLog                  = servertest.RunLog
 	runLogOf                = rigs.RunLogOf
@@ -48,7 +47,6 @@ var (
 	startWaitingRestartFake = servertest.StartWaitingRestartFake
 	waitFor                 = servertest.Await
 	waitStatus              = servertest.WaitStatus
-	liveUnder               = rigs.LiveUnder
 	liveUnderOther          = rigs.LiveUnderOther
 	pauseWithQuestion       = servertest.PauseWithQuestion
 )

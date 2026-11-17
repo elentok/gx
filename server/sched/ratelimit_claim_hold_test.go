@@ -87,7 +87,7 @@ func TestRateLimitHold_RestartHoldsBeforeTheFirstClaim(t *testing.T) {
 	// check reclaim runs can set the hold.
 	fake.SetState("epic-a-iter-01", agentrunner.StateWorking, "")
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
-	leaveIteration(t, h, store, repo, "herdr")
+	leaveIteration(t, h, store, repo, "fake")
 	stampRun(t, h, "fake", session)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()

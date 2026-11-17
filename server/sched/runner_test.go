@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
@@ -36,16 +37,6 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 	call := func() (context.Context, context.CancelFunc) {
 		return context.WithTimeout(context.Background(), 30*time.Second)
 	}
-	// A pass that finds herdr unprobed claims nothing, which would hide the refusal.
-	servertest.WaitFor(t, 30*time.Second, "herdr to be probed", func() bool {
-		ctx, cancel := call()
-		defer cancel()
-		snap, err := h.Client.Snapshot(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return !snap.HerdrUnavailable
-	})
 
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 	// The server rescans once right after start; let that finish so the edit merges after it.
@@ -152,7 +143,7 @@ func TestRunner_ClaimsAnotherTicketOfARootOnlyBelowThePerRootCap(t *testing.T) {
 		})
 		servertest.RegisterTurn(h)
 		// One agent of the root is already running.
-		h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/00", Runner: "herdr"})
+		h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/00", Runner: "pty"})
 		// The no-start case waits out the whole timeout, so it stays short.
 		timeout := time.Second
 		if tc.starts {
@@ -243,7 +234,7 @@ func TestRunner_ProjectCapHoldsItsProjectAndAnEditAppliesLive(t *testing.T) {
 		c.PollInterval = 50 * time.Millisecond
 	})
 	servertest.RegisterTurn(h)
-	h.Server.Registry().PutRun("proj-a:epic-a", runs.Run{Address: "proj-a:epic-a/00", Runner: "herdr"}) // proj-a is at its cap
+	h.Server.Registry().PutRun("proj-a:epic-a", runs.Run{Address: "proj-a:epic-a/00", Runner: "pty"}) // proj-a is at its cap
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
@@ -347,7 +338,7 @@ func TestExplain_NamesEveryFullCapWithItsCount(t *testing.T) {
 		c.MaxAgents = 1
 	})
 	servertest.RegisterTurn(h)
-	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/00", Runner: "herdr"})
+	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/00", Runner: "pty"})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if res, err := h.Client.Queue.Add(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
@@ -377,8 +368,8 @@ func TestExplain_OverCapAddsItsClauseOnce(t *testing.T) {
 		c.MaxAgents = 1
 	})
 	servertest.RegisterTurn(h)
-	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/00", Runner: "herdr"})
-	h.Server.Registry().PutRun("proj:epic-c", runs.Run{Address: "proj:epic-c/00", Runner: "herdr"})
+	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/00", Runner: "pty"})
+	h.Server.Registry().PutRun("proj:epic-c", runs.Run{Address: "proj:epic-c/00", Runner: "pty"})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if res, err := h.Client.Queue.Add(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
@@ -437,50 +428,63 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 
 func TestRunner_RestartPausesAHandleWhoseWorktreeIsGone(t *testing.T) {
 	t.Parallel()
-	store, repo := t.TempDir(), testutil.TempRepo(t)
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject))
-	registerLiveAgent(h)
-	wtPath, ticketPath := leaveIteration(t, h, store, repo, "herdr")
-	if err := os.RemoveAll(wtPath); err != nil {
-		t.Fatal(err)
-	}
+	runnerShapes(t, func(t *testing.T, headless bool) {
+		store, repo := t.TempDir(), testutil.TempRepo(t)
+		servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+		servertest.SetProjectRepo(t, store, "proj", repo)
+		work := func(p string) {
+			testutil.WriteFile(t, p, "agent.txt", "work")
+			testutil.CommitAll(t, p, "agent work")
+		}
+		var h *servertest.Harness
+		var wtPath, ticketPath string
+		if headless {
+			h = servertest.StartWithStore(t, store, servertest.WithRunner(servertest.NewHeadlessFake(nativerunner.VerdictLive)))
+			wtPath, ticketPath = h.LeaveHerdrRun(t, store, repo, epicA01, "fake", work)
+			asHeadlessRun(t, h)
+		} else {
+			h = servertest.StartWithStore(t, store)
+			wtPath, ticketPath = h.LeavePtyRun(t, store, repo, epicA01, true, work)
+		}
+		if err := os.RemoveAll(wtPath); err != nil {
+			t.Fatal(err)
+		}
 
-	h.Restart(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	evs, err := h.Client.Events(ctx, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for ev := range evs {
-		if ev.Type == wire.EventTicketPaused {
-			break
+		h.Restart(t)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		evs, err := h.Client.Events(ctx, 0)
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
-	tk, err := schema.ParseTicket(ticketPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertPaused(t, tk, schema.PauseClassRepair, schema.PauseHandleMismatch)
-	body, _ := os.ReadFile(ticketPath)
-	if !strings.Contains(string(body), schema.PausedHeading) {
-		t.Errorf("ticket has no Paused section:\n%s", body)
-	}
-	logged, _, err := runlog.ReadEvents(filepath.Join(store, "proj"), "epic-a")
-	if err != nil {
-		t.Fatal(err)
-	}
-	n := 0
-	for _, ev := range logged {
-		if ev.Kind == string(events.HandleMismatch) {
-			n++
+		for ev := range evs {
+			if ev.Type == wire.EventTicketPaused {
+				break
+			}
 		}
-	}
-	if n != 1 {
-		t.Errorf("handle-mismatch events = %d, want 1 (%v)", n, logged)
-	}
+		tk, err := schema.ParseTicket(ticketPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertPaused(t, tk, schema.PauseClassRepair, schema.PauseHandleMismatch)
+		body, _ := os.ReadFile(ticketPath)
+		if !strings.Contains(string(body), schema.PausedHeading) {
+			t.Errorf("ticket has no Paused section:\n%s", body)
+		}
+		logged, _, err := runlog.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+		if err != nil {
+			t.Fatal(err)
+		}
+		n := 0
+		for _, ev := range logged {
+			if ev.Kind == string(events.HandleMismatch) {
+				n++
+			}
+		}
+		if n != 1 {
+			t.Errorf("handle-mismatch events = %d, want 1 (%v)", n, logged)
+		}
+	})
 }
 
 func TestRunner_APauseSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *testing.T) {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/runnerbuild"
@@ -297,14 +298,9 @@ func TestRunner_AmbiguousBasePausesWithoutLaunching(t *testing.T) {
 
 func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
 	t.Parallel()
-	store, repo := t.TempDir(), testutil.TempRepo(t)
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject))
-	registerLiveAgent(h)
-	leaveIteration(t, h, store, repo, "herdr")
-
-	h.Restart(t)
+	own := newRenamedFake("a", nativerunner.VerdictFinished)
+	h, _ := restartUnder(t, "a", newRenamedFake("b", nativerunner.VerdictFinished), map[string]agentrunner.Runner{"a": own})
+	store := h.TicketStore
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs, err := h.Client.Events(ctx, 0)
@@ -386,7 +382,7 @@ func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
 	defer mu.Unlock()
 	for _, p := range asked {
 		// scratch is asked by the log prune, which visits every project.
-		// The herdr health probe is asked for the fallback project.
+		// The default runner is built for the fallback project at startup.
 		if p != "proj" && p != projects.ScratchProject && p != runnerbuild.FallbackProject {
 			t.Errorf("RunnerFor asked for project %q", p)
 		}

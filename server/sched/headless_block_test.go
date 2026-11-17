@@ -60,11 +60,11 @@ func TestHeadlessBlock_PausesAtOnce(t *testing.T) {
 	}
 }
 
-// A herdr or pty hosted agent that stays blocked past the dwell is paused by
+// A pty hosted agent that stays blocked past the dwell is paused by
 // the server wait loop, like a headless one.
 func TestHeadlessBlock_NonHeadlessPausesAfterDwell(t *testing.T) {
 	t.Parallel()
-	for _, runner := range []string{"herdr", "pty"} {
+	for _, runner := range []string{"pty"} {
 		t.Run(runner, func(t *testing.T) {
 			_, ticketPath, turn := startBlockable(t, runner)
 			turn.SetState("epic-a-iter-01", agentrunner.StateBlocked, "waiting on a prompt")
