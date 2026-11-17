@@ -27,7 +27,7 @@ func startHeadlessRestart(t *testing.T, verdict nativerunner.Verdict, retention 
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.LogRetention = retention
 	})
-	_, ticketPath := leaveIteration(t, h, store, repo, "herdr")
+	_, ticketPath := leaveIteration(t, h, store, repo, "fake")
 	asHeadlessRun(t, h)
 	h.Restart(t)
 	return fake, ticketPath

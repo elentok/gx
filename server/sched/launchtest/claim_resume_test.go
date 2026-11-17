@@ -106,12 +106,10 @@ func TestClaim_ResumesOrColdStarts(t *testing.T) {
 		{"answered pty resumes", "pty", "claude", true, false, nil, []string{"sess-old"}, "resumed"},
 		{"failed resume falls back cold", "pty", "claude", true, false, errors.New("no conversation found"), []string{"sess-old", ""}, "cold-start"},
 		{"plain resume cold-starts", "pty", "claude", false, false, nil, []string{""}, "cold-start"},
-		{"herdr cold-starts", "herdr", "claude", true, false, nil, []string{""}, "cold-start"},
 		{"headless cold-starts", "headless", "claude", true, false, nil, []string{""}, "cold-start"},
 		{"codex resumes", "pty", "codex", true, true, nil, []string{"sess-old"}, "resumed"},
 		{"codex without rollout cold-starts", "pty", "codex", true, false, nil, []string{""}, "cold-start"},
 		{"codex plain resume cold-starts", "pty", "codex", false, true, nil, []string{""}, "cold-start"},
-		{"codex herdr cold-starts", "herdr", "codex", true, true, nil, []string{""}, "cold-start"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -32,7 +32,6 @@ var (
 	leaveIteration          = servertest.LeaveIteration
 	newRenamedFake          = servertest.NewRenamedFake
 	ofType                  = servertest.OfType
-	registerLiveAgent       = rigs.RegisterLiveAgent
 	restartUnder            = rigs.RestartUnder
 	runLog                  = servertest.RunLog
 	runnerShapes            = servertest.RunnerShapes

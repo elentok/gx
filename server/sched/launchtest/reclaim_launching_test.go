@@ -17,7 +17,6 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -129,24 +128,16 @@ func markLaunching(t *testing.T, h *servertest.Harness) {
 }
 
 // restartLaunching leaves a launching handle with work as the agent's, then
-// restarts. herdr sets up the herdr agent; fake is the headless runner, nil
-// for a herdr run, whose opts turn the fake herdr on.
-func restartLaunching(t *testing.T, fake *headlessFake, herdr func(*servertest.Harness), work func(*testing.T, string), opts ...func(*server.Config)) (*servertest.Harness, string) {
+// restarts. fake is the headless runner.
+func restartLaunching(t *testing.T, fake *headlessFake, work func(*testing.T, string), opts ...func(*server.Config)) (*servertest.Harness, string) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	if fake != nil {
-		opts = append(opts, servertest.WithRunner(fake))
-	}
+	opts = append(opts, servertest.WithRunner(fake))
 	h := servertest.StartWithStore(t, store, opts...)
-	if herdr != nil {
-		herdr(h)
-	}
-	_, ticketPath := leaveIterationWith(t, h, store, repo, "herdr", func(p string) { work(t, p) })
-	if fake != nil {
-		asHeadlessRun(t, h)
-	}
+	_, ticketPath := leaveIterationWith(t, h, store, repo, "fake", func(p string) { work(t, p) })
+	asHeadlessRun(t, h)
 	markLaunching(t, h)
 	h.Restart(t)
 	return h, ticketPath
@@ -172,7 +163,7 @@ func TestReclaim_LaunchingWithNoAgentReopens(t *testing.T) {
 		var ticketPath string
 		if headless {
 			fake := servertest.NewHeadlessFake(nativerunner.VerdictDied)
-			_, ticketPath = restartLaunching(t, fake, nil, noWork)
+			_, ticketPath = restartLaunching(t, fake, noWork)
 		} else {
 			_, ticketPath = restartLaunchingPty(t, false, nil)
 		}
@@ -184,7 +175,7 @@ func TestReclaim_LaunchingWithNoAgentReopens(t *testing.T) {
 func TestReclaim_LaunchingWithNoAgentLaunchesAgainAsANewLaunch(t *testing.T) {
 	t.Parallel()
 	fake := servertest.NewHeadlessFake(nativerunner.VerdictDied)
-	h, ticketPath := restartLaunching(t, fake, nil, noWork)
+	h, ticketPath := restartLaunching(t, fake, noWork)
 	waitStatus(t, ticketPath, schema.StatusOpen)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -194,32 +185,11 @@ func TestReclaim_LaunchingWithNoAgentLaunchesAgainAsANewLaunch(t *testing.T) {
 	waitStatus(t, ticketPath, schema.StatusClaimed)
 }
 
-func TestReclaim_HerdrLaunchingIdleAgentIsStoppedThenReopens(t *testing.T) {
-	t.Parallel()
-	var mu sync.Mutex
-	closed := 0
-	_, ticketPath := restartLaunching(t, nil, func(h *servertest.Harness) {
-		registerLiveAgent(h)
-		h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-			mu.Lock()
-			closed++
-			mu.Unlock()
-			return map[string]any{}, herdrfake.Identities{}, nil
-		})
-	}, noWork, servertest.WithHerdr(servertest.HerdrIsTheSubject))
-	waitStatus(t, ticketPath, schema.StatusOpen)
-	mu.Lock()
-	defer mu.Unlock()
-	if closed == 0 {
-		t.Error("the idle agent's tab was never closed")
-	}
-}
-
 func TestReclaim_LaunchingIdleAgentIsStoppedThenReopens(t *testing.T) {
 	t.Parallel()
 	t.Run("headless", func(t *testing.T) {
 		fake := servertest.NewHeadlessFake(nativerunner.VerdictFinished)
-		_, ticketPath := restartLaunching(t, fake, nil, noWork)
+		_, ticketPath := restartLaunching(t, fake, noWork)
 		waitStatus(t, ticketPath, schema.StatusOpen)
 		if stopped := fake.Stopped(); !slices.Equal(stopped, []string{"p1"}) {
 			t.Errorf("stopped %v, want p1", stopped)
@@ -241,7 +211,7 @@ func TestReclaim_LaunchingWorkingAgentIsALiveRun(t *testing.T) {
 			t.Fatal(err)
 		}
 		fake.SetState("epic-a-iter-01", agentrunner.StateWorking, "")
-		h, ticketPath := restartLaunching(t, fake, nil, commitAgentWork)
+		h, ticketPath := restartLaunching(t, fake, commitAgentWork)
 		waitReclaimedLive(t, h)
 		fake.SetState("epic-a-iter-01", agentrunner.StateDone, "")
 		waitStatus(t, ticketPath, schema.StatusDone)

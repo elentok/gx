@@ -87,7 +87,7 @@ func TestLaunchTimed_AFailedLaunchLogsNoTiming(t *testing.T) {
 func TestLaunchTimed_TheReclaimOfACutOffLaunchGetsItsOwnTiming(t *testing.T) {
 	t.Parallel()
 	fake := servertest.NewHeadlessFake(nativerunner.VerdictDied)
-	h, ticketPath := restartLaunching(t, fake, nil, noWork)
+	h, ticketPath := restartLaunching(t, fake, noWork)
 	waitStatus(t, ticketPath, schema.StatusOpen)
 	if timed := ofType(runLog(t, h), events.LaunchTimed); len(timed) != 0 {
 		t.Fatalf("launch-timed = %+v after the reclaim, want none", timed)

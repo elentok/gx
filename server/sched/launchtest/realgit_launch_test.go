@@ -11,15 +11,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
@@ -33,7 +32,7 @@ func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
 	chat := newSlackHook(t)
 	const label = "epic-a-iter-01"
 	fake := runnerfake.NewRunner()
-	fake.SetStartErr(label, errors.New("Herdr rejected Codex integration"))
+	fake.SetStartErr(label, errors.New("codex integration rejected"))
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond // several ticks pass while the test waits
 		c.Chat = notify.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
@@ -55,7 +54,7 @@ func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationLaunchFailed, "proj:epic-a/01")
 
-	if posts := chat.PostsSince(started); len(posts) != 1 || !strings.Contains(posts[0], "Herdr rejected Codex integration") {
+	if posts := chat.PostsSince(started); len(posts) != 1 || !strings.Contains(posts[0], "codex integration rejected") {
 		t.Errorf("chat sends = %v, want exactly 1 carrying the launch error", posts)
 	}
 	if got := len(fake.ResumeIDs(label)); got != 1 {
@@ -86,18 +85,11 @@ func TestLaunchPort_RestartReattachesAndMergesOnce(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject))
-	registerLiveAgent(h)
-	var prompts, starts atomic.Int32
-	h.Herdr.Register("agent", "prompt", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		prompts.Add(1)
-		return map[string]any{}, herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("agent", "start", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		starts.Add(1)
-		return map[string]any{}, herdrfake.Identities{}, nil
-	})
-	leaveIteration(t, h, store, repo, "herdr")
+	const label = "epic-a-iter-01"
+	fake := servertest.NewHeadlessFake(nativerunner.VerdictFinished)
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
+	leaveIteration(t, h, store, repo, "fake")
+	asHeadlessRun(t, h)
 
 	h.Restart(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -108,8 +100,8 @@ func TestLaunchPort_RestartReattachesAndMergesOnce(t *testing.T) {
 	}
 	servertest.WaitForEvent(ctx, t, evs, wire.EventRootCompleted, "")
 
-	if prompts.Load() != 0 || starts.Load() != 0 {
-		t.Errorf("agent starts = %d, prompts = %d, want the live session reused", starts.Load(), prompts.Load())
+	if starts, prompts := fake.ResumeIDs(label), fake.Prompts(label); len(starts) != 0 || len(prompts) != 0 {
+		t.Errorf("agent starts = %q, prompts = %q, want the live session reused", starts, prompts)
 	}
 	git := func(args ...string) string {
 		out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput()
