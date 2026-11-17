@@ -29,9 +29,9 @@ func outageTurns(s string) int {
 	return n
 }
 
-// exitAfterAskDelay is how long an agent that exits after asking stays idle
-// first, so the server adopts the ask before it sees the process gone.
-const exitAfterAskDelay = 2 * time.Second
+// exitAfterAskLimit caps how long an agent that exits after asking waits for
+// the server to adopt the ask before it leaves anyway.
+const exitAfterAskLimit = 30 * time.Second
 
 // stallTurnLength is how long a BehaviourStall turn stays busy.
 const stallTurnLength = 1500 * time.Millisecond

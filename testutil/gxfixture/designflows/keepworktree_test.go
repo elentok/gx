@@ -53,6 +53,7 @@ func TestKeepWorktreeScenario_TheAskedFileSurvivesTheAnswerAndASecondTicketRuns(
 	t.Parallel()
 	r := start(t, "keep-worktree")
 	r.WaitStatus(t, keepFirst, askedStatus)
+	r.WaitAgentGone(t)
 	path := r.askedWorktree(t)
 	if path == "" {
 		t.Fatalf("no worktree holds %s while the ticket waits:\n%s", agentfake.UncommittedFile, r.worktrees(t))
@@ -102,6 +103,7 @@ func TestKeepCleanupScenario_ACommitlessAskKeepsItsWorktree(t *testing.T) {
 	t.Parallel()
 	r := start(t, "keep-cleanup")
 	r.WaitStatus(t, keepFirst, askedStatus)
+	r.WaitAgentGone(t)
 	path := r.askedWorktree(t)
 	if path == "" {
 		t.Fatalf("no worktree holds %s after the ask:\n%s", agentfake.UncommittedFile, r.worktrees(t))
@@ -117,6 +119,7 @@ func TestKeepCleanupScenario_CancellingThePausedTicketRemovesItsWorktree(t *test
 	t.Parallel()
 	r := start(t, "keep-cleanup")
 	r.WaitStatus(t, keepFirst, askedStatus)
+	r.WaitAgentGone(t)
 	path := r.askedWorktree(t)
 	if path == "" {
 		t.Fatalf("no worktree holds %s before the cancel:\n%s", agentfake.UncommittedFile, r.worktrees(t))
@@ -130,6 +133,7 @@ func TestKeepCleanupScenario_MergingTheEpicRemovesALeftoverIterationWorktree(t *
 	t.Parallel()
 	r := start(t, "keep-cleanup")
 	r.WaitStatus(t, keepFirst, askedStatus)
+	r.WaitAgentGone(t)
 	r.WaitStatus(t, keepSecond, "done")
 	path := r.askedWorktree(t)
 	if path == "" {

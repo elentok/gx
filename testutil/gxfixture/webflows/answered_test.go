@@ -19,6 +19,7 @@ func TestAnswerFinishedScenario_AnsweringAFinishedAgentIsAdopted(t *testing.T) {
 	r := start(t, "answer-finished")
 	const addr = "demo:finished-answer-epic/01"
 	r.WaitStatus(t, addr, askedStatus)
+	r.WaitAgentGone(t)
 	// The token of the first ask, as an open Answer form holds it.
 	d := r.Detail(t, addr)
 	r.Gx(t, "server", "tickets", "resume", addr)
@@ -52,6 +53,7 @@ func TestAnswerQueuedScenario_AnsweringTheGoneAgentQueuesTheTicket(t *testing.T)
 	r := start(t, "answer-queued")
 	const addr = "demo:queued-answer-epic/01"
 	r.WaitStatus(t, addr, askedStatus)
+	r.WaitAgentGone(t)
 	d := r.Detail(t, addr)
 	data, ok := r.Web(t).Try(t, "/v1/tickets/answer", map[string]any{"address": addr, "state": d.State, "text": "go on"})
 	if !ok {

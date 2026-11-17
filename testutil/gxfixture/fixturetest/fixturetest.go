@@ -301,6 +301,15 @@ func (r *Running) WaitStatus(t *testing.T, addr, want string) {
 	}
 }
 
+// WaitAgentGone waits for an exit-after-ask fake agent to leave, so an answer
+// meets a ticket whose agent is gone.
+func (r *Running) WaitAgentGone(t *testing.T) {
+	t.Helper()
+	if !testutil.Poll(30*time.Second, 50*time.Millisecond, func() bool { return agentfake.FileExists(r.HoldFile + agentfake.ExitedSuffix) }) {
+		t.Fatal("the asking agent never exited")
+	}
+}
+
 // WebClient trusts the root the fixture's server wrote to its state dir. It
 // carries the fixture's login cookie when signedIn.
 func (r *Running) WebClient(t *testing.T, signedIn bool) *http.Client {

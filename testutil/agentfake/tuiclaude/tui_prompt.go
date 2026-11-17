@@ -337,10 +337,13 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 		return
 	}
 	if exitAfterAsk {
-		// Go idle first and leave later: the server adopts the ask from the
-		// finished turn, and an exit before that reads as a died session.
+		// Go idle first and leave once the server has adopted the ask: an exit
+		// before that reads as a died session.
 		_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
-		time.Sleep(exitAfterAskDelay)
+		WaitTicketLeavesClaimed(cfg, address, exitAfterAskLimit)
+		if cfg.Hold != "" {
+			_ = os.WriteFile(cfg.Hold+ExitedSuffix, nil, 0o644)
+		}
 		_ = SendControl(t.ctlPath, Control{Action: ActionExit})
 		return
 	}

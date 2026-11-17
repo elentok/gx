@@ -28,6 +28,11 @@ const UncommittedFile = "uncommitted-note.txt"
 // instead of on a terminal state.
 const StartedSuffix = ".started"
 
+// ExitedSuffix names the marker file (Hold + ExitedSuffix) the TUI fake creates
+// as it exits after its asking turn (ExitAfterAsk), so a test can wait for the
+// agent to be gone before it answers.
+const ExitedSuffix = ".exited"
+
 // WorkerConfig tells WorkTicket how to finish a ticket.
 type WorkerConfig struct {
 	// ExitAfterAsk makes the TUI fake exit once the turn that asked is over, as
@@ -312,6 +317,20 @@ func WaitHold(cfg WorkerConfig) {
 	start := time.Now()
 	for FileExists(cfg.Hold) && (limit <= 0 || time.Since(start) < limit) {
 		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// WaitTicketLeavesClaimed polls the ticket until it is no longer claimed (the
+// server has adopted the agent's report) or limit passes.
+func WaitTicketLeavesClaimed(cfg WorkerConfig, address string, limit time.Duration) {
+	start := time.Now()
+	for time.Since(start) < limit {
+		cmd := exec.Command(cfg.Gx, "tickets", "show", address)
+		cmd.Env = append(os.Environ(), cfg.Env...)
+		if out, err := cmd.Output(); err == nil && !strings.Contains(string(out), "\nstatus: claimed\n") {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
