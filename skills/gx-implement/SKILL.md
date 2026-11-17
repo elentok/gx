@@ -98,9 +98,9 @@ Then, while working:
   the event (poll with a timeout), never a fixed sleep. Never weaken, skip or delete an assertion
   just to get green. For any other failing test, follow [gx-failing-tests](../gx-failing-tests.md).
 - **A Playwright flow fails outside your own steps: rerun the flow once, then file it and stop.**
-  No `--repeat-each` loops and no baseline worktree. See `gx-playwright-e2es`.
+  No `--repeat-each` loops and no baseline worktree. See `gx-playwright-tests` and the `.ai/index.md` Testing section.
 - **A Playwright flow fails: read its `error-context.md` first.** Do this before reproducing on a
-  clean tree and before any `gx tickets ask`. See `gx-playwright-e2es`.
+  clean tree and before any `gx tickets ask`. See `gx-playwright-tests`.
 - **Never report a result you did not see.** If a check's output is missing or cut off, re-run it.
   Do not claim "no remaining imports" or "gofmt is clean" from silence.
 - **Read files with a file read (Read), not a shell command.** If a read ends in "(exporter
@@ -108,7 +108,7 @@ Then, while working:
 
 If the ticket adds or changes tests, read [gx-test-guidelines](../gx-test-guidelines/SKILL.md) before you
 write the first one. If the ticket text, its seams or the touched files are Playwright, also load
-`gx-playwright-e2es`.
+`gx-playwright-tests` and read the `.ai/index.md` Testing section.
 
 ## Forking when the ticket outgrows budget
 

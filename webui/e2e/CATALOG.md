@@ -173,7 +173,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 
 The suite is capped by `maxFlows` in `playwrightguard/budget_test.go`, which equals the number of
 `test(` calls in `*.e2e.ts` (153). Before you add a flow, add a step to a flow on the same scenario
-(see `skills/gx-playwright-e2es`) and keep this file and `maxFlows` in step with the code.
+(see `gx-only-e2es`) and keep this file and `maxFlows` in step with the code.
 
 A flow's title starts with its plan number. A flow that absorbed others lists their numbers in its
 title (for example `"16. Needs you (+63, 28, 29, 30)"`). Flows with no number are named by what

@@ -1,13 +1,15 @@
 ---
-name: gx-playwright-e2es
-description: Rules for writing and reviewing gx's Playwright e2e flows (`webui/e2e/*.e2e.ts`). Covers whether a flow may be written at all, the flow budget, waits before state reads, stale expectations and `-g` filters. Use when a ticket or diff touches a Playwright file, or before writing a new e2e flow.
+name: gx-only-e2es
+description: gx-only rules for Playwright e2e flows (`webui/e2e/*.e2e.ts`), the `playwrightguard` flow budget and `webui/e2e/CATALOG.md`. Load it before touching a Playwright file or writing a new flow.
 ---
 
-# Playwright e2e rules
+# gx Playwright e2e rules
 
-The generic test rules are in [gx-test-guidelines](../gx-test-guidelines/SKILL.md). This skill adds the
-Playwright-specific ones. Flow conventions are in `webui/e2e/CATALOG.md` and `.ai/index.md`
-("Testing"). To drive the UI by hand, use [gx-ui-check](../gx-ui-check/SKILL.md), not this skill.
+This skill is repo-local. It is not in the bundle. The generic Playwright rules (waits, state reads,
+redirects, counts, flakes) are in the portable `gx-playwright-tests` skill, and the common test rules
+are in `gx-test-guidelines`. Read those too. This skill adds what only gx has. Flow conventions are
+in `webui/e2e/CATALOG.md` and `.ai/index.md` ("Testing"). To drive the UI by hand, use `gx-ui-check`,
+not this skill.
 
 ## Write an e2e only when vitest or a Go test cannot cover it
 
@@ -38,17 +40,6 @@ Rules when you do add a flow:
   whenever you remove flows.
 - **Say why in the PR or commit:** name the vitest or Go test you considered and what it cannot see.
 - **No flow for a bug fix** unless the bug was in the server/browser seam. Pin the fix with a unit test.
-
-## A state read follows an `expect` on the same locator
-
-`evaluate`, `evaluateAll` and `getComputedStyle` read the page once, with no retry.
-
-**Why:** a read right after navigation or a hash change sees the page before it renders. Flow 57
-read `evaluateAll` right after setting the hash and got `-1` on a slow run. A read after
-`toBeVisible()` on a different locator has the same problem.
-
-**Fix:** put a web-first `expect(locator)` assertion on the same locator first, then read. Better,
-replace the read with a web-first assertion (`toHaveCSS`, `toHaveCount`, `toHaveText`) that retries.
 
 ## Before the first browser run
 
@@ -81,6 +72,43 @@ await page.addInitScript(() => {
 - A rename re-sorts the sidebar rows, so `.first()` can point at another chat afterwards. Locate a
   chat row by `a[href$="/agents/<id>"]`.
 
+## `-g` patterns: use the brief command
+
+Playwright matches `-g` against `[project] › file › title`, so a `^` anchor matches nothing and the
+run passes with zero tests. Use `gx brief -C webui playwright <file> <flow numbers>`. It builds the
+pattern. Check that the run reports the tests you named.
+
+## gx forms of the generic rules
+
+The reasons are in `gx-playwright-tests`. These are the gx cases and commands.
+
+- **Redirects.** `goto(page, hash)` returns before the page settles. After a route that redirects
+  (`#/settings`), wait for the final URL before the next `goto` (flow 22).
+- **Boxes.** Several `boundingBox` reads after `setViewportSize` go in one `expect.poll` (flow 24).
+- **Covered control.** A control covered by a fixed page is a product bug. Use no `force` and no
+  wait (flows 152, 88, 117).
+- **Sibling counts.** When a new menu item, tab or settings category lands, search `webui/e2e` for
+  the counts of its siblings (`toHaveCount(4)`, the category list). Flows 72b, epics 2 and settings
+  200 broke this way. Prefer `toContainText` of the named items over a count.
+- **Rare flakes.** Run `gx brief -C webui playwright <file> <flow numbers> --repeat-each 20`. A
+  repeat of 18 to 20 at load 3 or more shows a rare flake. One rerun proves nothing.
+- **Timeouts.** Keep each `expect` timeout below the test timeout.
+
+## macOS storm and burst flows need the cgo build
+
+Storm and burst scenarios need the cgo `gx` build (`GX_E2E_GX_CGO`). Without it the watchdog cannot
+read the process table on macOS, and the storm flow fails at a 150 s wait. Set the variable before
+you debug that wait.
+
+## Run a scratch copy of a flow
+
+To try a flow without touching `webui/e2e`:
+
+1. Copy `webui/e2e` to the scratchpad.
+2. Symlink `src` and `node_modules` next to the copy.
+3. Patch `global-setup.ts` for the new location.
+4. Run with the cwd at the repo root. The `dev-mode` scenario builds a fake `pnpm` relative to it.
+
 ## Update the flow when the UI change was on purpose
 
 **Why:** flow 22 kept expecting a transparent background after the amber pill was accepted. It failed
@@ -88,14 +116,6 @@ await page.addInitScript(() => {
 
 **Fix:** when a ticket changes what a flow asserts, change that flow in the same ticket. Search
 `webui/e2e/` for the old value.
-
-## `-g` patterns match the full title
-
-**Why:** Playwright matches `-g` against `[project] › file › title`. A `^` anchor matches nothing, so
-the run passes with zero tests.
-
-**Fix:** use `gx brief -C webui playwright <file> <flow numbers>`. It builds the pattern. Check that
-the run reports the tests you named.
 
 ## A failing flow: read `error-context.md` before anything else
 
@@ -121,18 +141,10 @@ had a follow-up. A flake costs a minute per run and the reruns prove nothing new
 **Fix:** when a flow fails at a step before or outside your own steps:
 
 1. Rerun that flow **once** on your change, with `gx brief -C webui playwright <file> <flow number>`.
-2. If it fails the same way, file it with [gx-follow-up](../gx-follow-up/SKILL.md) (wording in
-   [gx-flake-tickets](../gx-flake-tickets.md)) and stop iterating on it. Do not add `--workers`,
-   `--repeat-each` or a clean-worktree baseline.
+2. If it fails the same way, file it with `gx-follow-up` (wording in `gx-flake-tickets`) and stop
+   iterating on it. Do not add `--workers`, `--repeat-each` or a clean-worktree baseline.
 3. If it passes, say so in one line. Call it flaky only with that evidence, not after a single rerun
    you did not compare.
 
-Carry on with your own steps, and finish with `gx tickets set --check-failures` as
-[gx-failing-tests](../gx-failing-tests.md) says.
-
-## Wait for the event, never for time
-
-**Why:** a fixed `waitForTimeout` is too short on a loaded runner and too long everywhere else.
-
-**Fix:** wait on a locator, a response or a URL (`expect(...)`, `waitForResponse`, `waitForURL`). See
-the timing rules in the shared list.
+Carry on with your own steps, and finish with `gx tickets set --check-failures` as `gx-failing-tests`
+says.

@@ -204,7 +204,8 @@ For every seam file, state what the agent cannot guess:
   `gx brief -C webui playwright <file> <flow numbers>`. A `^` anchor finds no tests, because Playwright
   matches `-g` against the full title, which starts with the project and file prefix.
 - **Playwright skill**: when the seams include a Playwright file, tell the agent to load
-  `gx-playwright-e2es` (its rules on waits before state reads and on `-g` filters).
+  `gx-playwright-tests` (its rules on waits before state reads and on `-g` filters). For gx's own
+  rules, point it at the `.ai/index.md` Testing section.
 - **Generated files**: when the ticket says "regenerate", name the exact command (e.g.
   `make web-types`) after checking the Makefile target exists.
 - **Mock path**: for a ticket that builds from a stored mock, give the mock HTML path

@@ -163,7 +163,7 @@ that produced it (`Quality / <skill-name>`, or `Spec`), plus the epic's ticket l
 already shipped, what the epic was for) and the known spec deviations list from step 1. Also give
 it the paths it would otherwise hunt for: the output of `gx tickets root`, the spec path (or ticket
 address list) from step 1, the review file paths from step 3, and, for a finding that touches
-`webui/e2e/*.e2e.ts`, the `gx-playwright-e2es` skill. Tell it to verify a claim with one grep or one read, not to
+`webui/e2e/*.e2e.ts`, the `gx-playwright-tests` skill and the `.ai/index.md` Testing section. Tell it to verify a claim with one grep or one read, not to
 re-run searches the reviewers already ran. Ask it to:
 
 - Treat a finding that only restates a known spec deviation as **rejected** (reason: deliberate

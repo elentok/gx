@@ -73,8 +73,8 @@ A new config key must reach the settings page or be excluded with a reason:
   below are gx-only.
 - **Default to no new Playwright flow.** Cover render and component logic with vitest and server
   rules with Go tests. A flow needs a real server round trip, browser layout, or a multi-page
-  journey, and extends an existing flow when it can. `playwrightguard` fails above `maxFlows`. Full
-  rules: `skills/gx-playwright-e2es`.
+  journey, and extends an existing flow when it can. `playwrightguard` fails above `maxFlows`. Before
+  touching a Playwright file, read `gx-only-e2es` (`.claude/skills/gx-only-e2es/SKILL.md`).
 - Ticket agents run changed-file `gx check` and never `gx check --full`. The epic's verify ticket,
   the proof and the person run `gx check --full`; the verify ticket runs it and the soak in the
   background and polls.

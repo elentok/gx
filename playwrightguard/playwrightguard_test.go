@@ -1,6 +1,6 @@
 // Package playwrightguard holds the repo guard for Playwright state reads: a
 // locator read (evaluate, evaluateAll) must follow an expect on the same
-// locator, so the read never races the page (skills/gx-playwright-e2es).
+// locator, so the read never races the page (gx-only-e2es skill).
 package playwrightguard
 
 import (
@@ -67,7 +67,7 @@ func violations(path, src string) []string {
 			continue
 		}
 		problems = append(problems, fmt.Sprintf(
-			"%s:%d: %q is read before any expect on it. Add `await expect(%s)...` (toBeVisible, toHaveCount, toHaveCSS) before the read, or wrap the read in expect.poll.",
+			"%s:%d: %q is read before any expect on it. Add `await expect(%s)...` (toBeVisible, toHaveCount, toHaveCSS) before the read, or wrap the read in expect.poll. Rules: the gx-only-e2es skill.",
 			path, i+1, strings.TrimSpace(line), recv))
 	}
 	return problems

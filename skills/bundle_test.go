@@ -157,7 +157,6 @@ var requiredFiles = []string{
 	"gx-ci-fix/agents/openai.yaml",
 	"gx-pr-text/SKILL.md",
 	"gx-pr-text/agents/openai.yaml",
-	"gx-playwright-e2es/SKILL.md",
 	"gx-playwright-tests/SKILL.md",
 	"gx-ui-check/SKILL.md",
 	"gx-ui-check/MOCK-CHECK.md",
@@ -310,7 +309,6 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-ci-fix":                             true,
 	"gx-pr-text":                            true,
 	"gx-ui-check":                           false,
-	"gx-playwright-e2es":                    false,
 	"gx-playwright-tests":                   false,
 }
 

@@ -1,6 +1,8 @@
 package skills
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -108,10 +110,62 @@ func TestTestReviewSkill(t *testing.T) {
 	}
 }
 
+const gxOnlySkill = "../.claude/skills/gx-only-e2es/SKILL.md"
+
+func TestGxOnlyE2esSkillIsWired(t *testing.T) {
+	dir := "../.claude/skills/gx-only-e2es"
+	info, err := os.Lstat(dir)
+	if err != nil {
+		t.Fatalf("skill dir: %v", err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		t.Errorf("%s must be a real directory", dir)
+	}
+	text := readFile(t, gxOnlySkill)
+	fm, _, _ := strings.Cut(strings.TrimPrefix(text, "---\n"), "\n---")
+	if !strings.Contains(fm, "name: gx-only-e2es") {
+		t.Errorf("frontmatter lacks name: gx-only-e2es")
+	}
+	for _, want := range []string{"webui/e2e/*.e2e.ts", "playwrightguard", "CATALOG.md"} {
+		if !strings.Contains(fm, want) {
+			t.Errorf("description lacks %q", want)
+		}
+	}
+
+	link := "../.agents/skills/gx-only-e2es"
+	li, err := os.Lstat(link)
+	if err != nil {
+		t.Fatalf("agents link: %v", err)
+	}
+	if li.Mode()&os.ModeSymlink == 0 {
+		t.Errorf("%s must be a symlink", link)
+	}
+	got, err := filepath.EvalSymlinks(link)
+	if err != nil {
+		t.Fatalf("resolve link: %v", err)
+	}
+	want, _ := filepath.EvalSymlinks(dir)
+	if got != want {
+		t.Errorf("link resolves to %s, want %s", got, want)
+	}
+
+	checkAnchors(t, "../.ai/index.md", "`gx-only-e2es`")
+	checkAnchors(t, "../playwrightguard/budget_test.go", "gx-only-e2es")
+	checkAnchors(t, "../playwrightguard/playwrightguard_test.go", "gx-only-e2es")
+	names, err := BundleSkillNames()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range names {
+		if name == "gx-only-e2es" || strings.HasSuffix(name, "playwright-e2es") {
+			t.Errorf("bundle lists %s", name)
+		}
+	}
+}
+
 func TestPlaywrightE2esSkillIsWired(t *testing.T) {
-	checkAnchors(t, "gx-playwright-e2es/SKILL.md", "(../gx-test-guidelines/SKILL.md)", "(../gx-ui-check/SKILL.md)")
-	checkAnchors(t, "gx-to-tickets/SKILL.md", "gx-playwright-e2es")
-	checkAnchors(t, "gx-test-review/SKILL.md", "(../gx-playwright-e2es/SKILL.md)")
+	checkAnchors(t, "gx-to-tickets/SKILL.md", "gx-playwright-tests")
+	checkAnchors(t, "gx-test-review/SKILL.md", "(../gx-playwright-tests/SKILL.md)")
 }
 
 func TestGxUICheckBlocksWorkersByDefault(t *testing.T) {
@@ -129,36 +183,36 @@ func TestGxImplementTestRules(t *testing.T) {
 		"There is no exemption list",
 		"`gx check --full`",
 		"changed-file `gx check`",
-		"`gx-playwright-e2es`",
+		"`gx-playwright-tests`",
 	)
 	checkAnchors(t, "../.ai/index.md", "`gx check --full`", "skills/gx-test-guidelines/SKILL.md", "GOMAXPROCS", "claudeenv", "envguard")
 	checkAnchors(t, "../.ai/index.md", "start it with `run_in_background` from the first call", "TaskStop")
 }
 
 func TestUnrelatedFlakyFlowRule(t *testing.T) {
-	checkAnchors(t, "gx-playwright-e2es/SKILL.md",
+	checkAnchors(t, gxOnlySkill,
 		"## An unrelated failing flow: rerun once, file it, stop",
-		"[gx-follow-up](../gx-follow-up/SKILL.md)",
-		"[gx-flake-tickets](../gx-flake-tickets.md)",
+		"`gx-follow-up`",
+		"`gx-flake-tickets`",
 		"`--repeat-each`",
 	)
-	checkAnchors(t, "gx-implement/SKILL.md", "gx-playwright-e2es", "rerun the flow once")
+	checkAnchors(t, "gx-implement/SKILL.md", "gx-playwright-tests", "rerun the flow once")
 }
 
 func TestPlaywrightE2esRunsGuardBeforeFirstBrowserRun(t *testing.T) {
-	checkAnchors(t, "gx-playwright-e2es/SKILL.md",
+	checkAnchors(t, gxOnlySkill,
 		"## Before the first browser run",
 		"`gx brief go-test ./playwrightguard`",
 	)
 }
 
 func TestFailingFlowReadsErrorContextFirst(t *testing.T) {
-	checkAnchors(t, "gx-playwright-e2es/SKILL.md",
+	checkAnchors(t, gxOnlySkill,
 		"## A failing flow: read `error-context.md` before anything else",
 		"clean worktree at HEAD",
 		"`gx tickets ask`",
 	)
-	checkAnchors(t, "gx-implement/SKILL.md", "read its `error-context.md` first", "`gx-playwright-e2es`")
+	checkAnchors(t, "gx-implement/SKILL.md", "read its `error-context.md` first", "`gx-playwright-tests`")
 }
 
 func TestTestGuidelinesKeepGxOnlyRulesInIndex(t *testing.T) {
