@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -29,6 +30,26 @@ func TestNewReviewersRules(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestNewReviewersCodeReviewRules(t *testing.T) {
+	path := "gx-code-review/SKILL.md"
+	checkAnchors(t, path,
+		`["gx-thermo-nuclear-code-quality-review", "gx-test-review", "gx-code-reviewer", "gx-silent-failure-hunter", "gx-type-design-analyzer", "gx-comment-analyzer", "gx-pr-test-analyzer", "gx-security-review"]`,
+		"(../gx-local-tracker.md#skill-conventions)",
+		"count toward the waves",
+		"follows the same wave rule",
+		"Every configured reviewer still runs",
+		"the single launch message stays",
+		"Never defer a confirmed security finding",
+	)
+	text := normalizeSpace(readFile(t, path))
+	if n := strings.Count(text, "Never defer a confirmed security finding"); n != 1 {
+		t.Errorf("%s holds the security rule %d times, want 1", path, n)
+	}
+	if regexp.MustCompile(`\b(3|6|three|six) subagents`).MatchString(text) {
+		t.Errorf("%s restates the parallel cap", path)
 	}
 }
 

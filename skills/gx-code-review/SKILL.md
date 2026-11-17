@@ -59,7 +59,7 @@ stop and fix the ticket's frontmatter before doing anything else.
 ## 2. Read the configured review skills
 
 `gx config get skills.code-review` prints the effective list as JSON. If the list is
-empty or the field is absent, fall back to the default list: `["gx-thermo-nuclear-code-quality-review", "gx-test-review"]`.
+empty or the field is absent, fall back to the default list: `["gx-thermo-nuclear-code-quality-review", "gx-test-review", "gx-code-reviewer", "gx-silent-failure-hunter", "gx-type-design-analyzer", "gx-comment-analyzer", "gx-pr-test-analyzer", "gx-security-review"]`.
 
 Resolve each name to a `SKILL.md` path, taking the first that exists: `skills/<name>/SKILL.md` from
 the reviewed repo's root, then `../<name>/SKILL.md` relative to this file. Subagents read that file
@@ -107,6 +107,10 @@ since the next step needs every result back before it can start). Running them i
 is what makes the passes independent instead of serialized, and it is what puts the Spec axis
 alongside the quality passes rather than after them.
 
+The parallel cap and waves are in [Skill conventions](../gx-local-tracker.md#skill-conventions). The
+Spec subagents (every range, and the coverage re-dispatch) count toward the waves. Every configured
+reviewer still runs, whatever the wave count. On Claude the single launch message stays.
+
 Every subagent gets the shared review file's path from above.
 
 **Quality subagents** (one per configured skill) also get:
@@ -141,7 +145,7 @@ by ticket-address range (about 12 tickets each), each with the same brief for it
 in the same message as the quality calls.
 
 **Coverage.** After the results return, check each `Covered:` line. When a range is only partly
-covered, re-dispatch a Spec subagent for the tickets left out before triage. Never let a partial
+covered, re-dispatch a Spec subagent for the tickets left out before triage; it follows the same wave rule. Never let a partial
 review read as a full one: step 7 records `Spec reviewed N of M tickets`, with N counted from the
 `Covered:` lines.
 
@@ -176,6 +180,9 @@ re-run searches the reviewers already ran. Ask it to:
     (a comment, whitespace, or about 10 changed lines or fewer) that has no neighbour in its area to
     merge into is **deferred**, never **approved**: a fix ticket costs a full iteration;
   - **rejected** — dropped.
+- Never defer a confirmed security finding: approve it, and reject it only when it is not real. The
+  tiny-finding rule above does not apply to it. A security finding is one raised by the security
+  reviewer, or by any other reviewer when it describes a vulnerability.
 - Never reject a finding whose reason is to amend the spec or docs (for example "change the spec
   wording rather than the code"): the edit still has to happen, and a rejection files nothing.
   Verdict it **approved** or **deferred**, and name the spec or docs edit as the fix.
