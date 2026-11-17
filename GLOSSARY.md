@@ -376,7 +376,7 @@ the harness of an earlier run of the same ticket, then the Default harness. The 
 **Stale holder** — a leftover agent that holds a ticket's label when gx launches for that ticket:
 no live run tracks it, and it is idle or done. gx closes it and launches fresh; it never adopts it.
 A leftover agent that is still working is not a stale holder: the ticket is Paused and a person or the
-investigate agent decides. _Avoid_: zombie, orphan pane.
+investigate agent decides. _Avoid_: zombie.
 
 **Interactive session** — a session a person starts and types into from the Agents tab, rather than
 one the loop launches for an iteration. `gx server` keeps it alive while no TUI is open. _Avoid_:
@@ -579,8 +579,7 @@ state on every view: green when up, red with `server down`, yellow with `read-on
 the icon never drops. When down, the Queue tab is cleared and offers to start the server; the
 Tickets tab still reads markdown.
 
-**Launch** — the server starting an iteration: claim the ticket, create the worktree, open the
-start the agent. _Avoid_: spawn (retired), start (ambiguous with `gx server start`).
+**Launch** — the server starting an iteration: claim the ticket, create the worktree, start the agent. _Avoid_: spawn (retired), start (ambiguous with `gx server start`).
 
 **Launch time** — how long a **Launch** took: from the claim to the launch prompt being delivered.
 Only a launch that reaches prompt delivered has one; it is written as a `launch-timed` run-log event.
@@ -589,7 +588,7 @@ Only a launch that reaches prompt delivered has one; it is written as a `launch-
 installing dependencies (waiting on a shared install counts), starting the agent, and sending the
 prompt. The four steps add up to the **Launch time**.
 
-**Reclaim** — the server, after a restart, taking back an iteration whose pane is still live and
+**Reclaim** — the server, after a restart, taking back an iteration whose agent is still live and
 owned (found by its recorded handle). A handle that no longer matches pauses the ticket
 with reason `handle-mismatch`. A run recorded under a runner that no longer exists is a gone agent:
 an empty claim reopens, and a claim with work pauses `handle-mismatch`. Replaces **Reattach** and

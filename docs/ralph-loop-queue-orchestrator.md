@@ -62,7 +62,7 @@ sequenceDiagram
         Session-->>Iter: idle (commits ahead of base)
         Iter->>Iter: MarkBuiltAwaitingLand (iteration_status: finished; status stays claimed)
         Iter-->>Run: builtAwaitingLandError{job} -> active slot freed
-        Run->>LandQ: queue job (pane/tab/sessionID, in-memory only), wake
+        Run->>LandQ: queue job (runner/sessionID, in-memory only), wake
     end
     LandQ->>LandQ: pick lowest-numbered claimed+finished ticket (rescanned from disk each pass)
     LandQ->>Feature: landCherryPick (single-goroutine serialized, no lock)
@@ -89,7 +89,7 @@ sequenceDiagram
    finish (e.g. fork-and-close, or a code-review ticket); zero commits otherwise → mark
    `needs-answer`, leave the worktree for a human. Commits present → write `iteration_status:
    finished` (`MarkBuiltAwaitingLand`; `status:` stays `claimed`) and return a
-   `builtAwaitingLandError` carrying the pane/tab/sessionID/worktree-path landing will need — the
+   `builtAwaitingLandError` carrying the runner/sessionID/worktree-path landing will need — the
    build goroutine's active slot is released right there, before any cherry-pick or conflict
    resolution runs.
 4. The land-queue worker (`landqueue.go`, one goroutine per `Run` call, replacing the old
@@ -119,10 +119,10 @@ once, synchronously, at the start of every epic run, before any new claim is mad
 
 ```mermaid
 flowchart TD
-    A[ticket status] -->|needs-repair| B{live tab exists?}
+    A[ticket status] -->|needs-repair| B{live agent exists?}
     B -->|yes| C[reattach]
     B -->|no| D[leave needs-repair]
-    A -->|claimed| E{live tab exists?}
+    A -->|claimed| E{live agent exists?}
     E -->|yes| C
     E -->|no| F[reconcileOrphanedClaim]
     F --> G{iteration branch has unlanded commits?}
@@ -162,7 +162,7 @@ flowchart TD
     C -->|no| D[CherryPickRange]
     D --> E{clean?}
     E -->|yes| G
-    E -->|no, conflict| F[open tab in FEATURE worktree,\nrun gx-resolving-merge-conflicts agent\n30 min timeout]
+    E -->|no, conflict| F[start agent in FEATURE worktree,\nrun gx-resolving-merge-conflicts agent\n30 min timeout]
     F --> G
     G --> H[stamp trailers, mark done, finishCleanup]
     H --> I[landResults outcome -> Run: completed++, IterationFinished]
@@ -176,7 +176,7 @@ delays *other queued lands* — every other ticket's build keeps running unaffec
 
 Eligibility (which ticket the worker picks next) is recomputed from ticket files on disk every
 pass — `status: claimed` + `iteration_status: finished` + no unresolved `blocked_by`, tie-broken by
-lowest ticket number — with no separate queue state persisted anywhere. Only the pane/tab/
+lowest ticket number — with no separate queue state persisted anywhere. Only the runner/
 sessionID/iteration-worktree-path a land actually needs (live-process state, not derivable from
 disk) survives in an in-memory `landJobs` map between a build handing a job off and the worker
 picking it up.
