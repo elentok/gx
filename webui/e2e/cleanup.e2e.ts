@@ -1,6 +1,6 @@
 import { access } from "node:fs/promises"
 import { withState } from "./diagnostics"
-import { expect, nav, openMenu, test, type Fixture } from "./fixture"
+import { expect, nav, openMenu, renderedText, test, type Fixture } from "./fixture"
 import type { Page } from "@playwright/test"
 
 // The sidebar re-renders as the route changes, which can detach the open menu; reopen until the click lands.
@@ -38,10 +38,9 @@ test.describe("198. Cleanup", () => {
 
     // What a missed wait prints: the page body and, for the waits on the one-off, its ticket.
     const pageBody = () =>
-      page
-        .locator("body")
-        .innerText({ timeout: 2_000 })
-        .catch((e: Error) => `(page body not readable: ${e.message})`)
+      renderedText(page.locator("body"), 2_000).catch(
+        (e: Error) => `(page body not readable: ${e.message})`,
+      )
     const oneOff = () =>
       fixture.cli("tickets", "show", "demo:one-offs/01").catch((e: Error) => `error: ${e.message}`)
     const pageState = async () => `Cleanup page body:\n${await pageBody()}`

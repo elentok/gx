@@ -1,7 +1,7 @@
 import { appendFile, mkdir } from "node:fs/promises"
 import { dirname } from "node:path"
 import type { Locator, Page } from "@playwright/test"
-import { expect, nav, test } from "./fixture"
+import { expect, nav, renderedText, test } from "./fixture"
 
 // Seeded totals are in the grilling-stats comment in testutil/gxfixture/scenarios.go.
 const grilling = (page: import("@playwright/test").Page) =>
@@ -23,16 +23,7 @@ const LIMIT_CARDS = [
 
 async function tip(card: Locator, day: number): Promise<string> {
   await card.locator(`[data-hit="${day}"]`).hover({ force: true })
-  return card.getByRole("tooltip").innerText()
-}
-
-async function openStats(
-  page: Page,
-  start: (scenario: string, opts?: { shape?: string }) => Promise<unknown>,
-) {
-  await start("limit-burn", { shape: "stats" })
-  await page.evaluate(() => (location.hash = "#/stats?range=30"))
-  await costCard(page, LIMIT_CARDS[0]).waitFor()
+  return renderedText(card.getByRole("tooltip"))
 }
 
 // Moved to vitest: 57 (Grilling section, StatsPage.test.tsx), 182 (limit burn, LimitBurnCards.test.tsx and
@@ -49,7 +40,7 @@ test("184. Live token ledger (and 182. Stats limit burn, phone)", async ({ page,
         timestamp: new Date().toISOString(),
         message: { model: "claude-sonnet-4-5", usage: { input_tokens: tokens, output_tokens: 0 } },
       }
-      await appendFile(path, JSON.stringify(line) + "\n")
+      await appendFile(path, `${JSON.stringify(line)}\n`)
     }
   }
   // Today's tokens per group from the CLI, the same numbers the page reads.

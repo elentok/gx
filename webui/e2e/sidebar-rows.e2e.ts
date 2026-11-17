@@ -238,7 +238,7 @@ test("Sidebar rows", async ({ page, start }) => {
       storageState: await page.context().storageState(),
     })
   const tablet = await phone.newPage()
-  await tablet.goto(new URL(page.url()).origin + "/#/epics")
+  await tablet.goto(`${new URL(page.url()).origin}/#/epics`)
   const tabletSidebar = tablet.getByRole("complementary", nav("Sidebar"))
   await tabletSidebar.getByRole("button", nav("Expand paused-epic")).click()
   const tabletWorking = tabletSidebar

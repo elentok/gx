@@ -45,7 +45,10 @@ function Harness({
       placeholder="Type"
       disabled={disabled}
       value={text}
-      onChange={(t) => (setText(t), onChange(t))}
+      onChange={(t) => {
+        setText(t)
+        onChange(t)
+      }}
     />
   )
 }
@@ -138,18 +141,21 @@ test("the editor edits the same text and Done closes it", async () => {
   expect(field().value).toBe("typed")
 })
 
+function SetNewParent({ onChange }: { onChange: () => void }) {
+  const [text, setText] = useState("hello world")
+  return (
+    <>
+      <button type="button" onClick={() => setText("hello world!")}>
+        Set new
+      </button>
+      <PromptBox label="Note" name="test-note" title={TITLE} value={text} onChange={onChange} />
+    </>
+  )
+}
+
 test("the editor shows a new value prop and keeps the caret: no copy", async () => {
   const onChange = vi.fn()
-  function Parent() {
-    const [text, setText] = useState("hello world")
-    return (
-      <>
-        <button onClick={() => setText("hello world!")}>Set new</button>
-        <PromptBox label="Note" name="test-note" title={TITLE} value={text} onChange={onChange} />
-      </>
-    )
-  }
-  renderThemed(<Parent />)
+  renderThemed(<SetNewParent onChange={onChange} />)
   field().setSelectionRange(2, 2)
   fireEvent.click(expand())
   await findLargeEditor(TITLE)
@@ -213,9 +219,9 @@ test("Escape does not close the editor", () => {
 })
 
 // The existing tests mean the textarea, so the pointer is coarse unless a test says otherwise.
-function withVi(on: boolean, ui: ReactNode, coarse = true, escape = "") {
+function withVi(on: boolean, ui: ReactNode, coarse = true, viEscape = "") {
   const state = {
-    snapshot: { sessions: [], vi_mode: on, vi_escape: escape },
+    snapshot: { sessions: [], vi_mode: on, vi_escape: viEscape },
     connected: true,
     loadedOnce: true,
     tick: 0,
@@ -487,7 +493,9 @@ function Live({
   const [text, setText] = useState("hello world")
   return (
     <CoarsePointerContext.Provider value={coarse}>
-      <button onClick={() => setCoarse((c) => !c)}>flip</button>
+      <button type="button" onClick={() => setCoarse((c) => !c)}>
+        flip
+      </button>
       <PromptBox
         label="Note"
         name="test-note"
@@ -704,7 +712,9 @@ function Pill({
   const [text, setText] = useState("hello")
   return (
     <>
-      <button onClick={() => setText("")}>submit</button>
+      <button type="button" onClick={() => setText("")}>
+        submit
+      </button>
       <PromptBox
         label="Note"
         name="test-note"

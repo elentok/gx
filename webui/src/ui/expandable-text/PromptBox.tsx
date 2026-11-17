@@ -178,6 +178,8 @@ function Field({
     // While the editor is open it places the caret itself.
     // The inline editor takes `pending` itself, as its `caret`.
     if (selection || showEditor) return
+    // `value` is a re-run trigger: the caret is placed after each text change.
+    void value
     const at = menu?.pending.current
     if (at == null) return
     menu!.pending.current = null

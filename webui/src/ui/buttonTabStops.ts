@@ -7,14 +7,16 @@ const SELECTOR = "button:not([tabindex])"
 
 function mark(root: ParentNode) {
   if (root instanceof Element && root.matches(SELECTOR)) root.setAttribute("tabindex", "0")
-  root.querySelectorAll(SELECTOR).forEach((b) => b.setAttribute("tabindex", "0"))
+  for (const b of root.querySelectorAll(SELECTOR)) b.setAttribute("tabindex", "0")
 }
 
 /** Starts the marking on `root`; returns a function that stops it. */
 export function installButtonTabStops(root: HTMLElement = document.body): () => void {
   mark(root)
   const observer = new MutationObserver((records) => {
-    for (const r of records) r.addedNodes.forEach((n) => n instanceof Element && mark(n))
+    for (const r of records) {
+      for (const n of r.addedNodes) if (n instanceof Element) mark(n)
+    }
   })
   observer.observe(root, { childList: true, subtree: true })
   return () => observer.disconnect()

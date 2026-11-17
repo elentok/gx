@@ -20,8 +20,14 @@ async function launches(dir: string) {
   return out
 }
 
+/** The parts of the fakes' config these flows edit. */
+interface FakeConfig {
+  models: { value: string; behaviour?: string }[]
+  modelsFail?: boolean
+}
+
 /** Rewrites the fakes' config: `patch` edits the parsed JSON. */
-async function editFakes(fixture: Fixture, patch: (cfg: Record<string, any>) => void) {
+async function editFakes(fixture: Fixture, patch: (cfg: FakeConfig) => void) {
   const path = fixture.modelFakes!.fake_config
   const cfg = JSON.parse(await readFile(path, "utf8"))
   patch(cfg)

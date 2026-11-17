@@ -1,4 +1,4 @@
-import type { Locator, Page } from "@playwright/test"
+import type { Locator } from "@playwright/test"
 import { expect, nav, test } from "./fixture"
 import {
   addInput,

@@ -24,7 +24,7 @@ const phoneAnchorRect: NonNullable<
 > = (el) => {
   if (!el || typeof window.matchMedia !== "function" || !window.matchMedia(PHONE_QUERY).matches)
     return null
-  const { x, y, width, height } = el.getBoundingClientRect()
+  const { x, y, height } = el.getBoundingClientRect()
   return { x, y, width: window.innerWidth - PHONE_EDGE_GAP - x, height }
 }
 

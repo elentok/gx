@@ -225,7 +225,7 @@ describe("vi off", () => {
   test("typing inserts letters and no mode is reported", () => {
     const { view, text, onModeChange } = mount(false)
     act(() => view.dispatch(view.state.replaceSelection("q")))
-    expect(text()).toBe("q" + DOC)
+    expect(text()).toBe(`q${DOC}`)
     expect(onModeChange).not.toHaveBeenCalled()
   })
 })

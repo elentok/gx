@@ -8,6 +8,10 @@ async function freshStore() {
   return import("./bigPromptStore")
 }
 
+function Probe({ useBigPrompt }: { useBigPrompt: () => boolean }) {
+  return <span data-testid="p">{String(useBigPrompt())}</span>
+}
+
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
@@ -48,10 +52,7 @@ test("throwing storage still toggles for the page", async () => {
 
 test("a storage event for the key updates the store and readers; other keys do nothing", async () => {
   const s = await freshStore()
-  function Probe() {
-    return <span data-testid="p">{String(s.useBigPrompt())}</span>
-  }
-  render(<Probe />)
+  render(<Probe useBigPrompt={s.useBigPrompt} />)
   expect(screen.getByTestId("p").textContent).toBe("false")
   act(() => {
     window.dispatchEvent(new StorageEvent("storage", { key: "other", newValue: "true" }))

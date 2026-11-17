@@ -77,7 +77,7 @@ test("26. New Design form", async ({ page, start }) => {
     const page2 = await other.newPage()
     const d2 = draftPage(page2)
     const side2 = sidebarKit(page2)
-    await page2.goto(page.url().split("#")[0]! + "#/epics")
+    await page2.goto(`${page.url().split("#")[0]!}#/epics`)
     await newDesign(page2)
     await expect(page2).toHaveURL(/#\/drafts\/[^/]+$/)
     const second = idOf(page2)

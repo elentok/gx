@@ -90,7 +90,7 @@ test("152. Phone, command menu", async ({ page, start }) => {
       storageState: await page.context().storageState(),
     })
   const fresh = await phone.newPage()
-  await fresh.goto(new URL(page.url()).origin + `/#/agents/${session.id}`)
+  await fresh.goto(`${new URL(page.url()).origin}/#/agents/${session.id}`)
   await messageBox(fresh).tap()
   await fresh.keyboard.type("/")
   await expect(commandMenu(fresh)).toBeVisible()

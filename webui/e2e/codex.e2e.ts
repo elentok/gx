@@ -8,9 +8,8 @@ import {
   openNewAgent,
   promptBox,
   sessions,
-  sidebar,
 } from "./agentsKit"
-import { expect, nav, openMenu, test } from "./fixture"
+import { expect, nav, openMenu, renderedText, test } from "./fixture"
 
 async function openAgentsSettings(page: Page) {
   await openMenu(page)
@@ -188,7 +187,7 @@ test("118. Codex queue rows, codex missing from PATH", async ({ page, start }) =
   await fixture.cli("server", "queue", "remove", "demo:ran-on-claude")
   await go(page, "#/e/demo:pinned")
   await expect(verdict(page, "pinned")).toContainText("codex is not on PATH")
-  const text = (await verdict(page, "pinned").innerText()).trim()
+  const text = (await renderedText(verdict(page, "pinned"))).trim()
   const explained = await fixture.cli("server", "tickets", "explain", "demo:pinned/01")
   expect(explained).toContain("codex is not on PATH")
   expect(explained).toContain(text.replace(/^.*?(codex is not on PATH)/s, "$1"))

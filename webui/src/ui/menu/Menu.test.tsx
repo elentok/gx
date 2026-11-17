@@ -156,6 +156,22 @@ describe("GxMenu on the phone", () => {
   })
 })
 
+function SignalHost() {
+  const [n, setN] = useState(0)
+  return (
+    <>
+      <button type="button" onClick={() => setN(n + 1)}>
+        signal
+      </button>
+      <GxMenu
+        trigger={trigger}
+        items={[{ value: "a", label: "A", onSelect: vi.fn() }]}
+        closeSignal={n}
+      />
+    </>
+  )
+}
+
 describe("GxMenu", () => {
   it("renders every item kind", async () => {
     const items: MenuEntry[] = [
@@ -296,22 +312,7 @@ describe("GxMenu", () => {
   })
 
   it("closes when the external signal changes", async () => {
-    function Host() {
-      const [n, setN] = useState(0)
-      return (
-        <>
-          <button type="button" onClick={() => setN(n + 1)}>
-            signal
-          </button>
-          <GxMenu
-            trigger={trigger}
-            items={[{ value: "a", label: "A", onSelect: vi.fn() }]}
-            closeSignal={n}
-          />
-        </>
-      )
-    }
-    const r = renderThemed(<Host />)
+    const r = renderThemed(<SignalHost />)
     await open(r)
     fireEvent.click(r.getByRole("button", { name: "signal" }))
     await waitFor(() => expect(r.queryByRole("menu")).toBeNull())
@@ -373,27 +374,28 @@ describe("GxMenu", () => {
   })
 })
 
+function FocusHost({ opens }: { opens: boolean }) {
+  const [dialog, setDialog] = useState(false)
+  return (
+    <>
+      <GxMenu
+        trigger={trigger}
+        items={[{ value: "a", label: "A", onSelect: () => opens && setDialog(true) }]}
+      />
+      {dialog && (
+        <Modal label="Dialog" onClose={() => setDialog(false)}>
+          <input aria-label="Name" />
+        </Modal>
+      )}
+    </>
+  )
+}
+
 describe("GxMenu focus after an item", () => {
-  function Host({ opens }: { opens: boolean }) {
-    const [dialog, setDialog] = useState(false)
-    return (
-      <>
-        <GxMenu
-          trigger={trigger}
-          items={[{ value: "a", label: "A", onSelect: () => opens && setDialog(true) }]}
-        />
-        {dialog && (
-          <Modal label="Dialog" onClose={() => setDialog(false)}>
-            <input aria-label="Name" />
-          </Modal>
-        )}
-      </>
-    )
-  }
   const render = (wide: boolean, opens: boolean) =>
     renderThemed(
       <WideContext.Provider value={wide}>
-        <Host opens={opens} />
+        <FocusHost opens={opens} />
       </WideContext.Provider>,
     )
 

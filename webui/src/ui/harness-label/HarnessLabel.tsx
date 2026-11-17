@@ -31,7 +31,14 @@ export function HarnessLabel({
   const showDot = harness && (dot || !model)
   const parts = [model, tierLabel, effort, note ?? ""].filter(Boolean)
   // One inline flow: it wraps between words (a real space), never inside the harness or a word.
-  const words = parts.flatMap((part) => part.split(" · "))
+  const seen = new Map<string, number>()
+  const words = parts
+    .flatMap((part) => part.split(" · "))
+    .map((word) => {
+      const n = seen.get(word) ?? 0
+      seen.set(word, n + 1)
+      return { word, key: `${word}#${n}` }
+    })
   return (
     <Text as="span" fontFamily="mono" fontSize="12px" color="text.dim">
       {showDot && (
@@ -47,8 +54,8 @@ export function HarnessLabel({
           {showName && (NAMES[harness] ?? harness)}
         </Box>
       )}
-      {words.map((word, i, rest) => (
-        <Fragment key={i}>
+      {words.map(({ word, key }, i, rest) => (
+        <Fragment key={key}>
           {i > 0 && " "}
           <Box as="span" whiteSpace="nowrap">
             {word}

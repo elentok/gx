@@ -30,6 +30,10 @@ const SIZES = {
 const COMET_SEGMENTS = 10
 const COMET_SHARE = 16
 const SEGMENT = COMET_SHARE / COMET_SEGMENTS
+const COMET = Array.from({ length: COMET_SEGMENTS }, (_, i) => ({
+  offset: -i * SEGMENT,
+  opacity: (i + 1) / COMET_SEGMENTS,
+}))
 
 interface Props {
   // 0..1
@@ -106,16 +110,16 @@ export function ProgressRing({
           _motionReduce={{ animation: "none" }}
         >
           <g transform={`rotate(-90 ${c} ${c})`}>
-            {Array.from({ length: COMET_SEGMENTS }, (_, i) => (
+            {COMET.map((seg) => (
               <circle
-                key={i}
+                key={seg.offset}
                 cx={c}
                 cy={c}
                 r={r}
                 pathLength={100}
                 strokeDasharray={`${SEGMENT} ${100 - SEGMENT}`}
-                strokeDashoffset={-i * SEGMENT}
-                opacity={(i + 1) / COMET_SEGMENTS}
+                strokeDashoffset={seg.offset}
+                opacity={seg.opacity}
               />
             ))}
           </g>

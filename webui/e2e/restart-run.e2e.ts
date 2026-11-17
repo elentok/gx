@@ -1,7 +1,7 @@
 import { realpath } from "node:fs/promises"
 import type { Page } from "@playwright/test"
 import { composer, messageBox, sessions } from "./agentsKit"
-import { expect, nav, test, toasts, type Fixture } from "./fixture"
+import { expect, nav, test, type Fixture } from "./fixture"
 import {
   buildText,
   dialog,

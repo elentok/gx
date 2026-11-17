@@ -29,7 +29,12 @@ vi.mock("./CodeEditor", async () => {
       return (
         <div data-testid="fake-editor" data-inline-rows={inline?.rows}>
           {["NORMAL", "VISUAL"].map((m) => (
-            <button key={m} data-testid={`fake-mode-${m}`} onClick={() => onModeChange(m)} />
+            <button
+              type="button"
+              key={m}
+              data-testid={`fake-mode-${m}`}
+              onClick={() => onModeChange(m)}
+            />
           ))}
         </div>
       )

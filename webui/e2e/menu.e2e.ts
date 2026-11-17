@@ -2,7 +2,7 @@ import { appendFile, glob, mkdir, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { withState } from "./diagnostics"
-import { expect, nav, test, type Fixture } from "./fixture"
+import { expect, nav, renderedText, test, type Fixture } from "./fixture"
 import type { Page } from "@playwright/test"
 
 const nowSec = () => Math.floor(Date.now() / 1000)
@@ -86,7 +86,7 @@ test.describe("120. Menu refresh", () => {
         usage: { input_tokens: 1_000_000, output_tokens: 0 },
       },
     }
-    await appendFile(fixture.agentTranscript, JSON.stringify(line) + "\n")
+    await appendFile(fixture.agentTranscript, `${JSON.stringify(line)}\n`)
 
     // The open menu refetches every 60 seconds; the page clock runs that interval, and the
     // server may take a poll or two to see the line, so each try moves the clock again.
@@ -150,10 +150,9 @@ type CodexSample = Awaited<ReturnType<typeof appendCodexSample>>
 
 // What a missed live-update wait prints: the open popover, the rollout line the scan should have read and the server log tail.
 const limitsState = (page: Page, fixture: Fixture, sample?: CodexSample) => async () => {
-  const popover = await page
-    .getByRole("dialog", nav("Usage limits"))
-    .innerText({ timeout: 2_000 })
-    .catch((e: Error) => `(popover not readable: ${e.message})`)
+  const popover = await renderedText(page.getByRole("dialog", nav("Usage limits")), 2_000).catch(
+    (e: Error) => `(popover not readable: ${e.message})`,
+  )
   const rollout = sample
     ? `${sample.rollout}\n${sample.line.trim()}\nappended ${Math.round((Date.now() - sample.at) / 1000)} s ago`
     : "no rollout file"

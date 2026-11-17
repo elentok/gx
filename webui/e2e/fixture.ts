@@ -5,7 +5,7 @@ import { mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "nod
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { promisify } from "node:util"
-import { expect, test as base, type Page } from "@playwright/test"
+import { expect, test as base, type Locator, type Page } from "@playwright/test"
 
 const run = promisify(execFile)
 
@@ -83,6 +83,9 @@ export interface HostFiles {
   ticket: string
 }
 
+/** A parsed JSON config file: tests read paths into it and assert on the leaves. */
+type ConfigTree = { [key: string]: ConfigTree }
+
 export interface Fixture {
   /** Runs a gx CLI verb against this fixture's server and no other. */
   cli(...args: string[]): Promise<string>
@@ -133,9 +136,9 @@ export interface Fixture {
   /** Writes the migrate scenarios' inject.json (extra test steps), read when the server starts. */
   setInject(steps: Array<{ name: string; fail?: string; notes?: string[] }>): Promise<void>
   /** The parsed `$HOME/.config/gx/config.json`, read fresh on every call. */
-  globalConfig(): Promise<Record<string, any>>
+  globalConfig(): Promise<ConfigTree>
   /** The parsed `project.json` of `project` in the fixture's ticket store, read fresh on every call. */
-  projectConfig(project: string): Promise<Record<string, any>>
+  projectConfig(project: string): Promise<ConfigTree>
   /** Writes `content` to `path` under the fixture's ticket store (`<project>/<epic>/issues/x.md`), creating dirs. */
   writeStoreFile(path: string, content: string): Promise<void>
   /** Reads a file under the fixture's ticket store. */
@@ -167,7 +170,7 @@ export interface Fixture {
   /** The code for the current step, for a secret the server no longer holds, so it is refused without a wait. */
   staleTotpCode(): string
   /** Adopts the secret the setup page showed (spaces allowed), for a fixture that started with setup pending. */
-  useTotpSecret(secret: string): void
+  setTotpSecret(secret: string): void
   /** The web password the fixture's setup used; empty while the setup is pending. */
   readonly password: string
   /** The TOTP secret; empty when the server runs with `server.web.totp=false`. */
@@ -519,7 +522,7 @@ async function startFixture(
     staleTotpCode() {
       return totpCode(totpSecret, Math.floor(Date.now() / 1000 / TOTP_PERIOD_S))
     },
-    useTotpSecret(secret) {
+    setTotpSecret(secret) {
       totpSecret = secret.replace(/\s/g, "")
     },
   }
@@ -621,6 +624,16 @@ export async function swipe(page: Page, from: [number, number], to: [number, num
 }
 
 /** Matches a role's accessible name exactly. */
+/**
+ * The rendered text (`innerText`: line breaks kept, hidden text left out) of the one element `loc` matches.
+ * It waits for the element and fails when `loc` matches more than one, as `loc.innerText()` does.
+ */
+export async function renderedText(loc: Locator, timeout?: number): Promise<string> {
+  await loc.waitFor({ state: "attached", timeout })
+  const [text] = await loc.allInnerTexts()
+  return text ?? ""
+}
+
 export const nav = (name: string) => ({ name, exact: true })
 
 /** The footer's Epics menu button; its name gains " · n need you" while cards need you. */

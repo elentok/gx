@@ -10,12 +10,17 @@ test.use({ serviceWorkers: "allow", launchOptions: { args: ["--ignore-certificat
 const LOADS = "__gxE2eLoads"
 const loads = (page: Page) => page.evaluate((key) => Number(sessionStorage.getItem(key)), LOADS)
 
+type Marked = Window & { __devMark?: boolean }
+
 /** Marks the document so a later reload shows as a missing mark. */
-const mark = (page: Page) => page.evaluate(() => ((window as any).__devMark = true))
+const mark = (page: Page) =>
+  page.evaluate(() => {
+    ;(window as Marked).__devMark = true
+  })
 // A read landing mid-navigation throws "context destroyed", which is itself the reload.
 const reloaded = (page: Page) =>
   expect
-    .poll(() => page.evaluate(() => (window as any).__devMark === undefined).catch(() => true))
+    .poll(() => page.evaluate(() => (window as Marked).__devMark === undefined).catch(() => true))
     .toBe(true)
 
 // A ready Vite serves the fake's own page, never the gx UI: the page then shows "vitefake" and has no menu.
@@ -27,7 +32,7 @@ const detailsRow = (page: Page) => menu(page).getByRole("menuitem", { name: /^De
 const control = (fixture: Fixture, body: object) =>
   writeFile(fixture.devControlFile, JSON.stringify(body))
 const devKey = async (fixture: Fixture) =>
-  (await fixture.globalConfig())["server"]?.["web"]?.["dev-frontend"]
+  (await fixture.globalConfig()).server?.web?.["dev-frontend"]
 
 // Menu-less pages (the fake's own) leave the CLI, which writes the same setting the row does.
 const setDev = (fixture: Fixture, on: boolean) =>

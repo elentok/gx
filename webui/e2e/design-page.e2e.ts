@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test"
-import { card, expect, nav, sessionRows, test } from "./fixture"
+import { card, expect, nav, renderedText, sessionRows, test } from "./fixture"
 
 const openDesign = async (page: Page) => {
   await page.evaluate(() => (location.hash = "#/d/demo:design-epic"))
@@ -167,9 +167,6 @@ test.describe("128. Copy ID (Design)", () => {
   })
 })
 
-const showChat = (page: Page) =>
-  page.getByRole("group", nav("View")).getByRole("button", nav("Chat")).click()
-
 const fontSize = async (el: Locator) => {
   await expect(el).toBeVisible()
   return el.evaluate((node) => getComputedStyle(node).fontSize)
@@ -322,7 +319,7 @@ test.describe("74. Question sheet layout", () => {
       if (
         box &&
         (await b.getAttribute("aria-label")) !== "Send answers" &&
-        (await b.innerText()) !== "Send answers"
+        (await renderedText(b)) !== "Send answers"
       )
         expect(box.x + box.width, "Send is right-most").toBeLessThanOrEqual(sendBox.x + 1)
     }

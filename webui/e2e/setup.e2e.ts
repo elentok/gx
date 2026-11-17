@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test"
-import { epicsButton, expect, test, type Fixture } from "./fixture"
+import { epicsButton, expect, renderedText, test, type Fixture } from "./fixture"
 
 const GOOD_PASSWORD = "correct horse battery staple"
 
@@ -16,7 +16,7 @@ const signedIn = (page: Page) =>
 
 /** The setup starts with no secret, so the fixture takes the key step 3 shows. */
 async function adoptKey(page: Page, fixture: Fixture) {
-  fixture.useTotpSecret(await page.locator('[data-mock-part="totp-key"] code').innerText())
+  fixture.setTotpSecret(await renderedText(page.locator('[data-mock-part="totp-key"] code')))
 }
 
 async function passwords(page: Page, password: string, again = password) {

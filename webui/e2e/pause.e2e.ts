@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test"
 import { realpath } from "node:fs/promises"
 import { withState } from "./diagnostics"
-import { card, expect, nav, test, toasts, type Fixture } from "./fixture"
+import { card, expect, nav, renderedText, test, toasts, type Fixture } from "./fixture"
 
 const recovery = (page: Page) => page.getByRole("form", { name: "Recovery actions" })
 
@@ -52,7 +52,7 @@ test.describe("3. Pause reasons and recovery", () => {
     // What a missed wait prints: the recovery card, every open dialog and the ticket.
     const state = (epic: string, id: string) => async () => {
       const read = (p: Promise<string>) => p.catch((e: Error) => `(not readable: ${e.message})`)
-      const card = await read(recovery(page).innerText({ timeout: 2_000 }))
+      const card = await read(renderedText(recovery(page), 2_000))
       const dialogs = await page
         .getByRole("dialog")
         .allInnerTexts()

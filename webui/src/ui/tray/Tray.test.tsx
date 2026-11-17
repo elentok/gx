@@ -13,17 +13,20 @@ const healthOf = (cpu: MeterHealth, memory = meter("normal"), disk = meter("norm
   disk,
 })
 
+function Harness() {
+  const [signal, setSignal] = useState(0)
+  return (
+    <CloseSignalContext.Provider value={signal}>
+      <Tray health={healthOf(meter("normal"))} />
+      <button type="button" onClick={() => setSignal(signal + 1)}>
+        bump
+      </button>
+    </CloseSignalContext.Provider>
+  )
+}
+
 describe("Tray", () => {
   it("closes its popover when the container's close signal changes", async () => {
-    function Harness() {
-      const [signal, setSignal] = useState(0)
-      return (
-        <CloseSignalContext.Provider value={signal}>
-          <Tray health={healthOf(meter("normal"))} />
-          <button onClick={() => setSignal(signal + 1)}>bump</button>
-        </CloseSignalContext.Provider>
-      )
-    }
     renderThemed(<Harness />)
     fireEvent.click(screen.getByRole("button", { name: /System health/ }))
     await screen.findByRole("dialog", { name: "System health" })

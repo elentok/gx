@@ -7,14 +7,12 @@ export const useCloseSignal = () => useContext(CloseSignalContext)
 
 /** Calls `onClose` when `signal` changes, never on mount. */
 export function useOnCloseSignal(signal: unknown, onClose: () => void) {
-  const first = useRef(true)
+  const seen = useRef(signal)
   const latest = useRef(onClose)
   latest.current = onClose
   useEffect(() => {
-    if (first.current) {
-      first.current = false
-      return
-    }
+    if (Object.is(seen.current, signal)) return
+    seen.current = signal
     latest.current()
   }, [signal])
 }

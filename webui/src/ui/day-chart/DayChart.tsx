@@ -83,7 +83,7 @@ export function DayChart({
     if (noData(i)) {
       marks.push(
         <rect
-          key={`nd${i}`}
+          key={`nd${days[i]}`}
           data-nodata={i}
           x={x}
           y={0}
@@ -97,7 +97,7 @@ export function DayChart({
     const style = dayStyles?.[i]
     const bar = (s: DaySeries, bx: number, y: number, w: number, h: number, below = false) =>
       h > 0 && (
-        <g key={`${i}-${s.key}`}>
+        <g key={`${days[i]}-${s.key}`}>
           <rect
             data-bar={i}
             data-series={s.key}
@@ -117,9 +117,9 @@ export function DayChart({
       )
     if (kind === "side-by-side") {
       const w = BAR / series.length
-      series.forEach((s, si) =>
-        marks.push(bar(s, x + si * w, baseY - val(s, i) * scale, w, val(s, i) * scale)),
-      )
+      series.forEach((s, si) => {
+        marks.push(bar(s, x + si * w, baseY - val(s, i) * scale, w, val(s, i) * scale))
+      })
     } else if (kind === "diverging") {
       const [add, rem] = series
       marks.push(bar(add, x, baseY - val(add, i) * scale, BAR, val(add, i) * scale))
@@ -142,6 +142,8 @@ export function DayChart({
   return (
     <Box position="relative" w="full" minW="0" onMouseLeave={() => setHover(null)}>
       <svg
+        role="img"
+        aria-label={series.map((s) => s.label).join(", ")}
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
         width="100%"
@@ -171,6 +173,10 @@ export function DayChart({
         {days.map((d, i) => (
           <rect
             key={d}
+            role="tab"
+            tabIndex={-1}
+            aria-selected={hover === i}
+            aria-label={d}
             data-hit={i}
             x={i * SLOT}
             y={0}

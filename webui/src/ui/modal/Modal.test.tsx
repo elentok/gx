@@ -80,10 +80,10 @@ describe("Modal", () => {
     function mountTrap() {
       renderThemed(
         <>
-          <button>Outside</button>
+          <button type="button">Outside</button>
           <Modal label="Thing" onClose={vi.fn()}>
-            <button>First</button>
-            <button>Last</button>
+            <button type="button">First</button>
+            <button type="button">Last</button>
           </Modal>
         </>,
       )
@@ -133,11 +133,11 @@ describe("Modal", () => {
     it("wraps Shift-Tab from a contenteditable that is the first element", () => {
       renderThemed(
         <Modal label="Thing" onClose={vi.fn()}>
-          <div contentEditable="true" role="textbox" aria-label="Editor" />
-          <button>Done</button>
+          <div contentEditable="true" data-testid="editor" />
+          <button type="button">Done</button>
         </Modal>,
       )
-      const editor = screen.getByRole("textbox", { name: "Editor" })
+      const editor = screen.getByTestId("editor")
       editor.focus()
       expect(fireEvent.keyDown(screen.getByRole("dialog"), { key: "Tab", shiftKey: true })).toBe(
         false,
@@ -154,7 +154,7 @@ describe("Modal", () => {
       const onKeyDown = vi.fn()
       renderThemed(
         <Modal label="Thing" onClose={vi.fn()} onKeyDown={onKeyDown}>
-          <button>First</button>
+          <button type="button">First</button>
         </Modal>,
       )
       fireEvent.keyDown(screen.getByRole("dialog"), { key: "a" })

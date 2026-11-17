@@ -185,22 +185,30 @@ export function PhoneMenu({ trigger, items, onClosed, onOpenChange, closeSignal 
     const handled = (() => {
       switch (e.key) {
         case "ArrowDown":
-          return (go(at + 1), true)
+          go(at + 1)
+          return true
         case "ArrowUp":
-          return (go(at < 0 ? -1 : at - 1), true)
+          go(at < 0 ? -1 : at - 1)
+          return true
         case "Home":
-          return (go(0), true)
+          go(0)
+          return true
         case "End":
-          return (go(-1), true)
+          go(-1)
+          return true
         case "Enter":
         case " ":
-          return (row?.run(), true)
+          row?.run()
+          return true
         case "ArrowRight":
-          return (row?.chevron && row.run(), true)
+          if (row?.chevron) row.run()
+          return true
         case "ArrowLeft":
-          return (path.length && back(), true)
+          if (path.length) back()
+          return true
         case "Escape":
-          return (close(), true)
+          close()
+          return true
         default:
           return false
       }

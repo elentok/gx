@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test"
 import { freshVisit } from "./agentsKit"
-import { expect, test } from "./fixture"
+import { expect, renderedText, test } from "./fixture"
 
 // Titled "N. " flat (no describe) so `gx brief playwright` can filter by number.
 
@@ -46,7 +46,7 @@ test("206. Rest screen, Break (R1)", async ({ page, start }) => {
   // A second page of the same server shows the same screen and message.
   const other = await freshVisit(page, "#/")
   await expect(restDialog(other)).toBeVisible()
-  await expect(part(other, "message")).toHaveText(await part(page, "message").innerText())
+  await expect(part(other, "message")).toHaveText(await renderedText(part(page, "message")))
 
   // 900px: parts in order, the page behind is covered (inert).
   await page.setViewportSize({ width: 900, height: 900 })
@@ -92,7 +92,7 @@ test("207. Rest screen, Bedtime (R2)", async ({ page, start }) => {
   // The server splits the default message into a message and a sub-message that names the End time.
   await expect(part(page, "message")).toHaveText("That's enough AI for today.")
   await expect(part(page, "submessage")).toHaveText(
-    `Go to sleep and come back tomorrow at ${await part(page, "time").innerText()}.`,
+    `Go to sleep and come back tomorrow at ${await renderedText(part(page, "time"))}.`,
   )
 
   await page.setViewportSize({ width: 375, height: 812 })
@@ -102,7 +102,7 @@ test("207. Rest screen, Bedtime (R2)", async ({ page, start }) => {
 
   const other = await freshVisit(page, "#/")
   await expect(restDialog(other)).toBeVisible()
-  await expect(part(other, "message")).toHaveText(await part(page, "message").innerText())
+  await expect(part(other, "message")).toHaveText(await renderedText(part(page, "message")))
 
   await part(page, "unlock-link").click()
   await page.getByLabel("Unlock sentence").fill("I'm up late and I'm addicted to AI")

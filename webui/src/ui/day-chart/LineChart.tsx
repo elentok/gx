@@ -25,6 +25,8 @@ export function LineChart({ days, tone, values, height = 110 }: LineChartProps) 
 
   return (
     <svg
+      role="img"
+      aria-label="Trend line"
       viewBox={`0 0 ${days.length * SLOT} ${height}`}
       preserveAspectRatio="none"
       width="100%"
@@ -40,9 +42,9 @@ export function LineChart({ days, tone, values, height = 110 }: LineChartProps) 
       />
       {runs
         .filter((r) => r.length > 1)
-        .map((r, i) => (
+        .map((r) => (
           <polyline
-            key={i}
+            key={r[0].join(",")}
             points={r.map((p) => p.join(",")).join(" ")}
             fill="none"
             stroke={toneVar(tone)}

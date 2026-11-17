@@ -1,5 +1,10 @@
 import type { Page } from "@playwright/test"
-import { expect, nav, test, type Fixture } from "./fixture"
+import { expect, nav, renderedText, test, type Fixture } from "./fixture"
+
+// An ANSI escape (the ESC character) or a style code that lost it. Built from the char code so the regex has no control character.
+const ESC = String.fromCharCode(27)
+const ANSI_1M = new RegExp(`\\[1m|\\[0m|${ESC}`)
+const ANSI_2M = new RegExp(`\\[2m|\\[0m|${ESC}`)
 import {
   chatOf,
   claudeIdle,
@@ -46,8 +51,6 @@ async function endRun(fixture: Fixture, id: string) {
   await expect.poll(async () => (await infoOf(fixture, id)).actionable.reason ?? "").not.toBe("")
 }
 
-const ESC = String.fromCharCode(27)
-
 test("155. Command output in the chat, cut at 12 lines", async ({ page, start }) => {
   const fixture = await start("agents-commands")
   await page.setViewportSize({ width: 1280, height: 800 })
@@ -74,7 +77,7 @@ test("155. Command output in the chat, cut at 12 lines", async ({ page, start })
   await expect(page.getByRole("button", { name: /^Show all/ })).toHaveCount(0)
 
   // No ANSI code, no caveat line, nothing sent back to the agent, and the session stays read.
-  expect(await output(page).innerText()).not.toMatch(/\[1m|\[0m|\u001b/)
+  expect(await renderedText(output(page))).not.toMatch(ANSI_1M)
   await expect(page.getByText(/Caveat/)).toHaveCount(0)
   expect(await fixture.input(conv)).not.toContain("cost-row")
   expect((await infoOf(fixture, idle.id)).actionable.reason ?? "").toBe("")
@@ -155,7 +158,7 @@ test("155. Command output in the chat, design page; 159. /exit, design page", as
   await expect(output(page)).not.toContainText("design-row-13")
   await page.getByRole("button", { name: "Show all (14 lines)" }).click()
   await expect(output(page)).toContainText("design-row-14")
-  expect(await output(page).innerText()).not.toMatch(/\[2m|\[0m|\u001b/)
+  expect(await renderedText(output(page))).not.toMatch(ANSI_2M)
   await expect(page.getByText(/Caveat/)).toHaveCount(0)
   expect(await fixture.input(conv)).not.toContain("design-row")
 

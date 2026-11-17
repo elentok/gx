@@ -31,7 +31,7 @@ test("Workspaces", async ({ page, start }) => {
     .newContext({ ignoreHTTPSErrors: true, storageState: await page.context().storageState() })
   const page2 = await second.newPage()
   const side2 = sidebarKit(page2)
-  await page2.goto(page.url().split("#")[0]! + "#/epics")
+  await page2.goto(`${page.url().split("#")[0]!}#/epics`)
 
   // The sidebar shows the Default workspace's rows on the Epics page, the seeded draft (no membership) among them.
   await expect(page.getByRole("button", nav("Workspace: Default workspace"))).toBeVisible()

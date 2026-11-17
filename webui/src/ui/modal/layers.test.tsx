@@ -41,9 +41,9 @@ describe("focusTopDialog", () => {
   it("focuses the topmost dialog's marked first field, else its panel, and leaves focus already inside alone", () => {
     render(
       <>
-        <button>outside</button>
-        <div aria-modal="true" tabIndex={-1} data-testid="lower" />
-        <div aria-modal="true" tabIndex={-1} data-testid="top">
+        <button type="button">outside</button>
+        <div role="dialog" aria-modal="true" tabIndex={-1} data-testid="lower" />
+        <div role="dialog" aria-modal="true" tabIndex={-1} data-testid="top">
           <input data-first-field="" aria-label="first" />
           <input aria-label="other" />
         </div>
@@ -60,7 +60,7 @@ describe("focusTopDialog", () => {
   })
 
   it("falls back to the panel when no field is marked", () => {
-    render(<div aria-modal="true" tabIndex={-1} data-testid="panel" />)
+    render(<div role="dialog" aria-modal="true" tabIndex={-1} data-testid="panel" />)
     focusTopDialog(document.body)
     expect(document.activeElement).toBe(document.querySelector('[data-testid="panel"]'))
   })

@@ -83,7 +83,6 @@ const askDialog = (question: string, ...options: string[]) => [
 ]
 
 const NOT_APPROVABLE = "This request needs a real answer. Use the key bar in Screen."
-const NOT_DELIVERED = "The answer did not reach the session. Check Screen."
 
 const plainBlocked = (s: SessionInfo) => !s.design && !s.queue && s.failure?.kind === "blocked"
 

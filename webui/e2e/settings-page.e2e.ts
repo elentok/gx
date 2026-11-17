@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test"
-import { expect, test, type Fixture } from "./fixture"
+import { expect, renderedText, test, type Fixture } from "./fixture"
 
 // What jsdom cannot see on the Settings page: the real server round trip into config.json and project.json, and phone layout.
 // Per-control behavior lives in SettingsPage.test.tsx.
@@ -32,7 +32,7 @@ const saved = (page: Page) => page.getByRole("status").filter({ hasText: "Saved"
 /** The number on a group's changed chip; a group with no changed row has no chip. */
 const groupCount = async (page: Page, group: string) => {
   const chip = page.getByTestId(`group-count-${group}`)
-  return (await chip.count()) === 0 ? 0 : Number(await chip.innerText())
+  return (await chip.count()) === 0 ? 0 : Number(await renderedText(chip))
 }
 
 /** A Models cell: its first button opens it, and its input shows while open. */
@@ -222,7 +222,7 @@ test("200. Settings page, global journey", async ({ page, start }) => {
         get: () => ({ platform: value }),
       })
     }, platform)
-    await p.goto(page.url().split("#")[0]! + "#/")
+    await p.goto(`${page.url().split("#")[0]!}#/`)
     return p
   }
   const mac = await onPlatform("MacIntel")

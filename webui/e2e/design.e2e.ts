@@ -6,6 +6,7 @@ import {
   holdRoute,
   nav,
   openEpics,
+  renderedText,
   section,
   sessionRows,
   test,
@@ -159,7 +160,7 @@ test.describe("9. Design progress to the end", () => {
     await page.evaluate(() => (location.hash = "#/e/demo:design-epic"))
     // innerText does not wait: under load it read the ring before its label rendered.
     await expect(ring(page)).toHaveText(/%\s*$/)
-    const epicLabel = (await ring(page).innerText()).trim()
+    const epicLabel = (await renderedText(ring(page))).trim()
 
     await page.evaluate(() => (location.hash = "#/epics"))
     await openDesign(page)

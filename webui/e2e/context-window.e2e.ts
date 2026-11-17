@@ -16,11 +16,11 @@ const fillOf = async (page: Page) => Number(await ring(page).getAttribute("data-
 
 /** An assistant line whose usage holds `tokens`; the badge follows the newest one. */
 const usageLine = (tokens: number) =>
-  JSON.stringify({
+  `${JSON.stringify({
     type: "assistant",
     timestamp: new Date().toISOString(),
     message: { model: "claude-sonnet-4-5", usage: { input_tokens: tokens, output_tokens: 0 } },
-  }) + "\n"
+  })}\n`
 
 const conversationOf = async (fixture: Fixture, s: SessionInfo) =>
   (await chatOf(fixture, s.id)).conversation_id

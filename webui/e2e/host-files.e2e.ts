@@ -113,7 +113,7 @@ test("204. Hosted files, wide", async ({ page, start }) => {
   await expect(message.getByRole("link", { name: "docs/plans/host-files.md" })).toBeVisible()
   await expect(message.getByRole("link", { name: "~/dev/gx/.scratch/flow.mmd" })).toBeVisible()
   await expect(message.getByRole("link", { name: "mocks/04-viewer.html" })).toBeVisible()
-  await expect(message.getByRole("link", { name: hf.temp_dir + "/shot-1.png" })).toBeVisible()
+  await expect(message.getByRole("link", { name: `${hf.temp_dir}/shot-1.png` })).toBeVisible()
   // Tool line, the person's prompt and the question card.
   await page.getByText("1 tool call").click()
   await expect(

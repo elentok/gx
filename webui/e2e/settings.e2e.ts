@@ -1,5 +1,5 @@
 import { chromium, type Browser, type Page } from "@playwright/test"
-import { epicsButton, expect, menuButton, nav, test, type Fixture } from "./fixture"
+import { epicsButton, expect, menuButton, nav, renderedText, test, type Fixture } from "./fixture"
 
 /** The ids `gx server web-logins` prints, one per line, the id first. */
 const loginIds = async (fixture: Fixture) =>
@@ -172,7 +172,7 @@ test("109. Reset authenticator", async ({ page, start }) => {
     await expect(
       page.getByText("The old app keeps working until this code checks out."),
     ).toBeVisible()
-    return page.locator('[data-mock-part="totp-key"] code').innerText()
+    return renderedText(page.locator('[data-mock-part="totp-key"] code'))
   }
 
   const abandoned = await begin()
@@ -194,7 +194,7 @@ test("109. Reset authenticator", async ({ page, start }) => {
     await page.getByRole("button", { name: "Save new authenticator" }).click()
     await expect(page.getByText("That code doesn't match.")).toBeVisible()
 
-    fixture.useTotpSecret(newKey)
+    fixture.setTotpSecret(newKey)
     await page.getByLabel("Code from the new app").fill(await fixture.nextTotpCode())
     await page.getByRole("button", { name: "Save new authenticator" }).click()
     await expect(page).toHaveURL(/#\/settings\/s\//)
@@ -202,7 +202,7 @@ test("109. Reset authenticator", async ({ page, start }) => {
     await openWebLogins(page)
     await expect(loginRows(page)).toHaveCount(1)
 
-    fixture.useTotpSecret(oldSecret)
+    fixture.setTotpSecret(oldSecret)
     const rejected = await signInElsewhere(
       browser,
       page.url(),
@@ -211,7 +211,7 @@ test("109. Reset authenticator", async ({ page, start }) => {
     )
     await expect(rejected.getByRole("heading", { name: "Sign in" })).toBeVisible()
 
-    fixture.useTotpSecret(newKey)
+    fixture.setTotpSecret(newKey)
     const accepted = await signInElsewhere(
       browser,
       page.url(),
@@ -244,7 +244,7 @@ test("110. Web reset from the CLI", async ({ page, start }) => {
   await page.locator('[data-mock-part="password"] input').fill(password)
   await page.locator('[data-mock-part="password-again"] input').fill(password)
   await page.getByRole("button", { name: "Continue" }).click()
-  fixture.useTotpSecret(await page.locator('[data-mock-part="totp-key"] code').innerText())
+  fixture.setTotpSecret(await renderedText(page.locator('[data-mock-part="totp-key"] code')))
   await page.getByLabel("Enter the code it shows").fill(await fixture.nextTotpCode())
   await page.getByRole("button", { name: "Finish setup" }).click()
   await expect(
@@ -295,14 +295,14 @@ test("112. Add the authenticator after a CLI reset", async ({ page: first, start
     "href",
     /^otpauth:\/\/totp\//,
   )
-  const key = await page.locator('[data-mock-part="totp-key"] code').innerText()
+  const key = await renderedText(page.locator('[data-mock-part="totp-key"] code'))
   expect(key.replace(/\s/g, "")).not.toBe(oldSecret)
 
   await page.getByLabel("Enter the code it shows").fill("000000")
   await page.getByRole("button", { name: "Sign in" }).click()
   await expect(page.getByRole("alert")).toHaveText("Wrong password or code")
 
-  fixture.useTotpSecret(key)
+  fixture.setTotpSecret(key)
   await page.getByLabel("Enter the code it shows").fill(await fixture.nextTotpCode())
   await page.getByRole("button", { name: "Sign in" }).click()
   await expect(
@@ -313,7 +313,7 @@ test("112. Add the authenticator after a CLI reset", async ({ page: first, start
 
   const browser = await chromium.launch()
   try {
-    fixture.useTotpSecret(oldSecret)
+    fixture.setTotpSecret(oldSecret)
     const rejected = await signInElsewhere(
       browser,
       page.url(),

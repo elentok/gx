@@ -16,6 +16,17 @@ export interface CommandMenuRow {
   segments: CommandMenuSegment[]
 }
 
+// Segments have no id: the key is the match flag and text plus how many equal segments came before.
+function keyedSegments(segments: CommandMenuSegment[]) {
+  const seen = new Map<string, number>()
+  return segments.map((s) => {
+    const base = `${s.match ? "m" : "t"}:${s.text}`
+    const n = seen.get(base) ?? 0
+    seen.set(base, n + 1)
+    return { s, key: `${base}#${n}` }
+  })
+}
+
 export type CommandMenuStatus = "ready" | "loading" | "failed" | "no-match"
 
 interface CommandMenuProps {
@@ -210,13 +221,13 @@ function Row({
         gridColumn="1"
         gridRow="1"
       >
-        {row.segments.map((s, i) =>
+        {keyedSegments(row.segments).map(({ s, key }) =>
           s.match ? (
-            <Text as="mark" key={i} bg="transparent" color={`tone.${tone}.fg`} fontWeight="700">
+            <Text as="mark" key={key} bg="transparent" color={`tone.${tone}.fg`} fontWeight="700">
               {s.text}
             </Text>
           ) : (
-            <span key={i}>{s.text}</span>
+            <span key={key}>{s.text}</span>
           ),
         )}
         {row.hint && <Text as="i" fontStyle="normal" color="text.dim">{` ${row.hint}`}</Text>}
