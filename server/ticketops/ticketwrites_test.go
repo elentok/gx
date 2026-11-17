@@ -92,6 +92,32 @@ func TestCancel_RemovesTheKeptWorktreeAndKeepsTheBranch(t *testing.T) {
 	}
 }
 
+func TestCancel_RemovesTheWorktreeOfAWaitingRunWhoseAgentDied(t *testing.T) {
+	t.Parallel()
+	h, _, fake := servertest.StartWaitingRestartFake(t, 0)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	s, ok, _ := fake.Find("epic-a-iter-01")
+	if !ok {
+		t.Fatal("fake agent missing")
+	}
+	if err := fake.Stop(s); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	if res, err := h.Client.Tickets.Cancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+		t.Fatalf("cancel = %+v, %v", res, err)
+	}
+	if time.Since(start) > 3*time.Second {
+		t.Error("cancel waited for the dead run to settle")
+	}
+	if n := len(h.Server.Runs()); n != 0 {
+		t.Errorf("runs = %d, want 0", n)
+	}
+}
+
 func TestCancel_RemovesTheForkDescendantsWorktreeToo(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)

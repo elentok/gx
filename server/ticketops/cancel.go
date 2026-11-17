@@ -89,7 +89,24 @@ func (o *Ops) markCancelled(ref queue.TicketRef, t tickets.Ticket, source string
 // still reads the worktree, and a missing one would pause the cancelled ticket.
 // False means the run never settled, so its worktree is left for the epic merge.
 func (o *Ops) awaitRunSettled(addr string) bool {
+	o.dropDeadWaitingRun(addr)
 	return o.d.Registry.WaitGone(addr, 5*time.Second, 20*time.Millisecond)
+}
+
+// dropDeadWaitingRun settles a kept asked run whose agent exited: nothing
+// else ends it, since its finish already ran when it asked.
+func (o *Ops) dropDeadWaitingRun(addr string) {
+	t, ok := o.d.Registry.Tracked(addr)
+	if !ok || t.WaitingSince.IsZero() {
+		return
+	}
+	a, err := tickets.ParseAddress(addr, tickets.AddressContext{})
+	if err != nil {
+		return
+	}
+	if _, _, live, err := o.d.Harness.LiveSession(a); err == nil && !live {
+		o.d.Registry.Delete(addr)
+	}
 }
 
 // CancelInvestigateChild is a person's recovery verb withdrawing ref's
