@@ -24,6 +24,8 @@ var Guards = []Guard{
 	{Name: "envguard", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/envguard\.`), Example: "github.com/elentok/gx/envguard.TestEnv"},
 	{Name: "playwrightguard", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/playwrightguard\.`), Example: "github.com/elentok/gx/playwrightguard.TestMaxFlows"},
 	{Name: "setstateguard", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/setstateguard\.`), Example: "github.com/elentok/gx/setstateguard.TestNoRawSetStateCleanup"},
+	{Name: "portable test skills rules test", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/skills\.TestPortableTestSkillsHoldNoGxOnlyText$`), Example: "github.com/elentok/gx/skills.TestPortableTestSkillsHoldNoGxOnlyText"},
+	{Name: "gx-only-e2es rules test", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/skills\.TestGxOnlyE2esSkillIsWired$`), Example: "github.com/elentok/gx/skills.TestGxOnlyE2esSkillIsWired"},
 	// Judgement call: the skills package also holds tests that are not rules
 	// tests, and they are dropped too. Splitting them needs a naming rule the
 	// package does not have yet.

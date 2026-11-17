@@ -1,8 +1,11 @@
 package skills
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -215,14 +218,73 @@ func TestFailingFlowReadsErrorContextFirst(t *testing.T) {
 	checkAnchors(t, "gx-implement/SKILL.md", "read its `error-context.md` first", "`gx-playwright-tests`")
 }
 
-func TestTestGuidelinesKeepGxOnlyRulesInIndex(t *testing.T) {
-	checkAnchors(t, "../.ai/index.md", "GOMAXPROCS", "claudeenv.In(home)", "envguard/envguard_test.go")
-	for _, path := range []string{"gx-test-guidelines/SKILL.md", "gx-go-tests/SKILL.md"} {
-		text := normalizeSpace(readFile(t, path))
-		for _, bad := range []string{"GOMAXPROCS", "claudeenv", "envguard"} {
-			if strings.Contains(text, bad) {
-				t.Errorf("%s holds gx-only term %q", path, bad)
+var portableTestSkills = []string{"gx-test-guidelines", "gx-go-tests", "gx-vitest-tests", "gx-playwright-tests"}
+
+var gxOnlyTerms = []string{"GOMAXPROCS", "claudeenv", "envguard", "gx-only-e2es", ".ai/index.md", "scripts/"}
+
+// A "gx" followed by a space and a lowercase word is a command. "gx-name"
+// (hyphen) is a skill name and "gx." or "gx Foo" is prose.
+var gxCommandRe = regexp.MustCompile(`\bgx [a-z]`)
+
+// gxOnlyTextHits returns "file:line: what" for each gx-only text found in the
+// given files (name -> text).
+func gxOnlyTextHits(files map[string]string) []string {
+	var hits []string
+	for name, text := range files {
+		for i, line := range strings.Split(text, "\n") {
+			if m := gxCommandRe.FindString(line); m != "" {
+				hits = append(hits, fmt.Sprintf("%s:%d: gx command %q", name, i+1, m))
+			}
+			for _, term := range gxOnlyTerms {
+				if strings.Contains(line, term) {
+					hits = append(hits, fmt.Sprintf("%s:%d: gx-only text %q", name, i+1, term))
+				}
 			}
 		}
+	}
+	sort.Strings(hits)
+	return hits
+}
+
+func TestTestGuidelinesKeepGxOnlyRulesInIndex(t *testing.T) {
+	checkAnchors(t, "../.ai/index.md", "GOMAXPROCS", "claudeenv.In(home)", "envguard/envguard_test.go")
+}
+
+func TestPortableTestSkillsHoldNoGxOnlyText(t *testing.T) {
+	files := map[string]string{}
+	for _, dir := range portableTestSkills {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+				continue
+			}
+			path := filepath.Join(dir, e.Name())
+			files[path] = readFile(t, path)
+		}
+	}
+	for _, hit := range gxOnlyTextHits(files) {
+		t.Error(hit)
+	}
+}
+
+func TestPortableSkillGuardCatchesBadInput(t *testing.T) {
+	bad := "run `gx brief go-test ./x`\nthen gx check\nsee scripts/proc-cap\nsee .ai/index.md\nuse gx-only-e2es\nset GOMAXPROCS"
+	got := gxOnlyTextHits(map[string]string{"bad.md": bad})
+	for _, want := range []string{"bad.md:1: gx command", "bad.md:2: gx command", "bad.md:3:", "bad.md:4:", "bad.md:5:", "bad.md:6:"} {
+		found := false
+		for _, h := range got {
+			found = found || strings.HasPrefix(h, want)
+		}
+		if !found {
+			t.Errorf("no hit starting %q in %v", want, got)
+		}
+	}
+	good := "load gx-playwright-tests and gx-test-review.\nThe gx server is not a command line.\nGX Check and gx."
+	// "gx server" matches by design: a lowercase word after "gx" reads as a command.
+	if got := gxOnlyTextHits(map[string]string{"good.md": good}); len(got) != 1 || !strings.HasPrefix(got[0], "good.md:2:") {
+		t.Errorf("good text hits = %v, want only line 2", got)
 	}
 }
