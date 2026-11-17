@@ -1,7 +1,7 @@
 // Package servertest is seam A: an in-process server on a temp state dir,
 // temp socket and temp ticket store, driven only through the API client. Start
 // changes no process env, so harnesses may run in parallel subtests; the
-// package's TestMain must call herdrfake.RunHelperProcess.
+// package's TestMain must call RunSessionProcesses.
 //
 // # The runner rule
 //
@@ -12,11 +12,6 @@
 //   - PTY (the default): the test needs a real agent turn.
 //   - runnerfake (WithRunner, WithRunnerFor): the test sets a runner state
 //     directly, or checks only what the server passed to Start.
-//   - herdr (WithHerdr): herdr is the subject.
-//
-// The fake herdr executable is first in PATH of every server's Config.Env but
-// fails any call unless the test asked for WithHerdr, so a stray herdr call
-// fails the test and names the command.
 package servertest
 
 import (
@@ -31,7 +26,6 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/syshealth"
-	"github.com/elentok/gx/testutil/herdrfake"
 )
 
 // RawGet sends GET http://gx<path> over the server's unix socket, bypassing
@@ -54,7 +48,6 @@ func (h *Harness) RawGet(ctx context.Context, path string) (*http.Response, erro
 type Harness struct {
 	Client *apiclient.Client
 	Server *server.Server // for reading the run registry; drive everything else through Client
-	Herdr  *herdrfake.State
 	// Disks is the free-space source, unless an option set its own FreeSpace.
 	Disks *FakeDisks
 	// Programs is the PATH lookup, unless an option set its own LookPath.
@@ -73,8 +66,7 @@ type Harness struct {
 	Banners *Banners
 	// Sounds records the session sounds played, unless an option set its own
 	// Player.
-	Sounds    *Sounds
-	herdrDown atomic.Bool
+	Sounds *Sounds
 
 	extraRunners []agentrunner.Runner
 	// pty is set when the harness builds the PTY runner itself; turn is the

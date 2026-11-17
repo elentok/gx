@@ -7,13 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/elentok/gx/testutil/agentfake"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -38,11 +36,11 @@ func newTurn(h *Harness, text, cwd, sessionID string) *Turn {
 	return &Turn{Address: addr, Cwd: cwd, Text: text, h: h, pty: h.pty, sessionID: sessionID}
 }
 
-// unsupported fails the test, naming control, when the turn is on herdr, where
-// the PTY-only controls cannot act.
+// unsupported fails the test, naming control, when the turn is not on PTY,
+// where the controls cannot act.
 func (t *Turn) unsupported(control string) bool {
 	if !t.pty {
-		t.h.tb.Errorf("servertest: Turn.%s is not supported on herdr; run this test on PTY (drop WithHerdr)", control)
+		t.h.tb.Errorf("servertest: Turn.%s is not supported here; it needs the PTY runner", control)
 	}
 	return !t.pty
 }
@@ -145,11 +143,11 @@ func appendLine(path string, line []byte) error {
 	return errors.Join(err, f.Close())
 }
 
-// ptyOnly reports whether the harness runs on PTY; on herdr it fails the test
+// ptyOnly reports whether the harness runs on PTY; otherwise it fails the test
 // naming hook, as the turn controls do.
 func (h *Harness) ptyOnly(hook string) bool {
 	if !h.pty {
-		h.tb.Errorf("servertest: Harness.%s is not supported on herdr; run this test on PTY (drop WithHerdr)", hook)
+		h.tb.Errorf("servertest: Harness.%s is not supported here; it needs the PTY runner", hook)
 	}
 	return h.pty
 }
@@ -213,8 +211,7 @@ type AgentStart struct {
 	Kind  string // the agent kind, e.g. claude
 }
 
-// Starts is every agent launch so far, in order, on PTY and on herdr (the
-// latter once OnTurn answers its commands).
+// Starts is every agent launch so far, in order.
 func (h *Harness) Starts() []AgentStart {
 	h.startsMu.Lock()
 	defer h.startsMu.Unlock()
@@ -228,98 +225,15 @@ func (h *Harness) recordStart(s AgentStart) {
 }
 
 // OnTurn runs agent for every turn (e.g. a commit in t.Cwd). The agent is idle
-// again when the hook returns. On herdr it also answers the commands a launch
-// makes, giving each tab its own pane and cwd.
+// again when the hook returns.
 func (h *Harness) OnTurn(agent func(t *Turn)) {
 	if h.pty {
 		h.turn.Store(&agent)
 		return
 	}
-	// A test on its own runner never launches through herdr, so the hook would
+	// A test on its own runner never launches through PTY, so the hook would
 	// never run and the test could pass without its script.
-	if h.Herdr == nil {
-		h.tb.Errorf("servertest: Harness.OnTurn needs PTY or WithHerdr")
-		return
-	}
-	var mu sync.Mutex
-	cwds := map[string]string{}  // pane -> cwd
-	named := map[string]string{} // agent name -> pane
-	turns := map[string]int{}    // pane -> state_change_seq
-	tabs := 0
-	reply := func(pane string) map[string]any {
-		mu.Lock()
-		defer mu.Unlock()
-		return map[string]any{"agent": map[string]any{
-			"pane_id": pane, "tab_id": "t" + strings.TrimPrefix(pane, "p"),
-			"agent_status": "idle", "state_change_seq": turns[pane],
-		}}
-	}
-	ok := func() (any, herdrfake.Identities, error) { return map[string]any{}, herdrfake.Identities{}, nil }
-	h.Herdr.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		mu.Lock()
-		pane, byName := named[argv[2]]
-		_, byPane := cwds[argv[2]]
-		mu.Unlock()
-		switch {
-		case byName:
-			return reply(pane), herdrfake.Identities{}, nil
-		case byPane:
-			return reply(argv[2]), herdrfake.Identities{}, nil
-		}
-		return nil, herdrfake.Identities{}, AgentNotFound(argv[2])
-	})
-	h.Herdr.Register("workspace", "create", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{"workspace": map[string]any{"workspace_id": "w1"}}, herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("tab", "create", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		mu.Lock()
-		defer mu.Unlock()
-		tabs++
-		pane := "p" + strconv.Itoa(tabs)
-		for i, a := range argv {
-			if a == "--cwd" && i+1 < len(argv) {
-				cwds[pane] = argv[i+1]
-			}
-		}
-		return map[string]any{"tab": map[string]any{"tab_id": "t" + strconv.Itoa(tabs)}, "root_pane": map[string]any{"pane_id": pane}}, herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("tab", "close", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		// Closing the tab ends the agent in its pane, so a relaunch starts fresh.
-		pane := "p" + strings.TrimPrefix(argv[2], "t")
-		mu.Lock()
-		defer mu.Unlock()
-		delete(cwds, pane)
-		for name, p := range named {
-			if p == pane {
-				delete(named, name)
-			}
-		}
-		return ok()
-	})
-	h.Herdr.Register("agent", "start", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		pane := flagValue(argv, "--pane")
-		mu.Lock()
-		named[argv[2]] = pane
-		cwd := cwds[pane]
-		mu.Unlock()
-		h.recordStart(AgentStart{Label: argv[2], Cwd: cwd, Kind: flagValue(argv, "--kind")})
-		return reply(pane), herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		return reply(argv[2]), herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		pane, text := argv[2], argv[3]
-		mu.Lock()
-		cwd := cwds[pane]
-		turns[pane]++ // the prompt starts a turn
-		mu.Unlock()
-		agent(newTurn(h, text, cwd, ""))
-		return reply(pane), herdrfake.Identities{}, nil
-	})
+	h.tb.Errorf("servertest: Harness.OnTurn needs the PTY runner")
 }
 
 // RegisterTurn makes the harness's agents take no-op turns and returns what the
@@ -344,18 +258,4 @@ func RegisterTurn(h *Harness) (starts func() []AgentStart, prompts func() []stri
 		return ""
 	}
 	return h.Starts, prompts, cwd
-}
-
-// AgentNotFound is the error a fake `herdr agent get` returns for an unknown target.
-func AgentNotFound(target string) error {
-	return errors.New(`{"error":{"code":"agent_not_found","message":"agent target ` + target + ` not found"}}`)
-}
-
-func flagValue(argv []string, flag string) string {
-	for i, a := range argv {
-		if a == flag && i+1 < len(argv) {
-			return argv[i+1]
-		}
-	}
-	return ""
 }

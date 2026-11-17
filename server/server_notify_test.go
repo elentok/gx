@@ -25,7 +25,6 @@ import (
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/oneoff"
@@ -59,17 +58,12 @@ func chatServerFlushing(t *testing.T, soft, hard float64, flush time.Duration) (
 		}
 	}))
 	t.Cleanup(hook.Close)
-	// A configured runner keeps New from probing herdr, so no "herdr
-	// unavailable" notice leaks into the recorded sends.
-	herdr := herdrfake.NewState(t)
-	herdr.Forbid() // the fake runner launches nothing, so any herdr call is stray
-	_, herdrEnv := herdrfake.StartStateEnv(t, herdr)
 	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
-	s, err := New(Config{Runner: runnerfake.NewRunner(), Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: t.TempDir(), Settings: Settings{BudgetSoftLimit: soft, BudgetHardLimit: hard,
+	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: t.TempDir(), Settings: Settings{BudgetSoftLimit: soft, BudgetHardLimit: hard,
 		Chat: notify.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush}},
 		// Not the real ~/.claude.json, which could add an extra-usage notice.
 		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
@@ -125,9 +119,6 @@ func TestQuiet_RestPeriodSilencesBannerSoundAndChatTogether(t *testing.T) {
 		arrived <- struct{}{}
 	}))
 	t.Cleanup(hook.Close)
-	herdr := herdrfake.NewState(t)
-	herdr.Forbid()
-	_, herdrEnv := herdrfake.StartStateEnv(t, herdr)
 	stateDir, err := os.MkdirTemp("", "gx")
 	if err != nil {
 		t.Fatal(err)
@@ -150,7 +141,7 @@ func TestQuiet_RestPeriodSilencesBannerSoundAndChatTogether(t *testing.T) {
 		return now
 	}
 	notifier, player := &recNotifier{}, &recPlayer{}
-	s, err := New(Config{Runner: runnerfake.NewRunner(), Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: t.TempDir(),
+	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: t.TempDir(),
 		Notifier: notifier, Player: player, RestClock: clock,
 		Settings: Settings{MentalHealth: mh,
 			Chat: notify.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: 20 * time.Millisecond}},
@@ -599,15 +590,12 @@ func TestServerChat_EmptyGateStatePathUsesTheStateDir(t *testing.T) {
 	t.Parallel()
 	hook := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	t.Cleanup(hook.Close)
-	herdr := herdrfake.NewState(t)
-	herdr.Forbid() // the fake runner launches nothing, so any herdr call is stray
-	_, herdrEnv := herdrfake.StartStateEnv(t, herdr)
 	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
-	s, err := New(Config{Runner: runnerfake.NewRunner(), Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: t.TempDir(),
+	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: t.TempDir(),
 		Settings:        Settings{Chat: notify.ServerChatConfig{SlackWebhookURL: hook.URL}},
 		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
 	if err != nil {

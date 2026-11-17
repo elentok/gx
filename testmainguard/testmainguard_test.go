@@ -1,7 +1,7 @@
 // Package testmainguard holds the repo-wide guard for test packages that use
-// the servertest harness. The harness runs the test binary as the fake herdr
-// and as the session holder; a package without both TestMain hooks re-runs its
-// whole suite in every child, without end.
+// the servertest harness. The harness runs the test binary as the session
+// holder; a package without the TestMain hook re-runs its whole suite in every
+// child, without end.
 package testmainguard
 
 import (
@@ -17,13 +17,13 @@ import (
 const servertestImport = `"github.com/elentok/gx/server/` + `servertest"`
 
 // hooks are the calls a TestMain needs; cmdtest.Main and cmdtest.MainWithGx
-// make both.
-var hooks = []string{"RunSessionProcesses(", "RunHelperProcess("}
+// make them.
+var hooks = []string{"RunSessionProcesses("}
 
 var wrappers = []string{"cmdtest.Main(", "cmdtest.MainWithGx("}
 
 // problems returns one message per package dir that imports servertest in a
-// test file but has no TestMain calling both hooks. files maps a test file
+// test file but has no TestMain calling the hook. files maps a test file
 // path to its source.
 func problems(files map[string]string) []string {
 	importers := map[string]bool{}
@@ -46,7 +46,7 @@ func problems(files map[string]string) []string {
 			}
 		}
 		if !ok {
-			out = append(out, dir+": tests import server/servertest, so its TestMain must call servertest.RunSessionProcesses() and herdrfake.RunHelperProcess() (or cmdtest.Main)")
+			out = append(out, dir+": tests import server/servertest, so its TestMain must call servertest.RunSessionProcesses() (or cmdtest.Main)")
 		}
 	}
 	sort.Strings(out)
@@ -90,7 +90,7 @@ func TestEveryServertestImporterHasTheTestMainHooks(t *testing.T) {
 
 func TestProblems(t *testing.T) {
 	imp := "package a\nimport " + servertestImport + "\n"
-	both := "func TestMain(m *testing.M) {\nservertest.RunSessionProcesses()\nherdrfake.RunHelperProcess()\n}\n"
+	hook := "func TestMain(m *testing.M) {\nservertest.RunSessionProcesses()\n}\n"
 	cases := []struct {
 		name  string
 		files map[string]string
@@ -98,10 +98,10 @@ func TestProblems(t *testing.T) {
 	}{
 		{"no import", map[string]string{"a/x_test.go": "package a\n"}, 0},
 		{"import without TestMain", map[string]string{"a/x_test.go": imp}, 1},
-		{"both hooks in another file", map[string]string{"a/x_test.go": imp, "a/main_test.go": both}, 0},
-		{"one hook only", map[string]string{"a/x_test.go": imp + "func TestMain(m *testing.M) {\nherdrfake.RunHelperProcess()\n}\n"}, 1},
+		{"hook in another file", map[string]string{"a/x_test.go": imp, "a/main_test.go": hook}, 0},
+		{"TestMain without the hook", map[string]string{"a/x_test.go": imp + "func TestMain(m *testing.M) {\n}\n"}, 1},
 		{"cmdtest.Main", map[string]string{"a/x_test.go": imp + "func TestMain(m *testing.M) { cmdtest.Main(m) }\n"}, 0},
-		{"TestMain in another dir", map[string]string{"a/x_test.go": imp, "b/main_test.go": both}, 1},
+		{"TestMain in another dir", map[string]string{"a/x_test.go": imp, "b/main_test.go": hook}, 1},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

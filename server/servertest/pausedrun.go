@@ -37,7 +37,7 @@ func RunGitIn(t *testing.T, repo string, args ...string) {
 // handle. It returns the worktree path and the ticket file.
 func LeaveIteration(t *testing.T, h *Harness, store, repo, runner string) (string, string) {
 	t.Helper()
-	return h.LeaveHerdrRun(t, store, repo, EpicA01, runner, func(wtPath string) {
+	return h.LeaveRecordedRun(t, store, repo, EpicA01, runner, func(wtPath string) {
 		testutil.WriteFile(t, wtPath, "agent.txt", "work")
 		testutil.CommitAll(t, wtPath, "agent work")
 	})

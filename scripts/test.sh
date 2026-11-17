@@ -37,7 +37,6 @@ race_pkgs=(
 	./nativerunner
 	./nativerunner/holder
 	./claudedoctor
-	./testutil/herdrfake
 )
 
 work=$(mktemp -d)

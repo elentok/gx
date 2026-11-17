@@ -39,7 +39,7 @@ func activeNeedsApproval(t *testing.T, h *servertest.Harness) bool {
 
 func TestPermissionCard_AppearsForBlockedAgentAndVanishesAfterAnswer(t *testing.T) {
 	t.Parallel()
-	h, fake := startBlockedClaimed(t, false, &agentrunner.Pending{
+	h, fake := startBlockedClaimed(t, &agentrunner.Pending{
 		ID: "req-1", Tool: "Bash", Input: json.RawMessage(`{"command":"ls"}`), Description: "List files",
 	})
 	ctx := context.Background()
@@ -78,7 +78,7 @@ func TestPermissionCard_AppearsForBlockedAgentAndVanishesAfterAnswer(t *testing.
 // the web button that ends that pause.
 func TestPermissionCard_StaysOnABlockedPanePause(t *testing.T) {
 	t.Parallel()
-	h, _ := startBlockedClaimed(t, false, &agentrunner.Pending{ID: "req-1", Tool: "Bash", Input: json.RawMessage(`{"command":"ls"}`)})
+	h, _ := startBlockedClaimed(t, &agentrunner.Pending{ID: "req-1", Tool: "Bash", Input: json.RawMessage(`{"command":"ls"}`)})
 	paths, _ := filepath.Glob(filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "01-*.md"))
 	if len(paths) != 1 {
 		t.Fatalf("ticket files = %v", paths)
@@ -121,7 +121,7 @@ func awaitTicketChanged(t *testing.T, ctx context.Context, evs <-chan wire.Event
 // fetch.
 func TestPermissionCard_BlockAndClearPublishTicketChanged(t *testing.T) {
 	t.Parallel()
-	h, fake := startBlockedClaimed(t, false, nil)
+	h, fake := startBlockedClaimed(t, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
@@ -143,7 +143,7 @@ func TestPermissionCard_BlockAndClearPublishTicketChanged(t *testing.T) {
 
 func TestPermissionCard_NotApprovablePromptShowsTheHint(t *testing.T) {
 	t.Parallel()
-	h, _ := startBlockedClaimed(t, false, &agentrunner.Pending{ID: "req-2", Tool: "ExitPlanMode", NotApprovable: true})
+	h, _ := startBlockedClaimed(t, &agentrunner.Pending{ID: "req-2", Tool: "ExitPlanMode", NotApprovable: true})
 	d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
 	if err != nil {
 		t.Fatal(err)
@@ -161,7 +161,7 @@ func TestPermissionCard_NotApprovablePromptShowsTheHint(t *testing.T) {
 
 func TestPermissionCard_NoCardWhenNotBlocked(t *testing.T) {
 	t.Parallel()
-	h, _ := startBlockedClaimed(t, false, nil)
+	h, _ := startBlockedClaimed(t, nil)
 	d, err := h.Client.Reads.Detail(context.Background(), answerAddr)
 	if err != nil || d.Permission != nil {
 		t.Errorf("permission = %+v, err %v; want none", d.Permission, err)
@@ -222,7 +222,7 @@ func TestPermissionCard_CodexHookRequestAllowAndDeny(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			h, fake := startBlockedClaimed(t, false, &agentrunner.Pending{
+			h, fake := startBlockedClaimed(t, &agentrunner.Pending{
 				ID: "codex-req-1", Tool: "Bash", Input: json.RawMessage(`{"command":"rg foo"}`), Description: "rg foo",
 			})
 			ctx := context.Background()

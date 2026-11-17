@@ -196,7 +196,7 @@ func TestEpicList_SeveralWaitingTicketsNameTheOldest(t *testing.T) {
 
 func TestEpicList_PermissionWaitingIsNeedsYou(t *testing.T) {
 	t.Parallel()
-	h, _ := startBlockedClaimed(t, false, &agentrunner.Pending{
+	h, _ := startBlockedClaimed(t, &agentrunner.Pending{
 		ID: "req-1", Tool: "Bash", Input: json.RawMessage(`{"command":"ls"}`), Description: "List files",
 	})
 	hs, err := h.Client.Handshake(context.Background())

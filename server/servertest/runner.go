@@ -7,21 +7,11 @@ import (
 	"github.com/elentok/gx/server"
 )
 
-// HerdrReason says why a test turns the fake herdr on.
-type HerdrReason int
-
-const (
-	// HerdrIsTheSubject is for a test of herdr itself: the herdr runner, its
-	// failures, or herdr-only behaviour.
-	HerdrIsTheSubject HerdrReason = iota + 1
-)
-
 // runnerChoice is what the runner options recorded; startWith resolves it once
 // every option has run, so the order of the options never matters.
 type runnerChoice struct {
 	runner    agentrunner.Runner
 	runnerFor func(name, dir string) agentrunner.Runner
-	herdr     bool
 }
 
 // choices maps a config under construction to its runnerChoice. Options are
@@ -50,12 +40,6 @@ func WithRunnerFor(configured agentrunner.Runner, fn func(name, dir string) agen
 		ch.runner = configured
 		ch.runnerFor = fn
 	}
-}
-
-// WithHerdr turns the fake herdr on. It makes herdr the configured runner only
-// when no WithRunner or WithRunnerFor is given.
-func WithHerdr(HerdrReason) func(*server.Config) {
-	return func(c *server.Config) { choiceOf(c).herdr = true }
 }
 
 // resolveRunner applies the recorded choice: WithRunner / WithRunnerFor first,

@@ -107,9 +107,10 @@ func StageLeftover(stateDir, store, repo string, tg Target, work func(wtPath str
 	return wt.Path, tk.Path, nil
 }
 
-// LeaveHerdrRun is LeaveRun for a run on runner (a herdr-style runner) in pane
-// p1 of tab t1 and workspace w1.
-func (h *Harness) LeaveHerdrRun(t *testing.T, store, repo string, tg Target, runner string, work func(wtPath string)) (wtPath, ticketPath string) {
+// LeaveRecordedRun is LeaveRun for a run whose runs.json handle names runner,
+// with pane p1, tab t1 and workspace w1. The runner need not exist: a leftover
+// test uses it to stage a run recorded under a removed runner such as "herdr".
+func (h *Harness) LeaveRecordedRun(t *testing.T, store, repo string, tg Target, runner string, work func(wtPath string)) (wtPath, ticketPath string) {
 	t.Helper()
 	return h.LeaveRun(t, store, repo, tg, work, func(Run) map[string]any {
 		return map[string]any{"runner": runner, "pane": "p1", "tab": "t1", "workspace": "w1"}

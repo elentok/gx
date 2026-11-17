@@ -16,7 +16,6 @@ import (
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/server/settings"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
@@ -77,9 +76,6 @@ func reloadChatServer(t *testing.T, global string, flush time.Duration) (*Server
 func reloadChatServerWith(t *testing.T, chat notify.ServerChatConfig) (*Server, string) {
 	t.Helper()
 	chat.GateStatePath = filepath.Join(t.TempDir(), "gate.json")
-	herdr := herdrfake.NewState(t)
-	herdr.Forbid() // the fake runner launches nothing, so any herdr call is stray
-	_, herdrEnv := herdrfake.StartStateEnv(t, herdr)
 	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +83,7 @@ func reloadChatServerWith(t *testing.T, chat notify.ServerChatConfig) (*Server, 
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
-	s, err := New(Config{Runner: runnerfake.NewRunner(), Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: store, ConfigPath: path, Settings: Settings{
+	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: store, ConfigPath: path, Settings: Settings{
 		Chat: chat,
 	}})
 	if err != nil {

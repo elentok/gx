@@ -23,13 +23,11 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets/schema"
 )
 
 func TestMain(m *testing.M) {
 	RunSessionProcesses()
-	herdrfake.RunHelperProcess()
 	os.Exit(m.Run())
 }
 
@@ -116,7 +114,7 @@ func TestPty_TheRunRecordsThePtyRunner(t *testing.T) {
 	}
 }
 
-func TestDefault_NoRunnerOptionRunsOnPtyWithOneStartAndNoHerdrCall(t *testing.T) {
+func TestDefault_NoRunnerOptionRunsOnPtyWithOneStart(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	h := startPty(t, store, repo)
@@ -129,25 +127,6 @@ func TestDefault_NoRunnerOptionRunsOnPtyWithOneStartAndNoHerdrCall(t *testing.T)
 	if runs := h.Server.Runs(); len(runs) != 1 || runs[0].Runner != "pty" {
 		t.Errorf("runs = %+v, want one run on the pty runner", runs)
 	}
-	if h.Herdr != nil {
-		t.Errorf("h.Herdr = %v, want nil: the default makes no herdr call", h.Herdr)
-	}
-	got := h.Starts()
-	if got[0].Kind != "claude" || got[0].Cwd == "" || got[0].Label == "" {
-		t.Errorf("start = %+v, want label, cwd and kind claude", got[0])
-	}
-}
-
-func TestDefault_WithHerdrRecordsOneStartPerLaunch(t *testing.T) {
-	t.Parallel()
-	store, repo := t.TempDir(), testutil.TempRepo(t)
-	h := startPty(t, store, repo, WithHerdr(HerdrIsTheSubject))
-	h.OnTurn(func(*Turn) {})
-	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
-		t.Fatalf("add: %+v, %v", res, err)
-	}
-	WaitFor(t, 30*time.Second, "the launch", func() bool { return len(h.Starts()) == 1 })
-
 	got := h.Starts()
 	if got[0].Kind != "claude" || got[0].Cwd == "" || got[0].Label == "" {
 		t.Errorf("start = %+v, want label, cwd and kind claude", got[0])

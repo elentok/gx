@@ -79,7 +79,6 @@ var allowed = map[string]int{
 	"ralphloop/notify/telegram_transport_test.go":                      7, // same rename as slack_transport_test.go
 	"server/budget/grace_test.go":                                      5,
 	"server/budget/limits_test.go":                                     2,
-	"server/sched/claimhold_test.go":                                   1, // negative wait: a herdr event would show within a few retries
 	"server/configreload_chat_test.go":                                 2,
 	"server/lifecycle/configreload_test.go":                            2,
 	"server/sched/deadlock_test.go":                                    2,
@@ -155,7 +154,6 @@ var allowed = map[string]int{
 	"testutil/gxfixture/webflows/prflow_test.go":                       1, // negative wait: an open PR epic is not stamped merged after the stamp delay
 	"testutil/gxfixture/limitsflows/restart_test.go":                   1, // poll loop with a deadline waiting on the running-agent count
 	"testutil/gxfixture/designflows/united_test.go":                    1,
-	"testutil/herdrfake/state_test.go":                                 2,
 	"testutil/runnerfake/runnerfake_test.go":                           1,
 	"tickets/stamp_lock_test.go":                                       1,
 	"tokenledger/ledger_test.go":                                       3, // mtime granularity: a no-op write must leave the file's mtime alone

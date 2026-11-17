@@ -7,17 +7,14 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/ralphloop/internal/fakes"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
 	"go.uber.org/goleak"
 )
 
-// TestMain re-enters the test binary as the fake herdr helper when launched
-// under herdrfake's coordinator, and gives merge locks a state dir.
+// TestMain gives merge locks a state dir.
 // goleak.VerifyTestMain fails the specific leaking test at leak time instead
 // of letting a stuck goroutine surface as a multi-minute package hang.
 func TestMain(m *testing.M) {
-	herdrfake.RunHelperProcess()
 	state, err := os.MkdirTemp("", "gx-ralphloop-state")
 	if err != nil {
 		panic(err)

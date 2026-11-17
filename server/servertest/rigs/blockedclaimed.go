@@ -15,11 +15,6 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-// HerdrHosted is a runner that reports itself as herdr-hosted.
-type HerdrHosted struct{ *servertest.HeadlessFake }
-
-func (HerdrHosted) Name() string { return "herdr" }
-
 // MarkStarted gives the staged run a start time, which makes the ticket active.
 func MarkStarted(t *testing.T, h *servertest.Harness) {
 	t.Helper()
@@ -42,21 +37,17 @@ func MarkStarted(t *testing.T, h *servertest.Harness) {
 }
 
 // StartBlockedClaimed starts a claimed ticket whose live agent is blocked on p.
-func StartBlockedClaimed(t *testing.T, herdr bool, p *agentrunner.Pending) (*servertest.Harness, *servertest.HeadlessFake) {
+func StartBlockedClaimed(t *testing.T, p *agentrunner.Pending) (*servertest.Harness, *servertest.HeadlessFake) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := servertest.NewHeadlessFake(nativerunner.VerdictLive)
-	var runner agentrunner.Runner = fake
-	if herdr {
-		runner = HerdrHosted{fake}
-	}
 	// The scaled-down dwell would pause the blocked ticket within a loaded
 	// machine's lag, before the test reads the card.
 	hold, release := servertest.GateDwell()
 	t.Cleanup(release)
-	h := servertest.StartWithStore(t, store, servertest.WithRunner(runner), hold, func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), hold, func(c *server.Config) {
 		c.BudgetPollInterval = time.Hour
 		c.WebAddr = "127.0.0.1:0"
 	})

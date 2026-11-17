@@ -2,7 +2,6 @@ package servertest
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -21,23 +20,7 @@ import (
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/claudeenv"
-	"github.com/elentok/gx/testutil/herdrfake"
 )
-
-// SetHerdrDown makes the fake herdr fail (or answer again) from now on.
-func (h *Harness) SetHerdrDown(down bool) { h.herdrDown.Store(down) }
-
-// StartHerdrDown is Start with herdr failing from before the server starts.
-func StartHerdrDown(t *testing.T, opts ...func(*server.Config)) *Harness {
-	t.Helper()
-	return startWith(t, t.TempDir(), true, opts...)
-}
-
-// StartHerdrDownWithStore is StartHerdrDown over a caller-seeded ticket store.
-func StartHerdrDownWithStore(t *testing.T, store string, opts ...func(*server.Config)) *Harness {
-	t.Helper()
-	return startWith(t, store, true, opts...)
-}
 
 // Start runs a server until the test ends. Tickets already written to
 // TicketStore are indexed at startup; since the harness creates TicketStore
@@ -51,14 +34,14 @@ func Start(t *testing.T, opts ...func(*server.Config)) *Harness {
 // Options tweak the server config before it starts.
 func StartWithStore(t *testing.T, store string, opts ...func(*server.Config)) *Harness {
 	t.Helper()
-	return startWith(t, store, false, opts...)
+	return startWith(t, store, opts...)
 }
 
 // shortTempRoot is the temp root of a harness's state dir, short enough for the
 // holder sockets below it.
 const shortTempRoot = "/tmp"
 
-func startWith(t *testing.T, store string, herdrDown bool, opts ...func(*server.Config)) *Harness {
+func startWith(t *testing.T, store string, opts ...func(*server.Config)) *Harness {
 	t.Helper()
 	// Unix socket paths are capped near 100 bytes; t.TempDir() can exceed that,
 	// and so can macOS's default temp root once a holder socket sits under it.
@@ -75,9 +58,6 @@ func startWith(t *testing.T, store string, herdrDown bool, opts ...func(*server.
 		}
 	})
 
-	// The fake herdr is first on PATH in every test; h.Herdr is only set, and the
-	// fake only answers, when the test asked for WithHerdr.
-	herdr := herdrfake.NewState(t)
 	h := &Harness{
 		tb:          t,
 		StateDir:    filepath.Join(stateDir, "state"),
@@ -88,15 +68,6 @@ func startWith(t *testing.T, store string, herdrDown bool, opts ...func(*server.
 	}
 	// Runs before the temp dir goes, so no session holder outlives the test.
 	t.Cleanup(func() { stopSessionHolders(h.SessionsDir) })
-	h.herdrDown.Store(herdrDown)
-	// The server's herdr probe is `workspace list`; answer it unless told to fail.
-	herdr.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		if h.herdrDown.Load() {
-			return nil, herdrfake.Identities{}, errors.New("herdr unavailable")
-		}
-		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
-	})
-	_, herdrEnv := herdrfake.StartStateEnv(t, herdr)
 
 	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, ConversationsDir: h.ConversationsDir, Build: "test-build", TicketStore: h.TicketStore}
 	// The production defaults: an implement launch with no model is refused.
@@ -105,7 +76,7 @@ func startWith(t *testing.T, store string, herdrDown bool, opts ...func(*server.
 	// seeded store. A test that wants migrations sets Config.Migrations.
 	h.cfg.Migrations = &migrations.Registry{}
 	h.cfg.RecentlyFinished = config.DefaultRecentlyFinished
-	// The herdr runner's wait N defaults to 5s, which every launch's slash
+	// The runner's wait N defaults to 5s, which every launch's slash
 	// command prompt would sit out: the fake agent starts no turn.
 	h.cfg.RunnerWait = 100 * time.Millisecond
 	// No server test reads the real harness binaries for model lists.
@@ -113,11 +84,11 @@ func startWith(t *testing.T, store string, herdrDown bool, opts ...func(*server.
 		return []commandlist.Model{}, nil
 	}
 	h.cfg.Models = commandlist.NewModelCache(commandlist.ModelCacheDeps{Claude: noModels, Codex: noModels})
-	// The server's env is the process env plus the fake herdr, a poisoned home
+	// The server's env is the process env plus a poisoned home
 	// and a clean config dir of its own, so code that reads HOME where it should
 	// read CLAUDE_CONFIG_DIR trips the canary. The merge locks go under the
 	// stateDir, not the real home's state dir.
-	h.cfg.Env = append(os.Environ(), herdrEnv...)
+	h.cfg.Env = os.Environ()
 	// The ticket store is the one repo product code creates in a server test;
 	// without this its commits start detached auto maintenance.
 	h.cfg.Env = git.WithMaintenanceOff(h.cfg.Env)
@@ -161,18 +132,13 @@ func startWith(t *testing.T, store string, herdrDown bool, opts ...func(*server.
 	h.cfg.BudgetPollInterval = 100 * time.Millisecond
 	h.cfg.ChatPollInterval = 100 * time.Millisecond
 	h.cfg.GuardPoll = 200 * time.Millisecond
-	choice := &runnerChoice{herdr: herdrDown}
+	choice := &runnerChoice{}
 	choices.Store(&h.cfg, choice)
 	t.Cleanup(func() { choices.Delete(&h.cfg) })
 	for _, o := range opts {
 		o(&h.cfg)
 	}
 	h.pty = resolveRunner(&h.cfg, choice)
-	if choice.herdr {
-		h.Herdr = herdr
-	} else {
-		herdr.ForbidExcept("workspace", "list")
-	}
 	if h.cfg.Notifier == nil {
 		h.Banners = &Banners{}
 		h.cfg.Notifier = h.Banners

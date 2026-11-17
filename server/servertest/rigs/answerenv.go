@@ -18,7 +18,6 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
@@ -129,19 +128,6 @@ func logEventsOfType(t *testing.T, ticketPath string, typ string) []ticketlog.Lo
 	return out
 }
 
-// RegisterLiveAgent makes the fake herdr report agent p1 as idle.
-func RegisterLiveAgent(h *servertest.Harness) {
-	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle", "state_change_seq": 1}}
-	for _, verb := range []string{"get", "wait"} {
-		h.Herdr.Register("agent", verb, func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-			return idle, herdrfake.Identities{}, nil
-		})
-	}
-	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{}, herdrfake.Identities{}, nil
-	})
-}
-
 // RestartUnder leaves an iteration whose handle names savedRunner ("" keeps
 // the herdr handle), then restarts a server configured with configured, whose
 // RunnerFor builds only the runners in others. It returns the ticket path.
@@ -156,9 +142,6 @@ func RestartUnder(t *testing.T, savedRunner string, configured agentrunner.Runne
 		}
 		return others[name]
 	})}, opts...)...)
-	if h.Herdr != nil {
-		RegisterLiveAgent(h)
-	}
 	h.DropAgentsAtCleanup(configured)
 	for _, r := range others {
 		h.DropAgentsAtCleanup(r)

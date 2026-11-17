@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/testutil/herdrfake"
 )
 
 // Main is the body of a package's TestMain: it serves the session processes
@@ -13,7 +12,6 @@ import (
 // dirs from EnvFor, so nothing here touches the process env.
 func Main(m *testing.M) {
 	servertest.RunSessionProcesses()
-	herdrfake.RunHelperProcess()
 	os.Exit(m.Run())
 }
 
@@ -22,7 +20,6 @@ func Main(m *testing.M) {
 // error is kept and reported by SharedGx.
 func MainWithGx(m *testing.M) {
 	servertest.RunSessionProcesses()
-	herdrfake.RunHelperProcess()
 	_, _ = buildSharedGx()
 	code := m.Run()
 	if sharedGxDir != "" {

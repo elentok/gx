@@ -32,11 +32,6 @@ func StartTicketWrites(t *testing.T, opts ...func(*server.Config)) (*Harness, st
 	return h, filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 }
 
-// HerdrNamed is a TurnRunner that answers to "herdr", so its runs are herdr-hosted.
-type HerdrNamed struct{ *TurnRunner }
-
-func (HerdrNamed) Name() string { return "herdr" }
-
 // CodexNamed is a TurnRunner on a native runner, hosting a Codex agent.
 type CodexNamed struct{ *TurnRunner }
 
@@ -70,8 +65,6 @@ func StartBlockable(t *testing.T, runnerName string, opts ...func(*server.Config
 	turn.PromptState = agentrunner.StateWorking
 	var fake agentrunner.Runner = CodexNamed{turn}
 	switch runnerName {
-	case "herdr":
-		fake = HerdrNamed{turn}
 	case "pty":
 		fake = PtyNamed{turn}
 	}

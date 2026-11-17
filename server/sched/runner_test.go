@@ -440,7 +440,7 @@ func TestRunner_RestartPausesAHandleWhoseWorktreeIsGone(t *testing.T) {
 		var wtPath, ticketPath string
 		if headless {
 			h = servertest.StartWithStore(t, store, servertest.WithRunner(servertest.NewHeadlessFake(nativerunner.VerdictLive)))
-			wtPath, ticketPath = h.LeaveHerdrRun(t, store, repo, epicA01, "fake", work)
+			wtPath, ticketPath = h.LeaveRecordedRun(t, store, repo, epicA01, "fake", work)
 			asHeadlessRun(t, h)
 		} else {
 			h = servertest.StartWithStore(t, store)

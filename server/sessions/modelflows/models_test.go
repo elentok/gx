@@ -19,7 +19,6 @@ import (
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 )
 
 // The servertest harness runs this test binary as its session holder and as
@@ -27,7 +26,6 @@ import (
 // child and forks without end.
 func TestMain(m *testing.M) {
 	servertest.RunSessionProcesses()
-	herdrfake.RunHelperProcess()
 	os.Exit(m.Run())
 }
 

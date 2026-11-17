@@ -12,7 +12,6 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
@@ -22,7 +21,6 @@ const testFlushInterval = servertest.FlushInterval
 
 func TestMain(m *testing.M) {
 	servertest.RunSessionProcesses()
-	herdrfake.RunHelperProcess()
 	// One zone away from UTC for every test: a test that swapped it mid-run
 	// moved the budget day under its parallel neighbours.
 	time.Local = time.FixedZone("test", 5*3600)
