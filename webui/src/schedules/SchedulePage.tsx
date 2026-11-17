@@ -293,7 +293,7 @@ function Editor({
 }) {
   useClaimHeader()
   const navigate = useNavigate()
-  const write = useWrite()
+  const write = useWrite({ toastRefusal: false })
   const [form, setForm] = useState(base)
   const timeIds = useRowIds(form.times.length)
   const [tried, setTried] = useState(false)
