@@ -1,6 +1,7 @@
 import { appendFile, glob, mkdir, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { withState } from "./diagnostics"
 import { expect, nav, test, type Fixture } from "./fixture"
 import type { Page } from "@playwright/test"
 
@@ -142,6 +143,22 @@ const appendCodexSample = async (fixture: Fixture, usedPercent: number) => {
   const resetsAt = nowSec() + 73 * 3600
   const line = `{"timestamp":"${new Date().toISOString()}","type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":${usedPercent},"window_minutes":10080,"resets_at":${resetsAt}}}}}\n`
   await appendFile(rollout, line)
+  return { rollout, line, at: Date.now() }
+}
+
+type CodexSample = Awaited<ReturnType<typeof appendCodexSample>>
+
+// What a missed live-update wait prints: the open popover, the rollout line the scan should have read and the server log tail.
+const limitsState = (page: Page, fixture: Fixture, sample?: CodexSample) => async () => {
+  const popover = await page
+    .getByRole("dialog", nav("Usage limits"))
+    .innerText({ timeout: 2_000 })
+    .catch((e: Error) => `(popover not readable: ${e.message})`)
+  const rollout = sample
+    ? `${sample.rollout}\n${sample.line.trim()}\nappended ${Math.round((Date.now() - sample.at) / 1000)} s ago`
+    : "no rollout file"
+  const logs = (await fixture.cli("server", "logs")).trim().split("\n").slice(-10).join("\n")
+  return `popover:\n${popover}\n\nrollout: ${rollout}\n\nlast 10 server log lines:\n${logs}`
 }
 
 test.describe("180. Menu limit burn", () => {
@@ -165,11 +182,15 @@ test.describe("180. Menu limit burn", () => {
     // A new statusline payload reaches the open menu.
     await report(fixture, payload(55, 96))
     // The report goes CLI, server, socket, page, which under full-check load outlasts the default expect timeout.
-    await expect(exactRow(page, "5h limit").getByText("55%")).toBeVisible({ timeout: 60_000 })
+    await withState("Claude statusline report not shown", limitsState(page, fixture), async () => {
+      await expect(exactRow(page, "5h limit").getByText("55%")).toBeVisible({ timeout: 60_000 })
+    })
     await expect(exactRow(page, "Weekly limit").getByText("96%")).toBeVisible()
 
     // A Codex scan that saves a new sample reaches the open menu.
-    await appendCodexSample(fixture, 55)
-    await expect(codexRow(page, "Weekly limit").getByText("55%")).toBeVisible({ timeout: 60_000 })
+    const sample = await appendCodexSample(fixture, 55)
+    await withState("Codex weekly 55% not shown", limitsState(page, fixture, sample), async () => {
+      await expect(codexRow(page, "Weekly limit").getByText("55%")).toBeVisible({ timeout: 60_000 })
+    })
   })
 })

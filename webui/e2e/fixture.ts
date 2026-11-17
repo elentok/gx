@@ -275,8 +275,26 @@ async function startFixture(
       ...Object.entries(config).flatMap(([key, value]) => ["--config", `${key}=${value}`]),
       scenario,
     ],
-    { stdio: ["ignore", "pipe", "inherit"] },
+    { stdio: ["ignore", "pipe", "pipe"] },
   )
+  // The runner still sees every line; the tail also goes into the error of a fixture that never starts,
+  // since the reason is on stderr and not tied to the failing test otherwise.
+  const stderrTail: string[] = []
+  let partial = ""
+  const keep = (line: string) => {
+    stderrTail.push(line)
+    if (stderrTail.length > 40) stderrTail.shift()
+  }
+  proc.stderr!.on("data", (chunk: Buffer) => {
+    process.stderr.write(chunk)
+    const lines = (partial + chunk).split("\n")
+    partial = lines.pop()!
+    lines.forEach(keep)
+  })
+  proc.stderr!.on("end", () => {
+    if (partial) keep(partial)
+    partial = ""
+  })
   const exited = new Promise<void>((resolve) => proc.once("exit", () => resolve()))
   let stopping: Promise<void> | undefined
   const stop = () => {
@@ -293,8 +311,13 @@ async function startFixture(
       const line = buf.split("\n")[0]
       if (buf.includes("\n")) resolve(JSON.parse(line))
     })
-    proc.once("exit", (code) =>
-      reject(new Error(`gxfixture exited with ${code} before it printed its output`)),
+    // "close" fires after stderr has ended, so the tail is complete.
+    proc.once("close", (code) =>
+      reject(
+        new Error(
+          `gxfixture exited with ${code} before it printed its output\n${stderrTail.join("\n")}`,
+        ),
+      ),
     )
   })
   const env = {
@@ -564,8 +587,13 @@ export const test = base.extend<{
       stops.push(stop)
       return fixture
     })
-    const loads = await page.evaluate((key) => sessionStorage.getItem(key), LOADS)
+    // A start that failed leaves the page on about:blank, where sessionStorage throws and hides the real error.
+    const started = stops.length > 0 && page.url() !== "about:blank"
+    const loads = started
+      ? await page.evaluate((key) => sessionStorage.getItem(key), LOADS)
+      : undefined
     await Promise.all(stops.map((stop) => stop()))
+    if (!started) return
     expect(loads, "no reload count: the page left its origin").not.toBeNull()
     expect(
       Number(loads),

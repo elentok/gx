@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test"
 import { realpath } from "node:fs/promises"
+import { withState } from "./diagnostics"
 import { card, expect, nav, test, toasts, type Fixture } from "./fixture"
 
 const recovery = (page: Page) => page.getByRole("form", { name: "Recovery actions" })
@@ -11,8 +12,9 @@ const openTicket = (page: Page, id: string, epic = "paused-epic") =>
 // The wait loop pauses an agent that stays blocked for its 15 s dwell.
 const dwell = { timeout: 30_000 }
 // A recovery scenario's agent has to launch, hang (two launches, each with a launch-proof grace) or
-// end its turn before the pause appears.
-const gateWait = { timeout: 150_000 }
+// end its turn before the pause appears. The wait stays under its own test's timeout, so a miss fails
+// an expect that names the step instead of a test timeout that names none; the margin is the fixture start.
+const gateWait = () => ({ timeout: Math.min(150_000, test.info().timeout - 15_000) })
 // The header pill; the Runs list repeats the label in a longer line.
 const stuck = (page: Page) => page.getByText("Paused · Agent stuck", { exact: true })
 
@@ -47,13 +49,27 @@ test.describe("3. Pause reasons and recovery", () => {
     const fix = (await repair.getByRole("button", { name: "Fix it with an agent" }).boundingBox())!
     expect(fix.y).toBeGreaterThanOrEqual(link.y + link.height)
 
-    // Every step opens the ticket, acts, and waits for its pause to clear.
-    const step = async (epic: string, id: string, reason: string, act: () => Promise<void>) => {
-      await openTicket(page, id, epic)
-      await expect(page.getByText(reason).first()).toBeVisible()
-      await act()
-      await expect(page.getByText(reason)).toHaveCount(0, { timeout: 30_000 })
+    // What a missed wait prints: the recovery card, every open dialog and the ticket.
+    const state = (epic: string, id: string) => async () => {
+      const read = (p: Promise<string>) => p.catch((e: Error) => `(not readable: ${e.message})`)
+      const card = await read(recovery(page).innerText({ timeout: 2_000 }))
+      const dialogs = await page
+        .getByRole("dialog")
+        .allInnerTexts()
+        .catch((e: Error) => [`(not readable: ${e.message})`])
+      const ticket = await read(fixture.cli("tickets", "show", `demo:${epic}/${id}`))
+      return `recovery card:\n${card}\n\nopen dialogs:\n${dialogs.join("\n---\n")}\n\ngx tickets show demo:${epic}/${id}:\n${ticket}`
     }
+    // Every step opens the ticket, acts, and waits for its pause to clear.
+    const step = (epic: string, id: string, reason: string, act: () => Promise<void>) =>
+      test.step(`${epic}/${id}: ${reason}`, async () => {
+        await openTicket(page, id, epic)
+        await expect(page.getByText(reason).first()).toBeVisible()
+        await act()
+        await withState(`${epic}/${id}: "${reason}" did not clear`, state(epic, id), async () => {
+          await expect(page.getByText(reason)).toHaveCount(0, { timeout: 30_000 })
+        })
+      })
     // Tooltips are server-supplied title attributes, set before any action changes the tickets.
     const tooltips = [
       ["05", "Merge again", "Merge the ticket's commits onto its target again."],
@@ -91,7 +107,9 @@ test.describe("3. Pause reasons and recovery", () => {
     await step("paused-epic", "08", "Paused by you", async () => {
       await recovery(page).getByRole("button", nav("Start over")).click()
       const dialog = page.getByRole("dialog", { name: "Start over" })
-      await dialog.getByRole("textbox", { name: "Reason" }).fill("wrong base")
+      await withState("Start over dialog has no Reason textbox", state("paused-epic", "08"), () =>
+        dialog.getByRole("textbox", { name: "Reason" }).fill("wrong base"),
+      )
       await dialog.getByRole("button", nav("Start over")).click()
     })
     await step("paused-epic", "09", "Run failed", async () => {
@@ -124,26 +142,23 @@ test.describe("3. Pause reasons and recovery", () => {
     // A ticket a removed herdr runner left with commits pauses as a handle mismatch; Retry resumes it on PTY.
     const leftover = await start("herdr-leftover-work")
     await openTicket(page, "01", "herdr-work-epic")
-    await expect(page.getByText("Session mismatch").first()).toBeVisible(gateWait)
-    await expect(page.getByText(/runner was removed/).first()).toBeVisible(gateWait)
+    await expect(page.getByText("Session mismatch").first()).toBeVisible(gateWait())
+    await expect(page.getByText(/runner was removed/).first()).toBeVisible(gateWait())
     await expect(recovery(page).getByRole("button")).toHaveText(
       [/^Retry(\s*Recommended)?$/, /^Start over(\s*Recommended)?$/],
-      gateWait,
+      gateWait(),
     )
     await recovery(page).getByRole("button", nav("Retry")).click()
     await expect(recovery(page)).toHaveCount(0, { timeout: 30_000 })
     // The Retry logs human-relaunch; only an iteration-started after it proves the retry launched a run.
     await expect
-      .poll(
-        async () => {
-          const history = JSON.parse(
-            await leftover.cli("server", "tickets", "history", "demo:herdr-work-epic/01", "--json"),
-          ) as { events: { type: string }[] }
-          const types = history.events.map((e) => e.type)
-          return types.slice(types.lastIndexOf("human-relaunch") + 1).includes("iteration-started")
-        },
-        { timeout: 150_000 },
-      )
+      .poll(async () => {
+        const history = JSON.parse(
+          await leftover.cli("server", "tickets", "history", "demo:herdr-work-epic/01", "--json"),
+        ) as { events: { type: string }[] }
+        const types = history.events.map((e) => e.type)
+        return types.slice(types.lastIndexOf("human-relaunch") + 1).includes("iteration-started")
+      }, gateWait())
       .toBe(true)
     await expect
       .poll(async () => {
@@ -167,11 +182,11 @@ test.describe("3. Pause reasons and recovery", () => {
   ) => {
     await start(scenario)
     await openTicket(page, "01", epic)
-    await expect(page.getByText(reason).first()).toBeVisible(gateWait)
+    await expect(page.getByText(reason).first()).toBeVisible(gateWait())
     // 20: while a repair pause's run is still finishing the card has no buttons; they return when it settles.
     await expect(recovery(page).getByRole("button")).toHaveText(
       buttons.map((b) => new RegExp(`^${b}(\\s*Recommended)?$`)),
-      gateWait,
+      gateWait(),
     )
     await act?.()
   }
@@ -212,8 +227,8 @@ test.describe("3. Pause reasons and recovery", () => {
       async () => {
         await retry(page)
         await cleared(page)
-        await expect(page.getByText("unchecked units: Story 1").first()).toBeVisible(gateWait)
-        await expect(recovery(page)).toBeVisible(gateWait)
+        await expect(page.getByText("unchecked units: Story 1").first()).toBeVisible(gateWait())
+        await expect(recovery(page)).toBeVisible(gateWait())
       },
     )
   })
@@ -232,7 +247,7 @@ test.describe("3. Pause reasons and recovery", () => {
         await expect(page.getByText("run the soak").first()).toBeVisible()
         await recovery(page).getByRole("button", nav("Keep waiting")).click()
         await cleared(page)
-        await expect(recovery(page)).toBeVisible(gateWait)
+        await expect(recovery(page)).toBeVisible(gateWait())
         await retry(page)
         await cleared(page)
       },
@@ -252,7 +267,7 @@ test.describe("3. Pause reasons and recovery", () => {
       async () => {
         await expect(recovery(page).getByRole("button")).toHaveText(
           [/^Retry(\s*Recommended)?$/, /^Start over$/],
-          gateWait,
+          gateWait(),
         )
       },
     )
@@ -327,9 +342,7 @@ test.describe("3. Pause reasons and recovery", () => {
     const fixture = await start("unknown-skill")
     await page.evaluate((hash) => (location.hash = hash), "#/t/demo:unknown-epic/01")
 
-    await expect(page.getByText("Could not start the agent").first()).toBeVisible({
-      timeout: 60_000,
-    })
+    await expect(page.getByText("Could not start the agent").first()).toBeVisible(gateWait())
     await expect(page.getByText(/does not know the skill \/gx-implement/).first()).toBeVisible()
     await expect(page.getByText(/even after gx refreshed the skill install/).first()).toBeVisible()
     await expect(page.getByText(/gx skills install/).first()).toBeVisible()
