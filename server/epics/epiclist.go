@@ -288,7 +288,7 @@ func (s *Epics) epicListRow(project string, e tickets.Epic, qidx queueIndex) wir
 	}
 	if !e.IsMap {
 		row.QueueSlot = qidx.slot(root.String())
-		decorateLoopCard(&row, row.QueueSlot)
+		decorateLoopCard(&row, row.QueueSlot, claimedPhase(e))
 		row.Verdict, row.Reason = s.capLine(root, e, row.Queued)
 		for _, t := range e.Tickets {
 			if e.RenderedStatus(t) != tickets.StatusClaimed {

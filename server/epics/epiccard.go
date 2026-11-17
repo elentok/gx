@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/oneoff"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // cardSectionOrder is the order the page lists the sections in.
@@ -58,12 +59,65 @@ func loopStatusWords(state wire.EpicListState, position int) string {
 	return "Not started"
 }
 
-// decorateLoopCard fills the card fields of a loop epic row.
-func decorateLoopCard(row *wire.EpicListRow, position int) {
+// claimedPhaseWords are the bare Running words by the kind of claimed ticket, in
+// rising priority: the latest phase wins when several kinds are claimed.
+var claimedPhaseWords = []struct {
+	word  string
+	types []schema.TicketType
+}{
+	{"Implementing", nil},
+	{"Resolving conflicts", []schema.TicketType{schema.TypeConflictResolution, schema.TypeTrunkConflict}},
+	{"Code-reviewing", []schema.TicketType{schema.TypeCodeReview}},
+	{"Verifying", []schema.TicketType{schema.TypeVerify}},
+}
+
+// claimedPhase is the bare word of a running epic, from its claimed tickets.
+// Anything else, fix tickets included, and no claimed ticket read "Implementing".
+func claimedPhase(e tickets.Epic) string {
+	best := 0
+	for _, t := range e.Tickets {
+		if e.RenderedStatus(t) != tickets.StatusClaimed {
+			continue
+		}
+		for i, p := range claimedPhaseWords {
+			if i > best && slices.Contains(p.types, schema.TicketType(t.Type)) {
+				best = i
+				break
+			}
+		}
+	}
+	return claimedPhaseWords[best].word
+}
+
+// loopWorkingWord is the bare working word of a loop epic row in state, empty
+// when the row is not working. phase is claimedPhase, used while Running.
+func loopWorkingWord(state wire.EpicListState, phase string) string {
+	switch state {
+	case wire.EpicListRunning:
+		return phase
+	case wire.EpicListMerging:
+		return "Merging"
+	case wire.EpicListWritingPRText:
+		return "Writing PR text"
+	case wire.EpicListFixingCI:
+		return "Fixing CI"
+	}
+	return ""
+}
+
+// decorateLoopCard fills the card fields of a loop epic row. phase is the
+// claimedPhase of its epic.
+func decorateLoopCard(row *wire.EpicListRow, position int, phase string) {
 	row.Addresses = []string{row.Address}
 	row.CardKind = wire.CardKindImplementation
 	row.Section = loopCardSection(row.State)
 	row.StatusWords = loopStatusWords(row.State, position)
+	if w := loopWorkingWord(row.State, phase); w != "" {
+		row.Working, row.WorkingWord, row.WorkKind = true, w, wire.WorkKindImplementation
+		if row.State == wire.EpicListRunning {
+			row.StatusWords = w + "..."
+		}
+	}
 	if row.Total > 0 {
 		row.RingProgress = row.Done * 100 / row.Total
 	}

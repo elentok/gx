@@ -103,6 +103,15 @@ func joinImplementation(row *wire.EpicListRow, impl *wire.EpicListRow, act desig
 		row.WaitingSince, row.Actions = p.waitingSince, p.actions
 		setCardTime(row, cardTimeSources{})
 		row.Addresses = []string{m.Address, impl.Address}
+		return
+	}
+	// At Branch the Design session still works while the -impl epic does not:
+	// the joined card shows the Design state. A countdown wins over working.
+	if p := placeDesign(m.Address, act, false, act.askedAt, m.ProgressStep); m.ProgressStep == wire.ProgressBranch &&
+		!impl.Working && p.working && p.countdownEndsAt.IsZero() {
+		row.Working, row.WorkKind = true, wire.WorkKindDesign
+		row.WorkingWord = designWords[wire.ProgressBranch]
+		row.StatusWords = row.WorkingWord + "..."
 	}
 }
 

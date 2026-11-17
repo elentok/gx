@@ -41,6 +41,8 @@ func (s *Epics) oneOffCards(project string, e tickets.Epic, qidx queueIndex) []w
 			row.WaitingSince = cmp.Or(n.Since, t.ClaimedAt, lastActivity(e))
 		} else if e.RenderedStatus(t) == tickets.StatusClaimed {
 			row.State, row.Section = wire.EpicListRunning, wire.SectionImplementing
+			// Words stay "One-off"; the client's ring spins on the flag alone.
+			row.Working = true
 		} else if slot := qidx.slot(addr.String()); slot > 0 {
 			row.State, row.Section = wire.EpicListQueued, wire.SectionImplementing
 			row.QueueSlot, row.StatusWords = slot, fmt.Sprintf("Queued #%d", slot)
