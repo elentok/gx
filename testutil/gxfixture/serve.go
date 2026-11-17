@@ -191,6 +191,21 @@ func seedLateDrafts(ctx context.Context, stateD string, list []spec.Draft) error
 	return nil
 }
 
+// seedChatDrafts creates the scenario's chat drafts through the real create route.
+func seedChatDrafts(ctx context.Context, stateD string, list []spec.ChatDraft) error {
+	cl := apiclient.New(server.SocketPath(stateD))
+	for _, d := range list {
+		res, err := cl.Sessions.CreateChatDraft(ctx, ops.ChatDraftCreateRequest{
+			Project: d.Project, Brief: d.Brief, Name: d.Name, Harness: d.Harness,
+			Model: d.Model, Effort: d.Effort, Folder: d.Folder, Workspace: d.Workspace,
+		})
+		if err != nil || res.Refused {
+			return fmt.Errorf("chat draft %q: %v %+v", d.Name, err, res)
+		}
+	}
+	return nil
+}
+
 // startFixAgents starts the scenario's Fix agents through the API: one per
 // FixAgents ticket, and the project-level one for a recorded failed migration.
 func (f *fixture) startFixAgents(ctx context.Context, sc scenario) error {
@@ -275,6 +290,9 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 		return s, err
 	}
 	if err := seedLateDrafts(ctx, f.stateD, sc.Drafts); err != nil {
+		return s, err
+	}
+	if err := seedChatDrafts(ctx, f.stateD, sc.ChatDrafts); err != nil {
 		return s, err
 	}
 	if err := f.startFixAgents(ctx, sc); err != nil {

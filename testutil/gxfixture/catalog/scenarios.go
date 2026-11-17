@@ -643,6 +643,9 @@ var Scenarios = map[string]scenario{
 	// workspaces: three workspaces with members, held items, agents and one card
 	// per section. See spec.WorkspacesScenario.
 	"workspaces": spec.WorkspacesScenario(),
+	// fork-source and chat-draft: fork-ws with the Fork sources, or with chat drafts. See spec/fork.go.
+	"fork-source": spec.ForkSourceScenario(),
+	"chat-draft":  spec.ChatDraftScenario(),
 	// bulk-actions: finished, queued, held and Design epics, live agents and
 	// archived epics for the bulk actions. See spec.BulkActionsScenario.
 	"bulk-actions": spec.BulkActionsScenario(),

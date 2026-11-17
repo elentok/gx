@@ -79,6 +79,8 @@ type Scenario struct {
 	EpicImages map[string]int
 	// Drafts are the New Design drafts seeded into the server's draft store.
 	Drafts []Draft
+	// ChatDrafts are chat drafts seeded once the server is up, through the create route.
+	ChatDrafts []ChatDraft
 	// Queue lists the epics put on the queue once the server is up.
 	Queue []string
 	// QueueAgents is the agent a queued address runs under (`queue add --agent`);
@@ -328,6 +330,8 @@ type SessionSpec struct {
 	// Harness is empty for Claude.
 	Harness string
 	Prompt  string
+	// Workspace is the workspace the settled session is moved to; it must exist (a Steps entry).
+	Workspace string
 	// Link is the map address the finished session is marked a design session of.
 	Link string
 	// Read clears the Unread the finished turn (or the crash) raised.
@@ -384,6 +388,12 @@ type Draft struct {
 	// route. An empty draft cannot be seeded before start: the sweep at server
 	// start deletes every empty draft with no live lease.
 	AfterStart bool
+}
+
+// ChatDraft is one chat draft seeded after the server starts. Folder is a
+// ops.ChatDraftFolder* value; Workspace must exist (a Steps entry).
+type ChatDraft struct {
+	Project, Name, Harness, Model, Effort, Folder, Brief, Workspace string
 }
 
 // CommandStep is one "/" command a seeded session runs. Output is the stdout

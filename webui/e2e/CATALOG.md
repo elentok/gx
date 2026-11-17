@@ -34,6 +34,11 @@ one-line help reply. `writing` (session running, two failed rows: one before its
 (Done, two kept rows, a ready epic and a map epic), `stopped` (started from the CLI: no session, stopped at Plan). `journey` has
 follow-ups and no record, for the Triage journey flow. Records are written with the `triage` package; the `verify` and `writing`
 sessions are started with `gx server triage open`. Data: `testutil/gxfixture/spec/triage.go`.
+`fork-source` seeds workspace `fork-ws` (`spec.WorkspaceFork`) holding a plain Claude chat, a plain Codex chat and a live Design session
+(map `fork-design`); `chat-draft` seeds the same workspace holding three chat drafts with distinct briefs: Claude (`opus`/`max`, folder
+source), Codex (`gpt-5.5-codex`/`high`, source) and a Claude one with a new-worktree folder. Both set `ForkHooks`: the server's
+`GX_FORK_HOOK_DIR` is `fork_hook_dir` in the fixture output; a `save-fail` or `start-fail` file there makes a draft save or a chat draft
+Start fail, and removing it disarms the hook. Data: `testutil/gxfixture/spec/fork.go`.
 `backlog` (project `demo`, no Triage) seeds three backlogs holding 11 (`parser`, plus a claimed ticket that is not counted), 5 (`sync`) and
 0 (`webui`) open tickets, and the half-filled charting map `retry-work` for "Finish move": its Notes name `sync` and list tickets 01 to 04,
 of which 03 and 04 are still in the backlog. Start Design (`gx agents start-design demo:<backlog>`) runs a fake chat: it prints the "Start this

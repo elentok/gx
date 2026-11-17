@@ -244,6 +244,11 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 			return fmt.Errorf("mark-read %s: %v (refused %v: %s)", id, err, res.Refused, res.Reason)
 		}
 	}
+	if s.Workspace != "" {
+		if res, err := apiclient.New(server.SocketPath(f.stateD)).Admin.MoveToWorkspace(context.Background(), s.Workspace, id); err != nil || len(res.Results) != 1 || res.Results[0].Status == wire.TargetRefused {
+			return fmt.Errorf("move %s to %q: %v %+v", id, s.Workspace, err, res)
+		}
+	}
 	if s.Key != "" || s.NoTranscript {
 		if err := f.recordTranscript(id, s); err != nil {
 			return err
