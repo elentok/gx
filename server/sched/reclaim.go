@@ -87,12 +87,8 @@ func (r *Reclaimer) ReclaimRuns() {
 func (r *Reclaimer) LogFlushingRunners() {
 	counts := map[string]int{}
 	for _, t := range r.registry.List() {
-		name := t.Runner
-		if name == "" {
-			name = runs.RunnerHerdr
-		}
-		if name != r.host.ConfiguredRunner() {
-			counts[name]++
+		if t.Runner != r.host.ConfiguredRunner() {
+			counts[t.Runner]++
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(counts)) {
@@ -198,12 +194,14 @@ func (r *Reclaimer) holdIfRateLimited(runner agentrunner.Runner, t runs.TrackedR
 // the runner reports gone is ever reopened.
 func (r *Reclaimer) reclaim(t runs.TrackedRun) error {
 	name := t.Runner
-	if name == "" {
-		name = runs.RunnerHerdr
-	}
 	runner := r.host.RunnerFor(t.Run)
 	if runner == nil {
-		return fmt.Errorf("%w: started by %s; %s unavailable", errHandleMismatch, name, name)
+		// A runner that cannot be built means the agent is gone.
+		if reopened, err := r.reopenEmptyClaim(t); err != nil || reopened {
+			return err
+		}
+		label := runs.RunnerLabel(name)
+		return fmt.Errorf("%w: started by %s; the %s runner was removed. Retry or Start over ends this pause.", errHandleMismatch, label, label)
 	}
 	if err := agentrunner.Healthy(runner); err != nil {
 		return fmt.Errorf("%w: started by %s; %s unavailable: %v", errHandleMismatch, name, name, err)

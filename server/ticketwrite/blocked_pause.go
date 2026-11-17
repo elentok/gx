@@ -70,6 +70,9 @@ func (w *Writer) RetryBlocked(address string) (bool, error) {
 		return false, nil
 	}
 	runner, err := w.d.Harness.RunnerOf(run.Run)
+	if errors.Is(err, agentrunner.ErrNotFound) {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}

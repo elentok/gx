@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
@@ -57,7 +58,6 @@ func TestRunnerForRun_PicksTheRunsOwnRunner(t *testing.T) {
 		{"herdr", "herdr"},
 		{"headless", "headless"},
 		{"pty", "pty"},
-		{"", "herdr"},
 	} {
 		r, ok := s.RunnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: tc.saved}).(*namedRunner)
 		if !ok || r.name != tc.want || r.project != "proj" {
@@ -69,8 +69,40 @@ func TestRunnerForRun_PicksTheRunsOwnRunner(t *testing.T) {
 func TestRunnerForRun_UnbuildableRunnerIsNil(t *testing.T) {
 	t.Parallel()
 	s, _ := routingServer()
-	if r := s.RunnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: "tmux"}); r != nil {
-		t.Errorf("got %v, want nil", r)
+	for _, name := range []string{"tmux", ""} {
+		if r := s.RunnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: name}); r != nil {
+			t.Errorf("runner %q: got %v, want nil", name, r)
+		}
+	}
+}
+
+func TestRunnerOf_UnbuildableRunnerIsAGoneAgent(t *testing.T) {
+	t.Parallel()
+	s, _ := routingServer()
+	for _, name := range []string{"tmux", ""} {
+		_, err := s.RunnerOf(runs.Run{Address: "proj:epic-a/01", Runner: name})
+		if !errors.Is(err, agentrunner.ErrNotFound) {
+			t.Errorf("runner %q: err = %v, want ErrNotFound", name, err)
+		}
+	}
+}
+
+func TestLiveSession_UnbuildableRunnerHasNoLiveSession(t *testing.T) {
+	t.Parallel()
+	reg, _, err := runs.Open(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg.PutRunIn("proj:epic-a/01", "proj:epic-a", t.TempDir(), "tmux", false)
+	built := runnerfake.NewRunner()
+	h := harnesschoice.New(harnesschoice.Deps{Host: fakeHarnessHost{}, Registry: reg, Config: harnesschoice.Config{
+		Runner:    &namedRunner{Runner: built, name: "headless"},
+		RunnerFor: func(string, string) agentrunner.Runner { return nil },
+	}})
+	addr := tickets.Address{Project: "proj", Epic: "epic-a", ID: "01"}
+	runner, _, ok, err := h.LiveSession(addr)
+	if runner != nil || ok || err != nil {
+		t.Errorf("LiveSession = %v, %v, %v; want no runner, not ok, no error", runner, ok, err)
 	}
 }
 
@@ -92,7 +124,7 @@ func TestRunnerForRun_FallsBackToTheConfiguredRunnerByName(t *testing.T) {
 	if r := s.RunnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: "headless"}); r != agentrunner.Runner(configured) {
 		t.Errorf("got %v, want the configured runner", r)
 	}
-	if r := s.RunnerForRun(runs.Run{Address: "proj:epic-a/01"}); r != nil {
+	if r := s.RunnerForRun(runs.Run{Address: "proj:epic-a/01", Runner: "herdr"}); r != nil {
 		t.Errorf("herdr run under headless with no RunnerFor: got %v, want nil", r)
 	}
 }

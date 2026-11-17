@@ -1,10 +1,10 @@
 package launchtest_test
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
@@ -14,7 +14,6 @@ import (
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -93,45 +92,50 @@ func TestReclaim_DeadEmptyClaimReopens(t *testing.T) {
 	})
 }
 
-// herdr answers not-found for the agent, which reclaim reads as gone.
-func TestReclaim_HerdrDeadEmptyClaimReopens(t *testing.T) {
-	t.Parallel()
+// restartUnbuildable leaves an iteration whose recorded runner cannot be built
+// after a restart: the server builds only the configured fake runner.
+func restartUnbuildable(t *testing.T, recorded string, work func(wtPath string)) (string, string, string, string) {
+	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject))
-	wtPath, ticketPath := leaveIterationWith(t, h, store, repo, "herdr", func(string) {})
-	stampRun(t, h, "herdr", herdrDeadSession)
+	configured := servertest.NewHeadlessFake(nativerunner.VerdictLive)
+	h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(configured, func(name, _ string) agentrunner.Runner {
+		if name == configured.Name() {
+			return configured
+		}
+		return nil
+	}))
+	wtPath, ticketPath := leaveIterationWith(t, h, store, repo, "herdr", work)
+	stampRun(t, h, recorded, herdrDeadSession)
 	h.Restart(t)
+	return store, repo, wtPath, ticketPath
+}
+
+func TestReclaim_UnbuildableRunnerEmptyClaimReopens(t *testing.T) {
+	t.Parallel()
+	store, repo, wtPath, ticketPath := restartUnbuildable(t, "gone", func(string) {})
 	assertEmptyClaimReopened(t, store, repo, wtPath, ticketPath)
 }
 
-func TestReclaim_HerdrLookupErrorNeverReopens(t *testing.T) {
+func TestReclaim_UnbuildableRunnerWithWorkPausesNamingIt(t *testing.T) {
 	t.Parallel()
-	store, repo := t.TempDir(), testutil.TempRepo(t)
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject))
-	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return nil, herdrfake.Identities{}, errors.New(`{"error":{"code":"internal","message":"herdr hiccup"}}`)
-	})
-	wtPath, ticketPath := leaveIterationWith(t, h, store, repo, "herdr", func(string) {})
-	stampRun(t, h, "herdr", herdrDeadSession)
-	h.Restart(t)
-
-	waitStatus(t, ticketPath, schema.StatusLegacyRepair)
-	if _, err := os.Stat(wtPath); err != nil {
-		t.Errorf("worktree gone: %v", err)
-	}
-	if _, err := git.RevParse(repo, "ralph-loop/epic-a-item-01"); err != nil {
-		t.Errorf("iteration branch gone: %v", err)
-	}
-	logged, _, err := runlog.ReadEvents(filepath.Join(store, "proj"), "epic-a")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if slices.ContainsFunc(logged, func(ev runlog.Event) bool { return ev.Type == string(events.ClaimReopened) }) {
-		t.Errorf("run log has claim-reopened: %v", logged)
+	for name, work := range map[string]func(*testing.T, string){"commit": commitAgentWork, "edit": editAgentWork} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, repo, wtPath, ticketPath := restartUnbuildable(t, "gone", func(p string) { work(t, p) })
+			waitStatus(t, ticketPath, schema.StatusLegacyRepair)
+			body, _ := os.ReadFile(ticketPath)
+			if !strings.Contains(string(body), "started by gone; the gone runner was removed. Retry or Start over ends this pause.") {
+				t.Errorf("ticket lacks the removed-runner reason:\n%s", body)
+			}
+			if _, err := os.Stat(wtPath); err != nil {
+				t.Errorf("worktree gone: %v", err)
+			}
+			if _, err := git.RevParse(repo, "ralph-loop/epic-a-item-01"); err != nil {
+				t.Errorf("iteration branch gone: %v", err)
+			}
+		})
 	}
 }
 

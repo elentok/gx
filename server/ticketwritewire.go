@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -42,6 +43,9 @@ func (h ticketWriteHost) HerdrUnavailable() bool { return h.s.herdr.IsUnavailabl
 
 func (h ticketWriteHost) StopRun(run runs.Run) error {
 	r, err := h.s.harness.RunnerOf(run)
+	if errors.Is(err, agentrunner.ErrNotFound) {
+		return nil // a gone agent is already stopped
+	}
 	if err != nil {
 		return err
 	}

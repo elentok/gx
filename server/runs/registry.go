@@ -48,11 +48,13 @@ const RunnerHerdr = "herdr"
 // Launching is the State of a run whose agent may not be started or prompted yet.
 const Launching = "launching"
 
-// savedRun reads runs.json, including files written before Run held a
-// Session: those carried the herdr pane at the top level instead.
-type savedRun struct {
-	TrackedRun
-	Pane string `json:"pane"`
+// RunnerLabel is runner for a message: an empty name (a record with no runner
+// field) reads as unknown.
+func RunnerLabel(runner string) string {
+	if runner == "" {
+		return "unknown"
+	}
+	return runner
 }
 
 // IterationLabel is the agent label of the iteration of the ticket at address.
@@ -171,20 +173,11 @@ func Open(stateDir string, log *slog.Logger) (*Registry, []TrackedRun, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	var saved []savedRun
+	var saved []TrackedRun
 	if err := json.Unmarshal(data, &saved); err != nil {
 		return nil, nil, err
 	}
-	out := make([]TrackedRun, 0, len(saved))
-	for _, s := range saved {
-		t := s.TrackedRun
-		if t.Session.ID == "" && s.Pane != "" {
-			t.Runner = RunnerHerdr
-			t.Session = agentrunner.Session{Label: IterationLabel(t.Address), ID: s.Pane}
-		}
-		out = append(out, t)
-	}
-	return r, out, nil
+	return r, saved, nil
 }
 
 // save writes through a rename so a crash never leaves a torn file. Callers hold mu.

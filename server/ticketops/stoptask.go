@@ -50,6 +50,10 @@ func (o *Ops) StopTask(req wire.QueueRequest) (wire.QueueResult, error) {
 		}
 		if f.Kind == transcript.BackgroundTaskAgent {
 			runner, err := o.d.Harness.RunnerOf(run.Run)
+			if errors.Is(err, agentrunner.ErrNotFound) {
+				r := queue.Refusal(wire.ReasonNotStoppable, "no live agent to stop its task")
+				return &r, nil
+			}
 			if err != nil {
 				return nil, err
 			}

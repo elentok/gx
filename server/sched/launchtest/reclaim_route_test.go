@@ -75,7 +75,7 @@ func TestReclaim_UnavailableRunnerPausesStuckNamingIt(t *testing.T) {
 	_, ticketPath := restartUnder(t, "pty", newRenamedFake("headless", nativerunner.VerdictLive), nil)
 	waitStatus(t, ticketPath, schema.StatusLegacyRepair)
 	body, _ := os.ReadFile(ticketPath)
-	if !strings.Contains(string(body), "started by pty; pty unavailable") {
+	if !strings.Contains(string(body), "started by pty; the pty runner was removed. Retry or Start over ends this pause.") {
 		t.Errorf("ticket lacks the runner in its reason:\n%s", body)
 	}
 }

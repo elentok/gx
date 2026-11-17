@@ -1,12 +1,14 @@
 package ticketops_test
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/server/broker"
@@ -106,5 +108,30 @@ func TestAnswer_QueuedPathUsesTheLaunchFake(t *testing.T) {
 	}
 	if len(launch.settled) != 0 {
 		t.Errorf("settled = %v; want no settle", launch.settled)
+	}
+}
+
+// A tracked waiting run whose runner cannot be built is a gone agent: the
+// answer is accepted and queued, not failed.
+func TestAnswer_UnbuildableRunnerIsQueued(t *testing.T) {
+	t.Parallel()
+	e := startAnswerEnv(t, nil)
+	reg := e.H.Server.Registry()
+	reg.PutRunIn(answerAddr, "proj:epic-a", t.TempDir(), "removed", false)
+	reg.MarkWaiting(answerAddr, time.Now())
+	state := pauseWithQuestion(t, e.Ticket, optionsBlock)
+
+	res, err := e.H.Client.Tickets.Answer(context.Background(), wire.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	if err != nil || res.Refused || res.Outcome != wire.OutcomeQueued {
+		t.Fatalf("answer = %+v, %v; want queued", res, err)
+	}
+	if n := answerCount(t, e.Ticket); n != 1 {
+		t.Errorf("pause.answer lines = %d, want 1", n)
+	}
+	if tk, err := schema.ParseTicket(e.Ticket); err != nil || tk.Status != schema.StatusOpen {
+		t.Errorf("ticket = %+v, %v; want open", tk, err)
+	}
+	if _, ok := reg.Tracked(answerAddr); ok {
+		t.Error("dead run still tracked")
 	}
 }

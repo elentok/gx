@@ -6,11 +6,13 @@ package budget
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop/metrics"
@@ -309,7 +311,7 @@ func (b *Budget) killRuns(now time.Time, list []runs.TrackedRun) int {
 			if err == nil {
 				err = r.Interrupt(t.Session)
 			}
-			if err != nil {
+			if err != nil && !errors.Is(err, agentrunner.ErrNotFound) {
 				b.log.Warn("budget stop signal", "ticket", t.Address, "err", err)
 			}
 		}()

@@ -159,14 +159,16 @@ func (o *Ops) Answer(req wire.QueueRequest) (wire.QueueResult, error) {
 				}
 				run, _ = o.d.Registry.Tracked(address)
 				runner, err := o.d.Harness.RunnerOf(run.Run)
-				if err != nil {
+				if err != nil && !errors.Is(err, agentrunner.ErrNotFound) {
 					return ticketlog.LogEvent{}, err
 				}
-				reply := yesNoReply(q, answer)
-				if req.Huh {
-					reply = answer
+				if err == nil {
+					reply := yesNoReply(q, answer)
+					if req.Huh {
+						reply = answer
+					}
+					err = runner.Prompt(run.Session, answerFrame(open.Seq, reply, note))
 				}
-				err = runner.Prompt(run.Session, answerFrame(open.Seq, reply, note))
 				switch {
 				case errors.Is(err, agentrunner.ErrNotReady):
 					return refuse(queue.Refusal(wire.ReasonAgentNotReady, err.Error()))
@@ -233,6 +235,9 @@ func (o *Ops) LiveTask(address string) (live, stoppable bool, err error) {
 		return false, false, nil
 	}
 	runner, err := o.d.Harness.RunnerOf(run.Run)
+	if errors.Is(err, agentrunner.ErrNotFound) {
+		return false, false, nil
+	}
 	if err != nil {
 		return false, false, err
 	}
@@ -281,6 +286,9 @@ func (o *Ops) AgentGone(address string) (bool, error) {
 		return true, nil
 	}
 	runner, err := o.d.Harness.RunnerOf(run.Run)
+	if errors.Is(err, agentrunner.ErrNotFound) {
+		return true, nil
+	}
 	if err != nil {
 		return false, err
 	}

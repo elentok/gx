@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -29,34 +30,31 @@ func (h *Harness) LaunchRunner(project string, agentKind agent.AgentKind) agentr
 // RunnerForRun is the runner that started run, whatever the configured one is.
 // It is nil when that runner cannot be built.
 func (h *Harness) RunnerForRun(run runs.Run) agentrunner.Runner {
-	name := run.Runner
-	if name == "" {
-		name = runs.RunnerHerdr
-	}
 	project := ""
 	if addr, err := tickets.ParseAddress(run.Address, tickets.AddressContext{}); err == nil {
 		project = addr.Project
 	}
-	return h.RunnerNamed(name, project)
+	return h.RunnerNamed(run.Runner, project)
 }
 
-// RunnerOf is RunnerForRun, failing when the run's runner cannot be built.
+// RunnerOf is RunnerForRun, failing when the run's runner cannot be built. The
+// error is a gone agent (agentrunner.ErrNotFound): nothing can host it.
 func (h *Harness) RunnerOf(run runs.Run) (agentrunner.Runner, error) {
 	if r := h.RunnerForRun(run); r != nil {
 		return r, nil
 	}
-	name := run.Runner
-	if name == "" {
-		name = runs.RunnerHerdr
-	}
-	return nil, fmt.Errorf("started by %s; %s unavailable", name, name)
+	return nil, fmt.Errorf("started by %s; that runner is unavailable: %w", runs.RunnerLabel(run.Runner), agentrunner.ErrNotFound)
 }
 
 // LiveSession is the session of address's live iteration and the runner
 // hosting it: a tracked run's own runner, else the configured one (a paused
-// ticket's agent can outlive its run).
+// ticket's agent can outlive its run). A run whose runner cannot be built has
+// no live session.
 func (h *Harness) LiveSession(addr tickets.Address) (agentrunner.Runner, agentrunner.Session, bool, error) {
 	runner, err := h.IterationRunner(addr)
+	if errors.Is(err, agentrunner.ErrNotFound) {
+		return nil, agentrunner.Session{}, false, nil
+	}
 	if err != nil {
 		return nil, agentrunner.Session{}, false, err
 	}

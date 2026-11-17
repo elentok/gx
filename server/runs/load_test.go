@@ -9,7 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 )
 
-func TestOpenRuns_OldFileLoadsAsHerdrSession(t *testing.T) {
+func TestOpenRuns_OldFileLoadsWithNoRunner(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	old := `[{"address":"proj:epic-a/01","agent":"claude","pane":"p1","tab":"t1","root":"proj:epic-a"}]`
@@ -20,10 +20,7 @@ func TestOpenRuns_OldFileLoadsAsHerdrSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Run{
-		Address: "proj:epic-a/01", Agent: "claude", Runner: RunnerHerdr,
-		Session: agentrunner.Session{Label: IterationLabel("proj:epic-a/01"), ID: "p1"},
-	}
+	want := Run{Address: "proj:epic-a/01", Agent: "claude"}
 	if len(saved) != 1 || !reflect.DeepEqual(saved[0].Run, want) || saved[0].Root != "proj:epic-a" {
 		t.Fatalf("saved = %+v, want run %+v", saved, want)
 	}

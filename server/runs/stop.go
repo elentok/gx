@@ -63,6 +63,9 @@ func (s *Stopper) pause(t TrackedRun, stop Stop) error {
 	if closeErr == nil {
 		closeErr = r.Stop(t.Session)
 	}
+	if errors.Is(closeErr, agentrunner.ErrNotFound) {
+		closeErr = nil // a gone agent is already stopped
+	}
 	if err := ticketlog.EndOpenRound(t.TicketPath, ticketlog.SourceGx, ticketlog.HowAuto, stop.CloseReason); err != nil {
 		closeErr = errors.Join(closeErr, err)
 	}

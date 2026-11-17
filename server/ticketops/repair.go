@@ -577,8 +577,9 @@ func (o *Ops) iterationSession(dir string, addr tickets.Address) (agentrunner.Ru
 		if pause.Label != "" {
 			label = pause.Label
 		}
-		if r := o.d.Harness.RunnerForRun(runs.Run{Address: addr.String(), Runner: pause.Runner}); pause.Runner != "" && r != nil {
-			runner = r
+		if pause.Runner != "" {
+			// A runner that cannot be built hosts nothing: no live session.
+			runner = o.d.Harness.RunnerForRun(runs.Run{Address: addr.String(), Runner: pause.Runner})
 		}
 	}
 	if runner == nil {
