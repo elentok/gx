@@ -132,11 +132,28 @@ test.describe("3. Pause reasons and recovery", () => {
     )
     await recovery(page).getByRole("button", nav("Retry")).click()
     await expect(recovery(page)).toHaveCount(0, { timeout: 30_000 })
+    // The Retry logs human-relaunch; only an iteration-started after it proves the retry launched a run.
     await expect
-      .poll(() => leftover.cli("server", "tickets", "history", "demo:herdr-work-epic/01"), {
-        timeout: 150_000,
+      .poll(
+        async () => {
+          const history = JSON.parse(
+            await leftover.cli("server", "tickets", "history", "demo:herdr-work-epic/01", "--json"),
+          ) as { events: { type: string }[] }
+          const types = history.events.map((e) => e.type)
+          return types.slice(types.lastIndexOf("human-relaunch") + 1).includes("iteration-started")
+        },
+        { timeout: 150_000 },
+      )
+      .toBe(true)
+    await expect
+      .poll(async () => {
+        const its = JSON.parse(await leftover.cli("server", "iterations", "--json")) as {
+          address: string
+          runner?: string
+        }[]
+        return its.filter((i) => i.address === "demo:herdr-work-epic/01").map((i) => i.runner)
       })
-      .toContain("iteration-started")
+      .toEqual(["pty"])
   })
 
   // Each recovery scenario is its own server and its own test, so the scenarios wait in parallel.
