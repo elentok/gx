@@ -1,6 +1,7 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { useEffect, useState } from "react"
 import type { SessionTask } from "../generated/server"
+import { keyed } from "./keyed"
 import { TaskCommand } from "./TaskCommandBlock"
 import {
   elapsedText,
@@ -183,11 +184,11 @@ export function TaskList({ tasks }: { tasks?: SessionTask[] }) {
   if (list.length === 0) return null
   const rows = (
     <Box role="list" aria-label="Tasks" display="flex" flexDirection="column" fontSize="sm">
-      {orderTasks(list).map((t, i) => {
+      {keyed(orderTasks(list), taskKey).map(({ key: rowKey, item: t }) => {
         const key = taskKey(t)
         return (
           <TaskRow
-            key={`${key}|${i}`}
+            key={rowKey}
             task={t}
             now={now}
             open={openRows.has(key)}

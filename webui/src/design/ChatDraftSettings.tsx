@@ -1,5 +1,5 @@
 import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Field, field } from "../agents/formField"
 import { fetchWorktrees, type FetchWorktrees } from "../agents/newSession"
 import { EFFORTS, HARNESSES, tierOptions, type Harness } from "../agents/tierOptions"
@@ -15,17 +15,18 @@ const harnessOf = (s: ChatSettings): Harness => (s.harness === "codex" ? "codex"
 /** The project list, empty until it arrives or if it fails. */
 export function useTrees(fetchTrees: FetchWorktrees = fetchWorktrees): ProjectWorktrees[] {
   const [trees, setTrees] = useState<ProjectWorktrees[]>([])
+  // The fetcher is fixed for the page's life.
+  const latestFetch = useRef(fetchTrees)
+  latestFetch.current = fetchTrees
   useEffect(() => {
     let live = true
-    fetchTrees().then(
+    latestFetch.current().then(
       (list) => live && setTrees(list),
       () => {},
     )
     return () => {
       live = false
     }
-    // The fetcher is fixed for the page's life.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   return trees
 }
@@ -36,17 +37,18 @@ export function useLaunchDefaults(
   fetcher: FetchDefaults = fetchLaunchDefaults,
 ): LaunchDefaults {
   const [got, setGot] = useState<{ harness: Harness } & LaunchDefaults>()
+  // The fetcher is fixed for the page's life.
+  const latestFetch = useRef(fetcher)
+  latestFetch.current = fetcher
   useEffect(() => {
     let live = true
-    fetcher(harness).then(
+    latestFetch.current(harness).then(
       (d) => live && setGot({ harness, ...d }),
       () => {},
     )
     return () => {
       live = false
     }
-    // The fetcher is fixed for the page's life.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [harness])
   // Another harness's defaults are never shown while this one loads.
   return got?.harness === harness ? got : { model: "", effort: "" }

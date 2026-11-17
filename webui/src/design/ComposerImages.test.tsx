@@ -47,7 +47,7 @@ const ready = (key: string): ComposerImage => ({
 
 function render(s: State) {
   return renderThemed(
-    <ComposerImages state={s} send={<button>Send</button>}>
+    <ComposerImages state={s} send={<button type="button">Send</button>}>
       <textarea aria-label="Message" />
     </ComposerImages>,
   )
@@ -99,7 +99,7 @@ test.each([
 ] as const)("Add is %s: labelled is %s", (device, labelled) => {
   renderThemed(
     <DeviceContext.Provider value={device}>
-      <ComposerImages state={state([])} send={<button>Send</button>}>
+      <ComposerImages state={state([])} send={<button type="button">Send</button>}>
         <textarea aria-label="Message" />
       </ComposerImages>
     </DeviceContext.Provider>,

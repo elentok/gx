@@ -93,7 +93,7 @@ export function useChatDraftAutosave({
       setStatus("saved")
       return
     }
-    let res
+    let res: Awaited<ReturnType<typeof drafts.save>>
     try {
       res = await drafts.save({
         id: initial.id,
@@ -162,41 +162,40 @@ export function useChatDraftAutosave({
 
   // The sidebar row and the facts follow a change elsewhere; a gone draft sends the page away.
   const conn = useConnectionContext()
+  // The client and connection are fixed for the page's life, so the effects below read them and
+  // `flush` through a ref. `flush` and `leaveGone` read refs only, so a call from an old render is safe.
+  const latestFns = useRef({ conn, drafts, flush, leaveGone })
+  latestFns.current = { conn, drafts, flush, leaveGone }
   useEffect(() => {
-    const off = conn.onEvent((_address, type) => {
+    const off = latestFns.current.conn.onEvent((_address, type) => {
       if (type !== EventChatDraftsChanged || phase.current === "finished") return
-      drafts
+      latestFns.current.drafts
         .read(initial.id)
         .then((res) => {
           if (phase.current === "finished") return
           if (res.kind === "ok") setFacts((was) => ({ ...res.draft, brief: was.brief }))
-          else if (res.kind === "gone") leaveGone(res.started)
+          else if (res.kind === "gone") latestFns.current.leaveGone(res.started)
         })
         .catch(() => {})
     })
     return () => {
       off()
     }
-    // The client and connection are fixed for the page's life.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [initial.id])
 
-  // Only refs are read below, so `flush` is safe to call from a stale closure.
   useEffect(() => {
-    const leave = () => flush()
+    const leave = () => latestFns.current.flush()
     window.addEventListener("pagehide", leave)
     return () => {
       window.removeEventListener("pagehide", leave)
       leave()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     if (status !== "unsaved") return
-    const id = setInterval(flush, RETRY_MS)
+    const id = setInterval(() => latestFns.current.flush(), RETRY_MS)
     return () => clearInterval(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
 
   const touched = () => {

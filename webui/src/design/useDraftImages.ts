@@ -49,7 +49,7 @@ export class ImageSlot {
   }
   set(entries: Entry[]) {
     this.entries = entries
-    this.subs.forEach((f) => f())
+    for (const f of this.subs) f()
   }
   subscribe = (f: () => void) => {
     this.subs.add(f)
@@ -71,7 +71,8 @@ export class DraftSlots {
   private open: ImageSlot | undefined
   /** The slot of the draft the form is on; made from `images` on first use. */
   current(images?: string[]) {
-    return (this.open ??= new ImageSlot(images))
+    this.open ??= new ImageSlot(images)
+    return this.open
   }
   /** Moves to `next`'s slot; `leaving` is the id of the draft being left. */
   switchTo(next: { id: string; images: string[] } | null, leaving?: string) {

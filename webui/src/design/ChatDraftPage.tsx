@@ -62,21 +62,22 @@ export function ChatDraftPage({
   const leaveGone = useLeaveGone(agentPath)
   // `undefined` is still loading; `null` is no such draft.
   const [loaded, setLoaded] = useState<ChatDraft | null>()
+  // The client is fixed for the page's life, so the read uses the latest of them without re-running.
+  const latest = useRef({ drafts, leaveGone })
+  latest.current = { drafts, leaveGone }
   useEffect(() => {
     let live = true
-    drafts
+    latest.current.drafts
       .read(id)
       .then((res) => {
         if (!live) return
-        if (res.kind === "gone") leaveGone(res.started)
+        if (res.kind === "gone") latest.current.leaveGone(res.started)
         else setLoaded(res.kind === "ok" ? res.draft : null)
       })
       .catch(() => live && setLoaded(null))
     return () => {
       live = false
     }
-    // The client is fixed for the page's life.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   useReadyWhen(loaded !== undefined, loaded ? "ready" : "empty", "network")

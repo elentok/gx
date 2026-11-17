@@ -46,7 +46,7 @@ export function useComposerImages(sessionId: string): ComposerImages {
   const count = useRef(draft.length)
   count.current = draft.length
   const [, rerender] = useState(0)
-  const touch = () => rerender((n) => n + 1)
+  const touch = useCallback(() => rerender((n) => n + 1), [])
 
   const upload = useCallback(
     (key: string, file: File) => {
@@ -73,7 +73,7 @@ export function useComposerImages(sessionId: string): ComposerImages {
         },
       )
     },
-    [sessionId, update],
+    [sessionId, update, touch],
   )
 
   const [error, setError] = useState("")
@@ -113,7 +113,7 @@ export function useComposerImages(sessionId: string): ComposerImages {
       touch()
       if (entry?.id) void deleteSessionImage(sessionId, entry.id).catch(() => undefined)
     },
-    [draft, sessionId, update],
+    [draft, sessionId, update, touch],
   )
 
   // After a send the server owns the files: drop the draft without deleting them.
@@ -122,7 +122,7 @@ export function useComposerImages(sessionId: string): ComposerImages {
     setRefused([])
     update(() => [])
     touch()
-  }, [update])
+  }, [update, touch])
 
   const images: ComposerImage[] = draft.map((e) => {
     const mine = local.current.get(e.key)

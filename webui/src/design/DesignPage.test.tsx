@@ -131,7 +131,9 @@ function render(
   )
   const setSessions = (next: SessionInfo[]) => {
     state = { ...state, snapshot: { sessions: next } } as unknown as ConnectionState
-    act(() => listeners.forEach((fn) => fn()))
+    act(() => {
+      for (const fn of listeners) fn()
+    })
   }
   return Object.assign(router, { setSessions })
 }

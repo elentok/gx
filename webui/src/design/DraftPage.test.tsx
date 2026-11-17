@@ -118,7 +118,12 @@ async function mount(
       </DeviceContext.Provider>,
     )
   })
-  return { emit: (type: string) => act(async () => listeners.forEach((l) => l("", type))) }
+  return {
+    emit: (type: string) =>
+      act(async () => {
+        for (const l of listeners) l("", type)
+      }),
+  }
 }
 const type = (name: string, value: string) =>
   fireEvent.change(screen.getByRole(name === "Project" ? "combobox" : "textbox", { name }), {

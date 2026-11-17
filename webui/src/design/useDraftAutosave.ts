@@ -127,7 +127,7 @@ export function useDraftAutosave({
     const s = server.current
     const idea = latest.current.idea
     if (idea === s.text) return true
-    let res
+    let res: Awaited<ReturnType<typeof drafts.save>>
     try {
       res = await drafts.save({ id: s.id, idea, revision: s.revision })
     } catch {
@@ -155,7 +155,7 @@ export function useDraftAutosave({
     const fields = latest.current
     const key = targetKey(fields)
     if (key === s.target || slugProblem(fields.slug)) return true
-    let res
+    let res: Awaited<ReturnType<typeof drafts.saveFields>>
     // Only the field the person changed, so an outside change to the other one is never written back.
     const had: { slug: string; project: string } = JSON.parse(s.target)
     try {
@@ -249,7 +249,10 @@ export function useDraftAutosave({
   }
   const currentId = () => server.current.id
 
-  // Every effect below reads refs only, so `flush` is safe to call from a stale closure.
+  // The effects below call these through a ref, so they run the functions of the latest render
+  // and never re-subscribe. Each of them reads refs only.
+  const latestFns = useRef({ flush, stash, hasContent, removeIfEmpty: drafts.removeIfEmpty })
+  latestFns.current = { flush, stash, hasContent, removeIfEmpty: drafts.removeIfEmpty }
   useEffect(() => {
     const leave = () => {
       // The save below may not finish before the page goes, so the fallback is written first.
@@ -258,8 +261,8 @@ export function useDraftAutosave({
         (failing.current || blocked.current) &&
         latest.current.idea !== server.current.text
       )
-        stash()
-      flush()
+        latestFns.current.stash()
+      latestFns.current.flush()
     }
     const hide = () => {
       pageHidden.current = true
@@ -274,24 +277,27 @@ export function useDraftAutosave({
       // In-app navigation only: a reload or tab close may come back to the page. The microtask
       // lets React's dev-mode remount cancel the request.
       queueMicrotask(() => {
-        if (!mounted.current && !pageHidden.current && phase.current === "editing" && !hasContent())
-          drafts.removeIfEmpty(server.current.id).catch(() => {})
+        if (
+          !mounted.current &&
+          !pageHidden.current &&
+          phase.current === "editing" &&
+          !latestFns.current.hasContent()
+        )
+          latestFns.current.removeIfEmpty(server.current.id).catch(() => {})
       })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const openedMoved = useRef(movedFrom !== undefined)
   useEffect(() => {
-    if (movedFrom !== undefined) flush()
     // Once, on open.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (openedMoved.current) latestFns.current.flush()
   }, [])
 
   useEffect(() => {
     if (status !== "unsaved") return
-    const id = setInterval(flush, RETRY_MS)
+    const id = setInterval(() => latestFns.current.flush(), RETRY_MS)
     return () => clearInterval(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
 
   const patch = (p: Partial<Fields>) => {

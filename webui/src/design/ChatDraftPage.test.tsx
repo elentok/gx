@@ -121,7 +121,12 @@ async function mount(
       </WideContext.Provider>,
     )
   })
-  return { emit: (type: string) => act(async () => listeners.forEach((l) => l("", type))) }
+  return {
+    emit: (type: string) =>
+      act(async () => {
+        for (const l of listeners) l("", type)
+      }),
+  }
 }
 const brief = () => screen.getByRole("textbox", { name: "Brief" }) as HTMLTextAreaElement
 const typeBrief = (value: string) => fireEvent.change(brief(), { target: { value } })

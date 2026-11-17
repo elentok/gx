@@ -139,14 +139,33 @@ export function FailureBanner({
       return res
     })
 
-  const onClick: Record<ButtonName, () => void> = {
-    Restore: () => (setClicked("Restore"), restore()),
-    "New session": () => (setClicked("New session"), startNew(run, address, session, open)),
-    Screen: () => setScreen(true),
-    Retry: () => (setClicked("Retry"), retry()),
-    "Close dialog": () => close.run(() => keys({ id: sessionId, key: "esc", only_blocked: true })),
-    Deny: () => decide.run(() => answer("deny")),
-    "Allow once": () => decide.run(() => answer("allow")),
+  const click = (name: ButtonName) => {
+    switch (name) {
+      case "Restore":
+        setClicked(name)
+        restore()
+        break
+      case "New session":
+        setClicked(name)
+        startNew(run, address, session, open)
+        break
+      case "Screen":
+        setScreen(true)
+        break
+      case "Retry":
+        setClicked(name)
+        retry()
+        break
+      case "Close dialog":
+        close.run(() => keys({ id: sessionId, key: "esc", only_blocked: true }))
+        break
+      case "Deny":
+        decide.run(() => answer("deny"))
+        break
+      case "Allow once":
+        decide.run(() => answer("allow"))
+        break
+    }
   }
   const answer = (decision: "allow" | "deny") =>
     keys({
@@ -262,7 +281,7 @@ export function FailureBanner({
                     }
                   : {})}
                 disabled={busy(name)}
-                onClick={onClick[name]}
+                onClick={() => click(name)}
               >
                 {busy(name) && (clicked === name || ownWrite(name)) && <Spinner size="sm" />}
                 {name}

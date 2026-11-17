@@ -19,6 +19,8 @@ export function ImageViewer({
 }) {
   const [index, setIndex] = useState(start)
   const img = images[index]
+  // The e2e flows and DesignPage.test find the picture by this text, so the position label stays as it was.
+  const position = `Image ${index + 1} of ${images.length}`
   return (
     <Modal
       label="Image"
@@ -36,7 +38,7 @@ export function ImageViewer({
       {img?.id && !img.placeholder ? (
         <img
           src={source(img)}
-          alt={`Image ${index + 1} of ${images.length}`}
+          alt={position}
           style={{
             width: "100%",
             maxHeight: "380px",

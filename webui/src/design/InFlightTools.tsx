@@ -1,6 +1,7 @@
 import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react"
 import { useState } from "react"
 import type { SessionInFlightTool } from "../generated/server"
+import { keyed } from "./keyed"
 
 const VERBS: Record<string, string> = {
   shell: "running shell: ",
@@ -73,8 +74,8 @@ export function InFlightTools({
                   py="2"
                 >
                   <Box as="ul" listStyleType="none" m="0" p="0" fontSize="sm">
-                    {others.map((t, i) => (
-                      <Box as="li" key={i} display="flex" gap="2">
+                    {keyed(others, (o) => `${o.kind}|${o.label}`).map(({ key, item: t }) => (
+                      <Box as="li" key={key} display="flex" gap="2">
                         <Text as="span" color="text.dim">
                           {KIND_WORDS[t.kind] ?? t.kind}
                         </Text>

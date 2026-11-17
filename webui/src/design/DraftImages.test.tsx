@@ -15,7 +15,7 @@ test("the gallery renders the draft image row in each state, with its line", () 
   ]
   expect(entry.cases.map((c) => c.label)).toEqual(["empty", "ready", "uploading", "failed"])
   entry.cases.forEach((c, i) => {
-    renderThemed(<>{c.node}</>)
+    renderThemed(<div>{c.node}</div>)
     if (lines[i]) expect(screen.getByText(lines[i]!)).toBeTruthy()
     expect(screen.queryByRole("button", { name: "Add image" })).toBeNull()
     cleanup()

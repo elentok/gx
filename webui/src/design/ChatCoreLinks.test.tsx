@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { type ComponentProps, useState } from "react"
 import { act, cleanup } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { FileLinkProvider } from "../files/FileLinkContext"
@@ -55,6 +55,23 @@ const base = [
   msg("m5", { kind: "output", text: "server/files/handler.go:3: oops" }),
 ]
 
+/** The chat with `expose` handed a function that appends one more message. */
+function GrowingPage({
+  resolver,
+  expose,
+}: {
+  resolver: ComponentProps<typeof FileLinkProvider>["resolver"]
+  expose: (append: () => void) => void
+}) {
+  const [msgs, set] = useState(base)
+  expose(() => set([...msgs, msg("m6", { text: "also new/file.go" })]))
+  return (
+    <FileLinkProvider resolver={resolver} recheckKey={msgs.at(-1)?.id}>
+      <ChatMessages chat={chatOf(msgs)} busy={false} sessionId="s1" showTools />
+    </FileLinkProvider>
+  )
+}
+
 describe("file links in the chat", () => {
   it("links found paths in text, tool lines and prompts, and nothing in commands or output", async () => {
     const { resolver } = stubResolver(["server/files/handler.go"])
@@ -95,16 +112,14 @@ describe("file links in the chat", () => {
   it("makes one call per load and one per new message, rechecking the missing ones", async () => {
     const { resolver, calls } = stubResolver(["server/files/handler.go"])
     let append: () => void = () => {}
-    function Page() {
-      const [msgs, set] = useState(base)
-      append = () => set([...msgs, msg("m6", { text: "also new/file.go" })])
-      return (
-        <FileLinkProvider resolver={resolver} recheckKey={msgs.at(-1)?.id}>
-          <ChatMessages chat={chatOf(msgs)} busy={false} sessionId="s1" showTools />
-        </FileLinkProvider>
-      )
-    }
-    renderThemed(<Page />)
+    renderThemed(
+      <GrowingPage
+        resolver={resolver}
+        expose={(fn) => {
+          append = fn
+        }}
+      />,
+    )
     await settle()
     expect(calls).toHaveLength(1)
     act(() => append())

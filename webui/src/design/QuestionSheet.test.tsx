@@ -86,31 +86,32 @@ test.each([
   expect(screen.getByLabelText("Answer to question 1")).toHaveProperty("rows", rows)
 })
 
+function KindHarness({ kind, seen }: { kind: string; seen: Answers[] }) {
+  const [answers, setAnswers] = useState<Answers>({})
+  return (
+    <QuestionSheet
+      round={[card({ label: "2", title: "Pick one", kind })]}
+      answers={answers}
+      onAnswers={(u) =>
+        setAnswers((a) => {
+          const next = u(a)
+          seen.push(next)
+          return next
+        })
+      }
+    />
+  )
+}
+
 test("the text answer's large editor is titled with the question and its text reaches onAnswers; choice questions have no answer field", async () => {
   const seen: Answers[] = []
-  function Harness({ kind }: { kind: string }) {
-    const [answers, setAnswers] = useState<Answers>({})
-    return (
-      <QuestionSheet
-        round={[card({ label: "2", title: "Pick one", kind })]}
-        answers={answers}
-        onAnswers={(u) =>
-          setAnswers((a) => {
-            const next = u(a)
-            seen.push(next)
-            return next
-          })
-        }
-      />
-    )
-  }
-  renderThemed(<Harness kind="text" />)
+  renderThemed(<KindHarness kind="text" seen={seen} />)
   fireEvent.click(screen.getByLabelText("Open the note in a large editor"))
   expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe("Answer to Q2 - Pick one")
   await typeInLargeEditor("Answer to Q2 - Pick one", "yes please")
   expect(seen.at(-1)?.["2"]?.text).toBe("yes please")
   cleanup()
-  renderThemed(<Harness kind="yes-no" />)
+  renderThemed(<KindHarness kind="yes-no" seen={seen} />)
   expect(screen.queryByLabelText("Answer to question 2")).toBeNull()
 })
 
@@ -122,25 +123,26 @@ test.each([false, true])("note opens five rows tall (big=%s)", (big) => {
   expect(screen.getByLabelText("Note text for question 1")).toHaveProperty("rows", 5)
 })
 
+function NoteHarness({ seen }: { seen: Answers[] }) {
+  const [answers, setAnswers] = useState<Answers>({})
+  return (
+    <QuestionSheet
+      round={[card({ label: "2", title: "Pick one" })]}
+      answers={answers}
+      onAnswers={(u) =>
+        setAnswers((a) => {
+          const next = u(a)
+          seen.push(next)
+          return next
+        })
+      }
+    />
+  )
+}
+
 test("the question note's large editor is titled with the question and its text reaches onAnswers", async () => {
   const seen: Answers[] = []
-  function Harness() {
-    const [answers, setAnswers] = useState<Answers>({})
-    return (
-      <QuestionSheet
-        round={[card({ label: "2", title: "Pick one" })]}
-        answers={answers}
-        onAnswers={(u) =>
-          setAnswers((a) => {
-            const next = u(a)
-            seen.push(next)
-            return next
-          })
-        }
-      />
-    )
-  }
-  renderThemed(<Harness />)
+  renderThemed(<NoteHarness seen={seen} />)
   fireEvent.click(screen.getByLabelText("Note on question 2"))
   // The text answer has its own expand button above the note's.
   fireEvent.click(screen.getAllByLabelText("Open the note in a large editor")[1])
@@ -149,23 +151,20 @@ test("the question note's large editor is titled with the question and its text 
   expect(seen.at(-1)?.["2"]?.note).toBe("hello")
 })
 
+function HuhHarness({ kind }: { kind: string }) {
+  const [answers, setAnswers] = useState<Answers>({})
+  return (
+    <>
+      <QuestionSheet round={[card({ kind })]} answers={answers} onAnswers={(u) => setAnswers(u)} />
+      <output>{JSON.stringify(answers["1"])}</output>
+    </>
+  )
+}
+
 test.each(["text", "yes-no"])(
   "Huh? on a %s question marks it huh, and a pick replaces the mark",
   (kind) => {
-    function Harness() {
-      const [answers, setAnswers] = useState<Answers>({})
-      return (
-        <>
-          <QuestionSheet
-            round={[card({ kind })]}
-            answers={answers}
-            onAnswers={(u) => setAnswers(u)}
-          />
-          <output>{JSON.stringify(answers["1"])}</output>
-        </>
-      )
-    }
-    renderThemed(<Harness />)
+    renderThemed(<HuhHarness kind={kind} />)
     fireEvent.click(screen.getByText("Huh?"))
     expect(screen.getByText("1 of 1 answered")).toBeTruthy()
     expect(JSON.parse(screen.getByRole("status").textContent ?? "")).toMatchObject({ huh: true })
@@ -190,23 +189,38 @@ test("the cards row opts out of the sidebar swipe", () => {
   expect(row?.hasAttribute(NO_SIDEBAR_SWIPE_ATTR)).toBe(true)
 })
 
+const scrollRound = [
+  card({ label: "1", kind: "yes-no", title: "A" }),
+  card({ label: "2", kind: "yes-no", title: "B" }),
+  card({ label: "3", kind: "text", title: "C" }),
+]
+
+function ScrollHarness({ focus }: { focus?: { index: number } }) {
+  const [answers, setAnswers] = useState<Answers>({})
+  return (
+    <QuestionSheet
+      round={scrollRound}
+      answers={answers}
+      onAnswers={(u) => setAnswers(u)}
+      focus={focus}
+    />
+  )
+}
+
+function Refocus() {
+  const [focus, setFocus] = useState<{ index: number }>({ index: 1 })
+  return (
+    <>
+      <button type="button" onClick={() => setFocus({ index: 1 })}>
+        refocus
+      </button>
+      <ScrollHarness focus={focus} />
+    </>
+  )
+}
+
 describe("a move scrolls the body to the top", () => {
-  const round = [
-    card({ label: "1", kind: "yes-no", title: "A" }),
-    card({ label: "2", kind: "yes-no", title: "B" }),
-    card({ label: "3", kind: "text", title: "C" }),
-  ]
-  function Harness({ focus }: { focus?: { index: number } }) {
-    const [answers, setAnswers] = useState<Answers>({})
-    return (
-      <QuestionSheet
-        round={round}
-        answers={answers}
-        onAnswers={(u) => setAnswers(u)}
-        focus={focus}
-      />
-    )
-  }
+  const Harness = ScrollHarness
   const body = () => screen.getByTestId("question-body")
   const scrolled = () => {
     body().scrollTop = 120
@@ -232,15 +246,6 @@ describe("a move scrolls the body to the top", () => {
   })
 
   test("a new focus object, even for the same question", () => {
-    function Refocus() {
-      const [focus, setFocus] = useState<{ index: number }>({ index: 1 })
-      return (
-        <>
-          <button onClick={() => setFocus({ index: 1 })}>refocus</button>
-          <Harness focus={focus} />
-        </>
-      )
-    }
     renderThemed(<Refocus />)
     scrolled()
     fireEvent.click(screen.getByText("refocus"))
@@ -296,22 +301,41 @@ describe("the Submit rule", () => {
   })
 })
 
+const keyboardRound = [
+  card({ label: "1", kind: "yes-no", title: "A" }),
+  card({ label: "2", kind: "yes-no", title: "B" }),
+]
+
+function KeyboardHarness({ initial = {} }: { initial?: Answers }) {
+  const [answers, setAnswers] = useState<Answers>(initial)
+  return (
+    <>
+      <QuestionSheet round={keyboardRound} answers={answers} onAnswers={(u) => setAnswers(u)} />
+      <button
+        type="button"
+        data-send-answers=""
+        onClick={() => document.body.setAttribute("data-sent", "1")}
+      >
+        Send answers
+      </button>
+    </>
+  )
+}
+
+function TextHarness() {
+  const [answers, setAnswers] = useState<Answers>({})
+  return (
+    <QuestionSheet
+      round={[card({ label: "1", kind: "text", title: "A" })]}
+      answers={answers}
+      onAnswers={(u) => setAnswers(u)}
+      mode="plain"
+    />
+  )
+}
+
 describe("keyboard", () => {
-  const round = [
-    card({ label: "1", kind: "yes-no", title: "A" }),
-    card({ label: "2", kind: "yes-no", title: "B" }),
-  ]
-  function Harness({ initial = {} }: { initial?: Answers }) {
-    const [answers, setAnswers] = useState<Answers>(initial)
-    return (
-      <>
-        <QuestionSheet round={round} answers={answers} onAnswers={(u) => setAnswers(u)} />
-        <button data-send-answers="" onClick={() => document.body.setAttribute("data-sent", "1")}>
-          Send answers
-        </button>
-      </>
-    )
-  }
+  const Harness = KeyboardHarness
   const q = (k: number) =>
     document.querySelectorAll<HTMLElement>(`[role=group][aria-label$=" of 2"]`)[k]
   const answer = (k: number, i: number) => q(k).querySelectorAll<HTMLElement>("[data-answer]")[i]
@@ -367,17 +391,6 @@ describe("keyboard", () => {
   })
 
   test("Esc in a text question's box (no answer button) blurs it and focuses the question's row", () => {
-    function TextHarness() {
-      const [answers, setAnswers] = useState<Answers>({})
-      return (
-        <QuestionSheet
-          round={[card({ label: "1", kind: "text", title: "A" })]}
-          answers={answers}
-          onAnswers={(u) => setAnswers(u)}
-          mode="plain"
-        />
-      )
-    }
     renderThemed(<TextHarness />)
     const box = document.querySelector<HTMLElement>("textarea")!
     box.focus()

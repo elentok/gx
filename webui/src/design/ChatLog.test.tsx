@@ -131,7 +131,12 @@ function renderChat(
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   )
-  return { emit: (a?: string) => act(async () => listeners.forEach((l) => l(a))) }
+  return {
+    emit: (a?: string) =>
+      act(async () => {
+        for (const l of listeners) l(a)
+      }),
+  }
 }
 
 test("each entry kind renders", async () => {

@@ -45,26 +45,25 @@ export function useDraftLifecycle({
       leave(res.started)
     }
   }
-  const latest = useRef(reread)
-  latest.current = reread
+  // The client and connection are fixed for the page's life, so the open effect reads them through a ref.
+  const latest = useRef({ reread, ping: () => drafts.ping(currentId()), conn })
+  latest.current = { reread, ping: () => drafts.ping(currentId()), conn }
 
   useEffect(() => {
-    const check = () => void latest.current()
-    const ping = () => drafts.ping(currentId()).catch(check)
+    const check = () => void latest.current.reread()
+    const ping = () => latest.current.ping().catch(check)
     ping()
     const timer = setInterval(ping, LEASE_MS)
-    const off = conn.onEvent((_address, type) => {
+    const off = latest.current.conn.onEvent((_address, type) => {
       if (type === EventDesignDraftsChanged) check()
     })
     return () => {
       clearInterval(timer)
       off()
     }
-    // The client and connection are fixed for the page's life.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
-    if (gone) void latest.current()
+    if (gone) void latest.current.reread()
   }, [gone])
 }

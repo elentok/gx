@@ -6,6 +6,7 @@ import { TaskList } from "./TaskList"
 import type { SessionChatImage, SessionChatMessage, SessionChatResponse } from "../generated/server"
 import { ImageViewer } from "./ImageViewer"
 import { InFlightTools } from "./InFlightTools"
+import { keyed } from "./keyed"
 import { sessionImageUrl } from "./sessionImages"
 import { LinkedText } from "../files/LinkedText"
 import { Markdown } from "../markdown/Markdown"
@@ -216,10 +217,10 @@ function ToolCalls({ m }: { m: SessionChatMessage }) {
           flexDirection="column"
           gap="0.5"
         >
-          {calls.map((c, i) => (
+          {keyed(calls, (c) => c).map(({ key, item: c }) => (
             <Box
               as="li"
-              key={i}
+              key={key}
               whiteSpace="pre-wrap"
               wordBreak="break-all"
               borderInlineStart="2px solid"

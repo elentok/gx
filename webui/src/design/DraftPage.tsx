@@ -93,9 +93,13 @@ export function DraftPage({ drafts = realDrafts, ...props }: PageProps) {
     [...new Set([...(list?.projects ?? []), ...(list?.epics ?? []).map((e) => e.project)])].sort()
   // `undefined` is still loading; `null` is no such draft.
   const [loaded, setLoaded] = useState<Loaded | null>()
+  // The client is fixed for the page's life, so the read uses the latest of them without re-running.
+  const latest = useRef({ drafts, leaveGone })
+  latest.current = { drafts, leaveGone }
   useEffect(() => {
     let live = true
     ;(async () => {
+      const { drafts } = latest.current
       const lastProject = await drafts.getLastProject().catch(() => "")
       const stuck = await saveUnsaved(drafts.save)
       const mine = stuck?.draft.id === id ? stuck : undefined
@@ -115,14 +119,12 @@ export function DraftPage({ drafts = realDrafts, ...props }: PageProps) {
       }
       if (!live) return
       // A bookmarked draft that was started or removed sends the person where it went.
-      if (res?.kind === "gone") leaveGone(res.started)
+      if (res?.kind === "gone") latest.current.leaveGone(res.started)
       else setLoaded(next)
     })().catch(() => live && setLoaded(null))
     return () => {
       live = false
     }
-    // The client is fixed for the page's life.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   useReadyWhen(loaded !== undefined, loaded ? "ready" : "empty", "network")
@@ -227,26 +229,27 @@ function DraftForm({
     document.addEventListener("keydown", stop, true)
     stopHold.current = stop
   }
-  const actions = useRef({ remove: askRemove, rename: renameFocus, focusPrompt })
-  actions.current = { remove: askRemove, rename: renameFocus, focusPrompt }
+  const hasContent = () => autosave.hasContent()
+  const actions = useRef({ remove: askRemove, rename: renameFocus, focusPrompt, hasContent })
+  actions.current = { remove: askRemove, rename: renameFocus, focusPrompt, hasContent }
   useEffect(
     () =>
       registerDraftPage({
         remove: () => actions.current.remove(),
         rename: () => actions.current.rename(),
-        isEmpty: () => !autosave.hasContent(),
+        isEmpty: () => !actions.current.hasContent(),
         focusPrompt: () => actions.current.focusPrompt(),
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   )
   // A page opened by New design asks for the Prompt's focus; a click or a bookmark does not.
   const { key: locationKey, state: locationState } = useLocation()
   const focusWanted = (locationState as { focusPrompt?: boolean } | null)?.focusPrompt === true
   useEffect(() => {
-    if (focusWanted) focusPrompt()
+    // A new navigation entry asks again, even for the same draft.
+    void locationKey
+    if (focusWanted) actions.current.focusPrompt()
     return () => stopHold.current()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationKey, focusWanted])
 
   const submit = (e: FormEvent) => {

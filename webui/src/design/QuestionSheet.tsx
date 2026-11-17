@@ -94,10 +94,14 @@ export function QuestionSheet({
   const row = useRef<HTMLDivElement>(null)
   const body = useRef<HTMLDivElement>(null)
   // A move starts at the question's title, not wherever the last one was left.
-  const toTop = () => {
+  const toTop = useCallback(() => {
     if (body.current) body.current.scrollTop = 0
-  }
-  useEffect(toTop, [index])
+  }, [])
+  useEffect(() => {
+    // A new question scrolls the body to its title.
+    void index
+    toTop()
+  }, [index, toTop])
   // Set while a smooth scroll we started is still moving, so its in-between frames don't set the question.
   const scrolling = useRef<number | undefined>(undefined)
 
@@ -109,7 +113,7 @@ export function QuestionSheet({
     toTop()
     setOpen(true)
     setToFocus(focus)
-  }, [focus])
+  }, [focus, toTop])
   useEffect(() => {
     if (!toFocus) return
     row.current?.children[toFocus.index]
@@ -189,6 +193,8 @@ export function QuestionSheet({
 
   // Keep the scroll position on the current question; scrolling by hand sets the question.
   useEffect(() => {
+    // Opening a folded sheet gives the row its width, so it scrolls to the current question then too.
+    void open
     const el = row.current
     if (
       el &&

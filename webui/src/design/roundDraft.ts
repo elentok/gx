@@ -8,13 +8,13 @@ const EMPTY: RoundDraftData = { answers: {}, index: 0, scroll: 0 }
 
 // Scrolls to `initial` on mount, then reports every scroll position. Pass a stable `onScroll`.
 function useScrollRestore(initial: number, onScroll: (y: number) => void) {
+  // The restore is for the first render only; later drafts must not yank the page back.
+  const first = useRef(initial)
   useEffect(() => {
-    if (initial > 0) window.scrollTo(0, initial)
+    if (first.current > 0) window.scrollTo(0, first.current)
     const listener = () => onScroll(window.scrollY)
     window.addEventListener("scroll", listener, { passive: true })
     return () => window.removeEventListener("scroll", listener)
-    // The restore is for the first render only; later drafts must not yank the page back.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onScroll])
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { SessionPermissionResponse } from "../generated/server"
 import { fetchJson } from "../ticket/detail"
 
@@ -18,18 +18,19 @@ type Read = { sessionId: string; value?: SessionPermissionResponse }
 /** Reads the prompt once per mount: it is the text the person answers, so it must not change under them. */
 export function usePermission(sessionId: string, enabled: boolean, read: FetchPermission) {
   const [done, setDone] = useState<Read>()
+  // `read` is a prop that tests stub; a new identity must not re-read.
+  const latestRead = useRef(read)
+  latestRead.current = read
   useEffect(() => {
     if (!enabled) return
     let live = true
-    read(sessionId).then(
+    latestRead.current(sessionId).then(
       (value) => live && setDone({ sessionId, value }),
       () => live && setDone({ sessionId }),
     )
     return () => {
       live = false
     }
-    // `read` is a prop that tests stub; a new identity must not re-read.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, enabled])
   const mine = done?.sessionId === sessionId ? done : undefined
   return { loaded: !!mine, permission: mine?.value }

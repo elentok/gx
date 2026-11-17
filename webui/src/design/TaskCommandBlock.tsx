@@ -32,6 +32,9 @@ export function TaskCommand({ command }: { command: string }) {
   const cut = !expanded && lines.length > COMMAND_LINE_LIMIT
   // jsdom has no layout, so this only fires in a browser: a long single line wrapped past five rows.
   useLayoutEffect(() => {
+    // The highlighted lines and the text change the wrapping, so they re-measure.
+    void text
+    void html
     const el = body.current
     setClipped(!expanded && !!el && el.scrollHeight > el.clientHeight)
   }, [expanded, text, html])
@@ -64,15 +67,17 @@ export function TaskCommand({ command }: { command: string }) {
         maxH={expanded ? undefined : "7.5em"}
         overflow={expanded ? undefined : "hidden"}
       >
-        {visible.map((src, i) => (
-          <Box
-            key={i}
-            minH="1.5em"
-            {...(shown
-              ? { dangerouslySetInnerHTML: { __html: shown[i] ?? "" } }
-              : { children: src || undefined })}
-          />
-        ))}
+        {visible
+          .map((src, line) => ({ id: `line-${line}`, src, markup: shown?.[line] }))
+          .map(({ id, src, markup }) => (
+            <Box
+              key={id}
+              minH="1.5em"
+              {...(shown
+                ? { dangerouslySetInnerHTML: { __html: markup ?? "" } }
+                : { children: src || undefined })}
+            />
+          ))}
       </Box>
       {cut && (
         <Box data-testid="task-command-more" color="text.faint" fontStyle="italic">

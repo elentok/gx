@@ -21,6 +21,9 @@ const KEYS: [label: string, key: string][] = [
   ["Ctrl+C", "ctrl+c"],
 ]
 
+/** A screen row is identified by its line number: the same line on the next read is the same row. */
+const lines = (rows: string[]) => rows.map((text, line) => ({ id: `line-${line}`, line, text }))
+
 const keyLabel = (label: string) =>
   ({ "↑": "Up", "↓": "Down", "←": "Left", "→": "Right" })[label] ?? label
 
@@ -68,10 +71,12 @@ export function ScreenModal({
       setLoading(false)
     }
   }
+  const latestLoad = useRef(load)
+  latestLoad.current = load
   useEffect(() => {
-    void load()
     // Only a different target reloads; Refresh is the other way in.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void target
+    void latestLoad.current()
   }, [target])
 
   const show = (next: string[]) => {
@@ -141,13 +146,13 @@ export function ScreenModal({
           borderRadius="8px"
           bg="surface.raised"
         >
-          {rows.map((row, i) => (
+          {lines(rows).map(({ id, line, text: row }) => (
             <Box
-              key={i}
+              key={id}
               as="span"
               display="block"
-              color={marked.includes(i) ? "tone.waiting.fg" : undefined}
-              fontWeight={marked.includes(i) ? "700" : undefined}
+              color={marked.includes(line) ? "tone.waiting.fg" : undefined}
+              fontWeight={marked.includes(line) ? "700" : undefined}
               transition="color 0.6s, font-weight 0.6s"
             >
               {row || " "}

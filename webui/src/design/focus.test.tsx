@@ -42,12 +42,17 @@ function render(focus: PostFocus) {
   const conn = {
     clientId: "tab-1",
     getState: () => state,
-    subscribe: (l: () => void) => (listeners.add(l), () => listeners.delete(l)),
+    subscribe: (l: () => void) => {
+      listeners.add(l)
+      return () => {
+        listeners.delete(l)
+      }
+    },
     onEvent: () => () => {},
   } as unknown as Connection
   const update = (patch: Partial<ConnectionState>) => {
     state = { ...state, ...patch }
-    listeners.forEach((l) => l())
+    for (const l of listeners) l()
   }
   const router = createMemoryRouter(
     appRoutes({
