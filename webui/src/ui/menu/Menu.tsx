@@ -1,5 +1,5 @@
 import { Box, Menu as ChakraMenu, Portal, Text } from "@chakra-ui/react"
-import { Fragment, useState, type ReactElement, type ReactNode } from "react"
+import { Fragment, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react"
 import { useWide } from "../../useWide"
 import { useCloseSignal, useOnCloseSignal } from "../closeSignal"
 import { focusTopDialog } from "../modal/layers"
@@ -262,7 +262,7 @@ const SETTLE_MS = 2000
  * not announce. For a short while, a dialog the pick opened takes back any focus that lands outside it:
  * its first text field where it marks one (tablet and desktop), else the panel.
  */
-function keepFocusInDialog() {
+function keepFocusInDialog(): () => void {
   const takeBack = (e: FocusEvent) => focusTopDialog(e.target as Node)
   const stop = () => {
     clearTimeout(timer)
@@ -275,6 +275,7 @@ function keepFocusInDialog() {
   document.addEventListener("focusin", takeBack)
   document.addEventListener("pointerdown", stop, true)
   document.addEventListener("keydown", stop, true)
+  return stop
 }
 
 function WideMenu({
@@ -289,6 +290,9 @@ function WideMenu({
   const [open, setOpen] = useState(false)
   useReportOpen(open, onOpenChange)
   useOnCloseSignal(closeSignal, () => setOpen(false))
+  // Only one window is live at a time, and unmount ends it: a timer left after the page is gone throws.
+  const endWindow = useRef<() => void>(undefined)
+  useEffect(() => () => endWindow.current?.(), [])
   return (
     <ChakraMenu.Root
       open={open}
@@ -300,7 +304,8 @@ function WideMenu({
         setOpen(e.open)
         if (e.open) return
         // Not gated on the dialog being mounted yet: its layer registers in an effect, after this runs.
-        keepFocusInDialog()
+        endWindow.current?.()
+        endWindow.current = keepFocusInDialog()
         onClosed?.()
       }}
     >

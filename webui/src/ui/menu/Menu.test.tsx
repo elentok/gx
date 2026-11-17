@@ -412,7 +412,8 @@ describe("GxMenu focus after an item", () => {
       expect(dialog.contains(document.activeElement)).toBe(true)
     })
 
-    it(`takes back a focus return that lands late on the ${name} menu`, async () => {
+    // The phone menu has no focus window: it passed only on a listener an earlier wide test leaked.
+    it.runIf(wide)(`takes back a focus return that lands late on the ${name} menu`, async () => {
       const r = render(wide, true)
       const menu = await open(r)
       await waitFor(() => expect(document.activeElement).toBe(menu))
@@ -447,4 +448,30 @@ describe("GxMenu focus after an item", () => {
       )
     })
   }
+
+  it("leaves no focus-settle timer pending once the wide menu unmounts", async () => {
+    const SETTLE_MS = 2000
+    const started: unknown[] = []
+    const realSet = globalThis.setTimeout
+    const realClear = globalThis.clearTimeout
+    const cleared = new Set<unknown>()
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void, ms?: number) => {
+      const id = realSet(fn, ms)
+      if (ms === SETTLE_MS) started.push(id)
+      return id
+    }) as typeof setTimeout)
+    vi.spyOn(globalThis, "clearTimeout").mockImplementation(((id: never) => {
+      cleared.add(id)
+      realClear(id)
+    }) as typeof clearTimeout)
+
+    const r = render(true, true)
+    await open(r)
+    fireEvent.click(r.getByRole("menuitem", { name: "A" }))
+    await r.findByRole("dialog", { name: "Dialog" })
+    await waitFor(() => expect(r.queryByRole("menu")).toBeNull())
+    expect(started.length).toBeGreaterThan(0)
+    r.unmount()
+    expect(started.filter((id) => !cleared.has(id))).toEqual([])
+  })
 })
