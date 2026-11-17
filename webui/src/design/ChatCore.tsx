@@ -317,11 +317,15 @@ function ChatScroller({ children }: { children: ReactNode }) {
   // The last scrollTop seen. Our own pins fire their scroll events a frame later, when the content may have
   // grown past the 80px slack (a message, the Working row): only a scroll that moves up is the reader leaving.
   const lastTop = useRef(0)
+  // The content height at the last scroll event. A shrinking chat (the Working row leaves, tool calls fold)
+  // makes the browser clamp scrollTop upward: that is not the reader leaving.
+  const lastHeight = useRef(0)
   useLayoutEffect(() => {
     const pin = () => {
       if (!el.current || !stuck.current) return
       el.current.scrollTop = el.current.scrollHeight
       lastTop.current = el.current.scrollTop
+      lastHeight.current = el.current.scrollHeight
     }
     pin()
     // The scroller's own box never grows with its content: watch the wrapper inside it.
@@ -346,8 +350,9 @@ function ChatScroller({ children }: { children: ReactNode }) {
         const t = e.currentTarget
         const gap = t.scrollHeight - t.scrollTop - t.clientHeight
         if (gap < 80) stuck.current = true
-        else if (t.scrollTop < lastTop.current) stuck.current = false
+        else if (t.scrollTop < lastTop.current && t.scrollHeight >= lastHeight.current) stuck.current = false
         lastTop.current = t.scrollTop
+        lastHeight.current = t.scrollHeight
       }}
     >
       <Box ref={inner} flex="1 0 auto" display="flex" flexDirection="column" gap="3">
