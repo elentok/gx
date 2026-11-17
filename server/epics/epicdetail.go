@@ -79,7 +79,12 @@ func (s *Epics) decorateLive(d *wire.EpicDetail, root queue.RootRef, e tickets.E
 		} else {
 			d.Deletable = deletable
 		}
-		d.DesignSection = designSection(d.Address, e, queue.MapProgress(e), s.designActivities()[d.Address])
+		step := queue.MapProgress(e)
+		act := s.designActivities()[d.Address]
+		act.creating = d.ImplAddress != "" && step == wire.ProgressCreateTickets
+		d.DesignSection = designSection(d.Address, e, step, act)
+		d.Working = step != wire.ProgressDone &&
+			placeDesign(d.Address, act, mapNotStarted(e, step), time.Time{}, step).working
 		return
 	}
 	d.State = EpicStateFor(root, e, s.Delivery(root.Project), s.Runs.StartedAtOf)

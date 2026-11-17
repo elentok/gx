@@ -19,9 +19,18 @@ type designActivity struct {
 	// delegating: every running session is a turn ended while a background
 	// task (a subagent) still runs; nothing waits on the person.
 	delegating, active bool
-	askedAt            time.Time
-	countdownAt        time.Time
-	endedAt            time.Time
+	// working: a live session is Starting, in a turn, or has a background
+	// subagent running. reportedStep is the agent's step report of the newest
+	// working session (by workingAt); Starting and subagent-only sessions have none.
+	working      bool
+	reportedStep string
+	workingAt    time.Time
+	// creating: the map is at Create tickets and its -impl epic exists, which
+	// works even while the session is idle. Set by the card builder, not by designActivities.
+	creating    bool
+	askedAt     time.Time
+	countdownAt time.Time
+	endedAt     time.Time
 }
 
 // designActivities folds the sessions into one designActivity per map address.
@@ -52,6 +61,14 @@ func (s *Epics) designActivities() map[string]designActivity {
 				a.delegating = !a.active
 			} else {
 				a.active, a.delegating = true, false
+			}
+			sessionWorking := info.Status.State == wire.SessionStarting ||
+				info.Status.State == wire.SessionWorking
+			if sessionWorking {
+				a.working = true
+				if !info.Status.Background && !info.StatusChangedAt.Before(a.workingAt) {
+					a.workingAt, a.reportedStep = info.StatusChangedAt, info.ReportedStep
+				}
 			}
 			if info.Actionable.Grilling {
 				a.asking = true

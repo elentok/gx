@@ -1040,6 +1040,10 @@ export interface EpicDetail extends ViewDiff {
    */
   design_section?: CardSection;
   /**
+   * Working is set on a map epic while its Design works, by the same rule as the card.
+   */
+  working?: boolean;
+  /**
    * StatusWords is the card's status line; PR, PRReason, PRActions, PRNotice and
    * PRActivity are the PR flow's live info, failure reason, buttons, the "CI
    * failing" notice text and the activity list, newest first.
@@ -1227,6 +1231,14 @@ export interface EpicListRow {
    */
   ring_progress?: number /* int */;
   /**
+   * Working is set by the server when the card's work is running: clients read
+   * it instead of matching status words. WorkingWord is the bare word (no
+   * "..."), WorkKind picks the arc color.
+   */
+  working?: boolean;
+  working_word?: string;
+  work_kind?: WorkKind;
+  /**
    * StepLine is the second line of a Follow-ups card with a Triage under its
    * pill, such as "Verifying 3 of 9"; RetryFailed is the failed rows a Write
    * offers to retry (0: no "Retry failed" button).
@@ -1385,6 +1397,12 @@ export const CardKindDesign = "design";
 export const CardKindOneOff = "one-off";
 export const CardKindFollowUps = "follow-ups";
 export type CardKind = typeof CardKindImplementation | typeof CardKindDesign | typeof CardKindOneOff | typeof CardKindFollowUps;
+/**
+ * WorkKind is the kind of work a working card shows.
+ */
+export const WorkKindDesign = "design";
+export const WorkKindImplementation = "implementation";
+export type WorkKind = typeof WorkKindDesign | typeof WorkKindImplementation;
 /**
  * CardActionKind names what a card button does.
  */

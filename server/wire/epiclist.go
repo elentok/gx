@@ -109,6 +109,12 @@ type EpicListRow struct {
 	StatusWords string      `json:"status_words,omitempty"`
 	// RingProgress is the ring fill in percent, 0 to 100.
 	RingProgress int `json:"ring_progress,omitempty"`
+	// Working is set by the server when the card's work is running: clients read
+	// it instead of matching status words. WorkingWord is the bare word (no
+	// "..."), WorkKind picks the arc color.
+	Working     bool     `json:"working,omitempty"`
+	WorkingWord string   `json:"working_word,omitempty"`
+	WorkKind    WorkKind `json:"work_kind,omitempty"`
 	// StepLine is the second line of a Follow-ups card with a Triage under its
 	// pill, such as "Verifying 3 of 9"; RetryFailed is the failed rows a Write
 	// offers to retry (0: no "Retry failed" button).
@@ -217,6 +223,14 @@ const (
 	CardKindDesign         CardKind = "design"
 	CardKindOneOff         CardKind = "one-off"
 	CardKindFollowUps      CardKind = "follow-ups"
+)
+
+// WorkKind is the kind of work a working card shows.
+type WorkKind string
+
+const (
+	WorkKindDesign         WorkKind = "design"
+	WorkKindImplementation WorkKind = "implementation"
 )
 
 // CardActionKind names what a card button does.

@@ -41,7 +41,7 @@ func reachedBranch(step wire.ProgressStep) bool {
 // joined card currently shows the -impl epic instead. A finished Design only
 // stays in Needs you while a question is still waiting on an answer.
 func designSection(address string, m tickets.Epic, step wire.ProgressStep, act designActivity) wire.CardSection {
-	p := placeDesign(address, act, mapNotStarted(m, step), time.Time{})
+	p := placeDesign(address, act, mapNotStarted(m, step), time.Time{}, step)
 	if step == wire.ProgressDone && p.section != wire.SectionNeedsYou {
 		return wire.SectionFinished
 	}
@@ -69,8 +69,9 @@ func decorateDesignCard(row *wire.EpicListRow, m tickets.Epic, impl *wire.EpicLi
 	default:
 		row.RingProgress = designPercent(m, row.ProgressStep)
 		fallback := cmp.Or(lastActivity(m), m.CreatedAt)
-		placeDesign(row.Address, act, mapNotStarted(m, row.ProgressStep), fallback).applyTo(row)
-		if row.ProgressStep == wire.ProgressCreateTickets && impl != nil && row.StatusWords == "Designing" {
+		act.creating = impl != nil && row.ProgressStep == wire.ProgressCreateTickets
+		placeDesign(row.Address, act, mapNotStarted(m, row.ProgressStep), fallback, row.ProgressStep).applyTo(row)
+		if row.Working && act.creating {
 			// The ring has no fraction to show yet; the client draws its placeholder.
 			row.RingProgress = 0
 			row.StatusWords = fmt.Sprintf("Creating tickets (%d so far)...", impl.Total)
@@ -97,7 +98,7 @@ func joinImplementation(row *wire.EpicListRow, impl *wire.EpicListRow, act desig
 	if impl.Section == wire.SectionNeedsYou {
 		return
 	}
-	if p := placeDesign(m.Address, act, false, act.askedAt); p.pill == PillQuestion {
+	if p := placeDesign(m.Address, act, false, act.askedAt, m.ProgressStep); p.pill == PillQuestion {
 		row.Section, row.StatePill, row.Reason = wire.SectionNeedsYou, p.pill, p.reason
 		row.WaitingSince, row.Actions = p.waitingSince, p.actions
 		setCardTime(row, cardTimeSources{})
@@ -108,16 +109,45 @@ func joinImplementation(row *wire.EpicListRow, impl *wire.EpicListRow, act desig
 func (p designPlacement) applyTo(row *wire.EpicListRow) {
 	row.Section, row.StatusWords, row.StatePill, row.Reason = p.section, p.statusWords, p.pill, p.reason
 	row.WaitingSince, row.CountdownEndsAt, row.Actions = p.waitingSince, p.countdownEndsAt, p.actions
+	row.Working, row.WorkingWord, row.WorkKind = p.working, p.workingWord, ""
+	if p.working {
+		row.WorkKind = wire.WorkKindDesign
+	}
 }
 
-// StatusDelegating is the Designing card's words while a subagent works; the
-// client spins the ring for it.
-const StatusDelegating = "Working"
+// designWords is the bare working word of each Design step.
+var designWords = map[wire.ProgressStep]string{
+	wire.ProgressChart:          "Charting",
+	wire.ProgressResolveTickets: "Researching",
+	wire.ProgressSpec:           "Writing spec",
+	wire.ProgressReview:         "Reviewing",
+	wire.ProgressCreateTickets:  "Creating tickets",
+	wire.ProgressBranch:         "Branching",
+}
 
-// designPlacement is where a Design card sits and what it shows.
+// reportedStepSteps maps a session's reported step to the Design step it names.
+var reportedStepSteps = map[string]wire.ProgressStep{
+	"chart": wire.ProgressChart, "resolve-tickets": wire.ProgressResolveTickets,
+	"spec": wire.ProgressSpec, "review": wire.ProgressReview, "grill-findings": wire.ProgressReview,
+	"create-tickets": wire.ProgressCreateTickets, "branch": wire.ProgressBranch,
+}
+
+// designWorkingWord is the bare word of a working Design: the working session's
+// reported step, then the map's own step, then "Designing".
+func designWorkingWord(act designActivity, step wire.ProgressStep) string {
+	if w, ok := designWords[reportedStepSteps[act.reportedStep]]; ok {
+		return w
+	}
+	return cmp.Or(designWords[step], "Designing")
+}
+
+// designPlacement is where a Design card sits and what it shows. working is set
+// with workingWord (bare); statusWords then ends with "...".
 type designPlacement struct {
 	section         wire.CardSection
 	statusWords     string
+	working         bool
+	workingWord     string
 	pill            string
 	reason          string
 	waitingSince    time.Time
@@ -126,9 +156,18 @@ type designPlacement struct {
 }
 
 // placeDesign places the Design card of the map at address from its sessions.
-// fallback starts a question's wait when the session holds no time for it.
-func placeDesign(address string, act designActivity, notStarted bool, fallback time.Time) designPlacement {
+// fallback starts a question's wait when the session holds no time for it. step
+// is the map's own step, which names the working word when no step is reported.
+func placeDesign(address string, act designActivity, notStarted bool, fallback time.Time, step wire.ProgressStep) designPlacement {
 	p := designPlacement{statusWords: "Designing"}
+	working := func() {
+		p.working = true
+		p.workingWord = designWorkingWord(act, step)
+		if act.creating {
+			p.workingWord = designWords[wire.ProgressCreateTickets]
+		}
+		p.statusWords = p.workingWord + "..."
+	}
 	switch {
 	case !act.running && notStarted:
 		p.section = wire.SectionReadyToDesign
@@ -142,6 +181,9 @@ func placeDesign(address string, act designActivity, notStarted bool, fallback t
 	case !act.countdownAt.IsZero():
 		p.section = wire.SectionDesigning
 		p.countdownEndsAt = act.countdownAt
+		if act.creating {
+			working()
+		}
 	case act.asking:
 		p.section = wire.SectionNeedsYou
 		p.pill = PillQuestion
@@ -150,8 +192,8 @@ func placeDesign(address string, act designActivity, notStarted bool, fallback t
 		p.actions = []wire.CardAction{{Kind: wire.CardActionAnswer, Label: "Answer", Target: address, Link: "#/d/" + address}}
 	default:
 		p.section = wire.SectionDesigning
-		if act.delegating {
-			p.statusWords = StatusDelegating
+		if act.working || act.creating {
+			working()
 		}
 		p.actions = []wire.CardAction{{Kind: wire.CardActionOpen, Label: "Open", Target: address}}
 	}

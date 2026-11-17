@@ -94,7 +94,7 @@ func TestEpicList_DesignCards(t *testing.T) {
 		actions []wire.CardActionKind
 	}{
 		{"d-idle", wire.SectionReadyToDesign, "Not started", "", []wire.CardActionKind{wire.CardActionDesign}},
-		{"d-live", wire.SectionDesigning, "Designing", "", []wire.CardActionKind{wire.CardActionOpen}},
+		{"d-live", wire.SectionDesigning, "Charting...", "", []wire.CardActionKind{wire.CardActionOpen}},
 		{"d-wait", wire.SectionNeedsYou, "Designing", epics.PillQuestion, []wire.CardActionKind{wire.CardActionAnswer}},
 		{"d-stopped", wire.SectionDesigning, "Designing", "", []wire.CardActionKind{wire.CardActionContinue}},
 		{"d-done", wire.SectionFinished, "Designed", "", nil},
@@ -158,8 +158,9 @@ func TestEpicList_NewDesignLifecycle(t *testing.T) {
 	id := res.Session.ID
 
 	r := waitForEpicRow(t, f, "fresh-idea", func(r wire.EpicListRow) bool { return r.Section == wire.SectionDesigning })
-	if r.Address != "proj:fresh-idea" || r.StatusWords != "Designing" {
-		t.Fatalf("running row = %+v, want a Designing card", r)
+	// A fresh session is Starting, then idle: the card works at Charting, then rests as Designing.
+	if r.Address != "proj:fresh-idea" || (r.Working && r.StatusWords != "Charting...") || (!r.Working && r.StatusWords != "Designing") {
+		t.Fatalf("running row = %+v, want a Charting or Designing card", r)
 	}
 
 	conv, _ := readMeta(t, f.H, id)["conversation_id"].(string)
