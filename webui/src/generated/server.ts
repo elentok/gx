@@ -3192,6 +3192,11 @@ export interface SessionInfo {
   reported_step?: string;
   reported_title?: string;
   /**
+   * FirstPromptPending is set while gx still holds the first prompt, waiting
+   * for the agent to be ready to take it.
+   */
+  first_prompt_pending?: boolean;
+  /**
    * Failure is set while the session is in one of the failure states.
    */
   failure?: SessionFailure;

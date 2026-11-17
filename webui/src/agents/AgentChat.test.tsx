@@ -484,3 +484,12 @@ test("a prompt with images shows a grid above its text", async () => {
   expect(await screen.findByText("why?")).toBeTruthy()
   expect(screen.getAllByRole("button", { name: /^Image \d of 2$/ })).toHaveLength(2)
 })
+
+test("a held first prompt shows a starting notice, and a sent one does not", async () => {
+  render(session({ status: { state: "starting" }, first_prompt_pending: true }), chat({ messages: [] }))
+  expect(await screen.findByRole("status")).toHaveProperty("textContent", expect.stringContaining("first prompt"))
+  cleanup()
+  render(session(), chat())
+  await screen.findByText("hello there")
+  expect(screen.queryByRole("status")).toBeNull()
+})

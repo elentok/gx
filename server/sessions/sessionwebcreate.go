@@ -32,6 +32,9 @@ type WebCreateSessionRequest struct {
 	// tier's. Effort needs a Model.
 	Model  string `json:"model,omitempty"`
 	Effort string `json:"effort,omitempty"`
+	// ImagePaths are server-side image files pasted before the prompt. Never
+	// read from a request body.
+	ImagePaths []string `json:"-"`
 }
 
 // SessionCreateWeb is sessionCreateWrite for the web mux. A body with any
@@ -100,7 +103,7 @@ func (mg *Manager) CreateWebSession(req WebCreateSessionRequest) (wire.SessionRe
 		Prompt:   prompt,
 		Tier:     req.Tier,
 		Harness:  req.Harness,
-	}, SessionCtx{Model: req.Model, Effort: req.Effort})
+	}, SessionCtx{Model: req.Model, Effort: req.Effort, ImagePaths: req.ImagePaths})
 	if err == nil && res.Session != nil && req.Workspace != "" && mg.workspaces != nil {
 		// An unknown name is refused by SetMember and the chat stays in Default.
 		if err := mg.workspaces.SetMember(res.Session.ID, req.Workspace); err != nil {

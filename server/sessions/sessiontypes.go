@@ -32,6 +32,9 @@ type SessionCtx struct {
 	// Model and Effort start the session on a model the person chose, over the
 	// tier's; Effort needs a Model.
 	Model, Effort string
+	// ImagePaths are image files copied into the new session's image folder and
+	// pasted before its first prompt.
+	ImagePaths []string
 }
 
 // SwitchTarget is the model, effort and by-hand flag a rollback restores.
@@ -94,6 +97,8 @@ type Meta struct {
 	// FirstPrompt waits for the ready report or the first Idle; it is cleared
 	// once typed or on exit.
 	FirstPrompt string `json:"first_prompt,omitempty"`
+	// FirstImages are the saved image ids pasted before FirstPrompt.
+	FirstImages []string `json:"first_images,omitempty"`
 	// ConversationID is the newest one the harness reported; a resume
 	// continues it.
 	ConversationID string    `json:"conversation_id"`
@@ -199,32 +204,33 @@ func (m Meta) ChatMeta() chat.Meta {
 
 func (m Meta) Info() wire.SessionInfo {
 	info := wire.SessionInfo{
-		ID:              m.ID,
-		Name:            m.Name,
-		AutoName:        m.AutoName,
-		Project:         m.Project,
-		Dir:             m.Dir,
-		Harness:         m.Harness,
-		Ticket:          m.Ticket,
-		Design:          m.IsDesign(),
-		Flow:            string(m.Flow),
-		FlowKey:         m.key(),
-		FixOf:           m.FixOf,
-		Status:          m.Status,
-		StatusChangedAt: m.StatusChangedAt,
-		RunStartedAt:    cmp.Or(m.RestoredAt, m.CreatedAt),
-		Exit:            m.Exit,
-		Stopped:         m.Stopped,
-		Unread:          m.Unread,
-		Actionable:      m.Actionable,
-		AutoAdvance:     !m.AutoAdvanceOff,
-		AutoQueue:       m.AutoQueue,
-		ReportedStep:    m.ReportedStep,
-		ReportedTitle:   m.ReportedTitle,
-		RebaseNote:      m.RebaseNote,
-		Tier:            m.Tier,
-		Model:           m.Model,
-		Effort:          m.Effort,
+		ID:                 m.ID,
+		Name:               m.Name,
+		AutoName:           m.AutoName,
+		Project:            m.Project,
+		Dir:                m.Dir,
+		Harness:            m.Harness,
+		Ticket:             m.Ticket,
+		Design:             m.IsDesign(),
+		Flow:               string(m.Flow),
+		FlowKey:            m.key(),
+		FixOf:              m.FixOf,
+		Status:             m.Status,
+		StatusChangedAt:    m.StatusChangedAt,
+		RunStartedAt:       cmp.Or(m.RestoredAt, m.CreatedAt),
+		Exit:               m.Exit,
+		Stopped:            m.Stopped,
+		Unread:             m.Unread,
+		Actionable:         m.Actionable,
+		AutoAdvance:        !m.AutoAdvanceOff,
+		AutoQueue:          m.AutoQueue,
+		ReportedStep:       m.ReportedStep,
+		ReportedTitle:      m.ReportedTitle,
+		RebaseNote:         m.RebaseNote,
+		Tier:               m.Tier,
+		Model:              m.Model,
+		Effort:             m.Effort,
+		FirstPromptPending: m.FirstPrompt != "",
 	}
 	if st := m.Status; st.State == wire.SessionBlocked {
 		info.Actionable = wire.SessionActionable{Kind: st.Kind, Reason: cmp.Or(st.Message, st.Kind, wire.SessionBlocked)}

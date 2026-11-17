@@ -2,7 +2,6 @@ package chatdrafts
 
 import (
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
@@ -72,7 +71,7 @@ func TestStore_DeleteRemovesTheImages(t *testing.T) {
 	}
 }
 
-func TestStart_ListsTheDraftsImagesAfterTheBrief(t *testing.T) {
+func TestStart_PassesTheDraftsImagesApartFromTheBrief(t *testing.T) {
 	t.Parallel()
 	r := newStartRig(t)
 	d := r.draft(t, ops2Draft("the brief"))
@@ -83,14 +82,13 @@ func TestStart_ListsTheDraftsImagesAfterTheBrief(t *testing.T) {
 	if out, err := r.c.Start(d.ID); err != nil || out.Refused {
 		t.Fatalf("start = %+v, %v", out, err)
 	}
-	prompt := r.reqs[0].Prompt
-	head, list, ok := strings.Cut(prompt, "\n\nImages:\n")
-	if !ok || head != "the brief" {
-		t.Fatalf("prompt = %q", prompt)
+	req := r.reqs[0]
+	if req.Prompt != "the brief" || len(req.ImagePaths) != 1 {
+		t.Fatalf("prompt = %q, images = %v", req.Prompt, req.ImagePaths)
 	}
-	// The draft is gone by now, but the listed copy still exists.
-	if _, err := os.Stat(list); err != nil {
-		t.Fatalf("listed image %q: %v", list, err)
+	// The draft is gone by now, but the passed copy still exists.
+	if _, err := os.Stat(req.ImagePaths[0]); err != nil {
+		t.Fatalf("image %q: %v", req.ImagePaths[0], err)
 	}
 }
 

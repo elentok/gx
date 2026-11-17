@@ -235,6 +235,7 @@ func (f *firstPrompt) deliver(prompt string) error {
 		return err
 	}
 	p := f.prompter(c, turn)
+	p.images = f.firstImages()
 	p.held = release
 	defer p.releaseHeld()
 	if !f.typing().ReadyToType(f.p.projects.TypingIO(f.dir, c, "first-prompt")) {
@@ -245,6 +246,9 @@ func (f *firstPrompt) deliver(prompt string) error {
 	}
 	caps := claudeui.DefaultNudgeCaps
 	caps.Grace = cmp.Or(f.p.cfg.PromptGrace, caps.Grace)
+	// A swallowed first Enter is pressed again after seconds, not after the
+	// grace: a person who started this chat is watching an empty page.
+	caps.Settle = min(sendSettle, caps.Grace)
 	report := func(d claudeui.NudgeDecision) {
 		f.log.Debug("first prompt nudge", "decision", string(d))
 	}
@@ -547,4 +551,19 @@ func PromptHead(prompt string) string {
 		return string(r[:40]) + "…"
 	}
 	return prompt
+}
+
+// firstImages is the saved images the chat started with, pasted before the
+// first prompt. A missing one is logged and skipped: the text still goes.
+func (f *firstPrompt) firstImages() imageSet {
+	meta, err := sessions.ReadMeta(f.dir)
+	if err != nil || len(meta.FirstImages) == 0 {
+		return imageSet{}
+	}
+	paths, refusal := f.p.resolveImages(f.dir, meta.FirstImages, true)
+	if refusal != nil {
+		f.log.Warn("first prompt images", "reason", refusal.Message)
+		return imageSet{}
+	}
+	return f.p.imageSetOf(f.dir, meta.FirstImages, paths)
 }

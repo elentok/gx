@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/elentok/gx/server/imagestore"
@@ -117,14 +116,6 @@ func (s *Store) CopyImages(d *ops.ChatDraft) ([]string, error) {
 		paths = append(paths, to)
 	}
 	return paths, nil
-}
-
-// withImages is the brief with an "Images:" list of paths after it.
-func withImages(brief string, paths []string) string {
-	if len(paths) == 0 {
-		return brief
-	}
-	return brief + "\n\nImages:\n" + strings.Join(paths, "\n")
 }
 
 // imageUpload serves POST /v1/agents/drafts/images?id=<draft>: the body is one

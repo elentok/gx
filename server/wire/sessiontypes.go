@@ -98,6 +98,9 @@ type SessionInfo struct {
 	// when the session goes idle.
 	ReportedStep  string `json:"reported_step,omitempty"`
 	ReportedTitle string `json:"reported_title,omitempty"`
+	// FirstPromptPending is set while gx still holds the first prompt, waiting
+	// for the agent to be ready to take it.
+	FirstPromptPending bool `json:"first_prompt_pending,omitempty"`
 	// Failure is set while the session is in one of the failure states.
 	Failure *SessionFailure `json:"failure,omitempty"`
 	// RebaseNote says why a Design open did not rebase the design branch onto

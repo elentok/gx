@@ -168,6 +168,11 @@ export function AgentChat({
           showTools
           working={<WorkingRow current={chat.current} others={chat.others} />}
         />
+        {session.first_prompt_pending && (
+          <Text role="status" fontSize="sm" color="fg.muted">
+            Starting the agent. Your first prompt is sent as soon as it is ready.
+          </Text>
+        )}
         {card && (
           <CardSheet
             key={card.id}

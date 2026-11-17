@@ -25,6 +25,8 @@ import (
 	"github.com/elentok/gx/proccap"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/health"
+	"github.com/elentok/gx/server/imagestore"
+	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/oneoff"
@@ -153,6 +155,10 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 		return Refusal(wire.ReasonSessionNameTaken, fmt.Sprintf("a live session is already named %q", meta.Name)), nil
 	}
 	if err != nil {
+		return wire.SessionResult{}, err
+	}
+	if err := mg.saveFirstImages(dir, &meta, sc.ImagePaths); err != nil {
+		mg.endFailedStart(dir, &meta)
 		return wire.SessionResult{}, err
 	}
 	if meta.IsDesign() && meta.Ticket != "" {
@@ -750,4 +756,27 @@ func (mg *Manager) UpdateSessionMetaOrWarn(dir, id string, change func(*Meta) bo
 	if err := mg.UpdateSessionMeta(dir, id, change); err != nil {
 		mg.log.Warn("update session meta", "session", id, "err", err)
 	}
+}
+
+// saveFirstImages copies the image files into the session's image folder and
+// records their ids on the meta, for the first prompt to paste.
+func (mg *Manager) saveFirstImages(dir string, meta *Meta, paths []string) error {
+	if len(paths) == 0 {
+		return nil
+	}
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		res, err := imagestore.Save(filepath.Join(dir, chat.ImagesDir), data)
+		if err != nil {
+			return err
+		}
+		if res.Refused {
+			return fmt.Errorf("first prompt image %s: %s", filepath.Base(p), res.Message)
+		}
+		meta.FirstImages = append(meta.FirstImages, res.ID)
+	}
+	return WriteMeta(dir, *meta)
 }

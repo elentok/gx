@@ -62,7 +62,7 @@ func (c *ChatDrafts) Start(id string) (ops.ChatDraftResult, error) {
 		return c.startFailed(d, ops.ReasonChatDraftStartFailed, err.Error())
 	}
 	res, err := c.CreateChat(sessions.WebCreateSessionRequest{
-		Project: d.Project, Dir: dir, Name: d.Name, Prompt: withImages(d.Brief, images),
+		Project: d.Project, Dir: dir, Name: d.Name, Prompt: d.Brief, ImagePaths: images,
 		Harness: d.Harness, Model: d.Model, Effort: d.Effort, Workspace: ws,
 	})
 	switch {

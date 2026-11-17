@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -121,7 +122,7 @@ func TestStart_CreateRequestCarriesTheDraftsSettings(t *testing.T) {
 	}
 	want := sessions.WebCreateSessionRequest{Project: "proj", Dir: "/trunk", Name: "n", Prompt: "the brief",
 		Harness: "claude", Model: "m", Effort: "high", Workspace: "Bugs"}
-	if len(r.reqs) != 1 || r.reqs[0] != want {
+	if len(r.reqs) != 1 || !reflect.DeepEqual(r.reqs[0], want) {
 		t.Fatalf("requests = %+v, want %+v", r.reqs, want)
 	}
 }
