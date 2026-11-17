@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/chatdrafts"
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
@@ -27,7 +28,9 @@ func TestWorkspacesRoutes_MoveDraftPublishes(t *testing.T) {
 	servertest.WaitForEvent(ctx, t, f.Evs, wire.EventWorkspacesChanged, "")
 	// moved returns the event types one move published; the sentinel
 	// workspace's event comes after them on the ordered stream.
+	chatEvents := 0
 	moved := func(sentinel string, keys ...string) (workspacesEvents, draftEvents int) {
+		chatEvents = 0
 		t.Helper()
 		if res, err := f.H.Client.Admin.MoveToWorkspace(ctx, "Bugs", keys...); err != nil || res.Results[0].Status != wire.TargetDone {
 			t.Fatalf("move = %+v, %v", res, err)
@@ -41,6 +44,8 @@ func TestWorkspacesRoutes_MoveDraftPublishes(t *testing.T) {
 				switch ev.Type {
 				case wire.EventDesignDraftsChanged:
 					draftEvents++
+				case wire.EventChatDraftsChanged:
+					chatEvents++
 				case wire.EventWorkspacesChanged:
 					workspacesEvents++
 					// the sentinel's own event is the last one
@@ -56,8 +61,15 @@ func TestWorkspacesRoutes_MoveDraftPublishes(t *testing.T) {
 	if w, dr := moved("s1", drafts.MemberKey(d.ID)); w != 2 || dr != 1 {
 		t.Errorf("draft move published %d workspaces-changed and %d design-drafts-changed, want 2 and 1", w, dr)
 	}
+	if chatEvents != 0 {
+		t.Errorf("design draft move published %d chat-drafts-changed, want 0", chatEvents)
+	}
 	if w, dr := moved("s2", "proj:plain"); w != 2 || dr != 0 {
 		t.Errorf("design move published %d workspaces-changed and %d design-drafts-changed, want 2 and 0", w, dr)
+	}
+	chat := chatdrafts.MemberKey(seedChatDraft(t, f.H.StateDir))
+	if w, dr := moved("s3", chat); w != 2 || dr != 0 || chatEvents != 1 {
+		t.Errorf("chat draft move published %d workspaces-changed, %d design-drafts-changed and %d chat-drafts-changed, want 2, 0 and 1", w, dr, chatEvents)
 	}
 }
 

@@ -236,6 +236,7 @@ type fakeDir struct {
 
 func (d fakeDir) DesignExists(key string) bool { return d.designs[key] }
 func (d fakeDir) DraftExists(id string) bool   { return d.drafts[id] }
+func (d fakeDir) ChatDraftExists(string) bool  { return false }
 func (d fakeDir) Sessions() []wire.SessionInfo { return d.sessions }
 func (d fakeDir) RootQueued(string) bool       { return false }
 func (d fakeDir) StopSession(string) error     { return nil }

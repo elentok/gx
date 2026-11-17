@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"strings"
 
+	"github.com/elentok/gx/server/chatdrafts"
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -18,6 +19,8 @@ type Directory interface {
 	DesignExists(key string) bool
 	// DraftExists reports whether a New Design draft with this id exists.
 	DraftExists(id string) bool
+	// ChatDraftExists reports whether a chat draft with this id exists.
+	ChatDraftExists(id string) bool
 	Epic(key string) (tickets.Epic, bool)
 	Sessions() []wire.SessionInfo
 	// RootQueued reports whether any ticket of the `project:epic` root is queued.
@@ -35,6 +38,12 @@ func (s *Store) joinable(key string) error {
 	dir := s.dir()
 	if id, ok := drafts.ParseMemberKey(key); ok {
 		if !dir.DraftExists(id) {
+			return ReasonUnknownKey
+		}
+		return nil
+	}
+	if id, ok := chatdrafts.ParseMemberKey(key); ok {
+		if !dir.ChatDraftExists(id) {
 			return ReasonUnknownKey
 		}
 		return nil

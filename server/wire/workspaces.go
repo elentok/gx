@@ -26,6 +26,19 @@ type DesignDraftRow struct {
 	MemberKey string `json:"member_key"`
 }
 
+// ChatDraftRow is one chat draft in the snapshot: what the sidebar row shows.
+// It carries no brief.
+type ChatDraftRow struct {
+	ID        string    `json:"id"`
+	Label     string    `json:"label"`
+	Project   string    `json:"project"`
+	Harness   string    `json:"harness"`
+	EditedAt  time.Time `json:"edited_at"`
+	Workspace string    `json:"workspace"`
+	// MemberKey is the workspace membership key of this draft.
+	MemberKey string `json:"member_key"`
+}
+
 // ProjectWorktrees is one project in the /v1/projects/worktrees payload: its
 // repo root, the dirs of its other worktrees and the model each tier runs under
 // for the chat harness (empty when that tier inherits the CLI's own setting).

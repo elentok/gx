@@ -2031,6 +2031,10 @@ export interface Snapshot {
    */
   design_drafts?: DesignDraftRow[];
   /**
+   * ChatDrafts are the chat draft rows; filled in by the handler.
+   */
+  chat_drafts?: ChatDraftRow[];
+  /**
    * SkillsInstallProblem is why the skill install `gx server start` ran
    * last did not finish; empty when it did. Filled in by the handler.
    */
@@ -4326,6 +4330,22 @@ export interface DesignDraftRow {
   label: string;
   project: string;
   slug: string;
+  edited_at: string;
+  workspace: string;
+  /**
+   * MemberKey is the workspace membership key of this draft.
+   */
+  member_key: string;
+}
+/**
+ * ChatDraftRow is one chat draft in the snapshot: what the sidebar row shows.
+ * It carries no brief.
+ */
+export interface ChatDraftRow {
+  id: string;
+  label: string;
+  project: string;
+  harness: string;
   edited_at: string;
   workspace: string;
   /**

@@ -51,6 +51,11 @@ func (d workspacesDirectory) DraftExists(id string) bool {
 	return d.s.designs.DraftExists(id)
 }
 
+// ChatDraftExists reports whether a chat draft with this id is stored.
+func (d workspacesDirectory) ChatDraftExists(id string) bool {
+	return d.s.chatDrafts.Exists(id)
+}
+
 func (d workspacesDirectory) RootQueued(key string) bool {
 	root, err := queue.ParseRootRef(key)
 	return err == nil && d.s.queue.RootQueued(root)

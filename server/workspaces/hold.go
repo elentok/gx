@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elentok/gx/server/chatdrafts"
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
@@ -80,7 +81,8 @@ func (s *Store) holdTargetOf(addr string) (holdTarget, *wire.TargetResult) {
 	}
 	addr = strings.TrimSpace(addr)
 	dir := s.dir()
-	if _, isDraft := drafts.ParseMemberKey(addr); isDraft {
+	_, isChat := chatdrafts.ParseMemberKey(addr)
+	if _, isDraft := drafts.ParseMemberKey(addr); isDraft || isChat {
 		return refuse(wire.ReasonHoldNotHoldable, "a draft cannot be held")
 	}
 	if _, _, ok := tickets.ParseEpicAddress(addr); !ok {
@@ -179,11 +181,14 @@ func (s *Store) UnholdEpics(targets []string) (wire.TargetsResult, error) {
 // MoveTargets puts each key in the workspace on its own, in order.
 func (s *Store) MoveTargets(keys []string, workspace string) (wire.TargetsResult, error) {
 	res := wire.TargetsResult{Results: make([]wire.TargetResult, 0, len(keys))}
-	movedDraft := false
+	movedDraft, movedChatDraft := false, false
 	// A draft row carries its workspace, so a moved draft changes the rows.
 	defer func() {
 		if movedDraft {
 			s.events.Publish(wire.EventDesignDraftsChanged, "")
+		}
+		if movedChatDraft {
+			s.events.Publish(wire.EventChatDraftsChanged, "")
 		}
 	}()
 	for _, key := range keys {
@@ -193,6 +198,9 @@ func (s *Store) MoveTargets(keys []string, workspace string) (wire.TargetsResult
 		case err == nil:
 			if _, isDraft := drafts.ParseMemberKey(key); isDraft {
 				movedDraft = true
+			}
+			if _, isChat := chatdrafts.ParseMemberKey(key); isChat {
+				movedChatDraft = true
 			}
 			res.Results = append(res.Results, wire.TargetResult{Target: key, Status: wire.TargetDone})
 		case errors.As(err, &reason):

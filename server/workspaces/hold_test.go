@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server/chatdrafts"
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
@@ -137,6 +138,22 @@ func TestHold_RefusesOneOffsFollowUpsAndUnknown(t *testing.T) {
 func TestHold_RefusesDraftKey(t *testing.T) {
 	f := holdFixture(t)
 	key := drafts.MemberKey("0123456789abcdef")
+	res := hold(t, f, true, false, key)
+	if r := res.Results[0]; !r.Refused() || r.Reason != wire.ReasonHoldNotHoldable || len(res.Held) != 0 {
+		t.Errorf("hold %s = %+v, want not-holdable and nothing held", key, res)
+	}
+	un, err := f.H.Client.Admin.UnholdEpics(f.Ctx, []string{key})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := un.Results[0]; !r.Refused() || r.Reason != wire.ReasonHoldNotHoldable {
+		t.Errorf("unhold %s = %+v, want not-holdable", key, un)
+	}
+}
+
+func TestHold_RefusesChatDraftKey(t *testing.T) {
+	f := holdFixture(t)
+	key := chatdrafts.MemberKey("0123456789abcdef")
 	res := hold(t, f, true, false, key)
 	if r := res.Results[0]; !r.Refused() || r.Reason != wire.ReasonHoldNotHoldable || len(res.Held) != 0 {
 		t.Errorf("hold %s = %+v, want not-holdable and nothing held", key, res)

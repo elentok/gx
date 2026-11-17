@@ -11,6 +11,10 @@ export const ChatDraftFolderWorktree = "worktree";
  */
 export type ChatDraftFolder = typeof ChatDraftFolderSource | typeof ChatDraftFolderTrunk | typeof ChatDraftFolderWorktree;
 /**
+ * ReasonChatDraftStartFailed: Start hit an error that is not a refusal; the draft stays.
+ */
+export const ReasonChatDraftStartFailed = "start-failed";
+/**
  * ChatDraft is a brief and the launch settings of a chat that does not exist
  * yet. Dir is the resolved folder for source and trunk, empty for worktree
  * until Start. Worktree names the new worktree; WorktreePath is set once Start

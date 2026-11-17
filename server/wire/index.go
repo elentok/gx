@@ -141,6 +141,8 @@ type Snapshot struct {
 	Placements []SessionPlacement `json:"placements,omitempty"`
 	// DesignDrafts are the draft rows; filled in by the handler.
 	DesignDrafts []DesignDraftRow `json:"design_drafts,omitempty"`
+	// ChatDrafts are the chat draft rows; filled in by the handler.
+	ChatDrafts []ChatDraftRow `json:"chat_drafts,omitempty"`
 	// SkillsInstallProblem is why the skill install `gx server start` ran
 	// last did not finish; empty when it did. Filled in by the handler.
 	SkillsInstallProblem string `json:"skills_install_problem,omitempty"`

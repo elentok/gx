@@ -20,10 +20,12 @@ type fakeDesigns struct {
 	Directory
 	designs map[string]bool
 	drafts  map[string]bool
+	chats   map[string]bool
 }
 
-func (f fakeDesigns) DesignExists(key string) bool { return f.designs[key] }
-func (f fakeDesigns) DraftExists(id string) bool   { return f.drafts[id] }
+func (f fakeDesigns) ChatDraftExists(id string) bool { return f.chats[id] }
+func (f fakeDesigns) DesignExists(key string) bool   { return f.designs[key] }
+func (f fakeDesigns) DraftExists(id string) bool     { return f.drafts[id] }
 
 func open(t *testing.T, dir string, b *broker.Broker) *Store {
 	t.Helper()
