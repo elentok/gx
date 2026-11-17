@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.51.4 - 2026-11-17
+
+- Fixed the web chat losing auto-scroll when content shrinks.
+
 ## v0.51.3 - 2026-11-17
 
 - Added a Rest feature for mental health. A Rest screen locks the UI for a Break (with countdown) or Bedtime. "Unlock anyway" is an input on the screen. Warning toasts show top-right before a Break or Bedtime. Queued tickets and running agents keep working under Rest. New settings keys, `gx rest` verbs, and a Mental health card in Stats. The Rest screen works with the keyboard.
