@@ -19,14 +19,22 @@ var herdrImporters = []string{
 func TestOnlyAllowedPackagesImportHerdr(t *testing.T) {
 	for _, pkg := range importersOf(t, "github.com/elentok/gx/herdr") {
 		if !slices.Contains(herdrImporters, pkg) {
-			t.Errorf("%s imports the herdr package; go through agentrunner.Runner", pkg)
+			t.Errorf("%s imports the herdr package; herdr is only a terminal multiplexer, so only the packages in herdrImporters may use it", pkg)
 		}
 	}
 }
 
+// vtImporters may import x/vt. testutil/vtterm is a test-only rig that needs
+// the raw emulator for cursor and cell colours, so it does not go through
+// agentrunner/screen.
+var vtImporters = []string{
+	"github.com/elentok/gx/agentrunner/screen",
+	"github.com/elentok/gx/testutil/vtterm",
+}
+
 func TestOnlyScreenImportsVT(t *testing.T) {
 	for _, pkg := range importersOf(t, "github.com/charmbracelet/x/vt") {
-		if pkg != "github.com/elentok/gx/agentrunner/screen" {
+		if !slices.Contains(vtImporters, pkg) {
 			t.Errorf("%s imports x/vt; go through agentrunner/screen", pkg)
 		}
 	}

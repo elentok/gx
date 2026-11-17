@@ -28,16 +28,6 @@ func TestHerdrConfigWarnsOnceAndRunsOnPty(t *testing.T) {
 	r.WaitStatus(t, project+":herdr-config-epic/01", "claimed")
 }
 
-// skipWhileHerdrRunnerExists skips while the herdr runner is still built, when
-// a leftover herdr run pauses as "herdr unavailable" instead of reading as a
-// gone agent. The herdr-runner deletion ticket makes this a no-op.
-func skipWhileHerdrRunnerExists(t *testing.T, ticketBody string) {
-	t.Helper()
-	if strings.Contains(ticketBody, "herdr unavailable") {
-		t.Skip("the herdr runner is still built; leftover herdr runs read as gone agents once it is deleted")
-	}
-}
-
 func TestHerdrLeftoverEmptyReopensOnPty(t *testing.T) {
 	r := start(t, "herdr-leftover-empty")
 	reopened := false
@@ -48,9 +38,7 @@ func TestHerdrLeftoverEmptyReopensOnPty(t *testing.T) {
 		t.Fatal("the ticket was neither reopened nor paused")
 	}
 	if !reopened {
-		body := r.epicTicketFile(t, "herdr-empty-epic")
-		skipWhileHerdrRunnerExists(t, body)
-		t.Fatalf("the start did not reopen the ticket:\n%s", body)
+		t.Fatalf("the start did not reopen the ticket:\n%s", r.epicTicketFile(t, "herdr-empty-epic"))
 	}
 	r.WaitStatus(t, spec.HerdrLeftoverEmptyTicket, "claimed")
 }
@@ -62,7 +50,6 @@ func TestHerdrLeftoverWorkPausesHandleMismatch(t *testing.T) {
 	if !strings.Contains(body, "pause_reason: handle-mismatch") {
 		t.Fatalf("ticket is not paused handle-mismatch:\n%s", body)
 	}
-	skipWhileHerdrRunnerExists(t, body)
 	paused := r.Gx(t, "tickets", "paused", spec.HerdrLeftoverWorkTicket)
 	for _, want := range []string{"herdr runner was removed", "Retry or Start over ends this pause"} {
 		if !strings.Contains(body+paused, want) {
