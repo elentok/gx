@@ -104,9 +104,19 @@ func TestTestReviewSkill(t *testing.T) {
 		".ai/index.md",
 		"(../gx-code-review/SKILL.md)",
 		"consultant triage",
+		"(../gx-go-tests/SKILL.md)",
+		"(../gx-vitest-tests/SKILL.md)",
+		"(../gx-playwright-tests/SKILL.md)",
+		"**Meaningful coverage:**",
+		"**Assertions that pass early:**",
+		"**Timing assumptions:**",
+		"**Isolation:**",
+		"**Cleanup:**",
+		"**Diagnostics:**",
+		"needs a disposer",
 	)
 	text := normalizeSpace(readFile(t, "gx-test-review/SKILL.md"))
-	for _, bad := range []string{"go test", "gx check", "gx brief"} {
+	for _, bad := range []string{"go test", "gx check", "gx brief", "gx-playwright-e2es"} {
 		if strings.Contains(text, bad) {
 			t.Errorf("gx-test-review/SKILL.md names a command to run: %q", bad)
 		}
@@ -168,7 +178,6 @@ func TestGxOnlyE2esSkillIsWired(t *testing.T) {
 
 func TestPlaywrightE2esSkillIsWired(t *testing.T) {
 	checkAnchors(t, "gx-to-tickets/SKILL.md", "gx-playwright-tests")
-	checkAnchors(t, "gx-test-review/SKILL.md", "(../gx-playwright-tests/SKILL.md)")
 }
 
 func TestGxUICheckBlocksWorkersByDefault(t *testing.T) {
