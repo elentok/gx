@@ -48,8 +48,19 @@ export function MermaidDiagram({ source, onSettled }: { source: string; onSettle
     <Box
       data-diagram="done"
       overflowX="auto"
-      css={{ "& svg": { display: "block", marginInline: "auto" } }}
-      // Mermaid's strict security level sanitizes the SVG it returns.
+      css={{
+        "& svg": { display: "block", marginInline: "auto" },
+        // Pele reads these CSS variables, so the diagram takes the app's dark palette.
+        "--pele-bg": "{colors.surface}",
+        "--pele-fg": "{colors.text}",
+        "--pele-muted": "{colors.text.dim}",
+        "--pele-line": "{colors.text.dim}",
+        "--pele-surface": "{colors.surface.raised}",
+        "--pele-surface-alt": "{colors.sidebar}",
+        "--pele-border": "{colors.border}",
+        "--pele-accent": "{colors.tone.running.fg}",
+      }}
+      // Pele emits SVG text only: no HTML labels, and link schemes are restricted.
       dangerouslySetInnerHTML={{ __html: state.svg }}
     />
   )

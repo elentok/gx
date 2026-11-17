@@ -19,10 +19,10 @@ test("204. Hosted files, wide", async ({ page, start }) => {
   const hf = fixture.hostFiles!
   const plan = join(hf.repo, "docs/plans/host-files.md")
 
-  // The Mermaid bundle is requested only when a diagram shows: a Markdown file without one asks for none.
+  // The Pele bundle (the `pele/lazy` chunk) is requested only when a diagram shows: a Markdown file without one asks for none.
   const bundleRequests: string[] = []
   page.on("request", (r) => {
-    if (/mermaid/i.test(new URL(r.url()).pathname)) bundleRequests.push(r.url())
+    if (/\/assets\/lazy-/.test(new URL(r.url()).pathname)) bundleRequests.push(r.url())
   })
   await go(page, `#/files${join(hf.repo, "docs/plans/other.md")}`)
   await expect(page.getByRole("heading", { name: "Other", level: 1 })).toBeVisible()
@@ -268,7 +268,7 @@ test("204. Hosted files, wide", async ({ page, start }) => {
   await view("docs/plans/host-files.md")
   const md = page.getByTestId("markdown-view")
   await expect(md.getByRole("heading", { name: "Host files plan", level: 1 })).toBeVisible()
-  await expect(md.locator("svg[aria-roledescription='flowchart-v2']")).toBeVisible()
+  await expect(md.locator("svg[aria-roledescription='flowchart']")).toBeVisible()
   const handlerLink = md.getByRole("link", { name: "the handler" })
   await expect(handlerLink).toHaveAttribute("href", /#\/files\/.*\/server\/files\/handler\.go$/)
   const picture = md.getByRole("img", { name: "pic" })

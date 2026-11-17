@@ -8,20 +8,19 @@ import { stubResolver } from "./stubResolver.testutil"
 
 const mocks = vi.hoisted(() => ({
   factory: vi.fn(),
-  initialize: vi.fn(),
-  render: vi.fn(),
+  renderAsync: vi.fn(),
 }))
 
-vi.mock("mermaid", () => {
+vi.mock("pele/lazy", () => {
   mocks.factory()
-  return { default: { initialize: mocks.initialize, render: mocks.render } }
+  return { renderAsync: mocks.renderAsync }
 })
 
 const settle = () => act(async () => {})
 const scrollIntoView = vi.fn()
 
 beforeEach(() => {
-  mocks.render.mockImplementation(async () => ({ svg: "<svg data-testid='dia'></svg>" }))
+  mocks.renderAsync.mockImplementation(async () => ({ svg: "<svg data-testid='dia'></svg>" }))
   Element.prototype.scrollIntoView = scrollIntoView
 })
 afterEach(() => vi.clearAllMocks())
@@ -42,10 +41,10 @@ async function markdown(text: string, heading?: string) {
 
 describe("Mermaid", () => {
   // First on purpose: the loader keeps the module once any later test has imported it.
-  it("never imports mermaid for a Markdown file without a fence", async () => {
+  it("never imports pele for a Markdown file without a fence", async () => {
     await markdown("# Title\n\n```js\nconst a = 1\n```\n")
     expect(mocks.factory).not.toHaveBeenCalled()
-    expect(mocks.render).not.toHaveBeenCalled()
+    expect(mocks.renderAsync).not.toHaveBeenCalled()
   })
 
   it("renders a Mermaid file as a diagram with strict security, and Source shows the text", async () => {
@@ -60,10 +59,7 @@ describe("Mermaid", () => {
     }
     const { container, getByText } = renderThemed(<Toggle />)
     await settle()
-    expect(mocks.render).toHaveBeenCalledWith(expect.any(String), "graph TD; A-->B")
-    expect(mocks.initialize).toHaveBeenCalledWith(
-      expect.objectContaining({ securityLevel: "strict" }),
-    )
+    expect(mocks.renderAsync).toHaveBeenCalledWith("graph TD; A-->B", expect.objectContaining({ responsive: false }))
     expect(container.querySelector("svg")).not.toBeNull()
     await act(async () => getByText("source").click())
     expect(container.querySelector("svg")).toBeNull()
@@ -73,12 +69,13 @@ describe("Mermaid", () => {
   it("renders one diagram per mermaid fence", async () => {
     const text = "```mermaid\ngraph TD; A-->B\n```\n\ntext\n\n```mermaid\ngraph LR; C-->D\n```\n"
     const { container } = await markdown(text)
-    expect(mocks.render).toHaveBeenCalledTimes(2)
+    await settle()
+    expect(mocks.renderAsync).toHaveBeenCalledTimes(2)
     expect(container.querySelectorAll("svg")).toHaveLength(2)
   })
 
   it("shows the error text and the source when a render fails", async () => {
-    mocks.render.mockRejectedValue(new Error("Parse error on line 1"))
+    mocks.renderAsync.mockRejectedValue(new Error("Parse error on line 1"))
     const { container, getByRole } = renderThemed(
       <MermaidView text="not a diagram" source={false} />,
     )
@@ -112,7 +109,7 @@ describe("heading scroll", () => {
 
   it("waits for diagrams to render before scrolling", async () => {
     let finish!: (v: { svg: string }) => void
-    mocks.render.mockReturnValue(new Promise((r) => (finish = r)))
+    mocks.renderAsync.mockReturnValue(new Promise((r) => (finish = r)))
     await markdown("```mermaid\ngraph TD; A-->B\n```\n\n## Usage\n", "usage")
     expect(scrollIntoView).not.toHaveBeenCalled()
     await act(async () => finish({ svg: "<svg></svg>" }))
