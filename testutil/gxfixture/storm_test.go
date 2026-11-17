@@ -65,8 +65,9 @@ func TestSessionStormExitsTheSessionAndPausesNoTicket(t *testing.T) {
 }
 
 // raiseProcessCap lifts the soft process limit by extra (never above the hard
-// limit) for the test: scripts/proc-cap leaves 200 spare processes, fewer than
-// the burst tree needs. The limit goes back when the test ends.
+// limit) for the test: scripts/proc-cap leaves 800 spare processes, fewer than
+// the burst tree needs. The raise applies only to this test; its siblings in
+// the same binary do not get it. The limit goes back when the test ends.
 func raiseProcessCap(t *testing.T, extra uint64) {
 	t.Helper()
 	var lim unix.Rlimit

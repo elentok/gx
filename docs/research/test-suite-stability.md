@@ -33,14 +33,16 @@ From the repository root, replace the package and test placeholders:
 
 ```sh
 # Reproduce without a cached success.
-gx brief go-test -exec "$PWD/scripts/proc-cap" ./PACKAGE -run 'TestName$' -count=1
+gx brief go-test ./PACKAGE -run 'TestName$' -count=1
 
 # Only for an assigned flake investigation, use a fixed repeat budget.
-gx brief go-test -exec "$PWD/scripts/proc-cap" ./PACKAGE -run 'TestName$' -count=10 -shuffle=on
+gx brief go-test ./PACKAGE -run 'TestName$' -count=10 -shuffle=on
 
 # Replay the recorded seed. Use -race for shared-memory investigations.
-gx brief go-test -exec "$PWD/scripts/proc-cap" ./PACKAGE -run 'TestName$' -count=1 -shuffle=12345 -race
+gx brief go-test ./PACKAGE -run 'TestName$' -count=1 -shuffle=12345 -race
 ```
+
+`gx brief go-test` already adds the process cap (`scripts/proc-cap`) itself, so the examples do not pass `-exec`.
 
 Never run `go test ./...` locally. Scope server iterations with `-run`. Stop after required targeted checks pass. A dedicated reliability task may define a separate bounded validation sample.
 

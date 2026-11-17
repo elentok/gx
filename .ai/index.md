@@ -86,7 +86,7 @@ A new config key must reach the settings page or be excluded with a reason:
 - Never run `go clean -cache` directly, use `gx brief go-clean-cache`.
 - Once a targeted run passes, stop. Don't rerun the full suite to double-check.
 - Run every `go test` with `-exec "$PWD/scripts/proc-cap"` (the Makefile does). It caps your user's
-  process count at the current count + 200, so a test binary that forks itself (a `TestMain` missing
+  process count at the current count + 800, so a test binary that forks itself (a `TestMain` missing
   `servertest.RunSessionProcesses()` or `cmdtest.Main`) fails fast instead of
   crashing the laptop. A package using `servertest` needs `servertest.RunSessionProcesses()` (or
   `cmdtest.Main`); the testmainguard check requires only that call.
