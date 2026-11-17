@@ -839,6 +839,19 @@ func TestInvestigateNamesCodexSessionLookup(t *testing.T) {
 	}
 }
 
+// TestInvestigateHasNoHerdrNames pins the investigator guide to PTY-hosted
+// agents: these structural names belong to a runner that no longer exists.
+func TestInvestigateHasNoHerdrNames(t *testing.T) {
+	for _, file := range []string{"gx-investigate/SKILL.md", "gx-investigate/gotchas.md"} {
+		raw := strings.ToLower(readFile(t, file))
+		for _, banned := range []string{"herdr", "tabcreate", "agent_pane_busy"} {
+			if strings.Contains(raw, banned) {
+				t.Errorf("%s must not name %q", file, banned)
+			}
+		}
+	}
+}
+
 // TestFollowUpAddHasOneRoute pins gx-follow-up as the only skill that files a
 // follow-up: any other caller naming the verb would skip its dedupe.
 func TestFollowUpAddHasOneRoute(t *testing.T) {

@@ -534,7 +534,7 @@ links:                 # optional, any type: buttons on the card
   the ticket is not **answered**.
 
 Scope is **voluntary** asks only: a question the agent itself decides it needs answered. An
-involuntary interactive prompt gx catches from outside (herdr reporting the pane as `blocked`) is the
+involuntary interactive prompt gx catches from outside (the runner reporting the agent as blocked, for example at a permission prompt) is the
 orchestrator gate's problem, not the agent's, and follows a different path.
 
 ## The `## Needs Repair` section

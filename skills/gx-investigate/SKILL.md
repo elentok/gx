@@ -22,7 +22,7 @@ frontmatter; `Frontier` filters to open, unblocked, unclaimed tickets, lowest nu
 `RunScope` narrows that further when the caller requested specific ticket IDs — walking each
 ticket's `Parent` chain so mid-run forks and code-review-spawned tickets stay in scope
 dynamically. Each scheduling pass claims a frontier ticket, launches an iteration (new git
-worktree, agent started via `herdr`, the `gx-implement` skill prompt sent), waits for completion
+worktree, agent started on the PTY runner, the `gx-implement` skill prompt sent), waits for completion
 or a pause condition (smart-zone context ceiling, rate limit), cherry-picks the resulting commits
 onto the epic's feature branch, and marks the ticket done. A freed slot is immediately backfilled
 from the frontier. `Run` exits once every ticket in scope reaches a done-family status.
@@ -61,10 +61,16 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
   `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl` (default `~/.codex/sessions`); find it by the
   session id. If you suspect a Codex format mismatch, run `gx codex doctor`: its rollout-format
   check names the missing field.
-- **`herdr`** (pane/session driver) is an external binary gx shells out to — its own pane/session
-  state isn't a file in this repo and isn't readable through gx. If the symptom is at the
-  tmux-pane level (hung pane, wrong agent launched), you're debugging herdr's process, not gx's
-  state.
+- **PTY agent state** — agents run on the PTY runner. Each has a directory under
+  `nativerunner.AgentsRoot(stateDir, project)` (`nativerunner/agentdir.go`, i.e.
+  `<state dir>/agents/<project>/`) holding a `meta.json` (`nativerunner.Meta`,
+  `nativerunner/launch.go`: runner, agent pid, holder pid, session id, label, epic, cwd). The
+  holder is the process that owns the agent's terminal. The run registry `runs.json` in the state
+  dir (`server/runs/registry.go`, `runs.Run`: `runner`, `session`, `address`) maps a ticket to its
+  live session. Read an agent without attaching with the `gx agents` verbs: `list`, `screen`
+  (the terminal as plain text), `chat`, `permission` (a blocking dialog). See `gx agents --help`.
+  A symptom below the gx layer (a hung terminal, the wrong program running) belongs to the agent
+  program, not to gx's state: read `screen` and the transcript before reading scheduler code.
 - **`gx.log`** (relative to cwd, e.g. `ralphloop/gx.log` when gx is run from there) is Bubble Tea's
   TUI debug log, written by any `logger.Debug()` call in the UI packages — global per process
   invocation, unrelated to ralph-loop scheduling. Don't confuse it with `run-log.jsonl`.
@@ -96,7 +102,7 @@ cpu-watchdog: that process stayed above `cpu-watchdog.threshold-percent` of one 
 holds:
 
 - `summary.md`: one row per 10s sample, **self** (gx's own Go code) vs **children** (subprocesses
-  that exited in that interval: `herdr`, `git`, …).
+  that exited in that interval: `git`, `rg`, `pnpm`, …).
 - `cpu.pprof`: a 20s CPU profile taken right after the spike fired. Symbols are embedded, so no
   binary is needed: `go tool pprof -top -cum <dir>/cpu.pprof`, then `-list '<func regexp>'` on the
   hot functions. `-top` sorts by own time, `-cum` by time including callees.
@@ -110,9 +116,9 @@ Read the split first; it decides where to look:
    (de)serialization of a large snapshot per event.
 2. **Children is high** → the profile shows little; the cost is processes gx starts. Look in
    `goroutines.txt` for goroutines sitting in `os/exec` (`(*Cmd).Wait`, `forkExec`) and walk up to
-   the gx loop that starts them. Typical shape: a wait/poll loop around `herdr agent wait` or
-   `herdr agent get` whose sleep is skipped when herdr answers at once (fixed once in
-   the herdr runner's `Wait`), or a `git` call per ticket per tick.
+   the gx loop that starts them. Typical shape: a wait/poll loop around the runner's status call
+   (`agentrunner.Runner`, `WaitForFinish` in `ralphloop/supervise/waitforfinish.go`) whose sleep is
+   skipped when the call answers at once, or a `git` call per ticket per tick.
 3. **Profile empty or missing** → `summary.md` lists any capture error. The spike may have ended
    before profiling started; say so and use the goroutine dump alone.
 
@@ -215,7 +221,7 @@ session. Everything above (background, state, diagnosis) applies unchanged; only
   with an offer ("say go and I'll…", "want me to file this?"), and never end on an "Open
   question": decide, or run `gx tickets ask` if a person must answer. Do the allowed action, or
   name the command for a human in the report.
-- **Write the diagnosis into your own ticket** before the finish report, so it outlives the pane:
+- **Write the diagnosis into your own ticket** before the finish report, so it outlives the session:
   `gx tickets section <your-addr> Findings -` with the final report (see Final report) on stdin.
   Do this in every unattended ending, including `No catalog entry matched`.
 - **Write files with Write, in their own call.** Put the findings (and any `recommend` diagnosis)
@@ -251,8 +257,8 @@ write `## Findings`, report, and run no recovery verb.
 **Choose the ending by status first, then completeness.**
 
 - `paused`, class `answer` → never merge or start over. Route to answer-then-resume: the human
-  answers the open question (`m` menu → "Answer…", `gx tickets answer`, or "Watch" to jump to a live
-  pane), then `gx server tickets resume <project:epic/NN>` (or `m` → "Resume (I answered)").
+  answers the open question (`m` menu → "Answer…", `gx tickets answer`, or "Watch" to jump to the live
+  session), then `gx server tickets resume <project:epic/NN>` (or `m` → "Resume (I answered)").
 - `claimed` / `paused`, class `repair` (`merge` also accepts `done`; `start-over` needs `--force` for
   `done`):
   - Complete → `gx server tickets merge <project:epic/NN> --json`. Commits already merged with a
@@ -287,7 +293,7 @@ looking at when you found it:
   have built) — publish as a `type: research` ticket in that epic (`<root>/<epic-slug>/`),
   following gx-local-tracker.md's template: what's wrong, the evidence (log lines, ticket IDs),
   and a suggested fix direction. A follow-up fix ticket can then `blocked_by` it.
-- **Bug is in gx/ralph-loop tooling itself** (scheduler, a skill's own instructions, herdr
+- **Bug is in gx/ralph-loop tooling itself** (scheduler, a skill's own instructions, runner
   plumbing) surfaced *while* running some epic, but not part of what that epic's tickets asked
   for — file it with the `gx-follow-up` skill instead, even though you found it investigating a
   specific epic. Don't clutter that epic's own issue list with a finding about gx itself.

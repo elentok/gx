@@ -65,55 +65,21 @@ archived and renumbered, and the tracker isn't on every machine.
   Same failure shape as the `epicCompleteText` `(s)` gotcha below, in the newer batch-join path.
   Found live: in one run 19/26 telegram `notify_kind: batch` sends 400'd; the 7 that succeeded
   matched exactly the 7 notifications the user reported receiving. Not fixed as of this entry.
-- **Nudge-retry exhaustion on the initial `herdr agent wait --until working` launch step leaves a
-  ticket Paused (repair) with a live, never-prompted pane leaked.** `promptWithNudge`
-  (`ralphloop/deps/deps.go`) only resends bare Enter, never the actual prompt text, across its
-  3 nudges (`promptMaxNudges`, 45s each); if the agent never
-  reaches `working` before all 3 exhaust, no prompt content was ever delivered, and the created
-  pane/tab is left alive with an empty prompt box — the former `loop.go`'s generic `r.err != nil` catch-all
-  (since removed) paused the ticket (repair) with no `iteration-started`
-  logged and no cleanup of the orphaned pane. Found live: the pane sat idle at Claude Code's
-  fresh welcome screen ~2min after launch. Fixed:
-  `promptWithNudge` now diffs a pane-text snapshot per attempt and retypes the full prompt (capped
-  by `promptMaxRetypes`) instead of nudging when nothing changed, returning `errStuckSubmission`
-  once retypes are exhausted; `runIteration` retries once against a fresh pane on that error and
-  closes whichever pane it finally gives up on.
-- **Reclaiming an already-live pane via `reattachIteration` logs no `iteration-started`, so the
-  Queue spinner and the epic's "N paused" count both go stale.** `resumeReattachable`
-  (formerly `ralphloop/loop.go`) routes a reclaim of a ticket with a still-live tab/pane through
-  `reattachIteration`, which deliberately sets `StartEvent=""` (`ralphloop/lifecycle.go`);
-  that gates off both the run-log event and `sink().IterationStarted`
-  (`ralphloop/supervise/startprompt/startandprompt.go`). The UI spinner (`ui/tickets/live_row.go`) and the epic-paused
-  count (in the since-deleted `ui/tickets/loop_registry.go`) both only updated on
-  `IterationStarted`/`TicketReattached`/`IterationPaused` events, never recomputing from ticket
-  status directly — so a ticket can sit `claimed` with `gx` genuinely still polling it (confirmed
-  live via the `herdr agent wait` process) while the UI shows no spinner and the epic title stays
-  stuck at a stale paused count. Found live on the same stalled pane as the entry below, retried
-  3x. The paused-count half went away when the cutover deleted the loop registry; re-check the
-  spinner half against the server before relying on it.
-- **`attachToLiveAgent` treats a permanently-stalled idle pane as "already finished," pausing a
-  second ticket zero-commit with no real work attempted.** A ticket that already leaked a pane/tab
-  from a failed launch (the `agent_prompt_stalled` gotcha below) can, on reclaim, collide (`agent_name_taken`) with
-  that same leaked agent name; `attachToLiveAgent` (`ralphloop/launch.go`) reattaches to it
-  and, since its status is `idle`, logs `iteration-started`/`-finished` back-to-back with no
-  `AgentPrompt`/`waitForFinish` ever run — `promptWithNudge`'s stall-retry never gets a chance.
-  `finishIteration` then pauses the ticket with `pause_reason: zero-commit` against the
-  *new*, unused tab, while the actually-stalled agent sits untouched in the *old* leaked one — two
-  live tabs end up under one label. Found live: the session id on the ticket matched the
-  *original* stalled session (`state_change_seq` unchanged since). Not fixed as of this entry.
-- **A `herdr agent prompt agent_prompt_stalled` error leaves a ticket Paused (repair) with no
-  `iteration-started` ever logged, and the retry code that exists doesn't cover it.**
-  `iteration-started` is logged only after `AgentPrompt` succeeds (`ralphloop/supervise/startprompt/startandprompt.go`);
-  a failed prompt-send returns before that line ever runs. There's a nudge-retry
-  (`promptWithNudge`, `ralphloop/deps/deps.go`) but it only fires when the error text contains
-  "timed out" (`isPollTimeout`, `ralphloop/supervise/waitforfinish.go`) — herdr's stalled-prompt
-  message ("produced no observed state change within 5000 ms") doesn't match, so it's one-shot.
-  Ends up in the same generic `r.err != nil` catch-all as `agent_pane_busy` below
-  (formerly `ralphloop/loop.go`); clear the ticket back to `open` to reclaim, same as that entry —
-  but reclaim leaks a second herdr tab (`TabCreate` has no collision detection) since the failed
-  launch never cleaned up its own pane. Fixed by widening `isPollTimeout` to also match
-  `agent_prompt_stalled`/"no observed state change" (`ralphloop/supervise/waitforfinish.go`); the
-  pane/tab-leak-on-reclaim part is still open.
+- **A launch prompt that never takes effect leaves a ticket Paused (repair) as `agent_prompt_stalled`
+  (card "Could not start the agent"), with no `iteration-started` logged.** The runner retries the
+  prompt first (`PromptNudged` run-log events, `events.PromptNudged`, written in
+  `server/sched/launch.go`); `startprompt.StartAndPrompt`
+  (`ralphloop/supervise/startprompt/startandprompt.go`) relaunches once on a prompt the agent never
+  picked up, then maps the failure to `agent_prompt_stalled` or `agent_name_taken`. Recovery: Retry
+  or Start over on the ticket. The fixture `hung-pane-twice` (`testutil/gxfixture/spec/recovery.go`)
+  reproduces it.
+- **Reclaiming an already-live session via `reattachIteration` logs no `iteration-started`.**
+  `reattachIteration` deliberately sets `StartEvent=""` (`ralphloop/lifecycle.go`), which gates off
+  both the run-log event and `sink().IterationStarted`
+  (`ralphloop/supervise/startprompt/startandprompt.go`), so a reclaimed ticket sits `claimed` with
+  gx still waiting on it and no `iteration-started` in `run-log.jsonl`. The Queue spinner no longer
+  depends on that event: the web UI draws it from the row's status bucket (`isRunning` in
+  `webui/src/epic/rows.ts`), so a claimed ticket shows it.
 - **`type: code-review` tickets always stall as Paused (`pause_reason: zero-commit`)
   under ralph-loop.** `gx-implement/SKILL.md` told the agent to "follow the gx-code-review
   skill instead," which the agent read as invoking a skill by name (Skill tool) — but `gx-code-review` sets
@@ -125,13 +91,6 @@ archived and renumbered, and the tracker isn't on every machine.
   command already resolved isn't blocked by `disable-model-invocation` the way an in-session
   Skill-tool call is. `gx-implement/SKILL.md` keeps a short note for the manual-invocation edge
   case only.
-- **Every ticket in an epic ends up Paused (repair) on first claim, so the whole epic pauses.**
-  `ralphloop/worktree/labels.go`'s `IterationLabel` (`epicName + "-iter-" + identifier`, no length cap) is used
-  verbatim as the herdr agent name; epic slugs of 25+ chars push double-digit-ticket labels past
-  herdr's 32-char `invalid_agent_name` limit, and herdr's error isn't special-cased the way
-  `agent_name_taken` is, so it falls into the generic non-fatal repair-pause path and every
-  ticket fails identically. Found live: a 27-char slug gave 34-char labels, and every ticket was
-  rejected. Not fixed as of this entry.
 - **A ticket forked 4 times (`02a`→`02a1`→`02a2`→`02a3`) despite `gx-to-tickets`
   already having the rules to catch it.** The ticket named 3 independent variants (SKILL.md's
   "variant fan-out" rule, N>couple should split) whose tests fell across 4 different files each
@@ -140,22 +99,13 @@ archived and renumbered, and the tracker isn't on every machine.
   neither rule fired. Not fixed as of this entry; the fix direction is a file-count trigger for
   the explore/implement split.
 
-- **A smart-zone `/compact` gets cancelled by gx's own finish-up prompt when herdr reports the pane
-  idle/done during compaction.** `waitForCompactionSignal` (`ralphloop/supervise/waitforfinish.go`) returns
-  success on *any* non-error `AgentWait`, consulting the transcript's compaction-boundary count only
-  on a wait *timeout* past `smartZoneCompactTimeoutMs` (5 min) — so a prematurely-idle pane bypasses
-  the very signal `compactSignalUnconfirmed` had just used to prove compaction hadn't finished, and
-  the finish-up prompt arrives as queued input that aborts the compaction. Found live: the whole
-  compact+finish-up contract completed in 4.5s, the second breach reported identical occupancy,
-  and the session's only `compact_boundary` belonged to the *second* `/compact`. Not fixed as of
-  this entry.
-
-- **`agent_pane_busy` on `herdr agent start` pauses a ticket (repair) with no
-  `iteration-started` logged at all.** `--pane` is herdr's own `RootPaneID` from `tab create`, not
-  allocated/pooled by gx (`ralphloop/lifecycle.go` → `herdr/tab.go` →
-  `launch.go:76,220-225`); two tickets launching concurrently under `MaxParallel` can race inside
-  herdr's own pane allocator (external binary, no gx-side mutex around the herdr CLI calls). Not a
-  gx-source bug; unstick by clearing the ticket back to `open` for the scheduler to reclaim.
+- **A smart-zone `/compact` gets cancelled by gx's own finish-up prompt when the runner reports the
+  agent idle/done during compaction.** `waitForCompactionSignal` (`ralphloop/supervise/waitforfinish.go`)
+  returned success on *any* non-error wait, so a prematurely-idle agent bypassed the compaction-boundary
+  signal and the finish-up prompt arrived as queued input that aborted the compaction. Found live: the
+  whole compact+finish-up contract completed in 4.5s, the second breach reported identical occupancy,
+  and the session's only `compact_boundary` belonged to the *second* `/compact`. Fixed: the premature-idle
+  gate (`compactGateConfirmed`, `WaitForFinish`) confirms against the transcript's compaction boundaries first.
 
 Older entries below describe a `children` frontmatter field that no longer exists: fork descendants
 are now derived from `parent` alone (see [gx-local-tracker.md](../gx-local-tracker.md)). They are
@@ -291,13 +241,13 @@ kept as history of what the code did at the time, not as a description of today'
   fine.** A parent ticket doing a mid-flight fork (e.g. `06` → `06b`) can still be actively
   authoring the child ticket's file (full-content file write (`Write`), not `gx tickets set`) *after* the
   scheduler has already claimed and launched an independent iteration for that child — the
-  child's own agent was already running under a live herdr session. The parent's plain-file
+  child's own agent was already running under a live session. The parent's plain-file
   overwrite of `06b.md` clobbers the `status: claimed` the scheduler had just set, reverting it to
   `open`; the next `scheduler-scan` sees it unclaimed and re-launches a second iteration under the
-  *same* deterministic herdr agent name, which collides with the still-alive original
+  *same* agent label, which collides with the still-alive original
   (`agent_name_taken`). the former `ralphloop/loop.go`'s `r.err != nil` path treats the failed
   launch as non-fatal: pauses that ticket (repair) and fires `IterationPaused`
-  (`"{label} paused"` notification quoting the herdr error) but keeps scheduling. Harmless when
+  (`"{label} paused"` notification quoting the runner's error) but keeps scheduling. Harmless when
   the original iteration finishes normally afterward (its `done` write overwrites the spurious
   pause), but the underlying race — two unsynchronized writers (ralph-loop's
   `Claim()`/`SetStatus()` vs. an agent's raw file write (`Write`)) sharing one ticket file with no locking
@@ -313,11 +263,11 @@ kept as history of what the code did at the time, not as a description of today'
 - **A stuck `claimed` ticket had no recovery path but hand-run git.** Commits were often already merged with a stale status, and the resume gesture existed but was hidden in the `m` menu. Now `gx tickets merge|verify|start-over|resume` plus this skill's recovery section.
 - **Ticket sits `claimed` with `background-task-gate-held`, agent idle, code uncommitted.** The `/gx-implement` prompt arrived as `"\n/gx-implement …"`, so Claude Code (seen on 2.1.290) did not expand the slash command; the agent worked without the skill and never committed. A stray backgrounded Bash call then held the finish gate. Not fixed as of this entry.
 - **Ticket paused `zero-commit` but the agent commits minutes later.** The background-task gate treats any transcript line containing the task id as "resolved", including the agent's own `tail .../<id>.output`, file read (`Read`) or `Monitor`. Monitor waits are not gated either. Assistant-line mentions were fixed later (see the `WaitIterationFinished` entries below); Monitor waits were not gated as of this entry.
-- **Server stopped while starting tickets → they come back Paused (repair, reason `handle-mismatch`, herdr `agent_not_found`), some with no leftovers at all.** No commits, so `gx server tickets start-over gx:<epic>/<id> --reason ...` is the recovery. Not fixed as of this entry.
+- **Server stopped while starting tickets → they came back Paused (repair, reason `handle-mismatch`), some with no leftovers at all.** Now a claim with no work reopens (`claim-reopened`) and only a claim that holds work pauses `handle-mismatch` (`server/sched/reclaim.go`); Retry or Start over (`gx server tickets start-over gx:<epic>/<id> --reason ...`) ends it.
 - **Notification `🛑 needs repair: iteration ended without merging the ticket` (blank reason), ticket still `claimed` with `iteration_status: finished`.** The merge conflicted (`gx server tickets merge` → `outcome: conflicted`, `UU` files in the feature worktree) and the conflict outcome is swallowed instead of reported. Resolve in the feature worktree, then `merge --continue`/`--abort`. Not fixed as of this entry.
 - **Large epic (~50+ tickets) fails on its first claim: `logging scheduler scan: event line is N bytes, over the 4096 cap`.** `events.Fit` can't shorten `Scan`, and `claimNext` treats the log error as fatal, stranding the ticket `claimed`. Fixed: `logSchedulerScan` splits a pass across lines sharing one `time`; a failed scan log is debug-only.
 - **`paused-rate-limit` right as an agent finishes, "resets" = the pane's `done H:MM PM`, pause lasts ~3h.** A near-limit warning matches the detector, the token is the first clock time in the pane, and it's read as UTC. Restarting gx to escape it can then re-merge a conflict-resolved ticket and fail the epic. Not fixed as of this entry.
-- **Server names the herdr agent after the queue item id, not the ticket id (`server/runner.go` `launch`, `addr.ID`).** Every ticket from queue item `01` gets `…-iter-01`; a second ticket collides (`agent_name_taken`) and restart reclaim finds a handle mismatch. Fixed in `5c4a4c59`: `launch` now takes the ticket address.
+- **Server names the agent (its label) after the queue item id, not the ticket id (`server/runner.go` `launch`, `addr.ID`).** Every ticket from queue item `01` gets `…-iter-01`; a second ticket collides (`agent_name_taken`) and restart reclaim finds a handle mismatch. Fixed in `5c4a4c59`: `launch` now takes the ticket address.
 - **Server pauses tickets that are not stuck: `zero-commit` while the agent waits on a background test run, and a repair pause "merge deferred: merge lock held" while another merge holds the lock.** `server/runner.go` `finishRun` took the first idle as a finish and failed on a deferred merge; the in-process loop debounces, gates on background tasks and retries. Fixed in `ab11215b` (`ralphloop.WaitIterationFinished`, the built-merge retry). To recover an old false pause: `gx server tickets pause <addr> --reason …` (gets it to a repair pause; `tickets set` refuses that status), then `gx server tickets merge`; a conflict leaves a cherry-pick in the feature worktree, so resolve, `git cherry-pick --continue`, then `merge --continue`.
 - **Server pauses zero-commit although `WaitIterationFinished` is in place: the background-task gate saw the task as resolved.** `transcript.ReadBackgroundTasks` resolved a task when its id appeared on *any* later line, including the agent's own `Monitor` or file read (`Read`) of `…/tasks/<id>.output`. Assistant lines no longer resolve (fix in the `transcript:` commit after `2c6d0ea9`). Recover with a repair pause + `gx server tickets merge`.
 - **Server pauses with `zero-commit` while an async subagent is still working.** The agent launched an async Agent and idled; the subagent's own background run produced an interim `task-notification` ("the result below may be interim"). The gate had no Agent marker, and an interim notice would have resolved one anyway. Fixed: `agentId` from an `async_launched` result is a marker, and interim notices don't resolve it.
