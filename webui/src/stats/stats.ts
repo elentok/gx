@@ -1,3 +1,4 @@
+import { useRef } from "react"
 import { apiFetch } from "../apiFetch"
 import type { Connection } from "../connection"
 import {
@@ -44,6 +45,8 @@ export interface StatsState {
   stats: Stats | null
   /** The first fetch failed and nothing is on screen. */
   failed: boolean
+  /** `stats` are from an earlier query; the current one is loading or failed. */
+  stale: boolean
   source: FetchedState<Stats>["source"]
   retry: () => void
 }
@@ -63,5 +66,10 @@ export function useStats(
       debounceMs: STATS_REFETCH_DEBOUNCE_MS,
     },
   )
-  return { stats: data, failed, source, retry }
+  // useFetched never shows another id's data, so a filter change reads as
+  // "no data". Keep the last loaded stats here instead of changing that contract.
+  const last = useRef<Stats | null>(null)
+  if (data) last.current = data
+  const stats = data ?? last.current
+  return { stats, failed: failed && !stats, stale: !data && !!stats, source, retry }
 }

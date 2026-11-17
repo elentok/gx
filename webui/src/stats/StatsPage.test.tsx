@@ -538,6 +538,68 @@ test("Include dev refetches with includeDev and lives in the URL", async () => {
   expect((screen.getByLabelText("Include dev") as HTMLInputElement).checked).toBe(true)
 })
 
+// A filter change moves to a new query id, and the page cache holds only the old id's entry,
+// so the new id has no cache. The fetch for it is held by the test.
+function heldSecondFetch() {
+  let release: (s: Stats) => void = () => {}
+  let fail: (e: Error) => void = () => {}
+  const fetchStats = vi.fn<FetchStats>().mockResolvedValueOnce(perfStats())
+  fetchStats.mockImplementationOnce(
+    () =>
+      new Promise<Stats>((res, rej) => {
+        release = res
+        fail = rej
+      }),
+  )
+  return { fetchStats, release: (s: Stats) => release(s), fail: (e: Error) => fail(e) }
+}
+
+test("Include dev keeps the same checkbox mounted while the new numbers load (story 39a)", async () => {
+  const { fetchStats, release } = heldSecondFetch()
+  renderStats(fetchStats)
+  await screen.findByText("Web performance")
+  const toggle = screen.getByLabelText("Include dev") as HTMLInputElement
+  fireEvent.click(toggle)
+  await waitFor(() => expect(fetchStats).toHaveBeenCalledTimes(2))
+  expect(toggle.isConnected).toBe(true)
+  expect(screen.queryByRole("status", { name: "Loading stats" })).toBeNull()
+  const body = screen.getByText("Web performance").closest("[aria-busy]")
+  expect(body?.getAttribute("aria-busy")).toBe("true")
+  release(perfStats())
+  await waitFor(() => expect(body?.getAttribute("aria-busy")).toBe("false"))
+  expect(screen.getByLabelText("Include dev")).toBe(toggle)
+})
+
+test("a range or project change keeps the previous cards while the new fetch loads", async () => {
+  const { fetchStats, release } = heldSecondFetch()
+  const router = renderStats(fetchStats)
+  await screen.findByText("Tickets merged")
+  await router.navigate("/stats?range=30&project=gx")
+  await waitFor(() => expect(fetchStats).toHaveBeenCalledTimes(2))
+  expect(screen.getByText("Tickets merged")).toBeTruthy()
+  expect(screen.queryByRole("status", { name: "Loading stats" })).toBeNull()
+  release(perfStats())
+  await waitFor(() =>
+    expect(
+      screen.getByText("Tickets merged").closest("[aria-busy]")?.getAttribute("aria-busy"),
+    ).toBe("false"),
+  )
+})
+
+test("a failed filter-change refetch keeps the stale numbers, with no loader or error", async () => {
+  const { fetchStats, fail } = heldSecondFetch()
+  const router = renderStats(fetchStats)
+  await screen.findByText("Tickets merged")
+  await router.navigate("/stats?range=30")
+  await waitFor(() => expect(fetchStats).toHaveBeenCalledTimes(2))
+  fail(new Error("boom"))
+  await act(async () => {})
+  expect(screen.getByText("Tickets merged")).toBeTruthy()
+  expect(screen.queryByRole("status", { name: "Loading stats" })).toBeNull()
+  expect(screen.queryByText("Could not load stats")).toBeNull()
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull()
+})
+
 test("with no samples the section shows the empty state, and says dev samples are hidden", async () => {
   renderStats(async () => perfStats({ dev_hidden: true }))
   const empty = (await screen.findByTestId("perf-empty")).textContent ?? ""

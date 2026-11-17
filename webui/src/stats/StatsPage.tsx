@@ -332,11 +332,13 @@ export function StatsPage({
   const project = params.get("project") ?? ""
   const includeDev = params.get("dev") === "1"
   const perfTab: PerfTab = params.get("perf") === "route" ? "route" : "hard"
-  const { stats, failed, source, retry } = useStats(
+  const { stats, failed, stale, source, retry } = useStats(
     { range, project, includeDev },
     fetchStats,
     conn,
   )
+  // failed is false while stale numbers are on screen, so the ready signal
+  // for a failed filter change ends only when source does.
   useFetchedReady({ failed, source })
   const { list } = useEpicList(fetchEpics, conn)
 
@@ -395,7 +397,7 @@ export function StatsPage({
       ) : !stats ? (
         <FullScreenLoader label="Loading stats" />
       ) : (
-        <>
+        <Box aria-busy={stale} opacity={stale ? 0.5 : 1} transition="opacity 0.15s">
           <Throughput stats={stats} />
           <Cost stats={stats} project={project} />
           <Grilling stats={stats} />
@@ -411,7 +413,7 @@ export function StatsPage({
             onIncludeDev={(on) => set("dev", on ? "1" : "")}
           />
           <MentalHealth stats={stats} />
-        </>
+        </Box>
       )}
     </DetailPage>
   )
