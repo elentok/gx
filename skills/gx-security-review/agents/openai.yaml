@@ -1,0 +1,5 @@
+interface:
+  display_name: "Security Review"
+  short_description: "Review changed code for exploitable vulnerabilities"
+policy:
+  allow_implicit_invocation: false

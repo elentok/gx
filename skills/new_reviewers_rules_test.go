@@ -13,6 +13,7 @@ func TestNewReviewersRules(t *testing.T) {
 		"gx-type-design-analyzer",
 		"gx-comment-analyzer",
 		"gx-pr-test-analyzer",
+		"gx-security-review",
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := name + "/SKILL.md"
@@ -28,6 +29,20 @@ func TestNewReviewersRules(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The upstream command runs shell lines; the skill reads the review files instead.
+func TestSecurityReviewReadsReviewFiles(t *testing.T) {
+	path := "gx-security-review/SKILL.md"
+	text := readFile(t, path)
+	for line := range strings.SplitSeq(text, "\n") {
+		if strings.HasPrefix(line, "!") {
+			t.Errorf("%s has a line starting with !: %q", path, line)
+		}
+	}
+	if !strings.Contains(normalizeSpace(text), "shared review files") {
+		t.Errorf("%s does not mention the shared review files", path)
 	}
 }
 

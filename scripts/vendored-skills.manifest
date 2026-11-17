@@ -18,3 +18,4 @@ gx-silent-failure-hunter  anthropics/claude-plugins-official  plugins/pr-review-
 gx-type-design-analyzer   anthropics/claude-plugins-official  plugins/pr-review-toolkit/agents/type-design-analyzer.md   plugins/pr-review-toolkit/LICENSE  fd30cee  port
 gx-comment-analyzer       anthropics/claude-plugins-official  plugins/pr-review-toolkit/agents/comment-analyzer.md       plugins/pr-review-toolkit/LICENSE  fd30cee  port
 gx-pr-test-analyzer       anthropics/claude-plugins-official  plugins/pr-review-toolkit/agents/pr-test-analyzer.md       plugins/pr-review-toolkit/LICENSE  fd30cee  port
+gx-security-review        anthropics/claude-code-security-review  .claude/commands/security-review.md  LICENSE  0c6a49f  port
