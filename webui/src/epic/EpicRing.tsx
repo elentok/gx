@@ -23,6 +23,7 @@ export function EpicRing({
       label={size === "compact" ? "" : r.label}
       size={size}
       live={r.live}
+      arc={r.arc}
     />
   )
 }

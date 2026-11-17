@@ -226,9 +226,14 @@ test.each([
     "waiting",
     false,
   ],
-  ["a working session", {}, [session("a", { status: { state: "working" } })], "running", true],
-  ["a starting session", {}, [session("a", { status: { state: "starting" } })], "running", true],
-  ["creating tickets", { steps: stepsAt(5), impl_address: "gx:a-impl" }, [], "running", true],
+  ["the working flag", { working: true }, [], "running", true],
+  [
+    "a working session but no working flag",
+    {},
+    [session("a", { status: { state: "working" } })],
+    "running",
+    false,
+  ],
   ["an idle live session", {}, [session("a")], "running", false],
   ["only an Exited session", {}, [session("a", { status: { state: "exited" } })], "muted", false],
   ["no session", {}, [], "muted", false],
@@ -238,6 +243,22 @@ test.each([
   expect(ringOf().getAttribute("data-kind")).toBe("design")
   expect(ringOf().getAttribute("data-tone")).toBe(tone)
   expect(!!screen.queryByTestId("comet")).toBe(comet)
+})
+
+test("a working Design draws the purple arc", async () => {
+  render([map("a")], [], "/d/gx:a", detailOf({ working: true, ring_progress: 40 }))
+  await screen.findByText("40%")
+  expect(ringOf().getAttribute("data-arc")).toBe("kind.design.fg")
+})
+
+test("a session changing state or background mark refetches the detail", async () => {
+  const epic = vi.fn(async () => ({ kind: "ok" as const, detail: deletable }))
+  const router = render([map("a")], [session("a")], "/d/gx:a", deletable, { epic })
+  await waitFor(() => expect(epic).toHaveBeenCalledTimes(1))
+  router.setSessions([session("a", { status: { state: "working" } })])
+  await waitFor(() => expect(epic).toHaveBeenCalledTimes(2))
+  router.setSessions([session("a", { status: { state: "working", background: true } })])
+  await waitFor(() => expect(epic).toHaveBeenCalledTimes(3))
 })
 
 test("the ring sits in the header actions after the title at 56px, and at 44px on a phone", async () => {

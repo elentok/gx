@@ -67,7 +67,10 @@ function DesignBody({
   const card = epics.find((e) => e.addresses?.[0] === address)
   const live = liveSessions(address, sessions)
   // `deletable` depends on the live sessions, and a session stop is no ticket event.
-  const liveKey = live.map((s) => s.id).join(",")
+  // The header ring reads the detail's `working` flag, which follows each session's state and background mark.
+  const liveKey = live
+    .map((s) => `${s.id}:${s.status.state}:${s.status.background ? "bg" : ""}`)
+    .join(",")
   const seenLiveKey = useRef(liveKey)
   useEffect(() => {
     if (seenLiveKey.current === liveKey) return

@@ -855,14 +855,13 @@ test.each([
     "waiting",
     false,
   ],
-  ["a working session", { steps: steps("spec") }, [session("working")], "running", true],
-  ["a starting session", { steps: steps("spec") }, [session("starting")], "running", true],
+  ["the working flag", { steps: steps("spec"), working: true }, [], "running", true],
   [
-    "creating tickets",
-    { steps: steps("create-tickets"), impl_address: "gx:blog-impl" },
-    [],
+    "a working session but no working flag",
+    { steps: steps("spec") },
+    [session("working")],
     "running",
-    true,
+    false,
   ],
   ["an idle live session", { steps: steps("spec") }, [session("idle")], "running", false],
   ["only an Exited session", { steps: steps("spec") }, [session("exited")], "muted", false],
@@ -887,6 +886,8 @@ test("a Design in Needs you reads waiting, even past Branch with no joined card 
 test.each([
   ["running", "running", true],
   ["merging", "running", true],
+  ["writing-pr-text", "running", true],
+  ["fixing-ci", "running", true],
   ["finished", "done", false],
   ["paused", "muted", false],
 ])(

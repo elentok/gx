@@ -3,9 +3,9 @@ import {
   EpicStateFinished,
   EpicStateMerging,
   EpicStateRunning,
-  MapStepCurrent,
+  EpicStateWritingPRText,
+  EpicStateFixingCI,
   MapStepDone,
-  ProgressCreateTickets,
   ProgressDone,
   SectionNeedsYou,
   type EpicDetail,
@@ -19,6 +19,7 @@ export interface PageRing {
   kind: Kind
   tone: Tone
   live: boolean
+  arc?: string
   progress: number
   label: string
 }
@@ -31,16 +32,19 @@ function designTone(d: EpicDetail, sessions: SessionInfo[]): Pick<PageRing, "ton
   const live = liveSessions(d.address, sessions)
   const actionable = live.some((s) => !!s.actionable?.reason)
   if (d.design_section === SectionNeedsYou || actionable) return { tone: "waiting", live: false }
-  const creating = stepState(d, ProgressCreateTickets) === MapStepCurrent && !!d.impl_address
-  if (creating || live.some((s) => s.status.state === "starting" || s.status.state === "working")) {
-    return { tone: "running", live: true }
-  }
+  if (d.working) return { tone: "running", live: true }
   return live.length > 0 ? { tone: "running", live: false } : { tone: "muted", live: false }
 }
 
+const LIVE_LOOP_STATES: string[] = [
+  EpicStateRunning,
+  EpicStateMerging,
+  EpicStateWritingPRText,
+  EpicStateFixingCI,
+]
+
 function loopTone(d: EpicDetail): Pick<PageRing, "tone" | "live"> {
-  if (d.state === EpicStateRunning || d.state === EpicStateMerging)
-    return { tone: "running", live: true }
+  if (LIVE_LOOP_STATES.includes(d.state ?? "")) return { tone: "running", live: true }
   return { tone: d.state === EpicStateFinished ? "done" : "muted", live: false }
 }
 
@@ -54,7 +58,9 @@ export function pageRing(
   const kind = card?.card_kind ? RING_KIND[card.card_kind] : isMap ? "design" : "implementation"
   if (isMap) {
     const pct = d.ring_progress ?? 0
-    return { kind, ...designTone(d, sessions), progress: pct / 100, label: `${pct}%` }
+    const t = designTone(d, sessions)
+    const arc = t.live && t.tone === "running" ? "kind.design.fg" : undefined
+    return { kind, ...t, arc, progress: pct / 100, label: `${pct}%` }
   }
   const tone =
     card && d.kind === "loop" ? { tone: ringTone(card), live: isLive(card) } : loopTone(d)
