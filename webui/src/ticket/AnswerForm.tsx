@@ -102,7 +102,10 @@ export function AnswerForm({
       borderRadius="12px"
       px="3"
     >
-      <Question card={card} answer={answer} onChange={setAnswer} onPicked={() => {}} />
+      {/* A long question scrolls inside this area so the Send button stays on screen. */}
+      <Box overflowY="auto" minH="0" maxH="calc(100dvh - 160px)" overscrollBehavior="contain">
+        <Question card={card} answer={answer} onChange={setAnswer} onPicked={() => {}} />
+      </Box>
       {error && <Text role="alert">{error}</Text>}
       <Button emphasis="main" alignSelf="flex-end" disabled={!ready || pending} onClick={send}>
         Send answer
