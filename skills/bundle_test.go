@@ -26,6 +26,7 @@ var requiredFiles = []string{
 	"gx-local-tracker.md",
 	"gx-failing-tests.md",
 	"gx-flake-tickets.md",
+	"gx-handoff.md",
 	"gx-test-guidelines.md",
 	"gx-to-tickets/SKILL.md",
 	"gx-to-tickets/LICENSE",

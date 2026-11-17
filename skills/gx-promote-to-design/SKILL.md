@@ -32,7 +32,7 @@ Read [gx-unslop](../gx-unslop/SKILL.md) before writing the brief, and
    ```
 
 5. **Last message**: link the new Design page. Get the web base URL from `gx server web-url --json`
-   (its `url` field) and add `/#/d/<project>:<slug>`. With no web UI, print `<project>:<slug>` only.
+   (its `base_url` field) and add `/#/d/<project>:<slug>`. With no web UI, print `<project>:<slug>` only.
 
 ## Failure handling
 
@@ -49,19 +49,8 @@ The first line is exactly this sentence, which marks the brief as promoted:
 
 The `gx-wayfinder` Chart rule quotes the same sentence; a skills test fails when they differ.
 
-Write for a cold reader: the Design agent has not seen the chat, so the brief must make sense
-without the transcript. After the first line, in order:
-
-- **Goal**: what the person wants.
-- **Decisions**: what the chat settled, each with its reason.
-- **Open questions**: what is still undecided.
-- **Branch and changed files**: the Design branch starts from trunk, so it cannot see this chat's
-  uncommitted or unmerged code. No code moves. Name the chat's branch and list the changed files:
-  the working-tree changes (`git status --short`) plus the diff against the merge-base with trunk
-  (`git diff --name-status $(git merge-base HEAD <trunk>)`). On trunk with a clean tree, say there is
-  no unmerged code.
-- **Source chat**, last: the harness, the conversation id and the transcript path, all from
-  `gx agent transcript --json` (`harness`, `conversation_id`, `path`, `found`). When `found` is
-  false, leave the path line out; the brief stays valid.
+The section order and the rule for each section are in [gx-handoff](../gx-handoff.md). A Promote
+brief ends with **Source chat** (from `gx agent transcript --json`) and leaves out the fork-only
+sections.
 
 Use the `GLOSSARY.md` words: Promote to Design, Design, Design session.

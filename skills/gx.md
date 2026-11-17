@@ -182,6 +182,7 @@ skills/
   gx-local-tracker.md  — the shared local ticket tracker contract
   gx-failing-tests.md  — the shared rule for sorting a failing test
   gx-flake-tickets.md  — the shared rule for writing flake and timeout tickets
+  gx-handoff.md        — the shared rules for the brief that starts a Design or a fork
   gx-to-tickets/
     SKILL.md
   gx-tdd/
