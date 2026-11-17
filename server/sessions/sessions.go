@@ -147,6 +147,7 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 		meta.Flow, meta.FlowKey = sc.Flow, sc.FlowKey
 	}
 	applyTier(mg, &meta, tier)
+	applyChosenModel(&meta, sc.Model, sc.Effort)
 	dir, err := mg.saveNewSession(&meta, req.UniqueName)
 	if errors.Is(err, errSessionNameTaken) {
 		return Refusal(wire.ReasonSessionNameTaken, fmt.Sprintf("a live session is already named %q", meta.Name)), nil
@@ -182,6 +183,15 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 func applyTier(mg *Manager, meta *Meta, tier agent.Tier) {
 	meta.Tier = tier
 	meta.Model, meta.Effort = agent.ResolveTier(mg.projects.AgentsConfig(meta.Project), agent.AgentFor(meta.Harness), tier)
+}
+
+// applyChosenModel replaces the tier's model and effort with the person's pick
+// and marks it hand-chosen, so launch args keep it over a configured flag.
+func applyChosenModel(meta *Meta, model, effort string) {
+	if model == "" {
+		return
+	}
+	meta.Model, meta.Effort, meta.SwitchedByHand = model, effort, true
 }
 
 // addSessionWorktree makes worktree name from the project's trunk, as the

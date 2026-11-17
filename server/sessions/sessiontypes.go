@@ -29,6 +29,9 @@ type SessionCtx struct {
 	// (a Triage: flow triage, key the project name).
 	Flow    tickets.Flow
 	FlowKey string
+	// Model and Effort start the session on a model the person chose, over the
+	// tier's; Effort needs a Model.
+	Model, Effort string
 }
 
 // SwitchTarget is the model, effort and by-hand flag a rollback restores.

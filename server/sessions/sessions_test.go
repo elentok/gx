@@ -694,6 +694,44 @@ func TestWebSessionCreate_TierIsSaved(t *testing.T) {
 	}
 }
 
+func TestWebSessionCreate_ChosenModel(t *testing.T) {
+	t.Parallel()
+	for name, c := range map[string]struct {
+		extra       string
+		wantRefused bool
+		model       any
+		effort      any
+		byHand      any
+	}{
+		"model and effort": {extra: `,"model":"opus","effort":"high"`, model: "opus", effort: "high", byHand: true},
+		"model only":       {extra: `,"model":"opus"`, model: "opus", effort: nil, byHand: true},
+		"effort only":      {extra: `,"effort":"high"`, wantRefused: true},
+		"neither":          {extra: ``, model: nil, effort: nil, byHand: nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := startDesigns(t)
+			code, res := f.webCreate(t, `{"project":"proj","dir":"`+f.projectRoot(t)+`","tier":"light"`+c.extra+`}`)
+			if c.wantRefused {
+				if code != http.StatusOK || !res.Refused || res.Reason != wire.ReasonSessionBadRequest {
+					t.Fatalf("create = %d %+v, want bad-request refusal", code, res)
+				}
+				return
+			}
+			if code != http.StatusOK || res.Refused || res.Session == nil {
+				t.Fatalf("create = %d %+v", code, res)
+			}
+			m := readMeta(t, f.h, res.Session.ID)
+			if m["tier"] != "light" || m["switched_by_hand"] != c.byHand {
+				t.Errorf("meta tier=%v switched_by_hand=%v, want light %v", m["tier"], m["switched_by_hand"], c.byHand)
+			}
+			if c.model != nil && (m["model"] != c.model || m["effort"] != c.effort) {
+				t.Errorf("meta model=%v effort=%v, want %v %v", m["model"], m["effort"], c.model, c.effort)
+			}
+		})
+	}
+}
+
 func TestSessionStatus_Promptable(t *testing.T) {
 	t.Parallel()
 	for name, c := range map[string]struct {

@@ -28,6 +28,10 @@ type WebCreateSessionRequest struct {
 	Harness string `json:"harness,omitempty"`
 	// Workspace is the workspace the chat lands in; missing or unknown reads as Default.
 	Workspace string `json:"workspace,omitempty"`
+	// Model and Effort start the chat on exactly this model and effort, not the
+	// tier's. Effort needs a Model.
+	Model  string `json:"model,omitempty"`
+	Effort string `json:"effort,omitempty"`
 }
 
 // SessionCreateWeb is sessionCreateWrite for the web mux. A body with any
@@ -77,6 +81,9 @@ func (mg *Manager) createWebSession(req WebCreateSessionRequest) (wire.SessionRe
 	if refusal != nil {
 		return *refusal, nil
 	}
+	if req.Effort != "" && req.Model == "" {
+		return Refusal(wire.ReasonSessionBadRequest, "effort needs a model"), nil
+	}
 	refusal, err := mg.CheckProjectDir(req.Project, req.Dir)
 	if err != nil {
 		return wire.SessionResult{}, err
@@ -92,7 +99,7 @@ func (mg *Manager) createWebSession(req WebCreateSessionRequest) (wire.SessionRe
 		Prompt:   prompt,
 		Tier:     req.Tier,
 		Harness:  req.Harness,
-	}, SessionCtx{})
+	}, SessionCtx{Model: req.Model, Effort: req.Effort})
 	if err == nil && res.Session != nil && req.Workspace != "" && mg.workspaces != nil {
 		// An unknown name is refused by SetMember and the chat stays in Default.
 		if err := mg.workspaces.SetMember(res.Session.ID, req.Workspace); err != nil {
