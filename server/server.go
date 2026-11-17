@@ -34,6 +34,7 @@ import (
 	"github.com/elentok/gx/server/archive"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/budget"
+	"github.com/elentok/gx/server/chatdrafts"
 	"github.com/elentok/gx/server/cleanup"
 	"github.com/elentok/gx/server/designs"
 	"github.com/elentok/gx/server/devvite"
@@ -172,6 +173,8 @@ type Server struct {
 	startDesign *startdesign.StartDesign
 	// designs opens, cleans up and deletes the Design sessions; the Manager calls it back.
 	designs *designs.Designs
+	// chatDrafts serves the chat draft routes; see chatdraftsdeps.go.
+	chatDrafts *chatdrafts.ChatDrafts
 	// triage publishes triage-changed for the live Triage records.
 	triage *triage.Triage
 	focus  *sessions.FocusReports
@@ -524,6 +527,7 @@ func New(cfg Config) (*Server, error) {
 		OnTriageIdle: s.triage.StopFinished,
 	})
 	s.sessions = newManager(s)
+	s.chatDrafts = newChatDrafts(s)
 	s.archive = newArchive(s)
 	s.sessions.Maps.OnDesignStart = s.clearHold
 	s.sessions.OnSessionGone = func(id string) {

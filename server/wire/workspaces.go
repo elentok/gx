@@ -9,6 +9,10 @@ const EventWorkspacesChanged = "workspaces-changed"
 // (a draft was created, relabelled, retargeted, moved or deleted). The address is "".
 const EventDesignDraftsChanged = "design-drafts-changed"
 
+// EventChatDraftsChanged announces that the set of chat draft rows changed
+// (a draft was created, started, moved or deleted). The address is "".
+const EventChatDraftsChanged = "chat-drafts-changed"
+
 // DesignDraftRow is one draft in the snapshot: what the sidebar row
 // shows. It carries no prompt text and no image list.
 type DesignDraftRow struct {

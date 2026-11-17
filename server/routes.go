@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/server/archive"
 	"github.com/elentok/gx/server/budget"
+	"github.com/elentok/gx/server/chatdrafts"
 	"github.com/elentok/gx/server/cleanup"
 	"github.com/elentok/gx/server/designs"
 	"github.com/elentok/gx/server/diff"
@@ -81,6 +82,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		srvrecovery.Routes(func() *srvrecovery.Recovery { return s.recovery }),
 		epics.Routes(func() *epics.Epics { return s.epics }),
 		designs.Routes(func() *designs.Designs { return s.designs }),
+		chatdrafts.Routes(func() *chatdrafts.ChatDrafts { return s.chatDrafts }),
 		triage.Routes(func() *triage.Triage { return s.triage }),
 		sessprompt.Routes(func() *sessprompt.Prompt { return s.prompt }),
 		merge.Routes(func() *merge.Merger { return s.merger }, func() *merge.Landing { return s.landing }),
