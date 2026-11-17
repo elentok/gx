@@ -44,6 +44,9 @@ func (c *ChatDrafts) Start(id string) (ops.ChatDraftResult, error) {
 			}
 		}
 		dir = d.WorktreePath
+		if HookArmed(c.ForkHookDir, HookStartFail) {
+			return c.startFailed(d, ops.ReasonChatDraftStartFailed, ErrHookStartFail.Error())
+		}
 	}
 	ws := ""
 	if c.Workspaces != nil {

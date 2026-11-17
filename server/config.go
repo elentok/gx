@@ -121,6 +121,9 @@ type Config struct {
 	// lists real processes. Both are test hooks.
 	CacheGateCap  time.Duration
 	CacheGateScan func() (bool, error)
+	// ForkHookDir arms the draft test hooks: a save-fail or start-fail file in
+	// it makes that step fail (see chatdrafts.HookArmed). Empty means off.
+	ForkHookDir string
 
 	// Runner is the configured agent runner; nil means herdr. Herdr health
 	// is only probed when it reports health (agentrunner.HealthChecker).

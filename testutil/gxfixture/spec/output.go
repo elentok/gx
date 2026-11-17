@@ -34,6 +34,9 @@ type Output struct {
 	// GateDir holds the cache-gate scenarios' fake go (bin/go) and its control files; empty elsewhere.
 	// The launch-held scenario also uses it: bin/npm waits while npm-hold exists, and npm-started marks the wait.
 	GateDir string `json:"gate_dir,omitempty"`
+	// ForkHookDir is the server's GX_FORK_HOOK_DIR: create save-fail or start-fail in it to arm that
+	// draft failure, remove the file to disarm; empty unless the scenario sets ForkHooks.
+	ForkHookDir string `json:"fork_hook_dir,omitempty"`
 	// ConfigFile is the global config file; edit it and run `gx server reload-config` to change a setting live.
 	ConfigFile string `json:"config_file"`
 	// ChatCapture is the file the chat-capture scenario's endpoint appends every Slack and

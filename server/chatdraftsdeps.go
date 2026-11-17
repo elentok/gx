@@ -13,6 +13,6 @@ func newChatDrafts(s *Server) *chatdrafts.ChatDrafts {
 		Projects: s.projects, Workspaces: s.workspaces,
 		Sessions:    func() ([]wire.SessionInfo, error) { return s.sessions.ListSessions() },
 		CreateChat:  s.sessions.CreateWebSession,
-		AddWorktree: s.sessions.AddSessionWorktree,
+		AddWorktree: s.sessions.AddSessionWorktree, ForkHookDir: s.cfg.ForkHookDir,
 	})
 }

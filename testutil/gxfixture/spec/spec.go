@@ -165,6 +165,9 @@ type Scenario struct {
 	FakeGH *FakeGH
 	// FakeNpm writes the gate dir's fake npm and holds it (see launchstate.go).
 	FakeNpm bool
+	// ForkHooks gives the server a GX_FORK_HOOK_DIR: a save-fail or start-fail
+	// file in Output.ForkHookDir makes a draft save or a chat draft Start fail.
+	ForkHooks bool
 	// FailingNpm makes that fake npm fail at once instead of holding.
 	FailingNpm bool
 	// DropAskedAgent forces the server to clean up an asking agent, as a

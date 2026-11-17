@@ -35,6 +35,8 @@ type Deps struct {
 	// OnBranch is called when a map's design step moves to Branch inside a
 	// running server; nil skips it.
 	OnBranch func(project, epic string)
+	// ForkHookDir is the test-hook dir (see chatdrafts.HookArmed); empty turns the hooks off.
+	ForkHookDir string
 }
 
 // Workspaces is the slice of the workspace store a promoted Design uses.
@@ -61,6 +63,8 @@ type Designs struct {
 	webURL     func() string
 	workspaces Workspaces
 	onBranch   func(project, epic string)
+	// forkHookDir is the test-hook dir; empty turns the hooks off.
+	forkHookDir string
 	// seeded: the Ready seed mark has been settled this run.
 	seeded atomic.Bool
 	// sessions comes later than Designs: the Manager calls CleanupDesign back,
@@ -79,8 +83,8 @@ func New(d Deps) *Designs {
 		log: d.Log, ticketStore: d.TicketStore, conversationsDir: d.ConversationsDir,
 		idx: d.Idx, projects: d.Projects, events: d.Events, guards: d.Guards,
 		chat: d.Chat, webURL: d.WebURL, workspaces: d.Workspaces,
-		onBranch: d.OnBranch,
-		drafts:   drafts.New(d.StateDir),
+		onBranch: d.OnBranch, forkHookDir: d.ForkHookDir,
+		drafts: drafts.New(d.StateDir),
 	}
 }
 

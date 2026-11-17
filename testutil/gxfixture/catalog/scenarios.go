@@ -96,6 +96,11 @@ var Scenarios = map[string]scenario{
 			{Project: project, Slug: "onboarding", Idea: "A first-run walkthrough", Images: 2},
 		},
 	},
+	// fork-hooks: one empty-handed epic and the draft failure hooks, for the draft-save and Start failure tests.
+	"fork-hooks": {
+		Epics:     []epic{{Project: project, Name: "hooks-epic", Tickets: []ticket{{ID: "01", Slug: "first", Opts: servertest.TicketOpts{}}}}},
+		ForkHooks: true,
+	},
 	// disk-low: an unqueued epic whose project cleans through the disk control files.
 	"disk-low": {
 		Epics: []epic{{Project: project, Name: "disk-epic", Tickets: []ticket{

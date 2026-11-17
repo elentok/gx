@@ -44,6 +44,8 @@ type Deps struct {
 	// Manager.AddSessionWorktree, as fields so sessions need not be built in tests.
 	CreateChat  func(sessions.WebCreateSessionRequest) (wire.SessionResult, error)
 	AddWorktree func(project, name string) (path, refusal string)
+	// ForkHookDir is the test-hook dir (see HookArmed); empty turns the hooks off.
+	ForkHookDir string
 }
 
 // ChatDrafts serves the chat draft routes.
@@ -82,6 +84,10 @@ func decode[T any](w http.ResponseWriter, r *http.Request) (req T, ok bool) {
 func (c *ChatDrafts) create(w http.ResponseWriter, r *http.Request) {
 	req, ok := decode[ops.ChatDraftCreateRequest](w, r)
 	if !ok {
+		return
+	}
+	if HookArmed(c.ForkHookDir, HookSaveFail) {
+		serverError(w, ErrHookSaveFail)
 		return
 	}
 	d, res, err := c.build(req)

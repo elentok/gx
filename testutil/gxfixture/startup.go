@@ -199,6 +199,12 @@ func (f *fixture) prepareStore(sc scenario, shape string, port int, configs []st
 			return err
 		}
 	}
+	if sc.ForkHooks {
+		if err := os.MkdirAll(forkHookDir(f), 0o755); err != nil {
+			return err
+		}
+		f.env = append(f.env, "GX_FORK_HOOK_DIR="+forkHookDir(f))
+	}
 	if sc.Restart != nil {
 		if err := f.setupRestart(*sc.Restart, sc.ProjectNames()); err != nil {
 			return err
@@ -236,10 +242,16 @@ func (f *fixture) prepareStore(sc scenario, shape string, port int, configs []st
 	return nil
 }
 
+// forkHookDir sits outside the project repo, so the trunk stays clean.
+func forkHookDir(f *fixture) string { return filepath.Join(f.root, "fork-hooks") }
+
 // addScenarioOutput fills the Output fields that only some scenarios have.
 func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts map[string]string) {
 	if sc.FakeGo || sc.FakeNpm {
 		res.GateDir = gateDir(f)
+	}
+	if sc.ForkHooks {
+		res.ForkHookDir = forkHookDir(f)
 	}
 	if sc.FakeGH != nil {
 		res.GHState, res.Origin = fakeGH{f}.ghState(), fakeGH{f}.origin()

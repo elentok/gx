@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/server/chatdrafts"
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/imagestore"
 	"github.com/elentok/gx/server/wire"
@@ -84,6 +85,10 @@ func draftCreate(s *Designs, w http.ResponseWriter, r *http.Request) {
 	var req ops.DesignDraftCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if chatdrafts.HookArmed(s.forkHookDir, chatdrafts.HookSaveFail) {
+		http.Error(w, chatdrafts.ErrHookSaveFail.Error(), http.StatusInternalServerError)
 		return
 	}
 	refuse := func(reason string) {
