@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.51.8 - 2026-11-17
+
+- Added a two-finger swipe down on touch devices (phone and tablet) in the web UI to start a new chat draft. The swipe must start in the center 75% of the window.
+- Changed the chat draft page. It has a brief-first composer card with an editable title (the chat's Name), a project/folder breadcrumb, and one settings pill that opens a popover for harness, model and effort. The pill shows the real default model and effort the server reports, never "Default". The folder can be an existing worktree. Leader `c` opens a chat draft and Leader `C` opens the old New chat dialog.
+- Added chat draft image support. Start saves the images in the new session's image folder and pastes them before the first prompt, like a chat-page send, so the chat page shows an image strip and not file paths.
+- Added chat drafts as a full feature (the fork work): a draft record and store with routes, a sidebar row with Move, a brief editor with autosave and Remove, and a "New chat draft" item in the + New menu. `gx agents drafts create` and `gx designs drafts create` save drafts. Start uses the draft's exact model and effort and shows errors. A new gx-fork skill and a shared gx-handoff.md brief doc were added. Drafts only offer tiers that have a model, and New chat sends no harness.
+- Added a clickable status menu in the footer. It replaces the separate warning, paused and offline icons and explains why each problem appeared. The extra footer row is gone, and the health popover shows a spinner until the first report arrives.
+- Added a "starting" notice on the chat page while gx still holds the first prompt (`first_prompt_pending` on SessionInfo).
+- Added epic status that follows a working flag. The server decides when a Design is working and which phase word shows. Sidebar rows, cards, jump menu rows and the Design/Epic header rings use it, and Design work draws a purple arc.
+- Added better code review skills: code-reviewer, silent-failure-hunter, type-design-analyzer, comment-analyzer, pr-test-analyzer and security-review. gx-code-review now defaults to eight reviewers, runs in waves, and never defers security findings.
+- Changed the first prompt's swallowed-Enter retry to the same 3 second settle as chat sends (it waited the 45 second nudge grace before).
+- Changed agents to run on the PTY runner only. The herdr runner, its health watch and banner, wire fields, `agent_pane_busy`, "Go to pane" and the herdr e2e suite are removed. A legacy `agent-runner` value of `herdr` reads as `auto`, and `agent_pane_busy` is migrated away. Docs, skills and ADR 0048 are updated (ADRs 0031, 0043 and 0044 are marked superseded).
+- Fixed Start over resolving the caller's directory. It now resolves the project repo.
+- Fixed Cancel so it drops a waiting run whose agent died and removes its worktree.
+- Fixed a failure when a run's recorded runner cannot be built. gx now treats the agent as gone.
+- Fixed long questions in the web chat answer form. They now scroll inside the form.
+- Fixed chat draft Start so it tolerates a remove failure and keeps the source folder.
+
 ## v0.51.7 - 2026-11-17
 
 - Fixed agents staying stuck on Claude's "Adding a new directory" dialog. The dialog refuses keys sent too soon, and gx sent one every 500 ms. gx now waits 5 seconds before the first key and between keys.
