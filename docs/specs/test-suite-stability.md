@@ -45,7 +45,7 @@ Regressions and fork errors
 6. As a person who reloads config, I want a pending quiet timer re-armed when the settings change, so that the new debounce applies even when no further event comes.
 7. As a release owner, I want a full capped run to show no `resource temporarily unavailable` errors, so that a fork limit never fails an unrelated package.
 8. As a release owner, I want the default process headroom at 800, set in one place, so that the normal ramp of a full run plus one burst from another session fits.
-9. As a developer running two sessions on one machine, I want the 240-process burst test to run in its own step after all other steps finish, so that it cannot spend the limit of its siblings or of the other session.
+9. As a developer, I want the 240-process burst test to run in its own step after all other steps of the same run finish, so that it cannot spend the limit of its same-run siblings. The cross-session case (another session's burst) is covered by the headroom of 800: ramp 250 + burst 240 + the other session's burst 240 = 730.
 10. As a maintainer, I want the process cap kept, so that a test binary that re-runs itself still fails fast instead of crashing the laptop.
 11. As a maintainer, I want the extra `-exec scripts/proc-cap` removed from the report's `gx brief go-test` examples, so that nobody applies the cap twice.
 
@@ -72,7 +72,7 @@ Playwright
 27. As a developer, I want flows 199, 155 and 159, 72b, the menu part of epics 2, settings 200, menu 117, 158 and 160 updated to the planned product behaviour, so that stale expectations stop failing every run.
 28. As a developer, I want flow 158 and 160 tails rewritten to answer through the question sheet, so that they match the card that hides the blocked notice.
 29. As a phone or tablet user, I want the sidebar burger usable on every Agents page state, so that I can open the sidebar when no session is selected.
-30. As a maintainer, I want every state of every routed page to have a header registered with the shell, so that no pinned page can cover the burger again.
+30. As a maintainer, I want every state of every routed page to have a header registered with the shell, so that no pinned page can cover the burger again. The Schedules and File viewer bars register through the shared helper and carry the burger, so the route test covers them with no exception.
 31. As a maintainer, I want a Vitest test that renders each routed page in its loading, not-found, empty and failed states and checks for a header, with no allowlist, so that the rule is enforced.
 32. As a developer, I want a page without its own header to claim one with a small shared helper, with the page's own title from the route in loading and error states, so that the rule is cheap to follow.
 33. As a developer, I want the shell's own burger row kept for shell states that mount no page, so that "Can't reach gx" and the lazy-page loader still work.
@@ -95,7 +95,8 @@ Vitest
 44. As a developer, I want the ScreenModal Refresh test to wait until the button is enabled before it clicks, so that a click on a disabled button is not silently lost.
 45. As a developer, I want the InterruptControl test to keep its focus wait and drop the 5 s overrides, so that it uses the repo's global wait.
 46. As a developer, I want the menu's focus-settle timer to return a disposer that the menu calls on unmount, so that no timer outlives jsdom.
-47. As a developer, I want test setup to cancel module-level timers after each test, so that a leaked timer cannot fail a run with every test green.
+47. As a developer, I want every product module with a module-level timer to export a cancel/disposer, and `test-setup.ts` to call all of them after each test, so that a leaked timer cannot fail a run with every test green. The rule "a product timer needs a disposer" is also in `gx-vitest-tests` and `gx-test-review`.
+47a. As a maintainer, I want a Vitest guard that fails when a module-level timer has no disposer registered, so that a new leaked timer cannot be added.
 48. As a developer, I want a unit test showing the timer count is zero after a menu item is picked and the menu unmounts, so that the leak stays fixed.
 
 Shared skills
@@ -106,7 +107,7 @@ Shared skills
 52. As an agent writing Playwright flows in any project, I want a portable Playwright skill with the lessons from the Playwright report, so that I know about redirects, `expect.poll`, covered controls and error-context first.
 53. As an agent in gx, I want the gx-only Playwright rules in a repo-local skill that the index, the skill description and the guard message all point to, so that I load it before I touch a flow.
 54. As a person using other projects, I want gx to install only the portable skills, so that gx-only rules do not leak into my projects.
-55. As a maintainer, I want a test that fails when a portable test skill names a gx command, so that the shared skills stay portable.
+55. As a maintainer, I want a rules test that fails when a portable test skill holds a `gx <verb>` command line (`gx brief`, `gx check`, `gx tickets`, ...), a `scripts/` path or `.ai/index.md`, and allows `gx-*` skill names, so that the shared skills stay portable.
 56. As an agent implementing a ticket, I want `gx-implement` and `gx-tdd` to read the guidelines and the framework skill that matches the changed files, so that the rules are applied while I write.
 57. As a maintainer, I want the portable Go rules moved out of `.ai/index.md`, with only gx policy left there, so that each rule has one home.
 
@@ -118,7 +119,7 @@ Review
 Guards
 
 60. As a maintainer, I want the Biome linter on in `gx check` and CI with `recommended` plus the `react` and `test` domains, so that hook misuse, index keys, untyped buttons and focused tests fail early.
-61. As a maintainer, I want `noNonNullAssertion` off with a comment, and every other finding fixed with the rules running as errors, so that the linter ships green.
+61. As a maintainer, I want every enabled Biome rule to run as an error, `noNonNullAssertion` off with a comment, all ~760 warnings and ~270 errors fixed in the epic, and the check to fail on any diagnostic, so that the linter ships with zero findings.
 62. As a maintainer, I want a rules test that fails on Playwright fixed sleeps (`waitForTimeout`), so that clock waits do not return.
 63. As a maintainer, I want a rules test that fails on a fake `SetState` cleanup with no liveness check, so that the cleanup panic does not return.
 64. As a maintainer, I want guards to have no allowlist and to ship green, so that an exemption list cannot grow.
@@ -139,7 +140,7 @@ Tickets
 
 74. As a maintainer, I want each fix to close the old flake tickets it explains, in place, with a note that links the impl ticket, so that evidence stays and addresses stay stable.
 75. As a maintainer, I want the 7 duplicates and the obsolete tickets closed first with the right reason, so that the list shrinks before the work.
-76. As a maintainer, I want every flake ticket that no fix explains moved into `test-health` at the end of the epic, so that old epics end up empty.
+76. As a maintainer, I want every flake ticket that no fix explains moved into `test-health` at the end of the epic, so that old epics end up empty. A ticket that cannot move (`gx tickets move` only moves flat, never-run draft or open tickets) gets a new `test-health` ticket that links the old one and keeps its evidence, and the old one is closed with a link.
 77. As a person filing a flake, I want `gx-follow-up` and the flake-ticket rules to check `test-health` for a match and add a "seen again" entry, so that reports stop spreading.
 
 ## Implementation Decisions
@@ -149,7 +150,7 @@ Principle for every item below: fix at the cause. No retries. No blanket timeout
 Regressions
 
 - Codex question matcher: add a raw question field to the wire question-card type, set it where the Codex card is built, and compare the overlay's question text with that field (falling back to the title when it is empty). Do not edit the prompt-package fixtures to draw the header, and do not guess where a header ends. The web type for the card is a hand-written interface in the question sheet code, so it is updated by hand with the new field. A code read of the prompt package found the title comparison only in the Codex matcher: the Claude path uses the title only for a plan-prefix check, so story 3 needs no code change, only a test that the Claude dialog answer still works with a header folded into the title.
-- Store commit: the watch hook calls the poll check on every poll tick, with the watch live or not. The check restarts the quiet period only when the dirty files change. The implementer picks the poll interval for a live watch. It must be short enough that the existing 10 s test wait is met with margin, and it must cost no more than the existing per-tick rescan. A pending quiet timer is also re-armed when settings change. The test, its debounce and its 10 s wait stay as they are.
+- Store commit: the watch hook calls the poll check on every poll tick, with the watch live or not. The check restarts the quiet period only when the dirty files change. The poll interval for a live watch stays the existing `watchedPollInterval`. A check next to the debounce test asserts that `watchedPollInterval` plus the test's debounce is under half of the test's 10 s wait, so the wait is met with margin. A pending quiet timer is also re-armed when settings change. The test, its debounce and its 10 s wait stay as they are.
 - A debug run showed the cause: zero watch events reached the loop in the test and the poll never reached the commit loop. The fix does not depend on why the watcher delivered nothing.
 
 Process limit
@@ -176,7 +177,7 @@ Go readiness (grouped by cause)
 Playwright
 
 - Stale flows: update 199, 155 and 159, 72b, epics 2 menu, settings 200, menu 117, and the two locators and tail of 158 and the tail of 160, as listed in the Playwright report. Prefer `toContainText` of named items over a count. Review renames in e2e files by diff.
-- Burger: the empty and other headerless states of pinned pages (Agents, Design, Triage) get a header that carries the burger. A shared helper, named by the implementer, lets a page without its own header claim one. In loading and error states the title is the page's own title from the route. About 20 other headerless states (Epic, Ticket, Draft, Settings and account loading or not-found states) are covered by the same rule. The Schedules and File viewer pages use their own bars and keep them. Flows 152, 88 and 117 stay as they are and must pass.
+- Burger: the empty and other headerless states of pinned pages (Agents, Design, Triage) get a header that carries the burger. A shared helper, named by the implementer, lets a page without its own header claim one. In loading and error states the title is the page's own title from the route. About 20 other headerless states (Epic, Ticket, Draft, Settings and account loading or not-found states) are covered by the same rule. The Schedules and File viewer bars register with the shell through the same shared helper and carry the burger, so the route test covers them with no exception. Flows 152, 88 and 117 stay as they are and must pass.
 - Flows 24 and 22: poll the footer boxes together, and wait for the final settings URL.
 - Service worker (cause proven by ticket 17): the install is slow, not failing. The precache holds 280 unread response bodies and Chrome drains them about 3 per 200 ms inside a service worker (18 s against a 10 s poll). A page does not show it. Fix: read each body inside the precache map callback and build the cached response from the bytes, so no response is held unread. Memory cost: the dist (about 14 MB) is buffered once, as the code already did by holding every response. The Vitest guard checks the order (all bodies read before the cache opens) with a spy on the body read. It guards the rule only: a Vitest test cannot show the Chrome stall. Do not raise the 10 s activation poll: a slower or busier machine would stay red with a longer one. Bounded concurrency is not needed. Epics 2 also needs its stale "Archive" menu entry, which is already in the stale-flow story.
 - Flow 184, counts: before the counts are first read, set the hash to the stats route and reload, then wait for the Web performance region. This is a test-only change. Do not edit the route span code: the catch-all redirect queuing nothing is documented and covered by Vitest. The reload makes `app_ready` and the click's INP sample arrive.
@@ -193,30 +194,34 @@ Vitest
 - Routes test: wait on the text that proves the new epic painted, and clear `sessionStorage` between the two renders.
 - ScreenModal: wait for the first load to show, then click.
 - InterruptControl: keep the focus wait, drop the 5 s overrides.
-- Menu timer: the focus-settle function returns a disposer. The menu calls it on unmount. Test setup cancels leftover module timers after each test.
+- Menu timer: the focus-settle function returns a disposer. The menu calls it on unmount.
+- Timer disposers (story 47): every product module with a module-level timer exports a cancel/disposer and registers it with a small `registerTimerDisposer` helper. `test-setup.ts` runs all registered disposers after each test. The menu module's `cancelFocusWindow()` is the first. The implementer finds the others with `rg -n "^(export )?(let|var) \w+.*(Timeout|Timer|Interval)|^(setTimeout|setInterval)\(" webui/src -g '!*.test.*' -g '!*.spec.*'` and lists them in the PR.
+- Timer guard (story 47a): a Vitest guard reads the non-test files under `webui/src` and fails when a file has a column-0 `let` or `var` whose name or type mentions `Timeout`, `Timer` or `Interval`, or a column-0 `setTimeout`/`setInterval` call, and does not call `registerTimerDisposer`. It has no allowlist and ships green. A timer that is not at module level is not caught by the guard and is left to `gx-test-review`.
 - Closed without a test change: the ArchivePage and RestartDialog "spinner" and "once" tests (no repro), webui-flakes/01 (obsolete), test-health/03 (stale), follow-ups/518 (fixed).
 
 Skills
 
-- `gx-test-guidelines` becomes a skill directory with a description and no framework content. The portable skills are `gx-go-tests`, `gx-vitest-tests` and `gx-playwright-tests`. The implementer may pick different names within the `gx-` prefix. They hold no gx command. A new test enforces this.
+- `gx-test-guidelines` becomes a skill directory with a description and no framework content. The portable skills are `gx-go-tests`, `gx-vitest-tests` and `gx-playwright-tests`. The implementer may pick different names within the `gx-` prefix. They hold no gx command. A new rules test enforces this: it forbids `gx <verb>` command lines (`gx brief`, `gx check`, `gx tickets`, ...), `scripts/` paths and `.ai/index.md` in the portable skills, and allows `gx-*` skill names.
 - Content comes from the "Lessons" sections of the root-cause reports. Examples: wait on the signal that means ready, a counter must come from a real event, baseline timing, cleanups tolerate "already gone", inject a delay to prove a race, read error-context first, never wait a long time on a lost event.
 - The Vitest skill is a copy of the person's dotfiles `vitest` skill, expanded. Deleting the dotfiles copy is a manual step (see Further Notes).
 - The gx-only Playwright rules move to the repo-local skill `gx-only-e2es`. It is one real directory under `.claude/skills`, symlinked from `.agents/skills`, because Codex reads only `.agents/skills` in a repo. gx stops installing it into other projects. Its description names `webui/e2e/*.e2e.ts`, `playwrightguard` and `CATALOG.md`. The Testing section of `.ai/index.md` says to read it before touching a Playwright file. The `playwrightguard` failure message names it. A repo rules test guards the index line, the skill path and the symlink. The `gx-` prefix is not enforced on repo-local skills.
 - `.ai/index.md` keeps gx policy and helpers (the process cap and headroom, `GOMAXPROCS`, `claudeenv`, `envguard`, `servertest`, `shortTempDir`, `gx brief` and `gx check`, the flow budget). The portable Go rules move out (state from `t.TempDir` and `t.Name`, short socket paths, injected clock, no real HOME or live machine state, no fake that hangs on idle paths). The extra `-exec scripts/proc-cap` text is removed where `gx brief` already applies the cap.
 - `gx-implement`, `gx-tdd` and `gx-test-review` read the guidelines plus the matching framework skill and point to `.ai/index.md`. They stop naming `gx-playwright-e2es`. `skills/test_rules_test.go` gets new anchors. The guidelines heading test keeps its Why and Fix check but reads the rule count from the file.
 - `gx-failing-tests.md` and `gx-flake-tickets.md` stay plain gx files because they name the tracker.
+- `gx-vitest-tests` and `gx-test-review` also carry the rule "a product timer needs a disposer".
 - `gx-test-review` rules: meaningful coverage, assertions that pass early, timing assumptions, isolation, cleanup, diagnostics. It judges against the shared skills and the project's test docs. The dotfiles `code-review` skill gets no Tests axis.
 
 Guards
 
-- Biome linter: `recommended` plus the `react` and `test` domains, run in `gx check` and CI. A trial found 270 errors and 760 warnings. `noNonNullAssertion` is off with a comment. Every other finding is fixed in the epic. No ratchet.
+- Biome linter: `recommended` plus the `react` and `test` domains, run in `gx check` and CI. Every enabled rule runs as an error (the config sets severity `error`, and the check also passes `--error-on-warnings`), and the check fails on any diagnostic. A trial found 270 errors and 760 warnings. `noNonNullAssertion` is off with a comment. Every other finding, warnings included, is fixed in the epic. No ratchet.
 - Go rules tests (the `envguard` pattern, run in `gx check`): Playwright fixed sleeps, and fake `SetState` cleanups with no liveness check. The implementer picks whether they extend an existing guard package. Neither has an allowlist. Both ship green.
-- Left to review: Go `time.Sleep`, negative Playwright assertions with no positive barrier, one-time `evaluate` reads, Vitest waits on the wrong fetch, leaked timers.
+- Left to review: Go `time.Sleep`, negative Playwright assertions with no positive barrier, one-time `evaluate` reads, Vitest waits on the wrong fetch, and leaked timers that are not module-level (module-level timers have the Vitest guard of story 47a).
 
 Measurement
 
 - New index fields: attempt, a failure signature of about 200 characters, load at start and end, process count at start and end, origin (release or agent). Stable test names as in story 66.
-- The headline is the first-attempt pass rate of full `gx check --full` runs on trunk. Guard tests (`sizeguard`, `sleepguard`, `oldwords`, `envguard`) are excluded. A pass on rerun counts as a failure. The same-tree fail-then-pass list per test is the diagnostic.
+- `attempt` comes from `gx check`'s rerun flag. For a manual run it comes from the last index line with the same `tree_id` and args (one more than that line's attempt). `origin` comes from an env var, `GX_CHECK_ORIGIN=release`, set by `/gx-bump`. No value means `agent`.
+- The headline is the first-attempt pass rate of full `gx check --full` runs on trunk. Guard tests are excluded by category: guard packages, rules tests under `skills/`, and the lint step. The categories live in one list that the measurement command reads. The list names the existing guards (`sizeguard`, `sleepguard`, `oldwords`, `envguard`) and the new ones: the Biome lint step, the Playwright fixed-sleep rule, the `SetState` cleanup rule, the portable-skill rule, the `gx-only-e2es` rules test, the route-header test, the timer-disposer guard and `playwrightguard`. A pass on rerun counts as a failure. The same-tree fail-then-pass list per test is the diagnostic.
 - Numbers are computed when read, from the index and `gx check` records. No new store or dashboard. A short script or a `gx brief` view prints the headline and the list. The implementer picks which.
 - Slow tests no longer count as failures in the headline. A Vitest run that exits 1 with all tests green is recorded as a failed entry with a signature (for example the unhandled error text).
 - The first impl ticket records the baseline (109 of 111 full runs failed) before any fix.
@@ -226,7 +231,7 @@ Measurement
 Tickets
 
 - A fix closes the tickets it explains in place with `gx tickets set --status done` (map and backlog tickets) or `gx tickets close --reason fixed` (follow-ups), with a note linking the impl ticket. Duplicates close with `--reason duplicate` and the kept address. Obsolete tickets close with `--reason obsolete`.
-- At the end, unexplained tickets move to `test-health` with `gx tickets move`. A move renumbers, so it waits until fixes have closed their tickets. The old map epics keep `destination_unconfirmed: true`.
+- At the end, unexplained tickets move to `test-health` with `gx tickets move`. A move renumbers, so it waits until fixes have closed their tickets. `gx tickets move` only moves flat, never-run draft or open tickets. The move ticket first lists the surviving tickets that cannot move. Each of those gets a new `test-health` ticket that links the old one and keeps its evidence, and the old one is closed with a link to the new one. The old map epics keep `destination_unconfirmed: true`.
 - `gx-follow-up` and `skills/gx-flake-tickets.md` also search `test-health` and append a "seen again" entry to a match. New flakes go to follow-ups, then triage, then `test-health`.
 
 Order
@@ -247,7 +252,7 @@ Seams (existing ones, highest first):
 
 - `gx check --full` on trunk, as measured by the `gx brief` index. This is the proof of the epic.
 - Go package tests at each fixed behaviour: the Codex question tests (8 existing), the store-commit debounce test, `storecommit`, the launch and nudge tests, the budget tests, the pid watcher tests, the fixture package tests.
-- Vitest files for each fixed Vitest group, the page-header test over the routes, the service worker precache test, the menu timer test, and the Stats page test that the "Include dev" checkbox stays mounted across a filter-change refetch (render the page with no cache for the new id, hold the second fetch pending, click, assert the same element is still connected, then resolve the fetch). Prior art: the Stats page tests and the `useFetched` tests.
+- Vitest files for each fixed Vitest group, the timer-disposer guard, the page-header test over the routes, the service worker precache test, the menu timer test, and the Stats page test that the "Include dev" checkbox stays mounted across a filter-change refetch (render the page with no cache for the new id, hold the second fetch pending, click, assert the same element is still connected, then resolve the fetch). Prior art: the Stats page tests and the `useFetched` tests.
 - Playwright flows 152, 88, 117, 102, 24, 22, 184, 199, 155, 159, 72b, 158, 160, settings 200, menu 117, dev-mode and epics 2.
 - Rules tests in `skills/` and the guard packages for the skills, the guards and the index line.
 
@@ -263,13 +268,15 @@ Rules:
 Regressions and fork errors (stories 1 to 11)
 
 - Flows: none (no web change).
-- Checks: `gx brief go-test ./server/sessions/prompt -run TestSessionAnswer_CodexQuestion -count=1` exits 0 with all 8 entries passing. `gx brief go-test ./server/lifecycle -run TestConfigReload_StoreCommitDebounceApplies -count=20` exits 0. `gx brief go-test ./storecommit ./server/settings ./server/index ./server/lifecycle -count=1` exits 0. `rg "resource temporarily" ` over the logs of two full `gx check --full --kind test` runs finds nothing, one run taken while another session runs a Go test job. `scripts/proc-cap --help` and the script show a default of 800. The burst test appears in its own step that starts after the others end.
+- Checks: `gx brief go-test ./server/sessions/prompt -run TestSessionAnswer_CodexQuestion -count=1` exits 0 with all 8 entries passing. `gx brief go-test ./server/lifecycle -run TestConfigReload_StoreCommitDebounceApplies -count=20` exits 0. `gx brief go-test ./storecommit ./server/settings ./server/index ./server/lifecycle -count=1` exits 0. `rg "resource temporarily" ` over the logs of two full `gx check --full --kind test` runs finds nothing, one run taken while another session runs a Go test job and a `testutil/gxfixture` run. `gx brief go-test ./server/lifecycle -run TestConfigReload_StoreCommitDebounceApplies -count=1` also runs the new check that `watchedPollInterval` plus the debounce is under half of the 10 s wait. `scripts/proc-cap --help` and the script show a default of 800. The burst test appears in its own step that starts after the others end.
 - New to write: the "fresh store poll catches a lost watch event" Go test if the existing debounce test does not cover the re-arm (story 6).
 
 Go readiness (stories 12 to 26)
 
 - Flows: none.
 - Checks: `gx brief go-test ./harness ./nativerunner/... ./server/sched/launchtest ./server/sessions/... -count=1` exits 0 (pid watcher consumers after the launch baseline change). `gx brief go-test ./server/sched/launchtest -count=10` exits 0. `gx brief go-test ./harness -count=1` exits 0 and includes the new "fresh idle does not move Turn" test. `gx brief go-test ./testutil/gxfixture ./server/lifecycle ./server/budget -count=1` exits 0. The delay-injection runs from the reports pass with the fix. The guard test for unguarded `SetState` cleanups passes (see guards).
+- Story 13: a new harness test launches with no stall option and sees a turn for the launch prompt (`gx brief go-test ./harness -count=1` includes it and exits 0).
+- Story 17: `rg -n "holder" --glob "*_test.go"` lists every test that waits for the holder. The PR lists each hit that then types, and each waits for the acked control first. A run with a delay injected before the agent reads input passes.
 - New to write: tests named in the decisions (pid watcher, lock write, seeder by id, budget wait, countdown hold).
 
 Playwright (stories 27 to 41)
@@ -286,28 +293,36 @@ Vitest (stories 42 to 48)
 
 - Flows: none.
 - Checks: `gx brief -C webui vitest src/epic src/routes src/ui` exits 0. Ten loaded full Vitest runs print no `Errors` line. The new timer-count test passes.
+- Story 47: `rg -n "^(export )?(let|var) \w+.*(Timeout|Timer|Interval)|^(setTimeout|setInterval)\(" webui/src -g '!*.test.*' -g '!*.spec.*'` lists the module-level timers. The PR lists them, each has an exported disposer, and `test-setup.ts` calls all of them in `afterEach`.
+- Story 47a: `gx brief -C webui vitest src/timers` (the timer guard) exits 0 on trunk. Removing a `registerTimerDisposer` call in a scratch copy makes it exit 1 and name the file.
 
 Shared skills and review (stories 49 to 59)
 
 - Flows: none.
 - Checks: `gx skills list` shows the new portable skills and does not list `gx-only-e2es`. `gx brief go-test ./skills -count=1` exits 0 (no gx command in the portable skills, new anchors, heading count). The `.agents/skills/gx-only-e2es` symlink resolves to the `.claude/skills` directory. `.ai/index.md` has the Testing line that names it.
+- Story 55: the portable-skill rules test exits 0, and adding a `gx brief` line, a `scripts/` path or `.ai/index.md` to a portable skill in a scratch copy makes it exit 1. A `gx-*` skill name is accepted.
+- Story 57: `rg -n "t\.TempDir|t\.Name|short socket|injected clock" .ai/index.md` finds none of the moved Go rules. `rg -n "exec scripts/proc-cap" .ai/index.md` finds none beside where `gx brief` applies the cap.
+- Stories 47 and 58: `rg -l "needs a disposer" skills .claude/skills` finds `gx-vitest-tests` and `gx-test-review`.
 - New to write: the rules tests in the decisions.
 
 Guards (stories 60 to 64)
 
 - Flows: none.
-- Checks: `gx check` runs Biome lint and exits 0 on trunk. Adding a `waitForTimeout` or a raw `SetState` cleanup in a scratch copy makes the matching rules test exit 1 and name the file.
+- Checks: `gx check` runs Biome lint and exits 0 on trunk, and `pnpm exec biome lint` in `webui` prints no error and no warning. Adding a `waitForTimeout` or a raw `SetState` cleanup in a scratch copy makes the matching rules test exit 1 and name the file.
 
 Measurement (stories 65 to 73)
 
 - Flows: none.
-- Checks: after a `gx brief` run, the newest line of the brief index holds `attempt`, `signature`, load, process count and `origin`. A Vitest run with an injected unhandled error is recorded as failed. The measurement command prints the first-attempt pass rate and the flip list. The slow-test count no longer appears as a failure in the headline. After the 20-run proof, the command shows 20 consecutive passes.
+- Checks: after a `gx brief` run, the newest line of the brief index holds `attempt`, `signature`, load, process count and `origin`. A Vitest run with an injected unhandled error is recorded as failed. The measurement command prints the first-attempt pass rate and the flip list. The slow-test count no longer appears as a failure in the headline. After the 20-run proof, the command shows 20 consecutive passes. A re-run of the same tree shows `attempt` 2, and a run with `GX_CHECK_ORIGIN=release` shows `origin` release (no value shows agent). The exclusion list read by the command names every guard in the Measurement decision, and none of them counts in the headline.
+- Story 66: the index shows a Vitest test name with no worktree path and a Playwright test name with no `e2e/` prefix and no `─` suffix.
+- Story 69: `rg -n "go-test.*json|playwright.*json|failure\(\)" .github/workflows/ci.yml` shows both reports uploaded when the job fails.
+- Story 72: the measurement output shows p50 and p95 per test. A slow test never changes the exit code or the headline.
 - New to write: the measurement command or view.
 
 Tickets (stories 74 to 77)
 
 - Flows: none.
-- Checks: `gx tickets show` of a fixed flake ticket shows a done status and the impl link. After the final step, the old flake epics list no open tickets and `test-health` holds the survivors. `skills/gx-flake-tickets.md` and `gx-follow-up` name `test-health`.
+- Checks: `gx tickets show` of a fixed flake ticket shows a done status and the impl link. After the final step, the old flake epics list no open tickets and `test-health` holds the survivors. A surviving ticket that could not move shows a closed status with a link to its new `test-health` ticket, and the new ticket links back and holds the evidence. Story 75: before any impl ticket starts, `gx tickets show` of each of the 7 duplicates shows `duplicate` with the kept address, and each obsolete ticket shows `obsolete`. `skills/gx-flake-tickets.md` and `gx-follow-up` name `test-health`.
 
 ## Out of Scope
 
