@@ -69,8 +69,9 @@ A new config key must reach the settings page or be excluded with a reason:
   (`testutil/gxfixture/tuiflows`, driven through `testutil/vtterm`). `make test` shares one CPU budget between its steps, half the cores by
   default; set `GX_TEST_CPUS=<n>` to change it. Every `gx brief go-test` run caps itself the same
   way (GOMAXPROCS at two fifths of that budget) unless the environment already sets GOMAXPROCS.
-- Test-writing rules shared with other projects are in `skills/gx-test-guidelines/SKILL.md`. The rules
-  below are gx-only.
+- Test-writing rules shared with other projects are in `skills/gx-test-guidelines/SKILL.md`, and the
+  portable Go test rules (test state, socket paths, clocks, real machine state, fakes on idle paths)
+  are in `skills/gx-go-tests/SKILL.md`. The rules below are gx-only.
 - **Default to no new Playwright flow.** Cover render and component logic with vitest and server
   rules with Go tests. A flow needs a real server round trip, browser layout, or a multi-page
   journey, and extends an existing flow when it can. `playwrightguard` fails above `maxFlows`. Before
@@ -85,10 +86,12 @@ A new config key must reach the settings page or be excluded with a reason:
   of sibling tickets rather than re-running it.
 - Never run `go clean -cache` directly, use `gx brief go-clean-cache`.
 - Once a targeted run passes, stop. Don't rerun the full suite to double-check.
-- Run every `go test` with `-exec "$PWD/scripts/proc-cap"` (the Makefile does). It caps your user's
-  process count at the current count + 800, so a test binary that forks itself (a `TestMain` missing
-  `servertest.RunSessionProcesses()` or `cmdtest.Main`) fails fast instead of
-  crashing the laptop. A package using `servertest` needs `servertest.RunSessionProcesses()` (or
+- `gx brief go-test` and `gx check` cap the process count themselves: never add `-exec` there. Only a
+  raw `go test` (the Makefile does) passes `scripts/proc-cap` as its `-exec` program. The cap is the current
+  process count plus the headroom. The default headroom (800) lives only in `scripts/proc-cap`;
+  `GX_PROC_HEADROOM` overrides it. A test binary that forks itself (a `TestMain` missing
+  `servertest.RunSessionProcesses()` or `herdrfake.RunHelperProcess()`) fails fast under the cap
+  instead of crashing the laptop. A package using `servertest` needs `servertest.RunSessionProcesses()` (or
   `cmdtest.Main`); the testmainguard check requires only that call.
 - Verify with `gx check` in the foreground, unpiped. Iterate with `gx brief`. Never pipe, `tail` or
   background either.
@@ -117,11 +120,9 @@ A new config key must reach the settings page or be excluded with a reason:
     so a `^` anchor finds no tests. It adds the config and the line reporter, and runs
     `make web-build` only when `webui/dist/index.html` is missing. `--help` prints usage; `--list`
     shows flow titles.
-- Unix socket paths are capped near 100 bytes, and `t.TempDir()` can exceed that. Holder-socket
-  tests (anything that binds `holder.sock`) need a short `TMPDIR` or a short state root; use
-  `shortTempDir` in `nativerunner` and `nativerunner/holder` tests. The failure is `bind: invalid argument`.
-- Tests never read live machine state, such as sibling worktrees, real branches or the live
-  server's state. Use `t.TempDir()` and `testutil.TempRepo`.
+- Holder-socket tests (anything that binds `holder.sock`) use `shortTempDir` in `nativerunner` and
+  `nativerunner/holder` tests. Rule: socket paths in `skills/gx-go-tests/SKILL.md`.
+- Tests build repos with `testutil.TempRepo`. Rule: real machine state in `skills/gx-go-tests/SKILL.md`.
 
 ## Adding a server route
 
@@ -140,9 +141,8 @@ instead of hand-written helpers. A web test that needs a project repo also needs
 `SetProjectRepoNoAutoMerge`; `newFFFixture` does not provide one. Rig traps:
 [server-test-rigs.md](server-test-rigs.md).
 
-`servertest` fake agents idle without sending a report. New idle-path or finish-path behaviour (a
-stall nudge, say) makes every fake agent hang until the test times out. Give it an off switch that
-is off by default in `servertest`.
+New idle-path or finish-path behaviour gets an off switch that is off by default in `servertest`
+fakes. Rule: fakes on idle paths in `skills/gx-go-tests/SKILL.md`.
 
 ## Pauses
 

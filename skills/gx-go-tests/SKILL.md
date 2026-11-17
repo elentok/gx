@@ -24,6 +24,34 @@ tool or the Go trap, and the general point stays in the guidelines.
 - **Fix:** write a state file in one write, or write a temp file and `os.Rename` it. A reader that
   can still see an empty file retries the read, and prints the path.
 
+## Test state
+
+- **Why:** a shared constant path or name makes parallel tests and reruns see each other's state.
+- **Fix:** take every path from `t.TempDir()` and every unique name from `t.Name()`.
+
+## Socket paths
+
+- **Why:** a Unix socket path is capped near 100 bytes. A long temp dir breaks the bind with
+  `bind: invalid argument`.
+- **Fix:** a test that binds a socket uses a short temp dir.
+
+## Clocks
+
+- **Why:** `time.Now()` in the code under test makes the test depend on wall time.
+- **Fix:** inject a clock and move it in the test.
+
+## Real machine state
+
+- **Why:** a test that reads the real `HOME`, sibling worktrees, real branches or a live server's
+  state passes on one machine and fails on another.
+- **Fix:** build the home, the repo and the state inside the test's temp dir, and pass them in.
+
+## Fakes on idle paths
+
+- **Why:** a fake agent idles without a report. New idle-path or finish-path behaviour, such as a
+  stall nudge, makes every fake hang until the test times out.
+- **Fix:** give the new behaviour an off switch, and keep it off by default in the fake.
+
 ## Quiet windows
 
 - **Why:** the test waits for "no change for 500 ms" and treats it as the end of async work. A busy

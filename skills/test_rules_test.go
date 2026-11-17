@@ -250,6 +250,20 @@ func TestTestGuidelinesKeepGxOnlyRulesInIndex(t *testing.T) {
 	checkAnchors(t, "../.ai/index.md", "GOMAXPROCS", "claudeenv.In(home)", "envguard/envguard_test.go")
 }
 
+// Each portable Go test rule has one home, the Go tests skill. The index keeps the gx helpers.
+func TestPortableGoRulesLiveInGoTestsSkill(t *testing.T) {
+	checkAnchors(t, "../.ai/index.md", "skills/gx-go-tests/SKILL.md", "skills/gx-test-guidelines/SKILL.md",
+		"shortTempDir", "servertest", "scripts/proc-cap", "GX_PROC_HEADROOM", "800")
+	index := normalizeSpace(readFile(t, "../.ai/index.md"))
+	for _, gone := range []string{"t.TempDir", `-exec "$PWD/scripts/proc-cap"`} {
+		if strings.Contains(index, gone) {
+			t.Errorf("../.ai/index.md still holds %q", gone)
+		}
+	}
+	checkAnchors(t, "gx-go-tests/SKILL.md", "## Test state", "## Socket paths", "## Clocks",
+		"## Real machine state", "## Fakes on idle paths")
+}
+
 func TestPortableTestSkillsHoldNoGxOnlyText(t *testing.T) {
 	files := map[string]string{}
 	for _, dir := range portableTestSkills {
