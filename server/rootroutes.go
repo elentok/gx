@@ -49,7 +49,6 @@ func (r rootRoutes) snapshot(w http.ResponseWriter, _ *http.Request) {
 	s := r.s
 	w.Header().Set("Content-Type", "application/json")
 	snap, agents := s.idx.SnapshotAgents()
-	snap.HerdrText, snap.HerdrUnavailable = s.herdr.Banner()
 	labeler := s.harness.Labeler()
 	for i, t := range snap.Tickets {
 		if addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil {
@@ -182,7 +181,6 @@ func (r rootRoutes) handshake(w http.ResponseWriter, _ *http.Request) {
 	s := r.s
 	w.Header().Set("Content-Type", "application/json")
 	h := wire.Handshake{APIVersion: wire.APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), WebURL: s.WebURL(), WebError: s.web.Err()}
-	h.HerdrText, h.HerdrUnavailable = s.herdr.Banner()
 	h.Migrating = s.migrator.Migrating()
 	if s.web.Listener() != nil {
 		var err error

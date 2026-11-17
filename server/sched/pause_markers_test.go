@@ -2,7 +2,6 @@ package sched_test
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -43,7 +41,6 @@ func TestLaunchFailure_TypedCausesReachChatAsSentences(t *testing.T) {
 	}{
 		{"worktree exists", existsErr, "The ticket's worktree folder already exists."},
 		{"session died", agentrunner.SessionDied("holder socket /tmp/gx-holder.sock timeout"), "The agent session ended unexpectedly."},
-		{"herdr lost", herdr.NewAgentNotFoundError("agent_not_found", errors.New("herdr agent get: agent_not_found")), "herdr lost track of the agent."},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -60,7 +57,7 @@ func TestLaunchFailure_TypedCausesReachChatAsSentences(t *testing.T) {
 			if got := waitForChat(count, c.sentence); got != 1 {
 				t.Errorf("sentence %q sent %d times, want once", c.sentence, got)
 			}
-			for _, leak := range []string{"gx-holder.sock", "agent_not_found", "stall-nudge", "session-died", "herdr-agent-lost"} {
+			for _, leak := range []string{"gx-holder.sock", "agent_not_found", "stall-nudge", "session-died"} {
 				if count(leak) != 0 {
 					t.Errorf("chat leaks %q", leak)
 				}

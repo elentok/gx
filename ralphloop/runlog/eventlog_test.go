@@ -186,6 +186,34 @@ func TestReadEvents_SkipsMalformedTrailingLine(t *testing.T) {
 	}
 }
 
+// Old run logs hold event types and a pause marker that no code writes any
+// more; the readers must not check types.
+func TestReadEvents_LoadsRemovedHerdrEventsAndMarker(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := RunLogPath(dir, "epic")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	content := `{"type":"herdr-unavailable"}` + "\n" +
+		`{"type":"herdr-available"}` + "\n" +
+		`{"type":"paused","ticket":"01","reason":"herdr-agent-lost: gone"}` + "\n"
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	events, ok, err := ReadEvents(dir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
+	}
+	if len(events) != 3 {
+		t.Fatalf("events = %+v, want all three lines", events)
+	}
+	if events[0].Type != "herdr-unavailable" || events[1].Type != "herdr-available" || events[2].Reason != "herdr-agent-lost: gone" {
+		t.Errorf("events = %+v", events)
+	}
+}
+
 func TestAppendEvent_ConcurrentAppends_NeverInterleave(t *testing.T) {
 	t.Parallel()
 	dir := fixture.EpicScratchDir(t, "epic")

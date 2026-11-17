@@ -42,12 +42,8 @@ type State struct {
 	// Seq 0, so it cannot tell whether a snapshot has arrived; Loaded does.
 	Seq uint64
 	// Loaded is set once a snapshot has been applied.
-	Loaded           bool
-	HerdrUnavailable bool
-	// HerdrText says which tickets wait on herdr. Events carry none, so it stays
-	// empty until the next snapshot.
-	HerdrText string
-	Budget    wire.BudgetStatus
+	Loaded bool
+	Budget wire.BudgetStatus
 	// ExtraUsage is the snapshot's extra-usage warning flag.
 	ExtraUsage bool
 	// Tickets is in snapshot order (by address, forks under their parent).
@@ -174,8 +170,6 @@ func (s State) ApplySnapshot(snap wire.Snapshot) State {
 	next := State{
 		Seq:              snap.Seq,
 		Loaded:           true,
-		HerdrUnavailable: snap.HerdrUnavailable,
-		HerdrText:        snap.HerdrText,
 		Budget:           snap.Budget,
 		ExtraUsage:       snap.ExtraUsage,
 		Tickets:          slices.Clone(snap.Tickets),
@@ -215,18 +209,11 @@ func (s State) Reduce(ev wire.Event) (State, Effect) {
 	}
 	s.Seq = ev.Seq
 
-	// Events carry no claim times, budget or cost, so every event but the
-	// herdr ones asks for a re-snapshot. The caller applies it to the live
+	// Events carry no claim times, budget or cost, so every event asks for a re-snapshot. The caller applies it to the live
 	// stream (no resubscribe) and refetches the queue only on queue-changed.
 	// The in-place updates below only make the row react before that snapshot
 	// arrives.
 	switch ev.Type {
-	case wire.EventHerdrUnavailable:
-		s.HerdrUnavailable = true
-		return s, EffectNone
-	case wire.EventHerdrAvailable:
-		s.HerdrUnavailable, s.HerdrText = false, ""
-		return s, EffectNone
 	case wire.EventSessionFocus:
 		return s, EffectNone
 	case wire.EventQueueChanged:

@@ -613,8 +613,6 @@ func (m QueueModel) header() header.Header {
 		Paused:       m.server.Paused,
 		ServerDown:   m.server.Down(),
 		HasServer:    m.server.ServerAPI != nil,
-		HerdrDown:    m.server.HerdrDown,
-		HerdrText:    m.server.HerdrText,
 		Budget:       m.server.Budget,
 		Finished:     m.server.Finished,
 		Spinner:      m.implementSpinner,

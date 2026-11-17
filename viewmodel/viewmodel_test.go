@@ -77,8 +77,6 @@ func TestReduce_EffectPerEventType(t *testing.T) {
 		{wire.EventTicketNudged, resnap},
 		{wire.EventQueueChanged, resnap | viewmodel.EffectRefetchQueue},
 		{wire.EventSessionChanged, resnap},
-		{wire.EventHerdrUnavailable, viewmodel.EffectNone},
-		{wire.EventHerdrAvailable, viewmodel.EffectNone},
 	}
 	for _, c := range cases {
 		t.Run(c.typ, func(t *testing.T) {
@@ -174,17 +172,6 @@ func TestToastFor(t *testing.T) {
 	}
 	if _, ok := viewmodel.ToastFor(wire.Event{Type: wire.EventTicketDone, Address: "gx:e/01"}); ok {
 		t.Fatal("ticket-done should not toast")
-	}
-}
-
-func TestReduce_HerdrAppliedInPlace(t *testing.T) {
-	s, _ := snapshot().Reduce(wire.Event{Seq: 11, Type: wire.EventHerdrUnavailable})
-	if !s.HerdrUnavailable {
-		t.Fatal("herdr-unavailable not applied")
-	}
-	s, _ = s.Reduce(wire.Event{Seq: 12, Type: wire.EventHerdrAvailable})
-	if s.HerdrUnavailable {
-		t.Fatal("herdr-available not applied")
 	}
 }
 

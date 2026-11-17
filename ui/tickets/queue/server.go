@@ -53,10 +53,6 @@ type Server struct {
 	WaitingLabels map[string]string
 	// CodexRows marks the snapshot tickets whose label says codex, by address.
 	CodexRows map[string]bool
-	// HerdrDown says the server cannot launch agents; HerdrText names the
-	// tickets waiting on herdr (empty falls back to the generic banner).
-	HerdrDown bool
-	HerdrText string
 	// Finished is the snapshot's Recently finished list. FinishedGen numbers the
 	// refresh tick chain: each page activation starts a new chain and the older
 	// chain's pending tick is ignored.
@@ -107,7 +103,7 @@ func (s Server) ApplyState(st *viewmodel.State) Server {
 		}
 	}
 	s.Finished = st.RecentlyFinished
-	s.HerdrDown, s.HerdrText, s.Budget = st.HerdrUnavailable, st.HerdrText, st.Budget
+	s.Budget = st.Budget
 	s.Paused = st.Mode == wire.QueueModePaused
 	return s
 }

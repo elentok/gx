@@ -196,8 +196,8 @@ func (h *harness) switchTo(tab nav.TabID) {
 	h.run(cmd)
 }
 
-func herdrEvent(seq uint64) wire.Event {
-	return wire.Event{Seq: seq, Type: wire.EventHerdrUnavailable}
+func noopEvent(seq uint64) wire.Event {
+	return wire.Event{Seq: seq, Type: wire.EventSessionFocus, Address: "s"}
 }
 
 func newStreamHarness(t *testing.T) (*harness, *streamFake) {
@@ -227,7 +227,7 @@ func TestServerStream_ReadOnlyKeepsReading(t *testing.T) {
 	f.readOnly = true
 
 	h.probeUp()
-	f.stream(0).ch <- herdrEvent(11)
+	f.stream(0).ch <- noopEvent(11)
 	h.pump()
 
 	if h.m.stream.vm.Seq != 11 {
@@ -242,16 +242,16 @@ func TestServerStream_EventsAreReadWhateverTabIsOpen(t *testing.T) {
 			h.probeUp()
 
 			h.switchTo(tab)
-			f.stream(0).ch <- herdrEvent(11)
+			f.stream(0).ch <- noopEvent(11)
 			h.pump()
 
-			if !h.m.stream.vm.HerdrUnavailable {
+			if h.m.stream.vm.Seq != 11 {
 				t.Errorf("event not applied while %s is open", tab)
 			}
 			h.switchTo(nav.TabWorktrees)
-			f.stream(0).ch <- wire.Event{Seq: 12, Type: wire.EventHerdrAvailable}
+			f.stream(0).ch <- noopEvent(12)
 			h.pump()
-			if h.m.stream.vm.HerdrUnavailable {
+			if h.m.stream.vm.Seq != 12 {
 				t.Errorf("event not applied after switching from %s", tab)
 			}
 		})
@@ -362,7 +362,7 @@ func TestStartSession_OpensThePrefilledCreateFormOnTheAgentsTab(t *testing.T) {
 
 func TestServerStream_GapAndClosedStreamEachResnapshotOnce(t *testing.T) {
 	cases := map[string]func(s *fakeStream){
-		"gap":    func(s *fakeStream) { s.ch <- herdrEvent(15) },
+		"gap":    func(s *fakeStream) { s.ch <- noopEvent(15) },
 		"closed": func(s *fakeStream) { close(s.ch) },
 	}
 	for name, trigger := range cases {
@@ -384,13 +384,13 @@ func TestServerStream_GapAndClosedStreamEachResnapshotOnce(t *testing.T) {
 func TestServerStream_StaleStreamMessagesAreIgnoredAfterResubscribe(t *testing.T) {
 	h, f := newStreamHarness(t)
 	h.probeUp()
-	f.stream(0).ch <- herdrEvent(15) // gap: re-snapshot, new subscription
+	f.stream(0).ch <- noopEvent(15) // gap: re-snapshot, new subscription
 	h.pump()
 
-	f.stream(0).ch <- herdrEvent(11) // late delivery from the cancelled stream
+	f.stream(0).ch <- noopEvent(11) // late delivery from the cancelled stream
 	h.pump()
 
-	if h.m.stream.vm.HerdrUnavailable || h.m.stream.vm.Seq != 10 {
+	if h.m.stream.vm.Seq != 10 {
 		t.Errorf("stale event applied: %+v", h.m.stream.vm)
 	}
 	if _, streams, _ := f.counts(); streams != 2 {
@@ -425,22 +425,22 @@ func TestServerStream_ActivePageGetsEachChangeAndCurrentStateOnSwitch(t *testing
 	live.model = stub
 	h.m.livePageByTab[nav.TabTickets] = live
 
-	f.stream(0).ch <- herdrEvent(11)
+	f.stream(0).ch <- noopEvent(11)
 	h.pump()
-	if stub.last == nil || !stub.last.HerdrUnavailable {
+	if stub.last == nil || stub.last.Seq != 11 {
 		t.Fatalf("active page did not receive the change: %+v", stub.last)
 	}
 
 	h.switchTo(nav.TabStatus)
 	calls := stub.calls
-	f.stream(0).ch <- wire.Event{Seq: 12, Type: wire.EventHerdrAvailable}
+	f.stream(0).ch <- noopEvent(12)
 	h.pump()
 	if stub.calls != calls {
 		t.Errorf("hidden page was delivered to")
 	}
 
 	h.switchTo(nav.TabTickets)
-	if stub.last == nil || stub.last.HerdrUnavailable || stub.last.Seq != 12 {
+	if stub.last == nil || stub.last.Seq != 12 {
 		t.Errorf("switch did not deliver the current state: %+v", stub.last)
 	}
 }
@@ -512,11 +512,11 @@ func TestServerStream_EventWhileQueueOpenShowsOnTicketsAfterSwitchBack(t *testin
 	h.m.livePageByTab[nav.TabTickets] = live
 
 	h.switchTo(nav.TabQueue)
-	f.stream(0).ch <- herdrEvent(11)
+	f.stream(0).ch <- noopEvent(11)
 	h.pump()
 	h.switchTo(nav.TabTickets)
 
-	if stub.last == nil || !stub.last.HerdrUnavailable {
+	if stub.last == nil || stub.last.Seq != 11 {
 		t.Errorf("event that arrived meanwhile is missing: %+v", stub.last)
 	}
 }

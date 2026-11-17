@@ -45,8 +45,6 @@ type PauseHost interface {
 	HoldPauseForRecovery(addr tickets.Address, ticketPath string, kind events.Kind, reason string) bool
 	// WriteFollowUp files the follow-up, or notes a repeat on the open one.
 	WriteFollowUp(from tickets.Address, f FollowUp) (string, error)
-	// HerdrUnavailable reports whether herdr is down.
-	HerdrUnavailable() bool
 	// StopRun stops the run's session.
 	StopRun(run runs.Run) error
 	// TakeTierOverride returns the ticket's one-time tier and clears it.
@@ -55,8 +53,6 @@ type PauseHost interface {
 
 // LaunchHost is what relaunching a ticket needs.
 type LaunchHost interface {
-	// HerdrHolds reports why r cannot take work now: herdr is down.
-	HerdrHolds(r agentrunner.Runner) (reason string, held bool)
 	// UsageGate reports why agent is held by a usage limit now.
 	UsageGate(agent agent.AgentKind, now time.Time) (verdict string, held bool)
 	// FreshHeldDisk reports the held disk status of project, if any.
@@ -110,27 +106,14 @@ type Deps struct {
 
 // Writer makes the single-ticket writes.
 type Writer struct {
-	d    Deps
-	fold PauseFold
+	d Deps
 	// nudges rate-limits Nudge.
 	nudges NudgeLimiter
 	// unblockMu makes leaving a headless block happen once, whoever sees it first.
 	unblockMu sync.Mutex
 }
 
-// New returns a Writer. The pause fold's cap flushes the digest to chat.
+// New returns a Writer.
 func New(d Deps) *Writer {
-	w := &Writer{d: d}
-	w.fold.OnCap = w.FlushPauseFold
-	return w
-}
-
-// FlushPauseFold sends the held herdr-outage pauses as one digest.
-func (w *Writer) FlushPauseFold() {
-	w.d.Chat.PauseDigest(w.fold.Flush())
-}
-
-// holdPause queues the pause line for the digest.
-func (w *Writer) holdPause(addr tickets.Address, ticketPath, status string, kind events.Kind, reason string) {
-	w.fold.Hold(notify.PauseDigestLine(addr.Project, addr.Epic, addr.ID, status, PauseChatDetail(ticketPath, kind, reason)))
+	return &Writer{d: d}
 }

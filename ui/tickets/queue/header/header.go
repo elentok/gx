@@ -36,8 +36,7 @@ var (
 	// every ticket is done.
 	epicStatusDoneStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen)
 
-	// EpicStatusProblemStyle is the warning yellow, used for the herdr banner
-	// and the budget total nearing its soft limit.
+	// EpicStatusProblemStyle is the warning yellow, used for the budget total nearing its soft limit.
 	EpicStatusProblemStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
 
 	// EpicStatusPausedAnswerStyle colors a paused epic's header status line
@@ -113,8 +112,6 @@ type Header struct {
 	// ServerDown, HasServer: the server link is down; a server client exists.
 	ServerDown bool
 	HasServer  bool
-	HerdrDown  bool
-	HerdrText  string
 	Budget     wire.BudgetStatus
 	Finished   []wire.FinishedEpic
 	Spinner    spinner.Model
@@ -422,13 +419,6 @@ func (h Header) BodyLines() []string {
 	if h.ServerDown {
 		return []string{EpicStatusPausedAnswerStyle.Render(ServerDownBanner)}
 	}
-	if h.HasServer && h.HerdrDown {
-		banner := herdrDownBanner
-		if h.HerdrText != "" {
-			banner = "herdr unavailable — " + h.HerdrText
-		}
-		return []string{EpicStatusProblemStyle.Render(banner)}
-	}
 	if h.Paused {
 		return []string{EpicStatusProblemStyle.Render(pausedLine(h.runningTicketCount()))}
 	}
@@ -457,10 +447,6 @@ func (h Header) runningTicketCount() int {
 	}
 	return n
 }
-
-// herdrDownBanner is shown in server mode while the server cannot reach
-// herdr: queued tickets stay queued until it answers again.
-const herdrDownBanner = "herdr unavailable — the server can't start agents until it answers"
 
 // idleBodyLine picks the reserved slot's idle copy: a pointer back to
 // the Tickets tab when nothing is checked, otherwise where runs start from.

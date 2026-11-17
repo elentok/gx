@@ -14,7 +14,6 @@ type Marker string
 const (
 	StallNudgeMarker  Marker = "stall-nudge"
 	SessionDiedMarker Marker = "session-died"
-	HerdrLostMarker   Marker = "herdr-agent-lost"
 	WorktreeExists    Marker = "worktree-exists"
 )
 

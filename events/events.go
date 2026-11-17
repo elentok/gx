@@ -119,8 +119,6 @@ const (
 	// LateFinishAdopted is a zero-commit pause whose agent reported finished
 	// after it, which the server then landed or closed.
 	LateFinishAdopted Type = "late-finish-adopted"
-	HerdrUnavailable  Type = "herdr-unavailable"
-	HerdrAvailable    Type = "herdr-available"
 	Submitted         Type = "submitted"
 	SubmitRefused     Type = "submit-refused"
 	Deadlocked        Type = "deadlocked"
@@ -225,13 +223,6 @@ const (
 	PRTrunkUpdate Kind = "pr-trunk-update"
 )
 
-// kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
-// of the kind (the outage fold holds on it), never an event field.
-var kindCauseHerdr = map[Kind]bool{
-	AgentNameTaken: true,
-	HandleMismatch: true,
-}
-
 // kinds is the closed set; Valid checks membership.
 var kinds = map[Kind]bool{
 	AgentNameTaken: true, AgentPromptStalled: true, ZeroCommit: true, BlockedPane: true,
@@ -281,9 +272,6 @@ var kindAwaitsAnswer = map[Kind]bool{
 // AwaitsAnswer reports whether a pause of this kind is a question for a
 // person rather than a fault to repair.
 func (k Kind) AwaitsAnswer() bool { return kindAwaitsAnswer[k] }
-
-// CauseHerdr reports whether a herdr outage can cause this kind.
-func (k Kind) CauseHerdr() bool { return kindCauseHerdr[k] }
 
 // kindRequired lists the types that must carry a valid kind: the failure and
 // recovery events introduced with the contract. Older failure types

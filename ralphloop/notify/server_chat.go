@@ -339,18 +339,6 @@ func (c *ServerChat) Result(project string, override *ServerChatConfig, projectD
 	}
 }
 
-// PauseDigest sends one message listing pauses that were held back, each line
-// carrying its own project name.
-func (c *ServerChat) PauseDigest(lines []string) {
-	if c == nil || len(lines) == 0 {
-		return
-	}
-	msg := pauseDigestMessage(lines)
-	for _, s := range c.globalSinks() {
-		s.sendMessage(msg, serverSource, "")
-	}
-}
-
 // ServerNotice is a server-level event: about the server itself, not a project.
 type ServerNotice struct {
 	Kind   string // notify kind, e.g. "server-started"
@@ -358,7 +346,7 @@ type ServerNotice struct {
 	Title  string
 	Detail string
 	// HoldsWork marks a notice that means work is stopped: hard budget limit,
-	// low disk, herdr down, trunk missing.
+	// low disk, trunk missing.
 	HoldsWork bool
 }
 

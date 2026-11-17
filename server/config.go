@@ -70,8 +70,6 @@ type Config struct {
 
 	ConfigWatchDebounce time.Duration // zero means the default
 
-	HerdrRetryInterval time.Duration // zero means the default
-
 	// RunnerWait is the default runner's configured wait; zero means
 	// config.LoadRunnerWait().
 	RunnerWait time.Duration
@@ -125,8 +123,7 @@ type Config struct {
 	// it makes that step fail (see chatdrafts.HookArmed). Empty means off.
 	ForkHookDir string
 
-	// Runner is the configured agent runner; nil means herdr. Herdr health
-	// is only probed when it reports health (agentrunner.HealthChecker).
+	// Runner is the configured agent runner; nil means the default runner.
 	Runner agentrunner.Runner
 	// RunnerFor, when set, returns the runner named runner for project, or nil
 	// when it cannot build one. Runners that keep per-project state on disk

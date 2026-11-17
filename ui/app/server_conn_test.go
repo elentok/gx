@@ -35,7 +35,6 @@ type fakeServerClient struct {
 	agentsui.SessionClient
 	down     bool
 	readOnly bool
-	herdr    bool
 	slow     bool
 }
 
@@ -67,7 +66,7 @@ func (f *fakeServerClient) Negotiate(context.Context, string) (apiclient.Negotia
 	if f.down {
 		return apiclient.Negotiation{}, fmt.Errorf("dial: %w", syscall.ECONNREFUSED)
 	}
-	return apiclient.Negotiation{Handshake: wire.Handshake{Pid: 4242, HerdrUnavailable: f.herdr}, ReadOnly: f.readOnly}, nil
+	return apiclient.Negotiation{Handshake: wire.Handshake{Pid: 4242}, ReadOnly: f.readOnly}, nil
 }
 
 func newServerShell(t *testing.T, client ServerClient) Model {
@@ -151,16 +150,6 @@ func TestNoServerDeps_ShowsDown(t *testing.T) {
 	m := New(*repo, Settings{ActiveWorktreePath: repoDir})
 	if got := titleText(m); !strings.Contains(got, "○ server down") {
 		t.Fatalf("title = %q, want the down indicator", got)
-	}
-}
-
-func TestServerMode_HerdrUnavailableShowsInIndicator(t *testing.T) {
-	m := newServerShell(t, &fakeServerClient{herdr: true})
-
-	m = probe(t, m)
-
-	if got := titleText(m); !strings.Contains(got, "⚠ herdr unavailable") {
-		t.Errorf("title = %q, want the herdr indicator", got)
 	}
 }
 

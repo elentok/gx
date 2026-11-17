@@ -37,7 +37,7 @@ func TestServe_ShutdownOrder(t *testing.T) {
 
 	want := []string{
 		"stop-fresh", "limits-events-stop", "budget-events-stop", "session-watches-close",
-		"wait-fresh", "wait-herdr", "wait-claim", "wait-prune", "wait-budget", "wait-tokens",
+		"wait-fresh", "wait-claim", "wait-prune", "wait-budget", "wait-tokens",
 		"wait-gates", "wait-cpu", "wait-storm", "wait-disks", "wait-migration-failures", "wait-health",
 		"wait-usage", "wait-sweep", "wait-models", "wait-progress", "wait-pr-watch", "wait-schedules", "wait-launches",
 		"config-watch-wait", "stop-hard-grace", "merges-close-and-wait", "stop-commits",

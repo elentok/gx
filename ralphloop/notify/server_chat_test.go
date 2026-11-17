@@ -107,19 +107,6 @@ func TestServerChat_LongTicketNoticeNamesItsTicket(t *testing.T) {
 	}
 }
 
-func TestServerChat_PauseDigestListsOneLinePerPauseWithNoProjectLine(t *testing.T) {
-	lines := []string{
-		PauseDigestLine("p1", "e", "01", ticketops.PauseStatus("spinning"), "The agent session ended unexpectedly."),
-		PauseDigestLine("p2", "e", "02", ticketops.PauseStatus("zero-commit"), "No commits merged."),
-	}
-	want := "🅿️ 2 tickets paused while herdr was down\n" +
-		"p1 · e/01 Repair: The agent session ended unexpectedly.\n" +
-		"p2 · e/02 Answer: No commits merged."
-	if got := pauseDigestMessage(lines).Text(slackStyle.chatStyle).String(); got != want {
-		t.Errorf("digest = %q, want %q", got, want)
-	}
-}
-
 func TestServerChat_OverrideReplacesGlobalWithoutMerging(t *testing.T) {
 	global, globalReqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: global.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})

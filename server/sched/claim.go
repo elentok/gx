@@ -39,7 +39,6 @@ func (s *Scheduler) KeepClaiming(ctx context.Context) {
 		s.releaseWaitingSlots(time.Now())
 		s.ClaimNext()
 		s.Explain.PublishChanges()
-		s.Herdr.SyncBanner()
 		select {
 		case <-ctx.Done():
 			return

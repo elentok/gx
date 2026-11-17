@@ -87,14 +87,9 @@ type Snapshot struct {
 	// MigrationFailures are the saved failed migrations; filled in by the
 	// handler, so a change to the record shows without a restart.
 	MigrationFailures []MigrationFailure `json:"migration_failures,omitempty"`
-	// HerdrUnavailable is set while herdr isn't answering and a ticket needs it;
-	// the server's own view, filled in by the handler rather than the index.
-	// HerdrText says which tickets wait.
-	HerdrUnavailable bool   `json:"herdr_unavailable,omitempty"`
-	HerdrText        string `json:"herdr_text,omitempty"`
 	// Migrating is set until the start-up migration run ends; filled in by the handler.
 	Migrating bool `json:"migrating,omitempty"`
-	// Budget is today's spend, filled in by the handler like HerdrUnavailable.
+	// Budget is today's spend, filled in by the handler.
 	Budget BudgetStatus `json:"budget"`
 	// ExtraUsage is set while the account auto-purchases extra usage, so the
 	// enqueue confirm can warn; filled in by the handler.
@@ -105,7 +100,7 @@ type Snapshot struct {
 	Health  Health       `json:"health"`
 	Tickets []TicketInfo `json:"tickets"`
 	// Pending is every queue entry with its explain verdict, so a client never
-	// asks per row. Filled in by the handler, like HerdrUnavailable.
+	// asks per row. Filled in by the handler.
 	Pending []PendingRow `json:"pending"`
 	// Mode is QueueModeRunning or QueueModePaused; filled in by the handler.
 	// Empty from a server that predates it.

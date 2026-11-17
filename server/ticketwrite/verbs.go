@@ -82,9 +82,6 @@ func (w *Writer) Relaunch(req wire.QueueRequest, qc queue.Ctx) (wire.QueueResult
 			return wire.QueueResult{}, nil
 		}
 		agent := w.d.Harness.ResolveTicket(ref.Addr, ref.Ticket).Harness
-		if reason, held := h.HerdrHolds(w.d.Harness.LaunchRunner(ref.Addr.Project, agent)); held {
-			return queue.Refusal(wire.ReasonHerdrUnavailable, reason), nil
-		}
 		if res, refused := h.BudgetRefusal(); refused {
 			return res, nil
 		}

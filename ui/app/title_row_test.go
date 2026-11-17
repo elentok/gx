@@ -61,7 +61,6 @@ var (
 	connUp       = ServerConn{State: ServerUp, PID: 1}
 	connDown     = ServerConn{State: ServerDown}
 	connReadOnly = ServerConn{State: ServerReadOnly, PID: 1}
-	connHerdr    = ServerConn{State: ServerHerdrUnavailable, PID: 1}
 )
 
 func TestTitleRow_ServerStates(t *testing.T) {
@@ -75,7 +74,6 @@ func TestTitleRow_ServerStates(t *testing.T) {
 		{"up", connUp, "gx › worktrees ▾ ● ? help"},
 		{"down", connDown, "gx › worktrees ▾ ○ server down ? help"},
 		{"read-only", connReadOnly, "gx › worktrees ▾ ◐ read-only — restart ? help"},
-		{"herdr", connHerdr, "gx › worktrees ▾ ⚠ herdr unavailable ? help"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -93,7 +91,6 @@ func TestTitleRow_ShortServerWords(t *testing.T) {
 	for conn, want := range map[ServerConn]string{
 		connDown:     "○ down ?",
 		connReadOnly: "◐ read-only ?",
-		connHerdr:    "⚠ no herdr ?",
 	} {
 		// Too narrow for the full words, wide enough for the short ones.
 		m := titleModel(t, false, 32, conn, 0)

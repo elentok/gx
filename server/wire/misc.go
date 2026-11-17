@@ -112,8 +112,7 @@ const (
 	ReasonIterationRunning = "iteration-running"
 	ReasonTicketDone       = "ticket-done"
 	// ReasonNotOneOff refuses a web cancel of a ticket outside the one-offs epic.
-	ReasonNotOneOff        = "not-one-off"
-	ReasonHerdrUnavailable = "herdr-unavailable"
+	ReasonNotOneOff = "not-one-off"
 	// ReasonAgentWorking refuses a retry while the ticket's agent is still
 	// working; the web maps it to "Stop agent and retry".
 	ReasonAgentWorking = "agent-working"
@@ -129,10 +128,6 @@ const (
 	NoCleanCommand = "no cleanup command set"
 )
 
-// VerdictHerdrDown is the explain verdict for a queued ticket that launches on
-// herdr while herdr is down or not installed.
-const VerdictHerdrDown = "herdr down"
-
 // CPUSpikeResult is what became of a reported spike.
 type CPUSpikeResult struct {
 	// Address is the investigate ticket filed for it; empty when none was.
@@ -140,13 +135,6 @@ type CPUSpikeResult struct {
 	// Message says why no ticket was filed.
 	Message string `json:"message,omitempty"`
 }
-
-const (
-	// EventHerdrUnavailable and EventHerdrAvailable are emitted on transition
-	// only, never per failed retry.
-	EventHerdrUnavailable = "herdr-unavailable"
-	EventHerdrAvailable   = "herdr-available"
-)
 
 const (
 	// EventTrunkMissing streams once when a project with queued roots enters

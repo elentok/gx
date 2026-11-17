@@ -49,26 +49,19 @@ func (w *Writer) PauseAs(address string, kind events.Kind, reason string) error 
 }
 
 // AnnouncePause is the one place that routes a pause already written: held for
-// recovery, held for herdr's digest, or sent to chat now. Every caller that has
+// recovery, or sent to chat now. Every caller that has
 // just written a pause goes through it; a recovery hold's release is the only
 // path that skips the recovery choice.
 func (w *Writer) AnnouncePause(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
 	switch {
 	case w.d.Host.HoldPauseForRecovery(addr, ticketPath, kind, reason):
-	case kind.CauseHerdr() && w.d.Host.HerdrUnavailable():
-		w.holdPause(addr, ticketPath, ticketops.PauseStatus(kind), kind, reason)
 	default:
 		w.sendPause(addr, ticketPath, kind, reason)
 	}
 }
 
-// NotifyPause releases a pause recovery was holding: herdr's outage is still
-// checked, the recovery hold is not.
+// NotifyPause releases a pause recovery was holding: the recovery choice is skipped.
 func (w *Writer) NotifyPause(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
-	if kind.CauseHerdr() && w.d.Host.HerdrUnavailable() {
-		w.holdPause(addr, ticketPath, ticketops.PauseStatus(kind), kind, reason)
-		return
-	}
 	w.sendPause(addr, ticketPath, kind, reason)
 }
 

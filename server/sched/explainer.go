@@ -31,7 +31,6 @@ type ExplainerDeps struct {
 	Guards    *runs.Guards
 	Projects  *projects.Registry
 	Harness   *harnesschoice.Harness
-	Herdr     *HerdrWatch
 	Limits    *limits.Limits
 	Rec       *merge.Reconciler
 	Disks     *disk.Disk
@@ -114,9 +113,6 @@ func (x *Explainer) ClaimHold(project string, t tickets.Ticket, rh harnesschoice
 	agent := rh.Harness
 	if reason := x.Harness.QueueMissingReason(project, rh); reason != "" {
 		return Hold{Verdict: wire.VerdictHarnessMissing, Reason: reason}, true
-	}
-	if reason, held := x.Herdr.Holds(x.Harness.LaunchRunner(project, agent)); held {
-		return Hold{Verdict: wire.VerdictHerdrDown, Reason: reason}, true
 	}
 	if limited, held := x.Registry.RateLimitHeld(string(agent)); held {
 		return Hold{Verdict: RateLimitVerdict(limited.RateLimitReset)}, true

@@ -39,13 +39,7 @@ func TestValidate_UnknownKindRejected(t *testing.T) {
 	}
 }
 
-func TestKind_CauseHerdrIsAnAttributeOfTheKind(t *testing.T) {
-	if !AgentNameTaken.CauseHerdr() || !HandleMismatch.CauseHerdr() {
-		t.Error("herdr-caused kinds not flagged")
-	}
-	if ZeroCommit.CauseHerdr() || Spinning.CauseHerdr() {
-		t.Error("non-herdr kinds flagged")
-	}
+func TestKinds_AreAllValid(t *testing.T) {
 	for _, k := range Kinds() {
 		if !k.Valid() {
 			t.Errorf("Kinds() returned invalid %q", k)

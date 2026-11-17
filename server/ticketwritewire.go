@@ -39,8 +39,6 @@ func (h ticketWriteHost) WriteFollowUp(from tickets.Address, f ticketwrite.Follo
 	return h.s.recovery.WriteFollowUp(from, f)
 }
 
-func (h ticketWriteHost) HerdrUnavailable() bool { return h.s.herdr.IsUnavailable() }
-
 func (h ticketWriteHost) StopRun(run runs.Run) error {
 	r, err := h.s.harness.RunnerOf(run)
 	if errors.Is(err, agentrunner.ErrNotFound) {
@@ -55,8 +53,6 @@ func (h ticketWriteHost) StopRun(run runs.Run) error {
 func (h ticketWriteHost) TakeTierOverride(ticketPath string) agent.Tier {
 	return ticketops.TakeTierOverride(ticketPath)
 }
-
-func (h ticketWriteHost) HerdrHolds(r agentrunner.Runner) (string, bool) { return h.s.herdr.Holds(r) }
 
 func (h ticketWriteHost) UsageGate(agent agent.AgentKind, now time.Time) (string, bool) {
 	return h.s.limits.UsageGate(agent, now)

@@ -79,10 +79,9 @@ type IconSet struct {
 
 	// Server* draw the title row's server indicator, one role per connection
 	// state. The nerd set uses one server glyph for all, told apart by color.
-	ServerUp               string
-	ServerDown             string
-	ServerReadOnly         string
-	ServerHerdrUnavailable string
+	ServerUp       string
+	ServerDown     string
+	ServerReadOnly string
 
 	// Queue* mark the title row's queue status, one per queue mode.
 	QueueRunning string
@@ -144,10 +143,9 @@ func Icons(useNerdFont bool) IconSet {
 			SessionLive:   ">",
 			DesignSession: "D",
 
-			ServerUp:               "●",
-			ServerDown:             "○",
-			ServerReadOnly:         "◐",
-			ServerHerdrUnavailable: "⚠",
+			ServerUp:       "●",
+			ServerDown:     "○",
+			ServerReadOnly: "◐",
 
 			QueueRunning: "▶",
 			QueuePaused:  "‖",
@@ -206,10 +204,9 @@ func Icons(useNerdFont bool) IconSet {
 		SessionLive:   "\uf120",
 		DesignSession: "\U000f0349",
 
-		ServerUp:               "\uf233",
-		ServerDown:             "\uf233",
-		ServerReadOnly:         "\uf233",
-		ServerHerdrUnavailable: "\uf233",
+		ServerUp:       "\uf233",
+		ServerDown:     "\uf233",
+		ServerReadOnly: "\uf233",
 
 		QueueRunning: "\uf04b", // fa-play
 		QueuePaused:  "\uf04c", // fa-pause

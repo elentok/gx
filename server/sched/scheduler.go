@@ -36,7 +36,6 @@ type SchedulerDeps struct {
 	Merger   *merge.Merger
 	Guards   *runs.Guards
 	Harness  *harnesschoice.Harness
-	Herdr    *HerdrWatch
 	Explain  *Explainer
 	// Launcher is set once the launcher exists: it calls back into the
 	// scheduler for the base rules.

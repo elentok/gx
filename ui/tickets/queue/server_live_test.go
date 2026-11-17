@@ -27,7 +27,7 @@ func loadedServerQueue(t *testing.T, status string) (QueueModel, tea.Cmd) {
 	if status == "claimed" {
 		claimedAt = time.Now()
 	}
-	return loadedServerQueueWith(t, status, claimedAt, false)
+	return loadedServerQueueWith(t, status, claimedAt)
 }
 
 // deliverQueue hands a fresh Queue tab the state the app shell would build
@@ -55,9 +55,9 @@ func deliverQueueTo(m QueueModel, snap wire.Snapshot, queue []wire.QueueItem) (Q
 	return next.(QueueModel), cmd
 }
 
-func loadedServerQueueWith(t *testing.T, status string, claimedAt time.Time, herdrDown bool) (QueueModel, tea.Cmd) {
+func loadedServerQueueWith(t *testing.T, status string, claimedAt time.Time) (QueueModel, tea.Cmd) {
 	t.Helper()
-	snap := wire.Snapshot{Seq: 1, HerdrUnavailable: herdrDown, Tickets: []wire.TicketInfo{
+	snap := wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: status, ClaimedAt: claimedAt},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open", BlockedBy: []string{"gx:alpha/01"}},
 	}}
@@ -153,28 +153,10 @@ func TestQueueServerMode_EnterNeverStartsInProcessRun(t *testing.T) {
 
 func TestQueueServerMode_TimerCountsFromServerClaimTime(t *testing.T) {
 	claimed := time.Now().Add(-10 * time.Minute)
-	m, _ := loadedServerQueueWith(t, "claimed", claimed, false)
+	m, _ := loadedServerQueueWith(t, "claimed", claimed)
 
 	if got := m.server.Live["gx:alpha"]["01"].StartedAt; !got.Equal(claimed) {
 		t.Errorf("startedAt = %v, want the server's claim time %v", got, claimed)
-	}
-}
-
-func TestQueueServerMode_HerdrDownBanner(t *testing.T) {
-	m, _ := loadedServerQueueWith(t, "open", time.Time{}, true)
-
-	body := strings.Join(m.header().BodyLines(), "\n")
-	if !strings.Contains(body, "herdr unavailable") {
-		t.Errorf("header body %q does not say herdr is unavailable", body)
-	}
-}
-
-func TestQueueServerMode_HerdrDownBannerNamesWhatWaits(t *testing.T) {
-	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, HerdrUnavailable: true, HerdrText: "herdr is down; waiting: gx:alpha/01"}, nil)
-
-	body := strings.Join(m.header().BodyLines(), "\n")
-	if !strings.Contains(body, "waiting: gx:alpha/01") {
-		t.Errorf("header body %q does not name the waiting ticket", body)
 	}
 }
 
@@ -257,7 +239,7 @@ func TestQueueServerMode_CrossEpicBlockersShowTheirEpic(t *testing.T) {
 }
 
 func TestQueueServerMode_ClaimedWithoutServerRunIsNotImplementing(t *testing.T) {
-	m, _ := loadedServerQueueWith(t, "claimed", time.Time{}, false)
+	m, _ := loadedServerQueueWith(t, "claimed", time.Time{})
 
 	if len(m.server.RunningEpics) != 0 {
 		t.Errorf("runningEpics = %v, want none: the server has no run for the claimed ticket", m.server.RunningEpics)

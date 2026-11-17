@@ -24,28 +24,6 @@ func TestServerEventsKinds_TextListsEveryKind(t *testing.T) {
 			t.Errorf("kind %q missing from output", k)
 		}
 	}
-	if !strings.Contains(out.String(), "agent_name_taken\tcause: herdr") {
-		t.Errorf("herdr attribute missing:\n%s", out.String())
-	}
-}
-
-func TestServerEventsKinds_JSONCarriesHerdrCause(t *testing.T) {
-	var out bytes.Buffer
-	if err := runServerEventsKinds(true, &out); err != nil {
-		t.Fatal(err)
-	}
-	var got []KindInfo
-	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != len(events.Kinds()) {
-		t.Fatalf("got %d kinds, want %d", len(got), len(events.Kinds()))
-	}
-	for _, i := range got {
-		if want := events.Kind(i.Kind).CauseHerdr(); i.CauseHerdr != want {
-			t.Errorf("%s: cause_herdr=%v, want %v", i.Kind, i.CauseHerdr, want)
-		}
-	}
 }
 
 func TestServerEventsKinds_ViaRootCommand(t *testing.T) {

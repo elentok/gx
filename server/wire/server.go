@@ -12,10 +12,6 @@ type Handshake struct {
 	// WebSetupPending is set until the first web password exists. It is only a flag: the
 	// handshake never carries the Setup code.
 	WebSetupPending bool `json:"web_setup_pending,omitempty"`
-	// HerdrUnavailable is set while herdr isn't answering and a ticket needs it,
-	// so a client can say why nothing starts. HerdrText names what waits.
-	HerdrUnavailable bool   `json:"herdr_unavailable,omitempty"`
-	HerdrText        string `json:"herdr_text,omitempty"`
 	// Migrating is set from the moment the server listens until the start-up
 	// migration of every project has ended, pass or fail.
 	Migrating bool `json:"migrating,omitempty"`

@@ -18,8 +18,7 @@ import (
 
 // KindInfo is one entry of the `gx server events kinds --json` payload.
 type KindInfo struct {
-	Kind       string `json:"kind"`
-	CauseHerdr bool   `json:"cause_herdr"`
+	Kind string `json:"kind"`
 }
 
 func newServerSnapshotCmd(d Deps) *cobra.Command {
@@ -131,7 +130,7 @@ func runServerEventsKinds(jsonOut bool, w io.Writer) error {
 	all := events.Kinds()
 	infos := make([]KindInfo, 0, len(all))
 	for _, k := range all {
-		infos = append(infos, KindInfo{Kind: string(k), CauseHerdr: k.CauseHerdr()})
+		infos = append(infos, KindInfo{Kind: string(k)})
 	}
 	if jsonOut {
 		enc := json.NewEncoder(w)
@@ -140,9 +139,6 @@ func runServerEventsKinds(jsonOut bool, w io.Writer) error {
 	}
 	for _, i := range infos {
 		line := i.Kind
-		if i.CauseHerdr {
-			line += "\tcause: herdr"
-		}
 		if _, err := fmt.Fprintln(w, line); err != nil {
 			return err
 		}

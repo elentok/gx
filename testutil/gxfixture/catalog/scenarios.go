@@ -231,11 +231,9 @@ var Scenarios = map[string]scenario{
 	// "gone" project has its own repo for a test to delete.
 	//   - produced: server started, low disk, disk clean, dispatch resumed, budget
 	//     soft and hard limit, long ticket, project unavailable, trunk missing and found.
-	//   - not produced: extra usage (needs a Claude account state), herdr down and up
-	//     and the herdr digest (the fixture runs the pty runner), daily summary (it
+	//   - not produced: extra usage (needs a Claude account state), daily summary (it
 	//     fires on the budget day rolling over, which follows the real clock). The
-	//     server-level Go tests (server/server_notify_test.go and
-	//     TestPauseFold_HerdrOutagePausesBecomeOneDigest) cover them.
+	//     server-level Go tests (server/server_notify_test.go) cover them.
 	"chat-server": {
 		ChatCapture: true,
 		Epics: []epic{

@@ -25,11 +25,6 @@ func (w *Writer) Nudge(req wire.QueueRequest) (wire.QueueResult, error) {
 	h := w.d.Host
 	return w.ResolvedWrite(req, func(ref queue.TicketRef) (wire.QueueResult, error) {
 		address := ref.Addr.String()
-		if r, err := w.d.Harness.IterationRunner(ref.Addr); err == nil {
-			if reason, held := h.HerdrHolds(r); held {
-				return queue.Refusal(wire.ReasonHerdrUnavailable, reason), nil
-			}
-		}
 		if res, refused := h.BudgetRefusal(); refused {
 			return res, nil
 		}

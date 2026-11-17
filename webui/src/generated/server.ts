@@ -1939,18 +1939,11 @@ export interface Snapshot {
    */
   migration_failures?: MigrationFailure[];
   /**
-   * HerdrUnavailable is set while herdr isn't answering and a ticket needs it;
-   * the server's own view, filled in by the handler rather than the index.
-   * HerdrText says which tickets wait.
-   */
-  herdr_unavailable?: boolean;
-  herdr_text?: string;
-  /**
    * Migrating is set until the start-up migration run ends; filled in by the handler.
    */
   migrating?: boolean;
   /**
-   * Budget is today's spend, filled in by the handler like HerdrUnavailable.
+   * Budget is today's spend, filled in by the handler.
    */
   budget: BudgetStatus;
   /**
@@ -1969,7 +1962,7 @@ export interface Snapshot {
   tickets: TicketInfo[];
   /**
    * Pending is every queue entry with its explain verdict, so a client never
-   * asks per row. Filled in by the handler, like HerdrUnavailable.
+   * asks per row. Filled in by the handler.
    */
   pending: PendingRow[];
   /**

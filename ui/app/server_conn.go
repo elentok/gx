@@ -94,8 +94,6 @@ func handshake(d *ServerDeps) serverConnMsg {
 	switch {
 	case n.ReadOnly:
 		conn.State = ServerReadOnly
-	case n.HerdrUnavailable:
-		conn.State = ServerHerdrUnavailable
 	}
 	return serverConnMsg{conn: conn}
 }

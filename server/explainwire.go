@@ -8,7 +8,7 @@ func newExplainer(s *Server) *sched.Explainer {
 	return sched.NewExplainer(sched.ExplainerDeps{
 		Scheduler: s.scheduler, StateDir: s.cfg.StateDir, Settings: &s.settings,
 		Registry: s.registry, Guards: s.guards, Projects: s.projects, Harness: s.harness,
-		Herdr: s.herdr, Limits: s.limits, Rec: s.rec, Disks: s.disks, Queue: s.queue, Events: s.events,
+		Limits: s.limits, Rec: s.rec, Disks: s.disks, Queue: s.queue, Events: s.events,
 	})
 }
 

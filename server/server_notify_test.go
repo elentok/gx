@@ -390,34 +390,6 @@ func TestNotifyPause_SelfReportedShowsQuestionSummary(t *testing.T) {
 	}
 }
 
-func TestPauseFold_HerdrOutagePausesBecomeOneDigest(t *testing.T) {
-	t.Parallel()
-	s, wait := chatServer(t, 0, 0)
-	s.herdr.SetUnavailable(true)
-	pause := func(project, id string, kind events.Kind) {
-		s.writer.NotifyPause(tickets.Address{Project: project, Epic: "epic", ID: id}, "", kind, "why-"+project)
-	}
-
-	pause("p1", "01", events.AgentNameTaken)
-	pause("p2", "02", events.HandleMismatch)
-	pause("p4", "04", events.ZeroCommit) // not herdr-caused: at once
-	s.herdr.SetUnavailable(false)
-	s.writer.FlushPauseFold()
-
-	s.chat.Close()
-	all := strings.Join(wait(-1), "\n") // the batcher may merge both into one send
-	if n := strings.Count(all, "paused while herdr was down"); n != 1 {
-		t.Fatalf("digests = %d, want 1: %s", n, all)
-	}
-	for _, p := range []string{"p1", "p2", "p4"} {
-		// Digest lines start "p · "; a live pause ends on the bare project line
-		// (newlines are still JSON-escaped in the recorded body).
-		if strings.Count(all, p+" · ")+strings.Count(all, `\n`+p+`\n`)+strings.Count(all, `\n`+p+`"`) != 1 {
-			t.Errorf("%s not sent exactly once: %s", p, all)
-		}
-	}
-}
-
 func TestNotifyResult_OnlyWhenTheSubmitAskedForIt(t *testing.T) {
 	t.Parallel()
 	s, wait := chatServer(t, 0, 0)

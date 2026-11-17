@@ -17,7 +17,6 @@ const (
 	ServerDown
 	// ServerReadOnly: API version mismatch; the client must not write.
 	ServerReadOnly
-	ServerHerdrUnavailable
 )
 
 // ServerConn is the connection state plus the server pid and web listener
@@ -48,8 +47,6 @@ func (c ServerConn) badge(icons ui.IconSet) (b serverBadge, ok bool) {
 		return serverBadge{icons.ServerDown, ui.ColorRed, "server down", "down"}, true
 	case ServerReadOnly:
 		return serverBadge{icons.ServerReadOnly, ui.ColorYellow, "read-only — restart", "read-only"}, true
-	case ServerHerdrUnavailable:
-		return serverBadge{icons.ServerHerdrUnavailable, ui.ColorYellow, "herdr unavailable", "no herdr"}, true
 	}
 	return serverBadge{}, false
 }

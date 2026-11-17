@@ -138,7 +138,6 @@ type Server struct {
 	diff       *diff.Diff
 	tips       *tips.Tips
 	events     *broker.Broker
-	herdr      *sched.HerdrWatch
 	writer     *ticketwrite.Writer
 	ops        *ticketops.Ops
 	pauseHold  ticketwrite.RecoveryHold
@@ -567,8 +566,6 @@ func New(cfg Config) (*Server, error) {
 	if err := (devHost{s}).newDevVite(); err != nil {
 		return nil, fmt.Errorf("start dev vite supervisor: %w", err)
 	}
-	// A down herdr never stops the server; it is reported and retried.
-	s.herdr = sched.NewHerdrWatch(s.log, herdrHost{s}, s.cfg.HerdrRetryInterval)
 	// The scheduler and the launcher call each other, so the launcher is set after both exist.
 	s.progress = sched.NewProgressTimer(sched.ProgressTimerDeps{
 		Registry: s.registry, Projects: s.projects, Writer: s.writer, Chat: s.chat, Interval: cfg.Chat.ProgressInterval,
@@ -578,8 +575,8 @@ func New(cfg Config) (*Server, error) {
 		Log: s.log, Projects: s.projects, Recovery: s.recovery, Registry: s.registry,
 		Index: s.idx, Writer: s.writer, Settings: &s.settings, Migrator: s.migrator, Queue: s.queue,
 		Budget: s.budget, Disks: s.disks, Rec: s.rec, Merger: s.merger, Guards: s.guards,
-		Harness: s.harness, Herdr: s.herdr,
-		Env: s.cfg.Env, PollInterval: s.cfg.PollInterval, TicketStore: s.cfg.TicketStore,
+		Harness: s.harness,
+		Env:     s.cfg.Env, PollInterval: s.cfg.PollInterval, TicketStore: s.cfg.TicketStore,
 	})
 	// The explanation reads the scheduler's caps and the claim pass asks it for holds.
 	s.explain = newExplainer(s)
@@ -592,7 +589,6 @@ func New(cfg Config) (*Server, error) {
 	})
 	s.scheduler.Launcher = s.launcher
 	s.reclaimer = sched.NewReclaimer(s.log, reclaimHost{s}, s.registry, savedRuns)
-	s.herdr.Check()
 	return s, nil
 }
 
@@ -671,8 +667,6 @@ func (s *Server) Serve(ctx context.Context) error {
 			OnPoll:        s.settings.CheckStoreCommits,
 		})
 	}()
-	herdrDone := make(chan struct{})
-	go func() { defer close(herdrDone); s.herdr.KeepChecked(freshCtx) }()
 	// A claim must not see a low disk before the watcher has recorded its projects.
 	s.disks.Check()
 	claimDone := make(chan struct{})
@@ -740,7 +734,6 @@ func (s *Server) Serve(ctx context.Context) error {
 		done chan struct{}
 	}{
 		{"wait-fresh", freshDone},
-		{"wait-herdr", herdrDone},
 		{"wait-claim", claimDone},
 		{"wait-prune", pruneDone},
 		{"wait-budget", budgetDone},

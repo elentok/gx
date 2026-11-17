@@ -79,29 +79,6 @@ func serverNoticeMessage(n ServerNotice) chatMessage {
 	return msg
 }
 
-// pauseDigestMessage is the herdr outage digest: one line per held pause, no
-// project line (each line names its own).
-func pauseDigestMessage(lines []string) chatMessage {
-	noun := "tickets"
-	if len(lines) == 1 {
-		noun = "ticket"
-	}
-	return chatMessage{
-		icon: "🅿️", subject: fmt.Sprintf("%d %s paused while herdr was down", len(lines), noun),
-		lines:       lines,
-		kind:        notifyKindTicketNeedsHuman,
-		urgency:     urgencyRepair,
-		summaryWord: "Repair",
-	}
-}
-
-// PauseDigestLine is one held pause in the digest: its project and ticket,
-// the pause's Status word and its detail.
-func PauseDigestLine(project, epic, identifier, status, detail string) string {
-	_, word := pauseIconWord(status)
-	return fmt.Sprintf("%s · %s/%s %s: %s", project, epic, identifier, word, detail)
-}
-
 // pauseIconWord is a pause's icon and Status word: Answer for the answer
 // class, Repair for any fault. status is the ticket's stored status word.
 func pauseIconWord(status string) (icon, word string) {
