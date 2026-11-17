@@ -33,7 +33,7 @@ export async function openNewAgent(page: Page, project?: string) {
   await add.or(show).first().waitFor()
   if (await show.isVisible()) await show.click()
   await add.click()
-  await page.getByRole("menuitem", { name: /^New chat/ }).click()
+  await page.getByRole("menuitem", { name: "New chat", exact: true }).click()
   await expect(newForm(page)).toBeVisible()
   if (project) await pickProject(page, project)
 }

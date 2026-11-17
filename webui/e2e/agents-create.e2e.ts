@@ -160,7 +160,7 @@ test("88. Phone, Agents page", async ({ page, start }) => {
     .toBe(true)
 
   // Create opens as a sheet at the bottom of the screen.
-  await page.getByRole("menuitem", { name: /^New chat/ }).click()
+  await page.getByRole("menuitem", { name: "New chat", exact: true }).click()
   await expect(newForm(page)).toBeVisible()
   await expect(page.getByTestId("grab-handle")).toBeVisible()
   await expect
