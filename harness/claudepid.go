@@ -238,11 +238,15 @@ func (w *PidWatcher) poll() {
 	s := f.PidStatus
 	w.mu.Lock()
 	changed := !w.live.seen || s != w.live.last || f.SessionID != w.live.conversationID
-	// last starts as ClaudeStarting, so a first read past starting still
-	// counts the change a poll missed.
+	// last starts as ClaudeStarting. The move from starting to idle is
+	// claude's startup, not a turn: a real claude writes no status or idle
+	// at launch and busy only after a prompt (docs/research/test-launch-baseline.md,
+	// "Observed: real claude at launch"). A first read of busy, shell or
+	// waiting still counts: a turn a poll missed.
 	// A new sessionId (/clear) is a turn a poll could not otherwise see.
 	newSession := w.live.conversationID != "" && f.SessionID != w.live.conversationID
-	if s.Status != w.live.last.Status || newSession {
+	startup := w.live.last.Status == ClaudeStarting && s.Status == ClaudeIdle
+	if (s.Status != w.live.last.Status && !startup) || newSession {
 		w.live.turn++
 		if s.Status == ClaudeBusy || s.Status == ClaudeShell {
 			w.live.rateLimit = nil

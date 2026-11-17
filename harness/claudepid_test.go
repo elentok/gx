@@ -38,8 +38,42 @@ func TestPidWatcher_IgnoresFileFromBeforeSpawn(t *testing.T) {
 	// Claude's startedAt is a little after the spawn; slack covers rounding.
 	writePidFile(t, dir, spawned.Add(-time.Second), `,"status":"idle"`)
 	w.poll()
-	if s, turn := w.PidState(); s == nil || s.Status != ClaudeIdle || turn != 1 {
+	if s, turn := w.PidState(); s == nil || s.Status != ClaudeIdle || turn != 0 {
 		t.Fatalf("fresh file: got %v at turn %d", s, turn)
+	}
+}
+
+func TestPidWatcher_FreshIdleIsNotATurn(t *testing.T) {
+	dir := t.TempDir()
+	spawned := time.Now()
+	w := newPidWatcher(dir, 4242, spawned)
+
+	writePidFile(t, dir, spawned, ``)
+	w.poll()
+	writePidFile(t, dir, spawned, `,"status":"idle"`)
+	w.poll()
+	if s, turn := w.PidState(); s == nil || s.Status != ClaudeIdle || turn != 0 {
+		t.Fatalf("fresh idle: got %v at turn %d, want idle at turn 0", s, turn)
+	}
+	writePidFile(t, dir, spawned, `,"status":"busy"`)
+	w.poll()
+	if _, turn := w.PidState(); turn != 1 {
+		t.Fatalf("busy after idle: turn = %d, want 1", turn)
+	}
+}
+
+func TestPidWatcher_FirstNonIdleReadCounts(t *testing.T) {
+	for _, status := range []string{"busy", "shell"} {
+		t.Run(status, func(t *testing.T) {
+			dir := t.TempDir()
+			spawned := time.Now()
+			w := newPidWatcher(dir, 4242, spawned)
+			writePidFile(t, dir, spawned, `,"status":"`+status+`"`)
+			w.poll()
+			if _, turn := w.PidState(); turn != 1 {
+				t.Fatalf("first %s read: turn = %d, want 1", status, turn)
+			}
+		})
 	}
 }
 
