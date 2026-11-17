@@ -100,8 +100,16 @@ type Model struct {
 	reporter *focusReporter
 }
 
+// Option tunes NewModel.
+type Option func(*Model)
+
+// WithDialer replaces how the tab attaches to a session's holder.
+func WithDialer(d terminal.AttachDialer) Option {
+	return func(m *Model) { m.dial = d }
+}
+
 // NewModel builds the tab; a nil client means there is no server to reach.
-func NewModel(client SessionClient, sessions Sessions, settings ui.Settings) Model {
+func NewModel(client SessionClient, sessions Sessions, settings ui.Settings, opts ...Option) Model {
 	sp := spinner.New()
 	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
 	m := Model{actions: sessionActions{client: client, sessionAPI: sessions}, settings: settings, spinner: sp, sidebar: sidebar{memo: &ui.Memo{}}, joinMemo: &ui.Memo{}, term: terminal.View{MainMemo: &ui.Memo{}}, dial: terminal.DialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: func() ([]create.Project, error) { return create.ListProjects(settings.TicketStore) },
@@ -114,6 +122,9 @@ func NewModel(client SessionClient, sessions Sessions, settings ui.Settings) Mod
 	}
 	m.sidebar.groupsPath = groupsFile(settings.Dirs)
 	m.sidebar.showQueue, m.sidebar.showDesign = loadGroups(m.sidebar.groupsPath)
+	for _, opt := range opts {
+		opt(&m)
+	}
 	return m
 }
 

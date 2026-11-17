@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server/wire"
 	agentsui "github.com/elentok/gx/ui/agents"
+	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
@@ -51,6 +52,9 @@ type ServerDeps struct {
 	Build string
 	// Start launches the server (the Queue tab's "s" when the server is down).
 	Start func(context.Context) error
+	// AttachDialer replaces how the Agents tab attaches to a session; nil
+	// (production) uses the holder dialer.
+	AttachDialer terminal.AttachDialer
 }
 
 // serverConnMsg is one handshake's outcome, to be applied to the shell. A

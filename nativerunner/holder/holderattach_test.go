@@ -186,6 +186,32 @@ func TestHolderAttach_KeyEchoSkipsThePacing(t *testing.T) {
 	}
 }
 
+func TestHolderAttach_ShiftedLetterEchoes(t *testing.T) {
+	c, _ := scriptHolder(t, `printf ready; exec cat`)
+	a := attach(t, c)
+	nextAttach(t, a)
+
+	if err := a.SendKey(screen.Key{Code: 'h', Text: "H", Mod: screen.ModShift}); err != nil {
+		t.Fatal(err)
+	}
+	for !frameHas(nextAttach(t, a).Frame, "readyH") {
+	}
+}
+
+func TestHolder_ChildGetsAColourTerminalWhateverTheParentHad(t *testing.T) {
+	t.Setenv("TERM", "dumb")
+	t.Setenv("COLORTERM", "")
+	c, _ := scriptHolder(t, `printf 'ready %s %s' "$TERM" "$COLORTERM"; exec cat`)
+
+	rows, _, err := c.Screen(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(rows, "\n"); !strings.Contains(got, "ready xterm-256color truecolor") {
+		t.Fatalf("child env not forced; screen:\n%s", got)
+	}
+}
+
 func TestHolderAttach_SlowClientRecoversWithAFullFrame(t *testing.T) {
 	t.Parallel()
 	// Redraws every row but the first, so only a full frame carries them all.

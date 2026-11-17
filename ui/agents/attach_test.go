@@ -246,6 +246,7 @@ func TestAttach_TerminalFocusSendsEveryKeyToTheSession(t *testing.T) {
 	presses := []tea.KeyPressMsg{
 		{Code: '1', Text: "1"}, {Code: 'g', Text: "g"}, {Code: 'q', Text: "q"},
 		{Code: 'j', Text: "j"}, {Code: 'c', Mod: tea.ModCtrl}, {Code: tea.KeyEnter},
+		{Code: 'h', Text: "H", Mod: tea.ModShift}, {Code: '!', Text: "!"},
 	}
 	for _, p := range presses {
 		next, cmd := m.Update(p)

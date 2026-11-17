@@ -137,7 +137,11 @@ func (m Model) newAgentsModel(s ui.Settings) agentsui.Model {
 	if m.settings.Server == nil {
 		return agentsui.NewModel(nil, nil, s)
 	}
-	return agentsui.NewModel(m.settings.Server.Client, m.settings.Server.Sessions, s).WithQueue(m.settings.Server.Queue).WithLastViewedFile(agentsui.LastViewedFile(s.Dirs)).
+	var opts []agentsui.Option
+	if d := m.settings.Server.AttachDialer; d != nil {
+		opts = append(opts, agentsui.WithDialer(d))
+	}
+	return agentsui.NewModel(m.settings.Server.Client, m.settings.Server.Sessions, s, opts...).WithQueue(m.settings.Server.Queue).WithLastViewedFile(agentsui.LastViewedFile(s.Dirs)).
 		WithCwdProject(cwdProjectName(s.TicketStore, m.settings.ActiveWorktreePath))
 }
 
