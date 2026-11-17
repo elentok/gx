@@ -10,10 +10,10 @@ import (
 	"github.com/elentok/gx/config"
 )
 
-func TestDefault_VerifyStoriesStepIsLastAndBacklogEpicKindRewritesAreaKind(t *testing.T) {
+func TestDefault_PaneBusyStepIsLastAndBacklogEpicKindRewritesAreaKind(t *testing.T) {
 	names := Default.Names()
-	if got := names[len(names)-1]; got != "verify-stories" {
-		t.Fatalf("last step = %q, want verify-stories", got)
+	if got := names[len(names)-1]; got != "pane-busy-to-iteration-error" {
+		t.Fatalf("last step = %q, want pane-busy-to-iteration-error", got)
 	}
 	root := t.TempDir()
 	epic := filepath.Join(root, "e", "ticket.md")

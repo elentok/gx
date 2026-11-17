@@ -27,6 +27,12 @@ var (
 		"park.permission": "pause.permission",
 		"park.closed":     "pause.closed",
 	}
+	// removedKinds are kinds that no longer exist and read as the kind that
+	// replaced them. Read-only: oldKinds never sees it, so LegacyKind does not
+	// spell a live kind as a removed one.
+	removedKinds = map[Kind]Kind{
+		"agent_pane_busy": IterationError,
+	}
 	oldKinds = reverse(legacyKinds)
 )
 
@@ -51,6 +57,9 @@ func ReadLegacy(t Type, k Kind) (Type, Kind) {
 // unknown kind comes back unchanged.
 func CurrentKind(k Kind) Kind {
 	if nk, ok := legacyKinds[k]; ok {
+		return nk
+	}
+	if nk, ok := removedKinds[k]; ok {
 		return nk
 	}
 	return k

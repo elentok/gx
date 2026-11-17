@@ -26,7 +26,6 @@ const (
 	PauseHandleMismatch     PauseReason = "handle-mismatch"
 	PauseDuplicateLive      PauseReason = "duplicate-live"
 	PauseAgentNameTaken     PauseReason = "agent_name_taken"
-	PauseAgentPaneBusy      PauseReason = "agent_pane_busy"
 	PauseAgentPromptStalled PauseReason = "agent_prompt_stalled"
 	PauseBackgroundTaskGate PauseReason = "background-task-gate"
 	PauseMergeConflict      PauseReason = "merge-conflict"
@@ -94,7 +93,6 @@ var pauseClasses = map[PauseReason]PauseClass{
 	PauseHandleMismatch:     PauseClassRepair,
 	PauseDuplicateLive:      PauseClassRepair,
 	PauseAgentNameTaken:     PauseClassRepair,
-	PauseAgentPaneBusy:      PauseClassRepair,
 	PauseAgentPromptStalled: PauseClassRepair,
 	PauseMergeConflict:      PauseClassRepair,
 	PauseAmbiguousMerge:     PauseClassRepair,
@@ -125,7 +123,6 @@ var pauseLabels = map[PauseReason]string{
 	PauseHandleMismatch:     "Session mismatch",
 	PauseDuplicateLive:      "Already running",
 	PauseAgentNameTaken:     "Could not start the agent",
-	PauseAgentPaneBusy:      "Could not start the agent",
 	PauseAgentPromptStalled: "Could not start the agent",
 	PauseClassifierOutage:   "Classifier gave no verdict",
 	// Background task.

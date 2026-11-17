@@ -7,7 +7,7 @@ func TestPauseReasonLabelGroups(t *testing.T) {
 		"waiting for a person": {PauseSelfReported, PauseAmbiguousBase},
 		"agent stopped or stuck": {
 			PauseZeroCommit, PauseMergeUnreported, PauseBlockedPane, PauseSpinning, PauseRetryExhausted,
-			PauseHandleMismatch, PauseDuplicateLive, PauseAgentNameTaken, PauseAgentPaneBusy, PauseAgentPromptStalled,
+			PauseHandleMismatch, PauseDuplicateLive, PauseAgentNameTaken, PauseAgentPromptStalled,
 			PauseClassifierOutage,
 		},
 		"background task": {PauseBackgroundTaskGate},

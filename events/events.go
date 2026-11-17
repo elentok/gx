@@ -150,8 +150,7 @@ type Kind string
 
 const (
 	AgentNameTaken Kind = "agent_name_taken"
-	AgentPaneBusy  Kind = "agent_pane_busy"
-	// AgentPromptStalled is herdr's agent_prompt_stalled: the initial prompt
+	// AgentPromptStalled is agent_prompt_stalled: the initial prompt
 	// never reached the pane.
 	AgentPromptStalled Kind = "agent_prompt_stalled"
 	ZeroCommit         Kind = "zero-commit"
@@ -230,13 +229,12 @@ const (
 // of the kind (the outage fold holds on it), never an event field.
 var kindCauseHerdr = map[Kind]bool{
 	AgentNameTaken: true,
-	AgentPaneBusy:  true,
 	HandleMismatch: true,
 }
 
 // kinds is the closed set; Valid checks membership.
 var kinds = map[Kind]bool{
-	AgentNameTaken: true, AgentPaneBusy: true, AgentPromptStalled: true, ZeroCommit: true, BlockedPane: true,
+	AgentNameTaken: true, AgentPromptStalled: true, ZeroCommit: true, BlockedPane: true,
 	SelfReported: true, HandleMismatch: true, RetryExhausted: true, Spinning: true,
 	BudgetKilled: true, AmbiguousMerge: true, AllPaused: true, BlockedCycle: true,
 	DuplicateLive: true, IterationError: true, Manual: true, AmbiguousBase: true,

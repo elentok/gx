@@ -122,7 +122,7 @@ func TestFinish_NoAgentSummaryStillFinishesAndGxWritesItsEntry(t *testing.T) {
 	} {
 		ev := runlog.Event{Type: string(typ), Ticket: "01"}
 		if events.KindRequired(typ) {
-			ev.Kind = string(events.AgentPaneBusy)
+			ev.Kind = string(events.AgentNameTaken)
 		}
 		if err := runlog.AppendEvent(scratch, servertest.SchedEpic, ev); err != nil {
 			t.Fatal(err)

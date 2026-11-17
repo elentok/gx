@@ -115,6 +115,11 @@ func init() {
 	Default.Register(Step{Name: "verify-stories", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return nil, nil
 	}})
+	// pane-busy-to-iteration-error: agent_pane_busy no longer exists as a pause
+	// reason. Never rename this step.
+	Default.Register(Step{Name: "pane-busy-to-iteration-error", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return ticketmigrate.MigratePaneBusyToIterationError(e.Root)
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

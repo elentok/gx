@@ -312,20 +312,6 @@ func pauseLaunchCollision(t *testing.T, kind events.Kind, earlier ...events.Type
 	return h
 }
 
-func TestRecovery_R6BusyPaneIsRelaunchedByARule(t *testing.T) {
-	t.Parallel()
-	h := pauseLaunchCollision(t, events.AgentPaneBusy)
-	waitFor(t, func() bool {
-		log, _, _ := runlog.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
-		for _, ev := range log {
-			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.AgentPaneBusy) && ev.Reason == "R6" && ev.Outcome == "ok" {
-				return true
-			}
-		}
-		return false
-	})
-}
-
 // A taken name needs herdr's candidate block read, so R6 hands it to an
 // investigate fork rather than acting.
 func TestRecovery_R6TakenNameForksAnInvestigateTicketNamingR6(t *testing.T) {

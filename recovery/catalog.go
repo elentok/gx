@@ -101,7 +101,6 @@ func Default() Catalog {
 		r4BlockedPaneDialog(),
 		// R11 is a narrower name-taken pause than R6's.
 		r11ClaimClobbered(),
-		r6PaneBusy(),
 		r6NameTaken(),
 		r8RateLimitPause(),
 		r10BackgroundGateHeld(),
@@ -256,25 +255,14 @@ func r8RateLimitPause() Entry {
 	}
 }
 
-// r6PaneBusy and r6NameTaken are a ticket paused because herdr refused its launch. A busy
-// pane is transient, so a rule relaunches once. A taken name needs herdr's
-// candidate block read: a leaked pane in this ticket's own worktree is closed
+// r6NameTaken is a ticket paused because its launch was refused for a taken
+// name. It needs the candidate block read: a leaked pane in this ticket's own worktree is closed
 // and the ticket relaunched, while another ticket's live agent means this
 // second launch is abandoned and the pause stands. Clearing the ticket back to
 // open is high authority, so it is outside the grant and the agent may only
-// propose it. Both require a launch-failed event of the same kind, so a pause
+// propose it. It requires a launch-failed event of the same kind, so a pause
 // that merely reuses the kind is not a collision. Launches disabled: there is
 // no S0 launch-failed event data behind it yet.
-func r6PaneBusy() Entry {
-	return Entry{
-		ID: "R6", Type: events.Paused, Kind: events.AgentPaneBusy,
-		Predicate: afterLaunchFailed(events.AgentPaneBusy),
-		Executor:  ExecutorRule, Authority: AuthorityLow, Verbs: []string{VerbRelaunch},
-		Remedy: func(f Failure, v Verbs) error {
-			return Run(v, Call{Verb: VerbRelaunch, Address: f.Address})
-		},
-	}
-}
 
 func r6NameTaken() Entry {
 	return Entry{

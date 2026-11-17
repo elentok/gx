@@ -14,6 +14,9 @@ func TestLegacyKindRoundTrip(t *testing.T) {
 	if got := LegacyKind(ZeroCommit); got != ZeroCommit {
 		t.Errorf("LegacyKind(%q) = %q, want it unchanged", ZeroCommit, got)
 	}
+	if got := LegacyKind(IterationError); got != IterationError {
+		t.Errorf("LegacyKind(%q) = %q, want it unchanged", IterationError, got)
+	}
 }
 
 func TestCurrentLogType(t *testing.T) {
@@ -42,6 +45,7 @@ func TestReadLegacy(t *testing.T) {
 		{"ticket-reset", "", TicketStartedOver, ""},
 		{Deadlocked, "all-parked", Deadlocked, AllPaused},
 		{Paused, Manual, Paused, Manual},
+		{Paused, "agent_pane_busy", Paused, IterationError},
 	}
 	for _, c := range cases {
 		typ, kind := ReadLegacy(c.inType, c.inKind)

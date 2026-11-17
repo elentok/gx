@@ -28,7 +28,7 @@ func TestMatch(t *testing.T) {
 	}{
 		{"match", Catalog{Enabled: true, Entries: []Entry{testEntry()}}, hit, "T1"},
 		{"wrong kind", Catalog{Enabled: true, Entries: []Entry{testEntry()}},
-			[]Event{{}, {Type: events.LaunchFailed, Kind: events.AgentPaneBusy}}, ""},
+			[]Event{{}, {Type: events.LaunchFailed, Kind: events.IterationError}}, ""},
 		{"wrong type", Catalog{Enabled: true, Entries: []Entry{testEntry()}},
 			[]Event{{}, {Type: events.Reclaimed, Kind: events.AgentNameTaken}}, ""},
 		{"predicate rejects", Catalog{Enabled: true, Entries: []Entry{testEntry()}}, hit[1:], ""},
@@ -110,8 +110,8 @@ func TestDefaultR5MatchesAStalledPauseAfterAStalledLaunch(t *testing.T) {
 	}{
 		{"stalled pause after stalled launch", []Event{{Type: events.IterationStarted}, stalledLaunch, stalledLaunch, stalledPause}, true},
 		{"no prior launch-failed", []Event{{Type: events.IterationStarted}, stalledPause}, false},
-		{"prior launch-failed of another kind", []Event{{Type: events.LaunchFailed, Kind: events.AgentPaneBusy}, stalledPause}, false},
-		{"other pause kind", []Event{stalledLaunch, {Type: events.Paused, Kind: events.AgentPaneBusy}}, false},
+		{"prior launch-failed of another kind", []Event{{Type: events.LaunchFailed, Kind: events.IterationError}, stalledPause}, false},
+		{"other pause kind", []Event{stalledLaunch, {Type: events.Paused, Kind: events.IterationError}}, false},
 		{"stalled kind on another type", []Event{stalledLaunch, {Type: events.IterationFinished, Kind: events.AgentPromptStalled}}, false},
 		{"the launch-failed itself", []Event{stalledLaunch}, false},
 	}
@@ -262,7 +262,6 @@ func TestDefaultOrderIsFirstWins(t *testing.T) {
 		"R3 agent zero-commit",
 		"R4 agent blocked-pane",
 		"R11 agent agent_name_taken",
-		"R6 rule agent_pane_busy",
 		"R6 agent agent_name_taken",
 		"R8 recognize ",
 		"R10 rule background-task-gate",
@@ -464,7 +463,7 @@ func TestR4MatchesOnlyAPausedBlockedPane(t *testing.T) {
 	}
 }
 
-func TestDefaultR6LaunchesDisabledAsABusyRetryAndATakenNameAgent(t *testing.T) {
+func TestDefaultR6LaunchesDisabledAsATakenNameAgent(t *testing.T) {
 	c := Default()
 	got := map[events.Kind]Entry{}
 	for _, e := range c.Entries {
@@ -472,17 +471,14 @@ func TestDefaultR6LaunchesDisabledAsABusyRetryAndATakenNameAgent(t *testing.T) {
 			got[e.Kind] = e
 		}
 	}
-	if len(got) != 2 {
-		t.Fatalf("R6 entries = %v, want one per launch-failed kind", got)
+	if len(got) != 1 {
+		t.Fatalf("R6 entries = %v, want one", got)
 	}
-	busy, taken := got[events.AgentPaneBusy], got[events.AgentNameTaken]
-	if busy.Enabled || busy.Executor != ExecutorRule || busy.Authority != AuthorityLow || busy.Remedy == nil || !slices.Equal(busy.Verbs, []string{"relaunch"}) {
-		t.Errorf("R6 busy = %+v, want disabled low rule that relaunches", busy)
-	}
+	taken := got[events.AgentNameTaken]
 	if taken.Enabled || taken.Executor != ExecutorAgent || taken.Authority != AuthorityMedium || !slices.Equal(taken.Verbs, []string{"close-pane", "relaunch"}) {
 		t.Errorf("R6 taken = %+v, want disabled medium agent that closes a pane and relaunches", taken)
 	}
-	seq := []Event{{Type: events.LaunchFailed, Kind: events.AgentPaneBusy}, {Type: events.Paused, Kind: events.AgentPaneBusy}}
+	seq := []Event{{Type: events.LaunchFailed, Kind: events.AgentNameTaken}, {Type: events.Paused, Kind: events.AgentNameTaken}}
 	if _, ok := c.Match(seq); ok {
 		t.Error("disabled R6 must not match")
 	}
@@ -501,14 +497,12 @@ func TestR6MatchesAPausedLaunchCollisionOfTheSameKind(t *testing.T) {
 		want     bool
 		executor Executor
 	}{
-		{"pane busy", []Event{failed(events.AgentPaneBusy), pause(events.AgentPaneBusy)}, true, ExecutorRule},
 		{"name taken", []Event{failed(events.AgentNameTaken), pause(events.AgentNameTaken)}, true, ExecutorAgent},
 		{"retries before the pause", []Event{failed(events.AgentNameTaken), failed(events.AgentNameTaken), {Type: events.IterationStarted}, pause(events.AgentNameTaken)}, true, ExecutorAgent},
-		{"pause with no launch-failed", []Event{pause(events.AgentPaneBusy)}, false, ""},
+		{"pause with no launch-failed", []Event{pause(events.AgentNameTaken)}, false, ""},
 		{"launch-failed of another kind", []Event{failed(events.AgentPromptStalled), pause(events.AgentNameTaken)}, false, ""},
-		{"busy failure, taken pause", []Event{failed(events.AgentPaneBusy), pause(events.AgentNameTaken)}, false, ""},
-		{"retry storm", []Event{failed(events.AgentPaneBusy), pause(events.RetryExhausted)}, false, ""},
-		{"launch-failed with no pause", []Event{failed(events.AgentPaneBusy)}, false, ""},
+		{"retry storm", []Event{failed(events.AgentNameTaken), pause(events.RetryExhausted)}, false, ""},
+		{"launch-failed with no pause", []Event{failed(events.AgentNameTaken)}, false, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -683,7 +677,6 @@ func TestR11MatchesANameTakenRelaunchOfAStillLiveIteration(t *testing.T) {
 		{"iteration paused first", []Event{started, {Type: events.Paused, Kind: events.IterationError}, taken, pause}, "R6"},
 		{"a person reset it", []Event{started, {Type: events.TicketStartedOver}, taken, pause}, "R6"},
 		{"merged first", []Event{started, {Type: events.CherryPicked}, taken, pause}, "R6"},
-		{"busy pane, not a taken name", []Event{started, {Type: events.LaunchFailed, Kind: events.AgentPaneBusy}, {Type: events.Paused, Kind: events.AgentPaneBusy}}, "R6"},
 		{"taken-name failure, other pause", []Event{started, taken, {Type: events.Paused, Kind: events.RetryExhausted}}, ""},
 	}
 	for _, tt := range tests {
@@ -744,7 +737,7 @@ func TestR12MatchesAQuickZeroCommitFinishOfAReclaimAfterAStall(t *testing.T) {
 		{"a person reset after the stall", []Event{stall, at(events.TicketStartedOver, "", time.Second), reclaimed, pause}, ""},
 		{"merged after the stall", []Event{stall, at(events.CherryPicked, "", time.Second), reclaimed, pause}, ""},
 		{"reclaim with no time", []Event{stall, {Type: events.Reclaimed}, pause}, ""},
-		{"stall of another kind", []Event{at(events.LaunchFailed, events.AgentPaneBusy, 0), reclaimed, pause}, ""},
+		{"stall of another kind", []Event{at(events.LaunchFailed, events.IterationError, 0), reclaimed, pause}, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
