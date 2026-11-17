@@ -70,7 +70,7 @@ async function request(path: string, body?: unknown): Promise<string> {
   return text
 }
 
-async function json<T>(path: string, body?: unknown): Promise<T> {
+export async function json<T>(path: string, body?: unknown): Promise<T> {
   const text = await request(path, body)
   try {
     return JSON.parse(text) as T

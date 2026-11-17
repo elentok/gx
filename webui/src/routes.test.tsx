@@ -1305,7 +1305,7 @@ test("a route name comes from the pattern, never the URL", async () => {
   expect(JSON.stringify(samples())).not.toMatch(/proj|secret|frag/)
 })
 
-test("every page route pattern has one of the 16 route names", () => {
+test("every page route pattern has one of the 19 route names", () => {
   // /rest/* are demo routes on made-up state; they carry no route name on purpose.
   const real = pageRoutePatterns().filter((p) => !p.startsWith("/rest/"))
   for (const pattern of real) expect(ROUTE_NAMES[pattern], pattern).toBeTruthy()
@@ -1315,6 +1315,7 @@ test("every page route pattern has one of the 16 route names", () => {
       "archive",
       "archive-epic",
       "backlog",
+      "chat-draft",
       "cleanup",
       "design",
       "design-draft",

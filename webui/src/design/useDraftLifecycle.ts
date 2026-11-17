@@ -10,12 +10,14 @@ import type { DraftAutosave } from "./useDraftAutosave"
 export const REMOVED_NOTE = "This draft was removed."
 const LEASE_MS = 30_000
 
-/** Leaves a gone draft's page: for the Design it was started as, else for the Epics page with a note. */
-export function useLeaveGone() {
+const designPath = (address: string) => designHref(address).slice(1)
+
+/** Leaves a gone draft's page: for where it was started as (`startedPath` turns its id into a route; the Design's by default), else for the Epics page with a note. */
+export function useLeaveGone(startedPath: (started: string) => string = designPath) {
   const navigate = useNavigate()
   return (started?: string) =>
     started
-      ? navigate(designHref(started).slice(1), { replace: true })
+      ? navigate(startedPath(started), { replace: true })
       : navigate("/epics", { replace: true, state: { note: REMOVED_NOTE } })
 }
 

@@ -14,10 +14,16 @@ interface Props {
   onAskRemove: () => void
   onKeep: () => void
   onRemove: () => void
+  /** The Start button's text; "Start design" by default. */
+  startLabel?: string
+  /** The remove question; the Design draft's, which mentions its images, by default. */
+  removeText?: string
 }
 
 /** The draft page's action bar: attach, remove and Start, or the remove confirmation. */
 export function DraftFooter({
+  startLabel = "Start design",
+  removeText = "Remove this draft and its images?",
   confirming,
   canAttach,
   reasonText,
@@ -42,7 +48,7 @@ export function DraftFooter({
       {confirming ? (
         <>
           <Text fontSize="sm" flex="1" minW="0" color="tone.paused.fg" fontWeight="600">
-            Remove this draft and its images?
+            {removeText}
           </Text>
           <Button type="button" emphasis="ghost" tone="muted" onClick={onKeep}>
             Keep
@@ -61,7 +67,7 @@ export function DraftFooter({
           {reasonText}
           <Button type="submit" tone="running" disabled={startDisabled}>
             {pending && <Spinner size="sm" />}
-            Start design
+            {startLabel}
           </Button>
         </>
       )}

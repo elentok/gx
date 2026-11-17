@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { useLocation } from "react-router"
 import { useConnectionState, type Connection } from "../connection"
 import { useEpicList, type FetchEpicList } from "../epics/list"
-import type { DesignDraftRow, Workspace, SessionPlacement } from "../generated/server"
+import type { ChatDraftRow, DesignDraftRow, Workspace, SessionPlacement } from "../generated/server"
 import { readStoredWorkspace, resolveActive, routePending, writeStoredWorkspace } from "./active"
 
 /** The ordered workspaces, the session placements and the total Needs-you count of the connection snapshot. */
@@ -10,6 +10,7 @@ export function useWorkspaces(conn: Connection): {
   workspaces: Workspace[]
   placements: SessionPlacement[]
   drafts: DesignDraftRow[]
+  chatDrafts: ChatDraftRow[]
   needsYouTotal: number
 } {
   const snapshot = useConnectionState(conn).snapshot
@@ -17,6 +18,7 @@ export function useWorkspaces(conn: Connection): {
     workspaces: snapshot?.workspaces ?? [],
     placements: snapshot?.placements ?? [],
     drafts: snapshot?.design_drafts ?? [],
+    chatDrafts: snapshot?.chat_drafts ?? [],
     needsYouTotal: snapshot?.needs_you_total ?? 0,
   }
 }
@@ -26,7 +28,7 @@ export function useActiveWorkspace(
   conn: Connection,
   fetcher?: FetchEpicList,
 ): { active: string; resolved: boolean; setActive: (name: string) => void } {
-  const { workspaces, placements, drafts } = useWorkspaces(conn)
+  const { workspaces, placements, drafts, chatDrafts } = useWorkspaces(conn)
   const { list } = useEpicList(fetcher, conn)
   const route = useLocation().pathname
   const [stored, setStored] = useState(readStoredWorkspace)
@@ -36,7 +38,7 @@ export function useActiveWorkspace(
   // The open item's workspace wins only for a route not yet applied; after that a pick (stored) wins.
   const [appliedRoute, setAppliedRoute] = useState<string | null>(null)
   // A route whose agent placement has not arrived stays pending, so it is applied once it does.
-  const routePendingNow = routePending({ route, placements, drafts })
+  const routePendingNow = routePending({ route, placements, drafts, chatDrafts })
   const routeIsNew = route !== appliedRoute && !routePendingNow
   const active = loaded
     ? resolveActive({
@@ -44,6 +46,7 @@ export function useActiveWorkspace(
         rows,
         placements,
         drafts,
+        chatDrafts,
         workspaces,
         stored,
       })

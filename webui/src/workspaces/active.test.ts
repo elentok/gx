@@ -107,6 +107,35 @@ describe("draft routes", () => {
     expect(routePending({ route: "/drafts/d1", placements, drafts })).toBe(false))
 })
 
+describe("chat draft routes", () => {
+  const chatDrafts = [
+    {
+      id: "c1",
+      label: "Split",
+      project: "demo",
+      harness: "claude",
+      edited_at: "",
+      workspace: "Ops",
+      member_key: "chat-draft/c1",
+    },
+  ]
+  test("a chat draft resolves to its workspace", () =>
+    expect(
+      resolveActive({
+        route: "/chat-drafts/c1",
+        rows,
+        placements,
+        chatDrafts,
+        workspaces,
+        stored: "Main",
+      }),
+    ).toBe("Ops"))
+  test("an unknown chat draft id is pending, a known one is not", () => {
+    expect(routePending({ route: "/chat-drafts/new", placements, chatDrafts })).toBe(true)
+    expect(routePending({ route: "/chat-drafts/c1", placements, chatDrafts })).toBe(false)
+  })
+})
+
 describe("routePending", () => {
   const pending = (route: string) => routePending({ route, placements })
   test("an agent the snapshot does not know is pending", () =>

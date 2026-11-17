@@ -115,6 +115,7 @@ const READY_WIRING: Record<
   "/files/*": "useFetched",
   "/d/*": "useDetailReady",
   "/drafts/:id": "useReadyWhen",
+  "/chat-drafts/:id": "useReadyWhen",
   "/triage/*": "useDetailReady",
   "/t/*": "useDetailReady",
   "/e/*": "useDetailReady",

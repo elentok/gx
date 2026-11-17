@@ -101,6 +101,10 @@ const DraftPage = lazy(() =>
   import("./design/DraftPage").then(({ DraftPage }) => ({ default: DraftPage })),
 )
 
+const ChatDraftPage = lazy(() =>
+  import("./design/ChatDraftPage").then(({ ChatDraftPage }) => ({ default: ChatDraftPage })),
+)
+
 const accountPagesModule = () => import("./settings/AccountPages")
 const AuthenticatorPage = lazy(() =>
   accountPagesModule().then(({ AuthenticatorPage }) => ({ default: AuthenticatorPage })),
@@ -393,6 +397,7 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
     { path: "/settings/*", element: <UnknownSettingsPage /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/drafts/:id", element: <DraftPage /> },
+    { path: "/chat-drafts/:id", element: <ChatDraftPage /> },
     { path: "/triage/*", element: <TriageRoute fetchers={fetchers} /> },
     {
       path: "/t/*",

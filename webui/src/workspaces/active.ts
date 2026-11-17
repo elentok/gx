@@ -1,5 +1,6 @@
 import {
   SectionOnHold,
+  type ChatDraftRow,
   type DesignDraftRow,
   type EpicListRow,
   type SessionPlacement,
@@ -32,6 +33,8 @@ export interface ResolveInput {
   placements: SessionPlacement[]
   /** The snapshot's draft rows; missing reads as none. */
   drafts?: DesignDraftRow[]
+  /** The snapshot's chat draft rows; missing reads as none. */
+  chatDrafts?: ChatDraftRow[]
   workspaces: Workspace[]
   stored: string | null
 }
@@ -46,12 +49,20 @@ function epicWorkspace(rows: EpicListRow[], address: string): string | null {
   return row.workspace || null
 }
 
-function itemWorkspace({ route, rows, placements, drafts = [] }: ResolveInput): string | null {
+function itemWorkspace({
+  route,
+  rows,
+  placements,
+  drafts = [],
+  chatDrafts = [],
+}: ResolveInput): string | null {
   const [, kind, ...rest] = route.split("/")
   const id = decodeURIComponent(rest.join("/"))
   switch (kind) {
     case "drafts":
       return drafts.find((d) => d.id === id)?.workspace || null
+    case "chat-drafts":
+      return chatDrafts.find((d) => d.id === id)?.workspace || null
     case "d":
     case "e":
       return epicWorkspace(rows, id)
@@ -73,12 +84,14 @@ export function routePending({
   route,
   placements,
   drafts = [],
-}: Pick<ResolveInput, "route" | "placements" | "drafts">): boolean {
+  chatDrafts = [],
+}: Pick<ResolveInput, "route" | "placements" | "drafts" | "chatDrafts">): boolean {
   const [, kind, ...rest] = route.split("/")
   const id = decodeURIComponent(rest.join("/"))
   if (id === "") return false
   if (kind === "agents") return !placements.some((x) => x.session === id)
   if (kind === "drafts") return !drafts.some((d) => d.id === id)
+  if (kind === "chat-drafts") return !chatDrafts.some((d) => d.id === id)
   return false
 }
 

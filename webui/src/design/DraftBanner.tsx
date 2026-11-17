@@ -1,8 +1,11 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import type { DraftAutosave } from "./useDraftAutosave"
 
 /** The conflict banner: the draft's text changed on another device, and the ways out. */
-export function DraftBanner({ actions }: { actions: DraftAutosave["bannerActions"] }) {
+export function DraftBanner({
+  actions,
+}: {
+  actions: { keepMine: () => void; loadTheirs: () => void }
+}) {
   const buttons = [
     { text: "Load theirs", onClick: actions.loadTheirs },
     { text: "Keep mine", onClick: actions.keepMine },
