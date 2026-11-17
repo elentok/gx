@@ -297,6 +297,7 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 		}()
 	}
 	var nextTrustKey time.Time
+	settling := false
 	for {
 		resp, err := ss.holder.StatusReply()
 		if err != nil {
@@ -324,10 +325,16 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 				return err
 			}
 			if startup := h.StartupScreen(scrolled, rows); startup.Dialog != harness.NoDialog {
-				if err := ss.holder.SendKeys(startup.Key); err != nil {
-					return err
+				if startup.Settle > 0 && !settling {
+					// Let a key-refusing dialog open before its first key.
+					settling = true
+					nextTrustKey = time.Now().Add(startup.Settle)
+				} else {
+					if err := ss.holder.SendKeys(startup.Key); err != nil {
+						return err
+					}
+					nextTrustKey = time.Now().Add(max(holder.TrustKeyRepeat, startup.Settle))
 				}
-				nextTrustKey = time.Now().Add(holder.TrustKeyRepeat)
 			}
 		}
 		select {

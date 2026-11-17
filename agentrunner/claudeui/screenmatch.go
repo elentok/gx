@@ -89,12 +89,19 @@ const (
 	// StartupTrust is the trust dialog, the one pre-session screen gx
 	// answers by screen rule.
 	StartupTrust
+	// StartupAddDir is the "Adding a new directory" dialog. It refuses keys
+	// for a while after it opens and after every key it refused, so gx must
+	// type into it slowly: a key every few hundred ms keeps it shut forever.
+	StartupAddDir
 )
 
 // ClassifyStartup reads a pre-session screen's normalized text.
 func ClassifyStartup(text string) Startup {
-	if matchesAll(text, trustAnchors) || matchesAll(text, addDirAnchors) {
+	if matchesAll(text, trustAnchors) {
 		return StartupTrust
+	}
+	if matchesAll(text, addDirAnchors) {
+		return StartupAddDir
 	}
 	return StartupNoSession
 }

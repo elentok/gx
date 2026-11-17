@@ -318,6 +318,7 @@ func terminalEnv(env []string) []string {
 func answerStartupDialogs(h harness.Harness, scr *screen.Screen, keys io.Writer, watcher harness.Watcher, exited <-chan struct{}, trust bool) {
 	var next time.Time
 	daemonAnswered := false
+	settling := false
 	for {
 		st := watcher.Status()
 		if st.State != harness.Starting && st.Blocked != harness.BlockedDialog {
@@ -326,11 +327,17 @@ func answerStartupDialogs(h harness.Harness, scr *screen.Screen, keys io.Writer,
 		if !daemonAnswered && !time.Now().Before(next) {
 			startup := h.StartupScreen(scr.ScrollbackTail(StartupScrollback), scr.Rows())
 			if startup.Dialog == harness.DaemonDialog || trust && startup.Dialog != harness.NoDialog {
-				if _, err := io.WriteString(keys, startup.Key); err != nil {
-					return
+				if startup.Settle > 0 && !settling {
+					// Let a key-refusing dialog open before its first key.
+					settling = true
+					next = time.Now().Add(startup.Settle)
+				} else {
+					if _, err := io.WriteString(keys, startup.Key); err != nil {
+						return
+					}
+					next = time.Now().Add(max(TrustKeyRepeat, startup.Settle))
+					daemonAnswered = startup.Dialog == harness.DaemonDialog
 				}
-				next = time.Now().Add(TrustKeyRepeat)
-				daemonAnswered = startup.Dialog == harness.DaemonDialog
 			}
 		}
 		select {

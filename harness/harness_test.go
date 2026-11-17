@@ -176,3 +176,11 @@ func TestClaudeDisplayName(t *testing.T) {
 		t.Errorf("glyph-only title = %q, want none", got)
 	}
 }
+
+func TestClaudeStartupScreen_AddDirSettles(t *testing.T) {
+	rows := []string{"Adding a new directory:", "/Users/x/Library/pnpm", "  No, exit", "❯ Yes, add it"}
+	got := claude(t).StartupScreen(nil, rows)
+	if got.Dialog != harness.AddDirDialog || got.Key != "\r" || got.Settle < 3*time.Second {
+		t.Errorf("StartupScreen = %+v, want AddDirDialog, Enter, a settle of 3s or more", got)
+	}
+}

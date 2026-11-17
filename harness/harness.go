@@ -178,12 +178,19 @@ const (
 	UpdateDialog
 	ModelNudgeDialog
 	DaemonDialog
+	// AddDirDialog is claude's "Adding a new directory" dialog.
+	AddDirDialog
 )
 
 // Startup is a classified pre-session screen; Key answers Dialog.
 type Startup struct {
 	Dialog Dialog
 	Key    string
+	// Settle, when set, is how long the dialog must sit untouched before a
+	// key goes in, and how long to wait between keys: it refuses keys typed
+	// too soon after opening or after a refused key. Zero means the default
+	// repeat spacing.
+	Settle time.Duration
 }
 
 // Claude is the claude harness's name.
