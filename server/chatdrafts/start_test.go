@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -230,12 +231,44 @@ func TestStart_EmptyBriefIsRefusedAndTheDraftStays(t *testing.T) {
 	t.Parallel()
 	r := newStartRig(t)
 	d := r.draft(t, ops.ChatDraft{})
-	if _, err := r.c.store.Save(ops.ChatDraftSaveRequest{ID: d.ID, Brief: "", Revision: 1}); err != nil {
+	if _, err := r.c.store.SaveChecked(ops.ChatDraftSaveRequest{ID: d.ID, Brief: "", Revision: 1}, nil); err != nil {
 		t.Fatal(err)
 	}
 	res, _ := r.c.Start(d.ID)
 	if !res.Refused || res.Reason != wire.ReasonEmptyPrompt || !r.c.store.Exists(d.ID) || r.chats.Load() != 0 {
 		t.Fatalf("start = %+v", res)
+	}
+}
+
+func TestStart_RemoveFailureAfterTheChatStillReturnsStartedAndASecondStartOpensNoChat(t *testing.T) {
+	t.Parallel()
+	r := newStartRig(t)
+	d := r.draft(t, ops.ChatDraft{})
+	draftDir := r.c.store.dir(d.ID)
+	r.createRes = func() (wire.SessionResult, error) {
+		// A read-only draft dir makes RemoveAll fail once the chat exists.
+		if err := os.Chmod(draftDir, 0o500); err != nil {
+			t.Fatal(err)
+		}
+		return wire.SessionResult{Session: &wire.SessionInfo{ID: "sess-1"}}, nil
+	}
+	t.Cleanup(func() { _ = os.Chmod(draftDir, 0o700) })
+	res, err := r.c.Start(d.ID)
+	if err != nil || res.Started != "sess-1" || res.Refused {
+		t.Fatalf("first start = %+v, %v", res, err)
+	}
+	if !r.c.store.Exists(d.ID) {
+		t.Fatal("test setup: the remove did not fail")
+	}
+	if err := os.Chmod(draftDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	res, err = r.c.Start(d.ID)
+	if err != nil || res.Started != "sess-1" || r.chats.Load() != 1 {
+		t.Fatalf("second start = %+v, %v, chats = %d", res, err, r.chats.Load())
+	}
+	if r.c.store.Exists(d.ID) {
+		t.Error("the second start did not clean the draft up")
 	}
 }
 

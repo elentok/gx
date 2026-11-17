@@ -150,11 +150,6 @@ func (s *Store) List() ([]ops.ChatDraft, error) {
 	return items, nil
 }
 
-// Save applies a save with no settings check. See SaveChecked.
-func (s *Store) Save(req ops.ChatDraftSaveRequest) (ops.ChatDraftResult, error) {
-	return s.SaveChecked(req, nil)
-}
-
 // SaveChecked writes the brief and merges each settings field the request
 // carries. The record's Dir, WorktreePath and StartError are left to check,
 // which sees the merged draft under the draft's lock and may fix up Dir;

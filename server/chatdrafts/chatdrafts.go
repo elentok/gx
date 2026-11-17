@@ -142,6 +142,14 @@ func (c *ChatDrafts) build(req ops.ChatDraftCreateRequest) (*ops.ChatDraft, ops.
 	if res := c.resolveFolder(d, req.FromSession, req.Worktree); res.Refused {
 		return nil, res, nil
 	}
+	if req.FromSession != "" {
+		// Resolved on a copy so the source folder is kept whatever folder was chosen.
+		probe := *d
+		probe.Folder = ops.ChatDraftFolderSource
+		if res := c.resolveFolder(&probe, req.FromSession, ""); !res.Refused {
+			d.SourceDir = probe.Dir
+		}
+	}
 	return d, ops.ChatDraftResult{}, nil
 }
 
@@ -191,6 +199,10 @@ func (c *ChatDrafts) resolveFolder(d *ops.ChatDraft, fromSession, worktree strin
 			return refuse(wire.ReasonSessionBadRequest, "project "+d.Project+" has no trunk checkout")
 		}
 	case ops.ChatDraftFolderSource:
+		if fromSession == "" && d.SourceDir != "" {
+			d.Dir = d.SourceDir
+			break
+		}
 		if fromSession == "" {
 			d.Dir = c.projectRoot(d.Project)
 			if d.Dir == "" {
@@ -295,6 +307,9 @@ func (c *ChatDrafts) checkSave(d *ops.ChatDraft, before ops.ChatDraft) *ops.Chat
 	if res := c.checkSettings(d); res != nil {
 		return res
 	}
+	if d.Project != before.Project {
+		d.SourceDir = "" // the source chat's folder belongs to the old project
+	}
 	if d.Folder == ops.ChatDraftFolderWorktree || d.Project != before.Project || d.Folder != before.Folder {
 		if res := c.resolveFolder(d, "", d.Worktree); res.Refused {
 			return &res
@@ -326,8 +341,8 @@ func (c *ChatDrafts) remove(w http.ResponseWriter, r *http.Request) {
 	wire.WriteJSON(w, ops.ChatDraftResult{Deleted: true})
 }
 
-// Routes lists the chat draft routes. All are web-only: the CLI verbs arrive
-// later. The getter is called per request, so a route can be listed before its
+// Routes lists the chat draft routes. Only create has a CLI handler; the rest
+// are web-only. The getter is called per request, so a route can be listed before its
 // ChatDrafts is built.
 func Routes(get func() *ChatDrafts) []wire.Route {
 	return []wire.Route{

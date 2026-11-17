@@ -190,6 +190,29 @@ func TestChatDraftCreate_FolderSourceFromAChatIsTheChatsDir(t *testing.T) {
 	}
 }
 
+func TestChatDraftSave_FolderBackToSourceKeepsTheSourceChatsFolder(t *testing.T) {
+	t.Parallel()
+	f := rigs.StartDesigns(t)
+	chat, dir := plainChat(t, f, "")
+	d := mustCreate(t, f, ops.ChatDraftCreateRequest{Folder: ops.ChatDraftFolderSource, FromSession: chat})
+	rev := d.Revision
+	save := func(folder string) *ops.ChatDraft {
+		t.Helper()
+		res := post(t, f, "save", ops.ChatDraftSaveRequest{ID: d.ID, Brief: "b", Revision: rev, Folder: str(folder)})
+		if res.Refused || res.Draft == nil {
+			t.Fatalf("save %s = %+v", folder, res)
+		}
+		rev = res.Draft.Revision
+		return res.Draft
+	}
+	if got := save(ops.ChatDraftFolderTrunk); got.Dir != f.Repo {
+		t.Fatalf("trunk dir = %q, want %q", got.Dir, f.Repo)
+	}
+	if got := save(ops.ChatDraftFolderSource); got.Dir != dir {
+		t.Errorf("source dir after the round trip = %q, want the chat's %q", got.Dir, dir)
+	}
+}
+
 func TestChatDraftCreate_FolderTrunk(t *testing.T) {
 	t.Parallel()
 	f := rigs.StartDesigns(t)

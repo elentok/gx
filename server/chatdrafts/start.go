@@ -1,6 +1,7 @@
 package chatdrafts
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/elentok/gx/server/sessions"
@@ -22,10 +23,13 @@ func (c *ChatDrafts) Start(id string) (ops.ChatDraftResult, error) {
 	defer unlock()
 	d, err := c.store.Get(id)
 	if err != nil {
-		if err == ErrNotFound {
+		if errors.Is(err, ErrNotFound) {
 			return c.gone(id), nil
 		}
 		return ops.ChatDraftResult{}, err
+	}
+	if session := c.store.Started(id); session != "" {
+		return c.finishStart(id, session), nil
 	}
 	if d.Brief == "" {
 		return refuse(wire.ReasonEmptyPrompt, "a brief is required"), nil
@@ -65,8 +69,15 @@ func (c *ChatDrafts) Start(id string) (ops.ChatDraftResult, error) {
 	if err := c.store.RecordStart(id, res.Session.ID); err != nil {
 		c.Log.Warn("record chat draft start", "draft", id, "err", err)
 	}
+	return c.finishStart(id, res.Session.ID), nil
+}
+
+// finishStart drops the draft of a chat that is running. A failure is logged,
+// not returned: the chat exists, and the Start record makes a later Start of
+// the leftover draft retry this instead of opening a second chat.
+func (c *ChatDrafts) finishStart(id, session string) ops.ChatDraftResult {
 	if _, err := c.store.remove(id); err != nil {
-		return ops.ChatDraftResult{}, err
+		c.Log.Warn("remove started chat draft", "draft", id, "err", err)
 	}
 	if c.Workspaces != nil {
 		if err := c.Workspaces.Remove(MemberKey(id)); err != nil {
@@ -74,7 +85,7 @@ func (c *ChatDrafts) Start(id string) (ops.ChatDraftResult, error) {
 		}
 	}
 	c.publish()
-	return ops.ChatDraftResult{Started: res.Session.ID}, nil
+	return ops.ChatDraftResult{Started: session}
 }
 
 // startFailed keeps d, saves msg on it as start_error and returns the refusal.

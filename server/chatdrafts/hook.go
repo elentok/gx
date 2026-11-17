@@ -15,7 +15,9 @@ const (
 // ErrHookSaveFail is the error a draft create answers while save-fail is armed.
 var ErrHookSaveFail = errors.New("test hook: draft save forced to fail")
 
-// ErrHookStartFail is the error a Start answers while start-fail is armed.
+// ErrHookStartFail is the error a Start answers while start-fail is armed. It
+// only fires for worktree-folder drafts: Start checks it after the worktree
+// step, so source and trunk drafts start normally.
 var ErrHookStartFail = errors.New("test hook: start forced to fail")
 
 // HookArmed reports whether the file name exists in dir. An empty dir is never

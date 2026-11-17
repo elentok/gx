@@ -29,6 +29,7 @@ function fakeDrafts(over: Partial<ChatDraft> = {}) {
     brief: "Split the auth work out.",
     folder: "worktree",
     dir: "",
+    source_dir: "",
     worktree: "split-auth-abc123",
     worktree_path: "",
     start_error: "",

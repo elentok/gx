@@ -56,7 +56,7 @@ func TestStore_SaveMergesOnlyTheSettingsGivenAndKeepsStartState(t *testing.T) {
 		t.Fatal(err)
 	}
 	name, harness := " new ", "codex"
-	res, err := s.Save(ops.ChatDraftSaveRequest{ID: d.ID, Brief: "second", Revision: 1, Name: &name, Harness: &harness})
+	res, err := s.SaveChecked(ops.ChatDraftSaveRequest{ID: d.ID, Brief: "second", Revision: 1, Name: &name, Harness: &harness}, nil)
 	if err != nil || res.Draft == nil {
 		t.Fatalf("save = %+v, %v", res, err)
 	}
@@ -71,11 +71,11 @@ func TestStore_SaveStaleRevisionIsAConflict(t *testing.T) {
 	t.Parallel()
 	s := New(t.TempDir())
 	d := newDraft(t, s, "first")
-	res, err := s.Save(ops.ChatDraftSaveRequest{ID: d.ID, Brief: "second", Revision: 1})
+	res, err := s.SaveChecked(ops.ChatDraftSaveRequest{ID: d.ID, Brief: "second", Revision: 1}, nil)
 	if err != nil || res.Draft == nil || res.Draft.Revision != 2 || res.Draft.Brief != "second" {
 		t.Fatalf("save = %+v, %v", res, err)
 	}
-	res, err = s.Save(ops.ChatDraftSaveRequest{ID: d.ID, Brief: "third", Revision: 1})
+	res, err = s.SaveChecked(ops.ChatDraftSaveRequest{ID: d.ID, Brief: "third", Revision: 1}, nil)
 	if err != nil || !res.Refused || res.Reason != ops.ReasonDraftRevisionConflict {
 		t.Fatalf("stale save = %+v, %v", res, err)
 	}
@@ -88,7 +88,7 @@ func TestStore_SaveChangesOnlyTheBrief(t *testing.T) {
 	t.Parallel()
 	s := New(t.TempDir())
 	d := newDraft(t, s, "first")
-	if _, err := s.Save(ops.ChatDraftSaveRequest{ID: d.ID, Brief: "second", Revision: 1}); err != nil {
+	if _, err := s.SaveChecked(ops.ChatDraftSaveRequest{ID: d.ID, Brief: "second", Revision: 1}, nil); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := s.Get(d.ID)
@@ -109,7 +109,7 @@ func TestStore_DeleteAndGoneIDs(t *testing.T) {
 	if existed, err := s.Delete(d.ID); err != nil || existed {
 		t.Errorf("second delete = %v, %v", existed, err)
 	}
-	if res, _ := s.Save(ops.ChatDraftSaveRequest{ID: d.ID, Revision: 1}); res.Reason != ops.ReasonDraftGone {
+	if res, _ := s.SaveChecked(ops.ChatDraftSaveRequest{ID: d.ID, Revision: 1}, nil); res.Reason != ops.ReasonDraftGone {
 		t.Errorf("save of deleted = %+v", res)
 	}
 	for _, id := range []string{d.ID, "", "../x", "abc", "ABCDEF0123456789"} {

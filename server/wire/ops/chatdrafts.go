@@ -17,15 +17,18 @@ const ReasonChatDraftStartFailed = "start-failed"
 // until Start. Worktree names the new worktree; WorktreePath is set once Start
 // made it, StartError when a Start failed.
 type ChatDraft struct {
-	ID           string    `json:"id"`
-	Project      string    `json:"project"`
-	Name         string    `json:"name"`
-	Harness      string    `json:"harness"`
-	Model        string    `json:"model"`
-	Effort       string    `json:"effort"`
-	Brief        string    `json:"brief"`
-	Folder       string    `json:"folder"`
-	Dir          string    `json:"dir"`
+	ID      string `json:"id"`
+	Project string `json:"project"`
+	Name    string `json:"name"`
+	Harness string `json:"harness"`
+	Model   string `json:"model"`
+	Effort  string `json:"effort"`
+	Brief   string `json:"brief"`
+	Folder  string `json:"folder"`
+	Dir     string `json:"dir"`
+	// SourceDir is the folder of the chat the draft was made from, kept so a
+	// folder edit back to "source" finds it again. Empty when there is no source chat.
+	SourceDir    string    `json:"source_dir"`
 	Worktree     string    `json:"worktree"`
 	WorktreePath string    `json:"worktree_path"`
 	StartError   string    `json:"start_error"`

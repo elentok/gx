@@ -30,6 +30,11 @@ export interface ChatDraft {
   brief: string;
   folder: string;
   dir: string;
+  /**
+   * SourceDir is the folder of the chat the draft was made from, kept so a
+   * folder edit back to "source" finds it again. Empty when there is no source chat.
+   */
+  source_dir: string;
   worktree: string;
   worktree_path: string;
   start_error: string;
@@ -284,6 +289,17 @@ export interface DesignDraftSaveRequest {
    * request creates a draft (no ID); ignored on a save of an existing draft.
    */
   workspace?: string;
+}
+/**
+ * DesignDraftCreateRequest creates a draft with its project, slug and idea.
+ * FromSession names the session whose workspace the draft joins; an unknown
+ * or empty one leaves it in Default.
+ */
+export interface DesignDraftCreateRequest {
+  project: string;
+  slug: string;
+  idea: string;
+  from_session?: string;
 }
 /**
  * DesignDraftTargetRequest sets a draft's slug and/or project. It is
