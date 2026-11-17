@@ -95,12 +95,15 @@ export function useDraftImages({
   ensureDraft,
   upload: send,
   remove: erase,
+  url = draftImageUrl,
 }: {
   slot: ImageSlot
   draftId: () => string | undefined
   ensureDraft: () => Promise<string>
   upload: UploadDraftImage
   remove: RemoveDraftImage
+  /** The image's url; the Design draft routes by default. */
+  url?: (draftId: string, image: string) => string
 }): DraftImages {
   const entries = useSyncExternalStore(slot.subscribe, () => slot.entries)
   const change = (fn: (cur: Entry[]) => Entry[]) => slot.set(fn(slot.entries))
@@ -158,7 +161,7 @@ export function useDraftImages({
     change(() => ids.map((id) => ({ key: id, id })))
   }
 
-  const urlOf = (id: string) => draftImageUrl(draftId() ?? "", id)
+  const urlOf = (id: string) => url(draftId() ?? "", id)
   const images = entries.map((e): ComposerImage => {
     if (e.id) return { key: e.key, state: "ready", url: urlOf(e.id), canRetry: false }
     if (e.refused) return { key: e.key, state: "failed", message: e.refused, canRetry: false }

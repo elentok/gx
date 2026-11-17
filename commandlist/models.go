@@ -24,6 +24,8 @@ type Model struct {
 	DefaultEffort string
 	// Upgrade is the successor the harness names; empty when it names none.
 	Upgrade string
+	// IsDefault is the Codex isDefault flag: the model a launch with no model uses.
+	IsDefault bool
 }
 
 type claudeModelsReply struct {
@@ -87,6 +89,7 @@ type codexModelsReply struct {
 			ID                        string `json:"id"`
 			Model                     string `json:"model"`
 			Hidden                    bool   `json:"hidden"`
+			IsDefault                 bool   `json:"isDefault"`
 			DefaultReasoningEffort    string `json:"defaultReasoningEffort"`
 			SupportedReasoningEfforts []struct {
 				ReasoningEffort string `json:"reasoningEffort"`
@@ -125,7 +128,7 @@ func ProbeCodexModels(ctx context.Context, dir string, env []string) ([]Model, e
 				return nil, err
 			}
 			for _, m := range reply.Result.Data {
-				row := Model{Value: m.ID, ID: m.Model, Hidden: m.Hidden, DefaultEffort: m.DefaultReasoningEffort, Efforts: []string{}}
+				row := Model{Value: m.ID, ID: m.Model, Hidden: m.Hidden, IsDefault: m.IsDefault, DefaultEffort: m.DefaultReasoningEffort, Efforts: []string{}}
 				for _, e := range m.SupportedReasoningEfforts {
 					row.Efforts = append(row.Efforts, e.ReasoningEffort)
 				}

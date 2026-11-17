@@ -134,7 +134,7 @@ func (c *ChatDrafts) build(req ops.ChatDraftCreateRequest) (*ops.ChatDraft, ops.
 	}
 	d := &ops.ChatDraft{
 		ID: id, Project: req.Project, Name: strings.TrimSpace(req.Name), Harness: req.Harness,
-		Model: req.Model, Effort: req.Effort, Brief: brief, Folder: req.Folder,
+		Model: req.Model, Effort: req.Effort, Brief: brief, Folder: req.Folder, Images: []string{},
 	}
 	if res := c.checkSettings(d); res != nil {
 		return nil, *res, nil
@@ -189,6 +189,32 @@ func (c *ChatDrafts) projectRoot(project string) string {
 	return ""
 }
 
+// projectHasDir says whether dir is the project's root or one of its worktrees.
+func (c *ChatDrafts) projectHasDir(project, dir string) bool {
+	if dir == "" {
+		return false
+	}
+	list, err := c.Projects.ListWorktrees()
+	if err != nil {
+		return false
+	}
+	dir = filepath.Clean(dir)
+	for _, p := range list {
+		if p.Project != project {
+			continue
+		}
+		if filepath.Clean(p.Root) == dir {
+			return true
+		}
+		for _, w := range p.Worktrees {
+			if filepath.Clean(w) == dir {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // resolveFolder fills d.Dir or d.Worktree from the folder choice. It creates
 // nothing on disk. A source folder with no fromSession is the project root.
 func (c *ChatDrafts) resolveFolder(d *ops.ChatDraft, fromSession, worktree string) ops.ChatDraftResult {
@@ -222,6 +248,10 @@ func (c *ChatDrafts) resolveFolder(d *ops.ChatDraft, fromSession, worktree strin
 		if d.Dir == "" {
 			return refuse(wire.ReasonSessionBadRequest, "the source session has no folder")
 		}
+	case ops.ChatDraftFolderDir:
+		if !c.projectHasDir(d.Project, d.Dir) {
+			return refuse(wire.ReasonSessionBadRequest, fmt.Sprintf("%q is not a folder of project %s", d.Dir, d.Project))
+		}
 	case ops.ChatDraftFolderWorktree:
 		d.Dir = ""
 		d.Worktree = worktree
@@ -232,7 +262,7 @@ func (c *ChatDrafts) resolveFolder(d *ops.ChatDraft, fromSession, worktree strin
 			return refuse(wire.ReasonSessionBadRequest, fmt.Sprintf("%q is not a local worktree name", d.Worktree))
 		}
 	default:
-		return refuse(wire.ReasonSessionBadRequest, fmt.Sprintf("folder %q is not source, trunk or worktree", d.Folder))
+		return refuse(wire.ReasonSessionBadRequest, fmt.Sprintf("folder %q is not source, trunk, dir or worktree", d.Folder))
 	}
 	return ops.ChatDraftResult{}
 }
@@ -301,7 +331,8 @@ func (c *ChatDrafts) save(w http.ResponseWriter, r *http.Request) {
 // when the project or the folder choice changed.
 func (c *ChatDrafts) checkSave(d *ops.ChatDraft, before ops.ChatDraft) *ops.ChatDraftResult {
 	if d.Project == before.Project && d.Harness == before.Harness && d.Model == before.Model &&
-		d.Effort == before.Effort && d.Folder == before.Folder && d.Worktree == before.Worktree {
+		d.Effort == before.Effort && d.Folder == before.Folder && d.Worktree == before.Worktree &&
+		d.Dir == before.Dir {
 		return nil
 	}
 	if res := c.checkSettings(d); res != nil {
@@ -310,7 +341,8 @@ func (c *ChatDrafts) checkSave(d *ops.ChatDraft, before ops.ChatDraft) *ops.Chat
 	if d.Project != before.Project {
 		d.SourceDir = "" // the source chat's folder belongs to the old project
 	}
-	if d.Folder == ops.ChatDraftFolderWorktree || d.Project != before.Project || d.Folder != before.Folder {
+	if d.Folder == ops.ChatDraftFolderWorktree || d.Project != before.Project || d.Folder != before.Folder ||
+		d.Dir != before.Dir {
 		if res := c.resolveFolder(d, "", d.Worktree); res.Refused {
 			return &res
 		}
@@ -357,5 +389,11 @@ func Routes(get func() *ChatDrafts) []wire.Route {
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().remove(w, r) }},
 		{Pattern: "POST /v1/agents/drafts/start", Web: wire.WebWrite,
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().start(w, r) }},
+		{Pattern: "POST /v1/agents/drafts/images", Web: wire.WebWrite, RawBody: true,
+			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().imageUpload(w, r) }},
+		{Pattern: "GET /v1/agents/drafts/images", Web: wire.WebRead,
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().imageServe(w, r) }},
+		{Pattern: "POST /v1/agents/drafts/images/delete", Web: wire.WebWrite,
+			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().imageRemove(w, r) }},
 	}
 }

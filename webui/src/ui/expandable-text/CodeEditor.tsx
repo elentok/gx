@@ -177,6 +177,7 @@ export default function CodeEditor({
   caret,
   handle,
   autoFocus = true,
+  bare,
   inline,
 }: {
   label: string
@@ -203,6 +204,8 @@ export default function CodeEditor({
   handle?: Ref<CodeEditorHandle>
   /** Focus the editor when it mounts. Default true. */
   autoFocus?: boolean
+  /** Draw no border, for an editor that sits inside a bordered card. */
+  bare?: boolean
   /** Sit inside a prompt box: `rows` lines tall, no border. Fixed for the editor's life; `rows` and `disabled` apply live. */
   inline?: {
     rows: number
@@ -449,9 +452,10 @@ export default function CodeEditor({
       flex="1"
       minH="0"
       overflow="hidden"
-      borderWidth="1px"
+      borderWidth={bare ? "0" : "1px"}
       borderRadius="10px"
       {...fieldLook}
+      {...(bare && { bg: "transparent" })}
     />
   )
 }

@@ -41,7 +41,7 @@ export function DraftHeader({
 }: Props) {
   return (
     <>
-      <Box display="flex" alignItems="center" gap="2" px="3" pt="3" flexShrink="0">
+      <Box display="flex" alignItems="center" gap="2" pt="3" flexShrink="0">
         <MascotToggle />
         <DraftIcon />
         <Text
@@ -96,7 +96,7 @@ export function DraftHeader({
         display="flex"
         alignItems="center"
         gap="2"
-        p="3"
+        py="3"
         borderBottomWidth="1px"
         borderColor="hairline"
         flexShrink="0"

@@ -3,6 +3,7 @@ package sessions
 import (
 	"cmp"
 	"net/http"
+	"os"
 
 	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/harness"
@@ -39,7 +40,12 @@ func SessionModelsRead(mg *Manager, w http.ResponseWriter, r *http.Request) {
 		harnessName, shown, effort = meta.Harness, info.Model, info.Effort
 	}
 	mg.Models.Refresh(harnessName)
-	wire.WriteJSON(w, modelsResponse(mg.Models, harnessName, shown, effort))
+	res := modelsResponse(mg.Models, harnessName, shown, effort)
+	// The probe reports no Claude effort default: the config's effortLevel is what a bare launch uses.
+	if harnessName == string(harness.Claude) && res.DefaultEffort == "" {
+		res.DefaultEffort = harness.ClaudeEffortLevel(harness.LaunchEnv(os.Environ(), mg.cfg.Env))
+	}
+	wire.WriteJSON(w, res)
 }
 
 // hasModelList says whether sessions of harnessName can pick a model: Claude and
@@ -78,6 +84,7 @@ func modelsResponse(cache *commandlist.ModelCache, harnessName, shown, effort st
 			out.Aliases = append(out.Aliases, wire.ModelAlias{Alias: m.Value, ID: m.ID, Latest: latestID(claudeEntries, m.ID)})
 		}
 	}
+	out.DefaultModel, out.DefaultEffort = defaultModel(list, codex)
 	out.Refreshing = cache.Refreshing(harnessName)
 	return out
 }
@@ -102,4 +109,15 @@ func latestID(entries []modelrules.Entry, id string) string {
 		return ""
 	}
 	return resolvedModelID(entries, latest)
+}
+
+// defaultModel is the resolved id and default effort of the model a launch
+// with no model runs: Claude's "default" row, or Codex's isDefault row.
+func defaultModel(list []commandlist.Model, codex bool) (id, effort string) {
+	for _, m := range list {
+		if (codex && m.IsDefault) || (!codex && m.Value == "default") {
+			return m.ID, m.DefaultEffort
+		}
+	}
+	return "", ""
 }

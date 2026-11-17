@@ -73,6 +73,18 @@ test("Leader opens the box and the next key runs its chord and closes it", () =>
   expect(box()).toBeNull()
 })
 
+test("Shift makes the capital chord, apart from the lowercase one", () => {
+  const lower = vi.fn()
+  const upper = vi.fn()
+  setup([chord("c", lower), chord("C", upper)])
+  leaderKey()
+  press("KeyC", { shiftKey: true })
+  expect([lower.mock.calls.length, upper.mock.calls.length]).toEqual([0, 1])
+  leaderKey()
+  press("KeyC")
+  expect([lower.mock.calls.length, upper.mock.calls.length]).toEqual([1, 1])
+})
+
 test("Leader in a field opens the box and the field keeps its text", () => {
   const run = vi.fn()
   setup([chord("a", run)])

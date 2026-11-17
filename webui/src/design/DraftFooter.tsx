@@ -35,22 +35,13 @@ export function DraftFooter({
   onRemove,
 }: Props) {
   return (
-    <Box
-      display="flex"
-      alignItems="center"
-      gap="2"
-      p="3"
-      borderTopWidth="1px"
-      borderColor="hairline"
-      bg="surface.raised"
-      flexShrink="0"
-    >
+    <Box display="flex" alignItems="center" gap="2" pb="1" flexShrink="0">
       {confirming ? (
         <>
           <Text fontSize="sm" flex="1" minW="0" color="tone.paused.fg" fontWeight="600">
             {removeText}
           </Text>
-          <Button type="button" emphasis="ghost" tone="muted" onClick={onKeep}>
+          <Button type="button" emphasis="secondary" onClick={onKeep}>
             Keep
           </Button>
           <Button type="button" tone="paused" onClick={onRemove}>
@@ -60,7 +51,7 @@ export function DraftFooter({
       ) : (
         <>
           {canAttach && <AttachButton onClick={onAttach} />}
-          <Button type="button" emphasis="ghost" tone="muted" onClick={onAskRemove}>
+          <Button type="button" emphasis="secondary" onClick={onAskRemove}>
             Remove
           </Button>
           <Box flex="1" />

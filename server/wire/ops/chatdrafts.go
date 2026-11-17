@@ -7,13 +7,16 @@ const (
 	ChatDraftFolderSource   = "source"
 	ChatDraftFolderTrunk    = "trunk"
 	ChatDraftFolderWorktree = "worktree"
+	// ChatDraftFolderDir launches in an existing folder of the project: its
+	// root or one of its worktrees, named by the draft's Dir.
+	ChatDraftFolderDir = "dir"
 )
 
 // ReasonChatDraftStartFailed: Start hit an error that is not a refusal; the draft stays.
 const ReasonChatDraftStartFailed = "start-failed"
 
 // ChatDraft is a brief and the launch settings of a chat that does not exist
-// yet. Dir is the resolved folder for source and trunk, empty for worktree
+// yet. Dir is the resolved folder for source, trunk and dir, empty for worktree
 // until Start. Worktree names the new worktree; WorktreePath is set once Start
 // made it, StartError when a Start failed.
 type ChatDraft struct {
@@ -34,6 +37,8 @@ type ChatDraft struct {
 	StartError   string    `json:"start_error"`
 	Revision     int       `json:"revision"`
 	EditedAt     time.Time `json:"edited_at"`
+	// Images lists image ids the server alone writes (upload and delete routes).
+	Images []string `json:"images"`
 	// Label is computed by the server on every read (never stored).
 	Label string `json:"label"`
 }
@@ -72,12 +77,14 @@ type ChatDraftSaveRequest struct {
 	Effort   *string `json:"effort,omitempty"`
 	Folder   *string `json:"folder,omitempty"`
 	Worktree *string `json:"worktree,omitempty"`
+	// Dir names the folder of the "dir" choice; the other choices resolve it.
+	Dir *string `json:"dir,omitempty"`
 }
 
 // Settings reports whether the save changes anything besides the brief.
 func (r ChatDraftSaveRequest) Settings() bool {
 	return r.Project != nil || r.Name != nil || r.Harness != nil || r.Model != nil ||
-		r.Effort != nil || r.Folder != nil || r.Worktree != nil
+		r.Effort != nil || r.Folder != nil || r.Worktree != nil || r.Dir != nil
 }
 
 // ChatDraftResult answers every chat draft route. A refusal is a result:

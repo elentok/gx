@@ -56,8 +56,13 @@ func (c *ChatDrafts) Start(id string) (ops.ChatDraftResult, error) {
 	if c.Workspaces != nil {
 		ws = c.Workspaces.Workspace(MemberKey(id))
 	}
+	// The draft goes once the chat runs, so its images are copied out first.
+	images, err := c.store.CopyImages(d)
+	if err != nil {
+		return c.startFailed(d, ops.ReasonChatDraftStartFailed, err.Error())
+	}
 	res, err := c.CreateChat(sessions.WebCreateSessionRequest{
-		Project: d.Project, Dir: dir, Name: d.Name, Prompt: d.Brief,
+		Project: d.Project, Dir: dir, Name: d.Name, Prompt: withImages(d.Brief, images),
 		Harness: d.Harness, Model: d.Model, Effort: d.Effort, Workspace: ws,
 	})
 	switch {

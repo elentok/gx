@@ -386,6 +386,19 @@ func TestChatDraftSave_EachSettingAloneStoresAndBumpsTheRevision(t *testing.T) {
 	}
 }
 
+func TestChatDraftSave_FolderDirTakesAFolderOfTheProject(t *testing.T) {
+	t.Parallel()
+	f := rigs.StartDesigns(t)
+	d := mustCreate(t, f, ops.ChatDraftCreateRequest{})
+	res := post(t, f, "save", ops.ChatDraftSaveRequest{
+		ID: d.ID, Brief: "b", Revision: d.Revision,
+		Folder: str(ops.ChatDraftFolderDir), Dir: str(f.Repo),
+	})
+	if res.Refused || res.Draft.Folder != ops.ChatDraftFolderDir || res.Draft.Dir != f.Repo {
+		t.Fatalf("save dir = %+v", res)
+	}
+}
+
 func TestChatDraftSave_RefusalsStoreNothing(t *testing.T) {
 	t.Parallel()
 	f := rigs.StartDesigns(t)
@@ -397,6 +410,7 @@ func TestChatDraftSave_RefusalsStoreNothing(t *testing.T) {
 		"bad harness": {ops.ChatDraftSaveRequest{Harness: str("nope")}, wire.ReasonSessionUnknownHarness},
 		"bad project": {ops.ChatDraftSaveRequest{Project: str("nope")}, wire.ReasonSessionBadRequest},
 		"bad folder":  {ops.ChatDraftSaveRequest{Folder: str("moon")}, wire.ReasonSessionBadRequest},
+		"dir outside": {ops.ChatDraftSaveRequest{Folder: str(ops.ChatDraftFolderDir), Dir: str("/etc")}, wire.ReasonSessionBadRequest},
 		"stale":       {ops.ChatDraftSaveRequest{Name: str("x"), Revision: 9}, ops.ReasonDraftRevisionConflict},
 	}
 	for name, c := range cases {
@@ -431,5 +445,21 @@ func TestChatDraftEvents_CreateAndDeletePublishOneEachBriefSaveNone(t *testing.T
 	}
 	if n := draftEvents(t, f, func() { post(t, f, "delete", ops.ChatDraftReadRequest{ID: d.ID}) }); n != 1 {
 		t.Errorf("delete published %d events, want 1", n)
+	}
+}
+
+func TestChatDraftImages_UploadedImageIsServedOnTheWebMux(t *testing.T) {
+	t.Parallel()
+	f := rigs.StartDesigns(t)
+	d := mustCreate(t, f, ops.ChatDraftCreateRequest{})
+	png := "\x89PNG\r\n\x1a\n" + strings.Repeat("\x00", 16)
+	code, out := servertest.WebPostJSON(t, f.Base+"/v1/agents/drafts/images?id="+d.ID, png, f.Ck, "", servertest.JSONPost(f.Base))
+	var up wire.SessionImageResult
+	if code != http.StatusOK || json.Unmarshal([]byte(out), &up) != nil || up.ID == "" {
+		t.Fatalf("upload = %d %s", code, out)
+	}
+	code, body := servertest.WebDoCookie(t, http.MethodGet, f.Base+"/v1/agents/drafts/images?id="+d.ID+"&image="+up.ID, f.Ck)
+	if code != http.StatusOK || body != png {
+		t.Fatalf("serve = %d, %d bytes, want the %d uploaded", code, len(body), len(png))
 	}
 }

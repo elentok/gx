@@ -41,7 +41,9 @@ type Store struct {
 
 // New builds a Store rooted in stateDir.
 func New(stateDir string) *Store {
-	return &Store{root: filepath.Join(stateDir, rootDir), now: time.Now}
+	s := &Store{root: filepath.Join(stateDir, rootDir), now: time.Now}
+	s.pruneStartedImages(startedImagesMaxAge)
+	return s
 }
 
 func (s *Store) dir(id string) string    { return filepath.Join(s.root, id) }
@@ -118,6 +120,9 @@ func (s *Store) Get(id string) (*ops.ChatDraft, error) {
 	if err := json.Unmarshal(b, &d); err != nil {
 		return nil, fmt.Errorf("chat draft %s: %w", id, err)
 	}
+	if d.Images == nil {
+		d.Images = []string{}
+	}
 	d.Label = Label(d.Name, d.Brief)
 	return &d, nil
 }
@@ -175,7 +180,7 @@ func (s *Store) SaveChecked(req ops.ChatDraftSaveRequest, check func(d *ops.Chat
 	d.Brief = req.Brief
 	for dst, src := range map[*string]*string{
 		&d.Project: req.Project, &d.Name: req.Name, &d.Harness: req.Harness, &d.Model: req.Model,
-		&d.Effort: req.Effort, &d.Folder: req.Folder, &d.Worktree: req.Worktree,
+		&d.Effort: req.Effort, &d.Folder: req.Folder, &d.Worktree: req.Worktree, &d.Dir: req.Dir,
 	} {
 		if src != nil {
 			*dst = *src

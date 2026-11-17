@@ -306,12 +306,12 @@ function DraftForm({
           onSlug={(slug) => patch({ slug })}
         />
         {slugError && (
-          <Text role="alert" fontSize="sm" color="tone.waiting.fg" px="3" pt="2" flexShrink="0">
+          <Text role="alert" fontSize="sm" color="tone.waiting.fg" pt="2" flexShrink="0">
             {slugError}
           </Text>
         )}
         {moved && (
-          <Text fontSize="sm" color="text.dim" px="3" pt="2" flexShrink="0">
+          <Text fontSize="sm" color="text.dim" pt="2" flexShrink="0">
             {movedFrom} no longer exists; moved to {draft.project}
           </Text>
         )}
@@ -320,7 +320,8 @@ function DraftForm({
           <Box
             flex="1"
             minH="0"
-            m="3"
+            mx="0"
+            my="3"
             display="flex"
             flexDirection="column"
             gap="1"
@@ -354,7 +355,8 @@ function DraftForm({
             {...field}
             flex="1"
             minH="0"
-            m="3"
+            mx="0"
+            my="3"
             resize="none"
             px="4"
             py="3"
@@ -382,11 +384,11 @@ function DraftForm({
             e.target.value = ""
           }}
         />
-        <Box flexShrink="0" px="3">
+        <Box flexShrink="0">
           <DraftImages state={imgs} />
         </Box>
         {sheetMode && reason && (
-          <Box px="3" pb="2" flexShrink="0">
+          <Box pb="2" flexShrink="0">
             {reasonText}
           </Box>
         )}

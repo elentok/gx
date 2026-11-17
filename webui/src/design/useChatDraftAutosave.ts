@@ -16,6 +16,7 @@ const SETTING_KEYS = [
   "effort",
   "folder",
   "worktree",
+  "dir",
 ] as const
 
 /** The launch settings of a chat draft, saved with the brief in one revision. */
@@ -29,6 +30,7 @@ const settingsOf = (d: ChatDraft): ChatSettings => ({
   effort: d.effort,
   folder: d.folder,
   worktree: d.worktree,
+  dir: d.dir,
 })
 
 /** `editing` saves; `finished` is Remove, or a gone draft, having taken the draft over. */

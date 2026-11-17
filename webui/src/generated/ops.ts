@@ -7,16 +7,21 @@ export const ChatDraftFolderSource = "source";
 export const ChatDraftFolderTrunk = "trunk";
 export const ChatDraftFolderWorktree = "worktree";
 /**
+ * ChatDraftFolderDir launches in an existing folder of the project: its
+ * root or one of its worktrees, named by the draft's Dir.
+ */
+export const ChatDraftFolderDir = "dir";
+/**
  * Chat draft folder choices.
  */
-export type ChatDraftFolder = typeof ChatDraftFolderSource | typeof ChatDraftFolderTrunk | typeof ChatDraftFolderWorktree;
+export type ChatDraftFolder = typeof ChatDraftFolderSource | typeof ChatDraftFolderTrunk | typeof ChatDraftFolderWorktree | typeof ChatDraftFolderDir;
 /**
  * ReasonChatDraftStartFailed: Start hit an error that is not a refusal; the draft stays.
  */
 export const ReasonChatDraftStartFailed = "start-failed";
 /**
  * ChatDraft is a brief and the launch settings of a chat that does not exist
- * yet. Dir is the resolved folder for source and trunk, empty for worktree
+ * yet. Dir is the resolved folder for source, trunk and dir, empty for worktree
  * until Start. Worktree names the new worktree; WorktreePath is set once Start
  * made it, StartError when a Start failed.
  */
@@ -40,6 +45,10 @@ export interface ChatDraft {
   start_error: string;
   revision: number /* int */;
   edited_at: string;
+  /**
+   * Images lists image ids the server alone writes (upload and delete routes).
+   */
+  images: string[];
   /**
    * Label is computed by the server on every read (never stored).
    */
@@ -83,6 +92,10 @@ export interface ChatDraftSaveRequest {
   effort?: string;
   folder?: string;
   worktree?: string;
+  /**
+   * Dir names the folder of the "dir" choice; the other choices resolve it.
+   */
+  dir?: string;
 }
 /**
  * ChatDraftResult answers every chat draft route. A refusal is a result:

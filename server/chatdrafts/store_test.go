@@ -1,7 +1,11 @@
 package chatdrafts
 
 import (
+	"os"
+	"path/filepath"
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/wire/ops"
@@ -94,7 +98,8 @@ func TestStore_SaveChangesOnlyTheBrief(t *testing.T) {
 	got, _ := s.Get(d.ID)
 	want := *d
 	want.Brief, want.Revision, want.EditedAt, want.Label = "second", 2, got.EditedAt, got.Label
-	if *got != want {
+	want.Images = []string{}
+	if !reflect.DeepEqual(*got, want) {
 		t.Errorf("after save = %+v, want %+v", *got, want)
 	}
 }
@@ -130,5 +135,28 @@ func TestMemberKey_IsNotADesignDraftKey(t *testing.T) {
 	}
 	if _, ok := ParseMemberKey(drafts.MemberKey("0123456789abcdef")); ok {
 		t.Error("ParseMemberKey parsed a Design draft key")
+	}
+}
+
+func TestNew_PrunesStartedImagesOlderThanThirtyDays(t *testing.T) {
+	t.Parallel()
+	state := t.TempDir()
+	base := filepath.Join(state, rootDir, startedImagesDir)
+	old, fresh := filepath.Join(base, "old"), filepath.Join(base, "fresh")
+	for _, dir := range []string{old, fresh} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	when := time.Now().Add(-31 * 24 * time.Hour)
+	if err := os.Chtimes(old, when, when); err != nil {
+		t.Fatal(err)
+	}
+	New(state)
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Errorf("old folder stays: %v", err)
+	}
+	if _, err := os.Stat(fresh); err != nil {
+		t.Errorf("fresh folder gone: %v", err)
 	}
 }

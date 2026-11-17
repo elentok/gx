@@ -37,6 +37,11 @@ type SessionModelsResponse struct {
 	Models     []SessionModelRow `json:"models"`
 	Aliases    []ModelAlias      `json:"aliases"`
 	Refreshing bool              `json:"refreshing"`
+	// DefaultModel is the resolved id of the model a launch with no model runs
+	// (Claude's "default" row, Codex's isDefault row); empty when unknown.
+	DefaultModel string `json:"default_model"`
+	// DefaultEffort is that model's default effort; empty when the harness does not say.
+	DefaultEffort string `json:"default_effort"`
 }
 
 // SessionInfo is an interactive session on the wire: everything the Agents

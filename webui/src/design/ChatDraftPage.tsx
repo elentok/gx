@@ -1,5 +1,14 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
-import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react"
+import { LuPencil } from "react-icons/lu"
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type FormEvent,
+} from "react"
 import { useNavigate, useParams } from "react-router"
 import type { FetchWorktrees } from "../agents/newSession"
 import { usePromptFocus } from "../agents/promptFocus"
@@ -10,13 +19,18 @@ import { agentPath } from "../hrefs"
 import { DetailPage } from "../page/DetailPage"
 import { MascotToggle } from "../shell/MascotToggle"
 import { useShell } from "../shell/ShellContext"
-import { DraftIcon } from "../shell/SidebarRows"
+import { ChatDraftIcon } from "../shell/SidebarRows"
 import type { ViMode } from "../ui/expandable-text/CodeEditor"
 import { ModeText } from "../ui/expandable-text/ModeText"
 import { useReadyWhen } from "../useReady"
 import { useViMode } from "../vimode"
 import { realChatDrafts, type ChatDraftsClient } from "./chatDrafts"
-import { ChatDraftSettings } from "./ChatDraftSettings"
+import type { FetchDefaults } from "./chatDraftDefaults"
+import { ChatDraftChips, ChatDraftCrumb, useLaunchDefaults, useTrees } from "./ChatDraftSettings"
+import { imageFiles } from "./ComposerImages"
+import { chatDraftImages } from "./draftImageApi"
+import { DraftImages } from "./DraftImages"
+import { DraftSlots, useDraftImages } from "./useDraftImages"
 import { DraftBanner } from "./DraftBanner"
 import { DraftFooter } from "./DraftFooter"
 import { field } from "./DraftHeader"
@@ -31,10 +45,17 @@ interface PageProps {
   drafts?: ChatDraftsClient
   /** Replaces the project list fetch, for tests. */
   fetchTrees?: FetchWorktrees
+  /** Replaces the launch-default fetch, for tests. */
+  fetchDefaults?: FetchDefaults
 }
 
 /** The chat draft page: the brief and launch settings of a chat that does not exist yet, autosaved until Remove. */
-export function ChatDraftPage({ drafts = realChatDrafts, fetchTrees, ...props }: PageProps) {
+export function ChatDraftPage({
+  drafts = realChatDrafts,
+  fetchTrees,
+  fetchDefaults,
+  ...props
+}: PageProps) {
   const params = useParams()
   const id = props.id ?? params.id ?? ""
   const leaveGone = useLeaveGone(agentPath)
@@ -74,7 +95,15 @@ export function ChatDraftPage({ drafts = realChatDrafts, fetchTrees, ...props }:
       </DetailPage>
     )
   }
-  return <ChatDraftForm key={loaded.id} drafts={drafts} initial={loaded} fetchTrees={fetchTrees} />
+  return (
+    <ChatDraftForm
+      key={loaded.id}
+      drafts={drafts}
+      initial={loaded}
+      fetchTrees={fetchTrees}
+      fetchDefaults={fetchDefaults}
+    />
+  )
 }
 
 const PLACEHOLDER = "What should the new chat start from?"
@@ -83,10 +112,12 @@ function ChatDraftForm({
   drafts,
   initial,
   fetchTrees,
+  fetchDefaults,
 }: {
   drafts: ChatDraftsClient
   initial: ChatDraft
   fetchTrees?: FetchWorktrees
+  fetchDefaults?: FetchDefaults
 }) {
   const shell = useShell()
   const navigate = useNavigate()
@@ -105,12 +136,30 @@ function ChatDraftForm({
     starting,
     startError,
   } = useChatDraftAutosave({ drafts, initial, onGone: leaveGone })
+  const trees = useTrees(fetchTrees)
+  const harness = settings.harness === "codex" ? "codex" : "claude"
+  const defaults = useLaunchDefaults(harness, fetchDefaults)
+  // An upload or failed tile stays with its draft.
+  const slot = useRef(new DraftSlots()).current.current(initial.images)
+  // The draft exists from the start, so an upload never has to save the text first.
+  const imgs = useDraftImages({
+    slot,
+    draftId: () => initial.id,
+    ensureDraft: async () => initial.id,
+    upload: chatDraftImages.upload,
+    remove: chatDraftImages.remove,
+    url: chatDraftImages.url,
+  })
   // An empty draft is a normal state: it opens with the placeholder and cannot start yet.
   const blocker = !brief.trim()
     ? "Write a brief to start."
-    : status === "saving"
-      ? "Saving the draft..."
-      : null
+    : imgs.uploading
+      ? "Uploading images..."
+      : imgs.failed
+        ? "Remove or retry the failed images."
+        : status === "saving"
+          ? "Saving the draft..."
+          : null
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
   const [confirming, setConfirming] = useState(false)
@@ -119,6 +168,8 @@ function ChatDraftForm({
   useEffect(() => claimHeader?.(), [claimHeader])
 
   const formRef = useRef<HTMLDivElement>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const titleInput = useRef<HTMLInputElement>(null)
   const focusBrief = () => formRef.current?.querySelector<HTMLElement>(PROMPT_BOX_SELECTOR)?.focus()
   // New chat draft opens this page asking for the brief's focus, and on an empty page it asks again.
   usePromptFocus(formRef)
@@ -142,6 +193,12 @@ function ChatDraftForm({
     if (blocker || banner || starting) return
     void start((session) => navigate(agentPath(session)))
   }
+  const pasted = (e: ClipboardEvent) => {
+    const files = imageFiles(e.clipboardData?.files)
+    if (files.length === 0) return
+    e.preventDefault()
+    void imgs.addFiles(files)
+  }
 
   return (
     <DetailPage fill title={{ kind: "Chat draft", name: facts.label }}>
@@ -155,62 +212,136 @@ function ChatDraftForm({
         flexDirection="column"
         overflow="hidden"
       >
-        <Box display="flex" alignItems="center" gap="2" px="3" pt="3" flexShrink="0">
+        <Box display="flex" alignItems="center" gap="2" pt="3" flexShrink="0">
           <MascotToggle />
-          <DraftIcon />
-          <Text as="h1" fontSize="lg" fontWeight="600" minW="0" truncate>
-            {facts.label}
-          </Text>
-          <Box flex="1" />
+          <ChatDraftIcon />
+          <chakra.input
+            ref={titleInput}
+            aria-label="Name"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="Untitled chat"
+            value={settings.name}
+            onChange={(e) => editSettings({ name: e.target.value })}
+            flex="1"
+            minW="0"
+            h="36px"
+            px="1"
+            bg="transparent"
+            color="text"
+            fontSize="lg"
+            fontWeight="600"
+            borderRadius="6px"
+            _placeholder={{ color: "text.dim" }}
+            _focus={{ bg: "surface.raised", outline: "none" }}
+          />
+          <chakra.button
+            type="button"
+            aria-label="Rename"
+            title="Rename"
+            onClick={() => titleInput.current?.focus()}
+            color="text.dim"
+            h="32px"
+            w="32px"
+            flexShrink="0"
+            display="grid"
+            placeItems="center"
+            borderRadius="8px"
+            _hover={{ bg: "surface", color: "text" }}
+          >
+            <LuPencil size={14} />
+          </chakra.button>
           {status !== "none" && (
             <Text fontSize="xs" color="text.dim" flexShrink="0" whiteSpace="nowrap">
               {status === "saving" ? "Saving..." : status === "unsaved" ? "Not saved" : "Saved"}
             </Text>
           )}
         </Box>
-        <ChatDraftSettings
+        <ChatDraftCrumb
           settings={settings}
+          trees={trees}
           worktreePath={facts.worktree_path}
           onChange={editSettings}
-          fetchTrees={fetchTrees}
         />
         {banner && <DraftBanner actions={bannerActions} />}
-        {viMode ? (
-          <Box flex="1" minH="0" m="3" display="flex" flexDirection="column" gap="1">
-            <Suspense fallback={<Spinner />}>
-              <CodeEditor
-                label="Brief"
-                value={brief}
-                onChange={edit}
-                placeholder={PLACEHOLDER}
-                selection={{ start: brief.length, end: brief.length }}
-                onSelectionChange={() => {}}
-                viMode
-                onModeChange={setViModeNow}
-              />
-            </Suspense>
-            <ModeText mode={viModeNow} />
+        <Box
+          flex="1"
+          minH="0"
+          mx="0"
+          my="3"
+          display="flex"
+          flexDirection="column"
+          bg="surface.raised"
+          borderWidth="1px"
+          borderColor="hairline"
+          borderRadius="12px"
+          overflow="hidden"
+          onPaste={pasted}
+        >
+          {viMode ? (
+            <Box flex="1" minH="0" display="flex" flexDirection="column" gap="1" p="2">
+              <Suspense fallback={<Spinner />}>
+                <CodeEditor
+                  label="Brief"
+                  value={brief}
+                  onChange={edit}
+                  placeholder={PLACEHOLDER}
+                  selection={{ start: brief.length, end: brief.length }}
+                  onSelectionChange={() => {}}
+                  viMode
+                  bare
+                  onModeChange={setViModeNow}
+                />
+              </Suspense>
+            </Box>
+          ) : (
+            <chakra.textarea
+              aria-label="Brief"
+              name="chat-brief"
+              autoComplete="off"
+              {...field}
+              borderWidth="0"
+              bg="transparent"
+              flex="1"
+              minH="0"
+              resize="none"
+              px="4"
+              py="3"
+              lineHeight="1.6"
+              _focus={{ outline: "none" }}
+              placeholder={PLACEHOLDER}
+              value={brief}
+              onChange={(e) => edit(e.target.value)}
+            />
+          )}
+          <Box flexShrink="0" px="0">
+            <DraftImages state={imgs} />
           </Box>
-        ) : (
-          <chakra.textarea
-            aria-label="Brief"
-            name="chat-brief"
-            autoComplete="off"
-            {...field}
-            flex="1"
-            minH="0"
-            m="3"
-            resize="none"
-            px="4"
-            py="3"
-            lineHeight="1.6"
-            placeholder={PLACEHOLDER}
-            value={brief}
-            onChange={(e) => edit(e.target.value)}
-          />
-        )}
+          <Box display="flex" alignItems="center" gap="2" px="3" py="2" flexShrink="0">
+            {viMode && <ModeText mode={viModeNow} />}
+            <Box flex="1" />
+            <ChatDraftChips
+              settings={settings}
+              tree={trees.find((p) => p.project === settings.project)}
+              defaults={defaults}
+              onChange={editSettings}
+            />
+          </Box>
+        </Box>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          data-testid="image-input"
+          onChange={(e) => {
+            void imgs.addFiles(imageFiles(e.target.files))
+            e.target.value = ""
+          }}
+        />
         {startError && (
-          <Box role="alert" px="3" pb="2" fontSize="sm" color="tone.error.fg" flexShrink="0">
+          <Box role="alert" pb="2" fontSize="sm" color="tone.error.fg" flexShrink="0">
             <Text>{startError}</Text>
             {facts.worktree_path && (
               <Text>
@@ -223,7 +354,7 @@ function ChatDraftForm({
           startLabel="Start chat"
           removeText="Remove this draft?"
           confirming={confirming}
-          canAttach={false}
+          canAttach
           reasonText={
             blocker && (
               <Text fontSize="12px" color="tone.waiting.fg">
@@ -233,7 +364,7 @@ function ChatDraftForm({
           }
           startDisabled={!!blocker || banner || starting}
           pending={starting}
-          onAttach={() => {}}
+          onAttach={() => fileInput.current?.click()}
           onAskRemove={() => setConfirming(true)}
           onKeep={() => setConfirming(false)}
           onRemove={removeNow}

@@ -62,7 +62,8 @@ test("lists the real chord table", () => {
     />,
   )
   expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
-    "cNew chat",
+    "cNew chat draft",
+    "CNew chat",
     "dNew design",
     "sFocus sidebar",
     "bBig prompt box",

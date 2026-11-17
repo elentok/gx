@@ -26,7 +26,9 @@ function lineText(state: State): { text: string; red: boolean } | undefined {
 export const useAttachIcon = (): boolean => true
 
 /** The attach button for `useAttachIcon`; the New Design sheet reuses it. */
-export function AttachButton({ onClick }: { onClick: () => void }) {
+export function AttachButton({ onClick, tall = false }: { onClick: () => void; tall?: boolean }) {
+  // Square, as tall as the buttons beside it: 44px in a phone's tall row, else a 40px button.
+  const side = tall ? "44px" : "40px"
   const icon = useAttachIcon()
   return (
     <Button
@@ -34,7 +36,7 @@ export function AttachButton({ onClick }: { onClick: () => void }) {
       emphasis="secondary"
       aria-label="Add image"
       title={icon ? "Add image" : undefined}
-      {...(icon ? { w: "44px", h: "44px", px: "0", justifyContent: "center" } : {})}
+      {...(icon ? { w: side, h: side, px: "0", justifyContent: "center" } : {})}
       flex="none"
       onClick={onClick}
     >
@@ -105,7 +107,7 @@ export function ComposerImages({
         </Box>
       )}
       <Box display="flex" gap="2" alignItems="center">
-        <AttachButton onClick={() => input.current?.click()} />
+        <AttachButton tall={phone} onClick={() => input.current?.click()} />
         <input
           ref={input}
           type="file"

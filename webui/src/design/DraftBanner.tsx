@@ -17,7 +17,7 @@ export function DraftBanner({
       alignItems="center"
       flexWrap="wrap"
       gap="2"
-      mx="3"
+      mx="0"
       mt="3"
       px="3"
       py="10px"

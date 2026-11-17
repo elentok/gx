@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { MemoryRouter, Route, Routes, useLocation } from "react-router"
 import { ConnectionContext, type Connection } from "../connection"
@@ -9,7 +9,10 @@ import {
   type ProjectWorktrees,
 } from "../generated/server"
 import { renderThemed } from "../ui/render"
+import { WideContext } from "../useWide"
 import { ChatDraftPage } from "./ChatDraftPage"
+import { chatDraftImages } from "./draftImageApi"
+import type { LaunchDefaults } from "./chatDraftDefaults"
 import type { ChatDraftOutcome, ChatDraftsClient, ChatStartOutcome } from "./chatDrafts"
 
 afterEach(() => {
@@ -36,6 +39,7 @@ function fakeDrafts(over: Partial<ChatDraft> = {}) {
     revision: 3,
     edited_at: "",
     label: "split-auth",
+    images: [],
     ...over,
   }
   const save = vi.fn(async (body: ChatDraftSaveRequest): Promise<ChatDraftOutcome> => {
@@ -63,18 +67,24 @@ function Where() {
 }
 const where = () => screen.getByTestId("where").textContent
 
+let claudeTiers: Record<string, string> = { worker: "opus" }
 const trees = async (): Promise<ProjectWorktrees[]> => [
   {
     project: "gx",
     root: "/r/gx",
-    worktrees: [],
+    worktrees: ["/r/gx-wt/main", "/r/gx-wt/feature-x"],
     tiers: {},
-    tier_models: { claude: { worker: "opus" } },
+    tier_models: { claude: claudeTiers },
   },
   { project: "other", root: "/r/other", worktrees: [], tiers: {} },
 ]
 
-async function mount(fake: ReturnType<typeof fakeDrafts>, viMode = false) {
+async function mount(
+  fake: ReturnType<typeof fakeDrafts>,
+  viMode = false,
+  defaults: LaunchDefaults = { model: "", effort: "" },
+  wide = true,
+) {
   const listeners = new Set<(address: string, type: string) => void>()
   const connState = { snapshot: { sessions: [], vi_mode: viMode } }
   const connection = {
@@ -88,18 +98,27 @@ async function mount(fake: ReturnType<typeof fakeDrafts>, viMode = false) {
   } as unknown as Connection
   await act(async () => {
     renderThemed(
-      <ConnectionContext.Provider value={connection}>
-        <MemoryRouter initialEntries={["/chat-drafts/c1"]}>
-          <Routes>
-            <Route path="/epics" element={<Where />} />
-            <Route path="/agents/*" element={<Where />} />
-            <Route
-              path="*"
-              element={<ChatDraftPage id="c1" drafts={fake.client} fetchTrees={trees} />}
-            />
-          </Routes>
-        </MemoryRouter>
-      </ConnectionContext.Provider>,
+      <WideContext.Provider value={wide}>
+        <ConnectionContext.Provider value={connection}>
+          <MemoryRouter initialEntries={["/chat-drafts/c1"]}>
+            <Routes>
+              <Route path="/epics" element={<Where />} />
+              <Route path="/agents/*" element={<Where />} />
+              <Route
+                path="*"
+                element={
+                  <ChatDraftPage
+                    id="c1"
+                    drafts={fake.client}
+                    fetchTrees={trees}
+                    fetchDefaults={async () => defaults}
+                  />
+                }
+              />
+            </Routes>
+          </MemoryRouter>
+        </ConnectionContext.Provider>
+      </WideContext.Provider>,
     )
   })
   return { emit: (type: string) => act(async () => listeners.forEach((l) => l("", type))) }
@@ -154,12 +173,29 @@ test("a failed Start shows the error and the worktree, keeps the brief, and Star
 
 const control = (name: string) =>
   screen.getByLabelText(name) as HTMLInputElement | HTMLSelectElement
+/** Harness, Model and Effort live in the settings popover; tests that use them mount with it open. */
+const openSettings = () =>
+  act(async () => void fireEvent.click(screen.getByRole("button", { name: "Chat settings" })))
+async function mountOpen(...args: Parameters<typeof mount>) {
+  const mounted = await mount(...args)
+  await openSettings()
+  return mounted
+}
+/** Opens a combobox and clicks the option with this text. */
+const pick = (name: string, option: string) => {
+  fireEvent.focus(control(name))
+  fireEvent.click(screen.getByRole("option", { name: new RegExp(`^${option}`) }))
+}
+/** The text of the option a chip shows. */
+const chipText = (name: string) => {
+  const select = control(name) as HTMLSelectElement
+  return select.options[select.selectedIndex].text
+}
 
 test("the settings and the brief render and Start is enabled", async () => {
-  await mount(fakeDrafts())
+  await mountOpen(fakeDrafts())
   expect(control("Project").value).toBe("gx")
-  expect(control("Folder").value).toBe("worktree")
-  expect(control("Worktree name").value).toBe("split-auth-abc123")
+  expect(control("Folder").value).toBe("split-auth-abc123")
   expect(control("Harness").value).toBe("claude")
   expect(control("Model").value).toBe("opus")
   expect(control("Effort").value).toBe("high")
@@ -169,15 +205,50 @@ test("the settings and the brief render and Start is enabled", async () => {
 })
 
 test("only tiers with a resolved model are offered as models", async () => {
-  await mount(fakeDrafts())
+  await mountOpen(fakeDrafts())
   const values = Array.from((control("Model") as HTMLSelectElement).options).map((o) => o.value)
   expect(values).toEqual(["", "opus"])
 })
 
+test("a tier that names the default model, or another tier's model, is not listed twice", async () => {
+  claudeTiers = {
+    light: "haiku",
+    worker: "claude-sonnet-5-5",
+    strongest: "claude-sonnet-5-5-20260101",
+  }
+  try {
+    await mountOpen(fakeDrafts({ model: "", effort: "" }), false, {
+      model: "claude-sonnet-5-5",
+      effort: "high",
+    })
+    const select = control("Model") as HTMLSelectElement
+    const rows = Array.from(select.options).map((o) => [o.value, o.textContent])
+    expect(rows).toEqual([
+      ["", "Claude Sonnet 5.5"],
+      ["haiku", "Claude Haiku"],
+    ])
+    expect(select.value).toBe("")
+  } finally {
+    claudeTiers = { worker: "opus" }
+  }
+})
+
+test("a model pinned to what the default also is stays selected, once", async () => {
+  claudeTiers = { worker: "claude-sonnet-5-5" }
+  try {
+    await mountOpen(fakeDrafts({ model: "claude-sonnet-5-5", effort: "" }), false, {
+      model: "claude-sonnet-5-5",
+      effort: "high",
+    })
+    const select = control("Model") as HTMLSelectElement
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(["claude-sonnet-5-5"])
+    expect(select.value).toBe("claude-sonnet-5-5")
+  } finally {
+    claudeTiers = { worker: "opus" }
+  }
+})
+
 test.each([
-  ["Project", "other", { project: "other" }],
-  ["Folder", "trunk", { folder: "trunk" }],
-  ["Worktree name", "fresh", { worktree: "fresh" }],
   ["Harness", "codex", { harness: "codex" }],
   ["Model", "", { model: "" }],
   ["Effort", "max", { effort: "max" }],
@@ -186,6 +257,7 @@ test.each([
   vi.useFakeTimers()
   const fake = fakeDrafts()
   await mount(fake)
+  if (label !== "Name") await openSettings()
   fireEvent.change(control(label), { target: { value } })
   await wait(800)
   expect(fake.save).toHaveBeenCalledTimes(1)
@@ -197,18 +269,161 @@ test.each([
   })
 })
 
+test.each([
+  ["Project", "other", { project: "other" }],
+  ["Folder", "Trunk checkout", { folder: "trunk" }],
+  ["Folder", "Source folder", { folder: "source" }],
+])("picking %s %s from its combobox saves only that field", async (label, option, body) => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts()
+  await mount(fake)
+  pick(label, option)
+  await wait(800)
+  expect(fake.save).toHaveBeenCalledTimes(1)
+  expect(fake.save).toHaveBeenCalledWith({
+    id: "c1",
+    brief: "Split the auth work out.",
+    revision: 3,
+    ...body,
+  })
+})
+
+test("typing in Folder filters the list and offers a new worktree", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts({ folder: "source" })
+  await mount(fake)
+  fireEvent.focus(control("Folder"))
+  fireEvent.change(control("Folder"), { target: { value: "trunk" } })
+  expect(screen.queryByRole("option", { name: /Source folder/ })).toBeNull()
+  expect(screen.getByRole("option", { name: /Trunk checkout/ })).toBeTruthy()
+  fireEvent.change(control("Folder"), { target: { value: "fresh" } })
+  fireEvent.click(screen.getByRole("option", { name: /Create worktree/ }))
+  await wait(800)
+  expect(fake.save).toHaveBeenCalledWith({
+    id: "c1",
+    brief: "Split the auth work out.",
+    revision: 3,
+    folder: "worktree",
+    worktree: "fresh",
+  })
+})
+
+test("Folder lists the project's existing worktrees and picking one saves its path", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts({ folder: "source" })
+  await mount(fake)
+  fireEvent.focus(control("Folder"))
+  // The trunk worktree is the Trunk checkout row, not a second row.
+  expect(screen.queryByRole("option", { name: /^main/ })).toBeNull()
+  fireEvent.change(control("Folder"), { target: { value: "feat" } })
+  fireEvent.click(screen.getByRole("option", { name: /feature-x/ }))
+  await wait(800)
+  expect(fake.save).toHaveBeenCalledWith({
+    id: "c1",
+    brief: "Split the auth work out.",
+    revision: 3,
+    folder: "dir",
+    dir: "/r/gx-wt/feature-x",
+  })
+})
+
+test("the title is the name: editing it saves the name", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts({ name: "" })
+  await mount(fake)
+  expect((control("Name") as HTMLInputElement).placeholder).toBe("Untitled chat")
+  fireEvent.change(control("Name"), { target: { value: "auth" } })
+  await wait(800)
+  expect(fake.save).toHaveBeenCalledWith({
+    id: "c1",
+    brief: "Split the auth work out.",
+    revision: 3,
+    name: "auth",
+  })
+})
+
+test("an unset model and effort show what the chat will launch with, never Default", async () => {
+  await mountOpen(fakeDrafts({ model: "", effort: "" }), false, {
+    model: "claude-opus-4-5",
+    effort: "high",
+  })
+  expect(chipText("Model")).toMatch(/Opus/)
+  expect(chipText("Effort")).toBe("high")
+  expect(screen.queryByText("Default")).toBeNull()
+})
+
+test("an unresolved default leaves the plain model name and shows Auto for effort", async () => {
+  await mountOpen(fakeDrafts({ model: "", effort: "" }))
+  expect(chipText("Model")).toBe("Model")
+  expect(chipText("Effort")).toBe("Auto")
+  expect((control("Effort") as HTMLSelectElement).disabled).toBe(true)
+})
+
+test("picking an effort with no model also saves the default model", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts({ model: "", effort: "" })
+  await mountOpen(fake, false, { model: "claude-opus-4-5", effort: "" })
+  fireEvent.change(control("Effort"), { target: { value: "max" } })
+  await wait(800)
+  expect(fake.save).toHaveBeenCalledWith({
+    id: "c1",
+    brief: "Split the auth work out.",
+    revision: 3,
+    effort: "max",
+    model: "claude-opus-4-5",
+  })
+})
+
+const png = (name = "a.png") =>
+  new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], name, {
+    type: "image/png",
+  })
+
+test("Add image opens the file picker, and a chosen file uploads to the draft", async () => {
+  const upload = vi.spyOn(chatDraftImages, "upload").mockResolvedValue("img1")
+  await mount(fakeDrafts())
+  const click = vi.spyOn(screen.getByTestId("image-input"), "click")
+  fireEvent.click(screen.getByRole("button", { name: "Add image" }))
+  expect(click).toHaveBeenCalled()
+  await act(async () =>
+    fireEvent.change(screen.getByTestId("image-input"), { target: { files: [png()] } }),
+  )
+  await screen.findByText("1 of 10 images")
+  expect(upload).toHaveBeenCalledWith("c1", expect.any(File))
+  upload.mockRestore()
+})
+
+test("a pasted image uploads, and Start waits for an upload in flight", async () => {
+  let finish: (id: string) => void = () => {}
+  const upload = vi
+    .spyOn(chatDraftImages, "upload")
+    .mockImplementation(() => new Promise((resolve) => (finish = resolve)))
+  await mount(fakeDrafts())
+  await act(async () =>
+    fireEvent.paste(brief(), { clipboardData: { files: [png()], types: ["Files"] } }),
+  )
+  await waitFor(() => expect(upload).toHaveBeenCalledWith("c1", expect.any(File)))
+  expect(startButton().disabled).toBe(true)
+  expect(screen.getByText("Uploading images...")).toBeTruthy()
+  await act(async () => finish("img1"))
+  expect(startButton().disabled).toBe(false)
+  upload.mockRestore()
+})
+
 test("a stale revision on a settings change shows the banner", async () => {
   vi.useFakeTimers()
   const fake = fakeDrafts()
   fake.save.mockResolvedValueOnce({ kind: "conflict" })
-  await mount(fake)
+  await mountOpen(fake)
   fireEvent.change(control("Effort"), { target: { value: "low" } })
   await wait(800)
   expect(screen.getByText("This draft changed on another device.")).toBeTruthy()
 })
 
 test("an empty draft opens with the placeholder, a disabled Start and its blocker", async () => {
-  await mount(fakeDrafts({ brief: "", name: "", model: "", effort: "", label: "Untitled chat" }))
+  await mountOpen(
+    fakeDrafts({ brief: "", name: "", model: "", effort: "", label: "Untitled chat" }),
+  )
   expect(brief().value).toBe("")
   expect(brief().placeholder).toBe("What should the new chat start from?")
   expect(startButton().disabled).toBe(true)
@@ -316,4 +531,38 @@ test("a chat-drafts-changed event that finds the draft gone leaves the page", as
   fake.read.mockResolvedValueOnce({ kind: "gone" })
   await emit(EventChatDraftsChanged)
   expect(where()).toBe("/epics This draft was removed.")
+})
+
+test("on a wide screen the settings are one pill too, and the paperclip is in the footer", async () => {
+  await mount(fakeDrafts())
+  expect(screen.getByRole("button", { name: "Chat settings" })).toBeTruthy()
+  expect(screen.queryByRole("combobox", { name: "Effort" })).toBeNull()
+  await openSettings()
+  for (const name of ["Harness", "Model", "Effort"]) expect(control(name)).toBeTruthy()
+  const attach = screen.getByRole("button", { name: "Add image" })
+  expect(attach.closest("form")?.lastElementChild?.contains(attach)).toBe(true)
+})
+
+test("on a phone one pill sums up the settings, and its sheet changes them", async () => {
+  await mount(
+    fakeDrafts({ model: "", effort: "" }),
+    false,
+    {
+      model: "claude-opus-4-5",
+      effort: "high",
+    },
+    false,
+  )
+  expect(screen.queryByRole("combobox", { name: "Effort" })).toBeNull()
+  const pill = screen.getByRole("button", { name: "Chat settings" })
+  expect(pill.textContent).toMatch(/Opus.*· high/)
+  await openSettings()
+  // A popover, not a bottom sheet.
+  expect(screen.queryByTestId("grab-handle")).toBeNull()
+  expect(screen.getByRole("dialog", { name: "Chat settings" })).toBeTruthy()
+  const effort = screen.getByRole("combobox", { name: "Effort" })
+  fireEvent.change(effort, { target: { value: "max" } })
+  expect(screen.getByRole("button", { name: "Chat settings" }).textContent).toMatch(/· max/)
+  fireEvent.keyDown(screen.getByRole("dialog", { name: "Chat settings" }), { key: "Escape" })
+  await waitFor(() => expect(screen.queryByRole("combobox", { name: "Effort" })).toBeNull())
 })

@@ -79,7 +79,14 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
       if (MODIFIER_KEYS.has(e.key)) return
       e.preventDefault()
       e.stopImmediatePropagation()
-      const letter = e.metaKey || e.ctrlKey || e.altKey || e.shiftKey ? null : letterOf(e)
+      // Shift alone makes the capital: Leader c and Leader C are two chords.
+      const plain = letterOf(e)
+      const letter =
+        e.metaKey || e.ctrlKey || e.altKey
+          ? null
+          : e.shiftKey
+            ? (plain?.toUpperCase() ?? null)
+            : plain
       const hit = letter
         ? tableRef.current.find((ch) => ch.key === letter && ch.available(c))
         : undefined

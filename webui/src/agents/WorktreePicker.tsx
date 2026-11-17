@@ -20,7 +20,10 @@ export function WorktreePicker({
   onPick,
   label = "Worktree",
   canCreate = true,
+  hideLabel,
 }: {
+  /** Keeps the label for screen readers only. */
+  hideLabel?: boolean
   label?: string
   canCreate?: boolean
   rows: Option[]
@@ -74,7 +77,7 @@ export function WorktreePicker({
   }
 
   return (
-    <Field label={label} caret>
+    <Field label={label} caret hideLabel={hideLabel}>
       <chakra.input
         role="combobox"
         aria-label={label}

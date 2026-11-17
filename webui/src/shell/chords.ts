@@ -5,7 +5,7 @@ import type { SessionInfo } from "../generated/server"
 import { isMac } from "../platform"
 import { getBigPrompt, toggleBigPrompt } from "../ui/expandable-text/bigPromptStore"
 import { focusSidebar } from "./focusSidebar"
-import { startNewDesign } from "../design/newDesign"
+import { startNewChatDraft, startNewDesign } from "../design/newDesign"
 import { openNewAgent } from "./newItemOpen"
 
 type Modifier = "cmd" | "ctrl" | "alt" | "shift"
@@ -121,7 +121,13 @@ export function chordTable({
   switchModel: () => void
 }): Chord[] {
   return [
-    { key: "c", label: () => "New chat", run: openNewAgent, available: () => true },
+    {
+      key: "c",
+      label: () => "New chat draft",
+      run: () => void startNewChatDraft(),
+      available: () => true,
+    },
+    { key: "C", label: () => "New chat", run: openNewAgent, available: () => true },
     {
       key: "d",
       label: () => "New design",

@@ -7,25 +7,38 @@ export type UploadDraftImage = (draftId: string, file: Blob) => Promise<string>
 export type RemoveDraftImage = (draftId: string, image: string) => Promise<unknown>
 
 export const MSG_DRAFT_GONE = "Draft is gone"
-const BASE = "/v1/designs/drafts/images"
 
-export const uploadDraftImage: UploadDraftImage = async (draftId, file) => {
-  const res = await apiFetch(`${BASE}?id=${encodeURIComponent(draftId)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/octet-stream" },
-    body: file,
-  })
-  const result = await readWrite<SessionImageResult & SessionResult>(res)
-  if (result.reason === "draft-gone") throw new Error(MSG_DRAFT_GONE)
-  if (result.refused || !result.id) throw new Error(result.message || "Upload failed")
-  return result.id
+export interface DraftImageApi {
+  upload: UploadDraftImage
+  remove: RemoveDraftImage
+  url: (draftId: string, image: string) => string
 }
 
-const postRemove = postJson(`${BASE}/delete`)
-
-export const removeDraftImage: RemoveDraftImage = (draftId, image) =>
-  postRemove({ id: draftId, image })
-
-export function draftImageUrl(draftId: string, image: string): string {
-  return `${BASE}?id=${encodeURIComponent(draftId)}&image=${encodeURIComponent(image)}`
+/** The upload, remove and url calls of a draft kind whose image routes live under `base`. */
+export function draftImageApi(base: string): DraftImageApi {
+  const postRemove = postJson(`${base}/delete`)
+  return {
+    upload: async (draftId, file) => {
+      const res = await apiFetch(`${base}?id=${encodeURIComponent(draftId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: file,
+      })
+      const result = await readWrite<SessionImageResult & SessionResult>(res)
+      if (result.reason === "draft-gone") throw new Error(MSG_DRAFT_GONE)
+      if (result.refused || !result.id) throw new Error(result.message || "Upload failed")
+      return result.id
+    },
+    remove: (draftId, image) => postRemove({ id: draftId, image }),
+    url: (draftId, image) =>
+      `${base}?id=${encodeURIComponent(draftId)}&image=${encodeURIComponent(image)}`,
+  }
 }
+
+const design = draftImageApi("/v1/designs/drafts/images")
+export const uploadDraftImage = design.upload
+export const removeDraftImage = design.remove
+export const draftImageUrl = design.url
+
+/** The chat drafts' image routes. */
+export const chatDraftImages = draftImageApi("/v1/agents/drafts/images")

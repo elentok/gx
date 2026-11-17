@@ -3126,6 +3126,15 @@ export interface SessionModelsResponse {
   models: SessionModelRow[];
   aliases: ModelAlias[];
   refreshing: boolean;
+  /**
+   * DefaultModel is the resolved id of the model a launch with no model runs
+   * (Claude's "default" row, Codex's isDefault row); empty when unknown.
+   */
+  default_model: string;
+  /**
+   * DefaultEffort is that model's default effort; empty when the harness does not say.
+   */
+  default_effort: string;
 }
 /**
  * SessionInfo is an interactive session on the wire: everything the Agents

@@ -15,16 +15,31 @@ export function Field({
   label,
   optional,
   caret,
+  hideLabel,
   children,
 }: {
   label: string
   optional?: boolean
   caret?: boolean
+  /** Keeps the label for screen readers only. */
+  hideLabel?: boolean
   children: React.ReactNode
 }) {
   return (
     <chakra.label display="flex" flexDirection="column" gap="1.5" position="relative">
-      <Text as="span" fontSize="13px" color="text.muted">
+      <Text
+        as="span"
+        fontSize="13px"
+        color="text.muted"
+        {...(hideLabel && {
+          position: "absolute",
+          w: "1px",
+          h: "1px",
+          overflow: "hidden",
+          clipPath: "inset(50%)",
+          whiteSpace: "nowrap",
+        })}
+      >
         {label}
         {optional && <i> · optional</i>}
       </Text>

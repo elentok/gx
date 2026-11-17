@@ -22,6 +22,8 @@ const list = (...models: SessionModelRow[]): SessionModelsResponse => ({
   models,
   aliases: [],
   refreshing: false,
+  default_model: "",
+  default_effort: "",
 })
 
 const chat = (over: Partial<SessionInfo> = {}): SessionInfo => ({

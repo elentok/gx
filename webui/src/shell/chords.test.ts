@@ -185,7 +185,8 @@ describe("chord table c and d", () => {
   it("are always available with their labels", () => {
     const t = chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })
     expect(t.map((c) => [c.key, c.label({ path: "/" }), c.available({ path: "/" })])).toEqual([
-      ["c", "New chat", true],
+      ["c", "New chat draft", true],
+      ["C", "New chat", true],
       ["d", "New design", true],
       ["s", "Focus sidebar", true],
       ["b", "Big prompt box", true],
