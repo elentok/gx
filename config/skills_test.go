@@ -1,12 +1,49 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
+
+var eightSkills = []string{
+	"gx-thermo-nuclear-code-quality-review",
+	"gx-test-review",
+	"gx-code-reviewer",
+	"gx-silent-failure-hunter",
+	"gx-type-design-analyzer",
+	"gx-comment-analyzer",
+	"gx-pr-test-analyzer",
+	"gx-security-review",
+}
+
+func TestCodeReviewDefaultMatchesSkillText(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "skills", "gx-code-review", "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.Join(strings.Fields(string(data)), " ")
+	_, after, ok := strings.Cut(text, "fall back to the default list")
+	if !ok {
+		t.Fatal(`skill text has no "fall back to the default list"`)
+	}
+	m := regexp.MustCompile("`(\\[[^`]*\\])`").FindStringSubmatch(after)
+	if m == nil {
+		t.Fatal("no backticked JSON list after the default-list phrase")
+	}
+	var got []string
+	if err := json.Unmarshal([]byte(m[1]), &got); err != nil {
+		t.Fatalf("unmarshal %s: %v", m[1], err)
+	}
+	if want := DefaultSkillsConfig().CodeReview; !slices.Equal(got, want) {
+		t.Fatalf("skill text default = %v, Go default = %v", got, want)
+	}
+}
 
 func loadFromBody(t *testing.T, body string) Config {
 	t.Helper()
@@ -71,8 +108,8 @@ func TestLoadSkillsConfigDefaultsWhenBlockAbsent(t *testing.T) {
 	if cfg.Skills.Implement != "gx-implement" {
 		t.Fatalf("Skills.Implement = %q, want gx-implement", cfg.Skills.Implement)
 	}
-	if !slices.Equal(cfg.Skills.CodeReview, []string{"gx-thermo-nuclear-code-quality-review", "gx-test-review"}) {
-		t.Fatalf("Skills.CodeReview = %+v, want [gx-thermo-nuclear-code-quality-review gx-test-review]", cfg.Skills.CodeReview)
+	if !slices.Equal(cfg.Skills.CodeReview, eightSkills) {
+		t.Fatalf("Skills.CodeReview = %+v, want %v", cfg.Skills.CodeReview, eightSkills)
 	}
 }
 
@@ -98,8 +135,8 @@ func TestLoadSkillsConfigPreservesUnspecifiedDefault(t *testing.T) {
 	if cfg.Skills.Implement != "my-implement-skill" {
 		t.Fatalf("Skills.Implement = %q, want my-implement-skill", cfg.Skills.Implement)
 	}
-	if !slices.Equal(cfg.Skills.CodeReview, []string{"gx-thermo-nuclear-code-quality-review", "gx-test-review"}) {
-		t.Fatalf("Skills.CodeReview = %+v, want default [gx-thermo-nuclear-code-quality-review gx-test-review]", cfg.Skills.CodeReview)
+	if !slices.Equal(cfg.Skills.CodeReview, eightSkills) {
+		t.Fatalf("Skills.CodeReview = %+v, want default %v", cfg.Skills.CodeReview, eightSkills)
 	}
 }
 
