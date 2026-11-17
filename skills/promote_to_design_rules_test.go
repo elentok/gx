@@ -8,14 +8,26 @@ import (
 )
 
 // fixedLines maps each fixed first-line sentence (found in gx-handoff.md by
-// its first word) to the files that must carry it. Ticket 12 adds
-// gx-wayfinder/SKILL.md and 13 adds gx-fork/SKILL.md to the fork row.
+// its first word) to the files that must carry it. Ticket 13 adds
+// gx-fork/SKILL.md to the fork row.
 var fixedLines = []struct {
 	prefix string
 	files  []string
 }{
 	{"Promoted", []string{"gx-handoff.md", "gx-promote-to-design/SKILL.md", "gx-wayfinder/SKILL.md"}},
-	{"Forked", []string{"gx-handoff.md"}},
+	{"Forked", []string{"gx-handoff.md", "gx-wayfinder/SKILL.md"}},
+}
+
+func TestForkedOutAnchors(t *testing.T) {
+	wf := collapseSpace(readFile(t, "gx-wayfinder/SKILL.md"))
+	for _, want := range []string{"## Forked out", "](../gx-handoff.md)"} {
+		if !strings.Contains(wf, want) {
+			t.Errorf("gx-wayfinder/SKILL.md lacks %q", want)
+		}
+	}
+	if !strings.Contains(collapseSpace(readFile(t, "gx-design/SKILL.md")), "## Forked out") {
+		t.Error("gx-design/SKILL.md rubric lacks ## Forked out")
+	}
 }
 
 func fixedLineRe(prefix string) *regexp.Regexp {

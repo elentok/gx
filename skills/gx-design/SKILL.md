@@ -238,6 +238,8 @@ Review the spec against the map it came from and its own template, not in the ab
 - Does each state of each stored mock have a Mock states line in `## Verification`? A missing line
   is a finding, like a story with no entry.
 - Does anything creep past the map's `## Out of scope` or the Destination's boundary?
+- The map's `## Forked out` lists topics now owned by other sessions. Each forked topic still in the
+  spec (a user story, a decision or a Verification entry) is a finding.
 - What did the spec silently assume that the map never decided?
 - What holes remain, or what question does the spec raise but not answer?
 - Does Further Notes hold an open design question? Each one is a finding: step 4 should have sent

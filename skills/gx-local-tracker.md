@@ -24,7 +24,7 @@ authoritative.
   `<root>`, so it can be committed alongside the code it describes.
 - A `gx-wayfinder` map lives in its epic's entry file, `<root>/<epic-slug>/ticket.md`: the frontmatter
   says `kind: map` and the body is the map (Destination/Notes/Decisions-so-far/Not-yet-specified/
-  Out-of-scope — see the `gx-wayfinder` skill). `kind: map` makes it a **map epic**: hand-driven, never
+  Out-of-scope/Forked-out (optional) — see the `gx-wayfinder` skill). `kind: map` makes it a **map epic**: hand-driven, never
   scheduled by the server, and its decision tickets are claimed and closed by hand (see "Map epics"
   below). An epic is a map epic or a loop epic, never both. List map epics with
   `gx tickets epics --maps`. An unmigrated `.scratch` tree still uses `<root>/<epic-slug>/map.md`;

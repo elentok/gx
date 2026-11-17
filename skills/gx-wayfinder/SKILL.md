@@ -50,6 +50,10 @@ The whole map at low resolution, loaded once per session. Open tickets are **not
 ## Out of scope
 
 <!-- see "Out of scope": work ruled beyond the destination; closed, never graduates -->
+
+## Forked out
+
+<!-- optional, see "Forked out": one line per fork (topic, kind, new session name, no link) -->
 ```
 
 ### Tickets
@@ -100,6 +104,14 @@ Out-of-scope work never graduates (the frontier stops at the destination), so it
 
 Ruling something out of scope is a scoping act, not a step on the route. When a ticket that already exists turns out to sit past the destination (mis-scoped in while charting, or exposed by a resolution), **close it** (a closed ticket is unambiguously off the frontier) and leave one line in the **Out of scope** section: the gist plus why it's out of scope, linking the closed ticket. It stays out of **Decisions so far**, which records the route actually walked; a scope boundary isn't a step on it.
 
+## Forked out
+
+A Design source map can carry an optional `## Forked out` section, after **Out of scope**: one free-text line per fork (topic, kind, new session name, no link). Each forked topic is out of scope for Chart and the spec. A forked topic is not a decision: it never goes to **Decisions so far**.
+
+- Right after a fork, the forking Design session updates its own map for each forked topic: add one **Out of scope** line (gist, "forked to <kind> <name>"), close the topic's open ticket if it has one (the Close operation in [gx-local-tracker.md](../gx-local-tracker.md)), remove the topic from **Not yet specified** and trim the Destination. Write the sections with `gx tickets section <project:epic> <heading> -`.
+- Later runs (Chart and "Work through the map") read `## Forked out` and repeat those steps for any forked topic that still lacks an **Out of scope** line.
+- Chart leaves forked topics out of the Destination and the frontier.
+
 ## Invocation
 
 Two modes. Either way, **resolve one ticket per session unless the calling skill allows more**, and always allow more for research tickets.
@@ -110,7 +122,7 @@ User invokes with a loose idea.
 
 1. **Name the destination.** Follow [gx-grilling](../gx-grilling/SKILL.md) and [gx-domain-modeling](../gx-domain-modeling/SKILL.md) to pin down what this map is finding its way to: the spec, decision, or change. The destination fixes the scope, so it's settled first.
 2. **Map the frontier.** Grill again, **breadth-first** this time: fan out across the whole space rather than deep on any one thread, surfacing the open decisions and the first steps takeable now. **If this surfaces no fog** (the way to the destination is already clear, the whole journey small enough for one session), you don't need a map. Stop and ask the user how they'd like to proceed.
-   **Promoted brief.** When the map's `## Initial prompt` starts with the line `Promoted from a plain chat: the decisions below are settled.` (written by [gx-promote-to-design](../gx-promote-to-design/SKILL.md)), its decisions are settled: put them in **Decisions so far**, not in the frontier. Still confirm the Destination, and raise a decision again only when it conflicts with the code or with another decision.
+   **Promoted or forked brief.** When the map's `## Initial prompt` starts with either line `Promoted from a plain chat: the decisions below are settled.` (written by [gx-promote-to-design](../gx-promote-to-design/SKILL.md)) or `Forked from a chat or Design session: the decisions below are settled.` (written by the gx-fork skill; [gx-handoff](../gx-handoff.md) defines both lines and the brief sections), its decisions are settled: put them in **Decisions so far**, not in the frontier. Still confirm the Destination, and raise a decision again only when it conflicts with the code or with another decision.
 3. **Fill in the map** (label `wayfinder:map`). When the map already exists (New Design wrote it), fill in its sections instead of creating one: Destination and Notes filled in, Decisions-so-far empty, the fog sketched into **Not yet specified**. Keep `## Initial prompt` as it is.
 4. **Create the tickets you can specify now** as child issues of the map, then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Write cross-references in that pass too, with real ids: a placeholder `#<n>` auto-links to an unrelated issue. Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog: the **Not yet specified** section.
 5. **Fire the research subagents.** For each `research` ticket you just created, spin up a subagent (model from `gx agent model worker`; a second word is its `reasoning_effort`, see [Skill conventions](../gx-local-tracker.md#skill-conventions)) that follows [gx-research](../gx-research/SKILL.md) to resolve it in parallel, capturing its findings on a throwaway `research/<name>` branch with a context pointer from the ticket. Push the branch but open no PR: it is never merged.
