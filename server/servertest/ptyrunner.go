@@ -56,8 +56,9 @@ type ptyRunner struct {
 	*nativerunner.Pty
 	h *Harness
 
-	mu   sync.Mutex
-	cwds map[string]string // label -> the cwd the agent started in
+	mu    sync.Mutex
+	cwds  map[string]string // label -> the cwd the agent started in
+	kinds map[string]string // label -> the agent kind it started as
 }
 
 func (r *ptyRunner) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) {
@@ -68,6 +69,7 @@ func (r *ptyRunner) Start(opts agentrunner.StartOptions) (agentrunner.Session, e
 	if err == nil {
 		r.mu.Lock()
 		r.cwds[s.Label] = opts.Cwd
+		r.kinds[s.Label] = string(opts.Kind)
 		r.mu.Unlock()
 		r.h.recordStart(AgentStart{Label: s.Label, Cwd: opts.Cwd, Kind: string(opts.Kind)})
 	}
@@ -94,19 +96,33 @@ func (r *ptyRunner) Prompt(s agentrunner.Session, text string) error {
 // and end at once, which the typed prompt then runs. A turn control keeps the
 // turn open instead, and its follow-up goes in once the prompt is.
 func (r *ptyRunner) PromptNudged(s agentrunner.Session, text string, onNudge func(string)) error {
-	return r.prompt(s, text, onNudge, r.Pty.PromptNudged)
+	return r.prompt(s, text, onNudge, false, r.Pty.PromptNudged)
 }
 
-// PromptLaunch is PromptNudged for a launch prompt.
+// PromptLaunch is PromptNudged for a launch prompt. With no OnTurn hook, a
+// Claude launch prompt still arms a fast turn, so the launch sees a real turn
+// instead of the pid watcher's startup count. A hook (Turn.Stall) or the fake's
+// hang env keeps a test's stall.
 func (r *ptyRunner) PromptLaunch(ctx context.Context, s agentrunner.Session, text string, onNudge func(string)) error {
-	return r.prompt(s, text, onNudge, func(s agentrunner.Session, text string, onNudge func(string)) error {
+	return r.prompt(s, text, onNudge, true, func(s agentrunner.Session, text string, onNudge func(string)) error {
 		return r.Pty.PromptLaunch(ctx, s, text, onNudge)
 	})
 }
 
-func (r *ptyRunner) prompt(s agentrunner.Session, text string, onNudge func(string), send func(agentrunner.Session, string, func(string)) error) (err error) {
+func (r *ptyRunner) prompt(s agentrunner.Session, text string, onNudge func(string), launch bool, send func(agentrunner.Session, string, func(string)) error) (err error) {
 	home := r.h.Env("HOME")
-	if turn := r.h.turn.Load(); turn != nil {
+	turn := r.h.turn.Load()
+	if turn == nil && launch {
+		r.mu.Lock()
+		claude := r.kinds[s.Label] == "claude"
+		r.mu.Unlock()
+		if claude {
+			if err := agentfake.SendTUIControl(home, s.SessionID, agentfake.Control{Action: agentfake.ActionFast}); err != nil {
+				return err
+			}
+		}
+	}
+	if turn != nil {
 		r.mu.Lock()
 		cwd := r.cwds[s.Label]
 		r.mu.Unlock()
@@ -161,7 +177,7 @@ func (h *Harness) buildPty() {
 		if w, ok := wrapped[p]; ok {
 			return w
 		}
-		w := &ptyRunner{Pty: p, h: h, cwds: map[string]string{}}
+		w := &ptyRunner{Pty: p, h: h, cwds: map[string]string{}, kinds: map[string]string{}}
 		wrapped[p] = w
 		return w
 	}

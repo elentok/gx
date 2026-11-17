@@ -133,6 +133,24 @@ func TestDefault_NoRunnerOptionRunsOnPtyWithOneStart(t *testing.T) {
 	}
 }
 
+func TestPty_LaunchWithNoHookArmsAFastTurn(t *testing.T) {
+	t.Parallel()
+	h := startPty(t, t.TempDir(), testutil.TempRepo(t))
+	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	acks := filepath.Join(h.Env("HOME"), ".claude", "agentfake", "*.ack")
+	WaitFor(t, 30*time.Second, "an armed control handled for the launch prompt", func() bool {
+		files, _ := filepath.Glob(acks)
+		for _, f := range files {
+			if b, _ := os.ReadFile(f); len(b) > 0 {
+				return true
+			}
+		}
+		return false
+	})
+}
+
 // queueWithTurn queues the one ticket and returns once the hook has run.
 func queueWithTurn(t *testing.T, h *Harness, hook func(*Turn)) {
 	t.Helper()
