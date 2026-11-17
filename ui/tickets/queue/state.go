@@ -28,7 +28,7 @@ func (m QueueModel) WithServerState(st *viewmodel.State, link tabapi.ServerLink)
 	return m.applyServerState(st)
 }
 
-// applyServerState rebuilds rows, queue order, claim times, budget, herdr state
+// applyServerState rebuilds rows, queue order, claim times, budget, runner state
 // and queue mode from st.
 func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) {
 	hadFinished := len(m.server.Finished) > 0

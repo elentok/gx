@@ -8,7 +8,7 @@ import (
 )
 
 // Main is the body of a package's TestMain: it serves the session processes
-// and the herdr fake's helper process, then runs the tests. Tests get their
+// processes, then runs the tests. Tests get their
 // dirs from EnvFor, so nothing here touches the process env.
 func Main(m *testing.M) {
 	servertest.RunSessionProcesses()

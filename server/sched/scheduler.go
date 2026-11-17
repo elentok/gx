@@ -40,8 +40,6 @@ type SchedulerDeps struct {
 	// Launcher is set once the launcher exists: it calls back into the
 	// scheduler for the base rules.
 	Launcher *Launcher
-	// Env is the environment herdr is asked with.
-	Env []string
 	// PollInterval is the claim tick; zero means the index default.
 	PollInterval time.Duration
 	// TicketStore is the root of the ticket store.

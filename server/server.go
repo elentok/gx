@@ -575,8 +575,8 @@ func New(cfg Config) (*Server, error) {
 		Log: s.log, Projects: s.projects, Recovery: s.recovery, Registry: s.registry,
 		Index: s.idx, Writer: s.writer, Settings: &s.settings, Migrator: s.migrator, Queue: s.queue,
 		Budget: s.budget, Disks: s.disks, Rec: s.rec, Merger: s.merger, Guards: s.guards,
-		Harness: s.harness,
-		Env:     s.cfg.Env, PollInterval: s.cfg.PollInterval, TicketStore: s.cfg.TicketStore,
+		Harness:      s.harness,
+		PollInterval: s.cfg.PollInterval, TicketStore: s.cfg.TicketStore,
 	})
 	// The explanation reads the scheduler's caps and the claim pass asks it for holds.
 	s.explain = newExplainer(s)

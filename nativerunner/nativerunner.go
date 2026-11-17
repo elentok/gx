@@ -1,4 +1,4 @@
-// Package nativerunner owns the herdr-free agent runners (headless and pty).
+// Package nativerunner owns the agent runners (headless and pty).
 package nativerunner
 
 // MinClaudeVersion is the oldest claude release the native runners are known

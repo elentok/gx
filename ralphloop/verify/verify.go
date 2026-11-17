@@ -40,7 +40,7 @@ const (
 )
 
 // Leftovers reports iteration state still around for a ticket. A nil field
-// means the check couldn't get an answer (herdr down for Tab), never false.
+// means the check couldn't get an answer (runner session list unavailable for Tab), never false.
 type Leftovers struct {
 	Tab      *bool
 	Worktree *bool
@@ -154,7 +154,7 @@ func VerifyEpic(vd VerifyDeps, p VerifyParams) ([]TicketVerification, error) {
 	return out, nil
 }
 
-// verifyTicket verifies one ticket. live nil means herdr did not answer;
+// verifyTicket verifies one ticket. live nil means the runner did not answer;
 // mergedErr non-nil means the trailer rung couldn't run, which only matters
 // when no earlier rung already proved the merging.
 func verifyTicket(vd VerifyDeps, paths reconcilePaths, featureBranch string, t tickets.Ticket, events []runlog.Event, live, merged map[string]bool, mergedErr error) TicketVerification {

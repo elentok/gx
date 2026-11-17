@@ -162,7 +162,7 @@ func r10BackgroundGateHeld() Entry {
 
 // r11ClaimClobbered is a second launch of a ticket whose own iteration is still
 // live: an agent's full-file write reverted its claimed status to open, so the
-// scheduler launched it again and herdr refused the taken name. The run log
+// scheduler launched it again and the runner refused the taken name. The run log
 // shows it as a name-taken pause whose launch-failed follows an
 // iteration-started that nothing closed. The fix restores claimed with the live
 // iteration's session and keeps the duplicate from relaunching; the live tab is
@@ -256,7 +256,7 @@ func r8RateLimitPause() Entry {
 }
 
 // r6NameTaken is a ticket paused because its launch was refused for a taken
-// name. It needs the candidate block read: a leaked pane in this ticket's own worktree is closed
+// name. It needs the candidate block read: a leaked session in this ticket's own worktree is closed
 // and the ticket relaunched, while another ticket's live agent means this
 // second launch is abandoned and the pause stands. Clearing the ticket back to
 // open is high authority, so it is outside the grant and the agent may only
@@ -398,8 +398,8 @@ func r5PromptNeverDelivered() Entry {
 	}
 }
 
-// compactWaitTimedOutRE is a smart-zone-recovery-failed reason whose herdr
-// wait ran out, as opposed to one the pane or herdr refused.
+// compactWaitTimedOutRE is a smart-zone-recovery-failed reason whose
+// wait ran out, as opposed to one the pane or runner refused.
 var compactWaitTimedOutRE = regexp.MustCompile(`"code":"timeout"|(?i)timed out`)
 
 // FinishUpPrompt is what R7 types once the extended wait sees the compacted
