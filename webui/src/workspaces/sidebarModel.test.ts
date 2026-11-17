@@ -149,7 +149,7 @@ describe("buildSidebar", () => {
   it("maps Needs you, Working and dimmed server words", () => {
     const rows = [
       row("p:a", { section: SectionNeedsYou }),
-      row("p:b", { state: "running" }),
+      row("p:b", { state: "running", working: true }),
       row("p:c", { section: SectionFinished, status_words: "Finished" }),
     ]
     const s = buildSidebar({ ...base, rows, sessions: [], placements: [] })

@@ -9,7 +9,7 @@ import {
 } from "../generated/server"
 import { designHref } from "../hrefs"
 import { titleHref } from "../epics/cardLinks"
-import { isLive, RING_KIND, ringProgress, ringTone } from "../epics/ring"
+import { isLive, RING_KIND, ringArc, ringProgress, ringTone } from "../epics/ring"
 import { Button } from "../ui/button/Button"
 import { ProgressRing } from "../ui/progress-ring/ProgressRing"
 import { fuzzyScore } from "./fuzzy"
@@ -129,6 +129,7 @@ export function epicRow(row: EpicListRow, current: boolean): ListRowData {
       <ProgressRing
         progress={ringProgress(row)}
         tone={ringTone(row)}
+        arc={ringArc(row)}
         kind={kind}
         size="compact"
         live={isLive(row)}

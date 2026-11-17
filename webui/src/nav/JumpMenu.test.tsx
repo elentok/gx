@@ -3,7 +3,7 @@ import { createMemoryRouter, RouterProvider, useLocation } from "react-router"
 import { afterEach, expect, test } from "vitest"
 import type { EpicListRow } from "../generated/server"
 import { renderThemed } from "../ui/render"
-import { jumpHref, Menu, type ListRowData, type ListSection } from "./JumpMenu"
+import { epicRow, jumpHref, Menu, type ListRowData, type ListSection } from "./JumpMenu"
 
 afterEach(cleanup)
 
@@ -22,9 +22,27 @@ const row = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   card_kind: "implementation",
   section: "implementing",
   status_words: "Implementing...",
+  working: true,
+  work_kind: "implementation",
   ring_progress: 25,
   ...over,
 })
+
+test("a working Design row draws the purple arc, an Implementation row no override", () => {
+  const arc = (r: EpicListRow) => {
+    const { container } = renderThemed(<ProgressRingHost row={r} />)
+    return container.querySelector("[data-arc]")?.getAttribute("data-arc") ?? null
+  }
+  expect(arc(row("a", { card_kind: "design", work_kind: "design" }))).toBe("kind.design.fg")
+  cleanup()
+  expect(arc(row("b"))).toBeNull()
+  cleanup()
+  expect(arc(row("c", { working: false, work_kind: undefined }))).toBeNull()
+})
+
+function ProgressRingHost({ row: r }: { row: EpicListRow }) {
+  return <>{epicRow(r, false).lead}</>
+}
 
 test("a joined card with a Design question opens the Design page", () => {
   const joined = row("blog", {

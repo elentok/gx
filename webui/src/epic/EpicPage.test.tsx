@@ -908,7 +908,11 @@ test.each([
 )
 
 test("an -impl page uses its card's tone and comet when the card is for this page", async () => {
-  const card = row("blog-impl", { state: "running", addresses: ["gx:blog-impl", "gx:blog"] })
+  const card = row("blog-impl", {
+    state: "running",
+    working: true,
+    addresses: ["gx:blog-impl", "gx:blog"],
+  })
   render("/e/gx:blog-impl", [card], "loop", { detail: { state: "paused", done: 1, total: 2 } })
   await screen.findByText("1/2")
   expect(ringOf().getAttribute("data-tone")).toBe("running")

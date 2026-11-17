@@ -27,6 +27,9 @@ const row = (over: Partial<EpicListRow> = {}): EpicListRow => ({
   card_kind: "implementation",
   section: "implementing",
   status_words: "Implementing...",
+  working: true,
+  working_word: "Implementing",
+  work_kind: "implementation",
   ring_progress: 40,
   actions: [],
   ...over,
@@ -165,13 +168,59 @@ test("ring labels: percent, n/m, ellipsis, empty", () => {
   expect(screen.getByText("2/5")).toBeTruthy()
   cleanup()
   renderThemed(
-    <EpicCard row={row({ card_kind: "design", status_words: "Creating tickets (3 so far)..." })} />,
+    <EpicCard
+      row={row({
+        card_kind: "design",
+        work_kind: "design",
+        working_word: "Creating tickets",
+        status_words: "Creating tickets (3 so far)...",
+      })}
+    />,
   )
   expect(screen.getByText("…")).toBeTruthy()
   expect(screen.getByTestId("comet")).toBeTruthy()
   cleanup()
-  renderThemed(<EpicCard row={row({ card_kind: "one-off", state: "queued" })} />)
+  renderThemed(
+    <EpicCard
+      row={row({ card_kind: "one-off", state: "queued", working: false, work_kind: undefined })}
+    />,
+  )
   expect(screen.queryByText(/%|\d\/\d/)).toBeNull()
+})
+
+const arcOf = () => document.querySelector("[data-arc]")?.getAttribute("data-arc") ?? null
+const toneOf = () => document.querySelector("[data-tone]")?.getAttribute("data-tone")
+
+test("a working Design draws the purple arc with a comet", () => {
+  renderThemed(
+    <EpicCard
+      row={row({ card_kind: "design", work_kind: "design", status_words: "Charting..." })}
+    />,
+  )
+  expect(arcOf()).toBe("kind.design.fg")
+  expect(screen.getByTestId("comet")).toBeTruthy()
+})
+
+test("the joined card is purple while the Design works and blue once the impl epic runs", () => {
+  renderThemed(<EpicCard row={row({ work_kind: "design", status_words: "Branching..." })} />)
+  expect(arcOf()).toBe("kind.design.fg")
+  cleanup()
+  renderThemed(<EpicCard row={row()} />)
+  expect(arcOf()).toBeNull()
+  expect(toneOf()).toBe("running")
+})
+
+test("a row without the working flag is grey and does not spin, whatever its words say", () => {
+  renderThemed(<EpicCard row={row({ state: "ready", working: false, status_words: "Working" })} />)
+  expect(toneOf()).toBe("muted")
+  expect(screen.queryByTestId("comet")).toBeNull()
+  expect(arcOf()).toBeNull()
+})
+
+test("a working row spins from the flag whatever its state", () => {
+  renderThemed(<EpicCard row={row({ state: "queued", status_words: "Working" })} />)
+  expect(toneOf()).toBe("running")
+  expect(screen.getByTestId("comet")).toBeTruthy()
 })
 
 test("Queue posts in place, then reports the change", async () => {
@@ -622,15 +671,19 @@ test("a Follow-ups Needs you pill stays amber but a step pill does not", () => {
 
 test("the ring of a Follow-ups card is running with a pill and muted without", () => {
   expect(ringTone(followUps({ state_pill: "Route" }))).toBe("running")
-  expect(ringTone(followUps({ state: "idle", state_pill: undefined }))).toBe("muted")
+  expect(ringTone(followUps({ state: "idle", state_pill: undefined, working: false }))).toBe(
+    "muted",
+  )
 })
 
 test("a Follow-ups card draws a teal arc at Write and Done, other cards keep their tone", () => {
   const teal = "kind.implementation.fg"
   expect(ringArc(followUps({ state_pill: "Write" }))).toBe(teal)
   expect(ringArc(followUps({ state: "finished", state_pill: undefined }))).toBe(teal)
-  expect(ringArc(followUps({ state: "idle", state_pill: undefined }))).toBeUndefined()
-  expect(ringArc(row({ state: "finished" }))).toBeUndefined()
+  expect(
+    ringArc(followUps({ state: "idle", state_pill: undefined, working: false })),
+  ).toBeUndefined()
+  expect(ringArc(row({ state: "finished", working: false }))).toBeUndefined()
 })
 
 test("the Follow-ups title links to the Triage page and the ring shows the percent", () => {

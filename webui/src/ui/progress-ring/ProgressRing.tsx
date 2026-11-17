@@ -66,6 +66,7 @@ export function ProgressRing({
       h={`${px}px`}
       data-kind={kind}
       data-tone={tone}
+      data-arc={arc}
     >
       <chakra.svg
         viewBox={`0 0 ${px} ${px}`}

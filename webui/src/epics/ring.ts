@@ -4,9 +4,8 @@ import {
   CardKindImplementation,
   CardKindOneOff,
   EpicListFinished,
-  EpicListMerging,
-  EpicListRunning,
   SectionNeedsYou,
+  WorkKindDesign,
   type EpicListRow,
 } from "../generated/server"
 import type { Kind, Tone } from "../ui/tone"
@@ -52,22 +51,24 @@ export function ringTone(row: EpicListRow): Tone {
   return isLive(row) ? "running" : "muted"
 }
 
-/** The mock draws a Follow-ups card's arc teal (the implementation colour) at Write and Done too. */
-export const ringArc = (row: EpicListRow): string | undefined =>
-  row.card_kind === CardKindFollowUps && ringTone(row) !== "muted"
-    ? "kind.implementation.fg"
-    : undefined
+/**
+ * The mock draws a Follow-ups card's arc teal (the implementation colour) at Write and Done too.
+ * A working Design is purple; the kind comes from the row's work_kind, never from card_kind,
+ * because the joined card at Branch is "implementation" while the Design still works.
+ */
+export const ringArc = (row: EpicListRow): string | undefined => {
+  if (row.card_kind === CardKindFollowUps && ringTone(row) !== "muted")
+    return "kind.implementation.fg"
+  if (isLive(row) && ringTone(row) === "running" && row.work_kind === WorkKindDesign)
+    return "kind.design.fg"
+  return undefined
+}
 
-export const isCreatingTickets = (row: EpicListRow) =>
-  row.status_words?.startsWith("Creating tickets") ?? false
+/** A Design at Create tickets has no fraction yet; the server sends its bare working word. */
+export const hasNoFractionYet = (row: EpicListRow) =>
+  row.card_kind === CardKindDesign && !!row.working && row.working_word === "Creating tickets"
 
-export const isDelegating = (row: EpicListRow) => row.status_words === "Working"
-
-export const isLive = (row: EpicListRow) =>
-  row.state === EpicListRunning ||
-  row.state === EpicListMerging ||
-  isCreatingTickets(row) ||
-  isDelegating(row)
+export const isLive = (row: EpicListRow) => !!row.working
 
 export const ringProgress = (row: EpicListRow) =>
   (row.ring_progress ?? (row.total ? (row.done / row.total) * 100 : 0)) / 100

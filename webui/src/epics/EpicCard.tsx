@@ -55,7 +55,7 @@ import { PrLine } from "./PrLine"
 import {
   READY_FOR_REVIEW_REASON,
   RING_KIND,
-  isCreatingTickets,
+  hasNoFractionYet,
   isLive,
   isReadyForReview,
   followUpsTone,
@@ -66,7 +66,7 @@ import {
 } from "./ring"
 
 function ringLabel(row: EpicListRow): string {
-  if (isCreatingTickets(row)) return "…"
+  if (hasNoFractionYet(row)) return "…"
   if (row.card_kind === CardKindDesign || row.card_kind === CardKindFollowUps)
     return `${row.ring_progress ?? 0}%`
   if (row.card_kind === CardKindImplementation) return `${row.done}/${row.total}`

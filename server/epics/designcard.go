@@ -74,6 +74,7 @@ func decorateDesignCard(row *wire.EpicListRow, m tickets.Epic, impl *wire.EpicLi
 		if row.Working && act.creating {
 			// The ring has no fraction to show yet; the client draws its placeholder.
 			row.RingProgress = 0
+			row.WorkingWord = designWords[wire.ProgressCreateTickets]
 			row.StatusWords = fmt.Sprintf("Creating tickets (%d so far)...", impl.Total)
 		}
 	}
