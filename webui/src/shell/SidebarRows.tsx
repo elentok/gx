@@ -516,6 +516,11 @@ function Row({
                   size="sidebar"
                   tone={row.status.tone}
                   live={row.status.tone === "running"}
+                  arc={
+                    row.kind === "design" && row.status.tone === "running"
+                      ? "kind.design.fg"
+                      : undefined
+                  }
                 />
                 <Box
                   data-testid="kind-dot"

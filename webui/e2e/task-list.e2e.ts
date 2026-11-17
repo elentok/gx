@@ -1,6 +1,7 @@
-import type { Page } from "@playwright/test"
-import { expect, test } from "./fixture"
-import { go, sessions } from "./agentsKit"
+import { appendFileSync } from "node:fs"
+import type { Locator, Page } from "@playwright/test"
+import { card, expect, test } from "./fixture"
+import { chatOf, go, sessions, sidebar } from "./agentsKit"
 
 const summary = (page: Page, text: string) =>
   page.getByRole("button", { name: new RegExp(`^.?\\s*${text}`) })
@@ -87,6 +88,82 @@ test("208. Task list", async ({ page, start }) => {
     await page.getByRole("button", { name: /^Show all \(\d+ lines\)$/ }).click()
     await noSideScroll(page)
   }
+
+  // The working Design is purple everywhere and follows its session on the open page: the step the session reports
+  // sets the word, a turn start and end flip the card, the sidebar row and the Design header with no reload.
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const designCard = card(page, "design-epic")
+  const designRow = sidebar(page).getByRole("link", { name: /design-epic/ })
+  const cardRing = designCard.locator("[data-kind='design']").first()
+  const rowRing = designRow.locator("[data-kind='design']")
+  const headerRing = page
+    .locator("[data-kind='design']:not([data-testid='sidebar-body'] *)")
+    .first()
+  const purple = async (ring: Locator) => {
+    await expect(ring).toHaveAttribute("data-arc", "kind.design.fg")
+    await expect(ring.getByTestId("comet")).toBeVisible()
+  }
+  // The Design page keeps its tone while a session lives; only the arc and the comet show that a turn runs.
+  const stopped = async (ring: Locator) => {
+    await expect(ring).not.toHaveAttribute("data-arc", /.+/)
+    await expect(ring.getByTestId("comet")).toHaveCount(0)
+  }
+  const grey = async (ring: Locator) => {
+    await expect(ring).toHaveAttribute("data-tone", "muted")
+    await stopped(ring)
+  }
+  await go(page, "#/epics")
+  // No step reported: the map's step word, "..." on the card only.
+  await expect(designCard.getByTestId("status")).toHaveText("Researching...")
+  await expect(designRow).toContainText("Researching")
+  await expect(designRow).not.toContainText("...")
+  await purple(cardRing)
+  await purple(rowRing)
+  await fixture.cliEnv({ GX_AGENT_SESSION: claude.id }, "agent", "step", "spec")
+  await expect(designCard.getByTestId("status")).toHaveText("Writing spec...")
+  await expect(designRow).toContainText("Writing spec")
+  await expect(designRow).not.toContainText("...")
+  await go(page, "#/d/demo:design-epic")
+  await purple(headerRing)
+  await purple(rowRing)
+
+  // A turn and its background task end, then a turn starts, with the page open. The shape with one subagent is the
+  // one whose task a flow can end (the claude shape's tasks run throughout).
+  const turn = await start("bg-progress", { shape: "subagent-with-inner-task" })
+  const worker = (await sessions(turn)).find((s) => s.harness !== "codex")!
+  const workerConv = (await chatOf(turn, worker.id)).conversation_id
+  await go(page, "#/epics")
+  await purple(cardRing)
+  await purple(rowRing)
+  await go(page, "#/d/demo:design-epic")
+  await purple(headerRing)
+  await turn.controlClaude(workerConv, { action: "finish" })
+  appendFileSync(
+    turn.transcripts["subagent-with-inner-task"],
+    `${JSON.stringify({
+      type: "queue-operation",
+      operation: "enqueue",
+      timestamp: new Date().toISOString(),
+      content:
+        "<task-notification>\n<task-id>a1ner0001</task-id>\n<status>completed</status>\n<summary>Agent done</summary>\n<usage>\n<subagent_tokens>900</subagent_tokens>\n<tool_uses>1</tool_uses>\n</usage>\n</task-notification>",
+    })}\n`,
+  )
+  await grey(rowRing)
+  await stopped(headerRing)
+  await go(page, "#/epics")
+  await grey(cardRing)
+  await expect
+    .poll(() =>
+      turn.cli("agents", "prompt", worker.id, "[slow] one more").then(
+        () => true,
+        () => false,
+      ),
+    )
+    .toBe(true)
+  await purple(cardRing)
+  await purple(rowRing)
+  await go(page, "#/d/demo:design-epic")
+  await purple(headerRing)
 
   // One task: the row alone, no summary button.
   await page.setViewportSize({ width: 1280, height: 800 })

@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test"
+import { sidebar } from "./agentsKit"
 import { card, expect, menu, menuButton, nav, openEpics, section, test } from "./fixture"
 
 const NEEDS_YOU = [
@@ -173,6 +174,21 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
   await tryAgain.click()
   await expect(prCard.getByText("Fixing CI")).toBeVisible()
   await expect(prCard.getByTestId("pill")).toHaveCount(0)
+  // A working Implementation is blue, not the Design purple: the card and the sidebar row run the comet on the plain
+  // running arc. The sidebar word has no attempt count, the card keeps it and has no "...".
+  const fixingRow = sidebar(page).getByRole("link", { name: /ticket-search/ })
+  for (const ring of [
+    prCard.locator("[data-kind='implementation']").first(),
+    fixingRow.locator("[data-kind='implementation']"),
+  ]) {
+    await expect(ring).toHaveAttribute("data-tone", "running")
+    await expect(ring).not.toHaveAttribute("data-arc", /.+/)
+    await expect(ring.getByTestId("comet")).toBeVisible()
+  }
+  await expect(prCard.getByTestId("status")).toContainText(/Fixing CI \(attempt \d+ of \d+\)/)
+  await expect(prCard.getByTestId("status")).not.toContainText("...")
+  await expect(fixingRow).toContainText("Fixing CI")
+  await expect(fixingRow).not.toContainText(/attempt|\.\.\./)
   expect(await pr.cli("server", "epics")).toContain("412")
 })
 
