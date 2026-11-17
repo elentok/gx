@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { signOut } from "./apiFetch"
+import { runTimerDisposers } from "./timerDisposers"
 import { dropQueue, enableQueue, queueSample } from "./webPerf"
 
 const sample = { metric: "fcp", value: 10 } as const
@@ -159,5 +160,14 @@ describe("webPerf", () => {
     queueSample(sample)
     vi.advanceTimersByTime(10_000)
     expect(localStorage.length + sessionStorage.length).toBe(0)
+  })
+
+  it("registers a disposer that clears the idle timer", () => {
+    queueSample(sample)
+    expect(vi.getTimerCount()).toBe(1)
+    runTimerDisposers()
+    expect(vi.getTimerCount()).toBe(0)
+    vi.advanceTimersByTime(10_000)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

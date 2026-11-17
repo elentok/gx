@@ -1,5 +1,7 @@
-import { configure } from "@testing-library/react"
+import { cleanup, configure } from "@testing-library/react"
 import { afterEach } from "vitest"
+import { describePending, installTimerTracking, type TimerTarget } from "./pendingTimers"
+import { runTimerDisposers } from "./timerDisposers"
 
 // findBy and waitFor give up after a second by default, which a machine under load outlasts.
 configure({ asyncUtilTimeout: 10_000 })
@@ -46,8 +48,24 @@ if (typeof Range !== "undefined") {
   Range.prototype.getBoundingClientRect ??= zeroRect
 }
 
+const timers = installTimerTracking(
+  globalThis as unknown as TimerTarget,
+  ...(typeof window === "undefined" ? [] : [window as unknown as TimerTarget]),
+)
+
 // A page cache entry or a stored filter must never leak into the next test.
 afterEach(() => {
   globalThis.sessionStorage?.clear()
   globalThis.localStorage?.clear()
+})
+
+// The explicit cleanup() makes the order against Testing Library's own hook irrelevant: unmounting
+// runs the components' timer cleanups before the pending check reads the records.
+afterEach(async () => {
+  cleanup()
+  runTimerDisposers()
+  await timers.settle()
+  const pending = timers.pending()
+  timers.reset()
+  if (pending.length > 0) throw new Error(describePending(pending))
 })

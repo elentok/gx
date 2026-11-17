@@ -1,5 +1,7 @@
 // Holds performance samples and sends them to the server. It measures nothing itself.
 // Plain fetch, not apiFetch: a 401 from telemetry must never sign the page out.
+import { registerTimerDisposer } from "./timerDisposers"
+
 const ROUTE = "/v1/web-performance"
 const SCHEMA_VERSION = 1
 const FLUSH_AT = 20
@@ -91,6 +93,8 @@ export function dropQueue(): void {
   clearTimeout(idleTimer)
   queue = []
 }
+
+registerTimerDisposer(dropQueue)
 
 function post(body: string): void {
   fetch(ROUTE, {

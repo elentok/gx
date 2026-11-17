@@ -262,6 +262,8 @@ export default function CodeEditor({
     v.dispatch({ selection: { anchor, head } })
     callbacks.current.onModeChange?.("INSERT")
     stopVi.current = () => {
+      // A vim notice (yanked, a refused :q) holds a 5 s timer that the engine never clears on destroy.
+      ;(cm.state as { currentNotificationClose?: () => void }).currentNotificationClose?.()
       cm.off("vim-mode-change", onMode)
       dom?.removeAttribute(VI_MODE_ATTR)
       closers.delete(cm)
