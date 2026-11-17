@@ -29,7 +29,13 @@ type Lock struct{ f *os.File }
 const (
 	samePidLockRetry     = 2 * time.Second
 	samePidLockRetryTick = 20 * time.Millisecond
+	// lockPidReadWait bounds the re-read of a lock file with no full pid yet.
+	lockPidReadWait = 500 * time.Millisecond
 )
+
+// LockPidWidth is the width of the zero-padded pid in the lock file, wide
+// enough for the largest pid any OS allows.
+const LockPidWidth = 10
 
 // AcquireLock takes the lock at path or says who holds it.
 func AcquireLock(path string) (*Lock, error) {
@@ -37,7 +43,9 @@ func AcquireLock(path string) (*Lock, error) {
 	if err != nil {
 		return nil, err
 	}
-	deadline := time.Now().Add(samePidLockRetry)
+	start := time.Now()
+	deadline := start.Add(samePidLockRetry)
+	unreadableDeadline := start.Add(lockPidReadWait)
 	for {
 		err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 		if err == nil {
@@ -47,27 +55,41 @@ func AcquireLock(path string) (*Lock, error) {
 			f.Close()
 			return nil, err
 		}
-		raw, _ := os.ReadFile(path)
-		holder := strings.TrimSpace(string(raw))
-		if holder != strconv.Itoa(os.Getpid()) {
+		pid, ok := readLockPid(path)
+		switch {
+		case !ok:
+			// A new file is empty until the winner's first write.
+			if !time.Now().Before(unreadableDeadline) {
+				f.Close()
+				return nil, fmt.Errorf("lock %s is held but holds no pid after %s", path, lockPidReadWait)
+			}
+		case pid != os.Getpid():
 			f.Close()
-			return nil, fmt.Errorf("already running (pid %s)", holder)
-		}
-		if !time.Now().Before(deadline) {
+			return nil, fmt.Errorf("already running (pid %d)", pid)
+		case !time.Now().Before(deadline):
 			f.Close()
-			return nil, fmt.Errorf("lock still held by this process (pid %s) after %s", holder, samePidLockRetry)
+			return nil, fmt.Errorf("lock still held by this process (pid %d) after %s", pid, samePidLockRetry)
 		}
 		time.Sleep(samePidLockRetryTick)
 	}
-	if err := f.Truncate(0); err != nil {
-		f.Close()
-		return nil, err
-	}
-	if _, err := f.WriteAt([]byte(strconv.Itoa(os.Getpid())), 0); err != nil {
+	// One fixed-width write and no truncate: a shorter pid fully covers an older
+	// longer one, so a loser never reads an empty file once a pid was written.
+	if _, err := f.WriteAt(fmt.Appendf(nil, "%0*d", LockPidWidth, os.Getpid()), 0); err != nil {
 		f.Close()
 		return nil, err
 	}
 	return &Lock{f: f}, nil
+}
+
+// readLockPid parses the full-width pid in the lock file. ok is false for an
+// empty or short file.
+func readLockPid(path string) (pid int, ok bool) {
+	raw, _ := os.ReadFile(path)
+	if len(raw) != LockPidWidth {
+		return 0, false
+	}
+	pid, err := strconv.Atoi(string(raw))
+	return pid, err == nil
 }
 
 // Release drops the lock.
