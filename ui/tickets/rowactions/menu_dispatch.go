@@ -11,7 +11,7 @@ import (
 // dispatchMenuAction runs an accepted "m" menu action for either tab, keyed by
 // the row's address (result.Path). Orchestration writes go only through the
 // server.
-func dispatchMenuAction(api tabapi.ServerAPI, admin tabapi.AdminAPI, reads tabapi.ReadsAPI, sessions tabapi.SessionsAPI, tix tabapi.TicketsAPI, worktreeRoot string, settings ui.Settings, width int, result actionsMenuResult) tea.Cmd {
+func dispatchMenuAction(api tabapi.ServerAPI, admin tabapi.AdminAPI, sessions tabapi.SessionsAPI, tix tabapi.TicketsAPI, worktreeRoot string, settings ui.Settings, width int, result actionsMenuResult) tea.Cmd {
 	if word, ok := RecoveryWord(result.Action); ok {
 		return cmdServerWrite(admin, tix, word, result.Path)
 	}
@@ -36,9 +36,7 @@ func dispatchMenuAction(api tabapi.ServerAPI, admin tabapi.AdminAPI, reads tabap
 		file, address := ResolveTicketPath(settings.TicketStore, result.Path)
 		return CmdTranscript(settings.Dirs, file, address, width)
 	case ActionWatch:
-		return CmdWatchAgent(reads, settings.Dirs, AgentAddress(result.Path, result.TicketID))
-	case ActionGoToPane:
-		return CmdServerFocusPane(reads, result.Path)
+		return CmdWatchAgent(settings.Dirs, AgentAddress(result.Path, result.TicketID))
 	}
 	return nil
 }

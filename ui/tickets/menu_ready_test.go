@@ -16,7 +16,7 @@ func fakeNativeLog(t *testing.T, log agentlog.Log, err error) {
 	t.Helper()
 	prev := rowactions.AgentLog
 	t.Cleanup(func() { rowactions.AgentLog = prev })
-	rowactions.AgentLog = func(context.Context, config.Dirs, string, rowactions.HerdrLookup) (agentlog.Log, error) {
+	rowactions.AgentLog = func(context.Context, config.Dirs, string) (agentlog.Log, error) {
 		return log, err
 	}
 }

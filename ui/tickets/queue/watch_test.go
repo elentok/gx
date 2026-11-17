@@ -3,16 +3,11 @@ package queue
 import (
 	"context"
 	"os"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/ui/contextmenu"
-	"github.com/elentok/gx/ui/tickets/internal/tickettest"
 	"github.com/elentok/gx/ui/tickets/rowactions"
 )
 
@@ -32,7 +27,7 @@ func appendWatchLog(t *testing.T, path string, texts ...string) {
 	}
 }
 
-func fakeAgentLog(t *testing.T, f func(context.Context, config.Dirs, string, rowactions.HerdrLookup) (agentlog.Log, error)) {
+func fakeAgentLog(t *testing.T, f func(context.Context, config.Dirs, string) (agentlog.Log, error)) {
 	t.Helper()
 	prev := rowactions.AgentLog
 	t.Cleanup(func() { rowactions.AgentLog = prev })
@@ -41,44 +36,9 @@ func fakeAgentLog(t *testing.T, f func(context.Context, config.Dirs, string, row
 
 func fakeNativeLog(t *testing.T, log agentlog.Log, err error) {
 	t.Helper()
-	fakeAgentLog(t, func(context.Context, config.Dirs, string, rowactions.HerdrLookup) (agentlog.Log, error) {
+	fakeAgentLog(t, func(context.Context, config.Dirs, string) (agentlog.Log, error) {
 		return log, err
 	})
-}
-
-// fakeHerdrOnlyLog runs the real locator against an empty state dir, so every
-// log comes from the herdr lookup the tab hands it.
-func fakeHerdrOnlyLog(t *testing.T) {
-	t.Helper()
-	stateDir := t.TempDir()
-	fakeAgentLog(t, func(ctx context.Context, _ config.Dirs, address string, herdr rowactions.HerdrLookup) (agentlog.Log, error) {
-		a, err := tickets.ParseAddress(address, tickets.AddressContext{})
-		if err != nil {
-			return agentlog.Log{}, err
-		}
-		return agentlog.Locator{StateDir: stateDir, Herdr: herdr}.AgentLog(ctx, a)
-	})
-}
-
-// herdrAPI is a server running one herdr iteration of agent on gx:alpha/01.
-func herdrAPI(agent, transcript string) tickettest.FakeServerAPI {
-	return tickettest.FakeServerAPI{IterationsRes: []wire.IterationInfo{
-		{Address: "gx:alpha/01", Agent: agent, Transcript: transcript, Pane: "p1", Tab: "t1"},
-	}}
-}
-
-// fakeFocus records the herdr tabs focused.
-func fakeFocus(t *testing.T) *[]string {
-	t.Helper()
-	var focused []string
-	prev := rowactions.FocusIterationTab
-	t.Cleanup(func() { rowactions.FocusIterationTab = prev })
-	rowactions.FocusIterationTab = func(tab string) error { focused = append(focused, tab); return nil }
-	return &focused
-}
-
-func hasItem(items []contextmenu.Item[rowactions.TicketTarget], label string) bool {
-	return slices.ContainsFunc(items, func(it contextmenu.Item[rowactions.TicketTarget]) bool { return it.Label == label })
 }
 
 func TestWatch_NoOrPrunedLogDims(t *testing.T) {
@@ -98,23 +58,5 @@ func TestWatch_NoOrPrunedLogDims(t *testing.T) {
 				t.Errorf("Watch disabled = %q, want %q", got, rowactions.NoAgentLog)
 			}
 		})
-	}
-}
-
-func TestGoToPane_HerdrOnlyAndFocusesPane(t *testing.T) {
-	fakeHerdrOnlyLog(t)
-	focused := fakeFocus(t)
-	m := selectFirstQueueTicketRow(t, newServerQueueModel(t, nil))
-	if _, ready := requestQueueMenu(t, m); hasItem(ready.Items, "Go to pane") {
-		t.Error("Go to pane shown for a ticket with no herdr agent")
-	}
-	m.server.ServerAPI, m.srv.Reads = herdrAPI("codex", ""), tickettest.FakeReads{FakeServerAPI: herdrAPI("codex", "")}
-	_, cmd := chooseQueueMenuItem(t, openQueueMenu(t, m), "Go to pane")
-	if cmd == nil {
-		t.Fatal("Go to pane returned no Cmd")
-	}
-	cmd()
-	if !slices.Equal(*focused, []string{"t1"}) {
-		t.Errorf("focused = %v, want [t1]", *focused)
 	}
 }

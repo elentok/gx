@@ -7,7 +7,6 @@ type IterationInfo struct {
 	Address string `json:"address"`
 	Agent   string `json:"agent,omitempty"`
 	Pane    string `json:"pane"`
-	Tab     string `json:"tab,omitempty"`
 	// Runner names what hosts the iteration; QueueAgent is the PTY run's row id
 	// in the sessions listing, empty for every other runner.
 	Runner     string `json:"runner,omitempty"`

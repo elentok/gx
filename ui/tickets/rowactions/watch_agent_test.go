@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -13,7 +12,6 @@ import (
 
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tickets/internal/tickettest"
@@ -24,12 +22,12 @@ const watchLogLine = `{"type":"assistant","message":{"role":"assistant","content
 
 func fakeNativeLog(t *testing.T, log agentlog.Log, err error) {
 	t.Helper()
-	fakeAgentLog(t, func(context.Context, config.Dirs, string, HerdrLookup) (agentlog.Log, error) {
+	fakeAgentLog(t, func(context.Context, config.Dirs, string) (agentlog.Log, error) {
 		return log, err
 	})
 }
 
-func fakeAgentLog(t *testing.T, f func(context.Context, config.Dirs, string, HerdrLookup) (agentlog.Log, error)) {
+func fakeAgentLog(t *testing.T, f func(context.Context, config.Dirs, string) (agentlog.Log, error)) {
 	t.Helper()
 	prev := AgentLog
 	t.Cleanup(func() { AgentLog = prev })
@@ -87,7 +85,7 @@ func TestWatchAgent_RendersLogInModal(t *testing.T) {
 	}
 	fakeNativeLog(t, agentlog.Log{Path: path}, nil)
 
-	loaded, ok := CmdWatchAgent(nil, config.Dirs{}, "gx:epic/01")().(WatchLoadedMsg)
+	loaded, ok := CmdWatchAgent(config.Dirs{}, "gx:epic/01")().(WatchLoadedMsg)
 	if !ok {
 		t.Fatal("expected WatchLoadedMsg")
 	}
@@ -103,7 +101,7 @@ func TestWatchAgent_PtyShowsConversation(t *testing.T) {
 	appendWatchLog(t, path, "pty conversation")
 	fakeNativeLog(t, agentlog.Log{Path: path, PtyDir: "/pty/dir"}, nil)
 
-	loaded := CmdWatchAgent(nil, config.Dirs{}, "gx:epic/01")().(WatchLoadedMsg)
+	loaded := CmdWatchAgent(config.Dirs{}, "gx:epic/01")().(WatchLoadedMsg)
 	modal := WatchModal{}.Open(loaded, 120, 40)
 	t.Cleanup(modal.Close)
 	if view := modal.View(); !strings.Contains(view, "pty conversation") {
@@ -119,7 +117,7 @@ func openLiveWatch(t *testing.T, texts ...string) (w WatchModal, path string, en
 	appendWatchLog(t, path, texts...)
 	ended = new(bool)
 	fakeNativeLog(t, agentlog.Log{Path: path, Ended: func() bool { return *ended }}, nil)
-	loaded := CmdWatchAgent(nil, config.Dirs{}, "gx:epic/01")().(WatchLoadedMsg)
+	loaded := CmdWatchAgent(config.Dirs{}, "gx:epic/01")().(WatchLoadedMsg)
 	w = WatchModal{}.Open(loaded, 120, 40)
 	t.Cleanup(w.Close)
 	return w, path, ended, w.Tick()
@@ -218,7 +216,7 @@ func TestWatchLive_CloseStopsTick(t *testing.T) {
 func failOnNativeLog(t *testing.T) (undo func()) {
 	t.Helper()
 	prev := AgentLog
-	AgentLog = func(context.Context, config.Dirs, string, HerdrLookup) (agentlog.Log, error) {
+	AgentLog = func(context.Context, config.Dirs, string) (agentlog.Log, error) {
 		t.Error("native liveness resolved on the Update goroutine")
 		return agentlog.Log{}, agentlog.ErrNoAgent
 	}
@@ -228,7 +226,7 @@ func failOnNativeLog(t *testing.T) (undo func()) {
 func TestWatch_ResolvesLivenessInCmd(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 	undo := failOnNativeLog(t)
-	cmd := CmdWatchAgent(tickettest.FakeReads{}, config.Dirs{}, "gx:epic/01")
+	cmd := CmdWatchAgent(config.Dirs{}, "gx:epic/01")
 	undo()
 	cmd()
 }
@@ -247,7 +245,7 @@ func TestWatchReason_NativeLog(t *testing.T) {
 	}
 	for _, c := range cases {
 		fakeNativeLog(t, c.log, c.err)
-		if got := WatchReason(tickettest.FakeReads{}, config.Dirs{}, "gx:epic/01"); got != c.want {
+		if got := WatchReason(config.Dirs{}, "gx:epic/01"); got != c.want {
 			t.Errorf("%s: WatchReason = %q, want %q", c.name, got, c.want)
 		}
 	}
@@ -403,7 +401,7 @@ func TestWatch_NoServerOpensHeadlessAndPty(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			log.Path = watchLogFile(t)
-			fakeAgentLog(t, func(_ context.Context, _ config.Dirs, address string, _ HerdrLookup) (agentlog.Log, error) {
+			fakeAgentLog(t, func(_ context.Context, _ config.Dirs, address string) (agentlog.Log, error) {
 				if !strings.HasSuffix(address, ":my-epic/01") {
 					return agentlog.Log{}, agentlog.ErrNoAgent
 				}
@@ -435,84 +433,5 @@ func TestWatch_NoOrPrunedLogDims(t *testing.T) {
 				t.Errorf("Watch disabled = %q, want %q", got, NoAgentLog)
 			}
 		})
-	}
-}
-
-// fakeHerdrOnlyLog runs the real locator against an empty state dir, so every
-// log comes from the herdr lookup the tab hands it.
-func fakeHerdrOnlyLog(t *testing.T) {
-	t.Helper()
-	stateDir := t.TempDir()
-	fakeAgentLog(t, func(ctx context.Context, _ config.Dirs, address string, herdr HerdrLookup) (agentlog.Log, error) {
-		a, err := tickets.ParseAddress(address, tickets.AddressContext{})
-		if err != nil {
-			return agentlog.Log{}, err
-		}
-		return agentlog.Locator{StateDir: stateDir, Herdr: herdr}.AgentLog(ctx, a)
-	})
-}
-
-// herdrAPI is a server running one herdr iteration of agent on gx:alpha/01.
-func herdrAPI(agent, transcript string) tickettest.FakeServerAPI {
-	return tickettest.FakeServerAPI{IterationsRes: []wire.IterationInfo{
-		{Address: "gx:alpha/01", Agent: agent, Transcript: transcript, Pane: "p1", Tab: "t1"},
-	}}
-}
-
-func TestWatch_HerdrClaudeOpensLiveModal(t *testing.T) {
-	fakeHerdrOnlyLog(t)
-	w := openWatchFromMenu(t, serverTab("claimed", herdrAPI("claude", watchLogFile(t))))
-	if view := w.View(); !w.IsOpen() || !strings.Contains(view, "· live") || !strings.Contains(view, "hello from the agent") {
-		t.Errorf("Watch on a herdr claude agent did not open live:\n%s", view)
-	}
-}
-
-func TestWatch_HerdrDimReasons(t *testing.T) {
-	t.Run("codex", func(t *testing.T) {
-		fakeHerdrOnlyLog(t)
-		var rm Menus
-		ready := requestTicketMenu(t, &rm, serverTab("claimed", herdrAPI("codex", "")))
-		if got := itemByLabel(t, ready.Items, "Watch").Disabled; got != NotForCodex {
-			t.Errorf("Watch disabled = %q, want %q", got, NotForCodex)
-		}
-		if got := itemByLabel(t, ready.Items, "Go to pane").Disabled; got != "" {
-			t.Errorf("Go to pane disabled = %q, want enabled", got)
-		}
-	})
-	t.Run("no server", func(t *testing.T) {
-		fakeHerdrOnlyLog(t)
-		var rm Menus
-		ready := requestTicketMenu(t, &rm, offlineTab())
-		if got := itemByLabel(t, ready.Items, "Watch").Disabled; got != NoAgentLog {
-			t.Errorf("Watch disabled = %q, want %q", got, NoAgentLog)
-		}
-	})
-}
-
-// fakeFocus records the herdr tabs focused.
-func fakeFocus(t *testing.T) *[]string {
-	t.Helper()
-	var focused []string
-	prev := FocusIterationTab
-	t.Cleanup(func() { FocusIterationTab = prev })
-	FocusIterationTab = func(tab string) error { focused = append(focused, tab); return nil }
-	return &focused
-}
-
-func TestGoToPane_HerdrOnlyAndFocusesPane(t *testing.T) {
-	fakeHerdrOnlyLog(t)
-	focused := fakeFocus(t)
-	var rm Menus
-	if hasItem(requestTicketMenu(t, &rm, serverTab("claimed", tickettest.FakeServerAPI{})).Items, "Go to pane") {
-		t.Error("Go to pane shown for a ticket with no herdr agent")
-	}
-	tab := serverTab("claimed", herdrAPI("claude", ""))
-	cmd := pickTicketMenuItem(t, tab, requestTicketMenu(t, &rm, tab), "Go to pane")
-	if cmd == nil {
-		t.Fatal("Go to pane returned no Cmd")
-	}
-	cmd()
-	if !slices.Equal(*focused, []string{"t1"}) {
-		t.Errorf("focused = %v, want [t1]", *focused)
 	}
 }

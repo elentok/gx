@@ -2,8 +2,6 @@ package rowactions
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -18,12 +16,11 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
-	"github.com/elentok/gx/ui/tickets/tabapi"
 )
 
 // ActionWatch opens an agent's conversation in the Watch modal, for every
-// runner; ActionGoToPane jumps to a herdr agent's pane. Handled by the menu
-// dispatcher.
+// runner; ActionGoToPane labels the PTY agent's live-panel item, which carries
+// its own Run. Handled by the menu dispatcher.
 const (
 	ActionWatch    = "watch"
 	ActionGoToPane = "go-to-pane"
@@ -33,11 +30,8 @@ const (
 // the Update goroutine.
 const maxWatchLines = 2000
 
-// HerdrLookup finds a live herdr iteration by full ticket address.
-type HerdrLookup = func(ctx context.Context, address string) (agentlog.HerdrIteration, bool, error)
-
 // AgentLog is a package-level seam so tests can fake the agent log.
-var AgentLog = func(ctx context.Context, dirs config.Dirs, address string, herdr HerdrLookup) (agentlog.Log, error) {
+var AgentLog = func(ctx context.Context, dirs config.Dirs, address string) (agentlog.Log, error) {
 	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
 		return agentlog.Log{}, err
@@ -47,31 +41,7 @@ var AgentLog = func(ctx context.Context, dirs config.Dirs, address string, herdr
 		return agentlog.Log{}, err
 	}
 	home, _ := dirs.Home()
-	return agentlog.Locator{StateDir: stateDir, Home: home, CodexHome: dirs.CodexHome(), Herdr: herdr}.AgentLog(ctx, a)
-}
-
-// errServerDown marks a herdr lookup whose server didn't answer.
-var errServerDown = errors.New(ServerNotRunning)
-
-// serverHerdrLookup looks an address up in the server's iterations read. Nil
-// without a server: only the server knows herdr iterations, so herdr isn't in
-// play and an agentless ticket reads as having no agent log.
-func serverHerdrLookup(api tabapi.ReadsAPI) HerdrLookup {
-	if api == nil {
-		return nil
-	}
-	return func(ctx context.Context, address string) (agentlog.HerdrIteration, bool, error) {
-		list, err := api.Iterations(ctx)
-		if err != nil {
-			return agentlog.HerdrIteration{}, false, fmt.Errorf("%w: %v", errServerDown, err)
-		}
-		for _, it := range list {
-			if it.Address == address {
-				return agentlog.HerdrIteration{Agent: it.Agent, Transcript: it.Transcript}, true, nil
-			}
-		}
-		return agentlog.HerdrIteration{}, false, nil
-	}
+	return agentlog.Locator{StateDir: stateDir, Home: home, CodexHome: dirs.CodexHome()}.AgentLog(ctx, a)
 }
 
 // AgentAddress is the address the log lookup takes for a row's Path: already
@@ -83,20 +53,12 @@ func AgentAddress(path, id string) string {
 	return path
 }
 
-// NotForCodex is the reason Watch is dim for a codex agent.
-const NotForCodex = "not supported for codex"
-
 // WatchReason is why Watch can't open address's agent log, empty when it
 // can, whether the agent still runs or has ended.
-func WatchReason(api tabapi.ReadsAPI, dirs config.Dirs, address string) string {
-	log, err := AgentLog(context.Background(), dirs, address, serverHerdrLookup(api))
-	switch {
-	case err == nil && !log.Pruned:
+func WatchReason(dirs config.Dirs, address string) string {
+	log, err := AgentLog(context.Background(), dirs, address)
+	if err == nil && !log.Pruned {
 		return ""
-	case errors.Is(err, agentlog.ErrUnsupported):
-		return NotForCodex
-	case errors.Is(err, errServerDown):
-		return ServerNotRunning
 	}
 	return NoAgentLog
 }
@@ -297,12 +259,12 @@ func (w WatchModal) View() string {
 }
 
 // CmdWatchAgent opens address's agent log live, rendered with the same
-// renderer and tail stepper as `gx server agents watch`. A pty or herdr
-// agent's log is its conversation transcript, not its terminal screen. The
-// tail stays on this run's log, so a later resumed run is not followed.
-func CmdWatchAgent(api tabapi.ReadsAPI, dirs config.Dirs, address string) tea.Cmd {
+// renderer and tail stepper as `gx server agents watch`. A pty agent's log is
+// its conversation transcript, not its terminal screen. The tail stays on
+// this run's log, so a later resumed run is not followed.
+func CmdWatchAgent(dirs config.Dirs, address string) tea.Cmd {
 	return func() tea.Msg {
-		log, err := AgentLog(context.Background(), dirs, address, serverHerdrLookup(api))
+		log, err := AgentLog(context.Background(), dirs, address)
 		if err != nil {
 			return notify.Error("watch: " + err.Error())()
 		}

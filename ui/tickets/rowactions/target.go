@@ -1,7 +1,7 @@
 package rowactions
 
 // TicketTarget is the ticket row a Context menu was opened on. EpicName is
-// the bare epic the herdr launches want.
+// the bare epic.
 type TicketTarget struct{ Address, EpicName, TicketID string }
 
 // ServerNotRunning is the reason the menus give for a write that needs the

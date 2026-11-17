@@ -46,7 +46,7 @@ func TestTicketMenuItems_DimReasons(t *testing.T) {
 		t.Errorf("unmute = %q, want %q", got, notMuted)
 	}
 
-	paused := ticketMenuInput{rendered: tickets.StatusPausedRepair, ticket: tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseManual}, herdrDown: true, detail: &resumeDetail}
+	paused := ticketMenuInput{rendered: tickets.StatusPausedRepair, ticket: tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseManual}, detail: &resumeDetail}
 	if got := disabled(paused, "Pause"); got != alreadyPaused {
 		t.Errorf("pause on a paused ticket = %q", got)
 	}
@@ -54,7 +54,7 @@ func TestTicketMenuItems_DimReasons(t *testing.T) {
 		t.Errorf("resume on a paused ticket = %q, want enabled", got)
 	}
 	if got := disabled(paused, "Investigate"); got != "" {
-		t.Errorf("investigate with herdr down = %q, want enabled", got)
+		t.Errorf("investigate on a paused ticket = %q, want enabled", got)
 	}
 }
 
@@ -118,17 +118,14 @@ func TestTicketMenuItems_ResumeEnterHintOnlyWhenEnterResumes(t *testing.T) {
 
 func TestTicketMenuItems_GoToPane(t *testing.T) {
 	if hasItem(ticketMenuItems(ticketMenuInput{}), "Go to pane") {
-		t.Error("Go to pane shown without a herdr pane")
+		t.Error("Go to pane shown without a PTY agent")
 	}
 	for _, tt := range []struct {
 		name string
 		in   ticketMenuInput
 		want string
 	}{
-		{"live pane", ticketMenuInput{paneLive: true}, ""},
-		{"herdr down", ticketMenuInput{paneLive: true, herdrDown: true}, herdrDownText},
 		{"pty live", ticketMenuInput{queueAgent: "queue-a", ptyLive: true}, ""},
-		{"pty live, herdr down", ticketMenuInput{queueAgent: "queue-a", ptyLive: true, herdrDown: true}, ""},
 		{"pty holder gone", ticketMenuInput{queueAgent: "queue-a"}, holderGoneText},
 	} {
 		item := itemByLabel(t, ticketMenuItems(tt.in), "Go to pane")
@@ -148,7 +145,7 @@ func TestTicketMenuItems_GoToPanePTYOpensTheAgentsRow(t *testing.T) {
 func TestCmdTicketMenu_FetchesIterationsOnce(t *testing.T) {
 	calls := 0
 	api := tickettest.CountingIterationsAPI{FakeReads: tickettest.FakeReads{}, Calls: &calls}
-	in := newTicketMenuInput(tickets.Epic{}, tickets.Ticket{Path: "gx:alpha/01", Title: "First"}, false, "")
+	in := newTicketMenuInput(tickets.Epic{}, tickets.Ticket{Path: "gx:alpha/01", Title: "First"}, "")
 
 	cmdTicketMenu(api, config.Dirs{}, in)()
 
@@ -159,10 +156,10 @@ func TestCmdTicketMenu_FetchesIterationsOnce(t *testing.T) {
 
 func TestCmdTicketMenu_PTYIterationOffersTheAgentRow(t *testing.T) {
 	api := tickettest.FakeServerAPI{IterationsRes: []wire.IterationInfo{{Address: "gx:alpha/01", Runner: "pty", QueueAgent: "queue-gx-alpha-01"}}}
-	in := newTicketMenuInput(tickets.Epic{}, tickets.Ticket{Path: "gx:alpha/01"}, true, "")
+	in := newTicketMenuInput(tickets.Epic{}, tickets.Ticket{Path: "gx:alpha/01"}, "")
 	msg := cmdTicketMenu(tickettest.FakeReads{FakeServerAPI: api}, config.Dirs{}, in)().(TicketReadyMsg)
 	item := itemByLabel(t, msg.Items, "Go to pane")
 	if item.Disabled != "" {
-		t.Fatalf("Go to pane dimmed %q with a live PTY holder and herdr down", item.Disabled)
+		t.Fatalf("Go to pane dimmed %q with a live PTY holder", item.Disabled)
 	}
 }

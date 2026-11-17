@@ -33,13 +33,10 @@ type ticketMenuInput struct {
 	rendered tickets.RenderedStatus
 	ticket   tickets.Ticket
 	isMap    bool
-	// paneLive marks a live herdr agent, which has a tab to focus.
-	paneLive bool
 	// queueAgent is the Agents-tab row id of a PTY run; ptyLive is whether its
 	// holder is still there.
 	queueAgent string
 	ptyLive    bool
-	herdrDown  bool
 	archived   bool
 	// watchReason is why Watch is dim; empty when it can open.
 	watchReason string
@@ -59,7 +56,6 @@ const (
 	alreadyPaused  = "already paused"
 	notPaused      = "not paused"
 	notMuted       = "not muted"
-	herdrDownText  = "herdr not running"
 	holderGoneText = "agent is gone"
 	archivedText   = "archived"
 	noProposal     = "no recovery proposal"
@@ -147,17 +143,13 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[TicketTarget] {
 		pick("Transcript", "", ActionTranscript, contextmenu.Agent, ""),
 		suggest(InvestigateSuggested(in.rendered),
 			pick("Investigate", "", ActionInvestigate, contextmenu.Agent, "")))
-	switch {
-	case in.queueAgent != "":
-		// A PTY pane is the Agents tab's live panel, so herdr being down is moot.
+	if in.queueAgent != "" {
 		it := pick("Go to pane", "", ActionGoToPane, contextmenu.Agent, reasonIf(!in.ptyLive, holderGoneText))
 		if it.Disabled == "" {
 			id := in.queueAgent
 			it.Run = func(TicketTarget) tea.Cmd { return func() tea.Msg { return tabapi.GoToSessionMsg{ID: id} } }
 		}
 		items = append(items, it)
-	case in.paneLive:
-		items = append(items, pick("Go to pane", "", ActionGoToPane, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText)))
 	}
 
 	if in.onQueue {
@@ -260,12 +252,11 @@ func (msg TicketReadyMsg) Toast() tea.Cmd {
 
 // newTicketMenuInput is what both tabs read from a ticket row when "m" is
 // pressed; liveness is left to cmdTicketMenu.
-func newTicketMenuInput(epic tickets.Epic, ticket tickets.Ticket, herdrDown bool, serverReason string) ticketMenuInput {
+func newTicketMenuInput(epic tickets.Epic, ticket tickets.Ticket, serverReason string) ticketMenuInput {
 	return ticketMenuInput{
 		rendered:     rowfmt.TicketStatus(epic, ticket),
 		ticket:       ticket,
 		isMap:        epic.IsMap,
-		herdrDown:    herdrDown,
 		serverReason: serverReason,
 	}
 }
@@ -274,19 +265,18 @@ func newTicketMenuInput(epic tickets.Epic, ticket tickets.Ticket, herdrDown bool
 // opens once the result comes back.
 func cmdTicketMenu(api tabapi.ReadsAPI, dirs config.Dirs, in ticketMenuInput) tea.Cmd {
 	address := in.ticket.Path
-	// A row's Path is its address and its epic is "project:epic"; the herdr
-	// launches want the bare epic.
+	// A row's Path is its address and its epic is "project:epic"; targets want
+	// the bare epic.
 	epicName, _, _ := tickets.SplitTrailerValue(address)
 	target := TicketTarget{Address: address, EpicName: epicName, TicketID: in.ticket.DisplayNumber()}
 	prompt := fmt.Sprintf("Ticket %q", in.ticket.Title)
 	return func() tea.Msg {
 		api := SnapshotIterations(api)
 		it, live := ServerIteration(api, address)
-		in.paneLive = live && it.Tab != ""
 		if live && it.QueueAgent != "" {
 			in.queueAgent, in.ptyLive = it.QueueAgent, true
 		}
-		in.watchReason = WatchReason(api, dirs, AgentAddress(address, target.TicketID))
+		in.watchReason = WatchReason(dirs, AgentAddress(address, target.TicketID))
 		var err error
 		in.detail, err = TicketDetail(api, address)
 		return TicketReadyMsg{Target: target, Prompt: prompt, Items: ticketMenuItems(in), DetailErr: err}

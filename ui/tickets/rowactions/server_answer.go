@@ -5,20 +5,10 @@ import (
 	"fmt"
 	"path/filepath"
 
-	tea "charm.land/bubbletea/v2"
-
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tickets/tabapi"
 )
-
-// focusIterationTab is a package-level seam so tests can fake herdr.
-var FocusIterationTab = func(tabID string) error {
-	_, err := herdr.TabFocus(tabID)
-	return err
-}
 
 // iterationsSnapshot is a ReadsAPI whose Iterations read is answered from one
 // earlier fetch, so a caller that looks up several things in a row hits the
@@ -79,19 +69,4 @@ func ResolveTicketPath(store, path string) (file, address string) {
 		return f, path
 	}
 	return path, ""
-}
-
-// cmdServerFocusPane focuses the herdr tab the iterations read names for
-// address.
-func CmdServerFocusPane(api tabapi.ReadsAPI, address string) tea.Cmd {
-	return func() tea.Msg {
-		it, live := ServerIteration(api, address)
-		if !live || it.Tab == "" {
-			return notify.Warning("the agent is no longer live")()
-		}
-		if err := FocusIterationTab(it.Tab); err != nil {
-			return notify.Error("focus pane: " + err.Error())()
-		}
-		return nil
-	}
 }

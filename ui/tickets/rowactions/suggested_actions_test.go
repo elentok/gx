@@ -61,10 +61,9 @@ func TestTicketHasSuggestedActions_AgreesWithMenu(t *testing.T) {
 		{"blocked", ticketMenuInput{rendered: tickets.StatusBlocked}, false},
 		{"paused (answer)", ticketMenuInput{rendered: tickets.StatusPausedAnswer}, true},
 		// The row has no detail; the menu opens with the answer verbs Suggested.
-		{"paused (answer) herdr down", ticketMenuInput{rendered: tickets.StatusPausedAnswer, herdrDown: true, detail: &answerDetail}, true},
+		{"paused (answer) with detail", ticketMenuInput{rendered: tickets.StatusPausedAnswer, detail: &answerDetail}, true},
 		{"paused (repair)", ticketMenuInput{rendered: tickets.StatusPausedRepair}, true},
-		{"paused (repair) herdr down", ticketMenuInput{rendered: tickets.StatusPausedRepair, herdrDown: true}, true},
-		{"error herdr down", ticketMenuInput{rendered: tickets.StatusError, herdrDown: true}, true},
+		{"error", ticketMenuInput{rendered: tickets.StatusError}, true},
 		{"muted open", ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Mutes: muted}}, true},
 		{"muted open server down", ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Mutes: muted}, serverReason: ServerNotRunning}, false},
 		{"open on a map", ticketMenuInput{rendered: tickets.StatusOpen, isMap: true}, true},

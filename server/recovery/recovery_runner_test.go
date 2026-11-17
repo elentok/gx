@@ -48,8 +48,8 @@ func TestRecoveryRunner_HeadlessRunListsWithoutPaneOrTab(t *testing.T) {
 		t.Fatalf("iterations = %+v, want one", its)
 	}
 	it := its[0]
-	if it.Pane != "" || it.Tab != "" || it.Session != sess.SessionID || it.Branch == "" || it.Worktree == "" {
-		t.Errorf("iteration = %+v, want session %s, worktree and branch, no pane or tab", it, sess.SessionID)
+	if it.Pane != "" || it.Session != sess.SessionID || it.Branch == "" || it.Worktree == "" {
+		t.Errorf("iteration = %+v, want session %s, worktree and branch, no pane", it, sess.SessionID)
 	}
 }
 

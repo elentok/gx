@@ -61,25 +61,15 @@ func TestMenus_KeyOpensOnEveryStatus(t *testing.T) {
 	}
 }
 
-// Seam D: on herdr, Go to pane jumps to the tab from the iterations read, and
-// Resume issues resume.
-func TestMenus_GoToPaneAndResume(t *testing.T) {
-	focused := fakeFocus(t)
+// Seam D: Resume issues resume.
+func TestMenus_Resume(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 
 	var calls []string
-	api := tickettest.FakeServerAPI{
-		Calls: &calls, DetailRes: detailWith(wire.ActionAnswer, wire.ActionResume),
-		IterationsRes: []wire.IterationInfo{{Address: "gx:alpha/01", Pane: "p1", Tab: "t1"}},
-	}
+	api := tickettest.FakeServerAPI{Calls: &calls, DetailRes: detailWith(wire.ActionAnswer, wire.ActionResume)}
 	tab := pausedAnswerTab(api)
 	var rm Menus
 	ready := requestTicketMenu(t, &rm, tab)
-
-	pickTicketMenuItem(t, tab, ready, "Go to pane")()
-	if !slices.Equal(*focused, []string{"t1"}) {
-		t.Fatalf("focused = %v", *focused)
-	}
 
 	cmd := pickTicketMenuItem(t, tab, ready, resumeLabel)
 	if msg, ok := cmd().(ServerWriteMsg); !ok || msg.Verb != "resume" {

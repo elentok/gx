@@ -108,7 +108,7 @@ func (rm *Menus) openEpic(env Env, sel Selection) {
 }
 
 func (rm *Menus) openTicket(env Env, sel Selection) tea.Cmd {
-	in := newTicketMenuInput(sel.Epic, sel.Ticket, env.Settings.HerdrUnavailable, serverReason(env.ServerAPI, env.Link))
+	in := newTicketMenuInput(sel.Epic, sel.Ticket, serverReason(env.ServerAPI, env.Link))
 	in.archived = sel.Archived
 	in.session = sel.Session
 	in.queueAgent = sel.QueueAgent
@@ -183,7 +183,7 @@ func HasPendingProposal(body string) bool {
 
 // HasSuggestedActions keys a row's badge off the menu "m" would open on it.
 func (rm *Menus) HasSuggestedActions(env Env, epic tickets.Epic, ticket tickets.Ticket, archived bool) bool {
-	in := newTicketMenuInput(epic, ticket, env.Settings.HerdrUnavailable, serverReason(env.ServerAPI, env.Link))
+	in := newTicketMenuInput(epic, ticket, serverReason(env.ServerAPI, env.Link))
 	in.archived = archived
 	return ticketHasSuggestedActions(in)
 }
@@ -200,5 +200,5 @@ func ResumeEnter(tab Tab) (cmd tea.Cmd, handled bool) {
 }
 
 func dispatchPick(env Env, result actionsMenuResult) tea.Cmd {
-	return dispatchMenuAction(env.ServerAPI, env.Admin, env.Reads, env.Sessions, env.Tickets, env.WorktreeRoot, env.Settings, env.Width, result)
+	return dispatchMenuAction(env.ServerAPI, env.Admin, env.Sessions, env.Tickets, env.WorktreeRoot, env.Settings, env.Width, result)
 }

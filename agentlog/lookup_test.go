@@ -13,7 +13,6 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/nativerunner/proctable"
-	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -67,17 +66,10 @@ func writeRunnerDir(t *testing.T, stateDir, runner, log string) string {
 	return dir
 }
 
-func noHerdr(t *testing.T) func(context.Context, string) (agentlog.HerdrIteration, bool, error) {
-	return func(context.Context, string) (agentlog.HerdrIteration, bool, error) {
-		t.Error("herdr consulted although a native agent exists")
-		return agentlog.HerdrIteration{}, false, nil
-	}
-}
-
 func TestAgentLog_LiveNative(t *testing.T) {
 	stateDir := t.TempDir()
 	dir := writeAgentDir(t, stateDir, true)
-	l, err := agentlog.Locator{StateDir: stateDir, Procs: liveProcs, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	l, err := agentlog.Locator{StateDir: stateDir, Procs: liveProcs}.AgentLog(context.Background(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +84,7 @@ func TestAgentLog_LiveNative(t *testing.T) {
 func TestAgentLog_FinishedNative(t *testing.T) {
 	stateDir := t.TempDir()
 	writeAgentDir(t, stateDir, true)
-	l, err := agentlog.Locator{StateDir: stateDir, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	l, err := agentlog.Locator{StateDir: stateDir, Procs: fakeProcs{}}.AgentLog(context.Background(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +97,7 @@ func TestAgentLog_Pruned(t *testing.T) {
 	home := t.TempDir()
 	stateDir := t.TempDir()
 	writeAgentDir(t, stateDir, false)
-	l, err := agentlog.Locator{StateDir: stateDir, Home: home, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	l, err := agentlog.Locator{StateDir: stateDir, Home: home, Procs: fakeProcs{}}.AgentLog(context.Background(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +114,7 @@ func TestAgentLog_PtyReadsTheTranscript(t *testing.T) {
 		41: {Start: "t0", Cmdline: "gx agent-holder --session-id " + session},
 		42: liveProcs[42],
 	}
-	l, err := agentlog.Locator{StateDir: stateDir, Home: home, Procs: procs, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	l, err := agentlog.Locator{StateDir: stateDir, Home: home, Procs: procs}.AgentLog(context.Background(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +146,7 @@ func TestAgentLog_CodexPtyReadsTheRollout(t *testing.T) {
 	}
 	locate := func() (agentlog.Log, error) {
 		procs := fakeProcs{41: {Start: "t0", Cmdline: "gx agent-holder --session-id " + session}, 42: liveProcs[42]}
-		return agentlog.Locator{StateDir: stateDir, CodexHome: codexHome, Procs: procs, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+		return agentlog.Locator{StateDir: stateDir, CodexHome: codexHome, Procs: procs}.AgentLog(context.Background(), addr)
 	}
 	if _, err := locate(); !errors.Is(err, agentlog.ErrNoAgent) {
 		t.Fatalf("no rollout yet: got %v, want ErrNoAgent", err)
@@ -190,27 +182,7 @@ func TestAgentLog_TranscriptUnderAnotherProjectDir(t *testing.T) {
 	if err := os.WriteFile(want, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	l, err := agentlog.Locator{StateDir: stateDir, Home: home, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if l.Path != want {
-		t.Errorf("got %s, want %s", l.Path, want)
-	}
-}
-
-func TestAgentLog_HerdrTranscriptUnderAnotherProjectDir(t *testing.T) {
-	home := t.TempDir()
-	want := transcript.PathIn(home, "/work", session)
-	if err := os.MkdirAll(filepath.Dir(want), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(want, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	derived := transcript.PathIn(home, "/work/tree", session)
-	loc := agentlog.Locator{StateDir: t.TempDir(), Herdr: herdrWith(agentlog.HerdrIteration{Agent: "claude", Transcript: derived}, true)}
-	l, err := loc.AgentLog(context.Background(), addr)
+	l, err := agentlog.Locator{StateDir: stateDir, Home: home, Procs: fakeProcs{}}.AgentLog(context.Background(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +195,7 @@ func TestAgentLog_PtyPruned(t *testing.T) {
 	home := t.TempDir()
 	stateDir := t.TempDir()
 	dir := writeRunnerDir(t, stateDir, "pty", "")
-	l, err := agentlog.Locator{StateDir: stateDir, Home: home, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	l, err := agentlog.Locator{StateDir: stateDir, Home: home, Procs: fakeProcs{}}.AgentLog(context.Background(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,52 +211,15 @@ func TestAgentLog_UnknownRunner(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, nativerunner.MetaFile), meta, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, err := agentlog.Locator{StateDir: stateDir, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	_, err := agentlog.Locator{StateDir: stateDir, Procs: fakeProcs{}}.AgentLog(context.Background(), addr)
 	if !errors.Is(err, nativerunner.ErrUnknownRunner) {
 		t.Errorf("got %v, want ErrUnknownRunner", err)
 	}
 }
 
-func herdrWith(it agentlog.HerdrIteration, ok bool) func(context.Context, string) (agentlog.HerdrIteration, bool, error) {
-	return func(_ context.Context, address string) (agentlog.HerdrIteration, bool, error) {
-		if address != addr.String() {
-			return agentlog.HerdrIteration{}, false, nil
-		}
-		return it, ok, nil
-	}
-}
-
-func TestAgentLog_HerdrClaude(t *testing.T) {
-	// The transcript lives under a temp dir: transcript.Resolve globs the grandparent of a missing path, and
-	// a path like /t/s.jsonl would make it glob the filesystem root (it hangs opening /home on macOS).
-	transcriptPath := filepath.Join(t.TempDir(), "projects", "p", "s.jsonl")
-	loc := agentlog.Locator{StateDir: t.TempDir(), Herdr: herdrWith(agentlog.HerdrIteration{Agent: "claude", Transcript: transcriptPath}, true)}
-	l, err := loc.AgentLog(context.Background(), addr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if l.Path != transcriptPath || l.Offset != 0 || l.Ended() {
-		t.Errorf("got %+v (ended %v)", l, l.Ended())
-	}
-}
-
-func TestAgentLog_HerdrCodex(t *testing.T) {
-	loc := agentlog.Locator{StateDir: t.TempDir(), Herdr: herdrWith(agentlog.HerdrIteration{Agent: string(agent.AgentCodex)}, true)}
-	if _, err := loc.AgentLog(context.Background(), addr); !errors.Is(err, agentlog.ErrUnsupported) {
-		t.Errorf("got %v, want ErrUnsupported", err)
-	}
-}
-
 func TestAgentLog_None(t *testing.T) {
-	for name, herdr := range map[string]func(context.Context, string) (agentlog.HerdrIteration, bool, error){
-		"no herdr":      nil,
-		"no live herdr": herdrWith(agentlog.HerdrIteration{}, false),
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := agentlog.Locator{StateDir: t.TempDir(), Herdr: herdr}.AgentLog(context.Background(), addr)
-			if !errors.Is(err, agentlog.ErrNoAgent) {
-				t.Errorf("got %v, want ErrNoAgent", err)
-			}
-		})
+	_, err := agentlog.Locator{StateDir: t.TempDir()}.AgentLog(context.Background(), addr)
+	if !errors.Is(err, agentlog.ErrNoAgent) {
+		t.Errorf("got %v, want ErrNoAgent", err)
 	}
 }

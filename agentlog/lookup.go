@@ -17,12 +17,8 @@ import (
 )
 
 var (
-	// ErrNoAgent: the ticket has no native agent directory and no live herdr
-	// iteration.
+	// ErrNoAgent: the ticket has no native agent directory.
 	ErrNoAgent = errors.New("no agent log")
-	// ErrUnsupported: herdr Codex agents have no log gx can read, and watch
-	// never scrapes panes.
-	ErrUnsupported = errors.New("watch is not supported for herdr codex agents")
 
 	errNoHome = errors.New("home directory unknown")
 )
@@ -39,7 +35,7 @@ func (l Locator) transcriptPath(cwd, sessionID string) string {
 // Log is where one agent's log lives.
 type Log struct {
 	// Path is the JSONL file to read from Offset: out.jsonl for a headless
-	// agent, the claude transcript for a pty or herdr one. Empty when Pruned.
+	// agent, the claude transcript for a pty one. Empty when Pruned.
 	Path   string
 	Offset int64
 	// Ended reports whether the agent is gone, so follow knows to stop.
@@ -55,14 +51,7 @@ type Log struct {
 	Render func([]byte) []string
 }
 
-// HerdrIteration is what Locator needs from a live herdr iteration.
-type HerdrIteration struct {
-	Agent      string
-	Transcript string
-}
-
-// Locator finds an agent's log: the native agent directory first, then a
-// live herdr iteration.
+// Locator finds an agent's log in the native agent directory.
 type Locator struct {
 	StateDir string
 	// Home is the user's home, where claude keeps its transcripts. Empty means
@@ -72,9 +61,6 @@ type Locator struct {
 	CodexHome string
 	// Procs overrides the process table native liveness checks use.
 	Procs proctable.ProcessTable
-	// Herdr looks up a live herdr iteration by full ticket address. Nil
-	// means herdr isn't in play.
-	Herdr func(ctx context.Context, address string) (HerdrIteration, bool, error)
 }
 
 // AgentLog finds the log of a's agent.
@@ -124,27 +110,5 @@ func (l Locator) AgentLog(ctx context.Context, a tickets.Address) (Log, error) {
 		return Log{}, err
 	}
 
-	if l.Herdr == nil {
-		return Log{}, fmt.Errorf("%w for %s", ErrNoAgent, a)
-	}
-	it, ok, err := l.Herdr(ctx, a.String())
-	if err != nil {
-		return Log{}, err
-	}
-	if !ok {
-		return Log{}, fmt.Errorf("%w for %s", ErrNoAgent, a)
-	}
-	if it.Agent == string(agent.AgentCodex) {
-		return Log{}, ErrUnsupported
-	}
-	if it.Transcript == "" {
-		return Log{}, fmt.Errorf("%w for %s: herdr agent has no claude session yet", ErrNoAgent, a)
-	}
-	return Log{
-		Path: transcript.Resolve(it.Transcript),
-		Ended: func() bool {
-			_, ok, err := l.Herdr(ctx, a.String())
-			return err == nil && !ok
-		},
-	}, nil
+	return Log{}, fmt.Errorf("%w for %s", ErrNoAgent, a)
 }

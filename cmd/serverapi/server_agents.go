@@ -112,7 +112,7 @@ func newServerAgentsCmd(d Deps) *cobra.Command {
 			ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 			defer stop()
 			home, _ := d.Dirs().Home()
-			loc := agentlog.Locator{StateDir: stateDir, Home: home, CodexHome: d.Dirs().CodexHome(), Herdr: herdrIteration(d.Dial())}
+			loc := agentlog.Locator{StateDir: stateDir, Home: home, CodexHome: d.Dirs().CodexHome()}
 			log, err := loc.AgentLog(ctx, a)
 			if err != nil {
 				return err
@@ -177,26 +177,6 @@ func agentsWriteCmd(d Deps, use, short string, args cobra.PositionalArgs, do fun
 	}
 	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	return c
-}
-
-// herdrIteration looks address up among the server's live iterations.
-func herdrIteration(dial func() (*apiclient.Client, error)) func(ctx context.Context, address string) (agentlog.HerdrIteration, bool, error) {
-	return func(ctx context.Context, address string) (agentlog.HerdrIteration, bool, error) {
-		cl, err := dial()
-		if err != nil {
-			return agentlog.HerdrIteration{}, false, err
-		}
-		its, err := cl.Reads.Iterations(ctx)
-		if err != nil {
-			return agentlog.HerdrIteration{}, false, err
-		}
-		for _, it := range its {
-			if it.Address == address {
-				return agentlog.HerdrIteration{Agent: it.Agent, Transcript: it.Transcript}, true, nil
-			}
-		}
-		return agentlog.HerdrIteration{}, false, nil
-	}
 }
 
 // runAgentsWatch prints log from its offset. With Follow it keeps polling
