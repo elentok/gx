@@ -10,7 +10,7 @@
 # The steps are separate processes, each with its own output file:
 #   race    the PTY-runner packages under -race (a vt emulator shared with a
 #           background goroutine, and herdrrunner's use of the herdr fake)
-#   go      every other package except ./server/... and ./e2e
+#   go      every other package except ./server/...
 #   server  ./server/... (server and its subpackages)
 #   web     make web-test (install, tsc, vitest with 3 workers)
 #   e2e     make web-e2e (Playwright); only with GX_TEST_E2E=1, which `gx check
@@ -55,7 +55,7 @@ gx=$work/gx
 export XDG_STATE_HOME=$work/state
 
 # Package paths (not dirs) of everything the "go" step runs.
-skip=$(printf '%s\n' "$module/e2e" "${race_pkgs[@]/#.\//$module/}")
+skip=$(printf '%s\n' "${race_pkgs[@]/#.\//$module/}")
 other_pkgs=()
 while IFS= read -r pkg; do
 	other_pkgs+=("$pkg")

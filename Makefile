@@ -1,4 +1,4 @@
-.PHONY: build web-build web-dev web-test web-e2e web-types install test e2e test-docker-ubuntu run
+.PHONY: build web-build web-dev web-test web-e2e web-types install test test-docker-ubuntu run
 
 GO_VERSION := 1.25.0
 
@@ -41,15 +41,9 @@ web-types:
 install: web-build
 	go install -ldflags "$(LDFLAGS)" .
 
-# Every non-e2e test step side by side; see scripts/test.sh. The real-herdr e2e
-# tests skip here even inside herdr: they need GX_E2E=1 (see e2e).
+# Every non-e2e test step side by side; see scripts/test.sh.
 test:
 	scripts/test.sh
-
-# e2e runs the herdr e2e suite against a real, already-running herdr daemon
-# (herdr must be on PATH). Tests skip themselves if either isn't available.
-e2e:
-	GX_E2E=1 HERDR_ENV=1 go test -exec "$(CURDIR)/scripts/proc-cap" ./e2e/... -timeout=2m
 
 coverage:
 	go test -exec "$(CURDIR)/scripts/proc-cap" ./... -coverprofile=coverage.out

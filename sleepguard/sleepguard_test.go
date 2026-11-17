@@ -59,9 +59,6 @@ var allowed = map[string]int{
 	"cmd/serverapi/server_agents_test.go":                              1,
 	"cmd/serverapi/server_disk_status_test.go":                         1,
 	"cmd/serverctl/server_logs_test.go":                                1,
-	"e2e/agents_terminal_test.go":                                      6,
-	"e2e/idle_while_working_test.go":                                   1,
-	"e2e/server_lifecycle_test.go":                                     3, // one is a poll loop with a deadline waiting on a condition
 	"harness/harness_test.go":                                          1,
 	"nativerunner/answer_test.go":                                      1,
 	"nativerunner/conformance_test.go":                                 1,
