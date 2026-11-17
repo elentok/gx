@@ -1,0 +1,5 @@
+interface:
+  display_name: "Fork"
+  short_description: "Fork topics of this session into new chats or Designs"
+policy:
+  allow_implicit_invocation: false

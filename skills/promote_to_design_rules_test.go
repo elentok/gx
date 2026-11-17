@@ -8,14 +8,13 @@ import (
 )
 
 // fixedLines maps each fixed first-line sentence (found in gx-handoff.md by
-// its first word) to the files that must carry it. Ticket 13 adds
-// gx-fork/SKILL.md to the fork row.
+// its first word) to the files that must carry it.
 var fixedLines = []struct {
 	prefix string
 	files  []string
 }{
 	{"Promoted", []string{"gx-handoff.md", "gx-promote-to-design/SKILL.md", "gx-wayfinder/SKILL.md"}},
-	{"Forked", []string{"gx-handoff.md", "gx-wayfinder/SKILL.md"}},
+	{"Forked", []string{"gx-handoff.md", "gx-wayfinder/SKILL.md", "gx-fork/SKILL.md"}},
 }
 
 func TestForkedOutAnchors(t *testing.T) {
@@ -149,6 +148,37 @@ func TestGxStartDesignSkill(t *testing.T) {
 		if !strings.Contains(text, want) {
 			t.Errorf("gx-start-design/SKILL.md lacks %q", want)
 		}
+	}
+}
+
+func TestGxForkSkill(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-fork/SKILL.md"))
+	for _, want := range []string{
+		"gx agent actionable",
+		"gx agents drafts create",
+		"gx designs drafts create",
+		"gx server web-url --json",
+		"`base_url`",
+		"more than 5",
+		"## Forked out",
+		"## Failure handling",
+		"[gx-grilling](../gx-grilling/SKILL.md)",
+		"[gx-handoff](../gx-handoff.md)",
+		"[gx-wayfinder](../gx-wayfinder/SKILL.md)",
+		"GX_AGENT_SESSION",
+		"gx agents list --json",
+		"`queue`",
+		"`fix_of`",
+		"**Handled elsewhere**",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("gx-fork/SKILL.md lacks %q", want)
+		}
+	}
+	card := strings.Index(text, "approval card")
+	create := strings.Index(text, "gx agents drafts create")
+	if card < 0 || create < 0 || card > create {
+		t.Error("gx-fork/SKILL.md: the card step must come before the first create verb")
 	}
 }
 
