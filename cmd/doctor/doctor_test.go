@@ -11,7 +11,6 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -214,86 +213,18 @@ func TestDoctor_Fix_AppliesWhenConfirmed(t *testing.T) {
 	}
 }
 
-func TestDoctor_CheckBlockedForm_Pass(t *testing.T) {
-	t.Parallel()
-	var stdout bytes.Buffer
-	var gotTarget string
-	d := Deps{
-		Env: cmdbase.Env{
-			Env:    cmdtest.EnvFor(t),
-			Stdin:  strings.NewReader("\n"),
-			Stdout: &stdout,
-			Stderr: bytes.NewBuffer(nil),
-		},
-		ExplainAgent: func(target string) (herdr.AgentExplainResult, error) {
-			gotTarget = target
-			return herdr.AgentExplainResult{State: "blocked", MatchedRuleID: "live_blocked_form"}, nil
-		},
-	}
-
-	if err := runDoctorCmd(t, d, "--check-blocked-form", "iter-01"); err != nil {
-		t.Fatalf("doctor --check-blocked-form: %v", err)
-	}
-	if gotTarget != "iter-01" {
-		t.Errorf("explainAgent target = %q, want %q", gotTarget, "iter-01")
-	}
-	if !strings.Contains(stdout.String(), "PASS: herdr matched live_blocked_form.") {
-		t.Errorf("expected PASS message, got: %q", stdout.String())
-	}
-}
-
-func TestDoctor_CheckBlockedForm_FailsOnWrongRule(t *testing.T) {
-	t.Parallel()
-	var stdout bytes.Buffer
-	d := Deps{
-		Env: cmdbase.Env{
-			Env:    cmdtest.EnvFor(t),
-			Stdin:  strings.NewReader("\n"),
-			Stdout: &stdout,
-			Stderr: bytes.NewBuffer(nil),
-		},
-		ExplainAgent: func(target string) (herdr.AgentExplainResult, error) {
-			return herdr.AgentExplainResult{State: "idle", MatchedRuleID: "live_prompt_box"}, nil
-		},
-	}
-
-	err := runDoctorCmd(t, d, "--check-blocked-form", "iter-01")
-	if err == nil {
-		t.Fatal("expected error for mismatched rule")
-	}
-	if !strings.Contains(stdout.String(), "FAIL:") {
-		t.Errorf("expected FAIL message, got: %q", stdout.String())
-	}
-}
-
-func TestDoctor_Help_SaysBlockedFormIsHerdrOnly(t *testing.T) {
-	t.Parallel()
-	var stdout bytes.Buffer
-	d := Deps{Env: cmdbase.Env{Env: cmdtest.EnvFor(t), Stdout: &stdout, Stderr: &stdout}}
-
-	if err := runDoctorCmd(t, d, "--help"); err != nil {
-		t.Fatalf("doctor --help: %v", err)
-	}
-	out := strings.Join(strings.Fields(stdout.String()), " ")
-	for _, want := range []string{"--check-blocked-form", "herdr only", "gx claude doctor"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("doctor --help missing %q, got: %q", want, out)
-		}
-	}
-}
-
-func TestDoctor_CheckBlockedForm_RequiresTarget(t *testing.T) {
+func TestDoctor_CheckBlockedFormFlagIsGone(t *testing.T) {
 	t.Parallel()
 	d := Deps{Env: cmdbase.Env{
 		Env:   cmdtest.EnvFor(t),
 		Getwd: func() (string, error) { return "", errors.New("should not be called") },
 	}}
 
-	err := runDoctorCmd(t, d, "--check-blocked-form")
+	err := runDoctorCmd(t, d, "--check-blocked-form", "x")
 	if err == nil {
-		t.Fatal("expected error for missing target")
+		t.Fatal("expected error for removed flag")
 	}
-	if !strings.Contains(err.Error(), "--check-blocked-form requires a pane target") {
+	if !strings.Contains(err.Error(), `unknown doctor flag "--check-blocked-form"`) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

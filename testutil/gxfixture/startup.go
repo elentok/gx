@@ -143,9 +143,6 @@ func (f *fixture) applyScenarioEnv(o opts, sc scenario) error {
 		}
 		f.env = append(f.env, "GX_STALL_THRESHOLD="+stallThreshold)
 	}
-	if sc.DropAskedAgent {
-		f.env = append(f.env, "GX_DROP_ASKED_AGENT=1")
-	}
 	if sc.FastPacing {
 		f.env = append(f.env, "GX_FAST_PACING=1")
 	}

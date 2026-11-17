@@ -585,7 +585,7 @@ func New(cfg Config) (*Server, error) {
 		Log: s.log, Host: s.scheduler, Projects: s.projects, Recovery: s.recovery, Sessions: s.sessions,
 		Settings: &s.settings, Registry: s.registry, Guards: s.guards, Events: s.events, Index: s.idx,
 		Budget: s.budget, Writer: s.writer, Harness: s.harness, Landing: s.landing, Merger: s.merger,
-		OneOffs: s.oneOffs, Chat: s.chat, Progress: s.progress, DropAskedAgent: s.cfg.DropAskedAgent,
+		OneOffs: s.oneOffs, Chat: s.chat, Progress: s.progress,
 	})
 	s.scheduler.Launcher = s.launcher
 	s.reclaimer = sched.NewReclaimer(s.log, reclaimHost{s}, s.registry, savedRuns)

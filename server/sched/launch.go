@@ -74,8 +74,6 @@ type LauncherDeps struct {
 	Chat     *notify.ServerChat
 	// Progress receives each merged epic ticket for the next Progress message.
 	Progress *ProgressTimer
-	// DropAskedAgent closes an agent that asked instead of keeping it alive.
-	DropAskedAgent bool
 }
 
 // Launcher claims a ticket, starts its agent and settles the run when the

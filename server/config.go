@@ -84,11 +84,6 @@ type Config struct {
 	// unknown-skill error; nil means no refresh and no retry.
 	RefreshSkills func() error
 
-	// DropAskedAgent makes every run clean up after its agent asks, as a
-	// herdr-hosted run does. Test-only: gxfixture sets it, because a fixture
-	// has no herdr to exercise that path.
-	DropAskedAgent bool
-
 	// WrapLateFinishScan decorates the rescan's late-finish adoption step. It
 	// is the one narrow seam for the gxfixture-only hold (cmd/serverctl), so a
 	// flow can answer before the scan wins the race; nil in a release build.

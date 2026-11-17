@@ -28,13 +28,6 @@ func fastPollInterval(getenv func(string) string) time.Duration {
 
 const fastPacing = 100 * time.Millisecond
 
-// dropAskedAgent lets gxfixture force the cleanup a herdr-hosted run does when
-// its agent asks, which a fixture's pty runner never takes. Only the gxfixture
-// build reads the variable, so a release binary cannot be switched into it.
-func dropAskedAgent(getenv func(string) string) bool {
-	return getenv("GX_DROP_ASKED_AGENT") == "1"
-}
-
 // wrapLateFinishScan holds the late-finish rescan while the file named by
 // GX_HOLD_LATE_FINISH_SCAN exists, so a flow can send its answer before the
 // scan adopts. It returns nil (no hold) when the variable is unset.

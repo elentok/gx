@@ -93,7 +93,7 @@ func (f *fixture) seed(sc scenario) error {
 	if sc.Hold {
 		holdTimeout = "1h"
 	}
-	wcfg := agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: holdTimeout, Behaviour: sc.Behaviour, Design: sc.Design, DesignHold: sc.DesignHold, DesignByMap: sc.DesignByMap, Triage: sc.TriageAgent, Chat: sc.Chat, Transcript: sc.Transcripts}
+	wcfg := agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: holdTimeout, Behaviour: sc.Behaviour, Design: sc.Design, DesignHold: sc.DesignHold, DesignByMap: sc.DesignByMap, Triage: sc.TriageAgent, Chat: sc.Chat, Transcript: sc.Transcripts, ExitAfterAsk: sc.AgentExitsAfterAsk}
 	if sc.Usage {
 		resets := time.Now().Add(72 * time.Hour).Unix()
 		wcfg.Usage = &agentfake.UsageConfig{

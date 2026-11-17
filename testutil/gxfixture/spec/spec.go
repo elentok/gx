@@ -193,9 +193,10 @@ type Scenario struct {
 	ForkHooks bool
 	// FailingNpm makes that fake npm fail at once instead of holding.
 	FailingNpm bool
-	// DropAskedAgent forces the server to clean up an asking agent, as a
-	// herdr-hosted run does (see keepworktree.go).
-	DropAskedAgent bool
+	// AgentExitsAfterAsk makes the fake agent exit once the turn that asked is
+	// over, so the asking agent is gone while its worktree is kept (see
+	// keepworktree.go).
+	AgentExitsAfterAsk bool
 	// FastPacing caps the server's ralphloop pacing waits and shortens its
 	// index and claim poll (GX_FAST_PACING), for a scenario whose flow waits on
 	// several launches in a row.

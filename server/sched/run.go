@@ -522,7 +522,7 @@ func (l *Launcher) settleRun(rc runContext, err error) {
 		}
 		defer l.Guards.Merges.End()
 		one.Model, one.Effort = l.Projects.RunAgentConfig(addr.Project, one.Agent, run)
-		one.KeepAskedAgent = !l.DropAskedAgent && keepsAskedAgent(run)
+		one.KeepAskedAgent = keepsAskedAgent(run)
 		out, err = mode.Finish(deps, one, wt, run.Session.ID)
 		// The finish path wrote the merge or the pause; the store watch is only a hint.
 		l.Index.Rescan()

@@ -212,12 +212,14 @@ func TestLaunchdInstall_WritesCrashOnlyKeepAliveAndRunAtLoad(t *testing.T) {
 	}
 }
 
-// launchd starts agents with PATH=/usr/bin:/bin:/usr/sbin:/sbin, where herdr
-// and the agent CLIs aren't, so the installing shell's PATH and herdr socket
-// must be written into the plist.
+// launchd starts agents with PATH=/usr/bin:/bin:/usr/sbin:/sbin, where the
+// agent CLIs aren't, so the installing shell's PATH must be written into the
+// plist, and nothing else of its environment.
 func TestLaunchdInstall_WritesInstallingShellsEnvironment(t *testing.T) {
 	a, _ := newTestAgent(t)
-	a.environ = map[string]string{"PATH": "/opt/homebrew/bin:/usr/bin", "HERDR_SOCKET_PATH": "/h/herdr.sock"}
+	a.environ = launchdEnviron(func(key string) string {
+		return map[string]string{"PATH": "/opt/homebrew/bin:/usr/bin", "HERDR_SOCKET_PATH": "/h/herdr.sock"}[key]
+	})
 
 	if err := a.Install(); err != nil {
 		t.Fatal(err)
@@ -228,7 +230,6 @@ func TestLaunchdInstall_WritesInstallingShellsEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := "<key>EnvironmentVariables</key>\n\t<dict>\n" +
-		"\t\t<key>HERDR_SOCKET_PATH</key>\n\t\t<string>/h/herdr.sock</string>\n" +
 		"\t\t<key>PATH</key>\n\t\t<string>/opt/homebrew/bin:/usr/bin</string>\n" +
 		"\t</dict>"
 	if !strings.Contains(string(raw), want) {
@@ -236,11 +237,11 @@ func TestLaunchdInstall_WritesInstallingShellsEnvironment(t *testing.T) {
 	}
 }
 
-func TestLaunchdEnviron_KeepsOnlyPathAndHerdrSocket(t *testing.T) {
+func TestLaunchdEnviron_KeepsOnlyPath(t *testing.T) {
 	got := launchdEnviron(func(key string) string {
 		return map[string]string{"PATH": "/p", "HERDR_SOCKET_PATH": "/s", "HERDR_PANE_ID": "w:p1"}[key]
 	})
-	want := map[string]string{"PATH": "/p", "HERDR_SOCKET_PATH": "/s"}
+	want := map[string]string{"PATH": "/p"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("launchdEnviron = %v, want %v", got, want)
 	}

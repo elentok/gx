@@ -47,7 +47,7 @@ type launchdAgent struct {
 	exe       string
 	uid       int
 	// environ is written into the plist: launchd's own PATH is
-	// /usr/bin:/bin:/usr/sbin:/sbin, which has neither herdr nor the agents.
+	// /usr/bin:/bin:/usr/sbin:/sbin, which has neither git nor the agents.
 	environ map[string]string
 	run     func(args ...string) error
 	// output runs launchctl and returns its combined output.
@@ -55,9 +55,8 @@ type launchdAgent struct {
 }
 
 // launchdEnvKeys are the installing shell's variables the server needs: PATH
-// to find herdr, git and the agent CLIs, and herdr's socket. Pane- and
-// tab-scoped HERDR_* variables are left out on purpose.
-var launchdEnvKeys = []string{"PATH", "HERDR_SOCKET_PATH"}
+// to find git and the agent CLIs.
+var launchdEnvKeys = []string{"PATH"}
 
 // launchdEnviron picks launchdEnvKeys' non-empty values via getenv.
 func launchdEnviron(getenv func(string) string) map[string]string {

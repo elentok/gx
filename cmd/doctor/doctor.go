@@ -15,7 +15,6 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketgit"
 	"github.com/elentok/gx/ui"
@@ -25,8 +24,6 @@ import (
 // Deps is the runtime context of `gx doctor`.
 type Deps struct {
 	cmdbase.Env
-	// ExplainAgent reads herdr's pane recognition; nil means herdr.AgentExplain.
-	ExplainAgent func(target string) (herdr.AgentExplainResult, error)
 	// ProbeGhostty is the Ghostty AppleScript probe; nil means the real one.
 	ProbeGhostty func() error
 	// ConfirmForce asks before applying a fix.
@@ -39,7 +36,6 @@ type Deps struct {
 // and GOOS.
 func DefaultDeps() Deps {
 	return Deps{
-		ExplainAgent: herdr.AgentExplain,
 		ProbeGhostty: terminalrun.ProbeGhostty,
 	}
 }
@@ -47,15 +43,14 @@ func DefaultDeps() Deps {
 // New builds the `gx doctor` command.
 func New(d Deps) *cobra.Command {
 	return &cobra.Command{
-		Use:   "doctor [--fix] [--pause] [--check-blocked-form <target>] [--check-ghostty]",
+		Use:   "doctor [--fix] [--pause] [--check-ghostty]",
 		Short: "check the repo for common configuration issues",
 		Long: `Check the repo for common configuration issues.
 
 --check-ghostty runs instead of the repo checks and probes Ghostty's AppleScript
 interface. It may show a macOS Automation prompt.
 
---check-blocked-form <target> checks herdr only: it reads herdr's blocked-pane
-recognition. For a PTY agent run "gx claude doctor" instead.`,
+To check a PTY agent run "gx claude doctor".`,
 		// runDoctor does its own flag parsing, so cobra never sees --help.
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -70,7 +65,6 @@ recognition. For a PTY agent run "gx claude doctor" instead.`,
 func runDoctor(args []string, d Deps) error {
 	var fix bool
 	var pause bool
-	var blockedFormTarget string
 	var checkGhostty bool
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -80,19 +74,9 @@ func runDoctor(args []string, d Deps) error {
 			pause = true
 		case "--check-ghostty":
 			checkGhostty = true
-		case "--check-blocked-form":
-			i++
-			if i >= len(args) {
-				return fmt.Errorf("--check-blocked-form requires a pane target")
-			}
-			blockedFormTarget = args[i]
 		default:
 			return fmt.Errorf("unknown doctor flag %q", args[i])
 		}
-	}
-
-	if blockedFormTarget != "" {
-		return runDoctorBlockedFormCheck(blockedFormTarget, d)
 	}
 
 	getenv := d.Getenv
@@ -183,45 +167,6 @@ func runDoctor(args []string, d Deps) error {
 		pauseDoctor(d.Stdout, stdin)
 	}
 
-	return nil
-}
-
-// runDoctorBlockedFormCheck is gx doctor's interactive regression check for
-// the orchestrator gate (ralphloop's blocked-pane pause): it asks the operator
-// to drive target into a live blocked form by hand, then asserts herdr's own
-// pane monitor still recognizes it via the "live_blocked_form" rule the gate
-// depends on. See docs/runbooks/blocked-form-regression-check.md for the
-// full procedure and what to do on failure. It only runs when
-// --check-blocked-form is passed explicitly, so it never fires (or fails) in
-// a headless `gx doctor` invocation.
-func runDoctorBlockedFormCheck(target string, d Deps) error {
-	stdin := d.Stdin
-	if stdin == nil {
-		stdin = os.Stdin
-	}
-	explainAgent := d.ExplainAgent
-	if explainAgent == nil {
-		explainAgent = herdr.AgentExplain
-	}
-
-	fmt.Fprintln(d.Stdout, "Interactive check: blocked-form detection")
-	fmt.Fprintf(d.Stdout, "In pane %q, drive the agent into a form the orchestrator gate must\n", target)
-	fmt.Fprintln(d.Stdout, "recognize as blocked (see docs/runbooks/blocked-form-regression-check.md).")
-	fmt.Fprint(d.Stdout, "Once the prompt is showing, press Enter...")
-	_, _ = bufio.NewReader(stdin).ReadString('\n')
-
-	result, err := explainAgent(target)
-	if err != nil {
-		return fmt.Errorf("explaining %s: %w", target, err)
-	}
-
-	if result.State != "blocked" || result.MatchedRuleID != "live_blocked_form" {
-		fmt.Fprintf(d.Stdout, "FAIL: herdr matched rule %q (state %q); want \"live_blocked_form\" (state \"blocked\").\n", result.MatchedRuleID, result.State)
-		fmt.Fprintln(d.Stdout, "See docs/runbooks/blocked-form-regression-check.md for what to do next.")
-		return fmt.Errorf("blocked-form check failed: matched rule %q, not live_blocked_form", result.MatchedRuleID)
-	}
-
-	fmt.Fprintln(d.Stdout, "PASS: herdr matched live_blocked_form.")
 	return nil
 }
 

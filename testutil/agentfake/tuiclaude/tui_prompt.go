@@ -314,6 +314,9 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 	// be too late; claude also refreshes it mid-turn.
 	t.runStatusLine()
 	began := time.Now()
+	// The asking turn is the one that has not left UncommittedFile yet; a relaunch
+	// after the answer finds it and must stay up to finish.
+	exitAfterAsk := cfg.ExitAfterAsk && IsAsk(cfg.Behaviour[address]) && !FileExists(UncommittedFile)
 	failing := t.opts.classifierOutage > 0
 	if failing {
 		t.opts.classifierOutage--
@@ -331,6 +334,14 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 	}
 	if cfg.Behaviour[address] == BehaviourFail {
 		_ = SendControl(t.ctlPath, Control{Action: ActionExit, Code: 1})
+		return
+	}
+	if exitAfterAsk {
+		// Go idle first and leave later: the server adopts the ask from the
+		// finished turn, and an exit before that reads as a died session.
+		_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
+		time.Sleep(exitAfterAskDelay)
+		_ = SendControl(t.ctlPath, Control{Action: ActionExit})
 		return
 	}
 	if StartsBackgroundTask(cfg.Behaviour[address]) {

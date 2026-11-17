@@ -1,11 +1,9 @@
 package agentfake
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,15 +24,18 @@ const WorkerConfigFile = ".agentfake-worker.json"
 const UncommittedFile = "uncommitted-note.txt"
 
 // StartedSuffix names the marker file (Hold + StartedSuffix) the worker creates
-// once it has received a prompt: herdr's agent status never reports "working",
-// so tests wait on this instead.
+// once it has received a prompt, so tests can wait on the prompt arriving
+// instead of on a terminal state.
 const StartedSuffix = ".started"
 
-// WorkerConfig tells RunWorker how to finish a ticket.
+// WorkerConfig tells WorkTicket how to finish a ticket.
 type WorkerConfig struct {
-	Gx   string   `json:"gx"`             // gx binary used to report the iteration finished
-	Env  []string `json:"env,omitempty"`  // KEY=VALUE entries gx runs with (XDG dirs)
-	Hold string   `json:"hold,omitempty"` // while this file exists the agent stays "working"
+	// ExitAfterAsk makes the TUI fake exit once the turn that asked is over, as
+	// an agent that is gone by the time its question is answered.
+	ExitAfterAsk bool     `json:"exit_after_ask,omitempty"`
+	Gx           string   `json:"gx"`             // gx binary used to report the iteration finished
+	Env          []string `json:"env,omitempty"`  // KEY=VALUE entries gx runs with (XDG dirs)
+	Hold         string   `json:"hold,omitempty"` // while this file exists the agent stays "working"
 	// HoldTimeout is a Go duration after which the hold is ignored, so a flow
 	// that forgets to release it cannot hang; empty means no limit.
 	HoldTimeout string `json:"hold_timeout,omitempty"`
@@ -320,35 +321,6 @@ func askQuestion(cfg WorkerConfig, address, body string) error {
 	cmd.Stdin = strings.NewReader(body)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("gx tickets ask: %w\n%s", err, out)
-	}
-	return nil
-}
-
-// RunWorker is a fake agent that does a ticket's work: for each submitted
-// prompt (`/skill <address>`) it stays working while the Hold file exists,
-// commits a file in the current directory, reports the iteration finished
-// through gx, and goes idle again.
-func RunWorker(in io.Reader, out io.Writer) error {
-	raw, err := os.ReadFile(WorkerConfigFile)
-	if err != nil {
-		return err
-	}
-	var cfg WorkerConfig
-	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return err
-	}
-	fmt.Fprint(out, IdleTitle)
-	scanner := bufio.NewScanner(in)
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) == 0 {
-			continue
-		}
-		fmt.Fprint(out, WorkingTitle)
-		if err := WorkTicket(cfg, fields[len(fields)-1]); err != nil {
-			return err
-		}
-		fmt.Fprint(out, IdleTitle)
 	}
 	return nil
 }

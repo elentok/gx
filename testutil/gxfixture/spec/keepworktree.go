@@ -14,15 +14,15 @@ var keepWorktreeEpic = []epic{{project, "keep-epic", []ticket{
 }}}
 
 var (
-	// KeepWorktree forces the cleanup a herdr-hosted run does when its agent
-	// asks, so the kept worktree is the only thing that carries the file over.
+	// KeepWorktree has the agent exit when it asks, so the kept worktree is the
+	// only thing that carries the file over.
 	KeepWorktree = scenario{
-		Epics:          keepWorktreeEpic,
-		Queue:          []string{project + ":keep-epic"},
-		Behaviour:      map[string]string{project + ":keep-epic/01": agentfake.BehaviourWriteAsk},
-		DropAskedAgent: true,
+		Epics:              keepWorktreeEpic,
+		Queue:              []string{project + ":keep-epic"},
+		Behaviour:          map[string]string{project + ":keep-epic/01": agentfake.BehaviourWriteAsk},
+		AgentExitsAfterAsk: true,
 	}
-	// KeepAgent is the same ask on the unmodified pty runner, which keeps the
+	// KeepAgent is the same ask with the agent staying up, which keeps the
 	// worktree, pane and session.
 	KeepAgent = scenario{
 		Epics:     keepWorktreeEpic,
@@ -32,10 +32,10 @@ var (
 	// KeepCleanup is keepWorktree with a manual epic merge, so a test can cancel
 	// the asking ticket and then merge the epic itself.
 	KeepCleanup = scenario{
-		Epics:          keepWorktreeEpic,
-		Queue:          []string{project + ":keep-epic"},
-		Behaviour:      map[string]string{project + ":keep-epic/01": agentfake.BehaviourWriteAsk},
-		DropAskedAgent: true,
-		ManualMerge:    []string{project},
+		Epics:              keepWorktreeEpic,
+		Queue:              []string{project + ":keep-epic"},
+		Behaviour:          map[string]string{project + ":keep-epic/01": agentfake.BehaviourWriteAsk},
+		AgentExitsAfterAsk: true,
+		ManualMerge:        []string{project},
 	}
 )
