@@ -605,7 +605,7 @@ test("a merged ticket's stat line adds elapsed, cost and context; a map ticket h
   expect(await screen.findByText("implement · 10m · $1.50 · 85K context")).toBeTruthy()
   cleanup()
   renderAt("/t/proj:work/02", withDetail({ map_epic: true, type: "implement" }))
-  await screen.findByRole("heading", { level: 1 })
+  await screen.findByRole("heading", { level: 1, name: "Title of proj:work/02" })
   expect(screen.queryByText("implement")).toBeNull()
 })
 

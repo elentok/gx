@@ -23,6 +23,8 @@ import { DraftSlots, type DraftImages as DraftImagesState } from "./useDraftImag
 import { useShell } from "../shell/ShellContext"
 import { useEpicList } from "../epics/list"
 import { DetailPage } from "../page/DetailPage"
+import { StateHeader } from "../page/StateHeader"
+import { useClaimHeader } from "../page/useClaimHeader"
 import { designHref } from "../hrefs"
 import { postOpenDesign, type OpenDesign } from "./open"
 import { saveUnsaved, type Restored } from "./unsaved"
@@ -131,6 +133,7 @@ export function DraftPage({ drafts = realDrafts, ...props }: PageProps) {
   if (!loaded || stale) {
     return (
       <DetailPage title={{ kind: "Design draft" }}>
+        <StateHeader title="Design draft" />
         <Box display="flex" alignItems="center" justifyContent="center" py="10">
           {loaded === undefined || stale ? (
             <Spinner />
@@ -187,9 +190,8 @@ function DraftForm({
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
   const [confirming, setConfirming] = useState(false)
-  // Like PageHeader: the mascot toggle leads this header, so the shell drops its floating one.
-  const claimHeader = shell?.claimHeader
-  useEffect(() => claimHeader?.(), [claimHeader])
+  // The mascot toggle leads this header, so the shell drops its floating one.
+  useClaimHeader()
   useDraftLifecycle({ drafts, autosave })
 
   const removeNow = () => {

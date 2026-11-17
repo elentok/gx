@@ -34,7 +34,7 @@ import { PageHeader } from "../page/PageHeader"
 import { PageIcon } from "../page/PageIcon"
 import { Button } from "../ui/button/Button"
 import { Chip } from "../ui/chip/Chip"
-import { Spinner } from "../ui/spinner/Spinner"
+import { StateHeader } from "../page/StateHeader"
 import { useFetched, type FetchedState } from "../useFetched"
 import { useFetchedReady, useReady } from "../useReady"
 import { useWrite } from "../useWrite"
@@ -49,7 +49,7 @@ import {
   type LoginWrite,
   type WebLoginEntry,
 } from "./logins"
-import { BackLink, CountChip, Frame, Group, rowProps, SearchBox } from "./parts"
+import { BackLink, CountChip, Frame, Group, LoadingState, rowProps, SearchBox } from "./parts"
 import type { WriteSetting } from "./SettingsRow"
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -385,7 +385,7 @@ export function CertificatePage({
   useFetchedReady(auth)
   return (
     <DetailPage title={{ kind: "Settings", name: "Certificate" }}>
-      {auth.data ? <CertificateView cert={auth.data} /> : <Spinner label="Loading" />}
+      {auth.data ? <CertificateView cert={auth.data} /> : <LoadingState title="Certificate" />}
     </DetailPage>
   )
 }
@@ -474,7 +474,7 @@ function SectionPage({
           </Box>
         </Frame>
       ) : (
-        <Spinner label="Loading" />
+        <LoadingState title={section} />
       )}
     </DetailPage>
   )
@@ -522,7 +522,7 @@ function ShellPage({
           onWrite={onWrite}
         />
       ) : (
-        <Spinner label="Loading" />
+        <LoadingState title={section ?? "Settings"} />
       )}
     </DetailPage>
   )
@@ -570,7 +570,7 @@ function GlobalHomePage({ slug, ...props }: SettingsPageProps & { slug?: string 
           onSignOut={() => void signOut()}
         />
       ) : (
-        <Spinner label="Loading" />
+        <LoadingState title="Settings" />
       )}
     </DetailPage>
   )
@@ -595,6 +595,7 @@ function ProjectPage({
   if (settings.failed) {
     return (
       <DetailPage title={{ kind: "Settings" }}>
+        <StateHeader title="Settings" />
         <EmptyState title="Project not found">There is no project named “{project}”.</EmptyState>
       </DetailPage>
     )
@@ -614,7 +615,7 @@ function ProjectPage({
             onScope={(next) => navigate(homePath(next))}
           />
         ) : (
-          <Spinner label="Loading" />
+          <LoadingState title={project} />
         )}
       </DetailPage>
     )
@@ -656,7 +657,7 @@ export function WebLoginsPage({
       {logins.data ? (
         <WebLoginsView logins={logins.data} now={now()} />
       ) : (
-        <Spinner label="Loading" />
+        <LoadingState title="Web logins" />
       )}
     </DetailPage>
   )
@@ -683,9 +684,10 @@ export function WebLoginPage({
   return (
     <DetailPage title={{ kind: "Settings", name: login?.name ?? "Web login" }}>
       {!logins.data ? (
-        <Spinner label="Loading" />
+        <LoadingState title="Web login" />
       ) : !login ? (
         <Frame>
+          <StateHeader title="Web login" />
           <BackLink />
           <Text mt="4" color="text.muted">
             This web login no longer exists.
@@ -722,6 +724,7 @@ export function UnknownSettingsPage() {
   return (
     <DetailPage title={{ kind: "Settings" }}>
       <Frame>
+        <StateHeader title="Settings" />
         <BackLink />
       </Frame>
     </DetailPage>

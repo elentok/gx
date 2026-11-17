@@ -17,8 +17,9 @@ import { PROMPT_BOX_SELECTOR } from "../ui/expandable-text/look"
 import type { ChatDraft } from "../generated/server"
 import { agentPath } from "../hrefs"
 import { DetailPage } from "../page/DetailPage"
+import { StateHeader } from "../page/StateHeader"
+import { useClaimHeader } from "../page/useClaimHeader"
 import { MascotToggle } from "../shell/MascotToggle"
-import { useShell } from "../shell/ShellContext"
 import { ChatDraftIcon } from "../shell/SidebarRows"
 import type { ViMode } from "../ui/expandable-text/CodeEditor"
 import { ModeText } from "../ui/expandable-text/ModeText"
@@ -85,6 +86,7 @@ export function ChatDraftPage({
   if (!loaded || stale) {
     return (
       <DetailPage title={{ kind: "Chat draft" }}>
+        <StateHeader title="Chat draft" />
         <Box display="flex" alignItems="center" justifyContent="center" py="10">
           {loaded === undefined || stale ? (
             <Spinner />
@@ -119,7 +121,6 @@ function ChatDraftForm({
   fetchTrees?: FetchWorktrees
   fetchDefaults?: FetchDefaults
 }) {
-  const shell = useShell()
   const navigate = useNavigate()
   const leaveGone = useLeaveGone(agentPath)
   const {
@@ -163,9 +164,8 @@ function ChatDraftForm({
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
   const [confirming, setConfirming] = useState(false)
-  // Like PageHeader: the mascot toggle leads this header, so the shell drops its floating one.
-  const claimHeader = shell?.claimHeader
-  useEffect(() => claimHeader?.(), [claimHeader])
+  // The mascot toggle leads this header, so the shell drops its floating one.
+  useClaimHeader()
 
   const formRef = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)

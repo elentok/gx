@@ -1,6 +1,18 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import type { ReactNode } from "react"
 import { SETTINGS_HREF } from "../hrefs"
+import { StateHeader } from "../page/StateHeader"
+import { Spinner } from "../ui/spinner/Spinner"
+
+/** A settings page still loading: the page's own header over the spinner. */
+export function LoadingState({ title }: { title: string }) {
+  return (
+    <>
+      <StateHeader title={title} />
+      <Spinner label="Loading" />
+    </>
+  )
+}
 
 export const CountChip = ({ n, testId }: { n: number; testId?: string }) => (
   <chakra.span

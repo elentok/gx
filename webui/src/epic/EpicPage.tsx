@@ -33,6 +33,7 @@ import { Markdown } from "../markdown/Markdown"
 import { DetailPage } from "../page/DetailPage"
 import { FileLinkProvider, NoFileLinks } from "../files/FileLinkContext"
 import { PageHeader } from "../page/PageHeader"
+import { StateHeader } from "../page/StateHeader"
 import { PageIcon } from "../page/PageIcon"
 import { Badge } from "../ui/badge/Badge"
 import { Button } from "../ui/button/Button"
@@ -525,7 +526,10 @@ function EpicPageBody({
   return (
     <FileLinkProvider base={{ project: address.split(":")[0] }}>
       {notFound ? (
-        <EmptyState title="Epic not found">{address} does not exist.</EmptyState>
+        <>
+          <StateHeader title={name} />
+          <EmptyState title="Epic not found">{address} does not exist.</EmptyState>
+        </>
       ) : detail ? (
         <>
           <PageHeader
@@ -581,7 +585,10 @@ function EpicPageBody({
           <MoreStats detail={detail} />
         </>
       ) : (
-        <FullScreenLoader label="Loading epic" />
+        <>
+          <StateHeader title={name} />
+          <FullScreenLoader label="Loading epic" />
+        </>
       )}
     </FileLinkProvider>
   )

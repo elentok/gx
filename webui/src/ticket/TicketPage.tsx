@@ -10,6 +10,7 @@ import { VerdictLine, verdictText } from "../verdict"
 import { isExited } from "../agents/sessionWrites"
 import { PageHeader } from "../page/PageHeader"
 import { PageIcon } from "../page/PageIcon"
+import { StateHeader } from "../page/StateHeader"
 import { Button } from "../ui/button/Button"
 import { EmptyState } from "../ui/empty-state/EmptyState"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
@@ -60,7 +61,10 @@ export function TicketPage({
     <DetailPage title={{ kind: "Ticket", name: detail?.title.trim() || address }}>
       <FileLinkProvider base={{ project: address.split(":")[0] }}>
         {notFound ? (
-          <EmptyState title="Ticket not found">{address} does not exist.</EmptyState>
+          <>
+            <StateHeader title={address} />
+            <EmptyState title="Ticket not found">{address} does not exist.</EmptyState>
+          </>
         ) : detail ? (
           <>
             <PageHeader title={detail.title} icon={<PageIcon kind="ticket" />} subtitle={address}>
@@ -101,7 +105,10 @@ export function TicketPage({
             )}
           </>
         ) : (
-          <FullScreenLoader label="Loading ticket" />
+          <>
+            <StateHeader title={address} />
+            <FullScreenLoader label="Loading ticket" />
+          </>
         )}
       </FileLinkProvider>
     </DetailPage>

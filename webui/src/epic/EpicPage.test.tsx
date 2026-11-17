@@ -106,7 +106,8 @@ const joined = row("blog-impl", { addresses: ["gx:blog-impl", "gx:blog"], card_k
 
 test("the epic page title is a plain heading, not a dropdown, and there is no back link", async () => {
   render("/e/gx:blog-impl", [joined, row("other")])
-  const title = await screen.findByRole("heading", { level: 1 })
+  await screen.findByTestId("stats-line")
+  const title = screen.getByRole("heading", { level: 1 })
   expect(screen.queryByRole("link", { name: /^←/ })).toBeNull()
   expect(within(title).queryByRole("button")).toBeNull()
 })
@@ -137,7 +138,7 @@ test("an unmerged epic with commits ahead links View diff with the response's ba
 
 test("an epic whose boolean is false shows no View diff", async () => {
   render("/e/gx:blog-impl", [], "loop", { detail: { diff_base: "main", diff_tip: "b" } })
-  expect(await screen.findByRole("heading", { level: 1 })).toBeTruthy()
+  await screen.findByTestId("stats-line")
   expect(screen.queryByRole("link", { name: "View diff" })).toBeNull()
 })
 
@@ -155,7 +156,7 @@ test("a merged epic with no recorded range links with empty refs and the epic", 
 
 test("an -impl epic with no Design shows no partner button", async () => {
   render("/e/gx:solo-impl", [row("solo-impl")])
-  await screen.findByRole("heading", { level: 1 })
+  await screen.findByTestId("stats-line")
   expect(screen.queryByRole("button", { name: /Open (design|implementation epic)/ })).toBeNull()
 })
 
@@ -1209,7 +1210,7 @@ test("opening an unread epic marks it seen; a read one posts nothing", async () 
     cleanup()
     fetchMock.mockClear()
     render("/e/gx:calm", [row("calm", { addresses: ["gx:calm"] })])
-    await screen.findByRole("heading", { level: 1 })
+    await screen.findByTestId("stats-line")
     expect(fetchMock).not.toHaveBeenCalledWith("/v1/epics/mark-seen", expect.anything())
   } finally {
     vi.unstubAllGlobals()

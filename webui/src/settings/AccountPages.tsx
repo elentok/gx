@@ -9,13 +9,13 @@ import { DetailPage } from "../page/DetailPage"
 import { PageHeader } from "../page/PageHeader"
 import { PageIcon } from "../page/PageIcon"
 import { Button } from "../ui/button/Button"
-import { Spinner } from "../ui/spinner/Spinner"
 import { useFetched } from "../useFetched"
 import { useFetchedReady } from "../useReady"
 import { useWrite } from "../useWrite"
 import { beginReset, changePassword, finishReset, type AccountCall } from "./account"
 import { fetchLogins, type FetchLogins } from "./logins"
-import { BackLink, Frame } from "./parts"
+import { StateHeader } from "../page/StateHeader"
+import { BackLink, Frame, LoadingState } from "./parts"
 
 function Form({
   onSubmit,
@@ -265,7 +265,7 @@ export function ChangePasswordPage({
   return (
     <DetailPage title={{ kind: "Settings", name: "Change password" }}>
       {loading || !auth ? (
-        <Spinner label="Loading" />
+        <LoadingState title="Change password" />
       ) : (
         <ChangePasswordView
           otherDevices={otherDevices}
@@ -298,17 +298,14 @@ export function AuthenticatorPage({
   const { auth, loading, otherDevices, write, leave, error } = useAccountPage(fetchAuth, fetchList)
   const [next, setNext] = useState<NewAuthenticator>()
   const mode: AuthenticatorMode = auth?.setup_code_required ? "add" : "replace"
+  const title = mode === "add" ? "Add authenticator" : "Reset authenticator"
   return (
-    <DetailPage
-      title={{
-        kind: "Settings",
-        name: mode === "add" ? "Add authenticator" : "Reset authenticator",
-      }}
-    >
+    <DetailPage title={{ kind: "Settings", name: title }}>
       {loading || !auth ? (
-        <Spinner label="Loading" />
+        <LoadingState title={title} />
       ) : !auth.totp_on ? (
         <Frame>
+          <StateHeader title={title} />
           <BackLink />
           <Text mt="4" color="text.muted">
             The authenticator is turned off.
