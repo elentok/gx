@@ -17,7 +17,7 @@ import (
 // smokeScenarios are the scenarios no other test starts, plus "ready" as the
 // baseline. The covered ones need no second start here.
 var smokeScenarios = []string{
-	"check-lock", "design-branch", "design-defaulted", "design-error", "design-guard",
+	"agent-pane-busy", "herdr-config", "old-run-log", "check-lock", "design-branch", "design-defaulted", "design-error", "design-guard",
 	"design-mixed", "design-plain", "design-text", "design-working", "edge",
 	"long-running", "mixed", "model-mismatch", "model-switch", "restart-launchd", "ready",
 }

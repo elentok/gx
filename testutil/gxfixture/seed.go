@@ -228,6 +228,9 @@ func (f *fixture) seed(sc scenario) error {
 				return err
 			}
 		}
+		if err := appendRawRunLog(filepath.Join(f.store, e.Project, e.Name, "run-log.jsonl"), sc.RunLog[addr]); err != nil {
+			return err
+		}
 		for _, tk := range e.Tickets {
 			if err := servertest.WriteTicketFile(f.store, e.Project, e.Name, tk.ID, tk.Slug, tk.Opts); err != nil {
 				return err

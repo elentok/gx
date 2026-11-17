@@ -47,6 +47,22 @@ type ArchivedEpic struct {
 	Tickets             []Ticket
 }
 
+// LeftoverRun is one run left behind for the server's start-up recovery.
+type LeftoverRun struct {
+	// Address is the ticket, project:epic/id. Its epic must be seeded.
+	Address string
+	// Runner is the runner recorded in the run's runs.json entry.
+	Runner string
+	// Commit adds one commit to the run's worktree; false leaves it clean.
+	Commit bool
+}
+
+// RunLogLine is one run-log event. Type and Kind are plain strings so a line
+// can carry a name the code no longer defines.
+type RunLogLine struct {
+	Type, Kind, Reason string
+}
+
 // Git runs git in dir for a GitSetup hook.
 type Git func(dir string, args ...string) error
 
@@ -146,6 +162,11 @@ type Scenario struct {
 	// PickedEpics (project:epic) get a run log with a cherry-picked event, the
 	// mark of an epic whose commits reached trunk.
 	PickedEpics []string
+	// LeftoverRuns are claimed tickets with a worktree and a runs.json entry
+	// staged before the server starts, as a server that died mid-iteration leaves them.
+	LeftoverRuns []LeftoverRun
+	// RunLog holds extra run-log events by epic address, written with the epic's seed.
+	RunLog map[string][]RunLogLine
 	// QueueAfterSessions queues sc.Queue once the sessions are seeded: a Queue
 	// agent's control file would otherwise break seedSession's before/after diff.
 	QueueAfterSessions bool

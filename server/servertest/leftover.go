@@ -2,6 +2,7 @@ package servertest
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -38,9 +39,23 @@ type Run struct {
 // It returns the worktree path and the ticket file.
 func (h *Harness) LeaveRun(t *testing.T, store, repo string, tg Target, work func(wtPath string), handle func(Run) map[string]any) (wtPath, ticketPath string) {
 	t.Helper()
-	epics, err := tickets.Load(filepath.Join(store, tg.Project))
+	var workFn func(string) error
+	if work != nil {
+		workFn = func(wt string) error { work(wt); return nil }
+	}
+	wtPath, ticketPath, err := StageLeftover(h.StateDir, store, repo, tg, workFn, handle)
 	if err != nil {
 		t.Fatal(err)
+	}
+	return wtPath, ticketPath
+}
+
+// StageLeftover is LeaveRun without a testing.T: it writes runs.json under
+// stateDir and returns an error instead of failing a test.
+func StageLeftover(stateDir, store, repo string, tg Target, work func(wtPath string) error, handle func(Run) map[string]any) (wtPath, ticketPath string, err error) {
+	epics, err := tickets.Load(filepath.Join(store, tg.Project))
+	if err != nil {
+		return "", "", err
 	}
 	var tk tickets.Ticket
 	found := false
@@ -55,19 +70,21 @@ func (h *Harness) LeaveRun(t *testing.T, store, repo string, tg Target, work fun
 		}
 	}
 	if !found {
-		t.Fatalf("no ticket %s in %s", tg.Ticket, store)
+		return "", "", fmt.Errorf("no ticket %s in %s", tg.Ticket, store)
 	}
 	if err := ticketops.Claim(tk.Path); err != nil {
-		t.Fatal(err)
+		return "", "", err
 	}
 	wt, err := ralphloop.PrepareIteration(deps.DefaultDeps(), ralphloop.OneIteration{
 		RepoDir: repo, Epic: tg.Epic, ScratchDir: store, Agent: agent.AgentClaude, Ticket: tk,
 	})
 	if err != nil {
-		t.Fatal(err)
+		return "", "", err
 	}
 	if work != nil {
-		work(wt.Path)
+		if err := work(wt.Path); err != nil {
+			return "", "", err
+		}
 	}
 
 	entry := handle(Run{Ticket: tk, Worktree: wt})
@@ -79,12 +96,15 @@ func (h *Harness) LeaveRun(t *testing.T, store, repo string, tg Target, work fun
 	}
 	data, err := json.Marshal([]map[string]any{entry})
 	if err != nil {
-		t.Fatal(err)
+		return "", "", err
 	}
-	if err := os.WriteFile(filepath.Join(h.StateDir, "runs.json"), data, 0o600); err != nil {
-		t.Fatal(err)
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		return "", "", err
 	}
-	return wt.Path, tk.Path
+	if err := os.WriteFile(filepath.Join(stateDir, "runs.json"), data, 0o600); err != nil {
+		return "", "", err
+	}
+	return wt.Path, tk.Path, nil
 }
 
 // LeaveHerdrRun is LeaveRun for a run on runner (a herdr-style runner) in pane
