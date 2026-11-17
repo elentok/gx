@@ -43,9 +43,9 @@ test("Esc again closes the confirm, sends nothing and returns focus to the butto
   // Focus must be inside the confirm before Esc, or the key lands on the page.
   await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true))
   fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
-  await waitFor(() => expect(confirm()).toBeNull(), { timeout: 5000 })
+  await waitFor(() => expect(confirm()).toBeNull())
   expect(onInterrupt).not.toHaveBeenCalled()
-  await waitFor(() => expect(document.activeElement).toBe(button()), { timeout: 5000 })
+  await waitFor(() => expect(document.activeElement).toBe(button()))
 })
 
 test("a click-opened confirm focuses Cancel", async () => {

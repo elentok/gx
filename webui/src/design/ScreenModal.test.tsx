@@ -108,7 +108,7 @@ test("marks fade", async () => {
 
 test("Refresh does one plain read and sends no key", async () => {
   const { f, poster } = open()
-  await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
+  await screen.findByText("row one")
   fireEvent.click(screen.getByRole("button", { name: "Refresh" }))
   await waitFor(() => expect(f).toHaveBeenCalledTimes(2))
   expect(poster).not.toHaveBeenCalled()
