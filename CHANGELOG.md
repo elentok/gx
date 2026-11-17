@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.51.3 - 2026-11-17
+
+- Added a Rest feature for mental health. A Rest screen locks the UI for a Break (with countdown) or Bedtime. "Unlock anyway" is an input on the screen. Warning toasts show top-right before a Break or Bedtime. Queued tickets and running agents keep working under Rest. New settings keys, `gx rest` verbs, and a Mental health card in Stats. The Rest screen works with the keyboard.
+- Added a task list in the chat. It shows a summary line and rows for Claude shells, Monitors and subagents, and for Codex commands and subagents. Expanded rows show details per kind (output size, last line, exit code, model, tokens, tool calls, current call) and a highlighted command. This replaces the old background-task text.
+- Added a less eager process storm guard. It kills a storm only after 10 samples or over a hard ceiling, and the report names the top processes and the limit that fired.
+- Added launch recovery for agents. gx refreshes the skill install and retries once when a launch ends with an unknown skill (Claude and Codex). gx no longer resends a prompt into a working agent. The launch note now goes through a store file (Claude) or `developer_instructions` (Codex), and the typed prompt stays bare.
+- Added a verify finish block. A verify ticket cannot finish with unchecked stories. gx resends, then pauses after a cap. Verify tickets now have a strict Stories section.
+- Added `gx tickets show --brief`, `gx tickets section --append`, and `gx brief playwright --all`. A bare `gx brief playwright` run is now refused. Failing-test output is shorter.
+- Added a duplicate check for follow-ups. `follow-up add` refuses a title that an open follow-up already has (`--force` overrides). Ask summaries over 120 chars are refused locally.
+- Changed diagrams to render with Pele instead of Mermaid.
+- Changed sidebar bulk Archive to fit every epic and Design, like the row menu.
+- Changed Ask cards to number questions by position, with the header folded into the title.
+- Changed Triage to use the design flow's tabs and question sheet. Past Triages are collapsed by default and hidden on phones.
+- Changed "New session / Create session" to "New chat / Create chat" in the Agents form.
+- Changed quota percentage labels in burn stats to be clearer.
+- Changed conflict-resolution child tickets to show tokens and elapsed time.
+- Fixed a rate-limited idle agent being nudged. gx now holds it. Merge tickets launch under gx-merge.
+- Fixed a released ask disappearing in the busy gap before Claude's dialog shows.
+- Fixed the epic all-done check not running after Cancel marks tickets cancelled.
+- Fixed clearing a paused ticket not cancelling the epic-level investigate ticket.
+- Fixed a hosted image being marked missing on non-404 errors. It now happens only after a 404.
+- Fixed clicking the same fragment link twice not scrolling again.
+- Fixed the hosted-file token route. It now answers 405 with `Allow` for non-GET/HEAD requests.
+- Fixed a missing full SHA with no epic stamped. It now returns 400 "Unknown ref".
+- Fixed the typing lock and rename slot staying behind for a session that is gone.
+- Fixed a false mention warning for a ticket's own fork child.
+- Fixed web performance stats. Side fetches no longer count as blocking API latency, and the daily bucket uses local time.
+- Fixed idle transcript polls. They now cost one stat, and old runs skip the all-directories transcript glob.
+- Fixed `gx check --full` so the format step is check-only.
+
 ## v0.51.2 - 2026-11-15
 
 - Changed long chats to mount fewer DOM nodes. The chat shows the newest 60 messages, and "Show earlier" adds 60 more. Tool-call lines mount only when you open the run. Markdown no longer re-parses on every file verdict batch.
