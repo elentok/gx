@@ -7,7 +7,7 @@ into Claude's and Codex's user skill roots.
 
 These skills are gx-specific adaptations of upstream skills. They're inlined here, rather than
 fetched at install time: security and ease-of-deployment — no network fetch during an unattended
-ralph-loop run. Each vendored directory has a `LICENSE` (MIT) and a `README.md` naming its upstream.
+ralph-loop run. Each vendored directory has a `LICENSE` (MIT, except the five from `anthropics/claude-plugins-official`, which are Apache-2.0) and a `README.md` naming its upstream.
 
 From [Matt Pocock's skills repo](https://github.com/mattpocock/skills) (Matt Pocock):
 
@@ -29,6 +29,22 @@ From [cursor/plugins](https://github.com/cursor/plugins):
 | --- | --- | --- |
 | `gx-unslop` | `pstack/skills/unslop` | Lauren Tan (`pstack`) |
 | `gx-thermo-nuclear-code-quality-review` | `cursor-team-kit/skills/thermo-nuclear-code-quality-review` | Cursor (`cursor-team-kit`) |
+
+From [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) (Apache-2.0):
+
+| Skill | Upstream path |
+| --- | --- |
+| `gx-code-reviewer` | `plugins/pr-review-toolkit/agents/code-reviewer.md` |
+| `gx-silent-failure-hunter` | `plugins/pr-review-toolkit/agents/silent-failure-hunter.md` |
+| `gx-type-design-analyzer` | `plugins/pr-review-toolkit/agents/type-design-analyzer.md` |
+| `gx-comment-analyzer` | `plugins/pr-review-toolkit/agents/comment-analyzer.md` |
+| `gx-pr-test-analyzer` | `plugins/pr-review-toolkit/agents/pr-test-analyzer.md` |
+
+From [anthropics/claude-code-security-review](https://github.com/anthropics/claude-code-security-review) (MIT):
+
+| Skill | Upstream path |
+| --- | --- |
+| `gx-security-review` | `.claude/commands/security-review.md` |
 
 `gx-resolving-merge-conflicts` came from a skill Matt Pocock's repo has since removed, so it has no
 upstream to pin; gx owns it now. `gx-verify` is gx's own.
@@ -256,6 +272,36 @@ skills/
     README.md
     agents/openai.yaml
   gx-thermo-nuclear-code-quality-review/
+    SKILL.md
+    LICENSE
+    README.md
+    agents/openai.yaml
+  gx-code-reviewer/
+    SKILL.md
+    LICENSE
+    README.md
+    agents/openai.yaml
+  gx-silent-failure-hunter/
+    SKILL.md
+    LICENSE
+    README.md
+    agents/openai.yaml
+  gx-type-design-analyzer/
+    SKILL.md
+    LICENSE
+    README.md
+    agents/openai.yaml
+  gx-comment-analyzer/
+    SKILL.md
+    LICENSE
+    README.md
+    agents/openai.yaml
+  gx-pr-test-analyzer/
+    SKILL.md
+    LICENSE
+    README.md
+    agents/openai.yaml
+  gx-security-review/
     SKILL.md
     LICENSE
     README.md

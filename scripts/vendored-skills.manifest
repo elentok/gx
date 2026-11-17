@@ -1,6 +1,8 @@
 # Maintainer data for scripts/sync-vendored-skills.sh. Not part of the installed bundle.
 # Columns, whitespace separated:
 #   gx-skill  upstream-repo  upstream-skill-path  upstream-license-path  last-synced-commit  [strategy]
+# upstream-skill-path is a directory, or a file path for a "port" row (a single agent or command file).
+# last-synced-commit is the upstream commit the copy was taken from.
 # strategy is "merge" or "port"; "merge" when absent.
 gx-tdd         mattpocock/skills  skills/engineering/tdd          LICENSE  bd453a6  merge
 gx-to-tickets  mattpocock/skills  skills/engineering/to-tickets   LICENSE  19c50d5  port

@@ -445,6 +445,28 @@ func TestSyncMissingUpstreamPath_IsReportedAndNothingIsWritten(t *testing.T) {
 	assertSnapshotUnchanged(t, before, snapshot(t, filepath.Dir(f.gxSkill)))
 }
 
+func TestSyncPort_FilePathUpstream(t *testing.T) {
+	f := newSyncFixture(t)
+	const cmdPath = ".claude/commands/review.md"
+	pin := f.commitUpstream(t, "add command", map[string]string{cmdPath: "review v1\n"})
+	f.commitUpstream(t, "edit command", map[string]string{cmdPath: "review v2\n"})
+	gxFile := filepath.Join(filepath.Dir(f.gxSkill), "gx-review")
+	writeFile(t, filepath.Join(gxFile, "SKILL.md"), "review v1\n")
+	writeFile(t, filepath.Join(gxFile, "LICENSE"), "MIT\n")
+	writeFile(t, f.manifest, "gx-review "+fixtureRepo+" "+cmdPath+" LICENSE "+pin+" port\n")
+
+	out := f.runSync(t, "--merge")
+
+	for _, bad := range []string{"no longer exists", "license changed"} {
+		if strings.Contains(out, bad) {
+			t.Errorf("file-path port row rejected (%q):\n%s", bad, out)
+		}
+	}
+	if !strings.Contains(out, "+review v2") {
+		t.Errorf("report missing the upstream diff:\n%s", out)
+	}
+}
+
 func TestRealManifest_SeedsTheBundledSkills(t *testing.T) {
 	b, err := os.ReadFile("vendored-skills.manifest")
 	if err != nil {

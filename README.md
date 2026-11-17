@@ -516,3 +516,5 @@ gx bundles skills adapted from these projects. Each copy lives in `skills/` with
 - [Matt Pocock](https://github.com/mattpocock), from [mattpocock/skills](https://github.com/mattpocock/skills): to-tickets, tdd, implement, research, prototype, wayfinder, to-spec, domain-modeling and grilling. The merge-conflict skill started there too.
 - [Lauren Tan](https://github.com/poteto), from `pstack` in [cursor/plugins](https://github.com/cursor/plugins): unslop.
 - [Eric Zakariasson](https://github.com/ericzakariasson), from `cursor-team-kit` in [cursor/plugins](https://github.com/cursor/plugins): thermo-nuclear-code-quality-review.
+- Anthropic, from `plugins/pr-review-toolkit/agents/` in [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) (Apache-2.0): code-reviewer, silent-failure-hunter, type-design-analyzer, comment-analyzer and pr-test-analyzer.
+- Anthropic, from `.claude/commands/security-review.md` in [anthropics/claude-code-security-review](https://github.com/anthropics/claude-code-security-review) (MIT): security-review.
