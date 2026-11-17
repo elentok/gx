@@ -95,6 +95,12 @@ func (p *Prompt) codexQuestionReady(id string) (string, wire.SessionResult, erro
 	return dir, wire.SessionResult{}, nil
 }
 
+// codexQuestionText is the text the Codex screen draws for q: the raw
+// question, or the title for a card that carries none.
+func codexQuestionText(q wire.QuestionCardQuestion) string {
+	return cmp.Or(q.Question, q.Title)
+}
+
 // checkOverlay waits for the overlay's header to read question i+1 (a late
 // redraw is not a mismatch), then compares the rest of the screen with the
 // card's question. It returns a description of the difference, or "".
@@ -123,7 +129,7 @@ func checkOverlay(c *holder.HolderClient, wait time.Duration, i, total int, q wi
 	switch {
 	case o.Total != total:
 		return fmt.Sprintf("the screen has %d questions, the card has %d", o.Total, total)
-	case claudeui.Normalize(o.Question) != claudeui.Normalize(q.Title):
+	case claudeui.Normalize(o.Question) != claudeui.Normalize(codexQuestionText(q)):
 		return "the question text on the screen differs from the card"
 	case o.Rows != len(numbered)+1:
 		return fmt.Sprintf("the screen has %d rows, the card has %d options", o.Rows-1, len(numbered))

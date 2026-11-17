@@ -45,7 +45,7 @@ func TestCards_PlainCodexListsTheOpenQuestionCall(t *testing.T) {
 		t.Fatalf("cards = %+v, want the codex-question card call_1", got)
 	}
 	q := got[0].Questions[0]
-	if q.Label != "1" || q.Title != "Color: Which color?" || len(q.Options) != 3 ||
+	if q.Label != "1" || q.Title != "Color: Which color?" || q.Question != "Which color?" || len(q.Options) != 3 ||
 		q.Options[1].Label != "Blue" || q.Options[1].Description != "Choose blue." ||
 		!q.Options[2].Text || q.Options[2].ID != CodexFreeTextID {
 		t.Errorf("question = %+v", q)

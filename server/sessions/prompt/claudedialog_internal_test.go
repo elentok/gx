@@ -44,3 +44,21 @@ func TestClaudeUpdatedInput_ClickOrder(t *testing.T) {
 		})
 	}
 }
+
+func TestCodexQuestionText_FallsBackToTheTitle(t *testing.T) {
+	tests := []struct {
+		name string
+		q    wire.QuestionCardQuestion
+		want string
+	}{
+		{"raw text wins", wire.QuestionCardQuestion{Title: "Header: Which?", Question: "Which?"}, "Which?"},
+		{"empty raw falls back", wire.QuestionCardQuestion{Title: "Header: Which?"}, "Header: Which?"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := codexQuestionText(tt.q); got != tt.want {
+				t.Fatalf("codexQuestionText = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

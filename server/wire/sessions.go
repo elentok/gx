@@ -409,6 +409,9 @@ type QuestionCardQuestion struct {
 	Recommended string               `json:"recommended,omitempty"`
 	Links       []QuestionLink       `json:"links,omitempty"`
 	Note        string               `json:"note,omitempty"`
+	// Question is a Codex question's raw text, without the header the Title
+	// carries. Not shown; the answer check compares it with the screen.
+	Question string `json:"question,omitempty"`
 }
 
 // QuestionCard is one source item the person answers: a hook dialog, a Codex

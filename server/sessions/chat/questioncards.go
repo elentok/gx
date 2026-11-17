@@ -108,7 +108,7 @@ const CodexFreeTextID = "other"
 func CodexQuestionCard(q codexsession.OpenQuestion) []wire.QuestionCard {
 	qs := make([]wire.QuestionCardQuestion, len(q.Questions))
 	for i, it := range q.Questions {
-		cq := wire.QuestionCardQuestion{Kind: "options", Label: strconv.Itoa(i + 1), Title: headed(it.Header, it.Question)}
+		cq := wire.QuestionCardQuestion{Kind: "options", Label: strconv.Itoa(i + 1), Title: headed(it.Header, it.Question), Question: it.Question}
 		for j, o := range it.Options {
 			cq.Options = append(cq.Options, wire.QuestionCardOption{ID: strconv.Itoa(j + 1), Label: o.Label, Description: o.Description})
 		}

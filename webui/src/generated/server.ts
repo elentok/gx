@@ -2954,6 +2954,11 @@ export interface QuestionCardQuestion {
   recommended?: string;
   links?: QuestionLink[];
   note?: string;
+  /**
+   * Question is a Codex question's raw text, without the header the Title
+   * carries. Not shown; the answer check compares it with the screen.
+   */
+  question?: string;
 }
 /**
  * QuestionCard is one source item the person answers: a hook dialog, a Codex

@@ -35,6 +35,8 @@ export interface QuestionCard {
   /** Resources the question depends on, such as a mock's URL. */
   links?: { label: string; url: string }[]
   note?: string
+  /** The raw question text of a Codex card; not shown. */
+  question?: string
   /** What the question is about, shown muted above its title. */
   context?: string
   /** Where the context leads: the ticket the question is about. */
