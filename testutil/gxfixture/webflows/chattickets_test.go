@@ -2,13 +2,16 @@ package webflows
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/gxfixture/chatcapture"
+	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 )
 
 // captured is every line of the capture file so far.
@@ -26,11 +29,22 @@ func captured(path string) []chatcapture.Line {
 
 // waitForParts waits until, for every part, a Slack line holds all its needles.
 // Needles are the ticket address and the kind wording, not the layout.
+// It polls only for what is left of the test's budget (the fixture start and
+// the launch-slot wait came out of it first), so it gives up and prints before
+// the hang limit kills the run.
 func waitForParts(t *testing.T, r *running, want map[string][]string) {
 	t.Helper()
+	if msg := pollParts(r.ChatCapture, want, r.BudgetLeft(), r.StartUsed()); msg != "" {
+		t.Fatal(msg)
+	}
+}
+
+// pollParts is waitForParts without a test: it returns "" once every part is
+// there, or the failure message when within runs out.
+func pollParts(capture string, want map[string][]string, within, startUsed time.Duration) string {
 	var got []chatcapture.Line
 	missing := func() []string {
-		got = captured(r.ChatCapture)
+		got = captured(capture)
 		var out []string
 		for part, needles := range want {
 			found := false
@@ -50,8 +64,29 @@ func waitForParts(t *testing.T, r *running, want map[string][]string) {
 		}
 		return out
 	}
-	if !testutil.Poll(60*time.Second, 200*time.Millisecond, func() bool { return len(missing()) == 0 }) {
-		t.Fatalf("no capture line for %v; got %+v", missing(), got)
+	if !testutil.Poll(within, 200*time.Millisecond, func() bool { return len(missing()) == 0 }) {
+		return fmt.Sprintf("no capture line for %v after polling %s (the fixture start used %s of the %s test budget); got %+v",
+			missing(), within, startUsed, fixturetest.TestBudget, got)
+	}
+	return ""
+}
+
+func TestWaitForParts_StopsWhenTheBudgetIsSpent(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "capture.jsonl")
+	line, _ := json.Marshal(chatcapture.Line{Transport: "slack", Text: "hello there"})
+	if err := os.WriteFile(path, append(line, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	began := time.Now()
+	msg := pollParts(path, map[string][]string{"missing-part": {"nope"}}, 300*time.Millisecond, 45*time.Second)
+	if took := time.Since(began); took > 5*time.Second {
+		t.Fatalf("poll ran %s, want it to stop with the spent budget", took)
+	}
+	for _, want := range []string{"missing-part", "hello there", "45s", "50s"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("message %q lacks %q", msg, want)
+		}
 	}
 }
 

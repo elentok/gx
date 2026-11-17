@@ -108,7 +108,28 @@ type Running struct {
 	cmd     *exec.Cmd
 	stderr  *syncBuffer
 	stopped bool
+	began   time.Time     // when the test began starting this fixture
+	started time.Duration // how long the start took, slot wait included
 	spec.Output
+}
+
+// TestBudget is the time one fixture test spends on starting the fixture, waiting
+// for a launch slot and polling afterwards. It stays under the 60s hang limit
+// that .gx/checks.json gives `gx brief go-test` (see hangLimit), so a slow start
+// leaves a short poll that prints its own diagnostic instead of a HUNG kill.
+const TestBudget = 50 * time.Second
+
+// hangLimit mirrors the default "hang" limit of check/config.go and
+// .gx/checks.json; TestBudgetIsUnderHangLimit keeps TestBudget below it.
+const hangLimit = 60 * time.Second
+
+// StartUsed is how long the fixture start took, launch-slot wait included.
+func (r *Running) StartUsed() time.Duration { return r.started }
+
+// BudgetLeft is what is left of TestBudget, measured from when the test began
+// starting the fixture. It is never negative.
+func (r *Running) BudgetLeft() time.Duration {
+	return max(0, TestBudget-time.Since(r.began))
 }
 
 // Start starts the scenario.
@@ -136,10 +157,12 @@ func Launch(t *testing.T, register func(func()), scenario string, env []string, 
 			r.logStderrIfFailed(t)
 		}
 	})
+	began := time.Now()
 	r, err := LaunchProc(register, scenario, env, flags...)
 	if err != nil {
 		t.Fatal(err)
 	}
+	r.began, r.started = began, time.Since(began)
 	return r
 }
 

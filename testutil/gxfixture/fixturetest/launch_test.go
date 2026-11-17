@@ -10,6 +10,15 @@ import (
 	"time"
 )
 
+func TestBudgetIsUnderHangLimit(t *testing.T) {
+	if TestBudget >= hangLimit {
+		t.Fatalf("TestBudget %s must stay under the hang limit %s", TestBudget, hangLimit)
+	}
+	if startTimeout >= TestBudget {
+		t.Fatalf("startTimeout %s must leave part of TestBudget %s for the poll", startTimeout, TestBudget)
+	}
+}
+
 func TestCapParallel(t *testing.T) {
 	f := flag.Lookup("test.parallel")
 	orig := f.Value.String()
