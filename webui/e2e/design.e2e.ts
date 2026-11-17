@@ -223,8 +223,8 @@ const flipAuto = async (page: Page, from: "on" | "off") => {
 }
 
 test.describe("11. Auto-advance, cancel", () => {
-  // The server's "a note typed during the countdown stops the send" is proven in
-  // server/sessions_autoadvance_countdown_test.go (PageNoteStopsTheSendAndKeepsContinue).
+  // "Nothing is sent after Cancel" is proven in server/sessions/prompt/promptflows
+  // (TestAutoAdvance_StopsTheCountdown/Cancel): the countdown is gone, so it cannot fire.
   test("Cancel stops the send and Continue stays", async ({ page, start }) => {
     await start("design", { autoAdvanceDelay: "5s" })
     await answerFirstRound(page)
@@ -232,9 +232,6 @@ test.describe("11. Auto-advance, cancel", () => {
     await page.getByRole("button", nav("Cancel")).click()
     await expect(page.getByText(/Continuing in/)).toHaveCount(0)
     await expect(page.getByRole("button", { name: /^Continue/ })).toBeVisible()
-    // Wait past the old deadline: nothing was sent.
-    await page.waitForTimeout(6000)
-    await expect(page.getByText("A fresh round.")).toHaveCount(0)
   })
 })
 

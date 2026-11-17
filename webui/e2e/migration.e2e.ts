@@ -91,7 +91,8 @@ test("169. Migrating state holds scheduling", async ({ start, page }) => {
   })
 
   await test.step("nothing is claimed, no recovery or merge starts, and no start-up step ran", async () => {
-    await page.waitForTimeout(2000)
+    // "Held for a while" is proven in server/lifecycle/migrate_gate_test.go (TestMigrate_SchedulerHoldsUntilTheRunEnds);
+    // here the state right after the manual agent ran is read, with no wait.
     expect(await fixture.cli("tickets", "show", ready)).not.toContain("claimed")
     expect(await fixture.cli("tickets", "show", mergeLast)).not.toContain("claimed")
     expect(await fixture.cli("tickets", "show", stuckEpic)).not.toMatch(/^02 /m)

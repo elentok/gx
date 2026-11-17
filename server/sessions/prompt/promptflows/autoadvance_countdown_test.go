@@ -151,6 +151,10 @@ func startCountdown(t *testing.T) (*grillingFixture, *holder.HolderClient) {
 // and exactly one banner told the person.
 func wantStopped(t *testing.T, f *grillingFixture, c *holder.HolderClient) {
 	t.Helper()
+	// A stopped countdown is gone, so nothing is left that could fire: wait for that, not for the clock.
+	servertest.WaitFor(t, 5*time.Second, "the countdown to be gone", func() bool {
+		return f.H.Server.Prompt().AutoAdvanceDeadline(f.ID).IsZero()
+	})
 	time.Sleep(2 * countdownDelay) // negative wait: a countdown still running would end within this window
 	if screenHas(t, c, "/clear") {
 		t.Error("a stopped countdown still sent /clear")
