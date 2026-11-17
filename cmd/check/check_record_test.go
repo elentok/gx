@@ -434,6 +434,8 @@ func TestCheck_SlowLimit(t *testing.T) {
 			}
 			if k := kindRecord(t, recs[0], "test"); !reflect.DeepEqual(k.Failed, []string{"example.com/tiny.TestSlow"}) {
 				t.Errorf("failed = %v", k.Failed)
+			} else if !reflect.DeepEqual(k.Slow, []string{"example.com/tiny.TestSlow"}) {
+				t.Errorf("slow = %v", k.Slow)
 			}
 		})
 	}

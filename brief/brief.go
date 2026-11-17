@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -207,6 +208,50 @@ type indexEntry struct {
 	TestDurations map[string]int64 `json:"test_durations,omitempty"`
 }
 
+// unhandledTestName is the failed entry of a vitest run that exits non-zero
+// with every test green.
+const unhandledTestName = "vitest unhandled errors"
+
+// StableName is the index name of a test: the same on every run and in every
+// worktree. A vitest name loses the run directory from its file path, a
+// playwright name loses the `e2e/` prefix, and any name loses the trailing
+// ` ───` rule the line reporter prints. Every index field that names a test
+// goes through it.
+func StableName(tool, dir, name string) string {
+	name = strings.TrimRight(name, " ")
+	name = strings.TrimRight(name, "─")
+	name = strings.TrimRight(name, " ")
+	switch tool {
+	case "vitest":
+		if dir != "" {
+			name = strings.TrimPrefix(name, strings.TrimSuffix(dir, "/")+"/")
+		}
+	case "playwright":
+		name = strings.TrimPrefix(name, "e2e/")
+	}
+	return name
+}
+
+// nameTests rewrites Tests, Failed and the keys of TestDurations with
+// StableName.
+func (e *indexEntry) nameTests(tool, dir string) {
+	rename := func(names []string) []string {
+		for i, n := range names {
+			names[i] = StableName(tool, dir, n)
+		}
+		return names
+	}
+	rename(e.Tests)
+	rename(e.Failed)
+	if e.TestDurations != nil {
+		named := make(map[string]int64, len(e.TestDurations))
+		for n, ms := range e.TestDurations {
+			named[StableName(tool, dir, n)] += ms
+		}
+		e.TestDurations = named
+	}
+}
+
 // ReadIndex returns the lines of the index under dataDir, oldest first. A
 // missing index is empty; a line that does not decode is skipped.
 func ReadIndex(dataDir string) ([]IndexEntry, error) {
@@ -346,6 +391,12 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	for _, u := range outcome.Failures {
 		entry.Failed = append(entry.Failed, u.String())
 	}
+	if len(outcome.Failures) == 0 && outcome.Unhandled != "" {
+		entry.Failed = append(entry.Failed, unhandledTestName)
+	}
+	entry.nameTests(tool.Name(), runDir)
+	outcome.Tests = slices.Clone(entry.Tests)
+	outcome.TestDurations = entry.TestDurations
 	if err := appendIndex(indexPath, entry); err != nil {
 		return cantRun(o.Out, "cannot write index: "+err.Error()), Outcome{}
 	}

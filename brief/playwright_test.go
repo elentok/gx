@@ -377,6 +377,36 @@ func TestReport_PlaywrightPrintsSnapshotsOnlyUnderUnitsShownWithText(t *testing.
 	}
 }
 
+func TestPlaywrightParse_RuleSuffixedListNamesDoNotDoubleTheFailures(t *testing.T) {
+	t.Parallel()
+	rule := strings.Repeat("─", 30)
+	titles := []struct{ file, title string }{
+		{"epics", "2. Epic looks right"},
+		{"menu", "117. Limits block › a statusline report reaches the open menu"},
+		{"menu", "180. Menu limit burn › narrow menu fits; live updates"},
+		{"phone", "41. Phone, New Design sheet"},
+		{"phone", "24. Phone, Design page"},
+	}
+	var out, list strings.Builder
+	for i, tt := range titles {
+		fmt.Fprintf(&out, "  %d) [chromium] › e2e/%s.e2e.ts:20:1 › %s %s\n\n    Error: boom\n\n", i+1, tt.file, tt.title, rule)
+		fmt.Fprintf(&list, "    [chromium] › e2e/%s.e2e.ts:20:1 › %s %s\n", tt.file, tt.title, rule)
+	}
+	out.WriteString("  5 failed\n")
+	out.WriteString(list.String())
+	out.WriteString("  10 passed\n")
+	got := Playwright{}.Parse([]byte(out.String()), 1)
+	if len(got.Failures) != 5 || len(got.Tests) != 5 {
+		t.Fatalf("failures = %d, tests = %d, want 5: %v", len(got.Failures), len(got.Tests), got.Tests)
+	}
+	for _, n := range got.Tests {
+		n = StableName("playwright", "", n)
+		if strings.Contains(n, "─") || strings.HasPrefix(n, "e2e/") {
+			t.Errorf("name %q keeps the rule or the e2e/ prefix", n)
+		}
+	}
+}
+
 func TestPlaywrightParse_FailureHeadingWithoutRule(t *testing.T) {
 	out := "  1) [chromium] › e2e/a.e2e.ts:177:1 › 158. A very long title that fills the line \n\n    Error: boom\n\n  1 failed\n    [chromium] › e2e/a.e2e.ts:177:1 › 158. A very long title that fills the line\n"
 	got := Playwright{}.Parse([]byte(out), 1)

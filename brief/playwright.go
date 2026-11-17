@@ -325,7 +325,7 @@ var (
 	playwrightCode   = regexp.MustCompile(`^\s*>?\s*\d+ \|`)
 	// playwrightListed matches a test line of the list under "N failed", such
 	// as `    [chromium] › epics.e2e.ts:12:5 › 2. Epic looks right`.
-	playwrightListed = regexp.MustCompile(`^\s+(?:\[[^\]]+\] › )?(\S+?):\d+:\d+ › (.+?)\s*$`)
+	playwrightListed = regexp.MustCompile(`^\s+(?:\[[^\]]+\] › )?(\S+?):\d+:\d+ › (.+?)(?: ─+)?\s*$`)
 )
 
 // Parse reads the failure blocks and the counts from the line reporter. Each
