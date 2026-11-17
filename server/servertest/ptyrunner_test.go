@@ -242,15 +242,19 @@ func TestPty_HoldKeepsTheRunWorkingUntilReleased(t *testing.T) {
 	h := startPty(t, t.TempDir(), testutil.TempRepo(t))
 	var release func()
 	queueWithTurn(t, h, func(turn *Turn) { release = turn.Hold() })
-	WaitFor(t, 30*time.Second, "the live iteration", func() bool { return liveIterations(t, h) == 1 })
+	WaitState(t, 30*time.Second, "the live iteration", func() (bool, string) {
+		return liveIterations(t, h) == 1, h.SessionState("")
+	})
 
 	time.Sleep(10 * ptyPollInterval) // negative wait: a wrong reap would come within a few polls
 	if n := liveIterations(t, h); n != 1 {
-		t.Fatalf("live iterations = %d, want the held run still live", n)
+		t.Fatalf("live iterations = %d, want the held run still live\n%s", n, h.SessionState(""))
 	}
 
 	release()
-	WaitFor(t, 30*time.Second, "the turn to end", func() bool { return liveIterations(t, h) == 0 })
+	WaitState(t, 30*time.Second, "the turn to end", func() (bool, string) {
+		return liveIterations(t, h) == 0, h.SessionState("")
+	})
 }
 
 func TestPty_FailNextStartPausesTheTicketAndFailsOnlyOneStart(t *testing.T) {

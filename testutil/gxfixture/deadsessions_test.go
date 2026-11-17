@@ -28,6 +28,7 @@ func (r *running) wantAllCrashed(t *testing.T, n int) []wire.SessionInfo {
 	t.Helper()
 	var list []wire.SessionInfo
 	var holders, agents int
+	began := time.Now()
 	// The server marks the dead sessions and reaps their processes after it
 	// starts, so a one-shot read can see the state half way.
 	settled := testutil.Poll(15*time.Second, 100*time.Millisecond, func() bool {
@@ -43,6 +44,7 @@ func (r *running) wantAllCrashed(t *testing.T, n int) []wire.SessionInfo {
 		holders, agents = r.ProcessCounts(t)
 		return holders == 0 && agents == 0
 	})
+	t.Logf("settle poll took %s (settled = %t)", time.Since(began).Round(time.Millisecond), settled)
 	if !settled {
 		t.Fatalf("sessions never settled to %d exited/crashed with no processes: holders = %d, agents = %d, list = %+v", n, holders, agents, list)
 	}
@@ -131,7 +133,9 @@ func TestRestartSessions_OptInResumesEachSessionOnce(t *testing.T) {
 }
 
 func TestDeadMany(t *testing.T) {
+	began := time.Now()
 	r := start(t, "dead-many")
+	t.Logf("fixture start took %s", time.Since(began).Round(time.Millisecond))
 	r.wantAllCrashed(t, spec.DeadSessionCount)
 }
 

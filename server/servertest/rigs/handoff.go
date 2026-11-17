@@ -80,9 +80,9 @@ func (f HandoffFixture) ContinueSession(t *testing.T) {
 func (f HandoffFixture) NewConversation(t *testing.T, old string) map[string]any {
 	t.Helper()
 	var meta map[string]any
-	servertest.WaitFor(t, 10*time.Second, "a new conversation id", func() bool {
+	servertest.WaitState(t, 10*time.Second, "a new conversation id", func() (bool, string) {
 		meta = servertest.ReadMeta(t, f.H, f.ID)
-		return meta["conversation_id"] != old
+		return meta["conversation_id"] != old, f.H.SessionState(f.ID)
 	})
 	return meta
 }

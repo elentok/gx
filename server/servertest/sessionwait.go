@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,6 +37,38 @@ func WaitForHolder(t *testing.T, dir string) *holder.HolderClient {
 		t.Fatalf("no holder in %s: %v", dir, err)
 	}
 	return c
+}
+
+// SessionState describes what a timed-out wait on a session can see: the live
+// iteration list and, for each session dir (only id's when id is not empty),
+// its meta.json and whether the holder answers. For WaitState's read.
+func (h *Harness) SessionState(id string) string {
+	var b strings.Builder
+	if its, err := h.Client.Reads.Iterations(context.Background()); err != nil {
+		fmt.Fprintf(&b, "iterations: error %v\n", err)
+	} else {
+		fmt.Fprintf(&b, "iterations (%d): %+v\n", len(its), its)
+	}
+	entries, _ := os.ReadDir(h.SessionsDir)
+	for _, e := range entries {
+		if !e.IsDir() || (id != "" && e.Name() != id) {
+			continue
+		}
+		dir := filepath.Join(h.SessionsDir, e.Name())
+		meta, err := os.ReadFile(filepath.Join(dir, "meta.json"))
+		fmt.Fprintf(&b, "session %s meta (err %v): %s\n", e.Name(), err, strings.TrimSpace(string(meta)))
+		if c, err := holder.DialHolder(dir); err != nil {
+			fmt.Fprintf(&b, "session %s holder: %v\n", e.Name(), err)
+		} else {
+			fmt.Fprintf(&b, "session %s holder: answers (holder pid %d, child pid %d)\n", e.Name(), c.HolderPID(), c.ChildPID())
+			if w, err := c.Watched(); err != nil {
+				fmt.Fprintf(&b, "session %s watch: error %v\n", e.Name(), err)
+			} else {
+				fmt.Fprintf(&b, "session %s watch: %+v\n", e.Name(), w)
+			}
+		}
+	}
+	return b.String()
 }
 
 // WaitForSession waits until the snapshot's session id satisfies ok. It reads
