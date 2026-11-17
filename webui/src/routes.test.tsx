@@ -489,9 +489,10 @@ test("a Merge blocked epic shows its label and merge-block reason; a Merging epi
   expect(statsLine()).toMatch(/^Paused · /)
   expect(screen.getByText("Can't merge: rebase clash in a.go")).toBeTruthy()
   cleanup()
+  // The first render wrote the page cache; the second must paint from its own fetch.
+  sessionStorage.clear()
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "merging", total: 2, done: 1 }))
-  await screen.findByTestId("stats-line")
-  expect(statsLine()).toMatch(/^Merging · /)
+  await waitFor(() => expect(statsLine()).toMatch(/^Merging · /))
 })
 
 test("live tickets show their status word, elapsed time and cost; the draft word shows on drafts", async () => {

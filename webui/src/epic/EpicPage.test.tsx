@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { cleanup as unmountAll, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
@@ -15,7 +15,13 @@ import { appRoutes } from "../routes"
 import type { FixAgent } from "./fixAgent"
 import { renderThemed } from "../ui/render"
 
-afterEach(cleanup)
+afterEach(unmountAll)
+
+// A second render in one test must not paint the first one's page cache: the cache is not an input.
+const cleanup = () => {
+  unmountAll()
+  sessionStorage.clear()
+}
 
 const row = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   address: `gx:${name}`,
@@ -79,18 +85,30 @@ function render(
     refresh: () => {},
   } as unknown as Connection
   const list: EpicList = { epics, follow_ups: [] }
+  // The page joins the card (list fetch) with the detail (detail fetch). The detail resolves only
+  // after the list settled, so any text a test waits on from the detail implies the card arrived.
+  let listSettled!: () => void
+  const listDone = new Promise<void>((resolve) => {
+    listSettled = resolve
+  })
   const router = createMemoryRouter(
     appRoutes({
       fixAgent: extra.fixAgent,
-      epicList: async () => list,
+      epicList: async () => {
+        listSettled()
+        return list
+      },
       epic: extra.hang
         ? () => new Promise(() => {})
         : extra.notFound
           ? async () => ({ kind: "not-found" })
-          : async (address) => ({
-              kind: "ok",
-              detail: { ...detailOf(address, kind), ...extra.detail },
-            }),
+          : async (address) => {
+              await listDone
+              return {
+                kind: "ok",
+                detail: { ...detailOf(address, kind), ...extra.detail },
+              }
+            },
     }),
     { initialEntries: [path] },
   )
