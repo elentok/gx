@@ -26,6 +26,7 @@ var Guards = []Guard{
 	{Name: "setstateguard", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/setstateguard\.`), Example: "github.com/elentok/gx/setstateguard.TestNoRawSetStateCleanup"},
 	{Name: "portable test skills rules test", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/skills\.TestPortableTestSkillsHoldNoGxOnlyText$`), Example: "github.com/elentok/gx/skills.TestPortableTestSkillsHoldNoGxOnlyText"},
 	{Name: "gx-only-e2es rules test", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/skills\.TestGxOnlyE2esSkillIsWired$`), Example: "github.com/elentok/gx/skills.TestGxOnlyE2esSkillIsWired"},
+	{Name: "biome lint", Kind: "lint"},
 	// The check itself runs in every Vitest test's afterEach, so a leak is attributed to the leaking
 	// test, which no name can match. Only the check's own unit tests are matched by name.
 	{Name: "pending-timer check", Pattern: regexp.MustCompile(`^(?:.*/)?src/pendingTimers\.test\.tsx(?: > |$)`), Example: "src/pendingTimers.test.tsx > pending timer check reports a pending timeout with its creation stack"},

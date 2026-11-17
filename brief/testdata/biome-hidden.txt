@@ -1,0 +1,1 @@
+{"summary":{"errors":0,"warnings":0,"infos":0,"diagnosticsNotPrinted":4},"diagnostics":[],"command":"lint"}

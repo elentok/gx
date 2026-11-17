@@ -44,7 +44,7 @@ func New(d Deps) *cobra.Command {
 		Long: `Run a dev tool and print one result line and the log path (always the last
 line). Exit 0 means pass, 1 fail, 2 brief could not run the tool.
 
-Tools: go-test, go-build, go-vet, vitest, tsc, playwright, conflicts,
+Tools: go-test, go-build, go-vet, vitest, tsc, biome, playwright, conflicts,
 go-clean-cache (the node
 tools run from the node_modules/.bin found walking up to the git root).
 go-build and go-vet print one line when clean and group errors by file.

@@ -363,3 +363,90 @@ func (Tsc) RerunArgs([]string, []Unit) []string { return nil }
 func (Tsc) NarrowArgs([]string, string) []string { return nil }
 
 func (Tsc) SplitTestName(name string) (string, string) { return noSplit(name) }
+
+// Biome wraps `biome lint`. Biome exits 0 for a warning or an info, so Parse
+// decides the verdict from the JSON report and Run turns a failure into a
+// failing exit.
+type Biome struct{}
+
+func (Biome) Name() string { return "biome" }
+
+// Plan finds the binary and asks for every diagnostic of every severity.
+func (Biome) Plan(_ []string, dir string, args []string) (Invocation, error) {
+	bin, err := findNodeBin(dir, "biome")
+	if err != nil {
+		return Invocation{}, err
+	}
+	argv := append([]string{"lint", "--reporter=json", "--diagnostic-level=info", "--max-diagnostics=none"}, args...)
+	return Invocation{Bin: bin, Argv: argv}, nil
+}
+
+// Parse finds the JSON line (a stderr notice may come before or after it) and
+// groups the diagnostics by file. Any diagnostic, any hidden diagnostic or a
+// missing report is a failure.
+func (Biome) Parse(out []byte, _ int) Outcome {
+	var rep struct {
+		Summary     struct{ DiagnosticsNotPrinted int }
+		Diagnostics []struct {
+			Severity string
+			Message  string
+			Category string
+			Location struct {
+				Path  any
+				Start struct{ Line, Column int }
+			}
+		}
+	}
+	found := false
+	for l := range strings.SplitSeq(string(out), "\n") {
+		if strings.HasPrefix(l, `{"summary"`) && json.Unmarshal([]byte(l), &rep) == nil {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return Outcome{Failures: []Unit{{Location: "(biome)", Name: "no report", Text: "no JSON report in the output:\n" + strings.TrimSpace(string(out))}}}
+	}
+	var files []*fileErrors
+	byFile := map[string]*fileErrors{}
+	for _, d := range rep.Diagnostics {
+		file := "(global)"
+		switch p := d.Location.Path.(type) {
+		case string:
+			file = p
+		case map[string]any:
+			if s, ok := p["file"].(string); ok {
+				file = s
+			}
+		}
+		f := byFile[file]
+		if f == nil {
+			f = &fileErrors{file: file}
+			byFile[file] = f
+			files = append(files, f)
+		}
+		f.errors++
+		f.lines = append(f.lines, fmt.Sprintf("%d:%d %s %s", d.Location.Start.Line, d.Location.Start.Column, d.Category, d.Message))
+	}
+	var failures []Unit
+	for _, f := range files {
+		name := fmt.Sprintf("%d findings", f.errors)
+		if f.errors == 1 {
+			name = "1 finding"
+		}
+		failures = append(failures, Unit{Location: f.file, Name: name, Text: strings.Join(f.lines, "\n")})
+	}
+	if n := rep.Summary.DiagnosticsNotPrinted; n > 0 {
+		failures = append(failures, Unit{Location: "(biome)", Name: "hidden findings", Text: fmt.Sprintf("%d diagnostics were not printed", n)})
+	}
+	if len(failures) == 0 {
+		return Outcome{Units: 1, Summary: "no findings"}
+	}
+	return Outcome{Failures: failures}
+}
+
+func (Biome) RerunArgs([]string, []Unit) []string { return nil }
+
+func (Biome) NarrowArgs([]string, string) []string { return nil }
+
+func (Biome) SplitTestName(name string) (string, string) { return noSplit(name) }

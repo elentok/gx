@@ -1,4 +1,4 @@
-.PHONY: build web-build web-dev web-test web-e2e web-types install test test-docker-ubuntu run
+.PHONY: build web-build web-dev web-test web-lint web-e2e web-types install test test-docker-ubuntu run
 
 GO_VERSION := 1.25.0
 
@@ -23,6 +23,10 @@ web-dev:
 
 # WEB_TEST_WORKERS caps vitest's workers; scripts/test.sh sets it to share the CPU budget.
 WEB_TEST_WORKERS ?=
+
+web-lint:
+	cd webui && pnpm install --frozen-lockfile
+	$(GX) brief -C webui biome
 
 web-test:
 	cd webui && pnpm install --frozen-lockfile

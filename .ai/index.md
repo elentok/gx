@@ -108,7 +108,7 @@ A new config key must reach the settings page or be excluded with a reason:
 - Run web tests through `make web-test`. gx installs dependencies when it creates an iteration
   worktree, so web tests work in a fresh worktree. `make web-test` still installs first, at the cost
   of a slower run.
-- `gx brief` tools: `go-test`, `go-build`, `go-vet`, `vitest`, `tsc`, `playwright`, `conflicts`.
+- `gx brief` tools: `go-test`, `go-build`, `go-vet`, `vitest`, `tsc`, `biome`, `playwright`, `conflicts`.
   Any other name exits 2 with `unknown tool`. Use `gx brief go-build ./...` and
   `gx brief go-vet ./cmd/...`, never `go build ./... | tail`.
 - Quiet web runs, from anywhere in the repo (always pass `-C webui`; the shell cwd persists between
@@ -401,6 +401,7 @@ Web checks:
 
 - Type-check with `gx brief tsc`, not a hand-built `pnpm exec tsc ... | tail`.
 - The web UI formats with Biome (`webui/biome.jsonc`: no semicolons, double quotes, width 100). `pnpm --dir webui run lint` runs the linter.
+  `gx check` runs `gx brief -C webui biome`, which fails on any finding, infos included.
   Run `cd webui && pnpm format <files>`. `gx check --kind format` does the same. Never run prettier or npx.
 - `make web-types` writes `webui/src/generated/server.ts` from `server/wire` and
   `webui/src/generated/ops.ts` from `server/wire/ops`. The `server/wire` entry has the frontmatter

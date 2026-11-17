@@ -313,6 +313,31 @@ func TestBrief_TscFailureGroupsByFileWithLimits(t *testing.T) {
 	}
 }
 
+func TestBrief_BiomeFailsOnAnInfoThoughBiomeExitsZero(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	rec := nodeStub(t, repo, "biome", "biome-info.txt", 0)
+	out, code := runBriefCmd(t, repo, "biome")
+	if code != 1 || !strings.HasPrefix(out, "FAIL biome: 1 failed in ") {
+		t.Fatalf("exit %d, out:\n%s", code, out)
+	}
+	if !strings.Contains(out, "src/a.ts") || !strings.Contains(out, "lint/style/useTemplate") || !strings.HasSuffix(lastLine(out), "-biome.log") {
+		t.Errorf("file, rule or log path missing:\n%s", out)
+	}
+	got := strings.Join(recorded(t, rec)[1:], " ")
+	if got != "lint --reporter=json --diagnostic-level=info --max-diagnostics=none" {
+		t.Errorf("biome args = %q", got)
+	}
+}
+
+func TestBrief_BiomeCleanPasses(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	nodeStub(t, repo, "biome", "biome-clean.txt", 0)
+	out, code := runBriefCmd(t, repo, "biome")
+	if code != 0 || !strings.HasPrefix(out, "PASS biome: no findings in ") {
+		t.Fatalf("exit %d, out:\n%s", code, out)
+	}
+}
+
 func TestBrief_TscLongDiagnosticIsCut(t *testing.T) {
 	out, code := runBriefCmd(t, tscFailRepo(t, "tsc-long.txt"), "tsc")
 	if code != 1 || !strings.Contains(out, "src/tmpbrief1.ts\n  2 errors\n") {

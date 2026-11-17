@@ -1,6 +1,8 @@
 package brief
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -20,6 +22,52 @@ func TestTscParse_KeepsFilelessDiagnosticsAsGlobalUnit(t *testing.T) {
 	want := "error TS5101: Option 'baseUrl' is deprecated.\n  Specify compilerOption 'ignoreDeprecations'."
 	if g.Text != want {
 		t.Errorf("global text = %q, want %q", g.Text, want)
+	}
+}
+
+func TestBiomeParse(t *testing.T) {
+	t.Parallel()
+	read := func(name string) []byte {
+		b, err := os.ReadFile(filepath.Join("testdata", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	cases := []struct {
+		sample  string
+		out     string // overrides sample
+		units   int    // failure units, 0 means pass
+		text    string
+		wantRaw bool
+	}{
+		{sample: "biome-clean.txt"},
+		{sample: "biome-info.txt", units: 1, text: "3:14 lint/style/useTemplate"},
+		{sample: "biome-warning.txt", units: 1, text: "1:8 lint/suspicious/noExplicitAny"},
+		{sample: "biome-error.txt", units: 1, text: "2:7 lint/correctness/noUnusedVariables"},
+		{sample: "biome-hidden.txt", units: 1, text: "4 diagnostics were not printed"},
+		{out: "The `json` reporter is experimental.\nsomething else\n", units: 1, text: "something else"},
+	}
+	for _, c := range cases {
+		out := []byte(c.out)
+		if c.sample != "" {
+			out = read(c.sample)
+		}
+		got := Biome{}.Parse(out, 0)
+		if len(got.Failures) != c.units {
+			t.Errorf("%s%q: failures = %+v, want %d", c.sample, c.out, got.Failures, c.units)
+			continue
+		}
+		if c.units == 0 && got.Units == 0 {
+			t.Errorf("%s: a pass must count a unit", c.sample)
+		}
+		if c.units > 0 && !strings.Contains(got.Failures[0].Text, c.text) {
+			t.Errorf("%s%q: text = %q, want %q", c.sample, c.out, got.Failures[0].Text, c.text)
+		}
+	}
+	two := Biome{}.Parse(read("biome-info.txt"), 0)
+	if two.Failures[0].Location != "src/a.ts" || two.Failures[0].Name != "2 findings" {
+		t.Errorf("unit = %+v, want src/a.ts with 2 findings", two.Failures[0])
 	}
 }
 

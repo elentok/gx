@@ -1,0 +1,1 @@
+{"summary":{"errors":1,"warnings":0,"infos":0,"diagnosticsNotPrinted":0},"diagnostics":[{"severity":"error","message":"Unused variable.","category":"lint/correctness/noUnusedVariables","location":{"path":"src/c.ts","start":{"line":2,"column":7}}}],"command":"lint"}

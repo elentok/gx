@@ -39,6 +39,10 @@ jobs:
       - name: Build web UI
         run: make web-build
 
+      - name: Web lint
+        if: runner.os == 'Linux'
+        run: make web-lint
+
       - name: Install delta (Ubuntu)
         if: runner.os == 'Linux'
         run: |

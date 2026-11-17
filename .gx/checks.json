@@ -1,4 +1,8 @@
 {
+  "lint": {
+    "changed": "gx brief -C webui biome",
+    "full": "gx brief -C webui biome"
+  },
   "guards": {
     "full": "gx brief go-test ./sleepguard ./envguard ./oldwords ./playwrightguard ./sizeguard ./setstateguard",
     "changed": "gx brief go-test -run '^TestNoNewSleeps$' ./sleepguard",

@@ -1,0 +1,2 @@
+The `json` and `json-pretty` reporters are experimental.
+{"summary":{"changed":0,"unchanged":3,"matches":0,"duration":{"secs":0,"nanos":1000},"scannerDuration":{"secs":0,"nanos":1000},"errors":0,"warnings":0,"infos":0,"skipped":0,"suggestedFixesSkipped":0,"diagnosticsNotPrinted":0},"diagnostics":[],"command":"lint"}

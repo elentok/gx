@@ -56,7 +56,7 @@ type Tool interface {
 var tools = map[string]Tool{}
 
 func init() {
-	for _, t := range []Tool{GoTest{}, GoBuild{}, GoVet{}, Vitest{}, Tsc{}, Playwright{}} {
+	for _, t := range []Tool{GoTest{}, GoBuild{}, GoVet{}, Vitest{}, Tsc{}, Biome{}, Playwright{}} {
 		tools[t.Name()] = t
 	}
 }
@@ -350,6 +350,10 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	after := sample()
 
 	outcome := tool.Parse(out, exit)
+	if exit == 0 && len(outcome.Failures) > 0 {
+		// A tool such as biome exits 0 on a finding; the report decides.
+		exit = ExitFail
+	}
 	if rr, ok := tool.(ReportReader); ok && plan.ReportFile != "" {
 		outcome.TestDurations = rr.ReadReport(plan.ReportFile)
 		if cr, ok := tool.(ContextReader); ok && exit != 0 {

@@ -1,0 +1,1 @@
+{"summary":{"errors":0,"warnings":1,"infos":0,"diagnosticsNotPrinted":0},"diagnostics":[{"severity":"warning","message":"Avoid any.","category":"lint/suspicious/noExplicitAny","location":{"path":"src/b.ts","start":{"line":1,"column":8}}}],"command":"lint"}
