@@ -135,7 +135,24 @@ test("184. Live token ledger (and 182. Stats limit burn, phone)", async ({ page,
   await expect(page.getByRole("region", nav("Web performance"))).toBeVisible()
   const perfBefore = await perfCounts()
   const perfNames = ["lcp", "fcp", "cls", "app_ready", "inp"]
-  const describeCounts = (counts: number[]) => perfNames.map((n, i) => `${n}=${counts[i]}`).join(" ")
+  const describeCounts = (counts: number[]) =>
+    perfNames.map((n, i) => `${n}=${counts[i]}`).join(" ")
+  // Hide by hand: the queue flush and web-vitals both listen for visibilitychange on document.
+  const setHidden = (hidden: boolean) =>
+    page.evaluate((h) => {
+      Object.defineProperty(document, "visibilityState", {
+        value: h ? "hidden" : "visible",
+        configurable: true,
+      })
+      Object.defineProperty(document, "hidden", { value: h, configurable: true })
+      document.dispatchEvent(new Event("visibilitychange"))
+    }, hidden)
+  // The vitals observers start at idle, after the page loads. A click before that makes no INP sample. FCP is
+  // reported when they start and the queue sends it when idle, so an FCP count that rises with the page still
+  // visible proves they are running. Hiding first would make web-vitals ignore FCP.
+  await expect
+    .poll(async () => (await perfCounts())[1] > perfBefore[1], { timeout: 60_000 })
+    .toBe(true)
   // An element with a gx action name gives INP a target.
   await page.locator("[data-gx-action]:visible").first().click()
   // LCP and INP entries reach the page's observers after a rendered frame; under load the hide can otherwise
@@ -143,12 +160,7 @@ test("184. Live token ledger (and 182. Stats limit burn, phone)", async ({ page,
   await page.evaluate(
     () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
   )
-  // Hide by hand: the queue flush and web-vitals both listen for visibilitychange on document.
-  await page.evaluate(() => {
-    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true })
-    Object.defineProperty(document, "hidden", { value: true, configurable: true })
-    document.dispatchEvent(new Event("visibilitychange"))
-  })
+  await setHidden(true)
   await expect
     .poll(
       async () => {
@@ -161,11 +173,7 @@ test("184. Live token ledger (and 182. Stats limit burn, phone)", async ({ page,
       { timeout: 60_000 },
     )
     .toBe("all rose")
-  await page.evaluate(() => {
-    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true })
-    Object.defineProperty(document, "hidden", { value: false, configurable: true })
-    document.dispatchEvent(new Event("visibilitychange"))
-  })
+  await setHidden(false)
 
   await page.evaluate(() => (location.hash = "#/stats?range=30"))
   const perf = page.getByRole("region", nav("Web performance"))
