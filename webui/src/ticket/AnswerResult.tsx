@@ -44,6 +44,8 @@ export function AnswerResult({ detail, sent }: { detail: TicketDetail; sent: Sen
   const [cut, setCut] = useState(false)
   const body = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
+    // The text is a deliberate re-measure trigger.
+    void latest?.text
     const el = body.current
     if (!el || open) return
     const measure = () => setCut(el.scrollHeight > el.clientHeight)

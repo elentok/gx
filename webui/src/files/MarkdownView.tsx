@@ -42,6 +42,7 @@ export function MarkdownView({
     // `settled` re-runs this when a diagram finishes, since it changes the layout.
     void settled
     void clicks
+    void text
     if (source || !heading || !box.current) return
     if (box.current.querySelector('[data-diagram="pending"]')) return
     const all = [...box.current.querySelectorAll("h1, h2, h3, h4, h5, h6")]

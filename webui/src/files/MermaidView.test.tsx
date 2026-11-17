@@ -39,6 +39,18 @@ async function markdown(text: string, heading?: string) {
   return view
 }
 
+function Toggle() {
+  const [source, setSource] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setSource(true)}>
+        source
+      </button>
+      <MermaidView text="graph TD; A-->B" source={source} />
+    </>
+  )
+}
+
 describe("Mermaid", () => {
   // First on purpose: the loader keeps the module once any later test has imported it.
   it("never imports pele for a Markdown file without a fence", async () => {
@@ -48,18 +60,12 @@ describe("Mermaid", () => {
   })
 
   it("renders a Mermaid file as a diagram with strict security, and Source shows the text", async () => {
-    function Toggle() {
-      const [source, setSource] = useState(false)
-      return (
-        <>
-          <button onClick={() => setSource(true)}>source</button>
-          <MermaidView text="graph TD; A-->B" source={source} />
-        </>
-      )
-    }
     const { container, getByText } = renderThemed(<Toggle />)
     await settle()
-    expect(mocks.renderAsync).toHaveBeenCalledWith("graph TD; A-->B", expect.objectContaining({ responsive: false }))
+    expect(mocks.renderAsync).toHaveBeenCalledWith(
+      "graph TD; A-->B",
+      expect.objectContaining({ responsive: false }),
+    )
     expect(container.querySelector("svg")).not.toBeNull()
     await act(async () => getByText("source").click())
     expect(container.querySelector("svg")).toBeNull()

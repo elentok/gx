@@ -186,10 +186,12 @@ export function EpicsPage({
   const focus = (location.state as { focus?: string } | null)?.focus
   // A one-time note from the page that sent us here (a removed draft). It is kept in state, then cleared from the history entry so a reload does not show it again.
   const [note] = useState(() => (location.state as { note?: string } | null)?.note)
+  // Latest-value refs let the effect run once on arrival without listing them as dependencies.
+  const arrival = useRef({ navigate, pathname: location.pathname, note, focus })
+  arrival.current = { navigate, pathname: location.pathname, note, focus }
   useEffect(() => {
-    if (note) navigate(location.pathname, { replace: true, state: { focus } })
-    // Once, on arrival.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const { navigate, pathname, note, focus } = arrival.current
+    if (note) navigate(pathname, { replace: true, state: { focus } })
   }, [])
   const focused = useRef<string | undefined>(undefined)
   const [scrollTo, setScrollTo] = useState<string>()
@@ -205,6 +207,9 @@ export function EpicsPage({
     setScrollTo(focus)
   }, [focus, list, sections])
   useEffect(() => {
+    // A section opening or the list changing can add the card, so they re-run the lookup.
+    void toggled
+    void list
     if (!scrollTo) return
     const card = [...document.querySelectorAll("[data-focus]")].find(
       (el) => el.getAttribute("data-focus") === scrollTo,

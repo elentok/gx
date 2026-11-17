@@ -168,6 +168,26 @@ describe("lagging alias note", () => {
   })
 })
 
+const Harness = () => {
+  const [section, setSection] = useState("Budget")
+  return (
+    <>
+      <button type="button" onClick={() => setSection("Scratch pad")}>
+        go
+      </button>
+      <SettingsShellView
+        entries={entries}
+        categories={treeFromEntries(entries)}
+        projects={[]}
+        section={section}
+        totpOn
+        onSignOut={() => {}}
+        onWrite={async () => ({})}
+      />
+    </>
+  )
+}
+
 describe("SettingsShellView", () => {
   it("keeps the sidebar at tablet width after a section click, in a 200px column", () => {
     const { getByRole } = renderThemed(
@@ -230,23 +250,6 @@ describe("SettingsShellView", () => {
   })
 
   it("opens the category of a section opened from a link", () => {
-    const Harness = () => {
-      const [section, setSection] = useState("Budget")
-      return (
-        <>
-          <button onClick={() => setSection("Scratch pad")}>go</button>
-          <SettingsShellView
-            entries={entries}
-            categories={treeFromEntries(entries)}
-            projects={[]}
-            section={section}
-            totpOn
-            onSignOut={() => {}}
-            onWrite={async () => ({})}
-          />
-        </>
-      )
-    }
     const { getByRole, queryByRole } = renderThemed(
       <MemoryRouter>
         <Harness />

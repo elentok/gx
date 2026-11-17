@@ -73,17 +73,17 @@ function ringLabel(row: EpicListRow): string {
   return ""
 }
 
+function secondsLeft(endsAt: string | undefined): number | undefined {
+  return endsAt ? Math.max(0, Math.ceil((Date.parse(endsAt) - Date.now()) / 1000)) : undefined
+}
+
 function useCountdown(endsAt: string | undefined): number | undefined {
-  const left = () =>
-    endsAt ? Math.max(0, Math.ceil((Date.parse(endsAt) - Date.now()) / 1000)) : undefined
-  const [seconds, setSeconds] = useState(left)
+  const [seconds, setSeconds] = useState(() => secondsLeft(endsAt))
   useEffect(() => {
-    setSeconds(left())
+    setSeconds(secondsLeft(endsAt))
     if (!endsAt) return
-    const id = setInterval(() => setSeconds(left()), 1000)
+    const id = setInterval(() => setSeconds(secondsLeft(endsAt)), 1000)
     return () => clearInterval(id)
-    // left() only reads endsAt.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endsAt])
   return seconds
 }

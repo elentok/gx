@@ -44,6 +44,9 @@ export function CodeView({
   }, [text, language])
 
   useEffect(() => {
+    // Highlighting swaps the line elements, so a new mark or new html re-scrolls.
+    void mark
+    void html
     cited.current?.scrollIntoView?.({ block: "center" })
   }, [mark, html])
 

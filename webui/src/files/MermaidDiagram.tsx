@@ -1,5 +1,5 @@
 import { Box, Text } from "@chakra-ui/react"
-import { useEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { CodeView } from "./CodeView"
 import { renderMermaid } from "./renderMermaid"
 
@@ -44,8 +44,20 @@ export function MermaidDiagram({ source, onSettled }: { source: string; onSettle
     )
   }
   if (state.status === "pending") return <Box data-diagram="pending" minH="4" />
+  return <DoneDiagram svg={state.svg} />
+}
+
+/** The rendered SVG, parsed and attached before paint so the diagram is in the DOM on the render that shows it. */
+function DoneDiagram({ svg }: { svg: string }) {
+  const host = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    // Pele emits SVG text only: no HTML labels, and link schemes are restricted.
+    const doc = new DOMParser().parseFromString(svg, "text/html")
+    host.current?.replaceChildren(...Array.from(doc.body.childNodes))
+  }, [svg])
   return (
     <Box
+      ref={host}
       data-diagram="done"
       overflowX="auto"
       css={{
@@ -60,8 +72,6 @@ export function MermaidDiagram({ source, onSettled }: { source: string; onSettle
         "--pele-border": "{colors.border}",
         "--pele-accent": "{colors.tone.running.fg}",
       }}
-      // Pele emits SVG text only: no HTML labels, and link schemes are restricted.
-      dangerouslySetInnerHTML={{ __html: state.svg }}
     />
   )
 }

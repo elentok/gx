@@ -3,10 +3,23 @@ import { useState } from "react"
 import { describe, expect, it, vi } from "vitest"
 import { renderThemed } from "../ui/render"
 import { MarkdownView } from "./MarkdownView"
+import type { FileResolver } from "./resolve"
 import { stubResolver } from "./stubResolver.testutil"
 
 const settle = () => act(async () => {})
 const FILE = "/repo/docs/guide.md"
+
+function Toggle({ text, resolver }: { text: string; resolver: FileResolver }) {
+  const [source, setSource] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setSource((s) => !s)}>
+        toggle
+      </button>
+      <MarkdownView path={FILE} text={text} source={source} resolver={resolver} />
+    </>
+  )
+}
 
 async function show(text: string, found: string[] = [], source = false) {
   const stub = stubResolver(found)
@@ -20,17 +33,9 @@ async function show(text: string, found: string[] = [], source = false) {
 describe("MarkdownView", () => {
   it("renders by default and shows the raw text as Source, and back", async () => {
     const stub = stubResolver([])
-    const text = "# Title\n\nsome *words*"
-    function Toggle() {
-      const [source, setSource] = useState(false)
-      return (
-        <>
-          <button onClick={() => setSource((s) => !s)}>toggle</button>
-          <MarkdownView path={FILE} text={text} source={source} resolver={stub.resolver} />
-        </>
-      )
-    }
-    const { container, getByText } = renderThemed(<Toggle />)
+    const { container, getByText } = renderThemed(
+      <Toggle text={"# Title\n\nsome *words*"} resolver={stub.resolver} />,
+    )
     expect(container.querySelector("h1")?.textContent).toBe("Title")
     await act(async () => getByText("toggle").click())
     expect(container.querySelector("h1")).toBeNull()

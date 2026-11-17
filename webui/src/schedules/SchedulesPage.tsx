@@ -91,7 +91,10 @@ export function SchedulesPage({
   useFetchedReady({ failed, source }, data?.schedules.length === 0)
   // A switch's answer shows at once; a fresh list replaces the answers.
   const [answers, setAnswers] = useState<Record<string, ScheduleInfo>>({})
-  useEffect(() => setAnswers({}), [data])
+  useEffect(() => {
+    void data
+    setAnswers({})
+  }, [data])
   const schedules = (data?.schedules ?? []).map((s) => answers[addressOf(s)] ?? s)
   const allOff = schedules.length > 0 && schedules.every((s) => !s.switch)
   return (

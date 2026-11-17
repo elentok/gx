@@ -8,6 +8,15 @@ import { stubResolver } from "./stubResolver.testutil"
 
 const settle = () => act(async () => {})
 
+function Mark() {
+  const ctx = useFileLinks()
+  return (
+    <button type="button" onClick={() => ctx?.markMissing("/abs/a.md")}>
+      mark
+    </button>
+  )
+}
+
 describe("FileLink", () => {
   it("is a same-tab link with the file icon and the dotted mono look", () => {
     const { container } = renderThemed(<FileLink path="/abs/a.md">a.md</FileLink>)
@@ -23,10 +32,6 @@ describe("FileLink", () => {
   })
 
   it("dims and drops the underline once the context marks the path missing", async () => {
-    function Mark() {
-      const ctx = useFileLinks()
-      return <button onClick={() => ctx?.markMissing("/abs/a.md")}>mark</button>
-    }
     const { container, getByText } = renderThemed(
       <FileLinkProvider resolver={stubResolver([]).resolver}>
         <FileLink path="/abs/a.md">a.md</FileLink>
