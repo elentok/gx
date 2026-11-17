@@ -246,6 +246,66 @@ describe("toggling the setting on an open editor", () => {
   })
 })
 
+describe("props applied after mount", () => {
+  type Props = Partial<React.ComponentProps<typeof CodeEditor>>
+  function open(first: Props = {}) {
+    const caret = { current: null as number | null }
+    const base = {
+      label: "Note text",
+      value: DOC,
+      onChange: () => {},
+      selection: { start: 0, end: 0 },
+      onSelectionChange: () => {},
+      viMode: false,
+      caret,
+    }
+    const el = (p: Props) => (
+      <ChakraProvider value={system}>
+        <CodeEditor {...base} {...p} />
+        <AppToaster />
+      </ChakraProvider>
+    )
+    const r = renderThemed(<CodeEditor {...base} {...first} />)
+    const view = EditorView.findFromDOM(screen.getByRole("textbox"))!
+    return { view, caret, rerender: (p: Props) => r.rerender(el(p)) }
+  }
+
+  test("a prop change keeps the same EditorView", () => {
+    const { view, rerender } = open({ inline: { rows: 3 } })
+    rerender({
+      inline: { rows: 3, disabled: true },
+      value: "changed",
+      placeholder: "p",
+      viMode: true,
+    })
+    expect(EditorView.findFromDOM(screen.getByRole("textbox"))).toBe(view)
+  })
+
+  test("a rerender that does not change vi keeps the vi mode", () => {
+    const { view, rerender } = open({ viMode: true })
+    act(() => void Vim.handleKey(getCM(view)!, "<Esc>", "user"))
+    expect(view.dom.parentElement!.getAttribute("data-vi-mode")).toBe("NORMAL")
+    rerender({ viMode: true, placeholder: "other" })
+    expect(view.dom.parentElement!.getAttribute("data-vi-mode")).toBe("NORMAL")
+  })
+
+  test("an outside value change moves the document and puts the caret from the ref", () => {
+    const { view, caret, rerender } = open()
+    caret.current = 2
+    rerender({ value: "abcdef", caret })
+    expect(view.state.doc.toString()).toBe("abcdef")
+    expect(view.state.selection.main.head).toBe(2)
+    expect(caret.current).toBeNull()
+  })
+
+  test("the same value with another inline leaves the document alone", () => {
+    const { view, rerender } = open({ inline: { rows: 3 } })
+    const doc = view.state.doc
+    rerender({ inline: { rows: 5 } })
+    expect(view.state.doc).toBe(doc)
+  })
+})
+
 describe("escape() handle", () => {
   test("leaves insert mode and keeps focus on the editor", () => {
     const { handle, onModeChange, view } = mount(true)

@@ -130,18 +130,19 @@ function useSlot(
   around?: { before?: () => void; after?: (v: EditorView) => void },
 ) {
   const slot = useRef(new Compartment())
-  const first = useRef(true)
+  const seen = useRef(dep)
+  // `dep` is the trigger; the rest is read at run time, so only a change of `dep` reconfigures.
+  const latest = useRef({ view, make, around })
+  latest.current = { view, make, around }
   useEffect(() => {
-    if (first.current) {
-      first.current = false
-      return
-    }
+    if (Object.is(seen.current, dep)) return
+    seen.current = dep
+    const { view, make, around } = latest.current
     const v = view.current
     if (!v) return
     around?.before?.()
     v.dispatch({ effects: slot.current.reconfigure(make()) })
     around?.after?.(v)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dep])
   return slot.current
 }
@@ -280,6 +281,36 @@ export default function CodeEditor({
   const disabled = !!inline?.disabled
   const lockSlot = useSlot(view, disabled, () => lockExt(disabled))
 
+  // The latest props for the effects that must not re-run on them: the mount effect and the value sync.
+  const latest = useRef({
+    value,
+    selection,
+    caret,
+    viMode,
+    disabled,
+    placeholder,
+    label,
+    autoFocus,
+    inline,
+    startVi,
+    viSlot,
+    lockSlot,
+  })
+  latest.current = {
+    value,
+    selection,
+    caret,
+    viMode,
+    disabled,
+    placeholder,
+    label,
+    autoFocus,
+    inline,
+    startVi,
+    viSlot,
+    lockSlot,
+  }
+
   useImperativeHandle(
     handle,
     () => ({
@@ -308,6 +339,19 @@ export default function CodeEditor({
   )
 
   useEffect(() => {
+    const {
+      value,
+      selection,
+      viMode,
+      disabled,
+      placeholder,
+      label,
+      autoFocus,
+      inline,
+      startVi,
+      viSlot,
+      lockSlot,
+    } = latest.current
     const clamp = (n: number) => Math.min(n, value.length)
     const v = new EditorView({
       parent: host.current!,
@@ -399,7 +443,6 @@ export default function CodeEditor({
     if (viMode) startVi(v)
     if (autoFocus) v.focus()
     // The editor is created once; later props are applied by the effects below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     return () => {
       stopVi.current?.()
       stopVi.current = null
@@ -412,10 +455,11 @@ export default function CodeEditor({
     if (!v) return
     const current = v.state.doc.toString()
     if (current === value) return
+    const { caret, inline, viMode } = latest.current
     external.current = true
     try {
       const at = caret?.current
-      caret && (caret.current = null)
+      if (caret) caret.current = null
       v.dispatch({
         changes: diff(current, value),
         ...(at == null ? {} : { selection: { anchor: Math.min(at, value.length) } }),
@@ -432,7 +476,6 @@ export default function CodeEditor({
         Vim.handleKey(cm, "i", "mapping")
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
 
   if (inline)
