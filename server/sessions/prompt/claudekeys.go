@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
@@ -71,6 +72,9 @@ func (k *keyDriver) run(req wire.SessionAnswerRequest) error {
 		return err
 	}
 	k.rows = rows
+	if ad, ok := claudeui.ParseAddDirDialog(rows); ok {
+		return k.addDir(req, ad)
+	}
 	d, ok := claudeui.ParseAskDialog(rows)
 	if !ok || !strings.HasPrefix(req.CardID, d.ID+"-") {
 		return dialogMismatch("the dialog on screen is not the one the card shows")
@@ -326,4 +330,42 @@ func (k *keyDriver) press(keys string) (bool, error) {
 		k.rows = rows
 	}
 	return !slices.Equal(k.rows, before), nil
+}
+
+// addDirAttempts bounds the keys sent to the add-directory dialog.
+const addDirAttempts = 4
+
+// addDir answers the add-directory dialog: option 1 adds the directory, 2 (or
+// no pick) exits. The dialog refuses keys typed soon after one it refused, so
+// each key is followed by a wait before the screen is read again.
+func (k *keyDriver) addDir(req wire.SessionAnswerRequest, d claudeui.AddDirDialog) error {
+	if !strings.HasPrefix(req.CardID, d.ID+"-") {
+		return dialogMismatch("the dialog on screen is not the one the card shows")
+	}
+	a := answerAt(req.Answers, 0)
+	if !isClaudeAnswered(a) || a.Choice == "2" && len(a.Choices) == 0 && strings.TrimSpace(a.Text) == "" {
+		_, err := k.press("\x1b")
+		return err
+	}
+	if a.Choice != "1" || len(a.Choices) > 0 || strings.TrimSpace(a.Text) != "" {
+		return badAnswer("pick Yes, add it or No, exit")
+	}
+	for range addDirAttempts {
+		if _, ok := claudeui.ParseAddDirDialog(k.rows); !ok {
+			return nil
+		}
+		if err := k.conn.SendPersonKeys(claudeui.TrustKey(k.rows)); err != nil {
+			return err
+		}
+		time.Sleep(harness.AddDirSettle)
+		rows, _, err := k.conn.Screen(0)
+		if err != nil {
+			return err
+		}
+		k.rows = rows
+	}
+	if _, ok := claudeui.ParseAddDirDialog(k.rows); ok {
+		return dialogMismatch("the dialog is still open")
+	}
+	return nil
 }

@@ -60,14 +60,14 @@ func (claudeHarness) StartupScreen(scrolled, rows []string) Startup {
 	case claudeui.StartupTrust:
 		return Startup{Dialog: TrustDialog, Key: claudeui.TrustKey(rows)}
 	case claudeui.StartupAddDir:
-		return Startup{Dialog: AddDirDialog, Key: claudeui.TrustKey(rows), Settle: addDirSettle}
+		return Startup{Dialog: AddDirDialog, Key: claudeui.TrustKey(rows), Settle: AddDirSettle}
 	}
 	return Startup{}
 }
 
-// addDirSettle is longer than the add-dir dialog's input-refusal window, which
+// AddDirSettle is longer than the add-dir dialog's input-refusal window, which
 // every refused key restarts.
-const addDirSettle = 5 * time.Second
+const AddDirSettle = 5 * time.Second
 
 // DisplayName drops the status glyph claude prefixes its title with (✳
 // idle, a braille spinner while working): the Agents tab shows the state

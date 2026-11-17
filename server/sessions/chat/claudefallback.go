@@ -56,6 +56,9 @@ func (w *dialogWaits) clear(id string) {
 // question, the dialog was not handed back to the terminal and its screen
 // parses.
 func (c *Chat) claudeFallbackCards(dir string, m Meta, snap Snapshot) []wire.QuestionCard {
+	if m.Status.State == wire.SessionBlocked && m.Status.Kind == "dialog" {
+		return c.addDirCards(dir, m, snap)
+	}
 	if m.Status.State != wire.SessionBlocked || m.Status.Kind != "question" || m.Status.Message != claudeInputNeeded {
 		c.dialogWaits.clear(m.ID)
 		return nil
@@ -122,4 +125,43 @@ func reviewBody(items []claudeui.AskReviewItem) string {
 		lines[i] = "- " + it.Question + " → " + it.Answer
 	}
 	return strings.Join(lines, "\n")
+}
+
+// addDirCards is the card of the "Adding a new directory" dialog a launch is
+// stuck on, when its screen parses. gx also answers the dialog itself; the
+// card is for when that fails.
+func (c *Chat) addDirCards(dir string, m Meta, snap Snapshot) []wire.QuestionCard {
+	conn, err := holder.DialHolder(dir)
+	if err != nil {
+		return nil
+	}
+	rows, _, err := conn.Screen(0)
+	if err != nil {
+		c.log.Warn("read screen for add-dir card", "session", m.ID, "err", err)
+		return nil
+	}
+	d, ok := claudeui.ParseAddDirDialog(rows)
+	if !ok {
+		return nil
+	}
+	return AddDirCard(d, personTurns(snap.Msgs))
+}
+
+// AddDirCard is the add-directory dialog as a claude-dialog card with the
+// two options of the dialog, numbered by position.
+func AddDirCard(d claudeui.AddDirDialog, turn int) []wire.QuestionCard {
+	return []wire.QuestionCard{{
+		Source: wire.CardSourceClaudeDialog,
+		ID:     fmt.Sprintf("%s-%d", d.ID, turn),
+		Questions: []wire.QuestionCardQuestion{{
+			Kind:  "options",
+			Title: "Add " + d.Dir + "?",
+			Body:  "This session hasn't worked here before. Claude Code will be able to read, edit and run files there.",
+			Options: []wire.QuestionCardOption{
+				{ID: "1", Label: "Yes, add it"},
+				{ID: "2", Label: "No, exit"},
+			},
+		}},
+		Fallback: true,
+	}}
 }

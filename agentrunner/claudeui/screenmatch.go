@@ -57,9 +57,11 @@ const trustYes = "Yes, I trust this folder"
 // every launch with --add-dir raises for a directory the session hasn't
 // worked in.
 var addDirAnchors = []string{
-	"Adding a new directory",
+	addDirTitle,
 	addDirYes,
 }
+
+const addDirTitle = "Adding a new directory"
 
 const addDirYes = "Yes, add it"
 
