@@ -70,8 +70,8 @@ orchestrator described above.
 - Go 1.21+
 - Git
 - tmux (optional, for `N` and `T` keybindings)
-- A coding agent for the orchestrator: Claude Code is hosted by `gx server` itself; herdr is an
-  optional alternative runner
+- A coding agent for the orchestrator: Claude Code is hosted by `gx server` itself on the PTY
+  runner (the default); the headless runner is the other choice
 - macOS or Linux. `gx server install` registers a launchd agent (macOS only)
 
 ## Installation
@@ -348,8 +348,7 @@ gx can run agents under Codex as well as Claude. Codex 0.166.0 or newer is requi
 - `gx codex setup` writes the git approval rules that gx relies on. It shows the changes and asks
   first; `--yes` skips the question.
 - Codex reads gx's skills from `~/.agents/skills`. `gx skills install` puts them there.
-- Codex runs on the PTY runner. Under `agent-runner: herdr` it gets a reduced flow: no live reply,
-  no approval cards and no resume.
+- Codex runs on the PTY runner.
 
 ## Configuration
 
@@ -369,7 +368,8 @@ Optional config file at `~/.config/gx/config.json` (run `gx config edit` to open
 | `execution-queue.spin-window` | duration string | `"5m"` | Window for counting `spin-cycles` (Go duration, e.g. `"90s"`). Unparsable or non-positive values keep the default. |
 | `execution-queue.waiting-slot-grace` | duration string | `"10m"` | How long a waiting agent counts toward the slot caps before it releases its slot and stays alive. Unparsable or non-positive values keep the default. |
 | `execution-queue.max-released-agents` | integer (≥0) | `5` | Maximum waiting agents that hold a released slot at once, across projects. The next waiting agent keeps its slot. `0` disables release. |
-| `runner-wait` | duration string | `"5s"` | N, the wait the agent runners bound their guards by (busy guard, `/` idle-after-N, Interrupt, herdr deny). Go duration, e.g. `"10s"`; unparsable or non-positive values keep the default. Read when the server starts. |
+| `agent-runner` | `"auto"` \| `"pty"` \| `"headless"` | `"auto"` | How gx hosts agents. `auto` picks the PTY runner (the default) when `claude` is on PATH. A stored `herdr` is read as `auto`, with a warning. Read when the server starts. |
+| `runner-wait` | duration string | `"5s"` | N, the wait the agent runners bound their guards by (busy guard, `/` idle-after-N, Interrupt). Go duration, e.g. `"10s"`; unparsable or non-positive values keep the default. Read when the server starts. |
 | `budget.soft-limit`        | dollars (float)                 | `20`      | Estimated API-equivalent-cost soft limit. Set to `0` to disable.                                                                                                                             |
 | `budget.hard-limit`        | dollars (float)                 | `30`      | Estimated API-equivalent-cost hard limit. Set to `0` to disable. Bumped up to `soft-limit` on load if it's set at or below a nonzero `soft-limit`.                                          |
 | `budget.notification-thresholds` | array of dollars (float)  | `[5, 10, 15]` | Estimated API-equivalent-cost thresholds at which a notification fires. Sorted and deduped on load.                                                                                    |

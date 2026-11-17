@@ -13,8 +13,8 @@ Facts checked in code. Paths are under `server/servertest/`.
 
 ## Turn hooks
 
-- `Harness.OnTurn` and `RegisterTurn` (`turn.go`) need a PTY runner or `WithHerdr` (`runner.go`).
-  Without one, the test fails with "Harness.OnTurn needs PTY or WithHerdr".
+- `Harness.OnTurn` and `RegisterTurn` (`turn.go`) need the PTY runner (`runner.go`).
+  Without it, the test fails with "Harness.OnTurn is not supported here; it needs the PTY runner".
 
 ## Rigs (`rigs/`)
 

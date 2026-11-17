@@ -21,7 +21,7 @@ Ticket Forking sections) this doc expands on.
 | **Epic** | A named unit of work: a directory `.scratch/<epic>/issues/*.md` of tickets, plus one shared **feature worktree/branch** checked out for the epic's lifetime. |
 | **Ticket** | One markdown file with frontmatter (`status`, `blocked_by`, `parent`, `type`, ...) describing one unit of agent work. |
 | **Epic run** | One call to `ralphloop.Run(...)`. The Queue tab no longer starts one: `gx server` schedules queued tickets itself, one iteration at a time (`server/runs.go`), using the same claim/build/land mechanics described below. Drives every unblocked ticket in that epic (or a narrower `RunScope`) to completion, up to `MaxParallel` concurrently (default 2). |
-| **Iteration** | The lifecycle of one ticket being worked: its own worktree, branch, herdr tab, and agent session, from claim through landing (or a stall). |
+| **Iteration** | The lifecycle of one ticket being worked: its own worktree, branch and agent session (hosted by the PTY runner), from claim through landing (or a stall). |
 | **Iteration worktree/branch** | Per-ticket git worktree (`{worktreeDir}/{epic}-item-{identifier}`) on branch `ralph-loop/{epic}-item-{identifier}`, created fresh off the feature branch's current tip. |
 | **Claim** | Atomically writes `status: claimed` on a ticket, taking it off the frontier so no other scan can pick it up. |
 | **Landing** | Cherry-picking a finished iteration branch's commits onto the shared feature worktree/branch (never a merge — always cherry-pick). Distinct from merging the epic into `main`, which is a separate later step (`gx merge` / `gx-merge` skill). |
@@ -30,7 +30,7 @@ Ticket Forking sections) this doc expands on.
 | **Parked** | A ticket whose `RenderedStatus` is `NeedsAnswer`, `NeedsRepair`, or `Draft` — waiting on a person, not runnable, and not retried on its own (`isParked`). An epic parks when every in-scope ticket left is parked or blocked, and keeps waiting rather than exiting; only a run with no runnable work *and* nothing parked is **deadlocked**, which is a hard error. See GLOSSARY.md's Ticket States section. |
 | **Fork** | Splitting a ticket into sibling tickets mid-flight because it outgrew its budget or turned out to mix concerns. Produces one `parent` edge per new ticket, written on the new ticket; nothing is recorded on the original. |
 | **Fork subtree** | A ticket plus every ticket reached by following `parent` reverse-edges down from it, at any depth. The unit `Blocking` recurses over: a `blocked_by` token resolves only once the named ticket's whole fork subtree is done. |
-| **Reconcile** | The pass that runs once at the start of every epic run, before scheduling starts, reconciling on-disk `status:` against live herdr sessions and git reality (crash recovery). |
+| **Reconcile** | The pass that runs once at the start of every epic run, before scheduling starts, reconciling on-disk `status:` against live agent sessions and git reality (crash recovery). |
 | **Gate** | The in-process pause/resume coordinator for one epic run. Something can be paused for rate-limit or needs-repair reasons; a smart-zone breach is handled differently and does **not** use the Gate (see §6). |
 | **RenderedStatus** | The Queue/Tickets UI's collapse of raw `status:` + graph-derived overlays into: Open, Claimed, Blocked, NeedsAnswer, NeedsRepair, Done, Draft, Waiting-for-children, Error. Blocked and Waiting-for-children are overlays — derived per render, never written to a file. |
 
@@ -44,7 +44,7 @@ sequenceDiagram
     participant Reconcile
     participant Scheduler as claimNext
     participant Iter as Iteration (goroutine)
-    participant Herdr as herdr tab/agent
+    participant Session as agent runner / session (PTY runner)
     participant LandQ as Land-queue worker
     participant Feature as feature worktree/branch
 
@@ -57,9 +57,9 @@ sequenceDiagram
         Run->>Scheduler: claimNext (frontier scan)
         Scheduler->>Scheduler: Claim() -> status: claimed
         Scheduler->>Iter: launch(ticket)
-        Iter->>Herdr: AddWorktree, TabCreate, AgentStart
-        Herdr->>Herdr: run /gx-implement <ticket>
-        Herdr-->>Iter: idle (commits ahead of base)
+        Iter->>Session: add worktree, install dependencies, start the agent
+        Session->>Session: run /gx-implement <ticket>
+        Session-->>Iter: idle (commits ahead of base)
         Iter->>Iter: MarkBuiltAwaitingLand (iteration_status: finished; status stays claimed)
         Iter-->>Run: builtAwaitingLandError{job} -> active slot freed
         Run->>LandQ: queue job (pane/tab/sessionID, in-memory only), wake
@@ -81,8 +81,8 @@ sequenceDiagram
    `blocked`, `out-of-scope`, `done`, `stalled` (parked, in the log's own literal decision string),
    `unclaimed`.
 2. `launch` spins up a goroutine: new iteration worktree off the feature branch's current tip,
-   dependency install (npm/pnpm/yarn/poetry/uv, detected from marker files), a herdr tab, an
-   agent session (Claude or Codex), and the skill prompt `/gx-implement <ticket-path>`.
+   dependency install (npm/pnpm/yarn/poetry/uv, detected from marker files), an
+   agent session on the PTY runner, the default (Claude or Codex), and the skill prompt `/gx-implement <ticket-path>`.
    `waitForFinish` blocks until the agent reaches a finish state, absorbing rate-limit pauses,
    needs-repair pauses, and smart-zone breaches along the way (§6).
 3. `finishIteration`: zero commits + `Commitless: true` → treat as an intentional zero-diff
@@ -107,7 +107,7 @@ sequenceDiagram
    fires and the epic's `ticket.md` gets a `completed_at` stamp.
 
 One epic → one feature worktree/branch, and one land-queue worker serializing every landing onto
-it. One ticket-iteration → its own worktree, branch, herdr tab, and agent session. Up to
+it. One ticket-iteration → its own worktree, branch, and agent session (hosted by the PTY runner). Up to
 `MaxParallel` iterations *build* concurrently under one epic run; landing itself is always
 one-at-a-time, but no longer ties up a build slot while it runs.
 
