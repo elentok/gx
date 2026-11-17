@@ -266,6 +266,41 @@ func TestStorePlace_QueueAndOneOffAgents(t *testing.T) {
 	}
 }
 
+func TestStoreWorkspaceOfSession(t *testing.T) {
+	s, err := workspaces.Open(t.TempDir(), broker.New(0), func() workspaces.Directory {
+		return fakeDir{designs: map[string]bool{"proj:map": true}, sessions: []wire.SessionInfo{
+			{ID: "chat"},
+			{ID: "design", Design: true, Ticket: "proj:map"},
+			{ID: "agent", Queue: true, Ticket: "proj:map-impl/02"},
+			{ID: "triage", Flow: "triage", FlowKey: "proj"},
+		}}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Create("Bugs"); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"chat", "proj:map"} {
+		if err := s.SetMember(key, "Bugs"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := map[string]string{
+		"chat":   "Bugs",
+		"design": "Bugs",
+		"agent":  "Bugs",
+		"nobody": workspaces.DefaultName,
+		"triage": workspaces.DefaultName,
+		"":       workspaces.DefaultName,
+	}
+	for id, w := range want {
+		if got := s.WorkspaceOfSession(id); got != w {
+			t.Errorf("WorkspaceOfSession(%q) = %q, want %q", id, got, w)
+		}
+	}
+}
+
 func TestStorePlace_TriageSessionSitsUnderOther(t *testing.T) {
 	s, err := workspaces.Open(t.TempDir(), broker.New(0), func() workspaces.Directory { return fakeDir{} })
 	if err != nil {

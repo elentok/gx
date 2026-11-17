@@ -163,8 +163,8 @@ export interface DesignOpenRequest {
   idea?: string;
   project?: string;
   /**
-   * FromSession is the chat that promoted the idea; the new Design starts in
-   * its workspace. An unknown id is ignored.
+   * FromSession is the chat or Design session that promoted the idea; the new
+   * Design starts in its workspace. An unknown id is ignored.
    */
   from_session?: string;
   /**

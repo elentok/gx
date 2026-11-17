@@ -40,6 +40,8 @@ type Deps struct {
 // Workspaces is the slice of the workspace store a promoted Design uses.
 type Workspaces interface {
 	Workspace(key string) string
+	// WorkspaceOfSession resolves a chat or a Design/Queue/Fix session id.
+	WorkspaceOfSession(id string) string
 	SetMember(key, workspace string) error
 	Remove(key string) error
 }

@@ -175,6 +175,34 @@ func TestDesignsOpenNew_PromotedFromAChatStartsInItsWorkspace(t *testing.T) {
 	}
 }
 
+func TestDesignsOpenNew_FromADesignSessionStartsInThatDesignsWorkspace(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	if _, err := f.h.Client.Admin.CreateWorkspace(f.ctx, "Bugs"); err != nil {
+		t.Fatal(err)
+	}
+	src := f.open(t, "proj:map", false)
+	if src.Session == nil {
+		t.Fatalf("open design = %+v", src)
+	}
+	if res, err := f.h.Client.Admin.MoveToWorkspace(f.ctx, "Bugs", "proj:map"); err != nil || res.Results[0].Refused() {
+		t.Fatalf("move design = %+v, %v", res, err)
+	}
+	res, err := f.h.Client.Sessions.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "from-design", NewDesign: true, Idea: "idea", Project: "proj", FromSession: src.Session.ID})
+	if err != nil || res.Refused {
+		t.Fatalf("open = %+v, %v", res, err)
+	}
+	l, err := f.h.Client.Reads.Workspaces(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range l.Workspaces {
+		if w.Name == "Bugs" && w.Members != 2 {
+			t.Errorf("Bugs members = %d, want 2", w.Members)
+		}
+	}
+}
+
 func TestDesignsOpenNew_WorkspaceNameDecidesWhereItLands(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)

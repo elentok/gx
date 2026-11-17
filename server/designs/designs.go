@@ -528,7 +528,7 @@ func (s *Designs) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult,
 		case req.DraftID != "":
 			name = draftWorkspace
 		case req.FromSession != "":
-			name = s.workspaces.Workspace(req.FromSession)
+			name = s.workspaces.WorkspaceOfSession(req.FromSession)
 		}
 		if name != "" {
 			if err := s.workspaces.SetMember(addr, name); err != nil {

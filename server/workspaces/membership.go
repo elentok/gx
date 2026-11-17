@@ -81,6 +81,25 @@ func (s *Store) Place(sessions []wire.SessionInfo) []wire.SessionPlacement {
 	return out
 }
 
+// WorkspaceOfSession is the workspace a session's work belongs in: a chat's
+// own, or the one holding the Design or epic a Design, Queue or Fix session
+// serves. Unknown ids and sessions that sit under Other answer Default.
+func (s *Store) WorkspaceOfSession(id string) string {
+	for _, si := range s.dir().Sessions() {
+		if si.ID != id {
+			continue
+		}
+		switch p := s.place(si); p.Kind {
+		case wire.PlacementChat:
+			return p.Workspace
+		case wire.PlacementEpic:
+			return s.Workspace(p.Epic)
+		}
+		break
+	}
+	return DefaultName
+}
+
 func (s *Store) place(si wire.SessionInfo) wire.SessionPlacement {
 	// A Triage session has no ticket and belongs to no workspace: it sits under Other.
 	if si.Flow == string(tickets.FlowTriage) {

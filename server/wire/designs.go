@@ -23,8 +23,8 @@ type DesignOpenRequest struct {
 	NewDesign bool   `json:"new_design,omitempty"`
 	Idea      string `json:"idea,omitempty"`
 	Project   string `json:"project,omitempty"`
-	// FromSession is the chat that promoted the idea; the new Design starts in
-	// its workspace. An unknown id is ignored.
+	// FromSession is the chat or Design session that promoted the idea; the new
+	// Design starts in its workspace. An unknown id is ignored.
 	FromSession string `json:"from_session,omitempty"`
 	// Workspace is the workspace a new Design lands in; FromSession wins, and
 	// a missing or unknown name reads as Default.
