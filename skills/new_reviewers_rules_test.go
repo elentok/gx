@@ -11,6 +11,8 @@ func TestNewReviewersRules(t *testing.T) {
 		"gx-code-reviewer",
 		"gx-silent-failure-hunter",
 		"gx-type-design-analyzer",
+		"gx-comment-analyzer",
+		"gx-pr-test-analyzer",
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := name + "/SKILL.md"
@@ -26,5 +28,13 @@ func TestNewReviewersRules(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The verify-ticket rule lives once, in the Quality brief of gx-code-review.
+func TestPRTestAnalyzerHoldsNoVerifyTicketRule(t *testing.T) {
+	path := "gx-pr-test-analyzer/SKILL.md"
+	if strings.Contains(normalizeSpace(readFile(t, path)), "open verify ticket") {
+		t.Errorf("%s restates the open-verify-ticket rule", path)
 	}
 }

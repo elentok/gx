@@ -1,0 +1,5 @@
+interface:
+  display_name: "PR Test Analyzer"
+  short_description: "Review a diff for missing tests"
+policy:
+  allow_implicit_invocation: false

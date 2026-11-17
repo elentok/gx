@@ -16,3 +16,5 @@ gx-thermo-nuclear-code-quality-review  cursor/plugins  cursor-team-kit/skills/th
 gx-code-reviewer          anthropics/claude-plugins-official  plugins/pr-review-toolkit/agents/code-reviewer.md          plugins/pr-review-toolkit/LICENSE  fd30cee  port
 gx-silent-failure-hunter  anthropics/claude-plugins-official  plugins/pr-review-toolkit/agents/silent-failure-hunter.md  plugins/pr-review-toolkit/LICENSE  fd30cee  port
 gx-type-design-analyzer   anthropics/claude-plugins-official  plugins/pr-review-toolkit/agents/type-design-analyzer.md   plugins/pr-review-toolkit/LICENSE  fd30cee  port
+gx-comment-analyzer       anthropics/claude-plugins-official  plugins/pr-review-toolkit/agents/comment-analyzer.md       plugins/pr-review-toolkit/LICENSE  fd30cee  port
+gx-pr-test-analyzer       anthropics/claude-plugins-official  plugins/pr-review-toolkit/agents/pr-test-analyzer.md       plugins/pr-review-toolkit/LICENSE  fd30cee  port

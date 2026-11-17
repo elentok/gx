@@ -1,0 +1,5 @@
+interface:
+  display_name: "Comment Analyzer"
+  short_description: "Review changed comments for accuracy and rot"
+policy:
+  allow_implicit_invocation: false
