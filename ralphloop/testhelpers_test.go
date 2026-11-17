@@ -60,26 +60,3 @@ func mustMergeLockDir(t *testing.T, scratchDir, epic string) string {
 	}
 	return dir
 }
-
-// setProcessEnv points the real process env var key at value for the rest of
-// the test, restored on cleanup via a manual os.Setenv/os.Unsetenv pair
-// rather than t.Setenv (which panics once a test has called t.Parallel()).
-// Only for tests driving herdrfake helpers (RegisterCodexRollout,
-// NewClaudeCompact) that read real process env directly and have no
-// DepsOverrides-style seam of their own — everything else should use
-// fakes.TestDepsWithOverrides instead. A test using this must stay non-parallel
-// with any other test that also touches the same env var.
-func setProcessEnv(t *testing.T, key, value string) {
-	t.Helper()
-	prev, had := os.LookupEnv(key)
-	if err := os.Setenv(key, value); err != nil {
-		t.Fatalf("Setenv %s: %v", key, err)
-	}
-	t.Cleanup(func() {
-		if had {
-			os.Setenv(key, prev)
-		} else {
-			os.Unsetenv(key)
-		}
-	})
-}

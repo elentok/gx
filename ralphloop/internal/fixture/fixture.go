@@ -146,15 +146,11 @@ func WriteFakeTranscript(t *testing.T, home, cwd, sessionID string, start time.T
 }
 
 // codexRolloutTestEpoch anchors synthetic rollout JSONL timestamps,
-// mirroring herdrfake.RegisterCodexRollout's own fixed epoch.
+// with a fixed epoch so rollouts are deterministic.
 var codexRolloutTestEpoch = time.Date(2026, 8, 4, 0, 0, 0, 0, time.UTC)
 
 // appendCodexRolloutLine appends one JSONL record to a synthetic Codex
-// rollout file at path, in the shape codexsession's reader expects (mirroring
-// herdrfake.CodexRollout's private appendLine) — needed because
-// herdrfake.State.Register claims "agent prompt"/"agent wait" globally by
-// verb+noun with no per-pane scoping, so RegisterCodexRollout can't coexist
-// with a second, differently-behaved Codex pane in the same test.
+// rollout file at path, in the shape codexsession's reader expects.
 func appendCodexRolloutLine(path string, line int, value map[string]any) error {
 	value["timestamp"] = codexRolloutTestEpoch.Add(time.Duration(line) * time.Millisecond).Format(time.RFC3339Nano)
 	encoded, err := json.Marshal(value)

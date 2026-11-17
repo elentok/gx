@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/proccap"
@@ -39,7 +38,6 @@ func TestNew_EveryRunnerCarriesN(t *testing.T) {
 	}{{9 * time.Second, 9 * time.Second}, {0, agentrunner.DefaultN}} {
 		_, runnerFor := New(agentrunner.ChoiceHeadless, testEnv(t), t.TempDir(), tc.n, Options{}, nil)
 		got := map[string]time.Duration{
-			"herdr":    runnerFor("herdr", "p").(*herdrrunner.Runner).WaitN(),
 			"headless": runnerFor("headless", "p").(*nativerunner.Headless).WaitN(),
 			"pty":      runnerFor("pty", "p").(*nativerunner.Pty).WaitN(),
 		}
@@ -71,17 +69,17 @@ func TestNew_PtyAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing.T) {
 
 func TestNew_BuildsAnyRunnerPerPairLazily(t *testing.T) {
 	_, runnerFor := New(agentrunner.ChoiceHeadless, testEnv(t), t.TempDir(), 0, Options{}, nil)
-	herdrA := runnerFor("herdr", "a")
-	if herdrA == nil || herdrA.Name() != "herdr" {
-		t.Fatalf("runnerFor(herdr, a) = %v, want a herdr runner", herdrA)
+	ptyA := runnerFor("pty", "a")
+	if ptyA == nil || ptyA.Name() != "pty" {
+		t.Fatalf("runnerFor(pty, a) = %v, want a pty runner", ptyA)
 	}
-	if runnerFor("herdr", "a") != herdrA {
+	if runnerFor("pty", "a") != ptyA {
 		t.Error("a (runner, project) pair must be built once and kept")
 	}
-	if runnerFor("herdr", "b") == herdrA {
+	if runnerFor("pty", "b") == ptyA {
 		t.Error("each project gets its own runner")
 	}
-	if runnerFor("headless", "a") == herdrA {
+	if runnerFor("headless", "a") == ptyA {
 		t.Error("each runner name gets its own runner")
 	}
 	if r := runnerFor("tmux", "a"); r != nil {
@@ -97,18 +95,18 @@ func TestNew_HeadlessDefaultRunnerHasARoot(t *testing.T) {
 }
 
 func TestNew_NamesComeFromTheRunners(t *testing.T) {
-	if r, _ := New(agentrunner.ChoiceHerdr, testEnv(t), t.TempDir(), 0, Options{}, nil); r.Name() != "herdr" {
-		t.Errorf("herdr Name = %q", r.Name())
+	if r, _ := New(agentrunner.ChoicePTY, testEnv(t), t.TempDir(), 0, Options{}, nil); r.Name() != "pty" {
+		t.Errorf("pty Name = %q", r.Name())
 	}
 	if r, _ := New(agentrunner.ChoiceHeadless, testEnv(t), t.TempDir(), 0, Options{}, nil); r.Name() != "headless" {
 		t.Errorf("headless Name = %q", r.Name())
 	}
 }
 
-func TestNew_HerdrServerCanBuildHeadless(t *testing.T) {
-	_, runnerFor := New(agentrunner.ChoiceHerdr, testEnv(t), t.TempDir(), 0, Options{}, nil)
+func TestNew_PtyServerCanBuildHeadless(t *testing.T) {
+	_, runnerFor := New(agentrunner.ChoicePTY, testEnv(t), t.TempDir(), 0, Options{}, nil)
 	if _, ok := runnerFor("headless", "proj").(*nativerunner.Headless); !ok {
-		t.Error("a herdr server must still reach a headless run's runner")
+		t.Error("a pty server must still reach a headless run's runner")
 	}
 }
 
@@ -122,9 +120,6 @@ func TestNew_ProcHeadroomReachesEveryRunnerWithoutAnOverride(t *testing.T) {
 		if got := src.Limit(nil); got != 107 {
 			t.Errorf("%s cap = %d, want 107", name, got)
 		}
-	}
-	if got := runnerFor("herdr", "p").(*herdrrunner.Runner).ProcCap(nil); got <= 0 {
-		t.Errorf("herdr cap = %d, want a positive cap", got)
 	}
 }
 

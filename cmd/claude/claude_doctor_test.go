@@ -29,8 +29,8 @@ func TestRunClaudeDoctor_DefaultRunnerFollowsConfig(t *testing.T) {
 	}{
 		{"pty", "pty", "runner: pty (agent-runner pty)"},
 		{"headless", "headless", "runner: headless (agent-runner headless)"},
-		{"herdr", "headless", "runner: headless (agent-runner herdr; doctor never checks herdr)"},
-		{"auto", "headless", "runner: headless (agent-runner auto; doctor never checks herdr)"},
+		{"auto", "pty", "runner: pty (agent-runner auto)"},
+		{"", "pty", "runner: pty (agent-runner auto)"},
 	}
 	for _, tc := range cases {
 		out := &strings.Builder{}

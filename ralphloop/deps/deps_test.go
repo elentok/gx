@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/testutil"
@@ -214,29 +213,6 @@ func TestDefaultDepsWithOverrides_ReadTurnsResolvesPathLikeReadOccupancy(t *test
 	}
 }
 
-func TestDefaultDepsWithOverrides_RunnerWaitReachesRunner(t *testing.T) {
-	t.Parallel()
-	runner := DefaultDepsWithOverrides(DepsOverrides{RunnerWait: 7 * time.Second}).Runner.(*herdrrunner.Runner)
-	if got := runner.WaitN(); got != 7*time.Second {
-		t.Errorf("WaitN() = %v, want 7s", got)
-	}
-}
-
-func TestDefaultDepsWithOverrides_PathOverridesPreflightLookup(t *testing.T) {
-	t.Parallel()
-	binDir := t.TempDir()
-	script := "#!/bin/sh\necho logged in\nexit 0\n"
-	if err := os.WriteFile(filepath.Join(binDir, "codex"), []byte(script), 0755); err != nil {
-		t.Fatalf("WriteFile codex stub: %v", err)
-	}
-
-	deps := DefaultDepsWithOverrides(DepsOverrides{Path: binDir})
-	err := deps.PreflightAgent(agent.AgentCodex)
-	if err == nil || !strings.Contains(err.Error(), "Herdr executable not found") {
-		t.Errorf("PreflightAgent() error = %v, want a Herdr-not-found error (codex resolved via override PATH, herdr did not)", err)
-	}
-}
-
 func TestDefaultDepsWithOverrides_CodexHomeOverridesContextAndRateLimitReads(t *testing.T) {
 	t.Parallel()
 	codexHome := t.TempDir()
@@ -269,14 +245,6 @@ func TestDefaultDepsWithOverrides_CodexHomeOverridesContextAndRateLimitReads(t *
 	empty := DefaultDepsWithOverrides(DepsOverrides{})
 	if _, ok, err := empty.ReadCodexCompactions("/repo/iter-01", "session-1"); err != nil || ok {
 		t.Errorf("empty Codex home: ReadCodexCompactions ok=%t err=%v, want unavailable", ok, err)
-	}
-
-	limit, ok, err := deps.Runner.(*herdrrunner.Runner).CodexQuota("/repo/iter-01", "session-1")
-	if err != nil {
-		t.Fatalf("CodexQuota() error = %v", err)
-	}
-	if !ok || limit.Quota != "primary" {
-		t.Errorf("CodexQuota() = (%+v, %t), want exhausted primary, ok=true", limit, ok)
 	}
 }
 
@@ -329,11 +297,4 @@ func TestRebaseOntoOrAbort_ConflictNamesTheConflictingFiles(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "aborted") || !strings.Contains(err.Error(), "a.txt") {
 		t.Fatalf("err = %v, want an aborted-rebase error naming a.txt", err)
 	}
-}
-
-// fixedNow returns a clock that never advances, for tests where elapsed
-// time isn't under test.
-func fixedNow() func() time.Time {
-	t := time.Now()
-	return func() time.Time { return t }
 }

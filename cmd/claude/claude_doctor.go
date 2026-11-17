@@ -36,7 +36,7 @@ func newClaudeDoctorCmd(d Deps) *cobra.Command {
 		Long: `Check the claude features gx's native runners rely on.
 
 Prints one PASS|FAIL|SKIP line per check and exits 1 on any FAIL. A check
-whose dependency did not pass is skipped. Never checks herdr.`,
+whose dependency did not pass is skipped.`,
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			src := liveDoctorSource()
@@ -170,15 +170,17 @@ func liveTurn(env []string) ([]json.RawMessage, error) {
 }
 
 // defaultDoctorRunner maps the config agent-runner to the runner doctor
-// checks, plus the header explaining it. auto would need a herdr probe to
-// resolve, and doctor never checks herdr, so everything but pty is headless.
+// checks, plus the header explaining it. auto (and an empty value) means pty,
+// as in agentrunner.Select; only headless stays headless.
 func defaultDoctorRunner(agentRunner string) (runner, header string) {
-	switch agentRunner {
-	case "pty", "headless":
-		return agentRunner, fmt.Sprintf("runner: %s (agent-runner %s)", agentRunner, agentRunner)
-	default:
-		return "headless", fmt.Sprintf("runner: headless (agent-runner %s; doctor never checks herdr)", agentRunner)
+	if agentRunner == "" {
+		agentRunner = "auto"
 	}
+	runner = "pty"
+	if agentRunner == "headless" {
+		runner = "headless"
+	}
+	return runner, fmt.Sprintf("runner: %s (agent-runner %s)", runner, agentRunner)
 }
 
 func runClaudeDoctor(d Deps, opts claudeDoctorOptions, src claudedoctor.Source, fixtureVersion string) error {

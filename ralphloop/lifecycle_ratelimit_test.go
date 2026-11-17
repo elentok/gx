@@ -188,7 +188,7 @@ func TestWaitIterationFinished_RateLimitUnknownResetPollsWhileLimitedAgain(t *te
 	}
 }
 
-// codexBlockedLimitFixture is a blocked Codex agent on herdr with a quota
+// codexBlockedLimitFixture is a blocked Codex agent on pty with a quota
 // limit; onReset runs on the hold sleep.
 func codexBlockedLimitFixture(t *testing.T, onReset func(r *runnerfake.Runner)) (deps.Deps, *runnerfake.Runner, OneIteration, *[]time.Duration) {
 	t.Helper()
@@ -196,7 +196,7 @@ func codexBlockedLimitFixture(t *testing.T, onReset func(r *runnerfake.Runner)) 
 		r.SetState("iter-01", agentrunner.StateBlocked, "Approve command?")
 		r.SetRateLimit("iter-01", rateLimitClock.Add(time.Minute))
 	}, func(*runnerfake.Runner, int) {})
-	one.Agent, one.Runner = agent.AgentCodex, "herdr"
+	one.Agent, one.Runner = agent.AgentCodex, string(agentrunner.ChoicePTY)
 	d.Sleep = func(dur time.Duration) {
 		*sleeps = append(*sleeps, dur)
 		r.SetRateLimit("iter-01", time.Time{})
