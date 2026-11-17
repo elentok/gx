@@ -323,7 +323,7 @@ The epic has no user-visible UI behaviour: no web, no stored mock. It changes sk
 bundle, a config default and a manifest. A verify ticket checks the CLI-visible parts against a
 temporary gx server.
 
-Reviewer skills and defaults (stories 1 to 11, 29 to 34):
+Reviewer skills and defaults (stories 1 to 11, 29 to 34)
 
 - Flows: none.
 - `gx config get skills.code-review` with no override prints the eight-skill JSON list, the two
@@ -337,7 +337,7 @@ Reviewer skills and defaults (stories 1 to 11, 29 to 34):
   script against its manifest row.
 - The bundle tests pass (`go test ./skills/...` under the capped runner).
 
-Size gate and skip steps (stories 12 to 19):
+Size gate and skip steps (stories 12 to 19)
 
 - Flows: none.
 - Read each new `SKILL.md`: the first step is `## 1. Skip when ...`, with its rule from the table,
@@ -346,7 +346,7 @@ Size gate and skip steps (stories 12 to 19):
   and skips every Quality subagent, and the Spec subagent still runs.
 - No new flow is needed: skip behaviour is prose and is checked by reading.
 
-Codex waves and triage (stories 20 to 28):
+Codex waves and triage (stories 20 to 28)
 
 - Flows: none.
 - Read `skills/gx-code-review/SKILL.md`: the wave rule (a link to "Skill conventions" with no
