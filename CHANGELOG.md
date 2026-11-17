@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.51.6 - 2026-11-17
+
+- Fixed agents stuck on Claude's "Adding a new directory" dialog. gx now answers it like the trust-folder dialog, so the web UI no longer needs the TUI to release the agent.
+- Changed Claude launches to also list each added writable directory in the settings' `additionalDirectories`.
+
 ## v0.51.5 - 2026-11-17
 
 - Changed the web chat so the Working row and task list sit below the scroller.
