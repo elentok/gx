@@ -112,7 +112,7 @@ func (mg *Manager) CreateSession(req wire.CreateSessionRequest, sc SessionCtx) (
 		return wire.SessionResult{}, err
 	}
 	if req.Worktree != "" {
-		dir, refusal := mg.addSessionWorktree(req.Project, req.Worktree)
+		dir, refusal := mg.AddSessionWorktree(req.Project, req.Worktree)
 		if refusal != "" {
 			return Refusal(wire.ReasonSessionBadRequest, refusal), nil
 		}
@@ -194,10 +194,10 @@ func applyChosenModel(meta *Meta, model, effort string) {
 	meta.Model, meta.Effort, meta.SwitchedByHand = model, effort, true
 }
 
-// addSessionWorktree makes worktree name from the project's trunk, as the
+// AddSessionWorktree makes worktree name from the project's trunk, as the
 // Worktrees tab does: at <linked worktree dir>/<name> on branch <name>. It
 // returns the new worktree's path, or why it could not be made.
-func (mg *Manager) addSessionWorktree(project, name string) (string, string) {
+func (mg *Manager) AddSessionWorktree(project, name string) (string, string) {
 	if !filepath.IsLocal(name) {
 		return "", fmt.Sprintf("bad worktree name %q", name)
 	}

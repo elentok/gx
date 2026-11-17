@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/projects"
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets/ticketgit"
@@ -25,6 +26,8 @@ type Workspaces interface {
 	WorkspaceOfSession(id string) string
 	SetMember(key, workspace string) error
 	Remove(key string) error
+	// Workspace is the workspace a member key belongs to.
+	Workspace(key string) string
 }
 
 // Deps is what ChatDrafts is built from.
@@ -37,6 +40,10 @@ type Deps struct {
 	Workspaces  Workspaces
 	// Sessions lists the sessions, to find a draft's source session.
 	Sessions func() ([]wire.SessionInfo, error)
+	// CreateChat is Manager.CreateWebSession and AddWorktree is
+	// Manager.AddSessionWorktree, as fields so sessions need not be built in tests.
+	CreateChat  func(sessions.WebCreateSessionRequest) (wire.SessionResult, error)
+	AddWorktree func(project, name string) (path, refusal string)
 }
 
 // ChatDrafts serves the chat draft routes.
@@ -211,8 +218,7 @@ func (c *ChatDrafts) read(w http.ResponseWriter, r *http.Request) {
 	d, err := c.store.Get(req.ID)
 	switch {
 	case errors.Is(err, ErrNotFound):
-		// 04 fills Started from the Start record.
-		wire.WriteJSON(w, ops.ChatDraftResult{Refused: true, Reason: ops.ReasonDraftGone})
+		wire.WriteJSON(w, c.gone(req.ID))
 	case err != nil:
 		serverError(w, err)
 	default:
@@ -269,5 +275,7 @@ func Routes(get func() *ChatDrafts) []wire.Route {
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().save(w, r) }},
 		{Pattern: "POST /v1/agents/drafts/delete", Web: wire.WebWrite,
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().remove(w, r) }},
+		{Pattern: "POST /v1/agents/drafts/start", Web: wire.WebWrite,
+			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().start(w, r) }},
 	}
 }

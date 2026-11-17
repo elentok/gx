@@ -186,6 +186,11 @@ func (s *Store) Delete(id string) (bool, error) {
 	}
 	unlock := s.lock(id)
 	defer unlock()
+	return s.remove(id)
+}
+
+// remove is Delete for a caller that already holds the draft's lock.
+func (s *Store) remove(id string) (bool, error) {
 	if _, err := s.Get(id); errors.Is(err, ErrNotFound) {
 		return false, nil
 	}

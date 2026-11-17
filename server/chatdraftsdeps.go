@@ -11,6 +11,8 @@ func newChatDrafts(s *Server) *chatdrafts.ChatDrafts {
 	return chatdrafts.NewChatDrafts(chatdrafts.Deps{
 		Log: s.log, StateDir: s.cfg.StateDir, TicketStore: s.cfg.TicketStore, Events: s.events,
 		Projects: s.projects, Workspaces: s.workspaces,
-		Sessions: func() ([]wire.SessionInfo, error) { return s.sessions.ListSessions() },
+		Sessions:    func() ([]wire.SessionInfo, error) { return s.sessions.ListSessions() },
+		CreateChat:  s.sessions.CreateWebSession,
+		AddWorktree: s.sessions.AddSessionWorktree,
 	})
 }

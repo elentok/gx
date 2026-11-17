@@ -45,7 +45,7 @@ func (mg *Manager) SessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 		res = Refusal(wire.ReasonSessionBadRequest, err.Error())
 	} else {
 		var err error
-		if res, err = mg.createWebSession(req); err != nil {
+		if res, err = mg.CreateWebSession(req); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -76,7 +76,8 @@ func (mg *Manager) CheckProjectDir(project, dir string) (*wire.SessionResult, er
 	return nil, nil
 }
 
-func (mg *Manager) createWebSession(req WebCreateSessionRequest) (wire.SessionResult, error) {
+// CreateWebSession is the web create route's logic, shared with chat draft Start.
+func (mg *Manager) CreateWebSession(req WebCreateSessionRequest) (wire.SessionResult, error) {
 	prompt, refusal := wire.ValidatePromptText(req.Prompt, "the first prompt")
 	if refusal != nil {
 		return *refusal, nil
