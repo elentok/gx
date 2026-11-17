@@ -23,6 +23,7 @@ var Guards = []Guard{
 	{Name: "oldwords", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/oldwords\.`), Example: "github.com/elentok/gx/oldwords.TestNoOldWords"},
 	{Name: "envguard", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/envguard\.`), Example: "github.com/elentok/gx/envguard.TestEnv"},
 	{Name: "playwrightguard", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/playwrightguard\.`), Example: "github.com/elentok/gx/playwrightguard.TestMaxFlows"},
+	{Name: "setstateguard", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/setstateguard\.`), Example: "github.com/elentok/gx/setstateguard.TestNoRawSetStateCleanup"},
 	// Judgement call: the skills package also holds tests that are not rules
 	// tests, and they are dropped too. Splitting them needs a naming rule the
 	// package does not have yet.
