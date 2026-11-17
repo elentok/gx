@@ -53,6 +53,8 @@ export function WorktreePicker({
 
   const at = Math.min(active, Math.max(options.length - 1, 0))
   useEffect(() => {
+    // Typing re-scrolls to the active row even when its index stays the same.
+    void query
     listRef.current?.children[at]?.scrollIntoView?.({ block: "nearest" })
   }, [at, query])
 

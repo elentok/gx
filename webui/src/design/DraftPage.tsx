@@ -5,7 +5,6 @@ import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "rea
 import { useLocation, useNavigate, useParams } from "react-router"
 import type { DesignDraft } from "../generated/server"
 import {
-  createDraft,
   deleteDraft,
   getLastProject,
   pingDraft,
@@ -35,7 +34,7 @@ import { useReadyWhen } from "../useReady"
 import { ModeText } from "../ui/expandable-text/ModeText"
 import type { ViMode } from "../ui/expandable-text/CodeEditor"
 import { DraftBanner } from "./DraftBanner"
-import { type Fields } from "./draftFields"
+import type { Fields } from "./draftFields"
 import { slugProblem } from "./draftSlug"
 import { useDraftAutosave } from "./useDraftAutosave"
 import { useDraftLifecycle, useLeaveGone } from "./useDraftLifecycle"

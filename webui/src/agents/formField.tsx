@@ -1,4 +1,4 @@
-import { Box, chakra, Text } from "@chakra-ui/react"
+import { Box, Text } from "@chakra-ui/react"
 
 export const field = {
   fontSize: "16px",
@@ -26,7 +26,7 @@ export function Field({
   children: React.ReactNode
 }) {
   return (
-    <chakra.label display="flex" flexDirection="column" gap="1.5" position="relative">
+    <Box as="label" display="flex" flexDirection="column" gap="1.5" position="relative">
       <Text
         as="span"
         fontSize="13px"
@@ -59,6 +59,6 @@ export function Field({
           ▾
         </Box>
       )}
-    </chakra.label>
+    </Box>
   )
 }

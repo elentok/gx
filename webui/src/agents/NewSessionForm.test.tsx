@@ -60,7 +60,12 @@ function mount(
   } = {},
 ) {
   const posts: NewSessionBody[] = []
-  const create: CreateSession = over.create ?? (async (body) => (posts.push(body), accepted))
+  const create: CreateSession =
+    over.create ??
+    (async (body) => {
+      posts.push(body)
+      return accepted
+    })
   const onCreated = vi.fn()
   const onClose = vi.fn()
   const state = { connected: over.connected ?? true } as ConnectionState
@@ -103,9 +108,10 @@ const type = (name: string, value: string) =>
     screen.getByRole(name === "Project" ? "combobox" : "textbox", { name }) as HTMLElement,
     { target: { value } },
   )
-const typeWorktree = (el: HTMLElement, value: string) => (
-  fireEvent.focus(el), fireEvent.change(el, { target: { value } })
-)
+const typeWorktree = (el: HTMLElement, value: string) => {
+  fireEvent.focus(el)
+  fireEvent.change(el, { target: { value } })
+}
 const list = () => within(screen.getByRole("listbox", { name: "Worktrees" }))
 const options = () =>
   list()

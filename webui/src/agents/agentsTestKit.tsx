@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, screen, within } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, beforeAll, beforeEach, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
@@ -31,7 +31,7 @@ export const session = (
 export const focusPosts: { session: string }[] = []
 
 // Call once at the top of each AgentsPage test file: it registers the shared cleanup and fetch stub.
-export function useAgentsPageHooks() {
+export function installAgentsPageHooks() {
   // The route lazy-loads AgentsPage; under load the first import can outlast a findBy timeout, so load it before any test runs.
   beforeAll(() => import("./AgentsPage"))
   afterEach(() => {
@@ -93,12 +93,21 @@ export function render(
   )
   const update = (patch: Partial<ConnectionState>) => {
     state = { ...state, ...patch } as unknown as ConnectionState
-    act(() => listeners.forEach((fn) => fn()))
+    act(() =>
+      listeners.forEach((fn) => {
+        fn()
+      }),
+    )
   }
   const setSessions = (next: SessionInfo[]) =>
     update({ snapshot: { sessions: next } } as Partial<ConnectionState>)
   const goLive = () => update({ liveSnapshot: true })
-  const emit = (address: string) => act(() => handlers.forEach((fn) => fn(address)))
+  const emit = (address: string) =>
+    act(() =>
+      handlers.forEach((fn) => {
+        fn(address)
+      }),
+    )
   return { router, setSessions, goLive, emit, update }
 }
 

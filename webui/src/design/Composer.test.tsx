@@ -17,7 +17,6 @@ import { appRoutes } from "../routes"
 import { renderThemed } from "../ui/render"
 import { WriteError } from "../useWrite"
 import type { FetchChat } from "./chat"
-import { Composer } from "./Composer"
 import type { PostAnswer, PostPrompt } from "./prompt"
 import { roundCards } from "./roundFixture"
 
@@ -985,7 +984,7 @@ test("a second Send click closes the popover and sends nothing", async () => {
 
 test("a popover row opens the sheet at that question and focuses its first control, from the Chat view", async () => {
   const answer = vi.fn<PostAnswer>(async () => ok)
-  const { s, popover: gaps } = await sendWithGaps(answer)
+  const { popover: gaps } = await sendWithGaps(answer)
   // The sheet is gone in the Chat view; close the popover first and open it again after.
   fireEvent.keyDown(gaps, { key: "Escape" })
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())

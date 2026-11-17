@@ -9,10 +9,10 @@ import {
   render,
   session,
   stubNewSession,
-  useAgentsPageHooks,
+  installAgentsPageHooks,
 } from "./agentsTestKit"
 
-useAgentsPageHooks()
+installAgentsPageHooks()
 
 test("phone: #/agents never redirects to the last session", () => {
   localStorage.setItem("gx.agents.last", "s-1")

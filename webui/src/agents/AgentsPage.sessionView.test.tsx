@@ -1,10 +1,10 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { expect, test, vi } from "vitest"
-import type { SessionChatResponse, SessionRoundCard } from "../generated/server"
+import type { SessionRoundCard } from "../generated/server"
 import { roundCards } from "../design/roundFixture"
-import { chat, chatOf, render, session, useAgentsPageHooks } from "./agentsTestKit"
+import { chat, chatOf, render, session, installAgentsPageHooks } from "./agentsTestKit"
 
-useAgentsPageHooks()
+installAgentsPageHooks()
 
 test("the header names the session, status, dir and ticket, with no model", async () => {
   render(

@@ -1,5 +1,5 @@
 import type { SessionInfo, SessionRequest, SessionResult } from "../generated/server"
-import { postStopSession, postTarget, rowToken, type StopSession } from "../design/open"
+import { postTarget, rowToken, type StopSession } from "../design/open"
 
 export type RemoveSession = (body: SessionRequest) => Promise<SessionResult>
 /** Remove confirms with yes, so the server stops a live session itself. */

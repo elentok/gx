@@ -11,10 +11,10 @@ import {
   session,
   stubPrompt,
   type,
-  useAgentsPageHooks,
+  installAgentsPageHooks,
 } from "./agentsTestKit"
 
-useAgentsPageHooks()
+installAgentsPageHooks()
 
 const noItem = () =>
   expect(screen.queryByRole("menuitem", { name: /Promote to Design/ })).toBeNull()

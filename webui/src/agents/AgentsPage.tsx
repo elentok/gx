@@ -80,11 +80,12 @@ export function AgentsPage({
   const session = selected ? sessions?.find((s) => s.id === selected) : undefined
   const listed = !!session
   const justCreated = !!(useLocation().state as { creating?: boolean } | null)?.creating
-  const [graceOver, setGraceOver] = useState(false)
+  const [graceOverFor, setGraceOverFor] = useState<string>()
+  const graceOver = graceOverFor !== undefined
   useEffect(() => {
-    setGraceOver(false)
+    setGraceOverFor(undefined)
     if (!justCreated) return
-    const t = setTimeout(() => setGraceOver(true), CREATING_GRACE_MS)
+    const t = setTimeout(() => setGraceOverFor(selected ?? ""), CREATING_GRACE_MS)
     return () => clearTimeout(t)
   }, [justCreated, selected])
   const creating = justCreated && !listed && !graceOver

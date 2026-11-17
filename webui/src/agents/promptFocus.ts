@@ -10,6 +10,8 @@ export function usePromptFocus(container: RefObject<HTMLElement | null>) {
   const { key, state } = useLocation()
   const wanted = (state as { focusPrompt?: boolean } | null)?.focusPrompt === true
   useEffect(() => {
+    // A new location key re-focuses even when the request is unchanged.
+    void key
     if (wanted) container.current?.querySelector<HTMLElement>(PROMPT_BOX_SELECTOR)?.focus()
   }, [container, key, wanted])
 }

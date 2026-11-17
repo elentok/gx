@@ -6,10 +6,10 @@ import {
   render,
   session,
   stubNewSession,
-  useAgentsPageHooks,
+  installAgentsPageHooks,
 } from "./agentsTestKit"
 
-useAgentsPageHooks()
+installAgentsPageHooks()
 
 test("a create from the New chat form opens the new session", async () => {
   stubNewSession(session("q-9", "q"))

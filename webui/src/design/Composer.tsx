@@ -5,8 +5,8 @@ import { useComposerDraft } from "../drafts"
 import {
   CardSourceRound,
   type SessionInfo,
-  SessionNext,
-  SessionRoundCard,
+  type SessionNext,
+  type SessionRoundCard,
 } from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { AutoAdvanceBar, AutoCountdown, type RunCall } from "./AutoAdvanceBar"

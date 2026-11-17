@@ -128,65 +128,6 @@ export function ChatDraftCrumb({
   )
 }
 
-function Chip({
-  label,
-  value,
-  options,
-  disabled,
-  onChange,
-}: {
-  label: string
-  value: string
-  options: { value: string; label: string }[]
-  disabled?: boolean
-  onChange: (value: string) => void
-}) {
-  // A saved value the list no longer offers stays selectable, so it is not silently replaced.
-  const listed = options.some((o) => o.value === value)
-  return (
-    <Box position="relative" flexShrink="0">
-      <chakra.select
-        aria-label={label}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        appearance="none"
-        h="32px"
-        pl="2.5"
-        pr="5"
-        fontSize="13px"
-        color="text"
-        bg="surface"
-        borderWidth="1px"
-        borderColor="hairline"
-        borderRadius="full"
-        maxW="150px"
-      >
-        {!listed && <option value={value}>{value}</option>}
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </chakra.select>
-      <Box
-        aria-hidden
-        position="absolute"
-        right="2.5"
-        top="0"
-        h="32px"
-        display="flex"
-        alignItems="center"
-        color="text.dim"
-        fontSize="10px"
-        pointerEvents="none"
-      >
-        ▾
-      </Box>
-    </Box>
-  )
-}
-
 type Opt = { value: string; label: string }
 
 /**

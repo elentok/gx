@@ -155,7 +155,9 @@ function drivenKind(s: SessionInfo): "Queue" | "Design" | "Triage" | undefined {
 /** The composer stays off for a gx-driven agent until a person confirms; selecting another session resets it. */
 function useComposerUnlock(session: SessionInfo) {
   const [unlockedId, setUnlockedId] = useState<string>()
-  useEffect(() => setUnlockedId(undefined), [session.id])
+  useEffect(() => {
+    setUnlockedId((cur) => (cur === session.id ? cur : undefined))
+  }, [session.id])
   const kind = drivenKind(session)
   return {
     kind,
@@ -349,11 +351,17 @@ export function withEchoes<M extends { id: string }>(
     }) as unknown as M
   const known = new Set(messages.map((m) => m.id))
   const out: M[] = []
-  echoes.forEach((e, i) => e.after === undefined && out.push(echo(e, i)))
+  echoes.forEach((e, i) => {
+    if (e.after === undefined) out.push(echo(e, i))
+  })
   for (const m of messages) {
     out.push(m)
-    echoes.forEach((e, i) => e.after === m.id && out.push(echo(e, i)))
+    echoes.forEach((e, i) => {
+      if (e.after === m.id) out.push(echo(e, i))
+    })
   }
-  echoes.forEach((e, i) => e.after !== undefined && !known.has(e.after) && out.push(echo(e, i)))
+  echoes.forEach((e, i) => {
+    if (e.after !== undefined && !known.has(e.after)) out.push(echo(e, i))
+  })
   return out
 }

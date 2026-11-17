@@ -9,10 +9,10 @@ import {
   CardSourceCodex,
   CardSourcePermission,
   type QuestionCard,
-  SessionChatResponse,
-  SessionFailure,
-  SessionInfo,
-  SessionResult,
+  type SessionChatResponse,
+  type SessionFailure,
+  type SessionInfo,
+  type SessionResult,
 } from "../generated/server"
 import { roundCards } from "../design/roundFixture"
 import { renderThemed } from "../ui/render"
@@ -55,6 +55,24 @@ const chat = (over: Partial<SessionChatResponse> = {}): SessionChatResponse => (
   ...over,
 })
 
+function Holder({
+  session,
+  initial,
+  refetch,
+  post,
+  register,
+}: {
+  session: SessionInfo
+  initial: SessionChatResponse
+  refetch: () => void
+  post?: PostAnswer
+  register: (set: (next: SessionChatResponse) => void) => void
+}) {
+  const [now, set] = useState(initial)
+  register(set)
+  return <AgentChat session={session} chat={now} refetch={refetch} post={post} />
+}
+
 function render(
   s: SessionInfo,
   c: SessionChatResponse,
@@ -74,12 +92,22 @@ function render(
   } as unknown as Connection
   // One mounted tree whose chat changes in place, so a new card id exercises the key and not a fresh mount.
   let setChat: (next: SessionChatResponse) => void = () => {}
-  function Holder() {
-    const [now, set] = useState(c)
-    setChat = set
-    return <AgentChat session={s} chat={now} refetch={refetch} post={post} />
-  }
-  const router = createMemoryRouter([{ path: "/", element: <Holder /> }])
+  const router = createMemoryRouter([
+    {
+      path: "/",
+      element: (
+        <Holder
+          session={s}
+          initial={c}
+          refetch={refetch}
+          post={post}
+          register={(set) => {
+            setChat = set
+          }}
+        />
+      ),
+    },
+  ])
   renderThemed(
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />

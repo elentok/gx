@@ -16,10 +16,10 @@ import {
   session,
   stubPrompt,
   type,
-  useAgentsPageHooks,
+  installAgentsPageHooks,
 } from "./agentsTestKit"
 
-useAgentsPageHooks()
+installAgentsPageHooks()
 
 test("Interrupt replaces Send while Working, with the Working reason, and the box stays editable", async () => {
   render(

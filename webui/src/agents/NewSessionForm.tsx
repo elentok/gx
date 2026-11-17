@@ -64,7 +64,8 @@ function PromptField({
   )
   useLayoutEffect(() => {
     if (pending.current == null) return
-    area.current?.setSelectionRange(pending.current, pending.current)
+    const at = Math.min(pending.current, value.length)
+    area.current?.setSelectionRange(at, at)
     pending.current = null
   }, [value])
   return (
