@@ -158,6 +158,11 @@ type Options struct {
 	// StateDir holds the Go cache gate lock. Go tools hold it shared while the
 	// child runs; empty means no gate.
 	StateDir string
+	// Attempt is the number of this try on this tree; zero means compute it
+	// from the index.
+	Attempt int
+	// Sample reads the machine load and process count; nil means SystemSample.
+	Sample SampleFunc
 }
 
 // EnvCheckRun and EnvCheckKind carry a `gx check` run and kind to its children.
@@ -190,6 +195,14 @@ type indexEntry struct {
 	TreeID     string   `json:"tree_id,omitempty"`
 	CheckRun   string   `json:"check_run,omitempty"`
 	CheckKind  string   `json:"check_kind,omitempty"`
+	// Attempt is the try number on this tree; old lines lack it (read as 1).
+	Attempt    int     `json:"attempt,omitempty"`
+	Signature  string  `json:"signature,omitempty"`
+	LoadStart  float64 `json:"load_start"`
+	LoadEnd    float64 `json:"load_end"`
+	ProcsStart int     `json:"procs_start"`
+	ProcsEnd   int     `json:"procs_end"`
+	Origin     string  `json:"origin,omitempty"`
 	// TestDurations is in milliseconds, keyed like Tests. Old lines lack it.
 	TestDurations map[string]int64 `json:"test_durations,omitempty"`
 }
@@ -257,6 +270,17 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	branch, _ := git.CurrentBranch(dir)
 	treeID, _ := history.TreeID(dir)
 
+	sample := o.Sample
+	if sample == nil {
+		sample = SystemSample
+	}
+	indexPath := filepath.Join(logDir, "index.jsonl")
+	attempt := o.Attempt
+	if attempt == 0 {
+		attempt = nextAttempt(indexPath, tool.Name(), treeID, o.Args)
+	}
+	before := sample()
+
 	hang := hangLimit(tool, o.Env)
 	run := func() ([]byte, int, error) {
 		releaseGate := registerGoBuild(tool, o.StateDir)
@@ -278,6 +302,7 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 		fmt.Fprintln(o.Out, lostCacheMessage)
 	}
 	elapsed := time.Since(start)
+	after := sample()
 
 	outcome := tool.Parse(out, exit)
 	if rr, ok := tool.(ReportReader); ok && plan.ReportFile != "" {
@@ -308,13 +333,20 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 		TreeID:     treeID,
 		CheckRun:   o.CheckRun,
 		CheckKind:  o.CheckKind,
+		Attempt:    attempt,
+		Signature:  signatureOf(exit, outcome, out),
+		LoadStart:  before.Load,
+		LoadEnd:    after.Load,
+		ProcsStart: before.Procs,
+		ProcsEnd:   after.Procs,
+		Origin:     originOf(o.Env),
 
 		TestDurations: outcome.TestDurations,
 	}
 	for _, u := range outcome.Failures {
 		entry.Failed = append(entry.Failed, u.String())
 	}
-	if err := appendIndex(filepath.Join(logDir, "index.jsonl"), entry); err != nil {
+	if err := appendIndex(indexPath, entry); err != nil {
 		return cantRun(o.Out, "cannot write index: "+err.Error()), Outcome{}
 	}
 	return report(tool, o, outcome, out, entry), outcome

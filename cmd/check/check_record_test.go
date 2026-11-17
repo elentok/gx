@@ -281,15 +281,21 @@ func TestCheck_SlowTestRerunUnderHighLoad(t *testing.T) {
 		}
 		lines, _ := brief.ReadIndex(data)
 		var first, rerun int64
+		var firstAttempt, rerunAttempt int
 		reruns := 0
 		for _, l := range lines {
 			switch {
 			case l.CheckKind == "test-rerun" && slices.Equal(l.Args, []string{"./...", "-run", "^TestSlow$"}):
 				reruns++
 				rerun = l.DurationMS
+				rerunAttempt = l.Attempt
 			case l.CheckKind == "test":
 				first = l.DurationMS
+				firstAttempt = l.Attempt
 			}
+		}
+		if firstAttempt != 1 || rerunAttempt != 2 {
+			t.Errorf("attempts: first run %d, re-run %d; want 1 and 2", firstAttempt, rerunAttempt)
 		}
 		if reruns != 1 {
 			t.Fatalf("index has %d tagged re-runs, want 1: %+v", reruns, lines)

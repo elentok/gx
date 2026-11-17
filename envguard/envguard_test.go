@@ -51,7 +51,7 @@ var allowed = map[site]entry{
 	{"cmd/cmdtest/env.go", ruleEnvRead}:                                  {1, reasonChild},
 	{"server/server.go", ruleConfigEnv}:                                  {1, reasonStartup},
 	{"sound/sound.go", ruleConfigEnv}:                                    {2, reasonStartup},
-	{"check/load.go", ruleChildEnv}:                                      {1, reasonTool},
+	{"brief/machine.go", ruleChildEnv}:                                   {1, reasonTool},
 	{"harness/claudepid.go", ruleChildEnv}:                               {1, reasonChild},
 	{"harness/claudepid.go", ruleHomeDir}:                                {1, reasonChild},
 	{"osnotify/osnotify.go", ruleChildEnv}:                               {1, reasonTool},

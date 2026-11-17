@@ -24,8 +24,14 @@ import (
 // runBriefCmd drives `gx brief` and returns stdout and the exit code.
 func runBriefCmd(t *testing.T, cwd string, args ...string) (string, int) {
 	t.Helper()
+	return runBriefSampled(t, nil, cwd, args...)
+}
+
+// runBriefSampled is runBriefCmd with the machine reader injected.
+func runBriefSampled(t *testing.T, sample brief.SampleFunc, cwd string, args ...string) (string, int) {
+	t.Helper()
 	var out bytes.Buffer
-	d := Deps{Env: cmdbase.Env{Stdout: &out, Stderr: &out, Getwd: func() (string, error) { return cwd, nil }, Env: cmdtest.EnvFor(t)}}
+	d := Deps{Sample: sample, Env: cmdbase.Env{Stdout: &out, Stderr: &out, Getwd: func() (string, error) { return cwd, nil }, Env: cmdtest.EnvFor(t)}}
 	err := cmdtest.Run(t, d.Env, append([]string{"brief"}, args...), New(d))
 	var ee *cmdbase.ExitError
 	if errors.As(err, &ee) {
@@ -116,10 +122,10 @@ func TestBrief_GoTestPass(t *testing.T) {
 	if err := json.Unmarshal([]byte(lines[0]), &fields); err != nil {
 		t.Fatal(err)
 	}
-	if len(fields) != 10 {
+	if len(fields) != 16 {
 		t.Errorf("index fields = %v", fields)
 	}
-	for _, k := range []string{"time", "tool", "args", "dir", "exit", "units", "duration_ms", "log", "tests", "test_durations"} {
+	for _, k := range []string{"time", "tool", "args", "dir", "exit", "units", "duration_ms", "log", "tests", "test_durations", "attempt", "load_start", "load_end", "procs_start", "procs_end", "origin"} {
 		if _, ok := fields[k]; !ok {
 			t.Errorf("index lacks %q", k)
 		}

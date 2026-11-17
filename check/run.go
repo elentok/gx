@@ -390,7 +390,7 @@ func (r *runner) rerunUnderLimit(l brief.IndexEntry, name string, limit time.Dur
 		return false
 	}
 	kind := l.CheckKind + rerunKindSuffix
-	exit, outcome := brief.RunOutcome(tool, brief.Options{Dir: l.Dir, Args: args, DataDir: r.dataDir, StateDir: r.stateDir, Out: io.Discard, Env: r.childEnv(kind), CheckRun: r.runID, CheckKind: kind})
+	exit, outcome := brief.RunOutcome(tool, brief.Options{Dir: l.Dir, Args: args, DataDir: r.dataDir, StateDir: r.stateDir, Out: io.Discard, Env: r.childEnv(kind), CheckRun: r.runID, CheckKind: kind, Attempt: max(l.Attempt, 1) + 1})
 	ms, ok := outcome.TestDurations[name]
 	return exit == brief.ExitPass && ok && time.Duration(ms)*time.Millisecond <= limit
 }

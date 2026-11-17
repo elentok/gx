@@ -32,6 +32,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"implement", "gx-implement/SKILL.md", []string{
 			"](../gx-failing-tests.md)", "-count=20", "`gx check`",
 		}},
+		{"bump marks release runs", "gx-bump/SKILL.md", []string{"GX_CHECK_ORIGIN=release"}},
 		{"implement guards kind", "gx-implement/SKILL.md", []string{"`gx check --kind guards`"}},
 		{"implement known failures", "gx-implement/SKILL.md", []string{"--known-failures", "--check-failures"}},
 		{"implement go run", "gx-implement/SKILL.md", []string{"go run ."}},

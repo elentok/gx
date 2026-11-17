@@ -41,6 +41,9 @@ Then, while it drafts, run the test suite. Skip the tests if the args contain "s
 `--skip-tests` (e.g. `/gx-bump skip tests` or `/gx-bump patch skip tests`). Otherwise, detect the
 project's test command, in this order, and run the first that applies:
 
+Run the command with `GX_CHECK_ORIGIN=release` set in its environment, so `gx brief` marks the
+index lines of this run as release runs.
+
 1. A `Makefile` with a `test` target - run `make test`.
 2. A `package.json` with a `"test"` script - run `npm test` (or the project's package manager
    equivalent).

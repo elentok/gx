@@ -22,6 +22,9 @@ type Deps struct {
 	// CacheGate holds the hooks of `brief go-clean-cache`; the zero value is
 	// production (tests shorten the cap).
 	CacheGate gocachegate.Deps
+	// Sample reads load and process count for the index line; nil is the real
+	// machine.
+	Sample brief.SampleFunc
 }
 
 // DefaultDeps is the production wiring: the zero value of every hook.
@@ -160,7 +163,7 @@ func runBrief(c *cobra.Command, d Deps, args []string) error {
 		return err
 	}
 	code := brief.Run(tool, brief.Options{Dir: dir, Args: args[1:], CDir: cFlag, DataDir: dataDir, StateDir: stateDir, Out: c.OutOrStdout(),
-		Env: d.Env.Env, CheckRun: d.Dirs().Getenv(brief.EnvCheckRun), CheckKind: d.Dirs().Getenv(brief.EnvCheckKind)})
+		Env: d.Env.Env, CheckRun: d.Dirs().Getenv(brief.EnvCheckRun), CheckKind: d.Dirs().Getenv(brief.EnvCheckKind), Sample: d.Sample})
 	if code != brief.ExitPass {
 		return &cmdbase.ExitError{Code: code}
 	}
