@@ -5,8 +5,7 @@ marks a point the map itself set (Notes, Out of scope). `[default]` marks a poin
 default. `[impl]` marks an implementer's choice: the map left it open and any sound choice is fine.
 `[review]` marks a point the design review settled with the person.
 Terms (Fork, Chat session, Workspace, Design, Design session, Promote to Design, Queue agent) are in
-`GLOSSARY.md`. The glossary already covers session forks, so this spec does not change it. [02]
-
+`GLOSSARY.md`.
 ## Problem Statement
 
 A chat or a Design session often deals with several topics at once, for example A, B and C. The
@@ -121,11 +120,12 @@ topics it kept. [01] [05]
 - Chat drafts get new server routes to create, edit, start and remove them, a new `gx agents drafts create` verb, a sidebar row in the draft's workspace and a draft page. Existing commands do not change, and `gx agents create` stays as it is. [05] [08]
 - `gx agents drafts create` reads the brief from stdin (cap 32 KiB, like `gx designs open --idea -`) and takes the project, folder choice, name, harness, model and effort. It sends `from_session` from `GX_AGENT_SESSION`, so the server puts the draft in that session's workspace. Flag names are [impl]. [08] [default]
 - The workspace member key of a chat draft is `chat-draft/<id>`. The two places that today treat any `draft/` key as a Design draft stay as they are, so a chat draft is never treated as a Design draft. The workspace store learns the chat draft key kind: `joinable` accepts it (sidebar Move works), `pruneEpicMembers` drops it when its draft is gone, Hold treats it like a draft row, and Move publishes a drafts event. A `chat-drafts-changed` event and chat draft rows in the snapshot carry the changes; Create, Move, Start and Remove publish the event. Names are [impl]. Server tests cover each. [08] [review]
+- Create allows an empty brief (the 32 KiB cap and the `!` prefix rule still apply to a non-empty brief), and Start of an empty draft is refused. Create takes an optional `workspace` name: with no `from_session` the draft joins that workspace, with neither it lands in Default, and with `from_session` the source's workspace wins. Folder `source` with no `from_session` resolves to the project root. Missing harness, model and effort take the defaults of the web New chat form. [21] [23]
 - A chat draft page route is `#/chat-drafts/<id>`. After Start the server keeps a redirect record to the new chat, as Design drafts keep one for 7 days, so a printed link keeps working. [review]
 - The sidebar row and the page chrome (Start and Remove buttons, autosave, revision flow) are shared code with Design drafts. Each draft kind keeps its own verbs. [08]
-- The draft page shows the project, folder, harness, model, effort and name, and lets the person edit the brief. The person changes the other fields with a note on the approval card, before the draft exists. After a successful Start the page goes to the new chat, as a Design draft goes to its Design. [05] [impl]
+- The draft page shows the project, folder, harness, model, effort and name, and lets the person edit the brief. The page edits all of them (project, a folder choice with a worktree name, harness, model, effort, name) in a settings form. Edits autosave with the brief through the save route, under one revision; a field the save omits stays unchanged, and a save never touches the recorded worktree path or start error. Once Start has made a worktree the folder shows as that worktree and is read-only. The person can still change a fork with a note on the approval card, before the draft exists. An empty draft is a normal state: the brief shows its placeholder and Start stays disabled with its blocker text. [22] After a successful Start the page goes to the new chat, as a Design draft goes to its Design. [05] [impl]
 - A Start request that creates a chat is a server call. The web chat create request gets optional `model` and `effort` fields, and Start uses them, so the chat starts on the source's exact model and effort from its first turn. No `gx agents switch` follows. `gx agents create` takes no new option. [08]
-- Start places the new chat in the draft's workspace, runs it in the chosen folder, types the brief as the first prompt and deletes the draft. A failed Start keeps the draft. [05] [06]
+- Start places the new chat in the draft's workspace, runs it in the chosen folder, types the brief as the first prompt and deletes the draft. A failed Start keeps the draft. A chat started with an explicit model or effort is marked as switched by hand (`SwitchedByHand = true`, set by `applyChosenModel` in `server/sessions/sessions.go`), so the chosen model is not overridden later. [05] [06]
 - The brief cap on Start is the web create route's existing 32 KiB cap. [03] [06]
 
 ### Design drafts
@@ -136,6 +136,10 @@ topics it kept. [01] [05]
 ### Workspace lookup fix
 
 - The `from_session` lookup of `gx designs open` and of the new draft verbs resolves a Design session to its workspace through its map address. Today a Design session id is not a workspace key, so a Design started from a Design session lands in Default. This is a server change. It fixes Design forks and Promote to Design from a Design session, and chat drafts use the same lookup. [03] [06]
+
+### Web + New menu
+
+- The sidebar `+ New` menu lists New design, New chat, New chat draft, then a separator and workspace. New chat draft creates an empty chat draft in the active workspace (default project, harness Claude, folder `source`) and opens its page; on an empty chat draft page it only focuses the brief. A failed create shows an error toast. The New chat dialog stays. No command palette entry or chord. [23]
 
 ### Not changed
 
