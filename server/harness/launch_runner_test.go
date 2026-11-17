@@ -15,14 +15,12 @@ import (
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
-// Codex runs on pty under every config but herdr, which hosts it only when
-// configured; Claude stays on the configured runner.
-func TestLaunchRunner_CodexRunsOnPtyUnlessHerdrIsConfigured(t *testing.T) {
+// Codex runs on pty under every config; Claude stays on the configured runner.
+func TestLaunchRunner_CodexRunsOnPty(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ configured, codexOn string }{
 		{"pty", "pty"},
 		{"headless", "pty"},
-		{"herdr", "herdr"},
 	} {
 		t.Run(tc.configured, func(t *testing.T) {
 			t.Parallel()
@@ -31,7 +29,7 @@ func TestLaunchRunner_CodexRunsOnPtyUnlessHerdrIsConfigured(t *testing.T) {
 			servertest.WriteTicket(t, store, "proj", "epic-b", "01", "claude one", "")
 			servertest.SetProjectRepo(t, store, "proj", repo)
 			fakes := map[string]rigs.NamedFake{}
-			for _, name := range []string{"pty", "headless", "herdr"} {
+			for _, name := range []string{"pty", "headless"} {
 				fakes[name] = rigs.NewNamedFake(runnerfake.NewRunner(), name)
 			}
 			configured := fakes[tc.configured]

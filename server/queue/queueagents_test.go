@@ -153,12 +153,10 @@ func TestQueueAgentRows_ReplyGivesCountAndLevel(t *testing.T) {
 	}
 }
 
-func TestQueueAgentRows_HerdrAndHeadlessRunsAreAbsent(t *testing.T) {
+func TestQueueAgentRows_HeadlessRunsAreAbsent(t *testing.T) {
 	t.Parallel()
-	for _, runner := range []string{"herdr", "headless"} {
-		h, _ := rigs.StartQueueRows(t, runner)
-		if rows := rigs.QueueRows(t, h); len(rows) != 0 {
-			t.Errorf("%s rows = %+v, want none", runner, rows)
-		}
+	h, _ := rigs.StartQueueRows(t, "headless")
+	if rows := rigs.QueueRows(t, h); len(rows) != 0 {
+		t.Errorf("headless rows = %+v, want none", rows)
 	}
 }

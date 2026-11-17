@@ -76,7 +76,7 @@ func startCrashedMerge(t *testing.T) (h *servertest.Harness, store, repo, lockDi
 func TestMergeRecovery_OrphanLockForAMergedTicketFinishesIt(t *testing.T) {
 	t.Parallel()
 	h, store, repo, lockDir := startCrashedMerge(t)
-	wt, ticketPath := leaveIteration(t, h, store, repo, "herdr")
+	wt, ticketPath := leaveIteration(t, h, store, repo, "pty")
 	_ = os.Remove(filepath.Join(h.StateDir, "runs.json"))
 	// The merge got as far as the cherry-pick before the process died. -x keeps the
 	// picked commit from hashing identically to its source within one second.
@@ -98,7 +98,7 @@ func TestMergeRecovery_OrphanLockForAMergedTicketFinishesIt(t *testing.T) {
 func TestMergeRecovery_OrphanLockForAnUnmergedTicketRollsBackTheHalfPick(t *testing.T) {
 	t.Parallel()
 	h, store, repo, lockDir := startCrashedMerge(t)
-	wt, ticketPath := leaveIteration(t, h, store, repo, "herdr")
+	wt, ticketPath := leaveIteration(t, h, store, repo, "pty")
 	_ = os.Remove(filepath.Join(h.StateDir, "runs.json"))
 	// A conflicting cherry-pick the crash left in progress.
 	feature := filepath.Join(filepath.Dir(wt), "epic-a")

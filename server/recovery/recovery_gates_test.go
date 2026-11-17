@@ -123,7 +123,7 @@ func dirtyAfter(t *testing.T, prepare func(string)) func(string) {
 // commits: only the finish wait's process check releases a gate.
 func TestRecovery_R10KeepsAnIdleAgentsGateHeld(t *testing.T) {
 	t.Parallel()
-	for _, runner := range []string{"herdr", "headless"} {
+	for _, runner := range []string{"pty", "headless"} {
 		for _, tc := range []struct {
 			name    string
 			prepare func(string)
@@ -150,7 +150,7 @@ func TestRecovery_R10KeepsAnIdleAgentsGateHeld(t *testing.T) {
 
 func TestRecovery_R10PausesADirtyWorktreeWithCommitsAndKeepsIt(t *testing.T) {
 	t.Parallel()
-	for _, runner := range []string{"herdr", "headless"} {
+	for _, runner := range []string{"pty", "headless"} {
 		t.Run(runner, func(t *testing.T) {
 			got := raiseGateHeld(t, runner, agentrunner.StateIdle, dirtyAfter(t, commitInWorktree(t)))
 			if got.applied.Reason != "R10" || got.applied.Outcome != "ok" {
@@ -171,7 +171,7 @@ func TestRecovery_R10PausesADirtyWorktreeWithCommitsAndKeepsIt(t *testing.T) {
 
 func TestRecovery_R10LeavesABusyAgentsGateAndEscalates(t *testing.T) {
 	t.Parallel()
-	for _, runner := range []string{"herdr", "headless"} {
+	for _, runner := range []string{"pty", "headless"} {
 		t.Run(runner, func(t *testing.T) {
 			got := raiseGateHeld(t, runner, agentrunner.StateWorking, commitInWorktree(t))
 			if got.applied.Reason != "R10" || !strings.Contains(got.applied.Outcome, wire.ReasonAgentBusy) {

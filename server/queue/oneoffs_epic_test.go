@@ -24,7 +24,7 @@ func startsWithLive(t *testing.T, h *servertest.Harness, root, first string, liv
 	t.Helper()
 	servertest.RegisterTurn(h)
 	for i := 0; i < live; i++ {
-		h.Server.Registry().PutRun(root, runs.Run{Address: root + "/9" + string(rune('0'+i)), Runner: "herdr"})
+		h.Server.Registry().PutRun(root, runs.Run{Address: root + "/9" + string(rune('0'+i)), Runner: "pty"})
 	}
 	wait := 2 * time.Second
 	if wantStart {

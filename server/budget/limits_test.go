@@ -2,7 +2,6 @@ package budget_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -19,7 +18,6 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
@@ -161,111 +159,6 @@ func TestBudget_SpendInTwoProjectsSumsTowardOneLimit(t *testing.T) {
 	}
 }
 
-func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
-	t.Parallel()
-	store, repo := t.TempDir(), testutil.TempRepo(t)
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject), func(c *server.Config) {
-		c.BudgetHardLimit = 5
-		c.BudgetKillGrace = time.Millisecond
-		c.BudgetPollInterval = time.Hour
-	})
-	servertest.RegisterTurn(h)
-	// The pane never goes quiet, so the run's finish wait would poll herdr
-	// until the package ends; take the agent away so the run settles first.
-	t.Cleanup(func() {
-		h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
-		})
-	})
-	live := map[string]any{"agent": map[string]any{
-		"pane_id": "p1", "tab_id": "t1", "agent_status": "working", "state_change_seq": 1,
-		"agent_session": map[string]any{"value": "sess"},
-	}}
-	// The agent is idle until prompted (Start waits for idle), then working.
-	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle"}}
-	var started, prompted atomic.Bool
-	h.Herdr.Register("agent", "start", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		started.Store(true)
-		return live, herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		if !started.Load() {
-			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
-		}
-		if !prompted.Load() {
-			return idle, herdrfake.Identities{}, nil
-		}
-		return live, herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		// The launch counts as delivered once the transcript shows it as the first user record.
-		now := time.Now().UTC()
-		line, _ := json.Marshal(map[string]any{
-			"type": "user", "uuid": "launch", "timestamp": now.Format(time.RFC3339Nano),
-			"message": map[string]any{"role": "user", "content": argv[3]},
-		})
-		file := filepath.Join(h.Env("HOME"), ".claude", "projects", "wt", "sess.jsonl")
-		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
-			return nil, herdrfake.Identities{}, err
-		}
-		if err := os.WriteFile(file, append(line, '\n'), 0o644); err != nil {
-			return nil, herdrfake.Identities{}, err
-		}
-		prompted.Store(true)
-		return map[string]any{"agent": map[string]any{
-			"pane_id": "p1", "tab_id": "t1", "agent_status": "working", "state_change_seq": 1,
-			"agent_session": map[string]any{"value": "sess"},
-		}}, herdrfake.Identities{}, nil
-	})
-	// Start waits for idle before the prompt; afterwards the pane never goes quiet.
-	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		if !prompted.Load() {
-			return idle, herdrfake.Identities{}, nil
-		}
-		return nil, herdrfake.Identities{}, errors.New("timed out waiting for agent status")
-	})
-	h.Herdr.Register("agent", "read", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return "", herdrfake.Identities{}, nil
-	})
-	var sent, closed []string
-	h.Herdr.Register("agent", "send-keys", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		sent = append(sent, strings.Join(argv, " "))
-		return map[string]any{}, herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("tab", "close", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		closed = append(closed, strings.Join(argv, " "))
-		return map[string]any{}, herdrfake.Identities{}, nil
-	})
-	// Cost rises on every read, so the pane never goes quiet after ctrl+c.
-	cost := 0.0
-	h.Server.Budget().SetCostOf(func(wire.IterationInfo) (float64, bool) { cost += 3; return cost, true })
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if _, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil {
-		t.Fatal(err)
-	}
-	servertest.WaitFor(t, 10*time.Second, "a live run", func() bool { return len(h.Server.Runs()) > 0 })
-	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
-	servertest.WaitFor(t, 10*time.Second, "the ticket to be budget-killed", func() bool {
-		h.Server.Budget().PollBudget()
-		data, _ := os.ReadFile(path)
-		return strings.Contains(string(data), "budget-killed")
-	})
-	data, _ := os.ReadFile(path)
-	if !strings.Contains(string(data), "status: paused") || !strings.Contains(string(data), "budget-killed") {
-		t.Fatalf("ticket not paused budget-killed:\n%s", data)
-	}
-	if len(sent) == 0 || !strings.Contains(sent[0], "ctrl+c") {
-		t.Errorf("send-keys = %v, want ctrl+c", sent)
-	}
-	if len(closed) == 0 {
-		t.Error("pane was not closed")
-	}
-}
-
 // An agent that keeps spending after the ctrl+c is closed and paused
 // budget-killed, and its run's own finish must not overwrite that pause.
 func TestBudget_HardLimitStopsRunThroughRunner(t *testing.T) {
@@ -366,6 +259,9 @@ func runBudgetKill(t *testing.T, cost func() float64, ticket servertest.TicketOp
 	}
 	if live, _ := fake.List("epic-a"); len(live) != 0 {
 		t.Errorf("sessions still live after budget kill: %v", live)
+	}
+	if fake.Interrupts("epic-a-iter-01") == 0 {
+		t.Error("run was stopped without being interrupted first")
 	}
 	return path
 }

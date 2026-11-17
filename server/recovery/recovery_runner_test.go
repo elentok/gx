@@ -16,7 +16,6 @@ import (
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/testutil/herdrfake"
 )
 
 const iterLabel = "epic-a-iter-01"
@@ -64,22 +63,12 @@ func TestRecoveryRunner_LiveCheckAgreesAcrossShapes(t *testing.T) {
 		{"headless", agentrunner.StateIdle, true},
 		{"headless", agentrunner.StateBlocked, true},
 		{"headless", agentrunner.StateDone, false},
-		{"herdr", agentrunner.StateIdle, true},
-		{"herdr", agentrunner.StateBlocked, true},
-		// herdr's done is a finished turn resting in its pane.
-		{"herdr", agentrunner.StateDone, true},
+		{"pty", agentrunner.StateIdle, true},
+		{"pty", agentrunner.StateBlocked, true},
+		{"pty", agentrunner.StateDone, false},
 	} {
 		t.Run(c.runner+"/"+string(c.state), func(t *testing.T) {
-			var opts []func(*server.Config)
-			if c.runner == "herdr" {
-				opts = append(opts, servertest.WithHerdr(servertest.HerdrIsTheSubject))
-			}
-			h, fake, sess := startOnRunner(t, c.runner, opts...)
-			if h.Herdr != nil {
-				h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-					return map[string]any{"agent": map[string]any{"pane_id": sess.ID, "tab_id": "tab-1"}}, herdrfake.Identities{}, nil
-				})
-			}
+			h, fake, _ := startOnRunner(t, c.runner)
 			fake.SetState(iterLabel, c.state, "")
 			its, err := h.Client.Reads.Iterations(context.Background())
 			if err != nil {
@@ -87,16 +76,6 @@ func TestRecoveryRunner_LiveCheckAgreesAcrossShapes(t *testing.T) {
 			}
 			if live := len(its) == 1; live != c.live {
 				t.Fatalf("iterations = %+v, want live %v", its, c.live)
-			}
-			if !c.live {
-				return
-			}
-			wantPane, wantTab := "", ""
-			if c.runner == "herdr" {
-				wantPane, wantTab = sess.ID, "tab-1"
-			}
-			if its[0].Pane != wantPane || its[0].Tab != wantTab {
-				t.Errorf("pane/tab = %q/%q, want %q/%q", its[0].Pane, its[0].Tab, wantPane, wantTab)
 			}
 		})
 	}
