@@ -10,18 +10,17 @@ type Choice string
 
 const (
 	ChoiceAuto     Choice = "auto"
-	ChoiceHerdr    Choice = "herdr"
 	ChoiceHeadless Choice = "headless"
 	// ChoicePTY is what auto picks when claude is on PATH.
 	ChoicePTY Choice = "pty"
 )
 
-// HerdrPingTimeout bounds how long an explicit herdr choice waits for herdr.
+// HerdrPingTimeout bounds how long the TUI's multiplexer gate waits for herdr.
 const HerdrPingTimeout = 2 * time.Second
 
 // DefaultN is the runner wait N when the config does not set one. It bounds
-// the busy guard's wait, the `/` rule's idle-after-N, Interrupt's wait for idle
-// and herdr's deny wait.
+// the busy guard's wait, the `/` rule's idle-after-N and Interrupt's wait for
+// idle.
 const DefaultN = 5 * time.Second
 
 // Probe is what Select needs to know about the machine.
@@ -53,12 +52,12 @@ func checkDefaultHarness(p Probe, harness string) error {
 	if harness == "codex" {
 		return fmt.Errorf("the default harness %q is not on PATH. Install codex or set the default to claude in ~/.config/gx/config.json.", harness)
 	}
-	return fmt.Errorf("%w (or set agent-runner: herdr)", err)
+	return err
 }
 
 // Select resolves setting to the runner to use. Auto and pty need the Default
 // harness on PATH; headless hosts only claude. Auto picks PTY and never pings
-// herdr. An explicit herdr with herdr down is an error, not a fallback.
+// herdr.
 func Select(setting, defaultHarness string, p Probe) (Choice, error) {
 	setting, _ = Normalise(setting)
 	if err := ValidateSetting(setting); err != nil {
@@ -71,11 +70,6 @@ func Select(setting, defaultHarness string, p Probe) (Choice, error) {
 			return "", err
 		}
 		return ChoicePTY, nil
-	case ChoiceHerdr:
-		if err := herdrUp(p); err != nil {
-			return "", fmt.Errorf("agent-runner is herdr but herdr is unavailable: %w", err)
-		}
-		return ChoiceHerdr, nil
 	}
 	if c == ChoicePTY {
 		if err := checkDefaultHarness(p, defaultHarness); err != nil {
@@ -94,16 +88,9 @@ func Select(setting, defaultHarness string, p Probe) (Choice, error) {
 func ValidateSetting(setting string) error {
 	setting, _ = Normalise(setting)
 	switch Choice(setting) {
-	case "", ChoiceAuto, ChoiceHerdr, ChoiceHeadless, ChoicePTY:
+	case "", ChoiceAuto, ChoiceHeadless, ChoicePTY:
 		return nil
 	default:
-		return fmt.Errorf("invalid agent-runner %q: want auto, herdr, headless or pty", setting)
+		return fmt.Errorf("invalid agent-runner %q: want auto, headless or pty", setting)
 	}
-}
-
-func herdrUp(p Probe) error {
-	if _, err := p.LookPath("herdr"); err != nil {
-		return err
-	}
-	return p.PingHerdr(HerdrPingTimeout)
 }

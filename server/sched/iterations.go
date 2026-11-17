@@ -7,7 +7,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/queue"
@@ -55,24 +54,16 @@ func (s *Scheduler) LiveIteration(address string) (ticketwrite.LiveIter, bool) {
 		return ticketwrite.LiveIter{}, false
 	}
 	st, err := runner.Status(sess)
-	// herdr's done is a finished turn resting in its pane, not an exit.
-	if err != nil || (st.State == agentrunner.StateDone && runner.Name() != runs.RunnerHerdr) {
+	if err != nil || st.State == agentrunner.StateDone {
 		return ticketwrite.LiveIter{}, false
 	}
 	if sess.SessionID == "" {
 		sess.SessionID = st.SessionID
 	}
-	label, branch, worktree := worktree.IterationIdentity(a.Epic, a.ID, s.Projects.WorktreeDir(a.Project))
+	_, branch, worktree := worktree.IterationIdentity(a.Epic, a.ID, s.Projects.WorktreeDir(a.Project))
 	it := wire.IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: sess.SessionID, Runner: runner.Name()}
 	if runner.Name() == queue.RunnerPTY {
 		it.QueueAgent = queue.AgentIDPrefix + runs.IterationLabel(address)
-	}
-	if runner.Name() == runs.RunnerHerdr {
-		it.Pane = sess.ID
-		cli := herdr.CLI{Env: s.Env}
-		if agent, err := cli.AgentGet(label); err == nil {
-			it.Tab = agent.TabID
-		}
 	}
 	if run, ok := s.Registry.RunOf(address); ok {
 		it.Agent = run.Agent

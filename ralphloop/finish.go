@@ -58,7 +58,7 @@ func finishIteration(d deps.Deps, p iterationParams, path, pane, base, branch, s
 	ahead, err := iterationCommitsAhead(d, path, base, branch)
 	if err != nil || ahead == 0 {
 		// supervise.WaitForFinish's own debounce (supervise.ConfirmFinished) already guards against
-		// herdr reporting the agent idle mid-turn, but a commit can still merge
+		// the runner reporting the agent idle mid-turn, but a commit can still merge
 		// in the gap between that confirmation and this check (e.g. a reattached
 		// iteration, which skips supervise.WaitForFinish's launch-time debounce entirely).
 		// The count can also fail transiently right after the pane exits (e.g.

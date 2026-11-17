@@ -12,12 +12,10 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
-	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/backgroundtask"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/metrics"
 	"github.com/elentok/gx/syshealth"
@@ -52,21 +50,17 @@ func readBackgroundProcess(sessionID, taskID string) (BackgroundProcess, error) 
 	return out, nil
 }
 
-// Deps are the external side-effecting operations the loop drives: herdr
-// socket-API calls, git worktree/cherry-picking, and the smart-zone
-// guardrail's transcript/pause-signal reads. DefaultDeps wires them to the
-// real herdr/git/transcript packages; tests substitute fakes so the
-// orchestration in loop.go can run without a live herdr server, git
-// process, or real Claude Code transcripts.
+// Deps are the external side-effecting operations the loop drives: the agent
+// runner, git worktree/cherry-picking, and the smart-zone guardrail's
+// transcript/pause-signal reads. DefaultDeps wires them to the real
+// git/transcript packages; tests substitute fakes so the orchestration in
+// loop.go can run without a live agent, git process, or real Claude Code
+// transcripts.
 type Deps struct {
-	// PreflightAgent verifies that the selected agent can be launched before
-	// the loop creates Herdr state or claims a ticket.
-	PreflightAgent func(agentKind agent.AgentKind) error
 	// VerifySkill confirms opts.Skill is installed for agent before the loop
-	// creates Herdr state or claims a ticket — like PreflightAgent, a missing
-	// skill is otherwise only discovered mid-iteration, after the ticket is
-	// already claimed and the agent has been prompted with a skill invocation
-	// it can't resolve.
+	// claims a ticket — a missing skill is otherwise only discovered
+	// mid-iteration, after the ticket is already claimed and the agent has
+	// been prompted with a skill invocation it can't resolve.
 	VerifySkill func(agentKind agent.AgentKind, skill string) error
 	// WorktreeDir returns the directory linked worktrees for repoDir's repo
 	// are created in (see git.Repo.LinkedWorktreeDir).
@@ -250,7 +244,8 @@ type Deps struct {
 	PauseTimer func(time.Duration) <-chan time.Time
 }
 
-// DefaultDeps wires Deps to the real herdr, git, and transcript packages.
+// DefaultDeps wires Deps to the real git and transcript packages. Runner is
+// nil: every caller that needs one sets it.
 func DefaultDeps() Deps {
 	return DefaultDepsWithOverrides(DepsOverrides{})
 }
@@ -267,45 +262,21 @@ type DepsOverrides struct {
 	// CodexHome is the resolved ~/.codex-equivalent directory (not $HOME) for
 	// Deps.ReadCodexContext/ReadCodexRateLimit.
 	CodexHome string
-	// Path, when non-empty, overrides os.Getenv("PATH") for codex/herdr/
-	// package-manager executable lookups (PreflightAgent, InstallDeps).
+	// Path, when non-empty, overrides os.Getenv("PATH") for package-manager
+	// executable lookups (InstallDeps).
 	Path string
-	// Env, when non-nil, is the environment the herdr CLI runs under, and its
-	// PATH entry (unless Path is set) is where executables are looked up.
-	Env []string
 	// StateDir is the gx state dir merge locks live under.
 	StateDir string
-	// RunnerWait is the runner's N; zero means agentrunner.DefaultN.
-	RunnerWait time.Duration
 	// RateLimitResetBuffer is Deps.RateLimitResetBuffer.
 	RateLimitResetBuffer time.Duration
 	// GuardPoll is Deps.GuardPoll.
 	GuardPoll time.Duration
-	// Finished tells the runner which sessions have reported their ticket
-	// finished (see herdrrunner.Runner.Finished). Nil means none.
-	Finished func(agentrunner.Session) bool
 }
 
 // DefaultDepsWithOverrides is DefaultDeps with overrides applied to the
 // in-process env reads described on DepsOverrides.
 func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
-	pathEnv := overrides.Path
-	if pathEnv == "" {
-		pathEnv = envPath(overrides.Env)
-	}
-	runner := herdrrunner.NewIn(herdr.CLI{Env: overrides.Env}, overrides.Home, overrides.CodexHome)
-	runner.N = overrides.RunnerWait
-	runner.Finished = overrides.Finished
-	runner.CodexQuota = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-		if overrides.CodexHome == "" {
-			return codexsession.RateLimit{}, false, nil
-		}
-		return codexsession.LastRateLimitIn(overrides.CodexHome, cwd, sessionID)
-	}
 	return Deps{
-		PreflightAgent: func(agentKind agent.AgentKind) error {
-			return preflightAgentWith(agentKind, lookPathFor(pathEnv), commandOutputIn(overrides.Env))
-		},
 		VerifySkill: func(agentKind agent.AgentKind, skill string) error {
 			return verifySkillWith(agentKind, skill, userHomeDirFor(overrides.Home), os.Stat)
 		},
@@ -321,7 +292,6 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		RemoveWorktree:       removeWorktree,
 		DeleteBranch:         deleteBranch,
 		RenameBranch:         renameBranch,
-		Runner:               runner,
 		MergeLockStateDir:    overrides.StateDir,
 		SessionHomes:         metrics.SessionHomes{Claude: overrides.Home, Codex: overrides.CodexHome},
 		RevParse:             git.RevParse,
@@ -477,25 +447,6 @@ func transcriptPath(home, cwd, sessionID string) (path string, found bool) {
 	return transcript.PathIn(home, cwd, sessionID), true
 }
 
-// envPath is the last PATH entry of env, or "" when it has none.
-func envPath(env []string) string {
-	for i := len(env) - 1; i >= 0; i-- {
-		if path, ok := strings.CutPrefix(env[i], "PATH="); ok {
-			return path
-		}
-	}
-	return ""
-}
-
-// lookPathFor returns exec.LookPath when pathEnv is empty (real process
-// PATH), or a lookup against the explicit pathEnv string otherwise.
-func lookPathFor(pathEnv string) func(string) (string, error) {
-	if pathEnv == "" {
-		return exec.LookPath
-	}
-	return func(file string) (string, error) { return lookPathIn(file, pathEnv) }
-}
-
 // userHomeDirFor returns a constant home, or an error when home is empty.
 func userHomeDirFor(home string) func() (string, error) {
 	return func() (string, error) {
@@ -508,9 +459,9 @@ func userHomeDirFor(home string) func() (string, error) {
 
 // lookPathIn resolves file against the PATH-style list pathEnv, the same
 // resolution exec.LookPath performs against the process's real PATH — used
-// so preflightAgentWith and InstallDependencies can be pointed at an
-// explicit PATH string per call instead of exec.LookPath's process-PATH
-// read, which no per-test override can reach without mutating process env.
+// so InstallDependencies can be pointed at an explicit PATH string per call
+// instead of exec.LookPath's process-PATH read, which no per-test override
+// can reach without mutating process env.
 func lookPathIn(file, pathEnv string) (string, error) {
 	for _, dir := range filepath.SplitList(pathEnv) {
 		if dir == "" {
@@ -526,70 +477,6 @@ func lookPathIn(file, pathEnv string) (string, error) {
 		}
 	}
 	return "", &exec.Error{Name: file, Err: exec.ErrNotFound}
-}
-
-// commandOutputIn runs name under env; nil env is the process environment.
-func commandOutputIn(env []string) func(string, ...string) ([]byte, error) {
-	return func(name string, args ...string) ([]byte, error) {
-		cmd := exec.Command(name, args...)
-		cmd.Env = env
-		return cmd.CombinedOutput()
-	}
-}
-
-func preflightAgentWith(
-	agentKind agent.AgentKind,
-	lookPath func(string) (string, error),
-	commandOutput func(string, ...string) ([]byte, error),
-) error {
-	if agentKind != agent.AgentCodex {
-		return nil
-	}
-	codexPath, err := lookPath("codex")
-	if err != nil {
-		return errors.New("codex executable not found in PATH; install Codex or add it to PATH")
-	}
-	loginStatus, statusErr := commandOutput(codexPath, "login", "status")
-	if isCodexUnauthenticated(string(loginStatus)) {
-		return errors.New("codex is not authenticated; run `codex login`")
-	}
-	if statusErr != nil {
-		return fmt.Errorf("could not verify Codex authentication: %w", statusErr)
-	}
-
-	herdrPath, err := lookPath("herdr")
-	if err != nil {
-		return errors.New("Herdr executable not found in PATH; install or upgrade Herdr with Codex integration")
-	}
-	help, err := commandOutput(herdrPath, "agent", "start", "--help")
-	if err != nil {
-		return fmt.Errorf("could not verify Herdr Codex integration; upgrade Herdr: %w", err)
-	}
-
-	const valuesPrefix = "[possible values:"
-	start := strings.Index(string(help), valuesPrefix)
-	if start >= 0 {
-		values := string(help)[start+len(valuesPrefix):]
-		if end := strings.IndexByte(values, ']'); end >= 0 {
-			for _, value := range strings.Split(values[:end], ",") {
-				if strings.TrimSpace(value) == string(agent.AgentCodex) {
-					return nil
-				}
-			}
-		}
-	}
-	return errors.New("installed Herdr does not support Codex agents; upgrade Herdr")
-}
-
-// isCodexUnauthenticated reports whether codex login status's output
-// indicates Codex has no valid credentials — distinct from the executable
-// simply being missing (a lookPath failure) or Herdr's Codex integration
-// being missing/incompatible (a herdrPath/help-output failure), both checked
-// separately above so an operator sees the actual cause instead of a single
-// generic "Codex launch failed".
-func isCodexUnauthenticated(output string) bool {
-	lower := strings.ToLower(output)
-	return strings.Contains(lower, "not logged in") || strings.Contains(lower, "not authenticated")
 }
 
 // verifySkillWith confirms skill is installed where agent resolves its

@@ -143,7 +143,7 @@ func (codexHarness) Launch(opts LaunchOptions) Command {
 }
 
 // CodexNoteArgs is the Codex args that carry the launch note sentence alone,
-// for a runner that sets no loop prompt of its own (herdr).
+// for a runner that sets no loop prompt of its own.
 func CodexNoteArgs(noteFile string) []string {
 	return []string{"-c", "developer_instructions=" + tomlString(GXNoteSentence(noteFile))}
 }

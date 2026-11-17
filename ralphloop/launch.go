@@ -19,7 +19,7 @@ type iterationParams struct {
 	// in (git.Repo.LinkedWorktreeDir for RepoDir's repo), resolved once in
 	// Run and threaded through so every iteration's path is
 	// filepath.Join(WorktreeDir, iterLabel(ticketNumber)) — deterministic,
-	// so a reattached iteration can recompute it without asking herdr.
+	// so a reattached iteration can recompute it without asking the runner.
 	WorktreeDir     string
 	FeatureWorktree string
 	FeatureBranch   string

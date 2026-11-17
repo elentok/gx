@@ -25,7 +25,6 @@ const selfFile = "sleepguard/sleepguard_test.go"
 // remove a sleep, replace it with a condition wait and lower the count. Keep
 // the map sorted, one entry per line.
 var allowed = map[string]int{
-	"agentrunner/herdrrunner/conformance_test.go":                      1,
 	"brief/brief_test.go":                                              2, // poll loops with a deadline
 	"check/check_test.go":                                              1, // poll loop with a deadline waiting on the go step
 	"check/lock_test.go":                                               2, // a held-lock stand-in that sleeps until killed, and a poll loop with a deadline waiting on the lock state
@@ -113,7 +112,6 @@ var allowed = map[string]int{
 	"server/sched/runner_test.go":                                      1,
 	"server/schedules/scheduler_test.go":                               1, // negative wait: a second run or a skip would show within a few checks
 	"server/server_notify_test.go":                                     1,
-	"server/server_test.go":                                            1,
 	"server/sessions/askflows/askfallback_test.go":                     1, // negative wait: no fallback card lists for a picker, a permission prompt or an unreadable layout
 	"server/sessions/retry_prompt_test.go":                             1, // negative wait: no second interrupt or prompt follows the retry
 	"server/sessions/sessionchatwatch_test.go":                         3, // includes a negative wait: a turn that reaches no model leaves the switch unconfirmed

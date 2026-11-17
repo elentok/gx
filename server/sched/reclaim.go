@@ -115,12 +115,12 @@ func (r *Reclaimer) pauseUnreclaimed(t runs.TrackedRun, cause error) {
 	}
 }
 
-// reclaimHeadless takes over a headless iteration: a live agent keeps running
-// on the adopted session, a finished one merges as if it had just finished, and
-// one that died with the server down is reopened when it left nothing behind,
-// else pauses stuck with its dir kept. A live agent that was waiting for
-// an answer stays waiting and unsettled.
-func (r *Reclaimer) reclaimHeadless(t runs.TrackedRun, runner agentrunner.Runner) error {
+// reclaimNative takes over an iteration of a native runner (headless or pty): a
+// live agent keeps running on the adopted session, a finished one merges as if
+// it had just finished, and one that died with the server down is reopened when
+// it left nothing behind, else pauses stuck with its dir kept. A live agent
+// that was waiting for an answer stays waiting and unsettled.
+func (r *Reclaimer) reclaimNative(t runs.TrackedRun, runner agentrunner.Runner) error {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
 		return err
@@ -189,7 +189,7 @@ func (r *Reclaimer) holdIfRateLimited(runner agentrunner.Runner, t runs.TrackedR
 }
 
 // reclaim goes through the runner that started t, whatever runner is
-// configured now: a herdr run under a headless server is still herdr's. An
+// configured now: a pty run under a headless server is still pty's. An
 // unavailable runner can't say whether the agent is gone, so only an agent
 // the runner reports gone is ever reopened.
 func (r *Reclaimer) reclaim(t runs.TrackedRun) error {
@@ -206,51 +206,7 @@ func (r *Reclaimer) reclaim(t runs.TrackedRun) error {
 	if err := agentrunner.Healthy(runner); err != nil {
 		return fmt.Errorf("%w: started by %s; %s unavailable: %v", errHandleMismatch, name, name, err)
 	}
-	if name != runs.RunnerHerdr {
-		return r.reclaimHeadless(t, runner)
-	}
-	label := runs.IterationLabel(t.Address)
-	session, found, err := runner.Find(label)
-	if err != nil {
-		// A lookup that failed says nothing about whether the agent is gone.
-		return fmt.Errorf("%w: agent %s: %v", errHandleMismatch, t.Address, err)
-	}
-	if !found || session.ID == "" {
-		if reopened, err := r.reopenEmptyClaim(t); err != nil || reopened {
-			return err
-		}
-		return fmt.Errorf("%w: no pane", errHandleMismatch)
-	}
-	if t.State == runs.Launching {
-		st, err := runner.Status(session)
-		if err != nil {
-			return fmt.Errorf("%w: agent %s: %v", errHandleMismatch, t.Address, err)
-		}
-		if st.Waiting() {
-			return r.stopLaunching(t, runner, session, string(st.State))
-		}
-	}
-	one, wt, mode, err := r.Resume(t)
-	if err != nil {
-		return err
-	}
-	root, err := queue.ParseRootRef(t.Root)
-	if err != nil {
-		return err
-	}
-	t.Runner = runs.RunnerHerdr
-	t.Session = agentrunner.Session{Label: label, ID: session.ID, SessionID: t.Session.SessionID}
-	t.State = ""
-	r.registry.Put(t)
-	r.host.Publish(wire.EventReclaimed, t.Address)
-	if r.host.ReportedFinished(t.TicketPath) {
-		// The wait reads the agent's state, which a leftover background task can hold at working.
-		r.host.Continue(runner, t, root, mode, one, wt, true)
-		return nil
-	}
-	r.holdIfRateLimited(runner, t)
-	r.host.Continue(runner, t, root, mode, one, wt, false)
-	return nil
+	return r.reclaimNative(t, runner)
 }
 
 // stopLaunching closes the agent of a launch the server died in, which is

@@ -28,7 +28,6 @@ import (
 
 // RegistryBack is what the Registry reads from the Server.
 type RegistryBack interface {
-	SessionFinished(sess agentrunner.Session) bool
 	// BusyAddresses is the address of every queued ticket, then of every run.
 	BusyAddresses() []string
 }

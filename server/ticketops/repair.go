@@ -80,8 +80,7 @@ func (l directLaunch) HostingDeps(tickets.Address) deps.Deps { return l.projects
 // directBack is the projects.RegistryBack of a repair run without a server.
 type directBack struct{}
 
-func (directBack) SessionFinished(agentrunner.Session) bool { return false }
-func (directBack) BusyAddresses() []string                  { return nil }
+func (directBack) BusyAddresses() []string { return nil }
 
 // RunRepairDirect runs a repair verb without a server, for the CLI's
 // server-down fallback. The verbs take the merge lock themselves, so a live
@@ -615,7 +614,7 @@ func (o *Ops) resumeSelfReported(epicPath, id, origin string) (wire.RepairResult
 			return wire.RepairResult{}, false, err
 		}
 		if !gone && !selfReported {
-			// A PTY or herdr run has no approvable card for a question menu, so
+			// A PTY run has no approvable card for a question menu, so
 			// Retry is the way out: end the pause, interrupt, and let the caller
 			// send the retry prompt.
 			interrupted, err := o.d.Writer.RetryBlocked(address)

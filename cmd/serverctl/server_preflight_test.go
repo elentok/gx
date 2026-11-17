@@ -45,7 +45,7 @@ func TestPreflightAgentRunner(t *testing.T) {
 		{"herdr reads as auto even with herdr down", "herdr", "", agentrunner.Probe{LookPath: found, PingHerdr: down}, "", "INFO"},
 		{"headless without claude", "headless", "", agentrunner.Probe{LookPath: missing, PingHerdr: up}, "claude is not on PATH", "ERROR"},
 		{"auto picks pty", "auto", "", agentrunner.Probe{LookPath: found, PingHerdr: up}, "", "INFO"},
-		{"auto without claude", "auto", "", agentrunner.Probe{LookPath: missing, PingHerdr: up}, "agent-runner: herdr", "ERROR"},
+		{"auto without claude", "auto", "", agentrunner.Probe{LookPath: missing, PingHerdr: up}, "claude is not on PATH", "ERROR"},
 		{"codex default without codex", "auto", "codex", agentrunner.Probe{LookPath: missing, PingHerdr: up},
 			`the default harness "codex" is not on PATH. Install codex or set the default to claude in ~/.config/gx/config.json.`, "ERROR"},
 		{"codex-only machine starts", "auto", "codex", agentrunner.Probe{LookPath: func(f string) (string, error) {

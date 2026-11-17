@@ -124,7 +124,7 @@ func TestApplyGlobalValidateSettingRefusal(t *testing.T) {
 	}
 }
 
-func TestApplyHerdrRunnerIsStoredAsAuto(t *testing.T) {
+func TestApplyHerdrSettingIsStoredAsAuto(t *testing.T) {
 	reg := registry.Default()
 	out, err := Apply(reg, ScopeGlobal, []byte(`{}`), []Change{set(`"herdr"`, "agent-runner")})
 	if err != nil {
@@ -138,7 +138,7 @@ func TestApplyHerdrRunnerIsStoredAsAuto(t *testing.T) {
 	}
 }
 
-func TestWriteHerdrRunnerNoticeAndSavedValue(t *testing.T) {
+func TestWriteHerdrSettingNoticeAndSavedValue(t *testing.T) {
 	w := newWriter(filepath.Join(t.TempDir(), "config.json"))
 	res, err := w.Write(Target{}, []Change{set(`"herdr"`, "agent-runner")})
 	if err != nil {

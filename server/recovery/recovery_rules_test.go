@@ -201,7 +201,7 @@ func TestRecovery_StalledPromptIsRetypedInFullByR5(t *testing.T) {
 
 func TestRecovery_UndeliverablePromptClosesThePane(t *testing.T) {
 	t.Parallel()
-	// Not a stall: herdrrunner nudge-retries a stalled prompt.
+	// Not a stall: the runner nudge-retries a stalled prompt.
 	applied, _, stopped := pauseStalledLaunch(t, errors.New("pane is gone"))
 	if applied.Reason != "R5" || applied.Outcome == "ok" {
 		t.Errorf("applied = %+v, want a failed R5", applied)

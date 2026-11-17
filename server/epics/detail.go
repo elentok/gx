@@ -257,8 +257,8 @@ func latestSummary(body string) *wire.LatestSummary {
 
 // PermissionCard is the pending prompt of addr's live agent, or nil. It reads
 // the runner's status, so it runs only when a detail or a snapshot is built.
-// A prompt the web cannot approve (a herdr-hosted agent, an unnamed dialog, a
-// tool that needs a real answer) gets a card with a hint and no request ID.
+// A prompt the web cannot approve (an unnamed dialog, a tool that needs a
+// real answer) gets a card with a hint and no request ID.
 func (s *Epics) PermissionCard(addr tickets.Address) (*wire.PermissionCard, error) {
 	runner, sess, ok, err := s.Harness.LiveSession(addr)
 	if err != nil || !ok {
@@ -273,7 +273,7 @@ func (s *Epics) PermissionCard(addr tickets.Address) (*wire.PermissionCard, erro
 		return &wire.PermissionCard{Description: st.BlockedReason, Hint: permissionHint}, nil
 	}
 	card := &wire.PermissionCard{RequestID: p.ID, Tool: p.Tool, Input: string(p.Input), Description: p.Description}
-	if p.NotApprovable || runner.Name() == string(agentrunner.ChoiceHerdr) {
+	if p.NotApprovable {
 		card.RequestID, card.Hint = "", permissionHint
 	}
 	return card, nil

@@ -127,7 +127,7 @@ func (s *Reconciler) runLive(run runs.Run) bool {
 		return false
 	}
 	st, err := runner.Status(run.Session)
-	return err == nil && (st.State != agentrunner.StateDone || runner.Name() == runs.RunnerHerdr)
+	return err == nil && st.State != agentrunner.StateDone
 }
 
 // sameDir reports whether a and b are one directory, through symlinks (macOS

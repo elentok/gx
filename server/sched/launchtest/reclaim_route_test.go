@@ -9,24 +9,19 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/herdrrunner"
-	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// findErrFake fails every label lookup, which runnerfake cannot inject.
-type findErrFake struct {
+// reattachErrFake fails every reattach lookup, which runnerfake cannot inject.
+type reattachErrFake struct {
 	renamedFake
 	err error
 }
 
-func (r findErrFake) Find(string) (agentrunner.Session, bool, error) {
-	return agentrunner.Session{}, false, r.err
+func (r reattachErrFake) Reattach(string) (agentrunner.Session, nativerunner.Verdict, error) {
+	return agentrunner.Session{}, nativerunner.VerdictLive, r.err
 }
 
 var waitStatus = servertest.WaitStatus
@@ -45,24 +40,10 @@ func TestReclaim_FinishesThroughTheRunsOwnRunner(t *testing.T) {
 	}
 }
 
-// Regression: a herdr run reclaimed under a headless server was waited on and
-// finished through headless, which had no such session, and was left unwatched.
-func TestReclaim_HerdrRunUnderAHeadlessServerFinishesThroughHerdr(t *testing.T) {
-	t.Parallel()
-	headless := newRenamedFake("headless", nativerunner.VerdictLive)
-	others := map[string]agentrunner.Runner{}
-	// The runner reaches the fake herdr through the server's own env.
-	_, ticketPath := restartUnder(t, "", headless, others, servertest.WithHerdr(servertest.HerdrIsTheSubject), func(c *server.Config) {
-		others["herdr"] = herdrrunner.NewIn(herdr.CLI{Env: c.Env}, harness.LookupEnv(c.Env, "HOME"), sessionlookup.RootsFrom(c.Env).CodexHome)
-	})
-	waitStatus(t, ticketPath, schema.StatusDone)
-}
-
 func TestReclaim_NonMismatchErrorPausesStuckWithItsReason(t *testing.T) {
 	t.Parallel()
-	// The handle names herdr, so reclaim looks the agent up by label on this runner.
-	lookup := findErrFake{newRenamedFake("herdr", nativerunner.VerdictLive), errors.New("lookup refused")}
-	_, ticketPath := restartUnder(t, "", lookup, nil)
+	lookup := reattachErrFake{newRenamedFake("a", nativerunner.VerdictLive), errors.New("lookup refused")}
+	_, ticketPath := restartUnder(t, "a", lookup, nil)
 	waitStatus(t, ticketPath, schema.StatusLegacyRepair)
 	body, _ := os.ReadFile(ticketPath)
 	if !strings.Contains(string(body), "lookup refused") {

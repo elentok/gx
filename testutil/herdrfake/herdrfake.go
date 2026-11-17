@@ -81,7 +81,7 @@ type Coordinator struct {
 }
 
 // Clock reads and advances a virtual clock as wall time, for code that paces
-// itself on a clock it is handed (herdrrunner.Runner's Now and Sleep). A
+// itself on a clock it is handed (the runner's Now and Sleep). A
 // timed-out "agent wait" moves it on by its --timeout: real herdr blocks that
 // long before reporting one, while a fake answers at once.
 func (c *Coordinator) Clock() (now func() time.Time, sleep func(time.Duration)) {

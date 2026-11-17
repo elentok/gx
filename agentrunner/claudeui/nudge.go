@@ -23,7 +23,7 @@ type NudgeCaps struct {
 	Settle  time.Duration
 }
 
-// DefaultNudgeCaps are herdr's caps. A tighter grace was too short for a
+// DefaultNudgeCaps are the nudge caps. A tighter grace was too short for a
 // cold-started agent to reach "working" under concurrent load, even with
 // plenty left on the caller's own deadline.
 var DefaultNudgeCaps = NudgeCaps{Grace: 45 * time.Second, Nudges: 3, Retypes: 2}

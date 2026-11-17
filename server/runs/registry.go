@@ -26,7 +26,7 @@ const FileName = "runs.json"
 type Run struct {
 	Address string `json:"address"`
 	Agent   string `json:"agent"`
-	// Runner names the agentrunner hosting Session, e.g. "herdr".
+	// Runner names the agentrunner hosting Session, e.g. "pty".
 	Runner  string              `json:"runner"`
 	Session agentrunner.Session `json:"session"`
 	// Model and Effort are what the agent launched under; a conflict on its
@@ -40,10 +40,6 @@ type Run struct {
 func (r Run) PauseEvent() runlog.Event {
 	return runlog.Event{Agent: agent.AgentKind(r.Agent), Runner: r.Runner, Label: r.Session.Label, AgentSession: r.Session.SessionID, Model: r.Model, Effort: r.Effort}
 }
-
-// RunnerHerdr is the Runner of every launch until the server launches
-// through agentrunner, and of any run an older server saved.
-const RunnerHerdr = "herdr"
 
 // Launching is the State of a run whose agent may not be started or prompted yet.
 const Launching = "launching"

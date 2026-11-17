@@ -76,9 +76,6 @@ func (o *Ops) AgentAnswer(req wire.QueueRequest) (wire.QueueResult, error) {
 			note, _ = ticketlog.ClipLogText(req.Text)
 			answer.Text = note
 		}
-		if req.RequestID != "" && runner.Name() == string(agentrunner.ChoiceHerdr) {
-			return queue.Refusal(wire.ReasonNotApprovable, "a herdr-hosted agent has no approval card"), nil
-		}
 		st, statusErr := runner.Status(sess)
 		if req.RequestID != "" {
 			if res, refused := checkOpenRequest(st, statusErr, req.RequestID); refused {

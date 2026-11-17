@@ -82,8 +82,10 @@ func TestNew_BuildsAnyRunnerPerPairLazily(t *testing.T) {
 	if runnerFor("headless", "a") == ptyA {
 		t.Error("each runner name gets its own runner")
 	}
-	if r := runnerFor("tmux", "a"); r != nil {
-		t.Errorf("unknown runner = %v, want nil", r)
+	for _, name := range []string{"tmux", "herdr"} {
+		if r := runnerFor(name, "a"); r != nil {
+			t.Errorf("runnerFor(%q) = %v, want nil", name, r)
+		}
 	}
 }
 

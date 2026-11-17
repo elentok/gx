@@ -163,7 +163,7 @@ func AgentArgs(agent AgentKind, cwd, scratchDir, epicName, model, effort string,
 		"--permission-mode", "auto", "--settings", claudeGuardSettings,
 		"--disallowedTools", loopDisallowedTools,
 	}
-	// herdr types the launch command into a shell, so keep it short: the
+	// a runner may type the launch command into a shell, so keep it short: the
 	// prompt goes in a file when one can be written.
 	if f := harness.GXSystemPromptFile(); f != "" {
 		args = append(args, "--append-system-prompt-file", f)
@@ -176,7 +176,7 @@ func AgentArgs(agent AgentKind, cwd, scratchDir, epicName, model, effort string,
 	if effort != "" {
 		args = append(args, "--effort", effort)
 	}
-	// herdr launches claude from these args itself, so the editor mode goes in here.
+	// the runner launches claude from these args itself, so the editor mode goes in here.
 	return harness.MergeClaudeSettings(args)
 }
 

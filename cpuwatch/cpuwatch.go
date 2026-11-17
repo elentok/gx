@@ -33,7 +33,7 @@ type Config struct {
 }
 
 // Sample is one interval's CPU use, in percent of one core. Children is the
-// subprocesses that exited in the interval (herdr, git): a profile never shows
+// subprocesses that exited in the interval (git): a profile never shows
 // them, so they are kept apart.
 type Sample struct {
 	At       time.Time `json:"at"`
@@ -205,7 +205,7 @@ func summary(s Spike, errs []error) string {
 	if s.Build != "" {
 		fmt.Fprintf(&b, "Build: %s\n\n", s.Build)
 	}
-	b.WriteString("Children is CPU used by subprocesses that exited (herdr, git, ...). `cpu.pprof` does not show it: look in `goroutines.txt` for loops that start processes.\n\n")
+	b.WriteString("Children is CPU used by subprocesses that exited (git, ...). `cpu.pprof` does not show it: look in `goroutines.txt` for loops that start processes.\n\n")
 	b.WriteString("| time | self % | children % |\n|---|---|---|\n")
 	for _, x := range s.Samples {
 		fmt.Fprintf(&b, "| %s | %.1f | %.1f |\n", x.At.Format(time.TimeOnly), x.Self, x.Children)

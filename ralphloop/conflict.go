@@ -333,8 +333,8 @@ func reattachLiveConflictResolver(d deps.Deps, p iterationParams, live agentrunn
 // session in the feature worktree and drives a "/gx-resolving-merge-conflicts"
 // agent to completion in it, returning its agent session id. The iteration's
 // own worktree/session are untouched while this runs. The idle signal is not
-// trusted on its own — see the 2.1.228 incident, where herdr misdetected the
-// pane as idle while the agent was still working — so once the wait reports
+// trusted on its own — see the 2.1.228 incident, where the runner misdetected the
+// agent as idle while the agent was still working — so once the wait reports
 // the agent done, the child is only marked done after
 // corroborating against the git sequencer itself (the ground truth for
 // whether the resolution actually finished). A sequencer that's still

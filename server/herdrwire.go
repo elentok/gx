@@ -2,7 +2,6 @@ package server
 
 import (
 	"github.com/elentok/gx/server/queue"
-	"github.com/elentok/gx/server/runs"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/notify"
@@ -10,16 +9,19 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+// herdrName is the runner name herdr ran under. Nothing builds it any more.
+const herdrName = "herdr"
+
 // herdrHost is sched.HerdrHost.
 type herdrHost struct{ s *Server }
 
 // Runner is the runner that hosts herdr tickets, or nil when the server cannot
 // build one.
 func (h herdrHost) Runner() agentrunner.Runner {
-	return h.s.harness.RunnerNamed(runs.RunnerHerdr, runnerbuild.FallbackProject)
+	return h.s.harness.RunnerNamed(herdrName, runnerbuild.FallbackProject)
 }
 
-func (h herdrHost) Configured() bool { return h.s.cfg.Runner.Name() == runs.RunnerHerdr }
+func (h herdrHost) Configured() bool { return h.s.cfg.Runner.Name() == herdrName }
 
 func (h herdrHost) Publish(event, id string) { h.s.events.Publish(event, id) }
 
@@ -45,12 +47,12 @@ func (h herdrHost) Waiting() []string {
 			continue
 		}
 		agent := s.harness.ResolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t).Harness
-		if r := s.harness.LaunchRunner(addr.Project, agent); r != nil && r.Name() == runs.RunnerHerdr {
+		if r := s.harness.LaunchRunner(addr.Project, agent); r != nil && r.Name() == herdrName {
 			out = append(out, item.Address)
 		}
 	}
 	for _, t := range s.registry.List() {
-		if r := s.harness.RunnerForRun(t.Run); r != nil && r.Name() == runs.RunnerHerdr {
+		if r := s.harness.RunnerForRun(t.Run); r != nil && r.Name() == herdrName {
 			out = append(out, t.Address)
 		}
 	}

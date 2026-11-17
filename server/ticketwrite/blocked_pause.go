@@ -59,7 +59,7 @@ func (w *Writer) LeaveBlocked(address string) error {
 	return nil
 }
 
-// RetryBlocked ends the blocked pause of a PTY or herdr run and interrupts its
+// RetryBlocked ends the blocked pause of a PTY run and interrupts its
 // agent, and reports whether it did. A headless run is left alone. The pause ends
 // first, through the same path as the answer verb, so the unblock watch seeing
 // the interrupt finds nothing left to do. Interrupt waits for idle, which a raw

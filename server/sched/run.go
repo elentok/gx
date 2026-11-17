@@ -77,7 +77,7 @@ func (l *Launcher) claim(root queue.RootRef, queued tickets.Address, t tickets.T
 		root: root, queued: queued, ticket: ticket, t: t, dir: dir, repo: repo, agentKind: agentKind, epics: epics,
 		rootBase: rootBase, leafBase: leafBase, answered: answered,
 		entry: runs.TrackedRun{
-			// The runner is named now: a reservation with none reads as herdr to the run watchers.
+			// The runner is named now: a reservation with none would mismatch the runner the run watchers look up.
 			Run:  runs.Run{Address: ticketAddr, Agent: string(agentKind), Runner: l.Harness.LaunchRunner(ticket.Project, agentKind).Name()},
 			Root: root.String(), Repo: repo, TicketPath: t.Path, StartedAt: time.Now(), State: runs.Launching, LaunchStep: runs.StepCreatingWorktree,
 		},
@@ -417,8 +417,8 @@ func (l *Launcher) stopHung(rc runContext) {
 	}
 }
 
-// BlockWatchPoll bounds each Wait of watchBlocked. A herdr Wait is one herdr
-// process, so a short poll would cost an idle server a process per tick.
+// BlockWatchPoll bounds each Wait of watchBlocked. A short poll would
+// cost an idle server a Wait per tick.
 const BlockWatchPoll = 30 * time.Second
 
 // watchBlocked publishes a ticket change each time the agent enters or leaves
@@ -577,12 +577,11 @@ func (l *Launcher) settleRun(rc runContext, err error) {
 }
 
 // keepsAskedAgent reports whether run's agent stays alive after it asks: a
-// Claude agent on a native runner, or a Codex agent on the pty runner.
-// Herdr-hosted runs clean up as before.
+// Claude agent on any runner, or a Codex agent on the pty runner.
 func keepsAskedAgent(run runs.Run) bool {
 	switch run.Agent {
 	case string(agent.AgentClaude):
-		return run.Runner != "" && run.Runner != runs.RunnerHerdr
+		return true
 	case string(agent.AgentCodex):
 		return run.Runner == string(agentrunner.ChoicePTY)
 	}

@@ -149,9 +149,6 @@ func (h *Harness) buildPty() {
 		StopGrace:    ptyStopGrace,
 		LaunchCaps:   launchCaps(env),
 	})
-	// The fake herdr executable is this binary too; the TUI env would make it
-	// answer as a Claude fake, so herdr is built over the plain env.
-	_, herdrFor := runnerbuild.New("herdr", h.cfg.Env, h.StateDir, h.cfg.RunnerWait, runnerbuild.Options{}, nil)
 	var mu sync.Mutex
 	wrapped := map[*nativerunner.Pty]*ptyRunner{}
 	wrap := func(r agentrunner.Runner) agentrunner.Runner {
@@ -170,9 +167,6 @@ func (h *Harness) buildPty() {
 	}
 	h.cfg.Runner = wrap(runnerFor("pty", runnerbuild.FallbackProject))
 	h.cfg.RunnerFor = func(name, project string) agentrunner.Runner {
-		if name == "herdr" {
-			return herdrFor(name, project)
-		}
 		return wrap(runnerFor(name, project))
 	}
 }

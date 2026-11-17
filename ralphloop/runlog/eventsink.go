@@ -47,7 +47,7 @@ const (
 
 // StalledTicket names one human-clearable ticket a paused epic is waiting
 // on. Reattachable reports whether its prior iteration still has a live,
-// owned herdr tab/agent (see resumeReattachable) — the epic-paused half of
+// owned agent (see resumeReattachable) — the epic-paused half of
 // distinguishing a pause a human clears by editing status alone from one a
 // live run can also self-heal from once cleared.
 type StalledTicket struct {
@@ -101,8 +101,8 @@ type EventSink interface {
 	// its initial prompt, for ticket. cwd/sessionID let a consumer resolve
 	// the session's transcript itself (transcript.PathIn) to compute elapsed
 	// time from its first line's timestamp, rather than stamping "now"
-	// client-side. agent/paneID identify which agent kind and herdr
-	// pane/tab this iteration is running on, so a consumer outside ralphloop
+	// client-side. agent/paneID identify which agent kind and
+	// session this iteration is running on, so a consumer outside ralphloop
 	// (the Queue tab's registry) can locate the live iteration itself.
 	IterationStarted(ticket tickets.Ticket, label string, cwd string, sessionID string, agent agent.AgentKind, paneID string)
 	// IterationPaused reports that identifier's iteration label paused for

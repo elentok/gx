@@ -110,7 +110,7 @@ func TestReadGlobalHidesSecretsAndShowsChatID(t *testing.T) {
 	}
 }
 
-func TestReadHerdrRunnerShowsAutoWithNotice(t *testing.T) {
+func TestReadHerdrSettingShowsAutoWithNotice(t *testing.T) {
 	t.Parallel()
 	w, _ := readFixture(t, `{"agent-runner":"herdr"}`, `{}`)
 	resp, err := w.Read(Target{}, nil)

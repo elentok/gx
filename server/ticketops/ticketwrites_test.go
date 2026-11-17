@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/broker"
@@ -309,8 +308,7 @@ func TestCancel_CascadesToNonTerminalDescendants(t *testing.T) {
 
 type noBack struct{}
 
-func (noBack) SessionFinished(agentrunner.Session) bool { return false }
-func (noBack) BusyAddresses() []string                  { return nil }
+func (noBack) BusyAddresses() []string { return nil }
 
 type noHost struct{}
 

@@ -112,7 +112,7 @@ Read the split first; it decides where to look:
    `goroutines.txt` for goroutines sitting in `os/exec` (`(*Cmd).Wait`, `forkExec`) and walk up to
    the gx loop that starts them. Typical shape: a wait/poll loop around `herdr agent wait` or
    `herdr agent get` whose sleep is skipped when herdr answers at once (fixed once in
-   `agentrunner/herdrrunner` `Wait`), or a `git` call per ticket per tick.
+   the herdr runner's `Wait`), or a `git` call per ticket per tick.
 3. **Profile empty or missing** → `summary.md` lists any capture error. The spike may have ended
    before profiling started; say so and use the goroutine dump alone.
 

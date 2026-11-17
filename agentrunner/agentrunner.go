@@ -1,7 +1,7 @@
 // Package agentrunner defines the one interface ralph-loop and the server
-// drive to host a coding agent, so herdr and a native runner are two
-// implementations of it. Hosting details (workspaces, tabs, nudges, dialog
-// rules, pane scraping) stay inside each adapter.
+// drive to host a coding agent, so the headless and PTY runners are two
+// implementations of it. Hosting details (nudges, dialog rules, screen
+// scraping) stay inside each adapter.
 package agentrunner
 
 import (
@@ -36,7 +36,7 @@ const (
 // needs them to mean.
 type Session struct {
 	Label string `json:"label"`
-	// ID is the adapter's handle (herdr pane, native process key).
+	// ID is the adapter's handle (native process key).
 	ID string `json:"id"`
 	// SessionID is the agent's own conversation id, when known.
 	SessionID string `json:"session_id,omitempty"`
@@ -56,7 +56,7 @@ type StartOptions struct {
 	NoAdopt bool
 	// ResumeSessionID names a previous Claude session to continue instead of
 	// starting a new one; the session keeps that id. Only the pty runner
-	// resumes: headless, herdr and Codex ignore it and cold-start.
+	// resumes: headless and Codex ignore it and cold-start.
 	ResumeSessionID string
 	// NoteFile is the launch note file a fresh Codex agent is told to read, by
 	// a sentence in its developer instructions. Claude gets its note through
@@ -278,7 +278,7 @@ type Runner interface {
 	Answer(s Session, a Answer) error
 }
 
-// HealthChecker is implemented by runners whose host can go away (herdr).
+// HealthChecker is implemented by runners whose host can go away.
 type HealthChecker interface {
 	Healthy() error
 }
@@ -290,7 +290,7 @@ type Cleaner interface {
 }
 
 // Nudger is implemented by runners whose Prompt nudges a prompt the agent
-// didn't pick up (herdr, pty). onNudge hears each decision
+// didn't pick up (pty). onNudge hears each decision
 // (claudeui.NudgeDecision).
 type Nudger interface {
 	PromptNudged(s Session, text string, onNudge func(decision string)) error

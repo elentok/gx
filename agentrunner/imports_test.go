@@ -12,7 +12,6 @@ import (
 // and herdr-only cleanup that haven't moved behind Runner yet. Shrink this
 // list, never grow it: a new caller goes through agentrunner.Runner.
 var herdrImporters = []string{
-	"github.com/elentok/gx/agentrunner/herdrrunner",
 	"github.com/elentok/gx/cmd/doctor",
 	"github.com/elentok/gx/cmd/serverctl",
 	"github.com/elentok/gx/ralphloop/deps",

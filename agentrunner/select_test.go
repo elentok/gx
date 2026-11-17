@@ -70,7 +70,7 @@ func TestSelect(t *testing.T) {
 		{name: "auto picks pty when herdr down", setting: "auto", onPath: both, want: agentrunner.ChoicePTY},
 		{name: "auto picks pty without herdr binary", setting: "auto", onPath: []string{"claude"}, want: agentrunner.ChoicePTY},
 		{name: "empty means auto", setting: "", onPath: both, herdrUp: true, want: agentrunner.ChoicePTY},
-		{name: "auto without claude", setting: "auto", onPath: []string{"herdr"}, herdrUp: true, wantErr: "agent-runner: herdr"},
+		{name: "auto without claude", setting: "auto", onPath: []string{"herdr"}, herdrUp: true, wantErr: "claude is not on PATH"},
 		{name: "auto without claude names claude", setting: "", wantErr: "claude is not on PATH"},
 		{name: "auto codex default with only codex", setting: "auto", harness: "codex", onPath: []string{"codex"}, want: agentrunner.ChoicePTY},
 		{name: "pty codex default with only codex", setting: "pty", harness: "codex", onPath: []string{"codex"}, want: agentrunner.ChoicePTY},

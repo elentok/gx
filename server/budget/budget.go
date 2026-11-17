@@ -223,7 +223,7 @@ func iterationCostIn(env []string) func(wire.IterationInfo) (float64, bool) {
 }
 
 // Iteration is the live iteration of address as its runner sees it, so a
-// headless run is metered like a herdr pane.
+// headless run is metered like a pty one.
 func (b *Budget) Iteration(address string) (wire.IterationInfo, bool) {
 	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {

@@ -26,7 +26,6 @@ import (
 	"github.com/elentok/gx/server/schedules"
 	"github.com/elentok/gx/server/sessions"
 
-	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/osnotify"
@@ -547,9 +546,6 @@ func New(cfg Config) (*Server, error) {
 	s.ops = newTicketOps(s)
 	s.schedRunner.Cancel = s.ops.Cancel
 	s.prompt.AnswerTicket = s.ops.Answer
-	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
-		h.Finished = s.sessions.SessionFinished
-	}
 	mux := http.NewServeMux()
 	// The rescan steps run in this order after every store scan.
 	s.idx.OnRescan(s.rec.ScanParentDefects)

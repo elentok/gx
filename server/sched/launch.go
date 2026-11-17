@@ -147,7 +147,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 	if t.Type == string(schema.TypeEvolve) {
 		extraDirs = l.evolveDirs(ticket)
 	}
-	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
+	// Every runner lookup uses the iteration label, not the ticket address.
 	label, _, _ := worktree.IterationIdentity(ticket.Epic, ticket.ID, "")
 	resumeID := one.ResumeSessionID
 	if agentKind == agent.AgentCodex && !l.CodexRolloutExists(cwd, resumeID) {
@@ -334,7 +334,7 @@ func (h labelHolder) describe() string {
 }
 
 // labelHolder finds who holds label after Start failed with takenErr. Only
-// herdr's error says the holder's cwd. The launching ticket's own registry
+// a runner whose error sets HolderCwd says the holder's cwd. The launching ticket's own registry
 // entry has no session yet, so it never counts as tracking the holder.
 func (l *Launcher) labelHolder(r agentrunner.Runner, ticket tickets.Address, label string, takenErr error) labelHolder {
 	var h labelHolder

@@ -18,10 +18,9 @@ func (h *Harness) RunnerFor(project string) agentrunner.Runner {
 }
 
 // LaunchRunner is the runner a new launch of agent in project uses. The
-// headless runner hosts only Claude, so Codex runs on pty unless herdr is
-// configured.
+// headless runner hosts only Claude, so Codex always runs on pty.
 func (h *Harness) LaunchRunner(project string, agentKind agent.AgentKind) agentrunner.Runner {
-	if agentKind == agent.AgentCodex && h.cfg.Runner.Name() != runs.RunnerHerdr {
+	if agentKind == agent.AgentCodex {
 		return h.RunnerNamed(string(agentrunner.ChoicePTY), project)
 	}
 	return h.RunnerFor(project)

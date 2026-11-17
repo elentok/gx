@@ -11,7 +11,7 @@ import (
 )
 
 // GXAskText is the ask part of the loop prompt, shared by Claude and Codex.
-// One line: herdr refuses launch arguments that contain a newline
+// One line: a launch argument that contains a newline is refused
 // (invalid_agent_argument).
 const GXAskText = "Never use the AskUserQuestion tool. To ask a person, run `gx tickets ask`. Do these steps in order. 1. Commit what is green. Work already done is not discarded while the question waits. 2. Run `gx tickets ask <addr> --body -` with the body on stdin. The body has two sections. `## Question`: a one-line plain-text summary first (no markdown, at most 120 characters), then optional detail. A person should be able to answer in one pass without reading the diff. When the answer is yes or no, or a pick from 2 to 6 choices, end the detail with a fenced ```gx-question block (YAML: `type: yes-no` with optional `yes:` and `no:` consequences, or `type: options` with `options:` entries of `id` and `label`; optional `recommended:`), so the person gets buttons instead of a text box. `## Handoff`: required and non-empty. Name the files you touched, the decisions you made and why, and what you do with each answer. 3. End your turn. The agent keeps its worktree, pane and slot while it waits. After `gx tickets ask`, end your turn. The person's reply reaches you as a new message, in this session or in a fresh one that starts from your handoff. If the reply leaves anything unclear, or you need more, run `gx tickets ask` again. Never end a turn with a question in plain text and no `ask` call. No one is told, and the ticket stalls."
 
@@ -113,7 +113,7 @@ func hasPromptFlag(args []string) bool {
 }
 
 // GXSystemPromptFile writes GXLoopPrompt to a file in the user cache dir and
-// returns its path, for claude's --append-system-prompt-file. A herdr launch
+// returns its path, for claude's --append-system-prompt-file. A launch that
 // types the whole command line into a shell, so a file keeps that line short.
 // It returns "" when the file cannot be written; callers then pass the text
 // inline.

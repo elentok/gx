@@ -168,7 +168,7 @@ func FakeDeps() (d deps.Deps, prompts *[]string, removedBranches *[]string) {
 }
 
 // RecordingRunner adds Runner prompts to FakeDeps' prompts slice, so tests
-// asserting the prompt sequence see initial prompts and herdr-sent ones alike.
+// asserting the prompt sequence see initial prompts and runner-sent ones alike.
 type RecordingRunner struct {
 	*runnerfake.Runner
 	record func(text string)

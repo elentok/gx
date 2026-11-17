@@ -18,7 +18,7 @@ import (
 // HerdrHosted is a runner that reports itself as herdr-hosted.
 type HerdrHosted struct{ *servertest.HeadlessFake }
 
-func (HerdrHosted) Name() string { return string(agentrunner.ChoiceHerdr) }
+func (HerdrHosted) Name() string { return "herdr" }
 
 // MarkStarted gives the staged run a start time, which makes the ticket active.
 func MarkStarted(t *testing.T, h *servertest.Harness) {

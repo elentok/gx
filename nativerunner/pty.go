@@ -467,7 +467,7 @@ func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(stri
 	if isSlashCommand(text) {
 		err = p.turns().promptSlash(pr, text)
 	} else {
-		// One bare-Enter nudge and one retype, then ErrNotDelivered: herdr's caps
+		// One bare-Enter nudge and one retype, then ErrNotDelivered: the default caps
 		// would hold a stuck prompt for minutes before the loop hears of it.
 		caps := claudeui.NudgeCaps{Grace: p.promptGrace(), Nudges: 2, Retypes: 1}
 		err = claudeui.PromptWithNudge(pr, text, caps, time.Time{}, time.Now, claudeui.ReportDecisions(onNudge))

@@ -145,7 +145,7 @@ type Event struct {
 	// from run-log.jsonl alone without reproducing the send.
 	Body string `json:"body,omitempty"`
 	// StateChangeSeq (iteration-started only, and only when the agent was
-	// actually launched here rather than attached to) is herdr's
+	// actually launched here rather than attached to) is the runner's
 	// turn count at the moment the session started — the launch-time
 	// baseline a later adopted launch (adoptedLaunch) compares its own
 	// live reading against to tell "idle because it genuinely finished a
@@ -244,7 +244,7 @@ func serverLogPath(storeDir string) string {
 	return filepath.Join(storeDir, "server-log.jsonl")
 }
 
-// AppendServerEvent appends an address-less event (herdr availability, budget
+// AppendServerEvent appends an address-less event (runner availability, budget
 // latches, server crash/restart) to the store's server event log. Epic events
 // never go through here: an event naming a ticket belongs in its epic's log.
 func AppendServerEvent(storeDir string, ev Event) error {

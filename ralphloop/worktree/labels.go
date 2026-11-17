@@ -15,19 +15,18 @@ import (
 //
 // IterationLabel is scoped by epicName, using the same flat "{epic}-..." form as
 // iterItemName, because this label is what's actually shown to the user
-// (herdr tab/pane names): two epics that each happen to reach iteration "06"
+// (agent and tab names): two epics that each happen to reach iteration "06"
 // would otherwise be indistinguishable wherever the label surfaces.
 //
-// herdr's agent name cap is 32 chars; a long epicName plus "-iter-" plus the
-// identifier can exceed that ("invalid_agent_name", every ticket in the epic
-// then fails to launch). When the full label doesn't fit, epicName is
+// An agent name is capped at 32 chars; a long epicName plus "-iter-" plus the
+// identifier can exceed that (every ticket in the epic then fails to launch). When the full label doesn't fit, epicName is
 // truncated and given a short content hash suffix — deterministic (every
 // call site recomputes the same label independently, e.g. reconcile.go
-// matching live herdr tabs) and collision-resistant (two epic names that
+// matching live agents) and collision-resistant (two epic names that
 // happen to share a long prefix truncate to different labels).
 const maxIterLabelLen = 32
 
-// IterationLabel is the herdr agent name of an iteration.
+// IterationLabel is the agent name of an iteration.
 func IterationLabel(epicName, identifier string) string {
 	suffix := "-iter-" + identifier
 	budget := maxIterLabelLen - len(suffix)
@@ -50,7 +49,7 @@ func iterItemName(epicName, identifier string) string {
 
 // IterationWorktreePath returns an iteration's on-disk worktree path, scoped
 // by epicName. worktreeDir is shared across every epic running against the
-// same repo (unlike the herdr workspace, which is already one-per-epic), so
+// same repo (unlike the agent workspace, which is already one-per-epic), so
 // without this two epics that both happen to use the same iteration number
 // (e.g. two "iter-04"s) would collide on the same directory. It's a sibling
 // of worktreeDir/epicName (the feature worktree), not nested inside it: git
@@ -68,7 +67,7 @@ func IterationKey(epicName, label string) string {
 }
 
 // IterationBranch is scoped by epicName (unlike IterationLabel, which is only
-// ever compared within one epic's own herdr workspace) because git branches
+// ever compared within one epic's own agent workspace) because git branches
 // live in the one shared bare repo across every worktree: two epics that
 // happen to reuse the same ticket identifier (e.g. an auto-split "06b") would
 // otherwise collide on the same branch name and fail AddWorktree.
@@ -76,12 +75,12 @@ func IterationBranch(epicName, identifier string) string {
 	return "ralph-loop/" + iterItemName(epicName, identifier)
 }
 
-// ConflictLabel is the herdr agent name of a ticket's conflict-resolution pane.
+// ConflictLabel is the agent name of a ticket's conflict-resolution pane.
 func ConflictLabel(identifier string) string {
 	return "conflict-" + identifier
 }
 
-// IterationIdentity is where a ticket's iteration lives: the herdr agent
+// IterationIdentity is where a ticket's iteration lives: the agent
 // label, the git branch and the worktree path under worktreeDir.
 func IterationIdentity(epicName, identifier, worktreeDir string) (label, branch, worktree string) {
 	return IterationLabel(epicName, identifier), IterationBranch(epicName, identifier), IterationWorktreePath(worktreeDir, epicName, identifier)

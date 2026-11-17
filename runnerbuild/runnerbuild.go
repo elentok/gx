@@ -8,13 +8,9 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
-	"github.com/elentok/gx/agentrunner/herdrrunner"
-	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/proccap"
-	"github.com/elentok/gx/sessionlookup"
 )
 
 // FallbackProject is the project the default runner is built for.
@@ -49,8 +45,6 @@ type Options struct {
 // for FallbackProject.
 func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, opts Options, pty *PtyOverride) (r agentrunner.Runner, runnerFor func(runner, project string) agentrunner.Runner) {
 	type pair struct{ runner, project string }
-	dirs := config.DirsFrom(env)
-	home, _ := dirs.Home()
 	var mu sync.Mutex
 	built := map[pair]agentrunner.Runner{}
 	runnerFor = func(runner, project string) agentrunner.Runner {
@@ -62,11 +56,6 @@ func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, o
 		}
 		var r agentrunner.Runner
 		switch agentrunner.Choice(runner) {
-		case agentrunner.ChoiceHerdr:
-			h := herdrrunner.NewIn(herdr.CLI{Env: env}, home, sessionlookup.RootsFrom(env).CodexHome)
-			h.N = n
-			h.ProcCap = proccap.Source{Headroom: opts.ProcHeadroom}.Limit
-			r = h
 		case agentrunner.ChoiceHeadless:
 			r = &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project), N: n, ProcCap: proccap.Source{Headroom: opts.ProcHeadroom}}
 		case agentrunner.ChoicePTY:

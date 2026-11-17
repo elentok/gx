@@ -27,7 +27,7 @@ func TestSettingsFromConfig_CarriesAgentsSessionKeys(t *testing.T) {
 
 // A server that started on herdr reads it as auto: a reload neither refuses
 // it nor reports a restart for agent-runner.
-func TestConfigReload_HerdrRunnerReadsAsAuto(t *testing.T) {
+func TestConfigReload_HerdrSettingReadsAsAuto(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")

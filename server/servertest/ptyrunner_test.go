@@ -240,53 +240,6 @@ func (r *failRecorder) Errorf(format string, args ...any) {
 	r.errors = append(r.errors, fmt.Sprintf(format, args...))
 }
 
-func TestHerdr_TurnControlFailsTheTestNamingTheControl(t *testing.T) {
-	t.Parallel()
-	for name, control := range map[string]func(*Turn){
-		"Stall":      func(turn *Turn) { turn.Stall() },
-		"Block":      func(turn *Turn) { turn.Block("why") },
-		"Exit":       func(turn *Turn) { turn.Exit(1) },
-		"Hold":       func(turn *Turn) { turn.Hold() },
-		"Transcript": func(turn *Turn) { turn.Transcript("hi") },
-	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			h := startPty(t, t.TempDir(), testutil.TempRepo(t), WithHerdr(HerdrIsTheSubject))
-			rec := &failRecorder{TB: t}
-			h.tb = rec
-			queueWithTurn(t, h, control)
-			WaitFor(t, 30*time.Second, "the failure report", func() bool {
-				rec.mu.Lock()
-				defer rec.mu.Unlock()
-				return len(rec.errors) > 0
-			})
-
-			rec.mu.Lock()
-			defer rec.mu.Unlock()
-			if len(rec.errors) != 1 || !strings.Contains(rec.errors[0], "Turn."+name) || !strings.Contains(rec.errors[0], "PTY") {
-				t.Errorf("errors = %q, want one naming Turn.%s and PTY", rec.errors, name)
-			}
-		})
-	}
-}
-
-func TestHerdr_HarnessHooksFailTheTestNamingTheHook(t *testing.T) {
-	t.Parallel()
-	h := startPty(t, t.TempDir(), testutil.TempRepo(t), WithHerdr(HerdrIsTheSubject))
-	rec := &failRecorder{TB: t}
-	h.tb = rec
-
-	h.FailNextStart(errors.New("boom"))
-	h.Stops()
-	h.BlockStops()
-
-	for i, name := range []string{"FailNextStart", "Stops", "BlockStops"} {
-		if len(rec.errors) != 3 || !strings.Contains(rec.errors[i], "Harness."+name) || !strings.Contains(rec.errors[i], "PTY") {
-			t.Fatalf("errors = %q, want one each naming Harness.%s and PTY", rec.errors, name)
-		}
-	}
-}
-
 func TestPty_HoldKeepsTheRunWorkingUntilReleased(t *testing.T) {
 	t.Parallel()
 	h := startPty(t, t.TempDir(), testutil.TempRepo(t))

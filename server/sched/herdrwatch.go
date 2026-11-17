@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
@@ -98,10 +97,13 @@ func (w *HerdrWatch) holdReason() (string, bool) {
 	return "", false
 }
 
+// herdrName is the runner name herdr ran under. Nothing builds it any more.
+const herdrName = "herdr"
+
 // Holds reports why r cannot take work now: r is herdr and herdr is down or
 // not installed. Any other runner is never held by herdr.
 func (w *HerdrWatch) Holds(r agentrunner.Runner) (string, bool) {
-	if r == nil || r.Name() != runs.RunnerHerdr {
+	if r == nil || r.Name() != herdrName {
 		return "", false
 	}
 	return w.holdReason()

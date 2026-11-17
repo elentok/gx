@@ -9,7 +9,7 @@
 #
 # The steps are separate processes, each with its own output file:
 #   race    the PTY-runner packages under -race (a vt emulator shared with a
-#           background goroutine, and herdrrunner's use of the herdr fake)
+#           background goroutine)
 #   go      every other package except ./server/...
 #   server  ./server/... (server and its subpackages)
 #   web     make web-test (install, tsc, vitest with 3 workers)
@@ -37,7 +37,6 @@ race_pkgs=(
 	./nativerunner
 	./nativerunner/holder
 	./claudedoctor
-	./agentrunner/herdrrunner
 	./testutil/herdrfake
 )
 

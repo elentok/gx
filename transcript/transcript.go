@@ -1,6 +1,6 @@
 // Package transcript reads Claude Code's own session transcript files
 // (~/.claude/projects/<slugified-cwd>/<session-id>.jsonl) to recover
-// information herdr itself doesn't expose, such as current context
+// information the runner doesn't expose, such as current context
 // occupancy.
 package transcript
 
@@ -74,8 +74,8 @@ func Slugify(cwd string) string {
 const maxSlugLen = 200
 
 // PathIn returns the transcript file path under home for a Claude Code
-// session launched in cwd with the given session id (herdr's
-// agent_session.value, which is the same UUID as the transcript's sessionId
+// session launched in cwd with the given session id (the same UUID as the
+// transcript's sessionId
 // field and filename).
 func PathIn(home, cwd, sessionID string) string {
 	return filepath.Join(home, ".claude", "projects", Slugify(cwd), sessionID+".jsonl")

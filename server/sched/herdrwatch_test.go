@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
@@ -86,12 +85,12 @@ func TestHerdrWatch_SyncBannerStreamsEachTransitionOnce(t *testing.T) {
 	}
 }
 
-func TestHerdrWatch_HoldsOnlyHerdrRunners(t *testing.T) {
+func TestHerdrWatch_HoldsOnlyTheHerdrNamedRunner(t *testing.T) {
 	t.Parallel()
 	w := newWatch(&fakeHost{})
 	w.SetUnavailable(true)
 
-	if reason, held := w.Holds(fakeRunner{name: runs.RunnerHerdr}); !held || reason != "herdr is down" {
+	if reason, held := w.Holds(fakeRunner{name: herdrName}); !held || reason != "herdr is down" {
 		t.Errorf("herdr runner = %q, %v, want held", reason, held)
 	}
 	if _, held := w.Holds(fakeRunner{name: "pty"}); held {

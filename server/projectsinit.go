@@ -1,7 +1,6 @@
 package server
 
 import (
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/wire"
 )
@@ -27,12 +26,6 @@ func (s *Server) initProjects() {
 
 // projectsBack is projects.RegistryBack and projects.MigratorBack.
 type projectsBack struct{ s *Server }
-
-// SessionFinished reports whether a finished session was a ticket agent that
-// reported iteration_status finished.
-func (b projectsBack) SessionFinished(sess agentrunner.Session) bool {
-	return b.s.sessions.SessionFinished(sess)
-}
 
 // BusyAddresses implements projects.RegistryBack.
 func (b projectsBack) BusyAddresses() []string {

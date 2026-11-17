@@ -1,7 +1,6 @@
 package server
 
 import (
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/settings"
@@ -68,12 +67,6 @@ func (h sessionHost) ListSessions() ([]wire.SessionInfo, error) { return h.sessi
 // SessionDir finds a session's dir and meta by id.
 func (h sessionHost) SessionDir(id string) (string, sessions.Meta, wire.SessionResult, error) {
 	return h.sessions.SessionDir(id)
-}
-
-// SessionFinished reports whether a finished session was a ticket agent that
-// reported iteration_status finished.
-func (h sessionHost) SessionFinished(sess agentrunner.Session) bool {
-	return h.sessions.SessionFinished(sess)
 }
 
 // FindTicket is sessions.Host's lookup, served by the ticket writer.
