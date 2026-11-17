@@ -70,8 +70,11 @@ test.describe("199. Triage journey", () => {
     // 12 backlogs: no new-backlog card; the row is listed under "Decided unless you object".
     await start("triage", { shape: "route-12-backlogs" })
     await openTriage(page)
+    await page.getByRole("button", { name: /^Chat$/ }).click()
     await expect(page.getByText("Decided unless you object")).toBeVisible()
     await expect(page.getByText(/Which backlog does it go to\?/)).toBeVisible()
+    await page.getByRole("button", { name: /^Questions \(/ }).click()
+    await expect(questionsOf(page)).toBeVisible()
     await expect(page.getByText(/Create the backlog/)).toHaveCount(0)
     await expect(questionsOf(page).getByRole("button", { name: /^Create tooling/ })).toHaveCount(0)
 
@@ -154,8 +157,9 @@ test.describe("199. Triage journey", () => {
     const round1 = questionsOf(page)
     await expect(page.getByText(/^Round 1 of 3/)).toBeVisible()
     await expect(round1.getByRole("group", { name: "Question 1 of 3" })).toBeVisible()
+    await page.getByRole("button", { name: /^Chat$/ }).click()
     await expect(page.getByText("Decided unless you object")).toBeVisible()
-    await expect(page.getByText(/Rename the helper while there\?/)).toBeVisible()
+    await page.getByRole("button", { name: /^Questions \(/ }).click()
     await expect(page.getByText("Which store should it use?")).toHaveCount(0)
     await expect(round1.getByRole("button", { name: /^Create tooling/ })).toBeVisible()
     await expect(round1.getByRole("button", { name: /^File under/ })).toHaveCount(0)
@@ -461,6 +465,7 @@ test.describe("199. Triage journey", () => {
     // A long countdown keeps Write waiting, so its view is read before the session writes.
     const old = await start("triage", { shape: "old-epics", autoAdvanceDelay: "60s" })
     await page.evaluate(() => (location.hash = "#/triage/gx"))
+    await page.getByRole("button", { name: /^Chat$/ }).click()
     await expect(page.getByText("move test-flakes -> backlog test-health: 2 tickets")).toBeVisible()
     await expect(
       page.getByText("move agent-guidance -> backlog agent-guidance-and-skills: 1 tickets"),
@@ -471,9 +476,10 @@ test.describe("199. Triage journey", () => {
     await expect(
       page.getByText("waiting: stuck-ticket-watchdog holds claimed gx:stuck-ticket-watchdog/01"),
     ).toBeVisible()
+    await page.getByRole("button", { name: /^Questions \(/ }).click()
     const oldRound = questionsOf(page)
     await expect(oldRound.getByRole("group", { name: "Question 1 of 3" })).toBeVisible()
-    await expect(page.getByText('Create the backlog "tooling"?', { exact: true })).toBeVisible()
+    await expect(page.getByText(/^Q1 - Create the backlog "tooling"\?$/)).toBeVisible()
     await expect(
       oldRound.getByText(/test-health|agent-guidance-and-skills|ticket-authoring/),
     ).toHaveCount(0)

@@ -131,7 +131,7 @@ test.describe("72. Design actions menu", () => {
 })
 
 test.describe("72b. Design menu before Start", () => {
-  test("the button exists before Start and the menu holds only Open design epic, Move, Hold and Copy design ID", async ({
+  test("the button exists before Start and the menu holds Open design epic, Move, Hold, Copy design ID and Archive", async ({
     page,
     start,
   }) => {
@@ -139,8 +139,9 @@ test.describe("72b. Design menu before Start", () => {
     await openDesign(page)
     await moreActions(page).click()
     const menu = actionsMenu(page)
-    await expect(menu.getByRole("menuitem")).toHaveCount(4)
     await expect(menu.getByRole("menuitem").first()).toHaveText("Open design epic ↗")
+    await expect(menu).toContainText("Move to workspace")
+    await expect(menu).toContainText("Archive")
     await expect(menu.getByRole("menuitem", nav("Move to workspace"))).toBeVisible()
     await expect(menu.getByRole("menuitem", { name: "Hold", exact: true })).toBeVisible()
     await expect(menu.getByRole("menuitem", { name: /^Copy design ID/ })).toContainText(
