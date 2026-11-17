@@ -27,6 +27,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 		}},
 		{"ui-check build order and repo path", "gx-ui-check/SKILL.md", []string{"make web-build", "GXF_REPO"}},
 		{"flake tickets", "gx-flake-tickets.md", []string{"`uptime`", "shared state", "`-run '^TestX$' -count=20`"}},
+		{"flake tickets test-health", "gx-flake-tickets.md", []string{"test-health", "seen again"}},
 		{"flake tickets in follow-up", "gx-follow-up/SKILL.md", []string{"](../gx-flake-tickets.md)"}},
 		{"flake tickets in to-tickets", "gx-to-tickets/SKILL.md", []string{"](../gx-flake-tickets.md)"}},
 		{"implement", "gx-implement/SKILL.md", []string{
@@ -112,6 +113,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 		}},
 		{"follow-up", "gx-follow-up/SKILL.md", []string{"search the candidates for that test name first"}},
 		{"follow-up seen again", "gx-follow-up/SKILL.md", []string{"gx tickets section --append <addr> Evidence -"}},
+		{"follow-up test-health", "gx-follow-up/SKILL.md", []string{"test-health", "gx tickets show <project>:test-health", "gx tickets root"}},
 		{"evolve", "gx-evolve/SKILL.md", []string{
 			"### Check rows", "### Launch rows", "`slower:`", "`flake:`", "](../gx-follow-up/SKILL.md)", "Category `bug`", "Category `idea`",
 		}},
