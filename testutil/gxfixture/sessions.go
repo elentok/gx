@@ -22,8 +22,8 @@ import (
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/testutil/agentfake"
-	"github.com/elentok/gx/testutil/agentfake/codex"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -52,13 +52,11 @@ func (f sessionSeeder) seedSessions(sc scenario) error {
 }
 
 // seedDeadSessions creates sc.DeadSessions sessions concurrently, then crashes
-// every fake that is up. The crash goes to all control files, which is why it
-// cannot tell the sessions apart: one at a time costs seconds a session.
+// every fake that is up, each through the control file of its own conversation.
 func (f sessionSeeder) seedDeadSessions(sc scenario) error {
 	if sc.DeadSessions == 0 {
 		return nil
 	}
-	before := f.controlFiles()
 	errs := make([]error, sc.DeadSessions)
 	ids := make([]string, sc.DeadSessions)
 	var wg sync.WaitGroup
@@ -74,12 +72,8 @@ func (f sessionSeeder) seedDeadSessions(sc scenario) error {
 			return err
 		}
 	}
-	fresh := slices.DeleteFunc(f.controlFiles(), func(name string) bool { return slices.Contains(before, name) })
-	if len(fresh) != len(ids) {
-		return fmt.Errorf("want %d new control files, got %d", len(ids), len(fresh))
-	}
-	for _, name := range fresh {
-		if err := agentfake.SendTUIControl(filepath.Join(f.root, "home"), strings.TrimSuffix(name, ".ctl"), agentfake.Control{Action: agentfake.ActionExit, Code: 1}); err != nil {
+	for _, id := range ids {
+		if err := f.controlSender(id, "")(agentfake.Control{Action: agentfake.ActionExit, Code: 1}); err != nil {
 			return err
 		}
 	}
@@ -93,27 +87,7 @@ func (f sessionSeeder) seedDeadSessions(sc scenario) error {
 	return nil
 }
 
-// settledControlFiles waits until the control files stop appearing. Queue, Fix
-// and Design agents start their fakes after the server accepts them, so a
-// snapshot taken right away would count their late files as a new session's.
-func (f sessionSeeder) settledControlFiles() []string {
-	const quietPolls = 5
-	deadline := time.Now().Add(sessionWaitTimeout)
-	last, quiet := f.controlFiles(), 0
-	for quiet < quietPolls && time.Now().Before(deadline) {
-		time.Sleep(100 * time.Millisecond)
-		cur := f.controlFiles()
-		if slices.Equal(cur, last) {
-			quiet++
-		} else {
-			last, quiet = cur, 0
-		}
-	}
-	return last
-}
-
 func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
-	before, codexBefore := f.settledControlFiles(), f.codexIDs()
 	dir := f.repoDir(sc, s.Project)
 	if s.HostFilesSecond {
 		dir = f.hostFiles.SecondWorktree
@@ -130,7 +104,7 @@ func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
 	slow := strings.Contains(s.Prompt, agentfake.ChatSlowMarker)
 	// A Codex fake holds its turn until a finish control, so the seeder ends it.
 	codexTurn := s.Harness == "codex" && s.Prompt != ""
-	sendControl := f.controlSender(id, s.Harness, before, codexBefore)
+	sendControl := f.controlSender(id, s.Harness)
 	if s.Prompt != "" {
 		role := transcript.ChatRoleAgent
 		if slow || codexTurn {
@@ -322,21 +296,30 @@ func (f sessionSeeder) claudeTranscriptPath(id string) (string, error) {
 // controlSender sends a control to the fake of the session just created. The
 // fake's control FIFO is named by its own id, not gx's session id, so the one
 // new file (Claude) or new args log under the Codex home (Codex) is this session's.
-func (f sessionSeeder) controlSender(id, harness string, before, codexBefore []string) func(agentfake.Control) error {
+func (f sessionSeeder) controlSender(id, harness string) func(agentfake.Control) error {
 	return func(c agentfake.Control) error {
+		conv, err := f.conversationID(id)
+		if err != nil {
+			return err
+		}
 		if harness == "codex" {
-			fresh := slices.DeleteFunc(f.codexIDs(), func(name string) bool { return slices.Contains(codexBefore, name) })
-			if len(fresh) != 1 {
-				return fmt.Errorf("session %s: want one new codex fake, got %v", id, fresh)
-			}
-			return agentfake.SendProgramControl(fresh[0], c)
+			return agentfake.SendProgramControl(conv, c)
 		}
-		fresh := slices.DeleteFunc(f.controlFiles(), func(name string) bool { return slices.Contains(before, name) })
-		if len(fresh) != 1 {
-			return fmt.Errorf("session %s: want one new control file, got %v", id, fresh)
-		}
-		return agentfake.SendTUIControl(filepath.Join(f.root, "home"), strings.TrimSuffix(fresh[0], ".ctl"), c)
+		return agentfake.SendTUIControl(filepath.Join(f.root, "home"), conv, c)
 	}
+}
+
+// conversationID reads the session's conversation id from its meta, which is
+// also the fake's id. The id can change after the first report, so each call
+// reads it again, and an empty one is waited for.
+func (f sessionSeeder) conversationID(id string) (string, error) {
+	dir := filepath.Join(f.root, "data", "gx", "sessions", id)
+	for deadline := time.Now().Add(sessionWaitTimeout); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
+		if m, err := sessions.ReadMeta(dir); err == nil && m.ConversationID != "" {
+			return m.ConversationID, nil
+		}
+	}
+	return "", fmt.Errorf("session %s: no conversation id in its meta", id)
 }
 
 // prompt sends text to the session. The server's status lags the fake's turn,
@@ -417,26 +400,6 @@ func (f sessionSeeder) runCommandStep(id string, st commandStep, sendControl fun
 			count(chat, transcript.ChatKindCommand) > count(before, transcript.ChatKindCommand) &&
 			(!wantOutput || count(chat, transcript.ChatKindOutput) > count(before, transcript.ChatKindOutput))
 	})
-}
-
-// controlFiles lists the control FIFOs of the TUI fakes started so far.
-func (f sessionSeeder) controlFiles() []string {
-	paths, _ := filepath.Glob(agentfake.TUIControlPath(filepath.Join(f.root, "home"), "*"))
-	names := make([]string, len(paths))
-	for i, p := range paths {
-		names[i] = filepath.Base(p)
-	}
-	return names
-}
-
-// codexIDs lists the ids of the Codex fakes started so far.
-func (f sessionSeeder) codexIDs() []string {
-	paths, _ := filepath.Glob(codex.CodexArgsPath(filepath.Join(f.root, "home", ".codex"), "*"))
-	ids := make([]string, len(paths))
-	for i, p := range paths {
-		ids[i] = strings.TrimSuffix(filepath.Base(p), ".args")
-	}
-	return ids
 }
 
 // repoDir is the repo root the project's sessions run in.
