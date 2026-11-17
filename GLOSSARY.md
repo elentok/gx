@@ -689,8 +689,15 @@ Design, Triage, One-off or Other. _Avoid_: kind, agent kind (**Harness** keeps t
 
 ## Ticket Forking
 
-**Fork** — dividing a ticket into new sibling tickets mid-flight, when it turns out to be larger
-than its budget or mixes concerns that should merge separately. _Avoid_: Split.
+**Fork** — dividing a unit of work that has grown too big into new siblings. It has two kinds:
+a **ticket fork** and a **session fork**. _Avoid_: Split, Spin off.
+
+**Ticket fork** — dividing a ticket into new sibling tickets mid-flight, when it turns out to be
+larger than its budget or mixes concerns that should merge separately.
+
+**Session fork** — moving some topics of a chat or Design session into new chats or new Designs in
+the same Workspace, each starting from a brief, while the source session keeps the rest. It writes
+no `parent` edge: the brief names the source session.
 
 **Parent** — the ticket a forked ticket came from, or the code-review ticket that opened a fix
 ticket. Frontmatter field `parent`, written on the descendant at creation. This is the only
