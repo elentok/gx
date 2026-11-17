@@ -17,12 +17,9 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/elentok/gx/herdr"
 )
 
 var ensureActiveWorkspaceOnce sync.Once
@@ -270,98 +267,6 @@ func (w *Workspace) waitOutput(flag, value string, timeout time.Duration) {
 func (w *Workspace) Read() string {
 	w.t.Helper()
 	return string(run(w.t, "pane", "read", w.RootPaneID, "--source", "visible"))
-}
-
-// AgentStart starts an interactive agent (e.g. claude, or a fake standing in
-// for one — see testutil/agentfake) in the workspace's root pane via `herdr
-// agent start`. opts.Pane defaults to the workspace's root pane if unset.
-//
-// Even after PrependPath's own sentinel wait, herdr's "is this pane an
-// available shell" bookkeeping can still occasionally lag behind the shell
-// actually being ready — worse under a loaded test suite (many packages'
-// tests running concurrently) than in isolation. That surfaces here as a
-// transient agent_pane_busy error rather than at PrependPath. Retry a few
-// times with a short backoff before failing the test, the same tolerance
-// PrependPath already applies to the analogous race.
-func (w *Workspace) AgentStart(opts herdr.AgentStartOptions) herdr.Agent {
-	w.t.Helper()
-	if opts.Pane == "" {
-		opts.Pane = w.RootPaneID
-	}
-
-	const maxAttempts = 5
-	var agent herdr.Agent
-	var err error
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		agent, err = herdr.AgentStart(opts)
-		if err == nil {
-			return agent
-		}
-		if !strings.Contains(err.Error(), "agent_pane_busy") || attempt == maxAttempts {
-			w.t.Fatalf("herdrctl: agent start: %v", err)
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-	return agent
-}
-
-// AgentPrompt submits a prompt to an agent via `herdr agent prompt`.
-// opts.Target defaults to the workspace's root pane if unset.
-func (w *Workspace) AgentPrompt(opts herdr.AgentPromptOptions) herdr.Agent {
-	w.t.Helper()
-	if opts.Target == "" {
-		opts.Target = w.RootPaneID
-	}
-	agent, err := herdr.AgentPrompt(opts)
-	if err != nil {
-		w.t.Fatalf("herdrctl: agent prompt: %v", err)
-	}
-	return agent
-}
-
-// AgentWait blocks until an agent reaches one of the requested states via
-// `herdr agent wait`. opts.Target defaults to the workspace's root pane if
-// unset.
-func (w *Workspace) AgentWait(opts herdr.AgentWaitOptions) herdr.Agent {
-	w.t.Helper()
-	if opts.Target == "" {
-		opts.Target = w.RootPaneID
-	}
-	agent, err := herdr.AgentWait(opts)
-	if err != nil {
-		w.t.Fatalf("herdrctl: agent wait: %v", err)
-	}
-	return agent
-}
-
-// AgentGet reads an agent's current status without waiting for a transition
-// or submitting a prompt, via `herdr agent get`. target defaults to the
-// workspace's root pane if empty.
-func (w *Workspace) AgentGet(target string) herdr.Agent {
-	w.t.Helper()
-	if target == "" {
-		target = w.RootPaneID
-	}
-	agent, err := herdr.AgentGet(target)
-	if err != nil {
-		w.t.Fatalf("herdrctl: agent get: %v", err)
-	}
-	return agent
-}
-
-// AgentExplain reports which detection rule herdr's pane monitor matched for
-// target's current state, via `herdr agent explain`. target defaults to the
-// workspace's root pane if empty.
-func (w *Workspace) AgentExplain(target string) herdr.AgentExplainResult {
-	w.t.Helper()
-	if target == "" {
-		target = w.RootPaneID
-	}
-	result, err := herdr.AgentExplain(target)
-	if err != nil {
-		w.t.Fatalf("herdrctl: agent explain: %v", err)
-	}
-	return result
 }
 
 // sessionEnv is the env of the herdr session these tests run inside:

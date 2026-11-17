@@ -193,7 +193,7 @@ func TestEnterNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 	_ = updated
 }
 
-func TestOHidesTerminalMenuWhenHerdrUnavailable(t *testing.T) {
+func TestOHidesTerminalMenuWhenHerdrMultiplexerDown(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
 	repo, err := git.FindRepo(repoDir)
@@ -201,15 +201,25 @@ func TestOHidesTerminalMenuWhenHerdrUnavailable(t *testing.T) {
 		t.Fatalf("FindRepo: %v", err)
 	}
 
-	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalHerdr, HerdrUnavailable: true}, keymgr.Manager{})
+	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalHerdr, MultiplexerDown: true}, keymgr.Manager{})
 	m.ready = true
 	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk}}
 	resizeTable(&m.table, 100, 10)
 	m.table.SetRows(m.buildRows())
 
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	if _, ok := updated.(Model).modal.(modal.TerminalMenu); ok {
-		t.Fatalf("o entered the terminal menu with herdr unavailable")
+		t.Fatalf("o entered the terminal menu with the herdr multiplexer down")
+	}
+	if cmd == nil {
+		t.Fatalf("expected an info notification")
+	}
+	msg, ok := cmd().(notify.NotifyMsg)
+	if !ok || !strings.Contains(msg.Message, "herdr multiplexer is not answering") {
+		t.Fatalf("got %#v, want a message saying the herdr multiplexer is not answering", msg)
+	}
+	if strings.Contains(msg.Message, "use tmux, kitty, herdr or ghostty") {
+		t.Fatalf("message %q still shows the more-options text", msg.Message)
 	}
 }
 

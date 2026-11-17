@@ -3,32 +3,28 @@ package herdr
 import (
 	"os"
 	"testing"
-
-	"github.com/elentok/gx/testutil/herdrfake"
 )
 
-// A CLI with an explicit Env finds herdr on that Env's PATH and runs it with
-// that Env, while the process environment is untouched. This is the process
-// boundary itself, end to end, with no faked runCommand.
-func TestCLI_ConfiguredEnvFindsFakeHerdr(t *testing.T) {
-	_, env := herdrfake.StartEnv(t, func(argv []string) ([]byte, int) {
-		if len(argv) != 2 || argv[0] != "workspace" || argv[1] != "list" {
-			t.Errorf("argv = %v, want [workspace list]", argv)
-			return herdrfake.CommandError("unexpected command")
-		}
-		return herdrfake.Result(map[string]any{
-			"workspaces": []map[string]string{{"workspace_id": "ws-1", "label": "mylabel"}},
-		})
-	})
+// A CLI with an explicit Env finds herdr on that Env's PATH and runs it as a
+// real child process: the process boundary end to end. The process PATH is
+// emptied so only the stub can answer.
+func TestCLI_ConfiguredEnvFindsStubHerdr(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("HERDR_BIN_PATH", "")
+	old := fallbackDirs
+	fallbackDirs = nil
+	t.Cleanup(func() { fallbackDirs = old })
 
-	id, err := CLI{Env: append(os.Environ(), env...)}.FindWorkspace("mylabel")
+	cli, _ := stubHerdr(t, map[string]reply{
+		"workspace list": {out: `{"result":{"workspaces":[{"workspace_id":"ws-1","label":"mylabel"}]}}`},
+	})
+	cli.Env = append(os.Environ(), cli.Env...)
+
+	id, err := cli.FindWorkspace("mylabel")
 	if err != nil {
 		t.Fatalf("FindWorkspace() error = %v", err)
 	}
 	if id != "ws-1" {
 		t.Fatalf("FindWorkspace() = %q, want %q", id, "ws-1")
-	}
-	if got := os.Getenv("GX_HERDR_FAKE_HELPER_SOCKET"); got != "" {
-		t.Fatalf("StartEnv changed the process environment: socket = %q", got)
 	}
 }

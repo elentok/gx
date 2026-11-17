@@ -7,18 +7,12 @@ import (
 	"testing"
 )
 
-// herdrImporters are the packages still allowed to import the herdr package:
-// the adapter, its test tooling, the herdr-only TUI features, and the wiring
-// and herdr-only cleanup that haven't moved behind Runner yet. Shrink this
-// list, never grow it: a new caller goes through agentrunner.Runner.
+// herdrImporters are the packages still allowed to import the herdr package.
+// herdr is only a terminal multiplexer now: the worktrees tab opens a herdr
+// workspace, and the server preflight and TUI gate ping it. Shrink this list,
+// never grow it.
 var herdrImporters = []string{
-	"github.com/elentok/gx/cmd/doctor",
 	"github.com/elentok/gx/cmd/serverctl",
-	"github.com/elentok/gx/ralphloop/deps",
-	"github.com/elentok/gx/runnerbuild",
-	"github.com/elentok/gx/server/sched",
-	"github.com/elentok/gx/testutil/herdrctl",
-	"github.com/elentok/gx/ui/tickets/rowactions",
 	"github.com/elentok/gx/ui/worktrees/launch",
 }
 

@@ -1,18 +1,16 @@
 package herdr
 
 import (
-	"errors"
+	"slices"
 	"testing"
 )
 
 func TestFindWorkspace_ReturnsMatchingID(t *testing.T) {
-	withFakeCommand(t, func(args ...string) ([]byte, error) {
-		return []byte(`{"result":{"workspaces":[
-			{"workspace_id":"w1","label":"other"},
-			{"workspace_id":"w2","label":"my-epic"}
-		]}}`), nil
-	})
-	id, err := FindWorkspace("my-epic")
+	cli, _ := stubHerdr(t, map[string]reply{"workspace list": {out: `{"result":{"workspaces":[
+		{"workspace_id":"w1","label":"other"},
+		{"workspace_id":"w2","label":"my-epic"}
+	]}}`}})
+	id, err := cli.FindWorkspace("my-epic")
 	if err != nil {
 		t.Fatalf("FindWorkspace() error = %v", err)
 	}
@@ -22,10 +20,8 @@ func TestFindWorkspace_ReturnsMatchingID(t *testing.T) {
 }
 
 func TestFindWorkspace_NoMatch_ReturnsEmpty(t *testing.T) {
-	withFakeCommand(t, func(args ...string) ([]byte, error) {
-		return []byte(`{"result":{"workspaces":[{"workspace_id":"w1","label":"other"}]}}`), nil
-	})
-	id, err := FindWorkspace("my-epic")
+	cli, _ := stubHerdr(t, map[string]reply{"workspace list": {out: `{"result":{"workspaces":[{"workspace_id":"w1","label":"other"}]}}`}})
+	id, err := cli.FindWorkspace("my-epic")
 	if err != nil {
 		t.Fatalf("FindWorkspace() error = %v", err)
 	}
@@ -35,52 +31,59 @@ func TestFindWorkspace_NoMatch_ReturnsEmpty(t *testing.T) {
 }
 
 func TestFindWorkspace_ListError_Propagates(t *testing.T) {
-	withFakeCommand(t, func(args ...string) ([]byte, error) {
-		return nil, errors.New("boom")
-	})
-	if _, err := FindWorkspace("my-epic"); err == nil {
+	cli, _ := stubHerdr(t, map[string]reply{"workspace list": {out: "boom", exit: 1}})
+	if _, err := cli.FindWorkspace("my-epic"); err == nil {
 		t.Fatal("FindWorkspace() error = nil, want error")
 	}
 }
 
 func TestFindOrCreateWorkspace_Existing_Focuses(t *testing.T) {
-	var calls [][]string
-	withFakeCommand(t, func(args ...string) ([]byte, error) {
-		calls = append(calls, args)
-		if args[0] == "workspace" && args[1] == "list" {
-			return []byte(`{"result":{"workspaces":[{"workspace_id":"w2","label":"my-epic"}]}}`), nil
-		}
-		return []byte(`{"result":{"type":"workspace_focused","workspace_id":"w2"}}`), nil
+	cli, argv := stubHerdr(t, map[string]reply{
+		"workspace list":  {out: `{"result":{"workspaces":[{"workspace_id":"w2","label":"my-epic"}]}}`},
+		"workspace focus": {out: `{"result":{"type":"workspace_focused","workspace_id":"w2"}}`},
 	})
-	id, err := FindOrCreateWorkspace("my-epic", "/path")
+	id, err := cli.FindOrCreateWorkspace("my-epic", "/path")
 	if err != nil {
 		t.Fatalf("FindOrCreateWorkspace() error = %v", err)
 	}
 	if id != "w2" {
 		t.Fatalf("FindOrCreateWorkspace() = %q, want %q", id, "w2")
 	}
-	if len(calls) != 2 || calls[1][0] != "workspace" || calls[1][1] != "focus" || calls[1][2] != "w2" {
-		t.Fatalf("expected a workspace focus call, got calls = %v", calls)
+	if want := []string{"workspace list", "workspace focus w2"}; !slices.Equal(calls(t, argv), want) {
+		t.Fatalf("calls = %v, want %v", calls(t, argv), want)
 	}
 }
 
 func TestFindOrCreateWorkspace_Missing_Creates(t *testing.T) {
-	var calls [][]string
-	withFakeCommand(t, func(args ...string) ([]byte, error) {
-		calls = append(calls, args)
-		if args[0] == "workspace" && args[1] == "list" {
-			return []byte(`{"result":{"workspaces":[]}}`), nil
-		}
-		return []byte(`{"result":{"workspace":{"workspace_id":"w9"}}}`), nil
+	cli, argv := stubHerdr(t, map[string]reply{
+		"workspace list":   {out: `{"result":{"workspaces":[]}}`},
+		"workspace create": {out: `{"result":{"workspace":{"workspace_id":"w9"}}}`},
 	})
-	id, err := FindOrCreateWorkspace("my-epic", "/path")
+	id, err := cli.FindOrCreateWorkspace("my-epic", "/path")
 	if err != nil {
 		t.Fatalf("FindOrCreateWorkspace() error = %v", err)
 	}
 	if id != "w9" {
 		t.Fatalf("FindOrCreateWorkspace() = %q, want %q", id, "w9")
 	}
-	if len(calls) != 2 || calls[1][0] != "workspace" || calls[1][1] != "create" {
-		t.Fatalf("expected a workspace create call, got calls = %v", calls)
+	if want := []string{"workspace list", "workspace create --cwd /path --label my-epic --focus"}; !slices.Equal(calls(t, argv), want) {
+		t.Fatalf("calls = %v, want %v", calls(t, argv), want)
+	}
+}
+
+func TestPing_Answers(t *testing.T) {
+	cli, argv := stubHerdr(t, map[string]reply{"workspace list": {out: `{"result":{"workspaces":[]}}`}})
+	if err := cli.Ping(); err != nil {
+		t.Fatalf("Ping() error = %v", err)
+	}
+	if want := []string{"workspace list"}; !slices.Equal(calls(t, argv), want) {
+		t.Fatalf("calls = %v, want %v", calls(t, argv), want)
+	}
+}
+
+func TestPing_Fails(t *testing.T) {
+	cli, _ := stubHerdr(t, map[string]reply{"workspace list": {out: "server not running", exit: 1}})
+	if err := cli.Ping(); err == nil {
+		t.Fatal("Ping() error = nil, want error")
 	}
 }

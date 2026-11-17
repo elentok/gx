@@ -328,8 +328,8 @@ func serverDeps(dirs config.Dirs) *app.ServerDeps {
 	return &app.ServerDeps{Client: tui, Sessions: tui.Sessions, Admin: tui.Admin, Tickets: tui.Tickets, Queue: tui.Queue, Reads: tui.Reads, Build: getVersion(), Start: serverctl.Starter(dirs, c)}
 }
 
-// herdrUnavailable reports herdr missing from PATH or not answering. It is
-// independent of agent_runner: the herdr-only TUI features need herdr itself.
+// herdrUnavailable reports the herdr multiplexer missing from PATH or not
+// answering; the worktrees tab uses it to hide the terminal menu.
 var herdrUnavailable = func() bool {
 	if _, err := serverctl.LiveProbe.LookPath("herdr"); err != nil {
 		return true
@@ -339,7 +339,7 @@ var herdrUnavailable = func() bool {
 
 func settingsFromConfig(dirs config.Dirs, cfg config.Config) ui.Settings {
 	return ui.Settings{
-		HerdrUnavailable: herdrUnavailable(),
+		MultiplexerDown:  herdrUnavailable(),
 		UseNerdFontIcons: cfg.UseNerdFontIcons,
 		ImageDiffs:       cfg.ImageDiffs,
 		InputModalBottom: cfg.InputModalBottom,

@@ -28,8 +28,11 @@ func credentialOpen(open modal.Modal) bool {
 // herdrTerminalDown reports a herdr terminal whose herdr is missing or
 // unreachable: its splits and tabs would fail, so the menu stays hidden.
 func herdrTerminalDown(s ui.Settings) bool {
-	return s.Terminal == ui.TerminalHerdr && s.HerdrUnavailable
+	return s.Terminal == ui.TerminalHerdr && s.MultiplexerDown
 }
+
+// herdrDownInfo is shown by `o` when herdrTerminalDown holds.
+const herdrDownInfo = "the herdr multiplexer is not answering"
 
 func (m Model) enterTerminalMenuFor(name, path string) Model {
 	title := "Open in Terminal"

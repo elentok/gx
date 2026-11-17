@@ -222,7 +222,10 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case bindingOpenTerminal:
-		if m.settings.Terminal == ui.TerminalPlain || herdrTerminalDown(m.settings) {
+		if herdrTerminalDown(m.settings) {
+			return m, notify.Info(herdrDownInfo)
+		}
+		if m.settings.Terminal == ui.TerminalPlain {
 			return m, notify.Info(modal.MoreOptionsInfo)
 		}
 		wt := m.cursorWorktree()
