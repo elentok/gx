@@ -2,8 +2,7 @@ import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react"
 import { useCompletion } from "../commands/useCompletion"
 import type { CommandTarget, FetchCommands } from "../commands/useCommandList"
-import { modelName } from "../modelName"
-import { TIERS, type TierId } from "../tiers"
+import type { TierId } from "../tiers"
 import { useWide } from "../useWide"
 import { useConnectionContext, useConnectionState } from "../connection"
 import type { ProjectWorktrees } from "../generated/server"
@@ -19,16 +18,12 @@ import {
   type CreateSession,
   type FetchWorktrees,
 } from "./newSession"
+import { HARNESSES, tierOptions, type Harness } from "./tierOptions"
 import { trimmed, useNewSessionDraft, type NewSessionDraft } from "./useNewSessionDraft"
 import { baseName, WorktreePicker, type Option } from "./WorktreePicker"
 import { setLastProject, type DraftsClient } from "../design/drafts"
 import { useDefaultProject } from "../workspaces/defaultProject"
 
-type Harness = "claude" | "codex"
-const HARNESSES: { id: Harness; label: string }[] = [
-  { id: "claude", label: "Claude" },
-  { id: "codex", label: "Codex" },
-]
 const TRUNK_NAMES = ["main", "master"]
 
 /** The First prompt textarea with the `/` menu. The list is read for the chosen worktree, or the project root when one is being created. */
@@ -291,18 +286,11 @@ export function NewSessionForm({
                 appearance="none"
                 pr="8"
               >
-                {TIERS.map((t) => {
-                  // Older servers only expose Claude's tier models.
-                  const models =
-                    current?.tier_models?.[harness] ??
-                    (harness === "claude" ? current?.tiers : undefined)
-                  const model = models?.[t.id]
-                  return (
-                    <option key={t.id} value={t.id}>
-                      {model ? `${t.label} (${modelName(model, harness)})` : t.label}
-                    </option>
-                  )
-                })}
+                {tierOptions(current, harness).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
               </chakra.select>
             </Field>
             <Field label="First prompt" optional>

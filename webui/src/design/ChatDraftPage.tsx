@@ -1,6 +1,7 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
 import { lazy, Suspense, useEffect, useState, type FormEvent } from "react"
 import { useNavigate, useParams } from "react-router"
+import type { FetchWorktrees } from "../agents/newSession"
 import type { ChatDraft } from "../generated/server"
 import { agentPath } from "../hrefs"
 import { DetailPage } from "../page/DetailPage"
@@ -12,6 +13,7 @@ import { ModeText } from "../ui/expandable-text/ModeText"
 import { useReadyWhen } from "../useReady"
 import { useViMode } from "../vimode"
 import { realChatDrafts, type ChatDraftsClient } from "./chatDrafts"
+import { ChatDraftSettings } from "./ChatDraftSettings"
 import { DraftBanner } from "./DraftBanner"
 import { DraftFooter } from "./DraftFooter"
 import { field } from "./DraftHeader"
@@ -24,10 +26,12 @@ interface PageProps {
   /** The draft to open; the route's `:id` by default. */
   id?: string
   drafts?: ChatDraftsClient
+  /** Replaces the project list fetch, for tests. */
+  fetchTrees?: FetchWorktrees
 }
 
-/** The chat draft page: the brief of a chat that does not exist yet, autosaved until Remove. */
-export function ChatDraftPage({ drafts = realChatDrafts, ...props }: PageProps) {
+/** The chat draft page: the brief and launch settings of a chat that does not exist yet, autosaved until Remove. */
+export function ChatDraftPage({ drafts = realChatDrafts, fetchTrees, ...props }: PageProps) {
   const params = useParams()
   const id = props.id ?? params.id ?? ""
   const leaveGone = useLeaveGone(agentPath)
@@ -67,39 +71,42 @@ export function ChatDraftPage({ drafts = realChatDrafts, ...props }: PageProps) 
       </DetailPage>
     )
   }
-  return <ChatDraftForm key={loaded.id} drafts={drafts} initial={loaded} />
+  return <ChatDraftForm key={loaded.id} drafts={drafts} initial={loaded} fetchTrees={fetchTrees} />
 }
 
 const PLACEHOLDER = "What should the new chat start from?"
 
-function Fact({ name, value }: { name: string; value: string }) {
-  return (
-    <Box minW="0">
-      <Text as="dt" fontSize="xs" color="text.dim">
-        {name}
-      </Text>
-      <Text as="dd" fontSize="sm" truncate>
-        {value}
-      </Text>
-    </Box>
-  )
-}
-
-function folderText({ folder, worktree }: ChatDraft) {
-  if (folder === "worktree") return worktree ? `New worktree ${worktree}` : "New worktree"
-  return folder === "trunk" ? "Trunk checkout" : "Source folder"
-}
-
-function ChatDraftForm({ drafts, initial }: { drafts: ChatDraftsClient; initial: ChatDraft }) {
+function ChatDraftForm({
+  drafts,
+  initial,
+  fetchTrees,
+}: {
+  drafts: ChatDraftsClient
+  initial: ChatDraft
+  fetchTrees?: FetchWorktrees
+}) {
   const shell = useShell()
   const navigate = useNavigate()
   const leaveGone = useLeaveGone(agentPath)
-  const { facts, brief, edit, status, banner, bannerActions, remove, start, starting, startError } =
-    useChatDraftAutosave({ drafts, initial, onGone: leaveGone })
+  const {
+    facts,
+    brief,
+    edit,
+    settings,
+    editSettings,
+    status,
+    banner,
+    bannerActions,
+    remove,
+    start,
+    starting,
+    startError,
+  } = useChatDraftAutosave({ drafts, initial, onGone: leaveGone })
+  // An empty draft is a normal state: it opens with the placeholder and cannot start yet.
   const blocker = !brief.trim()
     ? "Write a brief to start."
     : status === "saving"
-      ? "Saving the brief..."
+      ? "Saving the draft..."
       : null
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
@@ -142,23 +149,12 @@ function ChatDraftForm({ drafts, initial }: { drafts: ChatDraftsClient; initial:
             </Text>
           )}
         </Box>
-        <Box
-          as="dl"
-          display="grid"
-          gridTemplateColumns="repeat(auto-fit, minmax(140px, 1fr))"
-          gap="3"
-          p="3"
-          borderBottomWidth="1px"
-          borderColor="hairline"
-          flexShrink="0"
-        >
-          <Fact name="Project" value={facts.project} />
-          <Fact name="Folder" value={folderText(facts)} />
-          <Fact name="Harness" value={facts.harness} />
-          <Fact name="Model" value={facts.model || "Default"} />
-          <Fact name="Effort" value={facts.effort || "Default"} />
-          <Fact name="Name" value={facts.name || "None"} />
-        </Box>
+        <ChatDraftSettings
+          settings={settings}
+          worktreePath={facts.worktree_path}
+          onChange={editSettings}
+          fetchTrees={fetchTrees}
+        />
         {banner && <DraftBanner actions={bannerActions} />}
         {viMode ? (
           <Box flex="1" minH="0" m="3" display="flex" flexDirection="column" gap="1">

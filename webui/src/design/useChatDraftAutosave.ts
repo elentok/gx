@@ -8,12 +8,35 @@ const RETRY_MS = 5000
 
 export type ChatSaveStatus = "none" | "saving" | "saved" | "unsaved"
 
+const SETTING_KEYS = [
+  "project",
+  "name",
+  "harness",
+  "model",
+  "effort",
+  "folder",
+  "worktree",
+] as const
+
+/** The launch settings of a chat draft, saved with the brief in one revision. */
+export type ChatSettings = Pick<ChatDraft, (typeof SETTING_KEYS)[number]>
+
+const settingsOf = (d: ChatDraft): ChatSettings => ({
+  project: d.project,
+  name: d.name,
+  harness: d.harness,
+  model: d.model,
+  effort: d.effort,
+  folder: d.folder,
+  worktree: d.worktree,
+})
+
 /** `editing` saves; `finished` is Remove, or a gone draft, having taken the draft over. */
 type Phase = "editing" | "finished"
 
 /**
- * The open chat draft's brief and its autosave: 800 ms after typing it saves with the draft's
- * revision, a stale revision raises the conflict banner, a failed save retries every 5 s, and
+ * The open chat draft's brief and settings and their autosave: 800 ms after an edit it saves the
+ * brief and the changed settings with the draft's revision, a stale revision raises the conflict banner, a failed save retries every 5 s, and
  * leaving the page flushes. `onGone` runs when the draft vanished (started or removed elsewhere).
  */
 export function useChatDraftAutosave({
@@ -30,9 +53,19 @@ export function useChatDraftAutosave({
   const [status, setStatus] = useState<ChatSaveStatus>("saved")
   const [banner, setBanner] = useState(false)
 
+  const [settings, setSettings] = useState(() => settingsOf(initial))
+
   const latest = useRef(brief)
-  // What the server last had, so an unchanged brief saves nothing.
-  const server = useRef({ revision: initial.revision, text: initial.brief })
+  const latestSettings = useRef(settings)
+  // What the server last had, so an unchanged draft saves nothing.
+  const server = useRef({
+    revision: initial.revision,
+    text: initial.brief,
+    settings: settingsOf(initial),
+  })
+  const changedKeys = () =>
+    SETTING_KEYS.filter((k) => latestSettings.current[k] !== server.current.settings[k])
+  const dirty = () => latest.current !== server.current.text || changedKeys().length > 0
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const chain = useRef<Promise<void>>(Promise.resolve())
   const phase = useRef<Phase>("editing")
@@ -52,22 +85,29 @@ export function useChatDraftAutosave({
     if (phase.current !== "editing") return
     const s = server.current
     const text = latest.current
-    if (text === s.text) {
+    const sent = { ...latestSettings.current }
+    const changed = changedKeys()
+    if (text === s.text && changed.length === 0) {
       setStatus("saved")
       return
     }
     let res
     try {
-      res = await drafts.save({ id: initial.id, brief: text, revision: s.revision })
+      res = await drafts.save({
+        id: initial.id,
+        brief: text,
+        revision: s.revision,
+        ...Object.fromEntries(changed.map((k) => [k, sent[k]])),
+      })
     } catch {
       setStatus("unsaved")
       return
     }
     if (phase.current !== "editing") return
     if (res.kind === "ok") {
-      Object.assign(s, { revision: res.draft.revision, text })
+      Object.assign(s, { revision: res.draft.revision, text, settings: sent })
       setFacts(res.draft)
-      setStatus(latest.current === text ? "saved" : "saving")
+      setStatus(dirty() ? "saving" : "saved")
     } else if (res.kind === "conflict") {
       blocked.current = true
       setBanner(true)
@@ -102,9 +142,16 @@ export function useChatDraftAutosave({
     loadTheirs: async () => {
       const theirs = await readServer().catch(() => undefined)
       if (!theirs) return
-      Object.assign(server.current, { revision: theirs.revision, text: theirs.brief })
+      const theirSettings = settingsOf(theirs)
+      Object.assign(server.current, {
+        revision: theirs.revision,
+        text: theirs.brief,
+        settings: theirSettings,
+      })
       latest.current = theirs.brief
+      latestSettings.current = theirSettings
       setBrief(theirs.brief)
+      setSettings(theirSettings)
       setFacts(theirs)
       setStatus("saved")
       resume()
@@ -150,12 +197,20 @@ export function useChatDraftAutosave({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status])
 
+  const touched = () => {
+    if (!blocked.current && dirty()) setStatus("saving")
+    clearTimeout(timer.current)
+    timer.current = setTimeout(flush, AUTOSAVE_MS)
+  }
   const edit = (next: string) => {
     setBrief(next)
     latest.current = next
-    if (!blocked.current && next !== server.current.text) setStatus("saving")
-    clearTimeout(timer.current)
-    timer.current = setTimeout(flush, AUTOSAVE_MS)
+    touched()
+  }
+  const editSettings = (patch: Partial<ChatSettings>) => {
+    latestSettings.current = { ...latestSettings.current, ...patch }
+    setSettings(latestSettings.current)
+    touched()
   }
 
   /** Removes the draft: stops saving and deletes it once a save in flight is done. */
@@ -198,5 +253,18 @@ export function useChatDraftAutosave({
     }
   }
 
-  return { facts, brief, edit, status, banner, bannerActions, remove, start, starting, startError }
+  return {
+    facts,
+    brief,
+    edit,
+    settings,
+    editSettings,
+    status,
+    banner,
+    bannerActions,
+    remove,
+    start,
+    starting,
+    startError,
+  }
 }

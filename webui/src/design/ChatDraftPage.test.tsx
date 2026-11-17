@@ -2,7 +2,12 @@ import { act, cleanup, fireEvent, screen } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { MemoryRouter, Route, Routes, useLocation } from "react-router"
 import { ConnectionContext, type Connection } from "../connection"
-import { EventChatDraftsChanged, type ChatDraft } from "../generated/server"
+import {
+  EventChatDraftsChanged,
+  type ChatDraft,
+  type ChatDraftSaveRequest,
+  type ProjectWorktrees,
+} from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { ChatDraftPage } from "./ChatDraftPage"
 import type { ChatDraftOutcome, ChatDraftsClient, ChatStartOutcome } from "./chatDrafts"
@@ -32,8 +37,9 @@ function fakeDrafts(over: Partial<ChatDraft> = {}) {
     label: "split-auth",
     ...over,
   }
-  const save = vi.fn(async (body: { brief: string }): Promise<ChatDraftOutcome> => {
-    Object.assign(stored, { brief: body.brief, revision: stored.revision + 1 })
+  const save = vi.fn(async (body: ChatDraftSaveRequest): Promise<ChatDraftOutcome> => {
+    const { id: _id, revision: _revision, ...rest } = body
+    Object.assign(stored, rest, { revision: stored.revision + 1 })
     return { kind: "ok", draft: { ...stored } }
   })
   const remove = vi.fn(async (): Promise<ChatDraftOutcome> => ({ kind: "deleted" }))
@@ -56,6 +62,17 @@ function Where() {
 }
 const where = () => screen.getByTestId("where").textContent
 
+const trees = async (): Promise<ProjectWorktrees[]> => [
+  {
+    project: "gx",
+    root: "/r/gx",
+    worktrees: [],
+    tiers: {},
+    tier_models: { claude: { worker: "opus" } },
+  },
+  { project: "other", root: "/r/other", worktrees: [], tiers: {} },
+]
+
 async function mount(fake: ReturnType<typeof fakeDrafts>, viMode = false) {
   const listeners = new Set<(address: string, type: string) => void>()
   const connState = { snapshot: { sessions: [], vi_mode: viMode } }
@@ -75,7 +92,10 @@ async function mount(fake: ReturnType<typeof fakeDrafts>, viMode = false) {
           <Routes>
             <Route path="/epics" element={<Where />} />
             <Route path="/agents/*" element={<Where />} />
-            <Route path="*" element={<ChatDraftPage id="c1" drafts={fake.client} />} />
+            <Route
+              path="*"
+              element={<ChatDraftPage id="c1" drafts={fake.client} fetchTrees={trees} />}
+            />
           </Routes>
         </MemoryRouter>
       </ConnectionContext.Provider>,
@@ -107,7 +127,7 @@ test("Start is disabled for a blank brief and while a save is in flight, and say
   expect(screen.getByText("Write a brief to start.")).toBeTruthy()
   typeBrief("Something")
   expect(startButton().disabled).toBe(true)
-  expect(screen.getByText("Saving the brief...")).toBeTruthy()
+  expect(screen.getByText("Saving the draft...")).toBeTruthy()
   await wait(800)
   expect(startButton().disabled).toBe(false)
 })
@@ -131,19 +151,70 @@ test("a failed Start shows the error and the worktree, keeps the brief, and Star
   expect(where()).toBe("/agents/sess-9 ")
 })
 
-test("the facts and the brief render and Start is enabled", async () => {
+const control = (name: string) =>
+  screen.getByLabelText(name) as HTMLInputElement | HTMLSelectElement
+
+test("the settings and the brief render and Start is enabled", async () => {
   await mount(fakeDrafts())
-  for (const text of [
-    "gx",
-    "claude",
-    "opus",
-    "high",
-    "split-auth",
-    "New worktree split-auth-abc123",
-  ])
-    expect(screen.getAllByText(text).length).toBeGreaterThan(0)
+  expect(control("Project").value).toBe("gx")
+  expect(control("Folder").value).toBe("worktree")
+  expect(control("Worktree name").value).toBe("split-auth-abc123")
+  expect(control("Harness").value).toBe("claude")
+  expect(control("Model").value).toBe("opus")
+  expect(control("Effort").value).toBe("high")
+  expect(control("Name").value).toBe("split-auth")
   expect(brief().value).toBe("Split the auth work out.")
   expect(startButton().disabled).toBe(false)
+})
+
+test.each([
+  ["Project", "other", { project: "other" }],
+  ["Folder", "trunk", { folder: "trunk" }],
+  ["Worktree name", "fresh", { worktree: "fresh" }],
+  ["Harness", "codex", { harness: "codex" }],
+  ["Model", "", { model: "" }],
+  ["Effort", "max", { effort: "max" }],
+  ["Name", "renamed", { name: "renamed" }],
+])("changing %s saves once with the revision and only that field", async (label, value, body) => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts()
+  await mount(fake)
+  fireEvent.change(control(label), { target: { value } })
+  await wait(800)
+  expect(fake.save).toHaveBeenCalledTimes(1)
+  expect(fake.save).toHaveBeenCalledWith({
+    id: "c1",
+    brief: "Split the auth work out.",
+    revision: 3,
+    ...body,
+  })
+})
+
+test("a stale revision on a settings change shows the banner", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts()
+  fake.save.mockResolvedValueOnce({ kind: "conflict" })
+  await mount(fake)
+  fireEvent.change(control("Effort"), { target: { value: "low" } })
+  await wait(800)
+  expect(screen.getByText("This draft changed on another device.")).toBeTruthy()
+})
+
+test("an empty draft opens with the placeholder, a disabled Start and its blocker", async () => {
+  await mount(fakeDrafts({ brief: "", name: "", model: "", effort: "", label: "Untitled chat" }))
+  expect(brief().value).toBe("")
+  expect(brief().placeholder).toBe("What should the new chat start from?")
+  expect(startButton().disabled).toBe(true)
+  expect(screen.getByText("Write a brief to start.")).toBeTruthy()
+  expect(control("Model").value).toBe("")
+  fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+  expect(screen.getByText("Remove this draft?")).toBeTruthy()
+})
+
+test("once Start made a worktree the folder is that worktree and cannot be edited", async () => {
+  await mount(fakeDrafts({ worktree_path: "/work/split-auth-abc123" }))
+  expect(screen.queryByLabelText("Folder")).toBeNull()
+  expect(screen.getByText("Worktree /work/split-auth-abc123")).toBeTruthy()
 })
 
 test("typing saves after 800 ms with the draft's revision", async () => {
