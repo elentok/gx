@@ -51,7 +51,8 @@ jobs:
 
       - name: Test
         # make test runs the race packages, every other package, the server
-        # package and the web unit tests side by side (scripts/test.sh). Each Go
+        # package and the web unit tests side by side, then the 240-process burst
+        # test alone as the last step (scripts/test.sh). Each Go
         # step keeps -timeout=10m per package: CI runners' lower core counts
         # give concurrency-sensitive tests (e.g. pause/resume against a permit cap)
         # more room to legitimately run long; 2m and 5m both timed out on tests

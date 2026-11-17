@@ -4,25 +4,41 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
 
 // stubGX is what the stubbed `go build -o` installs as the gx binary. The "go"
 // step (a go-test run that is neither -race nor ./server) waits for the e2e
-// step's marker, so it only finishes if the two overlap.
+// step's marker, so it only finishes if the two overlap. Every non-burst step
+// leaves "<name>.ended" after a short delay; the burst step (the run with -run
+// naming the burst test) records which of those exist when it starts.
 const stubGX = `#!/usr/bin/env bash
 case " $* " in
-*" -race "*|*" ./server "*) exit 0 ;;
+*" -run ^TestProcessBurst"*)
+	ls "$STUB_DIR" | grep '\.ended$' >"$STUB_DIR/burst.saw" || true
+	exit "${BURST_EXIT:-0}"
+	;;
+*" -race "*) step=race ;;
+*" ./server/... "*) step=server ;;
+*)
+	step=go
+	echo "$*" >"$STUB_DIR/go.args"
+	;;
 esac
-if [[ -n ${WAIT_FOR_E2E:-} ]]; then
+if [[ $step == go && -n ${WAIT_FOR_E2E:-} ]]; then
 	for _ in $(seq 100); do
-		[[ -e "$STUB_DIR/e2e.started" ]] && exit 0
+		[[ -e "$STUB_DIR/e2e.started" ]] && break
 		sleep 0.1
 	done
-	echo "e2e never started while go was running" >&2
-	exit 1
+	if [[ ! -e "$STUB_DIR/e2e.started" ]]; then
+		echo "e2e never started while go was running" >&2
+		exit 1
+	fi
 fi
+sleep 0.3
+touch "$STUB_DIR/$step.ended"
 `
 
 const stubGo = `#!/usr/bin/env bash
@@ -38,9 +54,15 @@ esac
 
 const stubMake = `#!/usr/bin/env bash
 case $1 in
-web-test) echo "$*" >"$STUB_DIR/web-test.args" ;;
+web-test)
+	echo "$*" >"$STUB_DIR/web-test.args"
+	sleep 0.3
+	touch "$STUB_DIR/web.ended"
+	;;
 web-e2e)
 	touch "$STUB_DIR/e2e.started"
+	sleep 0.3
+	touch "$STUB_DIR/e2e.ended"
 	exit "${E2E_EXIT:-0}"
 	;;
 esac
@@ -117,4 +139,75 @@ func TestTestSh_E2EOffByDefault(t *testing.T) {
 	if code != 0 || strings.Contains(out, "e2e") {
 		t.Errorf("e2e ran without GX_TEST_E2E (exit %d):\n%s", code, out)
 	}
+}
+
+func TestTestSh_BurstStartsAfterEveryOtherStepEnded(t *testing.T) {
+	out, code, stubs := runTestSh(t, "GX_TEST_E2E=1")
+	if code != 0 {
+		t.Fatalf("exit %d:\n%s", code, out)
+	}
+	if !strings.Contains(out, "PASS burst") {
+		t.Errorf("no burst status line:\n%s", out)
+	}
+	saw, err := os.ReadFile(filepath.Join(stubs, "burst.saw"))
+	if err != nil {
+		t.Fatalf("the burst step never ran: %v\n%s", err, out)
+	}
+	for _, step := range []string{"race", "go", "server", "web", "e2e"} {
+		if !strings.Contains(string(saw), step+".ended") {
+			t.Errorf("burst started before %s ended; ended then: %q", step, saw)
+		}
+	}
+}
+
+func TestTestSh_FailingBurstFailsRun(t *testing.T) {
+	out, code, _ := runTestSh(t, "BURST_EXIT=1")
+	if code == 0 {
+		t.Fatalf("want non-zero exit:\n%s", out)
+	}
+	if !strings.Contains(out, "FAIL burst") {
+		t.Errorf("no failing burst line:\n%s", out)
+	}
+}
+
+func TestTestSh_GoStepSkipsBurstTest(t *testing.T) {
+	out, code, stubs := runTestSh(t)
+	if code != 0 {
+		t.Fatalf("exit %d:\n%s", code, out)
+	}
+	args, err := os.ReadFile(filepath.Join(stubs, "go.args"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(args), "-skip ^"+burstTestName(t)+"$") {
+		t.Errorf("go step args = %q, want -skip for the burst test", args)
+	}
+}
+
+// burstTestName reads the burst test's name from test.sh and checks it is a
+// real test function in storm_test.go, so a rename fails here instead of
+// putting the burst test back in the go step or dropping it.
+func burstTestName(t *testing.T) string {
+	t.Helper()
+	script, err := os.ReadFile("test.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`(?m)^burst_test=(\w+)$`).FindSubmatch(script)
+	if m == nil {
+		t.Fatal("test.sh has no burst_test=<name> line")
+	}
+	name := string(m[1])
+	storm, err := os.ReadFile(filepath.Join("..", "testutil", "gxfixture", "storm_test.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(storm), "func "+name+"(t *testing.T)") {
+		t.Fatalf("test.sh burst_test=%s is not a test in testutil/gxfixture/storm_test.go", name)
+	}
+	return name
+}
+
+func TestTestSh_BurstTestNameIsARealTest(t *testing.T) {
+	burstTestName(t)
 }

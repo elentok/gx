@@ -15,6 +15,9 @@
 #   web     make web-test (install, tsc, vitest with 3 workers)
 #   e2e     make web-e2e (Playwright); only with GX_TEST_E2E=1, which `gx check
 #           --full` sets. `make test` (CI) leaves it off: CI runs web-e2e as its own job.
+#   burst   the 240-process burst test, alone: it starts after every step above
+#           has ended, because its processes count against their process limit.
+#           The go step skips it.
 #
 # -timeout=10m per package: CI runners' lower core counts give
 # concurrency-sensitive tests more room to run long. -count=1 keeps the test
@@ -63,6 +66,11 @@ names=(race go server web)
 if [[ ${GX_TEST_E2E:-} == 1 ]]; then
 	names+=(e2e)
 fi
+names+=(burst)
+
+# Kept in one variable: the go step skips it, the burst step runs it, and
+# scripts/test_sh_test.go checks it names a real test.
+burst_test=TestProcessBurstUnderDefaultLimitsIsNotKilledAndTheTicketFinishes
 
 # run_step <name> <command...>: writes the command's output to $work/<name>.log
 # and its exit status and wall time to $work/<name>.status.
@@ -80,7 +88,7 @@ run_step() {
 # budget; e2e (GX_TEST_E2E=1 only) is on top, its Playwright workers unbudgeted.
 run_step race env GOMAXPROCS=1 "$gx" brief go-test -race -timeout=10m -count=1 "${race_pkgs[@]}" &
 pids=("$!")
-run_step go "$gx" brief go-test -timeout=10m -count=1 "${other_pkgs[@]}" &
+run_step go "$gx" brief go-test -timeout=10m -count=1 -skip "^${burst_test}\$" "${other_pkgs[@]}" &
 pids+=("$!")
 run_step server "$gx" brief go-test -timeout=10m -count=1 ./server/... &
 pids+=("$!")
@@ -93,6 +101,9 @@ fi
 for pid in "${pids[@]}"; do
 	wait "$pid" || true
 done
+
+# Alone: the burst's 240 processes would count against the siblings' limit.
+run_step burst "$gx" brief go-test -timeout=10m -count=1 -run "^${burst_test}\$" ./testutil/gxfixture
 
 failed=()
 for name in "${names[@]}"; do
