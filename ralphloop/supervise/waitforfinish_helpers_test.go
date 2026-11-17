@@ -1,19 +1,11 @@
 package supervise
 
 import (
-	"os"
-
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
-
-// withProcessEnv is the process environment with a fake herdr's entries
-// layered over it, for DepsOverrides.Env.
-func withProcessEnv(fakeEnv []string) []string {
-	return append(os.Environ(), fakeEnv...)
-}
 
 // blockedRunner is idleRunner with its session blocked.
 func blockedRunner(label string) *runnerfake.Runner {

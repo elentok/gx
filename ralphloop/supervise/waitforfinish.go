@@ -26,7 +26,7 @@ var waitForFinishStates = append(append([]agentrunner.State{}, RunnerFinishState
 // FinishDebounceMs is how long WaitForFinish and finishIteration each pause
 // before re-checking a just-reached "finished" signal, and FinishConfirmMs is
 // how long that recheck waits for the agent to prove it's still finished.
-// herdr's idle/done status reflects pane output settling, not a genuine
+// the runner's idle/done status reflects output settling, not a genuine
 // end-of-turn signal, so an agent that briefly stops producing output mid-turn
 // (e.g. between its last tool call and a commit) can look finished for an
 // instant. Without this debounce the loop would declare the iteration done,
@@ -221,7 +221,7 @@ func guardTick(d deps.Deps, p LaunchParams, sessionID string, vcap *VerifyCap, r
 // elapses without the pane confirming completion, waitForCompactionSignal
 // starts consulting the transcript's compaction-boundary signal on every
 // further poll tick (see smartZoneCompactExtendedTimeoutMs) instead of
-// declaring failure immediately — a herdr pane-status observation gap is not
+// declaring failure immediately — a pane-status observation gap is not
 // the same thing as compaction actually being stuck.
 const smartZoneCompactTimeoutMs = 300_000
 
@@ -548,7 +548,7 @@ const (
 // go idle mid-compaction, and trusting that report is what let the finish-up
 // prompt merge as queued input and cancel the compaction outright. A pane-status
 // wait that keeps timing out past smartZoneCompactTimeoutMs is conversely still
-// reported as success once the count advances, since a herdr observation gap is
+// reported as success once the count advances, since a pane-status observation gap is
 // not a stuck compaction. A transcript that can't be read at all right now
 // proves nothing either way, so it holds the gate closed and consumes the
 // extended bound like any other unconfirmed tick. The baseline itself is fixed
@@ -632,7 +632,7 @@ func ConfirmFinished(d deps.Deps, in *PersonInput, s agentrunner.Session, until 
 // WaitForBackgroundTasks gates ConfirmFinished's conclusion on any
 // outstanding-fresh backgrounded-shell-command marker in the Claude
 // transcript: a pane that looks idle/done while a background task it started
-// is still running is not actually finished, even though herdr's own status
+// is still running is not actually finished, even though the runner's own status
 // (and the FinishDebounceMs re-check already applied by the caller) agree it
 // looks so. Mirrors how compactBoundarySnapshot/stickyBaseline gate a
 // premature idle report during smart-zone recovery — an unreadable/
@@ -671,7 +671,7 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 		reading := backgroundtask.Resolve(backgroundtask.PidUnknown, tr, nil)
 
 		// The pane can still read idle while a notification-woken turn runs
-		// quick tool calls, so the transcript's turn end decides, not herdr.
+		// quick tool calls, so the transcript's turn end decides, not the runner.
 		gated = gated || reading.AwaitingTurnEnd
 		// A finished report with an ended turn settles the agent: a task that
 		// started before the report is not waited on.

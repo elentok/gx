@@ -80,7 +80,7 @@ func assertLaunchFailure(t *testing.T, err error, kind events.Kind) {
 	}
 }
 
-// nudgingRunner reports decisions on every PromptNudged, as herdr and pty do
+// nudgingRunner reports decisions on every PromptNudged, as pty does
 // on a launch prompt the agent didn't pick up at once.
 type nudgingRunner struct {
 	agentrunner.Runner

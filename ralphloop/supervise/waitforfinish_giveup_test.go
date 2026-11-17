@@ -145,6 +145,81 @@ func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 	}
 }
 
+// finishUpGuardRunner refuses the finish-up prompt while boundaryMerged is
+// false and records that it was asked, so a gate that lets the finish-up out
+// early is observable.
+type finishUpGuardRunner struct {
+	*fakes.BlipRunner
+	boundaryMerged func() bool
+	earlyAttempt   bool
+}
+
+func (r *finishUpGuardRunner) Prompt(s agentrunner.Session, text string) error {
+	if strings.Contains(text, "please finish up quickly") && !r.boundaryMerged() {
+		r.earlyAttempt = true
+		return errors.New("finish-up queued as input before the compaction boundary")
+	}
+	return r.BlipRunner.Prompt(s, text)
+}
+
+// TestWaitForFinish_PrematureIdleCompactEndsAtTheLateBoundary covers the
+// compactGateConfirmed route end to end: the agent reads idle the moment
+// "/compact" is prompted, the boundary merges a few polls later, and only then
+// may the finish-up prompt go out.
+func TestWaitForFinish_PrematureIdleCompactEndsAtTheLateBoundary(t *testing.T) {
+	t.Parallel()
+	const boundaryAfterSleeps = 3
+	sleeps := 0
+	boundaryMerged := func() bool { return sleeps >= boundaryAfterSleeps }
+	inner := fakes.BoundGiveUpRunner(nil)
+	inner.TimeoutIf = func(wait int) bool { return wait == 1 }
+	r := &finishUpGuardRunner{BlipRunner: inner, boundaryMerged: boundaryMerged}
+	d := deps.Deps{
+		Runner:        r,
+		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			if boundaryMerged() {
+				return 1, true, nil
+			}
+			return 0, true, nil
+		},
+		Sleep: func(time.Duration) { sleeps++ },
+	}
+	scratchDir := fixture.EpicScratchDir(t, "epic")
+	p := boundGiveUpParams()
+	p.ScratchDir, p.EpicName = scratchDir, "epic"
+
+	if err := WaitForFinish(d, p, "sess-19"); err != nil {
+		t.Fatalf("WaitForFinish: %v, want nil", err)
+	}
+	if r.earlyAttempt {
+		t.Error("finish-up prompt attempted before the compaction boundary merged: the gate let the premature idle through")
+	}
+	prompts := r.Prompts("iter-19")
+	if len(prompts) != 2 || prompts[0] != "/compact" || !strings.Contains(prompts[1], "please finish up quickly") {
+		t.Errorf("prompts = %v, want [/compact, finish-up]", prompts)
+	}
+
+	evs, ok, err := runlog.ReadEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
+	}
+	seen := map[string]bool{}
+	for _, e := range evs {
+		seen[e.Type] = true
+	}
+	for _, want := range []eventsc.Type{eventsc.Resumed, eventsc.SmartZoneGateReleased} {
+		if !seen[string(want)] {
+			t.Errorf("missing %s event", want)
+		}
+	}
+	for _, unwanted := range []eventsc.Type{eventsc.SmartZoneRecoveryFailed, eventsc.SmartZoneWaitExpired} {
+		if seen[string(unwanted)] {
+			t.Errorf("unexpected %s event", unwanted)
+		}
+	}
+}
+
 // TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets covers the
 // discrimination the reset is easy to get backwards on: recoverSmartZoneBreach
 // reports a failed finish-up prompt as (false, nil), so a reset keyed on a nil

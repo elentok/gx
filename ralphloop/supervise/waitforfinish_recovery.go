@@ -89,11 +89,9 @@ var ErrBlockedPanePaused = errors.New("iteration paused: pane blocked on an unan
 // operator's own pending dialog would be the destructive interrupt this path
 // exists to avoid.
 //
-// This whole gate rests on herdr's pane monitor still recognizing a blocked
-// Claude form as `agent_status: blocked` — that recognition lives outside
-// this repo and can silently regress on a Claude Code or herdr upgrade. See
-// docs/runbooks/blocked-form-regression-check.md for the (necessarily
-// interactive, via `gx doctor --check-blocked-form`) way to check it.
+// This whole gate rests on the runner's blocked state: for PTY Claude the pid
+// status `waiting`, for headless a pending permission request. That state can
+// silently regress on a Claude Code upgrade; `gx claude doctor` checks it.
 func DwellThenPauseBlocked(d deps.Deps, p LaunchParams, runner, sessionID string) (reason string, paused bool, err error) {
 	d.Sleep(BlockedDwellMs * time.Millisecond)
 

@@ -10,9 +10,9 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// SessionOrDefault is the Runner session hosting the agent. Herdr-only paths
-// (reattach, attach to a live agent) leave Session zero; herdrrunner's
-// Session.ID is the pane id, so those still address the right agent.
+// SessionOrDefault is the Runner session hosting the agent. Paths that
+// reattach to a live agent leave Session zero, and fall back to a session
+// addressed by Label and Pane.
 func (p LaunchParams) SessionOrDefault() agentrunner.Session {
 	if p.Session != (agentrunner.Session{}) {
 		return p.Session
@@ -29,7 +29,7 @@ type LaunchParams struct {
 	Model  string
 	Effort string
 	// Session is the Runner session hosting the agent, for a fresh launch
-	// started through Deps.Runner; zero on the herdr-only paths.
+	// started through Deps.Runner; zero on paths that only reattach.
 	Session agentrunner.Session
 	Pane    string // pane id to launch the agent in and send the prompt to
 	Prompt  string // initial skill prompt text
@@ -161,8 +161,8 @@ var PlainFinishStates = []string{"idle", "done"}
 // RunnerFinishStates is PlainFinishStates for Runner.Wait.
 var RunnerFinishStates = []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}
 
-// AlreadyFinished reports whether status (a herdr tab's current agent_status,
-// e.g. from TabList) already matches one of WaitForFinish's plain-completion
+// AlreadyFinished reports whether status (the agent's current state name)
+// already matches one of WaitForFinish's plain-completion
 // target states. "blocked" is deliberately excluded even though WaitForFinish
 // treats it as a finish state of its own — a pane already sitting blocked at
 // reattach still needs WaitForFinish's dwell-and-pause handling, not a bare

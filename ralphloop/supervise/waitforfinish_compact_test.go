@@ -2,17 +2,20 @@ package supervise
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/ralphloop/internal/fakes"
 	"github.com/elentok/gx/ralphloop/internal/fixture"
 	"github.com/elentok/gx/ralphloop/runlog"
+	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
@@ -65,7 +68,7 @@ func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 }
 
 // TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction verifies the
-// gap from research ticket 05: herdr's pane-status wait for "/compact" can
+// gap from research ticket 05: the runner's status wait for "/compact" can
 // keep timing out past smartZoneCompactTimeoutMs even though the compact is
 // genuinely still running, not stuck. Once the transcript's compaction-
 // boundary count rises above its pre-compact baseline, recovery must treat
@@ -129,7 +132,7 @@ func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
 }
 
 // TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait
-// verifies the other half of the same gap: when neither herdr's pane status
+// verifies the other half of the same gap: when neither the runner's status
 // nor the transcript's compaction-boundary count ever show completion, the
 // wait must eventually give up (at smartZoneCompactExtendedTimeoutMs) and
 // report a genuine failure, not poll forever.
@@ -646,5 +649,70 @@ func TestWaitForFinish_PropagatesNonGatedRecoveryErrors(t *testing.T) {
 	err := WaitForFinish(d, boundGiveUpParams(), "sess-19")
 	if err == nil || !strings.Contains(err.Error(), "pane is gone") {
 		t.Fatalf("WaitForFinish error = %v, want the transport failure propagated, not absorbed", err)
+	}
+}
+
+// compactAttemptCounter counts "/compact" prompts, including the ones the
+// fake rejects, which runnerfake does not record.
+type compactAttemptCounter struct {
+	*runnerfake.Runner
+	attempts int
+}
+
+func (r *compactAttemptCounter) Prompt(s agentrunner.Session, text string) error {
+	if text == "/compact" {
+		r.attempts++
+	}
+	return r.Runner.Prompt(s, text)
+}
+
+// TestRecoverSmartZoneBreach_CodexBlockedAtCompactSubmission pins that a Codex
+// session blocked at the "/compact" submission itself is a reported but
+// nonfatal recovery failure: the run neither pauses nor aborts.
+func TestRecoverSmartZoneBreach_CodexBlockedAtCompactSubmission(t *testing.T) {
+	t.Parallel()
+	const smartZone = 100
+	r := &compactAttemptCounter{Runner: fakes.IdleRunner("iter-09")}
+	r.FailNextPrompts("iter-09", 1, fmt.Errorf("%w: blocked", agentrunner.ErrNotReady))
+	scratchDir := fixture.EpicScratchDir(t, "epic")
+	d := deps.Deps{Runner: r, Sleep: func(time.Duration) {}, Now: func() time.Time { return time.Unix(0, 0) }}
+
+	recovered, err := recoverSmartZoneBreach(d, LaunchParams{
+		Label:      "iter-09",
+		Agent:      agent.AgentCodex,
+		Pane:       "pane-1",
+		SessionCwd: "/repo/iter-09",
+		SmartZone:  smartZone,
+		Gate:       NewGate(),
+		Ticket:     "09",
+		ScratchDir: scratchDir,
+		EpicName:   "epic",
+	}, "sess-09", "context occupancy 150 exceeds --smart-zone 100", smartZone)
+	if err != nil {
+		t.Fatalf("recoverSmartZoneBreach() error = %v, want nil: a blocked /compact is a failed recovery, not a failed iteration", err)
+	}
+	if recovered {
+		t.Error("recoverSmartZoneBreach() recovered = true, want false: the session never accepted /compact")
+	}
+	if r.attempts != 1 {
+		t.Errorf("/compact prompts = %d, want exactly 1", r.attempts)
+	}
+
+	events, ok, err := runlog.ReadEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
+	}
+	seen := map[string]bool{}
+	for _, e := range events {
+		seen[e.Type] = true
+	}
+	if !seen[string(eventsc.SmartZoneRecoveryFailed)] {
+		t.Error("missing smart-zone-recovery-failed event")
+	}
+	if seen[string(eventsc.Paused)] {
+		t.Error("paused event emitted, want none: a single failed recovery must not abort the run")
+	}
+	if seen[string(eventsc.Resumed)] {
+		t.Error("resumed event emitted, want none: nothing recovered")
 	}
 }
