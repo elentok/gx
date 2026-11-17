@@ -182,6 +182,25 @@ func TestGxForkSkill(t *testing.T) {
 	}
 }
 
+func TestGxForkSkillSettingsAppendAndSlug(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-fork/SKILL.md"))
+	for _, want := range []string{
+		"`--harness <harness> --model <model> --effort <effort>`, always",
+		`gx tickets section --append <project:epic> "Forked out" -`,
+		"also propose a slug",
+		"with the slug from the approved card",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("gx-fork/SKILL.md lacks %q", want)
+		}
+	}
+	for _, bad := range []string{"when they differ from the source's", `"Forked out" --append`} {
+		if strings.Contains(text, bad) {
+			t.Errorf("gx-fork/SKILL.md still has %q", bad)
+		}
+	}
+}
+
 func TestGxPromoteToDesignSkill(t *testing.T) {
 	text := collapseSpace(readFile(t, "gx-promote-to-design/SKILL.md"))
 	for _, want := range []string{

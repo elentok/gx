@@ -37,12 +37,13 @@ project, `dir`, harness, name, model and effort from the same row.
    group them or pick 5 before any card. The command may name the kind (chat or Design) and the folder.
 2. **Propose** a kind per topic, a short name per topic and a folder per chat fork. The folder is the
    source's folder by default, the trunk checkout when the source is a Design session, and a new
-   worktree from trunk only when the command asks.
+   worktree from trunk only when the command asks. For each Design topic also propose a slug: lowercase,
+   hyphenated, short, taken from the topic. It goes on the approval card.
 3. **Write every brief** by [gx-handoff](../gx-handoff.md), before any card. Sibling briefs name each
    other by topic and chat name, never a link.
 4. **Run `gx agent actionable`** so the session shows Actionable while the cards wait.
 5. **One yes-no approval card per fork** in the `gx-grilling` format, with a note. Show the topic, the
-   kind, the folder and the first lines of the brief. A note instead of Yes means redraft that fork,
+   kind, the folder (or the slug, for a Design) and the first lines of the brief. A note instead of Yes means redraft that fork,
    then ask again with a new card. No draft exists before its card is approved, and a refused fork gets
    none. The cards are the last thing in the turn: no tool call, no text after them.
 6. **Save each approved fork**, in order.
@@ -50,14 +51,16 @@ project, `dir`, harness, name, model and effort from the same row.
      source, not a fork that never exists, and tell the person.
    - Write each brief to a scratch file and pipe it on stdin, never as a shell argument.
    - A chat: `gx agents drafts create --project <project> --brief - --name <name> --folder source|trunk|worktree < <brief file>`,
-     plus `--harness`, `--model` and `--effort` when they differ from the source's.
-   - A Design: `gx designs drafts create --project <project> --slug <slug> --idea - < <brief file>`.
+     plus `--harness <harness> --model <model> --effort <effort>`, always, read from the source row. The
+     server never inherits them from the source, so leaving them out starts the draft on the project default.
+   - A Design: `gx designs drafts create --project <project> --slug <slug> --idea - < <brief file>`, with
+     the slug from the approved card.
    - Both print the new draft id.
    - A failed save is reported and the rest go on; its topic stays with the source. After a failed
      save, name each saved draft whose **Handled elsewhere** line still names the failed fork, and
      give the line to change on its draft page.
 7. **Design source only**: after each draft saves, add one line to the map's `## Forked out`:
-   `gx tickets section <project:epic> "Forked out" --append -`, with topic, kind and the new session's
+   `gx tickets section --append <project:epic> "Forked out" -`, with topic, kind and the new session's
    name, no link. A failed save adds none. Then follow the `## Forked out` rule of
    [gx-wayfinder](../gx-wayfinder/SKILL.md) for each saved fork: add the Out of scope line, close the
    topic's open ticket, remove it from Not yet specified and trim the Destination. A chat source gets
