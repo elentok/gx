@@ -28,7 +28,9 @@ const listeners = new Set<() => void>()
 
 function set(next: RenameRequest) {
   request = next
-  listeners.forEach((l) => l())
+  listeners.forEach((l) => {
+    l()
+  })
 }
 
 export const openRename = (open: NonNullable<RenameRequest>) => set(open)

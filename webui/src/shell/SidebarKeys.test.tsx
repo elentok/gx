@@ -234,8 +234,14 @@ async function setupLive() {
   let state = build()
   const conn = {
     getState: () => state,
-    subscribe: (l: () => void) => (subs.add(l), () => subs.delete(l)),
-    onEvent: (l: () => void) => (events.add(l), () => events.delete(l)),
+    subscribe: (l: () => void) => {
+      subs.add(l)
+      return () => subs.delete(l)
+    },
+    onEvent: (l: () => void) => {
+      events.add(l)
+      return () => events.delete(l)
+    },
   } as unknown as Connection
   const router = createMemoryRouter(
     [{ element: <AppShell />, children: [{ path: "*", element: <div>page</div> }] }],
@@ -255,8 +261,12 @@ async function setupLive() {
       epics = next.epics ?? epics
       state = build()
       act(() => {
-        subs.forEach((l) => l())
-        events.forEach((l) => l())
+        subs.forEach((l) => {
+          l()
+        })
+        events.forEach((l) => {
+          l()
+        })
       })
     },
     sessions: () => sessions,

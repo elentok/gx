@@ -133,7 +133,10 @@ test("a launch step change re-renders the ticket page with no reload", async () 
   const listeners: ((a?: string) => void)[] = []
   const evConn = {
     ...conn,
-    onEvent: (l: (a?: string) => void) => (listeners.push(l), () => {}),
+    onEvent: (l: (a?: string) => void) => {
+      listeners.push(l)
+      return () => {}
+    },
   } as unknown as Connection
   const stepped = (position: number, label: string): TicketDetail => ({
     ...base,
@@ -157,7 +160,9 @@ test("a launch step change re-renders the ticket page with no reload", async () 
     [4, "waiting for the agent"],
   ] as const) {
     current = stepped(position, label)
-    listeners.forEach((l) => l("gx:demo/12"))
+    listeners.forEach((l) => {
+      l("gx:demo/12")
+    })
     await screen.findByText(`Launching: ${label} (${position}/4)`)
   }
   expect(screen.queryByText(/installing dependencies/)).toBeNull()
@@ -168,7 +173,10 @@ test("a ticket page refetches when the event stream reopens, since events sent w
   const reState = { ...state, streams: 1 } as unknown as ConnectionState
   const reConn = {
     getState: () => reState,
-    subscribe: (l: () => void) => (subscribers.push(l), () => {}),
+    subscribe: (l: () => void) => {
+      subscribers.push(l)
+      return () => {}
+    },
     onEvent: () => () => {},
   } as unknown as Connection
   let current: TicketDetail = {
@@ -189,7 +197,9 @@ test("a ticket page refetches when the event stream reopens, since events sent w
 
   current = { ...base, status: "claimed" }
   reState.streams = 2
-  subscribers.forEach((l) => l())
+  subscribers.forEach((l) => {
+    l()
+  })
   await vi.waitFor(() => expect(screen.queryByText(/Launching/)).toBeNull())
 })
 

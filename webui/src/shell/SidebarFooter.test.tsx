@@ -3,7 +3,6 @@ import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import { renderThemed } from "../ui/render"
-import { DeviceContext } from "../useWide"
 import { SidebarFooter } from "./SidebarFooter"
 
 afterEach(cleanup)

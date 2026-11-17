@@ -23,7 +23,7 @@ import { PromptBox } from "../ui/expandable-text/PromptBox"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { useFetched } from "../useFetched"
 import { useFetchedReady } from "../useReady"
-import { refusalText, useWrite, type Refusable } from "../useWrite"
+import { refusalText, useWrite } from "../useWrite"
 import {
   DAYS,
   formOf,

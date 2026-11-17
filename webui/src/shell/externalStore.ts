@@ -18,7 +18,9 @@ export function createExternalStore<T>(initial: T, onFirst?: () => () => void): 
   const set = (next: T) => {
     if (next === value) return
     value = next
-    listeners.forEach((l) => l())
+    listeners.forEach((l) => {
+      l()
+    })
   }
   const subscribe = (l: () => void) => {
     if (listeners.size === 0) stop = onFirst?.()

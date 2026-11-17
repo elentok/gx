@@ -158,7 +158,11 @@ function setup({
           placements: state.snapshot!.placements!.filter((p) => p.session !== id),
         },
       } as ConnectionState
-      act(() => listeners.forEach((l) => l()))
+      act(() =>
+        listeners.forEach((l) => {
+          l()
+        }),
+      )
     },
   }
 }

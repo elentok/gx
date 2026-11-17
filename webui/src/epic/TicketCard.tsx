@@ -7,7 +7,7 @@ import { VerdictLine } from "../verdict"
 import { LongRunningBadge } from "../page/LongRunningBadge"
 import { Button } from "../ui/button/Button"
 import { HarnessLabel } from "../ui/harness-label/HarnessLabel"
-import { type EpicDetailRow } from "./detail"
+import type { EpicDetailRow } from "./detail"
 import { FixAgentDialog } from "./FixAgentDialog"
 import type { FixAgent } from "./fixAgent"
 import {

@@ -100,7 +100,11 @@ function setup(
       snapshot: { ...state.snapshot, sessions: sessions.filter((s) => s.id !== id) },
       tick: state.tick + 1,
     } as ConnectionState
-    act(() => listeners.forEach((l) => l()))
+    act(() =>
+      listeners.forEach((l) => {
+        l()
+      }),
+    )
   }
   const router = createMemoryRouter(
     [{ element: <AppShell />, children: [{ path: "*", element: <div /> }] }],

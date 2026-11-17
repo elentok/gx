@@ -1,6 +1,6 @@
 import { apiFetchSide } from "../apiFetch"
 import type { Connection } from "../connection"
-import { SectionNeedsYou, type EpicList, type EpicListRow } from "../generated/server"
+import { type EpicList, type EpicListRow } from "../generated/server"
 import { useFetched, type FetchedState } from "../useFetched"
 
 export type { EpicList }

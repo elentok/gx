@@ -114,11 +114,19 @@ function setup(device: Device, path = "/", extraRows: EpicListRow[] = []) {
   /** A new snapshot, as a refetch after design-drafts-changed delivers it. */
   const setDrafts = (drafts: DesignDraftRow[]) => {
     state = { ...state, snapshot: { ...state.snapshot, design_drafts: drafts } } as ConnectionState
-    act(() => listeners.forEach((fn) => fn()))
+    act(() =>
+      listeners.forEach((fn) => {
+        fn()
+      }),
+    )
   }
   const setChatDrafts = (chat_drafts: ChatDraftRow[]) => {
     state = { ...state, snapshot: { ...state.snapshot, chat_drafts } } as ConnectionState
-    act(() => listeners.forEach((fn) => fn()))
+    act(() =>
+      listeners.forEach((fn) => {
+        fn()
+      }),
+    )
   }
   const router = createMemoryRouter(
     [{ element: <AppShell />, children: [{ path: "*", element: <Page /> }] }],

@@ -10,7 +10,7 @@ import {
   HostedKindSVG,
 } from "../generated/ops"
 import { renderThemed } from "../ui/render"
-import { type PixelSize } from "./FileHoverCardMedia"
+import type { PixelSize } from "./FileHoverCardMedia"
 import { FileLinkProvider, useFileLinks } from "./FileLinkContext"
 import { FilePreviewBody, FilePreviewHeader } from "./FilePreviewBody"
 import { previewCache } from "./previewCache"

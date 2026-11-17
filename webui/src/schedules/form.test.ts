@@ -17,9 +17,9 @@ const filled = () => ({ ...newForm(), name: "Morning", prompt: "Summarise" })
 
 test("the three shortcuts set the days", () => {
   const by = Object.fromEntries(SHORTCUTS.map((s) => [s.label, s.days]))
-  expect(by["Weekdays"]).toEqual(["mon", "tue", "wed", "thu", "fri"])
+  expect(by.Weekdays).toEqual(["mon", "tue", "wed", "thu", "fri"])
   expect(by["Every day"]).toHaveLength(7)
-  expect(by["Weekends"]).toEqual(["sat", "sun"])
+  expect(by.Weekends).toEqual(["sat", "sun"])
 })
 
 test("a new Schedule starts on weekdays at 07:00 in scratch with 2 hours", () => {

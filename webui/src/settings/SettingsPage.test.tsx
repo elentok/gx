@@ -322,7 +322,10 @@ describe("SettingsPage Dev checkout", () => {
     const listeners = new Set<() => void>()
     const conn = {
       getState: () => state,
-      subscribe: (l: () => void) => (listeners.add(l), () => listeners.delete(l)),
+      subscribe: (l: () => void) => {
+        listeners.add(l)
+        return () => listeners.delete(l)
+      },
       onEvent: () => () => {},
     } as unknown as Connection
     const entries = [
@@ -359,7 +362,11 @@ describe("SettingsPage Dev checkout", () => {
     )
     expect(((await findByRole("switch")) as HTMLButtonElement).disabled).toBe(true)
     state = snap(true)
-    act(() => listeners.forEach((l) => l()))
+    act(() =>
+      listeners.forEach((l) => {
+        l()
+      }),
+    )
     await waitFor(() =>
       expect((document.querySelector("[role=switch]") as HTMLButtonElement).disabled).toBe(false),
     )

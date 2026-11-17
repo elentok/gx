@@ -323,9 +323,13 @@ function nestGroup(
   const out: { row: EpicDetailRow; indent: number }[] = []
   const walk = (row: EpicDetailRow, depth: number) => {
     out.push({ row, indent: Math.min(depth, MAX_INDENT) })
-    children.get(row.address)?.forEach((c) => walk(c, depth + 1))
+    children.get(row.address)?.forEach((c) => {
+      walk(c, depth + 1)
+    })
   }
-  roots.forEach((r) => walk(r, 0))
+  roots.forEach((r) => {
+    walk(r, 0)
+  })
   return out
 }
 

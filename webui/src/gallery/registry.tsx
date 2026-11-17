@@ -1,4 +1,4 @@
-import { Box, Menu, Text } from "@chakra-ui/react"
+import { Box, Text } from "@chakra-ui/react"
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react"
 import { PageHeader } from "../page/PageHeader"
 import { PageIcon } from "../page/PageIcon"
@@ -63,15 +63,10 @@ import type {
   Health,
   HealthState,
   LimitWindow,
-  UsageLimits,
-  UsageLimitWindow,
-  UsageSpend,
   UsageSummary,
 } from "../generated/server"
 import { UsageModeLimits, UsageModeSpending } from "../generated/server"
-import { LimitsBlock } from "../usage/LimitsBlock"
 import { LimitsTray } from "../usage/LimitsTray"
-import { SpendBlock } from "../usage/SpendBlock"
 import { KINDS, TONES, type Tone } from "../ui/tone"
 
 export interface GalleryCase {
@@ -168,55 +163,7 @@ const OpenMenu = ({ children }: { children: ReactNode }) => {
   return <div ref={root}>{children}</div>
 }
 
-const limitsNow = Date.UTC(2026, 9, 31, 12, 0, 0)
-const limitWin = (pct: number, resetsInSec: number, seenAgoSec: number): LimitWindow => ({
-  used_percentage: pct,
-  resets_at: limitsNow / 1000 + resetsInSec,
-  received_at: limitsNow / 1000 - seenAgoSec,
-})
-const weeklyWin = (pct: number, extra: Partial<UsageLimitWindow>): UsageLimitWindow => ({
-  ...limitWin(pct, 187200, 60),
-  ...extra,
-})
-const limitsStates: [string, UsageLimits, UsageLimits?][] = [
-  ["limits fresh", { five_hour: limitWin(34, 7800, 60), seven_day: limitWin(81, 187200, 60) }],
-  [
-    "limits weekly delta + Codex",
-    {
-      five_hour: limitWin(34, 7800, 60),
-      seven_day: weeklyWin(81, {
-        chip: { today: 7, yesterday: 5, direction: "up" },
-        forecast: {
-          status: "projected",
-          pace: 30,
-          at_reset: 130,
-          runs_out_at: limitsNow / 1000 + 86400,
-        },
-      }),
-    },
-    {
-      five_hour: limitWin(12, 13200, 60),
-      seven_day: weeklyWin(40, {
-        chip: { today: 3, yesterday: 4, direction: "down" },
-        forecast: { status: "projected", pace: 10, at_reset: 72 },
-      }),
-    },
-  ],
-  [
-    "limits few days",
-    { seven_day: weeklyWin(22, { forecast: { status: "needs_data", pace: 0, at_reset: 0 } }) },
-  ],
-  [
-    "limits stale",
-    { five_hour: limitWin(34, 7800, 10800), seven_day: limitWin(52, 187200, 10800) },
-  ],
-  [
-    "limits past reset",
-    { five_hour: limitWin(34, -60, 21600), seven_day: limitWin(52, 187200, 21600) },
-  ],
-  ["limits one window", { seven_day: limitWin(12, 464400, 60) }],
-]
-// The tray reads the real clock, so its windows reset relative to now, not to limitsNow.
+// The tray reads the real clock, so its windows reset relative to now.
 function LimitsTrayDemo({
   claude,
   codex,
@@ -239,22 +186,6 @@ function LimitsTrayDemo({
   } as UsageSummary
   return <LimitsTray conn={idleEpicConnection} fetcher={async () => summary} />
 }
-const spendStates: [string, UsageSpend][] = [
-  ["spend normal", { today: 4.82, since_sunday: 21.5, since_first: 96.1, first_day: "2026-09-01" }],
-  [
-    "spend short ledger",
-    {
-      today: 1.2,
-      since_sunday: 3.4,
-      since_sunday_short: true,
-      since_first: 3.4,
-      since_first_short: true,
-      first_day: "2026-10-30",
-    },
-  ],
-  ["spend empty", { today: 0, since_sunday: 0, since_first: 0 }],
-]
-
 // Opens a tooltip the way a user does, by clicking its marker once mounted.
 const OpenTip = ({ children }: { children: ReactNode }) => {
   const root = useRef<HTMLDivElement>(null)
@@ -545,6 +476,7 @@ export const galleryEntries: GalleryEntry[] = [
       [false, true].map((openMenu) => {
         const menu = (
           <GxMenu
+            key="menu"
             trigger={
               <button type="button" aria-label="Menu">
                 ⋯

@@ -36,7 +36,9 @@ const listeners = new Set<() => void>()
 
 function set(next: ModelPickerRequest | null) {
   request = next
-  listeners.forEach((l) => l())
+  listeners.forEach((l) => {
+    l()
+  })
 }
 
 export const openModelPicker = (open: ModelPickerRequest) => set(open)

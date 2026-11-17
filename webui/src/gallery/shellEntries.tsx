@@ -144,7 +144,9 @@ const clickSections =
       [...root.querySelectorAll("button")].find((b) => b.textContent?.startsWith(t)),
     )
     if (buttons.some((b) => !b)) return false
-    buttons.forEach((b) => b?.click())
+    buttons.forEach((b) => {
+      b?.click()
+    })
     return true
   }
 const noop = () => true
@@ -202,10 +204,11 @@ const chordBoxEntry: GalleryEntry = {
 // Slides the sidebar open once mounted; the docked desktop sidebar is already open.
 const OpenSidebar = () => {
   const shell = useShell()
+  const latest = useRef(shell)
+  latest.current = shell
   useEffect(() => {
-    if (!shell?.sidebarOpen) shell?.toggle()
     // Once on mount; toggling again would close it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!latest.current?.sidebarOpen) latest.current?.toggle()
   }, [])
   return null
 }

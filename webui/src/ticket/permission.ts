@@ -25,6 +25,6 @@ export const postDecision: PostDecision = async (body) => {
     body: JSON.stringify(body),
   })
   const result = await res.json().catch(() => null)
-  if (res.ok || (result && result.refused)) return result ?? {}
+  if (res.ok || result?.refused) return result ?? {}
   throw new Error(`decision: HTTP ${res.status}`)
 }

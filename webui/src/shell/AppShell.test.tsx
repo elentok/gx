@@ -35,7 +35,9 @@ function setup(device: Device, needsYou = 0, override: Partial<ConnectionState> 
   } as unknown as Connection
   setState = (patch) => {
     state = { ...state, ...patch }
-    listeners.forEach((fn) => fn())
+    listeners.forEach((fn) => {
+      fn()
+    })
   }
   const router = createMemoryRouter(
     [
