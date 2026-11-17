@@ -98,7 +98,12 @@ func (c *ChatDrafts) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if c.Workspaces != nil {
-		ws := c.Workspaces.WorkspaceOfSession(req.FromSession)
+		// The source's workspace wins over the requested name, as for a Design.
+		// An unknown name is refused by SetMember and the draft is rolled back.
+		ws := req.Workspace
+		if req.FromSession != "" || ws == "" {
+			ws = c.Workspaces.WorkspaceOfSession(req.FromSession)
+		}
 		if err := c.Workspaces.SetMember(MemberKey(d.ID), ws); err != nil {
 			if _, delErr := c.store.Delete(d.ID); delErr != nil {
 				c.Log.Warn("delete chat draft after membership failed", "draft", d.ID, "err", delErr)
@@ -114,42 +119,65 @@ func (c *ChatDrafts) create(w http.ResponseWriter, r *http.Request) {
 // build validates req and makes the record to store. A refusal is the result.
 func (c *ChatDrafts) build(req ops.ChatDraftCreateRequest) (*ops.ChatDraft, ops.ChatDraftResult, error) {
 	brief, bad := wire.ValidatePromptText(req.Brief, "the brief")
-	switch {
-	case bad != nil:
+	if bad != nil {
 		return nil, refuse(bad.Reason, bad.Message), nil
-	case brief == "":
-		return nil, refuse(wire.ReasonEmptyPrompt, "a brief is required"), nil
-	}
-	if _, err := c.Projects.Dir(req.Project); err != nil {
-		return nil, refuse(wire.ReasonSessionBadRequest, err.Error()), nil
-	}
-	hn := req.Harness
-	if hn == "" {
-		hn = c.Projects.LaunchHarness(req.Project)
-	}
-	if _, err := harness.Lookup(agentrunner.Kind(hn)); err != nil {
-		return nil, refuse(wire.ReasonSessionUnknownHarness, err.Error()), nil
-	}
-	if req.Effort != "" && req.Model == "" {
-		return nil, refuse(wire.ReasonSessionBadRequest, "effort needs a model"), nil
 	}
 	id, err := NewID()
 	if err != nil {
 		return nil, ops.ChatDraftResult{}, err
 	}
 	d := &ops.ChatDraft{
-		ID: id, Project: req.Project, Name: strings.TrimSpace(req.Name), Harness: hn,
+		ID: id, Project: req.Project, Name: strings.TrimSpace(req.Name), Harness: req.Harness,
 		Model: req.Model, Effort: req.Effort, Brief: brief, Folder: req.Folder,
 	}
-	if res := c.resolveFolder(d, req); res.Refused {
+	if res := c.checkSettings(d); res != nil {
+		return nil, *res, nil
+	}
+	if res := c.resolveFolder(d, req.FromSession, req.Worktree); res.Refused {
 		return nil, res, nil
 	}
 	return d, ops.ChatDraftResult{}, nil
 }
 
+// checkSettings refuses a bad project, harness or effort and gives an empty
+// harness the project's launch harness. The model and effort stay as given:
+// empty means the harness default, as on the New chat form.
+func (c *ChatDrafts) checkSettings(d *ops.ChatDraft) *ops.ChatDraftResult {
+	if _, err := c.Projects.Dir(d.Project); err != nil {
+		r := refuse(wire.ReasonSessionBadRequest, err.Error())
+		return &r
+	}
+	if d.Harness == "" {
+		d.Harness = c.Projects.LaunchHarness(d.Project)
+	}
+	if _, err := harness.Lookup(agentrunner.Kind(d.Harness)); err != nil {
+		r := refuse(wire.ReasonSessionUnknownHarness, err.Error())
+		return &r
+	}
+	if d.Effort != "" && d.Model == "" {
+		r := refuse(wire.ReasonSessionBadRequest, "effort needs a model")
+		return &r
+	}
+	return nil
+}
+
+// projectRoot is the project's repo root, the folder CheckProjectDir accepts.
+func (c *ChatDrafts) projectRoot(project string) string {
+	list, err := c.Projects.ListWorktrees()
+	if err != nil {
+		return ""
+	}
+	for _, p := range list {
+		if p.Project == project {
+			return p.Root
+		}
+	}
+	return ""
+}
+
 // resolveFolder fills d.Dir or d.Worktree from the folder choice. It creates
-// nothing on disk.
-func (c *ChatDrafts) resolveFolder(d *ops.ChatDraft, req ops.ChatDraftCreateRequest) ops.ChatDraftResult {
+// nothing on disk. A source folder with no fromSession is the project root.
+func (c *ChatDrafts) resolveFolder(d *ops.ChatDraft, fromSession, worktree string) ops.ChatDraftResult {
 	switch d.Folder {
 	case ops.ChatDraftFolderTrunk:
 		d.Dir = ticketgit.TrunkCheckout(c.TicketStore, d.Project)
@@ -157,9 +185,16 @@ func (c *ChatDrafts) resolveFolder(d *ops.ChatDraft, req ops.ChatDraftCreateRequ
 			return refuse(wire.ReasonSessionBadRequest, "project "+d.Project+" has no trunk checkout")
 		}
 	case ops.ChatDraftFolderSource:
-		src, found := c.source(req.FromSession)
+		if fromSession == "" {
+			d.Dir = c.projectRoot(d.Project)
+			if d.Dir == "" {
+				return refuse(wire.ReasonSessionBadRequest, "project "+d.Project+" has no root folder")
+			}
+			break
+		}
+		src, found := c.source(fromSession)
 		if !found {
-			return refuse(wire.ReasonSessionBadRequest, "a source folder needs a source session")
+			return refuse(wire.ReasonSessionBadRequest, "the source session was not found")
 		}
 		d.Dir = src.Dir
 		if src.Design {
@@ -170,7 +205,8 @@ func (c *ChatDrafts) resolveFolder(d *ops.ChatDraft, req ops.ChatDraftCreateRequ
 			return refuse(wire.ReasonSessionBadRequest, "the source session has no folder")
 		}
 	case ops.ChatDraftFolderWorktree:
-		d.Worktree = req.Worktree
+		d.Dir = ""
+		d.Worktree = worktree
 		if d.Worktree == "" {
 			d.Worktree = defaultWorktree(d.Name, d.ID)
 		}
@@ -231,12 +267,34 @@ func (c *ChatDrafts) save(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	res, err := c.store.Save(req)
+	res, err := c.store.SaveChecked(req, c.checkSave)
 	if err != nil {
 		serverError(w, err)
 		return
 	}
+	// The sidebar label can change with the name; a brief-only save changes no row.
+	if !res.Refused && req.Settings() {
+		c.publish()
+	}
 	wire.WriteJSON(w, res)
+}
+
+// checkSave validates the merged draft of a save and re-resolves its folder
+// when the project or the folder choice changed.
+func (c *ChatDrafts) checkSave(d *ops.ChatDraft, before ops.ChatDraft) *ops.ChatDraftResult {
+	if d.Project == before.Project && d.Harness == before.Harness && d.Model == before.Model &&
+		d.Effort == before.Effort && d.Folder == before.Folder && d.Worktree == before.Worktree {
+		return nil
+	}
+	if res := c.checkSettings(d); res != nil {
+		return res
+	}
+	if d.Folder == ops.ChatDraftFolderWorktree || d.Project != before.Project || d.Folder != before.Folder {
+		if res := c.resolveFolder(d, "", d.Worktree); res.Refused {
+			return &res
+		}
+	}
+	return nil
 }
 
 func (c *ChatDrafts) remove(w http.ResponseWriter, r *http.Request) {

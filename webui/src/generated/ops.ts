@@ -42,7 +42,8 @@ export interface ChatDraft {
 }
 /**
  * ChatDraftCreateRequest creates a chat draft. FromSession names the session
- * whose workspace and folder the draft starts from.
+ * whose workspace and folder the draft starts from. Workspace names the
+ * workspace of a draft with no FromSession; the brief may be empty.
  */
 export interface ChatDraftCreateRequest {
   project: string;
@@ -54,6 +55,7 @@ export interface ChatDraftCreateRequest {
   folder: string;
   worktree: string;
   from_session: string;
+  workspace?: string;
 }
 /**
  * ChatDraftReadRequest names one draft on the read and delete routes.
@@ -62,12 +64,20 @@ export interface ChatDraftReadRequest {
   id: string;
 }
 /**
- * ChatDraftSaveRequest saves the brief of a draft against the revision the caller saw.
+ * ChatDraftSaveRequest saves a draft against the revision the caller saw. The
+ * brief is always written; a settings field left out (nil) stays as it is.
  */
 export interface ChatDraftSaveRequest {
   id: string;
   brief: string;
   revision: number /* int */;
+  project?: string;
+  name?: string;
+  harness?: string;
+  model?: string;
+  effort?: string;
+  folder?: string;
+  worktree?: string;
 }
 /**
  * ChatDraftResult answers every chat draft route. A refusal is a result:

@@ -150,10 +150,17 @@ func (s *Store) List() ([]ops.ChatDraft, error) {
 	return items, nil
 }
 
-// Save applies a brief save: nothing but the brief, the revision and the
-// edited-at time change. A stale revision or a missing draft is a refused
-// result, not an error.
+// Save applies a save with no settings check. See SaveChecked.
 func (s *Store) Save(req ops.ChatDraftSaveRequest) (ops.ChatDraftResult, error) {
+	return s.SaveChecked(req, nil)
+}
+
+// SaveChecked writes the brief and merges each settings field the request
+// carries. The record's Dir, WorktreePath and StartError are left to check,
+// which sees the merged draft under the draft's lock and may fix up Dir;
+// a non-nil result from it is the refusal and nothing is written. A stale
+// revision or a missing draft is a refused result, not an error.
+func (s *Store) SaveChecked(req ops.ChatDraftSaveRequest, check func(d *ops.ChatDraft, before ops.ChatDraft) *ops.ChatDraftResult) (ops.ChatDraftResult, error) {
 	if !idPattern.MatchString(req.ID) {
 		return ops.ChatDraftResult{Refused: true, Reason: ops.ReasonDraftGone}, nil
 	}
@@ -169,7 +176,22 @@ func (s *Store) Save(req ops.ChatDraftSaveRequest) (ops.ChatDraftResult, error) 
 	if d.Revision != req.Revision {
 		return ops.ChatDraftResult{Refused: true, Reason: ops.ReasonDraftRevisionConflict}, nil
 	}
+	before := *d
 	d.Brief = req.Brief
+	for dst, src := range map[*string]*string{
+		&d.Project: req.Project, &d.Name: req.Name, &d.Harness: req.Harness, &d.Model: req.Model,
+		&d.Effort: req.Effort, &d.Folder: req.Folder, &d.Worktree: req.Worktree,
+	} {
+		if src != nil {
+			*dst = *src
+		}
+	}
+	d.Name = strings.TrimSpace(d.Name)
+	if check != nil {
+		if refusal := check(d, before); refusal != nil {
+			return *refusal, nil
+		}
+	}
 	d.Revision++
 	d.EditedAt = s.now().UTC()
 	if err := s.write(d); err != nil {

@@ -36,7 +36,8 @@ type ChatDraft struct {
 }
 
 // ChatDraftCreateRequest creates a chat draft. FromSession names the session
-// whose workspace and folder the draft starts from.
+// whose workspace and folder the draft starts from. Workspace names the
+// workspace of a draft with no FromSession; the brief may be empty.
 type ChatDraftCreateRequest struct {
 	Project     string `json:"project"`
 	Brief       string `json:"brief"`
@@ -47,6 +48,7 @@ type ChatDraftCreateRequest struct {
 	Folder      string `json:"folder"`
 	Worktree    string `json:"worktree"`
 	FromSession string `json:"from_session"`
+	Workspace   string `json:"workspace,omitempty"`
 }
 
 // ChatDraftReadRequest names one draft on the read and delete routes.
@@ -54,11 +56,25 @@ type ChatDraftReadRequest struct {
 	ID string `json:"id"`
 }
 
-// ChatDraftSaveRequest saves the brief of a draft against the revision the caller saw.
+// ChatDraftSaveRequest saves a draft against the revision the caller saw. The
+// brief is always written; a settings field left out (nil) stays as it is.
 type ChatDraftSaveRequest struct {
-	ID       string `json:"id"`
-	Brief    string `json:"brief"`
-	Revision int    `json:"revision"`
+	ID       string  `json:"id"`
+	Brief    string  `json:"brief"`
+	Revision int     `json:"revision"`
+	Project  *string `json:"project,omitempty"`
+	Name     *string `json:"name,omitempty"`
+	Harness  *string `json:"harness,omitempty"`
+	Model    *string `json:"model,omitempty"`
+	Effort   *string `json:"effort,omitempty"`
+	Folder   *string `json:"folder,omitempty"`
+	Worktree *string `json:"worktree,omitempty"`
+}
+
+// Settings reports whether the save changes anything besides the brief.
+func (r ChatDraftSaveRequest) Settings() bool {
+	return r.Project != nil || r.Name != nil || r.Harness != nil || r.Model != nil ||
+		r.Effort != nil || r.Folder != nil || r.Worktree != nil
 }
 
 // ChatDraftResult answers every chat draft route. A refusal is a result:

@@ -222,14 +222,12 @@ func TestChatDraftCreate_RefusalsStoreNothing(t *testing.T) {
 		req    ops.ChatDraftCreateRequest
 		reason string
 	}{
-		"empty brief":      {ops.ChatDraftCreateRequest{Brief: "  \n"}, wire.ReasonEmptyPrompt},
-		"over 32 KiB":      {ops.ChatDraftCreateRequest{Brief: strings.Repeat("x", wire.MaxSessionPromptBytes+1)}, wire.ReasonPromptTextTooLong},
-		"bang prefix":      {ops.ChatDraftCreateRequest{Brief: "!ls"}, wire.ReasonPromptPrefixNotAllowed},
-		"unknown project":  {ops.ChatDraftCreateRequest{Project: "nope"}, wire.ReasonSessionBadRequest},
-		"unknown harness":  {ops.ChatDraftCreateRequest{Harness: "nope"}, wire.ReasonSessionUnknownHarness},
-		"effort no model":  {ops.ChatDraftCreateRequest{Effort: "high"}, wire.ReasonSessionBadRequest},
-		"source no source": {ops.ChatDraftCreateRequest{Folder: ops.ChatDraftFolderSource}, wire.ReasonSessionBadRequest},
-		"unknown source":   {ops.ChatDraftCreateRequest{Folder: ops.ChatDraftFolderSource, FromSession: "nope"}, wire.ReasonSessionBadRequest},
+		"over 32 KiB":     {ops.ChatDraftCreateRequest{Brief: strings.Repeat("x", wire.MaxSessionPromptBytes+1)}, wire.ReasonPromptTextTooLong},
+		"bang prefix":     {ops.ChatDraftCreateRequest{Brief: "!ls"}, wire.ReasonPromptPrefixNotAllowed},
+		"unknown project": {ops.ChatDraftCreateRequest{Project: "nope"}, wire.ReasonSessionBadRequest},
+		"unknown harness": {ops.ChatDraftCreateRequest{Harness: "nope"}, wire.ReasonSessionUnknownHarness},
+		"effort no model": {ops.ChatDraftCreateRequest{Effort: "high"}, wire.ReasonSessionBadRequest},
+		"unknown source":  {ops.ChatDraftCreateRequest{Folder: ops.ChatDraftFolderSource, FromSession: "nope"}, wire.ReasonSessionBadRequest},
 	}
 	for name, c := range cases {
 		res := create(t, f, c.req)
@@ -286,7 +284,114 @@ func TestChatDraftDelete_RemovesTheRecordAndTheMember(t *testing.T) {
 	}
 }
 
-func TestChatDraftEvents_CreateAndDeletePublishOneEachSaveNone(t *testing.T) {
+func str(s string) *string { return &s }
+
+func TestChatDraftCreate_EmptyBriefInANamedWorkspace(t *testing.T) {
+	t.Parallel()
+	f := rigs.StartDesigns(t)
+	if _, err := f.H.Client.Admin.CreateWorkspace(f.Ctx, "Ideas"); err != nil {
+		t.Fatal(err)
+	}
+	body := ops.ChatDraftCreateRequest{Project: "proj", Folder: ops.ChatDraftFolderSource, Workspace: "Ideas"}
+	res := post(t, f, "create", body)
+	if res.Refused || res.Draft == nil || res.Draft.Brief != "" || res.Draft.Label != "Untitled chat" {
+		t.Fatalf("create = %+v", res)
+	}
+	if res.Draft.Dir != f.Repo {
+		t.Errorf("source with no session: dir = %q, want project root %q", res.Draft.Dir, f.Repo)
+	}
+	if got := workspaceOf(f, res.Draft.ID); got != "Ideas" {
+		t.Errorf("workspace = %q, want Ideas", got)
+	}
+	body.Workspace = ""
+	if d := post(t, f, "create", body).Draft; d == nil || workspaceOf(f, d.ID) != workspaces.DefaultName {
+		t.Errorf("no workspace: %+v", d)
+	}
+}
+
+func TestChatDraftCreate_FromSessionWinsOverWorkspace(t *testing.T) {
+	t.Parallel()
+	f := rigs.StartDesigns(t)
+	chat, _ := plainChat(t, f, "Bugs")
+	if _, err := f.H.Client.Admin.CreateWorkspace(f.Ctx, "Ideas"); err != nil {
+		t.Fatal(err)
+	}
+	d := mustCreate(t, f, ops.ChatDraftCreateRequest{FromSession: chat, Workspace: "Ideas"})
+	if got := workspaceOf(f, d.ID); got != "Bugs" {
+		t.Errorf("workspace = %q, want Bugs", got)
+	}
+}
+
+func TestChatDraftStart_EmptyBriefIsRefused(t *testing.T) {
+	t.Parallel()
+	f := rigs.StartDesigns(t)
+	d := post(t, f, "create", ops.ChatDraftCreateRequest{Project: "proj", Folder: ops.ChatDraftFolderTrunk}).Draft
+	if res := post(t, f, "start", ops.ChatDraftReadRequest{ID: d.ID}); !res.Refused || res.Reason != wire.ReasonEmptyPrompt {
+		t.Errorf("start = %+v", res)
+	}
+}
+
+func TestChatDraftSave_EachSettingAloneStoresAndBumpsTheRevision(t *testing.T) {
+	t.Parallel()
+	f := rigs.StartDesigns(t)
+	d := mustCreate(t, f, ops.ChatDraftCreateRequest{Name: "keep", Model: "opus", Effort: "high"})
+	rev := d.Revision
+	save := func(req ops.ChatDraftSaveRequest) *ops.ChatDraft {
+		t.Helper()
+		req.ID, req.Brief, req.Revision = d.ID, "b", rev
+		res := post(t, f, "save", req)
+		if res.Refused || res.Draft == nil || res.Draft.Revision != rev+1 {
+			t.Fatalf("save %+v = %+v", req, res)
+		}
+		rev++
+		return res.Draft
+	}
+	if got := save(ops.ChatDraftSaveRequest{Name: str("renamed")}); got.Name != "renamed" || got.Model != "opus" || got.Folder != d.Folder {
+		t.Errorf("name only: %+v", got)
+	}
+	if got := save(ops.ChatDraftSaveRequest{Harness: str("claude"), Model: str("sonnet"), Effort: str("low")}); got.Harness != "claude" || got.Model != "sonnet" || got.Effort != "low" || got.Name != "renamed" {
+		t.Errorf("harness/model/effort: %+v", got)
+	}
+	if got := save(ops.ChatDraftSaveRequest{Folder: str(ops.ChatDraftFolderSource)}); got.Folder != ops.ChatDraftFolderSource || got.Dir != f.Repo {
+		t.Errorf("folder only: %+v", got)
+	}
+	if got := save(ops.ChatDraftSaveRequest{Project: str("proj")}); got.Project != "proj" || got.Dir != f.Repo || got.Model != "sonnet" {
+		t.Errorf("project only: %+v", got)
+	}
+	if got := save(ops.ChatDraftSaveRequest{Folder: str(ops.ChatDraftFolderWorktree), Worktree: str("wt-1")}); got.Worktree != "wt-1" || got.Dir != "" {
+		t.Errorf("worktree: %+v", got)
+	}
+}
+
+func TestChatDraftSave_RefusalsStoreNothing(t *testing.T) {
+	t.Parallel()
+	f := rigs.StartDesigns(t)
+	d := mustCreate(t, f, ops.ChatDraftCreateRequest{Name: "keep"})
+	cases := map[string]struct {
+		req    ops.ChatDraftSaveRequest
+		reason string
+	}{
+		"bad harness": {ops.ChatDraftSaveRequest{Harness: str("nope")}, wire.ReasonSessionUnknownHarness},
+		"bad project": {ops.ChatDraftSaveRequest{Project: str("nope")}, wire.ReasonSessionBadRequest},
+		"bad folder":  {ops.ChatDraftSaveRequest{Folder: str("moon")}, wire.ReasonSessionBadRequest},
+		"stale":       {ops.ChatDraftSaveRequest{Name: str("x"), Revision: 9}, ops.ReasonDraftRevisionConflict},
+	}
+	for name, c := range cases {
+		c.req.ID, c.req.Brief = d.ID, "changed"
+		if c.req.Revision == 0 {
+			c.req.Revision = 1
+		}
+		if res := post(t, f, "save", c.req); !res.Refused || res.Reason != c.reason {
+			t.Errorf("%s: %+v, want refused %s", name, res, c.reason)
+		}
+	}
+	got := post(t, f, "read", ops.ChatDraftReadRequest{ID: d.ID}).Draft
+	if got.Revision != 1 || got.Brief != d.Brief || got.Name != "keep" || got.Harness != d.Harness {
+		t.Errorf("draft changed: %+v", got)
+	}
+}
+
+func TestChatDraftEvents_CreateAndDeletePublishOneEachBriefSaveNone(t *testing.T) {
 	t.Parallel()
 	f := rigs.StartDesigns(t)
 	var d *ops.ChatDraft
@@ -294,7 +399,12 @@ func TestChatDraftEvents_CreateAndDeletePublishOneEachSaveNone(t *testing.T) {
 		t.Errorf("create published %d events, want 1", n)
 	}
 	if n := draftEvents(t, f, func() { post(t, f, "save", ops.ChatDraftSaveRequest{ID: d.ID, Brief: "b", Revision: 1}) }); n != 0 {
-		t.Errorf("save published %d events, want 0", n)
+		t.Errorf("brief save published %d events, want 0", n)
+	}
+	if n := draftEvents(t, f, func() {
+		post(t, f, "save", ops.ChatDraftSaveRequest{ID: d.ID, Brief: "b", Revision: 2, Name: str("new")})
+	}); n != 1 {
+		t.Errorf("settings save published %d events, want 1", n)
 	}
 	if n := draftEvents(t, f, func() { post(t, f, "delete", ops.ChatDraftReadRequest{ID: d.ID}) }); n != 1 {
 		t.Errorf("delete published %d events, want 1", n)

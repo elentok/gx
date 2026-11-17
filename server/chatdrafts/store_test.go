@@ -47,6 +47,26 @@ func TestStore_LabelPrefersNameThenFallsBack(t *testing.T) {
 	}
 }
 
+func TestStore_SaveMergesOnlyTheSettingsGivenAndKeepsStartState(t *testing.T) {
+	t.Parallel()
+	s := New(t.TempDir())
+	d := newDraft(t, s, "first")
+	d.Name, d.Model, d.WorktreePath, d.StartError = "old", "opus", "/wt/made", "boom"
+	if err := s.write(d); err != nil {
+		t.Fatal(err)
+	}
+	name, harness := " new ", "codex"
+	res, err := s.Save(ops.ChatDraftSaveRequest{ID: d.ID, Brief: "second", Revision: 1, Name: &name, Harness: &harness})
+	if err != nil || res.Draft == nil {
+		t.Fatalf("save = %+v, %v", res, err)
+	}
+	got := res.Draft
+	if got.Name != "new" || got.Harness != "codex" || got.Model != "opus" || got.Revision != 2 ||
+		got.WorktreePath != "/wt/made" || got.StartError != "boom" {
+		t.Errorf("saved = %+v", got)
+	}
+}
+
 func TestStore_SaveStaleRevisionIsAConflict(t *testing.T) {
 	t.Parallel()
 	s := New(t.TempDir())
