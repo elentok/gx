@@ -138,6 +138,11 @@ test("184. Live token ledger (and 182. Stats limit burn, phone)", async ({ page,
   const describeCounts = (counts: number[]) => perfNames.map((n, i) => `${n}=${counts[i]}`).join(" ")
   // An element with a gx action name gives INP a target.
   await page.locator("[data-gx-action]:visible").first().click()
+  // LCP and INP entries reach the page's observers after a rendered frame; under load the hide can otherwise
+  // run first and the sample is never queued. Two frames after the click settle both.
+  await page.evaluate(
+    () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
+  )
   // Hide by hand: the queue flush and web-vitals both listen for visibilitychange on document.
   await page.evaluate(() => {
     Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true })
