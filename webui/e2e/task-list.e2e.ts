@@ -152,6 +152,10 @@ test("208. Task list", async ({ page, start }) => {
   await stopped(headerRing)
   await go(page, "#/epics")
   await grey(cardRing)
+  // The turn starts while the Design page is open: its header follows without a reload.
+  await go(page, "#/d/demo:design-epic")
+  await grey(rowRing)
+  await stopped(headerRing)
   await expect
     .poll(() =>
       turn.cli("agents", "prompt", worker.id, "[slow] one more").then(
@@ -160,10 +164,10 @@ test("208. Task list", async ({ page, start }) => {
       ),
     )
     .toBe(true)
-  await purple(cardRing)
-  await purple(rowRing)
-  await go(page, "#/d/demo:design-epic")
   await purple(headerRing)
+  await purple(rowRing)
+  await go(page, "#/epics")
+  await purple(cardRing)
 
   // One task: the row alone, no summary button.
   await page.setViewportSize({ width: 1280, height: 800 })
