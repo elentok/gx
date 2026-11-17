@@ -151,6 +151,14 @@ describe("fit rules", () => {
     expect(fits("remove")).toEqual(["chat", "a-live", "a-exited"])
   })
 
+  it("a chat draft fits Move and is refused by Remove and Hold", () => {
+    const cd = [r("chat-draft/x", { kind: "chat-draft" })]
+    const f = (a: Parameters<typeof fit>[0]) => fit(a, on("chat-draft/x"), cd)
+    expect(f("move").fits).toEqual(["chat-draft/x"])
+    expect(f("remove").skipped).toEqual([{ key: "chat-draft/x", reason: "can't be removed" }])
+    expect(f("hold").skipped).toEqual([{ key: "chat-draft/x", reason: "can't be held" }])
+  })
+
   it("Archive fits epics and Designs; the server's dry run refuses unfinished ones", () => {
     expect(fits("archive")).toEqual(["epic", "design", "queued", "held", "fin"])
     expect(fit("archive", on("chat"), rows).skipped).toEqual([

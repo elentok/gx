@@ -26,7 +26,7 @@ export const SELECT_ACTIONS: SelectAction[] = [
 export interface SelectRow {
   /** A row's address, or the session id of an agent row. */
   key: string
-  kind: "epic" | "design" | "chat" | "draft" | "agent" | "archived"
+  kind: "epic" | "design" | "chat" | "draft" | "chat-draft" | "agent" | "archived"
   /** A draft row's id, which the draft Remove write takes; its `key` is the workspace membership key. */
   draftId?: string
   /** False while the row is in a collapsed section. */
@@ -86,7 +86,11 @@ type Verdict = string | undefined
 /** undefined fits; a string is the reason the row is skipped. */
 const RULES: Record<SelectAction, (r: SelectRow) => Verdict> = {
   move: (r) =>
-    r.kind === "epic" || r.kind === "design" || r.kind === "chat" || r.kind === "draft"
+    r.kind === "epic" ||
+    r.kind === "design" ||
+    r.kind === "chat" ||
+    r.kind === "draft" ||
+    r.kind === "chat-draft"
       ? undefined
       : "can't be moved",
   hold: (r) => {
@@ -102,6 +106,7 @@ const RULES: Record<SelectAction, (r: SelectRow) => Verdict> = {
   },
   remove: (r) => {
     if (r.kind === "draft") return undefined
+    if (r.kind === "chat-draft") return "can't be removed"
     if (!r.session) return "not an agent"
     return canManage(r.session) ? undefined : "managed by the queue"
   },

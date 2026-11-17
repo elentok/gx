@@ -4,6 +4,7 @@ import {
   CardKindFollowUps,
   CardKindImplementation,
   CardKindOneOff,
+  type ChatDraftRow,
   type DesignDraftRow,
   SectionDesigning,
   SectionFinished,
@@ -517,5 +518,71 @@ describe("buildSidebar Design drafts", () => {
   it("numbers drafts with the other own rows, contiguously", () => {
     const s = buildSidebar({ ...input, sort: "name" })
     expect(s.rows.map((r) => r.number)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  describe("chat drafts", () => {
+    const chatDraft = (
+      id: string,
+      label: string,
+      over: Partial<ChatDraftRow> = {},
+    ): ChatDraftRow => ({
+      id,
+      label,
+      project: "p",
+      harness: "claude",
+      edited_at: "2026-01-02T00:00:00Z",
+      workspace: "Default",
+      member_key: `chat-draft/${id}`,
+      ...over,
+    })
+    const chatDrafts = [
+      chatDraft("c-beta", "Beta"),
+      chatDraft("c-alpha", "Alpha", { project: "z", edited_at: "2026-01-01T00:00:00Z" }),
+      chatDraft("c-away", "Away", { workspace: "Work" }),
+    ]
+    const withChat = { ...input, drafts: undefined, chatDrafts }
+    const rowsOf = (sort: string) => buildSidebar({ ...withChat, sort }).rows
+
+    it("builds a row for the active workspace only, never held", () => {
+      const s = buildSidebar(withChat)
+      expect(s.rows.find((r) => r.title === "Beta")).toMatchObject({
+        kind: "chat-draft",
+        key: "chat-draft/c-beta",
+        href: "#/chat-drafts/c-beta",
+        status: { words: "Draft", tone: "muted" },
+        agents: [],
+      })
+      expect(s.rows.some((r) => r.title === "Away")).toBe(false)
+      expect(s.held.some((r) => r.kind === "chat-draft")).toBe(false)
+    })
+
+    it("reads none when the snapshot has none", () => {
+      expect(buildSidebar({ ...input, drafts: undefined }).rows.map((r) => r.title)).toEqual([
+        "Blog",
+        "Chat",
+        "Mid",
+      ])
+    })
+
+    it.each([
+      ["name", ["Alpha", "Beta", "Blog", "Chat", "Mid"]],
+      ["activity", ["Mid", "Beta", "Alpha", "Chat", "Blog"]],
+      ["project", ["Beta", "Blog", "Chat", "Mid", "Alpha"]],
+      ["status", ["Blog", "Chat", "Alpha", "Beta", "Mid"]],
+    ])("sorts under %s", (sort, expected) => {
+      expect(rowsOf(sort).map((r) => r.title)).toEqual(expected)
+    })
+
+    it("groups by project and by Draft, and numbers contiguously", () => {
+      const groupOf = (sort: string) =>
+        Object.fromEntries(
+          rowsOf(sort)
+            .filter((r) => r.kind === "chat-draft")
+            .map((r) => [r.title, r.group]),
+        )
+      expect(groupOf("project")).toEqual({ Alpha: "z", Beta: "p" })
+      expect(groupOf("status")).toEqual({ Alpha: "Draft", Beta: "Draft" })
+      expect(rowsOf("name").map((r) => r.number)).toEqual([1, 2, 3, 4, 5])
+    })
   })
 })

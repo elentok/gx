@@ -30,7 +30,7 @@ export interface ItemRef {
   /** The Design or epic address, the chat's session id, or the draft's workspace membership key. */
   key: string
   name: string
-  kind: "design" | "epic" | "chat" | "draft"
+  kind: "design" | "epic" | "chat" | "draft" | "chat-draft"
   /** The workspace the item sits in. */
   workspace: string
   /** The epic (or the Design's -impl) holds a queue item. */

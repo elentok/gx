@@ -9,6 +9,7 @@ import {
   CardKindImplementation,
   SectionImplementing,
   SectionOnHold,
+  type ChatDraftRow,
   type DesignDraftRow,
   type EpicListRow,
   type SessionPlacement,
@@ -71,6 +72,7 @@ function setup(device: Device, path = "/") {
     snapshot: {
       needs_you_total: 0,
       design_drafts: [] as DesignDraftRow[],
+      chat_drafts: [] as ChatDraftRow[],
       workspaces: [
         { name: "Default", default: true, members: 0 },
         { name: "Work", members: 0 },
@@ -103,6 +105,10 @@ function setup(device: Device, path = "/") {
     state = { ...state, snapshot: { ...state.snapshot, design_drafts: drafts } } as ConnectionState
     act(() => listeners.forEach((fn) => fn()))
   }
+  const setChatDrafts = (chat_drafts: ChatDraftRow[]) => {
+    state = { ...state, snapshot: { ...state.snapshot, chat_drafts } } as ConnectionState
+    act(() => listeners.forEach((fn) => fn()))
+  }
   const router = createMemoryRouter(
     [{ element: <AppShell />, children: [{ path: "*", element: <Page /> }] }],
     { initialEntries: [path] },
@@ -114,7 +120,7 @@ function setup(device: Device, path = "/") {
       </ConnectionContext.Provider>
     </DeviceContext.Provider>,
   )
-  return { setDrafts }
+  return { setDrafts, setChatDrafts }
 }
 
 const body = () => within(screen.getByTestId("sidebar-body"))
@@ -146,6 +152,63 @@ test("a draft row shows the icon, label and Draft with no dot or ring; a snapsho
 
   setDrafts([])
   await waitFor(() => expect(body().queryByRole("link", { name: /Checkout redesign/ })).toBeNull())
+})
+
+const chatDraftRow = (over: Partial<ChatDraftRow> = {}): ChatDraftRow => ({
+  id: "c1",
+  label: "Explore caching",
+  project: "p",
+  harness: "claude",
+  edited_at: "2026-01-02T00:00:00Z",
+  workspace: "Default",
+  member_key: "chat-draft/c1",
+  ...over,
+})
+
+test("a chat draft row shows the icon, label and Draft; a snapshot update adds and removes it", async () => {
+  const { setChatDrafts } = setup("desktop", "/")
+  await body().findByRole("link", { name: /Blog/ })
+  expect(body().queryByRole("img", { name: "Chat draft" })).toBeNull()
+
+  setChatDrafts([chatDraftRow(), chatDraftRow({ id: "c2", label: "Elsewhere", workspace: "Work" })])
+  const link = await body().findByRole("link", { name: /Explore caching/ })
+  expect(link.getAttribute("href")).toBe("#/chat-drafts/c1")
+  expect(link.textContent).toContain("Draft")
+  expect(within(link).getByRole("img", { name: "Chat draft" })).toBeTruthy()
+  expect(body().queryByRole("link", { name: /Elsewhere/ })).toBeNull()
+
+  setChatDrafts([])
+  await waitFor(() => expect(body().queryByRole("link", { name: /Explore caching/ })).toBeNull())
+})
+
+test("a chat draft row's menu is only Move to workspace, which posts its key", async () => {
+  const fetchMock = vi.fn(
+    async (url: string, _init?: RequestInit) =>
+      new Response(
+        JSON.stringify(
+          String(url).includes("/v1/workspaces/")
+            ? { results: [{ target: "chat-draft/c1", status: "done" }] }
+            : { epics: rows, follow_ups: [] },
+        ),
+        { status: 200 },
+      ),
+  )
+  const { setChatDrafts } = setup("desktop")
+  vi.stubGlobal("fetch", fetchMock)
+  setChatDrafts([chatDraftRow()])
+  const link = await body().findByRole("link", { name: /Explore caching/ })
+  fireEvent.click(within(link.closest("li")!).getByRole("button", { name: "More actions" }))
+  await screen.findAllByRole("menuitem")
+  expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Move to workspace›"])
+  fireEvent.click(screen.getByRole("menuitem", { name: "Move to workspace" }))
+  fireEvent.click(await screen.findByRole("menuitem", { name: /^Work/ }))
+  await waitFor(() => {
+    const call = fetchMock.mock.calls.find(([u]) => String(u).includes("/v1/workspaces/move"))
+    expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({
+      name: "Work",
+      targets: ["chat-draft/c1"],
+    })
+  })
 })
 
 test("the draft row has a menu; removing the open draft from it navigates to /epics", async () => {

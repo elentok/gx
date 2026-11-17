@@ -118,6 +118,29 @@ export function DraftIcon() {
   )
 }
 
+/** The chat draft icon: a dashed page outline in the chat pink. */
+export function ChatDraftIcon() {
+  return (
+    <Box as="span" display="grid">
+      <svg
+        width="26"
+        height="26"
+        viewBox="0 0 26 26"
+        fill="none"
+        stroke="var(--chakra-colors-chat)"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-label="Chat draft"
+        role="img"
+      >
+        <rect x="5.5" y="4.5" width="15" height="17" rx="2.5" strokeDasharray="3 2.4" />
+        <path d="M9 10h8M9 13.5h8M9 17h4" />
+      </svg>
+    </Box>
+  )
+}
+
 function WrenchIcon({ status }: { status: SidebarStatus }) {
   return (
     <Box as="span" data-testid="fix-wrench" flex="none" display="grid" color={statusColor(status)}>
@@ -423,7 +446,7 @@ function MenuSlot({ number, children }: { number?: number; children: ReactNode }
 }
 
 const itemKind = (kind: SidebarRow["kind"]): ItemRef["kind"] =>
-  kind === "chat" || kind === "design" || kind === "draft" ? kind : "epic"
+  kind === "chat" || kind === "design" || kind === "draft" || kind === "chat-draft" ? kind : "epic"
 
 function Row({
   row,
@@ -483,6 +506,8 @@ function Row({
               <ChatIcon working={row.status.tone === "running"} />
             ) : row.kind === "draft" ? (
               <DraftIcon />
+            ) : row.kind === "chat-draft" ? (
+              <ChatDraftIcon />
             ) : (
               <Box position="relative" flex="none">
                 <ProgressRing
@@ -641,6 +666,7 @@ export function useSidebarModel(fetcher: FetchEpicList | undefined, active: stri
     sessions: snapshot?.sessions ?? [],
     placements: snapshot?.placements ?? [],
     drafts: snapshot?.design_drafts,
+    chatDrafts: snapshot?.chat_drafts,
     workspace: active,
     sort,
   })

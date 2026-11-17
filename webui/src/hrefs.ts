@@ -15,6 +15,9 @@ export const designHref = (address: string) => `#/d/${address}`
 /** A Design draft's page; the id is the draft's. */
 export const draftHref = (id: string) => `#/drafts/${id}`
 
+/** A chat draft's page; the id is the draft's. */
+export const chatDraftHref = (id: string) => `#/chat-drafts/${id}`
+
 /** A Triage is its project's, so the address is the project name. */
 export const triageHref = (project: string) => `#/triage/${project}`
 

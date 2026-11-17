@@ -13,6 +13,7 @@ import {
   SortNeedsYou,
   SortProject,
   SortStatus,
+  type ChatDraftRow,
   type DesignDraftRow,
   type EpicListRow,
   type SessionInfo,
@@ -21,7 +22,7 @@ import {
 } from "../generated/server"
 import { isActionable, isUnread, stateLabel } from "../agents/rules"
 import { RING_KIND, isLive, ringProgress } from "../epics/ring"
-import { agentHref, designHref, draftHref, triageHref } from "../hrefs"
+import { agentHref, chatDraftHref, designHref, draftHref, triageHref } from "../hrefs"
 import { isArchivable } from "../select/selectModel"
 import { titleHref } from "../epics/cardLinks"
 import type { Kind, Tone } from "../ui/tone"
@@ -54,7 +55,7 @@ export interface SidebarAgent {
 export interface SidebarRow {
   key: string
   /** Design is purple, epic teal (the ring kinds), chat pink; a draft has its own icon. */
-  kind: Kind | "chat" | "draft"
+  kind: Kind | "chat" | "draft" | "chat-draft"
   title: string
   href: string
   status: SidebarStatus
@@ -92,6 +93,8 @@ export interface SidebarInput {
   workspace: string
   /** The snapshot's Design draft rows; missing reads as none. */
   drafts?: DesignDraftRow[]
+  /** The snapshot's chat draft rows; missing reads as none. */
+  chatDrafts?: ChatDraftRow[]
   /** The active workspace's Sort value; missing or unknown reads as needs-you. */
   sort?: string
 }
@@ -230,6 +233,7 @@ export function buildSidebar({
   placements,
   workspace,
   drafts = [],
+  chatDrafts = [],
   sort,
 }: SidebarInput): Sidebar {
   const mode = sortOf(sort)
@@ -318,7 +322,27 @@ export function buildSidebar({
         at: time(d.edited_at),
       }
     })
-  const entries = [...own, ...chats, ...draftEntries]
+  const chatDraftEntries = chatDrafts
+    .filter((d) => d.workspace === workspace)
+    .map((d): Sortable<SidebarRow> => {
+      const status = draftStatus()
+      return {
+        item: {
+          key: d.member_key,
+          kind: "chat-draft",
+          title: d.label,
+          href: chatDraftHref(d.id),
+          status,
+          agents: [],
+        },
+        name: d.label,
+        needsYou: false,
+        project: d.project,
+        words: status.words,
+        at: time(d.edited_at),
+      }
+    })
+  const entries = [...own, ...chats, ...draftEntries, ...chatDraftEntries]
   const all = sortBy(mode, entries)
   if (mode === SortProject || mode === SortStatus) {
     const entryOf = new Map(entries.map((e) => [e.item, e]))

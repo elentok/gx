@@ -252,6 +252,15 @@ test("a draft offers Rename, Move to workspace and Remove in that order, and pos
   await waitFor(() => expect(w.move).toHaveBeenCalledExactlyOnceWith("draft/d1", "Default"))
 })
 
+test("a chat draft offers only Move to workspace, and posts the move with its key", async () => {
+  const w = writers()
+  await open({ key: "chat-draft/c1", name: "Chat", kind: "chat-draft", workspace: "Work" }, w)
+  expect(labels()).toEqual(["Move to workspace›"])
+  fireEvent.click(screen.getByRole("menuitem", { name: "Move to workspace" }))
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Default" }))
+  await waitFor(() => expect(w.move).toHaveBeenCalledExactlyOnceWith("chat-draft/c1", "Default"))
+})
+
 const draftRow: ItemRef = {
   key: "draft/d1",
   name: "Checkout",
