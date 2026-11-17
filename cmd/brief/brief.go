@@ -33,6 +33,7 @@ func DefaultDeps() Deps { return Deps{} }
 const (
 	goCleanCache = "go-clean-cache"
 	failures     = "failures"
+	health       = "health"
 )
 
 // New builds the `brief` command.
@@ -60,6 +61,11 @@ text, untrimmed. Without a log path it reads the latest failed run (exit 1
 while the log holds failures, 0 when none). With a test name it prints only
 that failure and the command that re-runs it. Use it instead of rg over the
 log.
+
+health [--limit N] [--all-runs] prints the first-attempt pass rate of full
+trunk gx check runs and the current streak, the tests that failed then passed
+on one tree, and p50/p95 per test. It always exits 0 (2 when the data cannot
+be read).
 
 go-clean-cache waits until no Go build runs, then runs go clean -cache. Use it
 instead of calling go clean -cache, which breaks running builds.
@@ -109,8 +115,8 @@ func runBrief(c *cobra.Command, d Deps, args []string) error {
 		return c.Help()
 	}
 	tool, ok := brief.ToolByName(args[0])
-	if !ok && args[0] != "conflicts" && args[0] != goCleanCache && args[0] != failures {
-		// conflicts, failures and go-clean-cache are not brief.Tools: they keep no log.
+	if !ok && args[0] != "conflicts" && args[0] != goCleanCache && args[0] != failures && args[0] != health {
+		// conflicts, failures, health and go-clean-cache are not brief.Tools: they keep no log.
 		return briefUsageError(c, fmt.Sprintf("unknown tool %q", args[0]))
 	}
 	if slices.Contains(args[1:], "-C") {
@@ -134,6 +140,9 @@ func runBrief(c *cobra.Command, d Deps, args []string) error {
 	stateDir, err := d.Dirs().StateDir()
 	if err != nil {
 		return err
+	}
+	if args[0] == health {
+		return runHealth(c, d, dir, args[1:])
 	}
 	if args[0] == failures {
 		dataDir, err := d.Dirs().DataDir()
