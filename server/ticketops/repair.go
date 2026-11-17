@@ -249,7 +249,8 @@ func (o *Ops) repairStartOver(req wire.RepairRequest, rc repairCtx) (wire.Repair
 	if rc.RequireState && strings.TrimSpace(req.Reason) == "" {
 		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonReasonRequired, Message: "a reason is required to start over"}), nil
 	}
-	epicPath, id, cwd, err := o.epicTarget(req, true, false)
+	// The project repo, not the caller's directory: the CLI may run outside it.
+	epicPath, id, cwd, err := o.epicTarget(req, true, true)
 	if err != nil {
 		return repairRefusal(err), nil
 	}

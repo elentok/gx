@@ -58,6 +58,16 @@ func TestHerdrLeftoverWorkPausesHandleMismatch(t *testing.T) {
 	}
 }
 
+func TestHerdrLeftoverWorkStartOverRestartsOnPty(t *testing.T) {
+	r := start(t, "herdr-leftover-work")
+	r.WaitStatus(t, spec.HerdrLeftoverWorkTicket, "needs-repair")
+	r.Gx(t, "server", "tickets", "start-over", spec.HerdrLeftoverWorkTicket, "--reason", "verify")
+	r.WaitStatus(t, spec.HerdrLeftoverWorkTicket, "claimed")
+	if body := r.epicTicketFile(t, "herdr-work-epic"); strings.Contains(body, "pause_reason:") {
+		t.Fatalf("start over left the pause:\n%s", body)
+	}
+}
+
 func TestHerdrAgentPaneBusyMigratesToIterationError(t *testing.T) {
 	r := start(t, "agent-pane-busy")
 	body := r.epicTicketFile(t, "pane-busy-epic")
