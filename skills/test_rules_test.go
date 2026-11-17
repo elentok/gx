@@ -189,13 +189,28 @@ func TestGxUICheckBlocksWorkersByDefault(t *testing.T) {
 func TestGxImplementTestRules(t *testing.T) {
 	checkAnchors(t, "gx-implement/SKILL.md",
 		"(../gx-test-guidelines/SKILL.md)",
+		"(../gx-go-tests/SKILL.md)",
+		"(../gx-vitest-tests/SKILL.md)",
+		"(../gx-playwright-tests/SKILL.md)",
+		".ai/index.md",
 		"before you write the first one",
 		"Before `--iteration-status finished`, check each new or changed test",
 		"pause with `gx tickets ask`",
 		"There is no exemption list",
 		"`gx check --full`",
 		"changed-file `gx check`",
-		"`gx-playwright-tests`",
+	)
+	for _, skill := range []string{"gx-implement/SKILL.md", "gx-tdd/SKILL.md"} {
+		if strings.Contains(readFile(t, skill), "gx-playwright-e2es") {
+			t.Errorf("%s still names gx-playwright-e2es", skill)
+		}
+	}
+	checkAnchors(t, "gx-tdd/SKILL.md",
+		"(../gx-test-guidelines/SKILL.md)",
+		"(../gx-go-tests/SKILL.md)",
+		"(../gx-vitest-tests/SKILL.md)",
+		"(../gx-playwright-tests/SKILL.md)",
+		".ai/index.md",
 	)
 	checkAnchors(t, "../.ai/index.md", "`gx check --full`", "skills/gx-test-guidelines/SKILL.md", "GOMAXPROCS", "claudeenv", "envguard")
 	checkAnchors(t, "../.ai/index.md", "start it with `run_in_background` from the first call", "TaskStop")
@@ -208,7 +223,7 @@ func TestUnrelatedFlakyFlowRule(t *testing.T) {
 		"`gx-flake-tickets`",
 		"`--repeat-each`",
 	)
-	checkAnchors(t, "gx-implement/SKILL.md", "gx-playwright-tests", "rerun the flow once")
+	checkAnchors(t, "gx-implement/SKILL.md", "(../gx-playwright-tests/SKILL.md)", ".ai/index.md", "rerun the flow once")
 }
 
 func TestPlaywrightE2esRunsGuardBeforeFirstBrowserRun(t *testing.T) {
@@ -224,7 +239,7 @@ func TestFailingFlowReadsErrorContextFirst(t *testing.T) {
 		"clean worktree at HEAD",
 		"`gx tickets ask`",
 	)
-	checkAnchors(t, "gx-implement/SKILL.md", "read its `error-context.md` first", "`gx-playwright-tests`")
+	checkAnchors(t, "gx-implement/SKILL.md", "read its `error-context.md` first", "(../gx-playwright-tests/SKILL.md)", ".ai/index.md")
 }
 
 var portableTestSkills = []string{"gx-test-guidelines", "gx-go-tests", "gx-vitest-tests", "gx-playwright-tests"}

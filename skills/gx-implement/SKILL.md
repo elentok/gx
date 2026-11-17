@@ -98,17 +98,21 @@ Then, while working:
   the event (poll with a timeout), never a fixed sleep. Never weaken, skip or delete an assertion
   just to get green. For any other failing test, follow [gx-failing-tests](../gx-failing-tests.md).
 - **A Playwright flow fails outside your own steps: rerun the flow once, then file it and stop.**
-  No `--repeat-each` loops and no baseline worktree. See `gx-playwright-tests` and the `.ai/index.md` Testing section.
+  No `--repeat-each` loops and no baseline worktree. See [gx-playwright-tests](../gx-playwright-tests/SKILL.md)
+  and the `.ai/index.md` "Testing" section.
 - **A Playwright flow fails: read its `error-context.md` first.** Do this before reproducing on a
-  clean tree and before any `gx tickets ask`. See `gx-playwright-tests`.
+  clean tree and before any `gx tickets ask`. See [gx-playwright-tests](../gx-playwright-tests/SKILL.md)
+  and the `.ai/index.md` "Testing" section.
 - **Never report a result you did not see.** If a check's output is missing or cut off, re-run it.
   Do not claim "no remaining imports" or "gofmt is clean" from silence.
 - **Read files with a file read (Read), not a shell command.** If a read ends in "(exporter
   truncated)" or has lost its indentation, read it again with a file read.
 
 If the ticket adds or changes tests, read [gx-test-guidelines](../gx-test-guidelines/SKILL.md) before you
-write the first one. If the ticket text, its seams or the touched files are Playwright, also load
-`gx-playwright-tests` and read the `.ai/index.md` Testing section.
+write the first one, and the framework skill that matches the touched files:
+[gx-go-tests](../gx-go-tests/SKILL.md) for `*_test.go`, [gx-vitest-tests](../gx-vitest-tests/SKILL.md)
+for `*.test.ts(x)`, [gx-playwright-tests](../gx-playwright-tests/SKILL.md) for `*.e2e.ts` or
+`webui/e2e/`. Follow the `.ai/index.md` "Testing" section for the project's own test rules.
 
 ## Forking when the ticket outgrows budget
 
@@ -299,7 +303,9 @@ background and polls).
 A new or changed test that waits on time or concurrency runs with `-count=20` before commit.
 
 Before `--iteration-status finished`, check each new or changed test against
-[gx-test-guidelines](../gx-test-guidelines/SKILL.md). If a test fails a per-test time limit, speed it up
+[gx-test-guidelines](../gx-test-guidelines/SKILL.md) and the matching framework skill
+([gx-go-tests](../gx-go-tests/SKILL.md), [gx-vitest-tests](../gx-vitest-tests/SKILL.md) or
+[gx-playwright-tests](../gx-playwright-tests/SKILL.md)). If a test fails a per-test time limit, speed it up
 first (fake clock, a test-sized wait override, shared setup, a lower test level). If it cannot get
 under the limit, pause with `gx tickets ask` and the person decides. There is no exemption list, and
 you never raise a limit. Suite-limit failures are not yours to fix, and you add no per-test timing to

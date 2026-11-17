@@ -80,6 +80,11 @@ on the critical paths and complex logic instead of every edge case.
 
 - **Red before green.** Write the failing test first, then only enough code to pass it. Don't
   anticipate future tests or add speculative features.
+- **Read the test rules before the first test of a cycle.** Read
+  [gx-test-guidelines](../gx-test-guidelines/SKILL.md) and the framework skill for the files you
+  test ([gx-go-tests](../gx-go-tests/SKILL.md), [gx-vitest-tests](../gx-vitest-tests/SKILL.md) or
+  [gx-playwright-tests](../gx-playwright-tests/SKILL.md)), and the `.ai/index.md` "Testing" section
+  for project rules.
 - **One slice at a time.** One seam, one test, one minimal implementation per cycle.
 - **Never leave the worktree root with a bare `cd`.** The shell keeps the new directory, so the
   next command runs in the wrong place. Run tests in a subshell, `(cd webui && pnpm exec vitest ...)`, or
