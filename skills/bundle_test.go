@@ -158,6 +158,7 @@ var requiredFiles = []string{
 	"gx-pr-text/SKILL.md",
 	"gx-pr-text/agents/openai.yaml",
 	"gx-playwright-e2es/SKILL.md",
+	"gx-playwright-tests/SKILL.md",
 	"gx-ui-check/SKILL.md",
 	"gx-ui-check/MOCK-CHECK.md",
 }
@@ -310,6 +311,7 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-pr-text":                            true,
 	"gx-ui-check":                           false,
 	"gx-playwright-e2es":                    false,
+	"gx-playwright-tests":                   false,
 }
 
 func TestSkillMetadataAndInvocationPolicy(t *testing.T) {

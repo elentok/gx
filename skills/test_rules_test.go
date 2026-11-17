@@ -48,6 +48,30 @@ func TestGoTestsSkill(t *testing.T) {
 	)
 }
 
+func TestPlaywrightTestsSkill(t *testing.T) {
+	checkRuleHeadings(t, "gx-playwright-tests/SKILL.md")
+	checkAnchors(t, "gx-playwright-tests/SKILL.md",
+		"(../gx-test-guidelines/SKILL.md)",
+		"`expect.poll`",
+		"`error-context.md`",
+		"## Read `error-context.md` first",
+		"## Assert the destination after you navigate",
+		"## Read boxes together in `expect.poll`",
+		"## Review renames by diff",
+		"## Visible and enabled is not clickable",
+		"## A fixture exit and a SecurityError are one failure",
+		"## Update the flow when the change was on purpose",
+		"## Write an e2e only when a lower test cannot cover it",
+		"## A state read follows an `expect` on the same locator",
+		"## `-g` patterns match the full title",
+		"## Wait for the event, never for time",
+		"## A new sibling changes the counts",
+		"## Prove a rare flake under load",
+		"## Keep each `expect` timeout below its test timeout",
+		"## A `check()` that did not change state can be an unmount",
+	)
+}
+
 func TestVitestSkill(t *testing.T) {
 	checkRuleHeadings(t, "gx-vitest-tests/SKILL.md")
 	checkAnchors(t, "gx-vitest-tests/SKILL.md",
