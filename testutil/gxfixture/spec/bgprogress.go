@@ -1,11 +1,11 @@
 package spec
 
 import (
-	"fmt"
 	"slices"
 	"time"
 
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/gxfixture/bgtx"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -16,45 +16,21 @@ var BgProgressShapes = []string{
 	"subagent-with-inner-task", "many", "timed-out-shell", "growing-output",
 }
 
-// Names the tests and flows of the shapes look at.
+// Keys of the exited shape's sessions in Output.Transcripts.
 const (
-	// BgTimedOutUseID is the tool_use id of the timed-out-shell call and of the
-	// claude shape's moved-to-background call.
-	BgTimedOutUseID = "toolu_timedout"
-	// BgInnerAgentID is the subagent of the subagent-with-inner-task shape.
-	BgInnerAgentID = "a1ner0001"
-	// BgGrowingKey is the growing-output shell's key in Output.TaskFiles.
-	BgGrowingKey = "growing-output"
-	// BgMonitorEvents is the number of event notices of the claude shape's Monitor.
-	BgMonitorEvents = 6
-	// BgManyTasks and BgManyFinished are the many shape's rows.
-	BgManyTasks, BgManyFinished = 50, 20
-	// BgScriptLines is the line count of the long shell commands.
-	BgScriptLines = 16
+	BgKeyExitedClaude = "exited-claude"
+	BgKeyExitedCodex  = "exited-codex"
 )
 
-// bgBuilders maps a shape to its expected task count and its lines.
-var bgBuilders = map[string]struct {
-	tasks int
-	build func(b *bgLines)
-}{
-	"claude":                   {7, bgClaude},
-	"single-task":              {1, bgSingleTask},
-	"subagent-with-inner-task": {1, bgInnerTask},
-	"many":                     {BgManyTasks, bgMany},
-	"timed-out-shell":          {1, bgTimedOut},
-	"growing-output":           {1, bgGrowing},
-}
-
 // BgProgressScenario is the bg-progress scenario in the given shape: Claude and
-// Codex sessions whose transcripts and task files hold the shape's tasks. The
-// single-session shapes are one Working Claude Design session of design-epic.
-// False for a name that is not a shape.
+// Codex sessions whose transcripts and task files hold the shape's tasks (see
+// bgtx). The single-session shapes are one Working Claude Design session of
+// design-epic. False for a name that is not a shape.
 func BgProgressScenario(shape string) (Scenario, bool) {
 	const mapAddr = project + ":design-epic"
 	var sessions []SessionSpec
-	if b, ok := bgBuilders[shape]; ok {
-		sessions = []SessionSpec{bgClaudeSession(mapAddr, shape, agentfake.ChatSlowMarker+" background tasks", b.tasks, bgSeed(b.build, nil))}
+	if b, ok := bgtx.Single[shape]; ok {
+		sessions = []SessionSpec{bgClaudeSession(mapAddr, shape, agentfake.ChatSlowMarker+" background tasks", b.Tasks, bgSeed(b.Build, nil))}
 	} else if m, ok := bgMulti[shape]; ok {
 		sessions = m(mapAddr)
 	} else {
@@ -69,12 +45,12 @@ func BgProgressScenario(shape string) (Scenario, bool) {
 	}, true
 }
 
-// bgSeed is a session's BgSeed func for a builder; adjust sets the seed's own fields.
-func bgSeed(build func(b *bgLines), adjust func(*BgSeed)) func(time.Time, BgPaths) BgSeed {
-	return func(now time.Time, p BgPaths) BgSeed {
-		l := newBgLines(now, p)
+// bgSeed is a session's seed func; adjust sets the seed's own fields.
+func bgSeed(build func(b *bgtx.Lines), adjust func(*bgtx.Seed)) func(time.Time, bgtx.Paths) bgtx.Seed {
+	return func(now time.Time, p bgtx.Paths) bgtx.Seed {
+		l := bgtx.NewLines(now, p)
 		build(l)
-		seed := l.seed()
+		seed := l.Seed()
 		if adjust != nil {
 			adjust(&seed)
 		}
@@ -82,130 +58,37 @@ func bgSeed(build func(b *bgLines), adjust func(*BgSeed)) func(time.Time, BgPath
 	}
 }
 
-func bgClaudeSession(mapAddr, key, prompt string, tasks int, seed func(time.Time, BgPaths) BgSeed) SessionSpec {
+func bgClaudeSession(mapAddr, key, prompt string, tasks int, seed func(time.Time, bgtx.Paths) bgtx.Seed) SessionSpec {
 	return SessionSpec{Project: project, Prompt: prompt, Link: mapAddr, Key: key, BgTasks: tasks, BgSeed: seed}
 }
 
-// bgCodexSession is a Codex session; a version rewrites the rollout's cli_version.
-func bgCodexSession(key string, tasks int, build func(b *bgLines), adjust func(*BgSeed)) SessionSpec {
-	return SessionSpec{
-		Project: project, Harness: "codex", Prompt: "background tasks", Key: key, BgTasks: tasks,
-		BgSeed: bgSeed(build, adjust),
-	}
+func bgCodexSession(key string, tasks int, build func(b *bgtx.Lines), adjust func(*bgtx.Seed)) SessionSpec {
+	return SessionSpec{Project: project, Harness: "codex", Prompt: "background tasks", Key: key, BgTasks: tasks, BgSeed: bgSeed(build, adjust)}
 }
 
-// Keys of the sessions the multi-session shapes seed, in Output.Transcripts.
-const (
-	BgKeyExitedClaude = "exited-claude"
-	BgKeyExitedCodex  = "exited-codex"
-	BgKeyNoEndClaude  = "no-end-claude"
-	BgKeyNoEndCodex   = "no-end-codex"
-)
-
-// Codex versions the shapes rewrite a rollout to: the first predates
-// item_completed lines, the second predates the exec cell shape.
-const (
-	bgCodexCellVersion = "0.145.0"
-	bgCodexOldVersion  = "0.143.0"
-)
-
-func bgVersion(v string) func(*BgSeed) { return func(s *BgSeed) { s.Version = v } }
+func bgVersion(v string) func(*bgtx.Seed) { return func(s *bgtx.Seed) { s.Version = v } }
 
 // bgMulti maps a shape of a Codex session, or of more than one, to its sessions.
 var bgMulti = map[string]func(mapAddr string) []SessionSpec{
 	"codex": func(string) []SessionSpec {
 		return []SessionSpec{
-			bgCodexSession("codex-items", 3, bgCodex(true, "00000000-0000-4000-8000-0000000000c2"), nil),
-			bgCodexSession("codex-cells", 3, bgCodex(false, "00000000-0000-4000-8000-0000000000c3"), bgVersion(bgCodexCellVersion)),
+			bgCodexSession("codex-items", 3, bgtx.Codex(true, "00000000-0000-4000-8000-0000000000c2"), nil),
+			bgCodexSession("codex-cells", 3, bgtx.Codex(false, "00000000-0000-4000-8000-0000000000c3"), bgVersion(bgtx.CodexCellVersion)),
 		}
 	},
 	"old-codex": func(string) []SessionSpec {
-		return []SessionSpec{bgCodexSession("old-codex", 0, bgOldCodex, func(s *BgSeed) { s.Version, s.Working = bgCodexOldVersion, true })}
+		return []SessionSpec{bgCodexSession("old-codex", 0, bgtx.OldCodex, func(s *bgtx.Seed) { s.Version, s.Working = bgtx.CodexOldVersion, true })}
 	},
 	"exited": func(mapAddr string) []SessionSpec {
-		claude := bgClaudeSession(mapAddr, BgKeyExitedClaude, "background tasks", 0, bgSeed(bgExitedClaude, nil))
-		claude.Crash = true
-		codex := bgCodexSession(BgKeyExitedCodex, 0, bgExitedCodex, nil)
-		codex.Crash = true
+		claude := bgClaudeSession(mapAddr, BgKeyExitedClaude, "background tasks", 0, bgSeed(bgtx.ExitedClaude, nil))
+		codex := bgCodexSession(BgKeyExitedCodex, 0, bgtx.ExitedCodex, nil)
+		claude.Crash, codex.Crash = true, true
 		return []SessionSpec{claude, codex}
 	},
 	// The Claude session is the second one so the Monitor's 20 s are not spent
 	// seeding the Codex session.
 	"no-end": func(mapAddr string) []SessionSpec {
-		claude := bgClaudeSession(mapAddr, BgKeyNoEndClaude, "background tasks", 5, bgSeed(bgNoEndClaude, func(s *BgSeed) { s.Age = BgNoEndAge }))
-		return []SessionSpec{bgCodexSession(BgKeyNoEndCodex, 1, bgNoEndCodex, nil), claude}
+		claude := bgClaudeSession(mapAddr, "no-end-claude", "background tasks", 5, bgSeed(bgtx.NoEndClaude, func(s *bgtx.Seed) { s.Age = bgtx.NoEndAge }))
+		return []SessionSpec{bgCodexSession("no-end-codex", 1, bgtx.NoEndCodex, nil), claude}
 	},
-}
-
-const (
-	sec    = time.Second
-	minute = time.Minute
-)
-
-// bgClaude: 7 tasks in one group, 3 done. The subagent runs throughout.
-func bgClaude(b *bgLines) {
-	b.subagent(6*minute, BgAgentID, "Survey the sessions code", surveyFile())
-
-	b.shell(5*minute+50*sec, "toolu_lint", "blint0001", "make lint", outputText("lint", 4, 40), 5*minute+8*sec)
-	b.endShell(5*minute+8*sec, "blint0001", "completed", `Background command "make lint" completed (exit code 0)`)
-
-	b.shell(5*minute, "toolu_script", "bscript01", bashScript(BgScriptLines), outputText("script", 5, 40)+"[exited with code 2]\n", 4*minute+48*sec)
-	b.endShell(4*minute+48*sec, "bscript01", "failed", `Background command "bash script" failed with exit code 2`)
-
-	b.shell(4*minute+30*sec, "toolu_sleep", "bsleep001", "sleep 900", "", 4*minute+18*sec)
-	b.use(4*minute+19*sec, "toolu_stop", "TaskStop", map[string]any{"task_id": "bsleep001"})
-	b.result(4*minute+18*sec, "toolu_stop", "Stopped bsleep001", map[string]any{"task_id": "bsleep001"})
-
-	b.use(4*minute, BgTimedOutUseID, "Bash", map[string]any{"command": "python3 - <<'PY'\nimport time\nfor i in range(100):\n    print(i)\n    time.sleep(5)\nPY", "timeout": 120000})
-	b.result(2*minute, BgTimedOutUseID, "Command exceeded the timeout and moved to the background. Output is being written to: "+b.outputPath("bpython01"),
-		map[string]any{"backgroundTaskId": "bpython01", "timedOutAfterMs": 120000})
-	b.file(BgFile{Path: b.outputPath("bpython01"), Content: outputText("python", 8, 20), Mtime: b.when(30 * sec)})
-
-	b.use(3*minute, "toolu_monitor", "Monitor", map[string]any{"command": "tail -f logs/app.log", "timeout_ms": 600000, "description": "Watch the app log"})
-	b.result(3*minute-sec, "toolu_monitor", "Monitor started: bmon00001", map[string]any{"taskId": "bmon00001", "timeoutMs": 600000})
-	for i := range BgMonitorEvents {
-		b.notify(170*sec-time.Duration(i)*20*sec, fmt.Sprintf("<task-id>bmon00001</task-id>\n<summary>Monitor event: line %d</summary>\n<event>request %d served</event>", i+1, i+1))
-	}
-
-	b.use(minute, "toolu_test", "Bash", map[string]any{"command": "make test"})
-}
-
-func bgSingleTask(b *bgLines) {
-	b.shell(minute, "toolu_long", "blong0001", bashScript(BgScriptLines), outputText("long", 3, 30), 20*sec)
-}
-
-// bgInnerTask: the subagent's own file launches a shell the parent never names.
-func bgInnerTask(b *bgLines) {
-	inner := []string{
-		subAssistant("msg_i1", 900, 50, subUse("toolu_inner", "Bash", map[string]any{"command": "make watch", "run_in_background": true})),
-		subResult("toolu_inner", "Command running in background with ID: binner001", map[string]any{"backgroundTaskId": "binner001"}),
-	}
-	b.subagent(4*minute, BgInnerAgentID, "Watch the build", inner)
-}
-
-// bgMany: the anchor subagent, 29 running shells and 20 finished ones.
-func bgMany(b *bgLines) {
-	b.subagent(6*minute, BgAgentID, "Survey the sessions code", surveyFile())
-	for i := range BgManyTasks - 1 {
-		id := fmt.Sprintf("bmany%04d", i)
-		start := 5*minute - time.Duration(i)*5*sec
-		b.shell(start, "toolu_"+id, id, fmt.Sprintf("make step-%d", i), outputText(id, 40, 50), 20*sec)
-		if i < BgManyFinished {
-			b.endShell(start-3*sec, id, "completed", fmt.Sprintf(`Background command "make step-%d" completed (exit code 0)`, i))
-		}
-	}
-}
-
-// bgTimedOut: the call ran past its timeout and moved to the background.
-func bgTimedOut(b *bgLines) {
-	b.use(9*minute, BgTimedOutUseID, "Bash", map[string]any{"command": "make slow-test", "timeout": 120000})
-	b.result(2*minute, BgTimedOutUseID, "Command exceeded the timeout and moved to the background. Output is being written to: "+b.outputPath("btimeout1"),
-		map[string]any{"backgroundTaskId": "btimeout1", "timedOutAfterMs": 120000})
-	b.file(BgFile{Path: b.outputPath("btimeout1"), Content: outputText("slow", 3, 30), Mtime: b.when(30 * sec)})
-}
-
-// bgGrowing: one running shell whose output file a test grows.
-func bgGrowing(b *bgLines) {
-	b.shell(minute, "toolu_grow", "bgrow0001", "make watch", "one\ntwo\nthree\n", 20*sec)
-	b.files[len(b.files)-1].Key = BgGrowingKey
 }

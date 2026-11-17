@@ -13,7 +13,7 @@ import (
 
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/testutil/gxfixture/spec"
+	"github.com/elentok/gx/testutil/gxfixture/bgtx"
 )
 
 // bgSessionAge puts the session's creation before every seeded task: a task
@@ -29,7 +29,7 @@ func (f sessionSeeder) seedBgProgress(id string, s sessionSpec) error {
 	}
 	now := time.Now()
 	convID := strings.TrimSuffix(filepath.Base(path), ".jsonl")
-	seed := s.BgSeed(now, spec.BgPaths{
+	seed := s.BgSeed(now, bgtx.Paths{
 		Tasks:     filepath.Join(f.root, "tmp", "claude", filepath.Base(filepath.Dir(path)), convID, "tasks"),
 		Subagents: strings.TrimSuffix(path, ".jsonl") + "/subagents",
 		Rollouts:  filepath.Join(f.root, "home", ".codex", "sessions"),
@@ -83,7 +83,7 @@ func setRolloutVersion(path, version string) error {
 	return os.Rename(tmp, path)
 }
 
-func (f sessionSeeder) writeBgFile(file spec.BgFile) error {
+func (f sessionSeeder) writeBgFile(file bgtx.File) error {
 	if err := os.MkdirAll(filepath.Dir(file.Path), 0o755); err != nil {
 		return err
 	}

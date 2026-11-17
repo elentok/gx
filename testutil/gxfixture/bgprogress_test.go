@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/gxfixture/bgtx"
 	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
@@ -133,23 +134,23 @@ func TestBgProgress_Shapes(t *testing.T) {
 			}
 			agent := tasks[0]
 			if agent.Finished || agent.Label != "Survey the sessions code" || agent.Model == "" ||
-				agent.Tokens != spec.BgSurveyTokens || agent.ToolCalls != spec.BgSurveyToolCalls || agent.CurrentCall != spec.BgSurveyCurrent {
+				agent.Tokens != bgtx.SurveyTokens || agent.ToolCalls != bgtx.SurveyToolCalls || agent.CurrentCall != bgtx.SurveyCurrent {
 				t.Fatalf("subagent = %+v", agent)
 			}
 			zero := 0
 			wantTaskEnd(t, tasks[1], "success", &zero, 42*time.Second)
 			wantTaskEnd(t, tasks[2], "failure", &exit2, 12*time.Second)
 			wantTaskEnd(t, tasks[3], "killed", nil, 12*time.Second)
-			if n := strings.Count(tasks[2].Command, "\n") + 1; n != spec.BgScriptLines {
-				t.Fatalf("script command has %d lines, want %d", n, spec.BgScriptLines)
+			if n := strings.Count(tasks[2].Command, "\n") + 1; n != bgtx.ScriptLines {
+				t.Fatalf("script command has %d lines, want %d", n, bgtx.ScriptLines)
 			}
 			moved := tasks[4]
-			wantStart(t, moved, lineTime(t, r.Transcripts["claude"], `"id":"`+spec.BgTimedOutUseID+`"`))
+			wantStart(t, moved, lineTime(t, r.Transcripts["claude"], `"id":"`+bgtx.TimedOutUseID+`"`))
 			if moved.Finished || !strings.HasPrefix(moved.Command, "python3 - <<'PY'") {
 				t.Fatalf("moved call = %+v, want it running", moved)
 			}
-			if mon := tasks[5]; mon.Finished || mon.EventCount != spec.BgMonitorEvents {
-				t.Fatalf("monitor = %+v, want it running with %d events", mon, spec.BgMonitorEvents)
+			if mon := tasks[5]; mon.Finished || mon.EventCount != bgtx.MonitorEvents {
+				t.Fatalf("monitor = %+v, want it running with %d events", mon, bgtx.MonitorEvents)
 			}
 			if call := tasks[6]; call.Finished || call.Command != "make test" {
 				t.Fatalf("foreground call = %+v, want it running", call)
@@ -157,13 +158,13 @@ func TestBgProgress_Shapes(t *testing.T) {
 		}},
 		{"single-task", func(t *testing.T, _ *running, tasks []wire.SessionTask) {
 			if len(tasks) != 1 || tasks[0].Kind != "shell" || tasks[0].Finished ||
-				strings.Count(tasks[0].Command, "\n")+1 != spec.BgScriptLines {
-				t.Fatalf("tasks = %+v, want one running shell with a %d-line command", tasks, spec.BgScriptLines)
+				strings.Count(tasks[0].Command, "\n")+1 != bgtx.ScriptLines {
+				t.Fatalf("tasks = %+v, want one running shell with a %d-line command", tasks, bgtx.ScriptLines)
 			}
 		}},
 		{"many", func(t *testing.T, _ *running, tasks []wire.SessionTask) {
-			if len(tasks) != spec.BgManyTasks || countFinished(tasks) != spec.BgManyFinished {
-				t.Fatalf("got %d tasks, %d finished, want %d and %d", len(tasks), countFinished(tasks), spec.BgManyTasks, spec.BgManyFinished)
+			if len(tasks) != bgtx.ManyTasks || countFinished(tasks) != bgtx.ManyFinished {
+				t.Fatalf("got %d tasks, %d finished, want %d and %d", len(tasks), countFinished(tasks), bgtx.ManyTasks, bgtx.ManyFinished)
 			}
 			if tasks[1].OutputBytes < 1500 {
 				t.Fatalf("shell output = %d bytes, want about 2 KB", tasks[1].OutputBytes)
@@ -173,7 +174,7 @@ func TestBgProgress_Shapes(t *testing.T) {
 			if len(tasks) != 1 || tasks[0].Finished {
 				t.Fatalf("tasks = %+v, want one running task", tasks)
 			}
-			wantStart(t, tasks[0], lineTime(t, r.Transcripts["timed-out-shell"], `"id":"`+spec.BgTimedOutUseID+`"`))
+			wantStart(t, tasks[0], lineTime(t, r.Transcripts["timed-out-shell"], `"id":"`+bgtx.TimedOutUseID+`"`))
 		}},
 		{"codex", func(t *testing.T, r *running, first []wire.SessionTask) {
 			// The first session keeps the item_completed version, the second is 0.145.0.
@@ -196,14 +197,14 @@ func TestBgProgress_Shapes(t *testing.T) {
 				if yielded.Finished || yielded.Command != "make test-long" {
 					t.Fatalf("session %d yielded command = %+v, want it running", i, yielded)
 				}
-				if agent.Finished || agent.Label != "review" || agent.Model != spec.BgCodexChildModel || agent.Tokens != spec.BgCodexChildTokens {
+				if agent.Finished || agent.Label != "review" || agent.Model != bgtx.CodexChildModel || agent.Tokens != bgtx.CodexChildTokens {
 					t.Fatalf("session %d subagent = %+v, want the child's model and tokens", i, agent)
 				}
 			}
 		}},
 		{"old-codex", func(t *testing.T, r *running, tasks []wire.SessionTask) {
 			chat := r.bgChat(t, 0)
-			if len(tasks) != 0 || chat.Current == nil || chat.Current.Kind != "shell" || chat.Current.Label != spec.BgOldCodexLabel {
+			if len(tasks) != 0 || chat.Current == nil || chat.Current.Kind != "shell" || chat.Current.Label != bgtx.OldCodexLabel {
 				t.Fatalf("tasks = %+v, current = %+v, want no tasks and the in-flight label", tasks, chat.Current)
 			}
 		}},
@@ -334,7 +335,7 @@ func TestBgProgress_NoEnd(t *testing.T) {
 	after := r.waitBgTasksOf(t, claudeAt, "the finished Monitor", func(tasks []wire.SessionTask) bool {
 		return len(tasks) == len(before) && tasks[monitor].Finished
 	})
-	wantTaskEnd(t, after[monitor], "", nil, spec.BgNoEndMonitorTimeout)
+	wantTaskEnd(t, after[monitor], "", nil, bgtx.NoEndMonitorTimeout)
 	if after[monitor].EventCount != 1 {
 		t.Fatalf("monitor after its timeout = %+v, want its one event and no more", after[monitor])
 	}
@@ -348,7 +349,7 @@ func TestBgProgress_NoEnd(t *testing.T) {
 func TestBgProgress_GrowingOutput(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "bg-progress", nil, "--shape", "growing-output")
-	path := r.TaskFiles[spec.BgGrowingKey]
+	path := r.TaskFiles[bgtx.GrowingKey]
 	first := r.waitBgTasks(t, "the 3-line output", func(tasks []wire.SessionTask) bool {
 		return len(tasks) == 1 && tasks[0].LastLine == "three"
 	})
@@ -375,7 +376,7 @@ func TestBgProgress_SubagentWithInnerTask(t *testing.T) {
 		t.Fatalf("tasks = %+v, want one running subagent and no inner shell", tasks)
 	}
 	appendTo(t, r.Transcripts["subagent-with-inner-task"], `{"type":"queue-operation","operation":"enqueue","timestamp":"`+
-		time.Now().UTC().Format(time.RFC3339Nano)+`","content":"<task-notification>\n<task-id>`+spec.BgInnerAgentID+
+		time.Now().UTC().Format(time.RFC3339Nano)+`","content":"<task-notification>\n<task-id>`+bgtx.InnerAgentID+
 		`</task-id>\n<status>completed</status>\n<summary>Agent done</summary>\n<usage>\n<subagent_tokens>900</subagent_tokens>\n<tool_uses>1</tool_uses>\n</usage>\n</task-notification>"}`+"\n")
 	r.waitBgTasks(t, "no open tasks after the final notification", func(tasks []wire.SessionTask) bool { return len(tasks) == 0 })
 }

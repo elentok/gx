@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/agentfake/triageplay"
+	"github.com/elentok/gx/testutil/gxfixture/bgtx"
 	"github.com/elentok/gx/testutil/gxfixture/limitseed"
 )
 
@@ -368,7 +369,7 @@ type SessionSpec struct {
 	NoTranscript bool
 	// BgSeed writes the session's background tasks into its transcript and task
 	// files; BgTasks is the task count the chat read must then show.
-	BgSeed  func(now time.Time, p BgPaths) BgSeed
+	BgSeed  func(now time.Time, p bgtx.Paths) bgtx.Seed
 	BgTasks int
 }
 
