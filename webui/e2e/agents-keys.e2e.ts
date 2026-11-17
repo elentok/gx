@@ -229,7 +229,7 @@ test("160. Phone, key input and Blocked notices", async ({ page, start }) => {
   expect(type.height).toBeGreaterThanOrEqual(44)
   await screenDialog(page).getByRole("button", { name: "Close", exact: true }).click()
 
-  // A permission prompt: Deny and Allow once fit beside Screen.
+  // A readable permission prompt is a card that covers the notice: its options, Dismiss and Submit fit the width.
   const permissionSession = (await claudeIdle(fixture, 1))!
   await fixture.controlClaude(await conversationOf(fixture, permissionSession.id), {
     action: "block",
@@ -237,6 +237,16 @@ test("160. Phone, key input and Blocked notices", async ({ page, start }) => {
     dialog: BASH_DIALOG,
   })
   await go(page, `#/agents/${permissionSession.id}`)
-  await expectNoticeFits(page, ["Screen", "Deny", "Allow once"])
+  const sheet = page.getByRole("group", { name: "Questions" })
+  await expect(sheet).toContainText("rg phone-notice")
+  await expect(failure(page)).toHaveCount(0)
+  expect(await sheet.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
+  for (const name of ["Yes", "No", "Dismiss", "Submit"]) {
+    const button = page.getByRole("button", { name, exact: true })
+    await expect(button).toBeVisible()
+    const box = (await button.boundingBox())!
+    expect(box.x, name).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width, name).toBeLessThanOrEqual(390)
+  }
   expect(await pageFits()).toBe(true)
 })

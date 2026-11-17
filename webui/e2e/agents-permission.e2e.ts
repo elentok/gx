@@ -32,6 +32,29 @@ const readSince = async (fixture: Fixture, conv: string, before: string) =>
 const failure = (page: Page) => page.getByRole("region", { name: "Session failure" })
 const noticeButton = (page: Page, name: string) =>
   failure(page).getByRole("button", { name, exact: true })
+const submit = (page: Page) => page.getByRole("button", { name: "Submit", exact: true })
+
+/**
+ * Picks `option` on the open permission card and submits. The card sends the option's digit; the fake
+ * leaves Blocked only on Enter, so the dialog is then finished from the fixture.
+ */
+async function answerCard(
+  page: Page,
+  fixture: Fixture,
+  blocked: { s: SessionInfo; conv: string },
+  before: string,
+  option: string,
+  digit: string,
+) {
+  await page
+    .getByRole("group", { name: "Questions" })
+    .getByRole("button", { name: option, exact: true })
+    .click()
+  await submit(page).click()
+  await expect.poll(() => readSince(fixture, blocked.conv, before)).toBe(digit)
+  await fixture.controlClaude(blocked.conv, { action: "finish" })
+  await leavesBlocked(fixture, blocked.s.id)
+}
 const screenDialog = (page: Page) => page.getByRole("dialog", { name: "Screen" })
 
 const BASH_DIALOG = (command: string) => [
@@ -196,7 +219,7 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await sheet.getByPlaceholder("Other", { exact: true }).first().fill("Postgres")
   await expect(sheet).toContainText("1 of 3 answered")
   // Picking an answer moves to the next question.
-  await sheet.getByRole("button", { name: "Note on question Checks" }).click()
+  await sheet.getByRole("button", { name: "Note on question 2" }).click()
   await expect(sheet.getByPlaceholder("Note on this question")).toBeVisible()
 
   const fallback = await cardOf("claude-dialog", "Which color?")
@@ -233,7 +256,7 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   const codexCard = await cardOf("codex-question", "Which store?")
   await go(page, `#/agents/${codexCard.id}`)
   await expect(sheet).toContainText("0 of 3 answered")
-  await expect(sheet.getByRole("button", { name: "Note on question Store" })).toBeVisible()
+  await expect(sheet.getByRole("button", { name: "Note on question 1" })).toBeVisible()
   await expect(page.getByRole("button", { name: "Huh?" })).toHaveCount(0)
   const ticketAsk = await cardOf("ticket-ask", "")
   await go(page, `#/agents/${ticketAsk.id}`)
@@ -373,27 +396,24 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
 
   const allow = await blockIdle(fixture, BASH_DIALOG("rg allow-me"))
   let before = await fixture.input(allow.conv)
-  await open(page, `#/agents/${allow.s.id}`)
-  await expect(failure(page)).toContainText("rg allow-me")
-  await expect(failure(page).getByRole("button")).toHaveText(["Screen", "Deny", "Allow once"])
-  await noticeButton(page, "Allow once").click()
-  await leavesBlocked(fixture, allow.s.id)
-  await expect.poll(() => readSince(fixture, allow.conv, before)).toBe("\r")
+  await go(page, `#/agents/${allow.s.id}`)
+  // A readable prompt is a card, and the card covers the blocked notice.
+  await expect(sheet).toContainText("rg allow-me")
+  await expect(failure(page)).toHaveCount(0)
+  await answerCard(page, fixture, allow, before, "Yes", "1")
 
   const deny = await blockIdle(fixture, BASH_DIALOG("rg deny-me"))
   before = await fixture.input(deny.conv)
-  await open(page, `#/agents/${deny.s.id}`)
-  await expect(failure(page)).toContainText("rg deny-me")
-  await noticeButton(page, "Deny").click()
-  await leavesBlocked(fixture, deny.s.id)
-  await expect.poll(() => readSince(fixture, deny.conv, before)).toBe("\x1b")
+  await go(page, `#/agents/${deny.s.id}`)
+  await expect(sheet).toContainText("rg deny-me")
+  await answerCard(page, fixture, deny, before, "No", "2")
 
   // A rename of a Blocked chat is held: the name shows at once, /rename reaches the input only after the answer.
   const held = await blockIdle(fixture, BASH_DIALOG("rg hold-rename"))
   expect(held.s.ticket).toBeFalsy()
   before = await fixture.input(held.conv)
-  await open(page, `#/agents/${held.s.id}`)
-  await expect(failure(page)).toContainText("rg hold-rename")
+  await go(page, `#/agents/${held.s.id}`)
+  await expect(sheet).toContainText("rg hold-rename")
   await moreActions(page).click()
   await page.getByRole("menu", nav("More actions")).getByRole("menuitem", nav("Rename")).click()
   const renameDialog = page.getByRole("dialog", nav("Rename chat"))
@@ -402,46 +422,25 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await expect(renameDialog).toHaveCount(0)
   await expect(row(page, held.s)).toContainText("held-name")
   await expect.poll(() => fixture.cli("agents", "list")).toContain("held-name")
-  await expect(failure(page)).toContainText("rg hold-rename")
-  await expect(sidebar(page).getByText(/held|pending|rename.*waiting/i)).toHaveCount(0)
-  await expect(failure(page).getByText(/held|pending|rename.*waiting/i)).toHaveCount(0)
+  await expect(sheet).toContainText("rg hold-rename")
+  await expect(sidebar(page).getByText(/held for|pending|rename.*waiting/i)).toHaveCount(0)
+  await expect(sheet.getByText(/held for|pending|rename.*waiting/i)).toHaveCount(0)
   await expect.poll(() => readSince(fixture, held.conv, before)).toBe("")
-  await noticeButton(page, "Allow once").click()
-  await leavesBlocked(fixture, held.s.id)
+  await answerCard(page, fixture, held, before, "Yes", "1")
   await expect.poll(() => readSince(fixture, held.conv, before)).toContain("/rename held-name")
   const sent = await readSince(fixture, held.conv, before)
-  expect(sent.startsWith("\r")).toBe(true)
+  expect(sent.startsWith("1")).toBe(true)
   expect(sent.split("held-name")).toHaveLength(2)
 
-  // Allow once refused for Claude prompts gx cannot approve.
-  const refused = async (text: string, notice: string) => {
-    const s = await blockedAt(fixture, "claude", text)
-    const conv = await conversationOf(fixture, s.id)
-    const before = await fixture.input(conv)
-    await open(page, `#/agents/${s.id}`)
-    await noticeButton(page, "Allow once").click()
-    await expect(failure(page).getByRole("alert")).toHaveText(notice)
-    expect(await stateOf(fixture, s.id)).toBe("blocked")
-    return { s, conv, before }
-  }
-
-  // Unreadable screen: no prompt text; Allow is refused and sends nothing; Deny still works.
-  const unreadable = await refused("", NOT_APPROVABLE)
-  expect(await readSince(fixture, unreadable.conv, unreadable.before)).toBe("")
-  await noticeButton(page, "Deny").click()
-  await leavesBlocked(fixture, unreadable.s.id)
-  await expect.poll(() => readSince(fixture, unreadable.conv, unreadable.before)).toBe("\x1b")
-
-  // A first option that is not a plain Yes would pick a standing permission, so no Enter is sent.
-  const standing = await refused("rg --files", NOT_APPROVABLE)
-  await expect(failure(page)).toContainText("rg --files")
-  expect(await readSince(fixture, standing.conv, standing.before)).toBe("")
-
-  // Down in the key bar reaches the fake. The fake draws no cursor, so the redrawn dialog, cursor on option 2, is armed by hand.
-  const moved = await blockedAt(fixture, "claude", "rg readable-command")
-  const movedConv = await conversationOf(fixture, moved.id)
-  const movedBefore = await fixture.input(movedConv)
-  await open(page, `#/agents/${moved.id}`)
+  // Unreadable screen: no card, so the notice stays. Allow is refused and sends nothing, and the key bar reaches the fake. Deny is below, on the Codex unreadable screen.
+  const unreadable = await blockedAt(fixture, "claude", "")
+  const unreadableConv = await conversationOf(fixture, unreadable.id)
+  const unreadableBefore = await fixture.input(unreadableConv)
+  await open(page, `#/agents/${unreadable.id}`)
+  await noticeButton(page, "Allow once").click()
+  await expect(failure(page).getByRole("alert")).toHaveText(NOT_APPROVABLE)
+  expect(await stateOf(fixture, unreadable.id)).toBe("blocked")
+  expect(await readSince(fixture, unreadableConv, unreadableBefore)).toBe("")
   // Any key leaves the session Blocked, and the notice (with the Screen dialog it owns) goes with it unless the page stops learning.
   await freeze(page)
   await noticeButton(page, "Screen").click()
@@ -449,35 +448,35 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
     .getByRole("group", { name: "Keys" })
     .getByRole("button", { name: "Down", exact: true })
     .click()
-  await expect.poll(() => readSince(fixture, movedConv, movedBefore)).toBe("\x1b[B")
+  await expect.poll(() => readSince(fixture, unreadableConv, unreadableBefore)).toBe("\x1b[B")
   await screenDialog(page).getByRole("button", { name: "Close", exact: true }).click()
   await page.unrouteAll({ behavior: "ignoreErrors" })
-  const redrawn = BASH_DIALOG("rg readable-command")
-  redrawn[4] = "  1. Yes"
-  redrawn[5] = "❯ 2. No"
-  await fixture.controlClaude(movedConv, {
-    action: "block",
-    waiting_for: "permission prompt",
-    dialog: redrawn,
-  })
-  await go(page, "#/agents")
-  await open(page, `#/agents/${moved.id}`)
-  await noticeButton(page, "Allow once").click()
-  await expect(failure(page).getByRole("alert")).toHaveText(NOT_APPROVABLE)
-  expect(await readSince(fixture, movedConv, movedBefore)).toBe("\x1b[B")
-  expect(await stateOf(fixture, moved.id)).toBe("blocked")
 
-  // Codex hook and screen.
+  // A first option that is not a plain Yes is a standing permission: the card lists it as its own option and sends nothing until picked.
+  const standing = await blockedAt(fixture, "claude", "rg --files")
+  const standingConv = await conversationOf(fixture, standing.id)
+  const standingBefore = await fixture.input(standingConv)
+  await go(page, `#/agents/${standing.id}`)
+  await expect(sheet).toContainText("rg --files")
+  await expect(
+    sheet.getByRole("button", { name: "Yes, and don't ask again for rg commands" }),
+  ).toBeVisible()
+  await expect(failure(page)).toHaveCount(0)
+  expect(await readSince(fixture, standingConv, standingBefore)).toBe("")
+
+  // Codex hook: the card (Allow and Deny, nothing else) covers the notice.
   const hook = await blockedAt(fixture, "codex", "rg codex-hook")
-  await open(page, `#/agents/${hook.id}`)
-  await expect(failure(page)).toContainText("rg codex-hook")
+  await go(page, `#/agents/${hook.id}`)
   // Story 28: the Agents-page card offers Allow and Deny and nothing else.
   const hookSheet = page.getByRole("group", { name: "Questions" })
   await expect(hookSheet).toBeVisible()
+  await expect(hookSheet).toContainText("rg codex-hook")
   await expect(hookSheet).toContainText("Allow this?")
   await expect(hookSheet.getByRole("button", { name: /^(Allow|Deny)$/ })).toHaveCount(2)
   await expect(hookSheet.getByRole("button", { name: "Other", exact: true })).toHaveCount(0)
-  await noticeButton(page, "Allow once").click()
+  await expect(failure(page)).toHaveCount(0)
+  await hookSheet.getByRole("button", { name: "Allow", exact: true }).click()
+  await submit(page).click()
   await leavesBlocked(fixture, hook.id)
   await expect.poll(() => fixture.codexDecisions()).toEqual([{ behavior: "allow", message: "" }])
 
@@ -500,10 +499,14 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   const ignored = await blockedAt(fixture, "claude", "rg ignores-allow")
   const ignoredConv = await conversationOf(fixture, ignored.id)
   const ignoredBefore = await fixture.input(ignoredConv)
-  await open(page, `#/agents/${ignored.id}`)
-  await noticeButton(page, "Allow once").click()
-  await expect(failure(page).getByRole("alert")).toHaveText(NOT_DELIVERED, { timeout: 30_000 })
-  // The Enter went out; the fake ignored it and no other option was picked.
-  await expect.poll(() => readSince(fixture, ignoredConv, ignoredBefore)).toBe("\r")
+  await go(page, `#/agents/${ignored.id}`)
+  await expect(sheet).toContainText("rg ignores-allow")
+  await sheet.getByRole("button", { name: "Yes", exact: true }).click()
+  await submit(page).click()
+  await expect(page.getByRole("alert")).toHaveText(`session ${ignored.id} is still blocked`, {
+    timeout: 30_000,
+  })
+  // The digit went out; the fake ignored it and no other option was picked.
+  await expect.poll(() => readSince(fixture, ignoredConv, ignoredBefore)).toBe("1")
   expect(await stateOf(fixture, ignored.id)).toBe("blocked")
 })
