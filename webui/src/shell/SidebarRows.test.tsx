@@ -9,6 +9,7 @@ import {
   CardKindImplementation,
   SectionImplementing,
   SectionOnHold,
+  WorkKindDesign,
   type ChatDraftRow,
   type DesignDraftRow,
   type EpicListRow,
@@ -48,6 +49,13 @@ const rows = [
   row("p:shop", { name: "Shop", card_kind: CardKindDesign }),
   row("p:old", { name: "Old", section: SectionOnHold, status_words: "Held" }),
 ]
+// The joined card at Branch: an implementation card while the Design still works.
+const joined = row("p:joined", {
+  name: "Joined",
+  working: true,
+  working_word: "Charting",
+  work_kind: WorkKindDesign,
+})
 const placements: SessionPlacement[] = [
   { session: "s1", kind: "epic", epic: "p:blog" },
   { session: "s2", kind: "other" },
@@ -61,11 +69,14 @@ function Page() {
   return <div data-testid="page-path">{useLocation().pathname}</div>
 }
 
-function setup(device: Device, path = "/") {
+function setup(device: Device, path = "/", extraRows: EpicListRow[] = []) {
   vi.stubGlobal(
     "fetch",
     vi.fn(
-      async () => new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 }),
+      async () =>
+        new Response(JSON.stringify({ epics: [...rows, ...extraRows], follow_ups: [] }), {
+          status: 200,
+        }),
     ),
   )
   let state = {
@@ -284,6 +295,15 @@ test("chat and epic icons sit in the same fixed, centering slot", async () => {
   }
   expect(epic.getByTestId("kind-dot")).toBeTruthy()
   expect(chat.getByLabelText("Chat")).toBeTruthy()
+})
+
+test("a joined card at Branch draws the Design purple arc; an idle Implementation card has none", async () => {
+  setup("desktop", "/", [joined])
+  const ring = (name: RegExp) =>
+    body().getByRole("link", { name }).querySelector("[data-kind][data-tone]")
+  await body().findByRole("link", { name: /Joined/ })
+  expect(ring(/Joined/)?.getAttribute("data-arc")).toBe("kind.design.fg")
+  expect(ring(/Blog/)?.getAttribute("data-arc")).toBeNull()
 })
 
 test("a Fix agent row shows the wrench in its status colour; Queue and plain agent rows have none", async () => {

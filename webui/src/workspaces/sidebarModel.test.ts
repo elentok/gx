@@ -11,6 +11,8 @@ import {
   SectionImplementing,
   SectionNeedsYou,
   SectionOnHold,
+  WorkKindDesign,
+  WorkKindImplementation,
   type EpicListRow,
   type SessionInfo,
   type SessionPlacement,
@@ -60,6 +62,19 @@ describe("buildSidebar", () => {
     const idle = session("d1", "p", { status: { state: "idle" } } as never)
     const s2 = buildSidebar({ ...base, rows: flagged, sessions: [idle], placements })
     expect(s2.rows[0].status).toEqual({ words: "Charting", tone: "running" })
+  })
+
+  it("a card's arc follows work_kind, never card_kind", () => {
+    const arcOf = (over: Partial<EpicListRow>) =>
+      buildSidebar({ ...base, rows: [row("p:x", over)], sessions: [], placements: [] }).rows[0].arc
+    const design: Partial<EpicListRow> = { card_kind: CardKindDesign, section: SectionDesigning }
+    expect(arcOf({ ...design, working: true, work_kind: WorkKindDesign })).toBe("kind.design.fg")
+    // The joined card at Branch: implementation card, Design still working.
+    expect(
+      arcOf({ card_kind: CardKindImplementation, working: true, work_kind: WorkKindDesign }),
+    ).toBe("kind.design.fg")
+    expect(arcOf({ working: true, work_kind: WorkKindImplementation })).toBeUndefined()
+    expect(arcOf({ ...design, work_kind: WorkKindDesign })).toBeUndefined()
   })
 
   it("a working card shows its bare working word", () => {

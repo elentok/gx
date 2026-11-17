@@ -21,7 +21,7 @@ import {
   type Sort,
 } from "../generated/server"
 import { isActionable, isUnread, stateLabel } from "../agents/rules"
-import { RING_KIND, isLive, ringProgress } from "../epics/ring"
+import { RING_KIND, isLive, ringArc, ringProgress } from "../epics/ring"
 import { agentHref, chatDraftHref, designHref, draftHref, triageHref } from "../hrefs"
 import { isArchivable } from "../select/selectModel"
 import { titleHref } from "../epics/cardLinks"
@@ -61,6 +61,8 @@ export interface SidebarRow {
   status: SidebarStatus
   /** Ring fill 0 to 1; absent on chats, which show the chat icon. */
   ring?: number
+  /** Ring arc color token, from the card's work_kind (see ringArc). */
+  arc?: string
   /** Alt+n shortcut, 1 to 9, on own rows only. */
   number?: number
   /** The section this row falls under in the By project and By status sorts; absent in the others. */
@@ -142,6 +144,7 @@ function cardRow(
     href: kind === "design" ? designHref(r.address) : titleHref(r),
     status: cardStatus(r),
     ring: ringProgress(r),
+    ...(ringArc(r) ? { arc: ringArc(r) } : {}),
     ...(held ? { held: true } : {}),
     ...(r.queued ? { queued: true } : {}),
     ...(isArchivable(r) ? { archivable: true } : {}),

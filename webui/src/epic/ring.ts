@@ -12,7 +12,7 @@ import {
   type EpicListRow,
   type SessionInfo,
 } from "../generated/server"
-import { RING_KIND, isLive, ringTone } from "../epics/ring"
+import { RING_KIND, designArc, isLive, ringTone } from "../epics/ring"
 import type { Kind, Tone } from "../ui/tone"
 
 export interface PageRing {
@@ -59,8 +59,7 @@ export function pageRing(
   if (isMap) {
     const pct = d.ring_progress ?? 0
     const t = designTone(d, sessions)
-    const arc = t.live && t.tone === "running" ? "kind.design.fg" : undefined
-    return { kind, ...t, arc, progress: pct / 100, label: `${pct}%` }
+    return { kind, ...t, arc: designArc(t.live, t.tone), progress: pct / 100, label: `${pct}%` }
   }
   const tone =
     card && d.kind === "loop" ? { tone: ringTone(card), live: isLive(card) } : loopTone(d)

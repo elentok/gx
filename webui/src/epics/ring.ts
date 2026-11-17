@@ -56,11 +56,16 @@ export function ringTone(row: EpicListRow): Tone {
  * A working Design is purple; the kind comes from the row's work_kind, never from card_kind,
  * because the joined card at Branch is "implementation" while the Design still works.
  */
+export const DESIGN_ARC = "kind.design.fg"
+
+/** The arc of a Design ring that is live and running; the one place the purple rule lives. */
+export const designArc = (live: boolean, tone: Tone): string | undefined =>
+  live && tone === "running" ? DESIGN_ARC : undefined
+
 export const ringArc = (row: EpicListRow): string | undefined => {
   if (row.card_kind === CardKindFollowUps && ringTone(row) !== "muted")
     return "kind.implementation.fg"
-  if (isLive(row) && ringTone(row) === "running" && row.work_kind === WorkKindDesign)
-    return "kind.design.fg"
+  if (row.work_kind === WorkKindDesign) return designArc(isLive(row), ringTone(row))
   return undefined
 }
 
