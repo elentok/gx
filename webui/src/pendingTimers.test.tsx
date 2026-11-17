@@ -23,6 +23,14 @@ function standIn() {
   return { target, fire }
 }
 
+function Timed({ target }: { target: TimerTarget }) {
+  useEffect(() => {
+    const id = target.setTimeout(() => {}, 1000)
+    return () => target.clearTimeout(id)
+  }, [target])
+  return null
+}
+
 describe("pending timer check", () => {
   it("reports a pending timeout with its creation stack", () => {
     const { target } = standIn()
@@ -84,14 +92,7 @@ describe("pending timer check", () => {
   it("runs the pending check after Testing Library cleanup", () => {
     const { target } = standIn()
     const tracker = installTimerTracking(target)
-    function Timed() {
-      useEffect(() => {
-        const id = target.setTimeout(() => {}, 1000)
-        return () => target.clearTimeout(id)
-      }, [])
-      return null
-    }
-    render(<Timed />)
+    render(<Timed target={target} />)
     expect(tracker.pending()).toHaveLength(1)
     cleanup()
     expect(tracker.pending()).toHaveLength(0)

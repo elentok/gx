@@ -15,7 +15,10 @@ function setup(migrating: boolean) {
   const subs = new Set<() => void>()
   const conn = {
     getState: () => state,
-    subscribe: (fn: () => void) => (subs.add(fn), () => subs.delete(fn)),
+    subscribe: (fn: () => void) => {
+      subs.add(fn)
+      return () => subs.delete(fn)
+    },
     refresh: () => {},
   } as unknown as Connection
   renderThemed(
@@ -27,7 +30,7 @@ function setup(migrating: boolean) {
   return (next: boolean) =>
     act(() => {
       state = { ...state, snapshot: { ...state.snapshot!, migrating: next } } as ConnectionState
-      subs.forEach((fn) => fn())
+      for (const fn of subs) fn()
     })
 }
 

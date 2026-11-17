@@ -33,7 +33,7 @@ const result: TriageResult = {
 
 test("groups and links render from the payload", () => {
   const { container } = renderThemed(
-    <DoneView result={result} queue={<button>Queue epic</button>} />,
+    <DoneView result={result} queue={<button type="button">Queue epic</button>} />,
   )
   for (const name of ["Ready epic", "Map epics", "Merged", "Closed", "Kept for later"])
     screen.getByRole("region", { name })
@@ -77,14 +77,23 @@ function renderQueue(
   const conn = {
     getState: () => ({ connected: true }),
     subscribe: () => () => {},
-    onEvent: (l: () => void) => (listeners.add(l), () => listeners.delete(l)),
+    onEvent: (l: () => void) => {
+      listeners.add(l)
+      return () => listeners.delete(l)
+    },
   } as unknown as Connection
   renderThemed(
     <ConnectionContext.Provider value={conn}>
       <DoneQueue epic="gx:ready-1" fetchEpics={fetchEpics as never} queue={queue as never} />
     </ConnectionContext.Provider>,
   )
-  return { queue, emit: () => act(() => listeners.forEach((l) => l())) }
+  return {
+    queue,
+    emit: () =>
+      act(() => {
+        for (const l of listeners) l()
+      }),
+  }
 }
 
 test("a ready row shows Queue and posts the queue add once", async () => {

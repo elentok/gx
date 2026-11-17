@@ -102,6 +102,7 @@ export function Row({
     >
       <Box aria-hidden color={raised ? color.fg : "text.dim"} display="flex">
         <svg
+          aria-hidden="true"
           width="18"
           height="18"
           viewBox="0 0 18 18"
@@ -181,8 +182,13 @@ export function CauseList({
   return (
     <Box px="14px" pb="2" fontSize="xs" lineHeight="1.45" color="text.dim" data-part={part}>
       {marker ??
-        list.rows.map((row, i) => (
-          <Box key={i} display="flex" gap="2" data-part="cause-row">
+        list.rows.map((row, i, rows) => (
+          <Box
+            key={`${row.label}-${rows.slice(0, i).filter((r) => r.label === row.label).length}`}
+            display="flex"
+            gap="2"
+            data-part="cause-row"
+          >
             <Text
               as="span"
               flex="1"

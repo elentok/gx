@@ -115,7 +115,7 @@ export function pruneDrafts(liveSessionIds: Iterable<string>): void {
       const prefix = key && [COMPOSER, ROUND, IMAGES].find((p) => key.startsWith(p))
       if (key && prefix && !live.has(key.slice(prefix.length))) stale.push(key)
     }
-    stale.forEach((key) => localStorage.removeItem(key))
+    for (const key of stale) localStorage.removeItem(key)
   } catch {
     // Not worth failing the page over.
   }

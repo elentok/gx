@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import { useNavigate } from "react-router"
-import { RestKindBedtime, RestKindBreak } from "./generated/server"
+import { type RestKindBedtime, RestKindBreak } from "./generated/server"
 import type { RestState } from "./rest"
 import { RestScreen } from "./RestScreen"
 

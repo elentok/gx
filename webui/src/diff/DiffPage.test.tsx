@@ -258,7 +258,7 @@ test("the Split/Unified switch is in the ref bar", async () => {
   expect(screen.getByRole("button", { name: "Unified" }).getAttribute("aria-pressed")).toBe("true")
 })
 
-const style = () => (pierre.last?.options as { diffStyle: string }).diffStyle
+const style = () => (pierre.last?.options as { diffStyle: string } | undefined)?.diffStyle
 
 test("the selected file's patch is fetched alone, by the resolved SHAs", async () => {
   const fetchPatch = vi.fn<FetchDiffPatch>(async (_p, _a, _b, path) => `patch of ${path}`)

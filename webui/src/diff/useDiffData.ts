@@ -54,15 +54,19 @@ export function useDiffData(
   const returned = commitsFetch && "value" in commitsFetch ? commitsFetch.value : undefined
   const commitsPending = !!(url.commits || url.ticket) && !commitsFetch
   // A `ticket` key expands to the SHAs of the returned commits that carry that address.
+  // `url.commits` is a fresh array on every parse, so it is rebuilt from its content to keep one identity.
+  const commitsKey = url.commits?.join(",")
+  const urlCommits = useMemo(
+    () => (commitsKey === undefined ? undefined : commitsKey === "" ? [] : commitsKey.split(",")),
+    [commitsKey],
+  )
   const wanted = useMemo(
     () =>
-      url.commits ??
+      urlCommits ??
       (url.ticket
         ? (returned?.commits ?? []).filter((c) => c.ticket === url.ticket).map((c) => c.sha)
         : undefined),
-    // `url.commits` is a fresh array on every parse, so it is keyed by its content.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [returned, url.commits?.join(","), url.ticket],
+    [returned, urlCommits, url.ticket],
   )
   const narrowing = useMemo(
     () => (returned ? wanted?.filter((s) => returned.commits.some((c) => c.sha === s)) : wanted),

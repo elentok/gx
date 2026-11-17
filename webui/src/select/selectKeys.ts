@@ -47,14 +47,14 @@ export type DispatchKey = SelectKey & { preventDefault(): void; stopPropagation(
 
 export interface SelectKeyHandlers {
   /** `s`: return false when there is nothing to select, so the key is left alone. */
-  enter: () => boolean | void
+  enter: () => boolean | undefined
   /** The select key of the focused item, or null when no item has focus. */
   itemKey: string | null
   toggle: (key: string) => void
   /** Enter outside select mode. Omit when the surface has no open action. */
   open?: (key: string) => void
   /** `.` or Shift+F10: open the focused item's menu. Return false when it has none, so the key is left alone. */
-  menu?: (key: string) => boolean | void
+  menu?: (key: string) => boolean | undefined
 }
 
 /**

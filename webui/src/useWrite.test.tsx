@@ -10,6 +10,7 @@ function Probe({ call, success }: { call: () => Promise<Refusable>; success?: bo
   return (
     <>
       <button
+        type="button"
         disabled={pending}
         onClick={() =>
           run(call, {

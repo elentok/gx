@@ -25,7 +25,9 @@ function useInertPage(screen: HTMLElement | null) {
       el.setAttribute("inert", "")
       inerted.push(el)
     }
-    return () => inerted.forEach((el) => el.removeAttribute("inert"))
+    return () => {
+      for (const el of inerted) el.removeAttribute("inert")
+    }
   }, [screen])
 }
 

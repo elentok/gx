@@ -78,9 +78,10 @@ function render(sessions: SessionInfo[], fetchers: RouteFetchers = {}) {
   const conn = {
     getState: () => state,
     subscribe: () => () => {},
-    onEvent: (l: (address: string | undefined, type?: string) => void) => (
-      events.add(l), () => events.delete(l)
-    ),
+    onEvent: (l: (address: string | undefined, type?: string) => void) => {
+      events.add(l)
+      return () => events.delete(l)
+    },
     refresh: () => {},
   } as unknown as Connection
   const router = createMemoryRouter(
@@ -98,7 +99,9 @@ function render(sessions: SessionInfo[], fetchers: RouteFetchers = {}) {
   )
   return {
     emit: (address: string, type = "triage-changed") =>
-      act(() => events.forEach((l) => l(address, type))),
+      act(() => {
+        for (const l of events) l(address, type)
+      }),
   }
 }
 
@@ -285,7 +288,10 @@ test("confirming Abandon posts once and the page shows the empty state with the 
         })
       : viewOf({ can_abandon: true, revision: 7 }),
   })
-  const abandonTriage = vi.fn(async () => ((abandoned = true), {}))
+  const abandonTriage = vi.fn(async () => {
+    abandoned = true
+    return {}
+  })
   const { emit } = render([session("working")], { triage, abandonTriage })
   await openMenu()
   fireEvent.click(await screen.findByRole("menuitem", { name: /Abandon Triage/ }))

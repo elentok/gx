@@ -15,7 +15,10 @@ function setup(missing?: boolean) {
   const subs = new Set<() => void>()
   const conn = {
     getState: () => state,
-    subscribe: (fn: () => void) => (subs.add(fn), () => subs.delete(fn)),
+    subscribe: (fn: () => void) => {
+      subs.add(fn)
+      return () => subs.delete(fn)
+    },
   } as unknown as Connection
   renderThemed(
     <ConnectionContext.Provider value={conn}>
@@ -25,7 +28,9 @@ function setup(missing?: boolean) {
   return (next?: boolean) =>
     act(() => {
       state = { ...state, snapshot: { ...state.snapshot!, node_missing: next } } as ConnectionState
-      subs.forEach((fn) => fn())
+      subs.forEach((fn) => {
+        fn()
+      })
     })
 }
 

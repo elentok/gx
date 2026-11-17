@@ -80,7 +80,10 @@ export function DevDetails({
           overflow="hidden"
         >
           {log.map((line, i) => (
-            <Box key={i} color={/error|exited/i.test(line) ? "tone.deadlocked.fg" : undefined}>
+            <Box
+              key={`${line}-${log.slice(0, i).filter((l) => l === line).length}`}
+              color={/error|exited/i.test(line) ? "tone.deadlocked.fg" : undefined}
+            >
               {line}
             </Box>
           ))}

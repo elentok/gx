@@ -33,7 +33,10 @@ function setup(warning?: RestWarning, lead = 2, zone: Zone = utc) {
   const subs = new Set<() => void>()
   const conn = {
     getState: () => state,
-    subscribe: (fn: () => void) => (subs.add(fn), () => subs.delete(fn)),
+    subscribe: (fn: () => void) => {
+      subs.add(fn)
+      return () => subs.delete(fn)
+    },
   } as unknown as Connection
   renderThemed(
     <ConnectionContext.Provider value={conn}>
@@ -46,7 +49,9 @@ function setup(warning?: RestWarning, lead = 2, zone: Zone = utc) {
         ...state,
         snapshot: snap(next, lead, zone),
       } as unknown as ConnectionState
-      subs.forEach((fn) => fn())
+      subs.forEach((fn) => {
+        fn()
+      })
     })
 }
 

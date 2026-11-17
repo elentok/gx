@@ -36,7 +36,7 @@ function refresh() {
   const next = compute()
   if (next.mode === current.mode && next.desktopCaption === current.desktopCaption) return
   current = next
-  listeners.forEach((l) => l())
+  for (const l of listeners) l()
 }
 
 export function getInstallState(): InstallState {

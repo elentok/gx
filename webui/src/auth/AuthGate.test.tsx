@@ -86,12 +86,20 @@ test("the signed-in app has the cert context", async () => {
   expect(await screen.findByText(`cert:${state.cer_path}`)).toBeTruthy()
 })
 
+function MountCounter({ mounts }: { mounts: () => void }) {
+  useEffect(mounts, [mounts])
+  return <p>the app</p>
+}
+
+// Set by the first render of EnabledProbe, so a test can read what was on at that moment.
+let enabledAtRender: number | undefined
+function EnabledProbe() {
+  enabledAtRender ??= vi.mocked(enableQueue).mock.calls.length
+  return <p>the app</p>
+}
+
 test("the app is not remounted when unknown turns into signed-in", async () => {
   const mounts = vi.fn()
-  const Child = () => {
-    useEffect(mounts, [])
-    return <p>the app</p>
-  }
   let fail = true
   renderThemed(
     <AuthGate
@@ -100,7 +108,7 @@ test("the app is not remounted when unknown turns into signed-in", async () => {
         return stateOf("signed-in")
       }}
     >
-      <Child />
+      <MountCounter mounts={mounts} />
     </AuthGate>,
   )
   await screen.findByText("the app")
@@ -160,14 +168,10 @@ test("sign out clears the page caches", async () => {
 })
 
 test("the sample queue is on before the app first renders when signed in", async () => {
-  let enabledAtRender: number | undefined
-  const Probe = () => {
-    enabledAtRender ??= vi.mocked(enableQueue).mock.calls.length
-    return <p>the app</p>
-  }
+  enabledAtRender = undefined
   renderThemed(
     <AuthGate fetchState={async () => stateOf("signed-in")}>
-      <Probe />
+      <EnabledProbe />
     </AuthGate>,
   )
   await screen.findByText("the app")

@@ -31,7 +31,12 @@ function eventConn() {
       return () => listeners.delete(l)
     },
   } as unknown as Connection
-  return { conn, emit: () => listeners.forEach((l) => l()) }
+  return {
+    conn,
+    emit: () => {
+      for (const l of listeners) l()
+    },
+  }
 }
 
 const epicList = async (): Promise<EpicList> => ({

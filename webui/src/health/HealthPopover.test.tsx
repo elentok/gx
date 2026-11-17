@@ -67,6 +67,14 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+// Set by the Harness on each render, so a test can flip the connection from outside React.
+let setConnected: (c: boolean) => void = () => {}
+const Harness = () => {
+  const [connected, set] = useState(true)
+  setConnected = set
+  return <Tray health={trayHealth} connected={connected} />
+}
+
 const openTray = async () => {
   const view = renderThemed(<Tray health={trayHealth} />)
   fireEvent.click(view.getByRole("button", { name: /^System health/ }))
@@ -453,12 +461,6 @@ describe("Tray offline", () => {
 
   it("keeps the last values offline, counts the age up, stops polling and fetches on reconnect", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    let setConnected: (c: boolean) => void = () => {}
-    const Harness = () => {
-      const [connected, set] = useState(true)
-      setConnected = set
-      return <Tray health={trayHealth} connected={connected} />
-    }
     const view = renderThemed(<Harness />)
     fireEvent.click(view.getByRole("button", { name: /^System health/ }))
     await view.findByText("gx server")

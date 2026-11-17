@@ -40,11 +40,15 @@ function fakeConnection(workspaces: Workspace[]) {
   } as unknown as Connection
   const setWorkspaces = (next: Workspace[]) => {
     state = { ...state, snapshot: { ...state.snapshot, workspaces: next } } as ConnectionState
-    act(() => listeners.forEach((fn) => fn()))
+    act(() => {
+      for (const fn of listeners) fn()
+    })
   }
   const setPlacements = (placements: SessionPlacement[]) => {
     state = { ...state, snapshot: { ...state.snapshot, placements } } as ConnectionState
-    act(() => listeners.forEach((fn) => fn()))
+    act(() => {
+      for (const fn of listeners) fn()
+    })
   }
   return { conn, setWorkspaces, setPlacements }
 }
@@ -54,7 +58,9 @@ function Probe({ conn }: { conn: Connection }) {
   return (
     <>
       <div data-testid="active">{active}</div>
-      <button onClick={() => setActive("Side")}>pick</button>
+      <button type="button" onClick={() => setActive("Side")}>
+        pick
+      </button>
     </>
   )
 }

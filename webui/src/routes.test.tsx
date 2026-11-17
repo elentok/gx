@@ -84,11 +84,14 @@ function fakeConnection(connected: boolean, snapshot: Snapshot = emptySnapshot) 
   return {
     getState: () => state,
     subscribe: () => () => {},
-    onEvent: (l: (address: string | undefined) => void) => (
-      listeners.add(l), () => listeners.delete(l)
-    ),
+    onEvent: (l: (address: string | undefined) => void) => {
+      listeners.add(l)
+      return () => listeners.delete(l)
+    },
     refresh: () => {},
-    emit: (address?: string) => listeners.forEach((l) => l(address)),
+    emit: (address?: string) => {
+      for (const l of listeners) l(address)
+    },
   } as unknown as Connection & { emit: (address?: string) => void }
 }
 
@@ -1096,7 +1099,13 @@ function Ready() {
 // Ready only once the button is clicked, so a span stays open across other events.
 function Late() {
   const [go, setGo] = useState(false)
-  return go ? <Ready key="late" /> : <button onClick={() => setGo(true)}>finish</button>
+  return go ? (
+    <Ready key="late" />
+  ) : (
+    <button type="button" onClick={() => setGo(true)}>
+      finish
+    </button>
+  )
 }
 
 function renderSpans(initial: string) {

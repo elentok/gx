@@ -25,18 +25,23 @@ function setup(period?: Period) {
   const subs = new Set<() => void>()
   const conn = {
     getState: () => state,
-    subscribe: (fn: () => void) => (subs.add(fn), () => subs.delete(fn)),
+    subscribe: (fn: () => void) => {
+      subs.add(fn)
+      return () => subs.delete(fn)
+    },
   } as unknown as Connection
   renderThemed(
     <ConnectionContext.Provider value={conn}>
-      <button>underneath</button>
+      <button type="button">underneath</button>
       <RestScreen />
     </ConnectionContext.Provider>,
   )
   return (next?: Period) =>
     act(() => {
       state = { ...state, snapshot: { rest: { rule, period: next } } } as unknown as ConnectionState
-      subs.forEach((fn) => fn())
+      subs.forEach((fn) => {
+        fn()
+      })
     })
 }
 

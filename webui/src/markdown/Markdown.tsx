@@ -127,7 +127,7 @@ function buildComponents(
       const first = node?.children[0]
       const cls = first?.type === "element" ? first.properties.className : undefined
       return Array.isArray(cls) && cls.includes("language-mermaid") ? (
-        <>{children}</>
+        children
       ) : (
         <pre>{children}</pre>
       )

@@ -247,7 +247,7 @@ test("failing snapshots back off 1s, 2s, 4s up to 15s and a good one clears them
   conn.start()
   await vi.advanceTimersByTimeAsync(0)
   expect(snaps()).toBe(1)
-  let expectedWaits = [1000, 2000, 4000, 8000, BACKOFF_MAX_MS, BACKOFF_MAX_MS]
+  const expectedWaits = [1000, 2000, 4000, 8000, BACKOFF_MAX_MS, BACKOFF_MAX_MS]
   for (const wait of expectedWaits) {
     const n = snaps()
     await vi.advanceTimersByTimeAsync(wait - 1)
@@ -434,10 +434,13 @@ test("liveSnapshot is false for a cached copy, true after the first fetch, false
     },
     openStream: async () => {
       let end!: () => void
-      const done = new Promise<void>((r) => (end = r))
+      const done = new Promise<void>((r) => {
+        end = r
+      })
       streams.push({ end })
       return (async function* () {
         await done
+        yield* []
       })()
     },
   })
@@ -499,7 +502,7 @@ function fakeConnection(initial: ConnectionState) {
   } as unknown as Connection
   const set = (next: ConnectionState) => {
     state = next
-    listeners.forEach((l) => l())
+    for (const l of listeners) l()
   }
   return { conn, set }
 }

@@ -33,8 +33,8 @@ export function Fingerprint({ value, size = "xs" }: { value: string; size?: "xs"
       fontSize={size}
       color="text.muted"
     >
-      {value.split(" ").map((group, i) => (
-        <span key={i}>{group}</span>
+      {value.split(" ").map((group, i, all) => (
+        <span key={`${group}-${all.slice(0, i).filter((g) => g === group).length}`}>{group}</span>
       ))}
     </Box>
   )

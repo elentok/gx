@@ -36,6 +36,8 @@ export function useFetched<T>(
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
+    // `attempt` only re-runs the fetch (retry, events, focus); nothing here reads it.
+    void attempt
     let live = true
     setFailed(false)
     latest.current().then(

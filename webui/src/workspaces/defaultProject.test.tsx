@@ -60,6 +60,10 @@ test("a candidate missing from the list is skipped at each step", () => {
   expect(pick({ pathname: "/agents/abc", lastProject: "b" })).toBe("b")
 })
 
+function Probe() {
+  return <span>{useDefaultProject(["a", "b", "c"])}</span>
+}
+
 test("the hook resolves the route, the snapshot and the server's last project", async () => {
   getLastProject.mockImplementation(async () => "c")
   const state = {
@@ -73,9 +77,6 @@ test("the hook resolves the route, the snapshot and the server's last project", 
     subscribe: () => () => {},
     onEvent: () => () => {},
   } as unknown as Connection
-  function Probe() {
-    return <span>{useDefaultProject(["a", "b", "c"])}</span>
-  }
   const router = createMemoryRouter([{ path: "*", element: <Probe /> }], {
     initialEntries: ["/stats"],
   })

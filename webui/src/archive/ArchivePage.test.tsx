@@ -37,7 +37,12 @@ function eventConn() {
       return () => listeners.delete(l)
     },
   } as unknown as Connection
-  return { conn: c, emit: () => listeners.forEach((l) => l()) }
+  return {
+    conn: c,
+    emit: () => {
+      for (const l of listeners) l()
+    },
+  }
 }
 
 function renderArchive(archived: FetchArchived, withConn: Connection = conn) {

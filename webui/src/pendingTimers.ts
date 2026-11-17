@@ -100,8 +100,12 @@ export function installTimerTracking(...targets: TimerTarget[]): TimerTracker {
         await new Promise<void>((resolve) => sleep(resolve, 10))
       }
     },
-    reset: () => recordSets.forEach((records) => records.clear()),
-    uninstall: () => restores.forEach((restore) => restore()),
+    reset: () => {
+      for (const records of recordSets) records.clear()
+    },
+    uninstall: () => {
+      for (const restore of restores) restore()
+    },
   }
 }
 

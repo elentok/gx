@@ -14,27 +14,31 @@ afterEach(() => {
 
 const TITLE = "Vite is down. gx serves the built files."
 
+function Probe({ postDevRestart }: { postDevRestart: () => Promise<void> }) {
+  useDevToast({ postDevRestart })
+  return null
+}
+
 function setup(first: DevState) {
   const postDevRestart = vi.fn().mockResolvedValue(undefined)
   let state = { snapshot: { dev: { state: first } }, connected: true } as unknown as ConnectionState
   const subs = new Set<() => void>()
   const conn = {
     getState: () => state,
-    subscribe: (fn: () => void) => (subs.add(fn), () => subs.delete(fn)),
+    subscribe: (fn: () => void) => {
+      subs.add(fn)
+      return () => subs.delete(fn)
+    },
   } as unknown as Connection
-  function Probe() {
-    useDevToast({ postDevRestart })
-    return null
-  }
   renderThemed(
     <ConnectionContext.Provider value={conn}>
-      <Probe />
+      <Probe postDevRestart={postDevRestart} />
     </ConnectionContext.Provider>,
   )
   const set = (next: DevState) =>
     act(() => {
       state = { ...state, snapshot: { dev: { state: next } } } as unknown as ConnectionState
-      subs.forEach((fn) => fn())
+      for (const fn of subs) fn()
     })
   return { set, postDevRestart }
 }

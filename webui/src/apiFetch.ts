@@ -15,7 +15,9 @@ export function signOut(): void {
   clearPageCache()
   dropQueue()
   noteSignedOut()
-  signedOutListeners.forEach((l) => l())
+  signedOutListeners.forEach((l) => {
+    l()
+  })
 }
 
 /** Every web API call goes through here, so a 401 signs the page out in one place. */

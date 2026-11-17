@@ -2,9 +2,24 @@ import { act } from "@testing-library/react"
 import { useState } from "react"
 import { describe, expect, it } from "vitest"
 import { FileLinkProvider } from "../files/FileLinkContext"
+import type { FileResolver } from "../files/resolve"
 import { stubResolver } from "../files/stubResolver.testutil"
 import { renderThemed } from "../ui/render"
 import { Markdown } from "./Markdown"
+
+// Set by Page on each render, so a test can change the recheck key from outside React.
+let setKey: (key: string) => void = () => {}
+function Page({ resolver }: { resolver: FileResolver }) {
+  const [key, set] = useState("m1")
+  setKey = set
+  return (
+    <FileLinkProvider resolver={resolver} recheckKey={key}>
+      <Markdown>{"see a.md"}</Markdown>
+      <Markdown>{"and b.md"}</Markdown>
+      <Markdown>{"and `c/d.md`"}</Markdown>
+    </FileLinkProvider>
+  )
+}
 
 it("renders emphasis, code, lists and links as elements", () => {
   const { container } = renderThemed(
@@ -139,19 +154,7 @@ describe("file links", () => {
 
   it("batches blocks of one pass into one call and rechecks only missing paths on a new key", async () => {
     const { resolver, calls } = stubResolver(["a.md"])
-    let setKey: (key: string) => void = () => {}
-    function Page() {
-      const [key, set] = useState("m1")
-      setKey = set
-      return (
-        <FileLinkProvider resolver={resolver} recheckKey={key}>
-          <Markdown>{"see a.md"}</Markdown>
-          <Markdown>{"and b.md"}</Markdown>
-          <Markdown>{"and `c/d.md`"}</Markdown>
-        </FileLinkProvider>
-      )
-    }
-    renderThemed(<Page />)
+    renderThemed(<Page resolver={resolver} />)
     await settle()
     expect(calls).toHaveLength(1)
     expect(calls[0].candidates.sort()).toEqual(["a.md", "b.md", "c/d.md"])

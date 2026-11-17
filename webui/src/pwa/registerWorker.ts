@@ -10,7 +10,7 @@ const listeners = new Set<() => void>()
 
 function set(next: WorkerRegistration) {
   current = next
-  listeners.forEach((l) => l())
+  for (const l of listeners) l()
 }
 
 export function getWorkerRegistration(): WorkerRegistration {

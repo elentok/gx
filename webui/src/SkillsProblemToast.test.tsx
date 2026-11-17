@@ -18,7 +18,10 @@ function setup(problem?: string) {
   const subs = new Set<() => void>()
   const conn = {
     getState: () => state,
-    subscribe: (fn: () => void) => (subs.add(fn), () => subs.delete(fn)),
+    subscribe: (fn: () => void) => {
+      subs.add(fn)
+      return () => subs.delete(fn)
+    },
   } as unknown as Connection
   renderThemed(
     <ConnectionContext.Provider value={conn}>
@@ -31,7 +34,9 @@ function setup(problem?: string) {
         ...state,
         snapshot: { ...state.snapshot!, skills_install_problem: next },
       } as ConnectionState
-      subs.forEach((fn) => fn())
+      subs.forEach((fn) => {
+        fn()
+      })
     })
 }
 

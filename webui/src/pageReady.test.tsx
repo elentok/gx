@@ -34,8 +34,16 @@ const conn = {
 // A fetcher that answers only when the test says so, so "not before" is observable.
 function gate<T>(value: T) {
   let release!: () => void
-  const wait = new Promise<void>((r) => (release = r))
-  return { fetch: async () => (await wait, value), release }
+  const wait = new Promise<void>((r) => {
+    release = r
+  })
+  return {
+    fetch: async () => {
+      await wait
+      return value
+    },
+    release,
+  }
 }
 
 const never = () => new Promise<never>(() => {})

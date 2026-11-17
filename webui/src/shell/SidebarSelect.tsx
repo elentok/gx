@@ -176,7 +176,10 @@ function useSidebarSelectKeys(sel: SidebarSelect) {
           ? nav.slice(6)
           : ""
       dispatchSelectKey(e, state.on, hasLayer() || isTextTarget(e.target), {
-        enter,
+        enter: () => {
+          enter()
+          return undefined
+        },
         itemKey: key || null,
         // The menu button is the anchor's sibling inside the row frame.
         menu: () => openItemMenu(stop?.parentElement),

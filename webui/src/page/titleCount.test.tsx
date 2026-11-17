@@ -25,7 +25,10 @@ function setup(reasons: string[]) {
   const subs = new Set<() => void>()
   const conn = {
     getState: () => state,
-    subscribe: (fn: () => void) => (subs.add(fn), () => subs.delete(fn)),
+    subscribe: (fn: () => void) => {
+      subs.add(fn)
+      return () => subs.delete(fn)
+    },
   } as unknown as Connection
   renderThemed(
     <ConnectionContext.Provider value={conn}>
@@ -35,7 +38,7 @@ function setup(reasons: string[]) {
   return (next: string[]) =>
     act(() => {
       state = { ...state, snapshot: { sessions: next.map(session) } } as unknown as ConnectionState
-      subs.forEach((fn) => fn())
+      for (const fn of subs) fn()
     })
 }
 

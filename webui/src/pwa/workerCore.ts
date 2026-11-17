@@ -56,7 +56,7 @@ export async function precache(deps: LifecycleDeps): Promise<void> {
     }),
   )
   const cache = await deps.caches.open(cacheNameFor(deps.buildId))
-  const shellURL = deps.origin + "/"
+  const shellURL = `${deps.origin}/`
   const ordered = [
     ...fetched.filter((f) => f.url !== shellURL),
     ...fetched.filter((f) => f.url === shellURL),
@@ -145,7 +145,7 @@ export function createFetchHandler(deps: WorkerDeps) {
     const path = url.pathname
     if (path.startsWith("/v1/")) return
     if (request.mode === "navigate" || path === "/" || path === "/index.html") {
-      event.respondWith(shell(event, url.origin + "/", url.origin))
+      event.respondWith(shell(event, `${url.origin}/`, url.origin))
     } else if (path.startsWith("/assets/")) {
       event.respondWith(cacheFirst(request))
     } else if (STALE_WHILE_REVALIDATE.test(path)) {

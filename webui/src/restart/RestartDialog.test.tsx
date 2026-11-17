@@ -21,6 +21,22 @@ const report = (over: Partial<RestartCheckReport> = {}): RestartCheckReport => (
   ...over,
 })
 
+// Set by Live on each render, so a test can change the live instance from outside React.
+let setInstance: (i: string) => void = () => {}
+function Live({ reload }: { reload: () => void }) {
+  const [i, set] = useState("i1")
+  setInstance = set
+  return (
+    <RestartDialog
+      check={() => Promise.resolve(report())}
+      restart={() => Promise.resolve(started)}
+      reload={reload}
+      liveInstance={i}
+      onClose={vi.fn()}
+    />
+  )
+}
+
 const started: RestartResult = {
   started: true,
   refused: false,
@@ -177,21 +193,7 @@ describe("RestartDialog", () => {
 
   it("reloads once when the live instance differs after the click", async () => {
     const reload = vi.fn()
-    let setInstance: (i: string) => void = () => {}
-    function Live() {
-      const [i, set] = useState("i1")
-      setInstance = set
-      return (
-        <RestartDialog
-          check={() => Promise.resolve(report())}
-          restart={() => Promise.resolve(started)}
-          reload={reload}
-          liveInstance={i}
-          onClose={vi.fn()}
-        />
-      )
-    }
-    const { findByRole, findByText } = renderThemed(<Live />)
+    const { findByRole, findByText } = renderThemed(<Live reload={reload} />)
     fireEvent.click(await findByRole("button", { name: "Restart" }))
     await findByText(/Restarting/)
     expect(reload).not.toHaveBeenCalled()
@@ -207,11 +209,11 @@ describe("RestartDialog", () => {
   })
 })
 
-describe("NewVersionStrip", () => {
-  function Probe({ build, reload }: { build?: string; reload: () => void }) {
-    return useBuildChanged(build) ? <NewVersionStrip reload={reload} /> : null
-  }
+function Probe({ build, reload }: { build?: string; reload: () => void }) {
+  return useBuildChanged(build) ? <NewVersionStrip reload={reload} /> : null
+}
 
+describe("NewVersionStrip", () => {
   it("shows only once the build differs from the first one seen, and the button reloads", () => {
     const reload = vi.fn()
     const { queryByText, getByRole, rerender } = renderThemed(<Probe build="v1" reload={reload} />)

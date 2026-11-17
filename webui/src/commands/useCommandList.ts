@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { apiFetch } from "../apiFetch"
 import type { SessionCommandEntry, SessionCommandsResponse } from "../generated/server"
 
@@ -60,6 +60,9 @@ export function useCommandList(
   enabled = true,
 ): CommandList {
   const key = keyOf(target, kind)
+  // Callers rebuild `target` each render; `key` is its identity, so the effect reads the latest one.
+  const targetRef = useRef(target)
+  targetRef.current = target
   const [state, setState] = useState<{ key: string; list: CommandList }>(() => ({
     key,
     list: fromCache(cache.get(key)),
@@ -73,7 +76,7 @@ export function useCommandList(
     if (!enabled) return
     if (cached && Date.now() - cached.at < COMMAND_LIST_MAX_AGE_MS) return
     let live = true
-    fetcher(target, kind).then(
+    fetcher(targetRef.current, kind).then(
       (res) => {
         const entry = { entries: res.entries ?? [], degraded: res.degraded, at: Date.now() }
         cache.set(key, entry)
@@ -87,8 +90,6 @@ export function useCommandList(
     return () => {
       live = false
     }
-    // target is rebuilt each render by callers; key is its identity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, kind, fetcher, enabled])
 
   return list

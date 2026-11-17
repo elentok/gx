@@ -103,7 +103,7 @@ function Trend({
       {points.map((p, i) =>
         p.p75 == null ? null : (
           <circle
-            key={i}
+            key={`${p.p75}-${p.count}-${points.slice(0, i).filter((q) => q.p75 === p.p75 && q.count === p.count).length}`}
             data-testid="trend-point"
             cx={x(i)}
             cy={y(p.p75)}

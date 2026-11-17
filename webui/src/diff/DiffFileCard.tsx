@@ -1,5 +1,5 @@
 import { Box, Spinner } from "@chakra-ui/react"
-import { useCallback, useState } from "react"
+import { type ReactNode, useCallback, useState } from "react"
 import type { DiffFile } from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { useKeyedFetch } from "../useKeyedFetch"
@@ -113,8 +113,11 @@ function Body({
   }
   return (
     <>
-      {fresh.value.map((part, i) => (
-        <Box key={i} data-testid={part.label === undefined ? undefined : "commit-patch"}>
+      {fresh.value.map((part, i, all) => (
+        <Box
+          key={`${part.label ?? ""}-${all.slice(0, i).filter((p) => p.label === part.label).length}`}
+          data-testid={part.label === undefined ? undefined : "commit-patch"}
+        >
           {part.label !== undefined && (
             <Box
               data-testid="commit-patch-label"
@@ -180,7 +183,7 @@ export function DiffFileCard(props: {
     () => fetchBlob(range.project, range.firstSha, range.secondSha, file.path),
     [fetchBlob, range.project, range.firstSha, range.secondSha, file.path],
   )
-  let body
+  let body: ReactNode
   if (isBinaryFile(file)) {
     body = <BinaryBody file={file} range={range} fetchBlob={fetchBlob} />
   } else if ((file.large || file.generated) && !loaded) {

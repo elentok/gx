@@ -5,7 +5,7 @@ import {
   GROUP_ON_HOLD,
   countLabel,
   enter,
-  fit,
+  fitOf,
   groupState,
   initialSelect,
   leave,
@@ -122,7 +122,7 @@ describe("fit rules", () => {
     r("arch", { kind: "archived" }),
   ]
   const all = on(...rows.map((x) => x.key))
-  const fits = (a: Parameters<typeof fit>[0]) => fit(a, all, rows).fits
+  const fits = (a: Parameters<typeof fitOf>[0]) => fitOf(a, all, rows).fits
 
   it("Move fits epics, Designs and chats", () => {
     expect(fits("move")).toEqual(["epic", "design", "chat", "queued", "held", "fin"])
@@ -130,19 +130,19 @@ describe("fit rules", () => {
 
   it("Hold fits rows not queued and not held", () => {
     expect(fits("hold")).toEqual(["epic", "design", "fin"])
-    expect(fit("hold", all, rows).skipped).toContainEqual({ key: "queued", reason: "queued" })
+    expect(fitOf("hold", all, rows).skipped).toContainEqual({ key: "queued", reason: "queued" })
   })
 
   it("Take off hold fits held rows", () => {
     expect(fits("unhold")).toEqual(["held"])
-    expect(fit("unhold", on("epic"), rows).skipped).toEqual([
+    expect(fitOf("unhold", on("epic"), rows).skipped).toEqual([
       { key: "epic", reason: "not on hold" },
     ])
   })
 
   it("Stop fits live agents the queue does not manage", () => {
     expect(fits("stop")).toEqual(["chat", "a-live"])
-    const f = fit("stop", all, rows)
+    const f = fitOf("stop", all, rows)
     expect(f.skipped).toContainEqual({ key: "a-exited", reason: "not live" })
     expect(f.skipped).toContainEqual({ key: "a-queue", reason: "managed by the queue" })
   })
@@ -153,7 +153,7 @@ describe("fit rules", () => {
 
   it("a chat draft fits Move and is refused by Remove and Hold", () => {
     const cd = [r("chat-draft/x", { kind: "chat-draft" })]
-    const f = (a: Parameters<typeof fit>[0]) => fit(a, on("chat-draft/x"), cd)
+    const f = (a: Parameters<typeof fitOf>[0]) => fitOf(a, on("chat-draft/x"), cd)
     expect(f("move").fits).toEqual(["chat-draft/x"])
     expect(f("remove").skipped).toEqual([{ key: "chat-draft/x", reason: "can't be removed" }])
     expect(f("hold").skipped).toEqual([{ key: "chat-draft/x", reason: "can't be held" }])
@@ -161,7 +161,7 @@ describe("fit rules", () => {
 
   it("Archive fits epics and Designs; the server's dry run refuses unfinished ones", () => {
     expect(fits("archive")).toEqual(["epic", "design", "queued", "held", "fin"])
-    expect(fit("archive", on("chat"), rows).skipped).toEqual([
+    expect(fitOf("archive", on("chat"), rows).skipped).toEqual([
       { key: "chat", reason: "can't be archived" },
     ])
   })
@@ -179,15 +179,15 @@ describe("labels", () => {
   const rows = [r("a"), r("b"), r("c", { kind: "chat" })]
 
   it("says n of m when some rows are skipped", () => {
-    expect(countLabel("archive", fit("archive", on("a", "b", "c"), rows))).toBe("Archive 2 of 3")
+    expect(countLabel("archive", fitOf("archive", on("a", "b", "c"), rows))).toBe("Archive 2 of 3")
   })
 
   it("says n when all fit", () => {
-    expect(countLabel("archive", fit("archive", on("a", "b"), rows))).toBe("Archive 2")
+    expect(countLabel("archive", fitOf("archive", on("a", "b"), rows))).toBe("Archive 2")
   })
 
   it("lists each skipped row with its reason", () => {
-    expect(skipLines(fit("archive", on("a", "c"), rows), (k) => k.toUpperCase())).toEqual([
+    expect(skipLines(fitOf("archive", on("a", "c"), rows), (k) => k.toUpperCase())).toEqual([
       "C: can't be archived",
     ])
   })

@@ -9,11 +9,14 @@ export type Device = "phone" | "tablet" | "desktop"
 /** Overrides the device type, so the gallery can show a tablet on a wide page. */
 export const DeviceContext = createContext<Device | undefined>(undefined)
 
+function mediaQuery(query: string) {
+  return typeof window.matchMedia === "function" ? window.matchMedia(query) : undefined
+}
+
 function useMedia(query: string, fallback: boolean) {
-  const mq = () => (typeof window.matchMedia === "function" ? window.matchMedia(query) : undefined)
-  const [matches, setMatches] = useState(() => mq()?.matches ?? fallback)
+  const [matches, setMatches] = useState(() => mediaQuery(query)?.matches ?? fallback)
   useEffect(() => {
-    const m = mq()
+    const m = mediaQuery(query)
     if (!m) return
     const on = () => setMatches(m.matches)
     setMatches(m.matches)

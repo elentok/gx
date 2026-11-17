@@ -171,7 +171,7 @@ export function toggleGroup(s: SelectState, rows: SelectRow[], group: string): S
   return { ...s, keys: [...s.keys, ...mine.filter((k) => !s.keys.includes(k))] }
 }
 
-export function fit(action: SelectAction, s: SelectState, rows: SelectRow[]): Fit {
+export function fitOf(action: SelectAction, s: SelectState, rows: SelectRow[]): Fit {
   const out: Fit = { fits: [], skipped: [] }
   for (const key of s.keys) {
     const row = rows.find((r) => r.key === key)
@@ -214,7 +214,7 @@ export interface ActionView {
 /** The actions to show: each with its label, and none that fits no selected row. */
 export function visibleActions(s: SelectState, rows: SelectRow[]): ActionView[] {
   return SELECT_ACTIONS.map((action) => {
-    const f = fit(action, s, rows)
+    const f = fitOf(action, s, rows)
     return { action, label: countLabel(action, f), fit: f }
   }).filter((a) => a.fit.fits.length > 0)
 }

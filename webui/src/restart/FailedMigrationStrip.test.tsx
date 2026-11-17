@@ -36,7 +36,10 @@ function setup(
   const subs = new Set<() => void>()
   const conn = {
     getState: () => state,
-    subscribe: (fn: () => void) => (subs.add(fn), () => subs.delete(fn)),
+    subscribe: (fn: () => void) => {
+      subs.add(fn)
+      return () => subs.delete(fn)
+    },
     refresh: () => {},
     onEvent: () => () => {},
   } as unknown as Connection
@@ -56,7 +59,7 @@ function setup(
           ...state,
           snapshot: { ...state.snapshot!, migration_failures: next },
         } as ConnectionState
-        subs.forEach((fn) => fn())
+        for (const fn of subs) fn()
       }),
   }
 }

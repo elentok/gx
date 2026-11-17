@@ -1,4 +1,3 @@
-import { Text } from "@chakra-ui/react"
 import { RestKindBedtime, RestKindBreak } from "./generated/server"
 import { RestDemoPage } from "./RestDemoPage"
 import { lazy } from "react"

@@ -26,7 +26,10 @@ beforeEach(() => {
   })
   vi.stubGlobal("caches", {
     keys: async () => [`${CACHE_PREFIX}1`, `${CACHE_PREFIX}2`, "other-cache"],
-    delete: async (n: string) => (calls.push(`delete ${n}`), true),
+    delete: async (n: string) => {
+      calls.push(`delete ${n}`)
+      return true
+    },
   })
   vi.stubGlobal("location", { reload })
 })

@@ -118,7 +118,6 @@ export function createConnection(deps: ConnectionDeps = {}) {
   let gen = 0
   let abort: AbortController | null = null
   let backoff = BACKOFF_MIN_MS
-  let live = false
   let refreshing = false
   let refreshQueued = false
   let watchdog: ReturnType<typeof setTimeout> | undefined
@@ -129,14 +128,15 @@ export function createConnection(deps: ConnectionDeps = {}) {
   function set(patch: Partial<ConnectionState>) {
     state = { ...state, ...patch }
     if (patch.snapshot) deps.cache?.save(patch.snapshot)
-    listeners.forEach((l) => l())
+    listeners.forEach((l) => {
+      l()
+    })
   }
 
   function teardown() {
     gen++
     abort?.abort()
     abort = null
-    live = false
     refreshing = false
     refreshQueued = false
     clearTimeout(watchdog)
@@ -211,7 +211,6 @@ export function createConnection(deps: ConnectionDeps = {}) {
         ctl.signal,
       )
       if (g !== gen) return
-      live = true
       markUp()
       set({ streams: state.streams + 1 })
       arm(g)
@@ -227,7 +226,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
         if (events.length > 0) void refresh(g)
         for (const b of events) {
           if (eventName(b) === RELOAD_EVENT) maybeReload(b)
-          eventListeners.forEach((l) => l(eventAddress(b), eventName(b)))
+          for (const l of eventListeners) l(eventAddress(b), eventName(b))
         }
       }
       if (g === gen) fail()
@@ -266,7 +265,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
   // and tells page-data hooks to refetch.
   function resync() {
     void connect()
-    eventListeners.forEach((l) => l(undefined, RESYNC_EVENT))
+    for (const l of eventListeners) l(undefined, RESYNC_EVENT)
   }
 
   function onVisibility() {

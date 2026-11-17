@@ -1,5 +1,6 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import qrcode from "qrcode-generator"
+import { useEffect, useRef } from "react"
 import { ErrorLine, Field } from "./AuthFields"
 
 function qrSvg(uri: string): string {
@@ -7,6 +8,27 @@ function qrSvg(uri: string): string {
   qr.addData(uri)
   qr.make()
   return qr.createSvgTag({ scalable: true, margin: 0 })
+}
+
+// The SVG is parsed with DOMParser and its nodes are put in with replaceChildren: nothing is
+// assigned as HTML, and an image/svg+xml document never runs script.
+function QrBox({ uri }: { uri: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const doc = new DOMParser().parseFromString(qrSvg(uri), "image/svg+xml")
+    ref.current?.replaceChildren(document.importNode(doc.documentElement, true))
+  }, [uri])
+  return (
+    <Box
+      ref={ref}
+      bg="white"
+      p="3"
+      borderRadius="md"
+      w="190px"
+      h="190px"
+      css={{ "& svg": { width: "100%", height: "100%", display: "block" } }}
+    />
+  )
 }
 
 // Groups of four, the way authenticator apps show a key to type by hand.
@@ -32,15 +54,7 @@ export function AddAuthenticator({
   return (
     <>
       <Box data-mock-part="totp-qr" display="flex" justifyContent="center">
-        <Box
-          bg="white"
-          p="3"
-          borderRadius="md"
-          w="190px"
-          h="190px"
-          css={{ "& svg": { width: "100%", height: "100%", display: "block" } }}
-          dangerouslySetInnerHTML={{ __html: qrSvg(uri) }}
-        />
+        <QrBox uri={uri} />
       </Box>
       <Text data-mock-part="totp-link" fontSize="sm" color="text.dim" textAlign="center">
         <chakra.a href={uri} textDecoration="underline">

@@ -39,7 +39,8 @@ test.each(["Epic", "Design", "Ticket"] as const)("the name leads every %s title"
 })
 
 // Never rendered: tsc alone enforces that the page frame's title prop stays required.
-export function MissingTitle() {
+test("the page frame's title prop stays required", () => {
   // @ts-expect-error title is required
-  return <DetailPage>x</DetailPage>
-}
+  const missing = <DetailPage>x</DetailPage>
+  expect(missing).toBeTruthy()
+})
