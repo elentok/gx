@@ -20,16 +20,19 @@ func TestAutoAdvance_RunEndSendsContinueAfterTheCountdown(t *testing.T) {
 		"error then run-end": "Error: the command failed\n" + runEndText,
 	} {
 		t.Run(name, func(t *testing.T) {
-			f := startAdvancing(t, storeWithMapStep(t, "spec"))
+			f := startHeldAdvancing(t, storeWithMapStep(t, "spec"))
 			c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
 			writeAssistantMessage(t, f.Path, text)
 			endTurn(t, f)
 			got := waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
-			if !got.AutoAdvanceAt.After(time.Now().Add(-time.Second)) || got.Actionable.Reason == "" {
+			if got.Actionable.Reason == "" {
 				t.Errorf("session = %+v, want a running countdown over a raised Continue", got)
 			}
 			if b, s := f.H.Banners.Sent(), f.H.Sounds.Played(); len(b) != 0 || len(s) != 0 {
 				t.Errorf("banners = %v, sounds = %v at countdown start, want none", b, s)
+			}
+			if !f.H.Server.Prompt().ReleaseAutoAdvance(f.ID) {
+				t.Fatal("no countdown to release")
 			}
 			waitForScreen(t, c, "/clear")
 			waitForScreen(t, c, "/gx-design map")

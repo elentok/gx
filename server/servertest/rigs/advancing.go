@@ -19,6 +19,14 @@ func StartAdvancing(t *testing.T, store string) *GrillingFixture {
 	return &GrillingFixture{H: h, Ctx: ctx, Evs: evs, ID: id, Conv: conv, Path: path}
 }
 
+// StartHeldAdvancing is StartAdvancing with a countdown that cannot end by
+// itself during a test: the test releases it through Prompt().ReleaseAutoAdvance.
+func StartHeldAdvancing(t *testing.T, store string) *GrillingFixture {
+	t.Helper()
+	h, ctx, evs, id, conv, path := StartGrillingSessionIn(t, "proj:map", store, servertest.WithAutoAdvanceDelay(time.Minute))
+	return &GrillingFixture{H: h, Ctx: ctx, Evs: evs, ID: id, Conv: conv, Path: path}
+}
+
 // SessionSnapshot is the fixture session's entry in the sessions list.
 func SessionSnapshot(t *testing.T, f *GrillingFixture) wire.SessionInfo {
 	t.Helper()

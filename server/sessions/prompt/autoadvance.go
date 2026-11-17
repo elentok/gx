@@ -29,6 +29,24 @@ type autoAdvances struct {
 type autoAdvance struct {
 	deadline time.Time
 	cancel   chan struct{}
+	fire     chan struct{}
+}
+
+// release ends the session's wait as if its timer fired, and reports whether a
+// countdown was running. The countdown then finishes through its usual path.
+func (a *autoAdvances) release(id string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	c := a.by[id]
+	if c == nil {
+		return false
+	}
+	select {
+	case <-c.fire:
+	default:
+		close(c.fire)
+	}
+	return true
 }
 
 // deadline is when the session's countdown ends; zero with none running.
@@ -65,7 +83,7 @@ func (a *autoAdvances) begin(id string, deadline time.Time) *autoAdvance {
 	if a.by == nil {
 		a.by = map[string]*autoAdvance{}
 	}
-	c := &autoAdvance{deadline: deadline, cancel: make(chan struct{})}
+	c := &autoAdvance{deadline: deadline, cancel: make(chan struct{}), fire: make(chan struct{})}
 	a.by[id] = c
 	return c
 }
@@ -100,6 +118,7 @@ func (p *Prompt) StartAutoAdvance(id string) bool {
 		defer timer.Stop()
 		select {
 		case <-timer.C:
+		case <-c.fire:
 		case <-c.cancel:
 			return
 		case <-p.sessions.Watches.Stop:
@@ -113,6 +132,10 @@ func (p *Prompt) StartAutoAdvance(id string) bool {
 	})
 	return true
 }
+
+// ReleaseAutoAdvance ends the session's running countdown early, as if its
+// timer fired, and reports whether one was running. For tests.
+func (p *Prompt) ReleaseAutoAdvance(id string) bool { return p.autoAdvances.release(id) }
 
 // advanceSwitch holds the auto-advance switch's private methods, keeping
 // Prompt's own method count down.
