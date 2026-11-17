@@ -13,11 +13,14 @@ import (
 // NudgeCaps bound PromptWithNudge. Grace bounds each submit/nudge wait for the
 // turn to start. Nudges caps the retries after the first submit; Retypes caps
 // how many of them may resubmit the text in full before PromptWithNudge gives
-// up with ErrStuckSubmission.
+// up with ErrStuckSubmission. Settle, when set, is a short first wait: if the
+// turn has not started by then and the screen shows the text landed (it
+// changed), the Enter is pressed at once instead of after the whole Grace.
 type NudgeCaps struct {
 	Grace   time.Duration
 	Nudges  int
 	Retypes int
+	Settle  time.Duration
 }
 
 // DefaultNudgeCaps are herdr's caps. A tighter grace was too short for a
@@ -257,7 +260,19 @@ func PromptWithNudge(p Prompter, text string, caps NudgeCaps, deadline time.Time
 	if err := p.Submit(text); err != nil {
 		return err
 	}
-	started, err := p.WaitStart(timeout)
+	first := timeout
+	if caps.Settle > 0 && caps.Settle < timeout {
+		first = caps.Settle
+	}
+	started, err := p.WaitStart(first)
+	if err == nil && !started && first < timeout {
+		// Claude swallows an Enter while it reviews a paste: a changed screen
+		// means the text is in the input, so the nudge below presses Enter now.
+		// An unchanged one may only be slow: keep waiting out the grace.
+		if after, readErr := p.Screen(); readErr == nil && after == snapshot {
+			started, err = p.WaitStart(timeout - first)
+		}
+	}
 	retypes := 0
 	for attempt := 0; err == nil && !started && attempt < caps.Nudges; attempt++ {
 		if timeout, ok = grace(); !ok {

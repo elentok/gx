@@ -415,3 +415,29 @@ func TestClearInput_WaitsForTheRedraw(t *testing.T) {
 		t.Fatalf("ClearInput() error = %v, want the late redraw accepted", err)
 	}
 }
+
+func TestPromptWithNudge_Settle_ChangedScreen_PressesEnterEarly(t *testing.T) {
+	f := &fakePrompter{starts: []bool{false, true}, screens: []string{"before", "typed"}}
+	caps := DefaultNudgeCaps
+	caps.Settle = 3 * time.Second
+	if err := PromptWithNudge(f, "hi", caps, time.Time{}, f.now, f.report); err != nil {
+		t.Fatalf("PromptWithNudge() error = %v", err)
+	}
+	assertCalls(t, f.calls, "submit:hi", "wait", "enter", "wait")
+	if f.timeouts[0] != 3*time.Second {
+		t.Fatalf("first wait = %v, want 3s", f.timeouts[0])
+	}
+}
+
+func TestPromptWithNudge_Settle_UnchangedScreen_WaitsOutGrace(t *testing.T) {
+	f := &fakePrompter{starts: []bool{false, true}, screens: []string{"same"}}
+	caps := DefaultNudgeCaps
+	caps.Settle = 3 * time.Second
+	if err := PromptWithNudge(f, "hi", caps, time.Time{}, f.now, f.report); err != nil {
+		t.Fatalf("PromptWithNudge() error = %v", err)
+	}
+	assertCalls(t, f.calls, "submit:hi", "wait", "wait")
+	if f.timeouts[1] != caps.Grace-caps.Settle {
+		t.Fatalf("second wait = %v, want %v", f.timeouts[1], caps.Grace-caps.Settle)
+	}
+}

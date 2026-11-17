@@ -20,6 +20,9 @@ import (
 // codexUnknownWait bounds the pane watch for Codex's "Unrecognized command".
 const codexUnknownWait = 2 * time.Second
 
+// sendSettle is how long a chat send waits for its turn before it checks that the Enter landed.
+const sendSettle = 3 * time.Second
+
 const sendFailedPrefix = "Send failed: "
 
 // sendPrompt types a person's text into the session and nudges it until its
@@ -128,6 +131,8 @@ func (p *Prompt) nudgePrompt(dir, text string, imgs imageSet) error {
 	run.ClearPersonTyped()
 	caps := claudeui.DefaultNudgeCaps
 	caps.Grace = cmp.Or(p.cfg.PromptGrace, caps.Grace)
+	// A person is waiting on a chat send: press a swallowed Enter after seconds, not after the grace.
+	caps.Settle = min(sendSettle, caps.Grace)
 	pr := &runPrompter{holderPrompter: holderPrompter{c: run.Holder(), typing: p.projects.SessionTyping(dir), io: p.projects.TypingIO(dir, run.Holder(), "send-nudge"), images: imgs,
 		lock: func() (func(), error) { return lockTyping(p, filepath.Base(dir), nil) }}, run: run}
 	report := func(d claudeui.NudgeDecision) {
