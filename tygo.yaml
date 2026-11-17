@@ -19,7 +19,6 @@ packages:
       - index.go
       - limitburn.go
       - limitsstore.go
-      - migrate.go
       - queue.go
       - rest.go
       - sessions.go
@@ -44,6 +43,7 @@ packages:
       - cleanup.go
       - designdrafts.go
       - hostedfiles.go
+      - migrate.go
       - restart.go
       - schedules.go
       - settingspage.go

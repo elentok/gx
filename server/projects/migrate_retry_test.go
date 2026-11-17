@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -50,7 +50,7 @@ func TestMigrate_RetryClearsTheRecordOnPass(t *testing.T) {
 
 	retry := func() {
 		t.Helper()
-		res, err := h.Client.Sessions.RetryMigration(ctx, wire.RetryMigrationRequest{Project: "proj"})
+		res, err := h.Client.Sessions.RetryMigration(ctx, ops.RetryMigrationRequest{Project: "proj"})
 		if err != nil || !res.Started {
 			t.Fatalf("retry = %+v, %v", res, err)
 		}
@@ -91,12 +91,12 @@ func TestMigrate_RetryRefusedWhileRunningOrUnknown(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.Sessions.RetryMigration(ctx, wire.RetryMigrationRequest{Project: "proj"})
-	if err != nil || !res.Refused || res.Reason != wire.ReasonRetryRunning {
+	res, err := h.Client.Sessions.RetryMigration(ctx, ops.RetryMigrationRequest{Project: "proj"})
+	if err != nil || !res.Refused || res.Reason != ops.ReasonRetryRunning {
 		t.Errorf("during a run = %+v, %v", res, err)
 	}
-	res, err = h.Client.Sessions.RetryMigration(ctx, wire.RetryMigrationRequest{Project: "nope"})
-	if err != nil || !res.Refused || res.Reason != wire.ReasonRetryUnknownProject {
+	res, err = h.Client.Sessions.RetryMigration(ctx, ops.RetryMigrationRequest{Project: "nope"})
+	if err != nil || !res.Refused || res.Reason != ops.ReasonRetryUnknownProject {
 		t.Errorf("unknown = %+v, %v", res, err)
 	}
 	relOnce.Do(func() { close(release) })

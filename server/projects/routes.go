@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -24,7 +25,7 @@ func Routes(reg func() *Registry, mig func() *Migrator, chk func() *Checks) []wi
 			handle(w, r, reg().SetPath)
 		}},
 		{Pattern: "POST /v1/projects/retry-migration", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, r *http.Request) {
-			handle(w, r, func(req wire.RetryMigrationRequest) (wire.RetryMigrationResult, error) {
+			handle(w, r, func(req ops.RetryMigrationRequest) (ops.RetryMigrationResult, error) {
 				return mig().Retry(req.Project), nil
 			})
 		}},

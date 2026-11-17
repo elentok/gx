@@ -1,8 +1,11 @@
-package prompt
+// Package dialogkeys answers claude's own AskUserQuestion and add-directory
+// dialogs by sending keys to the session's terminal, for a card with no hook
+// held behind it.
+package dialogkeys
 
 import (
-	"cmp"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -25,12 +28,55 @@ type dialogMismatch string
 
 func (m dialogMismatch) Error() string { return string(m) }
 
-// answerClaudeKeys answers a keystroke-fallback card by keys: the session's own
+// Config paces the keys. Step and Cap are the screen-settle interval and limit;
+// Settle reads the screen until it stops changing.
+type Config struct {
+	Log       *slog.Logger
+	Step, Cap time.Duration
+	Settle    func(read func() ([]string, error), step, limit time.Duration) []string
+}
+
+// PickOther marks the Other pick in the slice PickedIDs returns.
+const PickOther = -1
+
+// PickedIDs is the answer's picks in click order: 0-based rows of the nOptions
+// numbered options, with PickOther where the person clicked Other. The error
+// says only that a choice is no option; the caller names the question or
+// dialog.
+func PickedIDs(a wire.SessionAnswer, nOptions int) ([]int, error) {
+	var picks []int
+	for _, id := range slices.DeleteFunc(append([]string{a.Choice}, a.Choices...), func(id string) bool { return id == "" }) {
+		if id == "other" {
+			picks = append(picks, PickOther)
+			continue
+		}
+		n, err := strconv.Atoi(id)
+		if err != nil || n < 1 || n > nOptions {
+			return nil, fmt.Errorf("choice %q is not an option", id)
+		}
+		picks = append(picks, n-1)
+	}
+	return picks, nil
+}
+
+// Answered reports whether the answer picks or writes anything.
+func Answered(a wire.SessionAnswer) bool {
+	return a.Choice != "" || len(a.Choices) > 0 || strings.TrimSpace(a.Text) != ""
+}
+
+func firstAnswer(answers []wire.SessionAnswer) wire.SessionAnswer {
+	if len(answers) > 0 {
+		return answers[0]
+	}
+	return wire.SessionAnswer{}
+}
+
+// Answer answers a keystroke-fallback card by keys: the session's own
 // dialog, with no hook behind it. Before every key it re-reads the screen and
 // stops on any difference from what that key assumes, as the 60 s
 // askUserQuestionTimeout or a person at the terminal can change the dialog
 // under it. No answer dismisses with Esc.
-func (p *Prompt) answerClaudeKeys(req wire.SessionAnswerRequest, dir string) wire.SessionResult {
+func Answer(req wire.SessionAnswerRequest, dir string, cfg Config) wire.SessionResult {
 	if req.Release {
 		return sessions.Refusal(wire.ReasonStale, "the question moved on; review it first")
 	}
@@ -38,7 +84,7 @@ func (p *Prompt) answerClaudeKeys(req wire.SessionAnswerRequest, dir string) wir
 	if err != nil {
 		return sessions.Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has no live holder", req.ID))
 	}
-	k := &keyDriver{p: p, conn: conn}
+	k := &keyDriver{cfg: cfg, conn: conn}
 	err = k.run(req)
 	switch e := err.(type) {
 	case nil:
@@ -48,7 +94,7 @@ func (p *Prompt) answerClaudeKeys(req wire.SessionAnswerRequest, dir string) wir
 	case badAnswer:
 		return sessions.Refusal(wire.ReasonBadChoice, string(e))
 	default:
-		p.log.Warn("answer claude dialog by keys", "session", req.ID, "err", err)
+		cfg.Log.Warn("answer claude dialog by keys", "session", req.ID, "err", err)
 		return sessions.Refusal(wire.ReasonNotAnswerable, "Stopped, the dialog is still open: "+e.Error())
 	}
 }
@@ -60,7 +106,7 @@ func (b badAnswer) Error() string { return string(b) }
 
 // keyDriver sends keys to one dialog, checking the screen between them.
 type keyDriver struct {
-	p    *Prompt
+	cfg  Config
 	conn *holder.HolderClient
 	id   string   // the question block it started on
 	rows []string // the last screen read
@@ -80,8 +126,8 @@ func (k *keyDriver) run(req wire.SessionAnswerRequest) error {
 		return dialogMismatch("the dialog on screen is not the one the card shows")
 	}
 	k.id = d.ID
-	a := answerAt(req.Answers, 0)
-	if !isClaudeAnswered(a) {
+	a := firstAnswer(req.Answers)
+	if !Answered(a) {
 		_, err := k.press("\x1b")
 		return err
 	}
@@ -123,12 +169,12 @@ func dialogPicks(d claudeui.AskDialog, a wire.SessionAnswer) (picks []int, text 
 		return nil, "", badAnswer("the text has a line break or control character")
 	}
 	other := len(d.Options) - 1
-	picks, err = pickedIDs(a, other)
+	picks, err = PickedIDs(a, other)
 	if err != nil {
 		return nil, "", badAnswer(err.Error() + " of the dialog")
 	}
-	pickedOther := slices.Contains(picks, pickOther)
-	picks = slices.DeleteFunc(picks, func(p int) bool { return p == pickOther })
+	pickedOther := slices.Contains(picks, PickOther)
+	picks = slices.DeleteFunc(picks, func(p int) bool { return p == PickOther })
 	if pickedOther || text != "" {
 		picks = append(picks, other)
 	}
@@ -309,8 +355,7 @@ func (k *keyDriver) press(keys string) (bool, error) {
 	if err := k.conn.SendPersonKeys(keys); err != nil {
 		return false, err
 	}
-	step := cmp.Or(k.p.cfg.KeysSettleStep, DefaultKeysSettleStep)
-	limit := cmp.Or(k.p.cfg.KeysSettleCap, DefaultKeysSettleCap)
+	step, limit := k.cfg.Step, k.cfg.Cap
 	read := func() ([]string, error) {
 		rows, _, err := k.conn.Screen(0)
 		return rows, err
@@ -326,7 +371,7 @@ func (k *keyDriver) press(keys string) (bool, error) {
 		}
 		time.Sleep(step)
 	}
-	if rows := SettleScreen(read, step, limit); rows != nil {
+	if rows := k.cfg.Settle(read, step, limit); rows != nil {
 		k.rows = rows
 	}
 	return !slices.Equal(k.rows, before), nil
@@ -342,8 +387,8 @@ func (k *keyDriver) addDir(req wire.SessionAnswerRequest, d claudeui.AddDirDialo
 	if !strings.HasPrefix(req.CardID, d.ID+"-") {
 		return dialogMismatch("the dialog on screen is not the one the card shows")
 	}
-	a := answerAt(req.Answers, 0)
-	if !isClaudeAnswered(a) || a.Choice == "2" && len(a.Choices) == 0 && strings.TrimSpace(a.Text) == "" {
+	a := firstAnswer(req.Answers)
+	if !Answered(a) || a.Choice == "2" && len(a.Choices) == 0 && strings.TrimSpace(a.Text) == "" {
 		_, err := k.press("\x1b")
 		return err
 	}

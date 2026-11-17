@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/projectlock"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -102,7 +102,7 @@ func (m *Migrator) MigrateAll(ctx context.Context) {
 
 // retryMigration runs the project's pending steps in the background, the same
 // code path as the start-up run.
-func (m *Migrator) Retry(project string) wire.RetryMigrationResult {
+func (m *Migrator) Retry(project string) ops.RetryMigrationResult {
 	dir := ""
 	if m.cfg().TicketStore != "" {
 		dirs, _ := tickets.ProjectDirs(m.cfg().TicketStore)
@@ -113,16 +113,16 @@ func (m *Migrator) Retry(project string) wire.RetryMigrationResult {
 		}
 	}
 	if dir == "" {
-		return wire.RetryMigrationResult{Refused: true, Reason: wire.ReasonRetryUnknownProject, Message: "no project " + project}
+		return ops.RetryMigrationResult{Refused: true, Reason: ops.ReasonRetryUnknownProject, Message: "no project " + project}
 	}
 	if !m.Begin(project) {
-		return wire.RetryMigrationResult{Refused: true, Reason: wire.ReasonRetryRunning, Message: "project " + project + " is migrating"}
+		return ops.RetryMigrationResult{Refused: true, Reason: ops.ReasonRetryRunning, Message: "project " + project + " is migrating"}
 	}
 	go func() {
 		defer m.End(project)
 		m.migrateProject(m.Steps(), dir, &migrations.Pass{})
 	}()
-	return wire.RetryMigrationResult{Started: true}
+	return ops.RetryMigrationResult{Started: true}
 }
 
 // beginMigration marks project as migrating; it reports false when another run

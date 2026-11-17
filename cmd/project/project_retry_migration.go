@@ -7,7 +7,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +17,7 @@ func runProjectRetryMigration(ctx context.Context, cl *apiclient.Client, w io.Wr
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	res, err := cl.Sessions.RetryMigration(ctx, wire.RetryMigrationRequest{Project: name})
+	res, err := cl.Sessions.RetryMigration(ctx, ops.RetryMigrationRequest{Project: name})
 	if err != nil {
 		return fmt.Errorf("server write failed: %w", err)
 	}

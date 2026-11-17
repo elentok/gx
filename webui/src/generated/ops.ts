@@ -532,6 +532,31 @@ export const RootReasonWriteFailed = "write-failed";
 export type R = typeof ResolveReasonTooManyCandidates | typeof ResolveReasonBadBase | typeof ReasonPathNotAllowed | typeof ReasonHostNotAllowed | typeof RootReasonNotAbsolute | typeof RootReasonIsSlash | typeof RootReasonIsHome | typeof RootReasonMissing | typeof RootReasonNotFolder | typeof RootReasonBuiltIn | typeof RootReasonNotAdded | typeof RootReasonWriteFailed;
 
 //////////
+// source: migrate.go
+
+export const ReasonRetryRunning = "migrating";
+export const ReasonRetryUnknownProject = "unknown-project";
+/**
+ * Refusal reasons of the retry-migration route.
+ */
+export type ReasonRetry = typeof ReasonRetryRunning | typeof ReasonRetryUnknownProject;
+/**
+ * RetryMigrationRequest is the body of POST /v1/projects/retry-migration.
+ */
+export interface RetryMigrationRequest {
+  project: string;
+}
+/**
+ * RetryMigrationResult answers it: Started, or Refused with a Reason.
+ */
+export interface RetryMigrationResult {
+  started: boolean;
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+}
+
+//////////
 // source: restart.go
 
 export const ReasonRestartChanged = "changed";

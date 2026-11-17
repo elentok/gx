@@ -1,41 +1,19 @@
 package prompt
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/sessions/prompt/dialogkeys"
 	"github.com/elentok/gx/server/wire"
 )
 
 // dismissReason is what Claude reads when the person dismisses a held question.
 const dismissReason = "The user doesn't want to proceed with this question. Do not ask again. STOP and wait for the user to tell you how to proceed."
-
-// pickOther marks the Other pick in the slice pickedIDs returns.
-const pickOther = -1
-
-// pickedIDs is the answer's picks in click order: 0-based rows of the nOptions
-// numbered options, with pickOther where the person clicked Other. The error
-// says only that a choice is no option; the caller names the question or
-// dialog.
-func pickedIDs(a wire.SessionAnswer, nOptions int) ([]int, error) {
-	var picks []int
-	for _, id := range slices.DeleteFunc(append([]string{a.Choice}, a.Choices...), func(id string) bool { return id == "" }) {
-		if id == "other" {
-			picks = append(picks, pickOther)
-			continue
-		}
-		n, err := strconv.Atoi(id)
-		if err != nil || n < 1 || n > nOptions {
-			return nil, fmt.Errorf("choice %q is not an option", id)
-		}
-		picks = append(picks, n-1)
-	}
-	return picks, nil
-}
 
 // answerClaudeDialog resolves the held AskUserQuestion call of a claude-dialog
 // card (already checked as the current one): Release hands it to the terminal
@@ -51,7 +29,12 @@ func (p *Prompt) answerClaudeDialog(req wire.SessionAnswerRequest, dir string) w
 		}
 	}
 	if held == nil {
-		return p.answerClaudeKeys(req, dir)
+		return dialogkeys.Answer(req, dir, dialogkeys.Config{
+			Log:    p.log,
+			Step:   cmp.Or(p.cfg.KeysSettleStep, DefaultKeysSettleStep),
+			Cap:    cmp.Or(p.cfg.KeysSettleCap, DefaultKeysSettleCap),
+			Settle: SettleScreen,
+		})
 	}
 	var res wire.AskHookResult
 	switch {
@@ -60,7 +43,7 @@ func (p *Prompt) answerClaudeDialog(req wire.SessionAnswerRequest, dir string) w
 			return stale
 		}
 		return wire.SessionResult{}
-	case !slices.ContainsFunc(req.Answers, isClaudeAnswered):
+	case !slices.ContainsFunc(req.Answers, dialogkeys.Answered):
 		res = wire.AskHookResult{Decision: wire.AskHookDeny, Reason: dismissReason}
 	default:
 		input, refusal := claudeUpdatedInput(*held, req.Answers)
@@ -73,10 +56,6 @@ func (p *Prompt) answerClaudeDialog(req wire.SessionAnswerRequest, dir string) w
 		return stale
 	}
 	return wire.SessionResult{}
-}
-
-func isClaudeAnswered(a wire.SessionAnswer) bool {
-	return a.Choice != "" || len(a.Choices) > 0 || strings.TrimSpace(a.Text) != ""
 }
 
 // claudeUpdatedInput is the AskUserQuestion input that answers the call: the
@@ -107,17 +86,17 @@ func claudeUpdatedInput(held wire.AskHookRequest, answers []wire.SessionAnswer) 
 		for _, o := range q.Options {
 			cq.Options = append(cq.Options, option{o.Label, o.Description})
 		}
-		picks, err := pickedIDs(a, len(q.Options))
+		picks, err := dialogkeys.PickedIDs(a, len(q.Options))
 		if err != nil {
 			return nil, fmt.Sprintf("%v of question %d", err, i+1)
 		}
-		other := slices.Contains(picks, pickOther)
+		other := slices.Contains(picks, dialogkeys.PickOther)
 		if other && text == "" {
 			return nil, fmt.Sprintf("question %d needs text for Other", i+1)
 		}
 		var parts []string
 		for _, p := range picks {
-			if p == pickOther {
+			if p == dialogkeys.PickOther {
 				parts = append(parts, text)
 			} else {
 				parts = append(parts, q.Options[p].Label)

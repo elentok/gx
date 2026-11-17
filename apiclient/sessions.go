@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // Sessions is the sub-client for interactive sessions, designs and the TUI
@@ -48,8 +49,8 @@ func (s *Sessions) FinishMove(ctx context.Context, req wire.FinishMoveRequest) (
 
 // RetryMigration runs a project's pending migration steps again in the server.
 // A refusal is a result (Refused set), not an error.
-func (s *Sessions) RetryMigration(ctx context.Context, req wire.RetryMigrationRequest) (wire.RetryMigrationResult, error) {
-	var res wire.RetryMigrationResult
+func (s *Sessions) RetryMigration(ctx context.Context, req ops.RetryMigrationRequest) (ops.RetryMigrationResult, error) {
+	var res ops.RetryMigrationResult
 	err := s.t.post(ctx, "/v1/projects/retry-migration", req, &res)
 	return res, err
 }

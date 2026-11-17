@@ -1,4 +1,4 @@
-package wire
+package ops
 
 // Refusal reasons of the retry-migration route.
 const (
