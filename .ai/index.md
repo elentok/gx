@@ -400,7 +400,7 @@ Testing a click on a Chakra menu item needs `waitFor`. See "Testing a Chakra men
 Web checks:
 
 - Type-check with `gx brief tsc`, not a hand-built `pnpm exec tsc ... | tail`.
-- The web UI formats with Biome (`webui/biome.json`: no semicolons, double quotes, width 100).
+- The web UI formats with Biome (`webui/biome.jsonc`: no semicolons, double quotes, width 100). `pnpm --dir webui run lint` runs the linter.
   Run `cd webui && pnpm format <files>`. `gx check --kind format` does the same. Never run prettier or npx.
 - `make web-types` writes `webui/src/generated/server.ts` from `server/wire` and
   `webui/src/generated/ops.ts` from `server/wire/ops`. The `server/wire` entry has the frontmatter

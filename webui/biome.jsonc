@@ -6,6 +6,16 @@
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "javascript": { "formatter": { "semicolons": "asNeeded", "quoteStyle": "double" } },
-  "linter": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "domains": { "react": "recommended", "test": "recommended" },
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        // Off on purpose: the code uses `!` where a value is known to exist, and tsc already checks the rest.
+        "noNonNullAssertion": "off"
+      }
+    }
+  },
   "assist": { "enabled": false }
 }

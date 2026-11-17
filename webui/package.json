@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "format": "biome format --write",
+    "lint": "biome lint --diagnostic-level=info",
     "e2e": "playwright test -c e2e/playwright.config.ts"
   },
   "dependencies": {
