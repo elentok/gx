@@ -53,6 +53,8 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
     await page.keyboard.press("ControlOrMeta+p")
     await expect(palette).toHaveCount(0)
   }
+  // Settings redirects to its first section after it loads; a goto sent before that is overwritten.
+  await expect(page).toHaveURL(/#\/settings\/s\//)
 
   // It works from the Design page's chat box too.
   await goto(page, "#/d/demo:design-live")

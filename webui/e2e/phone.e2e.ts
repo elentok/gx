@@ -261,14 +261,18 @@ test("24. Phone, Design page", async ({ page, start }) => {
   const row = ["Add image", "Note"].map((n) => page.getByRole("button", nav(n)))
   const auto = page.getByRole("button", { name: /^Auto:/ })
   const send = page.getByRole("button", nav("Send"))
-  const boxes = []
-  for (const b of [...row, auto, send]) {
-    await expect(b).toBeVisible()
-    boxes.push((await b.boundingBox())!)
-  }
+  const buttons = [...row, auto, send]
+  for (const b of buttons) await expect(b).toBeVisible()
+  // The footer reflows on the next frame, so read all four boxes together until they share one row.
+  let boxes: { x: number; y: number; width: number; height: number }[] = []
+  await expect
+    .poll(async () => {
+      boxes = (await Promise.all(buttons.map((b) => b.boundingBox()))).map((b) => b!)
+      const ys = boxes.map((b) => b.y + b.height / 2)
+      return Math.max(...ys) - Math.min(...ys) < 0.5
+    })
+    .toBe(true)
   for (const b of boxes.slice(0, 2)) expect([b.width, b.height]).toEqual([44, 44])
-  const centers = boxes.map((b) => b.y + b.height / 2)
-  for (const c of centers) expect(c).toBeCloseTo(centers[0], 0)
   for (let i = 1; i < boxes.length; i++)
     expect(boxes[i].x).toBeGreaterThanOrEqual(boxes[i - 1].x + boxes[i - 1].width)
   // The paperclip is at the left edge of the footer, which has no separator and 12px above, none below.
