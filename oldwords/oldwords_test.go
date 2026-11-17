@@ -88,6 +88,7 @@ var allowed = map[string]allowance{
 	"ralphloop/ticketops/friction_test.go":        allow("tests the legacy land-conflict kind mapping", "land"),
 	"ui/tickets/preview/preview.go":               allow("highlights the legacy Needs Repair heading", "needsrepair"),
 	"testutil/gxfixture/deadrun_test.go":          allow("waits for the snapshot's legacy needs-repair status", "needsrepair"),
+	"testutil/gxfixture/herdrremoval_test.go":     allow("waits for the legacy needs-repair status a handle mismatch leaves", "needsrepair"),
 	// Wire and persisted names kept for compatibility with running servers,
 	// stored logs and on-disk state.
 	"server/wire/queue.go":                          allow("JSON wire fields parked, park_kind, park_reason", "park"),
