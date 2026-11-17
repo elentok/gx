@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.51.7 - 2026-11-17
+
+- Fixed agents staying stuck on Claude's "Adding a new directory" dialog. The dialog refuses keys sent too soon, and gx sent one every 500 ms. gx now waits 5 seconds before the first key and between keys.
+- Added a Yes/No question card in the web chat for that dialog, as a fallback if gx cannot answer it.
+
 ## v0.51.6 - 2026-11-17
 
 - Fixed agents stuck on Claude's "Adding a new directory" dialog. gx now answers it like the trust-folder dialog, so the web UI no longer needs the TUI to release the agent.
