@@ -48,6 +48,26 @@ func TestGoTestsSkill(t *testing.T) {
 	)
 }
 
+func TestVitestSkill(t *testing.T) {
+	checkRuleHeadings(t, "gx-vitest-tests/SKILL.md")
+	checkAnchors(t, "gx-vitest-tests/SKILL.md",
+		"(../gx-test-guidelines/SKILL.md)",
+		"## Prefer spyOn over mock",
+		"## Blank line between blocks",
+		"## Wait on what you read",
+		"## Renders share one cache",
+		"## Never click a disabled control",
+		"## Never fix a timeout with a longer wait",
+		"## A product timer needs a disposer",
+		"## Prove a race with an injected delay",
+		"## Check the whole run",
+		"## Use the global async wait",
+		"## Name a non-default environment",
+		"## Restore real timers",
+		"needs a disposer",
+	)
+}
+
 func TestTestReviewSkill(t *testing.T) {
 	checkAnchors(t, "gx-test-review/SKILL.md",
 		"## 1. Skip when no test file changed",
