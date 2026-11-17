@@ -5,7 +5,7 @@ import { ConnectionContext, type Connection } from "../connection"
 import { EventChatDraftsChanged, type ChatDraft } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { ChatDraftPage } from "./ChatDraftPage"
-import type { ChatDraftOutcome, ChatDraftsClient } from "./chatDrafts"
+import type { ChatDraftOutcome, ChatDraftsClient, ChatStartOutcome } from "./chatDrafts"
 
 afterEach(() => {
   cleanup()
@@ -38,8 +38,11 @@ function fakeDrafts(over: Partial<ChatDraft> = {}) {
   })
   const remove = vi.fn(async (): Promise<ChatDraftOutcome> => ({ kind: "deleted" }))
   const read = vi.fn(async (): Promise<ChatDraftOutcome> => ({ kind: "ok", draft: { ...stored } }))
-  const client: ChatDraftsClient = { read, save, remove }
-  return { client, read, save, remove, stored }
+  const start = vi.fn(
+    async (): Promise<ChatStartOutcome> => ({ kind: "started", session: "sess-9" }),
+  )
+  const client: ChatDraftsClient = { read, save, remove, start }
+  return { client, read, save, remove, start, stored }
 }
 
 /** Shows where the router is, so a redirect is visible. */
@@ -84,7 +87,51 @@ const brief = () => screen.getByRole("textbox", { name: "Brief" }) as HTMLTextAr
 const typeBrief = (value: string) => fireEvent.change(brief(), { target: { value } })
 const wait = (ms: number) => act(async () => void vi.advanceTimersByTime(ms))
 
-test("the facts and the brief render and Start is disabled", async () => {
+const startButton = () => screen.getByRole("button", { name: "Start chat" }) as HTMLButtonElement
+const clickStart = () => act(async () => fireEvent.click(startButton()))
+
+test("Start posts the draft and goes to the new chat", async () => {
+  const fake = fakeDrafts()
+  await mount(fake)
+  await clickStart()
+  expect(fake.start).toHaveBeenCalledWith("c1")
+  expect(where()).toBe("/agents/sess-9 ")
+})
+
+test("Start is disabled for a blank brief and while a save is in flight, and says why", async () => {
+  vi.useFakeTimers()
+  await mount(fakeDrafts())
+  expect(startButton().disabled).toBe(false)
+  typeBrief("   ")
+  expect(startButton().disabled).toBe(true)
+  expect(screen.getByText("Write a brief to start.")).toBeTruthy()
+  typeBrief("Something")
+  expect(startButton().disabled).toBe(true)
+  expect(screen.getByText("Saving the brief...")).toBeTruthy()
+  await wait(800)
+  expect(startButton().disabled).toBe(false)
+})
+
+test("a failed Start shows the error and the worktree, keeps the brief, and Start posts again", async () => {
+  const fake = fakeDrafts()
+  fake.start.mockImplementationOnce(async () => {
+    fake.stored.worktree_path = "/work/split-auth-abc123"
+    return { kind: "failed", message: "harness not found" }
+  })
+  await mount(fake)
+  await clickStart()
+  expect(screen.getByRole("alert").textContent).toContain("harness not found")
+  expect(screen.getByRole("alert").textContent).toContain(
+    "Start made a worktree at /work/split-auth-abc123; pressing Start again runs there",
+  )
+  expect(brief().value).toBe("Split the auth work out.")
+  expect(fake.remove).not.toHaveBeenCalled()
+  await clickStart()
+  expect(fake.start).toHaveBeenCalledTimes(2)
+  expect(where()).toBe("/agents/sess-9 ")
+})
+
+test("the facts and the brief render and Start is enabled", async () => {
   await mount(fakeDrafts())
   for (const text of [
     "gx",
@@ -96,9 +143,7 @@ test("the facts and the brief render and Start is disabled", async () => {
   ])
     expect(screen.getAllByText(text).length).toBeGreaterThan(0)
   expect(brief().value).toBe("Split the auth work out.")
-  expect((screen.getByRole("button", { name: "Start chat" }) as HTMLButtonElement).disabled).toBe(
-    true,
-  )
+  expect(startButton().disabled).toBe(false)
 })
 
 test("typing saves after 800 ms with the draft's revision", async () => {
@@ -184,7 +229,7 @@ test("a draft that was started goes to its session", async () => {
   const fake = fakeDrafts()
   fake.read.mockResolvedValueOnce({ kind: "gone", started: "sess-1" })
   await mount(fake)
-  expect(where()).toContain("/agents/")
+  expect(where()).toBe("/agents/sess-1 ")
 })
 
 test("a chat-drafts-changed event that finds the draft gone leaves the page", async () => {

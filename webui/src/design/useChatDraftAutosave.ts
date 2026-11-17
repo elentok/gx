@@ -169,5 +169,34 @@ export function useChatDraftAutosave({
       .catch(() => {})
   }
 
-  return { facts, brief, edit, status, banner, bannerActions, remove }
+  const [starting, setStarting] = useState(false)
+  const [startError, setStartError] = useState(initial.start_error)
+
+  /** Starts the chat: `onStarted` gets its session id. A failure keeps the draft and the page. */
+  const start = async (onStarted: (session: string) => void) => {
+    if (phase.current !== "editing" || starting) return
+    setStarting(true)
+    try {
+      await chain.current
+      const res = await drafts.start(initial.id)
+      if (res.kind === "started") {
+        phase.current = "finished"
+        clearTimeout(timer.current)
+        onStarted(res.session)
+        return
+      }
+      if (res.kind === "gone") return leaveGone(res.started)
+      setStartError(res.message)
+      // The failed Start may have left a worktree; the draft says where.
+      const again = await drafts.read(initial.id)
+      if (again.kind === "ok") setFacts((was) => ({ ...again.draft, brief: was.brief }))
+      else if (again.kind === "gone") leaveGone(again.started)
+    } catch (e) {
+      setStartError(e instanceof Error ? e.message : "Start failed")
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  return { facts, brief, edit, status, banner, bannerActions, remove, start, starting, startError }
 }

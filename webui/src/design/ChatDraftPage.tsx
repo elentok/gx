@@ -94,11 +94,13 @@ function ChatDraftForm({ drafts, initial }: { drafts: ChatDraftsClient; initial:
   const shell = useShell()
   const navigate = useNavigate()
   const leaveGone = useLeaveGone(agentPath)
-  const { facts, brief, edit, status, banner, bannerActions, remove } = useChatDraftAutosave({
-    drafts,
-    initial,
-    onGone: leaveGone,
-  })
+  const { facts, brief, edit, status, banner, bannerActions, remove, start, starting, startError } =
+    useChatDraftAutosave({ drafts, initial, onGone: leaveGone })
+  const blocker = !brief.trim()
+    ? "Write a brief to start."
+    : status === "saving"
+      ? "Saving the brief..."
+      : null
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
   const [confirming, setConfirming] = useState(false)
@@ -110,8 +112,11 @@ function ChatDraftForm({ drafts, initial }: { drafts: ChatDraftsClient; initial:
     remove()
     navigate("/epics", { state: { note: REMOVED_NOTE } })
   }
-  // Start comes with the next ticket; the form only keeps Enter from submitting the page.
-  const submit = (e: FormEvent) => e.preventDefault()
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (blocker || banner || starting) return
+    void start((session) => navigate(agentPath(session)))
+  }
 
   return (
     <DetailPage fill title={{ kind: "Chat draft", name: facts.label }}>
@@ -189,14 +194,30 @@ function ChatDraftForm({ drafts, initial }: { drafts: ChatDraftsClient; initial:
             onChange={(e) => edit(e.target.value)}
           />
         )}
+        {startError && (
+          <Box role="alert" px="3" pb="2" fontSize="sm" color="tone.error.fg" flexShrink="0">
+            <Text>{startError}</Text>
+            {facts.worktree_path && (
+              <Text>
+                Start made a worktree at {facts.worktree_path}; pressing Start again runs there
+              </Text>
+            )}
+          </Box>
+        )}
         <DraftFooter
           startLabel="Start chat"
           removeText="Remove this draft?"
           confirming={confirming}
           canAttach={false}
-          reasonText={null}
-          startDisabled
-          pending={false}
+          reasonText={
+            blocker && (
+              <Text fontSize="12px" color="tone.waiting.fg">
+                {blocker}
+              </Text>
+            )
+          }
+          startDisabled={!!blocker || banner || starting}
+          pending={starting}
           onAttach={() => {}}
           onAskRemove={() => setConfirming(true)}
           onKeep={() => setConfirming(false)}
