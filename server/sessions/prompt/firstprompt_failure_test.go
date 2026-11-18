@@ -103,10 +103,12 @@ func TestFirstPromptFailure_NeverStartedClearsLeftoverText(t *testing.T) {
 
 func TestFirstPromptFailure_GxRaisedSurvivesInputAndAgentRaisedDoesNot(t *testing.T) {
 	t.Parallel()
-	f := startFailingFirstPrompt(t, "fix the bug")
+	f := startFailingFirstPrompt(t, "fix the bug", agentfake.ProgramStartDelayEnv+"=1s")
 	f.gxActionable(t)
 
 	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
+	// The ack returns once the fake reads input; keys typed earlier are lost.
+	report(t, f.conv, agentfake.Control{State: "idle"})
 	att, err := c.Attach()
 	if err != nil {
 		t.Fatal(err)

@@ -161,6 +161,8 @@ func TestSessionKeys_TextIsTypedWithoutEnter(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
 	holder := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
+	// The ack returns once the fake reads input; keys typed earlier are lost.
+	report(t, f.conv, agentfake.Control{State: "idle"})
 	if res := f.keys(t, wire.SessionKeysRequest{Text: "hello there"}); res.Refused {
 		t.Fatalf("text = %+v", res)
 	}
