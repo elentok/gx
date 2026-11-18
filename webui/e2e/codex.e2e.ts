@@ -70,11 +70,11 @@ test("117. Default harness setting", async ({ page, start }) => {
     .toBeUndefined()
   expect(Object.keys(await fixture.projectConfig("dotfiles"))).toEqual(expect.arrayContaining(keys))
 
-  // The new session starts on the Default harness; the form has no harness picker.
+  // The form's Harness picker starts on the Default harness, so a session created without touching it uses it.
   const before = await sessions(fixture)
   await go(page, "#/agents")
   await openNewAgent(page)
-  await expect(newForm(page).getByRole("combobox", { name: "Harness" })).toHaveCount(0)
+  await expect(newForm(page).getByRole("combobox", { name: "Harness" })).toHaveValue("codex")
   await promptBox(page).fill("hello codex")
   await createButton(page).click()
   const fresh = await created(fixture, before)

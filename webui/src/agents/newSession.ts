@@ -15,6 +15,19 @@ export type FetchWorktrees = () => Promise<ProjectWorktrees[]>
 
 export const postCreateSession: CreateSession = postJson("/v1/sessions/create")
 
+/** The Default harness the Settings page shows: the global one and each project's override (empty when it follows the global). */
+export interface DefaultHarnesses {
+  default: string
+  projects: { project: string; harness: string }[]
+}
+export type FetchDefaultHarnesses = () => Promise<DefaultHarnesses>
+
+export const fetchDefaultHarnesses: FetchDefaultHarnesses = async () => {
+  const res = await apiFetch("/v1/settings/agents")
+  if (!res.ok) throw new Error(`default harness: HTTP ${res.status}`)
+  return res.json()
+}
+
 export const fetchWorktrees: FetchWorktrees = async () => {
   const res = await apiFetch("/v1/projects/worktrees")
   if (!res.ok) throw new Error(`worktrees: HTTP ${res.status}`)

@@ -5,7 +5,7 @@ import { ConnectionContext, type Connection, type ConnectionState } from "../con
 import type { ProjectWorktrees, SessionResult } from "../generated/server"
 import { renderThemed } from "../ui/render"
 import { clearCommandListCache, type FetchCommands } from "../commands/useCommandList"
-import type { CreateSession, NewSessionBody } from "./newSession"
+import type { CreateSession, DefaultHarnesses, NewSessionBody } from "./newSession"
 import { ShellContext, type Shell } from "../shell/ShellContext"
 import { NewSessionForm } from "./NewSessionForm"
 import { DeviceContext, type Device } from "../useWide"
@@ -56,6 +56,7 @@ function mount(
     fetchCommands?: FetchCommands
     workspace?: string
     fetchTrees?: () => Promise<ProjectWorktrees[]>
+    defaults?: DefaultHarnesses
     device?: Device
   } = {},
 ) {
@@ -89,6 +90,7 @@ function mount(
             <NewSessionForm
               drafts={drafts}
               fetchTrees={over.fetchTrees ?? (async () => trees)}
+              fetchDefaults={async () => over.defaults ?? { default: "claude", projects: [] }}
               create={create}
               fetchCommands={over.fetchCommands}
               onCreated={onCreated}
@@ -471,6 +473,36 @@ test("Harness posts codex when picked", async () => {
   submit()
   await waitFor(() => expect(onCreated).toHaveBeenCalled())
   expect(posts[0].harness).toBe("codex")
+})
+
+const harnessValue = () =>
+  (screen.getByRole("combobox", { name: "Harness" }) as HTMLSelectElement).value
+
+test("the Harness picker starts on the global Default harness and posts it", async () => {
+  const { posts, onCreated } = mount({ defaults: { default: "codex", projects: [] } })
+  await ready()
+  await waitFor(() => expect(harnessValue()).toBe("codex"))
+  submit()
+  await waitFor(() => expect(onCreated).toHaveBeenCalled())
+  expect(posts[0].harness).toBe("codex")
+})
+
+test("a project's Default harness override beats the global one", async () => {
+  const project = trees[0].project
+  mount({ defaults: { default: "claude", projects: [{ project, harness: "codex" }] } })
+  await ready()
+  await waitFor(() => expect(harnessValue()).toBe("codex"))
+})
+
+test("a picked harness is kept when the Default harness arrives", async () => {
+  const { posts, onCreated } = mount({ defaults: { default: "codex", projects: [] } })
+  await ready()
+  fireEvent.change(screen.getByRole("combobox", { name: "Harness" }), {
+    target: { value: "claude" },
+  })
+  submit()
+  await waitFor(() => expect(onCreated).toHaveBeenCalled())
+  expect(posts[0].harness).toBe("claude")
 })
 
 test("arrow keys move through the worktree list and Enter picks", async () => {

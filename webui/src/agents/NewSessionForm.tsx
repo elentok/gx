@@ -13,9 +13,12 @@ import { refusalText, useWrite } from "../useWrite"
 import { useShell } from "../shell/ShellContext"
 import { Field, field } from "./formField"
 import {
+  fetchDefaultHarnesses,
   fetchWorktrees,
   postCreateSession,
   type CreateSession,
+  type DefaultHarnesses,
+  type FetchDefaultHarnesses,
   type FetchWorktrees,
 } from "./newSession"
 import { HARNESSES, tierOptions, type Harness } from "./tierOptions"
@@ -95,6 +98,7 @@ function PromptField({
 export function NewSessionForm({
   drafts,
   fetchTrees = fetchWorktrees,
+  fetchDefaults = fetchDefaultHarnesses,
   create = postCreateSession,
   fetchCommands,
   onCreated,
@@ -103,6 +107,8 @@ export function NewSessionForm({
   /** The shared last-project value, also written by New design; injected for tests. */
   drafts?: Pick<DraftsClient, "getLastProject" | "setLastProject">
   fetchTrees?: FetchWorktrees
+  /** Reads the Default harness the picker starts on; a failed read leaves Claude. */
+  fetchDefaults?: FetchDefaultHarnesses
   create?: CreateSession
   /** Replaces the command-list fetch, for tests. */
   fetchCommands?: FetchCommands
@@ -115,7 +121,8 @@ export function NewSessionForm({
   const focusFirst = useFocusFirstField()
   const [loadError, setLoadError] = useState(false)
   const [tier, setTier] = useState<TierId>("worker")
-  const [harness, setHarness] = useState<Harness>("claude")
+  const [pickedHarness, setHarness] = useState<Harness>()
+  const [defaults, setDefaults] = useState<DefaultHarnesses>()
   const { draft, update, clear } = useNewSessionDraft()
   const { connected } = useConnectionState(useConnectionContext())
   const { run, pending, refusal, error } = useWrite()
@@ -132,9 +139,25 @@ export function NewSessionForm({
     }
   }, [fetchTrees])
 
+  useEffect(() => {
+    let live = true
+    fetchDefaults().then(
+      (d) => live && setDefaults(d),
+      () => {},
+    )
+    return () => {
+      live = false
+    }
+  }, [fetchDefaults])
+
   const projects = trees?.map((p) => p.project) ?? []
   const fallback = useDefaultProject(projects, drafts)
   const project = projects.includes(draft.project) ? draft.project : fallback
+  // A picked harness wins; else the project's override, the global Default, then Claude.
+  const defaultHarness =
+    defaults?.projects?.find((p) => p.project === project)?.harness || defaults?.default
+  const harness: Harness =
+    pickedHarness ?? HARNESSES.find((h) => h.id === defaultHarness)?.id ?? "claude"
   const current = trees?.find((p) => p.project === project)
   const rows: Option[] = current
     ? [
