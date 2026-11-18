@@ -1,7 +1,7 @@
 {
   "lint": {
-    "changed": "gx brief -C webui biome",
-    "full": "gx brief -C webui biome"
+    "changed": "go run . brief -C webui biome",
+    "full": "go run . brief -C webui biome"
   },
   "guards": {
     "full": "gx brief go-test ./sleepguard ./envguard ./oldwords ./playwrightguard ./sizeguard ./setstateguard",
