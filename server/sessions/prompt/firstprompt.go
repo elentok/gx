@@ -241,7 +241,12 @@ func (f *firstPrompt) deliver(prompt string) error {
 	if !f.typing().ReadyToType(f.p.projects.TypingIO(f.dir, c, "first-prompt")) {
 		return claudeui.ErrNotReadyToType
 	}
-	if err := f.p.ClearDraft(f.dir, c); err != nil {
+	if f.prefillShown(p, prompt) {
+		// The launch put the prompt in the input: clearing would erase it and
+		// typing would double it. Enter alone sends it; a nudge that finds the
+		// screen unchanged clears and types it in full.
+		p.skipType = true
+	} else if err := f.p.ClearDraft(f.dir, c); err != nil {
 		return err
 	}
 	caps := claudeui.DefaultNudgeCaps
@@ -249,8 +254,12 @@ func (f *firstPrompt) deliver(prompt string) error {
 	// A swallowed first Enter is pressed again after seconds, not after the
 	// grace: a person who started this chat is watching an empty page.
 	caps.Settle = min(sendSettle, caps.Grace)
+	// A nudge means the first Enter did not start the turn. The pane at that
+	// moment shows whether the text landed (Enter lost) or never did.
+	typedAt := time.Now()
 	report := func(d claudeui.NudgeDecision) {
-		f.log.Debug("first prompt nudge", "decision", string(d))
+		screen, _ := p.Screen()
+		f.log.Info("first prompt nudge", "decision", string(d), "since_deliver", time.Since(typedAt).Round(time.Millisecond).String(), "screen", screen)
 	}
 	err = claudeui.PromptWithNudge(p, prompt, caps, time.Time{}, time.Now, report)
 	if f.p.sessions.Watches.IsStopped() && err != nil {
@@ -395,6 +404,10 @@ type holderPrompter struct {
 	io      harness.TypingIO
 	cancel  <-chan struct{}
 	onTyped func()
+	// skipType makes the next Submit press the submit key without typing: the
+	// text is already in the input (claude's --prefill). A later Submit, after
+	// a clear, types as usual.
+	skipType bool
 	// images are pasted before the text on every Submit, so a retype after a
 	// clear attaches them again.
 	images imageSet
@@ -441,6 +454,13 @@ func (p *holderPrompter) Submit(text string) error {
 	defer release()
 	if err := p.cancelled(); err != nil {
 		return err
+	}
+	if p.skipType {
+		p.skipType = false
+		if p.onTyped != nil {
+			p.onTyped()
+		}
+		return p.submitKey()
 	}
 	if err := p.images.paste(p.c); err != nil {
 		return err
@@ -566,4 +586,39 @@ func (f *firstPrompt) firstImages() imageSet {
 		return imageSet{}
 	}
 	return f.p.imageSetOf(f.dir, meta.FirstImages, paths)
+}
+
+// prefillShown reports whether the launch passed prompt as --prefill and the
+// input box now holds it. A launch that did not, or a box that does not show it
+// (the flag was dropped, or the screen is not drawn yet), reads as no, and the
+// prompt is typed.
+func (f *firstPrompt) prefillShown(p *firstPrompter, prompt string) bool {
+	meta, err := sessions.ReadMeta(f.dir)
+	if err != nil || !meta.FirstPrefilled {
+		return false
+	}
+	screen, err := p.Screen()
+	if err != nil {
+		return false
+	}
+	if !screenShowsPrompt(screen, prompt) {
+		f.log.Warn("first prompt was prefilled but the input does not show it; typing it", "screen", screen)
+		return false
+	}
+	f.log.Info("first prompt prefilled; pressing Enter")
+	return true
+}
+
+// prefixRunes is how much of a prompt's start screenShowsPrompt looks for.
+const prefixRunes = 40
+
+// screenShowsPrompt reports whether screen holds the start of prompt, with
+// every run of whitespace read as one space so the input's wrapping and the
+// prompt's newlines do not matter.
+func screenShowsPrompt(screen, prompt string) bool {
+	want := strings.Join(strings.Fields(prompt), " ")
+	if r := []rune(want); len(r) > prefixRunes {
+		want = string(r[:prefixRunes])
+	}
+	return want != "" && strings.Contains(strings.Join(strings.Fields(screen), " "), want)
 }

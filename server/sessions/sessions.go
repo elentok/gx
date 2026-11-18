@@ -321,6 +321,8 @@ func (mg *Manager) startSessionHolderAs(dir string, meta *Meta, override *launch
 		cols, rows = holder.HolderCols, holder.HolderRows
 	}
 	meta.Cols, meta.Rows = cols, rows
+	prefill := !resume && override == nil && mg.canPrefill(meta)
+	meta.FirstPrefilled = prefill
 	if err := WriteMeta(dir, *meta); err != nil {
 		return err
 	}
@@ -356,6 +358,9 @@ func (mg *Manager) startSessionHolderAs(dir string, meta *Meta, override *launch
 		if launch, ok = h.Resume(meta.ConversationID, opts); !ok {
 			return fmt.Errorf("harness %s cannot resume", meta.Harness)
 		}
+	}
+	if prefill {
+		launch.Args = append(launch.Args, "--prefill", meta.FirstPrompt)
 	}
 	holder := mg.cfg.Holder
 	if len(holder) == 0 {
@@ -779,4 +784,18 @@ func (mg *Manager) saveFirstImages(dir string, meta *Meta, paths []string) error
 		meta.FirstImages = append(meta.FirstImages, res.ID)
 	}
 	return WriteMeta(dir, *meta)
+}
+
+// claudeSupportsPrefill is harness.ClaudeSupportsPrefill; tests replace it.
+var claudeSupportsPrefill = harness.ClaudeSupportsPrefill
+
+// canPrefill reports whether a launch should hand the first prompt to claude
+// as --prefill: plain text, no images, a claude that knows the flag. Anything
+// else is typed once the session is ready, as before.
+func (mg *Manager) canPrefill(meta *Meta) bool {
+	p := meta.FirstPrompt
+	return meta.Harness == string(harness.Claude) &&
+		p != "" && !strings.HasPrefix(p, "/") && len(p) <= harness.PrefillMaxBytes &&
+		len(meta.FirstImages) == 0 &&
+		claudeSupportsPrefill(mg.cfg.Env)
 }

@@ -97,6 +97,9 @@ type Meta struct {
 	// FirstPrompt waits for the ready report or the first Idle; it is cleared
 	// once typed or on exit.
 	FirstPrompt string `json:"first_prompt,omitempty"`
+	// FirstPrefilled is set when the launch passed FirstPrompt as --prefill, so
+	// the first prompt only needs Enter.
+	FirstPrefilled bool `json:"first_prefilled,omitempty"`
 	// FirstImages are the saved image ids pasted before FirstPrompt.
 	FirstImages []string `json:"first_images,omitempty"`
 	// ConversationID is the newest one the harness reported; a resume
