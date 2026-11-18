@@ -11,7 +11,7 @@ import (
 
 // rulesSkill is the skill the messages point at. One constant, so a rename
 // edits one place.
-const rulesSkill = "the gx-playwright-e2es skill"
+const rulesSkill = "the gx-only-e2es skill"
 
 var (
 	fixedSleep       = regexp.MustCompile(`\bwaitForTimeout\(`)

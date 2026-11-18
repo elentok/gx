@@ -30,6 +30,7 @@ var Guards = []Guard{
 	// The check itself runs in every Vitest test's afterEach, so a leak is attributed to the leaking
 	// test, which no name can match. Only the check's own unit tests are matched by name.
 	{Name: "pending-timer check", Pattern: regexp.MustCompile(`^(?:.*/)?src/pendingTimers\.test\.tsx(?: > |$)`), Example: "src/pendingTimers.test.tsx > pending timer check reports a pending timeout with its creation stack"},
+	{Name: "route-header test", Pattern: regexp.MustCompile(`^(?:.*/)?src/pageHeaders\.test\.tsx(?: > |$)`), Example: "src/pageHeaders.test.tsx > every page route pattern has a row"},
 	// Judgement call: the skills package also holds tests that are not rules
 	// tests, and they are dropped too. Splitting them needs a naming rule the
 	// package does not have yet.
