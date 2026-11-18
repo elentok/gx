@@ -408,6 +408,15 @@ set aside deliberately); calling it a Not started Design; "Discard" (the action 
 **Design draft page** — the web page of one Design draft, where the person writes the prompt and
 presses Start design or Remove. It replaces the New Design dialog. _Avoid_: New Design form, dialog.
 
+**Draft history** — the server's three lists of past text, each holding the latest 50 entries:
+Chat drafts and Design drafts as they were at Start or Remove, and messages sent from the chat or
+design composer. An entry keeps the text, its settings and its images. _Avoid_: undo, backup,
+recent drafts.
+
+**History popup** — the filterable list of one Draft history list, opened from a History button or
+Leader then `h`. Picking an entry fills the open draft page or composer. _Avoid_: history menu,
+picker.
+
 **Epic card** — one card of the Epics page, rendered from one `/v1/epics` row: a progress ring, the
 title (the only link), a "project · time · status" line, a state pill and reason when the card needs
 attention, and a footer of at most two buttons. It has one of four **card kinds**: **Design** (a map
