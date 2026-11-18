@@ -21,6 +21,13 @@ async function tell(page: Page, text: string) {
   await page.getByRole("button", nav("Send anyway")).click()
 }
 
+// The fixture runs with an hour-long auto-advance delay, so a countdown never ends by itself and
+// no assert races a short window: the test sees the countdown, then presses Continue to chain.
+async function pressContinue(page: Page) {
+  await expect(page.getByText(/Continuing in \d+s/)).toBeVisible()
+  await page.getByTestId("page-header-actions").getByRole("button", nav("Continue")).click()
+}
+
 const sendAnswers = (page: Page) => page.getByRole("button", nav("Send answers")).click()
 
 const sideways = (page: Page) =>
@@ -55,7 +62,7 @@ test.describe("199. Triage journey", () => {
     // The journey: no backlog exists, Verify takes two sessions.
     const fixture = await start("triage", {
       shape: "journey",
-      autoAdvanceDelay: "1s",
+      autoAdvanceDelay: "1h",
       hold: true,
       reloads: 1,
     })
@@ -86,11 +93,12 @@ test.describe("199. Triage journey", () => {
     // Verify: the session is held working, then it ends and a countdown chains the second.
     await expect(page.getByText("Working: Verify")).toBeVisible()
     await fixture.release()
-    await expect(page.getByText(/Continuing in \ds/)).toBeVisible()
+    await pressContinue(page)
     await expect(step(page, "verify", "done")).toBeVisible()
 
-    // Route chains into Questions on its own, and the page waits there: no countdown, the session
-    // idle and still alive.
+    // Route chains into Questions, and the page waits there: no countdown, the session idle and
+    // still alive.
+    await pressContinue(page)
     await expect(step(page, "questions", "current")).toBeVisible()
     await expect(page.getByRole("region", nav("Plan summary"))).toHaveCount(0)
     await expect(page.getByText(/Triage session running/)).toHaveCount(0)
@@ -107,6 +115,7 @@ test.describe("199. Triage journey", () => {
     await expect(round1.getByRole("group", { name: "Question 1 of 3" })).toBeVisible()
     await page.getByRole("button", { name: /^Chat$/ }).click()
     await expect(page.getByText("Decided unless you object")).toBeVisible()
+    await expect(page.getByText(/Rename the helper while there\?/)).toBeVisible()
     await page.getByRole("button", { name: /^Questions \(/ }).click()
     await expect(page.getByText("Which store should it use?")).toHaveCount(0)
     await expect(round1.getByRole("button", { name: /^Create tooling/ })).toBeVisible()
@@ -162,6 +171,7 @@ test.describe("199. Triage journey", () => {
       .getByRole("button", { name: /^Yes, write it/ })
       .click()
     await sendAnswers(page)
+    await pressContinue(page)
     await expect(step(page, "write", "current")).toBeVisible()
 
     // Write: the fake agent fails the first row before its move and the fourth after it.
@@ -194,6 +204,7 @@ test.describe("199. Triage journey", () => {
       failed("demo:follow-ups/01").getByRole("button", nav("Keep for later")),
     ).toHaveCount(0)
     await failed("demo:follow-ups/04").getByRole("button", nav("Retry")).click()
+    await pressContinue(page)
     const result = page.getByRole("region", nav("Triage result"))
     await expect(result.getByRole("region", nav("Kept for later"))).toBeVisible()
 
@@ -254,6 +265,7 @@ test.describe("199. Triage journey", () => {
     const again = await section(page, "Ready to design")
     await again.getByRole("button", nav("Triage")).click()
     await expect(page).toHaveURL(/#\/triage\/demo$/)
+    await pressContinue(page)
     await expect(step(page, "verify", "done")).toBeVisible()
 
     // The Agents page labels the Triage sessions.
@@ -300,6 +312,8 @@ test.describe("199. Triage journey", () => {
     // step line opens the steps sheet, and the header keeps its ring and menu.
     await openEpics(page)
     await (await section(page, "Ready to design")).getByRole("button", nav("Triage")).click()
+    await pressContinue(page)
+    await pressContinue(page)
     await expect(step(page, "questions", "current")).toBeVisible()
     await page.setViewportSize({ width: 390, height: 844 })
     await expect(page.getByRole("region", nav("Progress"))).toHaveCount(0)

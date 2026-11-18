@@ -475,6 +475,62 @@ test("the final approval round drops the round label and has no Approve button",
   expect(screen.queryByRole("button", { name: /Approve/ })).toBeNull()
 })
 
+const roundView = () =>
+  viewOf({ steps: stepsAt(2), open_round: { number: 1, questions: 1, answered: 0 } })
+
+const backlogCard = (options: string[]) => ({
+  label: "1",
+  title: "Create the backlog",
+  body: 'Create the backlog "tooling"?',
+  kind: "options",
+  options: options.map((label) => ({ id: label, label })),
+})
+
+const roundFetchers = (cards: ReturnType<typeof backlogCard>[], text = ""): RouteFetchers =>
+  ({
+    triage: async () => ({ kind: "ok", detail: roundView() }),
+    chat: async () => ({
+      kind: "ok",
+      detail: {
+        conversation_id: "c1",
+        messages: text ? [{ id: "m1", role: "agent", kind: "text", text, at: "" }] : [],
+        questions: roundCards(cards as never),
+      } as never,
+    }),
+  }) as RouteFetchers
+
+test.each([
+  ["with a backlog to file under", ["Create tooling", "File under parser", "Keep for later"]],
+  ["with no backlog seeded", ["Create tooling", "Keep for later"]],
+])("the new-backlog card %s lists its options", async (_name, options) => {
+  render([session("working")], roundFetchers([backlogCard(options)]))
+  for (const label of options) {
+    expect(await screen.findByRole("button", { name: label })).toBeTruthy()
+  }
+  expect(screen.queryByRole("button", { name: /^File under/ }) !== null).toBe(
+    options.includes("File under parser"),
+  )
+})
+
+const CHAT_DECIDED =
+  "Round 1.\n\n**Decided unless you object**\n\n- Rename the helper while there?: yes\n- Which backlog does it go to?: parser"
+
+test("at 12 backlogs the round has no new-backlog card and the Chat lists the decided filing", async () => {
+  const other = {
+    ...backlogCard(["Yes", "No"]),
+    title: "Keep the old flag",
+    body: "Keep the old flag?",
+  }
+  render([session("working")], roundFetchers([other], CHAT_DECIDED))
+  await screen.findByRole("button", { name: "Yes" })
+  expect(screen.queryByText(/Create the backlog/)).toBeNull()
+  expect(screen.queryByRole("button", { name: /^Create tooling/ })).toBeNull()
+  fireEvent.click(screen.getByRole("button", { name: "Chat" }))
+  expect(await screen.findByText("Decided unless you object")).toBeTruthy()
+  expect(screen.getByText(/Which backlog does it go to\?/)).toBeTruthy()
+  expect(screen.getByText(/Rename the helper while there\?/)).toBeTruthy()
+})
+
 const planRow = (n: number, action?: string, destination?: string) => ({
   ...row(n, "relevant"),
   action,
