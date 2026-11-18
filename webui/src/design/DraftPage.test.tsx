@@ -275,6 +275,33 @@ test("a page opened by New design takes back focus that a closing menu returns t
   trigger.remove()
 })
 
+test("leaving the page during the focus hold clears its timer and document listeners", async () => {
+  const added = vi.spyOn(document, "addEventListener")
+  const removed = vi.spyOn(document, "removeEventListener")
+  const setT = vi.spyOn(globalThis, "setTimeout")
+  const clearT = vi.spyOn(globalThis, "clearTimeout")
+  try {
+    await mount(fakeDrafts(), { state: { focusPrompt: true } })
+    const holdIndex = setT.mock.calls.findIndex(([, ms]) => ms === 2000)
+    expect(holdIndex).toBeGreaterThanOrEqual(0)
+    const timer = setT.mock.results[holdIndex].value
+    const events = ["focusin", "pointerdown", "keydown"]
+    // The hold adds its listeners right after starting its timer.
+    const after = setT.mock.invocationCallOrder[holdIndex]
+    const held = added.mock.calls.filter(
+      ([type], i) => events.includes(type) && added.mock.invocationCallOrder[i] > after,
+    )
+    expect(held).toHaveLength(3)
+    cleanup()
+    expect(clearT).toHaveBeenCalledWith(timer)
+    for (const [type, handler] of held) {
+      expect(removed.mock.calls.some(([t, h]) => t === type && h === handler)).toBe(true)
+    }
+  } finally {
+    vi.restoreAllMocks()
+  }
+})
+
 test("Rename focuses the slug field", async () => {
   await mount(fakeDrafts())
   fireEvent.click(screen.getByRole("button", { name: "Rename" }))

@@ -1,7 +1,12 @@
 import { cleanup, render } from "@testing-library/react"
 import { useEffect } from "react"
 import { describe, expect, it, vi } from "vitest"
-import { describePending, installTimerTracking, type TimerTarget } from "./pendingTimers"
+import {
+  describePending,
+  installTimerTracking,
+  madeByLibrary,
+  type TimerTarget,
+} from "./pendingTimers"
 import { registerTimerDisposer, runTimerDisposers } from "./timerDisposers"
 
 // A stand-in target with its own instant "timers", so nothing real is ever scheduled.
@@ -87,6 +92,34 @@ describe("pending timer check", () => {
       vi.useRealTimers()
       tracker.uninstall()
     }
+  })
+
+  it("does not wait for a short product timeout, so it is still reported", async () => {
+    const real = globalThis as unknown as TimerTarget
+    const target = {
+      setTimeout: real.setTimeout.bind(globalThis),
+      setInterval: real.setInterval.bind(globalThis),
+      clearTimeout: real.clearTimeout.bind(globalThis),
+      clearInterval: real.clearInterval.bind(globalThis),
+    } as TimerTarget
+    const tracker = installTimerTracking(target)
+    const id = target.setTimeout(() => {}, 100)
+    try {
+      await tracker.settle()
+      expect(tracker.pending()).toHaveLength(1)
+    } finally {
+      target.clearTimeout(id)
+      tracker.uninstall()
+    }
+  })
+
+  it("treats only a timer made from node_modules as a library timer", () => {
+    const frame = (path: string) => `Error: x\n    at wrap (a.ts:1:1)\n    at f (${path}:2:3)`
+    expect(madeByLibrary(frame("/repo/node_modules/@codemirror/view/dist/index.js"))).toBe(true)
+    expect(madeByLibrary(frame("/repo/node_modules/.pnpm/x@1/node_modules/jsdom/lib/a.js"))).toBe(
+      true,
+    )
+    expect(madeByLibrary(frame("/repo/webui/src/design/DraftPage.tsx"))).toBe(false)
   })
 
   it("runs the pending check after Testing Library cleanup", () => {

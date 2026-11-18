@@ -38,6 +38,11 @@ function madeByJsdom(stack: string): boolean {
   )
 }
 
+/** True when the direct caller (frame 2 of the stack) is under node_modules. */
+export function madeByLibrary(stack: string): boolean {
+  return /[\\/]node_modules[\\/]/.test(stack.split("\n")[2] ?? "")
+}
+
 /** Wraps the timer functions on each target; a target listed twice is wrapped once. */
 export function installTimerTracking(...targets: TimerTarget[]): TimerTracker {
   // Node timers are objects and jsdom's are numbers, so each target keeps its own id space.
@@ -89,13 +94,15 @@ export function installTimerTracking(...targets: TimerTarget[]): TimerTracker {
     pending,
     // Libraries (CodeMirror focus and blur, the vim dialog, Chakra's menu typeahead) keep a timer of a
     // few hundred ms that they never clear on destroy. Waiting for those to fire lets them end on their
-    // own; a product timer of a second or more is not waited for and is reported.
+    // own; a product timer, whatever its delay, is not waited for and is reported.
     async settle() {
       const sleep = originalSetTimeouts[0]
       const deadline = Date.now() + SETTLE_MAX_MS
       while (
         Date.now() < deadline &&
-        pending().some((t) => t.kind === "setTimeout" && t.delay <= SETTLE_MAX_MS)
+        pending().some(
+          (t) => t.kind === "setTimeout" && t.delay <= SETTLE_MAX_MS && madeByLibrary(t.stack),
+        )
       ) {
         await new Promise<void>((resolve) => sleep(resolve, 10))
       }
