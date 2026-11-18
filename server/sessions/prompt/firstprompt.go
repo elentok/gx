@@ -465,6 +465,7 @@ func (p *holderPrompter) Submit(text string) error {
 	if err := p.images.paste(p.c); err != nil {
 		return err
 	}
+	p.waitImageChips(len(p.images.paths))
 	text = p.images.withText(text)
 	if err := p.c.TypeTextBy(text, p.typing.PastesText(text)); err != nil {
 		return err
@@ -473,6 +474,28 @@ func (p *holderPrompter) Submit(text string) error {
 		p.onTyped()
 	}
 	return p.submitKey()
+}
+
+// imageChipWait bounds how long Submit waits for pasted images to show as
+// "[Image #N]" chips before it types the text.
+const imageChipWait = 4 * time.Second
+
+// waitImageChips waits until the screen shows n image chips. Claude reads a
+// pasted path off disk before it draws the chip, and text typed or an Enter
+// pressed meanwhile can be lost. A screen that never shows them (another
+// harness) costs imageChipWait, then typing goes on.
+func (p *holderPrompter) waitImageChips(n int) {
+	if n == 0 {
+		return
+	}
+	deadline := time.Now().Add(imageChipWait)
+	for time.Now().Before(deadline) {
+		rows, _, err := p.c.Screen(0)
+		if err != nil || strings.Count(strings.Join(rows, "\n"), "[Image #") >= n {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 // submitKey presses the harness submit key. Codex queues text with Tab while a
