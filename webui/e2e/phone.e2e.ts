@@ -229,7 +229,17 @@ test("24. Phone, Design page", async ({ page, start }) => {
   await expect(prev).toBeEnabled()
   await prev.click()
   await expect(prev).toBeDisabled()
-  const cardsBox = (await questions.getByTestId("question-body").boundingBox())!
+  // Prev scrolls the cards smoothly; swiping mid-scroll gets lost, so wait until the card stops moving.
+  const body = questions.getByTestId("question-body")
+  await expect(body).toBeVisible()
+  let cardsBox = (await body.boundingBox())!
+  await expect
+    .poll(async () => {
+      const prevBox = cardsBox
+      cardsBox = (await body.boundingBox())!
+      return cardsBox.x === prevBox.x && cardsBox.y === prevBox.y
+    })
+    .toBe(true)
   const cardY = cardsBox.y + 40
   await swipe(page, [150, cardY], [300, cardY + 5])
   await expect(sidebar).toBeHidden()
@@ -241,8 +251,16 @@ test("24. Phone, Design page", async ({ page, start }) => {
 
   // With a single question (the next round) a swipe right still leaves the sidebar closed.
   await questions.getByRole("button", { name: /Yes/ }).click()
+  // Send before the answer registers opens the gaps popover instead of sending.
+  await expect(questions.getByText("2 of 2 answered")).toBeVisible()
   await page.getByRole("button", nav("Send")).click()
-  await expect(questions.getByText("0 of 1 answered")).toBeVisible()
+  // The agent ends the run on the answers; the next round only follows Continue (or the 9s auto-advance, too slow
+  // for the expect timeout under load). Under load the run-end update can land after the first press, so press again.
+  const cont = page.getByRole("button", { name: /^Continue/ })
+  await expect(async () => {
+    if (await cont.isVisible()) await cont.click({ timeout: 2000 })
+    await expect(questions.getByText("0 of 1 answered")).toBeVisible({ timeout: 2000 })
+  }).toPass()
   const single = (await questions.getByTestId("question-body").boundingBox())!
   await swipe(page, [150, single.y + 40], [300, single.y + 45])
   await expect(sidebar).toBeHidden()
