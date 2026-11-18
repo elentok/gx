@@ -118,7 +118,7 @@ export function AgentComposer({
           label="Message"
           name="chat-message"
           title={`Message to ${session.name || session.id}`}
-          placeholder={`Message ${session.name || session.id}`}
+          placeholder="Message the agent"
           value={text}
           onChange={setText}
           onSubmit={onSubmit}

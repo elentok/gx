@@ -194,11 +194,9 @@ const ok = { refused: false } as Awaited<ReturnType<PostPrompt>>
 const cmdEnter = (el: HTMLElement, mod: "metaKey" | "ctrlKey" = "metaKey") =>
   fireEvent.keyDown(el, { key: "Enter", [mod]: true })
 
-test("the placeholder names the session and no hairline tops the composer", () => {
+test("the placeholder is neutral (iOS reads names as contact fields) and no hairline tops the composer", () => {
   render()
-  expect((box() as HTMLTextAreaElement).placeholder).toBe(
-    `Message ${session().name || session().id}`,
-  )
+  expect((box() as HTMLTextAreaElement).placeholder).toBe("Message the agent")
   expect(getComputedStyle(screen.getByRole("form", { name: "Composer" })).borderTopWidth).not.toBe(
     "1px",
   )
