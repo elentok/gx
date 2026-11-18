@@ -429,7 +429,7 @@ func TestPromptWithNudge_Settle_ChangedScreen_PressesEnterEarly(t *testing.T) {
 	}
 }
 
-func TestPromptWithNudge_Settle_UnchangedScreen_WaitsOutGrace(t *testing.T) {
+func TestPromptWithNudge_Settle_UnchangedScreen_WaitsOutGraceInSettleSteps(t *testing.T) {
 	f := &fakePrompter{starts: []bool{false, true}, screens: []string{"same"}}
 	caps := DefaultNudgeCaps
 	caps.Settle = 3 * time.Second
@@ -437,7 +437,19 @@ func TestPromptWithNudge_Settle_UnchangedScreen_WaitsOutGrace(t *testing.T) {
 		t.Fatalf("PromptWithNudge() error = %v", err)
 	}
 	assertCalls(t, f.calls, "submit:hi", "wait", "wait")
-	if f.timeouts[1] != caps.Grace-caps.Settle {
-		t.Fatalf("second wait = %v, want %v", f.timeouts[1], caps.Grace-caps.Settle)
+	if f.timeouts[1] != caps.Settle {
+		t.Fatalf("second wait = %v, want %v", f.timeouts[1], caps.Settle)
 	}
+}
+
+// A text that shows up late (an image paste) gets its Enter at the next
+// Settle look, not after the whole grace.
+func TestPromptWithNudge_Settle_LateScreenChange_PressesEnterAtTheNextLook(t *testing.T) {
+	f := &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", "before", "typed"}}
+	caps := DefaultNudgeCaps
+	caps.Settle = 3 * time.Second
+	if err := PromptWithNudge(f, "hi", caps, time.Time{}, f.now, f.report); err != nil {
+		t.Fatalf("PromptWithNudge() error = %v", err)
+	}
+	assertCalls(t, f.calls, "submit:hi", "wait", "wait", "enter", "wait")
 }

@@ -268,9 +268,16 @@ func PromptWithNudge(p Prompter, text string, caps NudgeCaps, deadline time.Time
 	if err == nil && !started && first < timeout {
 		// Claude swallows an Enter while it reviews a paste: a changed screen
 		// means the text is in the input, so the nudge below presses Enter now.
-		// An unchanged one may only be slow: keep waiting out the grace.
-		if after, readErr := p.Screen(); readErr == nil && after == snapshot {
-			started, err = p.WaitStart(timeout - first)
+		// An unchanged one may only be slow (an image paste can take seconds to
+		// show): keep waiting out the grace, but look again every Settle so a
+		// late-landing text gets its Enter then, not at the end of the grace.
+		for waited := first; err == nil && !started && waited < timeout; {
+			if after, readErr := p.Screen(); readErr != nil || after != snapshot {
+				break
+			}
+			step := min(caps.Settle, timeout-waited)
+			started, err = p.WaitStart(step)
+			waited += step
 		}
 	}
 	retypes := 0
