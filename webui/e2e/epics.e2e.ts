@@ -10,7 +10,7 @@ import {
   test,
   toasts,
 } from "./fixture"
-import { expectOption, HUH_MESSAGE } from "./question"
+import { expectOption } from "./question"
 import { CACHE_PREFIX } from "../src/pwa/workerCore"
 
 // The PWA steps of flow 2 need a registered worker, which only registers with the fixture's untrusted root ignored.
@@ -202,17 +202,8 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     await page.unroute("**/v1/tickets/answer")
   })
 
-  // 55: Huh? sends the fixed message, on a ticket that has not been answered yet.
-  await test.step("agent question: Huh? sends the fixed message", async () => {
-    await start("chat-tickets")
-    await page.evaluate((hash) => (location.hash = hash), "#/t/demo:ask-epic/01")
-    const form = page.getByRole("form", { name: "Answer" })
-    await form.getByRole("button", { name: "Huh?" }).click({ timeout: 60_000 })
-    await form.getByRole("button", { name: "Send answer" }).click()
-    const result = page.getByRole("group", { name: "Answered question" })
-    await expect(result.getByText(HUH_MESSAGE)).toHaveCount(1)
-    await expect(result.getByRole("status", { name: "Answer result" })).toBeVisible()
-  })
+  // 55: Huh? sends the fixed message. The wire side is TestAnswer_HuhDeliversTheMessageAndMarksTheLog,
+  // the click is AnswerForm's "Huh? posts the huh flag", and the card is AnswerResult's Huh? test.
 
   // 49: the ticket detail shows the Latest summary block; the Epics-page card carries none of it.
   await test.step("ticket detail shows Latest summary, the Epics card does not", async () => {

@@ -258,10 +258,23 @@ func (t *tui) appendTranscript(lines string) error {
 // BehaviourBackgroundTask task, which the gate card shows as its label.
 const BackgroundTaskLabel = "run the soak"
 
+// TaskReleaseSuffix names the file (Hold + TaskReleaseSuffix) whose removal ends
+// the background task's process, like the hold file ends a held agent.
+const TaskReleaseSuffix = ".task"
+
+// TaskReleasePath is the release file of the background task for a worker hold
+// file, or "" when the worker has no hold file.
+func TaskReleasePath(hold string) string {
+	if hold == "" {
+		return ""
+	}
+	return hold + TaskReleaseSuffix
+}
+
 // startBackgroundTask records the launch of a background shell task and gives
 // it what claude does: an output file under the task output base that a real
 // child process holds open as its stdout.
-func (t *tui) startBackgroundTask() error {
+func (t *tui) startBackgroundTask(hold string) error {
 	const taskID, toolUseID = "b1", "toolu_b1"
 	ts := time.Now().UTC().Format(time.RFC3339Nano)
 	launch := `{"isSidechain":false,"type":"assistant","timestamp":"` + ts + `","message":{"role":"assistant","stop_reason":"tool_use","content":[{"type":"tool_use","id":"` + toolUseID + `","name":"Bash","input":{"description":"` + BackgroundTaskLabel + `","command":"make soak","run_in_background":true}}]}}`
@@ -277,9 +290,17 @@ func (t *tui) startBackgroundTask() error {
 		return err
 	}
 	defer out.Close()
-	// The child outlives this call and a bounded sleep keeps a forgotten one
-	// from lingering.
-	child := exec.Command("sh", "-c", "for i in 1 2 3 4; do echo soak line $i; done; exec sleep 150")
+	release := TaskReleasePath(hold)
+	if release == "" {
+		release = filepath.Join(dir, taskID+".release")
+	}
+	if err := os.WriteFile(release, nil, 0o644); err != nil {
+		return err
+	}
+	// The child outlives this call and ends when the release file is removed,
+	// like a task a flow lets finish. The bound keeps a forgotten one from lingering.
+	script := `for i in 1 2 3 4; do echo soak line $i; done; n=0; while [ -e "$1" ] && [ $n -lt 750 ]; do sleep 0.2; n=$((n+1)); done`
+	child := exec.Command("sh", "-c", script, "sh", release)
 	child.Env = os.Environ()
 	child.Stdout = out
 	if err := child.Start(); err != nil {

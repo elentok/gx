@@ -225,6 +225,10 @@ type Scenario struct {
 	Steps [][]string
 	// Sessions are created in order once the server is up, as `gx agents create` makes them.
 	Sessions []SessionSpec
+	// SettleSessionsTogether still creates Sessions in order, but settles them all at once
+	// instead of each before the next, so a scenario of many sessions seeds fast. A session
+	// whose spec depends on an earlier one settling must not set it.
+	SettleSessionsTogether bool
 	// DeadSessions is how many prompt-less sessions are created together, after Sessions,
 	// then all crashed, so a large dead set seeds fast.
 	DeadSessions int

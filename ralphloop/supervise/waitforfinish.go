@@ -740,7 +740,8 @@ func WaitForBackgroundTasks(d deps.Deps, p LaunchParams, sessionID string, until
 		if heldMs >= int(holdCap()/time.Millisecond) {
 			return false, pauseBackgroundTaskHold(p, sessionID, reading.Tasks, hs.held)
 		}
-		pollMs := SmartZonePollMs
+		// The last poll ends at the cap, so a cap shorter than a poll is not stretched to one.
+		pollMs := min(SmartZonePollMs, int(holdCap()/time.Millisecond)-heldMs)
 		if p.FinishTimeoutMs > 0 {
 			remaining := p.FinishTimeoutMs - *elapsedMs
 			if remaining <= 0 {

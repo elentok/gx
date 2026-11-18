@@ -81,6 +81,17 @@ test("the note shows under the answer; a note-only answer reads no option picked
   expect(screen.getByText("neither")).toBeTruthy()
 })
 
+test("a Huh? answer shows the fixed message once, with the result status", () => {
+  const huh = "I could not follow this question. Could you explain it another way?"
+  const detail: TicketDetail = {
+    ...answeredWith({ huh: true }),
+    chat: [...base.chat, { from: "web", text: huh }],
+  }
+  renderThemed(<AnswerResult detail={detail} sent={sentAs("delivered")} />)
+  expect(screen.getAllByText(huh)).toHaveLength(1)
+  expect(status()).toBeTruthy()
+})
+
 test("the answer is the last web message when the chat has several exchanges", () => {
   const detail: TicketDetail = {
     ...answered,

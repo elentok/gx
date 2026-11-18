@@ -41,6 +41,12 @@ func sessionsOf(f *fixture) sessionSeeder { return sessionSeeder{f} }
 // seedSessions creates the scenario's sessions one at a time, each settled
 // before the next so the list keeps creation order.
 func (f sessionSeeder) seedSessions(sc scenario) error {
+	if sc.SettleSessionsTogether {
+		if err := f.seedSessionsTogether(sc); err != nil {
+			return err
+		}
+		return f.seedDeadSessions(sc)
+	}
 	for _, s := range sc.Sessions {
 		// A Codex session cannot start while codex is off PATH, which is the
 		// state the missing-harness flows need.
@@ -52,6 +58,38 @@ func (f sessionSeeder) seedSessions(sc scenario) error {
 		}
 	}
 	return f.seedDeadSessions(sc)
+}
+
+// seedSessionsTogether creates the sessions one at a time, so the list keeps
+// creation order, then settles them all at once: a scenario of two dozen
+// sessions waits out one session's start-up, not twenty-four.
+func (f sessionSeeder) seedSessionsTogether(sc scenario) error {
+	type created struct {
+		spec sessionSpec
+		id   string
+	}
+	var all []created
+	for _, s := range sc.Sessions {
+		if s.Harness == "codex" && !f.codex {
+			continue
+		}
+		id, err := f.createSpecSession(sc, s)
+		if err != nil {
+			return fmt.Errorf("session in %s: %w", s.Project, err)
+		}
+		all = append(all, created{s, id})
+	}
+	errs := make([]error, len(all))
+	var wg sync.WaitGroup
+	for i, c := range all {
+		wg.Go(func() {
+			if err := f.settleSession(c.spec, c.id); err != nil {
+				errs[i] = fmt.Errorf("session in %s: %w", c.spec.Project, err)
+			}
+		})
+	}
+	wg.Wait()
+	return errors.Join(errs...)
 }
 
 // seedDeadSessions creates sc.DeadSessions sessions concurrently, then crashes
@@ -91,14 +129,23 @@ func (f sessionSeeder) seedDeadSessions(sc scenario) error {
 }
 
 func (f sessionSeeder) seedSession(sc scenario, s sessionSpec) error {
+	id, err := f.createSpecSession(sc, s)
+	if err != nil {
+		return err
+	}
+	return f.settleSession(s, id)
+}
+
+func (f sessionSeeder) createSpecSession(sc scenario, s sessionSpec) (string, error) {
 	dir := f.repoDir(sc, s.Project)
 	if s.HostFilesSecond {
 		dir = f.hostFiles.SecondWorktree
 	}
-	id, err := f.createSession(s.Project, dir, s.Prompt, s.Harness)
-	if err != nil {
-		return err
-	}
+	return f.createSession(s.Project, dir, s.Prompt, s.Harness)
+}
+
+// settleSession drives a created session to the state its spec describes.
+func (f sessionSeeder) settleSession(s sessionSpec, id string) error {
 	if s.Rejected {
 		return f.waitFor(id, "an Unknown command Actionable", func(si wire.SessionInfo, _ wire.SessionChatResponse) bool {
 			return si.Actionable.GxRaised && strings.Contains(si.Actionable.Reason, "Unknown command:")

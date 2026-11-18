@@ -348,7 +348,7 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 		return
 	}
 	if StartsBackgroundTask(cfg.Behaviour[address]) {
-		if err := t.startBackgroundTask(); err != nil {
+		if err := t.startBackgroundTask(cfg.Hold); err != nil {
 			fmt.Fprintln(os.Stderr, "fakeclaude background task:", err)
 		}
 		_ = SendControl(t.ctlPath, Control{Action: ActionShell})

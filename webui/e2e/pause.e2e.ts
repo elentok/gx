@@ -178,24 +178,24 @@ test.describe("3. Pause reasons and recovery", () => {
     epic: string,
     reason: string,
     buttons: string[],
-    act?: () => Promise<void>,
+    act?: (fx: Fixture) => Promise<void>,
   ) => {
-    await start(scenario)
+    const fx = await test.step("start", () => start(scenario))
     await openTicket(page, "01", epic)
-    await expect(page.getByText(reason).first()).toBeVisible(gateWait())
+    await test.step("pause shows", () =>
+      expect(page.getByText(reason).first()).toBeVisible(gateWait()))
     // 20: while a repair pause's run is still finishing the card has no buttons; they return when it settles.
-    await expect(recovery(page).getByRole("button")).toHaveText(
-      buttons.map((b) => new RegExp(`^${b}(\\s*Recommended)?$`)),
-      gateWait(),
-    )
-    await act?.()
+    await test.step("buttons", () =>
+      expect(recovery(page).getByRole("button")).toHaveText(
+        buttons.map((b) => new RegExp(`^${b}(\\s*Recommended)?$`)),
+        gateWait(),
+      ))
+    await act?.(fx)
   }
   const retry = (page: Page) => recovery(page).getByRole("button", nav("Retry")).click()
   // The Runs list keeps a past pause's text, so a lifted pause shows as the recovery card going away.
   const cleared = (page: Page) => expect(recovery(page)).toHaveCount(0, { timeout: 30_000 })
   const gate = "Background task still running"
-  // The fake's background task sleeps 150 s, and the dirty case waits for it to exit.
-  const liveTaskTimeout = 240_000
 
   // 6: the relaunch hangs too; the pause names the cause and Retry ends it.
   test("a hung relaunch recovers", async ({ page, start }) => {
@@ -236,7 +236,6 @@ test.describe("3. Pause reasons and recovery", () => {
   // 70, 64, 28: a live Claude task. Keep waiting lifts the pause (the short hold cap pauses it again),
   // and Retry keeps the commits and ends it.
   test("a live task recovers", async ({ page, start }) => {
-    test.setTimeout(liveTaskTimeout)
     await recover(
       { page, start },
       "live-task-gate",
@@ -246,10 +245,10 @@ test.describe("3. Pause reasons and recovery", () => {
       async () => {
         await expect(page.getByText("run the soak").first()).toBeVisible()
         await recovery(page).getByRole("button", nav("Keep waiting")).click()
-        await cleared(page)
-        await expect(recovery(page)).toBeVisible(gateWait())
+        await test.step("cleared", () => cleared(page))
+        await test.step("paused again", () => expect(recovery(page)).toBeVisible(gateWait()))
         await retry(page)
-        await cleared(page)
+        await test.step("cleared by retry", () => cleared(page))
       },
     )
   })
@@ -257,14 +256,14 @@ test.describe("3. Pause reasons and recovery", () => {
   // 64: with a dirty worktree a live task still offers all four, and once the task's process exits
   // the card drops to Retry and Start over.
   test("a live task with a dirty worktree recovers", async ({ page, start }) => {
-    test.setTimeout(liveTaskTimeout)
     await recover(
       { page, start },
       "live-task-gate-dirty",
       "live-task-dirty-epic",
       gate,
       ["Keep waiting", "Stop task", "Retry", "Start over"],
-      async () => {
+      async (fx) => {
+        await fx.releaseTask()
         await expect(recovery(page).getByRole("button")).toHaveText(
           [/^Retry(\s*Recommended)?$/, /^Start over$/],
           gateWait(),

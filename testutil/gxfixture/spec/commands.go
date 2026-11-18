@@ -122,6 +122,7 @@ func BlockedScenario() scenario {
 	sc := AgentsScenario()
 	// A key the fake ignores (flow 158) fails after this wait, not after the 45s default.
 	sc.PromptGrace = "8s"
+	sc.SettleSessionsTogether = true
 	withCommandFakes(&sc, "", false)
 	sc.Sessions = append(sc.Sessions,
 		commandStepsSession(),

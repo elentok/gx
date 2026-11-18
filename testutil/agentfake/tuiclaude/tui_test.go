@@ -795,7 +795,8 @@ func TestTUIClaude_RateLimitWorkerWritesTheErrorThenFinishesOnContinue(t *testin
 func TestTUIClaude_BackgroundTaskWorkerLeavesALiveTaskWithOutputAndChild(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs)
 	f.waitStatus(StatusIdle, "")
-	f.writeWorkerConfig(WorkerConfig{Behaviour: map[string]string{"p:e/01": BehaviourBackgroundTask}})
+	hold := filepath.Join(t.TempDir(), "hold")
+	f.writeWorkerConfig(WorkerConfig{Hold: hold, Behaviour: map[string]string{"p:e/01": BehaviourBackgroundTask}})
 	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(backgroundtask.DefaultOutputBase(), "fixture", "sess-1")) })
 
 	f.typeLine("/gx-implement p:e/01")
@@ -814,7 +815,14 @@ func TestTUIClaude_BackgroundTaskWorkerLeavesALiveTaskWithOutputAndChild(t *test
 	if want := []string{"soak line 2", "soak line 3", "soak line 4"}; !slices.Equal(facts.Process.LastLines, want) {
 		t.Errorf("last lines = %v, want %v", facts.Process.LastLines, want)
 	}
-	_ = syscall.Kill(facts.Process.PID, syscall.SIGKILL)
+	defer func() { _ = syscall.Kill(facts.Process.PID, syscall.SIGKILL) }()
+
+	if err := os.Remove(TaskReleasePath(hold)); err != nil {
+		t.Fatal(err)
+	}
+	f.waitFor("the task's process to exit once released", func() bool {
+		return syscall.Kill(facts.Process.PID, 0) != nil
+	})
 }
 
 func TestTUIClaude_QuestionMenuWorkerBlocksOnANonApprovableDialogUntilEsc(t *testing.T) {

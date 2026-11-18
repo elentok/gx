@@ -40,7 +40,7 @@ var (
 	// answer, so the ticket card shows "holder unreachable, retrying" and
 	// clears once a dial works (under HolderReadoptCap, so it never pauses).
 	SlowHolder = recoveryEpic("slow-holder-epic", servertest.TicketOpts{}, false,
-		holder.UnreachableStatusDialsEnv+"=3")
+		holder.UnreachableStatusDialsEnv+"=3", "GX_GUARD_POLL=2s")
 	// CodexDropsPrompt: the Codex fake never takes its launch prompt, so the
 	// launch proof from the rollout fails.
 	CodexDropsPrompt = recoveryEpic("codex-drop-epic", servertest.TicketOpts{Agent: "codex"}, true,
@@ -81,7 +81,7 @@ const shortLaunchGrace = "GX_LAUNCH_UNKNOWN_GRACE=3s"
 // whose live-task hold cap is short enough to reach the pause, yet long enough
 // that a recovery shows the pause cleared before the relaunched agent hits it again.
 func backgroundEpic(name string, opts servertest.TicketOpts, codexHarness bool, behaviour string) scenario {
-	sc := recoveryEpic(name, opts, codexHarness, supervise.BackgroundTaskHoldCapEnv+"=15s")
+	sc := recoveryEpic(name, opts, codexHarness, supervise.BackgroundTaskHoldCapEnv+"=2s")
 	sc.Behaviour = map[string]string{project + ":" + name + "/01": behaviour}
 	return sc
 }

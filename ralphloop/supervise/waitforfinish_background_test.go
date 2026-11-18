@@ -230,6 +230,26 @@ func TestWaitForFinish_HoldCapEnvShortensTheCap(t *testing.T) {
 	}
 }
 
+// A cap below one poll pauses at the cap, not at the end of a full poll.
+func TestWaitForFinish_HoldCapEnvCutsTheLastPollShort(t *testing.T) {
+	const capEnv = 5 * time.Second
+	t.Setenv(BackgroundTaskHoldCapEnv, capEnv.String())
+	scratchDir := fixture.EpicScratchDir(t, "epic")
+	var sleeps int
+	reading := transcript.BackgroundTaskReading{AwaitingTurnEnd: true}
+	d := fakes.IdleBackgroundTaskDeps(func(string, string) (transcript.BackgroundTaskReading, error) { return reading, nil }, &sleeps)
+	var slept []time.Duration
+	d.Sleep = func(dur time.Duration) { slept = append(slept, dur) }
+
+	err := WaitForFinish(d, finishedTicket(t, scratchDir, time.Now().Add(-time.Minute)), "sess-30")
+	if _, ok := errors.AsType[*BlockedPausedError](err); !ok {
+		t.Fatalf("WaitForFinish error = %v, want a pause", err)
+	}
+	if got := slept[len(slept)-1]; got != capEnv {
+		t.Errorf("last sleep = %v, want %v (all: %v)", got, capEnv, slept)
+	}
+}
+
 // A Codex agent has no transcript marker, so the Claude gate never reads or
 // holds: a Codex turn that ends with a terminal running finishes at turn end.
 func TestWaitForFinish_BackgroundTaskGateDoesNotHoldACodexAgent(t *testing.T) {
