@@ -34,62 +34,10 @@ test.describe("199. Triage journey", () => {
     test.setTimeout(360_000)
     const inboxButton = () => page.getByRole("button", { name: /^Follow-ups · \d+ open$/ })
 
-    // Verify: Progress lists the five steps and the strip counts verdicts.
-    await start("triage", { shape: "verify" })
-    await openTriage(page)
-    const progress = page.getByRole("region", nav("Progress"))
-    await expect(progress.locator("li[data-step]")).toHaveText([
-      /Verify/,
-      /Route/,
-      /Questions/,
-      /Write/,
-      /Done/,
-    ])
-    await expect(step(page, "verify", "current")).toBeVisible()
-
-    // Route: round 1 waits with the new-backlog card first and three options. The plan summary is
-    // hidden at Questions (mock 06).
-    await start("triage", { shape: "route" })
-    await openTriage(page)
-    await expect(page.getByRole("region", nav("Plan summary"))).toHaveCount(0)
-    await expect(step(page, "questions", "current")).toBeVisible()
-    await expect(page.getByText(/^Round 1 of 3/)).toBeVisible()
-    const round = questionsOf(page)
-    await expect(round.getByRole("group", { name: "Question 1 of 3" })).toBeVisible()
-    await expect(round.getByRole("button", { name: /^Create tooling/ })).toBeVisible()
-    await expect(round.getByRole("button", { name: /^File under parser/ })).toBeVisible()
-    await expect(round.getByRole("button", { name: /^Keep for later/ })).toBeVisible()
-
-    // No backlog seeded: the new-backlog card has two options.
-    await start("triage", { shape: "route-no-backlog" })
-    await openTriage(page)
-    await expect(questionsOf(page).getByRole("button", { name: /^Create tooling/ })).toBeVisible()
-    await expect(questionsOf(page).getByRole("button", { name: /^Keep for later/ })).toBeVisible()
-    await expect(questionsOf(page).getByRole("button", { name: /^File under/ })).toHaveCount(0)
-
-    // 12 backlogs: no new-backlog card; the row is listed under "Decided unless you object".
-    await start("triage", { shape: "route-12-backlogs" })
-    await openTriage(page)
-    await page.getByRole("button", { name: /^Chat$/ }).click()
-    await expect(page.getByText("Decided unless you object")).toBeVisible()
-    await expect(page.getByText(/Which backlog does it go to\?/)).toBeVisible()
-    await page.getByRole("button", { name: /^Questions \(/ }).click()
-    await expect(questionsOf(page)).toBeVisible()
-    await expect(page.getByText(/Create the backlog/)).toHaveCount(0)
-    await expect(questionsOf(page).getByRole("button", { name: /^Create tooling/ })).toHaveCount(0)
-
-    // A round waits with a live session: the card says "Needs you" with Answer, the badge counts
-    // the six open follow-ups, and the sidebar popover opens the page.
-    await start("triage", { shape: "questions" })
-    await openEpics(page)
-    const waiting = card(page, "follow-ups")
-    await expect(waiting.getByText("Needs you")).toBeVisible()
-    await expect(waiting.getByRole("button", nav("Answer"))).toBeVisible()
-    await expect(inboxButton().locator("span")).toHaveText("6")
-    await inboxButton().click()
-    await page.getByRole("menuitem", { name: /demo/ }).click()
-    await expect(page).toHaveURL(/#\/triage\/demo$/)
-    await expect(page.getByText(/^Round 1 of 3/)).toBeVisible()
+    // The Verify header, the plan summary hidden at Questions, the Needs you card and the round
+    // options per backlog count are held by TriagePage.test.tsx, EpicCard.test.tsx and
+    // TestTriageScenario_RouteVariantsShowTheNewBacklogCardTheSpecNames. The journey below walks
+    // the same states in one browser.
 
     // The final card: "Write this plan?" and Review plan; an objection to a decided answer turns
     // into a question.
@@ -107,7 +55,7 @@ test.describe("199. Triage journey", () => {
     // The journey: no backlog exists, Verify takes two sessions.
     const fixture = await start("triage", {
       shape: "journey",
-      autoAdvanceDelay: "3s",
+      autoAdvanceDelay: "1s",
       hold: true,
       reloads: 1,
     })
@@ -363,7 +311,7 @@ test.describe("199. Triage journey", () => {
     await sheet.getByRole("button", nav("Close")).click()
     await expect(sheet).toHaveCount(0)
     await expect(page.getByRole("button", nav("Show progress steps"))).toBeVisible()
-    await expect(page.getByRole("button", nav("More actions"))).toBeVisible()
+    await expect(actions.getByRole("button", nav("More actions"))).toBeVisible()
     await expect(page.getByRole("heading", nav("Triage: demo"))).toBeVisible()
     expect(await sideways(page)).toBe(false)
 
