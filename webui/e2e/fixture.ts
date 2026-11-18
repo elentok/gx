@@ -629,17 +629,22 @@ export async function swipe(page: Page, from: [number, number], to: [number, num
   await cdp.detach()
 }
 
-/** Matches a role's accessible name exactly. */
 /**
  * The rendered text (`innerText`: line breaks kept, hidden text left out) of the one element `loc` matches.
- * It waits for the element and fails when `loc` matches more than one, as `loc.innerText()` does.
+ * It retries until exactly one element matches, so an element that detaches mid-read is waited for again.
+ * It throws at the timeout when `loc` matches none or several, and never returns "" for a missing element.
  */
-export async function renderedText(loc: Locator, timeout?: number): Promise<string> {
-  await loc.waitFor({ state: "attached", timeout })
-  const [text] = await loc.allInnerTexts()
-  return text ?? ""
+export async function renderedText(loc: Locator, timeout = 5_000): Promise<string> {
+  let text = ""
+  await expect(async () => {
+    const texts = await loc.allInnerTexts()
+    expect(texts).toHaveLength(1)
+    text = texts[0] as string
+  }).toPass({ timeout })
+  return text
 }
 
+/** Matches a role's accessible name exactly. */
 export const nav = (name: string) => ({ name, exact: true })
 
 /** The footer's Epics menu button; its name gains " · n need you" while cards need you. */
