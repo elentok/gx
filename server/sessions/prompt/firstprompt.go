@@ -478,7 +478,11 @@ func (p *holderPrompter) Submit(text string) error {
 
 // imageChipWait bounds how long Submit waits for pasted images to show as
 // "[Image #N]" chips before it types the text.
-const imageChipWait = 4 * time.Second
+//
+// Measured against a real claude: the chip took 8s and 19s to draw after a
+// bracketed path paste in two of three tries, and keys sent meanwhile land
+// before it and lose the Enter.
+const imageChipWait = 30 * time.Second
 
 // waitImageChips waits until the screen shows n image chips. Claude reads a
 // pasted path off disk before it draws the chip, and text typed or an Enter
