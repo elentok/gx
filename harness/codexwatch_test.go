@@ -217,6 +217,7 @@ func TestCodexStartupScreen_AnswersEveryDialog(t *testing.T) {
 	}
 	for text, want := range map[string]harness.Startup{
 		"Trust this directory? Press Enter to continue":       {Dialog: harness.TrustDialog, Key: "\r"},
+		"Folder access\nTrust this folder? Codex can read":    {Dialog: harness.TrustDialog, Key: "\r"},
 		"Hooks review: Press Enter to continue":               {Dialog: harness.HooksReviewDialog, Key: "\r"},
 		"Update available: Press Enter to continue":           {Dialog: harness.UpdateDialog, Key: "\r"},
 		"Model nudge: Press Enter to continue":                {Dialog: harness.ModelNudgeDialog, Key: "\r"},

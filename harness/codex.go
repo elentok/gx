@@ -206,7 +206,7 @@ var codexDialogs = []struct {
 	// answer must stop once the dialog has left the screen.
 	visibleOnly bool
 }{
-	{TrustDialog, []string{"do you trust the contents", "trust this directory"}, "\r", false},
+	{TrustDialog, []string{"do you trust the contents", "trust this directory", "trust this folder"}, "\r", false},
 	{HooksReviewDialog, []string{"hooks review"}, "\r", false},
 	{UpdateDialog, []string{"update available"}, "\r", false},
 	{ModelNudgeDialog, []string{"model nudge"}, "\r", false},
