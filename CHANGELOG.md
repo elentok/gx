@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.51.9 - 2026-11-18
+
+- Changed a new chat's first prompt to go in with `claude --prefill` when it is plain text (no image, no slash command, up to 32 KiB) and the installed claude knows the flag. gx then only presses Enter. Other chats, and a claude without the flag, type the prompt as before.
+- Added a log line with the pane at every first-prompt nudge.
+- Fixed a first prompt with an image that went out about 45 seconds late. Claude takes 8 to 19 seconds to draw a pasted image's `[Image #N]` chip and loses keys sent meanwhile. gx now waits up to 30 seconds for the chip before it types the text, and re-reads the pane every 3 seconds, so a late-drawing prompt gets its Enter at once.
+- Fixed iOS showing a contact AutoFill bar over the chat prompt box, with a neutral placeholder.
+
 ## v0.51.8 - 2026-11-17
 
 - Added a two-finger swipe down on touch devices (phone and tablet) in the web UI to start a new chat draft. The swipe must start in the center 75% of the window.
