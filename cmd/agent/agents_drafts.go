@@ -20,6 +20,27 @@ func newAgentsDraftsCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "drafts", Short: "chat drafts kept by the server", Args: cobra.NoArgs}
 	cmd.AddCommand(newAgentsDraftsCreateCmd(d))
 	cmd.AddCommand(newAgentsDraftsDeleteCmd(d))
+	image := &cobra.Command{Use: "image", Short: "images of a chat draft", Args: cobra.NoArgs}
+	image.AddCommand(newAgentsDraftsImageGetCmd(d))
+	cmd.AddCommand(image)
+	return cmd
+}
+
+// newAgentsDraftsImageGetCmd is `gx agents drafts image get`.
+func newAgentsDraftsImageGetCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	var out string
+	cmd := &cobra.Command{
+		Use:   "get <draft> <id>",
+		Short: "print a chat draft image's bytes, or save them with -o",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			return runImageGet(c, d, jsonOut, out, args[1], func(ctx context.Context, cl *apiclient.Client) ([]byte, string, error) {
+				return cl.Sessions.ChatDraftImage(ctx, args[0], args[1])
+			})
+		},
+	}
+	addImageGetFlags(cmd, &out, &jsonOut)
 	return cmd
 }
 

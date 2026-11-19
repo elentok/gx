@@ -419,7 +419,7 @@ func Routes(get func() *ChatDrafts) []wire.Route {
 		{Pattern: "POST /v1/agents/drafts/images", Web: wire.WebWrite, RawBody: true,
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().imageUpload(w, r) }},
 		{Pattern: "GET /v1/agents/drafts/images", Web: wire.WebRead,
-			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().imageServe(w, r) }},
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().imageServe(w, r) }},
 		{Pattern: "POST /v1/agents/drafts/images/delete", Web: wire.WebWrite,
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().imageRemove(w, r) }},
 	}

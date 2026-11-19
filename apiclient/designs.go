@@ -107,6 +107,11 @@ func (s *designs) DesignDraftImage(ctx context.Context, id, image string) ([]byt
 	return s.t.getBytes(ctx, "/v1/designs/drafts/images?id="+url.QueryEscape(id)+"&image="+url.QueryEscape(image))
 }
 
+// ChatDraftImage reads one image of a chat draft: its bytes and detected Content-Type.
+func (s *designs) ChatDraftImage(ctx context.Context, id, image string) ([]byte, string, error) {
+	return s.t.getBytes(ctx, "/v1/agents/drafts/images?id="+url.QueryEscape(id)+"&image="+url.QueryEscape(image))
+}
+
 // DesignImages lists the ids and file names in a map epic's images/ folder.
 func (s *designs) DesignImages(ctx context.Context, epic string) ([]wire.SessionImageResult, error) {
 	var res []wire.SessionImageResult
