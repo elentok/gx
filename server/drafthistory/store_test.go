@@ -186,6 +186,25 @@ func TestSave_OversizedImagesAreNotKept(t *testing.T) {
 	}
 }
 
+func TestSave_OverCapRepeatIsSkippedButOtherImagesSave(t *testing.T) {
+	s := newStore(t, 100)
+	big := func(fill byte) []string {
+		return []string{img(t, "img-0-a.png", 60, fill), img(t, "img-1-b.png", 60, 'z')}
+	}
+	if r := mustSave(t, s, Sent, Entry{Text: "big"}, big('b')...); r != Saved {
+		t.Fatal(r)
+	}
+	if r := mustSave(t, s, Sent, Entry{Text: "big"}, big('b')...); r != SkippedRepeat {
+		t.Fatalf("same over-cap draft: got %v", r)
+	}
+	if r := mustSave(t, s, Sent, Entry{Text: "big"}, big('c')...); r != Saved {
+		t.Fatalf("other over-cap images: got %v", r)
+	}
+	if items, _ := s.List(Sent); len(items) != 2 {
+		t.Fatalf("want 2 entries, got %d", len(items))
+	}
+}
+
 func TestSave_ConcurrentStoresLoseNothing(t *testing.T) {
 	dir := t.TempDir()
 	const n = 20

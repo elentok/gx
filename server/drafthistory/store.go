@@ -9,6 +9,7 @@ package drafthistory
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -59,6 +61,9 @@ type Entry struct {
 	Images []string `json:"images"`
 	// ImagesDropped is the "images not kept" mark: the images were too big for the cap.
 	ImagesDropped bool `json:"imagesDropped,omitempty"`
+	// DroppedHashes are the sha256 of the dropped images, so a repeat Save of the
+	// same oversize draft is still seen as a repeat.
+	DroppedHashes []string `json:"droppedHashes,omitempty"`
 
 	Project string `json:"project,omitempty"`
 	// Slug: Design drafts, and Design Sent messages (the epic part of the Ticket key).
@@ -226,6 +231,7 @@ func (s *Store) Save(l List, e Entry, imagePaths []string) (Result, error) {
 	e.SavedAt = s.now().UTC()
 	e.Images = []string{}
 	e.ImagesDropped = false
+	e.DroppedHashes = nil
 	if err := s.copyImages(l, &e, imagePaths); err != nil {
 		_ = os.RemoveAll(filepath.Join(s.dir(l), e.ID))
 		return 0, err
@@ -271,6 +277,7 @@ func (s *Store) copyImages(l List, e *Entry, src []string) error {
 	}
 	if total > s.cap {
 		e.ImagesDropped = true
+		e.DroppedHashes = hashFiles(src)
 		return nil
 	}
 	dir := filepath.Join(s.dir(l), e.ID)
@@ -291,6 +298,20 @@ func (s *Store) copyImages(l List, e *Entry, src []string) error {
 	return nil
 }
 
+// hashFiles returns the sha256 of each file, or nil when one cannot be read.
+func hashFiles(paths []string) []string {
+	out := make([]string, len(paths))
+	for i, p := range paths {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return nil
+		}
+		sum := sha256.Sum256(b)
+		out[i] = hex.EncodeToString(sum[:])
+	}
+	return out
+}
+
 func (s *Store) imageBytes(l List, es []Entry) int64 {
 	var n int64
 	for _, e := range es {
@@ -309,7 +330,15 @@ func (s *Store) sameAsNewest(l List, newest, e Entry, imagePaths []string) bool 
 	a.SavedAt, b.SavedAt = time.Time{}, time.Time{}
 	a.Images, b.Images = nil, nil
 	a.ImagesDropped = false
-	if !reflect.DeepEqual(a, b) || len(newest.Images) != len(imagePaths) {
+	a.DroppedHashes = nil
+	if !reflect.DeepEqual(a, b) {
+		return false
+	}
+	if newest.ImagesDropped {
+		// Entries saved before DroppedHashes existed have none, so never match.
+		return len(newest.DroppedHashes) == len(imagePaths) && slices.Equal(newest.DroppedHashes, hashFiles(imagePaths))
+	}
+	if len(newest.Images) != len(imagePaths) {
 		return false
 	}
 	held := s.paths(l, newest)
