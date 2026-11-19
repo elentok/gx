@@ -436,3 +436,35 @@ test("a pick sends the unsent content, fills text and images, shows notices, foc
   expect(screen.queryByRole("option")).toBeNull()
   expect(document.activeElement).toBe(box())
 })
+
+test("with an upload in flight the popup shows Saving… and restores nothing until it ends", async () => {
+  let finish: (id: string) => void = () => undefined
+  uploads.upload.mockReturnValueOnce(new Promise<string>((r) => (finish = r)))
+  const c = fakeCalls()
+  render({ s: chat(), historyCalls: c as unknown as HistoryCalls })
+  fireEvent.change(screen.getByTestId("image-input"), { target: { files: [pngFile()] } })
+  await screen.findByLabelText("Uploading")
+  fireEvent.click(screen.getByRole("button", { name: "History" }))
+  fireEvent.click(await screen.findByText("Saving…"))
+  expect(c.pick).not.toHaveBeenCalled()
+  finish("up1")
+  fireEvent.click(await screen.findByText("old msg"))
+  await waitFor(() => expect(c.pick).toHaveBeenCalledTimes(1))
+})
+
+test("a pick notice clears on the next edit and the Codex hint shows again", async () => {
+  const c = fakeCalls()
+  c.pick.mockResolvedValueOnce({
+    text: "/gx-design x",
+    images: ["n1"],
+    notices: ["1 image missing"],
+  })
+  render({ s: chat({ harness: "codex" }), historyCalls: c as unknown as HistoryCalls })
+  fireEvent.click(screen.getByRole("button", { name: "History" }))
+  fireEvent.click(await screen.findByText("old msg"))
+  await screen.findByText("1 image missing")
+  expect(screen.queryByText(HINT)).toBeNull()
+  fireEvent.change(box(), { target: { value: "/gx-design xy" } })
+  await waitFor(() => expect(screen.queryByText("1 image missing")).toBeNull())
+  expect(screen.getByText(HINT)).toBeTruthy()
+})

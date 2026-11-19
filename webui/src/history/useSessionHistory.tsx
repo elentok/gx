@@ -65,6 +65,16 @@ export function useSessionHistory({
     if (focusTick > 0) box.current?.querySelector<HTMLElement>(PROMPT_BOX_SELECTOR)?.focus()
   }, [focusTick, box])
 
+  // The text and images a pick left behind: an edit away from them, or a send, makes its notice stale.
+  const pickState = useRef<{ text: string; ids: string } | null>(null)
+  const ids = images.readyIds.join(",")
+  useEffect(() => {
+    const picked = pickState.current
+    if (!picked || (picked.text === text && picked.ids === ids)) return
+    pickState.current = null
+    setNotice("")
+  }, [text, ids])
+
   const restore = async (entry: DraftHistoryEntry) => {
     let res: ComposerPickResult
     try {
@@ -84,6 +94,7 @@ export function useSessionHistory({
       setNotice(refusalText(res))
       return
     }
+    pickState.current = { text: res.text, ids: res.images.join(",") }
     setText(res.text)
     images.replace(res.images)
     setNotice(res.notices.join(" · "))
@@ -110,6 +121,7 @@ export function useSessionHistory({
         list="sent"
         entries={entries}
         max={max}
+        restoreDisabled={images.uploading > 0}
         onRestore={(e) => void restore(e)}
         onClose={() => setEntries(null)}
       />
