@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/gxfixture/catalog"
+	"github.com/elentok/gx/testutil/gxfixture/historyseed"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
@@ -33,7 +34,7 @@ func TestDraftsScenario_SeedDraftsSkipsLateDraftsBeforeStart(t *testing.T) {
 func TestDraftHistoryScenario_SeedsThreeListsNewestFirst(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if err := seedDraftHistory(dir, catalog.Scenarios["draft-history"].History); err != nil {
+	if err := historyseed.Seed(dir, catalog.Scenarios["draft-history"].History, pngBase64); err != nil {
 		t.Fatal(err)
 	}
 	store := drafthistory.New(dir)

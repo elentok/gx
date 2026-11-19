@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/gxfixture/historyseed"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 	triagerec "github.com/elentok/gx/triage"
@@ -158,7 +159,7 @@ func (f *fixture) seed(sc scenario) error {
 	if err := seedDrafts(f.stateD, sc.Drafts); err != nil {
 		return err
 	}
-	if err := seedDraftHistory(f.stateD, sc.History); err != nil {
+	if err := historyseed.Seed(f.stateD, sc.History, pngBase64); err != nil {
 		return err
 	}
 	if sc.Conversations != nil {

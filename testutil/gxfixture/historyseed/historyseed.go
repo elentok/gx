@@ -1,4 +1,5 @@
-package main
+// Package historyseed seeds the draft-history scenario's entries.
+package historyseed
 
 import (
 	"encoding/base64"
@@ -13,9 +14,9 @@ import (
 // tinyImageCap is smaller than one PNG, so an entry saved under it keeps no images.
 const tinyImageCap = 1
 
-// seedDraftHistory stores the entries with the real draft history store, so the
-// server reads them as it reads entries a person made.
-func seedDraftHistory(stateDir string, list []spec.HistoryEntry) error {
+// Seed stores the entries with the real draft history store, so the server reads
+// them as it reads entries a person made. pngBase64 is the image every entry uses.
+func Seed(stateDir string, list []spec.HistoryEntry, pngBase64 string) error {
 	png, err := base64.StdEncoding.DecodeString(pngBase64)
 	if err != nil {
 		return err
