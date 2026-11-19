@@ -85,6 +85,13 @@ func Routes(get func() *Prompt) []wire.Route {
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().imageDeleteHandler(w, r) },
 		},
 		{
+			Pattern: "POST /v1/sessions/pick-history",
+			Web:     wire.WebWrite,
+			WebHandler: func(w http.ResponseWriter, r *http.Request) {
+				composerPicker{&imageStore{get()}}.composerPickHandler(w, r)
+			},
+		},
+		{
 			Pattern: "POST /v1/sessions/rename",
 			Web:     wire.WebWrite,
 			Handler: func(w http.ResponseWriter, r *http.Request) { namer{get()}.renameHandler(w, r) },

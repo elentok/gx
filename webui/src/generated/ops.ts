@@ -419,6 +419,30 @@ export interface DraftHistoryPickRequest {
   revision: number /* int */;
 }
 /**
+ * ComposerPickRequest picks a Sent messages entry into a session's composer.
+ * The composer keeps its text and image ids in the browser, so the call
+ * carries them. It takes no revision: composers have none.
+ */
+export interface ComposerPickRequest {
+  session_id: string;
+  entry_id: string;
+  text: string;
+  images: string[];
+}
+/**
+ * ComposerPickResult answers a composer pick. Text and Images are what the
+ * composer holds afterwards (the request's own when nothing changed). Images
+ * are new image ids of the session folder. Notices say what the restore left out.
+ */
+export interface ComposerPickResult {
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+  text: string;
+  images: string[];
+  notices: string[];
+}
+/**
  * DesignDraftPickResult answers a pick on a Design draft page. Draft is the
  * page after the pick (the same draft when nothing changed). Notices say what
  * the restore left out.

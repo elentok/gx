@@ -46,6 +46,28 @@ type DraftHistoryPickRequest struct {
 	Revision int    `json:"revision"`
 }
 
+// ComposerPickRequest picks a Sent messages entry into a session's composer.
+// The composer keeps its text and image ids in the browser, so the call
+// carries them. It takes no revision: composers have none.
+type ComposerPickRequest struct {
+	SessionID string   `json:"session_id"`
+	EntryID   string   `json:"entry_id"`
+	Text      string   `json:"text"`
+	Images    []string `json:"images"`
+}
+
+// ComposerPickResult answers a composer pick. Text and Images are what the
+// composer holds afterwards (the request's own when nothing changed). Images
+// are new image ids of the session folder. Notices say what the restore left out.
+type ComposerPickResult struct {
+	Refused bool     `json:"refused,omitempty"`
+	Reason  string   `json:"reason,omitempty"`
+	Message string   `json:"message,omitempty"`
+	Text    string   `json:"text"`
+	Images  []string `json:"images"`
+	Notices []string `json:"notices"`
+}
+
 // DesignDraftPickResult answers a pick on a Design draft page. Draft is the
 // page after the pick (the same draft when nothing changed). Notices say what
 // the restore left out.
