@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.51.10 - 2026-11-19
+
+- Added a fix for Codex's new "Trust this folder" startup dialog. gx now answers it like the other trust dialogs.
+- Added the pnpm home directory to the writable directories of queue agents in pnpm projects. The default pnpm writable directory in config is removed.
+- Fixed swallowed Enter keys on nudges. gx now retries them, and strips invisible characters (U+2028/2029, edge ZWJ/ZWNJ) before it types the prompt.
+- Fixed the first starting-to-idle move being counted as a turn in the pid watcher.
+- Fixed a new session's control file lookup. gx now finds it by session id.
+- Fixed the lock file pid write. It is now one fixed-width write and never truncates to empty.
+- Fixed the store commit loop. It now polls every tick and re-arms when settings change.
+- Fixed Codex question matching. gx compares the raw question text, not the display title.
+- Fixed the service worker install being slow. Each precache body is now read as it arrives.
+- Fixed the Stats page. It keeps the previous numbers on screen while a filter change loads.
+- Fixed the schedule form refusal showing both inline and as a toast. It now shows inline only.
+- Changed every pinned-page state and every other page state to have a header (with the burger menu).
+- Changed the menu focus-settle timer to return a disposer and clear it on unmount.
+- Changed `gx check` and CI to run Biome lint and fail on any diagnostic. All 288 existing errors, 105 warnings and 25 infos are fixed at their cause. Mermaid SVG is now attached through DOMParser.
+- Added `gx brief health`, with the first-attempt pass rate, the flip list and p50/p95 per test. The brief index now records attempt, signature, load, process count and origin, uses stable test names, and shows a slow list and silent Vitest failures.
+- Added test-suite stability work: CI keeps the `go test` JSON and the Playwright report as failure artifacts, the fixture captures each child's stderr, failing tests print the state they read, and the 240-process burst test runs as its own last step. The proc-cap default headroom is now 800.
+- Added test guards: a rules test fails on Playwright fixed sleeps, a `setstateguard` check fails on SetState inside a cleanup or defer, and the test setup tracks timer disposers and pending timers.
+- Changed slow and flaky tests: fixed and sped up many e2e flows, plus the budget, EpicPage, InterruptControl, live Screen and design tests.
+- Added a non-panicking Finish to the runner fake, used in every cleanup.
+- Added test skills (`gx-test-guidelines`, `gx-go-tests`, `gx-vitest-tests`, `gx-playwright-tests`, repo-local `gx-only-e2es`) and updated `gx-test-review`, `gx-implement`, `gx-tdd` and `gx-follow-up` to use them.
+- Added test-suite stability research notes and specs.
+
+
 ## v0.51.9 - 2026-11-18
 
 - Changed a new chat's first prompt to go in with `claude --prefill` when it is plain text (no image, no slash command, up to 32 KiB) and the installed claude knows the flag. gx then only presses Enter. Other chats, and a claude without the flag, type the prompt as before.
