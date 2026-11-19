@@ -1,11 +1,12 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useId, useState, type ReactNode } from "react"
 import type { SettingChange, SettingsEntry, SettingsWriteResult } from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { Chip } from "../ui/chip/Chip"
 import { Modal } from "../ui/modal/Modal"
 import { withKeys } from "../uniqueKeys"
 import { refusalText, useWrite } from "../useWrite"
+import { modelKeyHarness, useModelNames } from "./aliasNote"
 import { entryLabel, numberListHint, removeChange, setChange } from "./settingsApi"
 import { ChangedDot, Highlight, inputProps, SaveStatus, Segmented, TagChip } from "./parts"
 
@@ -61,10 +62,20 @@ export function TextControl({
   save,
   cancellable,
 }: ControlProps & { cancellable?: boolean }) {
+  const listId = useId()
+  const names = useModelNames(modelKeyHarness(entry.key))
   return (
     <>
+      {names.length > 0 && (
+        <datalist id={listId}>
+          {names.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
+      )}
       <chakra.input
         type="text"
+        list={names.length > 0 ? listId : undefined}
         aria-label={entryLabel(entry)}
         aria-invalid={invalid || undefined}
         value={draft}

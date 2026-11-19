@@ -27,3 +27,36 @@ export function aliasNote(entry: SettingsEntry, aliases: ModelAlias[] | undefine
   if (!hit?.latest || hit.latest === hit.id) return null
   return `${hit.alias} resolves to ${hit.id}. ${hit.latest} is newer. Enter the full id to use it.`
 }
+
+/** The harness a model key belongs to: agents.<harness>.model and its tier variants. */
+const MODEL_KEY = /^agents\.([a-z]+)\.(?:[a-z]+\.)?model$/
+export const modelKeyHarness = (key: string): string | undefined => MODEL_KEY.exec(key)?.[1]
+
+/** The names a model key takes: the harness's aliases and model ids. Empty when the route fails. */
+export async function fetchModelNames(harness: string): Promise<string[]> {
+  try {
+    const res = await apiFetch(`/v1/sessions/models?harness=${encodeURIComponent(harness)}`)
+    if (!res.ok) return []
+    const body = (await res.json()) as {
+      aliases?: ModelAlias[]
+      models?: { id: string }[]
+    }
+    return [
+      ...new Set([
+        ...(body.aliases ?? []).map((a) => a.alias),
+        ...(body.models ?? []).map((m) => m.id),
+      ]),
+    ]
+  } catch {
+    return []
+  }
+}
+
+/** The completions for a model key's input; empty for any other key, which starts no fetch. */
+export function useModelNames(harness: string | undefined): string[] {
+  return (
+    useFetched(`settings-model-names-${harness ?? ""}`, () =>
+      harness ? fetchModelNames(harness) : Promise.resolve([]),
+    ).data ?? []
+  )
+}
