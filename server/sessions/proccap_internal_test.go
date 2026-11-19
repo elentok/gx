@@ -14,15 +14,12 @@ import (
 func TestCanPrefill(t *testing.T) {
 	old := claudeSupportsPrefill
 	t.Cleanup(func() { claudeSupportsPrefill = old })
-	supported := true
+	supported, mg, claude := true, &Manager{}, string(harness.Claude)
 	claudeSupportsPrefill = func([]string) bool { return supported }
-	mg := &Manager{}
-	claude := string(harness.Claude)
 	tests := []struct {
-		name      string
-		meta      Meta
-		supported bool
-		want      bool
+		name            string
+		meta            Meta
+		supported, want bool
 	}{
 		{"plain text on a claude that knows the flag", Meta{Harness: claude, FirstPrompt: "fix the bug"}, true, true},
 		{"claude that does not know the flag", Meta{Harness: claude, FirstPrompt: "fix the bug"}, false, false},
