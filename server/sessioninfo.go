@@ -28,7 +28,7 @@ func (c chatSource) ReadMeta(dir string) (chat.Meta, error) {
 }
 
 func (c chatSource) CheckProjectDir(project, dir string) (*wire.SessionResult, error) {
-	return c.s.sessions.CheckProjectDir(project, dir)
+	return sessions.CheckProjectDir(c.s.sessions, project, dir)
 }
 
 // TicketAsk applies the same answerable checks as ticketops.Ops.Answer, so a

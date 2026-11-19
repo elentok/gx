@@ -58,7 +58,7 @@ func (mg *Manager) SessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 
 // CheckProjectDir returns a refusal when project is not configured or a
 // non-empty dir is neither its root nor one of its worktrees; nil means ok.
-func (mg *Manager) CheckProjectDir(project, dir string) (*wire.SessionResult, error) {
+func CheckProjectDir(mg *Manager, project, dir string) (*wire.SessionResult, error) {
 	list, err := mg.projects.ListWorktrees()
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (mg *Manager) CreateWebSession(req WebCreateSessionRequest) (wire.SessionRe
 	if req.Effort != "" && req.Model == "" {
 		return Refusal(wire.ReasonSessionBadRequest, "effort needs a model"), nil
 	}
-	refusal, err := mg.CheckProjectDir(req.Project, req.Dir)
+	refusal, err := CheckProjectDir(mg, req.Project, req.Dir)
 	if err != nil {
 		return wire.SessionResult{}, err
 	}
