@@ -36,6 +36,8 @@ import { unansweredOf } from "./round"
 import { SendPopover } from "./SendPopover"
 import { usePromptSend } from "./usePromptSend"
 import { useWide } from "../useWide"
+import { offersHistory } from "../agents/sessionWrites"
+import { useSessionHistory } from "../history/useSessionHistory"
 import { promptable } from "./view"
 
 // Under the chat, one line: the Auto menu, then Note and the main action. Nothing sends unless the session is Idle.
@@ -104,6 +106,19 @@ export function Composer({
   useEffect(() => {
     if (shared && !working) setOpen(true)
   }, [shared, working])
+  const root = useRef<HTMLDivElement>(null)
+  // A restored text must show even while Working, where the effect above stays shut.
+  const history = useSessionHistory({
+    enabled: offersHistory(session),
+    sessionId: session.id,
+    text,
+    setText: (t: string) => {
+      setText(t)
+      if (t !== "") setOpen(true)
+    },
+    images,
+    box: root,
+  })
   const hasContent = images.hasContent(text)
   const { send, write, enabled, pending } = usePromptSend({
     session,
@@ -241,6 +256,7 @@ export function Composer({
 
   return (
     <Box
+      ref={root}
       position="sticky"
       bottom="0"
       bg="surface"
@@ -259,6 +275,7 @@ export function Composer({
         footer={!open && footerLine}
         afterAdd={
           <>
+            {history.button}
             <Button
               emphasis="secondary"
               aria-label="Note"
@@ -337,6 +354,12 @@ export function Composer({
           />
         )}
       </ComposerImages>
+      {history.notice && (
+        <Text role="status" fontSize="xs" color="text.dim">
+          {history.notice}
+        </Text>
+      )}
+      {history.popup}
     </Box>
   )
 }

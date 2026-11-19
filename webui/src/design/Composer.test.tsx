@@ -1354,3 +1354,87 @@ test("images: adding one while busy leaves the note closed", async () => {
   await screen.findByRole("button", { name: "Remove image" })
   expect(screen.queryByLabelText("Message")).toBeNull()
 })
+
+const hEntry = {
+  id: "e1",
+  text: "old msg",
+  slug: "",
+  project: "gx",
+  name: "",
+  composer: "design",
+  savedAt: new Date().toISOString(),
+  imageCount: 0,
+  imagesDropped: false,
+  harness: "",
+  model: "",
+  effort: "",
+}
+const historyApi = vi.hoisted(() => ({
+  list: vi.fn(),
+  pick: vi.fn(),
+}))
+vi.mock("../history/api", async (orig) => ({
+  ...(await orig<typeof import("../history/api")>()),
+  postHistoryList: historyApi.list,
+  postComposerPick: historyApi.pick,
+}))
+const armHistory = (text = "old msg") => {
+  historyApi.list.mockReset().mockResolvedValue({ list: "sent", max: 50, entries: [hEntry] })
+  historyApi.pick.mockReset().mockResolvedValue({ text, images: [], notices: [] })
+}
+
+test("History sits between Add and Note; narrow it is an icon", async () => {
+  render({})
+  const history = await screen.findByRole("button", { name: "History" })
+  expect(history.textContent).toContain("History")
+  expect(history.nextElementSibling).toBe(screen.getByRole("button", { name: "Note" }))
+  cleanup()
+  render({ wide: false })
+  const phone = await screen.findByRole("button", { name: "History" })
+  expect(phone.textContent).toBe("")
+  expect(phone.getAttribute("title")).toBe("History")
+})
+
+test("a session that is not a Design shows no History button", async () => {
+  render({ auto: { queue: true } })
+  await screen.findByRole("button", { name: "Note" })
+  expect(screen.queryByRole("button", { name: "History" })).toBeNull()
+})
+
+test("a pick opens a closed Note while Working, fills it and sends the unsent text", async () => {
+  armHistory()
+  render({ state: "working" })
+  fireEvent.click(await screen.findByRole("button", { name: "History" }))
+  fireEvent.click(await screen.findByText("old msg"))
+  const box = await screen.findByLabelText("Message")
+  await waitFor(() => expect((box as HTMLTextAreaElement).value).toBe("old msg"))
+  expect(historyApi.list).toHaveBeenCalledWith({ list: "sent" })
+  expect(historyApi.pick).toHaveBeenCalledWith({
+    session_id: "s-a",
+    entry_id: "e1",
+    text: "",
+    images: [],
+  })
+  expect(screen.queryByRole("option")).toBeNull()
+})
+
+test("a pick focuses the Note of an idle session", async () => {
+  armHistory()
+  render({})
+  fireEvent.click(await screen.findByRole("button", { name: "History" }))
+  fireEvent.click(await screen.findByText("old msg"))
+  const box = await screen.findByLabelText("Message")
+  await waitFor(() => expect(document.activeElement).toBe(box))
+})
+
+test("in a round a pick fills the round note and sends nothing", async () => {
+  Element.prototype.scrollIntoView = vi.fn()
+  armHistory()
+  const answer = vi.fn<PostAnswer>(async () => ok)
+  render({ answer, chat: chatOf({ round: round() }) })
+  fireEvent.click(await screen.findByRole("button", { name: "History" }))
+  fireEvent.click(await screen.findByText("old msg"))
+  const box = await screen.findByLabelText("Message")
+  await waitFor(() => expect((box as HTMLTextAreaElement).value).toBe("old msg"))
+  expect(answer).not.toHaveBeenCalled()
+})
