@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/chatdrafts"
+	"github.com/elentok/gx/server/drafthistory"
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
@@ -83,6 +84,35 @@ func TestAgentsDrafts_CreateJSONCarriesID(t *testing.T) {
 	var res ops.ChatDraftResult
 	if err := json.Unmarshal(out.Bytes(), &res); err != nil || res.Draft == nil || res.Draft.ID == "" {
 		t.Fatalf("--json output = %q, %v", out.String(), err)
+	}
+}
+
+func TestAgentsDrafts_DeleteSavesAHistoryEntryAndUnknownIDIsRefused(t *testing.T) {
+	f := rigs.StartDesigns(t)
+	t.Setenv(holder.AgentSessionEnv, "")
+	var out bytes.Buffer
+	if err := execute(t, []string{"agents", "drafts", "create", "--project", "proj", "--brief", "-", "--folder", "trunk"}, draftsCmdDeps(f, "the brief", &out)); err != nil {
+		t.Fatal(err)
+	}
+	id := strings.TrimSpace(out.String())
+	out.Reset()
+	if err := execute(t, []string{"agents", "drafts", "delete", id, "--json"}, draftsCmdDeps(f, "", &out)); err != nil {
+		t.Fatal(err)
+	}
+	var res ops.ChatDraftResult
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil || !res.Deleted {
+		t.Fatalf("--json output = %q, %v", out.String(), err)
+	}
+	items, err := drafthistory.New(f.H.StateDir).List(drafthistory.ChatDrafts)
+	if err != nil || len(items) != 1 || items[0].Text != "the brief" {
+		t.Fatalf("history = %+v, %v", items, err)
+	}
+	err = execute(t, []string{"agents", "drafts", "delete", id}, draftsCmdDeps(f, "", &out))
+	if err == nil || !strings.Contains(err.Error(), ops.ReasonDraftGone) {
+		t.Fatalf("unknown id err = %v, want %s", err, ops.ReasonDraftGone)
+	}
+	if items, _ := drafthistory.New(f.H.StateDir).List(drafthistory.ChatDrafts); len(items) != 1 {
+		t.Errorf("entries after refused delete = %d, want 1", len(items))
 	}
 }
 

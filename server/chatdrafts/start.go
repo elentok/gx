@@ -34,6 +34,12 @@ func (c *ChatDrafts) Start(id string) (ops.ChatDraftResult, error) {
 	if d.Brief == "" {
 		return refuse(wire.ReasonEmptyPrompt, "a brief is required"), nil
 	}
+	// Saved before any launch step, so every failure keeps the entry; a repeat
+	// Start is skipped by the store. A failed save is logged and Start goes on
+	// (an explicit delete refuses instead, see deleteDraft).
+	if err := c.saveHistory(d); err != nil {
+		c.Log.Warn("save chat draft to history", "draft", id, "err", err)
+	}
 	dir := d.Dir
 	if d.Folder == ops.ChatDraftFolderWorktree {
 		if d.WorktreePath == "" {

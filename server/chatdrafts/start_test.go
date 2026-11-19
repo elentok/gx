@@ -59,6 +59,7 @@ type startRig struct {
 	chats     atomic.Int32
 	worktrees atomic.Int32
 	wtRefusal string
+	stateDir  string
 }
 
 func newStartRig(t *testing.T) *startRig {
@@ -67,8 +68,9 @@ func newStartRig(t *testing.T) *startRig {
 	r.createRes = func() (wire.SessionResult, error) {
 		return wire.SessionResult{Session: &wire.SessionInfo{ID: "sess-1"}}, nil
 	}
+	r.stateDir = t.TempDir()
 	r.c = NewChatDrafts(Deps{
-		Log: slog.New(slog.NewTextHandler(io.Discard, nil)), StateDir: t.TempDir(),
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)), StateDir: r.stateDir,
 		Events: r.events, Workspaces: r.ws,
 		CreateChat: func(req sessions.WebCreateSessionRequest) (wire.SessionResult, error) {
 			r.chats.Add(1)

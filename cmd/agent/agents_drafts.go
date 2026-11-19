@@ -19,7 +19,49 @@ import (
 func newAgentsDraftsCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "drafts", Short: "chat drafts kept by the server", Args: cobra.NoArgs}
 	cmd.AddCommand(newAgentsDraftsCreateCmd(d))
+	cmd.AddCommand(newAgentsDraftsDeleteCmd(d))
 	return cmd
+}
+
+// newAgentsDraftsDeleteCmd is `gx agents drafts delete`. The server saves the
+// draft to the Draft history before it removes it.
+func newAgentsDraftsDeleteCmd(d Deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "delete <id> [--json]",
+		Short: "delete a chat draft (it is kept in the Draft history)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := d.Dial()()
+			if err != nil {
+				return err
+			}
+			return runAgentsDraftsDelete(c.Context(), cl, c.OutOrStdout(), jsonOut, args[0])
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
+func runAgentsDraftsDelete(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string) error {
+	res, err := cl.Sessions.DeleteChatDraft(ctx, ops.ChatDraftReadRequest{ID: id})
+	if apiclient.IsNotRunning(err) {
+		res, err = ops.ChatDraftResult{Refused: true, Reason: wire.ReasonServerNotRunning}, nil
+	}
+	if err != nil {
+		return fmt.Errorf("server call failed: %w", err)
+	}
+	if jsonOut {
+		if err := writeDraftJSON(w, res); err != nil {
+			return err
+		}
+		return cmdbase.JSONRefusalExit(res.Refused)
+	}
+	if res.Refused {
+		return fmt.Errorf("refused (%s)", res.Reason)
+	}
+	_, err = fmt.Fprintln(w, "deleted", id)
+	return err
 }
 
 // newAgentsDraftsCreateCmd is `gx agents drafts create`. The server resolves

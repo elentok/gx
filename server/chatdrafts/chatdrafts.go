@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/drafthistory"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
@@ -51,12 +52,13 @@ type Deps struct {
 // ChatDrafts serves the chat draft routes.
 type ChatDrafts struct {
 	Deps
-	store *Store
+	store   *Store
+	history *drafthistory.Store
 }
 
 // NewChatDrafts builds ChatDrafts from d.
 func NewChatDrafts(d Deps) *ChatDrafts {
-	return &ChatDrafts{Deps: d, store: New(d.StateDir)}
+	return &ChatDrafts{Deps: d, store: New(d.StateDir), history: drafthistory.New(d.StateDir)}
 }
 
 func refuse(reason, msg string) ops.ChatDraftResult {
@@ -350,18 +352,40 @@ func (c *ChatDrafts) checkSave(d *ops.ChatDraft, before ops.ChatDraft) *ops.Chat
 	return nil
 }
 
+// deleteDraft is the explicit delete: read, save to history and remove under
+// one hold of the draft's lock. A failed save refuses the delete and keeps the
+// draft, so the text is never lost without a copy.
+func (c *ChatDrafts) deleteDraft(id string) (ops.ChatDraftResult, error) {
+	unlock := c.store.lock(id)
+	defer unlock()
+	d, err := c.store.Get(id)
+	if errors.Is(err, ErrNotFound) {
+		return ops.ChatDraftResult{Refused: true, Reason: ops.ReasonDraftGone}, nil
+	}
+	if err != nil {
+		return ops.ChatDraftResult{}, err
+	}
+	if err := c.saveHistory(d); err != nil {
+		return ops.ChatDraftResult{}, err
+	}
+	if _, err := c.store.remove(id); err != nil {
+		return ops.ChatDraftResult{}, err
+	}
+	return ops.ChatDraftResult{Deleted: true}, nil
+}
+
 func (c *ChatDrafts) remove(w http.ResponseWriter, r *http.Request) {
 	req, ok := decode[ops.ChatDraftReadRequest](w, r)
 	if !ok {
 		return
 	}
-	existed, err := c.store.Delete(req.ID)
+	res, err := c.deleteDraft(req.ID)
 	if err != nil {
 		serverError(w, err)
 		return
 	}
-	if !existed {
-		wire.WriteJSON(w, ops.ChatDraftResult{Refused: true, Reason: ops.ReasonDraftGone})
+	if res.Refused {
+		wire.WriteJSON(w, res)
 		return
 	}
 	if c.Workspaces != nil {
@@ -373,8 +397,8 @@ func (c *ChatDrafts) remove(w http.ResponseWriter, r *http.Request) {
 	wire.WriteJSON(w, ops.ChatDraftResult{Deleted: true})
 }
 
-// Routes lists the chat draft routes. Only create has a CLI handler; the rest
-// are web-only. The getter is called per request, so a route can be listed before its
+// Routes lists the chat draft routes. Create, delete and the image
+// download have a socket handler; the rest are web-only. The getter is called per request, so a route can be listed before its
 // ChatDrafts is built.
 func Routes(get func() *ChatDrafts) []wire.Route {
 	return []wire.Route{
@@ -386,6 +410,7 @@ func Routes(get func() *ChatDrafts) []wire.Route {
 		{Pattern: "POST /v1/agents/drafts/save", Web: wire.WebWrite,
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().save(w, r) }},
 		{Pattern: "POST /v1/agents/drafts/delete", Web: wire.WebWrite,
+			Handler:    func(w http.ResponseWriter, r *http.Request) { get().remove(w, r) },
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().remove(w, r) }},
 		{Pattern: "POST /v1/agents/drafts/start", Web: wire.WebWrite,
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().start(w, r) }},

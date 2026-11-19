@@ -78,6 +78,14 @@ func (s *designs) CreateChatDraft(ctx context.Context, req ops.ChatDraftCreateRe
 	return res, err
 }
 
+// DeleteChatDraft deletes a chat draft after the server saved its history
+// entry. A gone draft is a refused result, not an error.
+func (s *designs) DeleteChatDraft(ctx context.Context, req ops.ChatDraftReadRequest) (ops.ChatDraftResult, error) {
+	var res ops.ChatDraftResult
+	err := s.t.post(ctx, "/v1/agents/drafts/delete", req, &res)
+	return res, err
+}
+
 // SetDesignDraftTarget writes a draft's slug and project without a revision.
 // A gone draft is a refused result, not an error.
 func (s *designs) SetDesignDraftTarget(ctx context.Context, req ops.DesignDraftTargetRequest) (ops.DesignDraftSaveResult, error) {
