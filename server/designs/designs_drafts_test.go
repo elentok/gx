@@ -109,6 +109,25 @@ func (f designsFixture) wantDraftEvents(t *testing.T, what string, want int, act
 	}
 }
 
+func TestWebDesignDrafts_DeleteSavesNonEmptyDraftOnly(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	full, _ := f.draftWithImages(t)
+	slugOnly := f.seedDraft(t, "proj", "just-a-slug", "")
+	for _, id := range []string{slugOnly.ID, full.ID} {
+		if _, err := f.h.Client.Sessions.DeleteDesignDraft(f.ctx, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items := f.designHistory(t)
+	if len(items) != 1 {
+		t.Fatalf("entries = %d, want 1", len(items))
+	}
+	if e := items[0]; e.Text != "an idea" || e.Slug != "fresh-idea" || e.ImageCount != 2 {
+		t.Errorf("entry = %+v", e)
+	}
+}
+
 func TestWebDesignDrafts_Snapshot(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)

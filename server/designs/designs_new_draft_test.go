@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/designs/drafts"
+	"github.com/elentok/gx/server/drafthistory"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
@@ -36,6 +37,71 @@ func (f designsFixture) draftWithImages(t *testing.T) (*ops.DesignDraft, []strin
 		names = append(names, res.Name)
 	}
 	return d, names
+}
+
+func (f designsFixture) designHistory(t *testing.T) []drafthistory.Item {
+	t.Helper()
+	items, err := drafthistory.New(f.h.StateDir).List(drafthistory.DesignDrafts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return items
+}
+
+func TestDesignsOpenNew_StartSavesOneHistoryEntry(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	d, _ := f.draftWithImages(t)
+	if res := f.openFromDraft(t, "fresh-idea", "an idea", d.ID); res.Refused {
+		t.Fatalf("open = %+v", res)
+	}
+	items := f.designHistory(t)
+	if len(items) != 1 {
+		t.Fatalf("entries = %d, want 1", len(items))
+	}
+	if e := items[0]; e.Text != "an idea" || e.Project != "proj" || e.Slug != "fresh-idea" || e.ImageCount != 2 {
+		t.Errorf("entry = %+v", e)
+	}
+}
+
+func TestDesignsOpenNew_GoneDraftSavesNothingAndStartGoesOn(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	if res := f.openFromDraft(t, "fresh-idea", "an idea", "0123456789abcdef"); res.Refused || res.Session == nil {
+		t.Fatalf("open = %+v", res)
+	}
+	if n := len(f.designHistory(t)); n != 0 {
+		t.Errorf("entries = %d, want 0", n)
+	}
+}
+
+func TestDesignsOpenNew_FailedStartKeepsEntryAndRetryAddsNone(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	d, _ := f.draftWithImages(t)
+	projDir := filepath.Join(f.h.TicketStore, "proj")
+	if err := os.Chmod(projDir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(projDir, 0o755) })
+	if _, err := os.Create(filepath.Join(projDir, "probe")); err == nil {
+		t.Skip("directory permissions are not enforced here")
+	}
+	if _, err := f.h.Client.Sessions.OpenDesign(f.ctx, wire.DesignOpenRequest{Epic: "fresh-idea", NewDesign: true, Idea: "an idea", Project: "proj", DraftID: d.ID}); err == nil {
+		t.Fatal("open succeeded, want a failed map write")
+	}
+	if n := len(f.designHistory(t)); n != 1 {
+		t.Fatalf("entries after failed start = %d, want 1", n)
+	}
+	if err := os.Chmod(projDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if res := f.openFromDraft(t, "fresh-idea", "an idea", d.ID); res.Refused {
+		t.Fatalf("retry = %+v", res)
+	}
+	if n := len(f.designHistory(t)); n != 1 {
+		t.Errorf("entries after retry = %d, want 1", n)
+	}
 }
 
 func TestDesignsOpenNew_FromDraftMovesImagesAndListsThem(t *testing.T) {

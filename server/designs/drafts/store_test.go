@@ -2,14 +2,17 @@ package drafts
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/drafthistory"
 	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 )
@@ -29,6 +32,116 @@ func mustCreate(t *testing.T, s *Store, idea string) *ops.DesignDraft {
 		t.Fatalf("create: %v %v", d, err)
 	}
 	return d
+}
+
+func historyItems(t *testing.T, dir string) []drafthistory.Item {
+	t.Helper()
+	items, err := drafthistory.New(dir).List(drafthistory.DesignDrafts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return items
+}
+
+func TestDeleteSaving_NonEmptyDraftLeavesOneEntryWithImages(t *testing.T) {
+	dir := t.TempDir()
+	s := New(dir)
+	d, err := s.Create("proj", "my-slug", "an idea")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddImage(d.ID, append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 32)...)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteSaving(d.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Get(d.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("draft after delete: err = %v, want ErrNotFound", err)
+	}
+	items := historyItems(t, dir)
+	if len(items) != 1 {
+		t.Fatalf("entries = %d, want 1", len(items))
+	}
+	if e := items[0]; e.Text != "an idea" || e.Project != "proj" || e.Slug != "my-slug" || e.ImageCount != 1 {
+		t.Errorf("entry = %+v", e)
+	}
+}
+
+func TestDeleteSaving_SlugOnlyDraftSavesNothing(t *testing.T) {
+	dir := t.TempDir()
+	s := New(dir)
+	d, err := s.Create("proj", "only-slug", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteSaving(d.ID); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(historyItems(t, dir)); n != 0 {
+		t.Errorf("entries = %d, want 0", n)
+	}
+}
+
+func TestEmptyCleanupsAndPlainDeleteSaveNothing(t *testing.T) {
+	dir := t.TempDir()
+	s := New(dir)
+	empty, err := s.Create("proj", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DeleteIfEmpty(empty.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Create("proj", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SweepEmpty(); err != nil {
+		t.Fatal(err)
+	}
+	full := mustCreate(t, s, "words")
+	if err := s.Delete(full.ID); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(historyItems(t, dir)); n != 0 {
+		t.Errorf("entries = %d, want 0", n)
+	}
+}
+
+func TestSaveToHistory_RepeatIsOneEntryAndGoneDraftSavesNothing(t *testing.T) {
+	dir := t.TempDir()
+	s := New(dir)
+	d := mustCreate(t, s, "words")
+	for range 2 {
+		if err := s.SaveToHistory(d.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := len(historyItems(t, dir)); n != 1 {
+		t.Errorf("entries after repeat = %d, want 1", n)
+	}
+	if err := s.SaveToHistory("0123456789abcdef"); err != nil {
+		t.Errorf("gone draft: %v", err)
+	}
+	if n := len(historyItems(t, dir)); n != 1 {
+		t.Errorf("entries after gone draft = %d, want 1", n)
+	}
+}
+
+func TestDeleteSaving_FailedSaveKeepsTheDraft(t *testing.T) {
+	dir := t.TempDir()
+	// A file where the history folder should be makes every history write fail.
+	if err := os.WriteFile(filepath.Join(dir, "draft-history"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := New(dir)
+	d := mustCreate(t, s, "words")
+	if err := s.DeleteSaving(d.ID); err == nil {
+		t.Fatal("delete succeeded, want the failed save to refuse it")
+	}
+	if got, err := s.Get(d.ID); err != nil || got.Idea != "words" {
+		t.Errorf("draft after refused delete = %+v, %v", got, err)
+	}
 }
 
 func TestSave_CurrentRevisionBumpsAndStamps(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/designs/drafts"
+	"github.com/elentok/gx/server/drafthistory"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
@@ -69,6 +70,32 @@ func TestDesignsDrafts_ListShowDelete(t *testing.T) {
 	err = runDraftsShow(ctx, h.Client, &out, false, d.ID)
 	if err == nil || !strings.Contains(err.Error(), ops.ReasonDraftGone) {
 		t.Errorf("show after delete: err = %v, want a draft-gone refusal", err)
+	}
+}
+
+func TestDesignsDrafts_DeleteSavesAHistoryEntry(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir())
+	d, err := drafts.New(h.StateDir).Create("proj", "a-slug", "the idea")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	var out bytes.Buffer
+	if err := runDraftsDelete(ctx, h.Client, &out, false, d.ID); err != nil {
+		t.Fatal(err)
+	}
+	items, err := drafthistory.New(h.StateDir).List(drafthistory.DesignDrafts)
+	if err != nil || len(items) != 1 {
+		t.Fatalf("entries = %v, %v; want 1", items, err)
+	}
+	if e := items[0]; e.Text != "the idea" || e.Project != "proj" || e.Slug != "a-slug" {
+		t.Errorf("entry = %+v", e)
+	}
+	if err := runDraftsDelete(ctx, h.Client, &out, false, d.ID); err != nil {
+		t.Errorf("delete of an unknown id: %v", err)
+	}
+	if items, _ := drafthistory.New(h.StateDir).List(drafthistory.DesignDrafts); len(items) != 1 {
+		t.Errorf("entries after unknown-id delete = %d, want 1", len(items))
 	}
 }
 

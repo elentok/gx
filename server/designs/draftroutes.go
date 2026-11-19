@@ -309,7 +309,7 @@ func (s *Designs) draftDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := s.drafts.Delete(req.ID); err != nil {
+	if err := s.drafts.DeleteSaving(req.ID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

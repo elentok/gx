@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/server/drafthistory"
 	"github.com/elentok/gx/server/imagestore"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
@@ -41,8 +42,9 @@ var SlugRe = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 // lives in <id>/draft.json, with its images in <id>/images (written by the
 // image ops; the store reaches that folder by path only).
 type Store struct {
-	root string
-	now  func() time.Time
+	root    string
+	now     func() time.Time
+	history *drafthistory.Store
 	// locks maps a draft id to its *sync.Mutex.
 	locks sync.Map
 	// leases maps a draft id to when its page lease ends; guarded by leaseMu.
@@ -59,7 +61,7 @@ const (
 
 // New builds a Store rooted in stateDir.
 func New(stateDir string) *Store {
-	return &Store{root: filepath.Join(stateDir, rootDir), now: time.Now}
+	return &Store{root: filepath.Join(stateDir, rootDir), now: time.Now, history: drafthistory.New(stateDir)}
 }
 
 // ImagesDir is the folder a draft's images live in.
@@ -383,8 +385,60 @@ func (s *Store) Delete(id string) error {
 	}
 	unlock := s.lock(id)
 	defer unlock()
+	return s.removeLocked(id)
+}
+
+func (s *Store) removeLocked(id string) error {
 	s.dropLease(id)
 	return os.RemoveAll(s.dir(id))
+}
+
+// saveHistoryLocked copies the draft's current content to the Design drafts
+// history. A gone draft saves nothing. The history's own empty rule applies,
+// so a slug-only draft saves nothing too.
+func (s *Store) saveHistoryLocked(id string) error {
+	d, err := s.Get(id)
+	if errors.Is(err, ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var paths []string
+	for _, img := range d.Images {
+		if p, ok := imagestore.Find(s.ImagesDir(id), img); ok {
+			paths = append(paths, p)
+		}
+	}
+	_, err = s.history.Save(drafthistory.DesignDrafts,
+		drafthistory.Entry{Text: d.Idea, Project: d.Project, Slug: d.Slug}, paths)
+	return err
+}
+
+// SaveToHistory saves the draft's current content to the history without
+// deleting it (Start: a repeat Start is skipped by the history as a repeat).
+func (s *Store) SaveToHistory(id string) error {
+	if !idPattern.MatchString(id) {
+		return nil
+	}
+	unlock := s.lock(id)
+	defer unlock()
+	return s.saveHistoryLocked(id)
+}
+
+// DeleteSaving is the explicit delete: it saves the draft to the history, then
+// removes it, all under the draft's lock so the text cannot change in between.
+// A failed save refuses the delete and keeps the draft: the text must not be lost.
+func (s *Store) DeleteSaving(id string) error {
+	if !idPattern.MatchString(id) {
+		return nil
+	}
+	unlock := s.lock(id)
+	defer unlock()
+	if err := s.saveHistoryLocked(id); err != nil {
+		return fmt.Errorf("save draft to history: %w", err)
+	}
+	return s.removeLocked(id)
 }
 
 // dropLease forgets a deleted draft's lease so the map does not grow.

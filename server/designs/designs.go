@@ -495,6 +495,14 @@ func (s *Designs) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult,
 			}
 		}
 	}
+	// Saved before createMap: a Start that fails there keeps the draft and its
+	// entry, and the retry is a repeat the history skips. A failed save is
+	// logged and Start goes on.
+	if draftExisted {
+		if err := s.drafts.SaveToHistory(req.DraftID); err != nil {
+			s.log.Warn("save started draft to history", "draft", req.DraftID, "err", err)
+		}
+	}
 	if err := createMap(s.conversationsDir, dir, slug, idea, images); err != nil {
 		return wire.SessionResult{}, err
 	}
