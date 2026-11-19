@@ -36,6 +36,8 @@ export interface ComposerImages {
   remove: (key: string) => void
   /** Empties the draft once a send succeeded. */
   clear: () => void
+  /** Swaps the draft for these ready ids; the server already removed the old files, so none are deleted. */
+  replace: (ids: string[]) => void
 }
 
 /** Image draft of a session plus the uploads this tab runs. A pending entry this tab does not run reads as cut off. */
@@ -124,6 +126,16 @@ export function useComposerImages(sessionId: string): ComposerImages {
     touch()
   }, [update, touch])
 
+  const replace = useCallback(
+    (ids: string[]) => {
+      local.current.clear()
+      setRefused([])
+      update(() => ids.map((id) => ({ key: crypto.randomUUID(), id })))
+      touch()
+    },
+    [update, touch],
+  )
+
   const images: ComposerImage[] = draft.map((e) => {
     const mine = local.current.get(e.key)
     if (e.id)
@@ -157,5 +169,6 @@ export function useComposerImages(sessionId: string): ComposerImages {
     retry,
     remove,
     clear,
+    replace,
   }
 }

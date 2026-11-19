@@ -15,7 +15,9 @@ import type { SessionInfo } from "../generated/server"
 import { refusalText } from "../useWrite"
 import { useWide } from "../useWide"
 import { Button } from "../ui/button/Button"
+import { useSessionHistory, type HistoryCalls } from "../history/useSessionHistory"
 import { usePromptFocus } from "./promptFocus"
+import { offersHistory } from "./sessionWrites"
 
 // Under the Agents page's chat: the box is always open with Send beside it. A refusal shows inline only, as in the mock.
 export function AgentComposer({
@@ -27,6 +29,7 @@ export function AgentComposer({
   onStale,
   reason,
   onSent,
+  historyCalls,
 }: {
   session: SessionInfo
   lastMessage?: string
@@ -38,6 +41,8 @@ export function AgentComposer({
   reason?: string
   /** Called with the text once the server took the prompt, so the chat can show it before the transcript catches up. */
   onSent?: (text: string, images: string[]) => void
+  /** Tests inject fakes for the History list and pick calls. */
+  historyCalls?: HistoryCalls
 }) {
   const wide = useWide()
   const box = useRef<HTMLDivElement>(null)
@@ -54,6 +59,15 @@ export function AgentComposer({
   })
   // A Working session takes no prompt: Interrupt ends its turn and keeps the session.
   const working = session.status.state === "working" && !promptable(session)
+  const history = useSessionHistory({
+    enabled: offersHistory(session),
+    sessionId: session.id,
+    text,
+    setText,
+    images,
+    box,
+    calls: historyCalls,
+  })
   const canSend = images.canSend(text)
   const sendText = () =>
     send({ text, ...images.payload }, () => {
@@ -75,9 +89,11 @@ export function AgentComposer({
     ? { text: reason, red: false }
     : failure
       ? { text: failure, red: true }
-      : hint
-        ? { text: hint, red: false }
-        : undefined
+      : history.notice
+        ? { text: history.notice, red: false }
+        : hint
+          ? { text: hint, red: false }
+          : undefined
 
   return (
     <Box
@@ -96,6 +112,7 @@ export function AgentComposer({
       <ComposerImages
         state={images}
         gap="3"
+        afterAdd={history.button}
         send={
           working ? (
             <InterruptControl
@@ -131,6 +148,7 @@ export function AgentComposer({
           }}
         />
       </ComposerImages>
+      {history.popup}
     </Box>
   )
 }

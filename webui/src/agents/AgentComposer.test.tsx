@@ -9,7 +9,9 @@ import { typeInLargeEditor } from "../ui/expandable-text/testing"
 import { renderThemed } from "../ui/render"
 import { toaster } from "../ui/toaster"
 import { WideContext } from "../useWide"
+import type { HistoryCalls } from "../history/useSessionHistory"
 import { AgentComposer } from "./AgentComposer"
+import { offersHistory } from "./sessionWrites"
 
 afterEach(() => {
   cleanup()
@@ -38,6 +40,7 @@ function render(
     post?: PostPrompt
     reason?: string
     wide?: boolean
+    historyCalls?: HistoryCalls
   } = {},
 ) {
   return renderThemed(
@@ -49,6 +52,7 @@ function render(
             connected={over.connected ?? true}
             post={over.post}
             reason={over.reason}
+            historyCalls={over.historyCalls}
           />
         </WideContext.Provider>
       </MemoryRouter>
@@ -358,4 +362,77 @@ test("a text-only post has no images field", async () => {
   fireEvent.click(send())
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1))
   expect("images" in post.mock.calls[0][0]).toBe(false)
+})
+
+const chat = (over: Partial<SessionInfo> = {}): SessionInfo => ({
+  ...session(),
+  ticket: "",
+  ...over,
+})
+
+test.each([
+  ["chat", {}, true],
+  ["design", { flow: "design", design: true }, true],
+  ["fix agent", { fix_of: "gx:a/01" }, false],
+  ["project-level fix agent", { fix_of: "gx" }, false],
+  ["ticket agent", { ticket: "gx:a/01" }, false],
+  ["queue agent", { queue: "q" }, false],
+  ["triage flow", { flow: "triage" }, false],
+])("the History rule for a %s", (_name, over, offered) => {
+  expect(offersHistory(chat(over as Partial<SessionInfo>))).toBe(offered)
+})
+
+const entry = {
+  id: "e1",
+  text: "old msg",
+  slug: "",
+  project: "gx",
+  name: "",
+  composer: "chat",
+  savedAt: new Date().toISOString(),
+  imageCount: 0,
+  imagesDropped: false,
+  harness: "",
+  model: "",
+  effort: "",
+}
+const fakeCalls = () => ({
+  list: vi.fn(async () => ({ list: "sent", max: 50, entries: [entry] })),
+  pick: vi.fn(async () => ({ text: "old msg", images: ["n1"], notices: ["1 image missing"] })),
+})
+
+test("no History button on a ticket agent", () => {
+  render({})
+  expect(screen.queryByRole("button", { name: "History" })).toBeNull()
+})
+
+test("wide shows a labelled History button; narrow is icon only", () => {
+  render({ s: chat() })
+  expect(screen.getByRole("button", { name: "History" }).textContent).toContain("History")
+  cleanup()
+  render({ s: chat(), wide: false })
+  const b = screen.getByRole("button", { name: "History" })
+  expect(b.textContent).toBe("")
+  expect(b.getAttribute("title")).toBe("History")
+})
+
+test("a pick sends the unsent content, fills text and images, shows notices, focuses the box", async () => {
+  const c = fakeCalls()
+  render({ s: chat(), historyCalls: c as unknown as HistoryCalls })
+  fireEvent.change(box(), { target: { value: "unsent" } })
+  fireEvent.click(screen.getByRole("button", { name: "History" }))
+  fireEvent.click(await screen.findByText("old msg"))
+  await screen.findByText("1 image missing")
+  expect(c.list).toHaveBeenCalledWith({ list: "sent" })
+  expect(c.pick).toHaveBeenCalledWith({
+    session_id: "s-a",
+    entry_id: "e1",
+    text: "unsent",
+    images: [],
+  })
+  expect((box() as HTMLTextAreaElement).value).toBe("old msg")
+  expect(JSON.parse(localStorage.getItem("gx.draft.images.s-a") ?? "[]")[0].id).toBe("n1")
+  expect(localStorage.getItem("gx.draft.composer.s-a")).toContain("old msg")
+  expect(screen.queryByRole("option")).toBeNull()
+  expect(document.activeElement).toBe(box())
 })

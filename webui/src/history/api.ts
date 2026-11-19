@@ -1,5 +1,7 @@
 import { postJson } from "../design/open"
 import type {
+  ComposerPickRequest,
+  ComposerPickResult,
   DesignDraftPickResult,
   DraftHistoryListRequest,
   DraftHistoryListResult,
@@ -19,3 +21,7 @@ export const postHistoryList: ListHistory =
 export const postDesignPick: PickDesignHistory = postJson<DesignDraftPickResult>(
   "/v1/designs/drafts/pick-history",
 )
+
+/** Puts a Sent messages entry into a session's composer; the call carries the composer's unsent content. */
+export const postComposerPick: (body: ComposerPickRequest) => Promise<ComposerPickResult> =
+  postJson<ComposerPickResult>("/v1/sessions/pick-history")

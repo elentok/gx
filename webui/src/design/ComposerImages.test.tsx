@@ -34,6 +34,7 @@ function state(images: ComposerImage[], over: Partial<State> = {}): State {
     retry: vi.fn(),
     remove: vi.fn(),
     clear: vi.fn(),
+    replace: vi.fn(),
     ...over,
   }
 }
