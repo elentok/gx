@@ -69,7 +69,10 @@ import (
 // Chat draft page flow (+1): the Start round trip to a new chat on the draft's exact model and effort, the redirect and
 // the failed Start with its leftover worktree need a real server, the fixture's fake agents and a real page;
 // DraftPage.test.tsx (vitest) and the Go Start tests cover each rule alone.
-const maxFlows = 154
+//
+// Draft history popup flow (+1): the popup over the seeded lists needs a real server round trip, real layout at 1280 and 390px,
+// real key handling (Leader then h) and a reload; the vitest and Go tests cover each rule alone.
+const maxFlows = 155
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
