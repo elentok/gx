@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/drafthistory"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/gxfixture/catalog"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
@@ -116,16 +117,12 @@ func TestDraftHistoryScenario_StartsWithPagesAndIdleSessions(t *testing.T) {
 	}
 	var sessions []wire.SessionInfo
 	// The Queue agent is started by the queue loop, so it can show up a moment after start.
-	deadline := time.Now().Add(30 * time.Second)
-	for {
+	testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
 		if err := json.Unmarshal([]byte(r.Gx(t, "agents", "list", "--json")), &sessions); err != nil {
 			t.Fatal(err)
 		}
-		if slices.ContainsFunc(sessions, func(s wire.SessionInfo) bool { return s.Queue }) || time.Now().After(deadline) {
-			break
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
+		return slices.ContainsFunc(sessions, func(s wire.SessionInfo) bool { return s.Queue })
+	})
 	var plainClaude, plainCodex, designs, fixes, queues int
 	for _, s := range sessions {
 		switch {

@@ -80,12 +80,12 @@ func Routes(get func() *Designs) []wire.Route {
 		{
 			Pattern: "GET /v1/designs/images",
 			Web:     wire.WebRead,
-			Handler: func(w http.ResponseWriter, r *http.Request) { get().mapImageList(w, r) },
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().mapImages(w, r, false) },
 		},
 		{
 			Pattern: "GET /v1/designs/images/read",
 			Web:     wire.WebRead,
-			Handler: func(w http.ResponseWriter, r *http.Request) { get().mapImageServe(w, r) },
+			Handler: func(w http.ResponseWriter, r *http.Request) { get().mapImages(w, r, true) },
 		},
 		{
 			Pattern: "POST /v1/designs/drafts/images/delete",

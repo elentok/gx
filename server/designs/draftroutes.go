@@ -237,37 +237,28 @@ func (s *Designs) draftImageServe(w http.ResponseWriter, r *http.Request) {
 	imagestore.Serve(w, r, s.drafts.ImagesDir(id), r.URL.Query().Get("image"))
 }
 
-// mapImagesDir is the images/ folder of the map epic named by ?epic=project:epic.
-func (s *Designs) mapImagesDir(r *http.Request) (string, bool) {
-	project, epic, ok := strings.Cut(r.URL.Query().Get("epic"), ":")
-	if !ok || project == "" || epic == "" || strings.ContainsAny(epic, `/\`) || epic == ".." {
-		return "", false
+// mapImages serves the images/ folder of the map epic named by
+// ?epic=project:epic. With serve false it is GET /v1/designs/images: the ids
+// and file names, where anything unusable lists nothing. With serve true it is
+// GET /v1/designs/images/read?...&id=<image>.
+func (s *Designs) mapImages(w http.ResponseWriter, r *http.Request, serve bool) {
+	folder, ok := "", false
+	project, epic, found := strings.Cut(r.URL.Query().Get("epic"), ":")
+	if found && project != "" && epic != "" && !strings.ContainsAny(epic, `/\`) && epic != ".." {
+		if dir, reason, _ := s.mapEpicDir(project, epic); reason == "" {
+			folder, ok = filepath.Join(dir, epic, "images"), true
+		}
 	}
-	dir, reason, _ := s.mapEpicDir(project, epic)
-	if reason != "" {
-		return "", false
-	}
-	return filepath.Join(dir, epic, "images"), true
-}
-
-// mapImageList serves GET /v1/designs/images?epic=project:epic: the ids and
-// file names in the map's images/ folder. Anything unusable lists nothing.
-func (s *Designs) mapImageList(w http.ResponseWriter, r *http.Request) {
-	list := []wire.SessionImageResult{}
-	if folder, ok := s.mapImagesDir(r); ok {
-		list = imagestore.List(folder)
-	}
-	wire.WriteJSON(w, list)
-}
-
-// mapImageServe serves GET /v1/designs/images/read?epic=project:epic&id=<image>.
-func (s *Designs) mapImageServe(w http.ResponseWriter, r *http.Request) {
-	folder, ok := s.mapImagesDir(r)
-	if !ok {
+	switch {
+	case serve && !ok:
 		http.NotFound(w, r)
-		return
+	case serve:
+		imagestore.Serve(w, r, folder, r.URL.Query().Get("id"))
+	case ok:
+		wire.WriteJSON(w, imagestore.List(folder))
+	default:
+		wire.WriteJSON(w, []wire.SessionImageResult{})
 	}
-	imagestore.Serve(w, r, folder, r.URL.Query().Get("id"))
 }
 
 // draftRemoveIfEmpty serves POST /v1/designs/drafts/remove-if-empty.
