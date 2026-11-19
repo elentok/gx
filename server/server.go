@@ -522,7 +522,7 @@ func New(cfg Config) (*Server, error) {
 		},
 		Log: log, Events: events, SessionChat: s.sessionChat, Settings: &s.settings,
 		Projects: s.projects, BadRounds: s.recovery, Held: s.workspaces.IsHeld, Queue: s.queue,
-		OnTriageIdle: s.triage.StopFinished,
+		OnTriageIdle: s.triage.StopFinished, StateDir: cfg.StateDir,
 	})
 	s.sessions = newManager(s)
 	s.chatDrafts = newChatDrafts(s)

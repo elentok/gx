@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/drafthistory"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
@@ -101,6 +102,8 @@ type Deps struct {
 	Queue EpicQueue
 	// OnTriageIdle runs when a Triage session of a project goes idle. Nil is none.
 	OnTriageIdle func(project string)
+	// StateDir is the gx state dir the Draft history lives in.
+	StateDir string
 }
 
 // Prompt holds the auto-advance countdowns and the turn settling of the
@@ -122,6 +125,7 @@ type Prompt struct {
 	held         func(key string) bool
 	queue        EpicQueue
 	onTriageIdle func(project string)
+	history      *drafthistory.Store
 	// sessions comes later than Prompt: the Manager calls the Prompter back, so
 	// it is built after Prompt and handed over by GiveSessions.
 	sessions *sessions.Manager
@@ -145,7 +149,7 @@ func New(d Deps) *Prompt {
 	p := &Prompt{
 		cfg: d.Cfg, log: d.Log, events: d.Events, sessionChat: d.SessionChat,
 		settings: d.Settings, projects: d.Projects, badRounds: d.BadRounds, held: d.Held, queue: d.Queue,
-		onTriageIdle: d.OnTriageIdle,
+		onTriageIdle: d.OnTriageIdle, history: drafthistory.New(d.StateDir),
 	}
 	p.autoQueuer = &autoQueuer{p}
 	p.imageStore = &imageStore{p}

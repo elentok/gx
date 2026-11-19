@@ -74,7 +74,7 @@ func (p *Prompt) answerSession(req wire.SessionAnswerRequest, source string) (wi
 		ID: req.ID, Text: roundPrompt(card.Questions, req.Answers, req.Note),
 		LastMessage: req.LastMessage, Images: req.Images, Huh: huhOf(card.Questions, req.Answers),
 	}
-	return p.promptSession(prompt, source)
+	return p.promptSession(prompt, source, &req.Note)
 }
 
 // answerTicketAsk answers a ticket-ask card through the ticket answer code. A
