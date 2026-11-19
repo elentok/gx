@@ -27,6 +27,8 @@ export interface ChatDraftPageActions {
   /** True when the brief is blank. */
   isEmpty: () => boolean
   focusBrief: () => void
+  /** Opens the History popup. */
+  openHistory: () => void
 }
 
 let currentChat: ChatDraftPageActions | null = null

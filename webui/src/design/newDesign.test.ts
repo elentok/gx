@@ -125,7 +125,7 @@ describe("startNewChatDraft", () => {
   test("on an empty chat draft page it focuses the brief and creates nothing", async () => {
     mountAt("/chat-drafts/c1")
     const focusBrief = vi.fn()
-    const off = registerChatDraftPage({ isEmpty: () => true, focusBrief })
+    const off = registerChatDraftPage({ isEmpty: () => true, focusBrief, openHistory: vi.fn() })
     await startNewChatDraft(chatClient())
     off()
     expect(focusBrief).toHaveBeenCalledTimes(1)
@@ -135,7 +135,11 @@ describe("startNewChatDraft", () => {
 
   test("on a chat draft page with a brief it creates a draft", async () => {
     mountAt("/chat-drafts/c1")
-    const off = registerChatDraftPage({ isEmpty: () => false, focusBrief: vi.fn() })
+    const off = registerChatDraftPage({
+      isEmpty: () => false,
+      focusBrief: vi.fn(),
+      openHistory: vi.fn(),
+    })
     await startNewChatDraft(chatClient())
     off()
     expect(chatCreate).toHaveBeenCalledTimes(1)

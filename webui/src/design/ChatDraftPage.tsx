@@ -15,6 +15,9 @@ import { usePromptFocus } from "../agents/promptFocus"
 import { registerChatDraftPage } from "../shell/draftPageActions"
 import { PROMPT_BOX_SELECTOR } from "../ui/expandable-text/look"
 import type { ChatDraft } from "../generated/server"
+import { ReasonHistoryEntryGone, type DraftHistoryEntry } from "../generated/ops"
+import { HistoryButton, HistoryHost } from "../history/HistoryButton"
+import { postChatPick, type ListHistory, type PickChatHistory } from "../history/api"
 import { agentPath } from "../hrefs"
 import { DetailPage } from "../page/DetailPage"
 import { StateHeader } from "../page/StateHeader"
@@ -48,6 +51,8 @@ interface PageProps {
   fetchTrees?: FetchWorktrees
   /** Replaces the launch-default fetch, for tests. */
   fetchDefaults?: FetchDefaults
+  pickHistory?: PickChatHistory
+  listHistory?: ListHistory
 }
 
 /** The chat draft page: the brief and launch settings of a chat that does not exist yet, autosaved until Remove. */
@@ -55,6 +60,8 @@ export function ChatDraftPage({
   drafts = realChatDrafts,
   fetchTrees,
   fetchDefaults,
+  pickHistory,
+  listHistory,
   ...props
 }: PageProps) {
   const params = useParams()
@@ -105,6 +112,8 @@ export function ChatDraftPage({
       initial={loaded}
       fetchTrees={fetchTrees}
       fetchDefaults={fetchDefaults}
+      pickHistory={pickHistory}
+      listHistory={listHistory}
     />
   )
 }
@@ -116,11 +125,15 @@ function ChatDraftForm({
   initial,
   fetchTrees,
   fetchDefaults,
+  pickHistory = postChatPick,
+  listHistory,
 }: {
   drafts: ChatDraftsClient
   initial: ChatDraft
   fetchTrees?: FetchWorktrees
   fetchDefaults?: FetchDefaults
+  pickHistory?: PickChatHistory
+  listHistory?: ListHistory
 }) {
   const navigate = useNavigate()
   const leaveGone = useLeaveGone(agentPath)
@@ -133,6 +146,7 @@ function ChatDraftForm({
     status,
     banner,
     bannerActions,
+    pickHistory: pick,
     remove,
     start,
     starting,
@@ -165,6 +179,8 @@ function ChatDraftForm({
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
   const [confirming, setConfirming] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [notices, setNotices] = useState<string[]>([])
   // The mascot toggle leads this header, so the shell drops its floating one.
   useClaimHeader()
 
@@ -174,16 +190,32 @@ function ChatDraftForm({
   const focusBrief = () => formRef.current?.querySelector<HTMLElement>(PROMPT_BOX_SELECTOR)?.focus()
   // New chat draft opens this page asking for the brief's focus, and on an empty page it asks again.
   usePromptFocus(formRef)
-  const pageState = useRef({ empty: !brief.trim(), focusBrief })
-  pageState.current = { empty: !brief.trim(), focusBrief }
+  const openHistory = () => setHistoryOpen(true)
+  const pageState = useRef({ empty: !brief.trim(), focusBrief, openHistory })
+  pageState.current = { empty: !brief.trim(), focusBrief, openHistory }
   useEffect(
     () =>
       registerChatDraftPage({
         isEmpty: () => pageState.current.empty,
         focusBrief: () => pageState.current.focusBrief(),
+        openHistory: () => pageState.current.openHistory(),
       }),
     [],
   )
+
+  const restore = async (entry: DraftHistoryEntry) => {
+    const res = await pick((revision) =>
+      pickHistory({ entry_id: entry.id, draft_id: initial.id, revision }),
+    )
+    if (!res) return
+    if (!res.refused) {
+      imgs.reset(res.draft?.images ?? [])
+      setNotices(res.notices)
+    }
+    if (res.refused && res.reason === ReasonHistoryEntryGone) return
+    setHistoryOpen(false)
+    if (!res.refused) focusBrief()
+  }
 
   const removeNow = () => {
     remove()
@@ -252,6 +284,7 @@ function ChatDraftForm({
           >
             <LuPencil size={14} />
           </chakra.button>
+          <HistoryButton onClick={openHistory} />
           {status !== "none" && (
             <Text fontSize="xs" color="text.dim" flexShrink="0" whiteSpace="nowrap">
               {status === "saving" ? "Saving..." : status === "unsaved" ? "Not saved" : "Saved"}
@@ -264,7 +297,21 @@ function ChatDraftForm({
           worktreePath={facts.worktree_path}
           onChange={editSettings}
         />
+        {notices.map((n) => (
+          <Text key={n} fontSize="sm" color="text.dim" pt="2" flexShrink="0">
+            {n}
+          </Text>
+        ))}
         {banner && <DraftBanner actions={bannerActions} />}
+        {historyOpen && (
+          <HistoryHost
+            list="chat-drafts"
+            pending={status === "saving" || imgs.uploading > 0}
+            listHistory={listHistory}
+            onRestore={restore}
+            onClose={() => setHistoryOpen(false)}
+          />
+        )}
         <Box
           flex="1"
           minH="0"

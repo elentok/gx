@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
-import { afterEach, expect, test, vi } from "vitest"
+import { afterEach, describe, expect, test, vi } from "vitest"
 import { MemoryRouter, Route, Routes, useLocation } from "react-router"
 import { ConnectionContext, type Connection } from "../connection"
 import {
@@ -14,6 +14,8 @@ import { ChatDraftPage } from "./ChatDraftPage"
 import { chatDraftImages } from "./draftImageApi"
 import type { LaunchDefaults } from "./chatDraftDefaults"
 import type { ChatDraftOutcome, ChatDraftsClient, ChatStartOutcome } from "./chatDrafts"
+import type { ChatDraftPickResult, DraftHistoryEntry } from "../generated/ops"
+import type { ListHistory, PickChatHistory } from "../history/api"
 
 afterEach(() => {
   cleanup()
@@ -84,6 +86,7 @@ async function mount(
   viMode = false,
   defaults: LaunchDefaults = { model: "", effort: "" },
   wide = true,
+  history: { pickHistory?: PickChatHistory; listHistory?: ListHistory } = {},
 ) {
   const listeners = new Set<(address: string, type: string) => void>()
   const connState = { snapshot: { sessions: [], vi_mode: viMode } }
@@ -112,6 +115,7 @@ async function mount(
                     drafts={fake.client}
                     fetchTrees={trees}
                     fetchDefaults={async () => defaults}
+                    {...history}
                   />
                 }
               />
@@ -574,5 +578,121 @@ test("on a phone one pill sums up the settings, and its sheet changes them", asy
     const dialog = screen.queryByRole("dialog", { name: "Chat settings" })
     if (dialog) fireEvent.keyDown(dialog, { key: "Escape" })
     expect(screen.queryByRole("combobox", { name: "Effort" })).toBeNull()
+  })
+})
+
+describe("History", () => {
+  const entry: DraftHistoryEntry = {
+    id: "e1",
+    savedAt: new Date().toISOString(),
+    text: "Restored brief",
+    imageCount: 1,
+    imagesDropped: false,
+    project: "other",
+    slug: "",
+    name: "restored-name",
+    harness: "codex",
+    model: "gpt",
+    effort: "low",
+    folder: "source",
+    composer: "",
+  }
+  const listHistory = vi.fn<ListHistory>(async () => ({
+    list: "chat-drafts",
+    max: 50,
+    entries: [entry],
+  }))
+  // The server keeps the page's settings, so the entry's other values must not show.
+  const pickResult = (): ChatDraftPickResult => ({
+    notices: ["1 image missing"],
+    draft: {
+      ...fakeDrafts().stored,
+      name: "restored-name",
+      brief: "Restored brief",
+      revision: 10,
+      images: ["img1"],
+      label: "restored-name",
+    },
+  })
+  const history = () => screen.getByRole("button", { name: "History" })
+  const restore = () => screen.getByRole("button", { name: "Restore" }) as HTMLButtonElement
+  // The phone popup picks in two steps: tap a row, then Restore.
+  const openPopup = async () => {
+    await act(async () => void fireEvent.click(history()))
+    await act(async () => void fireEvent.click(screen.getByText("Restored brief")))
+  }
+  const mountPhone = (fake: ReturnType<typeof fakeDrafts>, pickHistory?: PickChatHistory) =>
+    mount(fake, false, undefined, false, { listHistory, pickHistory })
+
+  test("a wide page shows the History text and a phone shows the icon only", async () => {
+    await mount(fakeDrafts())
+    expect(history().textContent).toBe("History")
+    cleanup()
+    await mountPhone(fakeDrafts())
+    expect(history().textContent).toBe("")
+    expect(history().getAttribute("aria-label")).toBe("History")
+  })
+
+  test("the button opens the Chat drafts list only", async () => {
+    vi.useFakeTimers()
+    await mount(fakeDrafts(), false, undefined, true, { listHistory })
+    await act(async () => void fireEvent.click(history()))
+    expect(listHistory).toHaveBeenCalledWith({ list: "chat-drafts" })
+    expect(screen.getByText("Chat drafts")).toBeTruthy()
+    expect(screen.getByText("Restored brief")).toBeTruthy()
+  })
+
+  test("a pick sends the revision, adopts brief, images and name, and leaves the page saved", async () => {
+    vi.useFakeTimers()
+    const fake = fakeDrafts()
+    const pickHistory = vi.fn<PickChatHistory>(async () => pickResult())
+    await mountPhone(fake, pickHistory)
+    await openPopup()
+    await act(async () => void fireEvent.click(restore()))
+    expect(pickHistory).toHaveBeenCalledWith({ entry_id: "e1", draft_id: "c1", revision: 3 })
+    expect(brief().value).toBe("Restored brief")
+    expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe(
+      "restored-name",
+    )
+    expect(screen.getAllByRole("button", { name: "Remove image" })).toHaveLength(1)
+    expect(screen.getByText("1 image missing")).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "Restore" })).toBeNull()
+    expect(document.activeElement).toBe(brief())
+    expect(screen.getByText("Saved")).toBeTruthy()
+    await wait(800)
+    expect(fake.save).not.toHaveBeenCalled()
+    typeBrief("more")
+    await wait(800)
+    expect(fake.save).toHaveBeenCalledWith({ id: "c1", brief: "more", revision: 10 })
+  })
+
+  test("Restore stays disabled while a save is pending and enables once it ends", async () => {
+    vi.useFakeTimers()
+    const pickHistory = vi.fn<PickChatHistory>(async () => pickResult())
+    await mountPhone(fakeDrafts(), pickHistory)
+    typeBrief("typing")
+    await openPopup()
+    expect(restore().disabled).toBe(true)
+    expect(screen.getByText("Saving…")).toBeTruthy()
+    await wait(800)
+    expect(restore().disabled).toBe(false)
+    expect(pickHistory).not.toHaveBeenCalled()
+  })
+
+  test("a revision conflict closes the popup and raises the banner, brief unchanged", async () => {
+    vi.useFakeTimers()
+    const pickHistory = vi.fn<PickChatHistory>(async () => ({
+      refused: true,
+      reason: "revision-conflict",
+      notices: [],
+    }))
+    await mountPhone(fakeDrafts(), pickHistory)
+    await openPopup()
+    await act(async () => void fireEvent.click(restore()))
+    expect(screen.queryByRole("button", { name: "Restore" })).toBeNull()
+    expect(screen.getByText("This draft changed on another device.")).toBeTruthy()
+    for (const name of ["Load theirs", "Keep mine"])
+      expect(screen.getByRole("button", { name })).toBeTruthy()
+    expect(brief().value).toBe("Split the auth work out.")
   })
 })
