@@ -396,13 +396,21 @@ func (s *Store) removeLocked(id string) error {
 // saveHistoryLocked copies the draft's current content to the Design drafts
 // history. A gone draft saves nothing. The history's own empty rule applies,
 // so a slug-only draft saves nothing too.
-func (s *Store) saveHistoryLocked(id string) error {
+func (s *Store) saveHistoryLocked(id string) error { return s.saveHistoryAsLocked(id, nil) }
+
+// saveHistoryAsLocked is saveHistoryLocked with the slug and idea replaced by
+// over (slug, idea) when it is not nil: the project and images still come from
+// the stored draft.
+func (s *Store) saveHistoryAsLocked(id string, over *[2]string) error {
 	d, err := s.Get(id)
 	if errors.Is(err, ErrNotFound) {
 		return nil
 	}
 	if err != nil {
 		return err
+	}
+	if over != nil {
+		d.Slug, d.Idea = over[0], over[1]
 	}
 	var paths []string
 	for _, img := range d.Images {
@@ -424,6 +432,17 @@ func (s *Store) SaveToHistory(id string) error {
 	unlock := s.lock(id)
 	defer unlock()
 	return s.saveHistoryLocked(id)
+}
+
+// SaveToHistoryAs is SaveToHistory with the slug and idea a Start request sent,
+// which autosave may not have stored yet.
+func (s *Store) SaveToHistoryAs(id, slug, idea string) error {
+	if !idPattern.MatchString(id) {
+		return nil
+	}
+	unlock := s.lock(id)
+	defer unlock()
+	return s.saveHistoryAsLocked(id, &[2]string{slug, idea})
 }
 
 // DeleteSaving is the explicit delete: it saves the draft to the history, then

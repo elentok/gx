@@ -499,7 +499,7 @@ func (s *Designs) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult,
 	// entry, and the retry is a repeat the history skips. A failed save is
 	// logged and Start goes on.
 	if draftExisted {
-		if err := s.drafts.SaveToHistory(req.DraftID); err != nil {
+		if err := s.drafts.SaveToHistoryAs(req.DraftID, slug, idea); err != nil {
 			s.log.Warn("save started draft to history", "draft", req.DraftID, "err", err)
 		}
 	}

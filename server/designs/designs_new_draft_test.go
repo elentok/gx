@@ -64,6 +64,22 @@ func TestDesignsOpenNew_StartSavesOneHistoryEntry(t *testing.T) {
 	}
 }
 
+func TestDesignsOpenNew_StartSavesTheRequestsSlugAndIdeaNotTheStoredDraft(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	d := f.seedDraft(t, "proj", "old-slug", "old text")
+	if res := f.openFromDraft(t, "fresh-idea", "newer text", d.ID); res.Refused {
+		t.Fatalf("open = %+v", res)
+	}
+	items := f.designHistory(t)
+	if len(items) != 1 {
+		t.Fatalf("entries = %d, want 1", len(items))
+	}
+	if e := items[0]; e.Text != "newer text" || e.Slug != "fresh-idea" || e.Project != "proj" {
+		t.Errorf("entry = %+v", e)
+	}
+}
+
 func TestDesignsOpenNew_GoneDraftSavesNothingAndStartGoesOn(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
