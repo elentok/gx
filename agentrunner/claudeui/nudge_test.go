@@ -453,3 +453,106 @@ func TestPromptWithNudge_Settle_LateScreenChange_PressesEnterAtTheNextLook(t *te
 	}
 	assertCalls(t, f.calls, "submit:hi", "wait", "wait", "enter", "wait")
 }
+
+// inputPrompter adds a scripted input check to fakePrompter: each InputEmpty
+// answers the next entry of empties (the last one repeats).
+type inputPrompter struct {
+	*fakePrompter
+	empties []bool
+}
+
+func (f *inputPrompter) InputEmpty() (bool, bool, error) {
+	e := f.empties[0]
+	if len(f.empties) > 1 {
+		f.empties = f.empties[1:]
+	}
+	return e, true, nil
+}
+
+// Claude swallows two Enters in a row (the first strips invisible chars): the
+// nudge looks at the input after each settle and presses again, not after the
+// whole grace.
+func TestPromptWithNudge_Settle_SwallowedNudgeEnter_PressesAgainAtTheNextLook(t *testing.T) {
+	f := &inputPrompter{
+		fakePrompter: &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", "typed hi"}},
+		empties:      []bool{false},
+	}
+	caps := DefaultNudgeCaps
+	caps.Settle = 3 * time.Second
+	if err := PromptWithNudge(f, "hi", caps, time.Time{}, f.now, f.report); err != nil {
+		t.Fatalf("PromptWithNudge() error = %v", err)
+	}
+	assertCalls(t, f.calls, "submit:hi", "wait", "enter", "wait", "enter", "wait")
+	if f.timeouts[2] != caps.Settle {
+		t.Fatalf("wait after the second Enter = %v, want %v", f.timeouts[3], caps.Settle)
+	}
+	assertDecisions(t, f.decisions, NudgeEnter, NudgeEnter)
+}
+
+// An emptied input means the Enter landed and the turn is only slow to start:
+// no more Enters, and the rest of the grace is waited out.
+func TestPromptWithNudge_Settle_EmptyInputAfterNudgeEnter_WaitsOutGrace(t *testing.T) {
+	f := &inputPrompter{
+		fakePrompter: &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", "typed"}},
+		empties:      []bool{true},
+	}
+	caps := DefaultNudgeCaps
+	caps.Settle = 3 * time.Second
+	if err := PromptWithNudge(f, "hi", caps, time.Time{}, f.now, f.report); err != nil {
+		t.Fatalf("PromptWithNudge() error = %v", err)
+	}
+	assertCalls(t, f.calls, "submit:hi", "wait", "enter", "wait", "wait")
+	if got := f.timeouts[2]; got != caps.Grace-caps.Settle {
+		t.Fatalf("last wait = %v, want %v", got, caps.Grace-caps.Settle)
+	}
+}
+
+func TestPromptWithNudge_Settle_NudgeEnterCap(t *testing.T) {
+	f := &inputPrompter{
+		fakePrompter: &fakePrompter{screens: []string{"before", "typed hi"}},
+		empties:      []bool{false},
+	}
+	caps := DefaultNudgeCaps
+	caps.Settle = 3 * time.Second
+	caps.Nudges = 1
+	err := PromptWithNudge(f, "hi", caps, time.Time{}, f.now, f.report)
+	if !errors.Is(err, ErrStartTimeout) {
+		t.Fatalf("PromptWithNudge() error = %v, want ErrStartTimeout", err)
+	}
+	enters := 0
+	for _, c := range f.calls {
+		if c == "enter" {
+			enters++
+		}
+	}
+	if enters != settleEnterCap {
+		t.Fatalf("enters = %d, want %d", enters, settleEnterCap)
+	}
+}
+
+// A draft that is not gx's text may be a person's: no extra Enter.
+func TestPromptWithNudge_Settle_ForeignDraft_NoExtraEnter(t *testing.T) {
+	f := &inputPrompter{
+		fakePrompter: &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", "someone else's draft"}},
+		empties:      []bool{false},
+	}
+	caps := DefaultNudgeCaps
+	caps.Settle = 3 * time.Second
+	if err := PromptWithNudge(f, "hi", caps, time.Time{}, f.now, f.report); err != nil {
+		t.Fatalf("PromptWithNudge() error = %v", err)
+	}
+	assertCalls(t, f.calls, "submit:hi", "wait", "enter", "wait", "wait")
+}
+
+func TestPromptWithNudge_Settle_PastePlaceholder_CountsAsOurs(t *testing.T) {
+	f := &inputPrompter{
+		fakePrompter: &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", "> [Pasted text #1 +9 lines]"}},
+		empties:      []bool{false},
+	}
+	caps := DefaultNudgeCaps
+	caps.Settle = 3 * time.Second
+	if err := PromptWithNudge(f, "a long\nprompt", caps, time.Time{}, f.now, f.report); err != nil {
+		t.Fatalf("PromptWithNudge() error = %v", err)
+	}
+	assertCalls(t, f.calls, "submit:a long\nprompt", "wait", "enter", "wait", "enter", "wait")
+}

@@ -81,7 +81,7 @@ const typedTextMax = 512
 // pasteSettle is how long TypeText waits after a paste. An Enter that lands
 // while claude is still ingesting the paste is read as part of it (a newline,
 // not a submit), so the caller's Enter needs this gap.
-var pasteSettle = 300 * time.Millisecond
+var pasteSettle = 500 * time.Millisecond
 
 const (
 	holderIOTimeout = 5 * time.Second

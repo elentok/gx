@@ -86,6 +86,17 @@ func screenTail(screen string) string {
 	return strings.Join(lines[max(0, len(lines)-screenTailLines):], "\n")
 }
 
+// pastePlaceholder is how claude shows a long paste in its input: the text
+// itself is not on screen.
+const pastePlaceholder = "[Pasted text"
+
+// draftIsOurs reports whether the input shows gx's own text: its start, or
+// claude's placeholder for a long paste. A draft that is neither may be a
+// person's, which an extra Enter would submit.
+func draftIsOurs(screen, text string) bool {
+	return holdsText(screen, text) || strings.Contains(screen, pastePlaceholder)
+}
+
 // holdsText reports whether screen still shows the start of text, which
 // gx typed into the input.
 func holdsText(screen, text string) bool {
@@ -222,6 +233,49 @@ func ClearInput(p Prompter, text string) error {
 	return clearWhole(p, text)
 }
 
+// settleEnterCap caps the Enters one nudge presses while the input still holds
+// the text. Claude can swallow two in a row: the first strips a paste's
+// invisible characters ("Removed 1 invisible char") and holds it for review.
+const settleEnterCap = 3
+
+// nudgeEnter presses Enter, then waits for the turn to start. With settle set
+// and a Prompter that can read the input, it looks again after each settle: an
+// input still holding the text means the Enter was swallowed, so it presses
+// another, up to settleEnterCap, before it waits out the rest of timeout. It
+// presses again only when the draft is gx's own text.
+func nudgeEnter(p Prompter, text string, settle, timeout time.Duration, report func(NudgeDecision)) (bool, error) {
+	if err := p.SendEnter(); err != nil {
+		return false, fmt.Errorf("nudging stuck submission: %w", err)
+	}
+	checker, checks := p.(InputChecker)
+	if settle <= 0 || settle >= timeout || !checks {
+		return p.WaitStart(timeout)
+	}
+	waited := time.Duration(0)
+	for presses := 1; ; presses++ {
+		started, err := p.WaitStart(settle)
+		waited += settle
+		if err != nil || started {
+			return started, err
+		}
+		empty, known, err := checker.InputEmpty()
+		if err != nil || !known || empty || presses >= settleEnterCap || waited >= timeout {
+			break
+		}
+		if screen, readErr := p.Screen(); readErr != nil || !draftIsOurs(screen, text) {
+			break
+		}
+		report(NudgeEnter)
+		if err := p.SendEnter(); err != nil {
+			return false, fmt.Errorf("nudging stuck submission: %w", err)
+		}
+	}
+	if waited >= timeout {
+		return false, nil
+	}
+	return p.WaitStart(timeout - waited)
+}
+
 // PromptWithNudge submits text and waits for the turn to start, working
 // around a submission that lands without being sent (seen in production).
 // After each attempt that doesn't start, it compares the screen with the one
@@ -314,9 +368,10 @@ func PromptWithNudge(p Prompter, text string, caps NudgeCaps, deadline time.Time
 			}
 		} else {
 			report(NudgeEnter)
-			if err = p.SendEnter(); err != nil {
-				return fmt.Errorf("nudging stuck submission: %w", err)
+			if started, err = nudgeEnter(p, text, caps.Settle, timeout, report); err != nil {
+				return err
 			}
+			continue
 		}
 		started, err = p.WaitStart(timeout)
 	}

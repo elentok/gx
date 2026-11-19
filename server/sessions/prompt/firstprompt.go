@@ -466,6 +466,12 @@ func (p *holderPrompter) Submit(text string) error {
 		return err
 	}
 	p.waitImageChips(len(p.images.paths))
+	if clean, n := stripInvisible(text); n > 0 {
+		if p.io.Log != nil {
+			p.io.Log.Info("stripped invisible chars before typing", "count", n)
+		}
+		text = clean
+	}
 	text = p.images.withText(text)
 	if err := p.c.TypeTextBy(text, p.typing.PastesText(text)); err != nil {
 		return err
