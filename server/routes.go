@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/designs"
 	"github.com/elentok/gx/server/diff"
 	"github.com/elentok/gx/server/disk"
+	"github.com/elentok/gx/server/drafthistory"
 	"github.com/elentok/gx/server/epics"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/health"
@@ -83,6 +84,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		epics.Routes(func() *epics.Epics { return s.epics }),
 		designs.Routes(func() *designs.Designs { return s.designs }),
 		chatdrafts.Routes(func() *chatdrafts.ChatDrafts { return s.chatDrafts }),
+		drafthistory.Routes(func() *drafthistory.Store { return s.draftHistory }),
 		triage.Routes(func() *triage.Triage { return s.triage }),
 		sessprompt.Routes(func() *sessprompt.Prompt { return s.prompt }),
 		merge.Routes(func() *merge.Merger { return s.merger }, func() *merge.Landing { return s.landing }),

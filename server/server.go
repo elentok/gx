@@ -39,6 +39,7 @@ import (
 	"github.com/elentok/gx/server/devvite"
 	"github.com/elentok/gx/server/diff"
 	"github.com/elentok/gx/server/disk"
+	"github.com/elentok/gx/server/drafthistory"
 	"github.com/elentok/gx/server/epics"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/health"
@@ -173,6 +174,8 @@ type Server struct {
 	designs *designs.Designs
 	// chatDrafts serves the chat draft routes; see chatdraftsdeps.go.
 	chatDrafts *chatdrafts.ChatDrafts
+	// draftHistory serves the history list route; see drafthistorydeps.go.
+	draftHistory *drafthistory.Store
 	// triage publishes triage-changed for the live Triage records.
 	triage *triage.Triage
 	focus  *sessions.FocusReports
@@ -526,6 +529,7 @@ func New(cfg Config) (*Server, error) {
 	})
 	s.sessions = newManager(s)
 	s.chatDrafts = newChatDrafts(s)
+	s.draftHistory = newDraftHistory(s)
 	s.archive = newArchive(s)
 	s.sessions.Maps.OnDesignStart = s.clearHold
 	s.sessions.OnSessionGone = func(id string) {

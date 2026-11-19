@@ -365,6 +365,47 @@ export interface DesignDraftSaveResult {
 }
 
 //////////
+// source: drafthistory.go
+
+/**
+ * DraftHistoryListRequest names one of the three lists: "chat-drafts",
+ * "design-drafts" or "sent".
+ */
+export interface DraftHistoryListRequest {
+  list: string;
+}
+/**
+ * DraftHistoryEntry is one popup row. Fields that do not apply to the list's
+ * entry kind are empty. ImagesDropped replaces the count in the popup.
+ */
+export interface DraftHistoryEntry {
+  id: string;
+  savedAt: string;
+  text: string;
+  imageCount: number /* int */;
+  imagesDropped: boolean;
+  project: string;
+  slug: string;
+  name: string;
+  harness: string;
+  model: string;
+  effort: string;
+  folder: string;
+  /**
+   * Composer is "chat" or "design" for a Sent message.
+   */
+  composer: string;
+}
+/**
+ * DraftHistoryListResult is one list, newest first. Max is the list cap.
+ */
+export interface DraftHistoryListResult {
+  list: string;
+  max: number /* int */;
+  entries: DraftHistoryEntry[];
+}
+
+//////////
 // source: hostedfiles.go
 
 /**

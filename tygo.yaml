@@ -42,6 +42,7 @@ packages:
       - chatdrafts.go
       - cleanup.go
       - designdrafts.go
+      - drafthistory.go
       - hostedfiles.go
       - migrate.go
       - restart.go
