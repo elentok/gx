@@ -1,7 +1,7 @@
 import { access } from "node:fs/promises"
 import type { Page } from "@playwright/test"
 import { chatOf, PNG, png, steerUploads } from "./agentsKit"
-import { draftPage, renameDraft, startDesign } from "./draftKit"
+import { draftPage, history, renameDraft, startDesign } from "./draftKit"
 import { expect, flag, holdRoute, nav, openEpics, section, sessionRows, test } from "./fixture"
 import { sidebarKit } from "./sidebarKit"
 
@@ -16,7 +16,7 @@ const newDesign = (page: Page) => page.getByRole("button", nav("New design")).cl
 test("26. New Design form", async ({ page, start }) => {
   const fixture = await start("ready", { reloads: 2 })
   const d = draftPage(page)
-  const { row, sidebar } = sidebarKit(page)
+  const { row, rowMenu, sidebar } = sidebarKit(page)
   const draftIds = async () =>
     (await fixture.cli("designs", "drafts", "list"))
       .split("\n")
@@ -58,7 +58,7 @@ test("26. New Design form", async ({ page, start }) => {
     (await d.start.boundingBox())!,
   ]
   expect(rm.x).toBeLessThan(foot.x + foot.width / 2)
-  expect(st.x + st.width).toBeCloseTo(foot.x + foot.width - 12, 0)
+  expect(st.x + st.width).toBeCloseTo(foot.x + foot.width, 0)
 
   // New design on an empty draft's page reuses it: still one row, the Prompt focused.
   await d.slug.click()
@@ -270,6 +270,8 @@ test("26. New Design form", async ({ page, start }) => {
     // A good Start moves the files, opens the Design page and removes the draft row.
     const before = (await fixture.launches()).length
     await d.slug.fill("pictured")
+    // The history entry is read from the saved draft, so the slug must be saved before Start.
+    await expect.poll(() => fixture.cli("designs", "drafts", "list")).toContain("pictured")
     await d.start.click()
     await expect(page).toHaveURL(/#\/d\/demo:pictured$/)
     await expect(page2).toHaveURL(/#\/d\/demo:pictured$/)
@@ -315,6 +317,13 @@ test("26. New Design form", async ({ page, start }) => {
 
     // Remove on a draft with a prompt and images asks first; Keep leaves it, Remove deletes it and its image folder.
     await newDesign(page)
+    // The Start saved one entry with its text and slug: the newest History row on a new draft page.
+    const popup = history(page, "Design drafts")
+    await popup.open()
+    await expect(popup.rows).toHaveCount(1)
+    await expect(popup.rows.first()).toContainText("Mine again, more")
+    await expect(popup.rows.first()).toContainText("pictured")
+    await popup.close()
     await d.prompt.fill("To be removed")
     await page.getByTestId("image-input").setInputFiles([png(3)])
     await expect(open).toHaveCount(1)
@@ -341,10 +350,47 @@ test("26. New Design form", async ({ page, start }) => {
     await newDesign(page)
     await expect(d.prompt).toBeFocused()
     await expect.poll(draftIds).toHaveLength(1)
+    // The footer Remove above added a second row, newest first.
+    await popup.open()
+    await expect(popup.rows).toHaveCount(2)
+    await expect(popup.rows.first()).toContainText("To be removed")
+    await popup.close()
     await d.remove.click()
     await expect(page).toHaveURL(/#\/epics$/)
     await expect.poll(draftIds).toEqual([])
     await expect(page.getByText("Remove this draft and its images?")).toHaveCount(0)
+
+    // Remove from the sidebar row menu and with Leader then x each add a row with their own text.
+    await newDesign(page)
+    await d.prompt.fill("Removed from the row menu")
+    await expect(page.getByText("Saved")).toBeVisible()
+    await expect(row("Removed from the row menu")).toBeVisible()
+    await rowMenu("Removed from the row menu").click()
+    await page.getByRole("menuitem", nav("Remove")).click()
+    await page
+      .getByRole("dialog", { name: /^Remove / })
+      .getByRole("button", nav("Remove"))
+      .click()
+    await expect(row("Removed from the row menu")).toHaveCount(0)
+    await expect.poll(draftIds).toEqual([])
+    await newDesign(page)
+    await d.prompt.fill("Removed with Leader x")
+    await expect(page.getByText("Saved")).toBeVisible()
+    await page.keyboard.press("ControlOrMeta+e")
+    await page.keyboard.press("x")
+    const confirm = page.getByText("Remove this draft and its images?")
+    await expect(confirm).toBeVisible()
+    await confirm.locator("xpath=..").getByRole("button", nav("Remove")).click()
+    await expect(page).toHaveURL(/#\/epics$/)
+    await expect.poll(draftIds).toEqual([])
+    await newDesign(page)
+    await popup.open()
+    await expect(popup.rows).toHaveCount(4)
+    await expect(popup.rows.nth(0)).toContainText("Removed with Leader x")
+    await expect(popup.rows.nth(1)).toContainText("Removed from the row menu")
+    await popup.close()
+    await d.remove.click()
+    await expect(page).toHaveURL(/#\/epics$/)
   } finally {
     await other.close()
   }

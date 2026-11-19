@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test"
 import type { SessionInfo } from "../src/generated/server"
+import { history } from "./draftKit"
 import { expect, nav, test, type Fixture } from "./fixture"
 import {
   ask,
@@ -14,6 +15,7 @@ import {
   REPLY,
   sendButton,
   sessions,
+  thumbs,
 } from "./agentsKit"
 
 test("76. Send and draft", async ({ page, start }) => {
@@ -33,18 +35,25 @@ test("76. Send and draft", async ({ page, start }) => {
   await expect(page.getByText("a draft to keep", { exact: true })).toBeVisible()
   await expect.poll(() => fixture.cli("agents", "chat", idle.id)).toContain("a draft to keep")
 
-  // Add image is an icon-only 44px paperclip at every width.
+  // The sent text is the newest Sent messages row, with the session's name in its pill.
+  const sent = history(page, "Sent messages")
+  await sent.open()
+  await expect(sent.rows.first()).toContainText("a draft to keep")
+  await expect(sent.rows.first()).toContainText(`Chat · ${idle.name}`)
+  await sent.close()
+
+  // Add image is an icon-only 40px paperclip at every width.
   const add = composer(page).getByRole("button", { name: "Add image" })
   for (const width of [1280, 744, 390]) {
     await page.setViewportSize({ width, height: 800 })
     await expect(add).not.toContainText("Add")
-    await expect(add).toHaveCSS("width", "44px")
-    await expect(add).toHaveCSS("height", "44px")
+    await expect(add).toHaveCSS("width", "40px")
+    await expect(add).toHaveCSS("height", "40px")
   }
   await composer(page)
     .getByTestId("image-input")
     .setInputFiles({ name: "a.png", mimeType: "image/png", buffer: PNG })
-  await expect(composer(page).getByRole("img")).toHaveCount(1)
+  await expect(thumbs(page)).toHaveCount(1)
   await page.setViewportSize({ width: 1280, height: 800 })
 
   // Promote to Design types the command into a Claude and a Codex session; the draft stays and no dialog opens.

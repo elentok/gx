@@ -10,6 +10,23 @@ export const draftPage = (page: Page) => ({
   remove: page.getByRole("button", nav("Remove")),
 })
 
+/** The History popup of a draft page or composer: `list` is "Design drafts", "Chat drafts" or "Sent messages". */
+export const history = (page: Page, list: string) => {
+  const popup = page.getByRole("dialog", nav(`${list} history`))
+  return {
+    popup,
+    rows: popup.getByRole("option"),
+    open: async () => {
+      await page.getByRole("button", nav("History")).click()
+      await expect(popup).toBeVisible()
+    },
+    close: async () => {
+      await page.keyboard.press("Escape")
+      await expect(popup).toHaveCount(0)
+    },
+  }
+}
+
 /** Sets the draft's slug through the pencil, which focuses the slug field. */
 export const renameDraft = async (page: Page, slug: string) => {
   const d = draftPage(page)

@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test"
 import { chatOf, sessions } from "./agentsKit"
+import { history } from "./draftKit"
 import { expect, flag, nav, test, type Fixture } from "./fixture"
 import { goto, sidebarKit, stillMotion } from "./sidebarKit"
 
@@ -70,6 +71,12 @@ test("209. Chat draft page", async ({ page, start }) => {
   const worktreeId = await draftId(fx, "worktree-draft")
   await fx.forkHook("start-fail", true)
   await goto(page, `#/chat-drafts/${worktreeId}`)
+  // The started Claude draft is the one entry so far: the newest History row on a new draft page.
+  const popup = history(page, "Chat drafts")
+  await popup.open()
+  await expect(popup.rows).toHaveCount(1)
+  await expect(popup.rows.first()).toContainText("Edited brief of the Claude draft")
+  await popup.close()
   await d.start.click()
   await expect(d.error).toContainText("test hook")
   await expect(d.error).toContainText("Start made a worktree at")
@@ -111,6 +118,11 @@ test("209. Chat draft page", async ({ page, start }) => {
   // Codex: the same Start journey launches codex on the draft's model and effort.
   const codexId = await draftId(fx, "codex-draft")
   await goto(page, `#/chat-drafts/${codexId}`)
+  // The Remove above added one row with its brief, newest first; the failed Start added none.
+  await popup.open()
+  await expect(popup.rows).toHaveCount(3)
+  await expect(popup.rows.first()).toContainText("Brief of a draft to remove")
+  await popup.close()
   await d.brief.fill("Edited brief of the Codex draft")
   await expect(d.saved).toBeVisible()
   await d.start.click()
