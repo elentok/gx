@@ -170,6 +170,7 @@ export function HistoryPopup({
       label={`${name} history`}
       onClose={onClose}
       fillViewport
+      topGap={90}
       p="0"
       gap="0"
       bg="surface.raised"

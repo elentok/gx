@@ -17,9 +17,10 @@ const read = () => {
  * on-screen keyboard, so a `position: fixed; inset: 0` overlay reaches under it. The overlay instead
  * covers the visual viewport, and the sheet follows its height to keep the footer visible. Without
  * visualViewport the overlay is the full screen and the sheet is 88%. `belowTopBar` leaves the TopBar
- * uncovered, using the height it publishes in `--top-bar-height`.
+ * uncovered, using the height it publishes in `--top-bar-height`. `topGap` (px) makes the sheet end that far
+ * below the viewport top instead of being 88% tall.
  */
-export const useVisualViewportHeight = (belowTopBar = false) => {
+export const useVisualViewportHeight = (belowTopBar = false, topGap?: number) => {
   const [vv, setVv] = useState(read)
   useEffect(() => {
     const target = window.visualViewport
@@ -34,11 +35,14 @@ export const useVisualViewportHeight = (belowTopBar = false) => {
   }, [])
   if (!vv)
     return {
-      sheetHeight: "88%",
+      sheetHeight: topGap === undefined ? "88%" : `calc(100% - ${topGap}px)`,
       overlay: { top: belowTopBar ? TOP_BAR : "0", left: "0", right: "0", bottom: "0" },
     }
   return {
-    sheetHeight: `${Math.round(Math.min(SHEET_HEIGHT * window.innerHeight, vv.height - SHEET_TOP_GAP))}px`,
+    sheetHeight:
+      topGap === undefined
+        ? `${Math.round(Math.min(SHEET_HEIGHT * window.innerHeight, vv.height - SHEET_TOP_GAP))}px`
+        : `${Math.round(Math.min(window.innerHeight, vv.height) - topGap)}px`,
     overlay: belowTopBar
       ? {
           top: `calc(${vv.top}px + ${TOP_BAR})`,

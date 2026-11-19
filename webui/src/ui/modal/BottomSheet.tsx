@@ -29,6 +29,8 @@ interface BottomSheetProps extends Omit<BoxProps, "children"> {
   belowTopBar?: boolean
   /** Follow the visual viewport's height so the on-screen keyboard does not hide the footer; otherwise the sheet is as tall as its content, up to 80%. */
   fillViewport?: boolean
+  /** With `fillViewport`, the sheet's top edge is this many px below the viewport top, instead of the sheet being 88% tall. */
+  topGap?: number
   /** The panel's props on a wide screen, where this is a centered Modal and not a sheet. */
   desktop?: BoxProps
   /** The backdrop's props on a wide screen, such as a dialog that sits near the top. */
@@ -47,6 +49,7 @@ interface BottomSheetProps extends Omit<BoxProps, "children"> {
 export function BottomSheet({
   belowTopBar,
   fillViewport,
+  topGap,
   desktop,
   desktopBackdrop,
   followViewport,
@@ -55,7 +58,7 @@ export function BottomSheet({
   ...modal
 }: BottomSheetProps) {
   const sheetMode = !useWide()
-  const viewport = useVisualViewportHeight(belowTopBar)
+  const viewport = useVisualViewportHeight(belowTopBar, topGap)
   if (!sheetMode) {
     const follow = followViewport
       ? {

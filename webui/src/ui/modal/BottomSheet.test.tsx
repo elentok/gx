@@ -84,6 +84,19 @@ describe("BottomSheet", () => {
     expect(getComputedStyle(dialog).maxHeight).toBe("680px")
   })
 
+  it("fillViewport is 88% of the viewport tall, and topGap makes it end that many px below the top", () => {
+    const vv = { offsetTop: 0, height: 600 }
+    vi.stubGlobal("innerHeight", 800)
+    phone(vv)
+    expect(getComputedStyle(mount({ fillViewport: true }).dialog).height).toBe("592px")
+    cleanup()
+    phone(vv)
+    expect(getComputedStyle(mount({ fillViewport: true, topGap: 90 }).dialog).height).toBe("510px")
+    cleanup()
+    phone({ offsetTop: 0, height: 900 })
+    expect(getComputedStyle(mount({ fillViewport: true, topGap: 90 }).dialog).height).toBe("710px")
+  })
+
   it("still closes on a backdrop press on a wide screen with closeOnNarrowBackdrop off", () => {
     const onClose = vi.fn()
     press(mount({ closeOnNarrowBackdrop: false }, onClose).backdrop)

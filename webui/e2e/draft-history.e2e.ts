@@ -274,8 +274,7 @@ test("Draft history popup", async ({ page, start }) => {
   })
 
   await test.step("Phone: icon-only buttons and the bottom sheet", async () => {
-    // The sheet is 88% of the viewport tall, so its top is 90 px at a 750 px tall phone.
-    await page.setViewportSize({ width: 390, height: 750 })
+    await page.setViewportSize({ width: 390, height: 844 })
     await go(page, `#/drafts/${designId}`)
     await expect(draftPage(page).prompt).toBeVisible()
     await expect(historyButton(page)).toHaveText("")
@@ -291,6 +290,13 @@ test("Draft history popup", async ({ page, start }) => {
 
     const popup = history(page, "Sent messages")
     await popup.open()
+    await expect
+      .poll(async () => {
+        const b = await box(popup.popup)
+        return [b.x, b.y, b.width]
+      })
+      .toEqual([0, 90, 390])
+    await page.setViewportSize({ width: 390, height: 667 })
     await expect
       .poll(async () => {
         const b = await box(popup.popup)
