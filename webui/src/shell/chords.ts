@@ -1,5 +1,6 @@
 import { useLocation } from "react-router"
-import { canManage, isChat } from "../agents/sessionWrites"
+import { canManage, isChat, offersHistory } from "../agents/sessionWrites"
+import { designSession } from "../design/view"
 import { useConnectionContext, useConnectionState } from "../connection"
 import type { SessionInfo } from "../generated/server"
 import { isMac } from "../platform"
@@ -73,7 +74,8 @@ export function displayKey(setting: string | undefined): string {
   return [...mods.map((m) => WORDS[m]), char].join("+")
 }
 
-export type ChordContext = { path: string; session?: SessionInfo }
+/** `historyReady`: a composer has a History opener registered right now (set by ChordHost). */
+export type ChordContext = { path: string; session?: SessionInfo; historyReady?: boolean }
 
 export type Chord = {
   key: string
@@ -91,6 +93,15 @@ export const agentIdOf = (path: string): string | undefined =>
 export const draftIdOf = (path: string): string | undefined =>
   /^\/drafts\/([^/]+)\/?$/.exec(path)?.[1]
 
+/** The id of a `/chat-drafts/:id` page, or undefined for any other path. */
+export const chatDraftIdOf = (path: string): string | undefined =>
+  /^\/chat-drafts\/([^/]+)\/?$/.exec(path)?.[1]
+
+const canHistory = (ctx: ChordContext) =>
+  draftIdOf(ctx.path) !== undefined ||
+  chatDraftIdOf(ctx.path) !== undefined ||
+  (ctx.session !== undefined && offersHistory(ctx.session) && ctx.historyReady === true)
+
 const canRemove = (ctx: ChordContext) =>
   draftIdOf(ctx.path) !== undefined ||
   (agentIdOf(ctx.path) !== undefined && ctx.session !== undefined && canManage(ctx.session))
@@ -106,7 +117,14 @@ export function useOpenChat(): { path: string; session: SessionInfo | undefined 
   const { pathname } = useLocation()
   const { snapshot } = useConnectionState(useConnectionContext())
   const id = agentIdOf(pathname)
-  const session = id ? snapshot?.sessions?.find((s) => s.id === id) : undefined
+  // A Design's address holds a colon, so it is the whole path after `/d/`.
+  const design = /^\/d\/(.+)$/.exec(pathname)?.[1]
+  const sessions = snapshot?.sessions ?? []
+  const session = id
+    ? sessions.find((s) => s.id === id)
+    : design
+      ? designSession(design, sessions)
+      : undefined
   return { path: pathname, session }
 }
 
@@ -115,10 +133,12 @@ export function chordTable({
   remove,
   rename,
   switchModel,
+  history,
 }: {
   remove: () => void
   rename: () => void
   switchModel: () => void
+  history: () => void
 }): Chord[] {
   return [
     {
@@ -158,5 +178,6 @@ export function chordTable({
       danger: true,
       available: canRemove,
     },
+    { key: "h", label: () => "History", run: history, available: canHistory },
   ]
 }

@@ -4,8 +4,17 @@ import { useConnectionContext, useConnectionState } from "../connection"
 import { leaderKeyOf } from "../leaderKey"
 import { hasLayer } from "../ui/modal/layers"
 import { ChordBox } from "./ChordBox"
-import { draftPageActions } from "./draftPageActions"
-import { chordTable, draftIdOf, letterOf, matchesKey, useOpenChat, type Chord } from "./chords"
+import { hasHistoryOpener, openHistory as openComposerHistory } from "../history/historyOpener"
+import { chatDraftPageActions, draftPageActions } from "./draftPageActions"
+import {
+  chatDraftIdOf,
+  chordTable,
+  draftIdOf,
+  letterOf,
+  matchesKey,
+  useOpenChat,
+  type Chord,
+} from "./chords"
 import { openModelPicker } from "./modelPickerOpen"
 import { openRemoveConfirm } from "./removeConfirmOpen"
 import { openRename } from "./renameOpen"
@@ -23,9 +32,11 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
   const { snapshot } = useConnectionState(useConnectionContext())
   const leader = leaderKeyOf(snapshot)
   const { path: pathname, session } = useOpenChat()
-  const ctx = useMemo(() => ({ path: pathname, session }), [pathname, session])
-
   const [open, setOpen] = useState(false)
+  const baseCtx = useMemo(() => ({ path: pathname, session }), [pathname, session])
+  // Read the opener registration when the box renders open; the key handler reads it at event time.
+  const ctx = open ? { ...baseCtx, historyReady: hasHistoryOpener() } : baseCtx
+
   // The listener is mounted once and reads everything at event time.
   const live = useRef({ leader, ctx, session, navigate })
   live.current = { leader, ctx, session, navigate }
@@ -53,6 +64,12 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
           const { session: s } = live.current
           if (s) openModelPicker({ session: s })
         },
+        history: () => {
+          const { path } = live.current.ctx
+          if (draftIdOf(path)) draftPageActions()?.openHistory()
+          else if (chatDraftIdOf(path)) chatDraftPageActions()?.openHistory()
+          else openComposerHistory()
+        },
       }),
     [chords],
   )
@@ -61,7 +78,8 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const { leader: key, ctx: c } = live.current
+      const { leader: key } = live.current
+      const c = { ...live.current.ctx, historyReady: hasHistoryOpener() }
       if (!openRef.current) {
         if (!matchesKey(e, key) || hasLayer()) return
         e.preventDefault()

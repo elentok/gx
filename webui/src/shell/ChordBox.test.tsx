@@ -57,7 +57,12 @@ test("lists the real chord table", () => {
     <ChordBox
       leader="cmd+e"
       ctx={ctx}
-      chords={chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })}
+      chords={chordTable({
+        remove: () => {},
+        rename: () => {},
+        switchModel: () => {},
+        history: () => {},
+      })}
       onClose={() => {}}
     />,
   )
@@ -71,7 +76,12 @@ test("lists the real chord table", () => {
 })
 
 test("labels the b row Normal prompt box after big mode is on, and has no Gear control", () => {
-  const table = chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })
+  const table = chordTable({
+    remove: () => {},
+    rename: () => {},
+    switchModel: () => {},
+    history: () => {},
+  })
   const open = () => {
     renderThemed(<ChordBox leader="cmd+e" ctx={ctx} chords={table} onClose={() => {}} />)
     const out = screen.getAllByRole("menuitem").map((i) => i.textContent)
@@ -92,7 +102,12 @@ test("lists Switch model on a chat's page and not on a design's", () => {
     id: "s-a",
     status: { state: "idle" },
   } as unknown as NonNullable<Parameters<typeof ChordBox>[0]["ctx"]["session"]>
-  const table = chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })
+  const table = chordTable({
+    remove: () => {},
+    rename: () => {},
+    switchModel: () => {},
+    history: () => {},
+  })
   const labels = (c: Parameters<typeof ChordBox>[0]["ctx"]) => {
     renderThemed(<ChordBox leader="cmd+e" ctx={c} chords={table} onClose={() => {}} />)
     const out = screen.getAllByRole("menuitem").map((i) => i.textContent)

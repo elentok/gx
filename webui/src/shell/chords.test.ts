@@ -3,6 +3,7 @@ import type { SessionInfo } from "../generated/server"
 import {
   agentIdOf,
   canRename,
+  chatDraftIdOf,
   chordTable,
   displayKey,
   draftIdOf,
@@ -124,7 +125,12 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo => ({
 })
 
 describe("draft page chords", () => {
-  const table = chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })
+  const table = chordTable({
+    remove: () => {},
+    rename: () => {},
+    switchModel: () => {},
+    history: () => {},
+  })
   const ctx = { path: "/drafts/d1" }
   it("offers Rename and Remove on a draft page only", () => {
     for (const [key, label] of [
@@ -145,9 +151,12 @@ describe("draft page chords", () => {
 })
 
 describe("chord table x", () => {
-  const x = chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} }).find(
-    (c) => c.key === "x",
-  )!
+  const x = chordTable({
+    remove: () => {},
+    rename: () => {},
+    switchModel: () => {},
+    history: () => {},
+  }).find((c) => c.key === "x")!
   const page = "/agents/s-a"
 
   it("is available for a chat session, labelled Remove chat", () => {
@@ -172,9 +181,12 @@ describe("chord table x", () => {
   })
   it("calls the handed-in remove opener and is danger", () => {
     const remove = vi.fn()
-    const row = chordTable({ remove, rename: () => {}, switchModel: () => {} }).find(
-      (c) => c.key === "x",
-    )!
+    const row = chordTable({
+      remove,
+      rename: () => {},
+      switchModel: () => {},
+      history: () => {},
+    }).find((c) => c.key === "x")!
     row.run()
     expect(remove).toHaveBeenCalledOnce()
     expect(row.danger).toBe(true)
@@ -183,7 +195,12 @@ describe("chord table x", () => {
 
 describe("chord table c and d", () => {
   it("are always available with their labels", () => {
-    const t = chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })
+    const t = chordTable({
+      remove: () => {},
+      rename: () => {},
+      switchModel: () => {},
+      history: () => {},
+    })
     expect(t.map((c) => [c.key, c.label({ path: "/" }), c.available({ path: "/" })])).toEqual([
       ["c", "New chat draft", true],
       ["C", "New chat", true],
@@ -193,16 +210,76 @@ describe("chord table c and d", () => {
       ["r", "Rename chat", false],
       ["m", "Switch model", false],
       ["x", "Remove chat", false],
+      ["h", "History", false],
     ])
+  })
+})
+
+describe("chord table h", () => {
+  const h = chordTable({
+    remove: () => {},
+    rename: () => {},
+    switchModel: () => {},
+    history: () => {},
+  }).filter((c) => c.key === "h")[0]
+  const agent = "/agents/s-a"
+
+  it("is the last row, labelled History", () => {
+    const t = chordTable({
+      remove: () => {},
+      rename: () => {},
+      switchModel: () => {},
+      history: () => {},
+    })
+    expect(t[t.length - 1].key).toBe("h")
+    expect(h.label({ path: "/" })).toBe("History")
+  })
+  it.each([
+    ["/drafts/d1", undefined, false, true],
+    ["/chat-drafts/c1", undefined, false, true],
+    ["/epics", undefined, true, false],
+    [agent, session(), true, true],
+    [agent, session({ design: true, ticket: "gx:e/1" }), true, true],
+    [agent, session(), false, false],
+    [agent, session({ queue: true }), true, false],
+    [agent, session({ fix_of: "gx:e/1" }), true, false],
+    [agent, session({ fix_of: "gx:p" }), true, false],
+    [agent, session({ ticket: "gx:e/1" }), true, false],
+    [agent, session({ flow: "triage" }), true, false],
+  ])("on %s with %j (opener %s) is %s", (path, s, historyReady, want) => {
+    expect(h.available({ path, session: s, historyReady })).toBe(want)
+  })
+  it("reads the chat draft id from the path", () => {
+    expect(chatDraftIdOf("/chat-drafts/c1")).toBe("c1")
+    expect(chatDraftIdOf("/drafts/c1")).toBeUndefined()
+    expect(draftIdOf("/chat-drafts/c1")).toBeUndefined()
+  })
+  it("leaves r, m and x off a Design page's session", () => {
+    const ctx = {
+      path: "/d/gx:ep",
+      session: session({ design: true, ticket: "gx:ep/1" }),
+      historyReady: true,
+    }
+    const t = chordTable({
+      remove: () => {},
+      rename: () => {},
+      switchModel: () => {},
+      history: () => {},
+    })
+    for (const key of ["r", "m", "x"])
+      expect(t.find((c) => c.key === key)!.available(ctx)).toBe(false)
   })
 })
 
 describe("chord table b", () => {
   afterEach(() => setBigPrompt(false))
   const b = () =>
-    chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} }).find(
-      (c) => c.key === "b",
-    )!
+    chordTable({
+      remove: () => {},
+      rename: () => {},
+      switchModel: () => {},
+      history: () => {},
+    }).find((c) => c.key === "b")!
 
   it("is offered on every page", () => {
     for (const path of ["/agents/s1", "/drafts/d1", "/designs/x", "/epics", "/agents"]) {
@@ -223,7 +300,7 @@ describe("chord table b", () => {
 describe("chord table d", () => {
   it("runs the New design action once", () => {
     startNewDesign.mockClear()
-    chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })
+    chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {}, history: () => {} })
       .find((c) => c.key === "d")
       ?.run()
     expect(startNewDesign).toHaveBeenCalledTimes(1)
@@ -232,7 +309,7 @@ describe("chord table d", () => {
 
 describe("chord table m", () => {
   const switchModel = vi.fn()
-  const m = chordTable({ remove: () => {}, rename: () => {}, switchModel }).find(
+  const m = chordTable({ remove: () => {}, rename: () => {}, switchModel, history: () => {} }).find(
     (c) => c.key === "m",
   )!
   const page = "/agents/s-a"
@@ -262,7 +339,7 @@ describe("chord table m", () => {
 
 describe("chord table r", () => {
   const rename = vi.fn()
-  const r = chordTable({ remove: () => {}, rename, switchModel: () => {} }).find(
+  const r = chordTable({ remove: () => {}, rename, switchModel: () => {}, history: () => {} }).find(
     (c) => c.key === "r",
   )!
   const page = "/agents/s-a"

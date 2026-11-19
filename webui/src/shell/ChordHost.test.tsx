@@ -8,7 +8,8 @@ import { renderThemed } from "../ui/render"
 import { ChordHost } from "./ChordHost"
 import { getBigPrompt, setBigPrompt } from "../ui/expandable-text/bigPromptStore"
 import { chordTable, type Chord } from "./chords"
-import { registerDraftPage } from "./draftPageActions"
+import { registerHistoryOpener } from "../history/historyOpener"
+import { registerChatDraftPage, registerDraftPage } from "./draftPageActions"
 import { closeRename, useRenameRequest } from "./renameOpen"
 
 beforeEach(() => {
@@ -163,7 +164,8 @@ test("with a layer open the Leader key opens nothing", () => {
 })
 
 describe("Leader then b", () => {
-  const table = () => chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {} })
+  const table = () =>
+    chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {}, history: () => {} })
   afterEach(() => setBigPrompt(false))
 
   test("flips big mode from a focused textarea and the text stays", () => {
@@ -314,4 +316,70 @@ test("{leader} r does nothing on a Queue agent page", () => {
   expect(screen.queryByRole("menuitem", { name: /Rename chat/ })).toBeNull()
   press("KeyR")
   expect(screen.getByTestId("renaming").textContent).toBe("none")
+})
+
+describe("Leader then h", () => {
+  const design = session("s3", "gx", { design: true, ticket: "gx:ep/1" })
+  const item = () => screen.queryByRole("menuitem", { name: /History/ })
+
+  test.each([
+    ["a Design draft page", "/drafts/d1", registerDraftPage],
+    ["a Chat draft page", "/chat-drafts/c1", registerChatDraftPage],
+  ])("opens History on %s", (_name, path, register) => {
+    const openHistory = vi.fn()
+    const unregister = (register as (a: unknown) => () => void)({
+      remove: vi.fn(),
+      rename: vi.fn(),
+      isEmpty: () => true,
+      focusPrompt: vi.fn(),
+      focusBrief: vi.fn(),
+      openHistory,
+    })
+    setupChats(path)
+    leaderKey()
+    expect(item()).toBeTruthy()
+    press("KeyH")
+    expect(openHistory).toHaveBeenCalledTimes(1)
+    unregister()
+  })
+
+  test.each([
+    ["a chat's page", "/agents/s1", session("s1", "gamma")],
+    ["a Design's page", "/d/gx:ep", design],
+  ])("opens the composer's History on %s", (_name, path, s) => {
+    const open = vi.fn()
+    const unregister = registerHistoryOpener(open)
+    setupChats(path, [s])
+    leaderKey()
+    expect(item()).toBeTruthy()
+    press("KeyH")
+    expect(open).toHaveBeenCalledTimes(1)
+    unregister()
+  })
+
+  test.each([
+    ["with no opener registered", "/agents/s1", false],
+    ["on a Design page with no opener", "/d/gx:ep", false],
+    ["on a Queue agent", "/agents/s1", true],
+    ["off the four pages", "/epics", true],
+  ])("does nothing %s", (_name, path, registered) => {
+    const open = vi.fn()
+    const unregister = registered ? registerHistoryOpener(open) : () => {}
+    const s =
+      path === "/d/gx:ep" ? design : session("s1", "gamma", { queue: _name.includes("Queue") })
+    setupChats(path, [s])
+    leaderKey()
+    expect(item()).toBeNull()
+    press("KeyH")
+    expect(open).not.toHaveBeenCalled()
+    unregister()
+  })
+
+  test("a Design page does not offer r, m or x", () => {
+    setupChats("/d/gx:ep", [design])
+    leaderKey()
+    for (const name of [/Rename/, /Switch model/, /Remove/]) {
+      expect(screen.queryByRole("menuitem", { name })).toBeNull()
+    }
+  })
 })

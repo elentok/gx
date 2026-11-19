@@ -8,6 +8,9 @@ export function registerHistoryOpener(open: () => void): () => void {
   }
 }
 
+/** True while a composer has registered its History popup. */
+export const hasHistoryOpener = () => current !== null
+
 /** Opens the mounted composer's History popup; false when no composer offers one. */
 export function openHistory(): boolean {
   if (!current) return false
