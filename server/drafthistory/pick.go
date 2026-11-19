@@ -42,6 +42,17 @@ type Restored struct {
 	Missing int
 }
 
+// compared keeps the fields a pick compares and clears the rest, so a pick
+// keeps the page's other settings. Draft lists compare text, slug and name;
+// Sent messages compare text only. Images are compared by sameAsNewest.
+func compared(l List, e Entry) Entry {
+	out := Entry{ID: e.ID, Images: e.Images, Text: e.Text}
+	if l != Sent {
+		out.Slug, out.Name = e.Slug, e.Name
+	}
+	return out
+}
+
 // Restore swaps a page's images for the entry's. The page is the draft's
 // current text and settings (only what a pick changes matters) and pageImages
 // are the ids in imagesDir. The caller holds the draft's lock, so the page
@@ -57,16 +68,10 @@ func (s *Store) Restore(l List, p Picked, page Entry, imagesDir string, pageImag
 			pagePaths = append(pagePaths, path)
 		}
 	}
-	// Only text, slug, name and images are compared: a pick keeps the page's other settings.
-	held := p.Entry
-	page.Project, page.Harness, page.Model, page.Effort = held.Project, held.Harness, held.Model, held.Effort
-	page.Folder, page.Composer = held.Folder, held.Composer
-	if s.sameAsNewest(l, held, page, pagePaths) {
+	if s.sameAsNewest(l, compared(l, p.Entry), compared(l, page), pagePaths) {
 		return Restored{Images: pageImages}, nil
 	}
-	if err := saveCurrent(); err != nil {
-		return Restored{}, fmt.Errorf("save page to history: %w", err)
-	}
+	// Read before saving: the save can evict this entry from a full list.
 	var data [][]byte
 	missing := 0
 	for _, path := range p.Paths {
@@ -76,6 +81,9 @@ func (s *Store) Restore(l List, p Picked, page Entry, imagesDir string, pageImag
 			continue
 		}
 		data = append(data, b)
+	}
+	if err := saveCurrent(); err != nil {
+		return Restored{}, fmt.Errorf("save page to history: %w", err)
 	}
 	for _, id := range pageImages {
 		if _, _, err := imagestore.Remove(imagesDir, id); err != nil {
