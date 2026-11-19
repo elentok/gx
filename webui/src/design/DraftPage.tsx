@@ -4,6 +4,9 @@ import { DraftFooter } from "./DraftFooter"
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react"
 import { useLocation, useNavigate, useParams } from "react-router"
 import type { DesignDraft } from "../generated/server"
+import { ReasonHistoryEntryGone, type DraftHistoryEntry } from "../generated/ops"
+import { HistoryHost } from "../history/HistoryButton"
+import { postDesignPick, type ListHistory, type PickDesignHistory } from "../history/api"
 import {
   deleteDraft,
   getLastProject,
@@ -74,6 +77,8 @@ interface PageProps {
   projects?: string[]
   open?: OpenDesign
   drafts?: DraftsClient
+  pickHistory?: PickDesignHistory
+  listHistory?: ListHistory
 }
 
 interface Loaded {
@@ -151,6 +156,8 @@ export function DraftPage({ drafts = realDrafts, ...props }: PageProps) {
       projects={projects}
       open={props.open}
       drafts={drafts}
+      pickHistory={props.pickHistory}
+      listHistory={props.listHistory}
       loaded={loaded}
     />
   )
@@ -160,6 +167,8 @@ function DraftForm({
   projects,
   open = postOpenDesign,
   drafts,
+  pickHistory = postDesignPick,
+  listHistory,
   loaded: { draft: initial, restored, lastProject },
 }: Omit<PageProps, "id" | "projects"> & {
   projects: string[]
@@ -191,6 +200,8 @@ function DraftForm({
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
   const [confirming, setConfirming] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [notices, setNotices] = useState<string[]>([])
   // The mascot toggle leads this header, so the shell drops its floating one.
   useClaimHeader()
   useDraftLifecycle({ drafts, autosave })
@@ -230,8 +241,15 @@ function DraftForm({
     stopHold.current = stop
   }
   const hasContent = () => autosave.hasContent()
-  const actions = useRef({ remove: askRemove, rename: renameFocus, focusPrompt, hasContent })
-  actions.current = { remove: askRemove, rename: renameFocus, focusPrompt, hasContent }
+  const openHistory = () => setHistoryOpen(true)
+  const actions = useRef({
+    remove: askRemove,
+    rename: renameFocus,
+    focusPrompt,
+    hasContent,
+    openHistory,
+  })
+  actions.current = { remove: askRemove, rename: renameFocus, focusPrompt, hasContent, openHistory }
   useEffect(
     () =>
       registerDraftPage({
@@ -239,6 +257,7 @@ function DraftForm({
         rename: () => actions.current.rename(),
         isEmpty: () => !actions.current.hasContent(),
         focusPrompt: () => actions.current.focusPrompt(),
+        openHistory: () => actions.current.openHistory(),
       }),
     [],
   )
@@ -277,6 +296,17 @@ function DraftForm({
     )
   }
 
+  const restore = async (entry: DraftHistoryEntry) => {
+    const res = await autosave.pickHistory((revision) =>
+      pickHistory({ entry_id: entry.id, draft_id: autosave.currentId(), revision }),
+    )
+    if (!res) return
+    if (!res.refused) setNotices(res.notices)
+    if (res.refused && res.reason === ReasonHistoryEntryGone) return
+    setHistoryOpen(false)
+    if (!res.refused) focusPrompt()
+  }
+
   const reason = startBlocker(draft, imgs)
   const slugError = slugProblem(draft.slug)
   const reasonText = reason && (
@@ -306,6 +336,7 @@ function DraftForm({
           slugInput={slugInput}
           status={status}
           onRename={renameFocus}
+          onHistory={openHistory}
           onPickProject={pickProject}
           onSlug={(slug) => patch({ slug })}
         />
@@ -319,7 +350,21 @@ function DraftForm({
             {movedFrom} no longer exists; moved to {draft.project}
           </Text>
         )}
+        {notices.map((n) => (
+          <Text key={n} fontSize="sm" color="text.dim" pt="2" flexShrink="0">
+            {n}
+          </Text>
+        ))}
         {banner && <DraftBanner actions={bannerActions} />}
+        {historyOpen && (
+          <HistoryHost
+            list="design-drafts"
+            pending={status === "saving" || imgs.uploading > 0}
+            listHistory={listHistory}
+            onRestore={restore}
+            onClose={() => setHistoryOpen(false)}
+          />
+        )}
         {viMode ? (
           <Box
             flex="1"

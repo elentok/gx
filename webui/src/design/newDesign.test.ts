@@ -68,6 +68,7 @@ const page = (empty: boolean) => {
     rename: vi.fn(),
     isEmpty: () => empty,
     focusPrompt,
+    openHistory: vi.fn(),
   })
   return { focusPrompt, off }
 }

@@ -9,6 +9,8 @@ import type { DraftResult, DraftsClient } from "./drafts"
 import type { OpenDesign } from "./open"
 import { DraftPage } from "./DraftPage"
 import { designHref } from "../hrefs"
+import type { DesignDraftPickResult, DraftHistoryEntry } from "../generated/ops"
+import type { ListHistory, PickDesignHistory } from "../history/api"
 
 afterEach(() => {
   cleanup()
@@ -80,6 +82,8 @@ async function mount(
     viMode = false,
     open = ok,
     state,
+    pickHistory,
+    listHistory,
   }: {
     state?: unknown
     projects?: string[]
@@ -87,6 +91,8 @@ async function mount(
     pathname?: string
     viMode?: boolean
     open?: OpenDesign
+    pickHistory?: PickDesignHistory
+    listHistory?: ListHistory
   } = {},
 ) {
   const connState = { snapshot: { sessions: [], vi_mode: viMode } }
@@ -110,7 +116,16 @@ async function mount(
               <Route path="/d/*" element={<Where />} />
               <Route
                 path="*"
-                element={<DraftPage id="d1" projects={projects} open={open} drafts={fake.client} />}
+                element={
+                  <DraftPage
+                    id="d1"
+                    projects={projects}
+                    open={open}
+                    drafts={fake.client}
+                    pickHistory={pickHistory}
+                    listHistory={listHistory}
+                  />
+                }
               />
             </Routes>
           </MemoryRouter>
@@ -654,5 +669,121 @@ describe("a draft that vanished", () => {
     fake.client.read = async () => ({ kind: "gone", started: "gx:fresh" })
     await wait(800)
     expect(where()).toBe(`${designHref("gx:fresh").slice(1)} `)
+  })
+})
+
+describe("History", () => {
+  const entry: DraftHistoryEntry = {
+    id: "e1",
+    savedAt: new Date().toISOString(),
+    text: "Rework the sidebar",
+    imageCount: 0,
+    imagesDropped: false,
+    project: "gx",
+    slug: "sidebar",
+    name: "",
+    harness: "",
+    model: "",
+    effort: "",
+    folder: "",
+    composer: "",
+  }
+  const listHistory = vi.fn<ListHistory>(async () => ({
+    list: "design-drafts",
+    max: 50,
+    entries: [entry],
+  }))
+  const pickResult = (): DesignDraftPickResult => ({
+    notices: ["The epic name was cleared."],
+    draft: {
+      id: "d1",
+      project: "gx",
+      slug: "",
+      idea: "Rework the sidebar",
+      label: "Untitled design",
+      images: [],
+      revision: 10,
+      edited_at: "",
+    },
+  })
+  const history = () => screen.getByRole("button", { name: "History" })
+  const restore = () => screen.getByRole("button", { name: "Restore" }) as HTMLButtonElement
+  // The phone popup picks in two steps: tap a row, then Restore.
+  const phone = { device: "phone", listHistory } as const
+  const openPopup = async () => {
+    await act(async () => void fireEvent.click(history()))
+    await act(async () => void fireEvent.click(screen.getByText("Rework the sidebar")))
+  }
+  const prompt = () => screen.getByRole("textbox", { name: "Prompt" }) as HTMLTextAreaElement
+
+  test("a wide page shows the History text and a phone shows the icon only", async () => {
+    await mount(fakeDrafts())
+    expect(history().textContent).toBe("History")
+    cleanup()
+    await mount(fakeDrafts(), { device: "phone" })
+    expect(history().textContent).toBe("")
+    expect(history().getAttribute("aria-label")).toBe("History")
+  })
+
+  test("the button opens the Design drafts list", async () => {
+    vi.useFakeTimers()
+    await mount(fakeDrafts(), { listHistory })
+    await act(async () => void fireEvent.click(history()))
+    expect(listHistory).toHaveBeenCalledWith({ list: "design-drafts" })
+    expect(screen.getByText("Rework the sidebar")).toBeTruthy()
+    expect(screen.queryByText("Chat drafts")).toBeNull()
+  })
+
+  test("a pick sends the revision, fills the page and leaves it saved with the Prompt focused", async () => {
+    vi.useFakeTimers()
+    const fake = fakeDrafts()
+    const pickHistory = vi.fn<PickDesignHistory>(async () => pickResult())
+    await mount(fake, { ...phone, pickHistory })
+    await openPopup()
+    await act(async () => void fireEvent.click(restore()))
+    expect(pickHistory).toHaveBeenCalledWith({ entry_id: "e1", draft_id: "d1", revision: 3 })
+    expect(prompt().value).toBe("Rework the sidebar")
+    expect(screen.getByText("The epic name was cleared.")).toBeTruthy()
+    expect((screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value).toBe(
+      "gx",
+    )
+    expect(screen.queryByRole("button", { name: "Restore" })).toBeNull()
+    expect(document.activeElement).toBe(prompt())
+    expect(screen.getByText(/Saved/)).toBeTruthy()
+    await wait(800)
+    expect(fake.save).not.toHaveBeenCalled()
+    type("Prompt", "more")
+    await wait(800)
+    expect(fake.save).toHaveBeenCalledWith({ id: "d1", idea: "more", revision: 10 })
+  })
+
+  test("Restore stays disabled while a save is pending and enables once it ends", async () => {
+    vi.useFakeTimers()
+    const pickHistory = vi.fn<PickDesignHistory>(async () => pickResult())
+    await mount(fakeDrafts(), { ...phone, pickHistory })
+    type("Prompt", "typing")
+    await openPopup()
+    expect(restore().disabled).toBe(true)
+    expect(screen.getByText("Saving…")).toBeTruthy()
+    await wait(800)
+    expect(restore().disabled).toBe(false)
+    expect(pickHistory).not.toHaveBeenCalled()
+  })
+
+  test("a revision conflict closes the popup and raises the banner, text unchanged", async () => {
+    vi.useFakeTimers()
+    const pickHistory = vi.fn<PickDesignHistory>(async () => ({
+      refused: true,
+      reason: "revision-conflict",
+      notices: [],
+    }))
+    await mount(fakeDrafts({ idea: "mine" }), { ...phone, pickHistory })
+    await openPopup()
+    await act(async () => void fireEvent.click(restore()))
+    expect(screen.queryByRole("button", { name: "Restore" })).toBeNull()
+    expect(screen.getByText("This draft changed on another device.")).toBeTruthy()
+    for (const name of ["Load theirs", "Keep mine"])
+      expect(screen.getByRole("button", { name })).toBeTruthy()
+    expect(prompt().value).toBe("mine")
   })
 })

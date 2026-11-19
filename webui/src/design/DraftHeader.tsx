@@ -1,5 +1,6 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import type { RefObject } from "react"
+import { HistoryButton } from "../history/HistoryButton"
 import { MascotToggle } from "../shell/MascotToggle"
 import { DraftIcon } from "../shell/SidebarRows"
 
@@ -22,6 +23,7 @@ interface Props {
   slugInput: RefObject<HTMLInputElement | null>
   status: "none" | "saving" | "saved" | "unsaved"
   onRename: () => void
+  onHistory: () => void
   onPickProject: (project: string) => void
   onSlug: (slug: string) => void
 }
@@ -36,6 +38,7 @@ export function DraftHeader({
   slugInput,
   status,
   onRename,
+  onHistory,
   onPickProject,
   onSlug,
 }: Props) {
@@ -81,6 +84,7 @@ export function DraftHeader({
           </svg>
         </chakra.button>
         <Box flex="1" />
+        <HistoryButton onClick={onHistory} />
         {status !== "none" && (
           <Text fontSize="xs" color="text.dim" flexShrink="0" whiteSpace="nowrap">
             {status === "saved" && (

@@ -6,6 +6,8 @@ export interface DraftPageActions {
   /** True when the draft has no prompt, images or slug. */
   isEmpty: () => boolean
   focusPrompt: () => void
+  /** Opens the History popup. */
+  openHistory: () => void
 }
 
 // The page registers while mounted; the Chord host lives outside it, so they meet here.
