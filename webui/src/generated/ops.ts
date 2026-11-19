@@ -404,6 +404,40 @@ export interface DraftHistoryListResult {
   max: number /* int */;
   entries: DraftHistoryEntry[];
 }
+/**
+ * ReasonHistoryEntryGone: a pick named an entry that is no longer in the list
+ * (it was evicted since the popup loaded).
+ */
+export const ReasonHistoryEntryGone = "history-entry-gone";
+/**
+ * DraftHistoryPickRequest picks one entry onto a draft page. Revision is the
+ * page's revision; a stale one is refused with ReasonDraftRevisionConflict.
+ */
+export interface DraftHistoryPickRequest {
+  entry_id: string;
+  draft_id: string;
+  revision: number /* int */;
+}
+/**
+ * DesignDraftPickResult answers a pick on a Design draft page. Draft is the
+ * page after the pick (the same draft when nothing changed). Notices say what
+ * the restore left out.
+ */
+export interface DesignDraftPickResult {
+  refused?: boolean;
+  reason?: string;
+  draft?: DesignDraft;
+  notices: string[];
+}
+/**
+ * ChatDraftPickResult answers a pick on a Chat draft page, like DesignDraftPickResult.
+ */
+export interface ChatDraftPickResult {
+  refused?: boolean;
+  reason?: string;
+  draft?: ChatDraft;
+  notices: string[];
+}
 
 //////////
 // source: hostedfiles.go

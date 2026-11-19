@@ -33,3 +33,33 @@ type DraftHistoryListResult struct {
 	Max     int                 `json:"max"`
 	Entries []DraftHistoryEntry `json:"entries"`
 }
+
+// ReasonHistoryEntryGone: a pick named an entry that is no longer in the list
+// (it was evicted since the popup loaded).
+const ReasonHistoryEntryGone = "history-entry-gone"
+
+// DraftHistoryPickRequest picks one entry onto a draft page. Revision is the
+// page's revision; a stale one is refused with ReasonDraftRevisionConflict.
+type DraftHistoryPickRequest struct {
+	EntryID  string `json:"entry_id"`
+	DraftID  string `json:"draft_id"`
+	Revision int    `json:"revision"`
+}
+
+// DesignDraftPickResult answers a pick on a Design draft page. Draft is the
+// page after the pick (the same draft when nothing changed). Notices say what
+// the restore left out.
+type DesignDraftPickResult struct {
+	Refused bool         `json:"refused,omitempty"`
+	Reason  string       `json:"reason,omitempty"`
+	Draft   *DesignDraft `json:"draft,omitempty"`
+	Notices []string     `json:"notices"`
+}
+
+// ChatDraftPickResult answers a pick on a Chat draft page, like DesignDraftPickResult.
+type ChatDraftPickResult struct {
+	Refused bool       `json:"refused,omitempty"`
+	Reason  string     `json:"reason,omitempty"`
+	Draft   *ChatDraft `json:"draft,omitempty"`
+	Notices []string   `json:"notices"`
+}

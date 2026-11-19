@@ -201,6 +201,39 @@ func (s *Store) SaveChecked(req ops.ChatDraftSaveRequest, check func(d *ops.Chat
 	return ops.ChatDraftResult{Draft: d}, nil
 }
 
+// Pick restores a history entry onto draft id under the draft's lock. A stale
+// revision or a missing draft returns the refusal reason and writes nothing.
+// apply changes the draft and reports whether it did; only then does the draft
+// get the next revision.
+func (s *Store) Pick(id string, revision int, apply func(d *ops.ChatDraft) (changed bool, err error)) (*ops.ChatDraft, string, error) {
+	if !idPattern.MatchString(id) {
+		return nil, ops.ReasonDraftGone, nil
+	}
+	unlock := s.lock(id)
+	defer unlock()
+	d, err := s.Get(id)
+	if errors.Is(err, ErrNotFound) {
+		return nil, ops.ReasonDraftGone, nil
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	if d.Revision != revision {
+		return nil, ops.ReasonDraftRevisionConflict, nil
+	}
+	changed, err := apply(d)
+	if err != nil || !changed {
+		return d, "", err
+	}
+	d.Revision++
+	d.EditedAt = s.now().UTC()
+	if err := s.write(d); err != nil {
+		return nil, "", err
+	}
+	d.Label = Label(d.Name, d.Brief)
+	return d, "", nil
+}
+
 // Delete removes a draft's folder and reports whether a draft was there.
 func (s *Store) Delete(id string) (bool, error) {
 	if !idPattern.MatchString(id) {

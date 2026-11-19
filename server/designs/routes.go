@@ -42,6 +42,11 @@ func Routes(get func() *Designs) []wire.Route {
 			Handler: func(w http.ResponseWriter, r *http.Request) { draftCreate(get(), w, r) },
 		},
 		{
+			Pattern:    "POST /v1/designs/drafts/pick-history",
+			Web:        wire.WebWrite,
+			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().draftPickHistory(w, r) },
+		},
+		{
 			Pattern: "POST /v1/designs/drafts/target",
 			Web:     wire.WebWrite,
 			Handler: func(w http.ResponseWriter, r *http.Request) { get().draftTarget(w, r) },

@@ -414,6 +414,8 @@ func Routes(get func() *ChatDrafts) []wire.Route {
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().remove(w, r) }},
 		{Pattern: "POST /v1/agents/drafts/start", Web: wire.WebWrite,
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().start(w, r) }},
+		{Pattern: "POST /v1/agents/drafts/pick-history", Web: wire.WebWrite,
+			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().pickHistory(w, r) }},
 		{Pattern: "POST /v1/agents/drafts/images", Web: wire.WebWrite, RawBody: true,
 			WebHandler: func(w http.ResponseWriter, r *http.Request) { get().imageUpload(w, r) }},
 		{Pattern: "GET /v1/agents/drafts/images", Web: wire.WebRead,

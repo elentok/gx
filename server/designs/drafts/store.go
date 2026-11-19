@@ -441,6 +441,45 @@ func (s *Store) DeleteSaving(id string) error {
 	return s.removeLocked(id)
 }
 
+// Pick restores history entry p onto draft id under the draft's lock. A stale
+// revision or a missing draft returns the refusal reason and writes nothing.
+// apply gets the draft and changes it; it reports whether it did, and only then
+// does the draft get the next revision.
+func (s *Store) Pick(id string, revision int, apply func(d *ops.DesignDraft) (changed bool, err error)) (*ops.DesignDraft, string, error) {
+	if !idPattern.MatchString(id) {
+		return nil, ops.ReasonDraftGone, nil
+	}
+	unlock := s.lock(id)
+	defer unlock()
+	d, err := s.Get(id)
+	if errors.Is(err, ErrNotFound) {
+		return nil, ops.ReasonDraftGone, nil
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	if d.Revision != revision {
+		return nil, ops.ReasonDraftRevisionConflict, nil
+	}
+	changed, err := apply(d)
+	if err != nil || !changed {
+		return d, "", err
+	}
+	d.Revision++
+	d.EditedAt = s.now().UTC()
+	if err := s.write(d); err != nil {
+		return nil, "", err
+	}
+	d.Label = Label(d.Slug, d.Idea)
+	return d, "", nil
+}
+
+// SaveToHistoryLocked is SaveToHistory for a caller that holds the draft's lock (see Pick).
+func (s *Store) SaveToHistoryLocked(id string) error { return s.saveHistoryLocked(id) }
+
+// History is the Design drafts list's store.
+func (s *Store) History() *drafthistory.Store { return s.history }
+
 // dropLease forgets a deleted draft's lease so the map does not grow.
 func (s *Store) dropLease(id string) {
 	s.leaseMu.Lock()
