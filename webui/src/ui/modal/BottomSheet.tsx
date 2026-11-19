@@ -31,6 +31,8 @@ interface BottomSheetProps extends Omit<BoxProps, "children"> {
   fillViewport?: boolean
   /** The panel's props on a wide screen, where this is a centered Modal and not a sheet. */
   desktop?: BoxProps
+  /** The backdrop's props on a wide screen, such as a dialog that sits near the top. */
+  desktopBackdrop?: BoxProps
   /** On a wide screen, follow the visual viewport like a filling sheet; the panel is at most 680px tall. */
   followViewport?: boolean
   /** Escape closes the topmost layer; false to ignore it. */
@@ -46,6 +48,7 @@ export function BottomSheet({
   belowTopBar,
   fillViewport,
   desktop,
+  desktopBackdrop,
   followViewport,
   closeOnNarrowBackdrop = true,
   children,
@@ -62,7 +65,12 @@ export function BottomSheet({
         }
       : {}
     return (
-      <Modal {...modal} {...desktop} {...follow}>
+      <Modal
+        {...modal}
+        {...desktop}
+        {...follow}
+        backdrop={{ ...desktopBackdrop, ...follow.backdrop }}
+      >
         {children}
       </Modal>
     )
