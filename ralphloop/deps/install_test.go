@@ -464,3 +464,48 @@ func equalStrings(a, b []string) bool {
 	}
 	return true
 }
+
+func TestUsesPnpm(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name  string
+		files map[string]string
+		want  bool
+	}{
+		{"pnpm lockfile", map[string]string{"package.json": "{}", "pnpm-lock.yaml": ""}, true},
+		{"nested pnpm lockfile", map[string]string{"web/package.json": "{}", "web/pnpm-lock.yaml": ""}, true},
+		{"packageManager pnpm", map[string]string{"package.json": `{"packageManager":"pnpm@9.1.0"}`, "package-lock.json": "{}"}, true},
+		{"packageManager beats pnpm lockfile", map[string]string{"package.json": `{"packageManager":"npm@10.2.0"}`, "pnpm-lock.yaml": ""}, false},
+		{"npm", map[string]string{"package.json": "{}", "package-lock.json": "{}"}, false},
+		{"no node", map[string]string{"go.mod": "module x"}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			repo := installRepo(t, c.files, nil)
+			if got := UsesPnpm(repo); got != c.want {
+				t.Errorf("UsesPnpm() = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+func TestPnpmHome(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name      string
+		env       []string
+		home, os_ string
+		want      string
+	}{
+		{"env wins", []string{"A=1", "PNPM_HOME=/x/pnpm"}, "/h", "darwin", "/x/pnpm"},
+		{"darwin default", nil, "/h", "darwin", "/h/Library/pnpm"},
+		{"linux default", nil, "/h", "linux", "/h/.local/share/pnpm"},
+		{"unknown home", nil, "", "darwin", ""},
+	}
+	for _, c := range cases {
+		if got := PnpmHome(c.env, c.home, c.os_); got != c.want {
+			t.Errorf("%s: PnpmHome() = %q, want %q", c.name, got, c.want)
+		}
+	}
+}

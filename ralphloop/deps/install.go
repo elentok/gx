@@ -287,3 +287,45 @@ func chooseCommand(dir string, lockfiles []string, packageManager string) ([]str
 	command, _ := installCommand(managers[0], yarnBerry)
 	return command, nil
 }
+
+// UsesPnpm reports whether the worktree at path uses pnpm in any directory that
+// holds a tracked lockfile. Like the install, a package.json packageManager
+// beats the lockfile. A listing error counts as no.
+func UsesPnpm(path string) bool {
+	dirs, err := lockfileDirs(path)
+	if err != nil {
+		return false
+	}
+	for _, dir := range dirs {
+		pm, _ := readPackageManager(dir.path)
+		if pm != "" {
+			if strings.HasPrefix(pm, "pnpm@") {
+				return true
+			}
+			continue
+		}
+		if slices.Contains(dir.lockfiles, "pnpm-lock.yaml") {
+			return true
+		}
+	}
+	return false
+}
+
+// PnpmHome is the directory pnpm keeps its store and global bins in: PNPM_HOME
+// from env (KEY=VALUE entries) when set, else pnpm's per-OS default under
+// home. "" when neither is known.
+func PnpmHome(env []string, home, goos string) string {
+	for _, kv := range slices.Backward(env) {
+		if v, ok := strings.CutPrefix(kv, "PNPM_HOME="); ok && v != "" {
+			return v
+		}
+	}
+	switch {
+	case home == "":
+		return ""
+	case goos == "darwin":
+		return filepath.Join(home, "Library", "pnpm")
+	default:
+		return filepath.Join(home, ".local", "share", "pnpm")
+	}
+}

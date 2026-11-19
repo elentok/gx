@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -126,6 +127,19 @@ func (l *Launcher) evolveDirs(ticket tickets.Address) []string {
 	return dirs
 }
 
+// pnpmDirs is pnpm's home when the worktree at cwd uses pnpm, else nothing.
+// pnpm writes there during installs and runs, and claude asks about the dir on
+// every new session unless the launch adds it up front.
+func pnpmDirs(cwd string, tabEnv []string, home string) []string {
+	if !deps.UsesPnpm(cwd) {
+		return nil
+	}
+	if d := deps.PnpmHome(tabEnv, home, runtime.GOOS); d != "" {
+		return []string{d}
+	}
+	return nil
+}
+
 // agentEnv is the tab env, plus the run's agent (see AgentEnv) and, for an
 // investigate agent, its ticket's address so its CLI calls identify it (see
 // InvestigateEnv).
@@ -145,6 +159,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 	if t.Type == string(schema.TypeEvolve) {
 		extraDirs = l.evolveDirs(ticket)
 	}
+	extraDirs = append(extraDirs, pnpmDirs(cwd, l.Settings.Load().TabEnv, deps.SessionHomes.Claude)...)
 	// Every runner lookup uses the iteration label, not the ticket address.
 	label, _, _ := worktree.IterationIdentity(ticket.Epic, ticket.ID, "")
 	resumeID := one.ResumeSessionID
