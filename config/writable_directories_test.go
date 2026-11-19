@@ -8,10 +8,10 @@ import (
 func TestWritableDirectoriesProjectAddsToGlobal(t *testing.T) {
 	global := Config{Agents: DefaultAgentsConfig()}
 	project := global.WithProject(ProjectFile{Agents: &AgentsConfig{WritableDirectories: []string{"/project/cache"}}})
-	if !slices.Equal(project.Agents.WritableDirectories, []string{"~/Library/pnpm", "/project/cache"}) {
+	if !slices.Equal(project.Agents.WritableDirectories, []string{"/project/cache"}) {
 		t.Fatalf("directories = %v", project.Agents.WritableDirectories)
 	}
-	if !slices.Equal(global.Agents.WritableDirectories, []string{"~/Library/pnpm"}) {
+	if len(global.Agents.WritableDirectories) != 0 {
 		t.Fatal("project changed global directories")
 	}
 }
@@ -21,7 +21,7 @@ func TestParseWritableDirectories(t *testing.T) {
 		input string
 		want  []string
 	}{
-		{`{}`, []string{"~/Library/pnpm"}},
+		{`{}`, nil},
 		{`{"agents":{"writable-directories":[]}}`, []string{}},
 		{`{"agents":{"writable-directories":["/cache"]}}`, []string{"/cache"}},
 	} {

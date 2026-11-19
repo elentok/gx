@@ -124,7 +124,7 @@
           "description": "accepted in project.json, ignored"
         },
         "writable-directories": {
-          "description": "Additional directories agents may write. Project directories are added to the global list. Supports ~/ paths; relative paths use the agent's working directory. Applies on launch or resume. Default: ~/Library/pnpm.",
+          "description": "Additional directories agents may write. Project directories are added to the global list. Supports ~/ paths; relative paths use the agent's working directory. Applies on launch or resume. pnpm projects always get the pnpm home on top of this list.",
           "items": {
             "type": "string"
           },

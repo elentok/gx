@@ -105,8 +105,7 @@ func validateDefaultHarness(v string) error {
 // DefaultAgentsConfig returns the agents defaults.
 func DefaultAgentsConfig() AgentsConfig {
 	return AgentsConfig{
-		DefaultHarness:      HarnessClaude,
-		WritableDirectories: []string{"~/Library/pnpm"},
+		DefaultHarness: HarnessClaude,
 		Claude: AgentConfig{
 			Model: defaultClaudeModel, Effort: defaultClaudeEffort,
 			Light:     TierConfig{Model: defaultClaudeLightModel},
