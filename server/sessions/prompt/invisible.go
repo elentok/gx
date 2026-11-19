@@ -1,24 +1,32 @@
 package prompt
 
 import (
-	"strings"
 	"unicode"
 )
 
-// stripInvisible removes the invisible format characters (Unicode category Cf:
-// zero-width space, BOM, soft hyphen, bidi marks and the like) from text gx is
-// about to type. Claude strips them itself on Enter, shows "Removed N
-// invisible char" and holds the prompt unsent, so the Enter is lost. The
-// zero-width joiner and non-joiner stay: dropping them breaks emoji sequences
-// and Persian words. It returns the text and how many runes it removed.
+// stripInvisible removes the characters claude reports as "Removed N invisible
+// character from your prompt" from text gx is about to type: the Unicode
+// format characters (category Cf: zero-width space, BOM, soft hyphen, word
+// joiner, bidi marks, tags) and the line and paragraph separators U+2028 and
+// U+2029. Checked against claude 2.1.328.
+//
+// A zero-width joiner or non-joiner between two characters stays: claude keeps
+// it inside emoji sequences and Persian words, and drops it only at the edge of
+// the text or next to a space. It returns the text and how many runes it
+// removed.
 func stripInvisible(text string) (string, int) {
-	removed := 0
-	out := strings.Map(func(r rune) rune {
-		if unicode.Is(unicode.Cf, r) && r != '‌' && r != '‍' {
-			removed++
-			return -1
+	in := []rune(text)
+	out := make([]rune, 0, len(in))
+	for i, r := range in {
+		switch {
+		case r == '‌' || r == '‍':
+			if i == 0 || i == len(in)-1 || unicode.IsSpace(in[i-1]) || unicode.IsSpace(in[i+1]) {
+				continue
+			}
+		case unicode.Is(unicode.Cf, r), r == ' ', r == ' ':
+			continue
 		}
-		return r
-	}, text)
-	return out, removed
+		out = append(out, r)
+	}
+	return string(out), len(in) - len(out)
 }
