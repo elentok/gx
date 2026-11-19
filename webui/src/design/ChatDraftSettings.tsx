@@ -155,11 +155,15 @@ function useChoices(
 ) {
   const harness = harnessOf(settings)
   const usingDefaultModel = settings.model === ""
+  // An unset model launches on the worker tier, so that is the default; the probe's default row only stands in
+  // when the project configures no worker model.
+  const workerModel = tierOptions(tree, harness).find((t) => t.id === "worker")?.model
+  const defaultModel = workerModel || defaults.model
   // A tier the server gave no model is not offered: its id is not a model name.
   const candidates: Opt[] = [
     {
       value: "",
-      label: defaults.model ? String(modelName(defaults.model, harness)) : "Model",
+      label: defaultModel ? String(modelName(defaultModel, harness)) : "Model",
     },
     ...tierOptions(tree, harness).flatMap((t) =>
       t.model ? [{ value: t.model, label: String(modelName(t.model, harness)) }] : [],
@@ -198,10 +202,10 @@ function useChoices(
       value: settings.effort,
       options: efforts,
       // An effort needs a model, so with none known there is nothing to pair it with.
-      disabled: usingDefaultModel && !defaults.model,
+      disabled: usingDefaultModel && !defaultModel,
       onChange: (effort: string) =>
         // The server refuses an effort with no model: pin the model that would have been used.
-        onChange(effort && usingDefaultModel ? { effort, model: defaults.model } : { effort }),
+        onChange(effort && usingDefaultModel ? { effort, model: defaultModel } : { effort }),
     },
   ]
   // The pill's text: the model and effort in use, led by the harness only when it is not Claude.

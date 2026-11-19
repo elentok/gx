@@ -216,7 +216,8 @@ test("the settings and the brief render and Start is enabled", async () => {
 test("only tiers with a resolved model are offered as models", async () => {
   await mountOpen(fakeDrafts())
   const values = Array.from((control("Model") as HTMLSelectElement).options).map((o) => o.value)
-  expect(values).toEqual(["", "opus"])
+  // The worker tier is the default row's model, so the pinned draft keeps the one row.
+  expect(values).toEqual(["opus"])
 })
 
 test("a tier that names the default model, or another tier's model, is not listed twice", async () => {
@@ -362,10 +363,23 @@ test("an unset model and effort show what the chat will launch with, never Defau
 })
 
 test("an unresolved default leaves the plain model name and shows Auto for effort", async () => {
-  await mountOpen(fakeDrafts({ model: "", effort: "" }))
-  expect(chipText("Model")).toBe("Model")
-  expect(chipText("Effort")).toBe("Auto")
-  expect((control("Effort") as HTMLSelectElement).disabled).toBe(true)
+  claudeTiers = {}
+  try {
+    await mountOpen(fakeDrafts({ model: "", effort: "" }))
+    expect(chipText("Model")).toBe("Model")
+    expect(chipText("Effort")).toBe("Auto")
+    expect((control("Effort") as HTMLSelectElement).disabled).toBe(true)
+  } finally {
+    claudeTiers = { worker: "opus" }
+  }
+})
+
+test("an unset model shows the worker tier's model, not the probe's default", async () => {
+  await mountOpen(fakeDrafts({ model: "", effort: "" }), false, {
+    model: "claude-haiku-4-5",
+    effort: "",
+  })
+  expect(chipText("Model")).toBe("Claude Opus")
 })
 
 test("picking an effort with no model also saves the default model", async () => {
@@ -379,7 +393,7 @@ test("picking an effort with no model also saves the default model", async () =>
     brief: "Split the auth work out.",
     revision: 3,
     effort: "max",
-    model: "claude-opus-4-5",
+    model: "opus",
   })
 })
 
