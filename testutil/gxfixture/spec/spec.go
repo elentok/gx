@@ -97,6 +97,8 @@ type Scenario struct {
 	Drafts []Draft
 	// ChatDrafts are chat drafts seeded once the server is up, through the create route.
 	ChatDrafts []ChatDraft
+	// History seeds the Draft history lists before the server starts (see DraftHistoryScenario).
+	History []HistoryEntry
 	// Queue lists the epics put on the queue once the server is up.
 	Queue []string
 	// QueueAgents is the agent a queued address runs under (`queue add --agent`);

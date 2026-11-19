@@ -39,6 +39,22 @@ sessions are started with `gx server triage open`. Data: `testutil/gxfixture/spe
 source), Codex (`gpt-5.5-codex`/`high`, source) and a Claude one with a new-worktree folder. Both set `ForkHooks`: the server's
 `GX_FORK_HOOK_DIR` is `fork_hook_dir` in the fixture output; a `save-fail` or `start-fail` file there makes a draft save or a chat draft
 Start fail, and removing it disarms the hook. Data: `testutil/gxfixture/spec/fork.go`.
+`draft-history` (project `demo`, plus project `other`) seeds the Draft history before the server starts, with the real store, and holds the
+pages and sessions the Draft history popup flow opens: a Design draft with the idea "Idea of the history draft page", a chat draft named
+`history-chat-draft` with the brief "Brief of the history chat draft", an idle Claude chat, an idle Codex chat, an idle Design session on the
+map `history-design`, the project-level Fix agent (no History button) and a held Queue agent on `history-queue/01` (the `h` chord must not show
+there). Entries per list, newest first (each text is the constant in `testutil/gxfixture/spec/drafthistory.go`):
+- **Design drafts (8):** "History design draft whose Design exists" (slug `history-design`, the Design that exists), "History design draft with a
+  deleted image" (slug `gone-slug`, one image, file deleted from disk), "History design draft of another project" (project `other`), "History
+  design draft with two images", "History design draft plain A", "History design draft plain B", "History design draft plain C", and the oldest,
+  "History design draft with images not kept" (two images, `imagesDropped`).
+- **Chat drafts (6):** "History chat draft of Claude" (`claude`, `opus`, `max`, name `chat-claude`), "History chat draft of Codex" (`codex`,
+  `gpt-5.5-codex`, `high`, `chat-codex`), "History chat draft with an image" (`claude`, `opus`, `high`, new worktree, one image), then plain A (`codex`,
+  `low`), plain B (`claude`, `sonnet`, `medium`) and plain C (`claude`, `opus`, `low`): "History chat draft plain A" and so on.
+- **Sent messages (8):** "/history-command run it" (Claude chat, name `sent-command`), an images-only entry with no text (Claude chat `sent-only-images`,
+  one image), "History sent design message" (Design kind, slug `history-sent-slug`), "History sent chat message" (Chat kind, name
+  `history-sent-chat`), "History sent message with images" (two images), then "History sent plain A" (Design kind), "History sent plain B" and
+  "History sent plain C" (Chat kind). None of the names or slugs belongs to a seeded session.
 `backlog` (project `demo`, no Triage) seeds three backlogs holding 11 (`parser`, plus a claimed ticket that is not counted), 5 (`sync`) and
 0 (`webui`) open tickets, and the half-filled charting map `retry-work` for "Finish move": its Notes name `sync` and list tickets 01 to 04,
 of which 03 and 04 are still in the backlog. Start Design (`gx agents start-design demo:<backlog>`) runs a fake chat: it prints the "Start this

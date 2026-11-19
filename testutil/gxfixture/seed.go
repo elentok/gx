@@ -158,6 +158,9 @@ func (f *fixture) seed(sc scenario) error {
 	if err := seedDrafts(f.stateD, sc.Drafts); err != nil {
 		return err
 	}
+	if err := seedDraftHistory(f.stateD, sc.History); err != nil {
+		return err
+	}
 	if sc.Conversations != nil {
 		dir := filepath.Join(f.root, "data", "gx", "conversations")
 		started, recs := sc.Conversations(time.Now())
