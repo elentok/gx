@@ -112,6 +112,7 @@ var requiredFiles = []string{
 	"gx-prototype/LICENSE",
 	"gx-prototype/README.md",
 	"gx-prototype/agents/openai.yaml",
+	"gx-pwa/SKILL.md",
 	"gx-wayfinder/SKILL.md",
 	"gx-wayfinder/LICENSE",
 	"gx-wayfinder/README.md",
