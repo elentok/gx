@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/testutil/agentfake/triageplay"
 	"github.com/elentok/gx/testutil/gxfixture/bgtx"
 	"github.com/elentok/gx/testutil/gxfixture/limitseed"
+	"github.com/elentok/gx/testutil/gxfixture/perfdata"
 )
 
 const project = limitseed.Project
@@ -261,9 +262,9 @@ type Scenario struct {
 	// Spend seeds the budget ledger before the server starts, in the shape the
 	// --shape flag names (default normal), and prints the held agent's transcript path.
 	Spend bool
-	// WebPerf names the canned web performance samples (WebPerfFull or
-	// WebPerfLow) written to disk before the server starts.
-	WebPerf func() []WebPerfDay
+	// WebPerf names the canned web performance samples (perfdata.WebPerfFull or
+	// perfdata.WebPerfLow) written to disk before the server starts.
+	WebPerf func() []perfdata.WebPerfDay
 	// CheckWaiting writes a live check-lock waiting state for the held agent's
 	// worktree once it runs, and prints the file's path.
 	CheckWaiting bool

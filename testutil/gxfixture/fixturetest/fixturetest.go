@@ -31,7 +31,7 @@ import (
 	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
-	"github.com/elentok/gx/testutil/gxfixture/spec"
+	"github.com/elentok/gx/testutil/gxfixture/output"
 )
 
 // The binaries Run builds: gx, the fixture program, fakeclaude, fakecodex and the fake gh.
@@ -110,7 +110,7 @@ type Running struct {
 	stopped bool
 	began   time.Time     // when the test began starting this fixture
 	started time.Duration // how long the start took, slot wait included
-	spec.Output
+	output.Output
 }
 
 // TestBudget is the time one fixture test spends on starting the fixture, waiting

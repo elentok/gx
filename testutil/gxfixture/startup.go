@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/agentfake/codex"
+	"github.com/elentok/gx/testutil/gxfixture/output"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
@@ -243,7 +244,7 @@ func (f *fixture) prepareStore(sc scenario, shape string, port int, configs []st
 func forkHookDir(f *fixture) string { return filepath.Join(f.root, "fork-hooks") }
 
 // addScenarioOutput fills the Output fields that only some scenarios have.
-func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts map[string]string) {
+func (f *fixture) addScenarioOutput(res *output.Output, sc scenario, transcripts map[string]string) {
 	if sc.FakeGo || sc.FakeNpm {
 		res.GateDir = gateDir(f)
 	}
@@ -272,7 +273,7 @@ func (f *fixture) addScenarioOutput(res *spec.Output, sc scenario, transcripts m
 	}
 	if sc.ModelFakes {
 		home := filepath.Join(f.root, "home")
-		res.ModelFakes = &spec.ModelFakesOutput{
+		res.ModelFakes = &output.ModelFakesOutput{
 			FakeConfig: filepath.Join(f.root, "agentfake-commands.json"),
 			QueryLog:   filepath.Join(f.root, "model-queries.jsonl"),
 			ClaudeDir:  filepath.Dir(agentfake.TUILaunchLogPath(home, "x")),

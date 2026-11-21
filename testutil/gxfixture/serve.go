@@ -21,6 +21,7 @@ import (
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/gxfixture/output"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 	"github.com/elentok/gx/testutil/gxfixture/websignin"
 )
@@ -417,8 +418,8 @@ func (f *fixture) openDesign(ctx context.Context, sc scenario, addr string) erro
 }
 
 // buildOutput assembles what the fixture prints.
-func (f *fixture) buildOutput(sc scenario, rs *runningServer, s seeded) spec.Output {
-	res := spec.Output{WebURL: rs.webURL, CookieName: rs.in.CookieName, Cookie: rs.in.Cookie, Password: rs.password, TOTPSecret: rs.in.TOTPSecret, TOTPStep: rs.in.TOTPStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: f.gx, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: rs.logPath, AgentTranscript: s.agentTranscript, CheckWaitingFile: s.checkWaitingFile, OutsideTreePID: s.outsideTreePID}
+func (f *fixture) buildOutput(sc scenario, rs *runningServer, s seeded) output.Output {
+	res := output.Output{WebURL: rs.webURL, CookieName: rs.in.CookieName, Cookie: rs.in.Cookie, Password: rs.password, TOTPSecret: rs.in.TOTPSecret, TOTPStep: rs.in.TOTPStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: f.gx, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: rs.logPath, AgentTranscript: s.agentTranscript, CheckWaitingFile: s.checkWaitingFile, OutsideTreePID: s.outsideTreePID}
 	if sc.RateLimitFromUsage {
 		res.RateLimitReleaseFile = f.rateLimitReleaseFile()
 	}
@@ -429,7 +430,7 @@ func (f *fixture) buildOutput(sc scenario, rs *runningServer, s seeded) spec.Out
 	return res
 }
 
-func printOutput(o opts, res spec.Output) error {
+func printOutput(o opts, res output.Output) error {
 	if o.shellEnv {
 		fmt.Print(res.ShellEnv())
 		return nil

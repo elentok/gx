@@ -1,4 +1,6 @@
-package spec
+// Package output is the JSON gxfixture prints. It is apart from spec to keep
+// spec under its size limit.
+package output
 
 import (
 	"fmt"
@@ -99,6 +101,22 @@ type Output struct {
 	HostFiles *HostFilesOutput `json:"host_files,omitempty"`
 	// ModelFakes is the model-switch scenario's fake files; nil elsewhere.
 	ModelFakes *ModelFakesOutput `json:"model_fakes,omitempty"`
+}
+
+// HostFilesOutput is what the host-files scenario prints for its flows.
+type HostFilesOutput struct {
+	// Repo is demo's main checkout; SecondWorktree holds the file only the
+	// second worktree has (SecondOnly, relative to it).
+	Repo           string `json:"repo"`
+	SecondWorktree string `json:"second_worktree"`
+	SecondOnly     string `json:"second_only"`
+	// TempDir holds shot-1.png, owned by the running user.
+	TempDir string `json:"temp_dir"`
+	// OtherOrigin is the second local origin the mock page loads a script from
+	// and tries to fetch.
+	OtherOrigin string `json:"other_origin"`
+	// Ticket is the address of the ticket whose body holds the two paths.
+	Ticket string `json:"ticket"`
 }
 
 // ModelFakesOutput names what a model-switch flow reads and writes. The fakes

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
-	"github.com/elentok/gx/testutil/gxfixture/spec"
+	"github.com/elentok/gx/testutil/gxfixture/output"
 	"io"
 	"net/http"
 	"os"
@@ -18,7 +18,7 @@ import (
 )
 
 func TestShellEnv_ExportsTheCLIEnvAndTheFixtureVariablesQuoted(t *testing.T) {
-	o := spec.Output{
+	o := output.Output{
 		WebURL: "https://127.0.0.1:1/a b", CookieName: "__Host-gx_login_1", Cookie: "c", StateDir: "/tmp/s", Socket: "/tmp/s.sock", HoldFile: "/tmp/h",
 		Gx: "/bin/gx", DiskDir: "/tmp/disk", HealthDir: "/tmp/health", Env: []string{"HOME=/tmp/it's/home", "XDG_DATA_HOME=/tmp/d"},
 	}
@@ -167,28 +167,28 @@ func TestStart_WorktreeIsTheOwningWorkingDirectory(t *testing.T) {
 }
 
 func TestShellEnv_ExportsWorktreeWhenSet(t *testing.T) {
-	got := spec.Output{Worktree: "/w/wt-1"}.ShellEnv()
+	got := output.Output{Worktree: "/w/wt-1"}.ShellEnv()
 	if want := "export GXF_WORKTREE='/w/wt-1'\n"; !strings.Contains(got, want) {
 		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
 	}
 }
 
 func TestShellEnv_ExportsPID(t *testing.T) {
-	got := spec.Output{PID: 4242}.ShellEnv()
+	got := output.Output{PID: 4242}.ShellEnv()
 	if want := "export GXF_PID='4242'\n"; !strings.Contains(got, want) {
 		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
 	}
 }
 
 func TestShellEnv_ExportsRepoWhenSet(t *testing.T) {
-	got := spec.Output{Repo: "/r/repo"}.ShellEnv()
+	got := output.Output{Repo: "/r/repo"}.ShellEnv()
 	if want := "export GXF_REPO='/r/repo'\n"; !strings.Contains(got, want) {
 		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
 	}
 }
 
 func TestShellEnv_ExportsBrowserSessionWhenSet(t *testing.T) {
-	got := spec.Output{BrowserSession: "wt-1"}.ShellEnv()
+	got := output.Output{BrowserSession: "wt-1"}.ShellEnv()
 	if want := "export GXF_BROWSER_SESSION='wt-1'\n"; !strings.Contains(got, want) {
 		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
 	}
@@ -205,14 +205,14 @@ func TestStart_LogFileIsTheServerLogAndExists(t *testing.T) {
 }
 
 func TestShellEnv_ExportsLogFileWhenSet(t *testing.T) {
-	got := spec.Output{LogFile: "/tmp/r/server.out"}.ShellEnv()
+	got := output.Output{LogFile: "/tmp/r/server.out"}.ShellEnv()
 	if want := "export GXF_LOG_FILE='/tmp/r/server.out'\n"; !strings.Contains(got, want) {
 		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
 	}
 }
 
 func TestShellEnv_ExportsMockURLWhenSet(t *testing.T) {
-	got := spec.Output{MockURL: "http://127.0.0.1:2/"}.ShellEnv()
+	got := output.Output{MockURL: "http://127.0.0.1:2/"}.ShellEnv()
 	if want := "export GXF_MOCK_URL='http://127.0.0.1:2/'\n"; !strings.Contains(got, want) {
 		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
 	}

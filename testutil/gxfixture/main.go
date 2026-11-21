@@ -46,6 +46,7 @@ import (
 
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/gxfixture/catalog"
+	"github.com/elentok/gx/testutil/gxfixture/output"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
@@ -241,7 +242,7 @@ type fixture struct {
 	// devControl is the dev-mode scenario's fake pnpm control file; empty elsewhere.
 	devControl string
 	// hostFiles is the host-files scenario's printed paths; nil elsewhere.
-	hostFiles *spec.HostFilesOutput
+	hostFiles *output.HostFilesOutput
 }
 
 // waitReady polls until the server answers with its web URL and Setup code.

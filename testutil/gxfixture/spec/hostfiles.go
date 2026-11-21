@@ -11,19 +11,3 @@ const (
 	HostFilesEpic   = "files-epic"
 	HostFilesTicket = "01"
 )
-
-// HostFilesOutput is what the host-files scenario prints for its flows.
-type HostFilesOutput struct {
-	// Repo is demo's main checkout; SecondWorktree holds the file only the
-	// second worktree has (SecondOnly, relative to it).
-	Repo           string `json:"repo"`
-	SecondWorktree string `json:"second_worktree"`
-	SecondOnly     string `json:"second_only"`
-	// TempDir holds shot-1.png, owned by the running user.
-	TempDir string `json:"temp_dir"`
-	// OtherOrigin is the second local origin the mock page loads a script from
-	// and tries to fetch.
-	OtherOrigin string `json:"other_origin"`
-	// Ticket is the address of the ticket whose body holds the two paths.
-	Ticket string `json:"ticket"`
-}

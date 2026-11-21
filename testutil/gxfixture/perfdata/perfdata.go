@@ -1,4 +1,6 @@
-package spec
+// Package perfdata holds the canned web performance samples of the
+// web-performance scenarios. It is apart from spec to keep spec under its size limit.
+package perfdata
 
 import (
 	"fmt"

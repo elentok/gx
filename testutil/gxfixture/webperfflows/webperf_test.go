@@ -8,7 +8,7 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
-	"github.com/elentok/gx/testutil/gxfixture/spec"
+	"github.com/elentok/gx/testutil/gxfixture/perfdata"
 )
 
 func TestMain(m *testing.M) {
@@ -126,7 +126,7 @@ func TestWebPerformanceFixture_VolumeSpansTheSampleThreshold(t *testing.T) {
 func TestWebPerformanceFixture_SeedsDaysRoutesAndDevSamples(t *testing.T) {
 	routes := map[string]bool{}
 	dev := 0
-	data := spec.WebPerfFull()
+	data := perfdata.WebPerfFull()
 	for _, d := range data {
 		for _, s := range d.Samples {
 			if s.Metric == "route_ready" && s.Env == "prod" {

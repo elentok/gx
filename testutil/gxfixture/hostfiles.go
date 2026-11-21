@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/gxfixture/output"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 	"github.com/elentok/gx/transcript"
 )
@@ -195,7 +196,7 @@ func (f hostFilesFixture) setup(shape string) error {
 	if out, err := f.cli("tickets", "section", addr, "Links", body); err != nil {
 		return fmt.Errorf("ticket body: %w\n%s", err, out)
 	}
-	f.hostFiles = &spec.HostFilesOutput{Repo: repo, SecondWorktree: second, SecondOnly: hostFilesSecondOnly, TempDir: temp, OtherOrigin: other, Ticket: addr}
+	f.hostFiles = &output.HostFilesOutput{Repo: repo, SecondWorktree: second, SecondOnly: hostFilesSecondOnly, TempDir: temp, OtherOrigin: other, Ticket: addr}
 	return nil
 }
 
