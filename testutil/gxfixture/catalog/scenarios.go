@@ -654,6 +654,12 @@ var Scenarios = map[string]scenario{
 	// bulk-actions: finished, queued, held and Design epics, live agents and
 	// archived epics for the bulk actions. See spec.BulkActionsScenario.
 	"bulk-actions": spec.BulkActionsScenario(),
+
+	// The Initiative scenarios. See spec/initiative.go.
+	"initiative-fresh":           spec.InitiativeFreshScenario(),
+	"initiative-m1-implementing": spec.InitiativeM1ImplementingScenario(),
+	"initiative-m1-gated":        spec.InitiativeM1GatedScenario(),
+	"initiative-broken-links":    spec.InitiativeBrokenLinksScenario(),
 	// triage: follow-ups and a Triage in the state --shape names (default c-few).
 	// run swaps in spec.TriageScenario(shape).
 	"triage": {TriageShaped: true},
