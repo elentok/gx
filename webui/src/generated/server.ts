@@ -2087,6 +2087,118 @@ export interface FinishedEpic {
 }
 
 //////////
+// source: initiatives.go
+
+/**
+ * InitiativeList is the Initiatives page's read model: each project with at
+ * least one Initiative. GET /v1/initiatives. It carries no Start action.
+ */
+export interface InitiativeList {
+  projects: InitiativeProject[];
+}
+/**
+ * InitiativeProject is one project's Initiatives.
+ */
+export interface InitiativeProject {
+  project: string;
+  initiatives: InitiativeRow[];
+}
+/**
+ * InitiativeRow is one Initiative in the list. State is "active", "stopped" or
+ * "finished". Done counts gated Milestones out of Total. Current is the slug of
+ * the first Milestone not gated, empty when all are. StoppedAt is the number of
+ * the Milestone whose gate stopped the Initiative, 0 unless State is "stopped".
+ */
+export interface InitiativeRow {
+  address: string;
+  slug: string;
+  state: string;
+  done: number /* int */;
+  total: number /* int */;
+  current: string;
+  stopped_at: number /* int */;
+}
+/**
+ * InitiativePage is one Initiative's page data. GET /v1/initiatives/detail.
+ */
+export interface InitiativePage {
+  address: string;
+  slug: string;
+  state: string;
+  stopped_at: number /* int */;
+  destination: string;
+  milestones: InitiativeMilestone[];
+  assumptions: InitiativeAssumption[];
+  deferred: InitiativeDeferred[];
+  gate_notes: InitiativeGateNote[];
+  unparsed: InitiativeUnparsed[];
+}
+/**
+ * InitiativeAssumption is one parsed Assumption.
+ */
+export interface InitiativeAssumption {
+  n: number /* int */;
+  text: string;
+  tested_by: string;
+  state: string;
+  evidence: string;
+}
+/**
+ * InitiativeDeferred is one parsed Deferred item.
+ */
+export interface InitiativeDeferred {
+  item: string;
+  to: string;
+  why: string;
+  from: string;
+  state: string;
+}
+/**
+ * InitiativeGateNote is one gate note: the Milestone slug, its outcome, the
+ * Assumption results it recorded and its taught and placed lines.
+ */
+export interface InitiativeGateNote {
+  slug: string;
+  outcome: string;
+  assumptions: InitiativeGateAssumption[];
+  taught: string[];
+  placed: string[];
+}
+/**
+ * InitiativeGateAssumption is one "A<n> | state | evidence" line of a gate note.
+ */
+export interface InitiativeGateAssumption {
+  n: number /* int */;
+  state: string;
+  evidence: string;
+}
+/**
+ * InitiativeMilestone is one Milestone. State is "sketch", "designing",
+ * "implementing", "merged", "gated" or "broken". A sketch or broken Milestone
+ * has empty DesignAddress and ImplAddress; a broken one keeps Design as the
+ * plain slug the Initiative names.
+ */
+export interface InitiativeMilestone {
+  number: number /* int */;
+  slug: string;
+  name: string;
+  goal: string;
+  state: string;
+  broken: boolean;
+  design: string;
+  design_address: string;
+  impl_address: string;
+}
+/**
+ * InitiativeUnparsed is a body line that did not parse, verbatim, with the
+ * section it came from.
+ */
+export interface InitiativeUnparsed {
+  section: string;
+  raw: string;
+}
+
+//////////
 // source: limitburn.go
 
 /**

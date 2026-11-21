@@ -75,6 +75,7 @@ type View struct {
 	Done       int    // gated Milestones
 	Total      int    // parsed Milestones
 	Current    string // slug of the first Milestone not gated, "" when all are
+	StoppedAt  int    // Milestone number of the last gate note when State is stopped, else 0
 	Problems   []Problem
 	// Orphans are map epics whose initiative: and milestone: match a
 	// Milestone that links no Design.
@@ -88,7 +89,7 @@ func Read(init tickets.Epic, live, archived []tickets.Epic) View {
 	v := View{Slug: init.Name, State: StateActive}
 	find := func(name string) (tickets.Epic, bool) { return findEpic(name, live, archived) }
 
-	gated, lastOutcome := gateInfo(body.GateNotes)
+	gated, lastOutcome, lastSlug := gateInfo(body.GateNotes)
 	v.collectUnparsed(body)
 
 	for _, e := range body.Milestones {
@@ -129,6 +130,11 @@ func Read(init tickets.Epic, live, archived []tickets.Epic) View {
 	switch lastOutcome {
 	case OutcomeStop:
 		v.State = StateStopped
+		for _, m := range v.Milestones {
+			if m.Slug == lastSlug {
+				v.StoppedAt = m.Number
+			}
+		}
 	case OutcomeDone:
 		v.State = StateFinished
 	}
@@ -283,7 +289,7 @@ func BackLinkFor(e tickets.Epic, all []tickets.Epic) BackLink {
 
 // gateInfo returns the slugs that have a gate note and the outcome of the last
 // note.
-func gateInfo(lines []Entry[GateLine]) (map[string]bool, string) {
+func gateInfo(lines []Entry[GateLine]) (map[string]bool, string, string) {
 	gated := map[string]bool{}
 	var last, current string
 	for _, e := range lines {
@@ -301,7 +307,7 @@ func gateInfo(lines []Entry[GateLine]) (map[string]bool, string) {
 			}
 		}
 	}
-	return gated, last
+	return gated, last, current
 }
 
 func findEpic(name string, sets ...[]tickets.Epic) (tickets.Epic, bool) {

@@ -17,6 +17,7 @@ packages:
       - fixagent.go
       - healthreport.go
       - index.go
+      - initiatives.go
       - limitburn.go
       - limitsstore.go
       - queue.go

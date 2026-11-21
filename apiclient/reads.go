@@ -165,6 +165,20 @@ func (r *Reads) Backlog(ctx context.Context) (wire.BacklogList, error) {
 	return l, err
 }
 
+// Initiatives returns each project's Initiatives with state and counts.
+func (r *Reads) Initiatives(ctx context.Context) (wire.InitiativeList, error) {
+	var l wire.InitiativeList
+	err := r.t.get(ctx, "/v1/initiatives", &l)
+	return l, err
+}
+
+// InitiativeDetail returns one Initiative's page data.
+func (r *Reads) InitiativeDetail(ctx context.Context, address string) (wire.InitiativePage, error) {
+	var p wire.InitiativePage
+	err := r.t.get(ctx, "/v1/initiatives/detail?address="+url.QueryEscape(address), &p)
+	return p, err
+}
+
 // ArchivedEpics returns the archived epics and Designs, newest first.
 func (r *Reads) ArchivedEpics(ctx context.Context) (wire.ArchivedEpicList, error) {
 	var l wire.ArchivedEpicList
