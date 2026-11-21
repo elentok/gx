@@ -161,7 +161,7 @@ func TestReshapeInsert_Refusals(t *testing.T) {
 	refuses(t, repo, ticket, "out of range", append(slices.Clone(add), "7")...)
 }
 
-func TestReshapeDestination_ReplacesTheFirstLineAndKeepsTheRest(t *testing.T) {
+func TestReshapeDestination_ReplacesTheWholeSection(t *testing.T) {
 	repo, ticket := reshapeSetup(t)
 	before := readFile(t, ticket)
 
@@ -169,13 +169,17 @@ func TestReshapeDestination_ReplacesTheFirstLineAndKeepsTheRest(t *testing.T) {
 		t.Fatal(err)
 	}
 	after := readFile(t, ticket)
-	want := strings.Replace(before, "old destination\n", "new destination\n", 1)
+	want := strings.Replace(before, "old destination\n"+unparsedDestination+"\n", "new destination\n", 1)
 	if after != want {
-		t.Errorf("file changed beyond the Destination line:\n%s", after)
+		t.Errorf("file changed beyond the Destination section:\n%s", after)
 	}
-	if !strings.Contains(schemaSection(after, "Destination"), unparsedDestination) {
-		t.Errorf("unparsed Destination line lost: %q", schemaSection(after, "Destination"))
-	}
+}
+
+func TestMilestoneSlug_RefusesUnplaced(t *testing.T) {
+	repo, ticket := reshapeSetup(t)
+
+	refuses(t, repo, ticket, "reserved", "milestone", "add", "mine:init", "unplaced", "--name", "N", "--goal", "g")
+	refuses(t, repo, ticket, "reserved", "milestone", "set", "mine:init", "m3", "--slug", "unplaced")
 }
 
 func TestReshapeDestination_RefusesBlankText(t *testing.T) {

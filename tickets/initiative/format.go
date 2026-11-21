@@ -477,17 +477,10 @@ func ParseBody(body string) Body {
 	}
 }
 
-// SetDestination replaces the first line under ## Destination with text and
-// keeps every later line of the section as it was. A missing or empty section
-// becomes text alone.
+// SetDestination replaces the whole ## Destination section with text. The
+// Destination is free prose with no line format, so no line needs protecting.
 func (b *Body) SetDestination(text string) {
-	lines := strings.Split(schema.Section(b.raw, Destination), "\n")
-	if lines[0] == "" {
-		lines = []string{text}
-	} else {
-		lines[0] = text
-	}
-	b.raw = schema.SetSection(b.raw, Destination, strings.Join(lines, "\n"))
+	b.raw = schema.SetSection(b.raw, Destination, text)
 }
 
 // Render writes the sections back into the original body. Other sections, and

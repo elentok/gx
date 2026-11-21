@@ -1,6 +1,7 @@
 package ticketsflow
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -29,6 +30,17 @@ func runTicketsEpicAddFields(cfgDirs config.Dirs, cwd, arg string, fields ticket
 	}
 	if err := epicname.Refuse(projectDir, project, name); err != nil {
 		return err
+	}
+	if fields.Initiative != "" && fields.Milestone != "" {
+		for _, sibling := range []string{name + "-design", name + "-impl"} {
+			why, err := epicname.Taken(projectDir, project, sibling)
+			if err != nil {
+				return err
+			}
+			if why != "" {
+				return errors.New(why)
+			}
+		}
 	}
 	records, err := conversations.DirIn(cfgDirs)
 	if err != nil {

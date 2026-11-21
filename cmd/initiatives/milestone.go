@@ -138,6 +138,9 @@ func namedBy(m initiative.MilestoneView) string {
 // checkSlugFree refuses a slug that is already a Milestone or whose epic
 // names exist, live or archived.
 func checkSlugFree(b *initiative.Body, v initiative.View, exists epicSet, slug string) error {
+	if slug == initiative.Unplaced {
+		return fmt.Errorf("%q is reserved for deferred items no Milestone owns; pick another slug", slug)
+	}
 	for _, e := range b.Milestones {
 		if !e.Unparsed() && e.Value.Slug == slug {
 			return fmt.Errorf("Milestone %q already exists", slug)

@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 )
 
 // mergeOldEpicTicket commits an earlier epic's ticket onto the repo's trunk,
@@ -45,6 +46,20 @@ func TestRunTicketsEpicAdd_RefusesNameUsedBefore(t *testing.T) {
 	}
 	if err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, "mine:old-2", "loop", "open", "", &bytes.Buffer{}); err != nil {
 		t.Errorf("old-2: %v, want created", err)
+	}
+}
+
+func TestRunTicketsEpicAdd_MilestoneDesignRefusesExistingImpl(t *testing.T) {
+	cwd, project := setupEpicAddProject(t)
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "init-m1-impl"))
+
+	fields := tickets.EpicFields{Kind: "map", Initiative: "init", Milestone: "m1"}
+	err := runTicketsEpicAddFields(config.DirsFrom(envFor(t)), cwd, "mine:init-m1", fields, "", &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), `"init-m1-impl"`) {
+		t.Errorf("err = %v, want refusal naming init-m1-impl", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(project, "init-m1")); statErr == nil {
+		t.Error("refusal wrote an epic directory")
 	}
 }
 

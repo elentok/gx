@@ -265,3 +265,15 @@ func countMilestones(s string) (int, int, []string)  { return tally(ParseMilesto
 func countAssumptions(s string) (int, int, []string) { return tally(ParseAssumptions(s)) }
 func countDeferred(s string) (int, int, []string)    { return tally(ParseDeferred(s)) }
 func countGate(s string) (int, int, []string)        { return tally(ParseGateNotes(s)) }
+
+func TestSetDestination_ReplacesTheWholeSection(t *testing.T) {
+	b := ParseBody("## Initial prompt\n\np\n\n## Destination\n\nline one\nline two\n\n## Milestones\n\n- m1 | One | goal: g\n")
+	b.SetDestination("fresh")
+	got, err := b.Render()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(got, "line one") || strings.Contains(got, "line two") || !strings.Contains(got, "fresh") {
+		t.Errorf("Destination not fully replaced:\n%s", got)
+	}
+}
