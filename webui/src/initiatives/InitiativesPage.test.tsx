@@ -106,13 +106,6 @@ test("lists Initiatives per project with state, progress and the current Milesto
   )
 })
 
-test("the row link opens the Initiative page stub with the slug", async () => {
-  renderInitiatives(() => new Response(JSON.stringify(list)))
-
-  fireEvent.click(await screen.findByRole("link", { name: "mobile-app" }))
-  expect(await screen.findByRole("heading", { name: "mobile-app" })).toBeTruthy()
-})
-
 test("with no Initiative anywhere the page says how to start one", async () => {
   renderInitiatives(() => new Response(JSON.stringify({ projects: [] })))
 

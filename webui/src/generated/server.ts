@@ -2203,6 +2203,14 @@ export interface InitiativeMilestone {
   design: string;
   design_address: string;
   impl_address: string;
+  /**
+   * ImplExists is false while the Milestone is only designing: ImplAddress
+   * then names an epic that is not there yet. The Archived flags send a link to
+   * the Archive page.
+   */
+  impl_exists: boolean;
+  design_archived: boolean;
+  impl_archived: boolean;
 }
 /**
  * InitiativeUnparsed is a body line that did not parse, verbatim, with the

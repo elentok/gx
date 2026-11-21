@@ -78,7 +78,7 @@ func TestInitiatives_PageHasMilestonesAndSections(t *testing.T) {
 		{Number: 1, Slug: "a", Name: "a name", Goal: "goal of a", State: "sketch"},
 		{Number: 2, Slug: "b", Name: "b name", Goal: "goal of b", State: "designing", Design: "db", DesignAddress: "proj:db", ImplAddress: "proj:db-impl"},
 		{Number: 3, Slug: "c", Name: "c name", Goal: "goal of c", State: "broken", Broken: true, Design: "gone"},
-		{Number: 4, Slug: "d", Name: "d name", Goal: "goal of d", State: "designing", Design: "arch", DesignAddress: "proj:arch", ImplAddress: "proj:arch-impl"},
+		{Number: 4, Slug: "d", Name: "d name", Goal: "goal of d", State: "designing", Design: "arch", DesignAddress: "proj:arch", ImplAddress: "proj:arch-impl", DesignArchived: true},
 	}
 	if len(p.Milestones) != len(want) {
 		t.Fatalf("milestones = %+v", p.Milestones)

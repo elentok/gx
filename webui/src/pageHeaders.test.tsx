@@ -340,11 +340,25 @@ const rows: Row[] = [
     marker: "gx initiatives new",
   },
   {
-    name: "initiative stub",
+    name: "initiative loading",
     pattern: "/initiatives/*",
     path: "/initiatives/gx:payments-rewrite",
-    fetchers: {},
-    marker: "gx:payments-rewrite",
+    fetchers: { initiative: never },
+    marker: "Loading initiative",
+  },
+  {
+    name: "initiative failed",
+    pattern: "/initiatives/*",
+    path: "/initiatives/gx:payments-rewrite",
+    fetchers: { initiative: failing },
+    marker: "Could not load the initiative",
+  },
+  {
+    name: "initiative not found",
+    pattern: "/initiatives/*",
+    path: "/initiatives/gx:payments-rewrite",
+    fetchers: { initiative: notFound },
+    marker: "Initiative not found",
   },
   {
     name: "cleanup loading",

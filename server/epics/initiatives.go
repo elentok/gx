@@ -122,6 +122,7 @@ func initiativePage(project string, e tickets.Epic, live, archived []tickets.Epi
 		}
 		if m.ImplEpic != "" {
 			wm.DesignAddress, wm.ImplAddress = addr(m.Design), addr(m.ImplEpic)
+			wm.ImplExists, wm.DesignArchived, wm.ImplArchived = m.ImplExists, m.DesignArchived, m.ImplArchived
 		}
 		p.Milestones = append(p.Milestones, wm)
 	}

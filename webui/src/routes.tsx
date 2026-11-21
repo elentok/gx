@@ -38,7 +38,7 @@ import type {
   PostSwitch,
 } from "./schedules/schedules"
 import type { FetchBacklog, PostFinishMove, PostStartDesign } from "./backlog/backlog"
-import type { FetchInitiatives } from "./initiatives/initiatives"
+import type { FetchInitiative, FetchInitiatives } from "./initiatives/initiatives"
 import { EpicsPage } from "./epics/EpicsPage"
 import type { FetchEpicList } from "./epics/list"
 import type { FetchCleanup, PostCleanup } from "./cleanup/cleanup"
@@ -265,6 +265,7 @@ export interface RouteFetchers {
   archived?: FetchArchived
   backlog?: FetchBacklog
   initiatives?: FetchInitiatives
+  initiative?: FetchInitiative
   startDesign?: PostStartDesign
   finishMove?: PostFinishMove
   schedules?: FetchSchedules
@@ -378,7 +379,7 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
     },
     { path: "/initiatives", element: <InitiativesPage fetchList={fetchers.initiatives} /> },
     // An Initiative's address holds a colon (project:slug), so it arrives as the splat.
-    { path: "/initiatives/*", element: <InitiativePage /> },
+    { path: "/initiatives/*", element: <InitiativePage fetchDetail={fetchers.initiative} /> },
     {
       path: "/schedules",
       element: <SchedulesPage fetchList={fetchers.schedules} post={fetchers.switchSchedule} />,

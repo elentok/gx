@@ -95,6 +95,12 @@ type InitiativeMilestone struct {
 	Design        string `json:"design"`
 	DesignAddress string `json:"design_address"`
 	ImplAddress   string `json:"impl_address"`
+	// ImplExists is false while the Milestone is only designing: ImplAddress
+	// then names an epic that is not there yet. The Archived flags send a link to
+	// the Archive page.
+	ImplExists     bool `json:"impl_exists"`
+	DesignArchived bool `json:"design_archived"`
+	ImplArchived   bool `json:"impl_archived"`
 }
 
 // InitiativeUnparsed is a body line that did not parse, verbatim, with the

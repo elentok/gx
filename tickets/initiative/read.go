@@ -46,6 +46,9 @@ type MilestoneView struct {
 	ImplEpic         string // "<design>-impl", empty without a live design link
 	State            string
 	Broken           bool
+	// ImplExists is whether the impl epic is in the store, live or archived;
+	// DesignArchived and ImplArchived say that epic is archived.
+	ImplExists, DesignArchived, ImplArchived bool
 }
 
 // NamesSlug reports whether the Milestone's slug is named elsewhere, by a
@@ -106,7 +109,11 @@ func Read(init tickets.Epic, live, archived []tickets.Epic) View {
 			} else {
 				mv.ImplEpic = m.Design + tickets.ImplEpicSuffix
 				mv.State = MilestoneDesigning
+				_, designLive := findEpic(m.Design, live)
+				mv.DesignArchived = !designLive
 				if impl, ok := find(mv.ImplEpic); ok {
+					_, implLive := findEpic(mv.ImplEpic, live)
+					mv.ImplExists, mv.ImplArchived = true, !implLive
 					mv.State = MilestoneImplementing
 					if !impl.MergedAt.IsZero() {
 						mv.State = MilestoneMerged
