@@ -54,6 +54,34 @@ test("the title is the only link and points at the epic page", () => {
   expect(links[0].getAttribute("href")).toBe("#/e/gx:blog")
 })
 
+test.each(["implementation", "design"])(
+  "a %s card with back-link data shows Milestone N of the Initiative, linked to its page",
+  (kind) => {
+    renderThemed(
+      <EpicCard
+        row={needsYou({
+          card_kind: kind as EpicListRow["card_kind"],
+          milestone: 2,
+          initiative: "Launch",
+          initiative_address: "gx:launch",
+        })}
+      />,
+    )
+    const line = screen.getByTestId("back-link")
+    expect(text(line)).toBe("Milestone 2 of Launch")
+    const links = screen.getAllByRole("link")
+    expect(links).toHaveLength(2)
+    expect(within(line).getByRole("link", { name: "Launch" }).getAttribute("href")).toBe(
+      "#/initiatives/gx:launch",
+    )
+  },
+)
+
+test("a card whose link does not resolve shows no back-link line", () => {
+  renderThemed(<EpicCard row={needsYou({ milestone: 2 })} />)
+  expect(screen.queryByTestId("back-link")).toBeNull()
+})
+
 test("a dirty-trunk row renders both buttons and the reason, with no file list", () => {
   renderThemed(
     <EpicCard

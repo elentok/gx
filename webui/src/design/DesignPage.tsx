@@ -4,6 +4,7 @@ import { useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail"
 import { useDetailReady } from "../useReady"
+import { BackLinkLine } from "../initiatives/BackLinkLine"
 import { EpicRing } from "../epic/EpicRing"
 import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list"
 import { PageIcon } from "../page/PageIcon"
@@ -111,7 +112,12 @@ function DesignBody({
                 : undefined,
           }
         }}
-        subtitleSuffix={card?.section === SectionOnHold && " · On hold"}
+        subtitleSuffix={
+          <>
+            {card?.section === SectionOnHold && " · On hold"}
+            {detail && <BackLinkLine link={detail} />}
+          </>
+        }
         chatTop={({ questions }) =>
           !questions &&
           detail &&

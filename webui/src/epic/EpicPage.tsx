@@ -33,6 +33,7 @@ import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list"
 import { Markdown } from "../markdown/Markdown"
 import { DetailPage } from "../page/DetailPage"
 import { FileLinkProvider, NoFileLinks } from "../files/FileLinkContext"
+import { BackLinkLine } from "../initiatives/BackLinkLine"
 import { PageHeader } from "../page/PageHeader"
 import { StateHeader } from "../page/StateHeader"
 import { PageIcon } from "../page/PageIcon"
@@ -544,6 +545,7 @@ function EpicPageBody({
             subtitle={
               <>
                 <StatsLine detail={detail} now={now} designLive={designLive} />
+                <BackLinkLine link={detail} />
                 {detail.summary ? <DescriptionLine summary={detail.summary} /> : null}
               </>
             }

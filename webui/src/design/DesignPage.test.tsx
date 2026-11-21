@@ -157,6 +157,22 @@ test("the meta line holds no model and no epic link; the menu's Agent block has 
   expect(block.queryByText("Effort")).toBeNull()
 })
 
+test("the header shows Milestone N of the Initiative when the detail has it, and nothing otherwise", async () => {
+  render(
+    [map("a")],
+    [],
+    "/d/gx:a",
+    detailOf({ milestone: 3, initiative: "Launch", initiative_address: "gx:launch" }),
+  )
+  const line = await screen.findByTestId("back-link")
+  expect(line.textContent).toBe("Milestone 3 of Launch")
+  expect(within(line).getByRole("link").getAttribute("href")).toBe("#/initiatives/gx:launch")
+  cleanup()
+  render([map("a")], [])
+  await metaText()
+  expect(screen.queryByTestId("back-link")).toBeNull()
+})
+
 test("on a phone the Agent block shows Effort and Tier, and no model", () =>
   onPhone(async () => {
     render([map("a")], [session("a", { tier: "worker", model: "sonnet", effort: "medium" })])

@@ -130,6 +130,21 @@ test("the epic page title is a plain heading, not a dropdown, and there is no ba
   expect(within(title).queryByRole("button")).toBeNull()
 })
 
+test("the header shows Milestone N of the Initiative when the detail has it, and nothing otherwise", async () => {
+  render("/e/gx:blog-impl", [joined], "loop", {
+    detail: { milestone: 3, initiative: "Launch", initiative_address: "gx:launch" },
+  })
+  const line = await screen.findByTestId("back-link")
+  expect(line.textContent).toBe("Milestone 3 of Launch")
+  expect(within(line).getByRole("link").getAttribute("href")).toBe("#/initiatives/gx:launch")
+})
+
+test("a header whose epic has no resolved link shows no back-link line", async () => {
+  render("/e/gx:blog-impl", [joined])
+  await screen.findByTestId("stats-line")
+  expect(screen.queryByTestId("back-link")).toBeNull()
+})
+
 test("a Design's epic page has an Open implementation epic button that goes to the -impl page", async () => {
   render("/e/gx:blog", [joined], "map")
   fireEvent.click(await screen.findByRole("button", { name: "Open implementation epic" }))

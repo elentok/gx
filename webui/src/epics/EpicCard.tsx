@@ -25,6 +25,7 @@ import {
   type EpicListRow,
   type Workspace,
 } from "../generated/server"
+import { BackLinkLine } from "../initiatives/BackLinkLine"
 import { PAGE_ATTR, PAGE_OPEN_ATTR } from "../select/pageKeys"
 import { SelectBox } from "../shell/SidebarSelect"
 import { followUpsFocus } from "../workspaces/followUpsBadge"
@@ -377,6 +378,7 @@ export function EpicCard({
               {row.status_words}
             </Text>
           </Text>
+          <BackLinkLine link={row} />
         </Box>
         {row.workspace && (
           <Box ml="auto" flex="none">
