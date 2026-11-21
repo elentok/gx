@@ -52,6 +52,20 @@ func storeCmd(d Deps, use, short string, setup func(*cobra.Command), build func(
 	return cmd
 }
 
+// designName turns a Design flag value, bare or project:epic, into the bare
+// epic name the body stores. A project other than the Initiative's is refused.
+func designName(initiativeAddr, value string) (string, error) {
+	project, _, _ := strings.Cut(initiativeAddr, ":")
+	p, name, ok := strings.Cut(value, ":")
+	if !ok {
+		return value, nil
+	}
+	if p != project {
+		return "", fmt.Errorf("Design %q is in project %q, but the Initiative is in %q: a Design must live in the Initiative's project", value, p, project)
+	}
+	return name, nil
+}
+
 func newDeferredAdd(d Deps) *cobra.Command {
 	return storeCmd(d, "add <project:initiative> <item>", "add an open deferred item",
 		func(c *cobra.Command) {
@@ -66,6 +80,10 @@ func newDeferredAdd(d Deps) *cobra.Command {
 			to, _ := c.Flags().GetString("to")
 			why, _ := c.Flags().GetString("why")
 			from, _ := c.Flags().GetString("from")
+			from, err := designName(args[0], from)
+			if err != nil {
+				return nil, err
+			}
 			return func(b *initiative.Body, v initiative.View, _ epicSet) (string, error) {
 				if err := checkPlacement(v, to); err != nil {
 					return "", err

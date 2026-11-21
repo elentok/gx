@@ -74,6 +74,10 @@ func newMilestoneSet(d Deps) *cobra.Command {
 			}
 			if c.Flags().Changed("design") {
 				design, _ := c.Flags().GetString("design")
+				design, err := designName(args[0], design)
+				if err != nil {
+					return "", err
+				}
 				if !exists(design) {
 					return "", fmt.Errorf("Design %q does not exist in the store", design)
 				}

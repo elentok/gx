@@ -93,6 +93,20 @@ func TestMilestoneSetDesign_LinksOnlyTheNamedMilestone(t *testing.T) {
 	refuses(t, repo, ticket, "does not exist", "milestone", "set", "mine:init", "m2", "--design", "missing")
 }
 
+func TestMilestoneSetDesign_AcceptsProjectEpicOfTheInitiativesProject(t *testing.T) {
+	repo, project := setup(t)
+	ticket := seedInitiative(t, project, milestoneBody)
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "d2"))
+
+	if _, err := run(t, repo, "milestone", "set", "mine:init", "m2", "--design", "mine:d2"); err != nil {
+		t.Fatal(err)
+	}
+	if got := milestoneBySlug(t, ticket, "m2").Design; got != "d2" {
+		t.Errorf("m2 design = %q, want the bare name", got)
+	}
+	refuses(t, repo, ticket, `in project "other"`, "milestone", "set", "mine:init", "m3", "--design", "other:d2")
+}
+
 func TestMilestoneClearDesign_BackToSketchAndDropsTheBrokenMarker(t *testing.T) {
 	repo, project := setup(t)
 	// d1 is not in the store, so m1 is broken.
