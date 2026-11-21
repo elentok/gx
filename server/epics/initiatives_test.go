@@ -71,7 +71,7 @@ func TestInitiatives_PageHasMilestonesAndSections(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("status %d", code)
 	}
-	if p.Slug != "alpha" || p.State != "active" || !strings.Contains(p.Destination, "Go somewhere.") {
+	if p.Slug != "alpha" || p.Project != "proj" || p.State != "active" || !strings.Contains(p.Destination, "Go somewhere.") {
 		t.Errorf("header = %+v", p)
 	}
 	want := []wire.InitiativeMilestone{

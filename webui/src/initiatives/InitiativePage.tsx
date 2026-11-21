@@ -20,13 +20,7 @@ import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import type { Tone } from "../ui/tone"
 import { useFetched } from "../useFetched"
 import { useFetchedReady } from "../useReady"
-import { fetchInitiative, type FetchInitiative } from "./initiatives"
-
-const INITIATIVE_STATE: Record<string, { label: string; tone: Tone }> = {
-  active: { label: "Active", tone: "waiting" },
-  stopped: { label: "Stopped", tone: "deadlocked" },
-  finished: { label: "Finished", tone: "done" },
-}
+import { fetchInitiative, INITIATIVE_STATE, keyed, type FetchInitiative } from "./initiatives"
 
 const MILESTONE_TONE: Record<string, Tone> = {
   sketch: "muted",
@@ -105,22 +99,114 @@ function Empty({ children }: { children: ReactNode }) {
 function UnparsedLines({ lines }: { lines: InitiativeUnparsed[] }) {
   return (
     <>
-      {lines.map((u) => (
-        <Text key={u.raw} color="text.muted" fontFamily="mono" whiteSpace="pre-wrap" data-unparsed>
-          {u.raw}
+      {keyed(lines, (u) => u.raw).map(({ key, item }) => (
+        <Text key={key} color="text.muted" fontFamily="mono" whiteSpace="pre-wrap" data-unparsed>
+          {item.raw}
         </Text>
       ))}
     </>
   )
 }
 
-function MilestoneBlock({ m }: { m: InitiativeMilestone }) {
-  const tone = MILESTONE_TONE[m.state] ?? "muted"
+/** Empty text when nothing parsed and nothing is unparsed; else the content plus the unparsed lines. */
+function SectionBody({
+  empty,
+  count,
+  unparsed,
+  children,
+}: {
+  empty: ReactNode
+  count: number
+  unparsed: InitiativeUnparsed[]
+  children: ReactNode
+}) {
+  if (count === 0 && unparsed.length === 0) return <Empty>{empty}</Empty>
+  return (
+    <>
+      {children}
+      <UnparsedLines lines={unparsed} />
+    </>
+  )
+}
+
+function DataTable({
+  heads,
+  rows,
+}: {
+  heads: string[]
+  rows: { key: string; cells: ReactNode[] }[]
+}) {
+  if (rows.length === 0) return null
+  return (
+    <Box as="table" w="100%" borderCollapse="collapse">
+      <Box as="thead">
+        <Box as="tr">
+          {heads.map((h) => (
+            <Box as="th" key={h} {...headCell}>
+              {h}
+            </Box>
+          ))}
+        </Box>
+      </Box>
+      <Box as="tbody">
+        {rows.map(({ key, cells }) => (
+          <Box as="tr" key={key}>
+            {cells.map((cell, c) => (
+              <Box as="td" key={heads[c]} {...bodyCell}>
+                {cell}
+              </Box>
+            ))}
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  )
+}
+
+function DesignLinks({ m }: { m: InitiativeMilestone }) {
   const link = (href: string, text: string) => (
     <Link href={href} color="tone.running.fg" mr="3">
       {text}
     </Link>
   )
+  return (
+    <>
+      {link(
+        m.design_archived ? archiveHref(m.design_address) : designHref(m.design_address),
+        `Design: ${m.design}`,
+      )}
+      {m.impl_exists &&
+        link(
+          m.impl_archived ? archiveHref(m.impl_address) : epicHref(m.impl_address),
+          `Impl epic: ${m.design}-impl`,
+        )}
+    </>
+  )
+}
+
+function MilestoneLinks({ m }: { m: InitiativeMilestone }) {
+  if (m.broken) {
+    return (
+      <Text as="span" color="text.muted">
+        <Text as="span" color="tone.deadlocked.fg">
+          broken link
+        </Text>{" "}
+        Design: {m.design}
+      </Text>
+    )
+  }
+  if (!m.design) {
+    return (
+      <Text as="span" color="text.muted">
+        Sketch only: no Design yet
+      </Text>
+    )
+  }
+  return <DesignLinks m={m} />
+}
+
+function MilestoneBlock({ m }: { m: InitiativeMilestone }) {
+  const tone = MILESTONE_TONE[m.state] ?? "muted"
   return (
     <Box
       borderWidth="1px"
@@ -143,30 +229,7 @@ function MilestoneBlock({ m }: { m: InitiativeMilestone }) {
         </Text>
       </Box>
       <Box>
-        {m.broken ? (
-          <Text as="span" color="text.muted">
-            <Text as="span" color="tone.deadlocked.fg">
-              broken link
-            </Text>{" "}
-            Design: {m.design}
-          </Text>
-        ) : !m.design ? (
-          <Text as="span" color="text.muted">
-            Sketch only: no Design yet
-          </Text>
-        ) : (
-          <>
-            {link(
-              m.design_archived ? archiveHref(m.design_address) : designHref(m.design_address),
-              `Design: ${m.design}`,
-            )}
-            {m.impl_exists &&
-              link(
-                m.impl_archived ? archiveHref(m.impl_address) : epicHref(m.impl_address),
-                `Impl epic: ${m.design}-impl`,
-              )}
-          </>
-        )}
+        <MilestoneLinks m={m} />
       </Box>
     </Box>
   )
@@ -212,124 +275,79 @@ function InitiativeBody({ data }: { data: InitiativeData }) {
             {state.label}
           </Chip>
         }
-        subtitle={`${data.address.split(":")[0]} · initiative`}
+        subtitle={`${data.project} · initiative`}
       />
       <Section title="Destination">
-        {paragraphs.length === 0 ? (
-          <Empty>No Destination written yet.</Empty>
-        ) : (
-          paragraphs.map((p) => <Text key={p}>{p}</Text>)
-        )}
+        <SectionBody empty="No Destination written yet." count={paragraphs.length} unparsed={[]}>
+          {keyed(paragraphs, (p) => p).map(({ key, item }) => (
+            <Text key={key}>{item}</Text>
+          ))}
+        </SectionBody>
       </Section>
       <Section title="Milestones">
-        {data.milestones.length === 0 && unparsed("Milestones").length === 0 && (
-          <Empty>No Milestones yet.</Empty>
-        )}
-        {data.milestones.map((m) => (
-          <MilestoneBlock key={m.number} m={m} />
-        ))}
-        <UnparsedLines lines={unparsed("Milestones")} />
+        <SectionBody
+          empty="No Milestones yet."
+          count={data.milestones.length}
+          unparsed={unparsed("Milestones")}
+        >
+          {keyed(data.milestones, (m) => String(m.number)).map(({ key, item }) => (
+            <MilestoneBlock key={key} m={item} />
+          ))}
+        </SectionBody>
       </Section>
       <Section title="Assumptions">
-        {data.assumptions.length === 0 && unparsed("Assumptions").length === 0 ? (
-          <Empty>No Assumptions yet.</Empty>
-        ) : (
-          <>
-            {data.assumptions.length > 0 && (
-              <Box as="table" w="100%" borderCollapse="collapse">
-                <Box as="thead">
-                  <Box as="tr">
-                    {["#", "Assumption", "Tested by", "State", "Evidence"].map((h) => (
-                      <Box as="th" key={h} {...headCell}>
-                        {h}
-                      </Box>
-                    ))}
-                  </Box>
-                </Box>
-                <Box as="tbody">
-                  {data.assumptions.map((a) => (
-                    <Box as="tr" key={a.n}>
-                      <Box as="td" {...bodyCell}>
-                        A{a.n}
-                      </Box>
-                      <Box as="td" {...bodyCell}>
-                        {a.text}
-                      </Box>
-                      <Box as="td" {...bodyCell}>
-                        {a.tested_by}
-                      </Box>
-                      <Box as="td" {...bodyCell}>
-                        <StateText value={a.state} />
-                      </Box>
-                      <Box as="td" {...bodyCell}>
-                        {a.evidence}
-                      </Box>
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
-            )}
-            <UnparsedLines lines={unparsed("Assumptions")} />
-          </>
-        )}
+        <SectionBody
+          empty="No Assumptions yet."
+          count={data.assumptions.length}
+          unparsed={unparsed("Assumptions")}
+        >
+          <DataTable
+            heads={["#", "Assumption", "Tested by", "State", "Evidence"]}
+            rows={keyed(data.assumptions, (a) => String(a.n)).map(({ key, item: a }) => ({
+              key,
+              cells: [
+                `A${a.n}`,
+                a.text,
+                a.tested_by,
+                <StateText key="state" value={a.state} />,
+                a.evidence,
+              ],
+            }))}
+          />
+        </SectionBody>
       </Section>
       <Section title="Deferred">
-        {data.deferred.length === 0 && unparsed("Deferred").length === 0 ? (
-          <Empty>Nothing deferred.</Empty>
-        ) : (
-          <>
-            {data.deferred.length > 0 && (
-              <Box as="table" w="100%" borderCollapse="collapse">
-                <Box as="thead">
-                  <Box as="tr">
-                    {["Item", "To", "Why", "From", "State"].map((h) => (
-                      <Box as="th" key={h} {...headCell}>
-                        {h}
-                      </Box>
-                    ))}
-                  </Box>
-                </Box>
-                <Box as="tbody">
-                  {data.deferred.map((d) => (
-                    <Box as="tr" key={`${d.item}|${d.to}|${d.from}`}>
-                      <Box as="td" {...bodyCell}>
-                        {d.item}
-                      </Box>
-                      <Box as="td" {...bodyCell}>
-                        {d.to}
-                      </Box>
-                      <Box as="td" {...bodyCell}>
-                        {d.why}
-                      </Box>
-                      <Box as="td" {...bodyCell}>
-                        {d.from}
-                      </Box>
-                      <Box as="td" {...bodyCell}>
-                        <StateText value={d.state} />
-                      </Box>
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
+        <SectionBody
+          empty="Nothing deferred."
+          count={data.deferred.length}
+          unparsed={unparsed("Deferred")}
+        >
+          <DataTable
+            heads={["Item", "To", "Why", "From", "State"]}
+            rows={keyed(data.deferred, (d) => `${d.item}|${d.to}|${d.from}`).map(
+              ({ key, item: d }) => ({
+                key,
+                cells: [d.item, d.to, d.why, d.from, <StateText key="state" value={d.state} />],
+              }),
             )}
-            <UnparsedLines lines={unparsed("Deferred")} />
-          </>
-        )}
+          />
+        </SectionBody>
       </Section>
       <Section title="Gate notes">
-        {data.gate_notes.length === 0 && unparsed("Gate notes").length === 0 ? (
-          <Empty>
-            No gate yet. The gate runs when the impl epic is merged: re-run{" "}
-            <code>/gx-initiative {data.address}</code>.
-          </Empty>
-        ) : (
-          <>
-            {data.gate_notes.map((g) => (
-              <GateNoteBlock key={g.slug} g={g} />
-            ))}
-            <UnparsedLines lines={unparsed("Gate notes")} />
-          </>
-        )}
+        <SectionBody
+          empty={
+            <>
+              No gate yet. The gate runs when the impl epic is merged: re-run{" "}
+              <code>/gx-initiative {data.address}</code>.
+            </>
+          }
+          count={data.gate_notes.length}
+          unparsed={unparsed("Gate notes")}
+        >
+          {keyed(data.gate_notes, (g) => g.slug).map(({ key, item }) => (
+            <GateNoteBlock key={key} g={item} />
+          ))}
+        </SectionBody>
       </Section>
     </Box>
   )

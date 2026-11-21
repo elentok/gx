@@ -112,7 +112,7 @@ func initiativePage(project string, e tickets.Epic, live, archived []tickets.Epi
 	body := initiative.ParseBody(e.Body)
 	addr := func(name string) string { return queue.RootRef{Project: project, Epic: name}.String() }
 	p := wire.InitiativePage{
-		Address: addr(e.Name), Slug: v.Slug, State: v.State, StoppedAt: v.StoppedAt,
+		Address: addr(e.Name), Project: project, Slug: v.Slug, State: v.State, StoppedAt: v.StoppedAt,
 		Destination: schema.Section(e.Body, "Destination"),
 		Milestones:  []wire.InitiativeMilestone{}, Assumptions: []wire.InitiativeAssumption{},
 		Deferred: []wire.InitiativeDeferred{}, GateNotes: []wire.InitiativeGateNote{}, Unparsed: []wire.InitiativeUnparsed{},

@@ -13,13 +13,7 @@ import type { Tone } from "../ui/tone"
 import { useFetched } from "../useFetched"
 import { useFetchedReady } from "../useReady"
 import { useActiveWorkspace } from "../workspaces/useActiveWorkspace"
-import { fetchInitiatives, type FetchInitiatives } from "./initiatives"
-
-const STATE: Record<string, { label: string; tone: Tone }> = {
-  active: { label: "Active", tone: "waiting" },
-  stopped: { label: "Stopped", tone: "deadlocked" },
-  finished: { label: "Finished", tone: "done" },
-}
+import { fetchInitiatives, INITIATIVE_STATE, type FetchInitiatives } from "./initiatives"
 
 /** The Current cell's text; the server derives every part of it. */
 export function currentText(r: InitiativeRow): string {
@@ -40,7 +34,7 @@ const headCell = {
 } as const
 
 function InitiativeTableRow({ row }: { row: InitiativeRow }) {
-  const state = STATE[row.state] ?? { label: row.state, tone: "muted" as Tone }
+  const state = INITIATIVE_STATE[row.state] ?? { label: row.state, tone: "muted" as Tone }
   const cell = { py: "2", pr: "4", borderBottomWidth: "1px", borderColor: "hairline" } as const
   return (
     <Box as="tr">

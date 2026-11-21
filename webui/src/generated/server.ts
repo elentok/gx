@@ -2138,6 +2138,7 @@ export interface InitiativeRow {
  */
 export interface InitiativePage {
   address: string;
+  project: string;
   slug: string;
   state: string;
   stopped_at: number /* int */;

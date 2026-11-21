@@ -35,6 +35,7 @@ type InitiativeRow struct {
 // InitiativePage is one Initiative's page data. GET /v1/initiatives/detail.
 type InitiativePage struct {
 	Address     string                 `json:"address"`
+	Project     string                 `json:"project"`
 	Slug        string                 `json:"slug"`
 	State       string                 `json:"state"`
 	StoppedAt   int                    `json:"stopped_at"`

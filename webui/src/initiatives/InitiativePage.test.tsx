@@ -45,6 +45,7 @@ const ms = (over: Partial<InitiativeMilestone>): InitiativeMilestone => ({
 
 const page: InitiativePage = {
   address: "gx:payments-rewrite",
+  project: "gx",
   slug: "payments-rewrite",
   state: "active",
   stopped_at: 0,
@@ -230,6 +231,31 @@ test("an unparsed line shows verbatim in each section and drops nothing", async 
   expect(
     within(screen.getByRole("region", { name: "Assumptions" })).getByText("Keys work"),
   ).toBeTruthy()
+})
+
+test("identical unparsed lines and repeated paragraphs raise no duplicate-key warning", async () => {
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {})
+  renderPage(
+    ok({
+      ...page,
+      destination: "same\n\nsame",
+      unparsed: [
+        { section: "Milestones", raw: "dup line" },
+        { section: "Milestones", raw: "dup line" },
+      ],
+    }),
+  )
+
+  await screen.findByRole("region", { name: "Milestones" })
+  expect(screen.getAllByText("dup line")).toHaveLength(2)
+  expect(errors.mock.calls.flat().join(" ")).not.toContain("same key")
+  errors.mockRestore()
+})
+
+test("the subtitle shows the project from the wire", async () => {
+  renderPage(ok({ ...page, address: "gx:payments-rewrite", project: "other" }))
+
+  expect(await screen.findByText("other · initiative")).toBeTruthy()
 })
 
 test("an unparsed line alone keeps its section out of the empty state", async () => {
