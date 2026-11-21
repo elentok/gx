@@ -422,7 +422,7 @@ title (the only link), a "project · time · status" line, a state pill and reas
 attention, and a footer of at most two buttons. It has one of four **card kinds**: **Design** (a map
 epic, or a joined Design and its `-impl` epic until Branch), **Implementation** (a loop epic, or a
 joined card from Branch on), **One-off** (one ticket of the `one-offs` epic) and **Follow-ups** (one
-per project with open follow-ups). _Avoid_: tile, row (a row is the data behind a card).
+per project with open follow-ups). An Initiative has no card. _Avoid_: tile, row (a row is the data behind a card).
 
 **Command palette** — the web UI's centered, filterable list of actions a person runs from any page
 with the keyboard, such as starting a Design or going to the next Needs-you card. It runs actions
@@ -508,11 +508,13 @@ flat file in its `issues/`, linked by `parent`. _Avoid_: node (Go identifiers on
 
 **Epic** — a top-level ticket with children: a hand-authored set of dependent tickets. Its
 `ticket.md` carries `status`, `blocked_by` and timing in frontmatter; the body is optional
-(a plan, or a link to a spec). A forked ticket that has children is still just a ticket.
+(a plan, or a link to a spec). A forked ticket that has children is still just a ticket. An
+**Initiative** is stored like an epic but is not one.
 
 **Map epic** — an epic whose body is a wayfinder map and whose tickets are decisions a person
 resolves by hand. Nothing schedules it; the person driving it claims and closes its tickets. Its
-implementation work goes into a separate epic. _Avoid_: "map" alone for the epic (the map is its
+implementation work goes into a separate epic. It may belong to one **Milestone** of an Initiative.
+_Avoid_: "map" alone for the epic (the map is its
 body).
 
 **Ticket type** (`type` frontmatter) — what kind of work a ticket is. `implement` is the default
@@ -659,6 +661,28 @@ area, backlog map epic (the old per-Triage map epics a backlog replaces).
 
 **Backlog page** — the web page that lists a project's backlogs, each with its open ticket count and a
 Start Design button.
+
+**Initiative** — a feature too big for one Design: one Destination and an ordered list of
+**Milestones**. It is stored as an epic of kind `initiative` but is not an epic: nothing schedules it
+and the Epics page skips it. Jira mapping: an Initiative is a Jira epic, or a Jira story when the work
+is small; a gx epic under it is then a Jira story or a Jira sub-task. _Avoid_: project (a project is a
+registered repo), program, big epic.
+
+**Milestone** — one slice of an Initiative that ships value and tests an assumption. Each Milestone
+has one Design, one `-impl` epic and one PR. Only the next Milestone is designed in full; later ones
+stay a name, a one-line goal and the assumptions they test. A Milestone has no Jira counterpart.
+_Avoid_: phase, release, sprint.
+
+**Assumption** — something an Initiative expects to be true, tested by one Milestone. It is
+**unknown**, **confirmed** or **broken**. Only a **Gate** changes that state. _Avoid_: risk, hypothesis.
+
+**Deferred item** — a scope item a Design answered "later" for, kept on the Initiative with the
+Milestone it moves to and the reason. It is **placed** in a Milestone, or **unplaced** until a Gate
+places it. _Avoid_: follow-up (a follow-up is found after something ships), backlog item.
+
+**Gate** — the check that closes a Milestone once its `-impl` epic is merged. The person confirms each
+Assumption and each Deferred item placement, then the Gate note records one outcome: continue,
+reshape or stop. _Avoid_: retro (a Retro judges the tooling, a Gate judges the product), review.
 
 **Flow** — the kind of stepped work a session runs: a Design or a Triage. Each flow has its own step
 list, final step and skill. _Avoid_: wizard (it implies a person clicking through screens), workflow.
