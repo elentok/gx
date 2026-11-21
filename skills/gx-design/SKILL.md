@@ -108,7 +108,19 @@ From here on, **never `cd` and never edit the trunk checkout**:
 - The server does not see a plain session, so it can remove the worktree mid-run. Before the run-end
   commit, run `gx designs worktree <project:epic> --json` again if `<worktree>` is gone. There is no lease.
 
-Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the first match.
+Read the map with `gx tickets show <project:epic>`.
+
+**Initiative check** (a lead-in, not a numbered step). For a map with `initiative:`, at the start of
+every run read the Initiative with `gx tickets show <project:initiative>`: its Destination, this
+map's own Milestone entry (the map's `milestone:` slug), the Assumptions and the deferred items. If
+the link does not resolve (the Initiative is missing, the Milestone slug is unknown, or the
+Milestone's linked Design is not this map's own slug), stop, name the broken link and do nothing
+else. Check only this map's own link, not the other Milestones. gx-design never edits the
+Destination, the Milestone list or any Assumption, never edits the Initiative's other sections, and
+never formats an Initiative line or edits the Initiative with `gx tickets section`: it uses the
+`gx initiatives` verbs only. A map with no `initiative:` behaves as it always did.
+
+Evaluate in order; run the first match.
 
 At each detection, including after a chain, report the step it starts with
 `gx agent step <step> [--title "<ticket title>"]`. Use the step name from the list above; pass
@@ -119,6 +131,14 @@ the ticket title during `resolve-tickets`.
    follow gx-wayfinder's "Chart the map" into the existing map, including its
    Destination grilling. After charting, end the run with the run-end line: never chain into a later
    step in this run.
+   - **Seeded prompt.** In a map with `initiative:`, the Milestone goal, tested Assumptions and open
+     deferred items seeded into `## Initial prompt` are candidates, not decisions.
+   - **Too big.** When the idea is too big for one reviewable PR, say so and stop. There is no
+     threshold and no automatic conversion. In a plain Design, tell the person to run
+     `/gx-initiative`. In a Design with `initiative:`, tell the person to narrow this Milestone by
+     answering "later" for the excess, and never point to `/gx-initiative`: reshaping is allowed only
+     at a Gate.
+   - **Scope questions.** See "Scope answers" below.
    - **Tiers.** The charting session runs on the strongest tier. Its subagents follow the tier list,
      not the session: `gx agent model strongest` for the design reviews, `gx agent model worker`
      for gx-to-spec, gx-to-tickets and gx-research. Research tickets spawned while charting also use
@@ -178,6 +198,8 @@ the ticket title during `resolve-tickets`.
      without a redraft: the next run matches step 3 and resumes the map.
    - A spec never carries open design questions to the review.
    - Set `--design-step spec` only after the draft is written.
+   - In a map with `initiative:`, after the spec is written follow "Item states" below. The
+     spec-round questions use "Scope answers" below.
 5. **No `## Review findings` section on the map** → dispatch a design-review subagent (model from `gx agent model strongest`) against the
    spec (rubric below). It writes the findings as a markdown checklist (`- [ ] …`) with
    `gx tickets section <project:epic> "Review findings" -`. Write `- [x] No findings` if there are none. Then set `--design-step review`.
@@ -221,6 +243,32 @@ the ticket title during `resolve-tickets`.
      once it sees the Design is past Branch.
 9. **Otherwise** → report the `<epic>-impl` slug and stop. Launch it from the TUI Queue tab. Give the spec or mock path as a `gx files url <path>` link, and never start an HTTP server.
 
+## Scope answers
+
+In a map with `initiative:`, every scope question gx-design grills (a Destination or frontier
+round that decides whether an item is in this Milestone, and the spec-round questions) has three
+answers:
+
+- **In** this Milestone.
+- **Later** in a named Milestone, with a reason. Name one of the Initiative's Milestones, or
+  `unplaced` when no Milestone fits (never edit the Milestone list). Run
+  `gx initiatives deferred add <project:initiative> <item> --to <milestone|unplaced> --why <reason>
+  --from <this Design>`. Then write one pointer line under the map's `## Out of scope`, "deferred to
+  <milestone>, see the Initiative", with `gx tickets section <project:epic> "Out of scope" -`.
+- **Out**, with a reason. It stays on the map's `## Out of scope` only and is never copied to the
+  Initiative.
+
+Bugs and ideas found after something ships keep going to `follow-ups`, not to the Initiative. A
+plain Design keeps today's wording.
+
+## Item states
+
+In a map with `initiative:`, after the spec is written (step 4), and again after any review finding
+(steps 6 and 6b) that changes an item's answer, set each open deferred item for this Milestone with
+`gx initiatives deferred set <project:initiative> <item> --state taken` (the spec put it in), or
+re-defer it with `--to <milestone|unplaced> --why <new reason>`. The item states then match the
+spec's last version.
+
 ## Researching existing UI behavior
 
 When a map ticket or the spec depends on how the web UI behaves today, read
@@ -255,6 +303,8 @@ Review the spec against the map it came from and its own template, not in the ab
   [ADR 0042](../../docs/adr/0042-few-pauses-all-recoverable-from-the-web.md)).
 - Does the spec change the ticket or epic schema (a field, an enum value, a section name) without
   a new migration step? Each one is a finding.
+- Only for a map with `initiative:`: does every open deferred item for this Milestone appear in the
+  spec as in, later or out? A missing one is a finding.
 
 ## After every run
 

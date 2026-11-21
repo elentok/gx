@@ -104,6 +104,13 @@ Out-of-scope work never graduates (the frontier stops at the destination), so it
 
 Ruling something out of scope is a scoping act, not a step on the route. When a ticket that already exists turns out to sit past the destination (mis-scoped in while charting, or exposed by a resolution), **close it** (a closed ticket is unambiguously off the frontier) and leave one line in the **Out of scope** section: the gist plus why it's out of scope, linking the closed ticket. It stays out of **Decisions so far**, which records the route actually walked; a scope boundary isn't a step on it.
 
+In a map with `initiative:`, ask the three-value scope question first: in this Milestone, later in a
+named Milestone with a reason, or out with a reason. Record "later" with
+`gx initiatives deferred add <project:initiative> <item> --to <milestone|unplaced> --why <reason>
+--from <this Design>`, use `unplaced` when no Milestone fits, and write the pointer line "deferred
+to <milestone>, see the Initiative" under **Out of scope**. An "out" answer stays on the map only.
+Never format an Initiative line by hand.
+
 ## Forked out
 
 A Design source map can carry an optional `## Forked out` section, after **Out of scope**: one free-text line per fork (topic, kind, new session name, no link). Each forked topic is out of scope for Chart and the spec. A forked topic is not a decision: it never goes to **Decisions so far**.

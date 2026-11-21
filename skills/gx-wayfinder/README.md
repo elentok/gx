@@ -6,4 +6,6 @@ MIT, see `LICENSE`.
 
 gx changed this skill: it is renamed to `gx-wayfinder`, it uses the "Map epics" section of
 `gx-local-tracker.md` for every ticket operation instead of upstream's setup step, and its
-ticket-type calls link the `gx-` skills by path.
+ticket-type calls link the `gx-` skills by path. In a map with `initiative:`, the "Out of scope"
+operation asks the three-value Initiative scope question and records "later" through
+`gx initiatives deferred add`.
