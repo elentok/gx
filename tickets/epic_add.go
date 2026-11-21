@@ -30,6 +30,10 @@ type EpicFields struct {
 	Status                 string `yaml:"status,omitempty"`
 	DestinationUnconfirmed bool   `yaml:"destination_unconfirmed,omitempty"`
 
+	// Initiative and Milestone are for a map epic only.
+	Initiative string `yaml:"initiative,omitempty"`
+	Milestone  string `yaml:"milestone,omitempty"`
+
 	// CreatedAt is stamped by CreateEpic. A caller-supplied value refuses.
 	CreatedAt time.Time `yaml:"created_at,omitempty"`
 }
@@ -38,7 +42,7 @@ type EpicFields struct {
 // The land_block_* keys are stored epic frontmatter the server still writes.
 var EpicServerStamped = []string{"created_at", "completed_at", "merged_at", "queued_at", "design_started_at", "land_block_kind", "land_block_reason", "land_block_files", "trunk_fast_forwarded_at", "trunk_conflict_backup", "trunk_conflict_files", "evolved_at", "evolve_skipped", "evolve_ticket", "lines_added", "lines_removed", "total_tokens", "actual_cost", "had_codex", "friction", "pr_number", "pr_url", "archived_at", "archived_workspace", "branch_name", "range_base", "range_tip"}
 
-const epicSettableList = "kind, status, destination_unconfirmed"
+const epicSettableList = "kind, status, destination_unconfirmed, initiative, milestone"
 
 // ParseEpicFields decodes a frontmatter block holding only settable epic
 // fields. A server-stamped or unknown key refuses, naming which it is. The
@@ -51,7 +55,7 @@ func ParseEpicFields(yamlPart string) (EpicFields, error) {
 	}
 	for key := range keys {
 		switch key {
-		case "kind", "status", "destination_unconfirmed":
+		case "kind", "status", "destination_unconfirmed", "initiative", "milestone":
 		default:
 			if slices.Contains(EpicServerStamped, key) {
 				return f, fmt.Errorf("epic frontmatter: %s is server-stamped and cannot be set (settable: %s)", key, epicSettableList)
@@ -68,16 +72,20 @@ func ParseEpicFields(yamlPart string) (EpicFields, error) {
 	return f, nil
 }
 
-// validate checks the values: kind is map, loop or backlog, status is draft or open
-// (either may be empty, meaning not given).
+// validate checks the values: kind is map, loop, backlog or initiative, status is
+// draft or open (either may be empty, meaning not given). initiative and milestone
+// are for a map; a known other kind refuses them.
 func (f EpicFields) validate() error {
 	if !f.CreatedAt.IsZero() {
 		return errors.New("created_at is server-stamped and cannot be set")
 	}
 	switch f.Kind {
-	case "", KindMap, KindLoop, KindBacklog:
+	case "", KindMap, KindLoop, KindBacklog, KindInitiative:
 	default:
-		return fmt.Errorf("kind %q; want map, loop or backlog", f.Kind)
+		return fmt.Errorf("kind %q; want map, loop, backlog or initiative", f.Kind)
+	}
+	if f.Kind != "" && f.Kind != KindMap && (f.Initiative != "" || f.Milestone != "") {
+		return fmt.Errorf("initiative and milestone are for a map epic; this epic is kind: %s", f.Kind)
 	}
 	switch schema.Status(f.Status) {
 	case "", schema.StatusOpen, schema.StatusDraft:
@@ -111,7 +119,10 @@ func CreateEpic(conversationsDir, projectDir, name string, fields EpicFields, bo
 		body = text
 	}
 	if fields.Kind == "" {
-		return "", errors.New("kind is required (map, loop or backlog)")
+		return "", errors.New("kind is required (map, loop, backlog or initiative)")
+	}
+	if err := fields.validate(); err != nil {
+		return "", err
 	}
 	if fields.Status == "" {
 		fields.Status = string(schema.StatusDraft)
@@ -245,7 +256,7 @@ func mergeEpicFields(flags, body EpicFields) (EpicFields, error) {
 		name string
 		dst  *string
 		src  string
-	}{{"kind", &flags.Kind, body.Kind}, {"status", &flags.Status, body.Status}} {
+	}{{"kind", &flags.Kind, body.Kind}, {"status", &flags.Status, body.Status}, {"initiative", &flags.Initiative, body.Initiative}, {"milestone", &flags.Milestone, body.Milestone}} {
 		switch {
 		case p.src == "":
 		case *p.dst == "":

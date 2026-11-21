@@ -184,8 +184,10 @@ conversation history.
   warnings. Use `--dry-run` first.
 - **Close a follow-up**: `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it|promoted
   [--note ...]` — see "Follow-ups".
-- **Create or edit an epic**: `gx tickets epic add <project:epic> --kind map|loop|backlog --status
-  draft|open [--body -]` creates the epic's `ticket.md`. An `backlog` epic is a project's standing
+- **Create or edit an epic**: `gx tickets epic add <project:epic> --kind map|loop|backlog|initiative --status
+  draft|open [--body -]` creates the epic's `ticket.md`. An `initiative` epic is not scheduled, cannot
+  be queued and keeps its kind. A `map` epic may carry `initiative:` and `milestone:` (flags
+  `--initiative` and `--milestone`, or body frontmatter); other kinds refuse them. An `backlog` epic is a project's standing
   backlog: its status is `open`, a project has at most 12, `gx tickets epics --backlogs` lists them, the
   queue refuses one, and `gx tickets set --kind` cannot change a kind to or from `backlog`. It refuses a taken name: an existing epic,
   a branch of that name, or a name an earlier, merged epic used (its `Ralph-Loop-Ticket` trailers

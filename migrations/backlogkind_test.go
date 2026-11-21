@@ -12,8 +12,8 @@ import (
 
 func TestDefault_PaneBusyStepIsLastAndBacklogEpicKindRewritesAreaKind(t *testing.T) {
 	names := Default.Names()
-	if got := names[len(names)-1]; got != "pane-busy-to-iteration-error" {
-		t.Fatalf("last step = %q, want pane-busy-to-iteration-error", got)
+	if got := names[len(names)-1]; got != "initiative-epic-kind" {
+		t.Fatalf("last step = %q, want initiative-epic-kind", got)
 	}
 	root := t.TempDir()
 	epic := filepath.Join(root, "e", "ticket.md")
@@ -33,6 +33,9 @@ func TestDefault_PaneBusyStepIsLastAndBacklogEpicKindRewritesAreaKind(t *testing
 	first := readLines(t, applied)
 	if n := len(slices.DeleteFunc(slices.Clone(first), func(l string) bool { return l != "backlog-epic-kind" })); n != 1 {
 		t.Errorf("step recorded %d times in %v, want once", n, first)
+	}
+	if n := len(slices.DeleteFunc(slices.Clone(first), func(l string) bool { return l != "initiative-epic-kind" })); n != 1 {
+		t.Errorf("initiative step recorded %d times in %v, want once", n, first)
 	}
 	got, _ := os.ReadFile(epic)
 	if !strings.Contains(string(got), "kind: backlog") || strings.Contains(string(got), "kind: area") {

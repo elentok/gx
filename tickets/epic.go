@@ -16,6 +16,10 @@ const KindMap = "map"
 // need deciding and never runs a Design. Its kind never changes.
 const KindBacklog = "backlog"
 
+// KindInitiative is the ticket.md `kind:` of an initiative epic: it groups maps
+// and is never scheduled or queued. Its kind never changes.
+const KindInitiative = "initiative"
+
 // MaxBacklogs is the most live backlog epics one project may have.
 const MaxBacklogs = 12
 
@@ -69,6 +73,14 @@ func IsBacklogEpic(epicPath string) bool {
 	return epic.IsBacklog
 }
 
+// IsInitiativeEpic reports whether the epic at epicPath is an initiative, without
+// loading its tickets: its ticket.md says kind: initiative.
+func IsInitiativeEpic(epicPath string) bool {
+	epic := Epic{Path: epicPath}
+	loadEpicTicketMD(&epic)
+	return epic.IsInitiative
+}
+
 // LoadEpicTicketMD reads the epic at epicPath's ticket.md, without loading
 // its tickets.
 func LoadEpicTicketMD(epicPath string) Epic {
@@ -83,10 +95,15 @@ func LoadEpicTicketMD(epicPath string) Epic {
 type Epic struct {
 	Name      string
 	Path      string
-	IsMap     bool   // a wayfinder map: ticket.md says kind: map
-	IsBacklog bool   // a backlog: ticket.md says kind: backlog
-	Body      string // ticket.md's body
-	Tickets   []Ticket
+	IsMap     bool // a wayfinder map: ticket.md says kind: map
+	IsBacklog bool // a backlog: ticket.md says kind: backlog
+	// IsInitiative: ticket.md says kind: initiative.
+	IsInitiative bool
+	// Initiative and Milestone are a map's optional ticket.md fields.
+	Initiative string
+	Milestone  string
+	Body       string // ticket.md's body
+	Tickets    []Ticket
 
 	// HasTicketMD is true when the epic has its ticket.md entry file, whose
 	// frontmatter supplies Status, BlockedBy, Base and timing. An epic
@@ -203,9 +220,9 @@ func (e Epic) TotalCount() int {
 }
 
 // HoldsLoopWork reports whether the epic's tickets are loop work: false for a
-// wayfinder map (resolved by hand) and for a backlog (follow-ups, never scheduled).
+// wayfinder map (resolved by hand), a backlog (follow-ups) and an initiative.
 func (e Epic) HoldsLoopWork() bool {
-	return !e.IsMap && !e.IsBacklog
+	return !e.IsMap && !e.IsBacklog && !e.IsInitiative
 }
 
 // IsCharting: a map whose Design has not started past the chart step.

@@ -322,6 +322,8 @@ func humanizeSlug(slug string) string {
 // ticketMDYAML is the frontmatter of a top-level ticket's `ticket.md`.
 type ticketMDYAML struct {
 	Kind        string     `yaml:"kind"`
+	Initiative  string     `yaml:"initiative"`
+	Milestone   string     `yaml:"milestone"`
 	Status      string     `yaml:"status"`
 	BlockedBy   []string   `yaml:"blocked_by"`
 	Base        string     `yaml:"base"`
@@ -401,6 +403,8 @@ func loadEpicTicketMD(epic *Epic) {
 	}
 	epic.IsMap = wire.Kind == KindMap
 	epic.IsBacklog = wire.Kind == KindBacklog
+	epic.IsInitiative = wire.Kind == KindInitiative
+	epic.Initiative, epic.Milestone = wire.Initiative, wire.Milestone
 	epic.Status = wire.Status
 	epic.BlockedBy = wire.BlockedBy
 	epic.Base = wire.Base

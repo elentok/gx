@@ -75,6 +75,84 @@ func TestCreateEpic_ThirteenthBacklogRefusesAndWritesNothing(t *testing.T) {
 	}
 }
 
+func TestCreateEpic_InitiativeKind(t *testing.T) {
+	root := t.TempDir()
+	conv := t.TempDir()
+	if _, err := CreateEpic(conv, root, "flag", EpicFields{Kind: KindInitiative, Status: "open"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CreateEpic(conv, root, "body", EpicFields{Status: "open"}, "---\nkind: initiative\n---\n# x\n"); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"flag", "body"} {
+		e := LoadEpicTicketMD(filepath.Join(root, name))
+		if !e.IsInitiative || e.IsMap || e.IsBacklog || e.HoldsLoopWork() {
+			t.Errorf("%s: IsInitiative=%v IsMap=%v IsBacklog=%v HoldsLoopWork=%v", name, e.IsInitiative, e.IsMap, e.IsBacklog, e.HoldsLoopWork())
+		}
+	}
+	_, err := CreateEpic(conv, root, "bad", EpicFields{Kind: "nope"}, "")
+	if err == nil || !strings.Contains(err.Error(), "initiative") {
+		t.Errorf("bad kind err = %v, want it to name initiative", err)
+	}
+}
+
+func TestCreateEpic_MapInitiativeAndMilestone(t *testing.T) {
+	root := t.TempDir()
+	conv := t.TempDir()
+	if _, err := CreateEpic(conv, root, "m1", EpicFields{Kind: KindMap, Initiative: "x", Milestone: "y"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CreateEpic(conv, root, "m2", EpicFields{Kind: KindMap}, "---\ninitiative: x\nmilestone: y\n---\n# m\n"); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"m1", "m2"} {
+		e := LoadEpicTicketMD(filepath.Join(root, name))
+		if e.Initiative != "x" || e.Milestone != "y" {
+			t.Errorf("%s: initiative=%q milestone=%q", name, e.Initiative, e.Milestone)
+		}
+	}
+	refusals := []struct {
+		name   string
+		fields EpicFields
+		body   string
+	}{
+		{"conflict", EpicFields{Kind: KindMap, Initiative: "a"}, "---\ninitiative: b\n---\n"},
+		{"loop", EpicFields{Kind: KindLoop, Milestone: "y"}, ""},
+		{"backlog", EpicFields{Kind: KindBacklog, Initiative: "x"}, ""},
+		{"initiative", EpicFields{Kind: KindInitiative, Milestone: "y"}, ""},
+		{"body-loop", EpicFields{Kind: KindLoop}, "---\ninitiative: x\n---\n"},
+	}
+	for _, tc := range refusals {
+		if _, err := CreateEpic(conv, root, "r-"+tc.name, tc.fields, tc.body); err == nil {
+			t.Errorf("%s: want a refusal", tc.name)
+		}
+		if _, statErr := os.Stat(filepath.Join(root, "r-"+tc.name)); statErr == nil {
+			t.Errorf("%s: refusal wrote an epic directory", tc.name)
+		}
+	}
+}
+
+func TestUpdateEpicFields_InitiativeKindNeverChanges(t *testing.T) {
+	root := t.TempDir()
+	conv := t.TempDir()
+	for name, kind := range map[string]string{"ini": KindInitiative, "lp": KindLoop} {
+		if _, err := CreateEpic(conv, root, name, EpicFields{Kind: kind, Status: "open"}, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct{ name, to, current string }{{"ini", KindLoop, "initiative"}, {"lp", KindInitiative, "loop"}} {
+		path := filepath.Join(root, tc.name, "ticket.md")
+		before, _ := os.ReadFile(path)
+		err := UpdateEpicFields(path, EpicUpdate{Kind: &tc.to})
+		if err == nil || !strings.Contains(err.Error(), "kind: "+tc.current) {
+			t.Errorf("%s: err = %v, want a refusal naming kind: %s", tc.name, err, tc.current)
+		}
+		if after, _ := os.ReadFile(path); string(after) != string(before) {
+			t.Errorf("%s: refusal changed the file", tc.name)
+		}
+	}
+}
+
 func TestCreateEpic_RejectsCallerCreatedAtAndWritesNothing(t *testing.T) {
 	root := t.TempDir()
 	fields := EpicFields{Kind: KindLoop, CreatedAt: time.Now()}

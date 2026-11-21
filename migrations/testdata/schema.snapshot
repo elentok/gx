@@ -46,6 +46,9 @@ struct tickets.Epic
   Path string 
   IsMap bool 
   IsBacklog bool 
+  IsInitiative bool 
+  Initiative string 
+  Milestone string 
   Body string 
   Tickets []tickets.Ticket 
   HasTicketMD bool 
@@ -89,6 +92,8 @@ struct tickets.EpicFields
   Kind string yaml:"kind,omitempty"
   Status string yaml:"status,omitempty"
   DestinationUnconfirmed bool yaml:"destination_unconfirmed,omitempty"
+  Initiative string yaml:"initiative,omitempty"
+  Milestone string yaml:"milestone,omitempty"
   CreatedAt time.Time yaml:"created_at,omitempty"
 enum category: bug idea
 enum iteration_status:  asking finished working

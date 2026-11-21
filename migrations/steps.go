@@ -120,6 +120,11 @@ func init() {
 	Default.Register(Step{Name: "pane-busy-to-iteration-error", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return ticketmigrate.MigratePaneBusyToIterationError(e.Root)
 	}})
+	// initiative-epic-kind: kind: initiative and a map's initiative: and milestone:
+	// fields are optional; existing stores need no rewrite. Never rename this step.
+	Default.Register(Step{Name: "initiative-epic-kind", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

@@ -18,6 +18,11 @@ import (
 // An unknown project refuses with tickets.CodeUnknownProject before anything is
 // written.
 func runTicketsEpicAdd(cfgDirs config.Dirs, cwd, arg, kind, status, body string, w io.Writer) error {
+	return runTicketsEpicAddFields(cfgDirs, cwd, arg, tickets.EpicFields{Kind: kind, Status: status}, body, w)
+}
+
+// runTicketsEpicAddFields is runTicketsEpicAdd with the full set of flag fields.
+func runTicketsEpicAddFields(cfgDirs config.Dirs, cwd, arg string, fields tickets.EpicFields, body string, w io.Writer) error {
 	projectDir, project, name, err := resolveEpicTarget(cfgDirs, cwd, arg)
 	if err != nil {
 		return err
@@ -29,7 +34,7 @@ func runTicketsEpicAdd(cfgDirs config.Dirs, cwd, arg, kind, status, body string,
 	if err != nil {
 		return err
 	}
-	if _, err := tickets.CreateEpic(records, projectDir, name, tickets.EpicFields{Kind: kind, Status: status}, body); err != nil {
+	if _, err := tickets.CreateEpic(records, projectDir, name, fields, body); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(w, "%s:%s\n", project, name)
@@ -68,10 +73,10 @@ func newTicketsEpicCmd(d Deps) *cobra.Command {
 		Use:   "epic",
 		Short: "create and manage epics",
 	}
-	var kind, status, body string
+	var kind, status, body, initiative, milestone string
 	addCmd := &cobra.Command{
 		Use:   "add <project:epic>",
-		Short: "create an epic's ticket.md (kind map, loop or backlog, status draft or open)",
+		Short: "create an epic's ticket.md (kind map, loop, backlog or initiative, status draft or open)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			cwd, err := d.Getwd()
@@ -83,10 +88,13 @@ func newTicketsEpicCmd(d Deps) *cobra.Command {
 					return err
 				}
 			}
-			return runTicketsEpicAdd(d.dirs(), cwd, args[0], kind, status, body, c.OutOrStdout())
+			fields := tickets.EpicFields{Kind: kind, Status: status, Initiative: initiative, Milestone: milestone}
+			return runTicketsEpicAddFields(d.dirs(), cwd, args[0], fields, body, c.OutOrStdout())
 		},
 	}
-	addCmd.Flags().StringVar(&kind, "kind", "", "map, loop or backlog (required unless the body's frontmatter sets it)")
+	addCmd.Flags().StringVar(&kind, "kind", "", "map, loop, backlog or initiative (required unless the body's frontmatter sets it)")
+	addCmd.Flags().StringVar(&initiative, "initiative", "", "map only: the initiative the map belongs to")
+	addCmd.Flags().StringVar(&milestone, "milestone", "", "map only: the milestone the map belongs to")
 	addCmd.Flags().StringVar(&status, "status", "", "draft or open (default draft)")
 	addCmd.Flags().StringVar(&body, "body", "", "epic body, or - to read it from stdin; its frontmatter may set kind, status, destination_unconfirmed")
 	nextNameCmd := &cobra.Command{
@@ -138,7 +146,7 @@ func newTicketsEpicSetCmd(d Deps) *cobra.Command {
 			return ticketscmd.RunEpicSet(d.dirs(), c, path, c.OutOrStdout(), d.Getwd, d.Dial())
 		},
 	}
-	cmd.Flags().String("kind", "", "set kind (map, loop or backlog; never to or from backlog)")
+	cmd.Flags().String("kind", "", "set kind (map, loop, backlog or initiative; never to or from backlog or initiative)")
 	cmd.Flags().String("status", "", "set status (draft or open)")
 	cmd.Flags().String("destination-unconfirmed", "", "set destination_unconfirmed (true/false)")
 	cmd.Flags().String("blocked-by", "", "set blocked_by (comma-separated whole-epic tokens, e.g. other or project:other)")
