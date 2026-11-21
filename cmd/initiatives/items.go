@@ -252,6 +252,19 @@ func checkAtGate(v initiative.View) error {
 // editInitiative applies edit to the Initiative named by arg under the epic
 // lock, then prints the line it stored. Nothing is written when edit fails.
 func editInitiative(cfgDirs config.Dirs, cwd, arg string, w io.Writer, edit itemEdit) error {
+	return editInitiativeIn(cfgDirs, cwd, arg, w, func(b *initiative.Body, v initiative.View, _ epicSet) (string, error) {
+		return edit(b, v)
+	})
+}
+
+// epicSet answers whether an epic exists in the project's store, live or
+// archived.
+type epicSet func(name string) bool
+
+// storeEdit is an itemEdit that also sees which epics exist.
+type storeEdit func(body *initiative.Body, view initiative.View, exists epicSet) (string, error)
+
+func editInitiativeIn(cfgDirs config.Dirs, cwd, arg string, w io.Writer, edit storeEdit) error {
 	projectDir, _, slug, err := tickets.ResolveEpicTarget(cfgDirs, cwd, arg)
 	if err != nil {
 		return err
@@ -272,12 +285,15 @@ func editInitiative(cfgDirs config.Dirs, cwd, arg string, w io.Writer, edit item
 	if err != nil {
 		return err
 	}
+	exists := func(name string) bool {
+		return slices.ContainsFunc(append(slices.Clone(live), archived...), func(e tickets.Epic) bool { return e.Name == name })
+	}
 	var line string
 	err = tickets.EditEpicBody(ticketPath, func(text string) (string, error) {
 		body := initiative.ParseBody(text)
 		view := initiative.Read(tickets.Epic{Name: slug, Body: text}, live, archived)
 		var editErr error
-		if line, editErr = edit(&body, view); editErr != nil {
+		if line, editErr = edit(&body, view, exists); editErr != nil {
 			return "", editErr
 		}
 		return body.Render()

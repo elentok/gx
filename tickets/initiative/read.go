@@ -48,6 +48,10 @@ type MilestoneView struct {
 	Broken           bool
 }
 
+// NamesSlug reports whether the Milestone's slug is named elsewhere, by a
+// Design link or a gate note. Such a slug can no longer change.
+func (m MilestoneView) NamesSlug() bool { return m.Design != "" || m.State == MilestoneGated }
+
 // UnparsedLine is a line that did not parse, kept verbatim for display.
 type UnparsedLine struct {
 	Section string

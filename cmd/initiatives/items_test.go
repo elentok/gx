@@ -249,7 +249,7 @@ func schemaSection(body, heading string) string {
 	return section
 }
 
-func TestItems_ConcurrentVerbsBothLand(t *testing.T) {
+func TestItems_ConcurrentVerbsBothApply(t *testing.T) {
 	repo, project := setup(t)
 	ticket := seedInitiative(t, project, itemsBody)
 	var wg sync.WaitGroup
