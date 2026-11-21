@@ -17,6 +17,7 @@ import (
 	ticketscmd "github.com/elentok/gx/cmd/tickets"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/epicname"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketmove"
 	"github.com/elentok/gx/tickets/ticketspec"
@@ -349,7 +350,7 @@ func (d Deps) publishTickets(epicArg, manifestPath string, dryRun, jsonOut, allo
 			return nil, err
 		}
 	} else {
-		if err := refuseTakenEpicName(projectDir, project, name); err != nil {
+		if err := epicname.Refuse(projectDir, project, name); err != nil {
 			return nil, err
 		}
 		if plan, err = planPublish(epicPath, manifestPath, commit, allowCheckMisses, tickets.Epic{}, resolve); err != nil {

@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/cmd/evolve"
 	"github.com/elentok/gx/cmd/files"
 	"github.com/elentok/gx/cmd/gitops"
+	"github.com/elentok/gx/cmd/initiatives"
 	"github.com/elentok/gx/cmd/limits"
 	"github.com/elentok/gx/cmd/project"
 	"github.com/elentok/gx/cmd/rest"
@@ -258,6 +259,7 @@ Run without a command to open the status UI.`,
 		limits.NewAFK(limits.Deps{Env: d.Env}),
 		rest.New(rest.Deps{Env: d.Env}),
 		schedules.New(schedules.Deps{Env: d.Env}),
+		initiatives.New(initiatives.Deps{Env: d.Env}),
 		files.New(files.Deps{Env: d.Env}),
 		limits.NewViMode(limits.Deps{Env: d.Env}),
 		gitops.NewMerge(d.gitopsDeps()),

@@ -3,13 +3,13 @@ package ticketsflow
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/elentok/gx/cmd/cmdbase"
 	ticketscmd "github.com/elentok/gx/cmd/tickets"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/epicname"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +27,7 @@ func runTicketsEpicAddFields(cfgDirs config.Dirs, cwd, arg string, fields ticket
 	if err != nil {
 		return err
 	}
-	if err := refuseTakenEpicName(projectDir, project, name); err != nil {
+	if err := epicname.Refuse(projectDir, project, name); err != nil {
 		return err
 	}
 	records, err := conversations.DirIn(cfgDirs)
@@ -41,32 +41,7 @@ func runTicketsEpicAddFields(cfgDirs config.Dirs, cwd, arg string, fields ticket
 	return err
 }
 
-// resolveEpicTarget splits arg into its project directory, project name and
-// epic name. A bare epic name belongs to the cwd's project.
-func resolveEpicTarget(cfgDirs config.Dirs, cwd, arg string) (projectDir, project, name string, err error) {
-	project, name, hasProject := strings.Cut(arg, ":")
-	if !hasProject {
-		name = arg
-		if projectDir, err = tickets.RootForDirs(cfgDirs, cwd); err != nil {
-			return "", "", "", err
-		}
-		return projectDir, tickets.ProjectName(projectDir), name, nil
-	}
-	cfg, err := cfgDirs.Load()
-	if err != nil {
-		return "", "", "", err
-	}
-	dirs, err := tickets.ProjectDirs(cfg.TicketStore.Path)
-	if err != nil {
-		return "", "", "", err
-	}
-	for _, dir := range dirs {
-		if tickets.ProjectName(dir) == project {
-			return dir, project, name, nil
-		}
-	}
-	return "", "", "", &tickets.AddressError{Code: tickets.CodeUnknownProject, Msg: fmt.Sprintf("no project %q", project)}
-}
+var resolveEpicTarget = tickets.ResolveEpicTarget
 
 func newTicketsEpicCmd(d Deps) *cobra.Command {
 	epicCmd := &cobra.Command{
@@ -110,7 +85,7 @@ func newTicketsEpicCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			name, err := nextEpicName(projectDir, project, base)
+			name, err := epicname.Next(projectDir, project, base)
 			if err != nil {
 				return err
 			}

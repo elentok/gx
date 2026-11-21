@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/epicname"
 	"github.com/elentok/gx/tickets/ticketmove"
 	"github.com/spf13/cobra"
 )
@@ -24,7 +25,7 @@ func runTicketsStartDesign(cfgDirs config.Dirs, cwd, backlogArg, mapName, title 
 	}
 	if _, err := os.Stat(filepath.Join(projectDir, mapName)); err != nil {
 		// A new map: a rerun keeps its own, already taken, name.
-		if err := refuseTakenEpicName(projectDir, project, mapName); err != nil {
+		if err := epicname.Refuse(projectDir, project, mapName); err != nil {
 			return err
 		}
 	}

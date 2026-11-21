@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
@@ -115,6 +116,34 @@ func RootForDirs(dirs config.Dirs, dir string) (string, error) {
 		return "", err
 	}
 	return RootIn(cfg.TicketStore.Path, dir)
+}
+
+// ResolveEpicTarget splits arg ("project:epic" or a bare epic) into its
+// project directory, project name and epic name. A bare epic name belongs to
+// the cwd's project; an unknown project refuses with CodeUnknownProject.
+func ResolveEpicTarget(cfgDirs config.Dirs, cwd, arg string) (projectDir, project, name string, err error) {
+	project, name, hasProject := strings.Cut(arg, ":")
+	if !hasProject {
+		name = arg
+		if projectDir, err = RootForDirs(cfgDirs, cwd); err != nil {
+			return "", "", "", err
+		}
+		return projectDir, ProjectName(projectDir), name, nil
+	}
+	cfg, err := cfgDirs.Load()
+	if err != nil {
+		return "", "", "", err
+	}
+	dirs, err := ProjectDirs(cfg.TicketStore.Path)
+	if err != nil {
+		return "", "", "", err
+	}
+	for _, dir := range dirs {
+		if ProjectName(dir) == project {
+			return dir, project, name, nil
+		}
+	}
+	return "", "", "", &AddressError{Code: CodeUnknownProject, Msg: fmt.Sprintf("no project %q", project)}
 }
 
 // ProjectName is the name addresses carry for projectDir: project.json's
