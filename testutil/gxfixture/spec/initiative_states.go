@@ -40,6 +40,7 @@ func stoppedInitiative(slug, design string) scenario {
 	}
 	s.gate = gateNote("core", initiative.OutcomeStop,
 		initiative.GateLine{Kind: initiative.GateAssumption, N: 1, State: initiative.StateBroken, Evidence: "the remote drops partial data"},
+		initiative.GateLine{Kind: initiative.GateTaught, Text: "The remote cannot resume a push"},
 		initiative.GateLine{Kind: initiative.GatePlacement, Text: "Proxy support dropped"},
 	)
 	sc := initiativeScenario(slug, s)
@@ -64,9 +65,13 @@ func InitiativeFinishedScenario() scenario {
 	s.assumptions = a
 	s.gate = append(
 		gateNote("core", initiative.OutcomeContinue,
-			initiative.GateLine{Kind: initiative.GateAssumption, N: 1, State: initiative.StateConfirmed, Evidence: "resumed push passed in sync-core"}),
+			initiative.GateLine{Kind: initiative.GateAssumption, N: 1, State: initiative.StateConfirmed, Evidence: "resumed push passed in sync-core"},
+			initiative.GateLine{Kind: initiative.GateTaught, Text: "Resumed pushes work"},
+			initiative.GateLine{Kind: initiative.GatePlacement, Text: "none"}),
 		gateNote("retry", initiative.OutcomeDone,
-			initiative.GateLine{Kind: initiative.GateAssumption, N: 2, State: initiative.StateConfirmed, Evidence: "retry loop resumed in sync-retry"})...,
+			initiative.GateLine{Kind: initiative.GateAssumption, N: 2, State: initiative.StateConfirmed, Evidence: "retry loop resumed in sync-retry"},
+			initiative.GateLine{Kind: initiative.GateTaught, Text: "Retries resume after a drop"},
+			initiative.GateLine{Kind: initiative.GatePlacement, Text: "none"})...,
 	)
 	sc := initiativeScenario(InitiativeSlug, s)
 	addDesign(&sc, InitiativeDesign1, "core", string(tickets.StepDone), implMergedMeta)

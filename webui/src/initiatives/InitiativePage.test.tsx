@@ -247,6 +247,98 @@ test("an unparsed line alone keeps its section out of the empty state", async ()
   expect(screen.queryByText(/No gate yet/)).toBeNull()
 })
 
+const gated = (over: Partial<InitiativeMilestone>) =>
+  ms({
+    state: "gated",
+    design_address: `gx:${over.design}`,
+    impl_address: `gx:${over.design}-impl`,
+    impl_exists: true,
+    ...over,
+  })
+
+const stopped: InitiativePage = {
+  ...page,
+  state: "stopped",
+  milestones: [
+    gated({ number: 1, name: "Core", design: "core" }),
+    ms({ number: 2, name: "Refunds", goal: "Refund a charge" }),
+    ms({ number: 3, name: "Invoices", goal: "Monthly" }),
+  ],
+  assumptions: [{ n: 1, text: "Keys work", tested_by: "core", state: "broken", evidence: "twice" }],
+  deferred: [{ item: "Receipts", to: "unplaced", why: "no fit", from: "core", state: "dropped" }],
+  gate_notes: [
+    {
+      slug: "core",
+      outcome: "stop",
+      assumptions: [{ n: 1, state: "broken", evidence: "twice" }],
+      taught: ["Keys do not work"],
+      placed: ["Receipts dropped"],
+    },
+  ],
+}
+
+const finished: InitiativePage = {
+  ...page,
+  state: "finished",
+  milestones: [
+    gated({ number: 1, name: "Core", design: "core" }),
+    gated({ number: 2, name: "Refunds", design: "refunds" }),
+  ],
+  assumptions: [
+    { n: 1, text: "Keys work", tested_by: "core", state: "confirmed", evidence: "PR 1" },
+    { n: 2, text: "Ordered", tested_by: "refunds", state: "confirmed", evidence: "PR 2" },
+  ],
+  deferred: [],
+  gate_notes: [
+    {
+      slug: "core",
+      outcome: "continue",
+      assumptions: [{ n: 1, state: "confirmed", evidence: "PR 1" }],
+      taught: ["Keys work"],
+      placed: ["none"],
+    },
+    {
+      slug: "refunds",
+      outcome: "done",
+      assumptions: [{ n: 2, state: "confirmed", evidence: "PR 2" }],
+      taught: ["Ordered"],
+      placed: ["none"],
+    },
+  ],
+}
+
+test("a stopped Initiative shows the Stopped pill, a gated Milestone with links, bare sketches and the stop note", async () => {
+  renderPage(ok(stopped))
+
+  expect(await screen.findByText("Stopped")).toBeTruthy()
+  const ms = within(screen.getByRole("region", { name: "Milestones" }))
+  expect(ms.getByText("gated")).toBeTruthy()
+  expect(ms.getAllByRole("link")).toHaveLength(2)
+  expect(ms.getAllByText("Sketch only: no Design yet")).toHaveLength(2)
+  expect(screen.getByText("broken", { selector: "td span" })).toBeTruthy()
+  expect(screen.getByText("dropped", { selector: "td span" })).toBeTruthy()
+  const notes = screen.getByRole("region", { name: "Gate notes" })
+  expect(notes.textContent).toContain("core · outcome stop")
+  expect(notes.textContent).toContain("A1 · broken · twice")
+  expect(notes.textContent).toContain("Placements: Receipts dropped")
+})
+
+test("a finished Initiative shows the Finished pill, both Milestones gated, the empty Deferred line and two gate notes in order", async () => {
+  renderPage(ok(finished))
+
+  expect(await screen.findByText("Finished")).toBeTruthy()
+  const ms = within(screen.getByRole("region", { name: "Milestones" }))
+  expect(ms.getAllByText("gated")).toHaveLength(2)
+  expect(ms.getAllByRole("link")).toHaveLength(4)
+  expect(screen.getAllByText("confirmed", { selector: "td span" })).toHaveLength(2)
+  expect(screen.getByText("Nothing deferred.")).toBeTruthy()
+  const notes = screen.getByRole("region", { name: "Gate notes" }).textContent ?? ""
+  expect(notes.indexOf("core · outcome continue")).toBeGreaterThanOrEqual(0)
+  expect(notes.indexOf("refunds · outcome done")).toBeGreaterThan(
+    notes.indexOf("core · outcome continue"),
+  )
+})
+
 test("the page has no button", async () => {
   renderPage(ok(page))
 
