@@ -10,7 +10,7 @@ import (
 
 func newMilestone(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "milestone", Short: "add and change Milestones"}
-	cmd.AddCommand(newMilestoneAdd(d), newMilestoneSet(d))
+	cmd.AddCommand(newMilestoneAdd(d), newMilestoneSet(d), newMilestoneRemove(d), newMilestoneMove(d))
 	return cmd
 }
 
@@ -39,6 +39,7 @@ func newMilestoneAdd(d Deps) *cobra.Command {
 		c.Flags().String("goal", "", "one-line goal (required)")
 		_ = c.MarkFlagRequired("name")
 		_ = c.MarkFlagRequired("goal")
+		c.Flags().Int("at", 0, "insert at this position (1-based) instead of appending")
 	}, func(c *cobra.Command, args []string) (storeEdit, error) {
 		name, _ := c.Flags().GetString("name")
 		goal, _ := c.Flags().GetString("goal")
@@ -51,7 +52,14 @@ func newMilestoneAdd(d Deps) *cobra.Command {
 			if err := checkSlugFree(b, v, exists, m.Slug); err != nil {
 				return "", err
 			}
-			b.Milestones = append(b.Milestones, initiative.Parsed(m))
+			pos := len(v.Milestones) + 1
+			if c.Flags().Changed("at") {
+				pos, _ = c.Flags().GetInt("at")
+				if err := checkPosition(v, pos, len(v.Milestones)+1); err != nil {
+					return "", err
+				}
+			}
+			b.Milestones = insertMilestone(b.Milestones, pos, initiative.Parsed(m))
 			return line, nil
 		}, nil
 	})
@@ -71,22 +79,9 @@ func newMilestoneSet(d Deps) *cobra.Command {
 			return nil, err
 		}
 		return func(b *initiative.Body, v initiative.View, exists epicSet) (string, error) {
-			idx := -1
-			for i, e := range b.Milestones {
-				if !e.Unparsed() && e.Value.Slug == args[1] {
-					idx = i
-					break
-				}
-			}
-			if idx < 0 {
-				return "", fmt.Errorf("unknown Milestone %q", args[1])
-			}
-			var mv initiative.MilestoneView
-			for _, x := range v.Milestones {
-				if x.Slug == args[1] {
-					mv = x
-					break
-				}
+			idx, mv, err := findMilestone(b, v, args[1])
+			if err != nil {
+				return "", err
 			}
 			m := b.Milestones[idx].Value
 			oldSlug := m.Slug
