@@ -58,7 +58,7 @@ func archivedRows(project string, archived []tickets.Epic, knownWorkspaces map[s
 	}
 	var rows []wire.ArchivedEpicRow
 	for _, e := range archived {
-		if e.IsBacklog {
+		if e.IsBacklog || e.IsInitiative {
 			continue
 		}
 		if design, ok := strings.CutSuffix(e.Name, tickets.ImplEpicSuffix); ok && byName[design].IsMap {

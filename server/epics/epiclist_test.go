@@ -45,6 +45,7 @@ func TestEpicList_SectionRules(t *testing.T) {
 		rigs.WriteEpicFiles(t, store, "waiting", mapMD, open)
 		rigs.WriteEpicFiles(t, store, "mapdone", "---\nstatus: open\nkind: map\ncompleted_at: 2026-01-03T11:00:00Z\n---\n", done)
 		rigs.WriteEpicFiles(t, store, "an-backlog", "---\nstatus: open\nkind: backlog\n---\n", open)
+		rigs.WriteEpicFiles(t, store, "an-initiative", "---\nstatus: open\nkind: initiative\n---\n", open)
 		for _, hidden := range []string{"one-offs", "follow-ups", "work-archived", "follow-ups-archived", "one-offs-archived"} {
 			rigs.WriteEpicFiles(t, store, hidden, loop, open)
 		}

@@ -242,7 +242,7 @@ func newTicketsRootCmd(d Deps) *cobra.Command {
 }
 
 func newTicketsEpicsCmd(d Deps) *cobra.Command {
-	var mapsOnly, backlogsOnly bool
+	var mapsOnly, backlogsOnly, initiativesOnly bool
 	cmd := &cobra.Command{
 		Use:   "epics",
 		Short: "print bare epic slugs under the current repo's ticket root",
@@ -252,11 +252,12 @@ func newTicketsEpicsCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTicketsEpics(d.dirs(), cwd, c.OutOrStdout(), mapsOnly, backlogsOnly)
+			return runTicketsEpics(d.dirs(), cwd, c.OutOrStdout(), mapsOnly, backlogsOnly, initiativesOnly)
 		},
 	}
 	cmd.Flags().BoolVar(&mapsOnly, "maps", false, "only print epics with ticket.md kind: map")
 	cmd.Flags().BoolVar(&backlogsOnly, "backlogs", false, "only print epics with ticket.md kind: backlog")
+	cmd.Flags().BoolVar(&initiativesOnly, "initiatives", false, "only print epics with ticket.md kind: initiative")
 	return cmd
 }
 

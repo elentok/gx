@@ -73,3 +73,25 @@ func TestDeriveCollapsed_SearchOverrideIsTransient(t *testing.T) {
 		t.Fatalf("expected closed-epic default to reassert once it no longer matches, got collapsed=%v", noMatch["closed-epic"])
 	}
 }
+
+func TestGroupEpicIndexesBySection_SkipsBacklogsAndInitiatives(t *testing.T) {
+	t.Parallel()
+	epics := []tickets.Epic{
+		{Name: "work"},
+		{Name: "a-backlog", IsBacklog: true},
+		{Name: "an-initiative", IsInitiative: true},
+	}
+
+	total := 0
+	for _, idx := range groupEpicIndexesBySection(epics) {
+		for _, i := range idx {
+			total++
+			if epics[i].Name != "work" {
+				t.Errorf("sidebar lists %q, want only work", epics[i].Name)
+			}
+		}
+	}
+	if total != 1 {
+		t.Errorf("listed %d epics, want 1", total)
+	}
+}

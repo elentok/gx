@@ -56,8 +56,17 @@ func TestExecute_TicketsEpics_BacklogsFlagListsOnlyBacklogsAndMapsOmitThem(t *te
 	project := cmdtest.AddProject(t, store, "mine", repo)
 	testutil.WriteFile(t, project, "backlog-epic/ticket.md", "---\nkind: backlog\nstatus: open\n---\n# backlog")
 	testutil.WriteFile(t, project, "map-epic/ticket.md", "---\nkind: map\nstatus: open\n---\n# map")
+	testutil.WriteFile(t, project, "initiative-epic/ticket.md", "---\nkind: initiative\nstatus: open\n---\n# initiative")
 
-	for _, tc := range []struct{ flag, want string }{{"--backlogs", "backlog-epic\n"}, {"--maps", "map-epic\n"}} {
+	out, err := runIn(t, repo, "tickets", "epics")
+	if err != nil {
+		t.Fatalf("execute tickets epics: %v", err)
+	}
+	if want := "backlog-epic\ninitiative-epic\nmap-epic\n"; out != want {
+		t.Errorf("no flag: stdout = %q, want %q", out, want)
+	}
+
+	for _, tc := range []struct{ flag, want string }{{"--backlogs", "backlog-epic\n"}, {"--maps", "map-epic\n"}, {"--initiatives", "initiative-epic\n"}} {
 		out, err := runIn(t, repo, "tickets", "epics", tc.flag)
 		if err != nil {
 			t.Fatalf("execute tickets epics %s: %v", tc.flag, err)

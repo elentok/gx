@@ -88,7 +88,7 @@ func hasDoneTicket(epic tickets.Epic) bool {
 func groupEpicIndexesBySection(epics []tickets.Epic) map[Section][]int {
 	groups := make(map[Section][]int, SectionCount)
 	for i, epic := range epics {
-		if epic.IsBacklog {
+		if epic.IsBacklog || epic.IsInitiative {
 			continue
 		}
 		s := EpicSection(epic)

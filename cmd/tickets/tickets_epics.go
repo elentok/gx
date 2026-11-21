@@ -15,8 +15,9 @@ import (
 // bare slugs only, no path-building, so it composes with `gx tickets root`
 // in shell tooling like `cd $(gx tickets root)/$(gx tickets epics | fzf)`.
 // When mapsOnly is set, only epics with a ticket.md of kind: map (Epic.IsMap) are
-// printed; backlogsOnly does the same for kind: backlog (Epic.IsBacklog).
-func runTicketsEpics(dirs config.Dirs, cwd string, w io.Writer, mapsOnly, backlogsOnly bool) error {
+// printed; backlogsOnly and initiativesOnly do the same for kind: backlog
+// (Epic.IsBacklog) and kind: initiative (Epic.IsInitiative).
+func runTicketsEpics(dirs config.Dirs, cwd string, w io.Writer, mapsOnly, backlogsOnly, initiativesOnly bool) error {
 	root, err := tickets.RootForDirs(dirs, cwd)
 	if err != nil {
 		return err
@@ -28,7 +29,7 @@ func runTicketsEpics(dirs config.Dirs, cwd string, w io.Writer, mapsOnly, backlo
 	}
 
 	for _, epic := range epics {
-		if mapsOnly && !epic.IsMap || backlogsOnly && !epic.IsBacklog {
+		if mapsOnly && !epic.IsMap || backlogsOnly && !epic.IsBacklog || initiativesOnly && !epic.IsInitiative {
 			continue
 		}
 		fmt.Fprintln(w, epic.Name)

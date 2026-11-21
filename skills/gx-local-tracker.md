@@ -188,7 +188,7 @@ conversation history.
   draft|open [--body -]` creates the epic's `ticket.md`. An `initiative` epic is not scheduled, cannot
   be queued and keeps its kind. A `map` epic may carry `initiative:` and `milestone:` (flags
   `--initiative` and `--milestone`, or body frontmatter); other kinds refuse them. An `backlog` epic is a project's standing
-  backlog: its status is `open`, a project has at most 12, `gx tickets epics --backlogs` lists them, the
+  backlog: its status is `open`, a project has at most 12, `gx tickets epics --backlogs` lists them (`gx tickets epics --initiatives` lists the initiative epics), the
   queue refuses one, and `gx tickets set --kind` cannot change a kind to or from `backlog`. It refuses a taken name: an existing epic,
   a branch of that name, or a name an earlier, merged epic used (its `Ralph-Loop-Ticket` trailers
   are on trunk). `publish` refuses a taken name the same way when it creates the epic.
