@@ -26,7 +26,7 @@ type Deps struct {
 // New builds `gx initiatives`.
 func New(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "initiatives", Short: "create and manage Initiatives"}
-	cmd.AddCommand(newNew(d))
+	cmd.AddCommand(newNew(d), newDeferred(d), newAssumption(d))
 	return cmd
 }
 

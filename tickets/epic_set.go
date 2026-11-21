@@ -184,6 +184,20 @@ func SetEpicSection(ticketPath, heading, content string) error {
 	})
 }
 
+// EditEpicBody reads the epic ticket.md body at ticketPath, passes it to edit
+// and writes the result back, all under the ticket lock. An error from edit
+// writes nothing.
+func EditEpicBody(ticketPath string, edit func(body string) (string, error)) error {
+	return editEpicTicketMD(ticketPath, func(_ *yaml.Node, body *string) error {
+		next, err := edit(*body)
+		if err != nil {
+			return err
+		}
+		*body = next
+		return nil
+	})
+}
+
 // AppendEpicSection is SetEpicSection that keeps the section's existing text
 // and adds content after it.
 func AppendEpicSection(ticketPath, heading, content string) error {
