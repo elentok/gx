@@ -91,7 +91,7 @@ var allowed = map[string]int{
 	"server/health/healthprocs_test.go":                                4,
 	"server/merge/latefinish_test.go":                                  1,
 	"server/limits/limithistory_codex_test.go":                         2, // settle wait for the event coalescer; received-at has second granularity
-	"server/epics/map_done_test.go":                                    1,
+	"server/epics/mapprogress_test.go":                                 1, // negative wait: a wrong stamp would land within a beat
 	"server/merge/mergeflows/merge_finish_test.go":                     1,
 	"server/merge/mergedecide_test.go":                                 3,
 	"server/merge/mergeflows/mergefork_test.go":                        1,
