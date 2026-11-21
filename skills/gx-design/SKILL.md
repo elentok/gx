@@ -253,8 +253,9 @@ answers:
 - **Later** in a named Milestone, with a reason. Name one of the Initiative's Milestones, or
   `unplaced` when no Milestone fits (never edit the Milestone list). Run
   `gx initiatives deferred add <project:initiative> <item> --to <milestone|unplaced> --why <reason>
-  --from <this Design>`. Then write one pointer line under the map's `## Out of scope`, "deferred to
-  <milestone>, see the Initiative", with `gx tickets section <project:epic> "Out of scope" -`.
+  --from <this Design>`. Then add one pointer line under the map's `## Out of scope`, "deferred to
+  <milestone>, see the Initiative", with `gx tickets section --append <project:epic> "Out of scope" -`.
+  Never write the section without `--append`: that replaces it and erases earlier lines.
 - **Out**, with a reason. It stays on the map's `## Out of scope` only and is never copied to the
   Initiative.
 

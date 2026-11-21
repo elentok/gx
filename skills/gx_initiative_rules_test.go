@@ -143,8 +143,11 @@ func TestGxInitiativeGateStep(t *testing.T) {
 		"sets every open deferred item to `dropped` with that reason",
 		"\"Initiative done\"",
 		"One gate per Milestone, never re-run")
-	if strings.Index(step, "before the placement round") > strings.Index(step, "Write nothing before the answers") {
-		t.Error("reshape edits must be described before the write step")
+	reshape := strings.Index(step, "3. If the outcome is `reshape`")
+	placement := strings.Index(step, "4. Placement round")
+	write := strings.Index(step, "Write nothing before the answers")
+	if reshape < 0 || reshape > placement || placement > write {
+		t.Error("Gate order must be reshape edits, then the placement round, then the write step")
 	}
 }
 

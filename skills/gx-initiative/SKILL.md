@@ -53,18 +53,19 @@ Run the steps in this order. The first one that matches runs and the rest are sk
    1. Draft the gate note from the spec, the impl epic's tickets, the merged PR and the verify results. Read
       the Retro's follow-ups as evidence. Never copy them into the note.
    2. Grill in rounds, with your draft as the recommendation: each Assumption this Milestone tests and any
-      other Assumption the evidence touches. Then the placement of every open deferred item whose `to:` is
-      the gated Milestone or the next Milestone, and every `unplaced` one.
+      other Assumption the evidence touches. This settles the outcome.
    3. If the outcome is `reshape`, run the list and Destination edits the person confirms
       (`gx initiatives milestone add|move|remove|set`, `gx initiatives destination`) before the placement
       round, so the round sees the items they unplaced.
-   4. Write nothing before the answers. Then run `gx initiatives gate <project:initiative> <milestone>` with
+   4. Placement round: grill the placement of every open deferred item whose `to:` is the gated Milestone or
+      the next Milestone, and every `unplaced` one.
+   5. Write nothing before the answers. Then run `gx initiatives gate <project:initiative> <milestone>` with
       one `--outcome`: `continue`, `reshape`, `stop`, or `done` for the last Milestone. Pass the Assumption
       states and evidence with `--assumption`, the placements with `--placed`, and what the Milestone taught
       with `--taught`. A `reshape` note says what changed and why.
-   5. `stop` records why with `--reason` and sets every open deferred item to `dropped` with that reason.
+   6. `stop` records why with `--reason` and sets every open deferred item to `dropped` with that reason.
       `done` does the same with the reason "Initiative done". The Initiative stays open either way.
-   6. One gate per Milestone, never re-run. A wrong note is fixed by a later gate entry or by hand.
+   7. One gate per Milestone, never re-run. A wrong note is fixed by a later gate entry or by hand.
 
 4. **Resume: the latest gated Milestone has outcome `continue` or `reshape`, and the next Milestone has no
    Design.** Do not repeat the Gate. Confirm the next Milestone fits one reviewable PR, then run

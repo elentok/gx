@@ -422,6 +422,17 @@ func TestGxDesignQuestionBlockIsYAML(t *testing.T) {
 	}
 }
 
+func TestGxDesignLaterPointerAppendsToOutOfScope(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+	want := "gx tickets section --append <project:epic> \"Out of scope\" -"
+	if !strings.Contains(text, want) {
+		t.Errorf("gx-design/SKILL.md lacks %q", want)
+	}
+	if strings.Contains(text, "gx tickets section <project:epic> \"Out of scope\" -") {
+		t.Error("gx-design must never overwrite ## Out of scope with one line")
+	}
+}
+
 func sectionAfter(t *testing.T, text, start, end string) string {
 	t.Helper()
 	i := strings.Index(text, collapseSpace(start))
