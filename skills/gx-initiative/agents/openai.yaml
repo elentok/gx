@@ -1,0 +1,5 @@
+interface:
+  display_name: "Initiative"
+  short_description: "Shape, gate or advance an Initiative one step"
+policy:
+  allow_implicit_invocation: false

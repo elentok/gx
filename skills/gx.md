@@ -90,7 +90,9 @@ never the model on its own. One-offs never commit: `gx server one-off` has no `-
 `--base`. `gx-evolve` sets it too: the server launches it for `type: evolve`
 retros, never the model on its own. `gx-triage-follow-ups` sets it as well: emptying a follow-ups
 epic closes, moves and creates tickets in bulk, so a person starts it, never the model. `gx-design`
-sets it too: a person walks one epic through map, review and implement. `gx-to-tickets`, `gx-tdd`,
+sets it too: a person walks one epic through map, review and implement. `gx-initiative` sets it as
+well, and `agents/openai.yaml` sets `allow_implicit_invocation: false` for Codex: shaping an Initiative,
+running its Gate and creating a Design are deliberate steps a person starts. `gx-to-tickets`, `gx-tdd`,
 `gx-resolving-merge-conflicts`, and `gx-changelog` carry no such flag: it's fine for the model to reach for
 ticket breakdown, TDD guidance, or merge-conflict resolution on its own when a task calls
 for it — e.g. a code-review ticket that needs to spin up follow-up tickets can invoke
@@ -237,6 +239,9 @@ skills/
     SKILL.md
     agents/openai.yaml
   gx-design/
+    SKILL.md
+    agents/openai.yaml
+  gx-initiative/
     SKILL.md
     agents/openai.yaml
   gx-follow-up/
