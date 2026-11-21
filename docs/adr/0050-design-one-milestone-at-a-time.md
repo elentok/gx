@@ -2,9 +2,9 @@
 
 Only the next Milestone of an Initiative gets a full Design. Later Milestones stay a name, a
 one-line goal and the assumptions they test. Items a Design defers live on the Initiative, not in
-`follow-ups`, and so do the assumptions. A Design never edits them beyond adding deferred items.
-Only the Gate, run by the person after the impl epic merges, changes assumption states, places
-deferred items, reshapes the Milestone list or stops the Initiative. Reason: the first Milestone
+`follow-ups`, and so do the assumptions. A Design adds deferred items and sets its own Milestone's items to taken or re-defers them. Only
+the Gate, run by the person after the impl epic merges, changes assumption states, places
+unplaced deferred items, reshapes the Milestone list or stops the Initiative. Reason: the first Milestone
 gives hard evidence on whether the assumptions hold, so plans written up front for later Milestones
 go stale, and big designs produce huge PRs that need many fixes.
 
