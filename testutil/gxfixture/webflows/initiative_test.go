@@ -12,11 +12,17 @@ import (
 
 func TestInitiativeScenario_SeedsAndListsTheInitiative(t *testing.T) {
 	t.Parallel()
-	for scenario, slug := range map[string]string{
-		"initiative-fresh":           spec.InitiativeSlug,
-		"initiative-m1-implementing": spec.InitiativeSlug,
-		"initiative-m1-gated":        spec.InitiativeSlug,
-		"initiative-broken-links":    spec.InitiativeBrokenSlug,
+	for scenario, want := range map[string][]string{
+		"initiative-fresh":           {spec.InitiativeSlug},
+		"initiative-m1-implementing": {spec.InitiativeSlug},
+		"initiative-m1-gated":        {spec.InitiativeSlug},
+		"initiative-broken-links":    {spec.InitiativeBrokenSlug},
+		"initiative-stopped":         {spec.InitiativeSlug},
+		"initiative-finished":        {spec.InitiativeSlug},
+		"initiative-list":            {spec.InitiativeSlug, spec.InitiativeStoppedSlug},
+		"initiative-epics-cards":     {spec.InitiativeSlug},
+		"initiative-gate-ready":      {spec.InitiativeSlug},
+		"initiative-resume":          {spec.InitiativeSlug},
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			t.Parallel()
@@ -28,8 +34,10 @@ func TestInitiativeScenario_SeedsAndListsTheInitiative(t *testing.T) {
 			if err != nil {
 				t.Fatalf("gx tickets epics --initiatives: %v\n%s", err, out)
 			}
-			if got := strings.Fields(string(out)); !slices.Equal(got, []string{slug}) {
-				t.Errorf("Initiatives = %v, want [%s]", got, slug)
+			got := strings.Fields(string(out))
+			slices.Sort(got)
+			if !slices.Equal(got, want) {
+				t.Errorf("Initiatives = %v, want %v", got, want)
 			}
 		})
 	}

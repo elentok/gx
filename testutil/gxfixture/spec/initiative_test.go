@@ -219,6 +219,133 @@ func TestInitiativeScenario_BrokenLinksReportEveryProblem(t *testing.T) {
 	}
 }
 
+func readScenario(t *testing.T, sc scenario, slug string) (initiative.View, initiative.Body, []tickets.Epic) {
+	t.Helper()
+	live, archived := loadInitiativeScenario(t, sc)
+	init := findLive(t, live, slug)
+	v := initiative.Read(init, live, archived)
+	if len(v.Unparsed) != 0 || len(v.Problems) != 0 {
+		t.Errorf("%s: unparsed %+v, problems %+v", slug, v.Unparsed, v.Problems)
+	}
+	return v, initiative.ParseBody(init.Body), live
+}
+
+func gateOutcomes(b initiative.Body) []string {
+	var out []string
+	for _, g := range b.GateNotes {
+		if g.Value.Kind == initiative.GateOutcome {
+			out = append(out, g.Value.Outcome)
+		}
+	}
+	return out
+}
+
+func TestInitiativeScenario_StoppedIsGatedAtMilestone1(t *testing.T) {
+	t.Parallel()
+	v, body, _ := readScenario(t, InitiativeStoppedScenario(), InitiativeSlug)
+	want := []string{initiative.MilestoneGated, initiative.MilestoneSketch, initiative.MilestoneSketch}
+	if got := milestoneStates(v); v.State != initiative.StateStopped || v.StoppedAt != 1 || !slices.Equal(got, want) {
+		t.Errorf("state %q stoppedAt %d milestones %v, want stopped at 1 with %v", v.State, v.StoppedAt, got, want)
+	}
+	if len(body.Assumptions) != 1 || body.Assumptions[0].Value.State != initiative.StateBroken {
+		t.Errorf("assumptions = %+v, want one broken", body.Assumptions)
+	}
+	if len(body.Deferred) != 1 || body.Deferred[0].Value.State != initiative.DeferredDropped {
+		t.Errorf("deferred = %+v, want one dropped", body.Deferred)
+	}
+	if got := gateOutcomes(body); !slices.Equal(got, []string{initiative.OutcomeStop}) {
+		t.Errorf("gate outcomes = %v, want stop", got)
+	}
+	for _, g := range body.GateNotes {
+		if g.Value.Kind == initiative.GatePlacement && g.Value.Text != "Proxy support dropped" {
+			t.Errorf("placement = %q, want it to name the dropped item", g.Value.Text)
+		}
+	}
+}
+
+func TestInitiativeScenario_FinishedHasEmptyDeferredAndTwoGateNotes(t *testing.T) {
+	t.Parallel()
+	v, body, _ := readScenario(t, InitiativeFinishedScenario(), InitiativeSlug)
+	if v.State != initiative.StateFinished || v.Done != 2 || v.Total != 2 || v.Current != "" {
+		t.Errorf("view = %+v, want finished with 2 of 2 gated", v)
+	}
+	for _, a := range body.Assumptions {
+		if a.Value.State != initiative.StateConfirmed {
+			t.Errorf("assumption A%d state = %q, want confirmed", a.Value.N, a.Value.State)
+		}
+	}
+	if len(body.Assumptions) != 2 || len(body.Deferred) != 0 {
+		t.Errorf("assumptions %d, deferred %d, want 2 and 0", len(body.Assumptions), len(body.Deferred))
+	}
+	if got := gateOutcomes(body); !slices.Equal(got, []string{initiative.OutcomeContinue, initiative.OutcomeDone}) {
+		t.Errorf("gate outcomes = %v, want continue, done", got)
+	}
+}
+
+func TestInitiativeScenario_ListHasOneActiveAndOneStopped(t *testing.T) {
+	t.Parallel()
+	live, archived := loadInitiativeScenario(t, InitiativeListScenario())
+	active := initiative.Read(findLive(t, live, InitiativeSlug), live, archived)
+	if active.State != initiative.StateActive || active.Done != 1 || active.Total != 3 || active.Current != "retry" {
+		t.Errorf("active = %+v, want active, 1 of 3 done, current retry", active)
+	}
+	stopped := initiative.Read(findLive(t, live, InitiativeStoppedSlug), live, archived)
+	if stopped.State != initiative.StateStopped || stopped.StoppedAt != 1 {
+		t.Errorf("stopped = %+v, want stopped at Milestone 1", stopped)
+	}
+	var initiatives int
+	for _, e := range live {
+		if e.IsInitiative {
+			initiatives++
+		}
+	}
+	if initiatives != 2 {
+		t.Errorf("Initiatives = %d, want 2", initiatives)
+	}
+}
+
+func TestInitiativeScenario_EpicsCardsSeedTwoBackLinksAndOnePlainDesign(t *testing.T) {
+	t.Parallel()
+	_, _, live := readScenario(t, InitiativeEpicsCardsScenario(), InitiativeSlug)
+	for name, want := range map[string]int{InitiativeDesign1: 1, InitiativeDesign1 + tickets.ImplEpicSuffix: 1, InitiativeDesign2: 2} {
+		link := initiative.BackLinkFor(findLive(t, live, name), live)
+		if link.Milestone != want || link.Initiative != InitiativeSlug || link.Problem != nil {
+			t.Errorf("%s back-link = %+v, want Milestone %d", name, link, want)
+		}
+	}
+	if link := initiative.BackLinkFor(findLive(t, live, InitiativePlainDesign), live); link != (initiative.BackLink{}) {
+		t.Errorf("plain Design back-link = %+v, want none", link)
+	}
+	for _, e := range live {
+		if e.Name == InitiativeDesign2+tickets.ImplEpicSuffix {
+			t.Errorf("Design card has the impl epic %q", e.Name)
+		}
+	}
+	if !findLive(t, live, InitiativeSlug).IsInitiative {
+		t.Error("the Initiative is not an Initiative")
+	}
+}
+
+func TestInitiativeScenario_GateReadyMilestone1IsMerged(t *testing.T) {
+	t.Parallel()
+	v, body, _ := readScenario(t, InitiativeGateReadyScenario(), InitiativeSlug)
+	if v.Milestones[0].State != initiative.MilestoneMerged || len(body.GateNotes) != 0 {
+		t.Errorf("Milestone 1 state %q, gate notes %d, want merged and none", v.Milestones[0].State, len(body.GateNotes))
+	}
+}
+
+func TestInitiativeScenario_ResumeContinuesToAnUndesignedMilestone(t *testing.T) {
+	t.Parallel()
+	v, body, _ := readScenario(t, InitiativeResumeScenario(), InitiativeSlug)
+	want := []string{initiative.MilestoneGated, initiative.MilestoneSketch, initiative.MilestoneSketch}
+	if got := milestoneStates(v); !slices.Equal(got, want) || v.State != initiative.StateActive || v.Milestones[1].Design != "" {
+		t.Errorf("states %v active %q design %q, want %v, active, no Design", got, v.State, v.Milestones[1].Design, want)
+	}
+	if got := gateOutcomes(body); !slices.Equal(got, []string{initiative.OutcomeContinue}) {
+		t.Errorf("gate outcomes = %v, want continue", got)
+	}
+}
+
 // A seeded valid line that stops parsing back would show up as an unparsed
 // line, so every scenario but the broken-link one has none.
 func TestInitiativeScenario_SeededValidLinesParseBack(t *testing.T) {

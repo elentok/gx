@@ -126,9 +126,13 @@ func initiativeScenario(slug string, sections initiativeSections) scenario {
 // addDesign seeds a Design map of the Initiative at the given step, and
 // optionally its -impl epic (merged or not).
 func addDesign(sc *scenario, design, milestone string, step, impl string) {
+	addDesignOf(sc, InitiativeSlug, design, milestone, step, impl)
+}
+
+func addDesignOf(sc *scenario, initiativeSlug, design, milestone string, step, impl string) {
 	addr := project + ":" + design
 	sc.Epics = append(sc.Epics, initiativeEpic(design))
-	sc.EpicMeta[addr] = designMeta(InitiativeSlug, milestone)
+	sc.EpicMeta[addr] = designMeta(initiativeSlug, milestone)
 	if sc.DesignSteps == nil {
 		sc.DesignSteps = map[string]string{}
 	}

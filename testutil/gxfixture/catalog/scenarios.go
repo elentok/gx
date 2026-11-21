@@ -660,6 +660,12 @@ var Scenarios = map[string]scenario{
 	"initiative-m1-implementing": spec.InitiativeM1ImplementingScenario(),
 	"initiative-m1-gated":        spec.InitiativeM1GatedScenario(),
 	"initiative-broken-links":    spec.InitiativeBrokenLinksScenario(),
+	"initiative-stopped":         spec.InitiativeStoppedScenario(),
+	"initiative-finished":        spec.InitiativeFinishedScenario(),
+	"initiative-list":            spec.InitiativeListScenario(),
+	"initiative-epics-cards":     spec.InitiativeEpicsCardsScenario(),
+	"initiative-gate-ready":      spec.InitiativeGateReadyScenario(),
+	"initiative-resume":          spec.InitiativeResumeScenario(),
 	// triage: follow-ups and a Triage in the state --shape names (default c-few).
 	// run swaps in spec.TriageScenario(shape).
 	"triage": {TriageShaped: true},
