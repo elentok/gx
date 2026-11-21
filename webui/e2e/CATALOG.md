@@ -169,7 +169,8 @@ The routes are in `webui/src/routes.tsx` (`pageRoutes`). There is no separate Qu
 | `/archive`   | Archive                                 |                                                                                                                         |
 | `/agents/*`  | Agents (the splat is the session label) |                                                                                                                         |
 | `/backlog`   | Backlog                                 |                                                                                                                         |
-| `/initiatives` | Initiatives (read-only list, no Start button) |                                                                                                                         |
+| `/initiatives` | Initiatives (read-only list, no Start button) | heading "Initiatives"; one region per project named by the project (`demo`); columns Initiative, State, Milestones, Current; row link named by the slug |
+| `/initiatives/*` | Initiative | heading = slug (level 1), "demo · initiative", state pill; regions Destination, Milestones, Assumptions, Deferred, Gate notes |
 | `/schedules` | Schedules                               |                                                                                                                         |
 | `/stats`     | Stats                                   |                                                                                                                         |
 | `/cleanup`   | Cleanup                                 |                                                                                                                         |
@@ -189,7 +190,7 @@ worker outcome maps to ticket status, why fixture CLI writes land late, how to s
 and "read `test-results/**/error-context.md` first on a locator failure".
 
 The suite is capped by `maxFlows` in `playwrightguard/budget_test.go`, which equals the number of
-`test(` calls in `*.e2e.ts` (155). Before you add a flow, add a step to a flow on the same scenario
+`test(` calls in `*.e2e.ts` (157). Before you add a flow, add a step to a flow on the same scenario
 (see `gx-only-e2es`) and keep this file and `maxFlows` in step with the code.
 
 A flow's title starts with its plan number. A flow that absorbed others lists their numbers in its
@@ -207,6 +208,11 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **2. Epic looks right:** `mixed-epic` card, epic page ring, stats line and ticket cards before and after queueing; then the `summary-notes` ticket's "Latest summary" block (and no such text on its Epics card) and the `map-evolve` evolve ticket as a top-level one-off card. The last step is the PWA journey on a fresh `mixed` fixture (declares `reloads: 1`): the manifest link, fields and icons; the worker activates and an outside ticket still reaches the page through the event stream; Force refresh (toast, registration and a planted shell-cache entry gone, one reload); then `stopServer()` and a cold open in a new page of the same context, showing the shell, the Offline strip and "Can't reach gx. Retrying…" with no epic data.
 - **7. Epic completion:** the epic page when the last ticket finishes.
 - **6. Queue an epic, and outside changes show up:** Queue button disabled while `/v1/queue/add` runs, then the card moves to Implementing; changes made outside the page appear.
+
+### `initiatives.e2e.ts`
+
+- **210. Initiatives journey:** scenario `initiative-list`: Epics menu "Initiatives" opens the list with no reload; Active row "1 of 3 done" with its current Milestone, Stopped row "Stopped at Milestone 1 gate", no Start button, and `gx server initiatives` agrees. A row opens the gated page (Milestone states and pill equal `gx server initiative`, one column about 860px wide, links only where a Design or impl epic exists), Back returns to the list, the Stopped row opens the Stopped page (dropped Deferred row, `stop` note). A second `start("initiative-finished")` checks the Finished page (empty Deferred state, `continue` and `done` notes).
+- **211. Initiative on the Epics page:** scenario `initiative-epics-cards`: the Implementation and Design cards show "Milestone N of ship-sync" inside the card, a plain Design card has none and the Initiative has no card; the link opens the implementing Initiative page (CLI agrees, empty Gate notes naming `/gx-initiative`), its Impl epic and Design links open headers that show the same line and link back.
 
 ### `design.e2e.ts`
 

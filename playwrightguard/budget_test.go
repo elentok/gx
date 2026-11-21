@@ -72,7 +72,11 @@ import (
 //
 // Draft history popup flow (+1): the popup over the seeded lists needs a real server round trip, real layout at 1280 and 390px,
 // real key handling (Leader then h) and a reload; the vitest and Go tests cover each rule alone.
-const maxFlows = 155
+//
+// Initiative flows (+2): the Epics menu item, the list and its row links, the Initiative page in each state and the
+// Milestone link between Epics cards, the Initiative page and the epic header need the server payload and navigation
+// across pages; vitest pins every render alone.
+const maxFlows = 157
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
