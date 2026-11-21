@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.51.11 - 2026-11-21
+
+- Added Initiatives and Milestones (Milestone 1). An Initiative is a new epic kind that groups Designs and implementation epics into Milestones. It has body formats that parse, render and keep unparsed lines verbatim, and a migration step maps the new initiative and milestone fields.
+- Added the `gx initiatives` CLI: `new` (with slug clash checks), read verbs for the list and the Initiative page, `gate` (with its refusals) plus the stop and done drops, and `deferred` and `assumption` add/set verbs. `gx tickets epics --initiatives` lists them. `milestone set --design` and `deferred add --from` accept `project:epic`.
+- Added a read-only Initiatives page and nav entry. The list shows each Initiative's current Milestone number and state. The Initiative page covers the implementing, gated, stopped and finished states, and shows broken links, taught lines and placements.
+- Added "Milestone N of the Initiative" on Design and implementation cards and headers, plus a Milestone back-link on the Epics list and epic detail data.
+- Changed Initiatives to stay out of the queue, merge, PR, pause and stats, and to be skipped on the Epics page and the TUI sidebar.
+- Added the `/gx-initiative` skill for Claude and Codex. `gx-design` and `gx-wayfinder` now read the Initiative, ask a three-value scope question and track deferred items.
+- Added Draft history. A new store keeps three capped lists (chat drafts, Design drafts, sent messages). Starting or deleting a draft, web composer sends, Round notes and the Design Start request save an entry. The History button and popup (leader then `h`) restore entries on the Chat draft, Design draft, chat composer and Design composer. `gx agents drafts delete` and a Playwright flow are included.
+- Fixed draft history edge cases: a repeat of an over-cap draft is detected by hashing the dropped images, Restore is blocked while a restore is pending or an upload runs, stale pick notices are cleared, and the History sheet sits 90 px from the top of the viewport.
+- Fixed the settings model fields to show complete model names. New chat drafts now default to the worker tier's model.
+- Fixed Initiative edge cases: Destination replace, reserved unplaced slugs, Design sibling name guards, stray gate lines now shown, project read errors now logged, and impl epics of archived Designs now back-linked.
+- Added the `gx-pwa` skill for Home Screen icons, the manifest and iOS certificate trust.
+- Changed test and size-guard housekeeping: Triage wire types moved to `wire/ops`, fixture seed data moved out of `gxfixture/spec`, small files merged in `server/epics`, and the e2e catalog flow limit raised to 157 for the Initiative flows.
+
 ## v0.51.10 - 2026-11-19
 
 - Added a fix for Codex's new "Trust this folder" startup dialog. gx now answers it like the other trust dialogs.
