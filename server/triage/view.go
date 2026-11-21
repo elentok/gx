@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 	triagerec "github.com/elentok/gx/triage"
 )
@@ -73,19 +74,19 @@ func (t *Triage) readHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // View builds the payload of a project.
-func (t *Triage) View(project string) (wire.TriageView, error) {
+func (t *Triage) View(project string) (ops.TriageView, error) {
 	dir, err := t.projects.Dir(project)
 	if err != nil {
-		return wire.TriageView{}, err
+		return ops.TriageView{}, err
 	}
 	store := triagerec.NewStore(dir)
 	live, err := store.LoadLive()
 	if err != nil {
-		return wire.TriageView{}, err
+		return ops.TriageView{}, err
 	}
 	past, err := store.History()
 	if err != nil {
-		return wire.TriageView{}, err
+		return ops.TriageView{}, err
 	}
 	rec := live
 	if rec == nil && len(past) > 0 {
@@ -96,11 +97,11 @@ func (t *Triage) View(project string) (wire.TriageView, error) {
 	if rec != nil && rec.State == triagerec.StateLive {
 		v.Summary.Waiting = t.waitingLines(project)
 	}
-	v.History = []wire.TriageHistoryItem{}
+	v.History = []ops.TriageHistoryItem{}
 	for _, p := range past {
 		res := resultOf(p)
-		v.History = append(v.History, wire.TriageHistoryItem{
-			ID: p.ID, State: wire.TriageState(p.State), StartedAt: p.StartedAt.Format("2006-01-02T15:04:05Z07:00"),
+		v.History = append(v.History, ops.TriageHistoryItem{
+			ID: p.ID, State: ops.TriageState(p.State), StartedAt: p.StartedAt.Format("2006-01-02T15:04:05Z07:00"),
 			Rows: len(p.Rows), Result: res,
 		})
 	}
@@ -129,8 +130,8 @@ func (t *Triage) waitingLines(project string) []string {
 
 // destinations lists the choices for a row's destination: the epics the
 // verdicts suggested, the project's open map epics, and a new map epic.
-func (t *Triage) destinations(project string, rec *triagerec.Record) []wire.TriageDestination {
-	out := []wire.TriageDestination{}
+func (t *Triage) destinations(project string, rec *triagerec.Record) []ops.TriageDestination {
+	out := []ops.TriageDestination{}
 	seen := map[string]bool{}
 	if rec != nil {
 		var sug []string
@@ -142,7 +143,7 @@ func (t *Triage) destinations(project string, rec *triagerec.Record) []wire.Tria
 		}
 		sort.Strings(sug)
 		for _, s := range sug {
-			out = append(out, wire.TriageDestination{Kind: "suggested", Value: s, Label: s})
+			out = append(out, ops.TriageDestination{Kind: "suggested", Value: s, Label: s})
 		}
 	}
 	epics, err := t.projects.Epics(project)
@@ -156,20 +157,20 @@ func (t *Triage) destinations(project string, rec *triagerec.Record) []wire.Tria
 		}
 		sort.Strings(maps)
 		for _, name := range maps {
-			out = append(out, wire.TriageDestination{Kind: "map-epic", Value: name, Label: name})
+			out = append(out, ops.TriageDestination{Kind: "map-epic", Value: name, Label: name})
 		}
 	}
-	return append(out, wire.TriageDestination{Kind: "new-map-epic", Label: "New map epic"})
+	return append(out, ops.TriageDestination{Kind: "new-map-epic", Label: "New map epic"})
 }
 
-func buildView(project string, rec *triagerec.Record) wire.TriageView {
-	v := wire.TriageView{
-		Project: project, State: wire.TriageNone, Flow: string(tickets.FlowTriage),
-		Rows: []wire.TriageRow{}, ActionCounts: map[string]int{}, Destinations: []wire.TriageDestination{},
+func buildView(project string, rec *triagerec.Record) ops.TriageView {
+	v := ops.TriageView{
+		Project: project, State: ops.TriageNone, Flow: string(tickets.FlowTriage),
+		Rows: []ops.TriageRow{}, ActionCounts: map[string]int{}, Destinations: []ops.TriageDestination{},
 		EpicActions: triagerec.EpicActions,
-		History:     []wire.TriageHistoryItem{},
-		Summary: &wire.TriageSummary{
-			Actions: map[string]int{}, Backlogs: map[string]int{}, Moves: []wire.TriageMove{}, Waiting: []string{},
+		History:     []ops.TriageHistoryItem{},
+		Summary: &ops.TriageSummary{
+			Actions: map[string]int{}, Backlogs: map[string]int{}, Moves: []ops.TriageMove{}, Waiting: []string{},
 		},
 	}
 	if rec == nil {
@@ -177,7 +178,7 @@ func buildView(project string, rec *triagerec.Record) wire.TriageView {
 		return v
 	}
 	isLive := rec.State == triagerec.StateLive
-	v.ID, v.State, v.Revision = rec.ID, wire.TriageState(rec.State), rec.Revision
+	v.ID, v.State, v.Revision = rec.ID, ops.TriageState(rec.State), rec.Revision
 	v.Steps = steps(rec.Step)
 	v.LegacyWrite = rec.LegacyWrite()
 	v.CanAbandon = CanAbandon(isLive, rec.Step, v.LegacyWrite)
@@ -186,7 +187,7 @@ func buildView(project string, rec *triagerec.Record) wire.TriageView {
 	}
 	for _, m := range rec.Moves {
 		can := CanRetryMove(isLive, rec.Step, m)
-		v.Summary.Moves = append(v.Summary.Moves, wire.TriageMove{
+		v.Summary.Moves = append(v.Summary.Moves, ops.TriageMove{
 			OldEpic: m.OldEpic, Backlog: m.Backlog, State: string(m.State), LastError: m.LastError,
 			CanRetry: can, CanKeep: can,
 		})
@@ -237,11 +238,11 @@ func buildView(project string, rec *triagerec.Record) wire.TriageView {
 
 // openRound reports the first saved round that waits for an answer, and the
 // final-approval marker: no round open and no ask question left to round.
-func openRound(rec *triagerec.Record) (*wire.TriageOpenRound, bool) {
+func openRound(rec *triagerec.Record) (*ops.TriageOpenRound, bool) {
 	index, open, ok := rec.OpenRound()
 	if ok {
 		round := rec.Rounds[index]
-		return &wire.TriageOpenRound{
+		return &ops.TriageOpenRound{
 			Number: index + 1, Questions: len(round.Questions), Answered: len(round.Questions) - len(open),
 		}, false
 	}
@@ -293,8 +294,8 @@ func progress(rec *triagerec.Record, total, verdicts, plans, written int) (strin
 	return note, int((float64(idx) + within) * 100 / 4)
 }
 
-func buildRow(rec *triagerec.Record, r triagerec.Row, live bool) (wire.TriageRow, int, bool) {
-	row := wire.TriageRow{
+func buildRow(rec *triagerec.Record, r triagerec.Row, live bool) (ops.TriageRow, int, bool) {
+	row := ops.TriageRow{
 		Address: r.Address, Title: r.Title, Category: r.Category,
 		Verdict: r.Verdict, Evidence: r.Evidence, Files: r.Files,
 		Answers: r.Person.Answers, Gone: r.Write == triagerec.WriteGone,
@@ -331,9 +332,9 @@ func buildRow(rec *triagerec.Record, r triagerec.Row, live bool) (wire.TriageRow
 	return row, open, changed
 }
 
-func wireQuestion(q triagerec.Question) wire.TriageQuestion {
+func wireQuestion(q triagerec.Question) ops.TriageQuestion {
 	title, body, _ := strings.Cut(q.Text, "\n")
-	return wire.TriageQuestion{
+	return ops.TriageQuestion{
 		ID: q.ID, Title: title, Body: strings.TrimSpace(body), Kind: string(q.Kind),
 		Options: q.Options, Recommended: q.Default,
 	}
@@ -341,16 +342,16 @@ func wireQuestion(q triagerec.Question) wire.TriageQuestion {
 
 // resultOf groups the settled rows of rec by their action. A row counts once
 // it is written or kept.
-func resultOf(rec *triagerec.Record) wire.TriageResult {
+func resultOf(rec *triagerec.Record) ops.TriageResult {
 	order := []string{triagerec.ActionReady, triagerec.ActionBacklog, "merge", triagerec.ActionClose, "keep"}
-	by := map[string][]wire.TriageResultItem{}
-	res := wire.TriageResult{Groups: []wire.TriageResultGroup{}}
+	by := map[string][]ops.TriageResultItem{}
+	res := ops.TriageResult{Groups: []ops.TriageResultGroup{}}
 	for _, r := range rec.Rows {
 		row, _, _ := buildRow(rec, r, false)
 		if row.Gone || (r.Write != triagerec.WriteDone && !r.Person.KeepForLater) {
 			continue
 		}
-		item := wire.TriageResultItem{Address: r.Address, Title: r.Title}
+		item := ops.TriageResultItem{Address: r.Address, Title: r.Title}
 		switch row.Action {
 		case triagerec.ActionReady, triagerec.ActionBacklog:
 			item.Target = epicOf(r.FirstAddress())
@@ -366,7 +367,7 @@ func resultOf(rec *triagerec.Record) wire.TriageResult {
 	}
 	for _, a := range order {
 		if items := by[a]; len(items) > 0 {
-			res.Groups = append(res.Groups, wire.TriageResultGroup{Action: a, Items: items})
+			res.Groups = append(res.Groups, ops.TriageResultGroup{Action: a, Items: items})
 		}
 	}
 	return res

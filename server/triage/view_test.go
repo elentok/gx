@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/triage"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	triagerec "github.com/elentok/gx/triage"
 )
 
@@ -29,7 +29,7 @@ func startViewFixture(t *testing.T) (rigs.DesignsFixture, *triagerec.Store) {
 	return f, triagerec.NewStore(filepath.Join(store, "proj"))
 }
 
-func show(t *testing.T, f rigs.DesignsFixture) wire.TriageView {
+func show(t *testing.T, f rigs.DesignsFixture) ops.TriageView {
 	t.Helper()
 	v, err := f.H.Client.Triage.Show(f.Ctx, "proj")
 	if err != nil {
@@ -54,7 +54,7 @@ func mustRec(rec *triagerec.Record, err error) *triagerec.Record {
 	return rec
 }
 
-func stepStates(v wire.TriageView) string {
+func stepStates(v ops.TriageView) string {
 	out := ""
 	for _, s := range v.Steps {
 		out += string(s.State)[:1]
@@ -94,7 +94,7 @@ func TestView_DoneResultGroupsBacklogRows(t *testing.T) {
 func TestView_NoRecordIsNone(t *testing.T) {
 	f, _ := startViewFixture(t)
 	v := show(t, f)
-	if v.State != wire.TriageNone || v.ID != "" || len(v.History) != 0 || len(v.Rows) != 0 || v.CanAbandon {
+	if v.State != ops.TriageNone || v.ID != "" || len(v.History) != 0 || len(v.Rows) != 0 || v.CanAbandon {
 		t.Fatalf("unexpected none view: %+v", v)
 	}
 	if v.Flow != "triage" || len(v.Steps) != 5 || stepStates(v) != "ttttt" {
@@ -110,7 +110,7 @@ func TestView_RecordAtEachStep(t *testing.T) {
 	rec := mustRec(s.Create())
 
 	v := show(t, f)
-	if v.State != wire.TriageLive || v.StepNote != "0 of 2 verdicts saved" || stepStates(v) != "ctttt" || v.RingPercent != 0 || !v.CanAbandon {
+	if v.State != ops.TriageLive || v.StepNote != "0 of 2 verdicts saved" || stepStates(v) != "ctttt" || v.RingPercent != 0 || !v.CanAbandon {
 		t.Fatalf("verify: %+v", v)
 	}
 	if len(v.Rows) != 2 || v.Rows[0].Address != addrA || v.Rows[0].Title == "" {
@@ -153,7 +153,7 @@ func TestView_RecordAtEachStep(t *testing.T) {
 	rec = mustRec(s.WriteRow(rec.ID, rec.Revision, addrA, triagerec.WriteDone, nil, ""))
 	rec = mustRec(s.SetLastPass(rec.ID, rec.Revision, true))
 	v = show(t, f)
-	if v.State != wire.TriageDone || stepStates(v) != "ddddd" || v.RingPercent != 100 || v.Result == nil || v.CanAbandon {
+	if v.State != ops.TriageDone || stepStates(v) != "ddddd" || v.RingPercent != 100 || v.Result == nil || v.CanAbandon {
 		t.Fatalf("done: %+v", v)
 	}
 	groups := map[string]int{}
@@ -163,7 +163,7 @@ func TestView_RecordAtEachStep(t *testing.T) {
 	if groups["keep"] != 1 || groups["close"] != 1 || v.Result.Groups[0].Items[0].Reason != "fixed already" {
 		t.Fatalf("result = %+v", v.Result)
 	}
-	if len(v.History) != 1 || v.History[0].ID != rec.ID || v.History[0].State != wire.TriageDone {
+	if len(v.History) != 1 || v.History[0].ID != rec.ID || v.History[0].State != ops.TriageDone {
 		t.Fatalf("history = %+v", v.History)
 	}
 }
@@ -189,7 +189,7 @@ func TestView_AbandonedIsShownAsLatest(t *testing.T) {
 	rec := mustRec(s.Create())
 	mustRec(s.Abandon(rec.ID, rec.Revision))
 	v := show(t, f)
-	if v.State != wire.TriageAbandoned || v.ID != rec.ID || v.CanAbandon || v.Result != nil || len(v.History) != 1 {
+	if v.State != ops.TriageAbandoned || v.ID != rec.ID || v.CanAbandon || v.Result != nil || len(v.History) != 1 {
 		t.Fatalf("abandoned: %+v", v)
 	}
 }
@@ -210,7 +210,7 @@ func TestView_HistoryIsNewestFirstAndLiveWins(t *testing.T) {
 	third := mustRec(s.Create())
 
 	v := show(t, f)
-	if v.ID != third.ID || v.State != wire.TriageLive || len(v.History) != 2 || v.History[0].ID != second.ID || v.History[1].ID != first.ID {
+	if v.ID != third.ID || v.State != ops.TriageLive || len(v.History) != 2 || v.History[0].ID != second.ID || v.History[1].ID != first.ID {
 		t.Fatalf("view = %+v", v)
 	}
 }
@@ -317,7 +317,7 @@ func TestView_OpenRoundAndFinalApproval(t *testing.T) {
 
 	rec = mustRec(s.SaveRound(rec.ID, rec.Revision, []triagerec.Question{q}, false))
 	v := show(t, f)
-	if v.OpenRound == nil || *v.OpenRound != (wire.TriageOpenRound{Number: 1, Questions: 1, Answered: 0}) || v.FinalApproval {
+	if v.OpenRound == nil || *v.OpenRound != (ops.TriageOpenRound{Number: 1, Questions: 1, Answered: 0}) || v.FinalApproval {
 		t.Fatalf("open round: %+v", v.OpenRound)
 	}
 
@@ -411,8 +411,8 @@ func TestView_WebRead(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("GET /v1/triage = %d: %s", code, body)
 	}
-	var v wire.TriageView
-	if err := json.Unmarshal([]byte(body), &v); err != nil || v.State != wire.TriageLive || len(v.Rows) != 2 {
+	var v ops.TriageView
+	if err := json.Unmarshal([]byte(body), &v); err != nil || v.State != ops.TriageLive || len(v.Rows) != 2 {
 		t.Fatalf("body = %s (err %v)", body, err)
 	}
 	if code, _ := servertest.WebDo(t, f.H, "GET", f.Base+"/v1/triage?project=nope"); code != 404 {

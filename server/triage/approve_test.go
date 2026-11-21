@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/servertest/rigs"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	triagerec "github.com/elentok/gx/triage"
 )
 
@@ -19,9 +19,9 @@ func atWrite(t *testing.T, store *triagerec.Store) (*triagerec.Record, string, s
 	return rec, a, b
 }
 
-func rowAction(t *testing.T, f rigs.DesignsFixture, keep bool, rec *triagerec.Record, addr string) wire.TriageEditResult {
+func rowAction(t *testing.T, f rigs.DesignsFixture, keep bool, rec *triagerec.Record, addr string) ops.TriageEditResult {
 	t.Helper()
-	req := wire.TriageRowActionRequest{Project: "proj", Revision: rec.Revision, Address: addr}
+	req := ops.TriageRowActionRequest{Project: "proj", Revision: rec.Revision, Address: addr}
 	call := f.H.Client.Triage.Retry
 	if keep {
 		call = f.H.Client.Triage.Keep
@@ -60,7 +60,7 @@ func TestKeep_RefusedAfterMoveAcceptedBefore(t *testing.T) {
 	rec, a, b := atWrite(t, store)
 	rec = mustRec(store.WriteRow(rec.ID, rec.Revision, a, triagerec.WriteFailed, []string{"other/01-x"}, "boom"))
 	res := rowAction(t, f, true, rec, a)
-	if !res.Refused || res.Reason != wire.ReasonTriagePhase {
+	if !res.Refused || res.Reason != ops.ReasonTriagePhase {
 		t.Fatalf("keep after move = %+v, want refused", res)
 	}
 	if res := rowAction(t, f, true, rec, b); res.Refused {

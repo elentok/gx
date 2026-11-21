@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	triagerec "github.com/elentok/gx/triage"
 )
 
@@ -28,7 +29,7 @@ func jsonHandler[Req, Res any](fn func(Req) (Res, error)) http.HandlerFunc {
 }
 
 // refusalError lets an edit's apply func refuse the edit with a result.
-type refusalError struct{ res wire.TriageEditResult }
+type refusalError struct{ res ops.TriageEditResult }
 
 func (e *refusalError) Error() string { return e.res.Message }
 
@@ -37,7 +38,7 @@ func refusal(reason, msg string) error { return &refusalError{refusedEdit(reason
 // edit loads the project's live record, runs apply on it and turns a record
 // rule error or a refusalError into a refusal result. A saved edit publishes
 // triage-changed and returns the new revision.
-func (t *Triage) edit(project string, apply func(*triagerec.Store, *triagerec.Record) (*triagerec.Record, error)) (wire.TriageEditResult, error) {
+func (t *Triage) edit(project string, apply func(*triagerec.Store, *triagerec.Record) (*triagerec.Record, error)) (ops.TriageEditResult, error) {
 	store, rec, noLive, err := t.liveRecord(project)
 	if err != nil || noLive != nil {
 		return orRefusal(noLive), err
@@ -46,26 +47,26 @@ func (t *Triage) edit(project string, apply func(*triagerec.Store, *triagerec.Re
 	if res, handled := editRefusal(err); handled {
 		return res, nil
 	} else if err != nil {
-		return wire.TriageEditResult{}, err
+		return ops.TriageEditResult{}, err
 	}
 	t.Changed(project)
-	return wire.TriageEditResult{Revision: saved.Revision}, nil
+	return ops.TriageEditResult{Revision: saved.Revision}, nil
 }
 
 // editAndLaunch is edit followed, when the edit saved, by launchWrite.
-func (t *Triage) editAndLaunch(project string, skipIfLive bool, apply func(*triagerec.Store, *triagerec.Record) (*triagerec.Record, error)) (wire.TriageEditResult, error) {
+func (t *Triage) editAndLaunch(project string, skipIfLive bool, apply func(*triagerec.Store, *triagerec.Record) (*triagerec.Record, error)) (ops.TriageEditResult, error) {
 	res, err := t.edit(project, apply)
 	if err != nil || res.Refused {
 		return res, err
 	}
 	if err := t.launchWrite(project, skipIfLive); err != nil {
-		return wire.TriageEditResult{}, err
+		return ops.TriageEditResult{}, err
 	}
 	return res, nil
 }
 
 // liveRecord loads the project's live record, or a refusal result.
-func (t *Triage) liveRecord(project string) (*triagerec.Store, *triagerec.Record, *wire.TriageEditResult, error) {
+func (t *Triage) liveRecord(project string) (*triagerec.Store, *triagerec.Record, *ops.TriageEditResult, error) {
 	dir, err := t.projects.Dir(project)
 	if err != nil {
 		return nil, nil, nil, err
@@ -76,29 +77,29 @@ func (t *Triage) liveRecord(project string) (*triagerec.Store, *triagerec.Record
 		return nil, nil, nil, err
 	}
 	if rec == nil {
-		res := refusedEdit(wire.ReasonTriageNoLive, project+" has no live Triage")
+		res := refusedEdit(ops.ReasonTriageNoLive, project+" has no live Triage")
 		return nil, nil, &res, nil
 	}
 	return store, rec, nil, nil
 }
 
 // retry sets a failed row pending and starts a Write session unless one is live.
-func (t *Triage) retry(req wire.TriageRowActionRequest) (wire.TriageEditResult, error) {
+func (t *Triage) retry(req ops.TriageRowActionRequest) (ops.TriageEditResult, error) {
 	return t.editAndLaunch(req.Project, true, func(store *triagerec.Store, rec *triagerec.Record) (*triagerec.Record, error) {
 		return store.Retry(rec.ID, req.Revision, req.Address)
 	})
 }
 
 // keep marks a failed row kept while its follow-up is still in follow-ups.
-func (t *Triage) keep(req wire.TriageRowActionRequest) (wire.TriageEditResult, error) {
+func (t *Triage) keep(req ops.TriageRowActionRequest) (ops.TriageEditResult, error) {
 	return t.edit(req.Project, func(store *triagerec.Store, rec *triagerec.Record) (*triagerec.Record, error) {
 		return store.KeepForLater(rec.ID, req.Revision, req.Address)
 	})
 }
 
-func orRefusal(r *wire.TriageEditResult) wire.TriageEditResult {
+func orRefusal(r *ops.TriageEditResult) ops.TriageEditResult {
 	if r == nil {
-		return wire.TriageEditResult{}
+		return ops.TriageEditResult{}
 	}
 	return *r
 }

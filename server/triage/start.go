@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/ticketgit"
 	triagerec "github.com/elentok/gx/triage"
@@ -24,7 +25,7 @@ func (t *Triage) GiveSessions(m *sessions.Manager) { t.manager = m }
 
 func (t *Triage) openHandler(web bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req wire.TriageOpenRequest
+		var req ops.TriageOpenRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -40,7 +41,7 @@ func (t *Triage) openHandler(web bool) http.HandlerFunc {
 
 // open starts the project's Triage or returns the live one. Calls for one
 // project run one at a time, so a double click makes one record and one session.
-func (t *Triage) open(req wire.TriageOpenRequest, web bool) (wire.SessionResult, error) {
+func (t *Triage) open(req ops.TriageOpenRequest, web bool) (wire.SessionResult, error) {
 	project := req.Project
 	dir, err := t.projects.Dir(project)
 	if err != nil {
@@ -55,7 +56,7 @@ func (t *Triage) open(req wire.TriageOpenRequest, web bool) (wire.SessionResult,
 	}
 	if rec == nil {
 		if !store.HasFollowUps() {
-			return sessions.Refusal(wire.ReasonTriageNoFollowUps, project+" has no open follow-up to triage"), nil
+			return sessions.Refusal(ops.ReasonTriageNoFollowUps, project+" has no open follow-up to triage"), nil
 		}
 		rec, err = store.Create()
 		if _, ok := errors.AsType[*triagerec.LiveError](err); ok {

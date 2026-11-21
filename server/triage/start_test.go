@@ -10,10 +10,11 @@ import (
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/triage"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	triagerec "github.com/elentok/gx/triage"
 )
 
-func openTriage(t *testing.T, f rigs.DesignsFixture, req wire.TriageOpenRequest) wire.SessionResult {
+func openTriage(t *testing.T, f rigs.DesignsFixture, req ops.TriageOpenRequest) wire.SessionResult {
 	t.Helper()
 	res, err := f.H.Client.Triage.Open(f.Ctx, req)
 	if err != nil {
@@ -41,7 +42,7 @@ func TestOpen_CreatesRecordSnapshotAndOneSessionInTrunk(t *testing.T) {
 	triage.BeforeLaunch = func(string) { seen, _ = store.LoadLive() }
 	t.Cleanup(func() { triage.BeforeLaunch = nil })
 
-	res := openTriage(t, f, wire.TriageOpenRequest{Project: "proj"})
+	res := openTriage(t, f, ops.TriageOpenRequest{Project: "proj"})
 	if res.Refused || res.Session == nil {
 		t.Fatalf("open = %+v", res)
 	}
@@ -64,9 +65,9 @@ func TestOpen_CreatesRecordSnapshotAndOneSessionInTrunk(t *testing.T) {
 
 func TestOpen_SecondOpenReturnsTheLiveSession(t *testing.T) {
 	f, store := startViewFixture(t)
-	first := openTriage(t, f, wire.TriageOpenRequest{Project: "proj"})
+	first := openTriage(t, f, ops.TriageOpenRequest{Project: "proj"})
 	rec, _ := store.LoadLive()
-	second := openTriage(t, f, wire.TriageOpenRequest{Project: "proj"})
+	second := openTriage(t, f, ops.TriageOpenRequest{Project: "proj"})
 	if second.Session == nil || second.Session.ID != first.Session.ID {
 		t.Fatalf("second = %+v, want session %s", second, first.Session.ID)
 	}
@@ -81,7 +82,7 @@ func TestOpen_ConcurrentOpensEndWithOneRecordAndSession(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range ids {
 		wg.Go(func() {
-			if res, err := f.H.Client.Triage.Open(f.Ctx, wire.TriageOpenRequest{Project: "proj"}); err == nil && res.Session != nil {
+			if res, err := f.H.Client.Triage.Open(f.Ctx, ops.TriageOpenRequest{Project: "proj"}); err == nil && res.Session != nil {
 				ids[i] = res.Session.ID
 			}
 		})
@@ -103,7 +104,7 @@ func TestOpen_ConcurrentOpensEndWithOneRecordAndSession(t *testing.T) {
 func TestOpen_LiveRecordWithoutSessionLaunchesOnTheSameRecord(t *testing.T) {
 	f, store := startViewFixture(t)
 	rec := mustRec(store.Create())
-	res := openTriage(t, f, wire.TriageOpenRequest{Project: "proj"})
+	res := openTriage(t, f, ops.TriageOpenRequest{Project: "proj"})
 	if res.Refused || res.Session == nil {
 		t.Fatalf("open = %+v", res)
 	}
@@ -114,9 +115,9 @@ func TestOpen_LiveRecordWithoutSessionLaunchesOnTheSameRecord(t *testing.T) {
 
 func TestOpen_NewReplacesTheLiveSession(t *testing.T) {
 	f, _ := startViewFixture(t)
-	first := openTriage(t, f, wire.TriageOpenRequest{Project: "proj"}).Session
+	first := openTriage(t, f, ops.TriageOpenRequest{Project: "proj"}).Session
 	servertest.WaitForHolder(t, filepath.Join(f.H.SessionsDir, first.ID))
-	res := openTriage(t, f, wire.TriageOpenRequest{Project: "proj", New: true})
+	res := openTriage(t, f, ops.TriageOpenRequest{Project: "proj", New: true})
 	if res.Refused || res.Session == nil || res.Session.ID == first.ID {
 		t.Fatalf("new = %+v, want a fresh session", res)
 	}
@@ -124,7 +125,7 @@ func TestOpen_NewReplacesTheLiveSession(t *testing.T) {
 
 func TestOpen_WebNewNeedsAFreshToken(t *testing.T) {
 	f, _ := startViewFixture(t)
-	live := openTriage(t, f, wire.TriageOpenRequest{Project: "proj"}).Session
+	live := openTriage(t, f, ops.TriageOpenRequest{Project: "proj"}).Session
 	servertest.WaitForHolder(t, filepath.Join(f.H.SessionsDir, live.ID))
 	code, out := servertest.WebPostJSON(t, f.Base+"/v1/triage/open",
 		fmt.Sprintf(`{"project":"proj","new":true,"state":%q}`, live.ID+":starting:1"), f.Ck, "", servertest.JSONPost(f.Base))
@@ -143,7 +144,7 @@ func TestOpen_StartsAtQuestions(t *testing.T) {
 	if err := store.Save(rec); err != nil {
 		t.Fatal(err)
 	}
-	res := openTriage(t, f, wire.TriageOpenRequest{Project: "proj"})
+	res := openTriage(t, f, ops.TriageOpenRequest{Project: "proj"})
 	if res.Refused || res.Session == nil {
 		t.Fatalf("open = %+v, want a session", res)
 	}
@@ -156,9 +157,9 @@ func TestOpen_RefusesWithNoOpenFollowUp(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "follow-ups", "01", "done one", servertest.TicketOpts{Status: "done"})
 	f := rigs.StartDesignsIn(t, store)
-	res := openTriage(t, f, wire.TriageOpenRequest{Project: "proj"})
-	if !res.Refused || res.Reason != wire.ReasonTriageNoFollowUps {
-		t.Fatalf("open = %+v, want %s", res, wire.ReasonTriageNoFollowUps)
+	res := openTriage(t, f, ops.TriageOpenRequest{Project: "proj"})
+	if !res.Refused || res.Reason != ops.ReasonTriageNoFollowUps {
+		t.Fatalf("open = %+v, want %s", res, ops.ReasonTriageNoFollowUps)
 	}
 	if rec, _ := triagerec.NewStore(filepath.Join(store, "proj")).LoadLive(); rec != nil {
 		t.Fatalf("a record was created: %+v", rec)

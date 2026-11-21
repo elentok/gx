@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil"
 )
 
 func TestTriageScenario_OldEpicsRouteListsTheMovesButNotTheOthers(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "triage", nil, "--shape", "old-epics")
-	var v wire.TriageView
+	var v ops.TriageView
 	if !testutil.Poll(60*time.Second, 500*time.Millisecond, func() bool {
 		if err := json.Unmarshal([]byte(r.Gx(t, "server", "triage", "show", "gx", "--json")), &v); err != nil {
 			t.Fatal(err)

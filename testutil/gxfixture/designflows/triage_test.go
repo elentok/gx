@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake/triageplay"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
@@ -24,7 +25,7 @@ type triageWant struct {
 	words   string
 	triage  wire.FollowUpTriage
 	step    string // current step of `server triage show`, empty without a Triage
-	state   wire.TriageState
+	state   ops.TriageState
 	// labels are the card's action labels in order; nil skips the check.
 	labels []string
 }
@@ -35,16 +36,16 @@ func TestTriageScenario_EveryShapeShowsTheCardItNames(t *testing.T) {
 		{shape: "c-zero", triage: ""},
 		{shape: "c-few", section: wire.SectionReadyToDesign, words: "1 bug, 1 idea", triage: wire.FollowUpTriageNone},
 		{shape: "c-many", section: wire.SectionReadyToDesign, words: "30 bugs, 15 ideas", triage: wire.FollowUpTriageNone},
-		{shape: "c-live", section: wire.SectionNeedsYou, pill: "Needs you", words: "6 bugs, 6 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
-		{shape: "verify", section: wire.SectionDesigning, pill: "Verify", words: "30 bugs, 15 ideas", triage: wire.FollowUpTriageRunning, step: "verify", state: wire.TriageLive},
-		{shape: "route", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
-		{shape: "route-12-backlogs", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
-		{shape: "route-no-backlog", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
-		{shape: "questions", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
-		{shape: "final-approval", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: wire.TriageLive},
-		{shape: "writing", section: wire.SectionDesigning, pill: "Write", words: "6 bugs", triage: wire.FollowUpTriageRunning, step: "write", state: wire.TriageLive, labels: []string{"Retry failed (2)", "Continue"}},
-		{shape: "result", section: wire.SectionReadyToDesign, pill: "Done", words: "2 bugs", triage: wire.FollowUpTriageNone, state: wire.TriageDone, labels: []string{"Queue"}},
-		{shape: "stopped", section: wire.SectionDesigning, pill: "Route", words: "4 bugs", triage: wire.FollowUpTriageStopped, step: "route", state: wire.TriageLive},
+		{shape: "c-live", section: wire.SectionNeedsYou, pill: "Needs you", words: "6 bugs, 6 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: ops.TriageLive},
+		{shape: "verify", section: wire.SectionDesigning, pill: "Verify", words: "30 bugs, 15 ideas", triage: wire.FollowUpTriageRunning, step: "verify", state: ops.TriageLive},
+		{shape: "route", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: ops.TriageLive},
+		{shape: "route-12-backlogs", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: ops.TriageLive},
+		{shape: "route-no-backlog", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: ops.TriageLive},
+		{shape: "questions", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: ops.TriageLive},
+		{shape: "final-approval", section: wire.SectionNeedsYou, pill: "Needs you", words: "4 bugs, 2 ideas", triage: wire.FollowUpTriageWaiting, step: "questions", state: ops.TriageLive},
+		{shape: "writing", section: wire.SectionDesigning, pill: "Write", words: "6 bugs", triage: wire.FollowUpTriageRunning, step: "write", state: ops.TriageLive, labels: []string{"Retry failed (2)", "Continue"}},
+		{shape: "result", section: wire.SectionReadyToDesign, pill: "Done", words: "2 bugs", triage: wire.FollowUpTriageNone, state: ops.TriageDone, labels: []string{"Queue"}},
+		{shape: "stopped", section: wire.SectionDesigning, pill: "Route", words: "4 bugs", triage: wire.FollowUpTriageStopped, step: "route", state: ops.TriageLive},
 		{shape: "journey", section: wire.SectionReadyToDesign, words: "3 bugs, 2 ideas", triage: wire.FollowUpTriageNone},
 	} {
 		t.Run(w.shape, func(t *testing.T) {
@@ -135,7 +136,7 @@ func TestTriageScenario_RouteVariantsShowTheNewBacklogCardTheSpecNames(t *testin
 	}
 }
 
-func currentStep(v wire.TriageView) string {
+func currentStep(v ops.TriageView) string {
 	for _, s := range v.Steps {
 		if s.State == wire.MapStepCurrent {
 			return string(s.Step)
@@ -153,9 +154,9 @@ func (r *running) epicList(t *testing.T) wire.EpicList {
 	return list
 }
 
-func (r *running) triageView(t *testing.T) wire.TriageView {
+func (r *running) triageView(t *testing.T) ops.TriageView {
 	t.Helper()
-	var v wire.TriageView
+	var v ops.TriageView
 	if err := json.Unmarshal([]byte(r.Gx(t, "server", "triage", "show", project, "--json")), &v); err != nil {
 		t.Fatal(err)
 	}
@@ -201,9 +202,9 @@ func TestTriageScenario_CFewSpansTwoProjects(t *testing.T) {
 }
 
 // waitTriage polls the shown Triage until ok holds and returns that view.
-func (r *running) waitTriage(t *testing.T, what string, ok func(v wire.TriageView) bool) wire.TriageView {
+func (r *running) waitTriage(t *testing.T, what string, ok func(v ops.TriageView) bool) ops.TriageView {
 	t.Helper()
-	var v wire.TriageView
+	var v ops.TriageView
 	if !testutil.Poll(60*time.Second, 500*time.Millisecond, func() bool {
 		v = r.triageView(t)
 		return ok(v)
@@ -237,7 +238,7 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 
 	// Verify takes two sessions: the fake saves three verdicts per session. With
 	// no backlog seeded, Route proposes one and round 1 waits on three questions.
-	v := r.waitTriage(t, "Route to end at Questions", func(v wire.TriageView) bool {
+	v := r.waitTriage(t, "Route to end at Questions", func(v ops.TriageView) bool {
 		return currentStep(v) == "questions" && v.OpenRound != nil
 	})
 	if v.OpenRound.Questions != 3 {
@@ -264,7 +265,7 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 		project + ":follow-ups/01": triageplay.RefusalBeforeMove,
 		project + ":follow-ups/04": triageplay.RefusalAfterMove,
 	}
-	v = r.waitTriage(t, "the Write session to end", func(v wire.TriageView) bool {
+	v = r.waitTriage(t, "the Write session to end", func(v ops.TriageView) bool {
 		failed, written := 0, 0
 		for _, row := range v.Rows {
 			switch row.WriteState {
@@ -289,7 +290,7 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 	// Each Retry runs its own Write session; the Triage is done after the last.
 	for address := range failedRows {
 		r.Gx(t, "server", "triage", "retry", project, address, "--revision", fmt.Sprint(r.triageView(t).Revision))
-		r.waitTriage(t, "the retry of "+address, func(v wire.TriageView) bool {
+		r.waitTriage(t, "the retry of "+address, func(v ops.TriageView) bool {
 			for _, row := range v.Rows {
 				if row.Address == address {
 					return row.WriteState == "done"
@@ -299,7 +300,7 @@ func TestTriageScenario_JourneyRunsFromStartToDoneWithOneRetry(t *testing.T) {
 		})
 		r.waitNoSession(t)
 	}
-	v = r.waitTriage(t, "the Triage to be done", func(v wire.TriageView) bool { return v.State == wire.TriageDone })
+	v = r.waitTriage(t, "the Triage to be done", func(v ops.TriageView) bool { return v.State == ops.TriageDone })
 	if v.Result == nil || v.Result.ReadyEpic != project+":triage-ready" {
 		t.Fatalf("result = %+v, want a ready epic", v.Result)
 	}

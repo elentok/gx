@@ -27,7 +27,6 @@ packages:
       - startdesign.go
       - stats.go
       - targets.go
-      - triage.go
       - usagesummary.go
       - verdicts.go
       - workspaces.go
@@ -39,6 +38,7 @@ packages:
     enum_style: "union"
   - path: "github.com/elentok/gx/server/wire/ops"
     output_path: "webui/src/generated/ops.ts"
+    frontmatter: "import type { MapStep } from './server';"
     include_files:
       - chatdrafts.go
       - cleanup.go
@@ -49,6 +49,7 @@ packages:
       - restart.go
       - schedules.go
       - settingspage.go
+      - triage.go
     type_mappings:
       time.Time: "string"
       json.RawMessage: "unknown"

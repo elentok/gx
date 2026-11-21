@@ -10,7 +10,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // newServerTriageCmd groups the Triage verbs that talk to the server.
@@ -35,7 +35,7 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 				return fmt.Errorf("server ping failed: %w", err)
 			}
 			if jsonOut {
-				return cmdbase.WriteStamped(c.OutOrStdout(), wire.TriageChangedResult{Project: args[0]}, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
+				return cmdbase.WriteStamped(c.OutOrStdout(), ops.TriageChangedResult{Project: args[0]}, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd))
 			}
 			return nil
 		},
@@ -57,7 +57,7 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res, err := cl.Triage.Open(ctx, wire.TriageOpenRequest{Project: args[0], New: openNew})
+			res, err := cl.Triage.Open(ctx, ops.TriageOpenRequest{Project: args[0], New: openNew})
 			if err != nil {
 				return fmt.Errorf("server write failed: %w", err)
 			}
@@ -80,7 +80,7 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 	open.Flags().BoolVar(&openNew, "new", false, "stop the live session and start a fresh one")
 	cmd.AddCommand(open)
 
-	editOut := func(c *cobra.Command, res wire.TriageEditResult, asJSON bool) error {
+	editOut := func(c *cobra.Command, res ops.TriageEditResult, asJSON bool) error {
 		if asJSON {
 			if err := cmdbase.WriteStamped(c.OutOrStdout(), res, cmdbase.ViaServer, cmdbase.CallerActor(os.Getwd)); err != nil {
 				return err
@@ -109,7 +109,7 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res, err := cl.Triage.Ungroup(ctx, wire.TriageUngroupRequest{Project: args[0], Revision: ungroupRevision, Address: args[1]})
+			res, err := cl.Triage.Ungroup(ctx, ops.TriageUngroupRequest{Project: args[0], Revision: ungroupRevision, Address: args[1]})
 			if err != nil {
 				return fmt.Errorf("server write failed: %w", err)
 			}
@@ -135,7 +135,7 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res, err := cl.Triage.Abandon(ctx, wire.TriageAbandonRequest{Project: args[0], Revision: abandonRevision})
+			res, err := cl.Triage.Abandon(ctx, ops.TriageAbandonRequest{Project: args[0], Revision: abandonRevision})
 			if err != nil {
 				return fmt.Errorf("server write failed: %w", err)
 			}
@@ -167,8 +167,8 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				req := wire.TriageRowActionRequest{Project: args[0], Revision: revision, Address: args[1]}
-				var res wire.TriageEditResult
+				req := ops.TriageRowActionRequest{Project: args[0], Revision: revision, Address: args[1]}
+				var res ops.TriageEditResult
 				if keep {
 					res, err = cl.Triage.Keep(ctx, req)
 				} else {
@@ -192,10 +192,10 @@ func newServerTriageCmd(d Deps) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return cmdbase.ServerRead(d.Dial(), c.Context(), showJSON, c.OutOrStdout(),
-				func(ctx context.Context, cl *apiclient.Client) (wire.TriageView, error) {
+				func(ctx context.Context, cl *apiclient.Client) (ops.TriageView, error) {
 					return cl.Triage.Show(ctx, args[0])
 				},
-				func(w io.Writer, v wire.TriageView) error {
+				func(w io.Writer, v ops.TriageView) error {
 					_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d rows\t%s\n", v.Project, v.State, v.StepNote, len(v.Rows), v.ID)
 					return err
 				})

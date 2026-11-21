@@ -1,4 +1,6 @@
-package wire
+package ops
+
+import "github.com/elentok/gx/server/wire"
 
 // EventTriageChanged is emitted with the project name as its address when a
 // project's live Triage record changed.
@@ -197,11 +199,11 @@ type TriageSummary struct {
 // TriageView is the payload of GET /v1/triage?project=: the live Triage of the
 // project, else the latest, plus the past ones.
 type TriageView struct {
-	Project string      `json:"project"`
-	ID      string      `json:"id,omitempty"`
-	State   TriageState `json:"state"`
-	Flow    string      `json:"flow"`
-	Steps   []MapStep   `json:"steps"`
+	Project string         `json:"project"`
+	ID      string         `json:"id,omitempty"`
+	State   TriageState    `json:"state"`
+	Flow    string         `json:"flow"`
+	Steps   []wire.MapStep `json:"steps"`
 	// StepNote describes progress inside the current step.
 	StepNote    string `json:"step_note,omitempty"`
 	RingPercent int    `json:"ring_percent"`

@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	triagerec "github.com/elentok/gx/triage"
 )
 
@@ -31,22 +32,22 @@ func toApprove(t *testing.T, store *triagerec.Store) (*triagerec.Record, string,
 	return rec, a, b
 }
 
-func ungroup(t *testing.T, f rigs.DesignsFixture, revision int, address string) wire.TriageEditResult {
+func ungroup(t *testing.T, f rigs.DesignsFixture, revision int, address string) ops.TriageEditResult {
 	t.Helper()
-	res, err := f.H.Client.Triage.Ungroup(f.Ctx, wire.TriageUngroupRequest{Project: "proj", Revision: revision, Address: address})
+	res, err := f.H.Client.Triage.Ungroup(f.Ctx, ops.TriageUngroupRequest{Project: "proj", Revision: revision, Address: address})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return res
 }
 
-func rowOf(v wire.TriageView, addr string) wire.TriageRow {
+func rowOf(v ops.TriageView, addr string) ops.TriageRow {
 	for _, r := range v.Rows {
 		if r.Address == addr {
 			return r
 		}
 	}
-	return wire.TriageRow{}
+	return ops.TriageRow{}
 }
 
 func TestUngroup_UndoesAGroupLikeTheCLIAndRefusesAStaleRevision(t *testing.T) {
@@ -123,7 +124,7 @@ func TestAbandon_AtPlanEndsSessionAndMovesToHistoryWithoutTouchingTickets(t *tes
 	servertest.WriteTicketWith(t, root, "proj", "follow-ups", "02", "second", servertest.TicketOpts{})
 	f := rigs.StartDesignsIn(t, root)
 	store := triagerec.NewStore(filepath.Join(root, "proj"))
-	sess := openTriage(t, f, wire.TriageOpenRequest{Project: "proj"}).Session
+	sess := openTriage(t, f, ops.TriageOpenRequest{Project: "proj"}).Session
 	servertest.WaitForHolder(t, filepath.Join(f.H.SessionsDir, sess.ID))
 	rec, _ := store.LoadLive()
 	for _, r := range rec.Rows {
@@ -131,7 +132,7 @@ func TestAbandon_AtPlanEndsSessionAndMovesToHistoryWithoutTouchingTickets(t *tes
 	}
 	before := ticketFiles(t, root)
 
-	res, err := f.H.Client.Triage.Abandon(f.Ctx, wire.TriageAbandonRequest{Project: "proj", Revision: rec.Revision})
+	res, err := f.H.Client.Triage.Abandon(f.Ctx, ops.TriageAbandonRequest{Project: "proj", Revision: rec.Revision})
 	if err != nil || res.Refused {
 		t.Fatalf("abandon = %+v, %v", res, err)
 	}
@@ -139,7 +140,7 @@ func TestAbandon_AtPlanEndsSessionAndMovesToHistoryWithoutTouchingTickets(t *tes
 		t.Fatalf("record still live: %+v", live)
 	}
 	v := show(t, f)
-	if v.State != wire.TriageAbandoned || len(v.History) != 1 || v.History[0].State != wire.TriageAbandoned {
+	if v.State != ops.TriageAbandoned || len(v.History) != 1 || v.History[0].State != ops.TriageAbandoned {
 		t.Fatalf("view = state %s, history %+v", v.State, v.History)
 	}
 	servertest.WaitFor(t, 10*time.Second, "the Triage session to stop", func() bool { return len(f.Live(t)) == 0 })
@@ -157,13 +158,13 @@ func TestAbandon_AtPlanEndsSessionAndMovesToHistoryWithoutTouchingTickets(t *tes
 func TestAbandon_RefusedAtWriteAndWhenStale(t *testing.T) {
 	f, store := startViewFixture(t)
 	rec, _, _ := toApprove(t, store)
-	res, err := f.H.Client.Triage.Abandon(f.Ctx, wire.TriageAbandonRequest{Project: "proj", Revision: rec.Revision + 5})
+	res, err := f.H.Client.Triage.Abandon(f.Ctx, ops.TriageAbandonRequest{Project: "proj", Revision: rec.Revision + 5})
 	if err != nil || !res.Refused || res.Reason != wire.ReasonStale {
 		t.Fatalf("stale abandon = %+v, %v", res, err)
 	}
 	rec = mustRec(store.Approve(rec.ID, rec.Revision))
-	res, err = f.H.Client.Triage.Abandon(f.Ctx, wire.TriageAbandonRequest{Project: "proj", Revision: rec.Revision})
-	if err != nil || !res.Refused || res.Reason != wire.ReasonTriagePhase {
+	res, err = f.H.Client.Triage.Abandon(f.Ctx, ops.TriageAbandonRequest{Project: "proj", Revision: rec.Revision})
+	if err != nil || !res.Refused || res.Reason != ops.ReasonTriagePhase {
 		t.Fatalf("abandon at write = %+v, %v", res, err)
 	}
 	if live, _ := store.LoadLive(); live == nil {

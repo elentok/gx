@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	triagerec "github.com/elentok/gx/triage"
 )
 
@@ -28,7 +29,7 @@ func nextTriageEvent(t *testing.T, f rigs.DesignsFixture) wire.Event {
 	for {
 		select {
 		case ev := <-f.Evs:
-			if ev.Type == wire.EventTriageChanged {
+			if ev.Type == ops.EventTriageChanged {
 				return ev
 			}
 		case <-timeout:
@@ -82,7 +83,7 @@ func TestTriageEvents_RescanBackstopPublishesOncePerRevision(t *testing.T) {
 	nextTriageEvent(t, f)
 	select {
 	case ev := <-f.Evs:
-		if ev.Type == wire.EventTriageChanged {
+		if ev.Type == ops.EventTriageChanged {
 			t.Fatalf("second triage-changed for one revision: %+v", ev)
 		}
 	case <-time.After(300 * time.Millisecond):

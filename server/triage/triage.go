@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 	triagerec "github.com/elentok/gx/triage"
 )
@@ -90,7 +91,7 @@ func Routes(get func() *Triage) []wire.Route {
 }
 
 func (t *Triage) changedHandler(w http.ResponseWriter, r *http.Request) {
-	var req wire.TriageChangedRequest
+	var req ops.TriageChangedRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -99,7 +100,7 @@ func (t *Triage) changedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	wire.WriteJSON(w, wire.TriageChangedResult{Project: req.Project})
+	wire.WriteJSON(w, ops.TriageChangedResult{Project: req.Project})
 }
 
 // Changed publishes triage-changed for project and records the revision, so
@@ -110,7 +111,7 @@ func (t *Triage) Changed(project string) error {
 		return err
 	}
 	t.note(project, dir)
-	t.events.Publish(wire.EventTriageChanged, project)
+	t.events.Publish(ops.EventTriageChanged, project)
 	return nil
 }
 
@@ -124,7 +125,7 @@ func (t *Triage) ScanRevisions() {
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
 		if t.note(project, dir) {
-			t.events.Publish(wire.EventTriageChanged, project)
+			t.events.Publish(ops.EventTriageChanged, project)
 		}
 	}
 }
