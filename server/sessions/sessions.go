@@ -351,7 +351,7 @@ func (mg *Manager) startSessionHolderAs(dir string, meta *Meta, override *launch
 		FilesOnly: true,
 	}
 	home := harness.LookupEnv(env, "HOME")
-	opts.Args = harness.WritableDirectoryArgs(agentrunner.Kind(meta.Harness), opts.Args, mg.projects.AgentsConfig(meta.Project).WritableDirectories, home, meta.Dir)
+	opts.Args = harness.WritableDirectoryArgs(agentrunner.Kind(meta.Harness), opts.Args, mg.projects.AgentsConfig(meta.Project).WritableDirectories, home, harness.CodexHomeIn(env), meta.Dir)
 	launch := h.Launch(opts)
 	if resume {
 		var ok bool

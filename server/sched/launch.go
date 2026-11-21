@@ -170,7 +170,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 	// sit out before it can finish.
 	ctx := one.Context
 	args := agent.AgentArgs(agentKind, cwd, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...)
-	args = harness.WritableDirectoryArgs(agentrunner.Kind(agentKind), args, l.Projects.AgentsConfig(ticket.Project).WritableDirectories, deps.SessionHomes.Claude, cwd)
+	args = harness.WritableDirectoryArgs(agentrunner.Kind(agentKind), args, l.Projects.AgentsConfig(ticket.Project).WritableDirectories, deps.SessionHomes.Claude, deps.SessionHomes.Codex, cwd)
 	prompt := srvrecovery.LaunchPrompt(agentKind, srvrecovery.LaunchSkill(t), ticket.String())
 	args, noteFile, err := l.applyLaunchNote(ticket, launchNote(t, cwd), agentKind == agent.AgentCodex, args)
 	if err != nil {

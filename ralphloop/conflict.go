@@ -364,7 +364,7 @@ func resolveCherryPickConflict(d deps.Deps, p iterationParams) (sessionID string
 		Epic:  p.FeatureBranch,
 		Cwd:   p.FeatureWorktree,
 		Kind:  agentrunner.Kind(p.Agent),
-		Args:  harness.WritableDirectoryArgs(agentrunner.Kind(p.Agent), agent.AgentArgs(p.Agent, p.FeatureWorktree, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort), p.WritableDirectories, d.SessionHomes.Claude, p.FeatureWorktree),
+		Args:  harness.WritableDirectoryArgs(agentrunner.Kind(p.Agent), agent.AgentArgs(p.Agent, p.FeatureWorktree, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort), p.WritableDirectories, d.SessionHomes.Claude, d.SessionHomes.Codex, p.FeatureWorktree),
 	}, prompt, startprompt.Hooks{
 		OnFail: func(attempt int, kind events.Kind, err error) {
 			p.logLaunchFailed(label, attempt, kind, err)

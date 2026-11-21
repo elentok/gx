@@ -58,7 +58,7 @@ func agentsEntries() []Entry {
 	add(agents("Launch"), Entry{Key: Key("agents", "claude-args"), Type: TypeStringList,
 		Description: "Extra command-line arguments passed to every Claude session."})
 	add(agents("Launch"), Entry{Key: Key("agents", "writable-directories"), Type: TypeStringList, ProjectOverridable: true, Override: OverrideAdd,
-		Description: "Additional directories agents may write. Project directories are added to the global list. Supports ~/ paths; relative paths use the agent's working directory. Applies on launch or resume. pnpm projects always get the pnpm home on top of this list."})
+		Description: "Additional directories agents may write. Project directories are added to the global list. Supports ~/ paths; relative paths use the agent's working directory. Applies on launch or resume. pnpm projects always get the pnpm home on top of this list. Codex also keeps the writable_roots listed in its own config.toml."})
 	add(agents("Runner"), Entry{Key: Key("agent-runner"), Type: TypeEnum, Enum: runnerChoices(), Restart: true,
 		Description: "How gx runs agents: auto picks for you, or choose headless or pty."})
 	add(agents("Runner"), Entry{Key: Key("runner-wait"), Type: TypeDuration, Restart: true,
