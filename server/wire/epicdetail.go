@@ -140,6 +140,8 @@ type EpicDetail struct {
 	// Steps is a map epic's Progress, and ImplAddress the address of its impl epic once it exists.
 	Steps       []MapStep `json:"steps,omitempty"`
 	ImplAddress string    `json:"impl_address,omitempty"`
+	// BackLink names the Milestone a Design or its -impl epic belongs to.
+	BackLink `tstype:",extends"`
 	// RingProgress is a map epic's Design progress in percent, as on the Design card.
 	RingProgress int `json:"ring_progress,omitempty"`
 	// DesignSection is a map epic's own Design card section, which the page's tone

@@ -966,7 +966,7 @@ export interface EpicFriction {
  * EpicDetail is the /v1/epics/detail payload. Seconds and dollars throughout;
  * the payload carries no token counts outside Stats.
  */
-export interface EpicDetail extends ViewDiff {
+export interface EpicDetail extends ViewDiff, BackLink {
   address: string;
   kind: string;
   /**
@@ -1160,9 +1160,18 @@ export const ProgressCreateTickets: ProgressStep = "create-tickets";
 export const ProgressBranch: ProgressStep = "branch";
 export const ProgressDone: ProgressStep = "done";
 /**
+ * BackLink is the "Milestone N of <Initiative>" data of a Design or its -impl
+ * epic. All three fields are empty when the epic has no resolvable Milestone.
+ */
+export interface BackLink {
+  milestone?: number /* int */;
+  initiative?: string;
+  initiative_address?: string;
+}
+/**
  * EpicListRow is one epic of the /v1/epics payload.
  */
-export interface EpicListRow {
+export interface EpicListRow extends BackLink {
   address: string;
   project: string;
   name: string;

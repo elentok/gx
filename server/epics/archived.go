@@ -116,6 +116,9 @@ func (s *Epics) ArchivedDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	d := s.buildEpicDetail(root, archived, archived[i], time.Now())
 	d.ArchivedAt = archived[i].ArchivedAt
+	if live, err := s.Projects.Epics(root.Project); err == nil {
+		d.BackLink = backLinkOf(root.Project, archived[i], slices.Concat(live, archived))
+	}
 	if d.Kind == wire.EpicKindLoop {
 		// An archived epic runs nothing, so no ticket has a claim.
 		d.State = EpicStateFor(root, archived[i], "", NoClaims)

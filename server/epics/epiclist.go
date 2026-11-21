@@ -191,6 +191,7 @@ func (s *Epics) projectCards(project string, epics []tickets.Epic, designs map[s
 		return ok && has
 	}
 
+	all := s.withArchived(project, epics)
 	var rows []wire.EpicListRow
 	if fu, ok := byName[followUpsEpicName]; ok {
 		if row, ok := followUpsCard(project, fu, rec, done, readyToQueue(project, done, epics, qidx), triageLive[project]); ok {
@@ -214,6 +215,7 @@ func (s *Epics) projectCards(project string, epics []tickets.Epic, designs map[s
 				impl = &r
 			}
 			decorateDesignCard(&row, e, impl, designs[row.Address])
+			row.BackLink = backLinkOf(project, e, all)
 		}
 		rows = append(rows, row)
 	}

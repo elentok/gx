@@ -50,6 +50,7 @@ func (s *Epics) EpicDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := s.buildEpicDetail(root, epics, epics[i], time.Now())
+	d.BackLink = backLinkOf(root.Project, epics[i], s.withArchived(root.Project, epics))
 	s.decorateLive(&d, root, epics[i])
 	wire.WriteJSON(w, d)
 }

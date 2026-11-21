@@ -63,6 +63,14 @@ const (
 	ProgressDone           ProgressStep = "done"
 )
 
+// BackLink is the "Milestone N of <Initiative>" data of a Design or its -impl
+// epic. All three fields are empty when the epic has no resolvable Milestone.
+type BackLink struct {
+	Milestone         int    `json:"milestone,omitempty"`
+	Initiative        string `json:"initiative,omitempty"`
+	InitiativeAddress string `json:"initiative_address,omitempty"`
+}
+
 // EpicListRow is one epic of the /v1/epics payload.
 type EpicListRow struct {
 	Address     string        `json:"address"`
@@ -143,6 +151,9 @@ type EpicListRow struct {
 	// Workspace is the workspace of a Design or epic card; empty on One-off and
 	// Follow-ups cards. A joined card reads its Design's.
 	Workspace string `json:"workspace,omitempty"`
+	// BackLink names the Milestone a Design or Implementation card belongs to.
+	// It is empty when the card has no resolvable Milestone.
+	BackLink `tstype:",extends"`
 	// Workspaces is set on a Follow-ups card only: the workspaces of its project.
 	Workspaces []string `json:"workspaces,omitempty"`
 	// Unread is set on an Implementation card that is in Needs you or Merged and
