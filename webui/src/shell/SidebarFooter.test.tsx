@@ -109,7 +109,7 @@ test("the Epics icon opens a menu with Epics and Archive, and Archive navigates 
   await waitFor(() => expect(router.state.location.pathname).toBe("/archive"))
 })
 
-test("the Epics menu lists Backlog before the one separator and Scheduled prompts after it, and it navigates to /schedules", async () => {
+test("the Epics menu lists Backlog and Initiatives before the one separator and Scheduled prompts after it, and it navigates to /schedules", async () => {
   const router = setupWithRouter()
   fireEvent.click(screen.getByRole("button", { name: "Epics" }))
   const menu = await screen.findByRole("menu")
@@ -117,9 +117,16 @@ test("the Epics menu lists Backlog before the one separator and Scheduled prompt
   const names = Array.from(menu.querySelectorAll('[role="menuitem"],[role="separator"]')).map(
     (el) => (el.getAttribute("role") === "separator" ? "---" : el.textContent?.replace(/\d+$/, "")),
   )
-  expect(names).toEqual(["Epics", "Archive", "Backlog", "---", "Scheduled prompts"])
+  expect(names).toEqual(["Epics", "Archive", "Backlog", "Initiatives", "---", "Scheduled prompts"])
   fireEvent.click(screen.getByRole("menuitem", { name: "Scheduled prompts" }))
   await waitFor(() => expect(router.state.location.pathname).toBe("/schedules"))
+})
+
+test("the Initiatives menu item navigates to /initiatives", async () => {
+  const router = setupWithRouter()
+  fireEvent.click(screen.getByRole("button", { name: "Epics" }))
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Initiatives" }))
+  await waitFor(() => expect(router.state.location.pathname).toBe("/initiatives"))
 })
 
 test("the Epics menu entry shows the epic count", async () => {

@@ -10,6 +10,7 @@ const PATHS = {
   ticket: "M3 4h10v8H3zM6 7h4M6 9.5h3",
   agent: "M3 3.5h10v7H8l-3 2.5v-2.5H3z",
   backlog: "M2.5 5h11v8h-11zM4.5 3h7M6 8h4",
+  initiative: "M3 13V3M3 4h8l-1.5 2.5L11 9H3",
 } as const
 
 /** The large icon in a PageHeader for the pages that have a kind. */

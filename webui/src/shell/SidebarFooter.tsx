@@ -108,6 +108,7 @@ function EpicsMenu({ needsYou }: { needsYou: number }) {
         },
         { value: "archive", label: "Archive", onSelect: go("/archive") },
         { value: "backlog", label: "Backlog", onSelect: go("/backlog") },
+        { value: "initiatives", label: "Initiatives", onSelect: go("/initiatives") },
         { kind: "separator" },
         { value: "schedules", label: "Scheduled prompts", onSelect: go("/schedules") },
       ]}

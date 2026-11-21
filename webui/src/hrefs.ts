@@ -41,6 +41,11 @@ export const SCHEDULES_HREF = "#/schedules"
 
 export const BACKLOG_HREF = "#/backlog"
 
+export const INITIATIVES_HREF = "#/initiatives"
+
+/** One Initiative's page; the address holds a colon, so the route takes a splat. */
+export const initiativeHref = (address: string) => `${INITIATIVES_HREF}/${address}`
+
 export const STATS_HREF = "#/stats"
 
 export const CLEANUP_HREF = "#/cleanup"

@@ -2106,10 +2106,12 @@ export interface InitiativeList {
   projects: InitiativeProject[];
 }
 /**
- * InitiativeProject is one project's Initiatives.
+ * InitiativeProject is one project's Initiatives. Workspaces are the project's,
+ * as on BacklogProject, for the active-workspace filter.
  */
 export interface InitiativeProject {
   project: string;
+  workspaces: string[];
   initiatives: InitiativeRow[];
 }
 /**
@@ -2117,6 +2119,8 @@ export interface InitiativeProject {
  * "finished". Done counts gated Milestones out of Total. Current is the slug of
  * the first Milestone not gated, empty when all are. StoppedAt is the number of
  * the Milestone whose gate stopped the Initiative, 0 unless State is "stopped".
+ * CurrentNumber and CurrentState are the number and derived state of the
+ * Current Milestone, 0 and empty when Current is.
  */
 export interface InitiativeRow {
   address: string;
@@ -2125,6 +2129,8 @@ export interface InitiativeRow {
   done: number /* int */;
   total: number /* int */;
   current: string;
+  current_number: number /* int */;
+  current_state: string;
   stopped_at: number /* int */;
 }
 /**

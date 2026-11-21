@@ -11,6 +11,8 @@ export const ROUTE_NAMES: Record<string, string> = {
   "/stats": "stats",
   "/cleanup": "cleanup",
   "/backlog": "backlog",
+  "/initiatives": "initiatives",
+  "/initiatives/*": "initiative",
   "/schedules": "schedules",
   "/schedules/new": "schedule",
   "/schedules/*": "schedule",

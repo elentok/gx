@@ -18,6 +18,8 @@ export type PageTitle = {
     | "File"
     | "Scheduled prompts"
     | "Backlog"
+    | "Initiatives"
+    | "Initiative"
   name?: string
 }
 

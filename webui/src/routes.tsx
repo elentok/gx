@@ -38,6 +38,7 @@ import type {
   PostSwitch,
 } from "./schedules/schedules"
 import type { FetchBacklog, PostFinishMove, PostStartDesign } from "./backlog/backlog"
+import type { FetchInitiatives } from "./initiatives/initiatives"
 import { EpicsPage } from "./epics/EpicsPage"
 import type { FetchEpicList } from "./epics/list"
 import type { FetchCleanup, PostCleanup } from "./cleanup/cleanup"
@@ -76,6 +77,16 @@ const FileViewerPage = lazy(() =>
 )
 const BacklogPage = lazy(() =>
   import("./backlog/BacklogPage").then(({ BacklogPage }) => ({ default: BacklogPage })),
+)
+const InitiativesPage = lazy(() =>
+  import("./initiatives/InitiativesPage").then(({ InitiativesPage }) => ({
+    default: InitiativesPage,
+  })),
+)
+const InitiativePage = lazy(() =>
+  import("./initiatives/InitiativePage").then(({ InitiativePage }) => ({
+    default: InitiativePage,
+  })),
 )
 const SchedulePage = lazy(() =>
   import("./schedules/SchedulePage").then(({ SchedulePage }) => ({ default: SchedulePage })),
@@ -253,6 +264,7 @@ export interface RouteFetchers {
   diffCommitPatches?: FetchDiffCommitPatches
   archived?: FetchArchived
   backlog?: FetchBacklog
+  initiatives?: FetchInitiatives
   startDesign?: PostStartDesign
   finishMove?: PostFinishMove
   schedules?: FetchSchedules
@@ -364,6 +376,9 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
         />
       ),
     },
+    { path: "/initiatives", element: <InitiativesPage fetchList={fetchers.initiatives} /> },
+    // An Initiative's address holds a colon (project:slug), so it arrives as the splat.
+    { path: "/initiatives/*", element: <InitiativePage /> },
     {
       path: "/schedules",
       element: <SchedulesPage fetchList={fetchers.schedules} post={fetchers.switchSchedule} />,

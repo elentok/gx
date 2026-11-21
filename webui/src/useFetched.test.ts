@@ -97,6 +97,8 @@ const READY_WIRING: Record<
   "/stats": "useFetched",
   "/cleanup": "useFetched",
   "/backlog": "useFetched",
+  "/initiatives": "useFetched",
+  "/initiatives/*": "useReady",
   "/schedules": "useFetched",
   "/schedules/new": "useFetched",
   "/schedules/*": "useFetched",

@@ -169,6 +169,7 @@ The routes are in `webui/src/routes.tsx` (`pageRoutes`). There is no separate Qu
 | `/archive`   | Archive                                 |                                                                                                                         |
 | `/agents/*`  | Agents (the splat is the session label) |                                                                                                                         |
 | `/backlog`   | Backlog                                 |                                                                                                                         |
+| `/initiatives` | Initiatives (read-only list, no Start button) |                                                                                                                         |
 | `/schedules` | Schedules                               |                                                                                                                         |
 | `/stats`     | Stats                                   |                                                                                                                         |
 | `/cleanup`   | Cleanup                                 |                                                                                                                         |

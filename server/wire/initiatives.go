@@ -6,9 +6,11 @@ type InitiativeList struct {
 	Projects []InitiativeProject `json:"projects"`
 }
 
-// InitiativeProject is one project's Initiatives.
+// InitiativeProject is one project's Initiatives. Workspaces are the project's,
+// as on BacklogProject, for the active-workspace filter.
 type InitiativeProject struct {
 	Project     string          `json:"project"`
+	Workspaces  []string        `json:"workspaces"`
 	Initiatives []InitiativeRow `json:"initiatives"`
 }
 
@@ -16,14 +18,18 @@ type InitiativeProject struct {
 // "finished". Done counts gated Milestones out of Total. Current is the slug of
 // the first Milestone not gated, empty when all are. StoppedAt is the number of
 // the Milestone whose gate stopped the Initiative, 0 unless State is "stopped".
+// CurrentNumber and CurrentState are the number and derived state of the
+// Current Milestone, 0 and empty when Current is.
 type InitiativeRow struct {
-	Address   string `json:"address"`
-	Slug      string `json:"slug"`
-	State     string `json:"state"`
-	Done      int    `json:"done"`
-	Total     int    `json:"total"`
-	Current   string `json:"current"`
-	StoppedAt int    `json:"stopped_at"`
+	Address       string `json:"address"`
+	Slug          string `json:"slug"`
+	State         string `json:"state"`
+	Done          int    `json:"done"`
+	Total         int    `json:"total"`
+	Current       string `json:"current"`
+	CurrentNumber int    `json:"current_number"`
+	CurrentState  string `json:"current_state"`
+	StoppedAt     int    `json:"stopped_at"`
 }
 
 // InitiativePage is one Initiative's page data. GET /v1/initiatives/detail.

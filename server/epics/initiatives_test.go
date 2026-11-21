@@ -35,7 +35,7 @@ func TestInitiatives_ListOmitsProjectsWithNone(t *testing.T) {
 		got[r.Slug] = r
 	}
 	want := map[string]wire.InitiativeRow{
-		"alpha":    {Address: "proj:alpha", Slug: "alpha", State: "active", Done: 0, Total: 4, Current: "a"},
+		"alpha":    {Address: "proj:alpha", Slug: "alpha", State: "active", Done: 0, Total: 4, Current: "a", CurrentNumber: 1, CurrentState: "sketch"},
 		"stopper":  {Address: "proj:stopper", Slug: "stopper", State: "stopped", Done: 2, Total: 2, StoppedAt: 2},
 		"finisher": {Address: "proj:finisher", Slug: "finisher", State: "finished", Done: 1, Total: 1},
 	}

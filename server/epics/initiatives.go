@@ -20,6 +20,12 @@ func (s *Epics) Initiatives(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	list, err := s.cardList()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	workspacesOf := s.projectWorkspaces(list.Epics)
 	out := wire.InitiativeList{Projects: []wire.InitiativeProject{}}
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
@@ -38,13 +44,19 @@ func (s *Epics) Initiatives(w http.ResponseWriter, _ *http.Request) {
 				continue
 			}
 			v := initiative.Read(e, live, archived)
-			rows = append(rows, wire.InitiativeRow{
+			row := wire.InitiativeRow{
 				Address: queue.RootRef{Project: project, Epic: e.Name}.String(), Slug: v.Slug, State: v.State,
 				Done: v.Done, Total: v.Total, Current: v.Current, StoppedAt: v.StoppedAt,
-			})
+			}
+			for _, m := range v.Milestones {
+				if m.Slug == v.Current {
+					row.CurrentNumber, row.CurrentState = m.Number, string(m.State)
+				}
+			}
+			rows = append(rows, row)
 		}
 		if len(rows) > 0 {
-			out.Projects = append(out.Projects, wire.InitiativeProject{Project: project, Initiatives: rows})
+			out.Projects = append(out.Projects, wire.InitiativeProject{Project: project, Workspaces: workspacesOf(project), Initiatives: rows})
 		}
 	}
 	wire.WriteJSON(w, out)
