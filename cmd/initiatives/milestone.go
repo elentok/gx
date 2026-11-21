@@ -14,25 +14,6 @@ func newMilestone(d Deps) *cobra.Command {
 	return cmd
 }
 
-func storeCmd(d Deps, use, short string, setup func(*cobra.Command), build func(c *cobra.Command, args []string) (storeEdit, error)) *cobra.Command {
-	cmd := &cobra.Command{
-		Use: use, Short: short, Args: cobra.ExactArgs(2),
-		RunE: func(c *cobra.Command, args []string) error {
-			edit, err := build(c, args)
-			if err != nil {
-				return err
-			}
-			cwd, err := d.Cwd()
-			if err != nil {
-				return err
-			}
-			return editInitiativeIn(d.Dirs(), cwd, args[0], c.OutOrStdout(), edit)
-		},
-	}
-	setup(cmd)
-	return cmd
-}
-
 func newMilestoneAdd(d Deps) *cobra.Command {
 	return storeCmd(d, "add <project:initiative> <slug>", "append a sketch Milestone", func(c *cobra.Command) {
 		c.Flags().String("name", "", "Milestone name (required)")

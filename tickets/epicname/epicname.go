@@ -29,13 +29,18 @@ const maxSuffix = 99
 // trailers as theirs. A project with no repo, or a repo whose trunk can't be
 // resolved, skips the git checks.
 func Taken(projectDir, project, name string) (string, error) {
+	archived, err := tickets.ArchivedEpicNames(projectDir)
+	if err != nil {
+		return "", err
+	}
+	return takenIn(projectDir, project, name, archived)
+}
+
+// takenIn is Taken with the archived epic names already read.
+func takenIn(projectDir, project, name string, archived map[string]bool) (string, error) {
 	if _, err := os.Stat(filepath.Join(projectDir, name)); err == nil {
 		return fmt.Sprintf("epic %q already exists", name), nil
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return "", err
-	}
-	archived, err := tickets.ArchivedEpicNames(projectDir)
-	if err != nil {
 		return "", err
 	}
 	if archived[name] {
@@ -81,12 +86,16 @@ func Refuse(projectDir, project, name string) error {
 // Next returns base when it is free, else the first free base-N for N from 2 up
 // to maxSuffix.
 func Next(projectDir, project, base string) (string, error) {
+	archived, err := tickets.ArchivedEpicNames(projectDir)
+	if err != nil {
+		return "", err
+	}
 	for n := 1; n <= maxSuffix; n++ {
 		name := base
 		if n > 1 {
 			name = base + "-" + strconv.Itoa(n)
 		}
-		why, err := Taken(projectDir, project, name)
+		why, err := takenIn(projectDir, project, name, archived)
 		if err != nil {
 			return "", err
 		}

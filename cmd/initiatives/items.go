@@ -15,10 +15,6 @@ import (
 	"github.com/elentok/gx/tickets/initiative"
 )
 
-// itemEdit changes one line of body and returns the line it stored. view is
-// derived from the same body the edit sees.
-type itemEdit func(body *initiative.Body, view initiative.View) (string, error)
-
 func newDeferred(d Deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "deferred", Short: "add and change deferred items"}
 	cmd.AddCommand(newDeferredAdd(d), newDeferredSet(d))
@@ -31,11 +27,15 @@ func newAssumption(d Deps) *cobra.Command {
 	return cmd
 }
 
-// itemCmd wires a verb: it resolves the cwd, then runs build on the parsed
+// storeEdit changes one line of body and returns the line it stored. view is
+// derived from the same body the edit sees; exists says which epics exist.
+type storeEdit func(body *initiative.Body, view initiative.View, exists epicSet) (string, error)
+
+// storeCmd wires a verb: it resolves the cwd, then runs build on the parsed
 // args and flags to get the edit.
-func itemCmd(d Deps, use, short string, nargs int, setup func(*cobra.Command), build func(c *cobra.Command, args []string) (itemEdit, error)) *cobra.Command {
+func storeCmd(d Deps, use, short string, setup func(*cobra.Command), build func(c *cobra.Command, args []string) (storeEdit, error)) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: use, Short: short, Args: cobra.ExactArgs(nargs),
+		Use: use, Short: short, Args: cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
 			edit, err := build(c, args)
 			if err != nil {
@@ -45,7 +45,7 @@ func itemCmd(d Deps, use, short string, nargs int, setup func(*cobra.Command), b
 			if err != nil {
 				return err
 			}
-			return editInitiative(d.Dirs(), cwd, args[0], c.OutOrStdout(), edit)
+			return editInitiativeIn(d.Dirs(), cwd, args[0], c.OutOrStdout(), edit)
 		},
 	}
 	setup(cmd)
@@ -53,7 +53,7 @@ func itemCmd(d Deps, use, short string, nargs int, setup func(*cobra.Command), b
 }
 
 func newDeferredAdd(d Deps) *cobra.Command {
-	return itemCmd(d, "add <project:initiative> <item>", "add an open deferred item", 2,
+	return storeCmd(d, "add <project:initiative> <item>", "add an open deferred item",
 		func(c *cobra.Command) {
 			c.Flags().String("to", "", "Milestone slug, or unplaced (required)")
 			c.Flags().String("why", "", "why it is deferred (required)")
@@ -62,18 +62,18 @@ func newDeferredAdd(d Deps) *cobra.Command {
 				_ = c.MarkFlagRequired(f)
 			}
 		},
-		func(c *cobra.Command, args []string) (itemEdit, error) {
+		func(c *cobra.Command, args []string) (storeEdit, error) {
 			to, _ := c.Flags().GetString("to")
 			why, _ := c.Flags().GetString("why")
 			from, _ := c.Flags().GetString("from")
-			return func(b *initiative.Body, v initiative.View) (string, error) {
+			return func(b *initiative.Body, v initiative.View, _ epicSet) (string, error) {
 				if err := checkPlacement(v, to); err != nil {
 					return "", err
 				}
-				for _, e := range b.Deferred {
-					if !e.Unparsed() && e.Value.Item == args[1] {
-						return "", fmt.Errorf("deferred item %q already exists", args[1])
-					}
+				if slices.ContainsFunc(b.Deferred, func(e initiative.Entry[initiative.DeferredItem]) bool {
+					return !e.Unparsed() && e.Value.Item == args[1]
+				}) {
+					return "", fmt.Errorf("deferred item %q already exists", args[1])
 				}
 				item := initiative.DeferredItem{Item: args[1], To: to, Why: why, From: from, State: initiative.DeferredOpen}
 				line, err := initiative.RenderDeferred(item)
@@ -87,29 +87,20 @@ func newDeferredAdd(d Deps) *cobra.Command {
 }
 
 func newDeferredSet(d Deps) *cobra.Command {
-	return itemCmd(d, "set <project:initiative> <item>", "change a deferred item's state or placement", 2,
+	return storeCmd(d, "set <project:initiative> <item>", "change a deferred item's state or placement",
 		func(c *cobra.Command) {
 			c.Flags().String("state", "", "open, taken or dropped")
 			c.Flags().String("to", "", "Milestone slug, or unplaced")
 			c.Flags().String("why", "", "new reason")
 		},
-		func(c *cobra.Command, args []string) (itemEdit, error) {
+		func(c *cobra.Command, args []string) (storeEdit, error) {
 			if err := requireChange(c, "state", "to", "why"); err != nil {
 				return nil, err
 			}
-			return func(b *initiative.Body, v initiative.View) (string, error) {
-				idx := -1
-				for i, e := range b.Deferred {
-					if e.Unparsed() || e.Value.Item != args[1] {
-						continue
-					}
-					if idx >= 0 {
-						return "", fmt.Errorf("deferred item %q is ambiguous: it appears more than once", args[1])
-					}
-					idx = i
-				}
-				if idx < 0 {
-					return "", fmt.Errorf("no deferred item %q", args[1])
+			return func(b *initiative.Body, v initiative.View, _ epicSet) (string, error) {
+				idx, err := initiative.FindDeferred(b.Deferred, args[1])
+				if err != nil {
+					return "", err
 				}
 				item := b.Deferred[idx].Value
 				if c.Flags().Changed("state") {
@@ -135,14 +126,14 @@ func newDeferredSet(d Deps) *cobra.Command {
 }
 
 func newAssumptionAdd(d Deps) *cobra.Command {
-	return itemCmd(d, "add <project:initiative> <text>", "add an unknown Assumption", 2,
+	return storeCmd(d, "add <project:initiative> <text>", "add an unknown Assumption",
 		func(c *cobra.Command) {
 			c.Flags().String("tested-by", "", "slug of the Milestone that tests it (required)")
 			_ = c.MarkFlagRequired("tested-by")
 		},
-		func(c *cobra.Command, args []string) (itemEdit, error) {
+		func(c *cobra.Command, args []string) (storeEdit, error) {
 			testedBy, _ := c.Flags().GetString("tested-by")
-			return func(b *initiative.Body, v initiative.View) (string, error) {
+			return func(b *initiative.Body, v initiative.View, _ epicSet) (string, error) {
 				if err := checkMilestone(v, testedBy); err != nil {
 					return "", err
 				}
@@ -158,26 +149,20 @@ func newAssumptionAdd(d Deps) *cobra.Command {
 }
 
 func newAssumptionSet(d Deps) *cobra.Command {
-	return itemCmd(d, "set <project:initiative> <A<n>>", "change an Assumption's state, evidence or Milestone", 2,
+	return storeCmd(d, "set <project:initiative> <A<n>>", "change an Assumption's state, evidence or Milestone",
 		func(c *cobra.Command) {
 			c.Flags().String("state", "", "unknown, confirmed or broken")
 			c.Flags().String("evidence", "", "evidence text")
 			c.Flags().String("tested-by", "", "move to another Milestone (only at a Gate)")
 		},
-		func(c *cobra.Command, args []string) (itemEdit, error) {
+		func(c *cobra.Command, args []string) (storeEdit, error) {
 			if err := requireChange(c, "state", "evidence", "tested-by"); err != nil {
 				return nil, err
 			}
-			return func(b *initiative.Body, v initiative.View) (string, error) {
-				idx := -1
-				for i, e := range b.Assumptions {
-					if !e.Unparsed() && fmt.Sprintf("A%d", e.Value.N) == args[1] {
-						idx = i
-						break
-					}
-				}
-				if idx < 0 {
-					return "", fmt.Errorf("no Assumption %q", args[1])
+			return func(b *initiative.Body, v initiative.View, _ epicSet) (string, error) {
+				idx, err := initiative.FindAssumption(b.Assumptions, args[1])
+				if err != nil {
+					return "", err
 				}
 				a := b.Assumptions[idx].Value
 				if c.Flags().Changed("state") {
@@ -249,21 +234,12 @@ func checkAtGate(v initiative.View) error {
 	return nil
 }
 
-// editInitiative applies edit to the Initiative named by arg under the epic
-// lock, then prints the line it stored. Nothing is written when edit fails.
-func editInitiative(cfgDirs config.Dirs, cwd, arg string, w io.Writer, edit itemEdit) error {
-	return editInitiativeIn(cfgDirs, cwd, arg, w, func(b *initiative.Body, v initiative.View, _ epicSet) (string, error) {
-		return edit(b, v)
-	})
-}
-
 // epicSet answers whether an epic exists in the project's store, live or
 // archived.
 type epicSet func(name string) bool
 
-// storeEdit is an itemEdit that also sees which epics exist.
-type storeEdit func(body *initiative.Body, view initiative.View, exists epicSet) (string, error)
-
+// editInitiativeIn applies edit to the Initiative named by arg under the epic
+// lock, then prints the line it stored. Nothing is written when edit fails.
 func editInitiativeIn(cfgDirs config.Dirs, cwd, arg string, w io.Writer, edit storeEdit) error {
 	projectDir, _, slug, err := tickets.ResolveEpicTarget(cfgDirs, cwd, arg)
 	if err != nil {
@@ -285,9 +261,14 @@ func editInitiativeIn(cfgDirs config.Dirs, cwd, arg string, w io.Writer, edit st
 	if err != nil {
 		return err
 	}
-	exists := func(name string) bool {
-		return slices.ContainsFunc(append(slices.Clone(live), archived...), func(e tickets.Epic) bool { return e.Name == name })
+	names := map[string]bool{}
+	for _, e := range live {
+		names[e.Name] = true
 	}
+	for _, e := range archived {
+		names[e.Name] = true
+	}
+	exists := func(name string) bool { return names[name] }
 	var line string
 	err = tickets.EditEpicBody(ticketPath, func(text string) (string, error) {
 		body := initiative.ParseBody(text)

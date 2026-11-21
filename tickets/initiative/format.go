@@ -136,6 +136,42 @@ func NextAssumptionNumber(es []Entry[Assumption]) int {
 	return highest + 1
 }
 
+// ValidateOutcome refuses a Gate outcome that is not one of the known four.
+func ValidateOutcome(outcome string) error { return checkEnum("outcome", outcome, outcomes) }
+
+// AssumptionName is the "A<n>" an Assumption is addressed by.
+func AssumptionName(n int) string { return "A" + strconv.Itoa(n) }
+
+// FindDeferred returns the index of the parsed deferred item named item. It
+// refuses an item that appears twice.
+func FindDeferred(es []Entry[DeferredItem], item string) (int, error) {
+	idx := -1
+	for i, e := range es {
+		if e.Unparsed() || e.Value.Item != item {
+			continue
+		}
+		if idx >= 0 {
+			return 0, fmt.Errorf("deferred item %q is ambiguous: it appears more than once", item)
+		}
+		idx = i
+	}
+	if idx < 0 {
+		return 0, fmt.Errorf("no deferred item %q", item)
+	}
+	return idx, nil
+}
+
+// FindAssumption returns the index of the parsed Assumption addressed as name
+// ("A<n>").
+func FindAssumption(es []Entry[Assumption], name string) (int, error) {
+	for i, e := range es {
+		if !e.Unparsed() && AssumptionName(e.Value.N) == name {
+			return i, nil
+		}
+	}
+	return 0, fmt.Errorf("no Assumption %q", name)
+}
+
 func checkField(name, v string) error {
 	switch {
 	case v == "":
@@ -232,30 +268,39 @@ func parseAssumption(line string) (Assumption, bool) {
 	if !ok || len(parts) != 5 {
 		return Assumption{}, false
 	}
-	id := assumeIDRe.FindStringSubmatch(parts[0])
-	if id == nil {
+	n, ok := parseAssumeID(parts[0])
+	if !ok {
 		return Assumption{}, false
+	}
+	v, ok := cutFields(parts[2:], "tested by: ", "state: ", "evidence: ")
+	if !ok {
+		return Assumption{}, false
+	}
+	return Assumption{N: n, Text: parts[1], TestedBy: v[0], State: v[1], Evidence: v[2]}, true
+}
+
+// parseAssumeID reads the n of "A<n>".
+func parseAssumeID(s string) (int, bool) {
+	id := assumeIDRe.FindStringSubmatch(s)
+	if id == nil {
+		return 0, false
 	}
 	n, err := strconv.Atoi(id[1])
-	if err != nil {
-		return Assumption{}, false
-	}
-	a := Assumption{N: n, Text: parts[1]}
-	for i, prefix := range []string{"tested by: ", "state: ", "evidence: "} {
-		v, ok := strings.CutPrefix(parts[2+i], prefix)
+	return n, err == nil
+}
+
+// cutFields strips each prefix from the part at the same position. It fails
+// when a part lacks its prefix.
+func cutFields(parts []string, prefixes ...string) ([]string, bool) {
+	out := make([]string, len(prefixes))
+	for i, prefix := range prefixes {
+		v, ok := strings.CutPrefix(parts[i], prefix)
 		if !ok {
-			return Assumption{}, false
+			return nil, false
 		}
-		switch i {
-		case 0:
-			a.TestedBy = v
-		case 1:
-			a.State = v
-		default:
-			a.Evidence = v
-		}
+		out[i] = v
 	}
-	return a, true
+	return out, true
 }
 
 // RenderDeferred returns the canonical line of d.
@@ -276,24 +321,11 @@ func parseDeferred(line string) (DeferredItem, bool) {
 	if !ok || len(parts) != 5 {
 		return DeferredItem{}, false
 	}
-	d := DeferredItem{Item: parts[0]}
-	for i, prefix := range []string{"to: ", "why: ", "from: ", "state: "} {
-		v, ok := strings.CutPrefix(parts[1+i], prefix)
-		if !ok {
-			return DeferredItem{}, false
-		}
-		switch i {
-		case 0:
-			d.To = v
-		case 1:
-			d.Why = v
-		case 2:
-			d.From = v
-		default:
-			d.State = v
-		}
+	v, ok := cutFields(parts[1:], "to: ", "why: ", "from: ", "state: ")
+	if !ok {
+		return DeferredItem{}, false
 	}
-	return d, true
+	return DeferredItem{Item: parts[0], To: v[0], Why: v[1], From: v[2], State: v[3]}, true
 }
 
 // RenderGateLine returns the canonical line of g.
@@ -346,12 +378,8 @@ func parseGateLine(line string) (GateLine, bool) {
 	if len(parts) != 3 {
 		return GateLine{}, false
 	}
-	id := assumeIDRe.FindStringSubmatch(parts[0])
-	if id == nil {
-		return GateLine{}, false
-	}
-	n, err := strconv.Atoi(id[1])
-	if err != nil {
+	n, ok := parseAssumeID(parts[0])
+	if !ok {
 		return GateLine{}, false
 	}
 	return GateLine{Kind: GateAssumption, N: n, State: parts[1], Evidence: parts[2]}, true
@@ -404,19 +432,9 @@ func renderLines[T any](es []Entry[T], render func(T) (string, error), blankBefo
 	return strings.TrimSuffix(b.String(), "\n"), nil
 }
 
-// ParseMilestones parses the text of ## Milestones.
-func ParseMilestones(text string) []Entry[Milestone] {
-	return parseLines(text, parseMilestone, RenderMilestone)
-}
-
 // RenderMilestones renders the text of ## Milestones.
 func RenderMilestones(es []Entry[Milestone]) (string, error) {
 	return renderLines(es, RenderMilestone, nil)
-}
-
-// ParseAssumptions parses the text of ## Assumptions.
-func ParseAssumptions(text string) []Entry[Assumption] {
-	return parseLines(text, parseAssumption, RenderAssumption)
 }
 
 // RenderAssumptions renders the text of ## Assumptions, refusing a repeated A<n>.
@@ -434,19 +452,9 @@ func RenderAssumptions(es []Entry[Assumption]) (string, error) {
 	return renderLines(es, RenderAssumption, nil)
 }
 
-// ParseDeferred parses the text of ## Deferred.
-func ParseDeferred(text string) []Entry[DeferredItem] {
-	return parseLines(text, parseDeferred, RenderDeferred)
-}
-
 // RenderDeferredItems renders the text of ## Deferred.
 func RenderDeferredItems(es []Entry[DeferredItem]) (string, error) {
 	return renderLines(es, RenderDeferred, nil)
-}
-
-// ParseGateNotes parses the text of ## Gate notes.
-func ParseGateNotes(text string) []Entry[GateLine] {
-	return parseLines(text, parseGateLine, RenderGateLine)
 }
 
 // RenderGateNotes renders the text of ## Gate notes, with a blank line before
@@ -470,10 +478,10 @@ type Body struct {
 func ParseBody(body string) Body {
 	return Body{
 		raw:         body,
-		Milestones:  ParseMilestones(schema.Section(body, Milestones)),
-		Assumptions: ParseAssumptions(schema.Section(body, Assumptions)),
-		Deferred:    ParseDeferred(schema.Section(body, Deferred)),
-		GateNotes:   ParseGateNotes(schema.Section(body, GateNotes)),
+		Milestones:  parseLines(schema.Section(body, Milestones), parseMilestone, RenderMilestone),
+		Assumptions: parseLines(schema.Section(body, Assumptions), parseAssumption, RenderAssumption),
+		Deferred:    parseLines(schema.Section(body, Deferred), parseDeferred, RenderDeferred),
+		GateNotes:   parseLines(schema.Section(body, GateNotes), parseGateLine, RenderGateLine),
 	}
 }
 

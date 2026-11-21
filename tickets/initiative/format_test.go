@@ -261,6 +261,44 @@ func tally[T any](es []Entry[T]) (total, unparsed int, raws []string) {
 	return
 }
 
+// Section-level parsers: production reaches them only through ParseBody.
+func ParseMilestones(s string) []Entry[Milestone] {
+	return parseLines(s, parseMilestone, RenderMilestone)
+}
+func ParseAssumptions(s string) []Entry[Assumption] {
+	return parseLines(s, parseAssumption, RenderAssumption)
+}
+func ParseDeferred(s string) []Entry[DeferredItem] {
+	return parseLines(s, parseDeferred, RenderDeferred)
+}
+func ParseGateNotes(s string) []Entry[GateLine] {
+	return parseLines(s, parseGateLine, RenderGateLine)
+}
+
+func TestFindDeferred(t *testing.T) {
+	d := func(item string) Entry[DeferredItem] { return Parsed(DeferredItem{Item: item}) }
+	es := []Entry[DeferredItem]{d("a"), {Raw: "- junk"}, d("b"), d("a")}
+	if i, err := FindDeferred(es, "b"); err != nil || i != 2 {
+		t.Errorf("b = %d, %v", i, err)
+	}
+	if _, err := FindDeferred(es, "a"); err == nil || !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("a: want ambiguous, got %v", err)
+	}
+	if _, err := FindDeferred(es, "zz"); err == nil || !strings.Contains(err.Error(), "no deferred item") {
+		t.Errorf("zz: want not found, got %v", err)
+	}
+}
+
+func TestFindAssumption(t *testing.T) {
+	es := []Entry[Assumption]{{Raw: "- junk"}, Parsed(Assumption{N: 2}), Parsed(Assumption{N: 7})}
+	if i, err := FindAssumption(es, "A7"); err != nil || i != 2 {
+		t.Errorf("A7 = %d, %v", i, err)
+	}
+	if _, err := FindAssumption(es, "A3"); err == nil {
+		t.Error("A3: want error")
+	}
+}
+
 func countMilestones(s string) (int, int, []string)  { return tally(ParseMilestones(s)) }
 func countAssumptions(s string) (int, int, []string) { return tally(ParseAssumptions(s)) }
 func countDeferred(s string) (int, int, []string)    { return tally(ParseDeferred(s)) }

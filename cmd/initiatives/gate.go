@@ -79,9 +79,6 @@ func applyGate(b *initiative.Body, v initiative.View, g gateCall) (string, error
 		dropOpen(b, "Initiative done")
 	}
 	for _, l := range lines {
-		if _, err := initiative.RenderGateLine(l); err != nil {
-			return "", err
-		}
 		b.GateNotes = append(b.GateNotes, initiative.Parsed(l))
 	}
 	return "### " + g.slug, nil
@@ -106,8 +103,7 @@ func checkGateable(v initiative.View, g gateCall) error {
 	if g.outcome == initiative.OutcomeDone && v.Milestones[len(v.Milestones)-1].Slug != g.slug {
 		return fmt.Errorf("outcome done needs the last Milestone, and %q is not the last", g.slug)
 	}
-	_, err := initiative.RenderGateLine(initiative.GateLine{Kind: initiative.GateOutcome, Outcome: g.outcome})
-	return err
+	return initiative.ValidateOutcome(g.outcome)
 }
 
 func applyGateAssumption(b *initiative.Body, spec string) (initiative.GateLine, error) {
@@ -115,20 +111,17 @@ func applyGateAssumption(b *initiative.Body, spec string) (initiative.GateLine, 
 	if len(parts) != 3 {
 		return initiative.GateLine{}, fmt.Errorf("--assumption %q: want A<n>=<state>=<evidence>", spec)
 	}
-	for i := range b.Assumptions {
-		e := b.Assumptions[i]
-		if e.Unparsed() || fmt.Sprintf("A%d", e.Value.N) != parts[0] {
-			continue
-		}
-		a := e.Value
-		a.State, a.Evidence = parts[1], parts[2]
-		if _, err := initiative.RenderAssumption(a); err != nil {
-			return initiative.GateLine{}, err
-		}
-		b.Assumptions[i] = initiative.Parsed(a)
-		return initiative.GateLine{Kind: initiative.GateAssumption, N: a.N, State: a.State, Evidence: a.Evidence}, nil
+	i, err := initiative.FindAssumption(b.Assumptions, parts[0])
+	if err != nil {
+		return initiative.GateLine{}, err
 	}
-	return initiative.GateLine{}, fmt.Errorf("no Assumption %q", parts[0])
+	a := b.Assumptions[i].Value
+	a.State, a.Evidence = parts[1], parts[2]
+	if _, err := initiative.RenderAssumption(a); err != nil {
+		return initiative.GateLine{}, err
+	}
+	b.Assumptions[i] = initiative.Parsed(a)
+	return initiative.GateLine{Kind: initiative.GateAssumption, N: a.N, State: a.State, Evidence: a.Evidence}, nil
 }
 
 func applyGatePlacement(b *initiative.Body, v initiative.View, spec string) error {
@@ -139,18 +132,9 @@ func applyGatePlacement(b *initiative.Body, v initiative.View, spec string) erro
 	if err := checkPlacement(v, to); err != nil {
 		return err
 	}
-	idx := -1
-	for i, e := range b.Deferred {
-		if e.Unparsed() || e.Value.Item != item {
-			continue
-		}
-		if idx >= 0 {
-			return fmt.Errorf("deferred item %q is ambiguous: it appears more than once", item)
-		}
-		idx = i
-	}
-	if idx < 0 {
-		return fmt.Errorf("no deferred item %q", item)
+	idx, err := initiative.FindDeferred(b.Deferred, item)
+	if err != nil {
+		return err
 	}
 	d := b.Deferred[idx].Value
 	d.To = to
