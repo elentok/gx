@@ -123,6 +123,24 @@ func TestInitiatives_PageHasGateNotesAndStoppedMilestone(t *testing.T) {
 	}
 }
 
+func TestInitiatives_GateLineBeforeTheFirstHeadingIsListedUnparsed(t *testing.T) {
+	t.Parallel()
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "stray", "---\nstatus: open\nkind: initiative\n---\n\n## Milestones\n\n- x | x name | goal: gx\n\n## Gate notes\n\ntaught: orphan\n### x\noutcome: continue\n", nil)
+	})
+	code, p := getInitiative(t, h, base, "proj:stray")
+	if code != http.StatusOK {
+		t.Fatalf("status %d", code)
+	}
+	want := []wire.InitiativeUnparsed{{Section: "Gate notes", Raw: "taught: orphan"}}
+	if len(p.Unparsed) != 1 || p.Unparsed[0] != want[0] {
+		t.Errorf("unparsed = %+v, want %+v", p.Unparsed, want)
+	}
+	if len(p.GateNotes) != 1 || p.GateNotes[0].Slug != "x" || len(p.GateNotes[0].Taught) != 0 {
+		t.Errorf("gate notes = %+v", p.GateNotes)
+	}
+}
+
 func TestInitiatives_PageUnknownOrNotInitiativeIs404(t *testing.T) {
 	t.Parallel()
 	h, base := startInitiatives(t)

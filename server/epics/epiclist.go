@@ -215,8 +215,8 @@ func (s *Epics) projectCards(project string, epics []tickets.Epic, designs map[s
 				impl = &r
 			}
 			decorateDesignCard(&row, e, impl, designs[row.Address])
-			row.BackLink = backLinkOf(project, e, all)
 		}
+		row.BackLink = backLinkOf(project, e, all)
 		rows = append(rows, row)
 	}
 	return rows

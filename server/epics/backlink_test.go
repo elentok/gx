@@ -35,6 +35,7 @@ func seedBackLinks(t *testing.T, store string) {
 	rigs.WriteEpicFiles(t, store, "ok-impl", implLoopMD, open)
 	design("ofold", "old", "m")
 	rigs.WriteEpicFiles(t, store, ".archive/arch", "---\nstatus: open\nkind: map\ninitiative: alpha\nmilestone: c\ncompleted_at: 2026-01-02T10:00:00Z\n---\n", nil)
+	rigs.WriteEpicFiles(t, store, "arch-impl", implLoopMD, open)
 	design("noinit", "ghost", "b")
 	design("unknown", "alpha", "nope")
 	design("mismatch", "alpha", "a")
@@ -94,6 +95,19 @@ func TestEpicList_ArchivedInitiativeAndDesignStillResolveBackLink(t *testing.T) 
 	want := wire.BackLink{Milestone: 1, Initiative: "old", InitiativeAddress: "proj:old"}
 	if got := rows["ofold"].BackLink; got != want {
 		t.Errorf("design of an archived Initiative back-link = %+v, want %+v", got, want)
+	}
+}
+
+func TestEpicList_ImplEpicOfAnArchivedDesignCarriesTheBackLink(t *testing.T) {
+	t.Parallel()
+	_, rows := listBackLinks(t)
+	want := wire.BackLink{Milestone: 3, Initiative: "alpha", InitiativeAddress: "proj:alpha"}
+	r, ok := rows["arch-impl"]
+	if !ok {
+		t.Fatalf("no arch-impl row in %+v", rows)
+	}
+	if r.BackLink != want {
+		t.Errorf("arch-impl back-link = %+v, want %+v", r.BackLink, want)
 	}
 }
 

@@ -31,6 +31,7 @@ func (s *Epics) Initiatives(w http.ResponseWriter, _ *http.Request) {
 		project := tickets.ProjectName(dir)
 		live, err := s.Projects.Epics(project)
 		if err != nil {
+			s.Log.Warn("initiatives: read project epics", "project", project, "err", err)
 			continue
 		}
 		archived, err := tickets.LoadArchived(dir)
@@ -143,14 +144,19 @@ func initiativePage(project string, e tickets.Epic, live, archived []tickets.Epi
 			})
 		}
 	}
-	p.GateNotes = gateNotes(body.GateNotes)
+	var stray []string
+	p.GateNotes, stray = gateNotes(body.GateNotes)
+	for _, raw := range stray {
+		p.Unparsed = append(p.Unparsed, wire.InitiativeUnparsed{Section: initiative.GateNotes, Raw: raw})
+	}
 	return p
 }
 
 // gateNotes groups the parsed gate lines under their "### slug" headings. Lines
-// before the first heading belong to no note and are dropped.
-func gateNotes(lines []initiative.Entry[initiative.GateLine]) []wire.InitiativeGateNote {
-	out := []wire.InitiativeGateNote{}
+// before the first heading belong to no note; they come back as stray, in their
+// canonical text, so the page shows them rather than dropping them.
+func gateNotes(lines []initiative.Entry[initiative.GateLine]) (out []wire.InitiativeGateNote, stray []string) {
+	out = []wire.InitiativeGateNote{}
 	for _, e := range lines {
 		if e.Unparsed() {
 			continue
@@ -161,6 +167,9 @@ func gateNotes(lines []initiative.Entry[initiative.GateLine]) []wire.InitiativeG
 			continue
 		}
 		if len(out) == 0 {
+			if raw, err := initiative.RenderGateLine(g); err == nil {
+				stray = append(stray, raw)
+			}
 			continue
 		}
 		n := &out[len(out)-1]
@@ -175,5 +184,5 @@ func gateNotes(lines []initiative.Entry[initiative.GateLine]) []wire.InitiativeG
 			n.Placed = append(n.Placed, g.Text)
 		}
 	}
-	return out
+	return out, stray
 }
