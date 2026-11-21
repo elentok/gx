@@ -77,7 +77,12 @@ func TestGxInitiativeBrokenLinkStep(t *testing.T) {
 	step := section(t, initiativeSkill(t), "1. **Broken link", "2. **No Milestone")
 	requireAll(t, step,
 		"Check the full Milestone list, not one link",
+		"Missing Initiative: the Initiative does not exist",
+		"Unknown Milestone slug on a Design",
+		"Unparseable Milestones section: the section does not parse",
 		"A Milestone whose Design epic is not in the store",
+		"A Design whose Milestone links a different Design",
+		"Name the Milestone and print the fix",
 		"gx initiatives milestone set <project:initiative> <slug> --clear-design",
 		"write nothing")
 }

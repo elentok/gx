@@ -31,9 +31,16 @@ with a recommended answer for each question. Ask the person nothing in prose out
 Run the steps in this order. The first one that matches runs and the rest are skipped.
 
 1. **Broken link or unparseable Milestones section.** Check the full Milestone list, not one link. If a
-   link is broken or the Milestones section does not parse, stop and name it. A Milestone whose Design
-   epic is not in the store is one such link. Name the Milestone and print the command that clears it,
-   then stop and write nothing:
+   link is broken or the Milestones section does not parse, stop and name it. Each of these kinds stops
+   the run:
+   - Missing Initiative: the Initiative does not exist.
+   - Unknown Milestone slug on a Design: the Design names a Milestone slug the Initiative does not have.
+   - Unparseable Milestones section: the section does not parse.
+   - A Milestone whose Design epic is not in the store.
+   - A Design whose Milestone links a different Design.
+
+   Name the Milestone and print the fix, then stop and write nothing. For a Milestone whose Design epic is
+   missing or whose link points at a different Design, the fix is:
 
    ```
    gx initiatives milestone set <project:initiative> <slug> --clear-design
