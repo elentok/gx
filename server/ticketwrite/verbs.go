@@ -41,6 +41,9 @@ func (w *Writer) PauseRequest(req wire.QueueRequest) (wire.QueueResult, error) {
 		if ref.Epic.IsBacklog {
 			return queue.Refusal(wire.ReasonBacklogEpic, ref.Addr.String()+" is in a backlog; its tickets are follow-ups, not scheduled"), nil
 		}
+		if ref.Epic.IsInitiative {
+			return queue.Refusal(wire.ReasonInitiativeEpic, ref.Addr.String()+" is in an Initiative; it holds a plan and no scheduled work"), nil
+		}
 		run, _ := w.d.Registry.Tracked(ref.Addr.String())
 		if err := w.Pause(ref.ProjectDir, ref.Addr, ref.Ticket.Path, events.Manual, reason, run.Run); err != nil {
 			return wire.QueueResult{}, fmt.Errorf("pause %s: %w", ref.Addr, err)

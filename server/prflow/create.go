@@ -47,6 +47,9 @@ func Create(h CreateHost, req wire.QueueRequest) (wire.QueueResult, error) {
 	}
 	root := queue.RootRef{Project: project, Epic: epic}
 	e, ok := h.Epic(project, epic)
+	if ok && e.IsInitiative {
+		return queue.Refusal(wire.ReasonInitiativeEpic, root.String()+" is an Initiative; it never opens a PR"), nil
+	}
 	if !ok || len(e.Tickets) == 0 {
 		return queue.Refusal(wire.ReasonUnknownTicket, "no epic "+root.String()), nil
 	}

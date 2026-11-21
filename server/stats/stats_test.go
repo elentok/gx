@@ -462,6 +462,22 @@ func TestStats_BacklogDoneTicketsAreNotMergedOrCosted(t *testing.T) {
 	}
 }
 
+func TestStats_InitiativeDoneTicketsAreNotMergedOrCosted(t *testing.T) {
+	t.Parallel()
+	s := statsStore(t, func(store string) {
+		rigs.WriteProjectEpic(t, store, "proj", "an-initiative", "---\nkind: initiative\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "done_at: "+statsStamp(2)+"\ntotal_tokens: 50\nactual_cost: 0.5\n", "A"),
+		})
+	})("?range=30")
+	if got := statsAt(t, s, s.Throughput.TicketsMerged, 2); got != 0 {
+		t.Errorf("TicketsMerged = %d, want 0", got)
+	}
+	queue := costGroupOf(t, s, tokenledger.GroupQueue)
+	if got := statsAmountAt(t, s, queue.Tokens, 2); got != (wire.StatsAmount{}) {
+		t.Errorf("queue tokens = %+v, want zero", got)
+	}
+}
+
 func frictionYAML(body string) string { return "friction:\n" + body }
 
 func TestStats_FrictionLandsOnTheStampDayAndSplitsReasons(t *testing.T) {

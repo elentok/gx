@@ -80,11 +80,16 @@ func TestPause_RefusesARunningDoneAlreadyPausedOrMapEpicTicket(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(store, "proj", "backlog-epic", "ticket.md"), []byte("---\nkind: backlog\nstatus: open\n---\n# Backlog\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	servertest.WriteTicket(t, store, "proj", "ini-epic", "01", "stray", "")
+	if err := os.WriteFile(filepath.Join(store, "proj", "ini-epic", "ticket.md"), []byte("---\nkind: initiative\nstatus: open\n---\n# Initiative\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	h.Server.Registry().PutRun("proj:epic-a", runs.Run{Address: "proj:epic-a/01", Runner: "pty", Session: agentrunner.Session{ID: "p1"}})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	for _, c := range []struct{ name, address, reason string }{
+		{"initiative epic", "proj:ini-epic/01", wire.ReasonInitiativeEpic},
 		{"running", "proj:epic-a/01", wire.ReasonIterationRunning},
 		{"done", "proj:epic-a/02", wire.ReasonTicketDone},
 		{"map epic", "proj:map-epic/01", wire.ReasonMapEpic},

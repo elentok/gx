@@ -116,6 +116,9 @@ func (s *Merger) loadMergeEpic(req wire.QueueRequest) (mergeEpicRef, error) {
 		return mergeEpicRef{}, err
 	}
 	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return filepath.Base(e.Path) == epic })
+	if i >= 0 && epics[i].IsInitiative {
+		return mergeEpicRef{}, refuseMerge(wire.ReasonInitiativeEpic, root.String()+" is an Initiative; it never merges")
+	}
 	if i < 0 || len(epics[i].Tickets) == 0 {
 		return mergeEpicRef{}, refuseMerge(wire.ReasonUnknownTicket, "no epic "+root.String())
 	}

@@ -195,6 +195,8 @@ func (q *Queue) mapEpicRefusal(address string) *wire.QueueResult {
 		r = Refusal(wire.ReasonMapEpic, address+" is in a map epic; its tickets are resolved by hand, not scheduled")
 	case tickets.IsBacklogEpic(epicPath):
 		r = Refusal(wire.ReasonBacklogEpic, address+" is in a backlog; its tickets are follow-ups, not scheduled")
+	case tickets.IsInitiativeEpic(epicPath):
+		r = Refusal(wire.ReasonInitiativeEpic, address+" is in an Initiative; it holds a plan and no scheduled work")
 	default:
 		return nil
 	}
@@ -300,6 +302,8 @@ func (q *Queue) refusal(t queueTarget) *wire.QueueResult {
 		r = Refusal(wire.ReasonMapEpic, t.address+" is a map epic; its tickets are resolved by hand, not scheduled")
 	case e.IsBacklog:
 		r = Refusal(wire.ReasonBacklogEpic, t.address+" is a backlog; its tickets are follow-ups, not scheduled")
+	case e.IsInitiative:
+		r = Refusal(wire.ReasonInitiativeEpic, t.address+" is an Initiative; it holds a plan and no scheduled work")
 	case !e.MergedAt.IsZero():
 		r = Refusal(wire.ReasonAlreadyMerged, t.address+" is already merged")
 	case e.QueueRefusal() == tickets.QueueRefusalFollowUps:

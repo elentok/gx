@@ -2,6 +2,7 @@ package merge_test
 
 import (
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -12,6 +13,21 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
+
+func TestEpicMerge_RefusesAnInitiative(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "ini", "01", "stray", "")
+	if err := os.WriteFile(filepath.Join(store, "proj", "ini", "ticket.md"), []byte("---\nkind: initiative\nstatus: open\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
+	h := servertest.StartWithStore(t, store)
+	res, err := h.Client.Tickets.EpicMerge(t.Context(), "proj:ini")
+	if err != nil || !res.Refused || res.Reason != wire.ReasonInitiativeEpic {
+		t.Fatalf("res = %+v, err %v; want refusal %s", res, err, wire.ReasonInitiativeEpic)
+	}
+}
 
 func TestWeb_EpicMergeChecksTheShownState(t *testing.T) {
 	t.Parallel()

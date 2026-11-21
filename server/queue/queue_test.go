@@ -115,6 +115,10 @@ func TestQueue_Refusals(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(store, "proj", "backlog-epic", "ticket.md"), []byte("---\nkind: backlog\nstatus: open\n---\n# Backlog\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	servertest.WriteTicket(t, store, "proj", "ini-epic", "01", "stray", "")
+	if err := os.WriteFile(filepath.Join(store, "proj", "ini-epic", "ticket.md"), []byte("---\nkind: initiative\nstatus: open\n---\n# Initiative\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	h := servertest.StartWithStore(t, store)
 	ctx := context.Background()
 	if _, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", ""); err != nil {
@@ -134,6 +138,8 @@ func TestQueue_Refusals(t *testing.T) {
 		{"move unqueued", func() (wire.QueueResult, error) { return h.Client.Queue.Move(ctx, "proj:epic-a/02", 1) }, wire.ReasonNotQueued},
 		{"map epic", func() (wire.QueueResult, error) { return h.Client.Queue.Add(ctx, "proj:map-epic/01", "") }, wire.ReasonMapEpic},
 		{"backlog ticket", func() (wire.QueueResult, error) { return h.Client.Queue.Add(ctx, "proj:backlog-epic/01", "") }, wire.ReasonBacklogEpic},
+		{"initiative ticket", func() (wire.QueueResult, error) { return h.Client.Queue.Add(ctx, "proj:ini-epic/01", "") }, wire.ReasonInitiativeEpic},
+		{"initiative epic", func() (wire.QueueResult, error) { return h.Client.Queue.Add(ctx, "proj:ini-epic", "") }, wire.ReasonInitiativeEpic},
 		{"move out of range", func() (wire.QueueResult, error) { return h.Client.Queue.Move(ctx, "proj:epic-a/01", 2) }, wire.ReasonBadPosition},
 	}
 	for _, c := range cases {

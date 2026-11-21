@@ -3,6 +3,8 @@ package prflow_test
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/elentok/gx/server"
@@ -58,6 +60,12 @@ func TestCreatePR_RefusalsEachHaveAReason(t *testing.T) {
 		"unknown":     {reason: wire.ReasonUnknownTicket, addr: "proj:nope"},
 		"one-off": {reason: wire.ReasonOneOffsEpic, addr: "proj:" + tickets.OneOffsEpic, setup: func(t *testing.T, f *rigs.PRFlow) {
 			servertest.WriteTicketWith(t, f.Store, "proj", tickets.OneOffsEpic, "01", "x", servertest.TicketOpts{Status: "done"})
+		}},
+		"initiative": {reason: wire.ReasonInitiativeEpic, addr: "proj:ini", setup: func(t *testing.T, f *rigs.PRFlow) {
+			servertest.WriteTicket(t, f.Store, "proj", "ini", "01", "stray", "")
+			if err := os.WriteFile(filepath.Join(f.Store, "proj", "ini", "ticket.md"), []byte("---\nkind: initiative\nstatus: open\n---\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
 		}},
 		"incomplete": {reason: wire.ReasonNotComplete, setup: func(t *testing.T, f *rigs.PRFlow) {
 			servertest.WriteTicketWith(t, f.Store, "proj", "epic-a", "02", "more", servertest.TicketOpts{})

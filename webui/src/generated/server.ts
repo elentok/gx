@@ -2342,6 +2342,7 @@ export const ReasonBadPosition = "bad-position";
 export const ReasonTicketLive = "ticket-live";
 export const ReasonMapEpic = "map-epic";
 export const ReasonBacklogEpic = "backlog-epic";
+export const ReasonInitiativeEpic = "initiative-epic";
 export const ReasonNoOpenTickets = "no-open-tickets";
 export const ReasonEpicDraft = "epic-draft";
 export const ReasonEpicNotOpen = "epic-not-open";
@@ -2359,7 +2360,7 @@ export const ReasonPROpenFailed = "pr-open-failed";
 /**
  * Refusal reasons of the queue writes. Stable: clients switch on them.
  */
-export type Reason = typeof ReasonServerNotRunning | typeof ReasonUnknownTicket | typeof ReasonInvestigateStop | typeof ReasonInvalidAddress | typeof ReasonInvalidAgent | typeof ReasonAlreadyQueued | typeof ReasonNotQueued | typeof ReasonBadPosition | typeof ReasonTicketLive | typeof ReasonMapEpic | typeof ReasonBacklogEpic | typeof ReasonNoOpenTickets | typeof ReasonEpicDraft | typeof ReasonEpicNotOpen | typeof ReasonFollowUpsEpic | typeof ReasonAlreadyMerged | typeof ReasonMergePending | typeof ReasonNotComplete | typeof ReasonBranchMissing | typeof ReasonOneOffsEpic | typeof ReasonNotDirtyTrunk | typeof ReasonLocalAhead | typeof ReasonNeedsRebase | typeof ReasonHasPR | typeof ReasonPROpenFailed;
+export type Reason = typeof ReasonServerNotRunning | typeof ReasonUnknownTicket | typeof ReasonInvestigateStop | typeof ReasonInvalidAddress | typeof ReasonInvalidAgent | typeof ReasonAlreadyQueued | typeof ReasonNotQueued | typeof ReasonBadPosition | typeof ReasonTicketLive | typeof ReasonMapEpic | typeof ReasonBacklogEpic | typeof ReasonInitiativeEpic | typeof ReasonNoOpenTickets | typeof ReasonEpicDraft | typeof ReasonEpicNotOpen | typeof ReasonFollowUpsEpic | typeof ReasonAlreadyMerged | typeof ReasonMergePending | typeof ReasonNotComplete | typeof ReasonBranchMissing | typeof ReasonOneOffsEpic | typeof ReasonNotDirtyTrunk | typeof ReasonLocalAhead | typeof ReasonNeedsRebase | typeof ReasonHasPR | typeof ReasonPROpenFailed;
 /**
  * EventQueueChanged is emitted once per queue write; Address is the ticket it
  * touched. Clients re-read the queue on it.
