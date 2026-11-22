@@ -231,6 +231,30 @@ func TestRunTicketsSection_BlankContentRefusedUnlessCleared(t *testing.T) {
 	}
 }
 
+func TestRunTicketsSection_VerifiedUnknownKeyRefused(t *testing.T) {
+	t.Parallel()
+	_, issuesDir := newAddEpic(t)
+	path := filepath.Join(issuesDir, "01-a.md")
+	cmdtest.WriteTicket(t, path, "01", "open", "verify")
+	d := testDeps(t, nil, nil, nil)
+	stories := schema.SetSection("", schema.StoriesHeading, schema.StoriesSection([]string{"Story 1", "Story 2"}))
+	if err := runTicketsSection(d, path, schema.StoriesHeading, schema.Section(stories, schema.StoriesHeading), sectionOptions{}, io.Discard); err != nil {
+		t.Fatalf("seed stories: %v", err)
+	}
+	before, _ := os.ReadFile(path)
+
+	err := runTicketsSection(d, path, "Verified", "- Story 9 — pass @ abc\n", sectionOptions{}, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "Story 9") || !strings.Contains(err.Error(), "Story 1, Story 2") {
+		t.Fatalf("err = %v, want a refusal naming the bad key and the valid keys", err)
+	}
+	if after, _ := os.ReadFile(path); string(after) != string(before) {
+		t.Errorf("refused write changed the ticket:\n%s", after)
+	}
+	if err := runTicketsSection(d, path, "Verified", "- Story 1 — pass @ abc\n", sectionOptions{}, io.Discard); err != nil {
+		t.Errorf("valid key refused: %v", err)
+	}
+}
+
 func TestRunTicketsSection_Append(t *testing.T) {
 	t.Parallel()
 	_, issuesDir := newAddEpic(t)

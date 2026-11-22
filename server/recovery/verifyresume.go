@@ -58,7 +58,15 @@ func VerifyResumeNote(t tickets.Ticket, head string) string {
 	}
 	var b strings.Builder
 	b.WriteString(VerifyEveryStory + "\n")
-	fmt.Fprintf(&b, "This is a relaunch. HEAD is %s. The ticket's ## Verified section records earlier verdicts.\n", head)
+	fmt.Fprintf(&b, "This is a relaunch. HEAD is %s.", head)
+	if len(entries) > 0 {
+		b.WriteString(" The ticket's ## Verified section records earlier verdicts.")
+	}
+	b.WriteString("\n")
+	if len(units) > 0 {
+		fmt.Fprintf(&b, "Write each ## Verified line as `%s`, with the unit key exactly as in ## Stories: %s\n",
+			schema.VerifiedLineFormat, strings.Join(units, "; "))
+	}
 	if len(skip) > 0 {
 		fmt.Fprintf(&b, "Skip these stories, checked at HEAD:\n%s\n", strings.Join(skip, "\n"))
 	}

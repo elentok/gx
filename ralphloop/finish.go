@@ -426,7 +426,8 @@ func blockFinish(d deps.Deps, p iterationParams, path, pane, sessionID, list str
 	lp.VerifyCap = p.verifyCap
 	lp.Session = s
 	msg := "You reported finished, but these units have no ## Verified entry at HEAD: " + list +
-		". Check each one, add its entry to your ticket's ## Verified section, then report finished again."
+		". Check each one, add its entry to your ticket's ## Verified section (line format `" + schema.VerifiedLineFormat +
+		"`, key exactly as in ## Stories), then report finished again."
 	if err := supervise.PromptIdle(d, lp, msg); err != nil {
 		return sessionID, fmt.Errorf("sending finish block to %s: %w", label, err)
 	}

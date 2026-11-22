@@ -71,6 +71,30 @@ func ParseVerified(body string) []VerifiedEntry {
 	return out
 }
 
+// VerifiedLineFormat is the shape of one "## Verified" line, for prompts.
+const VerifiedLineFormat = "- <unit key> — pass|fail @ <sha>"
+
+// ValidateVerifiedKeys refuses "## Verified" content whose line keys match no
+// unit of body's "## Stories". A ticket without Stories has no unit list, so
+// nothing is checked. History lines are left alone.
+func ValidateVerifiedKeys(body, content string) error {
+	units := ParseStories(body)
+	if len(units) == 0 {
+		return nil
+	}
+	var bad []string
+	for _, e := range ParseVerified(SetSection("", VerifiedHeading, content)) {
+		if !e.History && !slices.Contains(units, e.Story) {
+			bad = append(bad, e.Story)
+		}
+	}
+	if len(bad) == 0 {
+		return nil
+	}
+	return fmt.Errorf("## Verified has no unit %q; valid keys: %s (line format: %s)",
+		strings.Join(bad, `", "`), strings.Join(units, ", "), VerifiedLineFormat)
+}
+
 // MarkVerifiedHistory flags every Verified entry as history, so none counts
 // after a Start over. A body without the section is returned unchanged.
 func MarkVerifiedHistory(body string) string {

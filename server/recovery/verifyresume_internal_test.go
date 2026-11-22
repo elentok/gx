@@ -55,6 +55,24 @@ func TestVerifyResumeNote_StoriesWithoutEntriesListsEveryUnit(t *testing.T) {
 	}
 }
 
+func TestVerifyResumeNote_NoVerifiedSectionDropsEarlierVerdictsSentence(t *testing.T) {
+	t.Parallel()
+	body := schema.SetSection("", schema.StoriesHeading, schema.StoriesSection([]string{"Story 1", "Story 2"}))
+	got := verifyNote(t, body, "head1")
+	if strings.Contains(got, "records earlier verdicts") {
+		t.Errorf("no ## Verified section, yet the note promises verdicts:\n%s", got)
+	}
+	for _, want := range []string{schema.VerifiedLineFormat, "Story 1; Story 2"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("note lacks %q:\n%s", want, got)
+		}
+	}
+	withEntry := schema.AppendVerified(body, schema.VerifiedEntry{Story: "Story 1", Verdict: "pass", Commit: "head0"})
+	if got := verifyNote(t, withEntry, "head1"); !strings.Contains(got, "records earlier verdicts") {
+		t.Errorf("a ticket with entries keeps the sentence:\n%s", got)
+	}
+}
+
 func TestVerifyResumeNote_NoStoriesSectionKeepsVerifiedSource(t *testing.T) {
 	t.Parallel()
 	body := schema.AppendVerified("", schema.VerifiedEntry{Story: "43", Verdict: "pass", Commit: "head1"})

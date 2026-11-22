@@ -39,9 +39,18 @@ func runTicketsSection(d Deps, path, heading, content string, opts sectionOption
 		}
 		return PrintTicketRef(path, jsonOut, w)
 	}
+	var verr error
 	err := schema.UpdateTicketWithBody(path, func(_ *schema.Ticket, body *string) {
+		if heading == schema.VerifiedHeading {
+			if verr = schema.ValidateVerifiedKeys(*body, content); verr != nil {
+				return
+			}
+		}
 		*body = setSection(*body, heading, content)
 	})
+	if err == nil {
+		err = verr
+	}
 	if err != nil {
 		return err
 	}
