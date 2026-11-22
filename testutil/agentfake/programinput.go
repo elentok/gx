@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -153,6 +154,24 @@ func (b *InputBox) Mark(marker string) {
 
 var pasteMarkers = strings.NewReplacer(PasteStart, "", PasteEnd, "")
 
+var pasteSpan = regexp.MustCompile(regexp.QuoteMeta(PasteStart) + `(.*?)` + regexp.QuoteMeta(PasteEnd))
+
+// drawnLines is the draft as claude draws it: a paste of one existing image
+// path becomes an "[Image #N] " chip, other markers vanish. The log keeps the
+// raw text.
+func (b *InputBox) drawnLines() []string {
+	n := 0
+	text := pasteSpan.ReplaceAllStringFunc(b.Text(), func(span string) string {
+		body := pasteSpan.FindStringSubmatch(span)[1]
+		if !IsImageFile(strings.TrimSpace(body)) {
+			return body
+		}
+		n++
+		return fmt.Sprintf("[Image #%d] ", n)
+	})
+	return strings.Split(pasteMarkers.Replace(text), "\n")
+}
+
 func (b *InputBox) Draw() {
 	var sb strings.Builder
 	sb.WriteString("\x1b[2J\x1b[H")
@@ -164,8 +183,7 @@ func (b *InputBox) Draw() {
 	} else if b.Text() == "" {
 		sb.WriteString(b.Marker + "\x1b[2m" + ProgramPlaceholder + "\x1b[0m")
 	} else {
-		for i, line := range b.Lines {
-			line = pasteMarkers.Replace(line)
+		for i, line := range b.drawnLines() {
 			if i == 0 {
 				sb.WriteString(b.Marker + line)
 			} else {

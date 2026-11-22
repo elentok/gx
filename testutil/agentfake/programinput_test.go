@@ -92,6 +92,21 @@ func TestProgramInput_CtrlUClearsOneLinePerPress(t *testing.T) {
 	p.WaitScreen(ProgramPlaceholder)
 }
 
+func TestProgramInput_PastedImagePathDrawsAChip(t *testing.T) {
+	img := filepath.Join(t.TempDir(), "shot.png")
+	if err := os.WriteFile(img, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p := holdInputProgram(t)
+	p.WaitScreen(ProgramPlaceholder)
+
+	p.keys(PasteStart + img + PasteEnd)
+	p.WaitScreen("❯ [Image #1]")
+	if screen := strings.Join(p.rows(), "\n"); strings.Contains(screen, img) {
+		t.Errorf("screen = %q; want the chip, not the path", screen)
+	}
+}
+
 func TestProgramInput_SeededDraft(t *testing.T) {
 	p := holdInputProgram(t, ProgramDraftEnv+"=old\ndraft")
 	p.WaitScreen("  draft")
