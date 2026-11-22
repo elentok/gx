@@ -53,7 +53,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 			"### Shared review file", "scratchpad", "verify a suspicion", "### Size gate", "50 changed lines",
 		}},
 		{"code-review per-area files, spec path and coverage", "gx-code-review/SKILL.md", []string{
-			"one diff file per", "100 KB", "minus a trailing -impl", "`Covered:", "Spec reviewed N of M tickets", "`gx tickets root`", "**deferred**, never **approved**",
+			"one diff file per", "100 KB", "minus a trailing -impl", "`Covered:", "Spec reviewed N of M code-changing tickets", "Covered: <addresses reviewed> of <M> code-changing tickets", "`implement` tickets plus their fix children", "`gx tickets root`", "**deferred**, never **approved**",
 		}},
 		{"code-review test gaps and verified facts", "gx-code-review/SKILL.md", []string{
 			"Open verify tickets own test gaps", "no open verify ticket covers that story", "consultant's verified facts",

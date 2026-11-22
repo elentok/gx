@@ -46,8 +46,9 @@ stop and fix the ticket's frontmatter before doing anything else.
   `gx tickets show <addr>`. Either way the
   spec resolves — the Spec axis always runs.
 - Derive reviewer scope from ticket statuses now: list the epic's tickets with their statuses and
-  count them (M tickets besides this one). Don't reuse a scope written into an older prompt or
-  ticket body.
+  count the code-changing ones: M is the epic's `implement` tickets plus their fix children. Verify,
+  investigate and merge tickets never change code, so they stay out of M. Don't reuse a scope
+  written into an older prompt or ticket body.
 - Collect the **known spec deviations** in one call:
   `gx tickets show <epic> --section "Spec deviations"`, optionally with `--tickets 31-46`. Pass the
   full list on, not a truncated view: no `| head`, and no loop whose output is cut ("N lines
@@ -135,18 +136,18 @@ Every subagent gets the shared review file's path from above.
 - The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour
   in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where
   the implementation looks wrong. Quote the spec line — or the ticket address and line — for each
-  finding. Under 400 words of findings, plus a last line `Covered: <addresses reviewed> of <M>`
-  that is not counted in the cap."
+  finding. Under 400 words of findings, plus a last line
+  `Covered: <addresses reviewed> of <M> code-changing tickets` that is not counted in the cap."
 - The test-gap rule: "Open verify tickets own test gaps. Report a missing test only when no open verify
   ticket covers that story."
 
-When the epic has more than about 12 tickets, split the Spec axis across several Spec subagents
-by ticket-address range (about 12 tickets each), each with the same brief for its own range. They go
+When M is more than about 12 code-changing tickets, split the Spec axis across several Spec
+subagents by ticket-address range (about 12 code-changing tickets each), each with the same brief for its own range. They go
 in the same message as the quality calls.
 
 **Coverage.** After the results return, check each `Covered:` line. When a range is only partly
 covered, re-dispatch a Spec subagent for the tickets left out before triage; it follows the same wave rule. Never let a partial
-review read as a full one: step 7 records `Spec reviewed N of M tickets`, with N counted from the
+review read as a full one: step 7 records `Spec reviewed N of M code-changing tickets`, with N counted from the
 `Covered:` lines.
 
 Collect every subagent's raw findings verbatim; don't summarize or filter them yourself here.
@@ -238,7 +239,7 @@ If the consultant deferred zero findings, skip this step.
 
 - Write the ticket body (append under the existing sections, don't replace them) with three parts:
   - **Raw findings**, per axis and reviewer skill, verbatim from step 3, with the coverage line
-    `Spec reviewed N of M tickets`.
+    `Spec reviewed N of M code-changing tickets`.
   - **Consultant triage**, verbatim from step 4.
   - **Final disposition** of each finding: the fix ticket it became; for a deferred finding, the
     follow-up it became, was appended to, or was dropped against; or why it was rejected.
