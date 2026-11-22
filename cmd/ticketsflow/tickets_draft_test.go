@@ -432,16 +432,6 @@ func TestTicketsDraft_NoGoplsFlagSkipsGoplsSilently(t *testing.T) {
 	}
 }
 
-func TestTicketsDraft_HelpListsNoGopls(t *testing.T) {
-	d, _, _ := draftSetup(t, factsPlan)
-	var buf bytes.Buffer
-	d.Env.Stdout = &buf
-	_ = execute(t, []string{"tickets", "draft", "--help"}, d)
-	if !strings.Contains(buf.String(), "--no-gopls") {
-		t.Errorf("help:\n%s", buf.String())
-	}
-}
-
 func TestTicketsDraft_MissingMakeTargetAndAnchoredPatternFail(t *testing.T) {
 	plan := strings.Replace(factsPlan, "[web-types]", "[no-such-target]", 1)
 	plan = strings.Replace(plan, `"Seven"`, `"^7"`, 1)

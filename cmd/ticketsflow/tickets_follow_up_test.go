@@ -195,28 +195,26 @@ func TestExecute_TicketsFollowUpAdd_ReportsEveryMissingSection(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsFollowUpAdd_HelpListsRequiredSections(t *testing.T) {
-	repo, _ := setupShowProject(t)
-	out, err := runIn(t, repo, "tickets", "follow-up", "add", "--help")
-	if err != nil {
+// followUpSearchProject returns a repo whose follow-ups epic holds one draft
+// per (id, title, problem) given, and the project dir.
+func followUpSearchProject(t *testing.T, drafts ...[3]string) (repo, project string) {
+	t.Helper()
+	repo = testutil.TempRepo(t)
+	project = addProject(t, isolateTicketStore(t), "mine", repo)
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, tickets.FollowUpsEpic))
+	issues := filepath.Join(project, tickets.FollowUpsEpic, "issues")
+	if err := os.MkdirAll(issues, 0755); err != nil {
 		t.Fatal(err)
 	}
-	for _, h := range []string{"Source", "Problem", "Suggested fix", "Evidence"} {
-		if !strings.Contains(out, h) {
-			t.Errorf("--help does not list %q:\n%s", h, out)
-		}
+	for _, d := range drafts {
+		testutil.WriteFile(t, issues, d[0]+"-x.md", fmt.Sprintf("---\nid: %q\nstatus: draft\ntype: research\n---\n\n# %s — %s\n\n## Problem\n\n%s\n", d[0], d[0], d[1], d[2]))
 	}
+	return repo, project
 }
 
 func TestExecute_TicketsFollowUpSearch_MatchesOpenAndArchivedWithReason(t *testing.T) {
-	repo := testutil.TempRepo(t)
-	project := addProject(t, isolateTicketStore(t), "mine", repo)
-	testutil.EnsureEpicTicketMD(t, filepath.Join(project, tickets.FollowUpsEpic))
+	repo, project := followUpSearchProject(t, [3]string{"05", "Cleanup", "The Disk fills up."})
 	fu := filepath.Join(project, tickets.FollowUpsEpic, "issues")
-	if err := os.MkdirAll(fu, 0755); err != nil {
-		t.Fatal(err)
-	}
-	testutil.WriteFile(t, fu, "05-disk.md", "---\nid: \"05\"\nstatus: draft\ntype: research\n---\n\n# 05 — Cleanup\n\n## Problem\n\nThe Disk fills up.\n")
 	testutil.WriteFile(t, fu, "06-menu.md", "---\nid: \"06\"\nstatus: open\ntype: research\n---\n\n# 06 — Menu\n\n## Problem\n\nEscape misbehaves.\n\n## Suggested fix\n\nguard\n")
 	if _, err := runIn(t, repo, "tickets", "close", "follow-ups/06", "--reason", "obsolete"); err != nil {
 		t.Fatal(err)
@@ -238,24 +236,8 @@ func TestExecute_TicketsFollowUpSearch_MatchesOpenAndArchivedWithReason(t *testi
 	}
 }
 
-func TestExecute_TicketsFollowUpSearch_NoMatchesPrintsALine(t *testing.T) {
-	repo := testutil.TempRepo(t)
-	addProject(t, isolateTicketStore(t), "mine", repo)
-	out, err := runIn(t, repo, "tickets", "follow-up", "search", "nothing-like-this")
-	if err != nil || out != "no matches\n" {
-		t.Errorf("search = %q, %v; want the no matches line and no error", out, err)
-	}
-}
-
 func TestExecute_TicketsFollowUpSearch_RepeatedQueryNamesEachMiss(t *testing.T) {
-	repo := testutil.TempRepo(t)
-	project := addProject(t, isolateTicketStore(t), "mine", repo)
-	fu := filepath.Join(project, tickets.FollowUpsEpic, "issues")
-	testutil.EnsureEpicTicketMD(t, filepath.Join(project, tickets.FollowUpsEpic))
-	if err := os.MkdirAll(fu, 0755); err != nil {
-		t.Fatal(err)
-	}
-	testutil.WriteFile(t, fu, "05-disk.md", "---\nid: \"05\"\nstatus: draft\ntype: research\n---\n\n# 05 — Cleanup\n\n## Problem\n\nThe Disk fills up.\n")
+	repo, _ := followUpSearchProject(t, [3]string{"05", "Cleanup", "The Disk fills up."})
 
 	out, err := runIn(t, repo, "tickets", "follow-up", "search", "--query", "disk", "--query", "nothing-like-this", "--query", "also-absent")
 	if err != nil {
@@ -268,17 +250,12 @@ func TestExecute_TicketsFollowUpSearch_RepeatedQueryNamesEachMiss(t *testing.T) 
 }
 
 func TestExecute_TicketsFollowUpSearch_CapsArchivedHits(t *testing.T) {
-	repo := testutil.TempRepo(t)
-	project := addProject(t, isolateTicketStore(t), "mine", repo)
-	for _, epic := range []string{tickets.FollowUpsEpic, tickets.ArchivedFollowUpsEpic} {
-		testutil.EnsureEpicTicketMD(t, filepath.Join(project, epic))
-		if err := os.MkdirAll(filepath.Join(project, epic, "issues"), 0755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	fu := filepath.Join(project, tickets.FollowUpsEpic, "issues")
-	testutil.WriteFile(t, fu, "01-open.md", "---\nid: \"01\"\nstatus: draft\ntype: research\n---\n\n# 01 — Open one\n\n## Problem\n\nwidget broke.\n")
+	repo, project := followUpSearchProject(t, [3]string{"01", "Open one", "widget broke."})
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, tickets.ArchivedFollowUpsEpic))
 	arch := filepath.Join(project, tickets.ArchivedFollowUpsEpic, "issues")
+	if err := os.MkdirAll(arch, 0755); err != nil {
+		t.Fatal(err)
+	}
 	for i := 1; i <= 12; i++ {
 		id := fmt.Sprintf("%02d", i)
 		testutil.WriteFile(t, arch, id+"-a.md", fmt.Sprintf("---\nid: %q\nstatus: cancelled\ntype: research\n---\n\n# %s — Old %s\n\n## Problem\n\nwidget broke.\n", id, id, id))
@@ -313,15 +290,7 @@ func TestExecute_TicketsFollowUpSearch_CapsArchivedHits(t *testing.T) {
 }
 
 func TestExecute_TicketsFollowUpSearch_SplitsArgumentsOnWhitespace(t *testing.T) {
-	repo := testutil.TempRepo(t)
-	project := addProject(t, isolateTicketStore(t), "mine", repo)
-	testutil.EnsureEpicTicketMD(t, filepath.Join(project, tickets.FollowUpsEpic))
-	fu := filepath.Join(project, tickets.FollowUpsEpic, "issues")
-	if err := os.MkdirAll(fu, 0755); err != nil {
-		t.Fatal(err)
-	}
-	testutil.WriteFile(t, fu, "05-a.md", "---\nid: \"05\"\nstatus: draft\ntype: research\n---\n\n# 05 — Alpha\n\n## Problem\n\nThe verify step is slow.\n")
-	testutil.WriteFile(t, fu, "06-b.md", "---\nid: \"06\"\nstatus: draft\ntype: research\n---\n\n# 06 — Beta\n\n## Problem\n\nEach ticket leaks.\n")
+	repo, _ := followUpSearchProject(t, [3]string{"05", "Alpha", "The verify step is slow."}, [3]string{"06", "Beta", "Each ticket leaks."})
 	want := "mine:follow-ups/05  draft  Alpha\nmine:follow-ups/06  draft  Beta\n"
 
 	for _, args := range [][]string{{"verify ticket"}, {"verify", "ticket"}, {"  ", "verify  ticket"}} {

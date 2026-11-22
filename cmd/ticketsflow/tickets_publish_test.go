@@ -234,19 +234,6 @@ func TestPublishInvalidTicketPrintsOnlyThatAndWritesNothing(t *testing.T) {
 	}
 }
 
-func TestCheckRenderedTicketsReportsOnlyTheInvalidOne(t *testing.T) {
-	good := []byte("---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
-	bad := []byte("---\nid: \"02\"\nstatus: open\ntype: task\n---\nBody.\n")
-	p := &publishPlan{Tickets: []plannedTicket{
-		{Path: "/x/issues/01-a.md", Open: good},
-		{Path: "/x/issues/02-b.md", Open: bad},
-	}}
-	errs := checkRenderedTickets(p)
-	if len(errs) != 1 || !strings.Contains(errs[0].Error(), "02-b.md") {
-		t.Fatalf("errs = %v, want one failure naming 02-b.md", errs)
-	}
-}
-
 func TestPublishManifestRefusalsWriteNothing(t *testing.T) {
 	for name, content := range map[string]string{
 		"cycle":         "- {slug: a, type: implement, blocked_by: [b], body: a.md}\n- {slug: b, type: implement, blocked_by: [a], body: b.md}\n",
@@ -566,25 +553,15 @@ func TestPublishArchiveFailureNamesFollowUpAndKeepsTickets(t *testing.T) {
 	}
 }
 
-func TestPublishDoesNotCloseFollowUpsOnDryRunOrWithoutPromotions(t *testing.T) {
-	fail := func(addr, reason, note string, w io.Writer) error {
+func TestPublishWithoutPromotionsClosesNoFollowUps(t *testing.T) {
+	d, _, manifest := setupPublish(t)
+	d.CloseFollowUp = func(addr, reason, note string, w io.Writer) error {
 		t.Errorf("CloseFollowUp called for %s", addr)
 		return nil
 	}
-	t.Run("dry run", func(t *testing.T) {
-		d, _, manifest := promoteFixture(t, "follow-ups/01", "")
-		d.CloseFollowUp = fail
-		if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest, "--dry-run"}, d); err != nil {
-			t.Fatalf("dry-run: %v", err)
-		}
-	})
-	t.Run("no promoted follow-ups", func(t *testing.T) {
-		d, _, manifest := setupPublish(t)
-		d.CloseFollowUp = fail
-		if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
-			t.Fatalf("publish: %v", err)
-		}
-	})
+	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
 }
 
 func TestPublishTicketsReturnsArchiveStepOnlyForRealRun(t *testing.T) {

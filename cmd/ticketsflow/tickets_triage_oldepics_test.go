@@ -100,8 +100,7 @@ func TestTriageOldEpics_ShowsMoveArchiveAndWaiting(t *testing.T) {
 }
 
 func TestTriageOldEpics_EmptyListIsAnEmptyArray(t *testing.T) {
-	repo := triageProject(t)
-	out, err := runIn(t, repo, "tickets", "triage", "oldepics", "--json")
+	out, err := runIn(t, triageProject(t), "tickets", "triage", "oldepics", "--json")
 	if err != nil || strings.TrimSpace(out) != "[]" {
 		t.Fatalf("out %q err %v", out, err)
 	}
@@ -144,8 +143,5 @@ func TestTriageOldEpics_ReadsBacklogFromTheTable(t *testing.T) {
 	got, err := listOldEpics(project, "gx", map[string]map[string]string{"gx": {"chat-cards": "web-ui"}})
 	if err != nil || len(got) != 1 || got[0].Backlog != "web-ui" {
 		t.Fatalf("got %+v err %v", got, err)
-	}
-	if _, err := os.Stat(project); err != nil {
-		t.Fatal(err)
 	}
 }

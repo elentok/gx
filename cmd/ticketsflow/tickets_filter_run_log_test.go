@@ -19,6 +19,18 @@ func writeRunLog(t *testing.T, epicDir string, lines []string) {
 	}
 }
 
+// filterRunLog runs runTicketsFilterRunLog over a run log holding lines.
+func filterRunLog(t *testing.T, lines []string, ticket string, events []string, scans bool) string {
+	t.Helper()
+	epicDir := filepath.Join(testutil.TempRepo(t), ".scratch", "widget-epic")
+	writeRunLog(t, epicDir, lines)
+	var buf bytes.Buffer
+	if err := runTicketsFilterRunLog(epicDir, ticket, events, scans, &buf); err != nil {
+		t.Fatalf("runTicketsFilterRunLog: %v", err)
+	}
+	return buf.String()
+}
+
 func TestIsSchedulerScan(t *testing.T) {
 	t.Parallel()
 	if !isSchedulerScan("scheduler-scan") {
@@ -31,20 +43,12 @@ func TestIsSchedulerScan(t *testing.T) {
 
 func TestRunTicketsFilterRunLog_FiltersByTicket(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempRepo(t)
-	epicDir := filepath.Join(repoDir, ".scratch", "widget-epic")
-	writeRunLog(t, epicDir, []string{
+	out := filterRunLog(t, []string{
 		`{"time":"2026-01-01T00:00:00Z","type":"iteration-started","ticket":"01"}`,
 		`{"time":"2026-01-01T00:01:00Z","type":"iteration-finished","ticket":"02"}`,
 		`{"time":"2026-01-01T00:02:00Z","type":"iteration-started","ticket":"01"}`,
-	})
+	}, "01", nil, false)
 
-	var buf bytes.Buffer
-	if err := runTicketsFilterRunLog(epicDir, "01", nil, false, &buf); err != nil {
-		t.Fatalf("runTicketsFilterRunLog: %v", err)
-	}
-
-	out := buf.String()
 	if strings.Count(out, `"ticket": "01"`) != 2 {
 		t.Errorf("output = %s, want exactly 2 events for ticket 01", out)
 	}
@@ -60,20 +64,12 @@ func TestRunTicketsFilterRunLog_FiltersByTicket(t *testing.T) {
 
 func TestRunTicketsFilterRunLog_FiltersByEvent(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempRepo(t)
-	epicDir := filepath.Join(repoDir, ".scratch", "widget-epic")
-	writeRunLog(t, epicDir, []string{
+	out := filterRunLog(t, []string{
 		`{"time":"2026-01-01T00:00:00Z","type":"iteration-started","ticket":"01"}`,
 		`{"time":"2026-01-01T00:01:00Z","type":"paused","ticket":"01"}`,
 		`{"time":"2026-01-01T00:02:00Z","type":"scheduler-scan","ticket":""}`,
-	})
+	}, "", []string{"paused", "scheduler-scan"}, false)
 
-	var buf bytes.Buffer
-	if err := runTicketsFilterRunLog(epicDir, "", []string{"paused", "scheduler-scan"}, false, &buf); err != nil {
-		t.Fatalf("runTicketsFilterRunLog: %v", err)
-	}
-
-	out := buf.String()
 	if strings.Contains(out, "iteration-started") {
 		t.Errorf("output = %s, should not contain iteration-started", out)
 	}
@@ -84,46 +80,26 @@ func TestRunTicketsFilterRunLog_FiltersByEvent(t *testing.T) {
 
 func TestRunTicketsFilterRunLog_HidesSchedulerScansUnlessAsked(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempRepo(t)
-	epicDir := filepath.Join(repoDir, ".scratch", "widget-epic")
-	writeRunLog(t, epicDir, []string{
+	lines := []string{
 		`{"time":"2026-01-01T00:01:00Z","type":"paused","ticket":"01"}`,
 		`{"time":"2026-01-01T00:02:00Z","type":"scheduler-scan","ticket":""}`,
-	})
-
-	var hidden bytes.Buffer
-	if err := runTicketsFilterRunLog(epicDir, "", nil, false, &hidden); err != nil {
-		t.Fatalf("runTicketsFilterRunLog: %v", err)
 	}
-	if !strings.Contains(hidden.String(), "paused") || strings.Contains(hidden.String(), "scheduler-scan") {
-		t.Errorf("default output = %s, want paused only", hidden.String())
+	if hidden := filterRunLog(t, lines, "", nil, false); !strings.Contains(hidden, "paused") || strings.Contains(hidden, "scheduler-scan") {
+		t.Errorf("default output = %s, want paused only", hidden)
 	}
-
-	var shown bytes.Buffer
-	if err := runTicketsFilterRunLog(epicDir, "", nil, true, &shown); err != nil {
-		t.Fatalf("runTicketsFilterRunLog: %v", err)
-	}
-	if !strings.Contains(shown.String(), "paused") || !strings.Contains(shown.String(), "scheduler-scan") {
-		t.Errorf("--scans output = %s, want both events", shown.String())
+	if shown := filterRunLog(t, lines, "", nil, true); !strings.Contains(shown, "paused") || !strings.Contains(shown, "scheduler-scan") {
+		t.Errorf("--scans output = %s, want both events", shown)
 	}
 }
 
 func TestRunTicketsFilterRunLog_CombinesTicketAndEventFilters(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempRepo(t)
-	epicDir := filepath.Join(repoDir, ".scratch", "widget-epic")
-	writeRunLog(t, epicDir, []string{
+	out := filterRunLog(t, []string{
 		`{"time":"2026-01-01T00:00:00Z","type":"iteration-started","ticket":"01"}`,
 		`{"time":"2026-01-01T00:01:00Z","type":"paused","ticket":"01"}`,
 		`{"time":"2026-01-01T00:02:00Z","type":"paused","ticket":"02"}`,
-	})
+	}, "01", []string{"paused"}, false)
 
-	var buf bytes.Buffer
-	if err := runTicketsFilterRunLog(epicDir, "01", []string{"paused"}, false, &buf); err != nil {
-		t.Fatalf("runTicketsFilterRunLog: %v", err)
-	}
-
-	out := buf.String()
 	if strings.Count(out, `"type": "paused"`) != 1 || !strings.Contains(out, `"ticket": "01"`) {
 		t.Errorf("output = %s, want exactly one paused event for ticket 01", out)
 	}
@@ -131,8 +107,7 @@ func TestRunTicketsFilterRunLog_CombinesTicketAndEventFilters(t *testing.T) {
 
 func TestRunTicketsFilterRunLog_NoRunLogYet(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempRepo(t)
-	epicDir := filepath.Join(repoDir, ".scratch", "widget-epic")
+	epicDir := filepath.Join(testutil.TempRepo(t), ".scratch", "widget-epic")
 	testutil.Mkdir(t, epicDir)
 
 	var buf bytes.Buffer
@@ -147,12 +122,9 @@ func TestRunTicketsFilterRunLog_NoRunLogYet(t *testing.T) {
 
 func TestRunTicketsFilterRunLog_MissingEpicErrors(t *testing.T) {
 	t.Parallel()
-	repoDir := testutil.TempRepo(t)
-	epicDir := filepath.Join(repoDir, ".scratch", "no-such-epic")
+	epicDir := filepath.Join(testutil.TempRepo(t), ".scratch", "no-such-epic")
 
-	var buf bytes.Buffer
-	err := runTicketsFilterRunLog(epicDir, "", nil, false, &buf)
-	if err == nil {
+	if err := runTicketsFilterRunLog(epicDir, "", nil, false, &bytes.Buffer{}); err == nil {
 		t.Fatal("runTicketsFilterRunLog: want error for missing epic, got nil")
 	}
 }
