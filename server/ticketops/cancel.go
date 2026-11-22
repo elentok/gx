@@ -117,12 +117,19 @@ func (o *Ops) dropDeadWaitingRun(addr string) {
 func (o *Ops) CancelInvestigateChild(ref queue.TicketRef, source string) error {
 	forks := ref.Epic.ForkParents()
 	for _, t := range ref.Epic.Tickets {
-		// A person answering or retrying an investigate ticket must not cancel it.
-		if t.Type != string(schema.TypeInvestigate) || isTerminal(t.Status) || t.Identifier == ref.Ticket.Identifier {
+		if t.Type != string(schema.TypeInvestigate) || isTerminal(t.Status) {
 			continue
 		}
-		parent, ok := forks.Of(t)
-		if ok && parent.Identifier != ref.Ticket.Identifier || !ok && t.Parent != nil {
+		// Skip self: a person answering or retrying an investigate ticket runs
+		// this verb on that ticket, and cancelling it would kill the run the
+		// verb is about to resume or relaunch (and drop its kept worktree).
+		if t.Identifier == ref.Ticket.Identifier {
+			continue
+		}
+		parent, isFork := forks.Of(t)
+		ownedByOther := isFork && parent.Identifier != ref.Ticket.Identifier
+		nonForkChild := !isFork && t.Parent != nil
+		if ownedByOther || nonForkChild {
 			continue
 		}
 		addr := tickets.Address{Project: ref.Addr.Project, Epic: ref.Addr.Epic, ID: t.Identifier}
