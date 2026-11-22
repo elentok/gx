@@ -26,6 +26,7 @@ type PlanStory struct {
 	GoTests     int      `yaml:"go_tests"`
 	SkillQuotes int      `yaml:"skill_quotes"`
 	MockStates  []string `yaml:"mock_states"`
+	NeedsHuman  bool     `yaml:"needs_human"` // a person must check it; planned like any story
 }
 
 // VerifyEntry is one planned verify ticket, before its body is written.

@@ -136,6 +136,17 @@ func TestVerifyPlan_ParseRejectsBadPlans(t *testing.T) {
 	}
 }
 
+func TestVerifyPlan_ParseAcceptsNeedsHuman(t *testing.T) {
+	t.Parallel()
+	plan, err := ParseVerifyPlan([]byte("stories:\n  - story: 1\n    needs_human: true\n"))
+	if err != nil {
+		t.Fatalf("needs_human plan: %v", err)
+	}
+	if len(plan.Stories) != 1 || plan.Stories[0].Story != 1 {
+		t.Errorf("stories = %+v", plan.Stories)
+	}
+}
+
 const groupedSpec = "## User Stories\n\n1. One\n2. Two\n3. Three\n4. Four\n\n## Verification\n\nAlpha (stories 1 to 3)\n\n- check a\n- check b\n\nBeta (stories 4 to 4)\n\n- check c\n"
 
 func buildBody(t *testing.T, spec string, nums ...int) (string, error) {
