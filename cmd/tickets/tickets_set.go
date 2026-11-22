@@ -408,6 +408,7 @@ func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io
 	if ticketref.IsEpicTicketMD(path) {
 		return RunEpicSet(dirs, c, path, w, getwd, dial)
 	}
+	var waivedNote string
 	if c.Flags().Changed("exported-at") {
 		return fmt.Errorf("%s: exported_at is gx-managed and not settable via `tickets set`", path)
 	}
@@ -432,7 +433,7 @@ func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io
 		if err := checkIterationStatusFinishedGuard(c, path); err != nil {
 			return err
 		}
-		if err := checkFinishedGuard(dirs, c, path, getwd); err != nil {
+		if err := checkFinishedGuard(dirs, c, path, getwd, &waivedNote); err != nil {
 			return err
 		}
 	}
@@ -518,6 +519,9 @@ func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io
 		}{ticketref.TicketLabel(path), path, changed}, cmdbase.ViaDirect, cmdbase.CallerActor(getwd))
 	}
 	fmt.Fprintf(w, "%s: updated (%s)\n", ticketref.TicketLabel(path), strings.Join(changed, ", "))
+	if waivedNote != "" {
+		fmt.Fprintln(w, waivedNote)
+	}
 	return nil
 }
 

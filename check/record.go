@@ -37,6 +37,8 @@ type KindRecord struct {
 	// Failed names the failing tests of the brief runs this kind started. A
 	// configured command that never calls `gx brief` has none.
 	Failed []string `json:"failed,omitempty"`
+	// Log is the kind's check log, which lists every failure.
+	Log string `json:"log,omitempty"`
 	// Slow names the tests that passed but ran over the slow limit. They are
 	// also in Failed, so the finish guard sees them; a failing-test count
 	// subtracts Slow from Failed.
@@ -164,7 +166,7 @@ func (r *runner) newRecord(opts Options, started time.Time, res Result, lock *Fu
 	}
 	for _, k := range res.Kinds {
 		rec.Kinds = append(rec.Kinds, KindRecord{
-			Kind: k.Kind, Status: k.Status, DurationMS: k.Duration.Milliseconds(), Failed: append(failed[k.Kind], k.SlowTests...), Slow: k.SlowTests, Warnings: k.Warnings,
+			Kind: k.Kind, Status: k.Status, DurationMS: k.Duration.Milliseconds(), Failed: append(failed[k.Kind], k.SlowTests...), Log: k.Log, Slow: k.SlowTests, Warnings: k.Warnings,
 		})
 	}
 	return rec

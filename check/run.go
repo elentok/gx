@@ -82,6 +82,9 @@ type KindResult struct {
 	// Failures name the failing tests of a failing gx default as brief renders
 	// them (`package.TestName`).
 	Failures []string
+	// Causes are the first error lines of the failures; Render prints the
+	// most common one when many tests fail.
+	Causes []string
 	// SlowTests name the tests that passed the kind's slow limit.
 	SlowTests []string
 	// Notes are lines printed under the kind: a skipped row of a gx default,

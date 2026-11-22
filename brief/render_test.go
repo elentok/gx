@@ -105,9 +105,18 @@ func TestRenderUnits_CutNoticesNameTheLogPath(t *testing.T) {
 		t.Errorf("line cut notice lacks the log path:\n%s", w.String())
 	}
 	w.Reset()
-	rawHead(&w, []byte("error: "+strings.Repeat("y", maxLineChars+5)), "/logs/b.log")
-	if want := "[12 more chars cut, search the log: /logs/b.log]"; !strings.Contains(w.String(), want) {
+	rawHead(&w, []byte("error: first\n"+strings.Repeat("y", maxLineChars+5)), "/logs/b.log")
+	if want := "[5 more chars cut, search the log: /logs/b.log]"; !strings.Contains(w.String(), want) {
 		t.Errorf("char cut notice lacks the log path:\n%s", w.String())
+	}
+}
+
+func TestRenderUnits_FirstLineIsNeverCut(t *testing.T) {
+	long := "a_test.go:1: " + strings.Repeat("g", maxLineChars+50)
+	var w bytes.Buffer
+	renderUnitsWith(&w, []Unit{{Location: "pkg", Name: "TestA", Text: long}}, maxFullUnits, "/logs/a.log", nil)
+	if !strings.Contains(w.String(), long) || strings.Contains(w.String(), "cut") {
+		t.Errorf("long first line was cut:\n%s", w.String())
 	}
 }
 

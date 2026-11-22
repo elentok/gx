@@ -3,6 +3,7 @@ package tickets
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -335,13 +336,38 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 		t.Run("lint red on the base is waived", func(t *testing.T) {
 			f, now := setup(t, lint)
 			now(lint)
-			var stderr bytes.Buffer
-			d := testDeps(t, &bytes.Buffer{}, &stderr, func() (string, error) { return f.wt, nil })
+			var stdout bytes.Buffer
+			d := testDeps(t, &stdout, &bytes.Buffer{}, func() (string, error) { return f.wt, nil })
 			if err := execute(t, []string{"tickets", "set", f.ticket, "--iteration-status=finished"}, d); err != nil {
 				t.Fatalf("finish: %v", err)
 			}
-			if !strings.Contains(stderr.String(), "pre-existing failure (red on the base, waived): lint") {
-				t.Errorf("stderr = %q", stderr.String())
+			if !strings.Contains(stdout.String(), "1 pre-existing failure(s) red on the base, waived") {
+				t.Errorf("stdout = %q", stdout.String())
+			}
+		})
+
+		t.Run("many waived failures print the result first and one waived line with the log", func(t *testing.T) {
+			var names []string
+			for i := range 72 {
+				names = append(names, fmt.Sprintf("pkg.TestN%d", i))
+			}
+			base := check.KindRecord{Kind: "test", Status: check.StatusFail, Failed: names}
+			f, now := setup(t, base)
+			now(check.KindRecord{Kind: "test", Status: check.StatusFail, Failed: names, Log: "/logs/check-test.log"})
+			var stdout, stderr bytes.Buffer
+			d := testDeps(t, &stdout, &stderr, func() (string, error) { return f.wt, nil })
+			if err := execute(t, []string{"tickets", "set", f.ticket, "--iteration-status=finished"}, d); err != nil {
+				t.Fatalf("finish: %v", err)
+			}
+			lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+			if len(lines) != 2 || !strings.Contains(lines[0], ": updated (") {
+				t.Fatalf("stdout = %q, want the updated line first, then one waived line", stdout.String())
+			}
+			if want := "72 pre-existing failure(s) red on the base, waived; the check log lists them: /logs/check-test.log"; lines[1] != want {
+				t.Errorf("waived line = %q, want %q", lines[1], want)
+			}
+			if strings.Contains(stderr.String(), "pre-existing") {
+				t.Errorf("stderr lists waived failures: %q", stderr.String())
 			}
 		})
 

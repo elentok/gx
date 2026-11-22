@@ -7,6 +7,26 @@ import (
 	"github.com/elentok/gx/brief"
 )
 
+// fewFailures is how many failures a kind lists without naming a dominant error.
+const fewFailures = 3
+
+// dominantCause returns the most common non-empty line and how often it occurs;
+// the earliest wins a tie.
+func dominantCause(causes []string) (string, int) {
+	counts := map[string]int{}
+	best, bestN := "", 0
+	for _, c := range causes {
+		if c == "" {
+			continue
+		}
+		counts[c]++
+		if counts[c] > bestN {
+			best, bestN = c, counts[c]
+		}
+	}
+	return best, bestN
+}
+
 // Render is the text `gx check` prints and writes to the summary file: the
 // summary path, one line per kind, the log and tail of each failing kind, then
 // the overall result.
@@ -33,6 +53,9 @@ func (r Result) Render() string {
 		}
 		failed++
 		fmt.Fprintf(&b, "\n%s log: %s\n", k.Kind, k.Log)
+		if line, n := dominantCause(k.Causes); len(k.Failures) > fewFailures && n > 1 {
+			fmt.Fprintf(&b, "  most common error (%d of %d failures): %s\n", n, len(k.Failures), line)
+		}
 		for _, name := range k.Failures {
 			fmt.Fprintf(&b, "  %s\n", name)
 		}

@@ -41,6 +41,7 @@ type stepResult struct {
 	skipped  string // why the step did not run
 	failed   bool
 	failures []string
+	causes   []string // first error line of each failure, as brief.FirstErrorLine
 }
 
 // groups sorts the selected files into the languages the defaults know.
@@ -350,6 +351,7 @@ func (r *runner) runDefault(kind string, log io.Writer, res *KindResult) {
 		case sr.failed:
 			res.Status = StatusFail
 			res.Failures = append(res.Failures, sr.failures...)
+			res.Causes = append(res.Causes, sr.causes...)
 		}
 		ran++
 	}
@@ -405,6 +407,7 @@ func (r *runner) runStep(kind string, s step, log io.Writer) stepResult {
 	sr := stepResult{failed: exit != brief.ExitPass}
 	for _, u := range outcome.Failures {
 		sr.failures = append(sr.failures, u.String())
+		sr.causes = append(sr.causes, brief.FirstErrorLine(u.Text))
 	}
 	return sr
 }

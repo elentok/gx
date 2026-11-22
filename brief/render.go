@@ -270,6 +270,19 @@ func TrimTail(lines []string) []string {
 	return lines
 }
 
+// FirstErrorLine is the line of a failure's text that says what failed: the
+// assertion line, else the first non-blank line after log noise. Empty when
+// there is none.
+func FirstErrorLine(text string) string {
+	lines, _ := focus(strings.Split(text, "\n"))
+	for _, l := range lines {
+		if l = strings.TrimSpace(l); l != "" {
+			return l
+		}
+	}
+	return ""
+}
+
 // limitText drops log noise, then returns the assertion line and at most
 // maxContextLines after it. Text without an assertion line gets its first
 // maxUnitLines. Each line is cut at maxLineChars, with a notice line wherever
@@ -289,7 +302,9 @@ func limitText(text, log string) []string {
 			out = append(out, cutNotice(len(lines)-limit, "lines", log))
 			break
 		}
-		if r := []rune(l); len(r) > maxLineChars {
+		// The first line is the assertion or error, the message the reader
+		// needs (a guard's whole finding); only the lines after it are cut.
+		if r := []rune(l); i > 0 && len(r) > maxLineChars {
 			l = string(r[:maxLineChars]) + cutNotice(len(r)-maxLineChars, "chars", log)
 		}
 		out = append(out, l)

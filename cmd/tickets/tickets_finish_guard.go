@@ -24,7 +24,10 @@ import (
 // worktree's current tree. The refusal is a plain error: it writes nothing and
 // never pauses (ADR 0042). A ticket with no iteration branch or worktree, or a
 // branch with no commits, skips the guard.
-func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd func() (string, error)) error {
+//
+// Waived pre-existing failures are not printed here: the one-line note goes to
+// *waivedNote so the caller prints it after the result line.
+func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd func() (string, error), waivedNote *string) error {
 	if v, _ := c.Flags().GetString("iteration-status"); schema.IterationStatus(v) != schema.IterationStatusFinished {
 		return nil
 	}
@@ -119,12 +122,16 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 	failedNow := append(failedTests(*failing), namelessFailedKinds(*failing)...)
 	preexisting := baselineFailures(recs0, base)
 	var fresh []string
+	waived := 0
 	for _, n := range failedNow {
 		if slices.Contains(preexisting, n) {
-			fmt.Fprintf(c.ErrOrStderr(), "pre-existing failure (red on the base, waived): %s\n", n)
+			waived++
 		} else {
 			fresh = append(fresh, n)
 		}
+	}
+	if waived > 0 {
+		*waivedNote = fmt.Sprintf("%d pre-existing failure(s) red on the base, waived; the check log lists them: %s", waived, failingLog(*failing))
 	}
 	if len(failedNow) > 0 && len(fresh) == 0 {
 		return nil
@@ -168,6 +175,16 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 		return fmt.Errorf("%s: the given follow-ups do not name these failing tests in their title or Problem section: %s%s", label, strings.Join(uncovered, ", "), knownFlakeHint(epicDir, uncovered))
 	}
 	return nil
+}
+
+// failingLog is the log of the first failing kind of a run that recorded one.
+func failingLog(r check.Record) string {
+	for _, k := range r.Kinds {
+		if k.Status == check.StatusFail && k.Log != "" {
+			return k.Log
+		}
+	}
+	return "(no log recorded)"
 }
 
 var followUpAddrRe = regexp.MustCompile(`[^\s:/]+:[^\s:/]+/\d+[[:alpha:]]?\d*`)
