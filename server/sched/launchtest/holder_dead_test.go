@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/servertest/rigs"
@@ -20,7 +21,7 @@ import (
 const verifiedEntry = "## Verified\n\n- story-1 passed at abc123\n"
 
 // startHeldTicket launches proj:epic-a/01 on a pty fake and returns once it is up.
-func startHeldTicket(t *testing.T) (pty rigs.NamedFake, ticketPath string) {
+func startHeldTicket(t *testing.T) (pty rigs.NamedFake, ticketPath string, h *servertest.Harness) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "held", "")
@@ -37,7 +38,7 @@ func startHeldTicket(t *testing.T) (pty rigs.NamedFake, ticketPath string) {
 	}
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	pty = rigs.NewNamedFake(runnerfake.NewRunner(), "pty")
-	h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(pty, func(string, string) agentrunner.Runner { return pty }),
+	h = servertest.StartWithStore(t, store, servertest.WithRunnerFor(pty, func(string, string) agentrunner.Runner { return pty }),
 		func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -45,17 +46,23 @@ func startHeldTicket(t *testing.T) (pty rigs.NamedFake, ticketPath string) {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 10*time.Second, "the ticket to launch", func() bool { return len(pty.Prompts(readoptLabel)) > 0 })
-	return pty, ticketPath
+	return pty, ticketPath, h
 }
 
 // A dead holder relaunches once, resuming the session, and the ticket body (the
 // earlier session's verdicts) is left as it was.
 func TestHolderDead_RelaunchesOnceResumingTheSession(t *testing.T) {
 	t.Parallel()
-	pty, path := startHeldTicket(t)
+	pty, path, h := startHeldTicket(t)
+	// A dead holder cannot be stopped, so its label stays taken at the relaunch.
+	pty.SetStopErrOnce(readoptLabel, errors.New("holder gone"))
 	pty.SetCallErr(readoptLabel, agentrunner.HolderDied("holder failed: dial"))
-	servertest.WaitFor(t, 20*time.Second, "the relaunch", func() bool { return len(pty.ResumeIDs(readoptLabel)) == 2 })
-	if ids := pty.ResumeIDs(readoptLabel); ids[1] == "" {
+	servertest.WaitFor(t, 20*time.Second, "the relaunch", func() bool { return len(pty.ResumeIDs(readoptLabel)) == 3 })
+	if closed := servertest.OfType(servertest.RunLog(t, h), events.StalePaneClosed); len(closed) != 1 {
+		t.Errorf("stale-pane-closed events = %+v, want one for the dead holder", closed)
+	}
+	// Starts: the first launch, the relaunch that hit the taken label, the retry after the close.
+	if ids := pty.ResumeIDs(readoptLabel); ids[2] == "" {
 		t.Errorf("resume ids = %q, want the relaunch to resume the first session", ids)
 	}
 	body, _ := os.ReadFile(path)
@@ -70,7 +77,7 @@ func TestHolderDead_RelaunchesOnceResumingTheSession(t *testing.T) {
 // A relaunch that fails pauses iteration-error with the holder-dead cause.
 func TestHolderDead_FailedRelaunchPausesNamingHolderDead(t *testing.T) {
 	t.Parallel()
-	pty, path := startHeldTicket(t)
+	pty, path, _ := startHeldTicket(t)
 	pty.SetStartErr(readoptLabel, errors.New("no pane"))
 	pty.SetCallErr(readoptLabel, agentrunner.HolderDied("holder failed: dial"))
 	servertest.WaitFor(t, 20*time.Second, "the ticket to pause", func() bool {

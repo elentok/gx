@@ -26,6 +26,7 @@ type session struct {
 	interruptDelay  time.Duration
 	interruptStarts []time.Time
 	stopErr         error
+	stopErrOnce     bool
 	limited         bool
 	resetAt         time.Time
 	limitErr        error
@@ -289,7 +290,11 @@ func (r *Runner) Stop(s agentrunner.Session) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if ss, err := r.live(s); err == nil && ss.stopErr != nil {
-		return ss.stopErr
+		failed := ss.stopErr
+		if ss.stopErrOnce {
+			ss.stopErr, ss.stopErrOnce = nil, false
+		}
+		return failed
 	}
 	r.sessions = slices.DeleteFunc(r.sessions, func(ss *session) bool { return ss.ID == s.ID })
 	r.notify()
@@ -505,6 +510,15 @@ func (r *Runner) SetStopErr(label string, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.byLabel(label).stopErr = err
+}
+
+// SetStopErrOnce makes the next Stop of the live session label fail with err
+// and leave it running, as a dead holder's does; later Stops succeed.
+func (r *Runner) SetStopErrOnce(label string, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	s := r.byLabel(label)
+	s.stopErr, s.stopErrOnce = err, true
 }
 
 // SetRateLimit marks label as rate limited until resetAt; a zero time clears

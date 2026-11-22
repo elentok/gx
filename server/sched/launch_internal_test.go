@@ -1,15 +1,18 @@
 package sched
 
 import (
+	"errors"
 	"slices"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -93,5 +96,41 @@ func TestClaimAndReserve_SerialisesCallers(t *testing.T) {
 	case <-second:
 	case <-time.After(5 * time.Second):
 		t.Fatal("the second claim never ran after the first finished")
+	}
+}
+
+func TestLabelHolder_StaleWhenDeadAndUntrackedOnly(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		callErr error
+		tracked bool
+		want    bool
+	}{
+		{"dead holder", agentrunner.HolderDied("dial"), false, true},
+		{"dead holder tracked by another run", agentrunner.HolderDied("dial"), true, false},
+		{"other status error", errors.New("status flaked"), false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fake := runnerfake.NewRunner()
+			sess, err := fake.Start(agentrunner.StartOptions{Label: "lbl"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			fake.SetCallErr("lbl", tc.callErr)
+			reg, _, err := runs.Open(t.TempDir(), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.tracked {
+				reg.PutRun("root", runs.Run{Address: "proj:epic-a/02", Session: sess})
+			}
+			l := NewLauncher(LauncherDeps{Registry: reg})
+			addr := tickets.Address{Project: "proj", Epic: "epic-a", ID: "01"}
+			if got := l.labelHolder(fake, addr, "lbl", agentrunner.ErrLabelTaken).stale; got != tc.want {
+				t.Errorf("stale = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

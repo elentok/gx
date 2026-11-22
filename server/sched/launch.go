@@ -360,12 +360,15 @@ func (l *Launcher) labelHolder(r agentrunner.Runner, ticket tickets.Address, lab
 		return h
 	}
 	h.Session, h.found = sess, true
-	if h.Status, err = r.Status(sess); err != nil {
+	// A holder whose status call fails as dead cannot be mid-turn; any other
+	// status error leaves it unjudged and open.
+	h.Status, err = r.Status(sess)
+	if err != nil && !errors.Is(err, agentrunner.ErrHolderDead) {
 		return h
 	}
 	tracked := slices.ContainsFunc(l.Registry.List(), func(t runs.TrackedRun) bool {
 		return t.Address != ticket.String() && (t.Session.Label == sess.Label || (sess.ID != "" && t.Session.ID == sess.ID))
 	})
-	h.stale = !tracked && h.Waiting()
+	h.stale = !tracked && (err != nil || h.Waiting())
 	return h
 }
