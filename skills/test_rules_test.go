@@ -186,6 +186,15 @@ func TestGxUICheckBlocksWorkersByDefault(t *testing.T) {
 		"until [ -s fx.json ]", "$GXF_WEB_COOKIE", "Resolve it before you source the fixture env")
 }
 
+func TestSingleFlowRunRoute(t *testing.T) {
+	for _, path := range []string{"gx-ui-check/SKILL.md", "../webui/e2e/CATALOG.md"} {
+		checkAnchors(t, path, "gx brief -C webui playwright <file> <flow numbers>", "pnpm run e2e -- <filter>", "unreliable")
+		if strings.Contains(normalizeSpace(readFile(t, path)), "Playwright's `-g <flow>`") {
+			t.Errorf("%s still tells people to pass -g to make web-e2e", path)
+		}
+	}
+}
+
 func TestGxImplementTestRules(t *testing.T) {
 	checkAnchors(t, "gx-implement/SKILL.md",
 		"(../gx-test-guidelines/SKILL.md)",

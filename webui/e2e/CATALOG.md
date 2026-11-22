@@ -1,6 +1,8 @@
 # Web e2e flow catalog
 
-Run with `make web-e2e`. Each flow starts its own fixture server (`testutil/gxfixture`), opens the
+Run the suite with `make web-e2e`. Run single flows with
+`gx brief -C webui playwright <file> <flow numbers>` (or `make web-e2e ARGS='<file> <flow numbers>'`).
+`pnpm run e2e -- <filter>` is unreliable: the filter can be dropped and every flow runs. Each flow starts its own fixture server (`testutil/gxfixture`), opens the
 `web_url` once, already signed in: the fixture finishes the web setup and `fixture.ts` adds the
 `cookie_name` cookie to the browser. The `web-setup`, `web-login` and `web-logins` scenarios start
 signed out or with extra web logins. `nextTotpCode()` returns a code for a new TOTP step, and

@@ -204,8 +204,10 @@ Read this before you guess; each wrong guess costs a rebuild.
 
 ## Porting e2e flows
 
-- Run one flow at a time with `make web-e2e` and Playwright's `-g <flow>`. A whole-file run makes
-  every wrong locator wait the full 60s timeout.
+- Run one flow at a time with `gx brief -C webui playwright <file> <flow numbers>`, or
+  `make web-e2e ARGS='<file> <flow numbers>'`. A whole-file run makes every wrong locator wait the
+  full 60s timeout. `pnpm run e2e -- <filter>` is unreliable (the filter can be dropped and every
+  flow runs), so do not use it.
 - When you write an explore ticket for UI or e2e work, run the suite and check each locator and
   card placement against the running UI. Reading the code is not enough. Record which flows fail
   now.

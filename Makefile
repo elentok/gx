@@ -36,7 +36,7 @@ web-test:
 # Browser flows against fixture servers (webui/e2e/CATALOG.md); the gx binary embeds the built UI.
 web-e2e: web-build
 	cd webui && pnpm exec playwright install chromium
-	$(GX) brief -C webui playwright --all
+	$(GX) brief -C webui playwright $(if $(ARGS),$(ARGS),--all)
 
 # Regenerates webui/src/generated/server.ts and ops.ts from the server's wire types.
 web-types:
