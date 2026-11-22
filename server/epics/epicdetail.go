@@ -82,10 +82,9 @@ func (s *Epics) decorateLive(d *wire.EpicDetail, root queue.RootRef, e tickets.E
 		}
 		step := queue.MapProgress(e)
 		act := s.designActivities()[d.Address]
-		act.creating = d.ImplAddress != "" && step == wire.ProgressCreateTickets
-		d.DesignSection = designSection(d.Address, e, step, act)
-		d.Working = step != wire.ProgressDone &&
-			placeDesign(d.Address, act, mapNotStarted(e, step), time.Time{}, step).working
+		hasImpl := d.ImplAddress != ""
+		d.DesignSection = designSection(d.Address, e, step, hasImpl, act)
+		d.Working = designPlacementFor(d.Address, step, mapNotStarted(e, step), hasImpl, act, time.Time{}).working
 		return
 	}
 	d.State = EpicStateFor(root, e, s.Delivery(root.Project), s.Runs.StartedAtOf)
@@ -111,12 +110,13 @@ func (s *Epics) buildMapDetail(root queue.RootRef, epics []tickets.Epic, e ticke
 	}
 	d.Steps = mapSteps(e, byName)
 	step := queue.MapProgress(e)
-	d.DesignSection = designSection(d.Address, e, step, designActivity{})
 	d.RingProgress = designPercent(e, step)
 	d.Stats = epicStats(e, e.CompletedAt, now)
-	if _, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {
+	_, hasImpl := byName[e.Name+tickets.ImplEpicSuffix]
+	if hasImpl {
 		d.ImplAddress = queue.RootRef{Project: root.Project, Epic: e.Name + tickets.ImplEpicSuffix}.String()
 	}
+	d.DesignSection = designSection(d.Address, e, step, hasImpl, designActivity{})
 	current, blocked := mapTicketFlags(e)
 	for _, t := range e.Tickets {
 		status := e.RenderedStatus(t)

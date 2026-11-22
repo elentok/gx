@@ -40,8 +40,8 @@ func reachedBranch(step wire.ProgressStep) bool {
 // designSection is the section of the map's own Design card, whether or not a
 // joined card currently shows the -impl epic instead. A finished Design only
 // stays in Needs you while a question is still waiting on an answer.
-func designSection(address string, m tickets.Epic, step wire.ProgressStep, act designActivity) wire.CardSection {
-	p := placeDesign(address, act, mapNotStarted(m, step), time.Time{}, step)
+func designSection(address string, m tickets.Epic, step wire.ProgressStep, hasImpl bool, act designActivity) wire.CardSection {
+	p := designPlacementFor(address, step, mapNotStarted(m, step), hasImpl, act, time.Time{})
 	if step == wire.ProgressDone && p.section != wire.SectionNeedsYou {
 		return wire.SectionFinished
 	}
@@ -69,9 +69,9 @@ func decorateDesignCard(row *wire.EpicListRow, m tickets.Epic, impl *wire.EpicLi
 	default:
 		row.RingProgress = designPercent(m, row.ProgressStep)
 		fallback := cmp.Or(lastActivity(m), m.CreatedAt)
-		act.creating = impl != nil && row.ProgressStep == wire.ProgressCreateTickets
-		placeDesign(row.Address, act, mapNotStarted(m, row.ProgressStep), fallback, row.ProgressStep).applyTo(row)
-		if row.Working && act.creating {
+		p := designPlacementFor(row.Address, row.ProgressStep, mapNotStarted(m, row.ProgressStep), impl != nil, act, fallback)
+		p.applyTo(row)
+		if row.Working && creatingTickets(row.ProgressStep, impl != nil) {
 			// The ring has no fraction to show yet; the client draws its placeholder.
 			row.RingProgress = 0
 			row.WorkingWord = designWords[wire.ProgressCreateTickets]
@@ -99,7 +99,8 @@ func joinImplementation(row *wire.EpicListRow, impl *wire.EpicListRow, act desig
 	if impl.Section == wire.SectionNeedsYou {
 		return
 	}
-	if p := placeDesign(m.Address, act, false, act.askedAt, m.ProgressStep); p.pill == PillQuestion {
+	p := designPlacementFor(m.Address, m.ProgressStep, false, true, act, act.askedAt)
+	if p.pill == PillQuestion {
 		row.Section, row.StatePill, row.Reason = wire.SectionNeedsYou, p.pill, p.reason
 		row.WaitingSince, row.Actions = p.waitingSince, p.actions
 		setCardTime(row, cardTimeSources{})
@@ -108,8 +109,7 @@ func joinImplementation(row *wire.EpicListRow, impl *wire.EpicListRow, act desig
 	}
 	// At Branch the Design session still works while the -impl epic does not:
 	// the joined card shows the Design state. A countdown wins over working.
-	if p := placeDesign(m.Address, act, false, act.askedAt, m.ProgressStep); m.ProgressStep == wire.ProgressBranch &&
-		!impl.Working && p.working && p.countdownEndsAt.IsZero() {
+	if m.ProgressStep == wire.ProgressBranch && !impl.Working && p.working && p.countdownEndsAt.IsZero() {
 		row.Working, row.WorkKind = true, wire.WorkKindDesign
 		row.WorkingWord = designWords[wire.ProgressBranch]
 		row.StatusWords = row.WorkingWord + "..."
@@ -165,15 +165,31 @@ type designPlacement struct {
 	actions         []wire.CardAction
 }
 
-// placeDesign places the Design card of the map at address from its sessions.
+// creatingTickets is the map at Create tickets with its -impl epic present,
+// which works even while the session is idle.
+func creatingTickets(step wire.ProgressStep, hasImpl bool) bool {
+	return hasImpl && step == wire.ProgressCreateTickets
+}
+
+// designPlacementFor is the one placement decision of a map's Design card, read
+// by the card, the epic detail and the section helper. It owns the creating rule.
 // fallback starts a question's wait when the session holds no time for it. step
 // is the map's own step, which names the working word when no step is reported.
-func placeDesign(address string, act designActivity, notStarted bool, fallback time.Time, step wire.ProgressStep) designPlacement {
+func designPlacementFor(address string, step wire.ProgressStep, notStarted, hasImpl bool, act designActivity, fallback time.Time) designPlacement {
+	return placeDesign(address, act, notStarted, fallback, step, creatingTickets(step, hasImpl))
+}
+
+// placeDesign places the Design card of the map at address from its sessions. A
+// Done map never works.
+func placeDesign(address string, act designActivity, notStarted bool, fallback time.Time, step wire.ProgressStep, creating bool) designPlacement {
 	p := designPlacement{statusWords: "Designing"}
 	working := func() {
+		if step == wire.ProgressDone {
+			return
+		}
 		p.working = true
 		p.workingWord = designWorkingWord(act, step)
-		if act.creating {
+		if creating {
 			p.workingWord = designWords[wire.ProgressCreateTickets]
 		}
 		p.statusWords = p.workingWord + "..."
@@ -191,7 +207,7 @@ func placeDesign(address string, act designActivity, notStarted bool, fallback t
 	case !act.countdownAt.IsZero():
 		p.section = wire.SectionDesigning
 		p.countdownEndsAt = act.countdownAt
-		if act.creating {
+		if creating {
 			working()
 		}
 	case act.asking:
@@ -202,7 +218,7 @@ func placeDesign(address string, act designActivity, notStarted bool, fallback t
 		p.actions = []wire.CardAction{{Kind: wire.CardActionAnswer, Label: "Answer", Target: address, Link: "#/d/" + address}}
 	default:
 		p.section = wire.SectionDesigning
-		if act.working || act.creating {
+		if act.working || creating {
 			working()
 		}
 		p.actions = []wire.CardAction{{Kind: wire.CardActionOpen, Label: "Open", Target: address}}

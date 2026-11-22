@@ -18,20 +18,22 @@ func TestPlaceDesign_Working(t *testing.T) {
 		step  wire.ProgressStep
 		words string
 		work  bool
+		impl  bool
 	}{
-		{"reported step wins", designActivity{running: true, working: true, reportedStep: "grill-findings"}, wire.ProgressSpec, "Reviewing", true},
-		{"unknown report falls to map step", designActivity{running: true, working: true, reportedStep: "zzz"}, wire.ProgressResolveTickets, "Researching", true},
-		{"subagent only falls to map step", designActivity{running: true, working: true, delegating: true}, wire.ProgressBranch, "Branching", true},
-		{"done falls to Designing", designActivity{running: true, working: true}, wire.ProgressDone, "Designing", true},
-		{"idle session does not work", designActivity{running: true}, wire.ProgressSpec, "Designing", false},
-		{"no session does not work", designActivity{}, wire.ProgressCreateTickets, "Designing", false},
-		{"creating works while idle", designActivity{running: true, creating: true}, wire.ProgressCreateTickets, "Creating tickets", true},
-		{"creating works in a countdown", designActivity{running: true, creating: true, countdownAt: t0}, wire.ProgressCreateTickets, "Creating tickets", true},
-		{"countdown otherwise keeps words", designActivity{running: true, working: true, countdownAt: t0}, wire.ProgressSpec, "Designing", false},
+		{"reported step wins", designActivity{running: true, working: true, reportedStep: "grill-findings"}, wire.ProgressSpec, "Reviewing", true, false},
+		{"unknown report falls to map step", designActivity{running: true, working: true, reportedStep: "zzz"}, wire.ProgressResolveTickets, "Researching", true, false},
+		{"subagent only falls to map step", designActivity{running: true, working: true, delegating: true}, wire.ProgressBranch, "Branching", true, false},
+		{"done never works", designActivity{running: true, working: true}, wire.ProgressDone, "Designing", false, false},
+		{"idle session does not work", designActivity{running: true}, wire.ProgressSpec, "Designing", false, false},
+		{"no session does not work", designActivity{}, wire.ProgressCreateTickets, "Designing", false, false},
+		{"creating works while idle", designActivity{running: true}, wire.ProgressCreateTickets, "Creating tickets", true, true},
+		{"creating works in a countdown", designActivity{running: true, countdownAt: t0}, wire.ProgressCreateTickets, "Creating tickets", true, true},
+		{"create tickets without impl is not creating", designActivity{running: true}, wire.ProgressCreateTickets, "Designing", false, false},
+		{"countdown otherwise keeps words", designActivity{running: true, working: true, countdownAt: t0}, wire.ProgressSpec, "Designing", false, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			p := placeDesign("proj:map", c.act, false, time.Time{}, c.step)
+			p := designPlacementFor("proj:map", c.step, false, c.impl, c.act, time.Time{})
 			if p.working != c.work {
 				t.Fatalf("working = %v, want %v", p.working, c.work)
 			}
@@ -47,7 +49,7 @@ func TestPlaceDesign_Working(t *testing.T) {
 }
 
 func TestPlaceDesign_QuestionBeatsWorking(t *testing.T) {
-	p := placeDesign("proj:map", designActivity{running: true, working: true, asking: true}, false, time.Time{}, wire.ProgressSpec)
+	p := designPlacementFor("proj:map", wire.ProgressSpec, false, false, designActivity{running: true, working: true, asking: true}, time.Time{})
 	if p.section != wire.SectionNeedsYou || p.working {
 		t.Fatalf("section %q working %v", p.section, p.working)
 	}

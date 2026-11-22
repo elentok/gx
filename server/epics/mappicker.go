@@ -25,12 +25,9 @@ type designActivity struct {
 	working      bool
 	reportedStep string
 	workingAt    time.Time
-	// creating: the map is at Create tickets and its -impl epic exists, which
-	// works even while the session is idle. Set by the card builder, not by designActivities.
-	creating    bool
-	askedAt     time.Time
-	countdownAt time.Time
-	endedAt     time.Time
+	askedAt      time.Time
+	countdownAt  time.Time
+	endedAt      time.Time
 }
 
 // designActivities folds the sessions into one designActivity per map address.
