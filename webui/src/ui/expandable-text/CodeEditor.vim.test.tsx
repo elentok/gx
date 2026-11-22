@@ -246,6 +246,25 @@ describe("toggling the setting on an open editor", () => {
   })
 })
 
+describe("without onSelectionChange", () => {
+  test("moving the cursor and typing still works and fires onChange", () => {
+    const onChange = vi.fn<(t: string) => void>()
+    renderThemed(
+      <CodeEditor
+        label="Note text"
+        value="abc"
+        onChange={onChange}
+        selection={{ start: 0, end: 0 }}
+        viMode={false}
+      />,
+    )
+    const view = EditorView.findFromDOM(screen.getByRole("textbox"))!
+    act(() => view.dispatch({ selection: { anchor: 2 } }))
+    act(() => view.dispatch({ changes: { from: 2, insert: "X" } }))
+    expect(onChange).toHaveBeenLastCalledWith("abXc")
+  })
+})
+
 describe("props applied after mount", () => {
   type Props = Partial<React.ComponentProps<typeof CodeEditor>>
   function open(first: Props = {}) {

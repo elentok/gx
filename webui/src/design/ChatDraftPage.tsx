@@ -335,7 +335,6 @@ function ChatDraftForm({
                   onChange={edit}
                   placeholder={PLACEHOLDER}
                   selection={{ start: brief.length, end: brief.length }}
-                  onSelectionChange={() => {}}
                   viMode
                   bare
                   onModeChange={setViModeNow}

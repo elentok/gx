@@ -388,7 +388,6 @@ function DraftForm({
                 onChange={(idea) => patch({ idea })}
                 placeholder={PLACEHOLDER}
                 selection={{ start: draft.idea.length, end: draft.idea.length }}
-                onSelectionChange={() => {}}
                 viMode
                 onModeChange={setViModeNow}
                 autoFocus={focusWanted}

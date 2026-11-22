@@ -187,7 +187,7 @@ export default function CodeEditor({
   placeholder?: string
   /** The selection to open with. Read once. */
   selection: Selection
-  onSelectionChange: (selection: Selection) => void
+  onSelectionChange?: (selection: Selection) => void
   /** Vi keys on or off. Applies live. */
   viMode: boolean
   /** The vi mode, on every change. Not called with vi mode off. */
@@ -433,7 +433,7 @@ export default function CodeEditor({
               callbacks.current.onChange(u.state.doc.toString())
             if (u.selectionSet || u.docChanged) {
               const { from, to } = u.state.selection.main
-              callbacks.current.onSelectionChange({ start: from, end: to })
+              callbacks.current.onSelectionChange?.({ start: from, end: to })
             }
           }),
         ],
