@@ -160,10 +160,15 @@ func (f sessionSeeder) settleSession(s sessionSpec, id string) error {
 		if slow || codexTurn {
 			role = transcript.ChatRolePerson
 		}
+		var pending error
 		if err := f.waitFor(id, "a "+role+" message", func(_ wire.SessionInfo, chat wire.SessionChatResponse) bool {
-			return slices.ContainsFunc(chat.Messages, func(m wire.SessionChatMessage) bool { return m.Role == role })
+			seen := slices.ContainsFunc(chat.Messages, func(m wire.SessionChatMessage) bool { return m.Role == role })
+			if seen && !slow && !codexTurn {
+				pending = f.turnEnd(id, chat)
+			}
+			return seen && pending == nil
 		}); err != nil {
-			return err
+			return fmt.Errorf("%w (%v)", err, pending)
 		}
 	}
 	if codexTurn {
@@ -341,6 +346,13 @@ func (f sessionSeeder) claudeTranscriptPath(id string) (string, error) {
 		return "", fmt.Errorf("session %s is not listed", id)
 	}
 	return transcript.PathIn(filepath.Join(f.root, "home"), list[i].Dir, chat.ConversationID), nil
+}
+
+// turnEnd is nil once the fake's own turn is over; the server's Idle can predate it.
+func (f sessionSeeder) turnEnd(id string, chat wire.SessionChatResponse) error {
+	m, _ := sessions.ReadMeta(filepath.Join(f.root, "data", "gx", "sessions", id))
+	replies := len(slices.DeleteFunc(slices.Clone(chat.Messages), func(c wire.SessionChatMessage) bool { return c.Role != transcript.ChatRoleAgent }))
+	return agentfake.TurnEnded(f.env, m.ConversationID, replies)
 }
 
 // controlSender sends a control to the fake of session id. The fake's control
