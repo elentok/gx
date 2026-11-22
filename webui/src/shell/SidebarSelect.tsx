@@ -30,7 +30,7 @@ import {
   type SelectState,
 } from "../select/selectModel"
 import { dispatchSelectKey, openItemMenu, selectIntent } from "../select/selectKeys"
-import type { SidebarRow } from "../workspaces/sidebarModel"
+import { rowItemKind, type SidebarRow } from "../workspaces/sidebarModel"
 import { showToast } from "../ui/toaster"
 import { isTextTarget } from "./keys"
 import { NAV_ATTR } from "./SidebarKeys"
@@ -197,10 +197,7 @@ function useSidebarSelectKeys(sel: SidebarSelect) {
 
 const rowOf = (r: SidebarRow, visible: boolean): SelectRow => ({
   key: r.key,
-  kind:
-    r.kind === "chat" || r.kind === "design" || r.kind === "draft" || r.kind === "chat-draft"
-      ? r.kind
-      : "epic",
+  kind: rowItemKind(r.kind),
   draftId: r.draft?.id,
   visible,
   selectable: true,

@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/budget"
-	"github.com/elentok/gx/server/chatdrafts"
-	"github.com/elentok/gx/server/designs/drafts"
 	harnesschoice "github.com/elentok/gx/server/harness"
 	"github.com/elentok/gx/server/limits"
 	"github.com/elentok/gx/server/queue"
@@ -76,10 +74,10 @@ func (s *Server) dropSessionMember(id string) {
 // project the index does not know yet is kept.
 func (s *Server) pruneEpicMembers() {
 	err := s.workspaces.Prune(func(key string) bool {
-		if id, isDraft := drafts.ParseMemberKey(key); isDraft {
+		switch kind, id := workspaces.ClassifyDraftKey(key); kind {
+		case workspaces.DesignDraft:
 			return s.designs.DraftExists(id)
-		}
-		if id, isChat := chatdrafts.ParseMemberKey(key); isChat {
+		case workspaces.ChatDraft:
 			return s.chatDrafts.Exists(id)
 		}
 		project, _, ok := tickets.ParseEpicAddress(key)

@@ -4,8 +4,6 @@ import (
 	"cmp"
 	"strings"
 
-	"github.com/elentok/gx/server/chatdrafts"
-	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/archivekey"
@@ -36,13 +34,13 @@ func (s *Store) joinable(key string) error {
 		return ReasonBlankKey
 	}
 	dir := s.dir()
-	if id, ok := drafts.ParseMemberKey(key); ok {
+	switch kind, id := ClassifyDraftKey(key); kind {
+	case DesignDraft:
 		if !dir.DraftExists(id) {
 			return ReasonUnknownKey
 		}
 		return nil
-	}
-	if id, ok := chatdrafts.ParseMemberKey(key); ok {
+	case ChatDraft:
 		if !dir.ChatDraftExists(id) {
 			return ReasonUnknownKey
 		}

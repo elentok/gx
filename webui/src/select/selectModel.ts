@@ -81,16 +81,16 @@ export interface Fit {
   skipped: { key: string; reason: string }[]
 }
 
+/** True for every draft kind, so a new draft kind is one edit here. */
+export const isDraftKind = (kind: SelectRow["kind"]): boolean =>
+  kind === "draft" || kind === "chat-draft"
+
 type Verdict = string | undefined
 
 /** undefined fits; a string is the reason the row is skipped. */
 const RULES: Record<SelectAction, (r: SelectRow) => Verdict> = {
   move: (r) =>
-    r.kind === "epic" ||
-    r.kind === "design" ||
-    r.kind === "chat" ||
-    r.kind === "draft" ||
-    r.kind === "chat-draft"
+    r.kind === "epic" || r.kind === "design" || r.kind === "chat" || isDraftKind(r.kind)
       ? undefined
       : "can't be moved",
   hold: (r) => {
@@ -105,8 +105,7 @@ const RULES: Record<SelectAction, (r: SelectRow) => Verdict> = {
     return isExited(r.session) ? "not live" : undefined
   },
   remove: (r) => {
-    if (r.kind === "draft") return undefined
-    if (r.kind === "chat-draft") return "can't be removed"
+    if (isDraftKind(r.kind)) return r.kind === "draft" ? undefined : "can't be removed"
     if (!r.session) return "not an agent"
     return canManage(r.session) ? undefined : "managed by the queue"
   },

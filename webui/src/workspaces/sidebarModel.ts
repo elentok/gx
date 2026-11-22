@@ -52,6 +52,12 @@ export interface SidebarAgent {
   unread?: boolean
 }
 
+/** The row kinds the menus and the select area know; every other row kind acts as an epic. */
+export type RowItemKind = "chat" | "design" | "draft" | "chat-draft" | "epic"
+
+export const rowItemKind = (kind: SidebarRow["kind"]): RowItemKind =>
+  kind === "chat" || kind === "design" || kind === "draft" || kind === "chat-draft" ? kind : "epic"
+
 export interface SidebarRow {
   key: string
   /** Design is purple, epic teal (the ring kinds), chat pink; a draft has its own icon. */

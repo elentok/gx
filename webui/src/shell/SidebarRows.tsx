@@ -5,6 +5,7 @@ import { useConnectionContext, useConnectionState } from "../connection"
 import { useEpicList, type FetchEpicList } from "../epics/list"
 import {
   buildSidebar,
+  rowItemKind,
   type SidebarAgent,
   type SidebarRow,
   type SidebarStatus,
@@ -445,9 +446,6 @@ function MenuSlot({ number, children }: { number?: number; children: ReactNode }
   )
 }
 
-const itemKind = (kind: SidebarRow["kind"]): ItemRef["kind"] =>
-  kind === "chat" || kind === "design" || kind === "draft" || kind === "chat-draft" ? kind : "epic"
-
 function Row({
   row,
   current,
@@ -462,7 +460,7 @@ function Row({
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const nested = row.agents.length > 0
-  const kind = itemKind(row.kind)
+  const kind = rowItemKind(row.kind)
   const item: ItemRef = {
     key: row.key,
     name: row.title,

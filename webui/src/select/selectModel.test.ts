@@ -8,6 +8,7 @@ import {
   fitOf,
   groupState,
   initialSelect,
+  isDraftKind,
   leave,
   prune,
   rowOfAgent,
@@ -37,6 +38,20 @@ const r = (key: string, over: Partial<SelectRow> = {}): SelectRow => ({
   ...over,
 })
 const on = (...keys: string[]): SelectState => ({ on: true, keys })
+
+describe("isDraftKind", () => {
+  it.each([
+    ["draft", true],
+    ["chat-draft", true],
+    ["epic", false],
+    ["design", false],
+    ["chat", false],
+    ["agent", false],
+    ["archived", false],
+  ] as const)("%s -> %s", (kind, want) => {
+    expect(isDraftKind(kind)).toBe(want)
+  })
+})
 
 describe("mode", () => {
   it("enters with nothing selected and leaves clearing the selection", () => {

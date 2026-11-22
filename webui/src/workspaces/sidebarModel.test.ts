@@ -18,7 +18,16 @@ import {
   type SessionPlacement,
 } from "../generated/server"
 import { session } from "../agents/agentsTestKit"
-import { buildSidebar } from "./sidebarModel"
+import { buildSidebar, rowItemKind } from "./sidebarModel"
+
+describe("rowItemKind", () => {
+  it.each(["chat", "design", "draft", "chat-draft"] as const)("keeps %s", (kind) => {
+    expect(rowItemKind(kind)).toBe(kind)
+  })
+  it.each(["implementation", "followups", "oneoff"] as const)("treats %s as an epic", (kind) => {
+    expect(rowItemKind(kind)).toBe("epic")
+  })
+})
 
 const row = (address: string, over: Partial<EpicListRow>): EpicListRow =>
   ({

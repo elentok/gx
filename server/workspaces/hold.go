@@ -7,8 +7,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/elentok/gx/server/chatdrafts"
-	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/oneoff"
@@ -81,8 +79,7 @@ func (s *Store) holdTargetOf(addr string) (holdTarget, *wire.TargetResult) {
 	}
 	addr = strings.TrimSpace(addr)
 	dir := s.dir()
-	_, isChat := chatdrafts.ParseMemberKey(addr)
-	if _, isDraft := drafts.ParseMemberKey(addr); isDraft || isChat {
+	if kind, _ := ClassifyDraftKey(addr); kind != NotDraft {
 		return refuse(wire.ReasonHoldNotHoldable, "a draft cannot be held")
 	}
 	if _, _, ok := tickets.ParseEpicAddress(addr); !ok {
@@ -181,13 +178,13 @@ func (s *Store) UnholdEpics(targets []string) (wire.TargetsResult, error) {
 // MoveTargets puts each key in the workspace on its own, in order.
 func (s *Store) MoveTargets(keys []string, workspace string) (wire.TargetsResult, error) {
 	res := wire.TargetsResult{Results: make([]wire.TargetResult, 0, len(keys))}
-	movedDraft, movedChatDraft := false, false
+	moved := map[DraftKind]bool{}
 	// A draft row carries its workspace, so a moved draft changes the rows.
 	defer func() {
-		if movedDraft {
+		if moved[DesignDraft] {
 			s.events.Publish(wire.EventDesignDraftsChanged, "")
 		}
-		if movedChatDraft {
+		if moved[ChatDraft] {
 			s.events.Publish(wire.EventChatDraftsChanged, "")
 		}
 	}()
@@ -196,12 +193,8 @@ func (s *Store) MoveTargets(keys []string, workspace string) (wire.TargetsResult
 		var reason Reason
 		switch {
 		case err == nil:
-			if _, isDraft := drafts.ParseMemberKey(key); isDraft {
-				movedDraft = true
-			}
-			if _, isChat := chatdrafts.ParseMemberKey(key); isChat {
-				movedChatDraft = true
-			}
+			kind, _ := ClassifyDraftKey(key)
+			moved[kind] = true
 			res.Results = append(res.Results, wire.TargetResult{Target: key, Status: wire.TargetDone})
 		case errors.As(err, &reason):
 			res.Results = append(res.Results, wire.RefusedTarget(key, refusals[reason], reason.Error()))
