@@ -107,7 +107,13 @@ type goPkg struct {
 	failed      bool
 	tests       []string // failed tests, in failure order
 	testOutput  map[string][]string
+	// timeout holds every output line from go's "panic: test timed out" on.
+	// The panic text is attributed to a test or to the package depending on the
+	// Go version, so all lines count.
+	timeout []string
 }
+
+const goTimeoutPanic = "panic: test timed out"
 
 // Parse counts finished tests and packages from the -json stream and collects
 // the failure units. Lines that are not JSON are ignored.
@@ -143,6 +149,9 @@ func (GoTest) Parse(out []byte, _ int) Outcome {
 		case "output":
 			p := pkg(ev.Package)
 			l := strings.TrimRight(ev.Output, "\n")
+			if p.timeout != nil || strings.HasPrefix(l, goTimeoutPanic) {
+				p.timeout = append(p.timeout, l)
+			}
 			if ev.Test == "" {
 				p.output = append(p.output, l)
 			} else if !isGoTestNoise(l) {
@@ -180,9 +189,11 @@ func (GoTest) Parse(out []byte, _ int) Outcome {
 
 	var failures []Unit
 	for _, p := range order {
-		leaves := 0
+		stuck := goTimeoutUnits(p.name, p.timeout)
+		leaves := len(stuck)
+		failures = append(failures, stuck...)
 		for _, t := range p.tests {
-			if hasFailingSubtest(p.tests, t) {
+			if hasFailingSubtest(p.tests, t) || slices.ContainsFunc(stuck, func(u Unit) bool { return u.Name == t }) {
 				continue
 			}
 			leaves++
@@ -204,6 +215,86 @@ func (GoTest) Parse(out []byte, _ int) Outcome {
 
 		TestDurations: durations,
 	}
+}
+
+var (
+	// goRunningTest matches a line of the panic's "running tests:" list, such
+	// as `\t\tTestFoo/sub (1s)`.
+	goRunningTest = regexp.MustCompile(`^\s+(Test\S*|Fuzz\S*|Example\S*) \(`)
+	// goStackFile matches the file line under a stack frame.
+	goStackFile = regexp.MustCompile(`^\s+(\S+\.go:\d+)`)
+)
+
+// goTimeoutUnits turns the output of a timed-out package into one failure per
+// stuck test. Each shows the timeout line and the project frames of the
+// goroutines that run that test; the runtime and the standard library frames
+// are dropped. Nil when the package did not time out.
+func goTimeoutUnits(pkg string, lines []string) []Unit {
+	if len(lines) == 0 {
+		return nil
+	}
+	var stuck []string
+	inList := false
+	for _, l := range lines[1:] {
+		if strings.TrimSpace(l) == "running tests:" {
+			inList = true
+			continue
+		}
+		if m := goRunningTest.FindStringSubmatch(l); inList && m != nil {
+			stuck = append(stuck, m[1])
+		} else if inList {
+			break
+		}
+	}
+	if len(stuck) == 0 {
+		return nil
+	}
+	// Each goroutine is a block of lines that starts with "goroutine N [".
+	var blocks [][]string
+	for _, l := range lines {
+		if strings.HasPrefix(l, "goroutine ") {
+			blocks = append(blocks, nil)
+		}
+		if len(blocks) > 0 {
+			blocks[len(blocks)-1] = append(blocks[len(blocks)-1], l)
+		}
+	}
+	var units []Unit
+	for _, t := range stuck {
+		top, _, _ := strings.Cut(t, "/")
+		text := []string{lines[0]}
+		for _, b := range blocks {
+			if !slices.ContainsFunc(b, func(l string) bool { return strings.Contains(l, "."+top+"(") }) {
+				continue
+			}
+			text = append(text, projectFrames(b)...)
+		}
+		units = append(units, Unit{Location: pkg, Name: t, Text: strings.Join(text, "\n")})
+	}
+	return units
+}
+
+// projectFrames returns "file.go:12 pkg.Func" for each frame of a goroutine
+// whose function is outside the standard library and the module cache. A
+// standard library function path has no dot in its first element.
+func projectFrames(block []string) []string {
+	var out []string
+	for i := 0; i+1 < len(block); i++ {
+		fn := block[i]
+		m := goStackFile.FindStringSubmatch(block[i+1])
+		if m == nil || strings.HasPrefix(fn, "\t") || strings.HasPrefix(fn, "created by ") {
+			continue
+		}
+		first, _, _ := strings.Cut(fn, "/")
+		if !strings.Contains(first, ".") || !strings.Contains(fn, "/") || strings.Contains(block[i+1], "/pkg/mod/") {
+			continue
+		}
+		if j := strings.LastIndex(fn, "("); j > 0 {
+			fn = fn[:j]
+		}
+		out = append(out, m[1]+" "+fn)
+	}
+	return out
 }
 
 // isGoTestNoise reports the framing lines go test -v prints around a test's

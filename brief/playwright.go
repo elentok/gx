@@ -236,8 +236,9 @@ func readSpecs(path string) []reportSpec {
 var locatorQuoted = regexp.MustCompile(`'([^']{2,})'|"([^"]{2,})"`)
 
 // snapshotExcerpt returns up to maxUnitLines lines of an error-context.md
-// snapshot that contain a string quoted in the failure's Locator line. A
-// failure with no Locator line or no matching snapshot line yields nil.
+// snapshot: first the lines that contain a string quoted in the failure's
+// Locator line, then the cause lines (see snapshotCause). Nil when neither
+// matches.
 func snapshotExcerpt(failure, snapshot string) []string {
 	var terms []string
 	for l := range strings.SplitSeq(failure, "\n") {
@@ -248,20 +249,30 @@ func snapshotExcerpt(failure, snapshot string) []string {
 		}
 	}
 	var out []string
-	for l := range strings.SplitSeq(snapshot, "\n") {
-		if len(terms) == 0 {
-			break
-		}
-		low := strings.ToLower(l)
-		if slices.ContainsFunc(terms, func(t string) bool { return strings.Contains(low, t) }) {
-			out = append(out, strings.TrimRight(l, " \r"))
+	add := func(match func(low string) bool) {
+		for l := range strings.SplitSeq(snapshot, "\n") {
+			l = strings.TrimRight(l, " \r")
 			if len(out) == maxUnitLines {
-				break
+				return
+			}
+			if match(strings.ToLower(l)) && !slices.Contains(out, l) {
+				out = append(out, l)
 			}
 		}
 	}
+	if len(terms) > 0 {
+		add(func(low string) bool {
+			return slices.ContainsFunc(terms, func(t string) bool { return strings.Contains(low, t) })
+		})
+	}
+	add(snapshotCause.MatchString)
 	return out
 }
+
+// snapshotCause matches a snapshot line that says why a flow failed even when
+// the locator does not name it: an alert or status text such as "Saving
+// stopped: ...". Lowercase, as it is matched against lowered lines.
+var snapshotCause = regexp.MustCompile(`\b(alert|stopped|failed|error|cannot|unable)\b`)
 
 // flowNumbersToGrep replaces bare flow numbers (`disk.e2e.ts 69 70`) with one
 // -g pattern. Playwright matches -g against the project, file and title joined

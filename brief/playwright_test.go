@@ -144,6 +144,32 @@ func TestPlaywrightParse_NoTestsFoundIsEmpty(t *testing.T) {
 	}
 }
 
+func TestPlaywrightReport_NoTestsFoundUnderCHintsAtRelativePaths(t *testing.T) {
+	var buf bytes.Buffer
+	report(Playwright{}, Options{Out: &buf, CDir: "webui"}, Outcome{}, []byte("Error: No tests found\n"), indexEntry{Exit: 1, Log: "LOG"})
+	if got := buf.String(); !strings.Contains(got, "relative to the -C directory (webui)") {
+		t.Errorf("no hint:\n%s", got)
+	}
+	buf.Reset()
+	report(Playwright{}, Options{Out: &buf}, Outcome{}, []byte("Error: No tests found\n"), indexEntry{Exit: 1, Log: "LOG"})
+	if strings.Contains(buf.String(), "hint:") {
+		t.Errorf("hint without -C:\n%s", buf.String())
+	}
+}
+
+func TestSnapshotExcerpt_IncludesCauseLinesBesideTheLocatorLines(t *testing.T) {
+	failure := "Error: expect(locator).toBeVisible()\nLocator: getByText('Done')"
+	snap := "- alert: \"Saving stopped: disk full\"\n- text \"Done\"\n- button \"Close\""
+	got := snapshotExcerpt(failure, snap)
+	want := []string{`- text "Done"`, `- alert: "Saving stopped: disk full"`}
+	if !slices.Equal(got, want) {
+		t.Errorf("excerpt = %q, want %q", got, want)
+	}
+	if got := snapshotExcerpt("Error: boom", snap); len(got) != 1 {
+		t.Errorf("without a locator the cause line still shows, got %q", got)
+	}
+}
+
 func playwrightDir(t *testing.T, config bool) string {
 	t.Helper()
 	orig := buildWeb

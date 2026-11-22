@@ -507,6 +507,9 @@ func report(tool Tool, o Options, outcome Outcome, out []byte, e indexEntry) int
 		} else if len(outcome.Failures) == 0 {
 			fmt.Fprintf(o.Out, "FAIL %s: exit %d in %s\n", tool.Name(), e.Exit, dur)
 			rawHead(o.Out, out, e.Log)
+			if o.CDir != "" && bytes.Contains(out, []byte("No tests found")) {
+				fmt.Fprintf(o.Out, "hint: test paths are relative to the -C directory (%s), not the repo root\n", o.CDir)
+			}
 		} else {
 			fmt.Fprintf(o.Out, "FAIL %s: %d failed in %s\n", tool.Name(), len(outcome.Failures), dur)
 			renderUnitsWith(o.Out, outcome.Failures, maxFullUnits, e.Log, func(u Unit) { renderSnapshot(o.Out, outcome, u) })
