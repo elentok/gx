@@ -22,6 +22,25 @@ func startReadyMap(t *testing.T, c mapCase) (*rigs.GrillingFixture, string) {
 	return rigs.StartAdvancing(t, store), store
 }
 
+// startHeldMap is startReadyMap with countdowns that cannot end by
+// themselves: a test that reads a running countdown uses it, and one that
+// needs a countdown to end releases it (releaseAutoQueue, ReleaseAutoAdvance).
+func startHeldMap(t *testing.T, c mapCase) (*rigs.GrillingFixture, string) {
+	t.Helper()
+	store := t.TempDir()
+	c.name = "map"
+	writeMapCase(t, store, c)
+	return rigs.StartHeldAdvancing(t, store), store
+}
+
+// releaseAutoQueue ends the session's running auto-queue countdown now.
+func releaseAutoQueue(t *testing.T, f *rigs.GrillingFixture) {
+	t.Helper()
+	if !f.H.Server.Prompt().ReleaseAutoQueue(f.ID) {
+		t.Fatal("no auto-queue countdown to release")
+	}
+}
+
 func setAutoQueue(t *testing.T, f *rigs.GrillingFixture, on bool) {
 	t.Helper()
 	if res, err := f.H.Client.Sessions.SetAutoQueue(f.Ctx, f.ID, on); err != nil || res.Refused {
@@ -134,9 +153,17 @@ func TestAutoQueue_ConditionsFailingDuringTheCountdownQueueNothingAndSendABanner
 		}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			f, store := startReadyMap(t, mapCase{step: "branch", implStatus: "open"})
+			f, store := startHeldMap(t, mapCase{step: "branch", implStatus: "open"})
 			setAutoQueue(t, f, true)
 			c.change(t, f, store)
+			// The index follows the filesystem asynchronously: release only once the server sees the change.
+			if !servertest.Poll(5*time.Second, func() bool {
+				reason, err := f.H.Server.Prompt().AutoQueueNotReady("proj", "map")
+				return err == nil && reason != ""
+			}) {
+				t.Fatal("the server never saw the failing condition")
+			}
+			releaseAutoQueue(t, f)
 			waitForBanner(t, f, c.want)
 			if name != "queued by hand" && queued(f) {
 				t.Error("queued despite the failing condition")
@@ -171,7 +198,7 @@ func TestAutoQueue_SwitchOffOrCancelStopsTheCountdownWithABanner(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			f, _ := startReadyMap(t, mapCase{step: "branch", implStatus: "open"})
+			f, _ := startHeldMap(t, mapCase{step: "branch", implStatus: "open"})
 			setAutoQueue(t, f, true)
 			if rigs.SessionSnapshot(t, f).AutoQueueAt == nil {
 				t.Fatal("no countdown running")
@@ -181,8 +208,7 @@ func TestAutoQueue_SwitchOffOrCancelStopsTheCountdownWithABanner(t *testing.T) {
 				t.Errorf("session = switch %v at %v, want switch %v with no countdown", got.AutoQueue, got.AutoQueueAt, c.wantSwitch)
 			}
 			waitForBanner(t, f, c.banner)
-			time.Sleep(rigs.CountdownDelay + 500*time.Millisecond)
-			if queued(f) {
+			if f.H.Server.Prompt().ReleaseAutoQueue(f.ID) || queued(f) {
 				t.Error("queued after the countdown was stopped")
 			}
 		})
@@ -205,7 +231,7 @@ func TestAutoQueue_CancelWithNoCountdownIsANoOpThatReturnsTheSession(t *testing.
 
 func TestAutoQueue_CancelLeavesAutoAdvanceAndAutoAdvanceCancelLeavesAutoQueue(t *testing.T) {
 	t.Parallel()
-	f, store := startReadyMap(t, mapCase{step: "spec", implStatus: "open"})
+	f, store := startHeldMap(t, mapCase{step: "spec", implStatus: "open"})
 	writeAssistantMessage(t, f.Path, runEndText)
 	endTurn(t, f)
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
@@ -245,7 +271,7 @@ func TestAutoQueue_CancelLeavesAutoAdvanceAndAutoAdvanceCancelLeavesAutoQueue(t 
 func TestAutoQueue_SwitchOffLeavesAutoAdvanceCountingDown(t *testing.T) {
 	t.Parallel()
 	store := rigs.StoreWithMapStep(t, "spec")
-	f := rigs.StartAdvancing(t, store)
+	f := rigs.StartHeldAdvancing(t, store)
 	writeAssistantMessage(t, f.Path, runEndText)
 	endTurn(t, f)
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
@@ -260,7 +286,7 @@ func TestAutoQueue_SwitchOffLeavesAutoAdvanceCountingDown(t *testing.T) {
 
 func TestAutoQueue_ARestartDropsTheCountdownAndKeepsTheSwitch(t *testing.T) {
 	t.Parallel()
-	f, _ := startReadyMap(t, mapCase{step: "branch", implStatus: "open"})
+	f, _ := startHeldMap(t, mapCase{step: "branch", implStatus: "open"})
 	setAutoQueue(t, f, true)
 	f.H.Restart(t)
 	got := rigs.SessionSnapshot(t, f)

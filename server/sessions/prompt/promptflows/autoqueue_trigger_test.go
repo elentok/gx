@@ -40,12 +40,13 @@ func noCountdownFor(t *testing.T, f *rigs.GrillingFixture) {
 
 func TestAutoQueueTrigger_ReachingBranchWithTheSwitchOnCountsDownThenQueues(t *testing.T) {
 	t.Parallel()
-	f, store := startReadyMap(t, mapCase{step: "spec", implStatus: "open", base: "other"})
+	f, store := startHeldMap(t, mapCase{step: "spec", implStatus: "open", base: "other"})
 	setAutoQueue(t, f, true)
 	moveMapToBranch(t, f, store)
 	if !servertest.Poll(5*time.Second, func() bool { return rigs.SessionSnapshot(t, f).AutoQueueAt != nil }) {
 		t.Fatal("no countdown after the map reached Branch")
 	}
+	releaseAutoQueue(t, f)
 	if !servertest.Poll(5*time.Second, func() bool { return queued(f) }) {
 		t.Fatal("epic not queued at the end of the countdown")
 	}

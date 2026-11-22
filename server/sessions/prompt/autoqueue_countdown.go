@@ -13,6 +13,10 @@ import (
 // none running. The countdowns are separate state from auto-advance's.
 func (p *autoQueuer) AutoQueueDeadline(id string) time.Time { return p.autoQueues.deadline(id) }
 
+// ReleaseAutoQueue ends the session's running auto-queue countdown early, as
+// if its timer fired, and reports whether one was running. For tests.
+func (p *autoQueuer) ReleaseAutoQueue(id string) bool { return p.autoQueues.release(id) }
+
 // mapOf splits a Design session's ticket into its project and map name.
 func mapOf(ticket string) (project, mapName string) {
 	epic, _, _ := strings.Cut(ticket, "/")
@@ -50,6 +54,7 @@ func (p *autoQueuer) startAutoQueue(id, ticket string) bool {
 		defer timer.Stop()
 		select {
 		case <-timer.C:
+		case <-c.fire:
 		case <-c.cancel:
 			return
 		case <-p.sessions.Watches.Stop:
