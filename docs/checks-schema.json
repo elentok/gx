@@ -17,10 +17,37 @@
           "additionalProperties": false,
           "properties": {
             "always": {
-              "description": "Commands that also run in every non-full run (changed, staged, --since), through the same path as the scoped command. A --full run covers them already.",
+              "description": "Commands that also run in every non-full run (changed, staged, --since), through the same path as the scoped command. A command string always runs; a {command, files} object runs only when a changed file matches a glob. A --full run covers them already.",
               "items": {
-                "minLength": 1,
-                "type": "string"
+                "oneOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "command": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "files": {
+                        "description": "Globs on repo-relative paths (* within a segment, ** across segments). The command runs only when a changed file matches one.",
+                        "items": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "minItems": 1,
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "command",
+                      "files"
+                    ],
+                    "type": "object"
+                  }
+                ]
               },
               "type": "array"
             },

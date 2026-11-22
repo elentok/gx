@@ -104,6 +104,33 @@ func TestCheck_Always(t *testing.T) {
 	}
 }
 
+func TestCheck_AlwaysFilesGlobs(t *testing.T) {
+	repo := checkRepo(t, `{"test":{"changed":"true","full":"true","always":[{"command":"touch $PWD/../glob-$(basename $PWD)","files":["**/*.go"]}]}}`)
+	marker := filepath.Join(filepath.Dir(repo), "glob-"+filepath.Base(repo))
+	ran := func() bool { _, err := os.Stat(marker); return err == nil }
+
+	testutil.WriteFile(t, repo, "docs/a.md", "x")
+	if out, code := runCheckCmd(t, repo, "--kind", "test"); code != 0 || ran() {
+		t.Fatalf("docs-only: code %d, ran %v, out %q; want the entry skipped", code, ran(), out)
+	}
+	testutil.WriteFile(t, repo, "pkg/b.go", "package pkg\n")
+	if out, code := runCheckCmd(t, repo, "--kind", "test"); code != 0 || !ran() {
+		t.Fatalf("go change: code %d, ran %v, out %q; want the entry run", code, ran(), out)
+	}
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err)
+	}
+	if out, code := runCheckCmd(t, repo, "--full", "--kind", "test"); code != 0 || ran() {
+		t.Errorf("full: code %d, ran %v, out %q; want the entry skipped", code, ran(), out)
+	}
+	for _, bad := range []string{`{"command":"x"}`, `{"files":["a"]}`, `{"command":"x","files":[]}`} {
+		r := checkRepo(t, `{"test":{"full":"true","always":[`+bad+`]}}`)
+		if out, code := runCheckCmd(t, r, "--kind", "test"); code != 2 || !strings.Contains(out, "always") {
+			t.Errorf("%s: code %d, out %q; want exit 2 naming always", bad, code, out)
+		}
+	}
+}
+
 func TestCheck_ConfiguredTestKindAlsoFromLinkedWorktree(t *testing.T) {
 	repo, wt := testutil.TempRepoWithLinkedWorktree(t, "feature")
 	for _, dir := range []string{repo, wt} {

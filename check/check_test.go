@@ -59,10 +59,19 @@ func TestParseConfig(t *testing.T) {
 		}
 	}
 	cfg, err = ParseConfig([]byte(`{"test":{"full":"t","always":["a","b"]}}`))
-	if err != nil || !slices.Equal(cfg["test"].Always, []string{"a", "b"}) {
+	if err != nil || !reflect.DeepEqual(cfg["test"].Always, []AlwaysEntry{{Command: "a"}, {Command: "b"}}) {
 		t.Errorf("always = %+v, err %v", cfg["test"].Always, err)
 	}
-	for _, bad := range []string{`{"test":{"full":"t","always":"a"}}`, `{"test":{"full":"t","always":[1]}}`, `{"test":{"full":"t","always":[""]}}`} {
+	cfg, err = ParseConfig([]byte(`{"test":{"full":"t","always":["a",{"command":"b","files":["**/*.go"]}]}}`))
+	if err != nil || len(cfg["test"].Always) != 2 || cfg["test"].Always[1].Command != "b" || cfg["test"].Always[1].Files[0] != "**/*.go" {
+		t.Errorf("object always = %+v, err %v", cfg["test"].Always, err)
+	}
+	for _, bad := range []string{
+		`{"test":{"full":"t","always":"a"}}`, `{"test":{"full":"t","always":[1]}}`, `{"test":{"full":"t","always":[""]}}`,
+		`{"test":{"full":"t","always":[{"files":["a"]}]}}`, `{"test":{"full":"t","always":[{"command":"","files":["a"]}]}}`,
+		`{"test":{"full":"t","always":[{"command":"a"}]}}`, `{"test":{"full":"t","always":[{"command":"a","files":[]}]}}`,
+		`{"test":{"full":"t","always":[{"command":"a","files":[""]}]}}`, `{"test":{"full":"t","always":[{"command":"a","files":["a"],"x":1}]}}`,
+	} {
 		if _, err := ParseConfig([]byte(bad)); err == nil {
 			t.Errorf("%s: want an error", bad)
 		}

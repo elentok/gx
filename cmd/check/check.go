@@ -43,7 +43,9 @@ the epic branch>, so a run after committing still has files to check.
 exclude each other. --kind format,lint runs only the named kinds.
 
 An entry may set "always": a list of commands that also run in every changed,
-staged and --since run (not --full, which covers them). A malformed list exits 2.
+staged and --since run (not --full, which covers them). An item is a command
+string (runs every time) or {"command", "files"}, which runs only when a changed
+file matches one of the globs ("**" crosses directories). A malformed list exits 2.
 
 The test entry may set "limits": {"suite": "4m", "slow": "20s", "hang": "60s"}.
 "slow" is one duration or a map by tool ("go", "vitest", "playwright"); a

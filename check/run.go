@@ -294,8 +294,10 @@ func (r *runner) runKind(kind string) KindResult {
 		}
 	}
 	if r.mode != ModeFull {
-		for _, cmd := range c.Always {
-			r.runShell(kind, cmd, logFile, &res)
+		for _, e := range c.Always {
+			if e.appliesTo(r.files) {
+				r.runShell(kind, e.Command, logFile, &res)
+			}
 		}
 	}
 	res.Duration = time.Since(start)

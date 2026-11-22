@@ -55,9 +55,21 @@ func SchemaJSON() []byte {
 				"description": "Command for a --full run, with {files} set to every tracked file.",
 			},
 			"always": obj{
-				"type":        "array",
-				"items":       str,
-				"description": "Commands that also run in every non-full run (changed, staged, --since), through the same path as the scoped command. A --full run covers them already.",
+				"type": "array",
+				"items": obj{"oneOf": []any{str, obj{
+					"type":                 "object",
+					"additionalProperties": false,
+					"required":             []string{"command", "files"},
+					"properties": obj{
+						"command": obj{"type": "string", "minLength": 1},
+						"files": obj{
+							"type": "array", "minItems": 1,
+							"items":       obj{"type": "string", "minLength": 1},
+							"description": "Globs on repo-relative paths (* within a segment, ** across segments). The command runs only when a changed file matches one.",
+						},
+					},
+				}}},
+				"description": "Commands that also run in every non-full run (changed, staged, --since), through the same path as the scoped command. A command string always runs; a {command, files} object runs only when a changed file matches a glob. A --full run covers them already.",
 			},
 			"limits": limits,
 		},

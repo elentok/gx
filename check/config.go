@@ -30,7 +30,14 @@ type Command struct {
 	Limits  Limits
 	// Always are extra commands that run in every non-full run, next to the
 	// scoped command. A --full run already covers them.
-	Always []string
+	Always []AlwaysEntry
+}
+
+// AlwaysEntry is one extra command. With Files set it runs only when a changed
+// file matches one of the globs.
+type AlwaysEntry struct {
+	Command string
+	Files   []string
 }
 
 // Limits are the optional time limits of a test entry. A zero duration means
@@ -196,18 +203,49 @@ func parseCommand(kind string, raw json.RawMessage) (Command, error) {
 			c.Limits = l
 		}
 		if pair.Always != nil {
-			var always []string
-			if err := json.Unmarshal(pair.Always, &always); err != nil {
-				return Command{}, errors.New(`"always" must be a list of command strings`)
+			var items []json.RawMessage
+			if err := json.Unmarshal(pair.Always, &items); err != nil {
+				return Command{}, errAlwaysShape
 			}
-			if slices.Contains(always, "") {
-				return Command{}, errors.New(`"always" must not hold an empty command`)
+			for _, item := range items {
+				e, err := parseAlwaysEntry(item)
+				if err != nil {
+					return Command{}, err
+				}
+				c.Always = append(c.Always, e)
 			}
-			c.Always = always
 		}
 		return c, nil
 	}
 	return Command{}, errors.New(`want a command string, false or {"changed", "full"}`)
+}
+
+var errAlwaysShape = errors.New(`"always" must be a list of command strings or {"command", "files"} objects`)
+
+func parseAlwaysEntry(raw json.RawMessage) (AlwaysEntry, error) {
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		if s == "" {
+			return AlwaysEntry{}, errors.New(`"always" must not hold an empty command`)
+		}
+		return AlwaysEntry{Command: s}, nil
+	}
+	var obj struct {
+		Command string   `json:"command"`
+		Files   []string `json:"files"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&obj); err != nil {
+		return AlwaysEntry{}, errAlwaysShape
+	}
+	if obj.Command == "" {
+		return AlwaysEntry{}, errors.New(`"always" object needs a non-empty "command"`)
+	}
+	if len(obj.Files) == 0 || slices.Contains(obj.Files, "") {
+		return AlwaysEntry{}, errors.New(`"always" object needs a non-empty "files" list of globs`)
+	}
+	return AlwaysEntry{Command: obj.Command, Files: obj.Files}, nil
 }
 
 // LoadConfig resolves the config: the repo file, else projectChecks (called

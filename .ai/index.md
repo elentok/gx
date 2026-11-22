@@ -69,6 +69,9 @@ A new config key must reach the settings page or be excluded with a reason:
   (`testutil/gxfixture/tuiflows`, driven through `testutil/vtterm`). `make test` shares one CPU budget between its steps, half the cores by
   default; set `GX_TEST_CPUS=<n>` to change it. Every `gx brief go-test` run caps itself the same
   way (GOMAXPROCS at two fifths of that budget) unless the environment already sets GOMAXPROCS.
+- Slow packages need a longer `-timeout` than the 60s used while iterating: `./testutil/gxfixture`
+  needs `-timeout 400s` (the full run in `scripts/test.sh` uses `10m`). Pick the timeout before the
+  first run; a too-short one only shows up as a panic after it expires.
 - Test-writing rules shared with other projects are in `skills/gx-test-guidelines/SKILL.md`, and the
   portable Go test rules (test state, socket paths, clocks, real machine state, fakes on idle paths)
   are in `skills/gx-go-tests/SKILL.md`. The rules below are gx-only.

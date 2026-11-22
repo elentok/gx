@@ -7,11 +7,11 @@
     "full": "gx brief go-test ./sleepguard ./envguard ./oldwords ./playwrightguard ./sizeguard ./setstateguard",
     "changed": "gx brief go-test -run '^TestNoNewSleeps$' ./sleepguard",
     "always": [
-      "gx brief go-test -run '^TestNoEnvReads$' ./envguard",
+      { "command": "gx brief go-test -run '^TestNoEnvReads$' ./envguard", "files": ["**/*.go"] },
       "gx brief go-test -run '^TestNoOldWords$' ./oldwords",
-      "gx brief go-test ./playwrightguard",
-      "gx brief go-test ./sizeguard",
-      "gx brief go-test ./setstateguard"
+      { "command": "gx brief go-test ./playwrightguard", "files": ["webui/**"] },
+      { "command": "gx brief go-test ./sizeguard", "files": ["**/*.go"] },
+      { "command": "gx brief go-test ./setstateguard", "files": ["**/*.go"] }
     ]
   },
   "test": {
