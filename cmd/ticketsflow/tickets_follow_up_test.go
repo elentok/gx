@@ -2,6 +2,7 @@ package ticketsflow
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -232,8 +233,62 @@ func TestExecute_TicketsFollowUpSearch_MatchesOpenAndArchivedWithReason(t *testi
 
 	// A word only in a non-Problem section does not match.
 	out, err = runIn(t, repo, "tickets", "follow-up", "search", "--project", "mine", "guard")
-	if err != nil || out != "" {
-		t.Errorf("search guard = %q, %v; want no hits", out, err)
+	if err != nil || out != "no matches\n" {
+		t.Errorf("search guard = %q, %v; want the no matches line", out, err)
+	}
+}
+
+func TestExecute_TicketsFollowUpSearch_NoMatchesPrintsALine(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	addProject(t, isolateTicketStore(t), "mine", repo)
+	out, err := runIn(t, repo, "tickets", "follow-up", "search", "nothing-like-this")
+	if err != nil || out != "no matches\n" {
+		t.Errorf("search = %q, %v; want the no matches line and no error", out, err)
+	}
+}
+
+func TestExecute_TicketsFollowUpSearch_CapsArchivedHits(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	project := addProject(t, isolateTicketStore(t), "mine", repo)
+	for _, epic := range []string{tickets.FollowUpsEpic, tickets.ArchivedFollowUpsEpic} {
+		testutil.EnsureEpicTicketMD(t, filepath.Join(project, epic))
+		if err := os.MkdirAll(filepath.Join(project, epic, "issues"), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fu := filepath.Join(project, tickets.FollowUpsEpic, "issues")
+	testutil.WriteFile(t, fu, "01-open.md", "---\nid: \"01\"\nstatus: draft\ntype: research\n---\n\n# 01 — Open one\n\n## Problem\n\nwidget broke.\n")
+	arch := filepath.Join(project, tickets.ArchivedFollowUpsEpic, "issues")
+	for i := 1; i <= 12; i++ {
+		id := fmt.Sprintf("%02d", i)
+		testutil.WriteFile(t, arch, id+"-a.md", fmt.Sprintf("---\nid: %q\nstatus: cancelled\ntype: research\n---\n\n# %s — Old %s\n\n## Problem\n\nwidget broke.\n", id, id, id))
+	}
+
+	out, err := runIn(t, repo, "tickets", "follow-up", "search", "widget")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 12 {
+		t.Fatalf("got %d lines, want open + 10 archived + more line:\n%s", len(lines), out)
+	}
+	if !strings.Contains(lines[0], "follow-ups/01") {
+		t.Errorf("first line = %q, want the open hit", lines[0])
+	}
+	if !strings.Contains(lines[1], "follow-ups-archived/12") || !strings.Contains(lines[10], "follow-ups-archived/03") {
+		t.Errorf("archived hits not newest first, capped at 10:\n%s", out)
+	}
+	if last := lines[11]; !strings.Contains(last, "2 more") || !strings.Contains(last, "--all") {
+		t.Errorf("last line = %q, want it to count 2 left out and name --all", last)
+	}
+
+	out, err = runIn(t, repo, "tickets", "follow-up", "search", "--all", "widget")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines = strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 13 || strings.Contains(out, "more archived") {
+		t.Errorf("--all printed %d lines, want open + 12 archived and no more line:\n%s", len(lines), out)
 	}
 }
 

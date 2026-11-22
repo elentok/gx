@@ -73,17 +73,20 @@ func newTicketsFollowUpCmd(d Deps) *cobra.Command {
 	followUpAddCmd.Flags().BoolVar(&followUpJSON, "json", false, "emit {address, path} JSON")
 	followUpCmd.AddCommand(followUpAddCmd)
 	var followUpProject string
+	var followUpSearchAll bool
 	followUpSearchCmd := &cobra.Command{
 		Use:   "search <words...>",
 		Short: "find open and archived follow-ups whose title or Problem mentions any of the words (a quoted phrase counts as separate words)",
 		Long: "Find open and archived follow-ups whose title or ## Problem mentions any of the words\n" +
 			"(case-insensitive, OR). A quoted phrase counts as separate words. Prints address, status and title per hit; an archived hit also\n" +
-			"shows its close reason.",
+			"shows its close reason. Open hits all print; archived hits print newest first, at most 10, with a last line counting the rest\n" +
+			"(--all prints them). No hit prints \"no matches\".",
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runTicketsFollowUpSearch(d, followUpProject, args, c.OutOrStdout())
+			return runTicketsFollowUpSearch(d, followUpProject, args, followUpSearchAll, c.OutOrStdout())
 		},
 	}
+	followUpSearchCmd.Flags().BoolVar(&followUpSearchAll, "all", false, "print every archived hit, not just the newest 10")
 	followUpSearchCmd.Flags().StringVar(&followUpProject, "project", "", "project to search (default: the cwd's)")
 	followUpCmd.AddCommand(followUpSearchCmd)
 	return followUpCmd

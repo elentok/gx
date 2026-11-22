@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/elentok/gx/cmd/ticketref"
@@ -14,8 +15,10 @@ import (
 // runTicketsFollowUpSearch prints one line per open or archived follow-up of
 // project whose title or ## Problem contains any of words (case-insensitive),
 // so a dedupe reads a few hits instead of two whole listings. An archived hit
-// also shows its close reason. An empty project means the cwd project.
-func runTicketsFollowUpSearch(d Deps, project string, words []string, w io.Writer) error {
+// also shows its close reason. Open hits print in full; archived hits come
+// newest first, capped at maxArchivedHits unless all. No hit prints "no
+// matches". An empty project means the cwd project.
+func runTicketsFollowUpSearch(d Deps, project string, words []string, all bool, w io.Writer) error {
 	words = searchWords(words)
 	if len(words) == 0 {
 		return fmt.Errorf("follow-up search needs at least one word")
@@ -28,28 +31,63 @@ func runTicketsFollowUpSearch(d Deps, project string, words []string, w io.Write
 	if err != nil {
 		return err
 	}
+	var open, archived []string
 	for _, name := range []string{tickets.FollowUpsEpic, tickets.ArchivedFollowUpsEpic} {
 		for _, e := range epics {
 			if e.Name != name {
 				continue
 			}
-			for _, t := range e.Tickets {
+			ts := append([]tickets.Ticket(nil), e.Tickets...)
+			if name == tickets.ArchivedFollowUpsEpic {
+				sort.SliceStable(ts, func(i, j int) bool { return newerID(ts[i].Identifier, ts[j].Identifier) })
+			}
+			for _, t := range ts {
 				haystack := strings.ToLower(t.Title + "\n" + schema.Section(t.Body, "Problem"))
 				if !containsAny(haystack, words) {
 					continue
 				}
 				a := tickets.Address{Project: project, Epic: name, ID: t.Identifier}
 				line := fmt.Sprintf("%s  %s  %s", a, t.Status, t.Title)
-				if name == tickets.ArchivedFollowUpsEpic {
-					if reason := closeReason(t.Body); reason != "" {
-						line += "  (" + reason + ")"
-					}
+				if name != tickets.ArchivedFollowUpsEpic {
+					open = append(open, line)
+					continue
 				}
-				fmt.Fprintln(w, line)
+				if reason := closeReason(t.Body); reason != "" {
+					line += "  (" + reason + ")"
+				}
+				archived = append(archived, line)
 			}
 		}
 	}
+	if len(open)+len(archived) == 0 {
+		fmt.Fprintln(w, "no matches")
+		return nil
+	}
+	for _, line := range open {
+		fmt.Fprintln(w, line)
+	}
+	shown := archived
+	if !all && len(shown) > maxArchivedHits {
+		shown = shown[:maxArchivedHits]
+	}
+	for _, line := range shown {
+		fmt.Fprintln(w, line)
+	}
+	if left := len(archived) - len(shown); left > 0 {
+		fmt.Fprintf(w, "%d more archived hits not shown; --all prints them\n", left)
+	}
 	return nil
+}
+
+const maxArchivedHits = 10
+
+// newerID reports whether id a sorts before b when newest comes first: IDs
+// are zero-padded counters, so a longer one is larger.
+func newerID(a, b string) bool {
+	if len(a) != len(b) {
+		return len(a) > len(b)
+	}
+	return a > b
 }
 
 func searchWords(words []string) []string {

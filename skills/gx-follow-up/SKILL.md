@@ -56,7 +56,7 @@ and, when the project has an epic named `test-health`, the tickets of `<project>
 the follow-ups ones with
 `gx tickets follow-up search --project <project> <words...>`: it matches any of the words in a
 title or `## Problem` (a quoted phrase counts as separate words) and prints address, status and title per hit, plus the close reason for an archived
-hit. Never print the whole listings. When the finding names a failing test, search the candidates
+hit. Open hits all print; archived hits print newest first, at most 10, and a last line counts the rest (`--all` prints them). No hit prints `no matches`. Never print the whole listings. When the finding names a failing test, search the candidates
 for that test name first. Judge each hit yourself, by title and `## Problem`: the same problem, not the same area.
 
 `follow-up search` does not read `test-health`. Search it with two reads and no new verb:
