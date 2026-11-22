@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { Connection } from "./connection"
-import { useOnChange } from "./hooks"
+import { useLatest, useOnChange } from "./hooks"
 import { readPageCache, writePageCache } from "./pageCache"
 import { useRefetchOnEvents } from "./refetch"
 
@@ -30,8 +30,7 @@ export function useFetched<T>(
   conn?: Connection,
   { id = "", debounceMs, refetchOnFocus = false }: FetchedOptions = {},
 ): FetchedState<T> {
-  const latest = useRef(fetcher)
-  latest.current = fetcher
+  const latest = useLatest(fetcher)
   const [loaded, setLoaded] = useState<{ id: string; data: T } | null>(null)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)

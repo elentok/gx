@@ -18,6 +18,7 @@ import type { ChatDraft } from "../generated/server"
 import { ReasonHistoryEntryGone, type DraftHistoryEntry } from "../generated/ops"
 import { HistoryButton, HistoryHost } from "../history/HistoryButton"
 import { postChatPick, type ListHistory, type PickChatHistory } from "../history/api"
+import { useLatest } from "../hooks"
 import { agentPath } from "../hrefs"
 import { DetailPage } from "../page/DetailPage"
 import { StateHeader } from "../page/StateHeader"
@@ -70,8 +71,7 @@ export function ChatDraftPage({
   // `undefined` is still loading; `null` is no such draft.
   const [loaded, setLoaded] = useState<ChatDraft | null>()
   // The client is fixed for the page's life, so the read uses the latest of them without re-running.
-  const latest = useRef({ drafts, leaveGone })
-  latest.current = { drafts, leaveGone }
+  const latest = useLatest({ drafts, leaveGone })
   useEffect(() => {
     let live = true
     latest.current.drafts
@@ -191,8 +191,7 @@ function ChatDraftForm({
   // New chat draft opens this page asking for the brief's focus, and on an empty page it asks again.
   usePromptFocus(formRef)
   const openHistory = () => setHistoryOpen(true)
-  const pageState = useRef({ empty: !brief.trim(), focusBrief, openHistory })
-  pageState.current = { empty: !brief.trim(), focusBrief, openHistory }
+  const pageState = useLatest({ empty: !brief.trim(), focusBrief, openHistory })
   useEffect(
     () =>
       registerChatDraftPage({

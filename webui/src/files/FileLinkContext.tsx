@@ -9,6 +9,7 @@ import {
   useState,
 } from "react"
 import { type HostedResolved, HostedFound, HostedMissing } from "../generated/ops"
+import { useLatest } from "../hooks"
 import { createResolver, type FileResolver, type ResolveBase } from "./resolve"
 
 export type FileLinkContextValue = {
@@ -78,8 +79,7 @@ export function FileLinkProvider({
   const [missing, setMissing] = useState<ReadonlySet<string>>(new Set())
   const pending = useRef(new Set<string>())
   const scheduled = useRef(false)
-  const latest = useRef(verdicts)
-  latest.current = verdicts
+  const latest = useLatest(verdicts)
 
   const rechecking = useRef(new Set<string>())
 

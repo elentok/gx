@@ -1,7 +1,7 @@
 import { Box, Text } from "@chakra-ui/react"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 import type { SessionRoundCard } from "../generated/server"
-import { useOnChange } from "../hooks"
+import { useLatest, useOnChange } from "../hooks"
 import { NO_SIDEBAR_SWIPE_ATTR } from "../shell/useSidebarSwipe"
 import { Button } from "../ui/button/Button"
 import { promptBoxNamed, PROMPT_BOX_SELECTOR } from "../ui/expandable-text/look"
@@ -221,8 +221,7 @@ export function QuestionSheet({
     setIndex(Math.min(round.length - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth))))
   }
 
-  const onAnswersRef = useRef(onAnswers)
-  onAnswersRef.current = onAnswers
+  const onAnswersRef = useLatest(onAnswers)
   const onAnswer = useCallback(
     (label: string, a: Answer) => onAnswersRef.current((all) => ({ ...all, [label]: a })),
     [],

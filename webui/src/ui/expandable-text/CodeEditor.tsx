@@ -13,6 +13,7 @@ import {
   type RefObject,
 } from "react"
 import type { MenuKey } from "../../commands/useCompletion"
+import { useLatest } from "../../hooks"
 import type { Selection } from "./LargeEditor"
 import { useViEscape } from "../../vimode"
 import { fieldLook, PROMPT_BOX_ATTR } from "./look"
@@ -132,8 +133,7 @@ function useSlot(
   const slot = useRef(new Compartment())
   const seen = useRef(dep)
   // `dep` is the trigger; the rest is read at run time, so only a change of `dep` reconfigures.
-  const latest = useRef({ view, make, around })
-  latest.current = { view, make, around }
+  const latest = useLatest({ view, make, around })
   useEffect(() => {
     if (Object.is(seen.current, dep)) return
     seen.current = dep
@@ -220,7 +220,7 @@ export default function CodeEditor({
 }) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
-  const callbacks = useRef({
+  const callbacks = useLatest({
     onChange,
     onSelectionChange,
     onModeChange,
@@ -229,15 +229,6 @@ export default function CodeEditor({
     onToggle,
     onMenuKey,
   })
-  callbacks.current = {
-    onChange,
-    onSelectionChange,
-    onModeChange,
-    onZZ,
-    onSubmit,
-    onToggle,
-    onMenuKey,
-  }
   const viEscape = useViEscape()
   mapEscape(viEscape)
   const external = useRef(false)
@@ -282,7 +273,7 @@ export default function CodeEditor({
   const lockSlot = useSlot(view, disabled, () => lockExt(disabled))
 
   // The latest props for the effects that must not re-run on them: the mount effect and the value sync.
-  const latest = useRef({
+  const latest = useLatest({
     value,
     selection,
     caret,
@@ -296,20 +287,6 @@ export default function CodeEditor({
     viSlot,
     lockSlot,
   })
-  latest.current = {
-    value,
-    selection,
-    caret,
-    viMode,
-    disabled,
-    placeholder,
-    label,
-    autoFocus,
-    inline,
-    startVi,
-    viSlot,
-    lockSlot,
-  }
 
   useImperativeHandle(
     handle,

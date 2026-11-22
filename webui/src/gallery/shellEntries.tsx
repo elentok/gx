@@ -11,6 +11,7 @@ import {
   type SessionInfo,
   type Workspace,
 } from "../generated/server"
+import { useLatest } from "../hooks"
 import { ListRow, type ListRowData } from "../nav/JumpMenu"
 import { AppShell } from "../shell/AppShell"
 import { ChordBox } from "../shell/ChordBox"
@@ -214,8 +215,7 @@ const chordBoxEntry: GalleryEntry = {
 // Slides the sidebar open once mounted; the docked desktop sidebar is already open.
 const OpenSidebar = () => {
   const shell = useShell()
-  const latest = useRef(shell)
-  latest.current = shell
+  const latest = useLatest(shell)
   useEffect(() => {
     // Once on mount; toggling again would close it.
     if (!latest.current?.sidebarOpen) latest.current?.toggle()

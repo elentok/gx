@@ -7,6 +7,7 @@ import {
   type DesignDraftPickResult,
 } from "../generated/ops"
 import { useConnectionContext, useConnectionState } from "../connection"
+import { useLatest } from "../hooks"
 import { defaultProject } from "../workspaces/defaultProject"
 import type { DraftsClient } from "./drafts"
 import { hasText, type Fields } from "./draftFields"
@@ -293,8 +294,7 @@ export function useDraftAutosave({
 
   // The effects below call these through a ref, so they run the functions of the latest render
   // and never re-subscribe. Each of them reads refs only.
-  const latestFns = useRef({ flush, stash, hasContent, removeIfEmpty: drafts.removeIfEmpty })
-  latestFns.current = { flush, stash, hasContent, removeIfEmpty: drafts.removeIfEmpty }
+  const latestFns = useLatest({ flush, stash, hasContent, removeIfEmpty: drafts.removeIfEmpty })
   useEffect(() => {
     const leave = () => {
       // The save below may not finish before the page goes, so the fallback is written first.

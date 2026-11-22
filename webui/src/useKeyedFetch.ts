@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
+import { useLatest } from "./hooks"
 
 /** The settled result of a keyed fetch: its value, or a failure. */
 export type Keyed<T> = { value: T } | { failed: true }
@@ -12,8 +13,7 @@ export function useKeyedFetch<T>(
   key: string | null,
   fetcher: () => Promise<T>,
 ): Keyed<T> | undefined {
-  const latest = useRef(fetcher)
-  latest.current = fetcher
+  const latest = useLatest(fetcher)
   const [settled, setSettled] = useState<{ key: string; result: Keyed<T> }>()
   useEffect(() => {
     if (key === null) return

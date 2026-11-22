@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from "react"
 import type { SelectApi } from "../shell/SidebarSelect"
+import { useLatest } from "../hooks"
 import { isTextTarget } from "../shell/keys"
 import { hasLayer } from "../ui/modal/layers"
 import { isMoveKey, moveInGrid } from "./gridNav"
@@ -21,8 +22,7 @@ const itemsOf = (area: HTMLElement) => Array.from(area.querySelectorAll<HTMLElem
  * Runs in the capture phase so that Enter toggles before an item's own click handler sees it.
  */
 export function usePageKeys(area: RefObject<HTMLElement | null>, select: SelectApi) {
-  const selectRef = useRef(select)
-  selectRef.current = select
+  const selectRef = useLatest(select)
   const stop = useRef("")
 
   // After every render: the list of items changes with the data.

@@ -6,6 +6,7 @@ import {
   type ChatDraftPickResult,
 } from "../generated/ops"
 import { EventChatDraftsChanged, type ChatDraft } from "../generated/server"
+import { useLatest } from "../hooks"
 import type { ChatDraftsClient } from "./chatDrafts"
 
 const AUTOSAVE_MS = 800
@@ -78,8 +79,7 @@ export function useChatDraftAutosave({
   const phase = useRef<Phase>("editing")
   // The banner's ref twin, so a flush in flight sees it before a render.
   const blocked = useRef(false)
-  const goneNow = useRef(onGone)
-  goneNow.current = onGone
+  const goneNow = useLatest(onGone)
 
   const leaveGone = (started?: string) => {
     phase.current = "finished"
@@ -206,8 +206,7 @@ export function useChatDraftAutosave({
   const conn = useConnectionContext()
   // The client and connection are fixed for the page's life, so the effects below read them and
   // `flush` through a ref. `flush` and `leaveGone` read refs only, so a call from an old render is safe.
-  const latestFns = useRef({ conn, drafts, flush, leaveGone })
-  latestFns.current = { conn, drafts, flush, leaveGone }
+  const latestFns = useLatest({ conn, drafts, flush, leaveGone })
   useEffect(() => {
     const off = latestFns.current.conn.onEvent((_address, type) => {
       if (type !== EventChatDraftsChanged || phase.current === "finished") return

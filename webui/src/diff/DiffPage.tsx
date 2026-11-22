@@ -1,8 +1,9 @@
 import { Box, chakra } from "@chakra-ui/react"
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react"
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router"
 import { fetchArchivedEpicDetail, fetchEpicDetail, type FetchEpicDetail } from "../epic/detail"
 import type { DiffFile } from "../generated/server"
+import { useLatest } from "../hooks"
 import { DetailPage } from "../page/DetailPage"
 import { PageHeader } from "../page/PageHeader"
 import { isTextTarget } from "../shell/keys"
@@ -278,8 +279,7 @@ function FilesBrowser({
     const from = index === -1 ? (d === 1 ? -1 : 0) : index
     onSelect(order[(from + d + order.length) % order.length].path)
   }
-  const stepRef = useRef(step)
-  stepRef.current = step
+  const stepRef = useLatest(step)
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || isTextTarget(e.target)) return

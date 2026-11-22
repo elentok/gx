@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react"
+import { useEffect } from "react"
 import { useNavigate } from "react-router"
 import { useConnectionContext } from "../connection"
 import { EventDesignDraftsChanged } from "../generated/server"
+import { useLatest } from "../hooks"
 import { designHref } from "../hrefs"
 import type { DraftsClient } from "./drafts"
 import type { DraftAutosave } from "./useDraftAutosave"
@@ -46,8 +47,7 @@ export function useDraftLifecycle({
     }
   }
   // The client and connection are fixed for the page's life, so the open effect reads them through a ref.
-  const latest = useRef({ reread, ping: () => drafts.ping(currentId()), conn })
-  latest.current = { reread, ping: () => drafts.ping(currentId()), conn }
+  const latest = useLatest({ reread, ping: () => drafts.ping(currentId()), conn })
 
   useEffect(() => {
     const check = () => void latest.current.reread()

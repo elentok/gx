@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react"
+import { useEffect } from "react"
+import { useLatest } from "../hooks"
 import { hasLayer } from "../ui/modal/layers"
 
 /** Horizontal travel that makes a gesture a swipe. */
@@ -47,8 +48,7 @@ export function useSidebarSwipe(opts: {
   onOpen: () => void
   onClose: () => void
 }) {
-  const latest = useRef(opts)
-  latest.current = opts
+  const latest = useLatest(opts)
   const { docked } = opts
   useEffect(() => {
     if (docked) return

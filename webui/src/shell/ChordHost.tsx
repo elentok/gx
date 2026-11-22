@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useOnChange } from "../hooks"
 import { useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
+import { useLatest } from "../hooks"
 import { leaderKeyOf } from "../leaderKey"
 import { hasLayer } from "../ui/modal/layers"
 import { ChordBox } from "./ChordBox"
@@ -39,8 +40,7 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
   const ctx = open ? { ...baseCtx, historyReady: hasHistoryOpener() } : baseCtx
 
   // The listener is mounted once and reads everything at event time.
-  const live = useRef({ leader, ctx, session, navigate })
-  live.current = { leader, ctx, session, navigate }
+  const live = useLatest({ leader, ctx, session, navigate })
   const openRef = useRef(false)
   const close = useCallback(() => {
     openRef.current = false
@@ -74,8 +74,7 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
       }),
     [chords],
   )
-  const tableRef = useRef(table)
-  tableRef.current = table
+  const tableRef = useLatest(table)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

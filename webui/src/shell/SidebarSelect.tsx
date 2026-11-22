@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react"
 import type { FetchEpicList } from "../epics/list"
+import { useLatest } from "../hooks"
 import { Button } from "../ui/button/Button"
 import { hasLayer } from "../ui/modal/layers"
 import {
@@ -79,8 +80,7 @@ export function useSelectApi(
   ownsKey: (t: EventTarget | null) => boolean = pageOwnsKey,
 ): SelectApi {
   const [state, setState] = useState<SelectState>(initialSelect)
-  const stateRef = useRef(state)
-  stateRef.current = state
+  const stateRef = useLatest(state)
   // A run's moved rows leave the list only on a later refetch, after afterRun ran on the old rows.
   // The moved rows can leave on several refetches (epics before drafts), so the flag stays up until select
   // mode ends or the user changes the selection.
@@ -93,8 +93,7 @@ export function useSelectApi(
     if (!next.on) runPending.current = false
     setState(next)
   }, [loaded, rows])
-  const ownsKeyRef = useRef(ownsKey)
-  ownsKeyRef.current = ownsKey
+  const ownsKeyRef = useLatest(ownsKey)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || !ownsKeyRef.current(e.target)) return
@@ -160,8 +159,7 @@ const QUEUE_REASON = "Managed by the queue: it can't be selected."
  * mode Enter toggles instead of reaching the row's open handler. Escape is handled by useSelectApi.
  */
 function useSidebarSelectKeys(sel: SidebarSelect) {
-  const ref = useRef(sel)
-  ref.current = sel
+  const ref = useLatest(sel)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const stop =

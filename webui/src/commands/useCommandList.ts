@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { apiFetchSide } from "../apiFetch"
 import type { SessionCommandEntry, SessionCommandsResponse } from "../generated/server"
+import { useLatest } from "../hooks"
 
 /** A session id, or the project + dir of a First prompt. */
 export type CommandTarget = { sessionId: string } | { project: string; dir: string }
@@ -61,8 +62,7 @@ export function useCommandList(
 ): CommandList {
   const key = keyOf(target, kind)
   // Callers rebuild `target` each render; `key` is its identity, so the effect reads the latest one.
-  const targetRef = useRef(target)
-  targetRef.current = target
+  const targetRef = useLatest(target)
   const [state, setState] = useState<{ key: string; list: CommandList }>(() => ({
     key,
     list: fromCache(cache.get(key)),

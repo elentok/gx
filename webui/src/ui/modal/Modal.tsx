@@ -7,6 +7,7 @@ import {
   type Ref,
 } from "react"
 import { createPortal } from "react-dom"
+import { useLatest } from "../../hooks"
 import { useIsTopLayer } from "./layers"
 
 interface ModalProps extends Omit<BoxProps, "children"> {
@@ -93,8 +94,7 @@ export function Modal({
 }: ModalProps) {
   // A drag that starts in the panel and ends on the backdrop fires a click there; only a press on the backdrop closes.
   const pressedBackdrop = useRef(false)
-  const close = useRef(onClose)
-  close.current = onClose
+  const close = useLatest(onClose)
   const isTop = useIsTopLayer()
   useEffect(() => {
     if (!closeOnEscape) return

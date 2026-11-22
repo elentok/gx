@@ -10,6 +10,7 @@ import { postSaveChecks, type SaveChecks } from "../checks/setup"
 import { fetchChecksStatus, type FetchChecksStatus } from "../checks/status"
 import { useConnectionContext } from "../connection"
 import { CardKindFollowUps, type Workspace } from "../generated/server"
+import { useLatest } from "../hooks"
 import { usePageKeys } from "../select/pageKeys"
 import { rowOfCard, type SelectAction } from "../select/selectModel"
 import { SidebarBulkActions } from "../shell/SidebarBulkActions"
@@ -188,8 +189,7 @@ export function EpicsPage({
   // A one-time note from the page that sent us here (a removed draft). It is kept in state, then cleared from the history entry so a reload does not show it again.
   const [note] = useState(() => (location.state as { note?: string } | null)?.note)
   // Latest-value refs let the effect run once on arrival without listing them as dependencies.
-  const arrival = useRef({ navigate, pathname: location.pathname, note, focus })
-  arrival.current = { navigate, pathname: location.pathname, note, focus }
+  const arrival = useLatest({ navigate, pathname: location.pathname, note, focus })
   useEffect(() => {
     const { navigate, pathname, note, focus } = arrival.current
     if (note) navigate(pathname, { replace: true, state: { focus } })

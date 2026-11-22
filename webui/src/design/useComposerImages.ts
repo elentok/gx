@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react"
 import { useImageDraft } from "../drafts"
+import { useLatest } from "../hooks"
 import { checkImages } from "./imageLimits"
 import { deleteSessionImage, sessionImageUrl, uploadSessionImage } from "./sessionImages"
 
@@ -45,8 +46,7 @@ export function useComposerImages(sessionId: string): ComposerImages {
   const [draft, update] = useImageDraft(sessionId)
   // Files and failures of uploads started by this tab only; never persisted.
   const local = useRef(new Map<string, { file: File; failed?: string }>())
-  const count = useRef(draft.length)
-  count.current = draft.length
+  const count = useLatest(draft.length)
   const [, rerender] = useState(0)
   const touch = useCallback(() => rerender((n) => n + 1), [])
 

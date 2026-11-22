@@ -1,10 +1,11 @@
 import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Field, field } from "../agents/formField"
 import { fetchWorktrees, type FetchWorktrees } from "../agents/newSession"
 import { EFFORTS, HARNESSES, tierOptions, type Harness } from "../agents/tierOptions"
 import { baseName, WorktreePicker, type Option } from "../agents/WorktreePicker"
 import type { ProjectWorktrees } from "../generated/server"
+import { useLatest } from "../hooks"
 import { modelName } from "../modelName"
 import { fetchLaunchDefaults, type FetchDefaults, type LaunchDefaults } from "./chatDraftDefaults"
 import type { ChatSettings } from "./useChatDraftAutosave"
@@ -16,8 +17,7 @@ const harnessOf = (s: ChatSettings): Harness => (s.harness === "codex" ? "codex"
 export function useTrees(fetchTrees: FetchWorktrees = fetchWorktrees): ProjectWorktrees[] {
   const [trees, setTrees] = useState<ProjectWorktrees[]>([])
   // The fetcher is fixed for the page's life.
-  const latestFetch = useRef(fetchTrees)
-  latestFetch.current = fetchTrees
+  const latestFetch = useLatest(fetchTrees)
   useEffect(() => {
     let live = true
     latestFetch.current().then(
@@ -38,8 +38,7 @@ export function useLaunchDefaults(
 ): LaunchDefaults {
   const [got, setGot] = useState<{ harness: Harness } & LaunchDefaults>()
   // The fetcher is fixed for the page's life.
-  const latestFetch = useRef(fetcher)
-  latestFetch.current = fetcher
+  const latestFetch = useLatest(fetcher)
   useEffect(() => {
     let live = true
     latestFetch.current(harness).then(

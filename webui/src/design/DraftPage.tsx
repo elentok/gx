@@ -6,6 +6,7 @@ import { useOnChange } from "../hooks"
 import { useLocation, useNavigate, useParams } from "react-router"
 import type { DesignDraft } from "../generated/server"
 import { ReasonHistoryEntryGone, type DraftHistoryEntry } from "../generated/ops"
+import { useLatest } from "../hooks"
 import { HistoryHost } from "../history/HistoryButton"
 import { postDesignPick, type ListHistory, type PickDesignHistory } from "../history/api"
 import {
@@ -100,8 +101,7 @@ export function DraftPage({ drafts = realDrafts, ...props }: PageProps) {
   // `undefined` is still loading; `null` is no such draft.
   const [loaded, setLoaded] = useState<Loaded | null>()
   // The client is fixed for the page's life, so the read uses the latest of them without re-running.
-  const latest = useRef({ drafts, leaveGone })
-  latest.current = { drafts, leaveGone }
+  const latest = useLatest({ drafts, leaveGone })
   useEffect(() => {
     let live = true
     ;(async () => {
@@ -243,14 +243,13 @@ function DraftForm({
   }
   const hasContent = () => autosave.hasContent()
   const openHistory = () => setHistoryOpen(true)
-  const actions = useRef({
+  const actions = useLatest({
     remove: askRemove,
     rename: renameFocus,
     focusPrompt,
     hasContent,
     openHistory,
   })
-  actions.current = { remove: askRemove, rename: renameFocus, focusPrompt, hasContent, openHistory }
   useEffect(
     () =>
       registerDraftPage({

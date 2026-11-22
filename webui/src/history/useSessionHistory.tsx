@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { LuClock } from "react-icons/lu"
 import type { ComposerImages } from "../design/useComposerImages"
 import type { ComposerPickRequest, ComposerPickResult, DraftHistoryEntry } from "../generated/ops"
+import { useLatest } from "../hooks"
 import { Button } from "../ui/button/Button"
 import { PROMPT_BOX_SELECTOR } from "../ui/expandable-text/look"
 import { refusalText } from "../useWrite"
@@ -53,8 +54,7 @@ export function useSessionHistory({
     )
   }, [list])
 
-  const openRef = useRef(open)
-  openRef.current = open
+  const openRef = useLatest(open)
   useEffect(() => {
     if (!enabled) return
     return registerHistoryOpener(() => openRef.current())

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { apiFetch } from "../apiFetch"
 import { RESYNC_EVENT, type Connection } from "../connection"
 import type { TicketDetail } from "../generated/server"
+import { useLatest } from "../hooks"
 import { readPageCache, writePageCache } from "../pageCache"
 
 export type { TicketDetail }
@@ -63,8 +64,7 @@ export function useDetail<T>(
     source: "cache",
   }))
   const latest = useRef(0)
-  const current = useRef(address)
-  current.current = address
+  const current = useLatest(address)
 
   const refetch = useCallback(() => {
     // A callback kept from an earlier address (a POST that returns after the person moved on) must not bump

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import type { SessionPermissionResponse } from "../generated/server"
+import { useLatest } from "../hooks"
 import { fetchJson } from "../ticket/detail"
 
 export type FetchPermission = (sessionId: string) => Promise<SessionPermissionResponse | undefined>
@@ -19,8 +20,7 @@ type Read = { sessionId: string; value?: SessionPermissionResponse }
 export function usePermission(sessionId: string, enabled: boolean, read: FetchPermission) {
   const [done, setDone] = useState<Read>()
   // `read` is a prop that tests stub; a new identity must not re-read.
-  const latestRead = useRef(read)
-  latestRead.current = read
+  const latestRead = useLatest(read)
   useEffect(() => {
     if (!enabled) return
     let live = true

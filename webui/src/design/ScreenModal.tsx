@@ -70,7 +70,7 @@ export function ScreenModal({
     } finally {
       setLoading(false)
     }
-  }, [latestFetcher, target])
+  }, [target])
   // Only a different target reloads (`load` changes with it); Refresh is the other way in.
   useEffect(() => {
     void load()

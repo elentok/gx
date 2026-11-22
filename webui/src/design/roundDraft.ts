@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { readRoundDraft, writeRoundDraft } from "../drafts"
+import { useLatest } from "../hooks"
 import type { Answers } from "../ui/question-sheet/round"
 
 type RoundDraftData = { answers: Answers; index: number; scroll: number }
@@ -30,8 +31,7 @@ export function useRoundDraft(sessionId: string, roundKey: string) {
   }))
   // The scroll lives in a ref: every scroll event saving through state would repaint the page.
   const scroll = useRef(draft.scroll)
-  const latest = useRef(draft)
-  latest.current = draft
+  const latest = useLatest(draft)
   const sent = useRef(false)
 
   const save = useCallback(

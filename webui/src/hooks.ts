@@ -32,5 +32,5 @@ export function useOnChange<T>(
     // `changes` is the trigger; it is a counter so the effect re-runs once per change.
     if (changes === 0 && !immediate) return
     return latestFn.current(latestValue.current)
-  }, [changes, immediate, latestFn, latestValue])
+  }, [changes, immediate])
 }

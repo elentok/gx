@@ -11,6 +11,13 @@
     "domains": { "react": "recommended", "test": "recommended" },
     "rules": {
       "preset": "recommended",
+      "correctness": {
+        // `useLatest` returns a ref that never changes identity, so it is not a dependency.
+        "useExhaustiveDependencies": {
+          "level": "error",
+          "options": { "hooks": [{ "name": "useLatest", "stableResult": true }] }
+        }
+      },
       "style": {
         // Off on purpose: the code uses `!` where a value is known to exist, and tsc already checks the rest.
         "noNonNullAssertion": "off"

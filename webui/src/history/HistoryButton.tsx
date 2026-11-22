@@ -1,7 +1,8 @@
 import { chakra } from "@chakra-ui/react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { LuClock } from "react-icons/lu"
 import type { DraftHistoryEntry } from "../generated/ops"
+import { useLatest } from "../hooks"
 import { useWide } from "../useWide"
 import { HistoryPopup } from "./HistoryPopup"
 import { postHistoryList, type HistoryList, type ListHistory } from "./api"
@@ -54,8 +55,7 @@ export function HistoryHost({
 }) {
   const [shown, setShown] = useState<{ entries: DraftHistoryEntry[]; max: number }>()
   // Once per opening: the load reads the latest props without re-running.
-  const latest = useRef({ listHistory, onClose })
-  latest.current = { listHistory, onClose }
+  const latest = useLatest({ listHistory, onClose })
   useEffect(() => {
     let live = true
     latest.current
