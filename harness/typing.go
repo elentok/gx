@@ -178,6 +178,9 @@ func inputState(rows []string, m markerTyping) InputState {
 	if start < 0 {
 		return InputUndecided
 	}
+	if tornFrame(plain(rows[start])) {
+		return InputUndecided
+	}
 	// The first row's text follows the marker; a multi-line draft continues on
 	// rows indented under it, up to the first row that isn't.
 	if hasDraftText(parseCells(rows[start])[1:]) {
@@ -192,6 +195,12 @@ func inputState(rows []string, m markerTyping) InputState {
 		}
 	}
 	return InputEmpty
+}
+
+// tornFrame reports whether the input row carries Claude's startup header or
+// logo, which means the read caught a frame mid-paint. Neither is a draft.
+func tornFrame(row string) bool {
+	return strings.ContainsRune(row, '█') || strings.Contains(row, "Claude Code v")
 }
 
 // hasDraftText reports whether cells hold a visible rune that is neither dim

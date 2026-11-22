@@ -97,6 +97,30 @@ func TestTyping_InputIsEmpty(t *testing.T) {
 			want: harness.InputUndecided,
 		},
 		{
+			name: "claude header on the input row is undecided",
+			kind: "claude",
+			rows: []string{rule, "❯ Claude Code v2.1.0", rule},
+			want: harness.InputUndecided,
+		},
+		{
+			name: "claude logo on the input row is undecided",
+			kind: "claude",
+			rows: []string{rule, "❯ ▐▛███▜▌", rule},
+			want: harness.InputUndecided,
+		},
+		{
+			name: "claude missing cursor row is undecided",
+			kind: "claude",
+			rows: []string{rule, dim + "  ? for shortcuts" + rst, "⏺ working"},
+			want: harness.InputUndecided,
+		},
+		{
+			name: "claude text elsewhere on screen with an empty composer",
+			kind: "claude",
+			rows: []string{"Claude Code v2.1.0", "▐▛███▜▌", "⏺ some answer", rule, "❯ " + rev + " " + rst, rule},
+			want: harness.InputEmpty, plain: true,
+		},
+		{
 			name: "codex placeholder",
 			kind: "codex",
 			rows: []string{bold + "›" + rst + " " + rev + "I" + rst + dim + "mprove documentation in @filename" + rst, "", dim + "  gpt-5 · ~/dev" + rst},
