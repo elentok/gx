@@ -46,7 +46,9 @@ type Config struct {
 	HardLimitGrace time.Duration
 	// EventInterval is the throttle window of budget-changed; zero means DefaultEventInterval.
 	EventInterval time.Duration
-	Env           []string
+	// EventClock is the throttle's time source; the zero value is the wall clock. A test seam.
+	EventClock broker.Clock
+	Env        []string
 	// ExtraUsageCheck reads the subscription state; nil means subscription.CheckFresh.
 	ExtraUsageCheck func() subscription.State
 }
@@ -107,7 +109,7 @@ func New(d Deps) (*Budget, error) {
 		cfg: d.Config, settings: d.Settings, projects: d.Projects, idx: d.Index, registry: d.Registry,
 		harness: d.Harness, events: d.Events, guards: d.Guards, chat: d.Chat, log: d.Log, host: d.Host,
 		ledger: l,
-		evs:    newEventFeed(d.Config.EventInterval, func() { d.Events.Publish(wire.EventBudgetChanged, "") }),
+		evs:    newEventFeed(d.Config.EventInterval, d.Config.EventClock, func() { d.Events.Publish(wire.EventBudgetChanged, "") }),
 		costOf: iterationCostIn(d.Config.Env),
 	}, nil
 }

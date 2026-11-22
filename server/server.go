@@ -376,7 +376,7 @@ func New(cfg Config) (*Server, error) {
 		Config: budget.Config{
 			StateDir: cfg.StateDir, SoftLimit: cfg.BudgetSoftLimit, HardLimit: cfg.BudgetHardLimit,
 			KillGrace: cfg.BudgetKillGrace, PollInterval: cfg.BudgetPollInterval,
-			HardLimitGrace: cfg.HardLimitGrace, EventInterval: cfg.BudgetEventInterval, Env: cfg.Env,
+			HardLimitGrace: cfg.HardLimitGrace, EventInterval: cfg.BudgetEventInterval, EventClock: cfg.BudgetEventClock, Env: cfg.Env,
 			ExtraUsageCheck: cfg.ExtraUsageCheck,
 		},
 		Settings: &s.settings, Projects: s.projects, Index: idx, Registry: registry, Harness: s.harness,

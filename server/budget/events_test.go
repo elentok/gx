@@ -10,13 +10,14 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/broker/brokertest"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
-// budgetEventInterval outlasts a burst of budget polls, which take tens of
-// milliseconds each, so the burst test sees one window.
+// budgetEventInterval is the throttle window. The burst test moves a fake clock
+// by it; the other tests wait it out in real time.
 const budgetEventInterval = 300 * time.Millisecond
 
 // budgetEventFixture runs a claimed ticket whose cost the test sets, with the
@@ -27,7 +28,7 @@ type budgetEventFixture struct {
 	cost float64
 }
 
-func newBudgetEventFixture(t *testing.T) *budgetEventFixture {
+func newBudgetEventFixture(t *testing.T, cfg ...func(*server.Config)) *budgetEventFixture {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -36,6 +37,9 @@ func newBudgetEventFixture(t *testing.T) *budgetEventFixture {
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.BudgetPollInterval = time.Hour
 		c.BudgetEventInterval = budgetEventInterval
+		for _, f := range cfg {
+			f(c)
+		}
 	})
 	f := &budgetEventFixture{h: h}
 	h.Server.Budget().SetCostOf(func(wire.IterationInfo) (float64, bool) {
@@ -118,12 +122,15 @@ func TestBudgetEvent_FirstPollPublishesNothing(t *testing.T) {
 }
 
 func TestBudgetEvent_BurstCoalescesAndSummaryShowsFinalTotal(t *testing.T) {
-	f := newBudgetEventFixture(t)
+	clock := brokertest.NewFakeClock()
+	f := newBudgetEventFixture(t, func(c *server.Config) { c.BudgetEventClock = clock.Clock() })
 	f.spend(1)
 	ch := f.stream(t)
+	// The clock stands still, so every poll lands in the leading fire's window.
 	for total := 2.0; total <= 6; total++ {
 		f.spend(total)
 	}
+	clock.Advance(budgetEventInterval)
 	if got := budgetEvents(ch); got < 1 || got > 2 {
 		t.Fatalf("budget-changed events = %d, want a leading and at most one trailing", got)
 	}

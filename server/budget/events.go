@@ -24,12 +24,12 @@ type eventFeed struct {
 	published int64 // reading at the last publish (or the baseline)
 }
 
-func newEventFeed(interval time.Duration, publish func()) *eventFeed {
+func newEventFeed(interval time.Duration, clock broker.Clock, publish func()) *eventFeed {
 	if interval <= 0 {
 		interval = DefaultEventInterval
 	}
 	f := &eventFeed{}
-	f.throttle = broker.NewThrottle(interval, func() {
+	f.throttle = broker.NewThrottleClock(interval, clock, func() {
 		f.mu.Lock()
 		f.published = f.current
 		f.mu.Unlock()

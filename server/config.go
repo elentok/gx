@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/osnotify"
+	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/devvite"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
@@ -137,6 +138,10 @@ type Config struct {
 	// BudgetEventInterval is the coalescing window of budget-changed; zero
 	// means DefaultBudgetEventInterval.
 	BudgetEventInterval time.Duration
+
+	// BudgetEventClock is the budget-changed throttle's time source; the zero
+	// value is the wall clock. A test seam.
+	BudgetEventClock broker.Clock
 
 	// LookPath finds a harness's program; nil looks over Env's PATH.
 	LookPath func(file string) (string, error)
