@@ -21,9 +21,7 @@ const pt = (t: Touch): Pt => ({ x: t.clientX, y: t.clientY })
 function inCenter(p: Pt): boolean {
   const mx = (window.innerWidth * (1 - CENTER_SHARE)) / 2
   const my = (window.innerHeight * (1 - CENTER_SHARE)) / 2
-  return (
-    p.x >= mx && p.x <= window.innerWidth - mx && p.y >= my && p.y <= window.innerHeight - my
-  )
+  return p.x >= mx && p.x <= window.innerWidth - mx && p.y >= my && p.y <= window.innerHeight - my
 }
 
 /**
