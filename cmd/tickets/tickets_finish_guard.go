@@ -140,12 +140,35 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 	if err != nil {
 		return err
 	}
+	var found []tickets.Ticket
 	for _, a := range addrs {
-		if _, _, err := ticketref.FindTicket(dirs, cwd, a); err != nil {
+		_, t, err := ticketref.FindTicket(dirs, cwd, a)
+		if err != nil {
 			return fmt.Errorf("%s: --check-failures %s: %w", label, a, err)
 		}
+		found = append(found, t)
+	}
+	var uncovered []string
+	for _, n := range fresh {
+		if !slices.ContainsFunc(found, func(t tickets.Ticket) bool { return namesFailure(t, n) }) {
+			uncovered = append(uncovered, n)
+		}
+	}
+	if len(uncovered) > 0 {
+		return fmt.Errorf("%s: the given follow-ups do not name these failing tests in their title or Problem section: %s%s", label, strings.Join(uncovered, ", "), knownFlakeHint(epicDir, uncovered))
 	}
 	return nil
+}
+
+// namesFailure reports whether a follow-up's title or Problem section contains
+// the failing test's full name, or its parent name when it is a subtest.
+func namesFailure(t tickets.Ticket, name string) bool {
+	needles := []string{name}
+	if parent, _, ok := strings.Cut(name, "/"); ok {
+		needles = append(needles, parent)
+	}
+	haystack := t.Title + "\n" + schema.Section(t.Body, "Problem")
+	return slices.ContainsFunc(needles, func(n string) bool { return strings.Contains(haystack, n) })
 }
 
 // staleRunHint explains a refusal when the branch has full-run records for
@@ -197,16 +220,11 @@ func knownFlakeHint(epicDir string, failed []string) string {
 	epic := tickets.LoadEpic(projectDir, tickets.FollowUpsEpic)
 	var b strings.Builder
 	for _, name := range failed {
-		needles := []string{name}
-		if parent, _, ok := strings.Cut(name, "/"); ok {
-			needles = append(needles, parent)
-		}
 		for _, t := range epic.Tickets {
 			if t.IsDone() || t.IsCancelled() {
 				continue
 			}
-			haystack := t.Title + "\n" + schema.Section(t.Body, "Problem")
-			if slices.ContainsFunc(needles, func(n string) bool { return strings.Contains(haystack, n) }) {
+			if namesFailure(t, name) {
 				a := tickets.Address{Project: filepath.Base(projectDir), Epic: tickets.FollowUpsEpic, ID: t.Identifier}
 				fmt.Fprintf(&b, "\nknown flake: %s (%s)", a, name)
 			}

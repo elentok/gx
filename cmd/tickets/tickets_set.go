@@ -67,6 +67,8 @@ Agent-only settable fields:
     run of the worktree's current tree. When the only failures are flakes or pre-existing
     failures, file a follow-up per failing test and pass --check-failures <addr,addr>,
     or pass --known-failures <addr> when one follow-up already tracks the whole failing set.
+    Each failing test (or its parent test, for a subtest) must appear in the title or
+    Problem section of one of the given follow-ups, or the finish is refused.
 
 Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   id — ticket identity, fixed at creation
@@ -174,7 +176,7 @@ func newTicketsSetCmd(d Deps) *cobra.Command {
 	cmd.Flags().String("long-ticket-turns", "", "set long_ticket_turns")
 	cmd.Flags().StringVar(&commitless, "commitless", "", "set commitless (true/false)")
 	cmd.Flags().StringVar(&iterationStatus, "iteration-status", "", "set the iteration_status field (working, asking, finished)")
-	cmd.Flags().String("known-failures", "", "with --iteration-status finished: follow-up addresses that track the failing tests of the last `gx check` run; one address covers the whole failing set")
+	cmd.Flags().String("known-failures", "", "with --iteration-status finished: follow-up addresses that track the failing tests of the last `gx check` run; one address covers the whole failing set; each failing test must be named in a follow-up's title or Problem")
 	cmd.Flags().String("check-failures", "", "with --iteration-status finished: follow-up addresses (comma-separated), one per failing test of the last `gx check` run")
 
 	// Declared only so a write attempt is refused with a clear message rather

@@ -38,8 +38,10 @@ func newFinishFixture(t *testing.T) *finishFixture {
 	}
 	ticket := filepath.Join(projectDir, "e", "issues", "01-x.md")
 	cmdtest.WriteTicketFile(t, ticket, "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
-	cmdtest.WriteTicketFile(t, filepath.Join(projectDir, "e", "issues", "02-flaky.md"), "---\nid: \"02\"\nstatus: open\ntype: implement\n---\nBody.\n")
-	cmdtest.WriteTicketFile(t, filepath.Join(projectDir, "e", "issues", "03-other.md"), "---\nid: \"03\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	cmdtest.WriteTicketFile(t, filepath.Join(projectDir, "e", "issues", "02-flaky.md"), "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n\n# TestA TestB TestNew lint flake\n")
+	cmdtest.WriteTicketFile(t, filepath.Join(projectDir, "e", "issues", "03-other.md"), "---\nid: \"03\"\nstatus: open\ntype: implement\n---\n\n# TestB flake\n")
+	cmdtest.WriteTicketFile(t, filepath.Join(projectDir, "e", "issues", "04-unrelated.md"), "---\nid: \"04\"\nstatus: open\ntype: implement\n---\n\n# Something else\n\n## Problem\nNothing to do with the failures.\n")
+	cmdtest.WriteTicketFile(t, filepath.Join(projectDir, "e", "issues", "05-parent.md"), "---\nid: \"05\"\nstatus: open\ntype: implement\n---\n\n# TestSuite hangs\n")
 	return &finishFixture{wt: wt, projectDir: projectDir, ticket: ticket}
 }
 
@@ -362,6 +364,32 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 		if err := f.finish(t, "--known-failures=02"); err != nil {
 			t.Fatalf("one known address for two tests: %v", err)
 		}
+	})
+
+	t.Run("known failures must name the failing tests", func(t *testing.T) {
+		f := newFinishFixture(t)
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
+		f.record(t, check.ExitFail, "", "TestA", "TestSuite/sub")
+		for _, addr := range []string{"04", "02"} {
+			err := f.finish(t, "--known-failures="+addr)
+			if err == nil || !strings.Contains(err.Error(), "TestSuite/sub") {
+				t.Fatalf("--known-failures=%s: want a refusal listing the uncovered test, got %v", addr, err)
+			}
+		}
+		f.assertUnwritten(t)
+		if err := f.finish(t, "--known-failures=02,05"); err != nil {
+			t.Fatalf("names TestA and the subtest's parent: %v", err)
+		}
+	})
+
+	t.Run("check failures must name the failing tests", func(t *testing.T) {
+		f := newFinishFixture(t)
+		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
+		f.record(t, check.ExitFail, "", "TestA")
+		if err := f.finish(t, "--check-failures=04"); err == nil || !strings.Contains(err.Error(), "TestA") {
+			t.Fatalf("unrelated follow-up: want a refusal listing TestA, got %v", err)
+		}
+		f.assertUnwritten(t)
 	})
 
 	t.Run("failing line naming no tests needs one address", func(t *testing.T) {

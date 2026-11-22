@@ -299,7 +299,9 @@ When the failures were already red before you started (a sibling ticket pushed `
 limit, a test family red on the base), do not rebuild a baseline worktree to prove it and do not
 file one follow-up per test. File one follow-up for the family (or find the open one, which the
 refusal message names) and finish with `--iteration-status finished --known-failures <addr>`;
-`--check-failures` is for one follow-up per failing test of your own run.
+`--check-failures` is for one follow-up per failing test of your own run. Both flags check that the
+follow-ups name every failing test (full name or the subtest's parent) in their title or `## Problem`
+section; a placeholder or unrelated address is refused.
 
 Never run `gx check --full`. Ticket agents run changed-file `gx check`. The epic's verify ticket,
 the proof and the person run `gx check --full` (the verify ticket runs it and the soak in the
