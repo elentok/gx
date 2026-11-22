@@ -242,19 +242,17 @@ func printEpicChecks(w io.Writer, table InputsTable) error {
 		}
 	}
 	for _, g := range groupFlakes(table.Flakes) {
-		var err error
 		if len(g) > runIncidentMinTests {
-			_, err = fmt.Fprintf(w, "\nrun-level incident: %d tests failed in %s, passed in %s (tree %s), packages %s, first %s",
-				len(g), g[0].FailingRun, g[0].PassingRun, g[0].TreeID, strings.Join(flakePackages(g), ", "), g[0].Test)
-		} else {
-			for _, f := range g {
-				if _, err = fmt.Fprintf(w, "\nflake: %s failed in %s, passed in %s (tree %s)", f.Test, f.FailingRun, f.PassingRun, f.TreeID); err != nil {
-					return err
-				}
+			if _, err := fmt.Fprintf(w, "\nrun-level incident: %d tests failed in %s, passed in %s (tree %s), packages %s, first %s",
+				len(g), g[0].FailingRun, g[0].PassingRun, g[0].TreeID, strings.Join(flakePackages(g), ", "), g[0].Test); err != nil {
+				return err
 			}
+			continue
 		}
-		if err != nil {
-			return err
+		for _, f := range g {
+			if _, err := fmt.Fprintf(w, "\nflake: %s failed in %s, passed in %s (tree %s)", f.Test, f.FailingRun, f.PassingRun, f.TreeID); err != nil {
+				return err
+			}
 		}
 	}
 	if table.FlakesNoTree > 0 {

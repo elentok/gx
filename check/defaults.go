@@ -180,20 +180,18 @@ func listed(dir, tool string) bool {
 // leaves out on purpose.
 func (r *runner) defaultSteps(kind string) (steps []step, notes []string) {
 	g := r.groups()
-	files := func(name string, args []string, fs []string) {
+	batched := func(name string, args []string, fs []string, listsDrift bool) {
 		for _, batch := range chunkFiles(fs, r.limit) {
-			steps = append(steps, step{name: name, dir: r.root, argv: append(slices.Clone(args), batch...)})
+			steps = append(steps, step{name: name, dir: r.root, argv: append(slices.Clone(args), batch...), listsDrift: listsDrift})
 		}
 	}
+	files := func(name string, args []string, fs []string) { batched(name, args, fs, false) }
+	driftFiles := func(name string, fs []string) { batched(name, []string{"-l"}, fs, true) }
 	switch kind {
 	case "format":
 		if r.mode == ModeFull {
-			n := len(steps)
-			files("shfmt", []string{"-l"}, g.shell)
-			files("gofmt", []string{"-l"}, g.golang)
-			for i := n; i < len(steps); i++ {
-				steps[i].listsDrift = true
-			}
+			driftFiles("shfmt", g.shell)
+			driftFiles("gofmt", g.golang)
 			break
 		}
 		files("shfmt", []string{"-w"}, g.shell)
