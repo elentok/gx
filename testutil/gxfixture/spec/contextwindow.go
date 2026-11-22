@@ -28,10 +28,12 @@ func ContextWindowScenario() scenario {
 		return s
 	}
 	sc := scenario{
-		Codex:       true,
-		Chat:        true,
-		Epics:       []epic{{project, mapAddr, nil}},
-		DesignSteps: map[string]string{project + ":" + mapAddr: "resolve-tickets"},
+		Codex: true,
+		Chat:  true,
+		// Ten sessions settled one at a time took most of the fixture's start.
+		SettleSessionsTogether: true,
+		Epics:                  []epic{{project, mapAddr, nil}},
+		DesignSteps:            map[string]string{project + ":" + mapAddr: "resolve-tickets"},
 		Sessions: []sessionSpec{
 			{Project: project, Prompt: "hello", Read: true, Tokens: 40_000, Key: "green"},
 			{Project: project, Prompt: "hello", Read: true, Tokens: 90_000, Key: "yellow"},
