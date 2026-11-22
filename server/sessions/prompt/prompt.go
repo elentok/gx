@@ -102,8 +102,8 @@ type Deps struct {
 	Queue EpicQueue
 	// OnTriageIdle runs when a Triage session of a project goes idle. Nil is none.
 	OnTriageIdle func(project string)
-	// StateDir is the gx state dir the Draft history lives in.
-	StateDir string
+	// History is the Draft history store, shared with the draft pages.
+	History *drafthistory.Store
 }
 
 // Prompt holds the auto-advance countdowns and the turn settling of the
@@ -126,6 +126,7 @@ type Prompt struct {
 	queue        EpicQueue
 	onTriageIdle func(project string)
 	history      *drafthistory.Store
+	composer     composerPicker
 	// sessions comes later than Prompt: the Manager calls the Prompter back, so
 	// it is built after Prompt and handed over by GiveSessions.
 	sessions *sessions.Manager
@@ -149,10 +150,11 @@ func New(d Deps) *Prompt {
 	p := &Prompt{
 		cfg: d.Cfg, log: d.Log, events: d.Events, sessionChat: d.SessionChat,
 		settings: d.Settings, projects: d.Projects, badRounds: d.BadRounds, held: d.Held, queue: d.Queue,
-		onTriageIdle: d.OnTriageIdle, history: drafthistory.New(d.StateDir),
+		onTriageIdle: d.OnTriageIdle, history: d.History,
 	}
 	p.autoQueuer = &autoQueuer{p}
 	p.imageStore = &imageStore{p}
+	p.composer = composerPicker{p.imageStore}
 	p.turnSettler = &turnSettler{p}
 	return p
 }

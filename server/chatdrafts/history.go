@@ -1,12 +1,9 @@
 package chatdrafts
 
 import (
-	"errors"
 	"net/http"
-	"os"
 
 	"github.com/elentok/gx/server/drafthistory"
-	"github.com/elentok/gx/server/imagestore"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
 )
@@ -19,43 +16,31 @@ func (c *ChatDrafts) pickHistory(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	p, err := c.history.Load(drafthistory.ChatDrafts, req.EntryID)
-	if errors.Is(err, os.ErrNotExist) {
-		wire.WriteJSON(w, ops.ChatDraftPickResult{Refused: true, Reason: ops.ReasonHistoryEntryGone, Notices: []string{}})
-		return
-	}
+	out, err := drafthistory.PickDraft(c.history, drafthistory.DraftPick[ops.ChatDraft]{
+		List: drafthistory.ChatDrafts,
+		Pick: c.store.Pick,
+		Restore: func(p drafthistory.Picked, d *ops.ChatDraft) (drafthistory.Restored, error) {
+			page := drafthistory.Entry{Text: d.Brief, Name: d.Name}
+			return c.history.Restore(drafthistory.ChatDrafts, p, page, c.store.ImagesDir(d.ID), d.Images,
+				func() error { return c.saveHistory(d) })
+		},
+		Apply: func(d *ops.ChatDraft, e drafthistory.Entry, images []string) []string {
+			d.Brief, d.Name, d.Images = e.Text, e.Name, images
+			return nil
+		},
+	}, req)
 	if err != nil {
 		serverError(w, err)
 		return
 	}
-	notices := []string{}
-	changedAny := false
-	d, reason, err := c.store.Pick(req.DraftID, req.Revision, func(d *ops.ChatDraft) (bool, error) {
-		page := drafthistory.Entry{Text: d.Brief, Name: d.Name}
-		res, err := c.history.Restore(drafthistory.ChatDrafts, p, page, c.store.ImagesDir(d.ID), d.Images,
-			func() error { return c.saveHistory(d) })
-		if err != nil || !res.Changed {
-			return false, err
-		}
-		d.Brief, d.Name, d.Images = p.Entry.Text, p.Entry.Name, res.Images
-		if res.Missing > 0 {
-			notices = append(notices, drafthistory.MissingNotice(res.Missing))
-		}
-		changedAny = true
-		return true, nil
-	})
-	if err != nil {
-		serverError(w, err)
+	if out.Reason != "" {
+		wire.WriteJSON(w, ops.ChatDraftPickResult{Refused: true, Reason: out.Reason, Notices: []string{}})
 		return
 	}
-	if reason != "" {
-		wire.WriteJSON(w, ops.ChatDraftPickResult{Refused: true, Reason: reason, Notices: []string{}})
-		return
-	}
-	if changedAny {
+	if out.Changed {
 		c.publish()
 	}
-	wire.WriteJSON(w, ops.ChatDraftPickResult{Draft: d, Notices: notices})
+	wire.WriteJSON(w, ops.ChatDraftPickResult{Draft: out.Draft, Notices: out.Notices})
 }
 
 // saveHistory adds d to the Chat drafts list with copies of its images. The
@@ -64,15 +49,9 @@ func (c *ChatDrafts) pickHistory(w http.ResponseWriter, r *http.Request) {
 // A failed save is the caller's call: an explicit delete refuses and keeps the
 // draft, Start logs it and goes on.
 func (c *ChatDrafts) saveHistory(d *ops.ChatDraft) error {
-	var paths []string
-	for _, id := range d.Images {
-		if src, ok := imagestore.Find(c.store.ImagesDir(d.ID), id); ok {
-			paths = append(paths, src)
-		}
-	}
 	_, err := c.history.Save(drafthistory.ChatDrafts, drafthistory.Entry{
 		Text: d.Brief, Project: d.Project, Name: d.Name, Harness: d.Harness,
 		Model: d.Model, Effort: d.Effort, Folder: d.Folder,
-	}, paths)
+	}, drafthistory.ImageFiles(c.store.ImagesDir(d.ID), d.Images))
 	return err
 }

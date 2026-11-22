@@ -88,7 +88,7 @@ func Routes(get func() *Prompt) []wire.Route {
 			Pattern: "POST /v1/sessions/pick-history",
 			Web:     wire.WebWrite,
 			WebHandler: func(w http.ResponseWriter, r *http.Request) {
-				composerPicker{&imageStore{get()}}.composerPickHandler(w, r)
+				get().composer.composerPickHandler(w, r)
 			},
 		},
 		{

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/server/drafthistory"
-	"github.com/elentok/gx/server/imagestore"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
 )
@@ -74,13 +73,7 @@ func (p composerPicker) pickComposer(req ops.ComposerPickRequest) (ops.ComposerP
 	p.imageMu.Lock()
 	defer p.imageMu.Unlock()
 	res, err := p.history.Restore(drafthistory.Sent, picked, page, folder, req.Images, func() error {
-		var paths []string
-		for _, id := range req.Images {
-			if path, ok := imagestore.Find(folder, id); ok {
-				paths = append(paths, path)
-			}
-		}
-		_, err := p.history.Save(drafthistory.Sent, page, paths)
+		_, err := p.history.Save(drafthistory.Sent, page, drafthistory.ImageFiles(folder, req.Images))
 		return err
 	})
 	if err != nil {

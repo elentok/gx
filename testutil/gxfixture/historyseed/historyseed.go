@@ -58,11 +58,11 @@ func Seed(stateDir string, list []spec.HistoryEntry, pngBase64 string) error {
 		if err != nil {
 			return err
 		}
-		files, err := normal.ImagePaths(l, items[0].ID)
+		picked, err := normal.Load(l, items[0].ID)
 		if err != nil {
 			return err
 		}
-		for _, p := range files {
+		for _, p := range picked.Paths {
 			if err := os.Remove(p); err != nil {
 				return err
 			}

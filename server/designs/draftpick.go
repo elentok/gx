@@ -2,7 +2,6 @@ package designs
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -36,46 +35,30 @@ func (s *Designs) draftPickHistory(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	hist := s.drafts.History()
-	p, err := hist.Load(drafthistory.DesignDrafts, req.EntryID)
-	if errors.Is(err, os.ErrNotExist) {
-		wire.WriteJSON(w, ops.DesignDraftPickResult{Refused: true, Reason: ops.ReasonHistoryEntryGone, Notices: []string{}})
-		return
-	}
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	notices := []string{}
-	changedAny := false
-	d, reason, err := s.drafts.Pick(req.DraftID, req.Revision, func(d *ops.DesignDraft) (bool, error) {
-		page := drafthistory.Entry{Text: d.Idea, Slug: d.Slug}
-		res, err := hist.Restore(drafthistory.DesignDrafts, p, page, s.drafts.ImagesDir(d.ID), d.Images,
-			func() error { return s.drafts.SaveToHistoryLocked(d.ID) })
-		if err != nil || !res.Changed {
-			return false, err
-		}
-		d.Idea, d.Images, d.Slug = p.Entry.Text, res.Images, p.Entry.Slug
-		if d.Slug != "" && s.slugTaken(d.Project, d.Slug) {
-			notices = append(notices, fmt.Sprintf("slug %q is already taken in %s, so it was cleared", d.Slug, d.Project))
+	out, err := drafthistory.PickDraft(s.history, drafthistory.DraftPick[ops.DesignDraft]{
+		List:    drafthistory.DesignDrafts,
+		Pick:    s.drafts.Pick,
+		Restore: s.drafts.RestoreHistory,
+		Apply: func(d *ops.DesignDraft, e drafthistory.Entry, images []string) []string {
+			d.Idea, d.Images, d.Slug = e.Text, images, e.Slug
+			if d.Slug == "" || !s.slugTaken(d.Project, d.Slug) {
+				return nil
+			}
+			notice := fmt.Sprintf("slug %q is already taken in %s, so it was cleared", d.Slug, d.Project)
 			d.Slug = ""
-		}
-		if res.Missing > 0 {
-			notices = append(notices, drafthistory.MissingNotice(res.Missing))
-		}
-		changedAny = true
-		return true, nil
-	})
+			return []string{notice}
+		},
+	}, req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if reason != "" {
-		wire.WriteJSON(w, ops.DesignDraftPickResult{Refused: true, Reason: reason, Notices: []string{}})
+	if out.Reason != "" {
+		wire.WriteJSON(w, ops.DesignDraftPickResult{Refused: true, Reason: out.Reason, Notices: []string{}})
 		return
 	}
-	if changedAny {
+	if out.Changed {
 		publishDrafts(s.events)
 	}
-	wire.WriteJSON(w, ops.DesignDraftPickResult{Draft: d, Notices: notices})
+	wire.WriteJSON(w, ops.DesignDraftPickResult{Draft: out.Draft, Notices: out.Notices})
 }

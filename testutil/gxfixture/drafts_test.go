@@ -73,7 +73,8 @@ func TestDraftHistoryScenario_SeedsThreeListsNewestFirst(t *testing.T) {
 		t.Errorf("dropped entry = %+v, want the images-not-kept mark and no images", dropped)
 	}
 	gone := design[spec.HistoryDesignGone]
-	paths, err := store.ImagePaths(drafthistory.DesignDrafts, gone.ID)
+	picked, err := store.Load(drafthistory.DesignDrafts, gone.ID)
+	paths := picked.Paths
 	if err != nil || gone.ImageCount != 1 || len(paths) != 1 {
 		t.Fatalf("deleted-image entry = %+v, paths %v, err %v, want a record listing one image", gone, paths, err)
 	}

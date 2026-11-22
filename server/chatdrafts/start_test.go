@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/broker"
+	"github.com/elentok/gx/server/drafthistory"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
@@ -71,7 +72,7 @@ func newStartRig(t *testing.T) *startRig {
 	r.stateDir = t.TempDir()
 	r.c = NewChatDrafts(Deps{
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil)), StateDir: r.stateDir,
-		Events: r.events, Workspaces: r.ws,
+		History: drafthistory.New(r.stateDir), Events: r.events, Workspaces: r.ws,
 		CreateChat: func(req sessions.WebCreateSessionRequest) (wire.SessionResult, error) {
 			r.chats.Add(1)
 			r.reqMu.Lock()

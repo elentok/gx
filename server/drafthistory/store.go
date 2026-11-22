@@ -21,6 +21,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/server/imagestore"
 )
 
 // List names one of the three lists.
@@ -179,20 +181,16 @@ func (s *Store) List(l List) ([]Item, error) {
 	return out, nil
 }
 
-// ImagePaths returns the absolute paths of the image files an entry holds.
-func (s *Store) ImagePaths(l List, id string) ([]string, error) {
-	unlock := s.lock(l)
-	defer unlock()
-	es, err := s.read(l)
-	if err != nil {
-		return nil, err
-	}
-	for _, e := range es {
-		if e.ID == id {
-			return s.paths(l, e), nil
+// ImageFiles returns the paths of the image files ids name in dir. An id with
+// no file is left out.
+func ImageFiles(dir string, ids []string) []string {
+	var paths []string
+	for _, id := range ids {
+		if p, ok := imagestore.Find(dir, id); ok {
+			paths = append(paths, p)
 		}
 	}
-	return nil, os.ErrNotExist
+	return paths
 }
 
 func (s *Store) paths(l List, e Entry) []string {

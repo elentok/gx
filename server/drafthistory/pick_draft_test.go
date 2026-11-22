@@ -233,10 +233,11 @@ func TestPickDraft_DeletedImageFileIsSkippedAndCounted(t *testing.T) {
 	d := designPage(t, f, "proj", "", "page text")
 	entry := seedEntry(t, f, drafthistory.DesignDrafts, drafthistory.Entry{Text: "picked"}, 3, 4, 5)
 	s := drafthistory.New(f.H.StateDir)
-	paths, err := s.ImagePaths(drafthistory.DesignDrafts, entry)
+	picked, err := s.Load(drafthistory.DesignDrafts, entry)
 	if err != nil {
 		t.Fatal(err)
 	}
+	paths := picked.Paths
 	if err := os.Remove(paths[1]); err != nil {
 		t.Fatal(err)
 	}

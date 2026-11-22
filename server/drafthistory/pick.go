@@ -62,12 +62,7 @@ func compared(l List, e Entry) Entry {
 // the page's images are removed and the entry's are saved as the draft's own.
 // A page equal to the entry changes nothing.
 func (s *Store) Restore(l List, p Picked, page Entry, imagesDir string, pageImages []string, saveCurrent func() error) (Restored, error) {
-	var pagePaths []string
-	for _, id := range pageImages {
-		if path, ok := imagestore.Find(imagesDir, id); ok {
-			pagePaths = append(pagePaths, path)
-		}
-	}
+	pagePaths := ImageFiles(imagesDir, pageImages)
 	if s.sameAsNewest(l, compared(l, p.Entry), compared(l, page), pagePaths) {
 		return Restored{Images: pageImages}, nil
 	}

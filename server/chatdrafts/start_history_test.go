@@ -120,7 +120,8 @@ func TestStart_HistoryEntryHoldsACopyOfTheImages(t *testing.T) {
 	if len(got) != 1 || got[0].ImageCount != 1 {
 		t.Fatalf("history = %+v", got)
 	}
-	paths, err := r.c.history.ImagePaths(drafthistory.ChatDrafts, got[0].ID)
+	picked, err := r.c.history.Load(drafthistory.ChatDrafts, got[0].ID)
+	paths := picked.Paths
 	if err != nil || len(paths) != 1 {
 		t.Fatalf("image paths = %v, %v", paths, err)
 	}

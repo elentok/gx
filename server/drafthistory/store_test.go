@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/imagestore"
 )
 
 func fixedClock() func() time.Time {
@@ -133,7 +135,8 @@ func TestSave_ImagesSurviveSourceDeletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	items, _ := s.List(Sent)
-	paths, err := s.ImagePaths(Sent, items[0].ID)
+	picked, err := s.Load(Sent, items[0].ID)
+	paths := picked.Paths
 	if err != nil || len(paths) != 1 {
 		t.Fatalf("paths %v err %v", paths, err)
 	}
@@ -154,8 +157,8 @@ func TestSave_CapDropsOldestEntries(t *testing.T) {
 	var total int64
 	items, _ := s.List(Sent)
 	for _, it := range items {
-		ps, _ := s.ImagePaths(Sent, it.ID)
-		for _, p := range ps {
+		picked, _ := s.Load(Sent, it.ID)
+		for _, p := range picked.Paths {
 			fi, err := os.Stat(p)
 			if err != nil {
 				t.Fatal(err)
@@ -220,5 +223,31 @@ func TestSave_ConcurrentStoresLoseNothing(t *testing.T) {
 	wg.Wait()
 	if got := texts(t, NewWith(dir, 0, nil), Sent); len(got) != n {
 		t.Fatalf("want %d entries, got %d", n, len(got))
+	}
+}
+
+func TestImageFiles_ReturnsTheFilesOfKnownIDsInOrder(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	var ids []string
+	for _, w := range []int{1, 2} {
+		b, err := os.ReadFile(pngFile(t, w))
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := imagestore.Save(dir, b)
+		if err != nil || res.Refused {
+			t.Fatalf("save: %+v %v", res, err)
+		}
+		ids = append(ids, res.ID)
+	}
+	got := ImageFiles(dir, []string{ids[1], "no-such-id", ids[0]})
+	if len(got) != 2 {
+		t.Fatalf("paths = %v, want the two known files", got)
+	}
+	for i, id := range []string{ids[1], ids[0]} {
+		if want, _ := imagestore.Find(dir, id); got[i] != want {
+			t.Fatalf("paths[%d] = %q, want %q", i, got[i], want)
+		}
 	}
 }

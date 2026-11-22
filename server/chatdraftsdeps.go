@@ -9,7 +9,7 @@ import (
 // Server gains no method.
 func newChatDrafts(s *Server) *chatdrafts.ChatDrafts {
 	return chatdrafts.NewChatDrafts(chatdrafts.Deps{
-		Log: s.log, StateDir: s.cfg.StateDir, TicketStore: s.cfg.TicketStore, Events: s.events,
+		Log: s.log, StateDir: s.cfg.StateDir, History: s.draftHistory, TicketStore: s.cfg.TicketStore, Events: s.events,
 		Projects: s.projects, Workspaces: s.workspaces,
 		Sessions:    func() ([]wire.SessionInfo, error) { return s.sessions.ListSessions() },
 		CreateChat:  s.sessions.CreateWebSession,

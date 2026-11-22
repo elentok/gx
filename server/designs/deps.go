@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/designs/drafts"
+	"github.com/elentok/gx/server/drafthistory"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/runs"
@@ -23,6 +24,8 @@ type Deps struct {
 	ConversationsDir string
 	// StateDir holds the New Design drafts.
 	StateDir string
+	// History is the Draft history store, shared with the other draft kinds.
+	History  *drafthistory.Store
 	Idx      *index.Index
 	Projects *projects.Registry
 	Events   *broker.Broker
@@ -55,6 +58,7 @@ type Designs struct {
 	conversationsDir string
 	// drafts keeps the New Design drafts, which are not epics.
 	drafts     *drafts.Store
+	history    *drafthistory.Store
 	idx        *index.Index
 	projects   *projects.Registry
 	events     *broker.Broker
@@ -79,12 +83,15 @@ type Designs struct {
 
 // New builds Designs from d.
 func New(d Deps) *Designs {
+	if d.History == nil {
+		d.History = drafthistory.New(d.StateDir)
+	}
 	return &Designs{
 		log: d.Log, ticketStore: d.TicketStore, conversationsDir: d.ConversationsDir,
 		idx: d.Idx, projects: d.Projects, events: d.Events, guards: d.Guards,
 		chat: d.Chat, webURL: d.WebURL, workspaces: d.Workspaces,
 		onBranch: d.OnBranch, forkHookDir: d.ForkHookDir,
-		drafts: drafts.New(d.StateDir),
+		drafts: drafts.NewWith(d.StateDir, d.History), history: d.History,
 	}
 }
 

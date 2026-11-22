@@ -6,7 +6,7 @@ import "github.com/elentok/gx/server/designs"
 func (s *Server) designsDeps() designs.Deps {
 	return designs.Deps{
 		Log: s.log, TicketStore: s.cfg.TicketStore, ConversationsDir: s.cfg.ConversationsDir,
-		StateDir: s.cfg.StateDir, ForkHookDir: s.cfg.ForkHookDir,
+		StateDir: s.cfg.StateDir, History: s.draftHistory, ForkHookDir: s.cfg.ForkHookDir,
 		Idx: s.idx, Projects: s.projects, Events: s.events, Guards: s.guards,
 		Chat: s.chat, WebURL: s.WebURL, Workspaces: s.workspaces,
 		// s.prompt is built after Designs, so it is read when the callback runs.

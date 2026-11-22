@@ -174,7 +174,8 @@ type Server struct {
 	designs *designs.Designs
 	// chatDrafts serves the chat draft routes; see chatdraftsdeps.go.
 	chatDrafts *chatdrafts.ChatDrafts
-	// draftHistory serves the history list route; see drafthistorydeps.go.
+	// draftHistory is the one Draft history store: the history list route and
+	// the chat draft, Design draft and Prompt code all use it.
 	draftHistory *drafthistory.Store
 	// triage publishes triage-changed for the live Triage records.
 	triage *triage.Triage
@@ -507,6 +508,7 @@ func New(cfg Config) (*Server, error) {
 		Source: chatSource{s}, Log: log,
 	})
 	// The Manager copies projects, harness and sessionChat, so it comes after them.
+	s.draftHistory = drafthistory.New(cfg.StateDir)
 	s.designs = designs.New(s.designsDeps())
 	s.designs.Startup()
 	s.triage = triage.New(triage.Deps{TicketStore: cfg.TicketStore, Projects: s.projects, Events: events,
@@ -522,11 +524,10 @@ func New(cfg Config) (*Server, error) {
 		},
 		Log: log, Events: events, SessionChat: s.sessionChat, Settings: &s.settings,
 		Projects: s.projects, BadRounds: s.recovery, Held: s.workspaces.IsHeld, Queue: s.queue,
-		OnTriageIdle: s.triage.StopFinished, StateDir: cfg.StateDir,
+		OnTriageIdle: s.triage.StopFinished, History: s.draftHistory,
 	})
 	s.sessions = newManager(s)
 	s.chatDrafts = newChatDrafts(s)
-	s.draftHistory = newDraftHistory(s)
 	s.archive = newArchive(s)
 	s.sessions.Maps.OnDesignStart = s.clearHold
 	s.sessions.OnSessionGone = func(id string) {

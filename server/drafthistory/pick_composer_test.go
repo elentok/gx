@@ -193,7 +193,8 @@ func TestPickComposer_MissingImageFilesGiveANotice(t *testing.T) {
 	t.Parallel()
 	f := chatSession(t)
 	entry := seedEntry(t, f.DesignsFixture, drafthistory.Sent, drafthistory.Entry{Text: "partly", Composer: drafthistory.ComposerChat}, 3, 4)
-	paths, err := drafthistory.New(f.H.StateDir).ImagePaths(drafthistory.Sent, entry)
+	picked, err := drafthistory.New(f.H.StateDir).Load(drafthistory.Sent, entry)
+	paths := picked.Paths
 	if err != nil || len(paths) != 2 {
 		t.Fatalf("paths = %v %v", paths, err)
 	}

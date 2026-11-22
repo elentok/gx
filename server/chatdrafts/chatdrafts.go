@@ -47,6 +47,8 @@ type Deps struct {
 	AddWorktree func(project, name string) (path, refusal string)
 	// ForkHookDir is the test-hook dir (see HookArmed); empty turns the hooks off.
 	ForkHookDir string
+	// History is the Draft history store, shared with the other draft kinds.
+	History *drafthistory.Store
 }
 
 // ChatDrafts serves the chat draft routes.
@@ -58,7 +60,7 @@ type ChatDrafts struct {
 
 // NewChatDrafts builds ChatDrafts from d.
 func NewChatDrafts(d Deps) *ChatDrafts {
-	return &ChatDrafts{Deps: d, store: New(d.StateDir), history: drafthistory.New(d.StateDir)}
+	return &ChatDrafts{Deps: d, store: New(d.StateDir), history: d.History}
 }
 
 func refuse(reason, msg string) ops.ChatDraftResult {

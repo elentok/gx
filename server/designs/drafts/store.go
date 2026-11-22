@@ -59,9 +59,12 @@ const (
 	LeaseTTL = 2 * time.Minute
 )
 
-// New builds a Store rooted in stateDir.
-func New(stateDir string) *Store {
-	return &Store{root: filepath.Join(stateDir, rootDir), now: time.Now, history: drafthistory.New(stateDir)}
+// New builds a Store rooted in stateDir with a Draft history store of its own.
+func New(stateDir string) *Store { return NewWith(stateDir, drafthistory.New(stateDir)) }
+
+// NewWith builds a Store rooted in stateDir that saves to the history store h.
+func NewWith(stateDir string, h *drafthistory.Store) *Store {
+	return &Store{root: filepath.Join(stateDir, rootDir), now: time.Now, history: h}
 }
 
 // ImagesDir is the folder a draft's images live in.
@@ -393,12 +396,12 @@ func (s *Store) removeLocked(id string) error {
 	return os.RemoveAll(s.dir(id))
 }
 
-// saveHistoryLocked copies the draft's current content to the Design drafts
-// history. A gone draft saves nothing. The history's own empty rule applies,
-// so a slug-only draft saves nothing too.
-func (s *Store) saveHistoryLocked(id string) error { return s.saveHistoryAsLocked(id, nil) }
+// SaveHistoryLocked copies the draft's current content to the Design drafts
+// history, for a caller that holds the draft's lock. A gone draft saves nothing.
+// The history's own empty rule applies, so a slug-only draft saves nothing too.
+func (s *Store) SaveHistoryLocked(id string) error { return s.saveHistoryAsLocked(id, nil) }
 
-// saveHistoryAsLocked is saveHistoryLocked with the slug and idea replaced by
+// saveHistoryAsLocked is SaveHistoryLocked with the slug and idea replaced by
 // over (slug, idea) when it is not nil: the project and images still come from
 // the stored draft.
 func (s *Store) saveHistoryAsLocked(id string, over *[2]string) error {
@@ -412,14 +415,9 @@ func (s *Store) saveHistoryAsLocked(id string, over *[2]string) error {
 	if over != nil {
 		d.Slug, d.Idea = over[0], over[1]
 	}
-	var paths []string
-	for _, img := range d.Images {
-		if p, ok := imagestore.Find(s.ImagesDir(id), img); ok {
-			paths = append(paths, p)
-		}
-	}
 	_, err = s.history.Save(drafthistory.DesignDrafts,
-		drafthistory.Entry{Text: d.Idea, Project: d.Project, Slug: d.Slug}, paths)
+		drafthistory.Entry{Text: d.Idea, Project: d.Project, Slug: d.Slug},
+		drafthistory.ImageFiles(s.ImagesDir(id), d.Images))
 	return err
 }
 
@@ -431,7 +429,7 @@ func (s *Store) SaveToHistory(id string) error {
 	}
 	unlock := s.lock(id)
 	defer unlock()
-	return s.saveHistoryLocked(id)
+	return s.SaveHistoryLocked(id)
 }
 
 // SaveToHistoryAs is SaveToHistory with the slug and idea a Start request sent,
@@ -454,7 +452,7 @@ func (s *Store) DeleteSaving(id string) error {
 	}
 	unlock := s.lock(id)
 	defer unlock()
-	if err := s.saveHistoryLocked(id); err != nil {
+	if err := s.SaveHistoryLocked(id); err != nil {
 		return fmt.Errorf("save draft to history: %w", err)
 	}
 	return s.removeLocked(id)
@@ -493,11 +491,13 @@ func (s *Store) Pick(id string, revision int, apply func(d *ops.DesignDraft) (ch
 	return d, "", nil
 }
 
-// SaveToHistoryLocked is SaveToHistory for a caller that holds the draft's lock (see Pick).
-func (s *Store) SaveToHistoryLocked(id string) error { return s.saveHistoryLocked(id) }
-
-// History is the Design drafts list's store.
-func (s *Store) History() *drafthistory.Store { return s.history }
+// RestoreHistory restores picked entry p onto d for a Pick's apply, which holds
+// the draft's lock. The page goes to the history first.
+func (s *Store) RestoreHistory(p drafthistory.Picked, d *ops.DesignDraft) (drafthistory.Restored, error) {
+	page := drafthistory.Entry{Text: d.Idea, Slug: d.Slug}
+	return s.history.Restore(drafthistory.DesignDrafts, p, page, s.ImagesDir(d.ID), d.Images,
+		func() error { return s.SaveHistoryLocked(d.ID) })
+}
 
 // dropLease forgets a deleted draft's lease so the map does not grow.
 func (s *Store) dropLease(id string) {
