@@ -58,6 +58,10 @@ type frameHub struct {
 	pushed int
 	// mouse is the screen's MouseReporting as of the last flush.
 	mouse bool
+	// resizedSinceOutput is set by a pty resize and cleared by the child's
+	// next output: until then the screen is what the child drew for the old
+	// size, so a read of it can't be trusted.
+	resizedSinceOutput bool
 }
 
 // attachClient is one attach's pacing state, guarded by frameHub.mu.
@@ -94,7 +98,10 @@ func (f *frameHub) run(output <-chan struct{}, done <-chan struct{}) {
 	for {
 		select {
 		case <-output:
-			f.flush()
+			f.mu.Lock()
+			f.resizedSinceOutput = false
+			f.flushLocked()
+			f.mu.Unlock()
 		case <-done:
 			return
 		}
@@ -220,10 +227,17 @@ func (f *frameHub) ownLocked(c *attachClient) error {
 	if c.width == 0 || (c.width == f.cols && c.height == f.rows) {
 		return nil
 	}
-	if err := f.setSize(c.width, c.height); err != nil {
+	return f.applySizeLocked(c.width, c.height)
+}
+
+// applySizeLocked resizes the pty and the screen and owes every attach a full
+// frame.
+func (f *frameHub) applySizeLocked(width, height int) error {
+	if err := f.setSize(width, height); err != nil {
 		return err
 	}
-	f.cols, f.rows = c.width, c.height
+	f.cols, f.rows = width, height
+	f.resizedSinceOutput = true
 	// The full frames cover the rows the resize dirtied.
 	f.scr.TakeDirty()
 	f.cursor = f.scr.Cursor()
@@ -234,6 +248,40 @@ func (f *frameHub) ownLocked(c *attachClient) error {
 		f.paceLocked(s)
 	}
 	return nil
+}
+
+// nudge resizes the pty by one column, alternating up and down so repeated
+// calls stay in range. It is for the test hook that resizes before a read.
+func (f *frameHub) nudge() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.cols%2 == 0 {
+		return f.applySizeLocked(f.cols+1, f.rows)
+	}
+	return f.applySizeLocked(f.cols-1, f.rows)
+}
+
+// ReadState is what a styled screen read says about the sizes behind it.
+type ReadState struct {
+	// Resized means the pty was resized and the child has not output since.
+	Resized bool `json:"resized,omitempty"`
+	// PTY is the pty's size; Attaches are the sizes of the attached viewers
+	// that have one.
+	PTY      [2]int   `json:"pty,omitempty"`
+	Attaches [][2]int `json:"attaches,omitempty"`
+}
+
+// readState reports the sizes behind a screen read.
+func (f *frameHub) readState() ReadState {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	st := ReadState{Resized: f.resizedSinceOutput, PTY: [2]int{f.cols, f.rows}}
+	for c := range f.subs {
+		if c.width > 0 {
+			st.Attaches = append(st.Attaches, [2]int{c.width, c.height})
+		}
+	}
+	return st
 }
 
 // sent tells the hub c's slot is free, so the full frame owed for a drop goes

@@ -338,3 +338,27 @@ func TestHolderAttach_ClickReachesAChildThatReportsTheMouse(t *testing.T) {
 		return len(rows) > 0 && strings.Contains(rows[0], `033[<0;3;1M`)
 	})
 }
+
+// A styled read after a pty resize is flagged until the child's next output,
+// and reports the attach's size beside the pty's.
+func TestHolderAttach_StyledReadReportsResizeUntilChildOutput(t *testing.T) {
+	c, dir := scriptHolder(t, `printf ready; `+waitGo+`printf more; cat >/dev/null`)
+	a := attach(t, c)
+	if err := a.Resize(100, 30); err != nil {
+		t.Fatal(err)
+	}
+	var read holder.ReadState
+	waitFor(t, "the read flags the resize", func() bool {
+		_, st, err := c.StyledScreenRead()
+		read = st
+		return err == nil && st.Resized
+	})
+	if read.PTY != [2]int{100, 30} || !slices.Contains(read.Attaches, [2]int{100, 30}) {
+		t.Errorf("read sizes = %+v; want the pty and the attach at 100x30", read)
+	}
+	touch(t, filepath.Join(dir, "go"))
+	waitFor(t, "child output clears the flag", func() bool {
+		_, st, err := c.StyledScreenRead()
+		return err == nil && !st.Resized
+	})
+}

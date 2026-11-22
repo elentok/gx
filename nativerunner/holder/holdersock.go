@@ -98,6 +98,20 @@ const (
 // for claude to pick the reason up after it is typed.
 var holderDenyTimeout = 3 * time.Second
 
+// holderResizeMarker is a test hook: while the file exists, every
+// screen-styled read resizes the pty first. Empty in a real holder.
+var holderResizeMarker string
+
+func statMarker() (os.FileInfo, error) {
+	if holderResizeMarker == "" {
+		return nil, os.ErrNotExist
+	}
+	return os.Stat(holderResizeMarker)
+}
+
+// ResizeBeforeReadFile is the marker file in a test holder's dir.
+const ResizeBeforeReadFile = "test-resize-before-read"
+
 // One request and one response per connection, each a JSON object.
 type holderRequest struct {
 	Op         string `json:"op"`
@@ -121,6 +135,9 @@ type holderResponse struct {
 	ChildStart  int64    `json:"child_start,omitempty"`
 	Screen      []string `json:"screen,omitempty"`
 	Scrollback  []string `json:"scrollback,omitempty"`
+	// Read is the sizes behind a screen-styled read. A holder without it
+	// reads as trusted.
+	Read *ReadState `json:"read,omitempty"`
 	// Claude is nil until claude's pid status file first appears.
 	Claude *harness.PidStatus `json:"claude,omitempty"`
 	Turn   int                `json:"turn,omitempty"`
@@ -283,7 +300,16 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 		return holderResponse{}, h.stop
 	}
 	if req.Op == OpScreenStyled && slices.Contains(h.ops, OpScreenStyled) {
-		return holderResponse{Screen: h.scr.StyledRows()}, nil
+		// A test holder resizes just before each read while its marker file
+		// exists. Other readers poll too, so the marker stays until the test
+		// removes it.
+		if _, err := statMarker(); err == nil {
+			if err := h.frames.nudge(); err != nil {
+				return holderResponse{Error: err.Error()}, nil
+			}
+		}
+		state := h.frames.readState()
+		return holderResponse{Screen: h.scr.StyledRows(), Read: &state}, nil
 	}
 	if req.Op == OpComposerSeen && slices.Contains(h.ops, OpComposerSeen) {
 		return holderResponse{ComposerSeen: h.composer.seen()}, nil
@@ -621,8 +647,20 @@ func (c *HolderClient) Screen(scrollback int) (rows, scrolled []string, err erro
 // StyledScreen runs the optional screen-styled op; check Supports first. Rows
 // carry their styling as SGR codes.
 func (c *HolderClient) StyledScreen() ([]string, error) {
+	rows, _, err := c.StyledScreenRead()
+	return rows, err
+}
+
+// StyledScreenRead is StyledScreen with the sizes behind the read: Resized
+// means the pty was resized and the child has not output since, so the rows
+// are untrusted.
+func (c *HolderClient) StyledScreenRead() ([]string, ReadState, error) {
 	resp, err := c.call(holderRequest{Op: OpScreenStyled})
-	return resp.Screen, err
+	var state ReadState
+	if resp.Read != nil {
+		state = *resp.Read
+	}
+	return resp.Screen, state, err
 }
 
 // ComposerSeen runs the optional composer-seen op. known is false for a

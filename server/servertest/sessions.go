@@ -145,6 +145,7 @@ func runTestHolder(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	holder.EnableResizeBeforeRead(dir)
 	return holder.RunHarnessHolder(dir, agentrunner.Kind(kind), opts, fs.Args())
 }
 

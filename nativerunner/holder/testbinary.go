@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"syscall"
@@ -45,6 +46,14 @@ func ServeTestBinary() bool {
 	return false
 }
 
+// EnableResizeBeforeRead arms the test hook of a holder running in dir: while
+// the ResizeBeforeReadFile marker exists there, each screen-styled read
+// resizes the pty first. Test holder binaries call it; a real holder never
+// does.
+func EnableResizeBeforeRead(dir string) {
+	holderResizeMarker = filepath.Join(dir, ResizeBeforeReadFile)
+}
+
 // exitWithOwner kills the holder and its child once the owner pid is gone.
 func exitWithOwner(owner int) {
 	tick := time.NewTicker(500 * time.Millisecond)
@@ -65,6 +74,7 @@ func serveTestHolder() {
 	if owner, err := strconv.Atoi(os.Getenv(HolderOwnerEnv)); err == nil && owner > 0 {
 		go exitWithOwner(owner)
 	}
+	EnableResizeBeforeRead(dir)
 	if os.Getenv(HolderNoOpsEnv) == "1" {
 		holderOptionalOps = nil
 	}

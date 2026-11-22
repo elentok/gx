@@ -1,6 +1,7 @@
 package prompt_test
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/servertest"
@@ -285,6 +287,41 @@ func TestSessionRename_DraftThatWillNotClearRaisesTheCard(t *testing.T) {
 	if len(got.Action) != 1 || got.Action[0] != "/rename new name" {
 		t.Errorf("action = %v, want the rename command to resend", got.Action)
 	}
+	logs, _ := os.ReadFile(server.LogPath(f.h.StateDir))
+	for _, want := range []string{"draft would not clear", "attach_sizes", "pty_size"} {
+		if !strings.Contains(string(logs), want) {
+			t.Errorf("server log lacks %q:\n%s", want, logs)
+		}
+	}
+}
+
+// A read between a pty resize and the child's next output is undecided, so gx
+// types without clearing: the draft is still in the input when the command
+// lands. The old code trusted the read, cleared, and submitted the command
+// alone.
+func TestSessionRename_ReadAfterResizeIsUntrustedAndTypes(t *testing.T) {
+	t.Parallel()
+	f := fromPrompt(rigs.StartPromptSessionAs(t, firstPromptGrace, wire.CreateSessionRequest{Name: "old"}, servertest.WithEnv(agentfake.ProgramDraftEnv+"=my draft")))
+	marker := filepath.Join(f.h.SessionsDir, f.id, holder.ResizeBeforeReadFile)
+	if err := os.WriteFile(marker, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.rename(t, f.id, "new name")
+	if !servertest.Poll(10*time.Second, func() bool { return strings.Contains(servertest.Submitted(t, f.conv), "/rename new name") }) {
+		t.Fatalf("submitted = %q, want the rename command", servertest.Submitted(t, f.conv))
+	}
+	if got := servertest.Submitted(t, f.conv); !strings.Contains(got, "my draft") {
+		t.Errorf("submitted = %q, want the draft kept because the read was untrusted", got)
+	}
+}
+
+// Text gx left itself, such as a stale /clear, clears like a person's draft,
+// and the next prompt lands alone.
+func TestSessionRename_StaleClearInTheInputIsCleared(t *testing.T) {
+	t.Parallel()
+	f := fromPrompt(rigs.StartPromptSessionAs(t, firstPromptGrace, wire.CreateSessionRequest{Name: "old"}, servertest.WithEnv(agentfake.ProgramDraftEnv+"=/clear")))
+	f.rename(t, f.id, "new name")
+	waitForSubmitted(t, f.conv, strconv.Quote("/rename new name")+"\n")
 }
 
 // A Blocked chat can only close into Starting through a restart with a dead

@@ -65,20 +65,24 @@ func (p *Prompt) ClearDraft(dir string, c *holder.HolderClient) error {
 			time.Sleep(draftSettlePoll)
 		}
 	}
-	rows, _ := c.StyledScreen()
-	log.Info("draft would not clear", "screen", strings.Join(rows, "\n"))
+	rows, read, _ := c.StyledScreenRead()
+	log.Info("draft would not clear", "screen", strings.Join(rows, "\n"),
+		"pty_size", read.PTY, "attach_sizes", read.Attaches)
 	return ErrDraft
 }
 
 // InputState runs the harness empty check when the holder serves styled rows.
 // A holder that doesn't, or a read that fails, is InputUndecided; the error is
 // for callers that report it.
+//
+// A read taken after a PTY resize, before the child's next output, is
+// untrusted: the screen is still what the child drew for the old size.
 func InputState(c *holder.HolderClient) (harness.InputState, error) {
 	if !c.Supports(holder.OpScreenStyled) {
 		return harness.InputUndecided, nil
 	}
-	rows, err := c.StyledScreen()
-	if err != nil {
+	rows, read, err := c.StyledScreenRead()
+	if err != nil || read.Resized {
 		return harness.InputUndecided, err
 	}
 	return sessionTyping.InputIsEmpty(rows), nil
