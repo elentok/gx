@@ -270,6 +270,34 @@ func TestExecute_TicketsShow_OptionalSectionMissingPrintsNothing(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsShowAndSection_EpicOwnSection(t *testing.T) {
+	repo, project := cmdtest.SetupShowProject(t)
+	testutil.WriteFile(t, filepath.Join(project, "epic"), "ticket.md",
+		"---\nstatus: open\n---\n\n# Epic\n\n## Deferred\n\n- later\n\n## Other\n\nx\n")
+	testutil.WriteFile(t, filepath.Join(project, "epic", "issues"), "07-second.md",
+		"---\nid: \"07\"\nstatus: done\ntype: implement\n---\n\n# 07 — Second\n\n## Deferred\n\n- ticket-level\n")
+
+	for _, verb := range [][]string{{"show", "epic", "--section", "Deferred"}, {"section", "epic", "Deferred"}} {
+		out, err := runIn(t, repo, append([]string{"tickets"}, verb...)...)
+		want := "- later\n\nmine:epic/07  Second\n- ticket-level\n\n"
+		if err != nil || out != want {
+			t.Errorf("%v printed %q, err %v; want %q", verb, out, err, want)
+		}
+	}
+
+	for _, verb := range [][]string{{"show", "epic", "--section", "Nope"}, {"section", "epic", "Nope"}} {
+		out, err := runIn(t, repo, append([]string{"tickets"}, verb...)...)
+		if err == nil || !strings.Contains(err.Error(), "no section Nope in epic epic") || out != "" {
+			t.Errorf("%v printed %q, err %v; want a missing-section error", verb, out, err)
+		}
+	}
+
+	out, err := runIn(t, repo, "tickets", "show", "epic", "--section", "Iteration summaries")
+	if err != nil || out != "" {
+		t.Errorf("missing optional section printed %q, err %v; want nothing and no error", out, err)
+	}
+}
+
 func TestExecute_TicketsShow_SectionTicketsFilterNarrowsEpic(t *testing.T) {
 	repo, project := cmdtest.SetupShowProject(t)
 	issues := filepath.Join(project, "epic", "issues")

@@ -83,7 +83,7 @@ func showSections(dirs config.Dirs, cwd, addr string, opts showOptions, w io.Wri
 				return &tickets.AddressError{Code: tickets.CodeEpicJSON, Msg: "--json is not supported for an epic address"}
 			}
 			if section != "" {
-				return showEpicSection(dirs, cwd, project, epic, section, filter, w)
+				return showEpicSection(dirs, cwd, project, epic, section, filter, opts.Exists, w)
 			}
 			return showEpic(dirs, cwd, project, epic, brief, w)
 		}
@@ -162,9 +162,11 @@ func parseTicketNumbers(s string) (map[int]bool, error) {
 	return set, nil
 }
 
-// showEpicSection prints the named section of each of the epic's tickets,
-// limited to the numbers in filter when it is non-nil.
-func showEpicSection(dirs config.Dirs, cwd, project, name, section string, filter map[int]bool, w io.Writer) error {
+// showEpicSection prints the named section of the epic's own body, then of
+// each of the epic's tickets (limited to the numbers in filter when it is
+// non-nil). A section found nowhere is an error unless it is optional; with
+// exists the caller reports absence through the exit code instead.
+func showEpicSection(dirs config.Dirs, cwd, project, name, section string, filter map[int]bool, exists bool, w io.Writer) error {
 	root, project, _, err := resolveEpic(dirs, cwd, project, name)
 	if err != nil {
 		return err
@@ -173,19 +175,32 @@ func showEpicSection(dirs config.Dirs, cwd, project, name, section string, filte
 	if err != nil {
 		return err
 	}
+	var found bool
 	for _, epic := range epics {
 		if epic.Name != name {
 			continue
 		}
+		if schema.HasSection(epic.Body, section) {
+			found = true
+			if _, err := fmt.Fprintf(w, "%s\n\n", schema.Section(epic.Body, section)); err != nil {
+				return err
+			}
+		}
 		for _, t := range epic.Tickets {
 			if filter != nil && !filter[t.Number] {
 				continue
+			}
+			if t.ReadErr == "" && schema.HasSection(t.Body, section) {
+				found = true
 			}
 			a := tickets.Address{Project: project, Epic: name, ID: t.Identifier}
 			if err := printTicketSection(a, t, section, w); err != nil {
 				return err
 			}
 		}
+	}
+	if !found && !schema.IsOptionalSection(section) && !exists {
+		return fmt.Errorf("no section %s in epic %s", section, name)
 	}
 	return nil
 }
