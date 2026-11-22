@@ -32,6 +32,8 @@ type fixtureHeader struct {
 const (
 	framesSuffix    = ".frames.jsonl"
 	snapshotsSuffix = ".status.jsonl"
+	// rawSuffix holds the raw PTY output as one JSON string on one line.
+	rawSuffix = ".raw.jsonl"
 )
 
 // FixtureSource is the recorded fixtures shipped in testdata/.
@@ -54,7 +56,7 @@ func LoadFixtures(fsys fs.FS) (Source, error) {
 	sessions := map[string]Recording{}
 	var oldest string
 	for _, p := range paths {
-		if strings.HasSuffix(p, framesSuffix) || strings.HasSuffix(p, snapshotsSuffix) {
+		if strings.HasSuffix(p, framesSuffix) || strings.HasSuffix(p, snapshotsSuffix) || strings.HasSuffix(p, rawSuffix) {
 			continue
 		}
 		name := strings.TrimSuffix(p, ".jsonl")
@@ -105,6 +107,18 @@ func readFixture(fsys fs.FS, name string) (string, Recording, error) {
 	rec.Snapshots, err = readLines(fsys, name+snapshotsSuffix)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return "", Recording{}, err
+	}
+
+	raw, err := readLines(fsys, name+rawSuffix)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return "", Recording{}, err
+	}
+	if len(raw) > 0 {
+		var s string
+		if err := json.Unmarshal(raw[0], &s); err != nil {
+			return "", Recording{}, fmt.Errorf("%s%s: %w", name, rawSuffix, err)
+		}
+		rec.Raw = []byte(s)
 	}
 	return header.ClaudeVersion, rec, nil
 }
@@ -164,7 +178,17 @@ func writeFixture(dir, name, version string, rec Recording) error {
 	if err := writeLines(filepath.Join(dir, name+framesSuffix), frames); err != nil {
 		return err
 	}
-	return writeLines(filepath.Join(dir, name+snapshotsSuffix), rec.Snapshots)
+	if err := writeLines(filepath.Join(dir, name+snapshotsSuffix), rec.Snapshots); err != nil {
+		return err
+	}
+	if len(rec.Raw) == 0 {
+		return nil
+	}
+	raw, err := json.Marshal(string(rec.Raw))
+	if err != nil {
+		return err
+	}
+	return writeLines(filepath.Join(dir, name+rawSuffix), []json.RawMessage{raw})
 }
 
 // writeLines writes one line per entry; it writes no file for no entries.

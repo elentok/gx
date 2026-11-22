@@ -43,6 +43,9 @@ func PtyLive(p *nativerunner.Pty, cwd string, drive func(agentrunner.Session) er
 		close(done)
 		wg.Wait()
 		rec.sample()
+		// raw.log is the holder's copy of every byte the child wrote; a missing
+		// file leaves Raw empty and the composer check fails on it.
+		rec.Raw, _ = os.ReadFile(filepath.Join(rec.dir, holder.RawLogFile))
 		return rec.Recording
 	}
 

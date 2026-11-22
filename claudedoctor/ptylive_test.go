@@ -185,8 +185,9 @@ func TestPtyLive_RecordsTrustFrameAndWaitingSnapshot(t *testing.T) {
 	ran := map[string]bool{}
 	for _, r := range claudedoctor.Run(table, "pty", src) {
 		ran[r.Name] = r.Status != claudedoctor.Skip
-		// The recording ends at the trust dialog; no permission dialog is shown.
-		if r.Status == claudedoctor.Fail && r.Name != "permission-dialog" && r.Name != "image-paste" {
+		// The recording ends at the trust dialog; no permission dialog is shown,
+		// and the fake TUI never draws Claude's composer marker.
+		if r.Status == claudedoctor.Fail && r.Name != "permission-dialog" && r.Name != "image-paste" && r.Name != "composer-marker" {
 			t.Errorf("%s failed on the live recording: %s", r.Name, r.Detail)
 		}
 	}

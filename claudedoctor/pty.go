@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/transcript"
@@ -17,6 +18,7 @@ import (
 var ptyChecks = []Check{
 	{Runner: "pty", Name: "pid-status", Mode: Fixture, Session: "pty-status", Run: checkPidStatus},
 	{Runner: "pty", Name: "trust-screen", Mode: Fixture, Session: "pty-trust", Run: checkTrustScreen},
+	{Runner: "pty", Name: "composer-marker", Mode: Fixture, Session: "pty-startup", Run: checkComposerMarker},
 	{Runner: "pty", Name: "permission-dialog", Mode: Fixture, Session: "pty-dialog", Run: checkPermissionDialog},
 	{Runner: "pty", Name: "rate-limit-transcript", Mode: Fixture, Session: "pty-rate-limit", Run: checkRateLimitTranscript},
 	{Runner: "pty", Name: "image-paste", Mode: Fixture, Session: "pty-image-paste", Run: checkImagePaste},
@@ -179,6 +181,30 @@ func checkPermissionDialog(in Input) (string, bool) {
 		}
 	}
 	return fmt.Sprintf("no approvable permission dialog in %d frames", len(in.Frames)), false
+}
+
+// checkComposerMarker feeds a startup's raw output to the harness composer
+// scanner, the one the holder's Composer seen flag uses. The marker alone is
+// not enough: a startup menu can draw it too, so the output replayed onto a
+// screen must also be past every startup dialog.
+func checkComposerMarker(in Input) (string, bool) {
+	h, err := harness.Lookup(harness.Claude)
+	if err != nil {
+		return err.Error(), false
+	}
+	scanning, ok := h.(harness.ComposerScanning)
+	if !ok {
+		return "claude harness has no composer scanner", false
+	}
+	if !scanning.NewComposerScanner().Feed(in.Raw) {
+		return fmt.Sprintf("no composer marker in %d bytes of startup output", len(in.Raw)), false
+	}
+	scr := screen.NewScreen(holder.HolderCols, holder.HolderRows)
+	_, _ = scr.Write(in.Raw)
+	if claudeui.ClassifyStartup(claudeui.Normalize(scr.Rows()...)) != claudeui.StartupNoSession {
+		return "composer marker matched, but a startup menu is still on screen", false
+	}
+	return fmt.Sprintf("composer marker in %d bytes of startup output, no startup menu on screen", len(in.Raw)), true
 }
 
 // checkTrustScreen matches the trust dialog screen rule on recorded frames.

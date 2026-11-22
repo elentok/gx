@@ -66,7 +66,7 @@ func TestPtyChecks_OnFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FixtureSource: %v", err)
 	}
-	want := map[string]Status{"pid-status": Pass, "trust-screen": Pass, "permission-dialog": Pass, "rate-limit-transcript": Pass, "image-paste": Pass, "image-paste-slash-record": Skip, "holder-survives-kickstart": Skip}
+	want := map[string]Status{"pid-status": Pass, "trust-screen": Pass, "composer-marker": Pass, "permission-dialog": Pass, "rate-limit-transcript": Pass, "image-paste": Pass, "image-paste-slash-record": Skip, "holder-survives-kickstart": Skip}
 	got := map[string]Result{}
 	for _, r := range Run(Table, "pty", src) {
 		got[r.Name] = r
@@ -78,6 +78,33 @@ func TestPtyChecks_OnFixtures(t *testing.T) {
 	}
 	if d := got["holder-survives-kickstart"].Detail; d != "live only" {
 		t.Errorf("holder-survives-kickstart detail = %q", d)
+	}
+}
+
+func TestCheckComposerMarker_FailsOnATrustDialogDrawnWithTheMarker(t *testing.T) {
+	t.Parallel()
+	src, err := FixtureSource()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := map[string]struct {
+		session string
+		ok      bool
+		want    string
+	}{
+		"recorded startup":               {"pty-startup", true, "composer marker"},
+		"trust dialog with NBSP after ❯": {"pty-startup-trust-nbsp", false, "startup menu"},
+		"recording without raw output":   {"pty-trust", false, "no composer marker"},
+	}
+	for name, c := range cases {
+		rec, err := src.Session(c.session)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		detail, ok := checkComposerMarker(Input{Recording: rec})
+		if ok != c.ok || !strings.Contains(detail, c.want) {
+			t.Errorf("%s: ok=%v detail=%q, want ok=%v mentioning %q", name, ok, detail, c.ok, c.want)
+		}
 	}
 }
 

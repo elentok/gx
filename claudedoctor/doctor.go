@@ -48,11 +48,13 @@ type Check struct {
 }
 
 // Recording is what one canned session produced: headless stream-json
-// events, PTY screen frames, and status-file snapshots, each in order.
+// events, PTY screen frames, status-file snapshots, each in order, and the
+// PTY's raw output bytes.
 type Recording struct {
 	Events    []json.RawMessage
 	Frames    []string
 	Snapshots []json.RawMessage
+	Raw       []byte
 }
 
 type Input struct {

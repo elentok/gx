@@ -72,7 +72,7 @@ func liveDoctorSource() claudedoctor.Source {
 				// a live run is never rate limited, so it passes on "no API error".
 				events, err := liveTurn(env)
 				return claudedoctor.Recording{Events: events}, err
-			case "pty-status", "pty-trust":
+			case "pty-status", "pty-trust", "pty-startup":
 				return ptyRun()
 			case "pty-image-paste":
 				return liveImage(env, claudedoctor.PtyImagePaste)
