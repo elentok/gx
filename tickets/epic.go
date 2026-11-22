@@ -222,7 +222,13 @@ func (e Epic) TotalCount() int {
 // HoldsLoopWork reports whether the epic's tickets are loop work: false for a
 // wayfinder map (resolved by hand), a backlog (follow-ups) and an initiative.
 func (e Epic) HoldsLoopWork() bool {
-	return !e.IsMap && !e.IsBacklog && !e.IsInitiative
+	return !e.IsMap && !e.IsPlanEpic()
+}
+
+// IsPlanEpic reports whether the epic is a backlog or an initiative: planning
+// containers that are no loop epic and no design.
+func (e Epic) IsPlanEpic() bool {
+	return e.IsBacklog || e.IsInitiative
 }
 
 // IsCharting: a map whose Design has not started past the chart step.

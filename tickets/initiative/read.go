@@ -83,13 +83,15 @@ type View struct {
 	// Orphans are map epics whose initiative: and milestone: match a
 	// Milestone that links no Design.
 	Orphans []string
+	// Body is the parsed epic body, so callers need not parse it again.
+	Body Body
 }
 
 // Read derives the View of an Initiative epic. live and archived are the
 // project's epics; an archived epic counts as existing. It does no IO.
 func Read(init tickets.Epic, live, archived []tickets.Epic) View {
 	body := ParseBody(init.Body)
-	v := View{Slug: init.Name, State: StateActive}
+	v := View{Slug: init.Name, State: StateActive, Body: body}
 	find := func(name string) (tickets.Epic, bool) { return findEpic(name, live, archived) }
 
 	gated, lastOutcome, lastSlug := gateInfo(body.GateNotes)

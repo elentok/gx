@@ -116,7 +116,7 @@ type statsBuilder struct {
 func (b *statsBuilder) addEpic(project string, e tickets.Epic) {
 	cost := b.impl
 	switch {
-	case e.IsBacklog, e.IsInitiative:
+	case e.IsPlanEpic():
 		// A backlog or an Initiative is no loop epic and no design: its done
 		// tickets are neither merged nor costed.
 	case e.IsMap:
@@ -153,7 +153,7 @@ func (b *statsBuilder) addEpic(project string, e tickets.Epic) {
 // tickets are design work, not merged tickets.
 func (b *statsBuilder) addTicket(project string, e tickets.Epic, tk tickets.Ticket, cost costSeries) {
 	if tk.IsDone() {
-		if i := b.win.Bucket(tk.DoneAt); i >= 0 && !e.IsBacklog && !e.IsInitiative {
+		if i := b.win.Bucket(tk.DoneAt); i >= 0 && !e.IsPlanEpic() {
 			cost[i].add(tk.TotalTokens, tk.ActualCost)
 			if !e.IsMap {
 				b.tp.TicketsMerged[i]++

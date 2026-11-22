@@ -96,6 +96,22 @@ func TestCreateEpic_InitiativeKind(t *testing.T) {
 	}
 }
 
+func TestEpic_IsPlanEpic(t *testing.T) {
+	for name, tc := range map[string]struct {
+		epic Epic
+		want bool
+	}{
+		"backlog":    {Epic{IsBacklog: true}, true},
+		"initiative": {Epic{IsInitiative: true}, true},
+		"map":        {Epic{IsMap: true}, false},
+		"plain":      {Epic{}, false},
+	} {
+		if got := tc.epic.IsPlanEpic(); got != tc.want {
+			t.Errorf("%s: IsPlanEpic = %v, want %v", name, got, tc.want)
+		}
+	}
+}
+
 func TestCreateEpic_MapInitiativeAndMilestone(t *testing.T) {
 	root := t.TempDir()
 	conv := t.TempDir()

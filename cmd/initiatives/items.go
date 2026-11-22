@@ -289,8 +289,8 @@ func editInitiativeIn(cfgDirs config.Dirs, cwd, arg string, w io.Writer, edit st
 	exists := func(name string) bool { return names[name] }
 	var line string
 	err = tickets.EditEpicBody(ticketPath, func(text string) (string, error) {
-		body := initiative.ParseBody(text)
 		view := initiative.Read(tickets.Epic{Name: slug, Body: text}, live, archived)
+		body := view.Body
 		var editErr error
 		if line, editErr = edit(&body, view, exists); editErr != nil {
 			return "", editErr

@@ -15,20 +15,14 @@ import (
 // Initiatives serves the Initiatives list: per project with an Initiative, one
 // row each with its state, done counts and current Milestone.
 func (s *Epics) Initiatives(w http.ResponseWriter, _ *http.Request) {
-	dirs, err := tickets.ProjectDirs(s.TicketStore)
+	dirs, err := s.ProjectCache.Dirs(s.TicketStore)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	list, err := s.cardList()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	workspacesOf := s.projectWorkspaces(list.Epics)
 	out := wire.InitiativeList{Projects: []wire.InitiativeProject{}}
 	for _, dir := range dirs {
-		project := tickets.ProjectName(dir)
+		project := s.ProjectCache.Name(dir)
 		live, err := s.Projects.Epics(project)
 		if err != nil {
 			s.Log.Warn("initiatives: read project epics", "project", project, "err", err)
@@ -51,13 +45,24 @@ func (s *Epics) Initiatives(w http.ResponseWriter, _ *http.Request) {
 			}
 			for _, m := range v.Milestones {
 				if m.Slug == v.Current {
-					row.CurrentNumber, row.CurrentState = m.Number, string(m.State)
+					row.CurrentNumber, row.CurrentState = m.Number, m.State
 				}
 			}
 			rows = append(rows, row)
 		}
 		if len(rows) > 0 {
-			out.Projects = append(out.Projects, wire.InitiativeProject{Project: project, Workspaces: workspacesOf(project), Initiatives: rows})
+			out.Projects = append(out.Projects, wire.InitiativeProject{Project: project, Initiatives: rows})
+		}
+	}
+	if len(out.Projects) > 0 {
+		list, err := s.cardList()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		workspacesOf := s.projectWorkspaces(list.Epics)
+		for i := range out.Projects {
+			out.Projects[i].Workspaces = workspacesOf(out.Projects[i].Project)
 		}
 	}
 	wire.WriteJSON(w, out)
@@ -95,12 +100,12 @@ func (s *Epics) InitiativeDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Epics) archivedOf(project string) ([]tickets.Epic, error) {
-	dirs, err := tickets.ProjectDirs(s.TicketStore)
+	dirs, err := s.ProjectCache.Dirs(s.TicketStore)
 	if err != nil {
 		return nil, err
 	}
 	for _, dir := range dirs {
-		if tickets.ProjectName(dir) == project {
+		if s.ProjectCache.Name(dir) == project {
 			return tickets.LoadArchived(dir)
 		}
 	}
@@ -109,7 +114,7 @@ func (s *Epics) archivedOf(project string) ([]tickets.Epic, error) {
 
 func initiativePage(project string, e tickets.Epic, live, archived []tickets.Epic) wire.InitiativePage {
 	v := initiative.Read(e, live, archived)
-	body := initiative.ParseBody(e.Body)
+	body := v.Body
 	addr := func(name string) string { return queue.RootRef{Project: project, Epic: name}.String() }
 	p := wire.InitiativePage{
 		Address: addr(e.Name), Project: project, Slug: v.Slug, State: v.State, StoppedAt: v.StoppedAt,
