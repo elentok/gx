@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Changed `gx tickets epic add` and `gx initiatives new` to say how to unarchive an archived epic name (`gx server epics unarchive project:name`) or to pick another name. `epic add` already refused archived names.
+
 ## v0.51.11 - 2026-11-21
 
 - Added Initiatives and Milestones (Milestone 1). An Initiative is a new epic kind that groups Designs and implementation epics into Milestones. It has body formats that parse, render and keep unparsed lines verbatim, and a migration step maps the new initiative and milestone fields.

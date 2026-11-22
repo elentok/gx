@@ -44,7 +44,7 @@ func takenIn(projectDir, project, name string, archived map[string]bool) (string
 		return "", err
 	}
 	if archived[name] {
-		return fmt.Sprintf("epic %q already exists in the archive", name), nil
+		return fmt.Sprintf("epic %q already exists in the archive; to reuse it run `gx server epics unarchive %s:%s`", name, project, name), nil
 	}
 	pf, err := config.ReadProjectFile(projectDir)
 	if err != nil || pf.Repo == nil {

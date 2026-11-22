@@ -49,6 +49,22 @@ func TestRunTicketsEpicAdd_RefusesNameUsedBefore(t *testing.T) {
 	}
 }
 
+func TestRunTicketsEpicAdd_ArchivedNameRefusalHintsUnarchive(t *testing.T) {
+	cwd, project := setupEpicAddProject(t)
+	if err := os.MkdirAll(filepath.Join(tickets.ArchiveDir(project), "gone"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, "mine:gone", "loop", "open", "", &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("want a refusal")
+	}
+	for _, want := range []string{"in the archive", "gx server epics unarchive mine:gone", "another name"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("err = %v, want containing %q", err, want)
+		}
+	}
+}
+
 func TestRunTicketsEpicAdd_MilestoneDesignRefusesExistingImpl(t *testing.T) {
 	cwd, project := setupEpicAddProject(t)
 	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "init-m1-impl"))
