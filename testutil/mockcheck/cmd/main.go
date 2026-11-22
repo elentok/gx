@@ -20,7 +20,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	problems := mockcheck.Validate(string(data))
+	problems, viewed := mockcheck.Validate(string(data))
+	for _, v := range viewed {
+		fmt.Println(v)
+	}
 	for _, p := range problems {
 		fmt.Fprintln(os.Stderr, p)
 	}

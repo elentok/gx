@@ -58,7 +58,9 @@ func TestMockRulesAnchors(t *testing.T) {
 			"After the first empty read of a state, stop",
 			"Never write `pass` for a state whose PNGs you did not see",
 			"go run ./testutil/mockcheck/cmd <file>",
-			"`<state>: pass <mock.png> <built.png>`",
+			"`<state>: pass <mock.png> <built.png> | <mock selector> | <built selector>`",
+			"the state is `unchecked` with that reason, never `pass`",
+			"prints one line per image it validated",
 		}},
 		{"ui check build", "gx-ui-check/SKILL.md", []string{
 			"go run ./testutil/gxfixture [--hold] <scenario>",
