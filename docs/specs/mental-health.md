@@ -131,7 +131,7 @@ A banner or sound trigger that fires during a Rest period is dropped, not resche
 11. "The agents ask you to please stop watching them." / "They work better when nobody stares."
 12. "Time for a tiny holiday." / "Go outside if you can, or just breathe by the window."
 
-**Stats.** The stats payload gets a "Mental health" section: for each day of the range, the number of Break starts (minus dropped ones), the unlocks of Break and the unlocks of Bedtime. It reads the records store, as ADR 0041's amendment allows for account-wide sections with their own store. It ignores the project filter, like Web performance, and follows the page's 7/30/90-day range and local days. The web page adds a section with a side-by-side chart card, following the Follow-ups card, placed after Web performance. The wire types are generated like the others.
+**Stats.** The stats payload gets a "Mental health" section: for each day of the range, the number of Break starts (minus dropped ones), the unlocks of Break and the unlocks of Bedtime. It reads the records store, as ADR 0041's amendment allows for account-wide sections with their own store. It ignores the project filter, like Web performance, and the card's small text says so, as the Web performance card's does. It follows the page's 7/30/90-day range and local days. The web page adds a section with a side-by-side chart card, following the Follow-ups card, placed after Web performance. The wire types are generated like the others.
 
 **Fixtures.** A new fixture scenario `rest` with shapes seeds config and the persisted Rest state (written at start, with times relative to the start). The shapes are listed under Verification.
 
