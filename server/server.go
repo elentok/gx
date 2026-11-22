@@ -520,7 +520,7 @@ func New(cfg Config) (*Server, error) {
 			PromptGrace: cfg.PromptGrace, LaunchProofCaps: cfg.LaunchProofCaps,
 			ActionStepStartTimeout: cfg.ActionStepStartTimeout, ActionSlashSettle: cfg.ActionSlashSettle,
 			KeysSettleStep: cfg.KeysSettleStep, KeysSettleCap: cfg.KeysSettleCap,
-			CodexQuestionWait: cfg.CodexQuestionWait,
+			CodexQuestionWait: cfg.CodexQuestionWait, Env: cfg.Env,
 		},
 		Log: log, Events: events, SessionChat: s.sessionChat, Settings: &s.settings,
 		Projects: s.projects, BadRounds: s.recovery, Held: s.workspaces.IsHeld, Queue: s.queue,

@@ -118,10 +118,8 @@ type PidWatcher struct {
 	notBefore int64
 	// startup reports a pre-session dialog on screen; nil sees none.
 	startup func() bool
-	// inputBox reports claude's prompt input on screen; nil sees none.
-	inputBox func() bool
-	now      func() time.Time
-	find     func(projectsDir, conversationID string) ([]string, error)
+	now     func() time.Time
+	find    func(projectsDir, conversationID string) ([]string, error)
 	// parents maps each running pid to its parent pid.
 	parents func() (map[int]int, error)
 
@@ -608,9 +606,8 @@ func (w *PidWatcher) Program(r ProgramReport) {
 	}
 }
 
-// Ready is the earliest of the pid file's idle, an OSC 7501 idle or done
-// report, and the input box on screen. The first two are stamped when seen;
-// the screen is read here, so it counts only when neither of them has fired.
+// Ready is the earlier of the pid file's idle and an OSC 7501 idle or done
+// report, each stamped when seen. The screen never counts.
 func (w *PidWatcher) Ready() ReadySignal {
 	if w.Status().State == Blocked {
 		return ""
@@ -625,8 +622,6 @@ func (w *PidWatcher) Ready() ReadySignal {
 		w.ready = ReadyPidFile
 	case !w.readyOSCAt.IsZero():
 		w.ready = ReadyOSC7501
-	case w.inputBox != nil && w.inputBox():
-		w.ready = ReadyScreen
 	}
 	return w.ready
 }

@@ -402,6 +402,18 @@ func (c *composerSeen) Write(p []byte) (int, error) {
 
 func (c *composerSeen) seen() bool { return c.flag.Load() }
 
+// ready is the watcher's ready signal, else the Composer seen flag. Neither
+// counts while the session is Blocked.
+func (h *holderServer) ready() harness.ReadySignal {
+	if r := h.watcher.Ready(); r != "" {
+		return r
+	}
+	if h.composer.seen() && h.watcher.Status().State != harness.Blocked {
+		return harness.ReadyComposer
+	}
+	return ""
+}
+
 // displayNameTail is how much earlier output displayName keeps, so a title
 // split across two reads is still seen whole.
 const displayNameTail = 1024

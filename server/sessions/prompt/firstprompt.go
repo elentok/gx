@@ -195,6 +195,7 @@ func (f *firstPrompt) markTyped() {
 func (f *firstPrompt) Start(signal, prompt string) {
 	f.log.Info("first prompt ready", "signal", signal, "len", len(prompt), "head", PromptHead(prompt))
 	f.p.sessions.Watches.Start(func() {
+		f.logMissingMarker(signal)
 		err := f.deliver(prompt)
 		switch {
 		case errors.Is(err, errNudgeCancelled):
@@ -210,6 +211,20 @@ func (f *firstPrompt) Start(signal, prompt string) {
 			f.log.Warn("type first prompt", "err", err)
 		}
 	})
+}
+
+// logMissingMarker logs one line, with the Claude version, when a signal other
+// than the composer marker started the prompt and the marker was never seen:
+// the version tells which release changed its composer.
+func (f *firstPrompt) logMissingMarker(signal string) {
+	c, err := holder.DialHolder(f.dir)
+	if err != nil || signal == string(harness.ReadyComposer) {
+		return
+	}
+	if seen, known, err := c.ComposerSeen(); err != nil || !known || seen {
+		return
+	}
+	f.log.Info("first prompt started without the composer marker", "signal", signal, "claude_version", harness.ClaudeVersion(f.p.cfg.Env))
 }
 
 func (f *firstPrompt) deliver(prompt string) error {
@@ -246,8 +261,6 @@ func (f *firstPrompt) deliver(prompt string) error {
 		// typing would double it. Enter alone sends it; a nudge that finds the
 		// screen unchanged clears and types it in full.
 		p.skipType = true
-	} else if err := f.p.ClearDraft(f.dir, c); err != nil {
-		return err
 	}
 	caps := claudeui.DefaultNudgeCaps
 	caps.Grace = cmp.Or(f.p.cfg.PromptGrace, caps.Grace)

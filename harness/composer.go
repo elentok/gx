@@ -1,6 +1,26 @@
 package harness
 
-import "bytes"
+import (
+	"bytes"
+	"context"
+	"os/exec"
+	"strings"
+	"time"
+)
+
+// ClaudeVersion is `claude --version` run under env, "unknown" when it fails.
+// It is for a log line naming the release whose composer was not recognised.
+func ClaudeVersion(env []string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "claude", "--version")
+	cmd.Env = env
+	out, err := cmd.Output()
+	if err != nil {
+		return "unknown"
+	}
+	return strings.TrimSpace(string(out))
+}
 
 // ComposerScanner reads an agent's raw output, fed in chunks as it is read,
 // and reports whether the composer has been drawn. It is a separate read from

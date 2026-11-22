@@ -273,7 +273,7 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 		default:
 		}
 		if h.pid == nil {
-			cur := newStreamStatus(h.watcher.Status(), h.watcher.ConversationID(), h.name.get(), h.watcher.Ready())
+			cur := newStreamStatus(h.watcher.Status(), h.watcher.ConversationID(), h.name.get(), h.ready())
 			turn := 0
 			if tw, ok := h.watcher.(harness.TurnWatcher); ok {
 				turn = tw.Turns()
@@ -436,7 +436,7 @@ func (h *holderServer) watch(conn net.Conn) {
 	defer h.changes.unsubscribe(changes)
 	var last *streamStatus
 	for {
-		cur := newStreamStatus(h.watcher.Status(), h.watcher.ConversationID(), h.name.get(), h.watcher.Ready())
+		cur := newStreamStatus(h.watcher.Status(), h.watcher.ConversationID(), h.name.get(), h.ready())
 		if last == nil || cur != *last {
 			if send(StreamStatus, cur) != nil {
 				return

@@ -70,6 +70,8 @@ type Config struct {
 	// CodexQuestionWait bounds the wait for each question's header on the
 	// overlay; zero means DefaultCodexQuestionWait.
 	CodexQuestionWait time.Duration
+	// Env is the server's environment, for the `claude --version` run.
+	Env []string
 }
 
 // RunOpts hooks an action run into a person's own input. OnTyped runs once a

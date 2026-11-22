@@ -80,9 +80,9 @@ type Watcher interface {
 type ReadySignal string
 
 const (
-	ReadyPidFile ReadySignal = "pid"
-	ReadyOSC7501 ReadySignal = "osc7501"
-	ReadyScreen  ReadySignal = "screen"
+	ReadyPidFile  ReadySignal = "pid"
+	ReadyOSC7501  ReadySignal = "osc7501"
+	ReadyComposer ReadySignal = "composer"
 )
 
 // TitleWatcher is a Watcher that also reads the child's OSC 0 window title,

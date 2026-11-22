@@ -38,6 +38,13 @@ type Harness struct {
 // no-resume fake is not one, so tests have a harness the switch refuses.
 func (h Harness) SwitchesModels() bool { return !h.NoResume }
 
+// NewComposerScanner is claude's: the fake draws, or is told to write, the
+// same composer marker.
+func (Harness) NewComposerScanner() harness.ComposerScanner {
+	claude, _ := harness.Lookup(harness.Claude)
+	return claude.(harness.ComposerScanning).NewComposerScanner()
+}
+
 func (Harness) Launch(opts harness.LaunchOptions) harness.Command {
 	claude, _ := harness.Lookup(harness.Claude)
 	return programCommand(claude.Launch(opts), opts)

@@ -329,7 +329,7 @@ type screenReadyWatcher struct {
 
 func (w *screenReadyWatcher) Ready() agentharness.ReadySignal {
 	if strings.Contains(strings.Join(w.scr.Rows(), "\n"), "READY") {
-		return agentharness.ReadyScreen
+		return agentharness.ReadyOSC7501
 	}
 	return ""
 }
@@ -355,8 +355,8 @@ func TestHolderWatch_ScreenOnlyReadyNeedsNoOtherStatusEvent(t *testing.T) {
 	if err := os.WriteFile(show, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if m, err := watch.Next(); err != nil || m.Type != holder.StreamStatus || m.Ready != agentharness.ReadyScreen {
-		t.Errorf("after the screen shows ready = %+v, %v; want ready by %q", m, err, agentharness.ReadyScreen)
+	if m, err := watch.Next(); err != nil || m.Type != holder.StreamStatus || m.Ready != agentharness.ReadyOSC7501 {
+		t.Errorf("after the screen shows ready = %+v, %v; want ready by %q", m, err, agentharness.ReadyOSC7501)
 	}
 }
 
@@ -377,9 +377,9 @@ func TestHolderWatch_ReportsReadySignal(t *testing.T) {
 	if m, err := watch.Next(); err != nil || m.Type != holder.StreamStatus || m.Ready != "" {
 		t.Fatalf("first message = %+v, %v; want a status that is not ready", m, err)
 	}
-	w.setReady(agentharness.ReadyScreen)
-	if m, err := watch.Next(); err != nil || m.Type != holder.StreamStatus || m.Ready != agentharness.ReadyScreen {
-		t.Errorf("after ready = %+v, %v; want ready by %q", m, err, agentharness.ReadyScreen)
+	w.setReady(agentharness.ReadyOSC7501)
+	if m, err := watch.Next(); err != nil || m.Type != holder.StreamStatus || m.Ready != agentharness.ReadyOSC7501 {
+		t.Errorf("after ready = %+v, %v; want ready by %q", m, err, agentharness.ReadyOSC7501)
 	}
 }
 
