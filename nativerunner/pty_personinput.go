@@ -118,7 +118,7 @@ func (pr *ptyPrompter) clearGxI() (bool, error) {
 	if text, ok := harness.InputText(rows); !ok || text != "i" || int64(t.InputPresses(pr.ss.session.SessionID)) <= pr.ss.sentPresses.Load() {
 		return false, nil
 	}
-	return true, pr.p.died(pr.ss, pr.ss.holder.SendKeys(t.ClearKey()))
+	return true, pr.batch(func() error { return pr.ss.holder.SendKeys(t.ClearKey()) })
 }
 
 // awaitEmptyInput waits up to wait for a person's draft to go, so gx never
@@ -179,12 +179,21 @@ func (pr *ptyPrompter) Submit(text string) error {
 		default:
 		}
 	}
-	if err := pr.ss.holder.TypeTextBy(text, pr.p.typing(pr.ss).PastesText(text)); err != nil {
-		return pr.p.died(pr.ss, err)
-	}
-	pr.typed = true
-	pr.ss.sentPresses.Store(int64(pr.p.typing(pr.ss).InputPresses(pr.ss.session.SessionID)))
-	return pr.SendEnter()
+	// The text and its Enter are one batch.
+	return pr.batch(func() error {
+		if err := pr.ss.holder.TypeTextBy(text, pr.p.typing(pr.ss).PastesText(text)); err != nil {
+			return pr.p.died(pr.ss, err)
+		}
+		pr.typed = true
+		pr.ss.sentPresses.Store(int64(pr.p.typing(pr.ss).InputPresses(pr.ss.session.SessionID)))
+		return pr.sendEnter()
+	})
+}
+
+// batch runs one input step with gx owning the input; waits between steps hold
+// nothing, so a person's key lands in them.
+func (pr *ptyPrompter) batch(fn func() error) error {
+	return pr.p.died(pr.ss, pr.ss.holder.Batch(fn))
 }
 
 // Clear presses the harness clear key once.
@@ -192,7 +201,9 @@ func (pr *ptyPrompter) Clear() error {
 	if err := pr.cancelled(); err != nil {
 		return err
 	}
-	return pr.p.died(pr.ss, pr.ss.holder.SendKeys(pr.p.typing(pr.ss).ClearKey()))
+	return pr.batch(func() error {
+		return pr.ss.holder.SendKeys(pr.p.typing(pr.ss).ClearKey())
+	})
 }
 
 // InputEmpty runs the harness empty check when the holder serves styled rows.
@@ -219,7 +230,12 @@ func (pr *ptyPrompter) ReadyToType() bool {
 	io.Session = pr.ss.session.SessionID
 	io.Log = pr.p.log
 	io.Caller = "pty-nudge"
-	return pr.p.typing(pr.ss).ReadyToType(io)
+	ready := false
+	_ = pr.batch(func() error {
+		ready = pr.p.typing(pr.ss).ReadyToType(io)
+		return nil
+	})
+	return ready
 }
 
 // HolderTypingIO reads styled rows when the holder serves them, plain rows
@@ -259,14 +275,18 @@ func (pr *ptyPrompter) SendEnter() error {
 	if err := pr.cancelled(); err != nil {
 		return err
 	}
+	return pr.batch(pr.sendEnter)
+}
+
+func (pr *ptyPrompter) sendEnter() error {
 	working := false
 	if w, err := pr.ss.holder.Watched(); err != nil {
-		return pr.p.died(pr.ss, err)
+		return err
 	} else if w != nil {
 		// A background terminal alone is no turn: Enter sends.
 		working = w.Status.State == harness.Working && !w.Status.Background
 	}
-	return pr.p.died(pr.ss, pr.ss.holder.SendKeys(pr.p.typing(pr.ss).SubmitKey(working)))
+	return pr.ss.holder.SendKeys(pr.p.typing(pr.ss).SubmitKey(working))
 }
 
 func (pr *ptyPrompter) WaitStart(timeout time.Duration) (bool, error) {

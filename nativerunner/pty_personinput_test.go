@@ -135,6 +135,49 @@ func TestPty_AttachWithNoKeysLeavesNudgesAlone(t *testing.T) {
 	}
 }
 
+func TestOwner_PtyNudgeStepsAreBatchesAndWaitsHoldNothing(t *testing.T) {
+	t.Parallel()
+	p := newPty(t)
+	p.PromptGrace = 100 * time.Millisecond
+	s := startPersonInputPty(t, p)
+	ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionStall})
+	a := attachTo(t, p, s)
+
+	owners := make(chan holder.AttachOwner, 64)
+	go func() {
+		for {
+			m, err := a.Next()
+			if err != nil {
+				return
+			}
+			if m.Type == holder.StreamOwner {
+				owners <- m.Owner
+			}
+		}
+	}()
+
+	if err := p.Prompt(s, "do it"); !errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("Prompt = %v; want ErrNotDelivered", err)
+	}
+	// The attach starts as the owner; every step then reports gx, then back.
+	var got []holder.AttachOwner
+	for len(owners) > 0 {
+		got = append(got, <-owners)
+	}
+	if len(got) < 5 || !got[0].Self {
+		t.Fatalf("owner reports = %+v; want the initial owner then gx/self pairs", got)
+	}
+	// 2 nudge Enters, a clear and a retype give several steps beyond the first.
+	for i, o := range got[1:] {
+		if want := i%2 == 0; o.GX != want || o.Self == want {
+			t.Fatalf("owner report %d = %+v; want strictly alternating gx and self", i+1, o)
+		}
+	}
+	if len(got)%2 != 1 {
+		t.Errorf("owner reports = %+v; want every batch to end back with the attach", got)
+	}
+}
+
 func draftPty(t *testing.T) *nativerunner.Pty {
 	t.Helper()
 	p := newPty(t)
