@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -101,7 +102,7 @@ func TestExecute_TicketsFollowUpAdd_Refusals(t *testing.T) {
 		{"type", "mine:follow-ups", "---\ncategory: idea\ntype: implement\n---\n\n" + followUpSections, tickets.CodeTypeOverride, "implement"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			before := dirEntries(t, filepath.Join(project, "epic", "issues"))
+			before := issueNames(t, project, "epic")
 			_, err := runIn(t, repo, "tickets", "follow-up", "add", tc.target, "--body", tc.body)
 			var ae *tickets.AddressError
 			if !errors.As(err, &ae) || ae.Code != tc.code {
@@ -113,7 +114,7 @@ func TestExecute_TicketsFollowUpAdd_Refusals(t *testing.T) {
 			if _, statErr := os.Stat(epic); !os.IsNotExist(statErr) {
 				t.Errorf("follow-ups was created: %v", statErr)
 			}
-			if after := dirEntries(t, filepath.Join(project, "epic", "issues")); after != before {
+			if after := issueNames(t, project, "epic"); !slices.Equal(after, before) {
 				t.Errorf("epic issues changed: %q -> %q", before, after)
 			}
 		})
@@ -306,17 +307,4 @@ func TestExecute_TicketsFollowUpSearch_SplitsArgumentsOnWhitespace(t *testing.T)
 	if _, err := runIn(t, repo, "tickets", "follow-up", "search", " ", ""); err == nil || !strings.Contains(err.Error(), "needs at least one word") {
 		t.Errorf("blank-only query err = %v, want needs at least one word", err)
 	}
-}
-
-func dirEntries(t *testing.T, dir string) string {
-	t.Helper()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var names []string
-	for _, e := range entries {
-		names = append(names, e.Name())
-	}
-	return strings.Join(names, ",")
 }

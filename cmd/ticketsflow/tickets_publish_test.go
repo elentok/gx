@@ -132,18 +132,6 @@ func TestPublishJSONAndDryRun(t *testing.T) {
 	}
 }
 
-func TestPublishIntoExistingEpicKeepsItsTickets(t *testing.T) {
-	d, project, manifest := setupPublish(t)
-	existingEpic(t, project)
-	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
-		t.Fatalf("publish: %v", err)
-	}
-	got := strings.Join(issueNames(t, project, "e"), " ")
-	if got != "01-old.md 02-a.md 03-b.md 04-c.md" {
-		t.Errorf("issues = %s", got)
-	}
-}
-
 func TestPublishRollback(t *testing.T) {
 	for _, existing := range []bool{false, true} {
 		t.Run(map[bool]string{false: "new epic", true: "existing epic"}[existing], func(t *testing.T) {
@@ -179,11 +167,7 @@ func TestPublishRollback(t *testing.T) {
 			if err := json.Unmarshal([]byte(publishOut(d)), &rows); err != nil {
 				t.Fatal(err)
 			}
-			first := "mine:e/01"
-			if existing {
-				first = "mine:e/02"
-			}
-			if rows[0].Address != first {
+			if first := map[bool]string{false: "mine:e/01", true: "mine:e/02"}[existing]; rows[0].Address != first {
 				t.Errorf("existing=%v: retry first address = %s, want %s", existing, rows[0].Address, first)
 			}
 		})
