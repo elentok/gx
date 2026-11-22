@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/agents/agentstyle"
 	"github.com/elentok/gx/ui/agents/jump"
+	"github.com/elentok/gx/ui/agents/terminal"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
@@ -44,6 +45,7 @@ var leaderBindings = []keys.Binding{
 	{Seq: []string{"ctrl+o"}, Title: "switch view"},
 	{Seq: []string{"q"}, Title: "leave tab"},
 	{Seq: []string{"i"}, Title: "unlock Queue/Design input"},
+	{Seq: []string{terminal.TakeOverKey}, Title: "take over session input"},
 	{Seq: []string{"?"}, Title: "help"},
 }
 
@@ -174,6 +176,9 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 		s, ok := m.selected()
 		cmd := m.actions.pick(pick, s, ok, m.attach)
 		return m, cmd
+	case terminal.TakeOverKey:
+		m.attach.TakeOver()
+		return m, nil
 	case "[":
 		return m.enterCopyMode()
 	case "n":

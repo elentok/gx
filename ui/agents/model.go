@@ -249,6 +249,9 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd = tea.Batch(terminal.WriteCopied(m.clipWrite, *res.Copied), cmd)
 		}
 		return m, cmd
+	case terminal.BlockedClearMsg:
+		m.attach.UpdateBlockedClear(msg)
+		return m, nil
 	case create.ProjectsMsg:
 		if m.create != nil {
 			m.create = m.create.UpdateProjects(msg, m.createCtx())
@@ -473,7 +476,7 @@ func (m Model) termView() terminal.View {
 		Width: m.width, Height: m.height, MainWidth: m.mainWidth(),
 		Sessions: m.sessions, Cursor: m.cursor, Attach: m.attach, Copy: m.copy,
 		Focused: m.terminalFocused, Covered: m.ModalOpen() || m.leaderPending, Selected: m.selectedID(),
-		DisplayName: agentstyle.DisplayName,
+		DisplayName: agentstyle.DisplayName, LeaderKey: leaderKeys(m.settings)[0],
 	}
 	v := m.term.WithInput(in)
 	if m.copy != nil {

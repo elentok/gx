@@ -22,6 +22,7 @@ type AttachStream interface {
 	SendKey(k screen.Key) error
 	Paste(text string) error
 	Resize(cols, rows int) error
+	TakeOver() error
 	Scroll(offset int) error
 	Wheel(x, y int, down bool) error
 	Mouse(x, y int, kind screen.MouseKind, button int) error
@@ -87,6 +88,38 @@ type Attachment struct {
 	// person confirms an unlock. A new attachment, so every new open, starts
 	// read-only again.
 	ReadOnly bool
+	// owner is who the holder says owns the input; OwnerUnknown until its first
+	// report.
+	owner Owner
+	// blocked: the holder dropped a key because this attach is not the owner.
+	// blockSeq tells a clear tick from an older blocked report's.
+	blocked  bool
+	blockSeq int
+}
+
+// Owner is who owns the session's input.
+type Owner int
+
+const (
+	OwnerUnknown Owner = iota
+	OwnerSelf
+	OwnerOther
+	OwnerGX
+)
+
+// BlockedHintTime is how long a blocked-key hint stays up.
+const BlockedHintTime = 4 * time.Second
+
+// BlockedClearMsg ends the blocked-key hint it was scheduled for.
+type BlockedClearMsg struct {
+	A   *Attachment
+	Seq int
+}
+
+// TakeOver asks the holder to make this attach the owner. Focus, typing and
+// resizing never do.
+func (a *Attachment) TakeOver() {
+	a.write(func(s AttachStream) error { return s.TakeOver() })
 }
 
 func (a *Attachment) Close() {
@@ -216,8 +249,32 @@ func (a *Attachment) UpdateStream(msg AttachStreamMsg) (StreamResult, tea.Cmd) {
 		return StreamResult{Exited: true}, nil
 	case holder.StreamCopy:
 		return StreamResult{Copied: &msg.msg.Text}, ReadAttach(a)
+	case holder.StreamOwner:
+		switch o := msg.msg.Owner; {
+		case o.Self:
+			a.owner = OwnerSelf
+			a.blocked = false
+		case o.GX:
+			a.owner = OwnerGX
+		default:
+			a.owner = OwnerOther
+		}
+	case holder.StreamBlocked:
+		a.blocked = true
+		a.blockSeq++
+		seq := a.blockSeq
+		return StreamResult{}, tea.Batch(ReadAttach(a), tea.Tick(BlockedHintTime, func(time.Time) tea.Msg {
+			return BlockedClearMsg{A: a, Seq: seq}
+		}))
 	}
 	return StreamResult{}, ReadAttach(a)
+}
+
+// UpdateBlockedClear drops the hint unless a newer blocked report replaced it.
+func (a *Attachment) UpdateBlockedClear(msg BlockedClearMsg) {
+	if a.Current(msg.A) && msg.Seq == a.blockSeq {
+		a.blocked = false
+	}
 }
 
 // applyFrame returns rows with the frame's changed rows written over them, or
@@ -340,10 +397,8 @@ func (a *Attachment) ForwardMove(mouse tea.Mouse, kind screen.MouseKind, clamp f
 	a.write(func(s AttachStream) error { return s.Mouse(x, y, kind, button) })
 }
 
-// Resize gives the session the panel's size. It runs on every focus, not only
-// on change: the pty follows the viewer that last focused or typed, and
-// another viewer may have resized it since. Typing needs no Resize, as the
-// holder claims this viewer's last size on input.
+// Resize gives the holder the panel's size. The pty takes it only while this
+// attach owns the input, so sending it never claims ownership.
 func (a *Attachment) Resize(cols, rows int) {
 	if a.Live() {
 		a.size = [2]int{cols, rows}

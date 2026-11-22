@@ -102,6 +102,11 @@ func (f *fakeAttach) Resize(cols, rows int) error {
 	return nil
 }
 
+func (f *fakeAttach) TakeOver() error {
+	f.log = append(f.log, "takeover")
+	return nil
+}
+
 func (f *fakeAttach) Close() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

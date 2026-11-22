@@ -30,6 +30,7 @@ func (a *idleAttach) Wheel(int, int, bool) error                  { return nil }
 func (a *idleAttach) Mouse(int, int, screen.MouseKind, int) error { return nil }
 func (a *idleAttach) Copy(holder.LinePos, holder.LinePos) error   { return nil }
 func (a *idleAttach) Resize(int, int) error                       { return nil }
+func (a *idleAttach) TakeOver() error                             { return nil }
 func (a *idleAttach) Close() error                                { a.once.Do(func() { close(a.done) }); return nil }
 
 // TestServerStream_AttachesWhenSwitchedToAfterTheStateLoaded: the page's dial

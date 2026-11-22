@@ -48,7 +48,12 @@ type Input struct {
 	Selected         string
 	// DisplayName is a session's name in the header.
 	DisplayName func(wire.SessionInfo) string
+	// LeaderKey is the first leader key, named in the take-over hint.
+	LeaderKey string
 }
+
+// TakeOverKey follows the leader to take over the session's input.
+const TakeOverKey = "t"
 
 // WithInput is v reading in.
 func (v View) WithInput(in Input) View {
@@ -97,7 +102,30 @@ func (v View) TerminalTitle(s wire.SessionInfo, titleStyle lipgloss.Style) strin
 	if v.in.Copy != nil && v.in.Copy.A.ID == s.ID {
 		title += " " + agentstyle.Detail.Render("copy")
 	}
+	if a := v.in.Attach; a != nil && a.ID == s.ID {
+		if text := v.ownerText(a); text != "" {
+			title += " " + agentstyle.Detail.Render(text)
+		}
+	}
 	return title
+}
+
+// ownerText is the input indicator: who owns the input, how a non-owner takes
+// it over, and a hint while a key of this client was blocked.
+func (v View) ownerText(a *Attachment) string {
+	takeOver := v.in.LeaderKey + " " + TakeOverKey + " to take over"
+	switch a.owner {
+	case OwnerSelf:
+		return "input: this client"
+	case OwnerGX:
+		return "input: gx · gx is typing · " + takeOver
+	case OwnerOther:
+		if a.blocked {
+			return "input: another client · blocked, " + takeOver
+		}
+		return "input: another client · " + takeOver
+	}
+	return ""
 }
 
 // harnessLabelText is the session's dim ` harness · tier · model effort`,
