@@ -3,10 +3,12 @@
 package brief
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -67,6 +69,13 @@ trunk gx check runs and the current streak, the tests that failed then passed
 on one tree, and p50/p95 per test. It always exits 0 (2 when the data cannot
 be read).
 
+go-test and vitest take --repeat N [--parallel M]: N runs of the tool, one
+process and one log per run, under the proc-cap protection. It prints
+"N runs: P passed, F failed" and the log path of the first failing run last.
+Exit 0 when all pass, 1 on any failure, 2 if a run could not execute.
+--parallel (default 1, at most 4) is read only together with --repeat; alone
+it is go test's own -parallel flag.
+
 go-clean-cache waits until no Go build runs, then runs go clean -cache. Use it
 instead of calling go clean -cache, which breaks running builds.
 
@@ -98,6 +107,49 @@ func resolveRelativeC(cwd, dir string) string {
 		return cwd
 	}
 	return joined
+}
+
+type repeatOpts struct{ n, parallel int }
+
+// splitRepeat takes --repeat N and --parallel M out of the tool's args.
+// --parallel is read only together with --repeat: alone it is go test's own
+// flag and stays in the args.
+func splitRepeat(args []string) ([]string, repeatOpts, error) {
+	rest, v, found := extractFlag(args, "--repeat")
+	if !found {
+		return args, repeatOpts{}, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 {
+		return nil, repeatOpts{}, errors.New("--repeat needs a positive number")
+	}
+	rep := repeatOpts{n: n, parallel: 1}
+	rest, v, found = extractFlag(rest, "--parallel")
+	if found {
+		p, err := strconv.Atoi(v)
+		if err != nil || p < 1 || p > brief.MaxRepeatParallel {
+			return nil, repeatOpts{}, fmt.Errorf("--parallel with --repeat takes 1 to %d, at most %d", brief.MaxRepeatParallel, brief.MaxRepeatParallel)
+		}
+		rep.parallel = p
+	}
+	return rest, rep, nil
+}
+
+// extractFlag removes `name value` or `name=value` from args. A name with no
+// value after it yields "".
+func extractFlag(args []string, name string) (rest []string, val string, found bool) {
+	for i := range args {
+		if v, ok := strings.CutPrefix(args[i], name+"="); ok {
+			return slices.Concat(args[:i], args[i+1:]), v, true
+		}
+		if args[i] == name {
+			if i+1 < len(args) {
+				val = args[i+1]
+			}
+			return slices.Concat(args[:i], args[min(i+2, len(args)):]), val, true
+		}
+	}
+	return args, "", false
 }
 
 func runBrief(c *cobra.Command, d Deps, args []string) error {
@@ -171,8 +223,21 @@ func runBrief(c *cobra.Command, d Deps, args []string) error {
 	if err != nil {
 		return err
 	}
-	code := brief.Run(tool, brief.Options{Dir: dir, Args: args[1:], CDir: cFlag, DataDir: dataDir, StateDir: stateDir, Out: c.OutOrStdout(),
-		Env: d.Env.Env, CheckRun: d.Dirs().Getenv(brief.EnvCheckRun), CheckKind: d.Dirs().Getenv(brief.EnvCheckKind), Sample: d.Sample})
+	toolArgs, rep, err := splitRepeat(args[1:])
+	if err != nil {
+		return briefUsageError(c, err.Error())
+	}
+	if rep.n > 0 && args[0] != "go-test" && args[0] != "vitest" {
+		return briefUsageError(c, "--repeat works only with go-test and vitest")
+	}
+	o := brief.Options{Dir: dir, Args: toolArgs, CDir: cFlag, DataDir: dataDir, StateDir: stateDir, Out: c.OutOrStdout(),
+		Env: d.Env.Env, CheckRun: d.Dirs().Getenv(brief.EnvCheckRun), CheckKind: d.Dirs().Getenv(brief.EnvCheckKind), Sample: d.Sample}
+	var code int
+	if rep.n > 0 {
+		code = brief.Repeat(tool, o, rep.n, rep.parallel)
+	} else {
+		code = brief.Run(tool, o)
+	}
 	if code != brief.ExitPass {
 		return &cmdbase.ExitError{Code: code}
 	}

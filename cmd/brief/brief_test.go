@@ -346,6 +346,52 @@ func TestBrief_UsageErrorsExit2WithOneLine(t *testing.T) {
 	}
 }
 
+func TestBrief_RepeatRuns(t *testing.T) {
+	dir := goModule(t)
+	out, code := runBriefCmd(t, dir, "go-test", "--repeat", "3", "--parallel", "2")
+	if code != 0 {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+	if !strings.HasPrefix(out, "3 runs: 3 passed, 0 failed") {
+		t.Errorf("out:\n%s", out)
+	}
+	testutil.WriteFile(t, dir, "b_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestBad(t *testing.T) { t.Fail() }\n")
+	out, code = runBriefCmd(t, dir, "go-test", "--repeat=2")
+	if code != 1 {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+	if !strings.HasPrefix(out, "2 runs: 0 passed, 2 failed") || !strings.HasSuffix(lastLine(out), ".log") {
+		t.Errorf("out:\n%s", out)
+	}
+}
+
+func TestBrief_RepeatRefusals(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"other tool", []string{"tsc", "--repeat", "2"}, "only with go-test and vitest"},
+		{"parallel above cap", []string{"go-test", "--repeat", "2", "--parallel", "5"}, "at most 4"},
+		{"bad count", []string{"go-test", "--repeat", "x"}, "positive number"},
+		{"missing count", []string{"go-test", "--repeat"}, "positive number"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out, code := runBriefCmd(t, t.TempDir(), tc.args...)
+			if code != 2 || !strings.Contains(out, tc.want) {
+				t.Fatalf("exit = %d, want 2 with %q, out:\n%s", code, tc.want, out)
+			}
+		})
+	}
+}
+
+func TestBrief_ParallelWithoutRepeatIsTheToolsOwn(t *testing.T) {
+	out, code := runBriefCmd(t, goModule(t), "go-test", "-parallel", "9")
+	if code != 0 || strings.Contains(out, "runs:") {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+}
+
 func TestBrief_NoArgsAndHelpPrintHelp(t *testing.T) {
 	for _, args := range [][]string{{}, {"-h"}} {
 		out, code := runBriefCmd(t, t.TempDir(), args...)
