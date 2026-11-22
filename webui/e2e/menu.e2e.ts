@@ -1,4 +1,4 @@
-import { appendFile, glob, mkdir, mkdtemp } from "node:fs/promises"
+import { appendFile, glob, mkdir, mkdtemp, readFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { withState } from "./diagnostics"
@@ -148,13 +148,20 @@ const appendCodexSample = async (fixture: Fixture, usedPercent: number) => {
 
 type CodexSample = Awaited<ReturnType<typeof appendCodexSample>>
 
-// What a missed live-update wait prints: the open popover, the rollout line the scan should have read and the server log tail.
+// The file's real last line, read back after the wait: the server scan may have rewritten the file since the append.
+const lastLine = (path: string) =>
+  readFile(path, "utf8").then(
+    (text) => text.trimEnd().split("\n").at(-1) ?? "(file is empty)",
+    (e: Error) => `(rollout not readable: ${e.message})`,
+  )
+
+// What a missed live-update wait prints: the open popover, the rollout file's last line and the server log tail.
 const limitsState = (page: Page, fixture: Fixture, sample?: CodexSample) => async () => {
   const popover = await renderedText(page.getByRole("dialog", nav("Usage limits")), 2_000).catch(
     (e: Error) => `(popover not readable: ${e.message})`,
   )
   const rollout = sample
-    ? `${sample.rollout}\n${sample.line.trim()}\nappended ${Math.round((Date.now() - sample.at) / 1000)} s ago`
+    ? `${sample.rollout}\n${await lastLine(sample.rollout)}\nappended ${Math.round((Date.now() - sample.at) / 1000)} s ago`
     : "no rollout file"
   const logs = (await fixture.cli("server", "logs")).trim().split("\n").slice(-10).join("\n")
   return `popover:\n${popover}\n\nrollout: ${rollout}\n\nlast 10 server log lines:\n${logs}`
