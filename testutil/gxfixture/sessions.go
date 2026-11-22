@@ -351,8 +351,11 @@ func (f sessionSeeder) claudeTranscriptPath(id string) (string, error) {
 // turnEnd is nil once the fake's own turn is over; the server's Idle can predate it.
 func (f sessionSeeder) turnEnd(id string, chat wire.SessionChatResponse) error {
 	m, _ := sessions.ReadMeta(filepath.Join(f.root, "data", "gx", "sessions", id))
-	replies := len(slices.DeleteFunc(slices.Clone(chat.Messages), func(c wire.SessionChatMessage) bool { return c.Role != transcript.ChatRoleAgent }))
-	return agentfake.TurnEnded(f.env, m.ConversationID, replies)
+	return agentfake.TurnEnded(f.env, m.ConversationID, agentReplies(chat))
+}
+
+func agentReplies(chat wire.SessionChatResponse) int {
+	return len(slices.DeleteFunc(slices.Clone(chat.Messages), func(m wire.SessionChatMessage) bool { return m.Role != transcript.ChatRoleAgent }))
 }
 
 // controlSender sends a control to the fake of session id. The fake's control
@@ -403,11 +406,6 @@ func (f sessionSeeder) prompt(id, text string) error {
 
 // promptAgain sends text as another chat turn and waits for its reply.
 func (f sessionSeeder) promptAgain(id, text string) error {
-	agentMessages := func(chat wire.SessionChatResponse) int {
-		return len(slices.DeleteFunc(slices.Clone(chat.Messages), func(m wire.SessionChatMessage) bool {
-			return m.Role != transcript.ChatRoleAgent
-		}))
-	}
 	var before wire.SessionChatResponse
 	if out, err := f.cli("agents", "chat", id, "--json"); err == nil {
 		_ = json.Unmarshal(out, &before)
@@ -417,9 +415,17 @@ func (f sessionSeeder) promptAgain(id, text string) error {
 	if err := f.prompt(id, text); err != nil {
 		return err
 	}
-	return f.waitFor(id, "a reply to "+text, func(si wire.SessionInfo, chat wire.SessionChatResponse) bool {
-		return si.Status.State == wire.SessionIdle && agentMessages(chat) > agentMessages(before)
+	pending := errors.New("no new reply yet")
+	err := f.waitFor(id, "a reply to "+text, func(si wire.SessionInfo, chat wire.SessionChatResponse) bool {
+		if si.Status.State == wire.SessionIdle && agentReplies(chat) > agentReplies(before) {
+			pending = f.turnEnd(id, chat)
+		}
+		return pending == nil
 	})
+	if err != nil {
+		return fmt.Errorf("%w (%v)", err, pending)
+	}
+	return nil
 }
 
 // runCommandStep sends one "/" command and waits until the chat shows it (and
