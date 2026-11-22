@@ -75,6 +75,7 @@ func newTicketsFollowUpCmd(d Deps) *cobra.Command {
 	followUpCmd.AddCommand(followUpAddCmd)
 	var followUpProject string
 	var followUpSearchAll bool
+	var followUpQueries []string
 	followUpSearchCmd := &cobra.Command{
 		Use:   "search <words...>",
 		Short: "find open and archived follow-ups whose title or Problem mentions any of the words (a quoted phrase counts as separate words)",
@@ -82,11 +83,12 @@ func newTicketsFollowUpCmd(d Deps) *cobra.Command {
 			"(case-insensitive, OR). A quoted phrase counts as separate words. Prints address, status and title per hit; an archived hit also\n" +
 			"shows its close reason. Open hits all print; archived hits print newest first, at most 10, with a last line counting the rest\n" +
 			"(--all prints them). No hit prints \"no matches\".",
-		Args: cobra.MinimumNArgs(1),
+		Args: cobra.ArbitraryArgs,
 		RunE: func(c *cobra.Command, args []string) error {
-			return runTicketsFollowUpSearch(d, followUpProject, args, followUpSearchAll, c.OutOrStdout())
+			return runTicketsFollowUpSearch(d, followUpProject, args, followUpQueries, followUpSearchAll, c.OutOrStdout())
 		},
 	}
+	followUpSearchCmd.Flags().StringArrayVar(&followUpQueries, "query", nil, "an extra query (repeatable); each query with no hit prints \"no matches: <query>\"")
 	followUpSearchCmd.Flags().BoolVar(&followUpSearchAll, "all", false, "print every archived hit, not just the newest 10")
 	followUpSearchCmd.Flags().StringVar(&followUpProject, "project", "", "project to search (default: the cwd's)")
 	followUpCmd.AddCommand(followUpSearchCmd)

@@ -18,11 +18,18 @@ import (
 // also shows its close reason. Open hits print in full; archived hits come
 // newest first, capped at maxArchivedHits unless all. No hit prints "no
 // matches". An empty project means the cwd project.
-func runTicketsFollowUpSearch(d Deps, project string, words []string, all bool, w io.Writer) error {
-	words = searchWords(words)
-	if len(words) == 0 {
+func runTicketsFollowUpSearch(d Deps, project string, words, queries []string, all bool, w io.Writer) error {
+	// Positional words form one query and each --query is another. Only a
+	// lone positional query keeps the bare "no matches" line.
+	var qs []string
+	if len(words) > 0 {
+		qs = append(qs, strings.Join(words, " "))
+	}
+	qs = append(qs, queries...)
+	if len(qs) == 0 || len(searchWords(qs)) == 0 {
 		return fmt.Errorf("follow-up search needs at least one word")
 	}
+	bare := len(queries) == 0
 	root, project, err := ticketref.ResolveProject(d.Env, project)
 	if err != nil {
 		return err
@@ -32,6 +39,7 @@ func runTicketsFollowUpSearch(d Deps, project string, words []string, all bool, 
 		return err
 	}
 	var open, archived []string
+	hit := make([]bool, len(qs))
 	for _, name := range []string{tickets.FollowUpsEpic, tickets.ArchivedFollowUpsEpic} {
 		for _, e := range epics {
 			if e.Name != name {
@@ -43,7 +51,13 @@ func runTicketsFollowUpSearch(d Deps, project string, words []string, all bool, 
 			}
 			for _, t := range ts {
 				haystack := strings.ToLower(t.Title + "\n" + schema.Section(t.Body, "Problem"))
-				if !containsAny(haystack, words) {
+				matched := false
+				for i, q := range qs {
+					if containsAny(haystack, searchWords([]string{q})) {
+						hit[i], matched = true, true
+					}
+				}
+				if !matched {
 					continue
 				}
 				a := tickets.Address{Project: project, Epic: name, ID: t.Identifier}
@@ -59,7 +73,7 @@ func runTicketsFollowUpSearch(d Deps, project string, words []string, all bool, 
 			}
 		}
 	}
-	if len(open)+len(archived) == 0 {
+	if bare && len(open)+len(archived) == 0 {
 		fmt.Fprintln(w, "no matches")
 		return nil
 	}
@@ -75,6 +89,13 @@ func runTicketsFollowUpSearch(d Deps, project string, words []string, all bool, 
 	}
 	if left := len(archived) - len(shown); left > 0 {
 		fmt.Fprintf(w, "%d more archived hits not shown; --all prints them\n", left)
+	}
+	if !bare {
+		for i, q := range qs {
+			if !hit[i] {
+				fmt.Fprintf(w, "no matches: %s\n", q)
+			}
+		}
 	}
 	return nil
 }

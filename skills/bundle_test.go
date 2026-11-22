@@ -767,6 +767,23 @@ func TestFollowUpTriggersAndNeverAsksUnattended(t *testing.T) {
 	}
 }
 
+// TestFollowUpFilesRegressionAfterArchiveDate pins that a repeating flake is
+// not dropped for matching an archived duplicate or obsolete ticket.
+func TestFollowUpFilesRegressionAfterArchiveDate(t *testing.T) {
+	raw := normalizeSpace(readFile(t, "gx-follow-up/SKILL.md"))
+	for _, phrase := range []string{
+		"An archived `duplicate` or `obsolete` ticket",
+		"dated after the archive date",
+		"file a regression",
+		"cites no date → drop it",
+		"`--query",
+	} {
+		if !strings.Contains(raw, normalizeSpace(phrase)) {
+			t.Errorf("gx-follow-up must contain %q", phrase)
+		}
+	}
+}
+
 // TestCodeReviewDefinesDeferred pins the verdict that routes a finding to
 // gx-follow-up instead of a fix ticket in the epic.
 func TestCodeReviewDefinesDeferred(t *testing.T) {

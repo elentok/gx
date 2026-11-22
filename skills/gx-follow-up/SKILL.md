@@ -56,7 +56,8 @@ and, when the project has an epic named `test-health`, the tickets of `<project>
 the follow-ups ones with
 `gx tickets follow-up search --project <project> <words...>`: it matches any of the words in a
 title or `## Problem` (a quoted phrase counts as separate words) and prints address, status and title per hit, plus the close reason for an archived
-hit. Open hits all print; archived hits print newest first, at most 10, and a last line counts the rest (`--all` prints them). No hit prints `no matches`. Never print the whole listings. When the finding names a failing test, search the candidates
+hit. Open hits all print; archived hits print newest first, at most 10, and a last line counts the rest (`--all` prints them). No hit prints `no matches`. Repeat `--query "<words>"` to search several
+phrases in one call; each query with no hit prints `no matches: <query>`. Never print the whole listings. When the finding names a failing test, search the candidates
 for that test name first. Judge each hit yourself, by title and `## Problem`: the same problem, not the same area.
 
 `follow-up search` does not read `test-health`. Search it with two reads and no new verb:
@@ -77,8 +78,13 @@ not.
   first). It keeps the existing text. Empty content is refused.
 - **An archived `fixed` ticket, or a `done` ticket in `test-health`** → file a regression: a new
   follow-up whose `## Source` and `## Evidence` cite that address.
-- **Any other archived ticket** (`obsolete`, `duplicate`, `not-worth-it`, `promoted`), **or a closed
-  or cancelled one in `test-health`** → drop it. File nothing; report the address and its reason.
+- **An archived `duplicate` or `obsolete` ticket** → compare the archive date with the dates the
+  caller cites for the new failure. A failure dated after the archive date is a repeat of something
+  the archive did not stop: file a regression, citing that address in `## Source` and `## Evidence`.
+  A failure dated on or before the archive date, or a caller that cites no date → drop it as below.
+- **Any other archived ticket** (`not-worth-it`, `promoted`), **or a closed or cancelled one in
+  `test-health`**, or a `duplicate` or `obsolete` one that fails the date test above → drop it. File
+  nothing; report the address and its reason.
 
 ## 3. Fill and file
 

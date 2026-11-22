@@ -247,6 +247,26 @@ func TestExecute_TicketsFollowUpSearch_NoMatchesPrintsALine(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsFollowUpSearch_RepeatedQueryNamesEachMiss(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	project := addProject(t, isolateTicketStore(t), "mine", repo)
+	fu := filepath.Join(project, tickets.FollowUpsEpic, "issues")
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, tickets.FollowUpsEpic))
+	if err := os.MkdirAll(fu, 0755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, fu, "05-disk.md", "---\nid: \"05\"\nstatus: draft\ntype: research\n---\n\n# 05 — Cleanup\n\n## Problem\n\nThe Disk fills up.\n")
+
+	out, err := runIn(t, repo, "tickets", "follow-up", "search", "--query", "disk", "--query", "nothing-like-this", "--query", "also-absent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "mine:follow-ups/05  draft  Cleanup\nno matches: nothing-like-this\nno matches: also-absent\n"
+	if out != want {
+		t.Errorf("search = %q, want %q", out, want)
+	}
+}
+
 func TestExecute_TicketsFollowUpSearch_CapsArchivedHits(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	project := addProject(t, isolateTicketStore(t), "mine", repo)
