@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "./connection"
 import { isUnlockSentence, postRestUnlock } from "./rest"
@@ -266,6 +266,20 @@ test("a typed Unlock draft is still there when the input leaves and comes back",
   expect(screen.queryByLabelText("Unlock sentence")).toBeNull()
   update(bedtime)
   expect((screen.getByLabelText("Unlock sentence") as HTMLInputElement).value).toBe("I'm Dana and")
+})
+
+test("a modal added to the body while the screen is up goes inert too, and all are lifted after", async () => {
+  const update = setup(bedtime)
+  const late = document.createElement("div")
+  document.body.append(late)
+  try {
+    await waitFor(() => expect(late.hasAttribute("inert")).toBe(true))
+    update(undefined)
+    expect(late.hasAttribute("inert")).toBe(false)
+    expect(screen.getByText("underneath").closest("[inert]")).toBeNull()
+  } finally {
+    late.remove()
+  }
 })
 
 test("the screen leaves and the page is live again when the period ends", () => {

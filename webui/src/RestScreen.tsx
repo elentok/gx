@@ -15,17 +15,24 @@ const ACCENT = "rest.accent"
 
 const MASK = "radial-gradient(circle at center, black 52%, transparent 71%)"
 
-// Everything else in the body goes inert, which covers the app and any modal portalled to the body.
+// Everything else in the body goes inert, which covers the app and any modal portalled to the body,
+// including one added after the screen appeared.
 function useInertPage(screen: HTMLElement | null) {
   useEffect(() => {
     if (!screen) return
-    const inerted: Element[] = []
-    for (const el of Array.from(document.body.children)) {
-      if (el === screen || el.hasAttribute("inert")) continue
-      el.setAttribute("inert", "")
-      inerted.push(el)
+    const inerted = new Set<Element>()
+    const apply = () => {
+      for (const el of Array.from(document.body.children)) {
+        if (el === screen || el.hasAttribute("inert")) continue
+        el.setAttribute("inert", "")
+        inerted.add(el)
+      }
     }
+    apply()
+    const observer = new MutationObserver(apply)
+    observer.observe(document.body, { childList: true })
     return () => {
+      observer.disconnect()
       for (const el of inerted) el.removeAttribute("inert")
     }
   }, [screen])
