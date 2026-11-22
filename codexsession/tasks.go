@@ -40,18 +40,26 @@ type cellOutput struct {
 	inner map[string]json.RawMessage
 }
 
-// parseCellOutput reads a custom_tool_call_output (a JSON string holding an
-// array of texts) or a function_call_output (a plain string).
+// parseCellOutput reads a custom_tool_call_output (an array of texts, or a JSON
+// string holding one) or a function_call_output (a plain string).
 func parseCellOutput(raw json.RawMessage) cellOutput {
-	var s string
-	if json.Unmarshal(raw, &s) != nil {
-		return cellOutput{}
-	}
 	var texts []struct {
 		Text string `json:"text"`
 	}
-	if json.Unmarshal([]byte(s), &texts) != nil || len(texts) == 0 {
-		return cellOutput{head: strings.TrimSpace(s)}
+	if json.Unmarshal(raw, &texts) != nil {
+		var s string
+		if json.Unmarshal(raw, &s) != nil {
+			return cellOutput{}
+		}
+		if json.Unmarshal([]byte(s), &texts) != nil {
+			texts = nil
+		}
+		if len(texts) == 0 {
+			return cellOutput{head: strings.TrimSpace(s)}
+		}
+	}
+	if len(texts) == 0 {
+		return cellOutput{}
 	}
 	out := cellOutput{head: strings.TrimSpace(texts[0].Text)}
 	for _, t := range texts[1:] {

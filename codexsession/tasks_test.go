@@ -289,6 +289,52 @@ func TestReadTasks_SubagentRows(t *testing.T) {
 	})
 }
 
+// cellOutArray is a custom_tool_call_output as newer Codex writes it: the
+// output is the array of input_text items itself, not a JSON string of it.
+func cellOutArray(sec int, id string, texts ...string) string {
+	var items []map[string]string
+	for _, s := range texts {
+		items = append(items, map[string]string{"type": "input_text", "text": s})
+	}
+	b, _ := json.Marshal(items)
+	return fmt.Sprintf(`{"timestamp":%q,"type":"response_item","payload":{"type":"custom_tool_call_output","call_id":%q,"output":%s}}`, at(sec), id, b)
+}
+
+func TestReadTasks_ErroredCallEndsItsRow(t *testing.T) {
+	t.Parallel()
+	got := readTasks(t,
+		execLine(1, "a", `const r = await Promise.allSettled([tools.exec_command({cmd:"preflight"}), tools.exec_command({cmd:"cat x"})]);`),
+		cellOutArray(3, "a", "Script completed\nWall time 1.0 seconds\nOutput:\n", `{"chunk_id":"ce57f0","exit_code":1,"output":"cannot write"}`, `{"chunk_id":"dc0ecf","exit_code":0,"output":"x"}`),
+		execLine(4, "b", `tools.exec_command({cmd:"false"})`),
+		cellOutArray(5, "b", "Script completed\nWall time 0.1 seconds\nOutput:\n", `{"chunk_id":"aa","exit_code":1,"output":""}`),
+	)
+	wantEnd(t, got[0], 3, "", nil)
+	wantEnd(t, got[1], 5, transcript.TaskOutcomeFailure, intp(1))
+}
+
+func TestReadTasks_CanceledCallEndsItsRow(t *testing.T) {
+	t.Parallel()
+	got := readTasks(t,
+		execLine(1, "a", `tools.exec_command({cmd:"sleep 100"})`),
+		cellOutArray(4, "a", "Script terminated"),
+	)
+	wantEnd(t, got[0], 4, transcript.TaskOutcomeKilled, nil)
+}
+
+func TestReadTasks_InterruptedTurnEndsItsPendingCalls(t *testing.T) {
+	t.Parallel()
+	got := readTasks(t,
+		execLine(1, "a", `tools.exec_command({cmd:"needs approval"})`),
+		execLine(2, "b", `tools.exec_command({cmd:"slow"})`),
+		cellOutArray(3, "b", "Script running with cell ID 7"),
+		`{"timestamp":"`+at(6)+`","type":"event_msg","payload":{"type":"turn_aborted","reason":"interrupted"}}`,
+	)
+	wantEnd(t, got[0], 6, transcript.TaskOutcomeKilled, nil)
+	if got[1].End != nil {
+		t.Errorf("yielded cell may outlive the turn, got end %+v", *got[1].End)
+	}
+}
+
 func TestReadTasks_MissingFile(t *testing.T) {
 	t.Parallel()
 	got, err := ReadTasks(filepath.Join(t.TempDir(), "none.jsonl"))

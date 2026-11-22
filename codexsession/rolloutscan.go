@@ -72,6 +72,8 @@ type cell struct {
 	commands int
 	// processID is the session_id the cell returned for a process that outlived it.
 	processID string
+	// yielded is set once the cell returned "Script running with cell ID N".
+	yielded bool
 }
 
 // subagent is one spawn_agent call.
@@ -137,6 +139,8 @@ func (s *scanner) line(raw []byte) {
 		return
 	}
 	switch {
+	case line.Type == "event_msg" && line.Payload.Type == "turn_aborted":
+		s.abortTurn(ts)
 	case line.Type == "response_item":
 		s.task(line, ts)
 	case line.Type == "event_msg" && line.Payload.Type == "item_completed" && bytes.Contains(raw, itemCompletedMarker):
@@ -167,6 +171,17 @@ func (s *scanner) endCell(c *cell, at time.Time, outcome string, code *int) {
 	c.rec.ExitCode = code
 	// The row ended, so the Working row must stop listing its call.
 	s.dropCall(c.callID)
+}
+
+// abortTurn ends the cells that have no output yet when their turn aborts (a
+// call waiting for approval never gets one). A yielded cell is not ended: its
+// process may keep running in the background.
+func (s *scanner) abortTurn(at time.Time) {
+	for _, c := range s.cells {
+		if !c.yielded && c.processID == "" {
+			s.endCell(c, at, transcript.TaskOutcomeKilled, nil)
+		}
+	}
 }
 
 func (s *scanner) dropCall(id string) {
@@ -201,6 +216,7 @@ func (s *scanner) task(line chatRolloutLine, ts time.Time) {
 		if c := s.byCall[p.CallID]; c != nil {
 			if id, ok := out.cellID(); ok {
 				s.byCellID[id] = c
+				c.yielded = true
 				return
 			}
 			outcome, ended := out.scriptEnd()
