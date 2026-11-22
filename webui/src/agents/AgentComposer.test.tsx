@@ -423,11 +423,13 @@ test("a pick sends the unsent content, fills text and images, shows notices, foc
     text: "unsent",
     images: [],
   })
-  expect((box() as HTMLTextAreaElement).value).toBe("old msg")
-  expect(JSON.parse(localStorage.getItem("gx.draft.images.s-a") ?? "[]")[0].id).toBe("n1")
-  expect(localStorage.getItem("gx.draft.composer.s-a")).toContain("old msg")
-  expect(screen.queryByRole("option")).toBeNull()
-  expect(document.activeElement).toBe(box())
+  await waitFor(() => expect((box() as HTMLTextAreaElement).value).toBe("old msg"))
+  await waitFor(() =>
+    expect(JSON.parse(localStorage.getItem("gx.draft.images.s-a") ?? "[]")[0].id).toBe("n1"),
+  )
+  await waitFor(() => expect(localStorage.getItem("gx.draft.composer.s-a")).toContain("old msg"))
+  await waitFor(() => expect(screen.queryByRole("option")).toBeNull())
+  await waitFor(() => expect(document.activeElement).toBe(box()))
 })
 
 test("with an upload in flight the popup shows Saving… and restores nothing until it ends", async () => {
