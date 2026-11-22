@@ -1,4 +1,4 @@
-import { Box, Text } from "@chakra-ui/react"
+import { Box, chakra, Text } from "@chakra-ui/react"
 import { useId, useState, type ReactNode } from "react"
 import type { Tone } from "../tone"
 
@@ -170,24 +170,29 @@ export function DayChart({
           stroke="var(--chakra-colors-border)"
         />
         {marks}
+      </svg>
+      {/* Native buttons: an SVG rect cannot be a real control. They sit over the bars, one per day slot. */}
+      <Box position="absolute" inset="0" display="flex">
         {days.map((d, i) => (
-          <rect
+          <chakra.button
+            type="button"
             key={d}
-            role="tab"
-            tabIndex={-1}
-            aria-selected={hover === i}
+            flex="1"
+            minW="0"
+            aria-pressed={hover === i}
             aria-label={d}
             data-hit={i}
-            x={i * SLOT}
-            y={0}
-            width={SLOT}
-            height={height}
-            fill="transparent"
+            bg="transparent"
             onMouseEnter={() => setHover(i)}
             onClick={() => setHover(hover === i ? null : i)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" && e.key !== " ") return
+              e.preventDefault()
+              setHover(hover === i ? null : i)
+            }}
           />
         ))}
-      </svg>
+      </Box>
       {hover !== null && (
         <Box
           role="tooltip"

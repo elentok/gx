@@ -121,6 +121,28 @@ describe("DayChart", () => {
     expect(getByRole("tooltip").textContent).toBe("TueA: 1")
   })
 
+  it("makes each day a button that Enter and Space toggle", () => {
+    const { getByRole, queryByRole } = renderThemed(
+      <DayChart
+        days={days}
+        series={[{ key: "a", label: "A", tone: "running", values: [1, 2, 3] }]}
+      />,
+    )
+    const tue = getByRole("button", { name: "Tue" })
+    expect(tue.tagName).toBe("BUTTON")
+    expect(tue.getAttribute("aria-pressed")).toBe("false")
+    fireEvent.keyDown(tue, { key: "Enter" })
+    expect(tue.getAttribute("aria-pressed")).toBe("true")
+    expect(getByRole("tooltip").textContent).toBe("TueA: 2")
+    fireEvent.keyDown(tue, { key: "Enter" })
+    expect(queryByRole("tooltip")).toBeNull()
+    fireEvent.keyDown(tue, { key: " " })
+    expect(getByRole("tooltip").textContent).toBe("TueA: 2")
+    fireEvent.keyDown(tue, { key: " " })
+    expect(queryByRole("tooltip")).toBeNull()
+    expect(tue.getAttribute("aria-pressed")).toBe("false")
+  })
+
   it("shows the date, each value and folded series on hover, and no data for a gap", () => {
     const { container, getByRole, queryByRole } = renderThemed(
       <DayChart
