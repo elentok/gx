@@ -160,15 +160,10 @@ func (f sessionSeeder) settleSession(s sessionSpec, id string) error {
 		if slow || codexTurn {
 			role = transcript.ChatRolePerson
 		}
-		var pending error
-		if err := f.waitFor(id, "a "+role+" message", func(_ wire.SessionInfo, chat wire.SessionChatResponse) bool {
-			seen := slices.ContainsFunc(chat.Messages, func(m wire.SessionChatMessage) bool { return m.Role == role })
-			if seen && !slow && !codexTurn {
-				pending = f.turnEnd(id, chat)
-			}
-			return seen && pending == nil
+		if err := f.waitTurn(id, "a "+role+" message", !slow && !codexTurn, func(_ wire.SessionInfo, chat wire.SessionChatResponse) bool {
+			return slices.ContainsFunc(chat.Messages, func(m wire.SessionChatMessage) bool { return m.Role == role })
 		}); err != nil {
-			return fmt.Errorf("%w (%v)", err, pending)
+			return err
 		}
 	}
 	if codexTurn {
@@ -348,10 +343,23 @@ func (f sessionSeeder) claudeTranscriptPath(id string) (string, error) {
 	return transcript.PathIn(filepath.Join(f.root, "home"), list[i].Dir, chat.ConversationID), nil
 }
 
-// turnEnd is nil once the fake's own turn is over; the server's Idle can predate it.
-func (f sessionSeeder) turnEnd(id string, chat wire.SessionChatResponse) error {
-	m, _ := sessions.ReadMeta(filepath.Join(f.root, "data", "gx", "sessions", id))
-	return agentfake.TurnEnded(f.env, m.ConversationID, agentReplies(chat))
+func (f sessionSeeder) sessionDir(id string) string {
+	return filepath.Join(f.root, "data", "gx", "sessions", id)
+}
+
+// waitTurn waits until ready holds and, when endsTurn, the fake's own turn is
+// over (the server's Idle can predate it). A timeout always names the fake's
+// pid-file status and the agent reply count.
+func (f sessionSeeder) waitTurn(id, what string, endsTurn bool, ready func(wire.SessionInfo, wire.SessionChatResponse) bool) error {
+	var last wire.SessionChatResponse
+	err := f.waitFor(id, what, func(si wire.SessionInfo, chat wire.SessionChatResponse) bool {
+		last = chat
+		return ready(si, chat) && (!endsTurn || agentfake.TurnEndedIn(f.env, f.sessionDir(id), agentReplies(chat)) == nil)
+	})
+	if err != nil {
+		return agentfake.TurnTimeoutIn(err, f.env, f.sessionDir(id), agentReplies(last))
+	}
+	return nil
 }
 
 func agentReplies(chat wire.SessionChatResponse) int {
@@ -378,7 +386,7 @@ func (f sessionSeeder) controlSender(id, harness string) func(agentfake.Control)
 // also the fake's id. The id can change after the first report, so each call
 // reads it again, and an empty one is waited for.
 func (f sessionSeeder) conversationID(id string) (string, error) {
-	dir := filepath.Join(f.root, "data", "gx", "sessions", id)
+	dir := f.sessionDir(id)
 	for deadline := time.Now().Add(sessionWaitTimeout); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
 		if m, err := sessions.ReadMeta(dir); err == nil && m.ConversationID != "" {
 			return m.ConversationID, nil
@@ -415,17 +423,9 @@ func (f sessionSeeder) promptAgain(id, text string) error {
 	if err := f.prompt(id, text); err != nil {
 		return err
 	}
-	pending := errors.New("no new reply yet")
-	err := f.waitFor(id, "a reply to "+text, func(si wire.SessionInfo, chat wire.SessionChatResponse) bool {
-		if si.Status.State == wire.SessionIdle && agentReplies(chat) > agentReplies(before) {
-			pending = f.turnEnd(id, chat)
-		}
-		return pending == nil
+	return f.waitTurn(id, "a reply to "+text, true, func(si wire.SessionInfo, chat wire.SessionChatResponse) bool {
+		return si.Status.State == wire.SessionIdle && agentReplies(chat) > agentReplies(before)
 	})
-	if err != nil {
-		return fmt.Errorf("%w (%v)", err, pending)
-	}
-	return nil
 }
 
 // runCommandStep sends one "/" command and waits until the chat shows it (and
