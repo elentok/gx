@@ -6,8 +6,6 @@ export interface DraftPageActions {
   /** True when the draft has no prompt, images or slug. */
   isEmpty: () => boolean
   focusPrompt: () => void
-  /** Opens the History popup. */
-  openHistory: () => void
 }
 
 // The page registers while mounted; the Chord host lives outside it, so they meet here.
@@ -27,8 +25,6 @@ export interface ChatDraftPageActions {
   /** True when the brief is blank. */
   isEmpty: () => boolean
   focusBrief: () => void
-  /** Opens the History popup. */
-  openHistory: () => void
 }
 
 let currentChat: ChatDraftPageActions | null = null

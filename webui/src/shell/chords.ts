@@ -1,5 +1,6 @@
 import { useLocation } from "react-router"
-import { canManage, isChat, offersHistory } from "../agents/sessionWrites"
+import { canManage, isChat } from "../agents/sessionWrites"
+import { hasHistoryOpener } from "../history/historyOpener"
 import { designSession } from "../design/view"
 import { useConnectionContext, useConnectionState } from "../connection"
 import type { SessionInfo } from "../generated/server"
@@ -74,8 +75,7 @@ export function displayKey(setting: string | undefined): string {
   return [...mods.map((m) => WORDS[m]), char].join("+")
 }
 
-/** `historyReady`: a composer has a History opener registered right now (set by ChordHost). */
-export type ChordContext = { path: string; session?: SessionInfo; historyReady?: boolean }
+export type ChordContext = { path: string; session?: SessionInfo }
 
 export type Chord = {
   key: string
@@ -97,10 +97,8 @@ export const draftIdOf = (path: string): string | undefined =>
 export const chatDraftIdOf = (path: string): string | undefined =>
   /^\/chat-drafts\/([^/]+)\/?$/.exec(path)?.[1]
 
-const canHistory = (ctx: ChordContext) =>
-  draftIdOf(ctx.path) !== undefined ||
-  chatDraftIdOf(ctx.path) !== undefined ||
-  (ctx.session !== undefined && offersHistory(ctx.session) && ctx.historyReady === true)
+/** A draft page or a composer that offers History has registered its opener. */
+const canHistory = () => hasHistoryOpener()
 
 const canRemove = (ctx: ChordContext) =>
   draftIdOf(ctx.path) !== undefined ||

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { SessionInfo } from "../generated/server"
+import { registerHistoryOpener } from "../history/historyOpener"
 import {
   agentIdOf,
   canRename,
@@ -222,7 +223,6 @@ describe("chord table h", () => {
     switchModel: () => {},
     history: () => {},
   }).filter((c) => c.key === "h")[0]
-  const agent = "/agents/s-a"
 
   it("is the last row, labelled History", () => {
     const t = chordTable({
@@ -234,22 +234,15 @@ describe("chord table h", () => {
     expect(t[t.length - 1].key).toBe("h")
     expect(h.label({ path: "/" })).toBe("History")
   })
-  it.each([
-    ["/drafts/d1", undefined, false, true],
-    ["/chat-drafts/c1", undefined, false, true],
-    ["/epics", undefined, true, false],
-    [agent, session(), true, true],
-    [agent, session({ design: true, ticket: "gx:e/1" }), true, true],
-    [agent, session(), false, false],
-    [agent, session({ queue: true }), true, false],
-    [agent, session({ fix_of: "gx:e/1" }), true, false],
-    [agent, session({ fix_of: "gx:p" }), true, false],
-    [agent, session({ ticket: "gx:e/1" }), true, false],
-    [agent, session({ flow: "triage" }), true, false],
-  ])("on %s with %j (opener %s) is %s", (path, s, historyReady, want) => {
-    expect(h.available({ path, session: s, historyReady })).toBe(want)
+  it("is available exactly while an opener is registered, whatever the path", () => {
+    expect(h.available({ path: "/drafts/d1" })).toBe(false)
+    const off = registerHistoryOpener(() => {})
+    expect(h.available({ path: "/drafts/d1" })).toBe(true)
+    expect(h.available({ path: "/epics" })).toBe(true)
+    off()
+    expect(h.available({ path: "/drafts/d1" })).toBe(false)
   })
-  it("reads the chat draft id from the path", () => {
+  it("tells a chat draft's path from a design draft's", () => {
     expect(chatDraftIdOf("/chat-drafts/c1")).toBe("c1")
     expect(chatDraftIdOf("/drafts/c1")).toBeUndefined()
     expect(draftIdOf("/chat-drafts/c1")).toBeUndefined()
@@ -258,7 +251,6 @@ describe("chord table h", () => {
     const ctx = {
       path: "/d/gx:ep",
       session: session({ design: true, ticket: "gx:ep/1" }),
-      historyReady: true,
     }
     const t = chordTable({
       remove: () => {},

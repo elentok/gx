@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
+import { useEffect, useRef, useState, type RefObject } from "react"
 import { LuClock } from "react-icons/lu"
 import type { ComposerImages } from "../design/useComposerImages"
 import type { ComposerPickRequest, ComposerPickResult, DraftHistoryEntry } from "../generated/ops"
-import { useLatest } from "../hooks"
 import { Button } from "../ui/button/Button"
 import { PROMPT_BOX_SELECTOR } from "../ui/expandable-text/look"
 import { refusalText } from "../useWrite"
 import { useWide } from "../useWide"
-import { postComposerPick, postHistoryList } from "./api"
-import { registerHistoryOpener } from "./historyOpener"
-import { HistoryPopup } from "./HistoryPopup"
+import { postComposerPick, type postHistoryList } from "./api"
+import { HistoryHost } from "./HistoryButton"
+import { useHistoryOpener } from "./usePickHistory"
 
 export interface HistoryCalls {
   list?: typeof postHistoryList
@@ -38,27 +37,13 @@ export function useSessionHistory({
   calls?: HistoryCalls
 }) {
   const wide = useWide()
-  const { list = postHistoryList, pick = postComposerPick } = calls
-  const [entries, setEntries] = useState<DraftHistoryEntry[] | null>(null)
-  const [max, setMax] = useState(50)
+  const { list, pick = postComposerPick } = calls
+  const [shown, setShown] = useState(false)
   const [notice, setNotice] = useState("")
   const [focusTick, setFocusTick] = useState(0)
 
-  const open = useCallback(() => {
-    list({ list: "sent" }).then(
-      (res) => {
-        setMax(res.max)
-        setEntries(res.entries)
-      },
-      (err) => setNotice(err instanceof Error ? err.message : "Could not load History"),
-    )
-  }, [list])
-
-  const openRef = useLatest(open)
-  useEffect(() => {
-    if (!enabled) return
-    return registerHistoryOpener(() => openRef.current())
-  }, [enabled])
+  const open = () => setShown(true)
+  useHistoryOpener(open, enabled)
 
   // After the popup closes: the prompt box takes focus.
   useEffect(() => {
@@ -85,11 +70,11 @@ export function useSessionHistory({
         images: images.readyIds,
       })
     } catch (err) {
-      setEntries(null)
+      setShown(false)
       setNotice(err instanceof Error ? err.message : "Could not restore")
       return
     }
-    setEntries(null)
+    setShown(false)
     if (res.refused) {
       setNotice(refusalText(res))
       return
@@ -116,14 +101,13 @@ export function useSessionHistory({
   ) : null
 
   const popup =
-    enabled && entries ? (
-      <HistoryPopup
+    enabled && shown ? (
+      <HistoryHost
         list="sent"
-        entries={entries}
-        max={max}
-        restoreDisabled={images.uploading > 0}
+        pending={images.uploading > 0}
+        listHistory={list}
         onRestore={(e) => void restore(e)}
-        onClose={() => setEntries(null)}
+        onClose={() => setShown(false)}
       />
     ) : null
 

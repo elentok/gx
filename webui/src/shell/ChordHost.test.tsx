@@ -9,7 +9,7 @@ import { ChordHost } from "./ChordHost"
 import { getBigPrompt, setBigPrompt } from "../ui/expandable-text/bigPromptStore"
 import { chordTable, type Chord } from "./chords"
 import { registerHistoryOpener } from "../history/historyOpener"
-import { registerChatDraftPage, registerDraftPage } from "./draftPageActions"
+import { registerDraftPage } from "./draftPageActions"
 import { closeRename, useRenameRequest } from "./renameOpen"
 
 beforeEach(() => {
@@ -277,7 +277,6 @@ describe("on a draft page", () => {
     rename: vi.fn(),
     isEmpty: () => true,
     focusPrompt: vi.fn(),
-    openHistory: vi.fn(),
   }
   let unregister = () => {}
   beforeEach(() => {
@@ -323,33 +322,14 @@ describe("Leader then h", () => {
   const item = () => screen.queryByRole("menuitem", { name: /History/ })
 
   test.each([
-    ["a Design draft page", "/drafts/d1", registerDraftPage],
-    ["a Chat draft page", "/chat-drafts/c1", registerChatDraftPage],
-  ])("opens History on %s", (_name, path, register) => {
-    const openHistory = vi.fn()
-    const unregister = (register as (a: unknown) => () => void)({
-      remove: vi.fn(),
-      rename: vi.fn(),
-      isEmpty: () => true,
-      focusPrompt: vi.fn(),
-      focusBrief: vi.fn(),
-      openHistory,
-    })
-    setupChats(path)
-    leaderKey()
-    expect(item()).toBeTruthy()
-    press("KeyH")
-    expect(openHistory).toHaveBeenCalledTimes(1)
-    unregister()
-  })
-
-  test.each([
-    ["a chat's page", "/agents/s1", session("s1", "gamma")],
-    ["a Design's page", "/d/gx:ep", design],
-  ])("opens the composer's History on %s", (_name, path, s) => {
+    ["a Design draft page", "/drafts/d1", []],
+    ["a Chat draft page", "/chat-drafts/c1", []],
+    ["a chat's page", "/agents/s1", [session("s1", "gamma")]],
+    ["a Design's page", "/d/gx:ep", [design]],
+  ])("opens the registered History on %s", (_name, path, sessions) => {
     const open = vi.fn()
     const unregister = registerHistoryOpener(open)
-    setupChats(path, [s])
+    setupChats(path, sessions)
     leaderKey()
     expect(item()).toBeTruthy()
     press("KeyH")
@@ -358,21 +338,14 @@ describe("Leader then h", () => {
   })
 
   test.each([
-    ["with no opener registered", "/agents/s1", false],
-    ["on a Design page with no opener", "/d/gx:ep", false],
-    ["on a Queue agent", "/agents/s1", true],
-    ["off the four pages", "/epics", true],
-  ])("does nothing %s", (_name, path, registered) => {
-    const open = vi.fn()
-    const unregister = registered ? registerHistoryOpener(open) : () => {}
-    const s =
-      path === "/d/gx:ep" ? design : session("s1", "gamma", { queue: _name.includes("Queue") })
-    setupChats(path, [s])
+    ["a chat's page", "/agents/s1"],
+    ["a Design page", "/d/gx:ep"],
+    ["a draft page", "/drafts/d1"],
+  ])("does nothing on %s with no opener registered", (_name, path) => {
+    setupChats(path, [design, session("s1", "gamma")])
     leaderKey()
     expect(item()).toBeNull()
     press("KeyH")
-    expect(open).not.toHaveBeenCalled()
-    unregister()
   })
 
   test("a Design page does not offer r, m or x", () => {

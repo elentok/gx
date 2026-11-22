@@ -1,12 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import { useConnectionContext } from "../connection"
-import {
-  ReasonDraftGone,
-  ReasonDraftRevisionConflict,
-  type ChatDraftPickResult,
-} from "../generated/ops"
+import type { ChatDraftPickResult } from "../generated/ops"
 import { EventChatDraftsChanged, type ChatDraft } from "../generated/server"
 import { useLatest } from "../hooks"
+import { usePickHistory } from "../history/usePickHistory"
 import type { ChatDraftsClient } from "./chatDrafts"
 
 const AUTOSAVE_MS = 800
@@ -165,25 +162,19 @@ export function useChatDraftAutosave({
     },
   }
 
-  /**
-   * Runs a history pick behind the saves in flight, with the revision the next save would send.
-   * A success takes the returned brief, name and revision and keeps the page's other settings. A
-   * conflict raises the banner and a gone draft leaves the page. Other refusals change nothing.
-   */
-  const pickHistory = (call: (revision: number) => Promise<ChatDraftPickResult>) => {
-    clearTimeout(timer.current)
-    const run = chain.current.then(async (): Promise<ChatDraftPickResult | undefined> => {
-      if (phase.current !== "editing") return
-      const res = await call(server.current.revision)
-      if (res.refused || !res.draft) {
-        if (res.reason === ReasonDraftRevisionConflict) {
-          blocked.current = true
-          setBanner(true)
-          setStatus("none")
-        } else if (res.reason === ReasonDraftGone) leaveGone()
-        return res
-      }
-      const picked = res.draft
+  /** A success takes the returned brief, name and revision and keeps the page's other settings. */
+  const pickHistory = usePickHistory<ChatDraft, ChatDraftPickResult>({
+    timer,
+    chain,
+    phase,
+    revision: () => server.current.revision,
+    onConflict: () => {
+      blocked.current = true
+      setBanner(true)
+      setStatus("none")
+    },
+    onGone: leaveGone,
+    apply: (picked) => {
       Object.assign(server.current, { revision: picked.revision, text: picked.brief })
       // The saved settings include the name, so the next flush must not resend it.
       server.current.settings = { ...server.current.settings, name: picked.name }
@@ -193,14 +184,8 @@ export function useChatDraftAutosave({
       setSettings(latestSettings.current)
       setFacts(picked)
       setStatus("saved")
-      return res
-    })
-    chain.current = run.then(
-      () => {},
-      () => {},
-    )
-    return run
-  }
+    },
+  })
 
   // The sidebar row and the facts follow a change elsewhere; a gone draft sends the page away.
   const conn = useConnectionContext()

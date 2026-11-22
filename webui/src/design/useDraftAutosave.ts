@@ -1,13 +1,10 @@
 import { useEffect, useRef, useState } from "react"
 import { useLocation } from "react-router"
 import type { DesignDraft } from "../generated/server"
-import {
-  ReasonDraftGone,
-  ReasonDraftRevisionConflict,
-  type DesignDraftPickResult,
-} from "../generated/ops"
+import type { DesignDraftPickResult } from "../generated/ops"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { useLatest } from "../hooks"
+import { usePickHistory } from "../history/usePickHistory"
 import { defaultProject } from "../workspaces/defaultProject"
 import type { DraftsClient } from "./drafts"
 import { hasText, type Fields } from "./draftFields"
@@ -229,22 +226,15 @@ export function useDraftAutosave({
     },
   }
 
-  /**
-   * Runs a history pick behind the saves in flight, with the revision the next save would send.
-   * A success replaces the page with the returned draft, keeping the page's project. A conflict
-   * raises the banner and a gone draft takes the save's way out. Other refusals change nothing.
-   */
-  const pickHistory = (call: (revision: number) => Promise<DesignDraftPickResult>) => {
-    clearTimeout(timer.current)
-    const run = chain.current.then(async (): Promise<DesignDraftPickResult | undefined> => {
-      if (phase.current !== "editing") return
-      const res = await call(server.current.revision)
-      if (res.refused || !res.draft) {
-        if (res.reason === ReasonDraftRevisionConflict) raise()
-        else if (res.reason === ReasonDraftGone) markGone()
-        return res
-      }
-      const picked = res.draft
+  /** A success replaces the page with the returned draft, keeping the page's project. */
+  const pickHistory = usePickHistory<DesignDraft, DesignDraftPickResult>({
+    timer,
+    chain,
+    phase,
+    revision: () => server.current.revision,
+    onConflict: raise,
+    onGone: markGone,
+    apply: (picked) => {
       const next = { slug: picked.slug, idea: picked.idea, project: latest.current.project }
       Object.assign(server.current, {
         revision: picked.revision,
@@ -257,14 +247,8 @@ export function useDraftAutosave({
       imgs.reset(picked.images)
       settle()
       setStatus(hasText(next) || picked.images.length > 0 ? "saved" : "none")
-      return res
-    })
-    chain.current = run.then(
-      () => {},
-      () => {},
-    )
-    return run
-  }
+    },
+  })
 
   /** Takes a slug or project changed elsewhere, unless the person has an edit of their own pending. */
   const adoptTarget = (theirs: DesignDraft) => {

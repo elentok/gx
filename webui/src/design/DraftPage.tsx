@@ -5,9 +5,10 @@ import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "rea
 import { useOnChange } from "../hooks"
 import { useLocation, useNavigate, useParams } from "react-router"
 import type { DesignDraft } from "../generated/server"
-import { ReasonHistoryEntryGone, type DraftHistoryEntry } from "../generated/ops"
 import { useLatest } from "../hooks"
 import { HistoryHost } from "../history/HistoryButton"
+import { HistoryNotices } from "../history/HistoryNotices"
+import { useDraftHistory } from "../history/usePickHistory"
 import { postDesignPick, type ListHistory, type PickDesignHistory } from "../history/api"
 import {
   deleteDraft,
@@ -201,8 +202,6 @@ function DraftForm({
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
   const [confirming, setConfirming] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
-  const [notices, setNotices] = useState<string[]>([])
   // The mascot toggle leads this header, so the shell drops its floating one.
   useClaimHeader()
   useDraftLifecycle({ drafts, autosave })
@@ -242,13 +241,18 @@ function DraftForm({
     stopHold.current = stop
   }
   const hasContent = () => autosave.hasContent()
-  const openHistory = () => setHistoryOpen(true)
+  const history = useDraftHistory({
+    pick: (entry) =>
+      autosave.pickHistory((revision) =>
+        pickHistory({ entry_id: entry.id, draft_id: autosave.currentId(), revision }),
+      ),
+    focus: focusPrompt,
+  })
   const actions = useLatest({
     remove: askRemove,
     rename: renameFocus,
     focusPrompt,
     hasContent,
-    openHistory,
   })
   useEffect(
     () =>
@@ -257,7 +261,6 @@ function DraftForm({
         rename: () => actions.current.rename(),
         isEmpty: () => !actions.current.hasContent(),
         focusPrompt: () => actions.current.focusPrompt(),
-        openHistory: () => actions.current.openHistory(),
       }),
     [],
   )
@@ -299,17 +302,6 @@ function DraftForm({
     )
   }
 
-  const restore = async (entry: DraftHistoryEntry) => {
-    const res = await autosave.pickHistory((revision) =>
-      pickHistory({ entry_id: entry.id, draft_id: autosave.currentId(), revision }),
-    )
-    if (!res) return
-    if (!res.refused) setNotices(res.notices)
-    if (res.refused && res.reason === ReasonHistoryEntryGone) return
-    setHistoryOpen(false)
-    if (!res.refused) focusPrompt()
-  }
-
   const reason = startBlocker(draft, imgs)
   const slugError = slugProblem(draft.slug)
   const reasonText = reason && (
@@ -339,7 +331,7 @@ function DraftForm({
           slugInput={slugInput}
           status={status}
           onRename={renameFocus}
-          onHistory={openHistory}
+          onHistory={history.show}
           onPickProject={pickProject}
           onSlug={(slug) => patch({ slug })}
         />
@@ -353,19 +345,15 @@ function DraftForm({
             {movedFrom} no longer exists; moved to {draft.project}
           </Text>
         )}
-        {notices.map((n) => (
-          <Text key={n} fontSize="sm" color="text.dim" pt="2" flexShrink="0">
-            {n}
-          </Text>
-        ))}
+        <HistoryNotices notices={history.notices} />
         {banner && <DraftBanner actions={bannerActions} />}
-        {historyOpen && (
+        {history.open && (
           <HistoryHost
             list="design-drafts"
             pending={status === "saving" || imgs.uploading > 0}
             listHistory={listHistory}
-            onRestore={restore}
-            onClose={() => setHistoryOpen(false)}
+            onRestore={history.restore}
+            onClose={history.hide}
           />
         )}
         {viMode ? (
