@@ -139,6 +139,36 @@ func TestAcquireLock_OtherPidFailsAtOnce(t *testing.T) {
 	}
 }
 
+// An older gx wrote the pid without padding; a new gx must still name it.
+func TestAcquireLock_UnpaddedPidNamesTheHolder(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, lifecycle.LockFileName)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString("999999"); err != nil {
+		t.Fatal(err)
+	}
+
+	start := time.Now()
+	_, err = lifecycle.AcquireLock(path)
+	if err == nil || !strings.Contains(err.Error(), "already running (pid 999999)") {
+		t.Fatalf("got %v, want already running (pid 999999)", err)
+	}
+	if d := time.Since(start); d > 500*time.Millisecond {
+		t.Fatalf("unpadded pid should fail at once, took %v", d)
+	}
+	if pid, held := lifecycle.LockHeldBy(dir); !held || pid != 999999 {
+		t.Fatalf("LockHeldBy: got pid %d held %v, want 999999 true", pid, held)
+	}
+}
+
 func TestLockHeldBy(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

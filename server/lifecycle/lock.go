@@ -81,15 +81,13 @@ func AcquireLock(path string) (*Lock, error) {
 	return &Lock{f: f}, nil
 }
 
-// readLockPid parses the full-width pid in the lock file. ok is false for an
-// empty or short file.
+// readLockPid parses the pid in the lock file: a run of digits of any length,
+// so an older gx's unpadded pid reads too. ok is false while the file has no
+// positive pid yet (empty, or a partial write of zero padding).
 func readLockPid(path string) (pid int, ok bool) {
 	raw, _ := os.ReadFile(path)
-	if len(raw) != LockPidWidth {
-		return 0, false
-	}
-	pid, err := strconv.Atoi(string(raw))
-	return pid, err == nil
+	pid, err := strconv.Atoi(strings.TrimSpace(string(raw)))
+	return pid, err == nil && pid > 0
 }
 
 // Release drops the lock.
@@ -108,7 +106,6 @@ func LockHeldBy(stateDir string) (int, bool) {
 		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 		return 0, false
 	}
-	raw, _ := os.ReadFile(path)
-	pid, _ := strconv.Atoi(strings.TrimSpace(string(raw)))
+	pid, _ := readLockPid(path)
 	return pid, true
 }
