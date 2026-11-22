@@ -1,6 +1,7 @@
 import { Box, Text } from "@chakra-ui/react"
 import { Fragment } from "react"
 import type { ModelLabel } from "../../modelName"
+import { withKeys } from "../../uniqueKeys"
 
 const NAMES: Record<string, string> = { claude: "Claude", codex: "Codex" }
 
@@ -31,14 +32,10 @@ export function HarnessLabel({
   const showDot = harness && (dot || !model)
   const parts = [model, tierLabel, effort, note ?? ""].filter(Boolean)
   // One inline flow: it wraps between words (a real space), never inside the harness or a word.
-  const seen = new Map<string, number>()
-  const words = parts
-    .flatMap((part) => part.split(" · "))
-    .map((word) => {
-      const n = seen.get(word) ?? 0
-      seen.set(word, n + 1)
-      return { word, key: `${word}#${n}` }
-    })
+  const words = withKeys(
+    parts.flatMap((part) => part.split(" · ")),
+    (word) => word,
+  )
   return (
     <Text as="span" fontFamily="mono" fontSize="12px" color="text.dim">
       {showDot && (
@@ -54,7 +51,7 @@ export function HarnessLabel({
           {showName && (NAMES[harness] ?? harness)}
         </Box>
       )}
-      {words.map(({ word, key }, i, rest) => (
+      {words.map(({ item: word, index: i, key }, _, rest) => (
         <Fragment key={key}>
           {i > 0 && " "}
           <Box as="span" whiteSpace="nowrap">

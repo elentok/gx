@@ -20,7 +20,8 @@ import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import type { Tone } from "../ui/tone"
 import { useFetched } from "../useFetched"
 import { useFetchedReady } from "../useReady"
-import { fetchInitiative, INITIATIVE_STATE, keyed, type FetchInitiative } from "./initiatives"
+import { withKeys } from "../uniqueKeys"
+import { fetchInitiative, INITIATIVE_STATE, type FetchInitiative } from "./initiatives"
 
 const MILESTONE_TONE: Record<string, Tone> = {
   sketch: "muted",
@@ -99,7 +100,7 @@ function Empty({ children }: { children: ReactNode }) {
 function UnparsedLines({ lines }: { lines: InitiativeUnparsed[] }) {
   return (
     <>
-      {keyed(lines, (u) => u.raw).map(({ key, item }) => (
+      {withKeys(lines, (u) => u.raw).map(({ key, item }) => (
         <Text key={key} color="text.muted" fontFamily="mono" whiteSpace="pre-wrap" data-unparsed>
           {item.raw}
         </Text>
@@ -279,7 +280,7 @@ function InitiativeBody({ data }: { data: InitiativeData }) {
       />
       <Section title="Destination">
         <SectionBody empty="No Destination written yet." count={paragraphs.length} unparsed={[]}>
-          {keyed(paragraphs, (p) => p).map(({ key, item }) => (
+          {withKeys(paragraphs, (p) => p).map(({ key, item }) => (
             <Text key={key}>{item}</Text>
           ))}
         </SectionBody>
@@ -290,7 +291,7 @@ function InitiativeBody({ data }: { data: InitiativeData }) {
           count={data.milestones.length}
           unparsed={unparsed("Milestones")}
         >
-          {keyed(data.milestones, (m) => String(m.number)).map(({ key, item }) => (
+          {withKeys(data.milestones, (m) => String(m.number)).map(({ key, item }) => (
             <MilestoneBlock key={key} m={item} />
           ))}
         </SectionBody>
@@ -303,7 +304,7 @@ function InitiativeBody({ data }: { data: InitiativeData }) {
         >
           <DataTable
             heads={["#", "Assumption", "Tested by", "State", "Evidence"]}
-            rows={keyed(data.assumptions, (a) => String(a.n)).map(({ key, item: a }) => ({
+            rows={withKeys(data.assumptions, (a) => String(a.n)).map(({ key, item: a }) => ({
               key,
               cells: [
                 `A${a.n}`,
@@ -324,7 +325,7 @@ function InitiativeBody({ data }: { data: InitiativeData }) {
         >
           <DataTable
             heads={["Item", "To", "Why", "From", "State"]}
-            rows={keyed(data.deferred, (d) => `${d.item}|${d.to}|${d.from}`).map(
+            rows={withKeys(data.deferred, (d) => `${d.item}|${d.to}|${d.from}`).map(
               ({ key, item: d }) => ({
                 key,
                 cells: [d.item, d.to, d.why, d.from, <StateText key="state" value={d.state} />],
@@ -344,7 +345,7 @@ function InitiativeBody({ data }: { data: InitiativeData }) {
           count={data.gate_notes.length}
           unparsed={unparsed("Gate notes")}
         >
-          {keyed(data.gate_notes, (g) => g.slug).map(({ key, item }) => (
+          {withKeys(data.gate_notes, (g) => g.slug).map(({ key, item }) => (
             <GateNoteBlock key={key} g={item} />
           ))}
         </SectionBody>

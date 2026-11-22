@@ -1,5 +1,6 @@
 import { Box, Text } from "@chakra-ui/react"
 import { Button } from "../ui/button/Button"
+import { withKeys } from "../uniqueKeys"
 import {
   postDevFrontend as defaultPostDevFrontend,
   postDevRestart as defaultPostDevRestart,
@@ -79,11 +80,8 @@ export function DevDetails({
           wordBreak="break-all"
           overflow="hidden"
         >
-          {log.map((line, i) => (
-            <Box
-              key={`${line}-${log.slice(0, i).filter((l) => l === line).length}`}
-              color={/error|exited/i.test(line) ? "tone.deadlocked.fg" : undefined}
-            >
+          {withKeys(log, (line) => line).map(({ item: line, key }) => (
+            <Box key={key} color={/error|exited/i.test(line) ? "tone.deadlocked.fg" : undefined}>
               {line}
             </Box>
           ))}

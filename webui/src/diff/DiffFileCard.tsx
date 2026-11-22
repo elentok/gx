@@ -1,6 +1,7 @@
 import { Box, Spinner } from "@chakra-ui/react"
 import { type ReactNode, useCallback, useState } from "react"
 import type { DiffFile } from "../generated/server"
+import { withKeys } from "../uniqueKeys"
 import { Button } from "../ui/button/Button"
 import { useKeyedFetch } from "../useKeyedFetch"
 import type { DiffBlobsBody, FetchDiffBlob, FetchDiffCommitPatches, FetchDiffPatch } from "./api"
@@ -113,11 +114,8 @@ function Body({
   }
   return (
     <>
-      {fresh.value.map((part, i, all) => (
-        <Box
-          key={`${part.label ?? ""}-${all.slice(0, i).filter((p) => p.label === part.label).length}`}
-          data-testid={part.label === undefined ? undefined : "commit-patch"}
-        >
+      {withKeys(fresh.value, (part) => part.label ?? "").map(({ item: part, index: i, key }) => (
+        <Box key={key} data-testid={part.label === undefined ? undefined : "commit-patch"}>
           {part.label !== undefined && (
             <Box
               data-testid="commit-patch-label"

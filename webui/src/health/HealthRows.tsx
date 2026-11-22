@@ -1,5 +1,6 @@
 import { Box, Link, Spinner, Text } from "@chakra-ui/react"
 import { useContext, type ReactNode } from "react"
+import { withKeys } from "../uniqueKeys"
 import { ConnectionContext, useConnectionState, type Connection } from "../connection"
 import { postCleanDisk } from "../page/DiskStrips"
 import { Button } from "../ui/button/Button"
@@ -182,13 +183,8 @@ export function CauseList({
   return (
     <Box px="14px" pb="2" fontSize="xs" lineHeight="1.45" color="text.dim" data-part={part}>
       {marker ??
-        list.rows.map((row, i, rows) => (
-          <Box
-            key={`${row.label}-${rows.slice(0, i).filter((r) => r.label === row.label).length}`}
-            display="flex"
-            gap="2"
-            data-part="cause-row"
-          >
+        withKeys(list.rows, (row) => row.label).map(({ item: row, key }) => (
+          <Box key={key} display="flex" gap="2" data-part="cause-row">
             <Text
               as="span"
               flex="1"

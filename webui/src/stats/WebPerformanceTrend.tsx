@@ -1,5 +1,6 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { useState } from "react"
+import { withKeys } from "../uniqueKeys"
 import type { StatsWebPerfRoute, StatsWebPerfTrend } from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { formatPerf, perfUnit } from "./formatPerf"
@@ -100,10 +101,10 @@ function Trend({
       {line.length > 1 && (
         <polyline points={line.join(" ")} fill="none" stroke={ACCENT} strokeWidth="2" />
       )}
-      {points.map((p, i) =>
+      {withKeys(points, (p) => `${p.p75}-${p.count}`).map(({ item: p, index: i, key }) =>
         p.p75 == null ? null : (
           <circle
-            key={`${p.p75}-${p.count}-${points.slice(0, i).filter((q) => q.p75 === p.p75 && q.count === p.count).length}`}
+            key={key}
             data-testid="trend-point"
             cx={x(i)}
             cy={y(p.p75)}

@@ -1,5 +1,6 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { createContext, useContext } from "react"
+import { withKeys } from "../uniqueKeys"
 
 export interface CertInfo {
   /** SHA-256 of the root certificate: 8 groups of 8, separated by spaces. */
@@ -33,8 +34,8 @@ export function Fingerprint({ value, size = "xs" }: { value: string; size?: "xs"
       fontSize={size}
       color="text.muted"
     >
-      {value.split(" ").map((group, i, all) => (
-        <span key={`${group}-${all.slice(0, i).filter((g) => g === group).length}`}>{group}</span>
+      {withKeys(value.split(" "), (group) => group).map(({ item: group, key }) => (
+        <span key={key}>{group}</span>
       ))}
     </Box>
   )
