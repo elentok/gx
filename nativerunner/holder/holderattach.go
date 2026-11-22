@@ -62,6 +62,8 @@ type frameHub struct {
 	// next output: until then the screen is what the child drew for the old
 	// size, so a read of it can't be trusted.
 	resizedSinceOutput bool
+	// owner is the attach whose keys and size count; nil means gx owns.
+	owner *attachClient
 }
 
 // attachClient is one attach's pacing state, guarded by frameHub.mu.
@@ -83,6 +85,9 @@ type attachClient struct {
 	// offset is the viewer's scroll offset; newLines counts the lines output
 	// since it left zero.
 	offset, newLines int
+	// ownerChanged wakes the attach loop to report the owner; the loop reads
+	// the current owner, so wakes coalesce.
+	ownerChanged chan struct{}
 }
 
 func (c *attachClient) pending() bool {
@@ -115,16 +120,26 @@ func (f *frameHub) subscribe() (*attachClient, Frame) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.flushLocked()
-	c := &attachClient{slot: make(chan Frame, 1), rows: map[int]struct{}{}, last: time.Now()}
+	c := &attachClient{slot: make(chan Frame, 1), rows: map[int]struct{}{}, last: time.Now(), ownerChanged: make(chan struct{}, 1)}
+	lone := len(f.subs) == 0
 	f.subs[c] = struct{}{}
+	if lone {
+		// Reported with the attach's first messages, not by a wake.
+		f.owner = c
+	}
 	return c, f.fullFrameLocked(c)
 }
 
+// unsubscribe drops c. If c owned the session, gx does, and the remaining
+// attaches are not promoted.
 func (f *frameHub) unsubscribe(c *attachClient) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.stopTimerLocked(c)
 	delete(f.subs, c)
+	if f.owner == c {
+		f.setOwnerLocked(nil)
+	}
 }
 
 // flush hands the dirty rows to every attach.
@@ -203,7 +218,8 @@ func (f *frameHub) keyed(c *attachClient) {
 	f.paceLocked(c)
 }
 
-// resized records c's viewer size and gives c the pty's size.
+// resized records c's viewer size. Only the owner's size reaches the pty; a
+// non-owner's changes its own view alone.
 func (f *frameHub) resized(c *attachClient, width, height int) error {
 	if width <= 0 || height <= 0 || width > math.MaxUint16 || height > math.MaxUint16 {
 		return fmt.Errorf("invalid attach size %dx%d", width, height)
@@ -211,14 +227,49 @@ func (f *frameHub) resized(c *attachClient, width, height int) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	c.width, c.height = width, height
+	if f.owner != c {
+		c.full = true
+		f.paceLocked(c)
+		return nil
+	}
 	return f.ownLocked(c)
 }
 
-// own gives c the pty's size, as the viewer that last focused or typed.
-func (f *frameHub) own(c *attachClient) error {
+// takeOver makes c the owner, so its keys reach the child and the pty takes
+// its size. Focus and typing never call it.
+func (f *frameHub) takeOver(c *attachClient) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.setOwnerLocked(c)
 	return f.ownLocked(c)
+}
+
+// isOwner reports whether c's keys reach the child.
+func (f *frameHub) isOwner(c *attachClient) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.owner == c
+}
+
+// gxOwns reports whether no attach owns the session.
+func (f *frameHub) gxOwns() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.owner == nil
+}
+
+// setOwnerLocked moves the owner, nil for gx, and tells every attach.
+func (f *frameHub) setOwnerLocked(owner *attachClient) {
+	if f.owner == owner {
+		return
+	}
+	f.owner = owner
+	for s := range f.subs {
+		select {
+		case s.ownerChanged <- struct{}{}:
+		default:
+		}
+	}
 }
 
 // ownLocked resizes the pty to c's size, and since every attach's view of the
@@ -487,6 +538,7 @@ func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 	clientErr := make(chan error, 1)
 	// Copy replies go out through the loop below, the conn's only writer.
 	copied := make(chan streamCopied)
+	blocked := make(chan struct{}, 1)
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
@@ -500,12 +552,17 @@ func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 			if err == nil {
 				switch typ {
 				case StreamInput:
-					// The child gets the key at the typing viewer's size.
-					if err = h.frames.own(client); err == nil {
-						if err = h.input(payload); err == nil {
-							h.frames.keyed(client)
+					if !h.frames.isOwner(client) {
+						// Dropped, never queued; one report covers a burst.
+						select {
+						case blocked <- struct{}{}:
+						default:
 						}
+					} else if err = h.input(payload); err == nil {
+						h.frames.keyed(client)
 					}
+				case StreamTakeOver:
+					err = h.frames.takeOver(client)
 				case StreamResize:
 					var size AttachResize
 					if err = json.Unmarshal(payload, &size); err == nil {
@@ -550,8 +607,23 @@ func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 	if send(StreamFrame, full) != nil {
 		return
 	}
+	sendOwner := func() error {
+		owned := h.frames.isOwner(client)
+		return send(StreamOwner, AttachOwner{Self: owned, GX: !owned && h.frames.gxOwns()})
+	}
+	if sendOwner() != nil {
+		return
+	}
 	for {
 		select {
+		case <-client.ownerChanged:
+			if sendOwner() != nil {
+				return
+			}
+		case <-blocked:
+			if send(StreamBlocked, struct{}{}) != nil {
+				return
+			}
 		case frame := <-client.slot:
 			if send(StreamFrame, frame) != nil {
 				return
@@ -619,12 +691,14 @@ type HolderAttach struct {
 }
 
 // AttachMessage is one message off an attach stream. Frame is set for
-// StreamFrame, ExitCode for StreamExit, Text for StreamCopy.
+// StreamFrame, ExitCode for StreamExit, Text for StreamCopy, Owner for
+// StreamOwner. StreamBlocked has no fields.
 type AttachMessage struct {
 	Type     StreamType
 	Frame    Frame
 	ExitCode int
 	Text     string
+	Owner    AttachOwner
 }
 
 // Next blocks for the next message, skipping types it does not know. A
@@ -655,6 +729,14 @@ func (a *HolderAttach) Next() (AttachMessage, error) {
 				return AttachMessage{}, err
 			}
 			return AttachMessage{Type: typ, Text: c.Text}, nil
+		case StreamOwner:
+			var o AttachOwner
+			if err := json.Unmarshal(payload, &o); err != nil {
+				return AttachMessage{}, err
+			}
+			return AttachMessage{Type: typ, Owner: o}, nil
+		case StreamBlocked:
+			return AttachMessage{Type: typ}, nil
 		case StreamError:
 			var e streamError
 			if err := json.Unmarshal(payload, &e); err != nil {
@@ -675,8 +757,14 @@ func (a *HolderAttach) Paste(text string) error {
 	return a.Send(StreamInput, AttachInput{Paste: text})
 }
 
-// Resize sends the viewer's size, which the child takes on, as the viewer
-// that last focused. Send it on focus.
+// TakeOver asks to become the owner, whose keys reach the child and whose size
+// the child takes on.
+func (a *HolderAttach) TakeOver() error {
+	return a.Send(StreamTakeOver, struct{}{})
+}
+
+// Resize sends the viewer's size. The child takes it on only while this
+// attach owns the session.
 func (a *HolderAttach) Resize(cols, rows int) error {
 	return a.Send(StreamResize, AttachResize{Cols: cols, Rows: rows})
 }

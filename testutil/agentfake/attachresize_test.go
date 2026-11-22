@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/x/ansi"
-	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner/holder"
 )
 
@@ -108,7 +107,7 @@ func (p *HeldProgram) waitSize(want string) {
 	})
 }
 
-func TestAttachResize_LastViewerToFocusOrTypeOwnsTheSize(t *testing.T) {
+func TestAttachResize_OnlyTheOwnerSetsTheSizeAndTakeOverMovesIt(t *testing.T) {
 	p, a := holdProgramAttach(t)
 	va := p.viewResized(a, 100, 30)
 	p.waitSize("100x30")
@@ -119,18 +118,19 @@ func TestAttachResize_LastViewerToFocusOrTypeOwnsTheSize(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = b.Close() })
 	vb := p.viewResized(b, 60, 20)
+	// b does not own the session: the pty keeps a's size, and the 99-dash line
+	// and rows past b's 20 are cropped from its view.
+	p.waitSize("100x30")
+	p.waitView(vb, 60, 20, "size=100x30")
+
+	if err := b.TakeOver(); err != nil {
+		t.Fatal(err)
+	}
 	p.waitSize("60x20")
 	// a's rows past the pty's 20 and columns past its 60 are padding.
 	p.waitView(va, 100, 30, "size=60x20")
 
-	if err := a.SendKey(screen.Key{Code: 'x', Text: "x"}); err != nil {
-		t.Fatal(err)
-	}
-	p.waitSize("100x30")
-	// The 99-dash line and rows past b's 20 are cropped.
-	p.waitView(vb, 60, 20, "size=100x30")
-
 	_ = a.Close()
 	_ = b.Close()
-	p.waitSize("100x30")
+	p.waitSize("60x20")
 }

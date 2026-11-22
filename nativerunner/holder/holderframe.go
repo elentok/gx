@@ -45,6 +45,15 @@ const (
 	// StreamMouse is a button press, release or drag a client sends on an
 	// attach, as an AttachMouse, for a child that reports the mouse.
 	StreamMouse
+	// StreamTakeOver is a client's request, with an empty payload, to become the
+	// attach that owns the session's input and size.
+	StreamTakeOver
+	// StreamOwner is the holder's AttachOwner report: sent first on an attach and
+	// again whenever the owner changes.
+	StreamOwner
+	// StreamBlocked tells a client its input was dropped because it does not own
+	// the session; the payload is an empty object.
+	StreamBlocked
 )
 
 // maxStreamPayload bounds one stream message; a bigger one ends the stream
@@ -170,9 +179,16 @@ type InputKey struct {
 	Mod  screen.KeyMod `json:"mod,omitempty"`
 }
 
+// AttachOwner is StreamOwner's payload: Self when this attach owns the session,
+// GX when gx does (no attach owns it). Neither means another attach owns it.
+type AttachOwner struct {
+	Self bool `json:"self,omitempty"`
+	GX   bool `json:"gx,omitempty"`
+}
+
 // AttachResize is StreamResize's payload. The pty follows the size of the
-// attach that last resized or typed; every other attach gets its frames
-// cropped or padded to its own size.
+// owning attach; every other attach gets its frames cropped or padded to its
+// own size.
 type AttachResize struct {
 	Cols int `json:"cols"`
 	Rows int `json:"rows"`

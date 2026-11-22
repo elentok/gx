@@ -47,11 +47,16 @@ func attach(t *testing.T, c *holder.HolderClient) *holder.HolderAttach {
 
 func nextAttach(t *testing.T, a *holder.HolderAttach) holder.AttachMessage {
 	t.Helper()
-	m, err := a.Next()
-	if err != nil {
-		t.Fatalf("attach: %v", err)
+	for {
+		m, err := a.Next()
+		if err != nil {
+			t.Fatalf("attach: %v", err)
+		}
+		// Owner reports are asserted in holderattachowner_test.go.
+		if m.Type != holder.StreamOwner && m.Type != holder.StreamBlocked {
+			return m
+		}
 	}
-	return m
 }
 
 func touch(t *testing.T, path string) {
@@ -263,7 +268,11 @@ func TestHolderAttach_OversizedMessageClosesWithError(t *testing.T) {
 	if err := holder.SendOversizedHeader(a); err != nil {
 		t.Fatal(err)
 	}
-	m, err := a.Next()
+	var m holder.AttachMessage
+	var err error
+	// The owner report may still be in flight ahead of the error.
+	for m, err = a.Next(); err == nil && m.Type == holder.StreamOwner; m, err = a.Next() {
+	}
 	if err == nil || !strings.Contains(err.Error(), "too big") {
 		t.Fatalf("after an oversized message = %+v, %v; want a too-big error", m, err)
 	}
