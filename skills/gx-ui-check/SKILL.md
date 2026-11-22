@@ -67,6 +67,10 @@ run it in parallel with `gx brief go-test`: a racing build makes every package f
 
 The JSON line has these fields:
 
+- `pages`: every page name the scenario holds, mapped to its full URL. Every scenario has `home`;
+  seeded drafts are `draft_1`.. (Design) and `chat_draft_1`.. (chat), and agent sessions are
+  `session_1`.. (the URL ends in the session id). `--env` exports each as `GXF_PAGE_<NAME>`, for
+  example `$GXF_PAGE_DRAFT_1`. Read the page from here; do not guess ids or paths.
 - `web_url`: the page URL. It is HTTPS from the fixture's own root certificate.
 - `cookie_name` and `cookie`: the web login the fixture created. Add this cookie to the browser
   (secure, with `web_url` as its URL) and the page is signed in. Both are empty in the `web-setup`
@@ -113,6 +117,10 @@ of that config whose `contextOptions.serviceWorkers` is `"allow"`:
    playwright-cli -s=$GXF_BROWSER_SESSION cookie-set "${GXF_WEB_COOKIE%%=*}" "${GXF_WEB_COOKIE#*=}" --domain=127.0.0.1 --path=/ --secure
    playwright-cli -s=$GXF_BROWSER_SESSION goto "$GXF_WEB_URL"
    ```
+   Then open the page you need and wait for it, once: `playwright-cli -s=$GXF_BROWSER_SESSION goto
+   "$GXF_PAGE_DRAFT_1"`, then `playwright-cli -s=$GXF_BROWSER_SESSION run-code "async page => {
+   await page.getByRole('heading').first().waitFor() }"` (any role or text the page shows when
+   ready). Do not `sleep`.
    Run each line as its own call. In a Playwright script use
    `waitUntil: "domcontentloaded"`: the page keeps a live connection, so `load` can time out. A flow
    that types a TOTP code uses the `nextTotpCode()` helper in `webui/e2e/fixture.ts`. It waits for a
@@ -129,6 +137,8 @@ of that config whose `contextOptions.serviceWorkers` is `"allow"`:
   `$GXF_WEB_COOKIE` (`name=value`). Do not parse the JSON line.
 - **Cookie flags:** `playwright-cli -s=$GXF_BROWSER_SESSION cookie-set <name> <value> --domain=127.0.0.1 --path=/ --secure`.
   `--url ... --secure` ends on a 404. Set the cookie, then `goto` the page.
+- **Print only an eval result:** `playwright-cli --raw -s=$GXF_BROWSER_SESSION eval "() => document.title"`.
+  `--raw` goes before the verb and drops the status and code lines.
 - **Routes use the hash:** the page is `$GXF_WEB_URL#/settings`, not `/settings`.
 - **Framed refs carry a prefix:** a ref in an iframe is `f1e270`, not `e270`. Copy the ref exactly from
   the snapshot. A ref from an older snapshot fails with "Ref ... not found": take a new snapshot.

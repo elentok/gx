@@ -4,6 +4,8 @@ package output
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -14,10 +16,14 @@ type Output struct {
 	// cookie value under CookieName, from the setup the fixture finished; it is
 	// empty in the web-setup and web-login scenarios, where the page starts signed out.
 	// Password is the web password, empty while the setup is pending.
-	WebURL     string `json:"web_url"`
-	CookieName string `json:"cookie_name"`
-	Cookie     string `json:"cookie"`
-	Password   string `json:"password,omitempty"`
+	WebURL string `json:"web_url"`
+	// Pages maps a page name to its full URL, for every scenario: "home", then
+	// "draft_1".. (Design drafts), "chat_draft_1".. and "session_1.." (agent sessions,
+	// by id). `--env` exports each as GXF_PAGE_<NAME>.
+	Pages      map[string]string `json:"pages"`
+	CookieName string            `json:"cookie_name"`
+	Cookie     string            `json:"cookie"`
+	Password   string            `json:"password,omitempty"`
 	// TOTPSecret and TOTPStep (the last step used) are left out when the server
 	// runs with server.web.totp=false.
 	TOTPSecret string `json:"totp_secret,omitempty"`
@@ -133,6 +139,20 @@ type ModelFakesOutput struct {
 	CodexDir  string `json:"codex_dir"`
 }
 
+// BuildPages names the pages of a started fixture. The web routes use the hash.
+func BuildPages(webURL string, designDrafts, chatDrafts, sessions []string) map[string]string {
+	pages := map[string]string{"home": webURL}
+	add := func(prefix, route string, ids []string) {
+		for i, id := range ids {
+			pages[prefix+strconv.Itoa(i+1)] = webURL + "#/" + route + "/" + id
+		}
+	}
+	add("draft_", "drafts", designDrafts)
+	add("chat_draft_", "chat-drafts", chatDrafts)
+	add("session_", "agents", sessions)
+	return pages
+}
+
 // ShellEnv is the output as `export` lines a shell can source: the CLI env, then
 // GXF_* variables for the rest. Values are single-quoted.
 func (o Output) ShellEnv() string {
@@ -144,6 +164,9 @@ func (o Output) ShellEnv() string {
 	}
 	export("GXF_WEB_URL", o.WebURL)
 	export("GXF_WEB_COOKIE", o.CookieName+"="+o.Cookie)
+	for _, name := range slices.Sorted(maps.Keys(o.Pages)) {
+		export("GXF_PAGE_"+strings.ToUpper(name), o.Pages[name])
+	}
 	export("GXF_GX", o.Gx)
 	export("GXF_DISK_DIR", o.DiskDir)
 	export("GXF_HEALTH_DIR", o.HealthDir)

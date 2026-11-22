@@ -164,6 +164,9 @@ func run(args []string) (err error) {
 		return err
 	}
 	res := f.buildOutput(sc, rs, s)
+	if res.Pages, err = f.pages(ctx, res.WebURL); err != nil {
+		return err
+	}
 	if o.mockDir != "" {
 		stopMock, mockURL, err := serveMock(o.mockDir)
 		if err != nil {

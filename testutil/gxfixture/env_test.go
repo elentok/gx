@@ -5,6 +5,7 @@ import (
 	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
 	"github.com/elentok/gx/testutil/gxfixture/output"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
@@ -36,6 +37,27 @@ func TestShellEnv_ExportsTheCLIEnvAndTheFixtureVariablesQuoted(t *testing.T) {
 		"export GXF_SOCKET='/tmp/s.sock'\n"
 	if got := o.ShellEnv(); got != want {
 		t.Errorf("ShellEnv() =\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestBuildPages_NamesHomeDraftsAndSessionsAndShellEnvExportsThem(t *testing.T) {
+	pages := output.BuildPages("https://h", []string{"d1"}, []string{"c1", "c2"}, []string{"s1"})
+	want := map[string]string{
+		"home": "https://h", "draft_1": "https://h#/drafts/d1",
+		"chat_draft_1": "https://h#/chat-drafts/c1", "chat_draft_2": "https://h#/chat-drafts/c2",
+		"session_1": "https://h#/agents/s1",
+	}
+	if !maps.Equal(pages, want) {
+		t.Errorf("pages = %v, want %v", pages, want)
+	}
+	env := output.Output{WebURL: "https://h", Pages: pages}.ShellEnv()
+	for _, line := range []string{"export GXF_PAGE_HOME='https://h'\n", "export GXF_PAGE_CHAT_DRAFT_2='https://h#/chat-drafts/c2'\n", "export GXF_PAGE_SESSION_1='https://h#/agents/s1'\n"} {
+		if !strings.Contains(env, line) {
+			t.Errorf("ShellEnv() lacks %q:\n%s", line, env)
+		}
+	}
+	if got := output.BuildPages("https://h", nil, nil, nil); len(got) != 1 || got["home"] != "https://h" {
+		t.Errorf("empty pages = %v, want only home", got)
 	}
 }
 

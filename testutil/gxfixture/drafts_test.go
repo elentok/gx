@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -104,6 +105,27 @@ func TestDraftHistoryScenario_SeedsThreeListsNewestFirst(t *testing.T) {
 	}
 	if it := sent[spec.HistorySentCommand]; it.Harness != "claude" || it.Composer != drafthistory.ComposerChat {
 		t.Errorf("command entry = %+v, want a Claude chat entry", it)
+	}
+}
+
+func TestPages_DraftScenariosNameTheirDraftAndSessionPages(t *testing.T) {
+	t.Parallel()
+	r := start(t, "draft-history")
+	for _, name := range []string{"home", "draft_1", "chat_draft_1", "session_1"} {
+		if r.Pages[name] == "" || !strings.HasPrefix(r.Pages[name], r.WebURL) {
+			t.Errorf("pages[%q] = %q, want a URL under %s: %v", name, r.Pages[name], r.WebURL, r.Pages)
+		}
+	}
+	if !strings.Contains(r.Pages["draft_1"], "#/drafts/") {
+		t.Errorf("draft_1 = %q, want a #/drafts/ route", r.Pages["draft_1"])
+	}
+}
+
+func TestPages_PlainScenarioHasHome(t *testing.T) {
+	t.Parallel()
+	r := start(t, "ready")
+	if r.Pages["home"] != r.WebURL {
+		t.Errorf("pages = %v, want home = %s", r.Pages, r.WebURL)
 	}
 }
 

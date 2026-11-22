@@ -188,6 +188,8 @@ func TestGxUICheckBlocksWorkersByDefault(t *testing.T) {
 	checkAnchors(t, "gx-ui-check/SKILL.md", "`serviceWorkers: \"block\"`", "bypass `page.route`")
 	checkAnchors(t, "gx-ui-check/SKILL.md", "gxfixture stop <scenario|pid>", "`GXF_PID`", "Never use `pkill -f gxfixture`",
 		"until [ -s fx.json ]", "$GXF_WEB_COOKIE", "Resolve it before you source the fixture env")
+	checkAnchors(t, "gx-ui-check/SKILL.md", "`pages`", "`GXF_PAGE_<NAME>`", "cookie-set", "`$GXF_PAGE_DRAFT_1`",
+		"waitFor()", "`--raw`")
 }
 
 func TestSingleFlowRunRoute(t *testing.T) {
