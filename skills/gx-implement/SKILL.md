@@ -280,7 +280,8 @@ phrase, and pin only structural anchors: headings, link paths, selector names, n
 skill area's shared test file and reuse `normalizeSpace`; never add a second file asserting the same
 phrase. See [gx-tdd](../gx-tdd/SKILL.md).
 
-Run typechecking regularly and single test files regularly. At the end, test only the packages you
+Run typechecking regularly (Go: `go build ./...`; web UI: `gx brief tsc`, as webui has no
+`typecheck` script) and single test files regularly. At the end, test only the packages you
 touched plus their direct importers (see `.ai/index.md` "Testing") — not the full suite.
 
 Run Go tests with `gx brief go-test`, not raw `go test`. While iterating, always pass

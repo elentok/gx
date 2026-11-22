@@ -216,6 +216,7 @@ func TestGxImplementTestRules(t *testing.T) {
 		"Do not extend a shared test fixture",
 		"`gx tickets set --status done` is refused",
 		"use `gx tickets close`",
+		"`gx brief tsc`",
 	)
 	checkAnchors(t, "gx-verify-epic/SKILL.md",
 		"`gx tickets set --status done` is refused",

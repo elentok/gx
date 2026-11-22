@@ -403,7 +403,7 @@ Testing a click on a Chakra menu item needs `waitFor`. See "Testing a Chakra men
 
 Web checks:
 
-- Type-check with `gx brief tsc`, not a hand-built `pnpm exec tsc ... | tail`.
+- Type-check with `gx brief tsc`, not a hand-built `pnpm exec tsc ... | tail`. The webui has no `typecheck` pnpm script.
 - The web UI formats with Biome (`webui/biome.jsonc`: no semicolons, double quotes, width 100). `pnpm --dir webui run lint` runs the linter.
   `gx check` runs `gx brief -C webui biome`, which fails on any finding, infos included.
   Run `cd webui && pnpm format <files>`. `gx check --kind format` does the same. Never run prettier or npx.
