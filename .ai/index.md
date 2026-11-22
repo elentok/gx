@@ -326,7 +326,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `testutil/runnerfake`, `testutil/vtterm` (terminal-emulator rig), `testutil/teatestv2`, `testutil/claudeenv`,
   `testutil/vitefake` (scripted fake `pnpm` for Dev mode fixtures; control file via
   `VITEFAKE_CONTROL`, binary in `cmd/pnpm`)
-- `testutil/gxfixture` — e2e fixture program: `gxfixture <ready|mixed|finishing|edge>` starts an
+- `testutil/gxfixture` — e2e fixture program (recipe for a new knob or scenario: `.ai/fixture-knobs.md`): `gxfixture <ready|mixed|finishing|edge>` starts an
   isolated real `gx server` (pty runner, `fakeclaude` as `claude`) and prints JSON with `web_url`,
   socket, state dir, hold file and `log_file` (the server's stdout+stderr, which holds the cleanup
   command's output tail); SIGTERM stops it. Per-ticket worker behaviour
