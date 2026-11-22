@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// Later tickets add their reviewer skills to this table.
 func TestNewReviewersRules(t *testing.T) {
 	for _, name := range []string{
 		"gx-code-reviewer",

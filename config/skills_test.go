@@ -11,18 +11,12 @@ import (
 	"time"
 )
 
-var eightSkills = []string{
-	"gx-thermo-nuclear-code-quality-review",
-	"gx-test-review",
-	"gx-code-reviewer",
-	"gx-silent-failure-hunter",
-	"gx-type-design-analyzer",
-	"gx-comment-analyzer",
-	"gx-pr-test-analyzer",
-	"gx-security-review",
-}
+var eightSkills = DefaultSkillsConfig().CodeReview
 
 func TestCodeReviewDefaultMatchesSkillText(t *testing.T) {
+	if len(eightSkills) != 8 {
+		t.Fatalf("default code-review skills = %d, want 8: %v", len(eightSkills), eightSkills)
+	}
 	data, err := os.ReadFile(filepath.Join("..", "skills", "gx-code-review", "SKILL.md"))
 	if err != nil {
 		t.Fatal(err)
