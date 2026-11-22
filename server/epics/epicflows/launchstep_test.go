@@ -2,6 +2,8 @@ package epicflows_test
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -75,8 +77,15 @@ func TestEpicList_LaunchingEpicCardCarriesItsStep(t *testing.T) {
 	if got, want := step(), (wire.LaunchStep{Label: "installing dependencies", Position: 2, Total: 4}); got != want {
 		t.Errorf("card step = %+v, want %+v", got, want)
 	}
+	// The launcher publishes an event when the step moves; a test that moves it
+	// on the registry makes the change visible by touching the ticket instead.
 	reg.SetLaunchStep("proj:work/01", "")
-	if got := step(); got != (wire.LaunchStep{}) {
+	touch := rigs.IssueMD("01", "claimed", "", "A touched")
+	if err := os.WriteFile(filepath.Join(store, "proj", "work", "01-a.md"), []byte(touch), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var got wire.LaunchStep
+	if !servertest.Poll(5*time.Second, func() bool { got = step(); return got == (wire.LaunchStep{}) }) {
 		t.Errorf("card step after the launch = %+v, want none", got)
 	}
 }

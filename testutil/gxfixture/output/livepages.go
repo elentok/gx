@@ -1,18 +1,15 @@
-package main
+package output
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/server"
-	"github.com/elentok/gx/testutil/gxfixture/output"
 )
 
-// pages names the draft and session pages the seeded server holds, so an agent
-// reads them from the output instead of looking them up.
-func (f *fixture) pages(ctx context.Context, webURL string) (map[string]string, error) {
-	cl := apiclient.New(server.SocketPath(f.stateD))
+// LivePages names the draft and session pages the server behind cl holds, so
+// an agent reads them from the output instead of looking them up.
+func LivePages(ctx context.Context, cl *apiclient.Client, webURL string) (map[string]string, error) {
 	snap, err := cl.Snapshot(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("pages: snapshot: %w", err)
@@ -31,5 +28,5 @@ func (f *fixture) pages(ctx context.Context, webURL string) (map[string]string, 
 	for _, si := range list {
 		sessions = append(sessions, si.ID)
 	}
-	return output.BuildPages(webURL, design, chat, sessions), nil
+	return BuildPages(webURL, design, chat, sessions), nil
 }

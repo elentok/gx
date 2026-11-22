@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -56,7 +57,9 @@ func TestEpicList_FollowUpCountCarriesTheSplitTheTriageStateAndWhatIsLeft(t *tes
 	if err := rs.Save(rec); err != nil {
 		t.Fatal(err)
 	}
-	if c, _ = count(); c.Triage != wire.FollowUpTriageStopped || c.Left != 2 {
+	// The triage file's change reaches the card list through the watcher.
+	servertest.Poll(5*time.Second, func() bool { c, _ = count(); return c.Triage == wire.FollowUpTriageStopped })
+	if c.Triage != wire.FollowUpTriageStopped || c.Left != 2 {
 		t.Errorf("live, no session: %+v, want stopped with 2 left", c)
 	}
 
@@ -65,7 +68,8 @@ func TestEpicList_FollowUpCountCarriesTheSplitTheTriageStateAndWhatIsLeft(t *tes
 	if err := rs.Save(rec); err != nil {
 		t.Fatal(err)
 	}
-	if c, _ = count(); c.Triage != wire.FollowUpTriageWaiting {
+	servertest.Poll(5*time.Second, func() bool { c, _ = count(); return c.Triage == wire.FollowUpTriageWaiting })
+	if c.Triage != wire.FollowUpTriageWaiting {
 		t.Errorf("at Questions: %+v, want waiting", c)
 	}
 

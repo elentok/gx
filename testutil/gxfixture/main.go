@@ -44,6 +44,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/gxfixture/catalog"
 	"github.com/elentok/gx/testutil/gxfixture/output"
@@ -164,7 +166,7 @@ func run(args []string) (err error) {
 		return err
 	}
 	res := f.buildOutput(sc, rs, s)
-	if res.Pages, err = f.pages(ctx, res.WebURL); err != nil {
+	if res.Pages, err = output.LivePages(ctx, apiclient.New(server.SocketPath(f.stateD)), res.WebURL); err != nil {
 		return err
 	}
 	if o.mockDir != "" {

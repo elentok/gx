@@ -39,12 +39,16 @@ func newShellOutputFixture(t *testing.T, kind, notification string) *shellOutput
 	ts := func(ago time.Duration) string { return time.Now().UTC().Add(-ago).Format(time.RFC3339Nano) }
 	input := `{"command":"make","description":"build","run_in_background":true}`
 	name := "Bash"
+	// A Monitor's result names its task as taskId beside timeoutMs; a shell's
+	// names it as backgroundTaskId.
+	result := `{"backgroundTaskId":"b1"}`
 	if kind == transcript.TaskKindMonitor {
 		input, name = `{"command":"tail","description":"watch","timeout_ms":3600000,"persistent":false}`, "Monitor"
+		result = `{"taskId":"b1","timeoutMs":3600000}`
 	}
 	lines := []string{
 		fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"content":[{"type":"tool_use","id":"u1","name":%q,"input":%s}]}}`, ts(time.Minute), name, input),
-		fmt.Sprintf(`{"type":"user","timestamp":%q,"message":{"content":[{"type":"tool_result","tool_use_id":"u1","content":"Output is being written to: %s"}]},"toolUseResult":{"backgroundTaskId":"b1"}}`, ts(50*time.Second), out),
+		fmt.Sprintf(`{"type":"user","timestamp":%q,"message":{"content":[{"type":"tool_result","tool_use_id":"u1","content":"Output is being written to: %s"}]},"toolUseResult":%s}`, ts(50*time.Second), out, result),
 	}
 	if notification != "" {
 		body := "<task-notification>\n<task-id>b1</task-id>\n<status>completed</status>\n<summary>" + notification + "</summary>\n</task-notification>"

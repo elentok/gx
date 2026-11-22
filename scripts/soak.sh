@@ -34,8 +34,8 @@ cd "$root"
 
 # failing_names <round output>: each failing test name of the round, once. Two
 # sources: the test log, and the run's record in <data>/check/*.jsonl, which
-# also lists failing slow tests that the test log never names. The round's first
-# output line is the summary path, <data>/check/<run>/summary.txt.
+# also lists failing slow tests that the test log never names. The round's
+# summary path line (after any machine preflight line) is <data>/check/<run>/summary.txt.
 failing_names() {
 	{
 		local log
@@ -48,7 +48,7 @@ failing_names() {
 			' "$log"
 		fi
 		local rundir
-		rundir=$(dirname "$(head -n 1 "$1")")
+		rundir=$(dirname "$(grep -m 1 '/summary\.txt$' "$1")")
 		if [[ -d $rundir ]]; then
 			cat "$(dirname "$rundir")"/*.jsonl 2>/dev/null |
 				jq -r --arg run "$(basename "$rundir")" \

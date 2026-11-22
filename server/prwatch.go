@@ -133,6 +133,11 @@ func (h prWatchHost) CancelStalePRText() {
 	}
 }
 
+// ViewChanged publishes the epic's change, which drops the shared card list.
+func (h prWatchHost) ViewChanged(t prflow.Target) {
+	h.s.events.Publish(wire.EventTicketChanged, t.Project+":"+t.Epic)
+}
+
 func (h prWatchHost) OpenPR(root queue.RootRef) (prflow.Outcome, error) { return h.s.PR.OpenPR(root) }
 
 // PauseCIFailing stores "CI failing" on the epic and sends its one notice.

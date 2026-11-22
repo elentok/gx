@@ -30,6 +30,8 @@ func setProject(t *testing.T, f *rigs.PRFlow, extra string) {
 	if err := servertest.WriteProjectRepo(f.Store, "proj", f.Origin.Local, extra); err != nil {
 		t.Fatal(err)
 	}
+	// The project file is read as of the last store scan.
+	f.Rescan(t)
 }
 
 func TestCreatePR_OpensAPRInPRAndMergeProjects(t *testing.T) {

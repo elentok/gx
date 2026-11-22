@@ -20,6 +20,11 @@ func TestSkillsAskForTierNotModel(t *testing.T) {
 			t.Errorf("%s lacks `gx agent model`", path)
 		}
 	}
+	for _, f := range []string{"gx-research/SKILL.md", "gx-wayfinder/SKILL.md"} {
+		if !strings.Contains(readFile(t, f), "`gx agent model worker`") {
+			t.Errorf("%s lacks the worker-tier model for research", f)
+		}
+	}
 	hardCoded := regexp.MustCompile(`model: ?"|"(sonnet|opus|haiku)"`)
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".md") {
@@ -39,23 +44,15 @@ func TestSkillsAskForTierNotModel(t *testing.T) {
 	}
 }
 
-func TestSkillConventionModelTier(t *testing.T) {
-	text := collapseSpace(readFile(t, "gx-local-tracker.md"))
+func TestSkillConventionModelTierAndReasoningEffort(t *testing.T) {
+	tracker := collapseSpace(readFile(t, "gx-local-tracker.md"))
 	for _, want := range []string{
 		"`gx agent model <tier>`",
 		"`light`, `worker`, `strongest`",
 		"leave out the `model` field",
 		"the subagent runs on the session model",
+		"first word", "second", "`reasoning_effort`",
 	} {
-		if !strings.Contains(text, want) {
-			t.Errorf("gx-local-tracker.md lacks %q", want)
-		}
-	}
-}
-
-func TestSkillConventionReasoningEffort(t *testing.T) {
-	tracker := collapseSpace(readFile(t, "gx-local-tracker.md"))
-	for _, want := range []string{"first word", "second", "`reasoning_effort`"} {
 		if !strings.Contains(tracker, want) {
 			t.Errorf("gx-local-tracker.md lacks %q", want)
 		}
@@ -71,46 +68,25 @@ func TestSkillConventionReasoningEffort(t *testing.T) {
 	}
 }
 
-func TestGxDesignEndsRunAfterChartAndDestination(t *testing.T) {
+func TestGxDesignPhrases(t *testing.T) {
 	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
 	for _, want := range []string{
+		// Ends the run after the chart and the Destination.
 		"After charting, end the run with the run-end line",
 		"end the run with the run-end line: never chain into step 3",
 		"steps 1 and 2 end the run",
-	} {
-		if !strings.Contains(text, collapseSpace(want)) {
-			t.Errorf("gx-design/SKILL.md lacks %q", want)
-		}
-	}
-}
-
-func TestGxDesignQuestionNoteWaitsForReply(t *testing.T) {
-	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
-	for _, want := range []string{
+		// A question in a card note waits for the reply.
 		"A question in a note waits for the reply",
 		"answer it in this same session",
 		"never with a `Next:` line",
 		"This holds in the last round too",
+		// Questions go through grilling rounds, and `recommended` is an option id.
+		"Never run `gx tickets ask` in this session",
+		"`recommended` must be the option's `id` exactly as written",
 	} {
 		if !strings.Contains(text, collapseSpace(want)) {
 			t.Errorf("gx-design/SKILL.md lacks %q", want)
 		}
-	}
-}
-
-func TestGxDesignAsksThroughGrillingRoundsNotTicketsAsk(t *testing.T) {
-	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
-	want := collapseSpace("Never run `gx tickets ask` in this session")
-	if !strings.Contains(text, want) {
-		t.Errorf("gx-design/SKILL.md lacks %q", want)
-	}
-}
-
-func TestGxDesignRecommendedIsOptionID(t *testing.T) {
-	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
-	want := collapseSpace("`recommended` must be the option's `id` exactly as written")
-	if !strings.Contains(text, want) {
-		t.Errorf("gx-design/SKILL.md lacks %q", want)
 	}
 }
 
@@ -160,14 +136,6 @@ func TestGxDesignRubricFlagsSchemaChangeWithoutMigrationStep(t *testing.T) {
 	}
 	if !strings.Contains(text[start:end], "without a new migration step") {
 		t.Error("rubric lacks the migration step line")
-	}
-}
-
-func TestGxResearchRunsOnWorkerTier(t *testing.T) {
-	for _, f := range []string{"gx-research/SKILL.md", "gx-wayfinder/SKILL.md"} {
-		if !strings.Contains(readFile(t, f), "`gx agent model worker`") {
-			t.Errorf("%s lacks the worker-tier model for research", f)
-		}
 	}
 }
 
@@ -355,19 +323,13 @@ func TestGxGrillingSkipRule_FailsWithoutDestinationException(t *testing.T) {
 	}
 }
 
-func TestGxGrillingCapsOptionsBlockAtSix(t *testing.T) {
+func TestGxGrillingOptionsBlockRules(t *testing.T) {
 	text := normalizeSpace(readFile(t, "gx-grilling/SKILL.md"))
-	if !strings.Contains(text, normalizeSpace("An `options` block takes 2 to 6 options")) {
-		t.Error("gx-grilling/SKILL.md lacks the 2 to 6 options limit")
-	}
 	if strings.Contains(text, "list every alternative") {
 		t.Error("gx-grilling/SKILL.md still tells the agent to list every alternative")
 	}
-}
-
-func TestGxGrillingKeepsLetteredOptionsOutOfYesNo(t *testing.T) {
-	text := normalizeSpace(readFile(t, "gx-grilling/SKILL.md"))
 	for _, want := range []string{
+		"An `options` block takes 2 to 6 options",
 		"Word a `yes-no` question so that \"Yes\" is your recommended answer",
 		"Never mix lettered options into a `yes-no` question",
 		"the `➡️` line must start with the same word as `recommended`",
@@ -390,20 +352,17 @@ func TestDesignSettlesConfirmationsBeforeSpec(t *testing.T) {
 			t.Errorf("gx-design/SKILL.md lacks %q", want)
 		}
 	}
-	wayfinder := normalizeSpace(readFile(t, "gx-wayfinder/SKILL.md"))
+	rawWayfinder := readFile(t, "gx-wayfinder/SKILL.md")
+	if !strings.Contains(rawWayfinder, "unless the calling skill allows more") {
+		t.Error("gx-wayfinder/SKILL.md lacks the calling-skill exception")
+	}
+	if strings.Contains(rawWayfinder, "never resolve more than one ticket per session**, with the exception") {
+		t.Error("gx-wayfinder/SKILL.md still has the old one-ticket rule")
+	}
+	wayfinder := normalizeSpace(rawWayfinder)
 	want := "rests on an unverified claim about how Claude, Codex or gx behaves, file the confirmation as a map ticket"
 	if !strings.Contains(wayfinder, normalizeSpace(want)) {
 		t.Errorf("gx-wayfinder/SKILL.md lacks %q", want)
-	}
-}
-
-func TestGxWayfinderLetsCallerAllowMoreTickets(t *testing.T) {
-	text := readFile(t, "gx-wayfinder/SKILL.md")
-	if !strings.Contains(text, "unless the calling skill allows more") {
-		t.Error("gx-wayfinder/SKILL.md lacks the calling-skill exception")
-	}
-	if strings.Contains(text, "never resolve more than one ticket per session**, with the exception") {
-		t.Error("gx-wayfinder/SKILL.md still has the old one-ticket rule")
 	}
 }
 

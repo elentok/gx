@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"reflect"
 	"slices"
 	"sync"
 	"time"
@@ -73,6 +74,9 @@ type Host interface {
 	// stamps merged_at and releases the root. False means the update failed and
 	// a block is stored; the watcher retries it every tick.
 	SyncTrunkAfterMerge(t Target) (synced bool)
+	// ViewChanged announces that the epic's PR view moved, so cached card lists
+	// rebuild.
+	ViewChanged(t Target)
 	// QueueRoot queues the epic's ticket so it is claimed.
 	QueueRoot(root queue.RootRef, ticketID string) error
 }
@@ -320,8 +324,12 @@ func (w *Watcher) pollProject(project string, ts []Target) error {
 			return err
 		}
 		w.mu.Lock()
+		old, had := w.views[epicKey{t.Project, t.Epic}]
 		w.views[epicKey{t.Project, t.Epic}] = v
 		w.mu.Unlock()
+		if !had || !reflect.DeepEqual(old, v) {
+			w.host.ViewChanged(t)
+		}
 		// An action error belongs to this epic: log it and go on with the
 		// others. It is not a GitHub outage.
 		if err := w.act(r, repo, t, v); err != nil {
