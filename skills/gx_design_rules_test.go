@@ -84,6 +84,20 @@ func TestGxDesignEndsRunAfterChartAndDestination(t *testing.T) {
 	}
 }
 
+func TestGxDesignQuestionNoteWaitsForReply(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+	for _, want := range []string{
+		"A question in a note waits for the reply",
+		"answer it in this same session",
+		"never with a `Next:` line",
+		"This holds in the last round too",
+	} {
+		if !strings.Contains(text, collapseSpace(want)) {
+			t.Errorf("gx-design/SKILL.md lacks %q", want)
+		}
+	}
+}
+
 func TestGxDesignAsksThroughGrillingRoundsNotTicketsAsk(t *testing.T) {
 	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
 	want := collapseSpace("Never run `gx tickets ask` in this session")

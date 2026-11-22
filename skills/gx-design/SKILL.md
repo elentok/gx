@@ -190,6 +190,11 @@ the ticket title during `resolve-tickets`.
    - **2-round cap.** Count the `spec-round-` tickets, so the count survives `/clear`,
      auto-advance and detours. A detour never resets it. A question too big for one round becomes
      the next round.
+   - **A question in a note waits for the reply.** If a card's note asks a question instead of
+     picking an option, answer it in this same session. The answer ends the turn with a new round
+     or a confirm card, never with a `Next:` line: auto-advance would start the next session before
+     the person reads the reply. This holds in the last round too. Only a reply that settles every
+     open question may end the run.
    - **Before each redraft**, run `gx agent context-window --fits spec`. On a stop, end the run
      with the run-end line.
    - **From the third draft on**, the subagent decides new design questions itself and lists each
