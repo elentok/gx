@@ -191,7 +191,12 @@ func (r *actionRun) TypeStep(i int, prompt string) error {
 // typeStepWith is TypeStep that pastes imgs after the draft check and before
 // the prompt.
 func (r *actionRun) typeStepWith(i int, prompt string, imgs imageSet) error {
-	release, err := lockTyping(r.p, filepath.Base(r.dir), r.Cancel)
+	unlock, err := lockTyping(r.p, filepath.Base(r.dir), r.Cancel)
+	if err != nil {
+		return err
+	}
+	// One batch: the draft clear, the paste, the text and its Enter.
+	release, err := holdInput(r.holder, unlock)
 	if err != nil {
 		return err
 	}

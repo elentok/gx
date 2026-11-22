@@ -117,6 +117,11 @@ func ClearByInput(t *testing.T, h *servertest.Harness, id string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A session with a first prompt blocks a person's keys until that prompt is
+	// sent; these sessions never get theirs, so end the launch hold here.
+	if err := c.Batch(func() error { return nil }); err != nil {
+		t.Fatal(err)
+	}
 	att, err := c.Attach()
 	if err != nil {
 		t.Fatal(err)

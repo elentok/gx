@@ -380,6 +380,7 @@ func (mg *Manager) startSessionHolderAs(dir string, meta *Meta, override *launch
 		},
 		procCapArgs(mg),
 		trustFlag(meta.MadeWorktree),
+		holdInputFlag(meta.FirstPrompt != ""),
 		[]string{"--", launch.Name},
 		launch.Args)
 	cmd := exec.Command(holder[0], args...)
@@ -514,6 +515,15 @@ func (mg *Manager) endFailedStart(dir string, meta *Meta) {
 func trustFlag(madeWorktree bool) []string {
 	if madeWorktree {
 		return []string{"--trust"}
+	}
+	return nil
+}
+
+// holdInputFlag has gx own the input from launch until the first prompt's
+// keys are sent; a session without a first prompt keeps the old behaviour.
+func holdInputFlag(hasFirstPrompt bool) []string {
+	if hasFirstPrompt {
+		return []string{"--hold-input"}
 	}
 	return nil
 }

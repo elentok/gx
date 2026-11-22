@@ -82,7 +82,20 @@ func (f *firstPrompt) startTimedOut() {
 		return true
 	})
 	if prompt != "" {
+		f.releaseLaunchHold()
 		f.raise(prompt, fmt.Sprintf("agent still starting after %s", f.timeout))
+	}
+}
+
+// releaseLaunchHold ends the launch hold of a prompt gx never typed, with an
+// empty batch, so a person is not locked out of a session gx gave up on.
+func (f *firstPrompt) releaseLaunchHold() {
+	c, err := holder.DialHolder(f.dir)
+	if err != nil {
+		return
+	}
+	if err := c.Batch(func() error { return nil }); err != nil {
+		f.log.Warn("release launch hold", "err", err)
 	}
 }
 
@@ -197,6 +210,9 @@ func (f *firstPrompt) Start(signal, prompt string) {
 	f.p.sessions.Watches.Start(func() {
 		f.logMissingMarker(signal)
 		err := f.deliver(prompt)
+		if !f.typed.Load() {
+			f.releaseLaunchHold()
+		}
 		switch {
 		case errors.Is(err, errNudgeCancelled):
 			f.log.Debug(errNudgeCancelled.Error())
@@ -251,7 +267,12 @@ func (f *firstPrompt) deliver(prompt string) error {
 	// Before the draft clear: vim NORMAL has to reach INSERT first. The nudge
 	// runs the same step again, which presses nothing once in INSERT.
 	// The first Submit inherits this lock, so the clear and the first type are one unit.
-	release, err := lockTyping(f.p, f.id, f.cancel)
+	unlock, err := lockTyping(f.p, f.id, f.cancel)
+	if err != nil {
+		return err
+	}
+	// The batch ends with the first Submit's Enter, or on any error return.
+	release, err := holdInput(c, unlock)
 	if err != nil {
 		return err
 	}
@@ -450,10 +471,14 @@ func (p *holderPrompter) acquire() (func(), error) {
 	if p.held != nil {
 		return p.releaseHeld, nil
 	}
-	if p.lock == nil {
-		return func() {}, nil
+	release := func() {}
+	if p.lock != nil {
+		var err error
+		if release, err = p.lock(); err != nil {
+			return nil, err
+		}
 	}
-	return p.lock()
+	return holdInput(p.c, release)
 }
 
 func (p *holderPrompter) cancelled() error {
@@ -545,14 +570,14 @@ func (p *holderPrompter) Clear() error {
 	if err := p.cancelled(); err != nil {
 		return err
 	}
-	return p.c.SendKeys(p.typing.ClearKey())
+	return p.c.Batch(func() error { return p.c.SendKeys(p.typing.ClearKey()) })
 }
 
 func (p *holderPrompter) SendEnter() error {
 	if err := p.cancelled(); err != nil {
 		return err
 	}
-	return p.submitKey()
+	return p.c.Batch(p.submitKey)
 }
 
 // firstPrompter is the first prompt's Prompter. A turn has started once the
