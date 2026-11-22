@@ -61,9 +61,7 @@ func Failures(dataDir, logPath, test string, w io.Writer) int {
 	fmt.Fprintf(w, "%d failed (%s)\n", len(failures), toolName)
 	renderUnitsText(w, failures, len(failures), nil, fullText)
 	if test != "" {
-		if re := tool.RerunArgs(nil, failures); re != nil {
-			fmt.Fprintln(w, rerunLine(toolName, "", re))
-		}
+		printRerun(w, tool, "", nil, failures)
 	}
 	fmt.Fprintln(w, logPath)
 	return ExitFail

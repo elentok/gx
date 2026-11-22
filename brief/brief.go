@@ -505,9 +505,7 @@ func report(tool Tool, o Options, outcome Outcome, out []byte, e indexEntry) int
 		} else {
 			fmt.Fprintf(o.Out, "FAIL %s: %d failed in %s\n", tool.Name(), len(outcome.Failures), dur)
 			renderUnitsWith(o.Out, outcome.Failures, maxFullUnits, func(u Unit) { renderSnapshot(o.Out, outcome, u) })
-			if re := tool.RerunArgs(o.Args, outcome.Failures); re != nil {
-				fmt.Fprintln(o.Out, rerunLine(tool.Name(), o.CDir, re))
-			}
+			printRerun(o.Out, tool, o.CDir, o.Args, outcome.Failures)
 		}
 		renderSlowest(tool, o.Out, outcome.TestDurations)
 		fmt.Fprintln(o.Out, e.Log)

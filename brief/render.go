@@ -7,6 +7,7 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 )
 
@@ -318,16 +319,34 @@ func rawHead(w io.Writer, out []byte) {
 // otherwise print a name filter of thousands of characters.
 const maxRerunChars = 1000
 
-// rerunLine builds the copy-ready command that re-runs only the failures.
-func rerunLine(tool string, cDir string, args []string) string {
-	line := fullRerunLine(tool, cDir, args)
-	if len(line) > maxRerunChars {
-		return "too many failing tests to list a re-run command; use `gx brief failures <log> <test>` for one"
+// printRerun prints the copy-ready command that re-runs only the failures.
+// Past the cap it re-runs the largest prefix of failures that fits, since the
+// long part is one name-filter argument that cannot be sliced.
+func printRerun(w io.Writer, tool Tool, cDir string, callerArgs []string, failures []Unit) {
+	build := func(n int) string {
+		re := tool.RerunArgs(callerArgs, failures[:n])
+		if re == nil {
+			return ""
+		}
+		return rerunLine(tool.Name(), cDir, re)
 	}
-	return line
+	line := build(len(failures))
+	if line == "" || len(line) <= maxRerunChars {
+		if line != "" {
+			fmt.Fprintln(w, line)
+		}
+		return
+	}
+	n := sort.Search(len(failures), func(i int) bool { return len(build(i+1)) > maxRerunChars })
+	if n == 0 {
+		fmt.Fprintln(w, "too many failing tests to list a re-run command; use `gx brief failures <log> <test>` for one")
+		return
+	}
+	fmt.Fprintf(w, "%s\n(first %d of %d failing tests; use `gx brief failures <log> <test>` for the rest)\n", build(n), n, len(failures))
 }
 
-func fullRerunLine(tool string, cDir string, args []string) string {
+// rerunLine builds the copy-ready command for the given rerun args.
+func rerunLine(tool string, cDir string, args []string) string {
 	parts := []string{"gx", "brief"}
 	if cDir != "" {
 		parts = append(parts, "-C", shellQuote(cDir))

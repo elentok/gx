@@ -124,14 +124,41 @@ func TestRenderUnits_ManyFailuresWithOneCauseShowTheCauseOnce(t *testing.T) {
 	}
 }
 
-func TestRerunLine_IsCappedInLength(t *testing.T) {
+func vitestUnits(n int) []Unit {
 	var units []Unit
-	for i := range 100 {
+	for i := range n {
 		units = append(units, Unit{Location: "a.test.ts", Name: fmt.Sprintf("test number %d", i), Text: "x"})
 	}
-	got := rerunLine("vitest", "", Vitest{}.RerunArgs(nil, units))
-	if len(got) > maxRerunChars+200 || strings.Contains(got, "test number 50") {
-		t.Errorf("rerun hint not capped (%d chars): %.200s", len(got), got)
+	return units
+}
+
+func TestPrintRerun_CapsToFirstNFailures(t *testing.T) {
+	units := vitestUnits(100)
+	var w bytes.Buffer
+	printRerun(&w, Vitest{}, "", nil, units)
+	cmd, note, _ := strings.Cut(w.String(), "\n")
+	if len(cmd) > maxRerunChars {
+		t.Errorf("command is %d chars, cap %d", len(cmd), maxRerunChars)
+	}
+	if !strings.Contains(cmd, "test number 0") || strings.Contains(cmd, "test number 99") {
+		t.Errorf("command should name the first failures only: %.200s", cmd)
+	}
+	n := strings.Count(cmd, "test number")
+	if want := fmt.Sprintf("(first %d of 100 failing tests; use `gx brief failures <log> <test>` for the rest)\n", n); note != want {
+		t.Errorf("note = %q, want %q", note, want)
+	}
+	if next := rerunLine("vitest", "", Vitest{}.RerunArgs(nil, units[:n+1])); len(next) <= maxRerunChars {
+		t.Errorf("prefix of %d is not the largest that fits", n)
+	}
+}
+
+func TestPrintRerun_UnderCapPrintsFullCommandWithoutNote(t *testing.T) {
+	units := vitestUnits(2)
+	var w bytes.Buffer
+	printRerun(&w, Vitest{}, "", nil, units)
+	want := rerunLine("vitest", "", Vitest{}.RerunArgs(nil, units)) + "\n"
+	if w.String() != want {
+		t.Errorf("printRerun = %q, want %q", w.String(), want)
 	}
 }
 
