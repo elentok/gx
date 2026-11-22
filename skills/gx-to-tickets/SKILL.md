@@ -288,8 +288,8 @@ to each claim:
   test-run time cap.
 - **Behaviour that must not change**: list one seam per state or variant of that behaviour, not only
   the ones the ticket edits.
-- **Line numbers**: when a ticket points at code, name a symbol, not a line. Lines move; symbols
-  stay.
+- **Line numbers**: name a symbol, not a line. Check the premises in [premises](premises.md) too:
+  run each named flow on the base, label unrun facts `unverified`.
 
 A lint proves that a name exists, not that a setup works. A seam that names a real fake can still be
 wrong, so the judgment rules above stay your job.
@@ -525,7 +525,7 @@ part has no `## Mock check`. A fix ticket for a look or layout finding also gets
 
 ## Acceptance criteria
 
-- [ ] Acceptance criterion 1
+- [ ] Acceptance criterion 1 (name the flow number or test name; label unrun premises `unverified`)
 - [ ] Acceptance criterion 2
 ```
 

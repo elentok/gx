@@ -94,6 +94,8 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"to-tickets changed label names e2e flows", "gx-to-tickets/SKILL.md", []string{"name the e2e flows to run"}},
 		{"to-tickets bundled and implement-only seams", "gx-to-tickets/SKILL.md", []string{"Every `implement` ticket", "5 or more"}},
 		{"to-tickets lint", "gx-to-tickets/SKILL.md", []string{"lint-claims", "--allow-claim-misses", "name a symbol"}},
+		{"to-tickets premises", "gx-to-tickets/SKILL.md", []string{"](premises.md)", "name the flow number or test name"}},
+		{"to-tickets premises rules", "gx-to-tickets/premises.md", []string{"# Check the premises", "Run it on the base", "`unverified`", "Search strings, not line numbers", "Shared file ordering"}},
 		{"to-tickets estimate", "gx-to-tickets/SKILL.md", []string{"1.12", "1.28", "0.83", "60K"}},
 		{"to-tickets calibration", "gx-to-tickets/SKILL.md", []string{"gx tickets calibration", "0.83"}},
 		{"to-tickets publish", "gx-to-tickets/SKILL.md", []string{"gx tickets publish", "--manifest", "--dry-run", "{{slug}}"}},
