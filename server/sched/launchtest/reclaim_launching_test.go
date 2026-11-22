@@ -33,7 +33,18 @@ func (l *launchSpy) Start(opts agentrunner.StartOptions) (agentrunner.Session, e
 	l.mu.Lock()
 	l.atStart = readRuns(nil, l.runsJSON)
 	l.mu.Unlock()
+	if opts.Mark != nil {
+		opts.Mark(agentrunner.MarkSpawned)
+		opts.Mark(agentrunner.MarkDialed)
+	}
 	return l.Runner.Start(opts)
+}
+
+// PromptLaunch reports the marks the pty runner reports around a launch prompt.
+func (l *launchSpy) PromptLaunch(ctx context.Context, s agentrunner.Session, text string, onNudge func(string)) error {
+	agentrunner.LaunchMark(ctx, agentrunner.MarkTyped)
+	agentrunner.LaunchMark(ctx, agentrunner.MarkEchoed)
+	return agentrunner.PromptNudged(l.Runner, s, text, onNudge)
 }
 
 // readRuns decodes runs.json; t may be nil off the test goroutine, where a

@@ -62,6 +62,32 @@ type StartOptions struct {
 	// a sentence in its developer instructions. Claude gets its note through
 	// the prompt file in Args instead.
 	NoteFile string
+	// Mark, when set, is called as Start passes a named point of the launch
+	// (see the Mark* constants), so a caller can time the parts of the start.
+	Mark func(name string)
+}
+
+// Launch marks a runner reports while it starts an agent and delivers the
+// launch prompt.
+const (
+	MarkSpawned = "spawn" // holder process started
+	MarkDialed  = "dial"  // holder socket answered
+	MarkTyped   = "idle"  // pane ready, launch prompt typed
+	MarkEchoed  = "echo"  // transcript shows the launch prompt
+)
+
+type launchMarkKey struct{}
+
+// WithLaunchMark makes PromptLaunch report its marks to mark.
+func WithLaunchMark(ctx context.Context, mark func(name string)) context.Context {
+	return context.WithValue(ctx, launchMarkKey{}, mark)
+}
+
+// LaunchMark reports name to the mark function ctx carries, if any.
+func LaunchMark(ctx context.Context, name string) {
+	if mark, _ := ctx.Value(launchMarkKey{}).(func(string)); mark != nil {
+		mark(name)
+	}
 }
 
 type Status struct {

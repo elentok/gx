@@ -78,8 +78,13 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	if err := pr.Submit(text); err != nil {
 		return notDelivered(err)
 	}
+	agentrunner.LaunchMark(ctx, agentrunner.MarkTyped)
 	if codex {
-		return p.proveCodexLaunch(ctx, ss, pr, firstUser, text, onNudge)
+		err := p.proveCodexLaunch(ctx, ss, pr, firstUser, text, onNudge)
+		if err == nil {
+			agentrunner.LaunchMark(ctx, agentrunner.MarkEchoed)
+		}
+		return err
 	}
 	proof := claudeui.LaunchProof{
 		FirstUser:   firstUser,
@@ -113,6 +118,7 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 		return err
 	}
 	// The command is in the transcript; a launch prompt must also start a turn.
+	agentrunner.LaunchMark(ctx, agentrunner.MarkEchoed)
 	started, err := pr.WaitStart(p.promptGrace())
 	switch {
 	case errors.Is(err, errPersonInput):
@@ -231,7 +237,7 @@ func (l ptyLauncher) launchCaps() claudeui.LaunchProofCaps {
 
 // launch connects to the holder ss started, records meta.json and waits for
 // claude to turn idle.
-func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Kind) error {
+func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Kind, mark func(string)) error {
 	h, err := harness.Lookup(kind)
 	if err != nil {
 		return err
@@ -247,6 +253,9 @@ func (l ptyLauncher) launch(ss *ptySession, dir, cwd string, kind agentrunner.Ki
 		if err := l.launchTick(ss, dir, deadline, "holder.sock never answered"); err != nil {
 			return err
 		}
+	}
+	if mark != nil {
+		mark(agentrunner.MarkDialed)
 	}
 	procs := proctable.OrPS(l.procs)
 	holderProc, ok, err := procs.Lookup(ss.holderPID)

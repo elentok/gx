@@ -143,6 +143,9 @@ func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) 
 	if err != nil {
 		return agentrunner.Session{}, err
 	}
+	if opts.Mark != nil {
+		opts.Mark(agentrunner.MarkSpawned)
+	}
 	ss := &ptySession{
 		session:   agentrunner.Session{Label: opts.Label, ID: opts.Label, SessionID: sessionID},
 		epic:      opts.Epic,
@@ -154,7 +157,7 @@ func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) 
 		_ = cmd.Wait()
 		close(ss.exited)
 	}()
-	if err := l.launch(ss, dir, opts.Cwd, ptyKind(opts)); err != nil {
+	if err := l.launch(ss, dir, opts.Cwd, ptyKind(opts), opts.Mark); err != nil {
 		killLaunch(ss.claudePID, ss.holderPID)
 		<-ss.exited
 		return agentrunner.Session{}, err

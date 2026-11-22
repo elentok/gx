@@ -108,13 +108,28 @@ type TrackedRun struct {
 	// when it ends. Never saved.
 	LaunchTimings LaunchTimings `json:"-"`
 	stepSince     time.Time
+	partSince     time.Time
 }
 
 // LaunchTimings is the time spent in each launch step. A step entered again
 // (a prompt retry) adds up.
 type LaunchTimings struct {
 	Worktree, Deps, Agent, Prompt time.Duration
+	// AgentParts and PromptParts split the Agent and Prompt steps by the marks
+	// the runner reported (see Registry.MarkLaunch). The time after the last
+	// mark of a step is booked to PartReady (agent) or PartTurn (prompt).
+	AgentParts, PromptParts map[string]time.Duration
 }
+
+// Launch parts: the marks the runner reports, and the time left after them.
+const (
+	PartSpawn = "spawn" // agent: holder process started
+	PartDial  = "dial"  // agent: holder socket answered
+	PartReady = "ready" // agent: agent turned idle
+	PartIdle  = "idle"  // prompt: pane idle and input empty, prompt typed
+	PartEcho  = "echo"  // prompt: transcript shows the prompt
+	PartTurn  = "turn"  // prompt: turn started
+)
 
 // Total is the claim to prompt delivered time: the four steps back to back.
 func (l LaunchTimings) Total() time.Duration { return l.Worktree + l.Deps + l.Agent + l.Prompt }
@@ -598,6 +613,41 @@ func (r *Registry) EndLaunch(address string) (LaunchTimings, bool) {
 	return t.LaunchTimings, true
 }
 
+// MarkLaunch books the time since the step or the previous mark to part of the
+// open step. A run with no open agent or prompt step is left alone.
+func (r *Registry) MarkLaunch(address, part string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.runs[address]
+	if !ok {
+		return
+	}
+	t.bookPart(part, time.Now())
+	r.runs[address] = t
+}
+
+// bookPart adds the time since the last mark to part of the open step.
+func (t *TrackedRun) bookPart(part string, now time.Time) {
+	var parts *map[string]time.Duration
+	switch t.LaunchStep {
+	case StepStartingAgent:
+		parts = &t.LaunchTimings.AgentParts
+	case StepSendingPrompt:
+		parts = &t.LaunchTimings.PromptParts
+	default:
+		return
+	}
+	since := t.partSince
+	if since.IsZero() {
+		since = t.stepSince
+	}
+	if *parts == nil {
+		*parts = map[string]time.Duration{}
+	}
+	(*parts)[part] += now.Sub(since)
+	t.partSince = now
+}
+
 // moveStep books the time since the step began to it and enters step.
 func (t *TrackedRun) moveStep(step LaunchStep) {
 	now := time.Now()
@@ -605,8 +655,14 @@ func (t *TrackedRun) moveStep(step LaunchStep) {
 	if since.IsZero() {
 		since = t.StartedAt
 	}
+	switch t.LaunchStep {
+	case StepStartingAgent:
+		t.bookPart(PartReady, now)
+	case StepSendingPrompt:
+		t.bookPart(PartTurn, now)
+	}
 	t.LaunchTimings.add(t.LaunchStep, now.Sub(since))
-	t.stepSince, t.LaunchStep = now, step
+	t.stepSince, t.partSince, t.LaunchStep = now, now, step
 }
 
 // Put stores t at t.Address as given, replacing any entry there.
@@ -624,7 +680,7 @@ func (r *Registry) Replace(t TrackedRun) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	old := r.runs[t.Address]
-	t.LaunchStep, t.LaunchTimings, t.stepSince = old.LaunchStep, old.LaunchTimings, old.stepSince
+	t.LaunchStep, t.LaunchTimings, t.stepSince, t.partSince = old.LaunchStep, old.LaunchTimings, old.stepSince, old.partSince
 	r.runs[t.Address] = t
 	r.save()
 }

@@ -182,7 +182,9 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 	}
 	start := func() (agentrunner.Session, error) {
 		l.setLaunchStep(ticket.String(), runs.StepStartingAgent)
-		launched, err := startprompt.StartAndPrompt(ctx, deps.Runner, agentrunner.StartOptions{
+		mark := func(part string) { l.Registry.MarkLaunch(ticket.String(), part) }
+		launched, err := startprompt.StartAndPrompt(agentrunner.WithLaunchMark(ctx, mark), deps.Runner, agentrunner.StartOptions{
+			Mark:            mark,
 			NoAdopt:         true,
 			Label:           label,
 			Epic:            ticket.Epic,
@@ -261,6 +263,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 		ev := runlog.Event{
 			Type: string(events.LaunchTimed), Label: label, Path: path, Total: timings.Total(),
 			WorktreeStep: timings.Worktree, DepsStep: timings.Deps, AgentStep: timings.Agent, PromptStep: timings.Prompt,
+			AgentParts: timings.AgentParts, PromptParts: timings.PromptParts,
 		}
 		if tr, found := l.Registry.Tracked(ticket.String()); found {
 			ev.ClaimedAt = tr.StartedAt

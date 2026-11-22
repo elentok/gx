@@ -183,6 +183,10 @@ type Event struct {
 	DepsStep     time.Duration `json:"deps_ns,omitempty"`
 	AgentStep    time.Duration `json:"agent_ns,omitempty"`
 	PromptStep   time.Duration `json:"prompt_ns,omitempty"`
+	// AgentParts and PromptParts split AgentStep and PromptStep by part name
+	// (launch-timed only). Events from before the split have none.
+	AgentParts  map[string]time.Duration `json:"agent_parts_ns,omitempty"`
+	PromptParts map[string]time.Duration `json:"prompt_parts_ns,omitempty"`
 }
 
 // eventLogMu serializes appends across every goroutine in the process (each

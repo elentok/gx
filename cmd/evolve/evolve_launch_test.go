@@ -30,8 +30,11 @@ func TestEvolveInputs_LaunchRows(t *testing.T) {
 	base := inputsTable(t, inputsFixture(t))
 
 	table := inputsTable(t, f)
-	if len(table.Launches) != 2 {
-		t.Fatalf("launches = %+v, want rows for 01 and 02 and no median (median is under the limit)", table.Launches)
+	if len(table.Launches) != 3 {
+		t.Fatalf("launches = %+v, want rows for 01 and 02 and the median", table.Launches)
+	}
+	if got := table.Launches[2]; got.Ticket != "" || got.TotalMS != 11_500 {
+		t.Errorf("median row = %+v, want no ticket and 11500ms (under the slow limit)", got)
 	}
 	if got := table.Launches[0]; got.Ticket != "01" || got.TotalMS != 40_000 || got.SlowestStep != "deps" {
 		t.Errorf("first row = %+v, want 01, 40000ms, deps", got)
@@ -43,6 +46,26 @@ func TestEvolveInputs_LaunchRows(t *testing.T) {
 	}
 	if len(base.Launches) != 0 {
 		t.Errorf("no launch events gave rows %+v", base.Launches)
+	}
+}
+
+func TestEvolveInputs_LaunchRowNamesSlowestPart(t *testing.T) {
+	t.Parallel()
+	f := inputsFixture(t)
+	ev := runlog.Event{
+		Type: string(events.LaunchTimed), Ticket: "01", Total: 40 * time.Second, AgentStep: 30 * time.Second, PromptStep: 10 * time.Second,
+		AgentParts:  map[string]time.Duration{"spawn": time.Second, "dial": 2 * time.Second, "ready": 27 * time.Second},
+		PromptParts: map[string]time.Duration{"idle": 2 * time.Second, "echo": 8 * time.Second},
+	}
+	if err := runlog.AppendEvent(filepath.Dir(f.epic), "epic", ev); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runEvolveInputs(f.env, &out, "proj:epic", false); err != nil {
+		t.Fatal(err)
+	}
+	if want := "launch: 01 40s, slowest step agent (ready 27s)"; !strings.Contains(out.String(), want) {
+		t.Errorf("output missing %q:\n%s", want, out.String())
 	}
 }
 

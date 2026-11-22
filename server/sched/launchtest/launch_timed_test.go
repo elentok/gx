@@ -34,6 +34,40 @@ func TestLaunchTimed_ADeliveredLaunchLogsOneEventWhoseStepsSumToTheTotal(t *test
 	}
 }
 
+func TestLaunchTimed_TheAgentAndPromptStepsSplitIntoPartsThatSumToThem(t *testing.T) {
+	t.Parallel()
+	spy := &launchSpy{Runner: runnerfake.NewRunner()}
+	h := launchOne(t, spy, wire.EventIterationStarted)
+	t.Cleanup(func() { spy.Finish("epic-a-iter-01") })
+	timed := ofType(runLog(t, h), events.LaunchTimed)
+	if len(timed) != 1 {
+		t.Fatalf("launch-timed = %+v, want one", timed)
+	}
+	ev := timed[0]
+	for _, c := range []struct {
+		step  string
+		total time.Duration
+		parts map[string]time.Duration
+		names []string
+	}{
+		{"agent", ev.AgentStep, ev.AgentParts, []string{"spawn", "dial", "ready"}},
+		{"prompt", ev.PromptStep, ev.PromptParts, []string{"idle", "echo", "turn"}},
+	} {
+		var sum time.Duration
+		for _, d := range c.parts {
+			sum += d
+		}
+		if len(c.parts) != len(c.names) || sum != c.total {
+			t.Errorf("%s parts = %v, want %v summing to %v", c.step, c.parts, c.names, c.total)
+		}
+		for _, n := range c.names {
+			if _, ok := c.parts[n]; !ok {
+				t.Errorf("%s parts = %v, missing %q", c.step, c.parts, n)
+			}
+		}
+	}
+}
+
 func TestLaunchTimed_ASlowInstallCountsInTheDepsStep(t *testing.T) {
 	t.Parallel()
 	const wait = 200 * time.Millisecond
