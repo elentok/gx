@@ -111,9 +111,8 @@ test("41. Phone, Design draft page", async ({ page, start }) => {
   expect(promptBox.y + promptBox.height).toBeLessThanOrEqual(foot.y)
 
   // The footer is the paperclip, Remove, and Start design at its right edge, each at natural width.
-  const pad = 12
   expect(c.x + c.width).toBeLessThanOrEqual(rm.x)
-  expect(s.x + s.width).toBeCloseTo(foot.x + foot.width - pad, 0)
+  expect(s.x + s.width).toBeCloseTo(foot.x + foot.width, 0)
   // Natural width: the label plus the button's padding, far short of the stretched half the footer once gave it.
   const content = await d.start.evaluate((el) => {
     const range = document.createRange()
