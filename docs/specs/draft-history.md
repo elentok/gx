@@ -42,7 +42,7 @@ The server keeps three lists of the latest 50 entries: Chat drafts, Design draft
 ### Opening the History popup
 
 24. As a person on a draft page, I want a History button in the title row beside the "Saved" status, so that I find the history where I write.
-25. As a person in a composer, I want a History button between Add and Note, so that it sits with the other composer tools.
+25. As a person in a composer, I want a History button right after Add (before Note where the composer has one), so that it sits with the other composer tools.
 26. As a person on a phone, I want the History button to be icon only (44 px in a composer), so that the row of buttons fits.
 27. As a keyboard user, I want Leader then `h` to open the same popup on a draft page or on the page of a chat or a Design (by the session rule above), so that I do not need the mouse.
 28. As a person, I want the Chord box to list `h  History` after the existing rows on those pages, and not on other pages, so that the box shows only what works.
@@ -100,7 +100,7 @@ Look, from the approved mock `02-history-popup-look`:
 
 - Variant A, the Palette dialog: centered, 640 px wide, at most 480 px tall, over a scrim, like the Jump menu. Title row "<list name> · newest first", a filter field with a search icon, two-line rows, and a hint line (up and down pick, Enter restore, Esc close, "N of 50").
 - Phone: a bottom sheet with the same title, filter and rows, plus Close and Restore buttons.
-- History button on a draft page: in the title row beside the "Saved" status, with a clock icon and the text "History", icon only on a phone. In a composer: between Add and Note, icon only on a phone (44 px, like Note).
+- History button on a draft page: in the title row beside the "Saved" status, with a clock icon and the text "History", icon only on a phone. In a composer: right after Add, before Note where the composer has one (the Design composer; the chat composer has no Note), icon only on a phone (44 px, like Note).
 - Chord box: a row `h  History` after the existing rows.
 
 Implementer's picks (the map does not decide them):
@@ -156,7 +156,7 @@ Entries:
 22. Go test at the history store with a small cap: entries with images are saved until the sum passes the cap. The oldest entries go (text and images) and the list's image bytes stay at or under the cap.
 23. Go test at the history store with a small cap: one entry whose images alone pass the cap keeps its text, keeps no images and is marked. The Popup flow shows the seeded marked row with "images not kept".
 24. Mock states `design-draft-wide` and `chat-draft-wide`. The Popup flow also checks the History button sits in the title row beside "Saved".
-25. Mock state `chat-composer-wide`. The Popup flow checks the button sits between Add and Note in the chat composer and in the Design composer.
+25. Mock state `chat-composer-wide`. The chat composer has an icon-only Add and no Note, so the Popup flow checks the button sits right after Add there. In the Design composer it checks the button sits between Add and Note.
 26. Mock states `design-draft-phone` and `design-composer-phone`. The button is icon only, and 44 px in the composer.
 27. Popup flow: Leader then `h` opens the popup on each of the four pages. Mock state `chord-box`. Existing flow "Chords" in `chords.e2e.ts` still passes with the new row.
 28. Mock state `chord-box` for the `h  History` row. Popup flow: on the Epics page and on a Queue agent and a Fix agent page the row does not show and `h` does nothing. Vitest on the chord's `available` rule.
