@@ -1275,14 +1275,21 @@ test("a request made after ready is not kept for the next span", async () => {
 })
 
 test("a request pending from an earlier span is timed from this span's start", async () => {
+  // The test owns the clock: request at 1000, span start at 1080, span end at 1130.
+  let now = 1000
+  const readyAt = 1130
+  vi.spyOn(performance, "now").mockImplementation(() => now)
+  vi.spyOn(performance, "mark").mockImplementation(
+    (name) => ({ name, startTime: name === "route_ready" ? readyAt : now }) as PerformanceMark,
+  )
   const router = renderSpans("/slow")
   await screen.findByText("slow")
   const finish = noteApiRequest()
-  await new Promise((r) => setTimeout(r, 80))
+  now = 1080
   await act(() => router.navigate("/tips"))
   finish()
   await waitFor(() => expect(sampled).toHaveBeenCalledTimes(1))
-  expect(samples()[0].api_latency).toBeLessThan(40)
+  expect(samples()[0]).toMatchObject({ metric: "route_ready", value: 50, api_latency: 50 })
 })
 
 test("a known redirect is one span for the final route", async () => {
