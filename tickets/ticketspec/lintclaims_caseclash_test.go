@@ -15,7 +15,12 @@ func TestCaseClash(t *testing.T) {
 	}{
 		{"same stem, other extension", "Foo.tsx", "Foo.css", ""},
 		{"same stem, test suffix", "Foo.tsx", "Foo.test.tsx", ""},
-		{"same stem, different case and extension", "foo.tsx", "Foo.ts", ""},
+		{"same stem, different case and extension", "foo.tsx", "Foo.ts", "foo.tsx"},
+		{"js beside jsx", "foo.jsx", "Foo.js", "foo.jsx"},
+		{"mts beside ts", "taskCommand.ts", "TaskCommand.mts", "taskCommand.ts"},
+		{"exact stem, other TS extension", "foo.ts", "foo.tsx", ""},
+		{"css beside tsx", "foo.tsx", "Foo.css", ""},
+		{"go beside md", "Foo.md", "foo.go", ""},
 		{"case-only difference", "Foo.tsx", "foo.tsx", "Foo.tsx"},
 	}
 	for _, tc := range cases {

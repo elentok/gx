@@ -255,17 +255,34 @@ func hasExactName(path string) bool {
 	return false
 }
 
+// tsFamilyExts are the extensions TypeScript treats as one namespace: it rejects
+// two files whose names differ only in case (TS1149) whatever their extension.
+var tsFamilyExts = map[string]bool{".ts": true, ".tsx": true, ".js": true, ".jsx": true, ".mts": true, ".cts": true}
+
 // caseClash returns the name of a sibling of the missing path that matches its
-// full base name case-insensitively but not exactly (foo.tsx beside Foo.tsx), or "".
+// full base name case-insensitively but not exactly (foo.tsx beside Foo.tsx), or
+// that differs only by stem case when both are in the TS/JS family (taskCommand.ts
+// beside TaskCommand.tsx), or "".
 func caseClash(path string) string {
 	entries, err := os.ReadDir(filepath.Dir(path))
 	if err != nil {
 		return ""
 	}
 	want := filepath.Base(path)
+	wantExt := filepath.Ext(want)
+	wantStem := strings.TrimSuffix(want, wantExt)
 	for _, e := range entries {
-		if !e.IsDir() && e.Name() != want && strings.EqualFold(e.Name(), want) {
-			return e.Name()
+		name := e.Name()
+		if e.IsDir() || name == want {
+			continue
+		}
+		if strings.EqualFold(name, want) {
+			return name
+		}
+		ext := filepath.Ext(name)
+		stem := strings.TrimSuffix(name, ext)
+		if tsFamilyExts[wantExt] && tsFamilyExts[ext] && stem != wantStem && strings.EqualFold(stem, wantStem) {
+			return name
 		}
 	}
 	return ""
