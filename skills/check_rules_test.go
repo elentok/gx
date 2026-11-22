@@ -135,9 +135,9 @@ func TestCheckRulesAnchors(t *testing.T) {
 
 func TestSectionReadUsesTicketsFlag(t *testing.T) {
 	checkAnchors(t, "gx-verify-epic/SKILL.md",
-		"gx tickets show <epic> --section Results --tickets 31-46", "A hand-built loop over")
+		"gx tickets show <epic> --section Results --tickets 31-46", "hand-built `sed` or `head` loops over")
 	checkAnchors(t, "gx-code-review/SKILL.md",
-		`gx tickets show <epic> --section "Spec deviations"`, "--tickets", "A hand-built loop over")
+		`gx tickets show <epic> --section "Spec deviations"`, "--tickets", "hand-built `sed` or `head` loops over")
 }
 
 func TestCheckRulesAbsences(t *testing.T) {
