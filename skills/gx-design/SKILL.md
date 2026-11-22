@@ -170,7 +170,7 @@ the ticket title during `resolve-tickets`.
    the map body (Destination, Decisions so far) and each closed ticket's title and resolution gist,
    not full ticket bodies. Also seed it with the list of stored mocks under `<root>/<map>/mocks/`.
    The spec is where the map's gaps first show, so tell the subagent to sort
-   every fact the map never decided. When you hand the spec to the person, give its path as a `gx files url <path>` link, and never start an HTTP server:
+   every fact the map never decided:
    - **Implementer's choice** (a name, a config key, an internal marker only): the spec says the
      implementer picks it, and moves on.
    - **Design question** (behaviour, scope, parity, which runners or harnesses it covers): the
@@ -178,6 +178,8 @@ the ticket title during `resolve-tickets`.
    - **Fact that needs a real run, a probe, a prototype or a proof of concept** (how a tool or
      process behaves): a design question, never an implementer's choice. The spec never says the
      implementer confirms, checks or verifies it; the impl epic starts with no open question.
+
+   You, not the spec subagent, hand the spec to the person: give its path as a `gx files url <path>` link, and never start an HTTP server.
 
    If it returns design questions with suggested answers, grill the person in this same session
    (`gx-grilling`), then dispatch the subagent again with the answers. Continuing the same subagent
