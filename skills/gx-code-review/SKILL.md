@@ -192,8 +192,11 @@ re-run searches the reviewers already ran. Ask it to:
 - Never reject a finding whose reason is to amend the spec or docs (for example "change the spec
   wording rather than the code"): the edit still has to happen, and a rejection files nothing.
   Verdict it **approved** or **deferred**, and name the spec or docs edit as the fix.
-- For each deferred finding, also give a target (`gx` for a gx tooling finding, else `<project>`)
-  and a `category` (`bug` for a defect, else `idea`). Group deferred findings that name the same fix;
+- For each deferred finding, also give a target and a `category` (`bug` for a defect, else `idea`).
+  The target is the real project name, taken from the epic address of the ticket under review
+  (the part before the colon). Use `gx` only when the finding passes the
+  [routing test](../gx-local-tracker.md) ("would this still exist if the epic had never been
+  authored?": yes means gx tooling). Never write the word `project` as the target. Group deferred findings that name the same fix;
   a group counts as one problem, so it files as one follow-up.
 
 The consultant only advises: it must not edit anything. Its output is the input to steps 6 and 7.
@@ -234,7 +237,9 @@ If the consultant approved zero findings, skip this step entirely; there's nothi
 ## 6. File deferred findings as follow-ups
 
 For each deferred group, call the `gx-follow-up` skill, `unattended`, passing the consultant's target
-and category, and the group as the finding. Its Source names this epic and this code-review ticket's
+and category unchanged, and the group as the finding. Never replace them with another project (not
+`gx`, not this epic's project). If the target is not a registered project, leave it out so
+`gx-follow-up` applies its own routing test. Its Source names this epic and this code-review ticket's
 address. Its normal dedupe applies, so a group may be appended to an existing follow-up or dropped
 against an archived one. Note the address it reports for each group.
 

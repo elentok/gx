@@ -60,6 +60,9 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"code-review test gaps and verified facts", "gx-code-review/SKILL.md", []string{
 			"Open verify tickets own test gaps", "no open verify ticket covers that story", "consultant's verified facts",
 		}},
+		{"code-review follow-up target", "gx-code-review/SKILL.md", []string{
+			"real project name", "[routing test](../gx-local-tracker.md)", "Never write the word `project`", "category unchanged", "Never replace them",
+		}},
 		{"tdd", "gx-tdd/SKILL.md", []string{"](../gx-failing-tests.md)", "-count=20"}},
 		{"verify", "gx-verify/SKILL.md", []string{
 			"gx check --staged", "`0`: pass", "`1`: fail", "`2`: could not run", "`3`: no applicable checks",
