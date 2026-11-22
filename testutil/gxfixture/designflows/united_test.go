@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil"
 )
 
 // cardsOf is `gx server epics --json`.
@@ -107,18 +108,14 @@ func TestDesignJoinedScenario_CardReadsCreatingTicketsAtThatStep(t *testing.T) {
 	r := start(t, "design-joined")
 	r.Gx(t, "tickets", "set", designAddr, "--design-step", "create-tickets")
 	var got wire.EpicListRow
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
+	testutil.Poll(10*time.Second, 200*time.Millisecond, func() bool {
 		for _, c := range r.cardsOf(t) {
 			if slices.Contains(c.Addresses, designAddr) {
 				got = c
 			}
 		}
-		if got.WorkingWord == "Creating tickets" {
-			break
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
+		return got.WorkingWord == "Creating tickets"
+	})
 	if !got.Working || got.WorkingWord != "Creating tickets" {
 		t.Errorf("card working=%v word=%q status=%q, want working Creating tickets", got.Working, got.WorkingWord, got.StatusWords)
 	}
