@@ -918,22 +918,23 @@ test("a Design in Needs you reads waiting, even past Branch with no joined card 
 })
 
 test.each([
-  ["running", "running", true],
-  ["merging", "running", true],
-  ["writing-pr-text", "running", true],
-  ["fixing-ci", "running", true],
-  ["finished", "done", false],
-  ["paused", "muted", false],
+  ["running", true, "running", true],
+  ["merging", true, "running", true],
+  ["writing-pr-text", true, "running", true],
+  ["fixing-ci", true, "running", true],
+  ["a state the client has no name for", true, "running", true],
+  ["finished", false, "done", false],
+  ["paused", false, "muted", false],
 ])(
-  "an -impl page whose state is %s (card shows the Design) uses its own kind and tone",
-  async (state, tone, comet) => {
+  "an -impl page whose state is %s, working %s (card shows the Design) uses its own kind and tone",
+  async (state, working, tone, comet) => {
     const card = row("blog-impl", {
       card_kind: "design",
       state: "paused",
       addresses: ["gx:blog", "gx:blog-impl"],
     })
     render("/e/gx:blog-impl", [card], "loop", {
-      detail: { state: state as EpicDetail["state"], done: 2, total: 7 },
+      detail: { state: state as EpicDetail["state"], working, done: 2, total: 7 },
     })
     expect(await screen.findByText("2/7")).toBeTruthy()
     expect(ringOf().getAttribute("data-kind")).toBe("implementation")

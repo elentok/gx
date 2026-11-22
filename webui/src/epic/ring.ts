@@ -1,10 +1,6 @@
 import { liveSessions } from "../design/view"
 import {
   EpicStateFinished,
-  EpicStateMerging,
-  EpicStateRunning,
-  EpicStateWritingPRText,
-  EpicStateFixingCI,
   MapStepDone,
   ProgressDone,
   SectionNeedsYou,
@@ -36,18 +32,6 @@ function designTone(d: EpicDetail, sessions: SessionInfo[]): Pick<PageRing, "ton
   return live.length > 0 ? { tone: "running", live: false } : { tone: "muted", live: false }
 }
 
-const LIVE_LOOP_STATES: string[] = [
-  EpicStateRunning,
-  EpicStateMerging,
-  EpicStateWritingPRText,
-  EpicStateFixingCI,
-]
-
-function loopTone(d: EpicDetail): Pick<PageRing, "tone" | "live"> {
-  if (LIVE_LOOP_STATES.includes(d.state ?? "")) return { tone: "running", live: true }
-  return { tone: d.state === EpicStateFinished ? "done" : "muted", live: false }
-}
-
 /** The ring of an epic page. `card` is the joined card whose active address is this page, if any. */
 export function pageRing(
   d: EpicDetail,
@@ -61,7 +45,11 @@ export function pageRing(
     const t = designTone(d, sessions)
     return { kind, ...t, arc: designArc(t.live, t.tone), progress: pct / 100, label: `${pct}%` }
   }
+  const done = d.state === EpicStateFinished
+  const own: Tone = d.working ? "running" : done ? "done" : "muted"
   const tone =
-    card && d.kind === "loop" ? { tone: ringTone(card), live: isLive(card) } : loopTone(d)
+    card && d.kind === "loop"
+      ? { tone: ringTone(card), live: isLive(card) }
+      : { tone: own, live: !!d.working }
   return { kind, ...tone, progress: d.total ? d.done / d.total : 0, label: `${d.done}/${d.total}` }
 }

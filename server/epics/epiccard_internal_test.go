@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -114,5 +115,32 @@ func TestJoinImplementation_QuestionStillWinsAtBranch(t *testing.T) {
 	joinImplementation(&row, &impl, designActivity{running: true, asking: true, working: true})
 	if row.Section != wire.SectionNeedsYou || row.Working {
 		t.Errorf("row = section %q working %v, want Needs you and not working", row.Section, row.Working)
+	}
+}
+
+func TestDetail_LoopWorkingFollowsTheCardRule(t *testing.T) {
+	t.Parallel()
+	root := queue.RootRef{Project: "proj", Epic: "epic"}
+	impl := typed("01", "done", schema.TypeImplement)
+	cases := []struct {
+		name  string
+		ts    []tickets.Ticket
+		state wire.EpicState
+		want  bool
+	}{
+		{"writing pr text", []tickets.Ticket{impl, typed("02", "open", schema.TypePRText)}, wire.EpicStateWritingPRText, true},
+		{"fixing ci", []tickets.Ticket{impl, typed("02", "open", schema.TypeCIFix)}, wire.EpicStateFixingCI, true},
+		{"waiting", []tickets.Ticket{typed("01", "open", schema.TypeImplement)}, wire.EpicStateWaiting, false},
+		{"awaiting merge", []tickets.Ticket{impl}, wire.EpicStateAwaitingMerge, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			d := wire.EpicDetail{Address: root.String(), Rows: make([]wire.EpicDetailRow, len(tc.ts))}
+			New(fakeEpics()).decorateLive(&d, root, tickets.Epic{Name: "epic", Tickets: tc.ts})
+			if d.State != tc.state || d.Working != tc.want {
+				t.Errorf("state = %q, working = %v; want %q, %v", d.State, d.Working, tc.state, tc.want)
+			}
+		})
 	}
 }

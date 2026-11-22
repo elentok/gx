@@ -147,7 +147,7 @@ type EpicDetail struct {
 	// DesignSection is a map epic's own Design card section, which the page's tone
 	// reads even when a joined card shows the -impl epic instead.
 	DesignSection CardSection `json:"design_section,omitempty"`
-	// Working is set on a map epic while its Design works, by the same rule as the card.
+	// Working is set while the epic works, by the same rule as the card: a map while its Design works, a loop in a state with a working word.
 	Working bool `json:"working,omitempty"`
 	// StatusWords is the card's status line; PR, PRReason, PRActions, PRNotice and
 	// PRActivity are the PR flow's live info, failure reason, buttons, the "CI

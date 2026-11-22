@@ -88,6 +88,7 @@ func (s *Epics) decorateLive(d *wire.EpicDetail, root queue.RootRef, e tickets.E
 		return
 	}
 	d.State = EpicStateFor(root, e, s.Delivery(root.Project), s.Runs.StartedAtOf)
+	d.Working = loopWorkingWord(wire.EpicListState(d.State), claimedPhase(e)) != ""
 	if EpicMergeBlocked(e) {
 		d.MergeBlockKind, d.MergeBlockReason, d.MergeBlockFiles = e.MergeBlockKind, e.MergeBlockReason, e.MergeBlockFiles
 		d.Actions = mergeBlockActions(e.MergeBlockKind)

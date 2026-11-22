@@ -1040,7 +1040,7 @@ export interface EpicDetail extends ViewDiff, BackLink {
    */
   design_section?: CardSection;
   /**
-   * Working is set on a map epic while its Design works, by the same rule as the card.
+   * Working is set while the epic works, by the same rule as the card: a map while its Design works, a loop in a state with a working word.
    */
   working?: boolean;
   /**
