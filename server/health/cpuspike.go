@@ -105,8 +105,8 @@ func cpuSpikePrompt(sp cpuwatch.Spike, c config.CPUWatchdogConfig) string {
 	if sp.Build != "" {
 		fmt.Fprintf(&b, ", build %s", sp.Build)
 	}
-	fmt.Fprintf(&b, "). It used %.0f%% of a core on average (%.0f%% itself, %.0f%% in subprocesses) for %s, above the cpu-watchdog threshold of %.0f%%.\n\n",
-		self+children, self, children, spikeLength(sp.Samples), c.ThresholdPercent)
+	fmt.Fprintf(&b, "). It used %.0f%% of a core on average for %s, above the cpu-watchdog threshold of %.0f%%. Separately, %.0f%% lifetime CPU of exited children was credited in those intervals; that is accounting, not load.\n\n",
+		self, spikeLength(sp.Samples), c.ThresholdPercent, children)
 	if sp.Dir == "" {
 		b.WriteString("No evidence was captured; reproduce the load and profile it.\n\n")
 	} else {
@@ -132,7 +132,7 @@ func avgCPU(samples []cpuwatch.Sample) float64 {
 	}
 	sum := 0.0
 	for _, x := range samples {
-		sum += x.Total()
+		sum += x.Self
 	}
 	return sum / float64(len(samples))
 }

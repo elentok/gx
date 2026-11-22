@@ -33,16 +33,14 @@ type Config struct {
 }
 
 // Sample is one interval's CPU use, in percent of one core. Children is the
-// subprocesses that exited in the interval (git): a profile never shows
-// them, so they are kept apart.
+// whole lifetime CPU of subprocesses that exited in the interval: the
+// reaped-children counter credits it all at once, so it is accounting, not
+// load. It is kept for context and never counts toward the threshold.
 type Sample struct {
 	At       time.Time `json:"at"`
 	Self     float64   `json:"self"`
 	Children float64   `json:"children"`
 }
-
-// Total is the sample's whole CPU use.
-func (s Sample) Total() float64 { return s.Self + s.Children }
 
 // Spike is a fired spike: the high samples and where its evidence was written.
 type Spike struct {
@@ -121,7 +119,7 @@ func (w *Watcher) observe(s Sample) ([]Sample, bool) {
 		w.streak, w.fired, w.calmSince = nil, false, time.Time{}
 		return nil, false
 	}
-	if s.Total() < cfg.Threshold {
+	if s.Self < cfg.Threshold {
 		w.streak = nil
 		if w.fired {
 			if w.calmSince.IsZero() {
@@ -205,8 +203,8 @@ func summary(s Spike, errs []error) string {
 	if s.Build != "" {
 		fmt.Fprintf(&b, "Build: %s\n\n", s.Build)
 	}
-	b.WriteString("Children is CPU used by subprocesses that exited (git, ...). `cpu.pprof` does not show it: look in `goroutines.txt` for loops that start processes.\n\n")
-	b.WriteString("| time | self % | children % |\n|---|---|---|\n")
+	b.WriteString("Children is the lifetime CPU of subprocesses that exited in that interval (git, ...), credited all at once. It is not load and does not count toward the threshold. `cpu.pprof` does not show it: look in `goroutines.txt` for loops that start processes.\n\n")
+	b.WriteString("| time | self % | children % (lifetime CPU of exited children) |\n|---|---|---|\n")
 	for _, x := range s.Samples {
 		fmt.Fprintf(&b, "| %s | %.1f | %.1f |\n", x.At.Format(time.TimeOnly), x.Self, x.Children)
 	}

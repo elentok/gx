@@ -101,8 +101,9 @@ cpu-watchdog: that process stayed above `cpu-watchdog.threshold-percent` of one 
 `cpu-watchdog.sustain`. The prompt names the evidence dir (under `<state dir>/cpu-spikes/`), which
 holds:
 
-- `summary.md`: one row per 10s sample, **self** (gx's own Go code) vs **children** (subprocesses
-  that exited in that interval: `git`, `rg`, `pnpm`, …).
+- `summary.md`: one row per 10s sample, **self** (gx's own Go code) vs **children** (the lifetime
+  CPU of subprocesses that exited in that interval: `git`, `rg`, `pnpm`, …; credited all at once, so
+  it never counts toward the spike and a big number can be one long-lived child).
 - `cpu.pprof`: a 20s CPU profile taken right after the spike fired. Symbols are embedded, so no
   binary is needed: `go tool pprof -top -cum <dir>/cpu.pprof`, then `-list '<func regexp>'` on the
   hot functions. `-top` sorts by own time, `-cum` by time including callees.
@@ -114,7 +115,8 @@ Read the split first; it decides where to look:
    every ticket file (`server/index.go` `scanStore`), a TUI render that recomputes derived state
    on each frame instead of on each change, a ticker or poll with a too-short interval, JSON
    (de)serialization of a large snapshot per event.
-2. **Children is high** → the profile shows little; the cost is processes gx starts. Look in
+2. **Children is high but self is low** → not a spike by itself (the watchdog fires on self only).
+   If many short children are the cost, the profile shows little. Look in
    `goroutines.txt` for goroutines sitting in `os/exec` (`(*Cmd).Wait`, `forkExec`) and walk up to
    the gx loop that starts them. Typical shape: a wait/poll loop around the runner's status call
    (`agentrunner.Runner`, `WaitForFinish` in `ralphloop/supervise/waitforfinish.go`) whose sleep is

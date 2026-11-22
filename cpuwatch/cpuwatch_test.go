@@ -82,12 +82,17 @@ func TestObserve_HeldSpikeKeepsOnlyRecentSamples(t *testing.T) {
 	}
 }
 
-func TestObserve_CountsChildren(t *testing.T) {
+func TestObserve_IgnoresChildren(t *testing.T) {
 	w := &Watcher{Config: Config{Threshold: 15, Sustain: 10 * time.Second}}
-	for i := range 2 {
-		samples, ok := w.observe(Sample{At: t0.Add(time.Duration(i) * 10 * time.Second), Self: 5, Children: 12})
-		if i == 1 && (!ok || len(samples) != 2) {
-			t.Fatalf("observe = %v, %v; want a 2-sample spike from children CPU", samples, ok)
+	for i := range 12 {
+		if samples, ok := w.observe(Sample{At: t0.Add(time.Duration(i) * 10 * time.Second), Self: 2, Children: 1000}); ok {
+			t.Fatalf("sample %d fired %v from children CPU alone", i, samples)
+		}
+	}
+	for i := 12; i < 14; i++ {
+		samples, ok := w.observe(Sample{At: t0.Add(time.Duration(i) * 10 * time.Second), Self: 20, Children: 1000})
+		if i == 13 && (!ok || len(samples) != 2) {
+			t.Fatalf("observe = %v, %v; want a 2-sample spike from self CPU", samples, ok)
 		}
 	}
 }
@@ -114,5 +119,8 @@ func TestFire_WritesEvidenceAndReports(t *testing.T) {
 	sum, _ := os.ReadFile(filepath.Join(got[0].Dir, "summary.md"))
 	if !strings.Contains(string(sum), "| 20.0 | 3.0 |") {
 		t.Errorf("summary.md lacks the sample row:\n%s", sum)
+	}
+	if !strings.Contains(string(sum), "| children % (lifetime CPU of exited children) |") {
+		t.Errorf("summary.md header does not name children as lifetime CPU of exited children:\n%s", sum)
 	}
 }
