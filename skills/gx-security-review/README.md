@@ -8,3 +8,7 @@ gx changed this skill: it is a skill, not a command (no `allowed-tools` key, `na
 files of `gx-code-review` instead of running shell lines, starts with a skip step, starts no nested
 subagents (it does the false-positive filtering itself in one pass), reports findings with a severity
 word and a confidence in a short list, and hands them back to the caller.
+
+The exclusions and precedents in `SKILL.md` are copied word for word from upstream, because the spec
+requires the same filter. Some of them never apply to gx (GitHub Actions workflows, `*.ipynb`, React
+and Angular XSS, Rust memory safety). The copy is deliberate.
