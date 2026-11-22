@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server/index"
 	"github.com/elentok/gx/tickets"
+	"github.com/fsnotify/fsnotify"
 )
 
 // storeWatchDebounce turns a burst of writes into one signal.
@@ -36,13 +37,20 @@ func WatchStore(dir string) (events <-chan struct{}, stop func(), err error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	out := signalOnChange(w.Events, w.Rewatch)
+	return out, w.Close, nil
+}
+
+// signalOnChange debounces raw watch events into signals on the returned
+// channel, which closes when src does.
+func signalOnChange(src <-chan fsnotify.Event, rewatch func()) <-chan struct{} {
 	out := make(chan struct{}, 1)
 	go func() {
 		defer close(out)
 		var debounce <-chan time.Time
 		for {
 			select {
-			case _, ok := <-w.Events:
+			case _, ok := <-src:
 				if !ok {
 					return
 				}
@@ -51,7 +59,7 @@ func WatchStore(dir string) (events <-chan struct{}, stop func(), err error) {
 				}
 			case <-debounce:
 				debounce = nil
-				w.Rewatch() // pick up directories created since
+				rewatch() // pick up directories created since
 				select {
 				case out <- struct{}{}:
 				default: // a signal is already pending
@@ -59,5 +67,5 @@ func WatchStore(dir string) (events <-chan struct{}, stop func(), err error) {
 			}
 		}
 	}()
-	return out, w.Close, nil
+	return out
 }

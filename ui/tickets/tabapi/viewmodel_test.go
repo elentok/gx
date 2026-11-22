@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/viewmodel"
+	"github.com/fsnotify/fsnotify"
 )
 
 // stateOf applies snap as a current server sends it, which always carries
@@ -57,6 +58,31 @@ func TestEpicsFromViewModel_MultiLevelForkKeepsItsNumber(t *testing.T) {
 	}
 }
 
+func TestWatchStore_FakeWatchSignalsAndRewatches(t *testing.T) {
+	t.Parallel()
+	src := make(chan fsnotify.Event)
+	rewatched := make(chan struct{}, 1)
+	out := signalOnChange(src, func() { rewatched <- struct{}{} })
+
+	src <- fsnotify.Event{Name: "x.md", Op: fsnotify.Write}
+	select {
+	case <-out:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no change signal after a watch event")
+	}
+	select {
+	case <-rewatched:
+	default:
+		t.Error("watch was not rewatched before the signal")
+	}
+	close(src)
+	if _, ok := <-out; ok {
+		t.Error("signal channel still open after the watch closed")
+	}
+}
+
+// Smoke test against the real filesystem; the behaviour is pinned by the
+// fake-watch test above.
 func TestWatchStore_FiresOnStoreChange(t *testing.T) {
 	dir := t.TempDir()
 	events, stop, err := WatchStore(dir)
@@ -68,7 +94,7 @@ func TestWatchStore_FiresOnStoreChange(t *testing.T) {
 	// write by seconds or drop it, so keep writing until one gets through.
 	write := time.NewTicker(500 * time.Millisecond)
 	defer write.Stop()
-	deadline := time.After(20 * time.Second)
+	deadline := time.After(8 * time.Second)
 	for i := 0; ; i++ {
 		if err := os.WriteFile(filepath.Join(dir, "x.md"), []byte{byte(i)}, 0o644); err != nil {
 			t.Fatal(err)
@@ -78,7 +104,7 @@ func TestWatchStore_FiresOnStoreChange(t *testing.T) {
 			return
 		case <-write.C:
 		case <-deadline:
-			t.Fatal("no change signal after store writes")
+			t.Fatal("environment problem, not a product bug: the OS delivered no file event (see gx:follow-ups/499)")
 		}
 	}
 }

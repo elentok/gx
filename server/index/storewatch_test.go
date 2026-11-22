@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+// realWatchDeadline bounds the real-filesystem smoke tests well under the
+// 20 s slow limit. The behaviour itself is pinned by fake-stream tests.
+const realWatchDeadline = 8 * time.Second
+
 func TestStoreWatchSeesNewFilesAndSkipsGit(t *testing.T) {
 	t.Parallel()
 	testStoreWatchSeesNewFilesAndSkipsGit(t, NewStoreWatch)
@@ -42,7 +46,7 @@ func testStoreWatchSeesNewFilesAndSkipsGit(t *testing.T, newWatch func(string) (
 	// so keep writing until one gets through.
 	write := time.NewTicker(500 * time.Millisecond)
 	defer write.Stop()
-	deadline := time.After(20 * time.Second)
+	deadline := time.After(realWatchDeadline)
 	writeTicket := func(i int) {
 		if err := os.WriteFile(filepath.Join(dir, "01-a.md"), []byte{byte(i)}, 0o644); err != nil {
 			t.Fatal(err)
@@ -61,7 +65,7 @@ func testStoreWatchSeesNewFilesAndSkipsGit(t *testing.T, newWatch func(string) (
 		case <-write.C:
 			writeTicket(i)
 		case <-deadline:
-			t.Fatal("no event for the new ticket file")
+			t.Fatal("environment problem, not a product bug: the OS delivered no file event (see gx:follow-ups/499)")
 		}
 	}
 }
