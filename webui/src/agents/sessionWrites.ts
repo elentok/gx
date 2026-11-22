@@ -13,9 +13,6 @@ export const canManage = (s: SessionInfo) => !s.queue
 /** A plain chat: not a queue agent, and not tied to a ticket, a fix or a flow (a Design is a flow). */
 export const isChat = (s: SessionInfo) => !s.queue && !s.ticket && !s.fix_of && !s.flow
 
-/** The one History rule: a chat or a Design gets the Sent messages list; every other session gets none. */
-export const offersHistory = (s: SessionInfo) => isChat(s) || (!!s.design && !s.queue)
-
 /** The Exited design sessions: the ones the sidebar's bulk clean-up removes. */
 export const exitedDesigns = (sessions: SessionInfo[]) =>
   sessions.filter((s) => s.design && isExited(s))

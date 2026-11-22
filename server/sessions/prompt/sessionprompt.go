@@ -31,7 +31,7 @@ func (p *Prompt) promptHandler(source string) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		res, err := p.promptSession(req, source, nil)
+		res, err := p.promptSession(req, source)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -46,9 +46,9 @@ func (p *Prompt) promptHandler(source string) http.HandlerFunc {
 // gx.follow-ups/07 tracks that.
 //
 // A web send is saved to the Sent messages list just before it starts. A Round
-// answer passes the note the person typed as note, which is saved in place of
-// the round text the server built; nil saves the validated text.
-func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string, note *string) (wire.SessionResult, error) {
+// answer sets req.SentText to the note the person typed, which is saved in
+// place of the round text the server built; nil saves the validated text.
+func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string) (wire.SessionResult, error) {
 	p.sessions.Watches.MetaMu.Lock()
 	defer p.sessions.Watches.MetaMu.Unlock()
 	dir, meta, res, err := p.sessions.SessionDir(req.ID)
@@ -130,8 +130,8 @@ func (p *Prompt) promptSession(req wire.SessionPromptRequest, source string, not
 	} else {
 		if source == promptSourceWeb && !req.Promote {
 			saved := text
-			if note != nil {
-				saved = *note
+			if req.SentText != nil {
+				saved = *req.SentText
 			}
 			saveSent(p.history, p.log, meta, saved, imgs.paths)
 		}

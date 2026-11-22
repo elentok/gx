@@ -3287,6 +3287,11 @@ export interface SessionInfo {
    */
   fix_of?: string;
   /**
+   * OffersHistory is true for a session that has a Sent messages list: a
+   * Design or a plain chat.
+   */
+  offers_history?: boolean;
+  /**
    * Queue marks a Queue agent row: a PTY-hosted ticket iteration. It has
    * no Unread or Actionable, and Holder is the agent dir the TUI opens the
    * live panel from.

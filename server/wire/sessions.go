@@ -305,6 +305,10 @@ type SessionPromptRequest struct {
 	Images []string `json:"images,omitempty"`
 	// Huh names the Grilling questions of the round that Text sends as Huh?.
 	Huh []SessionHuh `json:"huh,omitempty"`
+	// SentText, when set, is the text saved as the Sent entry in place of Text:
+	// a Round answer saves the note the person typed, not the round text the
+	// server built. Server-side only, never on the wire.
+	SentText *string `json:"-"`
 }
 
 // SessionHuh is a question sent as Huh?: the card's body and title.

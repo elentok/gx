@@ -163,6 +163,14 @@ func (m *Meta) UnmarshalJSON(b []byte) error {
 // IsDesign reports whether the session runs the design flow.
 func (m Meta) IsDesign() bool { return m.Flow == tickets.FlowDesign }
 
+// IsPlainChat reports whether the session is a chat tied to no flow, ticket or
+// fix.
+func (m Meta) IsPlainChat() bool { return m.Flow == "" && m.Ticket == "" && m.FixOf == "" }
+
+// OffersHistory is the one History rule: a Design and a plain chat get the
+// Sent messages list; every other session gets none.
+func (m Meta) OffersHistory() bool { return m.IsDesign() || m.IsPlainChat() }
+
 // IsStepped reports whether the session runs any flow.
 func (m Meta) IsStepped() bool { return m.Flow != "" }
 
@@ -218,6 +226,7 @@ func (m Meta) Info() wire.SessionInfo {
 		Flow:               string(m.Flow),
 		FlowKey:            m.key(),
 		FixOf:              m.FixOf,
+		OffersHistory:      m.OffersHistory(),
 		Status:             m.Status,
 		StatusChangedAt:    m.StatusChangedAt,
 		RunStartedAt:       cmp.Or(m.RestoredAt, m.CreatedAt),

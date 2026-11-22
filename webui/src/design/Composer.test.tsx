@@ -43,6 +43,7 @@ const session = (
   actionable: {},
   auto_advance: true,
   auto_queue: false,
+  offers_history: true,
   ...auto,
 })
 
@@ -1396,7 +1397,7 @@ test("History sits between Add and Note; narrow it is an icon", async () => {
 })
 
 test("a session that is not a Design shows no History button", async () => {
-  render({ auto: { queue: true } })
+  render({ auto: { queue: true, offers_history: false } })
   await screen.findByRole("button", { name: "Note" })
   expect(screen.queryByRole("button", { name: "History" })).toBeNull()
 })

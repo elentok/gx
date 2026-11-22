@@ -11,7 +11,6 @@ import { toaster } from "../ui/toaster"
 import { WideContext } from "../useWide"
 import type { HistoryCalls } from "../history/useSessionHistory"
 import { AgentComposer } from "./AgentComposer"
-import { offersHistory } from "./sessionWrites"
 
 afterEach(() => {
   cleanup()
@@ -367,19 +366,13 @@ test("a text-only post has no images field", async () => {
 const chat = (over: Partial<SessionInfo> = {}): SessionInfo => ({
   ...session(),
   ticket: "",
+  offers_history: true,
   ...over,
 })
 
-test.each([
-  ["chat", {}, true],
-  ["design", { flow: "design", design: true }, true],
-  ["fix agent", { fix_of: "gx:a/01" }, false],
-  ["project-level fix agent", { fix_of: "gx" }, false],
-  ["ticket agent", { ticket: "gx:a/01" }, false],
-  ["queue agent", { queue: "q" }, false],
-  ["triage flow", { flow: "triage" }, false],
-])("the History rule for a %s", (_name, over, offered) => {
-  expect(offersHistory(chat(over as Partial<SessionInfo>))).toBe(offered)
+test("no History button when the session does not offer History", () => {
+  render({ s: chat({ offers_history: false }) })
+  expect(screen.queryByRole("button", { name: "History" })).toBeNull()
 })
 
 const entry = {

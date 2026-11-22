@@ -25,6 +25,7 @@ export const session = (
   actionable: {},
   auto_advance: true,
   auto_queue: false,
+  offers_history: true,
   ...over,
 })
 

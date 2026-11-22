@@ -80,3 +80,21 @@ func TestDefaultModel(t *testing.T) {
 		t.Fatalf("none = %q, %q", id, eff)
 	}
 }
+
+func TestInfo_OffersHistoryForDesignAndPlainChatOnly(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		meta Meta
+		want bool
+	}{
+		"plain chat": {Meta{}, true},
+		"design":     {Meta{Flow: tickets.FlowDesign, Ticket: "proj:map"}, true},
+		"triage":     {Meta{Flow: "triage", FlowKey: "proj"}, false},
+		"ticket":     {Meta{Ticket: "proj:epic/01"}, false},
+		"fix-of":     {Meta{FixOf: "proj"}, false},
+	} {
+		if got := tc.meta.Info().OffersHistory; got != tc.want {
+			t.Errorf("%s: offers_history = %v, want %v", name, got, tc.want)
+		}
+	}
+}

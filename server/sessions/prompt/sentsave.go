@@ -10,14 +10,14 @@ import (
 
 // sentEntry is the Sent messages entry of a web send, or false for a session
 // that saves none. Only a Design and a plain chat (no flow, ticket or fix-of)
-// save; the web UI mirrors this rule from the session info.
+// save (Meta.OffersHistory, which the session info carries to the web UI).
 func sentEntry(meta sessions.Meta, text string) (drafthistory.Entry, bool) {
 	e := drafthistory.Entry{Text: text, Project: meta.Project}
 	switch {
 	case meta.IsDesign():
 		_, e.Slug, _ = strings.Cut(meta.Ticket, ":")
 		e.Composer = drafthistory.ComposerDesign
-	case meta.Flow == "" && meta.Ticket == "" && meta.FixOf == "":
+	case meta.IsPlainChat():
 		e.Name, e.Harness, e.Model, e.Effort = meta.Name, meta.Harness, meta.Model, meta.Effort
 		e.Composer = drafthistory.ComposerChat
 	default:

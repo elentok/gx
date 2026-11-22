@@ -36,7 +36,6 @@ import { unansweredOf } from "./round"
 import { SendPopover } from "./SendPopover"
 import { usePromptSend } from "./usePromptSend"
 import { useWide } from "../useWide"
-import { offersHistory } from "../agents/sessionWrites"
 import { useSessionHistory } from "../history/useSessionHistory"
 import { promptable } from "./view"
 
@@ -109,7 +108,7 @@ export function Composer({
   const root = useRef<HTMLDivElement>(null)
   // A restored text must show even while Working, where the effect above stays shut.
   const history = useSessionHistory({
-    enabled: offersHistory(session),
+    enabled: !!session.offers_history,
     sessionId: session.id,
     text,
     setText: (t: string) => {

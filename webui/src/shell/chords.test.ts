@@ -122,6 +122,7 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo => ({
   actionable: {},
   auto_advance: true,
   auto_queue: false,
+  offers_history: true,
   ...over,
 })
 

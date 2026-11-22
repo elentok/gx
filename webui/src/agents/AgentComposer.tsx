@@ -17,7 +17,6 @@ import { useWide } from "../useWide"
 import { Button } from "../ui/button/Button"
 import { useSessionHistory, type HistoryCalls } from "../history/useSessionHistory"
 import { usePromptFocus } from "./promptFocus"
-import { offersHistory } from "./sessionWrites"
 
 // Under the Agents page's chat: the box is always open with Send beside it. A refusal shows inline only, as in the mock.
 export function AgentComposer({
@@ -60,7 +59,7 @@ export function AgentComposer({
   // A Working session takes no prompt: Interrupt ends its turn and keeps the session.
   const working = session.status.state === "working" && !promptable(session)
   const history = useSessionHistory({
-    enabled: offersHistory(session),
+    enabled: !!session.offers_history,
     sessionId: session.id,
     text,
     setText,

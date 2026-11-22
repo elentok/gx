@@ -67,6 +67,9 @@ type SessionInfo struct {
 	// FixOf marks a Fix agent: the address of the ticket it fixes, or the bare
 	// project name for a failed migration.
 	FixOf string `json:"fix_of,omitempty"`
+	// OffersHistory is true for a session that has a Sent messages list: a
+	// Design or a plain chat.
+	OffersHistory bool `json:"offers_history,omitempty"`
 	// Queue marks a Queue agent row: a PTY-hosted ticket iteration. It has
 	// no Unread or Actionable, and Holder is the agent dir the TUI opens the
 	// live panel from.
