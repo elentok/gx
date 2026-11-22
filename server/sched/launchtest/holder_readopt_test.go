@@ -25,6 +25,22 @@ import (
 
 const readoptLabel = "epic-a-iter-01"
 
+// waitHeldLaunch waits for the queued ticket's first prompt on pty. A launch
+// is a scheduler poll plus git worktree setup on a temp repo, and both slow
+// down with every parallel test and CPU burner, so no fixed budget fits: it
+// waits until shortly before the test binary's own -timeout and prints the
+// server log tail if that runs out.
+func waitHeldLaunch(t *testing.T, h *servertest.Harness, pty rigs.NamedFake) {
+	t.Helper()
+	budget := 5 * time.Minute
+	if d, ok := t.Deadline(); ok {
+		budget = max(time.Second, time.Until(d)-5*time.Second)
+	}
+	servertest.WaitState(t, budget, "the ticket to launch", func() (bool, string) {
+		return len(pty.Prompts(readoptLabel)) > 0, h.LogTail(20)
+	})
+}
+
 // startUnreachable launches proj:epic-a/01 on a fake whose holder does not
 // answer, and returns what the tests need to watch it.
 func startUnreachable(t *testing.T) (h *servertest.Harness, base string, pty rigs.NamedFake, ticketPath string) {
@@ -44,7 +60,7 @@ func startUnreachable(t *testing.T) (h *servertest.Harness, base string, pty rig
 	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	servertest.WaitFor(t, 10*time.Second, "the ticket to launch", func() bool { return len(pty.Prompts(readoptLabel)) > 0 })
+	waitHeldLaunch(t, h, pty)
 	t.Cleanup(func() {
 		// A test that stops the session leaves nothing to clear.
 		if _, ok, _ := pty.Find(readoptLabel); ok {

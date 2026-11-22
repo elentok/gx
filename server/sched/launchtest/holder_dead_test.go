@@ -45,7 +45,7 @@ func startHeldTicket(t *testing.T) (pty rigs.NamedFake, ticketPath string, h *se
 	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	servertest.WaitFor(t, 10*time.Second, "the ticket to launch", func() bool { return len(pty.Prompts(readoptLabel)) > 0 })
+	waitHeldLaunch(t, h, pty)
 	return pty, ticketPath, h
 }
 
