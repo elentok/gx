@@ -82,3 +82,13 @@ func runIn(t *testing.T, cwd string, args ...string) (string, error) {
 	err := execute(t, args, d)
 	return stdout.String(), err
 }
+
+// mustRun is runIn that fails the test on error.
+func mustRun(t *testing.T, cwd string, args ...string) string {
+	t.Helper()
+	out, err := runIn(t, cwd, args...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}

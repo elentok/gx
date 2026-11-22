@@ -89,19 +89,29 @@ func runInStdin(t *testing.T, cwd, stdin string, args ...string) (string, error)
 	return stdout.String(), err
 }
 
+// triageVerified creates a record and gives both rows a verdict; it returns
+// the row addresses.
+func triageVerified(t *testing.T, repo string) []string {
+	t.Helper()
+	mustRun(t, repo, "tickets", "triage", "create")
+	rows := triagePending(t, repo)
+	for _, addr := range rows {
+		mustRun(t, repo, "tickets", "triage", "verdict", "--row", addr)
+	}
+	return rows
+}
+
+// groupPlan plans both rows ready and overlapping, so they form one group.
+func groupPlan(rows []string) string {
+	return `[{"rowId":"` + rows[0] + `","action":"ready","estimate":"10K","overlapWith":["` + rows[1] + `"]},` +
+		`{"rowId":"` + rows[1] + `","action":"ready","estimate":"10K","overlapWith":["` + rows[0] + `"]}]`
+}
+
 // triageAtApprove creates a record, verifies both rows and saves a plan for
 // them, optionally with a quick question on the first row.
 func triageAtApprove(t *testing.T, repo string, withQuestion bool) triageShown {
 	t.Helper()
-	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
-		t.Fatal(err)
-	}
-	rows := triagePending(t, repo)
-	for _, addr := range rows {
-		if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", addr); err != nil {
-			t.Fatal(err)
-		}
-	}
+	rows := triageVerified(t, repo)
 	q := ""
 	if withQuestion {
 		q = `,"questions":[{"id":"q1","text":"which?","kind":"quick","options":["a","b"],"default":"a"}]`
@@ -115,15 +125,7 @@ func triageAtApprove(t *testing.T, repo string, withQuestion bool) triageShown {
 
 func TestTriage_PlanSaveMovesToApproveAndDropsGoneRows(t *testing.T) {
 	repo := triageProject(t)
-	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
-		t.Fatal(err)
-	}
-	rows := triagePending(t, repo)
-	for _, addr := range rows {
-		if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", addr); err != nil {
-			t.Fatal(err)
-		}
-	}
+	rows := triageVerified(t, repo)
 	plan := `[{"rowId":"` + rows[0] + `","action":"ready"},{"rowId":"` + rows[1] + `","action":"ready"}]`
 	if _, err := runInStdin(t, repo, plan, "tickets", "triage", "plan", "--gone", rows[1]); err != nil {
 		t.Fatalf("plan: %v", err)
@@ -145,18 +147,14 @@ func TestTriage_PlanSaveMovesToApproveAndDropsGoneRows(t *testing.T) {
 func TestTriage_RowRefusals(t *testing.T) {
 	repo := triageProject(t)
 	// A record still at verify refuses a row save.
-	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "create")
 	s0 := triageShow(t, repo)
 	_, err := runIn(t, repo, "tickets", "triage", "row", "--row", s0.Rows[0].Address, "--revision", strconv.Itoa(s0.Revision))
 	if err == nil {
 		t.Error("row at step verify accepted")
 	}
 	for _, addr := range triagePending(t, repo) {
-		if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", addr); err != nil {
-			t.Fatal(err)
-		}
+		mustRun(t, repo, "tickets", "triage", "verdict", "--row", addr)
 	}
 	plan := `[{"rowId":"` + s0.Rows[0].Address + `","action":"ready"},{"rowId":"` + s0.Rows[1].Address + `","action":"ready"}]`
 	if _, err := runInStdin(t, repo, plan, "tickets", "triage", "plan"); err != nil {
@@ -180,22 +178,12 @@ func TestTriage_RowRefusals(t *testing.T) {
 
 func TestTriage_RowUngroupUndoesAGroupAtApproveOnly(t *testing.T) {
 	repo := triageProject(t)
-	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
-		t.Fatal(err)
-	}
-	rows := triagePending(t, repo)
-	for _, addr := range rows {
-		if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", addr); err != nil {
-			t.Fatal(err)
-		}
-	}
+	rows := triageVerified(t, repo)
 	rev := strconv.Itoa(triageShow(t, repo).Revision)
 	if _, err := runIn(t, repo, "tickets", "triage", "row", "--row", rows[0], "--ungroup", "--revision", rev); err == nil {
 		t.Fatal("ungroup accepted outside step approve")
 	}
-	plan := `[{"rowId":"` + rows[0] + `","action":"ready","estimate":"10K","overlapWith":["` + rows[1] + `"]},` +
-		`{"rowId":"` + rows[1] + `","action":"ready","estimate":"10K","overlapWith":["` + rows[0] + `"]}]`
-	if _, err := runInStdin(t, repo, plan, "tickets", "triage", "plan"); err != nil {
+	if _, err := runInStdin(t, repo, groupPlan(rows), "tickets", "triage", "plan"); err != nil {
 		t.Fatal(err)
 	}
 	s := triageShow(t, repo)
@@ -216,18 +204,8 @@ func TestTriage_RowUngroupUndoesAGroupAtApproveOnly(t *testing.T) {
 
 func TestTriage_ApprovePrintsTheGroupRow(t *testing.T) {
 	repo := triageProject(t)
-	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
-		t.Fatal(err)
-	}
-	rows := triagePending(t, repo)
-	for _, addr := range rows {
-		if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", addr); err != nil {
-			t.Fatal(err)
-		}
-	}
-	plan := `[{"rowId":"` + rows[0] + `","action":"ready","estimate":"10K","overlapWith":["` + rows[1] + `"]},` +
-		`{"rowId":"` + rows[1] + `","action":"ready","estimate":"10K","overlapWith":["` + rows[0] + `"]}]`
-	if _, err := runInStdin(t, repo, plan, "tickets", "triage", "plan"); err != nil {
+	rows := triageVerified(t, repo)
+	if _, err := runInStdin(t, repo, groupPlan(rows), "tickets", "triage", "plan"); err != nil {
 		t.Fatal(err)
 	}
 	s := triageShow(t, repo)
@@ -259,9 +237,7 @@ func TestTriage_ApproveAfterRowSaveWithOldRevisionIsStale(t *testing.T) {
 	repo := triageProject(t)
 	s := triageAtApprove(t, repo, false)
 	rev := strconv.Itoa(s.Revision)
-	if _, err := runIn(t, repo, "tickets", "triage", "row", "--row", s.Rows[0].Address, "--action", "close", "--revision", rev); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "row", "--row", s.Rows[0].Address, "--action", "close", "--revision", rev)
 	_, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", rev)
 	if !errors.Is(err, triage.ErrStaleRevision) {
 		t.Errorf("approve with old revision = %v, want stale", err)
@@ -284,9 +260,7 @@ func TestTriage_ApproveRefusedWhileQuestionOpen(t *testing.T) {
 func TestTriage_AbandonRefusedAtWrite(t *testing.T) {
 	repo := triageProject(t)
 	s := triageAtApprove(t, repo, false)
-	if _, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(s.Revision)); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(s.Revision))
 	if _, err := runIn(t, repo, "tickets", "triage", "abandon"); err == nil {
 		t.Error("abandon at write accepted")
 	}
@@ -295,9 +269,7 @@ func TestTriage_AbandonRefusedAtWrite(t *testing.T) {
 func TestTriage_AbandonAtApproveEndsTheLiveRecord(t *testing.T) {
 	repo := triageProject(t)
 	triageAtApprove(t, repo, false)
-	if _, err := runIn(t, repo, "tickets", "triage", "abandon"); err != nil {
-		t.Fatalf("abandon: %v", err)
-	}
+	mustRun(t, repo, "tickets", "triage", "abandon")
 	if _, err := runIn(t, repo, "tickets", "triage", "pending"); err == nil {
 		t.Error("a live record remains after abandon")
 	}
@@ -324,17 +296,13 @@ func TestTriage_ShowNextAcrossTheVerifyStep(t *testing.T) {
 	if s := triageShow(t, repo); s.Next != "start" {
 		t.Errorf("empty next = %q, want start", s.Next)
 	}
-	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "create")
 	s := triageShow(t, repo)
 	if s.Next != "verify" || len(s.Rows) != 2 {
 		t.Errorf("pending next/rows = %q/%d, want verify/2", s.Next, len(s.Rows))
 	}
 	for _, addr := range triagePending(t, repo) {
-		if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", addr, "--evidence", "e"); err != nil {
-			t.Fatalf("verdict %s: %v", addr, err)
-		}
+		mustRun(t, repo, "tickets", "triage", "verdict", "--row", addr, "--evidence", "e")
 	}
 	if s := triageShow(t, repo); s.Next != "route" || s.Step != "route" {
 		t.Errorf("after last verdict next/step = %q/%q, want route/route", s.Next, s.Step)
@@ -343,24 +311,18 @@ func TestTriage_ShowNextAcrossTheVerifyStep(t *testing.T) {
 
 func TestTriage_PendingShrinksAndGoneIsSaved(t *testing.T) {
 	repo := triageProject(t)
-	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "create")
 	pending := triagePending(t, repo)
 	if len(pending) != 2 {
 		t.Fatalf("pending = %v, want 2", pending)
 	}
-	if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", pending[0], "--verdict", "fixed"); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "verdict", "--row", pending[0], "--verdict", "fixed")
 	// A second session reads only the rows with no verdict.
 	rest := triagePending(t, repo)
 	if len(rest) != 1 || rest[0] != pending[1] {
 		t.Fatalf("pending after one verdict = %v, want [%s]", rest, pending[1])
 	}
-	if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", pending[1], "--gone"); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "verdict", "--row", pending[1], "--gone")
 	if got := triagePending(t, repo); len(got) != 0 {
 		t.Errorf("pending = %v, want none", got)
 	}
@@ -374,9 +336,7 @@ func TestTriage_PendingShrinksAndGoneIsSaved(t *testing.T) {
 
 func TestTriage_StaleRevisionIsRefusedAndRecordUnchanged(t *testing.T) {
 	repo := triageProject(t)
-	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "create")
 	before := triageShow(t, repo)
 	row := before.Rows[0].Address
 	_, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", row, "--revision", "99")
@@ -484,9 +444,7 @@ func TestTriage_AKilledSessionReprintsTheOpenRoundWithoutAnsweredQuestions(t *te
 	if got := showOpenRound(t, repo); len(got) != 2 {
 		t.Fatalf("open round after save = %v, want q1 and q2", got)
 	}
-	if _, err := runIn(t, repo, "tickets", "triage", "answer", "--question", "q1", "--answer", "b", "--revision", rev); err != nil {
-		t.Fatalf("answer: %v", err)
-	}
+	mustRun(t, repo, "tickets", "triage", "answer", "--question", "q1", "--answer", "b", "--revision", rev)
 	// A fresh session starts here: it reads the open round and asks only q2.
 	if got := showOpenRound(t, repo); len(got) != 1 || got[0] != "q2" {
 		t.Errorf("open round after one answer = %v, want [q2]", got)
@@ -495,9 +453,7 @@ func TestTriage_AKilledSessionReprintsTheOpenRoundWithoutAnsweredQuestions(t *te
 	if err != nil || !strings.Contains(out, "q2") || strings.Contains(out, "q1") {
 		t.Errorf("open-round = %q, %v, want q2 only", out, err)
 	}
-	if _, err := runIn(t, repo, "tickets", "triage", "answer", "--question", "q2", "--answer", "a"); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "answer", "--question", "q2", "--answer", "a")
 	if got := showOpenRound(t, repo); len(got) != 0 {
 		t.Errorf("open round after all answers = %v, want none", got)
 	}
@@ -514,11 +470,9 @@ func TestTriage_RoundRefusalsComeBackAsTheVerbsError(t *testing.T) {
 	if _, err := runInStdin(t, repo, roundJSON(row, "a", "b", "c", "d", "e", "f", "g"), "tickets", "triage", "round"); err == nil {
 		t.Error("a round of 7 questions accepted")
 	}
-	for i, id := range []string{"r1", "r2", "r3"} {
+	for _, id := range []string{"r1", "r2", "r3"} {
 		saveRound(t, repo, row, id)
-		if _, err := runIn(t, repo, "tickets", "triage", "answer", "--question", id, "--answer", "a"); err != nil {
-			t.Fatalf("answer %d: %v", i, err)
-		}
+		mustRun(t, repo, "tickets", "triage", "answer", "--question", id, "--answer", "a")
 	}
 	if _, err := runInStdin(t, repo, roundJSON(row, "r4"), "tickets", "triage", "round"); err == nil {
 		t.Error("a fourth ordinary round accepted")
@@ -532,12 +486,8 @@ func TestTriage_DecideAndObjectListTheDecisionWithTheObjectedFlag(t *testing.T) 
 	repo := triageProject(t)
 	s := triageAtApprove(t, repo, false)
 	row := s.Rows[0].Address
-	if _, err := runIn(t, repo, "tickets", "triage", "decide", "--row", row, "--question", "where?", "--choice", "parser", "--reason", "one caller"); err != nil {
-		t.Fatalf("decide: %v", err)
-	}
-	if _, err := runIn(t, repo, "tickets", "triage", "object", "--row", row, "--question", "where?", "--option", "parser", "--option", "caller"); err != nil {
-		t.Fatalf("object: %v", err)
-	}
+	mustRun(t, repo, "tickets", "triage", "decide", "--row", row, "--question", "where?", "--choice", "parser", "--reason", "one caller")
+	mustRun(t, repo, "tickets", "triage", "object", "--row", row, "--question", "where?", "--option", "parser", "--option", "caller")
 	out, err := runIn(t, repo, "tickets", "triage", "show", "--json")
 	if err != nil {
 		t.Fatal(err)
@@ -565,16 +515,12 @@ func TestTriage_DecideAndObjectListTheDecisionWithTheObjectedFlag(t *testing.T) 
 func TestTriage_AnUnconfirmedAgentBacklogRefusesApproveUntilConfirmed(t *testing.T) {
 	repo := triageProject(t)
 	triageAtApprove(t, repo, false)
-	if _, err := runIn(t, repo, "tickets", "triage", "backlog", "--name", "ui", "--source", "agent"); err != nil {
-		t.Fatalf("backlog: %v", err)
-	}
+	mustRun(t, repo, "tickets", "triage", "backlog", "--name", "ui", "--source", "agent")
 	cur := triageShow(t, repo)
 	if _, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(cur.Revision)); err == nil || !strings.Contains(err.Error(), "not confirmed") {
 		t.Fatalf("approve with an unconfirmed backlog = %v, want refusal", err)
 	}
-	if _, err := runIn(t, repo, "tickets", "triage", "backlog", "--name", "ui", "--source", "agent", "--confirm"); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "backlog", "--name", "ui", "--source", "agent", "--confirm")
 	cur = triageShow(t, repo)
 	if _, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(cur.Revision)); err != nil {
 		t.Errorf("approve after confirming: %v", err)
@@ -585,9 +531,7 @@ func TestTriage_CorrectMovesARowToAnBacklog(t *testing.T) {
 	repo := triageProject(t)
 	s := triageAtApprove(t, repo, false)
 	row := s.Rows[0].Address
-	if _, err := runIn(t, repo, "tickets", "triage", "correct", "--row", row, "--action", "backlog", "--destination", "ui"); err != nil {
-		t.Fatalf("correct: %v", err)
-	}
+	mustRun(t, repo, "tickets", "triage", "correct", "--row", row, "--action", "backlog", "--destination", "ui")
 	if _, err := runIn(t, repo, "tickets", "triage", "correct", "--row", row, "--action", "bogus"); err == nil {
 		t.Error("a correction to an unknown action accepted")
 	}

@@ -57,6 +57,22 @@ func writeManifest(t *testing.T, dir, content string) string {
 
 func publishOut(d Deps) string { return d.Stdout.(*bytes.Buffer).String() }
 
+func noEpic(t *testing.T, project string) {
+	t.Helper()
+	if _, err := os.Stat(filepath.Join(project, "e")); !os.IsNotExist(err) {
+		t.Errorf("epic left behind: %v", err)
+	}
+}
+
+// existingEpic gives project an open loop epic "e" holding ticket 01-old.
+func existingEpic(t *testing.T, project string) {
+	t.Helper()
+	writeEpicTicket(t, project, "e", "01-old.md", ticketFrontmatter("01", ""))
+	if err := os.WriteFile(filepath.Join(project, "e", "ticket.md"), []byte("---\nkind: loop\nstatus: open\n---\n\n# e\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func issueNames(t *testing.T, project, epic string) []string {
 	t.Helper()
 	entries, err := os.ReadDir(filepath.Join(project, epic, "issues"))
@@ -118,11 +134,7 @@ func TestPublishJSONAndDryRun(t *testing.T) {
 
 func TestPublishIntoExistingEpicKeepsItsTickets(t *testing.T) {
 	d, project, manifest := setupPublish(t)
-	writeEpicTicket(t, project, "e", "01-old.md", ticketFrontmatter("01", ""))
-	if err := os.WriteFile(filepath.Join(project, "e", "ticket.md"), []byte("---\nkind: loop\nstatus: open\n---\n\n# e\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
+	existingEpic(t, project)
 	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
@@ -137,10 +149,7 @@ func TestPublishRollback(t *testing.T) {
 		t.Run(map[bool]string{false: "new epic", true: "existing epic"}[existing], func(t *testing.T) {
 			d, project, manifest := setupPublish(t)
 			if existing {
-				writeEpicTicket(t, project, "e", "01-old.md", ticketFrontmatter("01", ""))
-				if err := os.WriteFile(filepath.Join(project, "e", "ticket.md"), []byte("---\nkind: loop\nstatus: open\n---\n\n# e\n"), 0o644); err != nil {
-					t.Fatal(err)
-				}
+				existingEpic(t, project)
 			}
 			wantFiles := len(issueNames(t, project, "e"))
 			writes := 0
@@ -194,9 +203,7 @@ func TestPublishRollbackWhenOpeningFails(t *testing.T) {
 	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err == nil {
 		t.Fatal("publish succeeded despite the fault")
 	}
-	if _, err := os.Stat(filepath.Join(project, "e")); !os.IsNotExist(err) {
-		t.Errorf("epic left behind: %v", err)
-	}
+	noEpic(t, project)
 }
 
 func TestPublishOpensOnce(t *testing.T) {
@@ -229,9 +236,7 @@ func TestPublishInvalidTicketPrintsOnlyThatAndWritesNothing(t *testing.T) {
 	if err == nil || err.Error() != `b: unknown type "task"` {
 		t.Fatalf("err = %v, want only ticket b's type failure", err)
 	}
-	if _, statErr := os.Stat(filepath.Join(project, "e")); !os.IsNotExist(statErr) {
-		t.Errorf("epic left behind: %v", statErr)
-	}
+	noEpic(t, project)
 }
 
 func TestPublishManifestRefusalsWriteNothing(t *testing.T) {
@@ -252,9 +257,7 @@ func TestPublishManifestRefusalsWriteNothing(t *testing.T) {
 			if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err == nil {
 				t.Fatal("publish succeeded")
 			}
-			if _, err := os.Stat(filepath.Join(project, "e")); !os.IsNotExist(err) {
-				t.Errorf("epic left behind: %v", err)
-			}
+			noEpic(t, project)
 		})
 	}
 }
@@ -279,9 +282,7 @@ func TestPublishClaimMissRefusesAndWritesNothing(t *testing.T) {
 	if out := publishOut(d); !strings.Contains(out, "miss: a: docs/nowhere.md") || strings.Contains(out, "SLUG") {
 		t.Errorf("output:\n%s", out)
 	}
-	if _, err := os.Stat(filepath.Join(project, "e")); !os.IsNotExist(err) {
-		t.Errorf("epic left behind: %v", err)
-	}
+	noEpic(t, project)
 }
 
 func TestPublishAllowClaimMisses(t *testing.T) {
@@ -371,9 +372,7 @@ func TestPublishShapeChecks(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 				t.Fatalf("err = %v, want it to contain %q", err, tc.wantErr)
 			}
-			if _, statErr := os.Stat(filepath.Join(project, "e")); !os.IsNotExist(statErr) {
-				t.Errorf("epic left behind: %v", statErr)
-			}
+			noEpic(t, project)
 		})
 	}
 }
@@ -465,28 +464,7 @@ func TestPublishStampsCommit(t *testing.T) {
 // a (from fromA) and b (from fromB); an empty from omits the field.
 func promoteFixture(t *testing.T, fromA, fromB string) (d Deps, project, manifest string) {
 	t.Helper()
-	d, project, _ = setupPublish(t)
-	for _, id := range []string{"01", "02", "03"} {
-		writeEpicTicket(t, project, "follow-ups", id+"-f.md",
-			"---\nid: \""+id+"\"\nstatus: open\ntype: research\ncategory: bug\n---\n\n# Follow-up "+id+"\n")
-	}
-	return d, project, promoteManifest(t, map[string]string{"a": fromA, "b": fromB}, "a", "b")
-}
-
-// promoteManifest writes a manifest of implement tickets, one per slug in
-// order, each with its from (omitted when empty).
-func promoteManifest(t *testing.T, from map[string]string, slugs ...string) string {
-	t.Helper()
-	dir := t.TempDir()
-	var m strings.Builder
-	for _, slug := range slugs {
-		writeTicketFile(t, filepath.Join(dir, slug+".md"), "# "+slug+"\n"+shapeSections+groupCriteria(from[slug]))
-		fmt.Fprintf(&m, "- slug: %s\n  type: implement\n  body: %s.md\n", slug, slug)
-		if from[slug] != "" {
-			fmt.Fprintf(&m, "  from: %s\n", from[slug])
-		}
-	}
-	return writeManifest(t, dir, m.String())
+	return groupFixture(t, groupEntry{slug: "a", from: fromA}, groupEntry{slug: "b", from: fromB})
 }
 
 func archivedFollowUp(t *testing.T, project, name string) string {
@@ -602,7 +580,7 @@ func TestPublishSecondRunSameDayJoinsExistingEpic(t *testing.T) {
 	if err := execute(t, []string{"tickets", "publish", epic, "--manifest", manifest}, d); err != nil {
 		t.Fatal(err)
 	}
-	second := promoteManifest(t, map[string]string{"c": "follow-ups/03"}, "c")
+	second := entriesManifest(t, []groupEntry{{slug: "c", from: "follow-ups/03"}})
 	if err := execute(t, []string{"tickets", "publish", epic, "--manifest", second}, d); err != nil {
 		t.Fatal(err)
 	}
@@ -634,10 +612,21 @@ func groupCriteria(from string) string {
 func groupFixture(t *testing.T, entries ...groupEntry) (d Deps, project, manifest string) {
 	t.Helper()
 	d, project, _ = setupPublish(t)
+	seedFollowUps(t, project)
+	return d, project, entriesManifest(t, entries)
+}
+
+func seedFollowUps(t *testing.T, project string) {
+	t.Helper()
 	for _, id := range []string{"01", "02", "03"} {
 		writeEpicTicket(t, project, "follow-ups", id+"-f.md",
 			"---\nid: \""+id+"\"\nstatus: open\ntype: research\ncategory: bug\n---\n\n# Follow-up "+id+"\n")
 	}
+}
+
+// entriesManifest writes a manifest of implement tickets, one per entry.
+func entriesManifest(t *testing.T, entries []groupEntry) string {
+	t.Helper()
 	dir := t.TempDir()
 	var m strings.Builder
 	for _, e := range entries {
@@ -653,7 +642,7 @@ func groupFixture(t *testing.T, entries ...groupEntry) (d Deps, project, manifes
 			fmt.Fprintf(&m, "  blocked_by: %s\n", e.blockedBy)
 		}
 	}
-	return d, project, writeManifest(t, dir, m.String())
+	return writeManifest(t, dir, m.String())
 }
 
 func TestPublishGroupOpensOneTicketWithUnionBlockedBy(t *testing.T) {

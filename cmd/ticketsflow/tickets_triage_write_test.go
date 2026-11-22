@@ -17,14 +17,10 @@ func triageAtWrite(t *testing.T) (repo, project string, s triageShown) {
 	t.Helper()
 	repo, project = triageProjectDir(t)
 	s = triageAtApprove(t, repo, true)
-	if _, err := runIn(t, repo, "tickets", "triage", "row", "--row", s.Rows[0].Address,
-		"--revision", strconv.Itoa(s.Revision), "--answer", "q1=beta"); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "row", "--row", s.Rows[0].Address,
+		"--revision", strconv.Itoa(s.Revision), "--answer", "q1=beta")
 	s = triageShow(t, repo)
-	if _, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(s.Revision)); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(s.Revision))
 	return repo, project, triageShow(t, repo)
 }
 
@@ -272,9 +268,7 @@ func TestTriageRerunAfterCrash_WritesNoSecondMoveNoteOrAnswers(t *testing.T) {
 func TestTriageWriteState_FailedKeepsRefusalAndRerunClearsIt(t *testing.T) {
 	repo, project, s := triageAtWrite(t)
 	row := s.Rows[0].Address
-	if _, err := runIn(t, repo, "tickets", "triage", "write-state", "--row", row, "--state", "failed", "--refusal", "server-not-running"); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "write-state", "--row", row, "--state", "failed", "--refusal", "server-not-running")
 	if got := rowWrite(t, repo, row); got.Write != "failed" || got.Refusal != "server-not-running" {
 		t.Fatalf("failed row = %+v", got)
 	}
@@ -294,9 +288,7 @@ func TestTriageWriteState_FailedKeepsRefusalAndRerunClearsIt(t *testing.T) {
 	if err := os.Rename(followUpFile(project), filepath.Join(archived, "01-f.md")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runIn(t, repo, done...); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, done...)
 	if got := rowWrite(t, repo, row); got.Write != "done" || got.Refusal != "" || strings.Join(got.NewAddresses, " ") != "p:ready-x/05 p:ready-x/06" {
 		t.Errorf("rerun row = %+v", got)
 	}
@@ -351,9 +343,7 @@ func TestTriageLastPass_DoneNeedsTheFlagAndEveryRowSettled(t *testing.T) {
 	a, b := s.Rows[0].Address, s.Rows[1].Address
 	state := func(row, st string) {
 		t.Helper()
-		if _, err := runIn(t, repo, "tickets", "triage", "write-state", "--row", row, "--state", st); err != nil {
-			t.Fatal(err)
-		}
+		mustRun(t, repo, "tickets", "triage", "write-state", "--row", row, "--state", st)
 	}
 	state(a, "done")
 	state(b, "gone") // a gone row does not block done
@@ -361,9 +351,7 @@ func TestTriageLastPass_DoneNeedsTheFlagAndEveryRowSettled(t *testing.T) {
 	if got := triageState(t, repo); got != "live" {
 		t.Fatalf("flag unset: state = %q, want live", got)
 	}
-	if _, err := runIn(t, repo, "tickets", "triage", "last-pass"); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "last-pass")
 	if got := triageState(t, repo); got != "done" {
 		t.Errorf("flag set: state = %q, want done", got)
 	}
@@ -371,12 +359,8 @@ func TestTriageLastPass_DoneNeedsTheFlagAndEveryRowSettled(t *testing.T) {
 
 func TestTriageLastPass_RowStillPendingKeepsItLive(t *testing.T) {
 	repo, _, s := triageAtWrite(t)
-	if _, err := runIn(t, repo, "tickets", "triage", "write-state", "--row", s.Rows[0].Address, "--state", "done"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runIn(t, repo, "tickets", "triage", "last-pass"); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "write-state", "--row", s.Rows[0].Address, "--state", "done")
+	mustRun(t, repo, "tickets", "triage", "last-pass")
 	if got := triageState(t, repo); got != "live" {
 		t.Errorf("state = %q, want live", got)
 	}
@@ -488,22 +472,6 @@ func moveLocate(t *testing.T, repo, epic string) moveLocateOut {
 	return l
 }
 
-// triageAtRoute is a verified Triage still at route; the plan is saved after
-// the moves.
-func triageAtRoute(t *testing.T, repo string) []string {
-	t.Helper()
-	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
-		t.Fatal(err)
-	}
-	rows := triagePending(t, repo)
-	for _, addr := range rows {
-		if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", addr); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return rows
-}
-
 func writeBacklogEpic(t *testing.T, project, name string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Join(project, name, "issues"), 0o755); err != nil {
@@ -517,7 +485,7 @@ func TestTriageMoves_SavedPendingAndAWaitingEpicIsRefused(t *testing.T) {
 	writeOldEpic(t, project, "old-a", "", triagedNote, "open", "claimed")
 	writeOldEpic(t, project, "old-w", "", triagedNote, "claimed", "done")
 	writeBacklogEpic(t, project, "backlog-a")
-	rows := triageAtRoute(t, repo)
+	rows := triageVerified(t, repo)
 
 	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-w","backlog":"backlog-a"}]`, "tickets", "triage", "moves"); err == nil {
 		t.Fatal("an epic with a claimed ticket and nothing to move got a unit")
@@ -559,7 +527,7 @@ func TestTriageMoveState_SavesAtWriteRefusesBefore(t *testing.T) {
 	repo, project := triageProjectDir(t)
 	writeOldEpic(t, project, "old-a", "", triagedNote, "open")
 	writeBacklogEpic(t, project, "backlog-a")
-	rows := triageAtRoute(t, repo)
+	rows := triageVerified(t, repo)
 	if _, err := runInStdin(t, repo, `[{"oldEpic":"old-a","backlog":"backlog-a"}]`, "tickets", "triage", "moves"); err != nil {
 		t.Fatal(err)
 	}
@@ -571,12 +539,8 @@ func TestTriageMoveState_SavesAtWriteRefusesBefore(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := triageShow(t, repo)
-	if _, err := runIn(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(s.Revision)); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runIn(t, repo, "tickets", "triage", "move-state", "--epic", "old-a", "--state", "failed", "--error", "needs-yes"); err != nil {
-		t.Fatalf("move-state: %v", err)
-	}
+	mustRun(t, repo, "tickets", "triage", "approve", "--revision", strconv.Itoa(s.Revision))
+	mustRun(t, repo, "tickets", "triage", "move-state", "--epic", "old-a", "--state", "failed", "--error", "needs-yes")
 	out, err := runIn(t, repo, "tickets", "triage", "show", "--json")
 	if err != nil || !strings.Contains(out, "needs-yes") {
 		t.Fatalf("show = %q, %v", out, err)
