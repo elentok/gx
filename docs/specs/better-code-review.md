@@ -269,11 +269,9 @@ down on diffs a reviewer cannot judge.
 - `README.md` credits gain both upstreams, named by repo and file path (never a bare slash-command
   token).
 - `docs/ralph-loop-queue-orchestrator.md` names the eight-skill default.
-- `scripts/vendored-skills.manifest`: one `port` row per new skill, in the manifest's columns: gx
-  skill, upstream repo, upstream file path, upstream license path, copied-from commit, `port`. The
-  column header comment is updated: the upstream-path column holds a directory, or a file path for a
-  `port` row, and the commit column is the commit the copy was taken from. The
-  copied-from commit is the upstream commit the copy was taken from. The copies are not synced
+- `scripts/vendored-skills.json`: one `port` entry per new skill, in the JSON fields: `skill`,
+  `repo`, `path`, `license`, `pin`, `strategy` (`port`). `path` holds a directory, or a file path
+  for a `port` entry; `pin` is the upstream commit the copy was taken from. The copies are not synced
   automatically: the sync script is not run, and the sync skill is run by hand as for the other
   vendored skills. The existing `port` handling works on a file path (path check, LICENSE gate,
   commit count and diff), so the script is not changed.
@@ -308,7 +306,7 @@ what the skill texts require. It does not check how a skill is worded beyond the
   new test reads the list in step 2 of `skills/gx-code-review/SKILL.md` and asserts it equals
   `DefaultSkillsConfig().CodeReview` in `config/skills.go`: same names, same order.
 - **Manifest rows.** `TestEveryVendoredSkillHasManifestRow` in `skills/bundle_test.go` already reads
-  `scripts/vendored-skills.manifest`; it covers the six new rows (each directory with a `LICENSE`
+  `scripts/vendored-skills.json`; it covers the six new rows (each directory with a `LICENSE`
   needs a row). No manual check.
 - **Sync script fixture.** A new case in `scripts/sync_vendored_skills_test.go` runs the script on a
   fixture manifest holding a `port` row whose upstream path is a file path (not a directory) and
@@ -362,8 +360,6 @@ Codex waves and triage (stories 20 to 28)
 
 ## Out of Scope
 
-- Rewriting `scripts/sync-vendored-skills.sh` in TypeScript with a JSON manifest. The new `port` rows
-  work with the bash script as it is (gx:follow-ups/573).
 - Installing the `pr-review-toolkit` plugin.
 - `code-simplifier`.
 - Automatic syncing of the copies.

@@ -76,7 +76,7 @@ func TestNewReviewersSeverityScale(t *testing.T) {
 			if !strings.Contains(text, "`high`") {
 				t.Errorf("%s does not name `high`", name)
 			}
-			for _, word := range []string{"`important`", "`low`"} {
+			for _, word := range []string{"`important`", "`low`", "90 important"} {
 				if strings.Contains(text, word) {
 					t.Errorf("%s names %s", name, word)
 				}

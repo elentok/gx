@@ -33,7 +33,7 @@ When the diff holds none, report "nothing to review" and stop.
   accessibility problems and inadequate test coverage.
 
 Rate each candidate from 0 to 100: 0-25 likely false positive or pre-existing; 26-50 minor nitpick
-not in the guidelines; 51-75 valid but low impact; 76-90 important; 91-100 critical bug or explicit
+not in the guidelines; 51-75 valid but low impact; 76-90 high; 91-100 critical bug or explicit
 guideline violation. Drop everything below 80. Report only findings you confirmed in the code you
 read, never a possible issue. Filter hard: quality over quantity.
 
