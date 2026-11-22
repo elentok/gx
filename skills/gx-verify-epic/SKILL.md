@@ -187,6 +187,12 @@ never fixes, never commits, never judges scope and never opens tickets.
 
 **Lone.** Write the lines and findings the same way, under `## Results` in your own ticket.
 
+**Human-only stories.** A story that needs hardware or a person (marked `needs_human` in the plan, or
+plainly so) is not a reason to ask. Write its line as `- Story <n>: unchecked, needs human`. A lone or
+collect ticket opens one child ticket for all of them together (not one per story), then finishes.
+Never run `gx tickets ask` for them. A part records the lines and leaves the child ticket to the
+collect ticket.
+
 ### Verified section
 
 After each story, also append one entry to the `## Verified` section of your own ticket, in the

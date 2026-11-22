@@ -451,13 +451,11 @@ session instead of upfront here. See [gx-local-tracker.md](../gx-local-tracker.m
 forking section for the numbering, blocking-edge, and `parent` mechanics.
 
 If the breakdown appends a trailing `type: code-review` ticket, run
-`gx tickets ensure-code-review <epic-slug>` instead of publishing it by hand — it's a no-op if the
-epic already has a code-review ticket among its published issues, else it stamps out the stub. Skip
-running it only if the user has explicitly asked for a second code-review ticket.
+`gx tickets ensure-code-review <epic-slug>` instead of publishing it by hand (a no-op if one exists).
+Skip it only if the user asked for a second code-review ticket.
 
-If the spec has a `## Verification` section that lists new flows or scenarios to write, turn each
-one into an implementation ticket in the breakdown, like any other piece of work. The verify ticket
-runs those flows; it only writes one itself when it is small (see gx-verify-epic).
+If the spec's `## Verification` section lists new flows or scenarios to write, turn each into an
+implementation ticket. The verify ticket runs them; it writes one only when small (see gx-verify-epic).
 
 #### Verify tickets
 
@@ -478,6 +476,8 @@ cap count mock states: one state section of the mock file, one name at one width
 split the ticket. The first ticket builds the parts and checks the first 4 states. A follow-on
 implement ticket, blocked by the first, checks the remaining states and fixes what differs.
 
+**Verify acceptance criteria must apply.** An autonomous verify ticket gets no acceptance criterion
+that cannot apply to the epic's project, such as "checked in a running gx" on a non-gx epic.
 After `publish`, run `gx tickets ensure-verify <epic-slug>`. It is a no-op when the epic already has
 a verify ticket.
 

@@ -125,6 +125,14 @@ func TestMockRulesAnchors(t *testing.T) {
 			"- Parts this ticket builds: ..., each with a line of styling facts: colours, casing, placement, tokens",
 			"Add one styling facts line per part",
 			"No `testutil/gxfixture`: plan no mock units",
+			"**Verify acceptance criteria must apply.**",
+			"no acceptance criterion that cannot apply to the epic's project",
+		}},
+		{"verify-planning", "gx-to-tickets/verify-planning.md", []string{
+			"**Human-only stories.**",
+			"`needs_human: true`",
+			"`## What to verify`",
+			"`unchecked, needs human`",
 		}},
 		{"verify-epic", "gx-verify-epic/SKILL.md", []string{
 			"**Mock states lines.**",
@@ -132,6 +140,10 @@ func TestMockRulesAnchors(t *testing.T) {
 			"estimate from `gx tickets verify-plan --table`",
 			"`pass`, `fail`, `unchecked`",
 			"A missing mock file named by a Mock states line is an `unchecked` line plus a finding",
+			"**Human-only stories.**",
+			"`- Story <n>: unchecked, needs human`",
+			"opens one child ticket for all of them",
+			"Never run `gx tickets ask` for them",
 		}},
 	}
 	for _, tc := range cases {

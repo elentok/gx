@@ -12,3 +12,8 @@ gx gives one lone `verify` entry when every story fits one part. Otherwise it gi
 `verify-part-N` entries and one `verify-collect` entry blocked by every part. The body formats
 follow [gx-verify-epic](../gx-verify-epic/SKILL.md) ("The verify part body"). Every entry sets
 `expected_context_window`. Do not restate the formats here.
+
+**Human-only stories.** A story that needs hardware or a person is still listed. Mark it in the plan
+file with `needs_human: true`. The verify ticket lists every story under `## What to verify`, marked
+ones included, so the section is never empty. The verify agent marks them `unchecked, needs human`
+and does not ask (see [gx-verify-epic](../gx-verify-epic/SKILL.md)).
