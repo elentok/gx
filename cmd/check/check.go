@@ -121,6 +121,9 @@ func runCheck(c *cobra.Command, d Deps, staged, full bool, since, kinds string) 
 	}
 	opts.ProjectFor = func(dir string) string { return check.ProjectForDirs(d.Dirs(), dir) }
 
+	if d.Getenv != nil {
+		check.SweepOrphansNow(c.OutOrStdout(), d.Getenv("TMPDIR"), d.Env.Env)
+	}
 	res, err := check.Run(opts)
 	if err != nil {
 		return checkUsageError(c, err.Error())

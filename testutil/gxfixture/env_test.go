@@ -10,10 +10,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/testutil/claudeenv"
 )
 
@@ -34,6 +36,18 @@ func TestShellEnv_ExportsTheCLIEnvAndTheFixtureVariablesQuoted(t *testing.T) {
 		"export GXF_SOCKET='/tmp/s.sock'\n"
 	if got := o.ShellEnv(); got != want {
 		t.Errorf("ShellEnv() =\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestIsolatedEnv_NamesTheOwnerSoTheServerAndHoldersStopWithIt(t *testing.T) {
+	t.Setenv(syshealth.OwnerPIDEnv, "1")
+	env, cliEnv := isolatedEnv("/tmp/r", "/tmp/r/bin")
+	want := syshealth.OwnerPIDEnv + "=" + strconv.Itoa(os.Getppid())
+	if !slices.Contains(env, want) {
+		t.Errorf("server env lacks %s", want)
+	}
+	if slices.ContainsFunc(cliEnv, func(kv string) bool { return strings.HasPrefix(kv, syshealth.OwnerPIDEnv+"=") }) {
+		t.Error("cliEnv carries the owner pid; a CLI run must not be tied to it")
 	}
 }
 

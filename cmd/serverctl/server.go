@@ -150,6 +150,8 @@ stop does not wait for running tickets.`,
 // runServer runs the foreground server until interrupted.
 func runServer(ctx context.Context, d Deps) error {
 	defer projectlock.SetWaitHook(nil)()
+	// A gxfixture server stops with the test binary that owns it.
+	syshealth.WatchOwnerFromEnv(func() { _ = syscall.Kill(os.Getpid(), syscall.SIGTERM) })
 	dirs := d.dirs()
 	stateDir, err := dirs.StateDir()
 	if err != nil {

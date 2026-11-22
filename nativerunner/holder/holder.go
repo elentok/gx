@@ -189,6 +189,12 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		_ = tty.Close()
 		return err
 	}
+	// A gxfixture holder dies with the test binary that owns it (the child is
+	// its own session leader, so its group is its pid).
+	syshealth.WatchOwnerFromEnv(func() {
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		os.Exit(1)
+	})
 	// A failed read leaves the start unset; ping still answers.
 	holderStart, _ := syshealth.ProcessStart(os.Getpid())
 	childStart, _ := syshealth.ProcessStart(cmd.Process.Pid)

@@ -238,6 +238,9 @@ func launchProc(register func(func()), scenario string, env []string, flags ...s
 	args := append([]string{"--gx", GxBin, "--fakeclaude", FakeBin, "--fakegh", FakeGHBin}, flags...)
 	cmd := exec.Command(FixtureBin, append(args, scenario)...)
 	cmd.Env = append(os.Environ(), env...)
+	// Its own group, so Kill reaches the server and everything else the fixture
+	// started in it.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	r := &Running{cmd: cmd, stderr: &syncBuffer{}}
 	cmd.Stderr = r.stderr
 	stdout, err := cmd.StdoutPipe()
@@ -339,6 +342,8 @@ func (r *Running) Kill() {
 		_ = r.cmd.Process.Kill()
 		<-done
 	}
+	// Whatever the fixture left in its group (a hung server) goes too.
+	_ = syscall.Kill(-r.cmd.Process.Pid, syscall.SIGKILL)
 }
 
 // Stop sends SIGTERM and waits for the fixture to exit.
@@ -356,6 +361,7 @@ func (r *Running) Stop(t *testing.T) {
 			t.Errorf("fixture exit: %v", err)
 		}
 	case <-time.After(30 * time.Second):
+		_ = syscall.Kill(-r.cmd.Process.Pid, syscall.SIGKILL)
 		t.Fatal("fixture did not stop on SIGTERM")
 	}
 }

@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"syscall"
+
+	"github.com/elentok/gx/check"
 )
 
-const tmpPrefix = "gxfb-"
+const tmpPrefix = check.FixtureDirPrefix
 
 // makeTempDir makes this run's build dir, named gxfb-<pid>-<random>, after
 // removing the dirs of runs that died. Run's defer RemoveAll never fires when
@@ -35,18 +35,7 @@ func sweepOrphans(root string) {
 }
 
 // ownerPid parses the pid out of a gxfb-<pid>-<random> dir name.
-func ownerPid(name string) (int, bool) {
-	rest, ok := strings.CutPrefix(name, tmpPrefix)
-	if !ok {
-		return 0, false
-	}
-	digits, _, ok := strings.Cut(rest, "-")
-	if !ok {
-		return 0, false
-	}
-	pid, err := strconv.Atoi(digits)
-	return pid, err == nil && pid > 0
-}
+func ownerPid(name string) (int, bool) { return check.FixtureOwnerPID(name) }
 
 // pidAlive reports whether a process with pid exists. EPERM means it exists
 // under another user.
