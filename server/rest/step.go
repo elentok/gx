@@ -24,7 +24,7 @@ var unlockSentence = regexp.MustCompile(`(?i)^\s*i['’]m\s+.+?\s+and\s+i['’]m
 // the settings and the time, so a settings change and a tick need no code of
 // their own beyond that.
 func Step(in Input) Result {
-	e := &engine{s: in.State, cfg: in.Config, now: in.Now, rand: in.Rand}
+	e := &engine{s: in.State, cfg: in.Config, now: in.Now, rand: in.Rand, text: [2]string{in.BreakMessage, in.BreakSub}}
 	if e.rand == nil {
 		e.rand = rand.IntN
 	}
@@ -44,6 +44,7 @@ type engine struct {
 	cfg     config.MentalHealthConfig
 	now     time.Time
 	rand    func(int) int
+	text    [2]string // Input.BreakMessage, Input.BreakSub
 	records []Record
 }
 
@@ -135,6 +136,9 @@ func (e *engine) startBreak() {
 }
 
 func (e *engine) breakText() (message, sub string) {
+	if e.text[0] != "" {
+		return e.text[0], e.text[1]
+	}
 	if custom := strings.TrimSpace(e.cfg.Break.Message); custom != "" {
 		return splitMessage(custom)
 	}

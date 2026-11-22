@@ -124,6 +124,9 @@ type Input struct {
 	Event Event
 	// Rand returns a random int in [0, n). Nil means math/rand/v2.
 	Rand func(n int) int
+	// BreakMessage and BreakSub, when BreakMessage is set, are the text of a
+	// Break that starts, ahead of the settings and the built-in choices.
+	BreakMessage, BreakSub string
 }
 
 // Result is the outcome of one Step.

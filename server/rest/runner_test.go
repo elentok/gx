@@ -83,6 +83,26 @@ func TestRunner_CountsOncePerMinuteThroughLiveSettings(t *testing.T) {
 // Seam: a Break survives a restart with its message and quiet-until time.
 // Seam: Quiet answers from the recomputed view, so a Break that has passed its
 // end stops being quiet before any timer tick saves the new state.
+func TestRunner_BreakTextOptionSetsTheBreakLines(t *testing.T) {
+	t.Parallel()
+	now, cfg := start(), breakCfg()
+	r, err := rest.Open(t.TempDir(), broker.New(0), func() config.MentalHealthConfig { return cfg },
+		func() time.Time { return now }, rest.WithBreakText("Stand up.", "Drink water."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(r.Close)
+	for range cfg.Break.WorkMinutes {
+		if _, err := r.Active(); err != nil {
+			t.Fatal(err)
+		}
+		now = now.Add(time.Minute)
+	}
+	if p := r.View().Period; p == nil || p.Message != "Stand up." || p.SubMessage != "Drink water." {
+		t.Fatalf("Break text = %+v, want the two option lines", p)
+	}
+}
+
 func TestRunner_QuietAgreesWithViewAfterBreakEndsWithoutTick(t *testing.T) {
 	t.Parallel()
 	g := openRig(t, t.TempDir(), start(), breakCfg())

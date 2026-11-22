@@ -1,9 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/elentok/gx/config"
@@ -22,7 +19,8 @@ func seedRest(f *fixture, sc scenario) error {
 	}
 	var now time.Time
 	cfg := func() config.MentalHealthConfig { return sc.Rest.Config }
-	r, err := rest.Open(f.stateD, broker.New(0), cfg, func() time.Time { return now })
+	r, err := rest.Open(f.stateD, broker.New(0), cfg, func() time.Time { return now },
+		rest.WithBreakText(spec.RestBreakMessage, spec.RestBreakSubMessage))
 	if err != nil {
 		return err
 	}
@@ -32,29 +30,5 @@ func seedRest(f *fixture, sc scenario) error {
 			return err
 		}
 	}
-	return setBreakText(filepath.Join(f.stateD, "rest.json"))
-}
-
-// setBreakText replaces the stored Break text with the mock's. The engine
-// chooses its own text, which no setting can make the mock's two lines, so the
-// persisted period is the one thing patched after the runner wrote it.
-func setBreakText(path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	var state map[string]any
-	if err := json.Unmarshal(data, &state); err != nil {
-		return err
-	}
-	period, ok := state["period"].(map[string]any)
-	if !ok {
-		return nil
-	}
-	period["message"], period["sub_message"] = spec.RestBreakMessage, spec.RestBreakSubMessage
-	data, err = json.Marshal(state)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o600)
+	return nil
 }

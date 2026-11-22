@@ -19,31 +19,48 @@ const stateFileName = "rest.json"
 // Runner is the live Rest engine: the core's state, the settings, the clock,
 // the files and the timers that move a Rest period without a request.
 type Runner struct {
-	mu      sync.Mutex
-	path    string
-	records *Records
-	events  *broker.Broker
-	cfg     func() config.MentalHealthConfig
-	now     func() time.Time
-	state   State
-	view    View
-	timer   *time.Timer
-	started bool
-	closed  bool
+	mu                     sync.Mutex
+	path                   string
+	records                *Records
+	events                 *broker.Broker
+	cfg                    func() config.MentalHealthConfig
+	now                    func() time.Time
+	state                  State
+	view                   View
+	timer                  *time.Timer
+	started                bool
+	closed                 bool
+	breakMessage, breakSub string
 }
 
 // Open loads the persisted state from stateDir. cfg is read on every call, so
 // a settings change needs no copy. It reads no settings until Start.
-func Open(stateDir string, events *broker.Broker, cfg func() config.MentalHealthConfig, now func() time.Time) (*Runner, error) {
+func Open(stateDir string, events *broker.Broker, cfg func() config.MentalHealthConfig, now func() time.Time, opts ...Option) (*Runner, error) {
 	records, err := OpenRecords(stateDir, now)
 	if err != nil {
 		return nil, err
 	}
 	r := &Runner{path: filepath.Join(stateDir, stateFileName), records: records, events: events, cfg: cfg, now: now}
+	for _, o := range opts {
+		o(r)
+	}
 	if err := r.load(); err != nil {
 		return nil, err
 	}
 	return r, nil
+}
+
+// Option changes how Open builds the runner.
+type Option func(*Runner)
+
+// WithBreakText makes every Break the runner starts show these two lines. A
+// fixture uses it; production passes no option.
+func WithBreakText(message, sub string) Option {
+	return func(r *Runner) { r.breakMessage, r.breakSub = message, sub }
+}
+
+func (r *Runner) input(ev Event) Input {
+	return Input{State: r.state, Config: r.cfg(), Now: r.now(), Event: ev, BreakMessage: r.breakMessage, BreakSub: r.breakSub}
 }
 
 // Records is the store of Break starts, dropped Breaks and unlocks.
@@ -101,7 +118,7 @@ func (r *Runner) Tick() (Result, error) { return r.apply(Event{Kind: EventTick})
 func (r *Runner) apply(ev Event) (Result, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	res := Step(Input{State: r.state, Config: r.cfg(), Now: r.now(), Event: ev})
+	res := Step(r.input(ev))
 	stateChanged := !reflect.DeepEqual(r.state, res.State)
 	changed := stateChanged || !sameView(r.view, res.View)
 	r.state, r.view = res.State, res.View
