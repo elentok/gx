@@ -119,8 +119,9 @@ type Running struct {
 // leaves a short poll that prints its own diagnostic instead of a HUNG kill.
 const TestBudget = 50 * time.Second
 
-// hangLimit mirrors the default "hang" limit of check/config.go and
-// .gx/checks.json; TestBudgetIsUnderHangLimit keeps TestBudget below it.
+// hangLimit copies the "hang" limit of .gx/checks.json;
+// TestHangLimitMatchesChecksJSON keeps them equal and TestBudgetIsUnderHangLimit
+// keeps TestBudget below it.
 const hangLimit = 60 * time.Second
 
 // StartUsed is how long the fixture start took, launch-slot wait included.

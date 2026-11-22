@@ -145,7 +145,7 @@ func Run(opts Options) (Result, error) {
 	}
 	r := &runner{root: root, runDir: runDir, runID: runID, dataDir: opts.DataDir, stateDir: opts.StateDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit, env: opts.Env, ticketStore: opts.TicketStore, installs: map[string]*installEntry{}, loadAvg: opts.LoadAvg}
 	if r.loadAvg == nil {
-		r.loadAvg = SystemLoad
+		r.loadAvg = brief.SystemLoad
 	}
 	r.loadStart = r.loadAvg()
 	if r.limit <= 0 {

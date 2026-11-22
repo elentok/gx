@@ -105,16 +105,8 @@ func waitForSession(ctx context.Context, h *Harness, evs <-chan wire.Event, id s
 				return s, ""
 			}
 		}
-		for typed := false; !typed; {
-			select {
-			case ev, open := <-evs:
-				if !open {
-					return giveUp(fmt.Sprintf("event stream ended before %s %q", wire.EventSessionChanged, id))
-				}
-				typed = ev.Type == wire.EventSessionChanged && ev.Address == id
-			case <-ctx.Done():
-				return giveUp(fmt.Sprintf("no %s event for %q: %v", wire.EventSessionChanged, id, ctx.Err()))
-			}
+		if _, err := nextEvent(ctx, evs, wire.EventSessionChanged, id); err != nil {
+			return giveUp(err.Error())
 		}
 	}
 }

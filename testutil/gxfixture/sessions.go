@@ -343,9 +343,9 @@ func (f sessionSeeder) claudeTranscriptPath(id string) (string, error) {
 	return transcript.PathIn(filepath.Join(f.root, "home"), list[i].Dir, chat.ConversationID), nil
 }
 
-// controlSender sends a control to the fake of the session just created. The
-// fake's control FIFO is named by its own id, not gx's session id, so the one
-// new file (Claude) or new args log under the Codex home (Codex) is this session's.
+// controlSender sends a control to the fake of session id. The fake's control
+// FIFO is named by its conversation id, not gx's session id, so each call reads
+// the id from the session's meta.
 func (f sessionSeeder) controlSender(id, harness string) func(agentfake.Control) error {
 	return func(c agentfake.Control) error {
 		conv, err := f.conversationID(id)
@@ -483,7 +483,7 @@ func (f sessionSeeder) waitFor(id, what string, ok func(wire.SessionInfo, wire.S
 			return nil
 		}
 	}
-	return errors.New(fmt.Sprintf("session %s never reached %s", id, what) + startFailureState(f.root, id))
+	return fmt.Errorf("session %s never reached %s%s", id, what, startFailureState(f.root, id))
 }
 
 const holderErrTailLines = 20

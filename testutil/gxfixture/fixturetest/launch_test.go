@@ -1,14 +1,38 @@
 package fixturetest
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 )
+
+func TestHangLimitMatchesChecksJSON(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", ".gx", "checks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg struct {
+		Test struct {
+			Limits struct{ Hang string }
+		}
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, err := time.ParseDuration(cfg.Test.Limits.Hang)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != hangLimit {
+		t.Fatalf("hangLimit = %s, .gx/checks.json test.limits.hang = %s: update the constant", hangLimit, got)
+	}
+}
 
 func TestBudgetIsUnderHangLimit(t *testing.T) {
 	if TestBudget >= hangLimit {

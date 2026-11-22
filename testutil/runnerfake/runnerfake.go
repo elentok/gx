@@ -107,13 +107,33 @@ func (r *Runner) live(s agentrunner.Session) (*session, error) {
 	return nil, fmt.Errorf("%w: %s", agentrunner.ErrNotFound, s.Label)
 }
 
-func (r *Runner) byLabel(label string) *session {
+// find returns the live session label, or nil. Callers hold r.mu.
+func (r *Runner) find(label string) *session {
 	for _, ss := range r.sessions {
 		if ss.Label == label {
 			return ss
 		}
 	}
-	panic(fmt.Sprintf("runnerfake: no live session %q", label))
+	return nil
+}
+
+func (r *Runner) byLabel(label string) *session {
+	ss := r.find(label)
+	if ss == nil {
+		panic(fmt.Sprintf("runnerfake: no live session %q", label))
+	}
+	return ss
+}
+
+// move sets ss's state and clears what the previous state carried.
+func (r *Runner) move(ss *session, state agentrunner.State, reason string) {
+	ss.status.State = state
+	ss.status.BlockedReason, ss.status.Error = "", ""
+	ss.status.Pending = nil
+	if state == agentrunner.StateBlocked {
+		ss.status.BlockedReason = reason
+	}
+	r.notify()
 }
 
 func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) {
@@ -388,14 +408,7 @@ func (r *Runner) Healthy() error {
 func (r *Runner) SetState(label string, state agentrunner.State, reason string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	ss := r.byLabel(label)
-	ss.status.State = state
-	ss.status.BlockedReason, ss.status.Error = "", ""
-	ss.status.Pending = nil
-	if state == agentrunner.StateBlocked {
-		ss.status.BlockedReason = reason
-	}
-	r.notify()
+	r.move(r.byLabel(label), state, reason)
 }
 
 // Finish moves the live session label to done and does nothing when no
@@ -404,14 +417,8 @@ func (r *Runner) SetState(label string, state agentrunner.State, reason string) 
 func (r *Runner) Finish(label string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for _, ss := range r.sessions {
-		if ss.Label == label {
-			ss.status.State = agentrunner.StateDone
-			ss.status.BlockedReason, ss.status.Error = "", ""
-			ss.status.Pending = nil
-			r.notify()
-			return
-		}
+	if ss := r.find(label); ss != nil {
+		r.move(ss, agentrunner.StateDone, "")
 	}
 }
 

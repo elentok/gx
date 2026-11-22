@@ -2,6 +2,7 @@ package servertest
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -87,17 +88,26 @@ func HeldMigration(t *testing.T) (opt func(*server.Config), entered <-chan struc
 // address when empty), failing the test if the stream ends or ctx expires first.
 func WaitForEvent(ctx context.Context, t *testing.T, evs <-chan wire.Event, typ, address string) wire.Event {
 	t.Helper()
+	ev, err := nextEvent(ctx, evs, typ, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ev
+}
+
+// nextEvent is WaitForEvent returning the failure instead of failing.
+func nextEvent(ctx context.Context, evs <-chan wire.Event, typ, address string) (wire.Event, error) {
 	for {
 		select {
 		case ev, open := <-evs:
 			if !open {
-				t.Fatalf("event stream ended before %s %s", typ, address)
+				return wire.Event{}, fmt.Errorf("event stream ended before %s %s", typ, address)
 			}
 			if ev.Type == typ && (address == "" || ev.Address == address) {
-				return ev
+				return ev, nil
 			}
 		case <-ctx.Done():
-			t.Fatalf("no %s event for %q: %v", typ, address, ctx.Err())
+			return wire.Event{}, fmt.Errorf("no %s event for %q: %v", typ, address, ctx.Err())
 		}
 	}
 }
