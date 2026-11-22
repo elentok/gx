@@ -1,0 +1,19 @@
+[
+	{ "skill": "gx-tdd", "repo": "mattpocock/skills", "path": "skills/engineering/tdd", "license": "LICENSE", "pin": "bd453a6", "strategy": "merge" },
+	{ "skill": "gx-to-tickets", "repo": "mattpocock/skills", "path": "skills/engineering/to-tickets", "license": "LICENSE", "pin": "19c50d5", "strategy": "port" },
+	{ "skill": "gx-implement", "repo": "mattpocock/skills", "path": "skills/engineering/implement", "license": "LICENSE", "pin": "386d4ff", "strategy": "port" },
+	{ "skill": "gx-grilling", "repo": "mattpocock/skills", "path": "skills/productivity/grilling", "license": "LICENSE", "pin": "5beb35b", "strategy": "merge" },
+	{ "skill": "gx-domain-modeling", "repo": "mattpocock/skills", "path": "skills/engineering/domain-modeling", "license": "LICENSE", "pin": "5beb35b", "strategy": "merge" },
+	{ "skill": "gx-unslop", "repo": "cursor/plugins", "path": "pstack/skills/unslop", "license": "pstack/LICENSE", "pin": "eb4db2b", "strategy": "merge" },
+	{ "skill": "gx-research", "repo": "mattpocock/skills", "path": "skills/engineering/research", "license": "LICENSE", "pin": "5beb35b", "strategy": "merge" },
+	{ "skill": "gx-prototype", "repo": "mattpocock/skills", "path": "skills/engineering/prototype", "license": "LICENSE", "pin": "5beb35b", "strategy": "merge" },
+	{ "skill": "gx-wayfinder", "repo": "mattpocock/skills", "path": "skills/engineering/wayfinder", "license": "LICENSE", "pin": "5beb35b", "strategy": "merge" },
+	{ "skill": "gx-to-spec", "repo": "mattpocock/skills", "path": "skills/engineering/to-spec", "license": "LICENSE", "pin": "5beb35b", "strategy": "merge" },
+	{ "skill": "gx-thermo-nuclear-code-quality-review", "repo": "cursor/plugins", "path": "cursor-team-kit/skills/thermo-nuclear-code-quality-review", "license": "cursor-team-kit/LICENSE", "pin": "eb4db2b", "strategy": "merge" },
+	{ "skill": "gx-code-reviewer", "repo": "anthropics/claude-plugins-official", "path": "plugins/pr-review-toolkit/agents/code-reviewer.md", "license": "plugins/pr-review-toolkit/LICENSE", "pin": "fd30cee", "strategy": "port" },
+	{ "skill": "gx-silent-failure-hunter", "repo": "anthropics/claude-plugins-official", "path": "plugins/pr-review-toolkit/agents/silent-failure-hunter.md", "license": "plugins/pr-review-toolkit/LICENSE", "pin": "fd30cee", "strategy": "port" },
+	{ "skill": "gx-type-design-analyzer", "repo": "anthropics/claude-plugins-official", "path": "plugins/pr-review-toolkit/agents/type-design-analyzer.md", "license": "plugins/pr-review-toolkit/LICENSE", "pin": "fd30cee", "strategy": "port" },
+	{ "skill": "gx-comment-analyzer", "repo": "anthropics/claude-plugins-official", "path": "plugins/pr-review-toolkit/agents/comment-analyzer.md", "license": "plugins/pr-review-toolkit/LICENSE", "pin": "fd30cee", "strategy": "port" },
+	{ "skill": "gx-pr-test-analyzer", "repo": "anthropics/claude-plugins-official", "path": "plugins/pr-review-toolkit/agents/pr-test-analyzer.md", "license": "plugins/pr-review-toolkit/LICENSE", "pin": "fd30cee", "strategy": "port" },
+	{ "skill": "gx-security-review", "repo": "anthropics/claude-code-security-review", "path": ".claude/commands/security-review.md", "license": "LICENSE", "pin": "0c6a49f", "strategy": "port" }
+]

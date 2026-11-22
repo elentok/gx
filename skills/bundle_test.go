@@ -6,6 +6,7 @@
 package skills
 
 import (
+	"encoding/json"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -561,15 +562,18 @@ func TestBundleHasNoConflictMarkers(t *testing.T) {
 	}
 }
 
-// manifestSkills returns the first field of every non-comment manifest row.
-func manifestSkills(manifest string) map[string]bool {
+// manifestSkills returns the skill name of every row in the JSON manifest.
+func manifestSkills(t *testing.T, manifest string) map[string]bool {
+	t.Helper()
+	var parsed []struct {
+		Skill string `json:"skill"`
+	}
+	if err := json.Unmarshal([]byte(manifest), &parsed); err != nil {
+		t.Fatalf("manifest is not valid JSON: %v", err)
+	}
 	rows := map[string]bool{}
-	for _, line := range strings.Split(manifest, "\n") {
-		fields := strings.Fields(line)
-		if len(fields) == 0 || strings.HasPrefix(fields[0], "#") {
-			continue
-		}
-		rows[fields[0]] = true
+	for _, r := range parsed {
+		rows[r.Skill] = true
 	}
 	return rows
 }
@@ -581,7 +585,7 @@ func unlistedVendoredSkills(t *testing.T, manifest string) []string {
 	// gx-resolving-merge-conflicts is gx's own skill: it has a LICENSE but no
 	// upstream to sync from.
 	exempt := map[string]bool{"gx-resolving-merge-conflicts": true}
-	rows := manifestSkills(manifest)
+	rows := manifestSkills(t, manifest)
 	var missing []string
 	for name := range bundleSkillNames(t) {
 		if _, err := os.Stat(filepath.Join(name, "LICENSE")); err != nil || exempt[name] || rows[name] {
@@ -594,18 +598,18 @@ func unlistedVendoredSkills(t *testing.T, manifest string) []string {
 }
 
 func TestEveryVendoredSkillHasManifestRow(t *testing.T) {
-	manifest, err := os.ReadFile(filepath.Join("..", "scripts", "vendored-skills.manifest"))
+	manifest, err := os.ReadFile(filepath.Join("..", "scripts", "vendored-skills.json"))
 	if err != nil {
 		t.Fatalf("reading manifest: %v", err)
 	}
 	for _, name := range unlistedVendoredSkills(t, string(manifest)) {
-		t.Errorf("%s has a LICENSE but no row in scripts/vendored-skills.manifest", name)
+		t.Errorf("%s has a LICENSE but no row in scripts/vendored-skills.json", name)
 	}
 
-	// Dropping a row must be caught.
+	// Dropping a row must be caught. The manifest has one row per line.
 	var kept []string
 	for _, line := range strings.Split(string(manifest), "\n") {
-		if !strings.HasPrefix(line, "gx-tdd ") {
+		if !strings.Contains(line, `"skill": "gx-tdd"`) {
 			kept = append(kept, line)
 		}
 	}

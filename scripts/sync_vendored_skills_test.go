@@ -1,6 +1,7 @@
 package scripts_test
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -77,19 +78,47 @@ func newSyncFixture(t *testing.T) *syncFixture {
 		"skills/beta/SKILL.md":  "beta v1\n",
 	})
 	writeFile(t, filepath.Join(f.gxSkill, "SKILL.md"), "alpha v1\n")
-	writeFile(t, f.manifest,
-		"gx-alpha "+fixtureRepo+" skills/alpha LICENSE "+f.pin+"\n"+
-			"gx-beta "+fixtureRepo+" skills/beta LICENSE "+f.pin+" port\n")
+	writeFile(t, f.manifest, manifestJSON(
+		manifestRow("gx-alpha", "skills/alpha", f.pin, ""),
+		manifestRow("gx-beta", "skills/beta", f.pin, "port")))
 	return f
+}
+
+// manifestRow renders one manifest row; an empty strategy leaves the field out.
+func manifestRow(skill, path, pin, strategy string) string {
+	row := `{"skill": "` + skill + `", "repo": "` + fixtureRepo + `", "path": "` + path + `", "license": "LICENSE", "pin": "` + pin + `"`
+	if strategy != "" {
+		row += `, "strategy": "` + strategy + `"`
+	}
+	return row + "}"
+}
+
+func manifestJSON(rows ...string) string {
+	return "[\n" + strings.Join(rows, ",\n") + "\n]\n"
+}
+
+// syncCmd builds the sync script command against the fixture.
+func (f *syncFixture) syncCmd(args ...string) *exec.Cmd {
+	cmd := exec.Command("node", append([]string{"sync-vendored-skills.ts", "--manifest", f.manifest, "--skills-dir", filepath.Dir(f.gxSkill)}, args...)...)
+	cmd.Env = append(os.Environ(), "GX_UPSTREAM_BASE="+f.base)
+	return cmd
 }
 
 func (f *syncFixture) runSync(t *testing.T, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("bash", append([]string{"sync-vendored-skills.sh", "--manifest", f.manifest, "--skills-dir", filepath.Dir(f.gxSkill)}, args...)...)
-	cmd.Env = append(os.Environ(), "GX_UPSTREAM_BASE="+f.base)
-	out, err := cmd.CombinedOutput()
+	out, err := f.syncCmd(args...).CombinedOutput()
 	if err != nil {
 		t.Fatalf("sync script: %v\n%s", err, out)
+	}
+	return string(out)
+}
+
+// runSyncFailing runs the script, expects a non-zero exit and returns its output.
+func (f *syncFixture) runSyncFailing(t *testing.T, args ...string) string {
+	t.Helper()
+	out, err := f.syncCmd(args...).CombinedOutput()
+	if err == nil {
+		t.Fatalf("sync script succeeded, want failure:\n%s", out)
 	}
 	return string(out)
 }
@@ -181,7 +210,7 @@ func newMergeFixture(t *testing.T) *syncFixture {
 	} {
 		writeFile(t, filepath.Join(f.gxSkill, name), c)
 	}
-	writeFile(t, f.manifest, "gx-alpha "+fixtureRepo+" skills/alpha LICENSE "+f.pin+"\n")
+	writeFile(t, f.manifest, manifestJSON(manifestRow("gx-alpha", "skills/alpha", f.pin, "")))
 	return f
 }
 
@@ -453,7 +482,7 @@ func TestSyncPort_FilePathUpstream(t *testing.T) {
 	gxFile := filepath.Join(filepath.Dir(f.gxSkill), "gx-review")
 	writeFile(t, filepath.Join(gxFile, "SKILL.md"), "review v1\n")
 	writeFile(t, filepath.Join(gxFile, "LICENSE"), "MIT\n")
-	writeFile(t, f.manifest, "gx-review "+fixtureRepo+" "+cmdPath+" LICENSE "+pin+" port\n")
+	writeFile(t, f.manifest, manifestJSON(manifestRow("gx-review", cmdPath, pin, "port")))
 
 	out := f.runSync(t, "--merge")
 
@@ -467,18 +496,95 @@ func TestSyncPort_FilePathUpstream(t *testing.T) {
 	}
 }
 
-func TestRealManifest_SeedsTheBundledSkills(t *testing.T) {
-	b, err := os.ReadFile("vendored-skills.manifest")
+func TestSyncMerge_SingleFileUpstreamMergesIntoRenamedTarget(t *testing.T) {
+	f := newSyncFixture(t)
+	const agentPath = "agents/code-reviewer.md"
+	pin := f.commitUpstream(t, "add agent", map[string]string{agentPath: "1\n2\n3\n4\n5\n6\n7\n"})
+	f.commitUpstream(t, "edit agent", map[string]string{agentPath: "up\n2\n3\n4\n5\n6\n7\n"})
+	writeFile(t, filepath.Join(filepath.Dir(f.gxSkill), "gx-code-reviewer", "SKILL.md"), "1\n2\n3\n4\n5\n6\ngx\n")
+	writeFile(t, f.manifest, manifestJSON(manifestRow("gx-code-reviewer", agentPath, pin, "")))
+
+	out := f.runSync(t, "--merge")
+
+	skillPath := filepath.Join(filepath.Dir(f.gxSkill), "gx-code-reviewer", "SKILL.md")
+	b, err := os.ReadFile(skillPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{
-		"gx-tdd mattpocock/skills skills/engineering/tdd LICENSE bd453a6 merge",
-		"gx-to-tickets mattpocock/skills skills/engineering/to-tickets LICENSE 19c50d5 port",
-		"gx-implement mattpocock/skills skills/engineering/implement LICENSE 386d4ff port",
+	if string(b) != "up\n2\n3\n4\n5\n6\ngx\n" {
+		t.Errorf("SKILL.md = %q", b)
+	}
+	if !strings.Contains(out, "clean files:\n  SKILL.md\n") {
+		t.Errorf("report:\n%s", out)
+	}
+}
+
+func TestSyncManifest_RejectsABadRowNamingTheRowAndField(t *testing.T) {
+	f := newSyncFixture(t)
+	writeFile(t, f.manifest, manifestJSON(
+		manifestRow("gx-alpha", "skills/alpha", f.pin, ""),
+		`{"skill": "gx-beta", "repo": "`+fixtureRepo+`", "path": "skills/beta", "license": "LICENSE"}`))
+
+	out := f.runSyncFailing(t, "--check")
+
+	if !strings.Contains(out, `row 2 (gx-beta): field "pin"`) {
+		t.Errorf("error should name row 2 and field pin:\n%s", out)
+	}
+}
+
+func TestSyncManifest_RejectsABadStrategy(t *testing.T) {
+	f := newSyncFixture(t)
+	writeFile(t, f.manifest, manifestJSON(manifestRow("gx-alpha", "skills/alpha", f.pin, "copy")))
+
+	out := f.runSyncFailing(t, "--check")
+
+	if !strings.Contains(out, `row 1 (gx-alpha): field "strategy"`) {
+		t.Errorf("error should name the strategy field:\n%s", out)
+	}
+}
+
+func TestSyncManifest_RejectsABadShape(t *testing.T) {
+	for _, tc := range []struct{ name, manifest, want string }{
+		{"not JSON", "gx-alpha owner/skills skills/alpha LICENSE abc\n", "not valid JSON"},
+		{"not an array", `{"skill": "gx-alpha"}`, "expected a JSON array of rows"},
+		{"row is not an object", `["gx-alpha"]`, "row 1: expected an object"},
 	} {
-		if !strings.Contains(strings.Join(strings.Fields(string(b)), " "), want) {
-			t.Errorf("manifest missing %q", want)
+		t.Run(tc.name, func(t *testing.T) {
+			f := newSyncFixture(t)
+			writeFile(t, f.manifest, tc.manifest)
+
+			out := f.runSyncFailing(t, "--check")
+
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("want %q in:\n%s", tc.want, out)
+			}
+		})
+	}
+}
+
+func TestRealManifest_SeedsTheBundledSkills(t *testing.T) {
+	b, err := os.ReadFile("vendored-skills.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rows []struct{ Skill, Repo, Path, License, Pin, Strategy string }
+	if err := json.Unmarshal(b, &rows); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, r := range rows {
+		got[r.Skill] = strings.Join([]string{r.Repo, r.Path, r.License, r.Pin, r.Strategy}, " ")
+	}
+	for skill, want := range map[string]string{
+		"gx-tdd":        "mattpocock/skills skills/engineering/tdd LICENSE bd453a6 merge",
+		"gx-to-tickets": "mattpocock/skills skills/engineering/to-tickets LICENSE 19c50d5 port",
+		"gx-implement":  "mattpocock/skills skills/engineering/implement LICENSE 386d4ff port",
+	} {
+		if got[skill] != want {
+			t.Errorf("%s = %q, want %q", skill, got[skill], want)
 		}
+	}
+	if len(rows) != 17 {
+		t.Errorf("manifest has %d rows, want 17", len(rows))
 	}
 }

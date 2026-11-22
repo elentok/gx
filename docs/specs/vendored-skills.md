@@ -342,14 +342,16 @@ These are ordinary gx edits to gx's copy. Later merges keep them like any other 
 
 ### The manifest
 
-- One file in the repo holds an entry per manifest skill: the gx skill name, the upstream repo, the
-  upstream skill path, the upstream LICENSE path, the last synced commit, and the strategy (`merge`
-  or `port`; `merge` when absent).
+- `scripts/vendored-skills.json` is a JSON array with one object per manifest skill: `skill` (the gx
+  skill name), `repo`, `path` (the upstream skill path), `license` (the upstream LICENSE path),
+  `pin` (the last synced commit) and optional `strategy` (`merge` or `port`; `merge` when absent).
+- The script validates it on load. An error names the row and the field.
 - It is maintainer data, read by the sync script. It is not part of the installed bundle.
 
 ### The sync skill and script
 
-- A repo-local agent skill, `.claude/skills/sync-vendored-skills/`, backed by a script. Maintainers
+- A repo-local agent skill, `.claude/skills/sync-vendored-skills/`, backed by
+  `node scripts/sync-vendored-skills.ts` (TypeScript, run directly by Node). Maintainers
   run it by hand. It is not in the bundle. The script fetches, merges and reports. The agent judges.
 - The script fetches each upstream repo with enough history to reach every pin, and resolves the
   latest commit on the default branch.
@@ -364,6 +366,8 @@ These are ordinary gx edits to gx's copy. Later merges keep them like any other 
     Otherwise it is a conflict.
   - A file in base but not in ours (gx deleted it) stays deleted when theirs equals base. Otherwise
     it is a conflict. This mirrors the upstream-delete rule.
+  - When the upstream path is a single file, it merges into the gx skill's `SKILL.md`, whatever the
+    upstream file is called.
 - **`port` strategy.** The script prints the upstream diff for the skill path and touches no file.
   A changed `LICENSE` is handled as in "Credit files".
   The agent carries each upstream change that matters to gx's copy over by hand.
