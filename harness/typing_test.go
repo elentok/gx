@@ -466,3 +466,53 @@ func TestLookupTyping_UnknownKindIsAnError(t *testing.T) {
 }
 
 func agentKind(s string) agentrunner.Kind { return agentrunner.Kind(s) }
+
+// Composer stream fixtures are the byte sequences quoted in
+// docs/research/composer-stream-signals.md (branch
+// research/composer-stream-signals); the raw capture files were not committed.
+const (
+	claudeComposerDraw = "\x1b[?2004h\x1b[?2031h\x1b[?1004h\x1b[?1049h\x1b[2J" +
+		"────\r\x1b[1B\x1b[39m❯ \x1b[2mTry \"fix lint errors\"\x1b>0q"
+	claudeTrustDialog = "\x1b[?2031h\x1b[2G\x1b[38;2;177;185;249m❯ \x1b[4G No, exit\x1b[4G Yes, I trust this folder"
+	claudeThemeMenu   = "\x1b[?2031h❯ \x1b[4G ✔ \x1b[6G Auto (match terminal)"
+	codexLoadingFrame = "\x1b[?2026h\x1b[?1049h\x1b[1;1H\x1b[JOpenAI Codex (v0.171.0)\x1b[38;1H › Ask Codex to do anything"
+	codexIdleReport   = "\x1b]7501;state=idle:app=codex\x1b\\"
+)
+
+func TestComposerScanner(t *testing.T) {
+	tests := []struct {
+		name   string
+		kind   agentrunner.Kind
+		chunks []string
+		want   bool
+	}{
+		{"claude composer", harness.Claude, []string{claudeComposerDraw}, true},
+		{"claude trust dialog", harness.Claude, []string{claudeTrustDialog}, false},
+		{"claude theme menu", harness.Claude, []string{claudeThemeMenu}, false},
+		{"claude marker split after pointer", harness.Claude, []string{"x❯", " Try"}, true},
+		{"claude marker split mid-glyph", harness.Claude, []string{"x\xe2\x9d", "\xaf Try"}, true},
+		{"claude marker split mid-nbsp", harness.Claude, []string{"❯\xc2", "\xa0"}, true},
+		{"claude menu split across chunks", harness.Claude, []string{"❯", "\x1b[4G No"}, false},
+		{"claude stays set after later output", harness.Claude, []string{claudeComposerDraw, "plain repaint"}, true},
+		{"codex loading frame is too early", harness.Codex, []string{codexLoadingFrame}, false},
+		{"codex idle report", harness.Codex, []string{codexLoadingFrame, codexIdleReport}, true},
+		{"codex idle report split", harness.Codex, []string{"\x1b]7501;state=idle:ap", "p=codex\x1b\\"}, true},
+		{"codex working report", harness.Codex, []string{"\x1b]7501;state=working:app=codex\x1b\\"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h, err := harness.Lookup(tt.kind)
+			if err != nil {
+				t.Fatal(err)
+			}
+			s := h.(harness.ComposerScanning).NewComposerScanner()
+			seen := false
+			for _, c := range tt.chunks {
+				seen = s.Feed([]byte(c))
+			}
+			if seen != tt.want {
+				t.Errorf("seen = %v, want %v", seen, tt.want)
+			}
+		})
+	}
+}

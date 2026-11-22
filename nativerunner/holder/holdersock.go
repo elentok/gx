@@ -60,6 +60,10 @@ const OpTurnOSC = "turn-osc"
 // The core screen op stays plain.
 const OpScreenStyled = "screen-styled"
 
+// OpComposerSeen reports the Composer seen flag: whether the agent's composer
+// marker was in the raw output. Once set it stays set.
+const OpComposerSeen = "composer-seen"
+
 // OpPaste writes text to the child as one paste, bracketed when the child
 // turned bracketed paste on.
 const OpPaste = "paste"
@@ -70,7 +74,7 @@ const OpPaste = "paste"
 const OpPersonKeys = "person-keys"
 
 // holderOptionalOps are the optional ops this holder serves.
-var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach, OpTurnOSC, OpScreenStyled, OpPaste, OpPersonKeys}
+var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach, OpTurnOSC, OpScreenStyled, OpPaste, OpPersonKeys, OpComposerSeen}
 
 // typedTextMax is the longest text that goes to the child as plain keys. A
 // tty read takes at most about 1 KB on macOS, and Claude Code keeps only the
@@ -133,6 +137,8 @@ type holderResponse struct {
 	// Watched is the watcher's status for a harness with no pid status file,
 	// such as Codex. A holder without it reads as none.
 	Watched *streamStatus `json:"watched,omitempty"`
+	// ComposerSeen is the composer-seen op's answer.
+	ComposerSeen bool `json:"composer_seen,omitempty"`
 }
 
 // denyBusyMessage is the keys error while a deny-reason step runs. The
@@ -152,9 +158,11 @@ func (e *ClaudeExitedError) Error() string { return fmt.Sprintf("claude exited (
 
 // holderServer answers holder.sock requests for one child.
 type holderServer struct {
-	scr  *screen.Screen
-	ptmx *os.File
-	proc *os.Process
+	// composer is the Composer seen flag, set once by the output scan.
+	composer *composerSeen
+	scr      *screen.Screen
+	ptmx     *os.File
+	proc     *os.Process
 	// holderStart and childStart are read once; zero means the read failed.
 	holderStart, childStart int64
 	// pid is nil for a harness whose watcher has no pid status.
@@ -276,6 +284,9 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 	}
 	if req.Op == OpScreenStyled && slices.Contains(h.ops, OpScreenStyled) {
 		return holderResponse{Screen: h.scr.StyledRows()}, nil
+	}
+	if req.Op == OpComposerSeen && slices.Contains(h.ops, OpComposerSeen) {
+		return holderResponse{ComposerSeen: h.composer.seen()}, nil
 	}
 	if req.Op == OpPaste && slices.Contains(h.ops, OpPaste) {
 		if h.denying.Load() {
@@ -612,6 +623,19 @@ func (c *HolderClient) Screen(scrollback int) (rows, scrolled []string, err erro
 func (c *HolderClient) StyledScreen() ([]string, error) {
 	resp, err := c.call(holderRequest{Op: OpScreenStyled})
 	return resp.Screen, err
+}
+
+// ComposerSeen runs the optional composer-seen op. known is false for a
+// holder without the op, which reads as unknown, never as not seen.
+func (c *HolderClient) ComposerSeen() (seen, known bool, err error) {
+	if !c.Supports(OpComposerSeen) {
+		return false, false, nil
+	}
+	resp, err := c.call(holderRequest{Op: OpComposerSeen})
+	if err != nil {
+		return false, false, err
+	}
+	return resp.ComposerSeen, true, nil
 }
 
 // SendKeys writes keys to the child's terminal as typed input.

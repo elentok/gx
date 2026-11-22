@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -213,7 +214,9 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		w.SetAskDir(dir)
 	}
 	pid, _ := watcher.(harness.PidStatusWatcher)
+	composer := newComposerSeen(h)
 	srv := &holderServer{
+		composer:    composer,
 		scr:         scr,
 		ptmx:        ptmx,
 		proc:        cmd.Process,
@@ -247,7 +250,7 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	copied := make(chan struct{})
 	go func() {
 		defer close(copied)
-		_, _ = io.Copy(io.MultiWriter(rawLog, scr, output, srv.name, &programStatus{ptmx: ptmx, watcher: watcher}, &srv.changes), ptmx)
+		_, _ = io.Copy(io.MultiWriter(rawLog, scr, output, srv.name, composer, &programStatus{ptmx: ptmx, watcher: watcher}, &srv.changes), ptmx)
 	}()
 
 	exitCode, waitErr := waitChild(cmd.Process.Pid)
@@ -373,6 +376,31 @@ func (s *programStatus) Write(p []byte) (int, error) {
 	}
 	return len(p), nil
 }
+
+// composerSeen is the per-session Composer seen flag: set when the harness's
+// scanner sees the composer in the raw output, never cleared. The scan stops
+// once it is set.
+type composerSeen struct {
+	scanner harness.ComposerScanner
+	flag    atomic.Bool
+}
+
+func newComposerSeen(h harness.Harness) *composerSeen {
+	c := &composerSeen{}
+	if s, ok := h.(harness.ComposerScanning); ok {
+		c.scanner = s.NewComposerScanner()
+	}
+	return c
+}
+
+func (c *composerSeen) Write(p []byte) (int, error) {
+	if c.scanner != nil && !c.flag.Load() && c.scanner.Feed(p) {
+		c.flag.Store(true)
+	}
+	return len(p), nil
+}
+
+func (c *composerSeen) seen() bool { return c.flag.Load() }
 
 // displayNameTail is how much earlier output displayName keeps, so a title
 // split across two reads is still seen whole.

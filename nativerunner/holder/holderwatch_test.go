@@ -382,3 +382,35 @@ func TestHolderWatch_ReportsReadySignal(t *testing.T) {
 		t.Errorf("after ready = %+v, %v; want ready by %q", m, err, agentharness.ReadyScreen)
 	}
 }
+
+func TestComposerSeen_SetOnceAndStays(t *testing.T) {
+	// ❯ then U+00A0 is the composer; the later line is a repaint.
+	_, c, _ := startHolder(t, `printf 'booting\n'; sleep 0.3; printf '\342\235\257\302\240Try\n'; printf 'drawn\n'; while read -r l; do :; done`)
+	waitFor(t, "composer seen", func() bool {
+		seen, known, err := c.ComposerSeen()
+		return err == nil && known && seen
+	})
+	waitForScreen(t, c, "drawn")
+	if seen, _, _ := c.ComposerSeen(); !seen {
+		t.Error("flag cleared after later output")
+	}
+}
+
+func TestComposerSeen_MenuStreamStaysUnset(t *testing.T) {
+	// A menu draws ❯ then a cursor move (ESC[4G), never ❯ plus U+00A0.
+	_, c, _ := startHolder(t, `printf '\342\235\257\033[4G No, exit\nmenu-drawn\n'; while read -r l; do :; done`)
+	waitForScreen(t, c, "menu-drawn")
+	seen, known, err := c.ComposerSeen()
+	if err != nil || !known || seen {
+		t.Errorf("ComposerSeen = %v, %v, %v; want unset on a known holder", seen, known, err)
+	}
+}
+
+func TestComposerSeen_OldHolderReadsUnknown(t *testing.T) {
+	holder.SetHolderOptionalOps(t, nil)
+	_, c, _ := startHolder(t, echoChild)
+	seen, known, err := c.ComposerSeen()
+	if err != nil || known || seen {
+		t.Errorf("ComposerSeen = %v, %v, %v; want unknown", seen, known, err)
+	}
+}
