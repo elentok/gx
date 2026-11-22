@@ -265,7 +265,9 @@ binary is older than the worktree and shows old behaviour.
 **Bug fixes: confirm red on the old code first (mutation check).** Write the regression test, run
 it against the unfixed code, and see it fail for the bug's reason (not a harness error or timeout).
 Only then apply the fix and see it go green. A test that passes before the fix proves nothing:
-rework it until it fails. If you cannot make it fail, pause with `gx tickets ask`.
+rework it until it fails. If a required red cannot be shown after a reasonable attempt, do not
+pause: record what the seam was, what you tried and why it stayed green under `## Spec deviations`,
+keep the green work and continue.
 
 **Every new test needs a red run, not only bug fixes.** Run each new test against the old code and
 see it fail for the right reason (a compile error counts), then make the change. A test that cannot

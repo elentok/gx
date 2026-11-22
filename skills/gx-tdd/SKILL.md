@@ -52,6 +52,10 @@ green, then pause the ticket with `gx tickets ask` (see
 [gx-local-tracker.md](../gx-local-tracker.md)): the question names the seam and why it
 cannot be observed, so the ticket author can approve a different seam.
 
+**A required red that cannot be shown does not pause the ticket.** When the ticket requires a red
+proof and the seam cannot show the race or bug after a reasonable attempt, record what the seam was,
+what you tried and why it stayed green under `## Spec deviations`. Keep the green work and continue.
+
 **Tests on skill text pin structure, not prose.** Collapse whitespace (newlines included) in both the
 skill text and the expected phrase, so a reflow never breaks the test. In Go, reuse `normalizeSpace`
 and `checkAnchors` from `skills/mock_rules_test.go`. Pin only structural anchors: headings, link

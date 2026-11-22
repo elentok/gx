@@ -238,6 +238,13 @@ func TestGxImplementTestRules(t *testing.T) {
 		"(../gx-playwright-tests/SKILL.md)",
 		".ai/index.md",
 	)
+	for _, skill := range []string{"gx-tdd/SKILL.md", "gx-to-tickets/SKILL.md"} {
+		checkAnchors(t, skill, "Spec deviations", "cannot be shown")
+	}
+	if strings.Contains(readFile(t, "gx-implement/SKILL.md"), "If you cannot make it fail, pause with `gx tickets ask`") {
+		t.Error("gx-implement still tells the agent to ask when a red cannot be shown")
+	}
+	checkAnchors(t, "gx-implement/SKILL.md", "cannot be shown")
 	checkAnchors(t, "../.ai/index.md", "`gx check --full`", "skills/gx-test-guidelines/SKILL.md", "GOMAXPROCS", "claudeenv", "envguard")
 	checkAnchors(t, "../.ai/index.md", "start it with `run_in_background` from the first call", "TaskStop")
 }

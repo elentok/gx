@@ -194,6 +194,7 @@ old code: it does not compile. For such a seam write "must fail to compile or fa
 and the agent confirms the compile error as the red step. When a seam names `ClaimNext`, name the queue
 step that feeds it too (e.g. `h.Client.QueueAdd(...)`), or the test never reaches the branch under test.
 
+A required red proof that cannot be shown after a reasonable attempt does not pause the agent: it records the seam, what it tried and why it stayed green under `## Spec deviations`, then continues.
 For every seam file, state what the agent cannot guess:
 
 - **Test environment**: name the environment of each seam file (read its first lines for
