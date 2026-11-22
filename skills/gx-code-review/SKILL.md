@@ -34,10 +34,13 @@ stop and fix the ticket's frontmatter before doing anything else.
   (`gx tickets epics` lists epics) — never open ticket files by path.
 - The epic's branch is the current branch (every ralph-loop worktree runs on a `ralph-loop/`-prefixed
   branch, one per epic — see gx-implement).
-- Capture the diff scope once, the same way `code-review` does it: `git merge-base main HEAD` for the
-  fixed point, `git diff <fixed-point>...HEAD` for the diff, `git log <fixed-point>..HEAD --oneline`
-  for the commit list. Fail here — not inside a subagent — if the merge-base can't be resolved or the
-  diff is empty.
+- Capture the diff scope once with `gx tickets review-bundle <project:epic>` (add `--out <dir>` to
+  pick the directory; the default is a new temp directory). It writes `index.md` (merge-base, commit
+  list, spec path, review skill paths, per-file index), the per-area diff files
+  (`diff-<area>-<n>.diff`, each under 100 KB; docs, fixtures and lockfiles stay out of the code
+  diffs) and `deviations.md`, and prints the merge-base, commits, spec and skill paths. It fails
+  here — not inside a subagent — if the merge-base can't be resolved or the diff is empty. Do not
+  run `git diff` or `git log` yourself.
 - The epic's spec is the first of these that exists: `docs/specs/<epic-slug>.md` from the repo root,
   then `docs/specs/<epic-slug minus a trailing -impl>.md` (an `-impl` epic's design spec has no
   `-impl` in its name), then `<epic-dir>/spec.md` (legacy location). Look with one `ls` over all
@@ -49,7 +52,10 @@ stop and fix the ticket's frontmatter before doing anything else.
   count the code-changing ones: M is the epic's `implement` tickets plus their fix children. Verify,
   investigate and merge tickets never change code, so they stay out of M. Don't reuse a scope
   written into an older prompt or ticket body.
-- Collect the **known spec deviations** in one call:
+- The **known spec deviations** and the tickets filed after this code-review ticket are in the
+  bundle's `deviations.md`; pass it on whole. The post-handoff tickets are follow-ups of the review,
+  so the Spec axis must not flag them as scope creep. When the bundle is not at hand, collect the
+  deviations in one call:
   `gx tickets show <epic> --section "Spec deviations"`, optionally with `--tickets 31-46`. Pass the
   full list on, not a truncated view: no `| head`, and no loop whose output is cut ("N lines
   omitted"). `--section` replaces hand-built `sed` or `head` loops over `gx tickets show`; `--section X --exists` tests for a section by exit code. Use only this epic's tickets (skip this
@@ -76,24 +82,23 @@ and the two paths tried for each, and end your turn.
 
 ### Size gate
 
-Count the changed lines (`git diff <fixed-point>...HEAD --shortstat`: insertions plus deletions). At
+Count the changed lines from the bundle's diff files (insertions plus deletions). At
 or under about 50 changed lines, skip the Quality subagents: a configured review skill costs far more
 than it finds on a diff that small. The Spec subagent still runs. Note the skip in the ticket body at
 step 7.
 
 ### Shared review file
 
-Reviewers must not each re-run the diff and the same searches. Write files in your scratchpad
-directory (with a file write) holding the fixed point, the commit list, the changed-file list, the diff,
-and the output of any search you already ran (say, a `rg` for a symbol the diff changes). Pass
-the paths to every subagent; they read those files instead of running `git diff` themselves. They may
-Read a changed file for more context, but not re-run the diff or a search a file already holds.
+Reviewers must not each re-run the diff and the same searches. The bundle from step 1 is the shared
+review file: pass every subagent the `index.md` path and the area files for its own scope (go, tests,
+web, docs). They read those files instead of running `git diff` themselves. They may Read a changed
+file for more context, but not re-run the diff or a search a file already holds. For the output of
+any search you ran yourself (say, a `rg` for a symbol the diff changes), write one more file in your
+scratchpad directory (with a file write) and pass its path too.
 
-Keep each file small enough to read in one Read. When the full diff would pass about 100 KB, write
-an index file (fixed point, commit list, changed-file list, search output) plus one diff file per
-area — a group of changed files that one ticket or one directory owns — and list each diff file with
-its size in the index. A reviewer reads the index first, then the area files for its own scope, each
-once, without paging one file in overlapping line ranges.
+Each bundle file is small enough to read in one Read. There is one diff file per area, and a
+reviewer reads the index first, then the area files for its own scope, each once, without paging
+one file in overlapping line ranges.
 
 Every subagent prompt also says: "You must verify a suspicion before you report it: read the file or
 run the check yourself, with one grep or one read. Do not flag something as possible or unverified.

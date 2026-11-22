@@ -51,6 +51,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"verify-epic edit-only", "gx-verify-epic/SKILL.md", editOnlyRule},
 		{"code-review shared diff", "gx-code-review/SKILL.md", []string{
 			"### Shared review file", "scratchpad", "verify a suspicion", "### Size gate", "50 changed lines",
+			"gx tickets review-bundle <project:epic>", "`deviations.md`",
 		}},
 		{"code-review per-area files, spec path and coverage", "gx-code-review/SKILL.md", []string{
 			"one diff file per", "100 KB", "minus a trailing -impl", "`Covered:", "Spec reviewed N of M code-changing tickets", "Covered: <addresses reviewed> of <M> code-changing tickets", "`implement` tickets plus their fix children", "`gx tickets root`", "**deferred**, never **approved**",

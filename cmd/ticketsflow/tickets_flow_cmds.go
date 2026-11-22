@@ -15,6 +15,7 @@ import (
 func Commands(d Deps) []*cobra.Command {
 	return []*cobra.Command{
 		newTicketsCalibrationCmd(d),
+		newTicketsReviewBundleCmd(d),
 		ticketref.NewEpicScopedCmd(d.Env, "ensure-code-review <epic>",
 			"no-op if the epic has a code-review ticket, else stamp out a stub",
 			func(epicPath string, _ []string, out io.Writer) error {
