@@ -65,6 +65,9 @@ type Registry struct {
 	worktreeDirsMu sync.Mutex
 	worktreeDirs   map[string]worktreeDirEntry
 	findRepo       func(dir string) (*git.Repo, error) // nil: git.FindRepo; a test seam
+
+	projectFilesMu sync.Mutex
+	projectFiles   map[string]projectFileEntry
 }
 
 // NewRegistry builds the Registry.
@@ -248,12 +251,51 @@ func (p *Registry) ChatOverride(project string) *notify.ServerChatConfig {
 func (p *Registry) AgentsConfig(project string) config.AgentsConfig {
 	set := p.settings.Load()
 	cfg := config.Config{Agents: config.AgentsConfig{Claude: set.AgentsClaude, Codex: set.AgentsCodex, DefaultHarness: set.AgentsDefaultHarness, WritableDirectories: set.AgentsWritableDirectories}}
-	if dir, err := p.Dir(project); err == nil {
-		if pf, err := config.ReadProjectFile(dir); err == nil {
-			cfg = cfg.WithProject(pf)
-		}
+	if pf, ok := p.cachedProjectFile(project); ok {
+		cfg = cfg.WithProject(pf)
 	}
 	return cfg.Agents
+}
+
+// readProjectFile is swapped in tests to count parses.
+var readProjectFile = config.ReadProjectFile
+
+type projectFileEntry struct {
+	key worktreeDirKey
+	pf  config.ProjectFile
+}
+
+// cachedProjectFile is the project's parsed project.json. Each call costs one
+// stat; the file is parsed again only when its mtime or size changed. A
+// missing or invalid file reports false and is not cached. The result is
+// shared: callers must not modify it.
+func (p *Registry) cachedProjectFile(project string) (config.ProjectFile, bool) {
+	dir, err := p.Dir(project)
+	if err != nil {
+		return config.ProjectFile{}, false
+	}
+	st, err := os.Stat(filepath.Join(dir, config.ProjectFileName))
+	if err != nil {
+		return config.ProjectFile{}, false
+	}
+	key := worktreeDirKey{mtime: st.ModTime(), size: st.Size()}
+	p.projectFilesMu.Lock()
+	e, ok := p.projectFiles[dir]
+	p.projectFilesMu.Unlock()
+	if ok && e.key == key {
+		return e.pf, true
+	}
+	pf, err := readProjectFile(dir)
+	if err != nil {
+		return config.ProjectFile{}, false
+	}
+	p.projectFilesMu.Lock()
+	if p.projectFiles == nil {
+		p.projectFiles = map[string]projectFileEntry{}
+	}
+	p.projectFiles[dir] = projectFileEntry{key: key, pf: pf}
+	p.projectFilesMu.Unlock()
+	return pf, true
 }
 
 // skillsConfig is config skills.* for project, with the project's overrides on
@@ -261,10 +303,8 @@ func (p *Registry) AgentsConfig(project string) config.AgentsConfig {
 func (p *Registry) skillsConfig(project string) config.SkillsConfig {
 	set := p.settings.Load()
 	cfg := config.Config{Skills: config.SkillsConfig{CIFix: set.CIFixSkills, PRText: set.PRTextSkill}}
-	if dir, err := p.Dir(project); err == nil {
-		if pf, err := config.ReadProjectFile(dir); err == nil {
-			cfg = cfg.WithProject(pf)
-		}
+	if pf, ok := p.cachedProjectFile(project); ok {
+		cfg = cfg.WithProject(pf)
 	}
 	return cfg.Skills
 }
