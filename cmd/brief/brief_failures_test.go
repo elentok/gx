@@ -2,6 +2,7 @@ package brief
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -75,6 +76,39 @@ func TestBrief_FailuresWithoutAFailedRunCannotRun(t *testing.T) {
 	t.Parallel()
 	out, code := runBriefCmd(t, t.TempDir(), "failures")
 	if code != 2 || !strings.Contains(out, "no failed brief run") {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+}
+
+func TestBrief_FailuresReadsACheckLogByTestName(t *testing.T) {
+	t.Parallel()
+	log, err := filepath.Abs("../../brief/testdata/check-test.log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, code := runBriefCmd(t, t.TempDir(), "failures", log)
+	if code != 1 {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+	for _, want := range []string{
+		"TestHealthProcs_FirstCallIsReadingAndWaitGetsTheList", "expected 63.69 to be less than 40",
+		"117. Default harness setting", "18. Joined card",
+		"pause.e2e.ts.3. Pause reasons and recovery took 152.60s, over the 45s limit",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestBrief_FailuresSaysSoWhenALogFailedButNothingParsed(t *testing.T) {
+	t.Parallel()
+	log, err := filepath.Abs("../../brief/testdata/check-failed-unparsed.log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, code := runBriefCmd(t, t.TempDir(), "failures", log)
+	if code != 1 || !strings.Contains(out, "failed but no parsed failures") || !strings.Contains(out, "exit status 1") || strings.Contains(out, "no failures in") {
 		t.Fatalf("exit = %d, out:\n%s", code, out)
 	}
 }

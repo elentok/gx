@@ -46,7 +46,19 @@ func Failures(dataDir, logPath, test string, w io.Writer) int {
 	if err != nil {
 		return cantRun(w, err.Error())
 	}
-	failures := tool.Parse(out, ExitFail).Failures
+	var failures []Unit
+	if IsCheckLog(out) {
+		failures, toolName = ParseCheckLog(out), "check"
+	} else {
+		failures = tool.Parse(out, ExitFail).Failures
+	}
+	if len(failures) == 0 && SaysFailed(out) {
+		fmt.Fprintf(w, "failed but no parsed failures in %s\n", logPath)
+		for _, l := range tailOf(out, 20) {
+			fmt.Fprintln(w, l)
+		}
+		return ExitFail
+	}
 	if len(failures) == 0 {
 		fmt.Fprintf(w, "no failures in %s\n", logPath)
 		return ExitPass
@@ -65,6 +77,12 @@ func Failures(dataDir, logPath, test string, w io.Writer) int {
 	}
 	fmt.Fprintln(w, logPath)
 	return ExitFail
+}
+
+// tailOf is the last n lines of out.
+func tailOf(out []byte, n int) []string {
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	return lines[max(0, len(lines)-n):]
 }
 
 // fullText is the untrimmed text of a failure.

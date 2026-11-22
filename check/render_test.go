@@ -5,6 +5,17 @@ import (
 	"testing"
 )
 
+func TestRender_FailingPlaywrightFlowsOfACheckLogAreNamedInTheSummary(t *testing.T) {
+	t.Parallel()
+	names := checkLogFailures("../brief/testdata/check-test.log")
+	out := Result{Exit: ExitFail, Kinds: []KindResult{{Kind: "test", Status: StatusFail, Log: "/tmp/log", Failures: names}}}.Render()
+	for _, want := range []string{"e2e/codex.e2e.ts.117. Default harness setting", "e2e/united.e2e.ts.18. Joined card"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("summary lacks %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestRender_ManyFailuresNameTheDominantError(t *testing.T) {
 	t.Parallel()
 	k := KindResult{Kind: "test", Status: StatusFail, Log: "/tmp/log"}

@@ -304,6 +304,9 @@ func (r *runner) runKind(kind string) KindResult {
 		}
 	}
 	res.Duration = time.Since(start)
+	if res.Status == StatusFail && len(res.Failures) == 0 {
+		res.Failures = checkLogFailures(res.Log)
+	}
 	if kind == kindTest {
 		r.enforceSlow(&res, c.Limits.Slow)
 		if r.mode == ModeFull {
@@ -369,6 +372,24 @@ func (r *runner) enforceSlow(res *KindResult, slow SlowLimits) {
 	slices.Sort(res.Warnings)
 	res.Status = StatusFail
 	res.Tail = append(res.Tail, msgs...)
+	if f, err := os.OpenFile(res.Log, os.O_APPEND|os.O_WRONLY, 0o644); err == nil {
+		fmt.Fprintln(f, strings.Join(msgs, "\n"))
+		f.Close()
+	}
+}
+
+// checkLogFailures names the failing tests a shell-run kind's log lists, so
+// the summary names them instead of showing the log's last lines.
+func checkLogFailures(log string) []string {
+	data, err := os.ReadFile(log)
+	if err != nil || !brief.IsCheckLog(data) {
+		return nil
+	}
+	var names []string
+	for _, u := range brief.ParseCheckLog(data) {
+		names = append(names, u.String())
+	}
+	return names
 }
 
 // rerunKindSuffix marks the index line of a slow test's re-run: same check run

@@ -1,0 +1,22 @@
+FAIL go      831s
+FAIL e2e     733s
+
+== go ==
+FAIL go-test: 1 failed in 13m49.86s
+github.com/elentok/gx/server/health
+  TestHealthProcs_FirstCallIsReadingAndWaitGetsTheList
+        healthprocs_test.go:191: expected 63.69 to be less than 40
+re-run only the failing tests: gx brief go-test -timeout=10m -count=1 github.com/elentok/gx/server/health -run '^(TestHealthProcs_FirstCallIsReadingAndWaitGetsTheList)$'
+/Users/david/.local/share/gx/brief/20261117T195230.271328000-go-test.log
+
+== e2e ==
+FAIL playwright: 2 failed in 11m57.36s
+e2e/codex.e2e.ts
+  117. Default harness setting
+    Expected: "codex"
+    Received: "claude"
+e2e/united.e2e.ts
+  18. Joined card
+152.6s  pause.e2e.ts.3. Pause reasons and recovery
+make: *** [web-e2e] Error 1
+slow test pause.e2e.ts.3. Pause reasons and recovery took 152.60s, over the 45s limit
