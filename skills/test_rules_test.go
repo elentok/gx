@@ -214,6 +214,12 @@ func TestGxImplementTestRules(t *testing.T) {
 		"Every new test needs a red run",
 		"packages that import the changed package",
 		"Do not extend a shared test fixture",
+		"`gx tickets set --status done` is refused",
+		"use `gx tickets close`",
+	)
+	checkAnchors(t, "gx-verify-epic/SKILL.md",
+		"`gx tickets set --status done` is refused",
+		"use `gx tickets close`",
 	)
 	for _, skill := range []string{"gx-implement/SKILL.md", "gx-tdd/SKILL.md"} {
 		if strings.Contains(readFile(t, skill), "gx-playwright-e2es") {

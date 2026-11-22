@@ -380,6 +380,19 @@ func inMapEpic(path string) bool {
 	return filepath.Base(issuesDir) == "issues" && tickets.IsMapEpic(filepath.Dir(issuesDir))
 }
 
+// closeHint tells an agent that asked for `done` which verb closes this kind
+// of ticket; empty for every other refused status.
+func closeHint(path string, s schema.Status) string {
+	if s != schema.StatusDone {
+		return ""
+	}
+	issuesDir := filepath.Dir(path)
+	if filepath.Base(issuesDir) == "issues" && filepath.Base(filepath.Dir(issuesDir)) == tickets.FollowUpsEpic {
+		return ". To close a follow-up, run `gx tickets close <addr>`"
+	}
+	return ". Do not close this ticket yourself: the server closes it after you report finished (`gx tickets set <addr> --iteration-status finished`)"
+}
+
 // mapDoneStamp is the tokens and cost to stamp when c closes a map epic's
 // ticket, from its recorded conversations; nil when nothing should be stamped.
 func mapDoneStamp(dirs config.Dirs, c *cobra.Command, path string) (*conversations.Totals, error) {
@@ -417,7 +430,7 @@ func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io
 		status, _ := c.Flags().GetString("status")
 		s := schema.Status(status)
 		if orchestrationStatuses[s] && !(mapEpicStatuses[s] && inMapEpic(path)) {
-			return fmt.Errorf("%s: --status %s is an orchestration status; the server owns it, `tickets set` only moves a ticket between draft and open (or, in a kind: map epic, claims and closes it)", path, status)
+			return fmt.Errorf("%s: --status %s is an orchestration status; the server owns it, `tickets set` only moves a ticket between draft and open (or, in a kind: map epic, claims and closes it)%s", path, status, closeHint(path, s))
 		}
 		if err := checkAgentStatusGuard(path, schema.Status(status), getwd); err != nil {
 			return err

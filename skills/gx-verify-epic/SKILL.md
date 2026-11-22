@@ -320,4 +320,6 @@ one-line bullets `Did`, `Went wrong`, `Decisions`, `Left`, `Red-first` (`yes`, o
 `gx tickets section <addr> "Iteration summaries" -`, which replaces the whole section (it is created if
 missing), so include earlier entries.
 
-`--status done` is never yours to set. gx decides it after you report `finished`.
+`--status done` is never yours to set: `gx tickets set --status done` is refused. gx decides it after
+you report `finished`. To close a follow-up use `gx tickets close`; the server closes every other
+ticket after you report finished.

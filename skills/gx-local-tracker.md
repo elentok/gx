@@ -230,7 +230,7 @@ A `type: code-review` ticket is exempt from the `blocked_by` check: it becomes e
 
 The gx server is the only scheduler. Orchestration statuses are written by it alone, and
 `gx tickets set --status` refuses them (`claimed`, `done`, `needs-answer`, `needs-repair`,
-`cancelled`). The one other writer is `gx tickets close`, which writes `cancelled` — only on a
+`cancelled`); the refusal names the right verb for the ticket's kind. The one other writer is `gx tickets close`, which writes `cancelled` — only on a
 `draft`/`open` ticket in a `follow-ups` epic:
 
 | Status | Written by |

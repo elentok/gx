@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/cmd/cmdtest"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
@@ -247,6 +248,30 @@ func TestExecute_TicketsSet_OrchestrationStatusesRefused(t *testing.T) {
 			raw, _ := os.ReadFile(path)
 			if string(raw) != original {
 				t.Errorf("ticket changed despite refusal: %q", raw)
+			}
+		})
+	}
+}
+
+// The --status done refusal names the verb for the ticket's kind.
+func TestExecute_TicketsSet_DoneRefusalNamesVerb(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct{ epic, want string }{
+		"follow-up":    {tickets.FollowUpsEpic, "gx tickets close"},
+		"other ticket": {"some-epic", "closes it after you report finished"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			dir := filepath.Join(t.TempDir(), tc.epic, "issues")
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(dir, "04b-ticket.md")
+			cmdtest.WriteTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
+			d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), cmdtest.NonAgentGetwd(t))
+			err := execute(t, []string{"tickets", "set", path, "--status=done"}, d)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want it to contain %q", err, tc.want)
 			}
 		})
 	}

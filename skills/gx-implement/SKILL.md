@@ -359,7 +359,9 @@ Once done, run `gx tickets set <addr> --iteration-status finished`. This report 
 merge, never conclude one: gx adopts it and decides `status: done` itself from its own commit
 count and cherry-pick outcome — never write `--status done` yourself, even paired with
 `--iteration-status finished`; merge status is gx's alone to set (the one exception is the
-draft→open fork handover in step 3 above). Code review runs separately, batched across the epic,
+draft→open fork handover in step 3 above). `gx tickets set --status done` is refused. To close
+a follow-up use `gx tickets close`; every other ticket is closed by the server after you report
+finished, so do not ask a person. Code review runs separately, batched across the epic,
 not per-ticket — do not invoke it from here.
 
 If you conclude this ticket needs **no commit** — e.g. exploration shows the behavior already
