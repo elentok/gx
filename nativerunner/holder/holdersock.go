@@ -73,8 +73,15 @@ const OpPaste = "paste"
 // it as a person's input. Plain keys stay silent.
 const OpPersonKeys = "person-keys"
 
+// OpBatchBegin and OpBatchEnd bracket a gx batch: gx owns the input in
+// between, and the attach that had it gets it back at the end.
+const (
+	OpBatchBegin = "batch-begin"
+	OpBatchEnd   = "batch-end"
+)
+
 // holderOptionalOps are the optional ops this holder serves.
-var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach, OpTurnOSC, OpScreenStyled, OpPaste, OpPersonKeys, OpComposerSeen}
+var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach, OpTurnOSC, OpScreenStyled, OpPaste, OpPersonKeys, OpComposerSeen, OpBatchBegin, OpBatchEnd}
 
 // typedTextMax is the longest text that goes to the child as plain keys. A
 // tty read takes at most about 1 KB on macOS, and Claude Code keeps only the
@@ -295,6 +302,7 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 		if _, err := h.ptmx.Write([]byte(req.Keys)); err != nil {
 			return holderResponse{Error: err.Error()}, nil
 		}
+		h.frames.gxKeyed()
 		return holderResponse{}, nil
 	case opStop:
 		return holderResponse{}, h.stop
@@ -321,6 +329,17 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 		if _, err := h.ptmx.Write(h.pasted(req.Keys)); err != nil {
 			return holderResponse{Error: err.Error()}, nil
 		}
+		h.frames.gxKeyed()
+		return holderResponse{}, nil
+	}
+	if req.Op == OpBatchBegin && slices.Contains(h.ops, OpBatchBegin) {
+		h.frames.beginBatch()
+		return holderResponse{}, nil
+	}
+	if req.Op == OpBatchEnd && slices.Contains(h.ops, OpBatchEnd) {
+		if err := h.frames.endBatch(); err != nil {
+			return holderResponse{Error: err.Error()}, nil
+		}
 		return holderResponse{}, nil
 	}
 	if req.Op == OpPersonKeys && slices.Contains(h.ops, OpPersonKeys) {
@@ -334,6 +353,7 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 		if _, err := h.ptmx.Write(data); err != nil {
 			return holderResponse{Error: err.Error()}, nil
 		}
+		h.frames.gxKeyed()
 		h.inputs.notify()
 		return holderResponse{}, nil
 	}
@@ -674,6 +694,32 @@ func (c *HolderClient) ComposerSeen() (seen, known bool, err error) {
 		return false, false, err
 	}
 	return resp.ComposerSeen, true, nil
+}
+
+// BatchBegin and BatchEnd run the optional batch ops; a holder without them
+// does nothing, so older holders keep working.
+func (c *HolderClient) BatchBegin() error {
+	if !c.Supports(OpBatchBegin) {
+		return nil
+	}
+	_, err := c.call(holderRequest{Op: OpBatchBegin})
+	return err
+}
+
+func (c *HolderClient) BatchEnd() error {
+	if !c.Supports(OpBatchEnd) {
+		return nil
+	}
+	_, err := c.call(holderRequest{Op: OpBatchEnd})
+	return err
+}
+
+// Batch runs fn with gx owning the input, and always ends the batch.
+func (c *HolderClient) Batch(fn func() error) error {
+	if err := c.BatchBegin(); err != nil {
+		return err
+	}
+	return errors.Join(fn(), c.BatchEnd())
 }
 
 // SendKeys writes keys to the child's terminal as typed input.

@@ -85,6 +85,8 @@ type HolderOptions struct {
 	AnswerDaemon bool
 	// ProcCap is the process limit the child's tree runs under; zero is none.
 	ProcCap int
+	// HoldInput makes gx own the input from launch until the first batch ends.
+	HoldInput bool
 	// Env (KEY=VALUE) is appended to the child's env.
 	Env []string
 }
@@ -238,6 +240,9 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		finished: make(chan struct{}),
 	}
 	watcher.OnChange(srv.changes.notify)
+	if opts.HoldInput {
+		srv.frames.holdLaunch()
+	}
 	// Runs before ln.Close, so watch streams get their exit before the
 	// socket goes.
 	defer srv.finish()

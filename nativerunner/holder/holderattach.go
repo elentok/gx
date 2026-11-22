@@ -64,7 +64,24 @@ type frameHub struct {
 	resizedSinceOutput bool
 	// owner is the attach whose keys and size count; nil means gx owns.
 	owner *attachClient
+	// held is set while gx holds the input: from launch with HoldInput until
+	// the first batch ends, and during each batch. Take-overs are ignored and a
+	// lone attach does not become the owner.
+	held bool
+	// batch is set while a gx batch is open; launchHold is the launch hold.
+	batch, launchHold bool
+	// handBack is the attach that owns when the hold ends: the owner a batch
+	// took the input from, or a lone attach that came during the hold.
+	handBack *attachClient
+	// batchTimer releases a batch gx never ended; batchGen tells a stale timer
+	// from the current one.
+	batchTimer *time.Timer
+	batchGen   int
 }
+
+// batchTimeout is how long a batch holds the input after gx's last key in it
+// before the holder releases it, for a gx that died mid-batch.
+var batchTimeout = 15 * time.Second
 
 // attachClient is one attach's pacing state, guarded by frameHub.mu.
 type attachClient struct {
@@ -124,10 +141,86 @@ func (f *frameHub) subscribe() (*attachClient, Frame) {
 	lone := len(f.subs) == 0
 	f.subs[c] = struct{}{}
 	if lone {
-		// Reported with the attach's first messages, not by a wake.
-		f.owner = c
+		if f.held {
+			f.handBack = c
+		} else {
+			// Reported with the attach's first messages, not by a wake.
+			f.owner = c
+		}
 	}
 	return c, f.fullFrameLocked(c)
+}
+
+// holdLaunch makes gx own the input from launch until the first batch ends.
+func (f *frameHub) holdLaunch() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.launchHold = true
+	f.held = true
+}
+
+// beginBatch makes gx the owner until endBatch, remembering the owner to hand
+// back to. A second begin only restarts the safety timer.
+func (f *frameHub) beginBatch() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.batch {
+		f.batch, f.held = true, true
+		if f.owner != nil {
+			f.handBack = f.owner
+		}
+		f.setOwnerLocked(nil)
+	}
+	f.armBatchLocked()
+}
+
+// gxKeyed restarts the batch's safety timer; gx wrote to the child.
+func (f *frameHub) gxKeyed() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.batch {
+		f.armBatchLocked()
+	}
+}
+
+func (f *frameHub) armBatchLocked() {
+	if f.batchTimer != nil {
+		f.batchTimer.Stop()
+	}
+	f.batchGen++
+	gen := f.batchGen
+	f.batchTimer = time.AfterFunc(batchTimeout, func() {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		if f.batch && f.batchGen == gen {
+			_ = f.endBatchLocked()
+		}
+	})
+}
+
+// endBatch returns the input to the attach it came from, which the pty then
+// takes the size of. Gx keeps it when that attach left. The first end also
+// ends the launch hold.
+func (f *frameHub) endBatch() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.endBatchLocked()
+}
+
+func (f *frameHub) endBatchLocked() error {
+	if f.batchTimer != nil {
+		f.batchTimer.Stop()
+		f.batchTimer = nil
+	}
+	f.batchGen++
+	f.batch, f.launchHold, f.held = false, false, false
+	c := f.handBack
+	f.handBack = nil
+	if c == nil {
+		return nil
+	}
+	f.setOwnerLocked(c)
+	return f.ownLocked(c)
 }
 
 // unsubscribe drops c. If c owned the session, gx does, and the remaining
@@ -137,6 +230,9 @@ func (f *frameHub) unsubscribe(c *attachClient) {
 	defer f.mu.Unlock()
 	f.stopTimerLocked(c)
 	delete(f.subs, c)
+	if f.handBack == c {
+		f.handBack = nil
+	}
 	if f.owner == c {
 		f.setOwnerLocked(nil)
 	}
@@ -240,6 +336,9 @@ func (f *frameHub) resized(c *attachClient, width, height int) error {
 func (f *frameHub) takeOver(c *attachClient) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.held {
+		return nil
+	}
 	f.setOwnerLocked(c)
 	return f.ownLocked(c)
 }

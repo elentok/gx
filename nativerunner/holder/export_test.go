@@ -29,6 +29,18 @@ func RunTestSessionHolder(dir string, h harness.Harness, gxSession string, argv 
 	return runHolder(dir, h, HolderOptions{GXSession: gxSession}, argv)
 }
 
+// RunTestHolderWith is RunTestHolder with options.
+func RunTestHolderWith(dir string, h harness.Harness, opts HolderOptions, argv []string) error {
+	return runHolder(dir, h, opts, argv)
+}
+
+// SetBatchTimeout shortens the batch safety timeout for the test.
+func SetBatchTimeout(t *testing.T, d time.Duration) {
+	old := batchTimeout
+	batchTimeout = d
+	t.Cleanup(func() { batchTimeout = old })
+}
+
 // SetHolderOptionalOps makes holders started by the test advertise ops.
 func SetHolderOptionalOps(t *testing.T, ops []string) {
 	old := holderOptionalOps

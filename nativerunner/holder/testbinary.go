@@ -89,6 +89,7 @@ func serveTestHolder() {
 	if i := slices.Index(args, "--proc-cap"); i >= 0 {
 		opts.ProcCap, _ = strconv.Atoi(args[i+1])
 	}
+	opts.HoldInput = slices.Contains(args[:slices.Index(args, "--")], "--hold-input")
 	if err := RunHarnessHolder(dir, kind, opts, args[slices.Index(args, "--")+1:]); err != nil {
 		// Like the real command, whose error cobra prints.
 		fmt.Fprintln(os.Stderr, "Error:", err)

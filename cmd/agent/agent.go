@@ -89,6 +89,7 @@ func NewHolder() *cobra.Command {
 	cmd.Flags().StringVar(&dir, "dir", "", "the agent directory")
 	cmd.Flags().BoolVar(&opts.Trust, "trust", false, "answer the harness's trust dialog")
 	cmd.Flags().IntVar(&opts.ProcCap, "proc-cap", 0, "cap the agent's process tree at this many processes of the uid (default none)")
+	cmd.Flags().BoolVar(&opts.HoldInput, "hold-input", false, "gx owns the input from launch until its first batch ends")
 	_ = cmd.MarkFlagRequired("session-id")
 	_ = cmd.MarkFlagRequired("dir")
 	return cmd

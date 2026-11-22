@@ -142,6 +142,7 @@ func runTestHolder(args []string) error {
 	fs.StringVar(&dir, "dir", "", "")
 	fs.BoolVar(&opts.Trust, "trust", false, "")
 	fs.IntVar(&opts.ProcCap, "proc-cap", 0, "")
+	fs.BoolVar(&opts.HoldInput, "hold-input", false, "")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
