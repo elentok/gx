@@ -37,6 +37,10 @@ func checkRuleHeadings(t *testing.T, path string) {
 	}
 }
 
+func TestVerifyEpicRunsFullCheckRequireQuiet(t *testing.T) {
+	checkAnchors(t, "gx-verify-epic/SKILL.md", "gx check --full --require-quiet")
+}
+
 func TestTestGuidelinesHeadings(t *testing.T) {
 	checkRuleHeadings(t, "gx-test-guidelines/SKILL.md")
 }

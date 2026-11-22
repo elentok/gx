@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
@@ -30,14 +31,27 @@ func runCheckCmdLoad(t *testing.T, loadAvg func() float64, cwd string, args ...s
 		Env:   cmdtest.EnvFor(t),
 	}
 	err := cmdtest.Run(t, env, append([]string{"check"}, args...), New(Deps{Env: env, LoadAvg: loadAvg}))
+	// The --full preflight line is covered by the Preflight tests; the other
+	// tests read the summary path from the first line.
+	text := dropPreflight(out.String())
 	var ee *cmdbase.ExitError
 	if errors.As(err, &ee) {
-		return out.String(), ee.Code
+		return text, ee.Code
 	}
 	if err != nil {
 		t.Fatalf("check: %v", err)
 	}
-	return out.String(), 0
+	return text, 0
+}
+
+func dropPreflight(out string) string {
+	var keep []string
+	for _, l := range strings.SplitAfter(out, "\n") {
+		if !strings.HasPrefix(l, "load average ") && !strings.HasPrefix(l, "warning: machine is loaded") {
+			keep = append(keep, l)
+		}
+	}
+	return strings.Join(keep, "")
 }
 
 // checkRepo is a TempRepo with checksJSON committed as .gx/checks.json and a
@@ -60,6 +74,65 @@ func logOf(t *testing.T, out, kind string) string {
 		t.Fatalf("log of %s: %v\n%s", kind, err, out)
 	}
 	return string(data)
+}
+
+// runCheckMachine runs `gx check` with the preflight sample injected.
+func runCheckMachine(t *testing.T, m check.Machine, cwd string, args ...string) (string, int) {
+	t.Helper()
+	var out bytes.Buffer
+	env := cmdbase.Env{
+		Stdout: &out, Stderr: &out,
+		Getwd: func() (string, error) { return cwd, nil },
+		Env:   cmdtest.EnvFor(t),
+	}
+	err := cmdtest.Run(t, env, append([]string{"check"}, args...),
+		New(Deps{Env: env, Machine: func() check.Machine { return m }}))
+	var ee *cmdbase.ExitError
+	if errors.As(err, &ee) {
+		return out.String(), ee.Code
+	}
+	if err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	return out.String(), 0
+}
+
+var (
+	quietMachine  = check.Machine{Load: 0, TopProc: "idle-proc", TopCPU: 1, Orphans: 2}
+	loadedMachine = check.Machine{Load: 100000, TopProc: "busy-proc", TopCPU: 99, Orphans: 3}
+)
+
+func TestPreflight_FullPrintsMachineLinesBeforeTheRun(t *testing.T) {
+	repo := checkRepo(t, `{"test":"true"}`)
+	out, code := runCheckMachine(t, quietMachine, repo, "--full")
+	if code != 0 || !strings.HasPrefix(out, "load average 0.00, top process idle-proc (1% CPU), 2 orphan fixture processes\n") {
+		t.Errorf("exit %d; want machine line first\n%s", code, out)
+	}
+	if out, _ := runCheckMachine(t, quietMachine, repo, "--staged"); strings.Contains(out, "load average") {
+		t.Errorf("non-full run printed a preflight\n%s", out)
+	}
+}
+
+func TestPreflight_LoadWarnsAndRunsOn(t *testing.T) {
+	repo := checkRepo(t, `{"test":"true"}`)
+	out, code := runCheckMachine(t, loadedMachine, repo, "--full")
+	if code != 0 || !strings.Contains(out, "warning: machine is loaded") || !strings.Contains(out, "test") {
+		t.Errorf("exit %d; want warning and a normal run\n%s", code, out)
+	}
+}
+
+func TestRequireQuiet_LoadedMachineStopsBeforeAnyKind(t *testing.T) {
+	repo := checkRepo(t, `{"test":"touch ran"}`)
+	out, code := runCheckMachine(t, loadedMachine, repo, "--full", "--require-quiet")
+	if code != 2 || !strings.Contains(out, "machine is loaded") || !strings.Contains(out, "busy-proc") {
+		t.Errorf("exit %d; want exit 2 naming the load\n%s", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(repo, "ran")); err == nil {
+		t.Error("a kind ran despite --require-quiet")
+	}
+	if out, code := runCheckMachine(t, quietMachine, repo, "--full", "--require-quiet"); code != 0 {
+		t.Errorf("quiet machine: exit %d\n%s", code, out)
+	}
 }
 
 func TestCheck_Limits(t *testing.T) {

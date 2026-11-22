@@ -127,8 +127,11 @@ parts. Pick one, and say which in your ticket. Send each failure through
 The one command, run in the background (`run_in_background`):
 
 ```
-gx check --full
+gx check --full --require-quiet
 ```
+
+`--require-quiet` makes a loaded machine fail in seconds (exit 2, naming the load) instead of after a
+long run. If it stops the run, wait for the load to drop and run it again; do not drop the flag.
 
 - Plain command: no pipe, no `|| gx check --full` fallback. A failing check exits non-zero too, so a
   fallback starts a second full run.

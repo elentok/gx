@@ -22,11 +22,13 @@ type Deps struct {
 	cmdbase.Env
 	// LoadAvg reads the 1-minute load average; nil reads the machine.
 	LoadAvg func() float64
+	// Machine samples the machine for the --full preflight; nil reads it.
+	Machine func() check.Machine
 }
 
 // New builds the `check` command.
 func New(d Deps) *cobra.Command {
-	var staged, full bool
+	var staged, full, requireQuiet bool
 	var since, kinds string
 	cmd := &cobra.Command{
 		Use:   "check [--staged | --since <ref> | --full] [--kind <list>]",
@@ -54,15 +56,20 @@ missing key turns that limit off. A malformed duration or an unknown key exits 2
 --since runs ignore it. When the 1-minute load average per core is above
 1.5 (check.HighLoadPerCore) it only warns and the run keeps exit 0.
 
+--full first prints the load average, the busiest process and the orphan fixture
+process count. Above the load threshold it warns and runs on; with --require-quiet
+it exits 2 without running any kind.
+
 Exit 0 pass, 1 fail, 2 gx could not run, 3 no applicable checks.`,
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runCheck(c, d, staged, full, since, kinds)
+			return runCheck(c, d, staged, full, requireQuiet, since, kinds)
 		},
 	}
 	cmd.Flags().BoolVar(&staged, "staged", false, "check the staged files")
 	cmd.Flags().StringVar(&since, "since", "", "check the files changed in <ref>...HEAD")
 	cmd.Flags().BoolVar(&full, "full", false, "run the full command on every tracked file")
+	cmd.Flags().BoolVar(&requireQuiet, "require-quiet", false, "with --full, exit 2 before running when the machine is loaded")
 	cmd.Flags().StringVar(&kinds, "kind", "", "comma-separated kinds to run (default: all)")
 	cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 		return checkUsageError(c, err.Error())
@@ -77,7 +84,7 @@ func checkUsageError(c *cobra.Command, msg string) error {
 	return &cmdbase.ExitError{Code: check.ExitCantRun}
 }
 
-func runCheck(c *cobra.Command, d Deps, staged, full bool, since, kinds string) error {
+func runCheck(c *cobra.Command, d Deps, staged, full, requireQuiet bool, since, kinds string) error {
 	opts := check.Options{}
 	modes := 0
 	if staged {
@@ -121,6 +128,21 @@ func runCheck(c *cobra.Command, d Deps, staged, full bool, since, kinds string) 
 	}
 	opts.ProjectFor = func(dir string) string { return check.ProjectForDirs(d.Dirs(), dir) }
 
+	if full {
+		sample := d.Machine
+		if sample == nil {
+			sample = func() check.Machine {
+				var tmp string
+				if d.Getenv != nil {
+					tmp = d.Getenv("TMPDIR")
+				}
+				return check.SampleMachine(tmp, d.Env.Env)
+			}
+		}
+		if msg := check.Preflight(c.OutOrStdout(), sample(), requireQuiet); msg != "" {
+			return checkUsageError(c, msg)
+		}
+	}
 	if d.Getenv != nil {
 		check.SweepOrphansNow(c.OutOrStdout(), d.Getenv("TMPDIR"), d.Env.Env)
 	}
