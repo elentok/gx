@@ -43,6 +43,27 @@ func TestRender_LongGuardLinePrintsInFull(t *testing.T) {
 	}
 }
 
+func TestRender_TypecheckTailKeepsDiagnosticsOnlyAndRerunCommand(t *testing.T) {
+	t.Parallel()
+	tail := []string{"error[a]: first " + strings.Repeat("x", 500), "error[b]: second"}
+	for range 25 {
+		tail = append(tail, "info: Possible overloads "+strings.Repeat("o", 1000), "    indented continuation")
+	}
+	r := Result{Exit: ExitFail, Kinds: []KindResult{{Kind: "typecheck", Status: StatusFail, Log: "/tmp/log", Tail: tail}}}
+	out := r.Render()
+	if strings.Contains(out, "info:") || strings.Contains(out, "continuation") {
+		t.Errorf("info or continuation lines kept:\n%s", out)
+	}
+	if !strings.Contains(out, "error[b]: second") || !strings.Contains(out, "rerun: gx check --kind typecheck") {
+		t.Errorf("diagnostics or rerun command missing:\n%s", out)
+	}
+	for line := range strings.SplitSeq(out, "\n") {
+		if len([]rune(line)) > 310 {
+			t.Errorf("line over the cap: %d chars", len(line))
+		}
+	}
+}
+
 func TestRender_FailureTailDropsLogNoiseAndStartsAtTheAssertion(t *testing.T) {
 	t.Parallel()
 	r := Result{Exit: ExitFail, Kinds: []KindResult{{

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -317,7 +318,11 @@ func (r *runner) runKind(kind string) KindResult {
 		r.afterFormat(before, &res)
 	}
 	if res.Status == StatusFail && len(res.Failures) == 0 && res.Tail == nil {
-		res.Tail = lastLines(res.Log, tailLines)
+		n := tailLines
+		if kind == "typecheck" {
+			n = math.MaxInt // Render drops info lines, so the window must not
+		}
+		res.Tail = lastLines(res.Log, n)
 	}
 	return res
 }

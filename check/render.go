@@ -59,8 +59,16 @@ func (r Result) Render() string {
 		for _, name := range k.Failures {
 			fmt.Fprintf(&b, "  %s\n", name)
 		}
-		for _, line := range brief.TrimTail(k.Tail) {
+		tail := brief.TrimTail(k.Tail)
+		if k.Kind == "typecheck" {
+			tail = brief.DiagnosticLines(tail)
+			tail = tail[max(0, len(tail)-tailLines):]
+		}
+		for _, line := range tail {
 			fmt.Fprintf(&b, "  %s\n", line)
+		}
+		if k.Kind == "typecheck" {
+			fmt.Fprintf(&b, "  rerun: gx check --kind typecheck\n")
 		}
 	}
 	switch r.Exit {

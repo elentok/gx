@@ -270,6 +270,22 @@ func TrimTail(lines []string) []string {
 	return lines
 }
 
+// DiagnosticLines keeps the first line of each compiler diagnostic: `info:`
+// lines and indented continuations go, and each line is cut at maxLineChars.
+func DiagnosticLines(lines []string) []string {
+	var out []string
+	for _, l := range lines {
+		if strings.TrimSpace(l) == "" || l[0] == ' ' || l[0] == '\t' || strings.HasPrefix(l, "info:") {
+			continue
+		}
+		if r := []rune(l); len(r) > maxLineChars {
+			l = string(r[:maxLineChars-1]) + "…"
+		}
+		out = append(out, l)
+	}
+	return out
+}
+
 // FirstErrorLine is the line of a failure's text that says what failed: the
 // assertion line, else the first non-blank line after log noise. Empty when
 // there is none.
