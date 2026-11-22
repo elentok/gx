@@ -97,3 +97,17 @@ No failure in any of the other 17 stress runs, with the check running next to th
 
 - Check summary and logs: `~/.local/share/gx/check/20261122T150053.362515000/` (run 1).
 - Stress run output is in the `gx brief` logs listed above; each log path is the last line `gx brief` prints.
+
+## Ticket 18: why the `test` kind took 1128 s (run 20261121T172314.661376000)
+
+The slowdown is machine load. No one package grew.
+
+- The `test` kind runs go, server, web, e2e and burst in parallel. The server part took 1089 s against 616 s in the 2026-11-18 baseline run (20261118T152906). go took 577 s against 595 s.
+- I compared per-package times from the `gx brief` go-test logs of both runs. 69 packages ran in both and took over 5 s. The median ratio is 1.41, and the sum went from 1974 s to 3025 s. The growth is spread over most packages (promptflows +137 s, merge +75 s, designs +61 s, epics +59 s, gxfixture +59 s, ...). No single package explains it.
+- The promptflows growth is partly the nine image tests that failed for real (fixed by follow-ups-20261121/84). They are out of scope here.
+- `server/drafthistory` (48 s) is new since the baseline, so it adds about 5% at most.
+- The same run failed six load flakes that all passed on rerun. 20/20 stress runs on 2026-11-22 found none of them except ticket 15.
+- `load_start` 6.14 and `load_end` 2.68 are two point samples on 12 cores, so they do not show the load in the middle of the run.
+- Earlier slow runs show the same spikes: 1132 s (2026-11-18 17:52), 933 s (2026-11-17), 885 to 919 s (2026-11-14). Quiet runs on 2026-11-22 took 558 s and 552 s.
+
+Verdict: no package to fix. The load preflight (gx:follow-ups/624) covers the slow runs.
