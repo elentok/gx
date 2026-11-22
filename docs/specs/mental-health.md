@@ -100,7 +100,7 @@ The implementer picks the file name, the field names and the event name.
 - Record one active minute (the browser heartbeat; the verb lets scripts and the verify ticket drive a Break without a browser).
 - Unlock with the sentence (the verb takes the sentence as an argument, so it takes the same effort).
 
-Each write answers with the new status. A write the server declines is a refusal result. The routes are web-writable.
+Each write answers with the new status. The CLI prints it as a one-line summary for a person (for example "break until 14:05") and as the full status with `--json`. A write the server declines is a refusal result: an error line for a person, a refusal result with `--json`. The routes are web-writable.
 
 **Snapshot and events.** The snapshot gets one Rest block: whether counting is on, the current Rest period (kind, end time, message, whether to show the Break rule note values: Work time and Break length, and the Bedtime range), the warning, and the server's current time, so the countdown does not depend on the browser clock. A change event makes clients refetch, as for AFK. The browser also hides the Rest screen on its own when its countdown reaches zero.
 
