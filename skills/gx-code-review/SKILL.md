@@ -123,9 +123,9 @@ Every subagent gets the shared review file's path from above.
 
 - The `SKILL.md` path resolved in step 2, with the instruction to Read it and follow it against that
   diff.
-- The spec path (or ticket address list) resolved in step 1, and the known spec deviations list,
-  with the rule: "Don't propose changes that undo an explicit requirement of the spec or tickets.
-  Flag the tension instead."
+- The spec path (or ticket address list) resolved in step 1, the spec's design-constraint lines, and
+  the known spec deviations list, with the rule: "Drop a finding the spec or tickets require. If you
+  still think it is worth raising, list it under a `Spec-mandated` heading, with no severity."
 - The brief: "Report findings as a list — file, line/hunk, summary, severity, suggested fix. Under
   500 words. The severity is one of `critical`, `high` or `medium`; drop anything lower."
 - The test-gap rule: "Open verify tickets own test gaps. Report a missing test only when no open verify
@@ -176,6 +176,8 @@ re-run searches the reviewers already ran. Ask it to:
   deviation, with the ticket address), but only after checking the deviation against the code. Keep
   a finding that says a deviation is stale or wrong.
 
+- List every finding a reviewer put under `Spec-mandated` in the review results under that heading,
+  with no verdict: they are not approved, deferred or rejected, and they file nothing.
 - Consolidate duplicate findings raised by more than one reviewer, across axes as well as within one.
 - Read the two axes against each other: a quality finding on code the Spec axis flags as scope creep
   argues for deleting the code rather than polishing it.

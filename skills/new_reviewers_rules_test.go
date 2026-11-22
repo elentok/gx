@@ -42,6 +42,9 @@ func TestNewReviewersCodeReviewRules(t *testing.T) {
 		"Every configured reviewer still runs",
 		"the single launch message stays",
 		"Never defer a confirmed security finding",
+		"the spec's design-constraint lines",
+		"under a `Spec-mandated` heading, with no severity",
+		"under that heading, with no verdict",
 	)
 	text := normalizeSpace(readFile(t, path))
 	if n := strings.Count(text, "Never defer a confirmed security finding"); n != 1 {
