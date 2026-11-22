@@ -36,6 +36,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"bump marks release runs", "gx-bump/SKILL.md", []string{"GX_CHECK_ORIGIN=release"}},
 		{"implement guards kind", "gx-implement/SKILL.md", []string{"`gx check --kind guards`"}},
 		{"implement known failures", "gx-implement/SKILL.md", []string{"--known-failures", "--check-failures"}},
+		{"implement known red", "gx-implement/SKILL.md", []string{"gx tickets follow-up search", "\"known red\" line", "`project:epic/ID`"}},
 		{"implement go run", "gx-implement/SKILL.md", []string{"go run ."}},
 		{"to-tickets go run", "gx-to-tickets/SKILL.md", []string{"go run ."}},
 		{"implement edit-only", "gx-implement/SKILL.md", []string{"`sed -i`", "write the file first"}},

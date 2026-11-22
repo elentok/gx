@@ -303,6 +303,11 @@ refusal message names) and finish with `--iteration-status finished --known-fail
 follow-ups name every failing test (full name or the subtest's parent) in their title or `## Problem`
 section; a placeholder or unrelated address is refused.
 
+When you find a red test or guard that is not yours, search the follow-ups
+(`gx tickets follow-up search`), file one if none exists, and write its address
+(`project:epic/ID`) on the "known red" line in `## Spec deviations`. `--iteration-status finished`
+is refused for a "known red" line that cites no follow-up.
+
 Never run `gx check --full`. Ticket agents run changed-file `gx check`. The epic's verify ticket,
 the proof and the person run `gx check --full` (the verify ticket runs it and the soak in the
 background and polls).

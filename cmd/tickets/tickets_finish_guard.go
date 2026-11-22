@@ -2,7 +2,9 @@ package tickets
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -35,6 +37,11 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 	ticket, err := schema.ParseTicket(path)
 	if err != nil {
 		return nil
+	}
+	if raw, err := os.ReadFile(path); err == nil {
+		if err := checkKnownRedOwned(path, schema.ParseBody(string(raw))); err != nil {
+			return err
+		}
 	}
 	pf, err := config.ReadProjectFile(filepath.Dir(epicDir))
 	if err != nil || pf.Repo == nil || *pf.Repo == "" {
@@ -156,6 +163,19 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 	}
 	if len(uncovered) > 0 {
 		return fmt.Errorf("%s: the given follow-ups do not name these failing tests in their title or Problem section: %s%s", label, strings.Join(uncovered, ", "), knownFlakeHint(epicDir, uncovered))
+	}
+	return nil
+}
+
+var followUpAddrRe = regexp.MustCompile(`[^\s:/]+:[^\s:/]+/\d+[[:alpha:]]?\d*`)
+
+// checkKnownRedOwned refuses a "known red" line in `## Spec deviations` that
+// cites no follow-up address: a red test that is not the ticket's needs an owner.
+func checkKnownRedOwned(path, body string) error {
+	for line := range strings.SplitSeq(schema.Section(body, "Spec deviations"), "\n") {
+		if strings.Contains(strings.ToLower(line), "known red") && !followUpAddrRe.MatchString(line) {
+			return fmt.Errorf("%s: a \"known red\" line in Spec deviations names no follow-up: %q; search `gx tickets follow-up search`, file one if none exists, and write its address (project:epic/ID) on that line", ticketref.TicketLabel(path), strings.TrimSpace(line))
+		}
 	}
 	return nil
 }

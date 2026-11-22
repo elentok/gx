@@ -154,6 +154,21 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 		}
 	})
 
+	t.Run("known red needs a follow-up address", func(t *testing.T) {
+		f := newFinishFixture(t)
+		cmdtest.WriteTicketFile(t, f.ticket, "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\nBody.\n\n## Spec deviations\n\n- TestFoo is Known RED on the base, left alone.\n")
+		err := f.finish(t)
+		if err == nil || !strings.Contains(err.Error(), "TestFoo is Known RED") || !strings.Contains(err.Error(), "follow-up") {
+			t.Fatalf("err = %v, want a refusal naming the line and asking for a follow-up", err)
+		}
+		f.assertUnwritten(t)
+
+		cmdtest.WriteTicketFile(t, f.ticket, "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\nBody.\n\n## Spec deviations\n\n- TestFoo is known red on the base, tracked in p:follow-ups/12.\n")
+		if err := f.finish(t); err != nil {
+			t.Fatalf("line with an address: %v", err)
+		}
+	})
+
 	t.Run("kind-filtered line does not count", func(t *testing.T) {
 		f := newFinishFixture(t)
 		cmdtest.CommitFile(t, f.wt, "a.txt", "a")
