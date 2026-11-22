@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.51.12 - 2026-11-22
+
+- Fixed Claude launches showing a writable-directory dialog for each directory on every start. Writable dirs now go through settings `additionalDirectories` instead of `--add-dir`. gx now merges the `writable_roots` of `$CODEX_HOME/config.toml` into Codex config instead of replacing them.
+- Added `gx failures --by-file` and `--runs` (findings per file, failing e2e files per Playwright run). `gx failures` and `gx health` are now cobra subcommands with real flags.
+- Added `gx brief --repeat N` to run a brief N times under load. `gx brief` failures now read the check logs, cut notices name the log path, rerun commands cap at the first N failures, go test timeouts name the stuck test, and piped input is refused.
+- Added `gx check --full` machine preflight and `--require-quiet` to stop on a loaded machine. `gx check` sweeps dead-owner `gxfb-*` fixture processes, and fixture children now die with their owner.
+- Added `gx tickets review-bundle` and `gx tickets show --exists`. `gx tickets show --section` and `section read` check the epic's own section first and exit 1 when a section is missing. `tickets set --status done` refusals name the close verb for the ticket kind, and the `epic add` archived-name refusal suggests `gx server epics unarchive` or another name.
+- Changed follow-up search: repeated `--query`, `--all`, a no-matches line and capped archived hits.
+- Changed verify: `tickets verify` lists human-only stories, `verify-plan` accepts the `needs_human` marker, Verified lines accept `unchecked <reason>`, and section Verified rejects unknown keys. The mock check refuses a pass with a tiny PNG or differing selectors.
+- Changed code review and ticket agents: one severity scale (critical, high, medium), deferred findings filed into their own project, and Quality reviewers get the spec's design constraints. A red-first bullet is required to finish, and finishing with a known red deviation that cites no follow-up is refused.
+- Changed skills: `gx-to-tickets` plans no mock units without a fixture and flags TS/JS planned files that clash by stem case. `gx-design` waits for a reply when a card note asks a question. `gx-question` yes/no docs use the flat form, and the parse error names the yes/no key. `gx-ui-check` gets page lookup: a pages map and `GXF_PAGE_*` exports in the fixture output, wait-for-page and `--raw` eval.
+- Changed Rest mode: triage Questions print as gx-question cards, late finishes are adopted for every pause kind, the classifier re-send budget resets per outage, enqueue checks the quiet state, and body children stay inert while Rest is up.
+- Fixed Codex sessions: array-shaped exec outputs are read, pending cells end when a turn aborts, and the make build row shows elapsed time. Fixed task rows: identical twins open and close on their own, and task-notifications are classified by one shared matcher.
+- Fixed the CPU watchdog to measure self CPU only and label children as exited-children lifetime CPU. Fixed label holders to close as stale when the status call fails, the lock parser to accept an unpadded pid, and `limitsState` to print the Codex rollout file's real last line.
+- Added `[Image #N]` chips in the Program input box for pasted image paths. Leader then Shift+C opens the New chat dialog.
+- Fixed the web UI: failed Stats keeps the old numbers dimmed with an error banner and Retry, DayChart day buttons toggle with Enter and Space, the History popup has no drag handle, Loop epic detail uses the server's working flag, Sortable working state follows status tone so drafts never show working, and the Start button sits flush with the draft footer on phones.
+- Changed guards: `always` entries take `{command, files}` globs, and guards skip docs-only changes. The `gx test` known-failures flags name the failing tests, and waived-failure counts print first. `make web-e2e` takes `ARGS`.
+- Changed the Go test timeout hold and split `launch-timed` into agent and prompt steps. `evolve inputs` prints the median launch.
+- Changed performance: project dirs and names are cached per store generation, `project.json` is cached by mtime, and card lists build once per event sequence. The PR watcher now announces a changed PR view so cached cards refresh.
+- Changed test and size-guard housekeeping: Soak finds the run summary after the preflight line, gxfixture page lookup moved to `output`, and the skills phrase tests are merged.
+
 ## Unreleased
 
 - Changed `gx tickets epic add` and `gx initiatives new` to say how to unarchive an archived epic name (`gx server epics unarchive project:name`) or to pick another name. `epic add` already refused archived names.
