@@ -335,9 +335,10 @@ checks below. No stored mock exists, so there is no Mock states list.
    scenario. Checks: on the story 8 ticket, Retry and Start over are offered in the web and both
    succeed.
 10. Answer and resume on a gone runner. Checks: on a ticket whose recorded runner is `herdr`, the
-    answer and resume verbs return the gone-agent result (no "herdr unavailable" error). Answer and
-    resume are checked on the `herdr-leftover-work` ticket: the answer is accepted and the ticket
-    resumes.
+    answer and resume verbs return the gone-agent result (no "herdr unavailable" error). The
+    `herdr-leftover-work` ticket is paused `handle-mismatch`, which is not a question pause, so there
+    `answer` is refused with `not-answerable ... use resume` and `resume` with `not_paused ... use
+    retry`. On that ticket, check that Retry ends the pause (as in entry 8).
 11. Records with no runner field. Checks: a `runs.json` entry with no runner restarts as in story 7
     or 8, and the registry code no longer defaults to herdr (covered by the unit test in the
     registry package).
