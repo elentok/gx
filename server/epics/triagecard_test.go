@@ -118,7 +118,7 @@ func TestEpicList_FollowUpsCardFollowsTheTriageLifetime(t *testing.T) {
 	if err := rs.Save(rec); err != nil {
 		t.Fatal(err)
 	}
-	r, _ = card()
+	servertest.Poll(5e9, func() bool { r, _ = card(); return r.StatePill == "Write" })
 	if r.StatePill != "Write" || r.StepLine != "0 of 2 written" || r.Section != wire.SectionDesigning || r.Actions[0].Kind != wire.CardActionContinue {
 		t.Errorf("live Triage, no session: %+v", r)
 	}
@@ -134,7 +134,8 @@ func TestEpicList_FollowUpsCardFollowsTheTriageLifetime(t *testing.T) {
 	if err := rs.Save(rec); err != nil {
 		t.Fatal(err)
 	}
-	if r, ok := card(); ok {
+	if !servertest.Poll(5e9, func() bool { _, ok := card(); return !ok }) {
+		r, _ := card()
 		t.Errorf("done at zero open: card = %+v, want none", r)
 	}
 

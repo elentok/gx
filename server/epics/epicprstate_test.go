@@ -64,7 +64,7 @@ func TestPRStates_SummaryListAndNeedsYou(t *testing.T) {
 					t.Errorf("words = %q, want %q", got, tc.wantWords)
 				}
 			}
-			n, ok := (&Epics{Deps{AutoFFMerge: func(string) bool { return true }}}).loopNeedsYou(root, e, list)
+			n, ok := (&Epics{Deps: Deps{AutoFFMerge: func(string) bool { return true }}}).loopNeedsYou(root, e, list)
 			if ok != (tc.wantSect == wire.SectionNeedsYou) || n.Pill != tc.wantPill && ok && tc.wantPill != "" {
 				t.Errorf("needs you = %+v (%v), want pill %q", n, ok, tc.wantPill)
 			}

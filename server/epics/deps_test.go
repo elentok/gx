@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -204,5 +206,52 @@ func TestEpicsDeps_EpicListReadsTheSettingsFake(t *testing.T) {
 	}
 	if list.RecentlyFinished != 7 {
 		t.Fatalf("RecentlyFinished = %d, want 7", list.RecentlyFinished)
+	}
+}
+
+func cachedEpics(t *testing.T, seq *atomic.Uint64) *Epics {
+	t.Helper()
+	d := fakeEpics()
+	d.TicketStore = t.TempDir()
+	d.Seq = seq.Load
+	return New(d)
+}
+
+func TestCardList_BuildsOncePerSequence(t *testing.T) {
+	var seq atomic.Uint64
+	s := cachedEpics(t, &seq)
+	s.EpicList(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/v1/epics", nil))
+	s.NeedsYouCounts()
+	if got := s.cards.builds.Load(); got != 1 {
+		t.Fatalf("builds with no event between calls = %d, want 1", got)
+	}
+	seq.Add(1)
+	s.NeedsYouCounts()
+	if got := s.cards.builds.Load(); got != 2 {
+		t.Fatalf("builds after an event = %d, want 2", got)
+	}
+}
+
+func TestCardList_ConcurrentCallsBuildOnce(t *testing.T) {
+	var seq atomic.Uint64
+	s := cachedEpics(t, &seq)
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() { s.NeedsYouCounts() })
+	}
+	wg.Wait()
+	if got := s.cards.builds.Load(); got != 1 {
+		t.Fatalf("builds for concurrent calls = %d, want 1", got)
+	}
+}
+
+func TestCardList_NilSeqNeverCaches(t *testing.T) {
+	d := fakeEpics()
+	d.TicketStore = t.TempDir()
+	s := New(d)
+	s.NeedsYouCounts()
+	s.NeedsYouCounts()
+	if got := s.cards.builds.Load(); got != 2 {
+		t.Fatalf("builds without Seq = %d, want 2", got)
 	}
 }

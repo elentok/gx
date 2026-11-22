@@ -81,6 +81,10 @@ type Workspaces interface {
 type Deps struct {
 	Log         *slog.Logger
 	TicketStore string
+	// Seq is the server's event sequence. Every change a client sees publishes
+	// an event, so an unchanged Seq means an unchanged card list. Nil turns the
+	// card-list cache off.
+	Seq func() uint64
 	// ProjectCache serves project dirs and names between store scans; nil reads
 	// the disk each time.
 	ProjectCache *tickets.ProjectCache
@@ -131,6 +135,9 @@ type Deps struct {
 // Epics serves the epic and ticket read models.
 type Epics struct {
 	Deps
+
+	// cards holds the last card list under the event sequence it was built for.
+	cards cardCache
 }
 
 // New builds the read models over d.

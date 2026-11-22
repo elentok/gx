@@ -36,6 +36,7 @@ func (s *Server) epicsDeps() epics.Deps {
 	return epics.Deps{
 		Log:         s.log,
 		TicketStore: s.cfg.TicketStore,
+		Seq:         s.events.CurrentSeq,
 
 		ProjectCache: s.idx.ProjectCache(),
 		Harness:      s.harness,

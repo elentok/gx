@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/elentok/gx/server/epics/prstate"
@@ -119,8 +121,50 @@ func (s *Epics) applyWorkspaces(rows []wire.EpicListRow) {
 	}
 }
 
-// cardList builds the page's cards, sorted, with workspaces and holds applied.
+// cardCache shares one built card list per event sequence. The mutex is held
+// through the build, so concurrent callers on one sequence wait for one build.
+type cardCache struct {
+	mu    sync.Mutex
+	valid bool
+	seq   uint64
+	list  wire.EpicList
+	// builds counts real builds, for tests.
+	builds atomic.Int64
+}
+
+// cardList returns the page's cards. Callers must not modify the result.
+// The sequence is read before the build: a change during the build leaves the
+// result under the older sequence, and the next call rebuilds.
 func (s *Epics) cardList() (wire.EpicList, error) {
+	if s.Seq == nil {
+		return s.buildCardList()
+	}
+	c := &s.cards
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	seq := s.Seq()
+	if c.valid && c.seq == seq {
+		return c.list, nil
+	}
+	c.valid = false
+	list, err := s.buildCardList()
+	if err != nil {
+		return list, err
+	}
+	c.valid, c.seq, c.list = true, seq, list
+	return list, nil
+}
+
+// dropCardList forgets the cached list, for a change no event announces.
+func (s *Epics) dropCardList() {
+	s.cards.mu.Lock()
+	s.cards.valid = false
+	s.cards.mu.Unlock()
+}
+
+// buildCardList builds the page's cards, sorted, with workspaces and holds applied.
+func (s *Epics) buildCardList() (wire.EpicList, error) {
+	s.cards.builds.Add(1)
 	dirs, err := s.ProjectCache.Dirs(s.TicketStore)
 	if err != nil {
 		return wire.EpicList{}, err

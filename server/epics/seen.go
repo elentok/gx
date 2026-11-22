@@ -132,6 +132,7 @@ func (s *Epics) MarkSeen(address string) error {
 	}
 	for _, r := range list.Epics {
 		if r.Address == address || slices.Contains(r.Addresses, address) {
+			defer s.dropCardList()
 			return s.Seen.Mark(r.Address, seenStateOf(r))
 		}
 	}
