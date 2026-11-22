@@ -264,7 +264,7 @@ func check(files map[string]string, allow map[string]exception) []string {
 			limit = e.limit
 		}
 		if m.size > limit {
-			msg := fmt.Sprintf("%s: %s %d, limit %d, over by %d. %s %s", m.name, m.measure, m.size, limit, m.size-limit, countNote, instructionFor(m.measure))
+			msg := fmt.Sprintf("%s: %s %d, limit %d, over by %d (headroom %d). %s %s", m.name, m.measure, m.size, limit, m.size-limit, limit-m.size, countNote, instructionFor(m.measure))
 			if len(m.parts) > 0 {
 				msg += breakdown(m.parts)
 			}
@@ -287,6 +287,35 @@ func check(files map[string]string, allow map[string]exception) []string {
 	return problems
 }
 
+// packageHeadroom is one package measure with its distance from the limit in force.
+type packageHeadroom struct {
+	name, measure       string
+	size, limit, margin int
+}
+
+func (h packageHeadroom) String() string {
+	return fmt.Sprintf("%s: %s %d, limit %d, headroom %d", h.name, h.measure, h.size, h.limit, h.margin)
+}
+
+// tightest returns the n package measures closest to their limit, smallest headroom first.
+// A valid exception entry replaces the default limit, as in check.
+func tightest(files map[string]string, allow map[string]exception, n int) []packageHeadroom {
+	ms, _ := measure(files)
+	var out []packageHeadroom
+	for _, m := range ms {
+		if m.key == m.name { // file and type measures are not package totals
+			continue
+		}
+		limit := m.def
+		if e, ok := allow[m.key]; ok && e.limit >= m.size {
+			limit = e.limit
+		}
+		out = append(out, packageHeadroom{m.name, m.measure, m.size, limit, limit - m.size})
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].margin < out[j].margin })
+	return out[:min(n, len(out))]
+}
+
 func trackedSources(t *testing.T) map[string]string {
 	t.Helper()
 	out, err := exec.Command("git", "-C", "..", "ls-files", "*.go").Output()
@@ -305,8 +334,12 @@ func trackedSources(t *testing.T) map[string]string {
 }
 
 func TestSizeLimits(t *testing.T) {
-	for _, p := range check(trackedSources(t), exceptions) {
+	files := trackedSources(t)
+	for _, p := range check(files, exceptions) {
 		t.Error(p)
+	}
+	for _, h := range tightest(files, exceptions, 10) {
+		t.Log(h)
 	}
 }
 
@@ -361,6 +394,40 @@ func merge(parts ...map[string]string) map[string]string {
 		maps.Copy(out, m)
 	}
 	return out
+}
+
+func TestCheck_TightestOrdersByHeadroom(t *testing.T) {
+	var parts []map[string]string
+	for i := 1; i <= 12; i++ {
+		parts = append(parts, many(fmt.Sprintf("p%02d", i), i, 1, ".go"))
+	}
+	got := tightest(merge(parts...), nil, 10)
+	if len(got) != 10 {
+		t.Fatalf("got %d entries, want 10", len(got))
+	}
+	for i, h := range got {
+		n := 12 - i
+		want := packageHeadroom{fmt.Sprintf("p%02d", n), measureFiles, n, maxPackageFiles, maxPackageFiles - n}
+		if h != want {
+			t.Errorf("entry %d = %v, want %v", i, h, want)
+		}
+	}
+}
+
+func TestCheck_TightestUsesExceptionLimit(t *testing.T) {
+	files := many("big", 60, 1, ".go")
+	allow := map[string]exception{"big:files": {limit: 70, reason: reasonCohesive}}
+	got := tightest(files, allow, 1)
+	if len(got) != 1 || got[0].limit != 70 || got[0].margin != 10 {
+		t.Errorf("got %v, want files limit 70 headroom 10", got)
+	}
+}
+
+func TestCheck_BreachMessageCarriesHeadroom(t *testing.T) {
+	got := check(many("big", 53, 1, ".go"), nil)
+	if len(got) != 1 || !strings.Contains(got[0], "over by 3 (headroom -3)") {
+		t.Errorf("got %v, want over by 3 (headroom -3)", got)
+	}
 }
 
 func TestCheck_Breaches(t *testing.T) {

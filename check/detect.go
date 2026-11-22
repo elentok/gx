@@ -31,8 +31,9 @@ var scriptNames = map[string][]string{
 	"format":    {"format", "fmt"},
 	"lint":      {"lint"},
 	"typecheck": {"typecheck", "type-check", "tsc"},
-	"guards":    {"guards"},
-	"test":      {"test"},
+	// A "guards" script is only offered as a candidate for .gx/checks.json; no default step runs it.
+	"guards": {"guards"},
+	"test":   {"test"},
 }
 
 // Detect reads root's Makefile, mise.toml, justfile and package.json files and
