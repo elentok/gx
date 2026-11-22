@@ -38,6 +38,25 @@ func TestTriageSkillAnchors(t *testing.T) {
 	}
 }
 
+func TestTriageQuestionsPrintsCards(t *testing.T) {
+	skill := collapseSpace(readFile(t, "gx-triage-follow-ups/SKILL.md"))
+	start := strings.Index(skill, "## 3. Questions")
+	end := strings.Index(skill, "## 4. Write")
+	if start < 0 || end < start {
+		t.Fatal("triage skill lacks the Questions section")
+	}
+	section := skill[start:end]
+	for _, want := range []string{
+		"`gx-question`", "`type: options`", "`recommended`",
+		"(../gx-local-tracker.md#the-question-block)",
+		"(../gx-grilling/SKILL.md)", "after a `---` line",
+	} {
+		if !strings.Contains(section, want) {
+			t.Errorf("Questions section lacks %q", want)
+		}
+	}
+}
+
 func TestTriageSkillTeachesGrouping(t *testing.T) {
 	skill := collapseSpace(readFile(t, "gx-triage-follow-ups/SKILL.md"))
 	for _, want := range []string{"`estimate`", "--ungroup", "oldest first"} {

@@ -132,8 +132,15 @@ gx refuses more than 6 questions and a fourth non-objection round, but the order
 yours. The person's answers are saved with `gx tickets triage answer`. The round is printed as its
 last act: end the turn there.
 
-**Decided unless you object.** After each round and in the final summary, print the self-decided
-answers per follow-up (save each with `gx tickets triage decide`). An objection becomes an `ask`
+**Cards.** In web mode and in chat mode, print each `ask` question of a round as a `gx-question`
+block, never as a numbered text list. Build it from the saved round: `type: options`, one `id` and
+quoted `label` per option, and `recommended` set to the round's default. The format is in
+[the question block](../gx-local-tracker.md#the-question-block); run the pre-send checks in
+[gx-grilling](../gx-grilling/SKILL.md) before printing.
+
+**Decided unless you object.** Plain text, never a card, printed after a `---` line. After each round
+and in the final summary, print the self-decided answers per follow-up (save each with
+`gx tickets triage decide`). An objection becomes an `ask`
 question in its own round (`gx tickets triage object`, `round --objection`), outside the cap, at most
 6, started by the person typing it.
 
