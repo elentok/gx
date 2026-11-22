@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -293,6 +294,48 @@ func TestExecute_TicketsShow_SectionTicketsFilterNarrowsEpic(t *testing.T) {
 	}
 	if _, err := runIn(t, repo, "tickets", "show", "epic", "--tickets", "8"); err == nil {
 		t.Error("--tickets without --section should refuse")
+	}
+}
+
+func TestExecute_TicketsShow_ExistsReportsASectionByExitCode(t *testing.T) {
+	repo, project := cmdtest.SetupShowProject(t)
+	issues := filepath.Join(project, "epic", "issues")
+	for _, id := range []string{"07", "08"} {
+		testutil.WriteFile(t, issues, id+"-t"+id+".md",
+			"---\nid: \""+id+"\"\nstatus: done\ntype: implement\n---\n\n# "+id+" — T"+id+"\n\n## Spec deviations\n\n- note "+id+"\n")
+	}
+
+	// exit is the code `gx tickets show` would end with: 0 for nil, the ExitError code, -1 for any other error.
+	exit := func(args ...string) (int, string) {
+		out, err := runIn(t, repo, append([]string{"tickets", "show"}, args...)...)
+		var ee *cmdbase.ExitError
+		switch {
+		case err == nil:
+			return 0, out
+		case errors.As(err, &ee):
+			return ee.Code, out
+		}
+		return -1, out
+	}
+	for _, c := range []struct {
+		name string
+		args []string
+		want int
+	}{
+		{"ticket with the section", []string{"mine:epic/07", "--section", "Spec deviations", "--exists"}, 0},
+		{"ticket without the section", []string{"mine:epic/06", "--section", "Spec deviations", "--exists"}, 1},
+		{"epic with the section somewhere", []string{"epic", "--section", "Spec deviations", "--exists"}, 0},
+		{"epic without the section anywhere", []string{"epic", "--section", "Nope", "--exists"}, 1},
+		{"epic, filter hits a ticket with it", []string{"epic", "--section", "Spec deviations", "--tickets", "8", "--exists"}, 0},
+		{"epic, filter misses every ticket with it", []string{"epic", "--section", "Spec deviations", "--tickets", "6", "--exists"}, 1},
+		{"no --section", []string{"mine:epic/07", "--exists"}, -1},
+		{"with --json", []string{"mine:epic/07", "--section", "Spec deviations", "--exists", "--json"}, -1},
+		{"with --brief", []string{"epic", "--section", "Spec deviations", "--exists", "--brief"}, -1},
+		{"bad address", []string{"mine:epic/99", "--section", "Spec deviations", "--exists"}, -1},
+	} {
+		if got, out := exit(c.args...); got != c.want || (c.want >= 0 && out != "") {
+			t.Errorf("%s: exit %d, output %q; want exit %d and no output", c.name, got, out, c.want)
+		}
 	}
 }
 

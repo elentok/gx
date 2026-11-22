@@ -52,7 +52,7 @@ stop and fix the ticket's frontmatter before doing anything else.
 - Collect the **known spec deviations** in one call:
   `gx tickets show <epic> --section "Spec deviations"`, optionally with `--tickets 31-46`. Pass the
   full list on, not a truncated view: no `| head`, and no loop whose output is cut ("N lines
-  omitted"). A hand-built loop over `gx tickets show` is not needed. Use only this epic's tickets (skip this
+  omitted"). `--section` replaces hand-built `sed` or `head` loops over `gx tickets show`; `--section X --exists` tests for a section by exit code. Use only this epic's tickets (skip this
   code-review ticket) and gather the bullets under each `## Spec deviations` section (also check `## Comments` and handoff notes for older
   tickets that recorded one there). Join them into one short list, each line prefixed with its
   ticket address. If there are none, the list is empty.

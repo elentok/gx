@@ -181,7 +181,7 @@ func newTicketsValidateCmd(d Deps) *cobra.Command {
 }
 
 func newTicketsShowCmd(d Deps) *cobra.Command {
-	var showJSON, showBrief bool
+	var showJSON, showBrief, showExists bool
 	var showSection, showTickets string
 	cmd := &cobra.Command{
 		Use: "show <addr>",
@@ -194,12 +194,13 @@ func newTicketsShowCmd(d Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			opts := showOptions{JSON: showJSON, Brief: showBrief, Section: showSection, Tickets: showTickets}
+			opts := showOptions{JSON: showJSON, Brief: showBrief, Section: showSection, Tickets: showTickets, Exists: showExists}
 			return runTicketsShow(d.dirs(), cwd, args[0], opts, c.OutOrStdout())
 		},
 	}
 	cmd.Flags().BoolVar(&showJSON, "json", false, "emit structured JSON instead of text")
-	cmd.Flags().StringVar(&showSection, "section", "", "print only this ## section, from the ticket or from every ticket of an epic that has it")
+	cmd.Flags().StringVar(&showSection, "section", "", "print only this ## section, from the ticket or from every ticket of an epic that has it (use it instead of hand-built sed or head loops)")
+	cmd.Flags().BoolVar(&showExists, "exists", false, "with --section, print nothing and exit 0 if the section is present (on the ticket, or on any ticket of the epic), 1 if not")
 	cmd.Flags().StringVar(&showTickets, "tickets", "", "with --section on an epic, only these ticket numbers, e.g. 15-18,20")
 	cmd.Flags().BoolVar(&showBrief, "brief", false, "with an epic address, print only the ticket lines (address, status, type, title)")
 	cmd.MarkFlagsMutuallyExclusive("json", "section")

@@ -72,8 +72,8 @@ Do not read the spec. Open it, at the path in the ticket, only for these cases:
 
 - its own ticket: it holds `## Out of Scope` and, when it has one, a starting table (step 5),
 - `## Results` from every verify ticket in its `blocked_by`, in one call:
-  `gx tickets show <epic> --section Results --tickets 31-46`. A hand-built loop over
-  `gx tickets show` is not needed. And
+  `gx tickets show <epic> --section Results --tickets 31-46`. `--section` replaces hand-built
+  `sed` or `head` loops over `gx tickets show`. And
 - the epic's deviations, as a part does.
 
 Do not read the spec. A collect ticket checks nothing itself, except the rerun of one inline fix

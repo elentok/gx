@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -35,6 +36,8 @@ type showOptions struct {
 	Brief   bool
 	Section string
 	Tickets string
+	// Exists prints nothing and reports through the exit code whether Section is present.
+	Exists bool
 }
 
 // runTicketsShow resolves addr (full or short form) against the cwd project
@@ -47,6 +50,23 @@ type showOptions struct {
 // A single ticket without the section is an error; --section and --json are
 // kept apart by the command's flag definitions.
 func runTicketsShow(dirs config.Dirs, cwd, addr string, opts showOptions, w io.Writer) error {
+	if opts.Exists {
+		if opts.Section == "" || opts.JSON || opts.Brief {
+			return errors.New("--exists needs --section and cannot be combined with --json or --brief")
+		}
+		var out bytes.Buffer
+		if err := showSections(dirs, cwd, addr, opts, &out); err != nil {
+			return err
+		}
+		if out.Len() == 0 {
+			return &cmdbase.ExitError{Code: 1}
+		}
+		return nil
+	}
+	return showSections(dirs, cwd, addr, opts, w)
+}
+
+func showSections(dirs config.Dirs, cwd, addr string, opts showOptions, w io.Writer) error {
 	jsonOut, brief, section := opts.JSON, opts.Brief, opts.Section
 	filter, err := parseTicketNumbers(opts.Tickets)
 	if err != nil {
@@ -78,7 +98,7 @@ func runTicketsShow(dirs config.Dirs, cwd, addr string, opts showOptions, w io.W
 		return errors.New("--tickets only applies to an epic address")
 	}
 	if section != "" {
-		if t.ReadErr == "" && !schema.HasSection(t.Body, section) && !schema.IsOptionalSection(section) {
+		if t.ReadErr == "" && !schema.HasSection(t.Body, section) && !schema.IsOptionalSection(section) && !opts.Exists {
 			return fmt.Errorf("no section %s in %s", section, a)
 		}
 		return printTicketSection(a, t, section, w)
