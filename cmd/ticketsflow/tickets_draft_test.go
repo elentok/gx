@@ -100,6 +100,16 @@ func draftSetup(t *testing.T, plan string) (d Deps, planPath, manifest string) {
 	return d, planPath, manifest
 }
 
+// mustDraft runs the draft command and returns its output.
+func mustDraft(t *testing.T, d Deps, plan, manifest string) string {
+	t.Helper()
+	out, err := draftOut(t, d, plan, manifest)
+	if err != nil {
+		t.Fatalf("draft: %v\n%s", err, out)
+	}
+	return out
+}
+
 func runDraftCmd(t *testing.T, d Deps, plan, manifest string) {
 	t.Helper()
 	if err := execute(t, []string{"tickets", "draft", "mine:demo-impl", "--plan", plan, "--manifest", manifest}, d); err != nil {
@@ -217,10 +227,7 @@ func TestTicketsDraft_MissingNamesFail(t *testing.T) {
 func TestTicketsDraft_GoodPlanStampsCallersFromGopls(t *testing.T) {
 	d, plan, manifest := draftSetup(t, draftPlan)
 	onlyTools(t, true, "rg", "git")
-	out, err := draftOut(t, d, plan, manifest)
-	if err != nil {
-		t.Fatalf("draft: %v\n%s", err, out)
-	}
+	out := mustDraft(t, d, plan, manifest)
 	body := readManifestFile(t, filepath.Join(filepath.Dir(manifest), "draft-body-alpha.md"))
 	if !strings.Contains(body, "callers (verified at ") || !strings.Contains(body, "cmd/sym.go:8") {
 		t.Errorf("body:\n%s", body)
@@ -233,10 +240,7 @@ func TestTicketsDraft_GoodPlanStampsCallersFromGopls(t *testing.T) {
 func TestTicketsDraft_NoGoplsFallsBackToRg(t *testing.T) {
 	d, plan, manifest := draftSetup(t, draftPlan)
 	onlyTools(t, false, "rg", "git")
-	out, err := draftOut(t, d, plan, manifest)
-	if err != nil {
-		t.Fatalf("draft: %v\n%s", err, out)
-	}
+	out := mustDraft(t, d, plan, manifest)
 	body := readManifestFile(t, filepath.Join(filepath.Dir(manifest), "draft-body-alpha.md"))
 	if !strings.Contains(body, "callers (rg result, not verified: ") || strings.Contains(body, "verified at ") {
 		t.Errorf("body:\n%s", body)
@@ -285,16 +289,14 @@ func factsFixture(t *testing.T, d Deps) {
 func TestTicketsDraft_PrintsEnvironmentFacts(t *testing.T) {
 	d, plan, manifest := draftSetup(t, factsPlan)
 	factsFixture(t, d)
-	out, err := draftOut(t, d, plan, manifest)
-	if err != nil {
-		t.Fatalf("draft: %v\n%s", err, out)
-	}
+	mustDraft(t, d, plan, manifest)
 	body := readManifestFile(t, filepath.Join(filepath.Dir(manifest), "draft-body-facts.md"))
+	names := migrations.Default.Names()
 	for _, want := range []string{
+		fmt.Sprintf("highest migration number in use: %d (step %s)", len(names), names[len(names)-1]),
 		"test environment of `webui/src/node.test.ts`: node",
 		"test environment of `webui/src/dom.test.ts`: default",
 		"make target `web-types` exists",
-		"highest migration number in use: ",
 		"helper `AlphaFn` at cmd/sym.go:6",
 		"playwright -g `Seven` on flow.e2e.ts: finds 1 test(s): 7. Seven things",
 		"consumers (rg, not verified: cmd/field.go:",
@@ -304,19 +306,6 @@ func TestTicketsDraft_PrintsEnvironmentFacts(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("body lacks %q:\n%s", want, body)
 		}
-	}
-}
-
-func TestTicketsDraft_VerifiedAtCallers(t *testing.T) {
-	d, plan, manifest := draftSetup(t, factsPlan)
-	factsFixture(t, d)
-	onlyTools(t, true, "rg", "git")
-	if out, err := draftOut(t, d, plan, manifest); err != nil {
-		t.Fatalf("draft: %v\n%s", err, out)
-	}
-	body := readManifestFile(t, filepath.Join(filepath.Dir(manifest), "draft-body-facts.md"))
-	if !strings.Contains(body, "callers (verified at ") {
-		t.Errorf("body:\n%s", body)
 	}
 }
 
@@ -334,9 +323,7 @@ func TestTicketsDraft_VerifiedAtAfterDaemonDialError(t *testing.T) {
 	if err := os.WriteFile(gopls, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := draftOut(t, d, plan, manifest); err != nil {
-		t.Fatalf("draft: %v\n%s", err, out)
-	}
+	mustDraft(t, d, plan, manifest)
 	body := readManifestFile(t, filepath.Join(filepath.Dir(manifest), "draft-body-facts.md"))
 	if !strings.Contains(body, "callers (verified at ") {
 		t.Errorf("body:\n%s", body)
@@ -377,10 +364,7 @@ func TestTicketsDraft_GoplsFailureNotedOnceAndStopsGopls(t *testing.T) {
 	factsFixture(t, d)
 	onlyTools(t, true, "rg", "git")
 	log := loggingGopls(t, "echo 'boom: no packages'; exit 1\n")
-	out, err := draftOut(t, d, planPath, manifest)
-	if err != nil {
-		t.Fatalf("draft: %v\n%s", err, out)
-	}
+	out := mustDraft(t, d, planPath, manifest)
 	if n := strings.Count(out, "note: gopls failed"); n != 1 {
 		t.Errorf("note count = %d:\n%s", n, out)
 	}
@@ -405,9 +389,7 @@ func TestTicketsDraft_SymbolsSharingADeclarationShareOneGoplsCall(t *testing.T) 
 	factsFixture(t, d)
 	onlyTools(t, true, "rg", "git")
 	log := loggingGopls(t, "echo \"$PWD/cmd/sym.go:8:22-30\"\n")
-	if out, err := draftOut(t, d, planPath, manifest); err != nil {
-		t.Fatalf("draft: %v\n%s", err, out)
-	}
+	mustDraft(t, d, planPath, manifest)
 	symbols := 4 // runAlpha, pkg.runAlpha, runBeta, AlphaFn
 	if n := goplsCalls(t, log); n == 0 || n >= symbols {
 		t.Errorf("gopls called %d times for %d symbols, want fewer but not none", n, symbols)
@@ -445,18 +427,6 @@ func TestTicketsDraft_MissingMakeTargetAndAnchoredPatternFail(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
-	}
-}
-
-func TestTicketsDraft_MigrationLineMatchesRegistry(t *testing.T) {
-	d, plan, manifest := draftSetup(t, factsPlan)
-	factsFixture(t, d)
-	runDraftCmd(t, d, plan, manifest)
-	body := readManifestFile(t, filepath.Join(filepath.Dir(manifest), "draft-body-facts.md"))
-	names := migrations.Default.Names()
-	want := fmt.Sprintf("highest migration number in use: %d (step %s)", len(names), names[len(names)-1])
-	if !strings.Contains(body, want) {
-		t.Errorf("body lacks %q:\n%s", want, body)
 	}
 }
 

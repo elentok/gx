@@ -57,6 +57,14 @@ func writeManifest(t *testing.T, dir, content string) string {
 
 func publishOut(d Deps) string { return d.Stdout.(*bytes.Buffer).String() }
 
+// mustPublish publishes the manifest into mine:e and fails the test on error.
+func mustPublish(t *testing.T, d Deps, manifest string, extra ...string) {
+	t.Helper()
+	if err := execute(t, append([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, extra...), d); err != nil {
+		t.Fatalf("publish: %v\n%s", err, publishOut(d))
+	}
+}
+
 func noEpic(t *testing.T, project string) {
 	t.Helper()
 	if _, err := os.Stat(filepath.Join(project, "e")); !os.IsNotExist(err) {
@@ -92,9 +100,7 @@ func issueNames(t *testing.T, project, epic string) []string {
 func TestPublishCreatesDraftLoopEpicAndOpensTickets(t *testing.T) {
 	d, project, manifest := setupPublish(t)
 
-	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
-		t.Fatalf("publish: %v", err)
-	}
+	mustPublish(t, d, manifest)
 	out := publishOut(d)
 	for _, want := range []string{"a  ", "mine:e/01", "mine:e/02", "mine:e/03", "40000"} {
 		if !strings.Contains(out, want) {
@@ -201,9 +207,7 @@ func TestPublishOpensOnce(t *testing.T) {
 		statuses = append(statuses, status)
 		return os.WriteFile(path, data, perm)
 	}
-	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
-		t.Fatalf("publish: %v", err)
-	}
+	mustPublish(t, d, manifest)
 	if got := strings.Join(statuses, " "); got != "draft draft draft open open open" {
 		t.Errorf("write order = %s, want all drafts then all opens", got)
 	}
@@ -306,9 +310,7 @@ func TestPublishPlannedNameDoesNotRefuse(t *testing.T) {
 	writeTicketFile(t, filepath.Join(dir, "a.md"), "# a\n\n## What to build\n\nAdd `docs/nowhere.md`.\n"+shapeSections)
 	writeTicketFile(t, filepath.Join(dir, "b.md"), "# b\n\n## Test seams\n\nuse `docs/nowhere.md`\n\n## Where to look\n\nnowhere\n")
 	writeManifest(t, dir, "- {slug: a, type: implement, body: a.md}\n- {slug: b, type: implement, blocked_by: [a], body: b.md}\n")
-	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
-		t.Fatalf("publish: %v\n%s", err, publishOut(d))
-	}
+	mustPublish(t, d, manifest)
 	if got := strings.Join(issueNames(t, project, "e"), " "); got != "01-a.md 02-b.md" {
 		t.Errorf("issues = %s", got)
 	}
@@ -462,9 +464,7 @@ func archivedFollowUp(t *testing.T, project, name string) string {
 
 func TestPublishFromStringAndListArchivesAsPromoted(t *testing.T) {
 	d, project, manifest := promoteFixture(t, "follow-ups/01", "[follow-ups/02, mine:follow-ups/03]")
-	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
-		t.Fatalf("publish: %v", err)
-	}
+	mustPublish(t, d, manifest)
 	for name, want := range map[string]string{"01-f.md": "mine:e/01", "02-f.md": "mine:e/02", "03-f.md": "mine:e/02"} {
 		raw := archivedFollowUp(t, project, name)
 		for _, w := range []string{"reason: promoted", "note: promoted to " + want} {
@@ -521,9 +521,7 @@ func TestPublishWithoutPromotionsClosesNoFollowUps(t *testing.T) {
 		t.Errorf("CloseFollowUp called for %s", addr)
 		return nil
 	}
-	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
-		t.Fatalf("publish: %v", err)
-	}
+	mustPublish(t, d, manifest)
 }
 
 func TestPublishTicketsReturnsArchiveStepOnlyForRealRun(t *testing.T) {
@@ -600,6 +598,7 @@ func groupFixture(t *testing.T, entries ...groupEntry) (d Deps, project, manifes
 	return d, project, entriesManifest(t, entries)
 }
 
+// seedFollowUps adds open follow-ups 01..03 to the project.
 func seedFollowUps(t *testing.T, project string) {
 	t.Helper()
 	for _, id := range []string{"01", "02", "03"} {
@@ -637,9 +636,7 @@ func TestPublishGroupOpensOneTicketWithUnionBlockedBy(t *testing.T) {
 		groupEntry{"dep2", "", "", ""},
 		groupEntry{"g", "20000", "[dep1, dep2]", "[follow-ups/01, follow-ups/02]"},
 	)
-	if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
-		t.Fatalf("publish: %v", err)
-	}
+	mustPublish(t, d, manifest)
 	if got := strings.Join(issueNames(t, project, "e"), " "); got != "01-dep1.md 02-dep2.md 03-g.md" {
 		t.Fatalf("issues = %s, want one ticket for the group", got)
 	}
@@ -695,9 +692,7 @@ func TestPublishGroupSplitChainsAndOverCapIsRefused(t *testing.T) {
 			groupEntry{"g1", "30000", "", "[follow-ups/01, follow-ups/02]"},
 			groupEntry{"g2", "30000", "[g1]", "follow-ups/03"},
 		)
-		if err := execute(t, []string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
-			t.Fatalf("publish: %v", err)
-		}
+		mustPublish(t, d, manifest)
 		raw, _ := os.ReadFile(filepath.Join(project, "e", "issues", "02-g2.md"))
 		if !strings.Contains(string(blockedByRE.Find(raw)), "01") {
 			t.Errorf("g2 does not wait on g1:\n%s", raw)

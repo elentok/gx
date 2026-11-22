@@ -539,14 +539,10 @@ func TestTriage_CorrectMovesARowToAnBacklog(t *testing.T) {
 
 func TestTriage_VerdictTakesThreeTagQuestions(t *testing.T) {
 	repo := triageProject(t)
-	if _, err := runIn(t, repo, "tickets", "triage", "create"); err != nil {
-		t.Fatal(err)
-	}
+	mustRun(t, repo, "tickets", "triage", "create")
 	row := triagePending(t, repo)[0]
 	q := `{"text":"where?","kind":"ask","options":["a","b"],"default":"a"}`
-	if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", row, "--question", q); err != nil {
-		t.Fatalf("verdict: %v", err)
-	}
+	mustRun(t, repo, "tickets", "triage", "verdict", "--row", row, "--question", q)
 	if _, err := runIn(t, repo, "tickets", "triage", "verdict", "--row", row, "--question", "plain text"); err == nil {
 		t.Error("a plain-text --question accepted")
 	}
