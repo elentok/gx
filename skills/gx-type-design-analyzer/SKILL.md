@@ -47,8 +47,8 @@ type that is fine. Do not rate types on a numeric scale.
 ## 4. Report
 
 One list, under 500 words. Each finding has: file and line or hunk, a one-line summary (the type,
-the broken or weak invariant, the bug it allows), a severity word (`high`, `medium` or `low`) and a
-pragmatic suggested fix that does not overcomplicate the code. No templates, no praise. When nothing
+the broken or weak invariant, the bug it allows), a severity word (`high` or `medium`; drop anything
+lower) and a pragmatic suggested fix that does not overcomplicate the code. No templates, no praise. When nothing
 survives, say "nothing to review".
 
 ## 5. Hand over

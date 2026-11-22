@@ -52,6 +52,36 @@ func TestNewReviewersCodeReviewRules(t *testing.T) {
 	}
 }
 
+// The severity scale lives once, in the Quality brief; each reviewer reports on it.
+func TestNewReviewersSeverityScale(t *testing.T) {
+	const scale = "severity is one of `critical`, `high` or `medium`"
+	brief := normalizeSpace(readFile(t, "gx-code-review/SKILL.md"))
+	if n := strings.Count(brief, scale); n != 1 {
+		t.Errorf("gx-code-review holds the severity scale %d times, want 1", n)
+	}
+	for _, name := range []string{
+		"gx-code-reviewer",
+		"gx-silent-failure-hunter",
+		"gx-type-design-analyzer",
+		"gx-comment-analyzer",
+		"gx-pr-test-analyzer",
+		"gx-security-review",
+	} {
+		t.Run(name, func(t *testing.T) {
+			text := normalizeSpace(readFile(t, name+"/SKILL.md"))
+			// Each skill uses only the part of the scale its own filtering reaches.
+			if !strings.Contains(text, "`high`") {
+				t.Errorf("%s does not name `high`", name)
+			}
+			for _, word := range []string{"`important`", "`low`"} {
+				if strings.Contains(text, word) {
+					t.Errorf("%s names %s", name, word)
+				}
+			}
+		})
+	}
+}
+
 // The upstream command runs shell lines; the skill reads the review files instead.
 func TestSecurityReviewReadsReviewFiles(t *testing.T) {
 	path := "gx-security-review/SKILL.md"

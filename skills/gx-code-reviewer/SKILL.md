@@ -40,7 +40,7 @@ read, never a possible issue. Filter hard: quality over quantity.
 ## 4. Report
 
 One list, under 500 words. Each finding has: file and line or hunk, a one-line summary (the bug or
-the guideline rule), a severity word (`critical` for 91-100, `important` for 80-90) and a suggested
+the guideline rule), a severity word (`critical` for 91-100, `high` for 80-90) and a suggested
 fix. No headers, no rating tables, no praise. When nothing survives, say "nothing to review".
 
 ## 5. Hand over

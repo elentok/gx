@@ -180,8 +180,8 @@ down on diffs a reviewer cannot judge.
 - **Output.** `gx-code-review`'s brief sets the output form: a list of file, line or hunk, summary,
   severity, suggested fix, under 500 words. Upstream output templates that conflict with it (long
   report headers, ratings tables, "positive observations" sections) are dropped or shortened to
-  fit. Upstream's own severity or confidence scale may stay as the `severity` value, mapped to one
-  word a triage consultant can rank. A finding below the upstream's own confidence bar stays dropped.
+  fit. Upstream's own severity or confidence scale may stay in the skill's filtering text, but the
+  reported `severity` word maps to the one scale in the Quality brief: `critical`, `high`, `medium`. A finding below the upstream's own confidence bar stays dropped.
 - **Plain tool phrases.** Upstream prompts name Claude tools (for example `Read`, `Grep`, `Bash`,
   `Task`). Each copy replaces them with the plain phrases from the "Tool names" table in
   `skills/gx-local-tracker.md` ("file read", "shell call", "start a subagent"). Each copy must pass
@@ -223,6 +223,7 @@ down on diffs a reviewer cannot judge.
   the shared review files: the changed-file list and the diff.
 - The rest of the upstream prompt stays: categories to look for, severity and confidence scale,
   false-positive exclusions, and the report form (adapted to the output rule above).
+- The security skill reports HIGH as `critical` and MEDIUM as `high`; LOW is not reported.
 - A security finding carries the severity word and a confidence the triage consultant can read, so
   that it can tell a confirmed finding from one that is not real.
 

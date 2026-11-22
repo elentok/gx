@@ -127,7 +127,7 @@ Every subagent gets the shared review file's path from above.
   with the rule: "Don't propose changes that undo an explicit requirement of the spec or tickets.
   Flag the tension instead."
 - The brief: "Report findings as a list — file, line/hunk, summary, severity, suggested fix. Under
-  500 words."
+  500 words. The severity is one of `critical`, `high` or `medium`; drop anything lower."
 - The test-gap rule: "Open verify tickets own test gaps. Report a missing test only when no open verify
   ticket covers that story."
 

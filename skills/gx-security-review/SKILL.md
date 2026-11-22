@@ -151,17 +151,18 @@ One list, under 500 words, Markdown only. Each finding has: file and line or hun
 summary (the vulnerability category and how it is exploited), a severity word, a confidence, and a
 suggested fix. No templates, no praise.
 
-Severity:
+Severity (the upstream words are HIGH, MEDIUM and LOW; report the mapped word):
 
-- `high`: directly exploitable, leading to RCE, data breach or authentication bypass.
-- `medium`: needs specific conditions but has significant impact.
-- `low`: defense-in-depth or lower-impact. Do not report it.
+- HIGH, reported as `critical`: directly exploitable, leading to RCE, data breach or authentication
+  bypass.
+- MEDIUM, reported as `high`: needs specific conditions but has significant impact.
+- LOW: defense-in-depth or lower-impact. Do not report it.
 
 Example:
 
 ```
 - `foo.py:42`: XSS: `username` is interpolated into HTML without escaping, so a crafted
-  `/bar?q=<script>` URL runs script in the victim's browser. Severity: high. Confidence: 0.9.
+  `/bar?q=<script>` URL runs script in the victim's browser. Severity: critical. Confidence: 0.9.
   Fix: escape the value or use auto-escaping templates.
 ```
 
