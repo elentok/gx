@@ -283,8 +283,12 @@ func newBatchedMessage(style mrkdwnStyle, msg chatMessage) batchedMessage {
 	return batchedMessage{text: msg.Text(style.chatStyle), kind: msg.kind, msg: &msg}
 }
 
-// enqueueItem queues item, collapsing it into an identical queued entry.
+// enqueueItem queues item, collapsing it into an identical queued entry. It
+// drops item while quiet, so no caller can leak a message past Rest.
 func (s *chatEventSink) enqueueItem(item batchedMessage) {
+	if s.isQuiet() {
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.queue {

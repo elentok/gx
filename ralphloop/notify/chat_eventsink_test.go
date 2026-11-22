@@ -618,6 +618,30 @@ func TestChatEventSink_Quiet_DropsNewAndQueuedEventsWithoutTouchingTheGate(t *te
 	}
 }
 
+// The queue helpers drop events themselves, so a caller that bypasses
+// sendItem still cannot leak a message while quiet.
+func TestChatEventSink_Quiet_DirectEnqueueQueuesNothing(t *testing.T) {
+	t.Parallel()
+	sink, transport := newFakeChatSink(t, &fakes.RecordingSink{})
+	sink.quiet = &quietFlag{}
+	sink.quiet.(*quietFlag).on.Store(true)
+
+	sink.enqueueItem(newBatchedMessage(sink.style, chatMessage{kind: notifyKindEpicComplete}))
+	sink.enqueueMessage(chatMessage{kind: notifyKindEpicComplete})
+
+	sink.mu.Lock()
+	queued := len(sink.queue)
+	sink.mu.Unlock()
+	if queued != 0 {
+		t.Errorf("queue length = %d, want 0 while quiet", queued)
+	}
+	sink.flush()
+	sink.Close()
+	if got := transport.snapshot(); len(got) != 0 {
+		t.Errorf("sent = %v, want none while quiet", got)
+	}
+}
+
 // TestChatEventSink_Close_FlushesQueuedMessageSynchronously pins ticket 06's
 // flush-on-close seam: Close sends the queue's one message before returning,
 // with no need to poll like the async sendRaw path.
