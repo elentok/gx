@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/elentok/gx/config"
@@ -12,9 +13,7 @@ import (
 func (r *Runner) Status() wire.RestStatus {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	cfg := r.cfg()
-	res := Step(Input{State: r.state, Config: cfg, Now: r.now(), Event: Event{Kind: EventTick}})
-	return statusOf(cfg, res)
+	return statusOf(r.cfg(), r.stepLocked())
 }
 
 func statusOf(cfg config.MentalHealthConfig, res Result) wire.RestStatus {
@@ -71,6 +70,10 @@ func Routes(runner func() *Runner) []wire.Route {
 			rn := runner()
 			res, err := do(rn, req)
 			if err != nil {
+				if _, ok := errors.AsType[badBody](err); ok {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -80,19 +83,22 @@ func Routes(runner func() *Runner) []wire.Route {
 	return []wire.Route{
 		{Pattern: "GET /v1/rest", Handler: func(w http.ResponseWriter, _ *http.Request) { wire.WriteJSON(w, runner().Status()) }},
 		write("POST /v1/rest/active", func(rn *Runner, _ *http.Request) (Result, error) { return rn.Active() }),
-		{Pattern: "POST /v1/rest/unlock", Web: wire.WebWrite, Handler: func(w http.ResponseWriter, req *http.Request) {
-			var body wire.RestUnlockRequest
-			if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			rn := runner()
-			res, err := rn.Unlock(body.Sentence)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			wire.WriteJSON(w, result(rn.cfg(), res))
-		}},
+		write("POST /v1/rest/unlock", writeBody(func(rn *Runner, body wire.RestUnlockRequest) (Result, error) {
+			return rn.Unlock(body.Sentence)
+		})),
+	}
+}
+
+// badBody marks a request body that did not decode, so the route answers 400.
+type badBody struct{ error }
+
+// writeBody decodes the request body into T, then runs the shared write path.
+func writeBody[T any](do func(*Runner, T) (Result, error)) func(*Runner, *http.Request) (Result, error) {
+	return func(rn *Runner, req *http.Request) (Result, error) {
+		var body T
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+			return Result{}, badBody{err}
+		}
+		return do(rn, body)
 	}
 }

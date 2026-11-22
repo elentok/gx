@@ -47,17 +47,30 @@ type engine struct {
 	records []Record
 }
 
+// periodEnded says whether a running period no longer holds: Rest is off, its
+// own feature is off, its time is up, or (Bedtime) the window has closed.
+func periodEnded(p Period, cfg config.MentalHealthConfig, now time.Time) bool {
+	switch {
+	case !cfg.Enabled:
+		return true
+	case p.Kind == KindBreak && !cfg.Break.Enabled:
+		return true
+	case p.Kind == KindBedtime && !cfg.Bedtime.Enabled:
+		return true
+	case !now.Before(p.End):
+		return true
+	case p.Kind == KindBedtime && !inBedtime(cfg.Bedtime, now):
+		return true
+	}
+	return false
+}
+
 // reconcile ends what no longer holds and starts Bedtime when it is due.
 func (e *engine) reconcile() {
 	b := e.cfg.Bedtime
-	if p := e.s.Period; p != nil {
-		switch {
-		case !e.cfg.Enabled,
-			p.Kind == KindBreak && (!e.cfg.Break.Enabled || !e.now.Before(p.End)),
-			p.Kind == KindBedtime && (!b.Enabled || !e.now.Before(p.End) || !inBedtime(b, e.now)):
-			e.s.Period = nil
-			e.s.WorkCount = 0
-		}
+	if p := e.s.Period; p != nil && periodEnded(*p, e.cfg, e.now) {
+		e.s.Period = nil
+		e.s.WorkCount = 0
 	}
 	if !e.cfg.Enabled || !e.cfg.Break.Enabled {
 		e.s.WorkCount = 0

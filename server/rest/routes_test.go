@@ -109,6 +109,29 @@ func TestRoutes_WebServesWritesAndSnapshotShowsRest(t *testing.T) {
 	}
 }
 
+func TestRoutes_UnlockBadBodyIs400AndGoodBodyStillRefuses(t *testing.T) {
+	t.Parallel()
+	h, base := servertest.StartWeb(t)
+	cookie := servertest.Login(t, h.StateDir, base)
+	post := func(body string) (int, string) {
+		return servertest.WebPostJSON(t, base+"/v1/rest/unlock", body, cookie, "", servertest.JSONPost(base))
+	}
+	if code, out := post(`{"sentence":`); code != http.StatusBadRequest {
+		t.Errorf("malformed unlock body = %d %s, want 400", code, out)
+	}
+	code, out := post(`{"sentence":"hello"}`)
+	if code != http.StatusOK {
+		t.Fatalf("good unlock body = %d %s", code, out)
+	}
+	var res wire.RestResult
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatal(err)
+	}
+	if !res.Refused || res.Reason != wire.ReasonRestNoPeriod {
+		t.Errorf("unlock result = %+v, want the no-period refusal", res)
+	}
+}
+
 func TestRoutes_RestartKeepsBreakThroughRoutes(t *testing.T) {
 	t.Parallel()
 	clock := servertest.NewRestClock(start())

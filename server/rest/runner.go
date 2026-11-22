@@ -71,7 +71,12 @@ func (r *Runner) Close() {
 func (r *Runner) View() View {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return Step(Input{State: r.state, Config: r.cfg(), Now: r.now(), Event: Event{Kind: EventTick}}).View
+	return r.stepLocked().View
+}
+
+// stepLocked is the read-only tick both Status and View recompute from.
+func (r *Runner) stepLocked() Result {
+	return Step(Input{State: r.state, Config: r.cfg(), Now: r.now(), Event: Event{Kind: EventTick}})
 }
 
 // Quiet is the one predicate Banner, sound and Chat ask. It reads the same
@@ -97,8 +102,8 @@ func (r *Runner) apply(ev Event) (Result, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	res := Step(Input{State: r.state, Config: r.cfg(), Now: r.now(), Event: ev})
-	changed := !reflect.DeepEqual(r.state, res.State) || !sameView(r.view, res.View)
 	stateChanged := !reflect.DeepEqual(r.state, res.State)
+	changed := stateChanged || !sameView(r.view, res.View)
 	r.state, r.view = res.State, res.View
 	var err error
 	if stateChanged {
