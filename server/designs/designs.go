@@ -447,19 +447,30 @@ func (s *Designs) designWorktree(req wire.DesignWorktreeRequest) (wire.DesignWor
 	return wire.DesignWorktreeResult{Path: d.Path, Note: d.Note, AfterBranch: d.Past, Harness: s.projects.LaunchHarness(project)}, nil
 }
 
+// validateDraftTarget checks a new Design's slug and idea for both the Start
+// path and the drafts-create route. It returns the trimmed, normalized idea,
+// or a wire reason and a message naming the detail.
+func validateDraftTarget(slug, rawIdea string) (idea, reason, msg string) {
+	if !designSlugRe.MatchString(slug) {
+		return "", wire.ReasonSessionBadRequest, fmt.Sprintf("%q is not a slug (want lowercase words joined by -)", slug)
+	}
+	idea = strings.TrimSpace(wire.NormalizeAnswer(rawIdea))
+	switch {
+	case idea == "":
+		return "", wire.ReasonEmptyPrompt, "an idea is required"
+	case len(idea) > wire.MaxSessionPromptBytes:
+		return "", wire.ReasonPromptTextTooLong, fmt.Sprintf("idea is over %d bytes", wire.MaxSessionPromptBytes)
+	}
+	return idea, "", ""
+}
+
 // openNewDesign starts a design session for an idea with no map yet: Epic is
 // the slug the map will take in Project. It creates no epic; Chart writes it.
 func (s *Designs) openNewDesign(req wire.DesignOpenRequest) (wire.SessionResult, error) {
 	slug := req.Epic
-	if !designSlugRe.MatchString(slug) {
-		return sessions.Refusal(wire.ReasonSessionBadRequest, fmt.Sprintf("%q is not a slug (want lowercase words joined by -)", slug)), nil
-	}
-	idea := strings.TrimSpace(wire.NormalizeAnswer(req.Idea))
-	switch {
-	case idea == "":
-		return sessions.Refusal(wire.ReasonEmptyPrompt, "an idea is required"), nil
-	case len(idea) > wire.MaxSessionPromptBytes:
-		return sessions.Refusal(wire.ReasonPromptTextTooLong, fmt.Sprintf("idea is over %d bytes", wire.MaxSessionPromptBytes)), nil
+	idea, reason, msg := validateDraftTarget(slug, req.Idea)
+	if reason != "" {
+		return sessions.Refusal(reason, msg), nil
 	}
 	dir, err := s.projects.Dir(req.Project)
 	if err != nil {

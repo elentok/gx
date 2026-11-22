@@ -3,7 +3,6 @@ package designs
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -91,24 +90,15 @@ func draftCreate(s *Designs, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, chatdrafts.ErrHookSaveFail.Error(), http.StatusInternalServerError)
 		return
 	}
-	refuse := func(reason string) {
-		wire.WriteJSON(w, ops.DesignDraftSaveResult{Refused: true, Reason: reason})
+	idea, reason, msg := validateDraftTarget(req.Slug, req.Idea)
+	if reason == "" && strings.TrimSpace(req.Project) == "" {
+		reason, msg = wire.ReasonSessionBadRequest, "project must not be blank"
 	}
-	switch {
-	case len(req.Idea) > wire.MaxSessionPromptBytes:
-		refuse(wire.ReasonPromptTextTooLong)
-		return
-	case strings.TrimSpace(req.Idea) == "":
-		refuse("idea must not be empty")
-		return
-	case strings.TrimSpace(req.Project) == "":
-		refuse("project must not be blank")
-		return
-	case !drafts.SlugRe.MatchString(req.Slug):
-		refuse(fmt.Sprintf("%q is not a slug (want lowercase words joined by -)", req.Slug))
+	if reason != "" {
+		wire.WriteJSON(w, ops.DesignDraftSaveResult{Refused: true, Reason: reason, Message: msg})
 		return
 	}
-	d, err := s.drafts.Create(req.Project, req.Slug, req.Idea)
+	d, err := s.drafts.Create(req.Project, req.Slug, idea)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

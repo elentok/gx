@@ -163,11 +163,19 @@ func printDraftImageResult(w io.Writer, jsonOut bool, res wire.SessionImageResul
 
 // draftNotRunning is the refusal every drafts verb prints when no server
 // answers: the verbs never start the server.
-func draftNotRunning(err error) (ops.DesignDraftSaveResult, bool) {
+func draftNotRunning[R draftResult[R]](err error) (R, bool) {
+	var zero R
 	if apiclient.IsNotRunning(err) {
-		return ops.DesignDraftSaveResult{Refused: true, Reason: wire.ReasonServerNotRunning}, true
+		return zero.WithRefusal(wire.ReasonServerNotRunning), true
 	}
-	return ops.DesignDraftSaveResult{}, false
+	return zero, false
+}
+
+// draftResult is what the Design and chat drafts routes share: a result that
+// can be refused, and can be built as a refusal.
+type draftResult[R any] interface {
+	Refusal() (refused bool, reason string)
+	WithRefusal(reason string) R
 }
 
 func writeDraftJSON(w io.Writer, v any) error {
@@ -182,21 +190,22 @@ func writeDraftJSON(w io.Writer, v any) error {
 
 // printDraftResult prints a read, save or delete result: the JSON form, or a
 // refusal as an error, or text via ok.
-func printDraftResult(w io.Writer, jsonOut bool, res ops.DesignDraftSaveResult, err error, ok func(ops.DesignDraftSaveResult) error) error {
-	if r, down := draftNotRunning(err); down {
+func printDraftResult[R draftResult[R]](w io.Writer, jsonOut bool, res R, err error, ok func(R) error) error {
+	if r, down := draftNotRunning[R](err); down {
 		res, err = r, nil
 	}
 	if err != nil {
 		return fmt.Errorf("server call failed: %w", err)
 	}
+	refused, reason := res.Refusal()
 	if jsonOut {
 		if err := writeDraftJSON(w, res); err != nil {
 			return err
 		}
-		return cmdbase.JSONRefusalExit(res.Refused)
+		return cmdbase.JSONRefusalExit(refused)
 	}
-	if res.Refused {
-		return fmt.Errorf("refused (%s)", res.Reason)
+	if refused {
+		return fmt.Errorf("refused (%s)", reason)
 	}
 	return ok(res)
 }

@@ -128,21 +128,8 @@ func newAgentsDraftsCreateCmd(d Deps) *cobra.Command {
 
 func runAgentsDraftsCreate(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req ops.ChatDraftCreateRequest) error {
 	res, err := cl.Sessions.CreateChatDraft(ctx, req)
-	if apiclient.IsNotRunning(err) {
-		res, err = ops.ChatDraftResult{Refused: true, Reason: wire.ReasonServerNotRunning}, nil
-	}
-	if err != nil {
-		return fmt.Errorf("server call failed: %w", err)
-	}
-	if jsonOut {
-		if err := writeDraftJSON(w, res); err != nil {
-			return err
-		}
-		return cmdbase.JSONRefusalExit(res.Refused)
-	}
-	if res.Refused {
-		return fmt.Errorf("refused (%s)", res.Reason)
-	}
-	_, err = fmt.Fprintln(w, res.Draft.ID)
-	return err
+	return printDraftResult(w, jsonOut, res, err, func(res ops.ChatDraftResult) error {
+		_, err := fmt.Fprintln(w, res.Draft.ID)
+		return err
+	})
 }

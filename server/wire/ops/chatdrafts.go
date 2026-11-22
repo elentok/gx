@@ -99,3 +99,10 @@ type ChatDraftResult struct {
 	Draft   *ChatDraft `json:"draft,omitempty"`
 	Started string     `json:"started,omitempty"`
 }
+
+func (r ChatDraftResult) Refusal() (bool, string) { return r.Refused, r.Reason }
+
+// WithRefusal is a refused result with reason, for callers that never reached the server.
+func (ChatDraftResult) WithRefusal(reason string) ChatDraftResult {
+	return ChatDraftResult{Refused: true, Reason: reason}
+}

@@ -102,6 +102,7 @@ type DesignDraftLeaseRequest struct {
 type DesignDraftSaveResult struct {
 	Refused bool         `json:"refused,omitempty"`
 	Reason  string       `json:"reason,omitempty"`
+	Message string       `json:"message,omitempty"`
 	Deleted bool         `json:"deleted,omitempty"`
 	Draft   *DesignDraft `json:"draft,omitempty"`
 	// Started is the Design address ("project:epic") a gone draft was started as.
@@ -109,4 +110,11 @@ type DesignDraftSaveResult struct {
 	// LabelChanged is set by a text save that changed the draft's list label.
 	// Server-side only: it never goes on the wire.
 	LabelChanged bool `json:"-"`
+}
+
+func (r DesignDraftSaveResult) Refusal() (bool, string) { return r.Refused, r.Reason }
+
+// WithRefusal is a refused result with reason, for callers that never reached the server.
+func (DesignDraftSaveResult) WithRefusal(reason string) DesignDraftSaveResult {
+	return DesignDraftSaveResult{Refused: true, Reason: reason}
 }

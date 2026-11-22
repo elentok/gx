@@ -495,19 +495,37 @@ func TestWebDesignDrafts_CreateRouteRefusals(t *testing.T) {
 		reason string
 	}{
 		"too long":      {ops.DesignDraftCreateRequest{Project: "p", Slug: "s", Idea: strings.Repeat("a", wire.MaxSessionPromptBytes+1)}, wire.ReasonPromptTextTooLong},
-		"empty idea":    {ops.DesignDraftCreateRequest{Project: "p", Slug: "s", Idea: " \n"}, "idea"},
-		"blank project": {ops.DesignDraftCreateRequest{Project: " ", Slug: "s", Idea: "i"}, "project"},
-		"bad slug":      {ops.DesignDraftCreateRequest{Project: "p", Slug: "Bad Slug", Idea: "i"}, "not a slug"},
-		"missing slug":  {ops.DesignDraftCreateRequest{Project: "p", Idea: "i"}, "not a slug"},
+		"empty idea":    {ops.DesignDraftCreateRequest{Project: "p", Slug: "s", Idea: " \n"}, wire.ReasonEmptyPrompt},
+		"blank project": {ops.DesignDraftCreateRequest{Project: " ", Slug: "s", Idea: "i"}, wire.ReasonSessionBadRequest},
+		"bad slug":      {ops.DesignDraftCreateRequest{Project: "p", Slug: "Bad Slug", Idea: "i"}, wire.ReasonSessionBadRequest},
+		"missing slug":  {ops.DesignDraftCreateRequest{Project: "p", Idea: "i"}, wire.ReasonSessionBadRequest},
 	}
 	for name, c := range cases {
 		res := f.createDraft(t, c.req)
-		if !res.Refused || res.Draft != nil || !strings.Contains(res.Reason, c.reason) {
-			t.Errorf("%s: result = %+v, want refused with %q", name, res, c.reason)
+		if !res.Refused || res.Draft != nil || res.Reason != c.reason || res.Message == "" {
+			t.Errorf("%s: result = %+v, want refused with %q and a message", name, res, c.reason)
 		}
 	}
 	if items, err := f.h.Client.Sessions.DesignDrafts(f.ctx); err != nil || len(items) != 0 {
 		t.Errorf("drafts after refusals = %v, %v, want none", items, err)
+	}
+}
+
+func TestDesignsOpenNew_RefusesLikeTheDraftRoute(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	cases := map[string]struct{ slug, idea string }{
+		"too long":     {"s", strings.Repeat("a", wire.MaxSessionPromptBytes+1)},
+		"empty idea":   {"s", " \n"},
+		"bad slug":     {"Bad Slug", "i"},
+		"missing slug": {"", "i"},
+	}
+	for name, c := range cases {
+		open := f.openNew(t, c.slug, c.idea)
+		draft := f.createDraft(t, ops.DesignDraftCreateRequest{Project: "proj", Slug: c.slug, Idea: c.idea})
+		if !open.Refused || !draft.Refused || open.Reason != draft.Reason {
+			t.Errorf("%s: open = %q (refused %v), draft = %q (refused %v), want the same refusal", name, open.Reason, open.Refused, draft.Reason, draft.Refused)
+		}
 	}
 }
 

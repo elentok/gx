@@ -356,6 +356,7 @@ export interface DesignDraftLeaseRequest {
 export interface DesignDraftSaveResult {
   refused?: boolean;
   reason?: string;
+  message?: string;
   deleted?: boolean;
   draft?: DesignDraft;
   /**
