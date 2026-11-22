@@ -20,13 +20,13 @@ const (
 // Period is the running Rest period. Treat it as immutable: Step replaces it
 // instead of editing it.
 type Period struct {
-	Kind  Kind
-	Start time.Time
-	End   time.Time
+	Kind  Kind      `json:"kind"`
+	Start time.Time `json:"start"`
+	End   time.Time `json:"end"`
 	// Message and SubMessage are the Break text chosen at the start, so every
 	// browser shows the same words. Bedtime text is rendered from the settings.
-	Message    string
-	SubMessage string
+	Message    string `json:"message,omitempty"`
+	SubMessage string `json:"sub_message,omitempty"`
 }
 
 // State is everything the engine remembers between events.
@@ -79,24 +79,16 @@ type Warning struct {
 	BreakMinutes int
 }
 
-// PeriodView is the running Rest period as the browsers show it.
-type PeriodView struct {
-	Kind       Kind
-	Start      time.Time
-	End        time.Time
-	Message    string
-	SubMessage string
-}
-
 // View is what the server publishes for one state.
 type View struct {
 	// Now is the time the view was computed for, in the location it was given.
 	Now time.Time
 	// Counting is true while an active minute would count.
 	Counting bool
-	Period   *PeriodView
-	Warning  *Warning
-	quiet    bool
+	// Period is the running period with its text rendered into Message.
+	Period  *Period
+	Warning *Warning
+	quiet   bool
 }
 
 // Quiet is State.Quiet as of the view's time.
@@ -122,12 +114,6 @@ type Event struct {
 	// Sentence is the typed unlock sentence, for EventUnlock.
 	Sentence string
 }
-
-// Refusal reasons of an unlock. They are stable: clients match on them.
-const (
-	ReasonSentenceMismatch = "sentence-mismatch"
-	ReasonNoRestPeriod     = "no-rest-period"
-)
 
 // Input is everything Step needs.
 type Input struct {

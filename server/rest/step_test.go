@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server/wire"
 )
 
 var testZone = time.FixedZone("test", 2*60*60)
@@ -421,7 +422,7 @@ func TestUnlock_SentenceVariants(t *testing.T) {
 		r.tick(at(23, 0, 0))
 		before := r.state
 		res := r.unlock(at(23, 1, 0), s)
-		if res.Refusal != ReasonSentenceMismatch || res.State != before || len(res.Records) != 0 || res.View.Period == nil {
+		if res.Refusal != wire.ReasonRestSentenceMismatch || res.State != before || len(res.Records) != 0 || res.View.Period == nil {
 			t.Errorf("%q: refusal = %q, changed = %v", s, res.Refusal, res.State != before)
 		}
 	}
@@ -429,7 +430,7 @@ func TestUnlock_SentenceVariants(t *testing.T) {
 
 func TestUnlock_NoRestPeriodIsRefused(t *testing.T) {
 	r := newRig(t, breakConfig())
-	if res := r.unlock(atMin(0), goodSentence); res.Refusal != ReasonNoRestPeriod {
+	if res := r.unlock(atMin(0), goodSentence); res.Refusal != wire.ReasonRestNoPeriod {
 		t.Fatalf("refusal = %q", res.Refusal)
 	}
 }

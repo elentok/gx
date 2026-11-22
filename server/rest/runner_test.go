@@ -133,8 +133,24 @@ func TestRunner_UnlockRefusal(t *testing.T) {
 	g := openRig(t, t.TempDir(), start(), breakCfg())
 	g.workToBreak(t)
 	res, err := g.Unlock("let me in")
-	if err != nil || res.Refusal != rest.ReasonSentenceMismatch {
-		t.Errorf("unlock = %q, %v, want %q", res.Refusal, err, rest.ReasonSentenceMismatch)
+	if err != nil || res.Refusal != wire.ReasonRestSentenceMismatch {
+		t.Errorf("unlock = %q, %v, want %q", res.Refusal, err, wire.ReasonRestSentenceMismatch)
+	}
+}
+
+// Seam: a rest.json written in the old format loads as the same period.
+func TestRunner_LoadsOldFormatFile(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	old := `{"work_count":2,"period":{"kind":"break","start":"2026-11-16T10:03:00+02:00","end":"2026-11-16T10:05:00+02:00","message":"Stretch","sub_message":"Back in 2"}}`
+	if err := os.WriteFile(filepath.Join(dir, "rest.json"), []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	g := openRig(t, dir, start().Add(4*time.Minute), breakCfg())
+	p := g.View().Period
+	wantEnd := time.Date(2026, 11, 16, 10, 5, 0, 0, zone)
+	if p == nil || p.Kind != rest.KindBreak || p.Message != "Stretch" || p.SubMessage != "Back in 2" || !p.End.Equal(wantEnd) {
+		t.Errorf("period = %+v, want a Break %q/%q ending %v", p, "Stretch", "Back in 2", wantEnd)
 	}
 }
 

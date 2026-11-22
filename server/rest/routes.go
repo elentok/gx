@@ -37,7 +37,7 @@ func statusOf(cfg config.MentalHealthConfig, res Result) wire.RestStatus {
 		st.Zone = name
 	}
 	if p := v.Period; p != nil {
-		st.Period = &wire.RestPeriod{Kind: string(p.Kind), Start: p.Start, End: p.End, Message: p.Message, SubMessage: p.SubMessage}
+		st.Period = toWire(*p)
 	}
 	if w := v.Warning; w != nil {
 		st.Warning = &wire.RestWarning{Kind: string(w.Kind), Start: w.Start, BreakMinutes: w.BreakMinutes}
@@ -45,10 +45,14 @@ func statusOf(cfg config.MentalHealthConfig, res Result) wire.RestStatus {
 	return st
 }
 
+func toWire(p Period) *wire.RestPeriod {
+	return &wire.RestPeriod{Kind: string(p.Kind), Start: p.Start, End: p.End, Message: p.Message, SubMessage: p.SubMessage}
+}
+
 // refusalMessages are the sentences the CLI prints for a refusal reason.
 var refusalMessages = map[string]string{
-	ReasonSentenceMismatch: `type "I'm <your name> and I'm addicted to AI" to unlock`,
-	ReasonNoRestPeriod:     "no Rest period is running",
+	wire.ReasonRestSentenceMismatch: `type "I'm <your name> and I'm addicted to AI" to unlock`,
+	wire.ReasonRestNoPeriod:         "no Rest period is running",
 }
 
 func result(cfg config.MentalHealthConfig, res Result) wire.RestResult {

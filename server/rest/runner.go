@@ -136,30 +136,19 @@ func (r *Runner) scheduleLocked() {
 	}
 }
 
-type persistedPeriod struct {
-	Kind       Kind      `json:"kind"`
-	Start      time.Time `json:"start"`
-	End        time.Time `json:"end"`
-	Message    string    `json:"message,omitempty"`
-	SubMessage string    `json:"sub_message,omitempty"`
-}
-
 type persisted struct {
-	WorkCount    int              `json:"work_count"`
-	LastActive   time.Time        `json:"last_active,omitzero"`
-	Period       *persistedPeriod `json:"period,omitempty"`
-	QuietUntil   time.Time        `json:"quiet_until,omitzero"`
-	UnlockedKind Kind             `json:"unlocked_kind,omitempty"`
+	WorkCount    int       `json:"work_count"`
+	LastActive   time.Time `json:"last_active,omitzero"`
+	Period       *Period   `json:"period,omitempty"`
+	QuietUntil   time.Time `json:"quiet_until,omitzero"`
+	UnlockedKind Kind      `json:"unlocked_kind,omitempty"`
 }
 
 // save writes through a rename so a crash never leaves a torn file.
 func (r *Runner) save() error {
 	p := persisted{
-		WorkCount: r.state.WorkCount, LastActive: r.state.LastActive,
+		WorkCount: r.state.WorkCount, LastActive: r.state.LastActive, Period: r.state.Period,
 		QuietUntil: r.state.QuietUntil, UnlockedKind: r.state.UnlockedKind,
-	}
-	if pe := r.state.Period; pe != nil {
-		p.Period = &persistedPeriod{Kind: pe.Kind, Start: pe.Start, End: pe.End, Message: pe.Message, SubMessage: pe.SubMessage}
 	}
 	data, err := json.Marshal(p)
 	if err != nil {
@@ -192,7 +181,8 @@ func (r *Runner) load() error {
 		QuietUntil: p.QuietUntil.In(loc), UnlockedKind: p.UnlockedKind,
 	}
 	if pe := p.Period; pe != nil {
-		r.state.Period = &Period{Kind: pe.Kind, Start: pe.Start.In(loc), End: pe.End.In(loc), Message: pe.Message, SubMessage: pe.SubMessage}
+		pe.Start, pe.End = pe.Start.In(loc), pe.End.In(loc)
+		r.state.Period = pe
 	}
 	return nil
 }

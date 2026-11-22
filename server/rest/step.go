@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server/wire"
 )
 
 const (
@@ -133,10 +134,10 @@ func (e *engine) breakText() (message, sub string) {
 func (e *engine) unlock(sentence string) string {
 	p := e.s.Period
 	if p == nil {
-		return ReasonNoRestPeriod
+		return wire.ReasonRestNoPeriod
 	}
 	if !unlockSentence.MatchString(sentence) {
-		return ReasonSentenceMismatch
+		return wire.ReasonRestSentenceMismatch
 	}
 	e.records = append(e.records, Record{Kind: RecordUnlock, Time: e.now, Rest: p.Kind})
 	e.s.QuietUntil = p.End
@@ -154,7 +155,7 @@ func (e *engine) view() View {
 		quiet:    e.s.Quiet(e.cfg, e.now),
 	}
 	if p := e.s.Period; p != nil {
-		pv := PeriodView{Kind: p.Kind, Start: p.Start, End: p.End, Message: p.Message, SubMessage: p.SubMessage}
+		pv := *p
 		if p.Kind == KindBedtime {
 			text := strings.ReplaceAll(e.cfg.Bedtime.Message, "{end}", e.cfg.Bedtime.End)
 			pv.Message, pv.SubMessage = splitMessage(text)
