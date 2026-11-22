@@ -49,6 +49,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"follow-up edit-only", "gx-follow-up/SKILL.md", editOnlyRule},
 		{"flake tickets edit-only", "gx-flake-tickets.md", editOnlyRule},
 		{"verify-epic edit-only", "gx-verify-epic/SKILL.md", editOnlyRule},
+		{"to-tickets edit-only", "gx-to-tickets/SKILL.md", editOnlyRule},
 		{"code-review shared diff", "gx-code-review/SKILL.md", []string{
 			"### Shared review file", "scratchpad", "verify a suspicion", "### Size gate", "50 changed lines",
 			"gx tickets review-bundle <project:epic>", "`deviations.md`",

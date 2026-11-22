@@ -13,16 +13,16 @@ declaring the tickets that **block** it — published to gx's local markdown tra
 [gx-local-tracker.md](../gx-local-tracker.md) for the full layout, frontmatter, and CLI contract;
 this skill only covers how to break work up and what to put in each ticket.
 
+Change files with a file edit (Edit) or file write (Write) only, never `sed -i`, `cat >`, `cat >>` or a heredoc. Write the file first, then use it (for section text, write a file and pipe it with `gx tickets section ... -`). Run one command per call, because a blocked call runs nothing.
+
 ralph-loop runs the published epic unattended, ticket by ticket, with no session-length limit — it
 will happily churn through however many tickets the epic has, overnight if needed. The only budget
 that matters is **context window per ticket**, never wall-clock time for the epic as a whole: split
 a ticket because its implementation won't fit one fresh context window, not because the epic "would
 take a while" to get through.
 
-Estimate the amount of tokens that will be needed for the implementation of each ticket; if a ticket
-will need more than 60K tokens of work, split it. The 60K counts the ticket's work only.
-
-The estimate is the ticket's work only. gx adds the start-up prefix itself. Cold estimates run 1.12
+Estimate the tokens needed to implement each ticket; if a ticket will need more than 60K tokens of
+work, split it. The 60K counts the ticket's work only. gx adds the start-up prefix itself. Cold estimates run 1.12
 to 1.28 times the real work. They look low only because the actual context window keeps the prefix.
 Estimate lower: multiply your first guess by 0.83. When a ticket sits close to the 60K limit, or
 its prose does not list the files it touches, split it instead of trusting the number. A ticket
@@ -45,18 +45,17 @@ lines can still blow the budget once you add:
   variant typically needs its own wiring and its own test assertion — treat N independent variants
   the same as threading a large file N times, and split by variant group if N is more than a couple.
   This is not optional when the variants also fall in different test files (see next bullet) — that
-  conjunction, not variant count alone, is what blows a budget: one past ticket named 3
-  variants sharing one root cause and forked 4 times before merging, because the variant count alone
-  didn't trigger a split.
+  conjunction, not variant count alone, is what blows a budget: one past ticket named 3 variants
+  sharing one root cause and forked 4 times before merging, as the count alone didn't trigger a split.
 - **Test-file fan-out.** Count how many *distinct existing test files* the ticket's Test Seams will
   need new cases in. Each file usually means its own read of existing fixtures/conventions before a
   new case can be written — 3+ files is the same cost shape as the explore/implement split below,
   even if the ticket reads as "mostly implementation" rather than "mostly tests." Don't let a single
   `expected_context_window` number smooth over this; split by file group (or route through
   explore/implement, below) once a ticket's Test Seams section names 3+ files. `publish` warns on 5
-  or more acceptance criteria with 5 or more files; a warning means you re-check the slice before
-  going on. The 3-or-more-test-files rule is not shown to predict overruns (precision 0.18, recall
-  0.31), so treat it as a prompt to look, not a limit.
+  or more acceptance criteria with 5 or more files; a warning means you re-check the slice first.
+  The 3-or-more-test-files rule is not shown to predict overruns (precision 0.18, recall 0.31), so
+  treat it as a prompt to look, not a limit.
 
 Separate "the capability doesn't exist yet" from "something consumes a capability that now exists"
 into different tickets — a plumbing/infra ticket vs. a feature-on-top ticket. This applies whenever
@@ -351,7 +350,7 @@ acceptance criteria. Verify tickets do not count as agent-written.
   (see [Skill conventions](../gx-local-tracker.md#skill-conventions)).
 - **A writer** fills the two TODO parts of its bodies and explores the code it needs. It never edits
   slugs or `blocked_by`. It reports any missing plan fact (an edge, entry symbol, test file, mock
-  state) to you instead.
+  state) to you instead. It fills bodies with Edit, never `sed -i`, `cat >` or a heredoc, one command per call.
 - **After all writers finish**, edit the plan and re-run `draft` once. A re-run keeps the writers'
   parts.
 - **Progress**: give each Agent call a description that starts with `writer N`. Print a start line
