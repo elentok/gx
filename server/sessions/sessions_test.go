@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/server/wire"
-
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/ralphloop/agent"
 	"github.com/elentok/gx/server/designs/drafts"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -650,26 +650,20 @@ func TestReportSessionStep_Refusals(t *testing.T) {
 	}
 }
 
-func TestSessionCreate_TierDefaultsToWorker(t *testing.T) {
+func TestSessionCreate_TierDefaultsToWorkerIsSavedAndResumeKeepsIt(t *testing.T) {
 	t.Parallel()
-	h, _, _, id, _ := startFakeSession(t)
-	if tier := readMeta(t, h, id)["tier"]; tier != "worker" {
-		t.Errorf("meta tier = %v, want worker", tier)
-	}
-}
-
-func TestSessionCreate_TierIsSavedAndResumeKeepsIt(t *testing.T) {
-	t.Parallel()
-	h, ctx, evs, id, _ := startFakeSessionWith(t, wire.CreateSessionRequest{Tier: "strongest"})
-	if tier := readMeta(t, h, id)["tier"]; tier != "strongest" {
-		t.Fatalf("meta tier = %v, want strongest", tier)
-	}
-	stopFakeSession(ctx, t, h, evs, id)
-	if r, err := h.Client.Sessions.Resume(ctx, id); err != nil || r.Refused {
-		t.Fatalf("resume = %+v, %v", r, err)
-	}
-	if tier := readMeta(t, h, id)["tier"]; tier != "strongest" {
-		t.Errorf("meta tier after resume = %v, want strongest", tier)
+	for asked, want := range map[agent.Tier]string{"": "worker", "strongest": "strongest"} {
+		h, ctx, evs, id, _ := startFakeSessionWith(t, wire.CreateSessionRequest{Tier: asked})
+		if tier := readMeta(t, h, id)["tier"]; tier != want {
+			t.Fatalf("tier %q: meta tier = %v, want %s", asked, tier, want)
+		}
+		stopFakeSession(ctx, t, h, evs, id)
+		if r, err := h.Client.Sessions.Resume(ctx, id); err != nil || r.Refused {
+			t.Fatalf("resume = %+v, %v", r, err)
+		}
+		if tier := readMeta(t, h, id)["tier"]; tier != want {
+			t.Errorf("tier %q: meta tier after resume = %v, want %s", asked, tier, want)
+		}
 	}
 }
 
@@ -768,7 +762,7 @@ func TestFocusSession_TargetsLastFocusedTUI(t *testing.T) {
 	}
 }
 
-func TestFocusSession_NoTUISucceedsWithNoTarget(t *testing.T) {
+func TestFocusSession_NoTUISucceedsWithNoTargetAndUnknownIDRefused(t *testing.T) {
 	t.Parallel()
 	h, ctx, _, id, _ := startFakeSession(t)
 	drop := openTUI(ctx, t, h, "tui-1")
@@ -783,12 +777,7 @@ func TestFocusSession_NoTUISucceedsWithNoTarget(t *testing.T) {
 	if err != nil || res.Refused || res.Client != "" {
 		t.Fatalf("focus = %+v, %v; want success with no target", res, err)
 	}
-}
-
-func TestFocusSession_RefusesUnknownID(t *testing.T) {
-	t.Parallel()
-	h, ctx, _, _, _ := startFakeSession(t)
-	res, err := h.Client.Sessions.Focus(ctx, "nope")
+	res, err = h.Client.Sessions.Focus(ctx, "nope")
 	if err != nil || res.Reason != wire.ReasonSessionUnknown {
 		t.Fatalf("focus = %+v, %v; want %s", res, err, wire.ReasonSessionUnknown)
 	}

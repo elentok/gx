@@ -161,20 +161,21 @@ func TestSessionInfoContext_NoReadingCarriesNeither(t *testing.T) {
 	}
 }
 
-func TestSessionInfoContext_CompactKeepsTheEarlierCount(t *testing.T) {
+func TestSessionInfoContext_LaterNoiseKeepsTheRealCount(t *testing.T) {
 	t.Parallel()
 	boundary := `{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"manual"}}`
-	info := modelTestServer(t, "/work/proj", replyWithUsage("claude-opus-5-5", 120000), boundary).SessionInfo(contextMeta)
-	if info.ContextTokens == nil || *info.ContextTokens != 120000 || info.ContextLevel != agent.LevelOrange {
-		t.Errorf("context = %v/%q, want 120000/orange", info.ContextTokens, info.ContextLevel)
-	}
-}
-
-func TestSessionInfoContext_SyntheticZeroLineKeepsTheRealCount(t *testing.T) {
-	t.Parallel()
-	info := modelTestServer(t, "/work/proj", replyWithUsage("claude-opus-5-5", 50000), syntheticReply).SessionInfo(contextMeta)
-	if info.ContextTokens == nil || *info.ContextTokens != 50000 || info.ContextLevel != agent.LevelGreen {
-		t.Errorf("context = %v/%q, want 50000/green", info.ContextTokens, info.ContextLevel)
+	for name, c := range map[string]struct {
+		tokens int
+		after  string
+		level  agent.ContextLevel
+	}{
+		"compact boundary":    {120000, boundary, agent.LevelOrange},
+		"synthetic zero line": {50000, syntheticReply, agent.LevelGreen},
+	} {
+		info := modelTestServer(t, "/work/proj", replyWithUsage("claude-opus-5-5", c.tokens), c.after).SessionInfo(contextMeta)
+		if info.ContextTokens == nil || *info.ContextTokens != c.tokens || info.ContextLevel != c.level {
+			t.Errorf("%s: context = %v/%q, want %d/%s", name, info.ContextTokens, info.ContextLevel, c.tokens, c.level)
+		}
 	}
 }
 
@@ -210,15 +211,6 @@ func TestSessionInfoModel_ReportedBeatsSavedAndNewestReplyWins(t *testing.T) {
 	}
 }
 
-func TestSessionInfoModel_TierAloneUntilFirstReply(t *testing.T) {
-	t.Parallel()
-	s := modelTestServer(t, "/work/proj", `{"type":"user","message":{"content":"hi"}}`)
-	info := s.SessionInfo(sessions.Meta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv", Tier: "light"})
-	if info.Tier != "light" || info.Model != "" {
-		t.Errorf("tier/model = %q/%q, want light and no model", info.Tier, info.Model)
-	}
-}
-
 func TestSessionInfoModel_OldMetaShowsTheReportedModelOnceItReplies(t *testing.T) {
 	t.Parallel()
 	meta := sessions.Meta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv"}
@@ -226,9 +218,10 @@ func TestSessionInfoModel_OldMetaShowsTheReportedModelOnceItReplies(t *testing.T
 	if replied.Model != "claude-sonnet-5-5" || replied.Tier != "" || replied.Effort != "" {
 		t.Errorf("tier/model/effort = %q/%q/%q, want no tier or effort and claude-sonnet-5-5", replied.Tier, replied.Model, replied.Effort)
 	}
+	meta.Tier = "light"
 	quiet := modelTestServer(t, "/work/proj", `{"type":"user","message":{"content":"hi"}}`).SessionInfo(meta)
-	if quiet.Model != "" {
-		t.Errorf("model = %q before the first reply, want empty", quiet.Model)
+	if quiet.Tier != "light" || quiet.Model != "" {
+		t.Errorf("tier/model = %q/%q before the first reply, want light and no model", quiet.Tier, quiet.Model)
 	}
 }
 
