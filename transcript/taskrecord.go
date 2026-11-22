@@ -56,6 +56,18 @@ type TaskRecord struct {
 	// file's mtime as the time.
 	Trailer *TaskEnd
 
+	// TaskID is the id a background launch result named: a shell's
+	// backgroundTaskId, a Monitor's taskId or an async subagent's agentId.
+	// Empty for a foreground call.
+	TaskID string
+	// Reported is set once a CLI report line (notification, queue operation,
+	// attachment, TaskOutput or TaskStop result) names TaskID. ReportedAt is the
+	// latest such line. AwaitingTurnEnd stays true until an assistant turn ends
+	// after it: the report wakes an agent that ended its turn to wait.
+	Reported        bool
+	ReportedAt      time.Time
+	AwaitingTurnEnd bool
+
 	// Details by kind; zero values are absent.
 	Command  string
 	ExitCode *int

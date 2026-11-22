@@ -1,6 +1,7 @@
 package transcript
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"regexp"
@@ -43,6 +44,11 @@ type taskRecordResult struct {
 	Status           string `json:"status"`
 	ResolvedModel    string `json:"resolvedModel"`
 	OutputFile       string `json:"outputFile"`
+	// A TaskOutput result: {retrieval_status, task: {task_id, ...}}.
+	RetrievalStatus string `json:"retrieval_status"`
+	Task            struct {
+		TaskID string `json:"task_id"`
+	} `json:"task"`
 }
 
 // ReadTaskRecords parses the parent transcript at path into task records:
@@ -51,12 +57,33 @@ type taskRecordResult struct {
 // assembly. The same scan also returns the current turn's open calls, exactly
 // as ReadInFlightTools lists them.
 func ReadTaskRecords(path string) ([]TaskRecord, []InFlightTool, error) {
+	scan, err := scanTaskRecords(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	return scan.records, scan.inFlight, nil
+}
+
+// taskScan is one pass over a transcript: the task records, the open calls,
+// and the line counts the background-task view needs to tell a missing or
+// unreadable file from an empty one.
+type taskScan struct {
+	records  []TaskRecord
+	inFlight []InFlightTool
+	missing  bool
+	nonBlank int
+	parsed   int
+}
+
+func scanTaskRecords(path string) (taskScan, error) {
+	var scan taskScan
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil, nil
+			scan.missing = true
+			return scan, nil
 		}
-		return nil, nil, err
+		return taskScan{}, err
 	}
 	defer f.Close()
 
@@ -66,8 +93,16 @@ func ReadTaskRecords(path string) ([]TaskRecord, []InFlightTool, error) {
 	byTask := map[string]*TaskRecord{}
 
 	err = ForEachLine(f, func(b []byte) {
+		if len(bytes.TrimSpace(b)) == 0 {
+			return
+		}
+		scan.nonBlank++
 		var l taskRecordLine
-		if json.Unmarshal(b, &l) != nil || l.IsSidechain {
+		if json.Unmarshal(b, &l) != nil {
+			return
+		}
+		scan.parsed++
+		if l.IsSidechain {
 			return
 		}
 		if l.Type == "assistant" || l.Type == "user" {
@@ -81,6 +116,9 @@ func ReadTaskRecords(path string) ([]TaskRecord, []InFlightTool, error) {
 		if tsErr != nil {
 			return
 		}
+		var res taskRecordResult
+		_ = json.Unmarshal(l.ToolUseResult, &res)
+		applyReports(recs, l, res, string(b), ts)
 		switch l.Type {
 		case "assistant":
 			for id, u := range taskToolUses(l.Message) {
@@ -122,8 +160,6 @@ func ReadTaskRecords(path string) ([]TaskRecord, []InFlightTool, error) {
 				applyNotification(text, ts, byTask)
 				return
 			}
-			var res taskRecordResult
-			_ = json.Unmarshal(l.ToolUseResult, &res)
 			if r := byTask[res.StoppedTaskID]; r != nil && res.StoppedTaskID != "" && r.End == nil {
 				r.End = &TaskEnd{At: ts, Outcome: TaskOutcomeKilled, Source: TaskEndTaskStop}
 			}
@@ -136,16 +172,17 @@ func ReadTaskRecords(path string) ([]TaskRecord, []InFlightTool, error) {
 				case r.Kind == TaskKindMonitor:
 					if res.TimeoutMs != nil && res.MonitorTaskID != "" {
 						r.Timeout = time.Duration(*res.TimeoutMs) * time.Millisecond
+						r.TaskID = res.MonitorTaskID
 						byTask[res.MonitorTaskID] = r
 					}
 				case r.Kind == TaskKindSubagent && res.Status == "async_launched":
-					r.ID, r.Model = res.AgentID, res.ResolvedModel
+					r.ID, r.TaskID, r.Model = res.AgentID, res.AgentID, res.ResolvedModel
 					r.OutputPath = usableOutputPath(res.OutputFile)
 					if res.AgentID != "" {
 						byTask[res.AgentID] = r
 					}
 				case res.BackgroundTaskID != "":
-					r.Kind = TaskKindShell
+					r.Kind, r.TaskID = TaskKindShell, res.BackgroundTaskID
 					byTask[res.BackgroundTaskID] = r
 					if p := outputPathText.FindStringSubmatch(item.text); p != nil {
 						r.OutputPath = p[1]
@@ -165,15 +202,29 @@ func ReadTaskRecords(path string) ([]TaskRecord, []InFlightTool, error) {
 				}
 			}
 		}
+		// A launch result with no tool_use of its own in the transcript, on a
+		// line of any type, still starts a background task.
+		if id, kind := res.launch(); id != "" && byTask[id] == nil {
+			r := &TaskRecord{Kind: kind, TaskID: id, StartedAt: ts}
+			if kind == TaskKindSubagent {
+				r.ID = id
+			}
+			if kind == TaskKindMonitor {
+				r.Timeout = time.Duration(*res.TimeoutMs) * time.Millisecond
+			}
+			byTask[id] = r
+			recs = append(recs, r)
+		}
 	})
 	if err != nil {
-		return nil, nil, err
+		return taskScan{}, err
 	}
-	out := make([]TaskRecord, len(recs))
+	scan.records = make([]TaskRecord, len(recs))
 	for i, r := range recs {
-		out[i] = *r
+		scan.records[i] = *r
 	}
-	return out, open.result(), nil
+	scan.inFlight = open.result()
+	return scan, nil
 }
 
 // applyNotification ends the shell a final task-notification names. A
