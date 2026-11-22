@@ -17,7 +17,7 @@ func TestWritableDirectoriesProjectEditorUsesAdditions(t *testing.T) {
 		t.Fatalf("project editor = %+v", project)
 	}
 	globalEntry := buildEntry(e, false, []byte(`{}`), []byte(`{}`))
-	if string(globalEntry.Default) != `["~/Library/pnpm"]` {
+	if string(globalEntry.Default) != "[]" {
 		t.Fatalf("global default = %s", globalEntry.Default)
 	}
 }
