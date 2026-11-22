@@ -1,8 +1,10 @@
 import { act, render } from "@testing-library/react"
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
 import type { SessionCommandsResponse } from "../generated/server"
+import * as routeSpans from "../routeSpans"
 import {
   clearCommandListCache,
+  fetchCommands,
   useCommandList,
   type CommandList,
   type FetchCommands,
@@ -30,6 +32,20 @@ function Gated({ fetcher, enabled }: { fetcher: FetchCommands; enabled: boolean 
   last = useCommandList({ sessionId: "a" }, "/", fetcher, enabled)
   return null
 }
+
+it("fetchCommands is a side fetch, not counted as an API request", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(JSON.stringify(resp(["help"])), { status: 200 })),
+  )
+  const note = vi.spyOn(routeSpans, "noteApiRequest")
+
+  await fetchCommands({ sessionId: "a" }, "/")
+
+  expect(note.mock.calls).toEqual([[true]])
+  note.mockRestore()
+  vi.unstubAllGlobals()
+})
 
 it("makes no read while disabled, then reads when it turns on", async () => {
   const fetcher = vi.fn<FetchCommands>().mockResolvedValue(resp(["help"]))

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { apiFetch } from "../apiFetch"
+import { apiFetchSide } from "../apiFetch"
 import type { SessionCommandEntry, SessionCommandsResponse } from "../generated/server"
 
 /** A session id, or the project + dir of a First prompt. */
@@ -17,7 +17,7 @@ export const fetchCommands: FetchCommands = async (target, kind) => {
     q.set("project", target.project)
     q.set("dir", target.dir)
   }
-  const res = await apiFetch(`/v1/sessions/commands?${q}`)
+  const res = await apiFetchSide(`/v1/sessions/commands?${q}`)
   if (!res.ok) throw new Error(`session commands: HTTP ${res.status}`)
   return res.json()
 }
