@@ -87,10 +87,10 @@ test("Chords", async ({ page, start }) => {
   await expect(prompt).toHaveValue("draft text")
   expect(page.url()).toBe(chatUrl)
   await expect(page.getByRole("dialog")).toHaveCount(0)
-  // Leader then c runs New chat and types no c; a modal open then keeps the Leader key shut.
+  // Leader then C (Shift+c) runs New chat and types no c; a modal open then keeps the Leader key shut.
   await page.keyboard.press(leader)
   await expect(chordBox).toBeVisible()
-  await page.keyboard.press("c")
+  await page.keyboard.press("Shift+C")
   const chordDialog = page.getByRole("dialog")
   await expect(chordDialog).toBeVisible()
   await expect(chordBox).toHaveCount(0)
@@ -158,7 +158,7 @@ test("Chords", async ({ page, start }) => {
   ).toHaveAttribute("aria-pressed", "true")
   await goto(page, "#/epics")
 
-  // The chords: c and d open the new chat and design forms, a click on the c row does the same, and the
+  // The chords: C (Shift+c) and d open the new chat form and a design draft, a click on the C row does the same, and the
   // palette's New chat opens the same form on the same project.
   const openBox = async () => {
     await expect(async () => {
@@ -176,13 +176,13 @@ test("Chords", async ({ page, start }) => {
   await goto(page, "#/d/side:side-design")
   await expect(page.getByRole("heading", { name: /side-design/ }).first()).toBeVisible()
   await openBox()
-  await page.keyboard.press("c")
+  await page.keyboard.press("Shift+C")
   await expect(chordForm).toBeVisible()
   await expect(chordProject).toHaveValue("side")
   await page.keyboard.press("Escape")
   await expect(chordForm).toHaveCount(0)
   await openBox()
-  await chordBox.getByRole("menuitem", { name: /New chat/ }).click()
+  await chordBox.getByRole("menuitem", { name: /^C\s*New chat$/ }).click()
   await expect(chordForm).toBeVisible()
   await expect(chordProject).toHaveValue("side")
   await page.keyboard.press("Escape")
@@ -245,7 +245,7 @@ test("Chords", async ({ page, start }) => {
   // On a live chat: Leader then x asks first with Keep focused, Keep leaves the chat, Remove deletes it.
   await goto(page, "#/epics")
   await openBox()
-  await page.keyboard.press("c")
+  await page.keyboard.press("Shift+C")
   await chordForm.getByRole("textbox", nav("Name")).fill("chord-chat")
   await chordForm.getByRole("textbox", nav("First prompt")).fill("hi")
   await chordForm.getByRole("button", nav("Create chat")).click()
@@ -317,7 +317,7 @@ test("Chords", async ({ page, start }) => {
   // A refusal shows its reason in the popup and keeps the text: the chat is removed from the CLI while the popup is open.
   await goto(page, "#/epics")
   await openBox()
-  await page.keyboard.press("c")
+  await page.keyboard.press("Shift+C")
   await chordForm.getByRole("textbox", nav("Name")).fill("refuse-chat")
   await chordForm.getByRole("textbox", nav("First prompt")).fill("hi")
   await chordForm.getByRole("button", nav("Create chat")).click()
@@ -357,7 +357,7 @@ test("Chords", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/agents$/)
   await expect.poll(() => fx.cli("agents", "list")).not.toContain(chordChat.id)
 
-  // Design page, Queue and a Queue agent: the box has c, d, s and b only, and x does nothing.
+  // Design page, Queue and a Queue agent: the box has c, C, d, s and b only, and x does nothing.
   // The palette lists no Rename chat there; its New chat row proves the filter ran.
   const expectNoRenameInPalette = async () => {
     await page.keyboard.press("ControlOrMeta+p")
@@ -372,7 +372,7 @@ test("Chords", async ({ page, start }) => {
   for (const hash of ["#/d/side:side-design", queueAgentHash]) {
     await goto(page, hash)
     await openBox()
-    await expect(chordBox.getByRole("menuitem")).toHaveCount(4)
+    await expect(chordBox.getByRole("menuitem")).toHaveCount(5)
     await expect(chordBox.getByRole("menuitem", { name: /^x/ })).toHaveCount(0)
     await expect(chordBox.getByRole("menuitem", { name: /^r/ })).toHaveCount(0)
     await page.keyboard.press("x")
