@@ -254,6 +254,11 @@ Use [gx-tdd](../gx-tdd/SKILL.md) where possible, at pre-agreed seams. Every decl
 real assertion; if one cannot be observed, pause the ticket with `gx tickets ask`, naming the seam, instead of finishing
 (see "When only a person can answer").
 
+**Changing a visible label (a menu item, a sidebar prefix, a button name): `rg` the e2e files for
+the old text.** Fix every match, update the "Routes and labels" table in `webui/e2e/CATALOG.md`, and
+run the flows that hit it with `gx brief -C webui playwright`. Stale locators otherwise surface many
+tickets later in code-review. Rules for the flows are in the `gx-only-e2es` skill.
+
 **Hand-running changed gx CLI code: use `go run . <cmd>`, not the installed `gx`.** The installed
 binary is older than the worktree and shows old behaviour.
 

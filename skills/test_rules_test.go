@@ -208,6 +208,9 @@ func TestGxImplementTestRules(t *testing.T) {
 		"There is no exemption list",
 		"`gx check --full`",
 		"changed-file `gx check`",
+		"`rg` the e2e files",
+		"the `gx-only-e2es` skill",
+		"`gx brief -C webui playwright`",
 	)
 	for _, skill := range []string{"gx-implement/SKILL.md", "gx-tdd/SKILL.md"} {
 		if strings.Contains(readFile(t, skill), "gx-playwright-e2es") {

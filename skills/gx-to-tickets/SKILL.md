@@ -235,7 +235,8 @@ context overrun) rediscovering it, then misses shared fixtures and fails the ful
 - **Removed or changed behaviour**: when the ticket deletes or changes behaviour, run `rg` for the
   removed names and the changed label or text across all tests, e2e flows and fixtures. Read every
   hit in full (no `| head`). List each affected test in Test seams, and give a scoped run (`-run`
-  pattern or file list) that covers every hit. Don't scope by the new feature's name.
+  pattern or file list) that covers every hit. Don't scope by the new feature's name. When a hit is
+  in an e2e flow, also name the e2e flows to run (`gx brief -C webui playwright <file> <flow numbers>`).
 - **Caller lists are verified, not recalled**: build every list of call sites with gopls
   `go_symbol_references` (not from memory or a ticket's prose) and stamp it `verified at {{commit}}`;
   `publish` fills in the commit. If gopls is unavailable, use `rg` and label the list
