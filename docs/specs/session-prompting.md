@@ -2,6 +2,10 @@
 
 Map: `gx:session-prompting` (decisions 01–09, plus review findings). Sources: `gx:follow-ups/13`, `14`, `15`, `22`.
 
+Changed 2026-11-22 by `docs/specs/single-owner-session-input.md`: the first prompt's ready signal is
+a composer marker in the raw output (not a screen read), the first prompt has no draft clear, and the
+draft check for later prompts acts only on a trusted screen read.
+
 ## Problem Statement
 
 A person who starts a session or runs an Action waits too long, and sometimes gets a broken prompt:
@@ -31,8 +35,10 @@ is fast, checks what it can, and never types over text it didn't write.
   checkout, and focus on Name. Enter creates at once. When a matching **Design session** exists, the
   menu shows "Go to design session…" above "Start session…".
 - **Ready signal.** Each **Harness** reports when its input is ready. For Claude it is the earliest
-  of the pid file `idle`, an OSC 7501 report, or a screen match on its input box. The first prompt
-  is typed on that signal, or on the first Idle if that comes first, so it never hangs.
+  of the pid file `idle`, an OSC 7501 idle report, or the composer marker (`❯` plus U+00A0) in the
+  raw output. For Codex it is
+  the OSC 7501 idle report. The first prompt is typed on that signal, or on the first Idle if that
+  comes first, so it never hangs. No screen read decides readiness.
 - **Nudged first prompt.** A real first prompt goes through the nudge (wait for Working, then Enter
   or retype). A slash first prompt is typed once and ends like an Action slash step, with one extra
   Enter if it is still in the input. Any input from the person stops the remaining nudges.
@@ -41,9 +47,12 @@ is fast, checks what it can, and never types over text it didn't write.
   commands.
 - **Ready to type.** Before any typed text, the harness makes sure its input accepts text. Claude
   with vim mode on and no `-- INSERT --` marker gets `i`, then a short re-check.
-- **Draft clear.** Before the first prompt and each Action step, gx checks the input is empty. The
-  dim placeholder is not a draft. If a person's draft is there, gx clears it (Ctrl+U until the
-  input reads empty) and types. Only a draft that won't clear raises the session as **Actionable**
+- **Draft clear.** Before each later prompt (each Action step, a web chat send to a live session),
+  gx checks the input is empty. The first prompt has no draft clear: a new session's input is empty.
+  The dim placeholder is not a draft. If a person's draft is there, gx clears it (Ctrl+U until the
+  input reads empty) and types. A read gx can't trust (cursor row missing, a header or logo on the
+  `❯` row, a PTY resize with no child output since) is undecided, and gx types. Only a trusted
+  draft that won't clear raises the session as **Actionable**
   with the unsent prompts and the reason "input would not clear". (Changed 2026-10-23: gx used to
   refuse on any draft, which left a stale `/clear` blocking Continue with no visible reason.)
 - **Whole-input clear.** The nudge's retype clears the whole input (repeated Ctrl+U, then an empty
@@ -104,8 +113,9 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 16. As a harness author, I want the ready signal to be a harness method, so that the server holds no
     Claude logic and a new harness only supplies its own rule. [03]
 17. As a gx maintainer, I want Claude's ready signal to be the earliest of the pid file `idle`, an
-    OSC 7501 report and an input-box screen match, and any signal that adds nothing dropped after
-    measuring, so that the signal is as fast as it can be with no dead parts. [03]
+    OSC 7501 idle report and the composer marker in the raw output (only the screen match is
+    dropped), and any signal that adds nothing
+    dropped after measuring, so that the signal is as fast as it can be with no dead parts. [03]
 18. As a ralph-loop user on the PTY runner, I want the launch wait to use the same ready signal
     through the shared harness code, so that loop launches get faster with no loop-specific work.
     [03]
@@ -185,20 +195,23 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 
 ### Draft check
 
-44. As a person with a draft in the input, I want gx to clear it before it types its first prompt
-    or Action step, so that the texts never mix and a leftover draft never blocks gx. [06]
+44. As a person with a draft in the input, I want gx to clear it before it types a later prompt or
+    Action step (not the first prompt, whose input is empty), so that the texts never mix and a
+    leftover draft never blocks gx. [06]
 45. As a person, when the draft won't clear, I want the session raised as Actionable with only the
     unsent steps and the reason "input would not clear", so that steps already sent never run
     twice. [06]
-46. As a person, I want the same for the first prompt, raised as a one-step Action. [06]
+46. As a person, I want a first prompt that fails to start (not a draft) raised as a one-step
+    Action. [06]
 47. As a person, I want my clearing or sending of the draft not to clear gx's Actionable, so that
     `a` still finds its steps. [07]
 48. As a person, I want `a` with the draft still there to clear it and send the same steps. [07]
 49. As a person, I want a gx-raised Actionable replaced only by `a`, a newer Actionable or exit,
     while an agent-raised one is still cleared by my input as today. [07]
-50. As a person, I want gx to type as today when the empty check can't decide, so that a missing
-    check never blocks every prompt. [06]
-51. As a person, I want the vim step first, then the draft check, then typing, on each path. [06]
+50. As a person, I want gx to type as today when the empty check can't decide or the read can't be
+    trusted, so that a missing or torn read never blocks a prompt. [06]
+51. As a person, I want the vim step first, then the draft check (later prompts only), then typing,
+    on each path. [06]
 
 ### Nudge retype
 
@@ -265,8 +278,10 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 
 ### Ready signal
 
-- Claude: the earliest of the pid file `idle`, an OSC 7501 report, or an input-box screen match
-  (like the existing `claudeui` screen rules).
+- Claude: the earliest of the pid file `idle`, an OSC 7501 idle report and the composer marker in
+  the raw output (changed by `docs/specs/single-owner-session-input.md`; only the input-box screen
+  match is gone). Codex: the OSC 7501
+  idle report.
 - Ready is a separate report from Session status. Session status precedence (OSC 7501 > pid file
   > transcript > screen rules) does not change. How the holder reports ready to the server is the
   implementer's choice.
@@ -276,22 +291,26 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 - The 30s start timeout counts Starting time from launch. A session that went Blocked is no longer
   Starting, so the timeout can't fire while a person answers a dialog.
 - The PTY runner's launch wait reads the same ready report through the shared holder and harness
-  code. No ralph-loop-specific work.
-- The hand measurement (below) checks which of the three Claude signals fires first, and drops any
-  that never fires first.
+  code. No ralph-loop-specific work. Ralph-loop's `PromptNudged` on the PTY runner takes input
+  ownership per batch of keys under the same rules (see
+  `docs/specs/single-owner-session-input.md`).
+- The hand measurement (below) checks which Claude signal (pid file `idle`, OSC 7501 idle, composer marker, first Idle) fires
+  first, and drops any that never fires first.
 
 ### First prompt (Create session only)
 
 - Replaces today's "type on first Idle with raw `SendKeys`". Fires on ready or first Idle,
-  whichever comes first. Order: ready to type, then the draft check, then deliver.
+  whichever comes first. Order: ready to type, then deliver. No draft check on the first prompt.
 - **Real prompt**: delivered through `claudeui.PromptWithNudge` (default caps) with a Prompter over
-  the session's holder. Ralph-loop's `PromptNudged` path is unchanged.
+  the session's holder. Ralph-loop's `PromptNudged` path is unchanged except that it takes input ownership per batch of keys.
 - **Slash prompt**: typed once. Ends on the first of a full turn, a new conversation id, or the
   settle window (same rule and config as an Action slash step). When the settle window ends, the
   empty check runs: the prompt still in the input → one Enter, then stop; empty or can't decide →
   stop.
 - **Person input** (`StreamInput`) after gx typed the prompt cancels every remaining nudge, for
-  slash and real prompts. Not a failure. Input before typing is the draft check's case.
+  slash and real prompts. Not a failure. gx holds input ownership only while it sends one batch of
+  keys (one nudge Enter or retype, the prompt), not during the wait for Working, so person keys
+  reach the agent during a wait (`docs/specs/single-owner-session-input.md`). Input before the first prompt's keys is not a draft case: gx owns the input from launch until they are sent, and a client that attaches earlier becomes owner after that batch (first-prompt owner rule in `docs/specs/single-owner-session-input.md`).
 - The slash rule and the input cancel live in the first-prompt path, not in the shared nudge.
 - **Failures**: nudge stuck (`ErrStuckSubmission`), nudge start timeout (`ErrStartTimeout`), still
   Starting after 30s, vim give-up. Each one logs a warning, then raises a gx-raised Actionable with
@@ -301,8 +320,7 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
     the input.
   - A turn that starts late after a timeout could make `a` send the prompt twice. Accepted: Actions
     need Idle, and the person chooses when to press `a`.
-- A draft at first-prompt time is cleared; one that won't clear raises a one-step Actionable with
-  "input would not clear".
+- No draft clear at first-prompt time (see `docs/specs/single-owner-session-input.md`).
 
 ### Actions
 
@@ -391,7 +409,7 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 A person measures by hand once the implementation epic lands, using the kept debug lines, on real Claude (and Codex for the
 herdr runner's typing rules), then records the results in this spec's Further Notes:
 
-- Launch → first status → each Claude ready signal → typed, on a map-epic Create session. Drop any
+- Launch → first status → each Claude ready signal (pid file `idle`, OSC 7501 idle, composer marker) → typed, on a map-epic Create session. Drop any
   ready signal that never fires first. Confirm the ~2s target.
 - Typed → Working for a skill slash command (`/gx-design`). If over ~700ms, raise the settle
   window's default above it.
@@ -415,7 +433,7 @@ herdr runner's typing rules), then records the results in this spec's Further No
      first prompt (typed once, Enter once if still in the input); person input cancelling the
      nudge; every first-prompt failure raising a gx-raised one-step Actionable with its reason,
      Banner and sound; the leftover-text clear; Action slash steps ending on new conversation id or
-     settle (with one Enter when still in the input); draft refusals on the first prompt and before step K; gx-raised Actionable surviving
+     settle (with one Enter when still in the input); draft refusals before step K; gx-raised Actionable surviving
      `StreamInput` while agent-raised doesn't; `a` with the draft still there; vim NORMAL with `i`
      and give-up. The fake grows knobs for: a late ready report, vim NORMAL mode, a seeded draft, a
      swallowed Enter, a local slash command that changes the conversation id, and multi-line input
@@ -444,16 +462,18 @@ herdr runner's typing rules), then records the results in this spec's Further No
 
 - New harnesses (opencode, cursor-cli, a native Codex harness): that is `gx:multi-harness`. The
   typing seam is harness-agnostic so they slot in. Actions and the first prompt run only on native
-  sessions, which only Claude supports today; Codex gets them when `gx:multi-harness` adds it.
-  Confirmed in review: for now Codex gets only the typing rules (whole-input clear, empty check,
-  never Ctrl+C, no-op ready to type), in the herdr runner's nudge.
+  sessions. Claude and Codex both run native (`nativerunner/ptycodex` for Codex), and Codex gets the
+  first-prompt ready rule (the OSC 7501 idle report, from
+  `docs/specs/single-owner-session-input.md`); other harnesses get them when `gx:multi-harness`
+  adds them. Codex's typing rules (whole-input clear, empty check, never Ctrl+C, no-op ready to
+  type) also apply in the herdr runner's nudge.
 - Changing harness launch arguments in ways that skip trust prompts, or passing the first prompt as
   a launch argument.
 - Redesigning the Agents create form beyond the directory step and the starting focus.
 - A dismiss key for a gx-raised Actionable.
 - Separate work for ralph-loop ticket launches: they get only what the shared harness and nudge
   code gives them. Ralph-loop's `PromptNudged` keeps its nudge as is (no slash rule, no input
-  cancel).
+  cancel), except that it takes input ownership per batch of keys.
 - Stashing and restoring a person's draft.
 
 ## Further Notes

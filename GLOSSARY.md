@@ -1414,3 +1414,8 @@ _Avoid_: test config.
 **Onboarding** — gx asking the person for a project's missing check config, with a recommended
 answer for each kind. A project with any check config, even an empty one, has nothing missing.
 _Avoid_: setup, init.
+
+**Input owner** — the client (TUI or web UI) or gx that holds a session's keys. Only the owner's keys
+reach the agent; a non-owner's keys are blocked with a take-over hint. The PTY size follows the last
+client owner, and gx never resizes it. gx takes the role while it types and gives it back after.
+_Avoid_: controller, focus.
