@@ -161,12 +161,29 @@ func ParseQuestionBlock(block string) (Question, error) {
 	return q, nil
 }
 
+// mapWhereStringExpected returns the top-level yes/no key that holds a map, or "".
+func mapWhereStringExpected(block string) string {
+	var raw map[string]any
+	if yaml.Unmarshal([]byte(block), &raw) != nil {
+		return ""
+	}
+	for _, key := range []string{"yes", "no"} {
+		if _, ok := raw[key].(map[string]any); ok {
+			return key
+		}
+	}
+	return ""
+}
+
 // applyBlock decodes and validates block into q.
 func applyBlock(q *Question, block string) error {
 	var b questionBlock
 	dec := yaml.NewDecoder(bytes.NewReader([]byte(block)))
 	dec.KnownFields(true)
 	if err := dec.Decode(&b); err != nil {
+		if key := mapWhereStringExpected(block); key != "" {
+			return fmt.Errorf("invalid gx-question YAML: `%s` must be a string, not a map (write `%s: \"one line\"`, with no nested `consequence:` key): %w", key, key, err)
+		}
 		return fmt.Errorf("invalid gx-question YAML: %w (a value holding `: ` or ` #` breaks it: wrap the label, consequence, yes and no values in double quotes)", err)
 	}
 	switch b.Type {

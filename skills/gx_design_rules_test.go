@@ -436,6 +436,19 @@ func TestGxDesignQuestionBlockIsYAML(t *testing.T) {
 	}
 }
 
+func TestGxLocalTrackerYesNoBlockIsFlat(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-local-tracker.md"))
+	for _, want := range []string{
+		"Each is a flat string. A nested map",
+		"is not accepted",
+		"type: yes-no recommended: yes yes: \"I rename the helper.\" no: \"I leave it as it is.\"",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("gx-local-tracker.md lacks %q", want)
+		}
+	}
+}
+
 func TestGxDesignLaterPointerAppendsToOutOfScope(t *testing.T) {
 	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
 	want := "gx tickets section --append <project:epic> \"Out of scope\" -"

@@ -503,6 +503,14 @@ links:                 # optional, any type: buttons on the card
 ```
 
 - `yes-no` has fixed labels "Yes" and "No". It takes optional one-line `yes:` and `no:` consequences.
+  Each is a flat string. A nested map (`yes:` with a `consequence:` key under it) is not accepted:
+
+  ```gx-question
+  type: yes-no
+  recommended: yes
+  yes: "I rename the helper."
+  no: "I leave it as it is."
+  ```
 - `options` takes `id`, `label` and an optional `consequence` per entry. Ids are unique.
 - `recommended` names one value. The UI shows a "Recommended" badge and preselects nothing.
 - Wrap every `label`, `consequence`, `yes` and `no` value in double quotes. A bare value breaks the
