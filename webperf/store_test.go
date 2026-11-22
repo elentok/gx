@@ -11,9 +11,6 @@ import (
 
 var zone = time.FixedZone("test", 2*3600)
 
-// The store names day files by local day; pin it so the suite does not depend on the machine zone.
-func init() { time.Local = zone }
-
 func at(y int, m time.Month, d, h int) time.Time { return time.Date(y, m, d, h, 0, 0, 0, zone) }
 
 func fnow(t time.Time) func() time.Time { return func() time.Time { return t } }
@@ -35,6 +32,7 @@ func smp(session, id string, v float64) Sample {
 func dayFile(dir, day string) string { return filepath.Join(dir, DirName, day+fileExt) }
 
 func TestAppend_WritesOneFilePerReceiveDayInPrivateMode(t *testing.T) {
+	setLocal(t, zone)
 	dir := t.TempDir()
 	now := at(2026, 11, 14, 23)
 	s := open(t, dir, now)
@@ -97,6 +95,7 @@ func countLines(b []byte) int {
 }
 
 func TestTornLastLine_SkippedOnReadAndNextWriteStartsNewLine(t *testing.T) {
+	setLocal(t, zone)
 	dir := t.TempDir()
 	now := at(2026, 11, 14, 10)
 	s := open(t, dir, now)
@@ -121,6 +120,7 @@ func TestTornLastLine_SkippedOnReadAndNextWriteStartsNewLine(t *testing.T) {
 }
 
 func TestDedupe_AcrossCallsAndRestart(t *testing.T) {
+	setLocal(t, zone)
 	dir := t.TempDir()
 	now := at(2026, 11, 14, 10)
 	s := open(t, dir, now)
@@ -141,6 +141,7 @@ func TestDedupe_AcrossCallsAndRestart(t *testing.T) {
 }
 
 func TestCaps_PerSessionAndPerDay(t *testing.T) {
+	setLocal(t, zone)
 	dir := t.TempDir()
 	now := at(2026, 11, 14, 10)
 	s := open(t, dir, now)
@@ -183,6 +184,7 @@ func TestCaps_PerSessionAndPerDay(t *testing.T) {
 }
 
 func TestSweep_DeletesFilesOlderThanRetention(t *testing.T) {
+	setLocal(t, zone)
 	dir := t.TempDir()
 	now := at(2026, 11, 14, 10)
 	if err := os.MkdirAll(filepath.Join(dir, DirName), 0o700); err != nil {
@@ -213,6 +215,7 @@ func TestSweep_DeletesFilesOlderThanRetention(t *testing.T) {
 }
 
 func TestDay_ColumnsAndNaNForAbsent(t *testing.T) {
+	setLocal(t, zone)
 	dir := t.TempDir()
 	now := at(2026, 11, 14, 10)
 	s := open(t, dir, now)
@@ -237,6 +240,7 @@ func TestDay_ColumnsAndNaNForAbsent(t *testing.T) {
 }
 
 func TestDay_PastDaysAreNotReRead(t *testing.T) {
+	setLocal(t, zone)
 	dir := t.TempDir()
 	now := at(2026, 11, 14, 10)
 	s := open(t, dir, now)
