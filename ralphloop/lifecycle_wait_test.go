@@ -264,6 +264,61 @@ func TestWaitIterationFinished_ClassifierOutageSkipsStallNudge(t *testing.T) {
 	}
 }
 
+// timeoutRunner makes chosen Wait calls time out, as a wait does while the
+// agent is working.
+type timeoutRunner struct {
+	*runnerfake.Runner
+	calls   int
+	timeout map[int]bool
+	onCall  func(call int)
+}
+
+func (r *timeoutRunner) Wait(s agentrunner.Session, states []agentrunner.State, d time.Duration) (agentrunner.Status, error) {
+	r.calls++
+	r.onCall(r.calls)
+	if r.timeout[r.calls] {
+		return agentrunner.Status{}, agentrunner.ErrTimeout
+	}
+	return r.Runner.Wait(s, states, d)
+}
+
+// Each outage gets its own 3 re-sends: outages split by working turns (a wait
+// timeout) do not spend one budget, so a 4th outage is not paused at once.
+func TestWaitIterationFinished_ClassifierOutageBudgetResetsBetweenOutages(t *testing.T) {
+	t.Parallel()
+	d, r, one, sleeps := stallNudgeFixture(t, "", 30*time.Second)
+	target := 0 // the outage shows until this many prompts were sent
+	d.ReadClassifierOutage = func(string, string) (int, error) {
+		if len(r.Prompts("iter-01")) < target {
+			return 1, nil
+		}
+		return 0, nil
+	}
+	targets := map[int]int{1: 1, 3: 2, 5: 3, 7: 1000}
+	d.Runner = &timeoutRunner{Runner: r, timeout: map[int]bool{2: true, 4: true, 6: true}, onCall: func(call int) {
+		if n, ok := targets[call]; ok {
+			target = n
+		}
+	}}
+	err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-01"}, agentrunner.Session{Label: "iter-01", ID: "pane-1"})
+	if _, paused := errors.AsType[*supervise.BlockedPausedError](err); !paused {
+		t.Fatalf("WaitIterationFinished = %v, want a BlockedPausedError", err)
+	}
+	if got := r.Prompts("iter-01"); len(got) != 6 {
+		t.Errorf("prompts = %q, want 6 (one per early outage, three for the 4th)", got)
+	}
+	var resendWaits []time.Duration
+	for _, s := range *sleeps {
+		if s >= time.Minute {
+			resendWaits = append(resendWaits, s)
+		}
+	}
+	want := []time.Duration{time.Minute, time.Minute, time.Minute, time.Minute, 2 * time.Minute, 4 * time.Minute}
+	if !slices.Equal(resendWaits, want) {
+		t.Errorf("resend waits = %v, want %v", resendWaits, want)
+	}
+}
+
 // Codex has no classifier, so an outage reading never applies to it.
 func TestWaitIterationFinished_ClassifierOutageIgnoredForCodex(t *testing.T) {
 	t.Parallel()

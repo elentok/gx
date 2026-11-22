@@ -335,6 +335,11 @@ func WaitIterationFinished(d deps.Deps, o OneIteration, w IterationWorktree, s a
 				if _, err := vcap.Tick(d, p, sessionID); err != nil {
 					return err
 				}
+				// A timeout means the agent is still working: the outage that spent
+				// the re-sends is over unless the classifier still gives no verdict.
+				if outageResends > 0 && !classifierOutage(d, p, s) {
+					outageResends = 0
+				}
 				continue
 			}
 			return err
