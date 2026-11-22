@@ -23,10 +23,12 @@ import (
 )
 
 // AdoptablePause reports whether a late finish can adopt a pause with this
-// reason: a zero-commit one, or a merge agent's unreported stop. A reason
-// implies its class, so the reason alone decides.
+// reason: any kind whose Retry prompts a live agent (schema.RetryPrompts), or
+// a merge agent's unreported stop. A reason implies its class, so the reason
+// alone decides.
 func AdoptablePause(status schema.Status, reason schema.PauseReason) bool {
-	return status == schema.StatusPaused && (reason == schema.PauseZeroCommit || reason == schema.PauseMergeUnreported)
+	_, prompted := schema.RetryPrompts[reason]
+	return status == schema.StatusPaused && (prompted || reason == schema.PauseMergeUnreported)
 }
 
 // lateFinish is an adoptable pause whose agent reported finished after it.

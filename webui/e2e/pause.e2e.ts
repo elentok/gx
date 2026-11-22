@@ -292,7 +292,7 @@ test.describe("3. Pause reasons and recovery", () => {
   })
 
   // 41: every turn ends on a "no verdict" error until the re-sends run out; Retry prompts the live
-  // agent, and the pause stays for the agent's own next move to end.
+  // agent. When that agent finishes, the late-finish adoption ends the ticket with no person step.
   test("a classifier outage recovers", async ({ page, start }) => {
     await recover(
       { page, start },

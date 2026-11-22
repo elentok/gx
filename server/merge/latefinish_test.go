@@ -10,6 +10,7 @@ import (
 
 	rlmerge "github.com/elentok/gx/ralphloop/merge"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/merge"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets/schema"
@@ -31,6 +32,26 @@ func TestLateFinish_MergesLateCommit(t *testing.T) {
 			t.Error("live agent not stopped after merging")
 		}
 	})
+}
+
+// Every pause whose Retry prompts a live agent must be adoptable, or a retried
+// agent that finishes leaves the ticket paused.
+func TestLateFinish_AdoptsEveryRetryPromptKind(t *testing.T) {
+	t.Parallel()
+	for reason := range schema.RetryPrompts {
+		if !merge.AdoptablePause(schema.StatusPaused, reason) {
+			t.Errorf("AdoptablePause(paused, %q) = false, want true", reason)
+		}
+	}
+	if !merge.AdoptablePause(schema.StatusPaused, schema.PauseMergeUnreported) {
+		t.Error("merge-unreported must stay adoptable")
+	}
+	if merge.AdoptablePause(schema.StatusPaused, schema.PauseMergeConflict) {
+		t.Error("merge-conflict must not be adoptable")
+	}
+	if merge.AdoptablePause(schema.StatusOpen, schema.PauseClassifierOutage) {
+		t.Error("a ticket that is not paused must not be adoptable")
+	}
 }
 
 func TestLateFinish_ClosesQuestionAsAdopted(t *testing.T) {

@@ -51,6 +51,20 @@ const (
 	PausePRTrunkUpdate      PauseReason = "pr-trunk-update"
 )
 
+// RetryPrompts is what a live agent receives when a person retries one of the
+// pauses whose agent is still running. The retry route prompts instead of
+// relaunching for exactly these kinds, and a late finish adopts exactly these
+// kinds, so the key set is the one list of both.
+var RetryPrompts = map[PauseReason]string{
+	PauseZeroCommit: "A person reviewed your finish with no commits and wants you to continue. " +
+		"Finish the work, or report `--iteration-status finished --commitless true`.",
+	PauseBlockedPane: "A person reviewed your blocked prompt and wants you to continue. " +
+		"Carry on with the work.",
+	PauseBackgroundTaskGate: "A person reviewed your uncommitted changes and wants you to continue the ticket's work. " +
+		"Commit what belongs, discard what does not, then finish.",
+	PauseClassifierOutage: "continue",
+}
+
 // ProcessStormReason is the pause detail for a run the watchdog killed: what
 // happened and why gx waits for a person. It names the rule that fired, the
 // limit that rule compared against and the biggest process names in the tree.

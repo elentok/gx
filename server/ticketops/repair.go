@@ -44,23 +44,6 @@ type repairCtx struct {
 	investigator string
 }
 
-// zeroCommitPrompt is what a live agent receives when a person resumes its
-// zero-commit finish.
-const zeroCommitPrompt = "A person reviewed your finish with no commits and wants you to continue. " +
-	"Finish the work, or report `--iteration-status finished --commitless true`."
-
-// retryPrompts is what a live agent receives when a person retries one of the
-// pauses whose agent is still running. The retry route prompts instead of
-// relaunching for exactly these kinds.
-var retryPrompts = map[schema.PauseReason]string{
-	schema.PauseZeroCommit: zeroCommitPrompt,
-	schema.PauseBlockedPane: "A person reviewed your blocked prompt and wants you to continue. " +
-		"Carry on with the work.",
-	schema.PauseBackgroundTaskGate: "A person reviewed your uncommitted changes and wants you to continue the ticket's work. " +
-		"Commit what belongs, discard what does not, then finish.",
-	schema.PauseClassifierOutage: "continue",
-}
-
 // retryPromptsRepair is true for a repair-class pause whose live agent a retry
 // prompts: a classifier outage leaves the agent running, waiting on a "continue".
 func retryPromptsRepair(tk schema.Ticket) bool {
@@ -352,7 +335,7 @@ func (o *Ops) repairResume(req wire.RepairRequest, rc repairCtx) (wire.RepairRes
 	if res, refused, err := o.resumeSelfReported(epicPath, id, rc.origin); refused || err != nil {
 		return res, err
 	}
-	if prompt, ok := retryPrompts[tk.PauseReason]; (paused || retryPromptsRepair(tk)) && ok {
+	if prompt, ok := schema.RetryPrompts[tk.PauseReason]; (paused || retryPromptsRepair(tk)) && ok {
 		prompted, err := o.promptLiveAgent(dir, addr, prompt)
 		if err != nil {
 			return repairRefusal(err), nil
@@ -537,7 +520,7 @@ func (o *Ops) PromptsOnRetry(address string) bool {
 	if err != nil || !tk.PausedAsking() && !retryPromptsRepair(tk) {
 		return false
 	}
-	if _, ok := retryPrompts[tk.PauseReason]; !ok {
+	if _, ok := schema.RetryPrompts[tk.PauseReason]; !ok {
 		return false
 	}
 	dir, err := o.d.Projects.Dir(addr.Project)
