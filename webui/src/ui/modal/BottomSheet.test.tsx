@@ -40,6 +40,12 @@ describe("BottomSheet", () => {
     expect(screen.getByTestId("grab-handle")).toBeTruthy()
   })
 
+  it("shows no grab handle on a phone with handle={false}", () => {
+    phone()
+    mount({ handle: false })
+    expect(screen.queryByTestId("grab-handle")).toBeNull()
+  })
+
   it("sits below the TopBar's published height, and follows the visual viewport", () => {
     phone({ offsetTop: 10, height: 600 })
     const { backdrop } = mount({ belowTopBar: true })

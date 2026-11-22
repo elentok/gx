@@ -161,6 +161,11 @@ test("on a phone a tap marks a row and Restore restores it", () => {
   expect(onClose).toHaveBeenCalledTimes(1)
 })
 
+test("on a phone the popup draws no grab handle", () => {
+  setup({}, false)
+  expect(screen.queryByTestId("grab-handle")).toBeNull()
+})
+
 test("while pending, rows show Saving… and nothing restores", () => {
   const { filter, onRestore, onClose } = setup({ restoreDisabled: true })
   expect(screen.getAllByText("Saving…")).toHaveLength(4)

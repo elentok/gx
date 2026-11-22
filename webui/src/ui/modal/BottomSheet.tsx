@@ -31,6 +31,8 @@ interface BottomSheetProps extends Omit<BoxProps, "children"> {
   fillViewport?: boolean
   /** With `fillViewport`, the sheet's top edge is this many px below the viewport top, instead of the sheet being 88% tall. */
   topGap?: number
+  /** Draw the grab handle on a phone; false for a sheet whose mock has none. */
+  handle?: boolean
   /** The panel's props on a wide screen, where this is a centered Modal and not a sheet. */
   desktop?: BoxProps
   /** The backdrop's props on a wide screen, such as a dialog that sits near the top. */
@@ -50,6 +52,7 @@ export function BottomSheet({
   belowTopBar,
   fillViewport,
   topGap,
+  handle = true,
   desktop,
   desktopBackdrop,
   followViewport,
@@ -86,7 +89,7 @@ export function BottomSheet({
       {...sheetPanel}
       {...(fillViewport ? { h: viewport.sheetHeight } : { maxH: "80%", overflow: "auto" })}
     >
-      <GrabHandle mt="2" />
+      {handle && <GrabHandle mt="2" />}
       {children}
     </Modal>
   )
