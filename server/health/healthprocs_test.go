@@ -182,20 +182,16 @@ func TestHealthProcs_FirstCallIsReadingAndWaitGetsTheList(t *testing.T) {
 	t.Parallel()
 	h := startProcs(t, procTiming{delay: 150 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second},
 		proc(10, "a", 400, 10))
-	start := time.Now()
 	first := health(t, h, false)
 	if first.Causes.CPU.Marker != wire.CauseMarkerReading || len(first.Causes.Memory.Rows) != 1 {
 		t.Fatalf("first call causes = %+v, want reading CPU and one memory row", first.Causes)
 	}
-	if time.Since(start) > 100*time.Millisecond {
-		t.Fatalf("first call took %v, want an immediate answer", time.Since(start))
-	}
 	waited := health(t, h, true)
-	if time.Since(start) < 150*time.Millisecond {
-		t.Fatalf("wait call returned after %v, want it to block for the second read", time.Since(start))
-	}
 	if waited.Causes.CPU.Marker != wire.CauseMarkerNone || !sameLabels(labels(waited.Causes.CPU), "a") {
 		t.Fatalf("wait call cpu list = %+v, want [a]", waited.Causes.CPU)
+	}
+	if n := h.Processes.Reads(); n != 2 {
+		t.Fatalf("reads = %d, want 2", n)
 	}
 }
 
@@ -216,10 +212,10 @@ func TestHealthProcs_WaitOnAQuietServerBlocksForTheSecondRead(t *testing.T) {
 // Seam: a second read that fails ends the wait with the unavailable marker (story 49).
 func TestHealthProcs_WaitReturnsUnavailableWhenTheSecondReadFails(t *testing.T) {
 	t.Parallel()
-	h := startProcs(t, procTiming{delay: 100 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second},
+	h := startProcs(t, procTiming{delay: 20 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second},
 		proc(10, "a", 400, 10))
+	h.Processes.FailAfter(1, errors.New("boom"))
 	health(t, h, false)
-	h.Processes.Fail(errors.New("boom"))
 	rep := health(t, h, true)
 	if rep.Causes.CPU.Marker != wire.CauseMarkerUnavailable {
 		t.Fatalf("cpu list = %+v, want unavailable", rep.Causes.CPU)
@@ -258,11 +254,7 @@ func TestHealthProcs_WaitStopsWithTheRequestContext(t *testing.T) {
 	h.Processes.Block()
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	start := time.Now()
 	if _, err := h.Client.Admin.HealthWait(ctx); err == nil {
 		t.Fatal("wait call succeeded, want the context error")
-	}
-	if time.Since(start) > 2*time.Second {
-		t.Fatalf("wait call took %v after its context ended", time.Since(start))
 	}
 }

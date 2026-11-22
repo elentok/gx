@@ -18,6 +18,7 @@ type FakeProcesses struct {
 	total   uint64
 	reads   int
 	err     error
+	okReads int // reads up to this number succeed even when err is set
 	release chan struct{}
 }
 
@@ -35,7 +36,15 @@ func (f *FakeProcesses) Set(procs ...syshealth.Process) {
 func (f *FakeProcesses) Fail(err error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.err = err
+	f.err, f.okReads = err, 0
+}
+
+// FailAfter lets the first reads reads succeed and makes the later ones fail
+// with err. Set it before the first read, so no timing decides which read fails.
+func (f *FakeProcesses) FailAfter(reads int, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.err, f.okReads = err, reads
 }
 
 // Block makes later reads wait until Release.
@@ -69,6 +78,7 @@ func (f *FakeProcesses) Argv(int) []string { return nil }
 func (f *FakeProcesses) Read() (syshealth.ProcessTable, error) {
 	f.mu.Lock()
 	f.reads++
+	readNo := f.reads
 	release := f.release
 	f.mu.Unlock()
 	if release != nil {
@@ -76,7 +86,7 @@ func (f *FakeProcesses) Read() (syshealth.ProcessTable, error) {
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.err != nil {
+	if f.err != nil && readNo > f.okReads {
 		return syshealth.ProcessTable{}, f.err
 	}
 	var used uint64
