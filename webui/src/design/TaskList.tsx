@@ -6,7 +6,7 @@ import { TaskCommand } from "./TaskCommandBlock"
 import {
   elapsedText,
   kindWord,
-  orderTasks,
+  orderRows,
   taskDetails,
   taskKey,
   taskMark,
@@ -184,18 +184,15 @@ export function TaskList({ tasks }: { tasks?: SessionTask[] }) {
   if (list.length === 0) return null
   const rows = (
     <Box role="list" aria-label="Tasks" display="flex" flexDirection="column" fontSize="sm">
-      {keyed(orderTasks(list), taskKey).map(({ key: rowKey, item: t }) => {
-        const key = taskKey(t)
-        return (
-          <TaskRow
-            key={rowKey}
-            task={t}
-            now={now}
-            open={openRows.has(key)}
-            onToggle={() => toggleRow(key)}
-          />
-        )
-      })}
+      {orderRows(keyed(list, taskKey)).map(({ key, item: t }) => (
+        <TaskRow
+          key={key}
+          task={t}
+          now={now}
+          open={openRows.has(key)}
+          onToggle={() => toggleRow(key)}
+        />
+      ))}
     </Box>
   )
   if (list.length === 1) return rows

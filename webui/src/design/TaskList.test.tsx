@@ -213,6 +213,23 @@ test("rows with details open independently, survive the tick and a closed summar
   expect(fetch).not.toHaveBeenCalled()
 })
 
+test("two identical rows open on their own, and a finished twin keeps its own open state", () => {
+  const twin = (over: Partial<SessionTask> = {}) => task({ output_bytes: 0, ...over })
+  const { rerender } = renderThemed(<TaskList tasks={[twin(), twin()]} />)
+  fireEvent.click(screen.getByRole("button", { name: /tasks done/ }))
+  const rows = () =>
+    screen
+      .getAllByRole("button")
+      .filter((b) => b.hasAttribute("aria-expanded") && !/tasks done/.test(b.textContent ?? ""))
+      .map((b) => b.getAttribute("aria-expanded"))
+  expect(rows()).toEqual(["false", "false"])
+  fireEvent.click(screen.getAllByRole("button", { name: /make/ })[0]!)
+  expect(rows()).toEqual(["true", "false"])
+  // The first launched twin finishes: it moves below the still running one.
+  rerender(<TaskList tasks={[twin({ finished: true, finished_at: at(3) }), twin()]} />)
+  expect(rows()).toEqual(["false", "true"])
+})
+
 test("the clock stops once the last row finished", () => {
   const { rerender } = renderThemed(<TaskList tasks={[task({}), task({ label: "x" })]} />)
   const clear = vi.spyOn(globalThis, "clearInterval")

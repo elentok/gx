@@ -49,8 +49,8 @@ export function kindWord(kind: string): string {
 }
 
 /** Running rows first, then the finished ones; each group keeps the server's launch order. */
-export function orderTasks(tasks: SessionTask[]): SessionTask[] {
-  return [...tasks.filter((t) => !t.finished), ...tasks.filter((t) => t.finished)]
+export function orderRows<R extends { item: SessionTask }>(rows: R[]): R[] {
+  return [...rows.filter((r) => !r.item.finished), ...rows.filter((r) => r.item.finished)]
 }
 
 /** "412", "4.2k", "41k", "1.2M". */
