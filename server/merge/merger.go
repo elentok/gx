@@ -66,14 +66,15 @@ func (s *Merger) AutoFFMerge(project string) bool {
 	return !pf.DeliveryIsPR() && pf.AutoFFMergeEnabled()
 }
 
-// Delivery is the project's delivery, read live from project.json: "pr" or, for
+// Delivery is the project's delivery, from project.json as of the last store
+// scan: "pr" or, for
 // anything else including an unreadable file, "merge".
 func (s *Merger) Delivery(project string) string {
 	dir, err := s.projects.Dir(project)
 	if err != nil {
 		return "merge"
 	}
-	if pf, _ := config.ReadProjectFile(dir); pf.DeliveryIsPR() {
+	if pf, _ := s.projects.ProjectFile(dir); pf.DeliveryIsPR() {
 		return config.DeliveryPR
 	}
 	return "merge"

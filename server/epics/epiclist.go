@@ -121,7 +121,7 @@ func (s *Epics) applyWorkspaces(rows []wire.EpicListRow) {
 
 // cardList builds the page's cards, sorted, with workspaces and holds applied.
 func (s *Epics) cardList() (wire.EpicList, error) {
-	dirs, err := tickets.ProjectDirs(s.TicketStore)
+	dirs, err := s.ProjectCache.Dirs(s.TicketStore)
 	if err != nil {
 		return wire.EpicList{}, err
 	}
@@ -130,7 +130,7 @@ func (s *Epics) cardList() (wire.EpicList, error) {
 	triageLive := s.triageSessions()
 	qidx := s.newQueueIndex()
 	for _, dir := range dirs {
-		project := tickets.ProjectName(dir)
+		project := s.ProjectCache.Name(dir)
 		list.Projects = append(list.Projects, project)
 		epics, err := s.Projects.Epics(project)
 		if err != nil {

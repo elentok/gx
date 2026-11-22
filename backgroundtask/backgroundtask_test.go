@@ -107,6 +107,35 @@ func TestReader_GrownTranscriptIsSeen(t *testing.T) {
 	}
 }
 
+func TestReader_MissingTranscriptGlobsOncePerInterval(t *testing.T) {
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	home := t.TempDir()
+	globs := 0
+	rd := &backgroundtask.Reader{Home: home, Now: func() time.Time { return now }, Glob: func(h, id string) ([]string, error) {
+		globs++
+		return transcript.FindByID(h, id)
+	}}
+	for range 20 {
+		if rd.Read("sess", backgroundtask.PidUnknown).Live {
+			t.Fatal("no transcript: want not live")
+		}
+	}
+	if globs != 1 {
+		t.Fatalf("globs = %d across many reads inside one interval, want 1", globs)
+	}
+	dir := filepath.Join(home, ".claude", "projects", "proj")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "sess.jsonl"), []byte(startLine("t1", now)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(time.Minute)
+	if !rd.Read("sess", backgroundtask.PidUnknown).Live {
+		t.Fatal("transcript appeared: want live after the interval")
+	}
+}
+
 func TestReader_AgedOutTaskIsSeenWithoutFileChange(t *testing.T) {
 	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 	rd, _ := newReader(t, startLine("t1", now), &now)

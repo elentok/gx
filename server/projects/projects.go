@@ -87,16 +87,22 @@ func NewChecks(cfg func() Env, reg *Registry, guards *runs.Guards) *Checks {
 
 // Dir finds the project's directory in the store.
 func (p *Registry) Dir(project string) (string, error) {
-	dirs, err := tickets.ProjectDirs(p.cfg().TicketStore)
+	cache := p.idx.ProjectCache()
+	dirs, err := cache.Dirs(p.cfg().TicketStore)
 	if err != nil {
 		return "", err
 	}
 	for _, d := range dirs {
-		if tickets.ProjectName(d) == project {
+		if cache.Name(d) == project {
 			return d, nil
 		}
 	}
 	return "", fmt.Errorf("no project %s in the ticket store", project)
+}
+
+// ProjectFile is dir's project.json as of the last store scan.
+func (p *Registry) ProjectFile(dir string) (config.ProjectFile, error) {
+	return p.idx.ProjectCache().File(dir)
 }
 
 // Of finds the project's directory in the store and the repo its agents run in.
@@ -118,12 +124,13 @@ func (p *Registry) Of(project string) (dir, repo string, err error) {
 // Epics is the named project's epics as of the last store scan; a project the
 // scan has not seen yet is read from disk.
 func (p *Registry) Epics(project string) ([]tickets.Epic, error) {
-	dirs, err := tickets.ProjectDirs(p.cfg().TicketStore)
+	cache := p.idx.ProjectCache()
+	dirs, err := cache.Dirs(p.cfg().TicketStore)
 	if err != nil {
 		return nil, err
 	}
 	for _, dir := range dirs {
-		if tickets.ProjectName(dir) != project {
+		if cache.Name(dir) != project {
 			continue
 		}
 		if epics, ok := p.idx.EpicsOf(dir); ok {

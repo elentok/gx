@@ -81,6 +81,9 @@ type Workspaces interface {
 type Deps struct {
 	Log         *slog.Logger
 	TicketStore string
+	// ProjectCache serves project dirs and names between store scans; nil reads
+	// the disk each time.
+	ProjectCache *tickets.ProjectCache
 
 	Harness  Harness
 	Projects Projects

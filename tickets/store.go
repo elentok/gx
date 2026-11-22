@@ -70,6 +70,10 @@ func ProjectDirs(storePath string) ([]string, error) {
 // project.json, stopping early when fn returns true. A missing store has no
 // projects.
 func forEachProject(storePath string, fn func(dir string, pf config.ProjectFile) (stop bool)) error {
+	return forEachProjectRead(storePath, config.ReadProjectFile, fn)
+}
+
+func forEachProjectRead(storePath string, read func(dir string) (config.ProjectFile, error), fn func(dir string, pf config.ProjectFile) (stop bool)) error {
 	if storePath == "" {
 		return errors.New("ticket-store.path is not set")
 	}
@@ -85,7 +89,7 @@ func forEachProject(storePath string, fn func(dir string, pf config.ProjectFile)
 			continue
 		}
 		dir := filepath.Join(storePath, e.Name())
-		pf, err := config.ReadProjectFile(dir)
+		pf, err := read(dir)
 		if os.IsNotExist(err) {
 			continue
 		}

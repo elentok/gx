@@ -76,15 +76,25 @@ func Resolve(pid Pid, tr transcript.BackgroundTaskReading, readErr error) Readin
 	return r
 }
 
+// globMissEvery spaces the glob for a session whose transcript is missing.
+const globMissEvery = 5 * time.Second
+
+var errNoTranscript = errors.New("transcript not found or ambiguous")
+
 // Reader reads a session's transcript by session id. The probe runs every few
 // seconds per held agent, and FindByID globs every project dir, so the found
 // path is cached per session id.
 type Reader struct {
 	Home string
 	Now  func() time.Time
+	// Glob is a test seam; nil means transcript.FindByID.
+	Glob func(home, sessionID string) ([]string, error)
 
 	mu    sync.Mutex
 	known map[string]string
+	// missed is when each session's last glob found no single transcript, so a
+	// held agent without one does not glob every project dir on each poll.
+	missed map[string]time.Time
 	// last is the newest parse per session id. An idle poll then costs one
 	// stat instead of a whole-transcript parse.
 	last map[string]cachedReading
@@ -146,12 +156,28 @@ func (rd *Reader) read(sessionID string) (transcript.BackgroundTaskReading, erro
 			return tr, nil
 		}
 	}
-	paths, err := transcript.FindByID(rd.Home, sessionID)
+	rd.mu.Lock()
+	missedAt, missed := rd.missed[sessionID]
+	rd.mu.Unlock()
+	if missed && now().Sub(missedAt) < globMissEvery {
+		return transcript.BackgroundTaskReading{}, errNoTranscript
+	}
+	find := rd.Glob
+	if find == nil {
+		find = transcript.FindByID
+	}
+	paths, err := find(rd.Home, sessionID)
 	if err != nil {
 		return transcript.BackgroundTaskReading{}, err
 	}
 	if len(paths) != 1 {
-		return transcript.BackgroundTaskReading{}, errors.New("transcript not found or ambiguous")
+		rd.mu.Lock()
+		if rd.missed == nil {
+			rd.missed = map[string]time.Time{}
+		}
+		rd.missed[sessionID] = now()
+		rd.mu.Unlock()
+		return transcript.BackgroundTaskReading{}, errNoTranscript
 	}
 	tr, err := rd.parse(sessionID, paths[0], now())
 	if err != nil {

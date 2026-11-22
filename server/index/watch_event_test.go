@@ -1,10 +1,48 @@
 package index
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/elentok/gx/server/broker"
 	"github.com/fsnotify/fsnotify"
 )
+
+func TestRescan_MovesTheGenerationAndRefreshesTheProjectCache(t *testing.T) {
+	store := t.TempDir()
+	write := func(name string) {
+		dir := filepath.Join(store, "p")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "project.json"), []byte(`{"name":"`+name+`"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("one")
+	idx := New(store, broker.New(1), nil)
+	cache := idx.ProjectCache()
+	dirs, err := cache.Dirs(store)
+	if err != nil || len(dirs) != 1 {
+		t.Fatalf("dirs = %v, %v", dirs, err)
+	}
+	if got := cache.Name(dirs[0]); got != "one" {
+		t.Fatalf("name = %q, want one", got)
+	}
+	write("two")
+	before := idx.Generation()
+	idx.Rescan()
+	if idx.Generation() == before {
+		t.Fatal("generation did not move on a rescan")
+	}
+	if _, err := cache.Dirs(store); err != nil {
+		t.Fatal(err)
+	}
+	if got := cache.Name(dirs[0]); got != "two" {
+		t.Fatalf("name after a rescan = %q, want two", got)
+	}
+}
 
 func TestStoreEventKind(t *testing.T) {
 	t.Parallel()

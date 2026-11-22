@@ -41,6 +41,10 @@ type Index struct {
 	// dir. Treated as read-only: readers share it until the next scan.
 	loaded map[string][]tickets.Epic
 
+	// gen counts the scans; projCache drops its snapshot when it moves.
+	gen       atomic.Uint64
+	projCache *tickets.ProjectCache
+
 	// rewatch is set by KeepFresh while the watch is armed; Rescan reads it.
 	rewatch atomic.Pointer[func()]
 	// onRescan and ready are set once, before KeepFresh runs.
@@ -53,6 +57,19 @@ type Index struct {
 	flightMu sync.Mutex
 	running  bool
 	pending  *flight
+}
+
+// Generation moves on every store scan.
+func (i *Index) Generation() uint64 { return i.gen.Load() }
+
+// ProjectCache is the store's project dirs, names and project files, valid
+// until the next scan.
+// A nil Index has none, which reads the disk each time.
+func (i *Index) ProjectCache() *tickets.ProjectCache {
+	if i == nil {
+		return nil
+	}
+	return i.projCache
 }
 
 // OnRescan registers a step that runs after every store rescan, in
@@ -107,6 +124,7 @@ func New(storePath string, events *broker.Broker, log *slog.Logger) *Index {
 		log = slog.Default()
 	}
 	i := &Index{events: events, storePath: storePath, log: log}
+	i.projCache = tickets.NewProjectCache(i.gen.Load)
 	list, loaded, err := scanStore(storePath)
 	if err != nil {
 		list, loaded = []indexedTicket{}, map[string][]tickets.Epic{}
@@ -185,6 +203,9 @@ func (i *Index) scanAndInstall() error {
 	if scan == nil {
 		scan = scanStore
 	}
+	// Bumped after the scan, even a failed one: a project.json edit made while
+	// it ran must not be served from a snapshot built before it.
+	defer i.gen.Add(1)
 	list, loaded, err := scan(i.storePath)
 	if err != nil {
 		return err
