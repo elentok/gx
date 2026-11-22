@@ -42,6 +42,9 @@ func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd f
 		if err := checkKnownRedOwned(path, schema.ParseBody(string(raw))); err != nil {
 			return err
 		}
+		if err := checkRedFirst(path, schema.ParseBody(string(raw))); err != nil {
+			return err
+		}
 	}
 	pf, err := config.ReadProjectFile(filepath.Dir(epicDir))
 	if err != nil || pf.Repo == nil || *pf.Repo == "" {
@@ -176,6 +179,22 @@ func checkKnownRedOwned(path, body string) error {
 		if strings.Contains(strings.ToLower(line), "known red") && !followUpAddrRe.MatchString(line) {
 			return fmt.Errorf("%s: a \"known red\" line in Spec deviations names no follow-up: %q; search `gx tickets follow-up search`, file one if none exists, and write its address (project:epic/ID) on that line", ticketref.TicketLabel(path), strings.TrimSpace(line))
 		}
+	}
+	return nil
+}
+
+// checkRedFirst refuses finishing when the newest agent entry of `## Iteration
+// summaries` has no `Red-first` bullet. A ticket with no agent entry passes:
+// a missing summary never blocks finishing.
+func checkRedFirst(path, body string) error {
+	for _, s := range slices.Backward(schema.ParseIterationSummaries(body)) {
+		if s.Label != "agent" {
+			continue
+		}
+		if s.RedFirst == "" {
+			return fmt.Errorf("%s: the newest iteration summary has no `Red-first` bullet; add `- Red-first: yes`, `no: <reason>` or `n/a: <reason>`", ticketref.TicketLabel(path))
+		}
+		return nil
 	}
 	return nil
 }

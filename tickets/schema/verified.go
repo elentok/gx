@@ -95,6 +95,8 @@ type IterationSummary struct {
 	WentWrong string
 	Decisions string
 	Left      string
+	// RedFirst is parsed only: gx's own entries never carry it.
+	RedFirst string
 }
 
 var summaryFields = []struct {
@@ -146,6 +148,9 @@ func ParseIterationSummaries(body string) []IterationSummary {
 			if v, ok := strings.CutPrefix(line, "- "+f.label+":"); ok {
 				*f.field(cur) = strings.TrimSpace(v)
 			}
+		}
+		if v, ok := strings.CutPrefix(line, "- Red-first:"); ok {
+			cur.RedFirst = strings.TrimSpace(v)
 		}
 	}
 	return out

@@ -255,8 +255,8 @@ If the consultant deferred zero findings, skip this step.
     follow-up it became, was appended to, or was dropped against; or why it was rejected.
 - Append your entry to `## Iteration summaries`
   ([format](../gx-local-tracker.md#iteration-summaries), inlined here so you need not look it up):
-  a `### <session id> — <RFC 3339 time from date -u +%Y-%m-%dT%H:%M:%SZ> — agent` heading, then four
-  one-line bullets `Did`, `Went wrong`, `Decisions`, `Left`. Write it with
+  a `### <session id> — <RFC 3339 time from date -u +%Y-%m-%dT%H:%M:%SZ> — agent` heading, then five
+  one-line bullets `Did`, `Went wrong`, `Decisions`, `Left`, `Red-first` (`yes`, or `n/a: <reason>`). Write it with
   `gx tickets section <addr> "Iteration summaries" -`, which replaces the whole section (it is created
   if missing), so include earlier entries.
 - `gx tickets set <addr> --iteration-status finished --commitless true` — this skill never commits

@@ -8,7 +8,7 @@ import (
 var inlinedSummaryFormat = []string{
 	"](../gx-local-tracker.md#iteration-summaries)",
 	"`### <session id> — <RFC 3339 time",
-	"`Did`, `Went wrong`, `Decisions`, `Left`",
+	"`Did`, `Went wrong`, `Decisions`, `Left`, `Red-first`",
 	`gx tickets section <addr> "Iteration summaries" -`,
 }
 
@@ -86,7 +86,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 			"### Verified section", "`## Verified`", "`- <story> — <verdict> @ <commit>`", "equals the current HEAD",
 		}},
 		{"iteration summaries", "gx-local-tracker.md", []string{
-			"## Iteration summaries", "`Did`, `Went wrong`, `Decisions`, `Left`", "labelled `gx`", "never blocks finishing",
+			"## Iteration summaries", "`Did`, `Went wrong`, `Decisions`, `Left`, `Red-first`", "labelled `gx`", "never blocks finishing",
 		}},
 		{"implement iteration summaries", "gx-implement/SKILL.md", inlinedSummaryFormat},
 		{"verify-epic iteration summaries", "gx-verify-epic/SKILL.md", inlinedSummaryFormat},

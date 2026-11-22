@@ -211,6 +211,9 @@ func TestGxImplementTestRules(t *testing.T) {
 		"`rg` the e2e files",
 		"the `gx-only-e2es` skill",
 		"`gx brief -C webui playwright`",
+		"Every new test needs a red run",
+		"packages that import the changed package",
+		"Do not extend a shared test fixture",
 	)
 	for _, skill := range []string{"gx-implement/SKILL.md", "gx-tdd/SKILL.md"} {
 		if strings.Contains(readFile(t, skill), "gx-playwright-e2es") {

@@ -169,6 +169,22 @@ func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
 		}
 	})
 
+	t.Run("newest agent summary needs a Red-first bullet", func(t *testing.T) {
+		f := newFinishFixture(t)
+		entry := "\n## Iteration summaries\n\n### s1 — 2026-01-02T03:04:05Z — agent\n\n- Did: x\n- Went wrong: Nothing\n- Decisions: y\n- Left: none\n"
+		cmdtest.WriteTicketFile(t, f.ticket, "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\nBody.\n"+entry)
+		err := f.finish(t)
+		if err == nil || !strings.Contains(err.Error(), "Red-first") {
+			t.Fatalf("err = %v, want a refusal naming Red-first", err)
+		}
+		f.assertUnwritten(t)
+
+		cmdtest.WriteTicketFile(t, f.ticket, "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\nBody.\n"+entry+"- Red-first: yes\n")
+		if err := f.finish(t); err != nil {
+			t.Fatalf("with Red-first: %v", err)
+		}
+	})
+
 	t.Run("kind-filtered line does not count", func(t *testing.T) {
 		f := newFinishFixture(t)
 		cmdtest.CommitFile(t, f.wt, "a.txt", "a")

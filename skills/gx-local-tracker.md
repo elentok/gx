@@ -567,7 +567,9 @@ loader fail on a file it merely observes rather than one it produced.
 
 Every iteration agent, of any ticket type, appends one entry to its own ticket's `## Iteration
 summaries` section before it reports `finished`. The entry is a `### <session id> — <RFC 3339 time> —
-agent` heading and four bullets: `Did`, `Went wrong`, `Decisions`, `Left`, one line each. Rewrite the
+agent` heading and five bullets: `Did`, `Went wrong`, `Decisions`, `Left`, `Red-first`, one line each.
+`Red-first` is `yes`, `no: <reason>` or `n/a: <reason>`; `gx tickets set --iteration-status finished`
+is refused when the newest agent entry lacks it. Rewrite the
 whole section with `gx tickets section <addr> "Iteration summaries" -`, keeping the earlier entries.
 `Went wrong: Nothing` is allowed only when the ticket's `## Spec deviations` is empty and nothing failed.
 gx appends its own entry, labelled `gx`, listing what it did (resends, relaunches, a re-adopted

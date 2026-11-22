@@ -267,6 +267,14 @@ it against the unfixed code, and see it fail for the bug's reason (not a harness
 Only then apply the fix and see it go green. A test that passes before the fix proves nothing:
 rework it until it fails. If you cannot make it fail, pause with `gx tickets ask`.
 
+**Every new test needs a red run, not only bug fixes.** Run each new test against the old code and
+see it fail for the right reason (a compile error counts), then make the change. A test that cannot
+run on the old code says so in `Red-first` (`no: <reason>`).
+
+**Run the neighbours before `finished`.** Run the test packages that import the changed package, or
+that test the changed behaviour, with a scoped `-run` where the package is large. Do not extend a
+shared test fixture or a shared `rows` array; use a local `setup` option.
+
 Tests on skill text collapse whitespace (newlines too) in both the skill text and the expected
 phrase, and pin only structural anchors: headings, link paths, selector names, numbers. Extend the
 skill area's shared test file and reuse `normalizeSpace`; never add a second file asserting the same
@@ -337,8 +345,9 @@ nothing failed.
 
 Before you report `finished`, append your entry to `## Iteration summaries`
 ([format](../gx-local-tracker.md#iteration-summaries), inlined here so you need not look it up):
-a `### <session id> — <RFC 3339 time from date -u +%Y-%m-%dT%H:%M:%SZ> — agent` heading, then four
-one-line bullets `Did`, `Went wrong`, `Decisions`, `Left`. Write it with
+a `### <session id> — <RFC 3339 time from date -u +%Y-%m-%dT%H:%M:%SZ> — agent` heading, then five
+one-line bullets `Did`, `Went wrong`, `Decisions`, `Left`, `Red-first` (`yes`, `no: <reason>` or
+`n/a: <reason>`; the finish is refused without it). Write it with
 `gx tickets section <addr> "Iteration summaries" -`, which replaces the whole section (it is created if
 missing), so include earlier entries.
 
