@@ -37,6 +37,16 @@ func DesignTwoLive() scenario {
 	return sc
 }
 
+// DesignJoined is the design scenario with its design session open and idle
+// after one plain turn. A card reads "Creating tickets" at the create-tickets
+// step only while a session runs; without one the card is a paused Design.
+func DesignJoined() scenario {
+	sc := DesignBase
+	sc.DesignByMap = map[string][]string{project + ":design-epic": {agentfake.DesignTurnPlain}}
+	sc.OpenDesigns = []string{project + ":design-epic"}
+	return sc
+}
+
 // Models the tier scenarios configure: the strongest tier and worker tier of
 // the demo project, and a worker model the fake claude refuses to start with.
 const (

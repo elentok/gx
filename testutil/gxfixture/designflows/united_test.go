@@ -102,6 +102,29 @@ func (r *running) issueFiles(t *testing.T, project, epic string) map[string]stri
 	return files
 }
 
+func TestDesignJoinedScenario_CardReadsCreatingTicketsAtThatStep(t *testing.T) {
+	t.Parallel()
+	r := start(t, "design-joined")
+	r.Gx(t, "tickets", "set", designAddr, "--design-step", "create-tickets")
+	var got wire.EpicListRow
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		for _, c := range r.cardsOf(t) {
+			if slices.Contains(c.Addresses, designAddr) {
+				got = c
+			}
+		}
+		if got.WorkingWord == "Creating tickets" {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !got.Working || got.WorkingWord != "Creating tickets" {
+		t.Errorf("card working=%v word=%q status=%q, want working Creating tickets", got.Working, got.WorkingWord, got.StatusWords)
+	}
+	r.Stop(t)
+}
+
 func TestManyDoneScenario_FiveMergedWithDistinctCloseTimesAndOneOpen(t *testing.T) {
 	t.Parallel()
 	r := start(t, "many-done")

@@ -193,7 +193,7 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
 })
 
 test("18. Joined card", async ({ page, start }) => {
-  const fixture = await start("design", { hold: true })
+  const fixture = await start("design-joined", { hold: true })
   const joined = card(page, "design-epic")
   await expect(page.getByRole("link", { name: "design-epic", exact: true })).toHaveCount(1)
   await expect(page.getByRole("link", { name: "design-epic-impl", exact: true })).toHaveCount(0)

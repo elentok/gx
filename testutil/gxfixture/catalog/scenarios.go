@@ -551,6 +551,9 @@ var Scenarios = map[string]scenario{
 	// design session replays fakeclaude's scripted chat. Its implementation
 	// epic exists, so Progress links to it at Branch and Done.
 	"design": spec.DesignBase,
+	// design-joined: design with its session open and idle, so the joined card
+	// shows Creating tickets at that step. See spec.DesignJoined.
+	"design-joined": spec.DesignJoined(),
 	// design-hold: design with the first design turn held busy, so the session
 	// stays running. See spec.DesignHold.
 	"design-hold": spec.DesignHold(),
