@@ -51,7 +51,8 @@ export function MermaidDiagram({ source, onSettled }: { source: string; onSettle
 function DoneDiagram({ svg }: { svg: string }) {
   const host = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
-    // Pele emits SVG text only: no HTML labels, and link schemes are restricted.
+    // The SVG is rendered by our own Pele renderer, not taken from outside. This insert is not a
+    // sanitiser: DOMParser does not make untrusted markup safe.
     const doc = new DOMParser().parseFromString(svg, "text/html")
     host.current?.replaceChildren(...Array.from(doc.body.childNodes))
   }, [svg])

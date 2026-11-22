@@ -1,6 +1,6 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import qrcode from "qrcode-generator"
-import { useEffect, useRef } from "react"
+import { useLayoutEffect, useRef } from "react"
 import { ErrorLine, Field } from "./AuthFields"
 
 function qrSvg(uri: string): string {
@@ -10,11 +10,12 @@ function qrSvg(uri: string): string {
   return qr.createSvgTag({ scalable: true, margin: 0 })
 }
 
-// The SVG is parsed with DOMParser and its nodes are put in with replaceChildren: nothing is
-// assigned as HTML, and an image/svg+xml document never runs script.
+// The SVG comes from our own QR generator, not from user input. This insert is not a sanitiser:
+// parsing with DOMParser does not make untrusted markup safe. A layout effect attaches it before
+// paint, so the box is never empty on first paint.
 function QrBox({ uri }: { uri: string }) {
   const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
+  useLayoutEffect(() => {
     const doc = new DOMParser().parseFromString(qrSvg(uri), "image/svg+xml")
     ref.current?.replaceChildren(document.importNode(doc.documentElement, true))
   }, [uri])
