@@ -11,6 +11,26 @@ import (
 // again when it really finishes, so this one must not resolve the task.
 const interimNotificationNote = "the result below may be interim"
 
+// taskNotice is how both transcript readers classify a task-notification:
+// Interim notices resolve nothing; a notice with an Outcome is final; one with
+// neither (a Monitor event) only reports that the task is alive.
+type taskNotice struct {
+	Interim bool
+	Outcome string
+}
+
+// classifyNotification reports whether text is a task-notification and, if
+// so, how it counts. The single place that decides it, for both readers.
+func classifyNotification(text string) (taskNotice, bool) {
+	if !strings.Contains(text, "<task-notification>") {
+		return taskNotice{}, false
+	}
+	if strings.Contains(text, interimNotificationNote) {
+		return taskNotice{Interim: true}, true
+	}
+	return taskNotice{Outcome: notificationKill[tagValue(text, "status")]}, true
+}
+
 // launch reads the background task a tool result starts: a shell
 // (backgroundTaskId), an async Agent (status async_launched) or a Monitor
 // (taskId plus timeoutMs). The id is empty when the result starts none.
@@ -82,7 +102,11 @@ func applyReports(recs []*TaskRecord, l taskRecordLine, res taskRecordResult, ra
 			r.AwaitingTurnEnd = false
 		}
 	}
-	if !l.reportsOnTasks(res) || strings.Contains(raw, interimNotificationNote) {
+	if !l.reportsOnTasks(res) {
+		return
+	}
+	notice, isNotice := classifyNotification(raw)
+	if notice.Interim {
 		return
 	}
 	byStructuredID := hasToolResult(l.Message)
@@ -93,7 +117,9 @@ func applyReports(recs []*TaskRecord, l taskRecordLine, res taskRecordResult, ra
 		if byStructuredID && res.structuredTaskID() != r.TaskID || !byStructuredID && !containsTaskIDToken(raw, r.TaskID) {
 			continue
 		}
-		r.Reported, r.ReportedAt, r.AwaitingTurnEnd = true, at, true
+		// A Monitor event notice wakes the agent but the Monitor keeps running.
+		r.Reported = r.Reported || !isNotice || notice.Outcome != "" || r.Kind != TaskKindMonitor
+		r.ReportedAt, r.AwaitingTurnEnd = at, true
 	}
 }
 

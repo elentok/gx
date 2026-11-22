@@ -230,15 +230,16 @@ func scanTaskRecords(path string) (taskScan, error) {
 // applyNotification ends the shell a final task-notification names. A
 // notification with no status (a Monitor event) or an interim one ends nothing.
 func applyNotification(text string, at time.Time, byTask map[string]*TaskRecord) {
-	if !strings.Contains(text, "<task-notification>") || strings.Contains(text, interimNotificationNote) {
+	notice, isNotice := classifyNotification(text)
+	if !isNotice || notice.Interim {
 		return
 	}
 	r := byTask[tagValue(text, "task-id")]
 	if r == nil {
 		return
 	}
-	outcome, ok := notificationKill[tagValue(text, "status")]
-	if !ok {
+	outcome := notice.Outcome
+	if outcome == "" {
 		// A Monitor event notice. The expiry notice lands after the timeout, so
 		// the time test leaves it out, not its text.
 		if r.Kind == TaskKindMonitor && r.Timeout > 0 && at.Before(r.StartedAt.Add(r.Timeout)) {

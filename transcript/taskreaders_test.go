@@ -20,6 +20,7 @@ func TestTaskReaders_AgreeOnRunning(t *testing.T) {
 		{"TaskStop of another task", "task-1", []string{startMarkerLine("task-1", "u1", start), taskStopLine("poll-1", later)}, true},
 		{"monitor outstanding", "mon-1", []string{monitorStartLine("mon-1", start)}, true},
 		{"monitor notified", "mon-1", []string{monitorStartLine("mon-1", start), notificationLine("mon-1", "u1", "completed", later)}, false},
+		{"monitor event notice", "mon-1", []string{monitorStartLine("mon-1", start), enqueueLine("mon-1", "", "event", later)}, true},
 		{"async agent outstanding", "agent-1", []string{asyncAgentLaunchLine("agent-1", start)}, true},
 		{"async agent interim notice", "agent-1", []string{asyncAgentLaunchLine("agent-1", start), interimAgentNotificationLine("agent-1", later)}, true},
 		{"async agent final notice", "agent-1", []string{asyncAgentLaunchLine("agent-1", start), notificationLine("agent-1", "u1", "completed", later)}, false},
