@@ -319,6 +319,17 @@ const selectProps = {
   bg: "transparent",
 } as const
 
+function LoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Box mt="6" display="flex" alignItems="center" gap="3">
+      <Text color="text.muted">Could not load stats</Text>
+      <Button emphasis="ghost" onClick={onRetry}>
+        Retry
+      </Button>
+    </Box>
+  )
+}
+
 export function StatsPage({
   fetchStats,
   fetchEpics,
@@ -332,14 +343,13 @@ export function StatsPage({
   const project = params.get("project") ?? ""
   const includeDev = params.get("dev") === "1"
   const perfTab: PerfTab = params.get("perf") === "route" ? "route" : "hard"
-  const { stats, failed, stale, source, retry } = useStats(
+  const { stats, failed, stale, refetchFailed, source, retry } = useStats(
     { range, project, includeDev },
     fetchStats,
     conn,
   )
-  // failed is false while stale numbers are on screen, so the ready signal
-  // for a failed filter change ends only when source does.
-  useFetchedReady({ failed, source })
+  // failed is false while old numbers are on screen, and source stays null for a new filter.
+  useFetchedReady({ failed: failed || refetchFailed, source })
   const { list } = useEpicList(fetchEpics, conn)
 
   const projects = [
@@ -388,16 +398,12 @@ export function StatsPage({
         </chakra.select>
       </Box>
       {failed ? (
-        <Box mt="6" display="flex" alignItems="center" gap="3">
-          <Text color="text.muted">Could not load stats</Text>
-          <Button emphasis="ghost" onClick={retry}>
-            Retry
-          </Button>
-        </Box>
+        <LoadError onRetry={retry} />
       ) : !stats ? (
         <FullScreenLoader label="Loading stats" />
       ) : (
         <Box aria-busy={stale} opacity={stale ? 0.5 : 1} transition="opacity 0.15s">
+          {refetchFailed && <LoadError onRetry={retry} />}
           <Throughput stats={stats} />
           <Cost stats={stats} project={project} />
           <Grilling stats={stats} />

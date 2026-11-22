@@ -45,8 +45,10 @@ export interface StatsState {
   stats: Stats | null
   /** The first fetch failed and nothing is on screen. */
   failed: boolean
-  /** `stats` are from an earlier query; the current one is loading or failed. */
+  /** `stats` are from an earlier query and the current one is still loading. */
   stale: boolean
+  /** `stats` are from an earlier query and the current one failed. */
+  refetchFailed: boolean
   source: FetchedState<Stats>["source"]
   retry: () => void
 }
@@ -71,5 +73,14 @@ export function useStats(
   const last = useRef<Stats | null>(null)
   if (data) last.current = data
   const stats = data ?? last.current
-  return { stats, failed: failed && !stats, stale: !data && !!stats, source, retry }
+  // useFetched reports `failed` while its own data is null, which includes a failed filter change.
+  const refetchFailed = failed && !data && !!stats
+  return {
+    stats,
+    failed: failed && !stats,
+    stale: !data && !!stats && !failed,
+    refetchFailed,
+    source,
+    retry,
+  }
 }

@@ -591,18 +591,22 @@ test("a range or project change keeps the previous cards while the new fetch loa
   )
 })
 
-test("a failed filter-change refetch keeps the stale numbers, with no loader or error", async () => {
+test("a failed filter-change refetch keeps the old numbers undimmed, with an error banner and Retry", async () => {
   const { fetchStats, fail } = heldSecondFetch()
+  fetchStats.mockResolvedValue(perfStats())
   const router = renderStats(fetchStats)
   await screen.findByText("Tickets merged")
   await router.navigate("/stats?range=30")
   await waitFor(() => expect(fetchStats).toHaveBeenCalledTimes(2))
   fail(new Error("boom"))
-  await act(async () => {})
-  expect(screen.getByText("Tickets merged")).toBeTruthy()
+  await screen.findByText("Could not load stats")
+  const body = screen.getByText("Tickets merged").closest("[aria-busy]")
+  expect(body?.getAttribute("aria-busy")).toBe("false")
   expect(screen.queryByRole("status", { name: "Loading stats" })).toBeNull()
-  expect(screen.queryByText("Could not load stats")).toBeNull()
-  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull()
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }))
+  await waitFor(() => expect(screen.queryByText("Could not load stats")).toBeNull())
+  expect(fetchStats).toHaveBeenLastCalledWith({ range: 30, project: "", includeDev: false })
+  expect(screen.getByText("Tickets merged")).toBeTruthy()
 })
 
 test("with no samples the section shows the empty state, and says dev samples are hidden", async () => {
