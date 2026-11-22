@@ -166,17 +166,17 @@ The routes are in `webui/src/routes.tsx` (`pageRoutes`). There is no separate Qu
 | Route        | Page                                    | Main labels                                                                                                             |
 | ------------ | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `/epics`     | Epics                                   | heading "Epics"; "Filter epics", "Workspace" and "Project" controls; Queue button on a card; "More actions" menu button |
-| `/archive`   | Archive                                 |                                                                                                                         |
-| `/agents/*`  | Agents (the splat is the session label) |                                                                                                                         |
-| `/backlog`   | Backlog                                 |                                                                                                                         |
+| `/archive`   | Archive                                 | heading "Archive"; "← Epics" link, "Select" button; "Newest first"; one row per archived epic named by the epic, with a "More actions" button; "Nothing is archived" when empty |
+| `/agents/*`  | Agents (the splat is the session label) | heading "Agents"; bare `/agents` shows "Pick a session" and a "New chat" button; with a label: heading = session name, "More actions" button, "Composer" form with "Message" textbox, "Add image", "History" and "Send" buttons |
+| `/backlog`   | Backlog                                 | heading "Backlog"; one region per project named by the project (`demo`); a row per backlog with its name, "N open" and a "Start Design" button (disabled at 0 open), plus "Finish move" on a half-filled one; "No epics yet." when empty |
 | `/initiatives` | Initiatives (read-only list, no Start button) | heading "Initiatives"; one region per project named by the project (`demo`); columns Initiative, State, Milestones, Current; row link named by the slug |
 | `/initiatives/*` | Initiative | heading = slug (level 1), "demo · initiative", state pill; regions Destination, Milestones, Assumptions, Deferred, Gate notes |
-| `/schedules` | Schedules                               |                                                                                                                         |
-| `/stats`     | Stats                                   |                                                                                                                         |
-| `/cleanup`   | Cleanup                                 |                                                                                                                         |
-| `/settings`  | Settings                                |                                                                                                                         |
-| `/triage/*`  | Triage                                  |                                                                                                                         |
-| `/diff`      | Diff                                    |                                                                                                                         |
+| `/schedules` | Schedules                               | heading "Scheduled prompts"; "New" button; a row per Schedule named by it, with its cadence ("Weekdays · 12:00") and a "Next ..." or "Off here" line; "No scheduled prompts yet." when empty |
+| `/stats`     | Stats                                   | heading "Stats"; "Project" and "Range" (7d, 30d, 90d) comboboxes; section headings Throughput, Cost and effort, Grilling, Friction, Launch, Web performance (buttons "Hard loads", "Route changes", "LCP", "INP"; "Why slow? Diagnostics"), Mental health |
+| `/cleanup`   | Cleanup                                 | heading "Cleanup"; "Project" combobox; regions Merged worktrees, Merged branches, Done epics, Unmerged idle worktrees, Needs the cleanup agent; row buttons "Remove", "Delete branch", "Archive"; "Start cleanup agent"; "Nothing to clean up" when empty |
+| `/settings`  | Settings                                | "Search settings" textbox; group buttons Agents, Ralph loop, Notifications, Mental health, Web UI, System, Account and a Models link; heading = the open group (`Agents` by default); switches such as "Restore sessions on start"; "Save" button |
+| `/triage/*`  | Triage (the splat is the project)       | heading "Triage: demo" (level 1), step name pill (Verify), "Follow-ups" count image, "Continue" and "More actions" buttons; link "Triage of demo:follow-ups ↗"; regions "Chat" (with "Composer" form) and "Progress" listing Verify, Route, Questions, Write, Done |
+| `/diff`      | Diff                                    | heading "Diff"; "Base ref" and "Tip ref" textboxes, "Reload" button; "Split" and "Unified" layout buttons; "COMMITS BY TICKET (N)" disclosure; "FILES (N)" with "Filter files" textbox and "Changed files" tree |
 
 ## Fixture-unrenderable states
 
