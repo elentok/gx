@@ -22,6 +22,8 @@ var (
 	devNull      = regexp.MustCompile(`>>?\s*/dev/null`)
 	scriptHeredc = regexp.MustCompile(`\b(python[0-9.]*|perl|ruby|node)\b[^\n]*<<`)
 	heredocStart = regexp.MustCompile(`<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)`)
+	// pipedBrief matches `gx brief ...` or `gx check ...` piped into tail, head or cut.
+	pipedBrief = regexp.MustCompile(`\bgx\s+(?:-\S+\s+)*(?:brief|check)\b[^\n|]*\|\s*(?:tail|head|cut)\b`)
 )
 
 // withoutHeredocBodies drops the lines a heredoc feeds to stdin, keeping the
@@ -106,6 +108,10 @@ func guardBashCommand(command string) string {
 func guardBashReason(command, editTool string) string {
 	hint := "Use " + editTool + " instead: it fails loudly on a stale read, a shell edit does not."
 	switch {
+	case pipedBrief.MatchString(withoutQuotedText(command)):
+		// Claude Code shows a hook's stderr only on a blocking exit, so the
+		// warning is a refusal; the unpiped command passes.
+		return "gx brief and gx check already print the result and the log path, so no extra pipe is needed. A pipe into tail, head or cut hides the exit code and the log path. Run the command again without the pipe."
 	case sedInPlace.MatchString(command):
 		return "sed -i edits files behind Edit's back. " + hint
 	case scriptHeredc.MatchString(command) && hasScriptHeredocBody(command):

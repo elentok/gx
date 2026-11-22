@@ -501,10 +501,10 @@ func report(tool Tool, o Options, outcome Outcome, out []byte, e indexEntry) int
 			fmt.Fprintf(o.Out, "FAIL %s: tests passed, %s in %s\n%s\n", tool.Name(), count, dur, detail)
 		} else if len(outcome.Failures) == 0 {
 			fmt.Fprintf(o.Out, "FAIL %s: exit %d in %s\n", tool.Name(), e.Exit, dur)
-			rawHead(o.Out, out)
+			rawHead(o.Out, out, e.Log)
 		} else {
 			fmt.Fprintf(o.Out, "FAIL %s: %d failed in %s\n", tool.Name(), len(outcome.Failures), dur)
-			renderUnitsWith(o.Out, outcome.Failures, maxFullUnits, func(u Unit) { renderSnapshot(o.Out, outcome, u) })
+			renderUnitsWith(o.Out, outcome.Failures, maxFullUnits, e.Log, func(u Unit) { renderSnapshot(o.Out, outcome, u) })
 			printRerun(o.Out, tool, o.CDir, o.Args, outcome.Failures)
 		}
 		renderSlowest(tool, o.Out, outcome.TestDurations)

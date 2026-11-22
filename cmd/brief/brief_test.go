@@ -487,7 +487,7 @@ func TestBrief_GoTestFailures(t *testing.T) {
 	if !strings.Contains(out, "more lines cut") {
 		t.Errorf("no cut notice for lines:\n%s", out)
 	}
-	if strings.Contains(out, strings.Repeat("x", 301)) || !strings.Contains(out, "x[") || !strings.Contains(out, "more chars cut, search the log]") {
+	if strings.Contains(out, strings.Repeat("x", 301)) || !strings.Contains(out, "x[") || !strings.Contains(out, "more chars cut, search the log: "+lastLine(out)+"]") {
 		t.Errorf("wide line not cut at 300:\n%s", out)
 	}
 	// Failures come in source order: Long, Wide, C, D, E are shown in full

@@ -335,9 +335,13 @@ func (Playwright) Parse(out []byte, _ int) Outcome {
 	var failures []Unit
 	var cur *Unit
 	var lines []string
+	step := ""
 	closeUnit := func() {
 		if cur != nil {
 			cur.Text = strings.TrimSpace(strings.Join(lines, "\n"))
+			if step != "" {
+				cur.Text += "\n\nstep: " + step
+			}
 			failures = append(failures, *cur)
 			cur = nil
 		}
@@ -357,7 +361,7 @@ func (Playwright) Parse(out []byte, _ int) Outcome {
 		}
 		if m := playwrightFailure.FindStringSubmatch(l); m != nil {
 			closeUnit()
-			cur, lines, cut, listing = &Unit{Location: m[1], Name: m[2]}, nil, false, false
+			cur, lines, step, cut, listing = &Unit{Location: m[1], Name: m[2]}, nil, "", false, false
 			continue
 		}
 		if m := playwrightTotals.FindStringSubmatch(l); m != nil {
@@ -379,10 +383,19 @@ func (Playwright) Parse(out []byte, _ int) Outcome {
 			}
 			continue
 		}
-		if cur == nil || cut {
+		if cur == nil {
 			continue
 		}
-		if t := strings.TrimSpace(l); t == "Call log:" || strings.HasPrefix(t, "at ") || playwrightCode.MatchString(l) {
+		t := strings.TrimSpace(l)
+		// The code frame's marked line names the failing step; it comes after
+		// the call log, so it is looked for past the cut too.
+		if step == "" && strings.HasPrefix(t, ">") && playwrightCode.MatchString(l) {
+			step = t
+		}
+		if cut {
+			continue
+		}
+		if t == "Call log:" || strings.HasPrefix(t, "at ") || playwrightCode.MatchString(l) {
 			cut = true
 			continue
 		}

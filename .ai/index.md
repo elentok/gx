@@ -94,7 +94,8 @@ A new config key must reach the settings page or be excluded with a reason:
   instead of crashing the laptop. A package using `servertest` needs `servertest.RunSessionProcesses()` (or
   `cmdtest.Main`); the testmainguard check requires only that call.
 - Verify with `gx check` in the foreground, unpiped. Iterate with `gx brief`. Never pipe, `tail` or
-  background either.
+  background either. No extra pipe is needed: `gx brief` already prints the failing test names,
+  the first assertion and the log path, and the guard hook refuses `gx brief ... | tail`.
 - `server/` is the slowest package. Run it only when you touched `server/` or
   `server/servertest/`, and scope it with `-run` while iterating. A plain `go test ./server` runs
   the tests in parallel and takes about 2 minutes.

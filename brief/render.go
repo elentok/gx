@@ -66,13 +66,23 @@ func renderUnits(w io.Writer, units []Unit) { renderUnitsMax(w, units, maxFullUn
 // renderUnitsMax is renderUnits with the number of units shown with text
 // chosen by the caller.
 func renderUnitsMax(w io.Writer, units []Unit, maxFull int) {
-	renderUnitsWith(w, units, maxFull, nil)
+	renderUnitsWith(w, units, maxFull, "", nil)
 }
 
 // renderUnitsWith is renderUnitsMax that also calls after(unit) right below the
 // text of each unit shown with text. Units listed by name only get no call.
-func renderUnitsWith(w io.Writer, units []Unit, maxFull int, after func(Unit)) {
-	renderUnitsText(w, units, maxFull, after, limitText)
+// Every cut notice names log, the file that holds the full text.
+func renderUnitsWith(w io.Writer, units []Unit, maxFull int, log string, after func(Unit)) {
+	renderUnitsText(w, units, maxFull, after, func(s string) []string { return limitText(s, log) })
+}
+
+// cutNotice is the bracketed note where text was cut: it says how much, and
+// where the full text is.
+func cutNotice(n int, what, log string) string {
+	if log == "" {
+		return fmt.Sprintf("[%d more %s cut, search the log]", n, what)
+	}
+	return fmt.Sprintf("[%d more %s cut, search the log: %s]", n, what, log)
 }
 
 // sharedCause returns the text every unit failed with, when there are more
@@ -264,7 +274,7 @@ func TrimTail(lines []string) []string {
 // maxContextLines after it. Text without an assertion line gets its first
 // maxUnitLines. Each line is cut at maxLineChars, with a notice line wherever
 // text was cut.
-func limitText(text string) []string {
+func limitText(text, log string) []string {
 	if text == "" {
 		return nil
 	}
@@ -276,11 +286,11 @@ func limitText(text string) []string {
 	var out []string
 	for i, l := range lines {
 		if i == limit {
-			out = append(out, fmt.Sprintf("[%d more lines cut, search the log]", len(lines)-limit))
+			out = append(out, cutNotice(len(lines)-limit, "lines", log))
 			break
 		}
 		if r := []rune(l); len(r) > maxLineChars {
-			l = string(r[:maxLineChars]) + fmt.Sprintf("[%d more chars cut, search the log]", len(r)-maxLineChars)
+			l = string(r[:maxLineChars]) + cutNotice(len(r)-maxLineChars, "chars", log)
 		}
 		out = append(out, l)
 	}
@@ -298,7 +308,7 @@ var (
 // rawHead prints the part of unparsed output that matters: from the first
 // error line on, or the last lines when none looks like an error. ANSI codes
 // and build noise are dropped first.
-func rawHead(w io.Writer, out []byte) {
+func rawHead(w io.Writer, out []byte, log string) {
 	var lines []string
 	for l := range strings.SplitSeq(ansiEscape.ReplaceAllString(string(out), ""), "\n") {
 		if !buildNoise.MatchString(strings.TrimRight(l, "\r")) {
@@ -310,7 +320,7 @@ func rawHead(w io.Writer, out []byte) {
 	} else if len(lines) > maxUnitLines {
 		lines = lines[len(lines)-maxUnitLines:]
 	}
-	for _, l := range limitText(strings.Join(lines, "\n")) {
+	for _, l := range limitText(strings.Join(lines, "\n"), log) {
 		fmt.Fprintln(w, l)
 	}
 }

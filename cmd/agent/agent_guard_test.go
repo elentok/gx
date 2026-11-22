@@ -9,6 +9,30 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 )
 
+func TestGuardBashCommand_PipedBriefIsRefusedWithTheLogPathHint(t *testing.T) {
+	t.Parallel()
+	for _, command := range []string{
+		"gx brief go-test -timeout 60s ./brief 2>&1 | tail -20",
+		"gx brief -C webui vitest | head -5",
+		"gx check | cut -c1-200",
+	} {
+		got := guardBashCommand(command)
+		if !strings.Contains(got, "log path") || !strings.Contains(got, "no extra pipe") {
+			t.Errorf("guardBashCommand(%q) = %q, want the piped-brief message", command, got)
+		}
+	}
+	for _, command := range []string{
+		"gx brief go-test -timeout 60s ./brief",
+		"gx check",
+		"rg foo . | head",
+		`git commit -m "do not pipe gx brief | tail"`,
+	} {
+		if got := guardBashCommand(command); got != "" {
+			t.Errorf("guardBashCommand(%q) = %q, want it allowed", command, got)
+		}
+	}
+}
+
 func TestGuardBashCommand(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

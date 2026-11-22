@@ -92,7 +92,7 @@ func signatureOf(exit int, outcome Outcome, out []byte) string {
 		text = detail
 	} else {
 		var b bytes.Buffer
-		rawHead(&b, out)
+		rawHead(&b, out, "")
 		text = b.String()
 	}
 	return truncateRunes(firstLine(text), maxSignatureChars)

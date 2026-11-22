@@ -42,9 +42,57 @@ func TestPlaywrightParse_KeepsOnlyTheFirstErrorOfEachFailure(t *testing.T) {
 		t.Fatalf("failures = %+v, want one", got.Failures)
 	}
 	f := got.Failures[0]
-	want := "Error: expect(locator).toBeVisible() failed\n\nLocator: getByText('x')\nExpected: visible"
+	want := "Error: expect(locator).toBeVisible() failed\n\nLocator: getByText('x')\nExpected: visible\n\nstep: > 15 |   await expect(x).toBeVisible()"
 	if f.Location != "epics.e2e.ts" || f.Name != "2. Epic looks right" || f.Text != want {
 		t.Errorf("failure = %+v, want text %q", f, want)
+	}
+}
+
+func TestPlaywrightParse_TwoFailedFlowsAreBothListedWithTheirFailingStep(t *testing.T) {
+	out := `Running 3 tests using 2 workers
+  1) [chromium] › a.e2e.ts:12:5 › 1. First flow ──────────
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByText('x')
+
+    Call log:
+      - waiting for getByText('x')
+
+      14 |   await a
+    > 15 |   await expect(x).toBeVisible()
+         |                   ^
+        at /repo/webui/e2e/a.e2e.ts:15:5
+
+  2) [chromium] › b.e2e.ts:20:5 › 2. Second flow ──────────
+
+    Error: expect(locator).toHaveText() failed
+
+    Locator: getByRole('heading')
+
+    Call log:
+      - waiting for getByRole('heading')
+
+      21 |   await b
+    > 22 |   await expect(y).toHaveText('z')
+         |                   ^
+        at /repo/webui/e2e/b.e2e.ts:22:5
+
+  2 failed
+    [chromium] › a.e2e.ts:12:5 › 1. First flow
+    [chromium] › b.e2e.ts:20:5 › 2. Second flow
+  1 passed (4.2s)
+`
+	got := Playwright{}.Parse([]byte(out), 1)
+	var buf bytes.Buffer
+	report(Playwright{}, Options{Out: &buf}, got, []byte(out), indexEntry{Exit: 1, Log: "/logs/pw.log"})
+	for _, want := range []string{"1. First flow", "2. Second flow", "toBeVisible", "toHaveText", "/logs/pw.log"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("report lacks %q:\n%s", want, buf.String())
+		}
+	}
+	if !strings.Contains(buf.String(), "step: > 15 |   await expect(x)") || !strings.Contains(buf.String(), "step: > 22 |   await expect(y)") {
+		t.Errorf("report lacks the failing step lines:\n%s", buf.String())
 	}
 }
 

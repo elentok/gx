@@ -11,7 +11,7 @@ func TestRawHead_StartsAtTheErrorAndDropsBuildNoise(t *testing.T) {
 	out := "dist/assets/a.woff2  12 kB\n(!) Some chunks are larger than 500 kB\n- Use dynamic import()\n\n" +
 		"\x1b[31mError: expect(locator).toBeVisible() failed\x1b[0m\nline 2\n"
 	var w bytes.Buffer
-	rawHead(&w, []byte(out))
+	rawHead(&w, []byte(out), "")
 	want := "Error: expect(locator).toBeVisible() failed\nline 2\n"
 	if w.String() != want {
 		t.Errorf("rawHead = %q, want %q", w.String(), want)
@@ -77,7 +77,7 @@ func TestRawHead_FallsBackToTheTail(t *testing.T) {
 	}
 	lines[29] = "the last line"
 	var w bytes.Buffer
-	rawHead(&w, []byte(strings.Join(lines, "\n")+"\n"))
+	rawHead(&w, []byte(strings.Join(lines, "\n")+"\n"), "")
 	if !strings.Contains(w.String(), "the last line") || strings.Contains(w.String(), "cut") {
 		t.Errorf("tail fallback lost the last line or cut it:\n%s", w.String())
 	}
@@ -94,6 +94,20 @@ func TestRenderUnits_GoFailureDropsJSONLogLinesAndShowsAssertionFirst(t *testing
 	want := "pkg\n  TestA\n    a_test.go:42: got 1, want 2\n    ctx 1\n    ctx 2\n    ctx 3\n    [1 more lines cut, search the log]\n"
 	if w.String() != want {
 		t.Errorf("renderUnits = %q, want %q", w.String(), want)
+	}
+}
+
+func TestRenderUnits_CutNoticesNameTheLogPath(t *testing.T) {
+	text := "a_test.go:42: got 1, want 2\nc1\nc2\nc3\nc4\n" + strings.Repeat("x", maxLineChars+5)
+	var w bytes.Buffer
+	renderUnitsWith(&w, []Unit{{Location: "pkg", Name: "TestA", Text: text}}, maxFullUnits, "/logs/a.log", nil)
+	if want := "[2 more lines cut, search the log: /logs/a.log]"; !strings.Contains(w.String(), want) {
+		t.Errorf("line cut notice lacks the log path:\n%s", w.String())
+	}
+	w.Reset()
+	rawHead(&w, []byte("error: "+strings.Repeat("y", maxLineChars+5)), "/logs/b.log")
+	if want := "[12 more chars cut, search the log: /logs/b.log]"; !strings.Contains(w.String(), want) {
+		t.Errorf("char cut notice lacks the log path:\n%s", w.String())
 	}
 }
 
