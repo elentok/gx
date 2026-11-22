@@ -33,7 +33,7 @@ func (sc *Scheduler) RunNow(s schedrec.Schedule, registered bool) (ops.ScheduleR
 	sc.checkMu.Lock()
 	defer sc.checkMu.Unlock()
 	if !registered {
-		return runNowRefusal(wire.ReasonUnknownProject, "no project "+s.Project+" in the ticket store", ""), nil
+		return runNowRefusal(ops.ScheduleRunNowReasonUnknownProject, "no project "+s.Project+" in the ticket store", ""), nil
 	}
 	d, err := sc.settlePrevious(Key{Project: s.Project, Slug: s.Slug})
 	if err != nil {

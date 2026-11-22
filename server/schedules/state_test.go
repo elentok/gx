@@ -7,7 +7,23 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/schedules"
+	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
+
+// The web matches these strings; the Go names must keep resolving to them.
+func TestRunNowReasons_MatchTheWebStrings(t *testing.T) {
+	for _, c := range [][2]string{
+		{schedules.ReasonPreviousRunStarted, "previous-run-started"},
+		{schedules.ReasonPreviousRunNeedsAttention, "previous-run-needs-attention"},
+		{ops.ScheduleRunNowReasonUnknownProject, "unknown-project"},
+		{wire.ReasonUnknownProject, ops.ScheduleRunNowReasonUnknownProject},
+	} {
+		if c[0] != c[1] {
+			t.Errorf("reason %q, want %q", c[0], c[1])
+		}
+	}
+}
 
 var (
 	key = schedules.Key{Project: "gx", Slug: "nightly"}

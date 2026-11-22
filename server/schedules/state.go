@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/fsutil"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 const (
@@ -28,8 +29,8 @@ const (
 const (
 	ReasonLate                      = "late"
 	ReasonProjectNotFound           = "project-not-found"
-	ReasonPreviousRunStarted        = "previous-run-started"
-	ReasonPreviousRunNeedsAttention = "previous-run-needs-attention"
+	ReasonPreviousRunStarted        = ops.ScheduleRunNowReasonPreviousRunStarted
+	ReasonPreviousRunNeedsAttention = ops.ScheduleRunNowReasonPreviousRunNeedsAttention
 )
 
 // Key identifies one Schedule.
