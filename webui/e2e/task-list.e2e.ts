@@ -186,6 +186,8 @@ test("208. Task list", async ({ page, start }) => {
   await csum.click()
   await expect(list(page).getByRole("listitem")).toHaveCount(3)
   await expect(rowOf(page, "make build")).toBeVisible()
+  await expect(elapsed(page, "make build")).toBeVisible()
+  await expect(elapsed(page, "make build")).toHaveText(/\S/)
 
   // Old Codex: no list, the Working row keeps its in-flight text.
   const old = await start("bg-progress", { shape: "old-codex" })
