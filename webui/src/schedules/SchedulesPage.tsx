@@ -1,5 +1,6 @@
 import { Box, Text } from "@chakra-ui/react"
-import { useEffect, useState, type KeyboardEvent } from "react"
+import { useState, type KeyboardEvent } from "react"
+import { useOnChange } from "../hooks"
 import { useNavigate } from "react-router"
 import { useConnectionContext } from "../connection"
 import type { ScheduleInfo } from "../generated/server"
@@ -91,10 +92,9 @@ export function SchedulesPage({
   useFetchedReady({ failed, source }, data?.schedules.length === 0)
   // A switch's answer shows at once; a fresh list replaces the answers.
   const [answers, setAnswers] = useState<Record<string, ScheduleInfo>>({})
-  useEffect(() => {
-    void data
+  useOnChange(data, () => {
     setAnswers({})
-  }, [data])
+  })
   const schedules = (data?.schedules ?? []).map((s) => answers[addressOf(s)] ?? s)
   const allOff = schedules.length > 0 && schedules.every((s) => !s.switch)
   return (

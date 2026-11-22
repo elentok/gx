@@ -1,5 +1,6 @@
 import { Box, Text } from "@chakra-ui/react"
-import { useLayoutEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
+import { useOnChange } from "../hooks"
 import type { TicketDetail } from "../generated/server"
 import { Markdown } from "../markdown/Markdown"
 import { Button } from "../ui/button/Button"
@@ -43,19 +44,22 @@ export function AnswerResult({ detail, sent }: { detail: TicketDetail; sent: Sen
   const [open, setOpen] = useState(false)
   const [cut, setCut] = useState(false)
   const body = useRef<HTMLDivElement>(null)
-  useLayoutEffect(() => {
-    // The text is a deliberate re-measure trigger.
-    void latest?.text
-    const el = body.current
-    if (!el || open) return
-    const measure = () => setCut(el.scrollHeight > el.clientHeight)
-    measure()
-    // A rotation or width change moves the line count without touching the text.
-    if (typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(measure)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [latest?.text, open])
+  // The text is a deliberate re-measure trigger.
+  useOnChange(
+    [latest?.text, open],
+    () => {
+      const el = body.current
+      if (!el || open) return
+      const measure = () => setCut(el.scrollHeight > el.clientHeight)
+      measure()
+      // A rotation or width change moves the line count without touching the text.
+      if (typeof ResizeObserver === "undefined") return
+      const observer = new ResizeObserver(measure)
+      observer.observe(el)
+      return () => observer.disconnect()
+    },
+    { immediate: true },
+  )
 
   // An adopted send records no answer, and the round it answered may no longer be the latest.
   if (!latest || !isAnsweredRound(latest, sent)) return null

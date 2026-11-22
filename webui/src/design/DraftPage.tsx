@@ -2,6 +2,7 @@ import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
 import { DraftHeader, field } from "./DraftHeader"
 import { DraftFooter } from "./DraftFooter"
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react"
+import { useOnChange } from "../hooks"
 import { useLocation, useNavigate, useParams } from "react-router"
 import type { DesignDraft } from "../generated/server"
 import { ReasonHistoryEntryGone, type DraftHistoryEntry } from "../generated/ops"
@@ -264,12 +265,15 @@ function DraftForm({
   // A page opened by New design asks for the Prompt's focus; a click or a bookmark does not.
   const { key: locationKey, state: locationState } = useLocation()
   const focusWanted = (locationState as { focusPrompt?: boolean } | null)?.focusPrompt === true
-  useEffect(() => {
-    // A new navigation entry asks again, even for the same draft.
-    void locationKey
-    if (focusWanted) actions.current.focusPrompt()
-    return () => stopHold.current()
-  }, [locationKey, focusWanted])
+  // A new navigation entry asks again, even for the same draft.
+  useOnChange(
+    [locationKey, focusWanted],
+    () => {
+      if (focusWanted) actions.current.focusPrompt()
+      return () => stopHold.current()
+    },
+    { immediate: true },
+  )
 
   const submit = (e: FormEvent) => {
     e.preventDefault()

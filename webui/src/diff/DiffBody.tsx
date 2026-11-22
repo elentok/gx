@@ -27,9 +27,11 @@ export function lineAnchors(patch: string, path: string): DiffLineAnnotation<Lin
       oldN = Number(h[1])
       newN = Number(h[2])
       inHunk = true
-    } else if (!inHunk || line.startsWith("\\")) {
-      // Before the first hunk, or a "\ No newline" marker: no line number moves.
-    } else if (line.startsWith("+")) {
+      continue
+    }
+    // Before the first hunk, or a "\ No newline" marker: no line number moves.
+    if (!inHunk || line.startsWith("\\")) continue
+    if (line.startsWith("+")) {
       out.push({ side: "additions", lineNumber: newN++, metadata: { path } })
     } else if (line.startsWith("-")) {
       out.push({ side: "deletions", lineNumber: oldN++, metadata: { path } })

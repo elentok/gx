@@ -3,6 +3,7 @@ import { ARCHIVE_HREF } from "../hrefs"
 import { HeaderLink } from "../page/HeaderLink"
 import { useEffect, useRef, useState } from "react"
 import { useLocation, useNavigate } from "react-router"
+import { useOnChange } from "../hooks"
 import { MissingBanner } from "../checks/MissingBanner"
 import { SetupDialog } from "../checks/SetupDialog"
 import { postSaveChecks, type SaveChecks } from "../checks/setup"
@@ -206,10 +207,8 @@ export function EpicsPage({
     if (section?.collapsedByDefault) setToggled((t) => new Set(t).add(section.key))
     setScrollTo(focus)
   }, [focus, list, sections])
-  useEffect(() => {
-    // A section opening or the list changing can add the card, so they re-run the lookup.
-    void toggled
-    void list
+  // A section opening or the list changing can add the card, so they re-run the lookup.
+  useOnChange([scrollTo, toggled, list], () => {
     if (!scrollTo) return
     const card = [...document.querySelectorAll("[data-focus]")].find(
       (el) => el.getAttribute("data-focus") === scrollTo,
@@ -217,7 +216,7 @@ export function EpicsPage({
     if (!card) return
     card.scrollIntoView?.({ block: "center" })
     setScrollTo(undefined)
-  }, [scrollTo, toggled, list])
+  })
   const newDesign = (
     <Button
       emphasis="main"

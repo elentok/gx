@@ -174,17 +174,17 @@ function Field({
     return () => onMode?.(null)
   }, [onMode, showEditor, selection, mode])
   const { wrap, editorSel, carry, swapped, read } = useSwapCarry(showEditor, area)
+  // No dependency list: the caret is placed after each text change, before paint, and `pending`
+  // is only set when there is a caret to place.
   useLayoutEffect(() => {
     // While the editor is open it places the caret itself.
     // The inline editor takes `pending` itself, as its `caret`.
     if (selection || showEditor) return
-    // `value` is a re-run trigger: the caret is placed after each text change.
-    void value
     const at = menu?.pending.current
     if (at == null) return
     menu!.pending.current = null
     area.current?.setSelectionRange(at, at)
-  }, [value, menu, selection, showEditor])
+  })
   const open = () => setSelection(read().sel)
   const editorHandle = useRef<CodeEditorHandle>(null)
   // Focus and selection are set synchronously, inside the user's gesture and before the layer unmounts, so a phone keeps its keyboard.

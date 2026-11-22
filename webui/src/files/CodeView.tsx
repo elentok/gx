@@ -1,5 +1,6 @@
 import { Box } from "@chakra-ui/react"
 import { useEffect, useRef, useState } from "react"
+import { useOnChange } from "../hooks"
 import { tokenStyles } from "./tokenStyles"
 
 /** The cited line as a 1-based line number, or undefined when it names no line of `total`. */
@@ -43,12 +44,14 @@ export function CodeView({
     }
   }, [text, language])
 
-  useEffect(() => {
-    // Highlighting swaps the line elements, so a new mark or new html re-scrolls.
-    void mark
-    void html
-    cited.current?.scrollIntoView?.({ block: "center" })
-  }, [mark, html])
+  // Highlighting swaps the line elements, so a new mark or new html re-scrolls.
+  useOnChange(
+    [mark, html],
+    () => {
+      cited.current?.scrollIntoView?.({ block: "center" })
+    },
+    { immediate: true },
+  )
 
   const shown = html && html.text === text && html.language === language ? html.lines : undefined
   return (

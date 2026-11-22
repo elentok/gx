@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useOnChange } from "../hooks"
 import { useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { leaderKeyOf } from "../leaderKey"
@@ -121,10 +122,9 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
   }, [close])
 
   // A page change closes the box with no action.
-  useEffect(() => {
-    void pathname
+  useOnChange(pathname, () => {
     close()
-  }, [pathname, close])
+  })
 
   if (!open) return null
   return <ChordBox leader={leader} ctx={ctx} chords={table} onClose={close} />

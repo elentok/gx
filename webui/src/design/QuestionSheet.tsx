@@ -1,6 +1,7 @@
 import { Box, Text } from "@chakra-ui/react"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 import type { SessionRoundCard } from "../generated/server"
+import { useOnChange } from "../hooks"
 import { NO_SIDEBAR_SWIPE_ATTR } from "../shell/useSidebarSwipe"
 import { Button } from "../ui/button/Button"
 import { promptBoxNamed, PROMPT_BOX_SELECTOR } from "../ui/expandable-text/look"
@@ -97,11 +98,14 @@ export function QuestionSheet({
   const toTop = useCallback(() => {
     if (body.current) body.current.scrollTop = 0
   }, [])
-  useEffect(() => {
-    // A new question scrolls the body to its title.
-    void index
-    toTop()
-  }, [index, toTop])
+  // A new question scrolls the body to its title.
+  useOnChange(
+    index,
+    () => {
+      toTop()
+    },
+    { immediate: true },
+  )
   // Set while a smooth scroll we started is still moving, so its in-between frames don't set the question.
   const scrolling = useRef<number | undefined>(undefined)
 
@@ -192,21 +196,24 @@ export function QuestionSheet({
   }
 
   // Keep the scroll position on the current question; scrolling by hand sets the question.
-  useEffect(() => {
-    // Opening a folded sheet gives the row its width, so it scrolls to the current question then too.
-    void open
-    const el = row.current
-    if (
-      el &&
-      typeof el.scrollTo === "function" &&
-      el.clientWidth > 0 &&
-      Math.round(el.scrollLeft / el.clientWidth) !== index
-    ) {
-      window.clearTimeout(scrolling.current)
-      scrolling.current = window.setTimeout(() => (scrolling.current = undefined), 600)
-      el.scrollTo({ left: index * el.clientWidth, behavior: "smooth" })
-    }
-  }, [index, open])
+  // Opening a folded sheet gives the row its width, so it scrolls to the current question then too.
+  useOnChange(
+    [index, open],
+    () => {
+      const el = row.current
+      if (
+        el &&
+        typeof el.scrollTo === "function" &&
+        el.clientWidth > 0 &&
+        Math.round(el.scrollLeft / el.clientWidth) !== index
+      ) {
+        window.clearTimeout(scrolling.current)
+        scrolling.current = window.setTimeout(() => (scrolling.current = undefined), 600)
+        el.scrollTo({ left: index * el.clientWidth, behavior: "smooth" })
+      }
+    },
+    { immediate: true },
+  )
   useEffect(() => () => window.clearTimeout(scrolling.current), [])
   const onScroll = () => {
     const el = row.current

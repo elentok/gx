@@ -1,5 +1,6 @@
-import { useEffect, type RefObject } from "react"
+import type { RefObject } from "react"
 import { useLocation } from "react-router"
+import { useOnChange } from "../hooks"
 import { PROMPT_BOX_SELECTOR } from "../ui/expandable-text/look"
 
 /** Navigation state that asks the chat page it lands on to focus its prompt. A click carries none. */
@@ -9,9 +10,12 @@ export const FOCUS_PROMPT_STATE = { focusPrompt: true }
 export function usePromptFocus(container: RefObject<HTMLElement | null>) {
   const { key, state } = useLocation()
   const wanted = (state as { focusPrompt?: boolean } | null)?.focusPrompt === true
-  useEffect(() => {
-    // A new location key re-focuses even when the request is unchanged.
-    void key
-    if (wanted) container.current?.querySelector<HTMLElement>(PROMPT_BOX_SELECTOR)?.focus()
-  }, [container, key, wanted])
+  // A new location key re-focuses even when the request is unchanged.
+  useOnChange(
+    [key, wanted],
+    () => {
+      if (wanted) container.current?.querySelector<HTMLElement>(PROMPT_BOX_SELECTOR)?.focus()
+    },
+    { immediate: true },
+  )
 }

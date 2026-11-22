@@ -3,7 +3,7 @@ import { copyText } from "../clipboard"
 import { withKeys } from "../uniqueKeys"
 import { GxMenu, menuGroups } from "../ui/menu/Menu"
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
-import { Fragment, useEffect, useMemo, useState } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import type { OpenDesign } from "../design/open"
@@ -174,10 +174,9 @@ function StatsLine({
 }) {
   // The server's wall clock is as of the fetch, so a running epic adds the time since then.
   // A new detail object is the trigger to take a new fetch time.
-  const fetchedAt = useMemo(() => {
-    void detail
-    return Date.now()
-  }, [detail])
+  const stamp = useRef({ detail, at: Date.now() })
+  if (stamp.current.detail !== detail) stamp.current = { detail, at: Date.now() }
+  const fetchedAt = stamp.current.at
   const wallClock =
     detail.state === "running" && detail.wall_clock !== undefined
       ? detail.wall_clock + Math.max(0, (now - fetchedAt) / 1000)

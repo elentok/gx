@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Connection } from "./connection"
+import { useOnChange } from "./hooks"
 import { readPageCache, writePageCache } from "./pageCache"
 import { useRefetchOnEvents } from "./refetch"
 
@@ -35,23 +36,26 @@ export function useFetched<T>(
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
 
-  useEffect(() => {
-    // `attempt` only re-runs the fetch (retry, events, focus); nothing here reads it.
-    void attempt
-    let live = true
-    setFailed(false)
-    latest.current().then(
-      (data) => {
-        if (!live) return
-        setLoaded({ id, data })
-        writePageCache(key, data, id)
-      },
-      () => live && setFailed(true),
-    )
-    return () => {
-      live = false
-    }
-  }, [key, id, attempt])
+  // `attempt` only re-runs the fetch (retry, events, focus); nothing here reads it.
+  useOnChange(
+    [key, id, attempt],
+    () => {
+      let live = true
+      setFailed(false)
+      latest.current().then(
+        (data) => {
+          if (!live) return
+          setLoaded({ id, data })
+          writePageCache(key, data, id)
+        },
+        () => live && setFailed(true),
+      )
+      return () => {
+        live = false
+      }
+    },
+    { immediate: true },
+  )
 
   const retry = useCallback(() => setAttempt((n) => n + 1), [])
   useRefetchOnEvents(conn, retry, debounceMs)

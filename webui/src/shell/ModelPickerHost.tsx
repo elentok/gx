@@ -1,6 +1,7 @@
 import { chakra, Kbd, Text } from "@chakra-ui/react"
-import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react"
+import { useMemo, useState, type FormEvent, type KeyboardEvent } from "react"
 import { useConnectionContext, useConnectionState } from "../connection"
+import { useOnChange } from "../hooks"
 import { blockedNote, TokenCostWarning } from "../design/modelSwitch"
 import { stateToken } from "../design/open"
 import type { SessionInfo, SessionModelsResponse } from "../generated/server"
@@ -46,22 +47,25 @@ export function ModelPickerHost() {
 function useModels(sessionId: string, fetchModels: FetchModels) {
   const [models, setModels] = useState<SessionModelsResponse | null>(null)
   const [refreshNo, setRefreshNo] = useState(0)
-  useEffect(() => {
-    // A bump of refreshNo is the re-read trigger.
-    void refreshNo
-    let live = true
-    let timer: ReturnType<typeof setTimeout> | undefined
-    void fetchModels(sessionId).then((res) => {
-      if (!live) return
-      // A failed read keeps the answer already shown.
-      if (res) setModels(res)
-      if (res?.refreshing) timer = setTimeout(() => setRefreshNo((n) => n + 1), REFRESH_MS)
-    })
-    return () => {
-      live = false
-      clearTimeout(timer)
-    }
-  }, [sessionId, fetchModels, refreshNo])
+  // A bump of refreshNo is the re-read trigger.
+  useOnChange(
+    [sessionId, fetchModels, refreshNo],
+    () => {
+      let live = true
+      let timer: ReturnType<typeof setTimeout> | undefined
+      void fetchModels(sessionId).then((res) => {
+        if (!live) return
+        // A failed read keeps the answer already shown.
+        if (res) setModels(res)
+        if (res?.refreshing) timer = setTimeout(() => setRefreshNo((n) => n + 1), REFRESH_MS)
+      })
+      return () => {
+        live = false
+        clearTimeout(timer)
+      }
+    },
+    { immediate: true },
+  )
   return models
 }
 

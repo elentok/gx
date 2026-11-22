@@ -1,6 +1,8 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { useLatest } from "../hooks"
 import { Button } from "../ui/button/Button"
+import { withKeys } from "../uniqueKeys"
 import { Modal } from "../ui/modal/Modal"
 import { refusalText, useWrite } from "../useWrite"
 import { postKeys, type PostKeys } from "./keys"
@@ -20,9 +22,6 @@ const KEYS: [label: string, key: string][] = [
   ["→", "right"],
   ["Ctrl+C", "ctrl+c"],
 ]
-
-/** A screen row is identified by its line number: the same line on the next read is the same row. */
-const lines = (rows: string[]) => rows.map((text, line) => ({ id: `line-${line}`, line, text }))
 
 const keyLabel = (label: string) =>
   ({ "↑": "Up", "↓": "Down", "←": "Left", "→": "Right" })[label] ?? label
@@ -56,11 +55,12 @@ export function ScreenModal({
   const [unchanged, setUnchanged] = useState(false)
   useEffect(() => () => clearTimeout(fadeRef.current), [])
 
-  const load = async () => {
+  const latestFetcher = useLatest(fetcher)
+  const load = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
-      const res = await fetcher(target)
+      const res = await latestFetcher.current(target)
       if (res.kind === "ok") {
         rowsRef.current = res.detail.rows
         setRows(res.detail.rows)
@@ -70,14 +70,11 @@ export function ScreenModal({
     } finally {
       setLoading(false)
     }
-  }
-  const latestLoad = useRef(load)
-  latestLoad.current = load
+  }, [latestFetcher, target])
+  // Only a different target reloads (`load` changes with it); Refresh is the other way in.
   useEffect(() => {
-    // Only a different target reloads; Refresh is the other way in.
-    void target
-    void latestLoad.current()
-  }, [target])
+    void load()
+  }, [load])
 
   const show = (next: string[]) => {
     const prev = rowsRef.current
@@ -146,9 +143,9 @@ export function ScreenModal({
           borderRadius="8px"
           bg="surface.raised"
         >
-          {lines(rows).map(({ id, line, text: row }) => (
+          {withKeys(rows, (row) => row).map(({ item: row, index: line, key }) => (
             <Box
-              key={id}
+              key={key}
               as="span"
               display="block"
               color={marked.includes(line) ? "tone.waiting.fg" : undefined}

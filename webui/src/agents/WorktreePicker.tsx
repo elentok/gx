@@ -1,5 +1,6 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import { useEffect, useRef, useState, type KeyboardEvent } from "react"
+import { useRef, useState, type KeyboardEvent } from "react"
+import { useOnChange } from "../hooks"
 import { Field, field } from "./formField"
 
 export interface Option {
@@ -52,11 +53,14 @@ export function WorktreePicker({
   options.push(...rows.filter((r) => !q || r.label.toLowerCase().includes(q.toLowerCase())))
 
   const at = Math.min(active, Math.max(options.length - 1, 0))
-  useEffect(() => {
-    // Typing re-scrolls to the active row even when its index stays the same.
-    void query
-    listRef.current?.children[at]?.scrollIntoView?.({ block: "nearest" })
-  }, [at, query])
+  // Typing re-scrolls to the active row even when its index stays the same.
+  useOnChange(
+    [at, query],
+    () => {
+      listRef.current?.children[at]?.scrollIntoView?.({ block: "nearest" })
+    },
+    { immediate: true },
+  )
 
   const pick = (o: Option) => {
     onPick(o)

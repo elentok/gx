@@ -83,9 +83,6 @@ export interface HostFiles {
   ticket: string
 }
 
-/** A parsed JSON config file: tests read paths into it and assert on the leaves. */
-type ConfigTree = { [key: string]: ConfigTree }
-
 export interface Fixture {
   /** Runs a gx CLI verb against this fixture's server and no other. */
   cli(...args: string[]): Promise<string>
@@ -138,9 +135,9 @@ export interface Fixture {
   /** Writes the migrate scenarios' inject.json (extra test steps), read when the server starts. */
   setInject(steps: Array<{ name: string; fail?: string; notes?: string[] }>): Promise<void>
   /** The parsed `$HOME/.config/gx/config.json`, read fresh on every call. */
-  globalConfig(): Promise<ConfigTree>
-  /** The parsed `project.json` of `project` in the fixture's ticket store, read fresh on every call. */
-  projectConfig(project: string): Promise<ConfigTree>
+  globalConfig(): Promise<ReturnType<typeof JSON.parse>>
+  /** The parsed `project.json` of `project` in the fixture's ticket store, read fresh on every call. Tests index into it freely, so it stays JSON.parse's untyped result. */
+  projectConfig(project: string): Promise<ReturnType<typeof JSON.parse>>
   /** Writes `content` to `path` under the fixture's ticket store (`<project>/<epic>/issues/x.md`), creating dirs. */
   writeStoreFile(path: string, content: string): Promise<void>
   /** Reads a file under the fixture's ticket store. */

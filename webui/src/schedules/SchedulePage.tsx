@@ -1,5 +1,6 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useOnChange } from "../hooks"
 import { useNavigate } from "react-router"
 import { useConnectionContext } from "../connection"
 import {
@@ -170,10 +171,9 @@ function ScheduleHeader({
   const [answered, setAnswered] = useState<boolean>()
   const serverSwitch = tools.info.switch
   // A new server value drops the local answer.
-  useEffect(() => {
-    void serverSwitch
+  useOnChange(serverSwitch, () => {
     setAnswered(undefined)
-  }, [serverSwitch])
+  })
   const on = answered ?? serverSwitch
   const runNow = () =>
     void runWrite.run(() => tools.runNow(existing.project, existing.slug), {
@@ -698,12 +698,13 @@ function Existing({
   const loaded = data && !data.refused ? formOf(data) : undefined
   const loadedKey = JSON.stringify(loaded)
   // Runs when the loaded content changes (the key), not on every new object of equal content.
-  const latestLoaded = useRef(loaded)
-  latestLoaded.current = loaded
-  useEffect(() => {
-    void loadedKey
-    if (latestLoaded.current) setBase(latestLoaded.current)
-  }, [loadedKey])
+  useOnChange(
+    loadedKey,
+    () => {
+      if (loaded) setBase(loaded)
+    },
+    { immediate: true },
+  )
   if (i < 0 || failed)
     return (
       <>

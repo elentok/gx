@@ -3,7 +3,8 @@ import { system, themeConfig } from "./theme"
 import { KINDS, TONES } from "./tone"
 
 const tokens = themeConfig.theme!.tokens!
-type Loose = { [key: string]: Loose }
+// The token trees are walked by path, so tests read them as JSON.parse's untyped result.
+const untyped = (v: unknown): ReturnType<typeof JSON.parse> => v
 
 describe("theme", () => {
   it("defines the surface.hover token used by task rows", () => {
@@ -11,7 +12,7 @@ describe("theme", () => {
   })
 
   it.each(TONES)("has fg and bg tokens for tone %s", (tone) => {
-    const entry = (tokens.colors as Loose).tone[tone]
+    const entry = untyped(tokens.colors).tone[tone]
     expect(entry.fg.value).toBeTruthy()
     expect(entry.bg.value).toBeTruthy()
     expect(system.token(`colors.tone.${tone}.fg`)).toBeTruthy()
@@ -19,7 +20,7 @@ describe("theme", () => {
   })
 
   it("defines one global focus-visible ring plus the inset sidebar form", () => {
-    const css = themeConfig.globalCss as Loose
+    const css = untyped(themeConfig.globalCss)
     expect(css[":focus-visible"].boxShadow).toContain("{colors.tone.running.fg}")
     expect(css[":focus-visible"].outline).toContain("none")
     expect(css["[data-focus-ring='inset']:focus-visible"].boxShadow).toContain("inset 0 0 0 2px")
@@ -46,7 +47,7 @@ describe("theme", () => {
     for (const group of ["colors", "fonts", "fontSizes", "spacing", "radii", "sizes"] as const) {
       expect(Object.keys(tokens[group] ?? {}), group).not.toHaveLength(0)
     }
-    const colors = tokens.colors as Loose
+    const colors = untyped(tokens.colors)
     for (const name of ["surface", "text"]) expect(colors[name], name).toBeDefined()
     expect(themeConfig.theme!.semanticTokens!.colors!.border).toBeDefined()
     expect(colors.text.muted).toBeDefined()

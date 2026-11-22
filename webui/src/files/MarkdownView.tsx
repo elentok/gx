@@ -1,5 +1,6 @@
 import { Box } from "@chakra-ui/react"
-import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react"
+import { type MouseEvent, useCallback, useRef, useState } from "react"
+import { useOnChange } from "../hooks"
 import { Markdown } from "../markdown/Markdown"
 import { CodeView } from "./CodeView"
 import { FileLinkProvider } from "./FileLinkContext"
@@ -38,17 +39,18 @@ export function MarkdownView({
     const href = e.target.closest("a[data-file-link]")?.getAttribute("href")
     if (href === viewerHref(path, { heading })) setClicks((n) => n + 1)
   }
-  useEffect(() => {
-    // `settled` re-runs this when a diagram finishes, since it changes the layout.
-    void settled
-    void clicks
-    void text
-    if (source || !heading || !box.current) return
-    if (box.current.querySelector('[data-diagram="pending"]')) return
-    const all = [...box.current.querySelectorAll("h1, h2, h3, h4, h5, h6")]
-    const at = headingSlugs(all.map((h) => h.textContent ?? "")).indexOf(heading)
-    all[at]?.scrollIntoView()
-  }, [source, heading, settled, clicks, text])
+  // `settled` re-runs this when a diagram finishes, since it changes the layout.
+  useOnChange(
+    [source, heading, settled, clicks, text],
+    () => {
+      if (source || !heading || !box.current) return
+      if (box.current.querySelector('[data-diagram="pending"]')) return
+      const all = [...box.current.querySelectorAll("h1, h2, h3, h4, h5, h6")]
+      const at = headingSlugs(all.map((h) => h.textContent ?? "")).indexOf(heading)
+      all[at]?.scrollIntoView()
+    },
+    { immediate: true },
+  )
   if (source) return <CodeView text={text} language="markdown" />
   return (
     <FileLinkProvider base={{ dir: dirOf(path) }} file={path} resolver={resolver}>
