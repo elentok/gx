@@ -2,44 +2,107 @@ package brief
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/spf13/cobra"
 
+	"github.com/elentok/gx/brief"
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/suitehealth"
 )
 
-// runHealth is `gx brief health [--limit N] [--all-runs]`.
-func runHealth(c *cobra.Command, d Deps, dir string, args []string) error {
-	opts := suitehealth.Options{}
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--all-runs":
-			opts.AllRuns = true
-		case "--limit":
-			if i+1 >= len(args) {
-				return briefUsageError(c, "--limit needs a number")
+// usageFlagErrors makes a flag or argument error exit 2 with one line, like
+// every other brief usage error.
+func usageFlagErrors(cmd *cobra.Command) {
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
+	cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+		return briefUsageError(c, err.Error())
+	})
+}
+
+func newHealth(d Deps) *cobra.Command {
+	var limit int
+	var allRuns bool
+	var cDir string
+	cmd := &cobra.Command{
+		Use:   "health [-C dir] [--limit N] [--all-runs]",
+		Short: "first-attempt pass rate and slow or flaky tests of gx check runs",
+		Args:  cobra.ArbitraryArgs,
+		RunE: func(c *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return briefUsageError(c, fmt.Sprintf("unknown health argument %q", args[0]))
 			}
-			i++
-			n, err := strconv.Atoi(args[i])
-			if err != nil || n <= 0 {
-				return briefUsageError(c, fmt.Sprintf("bad --limit %q", args[i]))
+			if c.Flags().Changed("limit") && limit <= 0 {
+				return briefUsageError(c, fmt.Sprintf("bad --limit %d", limit))
 			}
-			opts.Limit = n
-		default:
-			return briefUsageError(c, fmt.Sprintf("unknown health flag %q", args[i]))
+			dir, err := resolveDir(d, cDir)
+			if err != nil {
+				return err
+			}
+			dataDir, err := d.Dirs().DataDir()
+			if err != nil {
+				return err
+			}
+			opts := suitehealth.Options{Limit: limit, AllRuns: allRuns, DataDir: dataDir, Project: check.ProjectForDirs(d.Dirs(), dir)}
+			if code := suitehealth.Health(opts, c.OutOrStdout()); code != suitehealth.ExitPass {
+				return &cmdbase.ExitError{Code: code}
+			}
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&limit, "limit", 0, "count only the newest N runs")
+	cmd.Flags().BoolVar(&allRuns, "all-runs", false, "count every run, not only full trunk runs")
+	cmd.Flags().StringVarP(&cDir, "dir", "C", "", "project directory (default: the current one)")
+	usageFlagErrors(cmd)
+	return cmd
+}
+
+func newFailures(d Deps) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "failures [log [test]]",
+		Short: "print the failing tests of a brief log with their full text",
+		Args:  cobra.ArbitraryArgs,
+		RunE: func(c *cobra.Command, args []string) error {
+			dataDir, err := d.Dirs().DataDir()
+			if err != nil {
+				return err
+			}
+			var logPath, test string
+			if len(args) > 0 {
+				logPath = args[0]
+			}
+			if len(args) > 1 {
+				test = args[1]
+			}
+			if code := brief.Failures(dataDir, logPath, test, c.OutOrStdout()); code != brief.ExitPass {
+				return &cmdbase.ExitError{Code: code}
+			}
+			return nil
+		},
+	}
+	usageFlagErrors(cmd)
+	return cmd
+}
+
+// subcommand finds a registered subcommand of c by name.
+func subcommand(c *cobra.Command, name string) *cobra.Command {
+	for _, sub := range c.Commands() {
+		if sub.Name() == name {
+			return sub
 		}
 	}
-	dataDir, err := d.Dirs().DataDir()
-	if err != nil {
-		return err
-	}
-	opts.DataDir = dataDir
-	opts.Project = check.ProjectForDirs(d.Dirs(), dir)
-	if code := suitehealth.Health(opts, c.OutOrStdout()); code != suitehealth.ExitPass {
-		return &cmdbase.ExitError{Code: code}
-	}
 	return nil
+}
+
+// runSub runs a subcommand reached through `gx brief -C dir <sub>`: cobra
+// does not dispatch there, because the parent reads -C by hand.
+func runSub(sub *cobra.Command, cFlag string, args []string) error {
+	if cFlag != "" && sub.Flags().Lookup("dir") != nil {
+		args = append([]string{"-C", cFlag}, args...)
+	}
+	if err := sub.ParseFlags(args); err != nil {
+		return briefUsageError(sub, err.Error())
+	}
+	return sub.RunE(sub, sub.Flags().Args())
 }

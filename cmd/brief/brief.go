@@ -32,11 +32,23 @@ type Deps struct {
 // DefaultDeps is the production wiring: the zero value of every hook.
 func DefaultDeps() Deps { return Deps{} }
 
-const (
-	goCleanCache = "go-clean-cache"
-	failures     = "failures"
-	health       = "health"
-)
+const goCleanCache = "go-clean-cache"
+
+// resolveDir turns the -C value into the directory a tool runs in: cwd when
+// empty, otherwise the value made absolute.
+func resolveDir(d Deps, dir string) (string, error) {
+	cwd, err := d.Getwd()
+	if err != nil {
+		return "", err
+	}
+	if dir == "" {
+		return cwd, nil
+	}
+	if !filepath.IsAbs(dir) {
+		return resolveRelativeC(cwd, dir), nil
+	}
+	return dir, nil
+}
 
 // New builds the `brief` command.
 func New(d Deps) *cobra.Command {
@@ -88,6 +100,7 @@ everything after the tool name goes to the tool unchanged.`,
 			return runBrief(c, d, args)
 		},
 	}
+	cmd.AddCommand(newHealth(d), newFailures(d))
 	return cmd
 }
 
@@ -166,22 +179,20 @@ func runBrief(c *cobra.Command, d Deps, args []string) error {
 	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" {
 		return c.Help()
 	}
+	if sub := subcommand(c, args[0]); sub != nil {
+		return runSub(sub, cFlag, args[1:])
+	}
 	tool, ok := brief.ToolByName(args[0])
-	if !ok && args[0] != "conflicts" && args[0] != goCleanCache && args[0] != failures && args[0] != health {
-		// conflicts, failures, health and go-clean-cache are not brief.Tools: they keep no log.
+	if !ok && args[0] != "conflicts" && args[0] != goCleanCache {
+		// conflicts and go-clean-cache are not brief.Tools: they keep no log.
 		return briefUsageError(c, fmt.Sprintf("unknown tool %q", args[0]))
 	}
 	if slices.Contains(args[1:], "-C") {
 		return briefUsageError(c, "put -C before the tool: gx brief -C <dir> "+args[0])
 	}
-	cwd, err := d.Getwd()
+	dir, err := resolveDir(d, dir)
 	if err != nil {
 		return err
-	}
-	if dir == "" {
-		dir = cwd
-	} else if !filepath.IsAbs(dir) {
-		dir = resolveRelativeC(cwd, dir)
 	}
 	if args[0] == "conflicts" {
 		if code := brief.Conflicts(dir, c.OutOrStdout()); code != brief.ExitPass {
@@ -192,26 +203,6 @@ func runBrief(c *cobra.Command, d Deps, args []string) error {
 	stateDir, err := d.Dirs().StateDir()
 	if err != nil {
 		return err
-	}
-	if args[0] == health {
-		return runHealth(c, d, dir, args[1:])
-	}
-	if args[0] == failures {
-		dataDir, err := d.Dirs().DataDir()
-		if err != nil {
-			return err
-		}
-		var logPath, test string
-		if len(args) > 1 {
-			logPath = args[1]
-		}
-		if len(args) > 2 {
-			test = args[2]
-		}
-		if code := brief.Failures(dataDir, logPath, test, c.OutOrStdout()); code != brief.ExitPass {
-			return &cmdbase.ExitError{Code: code}
-		}
-		return nil
 	}
 	if args[0] == goCleanCache {
 		if code := brief.GoCleanCache(dir, stateDir, d.Env.Env, d.CacheGate, c.OutOrStdout()); code != brief.ExitPass {

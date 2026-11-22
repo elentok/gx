@@ -56,6 +56,19 @@ func TestBrief_HealthPrintsHeadlineFlipAndPercentiles(t *testing.T) {
 	}
 	writeLines(t, filepath.Join(data, "brief", "index.jsonl"), idx...)
 
+	for _, bad := range [][]string{{"--nope"}, {"--limit"}, {"--limit", "0"}, {"--limit", "x"}, {"extra"}} {
+		out, code := runBriefCmd(t, repo, append([]string{"health"}, bad...)...)
+		if code != brief.ExitCantRun || !strings.HasPrefix(out, "brief: ") {
+			t.Errorf("health %v: exit %d, out %q; want exit 2 and one brief: line", bad, code, out)
+		}
+	}
+	if _, code := runBriefCmd(t, t.TempDir(), "-C", repo, "health", "--limit", "5", "--all-runs"); code != 0 {
+		t.Errorf("-C <dir> health with flags: exit %d", code)
+	}
+	if _, code := runBriefCmd(t, repo, "failures", "--nope"); code != brief.ExitCantRun {
+		t.Errorf("failures --nope: exit %d, want 2", code)
+	}
+
 	out, code := runBriefCmd(t, repo, "health")
 	if code != 0 {
 		t.Fatalf("exit %d:\n%s", code, out)

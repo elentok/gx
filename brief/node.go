@@ -445,6 +445,15 @@ func (Biome) Parse(out []byte, _ int) Outcome {
 	return Outcome{Failures: failures}
 }
 
+// ExitFromOutcome makes a finding fail the run: biome exits 0 on one, so the
+// parsed report alone decides.
+func (Biome) ExitFromOutcome(exit int, o Outcome) int {
+	if exit == 0 && len(o.Failures) > 0 {
+		return ExitFail
+	}
+	return exit
+}
+
 func (Biome) RerunArgs([]string, []Unit) []string { return nil }
 
 func (Biome) NarrowArgs([]string, string) []string { return nil }

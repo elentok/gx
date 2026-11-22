@@ -26,6 +26,33 @@ func runIndexLine(t *testing.T, tool Tool, dir string) IndexEntry {
 	return lines[0]
 }
 
+// reportExitTool is an outcomeTool that, like biome, lets its report decide the exit.
+type reportExitTool struct{ outcomeTool }
+
+func (reportExitTool) ExitFromOutcome(exit int, o Outcome) int {
+	if exit == 0 && len(o.Failures) > 0 {
+		return ExitFail
+	}
+	return exit
+}
+
+func TestRunOutcome_ExitFromOutcomeIsOptIn(t *testing.T) {
+	t.Parallel()
+	o := Outcome{Units: 1, Failures: []Unit{{Location: "a", Name: "b"}}}
+	run := func(tool Tool) int {
+		var out bytes.Buffer
+		exit, _ := RunOutcome(tool, Options{Dir: t.TempDir(), DataDir: t.TempDir(), Out: &out})
+		return exit
+	}
+	plain := outcomeTool{shellTool{script: "exit 0", name: "go-test"}, o}
+	if got := run(plain); got != ExitPass {
+		t.Errorf("tool without ExitFromOutcome: exit %d, want %d", got, ExitPass)
+	}
+	if got := run(reportExitTool{plain}); got != ExitFail {
+		t.Errorf("tool with ExitFromOutcome: exit %d, want %d", got, ExitFail)
+	}
+}
+
 func TestStableName_RulesPerTool(t *testing.T) {
 	t.Parallel()
 	cases := []struct{ name, tool, dir, in, want string }{

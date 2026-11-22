@@ -96,6 +96,12 @@ type Invocation struct {
 	Dir string
 }
 
+// ExitReader is a Tool whose parsed report can change the exit code of its
+// process. Tools without it keep the process's own exit code.
+type ExitReader interface {
+	ExitFromOutcome(exit int, o Outcome) int
+}
+
 // ReportReader is a Tool that times its tests from Invocation.ReportFile.
 type ReportReader interface {
 	ReadReport(path string) map[string]int64
@@ -350,9 +356,8 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	after := sample()
 
 	outcome := tool.Parse(out, exit)
-	if exit == 0 && len(outcome.Failures) > 0 {
-		// A tool such as biome exits 0 on a finding; the report decides.
-		exit = ExitFail
+	if er, ok := tool.(ExitReader); ok {
+		exit = er.ExitFromOutcome(exit, outcome)
 	}
 	if rr, ok := tool.(ReportReader); ok && plan.ReportFile != "" {
 		outcome.TestDurations = rr.ReadReport(plan.ReportFile)
