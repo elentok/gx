@@ -104,6 +104,9 @@ type SessionInfo struct {
 	// FirstPromptPending is set while gx still holds the first prompt, waiting
 	// for the agent to be ready to take it.
 	FirstPromptPending bool `json:"first_prompt_pending,omitempty"`
+	// Notices are the non-blocking terminal issues on the session, as the
+	// SessionNotice* kinds; the web UI words each one.
+	Notices []string `json:"notices,omitempty"`
 	// Failure is set while the session is in one of the failure states.
 	Failure *SessionFailure `json:"failure,omitempty"`
 	// RebaseNote says why a Design open did not rebase the design branch onto
@@ -221,6 +224,14 @@ type SessionActionable struct {
 	// Derived marks one the server computed from a Design session's last turn.
 	Derived bool `json:"derived,omitempty"`
 }
+
+// The kinds of a session's non-blocking terminal issue.
+const (
+	// SessionNoticeUntrustedRead: gx typed while the screen read was stale after a resize.
+	SessionNoticeUntrustedRead = "untrusted-read"
+	// SessionNoticeNoComposerMarker: the first prompt started without the composer marker.
+	SessionNoticeNoComposerMarker = "no-composer-marker"
+)
 
 // SessionActionableQueue is the Kind of an Actionable that queues Target.
 const SessionActionableQueue = "queue"

@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
+	"github.com/elentok/gx/server/wire"
 )
 
 // sessionTyping is the only harness the server types into. It serves the parts
@@ -38,8 +39,16 @@ const (
 // can't decide types as before.
 func (p *Prompt) ClearDraft(dir string, c *holder.HolderClient) error {
 	log := p.log.With("session", filepath.Base(dir))
-	if state, _ := InputState(c); state != harness.InputNotEmpty {
+	state, read, _ := inputRead(c)
+	if read.Resized {
+		// gx types on without knowing whether a draft is there; say so beside the log line.
+		log.Info("typing on an untrusted screen read", "pty_size", read.PTY, "attach_sizes", read.Attaches)
+		p.RaiseNotice(dir, wire.SessionNoticeUntrustedRead)
+		return nil
+	}
+	if state != harness.InputNotEmpty {
 		log.Debug("draft check", "holds_draft", false)
+		p.ClearNotices(dir)
 		return nil
 	}
 	for range draftClearRounds {
@@ -57,6 +66,7 @@ func (p *Prompt) ClearDraft(dir string, c *holder.HolderClient) error {
 			}
 			if state != harness.InputNotEmpty {
 				log.Info("cleared a draft before typing")
+				p.ClearNotices(dir)
 				return nil
 			}
 			if time.Now().After(settle) {
@@ -78,14 +88,21 @@ func (p *Prompt) ClearDraft(dir string, c *holder.HolderClient) error {
 // A read taken after a PTY resize, before the child's next output, is
 // untrusted: the screen is still what the child drew for the old size.
 func InputState(c *holder.HolderClient) (harness.InputState, error) {
+	state, _, err := inputRead(c)
+	return state, err
+}
+
+// inputRead is InputState with the read, whose Resized flag tells an untrusted
+// read from one that simply can't decide.
+func inputRead(c *holder.HolderClient) (harness.InputState, holder.ReadState, error) {
 	if !c.Supports(holder.OpScreenStyled) {
-		return harness.InputUndecided, nil
+		return harness.InputUndecided, holder.ReadState{}, nil
 	}
 	rows, read, err := c.StyledScreenRead()
 	if err != nil || read.Resized {
-		return harness.InputUndecided, err
+		return harness.InputUndecided, read, err
 	}
-	return sessionTyping.InputIsEmpty(rows), nil
+	return sessionTyping.InputIsEmpty(rows), read, nil
 }
 
 // settleEnters caps the Enters PressEnterIfStillTyped presses, enterGap apart.

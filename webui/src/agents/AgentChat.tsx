@@ -23,6 +23,7 @@ import {
 } from "../generated/server"
 import { ReasonStale } from "../ticket/answer"
 import { Button } from "../ui/button/Button"
+import { SessionNotices } from "./SessionNotices"
 import { allAnswered, isAnswered, type QuestionMode } from "../ui/question-sheet/round"
 
 // Codex calls whose keys were partly typed. Module-level so leaving the page and coming back keeps Submit off.
@@ -183,6 +184,7 @@ export function AgentChat({
             refetch={refetch}
           />
         )}
+        <SessionNotices session={session} />
         {failure && !sheetCoversBlock(failure.kind, card) && (
           <FailureBanner
             failure={failure}

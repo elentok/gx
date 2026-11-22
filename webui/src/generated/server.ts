@@ -3344,6 +3344,11 @@ export interface SessionInfo {
    */
   first_prompt_pending?: boolean;
   /**
+   * Notices are the non-blocking terminal issues on the session, as the
+   * SessionNotice* kinds; the web UI words each one.
+   */
+  notices?: string[];
+  /**
    * Failure is set while the session is in one of the failure states.
    */
   failure?: SessionFailure;
@@ -3491,6 +3496,18 @@ export interface SessionActionable {
    */
   derived?: boolean;
 }
+/**
+ * SessionNoticeUntrustedRead: gx typed while the screen read was stale after a resize.
+ */
+export const SessionNoticeUntrustedRead = "untrusted-read";
+/**
+ * SessionNoticeNoComposerMarker: the first prompt started without the composer marker.
+ */
+export const SessionNoticeNoComposerMarker = "no-composer-marker";
+/**
+ * The kinds of a session's non-blocking terminal issue.
+ */
+export type SessionNotice = typeof SessionNoticeUntrustedRead | typeof SessionNoticeNoComposerMarker;
 /**
  * SessionActionableQueue is the Kind of an Actionable that queues Target.
  */

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -93,9 +94,17 @@ func TestFirstPrompt_InsertWithoutMarkerGetsTheCleanPrompt(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, ".claude.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, _, _, _, conv := startFirstPromptSession(t, "fix the bug", "CLAUDE_CONFIG_DIR="+dir, agentfake.ProgramInsertNoMarkerEnv+"=1")
+	h, ctx, evs, id, conv := startFirstPromptSession(t, "fix the bug", "CLAUDE_CONFIG_DIR="+dir, agentfake.ProgramInsertNoMarkerEnv+"=1")
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSubmitted(t, conv, "\"fix the bug\"\n")
+	// The marker was never drawn: the session carries the notice, and the log line has the attach sizes.
+	waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool {
+		return slices.Contains(s.Notices, wire.SessionNoticeNoComposerMarker)
+	})
+	logs, _ := os.ReadFile(server.LogPath(h.StateDir))
+	if !strings.Contains(string(logs), "without the composer marker") || !strings.Contains(string(logs), "attach_sizes") {
+		t.Errorf("server log lacks the missing-marker line with attach sizes:\n%s", logs)
+	}
 }
 
 // After a mid-session toggle to vim the probe runs, and its decision reaches

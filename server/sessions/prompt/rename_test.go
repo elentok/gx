@@ -313,6 +313,18 @@ func TestSessionRename_ReadAfterResizeIsUntrustedAndTypes(t *testing.T) {
 	if got := servertest.Submitted(t, f.conv); !strings.Contains(got, "my draft") {
 		t.Errorf("submitted = %q, want the draft kept because the read was untrusted", got)
 	}
+	// The issue is on the session beside its log line, and the next prompt that reads cleanly takes it off.
+	hasNotice := func(s wire.SessionInfo) bool { return slices.Contains(s.Notices, wire.SessionNoticeUntrustedRead) }
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, hasNotice)
+	logs, _ := os.ReadFile(server.LogPath(f.h.StateDir))
+	if !strings.Contains(string(logs), "typing on an untrusted screen read") || !strings.Contains(string(logs), "attach_sizes") {
+		t.Errorf("server log lacks the untrusted-read line with attach sizes:\n%s", logs)
+	}
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err)
+	}
+	f.rename(t, f.id, "newer name")
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return len(s.Notices) == 0 })
 }
 
 // Text gx left itself, such as a stale /clear, clears like a person's draft,

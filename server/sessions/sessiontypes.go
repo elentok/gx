@@ -123,6 +123,9 @@ type Meta struct {
 	// Actionable is the agent-raised one, which the person's next input clears,
 	// or a gx-raised one, which it spares. Exit clears either.
 	Actionable wire.SessionActionable `json:"actionable,omitzero"`
+	// Notices are the non-blocking terminal issues (wire.SessionNotice*) the next
+	// clean prompt clears.
+	Notices []string `json:"notices,omitempty"`
 	// AutoAdvanceOff is the inverse of the switch, so a meta written before the
 	// switch existed reads as on.
 	AutoAdvanceOff bool `json:"auto_advance_off,omitempty"`
@@ -234,6 +237,7 @@ func (m Meta) Info() wire.SessionInfo {
 		Stopped:            m.Stopped,
 		Unread:             m.Unread,
 		Actionable:         m.Actionable,
+		Notices:            m.Notices,
 		AutoAdvance:        !m.AutoAdvanceOff,
 		AutoQueue:          m.AutoQueue,
 		ReportedStep:       m.ReportedStep,

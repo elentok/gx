@@ -224,7 +224,13 @@ func (f *firstPrompt) logMissingMarker(signal string) {
 	if seen, known, err := c.ComposerSeen(); err != nil || !known || seen {
 		return
 	}
-	f.log.Info("first prompt started without the composer marker", "signal", signal, "claude_version", harness.ClaudeVersion(f.p.cfg.Env))
+	var read holder.ReadState
+	if c.Supports(holder.OpScreenStyled) {
+		_, read, _ = c.StyledScreenRead()
+	}
+	f.log.Info("first prompt started without the composer marker", "signal", signal, "claude_version", harness.ClaudeVersion(f.p.cfg.Env),
+		"pty_size", read.PTY, "attach_sizes", read.Attaches)
+	f.p.RaiseNotice(f.dir, wire.SessionNoticeNoComposerMarker)
 }
 
 func (f *firstPrompt) deliver(prompt string) error {
