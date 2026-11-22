@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/brief"
+	"github.com/elentok/gx/cmd/cmdtest"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -98,6 +100,60 @@ func TestBrief_FailuresReadsACheckLogByTestName(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
+	}
+}
+
+// indexOf writes a brief index whose entries point at fixture logs and
+// returns the directory to run in.
+func indexOf(t *testing.T, entries ...brief.IndexEntry) string {
+	t.Helper()
+	env := cmdtest.EnvFor(t)
+	data := filepath.Join(cmdtest.EnvValue(env, "XDG_DATA_HOME"), "gx")
+	var lines []any
+	for _, e := range entries {
+		abs, err := filepath.Abs(filepath.Join("../../brief/testdata", e.Log))
+		if err != nil {
+			t.Fatal(err)
+		}
+		e.Log = abs
+		lines = append(lines, e)
+	}
+	writeLines(t, filepath.Join(data, "brief", "index.jsonl"), lines...)
+	return testutil.TempRepo(t)
+}
+
+func TestBrief_FailuresByFileCountsFindingsPerFileSorted(t *testing.T) {
+	t.Parallel()
+	repo := indexOf(t, brief.IndexEntry{Tool: "biome", Exit: 1, Log: "biome-byfile.txt"})
+	out, code := runBriefCmd(t, repo, "failures", "--by-file")
+	if code != 1 {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+	want := "3 src/c.ts\n2 src/a.ts\n1 src/b.ts\n"
+	if !strings.Contains(out, want) || strings.Contains(out, "Avoid any") {
+		t.Errorf("want %q and no finding text, got:\n%s", want, out)
+	}
+}
+
+func TestBrief_FailuresRunsListsFailingE2eFilesPerRun(t *testing.T) {
+	t.Parallel()
+	repo := indexOf(t,
+		brief.IndexEntry{Tool: "playwright", Exit: 1, Time: "2026-01-01T00:00:01Z", Log: "pw-run1.log"},
+		brief.IndexEntry{Tool: "go-test", Exit: 1, Time: "2026-01-01T00:00:02Z", Log: "check-test.log"},
+		brief.IndexEntry{Tool: "playwright", Exit: 1, Time: "2026-01-01T00:00:03Z", Log: "pw-run2.log"},
+		brief.IndexEntry{Tool: "playwright", Exit: 0, Time: "2026-01-01T00:00:04Z", Log: "pw-run3.log"},
+	)
+	out, code := runBriefCmd(t, repo, "failures", "--runs", "2")
+	if code != 0 {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+	want := "2026-01-01T00:00:03Z FAIL pause.e2e.ts\n2026-01-01T00:00:04Z PASS\n"
+	if out != want {
+		t.Errorf("want:\n%s\ngot:\n%s", want, out)
+	}
+	out, _ = runBriefCmd(t, repo, "failures", "--runs")
+	if !strings.Contains(out, "2026-01-01T00:00:01Z FAIL disk.e2e.ts epics.e2e.ts\n") || strings.Contains(out, "go-test") {
+		t.Errorf("default N should list all three playwright runs:\n%s", out)
 	}
 }
 

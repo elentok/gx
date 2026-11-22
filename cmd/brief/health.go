@@ -2,6 +2,7 @@ package brief
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -59,14 +60,30 @@ func newHealth(d Deps) *cobra.Command {
 }
 
 func newFailures(d Deps) *cobra.Command {
+	var byFile, runs bool
 	cmd := &cobra.Command{
-		Use:   "failures [log [test]]",
+		Use:   "failures [--by-file] [log [test]] | failures --runs [N]",
 		Short: "print the failing tests of a brief log with their full text",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			dataDir, err := d.Dirs().DataDir()
 			if err != nil {
 				return err
+			}
+			if runs {
+				n := 10
+				if len(args) > 1 {
+					return briefUsageError(c, "--runs takes at most one number")
+				}
+				if len(args) == 1 {
+					if n, err = strconv.Atoi(args[0]); err != nil || n <= 0 {
+						return briefUsageError(c, fmt.Sprintf("bad --runs count %q", args[0]))
+					}
+				}
+				if code := brief.FailureRuns(dataDir, n, c.OutOrStdout()); code != brief.ExitPass {
+					return &cmdbase.ExitError{Code: code}
+				}
+				return nil
 			}
 			var logPath, test string
 			if len(args) > 0 {
@@ -75,12 +92,14 @@ func newFailures(d Deps) *cobra.Command {
 			if len(args) > 1 {
 				test = args[1]
 			}
-			if code := brief.Failures(dataDir, logPath, test, c.OutOrStdout()); code != brief.ExitPass {
+			if code := brief.Failures(dataDir, logPath, test, byFile, c.OutOrStdout()); code != brief.ExitPass {
 				return &cmdbase.ExitError{Code: code}
 			}
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&byFile, "by-file", false, "print one count per file instead of the failures")
+	cmd.Flags().BoolVar(&runs, "runs", false, "list the failing e2e files of the last N playwright runs (default 10)")
 	usageFlagErrors(cmd)
 	return cmd
 }

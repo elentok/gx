@@ -1,0 +1,9 @@
+Running 3 tests using 1 worker
+
+  1) [chromium] › pause.e2e.ts:3:5 › 3. Pause ──
+
+    Error: boom
+
+  1 failed
+    [chromium] › pause.e2e.ts:3:5 › 3. Pause ──
+  2 passed

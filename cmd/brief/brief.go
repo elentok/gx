@@ -75,6 +75,10 @@ text, untrimmed. Without a log path it reads the latest failed run (exit 1
 while the log holds failures, 0 when none). With a test name it prints only
 that failure and the command that re-runs it. Use it instead of rg over the
 log.
+failures --by-file [log] prints one "count file" line per file, largest first
+(a biome log: findings per file, so you see what is left). failures --runs [N]
+prints one line per run for the last N playwright runs (default 10): its time,
+then FAIL and the failing e2e files, or PASS.
 
 health [--limit N] [--all-runs] prints the first-attempt pass rate of full
 trunk gx check runs and the current streak, the tests that failed then passed
