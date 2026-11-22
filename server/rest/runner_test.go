@@ -81,6 +81,21 @@ func TestRunner_CountsOncePerMinuteThroughLiveSettings(t *testing.T) {
 }
 
 // Seam: a Break survives a restart with its message and quiet-until time.
+// Seam: Quiet answers from the recomputed view, so a Break that has passed its
+// end stops being quiet before any timer tick saves the new state.
+func TestRunner_QuietAgreesWithViewAfterBreakEndsWithoutTick(t *testing.T) {
+	t.Parallel()
+	g := openRig(t, t.TempDir(), start(), breakCfg())
+	g.workToBreak(t)
+	if !g.Quiet() {
+		t.Fatal("Quiet() = false during the Break, want true")
+	}
+	g.now = g.now.Add(time.Duration(g.cfg.Break.BreakMinutes+1) * time.Minute)
+	if g.Quiet() || g.Quiet() != g.View().Quiet() {
+		t.Errorf("after the Break's end: Quiet() = %v, View().Quiet() = %v, want both false", g.Quiet(), g.View().Quiet())
+	}
+}
+
 func TestRunner_RestartKeepsBreakAndQuietUntil(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
