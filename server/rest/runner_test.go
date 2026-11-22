@@ -274,7 +274,7 @@ func TestServer_FeatureOffShowsNoRest(t *testing.T) {
 		if _, err := h.Server.Rest().Active(); err != nil {
 			t.Fatal(err)
 		}
-		clock.Advance(time.Hour)
+		h.AdvanceRest(clock, time.Hour)
 	}
 	if v := h.Server.Rest().View(); v.Period != nil || v.Warning != nil {
 		t.Errorf("view = %+v, want no period and no warning", v)
@@ -291,7 +291,7 @@ func TestServer_ReloadEndsRunningBreak(t *testing.T) {
 		if _, err := h.Server.Rest().Active(); err != nil {
 			t.Fatal(err)
 		}
-		clock.Advance(time.Minute)
+		h.AdvanceRest(clock, time.Minute)
 	}
 	if v := h.Server.Rest().View(); v.Period == nil {
 		t.Fatal("no Break is running")

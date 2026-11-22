@@ -53,7 +53,7 @@ func TestServer_AgentsKeepWorkingUnderRest(t *testing.T) {
 				if _, err := h.Server.Rest().Active(); err != nil {
 					t.Fatal(err)
 				}
-				clock.Advance(time.Minute)
+				h.AdvanceRest(clock, time.Minute)
 			}
 			if p := h.Server.Rest().View().Period; p == nil || p.Kind != tc.kind {
 				t.Fatalf("period = %+v, want a %v", p, tc.kind)

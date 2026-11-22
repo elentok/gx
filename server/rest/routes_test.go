@@ -47,7 +47,7 @@ func TestRoutes_ActiveCountsOncePerMinute(t *testing.T) {
 	if a, b := active(), active(); a != 1 || b != 1 {
 		t.Errorf("two heartbeats in one minute = %d, %d; want 1, 1", a, b)
 	}
-	clock.Advance(time.Minute)
+	h.AdvanceRest(clock, time.Minute)
 	if got := active(); got != 2 {
 		t.Errorf("next minute = %d, want 2", got)
 	}
@@ -70,7 +70,7 @@ func TestRoutes_UnlockRefusesWrongSentenceAndEndsBreak(t *testing.T) {
 		if _, err := h.Client.Rest.Active(ctx); err != nil {
 			t.Fatal(err)
 		}
-		clock.Advance(time.Minute)
+		h.AdvanceRest(clock, time.Minute)
 	}
 	st, _ := h.Client.Rest.Status(ctx)
 	if st.Period == nil || st.Period.Kind != wire.RestKindBreak || st.Period.Message == "" {
@@ -118,7 +118,7 @@ func TestRoutes_RestartKeepsBreakThroughRoutes(t *testing.T) {
 		if _, err := h.Client.Rest.Active(ctx); err != nil {
 			t.Fatal(err)
 		}
-		clock.Advance(time.Minute)
+		h.AdvanceRest(clock, time.Minute)
 	}
 	before, _ := h.Client.Rest.Status(ctx)
 	if before.Period == nil {

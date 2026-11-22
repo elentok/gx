@@ -29,7 +29,7 @@ func TestServer_QueueRunsUnderRest(t *testing.T) {
 		if _, err := h.Server.Rest().Active(); err != nil {
 			t.Fatal(err)
 		}
-		clock.Advance(time.Minute)
+		h.AdvanceRest(clock, time.Minute)
 	}
 	if v := h.Server.Rest().View(); v.Period == nil {
 		t.Fatal("no Break is running")

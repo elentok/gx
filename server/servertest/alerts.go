@@ -32,9 +32,8 @@ func WithMentalHealth(m config.MentalHealthConfig) func(*server.Config) {
 
 // RestClock is a fake clock for the Rest engine. It is safe for concurrent use.
 type RestClock struct {
-	mu   sync.Mutex
-	t    time.Time
-	tick func()
+	mu sync.Mutex
+	t  time.Time
 }
 
 // NewRestClock starts the clock at t.
@@ -47,28 +46,23 @@ func (c *RestClock) Now() time.Time {
 	return c.t
 }
 
-// Advance moves the clock forward by d and runs one Rest tick, without waiting.
+// Advance moves the clock forward by d. It does not tick the engine; use
+// Harness.AdvanceRest for that.
 func (c *RestClock) Advance(d time.Duration) {
 	c.mu.Lock()
 	c.t = c.t.Add(d)
-	tick := c.tick
 	c.mu.Unlock()
-	if tick != nil {
-		tick()
-	}
 }
 
-// WithRestClock gives the Rest engine the fake clock and binds the clock's
-// Advance to the engine's tick.
+// AdvanceRest moves clock forward by d, then runs one Rest tick without waiting.
+func (h *Harness) AdvanceRest(clock *RestClock, d time.Duration) {
+	clock.Advance(d)
+	_, _ = h.Server.Rest().Tick()
+}
+
+// WithRestClock gives the Rest engine the fake clock.
 func WithRestClock(c *RestClock) func(*server.Config) {
-	return func(cfg *server.Config) {
-		cfg.RestClock = c.Now
-		cfg.RestTick = func(tick func()) {
-			c.mu.Lock()
-			c.tick = tick
-			c.mu.Unlock()
-		}
-	}
+	return func(cfg *server.Config) { cfg.RestClock = c.Now }
 }
 
 // StartBannerSession starts a fake session named fix-build with banners and

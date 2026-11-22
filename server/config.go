@@ -151,9 +151,6 @@ type Config struct {
 	// RestClock is the Rest engine's clock; nil means time.Now. It is not Clock
 	// (web auth) or SchedulesClock.
 	RestClock func() time.Time
-	// RestTick, when set, is called once at startup with the function that runs
-	// one Rest tick, so a test moves RestClock and ticks without waiting.
-	RestTick func(tick func())
 	// SchedulesInterval is how often the scheduler checks; zero means one minute.
 	SchedulesInterval time.Duration
 	// MigrationFailurePollInterval is how often the server checks the migration

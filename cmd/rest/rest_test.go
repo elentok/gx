@@ -45,7 +45,7 @@ func TestRest_VerbsReadActiveAndUnlock(t *testing.T) {
 		t.Errorf("active = %q, %v", out, err)
 	}
 	for range 2 {
-		clock.Advance(time.Minute)
+		h.AdvanceRest(clock, time.Minute)
 		if _, err := call(false, active); err != nil {
 			t.Fatal(err)
 		}

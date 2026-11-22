@@ -443,9 +443,6 @@ func New(cfg Config) (*Server, error) {
 	if err := s.rest.Start(); err != nil {
 		s.log.Error("rest engine start failed", "err", err)
 	}
-	if cfg.RestTick != nil {
-		cfg.RestTick(func() { _, _ = s.rest.Tick() })
-	}
 	s.cleanup = cleanup.New(cleanup.Deps{TicketStore: cfg.TicketStore, Env: cfg.Env, Events: events,
 		Sessions:     func() ([]wire.SessionInfo, error) { return s.sessions.ListSessions() },
 		SubmitOneOff: s.oneOffs.Submit,
@@ -817,7 +814,8 @@ func recordShutdown(step string) {
 // outside the package.
 func (s *Server) Settings() *settings.Holder { return &s.settings }
 
-// Rest is the live Rest engine, for tests.
+// Rest is the live Rest engine. Only the test harness uses it (no web-layer or
+// other production caller), to read the view and tick the engine.
 func (s *Server) Rest() *rest.Runner { return s.rest }
 
 // ResumerOf is s's session resumer, for tests that drive a restart directly. A
