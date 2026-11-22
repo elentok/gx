@@ -121,7 +121,8 @@ func TestMockRulesAnchors(t *testing.T) {
 			"never list a fixture-unrenderable state",
 			"checks the first 4 states",
 			"- Parts this ticket builds: ..., each with a line of styling facts: colours, casing, placement, tokens",
-			"add one styling facts line for each part",
+			"Add one styling facts line per part",
+			"No `testutil/gxfixture`: plan no mock units",
 		}},
 		{"verify-epic", "gx-verify-epic/SKILL.md", []string{
 			"**Mock states lines.**",
@@ -136,6 +137,16 @@ func TestMockRulesAnchors(t *testing.T) {
 			checkAnchors(t, tc.path, tc.wants...)
 		})
 	}
+}
+
+func TestMockCheckFixtureCheckPrecedesSteps(t *testing.T) {
+	text := readFile(t, "gx-ui-check/MOCK-CHECK.md")
+	fixture := strings.Index(text, "[ -d testutil/gxfixture ]")
+	steps := strings.Index(text, "\n## Steps")
+	if fixture < 0 || steps < 0 || fixture > steps {
+		t.Errorf("gx-ui-check/MOCK-CHECK.md: fixture check at %d must precede the Steps heading at %d", fixture, steps)
+	}
+	checkAnchors(t, "gx-ui-check/MOCK-CHECK.md", "`unchecked` with a reason counts as checked for the finish gate")
 }
 
 func TestPrototypeLogicHasNoStoreStep(t *testing.T) {

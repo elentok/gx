@@ -534,10 +534,10 @@ part has no `## Mock check`. A fix ticket for a look or layout finding also gets
 **Flake and timeout tickets** follow [gx-flake-tickets](../gx-flake-tickets.md): the acceptance
 criterion names one exact `-run '^TestX$'` and one `-count`.
 
-**Mock check rules.** Name the gxfixture scenario for every mock state. If none exists, add an
-implement ticket that creates it, and make it block every ticket that checks that state. Read
-"Fixture-unrenderable states" in `webui/e2e/CATALOG.md` first: never list a fixture-unrenderable
-state in `## Mock check`. Read the mock HTML and add one styling facts line for each part.
+**Mock check rules.** No `testutil/gxfixture`: plan no mock units and no 14000 per mock state. Else name the
+gxfixture scenario for every mock state; if none exists, add an implement ticket that creates it and
+block every ticket that checks it. Read "Fixture-unrenderable states" in `webui/e2e/CATALOG.md`: never
+list a fixture-unrenderable state in `## Mock check`. Add one styling facts line per part from the mock HTML.
 
 ### Frontmatter fields
 

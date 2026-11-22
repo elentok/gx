@@ -5,6 +5,15 @@ steps. The browser commands come from [gx-playwright-cli](../gx-playwright-cli/S
 
 Change files with a file edit (Edit) or file write (Write) only, never `sed -i`, `cat >`, `cat >>` or a heredoc. Write the file first, then use it (for section text, write a file and pipe it with `gx tickets section ... -`). Run one command per call, because a blocked call runs nothing.
 
+## Fixture check (do this first)
+
+Run `[ -d testutil/gxfixture ]`. If it is missing, this is not the gx repo and the steps below
+cannot work. That is not a tool failure and not a question for a person. Do not run the steps, do
+not run `testutil/mockcheck` and do not hand-build a screenshot script. Record each state as
+`<state>: unchecked no gx fixture` (in a verify ticket, a `## Verified` line
+`- <unit key> — unchecked no gx fixture @ <sha>`), then stop. `unchecked` with a reason counts as
+checked for the finish gate. "Projects without the gx fixture" below has the rest.
+
 ## Steps
 
 1. Resolve the mock directory first: `mocks=$(gx tickets root)/<map>/mocks`. Do it before any `cd`;

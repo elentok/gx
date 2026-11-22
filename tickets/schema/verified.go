@@ -48,7 +48,7 @@ func (e VerifiedEntry) line() string {
 	return l
 }
 
-var verifiedLine = regexp.MustCompile(`^- (.*) — (\S+) @ (\S+)( \[history\])?$`)
+var verifiedLine = regexp.MustCompile(`^- (.*) — (\S+(?: .*)?) @ (\S+)( \[history\])?$`)
 
 func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 
@@ -72,7 +72,7 @@ func ParseVerified(body string) []VerifiedEntry {
 }
 
 // VerifiedLineFormat is the shape of one "## Verified" line, for prompts.
-const VerifiedLineFormat = "- <unit key> — pass|fail @ <sha>"
+const VerifiedLineFormat = "- <unit key> — pass|fail|unchecked <reason> @ <sha>"
 
 // ValidateVerifiedKeys refuses "## Verified" content whose line keys match no
 // unit of body's "## Stories". A ticket without Stories has no unit list, so

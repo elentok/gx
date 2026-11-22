@@ -82,6 +82,24 @@ func TestFinishIteration_VerifyFinishWithUncheckedStories_BlocksAndResends(t *te
 	}
 }
 
+func TestFinishIteration_VerifiedUncheckedWithReason_LetsFinishThrough(t *testing.T) {
+	t.Parallel()
+	body := "## Stories\n\n- Mock states: ready\n\n## Verified\n\n- Mock states: ready — unchecked skipped: no gx fixture @ " + blockHead + "\n"
+	scratchDir, path := blockFixture(t, "verify", body)
+	d, prompts, _ := fakes.FakeDeps()
+	fakes.FakeRunner(d).PromptState = agentrunner.StateIdle
+	agentReportsFinished(t, d, path, nil)
+
+	driveIteration(t, d, scratchDir, path, &fakes.RecordingSink{})
+
+	if len(*prompts) != 1 {
+		t.Errorf("prompts = %v, want only the launch prompt (no finish block)", *prompts)
+	}
+	if n := countEvents(t, scratchDir, "finish-blocked"); n != 0 {
+		t.Errorf("finish-blocked events = %d, want 0", n)
+	}
+}
+
 func TestFinishIteration_VerifyFinishPastCap_ErrorsNamingUnits(t *testing.T) {
 	t.Parallel()
 	scratchDir, path := blockFixture(t, "verify", "## Stories\n\n- Story 1\n- Mock states: ready\n")
