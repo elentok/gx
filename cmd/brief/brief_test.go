@@ -425,14 +425,14 @@ func TestBrief_UnwritableLogExits2(t *testing.T) {
 }
 
 // failingModule has 7 failing tests in package a: one prints 30 lines, one a
-// 1000-character line. Package bad does not build.
+// 1000-character line after a short first line (the first line is never cut). Package bad does not build.
 func failingModule(t *testing.T, withBuildError bool) string {
 	t.Helper()
 	dir := t.TempDir()
 	testutil.WriteFile(t, dir, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	src := "package a\n\nimport (\n\t\"strings\"\n\t\"testing\"\n)\n\n" +
 		"func TestLong(t *testing.T) {\n\tfor i := 0; i < 30; i++ {\n\t\tt.Logf(\"long line %d\", i)\n\t}\n\tt.Fail()\n}\n" +
-		"func TestWide(t *testing.T) { t.Log(strings.Repeat(\"x\", 1000)); t.Fail() }\n"
+		"func TestWide(t *testing.T) { t.Log(\"first\"); t.Log(strings.Repeat(\"x\", 1000)); t.Fail() }\n"
 	for _, n := range []string{"C", "D", "E", "F", "G"} {
 		src += "func Test" + n + "(t *testing.T) { t.Error(\"boom " + n + "\") }\n"
 	}
