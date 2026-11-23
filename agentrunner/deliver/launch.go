@@ -44,7 +44,7 @@ func (o LaunchTimings) Caps() LaunchCaps {
 func (o LaunchTimings) ProofCaps() claudeui.LaunchProofCaps {
 	c := claudeui.DefaultLaunchProofCaps
 	c.Grace = cmp.Or(o.Grace, c.Grace)
-	c.UnknownGrace = cmp.Or(o.Window, c.UnknownGrace)
+	c.UnknownGrace = cmp.Or(o.Window, DefaultLaunchCaps.Window)
 	c.Poll = cmp.Or(o.Poll, c.Poll)
 	return c
 }
@@ -65,8 +65,15 @@ func deliverLaunch(t Input, text string, p Policy) error {
 		}
 		return deliverTurn(t, text, p)
 	}
+	now := p.Now
+	if now == nil {
+		now = time.Now
+	}
 	err := send()
-	var seen, sinceSend time.Duration
+	// The window runs on the clock from the first marker sighting, so time
+	// spent inside send() counts.
+	var firstSeen time.Time
+	lastSend := now()
 	for retypable(err) {
 		rows, _, rerr := t.ReadRows()
 		if rerr != nil {
@@ -75,20 +82,21 @@ func deliverLaunch(t Input, text string, p Policy) error {
 		if !screenHas(rows, marker) {
 			return err
 		}
-		if seen >= lc.Window {
+		if firstSeen.IsZero() {
+			firstSeen = now()
+		}
+		if now().Sub(firstSeen) >= lc.Window {
 			return errUnknown(text, marker)
 		}
 		if started, werr := t.WaitStart(lc.Poll); werr != nil || started {
 			return werr
 		}
-		seen += lc.Poll
-		sinceSend += lc.Poll
-		if sinceSend >= lc.RetypeEvery {
+		if now().Sub(lastSend) >= lc.RetypeEvery {
 			if p.Report != nil {
 				p.Report(claudeui.NudgePrompt)
 			}
-			sinceSend = 0
 			err = send()
+			lastSend = now()
 		}
 	}
 	return err

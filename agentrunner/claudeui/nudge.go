@@ -65,16 +65,6 @@ func ScreenTail(screen string) string {
 	return strings.Join(lines[max(0, len(lines)-screenTailLines):], "\n")
 }
 
-// HoldsText reports whether screen still shows the start of text, which
-// gx typed into the input.
-func HoldsText(screen, text string) bool {
-	first, _, _ := strings.Cut(strings.TrimSpace(text), "\n")
-	if len(first) > 20 {
-		first = first[:20]
-	}
-	return first != "" && strings.Contains(screen, first)
-}
-
 // NudgeDecision is what PromptWithNudge did about a submit the agent didn't
 // pick up. Its values are written to the run log as is.
 type NudgeDecision string

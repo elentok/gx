@@ -135,6 +135,30 @@ func TestCheckLaunchDelivered_NoRecordFailsAtGraceEnd(t *testing.T) {
 	}
 }
 
+func TestCheckLaunchDelivered_HungPaneReadsTheInputBoxOnly(t *testing.T) {
+	const rule = "──────────────────────"
+	for _, tt := range []struct {
+		name     string
+		pane     string
+		wantHung bool
+	}{
+		{"text in the box", "\n" + rule + "\n❯ " + launchText + "\n" + rule + "\n  ? for shortcuts", true},
+		{"echo outside the box", "● " + launchText + " (echo)\n" + rule + "\n❯ \n" + rule + "\n  ? for shortcuts", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			clock := time.Unix(1000, 0)
+			p := proofFor(&clock, func() (string, bool, error) { return "", false, nil })
+			p.Pane = func() (string, error) { return tt.pane, nil }
+
+			err := claudeui.CheckLaunchDelivered(context.Background(), p, launchText, claudeui.DefaultLaunchProofCaps)
+
+			if _, hung := errors.AsType[*claudeui.HungPaneError](err); hung != tt.wantHung {
+				t.Fatalf("err = %v, hung = %v, want %v", err, hung, tt.wantHung)
+			}
+		})
+	}
+}
+
 func TestCheckLaunchDelivered_PastedRecordIsItsOwnNotDeliveredError(t *testing.T) {
 	clock := time.Unix(1000, 0)
 	pasted := "<pasted_content>\n" + launchText + "\n</pasted_content>"

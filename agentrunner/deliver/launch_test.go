@@ -18,12 +18,37 @@ func launchCaps(marker string) *deliver.LaunchCaps {
 	return &deliver.LaunchCaps{Marker: marker, Window: 5 * time.Millisecond, RetypeEvery: time.Millisecond, Poll: time.Millisecond}
 }
 
-func launchPolicy(text, marker string, slash bool, report *[]claudeui.NudgeDecision) deliver.Policy {
+// clocked is a slashFake on a fake clock: a wait costs its duration and a type
+// costs typeCost, so the window is counted on the clock, not in polls.
+type clocked struct {
+	*slashFake
+	at       time.Time
+	typeCost time.Duration
+}
+
+func newClocked(f *slashFake, typeCost time.Duration) *clocked {
+	return &clocked{slashFake: f, at: time.Unix(1000, 0), typeCost: typeCost}
+}
+
+func (c *clocked) now() time.Time { return c.at }
+
+func (c *clocked) WaitStart(d time.Duration) (bool, error) {
+	c.at = c.at.Add(d)
+	return c.slashFake.WaitStart(d)
+}
+
+func (c *clocked) Type(text string) error {
+	c.at = c.at.Add(c.typeCost)
+	return c.slashFake.Type(text)
+}
+
+func launchPolicy(c *clocked, text, marker string, slash bool, report *[]claudeui.NudgeDecision) deliver.Policy {
 	p := deliver.PolicyFor(text)
 	if slash {
 		p.Slash.Settle = 0
 	}
 	p.Launch = launchCaps(marker)
+	p.Now = c.now
 	p.Report = func(d claudeui.NudgeDecision) { *report = append(*report, d) }
 	return p
 }
@@ -48,8 +73,9 @@ func TestDeliver_LaunchRetypesWhileTheMarkerShowsThenLands(t *testing.T) {
 			bad, good := ok([]string{tt.marker + " " + text}), ok([]string{""})
 			// One read after each send: the marker shows after the first two.
 			f := &slashFake{reads: []read{bad, bad, good}}
+			c := newClocked(f, 0)
 			var report []claudeui.NudgeDecision
-			if err := deliver.Deliver(f, text, launchPolicy(text, tt.marker, tt.slash, &report)); err != nil {
+			if err := deliver.Deliver(c, text, launchPolicy(c, text, tt.marker, tt.slash, &report)); err != nil {
 				t.Fatalf("Deliver() error = %v, want landed", err)
 			}
 			if len(report) != 2 || report[0] != claudeui.NudgePrompt || report[1] != claudeui.NudgePrompt {
@@ -65,8 +91,9 @@ func TestDeliver_LaunchRetypesWhileTheMarkerShowsThenLands(t *testing.T) {
 func TestDeliver_LaunchThatNeverLandsFailsWithUnknownSkill(t *testing.T) {
 	bad := ok([]string{claudeui.UnknownCommandMarker + " /gx-skill"})
 	f := &slashFake{reads: []read{bad}}
+	c := newClocked(f, 0)
 	var report []claudeui.NudgeDecision
-	err := deliver.Deliver(f, "/gx-skill", launchPolicy("/gx-skill", claudeui.UnknownCommandMarker, true, &report))
+	err := deliver.Deliver(c, "/gx-skill", launchPolicy(c, "/gx-skill", claudeui.UnknownCommandMarker, true, &report))
 	if !errors.Is(err, agentrunner.ErrNotDelivered) || !errors.Is(err, agentrunner.ErrUnknownSkill) {
 		t.Fatalf("Deliver() error = %v, want ErrNotDelivered and ErrUnknownSkill", err)
 	}
@@ -75,10 +102,29 @@ func TestDeliver_LaunchThatNeverLandsFailsWithUnknownSkill(t *testing.T) {
 	}
 }
 
+func TestDeliver_LaunchWindowEndsAtTheDeadlineWhenSendTakesTime(t *testing.T) {
+	bad := ok([]string{claudeui.UnknownCommandMarker + " /gx-skill"})
+	f := &slashFake{reads: []read{bad}}
+	// A retype costs 3ms; the window is 5ms from the first sighting.
+	c := newClocked(f, 3*time.Millisecond)
+	var report []claudeui.NudgeDecision
+	start := c.at
+	err := deliver.Deliver(c, "/gx-skill", launchPolicy(c, "/gx-skill", claudeui.UnknownCommandMarker, true, &report))
+	if !errors.Is(err, agentrunner.ErrUnknownSkill) {
+		t.Fatalf("Deliver() error = %v, want ErrUnknownSkill", err)
+	}
+	// First send (3ms) + window (5ms) + at most one retype (3ms). Counting only
+	// polls would run to about 23ms.
+	if got := c.at.Sub(start); got > 11*time.Millisecond {
+		t.Fatalf("ended after %s, want the window deadline, not a poll count", got)
+	}
+}
+
 func TestDeliver_LaunchWithoutTheMarkerRetypesNothing(t *testing.T) {
 	f := &slashFake{reads: []read{ok([]string{"all fine"})}}
+	c := newClocked(f, 0)
 	var report []claudeui.NudgeDecision
-	if err := deliver.Deliver(f, "/gx-skill", launchPolicy("/gx-skill", claudeui.UnknownCommandMarker, true, &report)); err != nil {
+	if err := deliver.Deliver(c, "/gx-skill", launchPolicy(c, "/gx-skill", claudeui.UnknownCommandMarker, true, &report)); err != nil {
 		t.Fatal(err)
 	}
 	if len(report) != 0 || typedCount(f) != 1 {

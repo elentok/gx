@@ -140,6 +140,20 @@ func LaunchedBy(content, text string) bool {
 		strings.HasPrefix(strings.TrimSpace(content), strings.TrimSpace(text))
 }
 
+// inputBoxHolds reports whether the input box on pane shows the start of text.
+// An echo or marker line outside the box does not count.
+func inputBoxHolds(pane, text string) bool {
+	box, ok := InputBoxRows(strings.Split(pane, "\n"))
+	if !ok {
+		return false
+	}
+	first, _, _ := strings.Cut(strings.TrimSpace(text), "\n")
+	if len(first) > 20 {
+		first = first[:20]
+	}
+	return first != "" && strings.Contains(strings.Join(box, "\n"), first)
+}
+
 // CheckLaunchDelivered returns nil once the transcript shows text as the first
 // user record, and agentrunner.ErrNotDelivered when the grace ends first. It
 // only reads: typing and retyping belong to deliver.Deliver. A cancelled ctx
@@ -177,7 +191,7 @@ func CheckLaunchDelivered(ctx context.Context, p LaunchProof, text string, caps 
 		if now.Sub(start) >= caps.Grace {
 			// The command still sits in the input and never reached the
 			// transcript: the pane stopped taking keys.
-			if HoldsText(pane, text) {
+			if inputBoxHolds(pane, text) {
 				return &HungPaneError{Screen: pane}
 			}
 			return fmt.Errorf("%w: %q: no user record after %s", agentrunner.ErrNotDelivered, text, caps.Grace)
