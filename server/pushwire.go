@@ -41,6 +41,8 @@ func pushService(s *Server) *webpush.Service {
 		Dispatcher: s.push,
 		Contact:    func() string { return s.settings.Load().WebPushContact },
 		PublicKey:  s.vapid.Public,
+
+		AllowHTTPEndpoints: s.cfg.PushAllowHTTPEndpoints,
 	}
 }
 

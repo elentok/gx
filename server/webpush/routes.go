@@ -40,6 +40,9 @@ type Service struct {
 	Dispatcher *Dispatcher
 	Contact    func() string
 	PublicKey  func() string
+	// AllowHTTPEndpoints is a test seam: accept an http: endpoint, for the
+	// fixture's loopback push service. False for every user.
+	AllowHTTPEndpoints bool
 }
 
 type routeBody struct {
@@ -110,7 +113,7 @@ func (s *Service) contactSet() bool { return ValidContact(s.Contact()) }
 // with the server's key: an https endpoint and keys the encryption can use.
 func (s *Service) validSubscription(b routeBody) bool {
 	u, err := url.Parse(b.Endpoint)
-	if err != nil || u.Scheme != "https" || u.Host == "" || b.VAPIDKey != s.PublicKey() {
+	if err != nil || (u.Scheme != "https" && !(s.AllowHTTPEndpoints && u.Scheme == "http")) || u.Host == "" || b.VAPIDKey != s.PublicKey() {
 		return false
 	}
 	p, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(b.P256dh, "="))

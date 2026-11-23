@@ -257,6 +257,7 @@ func (f *fixture) addScenarioOutput(res *output.Output, sc scenario, transcripts
 	res.ConfigFile = configFile(f.root)
 	res.DevControlFile = f.devControl
 	res.ChatCapture = f.chatCapture
+	res.PushServiceURL, res.PushControl, res.PushCapture = f.pushURL, f.pushControl, f.pushCapture
 	res.Transcripts = transcripts
 	res.TaskFiles = f.taskFiles
 	if sc.LimitBurn {

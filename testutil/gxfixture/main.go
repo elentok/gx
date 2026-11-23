@@ -137,6 +137,11 @@ func run(args []string) (err error) {
 		return err
 	}
 	defer stopCapture()
+	stopPush, err := f.startPushService(&o, sc)
+	if err != nil {
+		return err
+	}
+	defer stopPush()
 	if err := f.prepareStore(sc, shape, port, o.configs); err != nil {
 		return err
 	}
@@ -244,6 +249,8 @@ type fixture struct {
 	restarted bool
 	// chatCapture is the capture file of a chat-capture scenario; empty elsewhere.
 	chatCapture string
+	// pushURL, pushControl and pushCapture are the fake push service of a PushService scenario.
+	pushURL, pushControl, pushCapture string
 	// devControl is the dev-mode scenario's fake pnpm control file; empty elsewhere.
 	devControl string
 	// hostFiles is the host-files scenario's printed paths; nil elsewhere.

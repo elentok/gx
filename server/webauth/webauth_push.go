@@ -34,9 +34,9 @@ type PushTarget struct {
 	Sub     PushSubscription
 }
 
-func (s PushSubscription) valid() bool {
+func (w *WebAuth) validSub(s PushSubscription) bool {
 	u, err := url.Parse(s.Endpoint)
-	return err == nil && u.Scheme == "https" && u.Host != "" &&
+	return err == nil && (u.Scheme == "https" || w.AllowHTTPPush && u.Scheme == "http") && u.Host != "" &&
 		s.P256dh != "" && s.Auth != "" && s.VAPIDKey != ""
 }
 
@@ -74,7 +74,7 @@ func (w *WebAuth) PushKey() string {
 // SetPushSubscription stores sub as the login's subscription, replacing any
 // earlier one.
 func (w *WebAuth) SetPushSubscription(loginID string, sub PushSubscription) error {
-	if !sub.valid() {
+	if !w.validSub(sub) {
 		return ErrPushBadSubscription
 	}
 	w.mu.Lock()
@@ -88,7 +88,7 @@ func (w *WebAuth) SetPushSubscription(loginID string, sub PushSubscription) erro
 // RenewPushSubscription replaces the login's subscription only when it is still
 // at oldEndpoint under the current key, so a renewal cannot undo a removal.
 func (w *WebAuth) RenewPushSubscription(loginID, oldEndpoint string, sub PushSubscription) error {
-	if !sub.valid() {
+	if !w.validSub(sub) {
 		return ErrPushBadSubscription
 	}
 	w.mu.Lock()

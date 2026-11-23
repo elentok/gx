@@ -53,6 +53,10 @@ interface FixtureOutput {
   agent_transcript?: string
   /** The live check-lock waiting state; only the `check-lock` scenario prints it. */
   check_waiting_file?: string
+  /** The `mixed` scenario's fake push service: its base URL, the file that picks its answer and the file it logs requests to. */
+  push_service_url?: string
+  push_control?: string
+  push_capture?: string
   ratelimit_release_file?: string
   /** The `limit-burn` live shape's four Claude transcript paths, keyed queue, one_off, design and other; the `context-window` scenario's keyed sessions (green, yellow, orange, red, compact). */
   transcripts?: Record<string, string>
@@ -185,6 +189,23 @@ export interface Fixture {
   readonly agentTranscript: string
   /** Ends the `check-lock` scenario's wait by removing its waiting state. */
   releaseCheckLock(): Promise<void>
+  /** The `mixed` scenario's fake push service URL; a subscription endpoint is `<url>/push/<n>`. Empty elsewhere. */
+  readonly pushServiceURL: string
+  /** Makes the fake push service answer every request with `status` until `pushOk()`. */
+  failPush(status?: number): Promise<void>
+  /** Makes the fake push service answer 201 again. */
+  pushOk(): Promise<void>
+  /** The requests the fake push service logged so far (headers and body length, never the body). */
+  pushRequests(): Promise<
+    Array<{
+      path: string
+      ttl: string
+      urgency?: string
+      topic?: string
+      authorization: boolean
+      body_length: number
+    }>
+  >
   /** Ends the rate-limit hold of the `rate-limited` scenario; the hold lasts until this runs. */
   releaseRateLimit(): Promise<void>
   /** The `limit-burn` live shape's transcript paths by cost group (queue, one_off, design, other) and the `context-window` scenario's by session key (green, yellow, orange, red, compact); append usage lines to them. Empty elsewhere. */
@@ -344,6 +365,14 @@ async function startFixture(
     totpSecret: out.totp_secret ?? "",
     agentTranscript: out.agent_transcript ?? "",
     releaseCheckLock: () => rm(out.check_waiting_file ?? "", { force: true }),
+    pushServiceURL: out.push_service_url ?? "",
+    failPush: (status = 500) => writeFile(out.push_control ?? "", String(status)),
+    pushOk: () => rm(out.push_control ?? "", { force: true }),
+    pushRequests: async () =>
+      (await readFile(out.push_capture ?? "", "utf8"))
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line)),
     releaseRateLimit: () => writeFile(out.ratelimit_release_file ?? "", ""),
     transcripts: out.transcripts ?? {},
     taskFiles: out.task_files ?? {},

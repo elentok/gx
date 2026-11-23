@@ -1,3 +1,4 @@
+import { createECDH, randomBytes } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import {
   blockEvents,
@@ -319,6 +320,169 @@ test("2. Epic PWA: Force refresh and cold open", async ({ page, start, context }
     await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain(planted)
     // The fresh page registers a new worker as at start-up.
     await expect.poll(workerState).toBe("activated")
+
+    // Notifications, on a second page so the main page keeps its one reload. It fakes the platform's
+    // permission, push manager and app badge; the server, the stored subscription and the fake push
+    // service are real.
+    const ecdh = createECDH("prime256v1")
+    ecdh.generateKeys()
+    const subscription = {
+      endpoint: `${fixture.pushServiceURL}/push/1`,
+      p256dh: ecdh.getPublicKey().toString("base64url"),
+      auth: randomBytes(16).toString("base64url"),
+    }
+    const notif = await context.newPage()
+    await notif.setViewportSize({ width: 390, height: 844 })
+    await notif.addInitScript((sub) => {
+      const state = {
+        permissionRequests: 0,
+        applied: null as number | null,
+        cleared: 0,
+      }
+      Object.assign(window, { __push: state })
+      let permission: NotificationPermission = "default"
+      Object.defineProperty(Notification, "permission", {
+        get: () => permission,
+        configurable: true,
+      })
+      Notification.requestPermission = async () => {
+        state.permissionRequests++
+        permission = "granted"
+        return "granted"
+      }
+      let current: unknown = null
+      const manager = {
+        getSubscription: async () => current,
+        subscribe: async (options: { applicationServerKey: BufferSource }) => {
+          const key = new Uint8Array(options.applicationServerKey as ArrayBuffer).slice().buffer
+          current = {
+            endpoint: sub.endpoint,
+            options: { applicationServerKey: key },
+            toJSON: () => ({
+              endpoint: sub.endpoint,
+              keys: { p256dh: sub.p256dh, auth: sub.auth },
+            }),
+            unsubscribe: async () => {
+              current = null
+              return true
+            },
+          }
+          return current
+        },
+      }
+      Object.defineProperty(ServiceWorkerRegistration.prototype, "pushManager", {
+        get: () => manager,
+        configurable: true,
+      })
+      Object.defineProperty(navigator, "setAppBadge", {
+        value: async (n: number) => {
+          state.applied = n
+        },
+        configurable: true,
+      })
+      Object.defineProperty(navigator, "clearAppBadge", {
+        value: async () => {
+          state.applied = 0
+          state.cleared++
+        },
+        configurable: true,
+      })
+    }, subscription)
+    const pushState = () =>
+      notif.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __push: { permissionRequests: number; applied: number | null; cleared: number }
+            }
+          ).__push,
+      )
+    const go = (hash: string) => notif.evaluate((h) => (location.hash = h), hash)
+    await notif.goto(new URL("#/settings", page.url()).href)
+
+    // Story 4: the Account rows in order, and Notifications starts with an Off chip.
+    const account = notif.locator('[data-mock-part="account-group"]')
+    await expect(account.getByRole("link").nth(2)).toContainText("Password")
+    await expect(account.getByRole("link").nth(0)).toContainText("Web logins")
+    await expect(account.getByRole("link").nth(1)).toContainText("Notifications")
+    await expect(account.getByRole("link", { name: /^Notifications/ })).toContainText("Off")
+
+    // Story 2: opening the page asks for nothing, and the test row waits for the switch.
+    await account.getByRole("link", { name: /^Notifications/ }).click()
+    await expect(notif).toHaveURL(/#\/settings\/notifications$/)
+    const toggle = notif.getByRole("switch", { name: "Notifications on this device" })
+    await expect(toggle).toHaveAttribute("aria-checked", "false")
+    const testRow = notif.getByRole("button", { name: /Send test push/ })
+    await expect(testRow).toBeDisabled()
+    await expect(testRow).toContainText("Turn notifications on first.")
+    expect((await pushState()).permissionRequests).toBe(0)
+
+    // Stories 1, 3: the tap asks once, the switch reads On for the login, and the login row says Push on.
+    await toggle.click()
+    await expect(toggle).toHaveAttribute("aria-checked", "true")
+    await expect(notif.getByText(/^On for “.+”\.$/)).toBeVisible()
+    expect((await pushState()).permissionRequests).toBe(1)
+    await go("#/settings/logins")
+    const loginRow = notif
+      .locator('a[href^="#/settings/logins/"]')
+      .filter({ hasText: "This device" })
+    await expect(loginRow).toContainText("Push on")
+
+    // Stories 13, 15: a test push is sent, a failing fixture shows the failure, a healthy one clears it.
+    await go("#/settings/notifications")
+    await expect(toggle).toHaveAttribute("aria-checked", "true")
+    await expect(testRow).toBeEnabled()
+    await testRow.click()
+    const result = notif.locator('[data-mock-part="test-result"]')
+    await expect(result).toContainText("Sent.")
+    const sent = await fixture.pushRequests()
+    expect(sent.filter((r) => r.path === "/push/1")).toHaveLength(1)
+    expect(sent[0]).toMatchObject({ ttl: "60", authorization: true })
+    await fixture.failPush()
+    await testRow.click()
+    await expect(result).not.toContainText("Sent.")
+    await expect(notif.getByText(/^Last push failed: /)).toBeVisible()
+    await fixture.pushOk()
+    await testRow.click()
+    await expect(result).toContainText("Sent.")
+    await expect(notif.getByText(/^Last push failed: /)).toHaveCount(0)
+
+    // Story 35: the badge on the app icon is the snapshot's count.
+    // The page applies the snapshot's badge only when the field is there, and a zero badge is left out
+    // of the snapshot, so the expected value is the field itself, or nothing applied.
+    const snapshotBadge = async () => {
+      const snapshot = await context.request.get(new URL("/v1/snapshot", page.url()).href)
+      return ((await snapshot.json()) as { badge?: number }).badge ?? null
+    }
+    await expect
+      .poll(async () => (await pushState()).applied === (await snapshotBadge()))
+      .toBe(true)
+
+    // Story 6: switching off drops the row's chip and clears the badge.
+    const clearedBefore = (await pushState()).cleared
+    await toggle.click()
+    await expect(toggle).toHaveAttribute("aria-checked", "false")
+    await expect.poll(async () => (await pushState()).cleared).toBeGreaterThan(clearedBefore)
+    await go("#/settings/logins")
+    await expect(loginRow).toBeVisible()
+    await expect(loginRow).not.toContainText("Push on")
+
+    // Story 18: Remove on the login's page keeps the login and drops the push.
+    await go("#/settings/notifications")
+    await toggle.click()
+    await expect(toggle).toHaveAttribute("aria-checked", "true")
+    await go("#/settings/logins")
+    await loginRow.click()
+    await expect(notif).toHaveURL(/#\/settings\/logins\/.+/)
+    await expect(notif.locator('[data-mock-part="push-row"]')).toBeVisible()
+    await notif.getByRole("button", { name: "Remove" }).click()
+    await expect(notif.locator('[data-mock-part="push-row"]')).toHaveCount(0)
+    await go("#/settings/logins")
+    await expect(loginRow).toBeVisible()
+    await expect(loginRow).not.toContainText("Push on")
+    await go("#/settings/notifications")
+    await expect(toggle).toHaveAttribute("aria-checked", "false")
+    await notif.close()
 
     // Cold open, last: no per-tab copy exists in a new page, and nothing runs after the server stop.
     await fixture.stopServer()

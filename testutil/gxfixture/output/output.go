@@ -50,6 +50,12 @@ type Output struct {
 	// ChatCapture is the file the chat-capture scenario's endpoint appends every Slack and
 	// Telegram post to, one JSON line each; empty elsewhere.
 	ChatCapture string `json:"chat_capture,omitempty"`
+	// PushServiceURL, PushControl and PushCapture belong to the fake push service of a
+	// PushService scenario: its base URL, the file whose content picks the answer, and the
+	// file it appends one JSON line per request to; empty elsewhere.
+	PushServiceURL string `json:"push_service_url,omitempty"`
+	PushControl    string `json:"push_control,omitempty"`
+	PushCapture    string `json:"push_capture,omitempty"`
 	// RestartDir holds the fake restart binary's control files; empty outside the restart scenarios.
 	RestartDir string `json:"restart_dir,omitempty"`
 	// MigrateDir holds the migrate scenarios' control files and server script (see migrate.go); empty elsewhere.

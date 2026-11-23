@@ -220,6 +220,9 @@ type Scenario struct {
 	// ChatCapture points the server's Slack webhook and Telegram base URL at a
 	// capture endpoint and prints the file it appends to (see chat.go).
 	ChatCapture bool
+	// PushService starts a fake push service on loopback, lets the server accept
+	// its http: endpoint and prints its URL, control file and capture file (see push.go).
+	PushService bool
 	// ChatFlush overrides the capture's short flush interval, so a test can queue
 	// several messages inside one tick.
 	ChatFlush string

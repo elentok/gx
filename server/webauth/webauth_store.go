@@ -104,6 +104,10 @@ type webAuthFile struct {
 
 // WebAuth is the web auth store. All state lives in one file in the state dir.
 type WebAuth struct {
+	// AllowHTTPPush is a test seam: a push subscription may have an http:
+	// endpoint, for the fixture's loopback push service. Set before serving.
+	AllowHTTPPush bool
+
 	dir     string
 	now     func() time.Time
 	limiter *authLimiter

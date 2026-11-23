@@ -430,6 +430,7 @@ var Scenarios = map[string]scenario{
 	},
 	// mixed: tickets in several states, and a worker that asks and fails.
 	"mixed": {
+		PushService: true,
 		Epics: []epic{{Project: project, Name: "mixed-epic", Tickets: []ticket{
 			{ID: "01", Slug: "merged", Opts: servertest.TicketOpts{Status: "done"}},
 			{ID: "02", Slug: "open", Opts: servertest.TicketOpts{}},

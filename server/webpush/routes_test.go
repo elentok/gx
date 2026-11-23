@@ -37,7 +37,7 @@ type pushWeb struct {
 func (p *pushWeb) now() time.Time { return time.Now().Add(time.Duration(p.offset.Load())) }
 
 // startPushWeb is a web listener with two logins, a fake push service and the given contact email.
-func startPushWeb(t *testing.T, contact string) *pushWeb {
+func startPushWeb(t *testing.T, contact string, tweak ...func(*server.Config)) *pushWeb {
 	t.Helper()
 	p := &pushWeb{}
 	p.status.Store(http.StatusCreated)
@@ -52,6 +52,9 @@ func startPushWeb(t *testing.T, contact string) *pushWeb {
 		c.Clock = p.now
 		c.PushHTTPClient = svc.Client()
 		c.Settings.WebPushContact = contact
+		for _, f := range tweak {
+			f(c)
+		}
 	})
 	hs, err := p.h.Client.Handshake(context.Background())
 	if err != nil || hs.WebURL == "" {
@@ -159,6 +162,28 @@ func subBody(t *testing.T, key, endpoint string, extra string) string {
 	b64 := base64.RawURLEncoding
 	return fmt.Sprintf(`{"endpoint":%q,"p256dh":%q,"auth":%q,"vapid_key":%q%s}`,
 		endpoint, b64.EncodeToString(ua.PublicKey().Bytes()), b64.EncodeToString(auth), key, extra)
+}
+
+func TestPushRoutes_HTTPEndpointNeedsTheTestHook(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name   string
+		tweak  func(*server.Config)
+		reason string
+	}{
+		{"default", func(*server.Config) {}, wire.ReasonPushBadSubscription},
+		{"hook on", func(c *server.Config) { c.PushAllowHTTPEndpoints = true }, ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p := startPushWeb(t, testEmail, tt.tweak)
+			st, _ := p.state(t, p.first)
+			body := subBody(t, st.PublicKey, "http://127.0.0.1:9/push/1", "")
+			if r := p.reason(t, "/v1/web/push/subscribe", body, p.first); r != tt.reason {
+				t.Errorf("reason %q, want %q", r, tt.reason)
+			}
+		})
+	}
 }
 
 func TestPushRoutes_SubscribeStoresAndStateShowsIt(t *testing.T) {

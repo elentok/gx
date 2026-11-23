@@ -320,7 +320,8 @@ func runServer(ctx context.Context, d Deps) error {
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, RunnerWait: cfg.RunnerWait, WebAddr: cfg.Server.Web.Listen, LogLevel: logLevel,
 		AutoAdvanceDelay: autoAdvanceDelay, CommandListAge: commandListAge, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.Env.Env,
 		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval, TokenPollInterval: tokenPollInterval, PromptGrace: promptGrace, RateLimitResetBuffer: rateLimitBuffer, GuardPoll: guardPoll, BudgetKillGrace: budgetKillGrace,
-		ProcessSource: processSource, RefreshSkills: skillscmd.NewSharedRefresh(func() error { return skillscmd.Refresh(d.skillsDeps(), io.Discard) }).Refresh, ForkHookDir: os.Getenv("GX_FORK_HOOK_DIR"), WrapLateFinishScan: wrapLateFinishScan(os.Getenv), Sleep: fastSleep(os.Getenv), PollInterval: fastPollInterval(os.Getenv)})
+		ProcessSource: processSource, RefreshSkills: skillscmd.NewSharedRefresh(func() error { return skillscmd.Refresh(d.skillsDeps(), io.Discard) }).Refresh, ForkHookDir: os.Getenv("GX_FORK_HOOK_DIR"), WrapLateFinishScan: wrapLateFinishScan(os.Getenv), Sleep: fastSleep(os.Getenv), PollInterval: fastPollInterval(os.Getenv),
+		PushAllowHTTPEndpoints: os.Getenv("GX_PUSH_ALLOW_HTTP_ENDPOINTS") == "1"})
 	if err != nil {
 		return err
 	}

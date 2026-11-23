@@ -32,6 +32,8 @@ type Config struct {
 	StateDir     string
 	Clock        func() time.Time // nil means time.Now
 	InterfaceIPs func() []net.IP  // nil means the machine's interfaces
+	// AllowHTTPPush is the test seam of server.Config.PushAllowHTTPEndpoints.
+	AllowHTTPPush bool
 }
 
 // Host is what the web mux asks the root server for.
@@ -121,6 +123,7 @@ func (w *Web) Bind() {
 		w.log.Error("web auth unavailable", "err", err)
 		return
 	}
+	auth.AllowHTTPPush = w.cfg.AllowHTTPPush
 	// The key file is already written, so this is the one web-auth.json write
 	// that drops subscriptions made with an older key.
 	if err := auth.SetPushKey(w.host.PushKey()); err != nil {

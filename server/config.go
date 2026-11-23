@@ -269,6 +269,10 @@ type Config struct {
 	// PushMergeDelay is how long a push waits for events of its tag to
 	// merge; zero means one second.
 	PushMergeDelay time.Duration
+	// PushAllowHTTPEndpoints is a test seam: the subscription check accepts an
+	// http: endpoint, for the fixture's loopback push service. gxfixture sets it
+	// through GX_PUSH_ALLOW_HTTP_ENDPOINTS; false for every user.
+	PushAllowHTTPEndpoints bool
 	// ChatPollInterval is how often a working session's transcript size is
 	// checked; zero means defaultChatPollInterval.
 	ChatPollInterval time.Duration
