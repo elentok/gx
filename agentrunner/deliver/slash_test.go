@@ -218,6 +218,8 @@ func TestPolicyFor_PicksTheShapeFromTheText(t *testing.T) {
 		"/compact":        false,
 		"/compact foo":    false,
 		"/compactx":       true,
+		"​/cost":          true,
+		"​/compact":       false,
 		"hello":           false,
 		"!ls":             false,
 		"":                false,

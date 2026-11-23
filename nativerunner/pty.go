@@ -485,13 +485,6 @@ func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(stri
 	return notDelivered(err)
 }
 
-// isSlashCommand reports whether text is a "/" command that takes the
-// single-send rule. Only the launch prompts (here and headless) use it: the
-// prompt path leaves the rule to deliver.PolicyFor.
-func isSlashCommand(text string) bool {
-	return strings.HasPrefix(text, "/") && text != "/compact"
-}
-
 // Interrupt picks its key by state: Ctrl+C when busy, a lone Esc when blocked
 // (it denies the dialog), nothing otherwise. After a key it waits up to N for
 // idle, then presses Ctrl+C once: claude restores the cancelled prompt into the

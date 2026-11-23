@@ -173,7 +173,11 @@ func nudgeEnter(p Prompter, text string, settle, timeout time.Duration, report f
 		}
 		screen, readErr := p.Screen()
 		box, ok := claudeui.InputBoxRows(strings.Split(screen, "\n"))
-		if readErr != nil || !ok || !boxHoldsOurs(box, text, 0) {
+		chips := 0
+		if ic, has := p.(interface{ ImageCount() int }); has {
+			chips = ic.ImageCount()
+		}
+		if readErr != nil || !ok || !boxHoldsOurs(box, text, chips) {
 			break
 		}
 		report(claudeui.NudgeEnter)

@@ -48,7 +48,7 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 			return &claudeui.VimEditorError{}
 		}
 	}
-	if (codex && harness.CodexHomeIn(p.Env) == "") || (!codex && (home == "" || (ss.kind != "" && ss.kind != harness.Claude) || !isSlashCommand(text))) {
+	if (codex && harness.CodexHomeIn(p.Env) == "") || (!codex && (home == "" || (ss.kind != "" && ss.kind != harness.Claude) || !deliver.IsSlash(text))) {
 		return p.PromptNudged(s, text, onNudge)
 	}
 	turn, err := p.turns().awaitNotBusy(ss)

@@ -50,12 +50,18 @@ var DefaultSlashCaps = SlashCaps{
 	ResizeCap:   time.Second,
 }
 
-// PolicyFor picks the shape from the text: a text starting with "/" gets the
-// slash shape, except /compact with or without arguments, which starts a turn
-// like any prompt.
+// IsSlash reports whether text, after the hidden-character strip Deliver
+// applies, is a "/" command that takes the slash shape: every "/" text except
+// /compact with or without arguments, which starts a turn like any prompt.
+func IsSlash(text string) bool {
+	text, _ = Strip(text)
+	return strings.HasPrefix(text, "/") && firstToken(text) != "/compact"
+}
+
+// PolicyFor picks the shape from the text, by IsSlash.
 func PolicyFor(text string) Policy {
 	p := Policy{Caps: DefaultNudgeCaps}
-	if strings.HasPrefix(text, "/") && firstToken(text) != "/compact" {
+	if IsSlash(text) {
 		caps := DefaultSlashCaps
 		p.Slash = &caps
 	}

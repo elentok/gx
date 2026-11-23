@@ -116,6 +116,14 @@ func TestSessionPromptSlash(t *testing.T) {
 			t.Errorf("read %d Enters, want 2: %q", got, keys)
 		}
 	})
+	t.Run("HiddenCharacterBeforeSlashLandsWithOneEnter", func(t *testing.T) {
+		t.Parallel()
+		c := startTUIChat(t)
+		c.send(t, "​/cost")
+		c.waitKeys(t, "the text", func(k string) bool { return strings.Contains(k, "/cost") })
+		c.expectEnters(t, 2)
+		c.expectTypedOnce(t, "/cost")
+	})
 	t.Run("UnknownCommandFailsAtOnce", func(t *testing.T) {
 		t.Parallel()
 		c := startTUIChat(t, agentfake.TUIUnknownSkillEnv+"=1")

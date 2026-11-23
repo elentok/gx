@@ -3,6 +3,8 @@ package wire
 import (
 	"fmt"
 	"strings"
+
+	"github.com/elentok/gx/agentrunner/deliver"
 )
 
 // MaxSessionPromptBytes caps the text one send types.
@@ -19,8 +21,11 @@ func NormalizeAnswer(s string) string {
 // decides whether that is allowed. what names the text in refusal messages.
 func ValidatePromptText(text, what string) (string, *SessionResult) {
 	text = strings.TrimSpace(NormalizeAnswer(text))
+	// Deliver strips hidden characters before typing, so a "!" behind one is
+	// still a bang.
+	stripped, _ := deliver.Strip(text)
 	switch {
-	case strings.HasPrefix(text, "!"):
+	case strings.HasPrefix(stripped, "!"):
 		res := SessionResult{Refused: true, Reason: ReasonPromptPrefixNotAllowed, Message: what + " may not start with !"}
 		return text, &res
 	case len(text) > MaxSessionPromptBytes:

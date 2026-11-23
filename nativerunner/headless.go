@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/proccap"
@@ -423,7 +424,7 @@ func (h *Headless) prompt(s agentrunner.Session, text string, launch bool) error
 	if err != nil {
 		return fmt.Errorf("%w: %v", agentrunner.ErrNotDelivered, err)
 	}
-	if isSlashCommand(text) {
+	if deliver.IsSlash(text) {
 		return h.awaitSlash(ss, uuid, before.Turn, launch, unknown)
 	}
 	return h.awaitTurn(ss, uuid, before.Turn)

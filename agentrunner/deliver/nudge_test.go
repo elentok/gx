@@ -511,6 +511,28 @@ func TestPromptWithNudge_Settle_SwallowedNudgeEnter_PressesAgainAtTheNextLook(t 
 	assertDecisions(t, f.decisions, claudeui.NudgeEnter, claudeui.NudgeEnter)
 }
 
+type imagePrompter struct {
+	*fakePrompter
+	images int
+}
+
+func (f *imagePrompter) ImageCount() int { return f.images }
+
+// A send with images shows its chips before the text, so the swallowed first
+// Enter is still seen and the settle Enter fires.
+func TestPromptWithNudge_Settle_ImageChipBeforeTheText_PressesTheSettleEnter(t *testing.T) {
+	f := &imagePrompter{
+		fakePrompter: &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", boxScreen("[Image #1] hi")}},
+		images:       1,
+	}
+	caps := DefaultNudgeCaps
+	caps.Settle = 3 * time.Second
+	if err := PromptWithNudge(f, "hi", caps, time.Time{}, f.now, f.report); err != nil {
+		t.Fatalf("PromptWithNudge() error = %v", err)
+	}
+	assertCalls(t, f.calls, "submit:hi", "wait", "enter", "wait", "enter", "wait")
+}
+
 // An emptied input means the Enter landed and the turn is only slow to start:
 // no more Enters, and the rest of the grace is waited out.
 func TestPromptWithNudge_Settle_EmptyInputAfterNudgeEnter_WaitsOutGrace(t *testing.T) {
