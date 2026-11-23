@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Added delivery-failure cards for prompts gx could not send: a yellow "May not have been sent" card, a red "Send failed" card and a red Unknown command card with Resend and Restart agent. All three have Dismiss (`gx agents dismiss <id>`), which clears the card for every tab and the TUI.
+- Fixed a `/` command whose first Enter Claude swallowed. gx now presses Enter again only when the input row still starts with its own text, so the command needs no second Enter on the screen and never runs twice. Every prompt goes through one `Deliver` function, which is the only code that retries.
+
 ## v0.51.13 - 2026-11-23
 
 - Added a single input owner per session. Only one client types into a session at a time, and the holder sends each prompt as one batch. The TUI and the web screen view show the owner, a take-over key and a hint when a key is blocked. Blocking Actionable cards get Retry and Take over.

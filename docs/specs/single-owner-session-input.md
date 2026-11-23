@@ -3,6 +3,12 @@
 Map: `gx:single-owner-session-input` (research 01 to 03, decisions 04 to 07). Changes
 `docs/specs/session-prompting.md` (first prompt ready signal, draft check stories 44 to 51).
 
+Changed 2026-11-23 by `docs/specs/deliver-primitive.md`: the batch is `Deliver`'s (`agentrunner/deliver`),
+not `PromptNudged`'s. One `Deliver` batch holds the typing lock and the holder's batch around the
+image pastes, the typed text and its first Enter. The draft clear is its own batch, and every later
+nudge Enter, clear or retype, and every settle Enter, is its own batch too. `### Changes to
+session-prompting` below records the edits this spec made and is left as it was.
+
 ## Problem Statement
 
 A person sends a prompt from a chat draft, or starts a session, and the session hangs. The agent
@@ -128,9 +134,10 @@ session's input. Every terminal issue shows in the web UI.
 30. As a person, when no client is attached or the owner detaches, I want gx to own the input, so that
     the other client does not become owner without my action.
 31. As a person, I want gx to hold the input only while it sends one batch of keys and hand it back
-    to the previous owner after. One batch is ready-to-type (including the vim `i` and its re-check),
-    the draft clear, the typed text and its Enter for one step (an Action step, the first prompt's
-    text, a web chat send). Each later nudge Enter or retype is its own batch. gx hands the input back
+    to the previous owner after. One `Deliver` batch is the typing lock and the holder's batch around
+    the image pastes, the typed text and its first Enter, for one step (an Action step, the first
+    prompt's text, a web chat send). The draft clear is its own batch. Each later nudge Enter, clear
+    or retype, and each settle Enter, is its own batch. gx hands the input back
     after each batch, including during waits (a nudge waiting for Working, an Action waiting for
     Idle), so that my client keeps the input once gx is done and is never locked out for minutes.
     Person input during a wait still cancels the remaining nudges (session-prompting).
@@ -146,7 +153,7 @@ session's input. Every terminal issue shows in the web UI.
 36. As a person on any non-owner client, I want a take-over control beside the indicator, so that the
     way out is visible.
 37. As a person using ralph-loop on the PTY runner, I want its launch wait to use the new ready
-    signal and its `PromptNudged` to follow the same rules as other sessions on the holder (the
+    signal and its `Deliver` calls to follow the same rules as other sessions on the holder (the
     stricter draft check, ownership per batch of keys, the size rule), so that loop launches behave
     like other sessions.
 38. As a person using sessions on the herdr runner, I want the stricter `InputIsEmpty` (cursor-row
@@ -271,9 +278,10 @@ session's input. Every terminal issue shows in the web UI.
 - No client attached: gx owns. The owner detaches: gx owns, not the other client. A person takes it
   with the control.
 - gx holds ownership only while it sends one batch of keys and hands it back to the previous owner when the batch
-  ends. One batch is ready-to-type (including the vim `i` and its re-check), the draft clear, the
-  typed text and its Enter for one step (an Action step, the first prompt's text, a web chat send).
-  Each later nudge Enter or retype is its own batch. During waits (a nudge waiting for Working, an Action waiting for Idle) gx holds nothing, so
+  ends. One `Deliver` batch is the typing lock and the holder's batch (`HoldInput`) around the image
+  pastes, the typed text and its first Enter for one step (an Action step, the first prompt's text, a
+  web chat send). The draft clear is its own batch. Each later nudge Enter, clear or retype, and each
+  settle Enter, is its own batch. During waits (a nudge waiting for Working, an Action waiting for Idle) gx holds nothing, so
   person keys reach the agent, and person input during a wait still cancels the remaining nudges as
   `session-prompting.md` says. If the previous owner detached meanwhile, gx keeps it. While gx sends
   a batch, person keys are blocked and the take-over control is ignored.
@@ -442,7 +450,7 @@ Input owner (stories 22 to 37)
 36. Same: every non-owner shows the take-over control (web button, TUI key hint), also in the
     three-client case of 22.
 37. A ralph-loop ticket launch on the PTY runner: the launch wait ends on the new ready signal,
-    `PromptNudged` takes ownership for each batch of keys and hands it back (assert the owner
+    `Deliver` takes ownership for each batch of keys and hands it back (assert the owner
     reports), and its draft check uses the stricter `InputIsEmpty` and the size rule.
 38. A session on the herdr runner: no owner indicator and keys behave as today, except the herdr
     nudge's empty check uses the stricter `InputIsEmpty` (harness table test with the header-on-a-`❯`

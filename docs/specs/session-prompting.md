@@ -6,6 +6,12 @@ Changed 2026-11-22 by `docs/specs/single-owner-session-input.md`: the first prom
 a composer marker in the raw output (not a screen read), the first prompt has no draft clear, and the
 draft check for later prompts acts only on a trusted screen read.
 
+Changed 2026-11-23 by `docs/specs/deliver-primitive.md`: `Deliver` (`agentrunner/deliver`) is the only
+code that types a prompt and the only code that retries. A slash text is typed once and gx presses
+Enter again only when the input-box row starts with gx's own text (at most 3 times). Delivery
+failures show as three cards with a Dismiss verb, not as a one-step Actionable. Where this spec
+disagrees with that one, that one wins.
+
 ## Problem Statement
 
 A person who starts a session or runs an Action waits too long, and sometimes gets a broken prompt:
@@ -40,11 +46,12 @@ is fast, checks what it can, and never types over text it didn't write.
   the OSC 7501 idle report. The first prompt is typed on that signal, or on the first Idle if that
   comes first, so it never hangs. No screen read decides readiness.
 - **Nudged first prompt.** A real first prompt goes through the nudge (wait for Working, then Enter
-  or retype). A slash first prompt is typed once and ends like an Action slash step, with one extra
-  Enter if it is still in the input. Any input from the person stops the remaining nudges.
+  or retype). A slash first prompt is typed once and never retyped (a launch prompt that Claude
+  answers with `Unknown command:` is the one exception). Any input from the person stops the
+  remaining nudges.
 - **Fast slash steps.** An Action slash step ends on the first of: a full turn, a new conversation
-  id, or a 1s Idle settle window, with one extra Enter if it is still in the input. No list of
-  commands.
+  id, or a 1s Idle settle window. When the settle window ends, `Deliver` presses Enter again only
+  when the input-box row starts with gx's own text, at most 3 times. No list of commands.
 - **Ready to type.** Before any typed text, the harness makes sure its input accepts text. Claude
   with vim mode on and no `-- INSERT --` marker gets `i`, then a short re-check.
 - **Draft clear.** Before each later prompt (each Action step, a web chat send to a live session),
@@ -55,11 +62,15 @@ is fast, checks what it can, and never types over text it didn't write.
   draft that won't clear raises the session as **Actionable**
   with the unsent prompts and the reason "input would not clear". (Changed 2026-10-23: gx used to
   refuse on any draft, which left a stale `/clear` blocking Continue with no visible reason.)
-- **Whole-input clear.** The nudge's retype clears the whole input (repeated Ctrl+U, then an empty
-  check), never Ctrl+C.
-- **Failures are one key away.** Every first-prompt failure raises the prompt as a one-step
-  gx-raised Actionable. The person's input never clears a gx-raised Actionable; only `a`, a newer
-  Actionable or exit replaces it.
+- **Whole-input clear.** `Deliver`'s nudge retype clears the whole input (repeated Ctrl+U, then an
+  empty check), never Ctrl+C.
+- **Failures show as cards.** `Deliver` is the only code that retries. A failure that is not
+  recovered raises one of three delivery-failure cards: yellow "May not have been sent" (a slash
+  text gx cannot tell landed; no resend, since the command could run twice), red "Send failed", and
+  red Unknown command with Resend and Restart agent. Each has Dismiss, which clears it for every tab
+  and the TUI. The "gx stopped" cards of a draft that will not clear and of an agent still starting
+  keep Retry. The person's input never clears a gx-raised Actionable; only running it, Dismiss for
+  a delivery-failure card, a newer Actionable or exit replaces it.
 - **Logs.** Each step writes a debug line, so the timing targets can be checked from the server
   log.
 
@@ -130,10 +141,12 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
     that a local command never runs twice. [08]
 21. As a person, I want a slash first prompt to end on a full turn, a new conversation id or the
     Idle settle window, as an Action slash step does. [08]
-22. As a person, I want gx to press Enter once if the slash first prompt is still in the input when
-    the settle window ends, so that a swallowed Enter is recovered. [08]
-23. As a person, I want gx to stop without pressing Enter when the input is empty or the empty
-    check can't decide, so that gx never submits text it isn't sure about. [08]
+22. As a person, I want gx to press Enter again when the input-box row starts with the slash first
+    prompt's own text when the settle window ends (at most 3 times), so that a swallowed Enter is
+    recovered. [08]
+23. As a person, I want gx to press nothing when the settle read shows our text gone or cannot be
+    trusted, so that gx never submits text it isn't sure about. A read that cannot be trusted and
+    still shows our text ends as the "May not have been sent" card. [08]
 24. As a person who starts typing in the new session, I want my input to stop every remaining nudge
     (Enter and retype), so that gx never submits my half-typed text. [08]
 25. As a person, I want a nudge cancelled by my input to be no failure (no warning, no Actionable),
@@ -142,8 +155,9 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 ### First prompt: failures
 
 26. As a person whose first prompt fails (nudge stuck, nudge start timeout, still Starting after
-    30s, or vim NORMAL mode give-up), I want the session raised as Actionable with the prompt as a
-    one-step Action, so that one `a` retries it. [09]
+    30s, or vim NORMAL mode give-up), I want the session to show the red "Send failed" card with the
+    prompt to copy, not a one-step Actionable, for the give-up, agent-never-started and
+    never-reached-input exits, so that I see why and can Dismiss it. [09, deliver-primitive]
 27. As a person, I want each failure's reason to name its cause (stuck, agent never started, vim
     NORMAL mode, input not empty), so that I know what to fix before pressing `a`. [09]
 28. As a person, I want gx to clear its own leftover text once after a stuck or timed-out nudge, so
@@ -160,7 +174,9 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 32. As a person who runs an Action of `/clear` then a prompt, I want the next step typed within ~1s
     of `/clear` finishing, so that I don't wait 10s. [02]
 33. As a person, I want a slash step to end on the first of a full turn, a new conversation id while
-    Idle, or the Idle settle window, so that both local and turn-running commands end fast. [02]
+    Idle, or the Idle settle window, so that both local and turn-running commands end fast. When the
+    settle window decides nothing, the step raises the "May not have been sent" card, later steps
+    are dropped and the reason says "N later steps not sent". [02, deliver-primitive]
 34. As a person, I want a real-prompt step unchanged (Working then Idle, 10s start timeout), so that
     a prompt that never started still stops the rest. [02]
 35. As a harness author, I want no hard-coded command list (no `/clear`), so that any harness that
@@ -170,10 +186,10 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
     start timeout, so that it can be raised if a skill command goes Working late. [02]
 37. As a person, I want the next step typed at once after a conversation-id change, so that no fixed
     delay is added. [02]
-37a. As a person, I want gx to press Enter once if an Action slash step is still in the input when
-    the settle window ends, and to stop without Enter when the input is empty or the check can't
-    decide, so that a swallowed Enter doesn't make the next step's draft check refuse on gx's own
-    text. [08, review]
+37a. As a person, I want gx to press Enter again (at most 3 times) when an Action slash step's
+    text is at the start of the input-box row when the settle window ends, and to press nothing when
+    our text is gone, so that a swallowed Enter doesn't make the next step's draft check refuse on
+    gx's own text. [08, review, deliver-primitive]
 
 ### Ready to type (vim mode)
 
@@ -184,7 +200,7 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
     mid-session `/config` toggle is caught. [05]
 40. As a person, I want gx never to type into NORMAL mode, so that a prompt is never mangled. [05]
 41. As a person, I want the ready-to-type step on every typing path: the first prompt, Action
-    steps, `Prompt` and `PromptNudged` in both runners (before the retype's clear), and
+    steps, `Deliver` in the server and the PTY runner (before the retype's clear), and
     deny-with-reason after its Esc. [05]
 42. As a person, I want a vim give-up handled by each path's own failure rule: the first prompt
     raises Actionable; an Action stops its remaining steps, as other step failures do;
@@ -244,8 +260,9 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 
 - **Design session**, **Session ticket**, **Actionable** and **Action** as in `GLOSSARY.md`. The
   Actionable entry already covers a gx-raised one (draft, failed first prompt or failed Action).
-- **Typing path**: any code that types text into a session: the first prompt, Action steps,
-  `Prompt` and `PromptNudged` in the herdr and PTY runners, and deny-with-reason.
+- **Typing path**: any code that types text into a session: the first prompt, Action steps, chat
+  sends and the PTY runner's prompts. All of them are `Deliver` (`agentrunner/deliver`) now, and the
+  herdr runner is gone. Deny-with-reason is the one other typing path.
 - **Slash prompt**: a prompt whose first character is `/`. The only test gx makes on a prompt's
   text.
 - **gx-raised Actionable**: an Actionable gx raised itself (draft, failed first prompt or failed Action), as
@@ -291,8 +308,8 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 - The 30s start timeout counts Starting time from launch. A session that went Blocked is no longer
   Starting, so the timeout can't fire while a person answers a dialog.
 - The PTY runner's launch wait reads the same ready report through the shared holder and harness
-  code. No ralph-loop-specific work. Ralph-loop's `PromptNudged` on the PTY runner takes input
-  ownership per batch of keys under the same rules (see
+  code. No ralph-loop-specific work. Ralph-loop's PTY runner prompts through `Deliver`, which takes
+  input ownership per batch of keys under the same rules (see
   `docs/specs/single-owner-session-input.md`).
 - The hand measurement (below) checks which Claude signal (pid file `idle`, OSC 7501 idle, composer marker, first Idle) fires
   first, and drops any that never fires first.
@@ -301,25 +318,31 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 
 - Replaces today's "type on first Idle with raw `SendKeys`". Fires on ready or first Idle,
   whichever comes first. Order: ready to type, then deliver. No draft check on the first prompt.
-- **Real prompt**: delivered through `claudeui.PromptWithNudge` (default caps) with a Prompter over
-  the session's holder. Ralph-loop's `PromptNudged` path is unchanged except that it takes input ownership per batch of keys.
-- **Slash prompt**: typed once. Ends on the first of a full turn, a new conversation id, or the
-  settle window (same rule and config as an Action slash step). When the settle window ends, the
-  empty check runs: the prompt still in the input → one Enter, then stop; empty or can't decide →
-  stop.
+- **Real prompt**: delivered by `Deliver` with the turn-starting policy (nudge and retype, the start
+  signal is the holder's turn). The PTY runner's launch prompt goes through the same `Deliver`.
+- **Slash prompt**: typed once, never retyped. Ends on the first of a full turn, a new conversation
+  id, or the settle window (same rule and config as an Action slash step). When the settle window
+  ends, `Deliver` presses Enter again only when the input-box row starts with gx's own text, at most
+  3 times; our text gone means landed and gx presses nothing. A launch prompt that Claude answers
+  with `Unknown command:` (Codex: `Unrecognized command`) is retyped for about 30 seconds. That is
+  the launch policy's one retype.
 - **Person input** (`StreamInput`) after gx typed the prompt cancels every remaining nudge, for
   slash and real prompts. Not a failure. gx holds input ownership only while it sends one batch of
   keys (one nudge Enter or retype, the prompt), not during the wait for Working, so person keys
   reach the agent during a wait (`docs/specs/single-owner-session-input.md`). Input before the first prompt's keys is not a draft case: gx owns the input from launch until they are sent, and a client that attaches earlier becomes owner after that batch (first-prompt owner rule in `docs/specs/single-owner-session-input.md`).
-- The slash rule and the input cancel live in the first-prompt path, not in the shared nudge.
+- The slash rule lives in `Deliver`'s policy (a text that starts with `/`, except `/compact`, gets
+  the slash policy). The person-input cancel stays in the first-prompt path and is passed to
+  `Deliver` as a callback.
 - **Failures**: nudge stuck (`ErrStuckSubmission`), nudge start timeout (`ErrStartTimeout`), still
-  Starting after 30s, vim give-up. Each one logs a warning, then raises a gx-raised Actionable with
-  the prompt as a one-step Action and a per-cause reason.
+  Starting after 30s, vim give-up. Each one logs a warning. The give-up, agent-never-started and
+  never-reached-input exits raise the red "Send failed" card with the prompt to copy and a per-cause
+  reason. An undecided slash first prompt is logged and left to LaunchProof, with no card. A launch
+  prompt that is rejected for good raises the red Unknown command card.
   - Before raising after stuck or timeout, gx clears its own text once with the retype's clear.
     Still not empty, or can't decide → raise anyway, with a reason that tells the person to clear
     the input.
-  - A turn that starts late after a timeout could make `a` send the prompt twice. Accepted: Actions
-    need Idle, and the person chooses when to press `a`.
+  - A turn that starts late after a timeout could make a Resend send the prompt twice. Accepted:
+    the person chooses when to press it.
 - No draft clear at first-prompt time (see `docs/specs/single-owner-session-input.md`).
 
 ### Actions
@@ -331,9 +354,12 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
   - a new conversation id in a StreamStatus while Idle (Claude's `/clear` changes its pid file
     `sessionId`);
   - the settle window: the session stays Idle for this long after typing.
-- When a slash step ends on the settle window, the empty check runs, as for the slash first prompt:
-  the step still in the input → one Enter, then the step is done; empty or can't decide → done. One
-  shared rule for both.
+- When a slash step ends on the settle window, the settle read is `Deliver`'s, as for the slash
+  first prompt: Enter again only while the input-box row starts with our text (at most 3 times); our
+  text gone → done. One shared rule for both.
+- A step that stays undecided (a torn read that still shows our text) raises the "May not have been
+  sent" card for that step. Later steps are dropped and the reason says "N later steps not sent".
+  No remaining-steps Action is offered.
 - Blocked or exit still stop the rest.
 - Settle window: default 1s, a new server config field beside `ActionStepStartTimeout`. Its name,
   and whether a user config key sets it, are the implementer's choice.
@@ -354,7 +380,12 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 - `StreamInput` keeps clearing an agent-raised Actionable, but never a gx-raised one.
 - Replaced only by running it (`a`), a newer Actionable, or session exit.
 - Banner and `sound.Attention`, with the reason as text, as for agent-raised.
-- No dismiss key (a dismiss key would redesign the Agents tab; out of scope).
+- Dismiss (changed 2026-11-23 by `docs/specs/deliver-primitive.md`): the session verb `dismiss`
+  (CLI `gx agents dismiss <id>`) clears only the three delivery-failure kinds. Any other Actionable, or a
+  session with no card, gets a distinct refusal reason.
+- A structured `Kind` marks the three delivery-failure cards: `maybe-sent` ("May not have been
+  sent", no Action), `send-failed` and `unknown-command` (Resend and Restart agent). The web, the
+  TUI and the clear-on-success rule switch on `Kind`, not on the reason text.
 
 ### Nudge retype clear
 
@@ -365,10 +396,24 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
   gx typed), then the empty check when the runner's screen read carries styling. With no styling,
   the count alone decides.
 - Still not empty → the existing stuck error plus a debug line. Never Ctrl+C on any harness.
-- Applies to both the herdr runner and the PTY runner, through `claudeui.PromptWithNudge`'s
-  Prompter.
+- Applies to every `Deliver` call, in the server and in the PTY runner (the herdr runner is gone).
+  The nudge engine lives in `agentrunner/deliver`.
 - `docs/specs/server-recovery.md` (story 52 and the nudge decision near line 406) changes to:
   "clears the whole input (repeated Ctrl+U) before every full retype".
+
+### Deliver: one retry owner
+
+- `Deliver` (`agentrunner/deliver`) strips, takes the input, checks it is ready, clears a draft,
+  types, submits and checks the result. It is the only code that retries. No other layer nudges,
+  retypes or presses Enter again, so retries never stack.
+- A slash text is typed once. gx presses Enter again only when the input-box row starts with gx's
+  own text, at most 3 times. The one retype is a launch prompt that got `Unknown command:`
+  (Codex: `Unrecognized command`), for about 30 seconds.
+- An unrecovered failure raises one of the three delivery-failure cards (see "gx-raised
+  Actionable"). A guard test (`deliverguard`) fails when code outside its allowlist types, pastes or
+  submits.
+- The policies, the strip set, the settle read and the exits are in
+  `docs/specs/deliver-primitive.md`. They are not copied here.
 
 ### Deny-with-reason
 
@@ -443,7 +488,7 @@ herdr runner's typing rules), then records the results in this spec's Further No
      files, OSC 7501 events and config files with and without `editorMode: vim`. Covers Claude and
      Codex empty and draft inputs, can't decide on unstyled reads, the INSERT marker, and Codex's
      no-op ready-to-type.
-  3. **Nudge** (existing, `claudeui.PromptWithNudge` with a fake Prompter). Covers the 2N−1+2 clear
+  3. **Nudge** (existing, `deliver.PromptWithNudge` with a fake Prompter). Covers the 2N−1+2 clear
      count for multi-line text, the empty check after the clear, stuck when not empty, count-only
      when the read has no styling, ready-to-type before the clear, and never Ctrl+C. Both runners
      reach this through their Prompter, so one suite covers both.
@@ -470,10 +515,11 @@ herdr runner's typing rules), then records the results in this spec's Further No
 - Changing harness launch arguments in ways that skip trust prompts, or passing the first prompt as
   a launch argument.
 - Redesigning the Agents create form beyond the directory step and the starting focus.
-- A dismiss key for a gx-raised Actionable.
-- Separate work for ralph-loop ticket launches: they get only what the shared harness and nudge
-  code gives them. Ralph-loop's `PromptNudged` keeps its nudge as is (no slash rule, no input
-  cancel), except that it takes input ownership per batch of keys.
+- A dismiss key for a gx-raised Actionable other than the three delivery-failure cards (those have
+  the Dismiss verb since `docs/specs/deliver-primitive.md`).
+- Separate work for ralph-loop ticket launches: they get what `Deliver` gives them, including the
+  slash rule and the launch policy's `Unknown command` retype. Input ownership is per batch of
+  keys.
 - Stashing and restoring a person's draft.
 
 ## Further Notes

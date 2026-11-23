@@ -473,9 +473,10 @@ draws Unread as a bold title; Queue and Triage agents carry none. _Avoid_: needs
 
 **Actionable** — the agent needs something specific from the person: an answer to a permission
 prompt, question or dialog (while Blocked), a next step the agent itself raised, or prompts gx could
-not send (the input held a draft, or the first prompt failed). Viewing does not clear it; resolving
-the block or typing into the session does, except for one gx raised itself, which only running it or
-a newer Actionable or session exit replaces. Always carries a reason.
+not send (the input held a draft, or a delivery failed: see **Not-sent card**). Viewing does not
+clear it; resolving the block or typing into the session does, except for one gx raised itself, which
+only running it, a newer Actionable or session exit replaces. The three delivery-failure kinds also
+clear with the Dismiss verb. Always carries a reason.
 _Avoid_: unread (a read session can still be actionable).
 
 **Auto-advance** — the server sends a Design session's Continue by itself after a countdown.
@@ -487,6 +488,18 @@ is the sibling of Auto-advance; on its own it starts nothing.
 
 **Action** — the prompts an agent attaches to an Actionable it raised, which gx can send into the
 session on the person's request (e.g. clear, then run the next design step).
+
+**Deliver** — the one function (`agentrunner/deliver`) that types a prompt into a session and gets
+it sent: it strips hidden characters, takes the input, clears a draft, types, presses submit and
+checks the result. It is the only code that retries. A slash text is typed once; gx presses Enter
+again only when the input-box row starts with its own text, at most 3 times.
+_Avoid_: typing path, nudge (the nudge is `Deliver`'s turn-starting retry).
+
+**Not-sent card** — the card a session shows when `Deliver` could not tell whether a `/` command
+landed: yellow "May not have been sent", with the reason, the text to copy, Show screen and Dismiss,
+and no resend, because the command could run twice. Its siblings are the red "Send failed" card and
+the red Unknown command card (with Resend and Restart agent). All three are **Actionable** kinds that
+Dismiss clears.
 
 **Headless runner** — the agent runner that drives claude through its non-interactive,
 structured-event mode. It hosts Claude only: a Codex launch under `agent-runner: headless` runs on
@@ -1418,5 +1431,6 @@ _Avoid_: setup, init.
 
 **Input owner** — the client (TUI or web UI) or gx that holds a session's keys. Only the owner's keys
 reach the agent; a non-owner's keys are blocked with a take-over hint. The PTY size follows the last
-client owner, and gx never resizes it. gx takes the role while it types and gives it back after.
+client owner, and gx never resizes it. gx takes the role for one `Deliver` batch (the typed text and
+its first Enter, the draft clear, or one later Enter) and gives it back after.
 _Avoid_: controller, focus.
