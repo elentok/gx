@@ -2,6 +2,8 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { App } from "./App"
 import { readRoundDraft, writeRoundDraft } from "./drafts"
+import { listenForNotificationTaps } from "./pwa/notificationTap"
+import { TAP_MESSAGE } from "./pwa/workerCore"
 import type { Snapshot } from "./snapshot"
 import { renderThemed } from "./ui/render"
 
@@ -171,4 +173,38 @@ describe("the Backlog page", () => {
     expect(screen.queryByRole("dialog")).toBeNull()
     expect(window.location.hash).toBe("#/backlog")
   })
+})
+
+test("the mounted app follows a notification tap message", async () => {
+  const worker = new EventTarget()
+  Object.defineProperty(navigator, "serviceWorker", { value: worker, configurable: true })
+  listenForNotificationTaps()
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("{}")),
+  )
+  window.location.hash = "#/backlog"
+  renderThemed(
+    <App
+      deps={{
+        cache: { load: () => snapshotListing(), save: () => {} },
+        fetchSnapshot: async () => snapshotListing(),
+        openStream: () => new Promise(() => {}),
+      }}
+    />,
+  )
+  const port = { postMessage: vi.fn() }
+  act(() => {
+    worker.dispatchEvent(
+      Object.assign(new Event("message"), {
+        data: { type: TAP_MESSAGE, path: "/stats" },
+        ports: [port],
+      }),
+    )
+  })
+  await waitFor(() => expect(window.location.hash).toBe("#/stats"))
+  expect(port.postMessage).toHaveBeenCalledOnce()
+  vi.unstubAllGlobals()
+  Reflect.deleteProperty(navigator, "serviceWorker")
+  window.location.hash = ""
 })

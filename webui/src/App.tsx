@@ -9,6 +9,7 @@ import {
 } from "./connection"
 import { pruneDrafts } from "./drafts"
 import { routeHashLinkClicks } from "./nav/hashLinks"
+import { setTapRouter } from "./pwa/notificationTap"
 import { useRestHeartbeat } from "./rest"
 import { RestScreen } from "./RestScreen"
 import { createAppRouter } from "./routes"
@@ -38,6 +39,7 @@ export function App({ deps, fetchDetail }: { deps?: ConnectionDeps; fetchDetail?
   usePruneDraftsOnLiveSnapshot(conn)
   const [router] = useState(() => createAppRouter(fetchDetail))
   useEffect(() => routeHashLinkClicks(router), [router])
+  useEffect(() => setTapRouter(router), [router])
   useEffect(() => trackRouter(router), [router])
   return (
     <ConnectionContext.Provider value={conn}>

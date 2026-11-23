@@ -2,6 +2,8 @@ import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react
 import { useEffect } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { signOut } from "../apiFetch"
+import { listenForNotificationTaps } from "../pwa/notificationTap"
+import { TAP_MESSAGE } from "../pwa/workerCore"
 import { renderThemed } from "../ui/render"
 import { AuthGate } from "./AuthGate"
 import type { AuthState } from "./authState"
@@ -157,6 +159,35 @@ test("a successful login re-reads the state and keeps the hash", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }))
   expect(await screen.findByText("the app")).toBeTruthy()
   expect(window.location.hash).toBe("#/stats")
+})
+
+test("a tap while signed out keeps the target and it is still the hash after sign-in", async () => {
+  const worker = new EventTarget()
+  Object.defineProperty(navigator, "serviceWorker", { value: worker, configurable: true })
+  listenForNotificationTaps()
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("{}")),
+  )
+  let current = stateOf("signed-out")
+  renderGate(async () => current)
+  fireEvent.change(await screen.findByLabelText("Password"), { target: { value: "pw" } })
+  const port = { postMessage: vi.fn() }
+  act(() => {
+    worker.dispatchEvent(
+      Object.assign(new Event("message"), {
+        data: { type: TAP_MESSAGE, path: "/s/1" },
+        ports: [port],
+      }),
+    )
+  })
+  expect(window.location.hash).toBe("#/s/1")
+  expect(port.postMessage).toHaveBeenCalledOnce()
+  current = stateOf("signed-in")
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }))
+  expect(await screen.findByText("the app")).toBeTruthy()
+  expect(window.location.hash).toBe("#/s/1")
+  Reflect.deleteProperty(navigator, "serviceWorker")
 })
 
 test("sign out clears the page caches", async () => {
