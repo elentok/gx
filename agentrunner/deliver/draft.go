@@ -43,6 +43,15 @@ type DraftClearer interface {
 // can't decide types as before. The caller holds the input.
 func ClearDraft(c *holder.HolderClient, typing harness.Typing, log *slog.Logger, hooks DraftHooks) error {
 	state, read, _ := InputRead(c, typing)
+	// A frame caught mid-redraw reads undecided; the next read settles it. A
+	// holder without styled rows never will, so it does not wait.
+	if state == harness.InputUndecided && !read.Resized && c.Supports(holder.OpScreenStyled) {
+		deadline := time.Now().Add(draftSettleWait)
+		for state == harness.InputUndecided && !read.Resized && time.Now().Before(deadline) {
+			time.Sleep(draftSettlePoll)
+			state, read, _ = InputRead(c, typing)
+		}
+	}
 	if read.Resized || state == harness.InputUndecided {
 		log.Info("typing on an untrusted screen read", "resized", read.Resized, "pty_size", read.PTY, "attach_sizes", read.Attaches)
 		if hooks.Untrusted != nil {

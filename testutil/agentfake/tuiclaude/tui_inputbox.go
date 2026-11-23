@@ -166,7 +166,9 @@ func (t *tui) boxRows() []string {
 			}
 			for j, row := range strings.Split(ansi.Wrap(line, width, ""), "\n") {
 				if i == 0 && j == 0 {
-					row = prefix + row
+					// Real claude always styles the box, so a plain draft is still a
+					// styled read; with no SGR anywhere the harness check is undecided.
+					row = prefix + row + "\x1b[39m"
 				} else {
 					row = "  " + row
 				}

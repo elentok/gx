@@ -50,6 +50,8 @@ func TestRetry(t *testing.T) {
 			if res := f.keys(t, wire.SessionKeysRequest{Text: "typed meanwhile"}); res.Refused {
 				t.Fatalf("keys = %+v", res)
 			}
+			// The keys return before the TUI redraws; a retry that read the old frame sees no draft.
+			servertest.WaitForScreen(t, servertest.WaitForHolder(t, filepath.Join(f.h.SessionsDir, f.id)), "typed meanwhile")
 			if code, body := f.retry(t); code != http.StatusOK || strings.Contains(body, `"refused":true`) {
 				t.Fatalf("retry = %d %s", code, body)
 			}
