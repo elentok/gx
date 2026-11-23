@@ -36,6 +36,7 @@ func startTUIChat(t *testing.T, env ...string) tuiChat {
 		func(c *server.Config) {
 			c.ActionSlashSettle = 200 * time.Millisecond
 			c.PromptGrace = firstPromptGrace
+			c.ActionStepStartTimeout = firstPromptGrace
 		},
 		servertest.WithEnv("PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "HOME="+home, "CLAUDE_CONFIG_DIR="+filepath.Join(home, ".claude")))
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

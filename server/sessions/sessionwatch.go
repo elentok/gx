@@ -280,19 +280,6 @@ func (mg *Manager) watchSession(dir, id string, run int, crashUntil time.Time, r
 	}
 }
 
-// typeSessionPrompt sends Enter on its own, so the harness reads the prompt
-// as typed rather than as a paste ending in a newline.
-func TypeSessionPrompt(dir, prompt string) error {
-	c, err := holder.DialHolder(dir)
-	if err == nil {
-		err = c.TypeText(prompt)
-	}
-	if err == nil {
-		err = c.SendKeys("\r")
-	}
-	return err
-}
-
 func sessionExitOf(code int) string {
 	if code == 0 {
 		return wire.SessionExitClean

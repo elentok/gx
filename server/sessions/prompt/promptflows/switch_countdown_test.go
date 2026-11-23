@@ -21,7 +21,7 @@ func switchModel(t *testing.T, f *rigs.GrillingFixture, model string) wire.Sessi
 
 func TestSwitch_AnAcceptedSwitchStopsTheAutoAdvanceCountdownWithOneNotice(t *testing.T) {
 	t.Parallel()
-	f, _ := startCountdown(t)
+	f := startCountdown(t)
 
 	if res := switchModel(t, f, "opus"); res.Refused || res.Session == nil || res.Session.SwitchingModel != "opus" {
 		t.Fatalf("switch = %+v, want accepted", res)
@@ -61,7 +61,7 @@ func TestSwitch_AnAcceptedSwitchStopsTheAutoQueueCountdown(t *testing.T) {
 
 func TestSwitch_ARefusedSwitchLeavesTheCountdownRunning(t *testing.T) {
 	t.Parallel()
-	f, _ := startCountdown(t)
+	f := startCountdown(t)
 
 	if res := switchModel(t, f, ""); !res.Refused {
 		t.Fatalf("switch without a model = %+v, want refused", res)

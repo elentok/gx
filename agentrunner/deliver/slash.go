@@ -278,6 +278,13 @@ func (s *slashSend) undecided(polls int, visible bool) error {
 	return fmt.Errorf("%w: see the screen to tell whether %q ran (%d re-reads)", ErrMaybeUnsent, firstToken(s.text), polls)
 }
 
+// typeSubmitter is an Input that types and presses the first Enter under one
+// lock and batch, so another send's keys or draft clear cannot land between
+// them. between runs after the text is typed and before the Enter.
+type typeSubmitter interface {
+	TypeThenSubmit(text string, between func()) error
+}
+
 // deliverSlash types the command once and presses the submit key once. After
 // the settle it presses again only on a trusted read whose box row still shows
 // gx's text. It never retypes.
@@ -285,15 +292,24 @@ func deliverSlash(t Input, text string, caps SlashCaps, report func(claudeui.Nud
 	if !readyToType(t) {
 		return fmt.Errorf("%w: %w", claudeui.ErrStuckSubmission, claudeui.ErrNotReadyToType)
 	}
-	if err := t.Type(text); err != nil {
-		return err
-	}
 	s := &slashSend{t: t, text: text, chips: t.ImageCount(), caps: caps, launch: launch}
-	if caps.Settle > 0 {
-		s.baseline, _, _ = t.ReadRows()
+	readBaseline := func() {
+		if caps.Settle > 0 {
+			s.baseline, _, _ = t.ReadRows()
+		}
 	}
-	if err := t.SendEnter(); err != nil {
-		return err
+	if ts, ok := t.(typeSubmitter); ok {
+		if err := ts.TypeThenSubmit(text, readBaseline); err != nil {
+			return err
+		}
+	} else {
+		if err := t.Type(text); err != nil {
+			return err
+		}
+		readBaseline()
+		if err := t.SendEnter(); err != nil {
+			return err
+		}
 	}
 	if caps.Settle <= 0 {
 		return s.watch()

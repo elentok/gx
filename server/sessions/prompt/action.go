@@ -97,11 +97,14 @@ type actionRun struct {
 	// task still running; Promptable treats it as Idle.
 	background bool
 	started    time.Duration
-	settle     time.Duration
 	// convID is the last conversation id seen; convChanged is set when a
 	// status carried a different one, and cleared at each step.
 	convID      string
 	convChanged bool
+	// What the step's start signal saw, cleared at each step: a running turn, a
+	// Blocked state, or the signal that ended it on the spot.
+	sawWorking, wentBlocked bool
+	ended                   string
 	// personTyped is set once a person's own key or paste reaches the session.
 	personTyped bool
 	// gate, when set, runs under the typing lock before typeStepWith types; an
@@ -125,6 +128,10 @@ func (p *Prompt) SendAction(dir, label string, action []string) {
 	case errors.Is(err, ErrServerStopping), errors.Is(err, ErrWentBlocked), errors.Is(err, errNotIdle):
 		// Shutdown is not a failure, and Blocked or a busy session already shows.
 		p.log.Info(strings.ToLower(label)+" stopped", "session", filepath.Base(dir), "err", err)
+	case errors.Is(err, deliver.ErrMaybeUnsent):
+		// No Action: resending could run the command twice.
+		p.log.Warn(strings.ToLower(label)+" undecided", "session", filepath.Base(dir), "err", err)
+		p.raiseActionable(dir, wire.SessionActionable{Reason: undecidedStepReason(err, len(action)-i-1), GxRaised: true})
 	default:
 		p.log.Warn(strings.ToLower(label)+" failed", "session", filepath.Base(dir), "err", err)
 		p.RaiseGxActionable(dir, fmt.Sprintf("%s failed: %v", label, err), action[i:])
@@ -132,6 +139,19 @@ func (p *Prompt) SendAction(dir, label string, action []string) {
 }
 
 var errNotIdle = errors.New("session is not idle")
+
+// undecidedStepReason is the card of an undecided step: Deliver's reason, then
+// how many later steps were dropped.
+func undecidedStepReason(err error, later int) string {
+	reason := maybeSentPrefix + strings.TrimPrefix(err.Error(), deliver.ErrMaybeUnsent.Error()+": ")
+	switch later {
+	case 0:
+		return reason
+	case 1:
+		return reason + "; 1 later step not sent"
+	}
+	return fmt.Sprintf("%s; %d later steps not sent", reason, later)
+}
 
 // runAction sends the prompts and returns the index of the step it stopped
 // at, with the error it stopped on.
@@ -186,7 +206,6 @@ func (p *Prompt) openActionRun(dir string, opts RunOpts) (*actionRun, func(), er
 		RunOpts: opts,
 		p:       p, dir: dir, holder: c, msgs: msgs, state: wire.SessionIdle,
 		started: cmp.Or(p.cfg.ActionStepStartTimeout, DefaultActionStepStartTimeout),
-		settle:  cmp.Or(p.cfg.ActionSlashSettle, DefaultActionSlashSettle),
 	}
 	return run, func() {
 		close(done)
@@ -205,52 +224,81 @@ func (r *actionRun) TypeStep(i int, prompt string) error {
 }
 
 // typeStepWith is TypeStep that pastes imgs after the draft check and before
-// the prompt.
+// the prompt. The lock, the draft clear, the paste, the keys and the nudges
+// are deliver.Deliver's; the run's status watch is its start signal.
 func (r *actionRun) typeStepWith(i int, prompt string, imgs imageSet) error {
-	unlock, err := lockTyping(r.p, filepath.Base(r.dir), r.Cancel)
-	if err != nil {
-		return err
-	}
-	// One batch: the draft clear, the paste, the text and its Enter.
-	release, err := deliver.HoldInput(r.holder, unlock)
-	if err != nil {
-		return err
-	}
-	defer release()
+	id := filepath.Base(r.dir)
+	slash := strings.HasPrefix(prompt, "/")
+	t := &deliver.Target{C: r.holder, Typing: r.p.projects.SessionTyping(r.dir), IO: r.p.projects.TypingIO(r.dir, r.holder, "action-step"),
+		Cancel: r.Cancel, OnTyped: r.OnTyped,
+		Lock:  func() (func(), error) { return lockTyping(r.p, id, r.Cancel) },
+		Start: func(timeout time.Duration) (bool, error) { return r.waitStepStart(timeout, slash) }}
+	imgs.onto(t)
 	if r.gate != nil {
+		// The gate runs under the lock; Deliver's first keys take it over.
+		unlock, err := lockTyping(r.p, id, r.Cancel)
+		if err != nil {
+			return err
+		}
+		release, err := deliver.HoldInput(r.holder, unlock)
+		if err != nil {
+			return err
+		}
+		t.Held = release
+		defer t.ReleaseHeld()
 		if err := r.gate(); err != nil {
 			return err
 		}
 	}
-	if !r.p.projects.Typing().ReadyToType(r.p.projects.TypingIO(r.dir, r.holder, "action-step")) {
-		return fmt.Errorf("step %d: %w", i, claudeui.ErrNotReadyToType)
-	}
-	if err := r.p.ClearDraft(r.dir, r.holder); err != nil {
+	r.convChanged, r.sawWorking, r.wentBlocked, r.ended = false, false, false, ""
+	r.p.log.Info("action step typing", "session", id, "step", i, "len", len(prompt), "head", PromptHead(prompt))
+	policy := r.p.deliverPolicy(r.dir, prompt, r.started, "action step nudge")
+	if err := deliver.Deliver(t, prompt, policy); err != nil {
 		return err
 	}
-	r.convChanged = false
-	before, _ := InputState(r.holder)
-	r.p.log.Info("action step typing", "session", filepath.Base(r.dir), "step", i, "len", len(prompt), "head", PromptHead(prompt), "input_before", before)
-	if err := imgs.paste(r.holder); err != nil {
-		return err
-	}
-	if err := sessions.TypeSessionPrompt(r.dir, imgs.withText(prompt)); err != nil {
-		return err
-	}
-	if r.OnTyped != nil {
-		r.OnTyped()
-	}
-	r.p.log.Info("action step typed", "session", filepath.Base(r.dir), "step", i)
+	r.p.log.Info("action step typed", "session", id, "step", i)
 	return nil
+}
+
+// waitStepStart is a step's start signal for Deliver. A running turn is a
+// start; so is a Blocked state (the prompt was sent) and a person's own input.
+// A slash step also starts on a new conversation id while Idle (`/clear`).
+func (r *actionRun) waitStepStart(timeout time.Duration, slash bool) (bool, error) {
+	timer := time.After(timeout)
+	for {
+		expired, signal, err := r.NextStatus(timer)
+		switch {
+		case errors.Is(err, ErrWentBlocked):
+			r.wentBlocked = true
+			return true, nil
+		case err != nil:
+			return false, err
+		case signal != "":
+			r.ended = signal
+			return true, nil
+		case r.TurnRunning():
+			r.sawWorking = true
+			return true, nil
+		case slash && r.Promptable() && r.convChanged:
+			r.ended = signalNewConv
+			return true, nil
+		case expired:
+			return false, nil
+		}
+	}
 }
 
 // Step types one prompt and waits for it to end.
 func (r *actionRun) Step(i int, prompt string) error {
 	begin := time.Now()
 	if err := r.TypeStep(i, prompt); err != nil {
+		if errors.Is(err, claudeui.ErrStartTimeout) || errors.Is(err, claudeui.ErrStuckSubmission) {
+			r.p.log.Info("action step done", "session", filepath.Base(r.dir), "step", i, "signal", signalStartTimeout, "elapsed", time.Since(begin))
+			return fmt.Errorf("step %d: %w", i, err)
+		}
 		return err
 	}
-	signal, err := r.waitForStep(strings.HasPrefix(prompt, "/"))
+	signal, err := r.waitForStepEnd()
 	r.p.log.Info("action step done", "session", filepath.Base(r.dir), "step", i, "signal", signal, "elapsed", time.Since(begin))
 	if err != nil {
 		return fmt.Errorf("step %d: %w", i, err)
@@ -281,14 +329,6 @@ const (
 	signalPersonInput  = "person-input"
 )
 
-// waitForStep waits for a step to end and returns the signal it ended on.
-func (r *actionRun) waitForStep(slash bool) (string, error) {
-	if slash {
-		return r.waitForSlash()
-	}
-	return r.waitForTurn()
-}
-
 // NextStatus blocks for the next event of a step. It reports expired when the
 // timer fires. Otherwise a non-empty signal or an error means the step is over,
 // and neither means a status was applied to r.state. Blocked stops the rest
@@ -312,59 +352,30 @@ func (r *actionRun) NextStatus(timer <-chan time.Time) (expired bool, signal str
 	}
 }
 
-// The waits below read Idle as promptable: a finished turn that left a
-// background task running stays Working and never turns Idle.
-
-// waitForTurn waits for a real prompt to go Working then Idle. It stops the
-// rest if the session never goes Working within the start timeout.
-func (r *actionRun) waitForTurn() (string, error) {
-	timer := time.After(r.started)
-	working := false
-	for {
-		expired, signal, err := r.NextStatus(timer)
-		if signal != "" || err != nil {
+// waitForStepEnd waits for a typed step to end, after Deliver's start signal
+// has noted how it began. A running turn ends on the following Idle (read as
+// promptable: a finished turn that left a background task running stays
+// Working and never turns Idle). A command that never showed a turn ends on
+// Deliver's settle, which already pressed any Enter it needed.
+func (r *actionRun) waitForStepEnd() (string, error) {
+	if err := r.CatchUp(); err != nil {
+		return "", err
+	}
+	switch {
+	case r.ended != "":
+		return r.ended, nil
+	case r.wentBlocked:
+		return "", ErrWentBlocked
+	case r.sawWorking || r.TurnRunning():
+	default:
+		return signalSettle, nil
+	}
+	for !r.Promptable() {
+		if _, signal, err := r.NextStatus(nil); signal != "" || err != nil {
 			return signal, err
 		}
-		switch {
-		case expired && !working:
-			return signalStartTimeout, errors.New("prompt never went working")
-		case expired:
-		case r.TurnRunning():
-			working = true
-		case r.Promptable() && working:
-			return signalTurn, nil
-		}
 	}
-}
-
-// waitForSlash waits for a slash command to end. It may run locally in claude
-// and never show Working, so it ends on Working then Idle, on a new
-// conversation id while Idle (`/clear`), or on the settle window with the
-// session still Idle, where a swallowed Enter gets one more.
-func (r *actionRun) waitForSlash() (string, error) {
-	timer := time.After(r.settle)
-	working := false
-	for {
-		expired, signal, err := r.NextStatus(timer)
-		if signal != "" || err != nil {
-			return signal, err
-		}
-		switch {
-		case expired && (working || !r.Promptable()):
-		case expired:
-			pressed, err := r.p.PressEnterIfStillTyped(r.dir, r.holder)
-			if pressed {
-				r.p.log.Debug("action step settle enter", "session", filepath.Base(r.dir))
-			}
-			return signalSettle, err
-		case r.TurnRunning():
-			working = true
-		case r.Promptable() && working:
-			return signalTurn, nil
-		case r.Promptable() && r.convChanged:
-			return signalNewConv, nil
-		}
-	}
+	return signalTurn, nil
 }
 
 // Promptable reports whether the session waits for the person, as

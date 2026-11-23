@@ -124,6 +124,21 @@ func (t *Target) Type(text string) error {
 	return t.typeLocked(text)
 }
 
+// TypeThenSubmit types text and presses the submit key under one lock and
+// batch; between runs after the typing, before the key.
+func (t *Target) TypeThenSubmit(text string, between func()) error {
+	release, err := t.acquire()
+	if err != nil {
+		return err
+	}
+	defer release()
+	if err := t.typeLocked(text); err != nil {
+		return err
+	}
+	between()
+	return t.submitKey()
+}
+
 // ImageCount is how many images Type pastes before the text.
 func (t *Target) ImageCount() int { return len(t.Images) }
 

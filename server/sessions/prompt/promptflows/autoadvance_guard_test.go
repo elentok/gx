@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // autoSendOnce ends a turn on the run-end line and waits for the countdown to
@@ -15,6 +16,10 @@ func autoSendOnce(t *testing.T, f *grillingFixture) {
 	endTurn(t, f)
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt == nil && s.Actionable.Reason == "" })
+	// The box fake's /clear moves the session to a new conversation, whose
+	// transcript the next run-end line must be written to.
+	cleared := filepath.Join(filepath.Dir(f.Path), f.Conv+agentfake.ProgramClearedSuffix+".jsonl")
+	writeAssistantMessage(t, cleared, runEndText)
 }
 
 func TestAutoAdvance_StopsAfterFiveSendsWithNoInput(t *testing.T) {
@@ -73,18 +78,17 @@ func setSwitch(t *testing.T, f *grillingFixture, on bool) {
 func TestAutoAdvance_SwitchingOnOverARaisedContinueStartsTheCountdown(t *testing.T) {
 	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
-	c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+	waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
 	setSwitch(t, f, false)
 	writeAssistantMessage(t, f.Path, runEndText)
 	endTurn(t, f)
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
 	time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
-	if screenHas(t, c, "/clear") || sessionSnapshot(t, f).AutoAdvanceAt != nil {
+	if sentHas(t, f, "/clear") || sessionSnapshot(t, f).AutoAdvanceAt != nil {
 		t.Fatal("a countdown ran with the switch off")
 	}
 
 	setSwitch(t, f, true)
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
-	waitForScreen(t, c, "/clear")
-	waitForScreen(t, c, "/gx-design map")
+	waitForSent(t, f, "/clear", "/gx-design map")
 }

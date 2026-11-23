@@ -50,11 +50,23 @@ func (p *Prompt) deliverSend(dir, text string, imgs imageSet) error {
 	}
 	// Input from before gx typed is not a reason to stop.
 	run.ClearPersonTyped()
-	policy := deliver.PolicyFor(text)
-	policy.Draft = p.draftHooks(dir)
-	policy.Caps.Grace = cmp.Or(p.cfg.PromptGrace, policy.Caps.Grace)
+	policy := p.deliverPolicy(dir, text, cmp.Or(p.cfg.PromptGrace, deliver.DefaultNudgeCaps.Grace), "send nudge")
 	// A person is waiting on a chat send: press a swallowed Enter after seconds, not after the grace.
 	policy.Caps.Settle = min(sendSettle, policy.Caps.Grace)
+	id := filepath.Base(dir)
+	t := &deliver.Target{C: run.Holder(), Typing: p.projects.SessionTyping(dir), IO: p.projects.TypingIO(dir, run.Holder(), "send"),
+		Lock:  func() (func(), error) { return lockTyping(p, id, nil) },
+		Start: func(timeout time.Duration) (bool, error) { return waitRunStart(run, timeout) }}
+	imgs.onto(t)
+	return deliver.Deliver(t, text, policy)
+}
+
+// deliverPolicy is deliver.PolicyFor(text) with the draft hooks, the nudge
+// grace and the slash settle of the config; report names the nudge log line.
+func (p *Prompt) deliverPolicy(dir, text string, grace time.Duration, report string) deliver.Policy {
+	policy := deliver.PolicyFor(text)
+	policy.Draft = p.draftHooks(dir)
+	policy.Caps.Grace = grace
 	if policy.Slash != nil {
 		policy.Slash.Settle = cmp.Or(p.cfg.ActionSlashSettle, DefaultActionSlashSettle)
 		if meta, err := sessions.ReadMeta(dir); err == nil && meta.Harness == string(harness.Codex) {
@@ -65,14 +77,9 @@ func (p *Prompt) deliverSend(dir, text string, imgs imageSet) error {
 		}
 	}
 	policy.Report = func(d claudeui.NudgeDecision) {
-		p.log.Info("send nudge", "session", filepath.Base(dir), "decision", string(d))
+		p.log.Info(report, "session", filepath.Base(dir), "decision", string(d))
 	}
-	id := filepath.Base(dir)
-	t := &deliver.Target{C: run.Holder(), Typing: p.projects.SessionTyping(dir), IO: p.projects.TypingIO(dir, run.Holder(), "send"),
-		Lock:  func() (func(), error) { return lockTyping(p, id, nil) },
-		Start: func(timeout time.Duration) (bool, error) { return waitRunStart(run, timeout) }}
-	imgs.onto(t)
-	return deliver.Deliver(t, text, policy)
+	return policy
 }
 
 // finishSend settles a send's result: a success clears an earlier "Send failed"
@@ -121,21 +128,6 @@ type imageSet struct {
 	sent  func(id string)
 }
 
-// paste pastes each image path as its own bracketed paste, in order, waiting
-// out the paste settle after each: an Enter sent while claude still ingests an
-// image is swallowed, and the send then idles until the nudge grace ends.
-func (s imageSet) paste(c interface{ TypeTextBy(string, bool) error }) error {
-	for i, path := range s.paths {
-		if err := c.TypeTextBy(path, true); err != nil {
-			return err
-		}
-		if s.sent != nil {
-			s.sent(s.ids[i])
-		}
-	}
-	return nil
-}
-
 // imageSetOf is the imageSet for resolved ids, marking each sent in dir as its
 // paste succeeds.
 func (p *Prompt) imageSetOf(dir string, ids, paths []string) imageSet {
@@ -144,15 +136,6 @@ func (p *Prompt) imageSetOf(dir string, ids, paths []string) imageSet {
 			p.log.Warn("marking image sent", "session", filepath.Base(dir), "image", id, "err", err)
 		}
 	}}
-}
-
-// withText is the text typed after the pastes: one space separates it from
-// the last image's path.
-func (s imageSet) withText(text string) string {
-	if len(s.paths) == 0 {
-		return text
-	}
-	return " " + text
 }
 
 // onto sets the images the Target pastes before its text.

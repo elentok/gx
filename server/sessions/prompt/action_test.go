@@ -59,7 +59,7 @@ func TestRunAction_StepThatNeverWorksStopsTheRest(t *testing.T) {
 	c := waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	waitForScreen(t, c, "first-step")
 	raised := waitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised })
-	if want := "Action failed: step 0: prompt never went working"; raised.Actionable.Reason != want {
+	if want := "Action failed: step 0: timed out waiting for agent to start"; raised.Actionable.Reason != want {
 		t.Errorf("reason = %q, want %q", raised.Actionable.Reason, want)
 	}
 	if got := raised.Actionable.Action; len(got) != 2 || got[0] != "first-step" || got[1] != "second-step" {
@@ -74,19 +74,6 @@ func TestRunAction_StepThatNeverWorksStopsTheRest(t *testing.T) {
 	if screenHas(t, c, "second-step") {
 		t.Error("second prompt sent after the first never went working")
 	}
-}
-
-func TestRunAction_SlashCommandThatNeverWorksStillSendsTheRest(t *testing.T) {
-	t.Parallel()
-	h, ctx, evs, id, conv := startFakeSessionWith(t, wire.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = 200 * time.Millisecond })
-	idleWithAction(ctx, t, h, evs, id, conv, "/clear", "/gx-design X")
-
-	if res, err := h.Client.Sessions.RunAction(ctx, id); err != nil || res.Refused {
-		t.Fatalf("run action = %+v, %v", res, err)
-	}
-	c := waitForHolder(t, filepath.Join(h.SessionsDir, id))
-	waitForScreen(t, c, "/clear")
-	waitForScreen(t, c, "/gx-design X")
 }
 
 // startInputSession is startFakeSessionWith on a fake program with an input

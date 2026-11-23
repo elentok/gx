@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // CountdownDelay is the auto-advance delay StartAdvancing runs with.
@@ -15,7 +16,7 @@ const CountdownDelay = time.Second
 // auto-advance countdown set to CountdownDelay.
 func StartAdvancing(t *testing.T, store string) *GrillingFixture {
 	t.Helper()
-	h, ctx, evs, id, conv, path := StartGrillingSessionIn(t, "proj:map", store, servertest.WithAutoAdvanceDelay(CountdownDelay))
+	h, ctx, evs, id, conv, path := StartGrillingSessionIn(t, "proj:map", store, servertest.WithAutoAdvanceDelay(CountdownDelay), servertest.WithEnv(agentfake.ProgramInputEnv+"=1"))
 	return &GrillingFixture{H: h, Ctx: ctx, Evs: evs, ID: id, Conv: conv, Path: path}
 }
 
@@ -23,7 +24,7 @@ func StartAdvancing(t *testing.T, store string) *GrillingFixture {
 // itself during a test: the test releases it through Prompt().ReleaseAutoAdvance.
 func StartHeldAdvancing(t *testing.T, store string) *GrillingFixture {
 	t.Helper()
-	h, ctx, evs, id, conv, path := StartGrillingSessionIn(t, "proj:map", store, servertest.WithAutoAdvanceDelay(time.Minute))
+	h, ctx, evs, id, conv, path := StartGrillingSessionIn(t, "proj:map", store, servertest.WithAutoAdvanceDelay(time.Minute), servertest.WithEnv(agentfake.ProgramInputEnv+"=1"))
 	return &GrillingFixture{H: h, Ctx: ctx, Evs: evs, ID: id, Conv: conv, Path: path}
 }
 

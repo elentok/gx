@@ -8,7 +8,6 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -21,7 +20,7 @@ func TestAutoAdvance_RunEndSendsContinueAfterTheCountdown(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := startHeldAdvancing(t, storeWithMapStep(t, "spec"))
-			c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+			waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
 			writeAssistantMessage(t, f.Path, text)
 			endTurn(t, f)
 			got := waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
@@ -34,8 +33,7 @@ func TestAutoAdvance_RunEndSendsContinueAfterTheCountdown(t *testing.T) {
 			if !f.H.Server.Prompt().ReleaseAutoAdvance(f.ID) {
 				t.Fatal("no countdown to release")
 			}
-			waitForScreen(t, c, "/clear")
-			waitForScreen(t, c, "/gx-design map")
+			waitForSent(t, f, "/clear", "/gx-design map")
 			waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt == nil && s.Actionable.Reason == "" })
 		})
 	}
@@ -44,7 +42,7 @@ func TestAutoAdvance_RunEndSendsContinueAfterTheCountdown(t *testing.T) {
 func TestAutoAdvance_RunEndWithBackgroundTaskSendsContinue(t *testing.T) {
 	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
-	c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+	waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
 	report(t, f.Conv, agentfake.Control{State: "working"})
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool {
 		return s.Status.State == wire.SessionWorking && !s.Status.Background
@@ -54,8 +52,7 @@ func TestAutoAdvance_RunEndWithBackgroundTaskSendsContinue(t *testing.T) {
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool {
 		return s.Status.Background && s.AutoAdvanceAt != nil
 	})
-	waitForScreen(t, c, "/clear")
-	waitForScreen(t, c, "/gx-design map")
+	waitForSent(t, f, "/clear", "/gx-design map")
 }
 
 func TestAutoAdvance_EndingsThatNeverAdvance(t *testing.T) {
@@ -90,12 +87,12 @@ func TestAutoAdvance_EndingsThatNeverAdvance(t *testing.T) {
 				return
 			}
 			f := startAdvancing(t, storeWithMapStep(t, tc.step))
-			c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+			waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
 			writeAssistantMessage(t, f.Path, tc.text)
 			endTurn(t, f)
 			waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
 			time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
-			if screenHas(t, c, "/clear") {
+			if sentHas(t, f, "/clear") {
 				t.Error("an ending that never advances sent /clear")
 			}
 			if got := sessionSnapshot(t, f); got.AutoAdvanceAt != nil {
@@ -123,13 +120,13 @@ func TestAutoAdvance_SwitchOffOrHeldDesignStartsNoCountdown(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			f := startAdvancing(t, storeWithMapStep(t, "spec"))
-			c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+			waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
 			prevent(t, f)
 			writeAssistantMessage(t, f.Path, runEndText)
 			endTurn(t, f)
 			got := waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" })
 			time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
-			if got.AutoAdvanceAt != nil || screenHas(t, c, "/clear") {
+			if got.AutoAdvanceAt != nil || sentHas(t, f, "/clear") {
 				t.Errorf("session = %+v, want no countdown and nothing sent", got)
 			}
 		})
@@ -137,26 +134,26 @@ func TestAutoAdvance_SwitchOffOrHeldDesignStartsNoCountdown(t *testing.T) {
 }
 
 // startCountdown ends a run on a session so its countdown runs over a raised Continue.
-func startCountdown(t *testing.T) (*grillingFixture, *holder.HolderClient) {
+func startCountdown(t *testing.T) *grillingFixture {
 	t.Helper()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
-	c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+	waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
 	writeAssistantMessage(t, f.Path, runEndText)
 	endTurn(t, f)
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
-	return f, c
+	return f
 }
 
 // wantStopped checks that nothing was sent, the run-end Continue still stands
 // and exactly one banner told the person.
-func wantStopped(t *testing.T, f *grillingFixture, c *holder.HolderClient) {
+func wantStopped(t *testing.T, f *grillingFixture) {
 	t.Helper()
 	// A stopped countdown is gone, so nothing is left that could fire: wait for that, not for the clock.
 	servertest.WaitFor(t, 5*time.Second, "the countdown to be gone", func() bool {
 		return f.H.Server.Prompt().AutoAdvanceDeadline(f.ID).IsZero()
 	})
 	time.Sleep(2 * countdownDelay) // negative wait: a countdown still running would end within this window
-	if screenHas(t, c, "/clear") {
+	if sentHas(t, f, "/clear") {
 		t.Error("a stopped countdown still sent /clear")
 	}
 	got := sessionSnapshot(t, f)
@@ -200,10 +197,10 @@ func TestAutoAdvance_StopsTheCountdown(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			f, c := startCountdown(t)
+			f := startCountdown(t)
 			tc.stop(t, f)
 			if tc.keepsContinue {
-				wantStopped(t, f, c)
+				wantStopped(t, f)
 				return
 			}
 			if got := sessionSnapshot(t, f); got.AutoAdvanceAt != nil {
@@ -215,11 +212,11 @@ func TestAutoAdvance_StopsTheCountdown(t *testing.T) {
 
 func TestAutoAdvance_SwitchOffDuringTheCountdownStopsTheSend(t *testing.T) {
 	t.Parallel()
-	f, c := startCountdown(t)
+	f := startCountdown(t)
 	if res, err := f.H.Client.Sessions.SetAutoAdvance(f.Ctx, f.ID, false); err != nil || res.Refused {
 		t.Fatalf("switch off = %+v, %v", res, err)
 	}
-	wantStopped(t, f, c)
+	wantStopped(t, f)
 }
 
 func TestAutoAdvance_RunEndingWithTheSwitchOffPlaysOneBanner(t *testing.T) {
@@ -241,7 +238,7 @@ func TestAutoAdvance_RunEndingWithTheSwitchOffPlaysOneBanner(t *testing.T) {
 func TestAutoAdvance_TurnSeenOnlyMidFlightStartsNoCountdown(t *testing.T) {
 	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
-	c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+	waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
 	writeAssistantMessage(t, f.Path, runEndText)
 	report(t, f.Conv, agentfake.Control{State: "working"})
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionWorking })
@@ -255,7 +252,7 @@ func TestAutoAdvance_TurnSeenOnlyMidFlightStartsNoCountdown(t *testing.T) {
 	if s := sessionSnapshot(t, f); s.AutoAdvanceAt != nil {
 		t.Errorf("countdown = %v for a turn first seen mid-flight, want none", s.AutoAdvanceAt)
 	}
-	if screenHas(t, c, "/clear") {
+	if sentHas(t, f, "/clear") {
 		t.Error("a turn first seen mid-flight still sent /clear")
 	}
 }
@@ -263,7 +260,7 @@ func TestAutoAdvance_TurnSeenOnlyMidFlightStartsNoCountdown(t *testing.T) {
 func TestAutoAdvance_RestartDropsTheCountdownAndNeverStartsOne(t *testing.T) {
 	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
-	c := waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
+	waitForHolder(t, filepath.Join(f.H.SessionsDir, f.ID))
 	writeAssistantMessage(t, f.Path, runEndText)
 	endTurn(t, f)
 	waitForSession(f.Ctx, t, f.H, f.Evs, f.ID, func(s wire.SessionInfo) bool { return s.AutoAdvanceAt != nil })
@@ -273,7 +270,7 @@ func TestAutoAdvance_RestartDropsTheCountdownAndNeverStartsOne(t *testing.T) {
 	if s := sessionSnapshot(t, f); s.AutoAdvanceAt != nil || s.Actionable.Reason == "" || len(s.Actionable.Action) == 0 {
 		t.Errorf("session after restart = %+v, want no countdown and Continue raised", s)
 	}
-	if screenHas(t, c, "/clear") {
+	if sentHas(t, f, "/clear") {
 		t.Error("a restart during the countdown still sent /clear")
 	}
 }

@@ -355,7 +355,9 @@ func (f *firstPrompt) deliverSlash(prompt string) error {
 		return errSessionBlocked
 	}
 	source := f.launchSource() // counts before the first send
-	if err := run.Step(0, prompt); err != nil {
+	// An unknown command may only mean the skill registry is still filling: the
+	// proof below resends and decides.
+	if err := run.Step(0, prompt); err != nil && !errors.Is(err, agentrunner.ErrUnknownSkill) {
 		return err
 	}
 	select {
