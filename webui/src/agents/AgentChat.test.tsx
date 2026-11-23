@@ -468,6 +468,20 @@ test("a delivery card shows on the Agents tab with its copy text", async () => {
   expect(screen.queryByLabelText("gx stopped")).toBeNull()
 })
 
+test("an unknown-command card shows its four buttons on the Agents tab", async () => {
+  const actionable = {
+    gx_raised: true,
+    reason: "no",
+    kind: "unknown-command",
+    copy_text: "/x",
+  }
+  render(session({ actionable }), chat())
+  await screen.findByText("hello there")
+  const card = screen.getByRole("region", { name: "Send failed" })
+  const names = Array.from(card.querySelectorAll("button")).map((b) => b.textContent)
+  expect(names).toEqual(["Copy", "Resend", "Restart agent", "Show screen", "Dismiss"])
+})
+
 test.each([BlockingDraft, BlockingStarting])(
   "a %s blocking card shows on the Agents tab with Retry",
   async (blocking) => {

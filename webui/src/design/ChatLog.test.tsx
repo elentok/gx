@@ -958,6 +958,16 @@ test("a delivery card shows once, without the gx stopped notice", async () => {
   expect(screen.queryByRole("region", { name: "gx stopped" })).toBeNull()
 })
 
+test("an unknown-command card shows its four buttons in the Design chat", async () => {
+  const actionable = { gx_raised: true, reason: "no", kind: "unknown-command", copy_text: "/x" }
+  renderChat([session({ actionable })], focusChat())
+  const card = await screen.findByRole("region", { name: "Send failed" })
+  const names = within(card)
+    .getAllByRole("button")
+    .map((b) => b.textContent)
+  expect(names).toEqual(["Copy", "Resend", "Restart agent", "Show screen", "Dismiss"])
+})
+
 test("the Chat view has no sheet; the Questions view's sheet has no fold chevron and no focus button", async () => {
   renderChat([session()], focusChat())
   const sheet = await screen.findByRole("group", { name: "Questions" })

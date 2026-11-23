@@ -4,19 +4,22 @@ import { copyText } from "../clipboard"
 import {
   DeliveryMaybeSent,
   DeliverySendFailed,
+  DeliveryUnknownCommand,
   type SessionInfo,
   type SessionRequest,
   type SessionResult,
 } from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { refusalText, useWrite } from "../useWrite"
-import { postDismissSession } from "./open"
+import { postRetry } from "./BlockingCard"
+import { postDismissSession, postResumeSession, postStopSession, rowToken } from "./open"
 import type { FetchScreen } from "./screen"
 import { ScreenModal } from "./ScreenModal"
+import { promptable } from "./view"
 
 export type DismissSession = (body: SessionRequest) => Promise<SessionResult>
 
-type ButtonName = "Show screen" | "Dismiss"
+type ButtonName = "Resend" | "Restart agent" | "Show screen" | "Dismiss"
 
 interface KindLook {
   title: string
@@ -36,6 +39,11 @@ const KINDS: Record<string, KindLook> = {
     color: "tone.deadlocked.fg",
     buttons: ["Show screen", "Dismiss"],
   },
+  [DeliveryUnknownCommand]: {
+    title: "Send failed",
+    color: "tone.deadlocked.fg",
+    buttons: ["Resend", "Restart agent", "Show screen", "Dismiss"],
+  },
 }
 
 /** Whether the session carries a gx card for a send that gave up or may not have landed. */
@@ -49,11 +57,17 @@ export const isDeliveryCard = (s: SessionInfo) =>
 export function DeliveryCard({
   session,
   dismiss = postDismissSession,
+  resend = postRetry,
+  stop = postStopSession,
+  resume = postResumeSession,
   fetchScreen,
   onDone,
 }: {
   session: SessionInfo
   dismiss?: DismissSession
+  resend?: DismissSession
+  stop?: DismissSession
+  resume?: DismissSession
   fetchScreen?: FetchScreen
   onDone?: () => void
 }) {
@@ -61,10 +75,18 @@ export function DeliveryCard({
   const text = session.actionable.copy_text ?? ""
   const box = useRef<HTMLDivElement>(null)
   const [screen, setScreen] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const { run, pending, refusal, error } = useWrite({ toastRefusal: false })
   const problem = refusal ? refusalText(refusal) : error
+  const restart = async () => {
+    setConfirming(false)
+    const stopped = await stop({ id: session.id, state: rowToken(session) })
+    return stopped.refused ? stopped : resume({ id: session.id })
+  }
   const click = (name: ButtonName) => {
     if (name === "Show screen") setScreen(true)
+    else if (name === "Restart agent") setConfirming(true)
+    else if (name === "Resend") run(() => resend({ id: session.id }))
     else run(() => dismiss({ id: session.id }), { onDone })
   }
   return (
@@ -119,17 +141,29 @@ export function DeliveryCard({
         </Box>
       )}
       {problem && <Text role="alert">{problem}</Text>}
-      <Box data-mock-part="buttons" display="flex" gap="2" flexWrap="wrap">
-        {look.buttons.map((name) => (
-          <Button
-            key={name}
-            emphasis="secondary"
-            disabled={name === "Dismiss" && pending}
-            onClick={() => click(name)}
-          >
-            {name}
-          </Button>
-        ))}
+      <Box data-mock-part="buttons" display="flex" gap="2" flexWrap="wrap" alignItems="center">
+        {look.buttons.map((name) =>
+          name === "Restart agent" && confirming ? (
+            <Box key={name} display="flex" alignItems="center" gap="2">
+              <Text fontSize="sm">Restart the agent?</Text>
+              <Button emphasis="secondary" onClick={() => setConfirming(false)}>
+                Keep
+              </Button>
+              <Button emphasis="secondary" onClick={() => run(restart)}>
+                Restart
+              </Button>
+            </Box>
+          ) : (
+            <Button
+              key={name}
+              emphasis="secondary"
+              disabled={pending || (name === "Resend" && !promptable(session))}
+              onClick={() => click(name)}
+            >
+              {name}
+            </Button>
+          ),
+        )}
       </Box>
       {screen && (
         <ScreenModal

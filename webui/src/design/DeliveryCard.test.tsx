@@ -3,6 +3,7 @@ import { afterEach, expect, test, vi } from "vitest"
 import {
   DeliveryMaybeSent,
   DeliverySendFailed,
+  DeliveryUnknownCommand,
   type SessionInfo,
   type SessionRequest,
   type SessionResult,
@@ -82,6 +83,113 @@ test("Dismiss posts the id and then calls onDone", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Dismiss" }))
   await waitFor(() => expect(onDone).toHaveBeenCalled())
   expect(post).toHaveBeenCalledWith({ id: "s-a" })
+})
+
+const unknown = (state: string) => {
+  const s = session(DeliveryUnknownCommand)
+  s.status = { state } as SessionInfo["status"]
+  s.run_started_at = "t1"
+  return s
+}
+
+function openUnknown(
+  state = "idle",
+  over: Partial<Record<"resend" | "stop" | "resume", Post>> = {},
+) {
+  const calls: string[] = []
+  const fake = (name: "resend" | "stop" | "resume") =>
+    vi.fn<Post>(async (b) => {
+      calls.push(name)
+      return (over[name] ?? (async () => ({})))(b)
+    })
+  const resend = fake("resend")
+  const stop = fake("stop")
+  const resume = fake("resume")
+  renderThemed(
+    <DeliveryCard session={unknown(state)} resend={resend} stop={stop} resume={resume} />,
+  )
+  return { resend, stop, resume, calls }
+}
+
+type Post = (b: SessionRequest) => Promise<SessionResult>
+
+test("the unknown-command card lists Resend, Restart agent, Show screen, Dismiss in order", () => {
+  openUnknown()
+  const card = screen.getByRole("region", { name: "Send failed" })
+  expect(card.textContent).toContain("the card reason")
+  const names = screen.getAllByRole("button").map((b) => b.textContent)
+  expect(names).toEqual(["Copy", "Resend", "Restart agent", "Show screen", "Dismiss"])
+})
+
+test("isDeliveryCard is true for the unknown-command kind", () => {
+  expect(isDeliveryCard(session(DeliveryUnknownCommand))).toBe(true)
+})
+
+test.each([DeliveryMaybeSent, DeliverySendFailed])(
+  "the %s card has no Resend or Restart agent",
+  (kind) => {
+    open(kind)
+    expect(screen.queryByRole("button", { name: "Resend" })).toBeNull()
+    expect(screen.queryByRole("button", { name: "Restart agent" })).toBeNull()
+  },
+)
+
+test("Resend posts the id", async () => {
+  const { resend } = openUnknown("idle")
+  fireEvent.click(screen.getByRole("button", { name: "Resend" }))
+  await waitFor(() => expect(resend).toHaveBeenCalledWith({ id: "s-a" }))
+})
+
+test.each([
+  ["idle", false],
+  ["exited", true],
+  ["starting", true],
+  ["working", true],
+])("Resend for a %s session is disabled: %s", (state, disabled) => {
+  openUnknown(state)
+  expect((screen.getByRole("button", { name: "Resend" }) as HTMLButtonElement).disabled).toBe(
+    disabled,
+  )
+})
+
+test("a refused Resend shows its message in an alert", async () => {
+  openUnknown("idle", { resend: async () => ({ refused: true, message: "Session is exited." }) })
+  fireEvent.click(screen.getByRole("button", { name: "Resend" }))
+  expect((await screen.findByRole("alert")).textContent).toContain("Session is exited.")
+})
+
+test("Restart agent calls nothing before the confirm, and Keep calls nothing", () => {
+  const { stop, resume } = openUnknown()
+  fireEvent.click(screen.getByRole("button", { name: "Restart agent" }))
+  expect(screen.getByRole("button", { name: "Keep" })).toBeTruthy()
+  fireEvent.click(screen.getByRole("button", { name: "Keep" }))
+  expect(stop).not.toHaveBeenCalled()
+  expect(resume).not.toHaveBeenCalled()
+  expect(screen.getByRole("button", { name: "Restart agent" })).toBeTruthy()
+})
+
+test("Restart stops with the row token, then resumes", async () => {
+  const { stop, resume, calls } = openUnknown()
+  fireEvent.click(screen.getByRole("button", { name: "Restart agent" }))
+  fireEvent.click(screen.getByRole("button", { name: "Restart" }))
+  await waitFor(() => expect(resume).toHaveBeenCalledWith({ id: "s-a" }))
+  expect(stop).toHaveBeenCalledWith({ id: "s-a", state: "s-a:t1:live" })
+  expect(calls).toEqual(["stop", "resume"])
+})
+
+test("a refused stop skips the resume and shows the message", async () => {
+  const { resume } = openUnknown("idle", {
+    stop: async () => ({ refused: true, message: "Cannot stop." }),
+  })
+  fireEvent.click(screen.getByRole("button", { name: "Restart agent" }))
+  fireEvent.click(screen.getByRole("button", { name: "Restart" }))
+  expect((await screen.findByRole("alert")).textContent).toContain("Cannot stop.")
+  expect(resume).not.toHaveBeenCalled()
+})
+
+test("the card still renders for an Exited session", () => {
+  openUnknown("exited")
+  expect(screen.getByRole("region", { name: "Send failed" })).toBeTruthy()
 })
 
 test("a refused Dismiss shows its message in an alert", async () => {
