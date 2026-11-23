@@ -760,9 +760,9 @@ var Scenarios = map[string]scenario{
 	"deliver-cards": deliverCardsScenario(),
 	// deliver-launch-*: a project with no session and one fake knob each. See deliverLaunchScenario.
 	"deliver-launch-undecided":     deliverLaunchScenario(agentfake.TUIUndecidedEnv + "=1"),
-	"deliver-launch-rejected":      deliverLaunchScenario(agentfake.TUIUnknownSkillEnv + "=1"),
+	"deliver-launch-rejected":      deliverLaunchScenario(agentfake.TUIUnknownSkillEnv+"=1", "GX_LAUNCH_TIMINGS=3s"),
 	"deliver-launch-never-started": deliverLaunchScenario(agentfake.TUINoPidFileEnv + "=1"),
-	// host-files: demo's repo files, a second worktree, a mock page with a second origin and a
+	"deliver-launch-pasted":        deliverLaunchScenario(agentfake.TUIPasteOverEnv+"=10", "GX_LAUNCH_TIMINGS=3s"), // host-files: demo's repo files, a second worktree, a mock page with a second origin and a
 	// chat that links them. -shape no-main-worktree checks out demo's trunk nowhere.
 	"host-files": hostFilesScenario(),
 	// agents-interrupted: Claude and Codex, Chat and Design sessions whose chat holds one interrupted turn.

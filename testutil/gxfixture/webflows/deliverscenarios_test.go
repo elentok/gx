@@ -56,6 +56,7 @@ func TestDeliverScenario_FirstPromptExits(t *testing.T) {
 	}{
 		{"deliver-launch-rejected", "/gx-implement demo:ready-epic/01", wire.DeliveryUnknownCommand, "Unknown command:"},
 		{"deliver-launch-never-started", "do the thing", wire.DeliverySendFailed, "agent never started"},
+		{"deliver-launch-pasted", "/gx-implement demo:ready-epic/01", wire.DeliverySendFailed, "prompt not delivered"},
 	}
 	for _, row := range rows {
 		t.Run(row.scenario, func(t *testing.T) {

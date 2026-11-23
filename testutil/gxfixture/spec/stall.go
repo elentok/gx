@@ -13,7 +13,9 @@ import (
 // slash first prompt as an unknown command, so the session shows a failure.
 var RejectedFirstPrompt = scenario{
 	UnknownSkill: true,
-	Sessions:     []sessionSpec{{Project: project, Prompt: "/gx-implement demo:ready-epic/01", Rejected: true}},
+	// The server retypes a rejected launch prompt for 30s; the seeder waits for the card.
+	Env:      []string{"GX_LAUNCH_TIMINGS=3s"},
+	Sessions: []sessionSpec{{Project: project, Prompt: "/gx-implement demo:ready-epic/01", Rejected: true}},
 }
 
 // stallNudgeConfig shortens the idle wait before the server nudges a stalled agent.

@@ -277,6 +277,15 @@ func runServer(ctx context.Context, d Deps) error {
 			return fmt.Errorf("GX_PROMPT_GRACE: %w", err)
 		}
 	}
+	// Test hook: gxfixture shortens a launch slash prompt's retype window and landed-check grace.
+	var launchTimings deliver.LaunchTimings
+	if v := os.Getenv("GX_LAUNCH_TIMINGS"); v != "" {
+		d, perr := time.ParseDuration(v)
+		if perr != nil {
+			return fmt.Errorf("GX_LAUNCH_TIMINGS: %w", perr)
+		}
+		launchTimings = deliver.LaunchTimings{Grace: d, Window: d}
+	}
 	// Test hook: gxfixture reads CPU and memory from a control file and shortens the
 	// health read interval, so a flow can steer the Tray meters from outside the process.
 	var systemHealth syshealth.Reader
@@ -319,7 +328,7 @@ func runServer(ctx context.Context, d Deps) error {
 	srv, err := server.New(server.Config{Migrations: migrationReg, Settings: serverSettings, StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor, RestartBinary: restartBin,
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, RunnerWait: cfg.RunnerWait, WebAddr: cfg.Server.Web.Listen, LogLevel: logLevel,
 		AutoAdvanceDelay: autoAdvanceDelay, CommandListAge: commandListAge, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.Env.Env,
-		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval, TokenPollInterval: tokenPollInterval, PromptGrace: promptGrace, RateLimitResetBuffer: rateLimitBuffer, GuardPoll: guardPoll, BudgetKillGrace: budgetKillGrace,
+		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval, TokenPollInterval: tokenPollInterval, PromptGrace: promptGrace, LaunchProofCaps: launchTimings, RateLimitResetBuffer: rateLimitBuffer, GuardPoll: guardPoll, BudgetKillGrace: budgetKillGrace,
 		ProcessSource: processSource, RefreshSkills: skillscmd.NewSharedRefresh(func() error { return skillscmd.Refresh(d.skillsDeps(), io.Discard) }).Refresh, ForkHookDir: os.Getenv("GX_FORK_HOOK_DIR"), WrapLateFinishScan: wrapLateFinishScan(os.Getenv), Sleep: fastSleep(os.Getenv), PollInterval: fastPollInterval(os.Getenv),
 		PushAllowHTTPEndpoints: os.Getenv("GX_PUSH_ALLOW_HTTP_ENDPOINTS") == "1"})
 	if err != nil {

@@ -453,8 +453,8 @@ func TestRejectedFirstPromptScenario_TheSessionShowsAnUnknownCommandFailure(t *t
 		t.Fatalf("sessions = %d, want 1", len(list))
 	}
 	got := list[0].Actionable
-	if !got.GxRaised || !strings.Contains(got.Reason, "Unknown command:") {
-		t.Errorf("actionable = %+v, want a gx-raised Unknown command reason", got)
+	if !got.GxRaised || got.Kind != wire.DeliveryUnknownCommand {
+		t.Errorf("actionable = %+v, want a gx-raised %s", got, wire.DeliveryUnknownCommand)
 	}
 	r.Stop(t)
 }
