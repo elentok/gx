@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"os"
 	"path/filepath"
 )
@@ -13,33 +14,19 @@ const (
 	diskWatchInterval = "250ms"
 )
 
-// cleanScriptBody reads `clean` next to it: a size string is written to `free`, `fail`
-// fails with a message, and an empty or missing file does nothing. `free` is
-// replaced by a rename, so the server never reads a half-written file.
-const cleanScriptBody = `#!/bin/sh
-dir=$(dirname "$0")
-want=$(cat "$dir/clean" 2>/dev/null)
-case "$want" in
-'') exit 0 ;;
-fail)
-	echo "fixture cleanup failed" >&2
-	exit 1
-	;;
-esac
-printf '%s\n' "$want" > "$dir/free.tmp" && mv "$dir/free.tmp" "$dir/free"
-`
+// cleanScriptBody (cleanscript.sh) reads `clean` next to it: a size string is written to
+// `free`, `fail` fails with a message, and an empty or missing file does nothing.
+//
+//go:embed cleanscript.sh
+var cleanScriptBody string
 
 // diskDir sits outside the project repo, so the trunk stays clean.
 func (f *fixture) diskDir() string { return filepath.Join(f.root, "disk") }
 
 // rateLimitReleaseFile is outside the repo for the same reason as diskDir.
-func (f *fixture) rateLimitReleaseFile() string {
-	return filepath.Join(f.root, "ratelimit-release")
-}
+func (f *fixture) rateLimitReleaseFile() string { return filepath.Join(f.root, "ratelimit-release") }
 
-func (f *fixture) lateFinishScanHold() string {
-	return filepath.Join(f.root, "late-finish-scan-hold")
-}
+func (f *fixture) lateFinishScanHold() string { return filepath.Join(f.root, "late-finish-scan-hold") }
 
 func cleanScript(diskDir string) string { return filepath.Join(diskDir, "clean.sh") }
 
