@@ -37,7 +37,7 @@ const (
 	clearInputHint = " Clear the input first."
 )
 
-var errNudgeCancelled = errors.New("nudge cancelled: person input")
+var errNudgeCancelled = deliver.ErrCancelled
 
 // firstPrompt follows one session's first prompt from the watch stream: it
 // decides when to type, types in the background, and cancels the remaining
@@ -156,8 +156,8 @@ func (f *firstPrompt) clearLeftover(prompt string) (cleared, cancelled bool) {
 		f.log.Warn("clear leftover first prompt", "err", err)
 		return false, false
 	}
-	p := f.prompter(c, 0)
-	if err := claudeui.ClearInput(p, prompt); err != nil {
+	p := f.target(c, 0)
+	if err := deliver.ClearInput(p, prompt); err != nil {
 		if errors.Is(err, errNudgeCancelled) {
 			return false, true
 		}
@@ -276,14 +276,14 @@ func (f *firstPrompt) deliver(prompt string) error {
 		return err
 	}
 	// The batch ends with the first Submit's Enter, or on any error return.
-	release, err := holdInput(c, unlock)
+	release, err := deliver.HoldInput(c, unlock)
 	if err != nil {
 		return err
 	}
-	p := f.prompter(c, turn)
-	p.images = f.firstImages()
-	p.held = release
-	defer p.releaseHeld()
+	p := f.target(c, turn)
+	f.firstImages().onto(p)
+	p.Held = release
+	defer p.ReleaseHeld()
 	if !f.typing().ReadyToType(f.p.projects.TypingIO(f.dir, c, "first-prompt")) {
 		return claudeui.ErrNotReadyToType
 	}
@@ -291,9 +291,9 @@ func (f *firstPrompt) deliver(prompt string) error {
 		// The launch put the prompt in the input: clearing would erase it and
 		// typing would double it. Enter alone sends it; a nudge that finds the
 		// screen unchanged clears and types it in full.
-		p.skipType = true
+		p.SkipType = true
 	}
-	caps := claudeui.DefaultNudgeCaps
+	caps := deliver.DefaultNudgeCaps
 	caps.Grace = cmp.Or(f.p.cfg.PromptGrace, caps.Grace)
 	// A swallowed first Enter is pressed again after seconds, not after the
 	// grace: a person who started this chat is watching an empty page.
@@ -305,7 +305,7 @@ func (f *firstPrompt) deliver(prompt string) error {
 		screen, _ := p.Screen()
 		f.log.Info("first prompt nudge", "decision", string(d), "since_deliver", time.Since(typedAt).Round(time.Millisecond).String(), "screen", screen)
 	}
-	err = claudeui.PromptWithNudge(p, prompt, caps, time.Time{}, time.Now, report)
+	err = deliver.Deliver(p, prompt, deliver.Policy{Caps: caps, Report: report})
 	if f.p.sessions.Watches.IsStopped() && err != nil {
 		return nil
 	}
@@ -438,212 +438,44 @@ func (f *firstPrompt) proveDelivered(run *actionRun, prompt string, source func(
 	return err
 }
 
-// holderPrompter is the part of claudeui.Prompter every typed prompt shares:
-// the keys and screen reads over a session's holder. Each kind of prompt adds
-// its own WaitStart. Once cancel closes, no more keys go out; onTyped, when
-// set, runs once the text is typed.
-type holderPrompter struct {
-	c       *holder.HolderClient
-	typing  harness.Typing
-	io      harness.TypingIO
-	cancel  <-chan struct{}
-	onTyped func()
-	// skipType makes the next Submit press the submit key without typing: the
-	// text is already in the input (claude's --prefill). A later Submit, after
-	// a clear, types as usual.
-	skipType bool
-	// images are pasted before the text on every Submit, so a retype after a
-	// clear attaches them again.
-	images imageSet
-	// lock takes the chat's typing lock; Submit holds it for its type and Enter.
-	// Nil takes none.
-	lock func() (func(), error)
-	// held is a lock the caller already took; the next Submit uses it instead of
-	// taking its own. Submit and the caller both release it, once.
-	held func()
-}
-
-func (p *holderPrompter) releaseHeld() {
-	if release := p.held; release != nil {
-		p.held = nil
-		release()
-	}
-}
-
-// acquire returns the release func of the typing lock for one Submit.
-func (p *holderPrompter) acquire() (func(), error) {
-	if p.held != nil {
-		return p.releaseHeld, nil
-	}
-	release := func() {}
-	if p.lock != nil {
-		var err error
-		if release, err = p.lock(); err != nil {
-			return nil, err
-		}
-	}
-	return holdInput(p.c, release)
-}
-
-func (p *holderPrompter) cancelled() error {
-	select {
-	case <-p.cancel:
-		return errNudgeCancelled
-	default:
-		return nil
-	}
-}
-
-func (p *holderPrompter) Submit(text string) error {
-	release, err := p.acquire()
-	if err != nil {
-		return err
-	}
-	defer release()
-	if err := p.cancelled(); err != nil {
-		return err
-	}
-	if p.skipType {
-		p.skipType = false
-		if p.onTyped != nil {
-			p.onTyped()
-		}
-		return p.submitKey()
-	}
-	if err := p.images.paste(p.c); err != nil {
-		return err
-	}
-	p.waitImageChips(len(p.images.paths))
-	if clean, n := deliver.Strip(text); n > 0 {
-		if p.io.Log != nil {
-			p.io.Log.Info("stripped invisible chars before typing", "count", n)
-		}
-		text = clean
-	}
-	text = p.images.withText(text)
-	if err := p.c.TypeTextBy(text, p.typing.PastesText(text)); err != nil {
-		return err
-	}
-	if p.onTyped != nil {
-		p.onTyped()
-	}
-	return p.submitKey()
-}
-
-// imageChipWait bounds how long Submit waits for pasted images to show as
-// "[Image #N]" chips before it types the text.
-//
-// Measured against a real claude: the chip took 8s and 19s to draw after a
-// bracketed path paste in two of three tries, and keys sent meanwhile land
-// before it and lose the Enter.
-const imageChipWait = 30 * time.Second
-
-// waitImageChips waits until the screen shows n image chips. Claude reads a
-// pasted path off disk before it draws the chip, and text typed or an Enter
-// pressed meanwhile can be lost. A screen that never shows them (another
-// harness) costs imageChipWait, then typing goes on.
-func (p *holderPrompter) waitImageChips(n int) {
-	if n == 0 {
-		return
-	}
-	deadline := time.Now().Add(imageChipWait)
-	for time.Now().Before(deadline) {
-		rows, _, err := p.c.Screen(0)
-		if err != nil || strings.Count(strings.Join(rows, "\n"), "[Image #") >= n {
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-}
-
-// submitKey presses the harness submit key. Codex queues text with Tab while a
-// turn runs; a background terminal alone is no turn.
-func (p *holderPrompter) submitKey() error {
-	working := false
-	w, err := p.c.Watched()
-	if err != nil {
-		return err
-	}
-	if w != nil {
-		working = w.Status.State == harness.Working && !w.Status.Background
-	}
-	return p.c.SendKeys(p.typing.SubmitKey(working))
-}
-
-func (p *holderPrompter) Clear() error {
-	if err := p.cancelled(); err != nil {
-		return err
-	}
-	return p.c.Batch(func() error { return p.c.SendKeys(p.typing.ClearKey()) })
-}
-
-func (p *holderPrompter) SendEnter() error {
-	if err := p.cancelled(); err != nil {
-		return err
-	}
-	return p.c.Batch(p.submitKey)
-}
-
-// firstPrompter is the first prompt's Prompter. A turn has started once the
-// holder's Turn passes the one seen before typing.
-type firstPrompter struct {
-	holderPrompter
-	f    *firstPrompt
-	turn int
-}
-
 // typing is the typing rules of the session's harness.
 func (f *firstPrompt) typing() harness.Typing {
 	return f.p.projects.SessionTyping(f.dir)
 }
 
-func (f *firstPrompt) prompter(c *holder.HolderClient, turn int) *firstPrompter {
-	return &firstPrompter{holderPrompter: holderPrompter{c: c, typing: f.typing(), io: f.p.projects.TypingIO(f.dir, c, "first-prompt-nudge"), cancel: f.cancel, onTyped: f.markTyped, lock: func() (func(), error) { return lockTyping(f.p, f.id, f.cancel) }}, f: f, turn: turn}
+// target is the first prompt's Target. A turn has started once the holder's
+// Turn passes the one seen before typing.
+func (f *firstPrompt) target(c *holder.HolderClient, turn int) *deliver.Target {
+	return &deliver.Target{
+		C: c, Typing: f.typing(), IO: f.p.projects.TypingIO(f.dir, c, "first-prompt-nudge"),
+		Cancel: f.cancel, OnTyped: f.markTyped,
+		Lock:  func() (func(), error) { return lockTyping(f.p, f.id, f.cancel) },
+		Start: func(timeout time.Duration) (bool, error) { return f.waitStart(c, turn, timeout) },
+	}
 }
 
-func (p *firstPrompter) WaitStart(timeout time.Duration) (bool, error) {
+func (f *firstPrompt) waitStart(c *holder.HolderClient, turn int, timeout time.Duration) (bool, error) {
 	deadline := time.After(timeout)
 	for {
-		_, turn, err := p.c.Status()
+		_, now, err := c.Status()
 		if err != nil {
 			return false, err
 		}
-		if turn > p.turn {
+		if now > turn {
 			return true, nil
 		}
 		select {
-		case <-p.f.turnStarted:
+		case <-f.turnStarted:
 			return true, nil
-		case <-p.f.cancel:
+		case <-f.cancel:
 			return false, errNudgeCancelled
-		case <-p.f.p.sessions.Watches.Stop:
+		case <-f.p.sessions.Watches.Stop:
 			return false, errors.New("server stopping")
 		case <-deadline:
 			return false, nil
 		case <-time.After(holderPollInterval):
 		}
 	}
-}
-
-func (p *holderPrompter) Screen() (string, error) {
-	rows, _, err := p.c.Screen(0)
-	return strings.Join(rows, "\n"), err
-}
-
-// Log is the server logger the clear's pane capture goes to.
-func (p *holderPrompter) Log() *slog.Logger { return p.io.Log }
-
-func (p *holderPrompter) ReadyToType() bool {
-	return p.typing.ReadyToType(p.io)
-}
-
-// InputEmpty runs the harness empty check when the holder serves styled rows.
-func (p *holderPrompter) InputEmpty() (bool, bool, error) {
-	state, err := InputState(p.c)
-	if err != nil {
-		return false, false, err
-	}
-	return state == harness.InputEmpty, state == harness.InputEmpty || state == harness.InputNotEmpty, nil
 }
 
 // PromptHead is the start of a prompt for a log line.
@@ -673,7 +505,7 @@ func (f *firstPrompt) firstImages() imageSet {
 // input box now holds it. A launch that did not, or a box that does not show it
 // (the flag was dropped, or the screen is not drawn yet), reads as no, and the
 // prompt is typed.
-func (f *firstPrompt) prefillShown(p *firstPrompter, prompt string) bool {
+func (f *firstPrompt) prefillShown(p *deliver.Target, prompt string) bool {
 	meta, err := sessions.ReadMeta(f.dir)
 	if err != nil || !meta.FirstPrefilled {
 		return false

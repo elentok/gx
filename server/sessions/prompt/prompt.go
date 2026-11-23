@@ -54,7 +54,7 @@ type Config struct {
 	// prompt; zero means DefaultFirstPromptStartTimeout.
 	FirstPromptStartTimeout time.Duration
 	// PromptGrace bounds each wait for a typed prompt's turn to start; zero
-	// means claudeui.DefaultNudgeCaps.Grace.
+	// means deliver.DefaultNudgeCaps.Grace.
 	PromptGrace time.Duration
 	// LaunchProofCaps bound the check that a first slash prompt reached the
 	// transcript; a zero field means the claudeui default.

@@ -202,7 +202,7 @@ func CheckLaunchDelivered(ctx context.Context, p LaunchProof, text string, caps 
 		if now.Sub(start) >= caps.Grace {
 			// The command still sits in the input and never reached the
 			// transcript: the pane stopped taking keys.
-			if holdsText(pane, text) {
+			if HoldsText(pane, text) {
 				return &HungPaneError{Screen: pane}
 			}
 			return fmt.Errorf("%w: %q: no user record after %s", agentrunner.ErrNotDelivered, text, caps.Grace)

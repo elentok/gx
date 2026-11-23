@@ -54,7 +54,7 @@ func (p *Pty) PersonInput(s agentrunner.Session) (<-chan struct{}, func(), error
 	return events, func() { _ = watch.Close() }, nil
 }
 
-// ptyPrompter is claudeui.Prompter over holder.sock. A turn has started once
+// ptyPrompter is deliver.Prompter over holder.sock. A turn has started once
 // the holder's Turn passes turn.
 //
 // person carries a person's input (nil when unseen). Input before gx typed is

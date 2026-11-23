@@ -1,4 +1,4 @@
-package claudeui
+package deliver
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 )
 
 // fakePrompter is an in-memory Prompter. starts scripts WaitStart's answers in
@@ -21,7 +22,7 @@ type fakePrompter struct {
 	screens   []string
 	calls     []string
 	timeouts  []time.Duration
-	decisions []NudgeDecision
+	decisions []claudeui.NudgeDecision
 }
 
 func (f *fakePrompter) Submit(text string) error {
@@ -34,7 +35,7 @@ func (f *fakePrompter) Clear() error {
 	return nil
 }
 
-func (f *fakePrompter) report(d NudgeDecision) { f.decisions = append(f.decisions, d) }
+func (f *fakePrompter) report(d claudeui.NudgeDecision) { f.decisions = append(f.decisions, d) }
 
 func (f *fakePrompter) SendEnter() error {
 	f.calls = append(f.calls, "enter")
@@ -93,7 +94,7 @@ func TestPromptWithNudge_ChangedScreen_NudgesWithEnter(t *testing.T) {
 		t.Fatalf("PromptWithNudge() error = %v", err)
 	}
 	assertCalls(t, f.calls, "submit:hi", "wait", "enter", "wait")
-	assertDecisions(t, f.decisions, NudgeEnter)
+	assertDecisions(t, f.decisions, claudeui.NudgeEnter)
 }
 
 func TestPromptWithNudge_UnchangedScreen_ClearsThenRetypes(t *testing.T) {
@@ -102,17 +103,17 @@ func TestPromptWithNudge_UnchangedScreen_ClearsThenRetypes(t *testing.T) {
 		t.Fatalf("PromptWithNudge() error = %v", err)
 	}
 	assertCalls(t, f.calls, "submit:hi", "wait", "clear", "clear", "clear", "submit:hi", "wait")
-	assertDecisions(t, f.decisions, NudgeRetype)
+	assertDecisions(t, f.decisions, claudeui.NudgeRetype)
 }
 
 func TestPromptWithNudge_RetypeCap_ReturnsStuckSubmission(t *testing.T) {
 	f := &fakePrompter{screens: []string{"empty"}}
 	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report)
-	if !errors.Is(err, ErrStuckSubmission) {
-		t.Fatalf("PromptWithNudge() error = %v, want ErrStuckSubmission", err)
+	if !errors.Is(err, claudeui.ErrStuckSubmission) {
+		t.Fatalf("PromptWithNudge() error = %v, want claudeui.ErrStuckSubmission", err)
 	}
 	assertCalls(t, f.calls, "submit:hi", "wait", "clear", "clear", "clear", "submit:hi", "wait", "clear", "clear", "clear", "submit:hi", "wait")
-	assertDecisions(t, f.decisions, NudgeRetype, NudgeRetype, NudgeStuck)
+	assertDecisions(t, f.decisions, claudeui.NudgeRetype, claudeui.NudgeRetype, claudeui.NudgeStuck)
 }
 
 // readyPrompter adds a ready-to-type step to fakePrompter; the calls it
@@ -150,8 +151,8 @@ func TestClearInput_RunsReadyToTypeBeforeTheClearKeys(t *testing.T) {
 func TestClearInput_ReadyGiveUp_DoesNotClear(t *testing.T) {
 	f := &readyPrompter{fakePrompter: &fakePrompter{}, ready: []bool{false}}
 	err := ClearInput(f, "hi")
-	if !errors.Is(err, ErrStuckSubmission) || !errors.Is(err, ErrNotReadyToType) {
-		t.Fatalf("ClearInput() error = %v, want ErrStuckSubmission wrapping ErrNotReadyToType", err)
+	if !errors.Is(err, claudeui.ErrStuckSubmission) || !errors.Is(err, claudeui.ErrNotReadyToType) {
+		t.Fatalf("ClearInput() error = %v, want claudeui.ErrStuckSubmission wrapping claudeui.ErrNotReadyToType", err)
 	}
 	assertCalls(t, f.calls, "ready")
 }
@@ -159,21 +160,21 @@ func TestClearInput_ReadyGiveUp_DoesNotClear(t *testing.T) {
 func TestPromptWithNudge_ReadyGiveUpBeforeTyping_StopsAsStuck(t *testing.T) {
 	f := &readyPrompter{fakePrompter: &fakePrompter{screens: []string{"empty"}}, ready: []bool{false}}
 	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report)
-	if !errors.Is(err, ErrStuckSubmission) || !errors.Is(err, ErrNotReadyToType) {
-		t.Fatalf("PromptWithNudge() error = %v, want ErrStuckSubmission wrapping ErrNotReadyToType", err)
+	if !errors.Is(err, claudeui.ErrStuckSubmission) || !errors.Is(err, claudeui.ErrNotReadyToType) {
+		t.Fatalf("PromptWithNudge() error = %v, want claudeui.ErrStuckSubmission wrapping claudeui.ErrNotReadyToType", err)
 	}
 	assertCalls(t, f.calls, "ready")
-	assertDecisions(t, f.decisions, NudgeStuck)
+	assertDecisions(t, f.decisions, claudeui.NudgeStuck)
 }
 
 func TestPromptWithNudge_ReadyGiveUpBeforeTheClear_StopsAsStuckWithoutClearing(t *testing.T) {
 	f := &readyPrompter{fakePrompter: &fakePrompter{screens: []string{"empty"}}, ready: []bool{true, false}}
 	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report)
-	if !errors.Is(err, ErrStuckSubmission) {
-		t.Fatalf("PromptWithNudge() error = %v, want ErrStuckSubmission", err)
+	if !errors.Is(err, claudeui.ErrStuckSubmission) {
+		t.Fatalf("PromptWithNudge() error = %v, want claudeui.ErrStuckSubmission", err)
 	}
 	assertCalls(t, f.calls, "ready", "submit:hi", "wait", "ready")
-	assertDecisions(t, f.decisions, NudgeRetype, NudgeStuck)
+	assertDecisions(t, f.decisions, claudeui.NudgeRetype, claudeui.NudgeStuck)
 }
 
 // checkingPrompter adds an input check to fakePrompter; calls it records are
@@ -230,15 +231,15 @@ func TestPromptWithNudge_NotEmptyAfterClear_IsStuck(t *testing.T) {
 	noInputSettle(t)
 	f := &checkingPrompter{fakePrompter: &fakePrompter{screens: []string{"empty"}}, known: true}
 	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report)
-	if !errors.Is(err, ErrStuckSubmission) {
-		t.Fatalf("PromptWithNudge() error = %v, want ErrStuckSubmission", err)
+	if !errors.Is(err, claudeui.ErrStuckSubmission) {
+		t.Fatalf("PromptWithNudge() error = %v, want claudeui.ErrStuckSubmission", err)
 	}
 	want := append([]string{"submit:hi", "wait"}, clears(3)...)
 	want = append(want, "check")
 	want = append(want, clears(3)...)
 	want = append(want, "check")
 	assertCalls(t, f.calls, want...)
-	assertDecisions(t, f.decisions, NudgeRetype, NudgeStuck)
+	assertDecisions(t, f.decisions, claudeui.NudgeRetype, claudeui.NudgeStuck)
 }
 
 // logPrompter is a checkingPrompter that names its logger.
@@ -255,8 +256,8 @@ func TestClearInput_NeverEmpty_LogsTheCaptureAndIsInputNotEmpty(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	f := &logPrompter{checkingPrompter: &checkingPrompter{fakePrompter: &fakePrompter{screens: []string{"STUCK-DRAFT"}}, known: true}, log: log}
 	err := ClearInput(f, "hi")
-	if !errors.Is(err, ErrInputNotEmpty) {
-		t.Fatalf("ClearInput() error = %v, want ErrInputNotEmpty", err)
+	if !errors.Is(err, claudeui.ErrInputNotEmpty) {
+		t.Fatalf("ClearInput() error = %v, want claudeui.ErrInputNotEmpty", err)
 	}
 	if out := buf.String(); !strings.Contains(out, "STUCK-DRAFT") {
 		t.Fatalf("log = %q, want the pane capture", out)
@@ -267,9 +268,9 @@ func TestClearInput_IdenticalScreensHoldingGxText_IsHungPane(t *testing.T) {
 	noInputSettle(t)
 	f := &checkingPrompter{fakePrompter: &fakePrompter{screens: []string{"header\n> do the thing please\nfooter"}}, known: true}
 	err := ClearInput(f, "do the thing please")
-	var hung *HungPaneError
+	var hung *claudeui.HungPaneError
 	if !errors.As(err, &hung) || !errors.Is(err, agentrunner.ErrNotDelivered) {
-		t.Fatalf("ClearInput() error = %v, want HungPaneError wrapping ErrNotDelivered", err)
+		t.Fatalf("ClearInput() error = %v, want claudeui.HungPaneError wrapping ErrNotDelivered", err)
 	}
 	if !strings.Contains(err.Error(), "> do the thing please") {
 		t.Fatalf("error = %q, want the last screen lines", err)
@@ -289,9 +290,9 @@ func TestClearInput_NotHung(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := &checkingPrompter{fakePrompter: &fakePrompter{screens: tt.screens}, known: true}
 			err := ClearInput(f, tt.text)
-			var hung *HungPaneError
-			if errors.As(err, &hung) || !errors.Is(err, ErrInputNotEmpty) {
-				t.Fatalf("ClearInput() error = %v, want plain ErrInputNotEmpty", err)
+			var hung *claudeui.HungPaneError
+			if errors.As(err, &hung) || !errors.Is(err, claudeui.ErrInputNotEmpty) {
+				t.Fatalf("ClearInput() error = %v, want plain claudeui.ErrInputNotEmpty", err)
 			}
 			if !strings.Contains(err.Error(), tt.screens[len(tt.screens)-1]) {
 				t.Fatalf("error = %q, want the last screen lines", err)
@@ -314,7 +315,7 @@ func TestPromptWithNudge_UnstyledRead_CountAloneDecides(t *testing.T) {
 	if err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report); err != nil {
 		t.Fatalf("PromptWithNudge() error = %v", err)
 	}
-	assertDecisions(t, f.decisions, NudgeRetype)
+	assertDecisions(t, f.decisions, claudeui.NudgeRetype)
 }
 
 func TestPromptWithNudge_NeverPressesCtrlC(t *testing.T) {
@@ -331,21 +332,21 @@ func TestPromptWithNudge_NeverPressesCtrlC(t *testing.T) {
 func TestPromptWithNudge_NudgeCap_ReturnsStartTimeout(t *testing.T) {
 	f := &fakePrompter{screens: []string{"1", "2", "3", "4", "5"}}
 	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report)
-	if !errors.Is(err, ErrStartTimeout) || errors.Is(err, ErrStuckSubmission) {
-		t.Fatalf("PromptWithNudge() error = %v, want ErrStartTimeout only", err)
+	if !errors.Is(err, claudeui.ErrStartTimeout) || errors.Is(err, claudeui.ErrStuckSubmission) {
+		t.Fatalf("PromptWithNudge() error = %v, want claudeui.ErrStartTimeout only", err)
 	}
 	assertCalls(t, f.calls, "submit:hi", "wait", "enter", "wait", "enter", "wait", "enter", "wait")
-	assertDecisions(t, f.decisions, NudgeEnter, NudgeEnter, NudgeEnter, NudgeTimeout)
+	assertDecisions(t, f.decisions, claudeui.NudgeEnter, claudeui.NudgeEnter, claudeui.NudgeEnter, claudeui.NudgeTimeout)
 }
 
 func TestPromptWithNudge_NilReport(t *testing.T) {
 	f := &fakePrompter{screens: []string{"empty"}}
-	if err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, nil); !errors.Is(err, ErrStuckSubmission) {
-		t.Fatalf("PromptWithNudge() error = %v, want ErrStuckSubmission", err)
+	if err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, nil); !errors.Is(err, claudeui.ErrStuckSubmission) {
+		t.Fatalf("PromptWithNudge() error = %v, want claudeui.ErrStuckSubmission", err)
 	}
 }
 
-func assertDecisions(t *testing.T, got []NudgeDecision, want ...NudgeDecision) {
+func assertDecisions(t *testing.T, got []claudeui.NudgeDecision, want ...claudeui.NudgeDecision) {
 	t.Helper()
 	if !slices.Equal(got, want) {
 		t.Fatalf("decisions = %v, want %v", got, want)
@@ -356,8 +357,8 @@ func TestPromptWithNudge_CallerCaps(t *testing.T) {
 	caps := NudgeCaps{Grace: time.Second, Nudges: 2, Retypes: 1}
 	f := &fakePrompter{screens: []string{"empty", "typed", "typed"}}
 	err := PromptWithNudge(f, "hi", caps, time.Time{}, f.now, f.report)
-	if !errors.Is(err, ErrStartTimeout) {
-		t.Fatalf("PromptWithNudge() error = %v, want ErrStartTimeout", err)
+	if !errors.Is(err, claudeui.ErrStartTimeout) {
+		t.Fatalf("PromptWithNudge() error = %v, want claudeui.ErrStartTimeout", err)
 	}
 	assertCalls(t, f.calls, "submit:hi", "wait", "enter", "wait", "clear", "clear", "clear", "submit:hi", "wait")
 	for _, got := range f.timeouts {
@@ -368,8 +369,8 @@ func TestPromptWithNudge_CallerCaps(t *testing.T) {
 
 	f = &fakePrompter{screens: []string{"empty"}}
 	err = PromptWithNudge(f, "hi", caps, time.Time{}, f.now, f.report)
-	if !errors.Is(err, ErrStuckSubmission) {
-		t.Fatalf("PromptWithNudge() error = %v, want ErrStuckSubmission", err)
+	if !errors.Is(err, claudeui.ErrStuckSubmission) {
+		t.Fatalf("PromptWithNudge() error = %v, want claudeui.ErrStuckSubmission", err)
 	}
 	assertCalls(t, f.calls, "submit:hi", "wait", "clear", "clear", "clear", "submit:hi", "wait")
 }
@@ -378,8 +379,8 @@ func TestPromptWithNudge_HonoursDeadline(t *testing.T) {
 	f := &fakePrompter{screens: []string{"1", "2", "3", "4"}}
 	deadline := f.clock.Add(DefaultNudgeCaps.Grace + 5*time.Second)
 	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, deadline, f.now, f.report)
-	if !errors.Is(err, ErrStartTimeout) {
-		t.Fatalf("PromptWithNudge() error = %v, want ErrStartTimeout", err)
+	if !errors.Is(err, claudeui.ErrStartTimeout) {
+		t.Fatalf("PromptWithNudge() error = %v, want claudeui.ErrStartTimeout", err)
 	}
 	want := []time.Duration{DefaultNudgeCaps.Grace, 5 * time.Second}
 	if len(f.timeouts) != len(want) || f.timeouts[0] != want[0] || f.timeouts[1] != want[1] {
@@ -390,11 +391,11 @@ func TestPromptWithNudge_HonoursDeadline(t *testing.T) {
 func TestPromptWithNudge_ExpiredDeadline_NeverSubmits(t *testing.T) {
 	f := &fakePrompter{screens: []string{"a"}}
 	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, f.clock.Add(-time.Second), f.now, f.report)
-	if !errors.Is(err, ErrStartTimeout) {
-		t.Fatalf("PromptWithNudge() error = %v, want ErrStartTimeout", err)
+	if !errors.Is(err, claudeui.ErrStartTimeout) {
+		t.Fatalf("PromptWithNudge() error = %v, want claudeui.ErrStartTimeout", err)
 	}
 	assertCalls(t, f.calls)
-	assertDecisions(t, f.decisions, NudgeTimeout)
+	assertDecisions(t, f.decisions, claudeui.NudgeTimeout)
 }
 
 // lateClearPrompter shows the input empty only from the given check on, as an
@@ -486,7 +487,7 @@ func TestPromptWithNudge_Settle_SwallowedNudgeEnter_PressesAgainAtTheNextLook(t 
 	if f.timeouts[2] != caps.Settle {
 		t.Fatalf("wait after the second Enter = %v, want %v", f.timeouts[3], caps.Settle)
 	}
-	assertDecisions(t, f.decisions, NudgeEnter, NudgeEnter)
+	assertDecisions(t, f.decisions, claudeui.NudgeEnter, claudeui.NudgeEnter)
 }
 
 // An emptied input means the Enter landed and the turn is only slow to start:
@@ -516,8 +517,8 @@ func TestPromptWithNudge_Settle_NudgeEnterCap(t *testing.T) {
 	caps.Settle = 3 * time.Second
 	caps.Nudges = 1
 	err := PromptWithNudge(f, "hi", caps, time.Time{}, f.now, f.report)
-	if !errors.Is(err, ErrStartTimeout) {
-		t.Fatalf("PromptWithNudge() error = %v, want ErrStartTimeout", err)
+	if !errors.Is(err, claudeui.ErrStartTimeout) {
+		t.Fatalf("PromptWithNudge() error = %v, want claudeui.ErrStartTimeout", err)
 	}
 	enters := 0
 	for _, c := range f.calls {

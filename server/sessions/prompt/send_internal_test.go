@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/prompt/renameslot"
 )
@@ -119,9 +120,9 @@ func TestTypingLock_FirstPromptNudgeFailureBeforeSubmitReleases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hp := &holderPrompter{held: release}
-	hp.releaseHeld()
-	hp.releaseHeld()
+	hp := &deliver.Target{Held: release}
+	hp.ReleaseHeld()
+	hp.ReleaseHeld()
 	done := make(chan error, 1)
 	go func() {
 		r, err := lockTyping(p, "s1", nil)

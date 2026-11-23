@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/wire"
@@ -95,14 +96,7 @@ func InputState(c *holder.HolderClient) (harness.InputState, error) {
 // inputRead is InputState with the read, whose Resized flag tells an untrusted
 // read from one that simply can't decide.
 func inputRead(c *holder.HolderClient) (harness.InputState, holder.ReadState, error) {
-	if !c.Supports(holder.OpScreenStyled) {
-		return harness.InputUndecided, holder.ReadState{}, nil
-	}
-	rows, read, err := c.StyledScreenRead()
-	if err != nil || read.Resized {
-		return harness.InputUndecided, read, err
-	}
-	return sessionTyping.InputIsEmpty(rows), read, nil
+	return deliver.InputRead(c, sessionTyping)
 }
 
 // settleEnters caps the Enters PressEnterIfStillTyped presses, enterGap apart.

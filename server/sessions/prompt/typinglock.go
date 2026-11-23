@@ -1,10 +1,6 @@
 package prompt
 
-import (
-	"sync"
-
-	"github.com/elentok/gx/nativerunner/holder"
-)
+import "sync"
 
 // typingLocks is one lock per chat, held for one clear, type and Enter, so two
 // typers never interleave keys. Forgetting a chat is safe mid-typing.
@@ -34,19 +30,6 @@ func lockTyping(p *Prompt, id string, cancel <-chan struct{}) (func(), error) {
 	case <-stop:
 		return nil, ErrServerStopping
 	}
-}
-
-// holdInput makes gx the input owner for one batch. The returned func ends the
-// batch, then runs release; a failed begin runs release itself.
-func holdInput(c *holder.HolderClient, release func()) (func(), error) {
-	if err := c.BatchBegin(); err != nil {
-		release()
-		return nil, err
-	}
-	return func() {
-		_ = c.BatchEnd()
-		release()
-	}, nil
 }
 
 func (l *typingLocks) forget(id string) {

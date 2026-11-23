@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/codexui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/harness"
 )
 
@@ -129,16 +130,18 @@ func (p *Prompt) nudgePrompt(dir, text string, imgs imageSet) error {
 	}
 	// Input from before gx typed is not a reason to stop.
 	run.ClearPersonTyped()
-	caps := claudeui.DefaultNudgeCaps
+	caps := deliver.DefaultNudgeCaps
 	caps.Grace = cmp.Or(p.cfg.PromptGrace, caps.Grace)
 	// A person is waiting on a chat send: press a swallowed Enter after seconds, not after the grace.
 	caps.Settle = min(sendSettle, caps.Grace)
-	pr := &runPrompter{holderPrompter: holderPrompter{c: run.Holder(), typing: p.projects.SessionTyping(dir), io: p.projects.TypingIO(dir, run.Holder(), "send-nudge"), images: imgs,
-		lock: func() (func(), error) { return lockTyping(p, filepath.Base(dir), nil) }}, run: run}
+	pr := &deliver.Target{C: run.Holder(), Typing: p.projects.SessionTyping(dir), IO: p.projects.TypingIO(dir, run.Holder(), "send-nudge"),
+		Lock:  func() (func(), error) { return lockTyping(p, filepath.Base(dir), nil) },
+		Start: func(timeout time.Duration) (bool, error) { return waitRunStart(run, timeout) }}
+	imgs.onto(pr)
 	report := func(d claudeui.NudgeDecision) {
 		p.log.Info("send nudge", "session", filepath.Base(dir), "decision", string(d))
 	}
-	return claudeui.PromptWithNudge(pr, text, caps, time.Time{}, time.Now, report)
+	return deliver.Deliver(pr, text, deliver.Policy{Caps: caps, Report: report})
 }
 
 // imageSet is the Prompt images a send pastes before its text. The zero value
@@ -184,26 +187,29 @@ func (s imageSet) withText(text string) string {
 	return " " + text
 }
 
-// runPrompter is a send's Prompter: the run's watch tells when the turn
-// starts, and a person's own input stops the nudges.
-type runPrompter struct {
-	holderPrompter
-	run *actionRun
+// onto sets the images the Target pastes before its text.
+func (s imageSet) onto(t *deliver.Target) {
+	t.Images = s.paths
+	if s.sent != nil {
+		t.ImageSent = func(i int) { s.sent(s.ids[i]) }
+	}
 }
 
-func (p *runPrompter) WaitStart(timeout time.Duration) (bool, error) {
+// waitRunStart is a send's start signal: the run's watch tells when the turn
+// starts, and a person's own input stops the nudges.
+func waitRunStart(run *actionRun, timeout time.Duration) (bool, error) {
 	timer := time.After(timeout)
 	for {
-		expired, _, err := p.run.NextStatus(timer)
+		expired, _, err := run.NextStatus(timer)
 		switch {
 		case errors.Is(err, ErrWentBlocked):
 			// A dialog opened, so the prompt was sent.
 			return true, nil
 		case err != nil:
 			return false, err
-		case p.run.PersonTyped():
+		case run.PersonTyped():
 			return false, errNudgeCancelled
-		case p.run.TurnRunning():
+		case run.TurnRunning():
 			return true, nil
 		case expired:
 			return false, nil

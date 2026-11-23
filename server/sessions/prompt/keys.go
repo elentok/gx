@@ -17,7 +17,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/ralphloop/runlog"
@@ -180,7 +180,7 @@ func (p *Prompt) answerSessionPermission(req wire.SessionKeysRequest, source str
 	if err != nil {
 		return sessions.Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has no live holder", req.ID)), nil
 	}
-	grace := cmp.Or(p.cfg.PromptGrace, claudeui.DefaultNudgeCaps.Grace)
+	grace := cmp.Or(p.cfg.PromptGrace, deliver.DefaultNudgeCaps.Grace)
 	answer := agentrunner.Answer{Decision: agentrunner.Decision(req.Permission), RequestID: req.RequestID}
 	if err := holder.AnswerSessionPermission(c, dir, agentrunner.Kind(meta.Harness), answer, 20*time.Millisecond, grace); err != nil {
 		return sessionAnswerRefusal(req.ID, err)
@@ -217,7 +217,7 @@ func sessionAnswerRefusal(id string, err error) (wire.SessionResult, error) {
 // waitLeftBlocked waits up to the prompt grace for a guarded send to move the
 // session out of Blocked.
 func (p *Prompt) waitLeftBlocked(id, dir string) (wire.SessionResult, error) {
-	grace := cmp.Or(p.cfg.PromptGrace, claudeui.DefaultNudgeCaps.Grace)
+	grace := cmp.Or(p.cfg.PromptGrace, deliver.DefaultNudgeCaps.Grace)
 	deadline := time.Now().Add(grace)
 	for {
 		p.sessions.Watches.MetaMu.Lock()

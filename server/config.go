@@ -226,7 +226,7 @@ type Config struct {
 	// DefaultFirstPromptStartTimeout.
 	FirstPromptStartTimeout time.Duration
 	// PromptGrace bounds each wait for a typed prompt's turn to start
-	// before it is nudged; zero means claudeui.DefaultNudgeCaps.
+	// before it is nudged; zero means deliver.DefaultNudgeCaps.
 	PromptGrace time.Duration
 	// WebAttachIdle closes a web client's holder attach left unused this long;
 	// zero means webattach.DefaultIdleTimeout.

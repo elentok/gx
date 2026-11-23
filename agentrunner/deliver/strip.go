@@ -1,6 +1,5 @@
-// Package deliver types text into an agent's terminal. It is a leaf: it
-// imports only the standard library, and agentrunner/claudeui must never
-// import it.
+// Package deliver types text into an agent's terminal and nudges until the
+// turn starts. agentrunner/claudeui must never import it.
 package deliver
 
 import (

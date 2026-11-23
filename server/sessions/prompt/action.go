@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
@@ -211,7 +212,7 @@ func (r *actionRun) typeStepWith(i int, prompt string, imgs imageSet) error {
 		return err
 	}
 	// One batch: the draft clear, the paste, the text and its Enter.
-	release, err := holdInput(r.holder, unlock)
+	release, err := deliver.HoldInput(r.holder, unlock)
 	if err != nil {
 		return err
 	}

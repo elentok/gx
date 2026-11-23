@@ -16,6 +16,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/nativerunner/proctable"
@@ -44,7 +45,7 @@ type Pty struct {
 	// StartTimeout bounds Start's wait for claude to turn idle.
 	StartTimeout time.Duration
 	// PromptGrace bounds each wait of Prompt for Turn to move; defaults to
-	// claudeui.DefaultNudgeCaps.Grace.
+	// deliver.DefaultNudgeCaps.Grace.
 	PromptGrace time.Duration
 	// StopGrace is how long Stop waits for the holder to exit before it
 	// kills it.
@@ -444,7 +445,7 @@ func (p *Pty) Cleanup(label string) error {
 var _ agentrunner.Nudger = (*Pty)(nil)
 
 // Prompt types text plus Enter and returns once Turn moved past its value
-// before, nudging and retyping through claudeui.PromptWithNudge.
+// before, nudging and retyping through deliver.PromptWithNudge.
 func (p *Pty) Prompt(s agentrunner.Session, text string) error {
 	return p.PromptNudged(s, text, nil)
 }
@@ -472,8 +473,8 @@ func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(stri
 	} else {
 		// One bare-Enter nudge and one retype, then ErrNotDelivered: the default caps
 		// would hold a stuck prompt for minutes before the loop hears of it.
-		caps := claudeui.NudgeCaps{Grace: p.promptGrace(), Nudges: 2, Retypes: 1}
-		err = claudeui.PromptWithNudge(pr, text, caps, time.Time{}, time.Now, claudeui.ReportDecisions(onNudge))
+		caps := deliver.NudgeCaps{Grace: p.promptGrace(), Nudges: 2, Retypes: 1}
+		err = deliver.PromptWithNudge(pr, text, caps, time.Time{}, time.Now, deliver.ReportDecisions(onNudge))
 	}
 	if errors.Is(err, errPersonInput) {
 		return nil
@@ -604,7 +605,7 @@ func (p *Pty) WaitN() time.Duration {
 
 func (p *Pty) promptGrace() time.Duration {
 	if p.PromptGrace <= 0 {
-		return claudeui.DefaultNudgeCaps.Grace
+		return deliver.DefaultNudgeCaps.Grace
 	}
 	return p.PromptGrace
 }
