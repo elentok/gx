@@ -230,7 +230,6 @@ func TestDeliverTable(t *testing.T) {
 		// The plain screen has no input box: our text stays visible on a row that is
 		// neither the echo nor a menu row and the Enter changes nothing, so the settle
 		// read cannot tell whether the command ran. Each entry point maps it its own way.
-		const maybe = "May not have been sent: "
 		for _, r := range []struct {
 			name   string
 			run    func(t *testing.T, c tuiChat)
@@ -250,8 +249,8 @@ func TestDeliverTable(t *testing.T) {
 				c := startTUIChat(t, agentfake.TUIPlainScreenEnv+"=1")
 				r.run(t, c)
 				got := c.card(t)
-				if !strings.HasPrefix(got.Reason, maybe) || !strings.HasSuffix(got.Reason, r.suffix) || len(got.Action) != 0 {
-					t.Errorf("card = %+v, want the May not have been sent card with no Action to resend", got)
+				if got.Kind != wire.DeliveryMaybeSent || !strings.HasPrefix(got.Reason, "gx could not tell if "+r.typed+" ran.") || !strings.Contains(got.Reason, r.suffix) || len(got.Action) != 0 {
+					t.Errorf("card = %+v, want the maybe-sent card with no Action to resend", got)
 				}
 				c.expectEnters(t, 1)
 				c.expectTypedOnce(t, r.typed)
@@ -281,8 +280,8 @@ func TestDeliverTable(t *testing.T) {
 			reason string
 			action []string
 		}{
-			{"PlainGiveUp", []string{agentfake.TUISwallowEnterEnv + "=100"}, func(t *testing.T, c tuiChat) { c.send(t, "hello") }, "Send failed: timed out waiting for agent to start", []string{"hello"}},
-			{"DraftWillNotClear", []string{agentfake.TUIClearIgnoredEnv + "=1", agentfake.TUIDraftEnv + "=mine"}, func(t *testing.T, c tuiChat) { c.send(t, "hello") }, "Send failed: input would not clear", []string{"hello"}},
+			{"PlainGiveUp", []string{agentfake.TUISwallowEnterEnv + "=100"}, func(t *testing.T, c tuiChat) { c.send(t, "hello") }, "timed out waiting for agent to start", []string{"hello"}},
+			{"DraftWillNotClear", []string{agentfake.TUIClearIgnoredEnv + "=1", agentfake.TUIDraftEnv + "=mine"}, func(t *testing.T, c tuiChat) { c.send(t, "hello") }, "input would not clear", []string{"hello"}},
 			{"ActionStepGiveUp", []string{agentfake.TUISwallowEnterEnv + "=100"}, func(t *testing.T, c tuiChat) { c.runAction(t, "hello", "second") }, "Action failed: step 0: timed out waiting for agent to start", []string{"hello", "second"}},
 		} {
 			t.Run(r.name, func(t *testing.T) {
@@ -311,7 +310,7 @@ func TestDeliverTable(t *testing.T) {
 			c := startTUIChat(t, agentfake.TUIUnknownSkillEnv+"=1")
 			c.send(t, "/my-skill")
 			got := c.card(t)
-			if !strings.HasPrefix(got.Reason, "Send failed: ") || !strings.Contains(got.Reason, "Unknown command") || len(got.Action) != 1 || got.Action[0] != "/my-skill" {
+			if got.Kind != wire.DeliveryUnknownCommand || !strings.HasPrefix(got.Reason, "Unknown command") || len(got.Action) != 1 || got.Action[0] != "/my-skill" {
 				t.Errorf("card = %+v, want the red Send failed card with the text to resend", got)
 			}
 			c.expectEnters(t, 1)
@@ -372,7 +371,7 @@ func TestDeliverTable(t *testing.T) {
 				t.Fatalf("prompt = %+v", res)
 			}
 			got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised }).Actionable
-			if !strings.HasPrefix(got.Reason, "Send failed: ") || !strings.Contains(got.Reason, "Unrecognized command") || len(got.Action) != 1 || got.Action[0] != "/handoff" {
+			if got.Kind != wire.DeliveryUnknownCommand || !strings.HasPrefix(got.Reason, "Unrecognized command") || len(got.Action) != 1 || got.Action[0] != "/handoff" {
 				t.Errorf("card = %+v, want the red Send failed card with the text to resend", got)
 			}
 		})
