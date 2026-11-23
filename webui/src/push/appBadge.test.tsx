@@ -60,6 +60,18 @@ describe("useAppBadge", () => {
     expect(clearAppBadge).toHaveBeenCalledTimes(1)
   })
 
+  it("treats a live snapshot without a badge field as 0, also on return to the foreground", () => {
+    device(true)
+    state(undefined)
+    render(<Probe />)
+    expect(clearAppBadge).toHaveBeenCalledTimes(1)
+    clearAppBadge.mockClear()
+    setVisibility("visible")
+    act(() => void document.dispatchEvent(new Event("visibilitychange")))
+    expect(clearAppBadge).toHaveBeenCalledTimes(1)
+    expect(setAppBadge).not.toHaveBeenCalled()
+  })
+
   it("ignores a cached snapshot", () => {
     device(true)
     state(3, false)

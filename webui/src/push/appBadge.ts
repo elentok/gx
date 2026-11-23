@@ -10,12 +10,13 @@ function apply(badge: number) {
 
 /**
  * Shows the server's badge count on the app icon while push is on. Only a live snapshot counts:
- * a cached one may predate the badge. The app never counts itself.
+ * a cached one may predate the badge. The app never counts itself. The server omits `badge` at 0,
+ * so a live snapshot without it means 0.
  */
 export function useAppBadge() {
   const { snapshot, liveSnapshot } = useConnectionState(useConnectionContext())
   const { on } = usePushDevice()
-  const badge = liveSnapshot ? snapshot?.badge : undefined
+  const badge = liveSnapshot ? (snapshot?.badge ?? 0) : undefined
 
   useEffect(() => {
     if (!on || badge === undefined) return
