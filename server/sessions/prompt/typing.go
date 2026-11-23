@@ -1,9 +1,7 @@
 package prompt
 
 import (
-	"errors"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/elentok/gx/agentrunner/deliver"
@@ -18,68 +16,26 @@ import (
 var sessionTyping = harness.ClaudeTyping()
 
 // ErrDraft means a person's draft would not clear, so gx did not type.
-var ErrDraft = errors.New("input would not clear")
+var ErrDraft = deliver.ErrDraft
 
 // DraftReason is the reason of the Actionable gx raises when a draft would
 // not clear.
 const DraftReason = "input would not clear"
 
-// Clearing a draft: each round presses the clear key draftClearPresses times
-// (Ctrl+U on an empty input does nothing), then rereads the input until it
-// reads empty or draftSettleWait passes. The 32 presses clear a draft of up to
-// 16 lines.
-const (
-	draftClearRounds  = 4
-	draftClearPresses = 8
-	draftSettleWait   = time.Second
-	draftSettlePoll   = 25 * time.Millisecond
-)
+// draftHooks is what the draft clear tells the person: a notice when it typed
+// on an untrusted read, and none left once a read was trusted.
+func (p *Prompt) draftHooks(dir string) *deliver.DraftHooks {
+	return &deliver.DraftHooks{
+		Untrusted: func() { p.RaiseNotice(dir, wire.SessionNoticeUntrustedRead) },
+		Decided:   func() { p.ClearNotices(dir) },
+	}
+}
 
-// ClearDraft empties a person's draft before gx types. The placeholder is not
-// a draft: the harness check tells them apart by its dim style. A check that
-// can't decide types as before.
+// ClearDraft empties a person's draft before gx types (the Action steps; chat
+// sends clear it inside deliver.Deliver).
 func (p *Prompt) ClearDraft(dir string, c *holder.HolderClient) error {
 	log := p.log.With("session", filepath.Base(dir))
-	state, read, _ := inputRead(c)
-	if read.Resized || state == harness.InputUndecided {
-		// gx types on without knowing whether a draft is there; say so beside the log line.
-		log.Info("typing on an untrusted screen read", "resized", read.Resized, "pty_size", read.PTY, "attach_sizes", read.Attaches)
-		p.RaiseNotice(dir, wire.SessionNoticeUntrustedRead)
-		return nil
-	}
-	if state != harness.InputNotEmpty {
-		log.Debug("draft check", "holds_draft", false)
-		p.ClearNotices(dir)
-		return nil
-	}
-	for range draftClearRounds {
-		for range draftClearPresses {
-			if err := c.SendKeys(sessionTyping.ClearKey()); err != nil {
-				return err
-			}
-		}
-		// The agent redraws a moment after the keys land.
-		settle := time.Now().Add(draftSettleWait)
-		for {
-			state, err := InputState(c)
-			if err != nil {
-				return err
-			}
-			if state != harness.InputNotEmpty {
-				log.Info("cleared a draft before typing")
-				p.ClearNotices(dir)
-				return nil
-			}
-			if time.Now().After(settle) {
-				break
-			}
-			time.Sleep(draftSettlePoll)
-		}
-	}
-	rows, read, _ := c.StyledScreenRead()
-	log.Info("draft would not clear", "screen", strings.Join(rows, "\n"),
-		"pty_size", read.PTY, "attach_sizes", read.Attaches)
-	return ErrDraft
+	return deliver.ClearDraft(c, sessionTyping, log, *p.draftHooks(dir))
 }
 
 // InputState runs the harness empty check when the holder serves styled rows.

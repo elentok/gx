@@ -133,6 +133,7 @@ var allowed = map[string]int{
 	"server/sessions/prompt/firstprompt_failure_test.go":               1,
 	"server/sessions/prompt/firstprompt_launch_test.go":                1, // negative wait: a resend would come within a few ResendEvery
 	"server/sessions/prompt/firstprompt_test.go":                       3,
+	"server/sessions/prompt/promptflows/sessionprompt_slash_test.go":   2, // negative waits: no third Enter, retype or second compaction follows within a few grace windows
 	"server/sessions/prompt/promptflows/firstprompt_signals_test.go":   2, // negative waits: no second start, nudge or repeat submission follows within a few grace windows
 	"server/sessions/banners/sessions_banner_test.go":                  1,
 	"server/sessions/sessions_failstart_test.go":                       1,

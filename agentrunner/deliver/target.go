@@ -2,6 +2,7 @@ package deliver
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -271,8 +272,10 @@ type Input interface {
 // Policy is how Deliver delivers. A nil Slash is the turn-starting shape (Caps,
 // Deadline, Now); otherwise the slash shape. PolicyFor picks one from the text.
 type Policy struct {
-	Caps     NudgeCaps
-	Slash    *SlashCaps
+	Caps  NudgeCaps
+	Slash *SlashCaps
+	// Draft, when set, clears a person's draft before the text is typed.
+	Draft    *DraftHooks
 	Deadline time.Time
 	// Now is the clock for Deadline; nil is time.Now.
 	Now    func() time.Time
@@ -286,6 +289,14 @@ func Deliver(t Input, text string, policy Policy) error {
 	if clean, n := Strip(text); n > 0 {
 		logOf(t).Info("stripped invisible chars before typing", "count", n)
 		text = clean
+	}
+	if d, ok := t.(DraftClearer); ok && policy.Draft != nil {
+		if !readyToType(t) {
+			return fmt.Errorf("%w: %w", claudeui.ErrStuckSubmission, claudeui.ErrNotReadyToType)
+		}
+		if err := d.ClearDraft(*policy.Draft); err != nil {
+			return err
+		}
 	}
 	if policy.Slash != nil {
 		return deliverSlash(t, text, *policy.Slash, policy.Report)

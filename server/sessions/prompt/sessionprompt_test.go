@@ -108,7 +108,7 @@ func TestSessionPrompt_AcceptsSlashCommands(t *testing.T) {
 	}
 }
 
-func TestSessionPrompt_SlashCommandIsTypedOnce(t *testing.T) {
+func TestSessionPrompt_SlashCommandWithASwallowedEnterLandsOnce(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
 	if err := agentfake.SendProgramControl(f.conv, agentfake.Control{Action: agentfake.ActionSwallowEnter}); err != nil {
@@ -117,9 +117,10 @@ func TestSessionPrompt_SlashCommandIsTypedOnce(t *testing.T) {
 	if res := f.prompt(t, "/cost"); res.Refused {
 		t.Fatalf("prompt = %+v", res)
 	}
-	time.Sleep(2 * firstPromptGrace) // negative wait: a nudge's Enter would come within the grace window
-	if got := submitted(t, f.conv); got != "" {
-		t.Errorf("submitted = %q, want none: the one Enter was swallowed and not retried", got)
+	waitForSubmitted(t, f.conv, strconv.Quote("/cost")+"\n")
+	time.Sleep(2 * firstPromptGrace) // negative wait: a retype would come within the grace window
+	if got := submitted(t, f.conv); got != strconv.Quote("/cost")+"\n" {
+		t.Errorf("submitted = %q, want the command submitted once", got)
 	}
 }
 
