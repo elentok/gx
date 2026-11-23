@@ -83,8 +83,7 @@ func (f *firstPrompt) startTimedOut() {
 	})
 	if prompt != "" {
 		f.releaseLaunchHold()
-		f.log.Warn("first prompt failed", "reason", "agent still starting")
-		raiseBlocking(f.p, f.dir, fmt.Sprintf("agent still starting after %s", f.timeout), wire.BlockingStarting, []string{prompt})
+		f.raise(prompt, fmt.Sprintf("agent still starting after %s", f.timeout), wire.BlockingStarting)
 	}
 }
 
@@ -101,10 +100,10 @@ func (f *firstPrompt) releaseLaunchHold() {
 }
 
 // raise logs the failure, then hands the prompt to a person as a one-step
-// Action.
-func (f *firstPrompt) raise(prompt, reason string) {
+// Action. A blocking kind lets Retry run it again.
+func (f *firstPrompt) raise(prompt, reason, blocking string) {
 	f.log.Warn("first prompt failed", "reason", reason)
-	f.p.RaiseGxActionable(f.dir, reason, []string{prompt})
+	raiseBlocking(f.p, f.dir, reason, blocking, []string{prompt})
 }
 
 // failed raises the Actionable for a nudge that gave up. Where the input is
@@ -122,7 +121,7 @@ func (f *firstPrompt) failed(prompt string, err error) {
 			reason = withClearHint(reason)
 		}
 	}
-	f.raise(prompt, reason)
+	f.raise(prompt, reason, "")
 }
 
 // failureReason words a first-prompt failure and says whether gx's own text
@@ -209,17 +208,19 @@ func (f *firstPrompt) markTyped() {
 func (f *firstPrompt) Start(signal, prompt string) {
 	f.log.Info("first prompt ready", "signal", signal, "len", len(prompt), "head", PromptHead(prompt))
 	f.p.sessions.Watches.Start(func() {
-		f.logMissingMarker(signal)
 		err := f.deliver(prompt)
 		if !f.typed.Load() {
 			f.releaseLaunchHold()
 		}
+		// After delivery: the check dials the holder and runs `claude --version`,
+		// and a marker that shows during delivery is not missing.
+		f.logMissingMarker(signal)
 		switch {
 		case errors.Is(err, errNudgeCancelled):
 			f.log.Debug(errNudgeCancelled.Error())
 		case errors.Is(err, ErrDraft):
 			f.log.Info("draft would not clear")
-			raiseBlocking(f.p, f.dir, DraftReason, wire.BlockingDraft, []string{prompt})
+			f.raise(prompt, DraftReason, wire.BlockingDraft)
 		case errors.Is(err, claudeui.ErrStuckSubmission), errors.Is(err, claudeui.ErrStartTimeout),
 			errors.Is(err, claudeui.ErrNotReadyToType), errors.Is(err, errSessionBlocked),
 			errors.Is(err, agentrunner.ErrNotDelivered):
