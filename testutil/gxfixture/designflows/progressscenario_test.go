@@ -31,7 +31,7 @@ func TestRunningTicketTickScenario(t *testing.T) {
 
 func TestRecoveryScenarios_EachStartsAndPrintsItsJSON(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"hung-pane-twice", "hung-pane-once", "hung-pane-twice-codex", "codex-drops-prompt", "verify-notes", "summary-notes", "map-evolve", "live-task-gate", "live-task-gate-codex", "live-task-gate-dirty", "slow-holder", "holder-unreachable", "classifier-outage"} {
+	for _, name := range []string{"hung-pane-twice", "hung-pane-once", "hung-pane-twice-codex", "codex-drops-prompt", "verify-notes", "summary-notes", "map-evolve", "live-task-gate", "live-task-gate-codex", "live-task-gate-dirty", "slow-holder", "holder-unreachable", "classifier-outage", "launch-rejected", "launch-undecided"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			r := start(t, name)

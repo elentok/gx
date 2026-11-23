@@ -759,6 +759,8 @@ var Scenarios = map[string]scenario{
 	// deliver-cards: three idle Claude chats for the three delivery-failure cards. See deliverCardsScenario.
 	"deliver-cards": deliverCardsScenario(),
 	// deliver-launch-*: a project with no session and one fake knob each. See deliverLaunchScenario.
+	"launch-rejected":              launchRejected,
+	"launch-undecided":             launchUndecided,
 	"deliver-launch-undecided":     deliverLaunchScenario(agentfake.TUIUndecidedEnv + "=1"),
 	"deliver-launch-rejected":      deliverLaunchScenario(agentfake.TUIUnknownSkillEnv+"=1", "GX_LAUNCH_TIMINGS=3s"),
 	"deliver-launch-never-started": deliverLaunchScenario(agentfake.TUINoPidFileEnv + "=1"),
