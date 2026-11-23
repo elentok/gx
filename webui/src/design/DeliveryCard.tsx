@@ -43,6 +43,15 @@ interface CardButton {
   run: (a: CardActions) => void
 }
 
+const ROW_BUTTON = {
+  emphasis: "secondary",
+  h: "28px",
+  px: "10px",
+  fontSize: "14px",
+  fontWeight: "400",
+  borderRadius: "4px",
+} as const
+
 const RESEND: CardButton = {
   label: "Resend",
   run: (a) => a.write(() => a.resend({ id: a.session.id })),
@@ -205,17 +214,17 @@ export function DeliveryCard({
           button === RESTART && confirming ? (
             <Box key={button.label} display="flex" alignItems="center" gap="2">
               <Text fontSize="sm">Restart the agent?</Text>
-              <Button emphasis="secondary" onClick={() => setConfirming(false)}>
+              <Button {...ROW_BUTTON} onClick={() => setConfirming(false)}>
                 Keep
               </Button>
-              <Button emphasis="secondary" onClick={() => run(restart)}>
+              <Button {...ROW_BUTTON} onClick={() => run(restart)}>
                 Restart
               </Button>
             </Box>
           ) : (
             <Button
               key={button.label}
-              emphasis="secondary"
+              {...ROW_BUTTON}
               disabled={button === RESEND && (pending || !promptable(session))}
               onClick={() => button.run(actions)}
             >
