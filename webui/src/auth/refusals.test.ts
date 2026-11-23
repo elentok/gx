@@ -23,6 +23,16 @@ describe("reasonText", () => {
     expect(reasonText({ reason: TOTP_OFF })).toBe("The authenticator is turned off.")
   })
 
+  it("has a text for each push refusal", () => {
+    for (const reason of [
+      "push-no-contact",
+      "push-bad-subscription",
+      "push-not-yours",
+      "push-no-subscription",
+    ])
+      expect(reasonText({ reason })).not.toBe(reason)
+  })
+
   it("rounds the wait up to whole minutes", () => {
     expect(reasonText({ reason: RATE_LIMITED, wait_seconds: 181 })).toBe(
       "Too many tries. Try again in 4 minutes.",

@@ -17,6 +17,10 @@ const TEXTS: Record<string, string> = {
   [TOTP_MISMATCH]: TOTP_MISMATCH_TEXT,
   [PASSWORD_TOO_SHORT]: `The password needs at least ${MIN_PASSWORD} characters.`,
   [TOTP_OFF]: "The authenticator is turned off.",
+  "push-no-contact": "Set a contact email in the server settings before turning push on.",
+  "push-bad-subscription": "This browser's push subscription was not accepted. Try again.",
+  "push-not-yours": "That push subscription belongs to another web login.",
+  "push-no-subscription": "This device has no push subscription. Turn notifications on first.",
 }
 
 export function rateLimitText(waitSeconds: number): string {

@@ -109,6 +109,7 @@ const READY_WIRING: Record<
   "/settings/p/:project/s/:section": "useFetched",
   "/settings/logins": "useFetched",
   "/settings/logins/:id": "useFetched",
+  "/settings/notifications": "useReady",
   "/settings/password": "useFetched",
   "/settings/authenticator": "useFetched",
   "/settings/certificate": "useFetched",

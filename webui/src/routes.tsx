@@ -123,6 +123,12 @@ const ChangePasswordPage = lazy(() =>
   accountPagesModule().then(({ ChangePasswordPage }) => ({ default: ChangePasswordPage })),
 )
 
+const NotificationsPage = lazy(() =>
+  import("./settings/NotificationsPage").then(({ NotificationsPage }) => ({
+    default: NotificationsPage,
+  })),
+)
+
 const settingsPagesModule = () => import("./settings/SettingsPage")
 const CertificatePage = lazy(() =>
   settingsPagesModule().then(({ CertificatePage }) => ({ default: CertificatePage })),
@@ -399,6 +405,7 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
       path: "/settings/logins/:id",
       element: <WebLoginPage fetchList={fetchers.logins} signOut={fetchers.signOut} />,
     },
+    { path: "/settings/notifications", element: <NotificationsPage /> },
     {
       path: "/settings/password",
       element: <ChangePasswordPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} />,

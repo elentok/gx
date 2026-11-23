@@ -607,6 +607,13 @@ const rows: Row[] = [
     marker: "This web login no longer exists.",
   },
   {
+    name: "notifications",
+    pattern: "/settings/notifications",
+    path: "/settings/notifications",
+    fetchers: {},
+    marker: "Push alerts for sessions that need you, on this device only.",
+  },
+  {
     name: "password loading",
     pattern: "/settings/password",
     path: "/settings/password",

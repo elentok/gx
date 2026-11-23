@@ -49,7 +49,16 @@ import {
   type LoginWrite,
   type WebLoginEntry,
 } from "./logins"
-import { BackLink, CountChip, Frame, Group, LoadingState, rowProps, SearchBox } from "./parts"
+import {
+  BackLink,
+  CountChip,
+  Frame,
+  Group,
+  LoadingState,
+  PushChip,
+  rowProps,
+  SearchBox,
+} from "./parts"
 import type { WriteSetting } from "./SettingsRow"
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -170,6 +179,11 @@ export function SettingsHomeView({
                       ? undefined
                       : `${loginCount} ${loginCount === 1 ? "device" : "devices"}`
                   }
+                />
+                <LinkRow
+                  href={`${SETTINGS_HREF}/notifications`}
+                  label="Notifications"
+                  detail={<PushChip />}
                 />
                 <LinkRow href={`${SETTINGS_HREF}/password`} label="Password" />
                 {totpOn && (

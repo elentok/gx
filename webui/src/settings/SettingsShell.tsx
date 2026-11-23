@@ -10,7 +10,7 @@ import { EmptyState } from "../ui/empty-state/EmptyState"
 import { useDevice } from "../useWide"
 import { Chip } from "../ui/chip/Chip"
 import { entryLabel, groupBySection, isChanged, searchEntries, treeSections } from "./settingsApi"
-import { CountChip, Group, GroupBlock, SearchBox } from "./parts"
+import { CountChip, Group, GroupBlock, PushChip, SearchBox } from "./parts"
 import { DEV_FRONTEND_KEY } from "../dev"
 import { DevFrontendRow } from "./DevFrontendRow"
 import { SettingsRow, type WriteSetting } from "./SettingsRow"
@@ -261,6 +261,9 @@ function AccountNav({
       {isOpen && (
         <>
           <AccountLink href={`${SETTINGS_HREF}/logins`}>Web logins</AccountLink>
+          <AccountLink href={`${SETTINGS_HREF}/notifications`} detail={<PushChip />}>
+            Notifications
+          </AccountLink>
           <AccountLink href={`${SETTINGS_HREF}/password`}>Password</AccountLink>
           {totpOn && (
             <AccountLink href={`${SETTINGS_HREF}/authenticator`}>
@@ -277,9 +280,18 @@ function AccountNav({
   )
 }
 
-const AccountLink = ({ href, children }: { href: string; children: string }) => (
+const AccountLink = ({
+  href,
+  detail,
+  children,
+}: {
+  href: string
+  detail?: ReactNode
+  children: string
+}) => (
   <chakra.a href={href} {...navLink} pl="6">
     {children}
+    {detail}
   </chakra.a>
 )
 
