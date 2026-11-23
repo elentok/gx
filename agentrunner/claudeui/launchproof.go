@@ -41,24 +41,14 @@ type LaunchProof struct {
 	Sleep func(time.Duration)
 }
 
-// LaunchProofCaps bound CheckLaunchDelivered. Grace is how long a missing user
-// record keeps earning resends. UnknownGrace is the shorter window once the
-// pane shows "Unknown command:": the registry is rarely about to fill, so the
-// caller gets to retry in a fresh session sooner.
+// LaunchProofCaps bound CheckLaunchDelivered: Grace is how long a missing user
+// record is waited for, UnknownGrace how long the unknown-command line may
+// stay on screen (a started turn can leave a stale one), Poll the wait between
+// reads.
 type LaunchProofCaps struct {
 	Grace        time.Duration
 	UnknownGrace time.Duration
 	Poll         time.Duration
-	ResendEvery  time.Duration
-}
-
-// WithOverrides returns c with every non-zero field of o replacing its own.
-func (c LaunchProofCaps) WithOverrides(o LaunchProofCaps) LaunchProofCaps {
-	c.Grace = cmp.Or(o.Grace, c.Grace)
-	c.UnknownGrace = cmp.Or(o.UnknownGrace, c.UnknownGrace)
-	c.Poll = cmp.Or(o.Poll, c.Poll)
-	c.ResendEvery = cmp.Or(o.ResendEvery, c.ResendEvery)
-	return c
 }
 
 // ErrPastedLaunch means the launch command reached the transcript as pasted
@@ -68,12 +58,7 @@ var ErrPastedLaunch = fmt.Errorf("%w: the launch command was pasted as plain tex
 const pastedMarker = "<pasted_content"
 
 // DefaultLaunchProofCaps wait for about 30 seconds.
-var DefaultLaunchProofCaps = LaunchProofCaps{
-	Grace:        30 * time.Second,
-	UnknownGrace: 5 * time.Second,
-	Poll:         500 * time.Millisecond,
-	ResendEvery:  3 * time.Second,
-}
+var DefaultLaunchProofCaps = LaunchProofCaps{Grace: 30 * time.Second, UnknownGrace: 5 * time.Second, Poll: 500 * time.Millisecond}
 
 // NewRecordSource returns a LaunchProof.FirstUser over the transcript that
 // find locates. It counts the person records there now, so call it before the

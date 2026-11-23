@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/osnotify"
@@ -234,7 +234,7 @@ type Config struct {
 	// LaunchProofCaps bound the check that a claude session's first slash
 	// prompt reached the transcript; a zero field means the matching
 	// claudeui.DefaultLaunchProofCaps one.
-	LaunchProofCaps claudeui.LaunchProofCaps
+	LaunchProofCaps deliver.LaunchTimings
 
 	// CompactRewaitTimeout bounds recovery's R7 wait; zero means
 	// DefaultCompactRewaitTimeout.

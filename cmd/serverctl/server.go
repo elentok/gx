@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/limits"
@@ -182,7 +182,7 @@ func runServer(ctx context.Context, d Deps) error {
 		if err != nil {
 			return fmt.Errorf("GX_LAUNCH_UNKNOWN_GRACE: %w", err)
 		}
-		ptyOverride.LaunchCaps = claudeui.LaunchProofCaps{UnknownGrace: grace, Grace: 3 * grace}
+		ptyOverride.LaunchCaps = deliver.LaunchTimings{Window: grace, Grace: 3 * grace}
 	}
 	runner, runnerFor := runnerbuild.New(choice, dirs.Environ(), stateDir, cfg.RunnerWait, runnerOpts, ptyOverride)
 	configPath, err := dirs.FilePath()

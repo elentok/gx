@@ -15,9 +15,9 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// A Codex launch prompt the agent drops is resent in the session, relaunched
-// once, then pauses agent_prompt_stalled, whatever the ticket's type.
-func TestLaunch_CodexDroppedPromptResendsRelaunchesOnceThenPauses(t *testing.T) {
+// A Codex launch prompt the agent drops is typed once, relaunched once, then
+// pauses agent_prompt_stalled, whatever the ticket's type.
+func TestLaunch_CodexDroppedPromptRelaunchesOnceThenPauses(t *testing.T) {
 	for _, typ := range []string{"implement", "merge"} {
 		t.Run(typ, func(t *testing.T) {
 			t.Parallel()
@@ -54,8 +54,8 @@ func TestLaunch_CodexDroppedPromptResendsRelaunchesOnceThenPauses(t *testing.T) 
 					t.Errorf("launch-failed reason = %q, want the no-user-record wording", f.Reason)
 				}
 			}
-			if len(ofType(logged, events.PromptNudged)) == 0 {
-				t.Errorf("run log = %+v, want prompt-nudged for the resends", logged)
+			if n := ofType(logged, events.PromptNudged); len(n) != 0 {
+				t.Errorf("prompt-nudged events = %+v, want none: a drop shows no marker on the pane", n)
 			}
 		})
 	}

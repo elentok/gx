@@ -64,9 +64,9 @@ type Pty struct {
 	// the typing check reads claude's config dir and home. Empty means no
 	// config, never the process env.
 	Env []string
-	// LaunchCaps bound a launch prompt's transcript proof; a zero field means
-	// the default.
-	LaunchCaps claudeui.LaunchProofCaps
+	// LaunchCaps are a launch prompt's retype window and landed-check timings;
+	// a zero field means the default.
+	LaunchCaps deliver.LaunchTimings
 	// ProcCap is read at each launch: the holder's process tree may grow its
 	// headroom above the process count at that moment. The zero value means no cap.
 	ProcCap proccap.Source

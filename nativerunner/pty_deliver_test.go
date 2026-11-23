@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -39,7 +39,7 @@ func TestPty_Deliver(t *testing.T) {
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
 			t.Parallel()
-			p, s := launchPty(t, claudeui.LaunchProofCaps{})
+			p, s := launchPty(t, deliver.LaunchTimings{})
 			p.PromptGrace = 500 * time.Millisecond
 			if row.swallow {
 				ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionSwallowEnter})

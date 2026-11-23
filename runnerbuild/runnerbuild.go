@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/proctable"
 	"github.com/elentok/gx/proccap"
@@ -27,7 +27,7 @@ type PtyOverride struct {
 	StartTimeout time.Duration
 	PromptGrace  time.Duration
 	StopGrace    time.Duration
-	LaunchCaps   claudeui.LaunchProofCaps
+	LaunchCaps   deliver.LaunchTimings
 }
 
 // Options is what production configures on the runners.

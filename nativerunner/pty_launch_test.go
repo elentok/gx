@@ -13,13 +13,14 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/claudeenv"
 )
 
-func launchPty(t *testing.T, caps claudeui.LaunchProofCaps, env ...string) (*nativerunner.Pty, agentrunner.Session) {
+func launchPty(t *testing.T, caps deliver.LaunchTimings, env ...string) (*nativerunner.Pty, agentrunner.Session) {
 	t.Helper()
 	p := newPty(t)
 	// newPty's plain screen is dropped: a launch prompt waits for the input box.
@@ -48,16 +49,20 @@ func launchPty(t *testing.T, caps claudeui.LaunchProofCaps, env ...string) (*nat
 
 func TestPty_LaunchPromptThatStartsNoTurnIsNotDelivered(t *testing.T) {
 	t.Parallel()
-	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 600 * time.Millisecond, ResendEvery: time.Hour}, agentfake.TUINoTurnEnv+"=1")
+	p, s := launchPty(t, deliver.LaunchTimings{Grace: 600 * time.Millisecond, RetypeEvery: 50 * time.Millisecond}, agentfake.TUINoTurnEnv+"=1")
+	var decisions []string
 
-	if err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", nil); !errors.Is(err, agentrunner.ErrNotDelivered) {
+	if err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", func(d string) { decisions = append(decisions, d) }); !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("PromptLaunch = %v; want ErrNotDelivered", err)
+	}
+	if typed := strings.Count(fakeKeysTyped(t, p, s), "/gx-implement x/1\r"); typed != 1 || len(decisions) != 0 {
+		t.Errorf("typed %d times with decisions %v; want the command once and no retype", typed, decisions)
 	}
 }
 
 func TestPty_LaunchPromptUnknownCommandFailsFast(t *testing.T) {
 	t.Parallel()
-	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: time.Minute, UnknownGrace: 200 * time.Millisecond, ResendEvery: time.Hour}, agentfake.TUIUnknownSkillEnv+"=1")
+	p, s := launchPty(t, deliver.LaunchTimings{Grace: time.Minute, Window: 200 * time.Millisecond, RetypeEvery: time.Hour}, agentfake.TUIUnknownSkillEnv+"=1")
 
 	start := time.Now()
 	err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", nil)
@@ -70,9 +75,8 @@ func TestPty_LaunchPromptUnknownCommandFailsFast(t *testing.T) {
 }
 
 func TestPty_LaunchPromptLateRegistryIsResentThenStartsATurn(t *testing.T) {
-	t.Skip("the PTY launch has no retype until deliver-primitive-impl/21 (pty-launch-policy)")
 	t.Parallel()
-	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, UnknownGrace: time.Minute, ResendEvery: 200 * time.Millisecond},
+	p, s := launchPty(t, deliver.LaunchTimings{Grace: 30 * time.Second, Window: time.Minute, RetypeEvery: 200 * time.Millisecond, Poll: 20 * time.Millisecond},
 		agentfake.TUIRegistryDelayEnv+"=1s")
 	var mu sync.Mutex
 	var decisions []string
@@ -91,6 +95,10 @@ func TestPty_LaunchPromptLateRegistryIsResentThenStartsATurn(t *testing.T) {
 	if !slices.Contains(decisions, string(claudeui.NudgePrompt)) {
 		t.Errorf("decisions = %v; want %q", decisions, claudeui.NudgePrompt)
 	}
+	// Each retype answers one Unknown command: the keys hold the first type plus one per decision.
+	if typed := strings.Count(fakeKeysTyped(t, p, s), "/gx-implement x/1\r"); typed != 1+len(decisions) {
+		t.Errorf("command typed %d times for %d retypes; want one more type than retypes", typed, len(decisions))
+	}
 	st, err := p.Status(s)
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +110,7 @@ func TestPty_LaunchPromptLateRegistryIsResentThenStartsATurn(t *testing.T) {
 
 func TestPty_LaunchPromptPastedAsPlainTextIsItsOwnNotDeliveredError(t *testing.T) {
 	t.Parallel()
-	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour}, agentfake.TUIPasteOverEnv+"=5")
+	p, s := launchPty(t, deliver.LaunchTimings{Grace: 30 * time.Second, RetypeEvery: time.Hour}, agentfake.TUIPasteOverEnv+"=5")
 	var decisions []string
 
 	err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", func(d string) { decisions = append(decisions, d) })
@@ -120,7 +128,7 @@ func TestPty_LaunchPromptPastedAsPlainTextIsItsOwnNotDeliveredError(t *testing.T
 
 func TestPty_LaunchPromptThatLandsAtOnceLogsNoNudge(t *testing.T) {
 	t.Parallel()
-	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: 50 * time.Millisecond})
+	p, s := launchPty(t, deliver.LaunchTimings{Grace: 30 * time.Second, RetypeEvery: 50 * time.Millisecond})
 	var decisions []string
 
 	if err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", func(d string) { decisions = append(decisions, d) }); err != nil {
@@ -133,7 +141,7 @@ func TestPty_LaunchPromptThatLandsAtOnceLogsNoNudge(t *testing.T) {
 
 func TestPty_LaunchPromptIsDeliveredWithoutWaitingForATranscript(t *testing.T) {
 	t.Parallel()
-	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour})
+	p, s := launchPty(t, deliver.LaunchTimings{Grace: 30 * time.Second, RetypeEvery: time.Hour})
 	if matches, _ := filepath.Glob(filepath.Join(ptyHome(p), ".claude", "projects", "*", s.SessionID+".jsonl")); len(matches) != 0 {
 		t.Fatalf("transcripts before the prompt = %v; want none", matches)
 	}
@@ -169,7 +177,7 @@ func TestPty_LaunchPromptProvesDeliveryUnderACustomConfigDir(t *testing.T) {
 			cfg = v
 		}
 	}
-	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour}, env...)
+	p, s := launchPty(t, deliver.LaunchTimings{Grace: 30 * time.Second, RetypeEvery: time.Hour}, env...)
 
 	if err := p.PromptLaunch(context.Background(), s, "/gx-implement x/1", nil); err != nil {
 		t.Fatalf("PromptLaunch = %v; want nil", err)
@@ -181,7 +189,7 @@ func TestPty_LaunchPromptProvesDeliveryUnderACustomConfigDir(t *testing.T) {
 
 func TestPty_LaunchPromptStopsDeliveryWaitWhenCancelled(t *testing.T) {
 	t.Parallel()
-	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: time.Minute, UnknownGrace: time.Minute, ResendEvery: time.Hour},
+	p, s := launchPty(t, deliver.LaunchTimings{Grace: time.Minute, Window: time.Minute, RetypeEvery: time.Hour},
 		agentfake.TUILaunchRecordEnv+"=0")
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -203,7 +211,7 @@ func TestPty_LaunchPromptStopsDeliveryWaitWhenCancelled(t *testing.T) {
 
 func TestPty_LaunchPromptPersonTypingWithNoProofIsUnconfirmed(t *testing.T) {
 	t.Parallel()
-	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour}, agentfake.TUINoTurnEnv+"=1")
+	p, s := launchPty(t, deliver.LaunchTimings{Grace: 30 * time.Second, RetypeEvery: time.Hour}, agentfake.TUINoTurnEnv+"=1")
 	a := attachTo(t, p, s)
 
 	done := make(chan error, 1)

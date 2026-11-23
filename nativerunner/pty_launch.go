@@ -28,8 +28,8 @@ var _ agentrunner.LaunchPrompter = (*Pty)(nil)
 
 // PromptLaunch is PromptNudged for a launch prompt, which must start a turn.
 // A Claude "/" command is typed once and then proved by the transcript: its
-// first user record must be the command (see claudeui.CheckLaunchDelivered,
-// which also owns the resends). A person typing over it is unconfirmed unless
+// first user record must be the command (see claudeui.CheckLaunchDelivered).
+// Deliver retypes it while the pane shows the unknown-command marker. A person typing over it is unconfirmed unless
 // the transcript already shows the command. Other prompts, Codex, and runners
 // without a Claude home keep the PromptNudged path.
 func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text string, onNudge func(string)) error {
@@ -76,13 +76,27 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 		loc := &transcript.Locator{ProjectsDir: projects, Cwd: ss.cwd, SessionID: s.SessionID}
 		firstUser = claudeui.NewSessionRecordSource(loc.SessionID, loc.Find)
 	}
-	// One send, no reads: the transcript proof below owns what follows.
-	if err := pr.deliver(text, deliver.Policy{Slash: &deliver.SlashCaps{}}); err != nil {
+	// Deliver types and retypes while the pane says the skill is unknown; the
+	// transcript proof below owns what follows.
+	marker := claudeui.UnknownCommandMarker
+	if codex {
+		marker = codexui.UnknownCommandMarker
+	}
+	// One send and a short watch for the marker: no extra Enter, the proof below decides the rest.
+	slash := deliver.SlashCaps{Watch: min(time.Second, p.WaitN())}
+	policy := deliver.Policy{Slash: &slash, Launch: p.launcher().retypeCaps(marker), Report: func(d claudeui.NudgeDecision) {
+		if onNudge != nil {
+			onNudge(string(d))
+		}
+	}}
+	// A person's keys during the watch go to the proof, which keeps a command
+	// the transcript already shows and else reports it unconfirmed.
+	if err := pr.deliver(text, policy); err != nil && !errors.Is(err, errPersonInput) {
 		return notDelivered(err)
 	}
 	agentrunner.LaunchMark(ctx, agentrunner.MarkTyped)
 	if codex {
-		err := p.proveCodexLaunch(ctx, ss, pr, firstUser, text, onNudge)
+		err := p.proveCodexLaunch(ctx, pr, firstUser, text)
 		if err == nil {
 			agentrunner.LaunchMark(ctx, agentrunner.MarkEchoed)
 		}
@@ -97,7 +111,7 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	}
 	err = claudeui.CheckLaunchDelivered(ctx, proof, text, p.launcher().launchCaps())
 	if errors.Is(err, errPersonInput) {
-		// The person's keys end the resends; the transcript may still show the
+		// The person's keys end the wait; the transcript may still show the
 		// command from before they typed.
 		if content, ok, rerr := firstUser(); rerr != nil || !ok || !claudeui.LaunchedBy(content, text) {
 			return fmt.Errorf("%w: %q: a person typed before the transcript showed the command", agentrunner.ErrDeliveryUnconfirmed, text)
@@ -153,7 +167,7 @@ func (p *Pty) codexFirstUser(ss *ptySession) func() (string, bool, error) {
 // proveCodexLaunch is the Claude proof over the rollout: the prompt counts as
 // delivered once the rollout holds a matching user record, and is resent in
 // the session while it does not.
-func (p *Pty) proveCodexLaunch(ctx context.Context, ss *ptySession, pr *ptyRelay, firstUser func() (string, bool, error), text string, onNudge func(string)) error {
+func (p *Pty) proveCodexLaunch(ctx context.Context, pr *ptyRelay, firstUser func() (string, bool, error), text string) error {
 	proof := claudeui.LaunchProof{
 		FirstUser:     firstUser,
 		UnknownMarker: codexui.UnknownCommandMarker,
@@ -179,7 +193,7 @@ type ptyLauncher struct {
 	poll         time.Duration
 	startTimeout time.Duration
 	// capsOverride is Pty.LaunchCaps: set fields replace the default caps.
-	capsOverride claudeui.LaunchProofCaps
+	capsOverride deliver.LaunchTimings
 	// procCap is the cap for a launch now; zero means uncapped.
 	procCap func() int
 }
@@ -205,12 +219,17 @@ func (p *Pty) procCap() int {
 
 // launchCaps is the launch proof's caps with LaunchCaps' set fields applied.
 func (l ptyLauncher) launchCaps() claudeui.LaunchProofCaps {
-	caps := claudeui.DefaultLaunchProofCaps
-	caps.Grace = cmp.Or(l.capsOverride.Grace, caps.Grace)
-	caps.UnknownGrace = cmp.Or(l.capsOverride.UnknownGrace, caps.UnknownGrace)
+	caps := l.capsOverride.ProofCaps()
 	caps.Poll = cmp.Or(l.capsOverride.Poll, l.poll)
-	caps.ResendEvery = cmp.Or(l.capsOverride.ResendEvery, caps.ResendEvery)
 	return caps
+}
+
+// retypeCaps is the launch retype window for a pane whose unknown command
+// shows as marker.
+func (l ptyLauncher) retypeCaps(marker string) *deliver.LaunchCaps {
+	lc := l.capsOverride.Caps()
+	lc.Marker = marker
+	return &lc
 }
 
 // launch connects to the holder ss started, records meta.json and waits for

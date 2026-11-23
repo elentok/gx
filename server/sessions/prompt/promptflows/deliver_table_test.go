@@ -319,10 +319,10 @@ func TestDeliverTable(t *testing.T) {
 		})
 		t.Run("LaunchPromptRetypesForTheWindowThenEndsInTheCard", func(t *testing.T) {
 			t.Parallel()
-			// The retype comes every ResendEvery inside the UnknownGrace window.
+			// The retype comes every RetypeEvery inside the Window.
 			c := startTUIChatPromptWith(t, "/my-skill", func(cfg *server.Config) {
-				cfg.LaunchProofCaps.UnknownGrace = 2 * time.Second
-				cfg.LaunchProofCaps.ResendEvery = 300 * time.Millisecond
+				cfg.LaunchProofCaps.Window = 2 * time.Second
+				cfg.LaunchProofCaps.RetypeEvery = 300 * time.Millisecond
 			}, agentfake.TUIUnknownSkillEnv+"=1")
 			got := c.card(t)
 			if !strings.Contains(got.Reason, "Unknown command") || len(got.Action) != 1 || got.Action[0] != "/my-skill" {
@@ -335,8 +335,8 @@ func TestDeliverTable(t *testing.T) {
 		t.Run("CodexLaunchPromptRetypesForTheWindowThenEndsInTheCard", func(t *testing.T) {
 			t.Parallel()
 			f := fromPrompt(rigs.StartCodexPromptSessionAs(t, func(cfg *server.Config) {
-				cfg.LaunchProofCaps.UnknownGrace = 2 * time.Second
-				cfg.LaunchProofCaps.ResendEvery = 300 * time.Millisecond
+				cfg.LaunchProofCaps.Window = 2 * time.Second
+				cfg.LaunchProofCaps.RetypeEvery = 300 * time.Millisecond
 			}, wire.CreateSessionRequest{Prompt: "/handoff"}))
 			got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised }).Actionable
 			if !strings.Contains(got.Reason, "Unrecognized command") || len(got.Action) != 1 || got.Action[0] != "/handoff" {

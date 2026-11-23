@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
@@ -37,17 +37,17 @@ func WithLaunchGrace(d time.Duration) func(*server.Config) {
 
 // launchCaps is the launch proof's caps for env: a set WithLaunchGrace shortens
 // the grace and the resend interval with it.
-func launchCaps(env []string) claudeui.LaunchProofCaps {
+func launchCaps(env []string) deliver.LaunchTimings {
 	for _, kv := range slices.Backward(env) {
 		if v, ok := strings.CutPrefix(kv, launchGraceEnv+"="); ok {
 			d, err := time.ParseDuration(v)
 			if err != nil {
-				return claudeui.LaunchProofCaps{}
+				return deliver.LaunchTimings{}
 			}
-			return claudeui.LaunchProofCaps{Grace: d, UnknownGrace: d, ResendEvery: d / 4}
+			return deliver.LaunchTimings{Grace: d, Window: d, RetypeEvery: d / 4}
 		}
 	}
-	return claudeui.LaunchProofCaps{}
+	return deliver.LaunchTimings{}
 }
 
 // ptyRunner is a nativerunner.Pty whose prompts run the harness's OnTurn hook.

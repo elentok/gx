@@ -334,11 +334,7 @@ func (f *firstPrompt) deliver(prompt string) error {
 // launchCaps is the launch retype window: the config's LaunchProofCaps map onto
 // it, and a Codex slash looks for Codex's marker.
 func (f *firstPrompt) launchCaps(slash *deliver.SlashCaps) *deliver.LaunchCaps {
-	lc := deliver.DefaultLaunchCaps
-	o := f.p.cfg.LaunchProofCaps
-	lc.Window = cmp.Or(o.UnknownGrace, lc.Window)
-	lc.Poll = cmp.Or(o.Poll, lc.Poll)
-	lc.RetypeEvery = cmp.Or(o.ResendEvery, lc.RetypeEvery)
+	lc := f.p.cfg.LaunchProofCaps.Caps()
 	if slash != nil {
 		lc.Marker = slash.Marker
 	}
@@ -396,7 +392,7 @@ func (f *firstPrompt) launchSource() func() (string, bool, error) {
 // proveDelivered checks that a claude slash prompt reached its transcript. It
 // only reads: Deliver did the typing and the retyping.
 func (f *firstPrompt) proveDelivered(c *holder.HolderClient, prompt string, source func() (string, bool, error)) error {
-	caps := claudeui.DefaultLaunchProofCaps.WithOverrides(f.p.cfg.LaunchProofCaps)
+	caps := f.p.cfg.LaunchProofCaps.ProofCaps()
 	p := claudeui.LaunchProof{
 		FirstUser:   source,
 		CheckPasted: true,

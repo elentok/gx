@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/drafthistory"
 	"github.com/elentok/gx/server/projects"
@@ -58,7 +58,7 @@ type Config struct {
 	PromptGrace time.Duration
 	// LaunchProofCaps bound the check that a first slash prompt reached the
 	// transcript; a zero field means the claudeui default.
-	LaunchProofCaps claudeui.LaunchProofCaps
+	LaunchProofCaps deliver.LaunchTimings
 	// ActionStepStartTimeout bounds how long an Action step waits for its
 	// prompt to go Working; zero means DefaultActionStepStartTimeout.
 	ActionStepStartTimeout time.Duration

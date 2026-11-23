@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/codexui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/testutil/agentfake/codex"
 )
@@ -73,7 +74,7 @@ func TestPtyCodex_NoNoteKeepsTheLoopPromptAlone(t *testing.T) {
 func TestPtyCodex_LaunchPromptIsDeliveredByTheRolloutsUserRecord(t *testing.T) {
 	t.Parallel()
 	p, _ := codexRunner(t)
-	p.LaunchCaps = claudeui.LaunchProofCaps{Grace: 10 * time.Second, ResendEvery: time.Hour}
+	p.LaunchCaps = deliver.LaunchTimings{Grace: 10 * time.Second, RetypeEvery: time.Hour}
 	s := startCodex(t, p, realDir(t))
 
 	if err := p.PromptLaunch(context.Background(), s, "$gx-implement x/1", nil); err != nil {
@@ -81,10 +82,55 @@ func TestPtyCodex_LaunchPromptIsDeliveredByTheRolloutsUserRecord(t *testing.T) {
 	}
 }
 
+func TestPtyCodex_UnknownUntilInstalledLaunchIsRetypedThenStarts(t *testing.T) {
+	t.Parallel()
+	p, codexHome := codexRunner(t, codex.CodexUnknownUntilInstalledEnv+"=1")
+	p.LaunchCaps = deliver.LaunchTimings{Grace: 10 * time.Second, Window: time.Minute, RetypeEvery: 100 * time.Millisecond, Poll: 20 * time.Millisecond}
+	s := startCodex(t, p, realDir(t))
+	var decisions []string
+
+	err := p.PromptLaunch(context.Background(), s, "$gx-implement x/1", func(d string) {
+		if len(decisions) == 0 {
+			skillDir := filepath.Join(filepath.Dir(codexHome), ".agents", "skills", "gx-implement")
+			if err := os.MkdirAll(skillDir, 0o755); err != nil {
+				t.Error(err)
+			}
+			if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# skill\n"), 0o644); err != nil {
+				t.Error(err)
+			}
+		}
+		decisions = append(decisions, d)
+	})
+
+	if err != nil {
+		t.Fatalf("PromptLaunch = %v; want nil once the skill is installed", err)
+	}
+	if len(decisions) == 0 || slices.ContainsFunc(decisions, func(d string) bool { return d != string(claudeui.NudgePrompt) }) {
+		t.Errorf("decisions = %v; want only %q, at least one", decisions, claudeui.NudgePrompt)
+	}
+}
+
+func TestPtyCodex_NeverAcceptedLaunchIsRetypedThenErrUnknownSkill(t *testing.T) {
+	t.Parallel()
+	p, _ := codexRunner(t, codex.CodexUnknownSkillEnv+"=1")
+	p.LaunchCaps = deliver.LaunchTimings{Grace: time.Minute, Window: 400 * time.Millisecond, RetypeEvery: 100 * time.Millisecond, Poll: 20 * time.Millisecond}
+	s := startCodex(t, p, realDir(t))
+	var decisions []string
+
+	err := p.PromptLaunch(context.Background(), s, "$gx-implement x/1", func(d string) { decisions = append(decisions, d) })
+
+	if !errors.Is(err, agentrunner.ErrUnknownSkill) {
+		t.Fatalf("PromptLaunch = %v; want ErrUnknownSkill once the window ends", err)
+	}
+	if len(decisions) == 0 || slices.ContainsFunc(decisions, func(d string) bool { return d != string(claudeui.NudgePrompt) }) {
+		t.Errorf("decisions = %v; want only %q, at least one", decisions, claudeui.NudgePrompt)
+	}
+}
+
 func TestPtyCodex_UnknownSkillLaunchFailsFastWithErrUnknownSkill(t *testing.T) {
 	t.Parallel()
 	p, _ := codexRunner(t, codex.CodexUnknownSkillEnv+"=1")
-	p.LaunchCaps = claudeui.LaunchProofCaps{Grace: time.Minute, UnknownGrace: 200 * time.Millisecond, ResendEvery: time.Hour}
+	p.LaunchCaps = deliver.LaunchTimings{Grace: time.Minute, Window: 200 * time.Millisecond, RetypeEvery: time.Hour}
 	s := startCodex(t, p, realDir(t))
 
 	start := time.Now()
@@ -101,7 +147,7 @@ func TestPtyCodex_UnknownSkillLaunchFailsFastWithErrUnknownSkill(t *testing.T) {
 func TestPtyCodex_UnknownUntilInstalledSkillLaunchesOnceInstalled(t *testing.T) {
 	t.Parallel()
 	p, codexHome := codexRunner(t, codex.CodexUnknownUntilInstalledEnv+"=1")
-	p.LaunchCaps = claudeui.LaunchProofCaps{Grace: time.Minute, UnknownGrace: 200 * time.Millisecond, ResendEvery: time.Hour}
+	p.LaunchCaps = deliver.LaunchTimings{Grace: time.Minute, Window: 200 * time.Millisecond, RetypeEvery: time.Hour}
 	s := startCodex(t, p, realDir(t))
 
 	if err := p.PromptLaunch(context.Background(), s, "$gx-implement x/1", nil); !errors.Is(err, agentrunner.ErrUnknownSkill) {
@@ -114,18 +160,17 @@ func TestPtyCodex_UnknownUntilInstalledSkillLaunchesOnceInstalled(t *testing.T) 
 	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# skill\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	p.LaunchCaps = claudeui.LaunchProofCaps{Grace: 10 * time.Second, UnknownGrace: 5 * time.Second, ResendEvery: time.Hour}
+	p.LaunchCaps = deliver.LaunchTimings{Grace: 10 * time.Second, Window: 5 * time.Second, RetypeEvery: time.Hour}
 
 	if err := p.PromptLaunch(context.Background(), s, "$gx-implement x/1", nil); err != nil {
 		t.Fatalf("PromptLaunch after the install = %v; want nil", err)
 	}
 }
 
-func TestPtyCodex_DroppedLaunchPromptIsResentThenNotDelivered(t *testing.T) {
-	t.Skip("the PTY launch has no retype until deliver-primitive-impl/21 (pty-launch-policy)")
+func TestPtyCodex_DroppedLaunchPromptIsTypedOnceThenNotDelivered(t *testing.T) {
 	t.Parallel()
 	p, _ := codexRunner(t, codex.CodexDropPromptEnv+"=1")
-	p.LaunchCaps = claudeui.LaunchProofCaps{Grace: 1500 * time.Millisecond, ResendEvery: 300 * time.Millisecond}
+	p.LaunchCaps = deliver.LaunchTimings{Grace: 1500 * time.Millisecond, RetypeEvery: 300 * time.Millisecond}
 	s := startCodex(t, p, realDir(t))
 	var mu sync.Mutex
 	var decisions []string
@@ -141,7 +186,7 @@ func TestPtyCodex_DroppedLaunchPromptIsResentThenNotDelivered(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if !slices.Contains(decisions, string(claudeui.NudgePrompt)) {
-		t.Errorf("decisions = %v; want %q", decisions, claudeui.NudgePrompt)
+	if len(decisions) != 0 {
+		t.Errorf("decisions = %v; want no retype for a prompt with no marker on the pane", decisions)
 	}
 }

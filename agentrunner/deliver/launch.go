@@ -24,6 +24,31 @@ type LaunchCaps struct {
 // DefaultLaunchCaps retype for about 30 seconds.
 var DefaultLaunchCaps = LaunchCaps{Window: 30 * time.Second, RetypeEvery: 3 * time.Second, Poll: 500 * time.Millisecond}
 
+// LaunchTimings are the set-fields-win overrides of a launch prompt's timings:
+// the retype window and interval, plus the landed check's grace and poll. A
+// zero field keeps the default. It is the one test override of both.
+type LaunchTimings struct {
+	Grace, Window, RetypeEvery, Poll time.Duration
+}
+
+// Caps is DefaultLaunchCaps with the set fields applied.
+func (o LaunchTimings) Caps() LaunchCaps {
+	lc := DefaultLaunchCaps
+	lc.Window = cmp.Or(o.Window, lc.Window)
+	lc.RetypeEvery = cmp.Or(o.RetypeEvery, lc.RetypeEvery)
+	lc.Poll = cmp.Or(o.Poll, lc.Poll)
+	return lc
+}
+
+// ProofCaps is the landed check's caps with the set fields applied.
+func (o LaunchTimings) ProofCaps() claudeui.LaunchProofCaps {
+	c := claudeui.DefaultLaunchProofCaps
+	c.Grace = cmp.Or(o.Grace, c.Grace)
+	c.UnknownGrace = cmp.Or(o.Window, c.UnknownGrace)
+	c.Poll = cmp.Or(o.Poll, c.Poll)
+	return c
+}
+
 // retypable is a send result that leaves the text unsent, so a retype is safe.
 func retypable(err error) bool {
 	return err == nil || errors.Is(err, claudeui.ErrStartTimeout) || errors.Is(err, claudeui.ErrStuckSubmission)

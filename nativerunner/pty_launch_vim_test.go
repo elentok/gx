@@ -11,10 +11,11 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-var vimCaps = claudeui.LaunchProofCaps{Grace: 10 * time.Second, UnknownGrace: time.Minute, ResendEvery: time.Hour}
+var vimCaps = deliver.LaunchTimings{Grace: 10 * time.Second, Window: time.Minute, RetypeEvery: time.Hour}
 
 func typedKeys(t *testing.T, home string, s agentrunner.Session) string {
 	t.Helper()
