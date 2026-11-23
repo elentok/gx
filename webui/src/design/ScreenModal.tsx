@@ -8,12 +8,13 @@ import { refusalText, useWrite } from "../useWrite"
 import {
   OWNER_TEXT,
   postTakeOver,
+  tabClientId,
   subscribeOwner,
   useInputOwner,
   type SubscribeOwner,
   type TakeOver,
 } from "./inputOwner"
-import { postKeys, type PostKeys } from "./keys"
+import { ATTACH_KEYS, postInput, type PostInput } from "./keys"
 import { fetchScreen, type FetchScreen } from "./screen"
 import { changedRows, sameScreen } from "./screenDiff"
 
@@ -42,7 +43,7 @@ export function ScreenModal({
   target,
   fetcher = fetchScreen,
   keys = false,
-  poster = postKeys,
+  poster = postInput,
   subscribe = subscribeOwner,
   takeOver: postTakeOverFn = postTakeOver,
   blockedHintMs,
@@ -51,7 +52,7 @@ export function ScreenModal({
   target: string
   fetcher?: FetchScreen
   keys?: boolean
-  poster?: PostKeys
+  poster?: PostInput
   subscribe?: SubscribeOwner
   takeOver?: TakeOver
   blockedHintMs?: number
@@ -77,21 +78,28 @@ export function ScreenModal({
   useEffect(() => () => clearTimeout(fadeRef.current), [])
 
   const latestFetcher = useLatest(fetcher)
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError("")
-    try {
-      const res = await latestFetcher.current(target)
-      if (res.kind === "ok") {
-        rowsRef.current = res.detail.rows
-        setRows(res.detail.rows)
-      } else setError("This session has no screen.")
-    } catch {
-      setError("Could not load the screen. Try Refresh.")
-    } finally {
-      setLoading(false)
-    }
-  }, [target])
+  // `diff` marks what a key changed; `show` is declared below but only called after render.
+  const load = useCallback(
+    async (diff = false) => {
+      setLoading(true)
+      setError("")
+      try {
+        const res = await latestFetcher.current(target)
+        if (res.kind === "ok") {
+          if (diff) showRef.current(res.detail.rows)
+          else {
+            rowsRef.current = res.detail.rows
+            setRows(res.detail.rows)
+          }
+        } else setError("This session has no screen.")
+      } catch {
+        setError("Could not load the screen. Try Refresh.")
+      } finally {
+        setLoading(false)
+      }
+    },
+    [target],
+  )
   // Only a different target reloads (`load` changes with it); Refresh is the other way in.
   useEffect(() => {
     void load()
@@ -109,15 +117,25 @@ export function ScreenModal({
       setUnchanged(false)
     }, FADE_MS)
   }
+  const showRef = useLatest(show)
 
+  // Through the tab's own attach, so the input owner rules apply to these keys.
   const send = (body: { key?: string; text?: string }, after?: () => void) =>
-    run(() => poster({ id: target, settle: true, ...body }), {
-      onDone: (res) => {
-        after?.()
-        if (res.rows) show(res.rows)
-        else void load()
+    run(
+      () =>
+        poster({
+          id: target,
+          client: tabClientId(),
+          ...(body.key ? { key: ATTACH_KEYS[body.key] } : { paste: body.text }),
+        }),
+      {
+        onDone: (res) => {
+          after?.()
+          if (res.rows) show(res.rows)
+          else void load(true)
+        },
       },
-    })
+    )
 
   const problem = refusal ? refusalText(refusal) : sendError
 
@@ -142,7 +160,7 @@ export function ScreenModal({
           Screen
         </Text>
         <Box display="flex" gap="2">
-          <Button emphasis="secondary" disabled={loading} onClick={load}>
+          <Button emphasis="secondary" disabled={loading} onClick={() => void load()}>
             Refresh
           </Button>
           <Button emphasis="ghost" tone="muted" onClick={onClose}>

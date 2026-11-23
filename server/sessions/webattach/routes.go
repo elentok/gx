@@ -96,6 +96,7 @@ func (as *Attaches) eventsRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, res.Message, http.StatusConflict)
 		return
 	}
+	defer as.watch(at)()
 	flusher, _ := w.(http.Flusher)
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")

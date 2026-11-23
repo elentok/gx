@@ -6,6 +6,7 @@ package webattach
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/elentok/gx/agentrunner/screen"
@@ -57,9 +58,22 @@ type attach struct {
 	// done closes once the attach has ended and left the map.
 	done  chan struct{}
 	timer *time.Timer
+	// streams counts open event streams. An open stream is a tab that is
+	// watching, so the idle timer re-arms instead of closing the attach.
+	streams atomic.Int32
 }
 
 func (at *attach) touch(idle time.Duration) { at.timer.Reset(idle) }
+
+// watch marks an event stream open; the returned func marks it closed and
+// starts a fresh idle period.
+func (as *Attaches) watch(at *attach) func() {
+	at.streams.Add(1)
+	return func() {
+		at.streams.Add(-1)
+		at.touch(as.idle)
+	}
+}
 
 // open returns the client's attach to the session, opening it on first use.
 // A refusal comes back as a result with Refused set.
@@ -90,7 +104,13 @@ func (as *Attaches) open(id, client string) (*attach, wire.SessionResult, error)
 		return nil, sessions.Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s cannot be attached: %v", id, err)), nil
 	}
 	at := &attach{a: ha, events: make(chan Event, 16), done: make(chan struct{})}
-	at.timer = time.AfterFunc(as.idle, func() { _ = ha.Close() })
+	at.timer = time.AfterFunc(as.idle, func() {
+		if at.streams.Load() > 0 {
+			at.touch(as.idle)
+			return
+		}
+		_ = ha.Close()
+	})
 	as.m[k] = at
 	go as.read(k, at)
 	return at, wire.SessionResult{}, nil

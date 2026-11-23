@@ -136,10 +136,34 @@ func TestWebAttach_DetachEndsTheClientsStream(t *testing.T) {
 	}
 }
 
-func TestWebAttach_IdleAttachCloses(t *testing.T) {
+// A tab that only watches keeps its attach: an idle close would hand the input
+// back to gx and let the tab return as a non-owner.
+func TestWebAttach_OpenStreamKeepsAttachAlive(t *testing.T) {
 	t.Parallel()
 	f := rigs.StartCodexPromptSessionWith(t, func(c *server.Config) { c.WebAttachIdle = 200 * time.Millisecond })
-	waitLine(t, events(t, f, "tab-a"), "event: closed")
+	lines := events(t, f, "tab-a")
+	quiet := time.After(time.Second)
+	for {
+		select {
+		case l, ok := <-lines:
+			if !ok || l == "event: closed" {
+				t.Fatalf("attach with an open stream was closed (%q)", l)
+			}
+		case <-quiet:
+			return
+		}
+	}
+}
+
+// With no stream open, the attach goes after the idle timeout and releases the
+// input it owned, which tab-b's open stream sees as gx owning it.
+func TestWebAttach_IdleAttachWithoutStreamCloses(t *testing.T) {
+	t.Parallel()
+	f := rigs.StartCodexPromptSessionWith(t, func(c *server.Config) { c.WebAttachIdle = 200 * time.Millisecond })
+	typeKey(t, f, "tab-a", 'z')
+	b := events(t, f, "tab-b")
+	waitLine(t, b, ownerOther)
+	waitLine(t, b, ownerGX)
 }
 
 const (

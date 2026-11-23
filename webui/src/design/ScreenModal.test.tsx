@@ -3,7 +3,8 @@ import { afterEach, expect, test, vi } from "vitest"
 import { renderThemed } from "../ui/render"
 import type { SessionAttachEvent } from "../generated/server"
 import type { SubscribeOwner, TakeOver } from "./inputOwner"
-import type { PostKeys } from "./keys"
+import { ATTACH_KEYS, type PostInput } from "./keys"
+import { tabClientId } from "./inputOwner"
 import { ScreenModal } from "./ScreenModal"
 import type { FetchScreen } from "./screen"
 
@@ -16,9 +17,9 @@ const fetcher = (): FetchScreen =>
 
 type Emit = (ev: SessionAttachEvent) => void
 
-function open(opts: { keys?: boolean; poster?: PostKeys; hintMs?: number } = {}) {
+function open(opts: { keys?: boolean; poster?: PostInput; hintMs?: number } = {}) {
   const f = fetcher()
-  const poster = opts.poster ?? vi.fn<PostKeys>(async () => ({}))
+  const poster = opts.poster ?? vi.fn<PostInput>(async () => ({}))
   let emit: Emit = () => {}
   const subscribe: SubscribeOwner = (_t, _c, onEvent) => {
     emit = onEvent
@@ -89,29 +90,39 @@ test.each([
   ["Right", "right"],
   ["Ctrl+C", "ctrl+c"],
 ])(
-  "the %s button posts %s with settle and refetches a response without rows",
+  "the %s button sends %s through attach input with the tab's client id and refetches",
   async (name, key) => {
     const { f, poster } = open()
     await waitFor(() => expect(f).toHaveBeenCalledTimes(1))
     fireEvent.click(screen.getByRole("button", { name }))
-    await waitFor(() => expect(poster).toHaveBeenCalledWith({ id: "s-a", key, settle: true }))
+    await waitFor(() =>
+      expect(poster).toHaveBeenCalledWith({
+        id: "s-a",
+        client: tabClientId(),
+        key: ATTACH_KEYS[key],
+      }),
+    )
     await waitFor(() => expect(f).toHaveBeenCalledTimes(2))
   },
 )
 
-test("Type posts the text with settle and clears the field", async () => {
+test("Type pastes the text through attach input with the client id and clears the field", async () => {
   const { f, poster } = open()
   const field = screen.getByLabelText("Text to type") as HTMLInputElement
   fireEvent.change(field, { target: { value: "yes please" } })
   fireEvent.click(screen.getByRole("button", { name: "Type" }))
   await waitFor(() =>
-    expect(poster).toHaveBeenCalledWith({ id: "s-a", text: "yes please", settle: true }),
+    expect(poster).toHaveBeenCalledWith({
+      id: "s-a",
+      client: tabClientId(),
+      paste: "yes please",
+    }),
   )
   await waitFor(() => expect(field.value).toBe(""))
   await waitFor(() => expect(f).toHaveBeenCalledTimes(2))
 })
 
-const rowsPoster = (rows: string[]) => vi.fn<PostKeys>(async () => ({ rows }))
+const rowsPoster = (rows: string[]) => vi.fn<PostInput>(async () => ({ rows }))
 const rowOf = (text: string) => screen.getByText(text) as HTMLElement
 
 test("settled rows show without a second read and the changed row is marked", async () => {
@@ -167,7 +178,7 @@ test("Refresh does one plain read and sends no key", async () => {
 })
 
 test("a refusal shows its message and keeps the text", async () => {
-  const poster = vi.fn<PostKeys>(async () => ({ refused: true, message: "q-1 is a Queue agent" }))
+  const poster = vi.fn<PostInput>(async () => ({ refused: true, message: "q-1 is a Queue agent" }))
   open({ poster })
   const field = screen.getByLabelText("Text to type") as HTMLInputElement
   fireEvent.change(field, { target: { value: "hi" } })
