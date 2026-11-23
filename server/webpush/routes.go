@@ -150,8 +150,6 @@ func refuseStoreErr(w http.ResponseWriter, err error) {
 	switch {
 	case err == nil:
 		wire.WriteJSON(w, routeResult{})
-	case errors.Is(err, webauth.ErrPushBadSubscription):
-		refuse(w, wire.ReasonPushBadSubscription)
 	case errors.Is(err, webauth.ErrPushNoSubscription):
 		refuse(w, wire.ReasonPushNoSubscription)
 	case errors.Is(err, webauth.ErrWebLoginNotFound):

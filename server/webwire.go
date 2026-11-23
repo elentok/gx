@@ -39,7 +39,5 @@ func (s *Server) newWeb() *web.Web {
 		StateDir:     s.cfg.StateDir,
 		Clock:        s.cfg.Clock,
 		InterfaceIPs: s.cfg.WebInterfaceIPs,
-
-		AllowHTTPPush: s.cfg.PushAllowHTTPEndpoints,
 	}, s.log, webHost{s})
 }

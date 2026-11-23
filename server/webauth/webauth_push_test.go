@@ -72,27 +72,6 @@ func TestWebAuthStorePushOldFileWithoutPushFieldLoads(t *testing.T) {
 	}
 }
 
-func TestWebAuthStorePushRefusesBadSubscriptions(t *testing.T) {
-	w, _, _, first, _, _ := pushStore(t)
-	for name, sub := range map[string]PushSubscription{
-		"http":      pushSub("http://push.example.test/x"),
-		"no host":   pushSub("https:///x"),
-		"malformed": pushSub("://bad"),
-		"empty":     pushSub(""),
-		"no key":    {Endpoint: pushEndpoint, P256dh: "p", Auth: "a"},
-	} {
-		if err := w.SetPushSubscription(first, sub); !errors.Is(err, ErrPushBadSubscription) {
-			t.Errorf("%s: err = %v", name, err)
-		}
-		if err := w.RenewPushSubscription(first, pushEndpoint, sub); !errors.Is(err, ErrPushBadSubscription) {
-			t.Errorf("%s renew: err = %v", name, err)
-		}
-	}
-	if got, _ := w.PushSubscriptionOf(first); got.Endpoint != pushEndpoint {
-		t.Fatalf("stored %+v after refusals", got)
-	}
-}
-
 func TestWebAuthStorePushKeyChangeDeletesOldKeySubscriptions(t *testing.T) {
 	w, clock, dir, first, _, _ := pushStore(t)
 	if err := w.SetPushKey(pushKeyB); err != nil {

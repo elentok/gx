@@ -2,16 +2,12 @@ package webauth
 
 import (
 	"errors"
-	"net/url"
 	"time"
 
 	"github.com/elentok/gx/server/wire/ops"
 )
 
 var (
-	// ErrPushBadSubscription is a subscription with an endpoint that is not an
-	// https URL with a host, or with an empty key.
-	ErrPushBadSubscription = errors.New("push subscription is not valid")
 	// ErrPushNoSubscription is a renewal for a login with no subscription at the
 	// old endpoint.
 	ErrPushNoSubscription = errors.New("no push subscription to renew")
@@ -32,12 +28,6 @@ type PushTarget struct {
 	LoginID string
 	Name    string
 	Sub     PushSubscription
-}
-
-func (w *WebAuth) validSub(s PushSubscription) bool {
-	u, err := url.Parse(s.Endpoint)
-	return err == nil && (u.Scheme == "https" || w.AllowHTTPPush && u.Scheme == "http") && u.Host != "" &&
-		s.P256dh != "" && s.Auth != "" && s.VAPIDKey != ""
 }
 
 // SetPushKey remembers the server's VAPID public key and deletes every
@@ -74,9 +64,6 @@ func (w *WebAuth) PushKey() string {
 // SetPushSubscription stores sub as the login's subscription, replacing any
 // earlier one.
 func (w *WebAuth) SetPushSubscription(loginID string, sub PushSubscription) error {
-	if !w.validSub(sub) {
-		return ErrPushBadSubscription
-	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.updatePushLocked(loginID, func(*PushSubscription) (*PushSubscription, error) {
@@ -88,9 +75,6 @@ func (w *WebAuth) SetPushSubscription(loginID string, sub PushSubscription) erro
 // RenewPushSubscription replaces the login's subscription only when it is still
 // at oldEndpoint under the current key, so a renewal cannot undo a removal.
 func (w *WebAuth) RenewPushSubscription(loginID, oldEndpoint string, sub PushSubscription) error {
-	if !w.validSub(sub) {
-		return ErrPushBadSubscription
-	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	err := w.updatePushLocked(loginID, func(cur *PushSubscription) (*PushSubscription, error) {
