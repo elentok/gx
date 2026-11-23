@@ -19,18 +19,20 @@ func startDraftSession(t *testing.T, req wire.CreateSessionRequest, draft string
 	return startFakeSessionWith(t, req, withAlerts(true, true), servertest.WithEnv(agentfake.ProgramDraftEnv+"="+draft, agentfake.ProgramInputEnv+"=1"))
 }
 
-func TestDraft_FirstPromptClearsTheDraftAndTypes(t *testing.T) {
+// No draft is cleared before the first prompt (single-owner-session-input
+// spec, story 63): the prompt is typed after whatever the input holds.
+func TestDraft_FirstPromptKeepsTheDraftAndTypes(t *testing.T) {
 	t.Parallel()
 	_, _, _, _, conv := startDraftSession(t, wire.CreateSessionRequest{Prompt: "fix the bug"}, "my draft")
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSubmitted(t, conv, "\"fix the bug\"\n")
+	waitForSubmitted(t, conv, "\"my draftfix the bug\"\n")
 }
 
-func TestDraft_MultiLineDraftIsCleared(t *testing.T) {
+func TestDraft_MultiLineDraftIsKeptBeforeTheFirstPrompt(t *testing.T) {
 	t.Parallel()
 	_, _, _, _, conv := startDraftSession(t, wire.CreateSessionRequest{Prompt: "fix the bug"}, "one\ntwo\nthree\nfour\nfive")
 	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSubmitted(t, conv, "\"fix the bug\"\n")
+	waitForSubmitted(t, conv, "\"one\\ntwo\\nthree\\nfour\\nfivefix the bug\"\n")
 }
 
 func TestDraft_ActionClearsTheDraftAndTypes(t *testing.T) {
