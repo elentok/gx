@@ -40,9 +40,9 @@ const (
 func (p *Prompt) ClearDraft(dir string, c *holder.HolderClient) error {
 	log := p.log.With("session", filepath.Base(dir))
 	state, read, _ := inputRead(c)
-	if read.Resized {
+	if read.Resized || state == harness.InputUndecided {
 		// gx types on without knowing whether a draft is there; say so beside the log line.
-		log.Info("typing on an untrusted screen read", "pty_size", read.PTY, "attach_sizes", read.Attaches)
+		log.Info("typing on an untrusted screen read", "resized", read.Resized, "pty_size", read.PTY, "attach_sizes", read.Attaches)
 		p.RaiseNotice(dir, wire.SessionNoticeUntrustedRead)
 		return nil
 	}

@@ -242,6 +242,27 @@ func TestPty_LoneIGxTypedIsClearedBeforeThePrompt(t *testing.T) {
 	}
 }
 
+// A read between a resize and the child's next output is untrusted, so the
+// draft check neither clears the `i` nor waits on it; the prompt types on.
+func TestPty_ResizedReadIsNotTrustedByTheDraftCheck(t *testing.T) {
+	t.Parallel()
+	p := newPty(t)
+	p.Env = append(p.Env, agentfake.TUIDraftEnv+"=i")
+	p.PromptGrace = 200 * time.Millisecond
+	s := startPersonInputPty(t, p)
+	if err := os.WriteFile(filepath.Join(p.Root, s.Label, holder.ResizeBeforeReadFile), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gxharness.RecordInputPress(s.SessionID)
+	if err := p.Prompt(s, "do it"); err != nil {
+		t.Fatalf("Prompt = %v; want it to type on past the untrusted read", err)
+	}
+	keys := fakeKeysTyped(t, p, s)
+	if strings.Contains(keys, "\x15") || !strings.HasSuffix(keys, "do it\r") {
+		t.Errorf("keys = %q; want the prompt typed with no clear key", keys)
+	}
+}
+
 func TestPty_DraftsGxDidNotTypeStay(t *testing.T) {
 	t.Parallel()
 	for name, tc := range map[string]struct {

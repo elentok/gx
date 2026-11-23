@@ -110,9 +110,12 @@ func (pr *ptyPrompter) clearGxI() (bool, error) {
 	if !pr.ss.holder.Supports(holder.OpScreenStyled) {
 		return false, nil
 	}
-	rows, err := pr.ss.holder.StyledScreen()
+	rows, read, err := pr.ss.holder.StyledScreenRead()
 	if err != nil {
 		return false, pr.p.died(pr.ss, err)
+	}
+	if read.Resized {
+		return false, nil
 	}
 	t := pr.p.typing(pr.ss)
 	if text, ok := harness.InputText(rows); !ok || text != "i" || int64(t.InputPresses(pr.ss.session.SessionID)) <= pr.ss.sentPresses.Load() {
@@ -211,9 +214,12 @@ func (pr *ptyPrompter) InputEmpty() (bool, bool, error) {
 	if !pr.ss.holder.Supports(holder.OpScreenStyled) {
 		return false, false, nil
 	}
-	rows, err := pr.ss.holder.StyledScreen()
+	rows, read, err := pr.ss.holder.StyledScreenRead()
 	if err != nil {
 		return false, false, pr.p.died(pr.ss, err)
+	}
+	if read.Resized {
+		return false, false, nil
 	}
 	switch pr.p.typing(pr.ss).InputIsEmpty(rows) {
 	case harness.InputEmpty:
