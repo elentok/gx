@@ -174,8 +174,17 @@ func draftNotRunning[R draftResult[R]](err error) (R, bool) {
 // draftResult is what the Design and chat drafts routes share: a result that
 // can be refused, and can be built as a refusal.
 type draftResult[R any] interface {
-	Refusal() (refused bool, reason string)
+	Refusal() (refused bool, reason, message string)
 	WithRefusal(reason string) R
+}
+
+// refusalError is the text form of a refusal; a refusal with no message
+// (the CLI's own server-not-running one) prints the reason alone.
+func refusalError(reason, message string) error {
+	if message == "" {
+		return fmt.Errorf("refused (%s)", reason)
+	}
+	return fmt.Errorf("refused (%s): %s", reason, message)
 }
 
 func writeDraftJSON(w io.Writer, v any) error {
@@ -197,7 +206,7 @@ func printDraftResult[R draftResult[R]](w io.Writer, jsonOut bool, res R, err er
 	if err != nil {
 		return fmt.Errorf("server call failed: %w", err)
 	}
-	refused, reason := res.Refusal()
+	refused, reason, message := res.Refusal()
 	if jsonOut {
 		if err := writeDraftJSON(w, res); err != nil {
 			return err
@@ -205,7 +214,7 @@ func printDraftResult[R draftResult[R]](w io.Writer, jsonOut bool, res R, err er
 		return cmdbase.JSONRefusalExit(refused)
 	}
 	if refused {
-		return fmt.Errorf("refused (%s)", reason)
+		return refusalError(reason, message)
 	}
 	return ok(res)
 }

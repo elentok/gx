@@ -112,7 +112,9 @@ type DesignDraftSaveResult struct {
 	LabelChanged bool `json:"-"`
 }
 
-func (r DesignDraftSaveResult) Refusal() (bool, string) { return r.Refused, r.Reason }
+func (r DesignDraftSaveResult) Refusal() (bool, string, string) {
+	return r.Refused, r.Reason, r.Message
+}
 
 // WithRefusal is a refused result with reason, for callers that never reached the server.
 func (DesignDraftSaveResult) WithRefusal(reason string) DesignDraftSaveResult {

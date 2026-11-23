@@ -79,7 +79,7 @@ func runAgentsDraftsDelete(ctx context.Context, cl *apiclient.Client, w io.Write
 		return cmdbase.JSONRefusalExit(res.Refused)
 	}
 	if res.Refused {
-		return fmt.Errorf("refused (%s)", res.Reason)
+		return refusalError(res.Reason, res.Message)
 	}
 	_, err = fmt.Fprintln(w, "deleted", id)
 	return err

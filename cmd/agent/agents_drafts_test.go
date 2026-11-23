@@ -108,11 +108,22 @@ func TestAgentsDrafts_DeleteSavesAHistoryEntryAndUnknownIDIsRefused(t *testing.T
 		t.Fatalf("history = %+v, %v", items, err)
 	}
 	err = execute(t, []string{"agents", "drafts", "delete", id}, draftsCmdDeps(f, "", &out))
-	if err == nil || !strings.Contains(err.Error(), ops.ReasonDraftGone) {
-		t.Fatalf("unknown id err = %v, want %s", err, ops.ReasonDraftGone)
+	if want := "refused (" + ops.ReasonDraftGone + ")"; err == nil || err.Error() != want {
+		t.Fatalf("unknown id err = %v, want %q", err, want)
 	}
 	if items, _ := drafthistory.New(f.H.StateDir).List(drafthistory.ChatDrafts); len(items) != 1 {
 		t.Errorf("entries after refused delete = %d, want 1", len(items))
+	}
+}
+
+func TestAgentsDrafts_CreateRefusalPrintsTheServerMessage(t *testing.T) {
+	f := rigs.StartDesigns(t)
+	t.Setenv(holder.AgentSessionEnv, "no-such-session")
+	var out bytes.Buffer
+	err := execute(t, []string{"agents", "drafts", "create", "--project", "proj", "--brief", "-", "--folder", "source"}, draftsCmdDeps(f, "the brief", &out))
+	want := "refused (bad-request): the source session was not found"
+	if err == nil || err.Error() != want {
+		t.Fatalf("err = %v, want %q", err, want)
 	}
 }
 

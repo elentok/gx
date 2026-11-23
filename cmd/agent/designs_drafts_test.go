@@ -321,6 +321,17 @@ func TestDesignsDrafts_CreateRefusals(t *testing.T) {
 	}
 }
 
+func TestDesignsDrafts_RefusalPrintsTheServerMessage(t *testing.T) {
+	t.Setenv(holder.AgentSessionEnv, "")
+	f := rigs.StartDesigns(t)
+	var out bytes.Buffer
+	err := execute(t, draftsCreateArgs("--project", "p", "--slug", "Not A Slug"), draftsCmdDeps(f, "idea", &out))
+	want := `refused (bad-request): "Not A Slug" is not a slug (want lowercase words joined by -)`
+	if err == nil || err.Error() != want {
+		t.Fatalf("err = %v, want %q", err, want)
+	}
+}
+
 func TestDesignsDrafts_SaveRevisionConflict(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir())
 	d, err := drafts.New(h.StateDir).Create("proj", "s", "idea")
