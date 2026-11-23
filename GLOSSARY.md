@@ -1220,14 +1220,15 @@ uses the **global destination**, which also receives every server-level event. `
 --enable/--disable <transport>` acts on every destination of that transport, `--project <name>`
 narrows it to that project's destination.
 
-**Channel** — one of the four places the person can turn notifications on or off and choose what
-they get: Desktop (the **Banner** and its sound), Telegram, Slack and **Push**. Each channel has its
-own switch and its own list of **notification kinds**. A channel is not a **destination**: Telegram
+**Channel** — one of the five places the person can turn notifications on or off and choose what
+they get: Desktop (the **Banner** and its sound), Web toast (the web app's toaster, shown only
+while the web app is open), Telegram, Slack and **Push**. Each channel has its own switch. Each
+**notification kind** reaches any mix of channels. A channel is not a **destination**: Telegram
 is one channel however many destinations it has. _Avoid_: surface (that also covers the TUI and
 the Toast), transport (the code's word for Telegram or Slack only).
 
 **Notification kind** — one row of the shared catalog of things gx can notify about, such as a
-Paused ticket or an epic complete. Each **channel** sends only the kinds checked in its list.
+Paused ticket or an epic complete. A channel sends a kind only when the kind is checked for that channel.
 System messages about a channel itself (mute notices, test messages) are not kinds.
 _Avoid_: event type, notify kind.
 
