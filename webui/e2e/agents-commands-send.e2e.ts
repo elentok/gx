@@ -47,11 +47,13 @@ test("153. Send a command, typed once or nudged, and /clear", async ({ page, sta
   const compact = await claudeIdle(fixture, 1)
   const compactConv = await conversationOf(fixture, compact.id)
   await go(page, `#/agents/${compact.id}`)
+  const beforeCompact = (await chatOf(fixture, compact.id)).messages.length
   await messageBox(page).fill("/compact foo")
   await sendButton(page).click()
   await expect
-    .poll(async () => (await sessions(fixture)).find((s) => s.id === compact.id)!.status.state)
-    .toBe("working")
+    .poll(async () => (await chatOf(fixture, compact.id)).messages.length)
+    .toBeGreaterThan(beforeCompact)
+  await expect.poll(() => fixture.turnEnded(compactConv)).toBe(true)
   expect(countOf(await fixture.input(compactConv), "/compact foo")).toBe(1)
 
   // A Codex `$` skill is plain text for the agent, so it takes the nudge path too: the prompt reaches the chat.

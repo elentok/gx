@@ -82,7 +82,7 @@ test("193. Paste, drop and add images", async ({ page, start }) => {
   await expect(thumbs(page)).toHaveCount(9)
 
   // Busy: Add and the row keep working.
-  await fixture.cli("agents", "prompt", idle.id, "keep busy")
+  await fixture.cli("agents", "prompt", idle.id, "keep busy [slow]")
   await expect
     .poll(async () => (await sessions(fixture)).find((s) => s.id === idle.id)!.status.state)
     .toBe("working")

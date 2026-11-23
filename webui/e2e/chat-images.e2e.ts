@@ -101,12 +101,14 @@ test("189. Send images", async ({ page, start }) => {
   await open(page, claude.id)
   await addInput(page).setInputFiles(pngs(2))
   await expect(thumbs(page)).toHaveCount(2)
+  const beforeCompact = (await messagesOf(fixture, claude.id)).length
   await messageBox(page).fill("/compact foo")
   await sendButton(page).click()
   await expect(thumbs(page)).toHaveCount(0)
   await expect
-    .poll(async () => (await sessions(fixture)).find((s) => s.id === claude.id)!.status.state)
-    .toBe("working")
+    .poll(async () => (await messagesOf(fixture, claude.id)).length)
+    .toBeGreaterThan(beforeCompact)
+  await expect.poll(() => fixture.turnEnded(conv)).toBe(true)
   const input = await fixture.input(conv)
   const command = input.lastIndexOf("/compact foo")
   expect(command).toBeGreaterThan(0)
