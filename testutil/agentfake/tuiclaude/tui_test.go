@@ -486,6 +486,19 @@ func TestTUIClaude_BusyTurnRunsForASlashPromptUntilFinished(t *testing.T) {
 	f.waitStatus(StatusIdle, "")
 }
 
+func TestTUIClaude_CompactWithAndWithoutArgumentsGoesBusy(t *testing.T) {
+	for _, text := range []string{"/compact", "/compact foo"} {
+		t.Run(text, func(t *testing.T) {
+			f := startTUIFake(t, tuiLaunchArgs)
+			f.waitStatus(StatusIdle, "")
+			f.typeLine(text)
+			f.waitStatus(StatusBusy, "")
+			f.control(Control{Action: ActionFinish})
+			f.waitStatus(StatusIdle, "")
+		})
+	}
+}
+
 func TestTUIClaude_SlashPromptWithNothingArmedStartsNoTurn(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs)
 	f.waitStatus(StatusIdle, "")

@@ -38,3 +38,27 @@ func TestClassify_ATypedMessageOfATriageSessionGoesToThePlayer(t *testing.T) {
 		t.Errorf("slash command of a Triage session = %v, want it left alone", kind)
 	}
 }
+
+func TestClassify_CompactWithArgumentsIsAPlainPromptEvenWithAWorkerConfig(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, WorkerConfigFile), []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tu := &tui{pid: PidFile{Cwd: dir}}
+	for _, text := range []string{"/compact", "/compact foo"} {
+		if kind, _, _ := tu.classify(text); kind != promptPlain {
+			t.Errorf("classify(%q) = %v, want promptPlain", text, kind)
+		}
+	}
+}
+
+func TestSkillPromptKnobs_IgnoresCompactWithArguments(t *testing.T) {
+	t.Parallel()
+	tu := &tui{opts: tuiOptions{noTurn: true}}
+	for _, text := range []string{"/compact", "/compact foo"} {
+		if handled, err := tu.skillPromptKnobs(text); handled || err != nil {
+			t.Errorf("skillPromptKnobs(%q) = %v, %v, want false, nil", text, handled, err)
+		}
+	}
+}

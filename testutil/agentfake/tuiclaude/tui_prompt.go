@@ -198,7 +198,7 @@ func (o tuiOptions) skillUnknown(skill string, sinceStart time.Duration) bool {
 // whether it handled the prompt. The launch-record knob only writes the user
 // record and leaves the rest to the normal path.
 func (t *tui) skillPromptKnobs(text string) (bool, error) {
-	if !strings.HasPrefix(text, "/") || text == "/clear" || text == "/exit" || text == "/compact" {
+	if !strings.HasPrefix(text, "/") || text == "/clear" || text == "/exit" || isCompact(text) {
 		return false, nil
 	}
 	o := t.opts
@@ -261,16 +261,25 @@ func (t *tui) classify(text string) (promptKind, string, WorkerConfig) {
 	if IsTriagePrompt(text) || (t.triageProject != "" && text != "" && !strings.HasPrefix(text, "/")) {
 		return promptTriage, "", WorkerConfig{}
 	}
+	// Like claude, `/compact <args>` starts a plain turn, never ticket work.
+	if isCompact(text) {
+		return promptPlain, "", WorkerConfig{}
+	}
 	if address, cfg, ok := t.workerPrompt(text); ok {
 		return promptWorker, address, cfg
 	}
-	if strings.HasPrefix(text, "/") && text != "/compact" {
+	if strings.HasPrefix(text, "/") {
 		return promptSlash, "", WorkerConfig{}
 	}
 	if strings.HasPrefix(text, PermissionPromptPrefix) {
 		return promptPermission, "", WorkerConfig{}
 	}
 	return promptPlain, "", WorkerConfig{}
+}
+
+// isCompact reports whether text is `/compact`, with or without arguments.
+func isCompact(text string) bool {
+	return text == "/compact" || strings.HasPrefix(text, "/compact ")
 }
 
 // workerPrompt reports whether text is a skill prompt (`/skill <address>`) for
