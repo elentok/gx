@@ -209,8 +209,10 @@ func ptyOn(root, exe string) *nativerunner.Pty {
 func TestPty_Conformance(t *testing.T) {
 	runnertest.Run(t, func(t *testing.T) runnertest.Harness {
 		p := newPty(t)
+		const noBox = "the plain-screen fake has no input box, so Deliver reads a slash send as undecided; TestPty_Deliver covers it"
 		return runnertest.Harness{
 			Runner:   p,
+			Skip:     map[string]string{"SlashIdleDeliveredOnce": noBox, "SlashClearReturnsAtOnce": noBox},
 			Parallel: true,
 			FinishTurn: func(t *testing.T, s agentrunner.Session) {
 				ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionFinish})

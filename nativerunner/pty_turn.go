@@ -10,35 +10,11 @@ import (
 	"github.com/elentok/gx/harness"
 )
 
-// ptyTurn waits for a session's turn state: not busy, idle, a slash command's
-// delivery and background tasks. It reads Pty's timing settings and failure
-// mapping through p, as ptyPrompter does.
+// ptyTurn waits for a session's turn state: not busy, idle and background
+// tasks. It reads Pty's timing settings and failure mapping through p.
 type ptyTurn struct{ p *Pty }
 
 func (p *Pty) turns() ptyTurn { return ptyTurn{p} }
-
-// promptSlash sends a "/" command once, never nudging or retyping: most
-// commands start no turn, so a retype would run them twice. Delivered means
-// Turn moved (a working report, a new sessionId, a dialog) or claude is still
-// idle after N. A dialog command leaves the session blocked; gx never closes
-// it.
-func (t ptyTurn) promptSlash(pr *ptyPrompter, text string) error {
-	if err := pr.Submit(text); err != nil {
-		return err
-	}
-	started, err := pr.WaitStart(t.p.WaitN())
-	if err != nil || started {
-		return err
-	}
-	claude, _, program, err := pr.ss.holder.StatusWithProgram()
-	if err != nil {
-		return t.p.died(pr.ss, err)
-	}
-	if program == "working" || (claude != nil && claude.Status == harness.ClaudeBusy) {
-		return fmt.Errorf("%w: %q started no turn and claude is not idle", agentrunner.ErrNotDelivered, text)
-	}
-	return nil
-}
 
 // working reports whether the agent shows a running turn right now.
 func (t ptyTurn) working(ss *ptySession) (bool, error) {

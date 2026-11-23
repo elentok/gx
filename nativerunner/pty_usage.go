@@ -36,7 +36,7 @@ func (p *Pty) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
 }
 
 // ptyUsage reads a session's rate-limit facts. It reads Pty's Root and failure
-// mapping through p, as ptyPrompter does.
+// mapping through p, as ptyRelay does.
 type ptyUsage struct{ p *Pty }
 
 func (p *Pty) usage() ptyUsage { return ptyUsage{p} }

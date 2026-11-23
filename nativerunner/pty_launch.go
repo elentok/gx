@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/codexui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
@@ -54,7 +55,7 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	if err != nil {
 		return err
 	}
-	pr := &ptyPrompter{p: p, ctx: ctx, ss: ss, turn: turn}
+	pr := &ptyRelay{p: p, ctx: ctx, ss: ss, turn: turn}
 	if person, stop, err := p.PersonInput(s); err == nil {
 		defer stop()
 		pr.person = person
@@ -75,7 +76,8 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 		loc := &transcript.Locator{ProjectsDir: projects, Cwd: ss.cwd, SessionID: s.SessionID}
 		firstUser = claudeui.NewSessionRecordSource(loc.SessionID, loc.Find)
 	}
-	if err := pr.Submit(text); err != nil {
+	// One send, no reads: the transcript proof below owns what follows.
+	if err := pr.deliver(text, deliver.Policy{Slash: &deliver.SlashCaps{}}); err != nil {
 		return notDelivered(err)
 	}
 	agentrunner.LaunchMark(ctx, agentrunner.MarkTyped)
@@ -89,14 +91,9 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	proof := claudeui.LaunchProof{
 		FirstUser:   firstUser,
 		CheckPasted: true,
-		Pane: func() (string, error) {
-			if err := pr.cancelled(); err != nil {
-				return "", err
-			}
-			return pr.Screen()
-		},
-		Now:   time.Now,
-		Sleep: time.Sleep,
+		Pane:        pr.pane,
+		Now:         time.Now,
+		Sleep:       time.Sleep,
 	}
 	err = claudeui.CheckLaunchDelivered(ctx, proof, text, p.launcher().launchCaps())
 	if errors.Is(err, errPersonInput) {
@@ -112,7 +109,7 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	}
 	// The command is in the transcript; a launch prompt must also start a turn.
 	agentrunner.LaunchMark(ctx, agentrunner.MarkEchoed)
-	started, err := pr.WaitStart(p.promptGrace())
+	started, err := pr.waitStart(p.promptGrace())
 	switch {
 	case errors.Is(err, errPersonInput):
 		return nil
@@ -156,18 +153,13 @@ func (p *Pty) codexFirstUser(ss *ptySession) func() (string, bool, error) {
 // proveCodexLaunch is the Claude proof over the rollout: the prompt counts as
 // delivered once the rollout holds a matching user record, and is resent in
 // the session while it does not.
-func (p *Pty) proveCodexLaunch(ctx context.Context, ss *ptySession, pr *ptyPrompter, firstUser func() (string, bool, error), text string, onNudge func(string)) error {
+func (p *Pty) proveCodexLaunch(ctx context.Context, ss *ptySession, pr *ptyRelay, firstUser func() (string, bool, error), text string, onNudge func(string)) error {
 	proof := claudeui.LaunchProof{
 		FirstUser:     firstUser,
 		UnknownMarker: codexui.UnknownCommandMarker,
-		Pane: func() (string, error) {
-			if err := pr.cancelled(); err != nil {
-				return "", err
-			}
-			return pr.Screen()
-		},
-		Now:   time.Now,
-		Sleep: time.Sleep,
+		Pane:          pr.pane,
+		Now:           time.Now,
+		Sleep:         time.Sleep,
 	}
 	err := claudeui.CheckLaunchDelivered(ctx, proof, text, p.launcher().launchCaps())
 	if errors.Is(err, errPersonInput) {

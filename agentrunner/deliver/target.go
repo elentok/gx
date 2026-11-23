@@ -33,6 +33,9 @@ type Target struct {
 	IO     harness.TypingIO
 	// Cancel, once closed, stops every key with ErrCancelled.
 	Cancel <-chan struct{}
+	// CancelErr, when set, is checked before every key: a non-nil result stops it
+	// and is returned as is.
+	CancelErr func() error
 	// OnTyped, when set, runs once the text is typed.
 	OnTyped func()
 	// Start is WaitStart: false, not an error, when timeout passes with no turn.
@@ -92,6 +95,11 @@ func HoldInput(c *holder.HolderClient, release func()) (func(), error) {
 }
 
 func (t *Target) cancelled() error {
+	if t.CancelErr != nil {
+		if err := t.CancelErr(); err != nil {
+			return err
+		}
+	}
 	select {
 	case <-t.Cancel:
 		return ErrCancelled

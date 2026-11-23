@@ -12,11 +12,11 @@ import (
 // A server stop cancels the launch ctx while the launch waits for the turn.
 // The wait polls cancelled(), so a cancelled ctx must end it at once instead of
 // after the prompt grace.
-func TestPtyPrompter_CancelledCtxEndsTheTurnWait(t *testing.T) {
+func TestPtyRelay_CancelledCtxEndsTheTurnWait(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	pr := &ptyPrompter{ctx: ctx}
+	pr := &ptyRelay{ctx: ctx}
 
 	if err := pr.cancelled(); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled() = %v; want context.Canceled", err)
@@ -29,9 +29,9 @@ func TestPtyPrompter_CancelledCtxEndsTheTurnWait(t *testing.T) {
 	}
 }
 
-func TestPtyPrompter_NilCtxNeverCancels(t *testing.T) {
+func TestPtyRelay_NilCtxNeverCancels(t *testing.T) {
 	t.Parallel()
-	if err := (&ptyPrompter{}).cancelled(); err != nil {
+	if err := (&ptyRelay{}).cancelled(); err != nil {
 		t.Fatalf("cancelled() = %v; want nil", err)
 	}
 }

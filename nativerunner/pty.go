@@ -459,7 +459,7 @@ func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(stri
 	if err != nil {
 		return err
 	}
-	pr := &ptyPrompter{p: p, ss: ss, turn: turn}
+	pr := &ptyRelay{p: p, ss: ss, turn: turn}
 	// Without the watch op a person's keys go unseen, as on any older holder.
 	if person, stop, err := p.PersonInput(s); err == nil {
 		defer stop()
@@ -468,32 +468,26 @@ func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(stri
 	if err := pr.awaitEmptyInput(p.promptGrace()); err != nil {
 		return notDelivered(err)
 	}
-	if isSlashCommand(text) {
-		err = p.turns().promptSlash(pr, text)
+	policy := deliver.PolicyFor(text)
+	if policy.Slash != nil {
+		caps := p.slashCaps(ss.kind)
+		policy.Slash = &caps
 	} else {
 		// One bare-Enter nudge and one retype, then ErrNotDelivered: the default caps
 		// would hold a stuck prompt for minutes before the loop hears of it.
-		caps := deliver.NudgeCaps{Grace: p.promptGrace(), Nudges: 2, Retypes: 1}
-		err = deliver.PromptWithNudge(pr, text, caps, time.Time{}, time.Now, deliver.ReportDecisions(onNudge))
+		policy.Caps = deliver.NudgeCaps{Grace: p.promptGrace(), Nudges: 2, Retypes: 1}
 	}
+	policy.Report = deliver.ReportDecisions(onNudge)
+	err = pr.deliver(text, policy)
 	if errors.Is(err, errPersonInput) {
 		return nil
 	}
 	return notDelivered(err)
 }
 
-func notDelivered(err error) error {
-	if errors.Is(err, agentrunner.ErrNotDelivered) {
-		return err
-	}
-	if errors.Is(err, claudeui.ErrStuckSubmission) || errors.Is(err, claudeui.ErrStartTimeout) {
-		return fmt.Errorf("%w: %w", agentrunner.ErrNotDelivered, err)
-	}
-	return err
-}
-
 // isSlashCommand reports whether text is a "/" command that takes the
-// single-send rule. /compact keeps the normal path: it starts a turn.
+// single-send rule. Only the launch prompts (here and headless) use it: the
+// prompt path leaves the rule to deliver.PolicyFor.
 func isSlashCommand(text string) bool {
 	return strings.HasPrefix(text, "/") && text != "/compact"
 }
