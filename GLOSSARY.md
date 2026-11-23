@@ -1220,6 +1220,17 @@ uses the **global destination**, which also receives every server-level event. `
 --enable/--disable <transport>` acts on every destination of that transport, `--project <name>`
 narrows it to that project's destination.
 
+**Channel** — one of the four places the person can turn notifications on or off and choose what
+they get: Desktop (the **Banner** and its sound), Telegram, Slack and **Push**. Each channel has its
+own switch and its own list of **notification kinds**. A channel is not a **destination**: Telegram
+is one channel however many destinations it has. _Avoid_: surface (that also covers the TUI and
+the Toast), transport (the code's word for Telegram or Slack only).
+
+**Notification kind** — one row of the shared catalog of things gx can notify about, such as a
+Paused ticket or an epic complete. Each **channel** sends only the kinds checked in its list.
+System messages about a channel itself (mute notices, test messages) are not kinds.
+_Avoid_: event type, notify kind.
+
 **Counts line** — the line of state tallies a chat message may carry, in place of a fraction:
 `8 done · 2 in progress · 1 paused: 07 · 10 total`. A **ticket counts line** tallies the ticket
 states within one epic (`done · in progress · paused · blocked · ready · total`); a **queue counts
