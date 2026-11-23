@@ -118,7 +118,7 @@ const Message = ({
     fontSize="sm"
     borderWidth="1px"
     borderRadius="md"
-    borderColor={tone === "ok" ? "#1f5a35" : "#6b5316"}
+    borderColor={tone === "ok" ? "tone.done.fg" : "tone.waiting.fg"}
     bg="surface.raised"
     color={tone === "ok" ? "tone.done.fg" : "tone.waiting.fg"}
   >
