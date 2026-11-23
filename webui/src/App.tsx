@@ -8,6 +8,7 @@ import {
   type ConnectionDeps,
 } from "./connection"
 import { pruneDrafts } from "./drafts"
+import { useAppBadge } from "./push/appBadge"
 import { refreshPushDevice } from "./push/deviceState"
 import { runOpenChecks } from "./push/openChecks"
 import { routeHashLinkClicks } from "./nav/hashLinks"
@@ -36,6 +37,11 @@ function RestHeartbeat() {
   return null
 }
 
+function AppBadge() {
+  useAppBadge()
+  return null
+}
+
 export function App({ deps, fetchDetail }: { deps?: ConnectionDeps; fetchDetail?: FetchDetail }) {
   const conn = useConnection(deps)
   usePruneDraftsOnLiveSnapshot(conn)
@@ -49,6 +55,7 @@ export function App({ deps, fetchDetail }: { deps?: ConnectionDeps; fetchDetail?
   return (
     <ConnectionContext.Provider value={conn}>
       <RestHeartbeat />
+      <AppBadge />
       <RouterProvider router={router} />
       <RestScreen />
       <SkillsProblemToast />
