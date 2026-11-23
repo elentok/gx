@@ -186,6 +186,17 @@ func TestRepoChecksLimits(t *testing.T) {
 	}
 }
 
+func TestRepoChecksSetup(t *testing.T) {
+	got, err := LoadSetup("..", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"pnpm -C webui exec playwright install chromium"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("setup = %v, want %v", got, want)
+	}
+}
+
 func TestParseConfigLimits(t *testing.T) {
 	s := time.Second
 	cases := []struct {

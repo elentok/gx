@@ -1,4 +1,5 @@
 {
+  "setup": ["pnpm -C webui exec playwright install chromium"],
   "lint": {
     "changed": "go run . brief -C webui biome",
     "full": "go run . brief -C webui biome"
