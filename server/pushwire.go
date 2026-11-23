@@ -33,6 +33,17 @@ func newPush(s *Server, quiet func() bool) *webpush.Dispatcher {
 	}
 }
 
+// pushService is the push routes' view of the server. The routes run only
+// behind the web login, so the gate exists by then.
+func pushService(s *Server) *webpush.Service {
+	return &webpush.Service{
+		Store:      s.web.Gate(),
+		Dispatcher: s.push,
+		Contact:    func() string { return s.settings.Load().WebPushContact },
+		PublicKey:  s.vapid.Public,
+	}
+}
+
 // pushSubs adapts the web login gate, which exists only while the web listener is bound.
 type pushSubs struct{ s *Server }
 

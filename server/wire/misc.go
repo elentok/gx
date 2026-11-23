@@ -265,3 +265,11 @@ const (
 	ReasonLoginNotFound     = "login-not-found"
 	ReasonLoginNameInvalid  = "login-name-invalid"
 )
+
+// Refusals of the web push routes.
+const (
+	ReasonPushNoContact       = "push-no-contact"
+	ReasonPushBadSubscription = "push-bad-subscription"
+	ReasonPushNoSubscription  = "push-no-subscription"
+	ReasonPushNotYours        = "push-not-yours"
+)

@@ -41,6 +41,7 @@ import (
 	"github.com/elentok/gx/server/triage"
 	"github.com/elentok/gx/server/web"
 	"github.com/elentok/gx/server/webauth"
+	"github.com/elentok/gx/server/webpush"
 	"github.com/elentok/gx/server/webtls"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/workspaces"
@@ -58,6 +59,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		web.Routes(func() *web.Web { return s.web }),
 		webtls.Routes(func() *x509.Certificate { return s.web.Certs().Root() }),
 		webauth.Routes(func() *webauth.Gate { return s.web.Gate() }),
+		webpush.Routes(func() *webpush.Service { return pushService(s) }),
 		settings.Routes(func() *settings.Holder { return s.Settings() }),
 		index.Routes(func() *index.Index { return s.idx }, func() <-chan struct{} { return s.migrator.Done() }),
 		projects.Routes(func() *projects.Registry { return s.projects }, func() *projects.Migrator { return s.migrator }, func() *projects.Checks { return s.checks }),

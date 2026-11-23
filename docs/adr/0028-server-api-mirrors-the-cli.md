@@ -44,4 +44,6 @@ A route is web-only when it exists only on the web mux: the web auth and account
 
 A browser-only write behind the web login may be web-only.
 
+The push routes (`/v1/web/push/subscribe`, `remove`, `renew`, `test` and the read `state/`) are web-only browser writes behind the web login, with no CLI verb. Their refusal reasons are part of the public contract: `push-no-contact`, `push-bad-subscription`, `push-no-subscription` and `push-not-yours`. The state read is web-only because it answers for the caller's own login.
+
 A route that streams a body to a browser is web-only too: the hosted-file raw route (`GET /v1/files/`) and token route (`GET /v1/files/t/`). Both are in `WebOnlyRoutes` (`server/webwire.go`), which `TestWeb_OnlyRoutesMatchTheMux` checks against the web mux. The same test appends `WebPrefixGetPatterns()` to the served list in `server/web/webroutes_test.go`, so the prefix routes are covered there. The JSON routes under `/v1/hosted-files/` get verbs, and `routeVerbs` in `cmd/server_parity_test.go` maps them: `gx files url`, `gx files resolve` and `gx server files-roots list|add|remove`.
