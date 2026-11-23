@@ -231,6 +231,23 @@ type SessionKeysRequest struct {
 	Settle bool `json:"settle,omitempty"`
 }
 
+// AttachKey is one key press a web client sends through its holder attach.
+type AttachKey struct {
+	Code int    `json:"code"`
+	Text string `json:"text,omitempty"`
+	Mod  int    `json:"mod,omitempty"`
+}
+
+// SessionAttachRequest is the body of the web attach routes. Client names one
+// browser tab. Key and Paste are the input of POST /v1/sessions/attach/input;
+// exactly one is set.
+type SessionAttachRequest struct {
+	ID     string     `json:"id"`
+	Client string     `json:"client"`
+	Key    *AttachKey `json:"key,omitempty"`
+	Paste  string     `json:"paste,omitempty"`
+}
+
 // Kinds of SessionPermissionResponse.
 const (
 	PermissionKindPrompt     = "prompt"

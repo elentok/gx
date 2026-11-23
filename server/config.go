@@ -225,6 +225,9 @@ type Config struct {
 	// PromptGrace bounds each wait for a typed prompt's turn to start
 	// before it is nudged; zero means claudeui.DefaultNudgeCaps.
 	PromptGrace time.Duration
+	// WebAttachIdle closes a web client's holder attach left unused this long;
+	// zero means webattach.DefaultIdleTimeout.
+	WebAttachIdle time.Duration
 	// LaunchProofCaps bound the check that a claude session's first slash
 	// prompt reached the transcript; a zero field means the matching
 	// claudeui.DefaultLaunchProofCaps one.

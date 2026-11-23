@@ -31,6 +31,7 @@ import (
 	"github.com/elentok/gx/server/sessions/fixagent"
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/sessions/startdesign"
+	"github.com/elentok/gx/server/sessions/webattach"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/settingsapi"
 	"github.com/elentok/gx/server/stats"
@@ -87,6 +88,7 @@ var assembleRoutes = func(s *Server) []wire.Route {
 		drafthistory.Routes(func() *drafthistory.Store { return s.draftHistory }),
 		triage.Routes(func() *triage.Triage { return s.triage }),
 		sessprompt.Routes(func() *sessprompt.Prompt { return s.prompt }),
+		webattach.Routes(func() *webattach.Attaches { return s.webAttach }),
 		merge.Routes(func() *merge.Merger { return s.merger }, func() *merge.Landing { return s.landing }),
 		prflow.Routes(
 			func() func(wire.QueueRequest) (wire.QueueResult, error) { return s.PR.CreatePR },

@@ -52,6 +52,7 @@ import (
 	"github.com/elentok/gx/server/sessions/fixagent"
 	sessprompt "github.com/elentok/gx/server/sessions/prompt"
 	"github.com/elentok/gx/server/sessions/startdesign"
+	"github.com/elentok/gx/server/sessions/webattach"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/settingsapi"
 	"github.com/elentok/gx/server/stats"
@@ -108,6 +109,7 @@ type Server struct {
 	sessionChat *chat.Chat
 	// prompt holds the auto-advance countdowns and the turn settling.
 	prompt         *sessprompt.Prompt
+	webAttach      *webattach.Attaches
 	lock           *lifecycle.Lock
 	ln             net.Listener
 	http           *http.Server
@@ -527,12 +529,14 @@ func New(cfg Config) (*Server, error) {
 		OnTriageIdle: s.triage.StopFinished, History: s.draftHistory,
 	})
 	s.sessions = newManager(s)
+	s.webAttach = webattach.New(s.sessions, cfg.WebAttachIdle)
 	s.chatDrafts = newChatDrafts(s)
 	s.archive = newArchive(s)
 	s.sessions.Maps.OnDesignStart = s.clearHold
 	s.sessions.OnSessionGone = func(id string) {
 		s.dropSessionMember(id)
 		sessprompt.ForgetSession(s.prompt, id)
+		s.webAttach.Forget(id)
 	}
 	s.designs.GiveSessions(s.sessions)
 	s.prompt.GiveSessions(s.sessions)
