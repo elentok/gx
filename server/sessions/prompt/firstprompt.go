@@ -261,8 +261,15 @@ func (f *firstPrompt) deliver(prompt string) error {
 	if f.vimRestarted(c, prompt) {
 		return nil
 	}
-	if strings.HasPrefix(prompt, "/") {
-		return f.deliverSlash(prompt)
+	// A slash prompt skips the Idle check on purpose: the ready report can arrive
+	// while the session is still Starting, so only Blocked refuses.
+	slash := strings.HasPrefix(prompt, "/")
+	if w, err := c.Watched(); slash && err == nil && w != nil && w.Status.State == harness.Blocked {
+		return errSessionBlocked
+	}
+	var source func() (string, bool, error)
+	if slash {
+		source = f.launchSource() // counts before the first send
 	}
 	_, turn, err := c.Status()
 	if err != nil {
@@ -293,23 +300,44 @@ func (f *firstPrompt) deliver(prompt string) error {
 		// screen unchanged clears and types it in full.
 		p.SkipType = true
 	}
-	caps := deliver.DefaultNudgeCaps
-	caps.Grace = cmp.Or(f.p.cfg.PromptGrace, caps.Grace)
 	// A swallowed first Enter is pressed again after seconds, not after the
 	// grace: a person who started this chat is watching an empty page.
-	caps.Settle = min(sendSettle, caps.Grace)
+	policy := f.p.deliverPolicy(f.dir, prompt, cmp.Or(f.p.cfg.PromptGrace, deliver.DefaultNudgeCaps.Grace), "")
+	policy.Draft = nil // the first prompt never clears a draft
+	policy.Caps.Settle = min(sendSettle, policy.Caps.Grace)
+	policy.Launch = f.launchCaps(policy.Slash)
 	// A nudge means the first Enter did not start the turn. The pane at that
 	// moment shows whether the text landed (Enter lost) or never did.
 	typedAt := time.Now()
-	report := func(d claudeui.NudgeDecision) {
+	policy.Report = func(d claudeui.NudgeDecision) {
 		screen, _ := p.Screen()
 		f.log.Info("first prompt nudge", "decision", string(d), "since_deliver", time.Since(typedAt).Round(time.Millisecond).String(), "screen", screen)
 	}
-	err = deliver.Deliver(p, prompt, deliver.Policy{Caps: caps, Report: report})
-	if f.p.sessions.Watches.IsStopped() && err != nil {
+	err = deliver.Deliver(p, prompt, policy)
+	switch {
+	case f.p.sessions.Watches.IsStopped() && err != nil:
 		return nil
+	case slash && source != nil && (err == nil || errors.Is(err, deliver.ErrMaybeUnsent)):
+		if err != nil {
+			f.log.Info("slash first prompt undecided; the launch proof decides", "err", err)
+		}
+		return f.proveDelivered(c, prompt, source)
 	}
 	return err
+}
+
+// launchCaps is the launch retype window: the config's LaunchProofCaps map onto
+// it, and a Codex slash looks for Codex's marker.
+func (f *firstPrompt) launchCaps(slash *deliver.SlashCaps) *deliver.LaunchCaps {
+	lc := deliver.DefaultLaunchCaps
+	o := f.p.cfg.LaunchProofCaps
+	lc.Window = cmp.Or(o.UnknownGrace, lc.Window)
+	lc.Poll = cmp.Or(o.Poll, lc.Poll)
+	lc.RetypeEvery = cmp.Or(o.ResendEvery, lc.RetypeEvery)
+	if slash != nil {
+		lc.Marker = slash.Marker
+	}
+	return &lc
 }
 
 // vimRestarted runs the vim launch check for a claude session and, on a trip
@@ -338,36 +366,6 @@ func (f *firstPrompt) vimRestarted(c *holder.HolderClient, prompt string) bool {
 // waits on a person.
 var errSessionBlocked = errors.New("session is blocked")
 
-// deliverSlash types the prompt once and ends like an Action slash step. It
-// skips the Idle check on purpose: the ready report can arrive while the
-// session is still Starting, so only Blocked refuses. A step that fails after
-// typing (blocked, ended) is only logged: the prompt was delivered.
-func (f *firstPrompt) deliverSlash(prompt string) error {
-	run, closeRun, err := f.p.openActionRun(f.dir, RunOpts{OnTyped: f.markTyped, Cancel: f.cancel})
-	if err != nil {
-		return err
-	}
-	defer closeRun()
-	if err := run.CatchUp(); err != nil {
-		return err
-	}
-	if run.State() == wire.SessionBlocked {
-		return errSessionBlocked
-	}
-	source := f.launchSource() // counts before the first send
-	// An unknown command may only mean the skill registry is still filling: the
-	// proof below resends and decides.
-	if err := run.Step(0, prompt); err != nil && !errors.Is(err, agentrunner.ErrUnknownSkill) {
-		return err
-	}
-	select {
-	case <-f.cancel:
-		return errNudgeCancelled
-	default:
-	}
-	return f.proveDelivered(run, prompt, source)
-}
-
 // launchSource counts a claude session's person records now; nil for other harnesses.
 func (f *firstPrompt) launchSource() func() (string, bool, error) {
 	meta, err := sessions.ReadMeta(f.dir)
@@ -390,33 +388,19 @@ func (f *firstPrompt) launchSource() func() (string, bool, error) {
 	})
 }
 
-// proveDelivered checks that a claude slash prompt reached its transcript.
-func (f *firstPrompt) proveDelivered(run *actionRun, prompt string, source func() (string, bool, error)) error {
-	if source == nil {
-		return nil
-	}
+// proveDelivered checks that a claude slash prompt reached its transcript. It
+// only reads: Deliver did the typing and the retyping.
+func (f *firstPrompt) proveDelivered(c *holder.HolderClient, prompt string, source func() (string, bool, error)) error {
 	caps := claudeui.DefaultLaunchProofCaps.WithOverrides(f.p.cfg.LaunchProofCaps)
 	p := claudeui.LaunchProof{
 		FirstUser:   source,
 		CheckPasted: true,
-		Working:     func() (bool, error) { err := run.CatchUp(); return run.TurnRunning(), err },
 		Pane: func() (string, error) {
-			rows, _, err := run.Holder().Screen(0)
+			rows, _, err := c.Screen(0)
 			return strings.Join(rows, "\n"), err
 		},
-		Resend: func() error {
-			select {
-			case <-f.cancel:
-				return errNudgeCancelled
-			case <-f.p.sessions.Watches.Stop:
-				return ErrServerStopping
-			default:
-			}
-			return run.TypeStep(0, prompt)
-		},
-		Report: func(d claudeui.NudgeDecision) { f.log.Debug("first prompt nudge", "decision", string(d)) },
-		Now:    time.Now,
-		Sleep:  time.Sleep,
+		Now:   time.Now,
+		Sleep: time.Sleep,
 	}
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
@@ -512,28 +496,14 @@ func (f *firstPrompt) prefillShown(p *deliver.Target, prompt string) bool {
 	if err != nil || !meta.FirstPrefilled {
 		return false
 	}
-	screen, err := p.Screen()
+	rows, _, err := p.ReadRows()
 	if err != nil {
 		return false
 	}
-	if !screenShowsPrompt(screen, prompt) {
-		f.log.Warn("first prompt was prefilled but the input does not show it; typing it", "screen", screen)
+	if !deliver.BoxHoldsText(rows, prompt, p.ImageCount()) {
+		f.log.Warn("first prompt was prefilled but the input does not show it; typing it", "screen", strings.Join(rows, "\n"))
 		return false
 	}
 	f.log.Info("first prompt prefilled; pressing Enter")
 	return true
-}
-
-// prefixRunes is how much of a prompt's start screenShowsPrompt looks for.
-const prefixRunes = 40
-
-// screenShowsPrompt reports whether screen holds the start of prompt, with
-// every run of whitespace read as one space so the input's wrapping and the
-// prompt's newlines do not matter.
-func screenShowsPrompt(screen, prompt string) bool {
-	want := strings.Join(strings.Fields(prompt), " ")
-	if r := []rune(want); len(r) > prefixRunes {
-		want = string(r[:prefixRunes])
-	}
-	return want != "" && strings.Contains(strings.Join(strings.Fields(screen), " "), want)
 }

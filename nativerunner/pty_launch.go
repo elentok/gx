@@ -89,18 +89,11 @@ func (p *Pty) PromptLaunch(ctx context.Context, s agentrunner.Session, text stri
 	proof := claudeui.LaunchProof{
 		FirstUser:   firstUser,
 		CheckPasted: true,
-		Working:     func() (bool, error) { return p.turns().working(ss) },
 		Pane: func() (string, error) {
 			if err := pr.cancelled(); err != nil {
 				return "", err
 			}
 			return pr.Screen()
-		},
-		Resend: func() error { return pr.Submit(text) },
-		Report: func(d claudeui.NudgeDecision) {
-			if onNudge != nil {
-				onNudge(string(d))
-			}
 		},
 		Now:   time.Now,
 		Sleep: time.Sleep,
@@ -167,18 +160,11 @@ func (p *Pty) proveCodexLaunch(ctx context.Context, ss *ptySession, pr *ptyPromp
 	proof := claudeui.LaunchProof{
 		FirstUser:     firstUser,
 		UnknownMarker: codexui.UnknownCommandMarker,
-		Working:       func() (bool, error) { return p.turns().working(ss) },
 		Pane: func() (string, error) {
 			if err := pr.cancelled(); err != nil {
 				return "", err
 			}
 			return pr.Screen()
-		},
-		Resend: func() error { return pr.Submit(text) },
-		Report: func(d claudeui.NudgeDecision) {
-			if onNudge != nil {
-				onNudge(string(d))
-			}
 		},
 		Now:   time.Now,
 		Sleep: time.Sleep,

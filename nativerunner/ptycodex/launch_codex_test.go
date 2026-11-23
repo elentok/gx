@@ -122,6 +122,7 @@ func TestPtyCodex_UnknownUntilInstalledSkillLaunchesOnceInstalled(t *testing.T) 
 }
 
 func TestPtyCodex_DroppedLaunchPromptIsResentThenNotDelivered(t *testing.T) {
+	t.Skip("the PTY launch has no retype until deliver-primitive-impl/21 (pty-launch-policy)")
 	t.Parallel()
 	p, _ := codexRunner(t, codex.CodexDropPromptEnv+"=1")
 	p.LaunchCaps = claudeui.LaunchProofCaps{Grace: 1500 * time.Millisecond, ResendEvery: 300 * time.Millisecond}

@@ -29,9 +29,6 @@ type LaunchProof struct {
 	// the caller's count taken before the first send; ok is false while there
 	// is none.
 	FirstUser func() (content string, ok bool, err error)
-	// Working reports whether the runner shows the agent working; nil means
-	// never. While it does the proof sends no resend.
-	Working func() (bool, error)
 	// CheckPasted (Claude only) fails a record that wraps the command in
 	// Claude Code's pasted-content tag with ErrPastedLaunch.
 	CheckPasted bool
@@ -39,13 +36,9 @@ type LaunchProof struct {
 	// skill; empty means Claude's UnknownCommandMarker.
 	UnknownMarker string
 	// Pane returns the current pane text.
-	Pane func() (string, error)
-	// Resend types the launch prompt again in the same session.
-	Resend func() error
-	// Report hears each resend; nil is allowed.
-	Report func(NudgeDecision)
-	Now    func() time.Time
-	Sleep  func(time.Duration)
+	Pane  func() (string, error)
+	Now   func() time.Time
+	Sleep func(time.Duration)
 }
 
 // LaunchProofCaps bound CheckLaunchDelivered. Grace is how long a missing user
@@ -74,7 +67,7 @@ var ErrPastedLaunch = fmt.Errorf("%w: the launch command was pasted as plain tex
 
 const pastedMarker = "<pasted_content"
 
-// DefaultLaunchProofCaps resend for about 30 seconds.
+// DefaultLaunchProofCaps wait for about 30 seconds.
 var DefaultLaunchProofCaps = LaunchProofCaps{
 	Grace:        30 * time.Second,
 	UnknownGrace: 5 * time.Second,
@@ -164,13 +157,10 @@ func LaunchedBy(content, text string) bool {
 
 // CheckLaunchDelivered returns nil once the transcript shows text as the first
 // user record, and agentrunner.ErrNotDelivered when the grace ends first. It
-// resends text only while the transcript lacks the command, never after it
-// shows it, and never while the agent is working, so a command never runs
-// twice. A cancelled ctx ends the loop within
-// one poll with the context error, not a delivery failure.
+// only reads: typing and retyping belong to deliver.Deliver. A cancelled ctx
+// ends the loop within one poll with the context error, not a delivery failure.
 func CheckLaunchDelivered(ctx context.Context, p LaunchProof, text string, caps LaunchProofCaps) error {
 	start := p.Now()
-	var lastSend time.Time
 	var unknownAt time.Time
 	marker := cmp.Or(p.UnknownMarker, UnknownCommandMarker)
 	for {
@@ -208,25 +198,6 @@ func CheckLaunchDelivered(ctx context.Context, p LaunchProof, text string, caps 
 			return fmt.Errorf("%w: %q: no user record after %s", agentrunner.ErrNotDelivered, text, caps.Grace)
 		}
 
-		working := false
-		if p.Working != nil {
-			if working, err = p.Working(); err != nil {
-				return fmt.Errorf("reading agent state: %w", err)
-			}
-		}
-		if lastSend.IsZero() || now.Sub(lastSend) >= caps.ResendEvery {
-			// The first pass is the caller's own send; only later passes
-			// resend, and never into a working agent.
-			if !lastSend.IsZero() && !working {
-				if err := p.Resend(); err != nil {
-					return fmt.Errorf("resending launch prompt: %w", err)
-				}
-				if p.Report != nil {
-					p.Report(NudgePrompt)
-				}
-			}
-			lastSend = now
-		}
 		p.Sleep(caps.Poll)
 	}
 }

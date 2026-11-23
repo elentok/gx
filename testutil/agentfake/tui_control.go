@@ -101,6 +101,9 @@ const (
 	TUICompactDurationEnv = "GX_AGENTFAKE_TUI_COMPACT_DURATION"
 	// TUIUndecidedEnv, set to "1", arms ActionUndecided at launch.
 	TUIUndecidedEnv = "GX_AGENTFAKE_TUI_UNDECIDED"
+	// TUISwallowEnterEnv, a count, makes that many Enters from launch do
+	// nothing, draft kept, as ActionSwallowEnter does.
+	TUISwallowEnterEnv = "GX_AGENTFAKE_TUI_SWALLOW_ENTER"
 )
 
 // TUILocalCommandsPath logs one line per local-command event of the TUI fake

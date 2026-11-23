@@ -95,6 +95,8 @@ type tuiOptions struct {
 	compactDuration time.Duration
 	// undecided arms ActionUndecided at launch (see TUIUndecidedEnv).
 	undecided bool
+	// swallow is how many Enters do nothing from launch (see TUISwallowEnterEnv).
+	swallow int
 }
 
 // vimWedge parses a TUIVimWedgeEnv spec into the footer row to draw and
@@ -166,6 +168,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	pasteOver := pasteOverLimit(os.Getenv(TUIPasteOverEnv))
 	compactDuration, _ := time.ParseDuration(os.Getenv(TUICompactDurationEnv))
 	row, _ := LaunchModel(*model)
+	swallow, _ := strconv.Atoi(os.Getenv(TUISwallowEnterEnv))
 	return tuiOptions{
 		hung:                  hung,
 		vimFooter:             vimFooter,
@@ -193,6 +196,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		settings:              settings,
 		compactDuration:       compactDuration,
 		undecided:             os.Getenv(TUIUndecidedEnv) == "1",
+		swallow:               swallow,
 	}, nil
 }
 
@@ -290,5 +294,6 @@ func runTUIClaude() (int, error) {
 	}
 	t.typed.WriteString(opts.draft)
 	t.undecidedNext = opts.undecided
+	t.swallow = opts.swallow
 	return t.run(io.TeeReader(os.Stdin, in), ctl)
 }

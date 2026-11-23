@@ -24,7 +24,6 @@ func TestCheckLaunchDelivered_CancelEndsLoopWithContextError(t *testing.T) {
 	p := claudeui.LaunchProof{
 		FirstUser: func() (string, bool, error) { return "", false, nil },
 		Pane:      func() (string, error) { return "> ", nil },
-		Resend:    func() error { return nil },
 		Now:       func() time.Time { return clock },
 		Sleep: func(d time.Duration) {
 			clock = clock.Add(d)
@@ -55,40 +54,33 @@ func TestCheckLaunchDelivered(t *testing.T) {
 		// unknownAt is when the pane starts showing the unknown line (never when negative).
 		unknownAt time.Duration
 		wantErr   bool
-		// wantResends is the exact resend count; wantMaxElapsed bounds the time spent.
-		wantResends    int
+		// wantMaxElapsed bounds the time spent.
 		wantMaxElapsed time.Duration
 	}{
 		{name: "delivered at once", userAt: 0, user: launchRecord, unknownAt: -1},
 		{name: "typed text counts as the command", userAt: 0, user: launchText, unknownAt: -1},
 		{
 			name: "unknown command fails in seconds, not after the grace", userAt: -1, unknownAt: 0,
-			wantErr: true, wantResends: 1, wantMaxElapsed: 6 * time.Second,
+			wantErr: true, wantMaxElapsed: 6 * time.Second,
 		},
+		{name: "registry fills after 10s", userAt: 10 * time.Second, user: launchRecord, unknownAt: -1},
 		{
-			name: "registry fills after 10s", userAt: 10 * time.Second, user: launchRecord, unknownAt: -1,
-			wantResends: 3,
-		},
-		{
-			name: "no user record and no unknown line resends until the grace ends", userAt: -1, unknownAt: -1,
-			wantErr: true, wantResends: 9, wantMaxElapsed: 31 * time.Second,
+			name: "no user record and no unknown line waits until the grace ends", userAt: -1, unknownAt: -1,
+			wantErr: true, wantMaxElapsed: 31 * time.Second,
 		},
 		{
 			name: "a different first user record is not the proof", userAt: 0, user: "hello", unknownAt: -1,
-			wantErr: true, wantResends: 9, wantMaxElapsed: 31 * time.Second,
+			wantErr: true, wantMaxElapsed: 31 * time.Second,
 		},
 		{
 			// The command ran while the unknown line was still on the pane.
-			name: "transcript showing the command never gets a resend", userAt: 1 * time.Second, user: launchRecord, unknownAt: 0,
-			wantResends: 0,
+			name: "transcript showing the command wins over the unknown line", userAt: 1 * time.Second, user: launchRecord, unknownAt: 0,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			clock := time.Unix(1000, 0)
 			start := clock
-			resends := 0
-			var reported []claudeui.NudgeDecision
 			since := func() time.Duration { return clock.Sub(start) }
 			p := claudeui.LaunchProof{
 				FirstUser: func() (string, bool, error) {
@@ -100,10 +92,8 @@ func TestCheckLaunchDelivered(t *testing.T) {
 					}
 					return "> ", nil
 				},
-				Resend: func() error { resends++; return nil },
-				Report: func(d claudeui.NudgeDecision) { reported = append(reported, d) },
-				Now:    func() time.Time { return clock },
-				Sleep:  func(d time.Duration) { clock = clock.Add(d) },
+				Now:   func() time.Time { return clock },
+				Sleep: func(d time.Duration) { clock = clock.Add(d) },
 			}
 			err := claudeui.CheckLaunchDelivered(context.Background(), p, launchText, claudeui.DefaultLaunchProofCaps)
 			if tt.wantErr != errors.Is(err, agentrunner.ErrNotDelivered) {
@@ -111,17 +101,6 @@ func TestCheckLaunchDelivered(t *testing.T) {
 			}
 			if !tt.wantErr && err != nil {
 				t.Fatalf("err = %v", err)
-			}
-			if resends != tt.wantResends {
-				t.Errorf("resends = %d, want %d", resends, tt.wantResends)
-			}
-			if len(reported) != resends {
-				t.Errorf("reported %v, want one prompt-nudged per resend", reported)
-			}
-			for _, d := range reported {
-				if d != "prompt-nudged" {
-					t.Errorf("decision = %q, want prompt-nudged", d)
-				}
 			}
 			if tt.wantMaxElapsed > 0 && since() > tt.wantMaxElapsed {
 				t.Errorf("took %s, want at most %s", since(), tt.wantMaxElapsed)
@@ -131,78 +110,35 @@ func TestCheckLaunchDelivered(t *testing.T) {
 }
 
 // proofFor is a LaunchProof on a fake clock that checks for pasted records.
-func proofFor(clock *time.Time, resends *int, first func() (string, bool, error)) claudeui.LaunchProof {
+func proofFor(clock *time.Time, first func() (string, bool, error)) claudeui.LaunchProof {
 	return claudeui.LaunchProof{
 		FirstUser:   first,
 		CheckPasted: true,
 		Pane:        func() (string, error) { return "> ", nil },
-		Resend:      func() error { *resends++; return nil },
 		Now:         func() time.Time { return *clock },
 		Sleep:       func(d time.Duration) { *clock = clock.Add(d) },
 	}
 }
 
-func TestCheckLaunchDelivered_WorkingAgentWithoutRecordGetsNoResendAndFailsAtGrace(t *testing.T) {
+func TestCheckLaunchDelivered_NoRecordFailsAtGraceEnd(t *testing.T) {
 	start := time.Unix(1000, 0)
 	clock := start
-	resends := 0
-	p := proofFor(&clock, &resends, func() (string, bool, error) { return "", false, nil })
-	p.Working = func() (bool, error) { return true, nil }
-	var reported []claudeui.NudgeDecision
-	p.Report = func(d claudeui.NudgeDecision) { reported = append(reported, d) }
+	p := proofFor(&clock, func() (string, bool, error) { return "", false, nil })
 
 	err := claudeui.CheckLaunchDelivered(context.Background(), p, launchText, claudeui.DefaultLaunchProofCaps)
 
 	if !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("err = %v, want ErrNotDelivered at the grace end", err)
 	}
-	if resends != 0 || len(reported) != 0 {
-		t.Errorf("resends = %d, reported = %v; want none while working", resends, reported)
-	}
 	if got := clock.Sub(start); got < claudeui.DefaultLaunchProofCaps.Grace {
 		t.Errorf("ended after %s, want the grace clock to keep running to %s", got, claudeui.DefaultLaunchProofCaps.Grace)
 	}
 }
 
-// TestCheckLaunchDelivered_NoResendIntoAWorkingAgentForEveryCaller gives each
-// launch path its own Working source, shaped as that caller reads its runner,
-// and expects no resend while the agent works and no record exists.
-func TestCheckLaunchDelivered_NoResendIntoAWorkingAgentForEveryCaller(t *testing.T) {
-	tests := []struct {
-		name        string
-		checkPasted bool
-		working     func() (bool, error)
-	}{
-		{"herdr runner", true, func() (bool, error) { return true, nil }},
-		{"PTY Claude", true, func() (bool, error) { return true, nil }},
-		{"PTY Codex", false, func() (bool, error) { return true, nil }},
-		{"first prompt", true, func() (bool, error) { return true, nil }},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			clock := time.Unix(1000, 0)
-			resends := 0
-			p := proofFor(&clock, &resends, func() (string, bool, error) { return "", false, nil })
-			p.CheckPasted = tt.checkPasted
-			p.Working = tt.working
-
-			err := claudeui.CheckLaunchDelivered(context.Background(), p, launchText, claudeui.DefaultLaunchProofCaps)
-
-			if !errors.Is(err, agentrunner.ErrNotDelivered) {
-				t.Fatalf("err = %v, want ErrNotDelivered at the grace end", err)
-			}
-			if resends != 0 {
-				t.Errorf("resends = %d, want none into a working agent", resends)
-			}
-		})
-	}
-}
-
 func TestCheckLaunchDelivered_PastedRecordIsItsOwnNotDeliveredError(t *testing.T) {
 	clock := time.Unix(1000, 0)
-	resends := 0
 	pasted := "<pasted_content>\n" + launchText + "\n</pasted_content>"
-	p := proofFor(&clock, &resends, func() (string, bool, error) { return pasted, true, nil })
+	p := proofFor(&clock, func() (string, bool, error) { return pasted, true, nil })
 
 	err := claudeui.CheckLaunchDelivered(context.Background(), p, launchText, claudeui.DefaultLaunchProofCaps)
 

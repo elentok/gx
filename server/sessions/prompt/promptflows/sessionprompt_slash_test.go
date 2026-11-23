@@ -27,6 +27,12 @@ type tuiChat struct {
 // slash settle is short so a swallowed Enter is pressed again within a test.
 func startTUIChat(t *testing.T, env ...string) tuiChat {
 	t.Helper()
+	return startTUIChatPrompt(t, "", env...)
+}
+
+// startTUIChatPrompt starts the chat with a first prompt; with none it waits for Idle.
+func startTUIChatPrompt(t *testing.T, prompt string, env ...string) tuiChat {
+	t.Helper()
 	bin, home := t.TempDir(), t.TempDir()
 	script := "#!/bin/sh\nexport " + agentfake.TUIEnv + "=1 " + strings.Join(env, " ") + "\nexec '" + os.Args[0] + "' \"$@\"\n"
 	if err := os.WriteFile(filepath.Join(bin, "claude"), []byte(script), 0o755); err != nil {
@@ -37,6 +43,9 @@ func startTUIChat(t *testing.T, env ...string) tuiChat {
 			c.ActionSlashSettle = 200 * time.Millisecond
 			c.PromptGrace = firstPromptGrace
 			c.ActionStepStartTimeout = firstPromptGrace
+			if prompt != "" {
+				c.LaunchProofCaps.Grace = 4 * time.Second // the proof of an undelivered first prompt ends soon
+			}
 		},
 		servertest.WithEnv("PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "HOME="+home, "CLAUDE_CONFIG_DIR="+filepath.Join(home, ".claude")))
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -49,13 +58,15 @@ func startTUIChat(t *testing.T, env ...string) tuiChat {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: dir, Harness: "claude"})
+	res, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: dir, Harness: "claude", Prompt: prompt})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 	id := res.Session.ID
 	conv, _ := servertest.ReadMeta(t, h, id)["conversation_id"].(string)
-	servertest.WaitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	if prompt == "" {
+		servertest.WaitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionIdle })
+	}
 	return tuiChat{h: h, ctx: ctx, evs: evs, id: id, conv: conv, home: home}
 }
 

@@ -132,6 +132,13 @@ func boxHoldsOurs(box []string, text string, chips int) bool {
 	return prefix != "" && strings.HasPrefix(strings.TrimSpace(dropIgnorable(row)), prefix)
 }
 
+// BoxHoldsText reports whether the input box on rows shows the start of text,
+// or claude's chip for a paste of it. False when no box is drawn.
+func BoxHoldsText(rows []string, text string, chips int) bool {
+	box, ok := claudeui.InputBoxRows(rows)
+	return ok && boxHoldsOurs(box, text, chips)
+}
+
 var menuRow = regexp.MustCompile(`^\s+/\S`)
 
 // rowsHoldOurs reports whether the screen still shows gx's text: in the box
