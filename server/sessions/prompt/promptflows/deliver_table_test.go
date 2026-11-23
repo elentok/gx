@@ -1,6 +1,7 @@
 package promptflows_test
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -49,11 +50,16 @@ func (c tuiChat) card(t *testing.T) wire.SessionActionable {
 	return servertest.WaitForSession(c.ctx, t, c.h, c.evs, c.id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised }).Actionable
 }
 
-func (c tuiChat) swallowFirstEnter(t *testing.T) {
+func (c tuiChat) control(t *testing.T, ctl agentfake.Control) {
 	t.Helper()
-	if err := agentfake.SendTUIControl(c.home, c.conv, agentfake.Control{Action: agentfake.ActionSwallowEnter}); err != nil {
+	if err := agentfake.SendTUIControl(c.home, c.conv, ctl); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func (c tuiChat) swallowFirstEnter(t *testing.T) {
+	t.Helper()
+	c.control(t, agentfake.Control{Action: agentfake.ActionSwallowEnter})
 }
 
 // TestDeliverTable drives every commit-1 entry point through the server against
@@ -183,6 +189,121 @@ func TestDeliverTable(t *testing.T) {
 			c.expectCompactions(t, 1)
 		})
 	})
+	t.Run("ReadScreens", func(t *testing.T) {
+		t.Parallel()
+		long := "/compact " + strings.Repeat("keep the plan and the notes ", 25)
+		for _, r := range []struct {
+			name, text string
+			env        []string
+			setup      func(t *testing.T, c tuiChat)
+			enters     int
+		}{
+			{"IdleEmptyWithPlaceholder", "/cost", nil, nil, 2},
+			{"TypedWithSuggestionMenu", "/copy", nil, nil, 2},
+			{"ModelDialogOpen", "/model", nil, nil, 1},
+			{"HelpDialogOpen", "/help", nil, nil, 1},
+			{"CompactRunning", "/compact", nil, nil, 1},
+			{"CompactDone", "/compact", []string{agentfake.TUICompactDurationEnv + "=300ms"}, nil, 1},
+			{"WrappedMultiRowDraft", "/cost " + strings.Repeat("word ", 40), nil, nil, 2},
+			{"PasteOver512Bytes", long, nil, nil, 1},
+			// A person's draft is cleared before the send types, so the settle read
+			// meets only our text.
+			{"PersonsOwnDraftIsClearedFirst", "/cost", []string{agentfake.TUIDraftEnv + "=my own words"}, nil, 2},
+			// The dialog's "❯ 1. Yes" sits inside rules but is no input box: no settle Enter.
+			{"PermissionDialog", "/cost", nil, func(t *testing.T, c tuiChat) {
+				c.control(t, agentfake.Control{Action: agentfake.ActionBlock, Dialog: agentfake.BashPermissionDialog("rg x")})
+			}, 1},
+		} {
+			t.Run(r.name, func(t *testing.T) {
+				t.Parallel()
+				c := startTUIChat(t, r.env...)
+				if r.setup != nil {
+					r.setup(t, c)
+				}
+				c.send(t, r.text)
+				c.expectEnters(t, r.enters)
+			})
+		}
+	})
+	t.Run("Undecided", func(t *testing.T) {
+		t.Parallel()
+		// The plain screen has no input box: our text stays visible on a row that is
+		// neither the echo nor a menu row and the Enter changes nothing, so the settle
+		// read cannot tell whether the command ran. Each entry point maps it its own way.
+		const maybe = "May not have been sent: "
+		for _, r := range []struct {
+			name   string
+			run    func(t *testing.T, c tuiChat)
+			suffix string
+			typed  string
+		}{
+			{"ChatRaisesTheCard", func(t *testing.T, c tuiChat) { c.send(t, "/cost") }, "", "/cost"},
+			{"RenameRaisesTheCard", func(t *testing.T, c tuiChat) {
+				if _, err := c.h.Client.Sessions.Rename(c.ctx, wire.SessionRenameRequest{ID: c.id, Name: "new name"}); err != nil {
+					t.Fatal(err)
+				}
+			}, "", "/rename new name"},
+			{"ActionStepRaisesTheCardAndDropsLaterSteps", func(t *testing.T, c tuiChat) { c.runAction(t, "/first", "second") }, "1 later step not sent", "/first"},
+		} {
+			t.Run(r.name, func(t *testing.T) {
+				t.Parallel()
+				c := startTUIChat(t, agentfake.TUIPlainScreenEnv+"=1")
+				r.run(t, c)
+				got := c.card(t)
+				if !strings.HasPrefix(got.Reason, maybe) || !strings.HasSuffix(got.Reason, r.suffix) || len(got.Action) != 0 {
+					t.Errorf("card = %+v, want the May not have been sent card with no Action to resend", got)
+				}
+				c.expectEnters(t, 1)
+				c.expectTypedOnce(t, r.typed)
+				if strings.Contains(c.keys(), "second") {
+					t.Errorf("keys = %q, want the later step dropped", c.keys())
+				}
+			})
+		}
+		t.Run("FirstPromptRaisesNoCard", func(t *testing.T) {
+			t.Parallel()
+			c := startTUIChatPrompt(t, "/first", agentfake.TUIPlainScreenEnv+"=1")
+			c.waitKeys(t, "the prompt", func(k string) bool { return strings.Contains(k, "/first") })
+			if servertest.Poll(6*time.Second, func() bool { return servertest.ReadMeta(t, c.h, c.id)["actionable"] != nil }) {
+				t.Errorf("actionable = %v, want none for a first prompt", servertest.ReadMeta(t, c.h, c.id)["actionable"])
+			}
+			c.expectEnters(t, 1)
+		})
+	})
+	t.Run("Exits", func(t *testing.T) {
+		t.Parallel()
+		// Observed reasons: the first prompt gives up with "agent never started", not
+		// "Send failed" (see Spec deviations on the ticket).
+		for _, r := range []struct {
+			name   string
+			env    []string
+			run    func(t *testing.T, c tuiChat)
+			reason string
+			action []string
+		}{
+			{"PlainGiveUp", []string{agentfake.TUISwallowEnterEnv + "=100"}, func(t *testing.T, c tuiChat) { c.send(t, "hello") }, "Send failed: timed out waiting for agent to start", []string{"hello"}},
+			{"DraftWillNotClear", []string{agentfake.TUIClearIgnoredEnv + "=1", agentfake.TUIDraftEnv + "=mine"}, func(t *testing.T, c tuiChat) { c.send(t, "hello") }, "Send failed: input would not clear", []string{"hello"}},
+			{"ActionStepGiveUp", []string{agentfake.TUISwallowEnterEnv + "=100"}, func(t *testing.T, c tuiChat) { c.runAction(t, "hello", "second") }, "Action failed: step 0: timed out waiting for agent to start", []string{"hello", "second"}},
+		} {
+			t.Run(r.name, func(t *testing.T) {
+				t.Parallel()
+				c := startTUIChat(t, r.env...)
+				r.run(t, c)
+				got := c.card(t)
+				if got.Reason != r.reason || !slices.Equal(got.Action, r.action) {
+					t.Errorf("card = %+v, want reason %q and Action %q", got, r.reason, r.action)
+				}
+			})
+		}
+		t.Run("FirstPromptGivesUp", func(t *testing.T) {
+			t.Parallel()
+			c := startTUIChatPromptWith(t, "fix it", nil, agentfake.TUISwallowEnterEnv+"=100")
+			got := c.card(t)
+			if !strings.HasPrefix(got.Reason, "agent never started") || !slices.Equal(got.Action, []string{"fix it"}) {
+				t.Errorf("card = %+v, want the agent never started card with the prompt to resend", got)
+			}
+		})
+	})
 	t.Run("UnknownCommand", func(t *testing.T) {
 		t.Parallel()
 		t.Run("ChatSlashFailsAtOnceWithoutARetype", func(t *testing.T) {
@@ -198,12 +319,31 @@ func TestDeliverTable(t *testing.T) {
 		})
 		t.Run("LaunchPromptRetypesForTheWindowThenEndsInTheCard", func(t *testing.T) {
 			t.Parallel()
-			c := startTUIChatPromptWith(t, "/my-skill", func(cfg *server.Config) { cfg.LaunchProofCaps.UnknownGrace = 2 * time.Second }, agentfake.TUIUnknownSkillEnv+"=1")
+			// The retype comes every ResendEvery inside the UnknownGrace window.
+			c := startTUIChatPromptWith(t, "/my-skill", func(cfg *server.Config) {
+				cfg.LaunchProofCaps.UnknownGrace = 2 * time.Second
+				cfg.LaunchProofCaps.ResendEvery = 300 * time.Millisecond
+			}, agentfake.TUIUnknownSkillEnv+"=1")
 			got := c.card(t)
-			// Observed: the launch proof ends the window in the "prompt not delivered"
-			// card with no retype of the text (see Spec deviations on the ticket).
 			if !strings.Contains(got.Reason, "Unknown command") || len(got.Action) != 1 || got.Action[0] != "/my-skill" {
 				t.Errorf("card = %+v, want a card naming Unknown command with the text to resend", got)
+			}
+			if n := strings.Count(c.keys(), "/my-skill"); n < 2 {
+				t.Errorf("typed %d times, want a retype inside the window: %q", n, c.keys())
+			}
+		})
+		t.Run("CodexLaunchPromptRetypesForTheWindowThenEndsInTheCard", func(t *testing.T) {
+			t.Parallel()
+			f := fromPrompt(rigs.StartCodexPromptSessionAs(t, func(cfg *server.Config) {
+				cfg.LaunchProofCaps.UnknownGrace = 2 * time.Second
+				cfg.LaunchProofCaps.ResendEvery = 300 * time.Millisecond
+			}, wire.CreateSessionRequest{Prompt: "/handoff"}))
+			got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised }).Actionable
+			if !strings.Contains(got.Reason, "Unrecognized command") || len(got.Action) != 1 || got.Action[0] != "/handoff" {
+				t.Errorf("card = %+v, want a card naming Unrecognized command with the text to resend", got)
+			}
+			if n := strings.Count(submitted(t, f.conv), "/handoff"); n < 2 {
+				t.Errorf("submitted %d times, want a retype inside the window: %q", n, submitted(t, f.conv))
 			}
 		})
 	})
