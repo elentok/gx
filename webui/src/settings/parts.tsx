@@ -15,6 +15,12 @@ export function LoadingState({ title }: { title: string }) {
   )
 }
 
+export const Chevron = () => (
+  <Text aria-hidden color="text.dim">
+    ›
+  </Text>
+)
+
 export const CountChip = ({ n, testId }: { n: number; testId?: string }) => (
   <chakra.span
     data-testid={testId}
@@ -112,7 +118,15 @@ export const GroupBlock = ({
   </Box>
 )
 
-export const Group = ({ label, children }: { label?: string; children: ReactNode }) => (
+export const Group = ({
+  label,
+  part,
+  children,
+}: {
+  label?: string
+  part?: string
+  children: ReactNode
+}) => (
   <Box mt="6">
     {label && (
       <Text
@@ -128,6 +142,7 @@ export const Group = ({ label, children }: { label?: string; children: ReactNode
       </Text>
     )}
     <Box
+      data-mock-part={part}
       borderWidth="1px"
       borderColor="border"
       borderRadius="lg"

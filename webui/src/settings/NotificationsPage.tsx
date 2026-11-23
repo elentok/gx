@@ -12,7 +12,7 @@ import {
 } from "../push/deviceState"
 import { fetchPushState, removePush, subscribePush, testPush } from "../push/pushApi"
 import { useReady } from "../useReady"
-import { BackLink, Frame, rowProps } from "./parts"
+import { BackLink, Chevron, Frame, rowProps } from "./parts"
 
 export const SWITCH_LABEL = "Notifications on this device"
 export const SWITCH_OFF_TEXT = "Off. Turning it on asks this browser for permission."
@@ -166,6 +166,7 @@ export function NotificationsView({
               {on ? TEST_ON_TEXT : TEST_OFF_TEXT}
             </Text>
           </Box>
+          <Chevron />
         </chakra.button>
       </Card>
       {testMessage && <Message tone={testMessage.ok ? "ok" : "warn"}>{testMessage.text}</Message>}

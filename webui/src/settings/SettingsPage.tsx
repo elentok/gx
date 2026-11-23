@@ -52,6 +52,7 @@ import {
 import {
   BackLink,
   CountChip,
+  Chevron,
   Frame,
   Group,
   LoadingState,
@@ -64,15 +65,19 @@ import type { WriteSetting } from "./SettingsRow"
 const DAY_MS = 24 * 60 * 60 * 1000
 const LOGINS_HREF = `${SETTINGS_HREF}/logins`
 
-const Chevron = () => (
-  <Text aria-hidden color="text.dim">
-    ›
-  </Text>
-)
-
-function LinkRow({ href, label, detail }: { href: string; label: string; detail?: ReactNode }) {
+function LinkRow({
+  href,
+  label,
+  detail,
+  part,
+}: {
+  href: string
+  label: string
+  detail?: ReactNode
+  part?: string
+}) {
   return (
-    <chakra.a href={href} {...rowProps}>
+    <chakra.a href={href} data-mock-part={part} {...rowProps}>
       <Box flex="1" fontWeight="600">
         {label}
       </Box>
@@ -170,7 +175,7 @@ export function SettingsHomeView({
               </Group>
             ))}
             {project === undefined && (
-              <Group label="Account">
+              <Group label="Account" part="account-group">
                 <LinkRow
                   href={LOGINS_HREF}
                   label="Web logins"
@@ -183,6 +188,7 @@ export function SettingsHomeView({
                 <LinkRow
                   href={`${SETTINGS_HREF}/notifications`}
                   label="Notifications"
+                  part="notifications-row"
                   detail={<PushChip />}
                 />
                 <LinkRow href={`${SETTINGS_HREF}/password`} label="Password" />
