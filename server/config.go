@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -258,6 +259,12 @@ type Config struct {
 	// SessionBannerDelay is how long a session banner waits for triggers to
 	// merge; zero means defaultSessionBannerDelay.
 	SessionBannerDelay time.Duration
+	// PushHTTPClient sends Web Push requests; nil means a client with a
+	// timeout of about 15 seconds. Tests point it at an httptest service.
+	PushHTTPClient *http.Client
+	// PushMergeDelay is how long a push waits for events of its tag to
+	// merge; zero means one second.
+	PushMergeDelay time.Duration
 	// ChatPollInterval is how often a working session's transcript size is
 	// checked; zero means defaultChatPollInterval.
 	ChatPollInterval time.Duration

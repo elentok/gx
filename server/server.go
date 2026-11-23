@@ -121,6 +121,7 @@ type Server struct {
 	log        *slog.Logger
 	// vapid is the Web Push key pair, loaded once in New.
 	vapid          *webpush.Keys
+	push           *webpush.Dispatcher
 	idx            *index.Index
 	harness        *harnesschoice.Harness
 	settingsWriter *settingsapi.Writer
@@ -437,6 +438,7 @@ func New(cfg Config) (*Server, error) {
 		s.cfg.Player = sound.NewSystemPlayer(log)
 	}
 	s.cfg.Player = quietPlayer{next: s.cfg.Player, quiet: quiet}
+	s.push = newPush(s, quiet)
 	s.writer = newTicketWriter(s)
 	s.recovery = newRecovery(s)
 	// Built once the fields they copy are set; they and rec reach each other through s.
@@ -795,6 +797,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	stopCommits()
 	recordShutdown("chat-close")
 	s.chat.Close()
+	s.push.Close()
 	s.webPerf.Close()
 	s.rest.Close()
 	_ = os.Remove(SocketPath(s.cfg.StateDir))
