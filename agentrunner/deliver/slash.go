@@ -1,6 +1,7 @@
 package deliver
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -31,6 +32,13 @@ type SlashCaps struct {
 	// ResizePoll and ResizeCap bound the re-reads of a screen that was just
 	// resized.
 	ResizePoll, ResizeCap time.Duration
+	// Marker is the pane text that says the agent does not know the command.
+	// Empty is claude's "Unknown command: <our token>".
+	Marker string
+	// Watch, with a zero Settle, is how long the pane is watched for Marker
+	// after the Enter, polling every WatchPoll (50ms when zero). Codex draws its
+	// marker on screen only. Zero watches nothing.
+	Watch, WatchPoll time.Duration
 }
 
 // DefaultSlashCaps are the slash timings.
@@ -172,16 +180,61 @@ type slashSend struct {
 	chips    int
 	caps     SlashCaps
 	baseline []string
+	launch   bool
 }
 
-// unknown fails the send when the pane shows "Unknown command: <our token>"
-// that the baseline did not.
+// unknown fails the send when the pane shows the unknown-command marker
+// (claude's with our token) that the baseline did not. A launch send never
+// fails here: its retype window decides.
 func (s *slashSend) unknown(rows []string) error {
-	marker := claudeui.UnknownCommandMarker + " " + firstToken(s.text)
+	if s.launch {
+		return nil
+	}
+	marker := cmp.Or(s.caps.Marker, claudeui.UnknownCommandMarker+" "+firstToken(s.text))
 	if !screenHas(rows, marker) || screenHas(s.baseline, marker) {
 		return nil
 	}
-	return fmt.Errorf("%w: %w: %q: %s", agentrunner.ErrNotDelivered, agentrunner.ErrUnknownSkill, s.text, marker)
+	return errUnknown(s.text, marker)
+}
+
+func errUnknown(text, marker string) error {
+	return fmt.Errorf("%w: %w: %q: %s", agentrunner.ErrNotDelivered, agentrunner.ErrUnknownSkill, text, marker)
+}
+
+// WatchUnknown is the Codex check for a command typed outside Deliver: it reads
+// the screen for caps.Marker until caps.Watch passes. Deliver does the same
+// itself after a Codex slash send.
+func WatchUnknown(screen func() (string, error), text string, caps SlashCaps) error {
+	deadline := time.Now().Add(caps.Watch)
+	for {
+		if s, err := screen(); err == nil && strings.Contains(s, caps.Marker) {
+			return errUnknown(text, caps.Marker)
+		}
+		if !time.Now().Before(deadline) {
+			return nil
+		}
+		time.Sleep(cmp.Or(caps.WatchPoll, 50*time.Millisecond))
+	}
+}
+
+// watch reads the pane for Marker for caps.Watch after the Enter.
+func (s *slashSend) watch() error {
+	poll := cmp.Or(s.caps.WatchPoll, 50*time.Millisecond)
+	for waited := time.Duration(0); s.caps.Watch > 0; waited += poll {
+		rows, _, err := s.t.ReadRows()
+		if err == nil {
+			if err := s.unknown(rows); err != nil {
+				return err
+			}
+		}
+		if waited >= s.caps.Watch {
+			break
+		}
+		if started, err := s.t.WaitStart(poll); err != nil || started {
+			return err
+		}
+	}
+	return nil
 }
 
 // settled is one trusted-or-not read of the screen.
@@ -228,14 +281,14 @@ func (s *slashSend) undecided(polls int, visible bool) error {
 // deliverSlash types the command once and presses the submit key once. After
 // the settle it presses again only on a trusted read whose box row still shows
 // gx's text. It never retypes.
-func deliverSlash(t Input, text string, caps SlashCaps, report func(claudeui.NudgeDecision)) error {
+func deliverSlash(t Input, text string, caps SlashCaps, report func(claudeui.NudgeDecision), launch bool) error {
 	if !readyToType(t) {
 		return fmt.Errorf("%w: %w", claudeui.ErrStuckSubmission, claudeui.ErrNotReadyToType)
 	}
 	if err := t.Type(text); err != nil {
 		return err
 	}
-	s := &slashSend{t: t, text: text, chips: t.ImageCount(), caps: caps}
+	s := &slashSend{t: t, text: text, chips: t.ImageCount(), caps: caps, launch: launch}
 	if caps.Settle > 0 {
 		s.baseline, _, _ = t.ReadRows()
 	}
@@ -243,7 +296,7 @@ func deliverSlash(t Input, text string, caps SlashCaps, report func(claudeui.Nud
 		return err
 	}
 	if caps.Settle <= 0 {
-		return nil
+		return s.watch()
 	}
 	if started, err := t.WaitStart(caps.Settle); err != nil || started {
 		return err

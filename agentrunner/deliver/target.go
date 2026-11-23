@@ -274,6 +274,9 @@ type Input interface {
 type Policy struct {
 	Caps  NudgeCaps
 	Slash *SlashCaps
+	// Launch, when set, retypes the text while the pane shows the unknown-command
+	// marker, in either shape. Only a launch prompt sets it.
+	Launch *LaunchCaps
 	// Draft, when set, clears a person's draft before the text is typed.
 	Draft    *DraftHooks
 	Deadline time.Time
@@ -298,9 +301,16 @@ func Deliver(t Input, text string, policy Policy) error {
 			return err
 		}
 	}
-	if policy.Slash != nil {
-		return deliverSlash(t, text, *policy.Slash, policy.Report)
+	if policy.Launch != nil {
+		return deliverLaunch(t, text, policy)
 	}
+	if policy.Slash != nil {
+		return deliverSlash(t, text, *policy.Slash, policy.Report, false)
+	}
+	return deliverTurn(t, text, policy)
+}
+
+func deliverTurn(t Input, text string, policy Policy) error {
 	now := policy.Now
 	if now == nil {
 		now = time.Now

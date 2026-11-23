@@ -11,15 +11,15 @@ import (
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/codexui"
 	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/harness"
 )
 
-// codexUnknownWait bounds the pane watch for Codex's "Unrecognized command".
-const codexUnknownWait = 2 * time.Second
+// codexSlashWatch bounds the pane watch for Codex's "Unrecognized command",
+// which Codex draws on screen and never writes to the rollout.
+const codexSlashWatch = 2 * time.Second
 
 // sendSettle is how long a chat send waits for its turn before it checks that the Enter landed.
 const sendSettle = 3 * time.Second
@@ -58,8 +58,10 @@ func (p *Prompt) deliverSend(dir, text string, imgs imageSet) error {
 	if policy.Slash != nil {
 		policy.Slash.Settle = cmp.Or(p.cfg.ActionSlashSettle, DefaultActionSlashSettle)
 		if meta, err := sessions.ReadMeta(dir); err == nil && meta.Harness == string(harness.Codex) {
-			// One Enter, no read: checkCodexKnownCommand reads the pane after.
+			// One Enter, no input read: Deliver watches the pane for the marker after.
 			policy.Slash.Settle = 0
+			policy.Slash.Marker = codexui.UnknownCommandMarker
+			policy.Slash.Watch = codexSlashWatch
 		}
 	}
 	policy.Report = func(d claudeui.NudgeDecision) {
@@ -70,13 +72,7 @@ func (p *Prompt) deliverSend(dir, text string, imgs imageSet) error {
 		Lock:  func() (func(), error) { return lockTyping(p, id, nil) },
 		Start: func(timeout time.Duration) (bool, error) { return waitRunStart(run, timeout) }}
 	imgs.onto(t)
-	if err := deliver.Deliver(t, text, policy); err != nil {
-		return err
-	}
-	if policy.Slash != nil {
-		return checkCodexKnownCommand(dir, run, text)
-	}
-	return nil
+	return deliver.Deliver(t, text, policy)
 }
 
 // finishSend settles a send's result: a success clears an earlier "Send failed"
@@ -114,27 +110,6 @@ func (p *Prompt) clearSendFailed(dir string) {
 		m.Actionable = wire.SessionActionable{}
 		return true
 	})
-}
-
-// checkCodexKnownCommand watches a Codex pane briefly after a "/" command.
-// Codex draws "Unrecognized command" on screen and never writes it to the
-// rollout, so without this the person sees nothing.
-func checkCodexKnownCommand(dir string, run *actionRun, text string) error {
-	meta, err := sessions.ReadMeta(dir)
-	if err != nil || meta.Harness != string(harness.Codex) {
-		return nil
-	}
-	deadline := time.Now().Add(codexUnknownWait)
-	for {
-		rows, _, err := run.Holder().Screen(0)
-		if err == nil && strings.Contains(strings.Join(rows, "\n"), codexui.UnknownCommandMarker) {
-			return fmt.Errorf("%w: %q: %s", agentrunner.ErrUnknownSkill, text, codexui.UnknownCommandMarker)
-		}
-		if !time.Now().Before(deadline) {
-			return nil
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
 }
 
 // imageSet is the Prompt images a send pastes before its text. The zero value
