@@ -48,6 +48,8 @@ test("153. Send a command, typed once or nudged, and /clear", async ({ page, sta
   const compactConv = await conversationOf(fixture, compact.id)
   await go(page, `#/agents/${compact.id}`)
   const beforeCompact = (await chatOf(fixture, compact.id)).messages.length
+  // The first Enter is swallowed and the text stays: the settle Enter lands it, so it still runs once.
+  await fixture.controlClaude(compactConv, { action: "swallow-enter" })
   await messageBox(page).fill("/compact foo")
   await sendButton(page).click()
   await expect
@@ -59,6 +61,13 @@ test("153. Send a command, typed once or nudged, and /clear", async ({ page, sta
   // A Codex `$` skill is plain text for the agent, so it takes the nudge path too: the prompt reaches the chat.
   const codex = await codexIdle(fixture)
   await go(page, `#/agents/${codex.id}`)
+  // An unknown `/` command makes the Codex pane draw `Unrecognized command`: the red card offers Resend and
+  // Restart agent. The good send below clears it.
+  await messageBox(page).fill("/nosuchcommand")
+  await sendButton(page).click()
+  await expect(page.getByText("Send failed")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Resend", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Restart agent", exact: true })).toBeVisible()
   await messageBox(page).fill("$review-skill")
   await sendButton(page).click()
   await expect(page.getByText("$review-skill", { exact: true })).toBeVisible()
