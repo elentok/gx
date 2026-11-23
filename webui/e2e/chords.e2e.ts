@@ -1,6 +1,7 @@
 import { chatOf, row, sessions, titleHeading } from "./agentsKit"
 import { draftPage } from "./draftKit"
 import { expect, nav, test } from "./fixture"
+import type { Locator } from "@playwright/test"
 import { goto } from "./sidebarKit"
 
 // The Leader key's Chord box over the `workspaces` scenario; split from the Workspaces flow so each stays inside its time limit.
@@ -160,10 +161,13 @@ test("Chords", async ({ page, start }) => {
 
   // The chords: C (Shift+c) and d open the new chat form and a design draft, a click on the C row does the same, and the
   // palette's New chat opens the same form on the same project.
-  const openBox = async () => {
+  // After a hash change the old route can still render for a moment, and the route change then closes a box opened on it.
+  // `ready` is a row of the new page's box: the retry opens the box again until that row shows.
+  const openBox = async (ready: Locator = chordBox) => {
     await expect(async () => {
+      if (await chordBox.isVisible()) await page.keyboard.press("Escape")
       await page.keyboard.press(leader)
-      await expect(chordBox).toBeVisible({ timeout: 1_000 })
+      await expect(ready).toBeVisible({ timeout: 1_000 })
     }).toPass({ timeout: 10_000 })
   }
   const draftIds = async () =>
@@ -371,7 +375,7 @@ test("Chords", async ({ page, start }) => {
   const queueAgentHash = (await queueAgent.getAttribute("href"))!
   for (const hash of ["#/d/side:side-design", queueAgentHash]) {
     await goto(page, hash)
-    await openBox()
+    await openBox(chordBox.getByRole("menuitem", { name: /^c\s*New chat/ }))
     await expect(chordBox.getByRole("menuitem")).toHaveCount(5)
     await expect(chordBox.getByRole("menuitem", { name: /^x/ })).toHaveCount(0)
     await expect(chordBox.getByRole("menuitem", { name: /^r/ })).toHaveCount(0)
@@ -384,8 +388,7 @@ test("Chords", async ({ page, start }) => {
   // The epics page and the agents list are not a chat page either.
   for (const hash of ["#/epics", "#/agents"]) {
     await goto(page, hash)
-    await openBox()
-    await expect(chordBox.getByRole("menuitem", { name: /^c\s*New chat/ })).toBeVisible()
+    await openBox(chordBox.getByRole("menuitem", { name: /^c\s*New chat/ }))
     await expect(chordBox.getByRole("menuitem", { name: /^r/ })).toHaveCount(0)
     // Switch model is a chat page chord: no row, and the key opens no picker.
     await expect(chordBox.getByRole("menuitem", { name: /^m/ })).toHaveCount(0)
