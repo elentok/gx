@@ -416,6 +416,9 @@ func (l *launchTally) addTicket(win limits.StatsWindow, tk tickets.Ticket) {
 		l.days[i] = append(l.days[i], s.TotalMs)
 		l.steps["worktree"] = append(l.steps["worktree"], s.WorktreeMs)
 		l.steps["deps"] = append(l.steps["deps"], s.DepsMs)
+		if s.SetupMs > 0 {
+			l.steps["setup"] = append(l.steps["setup"], s.SetupMs)
+		}
 		l.steps["agent"] = append(l.steps["agent"], s.AgentMs)
 		l.steps["prompt"] = append(l.steps["prompt"], s.PromptMs)
 	}

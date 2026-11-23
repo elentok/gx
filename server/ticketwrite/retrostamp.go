@@ -55,6 +55,7 @@ func (w *Writer) stampLaunch(addr tickets.Address, ticketPath string) {
 		TotalMs:    lt.Total().Milliseconds(),
 		WorktreeMs: lt.Worktree.Milliseconds(),
 		DepsMs:     lt.Deps.Milliseconds(),
+		SetupMs:    lt.Setup.Milliseconds(),
 		AgentMs:    lt.Agent.Milliseconds(),
 		PromptMs:   lt.Prompt.Milliseconds(),
 	}

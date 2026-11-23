@@ -85,10 +85,29 @@ func launchWriter(t *testing.T) (*Writer, *runs.Registry) {
 func launchRun(reg *runs.Registry, address string, claimed time.Time) {
 	reg.Delete(address) // Put carries a replaced entry's timings over
 	reg.Put(runs.TrackedRun{Run: runs.Run{Address: address}, StartedAt: claimed})
-	for _, step := range []runs.LaunchStep{runs.StepCreatingWorktree, runs.StepInstallingDeps, runs.StepStartingAgent, runs.StepSendingPrompt} {
+	for _, step := range []runs.LaunchStep{runs.StepCreatingWorktree, runs.StepInstallingDeps, runs.StepRunningSetup, runs.StepStartingAgent, runs.StepSendingPrompt} {
 		reg.SetLaunchStep(address, step)
 	}
 	reg.EndLaunch(address)
+}
+
+func TestStampFinished_StampsSetupMs(t *testing.T) {
+	t.Parallel()
+	_, addr, path, _ := retroFixture(t, "")
+	w, reg := launchWriter(t)
+	reg.Put(runs.TrackedRun{
+		Run: runs.Run{Address: addr.String()}, StartedAt: time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC),
+		LaunchTimings: runs.LaunchTimings{Worktree: time.Second, Setup: 2500 * time.Millisecond},
+	})
+	w.stampLaunch(addr, path)
+
+	tk, err := schema.ParseTicket(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tk.Launch) != 1 || tk.Launch[0].SetupMs != 2500 {
+		t.Errorf("launch = %+v, want one stamp with SetupMs 2500", tk.Launch)
+	}
 }
 
 func TestStampFinished_LaunchedTwiceHasTwoEntries(t *testing.T) {

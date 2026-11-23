@@ -28,10 +28,10 @@ type launchStep struct {
 	parts map[string]time.Duration
 }
 
-// launchSteps names the four launch steps in the order they run.
-func launchSteps(ev runlog.Event) [4]launchStep {
-	return [4]launchStep{
-		{"worktree", ev.WorktreeStep, nil}, {"deps", ev.DepsStep, nil},
+// launchSteps names the five launch steps in the order they run.
+func launchSteps(ev runlog.Event) [5]launchStep {
+	return [5]launchStep{
+		{"worktree", ev.WorktreeStep, nil}, {"deps", ev.DepsStep, nil}, {"setup", ev.SetupStep, nil},
 		{"agent", ev.AgentStep, ev.AgentParts}, {"prompt", ev.PromptStep, ev.PromptParts},
 	}
 }

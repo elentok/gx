@@ -561,6 +561,22 @@ func TestStats_LaunchCountsEachLaunchOnItsClaimDay(t *testing.T) {
 	}
 }
 
+func TestStats_LaunchSetupStepAppearsOnlyWhenStampsHaveIt(t *testing.T) {
+	t.Parallel()
+	withSetup := launchYAML([2]int{1, 10000}) + "    setup_ms: 700\n"
+	withSetup2 := launchYAML([2]int{1, 10000}) + "    setup_ms: 900\n"
+	s := statsStore(t, func(store string) {
+		rigs.WriteProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": rigs.IssueMD("01", "done", "done_at: "+statsStamp(3)+"\n"+withSetup, "A"),
+			"02-b.md": rigs.IssueMD("02", "done", "done_at: "+statsStamp(3)+"\n"+withSetup2, "B"),
+			"03-c.md": rigs.IssueMD("03", "done", "done_at: "+statsStamp(3)+"\n"+launchYAML([2]int{1, 10000}), "C"),
+		})
+	})("?range=30")
+	if got := s.Launch.StepMedianMs["setup"]; got != 800 || len(s.Launch.StepMedianMs) != 5 {
+		t.Errorf("step medians = %v, want setup 800 over the two stamps with it, five steps", s.Launch.StepMedianMs)
+	}
+}
+
 func TestStats_LaunchExactlyAtTargetIsUnderTarget(t *testing.T) {
 	t.Parallel()
 	s := statsStore(t, func(store string) {

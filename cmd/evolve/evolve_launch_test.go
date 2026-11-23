@@ -69,6 +69,25 @@ func TestEvolveInputs_LaunchRowNamesSlowestPart(t *testing.T) {
 	}
 }
 
+func TestEvolveInputs_LaunchRowNamesSetupAsSlowestStep(t *testing.T) {
+	t.Parallel()
+	f := inputsFixture(t)
+	ev := runlog.Event{
+		Type: string(events.LaunchTimed), Ticket: "01", Total: 40 * time.Second,
+		DepsStep: 5 * time.Second, SetupStep: 30 * time.Second, PromptStep: 5 * time.Second,
+	}
+	if err := runlog.AppendEvent(filepath.Dir(f.epic), "epic", ev); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runEvolveInputs(f.env, &out, "proj:epic", false); err != nil {
+		t.Fatal(err)
+	}
+	if want := "launch: 01 40s, slowest step setup"; !strings.Contains(out.String(), want) {
+		t.Errorf("output missing %q:\n%s", want, out.String())
+	}
+}
+
 func TestEvolveInputs_SlowMedianLaunchRowPrintsNextToChecks(t *testing.T) {
 	t.Parallel()
 	f := inputsFixture(t)
