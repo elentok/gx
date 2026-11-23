@@ -5,6 +5,8 @@ import { afterEach, expect, test, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type { PostAnswer } from "../design/prompt"
 import {
+  BlockingDraft,
+  BlockingStarting,
   CardSourceClaudeDialog,
   CardSourceCodex,
   CardSourcePermission,
@@ -451,6 +453,16 @@ test("a gx-raised Actionable shows no gx stopped", async () => {
   await screen.findByText("hello there")
   expect(screen.queryByLabelText("gx stopped")).toBeNull()
 })
+
+test.each([BlockingDraft, BlockingStarting])(
+  "a %s blocking card shows on the Agents tab with Retry",
+  async (blocking) => {
+    render(session({ actionable: { gx_raised: true, reason: "never started", blocking } }), chat())
+    await screen.findByText("hello there")
+    expect(screen.getByLabelText("gx stopped").textContent).toContain("never started")
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy()
+  },
+)
 
 const BUTTONS: [string, string[]][] = [
   ["crashed", ["Restore"]],

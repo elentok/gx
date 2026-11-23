@@ -6,10 +6,10 @@ import { withKeys } from "../uniqueKeys"
 import { Modal } from "../ui/modal/Modal"
 import { refusalText, useWrite } from "../useWrite"
 import {
+  OWNER_TEXT,
   postTakeOver,
   subscribeOwner,
   useInputOwner,
-  type InputOwner,
   type SubscribeOwner,
   type TakeOver,
 } from "./inputOwner"
@@ -30,12 +30,6 @@ const KEYS: [label: string, key: string][] = [
   ["→", "right"],
   ["Ctrl+C", "ctrl+c"],
 ]
-
-const OWNER_TEXT: Record<InputOwner, string> = {
-  self: "Input: this client",
-  other: "Input: another client",
-  gx: "Input: gx is typing",
-}
 
 const keyLabel = (label: string) =>
   ({ "↑": "Up", "↓": "Down", "←": "Left", "→": "Right" })[label] ?? label

@@ -83,7 +83,8 @@ func (f *firstPrompt) startTimedOut() {
 	})
 	if prompt != "" {
 		f.releaseLaunchHold()
-		f.raise(prompt, fmt.Sprintf("agent still starting after %s", f.timeout))
+		f.log.Warn("first prompt failed", "reason", "agent still starting")
+		raiseBlocking(f.p, f.dir, fmt.Sprintf("agent still starting after %s", f.timeout), wire.BlockingStarting, []string{prompt})
 	}
 }
 
@@ -218,7 +219,7 @@ func (f *firstPrompt) Start(signal, prompt string) {
 			f.log.Debug(errNudgeCancelled.Error())
 		case errors.Is(err, ErrDraft):
 			f.log.Info("draft would not clear")
-			f.p.RaiseGxActionable(f.dir, DraftReason, []string{prompt})
+			raiseBlocking(f.p, f.dir, DraftReason, wire.BlockingDraft, []string{prompt})
 		case errors.Is(err, claudeui.ErrStuckSubmission), errors.Is(err, claudeui.ErrStartTimeout),
 			errors.Is(err, claudeui.ErrNotReadyToType), errors.Is(err, errSessionBlocked),
 			errors.Is(err, agentrunner.ErrNotDelivered):

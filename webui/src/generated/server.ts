@@ -3518,9 +3518,12 @@ export interface SessionUnread {
  * Kind is the block's kind on one derived from Blocked, which wins over an
  * agent-raised one while the block lasts. A "queue" Kind has no prompts: its
  * Target is the epic whose queue the Action runs. GxRaised marks one gx raised
- * itself: the person's input does not clear it.
+ * itself: the person's input does not clear it. Blocking names the two gx-raised
+ * cards that stop a prompt from landing, so clients offer Retry without matching
+ * Reason text.
  */
 export interface SessionActionable {
+  blocking?: string;
   kind?: string;
   reason?: string;
   action?: string[];
@@ -3540,6 +3543,12 @@ export interface SessionActionable {
    */
   derived?: boolean;
 }
+export const BlockingDraft = "draft";
+export const BlockingStarting = "starting";
+/**
+ * The Blocking values of a SessionActionable.
+ */
+export type Blocking = typeof BlockingDraft | typeof BlockingStarting;
 /**
  * SessionNoticeUntrustedRead: gx typed while the screen read was stale after a resize.
  */

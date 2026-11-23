@@ -69,6 +69,21 @@ func (p *Prompt) SendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 	return wire.SessionResult{Session: &info}, nil
 }
 
+// retryBlocking is the Retry button of a blocking gx card: it runs the unsent
+// steps as `a` does, whose first step clears the draft. It does not restart the
+// first-prompt path or wait for the first Idle. A plain function, so Prompt's
+// method count stays down.
+func retryBlocking(p *Prompt, req wire.SessionRequest) (wire.SessionResult, error) {
+	_, meta, res, err := p.sessions.SessionDir(req.ID)
+	if res.Refused || err != nil {
+		return res, err
+	}
+	if !meta.Actionable.GxRaised || meta.Actionable.Blocking == "" {
+		return sessions.Refusal(wire.ReasonSessionNoAction, fmt.Sprintf("session %s has no blocking card", req.ID)), nil
+	}
+	return p.RunSessionAction(req)
+}
+
 // actionRun follows the session's status on its own watch, not the saved
 // meta, which can still lag behind the Idle a step just saw.
 type actionRun struct {
@@ -105,7 +120,7 @@ func (p *Prompt) SendAction(dir, label string, action []string) {
 	case err == nil:
 	case errors.Is(err, ErrDraft):
 		p.log.Info("draft would not clear", "session", filepath.Base(dir), "unsent", len(action)-i)
-		p.RaiseGxActionable(dir, DraftReason, action[i:])
+		raiseBlocking(p, dir, DraftReason, wire.BlockingDraft, action[i:])
 	case errors.Is(err, ErrServerStopping), errors.Is(err, ErrWentBlocked), errors.Is(err, errNotIdle):
 		// Shutdown is not a failure, and Blocked or a busy session already shows.
 		p.log.Info(strings.ToLower(label)+" stopped", "session", filepath.Base(dir), "err", err)

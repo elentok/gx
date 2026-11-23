@@ -1,5 +1,6 @@
 import { Box, Text } from "@chakra-ui/react"
 import { useState } from "react"
+import { BlockingCard, isBlockingCard } from "../design/BlockingCard"
 import { ChatMessages, WorkingRow } from "../design/ChatCore"
 import { sheetCardsOf } from "../design/chat"
 import { FileLinkProvider } from "../files/FileLinkContext"
@@ -185,6 +186,7 @@ export function AgentChat({
           />
         )}
         <SessionNotices session={session} />
+        {!failure && isBlockingCard(session) && <BlockingCard session={session} onDone={refetch} />}
         {failure && !sheetCoversBlock(failure.kind, card) && (
           <FailureBanner
             failure={failure}

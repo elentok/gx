@@ -7,6 +7,7 @@ import { hasChat, roundKeyOf, roundOf } from "./chat"
 import { ChatMessages, WorkingRow, type WorkingStep } from "./ChatCore"
 import { TaskList } from "./TaskList"
 import type { AutoMenuState } from "./AutoMenu"
+import { BlockingCard, isBlockingCard } from "./BlockingCard"
 import { Composer } from "./Composer"
 import { FooterLine } from "./FooterLine"
 import { SwitchLine } from "./modelSwitch"
@@ -92,9 +93,11 @@ function ChatTail({
           {...actions}
         />
       )}
-      {!failure && session.actionable.gx_raised && session.actionable.reason && (
-        <GxStopped reason={session.actionable.reason} />
-      )}
+      {!failure && isBlockingCard(session) && <BlockingCard session={session} />}
+      {!failure &&
+        !isBlockingCard(session) &&
+        session.actionable.gx_raised &&
+        session.actionable.reason && <GxStopped reason={session.actionable.reason} />}
       {done || replacesComposer(failure) ? (
         <FooterLine session={session} />
       ) : (

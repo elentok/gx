@@ -313,6 +313,11 @@ func (p *Prompt) RaiseGxActionable(dir, reason string, action []string) {
 	p.raiseActionable(dir, wire.SessionActionable{Reason: reason, Action: action, GxRaised: true})
 }
 
+// raiseBlocking raises a gx Actionable that Retry can run again.
+func raiseBlocking(p *Prompt, dir, reason, blocking string, action []string) {
+	p.raiseActionable(dir, wire.SessionActionable{Reason: reason, Action: action, GxRaised: true, Blocking: blocking})
+}
+
 // raiseActionable is RaiseGxActionable for an Actionable with more than a
 // reason and prompts.
 func (p *Prompt) raiseActionable(dir string, a wire.SessionActionable) {

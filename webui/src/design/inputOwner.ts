@@ -11,6 +11,12 @@ import { readWrite } from "./open"
 
 export type InputOwner = "self" | "other" | "gx"
 
+export const OWNER_TEXT: Record<InputOwner, string> = {
+  self: "Input: this client",
+  other: "Input: another client",
+  gx: "Input: gx is typing",
+}
+
 /** Opens the attach event stream for one client; returns the function that closes it. */
 export type SubscribeOwner = (
   target: string,

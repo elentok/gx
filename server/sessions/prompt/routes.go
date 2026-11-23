@@ -102,8 +102,13 @@ func Routes(get func() *Prompt) []wire.Route {
 		},
 		{
 			Pattern: "POST /v1/sessions/run-action",
+			Web:     wire.WebWrite,
 			Handler: func(w http.ResponseWriter, r *http.Request) {
 				sessions.SessionWrite(get().RunSessionAction)(w, r)
+			},
+			WebHandler: func(w http.ResponseWriter, r *http.Request) {
+				p := get()
+				sessions.SessionWrite(func(req wire.SessionRequest) (wire.SessionResult, error) { return retryBlocking(p, req) })(w, r)
 			},
 		},
 	}

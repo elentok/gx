@@ -209,8 +209,11 @@ type SessionUnread struct {
 // Kind is the block's kind on one derived from Blocked, which wins over an
 // agent-raised one while the block lasts. A "queue" Kind has no prompts: its
 // Target is the epic whose queue the Action runs. GxRaised marks one gx raised
-// itself: the person's input does not clear it.
+// itself: the person's input does not clear it. Blocking names the two gx-raised
+// cards that stop a prompt from landing, so clients offer Retry without matching
+// Reason text.
 type SessionActionable struct {
+	Blocking string   `json:"blocking,omitempty"`
 	Kind     string   `json:"kind,omitempty"`
 	Reason   string   `json:"reason,omitempty"`
 	Action   []string `json:"action,omitempty"`
@@ -224,6 +227,12 @@ type SessionActionable struct {
 	// Derived marks one the server computed from a Design session's last turn.
 	Derived bool `json:"derived,omitempty"`
 }
+
+// The Blocking values of a SessionActionable.
+const (
+	BlockingDraft    = "draft"
+	BlockingStarting = "starting"
+)
 
 // The kinds of a session's non-blocking terminal issue.
 const (
