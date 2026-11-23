@@ -222,6 +222,7 @@ func TestPlacementPinsTable(t *testing.T) {
 	pin("Notifications/Notifications/Desktop", "agents.banners.enabled", "agents.sounds.enabled", "agents.sounds.done", "agents.sounds.attention")
 	pin("Notifications/Notifications/Telegram", "notifications.telegram.bot-token", "notifications.telegram.chat-id")
 	pin("Notifications/Notifications/Slack", "notifications.slack.webhook-url")
+	pin("Notifications/Notifications/Web push", "server.web.push-contact-email")
 	pin("Web UI/Access/Network", "server.web.listen", "server.web.allowed-hosts", "server.web.files.roots")
 	pin("Web UI/Access/Sign-in", "server.web.totp")
 	pin("Web UI/Keybindings/Leader key", "server.web.leader-key-mac", "server.web.leader-key")

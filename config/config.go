@@ -133,6 +133,9 @@ type WebConfig struct {
 	// on Mac and on other platforms. Empty turns chords off.
 	LeaderKeyMac string `json:"leader-key-mac"`
 	LeaderKey    string `json:"leader-key"`
+	// PushContactEmail is the one plain email address web push sends as its
+	// mailto: contact. Empty or invalid means web push is not startable.
+	PushContactEmail string `json:"push-contact-email" secret:"true"`
 }
 
 // DefaultRecentlyFinished is the RecentlyFinished when none is configured.
@@ -439,6 +442,9 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 		}
 		if w.LeaderKey != nil {
 			cfg.Server.Web.LeaderKey = *w.LeaderKey
+		}
+		if w.PushContactEmail != nil {
+			cfg.Server.Web.PushContactEmail = *w.PushContactEmail
 		}
 	}
 	if raw.Server != nil && raw.Server.TabEnv != nil {

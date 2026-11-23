@@ -69,6 +69,7 @@ func TestCoreEntries(t *testing.T) {
 		{key: Key("mental-health", "break", "work-minutes"), typ: TypeNumber, section: SectionMentalHealth},
 		{key: Key("mental-health", "break", "break-minutes"), typ: TypeNumber, section: SectionMentalHealth},
 		{key: Key("mental-health", "break", "message"), typ: TypeString, section: SectionMentalHealth},
+		{key: Key("server", "web", "push-contact-email"), typ: TypeSecret, section: n},
 	}
 	if got := len(r.All()); got != len(cases) {
 		t.Fatalf("entries = %d, want %d", got, len(cases))
@@ -88,6 +89,22 @@ func TestCoreEntries(t *testing.T) {
 		}
 		if e.Risky != (e.ConfirmText != "") {
 			t.Errorf("%v: risky and confirm text disagree", c.key)
+		}
+	}
+}
+
+func TestPushContactEmailEntry(t *testing.T) {
+	e, ok := Default().Lookup(Key("server", "web", "push-contact-email"))
+	if !ok || !e.WriteOnly() {
+		t.Fatalf("entry missing or not write-only: %v", ok)
+	}
+	for raw, ok := range map[string]bool{
+		`""`: true, `"me@example.com"`: true,
+		`"Me <me@example.com>"`: false, `"a@example.com, b@example.com"`: false, `"me@example.com "`: false,
+		`"mailto:me@example.com"`: false, `"nope"`: false, `5`: false,
+	} {
+		if err := CheckValue(e, json.RawMessage(raw), nil); (err == nil) != ok {
+			t.Errorf("%s: err = %v, want ok=%v", raw, err, ok)
 		}
 	}
 }

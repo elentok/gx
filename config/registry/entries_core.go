@@ -74,6 +74,8 @@ func coreEntries() []Entry {
 		Description: "The Telegram chat that receives notifications."})
 	add(Place{CategoryNotifications, SectionNotifications, "Slack"}, Entry{Key: Key("notifications", "slack", "webhook-url"), Type: TypeSecret,
 		Description: "The Slack webhook address that receives notifications."})
+	add(Place{CategoryNotifications, SectionNotifications, "Web push"}, Entry{Key: Key("server", "web", "push-contact-email"), Type: TypeSecret, CheckString: checkContactEmail,
+		Description: "The email address web push sends to the push service as its contact. Needed before the browser can turn on push. Empty turns web push off."})
 
 	mh := func(g string) Place { return Place{CategoryMentalHealth, SectionMentalHealth, g} }
 	add(mh("General"), Entry{Key: Key("mental-health", "enabled"), Type: TypeBool,

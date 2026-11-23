@@ -138,6 +138,9 @@ type Settings struct {
 	// and server.web.leader-key. Empty means chords are off.
 	WebLeaderKeyMac string
 	WebLeaderKey    string
+	// WebPushContact is config server.web.push-contact-email. A consumer asks
+	// webpush.ValidContact. Never log it.
+	WebPushContact string
 
 	// WebDevFrontend is config server.web.dev-frontend (Dev mode on).
 	WebDevFrontend bool
@@ -211,6 +214,7 @@ func FromConfig(cfg config.Config) Settings {
 		WebViEscape:                 cfg.Server.Web.ViEscape,
 		WebLeaderKeyMac:             cfg.Server.Web.LeaderKeyMac,
 		WebLeaderKey:                cfg.Server.Web.LeaderKey,
+		WebPushContact:              cfg.Server.Web.PushContactEmail,
 		WebDevFrontend:              cfg.Server.Web.DevFrontend,
 		WebDevDir:                   cfg.Server.Web.DevDir,
 	}

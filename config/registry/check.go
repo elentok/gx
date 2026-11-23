@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/mail"
 	"slices"
 	"strings"
 	"time"
@@ -119,6 +120,21 @@ func checkLeaderKey(s string) error {
 		return errors.New("Include cmd, ctrl or alt, for example cmd+e.")
 	}
 	return nil
+}
+
+// ValidContactEmail reports whether s is exactly one plain email address: no
+// display name, list, whitespace or mailto: prefix.
+func ValidContactEmail(s string) bool {
+	addr, err := mail.ParseAddress(s)
+	return err == nil && addr.Address == s
+}
+
+// checkContactEmail accepts "" (off) or one plain email address.
+func checkContactEmail(s string) error {
+	if s == "" || ValidContactEmail(s) {
+		return nil
+	}
+	return errors.New("Use one plain email address, such as me@example.com.")
 }
 
 // IsClock reports whether s is a 24-hour HH:MM time such as 07:30.

@@ -113,7 +113,7 @@ var tree = []CategoryDef{
 		{SectionEvolveRecovery, groups("Evolve", "Recovery")},
 	}},
 	{CategoryNotifications, []SectionDef{
-		{SectionNotifications, groups("Desktop", "Telegram", "Slack")},
+		{SectionNotifications, groups("Desktop", "Telegram", "Slack", "Web push")},
 	}},
 	{CategoryMentalHealth, []SectionDef{
 		{SectionMentalHealth, groups("General", "Bedtime", "Break")},

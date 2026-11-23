@@ -167,6 +167,7 @@ func changedKeys(old, next Settings) []string {
 		{"server.web.vi-escape", old.WebViEscape, next.WebViEscape},
 		{"server.web.leader-key-mac", old.WebLeaderKeyMac, next.WebLeaderKeyMac},
 		{"server.web.leader-key", old.WebLeaderKey, next.WebLeaderKey},
+		{"server.web.push-contact-email", old.WebPushContact, next.WebPushContact},
 		{"evolve", old.Evolve, next.Evolve},
 		{"recovery.enabled", old.RecoverySettings.Enabled, next.RecoverySettings.Enabled},
 		{"recovery.disabled", old.RecoverySettings.Disabled, next.RecoverySettings.Disabled},

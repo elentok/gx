@@ -565,6 +565,11 @@
               "description": "The address the web page is served on.",
               "type": "string"
             },
+            "push-contact-email": {
+              "default": "",
+              "description": "The email address web push sends to the push service as its contact. Needed before the browser can turn on push. Empty turns web push off.",
+              "type": "string"
+            },
             "totp": {
               "default": true,
               "description": "Ask for a one-time code when signing in to the web page.",

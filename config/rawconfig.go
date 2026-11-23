@@ -98,6 +98,8 @@ type rawConfig struct {
 
 			LeaderKeyMac *string `json:"leader-key-mac"`
 			LeaderKey    *string `json:"leader-key"`
+
+			PushContactEmail *string `json:"push-contact-email"`
 		} `json:"web"`
 	} `json:"server"`
 	AgentRunner       *string `json:"agent-runner"`

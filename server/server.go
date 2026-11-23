@@ -61,6 +61,7 @@ import (
 	"github.com/elentok/gx/server/tips"
 	"github.com/elentok/gx/server/triage"
 	"github.com/elentok/gx/server/web"
+	"github.com/elentok/gx/server/webpush"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/server/workspaces"
@@ -108,16 +109,18 @@ type Server struct {
 	// sessionChat reads the sessions' transcripts, commands, permissions and screens.
 	sessionChat *chat.Chat
 	// prompt holds the auto-advance countdowns and the turn settling.
-	prompt         *sessprompt.Prompt
-	webAttach      *webattach.Attaches
-	lock           *lifecycle.Lock
-	ln             net.Listener
-	http           *http.Server
-	web            *web.Web // the web listener; off unless Config.WebAddr is set and bound
-	vite           *devvite.Supervisor
-	viteServed     atomic.Bool // the web UI is served from Vite, so a swap away needs a reload; see devmode.go
-	logf           *lifecycle.RotatingFile
-	log            *slog.Logger
+	prompt     *sessprompt.Prompt
+	webAttach  *webattach.Attaches
+	lock       *lifecycle.Lock
+	ln         net.Listener
+	http       *http.Server
+	web        *web.Web // the web listener; off unless Config.WebAddr is set and bound
+	vite       *devvite.Supervisor
+	viteServed atomic.Bool // the web UI is served from Vite, so a swap away needs a reload; see devmode.go
+	logf       *lifecycle.RotatingFile
+	log        *slog.Logger
+	// vapid is the Web Push key pair, loaded once in New.
+	vapid          *webpush.Keys
 	idx            *index.Index
 	harness        *harnesschoice.Harness
 	settingsWriter *settingsapi.Writer
@@ -331,6 +334,14 @@ func New(cfg Config) (*Server, error) {
 	log := slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	warnIgnoredDevURL(log, cfg.ConfigPath)
 	idx := index.New(cfg.TicketStore, events, log)
+	// Task 03 wires the hook to the subscription store.
+	vapid, err := webpush.LoadOrCreate(cfg.StateDir, log, func(string) {})
+	if err != nil {
+		ln.Close()
+		_ = logf.Close()
+		lock.Release()
+		return nil, fmt.Errorf("load web push keys: %w", err)
+	}
 	registry, savedRuns, err := runs.Open(cfg.StateDir, log)
 	if err != nil {
 		ln.Close()
@@ -345,6 +356,8 @@ func New(cfg Config) (*Server, error) {
 		logf: logf,
 		log:  log,
 		idx:  idx,
+
+		vapid: vapid,
 
 		chat:     notify.NewServerChat(cfg.Chat),
 		registry: registry,

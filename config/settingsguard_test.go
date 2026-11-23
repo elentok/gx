@@ -19,8 +19,10 @@ const guardRule = `.ai/index.md "Adding a config key"`
 
 type guardInput struct {
 	Raw, Project, Config, Notifications reflect.Type
-	Entries                             []registry.Entry
-	Exclusions                          []registry.Exclusion
+	// Web is the server.web struct; nil skips its secret fields.
+	Web        reflect.Type
+	Entries    []registry.Entry
+	Exclusions []registry.Exclusion
 }
 
 type guardNode struct {
@@ -266,6 +268,9 @@ func settingsGuardProblems(in guardInput) []string {
 	out = append(out, checkSide("project.json", in.Project, project, registry.Entry.ProjectPath, exclProject, loaded)...)
 
 	want := secretKeys(in.Notifications, registry.Key("notifications"))
+	if in.Web != nil {
+		want = append(want, secretKeys(in.Web, registry.Key("server", "web"))...)
+	}
 	var have []string
 	for _, e := range in.Entries {
 		if e.WriteOnly() {
@@ -279,7 +284,7 @@ func settingsGuardProblems(in guardInput) []string {
 	}
 	for _, k := range have {
 		if !slices.Contains(want, k) {
-			out = append(out, `registry entry "`+k+`" is typed secret but its field lacks the secret:"true" tag. Add the tag to the field in config/notifications.go, or type the entry otherwise.`)
+			out = append(out, `registry entry "`+k+`" is typed secret but its field lacks the secret:"true" tag. Add the tag to the field in config/notifications.go or config/config.go, or type the entry otherwise.`)
 		}
 	}
 	slices.Sort(out)
@@ -290,7 +295,7 @@ func realGuardInput() guardInput {
 	return guardInput{
 		Raw: reflect.TypeOf(rawConfig{}), Project: reflect.TypeOf(ProjectFile{}),
 		Config: reflect.TypeOf(Config{}), Notifications: reflect.TypeOf(NotificationsConfig{}),
-		Entries: registry.Default().All(), Exclusions: registry.Exclusions(),
+		Web: reflect.TypeOf(WebConfig{}), Entries: registry.Default().All(), Exclusions: registry.Exclusions(),
 	}
 }
 
