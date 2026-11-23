@@ -27,12 +27,12 @@ func TestWriterPush_ConflictChildPauseSendsOnePush(t *testing.T) {
 	parentPath := filepath.Join(t.TempDir(), "epic-a", "issues", "01-first.md")
 	sink := w.FinishSink(tickets.Address{Project: "proj", Epic: "epic-a", ID: "01"}, parentPath)
 
-	sink.TicketNeedsHuman("01", "epic-a", "needs-repair", events.IterationError, "the parent")
+	sink.TicketNeedsHuman("01", "epic-a", "paused", events.IterationError, "the parent")
 	if len(rec.sent) != 0 {
 		t.Fatalf("the parent's own pause pushed %+v, want none", rec.sent)
 	}
 
-	sink.TicketNeedsHuman("01a", "epic-a", "needs-repair", events.IterationError, "boom")
+	sink.TicketNeedsHuman("01a", "epic-a", "paused", events.IterationError, "boom")
 	if len(rec.sent) != 1 {
 		t.Fatalf("pushes = %+v, want one for the child", rec.sent)
 	}

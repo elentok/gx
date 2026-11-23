@@ -137,7 +137,7 @@ func run(args []string) (err error) {
 		return err
 	}
 	defer stopCapture()
-	stopPush, err := f.startPushService(&o, sc)
+	stopPush, err := startPushService(f, &o, sc)
 	if err != nil {
 		return err
 	}

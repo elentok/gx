@@ -87,7 +87,7 @@ func TestRecoveryPush_PauseSendsChatWordsWithOrWithoutChat(t *testing.T) {
 				t.Fatalf("pushes = %+v, want one", got)
 			}
 			path := filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "01-first.md")
-			title, body := notify.PauseText("epic-a", path, "01", "needs-repair", ticketwrite.PauseChatDetail(path, events.IterationError, "boom"))
+			title, body := notify.PauseText("epic-a", path, "01", "paused", ticketwrite.PauseChatDetail(path, events.IterationError, "boom"))
 			want := servertest.Push{Title: title, Body: body, Path: "/t/proj:epic-a/01", Tag: "ticket:proj:epic-a/01", Urgent: false}
 			if got[0] != want {
 				t.Errorf("push = %+v, want %+v", got[0], want)
