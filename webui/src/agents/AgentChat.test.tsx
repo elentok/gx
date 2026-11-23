@@ -454,6 +454,20 @@ test("a gx-raised Actionable shows no gx stopped", async () => {
   expect(screen.queryByLabelText("gx stopped")).toBeNull()
 })
 
+test("a delivery card shows on the Agents tab with its copy text", async () => {
+  const actionable = {
+    gx_raised: true,
+    reason: "not sure",
+    kind: "maybe-sent",
+    copy_text: "/model x",
+  }
+  render(session({ actionable }), chat())
+  await screen.findByText("hello there")
+  const card = screen.getByRole("region", { name: "May not have been sent" })
+  expect(card.textContent).toContain("/model x")
+  expect(screen.queryByLabelText("gx stopped")).toBeNull()
+})
+
 test.each([BlockingDraft, BlockingStarting])(
   "a %s blocking card shows on the Agents tab with Retry",
   async (blocking) => {

@@ -8,6 +8,7 @@ import { ChatMessages, WorkingRow, type WorkingStep } from "./ChatCore"
 import { TaskList } from "./TaskList"
 import type { AutoMenuState } from "./AutoMenu"
 import { BlockingCard, isBlockingCard } from "./BlockingCard"
+import { DeliveryCard, isDeliveryCard } from "./DeliveryCard"
 import { Composer } from "./Composer"
 import { FooterLine } from "./FooterLine"
 import { SwitchLine } from "./modelSwitch"
@@ -94,8 +95,10 @@ function ChatTail({
         />
       )}
       {!failure && isBlockingCard(session) && <BlockingCard session={session} />}
+      {!failure && isDeliveryCard(session) && <DeliveryCard session={session} />}
       {!failure &&
         !isBlockingCard(session) &&
+        !isDeliveryCard(session) &&
         session.actionable.gx_raised &&
         session.actionable.reason && <GxStopped reason={session.actionable.reason} />}
       {done || replacesComposer(failure) ? (

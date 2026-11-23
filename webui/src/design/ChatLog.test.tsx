@@ -951,6 +951,13 @@ test("Questions keeps the gx stopped notice", async () => {
   expect(screen.getByRole("region", { name: "gx stopped" })).toBeTruthy()
 })
 
+test("a delivery card shows once, without the gx stopped notice", async () => {
+  const actionable = { gx_raised: true, reason: "failed", kind: "send-failed", copy_text: "hi" }
+  renderChat([session({ actionable })], focusChat())
+  await screen.findByRole("region", { name: "Send failed" })
+  expect(screen.queryByRole("region", { name: "gx stopped" })).toBeNull()
+})
+
 test("the Chat view has no sheet; the Questions view's sheet has no fold chevron and no focus button", async () => {
   renderChat([session()], focusChat())
   const sheet = await screen.findByRole("group", { name: "Questions" })

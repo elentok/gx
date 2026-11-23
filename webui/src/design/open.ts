@@ -72,6 +72,7 @@ export const postTarget =
   }
 
 export const postStopSession: StopSession = postTarget("/v1/sessions/stop")
+export const postDismissSession = postJson("/v1/sessions/dismiss")
 export type RenameSession = (body: SessionRenameRequest) => Promise<SessionResult>
 export const postRenameSession: RenameSession = postJson("/v1/sessions/rename")
 export const postResumeSession: ResumeSession = postJson("/v1/sessions/resume")
