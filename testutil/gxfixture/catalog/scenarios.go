@@ -758,6 +758,10 @@ var Scenarios = map[string]scenario{
 	"agents-images": agentsImagesScenario(),
 	// deliver-cards: three idle Claude chats for the three delivery-failure cards. See deliverCardsScenario.
 	"deliver-cards": deliverCardsScenario(),
+	// deliver-launch-*: a project with no session and one fake knob each. See deliverLaunchScenario.
+	"deliver-launch-undecided":     deliverLaunchScenario(agentfake.TUIUndecidedEnv + "=1"),
+	"deliver-launch-rejected":      deliverLaunchScenario(agentfake.TUIUnknownSkillEnv + "=1"),
+	"deliver-launch-never-started": deliverLaunchScenario(agentfake.TUINoPidFileEnv + "=1"),
 	// host-files: demo's repo files, a second worktree, a mock page with a second origin and a
 	// chat that links them. -shape no-main-worktree checks out demo's trunk nowhere.
 	"host-files": hostFilesScenario(),
