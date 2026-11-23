@@ -49,6 +49,11 @@ func (as *Attaches) inputWrite(w http.ResponseWriter, r *http.Request) {
 	case req.Key != nil && req.Paste == "":
 		res, err = as.Key(req.ID, req.Client, screen.Key{Code: rune(req.Key.Code), Text: req.Key.Text, Mod: screen.KeyMod(req.Key.Mod)})
 	case req.Paste != "" && req.Key == nil:
+		// The same bang rule as the prompt and keys routes.
+		if _, refused := wire.ValidatePromptText(req.Paste, "text"); refused != nil {
+			wire.WriteJSON(w, *refused)
+			return
+		}
 		res, err = as.Paste(req.ID, req.Client, req.Paste)
 	default:
 		res = sessions.Refusal(wire.ReasonSessionBadRequest, "send exactly one of key and paste")

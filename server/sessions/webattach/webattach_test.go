@@ -222,6 +222,7 @@ func TestWebAttach_Refusals(t *testing.T) {
 		"no input":        {ID: f.ID, Client: "tab-a"},
 		"two inputs":      {ID: f.ID, Client: "tab-a", Paste: "x", Key: &wire.AttachKey{Code: 'a'}},
 		"long client":     {ID: f.ID, Client: strings.Repeat("c", 65), Paste: "x"},
+		"bang prefix":     {ID: f.ID, Client: "tab-a", Paste: "!x"},
 	}
 	for name, req := range cases {
 		if res := post(t, f, "/v1/sessions/attach/input", req); !res.Refused {

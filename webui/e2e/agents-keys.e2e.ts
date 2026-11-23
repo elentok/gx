@@ -31,6 +31,13 @@ const KEYS: [name: string, cli: string, bytes: string][] = [
 const readSince = async (fixture: Fixture, conv: string, before: string) =>
   (await fixture.input(conv)).slice(before.length)
 
+// The modal also holds the `Input: this client` status, so pick the notice by its text.
+const unchangedNotice = (page: Page) =>
+  screenDialog(page).getByRole("status").filter({ hasText: "Screen unchanged" })
+
+// Type pastes through the attach, so the child sees a bracketed paste.
+const pasted = (text: string) => `\x1b[200~${text}\x1b[201~`
+
 /** Counts the screen reads the page makes. */
 function countScreenReads(page: Page) {
   let reads = 0
@@ -61,7 +68,7 @@ const expectMarkedRow = async (page: Page, text: string) => {
 /** The key leaves the screen as it was: the modal says so and no row is marked. */
 const expectScreenUnchanged = async (page: Page, key: string) => {
   await keyButton(page, key).click()
-  await expect(screenDialog(page).getByRole("status")).toHaveText("Screen unchanged")
+  await expect(unchangedNotice(page)).toBeVisible()
   await expect(
     screenDialog(page).getByLabel("Screen rows").locator("span").filter({ hasText: /\S/ }).first(),
   ).not.toHaveCSS("font-weight", "700")
@@ -81,20 +88,22 @@ test("156. Key bar and Type field in the screen view", async ({ page, start }) =
 
   // Type sends the text and no Enter; Enter is a key of its own. The reply carries the settled
   // screen with no Refresh click and no further read. A working fake draws no typed text, so the
-  // screen it settles on is the one the page already shows.
+  // screen it settles on is the one the page already shows. The attach input returns no rows, so
+  // each Type or key is followed by exactly one screen read.
   let before = await fixture.input(conv)
   let seen = reads()
   await typeBox(page).fill("hello")
   await typeButton(page).click()
-  await expect.poll(() => readSince(fixture, conv, before)).toBe("hello")
+  await expect.poll(() => readSince(fixture, conv, before)).toBe(pasted("hello"))
   await expect(typeBox(page)).toHaveValue("")
-  await expect(screenDialog(page).getByRole("status")).toHaveText("Screen unchanged")
-  expect(reads()).toBe(seen)
+  await expect(unchangedNotice(page)).toBeVisible()
+  await expect.poll(reads).toBe(seen + 1)
   expect(await readSince(fixture, conv, before)).not.toContain("\r")
 
   // A key that leaves the screen as it was says so too, and nothing is marked.
   await expectScreenUnchanged(page, "Left")
-  expect(reads()).toBe(seen)
+  await expect.poll(reads).toBe(seen + 2)
+  seen = reads()
 
   // Refresh is one plain read, with no key sent.
   before = await fixture.input(conv)
@@ -108,10 +117,9 @@ test("156. Key bar and Type field in the screen view", async ({ page, start }) =
     seen = reads()
     await keyButton(page, name).click()
     await expect.poll(() => readSince(fixture, conv, before)).toBe(bytes)
-    // Each key's response carries the rows, so the page does not read the screen again.
     if (name === "Ctrl+C") continue
     await expect(keyButton(page, name)).toBeEnabled()
-    expect(reads()).toBe(seen)
+    await expect.poll(reads).toBe(seen + 1)
   }
 
   await expect.poll(() => stateOf(fixture, stalled.id)).toBe("idle")
@@ -208,12 +216,11 @@ test("160. Phone, key input and Blocked notices", async ({ page, start }) => {
   ).toBe(true)
   expect(await pageFits()).toBe(true)
 
-  // The dialog hides typed text, so Type settles on the rows already shown: the modal says so, with no Refresh.
+  // A key the dialog ignores settles on the rows already shown: the modal says so, after one read.
+  // (Typed text and arrows are not used here: the fake reads their leading Esc as a denial of the dialog.)
   const reads = countScreenReads(page)
-  await typeBox(page).fill("go on")
-  await typeButton(page).click()
-  await expect(screenDialog(page).getByRole("status")).toHaveText("Screen unchanged")
-  expect(reads()).toBe(0)
+  await expectScreenUnchanged(page, "Tab")
+  await expect.poll(reads).toBe(1)
   await expect(rows).toContainText("long-row")
 
   // The keys are at least 44px tall and wrap onto more than one line.
