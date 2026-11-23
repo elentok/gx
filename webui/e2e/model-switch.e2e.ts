@@ -519,12 +519,14 @@ test("205. Model switch", async ({ page, start }) => {
   await go(page, "#/d/demo:switch-design")
   await expect(queuing).toHaveCount(0)
 
-  // Story 19: with the model query failing, only the current model is listed.
+  // Story 19: with the model query failing, the server keeps its last good list, so the picker still lists
+  // it. (A page that never got a list shows only the current model while it loads; that state is transient,
+  // so a flow cannot wait on it.)
   await editFakes(fixture, (cfg) => {
     cfg.modelsFail = true
   })
-  dialog = await openPicker(page, claudeFresh, 1)
-  await expect(dialog.getByRole("radiogroup", nav("Model")).getByRole("radio")).toHaveText(
+  dialog = await openPicker(page, claudeFresh, 6)
+  await expect(dialog.getByRole("radio", { name: /mystery-model/ })).toHaveText(
     /^Claude mystery-model\s*current$/,
   )
 })
