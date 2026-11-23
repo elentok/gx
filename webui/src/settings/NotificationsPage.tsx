@@ -6,10 +6,13 @@ import { PageIcon } from "../page/PageIcon"
 import {
   decodeKey,
   refreshPushDevice,
+  setKeyChanged,
+  subscriptionBody,
   subscriptionHasKey,
   usePushDevice,
   type PushDevice,
 } from "../push/deviceState"
+import { disabledReason } from "../push/reason"
 import { fetchPushState, removePush, subscribePush, testPush } from "../push/pushApi"
 import { useReady } from "../useReady"
 import { BackLink, Chevron, Frame, rowProps } from "./parts"
@@ -33,14 +36,10 @@ async function turnOn(): Promise<string | undefined> {
     sub = null
   }
   sub ??= await pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key })
-  const { endpoint, keys } = sub.toJSON()
-  const out = await subscribePush({
-    endpoint: endpoint ?? sub.endpoint,
-    p256dh: keys?.p256dh ?? "",
-    auth: keys?.auth ?? "",
-    vapid_key: publicKey,
-  })
-  return out.refused ? out.message : undefined
+  const out = await subscribePush(subscriptionBody(sub, publicKey))
+  if (out.refused) return out.message
+  setKeyChanged(false)
+  return undefined
 }
 
 async function turnOff(): Promise<string | undefined> {
@@ -101,9 +100,17 @@ function SwitchButton({
   )
 }
 
-const Message = ({ tone, children }: { tone: "ok" | "warn"; children: string }) => (
+const Message = ({
+  part,
+  tone,
+  children,
+}: {
+  part: "test-result" | "reason"
+  tone: "ok" | "warn"
+  children: string
+}) => (
   <Text
-    data-mock-part="test-result"
+    data-mock-part={part}
     role="status"
     mt="3"
     px="3"
@@ -111,7 +118,7 @@ const Message = ({ tone, children }: { tone: "ok" | "warn"; children: string }) 
     fontSize="sm"
     borderWidth="1px"
     borderRadius="md"
-    borderColor="border"
+    borderColor={tone === "ok" ? "#1f5a35" : "#6b5316"}
     bg="surface.raised"
     color={tone === "ok" ? "tone.done.fg" : "tone.waiting.fg"}
   >
@@ -135,6 +142,8 @@ export function NotificationsView({
   onTest: () => void
 }) {
   const { on } = device
+  const reason = disabledReason(device)
+  const failedAt = device.failureAt ? new Date(device.failureAt) : undefined
   return (
     <Frame>
       <BackLink />
@@ -147,12 +156,27 @@ export function NotificationsView({
           <Box flex="1" minW="0">
             <Text fontWeight="600">{SWITCH_LABEL}</Text>
             <Text fontSize="sm" color="text.muted">
-              {on ? `On for “${device.loginName ?? ""}”.` : SWITCH_OFF_TEXT}
+              {on ? `On for “${device.loginName ?? ""}”.` : (reason?.line ?? SWITCH_OFF_TEXT)}
             </Text>
+            {device.failureReason && (
+              <Text fontSize="sm" color="tone.waiting.fg">
+                Last push failed: {device.failureReason}
+                {failedAt && `, ${failedAt.toLocaleString()}`}
+              </Text>
+            )}
           </Box>
-          <SwitchButton on={on} disabled={busy || !device.supported} onToggle={onToggle} />
+          <SwitchButton
+            on={on}
+            disabled={busy || !!reason?.disabled || !device.supported}
+            onToggle={onToggle}
+          />
         </Box>
       </Card>
+      {reason?.message && (
+        <Message part="reason" tone="warn">
+          {reason.message}
+        </Message>
+      )}
       {error && (
         <Text role="alert" mt="3" fontSize="sm" color="tone.deadlocked.fg">
           {error}
@@ -169,7 +193,11 @@ export function NotificationsView({
           <Chevron />
         </chakra.button>
       </Card>
-      {testMessage && <Message tone={testMessage.ok ? "ok" : "warn"}>{testMessage.text}</Message>}
+      {testMessage && (
+        <Message part="test-result" tone={testMessage.ok ? "ok" : "warn"}>
+          {testMessage.text}
+        </Message>
+      )}
     </Frame>
   )
 }
@@ -206,6 +234,7 @@ export function NotificationsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.")
     } finally {
+      await refreshPushDevice()
       setBusy(false)
     }
   }

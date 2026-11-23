@@ -8,6 +8,8 @@ import {
   type ConnectionDeps,
 } from "./connection"
 import { pruneDrafts } from "./drafts"
+import { refreshPushDevice } from "./push/deviceState"
+import { runOpenChecks } from "./push/openChecks"
 import { routeHashLinkClicks } from "./nav/hashLinks"
 import { setTapRouter } from "./pwa/notificationTap"
 import { useRestHeartbeat } from "./rest"
@@ -41,6 +43,9 @@ export function App({ deps, fetchDetail }: { deps?: ConnectionDeps; fetchDetail?
   useEffect(() => routeHashLinkClicks(router), [router])
   useEffect(() => setTapRouter(router), [router])
   useEffect(() => trackRouter(router), [router])
+  useEffect(() => {
+    void runOpenChecks().finally(refreshPushDevice)
+  }, [])
   return (
     <ConnectionContext.Provider value={conn}>
       <RestHeartbeat />

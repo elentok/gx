@@ -36,5 +36,7 @@ export async function fetchPushState(): Promise<PushState> {
 }
 
 export const subscribePush = (body: SubscriptionBody) => post("/v1/web/push/subscribe", body)
+export const renewPush = (body: SubscriptionBody & { old_endpoint: string }) =>
+  post("/v1/web/push/renew", body)
 export const removePush = () => post("/v1/web/push/remove")
 export const testPush = () => post("/v1/web/push/test")

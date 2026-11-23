@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react"
 import { fetchLogins } from "../settings/logins"
-import { fetchPushState } from "./pushApi"
+import { fetchPushState, type SubscriptionBody } from "./pushApi"
 
 export interface PushDevice {
   supported: boolean
@@ -13,6 +13,13 @@ export interface PushDevice {
   keyMatches: boolean
   /** The name of the login of this device. */
   loginName: string | undefined
+  /** The server has a contact email, so it can sign pushes. */
+  contactSet: boolean
+  /** The reason and time of the last failed send, until the next success. */
+  failureReason: string | undefined
+  failureAt: string | undefined
+  /** An open-time check dropped this device's subscription because the server key changed. */
+  keyChanged: boolean
   on: boolean
 }
 
@@ -23,7 +30,40 @@ const OFF: PushDevice = {
   serverRecord: false,
   keyMatches: false,
   loginName: undefined,
+  contactSet: true,
+  failureReason: undefined,
+  failureAt: undefined,
+  keyChanged: false,
   on: false,
+}
+
+const KEY_CHANGED = "gx.push.keyChanged"
+
+export function readKeyChanged(): boolean {
+  try {
+    return localStorage.getItem(KEY_CHANGED) === "1"
+  } catch {
+    return false
+  }
+}
+
+export function setKeyChanged(changed: boolean) {
+  try {
+    if (changed) localStorage.setItem(KEY_CHANGED, "1")
+    else localStorage.removeItem(KEY_CHANGED)
+  } catch {
+    // The page works without storage; the reason is only shown this session.
+  }
+}
+
+export function subscriptionBody(sub: PushSubscription, vapidKey: string): SubscriptionBody {
+  const { endpoint, keys } = sub.toJSON()
+  return {
+    endpoint: endpoint ?? sub.endpoint,
+    p256dh: keys?.p256dh ?? "",
+    auth: keys?.auth ?? "",
+    vapid_key: vapidKey,
+  }
 }
 
 let current = OFF
@@ -80,6 +120,10 @@ export async function refreshPushDevice(): Promise<void> {
       serverRecord,
       keyMatches,
       loginName: logins.find((l) => l.this_device)?.name,
+      contactSet: state.contact_set,
+      failureReason: state.last_failure?.reason,
+      failureAt: state.last_failure?.at,
+      keyChanged: readKeyChanged(),
       on: permission === "granted" && browserSub && serverRecord && keyMatches,
     })
   } catch {
