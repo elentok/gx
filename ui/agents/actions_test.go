@@ -456,7 +456,7 @@ func TestActions_WhichKeyListsThem(t *testing.T) {
 	m := actionModel(t, &fakeSessionClient{}, "live")
 	m = update1(t, m, ctrlA)
 	view := plainView(m)
-	for _, want := range []string{"stop session", "remove session", "restore session", "run action"} {
+	for _, want := range []string{"stop session", "remove session", "restore session", "run action", "copy card text"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("which-key lacks %q:\n%s", want, view)
 		}

@@ -134,7 +134,7 @@ func TestLeader_WhichKeyBoxWhileWaiting(t *testing.T) {
 		t.Fatal("which-key box shown before the leader")
 	}
 	m = update1(t, m, ctrlA)
-	if view := plainView(m); !strings.Contains(view, "next session") || !strings.Contains(view, "toggle sidebar") {
+	if view := plainView(m); !strings.Contains(view, "next session") || !strings.Contains(view, "next needing attention") {
 		t.Fatalf("which-key box missing while waiting:\n%s", view)
 	}
 	m = update1(t, m, esc)

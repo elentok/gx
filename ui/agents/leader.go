@@ -34,6 +34,7 @@ var leaderBindings = []keys.Binding{
 	{Seq: []string{"r"}, Title: "restore session"},
 	{Seq: []string{"a"}, Title: "run action"},
 	{Seq: []string{"["}, Title: "copy mode"},
+	{Seq: []string{"y"}, Title: "copy card text"},
 	{Seq: []string{"n"}, Title: "next session"},
 	{Seq: []string{"p"}, Title: "previous session"},
 	{Seq: []string{"u"}, Title: "next needing attention"},
@@ -181,6 +182,12 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "[":
 		return m.enterCopyMode()
+	case "y":
+		s, ok := m.selected()
+		if !ok || !s.Actionable.IsDelivery() {
+			return m, notify.Info("no card text to copy")
+		}
+		return m, terminal.WriteCopied(m.clipWrite, s.Actionable.CopyText)
 	case "n":
 		m.cursor = m.sidebar.stepCursor(m.sidebarInput(), 1)
 	case "p":

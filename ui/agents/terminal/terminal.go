@@ -33,9 +33,16 @@ func infoLines(s wire.SessionInfo, now time.Time) []string {
 // way to cancel.
 func InfoRow(s wire.SessionInfo, now time.Time) string {
 	if s.Actionable.Reason != "" {
-		row := agentstyle.Reason.Render(s.Actionable.Reason)
-		if len(s.Actionable.Action) > 0 {
-			row += agentstyle.Action.Render("  <leader> a: " + strings.Join(s.Actionable.Action, " → "))
+		var row string
+		if s.Actionable.Kind == wire.DeliveryMaybeSent {
+			text := strings.Join(strings.Fields(s.Actionable.CopyText), " ")
+			row = agentstyle.Detail.Render("May not have been sent: "+text) +
+				agentstyle.Action.Render("  see the screen · <leader> y: copy · no resend")
+		} else {
+			row = agentstyle.Reason.Render(s.Actionable.Reason)
+			if len(s.Actionable.Action) > 0 {
+				row += agentstyle.Action.Render("  <leader> a: " + strings.Join(s.Actionable.Action, " → "))
+			}
 		}
 		if s.AutoAdvanceAt != nil {
 			left := max(s.AutoAdvanceAt.Sub(now), 0)
