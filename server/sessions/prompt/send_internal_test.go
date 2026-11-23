@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/sessions/prompt/renameslot"
 )
 
 func newLockPrompt() *Prompt {
@@ -250,27 +251,27 @@ func TestRenameCommandArg(t *testing.T) {
 }
 
 func TestRenameSlots_OnlyANewerRequestOwnsTheSlot(t *testing.T) {
-	var s renameSlots
-	a := s.put("s1", "/rename A")
-	b := s.put("s1", "/rename B")
-	if s.owns("s1", a) || !s.owns("s1", b) {
-		t.Fatalf("owns(a)=%v owns(b)=%v, want only the newer", s.owns("s1", a), s.owns("s1", b))
+	var s renameslot.Slots
+	a := s.Put("s1", "/rename A")
+	b := s.Put("s1", "/rename B")
+	if s.Owns("s1", a) || !s.Owns("s1", b) {
+		t.Fatalf("owns(a)=%v owns(b)=%v, want only the newer", s.Owns("s1", a), s.Owns("s1", b))
 	}
-	s.settle("s1", a) // the older request finishing must not empty B's command
-	if _, got := s.current("s1"); got != "/rename B" {
+	s.Settle("s1", a) // the older request finishing must not empty B's command
+	if _, got := s.Current("s1"); got != "/rename B" {
 		t.Errorf("held = %q, want B kept", got)
 	}
-	s.settle("s1", b)
-	if _, got := s.current("s1"); got != "" {
+	s.Settle("s1", b)
+	if _, got := s.Current("s1"); got != "" {
 		t.Errorf("held = %q, want empty once B settled", got)
 	}
 }
 
 func TestRenameSlots_EmptyRequestSupersedesAParkedOne(t *testing.T) {
-	var s renameSlots
-	s.put("s1", "/rename A")
-	s.put("s1", "")
-	if _, got := s.current("s1"); got != "" {
+	var s renameslot.Slots
+	s.Put("s1", "/rename A")
+	s.Put("s1", "")
+	if _, got := s.Current("s1"); got != "" {
 		t.Errorf("held = %q, want the held command replaced", got)
 	}
 }
@@ -281,7 +282,7 @@ func TestForgetSession_DropsLockAndRenameSlotEvenWhileTyping(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.renames.put("s1", "/rename A")
+	p.renames.Put("s1", "/rename A")
 
 	ForgetSession(p, "s1")
 	ForgetSession(p, "never-used")
@@ -290,9 +291,7 @@ func TestForgetSession_DropsLockAndRenameSlotEvenWhileTyping(t *testing.T) {
 	p.typingLocks.mu.Lock()
 	_, hasLock := p.typingLocks.chats["s1"]
 	p.typingLocks.mu.Unlock()
-	p.renames.mu.Lock()
-	_, hasSlot := p.renames.chats["s1"]
-	p.renames.mu.Unlock()
+	hasSlot := p.renames.Has("s1")
 	if hasLock || hasSlot {
 		t.Errorf("after forget: lock entry %v, rename slot %v, want both gone", hasLock, hasSlot)
 	}
@@ -303,9 +302,9 @@ func TestForgetSession_DropsLockAndRenameSlotEvenWhileTyping(t *testing.T) {
 func TestFinishRename_BlockedAtSendKeepsTheCommandAndClaimsTheWatcher(t *testing.T) {
 	p := newLockPrompt()
 	p.sessions.Watches.Close() // Start then runs nothing, so the claim stays visible
-	seq := p.renames.put("s1", "/rename B")
+	seq := p.renames.Put("s1", "/rename B")
 	(namer{p}).finishRename("/dir/s1", "s1", seq, "/rename B", errRenameBlocked)
-	if _, got := p.renames.current("s1"); got != "/rename B" || p.renames.claimWatch("s1") {
+	if _, got := p.renames.Current("s1"); got != "/rename B" || p.renames.ClaimWatch("s1") {
 		t.Errorf("held = %q, want the command kept with a claimed watcher", got)
 	}
 }

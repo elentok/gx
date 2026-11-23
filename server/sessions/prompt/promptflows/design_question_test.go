@@ -1,9 +1,6 @@
-package prompt_test
+package promptflows_test
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -38,34 +35,6 @@ func startQuestionRig(t *testing.T, afk bool) *questionRig {
 		t.Fatal(err)
 	}
 	return &questionRig{f: f, chat: chat, started: started, gate: gate}
-}
-
-// writeRounds writes n Grilling rounds to the transcript, each but the last
-// answered by the person.
-func writeRounds(t *testing.T, path string, n int) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	file, err := os.Create(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
-	enc := json.NewEncoder(file)
-	base := time.Now().Add(-time.Hour)
-	for i := 1; i <= n; i++ {
-		stamp := base.Add(time.Duration(i) * time.Minute).UTC().Format(time.RFC3339Nano)
-		lines := []map[string]any{{"type": "assistant", "uuid": fmt.Sprintf("round-%d", i), "timestamp": stamp, "message": map[string]any{"role": "assistant", "content": []map[string]any{{"type": "text", "text": fmt.Sprintf("❓ **Q1** - **Store**: Which store for round %d?", i)}}}}}
-		if i < n {
-			lines = append(lines, map[string]any{"type": "user", "uuid": fmt.Sprintf("answer-%d", i), "timestamp": stamp, "message": map[string]any{"role": "user", "content": "the first"}})
-		}
-		for _, line := range lines {
-			if err := enc.Encode(line); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
 }
 
 // askRound ends a turn whose transcript holds n rounds, the last one waiting.
@@ -209,3 +178,7 @@ func TestDesignQuestion_ABlockedSessionInAFKStillGetsItsAlert(t *testing.T) {
 		t.Errorf("posts = %q, want the Blocked alert and no Question", posts)
 	}
 }
+
+var waitAlerts = servertest.WaitAlerts
+
+var writeRounds = rigs.WriteRounds

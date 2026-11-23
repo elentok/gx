@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/server/projects"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/sessions/chat"
+	"github.com/elentok/gx/server/sessions/prompt/renameslot"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
 )
@@ -141,7 +142,7 @@ type Prompt struct {
 	autoAdvances autoAdvances
 	autoQueues   autoAdvances
 	typingLocks  typingLocks
-	renames      renameSlots
+	renames      renameslot.Slots
 
 	// imageMu orders the numbering of a session's Prompt images.
 	imageMu sync.Mutex

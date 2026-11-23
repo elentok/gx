@@ -69,13 +69,13 @@ func (p namer) sendRename(dir string, seq uint64, command string) {
 // finishRename settles a send. A chat that turned Blocked keeps its command held.
 func (p namer) finishRename(dir, id string, seq uint64, command string, err error) {
 	if errors.Is(err, errRenameSkip) {
-		if errors.Is(err, errRenameBlocked) && p.renames.claimWatch(id) {
+		if errors.Is(err, errRenameBlocked) && p.renames.ClaimWatch(id) {
 			p.sessions.Watches.Start(func() { p.holdRename(dir) })
 		}
 		return
 	}
 	if err == nil {
-		p.renames.settle(id, seq)
+		p.renames.Settle(id, seq)
 	}
 	finishSend(p.Prompt, dir, command, imageSet{}, err)
 }
@@ -90,7 +90,7 @@ func (p namer) typeRename(dir, id string, seq uint64, command string) error {
 		if err := run.CatchUp(); err != nil {
 			return err
 		}
-		if !p.renames.owns(id, seq) {
+		if !p.renames.Owns(id, seq) {
 			return errRenameSkip
 		}
 		switch run.State() {
@@ -99,7 +99,7 @@ func (p namer) typeRename(dir, id string, seq uint64, command string) error {
 		case wire.SessionBlocked:
 			return errRenameBlocked
 		default:
-			p.renames.settle(id, seq)
+			p.renames.Settle(id, seq)
 		}
 		return errRenameSkip
 	}
@@ -112,7 +112,7 @@ func (p namer) typeRename(dir, id string, seq uint64, command string) error {
 // holdRename follows a Blocked chat's status stream and types the held rename
 // when Blocked closes into Working or Idle. It drops the command when the chat
 // goes Starting, Rate-limited or Exited, or the stream ends. One watcher
-// serves the chat (renameSlots.claimWatch); it ends on release, on drop and
+// serves the chat (renameslot.Slots.ClaimWatch); it ends on release, on drop and
 // when the server stops. A new popup (Blocked to Blocked) keeps the hold.
 // SendAction is not reused: it stops at Blocked and only types from Idle.
 func (p namer) holdRename(dir string) {
@@ -153,8 +153,8 @@ func (p namer) holdRename(dir string) {
 // request that arrives in between by dropping it too.
 func (p namer) dropHeldRename(id string) {
 	for {
-		seq, _ := p.renames.current(id)
-		if p.renames.endWatch(id, seq) {
+		seq, _ := p.renames.Current(id)
+		if p.renames.EndWatch(id, seq) {
 			return
 		}
 	}
@@ -165,17 +165,17 @@ func (p namer) dropHeldRename(id string) {
 // anything else but Working or Idle drops.
 func (p namer) releaseHeldRename(dir, id string) bool {
 	for {
-		seq, command := p.renames.current(id)
+		seq, command := p.renames.Current(id)
 		if command == "" {
-			return p.renames.endWatch(id, seq)
+			return p.renames.EndWatch(id, seq)
 		}
 		err := p.typeRename(dir, id, seq, command)
 		if !errors.Is(err, errRenameSkip) {
 			finishSend(p.Prompt, dir, command, imageSet{}, err)
-		} else if _, left := p.renames.current(id); left != "" {
+		} else if _, left := p.renames.Current(id); left != "" {
 			return false
 		}
-		if p.renames.endWatch(id, seq) {
+		if p.renames.EndWatch(id, seq) {
 			return true
 		}
 	}
@@ -213,15 +213,15 @@ func (p namer) renameSession(req wire.SessionRenameRequest) (wire.SessionResult,
 	switch state := info.Status.State; {
 	case !changed:
 	case state == wire.SessionWorking, state == wire.SessionIdle:
-		seq := p.renames.put(req.ID, command)
+		seq := p.renames.Put(req.ID, command)
 		p.sessions.Watches.Start(func() { p.sendRename(dir, seq, command) })
 	case state == wire.SessionBlocked:
-		p.renames.put(req.ID, command)
-		if p.renames.claimWatch(req.ID) {
+		p.renames.Put(req.ID, command)
+		if p.renames.ClaimWatch(req.ID) {
 			p.sessions.Watches.Start(func() { p.holdRename(dir) })
 		}
 	default:
-		p.renames.put(req.ID, "") // supersedes an older held command
+		p.renames.Put(req.ID, "") // supersedes an older held command
 	}
 	return wire.SessionResult{Session: &info}, nil
 }

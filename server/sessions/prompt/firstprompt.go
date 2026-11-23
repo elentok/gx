@@ -18,6 +18,8 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/sessions"
+	"github.com/elentok/gx/server/sessions/prompt/invisible"
+	"github.com/elentok/gx/server/sessions/prompt/startclock"
 	"github.com/elentok/gx/server/wire"
 )
 
@@ -52,7 +54,7 @@ type firstPrompt struct {
 	id          string
 	run         int
 	timeout     time.Duration
-	clock       *StartClock
+	clock       *startclock.StartClock
 }
 
 // NewFirstPrompt is sessions.Prompter's first-prompt tracker of one watch.
@@ -62,7 +64,7 @@ func (p *Prompt) NewFirstPrompt(dir, id string, run int) sessions.FirstPrompt {
 		cancel: make(chan struct{}), turnStarted: make(chan struct{}),
 		timeout: cmp.Or(p.cfg.FirstPromptStartTimeout, DefaultFirstPromptStartTimeout),
 	}
-	f.clock = NewStartClock(f.timeout, f.startTimedOut)
+	f.clock = startclock.NewStartClock(f.timeout, f.startTimedOut)
 	return f
 }
 
@@ -512,7 +514,7 @@ func (p *holderPrompter) Submit(text string) error {
 		return err
 	}
 	p.waitImageChips(len(p.images.paths))
-	if clean, n := stripInvisible(text); n > 0 {
+	if clean, n := invisible.StripInvisible(text); n > 0 {
 		if p.io.Log != nil {
 			p.io.Log.Info("stripped invisible chars before typing", "count", n)
 		}

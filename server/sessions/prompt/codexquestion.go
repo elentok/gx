@@ -22,12 +22,15 @@ const DefaultCodexQuestionWait = 2 * time.Second
 
 const codexQuestionPoll = 20 * time.Millisecond
 
+// codexAsker holds the Codex question methods, keeping Prompt's own method count down.
+type codexAsker struct{ *Prompt }
+
 // answerCodexQuestion types the answers into Codex's question overlay, one
 // question at a time. Before each question it reads the screen and checks it
 // against the card; on any difference it stops, so gx never sends keys to a
 // screen it did not verify. The cursor starts on row 1 on every question, so
 // the moves do not depend on where it was.
-func (p *Prompt) answerCodexQuestion(req wire.SessionAnswerRequest, card wire.QuestionCard, source string) (wire.SessionResult, error) {
+func (p codexAsker) answerCodexQuestion(req wire.SessionAnswerRequest, card wire.QuestionCard, source string) (wire.SessionResult, error) {
 	plan, refusal := codexQuestionKeys(card, req.Answers)
 	if refusal != nil {
 		return *refusal, nil
@@ -82,7 +85,7 @@ func (p *Prompt) answerCodexQuestion(req wire.SessionAnswerRequest, card wire.Qu
 }
 
 // codexQuestionReady refuses unless the session is Blocked on a question.
-func (p *Prompt) codexQuestionReady(id string) (string, wire.SessionResult, error) {
+func (p codexAsker) codexQuestionReady(id string) (string, wire.SessionResult, error) {
 	p.sessions.Watches.MetaMu.Lock()
 	defer p.sessions.Watches.MetaMu.Unlock()
 	dir, meta, res, err := p.sessions.SessionDir(id)

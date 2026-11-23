@@ -32,6 +32,7 @@ var (
 	writeAssistantMessage  = rigs.WriteAssistantMessage
 	clearByInput           = rigs.ClearByInput
 	startAdvancing         = rigs.StartAdvancing
+	writeRounds            = rigs.WriteRounds
 	endTurn                = rigs.EndTurn
 	sessionSnapshot        = rigs.SessionSnapshot
 	autoSends              = rigs.AutoSends

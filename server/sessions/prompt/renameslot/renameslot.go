@@ -1,10 +1,10 @@
-package prompt
+package renameslot
 
 import "sync"
 
-// renameSlots holds one pending /rename per chat, in memory only. Every
+// Slots holds one pending /rename per chat, in memory only. Every
 // request takes the next sequence number, so a late older send types nothing.
-type renameSlots struct {
+type Slots struct {
 	mu    sync.Mutex
 	chats map[string]*renameSlot
 }
@@ -15,8 +15,8 @@ type renameSlot struct {
 	watching bool   // a hold watcher serves the chat
 }
 
-// claimWatch reports whether the caller must start the chat's one hold watcher.
-func (s *renameSlots) claimWatch(id string) bool {
+// ClaimWatch reports whether the caller must start the chat's one hold watcher.
+func (s *Slots) ClaimWatch(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	slot := s.chats[id]
@@ -27,8 +27,8 @@ func (s *renameSlots) claimWatch(id string) bool {
 	return true
 }
 
-// current is the chat's newest request: its number and held command.
-func (s *renameSlots) current(id string) (uint64, string) {
+// Current is the chat's newest request: its number and held command.
+func (s *Slots) Current(id string) (uint64, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if slot := s.chats[id]; slot != nil {
@@ -37,9 +37,9 @@ func (s *renameSlots) current(id string) (uint64, string) {
 	return 0, ""
 }
 
-// endWatch ends the hold watcher and empties the slot if seq is still newest.
+// EndWatch ends the hold watcher and empties the slot if seq is still newest.
 // It reports false when a newer request arrived, which the watcher must serve.
-func (s *renameSlots) endWatch(id string, seq uint64) bool {
+func (s *Slots) EndWatch(id string, seq uint64) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	slot := s.chats[id]
@@ -52,9 +52,9 @@ func (s *renameSlots) endWatch(id string, seq uint64) bool {
 	return true
 }
 
-// put makes command the chat's pending rename and returns its sequence number,
+// Put makes command the chat's pending rename and returns its sequence number,
 // even when empty, so it supersedes an older held one.
-func (s *renameSlots) put(id, command string) uint64 {
+func (s *Slots) Put(id, command string) uint64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.chats == nil {
@@ -70,25 +70,33 @@ func (s *renameSlots) put(id, command string) uint64 {
 	return slot.seq
 }
 
-func (s *renameSlots) forget(id string) {
+func (s *Slots) Forget(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.chats, id)
 }
 
-// owns reports whether seq is still the chat's newest request.
-func (s *renameSlots) owns(id string, seq uint64) bool {
+// Owns reports whether seq is still the chat's newest request.
+func (s *Slots) Owns(id string, seq uint64) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	slot := s.chats[id]
 	return slot != nil && slot.seq == seq
 }
 
-// settle empties the command once request seq typed or dropped, unless a newer one replaced it.
-func (s *renameSlots) settle(id string, seq uint64) {
+// Settle empties the command once request seq typed or dropped, unless a newer one replaced it.
+func (s *Slots) Settle(id string, seq uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if slot := s.chats[id]; slot != nil && slot.seq == seq {
 		slot.command = ""
 	}
+}
+
+// Has reports whether the chat has a slot.
+func (s *Slots) Has(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.chats[id]
+	return ok
 }

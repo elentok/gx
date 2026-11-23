@@ -16,7 +16,7 @@ type typingLocks struct {
 // ForgetSession drops a gone session's typing lock and rename slot.
 func ForgetSession(p *Prompt, id string) {
 	p.typingLocks.forget(id)
-	p.renames.forget(id)
+	p.renames.Forget(id)
 }
 
 // lockTyping waits for the chat's lock. The returned func releases it.

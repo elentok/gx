@@ -63,7 +63,7 @@ func (p *Prompt) answerSession(req wire.SessionAnswerRequest, source string) (wi
 	case wire.CardSourceClaudeDialog:
 		return p.answerClaudeDialog(req, dir), nil
 	case wire.CardSourceCodex:
-		return p.answerCodexQuestion(req, *card, source)
+		return codexAsker{p}.answerCodexQuestion(req, *card, source)
 	case wire.CardSourcePermission:
 		if meta.Harness == string(harness.Codex) {
 			return p.answerCodexCard(req, *card, source)

@@ -1,10 +1,10 @@
-package prompt
+package invisible
 
 import (
 	"unicode"
 )
 
-// stripInvisible removes the characters claude reports as "Removed N invisible
+// StripInvisible removes the characters claude reports as "Removed N invisible
 // character from your prompt" from text gx is about to type: the Unicode
 // format characters (category Cf: zero-width space, BOM, soft hyphen, word
 // joiner, bidi marks, tags) and the line and paragraph separators U+2028 and
@@ -14,7 +14,7 @@ import (
 // it inside emoji sequences and Persian words, and drops it only at the edge of
 // the text or next to a space. It returns the text and how many runes it
 // removed.
-func stripInvisible(text string) (string, int) {
+func StripInvisible(text string) (string, int) {
 	in := []rune(text)
 	out := make([]rune, 0, len(in))
 	for i, r := range in {

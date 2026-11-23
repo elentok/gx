@@ -1,4 +1,4 @@
-package prompt
+package invisible
 
 import "testing"
 
@@ -19,9 +19,9 @@ func TestStripInvisible(t *testing.T) {
 		{"keeps newline and nbsp", "a\n\u00a0b", "a\n\u00a0b", 0},
 	}
 	for _, tt := range tests {
-		got, removed := stripInvisible(tt.in)
+		got, removed := StripInvisible(tt.in)
 		if got != tt.want || removed != tt.removed {
-			t.Errorf("%s: stripInvisible(%q) = %q, %d; want %q, %d", tt.name, tt.in, got, removed, tt.want, tt.removed)
+			t.Errorf("%s: StripInvisible(%q) = %q, %d; want %q, %d", tt.name, tt.in, got, removed, tt.want, tt.removed)
 		}
 	}
 }
