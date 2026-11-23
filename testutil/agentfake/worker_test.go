@@ -69,6 +69,7 @@ func TestWorkTicket_NotesWritesVerifiedAndSummaryBeforeFinishing(t *testing.T) {
 	for _, want := range []string{
 		"tickets section p:e/01 Verified -\n- Story 1: the fake story — pass @ ",
 		"tickets section p:e/01 Iteration summaries -\n### fake-session",
+		"- Red-first: n/a: fake agent",
 		"tickets set p:e/01 --iteration-status finished",
 	} {
 		at := strings.Index(log, want)

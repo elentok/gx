@@ -2,6 +2,7 @@ package schema
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -63,10 +64,15 @@ func TestIterationSummaryRoundTrip(t *testing.T) {
 	}
 	b := a
 	b.SessionID, b.Label = "s2", "claude"
-	body := AppendIterationSummary(AppendIterationSummary(oldBody, a), b)
+	c := a
+	c.SessionID, c.Label, c.RedFirst = "s3", "agent", "n/a: fake agent"
+	body := AppendIterationSummary(AppendIterationSummary(AppendIterationSummary(oldBody, a), b), c)
 
-	if got := ParseIterationSummaries(body); !reflect.DeepEqual(got, []IterationSummary{a, b}) {
+	if got := ParseIterationSummaries(body); !reflect.DeepEqual(got, []IterationSummary{a, b, c}) {
 		t.Fatalf("ParseIterationSummaries = %+v", got)
+	}
+	if got := strings.Count(body, "Red-first:"); got != 1 {
+		t.Errorf("Red-first lines = %d, want 1 (only the entry that sets it)", got)
 	}
 }
 

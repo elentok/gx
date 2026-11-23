@@ -119,7 +119,7 @@ type IterationSummary struct {
 	WentWrong string
 	Decisions string
 	Left      string
-	// RedFirst is parsed only: gx's own entries never carry it.
+	// RedFirst is written only when set: gx's own entries leave it empty.
 	RedFirst string
 }
 
@@ -138,6 +138,9 @@ func (s IterationSummary) block() string {
 	fmt.Fprintf(&b, "### %s — %s — %s\n", oneLine(s.SessionID), s.Time.UTC().Format(time.RFC3339), oneLine(s.Label))
 	for _, f := range summaryFields {
 		fmt.Fprintf(&b, "\n- %s: %s", f.label, oneLine(*f.field(&s)))
+	}
+	if s.RedFirst != "" {
+		fmt.Fprintf(&b, "\n- Red-first: %s", oneLine(s.RedFirst))
 	}
 	return b.String()
 }

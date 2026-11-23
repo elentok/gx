@@ -398,6 +398,7 @@ func writeNotes(cfg WorkerConfig, address string) error {
 	summary := schema.AppendIterationSummary("", schema.IterationSummary{
 		SessionID: "fake-session", Time: time.Now(), Label: "agent",
 		Did: "Verified the fake story.", WentWrong: "Nothing.", Decisions: "None.", Left: "Nothing.",
+		RedFirst: "n/a: fake agent",
 	})
 	for _, s := range [][2]string{{schema.VerifiedHeading, verified}, {schema.IterationSummaryHeading, summary}} {
 		heading := s[0]
