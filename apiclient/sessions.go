@@ -154,6 +154,14 @@ func (s *Sessions) MarkRead(ctx context.Context, id string) (wire.SessionResult,
 	return res, err
 }
 
+// Dismiss clears a delivery-failure card. Any other card, or none, is a
+// refusal result.
+func (s *Sessions) Dismiss(ctx context.Context, id string) (wire.SessionResult, error) {
+	var res wire.SessionResult
+	err := s.t.post(ctx, "/v1/sessions/dismiss", wire.SessionRequest{ID: id}, &res)
+	return res, err
+}
+
 // Focus asks the most recently focused TUI to show a session; Client names it,
 // empty with no TUI connected.
 func (s *Sessions) Focus(ctx context.Context, id string) (wire.SessionResult, error) {

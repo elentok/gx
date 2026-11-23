@@ -24,6 +24,10 @@ const (
 	ReasonSessionNameTaken      = "name-taken"
 	ReasonSessionQueue          = "queue-session"
 	ReasonSessionNotPlain       = "not-plain-session"
+	// ReasonSessionNotDeliveryCard refuses Dismiss of a card that is not a delivery failure.
+	ReasonSessionNotDeliveryCard = "not-delivery-card"
+	// ReasonSessionNoCard refuses Dismiss of a session that shows no card.
+	ReasonSessionNoCard = "no-card"
 	// ReasonSessionBadName is ReasonBadName, so the public contract has one value.
 	ReasonSessionBadName = "bad-name"
 )

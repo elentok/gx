@@ -29,6 +29,7 @@ func NewAgents(d Deps) *cobra.Command {
 		newAgentsSessionCmd(d, "interrupt", "end a Working session's current turn (the session stays)", (*apiclient.Sessions).Interrupt),
 		newAgentsRemoveCmd(d),
 		newAgentsSessionCmd(d, "mark-read", "clear a session's Unread", (*apiclient.Sessions).MarkRead),
+		newAgentsSessionCmd(d, "dismiss", "clear a delivery-failure card", (*apiclient.Sessions).Dismiss),
 		newAgentsSessionCmd(d, "resume", "resume an Exited session's conversation", (*apiclient.Sessions).Resume),
 		newAgentsSessionCmd(d, "run-action", "send an Idle session's Action prompts, one per turn", (*apiclient.Sessions).RunAction),
 		newAgentsSessionCmd(d, "focus", "show a session in the most recently focused TUI", (*apiclient.Sessions).Focus),

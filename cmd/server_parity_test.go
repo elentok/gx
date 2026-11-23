@@ -133,6 +133,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/sessions/remove":                  "agents remove",
 	"POST /v1/sessions/remove-exited":           "agents remove",
 	"POST /v1/sessions/mark-read":               "agents mark-read",
+	"POST /v1/sessions/dismiss":                 "agents dismiss",
 	"POST /v1/sessions/focus":                   "agents report-focus",
 	"POST /v1/sessions/show":                    "agents focus",
 	"POST /v1/sessions/actionable":              "agent actionable",

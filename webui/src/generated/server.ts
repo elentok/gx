@@ -2635,13 +2635,21 @@ export const ReasonSessionNameTaken = "name-taken";
 export const ReasonSessionQueue = "queue-session";
 export const ReasonSessionNotPlain = "not-plain-session";
 /**
+ * ReasonSessionNotDeliveryCard refuses Dismiss of a card that is not a delivery failure.
+ */
+export const ReasonSessionNotDeliveryCard = "not-delivery-card";
+/**
+ * ReasonSessionNoCard refuses Dismiss of a session that shows no card.
+ */
+export const ReasonSessionNoCard = "no-card";
+/**
  * ReasonSessionBadName is ReasonBadName, so the public contract has one value.
  */
 export const ReasonSessionBadName = "bad-name";
 /**
  * Refusal reasons of the interactive-session writes.
  */
-export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionHarnessMissing | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonSessionNotDesign | typeof ReasonSessionNameTaken | typeof ReasonSessionQueue | typeof ReasonSessionNotPlain | typeof ReasonSessionBadName;
+export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionHarnessMissing | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonSessionNotDesign | typeof ReasonSessionNameTaken | typeof ReasonSessionQueue | typeof ReasonSessionNotPlain | typeof ReasonSessionNotDeliveryCard | typeof ReasonSessionNoCard | typeof ReasonSessionBadName;
 /**
  * SessionSwitchRequest is the body of POST /v1/sessions/switch. State is the web
  * token of SessionRequest. gx checks neither Model nor Effort: the harness

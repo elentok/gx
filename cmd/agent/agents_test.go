@@ -7,10 +7,12 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server/servertest/rigs"
 	"github.com/elentok/gx/server/wire"
@@ -502,6 +504,68 @@ func TestAgentsRemoveExited_PrintsIdsAndDryRunKeepsThem(t *testing.T) {
 	list, err := h.Client.Sessions.List(ctx)
 	if err != nil || len(list) != 0 {
 		t.Errorf("sessions after sweep = %+v, %v; want none", list, err)
+	}
+}
+
+func TestAgentsDismiss(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
+	ctx := context.Background()
+	created, err := h.Client.Sessions.Create(ctx, wire.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || created.Session == nil {
+		t.Fatalf("create = %+v, %v", created, err)
+	}
+	id := created.Session.ID
+	cardOf := func() string {
+		l, err := h.Client.Sessions.List(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, s := range l {
+			if s.ID == id {
+				return s.Actionable.Reason
+			}
+		}
+		return ""
+	}
+	seed := func(a wire.SessionActionable) {
+		meta := servertest.ReadMeta(t, h, id)
+		meta["actionable"] = a
+		data, err := json.Marshal(meta)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(h.SessionsDir, id, "meta.json"), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		servertest.WaitFor(t, 10*time.Second, "the card to show", func() bool { return cardOf() == a.Reason })
+	}
+	dismiss := func() (wire.SessionResult, int) {
+		var out bytes.Buffer
+		err := runAgentsSessionWrite(ctx, h.Client, &out, true, (*apiclient.Sessions).Dismiss, id)
+		var res wire.SessionResult
+		if jerr := json.Unmarshal(out.Bytes(), &res); jerr != nil {
+			t.Fatalf("output %q: %v", out.String(), jerr)
+		}
+		var exit *cmdbase.ExitError
+		if errors.As(err, &exit) {
+			return res, exit.Code
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res, 0
+	}
+
+	seed(wire.SessionActionable{Kind: wire.DeliverySendFailed, Reason: "card", GxRaised: true})
+	if res, code := dismiss(); code != 0 || res.Refused || res.Session == nil || cardOf() != "" {
+		t.Errorf("dismiss a delivery card = %+v exit %d, card %q; want cleared, exit 0", res, code, cardOf())
+	}
+	if res, code := dismiss(); code != 1 || res.Reason != wire.ReasonSessionNoCard {
+		t.Errorf("dismiss with no card = %+v exit %d; want %s exit 1", res, code, wire.ReasonSessionNoCard)
+	}
+	seed(wire.SessionActionable{Reason: "draft", Blocking: wire.BlockingDraft, GxRaised: true})
+	if res, code := dismiss(); code != 1 || res.Reason != wire.ReasonSessionNotDeliveryCard {
+		t.Errorf("dismiss a draft card = %+v exit %d; want %s exit 1", res, code, wire.ReasonSessionNotDeliveryCard)
 	}
 }
 
