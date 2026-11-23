@@ -58,9 +58,11 @@ func depsInstalledEvent(t *testing.T, o OneIteration) runlog.Event {
 
 func TestInstallDepsIn_PassesTheGivenListToTheInstall(t *testing.T) {
 	d, rec, o := prepareDepsFixture(t)
+	d.LoadSetup = func(string, string) ([]string, error) { return []string{"make gen"}, nil }
 	hooked := false
+	o.OnSetupStart = func() { hooked = true }
 
-	if err := installDepsIn(d, o, t.TempDir(), []string{"make gen"}, func() { hooked = true }); err != nil {
+	if err := installDepsIn(d, o, t.TempDir(), false); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(rec.setup, []string{"make gen"}) {
@@ -72,11 +74,38 @@ func TestInstallDepsIn_PassesTheGivenListToTheInstall(t *testing.T) {
 	}
 }
 
+func TestInstallDepsIn_SkipSetupLoadsNoListAndPassesNoHook(t *testing.T) {
+	d, rec, o := prepareDepsFixture(t)
+	d.LoadSetup = func(string, string) ([]string, error) { return []string{"make gen"}, nil }
+	o.OnSetupStart = func() {}
+
+	if err := installDepsIn(d, o, t.TempDir(), true); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.setup) != 0 || rec.hook != nil {
+		t.Errorf("install got list %v, hook set=%v; want neither", rec.setup, rec.hook != nil)
+	}
+}
+
+func TestInstallDepsIn_UnreadableListFailsBeforeAnyInstall(t *testing.T) {
+	d, rec, o := prepareDepsFixture(t)
+	boom := errors.New("bad checks.json")
+	d.LoadSetup = func(string, string) ([]string, error) { return nil, boom }
+
+	if err := installDepsIn(d, o, t.TempDir(), false); !errors.Is(err, boom) {
+		t.Errorf("err = %v, want %v", err, boom)
+	}
+	if len(rec.paths) != 0 {
+		t.Errorf("installed in %v, want no install", rec.paths)
+	}
+}
+
 func TestInstallDepsIn_LogsDepsInstalledWithSetupCommandsAndDurations(t *testing.T) {
 	d, rec, o := prepareDepsFixture(t)
 	rec.installTime, rec.setupTime = 2*time.Second, 3*time.Second
+	d.LoadSetup = func(string, string) ([]string, error) { return []string{"make gen"}, nil }
 
-	if err := installDepsIn(d, o, t.TempDir(), []string{"make gen"}, nil); err != nil {
+	if err := installDepsIn(d, o, t.TempDir(), false); err != nil {
 		t.Fatal(err)
 	}
 	e := depsInstalledEvent(t, o)
@@ -92,7 +121,9 @@ func TestInstallDepsIn_NoList_LogsOnlyTheInstallsAndNoSetupTime(t *testing.T) {
 	d, rec, o := prepareDepsFixture(t)
 	rec.installTime = 2 * time.Second
 
-	if err := installDepsIn(d, o, t.TempDir(), nil, nil); err != nil {
+	d.LoadSetup = nil
+
+	if err := installDepsIn(d, o, t.TempDir(), false); err != nil {
 		t.Fatal(err)
 	}
 	e := depsInstalledEvent(t, o)

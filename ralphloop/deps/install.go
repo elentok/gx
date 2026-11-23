@@ -86,7 +86,7 @@ func installAll(ctx context.Context, path string, dirs []lockfileDir, pathEnv, l
 // tracked, but never after a failed install. onSetupStart (may be nil) is
 // called once between the two, and only when setup is non-empty. The commands
 // list ends with one "setup: <command>" entry per setup command.
-func installAndSetupWithin(parent context.Context, path, pathEnv, logDir string, budget time.Duration, setup []string, onSetupStart func()) (commands []string, installTime, setupTime time.Duration, err error) {
+func installAndSetupWithin(parent context.Context, path, pathEnv, logDir string, budget time.Duration, setup []string, onSetupStart func()) ([]string, time.Duration, time.Duration, error) {
 	dirs, err := lockfileDirs(path)
 	if err != nil {
 		return nil, 0, 0, installError(path, err)
@@ -94,8 +94,8 @@ func installAndSetupWithin(parent context.Context, path, pathEnv, logDir string,
 	ctx, cancel := context.WithTimeout(parent, budget)
 	defer cancel()
 	start := time.Now()
-	commands, err = installAll(ctx, path, dirs, pathEnv, logDir)
-	installTime = time.Since(start)
+	commands, err := installAll(ctx, path, dirs, pathEnv, logDir)
+	installTime := time.Since(start)
 	if err != nil || len(setup) == 0 {
 		return commands, installTime, 0, err
 	}
@@ -103,7 +103,6 @@ func installAndSetupWithin(parent context.Context, path, pathEnv, logDir string,
 		onSetupStart()
 	}
 	start = time.Now()
-	defer func() { setupTime = time.Since(start) }()
 	for _, line := range setup {
 		if out, err := runSetup(ctx, path, line, pathEnv); err != nil {
 			return nil, installTime, 0, fmt.Errorf("running setup in %s: %w", path,
@@ -111,7 +110,7 @@ func installAndSetupWithin(parent context.Context, path, pathEnv, logDir string,
 		}
 		commands = append(commands, "setup: "+line)
 	}
-	return commands, installTime, 0, nil
+	return commands, installTime, time.Since(start), nil
 }
 
 func installError(dir string, err error) error {

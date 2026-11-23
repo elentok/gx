@@ -16,9 +16,20 @@ import (
 // directory. It runs outside worktreeLock so a slow install does not hold up
 // another ticket's git worktree add.
 //
-// setup is the worktree's setup list (see setupFor) and onSetupStart runs once
-// before its first command; both may be empty.
-func installDepsIn(d deps.Deps, o OneIteration, path string, setup []string, onSetupStart func()) error {
+// It loads the worktree's setup list (see setupFor) and runs o.OnSetupStart once
+// before its first command. A list that cannot be read fails before any
+// install. skipSetup (the commitless worktree) runs no setup and loads no list.
+func installDepsIn(d deps.Deps, o OneIteration, path string, skipSetup bool) error {
+	var setup []string
+	onSetupStart := o.OnSetupStart
+	if skipSetup {
+		onSetupStart = nil
+	} else {
+		var err error
+		if setup, err = setupFor(d, o, path); err != nil {
+			return err
+		}
+	}
 	ctx := o.Context
 	if ctx == nil {
 		ctx = context.Background()
@@ -54,16 +65,6 @@ func setupFor(d deps.Deps, o OneIteration, path string) ([]string, error) {
 		return nil, nil
 	}
 	return d.LoadSetup(path, o.ScratchDir)
-}
-
-// installWithSetupIn is installDepsIn with the worktree's setup list and the
-// launch's OnSetupStart hook. A list that cannot be read fails before any install.
-func installWithSetupIn(d deps.Deps, o OneIteration, path string) error {
-	setup, err := setupFor(d, o, path)
-	if err != nil {
-		return err
-	}
-	return installDepsIn(d, o, path, setup, o.OnSetupStart)
 }
 
 // discardAfterInstallFailure joins a failed discard onto the install error, so a

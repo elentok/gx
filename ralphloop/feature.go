@@ -27,7 +27,7 @@ func PrepareFeature(d deps.Deps, o OneIteration) (IterationWorktree, error) {
 	if err != nil {
 		return IterationWorktree{}, fmt.Errorf("creating feature worktree for branch %q: %w", o.Epic, err)
 	}
-	if err := installWithSetupIn(d, o, w.Path); err != nil {
+	if err := installDepsIn(d, o, w.Path, false); err != nil {
 		return IterationWorktree{}, err
 	}
 	return w, nil

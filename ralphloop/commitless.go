@@ -36,7 +36,7 @@ func PrepareCommitless(d deps.Deps, o OneIteration, scratchDir, ref string) (Ite
 		return IterationWorktree{}, fmt.Errorf("creating detached worktree at %s: %w", ref, err)
 	}
 	w := IterationWorktree{Path: path, Label: label, worktreeDir: wtDir}
-	if err := installDepsIn(d, o, path, nil, nil); err != nil {
+	if err := installDepsIn(d, o, path, true); err != nil {
 		return IterationWorktree{}, discardAfterInstallFailure(err, DiscardCommitless(d, o, w))
 	}
 	return w, nil

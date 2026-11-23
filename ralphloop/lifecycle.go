@@ -149,7 +149,7 @@ func PrepareIteration(d deps.Deps, o OneIteration) (IterationWorktree, error) {
 	if err != nil {
 		return IterationWorktree{}, err
 	}
-	if err := installWithSetupIn(d, o, w.Path); err != nil {
+	if err := installDepsIn(d, o, w.Path, false); err != nil {
 		return IterationWorktree{}, discardAfterInstallFailure(err, DiscardIteration(d, o, w))
 	}
 	return w, nil
