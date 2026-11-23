@@ -147,6 +147,29 @@ test("Start posts the draft and goes to the new chat", async () => {
   expect(where()).toBe("/agents/sess-9 ")
 })
 
+test("Cmd+Enter in the brief starts the chat", async () => {
+  const fake = fakeDrafts()
+  await mount(fake)
+  await act(async () => fireEvent.keyDown(brief(), { key: "Enter", metaKey: true }))
+  expect(fake.start).toHaveBeenCalledWith("c1")
+  expect(where()).toBe("/agents/sess-9 ")
+})
+
+test("Ctrl+Enter in the brief starts the chat", async () => {
+  const fake = fakeDrafts()
+  await mount(fake)
+  await act(async () => fireEvent.keyDown(brief(), { key: "Enter", ctrlKey: true }))
+  expect(fake.start).toHaveBeenCalledWith("c1")
+})
+
+test("plain Enter and Cmd+Enter on a blank brief do not start", async () => {
+  const fake = fakeDrafts({ brief: "   " })
+  await mount(fake)
+  await act(async () => fireEvent.keyDown(brief(), { key: "Enter", metaKey: true }))
+  await act(async () => fireEvent.keyDown(brief(), { key: "Enter" }))
+  expect(fake.start).not.toHaveBeenCalled()
+})
+
 test("Start is disabled for a blank brief and while a save is in flight, and says why", async () => {
   vi.useFakeTimers()
   await mount(fakeDrafts())
