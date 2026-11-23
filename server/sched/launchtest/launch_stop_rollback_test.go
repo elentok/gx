@@ -90,15 +90,15 @@ func TestLaunchStop_RollsBackAnInstallInFlightWithoutWaitingItOut(t *testing.T) 
 	t.Parallel()
 	entered := make(chan struct{})
 	var once atomic.Bool
-	install := func(ctx context.Context, _, _ string) ([]string, error) {
+	install := func(ctx context.Context, _, _ string, _ []string, _ func()) ([]string, time.Duration, time.Duration, error) {
 		if once.CompareAndSwap(false, true) {
 			close(entered)
 		}
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, 0, 0, ctx.Err()
 		case <-time.After(30 * time.Second):
-			return nil, nil
+			return nil, 0, 0, nil
 		}
 	}
 	h, repo, ticketPath, took := stopMidLaunch(t, entered, func(c *server.Config) { c.InstallDeps = install })

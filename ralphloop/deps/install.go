@@ -67,6 +67,10 @@ func installDependenciesWithin(parent context.Context, path, pathEnv, logDir str
 	}
 	ctx, cancel := context.WithTimeout(parent, budget)
 	defer cancel()
+	return installAll(ctx, path, dirs, pathEnv, logDir)
+}
+
+func installAll(ctx context.Context, path string, dirs []lockfileDir, pathEnv, logDir string) (commands []string, err error) {
 	for _, dir := range dirs {
 		command, err := installIn(ctx, path, dir.path, dir.lockfiles, pathEnv, logDir)
 		if err != nil {
@@ -75,6 +79,39 @@ func installDependenciesWithin(parent context.Context, path, pathEnv, logDir str
 		commands = append(commands, dir.path+": "+strings.Join(command, " "))
 	}
 	return commands, nil
+}
+
+// installAndSetupWithin is installDependenciesWithin followed by the setup
+// shell commands, all inside one budget. Setup runs even when no lockfile is
+// tracked, but never after a failed install. onSetupStart (may be nil) is
+// called once between the two, and only when setup is non-empty. The commands
+// list ends with one "setup: <command>" entry per setup command.
+func installAndSetupWithin(parent context.Context, path, pathEnv, logDir string, budget time.Duration, setup []string, onSetupStart func()) (commands []string, installTime, setupTime time.Duration, err error) {
+	dirs, err := lockfileDirs(path)
+	if err != nil {
+		return nil, 0, 0, installError(path, err)
+	}
+	ctx, cancel := context.WithTimeout(parent, budget)
+	defer cancel()
+	start := time.Now()
+	commands, err = installAll(ctx, path, dirs, pathEnv, logDir)
+	installTime = time.Since(start)
+	if err != nil || len(setup) == 0 {
+		return commands, installTime, 0, err
+	}
+	if onSetupStart != nil {
+		onSetupStart()
+	}
+	start = time.Now()
+	defer func() { setupTime = time.Since(start) }()
+	for _, line := range setup {
+		if out, err := runSetup(ctx, path, line, pathEnv); err != nil {
+			return nil, installTime, 0, fmt.Errorf("running setup in %s: %w", path,
+				describeInstallFailure(ctx, path, []string{line}, out, err, logDir))
+		}
+		commands = append(commands, "setup: "+line)
+	}
+	return commands, installTime, 0, nil
 }
 
 func installError(dir string, err error) error {
@@ -157,7 +194,22 @@ func runInstall(ctx context.Context, dir string, command []string, pathEnv strin
 			return nil, err
 		}
 	}
-	args := command[1:]
+	return runNiced(ctx, dir, name, command[1:], nil)
+}
+
+// runSetup runs the shell line in dir like an install, with pathEnv (when set)
+// as its PATH.
+func runSetup(ctx context.Context, dir, line, pathEnv string) ([]byte, error) {
+	var env []string
+	if pathEnv != "" {
+		env = []string{"PATH=" + pathEnv}
+	}
+	return runNiced(ctx, dir, "/bin/sh", []string{"-c", line}, env)
+}
+
+// runNiced runs name at low priority with extraEnv on top of the process
+// environment, and returns the combined output.
+func runNiced(ctx context.Context, dir, name string, args, extraEnv []string) ([]byte, error) {
 	// Two installs at once still burst the CPU; run them at low priority.
 	if nicePath, err := exec.LookPath("nice"); err == nil {
 		args = append([]string{"-n", "10", name}, args...)
@@ -165,7 +217,7 @@ func runInstall(ctx context.Context, dir string, command []string, pathEnv strin
 	}
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "CI=true")
+	cmd.Env = append(append(os.Environ(), "CI=true"), extraEnv...)
 	// A killed manager's children can keep the output pipe open; don't wait on them.
 	cmd.WaitDelay = time.Second
 	return cmd.CombinedOutput()
@@ -201,17 +253,24 @@ const maxConcurrentInstalls = 2
 
 var installSlots = make(chan struct{}, maxConcurrentInstalls)
 
+// InstallFunc installs the dependencies of the worktree at path, then runs the
+// setup shell commands there, one after the other. onSetupStart (may be nil)
+// is called once before the first setup command and never when setup is empty.
+// commands lists the installs, then one "setup: <command>" entry per setup
+// command; the durations are the time spent on each part.
+type InstallFunc func(ctx context.Context, path, logDir string, setup []string, onSetupStart func()) (commands []string, installTime, setupTime time.Duration, err error)
+
 // CapInstalls makes install wait for one of the shared install slots. The slot
 // is held per call, outside any worktree lock the caller takes.
-func CapInstalls(install func(ctx context.Context, path, logDir string) ([]string, error)) func(ctx context.Context, path, logDir string) ([]string, error) {
-	return func(ctx context.Context, path, logDir string) ([]string, error) {
+func CapInstalls(install InstallFunc) InstallFunc {
+	return func(ctx context.Context, path, logDir string, setup []string, onSetupStart func()) ([]string, time.Duration, time.Duration, error) {
 		select {
 		case installSlots <- struct{}{}:
 		case <-ctx.Done():
-			return nil, installError(path, fmt.Errorf("install cancelled while waiting for a slot: %w", ctx.Err()))
+			return nil, 0, 0, installError(path, fmt.Errorf("install cancelled while waiting for a slot: %w", ctx.Err()))
 		}
 		defer func() { <-installSlots }()
-		return install(ctx, path, logDir)
+		return install(ctx, path, logDir, setup, onSetupStart)
 	}
 }
 

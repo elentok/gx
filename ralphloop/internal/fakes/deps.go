@@ -149,8 +149,8 @@ func FakeDeps() (d deps.Deps, prompts *[]string, removedBranches *[]string) {
 		WorktreeExists: func(path string) (bool, error) {
 			return true, nil
 		},
-		InstallDeps: func(_ context.Context, path, logDir string) ([]string, error) {
-			return nil, nil
+		InstallDeps: func(context.Context, string, string, []string, func()) ([]string, time.Duration, time.Duration, error) {
+			return nil, 0, 0, nil
 		},
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			return 0, false, nil

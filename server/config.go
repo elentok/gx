@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/commandlist"
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/osnotify"
+	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/devvite"
 	"github.com/elentok/gx/server/wire"
@@ -95,7 +96,7 @@ type Config struct {
 	Sleep func(time.Duration)
 	// InstallDeps replaces the dependency install a worktree gets before its
 	// agent starts; nil means the real one. Tests fake it so no package manager runs.
-	InstallDeps func(ctx context.Context, path, logDir string) ([]string, error)
+	InstallDeps deps.InstallFunc
 
 	// CleanupRunner runs one disk cleanup command in dir; nil runs the real command.
 	CleanupRunner func(ctx context.Context, argv []string, dir string) ([]byte, error)

@@ -5,13 +5,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestCapInstalls_ConcurrentCalls_NeverExceedLimit(t *testing.T) {
 	var running, peak atomic.Int32
 	release := make(chan struct{})
 	entered := make(chan struct{}, 8)
-	capped := CapInstalls(func(_ context.Context, path, logDir string) ([]string, error) {
+	capped := CapInstalls(func(context.Context, string, string, []string, func()) ([]string, time.Duration, time.Duration, error) {
 		n := running.Add(1)
 		for {
 			p := peak.Load()
@@ -22,12 +23,12 @@ func TestCapInstalls_ConcurrentCalls_NeverExceedLimit(t *testing.T) {
 		entered <- struct{}{}
 		<-release
 		running.Add(-1)
-		return nil, nil
+		return nil, 0, 0, nil
 	})
 
 	var wg sync.WaitGroup
 	for range 6 {
-		wg.Go(func() { _, _ = capped(context.Background(), "p", "l") })
+		wg.Go(func() { _, _, _, _ = capped(context.Background(), "p", "l", nil, nil) })
 	}
 	for range maxConcurrentInstalls {
 		<-entered

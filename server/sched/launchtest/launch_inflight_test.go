@@ -50,15 +50,15 @@ func startInflight(t *testing.T, epics map[string][]string, projectExtra, failFo
 	r := &inflightRig{store: store, release: make(chan struct{})}
 	t.Cleanup(func() { close(r.release) })
 	r.h = servertest.StartWithStore(t, store, cfg, func(c *server.Config) {
-		c.InstallDeps = func(ctx context.Context, path, _ string) ([]string, error) {
+		c.InstallDeps = func(ctx context.Context, path, _ string, _ []string, _ func()) ([]string, time.Duration, time.Duration, error) {
 			if failFor != "" && strings.Contains(path, failFor) {
-				return nil, errors.New("boom")
+				return nil, 0, 0, errors.New("boom")
 			}
 			select {
 			case <-ctx.Done():
-				return nil, ctx.Err()
+				return nil, 0, 0, ctx.Err()
 			case <-r.release:
-				return nil, nil
+				return nil, 0, 0, nil
 			}
 		}
 	})

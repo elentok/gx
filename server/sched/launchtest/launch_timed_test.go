@@ -76,12 +76,12 @@ func TestLaunchTimed_ASlowInstallCountsInTheDepsStep(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := runnerfake.NewRunner()
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
-		c.InstallDeps = func(ctx context.Context, _, _ string) ([]string, error) {
+		c.InstallDeps = func(ctx context.Context, _, _ string, _ []string, _ func()) ([]string, time.Duration, time.Duration, error) {
 			select {
 			case <-ctx.Done():
-				return nil, ctx.Err()
+				return nil, 0, 0, ctx.Err()
 			case <-time.After(wait):
-				return nil, nil
+				return nil, 0, 0, nil
 			}
 		}
 	})

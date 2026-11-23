@@ -13,8 +13,8 @@ import (
 )
 
 // installFailure is the fake install of a worktree whose dependencies will not install.
-func installFailure(_ context.Context, path, _ string) ([]string, error) {
-	return nil, errors.New("installing dependencies in " + path + ": boom")
+func installFailure(_ context.Context, path, _ string, _ []string, _ func()) ([]string, time.Duration, time.Duration, error) {
+	return nil, 0, 0, errors.New("installing dependencies in " + path + ": boom")
 }
 
 // runFailingInstall queues ticket 01 of a fixture whose install fails and waits

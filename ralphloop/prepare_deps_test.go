@@ -23,9 +23,9 @@ type installRecorder struct {
 	err   error
 }
 
-func (r *installRecorder) install(_ context.Context, path, _ string) ([]string, error) {
+func (r *installRecorder) install(_ context.Context, path, _ string, _ []string, _ func()) ([]string, time.Duration, time.Duration, error) {
 	r.paths = append(r.paths, path)
-	return []string{"fake install"}, r.err
+	return []string{"fake install"}, 0, 0, r.err
 }
 
 func prepareDepsFixture(t *testing.T) (deps.Deps, *installRecorder, OneIteration) {
@@ -98,13 +98,13 @@ func TestPrepareCommitless_InstallsInADetachedWorktreeButNotAScratchDir(t *testi
 func TestPrepareIteration_WorktreeAddCompletesWhileAnotherInstallIsBlocked(t *testing.T) {
 	d, _, o := prepareDepsFixture(t)
 	entered, unblock := make(chan struct{}), make(chan struct{})
-	d.InstallDeps = func(ctx context.Context, _, _ string) ([]string, error) {
+	d.InstallDeps = func(ctx context.Context, _, _ string, _ []string, _ func()) ([]string, time.Duration, time.Duration, error) {
 		close(entered)
 		select {
 		case <-unblock:
 		case <-ctx.Done():
 		}
-		return nil, nil
+		return nil, 0, 0, nil
 	}
 	done := make(chan error, 1)
 	go func() { _, err := PrepareIteration(d, o); done <- err }()

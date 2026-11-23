@@ -23,7 +23,7 @@ func installDepsIn(d deps.Deps, o OneIteration, path string) error {
 	if o.OnDepsStart != nil {
 		o.OnDepsStart()
 	}
-	commands, err := d.InstallDeps(ctx, path, o.ScratchDir)
+	commands, _, _, err := d.InstallDeps(ctx, path, o.ScratchDir, nil, nil)
 	if err != nil {
 		return err
 	}

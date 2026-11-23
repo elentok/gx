@@ -386,9 +386,9 @@ func TestResolveCherryPickConflict_InstallsDepsInFeatureWorktreeBeforeLaunch(t *
 	d, _, _ := fakes.FakeDeps()
 	p := conflictParams(t, t.TempDir())
 	var installedIn []string
-	d.InstallDeps = func(_ context.Context, path, _ string) ([]string, error) {
+	d.InstallDeps = func(_ context.Context, path, _ string, _ []string, _ func()) ([]string, time.Duration, time.Duration, error) {
 		installedIn = append(installedIn, path)
-		return []string{"fake install"}, nil
+		return []string{"fake install"}, 0, 0, nil
 	}
 	started := false
 	fakes.OnRunnerStart(d, func(agentrunner.StartOptions) error {
@@ -410,8 +410,8 @@ func TestResolveCherryPickConflict_InstallFailure_PausesWithoutLaunching(t *test
 	t.Parallel()
 	d, _, _ := fakes.FakeDeps()
 	p := conflictParams(t, t.TempDir())
-	d.InstallDeps = func(context.Context, string, string) ([]string, error) {
-		return nil, errors.New("install boom")
+	d.InstallDeps = func(context.Context, string, string, []string, func()) ([]string, time.Duration, time.Duration, error) {
+		return nil, 0, 0, errors.New("install boom")
 	}
 	fakes.OnRunnerStart(d, func(agentrunner.StartOptions) error {
 		t.Error("resolver launched despite a failed install")

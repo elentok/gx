@@ -4,7 +4,6 @@ package projects
 
 import (
 	"cmp"
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -42,7 +41,7 @@ type Env struct {
 	Chat                         notify.ServerChatConfig
 	GuardPoll                    time.Duration
 	RefreshSkills                func() error
-	InstallDeps                  func(ctx context.Context, path, logDir string) ([]string, error)
+	InstallDeps                  deps.InstallFunc
 	RateLimitResetBuffer         time.Duration
 	RunnerWait                   time.Duration
 	Sleep                        func(time.Duration)

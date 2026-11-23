@@ -155,7 +155,9 @@ type Deps struct {
 	// empty means no lockfile, which is a silent no-op rather than an error.
 	// A failure's text already reads "installing dependencies in <dir>: ...".
 	// A failed install's full output is saved under logDir ("" skips it).
-	InstallDeps func(ctx context.Context, path, logDir string) (commands []string, err error)
+	// After the installs it runs the setup shell commands in the worktree, in
+	// the same slot and budget; see InstallFunc.
+	InstallDeps InstallFunc
 
 	// ReadOccupancy returns the current context occupancy for the Claude
 	// Code session launched in cwd, or ok=false if its transcript has no
@@ -312,8 +314,8 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		TrailerMap:           history.TrailerMap,
 		RebaseOntoOrAbort:    rebaseOntoOrAbort,
 		WorktreeExists:       worktreeExists,
-		InstallDeps: CapInstalls(func(ctx context.Context, path, logDir string) ([]string, error) {
-			return installDependenciesWithin(ctx, path, overrides.Path, logDir, installTimeout)
+		InstallDeps: CapInstalls(func(ctx context.Context, path, logDir string, setup []string, onSetupStart func()) ([]string, time.Duration, time.Duration, error) {
+			return installAndSetupWithin(ctx, path, overrides.Path, logDir, installTimeout, setup, onSetupStart)
 		}),
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			path, found := transcriptPath(overrides.Home, cwd, sessionID)
