@@ -342,12 +342,12 @@ New flows or scenarios to write (each becomes an implementation ticket; the impl
 - S7: a ralph-loop fixture with an undecided slash prompt on the PTY runner.
 - The three card scenarios of the Mock states list (below) and a TUI frame check for `tui-not-sent`. Web steps go into existing agents flows where the flow budget in `CATALOG.md` and `maxFlows` requires it.
 
-Mock states
+**Mock states**
 
-- `/Users/david/.local/share/gx/tickets/gx/deliver-primitive/mocks/06-not-sent-card.html`, state `web-may-not-be-sent`, width 640, fixture scenario: new (a chat whose fake leaves a `/model opus` draft in its box with an undecided read), parts: `card`, `reason`, `copy`, `buttons` (Show screen, Dismiss).
-- `/Users/david/.local/share/gx/tickets/gx/deliver-primitive/mocks/06-not-sent-card.html`, state `web-send-failed`, width 640, fixture scenario: new (a chat whose plain send never starts a turn), parts: `card`, `reason`, `copy`, `buttons` (Show screen, Dismiss).
-- `/Users/david/.local/share/gx/tickets/gx/deliver-primitive/mocks/06-not-sent-card.html`, state `web-unknown-command`, width 640, fixture scenario: new (a chat sending `/my-skill` that the fake answers with `Unknown command: /my-skill`), parts: `card`, `reason`, `copy`, `buttons` (Resend, Restart agent, Show screen, Dismiss).
-- `/Users/david/.local/share/gx/tickets/gx/deliver-primitive/mocks/06-not-sent-card.html`, state `tui-not-sent`, width 640, fixture scenario: the same as `web-may-not-be-sent`, opened in the TUI, parts: `row`.
+- `/Users/david/.local/share/gx/tickets/gx/deliver-primitive/mocks/06-not-sent-card.html`, `web-may-not-be-sent`, 640px, fixture scenario: new (a chat whose fake leaves a `/model opus` draft in its box with an undecided read), parts: `card`, `reason`, `copy`, `buttons` (Show screen, Dismiss).
+- `/Users/david/.local/share/gx/tickets/gx/deliver-primitive/mocks/06-not-sent-card.html`, `web-send-failed`, 640px, fixture scenario: new (a chat whose plain send never starts a turn), parts: `card`, `reason`, `copy`, `buttons` (Show screen, Dismiss).
+- `/Users/david/.local/share/gx/tickets/gx/deliver-primitive/mocks/06-not-sent-card.html`, `web-unknown-command`, 640px, fixture scenario: new (a chat sending `/my-skill` that the fake answers with `Unknown command: /my-skill`), parts: `card`, `reason`, `copy`, `buttons` (Resend, Restart agent, Show screen, Dismiss).
+- `/Users/david/.local/share/gx/tickets/gx/deliver-primitive/mocks/06-not-sent-card.html`, `tui-not-sent`, 640px, fixture scenario: the same as `web-may-not-be-sent`, opened in the TUI, parts: `row`.
 
 ## Out of Scope
 
