@@ -98,6 +98,22 @@ func TestAppendEvent_LaunchTimedRoundTrips(t *testing.T) {
 	}
 }
 
+func TestAppendEvent_DepsInstalledDurationsRoundTrip(t *testing.T) {
+	t.Parallel()
+	dir := fixture.EpicScratchDir(t, "epic")
+	want := Event{Type: string(eventsc.DepsInstalled), Ticket: "04", DepsStep: 2 * time.Second, SetupStep: 5 * time.Second}
+	if err := AppendEvent(dir, "epic", want); err != nil {
+		t.Fatalf("AppendEvent: %v", err)
+	}
+	got, ok, err := ReadEvents(dir, "epic")
+	if err != nil || !ok || len(got) != 1 {
+		t.Fatalf("ReadEvents = %v, %v, %v; want 1 event", got, ok, err)
+	}
+	if got[0].DepsStep != 2*time.Second || got[0].SetupStep != 5*time.Second {
+		t.Errorf("event = %+v, want deps 2s and setup 5s", got[0])
+	}
+}
+
 func TestAppendEvent_OversizedReasonIsTruncatedBelowCap(t *testing.T) {
 	t.Parallel()
 	dir := fixture.EpicScratchDir(t, "epic")

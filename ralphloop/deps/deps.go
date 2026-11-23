@@ -2,6 +2,7 @@ package deps
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,7 +14,9 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/backgroundtask"
+	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/git/history"
 	"github.com/elentok/gx/ralphloop/agent"
@@ -158,6 +161,10 @@ type Deps struct {
 	// After the installs it runs the setup shell commands in the worktree, in
 	// the same slot and budget; see InstallFunc.
 	InstallDeps InstallFunc
+	// LoadSetup returns the worktree's setup commands: its .gx/checks.json
+	// first, then the project.json `checks` key in projectDir. Empty means
+	// none. Nil means no list.
+	LoadSetup func(worktree, projectDir string) ([]string, error)
 
 	// ReadOccupancy returns the current context occupancy for the Claude
 	// Code session launched in cwd, or ok=false if its transcript has no
@@ -317,6 +324,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		InstallDeps: CapInstalls(func(ctx context.Context, path, logDir string, setup []string, onSetupStart func()) ([]string, time.Duration, time.Duration, error) {
 			return installAndSetupWithin(ctx, path, overrides.Path, logDir, installTimeout, setup, onSetupStart)
 		}),
+		LoadSetup: loadSetup,
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			path, found := transcriptPath(overrides.Home, cwd, sessionID)
 			if !found {
@@ -437,6 +445,18 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		GuardPoll:            overrides.GuardPoll,
 		PauseTimer:           time.After,
 	}
+}
+
+// loadSetup implements Deps.LoadSetup. A missing project.json is no list; the
+// file is read only when the worktree's own config is missing.
+func loadSetup(worktree, projectDir string) ([]string, error) {
+	return check.LoadSetup(worktree, func() (json.RawMessage, error) {
+		pf, err := config.ReadProjectFile(projectDir)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return pf.Checks, err
+	})
 }
 
 // transcriptPath resolves cwd/sessionID's transcript file path under home.

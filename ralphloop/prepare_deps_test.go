@@ -21,11 +21,117 @@ import (
 type installRecorder struct {
 	paths []string
 	err   error
+	// setup and hook are what the last call got; installTime and setupTime are
+	// what it reports back.
+	setup       []string
+	hook        func()
+	installTime time.Duration
+	setupTime   time.Duration
 }
 
-func (r *installRecorder) install(_ context.Context, path, _ string, _ []string, _ func()) ([]string, time.Duration, time.Duration, error) {
+func (r *installRecorder) install(_ context.Context, path, _ string, setup []string, hook func()) ([]string, time.Duration, time.Duration, error) {
 	r.paths = append(r.paths, path)
-	return []string{"fake install"}, 0, 0, r.err
+	r.setup, r.hook = setup, hook
+	commands := []string{"fake install"}
+	for _, s := range setup {
+		commands = append(commands, "setup: "+s)
+	}
+	return commands, r.installTime, r.setupTime, r.err
+}
+
+func depsInstalledEvent(t *testing.T, o OneIteration) runlog.Event {
+	t.Helper()
+	evs, _, err := runlog.ReadEvents(o.ScratchDir, o.Epic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range evs {
+		if e.Type == string(events.DepsInstalled) {
+			return e
+		}
+	}
+	t.Fatalf("no deps-installed event in %v", evs)
+	return runlog.Event{}
+}
+
+func TestInstallDepsIn_PassesTheGivenListToTheInstall(t *testing.T) {
+	d, rec, o := prepareDepsFixture(t)
+	hooked := false
+
+	if err := installDepsIn(d, o, t.TempDir(), []string{"make gen"}, func() { hooked = true }); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(rec.setup, []string{"make gen"}) {
+		t.Errorf("install got list %v, want [make gen]", rec.setup)
+	}
+	rec.hook()
+	if !hooked {
+		t.Error("install got a different setup-start hook")
+	}
+}
+
+func TestInstallDepsIn_LogsDepsInstalledWithSetupCommandsAndDurations(t *testing.T) {
+	d, rec, o := prepareDepsFixture(t)
+	rec.installTime, rec.setupTime = 2*time.Second, 3*time.Second
+
+	if err := installDepsIn(d, o, t.TempDir(), []string{"make gen"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	e := depsInstalledEvent(t, o)
+	if want := "fake install; setup: make gen"; e.Reason != want {
+		t.Errorf("Reason = %q, want %q", e.Reason, want)
+	}
+	if e.DepsStep != 2*time.Second || e.SetupStep != 3*time.Second {
+		t.Errorf("durations = %v, %v; want 2s, 3s", e.DepsStep, e.SetupStep)
+	}
+}
+
+func TestInstallDepsIn_NoList_LogsOnlyTheInstallsAndNoSetupTime(t *testing.T) {
+	d, rec, o := prepareDepsFixture(t)
+	rec.installTime = 2 * time.Second
+
+	if err := installDepsIn(d, o, t.TempDir(), nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	e := depsInstalledEvent(t, o)
+	if e.Reason != "fake install" || e.SetupStep != 0 || e.DepsStep != 2*time.Second {
+		t.Errorf("event = %+v, want only the install and no setup time", e)
+	}
+}
+
+func TestSetupFor_LoadsThroughTheDepsFunc(t *testing.T) {
+	d, _, o := prepareDepsFixture(t)
+	d.LoadSetup = func(worktree, projectDir string) ([]string, error) {
+		return []string{worktree, projectDir}, nil
+	}
+
+	got, err := setupFor(d, o, "/wt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"/wt", o.ScratchDir}; !slices.Equal(got, want) {
+		t.Errorf("setupFor = %v, want %v", got, want)
+	}
+}
+
+func TestSetupFor_NilLoaderMeansNoList(t *testing.T) {
+	d, _, o := prepareDepsFixture(t)
+	d.LoadSetup = nil
+
+	got, err := setupFor(d, o, "/wt")
+	if err != nil || len(got) != 0 {
+		t.Errorf("setupFor = %v, %v; want empty, nil", got, err)
+	}
+}
+
+func TestSetupFor_LoadFailureIsReturned(t *testing.T) {
+	d, _, o := prepareDepsFixture(t)
+	boom := errors.New("bad checks.json")
+	d.LoadSetup = func(string, string) ([]string, error) { return nil, boom }
+
+	if _, err := setupFor(d, o, "/wt"); !errors.Is(err, boom) {
+		t.Errorf("err = %v, want %v", err, boom)
+	}
 }
 
 func prepareDepsFixture(t *testing.T) (deps.Deps, *installRecorder, OneIteration) {

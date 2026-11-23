@@ -298,3 +298,42 @@ func TestRebaseOntoOrAbort_ConflictNamesTheConflictingFiles(t *testing.T) {
 		t.Fatalf("err = %v, want an aborted-rebase error naming a.txt", err)
 	}
 }
+
+func writeSetupConfig(t *testing.T, path, setup string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"setup": ["`+setup+`"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDefaultDeps_LoadSetup_RepoFileBeatsProjectJSON(t *testing.T) {
+	t.Parallel()
+	worktree, project := t.TempDir(), t.TempDir()
+	writeSetupConfig(t, filepath.Join(worktree, ".gx", "checks.json"), "from repo")
+	if err := os.WriteFile(filepath.Join(project, "project.json"), []byte(`{"checks": {"setup": ["from project"]}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := DefaultDeps().LoadSetup(worktree, project)
+	if err != nil || len(got) != 1 || got[0] != "from repo" {
+		t.Errorf("LoadSetup = %v, %v; want [from repo]", got, err)
+	}
+
+	// Without the repo file the project.json list is used.
+	got, err = DefaultDeps().LoadSetup(t.TempDir(), project)
+	if err != nil || len(got) != 1 || got[0] != "from project" {
+		t.Errorf("LoadSetup (no repo file) = %v, %v; want [from project]", got, err)
+	}
+}
+
+func TestDefaultDeps_LoadSetup_NoneIsEmpty(t *testing.T) {
+	t.Parallel()
+	// Neither file exists: a missing project.json is no list, not an error.
+	got, err := DefaultDeps().LoadSetup(t.TempDir(), t.TempDir())
+	if err != nil || len(got) != 0 {
+		t.Errorf("LoadSetup = %v, %v; want empty, nil", got, err)
+	}
+}

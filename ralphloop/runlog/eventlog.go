@@ -174,13 +174,15 @@ type Event struct {
 	Source  string `json:"source,omitempty"`
 	Action  string `json:"action,omitempty"`
 	Bytes   int    `json:"bytes,omitempty"`
-	// ClaimedAt, Total and the four step durations (launch-timed only): the
-	// claim time, claim to prompt delivered, and the time in each launch step.
-	// The steps sum to Total; Path says how the agent began.
+	// ClaimedAt, Total and the step durations (launch-timed): the claim time,
+	// claim to prompt delivered, and the time in each launch step. The steps sum
+	// to Total; Path says how the agent began. deps-installed carries DepsStep
+	// (the install) and SetupStep (the setup commands) only.
 	ClaimedAt    time.Time     `json:"claimed_at,omitzero"`
 	Total        time.Duration `json:"total_ns,omitempty"`
 	WorktreeStep time.Duration `json:"worktree_ns,omitempty"`
 	DepsStep     time.Duration `json:"deps_ns,omitempty"`
+	SetupStep    time.Duration `json:"setup_ns,omitempty"`
 	AgentStep    time.Duration `json:"agent_ns,omitempty"`
 	PromptStep   time.Duration `json:"prompt_ns,omitempty"`
 	// AgentParts and PromptParts split AgentStep and PromptStep by part name
