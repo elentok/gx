@@ -150,6 +150,10 @@ func startWith(t *testing.T, store string, opts ...func(*server.Config)) *Harnes
 		h.Sounds = &Sounds{}
 		h.cfg.Player = h.Sounds
 	}
+	if h.cfg.SessionPush == nil {
+		h.Pushes = &Pushes{}
+		h.cfg.SessionPush = h.Pushes
+	}
 	if h.cfg.SessionBannerDelay == 0 {
 		h.cfg.SessionBannerDelay = SessionBannerDelay
 	}

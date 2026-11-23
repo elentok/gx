@@ -4,8 +4,23 @@ import (
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/webpush"
 	"github.com/elentok/gx/server/wire"
 )
+
+// sessionPush is the sink of session pushes: the config's, else the dispatcher.
+func sessionPush(s *Server) sessions.PushSender {
+	if s.cfg.SessionPush != nil {
+		return s.cfg.SessionPush
+	}
+	return dispatcherPush{s.push}
+}
+
+type dispatcherPush struct{ d *webpush.Dispatcher }
+
+func (p dispatcherPush) SendPush(title, body, path, tag string, urgent bool) {
+	p.d.Push(webpush.Event{Title: title, Body: body, Path: path, Tag: tag, Urgent: urgent})
+}
 
 // newManager copies the fields it needs from s at call time, so s must have
 // them set (projects, harness and sessionChat come late in New).
@@ -16,6 +31,7 @@ func newManager(s *Server) *sessions.Manager {
 			TicketStore: s.cfg.TicketStore, Env: s.cfg.Env, Holder: s.cfg.Holder,
 			Notifier: s.cfg.Notifier, Player: s.cfg.Player,
 			SessionBannerDelay: s.cfg.SessionBannerDelay, SessionExitCleanupDelay: s.cfg.SessionExitCleanupDelay,
+			Push: sessionPush(s),
 		},
 		Log:      s.log,
 		Events:   s.events,

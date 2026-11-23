@@ -41,15 +41,25 @@ type bannerTrigger struct {
 	reason string
 	// questionSent: this wait already sent its Question, which stands in for the AFK alert.
 	questionSent bool
+	// failed: a new failure kind raised it; question: a Design round raised it.
+	failed, question bool
+}
+
+// PushSender sends a Web Push; path is a route path, never a URL. It must not block.
+type PushSender interface {
+	SendPush(title, body, path, tag string, urgent bool)
 }
 
 // TriggerBanner schedules the session's banner, or merges into the one
 // already waiting: attention beats done, and a reason replaces none.
 func (mg *Manager) TriggerBanner(id string, snd sound.Name, reason string) {
-	triggerBanner(mg, id, snd, reason, false)
+	triggerBanner(mg, id, snd, reason, bannerFlags{})
 }
 
-func triggerBanner(mg *Manager, id string, snd sound.Name, reason string, questionSent bool) {
+// bannerFlags are what a trigger adds to a push beyond the banner's words.
+type bannerFlags struct{ questionSent, failed, question bool }
+
+func triggerBanner(mg *Manager, id string, snd sound.Name, reason string, fl bannerFlags) {
 	b := &mg.banners
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -60,13 +70,15 @@ func triggerBanner(mg *Manager, id string, snd sound.Name, reason string, questi
 		if reason != "" {
 			p.reason = reason
 		}
-		p.questionSent = p.questionSent || questionSent
+		p.questionSent = p.questionSent || fl.questionSent
+		p.failed = p.failed || fl.failed
+		p.question = p.question || fl.question
 		return
 	}
 	if b.pending == nil {
 		b.pending = map[string]*bannerTrigger{}
 	}
-	b.pending[id] = &bannerTrigger{sound: snd, reason: reason, questionSent: questionSent}
+	b.pending[id] = &bannerTrigger{sound: snd, reason: reason, questionSent: fl.questionSent, failed: fl.failed, question: fl.question}
 	// Waits as a session watch, so close drops the banner and doesn't wait out the delay.
 	mg.Watches.Start(func() {
 		delay := time.NewTimer(mg.cfg.SessionBannerDelay)
@@ -116,7 +128,7 @@ func (mg *Manager) NoteFailure(id string) {
 	if kind == wire.FailureKindEnded && designDone(mg.projects, m) {
 		return
 	}
-	mg.TriggerBanner(id, sound.Attention, reason)
+	triggerBanner(mg, id, sound.Attention, reason, bannerFlags{failed: true})
 }
 
 // designDone reports whether the session is a Design whose map's Progress is Done.
@@ -160,7 +172,7 @@ type DesignQuestion struct {
 // session afterwards sends nothing more.
 func (mg *Manager) TriggerQuestionBanner(id string, snd sound.Name, reason string, q DesignQuestion) {
 	sent := sendDesignQuestion(mg, id, q)
-	triggerBanner(mg, id, snd, reason, sent)
+	triggerBanner(mg, id, snd, reason, bannerFlags{questionSent: sent, question: true})
 }
 
 func sendDesignQuestion(mg *Manager, id string, q DesignQuestion) bool {
@@ -249,14 +261,32 @@ func cardText(card wire.QuestionCard) string {
 // designLink is the Design page of a Design session, without the token; empty
 // when the web listener is off or the session is not a Design.
 func designLink(base string, m Meta) string {
-	if base == "" || !m.IsDesign() || m.Ticket == "" {
+	root := designRoot(m)
+	if base == "" || root == "" {
+		return ""
+	}
+	return base + "/#/d/" + root
+}
+
+// designRoot is the root of a Design session's ticket, as the Design page route
+// names it; empty when the session is not a Design.
+func designRoot(m Meta) string {
+	if !m.IsDesign() || m.Ticket == "" {
 		return ""
 	}
 	addr, err := tickets.ParseQueuedAddress(m.Ticket)
 	if err != nil {
 		return ""
 	}
-	return base + "/#/d/" + queue.RootOf(addr).String()
+	return queue.RootOf(addr).String()
+}
+
+// pushPath is the route a session's push opens.
+func pushPath(m Meta, id string) string {
+	if root := designRoot(m); root != "" {
+		return "/d/" + root
+	}
+	return "/agents/" + id
 }
 
 // OpenOnScreen reports whether the person already has the session open: a
@@ -296,6 +326,10 @@ func fireBanner(mg *Manager, id string) {
 			chatBody += "\n" + link
 		}
 		mg.alerts.SessionAlert(info.Project, mg.projects.ChatOverride(info.Project), info.Name, sessionStatusWord(info.Status.State), chatBody, info.Status.State != wire.SessionIdle)
+	}
+	if push := mg.cfg.Push; push != nil {
+		urgent := m.Actionable.Reason != "" || info.Status.State == wire.SessionBlocked || t.failed || t.question
+		push.SendPush(title, body, pushPath(m, id), "session:"+id, urgent)
 	}
 	if onScreen {
 		return

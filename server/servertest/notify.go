@@ -31,6 +31,31 @@ func (b *Banners) Sent() []osnotify.Notification {
 	return slices.Clone(b.sent)
 }
 
+// Push is one session push a harness recorded.
+type Push struct {
+	Title, Body, Path, Tag string
+	Urgent                 bool
+}
+
+// Pushes is a sessions.PushSender that records every push.
+type Pushes struct {
+	mu   sync.Mutex
+	sent []Push
+}
+
+func (p *Pushes) SendPush(title, body, path, tag string, urgent bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.sent = append(p.sent, Push{title, body, path, tag, urgent})
+}
+
+// Sent returns the pushes recorded so far.
+func (p *Pushes) Sent() []Push {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Clone(p.sent)
+}
+
 // SessionBannerDelay is a harness's session banner delay: long enough for a
 // test to merge a second trigger inside the window, shorter than the real one.
 const SessionBannerDelay = 300 * time.Millisecond

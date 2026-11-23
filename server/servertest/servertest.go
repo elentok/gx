@@ -67,6 +67,8 @@ type Harness struct {
 	// Sounds records the session sounds played, unless an option set its own
 	// Player.
 	Sounds *Sounds
+	// Pushes records the session pushes, unless an option set its own SessionPush.
+	Pushes *Pushes
 
 	extraRunners []agentrunner.Runner
 	// pty is set when the harness builds the PTY runner itself; turn is the

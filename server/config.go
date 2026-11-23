@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/ralphloop/deps"
 	"github.com/elentok/gx/server/broker"
 	"github.com/elentok/gx/server/devvite"
+	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
@@ -262,6 +263,9 @@ type Config struct {
 	// PushHTTPClient sends Web Push requests; nil means a client with a
 	// timeout of about 15 seconds. Tests point it at an httptest service.
 	PushHTTPClient *http.Client
+	// SessionPush replaces the dispatcher as the sink of session pushes; tests
+	// use it to record them.
+	SessionPush sessions.PushSender
 	// PushMergeDelay is how long a push waits for events of its tag to
 	// merge; zero means one second.
 	PushMergeDelay time.Duration
