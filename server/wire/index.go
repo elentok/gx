@@ -129,6 +129,9 @@ type Snapshot struct {
 	// NeedsYouTotal counts every Needs-you card, One-off cards included; filled in
 	// by the handler.
 	NeedsYouTotal int `json:"needs_you_total,omitempty"`
+	// Badge is the app icon badge count (Actionable sessions plus Paused
+	// tickets); filled in by the handler.
+	Badge int `json:"badge,omitempty"`
 	// Held are the held Design and epic keys; filled in by the handler.
 	Held []string `json:"held,omitempty"`
 	// Placements say where each session sits, keyed by session id; filled in by

@@ -18,7 +18,10 @@ export const hasUnreadMark = (s: SessionInfo) => !s.queue && !isTriage(s)
 
 export const isUnread = (s: SessionInfo) => hasUnreadMark(s) && s.unread.unread
 
-/** A Blocked session always waits on the person, with or without a recorded reason. */
+/**
+ * A Blocked session always waits on the person, with or without a recorded reason.
+ * Must match badgeCount in server/badge.go (the app icon badge).
+ */
 export const isActionable = (s: SessionInfo) =>
   hasAttentionMarks(s) && (!!s.actionable.reason || s.status.state === SessionBlocked)
 

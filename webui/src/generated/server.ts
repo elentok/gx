@@ -2038,6 +2038,11 @@ export interface Snapshot {
    */
   needs_you_total?: number /* int */;
   /**
+   * Badge is the app icon badge count (Actionable sessions plus Paused
+   * tickets); filled in by the handler.
+   */
+  badge?: number /* int */;
+  /**
    * Held are the held Design and epic keys; filled in by the handler.
    */
   held?: string[];
