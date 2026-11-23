@@ -15,6 +15,10 @@ import {
   sidebar,
 } from "./agentsKit"
 
+/** The Dismiss of a question sheet or card. A session notice (role status) has its own Dismiss, so it is left out. */
+const sheetDismiss = (page: Page) =>
+  page.locator('*:not([role="status"]) > button').filter({ hasText: /^Dismiss$/ })
+
 const conversationOf = async (fixture: Fixture, id: string) =>
   (await chatOf(fixture, id)).conversation_id
 const stateOf = async (fixture: Fixture, id: string) =>
@@ -225,7 +229,7 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await go(page, `#/agents/${fallback.id}`)
   await expect(sheet).toBeVisible()
   await expect(sheet.getByRole("button", { name: /^Note on question/ })).toHaveCount(0)
-  await expect(page.getByRole("button", { name: "Dismiss", exact: true })).toBeVisible()
+  await expect(sheetDismiss(page)).toBeVisible()
   await expect(page.getByRole("button", { name: "Huh?" })).toHaveCount(0)
   await expect(page.getByRole("button", { name: "Answer in the terminal" })).toHaveCount(0)
   // The question sheet has its own Dismiss and terminal buttons, so it covers
@@ -238,7 +242,7 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await expect(sheet).toBeVisible()
   await expect(sheet.getByRole("button", { pressed: true })).toHaveCount(0)
   await expect(page.getByRole("button", { name: "Huh?" })).toHaveCount(0)
-  await expect(page.getByRole("button", { name: "Dismiss", exact: true })).toBeVisible()
+  await expect(sheetDismiss(page)).toBeVisible()
   const plan = await cardOf("permission", "auto-accept edits")
   await go(page, `#/agents/${plan.id}`)
   // Story 24: the card shows the text of the plan file the dialog names.
@@ -262,13 +266,13 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await expect(sheet).toBeVisible()
   await expect(page.getByRole("button", { name: "Submit", exact: true })).toBeDisabled()
   await expect(page.getByRole("button", { name: "Huh?" })).toHaveCount(0)
-  await expect(page.getByRole("button", { name: "Dismiss", exact: true })).toHaveCount(0)
+  await expect(sheetDismiss(page)).toHaveCount(0)
   await expect(page.getByRole("button", { name: "Answer in the terminal" })).toHaveCount(0)
   const round = await cardOf("round", "Which store?")
   await go(page, `#/agents/${round.id}`)
   await expect(sheet).toContainText("Which store?")
   await expect(sheet.getByRole("button", { name: "Huh?" }).first()).toBeVisible()
-  await expect(page.getByRole("button", { name: "Dismiss", exact: true })).toHaveCount(0)
+  await expect(sheetDismiss(page)).toHaveCount(0)
 
   // On a phone the sheet fits the width.
   await page.setViewportSize({ width: 390, height: 844 })
@@ -339,7 +343,7 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   })
   await go(page, `#/agents/${asked.id}`)
   await expect(sheet).toContainText("Which pick?")
-  await page.getByRole("button", { name: "Dismiss", exact: true }).click()
+  await sheetDismiss(page).click()
   await expect(sheet).toHaveCount(0)
   await expect
     .poll(() => readFileSync(outFile, "utf8"), SLOW)
@@ -372,13 +376,13 @@ test("158. Allow once and Deny, readable Claude prompt; refused; Ignored Allow k
   await revisitUntil("Which shape?")
   await sheet.getByRole("button", { name: "Other", exact: true }).first().click()
   await expect(sheet.getByPlaceholder("Other", { exact: true }).first()).toHaveValue("")
-  await page.getByRole("button", { name: "Dismiss", exact: true }).click()
+  await sheetDismiss(page).click()
   await leavesBlocked(fixture, asked.id)
 
   // Last, since each answer clears its card: Dismiss on the fallback card, and the hook card moving to the terminal.
   await go(page, `#/agents/${fallback.id}`)
   await expect(sheet).toBeVisible()
-  await page.getByRole("button", { name: "Dismiss", exact: true }).click()
+  await sheetDismiss(page).click()
   await leavesBlocked(fixture, fallback.id)
   await expect(sheet).toHaveCount(0)
   await go(page, `#/agents/${hookCard.id}`)
