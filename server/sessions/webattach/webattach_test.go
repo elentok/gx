@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -71,9 +72,11 @@ func events(t *testing.T, f rigs.PromptFixture, client string) <-chan string {
 	return lines
 }
 
-func waitLine(t *testing.T, lines <-chan string, want string) {
+// waitLine reads until want shows up and returns the lines before it.
+func waitLine(t *testing.T, lines <-chan string, want string) []string {
 	t.Helper()
 	timeout := time.After(10 * time.Second)
+	var seen []string
 	for {
 		select {
 		case l, ok := <-lines:
@@ -81,8 +84,9 @@ func waitLine(t *testing.T, lines <-chan string, want string) {
 				t.Fatalf("event stream ended before %q", want)
 			}
 			if l == want {
-				return
+				return seen
 			}
+			seen = append(seen, l)
 		case <-timeout:
 			t.Fatalf("no %q on the event stream", want)
 		}
@@ -136,6 +140,53 @@ func TestWebAttach_IdleAttachCloses(t *testing.T) {
 	t.Parallel()
 	f := rigs.StartCodexPromptSessionWith(t, func(c *server.Config) { c.WebAttachIdle = 200 * time.Millisecond })
 	waitLine(t, events(t, f, "tab-a"), "event: closed")
+}
+
+const (
+	ownerSelf    = `data: {"type":"owner","self":true}`
+	ownerOther   = `data: {"type":"owner"}`
+	ownerGX      = `data: {"type":"owner","gx":true}`
+	blockedEvent = "event: blocked"
+)
+
+func TestOwner_FollowsTypingTakeOverAndDetach(t *testing.T) {
+	t.Parallel()
+	f := rigs.StartCodexPromptSession(t)
+	a := events(t, f, "tab-a")
+	b := events(t, f, "tab-b")
+	// The first attach owns a fresh session.
+	waitLine(t, a, ownerSelf)
+	waitLine(t, b, ownerOther)
+
+	// A gx batch takes the input from the owner and hands it back.
+	c, err := holder.DialHolder(filepath.Join(f.H.SessionsDir, f.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.BatchBegin(); err != nil {
+		t.Fatal(err)
+	}
+	waitLine(t, a, ownerGX)
+	waitLine(t, b, ownerGX)
+	if err := c.BatchEnd(); err != nil {
+		t.Fatal(err)
+	}
+	waitLine(t, a, ownerSelf)
+	waitLine(t, b, ownerOther)
+
+	// tab-b is not the owner: only tab-b hears its key was dropped.
+	typeKey(t, f, "tab-b", 'y')
+	waitLine(t, b, blockedEvent)
+
+	post(t, f, "/v1/sessions/attach/takeover", wire.SessionAttachRequest{ID: f.ID, Client: "tab-b"})
+	waitLine(t, b, ownerSelf)
+	seenByA := waitLine(t, a, ownerOther)
+	if slices.Contains(seenByA, blockedEvent) {
+		t.Errorf("tab-a was told about tab-b's blocked key: %q", seenByA)
+	}
+
+	post(t, f, "/v1/sessions/attach/detach", wire.SessionAttachRequest{ID: f.ID, Client: "tab-b"})
+	waitLine(t, a, ownerGX)
 }
 
 func TestWebAttach_Refusals(t *testing.T) {

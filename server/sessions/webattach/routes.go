@@ -21,6 +21,7 @@ const heartbeat = 20 * time.Second
 func Routes(get func() *Attaches) []wire.Route {
 	return []wire.Route{
 		{Pattern: "POST /v1/sessions/attach/input", Web: wire.WebWrite, WebHandler: func(w http.ResponseWriter, r *http.Request) { get().inputWrite(w, r) }},
+		{Pattern: "POST /v1/sessions/attach/takeover", Web: wire.WebWrite, WebHandler: func(w http.ResponseWriter, r *http.Request) { get().takeOverWrite(w, r) }},
 		{Pattern: "POST /v1/sessions/attach/detach", Web: wire.WebWrite, WebHandler: func(w http.ResponseWriter, r *http.Request) { get().detachWrite(w, r) }},
 		{Pattern: "GET /v1/sessions/attach/events/", Web: wire.WebReadPrefix, WebHandler: func(w http.ResponseWriter, r *http.Request) { get().eventsRead(w, r) }},
 	}
@@ -52,6 +53,19 @@ func (as *Attaches) inputWrite(w http.ResponseWriter, r *http.Request) {
 	default:
 		res = sessions.Refusal(wire.ReasonSessionBadRequest, "send exactly one of key and paste")
 	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	wire.WriteJSON(w, res)
+}
+
+func (as *Attaches) takeOverWrite(w http.ResponseWriter, r *http.Request) {
+	req, ok := decode(w, r)
+	if !ok {
+		return
+	}
+	res, err := as.TakeOver(req.ID, req.Client)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

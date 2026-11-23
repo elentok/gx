@@ -21,15 +21,13 @@ const DefaultIdleTimeout = 2 * time.Minute
 // maxClientLen bounds the client id a browser picks for its tab.
 const maxClientLen = 64
 
-// Event is one message of a client's event stream. Only the child's exit is
-// reported for now.
-type Event struct {
-	Type string `json:"type"`
-	Code int    `json:"code,omitempty"`
-}
+type Event = wire.SessionAttachEvent
 
-// EventExit is the Type of an event that reports the child's exit.
-const EventExit = "exit"
+const (
+	EventExit    = wire.AttachEventExit
+	EventOwner   = wire.AttachEventOwner
+	EventBlocked = wire.AttachEventBlocked
+)
 
 // Attaches is the set of open web attaches.
 type Attaches struct {
@@ -50,7 +48,7 @@ func New(sess *sessions.Manager, idle time.Duration) *Attaches {
 	return &Attaches{sess: sess, idle: idle, m: map[key]*attach{}}
 }
 
-// attach is one client's open holder attach. A reader goroutine drains the
+// attach is one client's open holder attach. A reader goroutine reads the
 // holder's messages, because an attach nobody reads would stall its holder
 // writes.
 type attach struct {
@@ -91,14 +89,14 @@ func (as *Attaches) open(id, client string) (*attach, wire.SessionResult, error)
 	if err != nil {
 		return nil, sessions.Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s cannot be attached: %v", id, err)), nil
 	}
-	at := &attach{a: ha, events: make(chan Event, 4), done: make(chan struct{})}
+	at := &attach{a: ha, events: make(chan Event, 16), done: make(chan struct{})}
 	at.timer = time.AfterFunc(as.idle, func() { _ = ha.Close() })
 	as.m[k] = at
 	go as.read(k, at)
 	return at, wire.SessionResult{}, nil
 }
 
-// read drains the attach until it ends, then removes it.
+// read consumes the attach until it ends, then removes it.
 func (as *Attaches) read(k key, at *attach) {
 	defer func() {
 		at.timer.Stop()
@@ -115,14 +113,40 @@ func (as *Attaches) read(k key, at *attach) {
 		if err != nil {
 			return
 		}
-		if m.Type == holder.StreamExit {
+		switch m.Type {
+		case holder.StreamExit:
 			select {
 			case at.events <- Event{Type: EventExit, Code: m.ExitCode}:
 			default:
 			}
 			return
+		case holder.StreamOwner:
+			at.emit(Event{Type: EventOwner, Self: m.Owner.Self, GX: m.Owner.GX})
+		case holder.StreamBlocked:
+			at.emit(Event{Type: EventBlocked})
 		}
 	}
+}
+
+// emit queues ev, dropping the oldest queued event when a slow stream let the
+// queue fill: the newest owner report is the one that matters.
+func (at *attach) emit(ev Event) {
+	for {
+		select {
+		case at.events <- ev:
+			return
+		default:
+		}
+		select {
+		case <-at.events:
+		default:
+		}
+	}
+}
+
+// TakeOver asks the holder to make the client the input owner.
+func (as *Attaches) TakeOver(id, client string) (wire.SessionResult, error) {
+	return as.send(id, client, func(a *holder.HolderAttach) error { return a.TakeOver() })
 }
 
 // Key types k into the session as the client.

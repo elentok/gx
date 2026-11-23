@@ -2879,6 +2879,50 @@ export interface SessionKeysRequest {
    */
   settle?: boolean;
 }
+/**
+ * AttachKey is one key press a web client sends through its holder attach.
+ */
+export interface AttachKey {
+  code: number /* int */;
+  text?: string;
+  mod?: number /* int */;
+}
+/**
+ * SessionAttachRequest is the body of the web attach routes. Client names one
+ * browser tab. Key and Paste are the input of POST /v1/sessions/attach/input;
+ * exactly one is set.
+ */
+export interface SessionAttachRequest {
+  id: string;
+  client: string;
+  key?: AttachKey;
+  paste?: string;
+}
+export const AttachEventExit = "exit";
+/**
+ * AttachEventOwner reports who owns the input, first on an attach and on every change.
+ */
+export const AttachEventOwner = "owner";
+/**
+ * AttachEventBlocked says this client's input was dropped because it is not the owner.
+ */
+export const AttachEventBlocked = "blocked";
+/**
+ * Types of SessionAttachEvent.
+ */
+export type AttachEvent = typeof AttachEventExit | typeof AttachEventOwner | typeof AttachEventBlocked;
+/**
+ * SessionAttachEvent is one message of a web client's attach event stream. Code
+ * belongs to an exit. Self and GX belong to an owner report: Self when this
+ * client owns the input, GX when gx does (gx is typing), neither when another
+ * client does.
+ */
+export interface SessionAttachEvent {
+  type: string;
+  code?: number /* int */;
+  self?: boolean;
+  gx?: boolean;
+}
 export const PermissionKindPrompt = "prompt";
 export const PermissionKindPlan = "plan";
 export const PermissionKindUnreadable = "unreadable";

@@ -248,6 +248,26 @@ type SessionAttachRequest struct {
 	Paste  string     `json:"paste,omitempty"`
 }
 
+// Types of SessionAttachEvent.
+const (
+	AttachEventExit = "exit"
+	// AttachEventOwner reports who owns the input, first on an attach and on every change.
+	AttachEventOwner = "owner"
+	// AttachEventBlocked says this client's input was dropped because it is not the owner.
+	AttachEventBlocked = "blocked"
+)
+
+// SessionAttachEvent is one message of a web client's attach event stream. Code
+// belongs to an exit. Self and GX belong to an owner report: Self when this
+// client owns the input, GX when gx does (gx is typing), neither when another
+// client does.
+type SessionAttachEvent struct {
+	Type string `json:"type"`
+	Code int    `json:"code,omitempty"`
+	Self bool   `json:"self,omitempty"`
+	GX   bool   `json:"gx,omitempty"`
+}
+
 // Kinds of SessionPermissionResponse.
 const (
 	PermissionKindPrompt     = "prompt"
