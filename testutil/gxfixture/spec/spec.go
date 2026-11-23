@@ -386,6 +386,8 @@ type SessionSpec struct {
 	Images bool
 	// Interrupted appends one interrupted turn to the chat (see InterruptedScenario).
 	Interrupted bool
+	// Notices are the wire.SessionNotice* kinds written onto the settled session's meta.
+	Notices []string
 	// HostFilesChat appends the host-files scenario's link messages to the chat.
 	HostFilesChat bool
 	// HostFilesSecond runs the session in the host-files feature worktree and

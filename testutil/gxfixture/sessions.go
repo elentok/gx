@@ -278,6 +278,18 @@ func (f sessionSeeder) settleSession(s sessionSpec, id string) error {
 			return err
 		}
 	}
+	if len(s.Notices) > 0 {
+		dir := filepath.Join(f.root, "data", "gx", "sessions", id)
+		meta, err := sessions.ReadMeta(dir)
+		if err != nil {
+			return err
+		}
+		// The fake agent has no composer marker, so the first prompt already raised that notice.
+		meta.Notices = slices.Clone(s.Notices)
+		if err := sessions.WriteMeta(dir, meta); err != nil {
+			return err
+		}
+	}
 	if s.Images {
 		return f.seedImages(id, s.Harness)
 	}

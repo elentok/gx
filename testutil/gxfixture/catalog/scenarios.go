@@ -760,6 +760,8 @@ var Scenarios = map[string]scenario{
 	"host-files": hostFilesScenario(),
 	// agents-interrupted: Claude and Codex, Chat and Design sessions whose chat holds one interrupted turn.
 	"agents-interrupted": spec.InterruptedScenario(),
+	// agents-notices: one Chat session per non-blocking notice kind (untrusted read, no composer marker).
+	"agents-notices": spec.NoticesScenario(),
 	// agents-commands: six lean sessions and two design sessions with fixed
 	// command lists from both fakes and an extra skill in the feature worktree.
 	// -slow delays the list probes past what a flow waits; -failed fails them.

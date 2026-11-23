@@ -278,6 +278,26 @@ test("75. Read a session", async ({ page, start }) => {
     )
     await expect(page.getByText("[Request interrupted by user]")).toHaveCount(0)
   }
+
+  // Each non-blocking notice shows its fixed text on its own session and dismisses.
+  const noticeTexts = [
+    /^gx typed while the terminal was still redrawing/,
+    /^The first prompt was sent without seeing the agent's input box/,
+  ]
+  const noticed = await sessions(await start("agents-notices"))
+  expect(noticed).toHaveLength(2)
+  const seen: string[] = []
+  for (const s of noticed) {
+    await go(page, `#/agents/${s.id}`)
+    const status = page.getByRole("status").filter({ hasText: /\S/ })
+    await expect(status).toHaveCount(1)
+    const text = ((await status.textContent()) ?? "").replace(/\s*Dismiss\s*$/, "")
+    expect(noticeTexts.filter((re) => re.test(text))).toHaveLength(1)
+    seen.push(text)
+    await status.getByRole("button", { name: "Dismiss" }).click()
+    await expect(status).toHaveCount(0)
+  }
+  expect(new Set(seen).size).toBe(2)
 })
 
 // Moved to vitest: 77 and 81 (AgentsPage.composer.test.tsx), 82 (AgentsPage.sessionView.test.tsx),
