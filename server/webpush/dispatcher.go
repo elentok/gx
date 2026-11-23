@@ -17,11 +17,6 @@ type Event struct {
 	Urgent                 bool
 }
 
-// Pusher is what the hooks call. A nil *Dispatcher is a valid no-op Pusher.
-type Pusher interface {
-	Push(Event)
-}
-
 // Subs is the subscription store the dispatcher reads and prunes.
 type Subs interface {
 	PushTargets() []webauth.PushTarget

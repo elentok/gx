@@ -124,6 +124,23 @@ func TestPush_ServerSendsToTheServiceAndRestSendsNothing(t *testing.T) {
 	}
 }
 
+// The Banner already merged for a second; the session sink must not hold the
+// push again. An hour of merge delay makes any second hold a timeout.
+func TestPush_SessionPushSkipsTheDispatcherHold(t *testing.T) {
+	t.Parallel()
+	s, _, got := pushServer(t, time.Now)
+	s.push.Merge = time.Hour
+	if s.sessions == nil {
+		t.Fatal("sessions must exist")
+	}
+	bannerPush(s).SendPush("done", "body", "/sessions/x", "session:x", false)
+	select {
+	case <-got:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the session push was held by the dispatcher")
+	}
+}
+
 func TestPush_NoWebListenerMeansNoTargets(t *testing.T) {
 	t.Parallel()
 	s, _, _ := pushServer(t, time.Now)

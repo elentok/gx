@@ -8,18 +8,37 @@ import (
 	"github.com/elentok/gx/server/wire"
 )
 
-// sessionPush is the sink of session pushes: the config's, else the dispatcher.
+// sessionPush is the push sink of callers that have not merged yet (tickets,
+// recovery): the config's, else the dispatcher, which holds each event for its
+// merge delay.
 func sessionPush(s *Server) sessions.PushSender {
 	if s.cfg.SessionPush != nil {
 		return s.cfg.SessionPush
 	}
-	return dispatcherPush{s.push}
+	return dispatcherPush{s.push, false}
 }
 
-type dispatcherPush struct{ d *webpush.Dispatcher }
+// bannerPush is the sink of the session Banner, which has already merged for
+// a second, so the dispatcher sends at once.
+func bannerPush(s *Server) sessions.PushSender {
+	if s.cfg.SessionPush != nil {
+		return s.cfg.SessionPush
+	}
+	return dispatcherPush{s.push, true}
+}
+
+type dispatcherPush struct {
+	d   *webpush.Dispatcher
+	now bool
+}
 
 func (p dispatcherPush) SendPush(title, body, path, tag string, urgent bool) {
-	p.d.Push(webpush.Event{Title: title, Body: body, Path: path, Tag: tag, Urgent: urgent})
+	ev := webpush.Event{Title: title, Body: body, Path: path, Tag: tag, Urgent: urgent}
+	if p.now {
+		p.d.PushNow(ev)
+		return
+	}
+	p.d.Push(ev)
 }
 
 // newManager copies the fields it needs from s at call time, so s must have
@@ -31,7 +50,7 @@ func newManager(s *Server) *sessions.Manager {
 			TicketStore: s.cfg.TicketStore, Env: s.cfg.Env, Holder: s.cfg.Holder,
 			Notifier: s.cfg.Notifier, Player: s.cfg.Player,
 			SessionBannerDelay: s.cfg.SessionBannerDelay, SessionExitCleanupDelay: s.cfg.SessionExitCleanupDelay,
-			Push: sessionPush(s),
+			Push: bannerPush(s),
 		},
 		Log:      s.log,
 		Events:   s.events,
