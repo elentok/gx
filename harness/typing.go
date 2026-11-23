@@ -258,9 +258,21 @@ func applySGR(st sgr, params string) sgr {
 	if params == "" {
 		return sgr{}
 	}
-	for p := range strings.SplitSeq(params, ";") {
-		n, _ := strconv.Atoi(p)
+	parts := strings.Split(params, ";")
+	for i := 0; i < len(parts); i++ {
+		n, _ := strconv.Atoi(parts[i])
 		switch n {
+		case 38, 48, 58:
+			// Colour arguments are not flags: 2;R;G;B or 5;N.
+			if i+1 >= len(parts) {
+				return st
+			}
+			i++
+			if m, _ := strconv.Atoi(parts[i]); m == 2 {
+				i += 3
+			} else {
+				i++
+			}
 		case 0:
 			st = sgr{}
 		case 1:

@@ -144,6 +144,42 @@ func TestTyping_InputIsEmpty(t *testing.T) {
 			rows: []string{"› quoted in the transcript", dim + "  footer" + rst},
 			want: harness.InputUndecided,
 		},
+		{
+			name: "claude coloured slash draft",
+			kind: "claude",
+			rows: []string{rule, "❯ \x1b[38;2;177;185;249m/help" + rst, rule},
+			want: harness.InputNotEmpty, plain: true,
+		},
+		{
+			name: "claude draft with truecolor foreground and background",
+			kind: "claude",
+			rows: []string{rule, "❯ \x1b[38;2;1;2;7m\x1b[48;2;0;22;27mfix" + rst, rule},
+			want: harness.InputNotEmpty, plain: true,
+		},
+		{
+			name: "claude draft with 256-colour background",
+			kind: "claude",
+			rows: []string{rule, "❯ \x1b[48;5;2mfix" + rst, rule},
+			want: harness.InputNotEmpty, plain: true,
+		},
+		{
+			name: "claude coloured placeholder that is also dim",
+			kind: "claude",
+			rows: []string{rule, "❯ " + dim + "\x1b[38;5;246mTry \"fix the bug\"" + rst, rule},
+			want: harness.InputEmpty, plain: true,
+		},
+		{
+			name: "claude draft with truncated colour arguments",
+			kind: "claude",
+			rows: []string{rule, "❯ \x1b[38;2;1mfix" + rst, rule},
+			want: harness.InputNotEmpty, plain: true,
+		},
+	}
+	for _, n := range []string{"0", "1", "2", "7", "22", "27"} {
+		tests = append(tests, tests[0])
+		tests[len(tests)-1].name = "claude draft with 256-colour index " + n
+		tests[len(tests)-1].rows = []string{rule, "❯ \x1b[38;5;" + n + "mfix" + rst, rule}
+		tests[len(tests)-1].want = harness.InputNotEmpty
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
