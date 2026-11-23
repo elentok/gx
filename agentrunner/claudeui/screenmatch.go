@@ -30,13 +30,31 @@ func Matches(text, anchor string) bool {
 // with ❯ between two border rules. Dialog options also start with ❯ but sit
 // under one rule at most, and an echoed prompt has no rule under it.
 func InputBox(rows []string) bool {
+	_, ok := InputBoxRows(rows)
+	return ok
+}
+
+// InputBoxRows returns the rows of claude's prompt input: the ❯ row and the
+// continuation rows of a wrapped or multi-line draft, between the two border
+// rules. It is false when rows show no such box.
+func InputBoxRows(rows []string) ([]string, bool) {
 	for i := 1; i+1 < len(rows); i++ {
-		if strings.HasPrefix(strings.TrimSpace(rows[i]), "❯") && isRule(rows[i-1]) && isRule(rows[i+1]) {
-			return true
+		if !strings.HasPrefix(strings.TrimSpace(rows[i]), "❯") || !isRule(rows[i-1]) {
+			continue
+		}
+		for j := i + 1; j < len(rows); j++ {
+			if isRule(rows[j]) {
+				return rows[i:j], true
+			}
 		}
 	}
-	return false
+	return nil, false
 }
+
+// PastedLines is the M of claude's "[Pasted text #N +M lines]" chip for a
+// paste of text: its line breaks. The research does not pin how claude counts
+// it, so the fake and the settle read both use this one function.
+func PastedLines(text string) int { return strings.Count(text, "\n") }
 
 // isRule reports whether row is a horizontal border: only ─ and spaces.
 func isRule(row string) bool {

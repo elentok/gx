@@ -1,0 +1,40 @@
+ ▐▛███▛█   Claude Code v2.1.330
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   /private/tmp/claude-501/i08-rgha/work
+
+
+❯ /model
+  ⎿  Kept model as Haiku 5.5
+
+❯ /help
+  ⎿  Help dialog dismissed
+
+❯ say hi in two words
+
+⏺ Hi there!
+
+✻ Baked for 1s · done 4:04 PM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_PE…
+  Haiku 5.5 · 🙂 41.6k · [▱▱▱▱▱▱▱▱▱▱▱▱] 4%
+  22% of 5h (resets 17:00) · 27% of weekly (resets Sat 14:00)
+  ⏵⏵ auto mode on (shift+tab to cycle)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

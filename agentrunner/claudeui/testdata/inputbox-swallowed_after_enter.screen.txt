@@ -1,0 +1,40 @@
+ ▐▛███▛█   Claude Code v2.1.330
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   /private/tmp/claude-501/i08-rgha/work
+
+
+✻ Conversation compacted (ctrl+o for the summary)
+
+
+❯ /compact
+  ⎿  Compacted (ctrl+o to see full summary)
+  ⎿  Read ../../../../../Users/david/.dotfiles/core/ai/AGENTS.md (29 lines)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ /help
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_PE…
+  ❯ /help                                    Show help and available commands
+    /debug                                   Turn on debug logging and investigate problems
+    /team-onboarding                         Help teammates ramp on Claude Code with a guide from your usage
+    /google-workspace                        Read this before the first Google Drive, Docs, Sheets or Slides connector
+                                             call whenever the task creates or changes a Google file. Use this skill …
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

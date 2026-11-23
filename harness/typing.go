@@ -223,6 +223,15 @@ type cell struct {
 	style sgr
 }
 
+// PlainRows strips the SGR styling from styled screen rows.
+func PlainRows(rows []string) []string {
+	out := make([]string, len(rows))
+	for i, r := range rows {
+		out[i] = plain(r)
+	}
+	return out
+}
+
 func plain(row string) string {
 	var sb strings.Builder
 	for _, c := range parseCells(row) {

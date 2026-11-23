@@ -1,0 +1,40 @@
+ ▐▛███▛█   Claude Code v2.1.330
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   /private/tmp/claude-501/i08-rgha/work
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ /model
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_PE…
+  ❯ /model                                   Switch model (currently Haiku 5.5)
+    /gx-domain-modeling                      Build and sharpen a project's domain model. Use when discussing codebase
+                                             terminology, writing or editing a GLOSSARY.md, or recording or editing a…
+    /auto-mode-setup                         Teach auto mode about your environment
+    /openscad-bosl2                          Generate, edit, or debug OpenSCAD 3D models using the BOSL2 library. Use
+                                             when creating or editing .scad files, or when asked for a 3D-printable p…
+    /effort                                  Set the model's effort level
+    /consult                                 Consult a higher-level model about the current activity. (user)
+    /gx-prototype                            Build a throwaway prototype to answer a design question. Use when the
+                                             user wants to sanity-check whether a state model or logic feels right, o…
+    /update-config                           Change settings: hooks, permissions, environment variables
+    /loop                                    Repeat a prompt or command on an interval (e.g. /loop 5m /foo)
+    /claude-api                              Build and debug apps that use the Claude API
+    /advisor                                 Let Claude consult a stronger model at key moments
+    /status                                  Show version, account, model, MCP servers, and setup warnings
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

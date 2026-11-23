@@ -58,10 +58,54 @@ func TestInputBox(t *testing.T) {
 		{"permission prompt", fixtureRows(t, "permission-w160"), false},
 		{"plan approval", fixtureRows(t, "plan-approval"), false},
 		{"blank screen", []string{"", ""}, false},
+		{"bare rule", []string{"", strings.Repeat("─", 40), ""}, false},
+		{"/help dialog", fixtureRows(t, "inputbox-help_open"), false},
+		{"/model dialog", fixtureRows(t, "inputbox-model_open"), false},
+		{"idle", fixtureRows(t, "inputbox-idle_empty"), true},
+		{"swallowed Enter with a menu", fixtureRows(t, "inputbox-swallowed_after_enter"), true},
+		{"running /compact", fixtureRows(t, "inputbox-compact_running"), true},
+		{"landed /model", fixtureRows(t, "inputbox-model_landed_empty"), true},
 	}
 	for _, c := range cases {
 		if got := InputBox(c.rows); got != c.want {
 			t.Errorf("%s: InputBox = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestInputBoxRows(t *testing.T) {
+	rule := strings.Repeat("─", 40)
+	cases := []struct {
+		name string
+		rows []string
+		want []string
+	}{
+		{"idle box", fixtureRows(t, "inputbox-idle_empty"), []string{`❯ Try "refactor <filepath>"`}},
+		{"typed draft with its menu", fixtureRows(t, "inputbox-typed_co_menu"), []string{"❯ /co"}},
+		{"swallowed Enter", fixtureRows(t, "inputbox-swallowed_after_enter"), []string{"❯ /help"}},
+		{"multi-row draft", []string{rule, "❯ first row", "  second row", rule, "  footer"}, []string{"❯ first row", "  second row"}},
+		{"running /compact", fixtureRows(t, "inputbox-compact_running"), []string{"❯ "}},
+	}
+	for _, c := range cases {
+		got, ok := InputBoxRows(c.rows)
+		if !ok {
+			t.Errorf("%s: no box found", c.name)
+			continue
+		}
+		for i := range got {
+			// Claude draws a no-break space after the marker.
+			got[i] = strings.TrimRight(strings.ReplaceAll(got[i], " ", " "), " ")
+		}
+		for i := range c.want {
+			c.want[i] = strings.TrimRight(c.want[i], " ")
+		}
+		if strings.Join(got, "\n") != strings.Join(c.want, "\n") {
+			t.Errorf("%s: rows = %q, want %q", c.name, got, c.want)
+		}
+	}
+	for _, name := range []string{"inputbox-help_open", "inputbox-model_open"} {
+		if rows, ok := InputBoxRows(fixtureRows(t, name)); ok {
+			t.Errorf("%s: rows = %q, want no box", name, rows)
 		}
 	}
 }

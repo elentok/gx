@@ -107,6 +107,39 @@ func (t *Target) Submit(text string) error {
 		return err
 	}
 	defer release()
+	if err := t.typeLocked(text); err != nil {
+		return err
+	}
+	return t.submitKey()
+}
+
+// Type types text, with the images pasted before it, and presses nothing.
+func (t *Target) Type(text string) error {
+	release, err := t.acquire()
+	if err != nil {
+		return err
+	}
+	defer release()
+	return t.typeLocked(text)
+}
+
+// ImageCount is how many images Type pastes before the text.
+func (t *Target) ImageCount() int { return len(t.Images) }
+
+// ReadRows is the plain screen rows and whether the read is untrusted: taken
+// after a PTY resize and before the child's next output. A holder without
+// styled rows serves plain rows, never resized.
+func (t *Target) ReadRows() ([]string, bool, error) {
+	if !t.C.Supports(holder.OpScreenStyled) {
+		rows, _, err := t.C.Screen(0)
+		return rows, false, err
+	}
+	rows, read, err := t.C.StyledScreenRead()
+	return harness.PlainRows(rows), read.Resized, err
+}
+
+// typeLocked is the typing half of Submit and Type, with the lock held.
+func (t *Target) typeLocked(text string) error {
 	if err := t.cancelled(); err != nil {
 		return err
 	}
@@ -115,7 +148,7 @@ func (t *Target) Submit(text string) error {
 		if t.OnTyped != nil {
 			t.OnTyped()
 		}
-		return t.submitKey()
+		return nil
 	}
 	for i, path := range t.Images {
 		if err := t.C.TypeTextBy(path, true); err != nil {
@@ -135,7 +168,7 @@ func (t *Target) Submit(text string) error {
 	if t.OnTyped != nil {
 		t.OnTyped()
 	}
-	return t.submitKey()
+	return nil
 }
 
 // waitImageChips waits until the screen shows n image chips. Claude reads a
@@ -225,23 +258,37 @@ func InputRead(c *holder.HolderClient, typing harness.Typing) (harness.InputStat
 	return typing.InputIsEmpty(rows), read, nil
 }
 
-// Policy is how Deliver waits for the turn to start.
+// Input is what Deliver needs from a target: the Prompter's keys plus a type
+// without the Enter, the image count and a screen read that says whether it
+// can be trusted. *Target is the production one.
+type Input interface {
+	Prompter
+	Type(text string) error
+	ImageCount() int
+	ReadRows() (rows []string, resized bool, err error)
+}
+
+// Policy is how Deliver delivers. A nil Slash is the turn-starting shape (Caps,
+// Deadline, Now); otherwise the slash shape. PolicyFor picks one from the text.
 type Policy struct {
 	Caps     NudgeCaps
+	Slash    *SlashCaps
 	Deadline time.Time
 	// Now is the clock for Deadline; nil is time.Now.
 	Now    func() time.Time
 	Report func(claudeui.NudgeDecision)
 }
 
-// Deliver strips the characters claude would remove, then types text into t
-// and nudges until the turn starts. It is the turn-starting shape.
-func Deliver(t *Target, text string, policy Policy) error {
+// Deliver strips the characters claude would remove, then types text into t.
+// The turn-starting shape nudges until the turn starts; the slash shape types
+// once and presses the submit key again only while the box still holds text.
+func Deliver(t Input, text string, policy Policy) error {
 	if clean, n := Strip(text); n > 0 {
-		if t.IO.Log != nil {
-			t.IO.Log.Info("stripped invisible chars before typing", "count", n)
-		}
+		logOf(t).Info("stripped invisible chars before typing", "count", n)
 		text = clean
+	}
+	if policy.Slash != nil {
+		return deliverSlash(t, text, *policy.Slash, policy.Report)
 	}
 	now := policy.Now
 	if now == nil {

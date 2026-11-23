@@ -1,0 +1,40 @@
+ ▐▛███▛█   Claude Code v2.1.330
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   /private/tmp/claude-501/i08-rgha/work
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ /co
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_PE…
+  ❯ /copy                                    Copy the last response to clipboard (/copy 2 for the one before)
+    /color                                   Set the prompt bar color for this session
+    /commit                                  Commit staged git changes, or include current changes only when the user…
+    /config                                  Open settings
+    /consult                                 Consult a higher-level model about the current activity. (user)
+    /compact                                 Free up context by summarizing the conversation so far
+    /context                                 Show what fills the context
+    /code-review                             3 free /ultrareview · Review the changes since a fixed point (commit, br…
+    /computer-use                            Read this skill before the first step of any request to do something in …
+    /coloring-page                           Make one adult coloring page from a description. Produces a layered Proc…
+    /codebase-design                         Shared vocabulary for designing deep modules. Use when the user wants to…
+    /usage (cost)                            Show session cost, plan usage, and activity stats
+    /resume (continue)                       Resume a previous session
+    /gx-code-review                          Run a configurable, unattended review pass over an epic once every other…
+    /gx-resolving-merge-conflicts            Use when you need to resolve an in-progress git merge/rebase conflict. (…
+    /idle-cost-audit                         Audit a TUI/CLI app for battery/CPU cost while idle. Use when asked why …
+    /gx-code-reviewer                        Read-only review of a diff's code against the project's documented guide…
+    /gx-comment-analyzer                     Read-only review of the comments a diff adds or changes, for factual acc…
+    /update-config                           Change settings: hooks, permissions, environment variables
+    ↓ 85 more
+
+
+
+
+
+
+
+
+
+
+

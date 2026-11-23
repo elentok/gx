@@ -1,0 +1,40 @@
+ ▐▛███▛█   Claude Code v2.1.330
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   /private/tmp/claude-501/i08-rgha/work
+
+
+❯ /model
+  ⎿  Kept model as Haiku 5.5
+
+❯ /help
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Help  General   Commands   Custom commands
+
+  Claude understands your codebase, makes edits with your permission, and runs commands — right from your terminal.
+
+  Shortcuts
+  ! for shell mode        esc esc to clear input             ctrl+shift+_ to undo
+  / for commands          shift+tab to cycle modes           ctrl+z to suspend
+  @ for file paths        shift+↑/↓ to change effort         ctrl+v to paste images
+  /btw for side question  ctrl+o to see full transcript      opt+p to switch model
+                          ctrl+t to toggle tasks             ctrl+s to stash prompt
+                          backslash (\) then enter for       ctrl+g to edit in $EDITOR
+                          newline                            /keybindings to customize
+
+  For more help: https://code.claude.com/docs/en/overview
+
+  ←/→ to switch · Esc to close
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -28,17 +28,6 @@ type NudgeCaps struct {
 // plenty left on the caller's own deadline.
 var DefaultNudgeCaps = NudgeCaps{Grace: 45 * time.Second, Nudges: 3, Retypes: 2}
 
-// pastePlaceholder is how claude shows a long paste in its input: the text
-// itself is not on screen.
-const pastePlaceholder = "[Pasted text"
-
-// draftIsOurs reports whether the input shows gx's own text: its start, or
-// claude's placeholder for a long paste. A draft that is neither may be a
-// person's, which an extra Enter would submit.
-func draftIsOurs(screen, text string) bool {
-	return claudeui.HoldsText(screen, text) || strings.Contains(screen, pastePlaceholder)
-}
-
 // ReportDecisions adapts agentrunner.Nudger's onNudge to PromptWithNudge's
 // report; nil stays nil.
 func ReportDecisions(onNudge func(string)) func(claudeui.NudgeDecision) {
@@ -138,7 +127,8 @@ func clearWhole(p Prompter, text string) error {
 		log = lp.Log()
 	}
 	log.Info("input not empty after full clear", "screen", screen)
-	if roundScreens[0] == roundScreens[len(roundScreens)-1] && claudeui.HoldsText(screen, text) {
+	box, inBox := claudeui.InputBoxRows(strings.Split(screen, "\n"))
+	if roundScreens[0] == roundScreens[len(roundScreens)-1] && inBox && boxHoldsOurs(box, text, 0) {
 		return &claudeui.HungPaneError{Screen: screen}
 	}
 	return fmt.Errorf("%w: %w: last screen lines:\n%s", claudeui.ErrStuckSubmission, claudeui.ErrInputNotEmpty, claudeui.ScreenTail(screen))
@@ -163,13 +153,12 @@ const settleEnterCap = 3
 // and a Prompter that can read the input, it looks again after each settle: an
 // input still holding the text means the Enter was swallowed, so it presses
 // another, up to settleEnterCap, before it waits out the rest of timeout. It
-// presses again only when the draft is gx's own text.
+// presses again only when the input box row shows gx's own text.
 func nudgeEnter(p Prompter, text string, settle, timeout time.Duration, report func(claudeui.NudgeDecision)) (bool, error) {
 	if err := p.SendEnter(); err != nil {
 		return false, fmt.Errorf("nudging stuck submission: %w", err)
 	}
-	checker, checks := p.(InputChecker)
-	if settle <= 0 || settle >= timeout || !checks {
+	if settle <= 0 || settle >= timeout {
 		return p.WaitStart(timeout)
 	}
 	waited := time.Duration(0)
@@ -179,11 +168,12 @@ func nudgeEnter(p Prompter, text string, settle, timeout time.Duration, report f
 		if err != nil || started {
 			return started, err
 		}
-		empty, known, err := checker.InputEmpty()
-		if err != nil || !known || empty || presses >= settleEnterCap || waited >= timeout {
+		if presses >= settleEnterCap || waited >= timeout {
 			break
 		}
-		if screen, readErr := p.Screen(); readErr != nil || !draftIsOurs(screen, text) {
+		screen, readErr := p.Screen()
+		box, ok := claudeui.InputBoxRows(strings.Split(screen, "\n"))
+		if readErr != nil || !ok || !boxHoldsOurs(box, text, 0) {
 			break
 		}
 		report(claudeui.NudgeEnter)

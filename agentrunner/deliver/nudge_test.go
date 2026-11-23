@@ -67,6 +67,27 @@ func (f *fakePrompter) Screen() (string, error) {
 
 func (f *fakePrompter) now() time.Time { return f.clock }
 
+// The settle comparison drops a property-based set; it must cover everything
+// the strip list removes, and U+1BCA0, which the strip leaves alone.
+func TestIgnorable_CoversTheStripList(t *testing.T) {
+	for _, rr := range removed {
+		for r := rr.lo; r <= rr.hi; r++ {
+			if !isIgnorable(r) {
+				t.Errorf("U+%04X is in the strip list but not ignorable", r)
+			}
+		}
+	}
+	if !isIgnorable(0x1BCA0) {
+		t.Error("U+1BCA0 is not ignorable")
+	}
+}
+
+// boxScreen is a screen with claude's input box holding draft.
+func boxScreen(draft string) string {
+	rule := strings.Repeat("─", 40)
+	return rule + "\n❯ " + draft + "\n" + rule
+}
+
 func assertCalls(t *testing.T, got []string, want ...string) {
 	t.Helper()
 	if len(got) != len(want) {
@@ -266,13 +287,13 @@ func TestClearInput_NeverEmpty_LogsTheCaptureAndIsInputNotEmpty(t *testing.T) {
 
 func TestClearInput_IdenticalScreensHoldingGxText_IsHungPane(t *testing.T) {
 	noInputSettle(t)
-	f := &checkingPrompter{fakePrompter: &fakePrompter{screens: []string{"header\n> do the thing please\nfooter"}}, known: true}
+	f := &checkingPrompter{fakePrompter: &fakePrompter{screens: []string{"header\n" + boxScreen("do the thing please") + "\nfooter"}}, known: true}
 	err := ClearInput(f, "do the thing please")
 	var hung *claudeui.HungPaneError
 	if !errors.As(err, &hung) || !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("ClearInput() error = %v, want claudeui.HungPaneError wrapping ErrNotDelivered", err)
 	}
-	if !strings.Contains(err.Error(), "> do the thing please") {
+	if !strings.Contains(err.Error(), "❯ do the thing please") {
 		t.Fatalf("error = %q, want the last screen lines", err)
 	}
 }
@@ -475,7 +496,7 @@ func (f *inputPrompter) InputEmpty() (bool, bool, error) {
 // whole grace.
 func TestPromptWithNudge_Settle_SwallowedNudgeEnter_PressesAgainAtTheNextLook(t *testing.T) {
 	f := &inputPrompter{
-		fakePrompter: &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", "typed hi"}},
+		fakePrompter: &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", boxScreen("hi")}},
 		empties:      []bool{false},
 	}
 	caps := DefaultNudgeCaps
@@ -494,7 +515,7 @@ func TestPromptWithNudge_Settle_SwallowedNudgeEnter_PressesAgainAtTheNextLook(t 
 // no more Enters, and the rest of the grace is waited out.
 func TestPromptWithNudge_Settle_EmptyInputAfterNudgeEnter_WaitsOutGrace(t *testing.T) {
 	f := &inputPrompter{
-		fakePrompter: &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", "typed"}},
+		fakePrompter: &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", boxScreen("")}},
 		empties:      []bool{true},
 	}
 	caps := DefaultNudgeCaps
@@ -510,7 +531,7 @@ func TestPromptWithNudge_Settle_EmptyInputAfterNudgeEnter_WaitsOutGrace(t *testi
 
 func TestPromptWithNudge_Settle_NudgeEnterCap(t *testing.T) {
 	f := &inputPrompter{
-		fakePrompter: &fakePrompter{screens: []string{"before", "typed hi"}},
+		fakePrompter: &fakePrompter{screens: []string{"before", boxScreen("hi")}},
 		empties:      []bool{false},
 	}
 	caps := DefaultNudgeCaps
@@ -534,7 +555,7 @@ func TestPromptWithNudge_Settle_NudgeEnterCap(t *testing.T) {
 // A draft that is not gx's text may be a person's: no extra Enter.
 func TestPromptWithNudge_Settle_ForeignDraft_NoExtraEnter(t *testing.T) {
 	f := &inputPrompter{
-		fakePrompter: &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", "someone else's draft"}},
+		fakePrompter: &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", boxScreen("someone else's draft")}},
 		empties:      []bool{false},
 	}
 	caps := DefaultNudgeCaps
@@ -547,7 +568,7 @@ func TestPromptWithNudge_Settle_ForeignDraft_NoExtraEnter(t *testing.T) {
 
 func TestPromptWithNudge_Settle_PastePlaceholder_CountsAsOurs(t *testing.T) {
 	f := &inputPrompter{
-		fakePrompter: &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", "> [Pasted text #1 +9 lines]"}},
+		fakePrompter: &fakePrompter{starts: []bool{false, false, true}, screens: []string{"before", boxScreen("[Pasted text #1 +1 lines]")}},
 		empties:      []bool{false},
 	}
 	caps := DefaultNudgeCaps

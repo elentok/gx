@@ -10,6 +10,8 @@ import (
 	"unicode"
 
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/elentok/gx/agentrunner/claudeui"
 )
 
 // pasteChipOver is the size above which claude shows a paste as a chip.
@@ -22,8 +24,9 @@ func PastedChip(n int, text string) string {
 	return fmt.Sprintf("[Pasted text #%d +%d lines]", n, PastedLines(text))
 }
 
-// PastedLines is the M of a paste chip: the line breaks in the pasted text.
-func PastedLines(text string) int { return strings.Count(text, "\n") }
+// PastedLines is the M of a paste chip, read from the one function the settle
+// read uses too.
+func PastedLines(text string) int { return claudeui.PastedLines(text) }
 
 // hiddenRanges is claude's pinned table of characters it removes from a
 // slash command or shell draft. It is written out here, not imported from
