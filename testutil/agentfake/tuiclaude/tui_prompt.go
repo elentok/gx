@@ -54,6 +54,8 @@ func (t *tui) submit() error {
 		text = strings.TrimSpace(text)
 	}
 	if text == "" && t.pid.Status != StatusWaiting {
+		// No turn starts, so nothing else would redraw the now empty box.
+		t.draw()
 		return nil
 	}
 	if t.pid.Status == StatusIdle {
