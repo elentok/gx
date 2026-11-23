@@ -28,6 +28,10 @@ type WebLogin struct {
 	Created   time.Time `json:"created"`
 	LastUsed  time.Time `json:"last_used"`
 	LastIP    string    `json:"last_ip"`
+	// PushOn and PushSince are filled by the store's List and Lookup, never set
+	// on a stored record: WebLogin is embedded in it, so they would be saved.
+	PushOn    bool      `json:"push_on"`
+	PushSince time.Time `json:"push_since,omitzero"`
 }
 
 // WebLoginsResult is the payload of the web login list and revoke routes behind

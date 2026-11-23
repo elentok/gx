@@ -18,7 +18,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 )
 
-func TestWebLogins_JSONListsEveryLoginWithItsFiveFields(t *testing.T) {
+func TestWebLogins_JSONListsEveryLoginWithItsFields(t *testing.T) {
 	h := startWebServer(t)
 	finishWebSetup(t, h)
 
@@ -35,10 +35,16 @@ func TestWebLogins_JSONListsEveryLoginWithItsFiveFields(t *testing.T) {
 	if len(raw.Logins) != 1 {
 		t.Fatalf("logins = %v, want 1", raw.Logins)
 	}
-	for _, key := range []string{"id", "name", "created", "last_used", "last_ip"} {
+	for _, key := range []string{"id", "name", "created", "last_used", "last_ip", "push_on"} {
 		if _, ok := raw.Logins[0][key]; !ok {
 			t.Errorf("login %v has no %q", raw.Logins[0], key)
 		}
+	}
+	if raw.Logins[0]["push_on"] != false {
+		t.Errorf("push_on = %v, want false", raw.Logins[0]["push_on"])
+	}
+	if _, ok := raw.Logins[0]["push_since"]; ok {
+		t.Errorf("login %v has push_since with push off", raw.Logins[0])
 	}
 }
 

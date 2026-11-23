@@ -39,6 +39,8 @@ type Host interface {
 	Settings() *settings.Settings
 	Routes() []wire.Route
 	WebPerf() *webperf.Store
+	// PushKey is the VAPID public key the server loaded.
+	PushKey() string
 }
 
 // Web owns the web listener and its login gate. After Bind, nothing writes its
@@ -118,6 +120,11 @@ func (w *Web) Bind() {
 		w.err = "web auth: " + err.Error()
 		w.log.Error("web auth unavailable", "err", err)
 		return
+	}
+	// The key file is already written, so this is the one web-auth.json write
+	// that drops subscriptions made with an older key.
+	if err := auth.SetPushKey(w.host.PushKey()); err != nil {
+		w.log.Warn("could not drop old push subscriptions", "err", err)
 	}
 	rawLn, err := net.Listen("tcp", w.cfg.Addr)
 	if err != nil {

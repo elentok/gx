@@ -31,6 +31,7 @@ type webHost struct{ s *Server }
 func (h webHost) Settings() *Settings     { return h.s.settings.Load() }
 func (h webHost) Routes() []wire.Route    { return h.s.routes }
 func (h webHost) WebPerf() *webperf.Store { return h.s.webPerf }
+func (h webHost) PushKey() string         { return h.s.vapid.Public() }
 
 func (s *Server) newWeb() *web.Web {
 	return web.New(web.Config{

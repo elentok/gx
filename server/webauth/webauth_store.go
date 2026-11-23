@@ -79,7 +79,8 @@ func (e *WebAuthWaitError) Error() string {
 
 type webLoginRecord struct {
 	ops.WebLogin
-	CookieHash string `json:"cookie_hash"`
+	CookieHash string            `json:"cookie_hash"`
+	Push       *PushSubscription `json:"push,omitempty"`
 	// savedAt is the last used time on disk, to write at most once a minute.
 	savedAt time.Time
 }
@@ -109,6 +110,7 @@ type WebAuth struct {
 
 	mu           sync.Mutex
 	file         webAuthFile
+	pushKey      string
 	setupCode    string
 	setupCreated time.Time
 	// pendingSecret is the TOTP secret handed out by SetupStart, tied to pendingCode.
@@ -666,7 +668,7 @@ func (w *WebAuth) Lookup(cookie, ip string) (ops.WebLogin, bool) {
 			}
 		}
 	}
-	return found.WebLogin, true
+	return w.viewLocked(found), true
 }
 
 // List returns the web logins, oldest first.
@@ -675,7 +677,7 @@ func (w *WebAuth) List() []ops.WebLogin {
 	defer w.mu.Unlock()
 	out := make([]ops.WebLogin, 0, len(w.file.Logins))
 	for _, rec := range w.file.Logins {
-		out = append(out, rec.WebLogin)
+		out = append(out, w.viewLocked(rec))
 	}
 	return out
 }
