@@ -156,10 +156,9 @@ func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
 		Context:             ctx,
 		RepoDir:             repo, Epic: queued.Epic, ScratchDir: dir, Agent: agentKind, Ticket: t, RootBase: c.rootBase, LeafBase: c.leafBase,
 		Model: model, Effort: effort, Sink: l.Writer.FinishSink(ticket, t.Path), StallNudgeDelay: l.Host.StalledNudgeDelay(),
-		OnDepsStart: func() { l.setLaunchStep(ticketAddr, runs.StepInstallingDeps) },
-		OnDepsDone:  func() { l.setLaunchStep(ticketAddr, runs.StepStartingAgent) },
-		// Stub: ticket 13 replaces it with the StepRunningSetup call.
-		OnSetupStart: func() {},
+		OnDepsStart:  func() { l.setLaunchStep(ticketAddr, runs.StepInstallingDeps) },
+		OnDepsDone:   func() { l.setLaunchStep(ticketAddr, runs.StepStartingAgent) },
+		OnSetupStart: func() { l.setLaunchStep(ticketAddr, runs.StepRunningSetup) },
 	}
 	deps := l.Projects.DepsWith(l.Harness.LaunchRunner(ticket.Project, agentKind))
 	deps.GateReleased = l.Registry.GateReleased(ticketAddr)

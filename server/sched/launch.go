@@ -262,7 +262,7 @@ func (l *Launcher) launch(deps deps.Deps, ticket tickets.Address, one ralphloop.
 	if timings, ok := l.Registry.EndLaunch(ticket.String()); ok {
 		ev := runlog.Event{
 			Type: string(events.LaunchTimed), Label: label, Path: path, Total: timings.Total(),
-			WorktreeStep: timings.Worktree, DepsStep: timings.Deps, AgentStep: timings.Agent, PromptStep: timings.Prompt,
+			WorktreeStep: timings.Worktree, DepsStep: timings.Deps, SetupStep: timings.Setup, AgentStep: timings.Agent, PromptStep: timings.Prompt,
 			AgentParts: timings.AgentParts, PromptParts: timings.PromptParts,
 		}
 		if tr, found := l.Registry.Tracked(ticket.String()); found {

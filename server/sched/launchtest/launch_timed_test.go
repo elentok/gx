@@ -26,7 +26,7 @@ func TestLaunchTimed_ADeliveredLaunchLogsOneEventWhoseStepsSumToTheTotal(t *test
 		t.Fatalf("launch-timed = %+v, want one", timed)
 	}
 	ev := timed[0]
-	if sum := ev.WorktreeStep + ev.DepsStep + ev.AgentStep + ev.PromptStep; ev.Total <= 0 || sum != ev.Total {
+	if sum := ev.WorktreeStep + ev.DepsStep + ev.SetupStep + ev.AgentStep + ev.PromptStep; ev.Total <= 0 || sum != ev.Total {
 		t.Errorf("total = %v, steps sum to %v", ev.Total, sum)
 	}
 	if ev.Path != "cold-start" || ev.ClaimedAt.IsZero() {
@@ -103,6 +103,45 @@ func TestLaunchTimed_ASlowInstallCountsInTheDepsStep(t *testing.T) {
 	timed := ofType(runLog(t, h), events.LaunchTimed)
 	if len(timed) != 1 || timed[0].DepsStep < wait {
 		t.Fatalf("launch-timed = %+v, want one with a deps step of at least %v", timed, wait)
+	}
+}
+
+func TestLaunchTimed_ASlowSetupCountsInTheSetupStep(t *testing.T) {
+	t.Parallel()
+	const wait = 200 * time.Millisecond
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	fake := runnerfake.NewRunner()
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
+		c.InstallDeps = func(ctx context.Context, _, _ string, _ []string, onSetupStart func()) ([]string, time.Duration, time.Duration, error) {
+			onSetupStart()
+			select {
+			case <-ctx.Done():
+				return nil, 0, 0, ctx.Err()
+			case <-time.After(wait):
+				return nil, 0, 0, nil
+			}
+		}
+	})
+	t.Cleanup(func() { fake.Finish("epic-a-iter-01") })
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs, err := h.Client.Events(ctx, snap.Seq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, err := h.Client.Queue.Add(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	servertest.WaitForEvent(ctx, t, evs, wire.EventIterationStarted, "proj:epic-a/01")
+	timed := ofType(runLog(t, h), events.LaunchTimed)
+	if len(timed) != 1 || timed[0].SetupStep < wait {
+		t.Fatalf("launch-timed = %+v, want one with a setup step of at least %v", timed, wait)
 	}
 }
 

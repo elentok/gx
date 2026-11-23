@@ -114,7 +114,7 @@ type TrackedRun struct {
 // LaunchTimings is the time spent in each launch step. A step entered again
 // (a prompt retry) adds up.
 type LaunchTimings struct {
-	Worktree, Deps, Agent, Prompt time.Duration
+	Worktree, Deps, Setup, Agent, Prompt time.Duration
 	// AgentParts and PromptParts split the Agent and Prompt steps by the marks
 	// the runner reported (see Registry.MarkLaunch). The time after the last
 	// mark of a step is booked to PartReady (agent) or PartTurn (prompt).
@@ -131,8 +131,10 @@ const (
 	PartTurn  = "turn"  // prompt: turn started
 )
 
-// Total is the claim to prompt delivered time: the four steps back to back.
-func (l LaunchTimings) Total() time.Duration { return l.Worktree + l.Deps + l.Agent + l.Prompt }
+// Total is the claim to prompt delivered time: the five steps back to back.
+func (l LaunchTimings) Total() time.Duration {
+	return l.Worktree + l.Deps + l.Setup + l.Agent + l.Prompt
+}
 
 func (l *LaunchTimings) add(step LaunchStep, d time.Duration) {
 	switch step {
@@ -140,6 +142,8 @@ func (l *LaunchTimings) add(step LaunchStep, d time.Duration) {
 		l.Worktree += d
 	case StepInstallingDeps:
 		l.Deps += d
+	case StepRunningSetup:
+		l.Setup += d
 	case StepStartingAgent:
 		l.Agent += d
 	case StepSendingPrompt:
@@ -147,12 +151,14 @@ func (l *LaunchTimings) add(step LaunchStep, d time.Duration) {
 	}
 }
 
-// LaunchStep names one of the four steps of a launch, in order.
+// LaunchStep names one of the five steps of a launch, in order. The setup
+// step appears only for a worktree with a setup list.
 type LaunchStep string
 
 const (
 	StepCreatingWorktree LaunchStep = "creating worktree"
 	StepInstallingDeps   LaunchStep = "installing dependencies"
+	StepRunningSetup     LaunchStep = "running setup"
 	StepStartingAgent    LaunchStep = "starting agent"
 	StepSendingPrompt    LaunchStep = "sending prompt"
 )
@@ -280,7 +286,7 @@ func (r *Registry) StartedAtOf(address string) (time.Time, bool) {
 
 // launchSteps is every launch step in order; its length is the step total
 // clients print, so adding a step here is the only edit a new step needs.
-var launchSteps = []LaunchStep{StepCreatingWorktree, StepInstallingDeps, StepStartingAgent, StepSendingPrompt}
+var launchSteps = []LaunchStep{StepCreatingWorktree, StepInstallingDeps, StepRunningSetup, StepStartingAgent, StepSendingPrompt}
 
 // Position is the 1-based place of s among the launch steps, 0 for "".
 func (s LaunchStep) Position() int {

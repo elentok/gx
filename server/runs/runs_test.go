@@ -64,6 +64,23 @@ func TestRunRegistry_LaunchStep(t *testing.T) {
 	}
 }
 
+func TestLaunchStepOf_FiveStepsWithSetupThirdOfFive(t *testing.T) {
+	t.Parallel()
+	r, _, err := Open(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const addr = "proj:epic/01"
+	r.Put(TrackedRun{Run: Run{Address: addr}, LaunchStep: StepRunningSetup})
+	label, pos, total := r.LaunchStepOf(addr)
+	if label != "running setup" || pos != 3 || total != 5 {
+		t.Errorf("setup step = %q %d of %d, want running setup 3 of 5", label, pos, total)
+	}
+	if got := StepSendingPrompt.Position(); got != 5 {
+		t.Errorf("sending prompt position = %d, want 5", got)
+	}
+}
+
 func TestRunPauseEvent_RecordsLaunchModelAndEffort(t *testing.T) {
 	t.Parallel()
 	ev := Run{Agent: "claude", Model: "opus", Effort: "high"}.PauseEvent()
