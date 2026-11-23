@@ -200,8 +200,7 @@ export function DeliveryCard({
             {text}
           </Text>
           <Button
-            emphasis="secondary"
-            fontSize="12.5px"
+            {...ROW_BUTTON}
             onClick={() => void copyText(text, box.current)}
           >
             Copy
