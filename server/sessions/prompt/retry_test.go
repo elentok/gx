@@ -63,7 +63,7 @@ func TestRetry(t *testing.T) {
 	t.Run("refuses a card that is not blocking", func(t *testing.T) {
 		t.Parallel()
 		f := startPromptSession(t)
-		f.seedActionable(t, wire.SessionActionable{Reason: "Send failed: x", Action: []string{"p"}, GxRaised: true})
+		f.seedActionable(t, wire.SessionActionable{Kind: wire.DeliverySendFailed, Reason: "x", Action: []string{"p"}, GxRaised: true})
 		if _, body := f.retry(t); !strings.Contains(body, wire.ReasonSessionNoAction) {
 			t.Errorf("retry body = %s, want the no-action refusal", body)
 		}

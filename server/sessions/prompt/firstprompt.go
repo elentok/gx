@@ -123,7 +123,12 @@ func (f *firstPrompt) failed(prompt string, err error) {
 			reason = withClearHint(reason)
 		}
 	}
-	f.raise(prompt, reason, "")
+	a := deliveryCard(prompt, err)
+	if a.Kind == wire.DeliverySendFailed {
+		a.Reason = reason
+	}
+	f.log.Warn("first prompt failed", "reason", a.Reason)
+	f.p.raiseActionable(f.dir, a)
 }
 
 // failureReason words a first-prompt failure and says whether gx's own text

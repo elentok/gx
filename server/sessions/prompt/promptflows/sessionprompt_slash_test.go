@@ -121,7 +121,7 @@ func TestSessionPromptSlash(t *testing.T) {
 		c := startTUIChat(t, agentfake.TUIUnknownSkillEnv+"=1")
 		c.send(t, "/my-skill")
 		got := servertest.WaitForSession(c.ctx, t, c.h, c.evs, c.id, func(s wire.SessionInfo) bool { return s.Actionable.Reason != "" }).Actionable
-		if !strings.HasPrefix(got.Reason, "Send failed: ") || !strings.Contains(got.Reason, "Unknown command") || len(got.Action) != 1 || got.Action[0] != "/my-skill" {
+		if got.Kind != wire.DeliveryUnknownCommand || !strings.Contains(got.Reason, "Unknown command") || len(got.Action) != 1 || got.Action[0] != "/my-skill" {
 			t.Errorf("card = %+v, want the red Send failed card with the text to resend", got)
 		}
 		if n := strings.Count(c.keys(), "/my-skill"); n != 1 {

@@ -2,7 +2,6 @@ package promptflows_test
 
 import (
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server/wire"
@@ -22,7 +21,7 @@ func (f promptFixture) failSend(t *testing.T, text string, ids ...string) wire.S
 		t.Fatalf("prompt = %+v", res)
 	}
 	return waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool {
-		return strings.HasPrefix(s.Actionable.Reason, "Send failed")
+		return s.Actionable.Kind == wire.DeliverySendFailed
 	}).Actionable
 }
 

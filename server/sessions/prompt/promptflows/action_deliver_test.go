@@ -30,7 +30,7 @@ func TestActionDeliver(t *testing.T) {
 		c := startTUIChat(t, agentfake.TUIPlainScreenEnv+"=1")
 		c.runAction(t, "/first-command", "second-step")
 		got := servertest.WaitForSession(c.ctx, t, c.h, c.evs, c.id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised }).Actionable
-		if !strings.HasPrefix(got.Reason, "May not have been sent: ") || !strings.HasSuffix(got.Reason, "1 later step not sent") || len(got.Action) != 0 {
+		if got.Kind != wire.DeliveryMaybeSent || !strings.HasSuffix(got.Reason, "1 later step not sent.") || len(got.Action) != 0 || got.CopyText != "/first-command" {
 			t.Errorf("card = %+v, want the May not have been sent card with no Action", got)
 		}
 		time.Sleep(2 * firstPromptGrace) // negative wait: a later step would be typed within it

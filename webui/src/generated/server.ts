@@ -3539,6 +3539,10 @@ export interface SessionActionable {
    */
   images?: string[];
   /**
+   * CopyText is the text of a delivery card (see IsDelivery), as sent and not stripped.
+   */
+  copy_text?: string;
+  /**
    * Grilling marks the Actionable of a gx-design grilling round, so clients
    * do not match its Reason text.
    */
@@ -3570,6 +3574,15 @@ export type SessionNotice = typeof SessionNoticeUntrustedRead | typeof SessionNo
  * SessionActionableQueue is the Kind of an Actionable that queues Target.
  */
 export const SessionActionableQueue = "queue";
+export const DeliveryMaybeSent = "maybe-sent";
+export const DeliverySendFailed = "send-failed";
+export const DeliveryUnknownCommand = "unknown-command";
+/**
+ * The Kinds of the three delivery-failure cards, raised when a send into a
+ * session ends unrecovered. MaybeSent has no Action: a resend could run the
+ * command twice.
+ */
+export type Delivery = typeof DeliveryMaybeSent | typeof DeliverySendFailed | typeof DeliveryUnknownCommand;
 /**
  * MarkActionableRequest is the body of `gx agent actionable`.
  */

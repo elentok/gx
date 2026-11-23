@@ -268,8 +268,8 @@ func TestSessionRename_CodexUnrecognizedCommandRaisesSendFailed(t *testing.T) {
 	f := fromPrompt(rigs.StartCodexPromptSession(t))
 	f.rename(t, f.id, "new name")
 	got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised }).Actionable
-	if !strings.HasPrefix(got.Reason, "Send failed: ") || !strings.Contains(got.Reason, "Unrecognized command") {
-		t.Errorf("reason = %q, want a Send failed card naming Unrecognized command", got.Reason)
+	if got.Kind != wire.DeliveryUnknownCommand || !strings.Contains(got.Reason, "Unrecognized command") {
+		t.Errorf("card = %+v, want an unknown-command card naming Unrecognized command", got)
 	}
 	if len(got.Action) != 1 || got.Action[0] != "/rename new name" {
 		t.Errorf("action = %v, want the rename command to resend", got.Action)

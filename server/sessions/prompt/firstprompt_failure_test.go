@@ -47,7 +47,7 @@ func TestFirstPromptFailure_StillStartingRaisesActionable(t *testing.T) {
 	t.Parallel()
 	f := startFailingFirstPrompt(t, "fix the bug")
 	got := f.gxActionable(t)
-	if !slices.Equal(got.Action, []string{"fix the bug"}) || !strings.Contains(got.Reason, "still starting") {
+	if !slices.Equal(got.Action, []string{"fix the bug"}) || !strings.Contains(got.Reason, "still starting") || got.Kind != "" {
 		t.Errorf("actionable = %+v, want the prompt as a one-step Action and a still-starting reason", got)
 	}
 	banners, sounds := waitAlerts(f.h, 1)
@@ -89,7 +89,7 @@ func TestFirstPromptFailure_NeverStartedClearsLeftoverText(t *testing.T) {
 	}()
 	report(t, f.conv, agentfake.Control{State: "idle"})
 	got := f.gxActionable(t)
-	if want := "agent never started"; got.Reason != want {
+	if want := "agent never started"; got.Reason != want || got.Kind != wire.DeliverySendFailed || got.CopyText != "fix the bug" {
 		t.Errorf("reason = %q, want %q (the leftover text cleared)", got.Reason, want)
 	}
 	if !slices.Equal(got.Action, []string{"fix the bug"}) {

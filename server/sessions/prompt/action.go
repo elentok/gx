@@ -131,7 +131,9 @@ func (p *Prompt) SendAction(dir, label string, action []string) {
 	case errors.Is(err, deliver.ErrMaybeUnsent):
 		// No Action: resending could run the command twice.
 		p.log.Warn(strings.ToLower(label)+" undecided", "session", filepath.Base(dir), "err", err)
-		p.raiseActionable(dir, wire.SessionActionable{Reason: undecidedStepReason(err, len(action)-i-1), GxRaised: true})
+		a := deliveryCard(action[i], err)
+		a.Reason = undecidedStepReason(a.Reason, len(action)-i-1)
+		p.raiseActionable(dir, a)
 	default:
 		p.log.Warn(strings.ToLower(label)+" failed", "session", filepath.Base(dir), "err", err)
 		p.RaiseGxActionable(dir, fmt.Sprintf("%s failed: %v", label, err), action[i:])
@@ -142,15 +144,14 @@ var errNotIdle = errors.New("session is not idle")
 
 // undecidedStepReason is the card of an undecided step: Deliver's reason, then
 // how many later steps were dropped.
-func undecidedStepReason(err error, later int) string {
-	reason := maybeSentPrefix + strings.TrimPrefix(err.Error(), deliver.ErrMaybeUnsent.Error()+": ")
+func undecidedStepReason(reason string, later int) string {
 	switch later {
 	case 0:
 		return reason
 	case 1:
-		return reason + "; 1 later step not sent"
+		return reason + " 1 later step not sent."
 	}
-	return fmt.Sprintf("%s; %d later steps not sent", reason, later)
+	return fmt.Sprintf("%s %d later steps not sent.", reason, later)
 }
 
 // runAction sends the prompts and returns the index of the step it stopped

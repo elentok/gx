@@ -116,7 +116,7 @@ func TestFirstPromptLaunch_AlwaysUnknownSlashPromptEndsInAVisibleFailure(t *test
 	t.Parallel()
 	f := startLaunchSession(t, agentfake.TUIUnknownSkillEnv+"=1")
 	got := f.gxActionable(t)
-	if !strings.Contains(got.Reason, "Unknown command:") || len(got.Action) != 1 || got.Action[0] != launchPrompt {
+	if got.Kind != wire.DeliveryUnknownCommand || !strings.Contains(got.Reason, "Unknown command:") || len(got.Action) != 1 || got.Action[0] != launchPrompt {
 		t.Errorf("actionable = %+v, want the prompt as a one-step Action and an Unknown command reason", got)
 	}
 }

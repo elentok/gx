@@ -368,8 +368,8 @@ func TestSessionPrompt_CodexUnrecognizedSlashCommandRaisesSendFailed(t *testing.
 		t.Fatalf("prompt = %+v", res)
 	}
 	got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised }).Actionable
-	if !strings.HasPrefix(got.Reason, "Send failed: ") || !strings.Contains(got.Reason, "Unrecognized command") {
-		t.Errorf("reason = %q, want a Send failed card naming Unrecognized command", got.Reason)
+	if got.Kind != wire.DeliveryUnknownCommand || !strings.Contains(got.Reason, "Unrecognized command") {
+		t.Errorf("card = %+v, want an unknown-command card naming Unrecognized command", got)
 	}
 	if len(got.Action) != 1 || got.Action[0] != "/handoff" {
 		t.Errorf("action = %v, want the text to resend", got.Action)

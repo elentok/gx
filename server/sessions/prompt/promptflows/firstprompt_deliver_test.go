@@ -35,7 +35,7 @@ func TestFirstPromptDeliver(t *testing.T) {
 		// No input box on screen: the settle read cannot tell whether the command ran.
 		c := startTUIChatPrompt(t, firstSlash, agentfake.TUIUndecidedEnv+"=1")
 		got := servertest.WaitForSession(c.ctx, t, c.h, c.evs, c.id, func(s wire.SessionInfo) bool { return s.Actionable.GxRaised }).Actionable
-		if strings.HasPrefix(got.Reason, "May not have been sent") {
+		if got.Kind == wire.DeliveryMaybeSent {
 			t.Errorf("reason = %q, want the launch proof's verdict, not the undecided card", got.Reason)
 		}
 		if n := strings.Count(c.keys(), firstSlash); n != 1 {

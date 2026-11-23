@@ -221,6 +221,8 @@ type SessionActionable struct {
 	GxRaised bool     `json:"gx_raised,omitempty"`
 	// Images are Prompt image ids a failed send did not paste.
 	Images []string `json:"images,omitempty"`
+	// CopyText is the text of a delivery card (see IsDelivery), as sent and not stripped.
+	CopyText string `json:"copy_text,omitempty"`
 	// Grilling marks the Actionable of a gx-design grilling round, so clients
 	// do not match its Reason text.
 	Grilling bool `json:"grilling,omitempty"`
@@ -244,6 +246,24 @@ const (
 
 // SessionActionableQueue is the Kind of an Actionable that queues Target.
 const SessionActionableQueue = "queue"
+
+// The Kinds of the three delivery-failure cards, raised when a send into a
+// session ends unrecovered. MaybeSent has no Action: a resend could run the
+// command twice.
+const (
+	DeliveryMaybeSent      = "maybe-sent"
+	DeliverySendFailed     = "send-failed"
+	DeliveryUnknownCommand = "unknown-command"
+)
+
+// IsDelivery reports whether the Actionable is one of the three delivery-failure cards.
+func (a SessionActionable) IsDelivery() bool {
+	switch a.Kind {
+	case DeliveryMaybeSent, DeliverySendFailed, DeliveryUnknownCommand:
+		return true
+	}
+	return false
+}
 
 // IsQueue reports whether the Action queues Target's epic instead of sending
 // prompts.

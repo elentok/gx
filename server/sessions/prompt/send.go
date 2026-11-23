@@ -3,9 +3,7 @@ package prompt
 import (
 	"cmp"
 	"errors"
-	"fmt"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/elentok/gx/server/sessions"
@@ -23,13 +21,6 @@ const codexSlashWatch = 2 * time.Second
 
 // sendSettle is how long a chat send waits for its turn before it checks that the Enter landed.
 const sendSettle = 3 * time.Second
-
-const (
-	sendFailedPrefix = "Send failed: "
-	// maybeSentPrefix starts the card of a slash send whose outcome the screen
-	// could not tell; it has no Action, as a resend could run the command twice.
-	maybeSentPrefix = "May not have been sent: "
-)
 
 // sendPrompt delivers a person's text to the session through deliver.Deliver. A
 // send that gives up raises a gx Actionable with the text, so the person can
@@ -82,7 +73,7 @@ func (p *Prompt) deliverPolicy(dir, text string, grace time.Duration, report str
 	return policy
 }
 
-// finishSend settles a send's result: a success clears an earlier "Send failed"
+// finishSend settles a send's result: a success clears an earlier delivery
 // card, a stop raises nothing and any other error raises the card. A plain
 // function, so Prompt's method count stays down.
 func finishSend(p *Prompt, dir, text string, imgs imageSet, err error) {
@@ -92,26 +83,20 @@ func finishSend(p *Prompt, dir, text string, imgs imageSet, err error) {
 		p.clearSendFailed(dir)
 	case errors.Is(err, errNudgeCancelled), errors.Is(err, ErrServerStopping):
 		log.Info("send stopped", "err", err)
-	case errors.Is(err, deliver.ErrMaybeUnsent):
-		log.Warn("send undecided", "err", err)
-		reason := strings.TrimPrefix(err.Error(), deliver.ErrMaybeUnsent.Error()+": ")
-		p.raiseActionable(dir, wire.SessionActionable{Reason: maybeSentPrefix + reason, Images: imgs.ids, GxRaised: true})
 	default:
 		log.Warn("send failed", "err", err)
-		p.raiseActionable(dir, wire.SessionActionable{
-			Reason: fmt.Sprintf("%s%v", sendFailedPrefix, err), Action: []string{text},
-			Images: imgs.ids, GxRaised: true,
-		})
+		a := deliveryCard(text, err)
+		a.Images = imgs.ids
+		p.raiseActionable(dir, a)
 	}
 }
 
-// clearSendFailed drops an earlier "Send failed" card once a send gets
+// clearSendFailed drops an earlier delivery card once a send gets
 // through, so the person doesn't see a stale stop on a session that runs.
 func (p *Prompt) clearSendFailed(dir string) {
 	id := filepath.Base(dir)
 	p.sessions.UpdateSessionMetaOrWarn(dir, id, func(m *sessions.Meta) bool {
-		reason := m.Actionable.Reason
-		if !m.Actionable.GxRaised || !strings.HasPrefix(reason, sendFailedPrefix) && !strings.HasPrefix(reason, maybeSentPrefix) {
+		if !m.Actionable.GxRaised || !m.Actionable.IsDelivery() {
 			return false
 		}
 		m.Actionable = wire.SessionActionable{}
