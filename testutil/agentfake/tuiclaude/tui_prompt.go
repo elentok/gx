@@ -19,6 +19,10 @@ func (t *tui) submit() error {
 		t.draw()
 		return nil
 	}
+	if t.pid.Status == StatusIdle && t.armUndecided() {
+		t.draw()
+		return nil
+	}
 	if t.swallow > 0 {
 		t.swallow--
 		t.draw()
@@ -51,6 +55,10 @@ func (t *tui) submit() error {
 	}
 	if text == "" && t.pid.Status != StatusWaiting {
 		return nil
+	}
+	if t.pid.Status == StatusIdle {
+		// A new prompt ends the screen of the last local command.
+		t.landed = nil
 	}
 	switch t.pid.Status {
 	case StatusIdle:
@@ -145,6 +153,11 @@ func (t *tui) submit() error {
 		if t.fast {
 			return t.fastTurn()
 		}
+		if isCompact(text) {
+			if err := t.startCompact(text); err != nil {
+				return err
+			}
+		}
 		if cfg, err := LoadWorkerConfig(t.pid.Cwd); err == nil && cfg.Chat {
 			return t.chatTurn(text, images)
 		}
@@ -221,7 +234,7 @@ func (o tuiOptions) skillUnknown(skill string, sinceStart time.Duration) bool {
 // whether it handled the prompt. The launch-record knob only writes the user
 // record and leaves the rest to the normal path.
 func (t *tui) skillPromptKnobs(text string) (bool, error) {
-	if !strings.HasPrefix(text, "/") || text == "/clear" || text == "/exit" || isCompact(text) {
+	if !strings.HasPrefix(text, "/") || text == "/clear" || text == "/exit" || isCompact(text) || t.opensLocalDialog(text) {
 		return false, nil
 	}
 	o := t.opts
@@ -434,6 +447,8 @@ func (t *tui) slashCommand(text string) error {
 		t.busyNext = false
 		t.prompt = text
 		return t.setStatus(StatusBusy, "")
+	case t.opensLocalDialog(text):
+		t.openLocalDialog(text)
 	}
 	return nil
 }

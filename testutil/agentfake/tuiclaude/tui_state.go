@@ -56,6 +56,7 @@ func (t *tui) cancel() error {
 	if t.pid.Status != StatusBusy {
 		return nil
 	}
+	t.compact = nil
 	t.typed.Reset()
 	t.typed.WriteString(t.prompt)
 	if err := t.setStatus(StatusIdle, ""); err != nil {
@@ -69,6 +70,9 @@ func (t *tui) handleControl(c Control) error {
 	switch c.Action {
 	case ActionFinish:
 		t.askHook = nil
+		if err := t.finishCompact(); err != nil {
+			return err
+		}
 		if err := t.setStatus(StatusIdle, ""); err != nil {
 			return err
 		}
@@ -128,6 +132,9 @@ func (t *tui) handleControl(c Control) error {
 		return nil
 	case ActionSwallowEnter:
 		t.swallow++
+		return nil
+	case ActionUndecided:
+		t.undecidedNext = true
 		return nil
 	case ActionModel:
 		t.opts.model = c.Model
@@ -345,6 +352,11 @@ func (t *tui) draw() {
 			no, yes = "  No, exit", "❯ Yes, I trust this folder"
 		}
 		rows = []string{"Quick safety check: Is this a project you created or one you trust?", "", no, yes}
+	case t.localDialog != "":
+		rows = t.localDialogRows()
+	case t.compact != nil && t.pid.Status == StatusBusy:
+		title = WorkingTitle
+		rows = t.compactRows()
 	case t.pid.Status == StatusWaiting:
 		rows = []string{
 			"> " + t.prompt,
@@ -359,9 +371,12 @@ func (t *tui) draw() {
 	case t.pid.Status == StatusBusy:
 		title = WorkingTitle
 		rows = []string{"> " + t.prompt, "✻ Working…"}
+	case t.undecided:
+		rows = t.undecidedRows()
 	case t.opts.draft != "" || !t.opts.plainScreen:
 		// The input box claudeui.InputBox recognises.
-		rows = append([]string{colored("✻ Welcome to Claude Code"), ""}, t.boxRows()...)
+		rows = append([]string{colored("✻ Welcome to Claude Code"), ""}, t.landed...)
+		rows = append(rows, t.boxRows()...)
 	default:
 		rows = []string{colored("✻ Welcome to Claude Code"), "", "> " + t.typed.String()}
 	}

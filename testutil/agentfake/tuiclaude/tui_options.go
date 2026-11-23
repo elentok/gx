@@ -91,6 +91,10 @@ type tuiOptions struct {
 	modelRow ProbeModel
 	// settings is --settings: inline JSON or a path to a JSON file.
 	settings string
+	// compactDuration ends a running /compact by itself (see TUICompactDurationEnv).
+	compactDuration time.Duration
+	// undecided arms ActionUndecided at launch (see TUIUndecidedEnv).
+	undecided bool
 }
 
 // vimWedge parses a TUIVimWedgeEnv spec into the footer row to draw and
@@ -160,6 +164,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		vimFooter = "-- INSERT --"
 	}
 	pasteOver := pasteOverLimit(os.Getenv(TUIPasteOverEnv))
+	compactDuration, _ := time.ParseDuration(os.Getenv(TUICompactDurationEnv))
 	row, _ := LaunchModel(*model)
 	return tuiOptions{
 		hung:                  hung,
@@ -186,6 +191,8 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		model:                 cmp.Or(ResolveClaudeModel(*model), ReportedModel),
 		modelRow:              row,
 		settings:              settings,
+		compactDuration:       compactDuration,
+		undecided:             os.Getenv(TUIUndecidedEnv) == "1",
 	}, nil
 }
 
@@ -282,5 +289,6 @@ func runTUIClaude() (int, error) {
 		},
 	}
 	t.typed.WriteString(opts.draft)
+	t.undecidedNext = opts.undecided
 	return t.run(io.TeeReader(os.Stdin, in), ctl)
 }

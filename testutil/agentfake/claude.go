@@ -44,6 +44,11 @@ const (
 	// busy until ActionFinish, ActionBlock or ActionExit. Unlike ActionStall,
 	// the prompt is accepted.
 	ActionBusy = "busy"
+	// ActionUndecided makes the TUI fake's next "/" draft submit leave its text
+	// in the input, swallow every Enter after it and draw a frame with no box
+	// and our text on a row that is neither the echo nor a menu row, so the box
+	// reader cannot decide.
+	ActionUndecided = "undecided"
 	// ActionAPIError makes the TUI fake append the transcript line claude
 	// writes for a failed API call: Error, Status and Message say which.
 	ActionAPIError = "apierror"

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/harness"
@@ -95,7 +96,28 @@ const (
 	// does when the auto-mode classifier is down: the turn ends on a "no verdict"
 	// tool error and the ticket is not worked. A later prompt works it.
 	TUIClassifierOutageEnv = "GX_AGENTFAKE_TUI_CLASSIFIER_OUTAGE"
+	// TUICompactDurationEnv, a Go duration, ends a running /compact by itself
+	// after that long. Without it only ActionFinish ends the compaction.
+	TUICompactDurationEnv = "GX_AGENTFAKE_TUI_COMPACT_DURATION"
+	// TUIUndecidedEnv, set to "1", arms ActionUndecided at launch.
+	TUIUndecidedEnv = "GX_AGENTFAKE_TUI_UNDECIDED"
 )
+
+// TUILocalCommandsPath logs one line per local-command event of the TUI fake
+// running sessionID under home: compact-start, compact-done, model-saved,
+// model-kept and help-closed.
+func TUILocalCommandsPath(home, sessionID string) string {
+	return filepath.Join(home, ".claude", "agentfake", sessionID+".localcmds")
+}
+
+// ReadTUILocalCommands is the events logged at TUILocalCommandsPath, in order.
+func ReadTUILocalCommands(home, sessionID string) []string {
+	raw, err := os.ReadFile(TUILocalCommandsPath(home, sessionID))
+	if err != nil {
+		return nil
+	}
+	return strings.Fields(string(raw))
+}
 
 // UnknownCommandText is what claude draws, and records, for a skill it doesn't know.
 func UnknownCommandText(skill string) string { return "Unknown command: " + skill }

@@ -145,6 +145,7 @@ var allowed = map[string]int{
 	"server/serverflows/unavailable_test.go":                           1,
 	"storecommit/storecommit_test.go":                                  1,
 	"testutil/agentfake/tuiclaude/tui_test.go":                         10, // poll loop with a deadline; negative waits: a slow-marker status must stay busy; an unarmed slash prompt starts no turn; an ignored Allow keeps the dialog open; a lone Esc leaves the turn alone; a stall lands before the prompt; the registry delay (1s) must pass before the retry; the launch-record opt-out writes no user record
+	"testutil/agentfake/tuiclaude/tui_localcmd_test.go":                1,  // negative wait: a compaction with no duration must stay busy
 	"testutil/agentfake/worker_test.go":                                1,
 	"testutil/gxfixture/limitsflows/cachegate_test.go":                 5, // two poll loops with a deadline; negative waits: the gate holds the clean
 	"testutil/gxfixture/designflows/design_test.go":                    5,

@@ -91,6 +91,17 @@ type tui struct {
 	// askUI is the AskUserQuestion dialog an ActionAskScreen opened; it takes
 	// every key until it ends.
 	askUI *askUI
+	// localDialog is the /model or /help dialog that is open ("" for none); it
+	// takes every key until it closes.
+	localDialog string
+	// compact is the running /compact, nil when none runs.
+	compact *compactRun
+	// landed are the rows of a finished local command, drawn above the box
+	// until the next submitted prompt.
+	landed []string
+	// undecidedNext arms the undecided mode for the next "/" draft; undecided
+	// is it active (see ActionUndecided).
+	undecidedNext, undecided bool
 }
 
 func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
@@ -144,6 +155,10 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			}
 		case t.askUI != nil:
 			if err := t.askScreenKey(ev.Key); err != nil {
+				return 0, err
+			}
+		case t.localDialog != "":
+			if err := t.localDialogKey(ev.Key); err != nil {
 				return 0, err
 			}
 		case t.opts.trust:
