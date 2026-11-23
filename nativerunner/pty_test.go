@@ -104,13 +104,15 @@ func TestPty_VimModeComesFromTheConfigDirInEnv(t *testing.T) {
 	})
 }
 
-// A /config toggle to vim after launch is probed. The TUI fake has no vim input
-// row the probe can read, so the result is unknown: the nudge logs it with its
-// caller and a capture of the screen, and types nothing.
+// A /config toggle to vim after launch is probed. The TUI fake is wedged in
+// NORMAL, which takes no keys, so the probe sees neither a marker nor a change
+// and the result is unknown: the nudge logs it with its caller and a capture of
+// the screen, and types nothing.
 func TestPty_NudgeAfterVimToggleLogsUnknownWithCaptureAndTypesNothing(t *testing.T) {
 	t.Parallel()
 	p := newPty(t)
-	p.Env = append(claudeenv.In(t.TempDir()), holder.HolderEnv+"=1", agentfake.TUIEnv+"=1")
+	wedge := "NORMAL:1:" + filepath.Join(t.TempDir(), "launches")
+	p.Env = append(claudeenv.In(t.TempDir()), holder.HolderEnv+"=1", agentfake.TUIEnv+"=1", agentfake.TUIVimWedgeEnv+"="+wedge)
 	var logs bytes.Buffer
 	p.SetLog(slog.New(slog.NewJSONHandler(&logs, nil)))
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})

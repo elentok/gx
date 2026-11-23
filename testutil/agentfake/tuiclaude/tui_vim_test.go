@@ -62,7 +62,7 @@ func TestTUIClaude_VimWedgeClearsAfterNLaunches(t *testing.T) {
 	healthy := startTUIFake(t, tuiLaunchArgs, TUIVimWedgeEnv+"="+spec)
 	healthy.waitStatus(StatusIdle, "")
 	healthy.typeRaw("z")
-	healthy.waitScreen("> z")
+	healthy.waitScreen("❯ z")
 	if strings.Contains(healthy.screen.String(), "-- INSERT --") {
 		t.Errorf("second launch drew the footer: %q", healthy.screen.String())
 	}
@@ -78,7 +78,7 @@ func TestTUIClaude_IgnoreEditorModeDrawsInsertAndTakesKeys(t *testing.T) {
 	f.waitScreen("-- INSERT --")
 
 	f.typeRaw("k")
-	f.waitScreen("> k")
+	f.waitScreen("❯ k")
 	f.typeLine("go")
 	f.waitStatus(StatusBusy, "")
 }
@@ -87,7 +87,7 @@ func TestTUIClaude_WithoutVimKnobsNoFooterIsDrawn(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs)
 	f.waitStatus(StatusIdle, "")
 	f.typeRaw("k")
-	f.waitScreen("> k")
+	f.waitScreen("❯ k")
 	if strings.Contains(f.screen.String(), "-- ") {
 		t.Errorf("unexpected footer: %q", f.screen.String())
 	}

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/charmbracelet/x/term"
 )
 
 // ProgramInputEnv, set to "1", gives the fake program an input box like
@@ -172,9 +174,26 @@ func (b *InputBox) drawnLines() []string {
 	return strings.Split(pasteMarkers.Replace(text), "\n")
 }
 
+// BoxCols is the width of claude's input box: the terminal's (20 without a
+// tty), never under 3, the least claudeui.InputBox reads as a rule.
+func BoxCols() int {
+	cols, _, err := term.GetSize(os.Stdout.Fd())
+	if err != nil || cols <= 0 {
+		cols = 20
+	}
+	return max(cols, 3)
+}
+
+// BoxRule is one border rule of claude's input box.
+func BoxRule() string { return strings.Repeat("─", BoxCols()) }
+
 func (b *InputBox) Draw() {
 	var sb strings.Builder
 	sb.WriteString("\x1b[2J\x1b[H")
+	boxed := b.Marker == PromptMarker
+	if boxed {
+		sb.WriteString(BoxRule() + "\r\n")
+	}
 	if b.normal && b.Text() == "" {
 		// The placeholder's text, unstyled, so a draft check that reads the
 		// screen before the INSERT switch sees a draft, while the vim probe sees
@@ -190,6 +209,9 @@ func (b *InputBox) Draw() {
 				sb.WriteString("\r\n  " + line)
 			}
 		}
+	}
+	if boxed {
+		sb.WriteString("\r\n" + BoxRule())
 	}
 	if b.vim && !b.normal && !b.noMarker {
 		sb.WriteString("\r\n-- INSERT --")

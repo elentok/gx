@@ -18,11 +18,13 @@ import (
 const signalPrompt = "fix the bug"
 
 // startTUIPromptSession starts a claude session on the TUI fake with a plain
-// first prompt. It returns the server log path.
+// first prompt. It returns the server log path. The fake draws its plain
+// screen: the input box's composer marker would be the first ready signal, and
+// this flow is about the pid file's.
 func startTUIPromptSession(t *testing.T) string {
 	t.Helper()
 	bin, home := t.TempDir(), t.TempDir()
-	script := "#!/bin/sh\nexport " + agentfake.TUIEnv + "=1\nexec '" + os.Args[0] + "' \"$@\"\n"
+	script := "#!/bin/sh\nexport " + agentfake.TUIEnv + "=1 " + agentfake.TUIPlainScreenEnv + "=1\nexec '" + os.Args[0] + "' \"$@\"\n"
 	if err := os.WriteFile(filepath.Join(bin, "claude"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}

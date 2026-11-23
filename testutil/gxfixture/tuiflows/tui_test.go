@@ -57,5 +57,5 @@ func TestTUI_AgentsTerminalTypesShiftedLetters(t *testing.T) {
 		return visible
 	})
 	v.Send("Hi There!")
-	v.WaitText("> Hi There!", waitTimeout)
+	v.WaitText("Hi There!", waitTimeout)
 }

@@ -65,7 +65,15 @@ func (t *tui) pasteKey(key byte) bool {
 // chip, anything else is text.
 func (t *tui) pasted(body string) {
 	path := strings.TrimSpace(body)
+	t.menuClosed = false
 	if !IsImageFile(path) {
+		if len(body) > pasteChipOver {
+			if t.typed.Len() == 0 {
+				t.pastes = nil
+			}
+			t.pastes = append(t.pastes, body)
+			body = PastedChip(len(t.pastes), body)
+		}
 		t.typed.WriteString(body)
 		t.draw()
 		return

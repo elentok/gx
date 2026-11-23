@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/harness"
 )
 
@@ -43,6 +44,15 @@ func (p *HeldProgram) waitInput(want harness.InputState) {
 func (p *HeldProgram) submitted() string {
 	data, _ := os.ReadFile(ProgramSubmittedPath(p.conv))
 	return string(data)
+}
+
+func TestProgramInput_ClaudeMarkerDrawsRulesAroundTheInputRow(t *testing.T) {
+	p := holdInputProgram(t)
+	p.WaitScreen(ProgramPlaceholder)
+	p.keys("hi")
+	p.WaitFor("a box around the draft", func() bool {
+		return claudeui.InputBox(p.rows())
+	})
 }
 
 func TestProgramInput_EmptyBoxShowsDimPlaceholder(t *testing.T) {

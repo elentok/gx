@@ -19,8 +19,31 @@ func (t *tui) submit() error {
 		t.draw()
 		return nil
 	}
-	text := t.typed.String()
+	if t.swallow > 0 {
+		t.swallow--
+		t.draw()
+		return nil
+	}
+	text := t.expandPastes(t.typed.String())
+	if t.pid.Status == StatusIdle {
+		if cleaned, n := stripHidden(text); n > 0 {
+			if strings.HasPrefix(text, "/") || strings.HasPrefix(text, "!") {
+				// The first Enter only cleans the box; the next one sends it.
+				t.typed.Reset()
+				t.typed.WriteString(cleaned)
+				t.pastes = nil
+				t.notice, t.invisibleShown = invisibleNotice(n), true
+				t.draw()
+				return nil
+			}
+			text = cleaned
+		}
+	}
+	if t.invisibleShown {
+		t.notice, t.invisibleShown = "", false
+	}
 	t.typed.Reset()
+	t.pastes = nil
 	images := t.images
 	t.images = nil
 	if len(images) > 0 {

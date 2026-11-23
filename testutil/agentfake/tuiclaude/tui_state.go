@@ -23,6 +23,12 @@ import (
 // turn it does nothing: only Ctrl+C cancels that. A stalled fake leaves a
 // dialog open.
 func (t *tui) interrupt() error {
+	if t.askHook == nil && len(t.menuRows()) > 0 {
+		// Esc on an open suggestion menu only closes it.
+		t.menuClosed = true
+		t.draw()
+		return nil
+	}
 	t.typed.Reset()
 	if t.askHook != nil {
 		// Esc on a held dialog ends the hook, as claude does.
@@ -119,6 +125,9 @@ func (t *tui) handleControl(c Control) error {
 		return t.descendants.Start(c.Count, c.Depth)
 	case ActionStopDescendants:
 		t.descendants.Stop()
+		return nil
+	case ActionSwallowEnter:
+		t.swallow++
 		return nil
 	case ActionModel:
 		t.opts.model = c.Model
@@ -319,8 +328,7 @@ func (t *tui) startBackgroundTask(hold string) error {
 // (supports-color), it decides from TERM and COLORTERM alone, so a session
 // without them is colorless.
 func colored(s string) string {
-	term := os.Getenv("TERM")
-	if os.Getenv("COLORTERM") == "" && (term == "" || term == "dumb") {
+	if !colorEnabled() {
 		return s
 	}
 	return "\x1b[31m" + s + "\x1b[0m"
@@ -351,16 +359,9 @@ func (t *tui) draw() {
 	case t.pid.Status == StatusBusy:
 		title = WorkingTitle
 		rows = []string{"> " + t.prompt, "✻ Working…"}
-	case t.opts.draft != "":
-		input := PromptMarker + t.typed.String()
-		if t.typed.Len() == 0 {
-			input = PromptMarker + "\x1b[2m" + ProgramPlaceholder + "\x1b[0m"
-		}
-		rows = []string{colored("✻ Welcome to Claude Code"), "", input}
-	case !t.opts.plainScreen && t.typed.Len() == 0:
-		// The input box claudeui.InputBox recognises; typed text echoes as "> ".
-		const rule = "────────────────────"
-		rows = []string{colored("✻ Welcome to Claude Code"), "", rule, "❯ ", rule}
+	case t.opts.draft != "" || !t.opts.plainScreen:
+		// The input box claudeui.InputBox recognises.
+		rows = append([]string{colored("✻ Welcome to Claude Code"), ""}, t.boxRows()...)
 	default:
 		rows = []string{colored("✻ Welcome to Claude Code"), "", "> " + t.typed.String()}
 	}

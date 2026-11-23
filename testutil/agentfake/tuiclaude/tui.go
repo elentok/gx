@@ -75,7 +75,15 @@ type tui struct {
 	outageWork *PendingWork
 	// images are the paths behind the [Image #N] chips in the input.
 	images []string
+	// pastes are the real texts behind the [Pasted text #N] chips in the input.
+	pastes []string
 	paste  pasteState
+	// menuClosed is set by Esc on an open suggestion menu, until the next typed key.
+	menuClosed bool
+	// swallow is how many more Enters do nothing (ActionSwallowEnter).
+	swallow int
+	// invisibleShown is set while notice is the "Removed N invisible character" line.
+	invisibleShown bool
 	// descendants is the process tree an ActionDescendants started.
 	descendants DescendantTree
 	// askHook is the AskUserQuestion hook an ActionAskQuestion started; Esc ends it.
@@ -175,6 +183,10 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			redraw()
 		default:
 			t.typed.WriteByte(ev.Key)
+			t.menuClosed = false
+			if t.invisibleShown {
+				t.notice, t.invisibleShown = "", false
+			}
 			// Echoed as claude does, the terminal's cursor after it.
 			redraw()
 		}

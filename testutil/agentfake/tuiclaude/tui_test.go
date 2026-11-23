@@ -261,7 +261,8 @@ func TestTUIClaude_PastedImagePathsBecomeChipsAndTranscriptLines(t *testing.T) {
 	f.paste(a)
 	f.waitScreen("[Image #1] ")
 	f.paste(b)
-	f.waitScreen("[Image #1] [Image #2] ")
+	// The 20-column fallback wraps the second chip over two rows.
+	f.waitScreen("#2] ")
 	f.typeLine("look")
 	f.waitStatus(StatusBusy, "")
 	f.waitStatus(StatusIdle, "")
@@ -745,12 +746,12 @@ func TestTUIClaude_CtrlCEndsTheTurnAndRestoresThePrompt(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.waitStatus(StatusIdle, "")
-	f.waitScreen("> hello")
+	f.waitScreen("❯ hello")
 	if _, err := io.WriteString(f.stdin, "\x15"); err != nil {
 		t.Fatal(err)
 	}
 	f.typeLine("again")
-	f.waitScreen("> again")
+	f.waitScreen("❯ again")
 }
 
 func TestTUIClaude_ExitControlExitsWithCode(t *testing.T) {
