@@ -23,7 +23,6 @@ export const ROUTE_NAMES: Record<string, string> = {
   "/settings/p/:project/s/:section": SETTINGS,
   "/settings/logins": SETTINGS,
   "/settings/logins/:id": SETTINGS,
-  "/settings/notifications": SETTINGS,
   "/settings/password": SETTINGS,
   "/settings/authenticator": SETTINGS,
   "/settings/certificate": SETTINGS,

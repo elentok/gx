@@ -1,11 +1,11 @@
 import { fireEvent, waitFor } from "@testing-library/react"
-import { MemoryRouter, Route, Routes } from "react-router"
+import { MemoryRouter } from "react-router"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import { refreshPushDevice, resetPushDeviceForTest } from "../push/deviceState"
 import { fetchPushState, removePush, subscribePush, testPush } from "../push/pushApi"
 import { renderThemed } from "../ui/render"
-import { NotificationsPage } from "./NotificationsPage"
+import { PushDevicePanel } from "./NotificationsPage"
 import { fetchLogins } from "./logins"
 
 vi.mock("../push/pushApi", () => ({
@@ -32,10 +32,8 @@ const conn = {
 const renderPage = () =>
   renderThemed(
     <ConnectionContext.Provider value={conn}>
-      <MemoryRouter initialEntries={["/settings/notifications"]}>
-        <Routes>
-          <Route path="/settings/notifications" element={<NotificationsPage />} />
-        </Routes>
+      <MemoryRouter>
+        <PushDevicePanel />
       </MemoryRouter>
     </ConnectionContext.Provider>,
   )
@@ -114,7 +112,7 @@ afterEach(() => {
   Reflect.deleteProperty(navigator, "serviceWorker")
 })
 
-describe("NotificationsPage", () => {
+describe("PushDevicePanel", () => {
   it("never asks for permission on load, and asks exactly once on the switch tap", async () => {
     const { findByRole } = renderPage()
     const sw = await findByRole("switch", { name: "Notifications on this device" })

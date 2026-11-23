@@ -58,7 +58,6 @@ import {
   Frame,
   Group,
   LoadingState,
-  PushChip,
   rowProps,
   SearchBox,
 } from "./parts"
@@ -187,12 +186,6 @@ export function SettingsHomeView({
                       : `${loginCount} ${loginCount === 1 ? "device" : "devices"}`
                   }
                 />
-                <LinkRow
-                  href={`${SETTINGS_HREF}/notifications`}
-                  label="Notifications"
-                  part="notifications-row"
-                  detail={<PushChip />}
-                />
                 <LinkRow href={`${SETTINGS_HREF}/password`} label="Password" />
                 {totpOn && (
                   <LinkRow
@@ -280,6 +273,8 @@ const signedInText = (created?: string) =>
         year: "numeric",
       })
     : "Unknown"
+
+const PUSH_CONTACT_KEY = "server.web.push-contact-email"
 
 const pushSinceText = (since?: string) =>
   since ? new Date(since).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""
@@ -469,7 +464,11 @@ function useSettingsTarget(
   const projects = [...new Set(list?.epics.map((e) => e.project) ?? [])].sort()
   const onWrite: WriteSetting = async (changes) => {
     const res = await postChanges(target, changes)
-    if (!res.refused) settings.retry()
+    if (!res.refused) {
+      settings.retry()
+      // The server reloaded: the push card must see the new contact email.
+      if (changes.some((c) => c.key === PUSH_CONTACT_KEY)) void refreshPushDevice()
+    }
     return res
   }
   return { settings, projects, onWrite }

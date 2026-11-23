@@ -17,7 +17,7 @@ func TestCoreEntries(t *testing.T) {
 		restart    bool
 		risky      bool
 	}
-	q, b, n, s := SectionExecutionQueue, SectionBudget, SectionNotifications, SectionServer
+	q, b, n, s := SectionExecutionQueue, SectionBudget, SectionDesktop, SectionServer
 	cases := []want{
 		{key: Key("execution-queue", "max-agents"), typ: TypeNumber, section: q, projectKey: "max-agents"},
 		{key: Key("execution-queue", "max-agents-per-epic"), typ: TypeNumber, section: q, projectOv: true},
@@ -33,9 +33,9 @@ func TestCoreEntries(t *testing.T) {
 		{key: Key("agents", "sounds", "enabled"), typ: TypeBool, section: n},
 		{key: Key("agents", "sounds", "done"), typ: TypeString, section: n},
 		{key: Key("agents", "sounds", "attention"), typ: TypeString, section: n},
-		{key: Key("notifications", "telegram", "bot-token"), typ: TypeSecret, section: n},
-		{key: Key("notifications", "telegram", "chat-id"), typ: TypeString, section: n},
-		{key: Key("notifications", "slack", "webhook-url"), typ: TypeSecret, section: n},
+		{key: Key("notifications", "telegram", "bot-token"), typ: TypeSecret, section: SectionTelegram},
+		{key: Key("notifications", "telegram", "chat-id"), typ: TypeString, section: SectionTelegram},
+		{key: Key("notifications", "slack", "webhook-url"), typ: TypeSecret, section: SectionSlack},
 		{key: Key("server", "tab-env"), typ: TypeStringList, section: s},
 		{key: Key("server", "log-retention"), typ: TypeDuration, section: s},
 		{key: Key("server", "watch-config"), typ: TypeBool, section: s},
@@ -69,7 +69,7 @@ func TestCoreEntries(t *testing.T) {
 		{key: Key("mental-health", "break", "work-minutes"), typ: TypeNumber, section: SectionMentalHealth},
 		{key: Key("mental-health", "break", "break-minutes"), typ: TypeNumber, section: SectionMentalHealth},
 		{key: Key("mental-health", "break", "message"), typ: TypeString, section: SectionMentalHealth},
-		{key: Key("server", "web", "push-contact-email"), typ: TypeSecret, section: n},
+		{key: Key("server", "web", "push-contact-email"), typ: TypeSecret, section: SectionPush},
 	}
 	if got := len(r.All()); got != len(cases) {
 		t.Fatalf("entries = %d, want %d", got, len(cases))

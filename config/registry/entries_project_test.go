@@ -29,7 +29,7 @@ func TestProjectView(t *testing.T) {
 	paths := map[string]Entry{}
 	for _, ps := range view {
 		for _, e := range ps.Entries {
-			if ps.Section == SectionNotifications {
+			if ps.Category == CategoryNotifications {
 				t.Errorf("notifications entry in project view: %v", e.Key)
 			}
 			if e.Key.String() == "evolve.deep-read-cap" {

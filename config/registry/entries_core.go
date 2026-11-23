@@ -58,7 +58,7 @@ func coreEntries() []Entry {
 	add(alerts, Entry{Key: Key("subscription", "suppress-extra-usage-warning"), Type: TypeBool,
 		Description: "Hide the warning that appears when a subscription runs into extra paid usage."})
 
-	desktop := Place{CategoryNotifications, SectionNotifications, "Desktop"}
+	desktop := Place{CategoryNotifications, SectionDesktop, "Desktop"}
 	add(desktop, Entry{Key: Key("agents", "banners", "enabled"), Type: TypeBool,
 		Description: "Show an OS banner when an interactive agent session needs you."})
 	add(desktop, Entry{Key: Key("agents", "sounds", "enabled"), Type: TypeBool,
@@ -67,14 +67,14 @@ func coreEntries() []Entry {
 		Description: "The sound file played when a session finishes, relative to the config directory. Empty uses the built-in sound."})
 	add(desktop, Entry{Key: Key("agents", "sounds", "attention"), Type: TypeString,
 		Description: "The sound file played when a session needs you, relative to the config directory. Empty uses the built-in sound."})
-	telegram := Place{CategoryNotifications, SectionNotifications, "Telegram"}
+	telegram := Place{CategoryNotifications, SectionTelegram, "Telegram"}
 	add(telegram, Entry{Key: Key("notifications", "telegram", "bot-token"), Type: TypeSecret,
 		Description: "The token of the Telegram bot that sends notifications."})
 	add(telegram, Entry{Key: Key("notifications", "telegram", "chat-id"), Type: TypeString,
 		Description: "The Telegram chat that receives notifications."})
-	add(Place{CategoryNotifications, SectionNotifications, "Slack"}, Entry{Key: Key("notifications", "slack", "webhook-url"), Type: TypeSecret,
+	add(Place{CategoryNotifications, SectionSlack, "Slack"}, Entry{Key: Key("notifications", "slack", "webhook-url"), Type: TypeSecret,
 		Description: "The Slack webhook address that receives notifications."})
-	add(Place{CategoryNotifications, SectionNotifications, "Web push"}, Entry{Key: Key("server", "web", "push-contact-email"), Type: TypeSecret, CheckString: checkContactEmail,
+	add(Place{CategoryNotifications, SectionPush, "Push"}, Entry{Key: Key("server", "web", "push-contact-email"), Type: TypeSecret, CheckString: checkContactEmail,
 		Description: "The email address web push sends to the push service as its contact. Needed before the browser can turn on push. Empty turns web push off."})
 
 	mh := func(g string) Place { return Place{CategoryMentalHealth, SectionMentalHealth, g} }

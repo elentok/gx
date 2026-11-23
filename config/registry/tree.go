@@ -28,7 +28,10 @@ const (
 	SectionBudget         Section = "Budget"
 	SectionPullRequests   Section = "Pull requests"
 	SectionEvolveRecovery Section = "Evolve and recovery"
-	SectionNotifications  Section = "Notifications"
+	SectionDesktop        Section = "Desktop"
+	SectionSlack          Section = "Slack"
+	SectionTelegram       Section = "Telegram"
+	SectionPush           Section = "Push"
 	SectionMentalHealth   Section = "Mental health"
 	SectionAccess         Section = "Access"
 	SectionKeybindings    Section = "Keybindings"
@@ -113,7 +116,10 @@ var tree = []CategoryDef{
 		{SectionEvolveRecovery, groups("Evolve", "Recovery")},
 	}},
 	{CategoryNotifications, []SectionDef{
-		{SectionNotifications, groups("Desktop", "Telegram", "Slack", "Web push")},
+		{SectionDesktop, groups("Desktop")},
+		{SectionSlack, groups("Slack")},
+		{SectionTelegram, groups("Telegram")},
+		{SectionPush, groups("Push")},
 	}},
 	{CategoryMentalHealth, []SectionDef{
 		{SectionMentalHealth, groups("General", "Bedtime", "Break")},

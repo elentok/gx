@@ -163,7 +163,7 @@ func TestReadProjectListsOnlyProjectKeys(t *testing.T) {
 		if !def.AppliesToProject() {
 			t.Errorf("project read lists %s", e.Key)
 		}
-		if def.Section == registry.SectionNotifications {
+		if def.Category == registry.CategoryNotifications {
 			t.Errorf("project read lists notifications key %s", e.Key)
 		}
 	}

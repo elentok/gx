@@ -2,7 +2,6 @@ import { Box, chakra, Text } from "@chakra-ui/react"
 import type { ReactNode } from "react"
 import { SETTINGS_HREF } from "../hrefs"
 import { StateHeader } from "../page/StateHeader"
-import { usePushDevice } from "../push/deviceState"
 import { Spinner } from "../ui/spinner/Spinner"
 
 /** A settings page still loading: the page's own header over the spinner. */
@@ -35,25 +34,6 @@ export const CountChip = ({ n, testId }: { n: number; testId?: string }) => (
     {n}
   </chakra.span>
 )
-
-/** "On" only while push is on for this device, else "Off". */
-export function PushChip() {
-  const { on } = usePushDevice()
-  return (
-    <chakra.span
-      data-mock-part="push-state-chip"
-      fontSize="11px"
-      px="7px"
-      py="1px"
-      borderRadius="full"
-      borderWidth="1px"
-      borderColor={on ? "tone.done.fg" : "border"}
-      color={on ? "tone.done.fg" : "text.muted"}
-    >
-      {on ? "On" : "Off"}
-    </chakra.span>
-  )
-}
 
 /** The text with each case-insensitive occurrence of the query wrapped in a <mark>. A blank query leaves it plain. */
 export function Highlight({ text, query }: { text: string; query?: string }) {

@@ -424,21 +424,6 @@ describe("SettingsHomeView", () => {
     expect(onSignOut).toHaveBeenCalledOnce()
   })
 
-  it("puts Notifications between Web logins and Password, with a chip that reads On only while push is on", () => {
-    const rows = () => renderThemed(<SettingsHomeView loginCount={1} totpOn onSignOut={() => {}} />)
-    push.on = false
-    const off = rows()
-    const hrefs = off.getAllByRole("link").map((a) => a.getAttribute("href"))
-    expect(hrefs.indexOf("#/settings/notifications")).toBe(hrefs.indexOf("#/settings/logins") + 1)
-    expect(hrefs.indexOf("#/settings/password")).toBe(hrefs.indexOf("#/settings/notifications") + 1)
-    expect(off.getByRole("link", { name: /Notifications/ }).textContent).toContain("Off")
-    off.unmount()
-    push.on = true
-    const on = rows()
-    expect(on.getByRole("link", { name: /Notifications/ }).textContent).toContain("On")
-    push.on = false
-  })
-
   it("lists the response's sections with a chevron and the changed count, and no project list", () => {
     const entries = [
       {

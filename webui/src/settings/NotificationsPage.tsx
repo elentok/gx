@@ -1,8 +1,5 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { useState } from "react"
-import { DetailPage } from "../page/DetailPage"
-import { PageHeader } from "../page/PageHeader"
-import { PageIcon } from "../page/PageIcon"
 import {
   decodeKey,
   refreshPushDevice,
@@ -14,8 +11,7 @@ import {
 } from "../push/deviceState"
 import { disabledReason } from "../push/reason"
 import { fetchPushState, removePush, subscribePush, testPush } from "../push/pushApi"
-import { useReady } from "../useReady"
-import { BackLink, Chevron, Frame, rowProps } from "./parts"
+import { Chevron, rowProps } from "./parts"
 
 export const SWITCH_LABEL = "Notifications on this device"
 export const SWITCH_OFF_TEXT = "Off. Turning it on asks this browser for permission."
@@ -126,7 +122,8 @@ const Message = ({
   </Text>
 )
 
-export function NotificationsView({
+/** The switch, the test row and their messages. Lives in the Push group of the Notifications section. */
+export function PushControls({
   device,
   busy,
   error,
@@ -145,10 +142,8 @@ export function NotificationsView({
   const reason = disabledReason(device)
   const failedAt = device.failureAt ? new Date(device.failureAt) : undefined
   return (
-    <Frame>
-      <BackLink />
-      <PageHeader title="Notifications" icon={<PageIcon kind="settings" />} />
-      <Text mt="1" fontSize="sm" color="text.muted">
+    <Box px="3" pb="3" data-mock-part="push-controls">
+      <Text mt="3" fontSize="sm" color="text.muted">
         Push alerts for sessions that need you, on this device only.
       </Text>
       <Card part="switch-card">
@@ -198,12 +193,12 @@ export function NotificationsView({
           {testMessage.text}
         </Message>
       )}
-    </Frame>
+    </Box>
   )
 }
 
-export function NotificationsPage() {
-  useReady()
+/** The push controls with their own state: the device, the busy flag, the last error and the test result. */
+export function PushDevicePanel() {
   const device = usePushDevice()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -240,15 +235,14 @@ export function NotificationsPage() {
   }
 
   return (
-    <DetailPage title={{ kind: "Settings", name: "Notifications" }}>
-      <NotificationsView
-        device={device}
-        busy={busy}
-        error={error}
-        testMessage={testMessage}
-        onToggle={() => void run(device.on ? turnOff : turnOn)}
-        onTest={() => void test()}
-      />
-    </DetailPage>
+    <PushControls
+      device={device}
+      busy={busy}
+      error={error}
+      testMessage={testMessage}
+      onToggle={() => void run(device.on ? turnOff : turnOn)}
+      onTest={() => void test()}
+    />
   )
 }
+

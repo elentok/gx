@@ -400,16 +400,12 @@ test("2. Epic PWA: Force refresh and cold open", async ({ page, start, context }
     const go = (hash: string) => notif.evaluate((h) => (location.hash = h), hash)
     await notif.goto(new URL("#/settings", page.url()).href)
 
-    // Story 4: the Account rows in order, and Notifications starts with an Off chip.
+    // Story 4: the Account rows no longer hold Notifications; the push card sits in the Notifications section.
     const account = notif.locator('[data-mock-part="account-group"]')
-    await expect(account.getByRole("link").nth(2)).toContainText("Password")
-    await expect(account.getByRole("link").nth(0)).toContainText("Web logins")
-    await expect(account.getByRole("link").nth(1)).toContainText("Notifications")
-    await expect(account.getByRole("link", { name: /^Notifications/ })).toContainText("Off")
+    await expect(account.getByRole("link", { name: /^Notifications/ })).toHaveCount(0)
 
     // Story 2: opening the page asks for nothing, and the test row waits for the switch.
-    await account.getByRole("link", { name: /^Notifications/ }).click()
-    await expect(notif).toHaveURL(/#\/settings\/notifications$/)
+    await go("#/settings/s/push")
     const toggle = notif.getByRole("switch", { name: "Notifications on this device" })
     await expect(toggle).toHaveAttribute("aria-checked", "false")
     const testRow = notif.getByRole("button", { name: /Send test push/ })
@@ -429,7 +425,7 @@ test("2. Epic PWA: Force refresh and cold open", async ({ page, start, context }
     await expect(loginRow).toContainText("Push on")
 
     // Stories 13, 15: a test push is sent, a failing fixture shows the failure, a healthy one clears it.
-    await go("#/settings/notifications")
+    await go("#/settings/s/push")
     await expect(toggle).toHaveAttribute("aria-checked", "true")
     await expect(testRow).toBeEnabled()
     await testRow.click()
@@ -468,7 +464,7 @@ test("2. Epic PWA: Force refresh and cold open", async ({ page, start, context }
     await expect(loginRow).not.toContainText("Push on")
 
     // Story 18: Remove on the login's page keeps the login and drops the push.
-    await go("#/settings/notifications")
+    await go("#/settings/s/push")
     await toggle.click()
     await expect(toggle).toHaveAttribute("aria-checked", "true")
     await go("#/settings/logins")
@@ -480,7 +476,7 @@ test("2. Epic PWA: Force refresh and cold open", async ({ page, start, context }
     await go("#/settings/logins")
     await expect(loginRow).toBeVisible()
     await expect(loginRow).not.toContainText("Push on")
-    await go("#/settings/notifications")
+    await go("#/settings/s/push")
     await expect(toggle).toHaveAttribute("aria-checked", "false")
     await notif.close()
 

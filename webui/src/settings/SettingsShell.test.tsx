@@ -303,35 +303,12 @@ describe("SettingsShellView", () => {
     expect(options).toEqual(["Global settings", "Project: gx", "Project: ripple"])
   })
 
-  it("lists Notifications between Web logins and Password, with a chip that reads On only while push is on", () => {
-    const { getByRole, unmount } = renderShell()
-    fireEvent.click(getByRole("button", { name: /Account/ }))
-    const hrefs = () =>
-      Array.from(document.querySelectorAll("a[href^='#/settings/']")).map((a) =>
-        a.getAttribute("href"),
-      )
-    expect(hrefs().indexOf("#/settings/notifications")).toBe(
-      hrefs().indexOf("#/settings/logins") + 1,
-    )
-    expect(hrefs().indexOf("#/settings/password")).toBe(
-      hrefs().indexOf("#/settings/notifications") + 1,
-    )
-    expect(getByRole("link", { name: /Notifications/ }).textContent).toContain("Off")
-    unmount()
-    push.on = true
-    const on = renderShell()
-    fireEvent.click(on.getByRole("button", { name: /Account/ }))
-    expect(on.getByRole("link", { name: /Notifications/ }).textContent).toContain("On")
-    push.on = false
-  })
-
   it("keeps the Account rows and their hrefs, and signs out", () => {
     const onSignOut = vi.fn()
     const { getByRole, getByText } = renderShell(undefined, onSignOut)
     fireEvent.click(getByRole("button", { name: /Account/ }))
     for (const [name, href] of [
       ["Web logins", "#/settings/logins"],
-      ["Notifications", "#/settings/notifications"],
       ["Password", "#/settings/password"],
       ["Authenticator", "#/settings/authenticator"],
       ["Certificate", "#/settings/certificate"],
