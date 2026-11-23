@@ -95,6 +95,8 @@ type Deps struct {
 	Events   *broker.Broker
 	Projects *projects.Registry
 	Chat     *notify.ServerChat
+	// Push sends the Web Push of a pause; nil sends none.
+	Push     Pusher
 	Registry *runs.Registry
 	Guards   *runs.Guards
 	Harness  *harnesschoice.Harness

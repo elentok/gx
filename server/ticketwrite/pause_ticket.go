@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/ralphloop/ticketops"
@@ -65,18 +66,67 @@ func (w *Writer) NotifyPause(addr tickets.Address, ticketPath string, kind event
 	w.sendPause(addr, ticketPath, kind, reason)
 }
 
-// sendPause sends the one chat message for a pause.
+// Pusher sends one Web Push; path is a route path. The push is independent of
+// Chat: no mute or destination gate applies to it.
+type Pusher interface {
+	SendPush(title, body, path, tag string, urgent bool)
+}
+
+// PushTicket sends a push tagged and routed to one ticket; a nil p sends none.
+func PushTicket(p Pusher, addr tickets.Address, title, body string, urgent bool) {
+	if p == nil {
+		return
+	}
+	p.SendPush(title, body, "/t/"+addr.String(), "ticket:"+addr.String(), urgent)
+}
+
+// PushEpic is PushTicket for an epic.
+func PushEpic(p Pusher, project, epic, title, body string, urgent bool) {
+	if p == nil {
+		return
+	}
+	id := project + ":" + epic
+	p.SendPush(title, body, "/e/"+id, "epic:"+id, urgent)
+}
+
+// sendPause sends the one chat message for a pause, and its push.
 func (w *Writer) sendPause(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
 	status := ticketops.PauseStatus(kind)
-	w.d.Chat.Pause(addr.Project, w.d.Projects.ChatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, PauseChatDetail(ticketPath, kind, reason), w.epicCounts(addr.Project, addr.Epic))
+	detail := PauseChatDetail(ticketPath, kind, reason)
+	w.d.Chat.Pause(addr.Project, w.d.Projects.ChatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, detail, w.epicCounts(addr.Project, addr.Epic))
+	title, body := notify.PauseText(addr.Epic, ticketPath, addr.ID, status, detail)
+	PushTicket(w.d.Push, addr, title, body, false)
 }
 
 // FinishSink carries the finish path's chat-worthy events the outcome cannot
 // show: a merge conflict's resolution starting, and its child pausing.
 func (w *Writer) FinishSink(addr tickets.Address, ticketPath string) runlog.EventSink {
-	return w.d.Chat.FinishSink(addr.Project, w.d.Projects.ChatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, func() schedule.EpicCounts {
+	chat := w.d.Chat.FinishSink(addr.Project, w.d.Projects.ChatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, func() schedule.EpicCounts {
 		return w.epicCounts(addr.Project, addr.Epic)
 	})
+	return pushSink{EventSink: chat, push: w.d.Push, addr: addr, ticketPath: ticketPath}
+}
+
+// pushSink adds the push of a conflict-resolution child's pause to the Chat sink.
+type pushSink struct {
+	runlog.EventSink
+	push       Pusher
+	addr       tickets.Address
+	ticketPath string
+}
+
+func (s pushSink) TicketNeedsHuman(identifier, epicName, status string, kind events.Kind, reason string) {
+	s.EventSink.TicketNeedsHuman(identifier, epicName, status, kind, reason)
+	// The parent's own pause is announced from the outcome, not here.
+	if identifier == s.addr.ID {
+		return
+	}
+	epicDir := filepath.Dir(filepath.Dir(s.ticketPath))
+	childPath := notify.ResolveTicketPath(filepath.Dir(epicDir), filepath.Base(epicDir), identifier)
+	title, body := notify.PauseText(s.addr.Epic, childPath, identifier, status, reason)
+	child := s.addr
+	child.ID = identifier
+	PushTicket(s.push, child, title, body, false)
 }
 
 // epicCounts tallies the epic from disk, fresh: a pause has just rewritten a

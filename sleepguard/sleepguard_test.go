@@ -107,6 +107,7 @@ var allowed = map[string]int{
 	"server/sched/ratelimit_hold_run_test.go":                          1, // negative wait: a launch would show within a few ticks
 	"server/recovery/recovery_notify_test.go":                          4,
 	"server/recovery/recovery_investigate_test.go":                     1,
+	"server/recovery/recovery_push_test.go":                            1, // negative wait: a wrong extra push would show within it
 	"server/recovery/recovery_gates_test.go":                           6,
 	"server/sched/runner_test.go":                                      1,
 	"server/schedules/scheduler_test.go":                               1, // negative wait: a second run or a skip would show within a few checks

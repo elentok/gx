@@ -22,7 +22,7 @@ import (
 // reads them per call.
 func newTicketWriter(s *Server) *ticketwrite.Writer {
 	return ticketwrite.New(ticketwrite.Deps{
-		Log: s.log, Index: s.idx, Events: s.events, Projects: s.projects, Chat: s.chat,
+		Log: s.log, Index: s.idx, Events: s.events, Projects: s.projects, Chat: s.chat, Push: sessionPush(s),
 		Registry: s.registry, Guards: s.guards, Harness: s.harness, Budget: s.budget,
 		Host: ticketWriteHost{s}, BlockWatchPoll: sched.BlockWatchPoll,
 	})

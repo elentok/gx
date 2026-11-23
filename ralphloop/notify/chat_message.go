@@ -343,6 +343,23 @@ func designReadyMessage(project, implEpic string, count int, link string) chatMe
 	}
 }
 
+// pushText is a message as a Web Push tells it: the Headline as title, the
+// lines joined as body. The project line is not part of a push.
+func pushText(m chatMessage) (title, body string) {
+	return m.Headline(), strings.Join(m.lines, " ")
+}
+
+// PauseText is Chat's pause wording as a push title and body.
+func PauseText(epic, ticketPath, identifier, status, detail string) (title, body string) {
+	return pushText(ticketPauseMessage("", epic, ticketPath, identifier, status, detail))
+}
+
+// EscalationText is Chat's escalation wording as a push title and body. An
+// empty ticketPath is an epic escalation.
+func EscalationText(epic, ticketPath, identifier, failure string) (title, body string) {
+	return pushText(escalatedMessage("", epic, ticketPath, identifier, failure))
+}
+
 // ticketPauseMessage is the "a machine paused this ticket for a person"
 // message: Answer for the answer class, Repair for any fault. status is the
 // ticket's stored status word, old or new.

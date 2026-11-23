@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop/agent"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server/queue"
@@ -206,6 +207,12 @@ func (rec *Recovery) escalate(plan recoveryPlan, f recovery.Failure, reason, out
 		failure = ticketwrite.PauseChatDetail(ref.Ticket.Path, f.Kind, f.Reason)
 	}
 	rec.d.Chat.Escalated(ref.Addr.Project, rec.d.Projects.ChatOverride(ref.Addr.Project), ref.Addr.Epic, ref.Ticket.Path, ref.Addr.ID, failure)
+	title, body := notify.EscalationText(ref.Addr.Epic, ref.Ticket.Path, ref.Addr.ID, failure)
+	if ref.Ticket.Path != "" {
+		ticketwrite.PushTicket(rec.d.Push, ref.Addr, title, body, true)
+	} else {
+		ticketwrite.PushEpic(rec.d.Push, ref.Addr.Project, ref.Addr.Epic, title, body, true)
+	}
 }
 
 // HoldPauseForRecovery starts whatever recovery the pause gets and, when a rule
