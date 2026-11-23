@@ -163,6 +163,16 @@ func rowsHoldOurs(rows []string, text string, chips int) bool {
 	return false
 }
 
+func screenCount(rows []string, s string) int {
+	n := 0
+	for _, r := range rows {
+		if strings.Contains(r, s) {
+			n++
+		}
+	}
+	return n
+}
+
 func screenHas(rows []string, s string) bool {
 	for _, r := range rows {
 		if strings.Contains(r, s) {
@@ -198,7 +208,9 @@ func (s *slashSend) unknown(rows []string) error {
 		return nil
 	}
 	marker := cmp.Or(s.caps.Marker, claudeui.UnknownCommandMarker+" "+firstToken(s.text))
-	if !screenHas(rows, marker) || screenHas(s.baseline, marker) {
+	// A count, not presence: a resend of a failed command finds the first
+	// failure's marker already on screen.
+	if screenCount(rows, marker) <= screenCount(s.baseline, marker) {
 		return nil
 	}
 	return errUnknown(s.text, marker)

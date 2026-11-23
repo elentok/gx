@@ -28,6 +28,9 @@ type tui struct {
 	limitLifted bool
 	// notice is a line drawn under the input, such as an unknown-command error.
 	notice string
+	// noticeRows is how many times notice is drawn: an unknown command repeated
+	// adds a line, as claude's transcript does.
+	noticeRows int
 	// vim is set by ActionVimToggle: the input then draws the INSERT footer.
 	vim        bool
 	pidPath    string
@@ -200,7 +203,7 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			t.typed.WriteByte(ev.Key)
 			t.menuClosed = false
 			if t.invisibleShown {
-				t.notice, t.invisibleShown = "", false
+				t.notice, t.invisibleShown, t.noticeRows = "", false, 0
 			}
 			// Echoed as claude does, the terminal's cursor after it.
 			redraw()

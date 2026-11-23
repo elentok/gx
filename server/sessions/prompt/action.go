@@ -50,6 +50,10 @@ func (p *Prompt) SendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 		}
 		imgs = p.imageSetOf(dir, ids, paths)
 	}
+	deliveryText := ""
+	if meta.Actionable.IsDelivery() {
+		deliveryText = meta.Actionable.CopyText
+	}
 	meta.Actionable = wire.SessionActionable{}
 	if auto {
 		meta.AutoSends++
@@ -61,9 +65,9 @@ func (p *Prompt) SendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 		return wire.SessionResult{}, err
 	}
 	p.events.Publish(wire.EventSessionChanged, req.ID)
-	if text := meta.Actionable.CopyText; text != "" && meta.Actionable.IsDelivery() {
+	if deliveryText != "" {
 		// Through the chat send path, so a second failure raises the same card.
-		p.sessions.Watches.Start(func() { p.sendPrompt(dir, text, imgs) })
+		p.sessions.Watches.Start(func() { p.sendPrompt(dir, deliveryText, imgs) })
 	} else if len(imgs.ids) > 0 {
 		p.sessions.Watches.Start(func() { p.sendPrompt(dir, action[0], imgs) })
 	} else {

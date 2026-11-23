@@ -36,7 +36,7 @@ func (t *tui) submit() error {
 				t.typed.Reset()
 				t.typed.WriteString(cleaned)
 				t.pastes = nil
-				t.notice, t.invisibleShown = invisibleNotice(n), true
+				t.notice, t.invisibleShown, t.noticeRows = invisibleNotice(n), true, 1
 				t.draw()
 				return nil
 			}
@@ -44,7 +44,7 @@ func (t *tui) submit() error {
 		}
 	}
 	if t.invisibleShown {
-		t.notice, t.invisibleShown = "", false
+		t.notice, t.invisibleShown, t.noticeRows = "", false, 0
 	}
 	t.typed.Reset()
 	t.pastes = nil
@@ -248,7 +248,11 @@ func (t *tui) skillPromptKnobs(text string) (bool, error) {
 	}
 	switch {
 	case o.skillUnknown(skill, time.Since(t.started)):
-		t.notice = UnknownCommandText(skill)
+		if text := UnknownCommandText(skill); text == t.notice {
+			t.noticeRows++
+		} else {
+			t.notice, t.noticeRows = text, 1
+		}
 		t.draw()
 		return true, AppendLine(path, map[string]any{
 			"type":      "system",

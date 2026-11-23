@@ -384,7 +384,9 @@ func (t *tui) draw() {
 		rows = []string{colored("✻ Welcome to Claude Code"), "", "> " + t.typed.String()}
 	}
 	if t.notice != "" && t.pid.Status == StatusIdle {
-		rows = append(rows, t.notice)
+		for range max(t.noticeRows, 1) {
+			rows = append(rows, t.notice)
+		}
 	}
 	footer := t.opts.vimFooter
 	if t.vim {

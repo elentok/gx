@@ -30,6 +30,22 @@ func TestDeliveryCards(t *testing.T) {
 			t.Errorf("card = %+v, want the unknown-command kind with the text", got)
 		}
 	})
+	t.Run("ResendOfUnknownCommandTypesTheCopyTextAndRaisesTheSameCard", func(t *testing.T) {
+		t.Parallel()
+		c := startTUIChat(t, agentfake.TUIUnknownSkillEnv+"=1")
+		c.send(t, "/my-skill")
+		first := c.card(t)
+		if res, err := c.h.Client.Sessions.RunAction(c.ctx, c.id); err != nil || res.Refused {
+			t.Fatalf("run action = %+v, %v", res, err)
+		}
+		c.waitKeys(t, "the second typing", func(k string) bool { return strings.Count(k, "/my-skill") >= 2 })
+		got := servertest.WaitForSession(c.ctx, t, c.h, c.evs, c.id, func(s wire.SessionInfo) bool {
+			return s.Actionable.IsDelivery() && s.Actionable.Reason != ""
+		}).Actionable
+		if got.Kind != first.Kind || got.CopyText != "/my-skill" || !strings.Contains(got.Reason, "Unknown command: /my-skill") || strings.HasPrefix(got.Reason, "Action failed") {
+			t.Errorf("card = %+v, want the same unknown-command card as %+v", got, first)
+		}
+	})
 	t.Run("UndecidedSlashSendIsMaybeSentWithNoResend", func(t *testing.T) {
 		t.Parallel()
 		c := startTUIChat(t, agentfake.TUIPlainScreenEnv+"=1")
