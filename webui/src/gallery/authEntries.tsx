@@ -124,6 +124,7 @@ export const authEntries: GalleryEntry[] = [
                 last_used: new Date().toISOString(),
                 last_ip: "192.168.1.23",
                 this_device: true,
+                push_on: true,
               },
               {
                 id: "b",
@@ -131,6 +132,7 @@ export const authEntries: GalleryEntry[] = [
                 last_used: new Date(Date.now() - 2 * 3600_000).toISOString(),
                 last_ip: "100.101.12.4",
                 this_device: false,
+                push_on: true,
               },
               {
                 id: "c",
@@ -198,9 +200,12 @@ export const authEntries: GalleryEntry[] = [
               last_used: new Date(Date.now() - 71 * 86400_000).toISOString(),
               last_ip: "100.77.3.9",
               this_device: false,
+              push_on: true,
+              push_since: new Date(Date.now() - 3 * 86400_000).toISOString(),
             }}
             onRename={() => {}}
             onSignOut={() => {}}
+            onRemovePush={() => {}}
           />
         ),
       },
@@ -220,6 +225,7 @@ export const authEntries: GalleryEntry[] = [
             }}
             onRename={() => {}}
             onSignOut={() => {}}
+            onRemovePush={() => {}}
           />
         ),
       },
@@ -238,6 +244,7 @@ export const authEntries: GalleryEntry[] = [
             }}
             onRename={() => {}}
             onSignOut={() => {}}
+            onRemovePush={() => {}}
           />
         ),
       },

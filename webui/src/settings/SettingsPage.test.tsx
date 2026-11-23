@@ -19,7 +19,11 @@ import type { SettingsEntry } from "../generated/server"
 import type { WebLoginEntry } from "./logins"
 
 const push = vi.hoisted(() => ({ on: false }))
-vi.mock("../push/deviceState", () => ({ usePushDevice: () => ({ on: push.on }) }))
+const refreshPushDevice = vi.hoisted(() => vi.fn(async () => {}))
+vi.mock("../push/deviceState", () => ({
+  usePushDevice: () => ({ on: push.on }),
+  refreshPushDevice,
+}))
 
 const NOW = Date.parse("2026-10-30T12:00:00Z")
 const DAY = 24 * 60 * 60 * 1000
@@ -556,6 +560,20 @@ describe("WebLoginsView", () => {
     expect(getByText("This device")).toBeTruthy()
   })
 
+  it("shows Push on only for a login with a subscription", () => {
+    const { getAllByText } = renderThemed(
+      <WebLoginsView
+        logins={[
+          login({ id: "a", name: "With", push_on: true }),
+          login({ id: "b", name: "Without" }),
+        ]}
+        now={NOW}
+      />,
+    )
+    expect(getAllByText("Push on")).toHaveLength(1)
+    expect(getAllByText("Push on")[0].closest("a")?.textContent).toContain("With")
+  })
+
   it("warns with 29 days left and not with 31", () => {
     const { queryByText } = renderThemed(
       <WebLoginsView
@@ -649,6 +667,61 @@ describe("WebLoginPage", () => {
     fireEvent.click(getByText("Sign out this device"))
     fireEvent.click(getByText("Sign out"))
     await waitFor(() => expect(revoke).toHaveBeenCalledWith("b"))
+  })
+
+  it("shows the Push row and Remove only for a login with a subscription", async () => {
+    const pushed = [
+      login({ id: "a", name: "Safari on iPhone", this_device: true }),
+      login({
+        id: "b",
+        name: "Firefox on Linux",
+        push_on: true,
+        push_since: "2026-10-20T12:00:00Z",
+      }),
+    ]
+    const withPush = renderAt("b", { fetchList: async () => pushed })
+    expect(await withPush.findByText("On since Oct 20")).toBeTruthy()
+    expect(withPush.getByText("Remove")).toBeTruthy()
+    withPush.unmount()
+    const without = renderAt("a", { fetchList: async () => pushed })
+    await without.findByText("Sign out this device")
+    expect(without.queryByText("Remove")).toBeNull()
+    expect(without.queryByText(/On since/)).toBeNull()
+  })
+
+  it("removes that login's push, refetches and keeps the login", async () => {
+    let list = [
+      login({
+        id: "b",
+        name: "Firefox on Linux",
+        push_on: true,
+        push_since: "2026-10-20T12:00:00Z",
+      }),
+    ]
+    const removePush = vi.fn(async () => {
+      list = [login({ id: "b", name: "Firefox on Linux" })]
+      return {}
+    })
+    const { findByText, queryByText, getByText } = renderAt("b", {
+      removePush,
+      fetchList: async () => list,
+    })
+    fireEvent.click(await findByText("Remove"))
+    await waitFor(() => expect(removePush).toHaveBeenCalledWith("b"))
+    await waitFor(() => expect(queryByText("Remove")).toBeNull())
+    expect(queryByText(/On since/)).toBeNull()
+    expect(getByText("Sign out this device")).toBeTruthy()
+  })
+
+  it("refreshes this device's push state when it removes its own", async () => {
+    refreshPushDevice.mockClear()
+    const removePush = vi.fn(async () => ({}))
+    const own = [
+      login({ id: "a", this_device: true, push_on: true, push_since: "2026-10-20T12:00:00Z" }),
+    ]
+    const { findByText } = renderAt("a", { removePush, fetchList: async () => own })
+    fireEvent.click(await findByText("Remove"))
+    await waitFor(() => expect(refreshPushDevice).toHaveBeenCalledOnce())
   })
 
   it("signs this device out through the gate instead of revoking", async () => {

@@ -29,6 +29,7 @@ import {
 import { fetchAuthState, type AuthState } from "../auth/authState"
 import { CER_LABEL, Fingerprint, PROFILE_LABEL, type CertInfo } from "../auth/cert"
 import { SETTINGS_HREF } from "../hrefs"
+import { refreshPushDevice } from "../push/deviceState"
 import { DetailPage } from "../page/DetailPage"
 import { PageHeader } from "../page/PageHeader"
 import { PageIcon } from "../page/PageIcon"
@@ -42,6 +43,7 @@ import {
   endsInDays,
   fetchLogins,
   lastSeenText,
+  removeLoginPush,
   renameLogin,
   revokeLogin,
   signOutThisDevice,
@@ -247,6 +249,11 @@ export function WebLoginsView({ logins, now }: { logins: WebLoginEntry[]; now: n
                 </Text>
               </Box>
               {login.this_device && <Chip tone="done">This device</Chip>}
+              {login.push_on && (
+                <span data-mock-part="push-chip">
+                  <Chip>Push on</Chip>
+                </span>
+              )}
               <Chevron />
             </chakra.a>
           )
@@ -274,6 +281,9 @@ const signedInText = (created?: string) =>
       })
     : "Unknown"
 
+const pushSinceText = (since?: string) =>
+  since ? new Date(since).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""
+
 // The mock counts in days from one day on; lastSeenText would say "10w".
 function lastUsedText(lastUsed: string, now: number): string {
   const days = Math.floor((now - Date.parse(lastUsed)) / DAY_MS)
@@ -287,6 +297,7 @@ export function WebLoginView({
   now,
   onRename,
   onSignOut,
+  onRemovePush,
   pending = false,
   startConfirming = false,
 }: {
@@ -294,6 +305,7 @@ export function WebLoginView({
   now: number
   onRename: (name: string) => void
   onSignOut: () => void
+  onRemovePush: () => void
   pending?: boolean
   /** Opens with the confirm step showing, for the gallery. */
   startConfirming?: boolean
@@ -308,8 +320,32 @@ export function WebLoginView({
           <Fact label="Signed in" value={signedInText(login.created)} />
           <Fact label="Last used" value={lastUsedText(login.last_used, now)} />
           <Fact label="Last IP" value={login.last_ip || "Unknown"} />
+          {login.push_on && (
+            <Box data-mock-part="push-row" {...rowProps} cursor="default" _hover={{}}>
+              <Box flex="1">
+                <Text fontWeight="600">Push</Text>
+                <Text fontSize="sm" color="text.muted">
+                  On since {pushSinceText(login.push_since)}
+                </Text>
+              </Box>
+              <chakra.button
+                type="button"
+                disabled={pending}
+                onClick={onRemovePush}
+                color="tone.deadlocked.fg"
+              >
+                Remove
+              </chakra.button>
+            </Box>
+          )}
         </Box>
       </Group>
+      {login.push_on && (
+        <Text mt="2" fontSize="sm" color="text.muted">
+          Remove deletes only the push subscription. The login stays. Only that device can turn it
+          back on.
+        </Text>
+      )}
       <Box mt="6">
         <chakra.label data-mock-part="name" display="block">
           <Text fontSize="sm" color="text.muted" mb="2">
@@ -687,12 +723,14 @@ export function WebLoginPage({
   fetchList = fetchLogins,
   rename = renameLogin,
   revoke = revokeLogin,
+  removePush = removeLoginPush,
   signOut = signOutThisDevice,
   now = Date.now,
 }: {
   fetchList?: FetchLogins
   rename?: LoginWrite
   revoke?: LoginWrite
+  removePush?: LoginWrite
   signOut?: () => void | Promise<void>
   now?: () => number
 }) {
@@ -721,6 +759,17 @@ export function WebLoginPage({
           onRename={(name) =>
             void write.run(() => rename(login.id, name), {
               onDone: logins.retry,
+            })
+          }
+          onRemovePush={() =>
+            void write.run(() => removePush(login.id), {
+              onDone: () => {
+                logins.retry()
+                if (login.this_device) {
+                  void navigator.clearAppBadge?.()
+                  void refreshPushDevice()
+                }
+              },
             })
           }
           onSignOut={() =>

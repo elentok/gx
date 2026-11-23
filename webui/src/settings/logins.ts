@@ -10,6 +10,8 @@ export interface WebLoginEntry {
   last_used: string
   last_ip: string
   this_device: boolean
+  push_on?: boolean
+  push_since?: string
 }
 
 export type FetchLogins = () => Promise<WebLoginEntry[]>
@@ -22,6 +24,9 @@ export type LoginWrite = (id: string, name?: string) => Promise<Refusable>
 export const renameLogin: LoginWrite = (id, name) => postJSON("/v1/web/logins/rename", { id, name })
 
 export const revokeLogin: LoginWrite = (id) => postJSON("/v1/web/logins/revoke", { id })
+
+/** Deletes only that login's push subscription; the login stays. */
+export const removeLoginPush: LoginWrite = (id) => postJSON("/v1/web/push/remove", { login_id: id })
 
 /** Ends this browser's login on the server, then signs the page out, whatever the server answered. */
 export async function signOutThisDevice(): Promise<void> {
