@@ -1,7 +1,7 @@
 import { Box, Text } from "@chakra-ui/react"
 import { useState } from "react"
-import { BlockingCard, isBlockingCard } from "../design/BlockingCard"
-import { DeliveryCard, isDeliveryCard } from "../design/DeliveryCard"
+import { BlockingCard } from "../design/BlockingCard"
+import { DeliveryCard, tailCard } from "../design/DeliveryCard"
 import { ChatMessages, WorkingRow } from "../design/ChatCore"
 import { sheetCardsOf } from "../design/chat"
 import { FileLinkProvider } from "../files/FileLinkContext"
@@ -158,6 +158,7 @@ export function AgentChat({
 }) {
   const busy = session.status.state === "working" && !session.status.background
   const failure = visibleFailure(session.failure)
+  const tail = tailCard(session)
   const card = chat.questions[0]
   return (
     <FileLinkProvider base={{ session: session.id }} recheckKey={chat.messages.at(-1)?.id}>
@@ -187,8 +188,8 @@ export function AgentChat({
           />
         )}
         <SessionNotices session={session} />
-        {!failure && isBlockingCard(session) && <BlockingCard session={session} onDone={refetch} />}
-        {!failure && isDeliveryCard(session) && <DeliveryCard session={session} onDone={refetch} />}
+        {!failure && tail === "blocking" && <BlockingCard session={session} onDone={refetch} />}
+        {!failure && tail === "delivery" && <DeliveryCard session={session} onDone={refetch} />}
         {failure && !sheetCoversBlock(failure.kind, card) && (
           <FailureBanner
             failure={failure}

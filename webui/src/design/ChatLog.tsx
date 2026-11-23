@@ -7,8 +7,8 @@ import { hasChat, roundKeyOf, roundOf } from "./chat"
 import { ChatMessages, WorkingRow, type WorkingStep } from "./ChatCore"
 import { TaskList } from "./TaskList"
 import type { AutoMenuState } from "./AutoMenu"
-import { BlockingCard, isBlockingCard } from "./BlockingCard"
-import { DeliveryCard, isDeliveryCard } from "./DeliveryCard"
+import { BlockingCard } from "./BlockingCard"
+import { DeliveryCard, tailCard } from "./DeliveryCard"
 import { Composer } from "./Composer"
 import { FooterLine } from "./FooterLine"
 import { SwitchLine } from "./modelSwitch"
@@ -61,6 +61,7 @@ function ChatTail({
   const [focus, setFocus] = useState<{ index: number }>()
   const failure = visibleFailure(session.failure, done)
   const round = roundOf(chat)
+  const tail = tailCard(session)
   return (
     // The bottom area: at most half the screen, so only the question body scrolls past that.
     // In the Questions view the cap is gone and the sheet takes the rest of the column.
@@ -94,13 +95,9 @@ function ChatTail({
           {...actions}
         />
       )}
-      {!failure && isBlockingCard(session) && <BlockingCard session={session} />}
-      {!failure && isDeliveryCard(session) && <DeliveryCard session={session} />}
-      {!failure &&
-        !isBlockingCard(session) &&
-        !isDeliveryCard(session) &&
-        session.actionable.gx_raised &&
-        session.actionable.reason && <GxStopped reason={session.actionable.reason} />}
+      {!failure && tail === "blocking" && <BlockingCard session={session} onDone={onStale} />}
+      {!failure && tail === "delivery" && <DeliveryCard session={session} onDone={onStale} />}
+      {!failure && tail === "stopped" && <GxStopped reason={session.actionable.reason ?? ""} />}
       {done || replacesComposer(failure) ? (
         <FooterLine session={session} />
       ) : (

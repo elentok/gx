@@ -958,6 +958,20 @@ test("a delivery card shows once, without the gx stopped notice", async () => {
   expect(screen.queryByRole("region", { name: "gx stopped" })).toBeNull()
 })
 
+test("Dismiss on a delivery card refetches the Design chat", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("{}", { status: 200 })),
+  )
+  const actionable = { gx_raised: true, reason: "failed", kind: "send-failed", copy_text: "hi" }
+  const fetchChat = vi.fn<FetchChat>(okChat(chatOf([])))
+  renderChat([session({ actionable })], fetchChat)
+  await screen.findByRole("region", { name: "Send failed" })
+  const before = fetchChat.mock.calls.length
+  fireEvent.click(screen.getByRole("button", { name: "Dismiss" }))
+  await waitFor(() => expect(fetchChat.mock.calls.length).toBeGreaterThan(before))
+})
+
 test("an unknown-command card shows its four buttons in the Design chat", async () => {
   const actionable = { gx_raised: true, reason: "no", kind: "unknown-command", copy_text: "/x" }
   renderChat([session({ actionable })], focusChat())

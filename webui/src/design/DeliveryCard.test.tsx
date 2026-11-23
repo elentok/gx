@@ -9,7 +9,7 @@ import {
   type SessionResult,
 } from "../generated/server"
 import { renderThemed } from "../ui/render"
-import { DeliveryCard, isDeliveryCard } from "./DeliveryCard"
+import { DeliveryCard, isDeliveryCard, tailCard } from "./DeliveryCard"
 import type { FetchScreen } from "./screen"
 
 afterEach(() => {
@@ -150,6 +150,25 @@ test.each([
   expect((screen.getByRole("button", { name: "Resend" }) as HTMLButtonElement).disabled).toBe(
     disabled,
   )
+})
+
+test("while Resend is pending only Resend is disabled", async () => {
+  const { resend } = openUnknown("idle", { resend: () => new Promise(() => {}) })
+  fireEvent.click(screen.getByRole("button", { name: "Resend" }))
+  await waitFor(() => expect(resend).toHaveBeenCalled())
+  const disabled = screen
+    .getAllByRole("button")
+    .filter((b) => (b as HTMLButtonElement).disabled)
+    .map((b) => b.textContent)
+  expect(disabled).toEqual(["Resend"])
+})
+
+test("tailCard picks blocking, delivery, stopped or null", () => {
+  const of = (actionable: object) => ({ ...session(), actionable }) as SessionInfo
+  expect(tailCard(of({ gx_raised: true, reason: "r", blocking: true }))).toBe("blocking")
+  expect(tailCard(session(DeliverySendFailed))).toBe("delivery")
+  expect(tailCard(of({ gx_raised: true, reason: "r", kind: "toString" }))).toBe("stopped")
+  expect(tailCard(of({}))).toBeNull()
 })
 
 test("a refused Resend shows its message in an alert", async () => {

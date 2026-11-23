@@ -2,6 +2,7 @@ import { Box, Text } from "@chakra-ui/react"
 import { useRef, useState } from "react"
 import { copyText } from "../clipboard"
 import {
+  type Delivery,
   DeliveryMaybeSent,
   DeliverySendFailed,
   DeliveryUnknownCommand,
@@ -11,47 +12,88 @@ import {
 } from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { refusalText, useWrite } from "../useWrite"
-import { postRetry } from "./BlockingCard"
-import { postDismissSession, postResumeSession, postStopSession, rowToken } from "./open"
+import { isBlockingCard, postRetry, type PostRetry } from "./BlockingCard"
+import {
+  postDismissSession,
+  postResumeSession,
+  postStopSession,
+  rowToken,
+  type ResumeSession,
+  type StopSession,
+} from "./open"
 import type { FetchScreen } from "./screen"
 import { ScreenModal } from "./ScreenModal"
 import { promptable } from "./view"
 
-export type DismissSession = (body: SessionRequest) => Promise<SessionResult>
+type SessionWrite = (body: SessionRequest) => Promise<SessionResult>
 
-type ButtonName = "Resend" | "Restart agent" | "Show screen" | "Dismiss"
+/** What a button's `run` can reach: the card's own state and its writes. */
+interface CardActions {
+  session: SessionInfo
+  write: ReturnType<typeof useWrite>["run"]
+  dismiss: SessionWrite
+  resend: PostRetry
+  onDone?: () => void
+  showScreen: () => void
+  confirmRestart: () => void
+}
+
+interface CardButton {
+  label: string
+  run: (a: CardActions) => void
+}
+
+const RESEND: CardButton = {
+  label: "Resend",
+  run: (a) => a.write(() => a.resend({ id: a.session.id })),
+}
+const RESTART: CardButton = { label: "Restart agent", run: (a) => a.confirmRestart() }
+const SHOW_SCREEN: CardButton = { label: "Show screen", run: (a) => a.showScreen() }
+const DISMISS: CardButton = {
+  label: "Dismiss",
+  run: (a) => a.write(() => a.dismiss({ id: a.session.id }), { onDone: a.onDone }),
+}
 
 interface KindLook {
   title: string
   color: string
-  buttons: ButtonName[]
+  buttons: CardButton[]
 }
 
 /** One entry per delivery kind; a new kind adds its title, colour and buttons here. */
-const KINDS: Record<string, KindLook> = {
+const KINDS: Record<Delivery, KindLook> = {
   [DeliveryMaybeSent]: {
     title: "May not have been sent",
     color: "tone.waiting.fg",
-    buttons: ["Show screen", "Dismiss"],
+    buttons: [SHOW_SCREEN, DISMISS],
   },
   [DeliverySendFailed]: {
     title: "Send failed",
     color: "tone.deadlocked.fg",
-    buttons: ["Show screen", "Dismiss"],
+    buttons: [SHOW_SCREEN, DISMISS],
   },
   [DeliveryUnknownCommand]: {
     title: "Send failed",
     color: "tone.deadlocked.fg",
-    buttons: ["Resend", "Restart agent", "Show screen", "Dismiss"],
+    buttons: [RESEND, RESTART, SHOW_SCREEN, DISMISS],
   },
 }
 
+const kindLook = (kind?: string): KindLook | undefined =>
+  kind && Object.hasOwn(KINDS, kind) ? KINDS[kind as Delivery] : undefined
+
 /** Whether the session carries a gx card for a send that gave up or may not have landed. */
 export const isDeliveryCard = (s: SessionInfo) =>
-  !!s.actionable?.gx_raised &&
-  !!s.actionable.reason &&
-  !!s.actionable.kind &&
-  s.actionable.kind in KINDS
+  !!s.actionable?.gx_raised && !!s.actionable.reason && !!kindLook(s.actionable.kind)
+
+/** The one card that sits at the tail of a session's chat, or null when there is none. */
+export type TailCardKind = "blocking" | "delivery" | "stopped"
+
+export function tailCard(s: SessionInfo): TailCardKind | null {
+  if (isBlockingCard(s)) return "blocking"
+  if (isDeliveryCard(s)) return "delivery"
+  return s.actionable?.gx_raised && s.actionable.reason ? "stopped" : null
+}
 
 /** The card of a send that did not land: why, the text as sent with Copy, and Show screen and Dismiss. */
 export function DeliveryCard({
@@ -64,14 +106,14 @@ export function DeliveryCard({
   onDone,
 }: {
   session: SessionInfo
-  dismiss?: DismissSession
-  resend?: DismissSession
-  stop?: DismissSession
-  resume?: DismissSession
+  dismiss?: SessionWrite
+  resend?: PostRetry
+  stop?: StopSession
+  resume?: ResumeSession
   fetchScreen?: FetchScreen
   onDone?: () => void
 }) {
-  const look = KINDS[session.actionable.kind ?? ""]
+  const look = kindLook(session.actionable.kind) as KindLook
   const text = session.actionable.copy_text ?? ""
   const box = useRef<HTMLDivElement>(null)
   const [screen, setScreen] = useState(false)
@@ -83,11 +125,14 @@ export function DeliveryCard({
     const stopped = await stop({ id: session.id, state: rowToken(session) })
     return stopped.refused ? stopped : resume({ id: session.id })
   }
-  const click = (name: ButtonName) => {
-    if (name === "Show screen") setScreen(true)
-    else if (name === "Restart agent") setConfirming(true)
-    else if (name === "Resend") run(() => resend({ id: session.id }))
-    else run(() => dismiss({ id: session.id }), { onDone })
+  const actions: CardActions = {
+    session,
+    write: run,
+    dismiss,
+    resend,
+    onDone,
+    showScreen: () => setScreen(true),
+    confirmRestart: () => setConfirming(true),
   }
   return (
     <Box
@@ -142,9 +187,9 @@ export function DeliveryCard({
       )}
       {problem && <Text role="alert">{problem}</Text>}
       <Box data-mock-part="buttons" display="flex" gap="2" flexWrap="wrap" alignItems="center">
-        {look.buttons.map((name) =>
-          name === "Restart agent" && confirming ? (
-            <Box key={name} display="flex" alignItems="center" gap="2">
+        {look.buttons.map((button) =>
+          button === RESTART && confirming ? (
+            <Box key={button.label} display="flex" alignItems="center" gap="2">
               <Text fontSize="sm">Restart the agent?</Text>
               <Button emphasis="secondary" onClick={() => setConfirming(false)}>
                 Keep
@@ -155,12 +200,12 @@ export function DeliveryCard({
             </Box>
           ) : (
             <Button
-              key={name}
+              key={button.label}
               emphasis="secondary"
-              disabled={pending || (name === "Resend" && !promptable(session))}
-              onClick={() => click(name)}
+              disabled={button === RESEND && (pending || !promptable(session))}
+              onClick={() => button.run(actions)}
             >
-              {name}
+              {button.label}
             </Button>
           ),
         )}
