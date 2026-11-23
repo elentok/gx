@@ -119,6 +119,30 @@ describe("ChecksEditor", () => {
     expect((v.getByLabelText("suite limit") as HTMLInputElement).value).toBe("4m")
   })
 
+  it.each([
+    ["project.json mode", false],
+    ["repo-file mode", true],
+  ])("shows setup as a read-only row in %s", (_name, repoFile) => {
+    const v = setup({ setup: ["pnpm i", "make gen"] }, {}, repoFile)
+    const row = v.getByTestId("checks-setup")
+    expect(row.textContent).toContain("pnpm i")
+    expect(row.textContent).toContain("make gen")
+    expect(row.querySelector("input, textarea, button")).toBeNull()
+  })
+
+  it("shows no setup row without setup", () => {
+    expect(setup({ lint: "l" }).queryByTestId("checks-setup")).toBeNull()
+  })
+
+  it("saving keeps setup and guards", async () => {
+    const v = setup({ lint: "x", guards: { a: 1 }, setup: ["s"] })
+    type(v, "lint command", "y")
+    await save(v)
+    expect(v.onWrite).toHaveBeenCalledWith([
+      { key: "checks", value: { lint: "y", guards: { a: 1 }, setup: ["s"] } },
+    ])
+  })
+
   it("shows the repo-file notice with the flag", () => {
     expect(setup(undefined, {}, true).queryByTestId("repo-checks-notice")).not.toBeNull()
   })

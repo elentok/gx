@@ -41,6 +41,33 @@ describe("checks model round trips", () => {
   })
 })
 
+describe("keys the editor does not own", () => {
+  const guards = { sizeguard: { max: 3 } }
+
+  it("keeps setup, guards and unknown keys when another kind changes", () => {
+    const model = checksToModel({ lint: "x", guards, setup: ["pnpm i"], other: 1 })
+    model.lint.command = "y"
+    expect(modelToChecks(model)).toEqual({
+      lint: "y",
+      guards,
+      setup: ["pnpm i"],
+      other: 1,
+    })
+  })
+
+  it.each([
+    ["setup only", { setup: ["pnpm i"] }],
+    ["guards only", { guards }],
+  ])("%s round trips and is not a remove change", (_name, value) => {
+    expect(roundTrip(value)).toEqual(value)
+    expect(modelToChange(checksToModel(value))).toEqual({ key: "checks", value })
+  })
+
+  it("an empty value is still a remove change", () => {
+    expect(modelToChange(checksToModel({}))).toEqual({ key: "checks", remove: true })
+  })
+})
+
 describe("slow limit", () => {
   it("keeps the per-tool map form and drops emptied tools", () => {
     const model = checksToModel({

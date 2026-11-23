@@ -31,7 +31,8 @@ export interface CheckForm {
   slowMap: Record<SlowTool, string>
 }
 
-export type ChecksModel = Record<CheckKind, CheckForm>
+/** `extras` holds the keys the editor does not own (setup, guards, ...); saving writes them back unchanged. */
+export type ChecksModel = Record<CheckKind, CheckForm> & { extras: Record<string, unknown> }
 
 const emptyForm = (): CheckForm => ({
   mode: "default",
@@ -86,7 +87,19 @@ function parseForm(raw: unknown): CheckForm {
 /** Form state for a project's `checks` value (anything unrecognised reads as default). */
 export function checksToModel(value: unknown): ChecksModel {
   const src = isRecord(value) ? value : {}
-  return Object.fromEntries(CHECK_KINDS.map((k) => [k, parseForm(src[k])])) as ChecksModel
+  const extras = Object.fromEntries(
+    Object.entries(src).filter(([k]) => !(CHECK_KINDS as readonly string[]).includes(k)),
+  )
+  return {
+    ...Object.fromEntries(CHECK_KINDS.map((k) => [k, parseForm(src[k])])),
+    extras,
+  } as ChecksModel
+}
+
+/** The `setup` commands of a `checks` value, empty when absent. */
+export function setupCommands(model: ChecksModel): string[] {
+  const setup = model.extras.setup
+  return Array.isArray(setup) ? setup.filter((s): s is string => typeof s === "string") : []
 }
 
 function limitsValue(form: CheckForm): Record<string, unknown> | undefined {
@@ -159,7 +172,7 @@ export function checksErrors(model: ChecksModel): Partial<Record<CheckKind, stri
 
 /** The minimal `checks` value: absent kinds stay absent; undefined when nothing is set. */
 export function modelToChecks(model: ChecksModel): Record<string, unknown> | undefined {
-  const out: Record<string, unknown> = {}
+  const out: Record<string, unknown> = { ...model.extras }
   for (const kind of CHECK_KINDS) {
     const v = formValue(kind, model[kind])
     if (v !== undefined) out[kind] = v

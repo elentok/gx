@@ -10,6 +10,7 @@ import {
   SLOW_TOOLS,
   checksErrors,
   checksToModel,
+  setupCommands,
   modelToChange,
   type CheckForm,
   type CheckKind,
@@ -252,6 +253,7 @@ export function ChecksEditor({
   const [saved, setSaved] = useState(false)
   const model = draft ?? initial
   const errors = checksErrors(model)
+  const setup = setupCommands(model)
   const dirty =
     draft !== undefined &&
     JSON.stringify(modelToChange(draft)) !== JSON.stringify(modelToChange(initial))
@@ -314,6 +316,22 @@ export function ChecksEditor({
             onChange={(patch) => edit(kind, patch)}
           />
         ))}
+        {setup.length > 0 && (
+          <Box data-testid="checks-setup" display="grid" gap="1">
+            <Text fontWeight="600" fontSize="sm">
+              setup
+            </Text>
+            <Text
+              fontFamily="mono"
+              fontSize="12px"
+              color="text.muted"
+              whiteSpace="pre-wrap"
+              overflowWrap="anywhere"
+            >
+              {setup.join("\n")}
+            </Text>
+          </Box>
+        )}
       </chakra.fieldset>
       <Box display="flex" gap="2" alignItems="center">
         <Button
