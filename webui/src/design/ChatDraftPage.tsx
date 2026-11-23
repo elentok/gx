@@ -28,6 +28,7 @@ import { MascotToggle } from "../shell/MascotToggle"
 import { ChatDraftIcon } from "../shell/SidebarRows"
 import type { ViMode } from "../ui/expandable-text/CodeEditor"
 import { ModeText } from "../ui/expandable-text/ModeText"
+import { submitOnCmdEnter } from "../ui/expandable-text/PromptBox"
 import { useReadyWhen } from "../useReady"
 import { useViMode } from "../vimode"
 import { realChatDrafts, type ChatDraftsClient } from "./chatDrafts"
@@ -210,10 +211,13 @@ function ChatDraftForm({
     remove()
     navigate("/epics", { state: { note: REMOVED_NOTE } })
   }
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
+  const startNow = () => {
     if (blocker || banner || starting) return
     void start((session) => navigate(agentPath(session)))
+  }
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    startNow()
   }
   const pasted = (e: ClipboardEvent) => {
     const files = imageFiles(e.clipboardData?.files)
@@ -322,6 +326,7 @@ function ChatDraftForm({
                   selection={{ start: brief.length, end: brief.length }}
                   viMode
                   bare
+                  onSubmit={startNow}
                   onModeChange={setViModeNow}
                 />
               </Suspense>
@@ -344,6 +349,7 @@ function ChatDraftForm({
               placeholder={PLACEHOLDER}
               value={brief}
               onChange={(e) => edit(e.target.value)}
+              onKeyDown={(e) => submitOnCmdEnter(e, startNow)}
             />
           )}
           <Box flexShrink="0" px="0">
