@@ -250,8 +250,11 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     await expect(retrying).toBeVisible({ timeout: 60_000 })
     await expect(retrying).toHaveCount(0, { timeout: 60_000 })
   })
+})
 
-  // The PWA steps run last, on a fresh `mixed` fixture: Force refresh reloads the page once, and the cold open stops the server.
+// Its own flow: with the other steps it ran close to the 45 s limit.
+// On a fresh `mixed` fixture: Force refresh reloads the page once, and the cold open stops the server.
+test("2. Epic PWA: Force refresh and cold open", async ({ page, start, context }) => {
   await test.step("PWA: manifest, worker, Force refresh, offline cold open", async () => {
     const fixture = await start("mixed", { config: { "recovery.enabled": "false" }, reloads: 1 })
     await expect(card(page, "mixed-epic")).toBeVisible()
@@ -306,9 +309,12 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     expect(await page.evaluate(() => caches.keys())).toContain(planted)
     await page.getByRole("button", nav("Menu")).click()
     await page.getByRole("menuitem", { name: "Force refresh" }).click()
-    await expect(page.getByText("Clearing the cache and reloading…")).toBeVisible()
+    // The toast goes away with the reload, so it is not asserted here (forceRefresh.test.ts does).
+    // A poll that lands mid-navigation throws "Execution context was destroyed"; retry it.
     await expect
-      .poll(() => page.evaluate((key) => sessionStorage.getItem(key), "__gxE2eLoads"))
+      .poll(() =>
+        page.evaluate((key) => sessionStorage.getItem(key), "__gxE2eLoads").catch(() => undefined),
+      )
       .toBe("1")
     await expect.poll(() => page.evaluate(() => caches.keys())).not.toContain(planted)
     // The fresh page registers a new worker as at start-up.

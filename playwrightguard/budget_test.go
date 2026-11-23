@@ -76,7 +76,9 @@ import (
 // Initiative flows (+2): the Epics menu item, the list and its row links, the Initiative page in each state and the
 // Milestone link between Epics cards, the Initiative page and the epic header need the server payload and navigation
 // across pages; vitest pins every render alone.
-const maxFlows = 157
+// Epic PWA flow (+1): flow 2 ran near the 45 s slow limit with its PWA steps, so Force refresh and the cold open run
+// as their own flow.
+const maxFlows = 158
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
