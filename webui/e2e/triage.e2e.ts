@@ -335,9 +335,15 @@ test.describe("199. Triage journey", () => {
     await inboxButton().click()
     await expect(page.getByRole("menuitem", { name: /demo/ })).toBeVisible()
     expect(await sideways(page)).toBe(false)
+  })
 
+  // Split from the journey for the 45 s slow limit: it starts its own shape.
+  test("Backlog: counts, Start Design, Finish move and the phone sheet", async ({
+    page,
+    start,
+  }) => {
+    test.setTimeout(360_000)
     // Backlog: the Epics menu has the item, the sidebar has no row, and each backlog shows its open count.
-    await page.setViewportSize({ width: 1280, height: 800 })
     const fx = await start("triage", { shape: "backlog" })
     await expect(page.getByRole("link", { name: /Backlog/ })).toHaveCount(0)
     await epicsButton(page).click()
@@ -420,10 +426,13 @@ test.describe("199. Triage journey", () => {
     await startDesign("sync").click()
     await expect(page.getByRole("dialog", nav("Start Design for sync"))).toBeVisible()
     expect(await sideways(page)).toBe(false)
+  })
 
+  // Split from the journey for the 45 s slow limit: it starts its own shape.
+  test("Old epics: the Route summary, the moves and the stamps", async ({ page, start }) => {
+    test.setTimeout(360_000)
     // Old epics: the Route summary lists the moves and the waiting epic; the table backlogs make
     // no question of their own.
-    await page.setViewportSize({ width: 1280, height: 800 })
     // A long countdown keeps Write waiting, so its view is read before the session writes.
     const old = await start("triage", { shape: "old-epics", autoAdvanceDelay: "60s" })
     await page.evaluate(() => (location.hash = "#/triage/gx"))

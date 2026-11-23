@@ -80,7 +80,9 @@ import (
 // as their own flow.
 // Interrupt flow (+1): flow 75 ran over the 45 s slow limit under load, so the tools-in-flight and Interrupt steps run
 // as their own flow.
-const maxFlows = 159
+// Triage split (+2): flow 199 ran over the 45 s slow limit under load, so the backlog and old-epics shapes run as their
+// own flows.
+const maxFlows = 161
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
