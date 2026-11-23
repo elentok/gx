@@ -61,7 +61,7 @@ func newFixture(t *testing.T, status ...int) *fixture {
 		w.WriteHeader(code)
 	}))
 	t.Cleanup(srv.Close)
-	keys, err := LoadOrCreate(t.TempDir(), slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+	keys, err := LoadOrCreate(t.TempDir(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

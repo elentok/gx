@@ -50,9 +50,8 @@ type Keys struct {
 func (k *Keys) Public() string { return k.public }
 
 // LoadOrCreate loads <stateDir>/web-push/vapid.json, or makes a new pair when
-// the file is missing or unusable. A new pair is written first, then onNewKey
-// runs with its public key string. A lost or bad file logs one line.
-func LoadOrCreate(stateDir string, log *slog.Logger, onNewKey func(newPublic string)) (*Keys, error) {
+// the file is missing or unusable. A lost or bad file logs one line.
+func LoadOrCreate(stateDir string, log *slog.Logger) (*Keys, error) {
 	path := filepath.Join(stateDir, dirName, fileName)
 	raw, readErr := os.ReadFile(path)
 	if readErr == nil {
@@ -63,14 +62,7 @@ func LoadOrCreate(stateDir string, log *slog.Logger, onNewKey func(newPublic str
 	} else if !errors.Is(readErr, os.ErrNotExist) {
 		log.Warn("web push key file unreadable, made a new key pair", "file", path)
 	}
-	k, err := create(path)
-	if err != nil {
-		return nil, err
-	}
-	if onNewKey != nil {
-		onNewKey(k.public)
-	}
-	return k, nil
+	return create(path)
 }
 
 func create(path string) (*Keys, error) {

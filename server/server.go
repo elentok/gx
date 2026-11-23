@@ -335,8 +335,7 @@ func New(cfg Config) (*Server, error) {
 	log := slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	warnIgnoredDevURL(log, cfg.ConfigPath)
 	idx := index.New(cfg.TicketStore, events, log)
-	// Task 03 wires the hook to the subscription store.
-	vapid, err := webpush.LoadOrCreate(cfg.StateDir, log, func(string) {})
+	vapid, err := webpush.LoadOrCreate(cfg.StateDir, log)
 	if err != nil {
 		ln.Close()
 		_ = logf.Close()

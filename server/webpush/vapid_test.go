@@ -20,31 +20,25 @@ func vapidPath(dir string) string { return filepath.Join(dir, "web-push", "vapid
 
 type loadResult struct {
 	keys *Keys
-	hook []string
 	logs string
 }
 
 func load(t *testing.T, dir string) loadResult {
 	t.Helper()
 	var buf bytes.Buffer
-	var r loadResult
-	log := slog.New(slog.NewTextHandler(&buf, nil))
-	k, err := LoadOrCreate(dir, log, func(p string) {
-		// vapid.json must already hold the new pair when the hook runs.
-		var f struct{ Public string }
-		raw, err := os.ReadFile(vapidPath(dir))
-		if err != nil {
-			t.Errorf("vapid.json not written before hook: %v", err)
-		} else if err := json.Unmarshal(raw, &f); err != nil || f.Public != p {
-			t.Errorf("vapid.json public = %q, hook got %q (err %v)", f.Public, p, err)
-		}
-		r.hook = append(r.hook, p)
-	})
+	k, err := LoadOrCreate(dir, slog.New(slog.NewTextHandler(&buf, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	r.keys, r.logs = k, buf.String()
-	return r
+	var f struct{ Public string }
+	raw, err := os.ReadFile(vapidPath(dir))
+	if err != nil {
+		t.Fatalf("vapid.json not written: %v", err)
+	}
+	if err := json.Unmarshal(raw, &f); err != nil || f.Public != k.Public() {
+		t.Fatalf("vapid.json public = %q, keys = %q (err %v)", f.Public, k.Public(), err)
+	}
+	return loadResult{keys: k, logs: buf.String()}
 }
 
 func TestVAPID_FirstUseCreatesFileAndReloads(t *testing.T) {
@@ -61,9 +55,6 @@ func TestVAPID_FirstUseCreatesFileAndReloads(t *testing.T) {
 	if dirInfo.Mode().Perm() != 0o700 {
 		t.Fatalf("dir mode = %v, want 0700", dirInfo.Mode().Perm())
 	}
-	if len(first.hook) != 1 || first.hook[0] != first.keys.Public() {
-		t.Fatalf("first use hook = %v", first.hook)
-	}
 	if first.logs != "" {
 		t.Fatalf("first use logged %q", first.logs)
 	}
@@ -72,8 +63,8 @@ func TestVAPID_FirstUseCreatesFileAndReloads(t *testing.T) {
 		t.Fatalf("public key not a 65-byte uncompressed point: %v len %d", err, len(pub))
 	}
 	again := load(t, dir)
-	if again.keys.Public() != first.keys.Public() || len(again.hook) != 0 {
-		t.Fatalf("reload changed the pair or fired the hook: %v", again.hook)
+	if again.keys.Public() != first.keys.Public() {
+		t.Fatal("reload changed the pair")
 	}
 }
 
@@ -105,9 +96,6 @@ func TestVAPID_BadFileMakesNewPair(t *testing.T) {
 			setup(dir)
 			old, _ := os.ReadFile(vapidPath(dir))
 			r := load(t, dir)
-			if len(r.hook) != 1 || r.hook[0] != r.keys.Public() {
-				t.Fatalf("hook = %v", r.hook)
-			}
 			if n := strings.Count(strings.TrimSpace(r.logs), "\n") + 1; r.logs == "" || n != 1 {
 				t.Fatalf("want one log line, got %q", r.logs)
 			}
