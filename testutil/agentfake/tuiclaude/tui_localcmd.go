@@ -165,9 +165,10 @@ func (t *tui) finishCompact() error {
 type compactRun struct{ command string }
 
 // undecidedRows is a frame the box reader cannot decide on: no box, and our
-// text on a row that is neither the echo nor a menu row.
+// text on a row that is neither the echo nor a menu row. A menu row is
+// whitespace then "/", so the text follows a word.
 func (t *tui) undecidedRows() []string {
-	return []string{colored("✻ Welcome to Claude Code"), "", "  " + t.typed.String()}
+	return []string{colored("✻ Welcome to Claude Code"), "", "  draft: " + t.typed.String()}
 }
 
 // armUndecided activates the undecided mode when the draft is a "/" command.

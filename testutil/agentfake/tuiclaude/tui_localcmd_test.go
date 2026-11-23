@@ -220,7 +220,7 @@ func TestLocalCommand_UndecidedModeKeepsTheTextAndSwallowsEveryEnter(t *testing.
 	f.control(Control{Action: ActionUndecided})
 	f.typeRaw("/help")
 	f.typeRaw("\r")
-	rows := f.waitRows("  /help")
+	rows := f.waitRows("  draft: /help")
 	if claudeui.InputBox(rows) {
 		t.Errorf("an undecided frame has a box: %q", rows)
 	}
@@ -248,7 +248,7 @@ func TestLocalCommand_UndecidedEnvArmsAtLaunch(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs, truecolorEnv, TUIUndecidedEnv+"=1")
 	f.waitStatus(StatusIdle, "")
 	f.typeLine("/model")
-	rows := f.waitRows("  /model")
+	rows := f.waitRows("  draft: /model")
 	if claudeui.InputBox(rows) || len(f.localCommands()) != 0 {
 		t.Errorf("undecided env did not hold: %q", rows)
 	}

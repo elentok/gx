@@ -148,6 +148,11 @@ symlink to `/etc/hosts`), `docs/plans/host-files.md` (relative link, image, `mer
 `mocks/04-viewer.html` with its four siblings; a second loopback origin serves one script and one JSON path. The output field `host_files`
 names `repo`, `second_worktree`, `second_only`, `temp_dir` (holds `shot-1.png`), `other_origin` and `ticket`. `--shape no-main-worktree` moves
 the repo off `main`, so no worktree has the trunk (default `main-worktree`). Data: `testutil/gxfixture/hostfiles.go`.
+The `deliver-cards` scenario is three idle Claude chats named `not-sent chat`, `send-failed chat` and `unknown-command chat` (first prompts, in
+that order). Each takes one control with `fixture.controlClaude`, then a send ends in its delivery-failure card: `undecided` and a send of
+`/model opus` give the "May not have been sent" card (`maybe-sent`); `stall` and a plain send give the red "Send failed" card (`send-failed`);
+`unknownskill` and a send of `/my-skill` give the red "Unknown command" card (`unknown-command`). The prompt grace is 2 s. Data:
+`testutil/gxfixture/catalog/deliverscenarios.go`.
 The `context-window` scenario seeds Claude sessions at 40K, 90K, 128K and 170K tokens (output `transcripts` keys `green`, `yellow`,
 `orange`, `red`, plus `compact`, a session that ran `/compact`), a fresh one, a finished one, one with no transcript file, a Codex one, a
 Queue agent, a Design session at 128K and an open Triage. The server announces transcript growth only while a session works, so a flow

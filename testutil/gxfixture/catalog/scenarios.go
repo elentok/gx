@@ -756,6 +756,8 @@ var Scenarios = map[string]scenario{
 	"agents-promote": spec.PromoteScenario(),
 	// agents-images: agents plus saved images in the chat of one Claude and one Codex session.
 	"agents-images": agentsImagesScenario(),
+	// deliver-cards: three idle Claude chats for the three delivery-failure cards. See deliverCardsScenario.
+	"deliver-cards": deliverCardsScenario(),
 	// host-files: demo's repo files, a second worktree, a mock page with a second origin and a
 	// chat that links them. -shape no-main-worktree checks out demo's trunk nowhere.
 	"host-files": hostFilesScenario(),

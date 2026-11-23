@@ -136,6 +136,9 @@ func (t *tui) handleControl(c Control) error {
 	case ActionUndecided:
 		t.undecidedNext = true
 		return nil
+	case ActionUnknownSkill:
+		t.opts.unknownSkill = true
+		return nil
 	case ActionModel:
 		t.opts.model = c.Model
 		return nil

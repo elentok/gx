@@ -539,6 +539,17 @@ func TestTUIClaude_UnknownSkillKnobDrawsTheErrorAndWritesNoUserRecord(t *testing
 	}
 }
 
+func TestTUIClaude_UnknownSkillControlRejectsTheNextSkillPromptAtRuntime(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.waitStatus(StatusIdle, "")
+	f.control(Control{Action: ActionUnknownSkill})
+	f.typeLine("/my-skill")
+	f.waitScreen("Unknown command: /my-skill")
+	if m := f.pidFile(); m["status"] != StatusIdle {
+		t.Fatalf("status = %v, want idle", m["status"])
+	}
+}
+
 func TestTUIClaude_RegistryDelayKnobKnowsTheSkillOnlyAfterTheDelay(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs, TUIRegistryDelayEnv+"=1s")
 	f.waitStatus(StatusIdle, "")

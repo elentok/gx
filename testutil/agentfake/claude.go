@@ -49,6 +49,9 @@ const (
 	// and our text on a row that is neither the echo nor a menu row, so the box
 	// reader cannot decide.
 	ActionUndecided = "undecided"
+	// ActionUnknownSkill makes the TUI fake answer every later skill prompt as an
+	// unknown command, as TUIUnknownSkillEnv does from launch.
+	ActionUnknownSkill = "unknownskill"
 	// ActionAPIError makes the TUI fake append the transcript line claude
 	// writes for a failed API call: Error, Status and Message say which.
 	ActionAPIError = "apierror"
