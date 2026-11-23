@@ -97,6 +97,8 @@ type tuiOptions struct {
 	undecided bool
 	// swallow is how many Enters do nothing from launch (see TUISwallowEnterEnv).
 	swallow int
+	// dropTyped drops every typed character (see TUIDropTypedEnv).
+	dropTyped bool
 }
 
 // vimWedge parses a TUIVimWedgeEnv spec into the footer row to draw and
@@ -197,6 +199,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		compactDuration:       compactDuration,
 		undecided:             os.Getenv(TUIUndecidedEnv) == "1",
 		swallow:               swallow,
+		dropTyped:             os.Getenv(TUIDropTypedEnv) == "1",
 	}, nil
 }
 

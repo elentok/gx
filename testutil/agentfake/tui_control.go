@@ -104,6 +104,9 @@ const (
 	// TUISwallowEnterEnv, a count, makes that many Enters from launch do
 	// nothing, draft kept, as ActionSwallowEnter does.
 	TUISwallowEnterEnv = "GX_AGENTFAKE_TUI_SWALLOW_ENTER"
+	// TUIDropTypedEnv, set to "1", drops every typed character before it
+	// reaches the input box, so a typed prompt never shows.
+	TUIDropTypedEnv = "GX_AGENTFAKE_TUI_DROP_TYPED"
 )
 
 // TUILocalCommandsPath logs one line per local-command event of the TUI fake

@@ -203,6 +203,7 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 				t.typed.WriteByte('i')
 			}
 			redraw()
+		case t.opts.dropTyped:
 		default:
 			t.typed.WriteByte(ev.Key)
 			t.menuClosed = false

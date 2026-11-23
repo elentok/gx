@@ -21,6 +21,14 @@ func TestDeliveryCards(t *testing.T) {
 			t.Errorf("card = %+v, want the text in Action and CopyText and a reason without the old prefix", got)
 		}
 	})
+	t.Run("PromptThatNeverReachesTheInputIsSendFailedWithResend", func(t *testing.T) {
+		t.Parallel()
+		c := startTUIChatPrompt(t, "fix it", agentfake.TUIDropTypedEnv+"=1")
+		got := c.card(t)
+		if got.Kind != wire.DeliverySendFailed || got.Reason != "prompt never reached the input" || !slices.Equal(got.Action, []string{"fix it"}) {
+			t.Errorf("card = %+v, want the send-failed kind, reason %q and the prompt to resend", got, "prompt never reached the input")
+		}
+	})
 	t.Run("UnknownCommandIsItsOwnKind", func(t *testing.T) {
 		t.Parallel()
 		c := startTUIChat(t, agentfake.TUIUnknownSkillEnv+"=1")
