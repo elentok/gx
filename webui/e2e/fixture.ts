@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { promisify } from "node:util"
 import { expect, test as base, type Locator, type Page } from "@playwright/test"
+import { baseCliEnv, cliEnvWith } from "./cliEnv"
 
 const run = promisify(execFile)
 
@@ -322,12 +323,12 @@ async function startFixture(
       ),
     )
   })
-  const env = {
-    ...process.env,
-    ...Object.fromEntries(
+  const env = baseCliEnv(
+    process.env,
+    Object.fromEntries(
       out.env.map((kv) => [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)]),
     ),
-  }
+  )
   let totpSecret = out.totp_secret ?? ""
   // The server refuses a step at or below the last one it accepted for a secret, and a secret it
   // has not accepted yet starts at 0.
@@ -362,11 +363,12 @@ async function startFixture(
       }
     },
     async cliEnv(extra, ...args) {
-      const { stdout } = await run(out.gx, args, { env: { ...env, ...extra }, cwd: tmpdir() })
+      const { stdout } = await run(out.gx, args, { env: cliEnvWith(env, extra), cwd: tmpdir() })
       return stdout
     },
     cliInput: (input, ...args) => runWithInput(out.gx, args, env, input),
-    cliEnvInput: (extra, input, ...args) => runWithInput(out.gx, args, { ...env, ...extra }, input),
+    cliEnvInput: (extra, input, ...args) =>
+      runWithInput(out.gx, args, cliEnvWith(env, extra), input),
     async release() {
       await rm(out.hold_file, { force: true })
     },
