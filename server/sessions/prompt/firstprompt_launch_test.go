@@ -48,10 +48,10 @@ func startLaunchSessionWith(t *testing.T, tune func(*server.Config), env ...stri
 	h := servertest.StartWithStore(t, t.TempDir(),
 		servertest.WithTestHolder(),
 		func(c *server.Config) {
-			c.LaunchProofCaps.Grace = 6 * time.Second
-			c.LaunchProofCaps.Window = 600 * time.Millisecond
-			c.LaunchProofCaps.Poll = 20 * time.Millisecond
-			c.LaunchProofCaps.RetypeEvery = 200 * time.Millisecond
+			c.LaunchTimings.Grace = 6 * time.Second
+			c.LaunchTimings.Window = 600 * time.Millisecond
+			c.LaunchTimings.Poll = 20 * time.Millisecond
+			c.LaunchTimings.RetypeEvery = 200 * time.Millisecond
 			if tune != nil {
 				tune(c)
 			}
@@ -125,7 +125,7 @@ func TestFirstPromptLaunch_LateRegistryIsDeliveredAfterResends(t *testing.T) {
 	t.Parallel()
 	// The registry fills after the unknown grace would have ended in the
 	// always-unknown test, so only a longer grace lets the resends win.
-	f := startLaunchSessionWith(t, func(c *server.Config) { c.LaunchProofCaps.Window = 5 * time.Second },
+	f := startLaunchSessionWith(t, func(c *server.Config) { c.LaunchTimings.Window = 5 * time.Second },
 		agentfake.TUIRegistryDelayEnv+"=1500ms")
 	f.waitForUserRecord(t)
 	if n := strings.Count(f.transcript(), agentfake.UnknownCommandText("/gx-implement")); n < 2 {

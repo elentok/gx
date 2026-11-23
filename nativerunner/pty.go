@@ -64,9 +64,9 @@ type Pty struct {
 	// the typing check reads claude's config dir and home. Empty means no
 	// config, never the process env.
 	Env []string
-	// LaunchCaps are a launch prompt's retype window and landed-check timings;
+	// LaunchTimings are a launch prompt's retype window and landed-check timings;
 	// a zero field means the default.
-	LaunchCaps deliver.LaunchTimings
+	LaunchTimings deliver.LaunchTimings
 	// ProcCap is read at each launch: the holder's process tree may grow its
 	// headroom above the process count at that moment. The zero value means no cap.
 	ProcCap proccap.Source
@@ -445,7 +445,7 @@ func (p *Pty) Cleanup(label string) error {
 var _ agentrunner.Nudger = (*Pty)(nil)
 
 // Prompt types text plus Enter and returns once Turn moved past its value
-// before, nudging and retyping through deliver.PromptWithNudge.
+// before, nudging and retyping through deliver.Deliver (called via pr.deliver).
 func (p *Pty) Prompt(s agentrunner.Session, text string) error {
 	return p.PromptNudged(s, text, nil)
 }

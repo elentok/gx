@@ -192,7 +192,7 @@ type ptyLauncher struct {
 	procs        proctable.ProcessTable
 	poll         time.Duration
 	startTimeout time.Duration
-	// capsOverride is Pty.LaunchCaps: set fields replace the default caps.
+	// capsOverride is Pty.LaunchTimings: set fields replace the default caps.
 	capsOverride deliver.LaunchTimings
 	// procCap is the cap for a launch now; zero means uncapped.
 	procCap func() int
@@ -208,7 +208,7 @@ func (p *Pty) launcher() ptyLauncher {
 		procs:        p.Procs,
 		poll:         p.pollInterval(),
 		startTimeout: p.startTimeout(),
-		capsOverride: p.LaunchCaps,
+		capsOverride: p.LaunchTimings,
 		procCap:      p.procCap,
 	}
 }
@@ -217,7 +217,7 @@ func (p *Pty) procCap() int {
 	return p.ProcCap.Limit(p.log)
 }
 
-// launchCaps is the launch proof's caps with LaunchCaps' set fields applied.
+// launchCaps is the launch proof's caps with LaunchTimings' set fields applied.
 func (l ptyLauncher) launchCaps() claudeui.LaunchProofCaps {
 	caps := l.capsOverride.ProofCaps()
 	caps.Poll = cmp.Or(l.capsOverride.Poll, l.poll)

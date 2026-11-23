@@ -100,9 +100,9 @@ func startAskFixtureAs(t *testing.T, create wire.CreateSessionRequest, link *wir
 		servertest.WithTestHolder(),
 		servertest.WithAlerts(true, true),
 		func(c *server.Config) {
-			c.LaunchProofCaps.Grace = 6 * time.Second
-			c.LaunchProofCaps.Window = 600 * time.Millisecond
-			c.LaunchProofCaps.Poll = 20 * time.Millisecond
+			c.LaunchTimings.Grace = 6 * time.Second
+			c.LaunchTimings.Window = 600 * time.Millisecond
+			c.LaunchTimings.Poll = 20 * time.Millisecond
 			c.DialogFallbackDelay = 300 * time.Millisecond
 			c.KeysSettleStep = 20 * time.Millisecond
 			for _, f := range cfg {

@@ -19,15 +19,15 @@ const FallbackProject = "_default"
 // PtyOverride replaces the Pty runner's holder, agent program, process table
 // and timings. Production passes nil, which leaves every field to its default.
 type PtyOverride struct {
-	Holder       []string
-	Claude       string
-	Codex        string
-	Procs        proctable.ProcessTable
-	PollInterval time.Duration
-	StartTimeout time.Duration
-	PromptGrace  time.Duration
-	StopGrace    time.Duration
-	LaunchCaps   deliver.LaunchTimings
+	Holder        []string
+	Claude        string
+	Codex         string
+	Procs         proctable.ProcessTable
+	PollInterval  time.Duration
+	StartTimeout  time.Duration
+	PromptGrace   time.Duration
+	StopGrace     time.Duration
+	LaunchTimings deliver.LaunchTimings
 }
 
 // Options is what production configures on the runners.
@@ -69,7 +69,7 @@ func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, o
 				p.StartTimeout = pty.StartTimeout
 				p.PromptGrace = pty.PromptGrace
 				p.StopGrace = pty.StopGrace
-				p.LaunchCaps = pty.LaunchCaps
+				p.LaunchTimings = pty.LaunchTimings
 			}
 			r = p
 		default:

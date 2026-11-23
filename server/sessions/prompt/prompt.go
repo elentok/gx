@@ -56,9 +56,10 @@ type Config struct {
 	// PromptGrace bounds each wait for a typed prompt's turn to start; zero
 	// means deliver.DefaultNudgeCaps.Grace.
 	PromptGrace time.Duration
-	// LaunchProofCaps bound the check that a first slash prompt reached the
-	// transcript; a zero field means the claudeui default.
-	LaunchProofCaps deliver.LaunchTimings
+	// LaunchTimings are the launch prompt's retype window and the timings of
+	// the check that its first slash prompt reached the transcript; a zero field
+	// means the matching default.
+	LaunchTimings deliver.LaunchTimings
 	// ActionStepStartTimeout bounds how long an Action step waits for its
 	// prompt to go Working; zero means DefaultActionStepStartTimeout.
 	ActionStepStartTimeout time.Duration

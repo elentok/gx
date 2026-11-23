@@ -31,7 +31,7 @@ func launchPty(t *testing.T, caps deliver.LaunchTimings, env ...string) (*native
 		return slices.ContainsFunc(env, func(e string) bool { return strings.HasPrefix(e, k+"=") })
 	})
 	p.Env = append(p.Env, env...)
-	p.LaunchCaps = caps
+	p.LaunchTimings = caps
 	// A worker config makes "/gx-implement x/1" start a turn (it blocks on a
 	// permission prompt), as a skill does.
 	cwd := t.TempDir()

@@ -182,7 +182,7 @@ func runServer(ctx context.Context, d Deps) error {
 		if err != nil {
 			return fmt.Errorf("GX_LAUNCH_UNKNOWN_GRACE: %w", err)
 		}
-		ptyOverride.LaunchCaps = deliver.LaunchTimings{Window: grace, Grace: 3 * grace}
+		ptyOverride.LaunchTimings = deliver.LaunchTimings{Window: grace, Grace: 3 * grace}
 	}
 	runner, runnerFor := runnerbuild.New(choice, dirs.Environ(), stateDir, cfg.RunnerWait, runnerOpts, ptyOverride)
 	configPath, err := dirs.FilePath()
@@ -328,7 +328,7 @@ func runServer(ctx context.Context, d Deps) error {
 	srv, err := server.New(server.Config{Migrations: migrationReg, Settings: serverSettings, StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor, RestartBinary: restartBin,
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, RunnerWait: cfg.RunnerWait, WebAddr: cfg.Server.Web.Listen, LogLevel: logLevel,
 		AutoAdvanceDelay: autoAdvanceDelay, CommandListAge: commandListAge, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.Env.Env,
-		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval, TokenPollInterval: tokenPollInterval, PromptGrace: promptGrace, LaunchProofCaps: launchTimings, RateLimitResetBuffer: rateLimitBuffer, GuardPoll: guardPoll, BudgetKillGrace: budgetKillGrace,
+		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval, TokenPollInterval: tokenPollInterval, PromptGrace: promptGrace, LaunchTimings: launchTimings, RateLimitResetBuffer: rateLimitBuffer, GuardPoll: guardPoll, BudgetKillGrace: budgetKillGrace,
 		ProcessSource: processSource, RefreshSkills: skillscmd.NewSharedRefresh(func() error { return skillscmd.Refresh(d.skillsDeps(), io.Discard) }).Refresh, ForkHookDir: os.Getenv("GX_FORK_HOOK_DIR"), WrapLateFinishScan: wrapLateFinishScan(os.Getenv), Sleep: fastSleep(os.Getenv), PollInterval: fastPollInterval(os.Getenv),
 		PushAllowHTTPEndpoints: os.Getenv("GX_PUSH_ALLOW_HTTP_ENDPOINTS") == "1"})
 	if err != nil {

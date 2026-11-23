@@ -154,14 +154,14 @@ func (h *Harness) buildPty() {
 	// still wins.
 	env := append(h.cfg.Env[:len(h.cfg.Env):len(h.cfg.Env)], agentfake.TUIEnv+"=1")
 	_, runnerFor := runnerbuild.New("pty", env, h.StateDir, h.cfg.RunnerWait, runnerbuild.Options{}, &runnerbuild.PtyOverride{
-		Holder:       []string{exe, holderArg},
-		Claude:       exe,
-		Procs:        NewProcessTable(),
-		PollInterval: ptyPollInterval,
-		StartTimeout: ptyStartTimeout,
-		PromptGrace:  ptyPromptGrace,
-		StopGrace:    ptyStopGrace,
-		LaunchCaps:   launchCaps(env),
+		Holder:        []string{exe, holderArg},
+		Claude:        exe,
+		Procs:         NewProcessTable(),
+		PollInterval:  ptyPollInterval,
+		StartTimeout:  ptyStartTimeout,
+		PromptGrace:   ptyPromptGrace,
+		StopGrace:     ptyStopGrace,
+		LaunchTimings: launchCaps(env),
 	})
 	var mu sync.Mutex
 	wrapped := map[*nativerunner.Pty]*ptyRunner{}

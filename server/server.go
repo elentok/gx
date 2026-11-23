@@ -533,7 +533,7 @@ func New(cfg Config) (*Server, error) {
 		Cfg: sessprompt.Config{
 			AutoAdvanceDelay: cfg.AutoAdvanceDelay, TurnSettleTimeout: cfg.TurnSettleTimeout,
 			TicketStore: cfg.TicketStore, FirstPromptStartTimeout: cfg.FirstPromptStartTimeout,
-			PromptGrace: cfg.PromptGrace, LaunchProofCaps: cfg.LaunchProofCaps,
+			PromptGrace: cfg.PromptGrace, LaunchTimings: cfg.LaunchTimings,
 			ActionStepStartTimeout: cfg.ActionStepStartTimeout, ActionSlashSettle: cfg.ActionSlashSettle,
 			KeysSettleStep: cfg.KeysSettleStep, KeysSettleCap: cfg.KeysSettleCap,
 			CodexQuestionWait: cfg.CodexQuestionWait, Env: cfg.Env,

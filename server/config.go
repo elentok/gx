@@ -231,10 +231,10 @@ type Config struct {
 	// WebAttachIdle closes a web client's holder attach left unused this long;
 	// zero means webattach.DefaultIdleTimeout.
 	WebAttachIdle time.Duration
-	// LaunchProofCaps bound the check that a claude session's first slash
-	// prompt reached the transcript; a zero field means the matching
-	// claudeui.DefaultLaunchProofCaps one.
-	LaunchProofCaps deliver.LaunchTimings
+	// LaunchTimings are the launch prompt's retype window and the timings of
+	// the check that its first slash prompt reached the transcript; a zero field
+	// means the matching default.
+	LaunchTimings deliver.LaunchTimings
 
 	// CompactRewaitTimeout bounds recovery's R7 wait; zero means
 	// DefaultCompactRewaitTimeout.

@@ -51,7 +51,7 @@ func startTUIChatPromptWith(t *testing.T, prompt string, tune func(*server.Confi
 			c.PromptGrace = firstPromptGrace
 			c.ActionStepStartTimeout = firstPromptGrace
 			if prompt != "" {
-				c.LaunchProofCaps.Grace = 4 * time.Second // the proof of an undelivered first prompt ends soon
+				c.LaunchTimings.Grace = 4 * time.Second // the proof of an undelivered first prompt ends soon
 			}
 			if tune != nil {
 				tune(c)

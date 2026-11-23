@@ -74,7 +74,7 @@ func TestPtyCodex_NoNoteKeepsTheLoopPromptAlone(t *testing.T) {
 func TestPtyCodex_LaunchPromptIsDeliveredByTheRolloutsUserRecord(t *testing.T) {
 	t.Parallel()
 	p, _ := codexRunner(t)
-	p.LaunchCaps = deliver.LaunchTimings{Grace: 10 * time.Second, RetypeEvery: time.Hour}
+	p.LaunchTimings = deliver.LaunchTimings{Grace: 10 * time.Second, RetypeEvery: time.Hour}
 	s := startCodex(t, p, realDir(t))
 
 	if err := p.PromptLaunch(context.Background(), s, "$gx-implement x/1", nil); err != nil {
@@ -85,7 +85,7 @@ func TestPtyCodex_LaunchPromptIsDeliveredByTheRolloutsUserRecord(t *testing.T) {
 func TestPtyCodex_UnknownUntilInstalledLaunchIsRetypedThenStarts(t *testing.T) {
 	t.Parallel()
 	p, codexHome := codexRunner(t, codex.CodexUnknownUntilInstalledEnv+"=1")
-	p.LaunchCaps = deliver.LaunchTimings{Grace: 10 * time.Second, Window: time.Minute, RetypeEvery: 100 * time.Millisecond, Poll: 20 * time.Millisecond}
+	p.LaunchTimings = deliver.LaunchTimings{Grace: 10 * time.Second, Window: time.Minute, RetypeEvery: 100 * time.Millisecond, Poll: 20 * time.Millisecond}
 	s := startCodex(t, p, realDir(t))
 	var decisions []string
 
@@ -113,7 +113,7 @@ func TestPtyCodex_UnknownUntilInstalledLaunchIsRetypedThenStarts(t *testing.T) {
 func TestPtyCodex_NeverAcceptedLaunchIsRetypedThenErrUnknownSkill(t *testing.T) {
 	t.Parallel()
 	p, _ := codexRunner(t, codex.CodexUnknownSkillEnv+"=1")
-	p.LaunchCaps = deliver.LaunchTimings{Grace: time.Minute, Window: 400 * time.Millisecond, RetypeEvery: 100 * time.Millisecond, Poll: 20 * time.Millisecond}
+	p.LaunchTimings = deliver.LaunchTimings{Grace: time.Minute, Window: 400 * time.Millisecond, RetypeEvery: 100 * time.Millisecond, Poll: 20 * time.Millisecond}
 	s := startCodex(t, p, realDir(t))
 	var decisions []string
 
@@ -130,7 +130,7 @@ func TestPtyCodex_NeverAcceptedLaunchIsRetypedThenErrUnknownSkill(t *testing.T) 
 func TestPtyCodex_UnknownSkillLaunchFailsFastWithErrUnknownSkill(t *testing.T) {
 	t.Parallel()
 	p, _ := codexRunner(t, codex.CodexUnknownSkillEnv+"=1")
-	p.LaunchCaps = deliver.LaunchTimings{Grace: time.Minute, Window: 200 * time.Millisecond, RetypeEvery: time.Hour}
+	p.LaunchTimings = deliver.LaunchTimings{Grace: time.Minute, Window: 200 * time.Millisecond, RetypeEvery: time.Hour}
 	s := startCodex(t, p, realDir(t))
 
 	start := time.Now()
@@ -147,7 +147,7 @@ func TestPtyCodex_UnknownSkillLaunchFailsFastWithErrUnknownSkill(t *testing.T) {
 func TestPtyCodex_UnknownUntilInstalledSkillLaunchesOnceInstalled(t *testing.T) {
 	t.Parallel()
 	p, codexHome := codexRunner(t, codex.CodexUnknownUntilInstalledEnv+"=1")
-	p.LaunchCaps = deliver.LaunchTimings{Grace: time.Minute, Window: 200 * time.Millisecond, RetypeEvery: time.Hour}
+	p.LaunchTimings = deliver.LaunchTimings{Grace: time.Minute, Window: 200 * time.Millisecond, RetypeEvery: time.Hour}
 	s := startCodex(t, p, realDir(t))
 
 	if err := p.PromptLaunch(context.Background(), s, "$gx-implement x/1", nil); !errors.Is(err, agentrunner.ErrUnknownSkill) {
@@ -160,7 +160,7 @@ func TestPtyCodex_UnknownUntilInstalledSkillLaunchesOnceInstalled(t *testing.T) 
 	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# skill\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	p.LaunchCaps = deliver.LaunchTimings{Grace: 10 * time.Second, Window: 5 * time.Second, RetypeEvery: time.Hour}
+	p.LaunchTimings = deliver.LaunchTimings{Grace: 10 * time.Second, Window: 5 * time.Second, RetypeEvery: time.Hour}
 
 	if err := p.PromptLaunch(context.Background(), s, "$gx-implement x/1", nil); err != nil {
 		t.Fatalf("PromptLaunch after the install = %v; want nil", err)
@@ -170,7 +170,7 @@ func TestPtyCodex_UnknownUntilInstalledSkillLaunchesOnceInstalled(t *testing.T) 
 func TestPtyCodex_DroppedLaunchPromptIsTypedOnceThenNotDelivered(t *testing.T) {
 	t.Parallel()
 	p, _ := codexRunner(t, codex.CodexDropPromptEnv+"=1")
-	p.LaunchCaps = deliver.LaunchTimings{Grace: 1500 * time.Millisecond, RetypeEvery: 300 * time.Millisecond}
+	p.LaunchTimings = deliver.LaunchTimings{Grace: 1500 * time.Millisecond, RetypeEvery: 300 * time.Millisecond}
 	s := startCodex(t, p, realDir(t))
 	var mu sync.Mutex
 	var decisions []string
