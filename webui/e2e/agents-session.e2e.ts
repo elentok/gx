@@ -109,7 +109,13 @@ test("75. Read a session", async ({ page, start }) => {
   await page.route("**/v1/sessions/chat*", (route) =>
     failing ? route.fulfill({ status: 500, body: "boom" }) : route.continue(),
   )
+  // Recover only after the failing read really happened, or the next event's refetch
+  // could be the first one and the flow would never test the failure.
+  const failedRead = page.waitForResponse(
+    (r) => r.url().includes("/v1/sessions/chat") && r.status() === 500,
+  )
   await ask(fixture, idle.id, "while failing")
+  await failedRead
   await expect(page.getByText("turn 10", { exact: true })).toBeVisible()
   await expect(page.getByText("while failing", { exact: true })).toHaveCount(0)
   failing = false
