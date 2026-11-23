@@ -47,6 +47,8 @@ test("189. Send images", async ({ page, start }) => {
   await expect
     .poll(async () => (await messagesOf(fixture, claude.id)).length)
     .toBeGreaterThan(before)
+  const conversation = (await chatOf(fixture, claude.id)).conversation_id
+  await expect.poll(() => fixture.turnEnded(conversation)).toBe(true)
   await expect
     .poll(async () => (await sessions(fixture)).find((s) => s.id === claude.id)!.status.state)
     .toBe("idle")

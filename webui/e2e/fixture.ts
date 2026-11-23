@@ -155,6 +155,12 @@ export interface Fixture {
   codexLaunches(session: string): Promise<string[][]>
   /** Arms (true) or disarms the fork draft failure hook `name` (`save-fail` or `start-fail`). */
   forkHook(name: "save-fail" | "start-fail", armed: boolean): Promise<void>
+  /**
+   * True when the fake claude's pid file for this conversation (the chat's `conversation_id`) says
+   * `idle`. Call it only after the reply is in the chat: the fake sets busy before it appends the
+   * reply, so an earlier call can see the `idle` left from before the turn.
+   */
+  turnEnded(conversation: string): Promise<boolean>
   /** Everything the fake claude of a conversation (the chat's `conversation_id`) read off its terminal, raw; empty before it read any. */
   input(conversation: string): Promise<string>
   /** Sends a control (`agentfake.Control`, JSON field names) to the fake claude of a conversation and waits until it handled it. */
@@ -464,6 +470,18 @@ async function startFixture(
       const file = join(out.fork_hook_dir!, name)
       if (armed) await writeFile(file, "")
       else await rm(file, { force: true })
+    },
+    async turnEnded(conversation) {
+      const dir = join(env.HOME!, ".claude", "sessions")
+      for (const name of await readdir(dir).catch(() => [] as string[])) {
+        try {
+          const pid = JSON.parse(await readFile(join(dir, name), "utf8"))
+          if (pid.sessionId === conversation) return pid.status === "idle"
+        } catch {
+          // A file the fake is rewriting, or not a pid file: skip it.
+        }
+      }
+      return false
     },
     async input(conversation) {
       return readFile(join(env.HOME!, ".claude", "agentfake", `${conversation}.in`), "utf8").catch(

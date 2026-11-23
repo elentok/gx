@@ -111,10 +111,9 @@ export async function ask(fixture: Fixture, id: string, text: string) {
     )
     .toBe(true)
   await expect.poll(async () => (await chatOf(fixture, id)).messages.length).toBe(before + 2)
-  // The server's state follows the fake a moment late, so a prompt sent now could still land on the old turn.
-  await expect
-    .poll(async () => (await sessions(fixture)).find((s) => s.id === id)!.status.state)
-    .toBe("working")
+  // The fake ends its turn a moment after the reply, and the server follows later still.
+  const conversation = (await chatOf(fixture, id)).conversation_id
+  await expect.poll(() => fixture.turnEnded(conversation)).toBe(true)
   await expect
     .poll(async () => (await sessions(fixture)).find((s) => s.id === id)!.status.state)
     .toBe("idle")
