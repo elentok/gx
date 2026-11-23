@@ -360,7 +360,10 @@ func (mg *Manager) recordSessionExit(m *Meta, exit string) bool {
 	}
 	mg.markExited(m, exit)
 	m.FirstPrompt = ""
-	m.Actionable = wire.SessionActionable{}
+	// The unknown-command card outlives the person's Stop so Resend works after a restart.
+	if !m.Stopped || m.Actionable.Kind != wire.DeliveryUnknownCommand {
+		m.Actionable = wire.SessionActionable{}
+	}
 	return true
 }
 

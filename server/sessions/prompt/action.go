@@ -61,7 +61,10 @@ func (p *Prompt) SendSessionAction(req wire.SessionRequest, auto bool) (wire.Ses
 		return wire.SessionResult{}, err
 	}
 	p.events.Publish(wire.EventSessionChanged, req.ID)
-	if len(imgs.ids) > 0 {
+	if text := meta.Actionable.CopyText; text != "" && meta.Actionable.IsDelivery() {
+		// Through the chat send path, so a second failure raises the same card.
+		p.sessions.Watches.Start(func() { p.sendPrompt(dir, text, imgs) })
+	} else if len(imgs.ids) > 0 {
 		p.sessions.Watches.Start(func() { p.sendPrompt(dir, action[0], imgs) })
 	} else {
 		p.resumer.StartContinue(dir, meta, "Action", action)
@@ -79,8 +82,12 @@ func retryBlocking(p *Prompt, req wire.SessionRequest) (wire.SessionResult, erro
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if !meta.Actionable.GxRaised || meta.Actionable.Blocking == "" {
+	a := meta.Actionable
+	if !a.GxRaised || (a.Blocking == "" && a.Kind != wire.DeliveryUnknownCommand) {
 		return sessions.Refusal(wire.ReasonSessionNoAction, fmt.Sprintf("session %s has no blocking card", req.ID)), nil
+	}
+	if meta.Status.State == wire.SessionExited {
+		return sessions.Refusal(wire.ReasonSessionNotLive, fmt.Sprintf("session %s has exited: restart the agent first", req.ID)), nil
 	}
 	return p.RunSessionAction(req)
 }
