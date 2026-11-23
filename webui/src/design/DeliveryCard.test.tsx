@@ -57,6 +57,14 @@ test.each([
   expect(names).toEqual(["Copy", "Show screen", "Dismiss"])
 })
 
+test("the reason sets the command in code", () => {
+  const s = session(DeliveryMaybeSent)
+  s.actionable!.reason = `gx could not tell if ${TEXT} ran.`
+  renderThemed(<DeliveryCard session={s} />)
+  const code = document.querySelector('[data-mock-part="reason"] code')
+  expect(code?.textContent).toBe(TEXT)
+})
+
 test("isDeliveryCard is true for the two kinds with a reason only", () => {
   expect(isDeliveryCard(session(DeliveryMaybeSent))).toBe(true)
   expect(isDeliveryCard(session(DeliverySendFailed))).toBe(true)

@@ -86,6 +86,13 @@ const kindLook = (kind?: string): KindLook | undefined =>
 export const isDeliveryCard = (s: SessionInfo) =>
   !!s.actionable?.gx_raised && !!s.actionable.reason && !!kindLook(s.actionable.kind)
 
+/** The reason split around the first copy of the command, which the mock sets in monospace. */
+function reasonParts(reason: string, command: string) {
+  const at = command ? reason.indexOf(command) : -1
+  if (at < 0) return { before: reason, code: "", after: "" }
+  return { before: reason.slice(0, at), code: command, after: reason.slice(at + command.length) }
+}
+
 /** The one card that sits at the tail of a session's chat, or null when there is none. */
 export type TailCardKind = "blocking" | "delivery" | "stopped"
 
@@ -115,6 +122,7 @@ export function DeliveryCard({
 }) {
   const look = kindLook(session.actionable.kind) as KindLook
   const text = session.actionable.copy_text ?? ""
+  const reason = reasonParts(session.actionable.reason ?? "", text)
   const box = useRef<HTMLDivElement>(null)
   const [screen, setScreen] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -151,7 +159,13 @@ export function DeliveryCard({
         {look.title}
       </Text>
       <Text fontSize="sm" data-mock-part="reason">
-        {session.actionable.reason}
+        {reason.before}
+        {reason.code && (
+          <Text as="code" fontFamily="mono" fontSize="12.5px">
+            {reason.code}
+          </Text>
+        )}
+        {reason.after}
       </Text>
       {text && (
         <Box
