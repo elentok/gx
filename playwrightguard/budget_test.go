@@ -78,7 +78,9 @@ import (
 // across pages; vitest pins every render alone.
 // Epic PWA flow (+1): flow 2 ran near the 45 s slow limit with its PWA steps, so Force refresh and the cold open run
 // as their own flow.
-const maxFlows = 158
+// Interrupt flow (+1): flow 75 ran over the 45 s slow limit under load, so the tools-in-flight and Interrupt steps run
+// as their own flow.
+const maxFlows = 159
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

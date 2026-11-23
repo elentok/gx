@@ -117,6 +117,43 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(page.getByText("while failing", { exact: true })).toHaveCount(1)
   await expect(page.getByText("after recovery", { exact: true })).toBeVisible()
 
+  // An interrupted turn is one dim separator in Claude and Codex, Chat and Design sessions.
+  const interrupted = await sessions(await start("agents-interrupted"))
+  expect(interrupted).toHaveLength(4)
+  for (const s of interrupted) {
+    await go(page, `#/agents/${s.id}`)
+    await expect(page.getByText("hello", { exact: true })).toBeVisible()
+    await expect(page.getByRole("separator").filter({ hasText: /^Turn interrupted$/ })).toHaveCount(
+      1,
+    )
+    await expect(page.getByText("[Request interrupted by user]")).toHaveCount(0)
+  }
+
+  // Each non-blocking notice shows its fixed text on its own session and dismisses.
+  const noticeTexts = [
+    /^gx typed while the terminal was still redrawing/,
+    /^The first prompt was sent without seeing the agent's input box/,
+  ]
+  const noticed = await sessions(await start("agents-notices"))
+  expect(noticed).toHaveLength(2)
+  const seen: string[] = []
+  for (const s of noticed) {
+    await go(page, `#/agents/${s.id}`)
+    const status = page.getByRole("status").filter({ hasText: /\S/ })
+    await expect(status).toHaveCount(1)
+    const text = ((await status.textContent()) ?? "").replace(/\s*Dismiss\s*$/, "")
+    expect(noticeTexts.filter((re) => re.test(text))).toHaveLength(1)
+    seen.push(text)
+    await status.getByRole("button", { name: "Dismiss" }).click()
+    await expect(status).toHaveCount(0)
+  }
+  expect(new Set(seen).size).toBe(2)
+})
+
+test("75. Tools in flight and Interrupt", async ({ page, start }) => {
+  await page.setViewportSize({ width: 1280, height: 560 })
+  const renameDialog = page.getByRole("dialog", nav("Rename chat"))
+
   // Tools in flight: the Working row names the newest call and counts the rest.
   const toolsFixture = await start("agents-tools")
   const tools = (await sessions(toolsFixture)).filter((s) => !s.queue)
@@ -265,39 +302,6 @@ test("75. Read a session", async ({ page, start }) => {
   }).toPass()
   await page.keyboard.press("Escape")
   await expect(confirm).toHaveCount(0)
-
-  // An interrupted turn is one dim separator in Claude and Codex, Chat and Design sessions.
-  const interrupted = await sessions(await start("agents-interrupted"))
-  expect(interrupted).toHaveLength(4)
-  await page.setViewportSize({ width: 1280, height: 560 })
-  for (const s of interrupted) {
-    await go(page, `#/agents/${s.id}`)
-    await expect(page.getByText("hello", { exact: true })).toBeVisible()
-    await expect(page.getByRole("separator").filter({ hasText: /^Turn interrupted$/ })).toHaveCount(
-      1,
-    )
-    await expect(page.getByText("[Request interrupted by user]")).toHaveCount(0)
-  }
-
-  // Each non-blocking notice shows its fixed text on its own session and dismisses.
-  const noticeTexts = [
-    /^gx typed while the terminal was still redrawing/,
-    /^The first prompt was sent without seeing the agent's input box/,
-  ]
-  const noticed = await sessions(await start("agents-notices"))
-  expect(noticed).toHaveLength(2)
-  const seen: string[] = []
-  for (const s of noticed) {
-    await go(page, `#/agents/${s.id}`)
-    const status = page.getByRole("status").filter({ hasText: /\S/ })
-    await expect(status).toHaveCount(1)
-    const text = ((await status.textContent()) ?? "").replace(/\s*Dismiss\s*$/, "")
-    expect(noticeTexts.filter((re) => re.test(text))).toHaveLength(1)
-    seen.push(text)
-    await status.getByRole("button", { name: "Dismiss" }).click()
-    await expect(status).toHaveCount(0)
-  }
-  expect(new Set(seen).size).toBe(2)
 })
 
 // Moved to vitest: 77 and 81 (AgentsPage.composer.test.tsx), 82 (AgentsPage.sessionView.test.tsx),
