@@ -8,9 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elentok/gx/agentrunner/codexui"
-	"github.com/elentok/gx/agentrunner/deliver"
-	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/sessions"
@@ -106,16 +103,7 @@ func (p namer) typeRename(dir, id string, seq uint64, command string) error {
 		}
 		return errRenameSkip
 	}
-	if err := run.typeStepWith(0, command, imageSet{}); err != nil {
-		return err
-	}
-	if meta, err := sessions.ReadMeta(dir); err != nil || meta.Harness != string(harness.Codex) {
-		return nil
-	}
-	return deliver.WatchUnknown(func() (string, error) {
-		rows, _, err := run.Holder().Screen(0)
-		return strings.Join(rows, "\n"), err
-	}, command, deliver.SlashCaps{Marker: codexui.UnknownCommandMarker, Watch: codexSlashWatch})
+	return run.typeStepWith(0, command, imageSet{})
 }
 
 // holdRename follows a Blocked chat's status stream and types the held rename

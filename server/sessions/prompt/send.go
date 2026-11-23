@@ -9,10 +9,9 @@ import (
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/server/wire"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
-	"github.com/elentok/gx/agentrunner/codexui"
 	"github.com/elentok/gx/agentrunner/deliver"
-	"github.com/elentok/gx/harness"
 )
 
 // codexSlashWatch bounds the pane watch for Codex's "Unrecognized command",
@@ -59,13 +58,12 @@ func (p *Prompt) deliverPolicy(dir, text string, grace time.Duration, report str
 	policy.Draft = p.draftHooks(dir)
 	policy.Caps.Grace = grace
 	if policy.Slash != nil {
-		policy.Slash.Settle = cmp.Or(p.cfg.ActionSlashSettle, DefaultActionSlashSettle)
-		if meta, err := sessions.ReadMeta(dir); err == nil && meta.Harness == string(harness.Codex) {
-			// One Enter, no input read: Deliver watches the pane for the marker after.
-			policy.Slash.Settle = 0
-			policy.Slash.Marker = codexui.UnknownCommandMarker
-			policy.Slash.Watch = codexSlashWatch
+		kind := agentrunner.Kind("")
+		if meta, err := sessions.ReadMeta(dir); err == nil {
+			kind = agentrunner.Kind(meta.Harness)
 		}
+		caps := deliver.SlashCapsFor(kind, cmp.Or(p.cfg.ActionSlashSettle, DefaultActionSlashSettle), deliver.DefaultSlashCaps.Gap, codexSlashWatch)
+		policy.Slash = &caps
 	}
 	policy.Report = func(d claudeui.NudgeDecision) {
 		p.log.Info(report, "session", filepath.Base(dir), "decision", string(d))

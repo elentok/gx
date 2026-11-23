@@ -13,6 +13,8 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/codexui"
+	"github.com/elentok/gx/harness"
 )
 
 // ErrMaybeUnsent ends a slash send whose screen could not tell whether the
@@ -48,6 +50,20 @@ var DefaultSlashCaps = SlashCaps{
 	ExtraEnters: 3,
 	ResizePoll:  25 * time.Millisecond,
 	ResizeCap:   time.Second,
+}
+
+// SlashCapsFor are the slash timings for a session of kind. Codex sends once
+// and watches the pane for its marker for watch; any other kind settles for
+// settle, and its extra Enters wait gap.
+func SlashCapsFor(kind agentrunner.Kind, settle, gap, watch time.Duration) SlashCaps {
+	caps := DefaultSlashCaps
+	caps.Settle, caps.Gap = settle, gap
+	if kind == harness.Codex {
+		caps.Settle = 0
+		caps.Marker = codexui.UnknownCommandMarker
+		caps.Watch = watch
+	}
+	return caps
 }
 
 // IsSlash reports whether text, after the hidden-character strip Deliver
@@ -226,22 +242,6 @@ func errUnknown(text, marker string) error {
 	return fmt.Errorf("%w: %w: %q: %s", agentrunner.ErrNotDelivered, agentrunner.ErrUnknownSkill, text, marker)
 }
 
-// WatchUnknown is the Codex check for a command typed outside Deliver: it reads
-// the screen for caps.Marker until caps.Watch passes. Deliver does the same
-// itself after a Codex slash send.
-func WatchUnknown(screen func() (string, error), text string, caps SlashCaps) error {
-	deadline := time.Now().Add(caps.Watch)
-	for {
-		if s, err := screen(); err == nil && strings.Contains(s, caps.Marker) {
-			return errUnknown(text, caps.Marker)
-		}
-		if !time.Now().Before(deadline) {
-			return nil
-		}
-		time.Sleep(cmp.Or(caps.WatchPoll, 50*time.Millisecond))
-	}
-}
-
 // watch reads the pane for Marker for caps.Watch after the Enter.
 func (s *slashSend) watch() error {
 	poll := cmp.Or(s.caps.WatchPoll, 50*time.Millisecond)
@@ -319,7 +319,7 @@ func deliverSlash(t Input, text string, caps SlashCaps, report func(claudeui.Nud
 	}
 	s := &slashSend{t: t, text: text, chips: t.ImageCount(), caps: caps, launch: launch}
 	readBaseline := func() {
-		if caps.Settle > 0 {
+		if caps.Settle > 0 || caps.Watch > 0 {
 			s.baseline, _, _ = t.ReadRows()
 		}
 	}

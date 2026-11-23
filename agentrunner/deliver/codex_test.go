@@ -33,8 +33,16 @@ func TestDeliver_CodexSlashTypesOnceAndPressesOneEnter(t *testing.T) {
 	}
 }
 
+func TestDeliver_CodexIgnoresAnUnrecognizedCommandLeftByAnEarlierSend(t *testing.T) {
+	stale := []string{"■ " + codexui.UnknownCommandMarker + " `/nope`", "› /model"}
+	f := &slashFake{reads: []read{ok(stale)}}
+	if err := deliver.Deliver(f, "/model", codexSlash("/model")); err != nil {
+		t.Fatalf("Deliver() error = %v, want nil: the marker was on the pane before the send", err)
+	}
+}
+
 func TestDeliver_CodexUnrecognizedCommandFailsTheSend(t *testing.T) {
-	f := &slashFake{reads: []read{ok([]string{"■ " + codexui.UnknownCommandMarker + " `/nope`"})}}
+	f := &slashFake{reads: []read{ok([]string{"› /nope"}), ok([]string{"■ " + codexui.UnknownCommandMarker + " `/nope`"})}}
 	err := deliver.Deliver(f, "/nope", codexSlash("/nope"))
 	if !errors.Is(err, agentrunner.ErrNotDelivered) || !errors.Is(err, agentrunner.ErrUnknownSkill) {
 		t.Fatalf("Deliver() error = %v, want ErrNotDelivered and ErrUnknownSkill", err)

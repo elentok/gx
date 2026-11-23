@@ -8,7 +8,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
-	"github.com/elentok/gx/agentrunner/codexui"
 	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
@@ -300,13 +299,6 @@ func (p *Pty) typing(ss *ptySession) harness.Typing {
 // than the runner's wait. Codex draws its unknown-command marker on screen only,
 // so it sends once and watches the pane.
 func (p *Pty) slashCaps(kind agentrunner.Kind) deliver.SlashCaps {
-	caps := deliver.DefaultSlashCaps
-	caps.Settle = min(caps.Settle, p.WaitN())
-	caps.Gap = min(caps.Gap, p.WaitN())
-	if kind == harness.Codex {
-		caps.Settle = 0
-		caps.Marker = codexui.UnknownCommandMarker
-		caps.Watch = min(time.Second, p.WaitN())
-	}
-	return caps
+	d := deliver.DefaultSlashCaps
+	return deliver.SlashCapsFor(kind, min(d.Settle, p.WaitN()), min(d.Gap, p.WaitN()), min(time.Second, p.WaitN()))
 }
