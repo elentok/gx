@@ -41,7 +41,7 @@ export function serviceWorkerPlugin(): Plugin {
 
 // The build id makes each build's worker byte-different, so it installs anew.
 // The fetch rules live in workerCore.ts; this entry only wires events to them.
-function workerSource(buildId: string, urls: string[], coreCode: string): string {
+export function workerSource(buildId: string, urls: string[], coreCode: string): string {
   return `// build ${buildId}
 ${coreCode}
 const lifecycle = {
@@ -64,6 +64,30 @@ self.addEventListener(
     caches: self.caches,
     fetch: (input, init) => fetch(input, init),
     cacheName: gxWorkerCore.cacheNameFor(lifecycle.buildId),
+  }),
+);
+self.addEventListener(
+  "push",
+  gxWorkerCore.createPushHandler({
+    showNotification: (title, options) => self.registration.showNotification(title, options),
+    setAppBadge: self.navigator.setAppBadge ? (n) => self.navigator.setAppBadge(n) : undefined,
+    clearAppBadge: self.navigator.clearAppBadge ? () => self.navigator.clearAppBadge() : undefined,
+  }),
+);
+self.addEventListener(
+  "notificationclick",
+  gxWorkerCore.createTapHandler({
+    origin: self.location.origin,
+    matchWindows: () => self.clients.matchAll({ type: "window", includeUncontrolled: true }),
+    openWindow: (url) => self.clients.openWindow(url),
+  }),
+);
+self.addEventListener(
+  "pushsubscriptionchange",
+  gxWorkerCore.createRenewHandler({
+    subscribe: (key) =>
+      self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }),
+    fetch: (input, init) => fetch(input, init),
   }),
 );
 `

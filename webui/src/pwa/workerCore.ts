@@ -153,3 +153,160 @@ export function createFetchHandler(deps: WorkerDeps) {
     }
   }
 }
+
+// The page listens for this message and answers on the port it was sent with.
+export const TAP_MESSAGE = "gx-notification-tap"
+// How long a tapped window gets to answer before it counts as having no listener.
+export const TAP_ACK_MS = 500
+// Route of 06 (server/webpush/routes.go pathRenew).
+export const PUSH_RENEW_PATH = "/v1/web/push/renew"
+
+interface PushPayload {
+  title?: string
+  body?: string
+  path?: string
+  badge?: number
+  tag?: string
+}
+
+export interface PushEventLike {
+  data: { json(): unknown } | null
+  waitUntil(work: Promise<unknown>): void
+}
+
+export interface PushDeps {
+  showNotification: (title: string, options: NotificationOptions) => Promise<void>
+  setAppBadge?: (count: number) => Promise<void>
+  clearAppBadge?: () => Promise<void>
+}
+
+export function createPushHandler(deps: PushDeps) {
+  async function show(payload: PushPayload) {
+    await deps.showNotification(payload.title || "gx", {
+      body: payload.body,
+      tag: payload.tag,
+      data: { path: payload.path },
+    })
+    if (typeof payload.badge !== "number") return
+    try {
+      if (payload.badge > 0) await deps.setAppBadge?.(payload.badge)
+      else await deps.clearAppBadge?.()
+    } catch {
+      // A badge error never undoes the notification.
+    }
+  }
+
+  return function onPush(event: PushEventLike): void {
+    let payload: PushPayload = {}
+    try {
+      const parsed = event.data?.json()
+      if (parsed && typeof parsed === "object") payload = parsed as PushPayload
+    } catch {
+      // An unreadable payload still gets a notification: iOS requires one.
+    }
+    event.waitUntil(show(payload))
+  }
+}
+
+export interface WindowClientLike {
+  focus(): Promise<unknown>
+  navigate(url: string): Promise<unknown>
+  postMessage(message: unknown, transfer: Transferable[]): void
+}
+
+export interface TapEventLike {
+  notification: { close(): void; data?: { path?: string } | null }
+  waitUntil(work: Promise<unknown>): void
+}
+
+export interface TapDeps {
+  origin: string
+  matchWindows: () => Promise<WindowClientLike[]>
+  openWindow: (url: string) => Promise<unknown>
+  ackMs?: number
+}
+
+export function createTapHandler(deps: TapDeps) {
+  const ackMs = deps.ackMs ?? TAP_ACK_MS
+
+  async function answered(client: WindowClientLike, path: string): Promise<boolean> {
+    const channel = new MessageChannel()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const ack = new Promise<boolean>((resolve) => {
+      channel.port1.onmessage = () => resolve(true)
+      timer = setTimeout(() => resolve(false), ackMs)
+    })
+    client.postMessage({ type: TAP_MESSAGE, path }, [channel.port2])
+    const ok = await ack
+    clearTimeout(timer)
+    channel.port1.close()
+    return ok
+  }
+
+  async function open(path: string) {
+    const url = `${deps.origin}/#${path}`
+    const [client] = await deps.matchWindows()
+    if (!client) {
+      await deps.openWindow(url)
+      return
+    }
+    await client.focus()
+    // No answer means the page has no listener yet: only a reload gets the path to it.
+    if (!(await answered(client, path))) await client.navigate(url)
+  }
+
+  return function onTap(event: TapEventLike): void {
+    event.notification.close()
+    event.waitUntil(open(event.notification.data?.path ?? "/").catch(() => undefined))
+  }
+}
+
+export interface SubscriptionLike {
+  endpoint: string
+  options?: { applicationServerKey?: ArrayBuffer | null }
+  toJSON(): { endpoint?: string; keys?: { p256dh?: string; auth?: string } }
+}
+
+export interface RenewEventLike {
+  oldSubscription?: { endpoint: string; options?: SubscriptionLike["options"] } | null
+  newSubscription?: SubscriptionLike | null
+  waitUntil(work: Promise<unknown>): void
+}
+
+export interface RenewDeps {
+  subscribe: (key: ArrayBuffer | undefined) => Promise<SubscriptionLike>
+  fetch: (input: string, init?: RequestInit) => Promise<Response>
+}
+
+function base64url(buf: ArrayBuffer | null | undefined): string {
+  if (!buf) return ""
+  let s = ""
+  for (const b of new Uint8Array(buf)) s += String.fromCharCode(b)
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+}
+
+export function createRenewHandler(deps: RenewDeps) {
+  async function renew(event: RenewEventLike) {
+    const old = event.oldSubscription
+    const key = old?.options?.applicationServerKey ?? undefined
+    const sub = event.newSubscription ?? (await deps.subscribe(key))
+    const json = sub.toJSON()
+    await deps.fetch(PUSH_RENEW_PATH, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        endpoint: json.endpoint ?? sub.endpoint,
+        p256dh: json.keys?.p256dh ?? "",
+        auth: json.keys?.auth ?? "",
+        vapid_key: base64url(key ?? sub.options?.applicationServerKey),
+        old_endpoint: old?.endpoint ?? "",
+      }),
+    })
+  }
+
+  return function onRenew(event: RenewEventLike): void {
+    // A refusal or a network error leaves the stored subscription as it was.
+    event.waitUntil(renew(event).catch(() => undefined))
+  }
+}

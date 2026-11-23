@@ -4,9 +4,17 @@ import {
   CACHE_PREFIX,
   cacheNameFor,
   createFetchHandler,
+  createPushHandler,
+  createRenewHandler,
+  createTapHandler,
   type FetchEventLike,
   precache,
+  PUSH_RENEW_PATH,
+  type PushDeps,
   pruneOldCaches,
+  type RenewEventLike,
+  TAP_ACK_MS,
+  TAP_MESSAGE,
 } from "./workerCore"
 
 const ORIGIN = "https://gx.test"
@@ -291,5 +299,199 @@ describe("service worker lifecycle", () => {
     await pruneOldCaches({ caches, buildId: "b2" })
     expect(all.has(cacheNameFor("b1"))).toBe(false)
     expect(await all.get(cacheNameFor("b2"))!.get(SHELL_URL)!.text()).toBe("<html>two</html>")
+  })
+})
+
+function pushEvent(payload: unknown, raw?: string) {
+  const work: Promise<unknown>[] = []
+  return {
+    event: {
+      data:
+        payload === undefined && raw === undefined
+          ? null
+          : { json: () => (raw !== undefined ? JSON.parse(raw) : payload) },
+      waitUntil: (p: Promise<unknown>) => void work.push(p),
+    },
+    done: () => Promise.all(work),
+  }
+}
+
+describe("service worker push", () => {
+  const payload = { title: "T", body: "B", path: "/s/1", badge: 3, tag: "k" }
+  const setup = (badge: Partial<PushDeps> = {}) => {
+    const showNotification = vi.fn(async () => {})
+    const setAppBadge = vi.fn(async () => {})
+    const clearAppBadge = vi.fn(async () => {})
+    const onPush = createPushHandler({ showNotification, setAppBadge, clearAppBadge, ...badge })
+    return { onPush, showNotification, setAppBadge, clearAppBadge }
+  }
+
+  it("shows the payload's notification and sets the badge", async () => {
+    const s = setup()
+    const e = pushEvent(payload)
+    s.onPush(e.event)
+    await e.done()
+    expect(s.showNotification).toHaveBeenCalledTimes(1)
+    expect(s.showNotification).toHaveBeenCalledWith("T", {
+      body: "B",
+      tag: "k",
+      data: { path: "/s/1" },
+    })
+    expect(s.setAppBadge).toHaveBeenCalledWith(3)
+  })
+
+  it("clears the badge at 0", async () => {
+    const s = setup()
+    const e = pushEvent({ ...payload, badge: 0 })
+    s.onPush(e.event)
+    await e.done()
+    expect(s.clearAppBadge).toHaveBeenCalledTimes(1)
+    expect(s.setAppBadge).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ["missing", pushEvent(undefined)],
+    ["unparsable", pushEvent(undefined, "{nope")],
+  ])("still shows a notification for a %s payload", async (_name, e) => {
+    const s = setup()
+    s.onPush(e.event)
+    await e.done()
+    expect(s.showNotification).toHaveBeenCalledWith("gx", expect.anything())
+  })
+
+  it("a failing setAppBadge does not stop the notification or the handler", async () => {
+    const s = setup({ setAppBadge: vi.fn(async () => Promise.reject(new Error("no"))) })
+    const e = pushEvent(payload)
+    s.onPush(e.event)
+    await expect(e.done()).resolves.toBeDefined()
+    expect(s.showNotification).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("service worker notification tap", () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  const tapEvent = (path: string) => {
+    const work: Promise<unknown>[] = []
+    return {
+      event: {
+        notification: { close: vi.fn(), data: { path } },
+        waitUntil: (p: Promise<unknown>) => void work.push(p),
+      },
+      done: () => Promise.all(work),
+    }
+  }
+  const win = (answers: boolean) => ({
+    focus: vi.fn(async () => {}),
+    navigate: vi.fn(async () => {}),
+    postMessage: vi.fn((_m: unknown, transfer: Transferable[]) => {
+      if (answers) (transfer[0] as MessagePort).postMessage("ok")
+    }),
+  })
+  const handler = (windows: ReturnType<typeof win>[]) => {
+    const openWindow = vi.fn(async () => {})
+    const onTap = createTapHandler({
+      origin: ORIGIN,
+      matchWindows: async () => windows,
+      openWindow,
+    })
+    return { onTap, openWindow }
+  }
+
+  it("focuses an answering window and messages it without navigating or opening", async () => {
+    const w = win(true)
+    const { onTap, openWindow } = handler([w])
+    const t = tapEvent("/s/1")
+    onTap(t.event)
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.waitFor(() => expect(w.postMessage).toHaveBeenCalled())
+    await t.done()
+    expect(t.event.notification.close).toHaveBeenCalled()
+    expect(w.focus).toHaveBeenCalled()
+    expect(w.postMessage.mock.calls[0][0]).toEqual({ type: TAP_MESSAGE, path: "/s/1" })
+    expect(w.navigate).not.toHaveBeenCalled()
+    expect(openWindow).not.toHaveBeenCalled()
+  })
+
+  it("navigates once after TAP_ACK_MS when the window never answers", async () => {
+    const w = win(false)
+    const { onTap } = handler([w])
+    const t = tapEvent("/s/1")
+    onTap(t.event)
+    await vi.advanceTimersByTimeAsync(TAP_ACK_MS - 1)
+    expect(w.navigate).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    await t.done()
+    expect(w.navigate).toHaveBeenCalledTimes(1)
+    expect(w.navigate).toHaveBeenCalledWith(`${ORIGIN}/#/s/1`)
+  })
+
+  it.each(["/s/abc", "/design/d1", "/tickets/gx/epic/01", "/tickets/gx/epic"])(
+    "opens a window at /#%s when none is open",
+    async (path) => {
+      const { onTap, openWindow } = handler([])
+      const t = tapEvent(path)
+      onTap(t.event)
+      await t.done()
+      expect(openWindow).toHaveBeenCalledWith(`${ORIGIN}/#${path}`)
+    },
+  )
+})
+
+describe("service worker subscription renewal", () => {
+  const sub = (endpoint: string) => ({
+    endpoint,
+    options: { applicationServerKey: new Uint8Array([251, 255]).buffer },
+    toJSON: () => ({ endpoint, keys: { p256dh: "P", auth: "A" } }),
+  })
+  const run = async (fetchImpl: () => Promise<Response>, event: Partial<RenewEventLike>) => {
+    const fetch = vi.fn(fetchImpl)
+    const subscribe = vi.fn(async () => sub("https://push/new"))
+    const work: Promise<unknown>[] = []
+    createRenewHandler({ fetch, subscribe })({
+      waitUntil: (p) => void work.push(p),
+      ...event,
+    })
+    await Promise.all(work)
+    return { fetch, subscribe }
+  }
+
+  it("posts the new subscription and the old endpoint to the renewal route", async () => {
+    const { fetch, subscribe } = await run(async () => new Response("{}"), {
+      oldSubscription: sub("https://push/old"),
+      newSubscription: sub("https://push/new"),
+    })
+    expect(subscribe).not.toHaveBeenCalled()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe(PUSH_RENEW_PATH)
+    expect(init.credentials).toBe("same-origin")
+    expect(JSON.parse(init.body as string)).toEqual({
+      endpoint: "https://push/new",
+      p256dh: "P",
+      auth: "A",
+      vapid_key: "-_8",
+      old_endpoint: "https://push/old",
+    })
+  })
+
+  it("subscribes with the old key when the event has no new subscription", async () => {
+    const { fetch, subscribe } = await run(async () => new Response("{}"), {
+      oldSubscription: sub("https://push/old"),
+    })
+    expect(subscribe).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it("throws nothing on a refusal or a network error", async () => {
+    await run(async () => new Response('{"refused":true}', { status: 200 }), {
+      oldSubscription: sub("https://push/old"),
+      newSubscription: sub("https://push/new"),
+    })
+    await run(async () => Promise.reject(new TypeError("offline")), {
+      oldSubscription: sub("https://push/old"),
+      newSubscription: sub("https://push/new"),
+    })
   })
 })
