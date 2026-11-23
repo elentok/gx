@@ -19,6 +19,17 @@ import (
 
 var hungHarnesses = []string{"claude", "codex"}
 
+// hungWording is the reason text a hung launch carries. Claude's launch types
+// through the draft wait, which sees the frozen pane. Codex's launch is one send
+// and a transcript proof (spec: no resend on a missing record), so it reports the
+// proof's timeout.
+func hungWording(harness string) (once, twice string) {
+	if harness == "codex" {
+		return "no user record", "no user record"
+	}
+	return "pane hung", "pane stopped taking keys, twice"
+}
+
 // hungLaunch queues proj:epic-a/01 on the real PTY runner over the fake claude
 // or codex whose first hangs launches stop taking keys.
 func hungLaunch(t *testing.T, harness string, hangs int) (*servertest.Harness, string, <-chan wire.Event) {
@@ -73,7 +84,8 @@ func hungOnce(t *testing.T, harness string) {
 	if len(failed) != 1 || failed[0].Kind != string(events.AgentPromptStalled) || failed[0].Attempt != 1 {
 		t.Fatalf("launch-failed events = %+v, want one agent_prompt_stalled for attempt 1", failed)
 	}
-	if !strings.Contains(failed[0].Reason, "pane hung") || !strings.Contains(failed[0].Reason, "gx-implement") {
+	once, _ := hungWording(harness)
+	if !strings.Contains(failed[0].Reason, once) || !strings.Contains(failed[0].Reason, "gx-implement") {
 		t.Errorf("launch-failed reason = %q, want the hung-pane error with the screen lines", failed[0].Reason)
 	}
 	if runs := h.Server.Runs(); len(runs) != 1 {
@@ -107,7 +119,8 @@ func hungTwice(t *testing.T, harness string) {
 		t.Errorf("launch-failed events = %d, want 2 (one per hung launch)", n)
 	}
 	paused := ofType(logged, events.Paused)
-	if len(paused) != 1 || !strings.Contains(paused[0].Reason, "pane stopped taking keys, twice") || !strings.Contains(paused[0].Reason, "gx-implement") {
+	_, twice := hungWording(harness)
+	if len(paused) != 1 || !strings.Contains(paused[0].Reason, twice) || !strings.Contains(paused[0].Reason, "gx-implement") {
 		t.Errorf("paused events = %+v, want the twice wording and the screen lines", paused)
 	}
 	if runs := h.Server.Runs(); len(runs) != 0 {

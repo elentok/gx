@@ -177,7 +177,11 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 		case ev.Key == '\r' && t.opts.hung:
 		case ev.Key == '\r':
 			// A raw LF is a line break in the input, as in claude, not Enter.
-			if err := t.submit(); err != nil {
+			err := t.submit()
+			// The box is empty after Enter; a path that starts no turn draws nothing,
+			// and the screen would keep showing the sent text.
+			t.draw()
+			if err != nil {
 				return 0, err
 			}
 			if t.quit {
