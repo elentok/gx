@@ -5,6 +5,14 @@ import { Button } from "../ui/button/Button"
 import { withKeys } from "../uniqueKeys"
 import { Modal } from "../ui/modal/Modal"
 import { refusalText, useWrite } from "../useWrite"
+import {
+  postTakeOver,
+  subscribeOwner,
+  useInputOwner,
+  type InputOwner,
+  type SubscribeOwner,
+  type TakeOver,
+} from "./inputOwner"
 import { postKeys, type PostKeys } from "./keys"
 import { fetchScreen, type FetchScreen } from "./screen"
 import { changedRows, sameScreen } from "./screenDiff"
@@ -23,6 +31,12 @@ const KEYS: [label: string, key: string][] = [
   ["Ctrl+C", "ctrl+c"],
 ]
 
+const OWNER_TEXT: Record<InputOwner, string> = {
+  self: "Input: this client",
+  other: "Input: another client",
+  gx: "Input: gx is typing",
+}
+
 const keyLabel = (label: string) =>
   ({ "↑": "Up", "↓": "Down", "←": "Left", "→": "Right" })[label] ?? label
 
@@ -35,14 +49,27 @@ export function ScreenModal({
   fetcher = fetchScreen,
   keys = false,
   poster = postKeys,
+  subscribe = subscribeOwner,
+  takeOver: postTakeOverFn = postTakeOver,
+  blockedHintMs,
   onClose,
 }: {
   target: string
   fetcher?: FetchScreen
   keys?: boolean
   poster?: PostKeys
+  subscribe?: SubscribeOwner
+  takeOver?: TakeOver
+  blockedHintMs?: number
   onClose: () => void
 }) {
+  const input = useInputOwner({
+    target,
+    enabled: keys,
+    subscribe,
+    takeOver: postTakeOverFn,
+    hintMs: blockedHintMs,
+  })
   const [rows, setRows] = useState<string[]>()
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -162,6 +189,30 @@ export function ScreenModal({
       </Text>
       {keys && (
         <>
+          {input.owner && (
+            <Box
+              display="flex"
+              gap="2"
+              alignItems="center"
+              flexWrap="wrap"
+              aria-label="Input owner"
+              role="group"
+            >
+              <Text fontSize="xs" color="text.dim" m="0" role="status">
+                {OWNER_TEXT[input.owner]}
+              </Text>
+              {input.owner !== "self" && (
+                <Button emphasis="secondary" onClick={() => void input.takeOver()}>
+                  Take over
+                </Button>
+              )}
+              {input.blocked && (
+                <Text fontSize="xs" color="tone.waiting.fg" m="0" role="status">
+                  Your key was not sent: another owner has the input. Take over to type.
+                </Text>
+              )}
+            </Box>
+          )}
           <Box display="flex" flexDirection="column" gap="1.5" aria-label="Keys" role="group">
             <Text
               fontSize="xs"

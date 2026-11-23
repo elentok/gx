@@ -1,6 +1,8 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { renderThemed } from "../ui/render"
+import type { SessionAttachEvent } from "../generated/server"
+import type { SubscribeOwner, TakeOver } from "./inputOwner"
 import type { PostKeys } from "./keys"
 import { ScreenModal } from "./ScreenModal"
 import type { FetchScreen } from "./screen"
@@ -12,20 +14,70 @@ const fetcher = (): FetchScreen =>
     async () => ({ kind: "ok", detail: { rows: ["row one"] } }) as Awaited<ReturnType<FetchScreen>>,
   )
 
-function open(opts: { keys?: boolean; poster?: PostKeys } = {}) {
+type Emit = (ev: SessionAttachEvent) => void
+
+function open(opts: { keys?: boolean; poster?: PostKeys; hintMs?: number } = {}) {
   const f = fetcher()
   const poster = opts.poster ?? vi.fn<PostKeys>(async () => ({}))
+  let emit: Emit = () => {}
+  const subscribe: SubscribeOwner = (_t, _c, onEvent) => {
+    emit = onEvent
+    return () => {}
+  }
+  const takeOver = vi.fn<TakeOver>(async () => ({}))
   renderThemed(
     <ScreenModal
       target="s-a"
       fetcher={f}
       keys={opts.keys ?? true}
       poster={poster}
+      subscribe={subscribe}
+      takeOver={takeOver}
+      blockedHintMs={opts.hintMs}
       onClose={() => {}}
     />,
   )
-  return { f, poster }
+  return { f, poster, takeOver, emit: (ev: SessionAttachEvent) => act(() => emit(ev)) }
 }
+
+test.each([
+  ["self", { type: "owner", self: true }, "Input: this client", false],
+  ["another client", { type: "owner" }, "Input: another client", true],
+  ["gx", { type: "owner", gx: true }, "Input: gx is typing", true],
+])("the indicator shows %s as owner; Take over only for non-owners", (_n, ev, text, canTake) => {
+  const { emit } = open()
+  emit(ev)
+  expect(screen.getByText(text)).toBeTruthy()
+  expect(!!screen.queryByRole("button", { name: "Take over" })).toBe(canTake)
+})
+
+test("with three clients the owner sees no Take over, a non-owner sees one", () => {
+  const { emit } = open()
+  emit({ type: "owner", self: true })
+  expect(screen.queryByRole("button", { name: "Take over" })).toBeNull()
+  cleanup()
+  const other = open()
+  other.emit({ type: "owner" })
+  expect(screen.getAllByRole("button", { name: "Take over" })).toHaveLength(1)
+})
+
+test("Take over calls the route and clears a blocked-key hint", async () => {
+  const { emit, takeOver } = open()
+  emit({ type: "owner" })
+  emit({ type: "blocked" })
+  expect(screen.getByText(/Your key was not sent/)).toBeTruthy()
+  fireEvent.click(screen.getByRole("button", { name: "Take over" }))
+  expect(takeOver).toHaveBeenCalledWith("s-a", expect.any(String))
+  expect(screen.queryByText(/Your key was not sent/)).toBeNull()
+})
+
+test("the blocked-key hint goes away after the timeout", async () => {
+  const { emit } = open({ hintMs: 20 })
+  emit({ type: "owner" })
+  emit({ type: "blocked" })
+  expect(screen.getByText(/Your key was not sent/)).toBeTruthy()
+  await waitFor(() => expect(screen.queryByText(/Your key was not sent/)).toBeNull())
+})
 
 test.each([
   ["Esc", "esc"],
