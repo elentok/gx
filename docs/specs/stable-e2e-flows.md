@@ -78,7 +78,7 @@ A fresh worktree installs the Playwright browsers on its own, for projects that 
   - The seam: `installDepsIn` loads the setup list (the worktree's `.gx/checks.json` first, then the project's project.json `checks`, through a new `Deps` func) and passes it to `InstallDeps`, empty for the commitless caller. `InstallDeps` gets an `OnSetupStart` hook and returns the commands plus the install and setup durations. `OneIteration` gets an `OnSetupStart`, wired in `server/sched/run.go` next to `OnDepsStart`. The conflict caller builds its own `OneIteration` with no hooks and keeps that: it is not a launch and shows no step. The signature change touches `server.Config.InstallDeps`, `server/projects/projects.go`, `ralphloop/internal/fakes/deps.go` and the tests that replace the whole func. The spec lists them so no override silently skips setup.
   - Timing: the `DepsInstalled` event gets a duration field, split into dependency install and setup. `launchSteps` in `server/runs/registry.go` gets a fifth step, "running setup" (`StepRunningSetup`), between "installing dependencies" and "starting agent", so a slow first Chromium download shows as setup and not as a hang in the install step. `LaunchTimings` gets a `Setup` field, `LaunchStamp` (`tickets/schema/launch.go`, written by `server/ticketwrite/retrostamp.go`) gets `setup_ms`, and the stats page (`server/stats/statsbuild.go`) gets a "setup" step. A launch with no setup list goes from install straight to "starting agent" (steps 2 of 5 to 4 of 5). The Go tests that pin a total of 4 (for example `server/epics/epicflows/launchstep_test.go`) change. The web UI reads the label, position and total off the wire and needs no code change. The launch stamp is the visible timing.
   - Failure text: a setup failure reads "running setup in <worktree>: <command>: <tail> (full output: <log>)", not "installing dependencies". The conflict pause reason keeps its prefix and embeds that text.
-  - Failure: on the iteration and feature paths a failed setup command discards the worktree. On the conflict path it pauses the ticket and keeps the worktree, as a failed install does there.
+  - Failure: on the iteration path a failed setup command discards the worktree. On the feature path it returns the error and keeps the epic's shared feature worktree, as a failed install does today. On the conflict path it pauses the ticket and keeps the worktree, as a failed install does there.
   - gx's own list holds `pnpm -C webui exec playwright install chromium`.
   - There is no extra skip check: `playwright install` skips a browser build already in the cache, which is shared by every worktree. A warm no-op costs about 1 to 2 s. The new timing shows the real cost. If it is large, a skip check is added later.
   - The config key is `setup`. The implementer picks the loader's and the types' names.
@@ -106,36 +106,36 @@ A fresh worktree installs the Playwright browsers on its own, for projects that 
 
 Flows run against a temporary gx server. Stories that share a flow are grouped.
 
-Gate (stories 1 to 3, 34):
+Gate (stories 1 to 3, 34 to 34)
 - Run `gx check --full` three times on the finished branch with Go and vitest running at the same time. The Playwright step passes all three runs, and no flow reports "slow" over 45 s.
 - Confirm the Playwright config sets no retries. Confirm `maxFlows` is still 157 and the flow guard test passes.
 - Out of the check: the `format` step and the Go step's flaky tests are not part of this map (see Out of Scope).
 
-Footer flows (stories 4 to 7):
+Footer flows (stories 4 to 7)
 - Run catalog flows health 81, health 82 and united 16. All pass.
 - Flow changes: the selector and name asserts above.
 
-Epics (stories 8 to 10):
+Epics (stories 8 to 10)
 - Run catalog flow epics 2. It passes with eight terms in Latest summary.
 - Run the fake agent worker notes test and the pause flows' `verify-notes` flow. Both pass.
 - Run the progress scenario Go test. It passes.
 
-Chat draft and CLI message (stories 11 to 15):
+Chat draft and CLI message (stories 11 to 15)
 - Run catalog flow chat-draft 209 from a shell with `GX_AGENT_SESSION` set to a value that is not in the fixture. It passes.
 - Run the workspaces, design and task-list flows. They still pass, so the per-call override still works.
 - In a fixture, run `echo hi | GX_AGENT_SESSION=missing gx agents drafts create --project demo --name remove-me --brief -`. The brief is fixed and short, so no other refusal comes first. Expect exit 1 and the output `refused (bad-request): the source session was not found`.
-- In a fixture, delete a draft id that does not exist (`gx agents drafts delete --project demo --name no-such-draft`). Expect exit 1 and a line of the form `refused (<reason>): <message>` with the server's reason and message. The test pins the exact text the server sends.
+- In a fixture, delete a draft id that does not exist (`gx agents drafts delete no-such-draft`). Expect exit 1 and `refused (draft-gone)`: the server sends no message for this refusal, so the CLI omits the trailing `: <message>` when the message is empty. The test pins the exact text the server sends.
 - New tests: one for the refusal message in the agents and designs draft command tests, and the fixture env unit test.
 
-Turn waits (stories 16 to 18):
+Turn waits (stories 16 to 18)
 - Run catalog flows agents-session 75, agents-create, agents-composer, host-files, context-window and chat-images 189, each three times in a full run. All pass.
 - New code: the fixture turn-ended check.
 
-Compact (stories 19 to 23):
+Compact (stories 19 to 23)
 - Run catalog flows chat-images 189, agents-commands-send and composer-images "keep busy". All pass.
 - Run the new TUI fake test: `/compact foo` at idle goes busy. It passes, and the bare `/compact` test still passes.
 
-Worktree setup (stories 24 to 33):
+Worktree setup (stories 24 to 33)
 - Create an iteration worktree for a gx epic ticket in a project whose Playwright cache lacks the browser build (or point `PLAYWRIGHT_BROWSERS_PATH` at an empty directory). The prepare step runs the Chromium install and the first `gx check --full` e2e run does not fail on a missing executable.
 - Create an iteration worktree for a project with no `setup` list. The install test checks that no extra command ran and the `DepsInstalled` Reason lists only the dependency installs.
 - Set a `setup` entry that exits non-zero in a scratch project. The prepare step fails, the worktree is discarded and the log file is kept.
