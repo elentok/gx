@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.51.13 - 2026-11-23
+
+- Added a single input owner per session. Only one client types into a session at a time, and the holder sends each prompt as one batch. The TUI and the web screen view show the owner, a take-over key and a hint when a key is blocked. Blocking Actionable cards get Retry and Take over.
+- Added a web attach channel: one holder attach per web client, with a safe per-tab client id. It reports the input owner and blocked keys on its events and has a take-over route. Web screen view keys now go through `attach/input`, and an open events stream keeps the attach alive. An attach paste refuses a bang prefix.
+- Added dismissible session notices for untrusted reads and a missing composer marker. Reads after a PTY resize and reads where the header or logo is on the input row count as untrusted, and every undecided read gets the notice. The composer marker is checked after delivery, and `gx claude doctor` checks it too.
+- Changed first prompts to start on the stream signals instead of clearing the draft first. The server prompt paths and the ralph-loop PTY nudge steps now send one batch each, and ralph-loop keeps Resized. Attach sizes are logged next to the draft line.
+- Fixed flaky Go tests: seeding and chained prompts now wait for the fake's turn end, and turn-end timeout errors name the pid-file status and reply count.
+- Changed test flows and fixtures: first-prompt flows for pid and OSC idle (attached client and prefill), an `agents-notices` fixture scenario with a notice step in flow 75, fixed `agents-keys` flows, and flow 158 now ignores the session notice Dismiss.
+- Changed internal size-guard housekeeping: shrank `server/sessions/prompt` and `testutil/gxfixture`.
+
 ## v0.51.12 - 2026-11-22
 
 - Fixed Claude launches showing a writable-directory dialog for each directory on every start. Writable dirs now go through settings `additionalDirectories` instead of `--add-dir`. gx now merges the `writable_roots` of `$CODEX_HOME/config.toml` into Codex config instead of replacing them.
