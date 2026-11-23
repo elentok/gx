@@ -14,7 +14,14 @@ func SchemaJSON() []byte {
 	ref := func(name string) obj { return obj{"$ref": "#/definitions/" + name} }
 	str := obj{"type": "string", "minLength": 1}
 
-	props := obj{"$schema": obj{"type": "string"}}
+	props := obj{
+		"$schema": obj{"type": "string"},
+		SetupKey: obj{
+			"type":        "array",
+			"items":       str,
+			"description": "Shell commands to run in a fresh worktree, in order. Not a check kind.",
+		},
+	}
 	for _, kind := range Kinds {
 		props[kind] = ref("check")
 	}

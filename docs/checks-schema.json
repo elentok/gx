@@ -125,6 +125,14 @@
     "lint": {
       "$ref": "#/definitions/check"
     },
+    "setup": {
+      "description": "Shell commands to run in a fresh worktree, in order. Not a check kind.",
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
     "test": {
       "$ref": "#/definitions/check"
     },

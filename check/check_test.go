@@ -32,13 +32,88 @@ func TestSchemaNamesExactlyTheKinds(t *testing.T) {
 		got = append(got, k)
 	}
 	slices.Sort(got)
-	want := append([]string{"$schema"}, Kinds...)
+	want := append([]string{"$schema", SetupKey}, Kinds...)
 	slices.Sort(want)
 	if !slices.Equal(got, want) {
 		t.Errorf("schema properties = %v, want %v", got, want)
 	}
 	if schema.AdditionalProperties == nil || *schema.AdditionalProperties {
 		t.Error("schema must set additionalProperties: false")
+	}
+}
+
+func TestParseConfigSetup(t *testing.T) {
+	cfg, err := ParseConfig([]byte(`{"setup":["pnpm install","go mod download"],"lint":"l"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := cfg[SetupKey]; ok || len(cfg) != 1 {
+		t.Errorf("cfg = %+v, want only lint", cfg)
+	}
+	for name, in := range map[string]string{
+		"string":  `{"setup":"pnpm install"}`,
+		"number":  `{"setup":3}`,
+		"empty":   `{"setup":["a",""]}`,
+		"nonstr":  `{"setup":[1]}`,
+		"objects": `{"setup":[{"command":"a"}]}`,
+	} {
+		_, err := ParseConfig([]byte(in))
+		if err == nil || !strings.Contains(err.Error(), "setup") || strings.Contains(err.Error(), "\n") {
+			t.Errorf("%s: err = %v, want a one-line error naming setup", name, err)
+		}
+	}
+}
+
+func TestLoadSetup(t *testing.T) {
+	project := func(raw string) func() (json.RawMessage, error) {
+		return func() (json.RawMessage, error) { return json.RawMessage(raw), nil }
+	}
+	cases := []struct {
+		name    string
+		repo    string // empty: no repo file
+		project func() (json.RawMessage, error)
+		want    []string
+	}{
+		{"repo file wins", `{"setup":["a"]}`, project(`{"setup":["b"]}`), []string{"a"}},
+		{"repo file without setup does not fall back", `{"lint":"l"}`, project(`{"setup":["b"]}`), nil},
+		{"project fallback", "", project(`{"setup":["b","c"]}`), []string{"b", "c"}},
+		{"neither", "", project(`{"lint":"l"}`), nil},
+		{"no project source", "", nil, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			if tc.repo != "" {
+				p := filepath.Join(root, RepoConfigPath)
+				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p, []byte(tc.repo), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got, err := LoadSetup(root, tc.project)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("setup = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestLoadSetupBadShapeNamesFile(t *testing.T) {
+	root := t.TempDir()
+	p := filepath.Join(root, RepoConfigPath)
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(`{"setup":"x"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadSetup(root, nil); err == nil || !strings.Contains(err.Error(), RepoConfigPath) {
+		t.Errorf("err = %v, want it to name %s", err, RepoConfigPath)
 	}
 }
 

@@ -64,7 +64,7 @@ func TestSaveChecks_RepoMakesOneCommitOfTheFileAlone(t *testing.T) {
 
 func TestSaveChecks_WritesConfigAsSent(t *testing.T) {
 	t.Parallel()
-	for _, cfg := range []string{`{}`, `{"test":false}`, `{"test":{"full":"make test"}}`} {
+	for _, cfg := range []string{`{}`, `{"test":false}`, `{"test":{"full":"make test"}}`, `{"setup":["pnpm install"],"lint":false}`} {
 		h, repo := checksFixture(t, "")
 		if res := saveChecks(t, h.Client.Admin, "repo", cfg); res.Refused {
 			t.Fatalf("%s: %+v", cfg, res)

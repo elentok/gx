@@ -135,25 +135,52 @@ type Config map[string]Command
 
 // ParseConfig reads the checks JSON. The error is one line naming the problem.
 func ParseConfig(data []byte) (Config, error) {
+	cfg, _, err := parseConfig(data)
+	return cfg, err
+}
+
+// SetupKey is a reserved config key, not a check kind: the shell commands to
+// run in a fresh worktree, in order.
+const SetupKey = "setup"
+
+var errSetupShape = errors.New(`"setup" must be a list of non-empty command strings`)
+
+func parseSetup(raw json.RawMessage) ([]string, error) {
+	var cmds []string
+	if err := json.Unmarshal(raw, &cmds); err != nil || slices.Contains(cmds, "") {
+		return nil, errSetupShape
+	}
+	return cmds, nil
+}
+
+func parseConfig(data []byte) (Config, []string, error) {
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal(data, &top); err != nil {
-		return nil, fmt.Errorf("invalid JSON: %v", err)
+		return nil, nil, fmt.Errorf("invalid JSON: %v", err)
 	}
 	cfg := Config{}
+	var setup []string
 	for _, key := range slices.Sorted(maps.Keys(top)) {
 		if key == "$schema" {
 			continue
 		}
+		if key == SetupKey {
+			var err error
+			if setup, err = parseSetup(top[key]); err != nil {
+				return nil, nil, err
+			}
+			continue
+		}
 		if !slices.Contains(Kinds, key) {
-			return nil, fmt.Errorf("unknown kind %q (want %s); %s", key, strings.Join(Kinds, ", "), RebuildHint)
+			return nil, nil, fmt.Errorf("unknown kind %q (want %s); %s", key, strings.Join(Kinds, ", "), RebuildHint)
 		}
 		c, err := parseCommand(key, top[key])
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", key, err)
+			return nil, nil, fmt.Errorf("%s: %w", key, err)
 		}
 		cfg[key] = c
 	}
-	return cfg, nil
+	return cfg, setup, nil
 }
 
 func parseCommand(kind string, raw json.RawMessage) (Command, error) {
@@ -251,30 +278,44 @@ func parseAlwaysEntry(raw json.RawMessage) (AlwaysEntry, error) {
 // LoadConfig resolves the config: the repo file, else projectChecks (called
 // only when the file is missing), else none. The repo file wins.
 func LoadConfig(root string, projectChecks func() (json.RawMessage, error)) (Config, error) {
+	cfg, _, err := loadParsed(root, projectChecks)
+	return cfg, err
+}
+
+// LoadSetup resolves the setup commands the same way LoadConfig resolves the
+// config. Open decision: when the repo file exists but has no "setup", the
+// result is empty and project.json is not consulted, because the repo file
+// wins whole.
+func LoadSetup(root string, projectChecks func() (json.RawMessage, error)) ([]string, error) {
+	_, setup, err := loadParsed(root, projectChecks)
+	return setup, err
+}
+
+func loadParsed(root string, projectChecks func() (json.RawMessage, error)) (Config, []string, error) {
 	data, err := os.ReadFile(filepath.Join(root, RepoConfigPath))
 	switch {
 	case err == nil:
-		cfg, err := ParseConfig(data)
+		cfg, setup, err := parseConfig(data)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", RepoConfigPath, err)
+			return nil, nil, fmt.Errorf("%s: %w", RepoConfigPath, err)
 		}
-		return cfg, nil
+		return cfg, setup, nil
 	case !errors.Is(err, os.ErrNotExist):
-		return nil, err
+		return nil, nil, err
 	}
 	if projectChecks == nil {
-		return Config{}, nil
+		return Config{}, nil, nil
 	}
 	raw, err := projectChecks()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(raw) == 0 {
-		return Config{}, nil
+		return Config{}, nil, nil
 	}
-	cfg, err := ParseConfig(raw)
+	cfg, setup, err := parseConfig(raw)
 	if err != nil {
-		return nil, fmt.Errorf("project.json checks: %w", err)
+		return nil, nil, fmt.Errorf("project.json checks: %w", err)
 	}
-	return cfg, nil
+	return cfg, setup, nil
 }
