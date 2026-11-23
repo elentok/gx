@@ -18,6 +18,8 @@ import {
   thumbs,
 } from "./agentsKit"
 
+const countOf = (text: string, part: string) => text.split(part).length - 1
+
 test("76. Send and draft", async ({ page, start }) => {
   const fixture = await start("agents-promote")
   const idle = (await sessions(fixture))[0]
@@ -70,6 +72,18 @@ test("76. Send and draft", async ({ page, start }) => {
     await expect(messageBox(page)).toHaveValue(draft)
     await expect(page.getByRole("dialog")).toHaveCount(0)
   }
+
+  // A `/` command holding U+1BCA0 (a character gx does not strip) keeps its text after the first Enter: the settle
+  // Enter lands it, so it runs once and the chat shows one message.
+  const slash = (await plainIdle(fixture, "claude")).withMessages[0]
+  const conv = (await chatOf(fixture, slash.id)).conversation_id
+  await go(page, `#/agents/${slash.id}`)
+  await messageBox(page).fill("/cost\u{1BCA0}")
+  await sendButton(page).click()
+  await expect.poll(async () => countOf(await fixture.input(conv), "/cost")).toBe(1)
+  await expect
+    .poll(async () => countOf(await fixture.cli("agents", "chat", slash.id), "/cost"))
+    .toBe(1)
 })
 
 test("78. Send refused", async ({ page, start }) => {

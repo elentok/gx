@@ -82,7 +82,9 @@ import (
 // as their own flow.
 // Triage split (+2): flow 199 ran over the 45 s slow limit under load, so the backlog and old-epics shapes run as their
 // own flows.
-const maxFlows = 161
+// Delivery cards flow (+1): Copy needs the real clipboard, Dismiss across a second tab needs a real browser, and
+// Show screen and the later good send need the fixture's fake agents; DeliveryCard.test.tsx covers each card alone.
+const maxFlows = 162
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

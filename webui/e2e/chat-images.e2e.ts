@@ -102,7 +102,8 @@ test("189. Send images", async ({ page, start }) => {
   await addInput(page).setInputFiles(pngs(2))
   await expect(thumbs(page)).toHaveCount(2)
   const beforeCompact = (await messagesOf(fixture, claude.id)).length
-  await messageBox(page).fill("/compact foo")
+  // U+1BCA0 is outside gx's strip set, so the first Enter keeps the text and only the settle Enter lands it.
+  await messageBox(page).fill("/compact foo\u{1BCA0}")
   await sendButton(page).click()
   await expect(thumbs(page)).toHaveCount(0)
   await expect
@@ -114,6 +115,8 @@ test("189. Send images", async ({ page, start }) => {
   expect(command).toBeGreaterThan(0)
   expect(input.lastIndexOf("/images/", command)).toBeGreaterThan(input.lastIndexOf("three for you"))
   expect(input.lastIndexOf("/images/")).toBeLessThan(command)
+  expect(input.split("/compact foo").length - 1).toBe(1)
+  expect((await fixture.cli("agents", "chat", claude.id)).split("/compact foo").length - 1).toBe(1)
 })
 
 test("189. Send images, design composer round", async ({ page, start }) => {

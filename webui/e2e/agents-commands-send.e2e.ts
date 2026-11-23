@@ -240,8 +240,26 @@ test("154. Commands in a design session, Continue with the countdown off", async
   await endRun(fixture, design.id)
   expect((await designInfo(fixture, design.id)).auto_advance_at).toBeUndefined()
   await expect(countdownText(page)).toHaveCount(0)
+  // The first Enter is swallowed and the text stays: the settle Enter lands `/clear`, the skill step then starts a
+  // turn, so the action ends on the new conversation id and not on the start timeout.
+  const firstConv = await conversationOf(fixture, design.id)
+  await fixture.controlClaude(firstConv, { action: "swallow-enter" })
   await page.getByRole("button", { name: /^Continue/ }).click()
   await expect
     .poll(async () => (await designInfo(fixture, design.id)).actionable.reason ?? "")
     .toBe("")
+  await expect.poll(() => conversationOf(fixture, design.id)).not.toBe(firstConv)
+  expect(countOf(await fixture.input(firstConv), "/clear")).toBe(1)
+
+  // S2: the first of two slash steps stays in the box, so the second is never sent and the card says so.
+  // /clear renames the session id only: the control FIFO and the input file keep the first conversation's name.
+  const skillRuns = countOf(await fixture.input(firstConv), "/gx-design")
+  await endRun(fixture, design.id)
+  await fixture.controlClaude(firstConv, { action: "undecided" })
+  await page.getByRole("button", { name: /^Continue/ }).click()
+  await expect(page.getByText(/1 later step not sent/)).toBeVisible()
+  await expect(page.getByRole("button", { name: "Resend", exact: true })).toHaveCount(0)
+  const received = await fixture.input(firstConv)
+  expect(countOf(received, "/clear")).toBe(2)
+  expect(countOf(received, "/gx-design")).toBe(skillRuns)
 })

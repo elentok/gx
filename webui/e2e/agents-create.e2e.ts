@@ -71,12 +71,16 @@ test("85. Create session", async ({ page, start }) => {
   await expect(worktreeBox(page)).toHaveValue("fresh-tree")
   expect(await sessions(fixture)).toHaveLength(beforeTree.length)
 
-  // A good one creates the worktree and runs the session in it.
-  await promptBox(page).fill("hello")
+  // A good one creates the worktree and runs the session in it. Its slash first prompt holds U+1BCA0, so the first
+  // Enter keeps the text and the settle Enter lands it: the prompt runs once.
+  await promptBox(page).fill("/cost\u{1BCA0}")
   await createButton(page).click()
   const inTree = await created(fixture, beforeTree)
   expect(inTree.dir).toMatch(/fresh-tree$/)
   await expect(page).toHaveURL(new RegExp(`#/agents/${inTree.id}$`))
+  await expect
+    .poll(async () => (await fixture.cli("agents", "chat", inTree.id)).split("/cost").length - 1)
+    .toBe(1)
   await expect(newForm(page)).toHaveCount(0)
 
   // 98. A project with no tier config runs the default worker model, and a reply keeps the label.
