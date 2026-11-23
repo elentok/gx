@@ -1,7 +1,7 @@
 import { useLayoutEffect } from "react"
 import { useLocation, useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
-import { useEpicList } from "../epics/list"
+import { fetchEpicList, useEpicList } from "../epics/list"
 import { ChatDraftFolderSource, type DesignDraftRow, type SessionInfo } from "../generated/server"
 import { chatDraftHref, draftHref } from "../hrefs"
 import { FOCUS_PROMPT_STATE } from "../agents/promptFocus"
@@ -24,12 +24,34 @@ export interface NewDesignContext {
   open: (href: string) => void
 }
 
+/** Project names from the server, for a click that lands before the epic list has loaded. */
+const fetchProjects = async (): Promise<string[]> => {
+  const list = await fetchEpicList()
+  return [
+    ...new Set([...(list.projects ?? []), ...(list.epics ?? []).map((e) => e.project)]),
+  ].sort()
+}
+
 export interface NewDesignClient {
   create: CreateDraft
   getLastProject: () => Promise<string>
+  listProjects?: () => Promise<string[]>
 }
 
-const realClient: NewDesignClient = { create: createDraft, getLastProject }
+const realClient: NewDesignClient = {
+  create: createDraft,
+  getLastProject,
+  listProjects: fetchProjects,
+}
+
+/** The context's projects, or the server's when the context has none yet. */
+async function knownProjects(
+  ctx: NewDesignContext,
+  listProjects: (() => Promise<string[]>) | undefined,
+): Promise<string[]> {
+  if (ctx.projects.length > 0 || !listProjects) return ctx.projects
+  return listProjects()
+}
 
 let context: NewDesignContext | null = null
 
@@ -84,7 +106,8 @@ export async function startNewDesign(client: NewDesignClient = realClient) {
   try {
     await moveLegacyDraft(client.create, ctx.workspace)
     const lastProject = await client.getLastProject().catch(() => "")
-    const project = defaultProject({ ...ctx, lastProject })
+    const projects = await knownProjects(ctx, client.listProjects)
+    const project = defaultProject({ ...ctx, projects, lastProject })
     const id = await client.create({ workspace: ctx.workspace, project })
     ctx.open(draftHref(id).slice(1))
   } catch (e) {
@@ -103,11 +126,13 @@ function toastCreateFailed(e: unknown) {
 export interface NewChatDraftClient {
   create: ChatDraftsClient["create"]
   getLastProject: () => Promise<string>
+  listProjects?: () => Promise<string[]>
 }
 
 const realChatClient: NewChatDraftClient = {
   create: realChatDrafts.create,
   getLastProject,
+  listProjects: fetchProjects,
 }
 
 /**
@@ -124,7 +149,8 @@ export async function startNewChatDraft(client: NewChatDraftClient = realChatCli
   }
   try {
     const lastProject = await client.getLastProject().catch(() => "")
-    const project = defaultProject({ ...ctx, lastProject })
+    const projects = await knownProjects(ctx, client.listProjects)
+    const project = defaultProject({ ...ctx, projects, lastProject })
     const id = await client.create({
       workspace: ctx.workspace,
       project,

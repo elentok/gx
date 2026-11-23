@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { registerChatDraftPage, registerDraftPage } from "../shell/draftPageActions"
 import { startNewChatDraft, startNewDesign, useNewDesignContext } from "./newDesign"
 
-const h = vi.hoisted(() => ({ showToast: vi.fn(), pathname: "/" }))
+const h = vi.hoisted(() => ({ showToast: vi.fn(), pathname: "/", emptyList: false }))
 const showToast = h.showToast
 vi.mock("../ui/toaster", () => ({ showToast: h.showToast }))
 
@@ -23,7 +23,9 @@ vi.mock("../connection", () => ({
 }))
 vi.mock("../epics/list", () => ({
   useEpicList: () => ({
-    list: { projects: ["alpha", "chatproj", "last"], epics: [{ project: "draftproj" }] },
+    list: h.emptyList
+      ? null
+      : { projects: ["alpha", "chatproj", "last"], epics: [{ project: "draftproj" }] },
   }),
 }))
 vi.mock("../shell/ShellContext", () => ({ useShell: () => ({ workspace: "w1" }) }))
@@ -119,6 +121,17 @@ describe("startNewChatDraft", () => {
     })
     expect(open).toHaveBeenCalledWith("/chat-drafts/c9")
     expect(create).not.toHaveBeenCalled()
+  })
+
+  test("with the epic list not loaded yet it asks the server for projects", async () => {
+    mountAt("/epics")
+    // Simulates the context before useEpicList has data.
+    const ctxless = { ...chatClient(), listProjects: async () => ["alpha", "beta"] }
+    h.emptyList = true
+    mounted?.rerender()
+    await startNewChatDraft(ctxless)
+    h.emptyList = false
+    expect(chatCreate).toHaveBeenCalledWith(expect.objectContaining({ project: "alpha" }))
   })
 
   test("on an empty chat draft page it focuses the brief and creates nothing", async () => {
