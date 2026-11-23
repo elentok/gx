@@ -158,6 +158,7 @@ var allowed = map[string]int{
 	"testutil/gxfixture/limitsflows/migrate_test.go":                   2, // poll loop with a deadline; negative wait: the hold must keep the server migrating
 	"testutil/gxfixture/designflows/ready_test.go":                     1,
 	"testutil/gxfixture/webflows/prflow_test.go":                       1, // negative wait: an open PR epic is not stamped merged after the stamp delay
+	"testutil/gxfixture/webflows/deliverscenarios_test.go":             1, // negative wait: an undecided launch slash prompt raises no card after the grace
 	"testutil/gxfixture/limitsflows/restart_test.go":                   1, // poll loop with a deadline waiting on the running-agent count
 	"testutil/gxfixture/designflows/united_test.go":                    1,
 	"testutil/runnerfake/runnerfake_test.go":                           1,
