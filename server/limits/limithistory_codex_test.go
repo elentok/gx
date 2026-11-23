@@ -143,6 +143,25 @@ func TestLimitHistoryCodex_ScanThatSavesEmitsOneEvent(t *testing.T) {
 	}
 }
 
+// After a restart the stored received-at stands in for the newest seen time. A
+// changed reading stamped in that very second is still newer than what was stored.
+func TestLimitHistoryCodex_RestartTakesChangedReadingFromTheStoredSecond(t *testing.T) {
+	t.Parallel()
+	r := newCodexUsageRig(t)
+	now := time.Now()
+	resets := now.Add(time.Hour)
+	r.writeCodexAgent("a", now.Add(-time.Minute), codexWindowJSON(20, 300, resets), "")
+	r.server().scanUsage()
+
+	again := r.server()
+	stored, _ := again.history.Latest(wire.LimitIDCodex5h)
+	r.writeCodexAgent("a", time.Unix(stored.ReceivedAt, 0), codexWindowJSON(55, 300, resets), "")
+	again.scanUsage()
+	if got := codexSamples(again, wire.LimitIDCodex5h); len(got) != 2 || got[1].UsedPercentage != 55 {
+		t.Fatalf("samples = %+v, want a second one at 55%%", got)
+	}
+}
+
 func TestLimitHistoryCodex_RestartKeepsSamples(t *testing.T) {
 	t.Parallel()
 	r := newCodexUsageRig(t)

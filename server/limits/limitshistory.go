@@ -120,13 +120,14 @@ func (h *limitHistory) record(id string, w wire.LimitWindow, now int64) (saved b
 // last one noted for the limit, and notes it. The newest seen time lives in
 // memory because the scan time stored as received-at can run ahead of a reading
 // that landed in the same second; after a restart the stored received-at stands
-// in for it.
+// in for it. A reading stamped in that same second is taken: received-at is
+// the scan time, so it can sit in the second of a reading that landed later.
 func (h *limitHistory) newerCodexReading(id string, seen int64) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	last, ok := h.codexSeen[id]
 	if !ok {
-		last = h.state.Latest[id].ReceivedAt
+		last = h.state.Latest[id].ReceivedAt - 1
 	}
 	if seen <= last {
 		return false
