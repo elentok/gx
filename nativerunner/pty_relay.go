@@ -69,22 +69,11 @@ type ptyRelay struct {
 	person  <-chan struct{}
 	typed   bool
 	stopped bool
-	// cancelErr is the error cancelled last returned, so deliverErr can tell it
-	// from a holder failure.
-	cancelErr error
 }
 
 // cancelled returns the launch ctx's error once it ends, and errPersonInput
 // once a person typed after gx did.
 func (pr *ptyRelay) cancelled() error {
-	err := pr.cancelCheck()
-	if err != nil {
-		pr.cancelErr = err
-	}
-	return err
-}
-
-func (pr *ptyRelay) cancelCheck() error {
 	if pr.ctx != nil {
 		if err := pr.ctx.Err(); err != nil {
 			return fmt.Errorf("launch prompt cancelled: %w", context.Cause(pr.ctx))
@@ -141,23 +130,14 @@ func (pr *ptyRelay) deliver(text string, policy deliver.Policy) error {
 	return pr.deliverErr(deliver.Deliver(pr.target(), text, policy))
 }
 
-// deliverErr maps an error from a holder call to the session's death and leaves
-// Deliver's own outcomes as they are.
+// deliverErr maps a holder failure to the session's death and leaves every
+// other outcome of Deliver as it is.
 func (pr *ptyRelay) deliverErr(err error) error {
-	if err == nil {
-		return nil
+	var holderErr *deliver.HolderError
+	if errors.As(err, &holderErr) {
+		return pr.p.died(pr.ss, err)
 	}
-	for _, own := range []error{
-		errPersonInput, pr.cancelErr, deliver.ErrMaybeUnsent, deliver.ErrCancelled,
-		agentrunner.ErrSessionDied, agentrunner.ErrNotDelivered, agentrunner.ErrNotReady,
-		agentrunner.ErrUnknownSkill, agentrunner.ErrDeliveryUnconfirmed,
-		claudeui.ErrStuckSubmission, claudeui.ErrStartTimeout,
-	} {
-		if own != nil && errors.Is(err, own) {
-			return err
-		}
-	}
-	return pr.p.died(pr.ss, err)
+	return err
 }
 
 // pane is the launch proof's screen read: it stops once the prompt is cancelled.

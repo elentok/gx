@@ -175,6 +175,10 @@ func TestSlash_UnknownCommandFailsAtOnceWithoutRetype(t *testing.T) {
 	if !errors.Is(err, agentrunner.ErrUnknownSkill) || !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("Deliver() error = %v, want ErrUnknownSkill wrapped in ErrNotDelivered", err)
 	}
+	var unknown *agentrunner.UnknownCommandError
+	if !errors.As(err, &unknown) || unknown.Text != "/xyz" || unknown.Marker != "Unknown command: /xyz" {
+		t.Fatalf("Deliver() error = %#v, want UnknownCommandError{/xyz, Unknown command: /xyz}", err)
+	}
 	if f.enters != 1 {
 		t.Fatalf("Enters = %d, want 1", f.enters)
 	}

@@ -2,6 +2,7 @@ package nativerunner_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,9 +11,23 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/deliver"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/testutil/agentfake"
 )
+
+func TestPty_DeliverErrKillsOnlyOnHolderErrors(t *testing.T) {
+	t.Parallel()
+	p := &nativerunner.Pty{Root: t.TempDir()}
+	own := fmt.Errorf("clear: %w", deliver.ErrDraft)
+	if got := nativerunner.DeliverErr(p, "e-01", own); got != own || errors.Is(got, agentrunner.ErrSessionDied) {
+		t.Errorf("ErrDraft mapped to %v; want it unchanged and the session alive", got)
+	}
+	holderFail := &deliver.HolderError{Err: &holder.ClaudeExitedError{Code: 3}}
+	if got := nativerunner.DeliverErr(p, "e-01", holderFail); !errors.Is(got, agentrunner.ErrSessionDied) {
+		t.Errorf("holder error mapped to %v; want ErrSessionDied", got)
+	}
+}
 
 // TestPty_Deliver runs a PTY prompt through deliver.Deliver over the real holder
 // and the Claude TUI fake. Each row counts the Enters the fake received, so a

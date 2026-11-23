@@ -221,6 +221,18 @@ type Answer struct {
 	RequestID string `json:"request_id,omitempty"`
 }
 
+// UnknownCommandError is a command the agent rejected: Text is what gx typed and
+// Marker the agent's rejection line. It is ErrNotDelivered and ErrUnknownSkill.
+type UnknownCommandError struct {
+	Text, Marker string
+}
+
+func (e *UnknownCommandError) Error() string {
+	return fmt.Sprintf("%v: %v: %q: %s", ErrNotDelivered, ErrUnknownSkill, e.Text, e.Marker)
+}
+
+func (e *UnknownCommandError) Unwrap() []error { return []error{ErrNotDelivered, ErrUnknownSkill} }
+
 var (
 	// ErrLabelTaken: Start found a live session already using the label.
 	ErrLabelTaken = errors.New("agentrunner: label taken")

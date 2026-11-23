@@ -3,7 +3,6 @@ package prompt
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/deliver"
@@ -20,12 +19,13 @@ func deliveryCard(text string, err error) wire.SessionActionable {
 		a.Kind, a.Action = wire.DeliveryMaybeSent, nil
 		a.Reason = fmt.Sprintf("gx could not tell if %s ran. The agent's input still shows it. See the screen. gx does not resend: the command could run twice.", text)
 	case errors.Is(err, agentrunner.ErrUnknownSkill):
-		// The marker is the error's last part, after the quoted text.
-		marker := err.Error()
-		if i := strings.LastIndex(marker, `": `); i >= 0 {
-			marker = marker[i+3:]
+		a.Kind = wire.DeliveryUnknownCommand
+		var unknown *agentrunner.UnknownCommandError
+		if errors.As(err, &unknown) {
+			a.Reason = unknown.Marker + ". It did not run."
+		} else {
+			a.Reason = err.Error() + ". It did not run."
 		}
-		a.Kind, a.Reason = wire.DeliveryUnknownCommand, marker+". It did not run."
 	}
 	return a
 }

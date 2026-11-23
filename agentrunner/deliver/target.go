@@ -15,6 +15,23 @@ import (
 // ErrCancelled means the caller's Cancel channel closed: no more keys go out.
 var ErrCancelled = errors.New("nudge cancelled: person input")
 
+// HolderError is a failed call to the session's holder: keys, screen reads or
+// the batch. Only these mean the session may be dead; Deliver's own outcomes
+// are never wrapped in it.
+type HolderError struct{ Err error }
+
+func (e *HolderError) Error() string { return e.Err.Error() }
+func (e *HolderError) Unwrap() error { return e.Err }
+
+// holderErr marks err as a holder failure; nil and an already marked err stay.
+func holderErr(err error) error {
+	var h *HolderError
+	if err == nil || errors.As(err, &h) {
+		return err
+	}
+	return &HolderError{Err: err}
+}
+
 // imageChipWait bounds how long Submit waits for pasted images to show as
 // "[Image #N]" chips before it types the text.
 //
@@ -86,7 +103,7 @@ func (t *Target) acquire() (func(), error) {
 func HoldInput(c *holder.HolderClient, release func()) (func(), error) {
 	if err := c.BatchBegin(); err != nil {
 		release()
-		return nil, err
+		return nil, holderErr(err)
 	}
 	return func() {
 		_ = c.BatchEnd()
@@ -156,10 +173,10 @@ func (t *Target) ImageCount() int { return len(t.Images) }
 func (t *Target) ReadRows() ([]string, bool, error) {
 	if !t.C.Supports(holder.OpScreenStyled) {
 		rows, _, err := t.C.Screen(0)
-		return rows, false, err
+		return rows, false, holderErr(err)
 	}
 	rows, read, err := t.C.StyledScreenRead()
-	return harness.PlainRows(rows), read.Resized, err
+	return harness.PlainRows(rows), read.Resized, holderErr(err)
 }
 
 // typeLocked is the typing half of Submit and Type, with the lock held.
@@ -176,7 +193,7 @@ func (t *Target) typeLocked(text string) error {
 	}
 	for i, path := range t.Images {
 		if err := t.C.TypeTextBy(path, true); err != nil {
-			return err
+			return holderErr(err)
 		}
 		if t.ImageSent != nil {
 			t.ImageSent(i)
@@ -187,7 +204,7 @@ func (t *Target) typeLocked(text string) error {
 		text = " " + text
 	}
 	if err := t.C.TypeTextBy(text, t.Typing.PastesText(text)); err != nil {
-		return err
+		return holderErr(err)
 	}
 	if t.OnTyped != nil {
 		t.OnTyped()
@@ -219,12 +236,12 @@ func (t *Target) submitKey() error {
 	working := false
 	w, err := t.C.Watched()
 	if err != nil {
-		return err
+		return holderErr(err)
 	}
 	if w != nil {
 		working = w.Status.State == harness.Working && !w.Status.Background
 	}
-	return t.C.SendKeys(t.Typing.SubmitKey(working))
+	return holderErr(t.C.SendKeys(t.Typing.SubmitKey(working)))
 }
 
 // Clear presses the harness clear key once.
@@ -232,7 +249,7 @@ func (t *Target) Clear() error {
 	if err := t.cancelled(); err != nil {
 		return err
 	}
-	return t.C.Batch(func() error { return t.C.SendKeys(t.Typing.ClearKey()) })
+	return holderErr(t.C.Batch(func() error { return t.C.SendKeys(t.Typing.ClearKey()) }))
 }
 
 // SendEnter presses the submit key on its own.
@@ -240,7 +257,7 @@ func (t *Target) SendEnter() error {
 	if err := t.cancelled(); err != nil {
 		return err
 	}
-	return t.C.Batch(t.submitKey)
+	return holderErr(t.C.Batch(t.submitKey))
 }
 
 // WaitStart is the caller's start signal.
@@ -249,7 +266,7 @@ func (t *Target) WaitStart(timeout time.Duration) (bool, error) { return t.Start
 // Screen is the plain screen rows joined by newlines.
 func (t *Target) Screen() (string, error) {
 	rows, _, err := t.C.Screen(0)
-	return strings.Join(rows, "\n"), err
+	return strings.Join(rows, "\n"), holderErr(err)
 }
 
 // Log is the logger the clear's pane capture goes to.
@@ -277,7 +294,7 @@ func InputRead(c *holder.HolderClient, typing harness.Typing) (harness.InputStat
 	}
 	rows, read, err := c.StyledScreenRead()
 	if err != nil || read.Resized {
-		return harness.InputUndecided, read, err
+		return harness.InputUndecided, read, holderErr(err)
 	}
 	return typing.InputIsEmpty(rows), read, nil
 }

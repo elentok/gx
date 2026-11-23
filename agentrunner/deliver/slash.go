@@ -239,7 +239,7 @@ func (s *slashSend) unknown(rows []string) error {
 }
 
 func errUnknown(text, marker string) error {
-	return fmt.Errorf("%w: %w: %q: %s", agentrunner.ErrNotDelivered, agentrunner.ErrUnknownSkill, text, marker)
+	return &agentrunner.UnknownCommandError{Text: text, Marker: marker}
 }
 
 // watch reads the pane for Marker for caps.Watch after the Enter.

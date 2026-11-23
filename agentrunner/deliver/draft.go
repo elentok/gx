@@ -63,7 +63,7 @@ func ClearDraft(c *holder.HolderClient, typing harness.Typing, log *slog.Logger,
 	for range draftClearRounds {
 		for range draftClearPresses {
 			if err := c.SendKeys(typing.ClearKey()); err != nil {
-				return err
+				return holderErr(err)
 			}
 		}
 		// The agent redraws a moment after the keys land.

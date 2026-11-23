@@ -186,7 +186,7 @@ func CheckLaunchDelivered(ctx context.Context, p LaunchProof, text string, caps 
 			unknownAt = now
 		}
 		if !unknownAt.IsZero() && now.Sub(unknownAt) >= caps.UnknownGrace {
-			return fmt.Errorf("%w: %w: %q: %s", agentrunner.ErrNotDelivered, agentrunner.ErrUnknownSkill, text, marker)
+			return &agentrunner.UnknownCommandError{Text: text, Marker: marker}
 		}
 		if now.Sub(start) >= caps.Grace {
 			// The command still sits in the input and never reached the
