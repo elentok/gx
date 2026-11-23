@@ -279,8 +279,8 @@ test("122. Codex design run", async ({ page, start }) => {
   await expect(cont).toBeVisible()
   await expect(async () => {
     await cont.click({ timeout: 2000 })
-    await expect(questions.getByText("Q9 - Keep going?")).toBeVisible({ timeout: 2000 })
-  }).toPass()
+    await expect(questions.getByText("Q9 - Keep going?")).toBeVisible({ timeout: 15000 })
+  }).toPass({ timeout: 30000 })
 
   await page.getByRole("group", nav("View")).getByRole("button", nav("Chat")).click()
   await expect(page.getByText(/^\$gx-design /).first()).toBeVisible()

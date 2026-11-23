@@ -116,7 +116,7 @@ var Scenarios = map[string]scenario{
 	"unknown-skill": {
 		Epics: []epic{{Project: project, Name: "unknown-epic", Tickets: []ticket{{ID: "01", Slug: "first", Opts: servertest.TicketOpts{}}}}},
 		Queue: []string{project + ":unknown-epic"},
-		Env:   []string{agentfake.TUIUnknownUntilFileEnv + "=" + spec.RootToken + "/disk/skill-known"},
+		Env:   []string{agentfake.TUIUnknownUntilFileEnv + "=" + spec.RootToken + "/disk/skill-known", "GX_LAUNCH_UNKNOWN_GRACE=3s"},
 	},
 	// unknown-skill-refresh: the agent knows the skill only once gx's refresh has
 	// installed it, so the launch ends with no pause.
