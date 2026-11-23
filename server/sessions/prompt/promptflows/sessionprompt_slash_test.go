@@ -33,6 +33,13 @@ func startTUIChat(t *testing.T, env ...string) tuiChat {
 // startTUIChatPrompt starts the chat with a first prompt; with none it waits for Idle.
 func startTUIChatPrompt(t *testing.T, prompt string, env ...string) tuiChat {
 	t.Helper()
+	return startTUIChatPromptWith(t, prompt, nil, env...)
+}
+
+// startTUIChatPromptWith is startTUIChatPrompt with tune applied to the server
+// config last.
+func startTUIChatPromptWith(t *testing.T, prompt string, tune func(*server.Config), env ...string) tuiChat {
+	t.Helper()
 	bin, home := t.TempDir(), t.TempDir()
 	script := "#!/bin/sh\nexport " + agentfake.TUIEnv + "=1 " + strings.Join(env, " ") + "\nexec '" + os.Args[0] + "' \"$@\"\n"
 	if err := os.WriteFile(filepath.Join(bin, "claude"), []byte(script), 0o755); err != nil {
@@ -45,6 +52,9 @@ func startTUIChatPrompt(t *testing.T, prompt string, env ...string) tuiChat {
 			c.ActionStepStartTimeout = firstPromptGrace
 			if prompt != "" {
 				c.LaunchProofCaps.Grace = 4 * time.Second // the proof of an undelivered first prompt ends soon
+			}
+			if tune != nil {
+				tune(c)
 			}
 		},
 		servertest.WithEnv("PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "HOME="+home, "CLAUDE_CONFIG_DIR="+filepath.Join(home, ".claude")))

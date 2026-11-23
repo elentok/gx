@@ -120,6 +120,7 @@ var allowed = map[string]int{
 	"server/sessions/prompt/promptflows/switch_countdown_test.go":      2, // negative waits: a countdown left running would end in the window
 	"server/sessions/prompt/promptflows/action_deliver_test.go":        2, // negative waits: a later step or a start-timeout card would come within a few grace windows
 	"server/sessions/prompt/promptflows/firstprompt_deliver_test.go":   1, // negative wait: a retype or a card would come within a few grace windows
+	"server/sessions/prompt/promptflows/deliver_table_test.go":         2, // negative waits: a stacked Enter, a retype or a second submission would come within a few grace windows
 	"server/sessions/prompt/promptflows/autoadvance_countdown_test.go": 6, // negative waits: a countdown would start and end in the window; includes a held Design
 	"server/sessions/prompt/promptflows/autoadvance_guard_test.go":     2,
 	"server/sessions/prompt/promptflows/autoqueue_countdown_test.go":   1, // negative waits: a countdown would end in the window and queue nothing
