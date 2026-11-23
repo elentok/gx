@@ -24,6 +24,7 @@ var Guards = []Guard{
 	{Name: "envguard", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/envguard\.`), Example: "github.com/elentok/gx/envguard.TestEnv"},
 	{Name: "playwrightguard", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/playwrightguard\.`), Example: "github.com/elentok/gx/playwrightguard.TestMaxFlows"},
 	{Name: "setstateguard", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/setstateguard\.`), Example: "github.com/elentok/gx/setstateguard.TestNoRawSetStateCleanup"},
+	{Name: "deliverguard", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/deliverguard\.`), Example: "github.com/elentok/gx/deliverguard.TestNoTypingOutsideDeliver"},
 	{Name: "portable test skills rules test", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/skills\.TestPortableTestSkillsHoldNoGxOnlyText$`), Example: "github.com/elentok/gx/skills.TestPortableTestSkillsHoldNoGxOnlyText"},
 	{Name: "gx-only-e2es rules test", Pattern: regexp.MustCompile(`^github\.com/elentok/gx/skills\.TestGxOnlyE2esSkillIsWired$`), Example: "github.com/elentok/gx/skills.TestGxOnlyE2esSkillIsWired"},
 	{Name: "biome lint", Kind: "lint"},

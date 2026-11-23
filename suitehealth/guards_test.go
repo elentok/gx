@@ -27,7 +27,7 @@ func TestSuiteHealth_GuardListNamesTheExistingGuards(t *testing.T) {
 	for _, g := range Guards {
 		have[g.Name] = true
 	}
-	for _, want := range []string{"sizeguard", "sleepguard", "oldwords", "envguard", "playwrightguard", "setstateguard", "biome lint", "skills rules tests", "portable test skills rules test", "gx-only-e2es rules test"} {
+	for _, want := range []string{"sizeguard", "sleepguard", "oldwords", "envguard", "playwrightguard", "setstateguard", "deliverguard", "biome lint", "skills rules tests", "portable test skills rules test", "gx-only-e2es rules test"} {
 		if !have[want] {
 			t.Errorf("guard %q missing", want)
 		}
