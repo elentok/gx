@@ -138,8 +138,9 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
   await expect(needs.locator("[data-section]")).toHaveCount(NEEDS_YOU.length - 1)
   await expect(needs.getByRole("link", { name: "paused-epic", exact: true })).toHaveCount(0)
 
-  // 28: AFK and Vi mode flip over SSE; the footer's paused icon follows `queue pause`.
-  const paused = page.getByRole("img", nav("Server queue is paused"))
+  // 28: AFK and Vi mode flip over SSE; the footer's paused state follows `queue pause`.
+  // Regex: the status button's name also lists health when health is high.
+  const paused = page.getByRole("button", { name: /Server queue is paused/ })
   await expect(paused).toHaveCount(0)
   await menuButton(page).click()
   await expect(afkItem(page)).toHaveAttribute("aria-checked", "false")

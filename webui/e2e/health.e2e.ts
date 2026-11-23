@@ -82,10 +82,14 @@ test("81. Tray popover (and 82. Tray offline)", async ({ page, start }) => {
   await expect(dialog.locator('[data-part="cpu"]')).toContainText("75% busy")
   await page.keyboard.press("Escape")
   await expect(dialog).toBeHidden()
-  const offline = page.getByRole("img", nav("Disconnected from the server"))
-  await expect(offline).toHaveCount(0)
+  await expect(page.getByRole("button", nav("System health is high or critical"))).toBeVisible()
   await fixture.stopServer()
-  await expect(offline).toBeVisible()
+  await expect(
+    page.getByRole(
+      "button",
+      nav("Disconnected from the server; System health is high or critical"),
+    ),
+  ).toBeVisible()
   await expect(tray(page)).toHaveAttribute("data-stale", "")
   await expect(tray(page)).toHaveCSS("opacity", "0.45")
   await expect(meter(page, "C")).toHaveAttribute("data-state", "high")
