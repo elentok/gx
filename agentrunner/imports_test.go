@@ -40,6 +40,16 @@ func TestOnlyScreenImportsVT(t *testing.T) {
 	}
 }
 
+// deliver is a leaf below the harness-specific packages: claudeui must never
+// import it. Passes today; it guards the later tickets that grow deliver.
+func TestClaudeuiDoesNotImportDeliver(t *testing.T) {
+	for _, pkg := range importersOf(t, "github.com/elentok/gx/agentrunner/deliver") {
+		if strings.HasPrefix(pkg, "github.com/elentok/gx/agentrunner/claudeui") {
+			t.Errorf("%s imports agentrunner/deliver", pkg)
+		}
+	}
+}
+
 func importersOf(t *testing.T, target string) []string {
 	t.Helper()
 	out, err := exec.Command("go", "list", "-f", "{{.ImportPath}}: {{join .Imports \" \"}}", "github.com/elentok/gx/...").Output()

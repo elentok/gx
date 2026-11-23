@@ -15,10 +15,10 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/agentrunner/deliver"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/server/sessions"
-	"github.com/elentok/gx/server/sessions/prompt/invisible"
 	"github.com/elentok/gx/server/sessions/prompt/startclock"
 	"github.com/elentok/gx/server/wire"
 )
@@ -514,7 +514,7 @@ func (p *holderPrompter) Submit(text string) error {
 		return err
 	}
 	p.waitImageChips(len(p.images.paths))
-	if clean, n := invisible.StripInvisible(text); n > 0 {
+	if clean, n := deliver.Strip(text); n > 0 {
 		if p.io.Log != nil {
 			p.io.Log.Info("stripped invisible chars before typing", "count", n)
 		}
