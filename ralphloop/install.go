@@ -56,6 +56,16 @@ func setupFor(d deps.Deps, o OneIteration, path string) ([]string, error) {
 	return d.LoadSetup(path, o.ScratchDir)
 }
 
+// installWithSetupIn is installDepsIn with the worktree's setup list and the
+// launch's OnSetupStart hook. A list that cannot be read fails before any install.
+func installWithSetupIn(d deps.Deps, o OneIteration, path string) error {
+	setup, err := setupFor(d, o, path)
+	if err != nil {
+		return err
+	}
+	return installDepsIn(d, o, path, setup, o.OnSetupStart)
+}
+
 // discardAfterInstallFailure joins a failed discard onto the install error, so a
 // retry that trips over the leftover worktree can be traced back.
 func discardAfterInstallFailure(installErr, discardErr error) error {

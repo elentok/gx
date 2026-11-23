@@ -158,6 +158,8 @@ func (l *Launcher) launchClaimed(c *claimed) (launched bool, err error) {
 		Model: model, Effort: effort, Sink: l.Writer.FinishSink(ticket, t.Path), StallNudgeDelay: l.Host.StalledNudgeDelay(),
 		OnDepsStart: func() { l.setLaunchStep(ticketAddr, runs.StepInstallingDeps) },
 		OnDepsDone:  func() { l.setLaunchStep(ticketAddr, runs.StepStartingAgent) },
+		// Stub: ticket 13 replaces it with the StepRunningSetup call.
+		OnSetupStart: func() {},
 	}
 	deps := l.Projects.DepsWith(l.Harness.LaunchRunner(ticket.Project, agentKind))
 	deps.GateReleased = l.Registry.GateReleased(ticketAddr)

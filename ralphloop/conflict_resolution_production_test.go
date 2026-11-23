@@ -386,8 +386,11 @@ func TestResolveCherryPickConflict_InstallsDepsInFeatureWorktreeBeforeLaunch(t *
 	d, _, _ := fakes.FakeDeps()
 	p := conflictParams(t, t.TempDir())
 	var installedIn []string
-	d.InstallDeps = func(_ context.Context, path, _ string, _ []string, _ func()) ([]string, time.Duration, time.Duration, error) {
+	var gotSetup []string
+	d.LoadSetup = func(string, string) ([]string, error) { return []string{"make gen"}, nil }
+	d.InstallDeps = func(_ context.Context, path, _ string, setup []string, _ func()) ([]string, time.Duration, time.Duration, error) {
 		installedIn = append(installedIn, path)
+		gotSetup = setup
 		return []string{"fake install"}, 0, 0, nil
 	}
 	started := false
@@ -403,6 +406,35 @@ func TestResolveCherryPickConflict_InstallsDepsInFeatureWorktreeBeforeLaunch(t *
 	}
 	if !started {
 		t.Error("resolver started before the install finished")
+	}
+	if !slices.Equal(gotSetup, []string{"make gen"}) {
+		t.Errorf("install got setup list %v, want [make gen]", gotSetup)
+	}
+}
+
+func TestResolveCherryPickConflict_SetupFailure_PausesAndKeepsTheWorktree(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakes.FakeDeps()
+	p := conflictParams(t, t.TempDir())
+	d.LoadSetup = func(string, string) ([]string, error) { return []string{"make gen"}, nil }
+	d.InstallDeps = func(context.Context, string, string, []string, func()) ([]string, time.Duration, time.Duration, error) {
+		return nil, 0, 0, errors.New("running setup in wt: setup boom")
+	}
+	fakes.OnRunnerStart(d, func(agentrunner.StartOptions) error {
+		t.Error("resolver launched despite a failed setup")
+		return nil
+	})
+
+	_, err := resolveCherryPickConflict(d, p)
+	if !errors.Is(err, errConflictResolutionUnresolved) {
+		t.Fatalf("err = %v, want errConflictResolutionUnresolved", err)
+	}
+	if !strings.Contains(err.Error(), "installing dependencies before conflict-resolution agent") ||
+		!strings.Contains(err.Error(), "running setup in wt: setup boom") {
+		t.Errorf("err = %v, want the install prefix and the setup failure", err)
+	}
+	if _, statErr := os.Stat(p.FeatureWorktree); statErr != nil {
+		t.Errorf("feature worktree gone: %v", statErr)
 	}
 }
 

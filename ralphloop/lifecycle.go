@@ -97,6 +97,9 @@ type OneIteration struct {
 	// the ticket has one (a scratch commitless ticket has none). Nil hears nothing.
 	OnDepsStart func()
 	OnDepsDone  func()
+	// OnSetupStart is called just before the first setup command, when the
+	// worktree has a setup list. Nil hears nothing.
+	OnSetupStart func()
 	// LongTicketTurns is the assistant-turn count at which OnLongTicket is
 	// called, once per launch; zero or a nil callback means no alert.
 	LongTicketTurns int
@@ -146,7 +149,7 @@ func PrepareIteration(d deps.Deps, o OneIteration) (IterationWorktree, error) {
 	if err != nil {
 		return IterationWorktree{}, err
 	}
-	if err := installDepsIn(d, o, w.Path, nil, nil); err != nil {
+	if err := installWithSetupIn(d, o, w.Path); err != nil {
 		return IterationWorktree{}, discardAfterInstallFailure(err, DiscardIteration(d, o, w))
 	}
 	return w, nil

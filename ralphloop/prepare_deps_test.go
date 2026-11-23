@@ -3,6 +3,8 @@ package ralphloop
 import (
 	"context"
 	"errors"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -198,6 +200,135 @@ func TestPrepareCommitless_InstallsInADetachedWorktreeButNotAScratchDir(t *testi
 	}
 	if want := []string{w.Path}; !slices.Equal(rec.paths, want) {
 		t.Errorf("installed in %v, want %v", rec.paths, want)
+	}
+}
+
+func withSetupLoader(d *deps.Deps, list ...string) {
+	d.LoadSetup = func(string, string) ([]string, error) { return list, nil }
+}
+
+func TestPrepareIteration_PassesTheSetupListToTheInstall(t *testing.T) {
+	d, rec, o := prepareDepsFixture(t)
+	withSetupLoader(&d, "make gen")
+
+	w, err := PrepareIteration(d, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(rec.setup, []string{"make gen"}) || !slices.Equal(rec.paths, []string{w.Path}) {
+		t.Errorf("install got %v in %v, want [make gen] in %s", rec.setup, rec.paths, w.Path)
+	}
+	if e := depsInstalledEvent(t, o); e.Reason != "fake install; setup: make gen" {
+		t.Errorf("Reason = %q", e.Reason)
+	}
+}
+
+func TestPrepareFeature_PassesTheSetupListToTheInstall(t *testing.T) {
+	d, rec, o := prepareDepsFixture(t)
+	withSetupLoader(&d, "make gen")
+
+	w, err := PrepareFeature(d, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(rec.setup, []string{"make gen"}) || !slices.Equal(rec.paths, []string{w.Path}) {
+		t.Errorf("install got %v in %v, want [make gen] in %s", rec.setup, rec.paths, w.Path)
+	}
+}
+
+func TestPrepareIteration_PassesOnSetupStartToTheInstall(t *testing.T) {
+	d, rec, o := prepareDepsFixture(t)
+	withSetupLoader(&d, "make gen")
+	started := false
+	o.OnSetupStart = func() { started = true }
+
+	if _, err := PrepareIteration(d, o); err != nil {
+		t.Fatal(err)
+	}
+	if rec.hook == nil {
+		t.Fatal("install got no setup-start hook")
+	}
+	rec.hook()
+	if !started {
+		t.Error("install got a different setup-start hook")
+	}
+}
+
+func TestPrepareIteration_SetupFailureDiscardsTheWorktree(t *testing.T) {
+	d, rec, o := prepareDepsFixture(t)
+	withSetupLoader(&d, "make gen")
+	rec.err = errors.New("running setup in x: boom")
+
+	w, err := PrepareIteration(d, o)
+	if err != rec.err {
+		t.Fatalf("err = %v, want the setup error itself", err)
+	}
+	if w.Path != "" || len(rec.paths) != 1 {
+		t.Fatalf("handle %q, installs %v", w.Path, rec.paths)
+	}
+	if _, statErr := os.Stat(rec.paths[0]); !os.IsNotExist(statErr) {
+		t.Errorf("iteration worktree %s still exists (stat err %v)", rec.paths[0], statErr)
+	}
+	out, gitErr := exec.Command("git", "-C", o.RepoDir, "branch", "--list", "ralph-loop/*").CombinedOutput()
+	if gitErr != nil || strings.Contains(string(out), "01") {
+		t.Errorf("iteration branch left behind: %q (%v)", out, gitErr)
+	}
+}
+
+func TestPrepareFeature_SetupFailureKeepsTheFeatureWorktree(t *testing.T) {
+	d, rec, o := prepareDepsFixture(t)
+	withSetupLoader(&d, "make gen")
+	rec.err = errors.New("running setup in x: boom")
+
+	if _, err := PrepareFeature(d, o); err != rec.err {
+		t.Fatalf("err = %v, want the setup error itself", err)
+	}
+	if _, err := os.Stat(rec.paths[0]); err != nil {
+		t.Errorf("feature worktree gone: %v", err)
+	}
+}
+
+func TestPrepare_NoSetupList_LogsOnlyTheInstalls(t *testing.T) {
+	d, _, o := prepareDepsFixture(t)
+	withSetupLoader(&d)
+
+	if _, err := PrepareIteration(d, o); err != nil {
+		t.Fatal(err)
+	}
+	if e := depsInstalledEvent(t, o); e.Reason != "fake install" {
+		t.Errorf("Reason = %q, want only the install", e.Reason)
+	}
+}
+
+func TestPrepareIteration_UnreadableSetupListFailsAndDiscards(t *testing.T) {
+	d, rec, o := prepareDepsFixture(t)
+	boom := errors.New("bad checks.json")
+	d.LoadSetup = func(string, string) ([]string, error) { return nil, boom }
+
+	if _, err := PrepareIteration(d, o); !errors.Is(err, boom) {
+		t.Fatalf("err = %v, want %v", err, boom)
+	}
+	if len(rec.paths) != 0 {
+		t.Errorf("installed in %v despite the unreadable list", rec.paths)
+	}
+}
+
+func TestPrepareCommitless_NeverPassesTheSetupList(t *testing.T) {
+	d, rec, o := prepareDepsFixture(t)
+	withSetupLoader(&d, "make gen")
+
+	if _, err := PrepareCommitless(d, o, "", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.paths) != 1 || len(rec.setup) != 0 {
+		t.Errorf("install got %v in %v, want an empty list", rec.setup, rec.paths)
+	}
+	rec.paths = nil
+	if _, err := PrepareCommitless(d, o, filepath.Join(t.TempDir(), "scratch"), ""); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.paths) != 0 {
+		t.Errorf("scratch dir installed in %v", rec.paths)
 	}
 }
 
