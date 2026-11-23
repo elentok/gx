@@ -6,6 +6,7 @@ import {
   type SessionAttachEvent,
   type SessionAttachRequest,
 } from "../generated/server"
+import { randomId } from "../connection"
 import { useLatest } from "../hooks"
 import { readWrite } from "./open"
 
@@ -54,6 +55,13 @@ export const postTakeOver: TakeOver = async (target, client) => {
 
 export const BLOCKED_HINT_MS = 4000
 
+let tabClient: string | undefined
+/** One attach client id per browser tab, made on first use so a disabled hook makes none. */
+export function tabClientId(): string {
+  tabClient ??= `web-${randomId()}`
+  return tabClient
+}
+
 /** Who owns the session's input, and whether this client's last key was blocked. */
 export function useInputOwner(opts: {
   target: string
@@ -65,7 +73,6 @@ export function useInputOwner(opts: {
   const [owner, setOwner] = useState<InputOwner>()
   const [blocked, setBlocked] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const client = useRef(crypto.randomUUID())
   const latest = useLatest(opts)
   const { target, enabled, subscribe } = opts
 
@@ -76,7 +83,7 @@ export function useInputOwner(opts: {
 
   useEffect(() => {
     if (!enabled) return
-    const close = subscribe(target, client.current, (ev) => {
+    const close = subscribe(target, tabClientId(), (ev) => {
       if (ev.type === AttachEventOwner) {
         setOwner(ev.self ? "self" : ev.gx ? "gx" : "other")
         if (ev.self) clearHint()
@@ -97,7 +104,7 @@ export function useInputOwner(opts: {
 
   const takeOver = useCallback(async () => {
     clearHint()
-    await latest.current.takeOver(latest.current.target, client.current)
+    await latest.current.takeOver(latest.current.target, tabClientId())
   }, [clearHint])
 
   return { owner, blocked, takeOver }

@@ -352,7 +352,7 @@ export function useSnapshotField<T>(sel: (snap: Snapshot) => T): T | undefined {
 
 // crypto.randomUUID exists only in secure contexts (HTTPS or localhost), and the
 // web UI is often opened over plain HTTP from another device.
-function randomId(): string {
+export function randomId(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16))
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")
 }
