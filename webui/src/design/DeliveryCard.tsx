@@ -199,10 +199,7 @@ export function DeliveryCard({
           >
             {text}
           </Text>
-          <Button
-            {...ROW_BUTTON}
-            onClick={() => void copyText(text, box.current)}
-          >
+          <Button {...ROW_BUTTON} onClick={() => void copyText(text, box.current)}>
             Copy
           </Button>
         </Box>
