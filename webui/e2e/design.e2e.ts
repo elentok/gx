@@ -569,9 +569,11 @@ test("Header shape: Design and Epic share the left edge and row at 1440px, and n
 }) => {
   const fixture = await start("design")
   await openEpicWithSummary(page, fixture, "A short destination.")
-  const edges = async () => ({
-    title: (await page.getByRole("heading", { level: 1 }).boundingBox())!,
-  })
+  const edges = async () => {
+    const title = page.getByRole("heading", { level: 1 })
+    await expect(title).toBeVisible()
+    return { title: (await title.boundingBox())! }
+  }
   const epic = await edges()
   await page.evaluate(() => (location.hash = "#/d/demo:design-epic"))
   await expect(page.getByRole("button", nav("Start design session"))).toBeVisible()

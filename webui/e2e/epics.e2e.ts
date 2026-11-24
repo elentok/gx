@@ -44,6 +44,12 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     "Archive",
     "Copy ID",
   ])
+  // Hold and Archive are neutral: they share Copy ID's color, so nothing here is danger-colored.
+  const colorOf = (name: string) =>
+    menu.getByRole("menuitem", nav(name)).evaluate((el) => getComputedStyle(el).color)
+  const neutral = await colorOf("Copy ID")
+  expect(await colorOf("Hold")).toBe(neutral)
+  expect(await colorOf("Archive")).toBe(neutral)
   await menu.getByRole("menuitem", nav("Copy ID")).click()
   await expect(menu).toHaveCount(0)
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("demo:mixed-epic")

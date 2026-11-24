@@ -78,7 +78,10 @@ function render(
 test("shows the Archived stamp and Unarchive as the only action", async () => {
   render("/archive/gx:blog-impl", detail())
   expect(await screen.findByTestId("archived-stamp")).toBeTruthy()
-  const names = screen.getAllByRole("button").map((b) => b.textContent)
+  const names = screen
+    .getAllByRole("button")
+    .filter((b) => b.getAttribute("aria-label") !== "More actions")
+    .map((b) => b.textContent)
   expect(names).toContain("Unarchive")
   for (const gone of ["Queue", "Hold", "Merge", "Fix", "Open design"]) {
     expect(names.some((n) => n?.startsWith(gone))).toBe(false)
@@ -121,6 +124,33 @@ test("Unarchive posts and navigates to the renamed active epic", async () => {
   fireEvent.click(await screen.findByRole("button", { name: "Unarchive" }))
   await waitFor(() => expect(router.state.location.pathname).toBe("/e/gx:blog-impl-2"))
   expect(bulkUnarchive).toHaveBeenCalledWith(["gx:blog-impl"])
+})
+
+test("the ⋯ is last in the header after the ring and lists Unarchive then Copy ID only", async () => {
+  render(
+    "/archive/gx:blog-impl",
+    detail({ pr: { url: "https://example.test/pr/1", chip: "#1", number: 1 } }),
+  )
+  await screen.findByTestId("archived-stamp")
+  const actions = screen.getByTestId("page-header-actions")
+  const more = within(actions).getAllByRole("button", { name: "More actions" })
+  expect(more).toHaveLength(1)
+  expect(actions.lastElementChild?.contains(more[0]!)).toBe(true)
+  fireEvent.click(more[0]!)
+  const items = await screen.findAllByRole("menuitem")
+  expect(items.map((i) => i.textContent?.replace(/gx:.*$/, ""))).toEqual(["Unarchive", "Copy ID"])
+})
+
+test("the menu's Unarchive posts at once and navigates to the renamed active epic", async () => {
+  bulkUnarchive.mockResolvedValue([
+    { target: "gx:blog-impl", status: "done", new_address: "gx:blog-impl-2" },
+  ])
+  const router = render("/archive/gx:blog-impl", detail())
+  fireEvent.click(await screen.findByRole("button", { name: "More actions" }))
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Unarchive" }))
+  await waitFor(() => expect(router.state.location.pathname).toBe("/e/gx:blog-impl-2"))
+  expect(bulkUnarchive).toHaveBeenCalledWith(["gx:blog-impl"])
+  expect(screen.queryByRole("alertdialog")).toBeNull()
 })
 
 test("the ring comes from the archived detail, not an active epic with the same address", async () => {

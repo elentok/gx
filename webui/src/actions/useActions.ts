@@ -86,7 +86,7 @@ export interface ActionWriters extends ItemWriters {
   post: PostPrompt
 }
 
-const unarchiveOne = async (address: string): Promise<ItemWriteResult> => {
+export const unarchiveOne = async (address: string): Promise<ItemWriteResult> => {
   const [r] = await bulkUnarchive([address])
   return r ? { ...refusalOf(r), new_address: r.new_address } : {}
 }

@@ -32,6 +32,13 @@ test.describe("53. Phone, epic page", () => {
     // The meta is indented 80px under the title.
     await expect(link.locator("[data-meta]")).toHaveCSS("padding-left", "80px")
 
+    // The ⋯ is the right-most item of the title row, and there is no triangle beside the title.
+    const headerActions = page.getByTestId("page-header-actions")
+    const actionsBox = (await headerActions.boundingBox())!
+    const moreBox = (await headerActions.getByRole("button", nav("More actions")).boundingBox())!
+    expect(moreBox.x + moreBox.width).toBeCloseTo(actionsBox.x + actionsBox.width, 0)
+    await expect(page.getByTestId("page-header-caret")).toHaveCount(0)
+
     // A long title wraps, and its meta sits below the whole title.
     const longTitle = page.getByText(long, nav(long))
     await expect(longTitle).toBeVisible()

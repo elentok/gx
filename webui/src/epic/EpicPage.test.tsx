@@ -988,7 +988,7 @@ test("the stats line stacks under the title, with the description below it when 
   expect(within(line).getByRole("button", { name: "Show full description" }).textContent).toBe(
     "A short summary",
   )
-  expect(screen.getByTestId("page-header-caret")).toBeTruthy()
+  expect(screen.queryByTestId("page-header-caret")).toBeNull()
   cleanup()
   render("/e/gx:blog-impl", [], "loop", { detail: { summary: "" } })
   const bare = await screen.findByTestId("page-header-subtitle")
@@ -1209,8 +1209,16 @@ test("the epic page shows Mark as merged when the server offers it and posts the
         pr_actions: [{ kind: "mark-merged", label: "Mark as merged" }],
       },
     })
-    fireEvent.click(await screen.findByRole("button", { name: "Mark as merged" }))
     const call = () => fetchMock.mock.calls.find(([url]) => url === "/v1/epics/mark-merged")
+    fireEvent.click(await screen.findByRole("button", { name: "Mark as merged" }))
+    // The footer button asks first; Cancel posts nothing.
+    const confirm = await screen.findByRole("alertdialog")
+    fireEvent.click(within(confirm).getByRole("button", { name: /^Cancel/ }))
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+    expect(call()).toBeUndefined()
+    fireEvent.click(screen.getByRole("button", { name: "Mark as merged" }))
+    const again = await screen.findByRole("alertdialog")
+    fireEvent.click(within(again).getByRole("button", { name: /^Mark as merged/ }))
     await waitFor(() => expect(call()).toBeTruthy())
     expect(JSON.parse(call()![1].body)).toEqual({
       address: "gx:blog-impl",
@@ -1221,10 +1229,57 @@ test("the epic page shows Mark as merged when the server offers it and posts the
   }
 })
 
-test("without a mark-merged action the epic page has no Mark as merged button", async () => {
+test("the menu's Mark as merged confirms before it posts", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValue(new Response(JSON.stringify({ merged: true }), { status: 200 }))
+  vi.stubGlobal("fetch", fetchMock)
+  try {
+    render("/e/gx:blog-impl", [], "loop", {
+      detail: {
+        state: "awaiting-merge",
+        pr_actions: [{ kind: "mark-merged", label: "Mark as merged" }],
+      },
+    })
+    const call = () => fetchMock.mock.calls.find(([url]) => url === "/v1/epics/mark-merged")
+    fireEvent.click(await screen.findByRole("button", { name: "More actions" }))
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Mark as merged" }))
+    const confirm = await screen.findByRole("alertdialog")
+    expect(call()).toBeUndefined()
+    fireEvent.click(within(confirm).getByRole("button", { name: /^Mark as merged/ }))
+    await waitFor(() => expect(call()).toBeTruthy())
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test("without a mark-merged action the epic page has no Mark as merged button or menu item", async () => {
   render("/e/gx:blog-impl", [], "loop", { detail: { state: "running" } })
   await screen.findByTestId("stats-line")
   expect(screen.queryByRole("button", { name: "Mark as merged" })).toBeNull()
+  fireEvent.click(await screen.findByRole("button", { name: "More actions" }))
+  await screen.findByRole("menuitem", { name: /^Copy ID/ })
+  expect(screen.queryByRole("menuitem", { name: "Mark as merged" })).toBeNull()
+})
+
+test("a detail with a PR link lists Open PR first in the menu and opens it", async () => {
+  const open = vi.fn()
+  vi.stubGlobal("open", open)
+  try {
+    render("/e/gx:blog-impl", [], "loop", {
+      detail: {
+        state: "awaiting-merge",
+        pr: { url: "https://example.test/pr/1", chip: "#1", number: 1 },
+      },
+    })
+    fireEvent.click(await screen.findByRole("button", { name: "More actions" }))
+    const items = await screen.findAllByRole("menuitem")
+    expect(items[0]?.textContent).toBe("Open PR")
+    fireEvent.click(items[0]!)
+    expect(open).toHaveBeenCalledWith("https://example.test/pr/1", "_blank", "noopener")
+  } finally {
+    vi.unstubAllGlobals()
+  }
 })
 
 test("an epic with no PR activity shows no activity panel", async () => {

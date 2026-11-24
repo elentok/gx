@@ -14,20 +14,23 @@ import { hasDesignSession, liveSessions } from "../design/view"
 import {
   ActionMerge,
   ActionStashMerge,
-  TargetDone,
+  CardActionMarkMerged,
+  CardActionOpenPR,
+  SectionOnHold,
   type EpicDetailRow,
   type EpicListRow,
 } from "../generated/server"
-import { useCardActions } from "../workspaces/itemActions"
+import type { Entity } from "../actions/entity"
+import { unarchiveOne } from "../actions/useActions"
+import { useEntityActions } from "../workspaces/itemActions"
 import { useWorkspaces } from "../workspaces/useActiveWorkspace"
 import { EpicRing } from "./EpicRing"
 import { MergeButton, StashMergeButton } from "../epics/MergeButton"
 import { archiveHref, designHref, epicHref } from "../hrefs"
 import { ViewDiffLink } from "../diff/ViewDiffLink"
 import { formatDate } from "../formatDate"
-import { unarchiveWithToasts } from "../select/bulkWrites"
 import { QueueButton } from "../epics/QueueButton"
-import { postEpicMarkSeen } from "../epics/queue"
+import { postEpicMarkMerged, postEpicMarkSeen } from "../epics/queue"
 import { useEpicList, type EpicList, type FetchEpicList } from "../epics/list"
 import { Markdown } from "../markdown/Markdown"
 import { DetailPage } from "../page/DetailPage"
@@ -44,7 +47,7 @@ import { useDetailReady } from "../useReady"
 import { useEpicDetail, type EpicDetail, type FetchEpicDetail } from "./detail"
 import type { FixAgent } from "./fixAgent"
 import { MoreStats } from "./MoreStats"
-import { PrActions, PrActivity, PrNotice } from "./PrFlow"
+import { action, PrActions, PrActivity, PrNotice } from "./PrFlow"
 import { TicketCard } from "./TicketCard"
 import {
   cardMeta,
@@ -218,6 +221,7 @@ function EpicBar({
   partner,
   openDesign,
   onChanged,
+  onMarkMerged,
 }: {
   address: string
   detail: EpicDetail
@@ -225,6 +229,7 @@ function EpicBar({
   partner?: string
   openDesign?: OpenDesign
   onChanged: () => void
+  onMarkMerged: { disabled: boolean; run: (anchor: HTMLElement) => void }
 }) {
   const navigate = useNavigate()
   const isImpl = address.endsWith("-impl")
@@ -270,7 +275,7 @@ function EpicBar({
           {detail.state === "awaiting-merge" && (
             <MergeButton address={address} state={detail.state} onMerged={onChanged} />
           )}
-          <PrActions detail={detail} onChanged={onChanged} />
+          <PrActions detail={detail} onChanged={onChanged} onMarkMerged={onMarkMerged} />
         </Box>
       </Box>
       {detail.pr_reason && !detail.pr_notice && (
@@ -287,12 +292,16 @@ function EpicBar({
 }
 
 // The archived page's bar: the stamp, the link to the Design's -impl archive page, and Unarchive. No other action.
-function ArchivedBar({ address, detail }: { address: string; detail: EpicDetail }) {
+function ArchivedBar({
+  address,
+  detail,
+  unarchive,
+}: {
+  address: string
+  detail: EpicDetail
+  unarchive: { disabled: boolean; run: () => void }
+}) {
   const navigate = useNavigate()
-  const unarchive = async () => {
-    const [r] = (await unarchiveWithToasts([address], slugOf)) ?? []
-    if (r?.status === TargetDone) navigate(epicHref(r.new_address ?? address).slice(1))
-  }
   return (
     <Box display="flex" flexWrap="wrap" alignItems="center" justifyContent="flex-end" gap="3">
       {detail.archived_at && (
@@ -310,7 +319,7 @@ function ArchivedBar({ address, detail }: { address: string; detail: EpicDetail 
       {detail.shows_view_diff && (
         <ViewDiffLink epic={address} base={detail.diff_base} tip={detail.diff_tip} />
       )}
-      <Button tone="running" onClick={() => void unarchive()}>
+      <Button tone="running" disabled={unarchive.disabled} onClick={() => unarchive.run()}>
         Unarchive
       </Button>
     </Box>
@@ -365,11 +374,83 @@ function DescriptionLine({ summary }: { summary: string }) {
   )
 }
 
-// The registry's actions for the card: Copy ID, Move, Remove and Hold. None for a card outside a workspace.
-function EpicMenu({ card }: { card?: EpicListRow }) {
+// The page's registry actions: the ⋯ menu, plus the footer buttons that run the same actions.
+// The card's own verbs (Move, Hold, Archive) need the active card in a workspace; the detail
+// alone gives Open PR, Mark as merged (when the server offers it) and Copy ID.
+function useEpicActions(
+  address: string,
+  detail: EpicDetail | null | undefined,
+  card: EpicListRow | undefined,
+  onChanged: () => void,
+) {
   const { workspaces } = useWorkspaces(useConnectionContext())
-  const { groups } = useCardActions(card, workspaces)
-  return <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} />
+  const navigate = useNavigate()
+  const wrap = useRef<HTMLSpanElement>(null)
+  // A footer button confirms on itself; the ⋯ pick confirms on the ⋯.
+  const footerAnchor = useRef<HTMLElement | null>(null)
+  const markMerged = detail ? action(detail, CardActionMarkMerged) : undefined
+  const prLink = detail ? (action(detail, CardActionOpenPR)?.link ?? detail.pr?.url) : undefined
+  const entity: Entity | undefined = !detail
+    ? undefined
+    : {
+        kind: "epic",
+        key: address,
+        name: slugOf(address),
+        surface: "page",
+        workspace: card?.workspace,
+        held: card?.section === SectionOnHold,
+        queued: card?.queued ?? detail.queued,
+        prUrl: prLink,
+        archived: !!detail.archived_at,
+      }
+  const hide = [
+    ...(card?.workspace ? [] : ["move", "hold", "unhold", "archive"]),
+    ...(markMerged ? [] : ["mark-merged"]),
+  ]
+  const { groups, get } = useEntityActions(
+    entity,
+    workspaces,
+    {
+      hide,
+      anchor: () => footerAnchor.current ?? wrap.current?.querySelector("button"),
+    },
+    {
+      state: detail?.state ?? "",
+      writers: {
+        markMerged: async (body) => {
+          const res = await postEpicMarkMerged({
+            ...body,
+            address: markMerged?.target ?? body.address,
+          })
+          if (!res.refused) onChanged()
+          return res
+        },
+        unarchive: async (a) => {
+          const res = await unarchiveOne(a)
+          if (!res.refused) navigate(epicHref(res.new_address ?? a).slice(1))
+          return res
+        },
+      },
+    },
+  )
+  const fromFooter = (id: string) => (anchor?: HTMLElement) => {
+    footerAnchor.current = anchor ?? null
+    try {
+      get(id)?.run()
+    } finally {
+      footerAnchor.current = null
+    }
+  }
+  const menu = (
+    <span ref={wrap} style={{ display: "contents" }}>
+      <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} />
+    </span>
+  )
+  return {
+    menu,
+    markMerged: { disabled: get("mark-merged")?.disabled ?? true, run: fromFooter("mark-merged") },
+    unarchive: { disabled: get("unarchive")?.disabled ?? true, run: fromFooter("unarchive") },
+  }
 }
 
 const mergeBlocked = (detail: EpicDetail) => detail.state === "paused" && !!detail.land_block_reason
@@ -507,6 +588,7 @@ function EpicPageBody({
   useEffect(() => {
     if (unread) void postEpicMarkSeen(address).catch(() => {})
   }, [unread, address])
+  const page = useEpicActions(address, detail, card, refetch)
 
   return (
     <FileLinkProvider base={{ project: address.split(":")[0] }}>
@@ -520,7 +602,6 @@ function EpicPageBody({
           <PageHeader
             title={name}
             icon={<PageIcon kind="epic" />}
-            caret
             subtitle={
               <>
                 <StatsLine detail={detail} now={now} designLive={designLive} />
@@ -536,12 +617,12 @@ function EpicPageBody({
                   sessions={sessions}
                   size={wide ? "header" : "headerSm"}
                 />
-                {!readOnly && <EpicMenu card={card} />}
+                {page.menu}
               </>
             }
             meta={
               readOnly ? (
-                <ArchivedBar address={address} detail={detail} />
+                <ArchivedBar address={address} detail={detail} unarchive={page.unarchive} />
               ) : (
                 <EpicBar
                   address={address}
@@ -550,6 +631,7 @@ function EpicPageBody({
                   partner={partner}
                   openDesign={openDesign}
                   onChanged={refetch}
+                  onMarkMerged={page.markMerged}
                 />
               )
             }

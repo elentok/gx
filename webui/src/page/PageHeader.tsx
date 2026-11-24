@@ -14,12 +14,9 @@ export function PageHeader({
   actions,
   meta,
   metaFlush,
-  caret,
   children,
 }: {
   title: string
-  /** A small decorative "▾" after the title (the epic and design pages). */
-  caret?: boolean
   /** The large icon left of the title. */
   icon?: ReactNode
   /** One truncated line of text under the title. Nothing renders when it is empty. */
@@ -75,22 +72,7 @@ export function PageHeader({
           ) : null}
           {/* A wide action (the Design session button) wraps below instead of squeezing the title. */}
           <Box minW="0" flex="1 1 140px">
-            {caret ? (
-              <Box display="flex" alignItems="baseline" gap="6px">
-                {h1}
-                <Box
-                  as="span"
-                  aria-hidden="true"
-                  data-testid="page-header-caret"
-                  color="text.dim"
-                  fontSize="12px"
-                >
-                  ▾
-                </Box>
-              </Box>
-            ) : (
-              h1
-            )}
+            {h1}
             {subtitle ? (
               <Box
                 data-testid="page-header-subtitle"

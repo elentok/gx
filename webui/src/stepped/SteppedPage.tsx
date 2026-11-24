@@ -204,7 +204,6 @@ export function SteppedPage({
         <PageHeader
           title={title}
           icon={icon}
-          caret
           subtitle={
             model && (
               <>

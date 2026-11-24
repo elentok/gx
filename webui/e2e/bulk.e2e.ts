@@ -243,6 +243,17 @@ test("Bulk actions", async ({ page, start }) => {
     await expect(page.getByRole("link", nav(name))).toHaveCount(0)
   }
   await expect(page.getByText("built", { exact: true })).toBeVisible()
+  // The ⋯ sits last in the title row and holds Unarchive and Copy ID only.
+  const archivedMore = page
+    .getByTestId("page-header-actions")
+    .getByRole("button", nav("More actions"))
+  const actionsBox = (await page.getByTestId("page-header-actions").boundingBox())!
+  const moreBox = (await archivedMore.boundingBox())!
+  expect(moreBox.x + moreBox.width).toBeCloseTo(actionsBox.x + actionsBox.width, 0)
+  await archivedMore.click()
+  await expect(page.getByRole("menuitem")).toHaveText([/^Unarchive/, /^Copy ID/])
+  await archivedMore.click()
+  await expect(page.getByRole("menu")).toHaveCount(0)
 
   // Entry 32 and 38: Unarchive from the detail puts the epic back in its named workspace, active on the Epics page.
   const membersBefore =

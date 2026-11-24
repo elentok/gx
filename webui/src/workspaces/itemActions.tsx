@@ -8,7 +8,7 @@ import {
   type Workspace,
 } from "../generated/server"
 import { agentKindOf, type AgentKind, type Entity, type EntityKind } from "../actions/entity"
-import { useActions, type ReadyAction } from "../actions/useActions"
+import { useActions, type ActionContext, type ReadyAction } from "../actions/useActions"
 import type { SurfaceContext } from "../actions/confirmRequest"
 import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu"
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
@@ -134,16 +134,32 @@ export function useItemActions(
     hide?: string[]
   } = {},
 ) {
-  const { actions } = useActions(item && entityOfItem(item), {
+  return useEntityActions(item && entityOfItem(item), workspaces, opts, {
+    writers,
+    onRemoved,
+    draft: item?.draft,
+    promote: { connected: true },
+  })
+}
+
+/** The menu groups and the ready actions of one entity, for a row or a page that reads the registry. */
+export function useEntityActions(
+  entity: Entity | undefined,
+  workspaces: Workspace[],
+  opts: {
+    anchor?: () => HTMLElement | null | undefined
+    hide?: string[]
+  } = {},
+  ctx: Partial<ActionContext> = {},
+) {
+  const { actions, get } = useActions(entity, {
     surface: () => {
       const anchor = opts.anchor?.()
       return anchor ? { mode: "anchor", anchor } : MODAL
     },
     workspaces,
-    writers,
-    onRemoved,
-    draft: item?.draft,
     promote: { connected: true },
+    ...ctx,
   })
   const hide = new Set(opts.hide ?? BUILT_BY_PAGE)
   const groups: MenuEntry[][] = []
@@ -151,12 +167,12 @@ export function useItemActions(
   for (const a of actions) {
     if (hide.has(a.id) || (a.id === "move" && workspaces.length === 0)) continue
     // A design or epic row offers no Stop; its sessions stop through Hold and Archive.
-    if (a.id === "stop" && (item?.kind === "design" || item?.kind === "epic")) continue
+    if (a.id === "stop" && (entity?.kind === "design" || entity?.kind === "epic")) continue
     if (a.group !== last) groups.push([])
     last = a.group
     groups[groups.length - 1]!.push(entryOf(a))
   }
-  return { groups }
+  return { groups, get }
 }
 
 /** The "..." menu of one item; renders nothing when it has no actions. */

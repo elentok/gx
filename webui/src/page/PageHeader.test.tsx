@@ -9,7 +9,7 @@ const render = (node: React.ReactNode, wide = true) =>
   renderThemed(<WideContext.Provider value={wide}>{node}</WideContext.Provider>)
 
 test("renders icon, title, subtitle, actions and meta bar", () => {
-  const { getByRole, getByTestId } = render(
+  const { getByRole, getByTestId, queryByTestId } = render(
     <PageHeader
       title="slow-tests"
       icon={<i>icon</i>}
@@ -23,6 +23,10 @@ test("renders icon, title, subtitle, actions and meta bar", () => {
   expect(getByTestId("page-header-subtitle").textContent).toBe("a line")
   expect(getByTestId("page-header-actions").textContent).toBe("menu")
   expect(getByTestId("page-header-meta").textContent).toBe("meta")
+  expect(queryByTestId("page-header-caret")).toBeNull()
+  expect(getByRole("heading", { level: 1 }).parentElement).toBe(
+    getByTestId("page-header-subtitle").parentElement,
+  )
 })
 
 test("inside the shell the page icon is dropped on every device, leaving the mascot alone", () => {

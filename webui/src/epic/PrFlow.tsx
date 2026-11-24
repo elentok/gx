@@ -14,7 +14,7 @@ import {
   type PRActivityEntry,
 } from "../generated/server"
 import { EpicActionButton } from "../epics/EpicActionButton"
-import { postEpicCreatePR, postEpicMarkMerged, postEpicTryAgain } from "../epics/queue"
+import { postEpicCreatePR, postEpicTryAgain } from "../epics/queue"
 import { ticketHref } from "../hrefs"
 import { Button } from "../ui/button/Button"
 
@@ -40,7 +40,7 @@ function Chip({ children, ...rest }: { children: ReactNode } & Omit<BoxProps, "c
   )
 }
 
-const action = (detail: EpicDetail, kind: string): CardAction | undefined =>
+export const action = (detail: EpicDetail, kind: string): CardAction | undefined =>
   detail.pr_actions?.find((a) => a.kind === kind)
 
 function TryAgainButton({
@@ -66,7 +66,16 @@ function TryAgainButton({
 }
 
 /** The PR chip, Open on GitHub, Try again and Create PR, in the order the server's pr_actions give them. */
-export function PrActions({ detail, onChanged }: { detail: EpicDetail; onChanged: () => void }) {
+export function PrActions({
+  detail,
+  onChanged,
+  onMarkMerged,
+}: {
+  detail: EpicDetail
+  onChanged: () => void
+  /** The registry's Mark as merged: it confirms on the button it is run from. */
+  onMarkMerged?: { disabled: boolean; run: (anchor: HTMLElement) => void }
+}) {
   const tryAgain = action(detail, CardActionTryAgain)
   const create = action(detail, CardActionCreatePR)
   const open = action(detail, CardActionOpenPR)
@@ -103,16 +112,14 @@ export function PrActions({ detail, onChanged }: { detail: EpicDetail; onChanged
           onDone={onChanged}
         />
       )}
-      {markMerged && (
-        <EpicActionButton
-          address={markMerged.target ?? detail.address}
-          state={detail.state ?? ""}
-          post={postEpicMarkMerged}
-          label={markMerged.label}
+      {markMerged && onMarkMerged && (
+        <Button
           tone="muted"
-          pendingLabel="Marking as merged…"
-          onDone={onChanged}
-        />
+          disabled={onMarkMerged.disabled}
+          onClick={(e) => onMarkMerged.run(e.currentTarget)}
+        >
+          {markMerged.label}
+        </Button>
       )}
     </>
   )
