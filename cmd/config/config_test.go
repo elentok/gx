@@ -261,7 +261,7 @@ func TestExecute_ConfigShow_PropagatesError(t *testing.T) {
 	}
 }
 
-func TestExecute_ConfigTestNotifications_NoneConfiguredPrintsNoticeAndSucceeds(t *testing.T) {
+func TestExecute_ConfigTestNotifications_NoneConfiguredNamesSkippedChannelsAndSucceeds(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := Deps{Env: cmdbase.Env{
@@ -275,8 +275,10 @@ func TestExecute_ConfigTestNotifications_NoneConfiguredPrintsNoticeAndSucceeds(t
 	if err := run(t, d, "config", "test-notifications"); err != nil {
 		t.Fatalf("execute config test-notifications: %v", err)
 	}
-	if !strings.Contains(stdout.String(), "no notification service configured") {
-		t.Fatalf("expected notice about no configured service, got: %q", stdout.String())
+	for _, line := range []string{"desktop: skipped", "web-toast: skipped", "push: skipped", "telegram: unconfigured", "slack: unconfigured"} {
+		if !strings.Contains(stdout.String(), line+"\n") {
+			t.Errorf("stdout missing %q, got: %q", line, stdout.String())
+		}
 	}
 }
 

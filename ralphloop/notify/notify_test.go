@@ -2,6 +2,7 @@ package notify
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -62,6 +63,36 @@ func TestSendMessage_CLIChannelsApplySwitchKindListAndMute(t *testing.T) {
 				t.Errorf("slack requests = %d, want %d", n, tc.posts)
 			}
 		})
+	}
+}
+
+func TestSendCLIMessage_TelegramErrorMentioningSlackIsBlamedOnTelegramOnly(t *testing.T) {
+	t.Parallel()
+	failing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "slack: boom", http.StatusInternalServerError)
+	}))
+	t.Cleanup(failing.Close)
+	slackServer, _ := fakeSlackServer(t, http.StatusOK)
+	statePath := testStatePath(t)
+	if err := UpdateNotificationState(statePath, func(s *NotificationState) {
+		s.Transports["slack"] = TransportState{Muted: true, Reason: "manual-disable"}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	on := config.ChannelConfig{Enabled: true, Kinds: []string{notifykind.CLIMessage}}
+	cfg := config.NotificationsConfig{
+		Telegram: config.TelegramConfig{BotToken: "tok", ChatID: "chat-1"},
+		Slack:    config.SlackConfig{WebhookURL: slackServer.URL},
+	}
+
+	got, err := sendCLIMessage(cfg, config.NotificationChannelsConfig{Telegram: on, Slack: on}, statePath, "hi", failing.URL)
+
+	if err == nil {
+		t.Fatal("sendCLIMessage: want error, got nil")
+	}
+	want := []ChannelOutcome{{ChannelTelegram, OutcomeFailed}, {ChannelSlack, OutcomeMuted}}
+	if !slices.Equal(got, want) {
+		t.Errorf("outcomes = %v, want %v", got, want)
 	}
 }
 

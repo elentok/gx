@@ -205,10 +205,6 @@ func runConfigTestNotifications(c *cobra.Command, d Deps, jsonOut bool) error {
 				configured++
 			}
 		}
-		if configured == 0 && !jsonOut {
-			fmt.Fprintf(d.Stdout, "no notification service configured (see `gx config edit`)\n")
-			return nil
-		}
 	}
 	if jsonOut {
 		if err := printJSON(d.Stdout, via.res, via.direct); err != nil {
@@ -231,28 +227,23 @@ func runConfigTestNotifications(c *cobra.Command, d Deps, jsonOut bool) error {
 // switch is off is not tested, so the test tells the truth about what a real
 // message would do. It returns the outcomes and how many sends failed.
 func testChatDirect(cfg gxconfig.Config, stderr io.Writer) (out []notify.ChannelOutcome, failed int) {
-	test := func(channel string, configured bool, ch gxconfig.ChannelConfig, send func() error) {
-		switch {
-		case !configured:
-			out = append(out, notify.ChannelOutcome{Channel: channel, Outcome: notify.OutcomeUnconfigured})
-		case !ch.Enabled:
-			out = append(out, notify.ChannelOutcome{Channel: channel, Outcome: notify.OutcomeOff})
-		default:
-			if err := send(); err != nil {
-				failed++
-				fmt.Fprintf(stderr, "%s: failed: %v\n", channel, err)
-				out = append(out, notify.ChannelOutcome{Channel: channel, Outcome: notify.OutcomeFailed})
-			} else {
-				out = append(out, notify.ChannelOutcome{Channel: channel, Outcome: notify.OutcomeSent})
-			}
+	out = notify.ChatGate(cfg.Notifications, cfg.NotificationChannels, "")
+	tg, slack := cfg.Notifications.Telegram, cfg.Notifications.Slack
+	sends := []func() error{
+		func() error { return notify.SendTelegramTestMessage(tg.BotToken, tg.ChatID) },
+		func() error { return notify.SendSlackTestMessage(slack.WebhookURL) },
+	}
+	for i := range out {
+		if out[i].Outcome != "" {
+			continue
+		}
+		if err := sends[i](); err != nil {
+			failed++
+			fmt.Fprintf(stderr, "%s: failed: %v\n", out[i].Channel, err)
+			out[i].Outcome = notify.OutcomeFailed
+		} else {
+			out[i].Outcome = notify.OutcomeSent
 		}
 	}
-	tg, slack := cfg.Notifications.Telegram, cfg.Notifications.Slack
-	test(notify.ChannelTelegram, tg.BotToken != "", cfg.NotificationChannels.Telegram, func() error {
-		return notify.SendTelegramTestMessage(tg.BotToken, tg.ChatID)
-	})
-	test(notify.ChannelSlack, slack.WebhookURL != "", cfg.NotificationChannels.Slack, func() error {
-		return notify.SendSlackTestMessage(slack.WebhookURL)
-	})
 	return out, failed
 }

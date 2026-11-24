@@ -1,9 +1,9 @@
 package notify
 
 import (
+	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/elentok/gx/config"
@@ -27,43 +27,56 @@ func SendMessage(cfg config.NotificationsConfig, statePath, text string) ([]stri
 // sendMessage is SendMessage with the Telegram API base URL injectable, so
 // tests can point it at a fake server instead of the real Telegram API.
 func sendMessage(cfg config.NotificationsConfig, statePath, text, telegramBaseURL string) ([]string, error) {
+	out := []ChannelOutcome{{Channel: ChannelTelegram}, {Channel: ChannelSlack}}
+	out, err := sendOutcomes(cfg, out, statePath, text, telegramBaseURL)
 	var sent []string
+	for _, o := range out {
+		if o.Outcome == OutcomeSent {
+			sent = append(sent, o.Channel)
+		}
+	}
+	return sent, err
+}
+
+// sendOutcomes sends text to each chat channel in out whose Outcome is still
+// empty and fills that Outcome in: unconfigured, muted by the gate, failed or
+// sent. A channel with an Outcome already (from ChatGate) is left alone. The
+// error joins the per-channel failures.
+func sendOutcomes(cfg config.NotificationsConfig, out []ChannelOutcome, statePath, text, telegramBaseURL string) ([]ChannelOutcome, error) {
 	var errs []error
-
-	if cfg.Telegram.BotToken != "" {
-		allowed, err := gateCLISend(statePath, "telegram")
-		if err != nil {
-			errs = append(errs, fmt.Errorf("telegram: %w", err))
-		} else if allowed {
-			if err := sendTelegramMessage(cfg.Telegram.BotToken, cfg.Telegram.ChatID, telegramBaseURL, text); err != nil {
-				errs = append(errs, fmt.Errorf("telegram: %w", err))
-			} else {
-				sent = append(sent, "telegram")
-			}
+	sends := []struct {
+		configured bool
+		send       func() error
+	}{
+		{cfg.Telegram.BotToken != "", func() error {
+			return sendTelegramMessage(cfg.Telegram.BotToken, cfg.Telegram.ChatID, telegramBaseURL, text)
+		}},
+		{cfg.Slack.WebhookURL != "", func() error { return SendSlackMessage(cfg.Slack.WebhookURL, text) }},
+	}
+	for i, s := range sends {
+		o := &out[i]
+		if o.Outcome != "" {
+			continue
+		}
+		if !s.configured {
+			o.Outcome = OutcomeUnconfigured
+			continue
+		}
+		allowed, err := gateCLISend(statePath, o.Channel)
+		if err == nil && allowed {
+			err = s.send()
+		}
+		switch {
+		case err != nil:
+			errs = append(errs, fmt.Errorf("%s: %w", o.Channel, err))
+			o.Outcome = OutcomeFailed
+		case allowed:
+			o.Outcome = OutcomeSent
+		default:
+			o.Outcome = OutcomeMuted
 		}
 	}
-
-	if cfg.Slack.WebhookURL != "" {
-		allowed, err := gateCLISend(statePath, "slack")
-		if err != nil {
-			errs = append(errs, fmt.Errorf("slack: %w", err))
-		} else if allowed {
-			if err := SendSlackMessage(cfg.Slack.WebhookURL, text); err != nil {
-				errs = append(errs, fmt.Errorf("slack: %w", err))
-			} else {
-				sent = append(sent, "slack")
-			}
-		}
-	}
-
-	if len(errs) == 0 {
-		return sent, nil
-	}
-	joined := errs[0]
-	for _, err := range errs[1:] {
-		joined = fmt.Errorf("%w; %w", joined, err)
-	}
-	return sent, joined
+	return out, errors.Join(errs...)
 }
 
 // OutcomeFailed is the direct fallback's outcome for a send that errored. The
@@ -78,6 +91,13 @@ func SendCLIMessage(cfg config.NotificationsConfig, channels config.Notification
 }
 
 func sendCLIMessage(cfg config.NotificationsConfig, channels config.NotificationChannelsConfig, statePath, text, telegramBaseURL string) ([]ChannelOutcome, error) {
+	return sendOutcomes(cfg, ChatGate(cfg, channels, notifykind.CLIMessage), statePath, text, telegramBaseURL)
+}
+
+// ChatGate is the configured/off/unchecked gate for Telegram and Slack, in
+// that order. A channel it stops has its Outcome set; one it lets through has
+// it empty. An empty kind skips the kind-list check, for system messages.
+func ChatGate(cfg config.NotificationsConfig, channels config.NotificationChannelsConfig, kind string) []ChannelOutcome {
 	out := []ChannelOutcome{{Channel: ChannelTelegram}, {Channel: ChannelSlack}}
 	gates := []struct {
 		configured bool
@@ -86,37 +106,17 @@ func sendCLIMessage(cfg config.NotificationsConfig, channels config.Notification
 		{cfg.Telegram.BotToken != "", channels.Telegram},
 		{cfg.Slack.WebhookURL != "", channels.Slack},
 	}
-	masked := cfg
 	for i, g := range gates {
 		switch {
 		case !g.configured:
 			out[i].Outcome = OutcomeUnconfigured
 		case !g.ch.Enabled:
 			out[i].Outcome = OutcomeOff
-		case !slices.Contains(g.ch.Kinds, notifykind.CLIMessage):
+		case kind != "" && !slices.Contains(g.ch.Kinds, kind):
 			out[i].Outcome = OutcomeUnchecked
-		default:
-			continue
-		}
-		if i == 0 {
-			masked.Telegram = config.TelegramConfig{}
-		} else {
-			masked.Slack = config.SlackConfig{}
 		}
 	}
-	sent, err := sendMessage(masked, statePath, text, telegramBaseURL)
-	for i := range out {
-		switch {
-		case out[i].Outcome != "":
-		case slices.Contains(sent, out[i].Channel):
-			out[i].Outcome = OutcomeSent
-		case err != nil && strings.Contains(err.Error(), out[i].Channel+": "):
-			out[i].Outcome = OutcomeFailed
-		default:
-			out[i].Outcome = OutcomeMuted
-		}
-	}
-	return out, err
+	return out
 }
 
 // SendTestBatch sends a fixed 2-message test batch to every notification
