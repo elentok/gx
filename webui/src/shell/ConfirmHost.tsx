@@ -214,7 +214,9 @@ function Confirm({ request }: { request: ConfirmRequest }) {
             borderRadius="10px"
             boxShadow="lg"
             color="text"
-            w={`min(${request.body.input ? 346 : 326}px, calc(100vw - ${2 * CONFIRM_INSET}px))`}
+            w={
+              wide ? `${request.body.input ? 346 : 326}px` : `calc(100vw - ${2 * CONFIRM_INSET}px)`
+            }
             css={{ "--popover-bg": "colors.surface.raised" }}
           >
             <Popover.Arrow>
