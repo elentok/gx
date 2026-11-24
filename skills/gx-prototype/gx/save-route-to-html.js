@@ -1,7 +1,21 @@
 async page => {
   const html = await page.evaluate(async () => {
     const rules = [];
-    for (const ss of document.styleSheets) { try { for (const r of ss.cssRules) rules.push(r.cssText) } catch {} }
+    // Chrome drops the var() text of a shorthand that a longhand overrides, so cssText holds `padding-right: ;`.
+    // The raw text is gone from the CSSOM, so fill each empty declaration from a matching element's computed value.
+    const ser = (r) => {
+      if (r.cssRules && !r.style) return r.cssText.slice(0, r.cssText.indexOf('{') + 1) + [...r.cssRules].map(ser).join(' ') + ' }';
+      if (!r.style || ![...r.style].some((p) => r.style.getPropertyValue(p) === '')) return r.cssText;
+      let el = null;
+      try { el = document.querySelector(r.selectorText) } catch {}
+      const decls = [...r.style].map((p) => {
+        let v = r.style.getPropertyValue(p);
+        if (v === '' && el) v = getComputedStyle(el).getPropertyValue(p);
+        return v === '' ? '' : p + ': ' + v + (r.style.getPropertyPriority(p) ? ' !important' : '') + ';';
+      });
+      return r.selectorText + ' { ' + decls.filter(Boolean).join(' ') + ' }';
+    };
+    for (const ss of document.styleSheets) { try { for (const r of ss.cssRules) rules.push(ser(r)) } catch {} }
     let css = rules.join('\n');
     // inline every font url as a data: URI
     const urls = [...new Set([...css.matchAll(/url\("?([^")]+\.woff2[^")]*)"?\)/g)].map(m => m[1]))];
