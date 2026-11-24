@@ -69,7 +69,11 @@ return (
     {variant === 'A' && <VariantA {...data} />}
     {variant === 'B' && <VariantB {...data} />}
     {variant === 'C' && <VariantC {...data} />}
-    <PrototypeSwitcher variants={['A','B','C']} current={variant} />
+    <PrototypeSwitcher variants={[
+      { key: 'A', name: 'Dense list' },
+      { key: 'B', name: 'Cards' },
+      { key: 'C', name: 'Table' },
+    ]} />
   </>
 );
 ```
@@ -83,7 +87,7 @@ For sub-shape B (new page): the throwaway route under `/prototype/<name>` mounts
 How the switcher looks and behaves is specified in [MOCK.md](MOCK.md); do not keep a second spec here. In short, it is a fixed bar at the bottom-centre with three pieces:
 
 - **Left arrow**: cycles to the previous variant (wraps around).
-- **Variant label**: shows the current variant key and, if the variant exports a name, that name too. e.g. `B (Sidebar layout)`.
+- **Variant label**: shows the current variant key and, if the variant exports a name, that name too. e.g. `B of 3` over `Sidebar layout`.
 - **Right arrow**: cycles forward (wraps around).
 
 Behaviour:
@@ -115,7 +119,7 @@ Copy the approved rows and states from the claude.ai artifact's HTML into a new 
 
 #### From a route
 
-Open the approved variant of the in-repo `?variant=` route in playwright-cli at each approved state and width, and save one self-contained HTML file. The save inlines every CSS rule from `document.styleSheets` and drops all scripts. You choose how the save script is written.
+Open the approved variant of the in-repo `?variant=` route in playwright-cli at each approved state and width, and save one self-contained HTML file. The save inlines every CSS rule from `document.styleSheets` and drops all scripts. In gx, use `skills/gx-prototype/gx/save-route-to-html.js`; other projects write their own.
 
 A variant route made for a design map never folds into main, so step 6's fold does not apply to it. It stays on the throwaway branch; the stored mock and that branch are the outputs.
 

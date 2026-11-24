@@ -75,7 +75,7 @@ function Switcher({ variants }: { variants: PrototypeVariant[] }) {
         </button>
         <div className="mk-label" aria-live="polite">
           <b>
-            {i + 1} of {n}
+            {variants[i].key} of {n}
           </b>
           <small>{variants[i].name || variants[i].key}</small>
         </div>

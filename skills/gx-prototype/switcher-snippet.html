@@ -37,7 +37,7 @@
   function render(){
     var i=idx();
     vs.forEach(function(v,j){v.hidden=j!==i});
-    lab.querySelector('b').textContent=(i+1)+' of '+vs.length;
+    lab.querySelector('b').textContent=vs[i].dataset.v+' of '+vs.length;
     lab.querySelector('small').textContent=vs[i].dataset.name||vs[i].dataset.v;
   }
   function step(d){location.hash='v='+encodeURIComponent(vs[(idx()+d+vs.length)%vs.length].dataset.v)}

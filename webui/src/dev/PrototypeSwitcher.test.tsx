@@ -33,14 +33,14 @@ const search = () => screen.getByTestId("search").textContent
 test("shows the first variant by default and cycles with prev and next", () => {
   const { container } = setup()
   const label = () => container.querySelector(".mk-label")?.textContent
-  expect(label()).toBe("1 of 3Dense list")
+  expect(label()).toBe("A of 3Dense list")
   fireEvent.click(screen.getByRole("button", { name: "Next variant" }))
   expect(search()).toBe("?variant=B")
-  expect(label()).toBe("2 of 3Cards")
+  expect(label()).toBe("B of 3Cards")
   fireEvent.click(screen.getByRole("button", { name: "Previous variant" }))
   fireEvent.click(screen.getByRole("button", { name: "Previous variant" }))
   expect(search()).toBe("?variant=C")
-  expect(label()).toBe("3 of 3Table")
+  expect(label()).toBe("C of 3Table")
 })
 
 test("keeps other search params", () => {
