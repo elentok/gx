@@ -1,6 +1,7 @@
 import {
   ActionStartOver,
   ReasonNeedsYes,
+  type SessionInfo,
   type SessionPromptRequest,
   type Workspace,
 } from "../generated/server"
@@ -155,7 +156,8 @@ export interface ReadyAction {
   reason?: string
   /** Move to workspace lists every workspace here. */
   items?: ReadyItem[]
-  run: () => void
+  /** The button the pick came from. Absent uses the context's surface; null forces a modal (a chord). */
+  run: (anchor?: HTMLElement | null) => void
 }
 
 const ARCHIVE_BUSY_TOAST = "item-archive-busy"
@@ -173,24 +175,32 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
 
   const surfaceOf = () => (typeof ctx.surface === "function" ? ctx.surface() : ctx.surface)
 
-  function ask(
-    decl: ActionDecl,
-    e: Entity,
-    req: Partial<ConfirmRequest> &
-      Pick<ConfirmRequest, "confirmLabel" | "title" | "onConfirm"> & { body: ConfirmBody },
-  ) {
-    openConfirm({
-      actionId: decl.id,
-      entityName: nameOf(e),
-      group: decl.group,
-      danger: decl.danger,
-      dismissLabel: "Cancel",
-      surface: surfaceOf(),
-      ...req,
-    })
-  }
+  // An explicit anchor (the button or menu the pick came from) wins over the context's surface.
+  const askAt =
+    (anchor?: HTMLElement | null) =>
+    (
+      decl: ActionDecl,
+      e: Entity,
+      req: Partial<ConfirmRequest> &
+        Pick<ConfirmRequest, "confirmLabel" | "title" | "onConfirm"> & { body: ConfirmBody },
+    ) => {
+      const surface = surfaceOf()
+      openConfirm({
+        actionId: decl.id,
+        entityName: nameOf(e),
+        group: decl.group,
+        danger: decl.danger,
+        dismissLabel: "Cancel",
+        surface:
+          anchor === undefined
+            ? surface
+            : { ...(anchor ? { mode: "anchor", anchor } : { mode: "modal" }), page: surface.page },
+        ...req,
+      })
+    }
+  type Ask = ReturnType<typeof askAt>
 
-  function runHold(decl: ActionDecl, e: Entity) {
+  function runHold(decl: ActionDecl, e: Entity, ask: Ask) {
     void run(async () => {
       const res = await w.hold(e.key)
       // A refusal that names live sessions is a question, not an error: ask, then re-post with yes.
@@ -211,7 +221,7 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
     })
   }
 
-  function runArchive(decl: ActionDecl, e: Entity) {
+  function runArchive(decl: ActionDecl, e: Entity, ask: Ask) {
     const archive = w.archive ?? postArchive
     const intro = `Archive ${e.name}? Live agents stop and the epic leaves the sidebar. Unarchive brings it back.`
     // The confirm opens at once with a spinner; the dry run fills it in, or a refusal closes it.
@@ -257,7 +267,7 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
     })
   }
 
-  function runRemove(decl: ActionDecl, e: Entity) {
+  function runRemove(decl: ActionDecl, e: Entity, ask: Ask) {
     if (isDraftEntity(e)) {
       const chatDraft = e.kind === "chat-draft"
       const id = ctx.draft?.id ?? e.key.replace(/^(chat-)?draft\//, "")
@@ -318,7 +328,7 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
     })
   }
 
-  function runStop(decl: ActionDecl, e: Entity) {
+  function runStop(decl: ActionDecl, e: Entity, ask: Ask) {
     const s = e.session
     if (!s) return
     ask(decl, e, {
@@ -356,7 +366,7 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
       return res
     })
 
-  function runStartOver(decl: ActionDecl, e: Entity) {
+  function runStartOver(decl: ActionDecl, e: Entity, ask: Ask) {
     ask(decl, e, {
       confirmLabel: decl.label,
       title: decl.label,
@@ -379,7 +389,7 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
     })
   }
 
-  function runCancelRun(decl: ActionDecl, e: Entity) {
+  function runCancelRun(decl: ActionDecl, e: Entity, ask: Ask) {
     ask(decl, e, {
       confirmLabel: "Cancel run",
       dismissLabel: "Cancel",
@@ -390,7 +400,7 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
     })
   }
 
-  function runNewSession(decl: ActionDecl, e: Entity) {
+  function runNewSession(decl: ActionDecl, e: Entity, ask: Ask) {
     const s = e.session
     const isLive = !!s && s.status.state !== "exited"
     const open = () =>
@@ -425,7 +435,8 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
   const epicWrite = (post: PostEpicWrite, e: Entity) =>
     void run(() => post({ address: e.key, state: ctx.state ?? "" }))
 
-  function exec(decl: ActionDecl, e: Entity) {
+  function exec(decl: ActionDecl, e: Entity, anchor?: HTMLElement | null) {
+    const ask = askAt(anchor)
     switch (decl.id) {
       case "open-design-epic":
         return w.navigate(epicHref(e.key))
@@ -438,13 +449,13 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
       case "promote":
         return runPromote(e)
       case "new-session":
-        return runNewSession(decl, e)
+        return runNewSession(decl, e, ask)
       case "hold":
-        return runHold(decl, e)
+        return runHold(decl, e, ask)
       case "unhold":
         return void run(() => w.unhold(e.key))
       case "stop":
-        return runStop(decl, e)
+        return runStop(decl, e, ask)
       case "mark-merged":
         return ask(decl, e, {
           confirmLabel: "Mark as merged",
@@ -455,7 +466,7 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
           onConfirm: () => epicWrite(w.markMerged, e),
         })
       case "archive":
-        return runArchive(decl, e)
+        return runArchive(decl, e, ask)
       case "unarchive":
         return void run(() => w.unarchive(e.key), {
           success: (res) =>
@@ -474,11 +485,11 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
             ),
           )
       case "start-over":
-        return runStartOver(decl, e)
+        return runStartOver(decl, e, ask)
       case "cancel-run":
-        return runCancelRun(decl, e)
+        return runCancelRun(decl, e, ask)
       case "remove":
-        return runRemove(decl, e)
+        return runRemove(decl, e, ask)
       case "delete-design":
         return ask(decl, e, {
           confirmLabel: "Delete design",
@@ -529,15 +540,20 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
               run: () => void run(() => w.move(e.key, ws.name)),
             }))
           : undefined,
-      run: () => exec(decl, e),
+      run: (anchor) => exec(decl, e, anchor),
     }
   }
 
-  if (!entity) return { actions: [] as ReadyAction[], pending, get: () => undefined }
+  /** Opens the Stop confirm for another session of the entity (a Design's live session list). */
+  const stopSession = (session: SessionInfo, anchor?: HTMLElement | null) => {
+    const decl = actionById("stop")
+    if (decl && entity) runStop(decl, { ...entity, session }, askAt(anchor))
+  }
+  if (!entity) return { actions: [] as ReadyAction[], pending, get: () => undefined, stopSession }
   const actions = menuActions(entity).map((d) => ready(d, entity))
   const get = (id: string) => {
     const decl = actionById(id)
     return decl ? ready(decl, entity) : undefined
   }
-  return { actions, pending, get }
+  return { actions, pending, get, stopSession }
 }

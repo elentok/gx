@@ -170,6 +170,35 @@ test("a managed session's menu holds the Agent block above Stop and Remove", asy
   expect(screen.getByRole("menuitem", { name: "Remove" })).toBeTruthy()
 })
 
+test("the chat page menu lists the Edit group in registry order", async () => {
+  renderThemed(
+    <SessionActions
+      session={session()}
+      onRemoved={() => {}}
+      promote={{ hasMessages: true, connected: true }}
+    />,
+  )
+  await openMenu()
+  await screen.findByRole("menu")
+  const names = screen.getAllByRole("menuitem").map((el) => el.textContent ?? "")
+  const at = (label: string) => names.findIndex((n) => n.startsWith(label))
+  expect(at("Rename")).toBeGreaterThanOrEqual(0)
+  expect(at("Rename")).toBeLessThan(at("Switch model"))
+  expect(at("Switch model")).toBeLessThan(at("Promote to Design"))
+})
+
+test("Stop on the chat page confirms as a popover on the ⋯", async () => {
+  renderThemed(
+    <>
+      <SessionActions session={session()} onRemoved={() => {}} stop={vi.fn()} />
+      <ConfirmHost />
+    </>,
+  )
+  await openMenu()
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Stop" }))
+  expect(await screen.findByRole("alertdialog")).toBeTruthy()
+})
+
 test("a refused remove is returned as the result", async () => {
   const remove = vi.fn(async () => ({ refused: true, reason: "stale" }))
   const res = await removeSession(session(), { remove })

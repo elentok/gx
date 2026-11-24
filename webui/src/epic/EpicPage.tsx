@@ -386,8 +386,6 @@ function useEpicActions(
   const { workspaces } = useWorkspaces(useConnectionContext())
   const navigate = useNavigate()
   const wrap = useRef<HTMLSpanElement>(null)
-  // A footer button confirms on itself; the ⋯ pick confirms on the ⋯.
-  const footerAnchor = useRef<HTMLElement | null>(null)
   const markMerged = detail ? action(detail, CardActionMarkMerged) : undefined
   const prLink = detail ? (action(detail, CardActionOpenPR)?.link ?? detail.pr?.url) : undefined
   const entity: Entity | undefined = !detail
@@ -409,7 +407,7 @@ function useEpicActions(
     workspaces,
     {
       hide,
-      anchor: () => footerAnchor.current ?? wrap.current?.querySelector("button"),
+      anchor: () => wrap.current?.querySelector("button"),
     },
     {
       state: detail?.state ?? "",
@@ -430,14 +428,7 @@ function useEpicActions(
       },
     },
   )
-  const fromFooter = (id: string) => (anchor?: HTMLElement) => {
-    footerAnchor.current = anchor ?? null
-    try {
-      get(id)?.run()
-    } finally {
-      footerAnchor.current = null
-    }
-  }
+  const fromFooter = (id: string) => (anchor?: HTMLElement) => get(id)?.run(anchor ?? null)
   const menu = (
     <span ref={wrap} style={{ display: "contents" }}>
       <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} />

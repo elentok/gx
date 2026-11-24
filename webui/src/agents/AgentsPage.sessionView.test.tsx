@@ -190,6 +190,8 @@ test("a chat's menu lists Move to workspace after Rename, with the Agent block a
   expect(items.slice(items.indexOf("Rename"))).toEqual([
     "Rename",
     "Move to workspace›",
+    "Switch model",
+    "Promote to Design",
     "Stop",
     "Copy ID",
     "Remove",

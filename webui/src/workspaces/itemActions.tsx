@@ -160,7 +160,7 @@ export function entryOf(a: ReadyAction): MenuEntry {
     danger: a.danger || undefined,
     disabled: a.disabled,
     hint: a.reason,
-    onSelect: a.run,
+    onSelect: () => a.run(),
   }
 }
 
@@ -201,7 +201,7 @@ export function useEntityActions(
   } = {},
   ctx: Partial<ActionContext> = {},
 ) {
-  const { actions, get } = useActions(entity, {
+  const { actions, get, stopSession } = useActions(entity, {
     surface: () => {
       const anchor = opts.anchor?.()
       return anchor ? { mode: "anchor", anchor, page: opts.page } : { ...MODAL, page: opts.page }
@@ -214,7 +214,7 @@ export function useEntityActions(
   const shown = actions.filter(
     (a) => !hide.has(a.id) && !(a.id === "move" && workspaces.length === 0),
   )
-  return { groups: groupsOf(shown), get }
+  return { groups: groupsOf(shown), get, stopSession }
 }
 
 /** The "..." menu of one item; renders nothing when it has no actions. */

@@ -1,6 +1,5 @@
 import { useRef } from "react"
 import { useNavigate } from "react-router"
-import { openConfirm } from "../actions/confirmRequest"
 import type { Entity } from "../actions/entity"
 import { useConnectionContext } from "../connection"
 import { SectionOnHold, type EpicListRow, type SessionInfo } from "../generated/server"
@@ -9,14 +8,7 @@ import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
 import { useWide } from "../useWide"
 import { useWorkspaces } from "../workspaces/useActiveWorkspace"
 import { useEntityActions } from "../workspaces/itemActions"
-import {
-  postDeleteDesign,
-  postStopSession,
-  rowToken,
-  type DeleteDesign,
-  type OpenFlow,
-  type StopSession,
-} from "./open"
+import { postDeleteDesign, type DeleteDesign, type OpenFlow, type StopSession } from "./open"
 import { agentSection, liveSessionEntries } from "./SessionControls"
 
 /** The writers the page injects; each wins over the default endpoint. */
@@ -76,7 +68,7 @@ export function DesignPageMenu({
     ...(shown ? [] : ["new-session"]),
     ...(deletable && live.length === 0 ? [] : ["delete-design"]),
   ]
-  const { groups: registry } = useEntityActions(
+  const { groups: registry, stopSession } = useEntityActions(
     entity,
     workspaces,
     { hide, anchor },
@@ -95,32 +87,13 @@ export function DesignPageMenu({
     },
   )
 
-  const stopOther = (s: SessionInfo) => {
-    const stop = writers.stop ?? postStopSession
-    const label = s.name || s.id
-    const target = anchor()
-    openConfirm({
-      actionId: "stop",
-      entityName: label,
-      group: "lifecycle",
-      confirmLabel: "Stop",
-      dismissLabel: "Cancel",
-      title: `Stop ${label}`,
-      body: { lines: [`Stop ${label}? Its agent ends.`] },
-      surface: target ? { mode: "anchor", anchor: target } : { mode: "modal" },
-      onConfirm: async () => {
-        const res = await stop({ id: s.id, state: rowToken(s) })
-        conn.refresh()
-        return res
-      },
-    })
-  }
-
   const groups: MenuEntry[][] = []
   const agent = shown && agentSection(shown, wide)
   if (agent) groups.push(agent)
   if (shown && live.length > 1)
-    groups.push(liveSessionEntries(live, shown, false, onSelect, stopOther, true))
+    groups.push(
+      liveSessionEntries(live, shown, false, onSelect, (s) => stopSession(s, anchor()), true),
+    )
   groups.push(...registry)
   return (
     <span ref={wrap} style={{ display: "contents" }}>

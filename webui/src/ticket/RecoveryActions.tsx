@@ -1,5 +1,5 @@
 import { Box, Spinner, Text } from "@chakra-ui/react"
-import { useRef, useState } from "react"
+import { useState } from "react"
 import { useActions } from "../actions/useActions"
 import { modelName } from "../modelName"
 import {
@@ -61,18 +61,13 @@ export function RecoveryActions({
   const recovering = useRecoverPending()
   const pending = writing || recovering
   // Start over and Cancel run are registry actions; the popover anchors on the footer button clicked.
-  const anchor = useRef<HTMLElement | null>(null)
   const { get } = useActions(ticketEntity(detail), {
-    surface: () =>
-      anchor.current ? { mode: "anchor", anchor: anchor.current } : { mode: "modal" },
+    surface: { mode: "modal" },
     state: detail.state ?? "",
     tooltip: detail.action_info?.[ActionStartOver]?.tooltip,
     onRecovered: onDone,
   })
-  const openConfirm = (id: string, button: HTMLElement) => {
-    anchor.current = button
-    get(id)?.run()
-  }
+  const openConfirm = (id: string, button: HTMLElement) => get(id)?.run(button)
   const [seenState, setSeenState] = useState(detail.state)
 
   // A new pause clears the pick: it may list different blockers.

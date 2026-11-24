@@ -1,4 +1,6 @@
 import { Box } from "@chakra-ui/react"
+import { useRef } from "react"
+import { renameEntry } from "../shell/renameOpen"
 import type { PostPrompt } from "../design/prompt"
 import { usePromptSend } from "../design/usePromptSend"
 import { postStopSession, type StopSession } from "../design/open"
@@ -7,12 +9,11 @@ import type { SessionInfo } from "../generated/server"
 import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu"
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
 import { useWide } from "../useWide"
-import { renameEntry } from "../shell/renameOpen"
 import { chatEntity } from "../actions/entity"
 import { useSnapshotField } from "../connection"
 import { useEntityActions } from "../workspaces/itemActions"
 
-/** The "⋯" menu: the Agent block, plus Stop (while live) and Remove for a session a person manages. */
+/** The "⋯" menu: the Agent block, then the registry's actions for the chat, confirming on the ⋯. */
 export function SessionActions({
   session,
   onRemoved,
@@ -37,11 +38,17 @@ export function SessionActions({
   const workspace = useSnapshotField(
     (s) => s.placements?.find((p) => p.session === session.id)?.workspace,
   )
-  // The Agent block, Promote and Rename are built here; the registry supplies the rest.
+  const wrap = useRef<HTMLSpanElement>(null)
+  // The registry supplies every item, in its order and on its anchor; only the Agent block and
+  // Promote's disabled reasons are built here.
   const registry = useEntityActions(
     { ...chatEntity(session), surface: "page", workspace },
     workspaces,
-    { hide: ["switch-model", "promote", "rename"] },
+    {
+      // Rename is offered only where the menu already offers it (not to Design or ticket sessions).
+      hide: [...(promote ? [] : ["promote"]), ...(renameEntry(session).length ? [] : ["rename"])],
+      anchor: () => wrap.current?.querySelector("button"),
+    },
     { onRemoved, writers: { stop } },
   )
   const promoteSend = usePromptSend({
@@ -56,31 +63,32 @@ export function SessionActions({
   const groups: MenuEntry[][] = []
   const agent = agentSection(session, wide)
   if (agent) groups.push(agent)
-  if (promote) {
-    const off =
-      promote.reason ??
+  const off = promote
+    ? (promote.reason ??
       (promote.hasMessages
         ? undefined
-        : "No messages yet. Promote turns on after the first message.")
-    groups.push([
-      {
-        value: "promote",
-        label: "Promote to Design",
-        hint: off,
-        disabled: !promoteSend.enabled || off !== undefined,
-        onSelect: () => promoteSend.send({ promote: true }),
-      },
-    ])
+        : "No messages yet. Promote turns on after the first message."))
+    : undefined
+  // The chat's own send path replaces the registry's Promote entry in place.
+  const promoteEntry: MenuEntry = {
+    value: "promote",
+    label: "Promote to Design",
+    hint: off,
+    disabled: !promoteSend.enabled || off !== undefined,
+    onSelect: () => promoteSend.send({ promote: true }),
   }
-  // Rename keeps its own entry: the registry offers it to Design and ticket sessions too.
-  const rename = renameEntry(session)
-  if (rename.length > 0) groups.push(rename)
-  groups.push(...registry.groups)
+  groups.push(
+    ...registry.groups.map((g) =>
+      g.map((e) => ("value" in e && e.value === "promote" ? promoteEntry : e)),
+    ),
+  )
   // A queue session with no tier, model or effort has nothing to put in the menu.
   if (groups.length === 0) return null
   return (
     <Box>
-      <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} />
+      <span ref={wrap} style={{ display: "contents" }}>
+        <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} />
+      </span>
     </Box>
   )
 }

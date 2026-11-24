@@ -32,8 +32,6 @@ export function useDraftMenu({ kind, id, name, empty, deleteNow, onRemoved }: Op
       ? snapshot?.chat_drafts?.find((d) => d.id === id)
       : snapshot?.design_drafts?.find((d) => d.id === id)
   const wrap = useRef<HTMLSpanElement>(null)
-  // Set while a footer button or a chord starts Remove; null is a modal.
-  const origin = useRef<{ anchor: HTMLElement | null } | null>(null)
   const key = row?.member_key ?? `${kind === "chat-draft" ? "chat-draft" : "draft"}/${id}`
   const entity: Entity = {
     kind,
@@ -59,8 +57,7 @@ export function useDraftMenu({ kind, id, name, empty, deleteNow, onRemoved }: Op
     {
       hide: [],
       page: key,
-      anchor: () =>
-        origin.current ? origin.current.anchor : wrap.current?.querySelector("button"),
+      anchor: () => wrap.current?.querySelector("button"),
     },
     {
       draft: { id, slug: "", project: "" },
@@ -68,14 +65,7 @@ export function useDraftMenu({ kind, id, name, empty, deleteNow, onRemoved }: Op
       onRemoved,
     },
   )
-  const remove = (anchor: HTMLElement | null = null) => {
-    origin.current = { anchor }
-    try {
-      get("remove")?.run()
-    } finally {
-      origin.current = null
-    }
-  }
+  const remove = (anchor: HTMLElement | null = null) => get("remove")?.run(anchor)
   const menu: ReactNode = (
     <span ref={wrap} style={{ display: "contents" }}>
       <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} />
