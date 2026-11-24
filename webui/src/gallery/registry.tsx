@@ -12,6 +12,7 @@ import { webPerformanceFull, webPerformanceLow } from "./webPerformanceData"
 import { WebPerformance, type PerfTab } from "../stats/WebPerformance"
 import type { StatsWebPerformance } from "../generated/server"
 import { ConnectionContext, type Connection } from "../connection"
+import { PrototypeSwitcher } from "../dev/PrototypeSwitcher"
 import { DraftImages } from "../design/DraftImages"
 import { ContextBadge } from "../design/ContextBadge"
 import { ImageStrip } from "../design/ImageStrip"
@@ -1768,6 +1769,35 @@ export const galleryEntries: GalleryEntry[] = [
   {
     name: "ErrorCard",
     cases: [{ label: "render error", node: <ErrorCard /> }],
+  },
+  {
+    name: "PrototypeSwitcher",
+    cases: [
+      {
+        label: "three variants",
+        node: (
+          <MemoryRouter initialEntries={["/?variant=B"]}>
+            <PrototypeSwitcher
+              variants={[
+                { key: "A", name: "Dense list" },
+                { key: "B", name: "Cards" },
+                { key: "C", name: "Table" },
+              ]}
+            />
+          </MemoryRouter>
+        ),
+      },
+      {
+        label: "long name",
+        node: (
+          <MemoryRouter>
+            <PrototypeSwitcher
+              variants={[{ key: "A", name: "A very long variant name that gets truncated" }]}
+            />
+          </MemoryRouter>
+        ),
+      },
+    ],
   },
   ...authEntries,
   ...shellEntries,
