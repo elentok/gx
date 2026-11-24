@@ -203,7 +203,7 @@ New flows or scenarios to write (these become implementation tickets)
 
 **Mock states**
 
-- `/Users/david/.local/share/gx/tickets/gx/better-mocks/mocks/02-one-mock-two-ways.html`, state `desktop-settings`, width 390, fixture scenario `settings`, parts: settings-page, os-banners-row, sounds-row, done-sound-row, attention-sound-row.
+- `/Users/david/.local/share/gx/tickets/gx/better-mocks/mocks/02-one-mock-two-ways.html`, `desktop-settings`, width 390, fixture scenario `settings`, parts settings-page, os-banners-row, sounds-row, done-sound-row, attention-sound-row.
 
 `mocks/03-variant-switcher.html` is not a state mock. See Further Notes.
 
