@@ -61,7 +61,7 @@ would show it.
 
 Every question to the person is a round, not only the occasions listed above. That includes the
 question that ends a prototype or mock ("Do you agree with B?", "Which look do you want?"): print
-it as a `❓ **Q1**` card with a `gx-question` block, after the link to the mock. Give a mock or spec file the person must open as a `gx files url <path>` link, and never start an HTTP server. A question in plain
+it as a `❓ **Q1**` card with a `gx-question` block, after the link to the mock. Give a mock or spec file the person must open as a `gx files url <path>` link, and never start an HTTP server. Every UI mock follows [MOCK.md](../gx-prototype/MOCK.md). A question in plain
 prose gets no card, so the person sees only the chat and gx never marks the session Actionable.
 
 The `gx-question` block is YAML with a `type` key (`yes-no` or `options`), never JSON and never
@@ -293,6 +293,9 @@ Review the spec against the map it came from and its own template, not in the ab
   entry is a finding. An epic with no user-visible behavior may say so in one line instead.
 - Does each state of each stored mock have a Mock states line in `## Verification`? A missing line
   is a finding, like a story with no entry.
+- Does each stored mock follow `MOCK.md` (real tokens and fonts, no invented values), and does the
+  ticket's Resolution hold the comparison pairs (or the source-only note) and a clean helper result?
+  A mock that does not is a finding. Check the Resolution and the helper result, not the design session.
 - Does anything creep past the map's `## Out of scope` or the Destination's boundary?
 - The map's `## Forked out` lists topics now owned by other sessions. Each forked topic still in the
   spec (a user story, a decision or a Verification entry) is a finding.

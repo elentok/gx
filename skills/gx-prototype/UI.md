@@ -4,6 +4,8 @@ Generate **several radically different UI variations** on a single route, switch
 
 If the question is about logic/state rather than what something looks like, this is the wrong branch. Use [LOGIC.md](LOGIC.md).
 
+[MOCK.md](MOCK.md) is the guide for how a UI mock must look.
+
 ## When this is the right shape
 
 - "What should this page look like?"
@@ -55,6 +57,8 @@ Variants must be **structurally different**: different layout, different informa
 
 ### 3. Wire them together
 
+In gx, the route mounts the existing `PrototypeSwitcher`. Other projects create the switcher from `switcher-snippet.html`. In-app routes use `?variant=` in every project; `#v=` is only for a standalone file.
+
 Create a single switcher component on the route:
 
 ```tsx
@@ -76,7 +80,7 @@ For sub-shape B (new page): the throwaway route under `/prototype/<name>` mounts
 
 ### 4. Build the floating switcher
 
-A small fixed-position bar at the bottom-centre of the screen with three pieces:
+How the switcher looks and behaves is specified in [MOCK.md](MOCK.md); do not keep a second spec here. In short, it is a fixed bar at the bottom-centre with three pieces:
 
 - **Left arrow**: cycles to the previous variant (wraps around).
 - **Variant label**: shows the current variant key and, if the variant exports a name, that name too. e.g. `B (Sidebar layout)`.
@@ -103,6 +107,8 @@ Applies to a UI prototype that resolves a map ticket. The session that resolves 
 
 - Store the mock at `<root>/<map>/mocks/<NN>-<slug>.html`. `<root>` is `gx tickets root`; `<NN>-<slug>` is the prototype ticket. Never store it in the repo or the `-impl` branch.
 - Keep only the approved rows and states. No rejected variants.
+- Before storing, confirm the mock follows [MOCK.md](MOCK.md). When `[ -d testutil/gxfixture ]`, also run `go run ./testutil/mocklint/cmd <file>...` on the stored files. In other projects the design rubric check is the only enforcement.
+- Write the comparison pairs (or the source-only note) and the helper output into the ticket's Resolution. The one block the helper exempts is `<style data-mock-inlined>`.
 #### From an artifact
 
 Copy the approved rows and states from the claude.ai artifact's HTML into a new standalone file, unchanged in look. The artifact stays as it is.
@@ -126,8 +132,10 @@ Either way:
 ### 6. Capture the answer and clean up
 
 Once a variant has won, capture the answer (which variant and why), then capture the prototype the way the [SKILL](SKILL.md) describes. Fold the winner into the real code and move the rest onto the throwaway branch, not into main.
-- **Sub-shape A**: fold the winner into the existing page; drop the losing variants and the switcher from main.
-- **Sub-shape B**: promote the winning variant to a real route; drop the throwaway route and the switcher from main.
+- **In gx** the switcher stays and only the variants are dropped, in both sub-shapes. `PrototypeSwitcher` is shared UI.
+  - **Sub-shape A**: fold the winner into the existing page; drop the losing variants from main.
+  - **Sub-shape B**: promote the winning variant to a real route; drop the throwaway route and the losing variants from main.
+- **In other projects** the switcher is dropped too, unless the project keeps a permanent one.
 
 The full set of variants is the primary source, so it goes on the throwaway branch, not the bin, since variant components and the switcher left in the main branch rot fast and confuse the next reader.
 

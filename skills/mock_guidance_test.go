@@ -65,6 +65,27 @@ func TestMockGuideGenericOutsideGx(t *testing.T) {
 	}
 }
 
+func TestPrototypeStepsWireMockGuide(t *testing.T) {
+	checkAnchors(t, "gx-prototype/SKILL.md", "[MOCK.md](MOCK.md)")
+	checkAnchors(t, "gx-prototype/UI.md",
+		"[MOCK.md](MOCK.md)", "PrototypeSwitcher", "switcher-snippet.html",
+		"`?variant=` in every project", "`#v=` is only for a standalone file",
+		"[ -d testutil/gxfixture ]", "go run ./testutil/mocklint/cmd <file>...",
+		"comparison pairs", "source-only note", "`<style data-mock-inlined>`",
+		"the switcher stays and only the variants are dropped",
+		"the switcher is dropped too, unless the project keeps a permanent one",
+	)
+	ui := normalizeSpace(readFile(t, "gx-prototype/UI.md"))
+	if strings.Contains(ui, "and the switcher from main") {
+		t.Error("gx-prototype/UI.md step 6 still drops the switcher in gx")
+	}
+	checkAnchors(t, "gx-design/SKILL.md",
+		"UI mock follows [MOCK.md](../gx-prototype/MOCK.md)",
+		"each stored mock follow `MOCK.md`", "comparison pairs", "source-only note",
+		"clean helper result", "not the design session",
+	)
+}
+
 func TestNoGxMockSkill(t *testing.T) {
 	if _, err := os.Stat("gx-mock"); !os.IsNotExist(err) {
 		t.Errorf("skills/gx-mock must not exist (stat err: %v)", err)
