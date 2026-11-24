@@ -130,7 +130,6 @@ func (p *pushWeb) reason(t *testing.T, path, body string, cookie *http.Cookie) s
 type pushState struct {
 	PublicKey   string `json:"public_key"`
 	ContactSet  bool   `json:"contact_set"`
-	ServerOn    bool   `json:"server_on"`
 	Subscribed  bool   `json:"subscribed"`
 	Endpoint    string `json:"endpoint"`
 	LastFailure *struct {
@@ -376,14 +375,10 @@ func TestPushRoutes_TestPushOneAttemptAndFailureReason(t *testing.T) {
 // subscribe and renew keep working so the devices are never lost.
 func TestPushRoutes_SwitchOffRefusesTestAndKeepsSubscriptions(t *testing.T) {
 	t.Parallel()
-	on := startPushWeb(t, testEmail)
-	if st, _ := on.state(t, on.first); !st.ServerOn {
-		t.Fatalf("state %+v, want server_on while the switch is on", st)
-	}
 	p := startPushWeb(t, testEmail, servertest.WithChannel("push", false, nil))
 	st, _ := p.state(t, p.first)
-	if st.ServerOn || !st.ContactSet {
-		t.Fatalf("state %+v, want server_on false and the contact still set", st)
+	if !st.ContactSet {
+		t.Fatalf("state %+v, want the contact still set", st)
 	}
 	if r := p.reason(t, "/v1/web/push/subscribe", subBody(t, st.PublicKey, p.svcURL+"/push/x", ""), p.first); r != "" {
 		t.Fatalf("subscribe refused while off: %q", r)

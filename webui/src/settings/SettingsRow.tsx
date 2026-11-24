@@ -109,8 +109,19 @@ export function TextControl({
   )
 }
 
-export function BoolControl({ entry, draft, pending, locked, save }: ControlProps) {
-  const on = draft === "true"
+export function BoolControl({
+  entry,
+  on,
+  pending,
+  locked = false,
+  save,
+}: {
+  entry: SettingsEntry
+  on: boolean
+  pending: boolean
+  locked?: boolean
+  save: (value: unknown) => void
+}) {
   return (
     <chakra.button
       type="button"
@@ -283,7 +294,15 @@ const CONTROLS: Record<string, (p: ControlProps) => ReactNode> = {
   "string-list": ListControl,
   "number-list": ListControl,
   secret: SecretControl,
-  bool: BoolControl,
+  bool: (p) => (
+    <BoolControl
+      entry={p.entry}
+      on={p.draft === "true"}
+      pending={p.pending}
+      locked={p.locked}
+      save={p.save}
+    />
+  ),
   number: TextControl,
   duration: TextControl,
   size: TextControl,

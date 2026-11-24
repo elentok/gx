@@ -956,9 +956,10 @@ describe("Notifications section: channel switches and kind rows", () => {
       notification_kinds: kinds,
       notification_channels: CHANNELS.map(([id, label]) => ({
         id,
-        label,
+        label: over[`${id}.label`] ?? label,
         switch_key: `notification-channels.${id}.enabled`,
         list_key: `notification-channels.${id}.kinds`,
+        section: id === "web-toast" ? "" : label,
       })),
     } as never
   }
@@ -1090,6 +1091,15 @@ describe("Notifications section: channel switches and kind rows", () => {
     expect(block.getAttribute("data-mock-part")).toBe("channel-settings")
     const input = within(block).getByRole("textbox") as HTMLInputElement
     expect(input.disabled).toBe(false)
+  })
+
+  it("keeps dimming an off channel's section after the channel label is renamed", async () => {
+    const { findByTestId } = renderPage(
+      { "telegram.enabled": false, "telegram.label": "Telegram bot" },
+      undefined,
+      "/settings/s/telegram",
+    )
+    expect((await findByTestId("group-Telegram")).getAttribute("data-dimmed")).toBe("true")
   })
 
   it("does not dim the group block of a channel that is on", async () => {

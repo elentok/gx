@@ -85,7 +85,7 @@ Every channel can check every row. Only Long ticket is unchecked by default.
 39. As an upgrading user, I want a later change of the default list never to alter my install, so that my lists stay mine.
 40. As a person, I want a strip of five channel switches at the top of Settings, Notifications, so that I see every channel's state at once.
 41. As a person, I want one row per kind with five chips, on or off, so that I pick channels per kind in one place.
-42. As a person, I want a settings section per channel (Telegram, Slack, Push, Desktop) below the rows, so that credentials and options stay next to the channel.
+42. As a person, I want a settings section per channel (Telegram, Slack, Push, Desktop), each its own sidebar page under Notifications, so that credentials and options stay next to the channel.
 43. As a person, I want Web toast to have only its switch and no section, so that the page shows nothing empty.
 44. As a person, I want a channel that is off to show a grey switch and dimmed chips and settings that I can still edit, so that I can set it up before turning it on.
 45. As a person, I want the Push server-wide switch beside the contact email, so that the server's Push controls are in one place.
@@ -198,7 +198,7 @@ Every channel can check every row. Only Long ticket is unchecked by default.
 
 ### Settings page (web)
 
-- Settings, Notifications opens with `channel-switches`: five labelled switches (Desktop, Web toast, Telegram, Slack, Push). Below, `kind-rows`: 16 rows, each with the kind name, a short hint and five chips in the order Desktop, Web toast, Telegram, Slack, Push. A chip toggles one cell. Then `channel-settings`: a section each for Telegram, Slack, Push and Desktop. Web toast has none.
+- Settings, Notifications opens with `channel-switches`: five labelled switches (Desktop, Web toast, Telegram, Slack, Push). Below, `kind-rows`: 16 rows, each with the kind name, a short hint and five chips in the order Desktop, Web toast, Telegram, Slack, Push. A chip toggles one cell. `channel-settings`: the Telegram, Slack, Push and Desktop sections are their own sidebar pages under Notifications, not part of this page. Web toast has none.
 - A channel that is off shows a grey switch and dimmed chips and settings. They stay editable and the checked kinds are kept.
 - The Push section holds the server-wide switch beside the contact email. The helper line reads "Off here stops Push for every device. Device switches keep their state."
 - The Account Notifications page's device switch is disabled while the server switch is off and shows the line "Push is off for the whole server. Turn it on in Settings › Notifications › Push." The device's state is kept. Its "Send test push" is disabled too.

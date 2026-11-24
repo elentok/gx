@@ -36,6 +36,9 @@ type NotificationChannel struct {
 	Label     string `json:"label"`
 	SwitchKey string `json:"switch_key"`
 	ListKey   string `json:"list_key"`
+	// Section is the settings section page of the channel's own options.
+	// Empty for a channel with none (Web toast).
+	Section string `json:"section"`
 }
 
 // NotificationKind is one row of the notification catalog.

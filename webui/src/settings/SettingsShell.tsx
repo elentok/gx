@@ -17,6 +17,7 @@ import { useDevice } from "../useWide"
 import { Chip } from "../ui/chip/Chip"
 import { entryLabel, groupBySection, isChanged, searchEntries, treeSections } from "./settingsApi"
 import { PushDevicePanel } from "./NotificationsPage"
+import { channelOn } from "./channelOn"
 import { CountChip, Group, GroupBlock, SearchBox } from "./parts"
 import { DEV_FRONTEND_KEY } from "../dev"
 import { DevFrontendRow } from "./DevFrontendRow"
@@ -356,13 +357,6 @@ const rowBuilder =
   }
 
 const PUSH_SECTION = "Push"
-const PUSH_SWITCH_KEY = "notification-channels.push.enabled"
-
-function pushServerOn(sectionEntries: SettingsEntry[]): boolean {
-  const entry = sectionEntries.find((e) => e.key === PUSH_SWITCH_KEY)
-  if (!entry) return true
-  return (entry.set ? entry.value : entry.default) !== false
-}
 
 type SectionBodyProps = Pick<
   ShellProps,
@@ -442,13 +436,8 @@ function SectionRows({
     )
   }
   const groups = sectionGroups(categories, section, sectionEntries)
-  // A channel's section is named like the channel; its switch is read from the snapshot.
   const channel =
-    project === undefined ? notificationChannels?.find((c) => c.label === section) : undefined
-  const switchOff = (c: NotificationChannel) => {
-    const e = entries.find((x) => x.key === c.switch_key)
-    return (e?.set ? e.value : e?.default) === false
-  }
+    project === undefined ? notificationChannels?.find((c) => c.section === section) : undefined
   return (
     <>
       {project !== undefined && groups.some((g) => g.table) && (
@@ -475,7 +464,7 @@ function SectionRows({
             key={g.name}
             title={g.name}
             changed={g.entries.filter(isChanged).length}
-            dimmed={channel !== undefined && switchOff(channel)}
+            dimmed={channel !== undefined && !channelOn(entries, channel)}
             part={channel && "channel-settings"}
           >
             {g.table ? (
@@ -502,7 +491,7 @@ function SectionRows({
               )
             )}
             {project === undefined && section === PUSH_SECTION && (
-              <PushDevicePanel serverOn={pushServerOn(sectionEntries)} />
+              <PushDevicePanel serverOn={channel === undefined || channelOn(entries, channel)} />
             )}
           </GroupBlock>
         ),

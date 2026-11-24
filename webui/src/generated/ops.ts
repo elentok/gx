@@ -958,6 +958,11 @@ export interface NotificationChannel {
   label: string;
   switch_key: string;
   list_key: string;
+  /**
+   * Section is the settings section page of the channel's own options.
+   * Empty for a channel with none (Web toast).
+   */
+  section: string;
 }
 /**
  * NotificationKind is one row of the notification catalog.

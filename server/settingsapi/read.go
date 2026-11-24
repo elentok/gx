@@ -77,10 +77,19 @@ func (w *Writer) Read(t Target, pendingRestart []string) (ops.SettingsReadRespon
 				ID: c.ID, Label: c.Label,
 				SwitchKey: "notification-channels." + c.ID + ".enabled",
 				ListKey:   "notification-channels." + c.ID + ".kinds",
+				Section:   string(channelSections[c.ID]),
 			})
 		}
 	}
 	return resp, nil
+}
+
+// channelSections names each channel's own settings section. Web toast has none.
+var channelSections = map[string]registry.Section{
+	"desktop":  registry.SectionDesktop,
+	"telegram": registry.SectionTelegram,
+	"slack":    registry.SectionSlack,
+	"push":     registry.SectionPush,
 }
 
 // buildTree is the registry tree cut down to the categories, sections and

@@ -5,6 +5,7 @@ import { Chip } from "../ui/chip/Chip"
 import { useDevice } from "../useWide"
 import { useWrite } from "../useWrite"
 import { BoolControl, writeErrorText, type WriteSetting } from "./SettingsRow"
+import { channelOn, currentValue } from "./channelOn"
 import { setChange } from "./settingsApi"
 
 const card = {
@@ -13,10 +14,6 @@ const card = {
   borderRadius: "8px",
   bg: "surface.raised",
 } as const
-
-const noop = () => {}
-
-const currentValue = (e: SettingsEntry | undefined) => (e?.set ? e.value : e?.default)
 
 /** The Notifications section: one switch per channel, then one row per kind with a chip per channel. */
 export function NotificationsOverview({
@@ -34,7 +31,7 @@ export function NotificationsOverview({
   const write = useWrite({ toastRefusal: false })
   const [lastKey, setLastKey] = useState("")
   const byKey = new Map(entries.map((e) => [e.key, e]))
-  const enabled = (c: NotificationChannel) => currentValue(byKey.get(c.switch_key)) === true
+  const enabled = (c: NotificationChannel) => channelOn(entries, c)
   const listOf = (c: NotificationChannel): string[] => {
     const v = currentValue(byKey.get(c.list_key))
     return Array.isArray(v) ? v.map(String) : []
@@ -89,14 +86,9 @@ export function NotificationsOverview({
               {entry && (
                 <BoolControl
                   entry={{ ...entry, label: c.label }}
-                  draft={on ? "true" : "false"}
-                  dirty={false}
-                  invalid={false}
+                  on={on}
                   pending={write.pending}
-                  locked={false}
-                  setDraft={noop}
                   save={(value) => save(c.switch_key, value)}
-                  remove={noop}
                 />
               )}
             </Box>

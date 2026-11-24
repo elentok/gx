@@ -75,7 +75,6 @@ type stateFailure struct {
 type stateResult struct {
 	PublicKey   string        `json:"public_key"`
 	ContactSet  bool          `json:"contact_set"`
-	ServerOn    bool          `json:"server_on"`
 	Subscribed  bool          `json:"subscribed"`
 	Endpoint    string        `json:"endpoint"`
 	LastFailure *stateFailure `json:"last_failure,omitempty"`
@@ -235,7 +234,7 @@ func (s *Service) state(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me := webauth.LoginIDFrom(r.Context())
-	out := stateResult{PublicKey: s.PublicKey(), ContactSet: s.contactSet(), ServerOn: s.switchOn()}
+	out := stateResult{PublicKey: s.PublicKey(), ContactSet: s.contactSet()}
 	if sub, ok := s.Store.PushSubscriptionOf(me); ok {
 		out.Subscribed, out.Endpoint = true, sub.Endpoint
 	}

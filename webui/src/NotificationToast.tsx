@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { useConnectionContext } from "./connection"
+import { notificationToastEvent, useConnectionContext } from "./connection"
 import { routeOpener } from "./pwa/notificationTap"
 import { showToast } from "./ui/toaster"
 
@@ -12,13 +12,13 @@ export function NotificationToast() {
   useEffect(() => {
     const off = conn.onEvent((_address, type, data) => {
       if (type !== EVENT_TYPE) return
-      const { title, body, path } = data
-      if (typeof title !== "string" || title === "") return
+      const { title, body, path } = notificationToastEvent(data)
+      if (!title) return
       const open = routeOpener(path)
       showToast({
         type: "info",
         title,
-        description: typeof body === "string" ? body : undefined,
+        description: body,
         actions: open && [{ label: "Open", onClick: open }],
       })
     })

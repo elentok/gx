@@ -101,7 +101,7 @@ export const GroupBlock = ({
       </Text>
       {changed > 0 && <CountChip n={changed} testId={`group-count-${title}`} />}
     </Box>
-    <Box opacity={dimmed ? 0.5 : 1}>{children}</Box>
+    {dimmed ? <Box opacity={0.5}>{children}</Box> : children}
   </Box>
 )
 

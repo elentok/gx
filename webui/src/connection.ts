@@ -78,6 +78,18 @@ function eventName(block: string): string {
   return /^event: ?(.*)$/m.exec(block)?.[1] ?? ""
 }
 
+/** The body of a `notification-toast` event. A field of another type reads as absent. */
+export interface NotificationToastEvent {
+  title?: string
+  body?: string
+  path?: string
+}
+
+export function notificationToastEvent(data: Record<string, unknown>): NotificationToastEvent {
+  const str = (v: unknown) => (typeof v === "string" ? v : undefined)
+  return { title: str(data.title), body: str(data.body), path: str(data.path) }
+}
+
 /** `data` is the parsed event body; most listeners need only the address and type. */
 export type EventListener = (
   address: string | undefined,
