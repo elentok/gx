@@ -1,6 +1,5 @@
 import { Text } from "@chakra-ui/react"
 import { useEffect, useRef } from "react"
-import { useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail"
 import { useDetailReady } from "../useReady"
@@ -24,8 +23,7 @@ import type { FetchScreen } from "./screen"
 import { SectionOnHold, type EpicListRow } from "../generated/server"
 import { slugOf } from "../slug"
 import { useWide } from "../useWide"
-import { useCardActions } from "../workspaces/itemActions"
-import { useWorkspaces } from "../workspaces/useActiveWorkspace"
+import { DesignPageMenu } from "./DesignPageMenu"
 import { designSession, liveSessions } from "./view"
 
 /** The injected fetchers and actions the Design page talks to the server through. */
@@ -57,7 +55,6 @@ function DesignBody({
   epics: EpicListRow[]
   startFailure?: string
 }) {
-  const navigate = useNavigate()
   const conn = useConnectionContext()
   const { detail, source, refetch } = useEpicDetail(address, conn, deps.fetchDetail)
   // Not-found keeps the loader here, so it is not an empty outcome.
@@ -79,8 +76,6 @@ function DesignBody({
     seenLiveKey.current = liveKey
     refetch()
   }, [liveKey, refetch])
-  const { workspaces } = useWorkspaces(conn)
-  const itemActions = useCardActions(card, workspaces)
   return (
     <SteppedPage
       address={address}
@@ -122,13 +117,16 @@ function DesignBody({
       }
       logTop={<MapImageStrip address={address} fetcher={deps.fetchMapImages} />}
       ticketRows={model && <Tickets rows={model.tickets} />}
-      designMenu={{
-        itemGroups: itemActions.groups,
-        deletable: detail?.deletable,
-        remove: deps.remove,
-        onDeleted: () => navigate("/epics"),
-        onOpenEpic: () => navigate(`/e/${address}`),
-      }}
+      designMenu={(ctx) => (
+        <DesignPageMenu
+          address={address}
+          name={name}
+          card={card}
+          deletable={detail?.deletable}
+          writers={deps}
+          {...ctx}
+        />
+      )}
     />
   )
 }

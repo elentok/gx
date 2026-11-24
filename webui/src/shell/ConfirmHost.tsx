@@ -18,7 +18,7 @@ import { Modal } from "../ui/modal/Modal"
 import { showToast } from "../ui/toaster"
 import { useWide } from "../useWide"
 import { refusalText, WriteError } from "../useWrite"
-import { focusMainHeadingAfterLanding } from "./focusMainHeading"
+import { focusMainHeadingAfterLanding, locationKey } from "./focusMainHeading"
 
 /** The one primary color for every confirm that is not a Danger-group action. */
 const PRIMARY_TONE = "running"
@@ -69,7 +69,7 @@ function Confirm({ request }: { request: ConfirmRequest }) {
 
   const close = (run: boolean) => {
     if (done.current || running.current) return
-    const from = window.location.pathname
+    const from = locationKey()
     const finish = () => {
       done.current = true
       // A sync onConfirm may have opened the next confirm; only close our own.

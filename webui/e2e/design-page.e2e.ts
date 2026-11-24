@@ -44,6 +44,16 @@ test.describe("72. Design actions menu", () => {
     // Level with the title row, not below it: the Progress sidebar starts under the header.
     const title = (await page.getByRole("heading", { level: 1 }).first().boundingBox())!
     expect(trigger.y).toBeLessThan(title.y + title.height)
+    // The last child of the header actions, right of the status ring.
+    const slot = page.getByTestId("page-header-actions")
+    await expect(slot).toBeVisible()
+    expect(
+      await slot.evaluate(
+        (el) => el.lastElementChild?.querySelector("button[aria-label='More actions']") !== null,
+      ),
+    ).toBe(true)
+    const ring = (await slot.locator("[data-kind][data-tone]").first().boundingBox())!
+    expect(ring.x + ring.width).toBeLessThanOrEqual(trigger.x)
 
     // Menu button states: hover fills, Tab shows an outline, open shows a border.
     const rest = await moreActions(page).evaluate((el) => getComputedStyle(el).backgroundColor)
@@ -121,12 +131,33 @@ test.describe("72. Design actions menu", () => {
     const before = await sessionRows(fixture, "design-epic")
     expect(before.filter((r) => /exited/.test(r))).toHaveLength(0)
     await menu.getByRole("menuitem", nav("Stop design-epic")).click()
-    await expect
-      .poll(
-        async () =>
-          (await sessionRows(fixture, "design-epic")).filter((r) => /exited/.test(r)).length,
-      )
-      .toBe(1)
+    // The menu closes and the shared Stop confirm names that session.
+    const confirm = page.getByRole("alertdialog")
+    await expect(menu).toHaveCount(0)
+    await expect(confirm).toContainText("Stop design-epic")
+    // The shown "Claude Code" session's row does not name the epic, so count every exited row.
+    const exitedCount = async () =>
+      (await fixture.cli("agents", "list")).split("\n").filter((r) => /exited/.test(r)).length
+    expect(await exitedCount()).toBe(0)
+    await confirm.getByRole("button", { name: /^Stop/ }).click()
+    await expect.poll(exitedCount).toBe(1)
+
+    // The page's own Stop ends the shown live session after a confirm: Cancel is focused, Esc keeps it.
+    await moreActions(page).click()
+    await menu.getByRole("menuitem", { name: "Stop", exact: true }).click()
+    await expect(confirm.getByRole("button", { name: /^Cancel/ })).toBeFocused()
+    await page.keyboard.press("Escape")
+    await expect(confirm).toHaveCount(0)
+    expect(await exitedCount()).toBe(1)
+    await moreActions(page).click()
+    await menu.getByRole("menuitem", { name: "Stop", exact: true }).click()
+    await confirm.getByRole("button", { name: /^Stop/ }).click()
+    await expect.poll(exitedCount).toBe(2)
+    // The Design stays, and with the shown session exited the page offers no Stop.
+    await expect(moreActions(page)).toBeVisible()
+    await moreActions(page).click()
+    await expect(menu.getByRole("menuitem", { name: "Open design epic" })).toBeVisible()
+    await expect(menu.getByRole("menuitem", { name: "Stop", exact: true })).toHaveCount(0)
   })
 })
 
@@ -139,12 +170,14 @@ test.describe("72b. Design menu before Start", () => {
     await openDesign(page)
     await moreActions(page).click()
     const menu = actionsMenu(page)
-    await expect(menu.getByRole("menuitem").first()).toHaveText("Open design epic ↗")
-    await expect(menu).toContainText("Move to workspace")
-    await expect(menu).toContainText("Archive")
-    await expect(menu.getByRole("menuitem", nav("Move to workspace"))).toBeVisible()
-    await expect(menu.getByRole("menuitem", { name: "Hold", exact: true })).toBeVisible()
-    await expect(menu.getByRole("menuitem", nav("Copy ID"))).toHaveCount(1)
+    await expect(menu.getByRole("menuitem").first()).toHaveText("Open design epic")
+    await expect(menu.getByRole("menuitem")).toHaveText([
+      "Open design epic",
+      /^Move to workspace/,
+      "Hold",
+      "Archive",
+      "Copy ID",
+    ])
   })
 })
 

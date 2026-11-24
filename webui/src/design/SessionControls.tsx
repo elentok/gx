@@ -1,5 +1,4 @@
 import { Box, Spinner, Text } from "@chakra-ui/react"
-import { useState } from "react"
 import { copyText } from "../clipboard"
 import { useConnectionContext } from "../connection"
 import type { DesignOpenRequest, SessionInfo } from "../generated/server"
@@ -10,12 +9,10 @@ import { useWide } from "../useWide"
 import { agentDetails } from "./agentDetails"
 import { useWrite } from "../useWrite"
 import {
-  postDeleteDesign,
   postOpenDesign,
   postStopSession,
   rowToken,
   stateToken,
-  type DeleteDesign,
   type OpenFlow,
   type StopSession,
 } from "./open"
@@ -87,12 +84,14 @@ export function startNew(
 }
 
 /** The live sessions: pick one to show it, or stop one that is not shown. */
-function liveSessionEntries(
+export function liveSessionEntries(
   live: SessionInfo[],
   shown: SessionInfo,
   pending: boolean,
   onSelect: (id: string) => void,
   onStop: (s: SessionInfo) => void,
+  /** The Design page's Stop opens a confirm, so its menu closes; Triage's runs at once and stays open. */
+  closeOnStop = false,
 ): MenuEntry[] {
   const heading: MenuEntry = {
     kind: "content",
@@ -133,7 +132,7 @@ function liveSessionEntries(
                 value: `stop-${s.id}`,
                 label: `Stop ${name}`,
                 danger: true,
-                closeOnSelect: false,
+                closeOnSelect: closeOnStop,
                 disabled: pending,
                 onSelect: () => onStop(s),
               },
@@ -143,47 +142,17 @@ function liveSessionEntries(
   ]
 }
 
-/** The in-place confirm "Delete design" turns into before it deletes. */
-function ConfirmDelete({
-  pending,
-  onKeep,
-  onDelete,
-}: {
-  pending: boolean
-  onKeep: () => void
-  onDelete: () => void
-}) {
-  return (
-    <Box display="flex" alignItems="center" gap="2" px="3" py="1.5">
-      <Text fontSize="sm">Delete this design?</Text>
-      <Button size="sm" emphasis="secondary" disabled={pending} onClick={onKeep}>
-        Keep
-      </Button>
-      <Button size="sm" tone="paused" disabled={pending} onClick={onDelete}>
-        {pending && <Spinner size="sm" />}
-        Delete
-      </Button>
-    </Box>
-  )
-}
-
 /**
- * The header's "⋯" menu: the Agent block, New session, the live sessions (with 2 or more), Copy design ID,
- * and Delete design while it can run. It always renders, since Copy design ID always applies.
+ * The Triage page's "⋯" menu: the Agent block, New session, the live sessions (with 2 or more), Copy triage ID
+ * and the flow's own items. The Design page reads the registry instead (`DesignPageMenu`).
  */
 export function DesignActionsMenu({
   address,
   shown,
   live,
-  deletable,
   onSelect,
-  onDeleted,
   open = postOpenDesign,
   stop = postStopSession,
-  remove = postDeleteDesign,
-  itemGroups = [],
-  onOpenEpic,
-  designItems = true,
   extraItems = [],
   onOpenChange,
 }: {
@@ -192,33 +161,19 @@ export function DesignActionsMenu({
   address: string
   /** Items another flow adds beside Copy ID, such as the Triage's Abandon. */
   extraItems?: MenuEntry[]
-  /** Delete, Hold, the epic link and the model row belong to a Design only; another flow's menu leaves them out. */
-  designItems?: boolean
-  /** The Move, Remove and Hold sections. Their dialogs belong to the page, so they outlive this menu. */
-  itemGroups?: MenuEntry[][]
-  /** Goes to the Design's epic page; the first menu item. */
-  onOpenEpic?: () => void
   shown?: SessionInfo
-  /** Live design sessions, newest first. */
+  /** Live sessions, newest first. */
   live: SessionInfo[]
-  /** The map has no Destination and no tickets yet, so it can still be deleted. */
-  deletable?: boolean
   onSelect: (id: string) => void
-  onDeleted: () => void
   open?: OpenFlow
   stop?: StopSession
-  remove?: DeleteDesign
 }) {
   const { run, pending } = useDesignWrite()
-  const [confirming, setConfirming] = useState(false)
   const wide = useWide()
-  const canDelete = designItems && deletable && live.length === 0
 
   const groups: MenuEntry[][] = []
   const agent = shown && agentSection(shown, wide)
   if (agent) groups.push(agent)
-  if (designItems && onOpenEpic)
-    groups.push([{ value: "open-design-epic", label: "Open design epic ↗", onSelect: onOpenEpic }])
   const sessionItems: MenuEntry[] = []
   if (shown)
     sessionItems.push({
@@ -238,49 +193,21 @@ export function DesignActionsMenu({
       ),
     )
   if (sessionItems.length > 0) groups.push(sessionItems)
-  // A Design's Copy ID comes from the registry (itemGroups); the other flows keep their own.
-  const copySection: MenuEntry[] = designItems
-    ? []
-    : [
-        {
-          value: "copy-design-id",
-          label: "Copy triage ID",
-          hint: address,
-          inlineHint: true,
-          onSelect: () => void copyText(address, null),
-        },
-      ]
-  copySection.push(...extraItems)
-  if (canDelete && !confirming)
-    copySection.push({
-      value: "delete-design",
-      label: "Delete design",
-      danger: true,
-      closeOnSelect: false,
-      onSelect: () => setConfirming(true),
-    })
-  groups.push(copySection)
-  if (designItems) groups.push(...itemGroups)
-  if (canDelete && confirming)
-    groups.push([
-      {
-        kind: "content",
-        value: "confirm-delete",
-        content: (
-          <ConfirmDelete
-            pending={pending}
-            onKeep={() => setConfirming(false)}
-            onDelete={() => run(() => remove({ epic: address }), { onDone: onDeleted })}
-          />
-        ),
-      },
-    ])
+  groups.push([
+    {
+      value: "copy-design-id",
+      label: "Copy triage ID",
+      hint: address,
+      inlineHint: true,
+      onSelect: () => void copyText(address, null),
+    },
+    ...extraItems,
+  ])
   return (
     <GxMenu
       trigger={<MoreActionsButton />}
       items={menuGroups(groups)}
       onOpenChange={onOpenChange}
-      onClosed={() => setConfirming(false)}
     />
   )
 }

@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
+import { closeConfirm } from "../actions/confirmRequest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import type {
   EpicDetail,
@@ -15,7 +16,11 @@ import { appRoutes, type RouteFetchers } from "../routes"
 import { roundCards } from "./roundFixture"
 import { renderThemed } from "../ui/render"
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  // A refused confirm stays open by design; the store outlives the render.
+  closeConfirm()
+})
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString()
 
@@ -198,8 +203,8 @@ test("with no session the menu has no Agent block, and Open design epic is its f
   const router = render([map("a")], [])
   await openMenu()
   expect(screen.queryByText("Agent")).toBeNull()
-  expect((await screen.findAllByRole("menuitem"))[0].textContent).toBe("Open design epic ↗")
-  fireEvent.click(screen.getByRole("menuitem", { name: "Open design epic ↗" }))
+  expect((await screen.findAllByRole("menuitem"))[0].textContent).toBe("Open design epic")
+  fireEvent.click(screen.getByRole("menuitem", { name: "Open design epic" }))
   await waitFor(() => expect(router.state.location.pathname).toBe("/e/gx:a"))
 })
 
@@ -225,7 +230,11 @@ test("the title row holds the Design name and More actions, with no picker or st
   expect(title.textContent).toBe("a")
   expect(within(title).queryByRole("button")).toBeNull()
   expect(screen.queryByRole("link", { name: /^←/ })).toBeNull()
-  expect(screen.getByRole("button", { name: "More actions" })).toBeTruthy()
+  const more = screen.getByRole("button", { name: "More actions" })
+  // The ⋯ is the header slot's last child, not a part of the session strip.
+  const slot = screen.getByTestId("page-header-actions")
+  expect(slot.lastElementChild?.contains(more)).toBe(true)
+  expect(within(slot).getAllByRole("button", { name: "More actions" })).toHaveLength(1)
   expect(screen.queryByRole("button", { name: "New session" })).toBeNull()
   expect(screen.queryByRole("button", { name: /live/ })).toBeNull()
   expect(screen.queryByLabelText("Filter Designs")).toBeNull()
@@ -589,23 +598,42 @@ test("the detail is fetched once on mount and once more when a session starts or
   await waitFor(() => expect(epic).toHaveBeenCalledTimes(3))
 })
 
-test("Keep returns with Delete design still listed", async () => {
-  render([map("a")], [], "/d/gx:a", deletable)
+const openDeleteConfirm = async () => {
   await openMenu()
   fireEvent.click(await screen.findByRole("menuitem", { name: "Delete design" }))
-  expect(await screen.findByText("Delete this design?")).toBeTruthy()
-  fireEvent.click(screen.getByRole("button", { name: "Keep" }))
+  return screen.findByRole("alertdialog")
+}
+
+test("Cancel returns with Delete design still listed", async () => {
+  const deleteDesign = vi.fn(async () => ({}))
+  render([map("a")], [], "/d/gx:a", deletable, { deleteDesign })
+  const dialog = await openDeleteConfirm()
+  expect(screen.queryByText("Delete this design?")).toBeNull()
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Cancel/ }))
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+  expect(deleteDesign).not.toHaveBeenCalled()
+  await openMenu()
   expect(await screen.findByRole("menuitem", { name: "Delete design" })).toBeTruthy()
 })
 
 test("confirming Delete calls the route and goes to the Epics page", async () => {
   const deleteDesign = vi.fn(async () => ({}))
   const router = render([map("a")], [], "/d/gx:a", deletable, { deleteDesign })
-  await openMenu()
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete design" }))
-  fireEvent.click(await screen.findByRole("button", { name: "Delete" }))
+  const dialog = await openDeleteConfirm()
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Delete design/ }))
   await waitFor(() => expect(router.state.location.pathname).toBe("/epics"))
   expect(deleteDesign).toHaveBeenCalledWith({ epic: "gx:a" })
+  // The memory router leaves the window's URL alone; the app's hash router moves it.
+  window.location.hash = "/epics"
+  try {
+    await waitFor(() => {
+      const heading = document.querySelector("[data-main-heading]")
+      expect(heading).toBeTruthy()
+      expect(document.activeElement).toBe(heading)
+    })
+  } finally {
+    window.location.hash = ""
+  }
 })
 
 const chatFetcher: RouteFetchers = {
@@ -668,9 +696,8 @@ test("a Design with no map images shows no strip", async () => {
 test("a refused delete shows the reason and keeps the page", async () => {
   const deleteDesign = vi.fn(async () => ({ refused: true, message: "a session is running" }))
   const router = render([map("a")], [], "/d/gx:a", deletable, { deleteDesign })
-  await openMenu()
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete design" }))
-  fireEvent.click(await screen.findByRole("button", { name: "Delete" }))
+  const dialog = await openDeleteConfirm()
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Delete design/ }))
   expect(await screen.findByText("a session is running")).toBeTruthy()
   expect(router.state.location.pathname).toBe("/d/gx:a")
 })

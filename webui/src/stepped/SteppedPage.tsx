@@ -1,10 +1,11 @@
 import { Box, chakra } from "@chakra-ui/react"
-import { useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
+import { currentConfirm, useConfirmRequest } from "../actions/confirmRequest"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { DesignChat } from "../design/ChatLog"
 import { hasChat, roundKeyOf, roundOf, useSessionChat, type FetchChat } from "../design/chat"
 import { useFocusReport, type PostFocus } from "../design/focus"
-import type { DeleteDesign, OpenFlow, ResumeSession, StopSession } from "../design/open"
+import type { OpenFlow, ResumeSession, StopSession } from "../design/open"
 import type { PostAnswer, PostPrompt } from "../design/prompt"
 import type { FetchScreen } from "../design/screen"
 import { DesignActionsMenu, Failure, StartDesignButton } from "../design/SessionControls"
@@ -28,16 +29,13 @@ export interface SteppedActions {
   focus?: PostFocus
 }
 
-/** The Design-only menu items (Delete, Hold, workspace Move), given only by the Design page. */
-export interface DesignMenu {
-  /** The Move, Remove and Hold sections; the page renders the dialogs they open. */
-  itemGroups?: MenuEntry[][]
-  /** The map has no Destination and no tickets yet, so it can still be deleted. */
-  deletable?: boolean
-  remove?: DeleteDesign
-  onDeleted: () => void
-  onOpenEpic: () => void
-}
+/** The Design page's own ⋯ menu (registry actions), given only by the Design page; Triage keeps `DesignActionsMenu`. */
+export type DesignMenu = (ctx: {
+  shown?: SessionInfo
+  live: SessionInfo[]
+  onSelect: (id: string) => void
+  onOpenChange: (open: boolean) => void
+}) => ReactNode
 
 export interface SteppedPageProps {
   /** The flow's key: a Design's map address, a Triage's project. */
@@ -83,7 +81,7 @@ export interface SteppedPageProps {
   footer?: ReactNode
 }
 
-// The right of the title row: the failed-start message, the first Start button, and the menu.
+// The right of the title row, left of the menu: the failed-start message and the first Start button.
 function SessionStrip({
   address,
   session,
@@ -91,14 +89,11 @@ function SessionStrip({
   startFailure,
   startLabel,
   headerButton,
-  menu,
 }: Pick<
   SteppedPageProps,
   "address" | "actions" | "startFailure" | "startLabel" | "headerButton"
 > & {
   session?: SessionInfo
-  /** The ⋯ menu; absent while it sits in the tabs row instead. */
-  menu?: ReactNode
 }) {
   // The reason is for the failed start only: a live session means a retry worked.
   const reason = !session || session.status.state === "exited" ? startFailure : undefined
@@ -110,7 +105,6 @@ function SessionStrip({
         : !session && (
             <StartDesignButton address={address} open={actions.open} label={startLabel} />
           )}
-      {menu}
     </Box>
   )
 }
@@ -154,7 +148,17 @@ export function SteppedPage({
   const keyboardOpen = useKeyboardOpen()
   // Opening the tabs-row menu moves focus off the field and closes the keyboard; the layout stays until the menu closes.
   const [menuHeld, setMenuHeld] = useState(false)
-  const compact = !sideColumn && (keyboardOpen || menuHeld)
+  // A confirm a menu pick opened is anchored on the tabs-row ⋯, which the layout must keep until it closes.
+  const [confirmHeld, setConfirmHeld] = useState(false)
+  const confirming = useConfirmRequest()
+  useEffect(() => {
+    if (!confirming) setConfirmHeld(false)
+  }, [confirming])
+  const holdMenu = (open: boolean) => {
+    setMenuHeld(open)
+    if (!open && currentConfirm()) setConfirmHeld(true)
+  }
+  const compact = !sideColumn && (keyboardOpen || menuHeld || confirmHeld)
   const stepsInline = wide && sideColumn
   // Switching shows an older live session; once it is gone the newest drives the page again.
   const session = live.find((s) => s.id === selected) ?? current
@@ -170,24 +174,21 @@ export function SteppedPage({
   const hasRound = chatty && roundOf(chat).length > 0
   const questions = hasRound && (toggle?.key === viewKey ? toggle.on : true)
   useFocusReport(conn, session?.id, connState.streams, actions.focus)
-  const menu = (onOpenChange?: (open: boolean) => void) => (
-    <DesignActionsMenu
-      address={address}
-      shown={session}
-      live={live}
-      designItems={!!designMenu}
-      extraItems={menuItems}
-      deletable={designMenu?.deletable}
-      itemGroups={designMenu?.itemGroups}
-      onOpenEpic={designMenu?.onOpenEpic}
-      onSelect={setSelected}
-      onDeleted={designMenu?.onDeleted ?? (() => {})}
-      open={actions.open}
-      stop={actions.stop}
-      remove={designMenu?.remove}
-      onOpenChange={onOpenChange}
-    />
-  )
+  const menu = (onOpenChange: (open: boolean) => void = () => {}) =>
+    designMenu ? (
+      designMenu({ shown: session, live, onSelect: setSelected, onOpenChange })
+    ) : (
+      <DesignActionsMenu
+        address={address}
+        shown={session}
+        live={live}
+        extraItems={menuItems}
+        onSelect={setSelected}
+        open={actions.open}
+        stop={actions.stop}
+        onOpenChange={onOpenChange}
+      />
+    )
   return (
     <>
       {stepsOpen && model && (
@@ -252,8 +253,8 @@ export function SteppedPage({
                 startFailure={startFailure}
                 startLabel={startLabel}
                 headerButton={headerButton}
-                menu={!compact && menu()}
               />
+              {!compact && menu()}
             </>
           }
         />
@@ -292,7 +293,7 @@ export function SteppedPage({
             working={working(session)}
             logTop={compact ? undefined : logTop}
             logTail={logTail}
-            tabsMenu={compact && hasRound ? menu(setMenuHeld) : undefined}
+            tabsMenu={compact && hasRound ? menu(holdMenu) : undefined}
             questions={questions}
             onQuestions={(on) => setToggle({ key: viewKey, on })}
             actions={{

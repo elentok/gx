@@ -394,9 +394,9 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
       )
     if (!isLive) return open()
     ask(decl, e, {
-      confirmLabel: "Stop and start new",
-      title: "New session",
-      body: { lines: ["Stop the current session and start a new one?"] },
+      confirmLabel: "New session",
+      title: `New session of ${e.name}`,
+      body: { lines: ["A new session stops the current session."] },
       onConfirm: open,
     })
   }
@@ -479,7 +479,9 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
           confirmLabel: "Delete design",
           title: `Delete ${e.name}`,
           body: { lines: [`Delete ${e.name}? Its map and sessions are removed.`] },
-          onConfirm: () => void run(() => w.deleteDesign({ epic: e.key })),
+          // The confirm stays open while the delete runs, and a refusal shows inside it.
+          removesOpenPage: e.surface === "page",
+          onConfirm: () => w.deleteDesign({ epic: e.key }),
         })
       case "queue":
         return epicWrite(w.queue, e)

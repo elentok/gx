@@ -345,11 +345,27 @@ test("24. Phone, Design page", async ({ page, start }) => {
   await expect(view).toBeVisible()
   await expect(more).toBeVisible()
   await expect(view.locator("xpath=../..").getByRole("button", nav("More actions"))).toBeVisible()
+  // The tabs-row ⋯ is at the right end of that row.
+  const tabsRow = view.locator("xpath=../..")
+  const tabsBox = (await tabsRow.boundingBox())!
+  const tabsMore = (await more.boundingBox())!
+  expect(tabsMore.x + tabsMore.width).toBeGreaterThan(tabsBox.x + tabsBox.width - 24)
   await setViewport(0)
   await box.blur()
   await expect(title).toBeVisible()
   await expect(topBar).toBeVisible()
   await expect(more).toHaveCount(1)
+  // The title-row ⋯ is the last child of the header actions and the right-most item of the row.
+  const slot = page.getByTestId("page-header-actions")
+  await expect(slot).toBeVisible()
+  expect(
+    await slot.evaluate(
+      (el) => !!el.lastElementChild?.querySelector("button[aria-label='More actions']"),
+    ),
+  ).toBe(true)
+  const slotBox = (await slot.boundingBox())!
+  const moreBox = (await more.boundingBox())!
+  expect(moreBox.x + moreBox.width).toBeGreaterThanOrEqual(slotBox.x + slotBox.width - 1)
 
   // The ⋯ menu holds Effort, Tier and the link to the design epic; the model is in the footer, without effort.
   await more.click()

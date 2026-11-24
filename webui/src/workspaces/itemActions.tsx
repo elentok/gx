@@ -206,7 +206,13 @@ export function useEntityActions(
   for (const a of actions) {
     if (hide.has(a.id) || (a.id === "move" && workspaces.length === 0)) continue
     // A design or epic row offers no Stop; its sessions stop through Hold and Archive.
-    if (a.id === "stop" && (entity?.kind === "design" || entity?.kind === "epic")) continue
+    // The Design page's Stop ends the session it shows.
+    if (
+      a.id === "stop" &&
+      entity?.surface !== "page" &&
+      (entity?.kind === "design" || entity?.kind === "epic")
+    )
+      continue
     if (a.group !== last) groups.push([])
     last = a.group
     groups[groups.length - 1]!.push(entryOf(a))
