@@ -54,6 +54,14 @@ function renderTicket(current: () => TicketDetail, connection: Connection = conn
 
 const card = () => screen.queryByRole("group", { name: "Action card" })
 
+// The footer's own buttons: the confirm popover and the page ⋯ menu carry the same names.
+const footer = () => within(screen.getByRole("form", { name: "Recovery actions" }))
+const footerButton = async (name: string) =>
+  within(await screen.findByRole("form", { name: "Recovery actions" })).getByRole("button", {
+    name,
+  })
+const popover = (name: string | RegExp) => screen.getByRole("alertdialog", { name })
+
 test("an open question shows the card first under the header, with its chat and rounds", async () => {
   renderTicket(() => base)
   const c = await screen.findByRole("group", { name: "Action card" })
@@ -231,7 +239,7 @@ test("Merge again posts to the merge route", async () => {
 
 test("with vi mode on the Start over reason is an editor, not a textarea", async () => {
   renderTicket(() => repair(["retry", "start-over"]), viConnection())
-  fireEvent.click(await screen.findByRole("button", { name: "Start over" }))
+  fireEvent.click(await footerButton("Start over"))
   await expectViEditor("Reason")
 })
 
@@ -239,15 +247,16 @@ test("Start over asks for a reason first and never sends branch deletion", async
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: {} })))
   stubFetch(fetchMock)
   renderTicket(() => repair(["retry", "start-over"]))
-  fireEvent.click(await screen.findByRole("button", { name: "Start over" }))
-  const dialog = screen.getByRole("dialog", { name: "Start over" })
+  fireEvent.click(await footerButton("Start over"))
+  const dialog = popover("Start over")
   expect(fetchMock).not.toHaveBeenCalled()
+  expect(within(dialog).getByText(info["start-over"].tooltip)).toBeTruthy()
   expect(within(dialog).getByText(/discards the branch's commits.*backup branch/i)).toBeTruthy()
   const reason = within(dialog).getByLabelText("Reason")
   expect(reason.getAttribute("autocomplete")).toBe("off")
   expect(reason.getAttribute("name")).toBe("recovery-reason")
   fireEvent.change(reason, { target: { value: "wrong approach" } })
-  fireEvent.click(within(dialog).getByRole("button", { name: "Start over" }))
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Start over/ }))
   await waitFor(() => expect(fetchMock).toHaveBeenCalled())
   const [url, body] = posted(fetchMock)[0]!
   expect(url).toBe("/v1/tickets/start-over")
@@ -259,29 +268,58 @@ test("Start over closes on Escape and drops the reason; Cancel closes; the field
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: {} })))
   stubFetch(fetchMock)
   renderTicket(() => repair(["retry", "start-over"]))
-  fireEvent.click(await screen.findByRole("button", { name: "Start over" }))
-  let dialog = screen.getByRole("dialog", { name: "Start over" })
+  fireEvent.click(await footerButton("Start over"))
+  let dialog = popover("Start over")
   expect(
     within(dialog).getByRole("button", { name: "Open the note in a large editor" }),
   ).toBeTruthy()
   fireEvent.change(within(dialog).getByLabelText("Reason"), { target: { value: "typed" } })
   fireEvent.keyDown(within(dialog).getByLabelText("Reason"), { key: "Escape" })
-  expect(screen.queryByRole("dialog")).toBeNull()
-  fireEvent.click(screen.getByRole("button", { name: "Start over" }))
-  dialog = screen.getByRole("dialog", { name: "Start over" })
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+  fireEvent.click(await footerButton("Start over"))
+  dialog = popover("Start over")
   expect((within(dialog).getByLabelText("Reason") as HTMLTextAreaElement).value).toBe("")
-  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }))
-  expect(screen.queryByRole("dialog")).toBeNull()
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Cancel/ }))
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
   expect(fetchMock).not.toHaveBeenCalled()
+})
+
+test("typing y and n in the Start over reason confirms nothing; Cmd+Enter confirms with a reason only", async () => {
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: {} })))
+  stubFetch(fetchMock)
+  renderTicket(() => repair(["retry", "start-over"]))
+  fireEvent.click(await footerButton("Start over"))
+  const field = within(popover("Start over")).getByLabelText("Reason") as HTMLTextAreaElement
+  fireEvent.keyDown(field, { key: "y" })
+  fireEvent.keyDown(field, { key: "n" })
+  fireEvent.keyDown(field, { key: "Enter", metaKey: true })
+  expect(fetchMock).not.toHaveBeenCalled()
+  expect(screen.getByRole("alertdialog", { name: "Start over" })).toBeTruthy()
+  fireEvent.change(field, { target: { value: "yes no" } })
+  fireEvent.keyDown(field, { key: "Enter", metaKey: true })
+  await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+  expect(posted(fetchMock)[0]![1]).toMatchObject({ reason: "yes no" })
+})
+
+test("the footer and the popover call Start over by the registry label, not action_info.label", async () => {
+  renderTicket(() =>
+    repair(["retry", "start-over"], {
+      action_info: { ...info, "start-over": { label: "Wipe it", tooltip: "Throw away the work." } },
+    }),
+  )
+  const button = await footerButton("Start over")
+  expect(button.getAttribute("title")).toBe("Throw away the work.")
+  fireEvent.click(button)
+  expect(popover("Start over")).toBeTruthy()
 })
 
 test("Start over's Confirm is disabled until a reason is typed", async () => {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: {} })))
   stubFetch(fetchMock)
   renderTicket(() => repair(["retry", "start-over"]))
-  fireEvent.click(await screen.findByRole("button", { name: "Start over" }))
-  const dialog = screen.getByRole("dialog", { name: "Start over" })
-  const confirm = within(dialog).getByRole("button", { name: "Start over" }) as HTMLButtonElement
+  fireEvent.click(await footerButton("Start over"))
+  const dialog = popover("Start over")
+  const confirm = within(dialog).getByRole("button", { name: /^Start over/ }) as HTMLButtonElement
   expect(confirm.disabled).toBe(true)
   fireEvent.change(within(dialog).getByLabelText("Reason"), { target: { value: "   " } })
   expect(confirm.disabled).toBe(true)
@@ -411,7 +449,7 @@ test("a recommendation shows its diagnosis and marks one button Recommended", as
   expect(c.textContent).toContain("The branch is unrecoverable.")
   expect(screen.getAllByText("Recommended")).toHaveLength(1)
   expect(
-    within(screen.getByRole("button", { name: /Start over/ })).getByText("Recommended"),
+    within(footer().getByRole("button", { name: /Start over/ })).getByText("Recommended"),
   ).toBeTruthy()
 })
 
@@ -506,10 +544,10 @@ const oneOff = (status: string): TicketDetail => ({
 })
 
 test.each(["open", "claimed", "needs-answer", "needs-repair"])(
-  "a %s One-off shows Cancel",
+  "a %s One-off shows Cancel run",
   async (status) => {
     renderTicket(() => oneOff(status))
-    expect(await screen.findByRole("button", { name: "Cancel" })).toBeTruthy()
+    expect(await footerButton("Cancel run")).toBeTruthy()
   },
 )
 
@@ -517,20 +555,25 @@ test.each([
   ["a done One-off", oneOff("done")],
   ["a cancelled One-off", oneOff("cancelled")],
   ["an epic ticket", { ...plain, status: "claimed" } as TicketDetail],
-])("%s shows no Cancel", async (_name, detail) => {
+])("%s shows no Cancel run", async (_name, detail) => {
   renderTicket(() => detail)
   await screen.findByRole("heading", { level: 1 })
-  expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull()
+  expect(screen.queryByRole("button", { name: "Cancel run" })).toBeNull()
 })
 
-test("confirming Cancel posts the address", async () => {
+test("confirming Cancel run posts the address", async () => {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({})))
   stubFetch(fetchMock)
   renderTicket(() => oneOff("claimed"))
-  fireEvent.click(await screen.findByRole("button", { name: "Cancel" }))
-  expect(screen.getByText(/later runs of that Schedule may start/)).toBeTruthy()
+  fireEvent.click(await footerButton("Cancel run"))
+  const dialog = popover(/Cancel run/)
+  expect(within(dialog).getByText(/later runs of that Schedule may start/)).toBeTruthy()
+  expect(within(dialog).queryByRole("button", { name: "Keep running" })).toBeNull()
+  expect(document.activeElement).toBe(
+    within(dialog).getByRole("button", { name: /^Cancel\b(?! run)/ }),
+  )
   expect(fetchMock).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole("button", { name: "Cancel run" }))
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Cancel run/ }))
   await waitFor(() => expect(fetchMock).toHaveBeenCalled())
   expect(posted(fetchMock)[0]).toEqual([
     "/v1/tickets/cancel",
@@ -538,11 +581,27 @@ test("confirming Cancel posts the address", async () => {
   ])
 })
 
-test("a refused Cancel shows its reason", async () => {
+test("a refused Cancel run shows its reason and keeps the popover open", async () => {
   const refusal = { refused: true, reason: "ticket-done", message: "proj:one-offs/12 is done" }
   stubFetch(vi.fn(async () => new Response(JSON.stringify(refusal))))
   renderTicket(() => oneOff("open"))
-  fireEvent.click(await screen.findByRole("button", { name: "Cancel" }))
-  fireEvent.click(screen.getByRole("button", { name: "Cancel run" }))
+  fireEvent.click(await footerButton("Cancel run"))
+  fireEvent.click(within(popover(/Cancel run/)).getByRole("button", { name: /^Cancel run/ }))
   expect((await screen.findByRole("alert")).textContent).toBe("proj:one-offs/12 is done")
+  expect(popover(/Cancel run/)).toBeTruthy()
+})
+
+test("with no field focused y confirms and n cancels the Cancel run popover", async () => {
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({})))
+  stubFetch(fetchMock)
+  renderTicket(() => oneOff("claimed"))
+  fireEvent.click(await footerButton("Cancel run"))
+  popover(/Cancel run/)
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: "n" })
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+  expect(fetchMock).not.toHaveBeenCalled()
+  fireEvent.click(await footerButton("Cancel run"))
+  popover(/Cancel run/)
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: "y" })
+  await waitFor(() => expect(fetchMock).toHaveBeenCalled())
 })

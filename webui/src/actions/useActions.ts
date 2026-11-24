@@ -50,7 +50,7 @@ import {
   type PostRecover,
 } from "../ticket/recover"
 import { showToast, toaster } from "../ui/toaster"
-import { useWrite } from "../useWrite"
+import { useWrite, type Refusable } from "../useWrite"
 import {
   defaultWriters,
   postArchive,
@@ -124,6 +124,8 @@ export interface ActionContext {
   writers?: Partial<ActionWriters>
   /** Runs after a chat's Remove lands. */
   onRemoved?: () => void
+  /** Runs after Start over or Cancel run landed. */
+  onRecovered?: () => void
   /** A draft's identity, for Rename. */
   draft?: DraftIdentity
   /** The state token the page or list holds: the epic's list state, the ticket's page state. */
@@ -342,6 +344,13 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
     if (e.session) openRename({ session: e.session })
   }
 
+  // Counts the write as pending and tells the page once the server accepted it.
+  const recovered = (call: () => Promise<Refusable>) =>
+    trackRecover(call).then((res) => {
+      if (!res.refused) ctx.onRecovered?.()
+      return res
+    })
+
   function runStartOver(decl: ActionDecl, e: Entity) {
     ask(decl, e, {
       confirmLabel: decl.label,
@@ -358,7 +367,7 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
       onConfirm: (input) => {
         const reason = input?.trim()
         if (!reason) return
-        return trackRecover(() =>
+        return recovered(() =>
           w.recover(ActionStartOver, { address: e.key, state: ctx.state ?? "", reason }),
         )
       },
@@ -372,7 +381,7 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
       title: `Cancel run of ${e.name}`,
       body: { lines: [CANCEL_NOTICE] },
       onConfirm: () =>
-        trackRecover(() => w.recover(ActionCancel, { address: e.key, state: ctx.state ?? "" })),
+        recovered(() => w.recover(ActionCancel, { address: e.key, state: ctx.state ?? "" })),
     })
   }
 

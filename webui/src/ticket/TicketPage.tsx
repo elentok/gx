@@ -1,6 +1,12 @@
 import { Box } from "@chakra-ui/react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router"
+import { useActions } from "../actions/useActions"
+import { ActionStartOver, type TicketDetail } from "../generated/server"
+import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu"
+import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
+import { entryOf } from "../workspaces/itemActions"
+import { ticketEntity } from "./recover"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { FileLinkProvider } from "../files/FileLinkContext"
 import { fetchTicketScreen, type FetchScreen } from "../design/screen"
@@ -22,6 +28,32 @@ import { TicketHeader } from "./TicketHeader"
 import { hasSections, NothingHere, TicketSections } from "./TicketSections"
 
 const WAITING_REFETCH_MS = 2000
+
+// The ⋯ of the page: Copy ID, then Start over and Cancel run. The confirm anchors on the ⋯ once the menu closed.
+function TicketMenu({ detail, onRecovered }: { detail: TicketDetail; onRecovered: () => void }) {
+  const wrap = useRef<HTMLSpanElement>(null)
+  const { actions } = useActions(ticketEntity(detail), {
+    surface: () => {
+      const anchor = wrap.current?.querySelector("button")
+      return anchor ? { mode: "anchor", anchor } : { mode: "modal" }
+    },
+    state: detail.state ?? "",
+    tooltip: detail.action_info?.[ActionStartOver]?.tooltip,
+    onRecovered,
+  })
+  const groups: MenuEntry[][] = []
+  let last: string | undefined
+  for (const a of actions) {
+    if (a.group !== last) groups.push([])
+    last = a.group
+    groups[groups.length - 1]!.push(entryOf(a))
+  }
+  return (
+    <span ref={wrap} style={{ display: "contents" }}>
+      <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} />
+    </span>
+  )
+}
 
 export function TicketPage({
   address,
@@ -67,7 +99,12 @@ export function TicketPage({
           </>
         ) : detail ? (
           <>
-            <PageHeader title={detail.title} icon={<PageIcon kind="ticket" />} subtitle={address}>
+            <PageHeader
+              title={detail.title}
+              icon={<PageIcon kind="ticket" />}
+              subtitle={address}
+              actions={<TicketMenu detail={detail} onRecovered={refetch} />}
+            >
               <TicketHeader detail={detail} now={Date.now()} />
               {verdict && (
                 <Box mt="2">

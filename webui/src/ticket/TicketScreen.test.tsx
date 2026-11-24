@@ -219,3 +219,101 @@ test("the ticket page shows the ticket's verdict under the header,and nothing wi
   await renderTicket(base, undefined, [mine])
   expect(screen.getByText("disk low: /tmp has 5G free")).toBeTruthy()
 })
+
+const headerActions = () => screen.getByTestId("page-header-actions")
+
+async function openMenu() {
+  fireEvent.click(within(headerActions()).getByRole("button", { name: "More actions" }))
+  return (await screen.findAllByRole("menuitem")).map((i) => i.textContent?.trim())
+}
+
+const oneOff = (status: string): TicketDetail => ({
+  ...base,
+  address: "proj:one-offs/12",
+  epic: "proj:one-offs",
+  status,
+  actions: [],
+})
+
+test("the ticket page has one More actions button, last in the header actions, once loaded", async () => {
+  await renderTicket(base)
+  const buttons = within(headerActions()).getAllByRole("button", { name: "More actions" })
+  expect(buttons).toHaveLength(1)
+  expect(headerActions().lastElementChild?.contains(buttons[0]!)).toBe(true)
+})
+
+test("a ticket without Start over that is no One-off lists Copy ID only, and Copy ID toasts the address", async () => {
+  const writeText = vi.fn(async () => {})
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true })
+  await renderTicket({ ...base, status: "claimed", actions: [] })
+  expect(await openMenu()).toEqual(["Copy ID"])
+  fireEvent.click(screen.getByRole("menuitem", { name: /Copy ID/ }))
+  expect(await screen.findByText(`Copied ${base.address}`)).toBeTruthy()
+})
+
+test("the menu lists Copy ID then Start over, never a recovery verb", async () => {
+  await renderTicket({ ...base, actions: ["retry", "start-over", "resume", "merge"] })
+  expect(await openMenu()).toEqual(["Copy ID", "Start over"])
+  expect(screen.getAllByRole("separator")).toHaveLength(1)
+})
+
+const CANCELLABLE = ["open", "claimed", "needs-answer", "needs-repair"] // oldword:ok
+
+test.each(CANCELLABLE)("a %s One-off lists Cancel run after Start over", async (status) => {
+  await renderTicket({ ...oneOff(status), actions: ["start-over"] })
+  expect(await openMenu()).toEqual(["Copy ID", "Start over", "Cancel run"])
+})
+
+test.each([
+  ["a done One-off", oneOff("done")],
+  ["a cancelled One-off", oneOff("cancelled")],
+  ["an epic ticket", { ...base, status: "claimed", actions: [] } as TicketDetail],
+])("%s lists no Cancel run", async (_name, detail) => {
+  await renderTicket(detail)
+  expect(await openMenu()).toEqual(["Copy ID"])
+})
+
+test("Start over and Cancel run from the menu open the shared popover and post nothing yet", async () => {
+  const fetchMock = vi.fn(async (_url: string) => new Response(JSON.stringify({})))
+  vi.stubGlobal("fetch", fetchMock)
+  await renderTicket({ ...oneOff("claimed"), actions: ["start-over"] })
+  await openMenu()
+  fireEvent.click(screen.getByRole("menuitem", { name: /Start over/ }))
+  expect(await screen.findByRole("alertdialog", { name: "Start over" })).toBeTruthy()
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })
+  await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+  await openMenu()
+  fireEvent.click(screen.getByRole("menuitem", { name: /Cancel run/ }))
+  expect(await screen.findByRole("alertdialog", { name: /Cancel run/ })).toBeTruthy()
+  const writes = fetchMock.mock.calls.filter(([url]) => String(url).startsWith("/v1/tickets/"))
+  expect(writes).toEqual([])
+  vi.unstubAllGlobals()
+})
+
+test("while a recovery write is pending the menu's Start over and Cancel run are disabled", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => new Promise<Response>(() => {})),
+  )
+  await renderTicket({ ...oneOff("claimed"), actions: ["start-over"] })
+  fireEvent.click(
+    within(screen.getByRole("form", { name: "Recovery actions" })).getByRole("button", {
+      name: "Cancel run",
+    }),
+  )
+  fireEvent.click(
+    within(await screen.findByRole("alertdialog")).getByRole("button", { name: /^Cancel run/ }),
+  )
+  await vi.waitFor(() =>
+    expect(
+      within(screen.getByRole("form", { name: "Recovery actions" })).getByRole("button", {
+        name: "Cancel run",
+      }),
+    ).toHaveProperty("disabled", true),
+  )
+  await openMenu()
+  for (const name of [/Start over/, /Cancel run/]) {
+    expect(screen.getByRole("menuitem", { name }).hasAttribute("data-disabled")).toBe(true)
+  }
+  vi.unstubAllGlobals()
+})

@@ -9,7 +9,9 @@ import {
   ActionStartOver,
   ActionStopTask,
   type Action,
+  type TicketDetail,
 } from "../generated/server"
+import type { Entity } from "../actions/entity"
 import { apiFetch } from "../apiFetch"
 import { createExternalStore } from "../shell/externalStore"
 import { WriteError, type Refusable } from "../useWrite"
@@ -42,6 +44,16 @@ export async function trackRecover<R>(call: () => Promise<R>): Promise<R> {
     inFlight.set(inFlight.get() - 1)
   }
 }
+
+/** The ticket page's registry entity: its address, the server's action list and its status word. */
+export const ticketEntity = (detail: TicketDetail): Entity => ({
+  kind: "ticket",
+  key: detail.address,
+  name: detail.title,
+  surface: "page",
+  serverActions: detail.actions as Action[],
+  status: detail.status,
+})
 
 /** A One-off that has not ended. The server refuses any other ticket. */
 export const canCancel = (detail: { address: string; status: string }) =>

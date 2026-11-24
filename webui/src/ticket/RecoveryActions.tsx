@@ -1,5 +1,6 @@
 import { Box, Spinner, Text } from "@chakra-ui/react"
-import { useState } from "react"
+import { useRef, useState } from "react"
+import { useActions } from "../actions/useActions"
 import { modelName } from "../modelName"
 import {
   ActionChooseBase,
@@ -10,18 +11,14 @@ import {
   type TicketDetail,
 } from "../generated/server"
 import { Button } from "../ui/button/Button"
-import { PromptBox } from "../ui/expandable-text/PromptBox"
-import { Modal } from "../ui/modal/Modal"
-import { refusalText, useWrite, type Refusable } from "../useWrite"
+import { useWrite, type Refusable } from "../useWrite"
 import { ReasonStale } from "./answer"
 import {
-  ActionCancel,
-  CANCEL_NOTICE,
   canCancel,
-  DISCARD_NOTICE,
   isRecoverAction,
   postRecover,
   ReasonAgentWorking,
+  ticketEntity,
   trackRecover,
   useRecoverPending,
   type PostRecover,
@@ -59,12 +56,23 @@ export function RecoveryActions({
 }) {
   const bases = detail.bases ?? []
   const [base, setBase] = useState("")
-  const [confirming, setConfirming] = useState(false)
-  const [cancelling, setCancelling] = useState(false)
   const { run, pending: writing, refusal } = useWrite()
   // The shared confirm's recovery writes count too: no second write while either is pending.
   const recovering = useRecoverPending()
   const pending = writing || recovering
+  // Start over and Cancel run are registry actions; the popover anchors on the footer button clicked.
+  const anchor = useRef<HTMLElement | null>(null)
+  const { get } = useActions(ticketEntity(detail), {
+    surface: () =>
+      anchor.current ? { mode: "anchor", anchor: anchor.current } : { mode: "modal" },
+    state: detail.state ?? "",
+    tooltip: detail.action_info?.[ActionStartOver]?.tooltip,
+    onRecovered: onDone,
+  })
+  const openConfirm = (id: string, button: HTMLElement) => {
+    anchor.current = button
+    get(id)?.run()
+  }
   const [seenState, setSeenState] = useState(detail.state)
 
   // A new pause clears the pick: it may list different blockers.
@@ -101,11 +109,7 @@ export function RecoveryActions({
             ? { type: "success", title: SUCCESS_TOASTS[action]! }
             : undefined
         },
-        onDone: () => {
-          setConfirming(false)
-          setCancelling(false)
-          onDone?.()
-        },
+        onDone,
       },
     )
 
@@ -171,14 +175,14 @@ export function RecoveryActions({
               title={info?.tooltip}
               emphasis={i === 0 ? "main" : "secondary"}
               disabled={!ready(action) || pending}
-              onClick={() =>
+              onClick={(e) =>
                 action === ActionStartOver
-                  ? setConfirming(true)
+                  ? openConfirm("start-over", e.currentTarget)
                   : send(action, base ? { base } : {})
               }
             >
               {pending && <Spinner size="sm" />}
-              {info?.label ?? action}
+              {action === ActionStartOver ? "Start over" : (info?.label ?? action)}
               {action === detail.recommendation?.verb && (
                 <Text as="span" fontSize="xs" fontWeight="600" textTransform="uppercase">
                   Recommended
@@ -188,80 +192,15 @@ export function RecoveryActions({
           )
         })}
         {cancellable && (
-          <Button emphasis="secondary" disabled={pending} onClick={() => setCancelling(true)}>
-            Cancel
+          <Button
+            emphasis="secondary"
+            disabled={pending}
+            onClick={(e) => openConfirm("cancel-run", e.currentTarget)}
+          >
+            Cancel run
           </Button>
         )}
       </Box>
-      {cancelling && (
-        <Modal label="Cancel this run" onClose={() => setCancelling(false)} p="4" w="md" gap="3">
-          <Text>{CANCEL_NOTICE}</Text>
-          {refusal && <Text role="alert">{refusalText(refusal)}</Text>}
-          <Box display="flex" gap="2" justifyContent="flex-end">
-            <Button emphasis="ghost" onClick={() => setCancelling(false)}>
-              Keep running
-            </Button>
-            <Button tone="deadlocked" disabled={pending} onClick={() => send(ActionCancel)}>
-              {pending && <Spinner size="sm" />}
-              Cancel run
-            </Button>
-          </Box>
-        </Modal>
-      )}
-      {confirming && (
-        <StartOverDialog
-          label={detail.action_info?.[ActionStartOver]?.label ?? "Start over"}
-          tooltip={detail.action_info?.[ActionStartOver]?.tooltip}
-          pending={pending}
-          onConfirm={(reason) => send(ActionStartOver, { reason })}
-          onClose={() => setConfirming(false)}
-        />
-      )}
     </Box>
-  )
-}
-
-// Start over throws the work away, so it asks first. It never sends branch deletion: the server keeps a backup.
-function StartOverDialog({
-  label,
-  tooltip,
-  pending,
-  onConfirm,
-  onClose,
-}: {
-  label: string
-  tooltip?: string
-  pending: boolean
-  onConfirm: (reason: string) => void
-  onClose: () => void
-}) {
-  const [reason, setReason] = useState("")
-  return (
-    <Modal label={label} onClose={onClose} p="4" w="md" gap="3">
-      {tooltip && <Text>{tooltip}</Text>}
-      <Text>{DISCARD_NOTICE}</Text>
-      <PromptBox
-        label="Reason"
-        name="recovery-reason"
-        title="Start over reason"
-        placeholder="Why start over?"
-        value={reason}
-        onChange={setReason}
-        rows={3}
-      />
-      <Box display="flex" gap="2" justifyContent="flex-end">
-        <Button emphasis="ghost" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          tone="deadlocked"
-          disabled={pending || !reason.trim()}
-          onClick={() => onConfirm(reason.trim())}
-        >
-          {pending && <Spinner size="sm" />}
-          {label}
-        </Button>
-      </Box>
-    </Modal>
   )
 }

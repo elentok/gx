@@ -125,7 +125,7 @@ export function useCardActions(card: EpicListRow | undefined, workspaces: Worksp
   })
 }
 
-function entryOf(a: ReadyAction): MenuEntry {
+export function entryOf(a: ReadyAction): MenuEntry {
   if (a.items) {
     return {
       kind: "submenu",
