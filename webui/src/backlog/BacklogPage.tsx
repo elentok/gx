@@ -14,7 +14,6 @@ import { BottomSheet } from "../ui/modal/BottomSheet"
 import { useFetched } from "../useFetched"
 import { useFetchedReady } from "../useReady"
 import { refusalText, useWrite } from "../useWrite"
-import { useActiveWorkspace } from "../workspaces/useActiveWorkspace"
 import {
   fetchBacklog,
   postFinishMove,
@@ -151,12 +150,9 @@ export function BacklogPage({
 }) {
   const conn = useConnectionContext()
   const { data, failed, source, retry } = useFetched("backlog", fetchList, conn)
-  const { active } = useActiveWorkspace(conn)
   const [starting, setStarting] = useState<{ project: string; backlog: BacklogEpic }>()
-  // No active workspace means every project.
-  const projects = (data?.projects ?? []).filter(
-    (p) => p.epics.length > 0 && (!active || p.workspaces?.includes(active)),
-  )
+  // The sidebar workspace filter only affects the sidebar, so list every project.
+  const projects = (data?.projects ?? []).filter((p) => p.epics.length > 0)
   useFetchedReady({ failed, source }, !!data && projects.length === 0)
 
   return (

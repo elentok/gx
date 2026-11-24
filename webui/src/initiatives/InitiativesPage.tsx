@@ -12,7 +12,6 @@ import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import type { Tone } from "../ui/tone"
 import { useFetched } from "../useFetched"
 import { useFetchedReady } from "../useReady"
-import { useActiveWorkspace } from "../workspaces/useActiveWorkspace"
 import { fetchInitiatives, INITIATIVE_STATE, type FetchInitiatives } from "./initiatives"
 
 /** The Current cell's text; the server derives every part of it. */
@@ -65,11 +64,8 @@ export function InitiativesPage({
 }) {
   const conn = useConnectionContext()
   const { data, failed, source, retry } = useFetched("initiatives", fetchList, conn)
-  const { active } = useActiveWorkspace(conn)
-  // No active workspace means every project.
-  const projects = (data?.projects ?? []).filter(
-    (p) => p.initiatives.length > 0 && (!active || p.workspaces?.includes(active)),
-  )
+  // The sidebar workspace filter only affects the sidebar, so list every project.
+  const projects = (data?.projects ?? []).filter((p) => p.initiatives.length > 0)
   useFetchedReady({ failed, source }, !!data && projects.length === 0)
 
   return (

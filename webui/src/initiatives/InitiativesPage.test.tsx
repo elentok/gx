@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { fireEvent, screen, within } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { App } from "../App"
 import type { InitiativeList } from "../generated/server"
@@ -124,10 +124,9 @@ test("a failed load shows the failure line and Retry loads again", async () => {
   expect(await screen.findByRole("region", { name: "gx" })).toBeTruthy()
 })
 
-test("the active workspace hides the projects of other workspaces", async () => {
+test("the sidebar workspace filter does not hide projects", async () => {
   localStorage.setItem(ACTIVE_KEY, "Else")
   renderInitiatives(() => new Response(JSON.stringify(list)))
 
-  await waitFor(() => expect(screen.getByText(/gx initiatives new/)).toBeTruthy())
-  expect(screen.queryByRole("region", { name: "gx" })).toBeNull()
+  expect(await screen.findByRole("region", { name: "gx" })).toBeTruthy()
 })
