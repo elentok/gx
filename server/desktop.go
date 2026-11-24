@@ -92,7 +92,7 @@ func preflight(s *Server, name, kind string, system bool) string {
 		return notify.OutcomeUnconfigured
 	}
 	switch {
-	case !ch.Enabled():
+	case !ch.Enabled:
 		return notify.OutcomeOff
 	case !ch.Allows(kind, system):
 		return notify.OutcomeUnchecked

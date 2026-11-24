@@ -69,7 +69,7 @@ func outcomes(t *testing.T, rec *httptest.ResponseRecorder) map[string]string {
 
 func TestNotifyRoutes_OffChannelIsAResultNotAnHTTPError(t *testing.T) {
 	t.Parallel()
-	s := routeServer(t, settings.NotifyChannels{Slack: settings.NotifyChannel{Off: true}})
+	s := routeServer(t, settings.NotifyChannels{Telegram: defaultOn()})
 	rec := httptest.NewRecorder()
 
 	rootRoutes{s}.notifySend(rec, httptest.NewRequest("POST", "/v1/notify/send", strings.NewReader(`{"message":"hi"}`)))
@@ -85,7 +85,7 @@ func TestNotifyRoutes_OffChannelIsAResultNotAnHTTPError(t *testing.T) {
 
 func TestNotifyRoutes_SendAppliesTheKindListAndTestSkipsIt(t *testing.T) {
 	t.Parallel()
-	none := settings.NotifyChannel{Kinds: []string{}}
+	none := settings.NotifyChannel{Enabled: true, Kinds: []string{}}
 	s := routeServer(t, settings.NotifyChannels{Desktop: none, WebToast: none, Slack: none, Push: none})
 
 	send := httptest.NewRecorder()
@@ -177,7 +177,7 @@ func chatServerFlushing(t *testing.T, soft, hard float64, flush time.Duration) (
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
-	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: t.TempDir(), Settings: Settings{BudgetSoftLimit: soft, BudgetHardLimit: hard,
+	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: t.TempDir(), Settings: Settings{BudgetSoftLimit: soft, BudgetHardLimit: hard, NotifyChannels: allOn(),
 		Chat: notify.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush}},
 		// Not the real ~/.claude.json, which could add an extra-usage notice.
 		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
@@ -257,7 +257,7 @@ func TestQuiet_RestPeriodSilencesBannerSoundAndChatTogether(t *testing.T) {
 	notifier, player := &recNotifier{}, &recPlayer{}
 	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: t.TempDir(),
 		Notifier: notifier, Player: player, RestClock: clock,
-		Settings: Settings{MentalHealth: mh,
+		Settings: Settings{MentalHealth: mh, NotifyChannels: allOn(),
 			Chat: notify.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: 20 * time.Millisecond}},
 		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
 	if err != nil {
@@ -710,7 +710,7 @@ func TestServerChat_EmptyGateStatePathUsesTheStateDir(t *testing.T) {
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
 	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: t.TempDir(),
-		Settings:        Settings{Chat: notify.ServerChatConfig{SlackWebhookURL: hook.URL}},
+		Settings:        Settings{NotifyChannels: allOn(), Chat: notify.ServerChatConfig{SlackWebhookURL: hook.URL}},
 		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
 	if err != nil {
 		t.Fatal(err)

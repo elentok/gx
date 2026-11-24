@@ -20,29 +20,28 @@ func TestSettingsFromConfig_CarriesNotifyChannels(t *testing.T) {
 	cfg.NotificationChannels.Push.Kinds = []string{}
 	got := settings.FromConfig(cfg).NotifyChannels
 
-	if got.Slack.Enabled() || !slices.Equal(got.Slack.KindIDs(), []string{"disk"}) {
+	if got.Slack.Enabled || !slices.Equal(got.Slack.KindIDs(), []string{"disk"}) {
 		t.Errorf("slack = %+v", got.Slack)
 	}
-	if !got.Push.Enabled() || got.Push.Kinds == nil || len(got.Push.KindIDs()) != 0 {
+	if !got.Push.Enabled || got.Push.Kinds == nil || len(got.Push.KindIDs()) != 0 {
 		t.Errorf("push = %+v, want on with an explicit empty list", got.Push)
 	}
 	for name, ch := range map[string]settings.NotifyChannel{"desktop": got.Desktop, "web-toast": got.WebToast, "telegram": got.Telegram} {
-		if !ch.Enabled() || !slices.Equal(ch.KindIDs(), notifykind.DefaultIDs()) {
+		if !ch.Enabled || !slices.Equal(ch.KindIDs(), notifykind.DefaultIDs()) {
 			t.Errorf("%s = %+v, want the new install defaults", name, ch)
 		}
 	}
 }
 
-func TestSettings_ZeroValueReadsAsNewInstall(t *testing.T) {
+func TestSettings_ZeroValueIsOffWithNoKinds(t *testing.T) {
 	t.Parallel()
 	var s settings.Settings
 	for name, ch := range map[string]settings.NotifyChannel{
 		"desktop": s.NotifyChannels.Desktop, "web-toast": s.NotifyChannels.WebToast, "telegram": s.NotifyChannels.Telegram,
 		"slack": s.NotifyChannels.Slack, "push": s.NotifyChannels.Push,
 	} {
-		ids := ch.KindIDs()
-		if !ch.Enabled() || len(ids) != 15 || slices.Contains(ids, notifykind.LongTicket) {
-			t.Errorf("%s: enabled=%v kinds=%v, want on with the 15 default ids", name, ch.Enabled(), ids)
+		if ch.Enabled || len(ch.KindIDs()) != 0 {
+			t.Errorf("%s = %+v, want off with no kinds", name, ch)
 		}
 	}
 }

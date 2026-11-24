@@ -28,27 +28,31 @@ func WithAlerts(banners, sounds bool) func(*server.Config) {
 
 // WithChannel sets one notification channel's switch and kind list. channel is
 // "desktop", "web-toast", "telegram", "slack" or "push". A nil kinds keeps the
-// default list; an empty non-nil list checks no kind.
+// harness's list for that channel; an empty non-nil list checks no kind.
 func WithChannel(channel string, on bool, kinds []string) func(*server.Config) {
 	return func(c *server.Config) {
-		ch := settings.NotifyChannel{Off: !on, Kinds: kinds}
 		n := &c.Settings.NotifyChannels
+		var ch *settings.NotifyChannel
 		switch channel {
 		case "desktop":
-			n.Desktop = ch
+			ch = &n.Desktop
 		case "web-toast":
-			n.WebToast = ch
+			ch = &n.WebToast
 		case "telegram":
-			n.Telegram = ch
+			ch = &n.Telegram
 		case "slack":
-			n.Slack = ch
+			ch = &n.Slack
 		case "push":
-			n.Push = ch
+			ch = &n.Push
 			if c.Settings.WebPushContact == "" {
 				c.Settings.WebPushContact = "me@example.com" // Push needs a contact email
 			}
 		default:
 			panic("servertest.WithChannel: unknown channel " + channel)
+		}
+		ch.Enabled = on
+		if kinds != nil {
+			ch.Kinds = kinds
 		}
 	}
 }

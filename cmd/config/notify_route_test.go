@@ -132,7 +132,7 @@ func TestExecute_Notify_OldServer404FallsBack(t *testing.T) {
 
 func TestExecute_ConfigTestNotifications_ServerUpSkipsAnOffChannelAndSaysSo(t *testing.T) {
 	opt, count := rigs.ChatRecorder(t)
-	h := servertest.Start(t, opt, func(c *server.Config) { c.NotifyChannels.Slack.Off = true })
+	h := servertest.Start(t, opt, func(c *server.Config) { c.NotifyChannels.Slack.Enabled = false })
 	d, stdout := routerDeps(t, func() (*apiclient.Client, error) { return h.Client, nil }, func(*gxconfig.Config) {})
 
 	if err := run(t, d, "config", "test-notifications"); err != nil {

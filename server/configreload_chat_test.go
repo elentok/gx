@@ -85,7 +85,7 @@ func reloadChatServerWith(t *testing.T, chat notify.ServerChatConfig) (*Server, 
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: store, ConfigPath: path, Settings: Settings{
-		Chat: chat,
+		Chat: chat, NotifyChannels: allOn(),
 	}})
 	if err != nil {
 		t.Fatal(err)

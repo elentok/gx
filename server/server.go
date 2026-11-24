@@ -213,7 +213,7 @@ func New(cfg Config) (*Server, error) {
 			return false
 		}
 		cur := s.settings.Load()
-		return cur != nil && !cur.NotifyChannels.Desktop.Enabled()
+		return cur != nil && !cur.NotifyChannels.Desktop.Enabled
 	}
 	silent := func() bool { return quiet() || desktopOff() }
 	cfg.Notifier = quietNotifier{next: cfg.Notifier, quiet: silent}

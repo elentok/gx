@@ -47,7 +47,7 @@ func newBreakerRig(t *testing.T, now func() time.Time, tweak ...func(*Config)) b
 		c.Notifier = r.banners
 		c.Player = &recPlayer{}
 		c.Settings.NotifyChannels = settings.NotifyChannels{
-			Desktop: settings.NotifyChannel{Kinds: kinds}, Push: settings.NotifyChannel{Kinds: kinds}, WebToast: settings.NotifyChannel{Kinds: kinds}}
+			Desktop: settings.NotifyChannel{Enabled: true, Kinds: kinds}, Push: settings.NotifyChannel{Enabled: true, Kinds: kinds}, WebToast: settings.NotifyChannel{Enabled: true, Kinds: kinds}, Slack: defaultOn()}
 		c.Settings.Chat = notify.ServerChatConfig{SlackWebhookURL: hook.URL, FlushInterval: 20 * time.Millisecond}
 	}}, tweak...)...)
 	t.Cleanup(func() { r.s.chat.Close() })

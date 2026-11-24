@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/elentok/gx/ralphloop/notify"
@@ -14,12 +15,13 @@ func TestNotifyChannelAllows(t *testing.T) {
 		system bool
 		want   bool
 	}{
-		{"zero value, default kind", NotifyChannel{}, "", true, true},
-		{"switch off", NotifyChannel{Off: true, Kinds: []string{"a"}}, "a", false, false},
-		{"switch off, system kind", NotifyChannel{Off: true}, "a", true, false},
-		{"kind checked", NotifyChannel{Kinds: []string{"a"}}, "a", false, true},
-		{"kind unchecked", NotifyChannel{Kinds: []string{"b"}}, "a", false, false},
-		{"system kind skips the list", NotifyChannel{Kinds: []string{}}, "a", true, true},
+		{"zero value is off", NotifyChannel{}, "a", true, false},
+		{"switch off", NotifyChannel{Kinds: []string{"a"}}, "a", false, false},
+		{"switch off, system kind", NotifyChannel{}, "a", true, false},
+		{"kind checked", NotifyChannel{Enabled: true, Kinds: []string{"a"}}, "a", false, true},
+		{"kind unchecked", NotifyChannel{Enabled: true, Kinds: []string{"b"}}, "a", false, false},
+		{"nil list checks no kind", NotifyChannel{Enabled: true}, "a", false, false},
+		{"system kind skips the list", NotifyChannel{Enabled: true, Kinds: []string{}}, "a", true, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -30,9 +32,21 @@ func TestNotifyChannelAllows(t *testing.T) {
 	}
 }
 
+func TestNotifyChannelKindIDsReturnsKindsAsStored(t *testing.T) {
+	if got := (NotifyChannel{}).KindIDs(); got != nil {
+		t.Errorf("nil Kinds = %v, want nil", got)
+	}
+	if got := (NotifyChannel{Kinds: []string{}}).KindIDs(); got == nil || len(got) != 0 {
+		t.Errorf("empty Kinds = %#v, want an empty non-nil list", got)
+	}
+	if got := (NotifyChannel{Kinds: []string{"a", "b"}}).KindIDs(); !slices.Equal(got, []string{"a", "b"}) {
+		t.Errorf("Kinds = %v, want [a b]", got)
+	}
+}
+
 func TestNotifyChannelsByID(t *testing.T) {
-	n := NotifyChannels{Desktop: NotifyChannel{Off: true}, Push: NotifyChannel{Kinds: []string{"x"}}}
-	if ch, ok := n.ByID(notify.ChannelDesktop); !ok || !ch.Off {
+	n := NotifyChannels{Desktop: NotifyChannel{}, Push: NotifyChannel{Enabled: true, Kinds: []string{"x"}}}
+	if ch, ok := n.ByID(notify.ChannelDesktop); !ok || ch.Enabled {
 		t.Fatalf("desktop = %+v, %v", ch, ok)
 	}
 	if ch, ok := n.ByID(notify.ChannelPush); !ok || len(ch.Kinds) != 1 {

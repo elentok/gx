@@ -41,7 +41,7 @@ func badgeCount(sessions []wire.SessionInfo, ts []wire.TicketInfo) int {
 // it: the badge and the routes ask only this.
 func pushSwitchOn(s *Server) bool {
 	ch, ok := channelFrom(&s.settings, notify.ChannelPush)
-	return ok && ch.Enabled()
+	return ok && ch.Enabled
 }
 
 // pushContact is the contact email the push service requires, "" when unset or

@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/notifykind"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/claudeenv"
@@ -76,6 +77,8 @@ func startWith(t *testing.T, store string, opts ...func(*server.Config)) *Harnes
 	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, ConversationsDir: h.ConversationsDir, Build: "test-build", TicketStore: h.TicketStore}
 	// The production defaults: an implement launch with no model is refused.
 	h.cfg.AgentsClaude, h.cfg.AgentsCodex = config.DefaultAgentsConfig().Claude, config.DefaultAgentsConfig().Codex
+	h.cfg.NotifyChannels = settings.FromConfig(config.Default()).NotifyChannels
+	h.cfg.WebPushContact = "me@example.com"
 	// Desktop checks the two session kinds, as a migrated config does, so a
 	// test counting session banners sees no server notice. WithChannel widens it.
 	h.cfg.NotifyChannels.Desktop.Kinds = []string{notifykind.SessionAlert, notifykind.DesignQuestion}

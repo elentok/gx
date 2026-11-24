@@ -26,7 +26,7 @@ type chatPolicy struct{ h *settings.Holder }
 
 func (p *chatPolicy) ChannelOn(name string) bool {
 	c, ok := channelFrom(p.h, name)
-	return ok && c.Enabled()
+	return ok && c.Enabled
 }
 
 func (p *chatPolicy) KindChecked(name, id string) bool {

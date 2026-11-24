@@ -60,7 +60,7 @@ func pushServer(t *testing.T, now func() time.Time, tweak ...func(*Config)) (s *
 	mh.Bedtime.Start, mh.Bedtime.End = "22:00", "06:00"
 	cfg := Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: t.TempDir(),
 		RestClock: now, PushHTTPClient: svc.Client(), PushMergeDelay: 10 * time.Millisecond,
-		Settings:        Settings{MentalHealth: mh, WebPushContact: "me@example.com"},
+		Settings:        Settings{MentalHealth: mh, WebPushContact: "me@example.com", NotifyChannels: allOn()},
 		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }}
 	for _, f := range tweak {
 		f(&cfg)
@@ -286,7 +286,7 @@ func TestPushChannel_EveryNewKindSendsOneNormalPushWithTheChatHeadlineAndPath(t 
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			s, log := recordedPushServer(t, settings.NotifyChannel{Kinds: []string{tc.kind}})
+			s, log := recordedPushServer(t, settings.NotifyChannel{Enabled: true, Kinds: []string{tc.kind}})
 			tc.send(s)
 			got := log.all()
 			if len(got) != 1 {
@@ -297,7 +297,7 @@ func TestPushChannel_EveryNewKindSendsOneNormalPushWithTheChatHeadlineAndPath(t 
 			}
 
 			// The same event with the kind unchecked sends nothing.
-			s, log = recordedPushServer(t, settings.NotifyChannel{Kinds: []string{}})
+			s, log = recordedPushServer(t, settings.NotifyChannel{Enabled: true, Kinds: []string{}})
 			tc.send(s)
 			if got := log.all(); len(got) != 0 {
 				t.Errorf("unchecked kind pushed %+v", got)
@@ -308,7 +308,7 @@ func TestPushChannel_EveryNewKindSendsOneNormalPushWithTheChatHeadlineAndPath(t 
 
 func TestPushChannel_ARouterPushIsOnePushWhateverTheProjectOverrideSays(t *testing.T) {
 	t.Parallel()
-	s, log := recordedPushServer(t, settings.NotifyChannel{})
+	s, log := recordedPushServer(t, defaultOn())
 	override := &notify.ServerChatConfig{}
 	s.chat.EpicComplete("proj", override, "epic", schedule.EpicCounts{}, 60, 1, true)
 	if got := log.all(); len(got) != 1 {
@@ -318,7 +318,7 @@ func TestPushChannel_ARouterPushIsOnePushWhateverTheProjectOverrideSays(t *testi
 
 func TestPushChannel_SwitchOffSendsNothing(t *testing.T) {
 	t.Parallel()
-	s, log := recordedPushServer(t, settings.NotifyChannel{Off: true})
+	s, log := recordedPushServer(t, settings.NotifyChannel{})
 	s.chat.NotifyOutcomes("hi")
 	if got := log.all(); len(got) != 0 {
 		t.Errorf("pushes = %+v, want none", got)
@@ -327,7 +327,7 @@ func TestPushChannel_SwitchOffSendsNothing(t *testing.T) {
 
 func TestPushChannel_TwoKindsOnOneTicketKeepTheirOwnTags(t *testing.T) {
 	t.Parallel()
-	s, log := recordedPushServer(t, settings.NotifyChannel{})
+	s, log := recordedPushServer(t, defaultOn())
 	s.chat.Result("proj", nil, t.TempDir(), "epic", "", "01", "done")
 	s.chat.Pause("proj", nil, "epic", "", "01", "paused", "", "why", schedule.EpicCounts{})
 	got := log.all()
@@ -400,7 +400,7 @@ func TestPushLayers_NoSendWithTheSwitchOffNoEmailOrNoDevice(t *testing.T) {
 		devices int
 		tweak   func(*Config)
 	}{
-		{"switch off", 1, func(c *Config) { c.Settings.NotifyChannels.Push.Off = true }},
+		{"switch off", 1, func(c *Config) { c.Settings.NotifyChannels.Push.Enabled = false }},
 		{"no email", 1, func(c *Config) { c.Settings.WebPushContact = "" }},
 		{"no device", 0, func(*Config) {}},
 	} {
@@ -426,7 +426,7 @@ func TestPushLayers_AnEventHeldWhileTheSwitchGoesOffIsDropped(t *testing.T) {
 	asked := switchAsked(s)
 	s.chat.NotifyOutcomes("held")
 	cur := *s.settings.Load()
-	cur.NotifyChannels.Push.Off = true
+	cur.NotifyChannels.Push.Enabled = false
 	s.settings.Store(&cur)
 	awaitAsked(t, asked)
 	s.push.Close()
@@ -437,7 +437,7 @@ func TestPushLayers_AnEventHeldWhileTheSwitchGoesOffIsDropped(t *testing.T) {
 
 func TestBadge_SnapshotHasNoBadgeWhileTheSwitchIsOffAndTheKindListDoesNotChangeTheCount(t *testing.T) {
 	t.Parallel()
-	s, _ := recordedPushServer(t, settings.NotifyChannel{Kinds: []string{}})
+	s, _ := recordedPushServer(t, settings.NotifyChannel{Enabled: true, Kinds: []string{}})
 	if !pushSwitchOn(s) {
 		t.Fatal("an empty kind list turned the switch off")
 	}
@@ -453,7 +453,7 @@ func TestBadge_SnapshotHasNoBadgeWhileTheSwitchIsOffAndTheKindListDoesNotChangeT
 	if got, want := snap(s).Badge, liveBadge(s); got != want {
 		t.Errorf("badge %d != live %d with an empty kind list", got, want)
 	}
-	off, _ := recordedPushServer(t, settings.NotifyChannel{Off: true})
+	off, _ := recordedPushServer(t, settings.NotifyChannel{})
 	if got := snap(off).Badge; got != 0 || liveBadge(off) != 0 {
 		t.Errorf("badge = %d, live = %d, want 0 while the switch is off", got, liveBadge(off))
 	}

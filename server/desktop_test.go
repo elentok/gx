@@ -40,6 +40,15 @@ func (l *bannerLog) all() []osnotify.Notification {
 
 // desktopServer is a server whose banners and sounds are recorded and whose
 // Desktop channel is ch.
+// defaultOn is a channel as a new install has it: on, with the default kinds.
+func defaultOn() settings.NotifyChannel {
+	return settings.NotifyChannel{Enabled: true, Kinds: notifykind.DefaultIDs()}
+}
+
+func allOn() settings.NotifyChannels {
+	return settings.NotifyChannels{Desktop: defaultOn(), WebToast: defaultOn(), Telegram: defaultOn(), Slack: defaultOn(), Push: defaultOn()}
+}
+
 func desktopServer(t *testing.T, ch settings.NotifyChannel) (*Server, *bannerLog, *recPlayer) {
 	t.Helper()
 	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
@@ -68,7 +77,7 @@ func overSoftLimit(s *Server) {
 
 func TestDesktop_ACheckedNonSessionKindIsABannerWithNoSound(t *testing.T) {
 	t.Parallel()
-	s, banners, player := desktopServer(t, settings.NotifyChannel{Kinds: []string{notifykind.BudgetAndUsage}})
+	s, banners, player := desktopServer(t, settings.NotifyChannel{Enabled: true, Kinds: []string{notifykind.BudgetAndUsage}})
 	overSoftLimit(s)
 	got := banners.all()
 	if len(got) != 1 || !strings.Contains(got[0].Title, "Budget soft limit reached") {
@@ -81,7 +90,7 @@ func TestDesktop_ACheckedNonSessionKindIsABannerWithNoSound(t *testing.T) {
 
 func TestDesktop_AnUncheckedKindIsNoBannerAndNoSound(t *testing.T) {
 	t.Parallel()
-	s, banners, player := desktopServer(t, settings.NotifyChannel{Kinds: []string{notifykind.SessionAlert}})
+	s, banners, player := desktopServer(t, settings.NotifyChannel{Enabled: true, Kinds: []string{notifykind.SessionAlert}})
 	overSoftLimit(s)
 	if got := banners.all(); len(got) != 0 || player.n.Load() != 0 {
 		t.Errorf("banners = %+v, sounds = %d, want none", got, player.n.Load())
@@ -90,7 +99,7 @@ func TestDesktop_AnUncheckedKindIsNoBannerAndNoSound(t *testing.T) {
 
 func TestDesktop_SwitchOffSendsNothing(t *testing.T) {
 	t.Parallel()
-	s, banners, player := desktopServer(t, settings.NotifyChannel{Off: true})
+	s, banners, player := desktopServer(t, settings.NotifyChannel{})
 	overSoftLimit(s)
 	(&desktopAdapter{s: s, webURL: func() string { return "" }}).Show(notify.DesktopNote{Kind: notifykind.SessionAlert, Session: true, Sound: sound.Done})
 	// The decorators drop the system banners and sounds that bypass the adapter.
@@ -118,7 +127,7 @@ func TestDesktop_OnlySessionKindsPlayASoundAndEveryTargetCarriesItsLink(t *testi
 		{"non-session kind never plays", notify.DesktopNote{Kind: notifykind.Disk, Sound: sound.Done}, "http://web/#/", 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s, banners, player := desktopServer(t, settings.NotifyChannel{})
+			s, banners, player := desktopServer(t, defaultOn())
 			a := &desktopAdapter{s: s, webURL: func() string { return "http://web" }}
 			a.Show(tc.note)
 			got := banners.all()
@@ -134,7 +143,7 @@ func TestDesktop_OnlySessionKindsPlayASoundAndEveryTargetCarriesItsLink(t *testi
 
 func TestDesktop_NoWebListenerMeansNoLink(t *testing.T) {
 	t.Parallel()
-	s, banners, _ := desktopServer(t, settings.NotifyChannel{})
+	s, banners, _ := desktopServer(t, defaultOn())
 	(&desktopAdapter{s: s, webURL: func() string { return "" }}).Show(notify.DesktopNote{Kind: notifykind.Disk, Target: notify.Target{Epic: "p:e"}})
 	if got := banners.all(); len(got) != 1 || got[0].Link != "" {
 		t.Errorf("banners = %+v, want one with no Link", got)
@@ -163,7 +172,7 @@ func sendServerStarted(s *Server) {
 
 func TestWebToast_CheckedKindReachesEveryOpenPageAndNoLaterPage(t *testing.T) {
 	t.Parallel()
-	s := webToastServer(t, settings.NotifyChannel{Kinds: []string{notifykind.ServerStarted}})
+	s := webToastServer(t, settings.NotifyChannel{Enabled: true, Kinds: []string{notifykind.ServerStarted}})
 	var chans []<-chan wire.Event
 	for range 2 {
 		ch, cancel, err := s.events.Subscribe(s.events.CurrentSeq())
@@ -216,8 +225,8 @@ func TestWebToast_CheckedKindReachesEveryOpenPageAndNoLaterPage(t *testing.T) {
 func TestWebToast_SwitchOffOrKindUncheckedPublishesNothing(t *testing.T) {
 	t.Parallel()
 	cases := map[string]settings.NotifyChannel{
-		"switch off":     {Off: true, Kinds: []string{notifykind.ServerStarted}},
-		"kind unchecked": {Kinds: []string{notifykind.Disk}},
+		"switch off":     {Enabled: false, Kinds: []string{notifykind.ServerStarted}},
+		"kind unchecked": {Enabled: true, Kinds: []string{notifykind.Disk}},
 	}
 	for name, ch := range cases {
 		t.Run(name, func(t *testing.T) {
