@@ -1324,6 +1324,11 @@ It has no Move or Hold actions, and opening a row leaves the active workspace un
 on a ticket and an Investigate agent of any other epic nest under its row. A Follow-up is a ticket, not a session, so it has no sidebar row.
 _Avoid_: Misc, Unfiled
 
+**Entity** — one of the six things a web action runs on: epic, Design, ticket, chat, design draft or
+chat draft. The **action registry** declares each action once per entity type. Not a menu item or a
+queue item.
+_Avoid_: item (clashes with menu item and queue item)
+
 **Chat session** — a plain agent session, the **Interactive session** that has no Session ticket.
 The web UI calls it "Chat" and "Chats". The Slack/Telegram **Chat** (see Notification Surfaces) is
 the other meaning. In the web UI the plain-agent-session meaning wins; the notification surface is
