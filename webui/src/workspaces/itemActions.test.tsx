@@ -358,7 +358,7 @@ const chatDraftRow: ItemRef = {
 }
 
 test("Remove deletes an empty chat draft through the chat drafts client", async () => {
-  chatRead.mockResolvedValue({ kind: "ok", draft: { id: "c1", brief: " " } })
+  chatRead.mockResolvedValue({ kind: "ok", draft: { id: "c1", brief: " ", images: [] } })
   chatRemove.mockResolvedValue({ kind: "deleted" })
   const onRemoved = await removeDraftRow(chatDraftRow)
   await waitFor(() => expect(onRemoved).toHaveBeenCalledTimes(1))
@@ -367,7 +367,17 @@ test("Remove deletes an empty chat draft through the chat drafts client", async 
 })
 
 test("Remove asks before deleting a chat draft with a brief", async () => {
-  chatRead.mockResolvedValue({ kind: "ok", draft: { id: "c1", brief: "look at caching" } })
+  chatRead.mockResolvedValue({
+    kind: "ok",
+    draft: { id: "c1", brief: "look at caching", images: [] },
+  })
+  await removeDraftRow(chatDraftRow)
+  await screen.findByRole("alertdialog")
+  expect(chatRemove).not.toHaveBeenCalled()
+})
+
+test("Remove asks before deleting a chat draft with an image and no brief", async () => {
+  chatRead.mockResolvedValue({ kind: "ok", draft: { id: "c1", brief: "", images: ["i1"] } })
   await removeDraftRow(chatDraftRow)
   await screen.findByRole("alertdialog")
   expect(chatRemove).not.toHaveBeenCalled()

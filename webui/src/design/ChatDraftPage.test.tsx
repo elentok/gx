@@ -1,4 +1,5 @@
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { ConfirmHost } from "../shell/ConfirmHost"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { MemoryRouter, Route, Routes, useLocation } from "react-router"
 import { ConnectionContext, type Connection } from "../connection"
@@ -102,6 +103,7 @@ async function mount(
   await act(async () => {
     renderThemed(
       <WideContext.Provider value={wide}>
+        <ConfirmHost />
         <ConnectionContext.Provider value={connection}>
           <MemoryRouter initialEntries={["/chat-drafts/c1"]}>
             <Routes>
@@ -475,8 +477,10 @@ test("an empty draft opens with the placeholder, a disabled Start and its blocke
   expect(startButton().disabled).toBe(true)
   expect(screen.getByText("Write a brief to start.")).toBeTruthy()
   expect(control("Model").value).toBe("")
-  fireEvent.click(screen.getByRole("button", { name: "Remove" }))
-  expect(screen.getByText("Remove this draft?")).toBeTruthy()
+  // The draft has no brief and no images, so Remove asks nothing.
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove" })))
+  expect(screen.queryByRole("alertdialog")).toBeNull()
+  await waitFor(() => expect(where()).toBe("/epics This draft was removed."))
 })
 
 test("once Start made a worktree the folder is that worktree and cannot be edited", async () => {
@@ -547,14 +551,31 @@ test("Remove asks, then deletes the draft and goes to the Epics page with the no
   const fake = fakeDrafts()
   await mount(fake)
   fireEvent.click(screen.getByRole("button", { name: "Remove" }))
-  expect(screen.getByText("Remove this draft?")).toBeTruthy()
+  const popover = await screen.findByRole("alertdialog")
   expect(fake.remove).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole("button", { name: "Keep" }))
-  expect(screen.queryByText("Remove this draft?")).toBeNull()
+  fireEvent.click(within(popover).getByRole("button", { name: /^Cancel/ }))
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+  expect(fake.remove).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole("button", { name: "Remove" }))
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove" })))
-  expect(fake.remove).toHaveBeenCalledWith("c1")
+  const again = await screen.findByRole("alertdialog")
+  await act(async () => fireEvent.click(within(again).getByRole("button", { name: /^Remove/ })))
+  await waitFor(() => expect(fake.remove).toHaveBeenCalledWith("c1"))
   expect(where()).toBe("/epics This draft was removed.")
+})
+
+test("an empty chat draft removes with no confirm", async () => {
+  const fake = fakeDrafts({ brief: "", images: [] })
+  await mount(fake)
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove" })))
+  expect(screen.queryByRole("alertdialog")).toBeNull()
+  await waitFor(() => expect(fake.remove).toHaveBeenCalledWith("c1"))
+})
+
+test("Rename from the ⋯ focuses the Name field", async () => {
+  await mount(fakeDrafts())
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }))
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Rename" }))
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Name")))
 })
 
 test("a draft that is gone goes to the Epics page with the note", async () => {

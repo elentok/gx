@@ -40,6 +40,7 @@ import { DraftImages } from "./DraftImages"
 import { DraftSlots, useDraftImages } from "./useDraftImages"
 import { DraftBanner } from "./DraftBanner"
 import { DraftFooter } from "./DraftFooter"
+import { useDraftMenu } from "./useDraftMenu"
 import { field } from "./DraftHeader"
 import { useChatDraftAutosave } from "./useChatDraftAutosave"
 import { REMOVED_NOTE, useLeaveGone } from "./useDraftLifecycle"
@@ -180,7 +181,6 @@ function ChatDraftForm({
           : null
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
-  const [confirming, setConfirming] = useState(false)
   // The mascot toggle leads this header, so the shell drops its floating one.
   useClaimHeader()
 
@@ -190,12 +190,29 @@ function ChatDraftForm({
   const focusBrief = () => formRef.current?.querySelector<HTMLElement>(PROMPT_BOX_SELECTOR)?.focus()
   // New chat draft opens this page asking for the brief's focus, and on an empty page it asks again.
   usePromptFocus(formRef)
-  const pageState = useLatest({ empty: !brief.trim(), focusBrief })
+  // A draft with no brief and no images has nothing to lose, so the registry removes it with no confirm.
+  const empty = !brief.trim() && imgs.count === 0
+  const draftMenu = useDraftMenu({
+    kind: "chat-draft",
+    id: initial.id,
+    name: settings.name || facts.label,
+    empty,
+    deleteNow: remove,
+    onRemoved: () => navigate("/epics", { state: { note: REMOVED_NOTE } }),
+  })
+  const pageState = useLatest({
+    empty,
+    focusBrief,
+    remove: () => draftMenu.remove(),
+    rename: () => titleInput.current?.focus(),
+  })
   useEffect(
     () =>
       registerChatDraftPage({
         isEmpty: () => pageState.current.empty,
         focusBrief: () => pageState.current.focusBrief(),
+        remove: () => pageState.current.remove(),
+        rename: () => pageState.current.rename(),
       }),
     [],
   )
@@ -207,10 +224,6 @@ function ChatDraftForm({
     focus: focusBrief,
   })
 
-  const removeNow = () => {
-    remove()
-    navigate("/epics", { state: { note: REMOVED_NOTE } })
-  }
   const startNow = () => {
     if (blocker || banner || starting) return
     void start((session) => navigate(agentPath(session)))
@@ -283,6 +296,7 @@ function ChatDraftForm({
               {status === "saving" ? "Saving..." : status === "unsaved" ? "Not saved" : "Saved"}
             </Text>
           )}
+          {draftMenu.menu}
         </Box>
         <ChatDraftCrumb
           settings={settings}
@@ -390,8 +404,6 @@ function ChatDraftForm({
         )}
         <DraftFooter
           startLabel="Start chat"
-          removeText="Remove this draft?"
-          confirming={confirming}
           canAttach
           reasonText={
             blocker && (
@@ -403,9 +415,7 @@ function ChatDraftForm({
           startDisabled={!!blocker || banner || starting}
           pending={starting}
           onAttach={() => fileInput.current?.click()}
-          onAskRemove={() => setConfirming(true)}
-          onKeep={() => setConfirming(false)}
-          onRemove={removeNow}
+          onRemove={draftMenu.remove}
         />
       </Box>
     </DetailPage>

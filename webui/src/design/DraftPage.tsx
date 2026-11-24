@@ -1,6 +1,7 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react"
 import { DraftHeader, field } from "./DraftHeader"
 import { DraftFooter } from "./DraftFooter"
+import { useDraftMenu } from "./useDraftMenu"
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react"
 import { useOnChange } from "../hooks"
 import { useLocation, useNavigate, useParams } from "react-router"
@@ -201,17 +202,21 @@ function DraftForm({
   const attachIcon = useAttachIcon()
   const viMode = useViMode()
   const [viModeNow, setViModeNow] = useState<ViMode>("INSERT")
-  const [confirming, setConfirming] = useState(false)
   // The mascot toggle leads this header, so the shell drops its floating one.
   useClaimHeader()
   useDraftLifecycle({ drafts, autosave })
 
-  const removeNow = () => {
-    autosave.remove()
-    navigate("/epics")
-  }
-  // An empty draft has nothing to lose, so it goes at once.
-  const askRemove = () => (autosave.hasContent() ? setConfirming(true) : removeNow())
+  // An empty draft has nothing to lose, so the registry removes it with no confirm.
+  const draftMenu = useDraftMenu({
+    kind: "design-draft",
+    id: autosave.currentId(),
+    name: label,
+    empty: !autosave.hasContent(),
+    deleteNow: autosave.remove,
+    onRemoved: () => navigate("/epics"),
+  })
+  // A chord has no button to anchor on, so its confirm is a modal.
+  const askRemove = () => draftMenu.remove()
   const renameFocus = () => slugInput.current?.focus()
   // The Chord host calls these through the registry, so it always sees the latest closures.
   const formRef = useRef<HTMLFormElement | null>(null)
@@ -330,6 +335,7 @@ function DraftForm({
           slugError={slugError}
           slugInput={slugInput}
           status={status}
+          menu={draftMenu.menu}
           onRename={renameFocus}
           onHistory={history.show}
           onPickProject={pickProject}
@@ -432,15 +438,12 @@ function DraftForm({
           </Box>
         )}
         <DraftFooter
-          confirming={confirming}
           canAttach={attachIcon}
           reasonText={!sheetMode && reasonText}
           startDisabled={pending || !!reason || !!banner}
           pending={pending}
           onAttach={() => fileInput.current?.click()}
-          onAskRemove={askRemove}
-          onKeep={() => setConfirming(false)}
-          onRemove={removeNow}
+          onRemove={draftMenu.remove}
         />
       </Box>
     </DetailPage>

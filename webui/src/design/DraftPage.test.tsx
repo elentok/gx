@@ -1,4 +1,5 @@
-import { act, cleanup, fireEvent, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { ConfirmHost } from "../shell/ConfirmHost"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { MemoryRouter, Route, Routes, useLocation } from "react-router"
 import { ConnectionContext, type Connection } from "../connection"
@@ -109,6 +110,7 @@ async function mount(
   await act(async () => {
     renderThemed(
       <DeviceContext.Provider value={device}>
+        <ConfirmHost />
         <ConnectionContext.Provider value={connection}>
           <MemoryRouter initialEntries={[{ pathname, state }]}>
             <Routes>
@@ -519,17 +521,42 @@ test.each([
     const fake = fakeDrafts(over)
     await mount(fake)
     fireEvent.click(screen.getByRole("button", { name: "Remove" }))
-    expect(screen.getByText("Remove this draft and its images?")).toBeTruthy()
-    expect(fake.client.remove).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole("button", { name: "Keep" }))
+    const popover = await screen.findByRole("alertdialog")
     expect(screen.queryByText("Remove this draft and its images?")).toBeNull()
+    expect(within(popover).queryByRole("button", { name: "Keep" })).toBeNull()
+    expect(fake.client.remove).not.toHaveBeenCalled()
+    fireEvent.click(within(popover).getByRole("button", { name: /^Cancel/ }))
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
     expect(fake.client.remove).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole("button", { name: "Remove" }))
-    await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Remove" })))
-    expect(fake.client.remove).toHaveBeenCalledTimes(1)
+    const again = await screen.findByRole("alertdialog")
+    await act(
+      async () => void fireEvent.click(within(again).getByRole("button", { name: /^Remove/ })),
+    )
+    await waitFor(() => expect(fake.client.remove).toHaveBeenCalledTimes(1))
     expect(where()).toBe("/epics ")
   },
 )
+
+test("the title row ends with a More actions menu: Rename, then Remove (Move needs a workspace)", async () => {
+  await mount(fakeDrafts())
+  const more = screen.getByRole("button", { name: "More actions" })
+  const row = more.closest("div")!
+  expect(row.lastElementChild?.contains(more) || row.lastElementChild === more).toBe(true)
+  fireEvent.click(more)
+  const items = (await screen.findAllByRole("menuitem")).map((i) => i.textContent)
+  expect(items.filter((t) => ["Rename", "Move to workspace", "Remove"].includes(t ?? ""))).toEqual([
+    "Rename",
+    "Remove",
+  ])
+})
+
+test("Rename from the ⋯ focuses the slug field", async () => {
+  await mount(fakeDrafts())
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }))
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Rename" }))
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Epic slug")))
+})
 
 test("Remove on a draft with only an image asks first", async () => {
   const fake = fakeDrafts()
@@ -537,7 +564,7 @@ test("Remove on a draft with only an image asks first", async () => {
   addImages(png())
   await screen.findByText("1 of 10 images")
   fireEvent.click(screen.getByRole("button", { name: "Remove" }))
-  expect(screen.getByText("Remove this draft and its images?")).toBeTruthy()
+  expect(await screen.findByRole("alertdialog")).toBeTruthy()
 })
 
 test("a good Start goes to the Design page with the draft id and no workspace", async () => {

@@ -35,7 +35,7 @@ import {
   type PostEpicWrite,
 } from "../epics/queue"
 import { epicHref } from "../hrefs"
-import { draftPageActions } from "../shell/draftPageActions"
+import { chatDraftPageActions, draftPageActions } from "../shell/draftPageActions"
 import { openModelPicker } from "../shell/modelPickerOpen"
 import { openRename, type DraftIdentity } from "../shell/renameOpen"
 import { bulkUnarchive } from "../select/bulkWrites"
@@ -281,7 +281,7 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
         if (empty === undefined) {
           if (chatDraft) {
             const res = await w.readChatDraft(id).catch(() => undefined)
-            empty = res?.kind === "ok" && !res.draft.brief.trim()
+            empty = res?.kind === "ok" && !res.draft.brief.trim() && res.draft.images.length === 0
           } else {
             const res = await w.readDraft(id).catch(() => undefined)
             const d = res?.kind === "ok" ? res.draft : undefined
@@ -332,7 +332,12 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
 
   function runRename(e: Entity) {
     if (e.kind === "chat-draft") {
-      openRename({ chatDraft: { id: ctx.draft?.id ?? e.key, name: e.name } })
+      const page = chatDraftPageActions()
+      if (page && surfaceOf().page === e.key) page.rename()
+      else
+        openRename({
+          chatDraft: { id: ctx.draft?.id ?? e.key.replace(/^chat-draft\//, ""), name: e.name },
+        })
       return
     }
     if (isDraftEntity(e)) {

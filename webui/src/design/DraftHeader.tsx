@@ -1,5 +1,5 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
-import type { RefObject } from "react"
+import type { ReactNode, RefObject } from "react"
 import { HistoryButton } from "../history/HistoryButton"
 import { MascotToggle } from "../shell/MascotToggle"
 import { DraftIcon } from "../shell/SidebarRows"
@@ -22,6 +22,8 @@ interface Props {
   slugError: string | undefined
   slugInput: RefObject<HTMLInputElement | null>
   status: "none" | "saving" | "saved" | "unsaved"
+  /** The ⋯ menu, last in the title row. */
+  menu: ReactNode
   onRename: () => void
   onHistory: () => void
   onPickProject: (project: string) => void
@@ -37,6 +39,7 @@ export function DraftHeader({
   slugError,
   slugInput,
   status,
+  menu,
   onRename,
   onHistory,
   onPickProject,
@@ -95,6 +98,7 @@ export function DraftHeader({
             {status === "saving" ? "Saving..." : status === "unsaved" ? "Not saved" : "Saved"}
           </Text>
         )}
+        {menu}
       </Box>
       <Box
         display="flex"

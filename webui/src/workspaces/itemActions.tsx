@@ -172,13 +172,18 @@ export function useItemActions(
   const cardKind = item?.kind === "epic" || item?.kind === "design" || item?.kind === "ticket"
   const noWorkspace = cardKind && !item.workspace
   const hide = noWorkspace ? [...(opts.hide ?? BUILT_BY_PAGE), ...WORKSPACE_ONLY] : opts.hide
-  return useEntityActions(item && entityOfItem(item), workspaces, { ...opts, hide }, {
-    writers,
-    state: opts.state,
-    onRemoved,
-    draft: item?.draft,
-    promote: { connected: true },
-  })
+  return useEntityActions(
+    item && entityOfItem(item),
+    workspaces,
+    { ...opts, hide },
+    {
+      writers,
+      state: opts.state,
+      onRemoved,
+      draft: item?.draft,
+      promote: { connected: true },
+    },
+  )
 }
 
 /** The menu groups and the ready actions of one entity, for a row or a page that reads the registry. */
@@ -188,13 +193,15 @@ export function useEntityActions(
   opts: {
     anchor?: () => HTMLElement | null | undefined
     hide?: string[]
+    /** The entity key of the page the menu sits on; Rename on that page edits in place. */
+    page?: string
   } = {},
   ctx: Partial<ActionContext> = {},
 ) {
   const { actions, get } = useActions(entity, {
     surface: () => {
       const anchor = opts.anchor?.()
-      return anchor ? { mode: "anchor", anchor } : MODAL
+      return anchor ? { mode: "anchor", anchor, page: opts.page } : { ...MODAL, page: opts.page }
     },
     workspaces,
     promote: { connected: true },

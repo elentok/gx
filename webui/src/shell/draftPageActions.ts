@@ -22,9 +22,13 @@ export const draftPageActions = () => current
 
 /** What New chat draft asks of an open chat draft page. Apart from the design page's so New design never lands here. */
 export interface ChatDraftPageActions {
-  /** True when the brief is blank. */
+  /** True when the draft has no brief and no images. */
   isEmpty: () => boolean
   focusBrief: () => void
+  /** Runs the registry Remove with the modal origin. */
+  remove: () => void
+  /** Focuses the Name field. */
+  rename: () => void
 }
 
 let currentChat: ChatDraftPageActions | null = null
