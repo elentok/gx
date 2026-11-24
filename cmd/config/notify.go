@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"io"
 	"slices"
 	"strings"
 	"time"
@@ -45,14 +46,22 @@ func isKnownNotifyTransport(name string) bool {
 // notifyDestinations lists every notification destination: the global one per
 // transport plus any a project's override adds.
 func notifyDestinations(d Deps) ([]notify.Destination, error) {
+	cfg, err := loadNotifyConfig(d)
+	if err != nil {
+		return nil, err
+	}
+	return notifyDestinationsFor(cfg)
+}
+
+func loadNotifyConfig(d Deps) (gxconfig.Config, error) {
 	load := d.LoadConfig
 	if load == nil {
 		load = d.Dirs().Load
 	}
-	cfg, err := load()
-	if err != nil {
-		return nil, err
-	}
+	return load()
+}
+
+func notifyDestinationsFor(cfg gxconfig.Config) ([]notify.Destination, error) {
 	dirs, err := tickets.ProjectDirs(cfg.TicketStore.Path)
 	if err != nil {
 		return nil, err
@@ -253,6 +262,33 @@ func notificationStatePath(dirs gxconfig.Dirs) (string, error) {
 	return notify.NotificationStatePath(dir), nil
 }
 
+// printChannelLines prints one line per channel: its switch, its kind count
+// and, for the breaker channels, since when it has been tripped.
+func printChannelLines(w io.Writer, chs gxconfig.NotificationChannelsConfig, state notify.NotificationState, now time.Time) {
+	rows := []struct {
+		name    string
+		cfg     gxconfig.ChannelConfig
+		breaker bool
+	}{
+		{"desktop", chs.Desktop, true},
+		{"web-toast", chs.WebToast, true},
+		{"telegram", chs.Telegram, false},
+		{"slack", chs.Slack, false},
+		{"push", chs.Push, true},
+	}
+	for _, r := range rows {
+		sw := "off"
+		if r.cfg.Enabled {
+			sw = "on"
+		}
+		line := fmt.Sprintf("channel %s: %s, %d kinds", r.name, sw, len(r.cfg.Kinds))
+		if ts := state.Transports[r.name]; r.breaker && ts.ChannelTripped(now, 0) {
+			line += ", tripped since " + ts.TrippedAt.Format(time.RFC3339)
+		}
+		fmt.Fprintln(w, line)
+	}
+}
+
 // runNotifyStatus reports every destination's mute state and projects, plus
 // every ticket under the current repo's tracker root carrying a non-empty Mutes.
 func runNotifyStatus(d Deps) error {
@@ -264,10 +300,15 @@ func runNotifyStatus(d Deps) error {
 	if err != nil {
 		return err
 	}
-	dests, err := notifyDestinations(d)
+	cfg, err := loadNotifyConfig(d)
 	if err != nil {
 		return err
 	}
+	dests, err := notifyDestinationsFor(cfg)
+	if err != nil {
+		return err
+	}
+	printChannelLines(d.Stdout, cfg.NotificationChannels, state, time.Now())
 	for _, dest := range dests {
 		line := fmt.Sprintf("%s: active", dest.Key)
 		if ts := state.Transports[dest.Key]; ts.Muted {

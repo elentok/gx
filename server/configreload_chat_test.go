@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/notifykind"
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/ralphloop/schedule"
 	"github.com/elentok/gx/server/settings"
@@ -176,6 +177,84 @@ func TestConfigReloadChat_ChannelSwitchAndKindListApplyOnTheNextSend(t *testing.
 				t.Errorf("body %q holds %q, which the kind list or the switch should have dropped", body, banned)
 			}
 		}
+	}
+}
+
+// writeChannelSwitchConfig writes a config with every channel's switch set to
+// on (the kind lists stay at their defaults).
+func writeChannelSwitchConfig(t *testing.T, s *Server, path, webhook string, on bool) {
+	t.Helper()
+	sw := map[string]any{"enabled": on}
+	data, err := json.Marshal(map[string]any{
+		"ticket-store":  map[string]any{"path": s.cfg.TicketStore},
+		"notifications": map[string]any{"slack": map[string]any{"webhook-url": webhook}},
+		"notification-channels": map[string]any{
+			"desktop": sw, "web-toast": sw, "telegram": sw, "slack": sw, "push": sw,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A changed switch reaches every channel's reader on the next reload: the
+// router reads settings.Settings per message, nothing is captured at start.
+func TestConfigReloadChannelSwitch_AppliesWithoutRestart(t *testing.T) {
+	t.Parallel()
+	s, path := reloadChatServer(t, "http://127.0.0.1:1/hook", time.Hour)
+	defer s.chat.Close()
+	outcomes := func() map[string]string {
+		return map[string]string{
+			"desktop":   preflight(s, notify.ChannelDesktop, func(n settings.NotifyChannels) settings.NotifyChannel { return n.Desktop }, notifykind.SessionAlert, true),
+			"web-toast": preflight(s, notify.ChannelWebToast, func(n settings.NotifyChannels) settings.NotifyChannel { return n.WebToast }, notifykind.SessionAlert, true),
+			"push":      preflight(s, notify.ChannelPush, func(n settings.NotifyChannels) settings.NotifyChannel { return n.Push }, notifykind.SessionAlert, true),
+		}
+	}
+
+	writeChannelSwitchConfig(t, s, path, "http://127.0.0.1:1/hook", false)
+	res := s.settings.Reload(settings.TriggerCommand)
+	for _, key := range []string{"desktop", "web-toast", "telegram", "slack", "push"} {
+		if !slices.Contains(res.Changed, "notification-channels."+key+".enabled") {
+			t.Errorf("reload changed %v, want the %s switch", res.Changed, key)
+		}
+	}
+	for name, got := range outcomes() {
+		if got != notify.OutcomeOff {
+			t.Errorf("%s after switching off = %q, want %q", name, got, notify.OutcomeOff)
+		}
+	}
+	if s.chat.Enabled() {
+		t.Error("chat still enabled with Telegram and Slack off")
+	}
+
+	writeChannelSwitchConfig(t, s, path, "http://127.0.0.1:1/hook", true)
+	s.settings.Reload(settings.TriggerCommand)
+	for name, got := range outcomes() {
+		if got != notify.OutcomeSent {
+			t.Errorf("%s after switching on = %q, want %q", name, got, notify.OutcomeSent)
+		}
+	}
+	if !s.chat.Enabled() {
+		t.Error("chat not enabled after switching back on")
+	}
+}
+
+// A notice queued while the switch was on is dropped when the switch is off at
+// the flush; Desktop, Web toast and Push queue nothing, so only chat has this.
+func TestConfigReloadChat_QueuedBatchForATurnedOffChannelIsDropped(t *testing.T) {
+	t.Parallel()
+	hook := newChatHook(t, nil)
+	s, path := reloadChatServer(t, hook.URL, time.Hour)
+
+	notice(s, "queued-before-off")
+	writeSlackChannelConfig(t, s, path, hook.URL, false, notifykind.IDs())
+	s.settings.Reload(settings.TriggerCommand)
+	s.chat.Close()
+	if got := hook.sent(); len(got) != 0 {
+		t.Errorf("sent %v, want nothing for a channel turned off", got)
 	}
 }
 

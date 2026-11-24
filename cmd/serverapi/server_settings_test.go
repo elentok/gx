@@ -19,6 +19,33 @@ import (
 
 const secretToken = "123456:SECRET-TOKEN-VALUE"
 
+func TestServerSettings_ChannelSwitchesAreBool(t *testing.T) {
+	store := t.TempDir()
+	path := filepath.Join(t.TempDir(), "config.json")
+	servertest.WriteConfig(t, path, store, nil)
+	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
+	ctx := context.Background()
+
+	var out bytes.Buffer
+	if err := runServerSettings(ctx, h.Client, &out, "global", true); err != nil {
+		t.Fatal(err)
+	}
+	var got ops.SettingsReadResponse
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	types := map[string]string{}
+	for _, e := range got.Entries {
+		types[e.Key] = e.Type
+	}
+	for _, ch := range []string{"desktop", "web-toast", "telegram", "slack", "push"} {
+		key := "notification-channels." + ch + ".enabled"
+		if types[key] != "bool" {
+			t.Errorf("%s type = %q, want bool", key, types[key])
+		}
+	}
+}
+
 func TestServerSettings_JSONMatchesEndpointAndHidesSecrets(t *testing.T) {
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")

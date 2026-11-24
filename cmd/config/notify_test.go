@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/cmd/cmdtest"
@@ -119,6 +120,115 @@ func TestExecute_Notify_MessageWithEnableRejected(t *testing.T) {
 	t.Parallel()
 	d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)}}
 	err := run(t, d, "notify", "hello", "--enable", "slack")
+	if err == nil || !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Fatalf("expected mutual-exclusion error, got: %v", err)
+	}
+}
+
+func notifyStatusOut(t *testing.T, mutate func(*gxconfig.Config)) string {
+	t.Helper()
+	repo := testutil.TempRepo(t)
+	store := cmdtest.IsolateTicketStore(t)
+	cmdtest.AddProject(t, store, "plain", repo)
+	var out bytes.Buffer
+	d := Deps{Env: cmdbase.Env{Stdout: &out, Stderr: bytes.NewBuffer(nil), Getwd: func() (string, error) { return repo, nil },
+		Env: cmdtest.EnvFor(t),
+		LoadConfig: func() (gxconfig.Config, error) {
+			cfg := gxconfig.Default()
+			cfg.TicketStore.Path = store
+			if mutate != nil {
+				mutate(&cfg)
+			}
+			return cfg, nil
+		}}}
+	if err := run(t, d, "notify", "--status"); err != nil {
+		t.Fatalf("execute notify --status: %v", err)
+	}
+	return out.String()
+}
+
+func TestExecute_Notify_Status_ListsFiveChannelsWithSwitchAndKindCount(t *testing.T) {
+	got := notifyStatusOut(t, func(cfg *gxconfig.Config) {
+		cfg.NotificationChannels.Slack.Enabled = false
+		cfg.NotificationChannels.Telegram.Kinds = []string{"a", "b"}
+		cfg.NotificationChannels.Push.Kinds = nil
+	})
+	want := []string{
+		"channel desktop: on, ",
+		"channel web-toast: on, ",
+		"channel telegram: on, 2 kinds",
+		"channel slack: off, ",
+		"channel push: on, 0 kinds",
+	}
+	pos := 0
+	for _, w := range want {
+		i := strings.Index(got[pos:], w)
+		if i < 0 {
+			t.Fatalf("want %q in order after offset %d, got: %q", w, pos, got)
+		}
+		pos += i + len(w)
+	}
+	if strings.Contains(got, "tripped since") {
+		t.Fatalf("no channel is tripped, got: %q", got)
+	}
+}
+
+func TestExecute_Notify_Status_ShowsTrippedSinceOnlyWhileTripped(t *testing.T) {
+	for _, channel := range []string{"desktop", "web-toast", "push"} {
+		t.Run(channel, func(t *testing.T) {
+			now := time.Now().UTC().Truncate(time.Second)
+			trippedAt := now.Add(-time.Minute)
+			cases := []struct {
+				name     string
+				lastSend time.Time
+				tripped  bool
+			}{
+				{"tripped", now.Add(-time.Minute), true},
+				{"cleared after 5 minutes", now.Add(-6 * time.Minute), false},
+			}
+			for _, c := range cases {
+				t.Run(c.name, func(t *testing.T) {
+					repo := testutil.TempRepo(t)
+					store := cmdtest.IsolateTicketStore(t)
+					cmdtest.AddProject(t, store, "plain", repo)
+					statePath, err := notificationStatePath(gxconfig.DirsFrom(cmdtest.EnvFor(t)))
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := notify.UpdateNotificationState(statePath, func(s *notify.NotificationState) {
+						s.Transports[channel] = notify.TransportState{Muted: true, Reason: "auto-trip", TrippedAt: trippedAt,
+							Sends: []notify.NotificationSend{{Time: c.lastSend}}}
+					}); err != nil {
+						t.Fatal(err)
+					}
+					var out bytes.Buffer
+					d := Deps{Env: cmdbase.Env{Stdout: &out, Stderr: bytes.NewBuffer(nil), Getwd: func() (string, error) { return repo, nil },
+						Env: cmdtest.EnvFor(t),
+						LoadConfig: func() (gxconfig.Config, error) {
+							cfg := gxconfig.Default()
+							cfg.TicketStore.Path = store
+							return cfg, nil
+						}}}
+					if err := run(t, d, "notify", "--status"); err != nil {
+						t.Fatal(err)
+					}
+					want := "tripped since " + trippedAt.Format(time.RFC3339)
+					if got := strings.Contains(out.String(), "channel "+channel+": on, ") && strings.Contains(out.String(), want); got != c.tripped {
+						t.Fatalf("tripped=%v want %v, got: %q", got, c.tripped, out.String())
+					}
+					if !c.tripped && strings.Contains(out.String(), "tripped since") {
+						t.Fatalf("cleared channel must not show tripped since, got: %q", out.String())
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestExecute_Notify_StatusWithEnableStillFails(t *testing.T) {
+	t.Parallel()
+	d := Deps{Env: cmdbase.Env{Stdout: bytes.NewBuffer(nil), Stderr: bytes.NewBuffer(nil)}}
+	err := run(t, d, "notify", "--status", "--enable", "slack")
 	if err == nil || !strings.Contains(err.Error(), "mutually exclusive") {
 		t.Fatalf("expected mutual-exclusion error, got: %v", err)
 	}
