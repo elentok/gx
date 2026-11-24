@@ -204,11 +204,25 @@ test("203. Schedules journey", async ({ page, start }) => {
   await runs.nth(0).getByRole("link").click()
   await expect(page).toHaveURL(/one-offs/)
   const recovery = page.getByRole("form", { name: "Recovery actions" })
-  // The paused shape offers Cancel only, no Resume or Start over.
+  // The paused shape offers Cancel run only in the footer, no Resume or Start over.
   await expect(recovery.getByRole("button")).toHaveCount(1)
-  await expect(recovery.getByRole("button", { name: "Cancel", exact: true })).toBeVisible()
-  await recovery.getByRole("button", { name: "Cancel", exact: true }).click()
-  await page.getByRole("button", { name: "Cancel run", exact: true }).click()
+  await expect(recovery.getByRole("button", { name: "Cancel run", exact: true })).toBeVisible()
+  // The ⋯ holds Copy ID and Cancel run, no Start over.
+  await page
+    .getByTestId("page-header-actions")
+    .getByRole("button", { name: "More actions" })
+    .click()
+  await expect(page.getByRole("menu", { name: "More actions" }).getByRole("menuitem")).toHaveText([
+    "Copy ID",
+    "Cancel run",
+  ])
+  await page.keyboard.press("Escape")
+  await recovery.getByRole("button", { name: "Cancel run", exact: true }).click()
+  const confirm = page.getByRole("alertdialog", { name: /^Cancel run of / })
+  // Each button carries its key hint ("n", "y") in its name.
+  await expect(confirm.getByRole("button")).toHaveText([/^Cancel\s*n$/, /^Cancel run\s*y$/])
+  await confirm.getByRole("button", { name: /^Cancel run/ }).click()
+  await expect(confirm).toHaveCount(0)
   await page.goBack()
   await expect(runs.nth(0)).toContainText("Cancelled")
 })

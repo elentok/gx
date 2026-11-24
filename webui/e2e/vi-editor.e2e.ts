@@ -262,16 +262,16 @@ const expectFocusStays = async (page: Page, layer: Locator, key: string, times: 
 const PAUSED_TICKET = "#/t/demo:paused-epic/08"
 const START_OVER = "Start over reason"
 
-// Opens the start-over dialog on the paused ticket; returns it.
+// Opens the start-over popover on the paused ticket from the footer button; returns it.
 const openStartOver = async (page: Page) => {
   await page.evaluate((hash) => (location.hash = hash), PAUSED_TICKET)
-  await page
+  const footer = page
     .getByRole("form", { name: "Recovery actions" })
     .getByRole("button", nav("Start over"))
-    .click()
-  const dialog = page.getByRole("dialog", nav("Start over"))
+  await footer.click()
+  const dialog = page.getByRole("alertdialog", nav("Start over"))
   await expect(dialog).toBeVisible()
-  return dialog
+  return { dialog, footer }
 }
 
 // Opens the large editor over the Reason field of the start-over dialog.
@@ -371,21 +371,19 @@ test.describe("126. Vi editor: layers and focus", () => {
     await phone.close()
   })
 
-  // Also covers "a backdrop press closes only the editor over the start-over dialog" and "Tab never
-  // leaves a plain modal".
-  test("Escape closes the start-over dialog, Tab stays in it, and the editor over it keeps both open", async ({
+  // Also covers "a backdrop press closes only the editor over the start-over popover".
+  test("Escape closes the start-over popover, focus returns to its button, and the editor over it keeps both open", async ({
     page,
     start,
   }) => {
     const fixture = await start("paused")
     await setViMode(fixture, page, true)
-    const dialog = await openStartOver(page)
-    await expectFocusStays(page, dialog, "Tab", 8)
-    await expectFocusStays(page, dialog, "Shift+Tab", 8)
+    const first = await openStartOver(page)
     await page.keyboard.press("Escape")
-    await expect(dialog).toHaveCount(0)
+    await expect(first.dialog).toHaveCount(0)
+    await expect(first.footer).toBeFocused()
 
-    const again = await openStartOver(page)
+    const { dialog: again } = await openStartOver(page)
     const editor = await openReasonEditor(page, again)
     await page.keyboard.press("Escape")
     await expect(editor).toBeVisible()

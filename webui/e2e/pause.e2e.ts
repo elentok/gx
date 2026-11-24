@@ -1,9 +1,12 @@
-import type { Page } from "@playwright/test"
+import type { Locator, Page } from "@playwright/test"
 import { realpath } from "node:fs/promises"
 import { withState } from "./diagnostics"
 import { card, expect, nav, renderedText, test, toasts, type Fixture } from "./fixture"
 
 const recovery = (page: Page) => page.getByRole("form", { name: "Recovery actions" })
+
+// The popover's confirm button carries its key hint ("y") in its name.
+const confirmName = { name: /^Start over/ }
 
 // A hash change keeps the page, since the fixture fails a test whose page reloaded.
 const openTicket = (page: Page, id: string, epic = "paused-epic") =>
@@ -22,8 +25,9 @@ const stuck = (page: Page) => page.getByText("Paused · Agent stuck", { exact: t
 // Resume and "Retry is disabled while the call runs" are vitest cases (ticket/ActionCard.test.tsx):
 // Resume needs ticket 08, which Start over consumes.
 test.describe("3. Pause reasons and recovery", () => {
-  test("every pause reason recovers", async ({ page, start }) => {
+  test("every pause reason recovers", async ({ page, context, start }) => {
     test.setTimeout(240_000)
+    await context.grantPermissions(["clipboard-read", "clipboard-write"])
     const fixture = await start("paused")
     await fixture.cli("server", "queue", "add", "demo:paused-epic")
 
@@ -105,12 +109,49 @@ test.describe("3. Pause reasons and recovery", () => {
       await recovery(page).getByRole("button", nav("Merge again")).click()
     })
     await step("paused-epic", "08", "Paused by you", async () => {
-      await recovery(page).getByRole("button", nav("Start over")).click()
-      const dialog = page.getByRole("dialog", { name: "Start over" })
-      await withState("Start over dialog has no Reason textbox", state("paused-epic", "08"), () =>
-        dialog.getByRole("textbox", { name: "Reason" }).fill("wrong base"),
+      const more = page.getByTestId("page-header-actions").getByRole("button", nav("More actions"))
+      const popover = page.getByRole("alertdialog", nav("Start over"))
+      // The popover sits against its anchor, above or below it, and spans the anchor's centre.
+      // The popover is positioned after it mounts, so the check polls.
+      const anchoredOn = (anchor: Locator) =>
+        expect
+          .poll(async () => {
+            const a = (await anchor.boundingBox())!
+            const p = (await popover.boundingBox())!
+            const gap = Math.min(Math.abs(p.y - (a.y + a.height)), Math.abs(a.y - (p.y + p.height)))
+            const centre = a.x + a.width / 2
+            return gap < 60 && centre > p.x && centre < p.x + p.width
+          })
+          .toBe(true)
+
+      // The ⋯ holds Copy ID and Start over, no Cancel run; Copy ID copies the address.
+      await more.click()
+      const menu = page.getByRole("menu", nav("More actions"))
+      await expect(menu.getByRole("menuitem")).toHaveText(["Copy ID", "Start over"])
+      await menu.getByRole("menuitem", nav("Copy ID")).click()
+      await expect(menu).toHaveCount(0)
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("demo:paused-epic/08")
+
+      // From the ⋯ the popover anchors under the ⋯; the confirm stays off until a reason is typed.
+      await more.click()
+      await menu.getByRole("menuitem", nav("Start over")).click()
+      await expect(popover).toBeVisible()
+      await anchoredOn(more)
+      const reason = popover.getByRole("textbox", { name: "Reason" })
+      await expect(popover.getByRole("button", confirmName)).toBeDisabled()
+      await page.keyboard.press("Escape")
+      await expect(popover).toHaveCount(0)
+
+      // From the footer it anchors on the footer button.
+      const footer = recovery(page).getByRole("button", nav("Start over"))
+      await footer.click()
+      await expect(popover).toBeVisible()
+      await anchoredOn(footer)
+      await expect(popover.getByRole("button", confirmName)).toBeDisabled()
+      await withState("Start over popover has no Reason textbox", state("paused-epic", "08"), () =>
+        reason.fill("wrong base"),
       )
-      await dialog.getByRole("button", nav("Start over")).click()
+      await popover.getByRole("button", confirmName).click()
     })
     await step("paused-epic", "09", "Run failed", async () => {
       await expect(
@@ -282,10 +323,10 @@ test.describe("3. Pause reasons and recovery", () => {
       ["Keep waiting", "Retry", "Start over"],
       async () => {
         await recovery(page).getByRole("button", nav("Start over")).click()
-        const dialog = page.getByRole("dialog", { name: "Start over" })
+        const dialog = page.getByRole("alertdialog", nav("Start over"))
         await expect(dialog.getByText(/Start over discards the branch's commits/)).toBeVisible()
         await dialog.getByRole("textbox", { name: "Reason" }).fill("drop the task")
-        await dialog.getByRole("button", nav("Start over")).click()
+        await dialog.getByRole("button", confirmName).click()
         await cleared(page)
       },
     )
