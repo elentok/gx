@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react"
 import type { FetchEpicList } from "../epics/list"
+import { isExited } from "../agents/sessionWrites"
 import { useLatest } from "../hooks"
 import { Button } from "../ui/button/Button"
 import { hasLayer } from "../ui/modal/layers"
@@ -196,7 +197,8 @@ function useSidebarSelectKeys(sel: SidebarSelect) {
 const rowOf = (r: SidebarRow, visible: boolean): SelectRow => ({
   key: r.key,
   kind: rowItemKind(r.kind),
-  draftId: r.draft?.id,
+  draftId: r.draft?.id ?? r.chatDraftId,
+  liveSessions: r.kind === "design" ? (r.sessions ?? []).filter((s) => !isExited(s)) : undefined,
   visible,
   selectable: true,
   group: r.held ? GROUP_ON_HOLD : undefined,

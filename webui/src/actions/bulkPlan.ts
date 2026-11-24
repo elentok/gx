@@ -26,25 +26,39 @@ export function planBulk(
   const skipLines = fit.skipped.map((s) => `${byKey.get(s.key)?.name ?? s.key}: ${s.reason}`)
   const needs = running.some((e) => action.confirm.rule(e))
   if (!needs) return { fit, label, skipLines }
-  const rows = running.map((e) => e.name)
-  const confirmLabel = `${action.label} ${running.length}`
   return {
     fit,
     label,
     skipLines,
-    confirm: {
-      actionId: action.id,
-      entityName: `${running.length} items`,
-      group: action.group,
-      danger: action.danger,
-      confirmLabel,
-      dismissLabel: action.id === "remove" ? "Keep" : "Cancel",
-      title: confirmLabel,
-      body: { lines: [`${confirmLabel}?`], rows },
+    confirm: bulkRequest(
+      action,
+      running.map((e) => e.name),
       surface,
-      onConfirm: () => {
-        onConfirm(running)
-      },
+      () => onConfirm(running),
+    ),
+  }
+}
+
+/** The confirm of a bulk run over `rows`: the button carries the count and the body lists every row. */
+export function bulkRequest(
+  action: ActionDecl,
+  rows: string[],
+  surface: SurfaceContext,
+  onConfirm: () => void,
+): ConfirmRequest {
+  const confirmLabel = `${action.barLabel ?? action.label} ${rows.length}`
+  return {
+    actionId: action.id,
+    entityName: `${rows.length} items`,
+    group: action.group,
+    danger: action.danger,
+    confirmLabel,
+    dismissLabel: "Cancel",
+    title: confirmLabel,
+    body: { lines: [], rows },
+    surface,
+    onConfirm: () => {
+      onConfirm()
     },
   }
 }

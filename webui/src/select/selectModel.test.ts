@@ -8,7 +8,6 @@ import {
   fitOf,
   groupState,
   initialSelect,
-  isDraftKind,
   leave,
   prune,
   rowOfAgent,
@@ -38,20 +37,6 @@ const r = (key: string, over: Partial<SelectRow> = {}): SelectRow => ({
   ...over,
 })
 const on = (...keys: string[]): SelectState => ({ on: true, keys })
-
-describe("isDraftKind", () => {
-  it.each([
-    ["draft", true],
-    ["chat-draft", true],
-    ["epic", false],
-    ["design", false],
-    ["chat", false],
-    ["agent", false],
-    ["archived", false],
-  ] as const)("%s -> %s", (kind, want) => {
-    expect(isDraftKind(kind)).toBe(want)
-  })
-})
 
 describe("mode", () => {
   it("enters with nothing selected and leaves clearing the selection", () => {
@@ -166,12 +151,59 @@ describe("fit rules", () => {
     expect(fits("remove")).toEqual(["chat", "a-live", "a-exited"])
   })
 
-  it("a chat draft fits Move and is refused by Remove and Hold", () => {
+  it("a chat draft fits Move and Remove and is refused by Hold", () => {
     const cd = [r("chat-draft/x", { kind: "chat-draft" })]
     const f = (a: Parameters<typeof fitOf>[0]) => fitOf(a, on("chat-draft/x"), cd)
     expect(f("move").fits).toEqual(["chat-draft/x"])
-    expect(f("remove").skipped).toEqual([{ key: "chat-draft/x", reason: "can't be removed" }])
+    expect(f("remove").fits).toEqual(["chat-draft/x"])
     expect(f("hold").skipped).toEqual([{ key: "chat-draft/x", reason: "can't be held" }])
+  })
+
+  it("every action skips the Queue agent as managed by the queue", () => {
+    const f = (a: Parameters<typeof fitOf>[0]) => fitOf(a, on("a-queue"), rows)
+    for (const a of ["move", "hold", "unhold", "stop", "archive", "unarchive", "remove"] as const)
+      expect(f(a).skipped).toEqual([{ key: "a-queue", reason: "managed by the queue" }])
+  })
+
+  it("Fix and Investigate agents fit Stop and Remove and skip Move and Hold", () => {
+    const fix = [r("fix", { kind: "agent", session: live })]
+    const f = (a: Parameters<typeof fitOf>[0]) => fitOf(a, on("fix"), fix)
+    expect(f("stop").fits).toEqual(["fix"])
+    expect(f("remove").fits).toEqual(["fix"])
+    expect(f("move").skipped).toEqual([{ key: "fix", reason: "can't be moved" }])
+    expect(f("hold").skipped).toEqual([{ key: "fix", reason: "can't be held" }])
+  })
+
+  it("a Design fits Stop with one live session and skips two as 2 live sessions", () => {
+    const d = (n: number) =>
+      r("d", {
+        kind: "design",
+        liveSessions: Array.from({ length: n }, (_, i) => session(`s${i}`, "p")),
+      })
+    expect(fitOf("stop", on("d"), [d(1)]).fits).toEqual(["d"])
+    expect(fitOf("stop", on("d"), [d(2)]).skipped).toEqual([
+      { key: "d", reason: "2 live sessions" },
+    ])
+    expect(fitOf("stop", on("d"), [d(0)]).skipped).toEqual([{ key: "d", reason: "not live" }])
+  })
+
+  it("shows the bar in the registry order, Remove last", () => {
+    const every: SelectRow[] = [
+      r("e"),
+      r("held", { held: true }),
+      r("arch", { kind: "archived" }),
+      r("c", { kind: "chat", session: live }),
+    ]
+    // Move, Hold, Take off hold, Stop, Archive, Unarchive and Remove each fit one of these rows.
+    expect(visibleActions(on("e", "held", "arch", "c"), every).map((a) => a.action)).toEqual([
+      "move",
+      "hold",
+      "unhold",
+      "stop",
+      "archive",
+      "unarchive",
+      "remove",
+    ])
   })
 
   it("Archive fits epics and Designs; the server's dry run refuses unfinished ones", () => {

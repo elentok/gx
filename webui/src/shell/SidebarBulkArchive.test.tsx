@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
+import { closeConfirm } from "../actions/confirmRequest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import {
   CardKindDesign,
@@ -22,6 +23,7 @@ vi.mock("../ui/toaster", async (orig) => ({
 }))
 
 afterEach(() => {
+  closeConfirm()
   cleanup()
   vi.unstubAllGlobals()
   localStorage.clear()
@@ -65,7 +67,7 @@ function setup(reply: Reply, drafts: DesignDraftRow[] = []) {
         return new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 })
       const body = JSON.parse(String(init?.body)) as Call
       calls.push(body)
-      return new Response(JSON.stringify(reply(body)), { status: 200 })
+      return new Response(JSON.stringify(await reply(body)), { status: 200 })
     }),
   )
   const state = {
@@ -110,6 +112,14 @@ async function selectRows(...names: string[]) {
   for (const n of names) fireEvent.click(box(`Select ${n}`))
 }
 
+/** Presses the popover's confirm button once the dry run has turned it on. */
+async function confirmArchive() {
+  const dialog = await screen.findByRole("alertdialog")
+  const confirm = within(dialog).getByRole("button", { name: /^Archive \d/ }) as HTMLButtonElement
+  await waitFor(() => expect(confirm.disabled).toBe(false))
+  fireEvent.click(confirm)
+}
+
 const dryOnly = (b: Call) =>
   b.dry_run
     ? { results: b.targets.map((t) => fits(t)) }
@@ -125,7 +135,8 @@ test("Archive posts a dry run first and confirms even with no live Session and n
   const calls = setup(dryOnly)
   await selectRows("Blog", "Shop")
   fireEvent.click(bar().getByRole("button", { name: "Archive 2" }))
-  const dialog = await screen.findByRole("dialog")
+  const dialog = await screen.findByRole("alertdialog")
+  await waitFor(() => expect(within(dialog).getAllByRole("listitem")).toHaveLength(2))
   expect(calls).toEqual([{ targets: ["p:blog", "p:shop"], dry_run: true }])
   expect(
     within(dialog)
@@ -144,10 +155,11 @@ test("the confirm lists live sessions and one trunk warning naming the epics not
   )
   await selectRows("Blog", "Shop")
   fireEvent.click(bar().getByRole("button", { name: "Archive 2" }))
-  const dialog = await screen.findByRole("dialog")
+  const dialog = await screen.findByRole("alertdialog")
+  await waitFor(() => expect(dialog.textContent).toContain("Live sessions will stop"))
   expect(dialog.textContent).toContain("Live sessions will stop: s1, s2.")
   expect(dialog.textContent).toContain("Not merged to trunk: Blog.")
-  fireEvent.click(within(dialog).getByRole("button", { name: "Archive" }))
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Archive \d/ }))
   await waitFor(() => expect(calls).toHaveLength(2))
   expect(calls[1]).toEqual({ targets: ["p:blog", "p:shop"], yes: true })
 })
@@ -156,7 +168,9 @@ test("Cancel sends no real call and keeps the selection", async () => {
   const calls = setup(dryOnly)
   await selectRows("Blog")
   fireEvent.click(bar().getByRole("button", { name: "Archive 1" }))
-  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }))
+  const dialog = await screen.findByRole("alertdialog")
+  await waitFor(() => expect(calls).toHaveLength(1))
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Cancel/ }))
   expect(calls).toHaveLength(1)
   expect(screen.getByTestId("select-count").textContent).toBe("1 selected")
 })
@@ -167,9 +181,7 @@ test("a persistent Archiving toast shows while the real call runs", async () => 
   )
   await selectRows("Blog", "Shop")
   fireEvent.click(bar().getByRole("button", { name: "Archive 2" }))
-  fireEvent.click(
-    within(await screen.findByRole("dialog")).getByRole("button", { name: "Archive" }),
-  )
+  await confirmArchive()
   await waitFor(() =>
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Archiving 2 epics…", persistent: true }),
@@ -190,9 +202,7 @@ test("a clash rename shows in the toast as Archived as ...-2", async () => {
   )
   await selectRows("Blog", "Shop")
   fireEvent.click(bar().getByRole("button", { name: "Archive 2" }))
-  fireEvent.click(
-    within(await screen.findByRole("dialog")).getByRole("button", { name: "Archive" }),
-  )
+  await confirmArchive()
   await waitFor(() => expect(toast).toHaveBeenCalled())
   expect(toast.mock.calls.map(([t]) => t.title)).toContain("Archived as blog-2")
 })
@@ -215,9 +225,10 @@ test("rows the dry run refuses are listed with the reason, do not run, and stay 
   )
   await selectRows("Blog", "Shop")
   fireEvent.click(bar().getByRole("button", { name: "Archive 2" }))
-  const dialog = await screen.findByRole("dialog")
+  const dialog = await screen.findByRole("alertdialog")
+  await waitFor(() => expect(dialog.textContent).toContain("Blog will not run"))
   expect(dialog.textContent).toContain("Blog will not run: impl epic not finished.")
-  fireEvent.click(within(dialog).getByRole("button", { name: "Archive" }))
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Archive \d/ }))
   await waitFor(() => expect(calls).toHaveLength(2))
   expect(calls[1]).toEqual({ targets: ["p:shop"], yes: true })
   await waitFor(() =>
@@ -239,13 +250,33 @@ test("several epics not on trunk share one warning, and the list scrolls above t
   )
   await selectRows("Blog", "Shop")
   fireEvent.click(bar().getByRole("button", { name: "Archive 2" }))
-  const dialog = await screen.findByRole("dialog")
+  const dialog = await screen.findByRole("alertdialog")
+  await waitFor(() => expect(dialog.textContent).toContain("Not merged to trunk"))
   expect(dialog.textContent?.match(/Not merged to trunk/g)).toHaveLength(1)
   expect(dialog.textContent).toContain("Not merged to trunk: Blog, Shop.")
-  const buttons = within(dialog).getByRole("button", { name: "Archive" }).parentElement
+})
+
+test("the popover shows a spinner with the confirm button off while the dry run is held, then the list", async () => {
+  let release = () => {}
+  const gate = new Promise<void>((r) => {
+    release = r
+  })
+  setup(async (b) => {
+    if (b.dry_run) await gate
+    return dryOnly(b)
+  })
+  await selectRows("Blog", "Shop")
+  fireEvent.click(bar().getByRole("button", { name: "Archive 2" }))
+  const dialog = await screen.findByRole("alertdialog")
+  expect(within(dialog).getByRole("status", { name: "Checking" })).toBeTruthy()
   expect(
-    buttons?.previousElementSibling && getComputedStyle(buttons.previousElementSibling).overflowY,
-  ).toBe("auto")
+    (within(dialog).getByRole("button", { name: /^Archive 2/ }) as HTMLButtonElement).disabled,
+  ).toBe(true)
+  release()
+  await waitFor(() => expect(within(dialog).getAllByRole("listitem")).toHaveLength(2))
+  expect(
+    (within(dialog).getByRole("button", { name: /^Archive 2/ }) as HTMLButtonElement).disabled,
+  ).toBe(false)
 })
 
 test("a draft in the selection is listed as skipped after the Archive confirm", async () => {
@@ -261,9 +292,7 @@ test("a draft in the selection is listed as skipped after the Archive confirm", 
   setup(dryOnly, [draft])
   await selectRows("Blog", "Untitled design")
   fireEvent.click(bar().getByRole("button", { name: "Archive 1 of 2" }))
-  fireEvent.click(
-    within(await screen.findByRole("dialog")).getByRole("button", { name: "Archive" }),
-  )
+  await confirmArchive()
   await waitFor(() =>
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({

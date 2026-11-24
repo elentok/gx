@@ -17,7 +17,10 @@ test("Bulk actions", async ({ page, start }) => {
   const count = sidebar.getByTestId("select-count")
   const done = sidebar.getByRole("button", nav("Done"))
   const barButton = (name: string) => bar.getByRole("button", { name: new RegExp(`^${name}\\b`) })
-  const dialog = (name: string) => page.getByRole("dialog", nav(name))
+  // The shared confirm: one popover on the clicked bar button, titled with the action and its count.
+  const popover = page.getByRole("alertdialog")
+  const popoverButton = (name: string) =>
+    popover.getByRole("button", { name: new RegExp(`^${name}`) })
 
   const enter = async () => {
     await sidebar.getByRole("button", nav("Select")).click()
@@ -72,16 +75,17 @@ test("Bulk actions", async ({ page, start }) => {
   await enter()
   await box("bulk-early").check()
   await barButton("Hold").click()
-  await expect(dialog("Hold selected")).toContainText("Holding ends these live sessions")
-  await dialog("Hold selected").getByRole("button", nav("Cancel")).click()
-  await expect(dialog("Hold selected")).toHaveCount(0)
+  await expect(popover).toContainText("Holding ends these live sessions")
+  await expect(popover.getByRole("listitem")).toHaveText(["bulk-early"])
+  await popoverButton("Cancel").click()
+  await expect(popover).toHaveCount(0)
   await expect(count).toHaveText("1 selected")
   await box("bulk-early").uncheck()
   await box("bulk-clash").check()
   // Story 38: a draft in the selection is skipped and listed, the epic is held.
   await box("Untitled design").check()
   await barButton("Hold").click()
-  await expect(dialog("Hold selected")).toHaveCount(0)
+  await expect(popover).toHaveCount(0)
   await expect(page.getByText("Not run on some rows")).toBeVisible()
   await expect(page.getByText("Untitled design: can't be held")).toBeVisible()
   // The held row stays selected, in the collapsed On hold section, so the mode stays on until Done.
@@ -98,18 +102,28 @@ test("Bulk actions", async ({ page, start }) => {
   await sidebar.getByRole("checkbox", { name: /^Select fix-/ }).check()
   await box("Claude Code").check()
   await box("Untitled design").check()
-  await barButton("Stop").click()
-  await expect(dialog("Stop selected")).toContainText("Stop ")
-  await expect(dialog("Stop selected")).not.toContainText("Claude Code")
-  await expect(dialog("Stop selected")).not.toContainText("Untitled design")
-  await dialog("Stop selected").getByRole("button", nav("Stop")).click()
-  await expect(dialog("Stop selected")).toHaveCount(0)
+  // The live Design has one live session, so Stop fits it. A Design with two live sessions is skipped
+  // as "2 live sessions"; no seeded Design has two, so selectModel.test.ts covers that case.
+  await box("bulk-early").check()
+  const stop = barButton("Stop")
+  await expect(stop).toHaveText("Stop 2 of 4")
+  await stop.click()
+  await expect(popover.getByRole("listitem")).toHaveCount(2)
+  await expect(popover).toContainText("bulk-early")
+  await expect(popover).not.toContainText("Claude Code")
+  await expect(popover).not.toContainText("Untitled design")
+  // The popover opens above the bar, on the button that was clicked.
+  const stopBox = (await stop.boundingBox())!
+  const popBox = (await popover.boundingBox())!
+  expect(popBox.y + popBox.height).toBeLessThanOrEqual(stopBox.y)
+  await popoverButton("Stop 2").click()
+  await expect(popover).toHaveCount(0)
   // The Hold step's toast can still be showing.
   await expect(page.getByText("Not run on some rows").first()).toBeVisible()
   await expect(page.getByText(/Claude Code.*not live/)).toBeVisible()
   await expect(page.getByText(/Untitled design: not an agent/)).toBeVisible()
-  // All three rows stay in the list (the stopped one as Exited), so all stay selected.
-  await expect(count).toHaveText("3 selected")
+  // All four rows stay in the list (the stopped ones as Exited), so all stay selected.
+  await expect(count).toHaveText("4 selected")
   await done.click()
   await expect(bar).toHaveCount(0)
 
@@ -121,8 +135,8 @@ test("Bulk actions", async ({ page, start }) => {
   await box("bulk-early").check()
   await box("Untitled design").check()
   await barButton("Archive").click()
-  const archive = dialog("Archive selected")
-  // The live Design is not finished and the draft is no epic, so the bar leaves both out of the dialog.
+  const archive = popover
+  // The live Design is not finished and the draft is no epic, so the bar leaves both out of the popover.
   await expect(archive).toContainText("Archive 2 epics?")
   await expect(archive).not.toContainText("Untitled design")
   // The skipped toast appears only after the confirm, which would archive epics that entry 22 needs.
@@ -132,7 +146,7 @@ test("Bulk actions", async ({ page, start }) => {
   await expect(archive.getByRole("listitem")).toHaveCount(2)
   await expect(archive.getByText(/Not merged to trunk/)).toHaveCount(1)
   await expect(archive.getByText(/^⚠ Not merged to trunk: bulk-done-solo\./)).toBeVisible()
-  await archive.getByRole("button", nav("Cancel")).click()
+  await popoverButton("Cancel").click()
   await expect(archive).toHaveCount(0)
 
   // Entry 22: an epic archived through the CLI leaves the selection.
@@ -144,29 +158,32 @@ test("Bulk actions", async ({ page, start }) => {
   await done.click()
   await expect(bar).toHaveCount(0)
 
-  // Stories 39 and 20: bulk Remove always asks, even for one empty draft; Keep leaves it, and a chat with the draft
-  // gets one confirmation listing both.
+  // Stories 20 and 58: a chat in the selection brings the Remove popover, listing both rows; Cancel leaves them.
+  // An empty draft alone is removed with no confirm.
   const draftCount = async () =>
     JSON.parse(await fx.cli("designs", "drafts", "list", "--json")).drafts.length as number
   expect(await draftCount()).toBe(2)
   await enter()
   await box("Untitled design").check()
-  await barButton("Remove").click()
-  await expect(dialog("Remove selected")).toContainText(
-    "Remove Untitled design? Its prompt and images are deleted.",
-  )
-  await dialog("Remove selected").getByRole("button", nav("Keep")).click()
-  await expect(dialog("Remove selected")).toHaveCount(0)
-  expect(await draftCount()).toBe(2)
   await box("Claude Code").check()
   await barButton("Remove").click()
-  await expect(dialog("Remove selected")).toContainText("Remove Claude Code")
-  await expect(dialog("Remove selected")).toContainText("Remove Untitled design?")
-  await dialog("Remove selected").getByRole("button", nav("Remove")).click()
-  await expect(dialog("Remove selected")).toHaveCount(0)
+  await expect(popover.getByRole("listitem")).toHaveText(["Untitled design", "Claude Code"])
+  await popoverButton("Cancel").click()
+  await expect(popover).toHaveCount(0)
+  expect(await draftCount()).toBe(2)
+  await box("Claude Code").uncheck()
+  await barButton("Remove").click()
   await expect(sidebar.getByRole("link", { name: /Untitled design/ })).toHaveCount(0)
-  await expect(sidebar.getByRole("link", { name: /Claude Code/ })).toHaveCount(0)
+  await expect(popover).toHaveCount(0)
   expect(await draftCount()).toBe(1)
+  await expect(bar).toHaveCount(0)
+  await enter()
+  await box("Claude Code").check()
+  await barButton("Remove").click()
+  await expect(popover).toContainText("Claude Code")
+  await popoverButton("Remove 1").click()
+  await expect(popover).toHaveCount(0)
+  await expect(sidebar.getByRole("link", { name: /Claude Code/ })).toHaveCount(0)
   expect(await fx.cli("agents", "list")).not.toContain("Claude Code")
   await expect(bar).toHaveCount(0)
 

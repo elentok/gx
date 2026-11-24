@@ -8,27 +8,22 @@ import {
   type EpicListRow,
   type SessionInfo,
 } from "../generated/server"
-import { canManage, isExited } from "../agents/sessionWrites"
+import { canManage } from "../agents/sessionWrites"
+import { agentKindOf, type Entity } from "../actions/entity"
+import { actionById, bulkBar, bulkFit, bulkLabel } from "../actions/registry"
 
+/** A registry action id: the bar's buttons are the registry actions that declare a bulk rule. */
 export type SelectAction = "move" | "hold" | "unhold" | "stop" | "remove" | "archive" | "unarchive"
-
-export const SELECT_ACTIONS: SelectAction[] = [
-  "move",
-  "hold",
-  "unhold",
-  "stop",
-  "remove",
-  "archive",
-  "unarchive",
-]
 
 /** One row of a select area, as the fit rules see it. The components build these from their own row data. */
 export interface SelectRow {
   /** A row's address, or the session id of an agent row. */
   key: string
   kind: "epic" | "design" | "chat" | "draft" | "chat-draft" | "agent" | "archived"
-  /** A draft row's id, which the draft Remove write takes; its `key` is the workspace membership key. */
+  /** A draft row's id (design or chat draft), which the draft Remove write takes; its `key` is the workspace membership key. */
   draftId?: string
+  /** A Design's live sessions: their count is its Stop rule, and the one session is what Stop ends. */
+  liveSessions?: SessionInfo[]
   /** False while the row is in a collapsed section. */
   visible: boolean
   /** False on a Queue agent row. */
@@ -81,37 +76,35 @@ export interface Fit {
   skipped: { key: string; reason: string }[]
 }
 
-/** True for every draft kind, so a new draft kind is one edit here. */
-export const isDraftKind = (kind: SelectRow["kind"]): boolean =>
-  kind === "draft" || kind === "chat-draft"
-
-type Verdict = string | undefined
-
-/** undefined fits; a string is the reason the row is skipped. */
-const RULES: Record<SelectAction, (r: SelectRow) => Verdict> = {
-  move: (r) =>
-    r.kind === "epic" || r.kind === "design" || r.kind === "chat" || isDraftKind(r.kind)
-      ? undefined
-      : "can't be moved",
-  hold: (r) => {
-    if (r.kind !== "epic" && r.kind !== "design") return "can't be held"
-    if (r.queued) return "queued"
-    return r.held ? "already on hold" : undefined
-  },
-  unhold: (r) => (r.held ? undefined : "not on hold"),
-  stop: (r) => {
-    if (!r.session) return "not an agent"
-    if (!canManage(r.session)) return "managed by the queue"
-    return isExited(r.session) ? "not live" : undefined
-  },
-  remove: (r) => {
-    if (isDraftKind(r.kind)) return r.kind === "draft" ? undefined : "can't be removed"
-    if (!r.session) return "not an agent"
-    return canManage(r.session) ? undefined : "managed by the queue"
-  },
-  // Like the row menu, the server's dry run decides which epics are finished enough.
-  archive: (r) => (r.kind === "epic" || r.kind === "design" ? undefined : "can't be archived"),
-  unarchive: (r) => (r.kind === "archived" ? undefined : "not archived"),
+/** The registry entity of a row, which the registry's bulk rules read. */
+export function entityOfRow(r: SelectRow, name = r.key): Entity {
+  const base = { key: r.key, name, held: r.held, queued: r.queued }
+  switch (r.kind) {
+    case "epic":
+      return { ...base, kind: "epic" }
+    case "archived":
+      return { ...base, kind: "epic", archived: true }
+    case "design":
+      return { ...base, kind: "design", liveSessions: r.liveSessions?.length }
+    case "draft":
+      return { ...base, kind: "design-draft" }
+    case "chat-draft":
+      return { ...base, kind: "chat-draft" }
+    case "chat":
+      return {
+        ...base,
+        kind: "chat",
+        session: r.session,
+        agent: r.session ? agentKindOf(r.session) : "chat",
+      }
+    case "agent":
+      return {
+        ...base,
+        kind: "chat",
+        session: r.session,
+        agent: r.session?.queue ? "queue" : "managed",
+      }
+  }
 }
 
 export interface SelectState {
@@ -170,33 +163,27 @@ export function toggleGroup(s: SelectState, rows: SelectRow[], group: string): S
   return { ...s, keys: [...s.keys, ...mine.filter((k) => !s.keys.includes(k))] }
 }
 
-export function fitOf(action: SelectAction, s: SelectState, rows: SelectRow[]): Fit {
-  const out: Fit = { fits: [], skipped: [] }
-  for (const key of s.keys) {
+/** The entities of the selected rows, in selection order; keys whose row left the list are dropped. */
+export function selectedEntities(
+  s: SelectState,
+  rows: SelectRow[],
+  nameOf: (key: string) => string = (k) => k,
+): Entity[] {
+  return s.keys.flatMap((key) => {
     const row = rows.find((r) => r.key === key)
-    if (!row) continue
-    const reason = RULES[action](row)
-    if (reason === undefined) out.fits.push(key)
-    else out.skipped.push({ key, reason })
-  }
-  return out
+    return row ? [entityOfRow(row, nameOf(key))] : []
+  })
 }
 
-const NAMES: Record<SelectAction, string> = {
-  move: "Move",
-  hold: "Hold",
-  unhold: "Take off hold",
-  stop: "Stop",
-  remove: "Remove",
-  archive: "Archive",
-  unarchive: "Unarchive",
+export function fitOf(action: SelectAction, s: SelectState, rows: SelectRow[]): Fit {
+  const decl = actionById(action)
+  return decl ? bulkFit(decl, selectedEntities(s, rows)) : { fits: [], skipped: [] }
 }
 
 /** "Archive 2 of 6", or "Archive 2" when every selected row fits. */
 export function countLabel(action: SelectAction, f: Fit): string {
-  const n = f.fits.length
-  const m = n + f.skipped.length
-  return n === m ? `${NAMES[action]} ${n}` : `${NAMES[action]} ${n} of ${m}`
+  const decl = actionById(action)
+  return decl ? bulkLabel(decl, f) : ""
 }
 
 /** The tooltip lines: one "name: reason" per skipped row. */
@@ -210,10 +197,11 @@ export interface ActionView {
   fit: Fit
 }
 
-/** The actions to show: each with its label, and none that fits no selected row. */
+/** The actions to show, in registry order: each with its label, and none that fits no selected row. */
 export function visibleActions(s: SelectState, rows: SelectRow[]): ActionView[] {
-  return SELECT_ACTIONS.map((action) => {
-    const f = fitOf(action, s, rows)
-    return { action, label: countLabel(action, f), fit: f }
-  }).filter((a) => a.fit.fits.length > 0)
+  return bulkBar(selectedEntities(s, rows)).map((v) => ({
+    action: v.id as SelectAction,
+    label: v.label,
+    fit: v.fit,
+  }))
 }

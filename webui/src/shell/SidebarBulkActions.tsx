@@ -1,9 +1,13 @@
-import { Box, Text } from "@chakra-ui/react"
-import { useRef, useState, type ReactNode } from "react"
+import { Box } from "@chakra-ui/react"
+import { useRef, useState, type MouseEvent } from "react"
+import { bulkRequest } from "../actions/bulkPlan"
+import { openConfirm, type ConfirmBody } from "../actions/confirmRequest"
+import { actionById, bulkConfirms } from "../actions/registry"
 import { useConnectionContext } from "../connection"
-import { TargetDone, TargetRefused, type TargetResult } from "../generated/server"
+import { readDraft } from "../design/drafts"
+import { realChatDrafts } from "../design/chatDrafts"
+import { TargetDone, TargetRefused, type SessionInfo, type TargetResult } from "../generated/server"
 import { isExited } from "../agents/sessionWrites"
-import type { SessionInfo } from "../generated/server"
 import {
   bulkArchive,
   bulkHold,
@@ -13,8 +17,10 @@ import {
   bulkStop,
   bulkUnhold,
   unarchiveWithToasts,
+  type DraftTarget,
 } from "../select/bulkWrites"
 import {
+  entityOfRow,
   skipLines,
   visibleActions,
   type ActionView,
@@ -22,7 +28,6 @@ import {
 } from "../select/selectModel"
 import { Button } from "../ui/button/Button"
 import { GxMenu } from "../ui/menu/Menu"
-import { Modal } from "../ui/modal/Modal"
 import { showToast, toaster } from "../ui/toaster"
 import type { Tone } from "../ui/tone"
 import { WriteError } from "../useWrite"
@@ -31,23 +36,9 @@ import type { SelectApi } from "./SidebarSelect"
 
 const BUSY_TOAST = "bulk-action-busy"
 
-/** A selected draft: its row key (the name lookup) and the id its Remove takes. */
-interface DraftTarget {
-  key: string
-  id: string
-}
+const SIDEBAR_ACTIONS: SelectAction[] = ["move", "hold", "unhold", "stop", "archive", "remove"]
 
-const SIDEBAR_ACTIONS: SelectAction[] = ["move", "hold", "unhold", "stop", "remove", "archive"]
-
-/** The question a bulk action is waiting on. Each kind carries the view it opened from, so confirming runs that same view. */
-type Confirm =
-  | { kind: "stop"; view: ActionView; sessions: SessionInfo[] }
-  | { kind: "remove"; view: ActionView; sessions: SessionInfo[]; drafts: DraftTarget[] }
-  | { kind: "hold"; view: ActionView; keys: string[]; sessions: string[] }
-  /** An archive dry run: the rows that would run and the ones it refused. */
-  | { kind: "archive"; view: ActionView; fits: TargetResult[]; refused: TargetResult[] }
-
-/** The buttons of the bar, in order. `move` is a menu and sits outside this table. */
+/** The buttons of the bar. `move` is a menu and sits outside this table. */
 const BUTTON_TONE: Partial<Record<SelectAction, Tone>> = {
   hold: "paused",
   unhold: "running",
@@ -57,40 +48,19 @@ const BUTTON_TONE: Partial<Record<SelectAction, Tone>> = {
   unarchive: "running",
 }
 
-function ConfirmModal({
-  label,
-  maxW,
-  cancelLabel = "Cancel",
-  confirmLabel,
-  tone,
-  confirmDisabled,
-  onCancel,
-  onConfirm,
-  children,
-}: {
-  label: string
-  maxW: "sm" | "md"
-  cancelLabel?: string
-  confirmLabel: string
-  tone: Tone
-  confirmDisabled?: boolean
-  onCancel: () => void
-  onConfirm: () => void
-  children: ReactNode
-}) {
-  return (
-    <Modal label={label} onClose={onCancel} maxW={maxW}>
-      {children}
-      <Box display="flex" gap="2" justifyContent="flex-end">
-        <Button emphasis="secondary" onClick={onCancel} autoFocus>
-          {cancelLabel}
-        </Button>
-        <Button tone={tone} disabled={confirmDisabled} onClick={onConfirm}>
-          {confirmLabel}
-        </Button>
-      </Box>
-    </Modal>
-  )
+/** Whether a draft has nothing to lose; a draft that cannot be read counts as not empty. */
+async function draftIsEmpty(d: DraftTarget): Promise<boolean> {
+  try {
+    if (d.chat) {
+      const res = await realChatDrafts.read(d.id)
+      return res.kind === "ok" && !res.draft.brief.trim() && res.draft.images.length === 0
+    }
+    const res = await readDraft(d.id)
+    const x = res.kind === "ok" ? res.draft : undefined
+    return !!x && !x.idea.trim() && !x.slug && x.images.length === 0
+  } catch {
+    return false
+  }
 }
 
 /** The actions of a select bar: each runs on the selected rows it fits. `shown` limits which actions the bar offers. */
@@ -106,10 +76,9 @@ export function SidebarBulkActions({
   const { workspaces } = useWorkspaces(useConnectionContext())
   const [pending, setPending] = useState(false)
   const inFlight = useRef(false)
-  const [confirm, setConfirm] = useState<Confirm>()
 
   const views = visibleActions(sel.state, sel.rows).filter((v) => shown.includes(v.action))
-  if (views.length === 0 && !confirm) return null
+  if (views.length === 0) return null
 
   const tip = (v: ActionView) =>
     [`Runs on ${v.fit.fits.map(sel.nameOf).join(", ")}`, ...skipLines(v.fit, sel.nameOf)].join("\n")
@@ -163,211 +132,169 @@ export function SidebarBulkActions({
     }
   }
 
+  const rowOf = (key: string) => sel.rows.find((r) => r.key === key)
+  /** The sessions an action ends: a row's own, or the one live session of a Design. */
+  const sessionsOf = (keys: string[]): SessionInfo[] =>
+    keys.flatMap((k) => {
+      const r = rowOf(k)
+      return r?.session ? [r.session] : (r?.liveSessions ?? [])
+    })
+  const draftsOf = (keys: string[]): DraftTarget[] =>
+    keys.flatMap((key) => {
+      const r = rowOf(key)
+      return r?.draftId ? [{ key, id: r.draftId, chat: r.kind === "chat-draft" }] : []
+    })
+
+  /** The confirm of a bulk run: a popover on the clicked button, listing every row the run covers. */
+  const request = (v: ActionView, anchor: HTMLElement, onConfirm: () => void) => {
+    const decl = actionById(v.action)
+    if (!decl) throw new Error(`no registry action ${v.action}`)
+    return bulkRequest(decl, v.fit.fits.map(sel.nameOf), { mode: "anchor", anchor }, onConfirm)
+  }
+
   // A dry run first: live sessions are the only thing worth a question.
-  const hold = (v: ActionView) =>
+  const hold = (v: ActionView, anchor: HTMLElement) =>
     run(v, async () => {
       const keys = v.fit.fits
       const dry = await bulkHold(keys, { dryRun: true })
       const sessions = dry.flatMap((r) => r.sessions ?? [])
       if (sessions.length === 0) return bulkHold(keys)
-      setConfirm({ kind: "hold", view: v, keys, sessions })
-      return undefined
-    })
-
-  // Archive always asks, from a dry run: the rows, the live sessions it stops, and epics gx cannot see on trunk.
-  const archive = (v: ActionView) =>
-    run(v, async () => {
-      const dry = await bulkArchive(v.fit.fits, { dryRun: true })
-      setConfirm({
-        kind: "archive",
-        view: v,
-        fits: dry.filter((r) => r.status !== TargetRefused),
-        refused: dry.filter((r) => r.status === TargetRefused),
+      const req = request(v, anchor, () => void run(v, () => bulkHold(keys, { yes: true })))
+      openConfirm({
+        ...req,
+        body: { ...req.body, lines: [`Holding ends these live sessions: ${sessions.join(", ")}.`] },
       })
       return undefined
     })
 
-  const nameOfSession = (s: SessionInfo) => sel.nameOf(s.id)
-  const sessionsOf = (keys: string[]) =>
-    keys.flatMap((k) => sel.rows.find((r) => r.key === k)?.session ?? [])
+  // Archive always asks, from a dry run: the rows, the live sessions it stops, and epics gx cannot see on trunk.
+  const archive = (v: ActionView, anchor: HTMLElement) => {
+    let fits: TargetResult[] = []
+    let refused: TargetResult[] = []
+    const req = request(v, anchor, () => {
+      const n = fits.length
+      // Rows the dry run refused do not run; they join the results so they stay selected with their reasons.
+      void run(
+        v,
+        async () => [
+          ...refused,
+          ...(n > 0
+            ? await bulkArchive(
+                fits.map((r) => r.target),
+                { yes: true },
+              )
+            : []),
+        ],
+        n > 0 ? `Archiving ${n} ${n === 1 ? "epic" : "epics"}…` : undefined,
+      )
+    })
+    openConfirm({
+      ...req,
+      prepare: async (): Promise<ConfirmBody> => {
+        const dry = await bulkArchive(v.fit.fits, { dryRun: true })
+        fits = dry.filter((r) => r.status !== TargetRefused)
+        refused = dry.filter((r) => r.status === TargetRefused)
+        const live = fits.flatMap((r) => r.sessions ?? [])
+        const offTrunk = fits.filter((r) => r.on_trunk === false)
+        const n = fits.length
+        return {
+          lines: [
+            `Archive ${n} ${n === 1 ? "epic" : "epics"}? Live agents stop and the epics leave the sidebar. Unarchive brings them back.`,
+            ...(live.length > 0 ? [`Live sessions will stop: ${live.join(", ")}.`] : []),
+            ...refused.map(
+              (r) => `${sel.nameOf(r.target)} will not run: ${r.message || r.reason || "refused"}.`,
+            ),
+          ],
+          warnings:
+            offTrunk.length > 0
+              ? [
+                  `⚠ Not merged to trunk: ${offTrunk.map((r) => sel.nameOf(r.target)).join(", ")}. Archiving keeps their branches, but the work is not on trunk.`,
+                ]
+              : [],
+          rows: fits.map((r) => sel.nameOf(r.target)),
+        }
+      },
+    })
+  }
 
-  // Stop asks once, listing the rows; Exited rows were already skipped "not live" by the fit.
-  // Remove asks once and says which rows are live.
-  const draftsOf = (keys: string[]): DraftTarget[] =>
-    keys.flatMap((key) => {
-      const id = sel.rows.find((r) => r.key === key)?.draftId
-      return id ? [{ key, id }] : []
+  // Remove asks when a chat or a draft with something in it is selected; a selection of empty drafts runs at once.
+  const remove = (v: ActionView, anchor: HTMLElement) =>
+    run(v, async () => {
+      const keys = v.fit.fits
+      const sessions = sessionsOf(keys)
+      const drafts = draftsOf(keys)
+      const write = async () => [
+        ...(sessions.length > 0 ? await bulkRemove(sessions) : []),
+        ...(await bulkRemoveDrafts(drafts)),
+      ]
+      const empty = new Map(
+        await Promise.all(drafts.map(async (d) => [d.key, await draftIsEmpty(d)] as const)),
+      )
+      const entities = keys.flatMap((k) => {
+        const r = rowOf(k)
+        return r ? [{ ...entityOfRow(r, sel.nameOf(k)), draftEmpty: empty.get(k) }] : []
+      })
+      const decl = actionById(v.action)
+      if (!decl || !bulkConfirms(decl, entities)) return write()
+      const live = sessions.filter((s) => !isExited(s))
+      const req = request(v, anchor, () => void run(v, write))
+      openConfirm({
+        ...req,
+        body: {
+          ...req.body,
+          lines: [
+            ...(sessions.length > 0 ? ["Their sessions are deleted."] : []),
+            ...(live.length > 0
+              ? [`Live and stopped first: ${live.map((s) => sel.nameOf(s.id)).join(", ")}.`]
+              : []),
+            ...(drafts.length > 0 ? ["A draft's prompt and images are deleted."] : []),
+          ],
+        },
+      })
+      return undefined
     })
 
-  const onClick: Partial<Record<SelectAction, (v: ActionView) => void>> = {
-    hold: (v) => void hold(v),
+  const onClick: Partial<Record<SelectAction, (v: ActionView, anchor: HTMLElement) => void>> = {
+    hold: (v, anchor) => void hold(v, anchor),
     unhold: (v) => void run(v, () => bulkUnhold(v.fit.fits)),
-    stop: (v) => setConfirm({ kind: "stop", view: v, sessions: sessionsOf(v.fit.fits) }),
-    // Remove always asks, even for one empty draft: a selection is deliberate.
-    remove: (v) =>
-      setConfirm({
-        kind: "remove",
-        view: v,
-        sessions: sessionsOf(v.fit.fits),
-        drafts: draftsOf(v.fit.fits),
-      }),
-    archive: (v) => void archive(v),
+    stop: (v, anchor) => {
+      const keys = v.fit.fits
+      openConfirm(request(v, anchor, () => void run(v, () => bulkStop(sessionsOf(keys)))))
+    },
+    remove: (v, anchor) => void remove(v, anchor),
+    archive: (v, anchor) => archive(v, anchor),
     unarchive: (v) => void run(v, () => unarchiveWithToasts(v.fit.fits, sel.nameOf)),
   }
 
   const move = views.find((v) => v.action === "move")
 
-  const close = () => setConfirm(undefined)
-  /** Closes the question, then runs the confirmed write. */
-  const confirmed = (v: ActionView, call: () => Promise<TargetResult[]>, busy?: string) => {
-    close()
-    void run(v, call, busy)
-  }
-
-  const modal = (c: Confirm) => {
-    switch (c.kind) {
-      case "stop":
-        return (
-          <ConfirmModal
-            label="Stop selected"
-            maxW="sm"
-            confirmLabel="Stop"
-            tone="paused"
-            onCancel={close}
-            onConfirm={() => confirmed(c.view, () => bulkStop(c.sessions))}
-          >
-            <Text>Stop {c.sessions.map(nameOfSession).join(", ")}?</Text>
-          </ConfirmModal>
-        )
-      case "remove":
-        return (
-          <ConfirmModal
-            label="Remove selected"
-            maxW="sm"
-            cancelLabel="Keep"
-            confirmLabel="Remove"
-            tone="paused"
-            onCancel={close}
-            onConfirm={() =>
-              confirmed(c.view, async () => [
-                ...(c.sessions.length > 0 ? await bulkRemove(c.sessions) : []),
-                ...(await bulkRemoveDrafts(c.drafts)),
-              ])
-            }
-          >
-            {c.sessions.length > 0 && (
-              <Text>
-                Remove {c.sessions.map(nameOfSession).join(", ")}? Their sessions are deleted.
-                {c.sessions.some((s) => !isExited(s)) &&
-                  ` Live and stopped first: ${c.sessions
-                    .filter((s) => !isExited(s))
-                    .map(nameOfSession)
-                    .join(", ")}.`}
-              </Text>
-            )}
-            {c.drafts.map((d) => (
-              <Text key={d.key}>
-                Remove {sel.nameOf(d.key)}? Its prompt and images are deleted.
-              </Text>
-            ))}
-          </ConfirmModal>
-        )
-      case "hold":
-        return (
-          <ConfirmModal
-            label="Hold selected"
-            maxW="sm"
-            confirmLabel="Hold and end sessions"
-            tone="paused"
-            onCancel={close}
-            onConfirm={() => confirmed(c.view, () => bulkHold(c.keys, { yes: true }))}
-          >
-            <Text>Holding ends these live sessions: {c.sessions.join(", ")}.</Text>
-          </ConfirmModal>
-        )
-      case "archive": {
-        const { fits, refused } = c
-        const live = fits.flatMap((r) => r.sessions ?? [])
-        const offTrunk = fits.filter((r) => r.on_trunk === false)
-        const n = fits.length
-        return (
-          <ConfirmModal
-            label="Archive selected"
-            maxW="md"
-            confirmLabel="Archive"
-            tone="running"
-            confirmDisabled={n === 0}
-            onCancel={close}
-            // Rows the dry run refused do not run; they join the results so they stay selected with their reasons.
-            onConfirm={() =>
-              confirmed(
-                c.view,
-                async () => [
-                  ...refused,
-                  ...(await bulkArchive(
-                    fits.map((r) => r.target),
-                    { yes: true },
-                  )),
-                ],
-                `Archiving ${n} ${n === 1 ? "epic" : "epics"}…`,
-              )
-            }
-          >
-            {/* The list scrolls on a short screen; the buttons below stay in view. */}
-            <Box display="flex" flexDirection="column" gap="2" overflowY="auto" minH="0" flex="1">
-              <Text fontWeight="bold">
-                Archive {n} {n === 1 ? "epic" : "epics"}? Live agents stop and the epics leave the
-                sidebar. Unarchive brings them back.
-              </Text>
-              <Box as="ul" pl="5" listStyleType="disc">
-                {fits.map((r) => (
-                  <li key={r.target}>{sel.nameOf(r.target)}</li>
-                ))}
-              </Box>
-              {live.length > 0 && <Text>Live sessions will stop: {live.join(", ")}.</Text>}
-              {offTrunk.length > 0 && (
-                <Text color="tone.waiting.fg">
-                  ⚠ Not merged to trunk: {offTrunk.map((r) => sel.nameOf(r.target)).join(", ")}.
-                  Archiving keeps their branches, but the work is not on trunk.
-                </Text>
-              )}
-              {refused.map((r) => (
-                <Text key={r.target}>
-                  {sel.nameOf(r.target)} will not run: {r.message || r.reason || "refused"}.
-                </Text>
-              ))}
-            </Box>
-          </ConfirmModal>
-        )
-      }
-    }
-  }
-
   return (
     <Box display="flex" flexWrap="wrap" gap="1.5">
-      {move && (
-        <GxMenu
-          placement="top-start"
-          trigger={
-            <Button
-              size="sm"
-              emphasis="secondary"
-              tone="running"
-              title={tip(move)}
-              disabled={pending}
-            >
-              {move.label}
-            </Button>
-          }
-          items={workspaces.map((w) => ({
-            value: `move-${w.name}`,
-            label: w.name,
-            disabled: pending,
-            onSelect: () => void run(move, () => bulkMove(move.fit.fits, w.name)),
-          }))}
-        />
-      )}
       {views.map((v) => {
+        if (v === move)
+          return (
+            <GxMenu
+              key={v.action}
+              placement="top-start"
+              trigger={
+                <Button
+                  size="sm"
+                  emphasis="secondary"
+                  tone="running"
+                  title={tip(v)}
+                  disabled={pending}
+                >
+                  {v.label}
+                </Button>
+              }
+              items={workspaces.map((w) => ({
+                value: `move-${w.name}`,
+                label: w.name,
+                disabled: pending,
+                onSelect: () => void run(v, () => bulkMove(v.fit.fits, w.name)),
+              }))}
+            />
+          )
         const tone = BUTTON_TONE[v.action]
         if (!tone) return null
         return (
@@ -378,13 +305,12 @@ export function SidebarBulkActions({
             tone={tone}
             title={tip(v)}
             disabled={pending}
-            onClick={() => onClick[v.action]?.(v)}
+            onClick={(e: MouseEvent<HTMLButtonElement>) => onClick[v.action]?.(v, e.currentTarget)}
           >
             {v.label}
           </Button>
         )
       })}
-      {confirm && modal(confirm)}
     </Box>
   )
 }

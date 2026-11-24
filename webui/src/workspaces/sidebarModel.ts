@@ -83,6 +83,10 @@ export interface SidebarRow {
   session?: SessionInfo
   /** A draft's row, for its menu's Rename and Remove. */
   draft?: DesignDraftRow
+  /** A Design's sessions (its row nests none), for the bulk Stop. */
+  sessions?: SessionInfo[]
+  /** A chat draft's id, for the bulk Remove. */
+  chatDraftId?: string
   /** A chat, or a Design with a session, has Unread; the title is drawn bold. */
   unread?: boolean
   agents: SidebarAgent[]
@@ -158,6 +162,7 @@ function cardRow(
     ...((kind === "design" ? sessions.some(isUnread) : r.unread) ? { unread: true } : {}),
     // A Design is one row: its session shows on the Design page, not nested under it.
     agents: kind === "design" ? [] : agents,
+    ...(kind === "design" ? { sessions } : {}),
   }
 }
 
@@ -349,6 +354,7 @@ export function buildSidebar({
           href: chatDraftHref(d.id),
           status,
           agents: [],
+          chatDraftId: d.id,
         },
         name: d.label,
         needsYou: false,

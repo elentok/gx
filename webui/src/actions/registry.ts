@@ -43,6 +43,8 @@ interface Base {
   confirm: ConfirmDecl
   /** Present only on the bar's actions. Returns nothing when the row fits, else the skip reason. */
   bulk?: BulkRule
+  /** The bar's word for the action when it differs from the menu label. */
+  barLabel?: string
   chord?: string
 }
 
@@ -116,6 +118,7 @@ export const ACTIONS: ActionDecl[] = [
     chord: "w",
     available: (e) => live(e) || isPlainChat(e) || isDraftEntity(e),
     confirm: confirmNever,
+    barLabel: "Move",
     bulk: bulkRule((e) =>
       live(e) || isPlainChat(e) || isDraftEntity(e) ? undefined : "can't be moved",
     ),
@@ -318,7 +321,8 @@ export interface BulkView {
 export function bulkLabel(a: ActionDecl, fit: BulkFit): string {
   const n = fit.fits.length
   const m = n + fit.skipped.length
-  return n === m ? `${a.label} ${n}` : `${a.label} ${n} of ${m}`
+  const name = a.barLabel ?? a.label
+  return n === m ? `${name} ${n}` : `${name} ${n} of ${m}`
 }
 
 /** The bar's actions in registry order, each with a count label, and none that fits no selected entity. */

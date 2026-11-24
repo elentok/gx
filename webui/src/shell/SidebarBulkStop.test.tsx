@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
+import { closeConfirm } from "../actions/confirmRequest"
 import { session } from "../agents/agentsTestKit"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import {
@@ -21,6 +22,7 @@ vi.mock("../ui/toaster", async (orig) => ({
 }))
 
 afterEach(() => {
+  closeConfirm()
   cleanup()
   vi.unstubAllGlobals()
   localStorage.clear()
@@ -139,10 +141,12 @@ test("Stop confirms once, lists the rows, and posts the token of each live row; 
   const stop = bar().getByRole("button", { name: "Stop 2 of 3" })
   expect(stop.title).toBe("Runs on alpha, bravo\ngone: not live")
   fireEvent.click(stop)
-  const dialog = await screen.findByRole("dialog")
-  expect(dialog.textContent).toContain("alpha, bravo")
+  const dialog = await screen.findByRole("alertdialog")
+  expect(within(dialog).getByText("alpha")).toBeTruthy()
+  expect(within(dialog).getByText("bravo")).toBeTruthy()
+  expect(dialog.textContent).not.toContain("gone")
   expect(calls).toHaveLength(0)
-  fireEvent.click(within(dialog).getByRole("button", { name: "Stop" }))
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Stop 2/ }))
   await waitFor(() => expect(calls).toHaveLength(1))
   expect(calls[0]).toEqual({
     route: "stop",
@@ -160,9 +164,9 @@ test("Remove names the live rows in the confirm and sends yes with the tokens", 
   const calls = setup()
   await selectRows("alpha", "gone")
   fireEvent.click(bar().getByRole("button", { name: "Remove 2" }))
-  const dialog = await screen.findByRole("dialog")
+  const dialog = await screen.findByRole("alertdialog")
   expect(dialog.textContent).toContain("Live and stopped first: alpha.")
-  fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }))
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Remove 2/ }))
   await waitFor(() => expect(calls).toHaveLength(1))
   expect(calls[0]).toEqual({
     route: "remove",
@@ -176,11 +180,13 @@ test("Remove names the live rows in the confirm and sends yes with the tokens", 
   })
 })
 
-test("Keep on the Remove confirm sends nothing and keeps the selection", async () => {
+test("Cancel on the Remove confirm sends nothing and keeps the selection", async () => {
   const calls = setup()
   await selectRows("alpha")
   fireEvent.click(bar().getByRole("button", { name: "Remove 1" }))
-  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Keep" }))
+  const dialog = await screen.findByRole("alertdialog")
+  expect(within(dialog).queryByRole("button", { name: /^Keep/ })).toBeNull()
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Cancel/ }))
   expect(calls).toHaveLength(0)
   expect(screen.getByTestId("select-count").textContent).toBe("1 selected")
 })
@@ -200,7 +206,9 @@ test("stale and queue-session results stay selected and toast their reasons; don
   }))
   await selectRows("alpha", "bravo")
   fireEvent.click(bar().getByRole("button", { name: "Stop 2" }))
-  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Stop" }))
+  fireEvent.click(
+    within(await screen.findByRole("alertdialog")).getByRole("button", { name: /^Stop 2/ }),
+  )
   await waitFor(() => expect(toast).toHaveBeenCalledTimes(2))
   expect(toast.mock.calls.map(([t]) => t.title)).toEqual([
     "alpha: changed, reselect",

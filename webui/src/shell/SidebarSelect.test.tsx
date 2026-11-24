@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
+import { closeConfirm } from "../actions/confirmRequest"
 import { session } from "../agents/agentsTestKit"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import {
@@ -18,6 +19,7 @@ import {
   ProgressDone,
   SectionFinished,
   SectionOnHold,
+  type ChatDraftRow,
   type DesignDraftRow,
   type EpicListRow,
   type SessionPlacement,
@@ -35,6 +37,7 @@ vi.mock("../ui/toaster", async (orig) => ({
 }))
 
 afterEach(() => {
+  closeConfirm()
   cleanup()
   vi.unstubAllGlobals()
   localStorage.clear()
@@ -86,19 +89,37 @@ interface Call {
 
 function setup({
   drafts = [],
+  chatDrafts = [],
   extraRows = [],
+  filled = false,
 }: {
   drafts?: DesignDraftRow[]
+  chatDrafts?: ChatDraftRow[]
   extraRows?: EpicListRow[]
+  /** The drafts' read answers carry text, so a bulk Remove has to ask. */
+  filled?: boolean
 } = {}) {
   const calls: Call[] = []
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
-      if (!/\/v1\/(workspaces|sessions|designs\/drafts)\//.test(String(url)))
+      if (!/\/v1\/(workspaces|sessions|designs\/drafts|agents\/drafts)\//.test(String(url)))
         return new Response(JSON.stringify({ epics: [...rows, ...extraRows], follow_ups: [] }), {
           status: 200,
         })
+      // A draft read: the text the page would show, empty unless `filled`.
+      if (/\/read/.test(String(url)))
+        return new Response(
+          JSON.stringify({
+            draft: {
+              idea: filled ? "text" : "",
+              brief: filled ? "text" : "",
+              slug: "",
+              images: [],
+            },
+          }),
+          { status: 200 },
+        )
       const body = JSON.parse(String(init?.body)) as Call["body"]
       calls.push({ url: String(url), body })
       const reply = body.targets
@@ -121,6 +142,7 @@ function setup({
         { name: "Work", members: 0 },
       ],
       design_drafts: drafts,
+      chat_drafts: chatDrafts,
       sessions: sessions(),
       placements,
     },
@@ -354,19 +376,35 @@ test("Move on a draft and a Design sends the draft's membership key with the Des
   expect(ctl.calls[0]!.body).toEqual({ name: "Work", targets: ["draft/d1", "p:shop"] })
 })
 
-test("bulk Remove on one empty draft still asks, and Remove deletes it", async () => {
+const chatDraft: ChatDraftRow = {
+  id: "c1",
+  label: "Quick question",
+  project: "p",
+  harness: "claude",
+  edited_at: "2026-05-01T10:00:00Z",
+  workspace: "Default",
+  member_key: "chat-draft/c1",
+}
+
+test("bulk Remove on one empty draft deletes it with no confirm", async () => {
   const ctl = setup({ drafts: [draft] })
   await enterSelect()
   fireEvent.click(box("Select Landing page"))
   fireEvent.click(bar().getByRole("button", { name: "Remove 1" }))
-  const dialog = await screen.findByRole("dialog")
-  expect(dialog.textContent).toContain("Remove Landing page? Its prompt and images are deleted.")
-  expect(within(dialog).getByRole("button", { name: "Keep" })).toBeTruthy()
-  expect(ctl.calls).toHaveLength(0)
-  fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }))
   await waitFor(() => expect(ctl.calls).toHaveLength(1))
+  expect(screen.queryByRole("alertdialog")).toBeNull()
   expect(ctl.calls[0]!.url).toMatch(/drafts\/delete/)
   expect(ctl.calls[0]!.body).toEqual({ id: "d1" })
+})
+
+test("a non-empty draft brings the confirm back", async () => {
+  const ctl = setup({ drafts: [draft], filled: true })
+  await enterSelect()
+  fireEvent.click(box("Select Landing page"))
+  fireEvent.click(bar().getByRole("button", { name: "Remove 1" }))
+  const dialog = await screen.findByRole("alertdialog")
+  expect(within(dialog).getByText("Landing page")).toBeTruthy()
+  expect(ctl.calls).toHaveLength(0)
 })
 
 test("a chat and a draft share one confirmation, and Remove calls both removes once", async () => {
@@ -375,13 +413,25 @@ test("a chat and a draft share one confirmation, and Remove calls both removes o
   fireEvent.click(box("Select talk"))
   fireEvent.click(box("Select Landing page"))
   fireEvent.click(bar().getByRole("button", { name: "Remove 2" }))
-  const dialog = await screen.findByRole("dialog")
+  const dialog = await screen.findByRole("alertdialog")
   expect(dialog.textContent).toContain("Their sessions are deleted.")
-  expect(dialog.textContent).toContain("Its prompt and images are deleted.")
-  fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }))
+  expect(dialog.textContent).toContain("A draft's prompt and images are deleted.")
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Remove 2/ }))
   await waitFor(() => expect(ctl.calls).toHaveLength(2))
   expect(ctl.calls.filter((c) => /sessions\/remove/.test(c.url))).toHaveLength(1)
   expect(ctl.calls.filter((c) => /drafts\/delete/.test(c.url))).toHaveLength(1)
+})
+
+test("a chat draft and a design draft are removed with one delete call each", async () => {
+  const ctl = setup({ drafts: [draft], chatDrafts: [chatDraft] })
+  await enterSelect()
+  fireEvent.click(box("Select Landing page"))
+  fireEvent.click(box("Select Quick question"))
+  fireEvent.click(bar().getByRole("button", { name: "Remove 2" }))
+  await waitFor(() => expect(ctl.calls).toHaveLength(2))
+  expect(ctl.calls.filter((c) => /\/v1\/agents\/drafts\/delete/.test(c.url))).toHaveLength(1)
+  expect(ctl.calls.filter((c) => /\/v1\/designs\/drafts\/delete/.test(c.url))).toHaveLength(1)
+  expect(ctl.calls.find((c) => /agents\/drafts\/delete/.test(c.url))!.body).toEqual({ id: "c1" })
 })
 
 test("Stop and Archive skip a draft and name it by its label", async () => {

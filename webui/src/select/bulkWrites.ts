@@ -1,3 +1,4 @@
+import { realChatDrafts } from "../design/chatDrafts"
 import { deleteDraft, type DeleteDraft } from "../design/drafts"
 import { postTargetsTo, rowToken } from "../design/open"
 import {
@@ -79,15 +80,27 @@ export async function unarchiveWithToasts(
 export const bulkStop = (sessions: SessionInfo[]) =>
   postSessions("/v1/sessions/stop", sessions, false)
 
+/** A selected draft: its row key (the name lookup), the id its Remove takes, and which client owns it. */
+export interface DraftTarget {
+  key: string
+  id: string
+  chat?: boolean
+}
+
+const removeChatDraft = (id: string) => realChatDrafts.remove(id)
+
 /** One draft Remove per row, reported as target results keyed by the row so one refusal does not hide the others. */
 export async function bulkRemoveDrafts(
-  drafts: { key: string; id: string }[],
-  remove: DeleteDraft = deleteDraft,
+  drafts: DraftTarget[],
+  remove: { design: DeleteDraft; chat: (id: string) => Promise<{ kind: string }> } = {
+    design: deleteDraft,
+    chat: removeChatDraft,
+  },
 ): Promise<TargetResult[]> {
   return Promise.all(
-    drafts.map(async ({ key, id }): Promise<TargetResult> => {
+    drafts.map(async ({ key, id, chat }): Promise<TargetResult> => {
       try {
-        const res = await remove(id)
+        const res = await (chat ? remove.chat(id) : remove.design(id))
         // A draft already gone (or started) is as removed as one this call removed.
         return res.kind === "deleted" || res.kind === "gone"
           ? { target: key, status: TargetDone }

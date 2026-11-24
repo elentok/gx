@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
+import { closeConfirm } from "../actions/confirmRequest"
 import { session } from "../agents/agentsTestKit"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import {
@@ -23,6 +24,7 @@ vi.mock("../ui/toaster", async (orig) => ({
 }))
 
 afterEach(() => {
+  closeConfirm()
   cleanup()
   vi.unstubAllGlobals()
   localStorage.clear()
@@ -163,10 +165,12 @@ test("Hold asks when a dry run lists sessions, and sends the real call with yes 
   }))
   await selectRows("Blog", "Shop")
   fireEvent.click(bar().getByRole("button", { name: "Hold 2" }))
-  const dialog = await screen.findByRole("dialog")
+  const dialog = await screen.findByRole("alertdialog")
   expect(dialog.textContent).toContain("designer")
+  expect(within(dialog).getByText("Blog")).toBeTruthy()
+  expect(within(dialog).getByText("Shop")).toBeTruthy()
   expect(calls).toHaveLength(1)
-  fireEvent.click(within(dialog).getByRole("button", { name: "Hold and end sessions" }))
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Hold 2/ }))
   await waitFor(() => expect(calls).toHaveLength(2))
   expect(calls[1].body).toEqual({ targets: ["p:blog", "p:shop"], yes: true })
 })
@@ -181,7 +185,8 @@ test("Cancel on the confirm sends no real call and keeps the selection", async (
   }))
   await selectRows("Blog")
   fireEvent.click(bar().getByRole("button", { name: "Hold 1" }))
-  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }))
+  const dialog = await screen.findByRole("alertdialog")
+  fireEvent.click(within(dialog).getByRole("button", { name: /^Cancel/ }))
   expect(calls).toHaveLength(1)
   expect(screen.getByTestId("select-count").textContent).toBe("1 selected")
 })
