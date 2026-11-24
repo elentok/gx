@@ -26,6 +26,15 @@ async page => {
     }
     const root = document.getElementById('root').cloneNode(true);
     root.querySelectorAll("script").forEach((s) => s.remove());
+    // inline every img src as a data: URI, so the saved file shows it when served from another origin
+    for (const img of root.querySelectorAll('img[src]')) {
+      const src = img.getAttribute('src');
+      if (src.startsWith('data:')) continue;
+      try {
+        const r = await fetch(src); const blob = await r.blob();
+        img.setAttribute('src', await new Promise((ok, no) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = no; f.readAsDataURL(blob); }));
+      } catch {}
+    }
     return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PROTOTYPE B saved</title><style data-mock-inlined>' + css + '</style></head><body class="' + document.body.className + '"><div id="root">' + root.innerHTML + '</div></body></html>';
   });
   return html;
