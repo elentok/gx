@@ -2,6 +2,7 @@
 package catalog
 
 import (
+	"encoding/json"
 	"maps"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/notifykind"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -18,6 +20,17 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
+
+// slackKindsWithLongTicket is a --config entry that checks the default kinds
+// plus long-ticket, which is unchecked by default, for the Slack channel.
+func slackKindsWithLongTicket() string {
+	ids := append(notifykind.DefaultIDs(), "long-ticket")
+	raw, err := json.Marshal(ids)
+	if err != nil {
+		panic(err)
+	}
+	return "notification-channels.slack.kinds=" + string(raw)
+}
 
 // chatEpicDone is a merged ticket that took an hour and recorded its cost.
 func chatEpicDone(doneAt string, tokens int64, cost float64) servertest.TicketOpts {
@@ -246,7 +259,7 @@ var Scenarios = map[string]scenario{
 		Hold:     true,
 		DiskLow:  true,
 		Spend:    true,
-		Config:   []string{"budget.soft-limit=6", "budget.hard-limit=9", "budget.long-ticket-turns=1"},
+		Config:   []string{"budget.soft-limit=6", "budget.hard-limit=9", "budget.long-ticket-turns=1", slackKindsWithLongTicket()},
 		Env:      []string{"GX_GUARD_POLL=250ms", "GX_BUDGET_KILL_GRACE=100ms"},
 	},
 	// chat-batch: chat-capture with a 5s flush interval (ChatFlush), so a test can
