@@ -2,11 +2,9 @@ package server
 
 import (
 	"net/http"
-	"slices"
 	"time"
 
 	"github.com/elentok/gx/ralphloop/notify"
-	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webpush"
 	"github.com/elentok/gx/server/wire"
@@ -42,8 +40,18 @@ func badgeCount(sessions []wire.SessionInfo, ts []wire.TicketInfo) int {
 // pushSwitchOn is the server-wide Push switch. The kind list does not apply to
 // it: the badge and the routes ask only this.
 func pushSwitchOn(s *Server) bool {
+	ch, ok := channelFrom(&s.settings, notify.ChannelPush)
+	return ok && ch.Enabled()
+}
+
+// pushContact is the contact email the push service requires, "" when unset or
+// when no settings are loaded.
+func pushContact(s *Server) string {
 	cur := s.settings.Load()
-	return cur == nil || cur.NotifyChannels.Push.Enabled()
+	if cur == nil {
+		return ""
+	}
+	return cur.WebPushContact
 }
 
 // liveBadge counts the badge from live state, 0 while the Push switch is off.
@@ -80,7 +88,7 @@ func newPush(s *Server, quiet func() bool) *webpush.Dispatcher {
 			if quiet() { // the sender drops it; a Rest period adds no attempt
 				return true, false
 			}
-			return channelCap(s, "push")
+			return channelCap(s, notify.ChannelPush)
 		},
 		Notice: webpush.Event{Title: "gx: Push paused", Body: breakerNotice("Push"), Path: "/", Tag: "notice:push-breaker"},
 		Merge:  s.cfg.PushMergeDelay,
@@ -97,8 +105,7 @@ func (p *pushAdapter) Send(n notify.PushNote) {
 	if p.s == nil {
 		return
 	}
-	cur := p.s.settings.Load()
-	if cur != nil && (!cur.NotifyChannels.Push.Enabled() || !(n.System || slices.Contains(cur.NotifyChannels.Push.KindIDs(), n.Kind))) {
+	if !channelAllows(p.s, notify.ChannelPush, n.Kind, n.System) || pushContact(p.s) == "" {
 		return
 	}
 	tag := n.Tag
@@ -114,7 +121,10 @@ func (p *pushAdapter) Send(n notify.PushNote) {
 
 // Preflight is what the channel would do with a note of kind now.
 func (p *pushAdapter) Preflight(kind string, system bool) string {
-	return preflight(p.s, notify.ChannelPush, func(n settings.NotifyChannels) settings.NotifyChannel { return n.Push }, kind, system)
+	if p.s != nil && pushContact(p.s) == "" {
+		return notify.OutcomeUnconfigured
+	}
+	return preflight(p.s, notify.ChannelPush, kind, system)
 }
 
 // pushService is the push routes' view of the server. The routes run only

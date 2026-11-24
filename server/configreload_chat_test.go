@@ -208,9 +208,9 @@ func TestConfigReloadChannelSwitch_AppliesWithoutRestart(t *testing.T) {
 	defer s.chat.Close()
 	outcomes := func() map[string]string {
 		return map[string]string{
-			"desktop":   preflight(s, notify.ChannelDesktop, func(n settings.NotifyChannels) settings.NotifyChannel { return n.Desktop }, notifykind.SessionAlert, true),
-			"web-toast": preflight(s, notify.ChannelWebToast, func(n settings.NotifyChannels) settings.NotifyChannel { return n.WebToast }, notifykind.SessionAlert, true),
-			"push":      preflight(s, notify.ChannelPush, func(n settings.NotifyChannels) settings.NotifyChannel { return n.Push }, notifykind.SessionAlert, true),
+			"desktop":   preflight(s, notify.ChannelDesktop, notifykind.SessionAlert, true),
+			"web-toast": preflight(s, notify.ChannelWebToast, notifykind.SessionAlert, true),
+			"push":      preflight(s, notify.ChannelPush, notifykind.SessionAlert, true),
 		}
 	}
 

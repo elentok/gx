@@ -2,12 +2,10 @@ package server
 
 import (
 	"context"
-	"slices"
 	"time"
 
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop/notify"
-	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/webpush"
 	"github.com/elentok/gx/server/wire"
 )
@@ -27,10 +25,10 @@ func (d *desktopAdapter) Show(n notify.DesktopNote) {
 	if d.s == nil {
 		return
 	}
-	cur := d.s.settings.Load()
-	if cur == nil || !cur.NotifyChannels.Desktop.Enabled() || !(n.System || slices.Contains(cur.NotifyChannels.Desktop.KindIDs(), n.Kind)) {
+	if !channelAllows(d.s, notify.ChannelDesktop, n.Kind, n.System) {
 		return
 	}
+	cur := d.s.settings.Load()
 	note := osnotify.Notification{Title: n.Title, Body: n.Body, Group: n.Group, Activate: n.Activate, Execute: n.Execute, Link: n.Link}
 	if !n.Session {
 		path := n.Target.Path()
@@ -47,7 +45,7 @@ func (d *desktopAdapter) Show(n notify.DesktopNote) {
 		return
 	}
 	// The banner and its sound are one send, and the cap is the last gate.
-	send, trip := channelCap(d.s, "desktop")
+	send, trip := channelCap(d.s, notify.ChannelDesktop)
 	if trip {
 		d.notify(osnotify.Notification{Title: "gx: Desktop paused", Body: breakerNotice("Desktop"), Group: "gx-desktop-breaker"})
 	}
@@ -69,28 +67,37 @@ func (d *desktopAdapter) notify(note osnotify.Notification) {
 }
 
 func (d *desktopAdapter) Preflight(kind string, system bool) string {
-	return preflight(d.s, notify.ChannelDesktop, func(n settings.NotifyChannels) settings.NotifyChannel { return n.Desktop }, kind, system)
+	return preflight(d.s, notify.ChannelDesktop, kind, system)
 }
 
 func (w *webToastAdapter) Preflight(kind string, system bool) string {
-	return preflight(w.s, notify.ChannelWebToast, func(n settings.NotifyChannels) settings.NotifyChannel { return n.WebToast }, kind, system)
+	return preflight(w.s, notify.ChannelWebToast, kind, system)
+}
+
+// channelAllows is the adapters' gate: switch and kind list through
+// NotifyChannel.Allows, and false for a nil Server or nil settings.
+func channelAllows(s *Server, name, kind string, system bool) bool {
+	if s == nil {
+		return false
+	}
+	ch, ok := channelFrom(&s.settings, name)
+	return ok && ch.Allows(kind, system)
 }
 
 // preflight is what the channel would do with a note of kind now, in the router's
 // order: switch, kind list, breaker. It counts no attempt.
-func preflight(s *Server, name string, pick func(settings.NotifyChannels) settings.NotifyChannel, kind string, system bool) string {
+func preflight(s *Server, name, kind string, system bool) string {
 	if s == nil {
 		return notify.OutcomeUnconfigured
 	}
-	cur := s.settings.Load()
-	if cur == nil {
+	ch, ok := channelFrom(&s.settings, name)
+	if !ok {
 		return notify.OutcomeUnconfigured
 	}
-	ch := pick(cur.NotifyChannels)
 	switch {
 	case !ch.Enabled():
 		return notify.OutcomeOff
-	case !system && !slices.Contains(ch.KindIDs(), kind):
+	case !ch.Allows(kind, system):
 		return notify.OutcomeUnchecked
 	}
 	if state, err := notify.LoadNotificationState(s.cfg.Chat.GateStatePath); err == nil && state.Transports[name].ChannelTripped(time.Now(), s.cfg.ChannelBreakerClear) {
@@ -117,11 +124,10 @@ func (w *webToastAdapter) Show(n notify.WebToastNote) {
 	if w.s == nil {
 		return
 	}
-	cur := w.s.settings.Load()
-	if cur == nil || !cur.NotifyChannels.WebToast.Enabled() || !(n.System || slices.Contains(cur.NotifyChannels.WebToast.KindIDs(), n.Kind)) {
+	if !channelAllows(w.s, notify.ChannelWebToast, n.Kind, n.System) {
 		return
 	}
-	send, trip := channelCap(w.s, "web-toast")
+	send, trip := channelCap(w.s, notify.ChannelWebToast)
 	if trip {
 		w.s.events.PublishEvent(wire.Event{Type: wire.EventNotificationToast, Title: "gx: Web toast paused", Body: breakerNotice("Web toast"), Path: "/"})
 	}

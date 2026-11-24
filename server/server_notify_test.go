@@ -107,6 +107,33 @@ func TestNotifyRoutes_SendAppliesTheKindListAndTestSkipsIt(t *testing.T) {
 	}
 }
 
+func TestNotifyRoutes_PushWithoutContactEmailIsUnconfigured(t *testing.T) {
+	t.Parallel()
+	hook := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	t.Cleanup(hook.Close)
+	s, hits, _ := pushServer(t, time.Now, func(c *Config) {
+		c.Settings.WebPushContact = ""
+		c.Settings.Chat.SlackWebhookURL = hook.URL
+	})
+	t.Cleanup(s.chat.Close)
+
+	send := httptest.NewRecorder()
+	rootRoutes{s}.notifySend(send, httptest.NewRequest("POST", "/v1/notify/send", strings.NewReader(`{"message":"hi"}`)))
+	test := httptest.NewRecorder()
+	rootRoutes{s}.notifyTest(test, httptest.NewRequest("POST", "/v1/notify/test", nil))
+
+	if got := outcomes(t, send)["push"]; got != notify.OutcomeUnconfigured {
+		t.Errorf("send: push = %q, want %q", got, notify.OutcomeUnconfigured)
+	}
+	if got := outcomes(t, test)["push"]; got != notify.OutcomeUnconfigured {
+		t.Errorf("test: push = %q, want %q", got, notify.OutcomeUnconfigured)
+	}
+	s.push.Close()
+	if hits.Load() != 0 {
+		t.Errorf("push hits = %d, want none", hits.Load())
+	}
+}
+
 func TestNotifyRoutes_SendNeedsAMessage(t *testing.T) {
 	t.Parallel()
 	s := routeServer(t, settings.NotifyChannels{})

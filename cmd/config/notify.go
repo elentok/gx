@@ -270,11 +270,11 @@ func printChannelLines(w io.Writer, chs gxconfig.NotificationChannelsConfig, sta
 		cfg     gxconfig.ChannelConfig
 		breaker bool
 	}{
-		{"desktop", chs.Desktop, true},
-		{"web-toast", chs.WebToast, true},
-		{"telegram", chs.Telegram, false},
-		{"slack", chs.Slack, false},
-		{"push", chs.Push, true},
+		{notify.ChannelDesktop, chs.Desktop, true},
+		{notify.ChannelWebToast, chs.WebToast, true},
+		{notify.ChannelTelegram, chs.Telegram, false},
+		{notify.ChannelSlack, chs.Slack, false},
+		{notify.ChannelPush, chs.Push, true},
 	}
 	for _, r := range rows {
 		sw := "off"

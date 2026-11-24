@@ -1,8 +1,11 @@
 package settings
 
 import (
+	"slices"
+
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/notifykind"
+	"github.com/elentok/gx/ralphloop/notify"
 )
 
 // NotifyChannel is one channel's switch and kind list, from config
@@ -26,6 +29,29 @@ func (c NotifyChannel) KindIDs() []string {
 		return notifykind.DefaultIDs()
 	}
 	return c.Kinds
+}
+
+// Allows is the one gate: the switch is on, and the kind is checked or the
+// note is a system one.
+func (c NotifyChannel) Allows(kind string, system bool) bool {
+	return c.Enabled() && (system || slices.Contains(c.KindIDs(), kind))
+}
+
+// ByID returns the channel with the notify.Channel* id.
+func (n NotifyChannels) ByID(id string) (NotifyChannel, bool) {
+	switch id {
+	case notify.ChannelDesktop:
+		return n.Desktop, true
+	case notify.ChannelWebToast:
+		return n.WebToast, true
+	case notify.ChannelTelegram:
+		return n.Telegram, true
+	case notify.ChannelSlack:
+		return n.Slack, true
+	case notify.ChannelPush:
+		return n.Push, true
+	}
+	return NotifyChannel{}, false
 }
 
 // NotifyChannels holds the five channels' settings.
