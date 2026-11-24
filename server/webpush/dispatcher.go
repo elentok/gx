@@ -34,9 +34,14 @@ type Dispatcher struct {
 	Badge func() int
 	// On is the server-wide switch, asked after the merge hold so an event held
 	// while it goes off is dropped. Nil means on. TestPush ignores it.
-	On    func() bool
-	Merge time.Duration // zero means one second
-	Log   *slog.Logger
+	On func() bool
+	// Cap is the send-rate cap, asked once per merged push as the last gate. It
+	// reports whether the push goes out and whether this call trips the breaker,
+	// in which case Notice goes out first, uncapped. Nil means no cap.
+	Cap    func() (send, trip bool)
+	Notice Event
+	Merge  time.Duration // zero means one second
+	Log    *slog.Logger
 
 	mu       sync.Mutex
 	pending  map[string]*pendingPush
@@ -133,6 +138,20 @@ func (d *Dispatcher) fanOut(ev Event) {
 	if d.On != nil && !d.On() {
 		return
 	}
+	if d.Cap != nil {
+		send, trip := d.Cap()
+		if trip {
+			d.deliver(d.Notice)
+		}
+		if !send {
+			return
+		}
+	}
+	d.deliver(ev)
+}
+
+// deliver sends ev to every subscribed device, one push however many there are.
+func (d *Dispatcher) deliver(ev Event) {
 	targets := d.Subs.PushTargets()
 	badge := d.Badge()
 	var wg sync.WaitGroup

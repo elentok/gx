@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"slices"
+	"time"
 
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop/notify"
@@ -39,14 +40,40 @@ func (d *desktopAdapter) Show(n notify.DesktopNote) {
 		}
 	}
 	// The Agents banner setting applies to session banners only.
-	if !n.Session || cur.AgentsBanners {
-		if err := d.s.cfg.Notifier.Notify(context.Background(), note); err != nil {
-			d.s.log.Warn("desktop banner", "kind", n.Kind, "error", err)
-		}
+	banner := !n.Session || cur.AgentsBanners
+	sound := n.Session && n.Sound != "" && cur.AgentsSounds.Enabled
+	if !(banner || sound) || d.s.rest.Quiet() {
+		return
 	}
-	if n.Session && n.Sound != "" && cur.AgentsSounds.Enabled {
+	// The banner and its sound are one send, and the cap is the last gate.
+	send, trip := channelCap(d.s, "desktop")
+	if trip {
+		d.notify(osnotify.Notification{Title: "gx: Desktop paused", Body: breakerNotice("Desktop"), Group: "gx-desktop-breaker"})
+	}
+	if !send {
+		return
+	}
+	if banner {
+		d.notify(note)
+	}
+	if sound {
 		d.s.cfg.Player.Play(context.Background(), cur.AgentsSounds, n.Sound)
 	}
+}
+
+func (d *desktopAdapter) notify(note osnotify.Notification) {
+	if err := d.s.cfg.Notifier.Notify(context.Background(), note); err != nil {
+		d.s.log.Warn("desktop banner", "title", note.Title, "error", err)
+	}
+}
+
+// channelCap counts one attempt on a channel against the shared state file.
+func channelCap(s *Server, channel string) (send, trip bool) {
+	return notify.ChannelCap(s.cfg.Chat.GateStatePath, channel, time.Now(), s.cfg.ChannelBreakerClear)
+}
+
+func breakerNotice(channel string) string {
+	return channel + " sent too many notifications in a minute, so gx stops it until it has been quiet for 5 minutes."
 }
 
 // webToastAdapter is the Web toast channel of the router: the switch and the
@@ -60,6 +87,13 @@ func (w *webToastAdapter) Show(n notify.WebToastNote) {
 	}
 	cur := w.s.settings.Load()
 	if cur == nil || !cur.NotifyChannels.WebToast.Enabled() || !slices.Contains(cur.NotifyChannels.WebToast.KindIDs(), n.Kind) {
+		return
+	}
+	send, trip := channelCap(w.s, "web-toast")
+	if trip {
+		w.s.events.PublishEvent(wire.Event{Type: wire.EventNotificationToast, Title: "gx: Web toast paused", Body: breakerNotice("Web toast"), Path: "/"})
+	}
+	if !send {
 		return
 	}
 	w.s.events.PublishEvent(wire.Event{Type: wire.EventNotificationToast, Title: n.Title, Body: n.Body, Path: n.Target.Path()})

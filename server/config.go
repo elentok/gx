@@ -269,6 +269,9 @@ type Config struct {
 	// PushMergeDelay is how long a push waits for events of its tag to
 	// merge; zero means one second.
 	PushMergeDelay time.Duration
+	// ChannelBreakerClear is how long a Desktop, Web toast or Push channel
+	// must see no attempt before its tripped breaker clears; zero means 5 minutes.
+	ChannelBreakerClear time.Duration
 	// PushAllowHTTPEndpoints is a test seam: the subscription check accepts an
 	// http: endpoint, for the fixture's loopback push service. gxfixture sets it
 	// through GX_PUSH_ALLOW_HTTP_ENDPOINTS; false for every user.
