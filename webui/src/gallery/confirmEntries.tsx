@@ -1,7 +1,6 @@
 import { Box } from "@chakra-ui/react"
 import { useRef } from "react"
 import { openConfirm, type ConfirmRequest } from "../actions/confirmRequest"
-import { ConfirmHost } from "../shell/ConfirmHost"
 import { Button } from "../ui/button/Button"
 import type { GalleryEntry } from "./registry"
 
@@ -27,7 +26,6 @@ function ConfirmCases() {
     })
   return (
     <Box display="flex" gap="2" flexWrap="wrap">
-      <ConfirmHost />
       <Button ref={ref} emphasis="secondary" onClick={open(() => ({}))}>
         Popover
       </Button>
@@ -46,7 +44,6 @@ function ConfirmCases() {
         emphasis="secondary"
         onClick={open(() => ({
           actionId: "stop",
-          group: "lifecycle",
           title: "Stop 3 sessions",
           confirmLabel: "Stop 3",
           body: { lines: [], rows: ["talk", "gx bugs 03", "gx bugs 04"] },

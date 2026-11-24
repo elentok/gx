@@ -19,6 +19,9 @@ import { focusMainHeadingAfterLanding } from "./focusMainHeading"
 const PRIMARY_TONE = "running"
 const DANGER_TONE = "paused"
 
+/** The mock's button: 29px, radius 6px, regular weight. */
+const BUTTON_LOOK = { size: "sm", h: "29px", borderRadius: "6px", fontWeight: "400" } as const
+
 const ids = new WeakMap<ConfirmRequest, number>()
 let nextId = 0
 const idOf = (r: ConfirmRequest) => {
@@ -122,7 +125,14 @@ function Confirm({ request }: { request: ConfirmRequest }) {
 
   if (surface.mode === "modal") {
     return (
-      <Modal label={request.title} onClose={() => close(false)} maxW="sm" data-part="confirm-modal">
+      <Modal
+        label={request.title}
+        onClose={() => close(false)}
+        w="min(340px, 100%)"
+        p="0"
+        borderRadius="12px"
+        data-part="confirm-modal"
+      >
         {card}
       </Modal>
     )
@@ -152,10 +162,10 @@ function Confirm({ request }: { request: ConfirmRequest }) {
             bg="surface.raised"
             borderWidth="1px"
             borderColor="border"
-            borderRadius="12px"
+            borderRadius="10px"
             boxShadow="lg"
             color="text"
-            w="min(340px, calc(100vw - 32px))"
+            w="min(300px, calc(100vw - 32px))"
             css={{ "--popover-bg": "colors.surface.raised" }}
           >
             <Popover.Arrow>
@@ -206,12 +216,12 @@ function ConfirmCard({
   onConfirm: () => void
 }) {
   return (
-    <Box>
-      <Box px="4" pt="3" pb="2" display="flex" flexDirection="column" gap="2">
-        <Text fontWeight="600" data-part="title">
+    <Box p="3" display="flex" flexDirection="column" gap="3">
+      <Box display="flex" flexDirection="column" gap="2">
+        <Text fontWeight="700" fontSize="14px" data-part="title">
           {request.title}
         </Text>
-        <Box data-part="body" fontSize="sm" color="text.dim" display="flex" flexDirection="column" gap="2">
+        <Box data-part="body" fontSize="13px" color="text.dim" display="flex" flexDirection="column" gap="2">
           {preparing ? (
             <Box role="status" aria-label="Checking" display="flex" alignItems="center" gap="2">
               <Spinner size="sm" color="tone.running.fg" />
@@ -240,28 +250,20 @@ function ConfirmCard({
             <Textarea
               data-part="reason-field"
               aria-label={body.input.label}
-              placeholder={body.input.label}
+              placeholder={body.input.required ? `${body.input.label} (required)` : body.input.label}
               value={text}
               onChange={(e) => onText(e.target.value)}
-              rows={3}
+              rows={2}
               size="sm"
             />
           )}
         </Box>
       </Box>
-      <Box
-        px="4"
-        py="3"
-        borderTopWidth="1px"
-        borderColor="border"
-        display="flex"
-        justifyContent="flex-end"
-        gap="2"
-      >
+      <Box display="flex" justifyContent="flex-end" gap="2">
         <Button
           ref={cancelRef}
           data-part="cancel-button"
-          size="sm"
+          {...BUTTON_LOOK}
           emphasis="secondary"
           autoFocus
           onClick={onCancel}
@@ -270,7 +272,7 @@ function ConfirmCard({
         </Button>
         <Button
           data-part="confirm-button"
-          size="sm"
+          {...BUTTON_LOOK}
           tone={request.group === "danger" ? DANGER_TONE : PRIMARY_TONE}
           disabled={!canConfirm}
           onClick={onConfirm}
