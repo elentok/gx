@@ -44,7 +44,7 @@ Mock guidance moves into `gx-prototype`, with no new skill.
 23. As a gx-design agent, I want a check in the store step, so that a mock with invented values is not stored.
 24. As a design reviewer, I want a rubric bullet on mock fidelity, so that a spec whose mock ignores the app's tokens is a finding.
 25. As a maintainer, I want a Go helper that checks stored mocks, so that raw colors, `system-ui`, scripts, switcher markup and missing state markup are caught without reading the file.
-26. As a maintainer, I want the helper to ignore the `:root` token block and the inlined stylesheet, so that real tokens and real rules do not raise false alarms.
+26. As a maintainer, I want the helper to ignore the inlined stylesheet (tokens, base layer and fonts in one `data-mock-inlined` style) and nothing else, so that real tokens and real rules do not raise false alarms while a hand-written palette does.
 27. As a maintainer, I want the helper to be tested, so that I can trust its findings.
 28. As an agent, I want the helper's error to name the file and the rule, so that I can fix the mock without guessing.
 29. As an agent in gx-design, I want every UI mock to follow this guidance, so that no mock skips it.
@@ -70,6 +70,8 @@ Mock guidance moves into `gx-prototype`, with no new skill.
 - The project's tokens override the look the claude.ai artifact design skill pushes.
 - The standard pill switcher is used in every mock, taken from `switcher-snippet.html`. UI.md step 4 and step 5a point to `MOCK.md` for it.
 - Icons are never drawn new. A mock copies the app's own SVG or uses the app's icon library.
+- A standalone mock pastes the tokens, the base layer and the fonts into one `<style data-mock-inlined>`, so the helper exempts them. `MOCK.md` and the files in `gx/` say so.
+- In-app routes in every project use the `?variant=` param for the switcher. The `#v=` hash is only for a standalone file. UI.md step 3 and `MOCK.md` say so.
 - A save script outside gx must write the same inlined-stylesheet marker, `data-mock-inlined`, on the `<style>` element, as the gx save script does. `MOCK.md` says so.
 
 **Token file and base layer (gx only)**
@@ -113,7 +115,7 @@ Mock guidance moves into `gx-prototype`, with no new skill.
   - any `<script>` element;
   - switcher markup, found by the pill's root class;
   - missing `data-mock-state` or `data-mock-width` markup, and a state section with no width.
-- The exempt blocks are the `:root` block and the inlined stylesheet. The inlined stylesheet is the saved copy of the app's real rules (Chakra's reset holds `system-ui` in its font fallback, and its colors are real). The helper recognizes it by the `data-mock-inlined` attribute on its `<style>` element. The save script writes that marker, and mock 02 carries it already. `MOCK.md` and step 5a document it.
+- The one exempt block is the inlined stylesheet: the `<style>` element carrying `data-mock-inlined`. It holds the app's real tokens (including Chakra's `:where(:root, :host)` and `.dark` token blocks), reset and fonts (Chakra's reset holds `system-ui` in its font fallback, and its colors are real). A `:root` block outside it is not exempt. The helper recognizes it by the `data-mock-inlined` attribute on its `<style>` element. The save script writes that marker, and mock 02 carries it already. `MOCK.md` and step 5a document it.
 - The helper is only for gx. Other projects have no such check.
 - Nothing runs the helper on already stored mocks as a gate. The stored mocks `02-one-mock-two-ways.html` and the notification-alignment mock are not restyled (see Out of Scope).
 
@@ -135,7 +137,7 @@ A good test checks behavior from outside: the file a command writes, the finding
 Seams:
 
 - **Generated files.** One Vitest drift test runs the generator and compares its output (tokens, base layer, `fonts.css`) with the committed files. Prior art: the existing webui theme tests and the generated-file checks in the repo.
-- **Stored-mock helper.** Go tests in `testutil/mocklint` use small HTML fixtures, one per rule: a hex color, an `rgba()` color, an `hsla()` color and a named color, each outside `:root`; a raw color inside `:root`; a raw color in the inlined stylesheet; `system-ui` outside the exempt blocks; `system-ui` inside the inlined stylesheet (must pass); a script; switcher markup; a missing state marker; a missing width marker; and a clean file. Prior art: `testutil/mockcheck`.
+- **Stored-mock helper.** Go tests in `testutil/mocklint` use small HTML fixtures, one per rule: a hex color, an `rgba()` color, an `hsla()` color and a named color, each outside the inlined stylesheet; a raw color in a `:root` block outside it; a raw color in the inlined stylesheet; a class read from `switcher-snippet.html` as the pill's root class, used by the switcher-markup rule; `system-ui` outside the exempt blocks; `system-ui` inside the inlined stylesheet (must pass); a script; switcher markup; a missing state marker; a missing width marker; and a clean file. Prior art: `testutil/mockcheck`.
 - **Skill text.** An anchors test, like the existing `mock_rules_test.go` and `gx_design_rules_test.go`, checks that UI.md steps 3, 5a and 6, `MOCK.md`, `SKILL.md` and the gx-design rubric carry the new rules, including the `data-mock-inlined` marker.
 - **Bundle.** `TestEmbeddedBundleContainsRequiredFiles` with the new `requiredFiles` entries.
 - **Switcher sync.** A Vitest test compares the `PrototypeSwitcher` class names and CSS with `switcher-snippet.html`.
@@ -158,14 +160,14 @@ Look of a mock (stories 1, 2, 5, 6, 7)
 
 1. Mock states: desktop-settings. Also compare the mocks built in 5 and 6 with the real Desktop settings section through MOCK-CHECK.md. Pass: both match.
 2. Mock states: desktop-settings. Same comparison as story 1.
-5. Build a mock for one gx page as an in-app route, save it with the gx save script, and run `go run ./testutil/mocklint/cmd <file>`. Pass: exit 0 with no findings. The saved file contains the inlined stylesheet, so this also covers `system-ui` inside it.
-6. Build the same page as a standalone file from the token file, base layer and `fonts.css`. Pass: 10 (all five faces `loaded`) and 11 pass for this mock.
+5. Build a mock for the Desktop settings section at 390px (state `desktop-settings`, the parts of the Mock states line) as an in-app route, save it with the gx save script, and run `go run ./testutil/mocklint/cmd <file>`. Pass: exit 0 with no findings. The saved file contains the inlined stylesheet, so this also covers `system-ui` inside it.
+6. Build the same page as a standalone file from the token file, base layer and `fonts.css`, pasted into one `<style data-mock-inlined>`. Pass: mocklint exits 0 on it, and 10 (all five faces `loaded`) and 11 pass for this mock.
 7. Read `MOCK.md`. Pass: it says the project's tokens win over the artifact design skill.
 
 Guidance and enforcement (stories 3, 4, 21 to 24, 29, 30)
 
 3. `gx skills` or the bundle listing shows `gx-prototype` with `MOCK.md`, `switcher-snippet.html` and the `gx/` folder, and `SKILL.md` and `UI.md` link to `MOCK.md`. Pass: the anchors test and `TestEmbeddedBundleContainsRequiredFiles` pass.
-4. Read `MOCK.md` outside its "In gx" section. Pass: it names no gx path, token file or gx component.
+4. Read `MOCK.md` outside its "In gx" section, and `switcher-snippet.html`. Pass: neither names a gx path, token file, gx token or gx component. The anchors test checks both.
 21. Read UI.md steps 3 and 6. Pass: in gx, the route mounts `PrototypeSwitcher` and step 6 keeps it, dropping only the variants, in both sub-shapes. In other projects step 6 drops the switcher unless the project keeps a permanent one.
 22. Open a stored mock. Pass: no `<script>` and no switcher markup.
 23. Read UI.md step 5a. Pass: it carries the check, the `[ -d testutil/gxfixture ]` guard, the helper call and the Resolution note.
@@ -188,8 +190,8 @@ For 13, 15, 16 and 17, build a page from the shipped `switcher-snippet.html` wit
 
 Helper (stories 25 to 28)
 
-25. Run the helper on fixtures with a raw color outside `:root` (hex, `rgba()`, `hsla()` and a named color, one each), one with `system-ui`, one with a script, one with switcher markup and one with no state markup. Pass: each gets a finding and a non-zero exit.
-26. Run the helper on `02-one-mock-two-ways.html`. Pass: no color or `system-ui` findings for the inlined stylesheet or `:root`.
+25. Run the helper on fixtures with a raw color outside the inlined stylesheet (hex, `rgba()`, `hsla()` and a named color, one each), one with `system-ui`, one with a script, one with switcher markup, one with no state markup, one with a state but no width marker and one with no width marker at all. Pass: each gets a finding and a non-zero exit.
+26. Run the helper on `02-one-mock-two-ways.html`. Pass: no color or `system-ui` findings (its tokens, `.dark` block and reset all sit in its `data-mock-inlined` style).
 27. Run `go test` on `testutil/mocklint`, capped with `scripts/proc-cap`. Pass: green.
 28. Read a finding. Pass: it names the file and the rule.
 
