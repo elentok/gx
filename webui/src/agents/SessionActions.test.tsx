@@ -2,7 +2,8 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { postStopSession, rowToken } from "../design/open"
 import type { SessionInfo } from "../generated/server"
-import { RemoveConfirmHost } from "../shell/RemoveConfirmHost"
+import { closeConfirm } from "../actions/confirmRequest"
+import { ConfirmHost } from "../shell/ConfirmHost"
 import { renderThemed } from "../ui/render"
 import { SessionActions } from "./SessionActions"
 import { exitedDesigns, removeSession } from "./sessionWrites"
@@ -16,6 +17,7 @@ vi.mock("./sessionWrites", async (importOriginal) => ({
 
 afterEach(() => {
   cleanup()
+  closeConfirm()
   mockRemove.mockReset()
 })
 
@@ -49,12 +51,12 @@ test("Remove on a live session is one call with the row token", async () => {
   renderThemed(
     <>
       <SessionActions session={live} onRemoved={onRemoved} stop={stop} />
-      <RemoveConfirmHost />
+      <ConfirmHost />
     </>,
   )
   await openMenu()
   fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }))
-  fireEvent.click(await screen.findByRole("button", { name: "Remove" }))
+  fireEvent.click(await screen.findByRole("button", { name: /^Remove/ }))
   await waitFor(() => expect(onRemoved).toHaveBeenCalled())
   expect(stop).not.toHaveBeenCalled()
   expect(mockRemove).toHaveBeenCalledExactlyOnceWith({ id: "s-a", state: rowToken(live) })
@@ -81,9 +83,15 @@ test("a Queue agent has no Rename item", () => {
 test("Stop sends the row token", async () => {
   const live = session()
   const stop = vi.fn(async () => ({}))
-  renderThemed(<SessionActions session={live} onRemoved={() => {}} stop={stop} />)
+  renderThemed(
+    <>
+      <SessionActions session={live} onRemoved={() => {}} stop={stop} />
+      <ConfirmHost />
+    </>,
+  )
   await openMenu()
   fireEvent.click(await screen.findByRole("menuitem", { name: "Stop" }))
+  fireEvent.click(await screen.findByRole("button", { name: /^Stop/ }))
   await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "s-a", state: rowToken(live) }))
 })
 
@@ -123,12 +131,12 @@ test("Remove forgets the session as the Agents page's last agent, so the page do
   renderThemed(
     <>
       <SessionActions session={done} onRemoved={() => {}} />
-      <RemoveConfirmHost />
+      <ConfirmHost />
     </>,
   )
   await openMenu()
   fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }))
-  fireEvent.click(await screen.findByRole("button", { name: "Remove" }))
+  fireEvent.click(await screen.findByRole("button", { name: /^Remove/ }))
   await waitFor(() => expect(localStorage.getItem("gx.agents.last")).toBeNull())
 })
 

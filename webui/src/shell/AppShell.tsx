@@ -22,7 +22,6 @@ import { setJumpOpen } from "./jumpOpen"
 import { MascotToggle } from "./MascotToggle"
 import { NewItemHost } from "./NewItemHost"
 import { ConfirmHost } from "./ConfirmHost"
-import { RemoveConfirmHost } from "./RemoveConfirmHost"
 import { ModelPickerHost } from "./ModelPickerHost"
 import { RenameHost } from "./RenameHost"
 import { ShellContext, type Shell } from "./ShellContext"
@@ -376,7 +375,6 @@ export function AppShell({
         <JumpPalette fetcher={fetchEpicList} active={active} />
         <CommandPalette />
         <NewItemHost />
-        <RemoveConfirmHost />
         <ConfirmHost />
         <RenameHost />
         <ModelPickerHost />

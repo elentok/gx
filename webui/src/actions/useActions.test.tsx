@@ -10,7 +10,12 @@ import {
 import { rowToken } from "../design/open"
 import { registerDraftPage } from "../shell/draftPageActions"
 import { ActionCancel } from "../ticket/recover"
-import { closeConfirm, currentConfirm, type SurfaceContext } from "./confirmRequest"
+import {
+  closeConfirm,
+  currentConfirm,
+  type ConfirmBody,
+  type SurfaceContext,
+} from "./confirmRequest"
 import type { Entity } from "./entity"
 import { actionById } from "./registry"
 import { planBulk } from "./bulkPlan"
@@ -168,25 +173,29 @@ test("Hold on a queued epic is disabled with the reason; Take off hold posts wit
   expect(currentConfirm()).toBeNull()
 })
 
-test("Archive dry-runs first, a refusal emits no request, and the confirm posts yes with the busy toast", async () => {
+test("Archive opens the confirm at once and prepares with a dry run; a refusal is handed to the host, and the confirm posts yes with the busy toast", async () => {
   const refused = setup(epic, {
     archive: vi.fn(async () => ({ refused: true, message: "not yet" })),
   })
   act(() => refused.act1("archive").run())
-  await waitFor(() => expect(showToast).toHaveBeenCalledWith({ type: "error", title: "not yet" }))
-  expect(currentConfirm()).toBeNull()
+  expect(refused.writers.archive).not.toHaveBeenCalled()
+  await expect(currentConfirm()?.prepare?.()).resolves.toMatchObject({
+    refused: true,
+    message: "not yet",
+  })
+  closeConfirm()
 
-  vi.clearAllMocks()
   const archive = vi.fn(async (_k: string, o: { dryRun?: boolean; yes?: boolean }) =>
     o.dryRun ? { sessions: ["s1"], on_trunk: false } : {},
   )
   const { act1 } = setup(epic, { archive })
   act(() => act1("archive").run())
-  await waitFor(() => expect(currentConfirm()).not.toBeNull())
-  expect(archive).toHaveBeenCalledTimes(1)
-  expect(archive).toHaveBeenCalledWith("demo:mixed-epic", { dryRun: true })
-  expect(currentConfirm()?.body.prepared).toMatchObject({ sessions: ["s1"], on_trunk: false })
-  expect(currentConfirm()?.body.warnings?.[0]).toContain("not merged to trunk")
+  expect(currentConfirm()?.confirmLabel).toBe("Archive")
+  const prepared = (await currentConfirm()?.prepare?.()) as ConfirmBody
+  expect(archive).toHaveBeenCalledExactlyOnceWith("demo:mixed-epic", { dryRun: true })
+  expect(prepared.prepared).toMatchObject({ sessions: ["s1"], on_trunk: false })
+  expect(prepared.lines.join(" ")).toContain("Live sessions will stop: s1.")
+  expect(prepared.warnings?.[0]).toContain("not merged to trunk")
   act(() => currentConfirm()?.onConfirm())
   await waitFor(() => expect(archive).toHaveBeenLastCalledWith("demo:mixed-epic", { yes: true }))
   expect(showToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Archiving Mixed…" }))
@@ -234,18 +243,23 @@ test("Remove asks to stop and remove a live chat, only remove an exited one, the
 test("Remove on an empty draft or chat draft deletes at once; a full or unreadable one asks", async () => {
   for (const kind of ["design-draft", "chat-draft"] as const) {
     const deleteDraft = vi.fn(async () => ({ kind: "ok" }) as never)
+    const deleteChatDraft = vi.fn(async () => ({ kind: "deleted" }) as never)
     const { act1 } = setup(
       { kind, key: "w/d1", name: "D", draftEmpty: true },
-      { deleteDraft },
+      { deleteDraft, deleteChatDraft },
       { draft: { id: "d1", slug: "", project: "" } },
     )
     act(() => act1("remove").run())
-    await waitFor(() => expect(deleteDraft).toHaveBeenCalledWith("d1"))
+    const used = kind === "chat-draft" ? deleteChatDraft : deleteDraft
+    await waitFor(() => expect(used).toHaveBeenCalledWith("d1"))
+    expect(kind === "chat-draft" ? deleteDraft : deleteChatDraft).not.toHaveBeenCalled()
     expect(currentConfirm()).toBeNull()
   }
   const full = setup({ kind: "design-draft", key: "w/d1", name: "D", draftEmpty: false })
   act(() => full.act1("remove").run())
   await waitFor(() => expect(currentConfirm()).not.toBeNull())
+  expect(currentConfirm()?.dismissLabel).toBe("Cancel")
+  expect(currentConfirm()?.body.lines[0]).toContain("Its prompt and images are deleted.")
   closeConfirm()
   const readDraft = vi.fn(async () => {
     throw new Error("gone")

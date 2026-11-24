@@ -185,6 +185,9 @@ function Confirm({ request }: { request: ConfirmRequest }) {
     <Popover.Root
       open
       onOpenChange={(e) => !e.open && close(false)}
+      // An async confirm (Hold, a draft's Remove) can open above the menu that started it. When that
+      // menu closes it asks the layers above it to dismiss; the confirm must stay.
+      onRequestDismiss={(e) => e.preventDefault()}
       initialFocusEl={() => cancelRef.current}
       finalFocusEl={() => (anchor.isConnected ? anchor : null)}
       // The anchor's own click would otherwise count as outside and reopen what it closed.

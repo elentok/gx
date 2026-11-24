@@ -1,29 +1,28 @@
-import { Box, Text } from "@chakra-ui/react"
-import { useState, type ReactNode } from "react"
+import { useRef } from "react"
 import {
   CardKindDesign,
-  HoldQueuedText,
   SectionOnHold,
   type DesignDraftRow,
   type EpicListRow,
-  ReasonNeedsYes,
-  type HoldRequest,
   type SessionInfo,
   type Workspace,
-  type WorkspaceRequest,
 } from "../generated/server"
-import { postTargetsTo, refusalOf, type StopSession } from "../design/open"
-import { useSessionManage } from "../agents/useSessionManage"
-import { deleteDraft, readDraft } from "../design/drafts"
-import { openRemoveConfirm } from "../shell/removeConfirmOpen"
-import { draftRenameEntry, renameEntry } from "../shell/renameOpen"
-import { Button } from "../ui/button/Button"
-import { Modal } from "../ui/modal/Modal"
+import { agentKindOf, type Entity, type EntityKind } from "../actions/entity"
+import { useActions, type ReadyAction } from "../actions/useActions"
+import type { SurfaceContext } from "../actions/confirmRequest"
 import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu"
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
-import { useWrite, WriteError, type Refusable } from "../useWrite"
-import { bulkArchive } from "../select/bulkWrites"
-import { showToast, toaster } from "../ui/toaster"
+import { defaultWriters, type ItemWriters } from "./itemWriters"
+
+export {
+  defaultWriters,
+  postArchive,
+  postHold,
+  postMove,
+  postUnhold,
+  type ItemWriteResult,
+  type ItemWriters,
+} from "./itemWriters"
 
 /** What the menu needs of a Design or epic card, a chat or a jump row. One-off, Follow-ups and Other get no menu. */
 export interface ItemRef {
@@ -42,6 +41,29 @@ export interface ItemRef {
   draft?: DesignDraftRow
 }
 
+const ENTITY_KIND: Record<ItemRef["kind"], EntityKind> = {
+  design: "design",
+  epic: "epic",
+  chat: "chat",
+  draft: "design-draft",
+  "chat-draft": "chat-draft",
+}
+
+/** The registry's view of a row. */
+export function entityOfItem(item: ItemRef): Entity {
+  return {
+    kind: ENTITY_KIND[item.kind],
+    key: item.key,
+    name: item.name,
+    surface: "row",
+    workspace: item.workspace,
+    held: item.held,
+    queued: item.queued,
+    session: item.session,
+    agent: item.session ? agentKindOf(item.session) : undefined,
+  }
+}
+
 /** The menu target of a Design or epic card; none for a card outside every workspace (One-off, Follow-ups, Other). */
 export function itemOfCard(card: EpicListRow | undefined): ItemRef | undefined {
   if (!card?.workspace) return undefined
@@ -55,289 +77,87 @@ export function itemOfCard(card: EpicListRow | undefined): ItemRef | undefined {
   }
 }
 
-/** The page-header form of {@link useItemActions}: no sections and no dialogs while the card is unknown. */
+/** Actions a card's own page or row builds by hand, so the shared set leaves them out. */
+const BUILT_BY_PAGE = ["open-design-epic", "open-pr", "new-session", "mark-merged", "delete-design"]
+const MODAL: SurfaceContext = { mode: "modal" }
+
+/**
+ * The page-header form of {@link useItemActions}: no sections while the card is unknown. EpicPage
+ * and SessionControls build Copy ID and the lifecycle items above by hand, so they are filtered
+ * out by id here until the pages read the registry themselves.
+ */
 export function useCardActions(card: EpicListRow | undefined, workspaces: Workspace[]) {
-  return useItemActions(itemOfCard(card), workspaces)
+  return useItemActions(itemOfCard(card), workspaces, undefined, undefined, {
+    hide: [...BUILT_BY_PAGE, "copy-id"],
+  })
 }
 
-/** The one result of a one-target write, flat as `useWrite` wants it. */
-export interface ItemWriteResult extends Refusable {
-  sessions?: string[]
-  /** An archive dry run's answer: whether gx sees the epic on trunk. */
-  on_trunk?: boolean
-  /** The name an archive took when it clashed with one already archived. */
-  new_address?: string
-}
-
-export interface ItemWriters {
-  move: (key: string, to: string) => Promise<ItemWriteResult>
-  hold: (epic: string, yes?: boolean) => Promise<ItemWriteResult>
-  unhold: (epic: string) => Promise<ItemWriteResult>
-  /** One epic's archive; `dryRun` only asks what it would stop. */
-  archive?: (epic: string, opts: { dryRun?: boolean; yes?: boolean }) => Promise<ItemWriteResult>
-  /** A chat's Stop; the agent page's default when absent. */
-  stop?: StopSession
-}
-
-/** Posts one target and unwraps its result: a refusal is `refused`, as `useWrite` reads it. */
-async function postOne(
-  route: string,
-  body: WorkspaceRequest | HoldRequest,
-): Promise<ItemWriteResult> {
-  const [r] = await postTargetsTo(`/v1/workspaces/${route}`, body)
-  if (!r) throw new WriteError("The server answered with no result.")
-  return { ...refusalOf(r), sessions: r.sessions }
-}
-
-export const postMove = (key: string, to: string) => postOne("move", { name: to, targets: [key] })
-export const postHold = (epic: string, yes?: boolean) =>
-  postOne("hold", { targets: [epic], ...(yes ? { yes } : {}) })
-export const postUnhold = (epic: string) => postOne("unhold", { targets: [epic] })
-
-export async function postArchive(
-  epic: string,
-  opts: { dryRun?: boolean; yes?: boolean },
-): Promise<ItemWriteResult> {
-  const r = (await bulkArchive([epic], opts))[0]
-  if (!r) throw new WriteError("The server answered with no result.")
+function entryOf(a: ReadyAction): MenuEntry {
+  if (a.items) {
+    return {
+      kind: "submenu",
+      value: a.id,
+      label: a.label,
+      items: a.items.map((i) => ({
+        value: `move-${i.label}`,
+        label: i.label,
+        current: i.current,
+        inlineHint: true,
+        hint: i.current ? "✓" : undefined,
+        disabled: a.disabled,
+        onSelect: i.run,
+      })),
+    }
+  }
   return {
-    ...refusalOf(r),
-    sessions: r.sessions,
-    on_trunk: r.on_trunk,
-    new_address: r.new_address,
+    value: a.id,
+    label: a.label,
+    danger: a.danger || undefined,
+    disabled: a.disabled,
+    hint: a.reason,
+    onSelect: a.run,
   }
 }
 
-export const defaultWriters: ItemWriters = {
-  move: postMove,
-  hold: postHold,
-  unhold: postUnhold,
-  archive: postArchive,
-}
-
-const ARCHIVE_BUSY_TOAST = "item-archive-busy"
-
-type Dialog =
-  | { kind: "hold"; sessions: string[] }
-  | { kind: "archive"; sessions: string[]; onTrunk?: boolean }
-
-interface DialogProps {
-  item: ItemRef
-  writers: ItemWriters
-  run: ReturnType<typeof useWrite>["run"]
-  close: () => void
-}
-
-function HoldDialog({ item, writers, run, close, sessions }: DialogProps & { sessions: string[] }) {
-  return (
-    <Modal label={`Hold ${item.name}`} onClose={close} maxW="sm">
-      <Text>
-        Holding {item.name} ends its live sessions: {sessions.join(", ")}.
-      </Text>
-      <Box display="flex" gap="2" justifyContent="flex-end">
-        <Button emphasis="secondary" onClick={close} autoFocus>
-          Cancel
-        </Button>
-        <Button
-          tone="paused"
-          onClick={() => {
-            close()
-            void run(() => writers.hold(item.key, true))
-          }}
-        >
-          Hold and end sessions
-        </Button>
-      </Box>
-    </Modal>
-  )
-}
-
-function ArchiveDialog({
-  item,
-  writers,
-  run,
-  close,
-  sessions,
-  onTrunk,
-}: DialogProps & { sessions: string[]; onTrunk?: boolean }) {
-  const archive = writers.archive ?? postArchive
-  return (
-    <Modal label={`Archive ${item.name}`} onClose={close} maxW="md">
-      <Text fontWeight="bold">
-        Archive {item.name}? Live agents stop and the epic leaves the sidebar. Unarchive brings it
-        back.
-      </Text>
-      {sessions.length > 0 && <Text>Live sessions will stop: {sessions.join(", ")}.</Text>}
-      {onTrunk === false && (
-        <Text color="tone.waiting.fg">
-          ⚠ {item.name} is not merged to trunk. Archiving keeps its branch, but the work is not on
-          trunk.
-        </Text>
-      )}
-      <Box display="flex" gap="2" justifyContent="flex-end">
-        <Button emphasis="secondary" onClick={close} autoFocus>
-          Cancel
-        </Button>
-        <Button
-          tone="running"
-          onClick={() => {
-            close()
-            showToast({
-              type: "info",
-              title: `Archiving ${item.name}…`,
-              id: ARCHIVE_BUSY_TOAST,
-              persistent: true,
-            })
-            void run(
-              () =>
-                archive(item.key, { yes: true }).finally(() => toaster.remove(ARCHIVE_BUSY_TOAST)),
-              {
-                success: (res) => ({
-                  type: "success",
-                  title: `Archived ${res.new_address ? res.new_address.split(":").pop() : item.name}`,
-                }),
-              },
-            )
-          }}
-        >
-          Archive
-        </Button>
-      </Box>
-    </Modal>
-  )
-}
-
-/** Asks to remove a draft; one with no prompt, slug or images is deleted at once. A draft that cannot be read is asked about. */
-async function removeDraft(
-  id: string,
-  label: string,
-  onRemoved: () => void,
-  run: ReturnType<typeof useWrite>["run"],
-) {
-  const res = await readDraft(id).catch(() => undefined)
-  const d = res?.kind === "ok" ? res.draft : undefined
-  if (d && !d.idea.trim() && !d.slug && d.images.length === 0) {
-    void run(
-      async () => {
-        await deleteDraft(id)
-        return {}
-      },
-      { onDone: onRemoved },
-    )
-    return
-  }
-  openRemoveConfirm({ draft: { id, label }, onRemoved })
-}
-
-/** The Move, Remove and Hold sections of an item's menu, plus the dialogs they open. No item, no sections and no dialogs. */
+/** The registry's actions for the item, as menu groups in registry order. No item, no groups. */
 export function useItemActions(
   item: ItemRef | undefined,
   workspaces: Workspace[],
   writers: ItemWriters = defaultWriters,
-  /** Runs after a chat's Remove lands. */
-  onRemoved: () => void = () => {},
+  /** Runs after a chat's or draft's Remove lands. */
+  onRemoved?: () => void,
+  opts: {
+    /** Where a confirm anchors, resolved when the action runs; absent means a modal. */
+    anchor?: () => HTMLElement | null | undefined
+    /** Action ids the caller builds itself. */
+    hide?: string[]
+  } = {},
 ) {
-  const { run, pending } = useWrite()
-  const [dialog, setDialog] = useState<Dialog>()
-  const manage = useSessionManage(item?.session, onRemoved, { stop: writers.stop })
-  if (!item) return { groups: [] as MenuEntry[][], dialogs: null as ReactNode }
-  const close = () => setDialog(undefined)
-
+  const { actions } = useActions(item && entityOfItem(item), {
+    surface: () => {
+      const anchor = opts.anchor?.()
+      return anchor ? { mode: "anchor", anchor } : MODAL
+    },
+    workspaces,
+    writers,
+    onRemoved,
+    draft: item?.draft,
+    promote: { connected: true },
+  })
+  const hide = new Set(opts.hide ?? BUILT_BY_PAGE)
   const groups: MenuEntry[][] = []
-  if (item.kind === "draft" && item.draft) groups.push(draftRenameEntry(item.draft))
-  if (workspaces.length > 0) {
-    groups.push([
-      {
-        kind: "submenu",
-        value: "move",
-        label: "Move to workspace",
-        items: workspaces.map((w) => {
-          const current = w.name === item.workspace
-          return {
-            value: `move-${w.name}`,
-            label: w.name,
-            current,
-            inlineHint: true,
-            hint: current ? "✓" : undefined,
-            disabled: pending,
-            onSelect: () => void run(() => writers.move(item.key, w.name)),
-          }
-        }),
-      },
-    ])
+  let last: string | undefined
+  for (const a of actions) {
+    if (hide.has(a.id) || (a.id === "move" && workspaces.length === 0)) continue
+    // A design or epic row offers no Stop; its sessions stop through Hold and Archive.
+    if (a.id === "stop" && (item?.kind === "design" || item?.kind === "epic")) continue
+    // The Queue agent is run by the queue; nothing on its row is a person's to use.
+    if (item?.session?.queue) continue
+    if (a.group !== last) groups.push([])
+    last = a.group
+    groups[groups.length - 1]!.push(entryOf(a))
   }
-
-  // The same item the chat page's menu has; a Fix agent or Queue agent row is no chat.
-  const manageItems = [...(item.kind === "chat" ? renameEntry(item.session) : []), ...manage.items]
-  if (item.kind === "chat" && manageItems.length > 0) groups.push(manageItems)
-
-  if (item.kind === "draft" && item.draft) {
-    const { id, label } = item.draft
-    groups.push([
-      {
-        value: "remove",
-        label: "Remove",
-        onSelect: () => void removeDraft(id, label, onRemoved, run),
-      },
-    ])
-  }
-
-  if (item.kind === "design" || item.kind === "epic") {
-    const hold = () =>
-      run(async () => {
-        const res = await writers.hold(item.key)
-        // A refusal that names live sessions is a question, not an error: ask, then re-post with yes.
-        if (res.refused && res.reason === ReasonNeedsYes) {
-          setDialog({ kind: "hold", sessions: res.sessions ?? [] })
-          return { ...res, refused: false }
-        }
-        return res
-      })
-    groups.push([
-      item.held
-        ? {
-            value: "unhold",
-            label: "Take off hold",
-            disabled: pending,
-            onSelect: () => void run(() => writers.unhold(item.key)),
-          }
-        : {
-            value: "hold",
-            label: "Hold",
-            hint: item.queued ? HoldQueuedText : undefined,
-            disabled: pending || item.queued,
-            onSelect: () => void hold(),
-          },
-    ])
-    const archive = writers.archive ?? postArchive
-    // A dry run first: the dialog lists the live sessions it stops and warns when the epic is not on trunk.
-    groups.push([
-      {
-        value: "archive",
-        label: "Archive",
-        disabled: pending,
-        onSelect: () =>
-          void run(async () => {
-            const dry = await archive(item.key, { dryRun: true })
-            if (dry.refused) return dry
-            setDialog({ kind: "archive", sessions: dry.sessions ?? [], onTrunk: dry.on_trunk })
-            return dry
-          }),
-      },
-    ])
-  }
-
-  const props = { item, writers, run, close }
-  const dialogs: ReactNode = (
-    <>
-      {dialog?.kind === "hold" ? <HoldDialog {...props} sessions={dialog.sessions} /> : null}
-      {dialog?.kind === "archive" ? (
-        <ArchiveDialog {...props} sessions={dialog.sessions} onTrunk={dialog.onTrunk} />
-      ) : null}
-    </>
-  )
-
-  return { groups, dialogs }
+  return { groups }
 }
 
 /** The "..." menu of one item; renders nothing when it has no actions. */
@@ -348,6 +168,7 @@ export function ItemMenu({
   onRemoved,
   extra,
   roving,
+  modal,
 }: {
   /** True in an area with roving focus: the trigger leaves the Tab order and `.` opens the menu. */
   roving?: boolean
@@ -357,17 +178,22 @@ export function ItemMenu({
   onRemoved?: () => void
   /** A card's own entries, as one more group after the item's. */
   extra?: MenuEntry[]
+  /** Confirms open as a modal, not a popover on the button (the Jump palette). */
+  modal?: boolean
 }) {
-  const { groups, dialogs } = useItemActions(item, workspaces, writers, onRemoved)
+  const wrap = useRef<HTMLSpanElement>(null)
+  // The wrapper owns the trigger, so the button is found from it when the pick runs.
+  const { groups } = useItemActions(item, workspaces, writers, onRemoved, {
+    anchor: modal ? undefined : () => wrap.current?.querySelector("button"),
+  })
   const all = extra?.length ? [...groups, extra] : groups
   if (all.length === 0) return null
   return (
-    <>
+    <span ref={wrap} style={{ display: "contents" }}>
       <GxMenu
         trigger={<MoreActionsButton tabIndex={roving ? -1 : undefined} />}
         items={menuGroups(all)}
       />
-      {dialogs}
-    </>
+    </span>
   )
 }

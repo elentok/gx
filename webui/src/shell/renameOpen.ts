@@ -33,7 +33,7 @@ export interface ChatDraftIdentity {
   name: string
 }
 
-// App-level state for the rename popup, kept outside React like removeConfirmOpen so the menu, the
+// App-level state for the rename popup, kept outside React like the confirm request so the menu, the
 // chord and the palette open one popup and only the host re-renders.
 let request: RenameRequest = null
 const listeners = new Set<() => void>()

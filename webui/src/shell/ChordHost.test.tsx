@@ -1,5 +1,7 @@
-import { act, cleanup, fireEvent, screen } from "@testing-library/react"
-import { createMemoryRouter, RouterProvider } from "react-router"
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { createMemoryRouter, RouterProvider, useLocation } from "react-router"
+import { closeConfirm } from "../actions/confirmRequest"
+import { ConfirmHost } from "./ConfirmHost"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { session } from "../agents/agentsTestKit"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
@@ -17,6 +19,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  closeConfirm()
   vi.useRealTimers()
   vi.restoreAllMocks()
 })
@@ -237,6 +240,8 @@ function setupChats(path: string, sessions = [session("s1", "gamma"), session("s
           <>
             <textarea aria-label="Message" defaultValue="" />
             <RenameProbe />
+            <PathProbe />
+            <ConfirmHost />
             <ChordHost />
           </>
         ),
@@ -250,6 +255,30 @@ function setupChats(path: string, sessions = [session("s1", "gamma"), session("s
     </ConnectionContext.Provider>,
   )
 }
+
+function PathProbe() {
+  return <div data-testid="path">{useLocation().pathname}</div>
+}
+
+test("{leader} x on a live chat opens the shared confirm as a modal, then lands on /agents", async () => {
+  const fetchMock = vi.fn(
+    async () =>
+      new Response(JSON.stringify({ results: [{ target: "s2", status: "done" }] }), {
+        status: 200,
+      }),
+  )
+  vi.stubGlobal("fetch", fetchMock)
+  setupChats("/agents/s2")
+  leaderKey()
+  press("KeyX")
+  const dialog = await screen.findByRole("dialog", { name: /Remove/ })
+  expect(dialog.textContent).toContain("Stop and remove")
+  expect(fetchMock).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole("button", { name: /^Remove/ }))
+  await waitFor(() => expect(screen.getByTestId("path").textContent).toBe("/agents"))
+  expect(fetchMock).toHaveBeenCalled()
+  vi.unstubAllGlobals()
+})
 
 test("{leader} r on a chat page renames that chat only", () => {
   setupChats("/agents/s2")

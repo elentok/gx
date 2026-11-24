@@ -369,26 +369,23 @@ function DescriptionLine({ summary }: { summary: string }) {
 // Copy epic ID (the address, `<project>:<name>`), then Move, Remove and Hold for a card in a workspace.
 function EpicMenu({ address, card }: { address: string; card?: EpicListRow }) {
   const { workspaces } = useWorkspaces(useConnectionContext())
-  const { groups, dialogs } = useCardActions(card, workspaces)
+  const { groups } = useCardActions(card, workspaces)
   return (
-    <>
-      <GxMenu
-        trigger={<MoreActionsButton />}
-        items={menuGroups([
-          [
-            {
-              value: "copy-epic-id",
-              label: "Copy epic ID",
-              hint: address,
-              inlineHint: true,
-              onSelect: () => void copyText(address, null),
-            },
-          ],
-          ...groups,
-        ])}
-      />
-      {dialogs}
-    </>
+    <GxMenu
+      trigger={<MoreActionsButton />}
+      items={menuGroups([
+        [
+          {
+            value: "copy-epic-id",
+            label: "Copy epic ID",
+            hint: address,
+            inlineHint: true,
+            onSelect: () => void copyText(address, null),
+          },
+        ],
+        ...groups,
+      ])}
+    />
   )
 }
 

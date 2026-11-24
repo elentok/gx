@@ -59,7 +59,7 @@ function trailingOf(status: SidebarStatus, item: ItemRef | undefined, workspaces
       <Words status={status} />
       {item && (
         <Box flex="none" onClick={(e) => e.stopPropagation()}>
-          <ItemMenu item={item} workspaces={workspaces} />
+          <ItemMenu item={item} workspaces={workspaces} modal />
         </Box>
       )}
     </>

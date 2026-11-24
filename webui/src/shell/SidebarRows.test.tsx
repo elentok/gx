@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
+import { closeConfirm } from "../actions/confirmRequest"
 import { session } from "../agents/agentsTestKit"
 import { SessionActions } from "../agents/SessionActions"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
@@ -21,6 +22,7 @@ import { AppShell } from "./AppShell"
 
 afterEach(() => {
   cleanup()
+  closeConfirm()
   vi.unstubAllGlobals()
   localStorage.clear()
 })
@@ -200,7 +202,7 @@ test("a chat draft row shows the icon, label and Draft; a snapshot update adds a
   await waitFor(() => expect(body().queryByRole("link", { name: /Explore caching/ })).toBeNull())
 })
 
-test("a chat draft row's menu is only Move to workspace, which posts its key", async () => {
+test("a chat draft row's menu is Rename, Move to workspace and Remove; Move posts its key", async () => {
   const fetchMock = vi.fn(
     async (url: string, _init?: RequestInit) =>
       new Response(
@@ -218,7 +220,11 @@ test("a chat draft row's menu is only Move to workspace, which posts its key", a
   const link = await body().findByRole("link", { name: /Explore caching/ })
   fireEvent.click(within(link.closest("li")!).getByRole("button", { name: "More actions" }))
   await screen.findAllByRole("menuitem")
-  expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Move to workspace›"])
+  expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+    "Rename",
+    "Move to workspace›",
+    "Remove",
+  ])
   fireEvent.click(screen.getByRole("menuitem", { name: "Move to workspace" }))
   fireEvent.click(await screen.findByRole("menuitem", { name: /^Work/ }))
   await waitFor(() => {
@@ -253,7 +259,8 @@ test("the draft row has a menu; removing the open draft from it navigates to /ep
   expect(
     await screen.findByText("Remove Checkout redesign? Its prompt and images are deleted."),
   ).toBeTruthy()
-  fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+  expect(await screen.findByRole("alertdialog")).toBeTruthy()
+  fireEvent.click(await screen.findByRole("button", { name: /^Remove/ }))
   await waitFor(() => expect(screen.getByTestId("page-path").textContent).toBe("/epics"))
   expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/designs/drafts/delete"))).toBe(
     true,
@@ -439,15 +446,18 @@ test("a row's ... menu opens and Move posts the other workspace", async () => {
   })
 })
 
-test("a chat row's menu offers Move, Rename, Stop and Remove", async () => {
+test("a chat row's menu follows the registry order", async () => {
   setup("desktop")
   const chat = await body().findByRole("link", { name: /^Chat talk/ })
   fireEvent.click(within(chat.closest("li")!).getByRole("button", { name: "More actions" }))
   await screen.findAllByRole("menuitem")
   expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
-    "Move to workspace›",
     "Rename",
+    "Move to workspace›",
+    "Switch model",
+    "Promote to Design",
     "Stop",
+    "Copy ID",
     "Remove",
   ])
 })
@@ -514,7 +524,7 @@ test("removing the open nested agent from its row confirms, then goes to the age
     }),
   )
   fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }))
-  fireEvent.click(await screen.findByRole("button", { name: "Remove" }))
+  fireEvent.click(await screen.findByRole("button", { name: /^Remove/ }))
   await waitFor(() =>
     expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/v1/sessions/remove"))).toBe(
       true,
@@ -554,7 +564,8 @@ test("removing the open chat from its row confirms, then leaves its page", async
     (await screen.findByText("Stop and remove talk? Its session is deleted.")).textContent,
   ).toBeTruthy()
   expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/v1/sessions/remove"))).toBe(false)
-  fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+  expect(screen.getByRole("alertdialog")).toBeTruthy()
+  fireEvent.click(screen.getByRole("button", { name: /^Remove/ }))
   await waitFor(() =>
     expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/v1/sessions/remove"))).toBe(
       true,

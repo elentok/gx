@@ -7,6 +7,7 @@ import {
 import { forgetLast } from "../agents/lastAgent"
 import { postRemoveSession, removeSession, type RemoveSession } from "../agents/sessionWrites"
 import { copyText } from "../clipboard"
+import { realChatDrafts, type ChatDraftsClient } from "../design/chatDrafts"
 import {
   deleteDraft as postDeleteDraft,
   readDraft as fetchDraft,
@@ -47,7 +48,7 @@ import {
   postArchive,
   type ItemWriteResult,
   type ItemWriters,
-} from "../workspaces/itemActions"
+} from "../workspaces/itemWriters"
 import {
   openConfirm,
   type ConfirmBody,
@@ -62,6 +63,8 @@ export interface ActionWriters extends ItemWriters {
   remove: RemoveSession
   deleteDraft: DeleteDraft
   readDraft: ReadDraft
+  deleteChatDraft: ChatDraftsClient["remove"]
+  readChatDraft: ChatDraftsClient["read"]
   markMerged: PostEpicWrite
   queue: PostEpicWrite
   merge: PostEpicWrite
@@ -87,6 +90,8 @@ const defaults: ActionWriters = {
   remove: postRemoveSession,
   deleteDraft: postDeleteDraft,
   readDraft: fetchDraft,
+  deleteChatDraft: realChatDrafts.remove,
+  readChatDraft: realChatDrafts.read,
   markMerged: postEpicMarkMerged,
   queue: postQueueAdd,
   merge: postEpicMerge,
@@ -104,7 +109,8 @@ const defaults: ActionWriters = {
 
 /** What a surface hands the hook besides the entity. */
 export interface ActionContext {
-  surface: SurfaceContext
+  /** A function resolves at the moment the action runs, for a menu whose anchor is known only then. */
+  surface: SurfaceContext | (() => SurfaceContext)
   workspaces?: Workspace[]
   /** Fakes for tests; the defaults call the endpoints each action calls today. */
   writers?: Partial<ActionWriters>
@@ -151,6 +157,8 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
   const { run, pending } = useWrite()
   const w: ActionWriters = { ...defaults, ...ctx.writers }
 
+  const surfaceOf = () => (typeof ctx.surface === "function" ? ctx.surface() : ctx.surface)
+
   function ask(
     decl: ActionDecl,
     e: Entity,
@@ -163,7 +171,7 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
       group: decl.group,
       danger: decl.danger,
       dismissLabel: "Cancel",
-      surface: ctx.surface,
+      surface: surfaceOf(),
       ...req,
     })
   }
@@ -175,7 +183,7 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
       if (res.refused && res.reason === ReasonNeedsYes) {
         const sessions = res.sessions ?? []
         ask(decl, e, {
-          confirmLabel: "Hold and end sessions",
+          confirmLabel: "Hold",
           title: `Hold ${e.name}`,
           body: {
             lines: [`Holding ${e.name} ends its live sessions: ${sessions.join(", ")}.`],
@@ -191,19 +199,21 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
 
   function runArchive(decl: ActionDecl, e: Entity) {
     const archive = w.archive ?? postArchive
-    void run(async () => {
-      const dry = await archive(e.key, { dryRun: true })
-      if (dry.refused) return dry
-      const sessions = dry.sessions ?? []
-      const lines = [
-        `Archive ${e.name}? Live agents stop and the epic leaves the sidebar. Unarchive brings it back.`,
-      ]
-      if (sessions.length > 0) lines.push(`Live sessions will stop: ${sessions.join(", ")}.`)
-      ask(decl, e, {
-        confirmLabel: "Archive",
-        title: `Archive ${e.name}`,
-        body: {
-          lines,
+    const intro = `Archive ${e.name}? Live agents stop and the epic leaves the sidebar. Unarchive brings it back.`
+    // The confirm opens at once with a spinner; the dry run fills it in, or a refusal closes it.
+    ask(decl, e, {
+      confirmLabel: "Archive",
+      title: `Archive ${e.name}`,
+      body: { lines: [intro] },
+      prepare: async () => {
+        const dry = await archive(e.key, { dryRun: true })
+        if (dry.refused) return { ...dry, refused: true as const }
+        const sessions = dry.sessions ?? []
+        return {
+          lines: [
+            intro,
+            ...(sessions.length > 0 ? [`Live sessions will stop: ${sessions.join(", ")}.`] : []),
+          ],
           warnings:
             dry.on_trunk === false
               ? [
@@ -211,36 +221,36 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
                 ]
               : [],
           prepared: dry,
-        },
-        onConfirm: () => {
-          showToast({
-            type: "info",
-            title: `Archiving ${e.name}…`,
-            id: ARCHIVE_BUSY_TOAST,
-            persistent: true,
-          })
-          void run(
-            () => archive(e.key, { yes: true }).finally(() => toaster.remove(ARCHIVE_BUSY_TOAST)),
-            {
-              success: (res) => ({
-                type: "success",
-                title: `Archived ${res.new_address ? res.new_address.split(":").pop() : e.name}`,
-              }),
-            },
-          )
-        },
-      })
-      return dry
+        }
+      },
+      onConfirm: () => {
+        showToast({
+          type: "info",
+          title: `Archiving ${e.name}…`,
+          id: ARCHIVE_BUSY_TOAST,
+          persistent: true,
+        })
+        void run(
+          () => archive(e.key, { yes: true }).finally(() => toaster.remove(ARCHIVE_BUSY_TOAST)),
+          {
+            success: (res) => ({
+              type: "success",
+              title: `Archived ${res.new_address ? res.new_address.split(":").pop() : e.name}`,
+            }),
+          },
+        )
+      },
     })
   }
 
   function runRemove(decl: ActionDecl, e: Entity) {
     if (isDraftEntity(e)) {
-      const id = ctx.draft?.id ?? e.key
+      const chatDraft = e.kind === "chat-draft"
+      const id = ctx.draft?.id ?? e.key.replace(/^(chat-)?draft\//, "")
       const del = () =>
         void run(
           async () => {
-            await w.deleteDraft(id)
+            await (chatDraft ? w.deleteChatDraft(id) : w.deleteDraft(id))
             return {}
           },
           { onDone: ctx.onRemoved },
@@ -248,17 +258,21 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
       const askDraft = () =>
         ask(decl, e, {
           confirmLabel: "Remove",
-          dismissLabel: "Keep",
           title: `Remove ${e.name}`,
-          body: { lines: [`Remove ${e.name}? The draft is deleted.`] },
+          body: { lines: [`Remove ${e.name}? Its prompt and images are deleted.`] },
           onConfirm: del,
         })
       const decide = async () => {
         let empty = e.draftEmpty
         if (empty === undefined) {
-          const res = await w.readDraft(id).catch(() => undefined)
-          const d = res?.kind === "ok" ? res.draft : undefined
-          empty = !!d && !d.idea.trim() && !d.slug && d.images.length === 0
+          if (chatDraft) {
+            const res = await w.readChatDraft(id).catch(() => undefined)
+            empty = res?.kind === "ok" && !res.draft.brief.trim()
+          } else {
+            const res = await w.readDraft(id).catch(() => undefined)
+            const d = res?.kind === "ok" ? res.draft : undefined
+            empty = !!d && !d.idea.trim() && !d.slug && d.images.length === 0
+          }
         }
         if (empty) del()
         else askDraft()
@@ -272,7 +286,6 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
     const exited = s.status.state === "exited"
     ask(decl, e, {
       confirmLabel: "Remove",
-      dismissLabel: "Keep",
       title: `Remove ${name}`,
       body: {
         lines: [
@@ -310,7 +323,7 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
     }
     if (isDraftEntity(e)) {
       const page = draftPageActions()
-      if (page && ctx.surface.page === e.key) page.rename()
+      if (page && surfaceOf().page === e.key) page.rename()
       else if (ctx.draft) openRename({ draft: ctx.draft })
       return
     }

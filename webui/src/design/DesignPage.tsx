@@ -82,59 +82,54 @@ function DesignBody({
   const { workspaces } = useWorkspaces(conn)
   const itemActions = useCardActions(card, workspaces)
   return (
-    <>
-      <SteppedPage
-        address={address}
-        title={name}
-        icon={<PageIcon kind="design" />}
-        wide={wide}
-        model={model}
-        ring={
-          detail
-            ? (size) => <EpicRing detail={detail} card={card} sessions={sessions} size={size} />
-            : undefined
+    <SteppedPage
+      address={address}
+      title={name}
+      icon={<PageIcon kind="design" />}
+      wide={wide}
+      model={model}
+      ring={
+        detail
+          ? (size) => <EpicRing detail={detail} card={card} sessions={sessions} size={size} />
+          : undefined
+      }
+      live={live}
+      current={designSession(address, sessions)}
+      actions={deps}
+      startLabel="Start design session"
+      startFailure={startFailure}
+      working={(session) => {
+        // The busy row follows what the agent reported; Progress and Continue keep following the map.
+        const running =
+          detail?.steps?.find((s) => s.step === session?.reported_step) ?? model?.current
+        // Without the map detail there is no step to name, so the row reads a bare "Working".
+        return {
+          step: running?.label,
+          title:
+            running?.step === "resolve-tickets"
+              ? session?.reported_title || detail?.rows.find((r) => r.current)?.title
+              : undefined,
         }
-        live={live}
-        current={designSession(address, sessions)}
-        actions={deps}
-        startLabel="Start design session"
-        startFailure={startFailure}
-        working={(session) => {
-          // The busy row follows what the agent reported; Progress and Continue keep following the map.
-          const running =
-            detail?.steps?.find((s) => s.step === session?.reported_step) ?? model?.current
-          // Without the map detail there is no step to name, so the row reads a bare "Working".
-          return {
-            step: running?.label,
-            title:
-              running?.step === "resolve-tickets"
-                ? session?.reported_title || detail?.rows.find((r) => r.current)?.title
-                : undefined,
-          }
-        }}
-        subtitleSuffix={
-          <>
-            {card?.section === SectionOnHold && " · On hold"}
-            {detail && <BackLinkLine link={detail} />}
-          </>
-        }
-        chatTop={({ questions }) =>
-          !questions &&
-          detail &&
-          showsImplLink(detail) && <ImplLink address={detail.impl_address!} />
-        }
-        logTop={<MapImageStrip address={address} fetcher={deps.fetchMapImages} />}
-        ticketRows={model && <Tickets rows={model.tickets} />}
-        designMenu={{
-          itemGroups: itemActions.groups,
-          deletable: detail?.deletable,
-          remove: deps.remove,
-          onDeleted: () => navigate("/epics"),
-          onOpenEpic: () => navigate(`/e/${address}`),
-        }}
-      />
-      {itemActions.dialogs}
-    </>
+      }}
+      subtitleSuffix={
+        <>
+          {card?.section === SectionOnHold && " · On hold"}
+          {detail && <BackLinkLine link={detail} />}
+        </>
+      }
+      chatTop={({ questions }) =>
+        !questions && detail && showsImplLink(detail) && <ImplLink address={detail.impl_address!} />
+      }
+      logTop={<MapImageStrip address={address} fetcher={deps.fetchMapImages} />}
+      ticketRows={model && <Tickets rows={model.tickets} />}
+      designMenu={{
+        itemGroups: itemActions.groups,
+        deletable: detail?.deletable,
+        remove: deps.remove,
+        onDeleted: () => navigate("/epics"),
+        onOpenEpic: () => navigate(`/e/${address}`),
+      }}
+    />
   )
 }
 

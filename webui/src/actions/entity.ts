@@ -32,6 +32,20 @@ export interface Entity {
   status?: string
 }
 
+/** The agent a session is: the Queue agent, a Fix agent, or a plain chat. */
+export const agentKindOf = (s: SessionInfo): AgentKind =>
+  s.queue ? "queue" : s.fix_of ? "fix" : "chat"
+
+/** The chat entity of a session, as a row lists it. */
+export const chatEntity = (s: SessionInfo): Entity => ({
+  kind: "chat",
+  key: s.id,
+  name: s.name || s.id,
+  surface: "row",
+  session: s,
+  agent: agentKindOf(s),
+})
+
 export const isChatEntity = (e: Entity) => e.kind === "chat"
 export const isDraftEntity = (e: Entity) => e.kind === "design-draft" || e.kind === "chat-draft"
 export const agentOf = (e: Entity): AgentKind => e.agent ?? "chat"

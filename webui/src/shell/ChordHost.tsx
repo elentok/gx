@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useOnChange } from "../hooks"
 import { useNavigate } from "react-router"
+import { chatEntity } from "../actions/entity"
+import { useActions } from "../actions/useActions"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { useLatest } from "../hooks"
 import { leaderKeyOf } from "../leaderKey"
@@ -10,7 +12,6 @@ import { openHistory } from "../history/historyOpener"
 import { draftPageActions } from "./draftPageActions"
 import { chordTable, draftIdOf, letterOf, matchesKey, useOpenChat, type Chord } from "./chords"
 import { openModelPicker } from "./modelPickerOpen"
-import { openRemoveConfirm } from "./removeConfirmOpen"
 import { openRename } from "./renameOpen"
 
 const MODIFIER_KEYS = new Set(["Control", "Meta", "Alt", "Shift"])
@@ -30,7 +31,12 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
   const ctx = useMemo(() => ({ path: pathname, session }), [pathname, session])
 
   // The listener is mounted once and reads everything at event time.
-  const live = useLatest({ leader, ctx, session, navigate })
+  // `x` runs the registry's Remove as a modal, then leaves the removed chat's page.
+  const { actions } = useActions(session && chatEntity(session), {
+    surface: { mode: "modal" },
+    onRemoved: () => navigate("/agents"),
+  })
+  const live = useLatest({ leader, ctx, session, remove: actions.find((a) => a.id === "remove") })
   const openRef = useRef(false)
   const close = useCallback(() => {
     openRef.current = false
@@ -42,9 +48,9 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
       chords ??
       chordTable({
         remove: () => {
-          const { session: s, navigate: nav, ctx: c } = live.current
+          const { remove, ctx: c } = live.current
           if (draftIdOf(c.path)) draftPageActions()?.remove()
-          else if (s) openRemoveConfirm({ session: s, onRemoved: () => nav("/agents") })
+          else remove?.run()
         },
         rename: () => {
           const { session: s, ctx: c } = live.current

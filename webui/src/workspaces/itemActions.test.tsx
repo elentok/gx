@@ -3,8 +3,8 @@ import { afterEach, expect, test, vi } from "vitest"
 import { HoldQueuedText, ReasonNeedsYes, type Workspace } from "../generated/server"
 import { session } from "../agents/agentsTestKit"
 import { rowToken } from "../design/open"
-import { RemoveConfirmHost } from "../shell/RemoveConfirmHost"
-import { closeRemoveConfirm } from "../shell/removeConfirmOpen"
+import { closeConfirm } from "../actions/confirmRequest"
+import { ConfirmHost } from "../shell/ConfirmHost"
 import { renderThemed } from "../ui/render"
 import { WideContext } from "../useWide"
 import { ItemMenu, postHold, type ItemRef, type ItemWriters } from "./itemActions"
@@ -15,6 +15,15 @@ vi.mock("../agents/sessionWrites", async (importOriginal) => ({
   postRemoveSession,
 }))
 
+const { chatRead, chatRemove } = vi.hoisted(() => ({ chatRead: vi.fn(), chatRemove: vi.fn() }))
+vi.mock("../design/chatDrafts", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../design/chatDrafts")>()
+  return {
+    ...original,
+    realChatDrafts: { ...original.realChatDrafts, read: chatRead, remove: chatRemove },
+  }
+})
+
 const { readDraft, deleteDraft } = vi.hoisted(() => ({ readDraft: vi.fn(), deleteDraft: vi.fn() }))
 vi.mock("../design/drafts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../design/drafts")>()),
@@ -24,7 +33,9 @@ vi.mock("../design/drafts", async (importOriginal) => ({
 
 afterEach(() => {
   cleanup()
-  closeRemoveConfirm()
+  closeConfirm()
+  chatRead.mockReset()
+  chatRemove.mockReset()
   postRemoveSession.mockReset()
   readDraft.mockReset()
   deleteDraft.mockReset()
@@ -44,10 +55,15 @@ const writers = (over: Partial<ItemWriters> = {}): ItemWriters => ({
 
 const design: ItemRef = { key: "p:shop", name: "Shop", kind: "design", workspace: "Work" }
 
-async function open(item: ItemRef, w: ItemWriters) {
+async function open(
+  item: ItemRef,
+  w: ItemWriters,
+  props: { modal?: boolean; onRemoved?: () => void } = {},
+) {
   renderThemed(
     <WideContext.Provider value={true}>
-      <ItemMenu item={item} workspaces={workspaces} writers={w} />
+      <ItemMenu item={item} workspaces={workspaces} writers={w} {...props} />
+      <ConfirmHost />
     </WideContext.Provider>,
   )
   fireEvent.click(screen.getByRole("button", { name: "More actions" }))
@@ -56,10 +72,11 @@ async function open(item: ItemRef, w: ItemWriters) {
 
 const labels = () => screen.getAllByRole("menuitem").map((i) => i.textContent)
 
-test("a Design offers Move and Hold, never Remove; Move lists every workspace with the current one marked and posts the pick", async () => {
+test("a Design offers Move, Hold, Archive and Copy ID in group order, never Remove; Move lists every workspace with the current one marked and posts the pick", async () => {
   const w = writers()
   await open(design, w)
-  expect(labels()).toEqual(["Move to workspace›", "Hold", "Archive"])
+  expect(labels()).toEqual(["Move to workspace›", "Hold", "Archive", "Copy ID"])
+  expect(screen.getAllByRole("separator").length).toBeGreaterThan(0)
   fireEvent.click(screen.getByRole("menuitem", { name: "Move to workspace" }))
   const work = await screen.findByRole("menuitem", { name: /Work/ })
   expect(work.getAttribute("aria-current")).toBe("true")
@@ -100,8 +117,12 @@ test("holding a Design with live sessions names them, then re-posts with yes", a
   expect((await screen.findByText(/scratch, draft/)).textContent).toContain(
     "ends its live sessions",
   )
+  // The closing menu hides its siblings from the accessibility tree for a moment.
+  expect(await screen.findByRole("alertdialog")).toBeTruthy()
   expect(hold).toHaveBeenCalledTimes(1)
-  fireEvent.click(screen.getByRole("button", { name: "Hold and end sessions" }))
+  expect(screen.queryByText(/Hold and end sessions/)).toBeNull()
+  expect(await screen.findByRole("button", { name: /^Cancel/ })).toBeTruthy()
+  fireEvent.click(screen.getByRole("button", { name: /^Hold/ }))
   await waitFor(() => expect(hold).toHaveBeenLastCalledWith("p:shop", true))
 })
 
@@ -137,9 +158,18 @@ test("Take off hold posts with no confirmation", async () => {
   await waitFor(() => expect(w.unhold).toHaveBeenCalledWith("p:shop"))
 })
 
-test("a chat can move but not be held", async () => {
+test("a chat can be moved but not held", async () => {
   await open({ ...design, kind: "chat" }, writers())
-  expect(labels()).toEqual(["Move to workspace›"])
+  expect(labels()).toContain("Move to workspace›")
+  expect(labels()).not.toContain("Hold")
+})
+
+test("a confirm from a modal menu (the Jump palette) is a dialog, with y and n hints", async () => {
+  await open({ ...chat("exited") }, writers(), { modal: true })
+  fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }))
+  const dialog = await screen.findByRole("dialog")
+  expect(dialog.textContent).toMatch(/Cancel\s*n/)
+  expect(dialog.textContent).toMatch(/Remove\s*y/)
 })
 
 const chat = (state: "idle" | "exited"): ItemRef => ({
@@ -150,31 +180,40 @@ const chat = (state: "idle" | "exited"): ItemRef => ({
   session: session("s3", "p", { name: "talk", status: { state } }),
 })
 
-test("a live chat offers Rename, Stop and Remove; Stop posts the stop", async () => {
+test("a live chat's menu is in registry order; Stop asks, then posts the stop", async () => {
   const stop = vi.fn(async () => ({}))
   await open(chat("idle"), writers({ stop }))
-  expect(labels()).toEqual(["Move to workspace›", "Rename", "Stop", "Remove"])
+  expect(labels()).toEqual([
+    "Rename",
+    "Move to workspace›",
+    "Switch model",
+    "Promote to Design",
+    "Stop",
+    "Copy ID",
+    "Remove",
+  ])
   fireEvent.click(screen.getByRole("menuitem", { name: "Stop" }))
+  fireEvent.click(await screen.findByRole("button", { name: /^Stop/ }))
   await waitFor(() => expect(stop).toHaveBeenCalledWith(expect.objectContaining({ id: "s3" })))
 })
 
-test("an exited chat offers Rename and Remove; Remove asks first, then removes and reports", async () => {
+test("a Fix agent row lists Stop, Copy ID and Remove (registry group order)", async () => {
+  const item = chat("idle")
+  await open({ ...item, session: { ...item.session!, fix_of: "p:x/01" } }, writers())
+  expect(labels()).toEqual(["Stop", "Copy ID", "Remove"])
+})
+
+test("an exited chat has no Stop; Remove asks first, then removes and reports", async () => {
   postRemoveSession.mockResolvedValue({})
   const item = chat("exited")
   const onRemoved = vi.fn()
-  renderThemed(
-    <WideContext.Provider value={true}>
-      <ItemMenu item={item} workspaces={workspaces} writers={writers()} onRemoved={onRemoved} />
-      <RemoveConfirmHost />
-    </WideContext.Provider>,
-  )
-  fireEvent.click(screen.getByRole("button", { name: "More actions" }))
-  await screen.findAllByRole("menuitem")
-  expect(labels()).toEqual(["Move to workspace›", "Rename", "Remove"])
+  await open(item, writers(), { onRemoved })
+  expect(labels()).not.toContain("Stop")
+  expect(labels().at(-1)).toBe("Remove")
   fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }))
   expect((await screen.findByText("Remove talk? Its session is deleted.")).textContent).toBeTruthy()
   expect(postRemoveSession).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+  fireEvent.click(screen.getByRole("button", { name: /^Remove/ }))
   await waitFor(() =>
     expect(postRemoveSession).toHaveBeenCalledExactlyOnceWith({
       id: "s3",
@@ -184,40 +223,45 @@ test("an exited chat offers Rename and Remove; Remove asks first, then removes a
   await waitFor(() => expect(onRemoved).toHaveBeenCalled())
 })
 
-test("a queue agent's chat gets no Stop or Remove", async () => {
+test("a queue agent's row has no menu button", () => {
   const item = chat("idle")
-  await open(
-    { ...item, session: { ...item.session!, queue: true } as ItemRef["session"] },
-    writers(),
+  renderThemed(
+    <ItemMenu
+      item={{ ...item, session: { ...item.session!, queue: true } as ItemRef["session"] }}
+      workspaces={workspaces}
+      writers={writers()}
+    />,
   )
-  expect(labels()).toEqual(["Move to workspace›"])
-})
-
-test("an item with nothing to offer renders no button", () => {
-  renderThemed(<ItemMenu item={{ ...design, kind: "chat" }} workspaces={[]} writers={writers()} />)
   expect(screen.queryByRole("button", { name: "More actions" })).toBeNull()
 })
 
-test("Archive asks first from a dry run, listing live sessions and the trunk warning, then archives with yes", async () => {
-  const archive = vi.fn(async (_key: string, opts: { dryRun?: boolean; yes?: boolean }) =>
-    opts.dryRun ? { sessions: ["agent-1"], on_trunk: false } : {},
+test("Archive shows a spinner with the confirm off while the dry run runs, then the sessions and the trunk warning, then archives with yes", async () => {
+  let finish: (r: { sessions: string[]; on_trunk: boolean }) => void = () => {}
+  const archive = vi.fn((_key: string, opts: { dryRun?: boolean; yes?: boolean }) =>
+    opts.dryRun
+      ? new Promise<{ sessions: string[]; on_trunk: boolean }>((r) => (finish = r))
+      : Promise.resolve({}),
   )
   await open({ ...design, kind: "epic" }, writers({ archive }))
   fireEvent.click(screen.getByRole("menuitem", { name: "Archive" }))
-  const dialog = await screen.findByRole("dialog")
+  const dialog = await screen.findByRole("alertdialog")
+  const confirm = screen.getByRole("button", { name: /^Archive/ })
+  expect((confirm as HTMLButtonElement).disabled).toBe(true)
   expect(archive).toHaveBeenCalledWith("p:shop", { dryRun: true })
-  expect(dialog.textContent).toContain("Live sessions will stop: agent-1.")
+  finish({ sessions: ["agent-1"], on_trunk: false })
+  await waitFor(() => expect(dialog.textContent).toContain("Live sessions will stop: agent-1."))
   expect(dialog.textContent).toContain("is not merged to trunk")
-  fireEvent.click(screen.getByRole("button", { name: "Archive" }))
+  expect((confirm as HTMLButtonElement).disabled).toBe(false)
+  fireEvent.click(confirm)
   await waitFor(() => expect(archive).toHaveBeenCalledWith("p:shop", { yes: true }))
 })
 
-test("Archive refused by the dry run opens no dialog", async () => {
+test("Archive refused by the dry run opens no confirm", async () => {
   const archive = vi.fn(async () => ({ refused: true, message: "the epic is queued" }))
   await open({ ...design, kind: "epic" }, writers({ archive }))
   fireEvent.click(screen.getByRole("menuitem", { name: "Archive" }))
   await waitFor(() => expect(archive).toHaveBeenCalled())
-  expect(screen.queryByRole("dialog")).toBeNull()
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
 })
 
 test("a chat has no Archive item", async () => {
@@ -252,10 +296,10 @@ test("a draft offers Rename, Move to workspace and Remove in that order, and pos
   await waitFor(() => expect(w.move).toHaveBeenCalledExactlyOnceWith("draft/d1", "Default"))
 })
 
-test("a chat draft offers only Move to workspace, and posts the move with its key", async () => {
+test("a chat draft offers Rename, Move to workspace and Remove, and posts the move with its key", async () => {
   const w = writers()
   await open({ key: "chat-draft/c1", name: "Chat", kind: "chat-draft", workspace: "Work" }, w)
-  expect(labels()).toEqual(["Move to workspace›"])
+  expect(labels()).toEqual(["Rename", "Move to workspace›", "Remove"])
   fireEvent.click(screen.getByRole("menuitem", { name: "Move to workspace" }))
   fireEvent.click(await screen.findByRole("menuitem", { name: "Default" }))
   await waitFor(() => expect(w.move).toHaveBeenCalledExactlyOnceWith("chat-draft/c1", "Default"))
@@ -281,26 +325,20 @@ const stored = (idea: string) => ({
   draft: { id: "d1", idea, slug: "", images: [] },
 })
 
-async function removeDraftRow() {
+async function removeDraftRow(item: ItemRef = draftRow) {
   const onRemoved = vi.fn()
-  renderThemed(
-    <WideContext.Provider value={true}>
-      <ItemMenu item={draftRow} workspaces={workspaces} writers={writers()} onRemoved={onRemoved} />
-      <RemoveConfirmHost />
-    </WideContext.Provider>,
-  )
-  fireEvent.click(screen.getByRole("button", { name: "More actions" }))
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }))
+  await open(item, writers(), { onRemoved })
+  fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }))
   return onRemoved
 }
 
-test("Remove deletes an empty draft with no dialog", async () => {
+test("Remove deletes an empty draft with no confirm", async () => {
   readDraft.mockResolvedValue(stored("  "))
   deleteDraft.mockResolvedValue({ kind: "deleted" })
   const onRemoved = await removeDraftRow()
   await waitFor(() => expect(onRemoved).toHaveBeenCalledTimes(1))
   expect(deleteDraft).toHaveBeenCalledExactlyOnceWith("d1")
-  expect(screen.queryByRole("button", { name: "Keep" })).toBeNull()
+  expect(screen.queryByRole("alertdialog")).toBeNull()
 })
 
 test.each([
@@ -309,6 +347,31 @@ test.each([
 ])("Remove asks before deleting %s", async (_name, arrange) => {
   arrange()
   await removeDraftRow()
-  await screen.findByRole("button", { name: "Keep" })
+  const dialog = await screen.findByRole("alertdialog")
+  expect(dialog.textContent).toContain("Its prompt and images are deleted.")
+  expect(await screen.findByRole("button", { name: /^Cancel/ })).toBeTruthy()
   expect(deleteDraft).not.toHaveBeenCalled()
+})
+
+const chatDraftRow: ItemRef = {
+  key: "chat-draft/c1",
+  name: "Explore",
+  kind: "chat-draft",
+  workspace: "Work",
+}
+
+test("Remove deletes an empty chat draft through the chat drafts client", async () => {
+  chatRead.mockResolvedValue({ kind: "ok", draft: { id: "c1", brief: " " } })
+  chatRemove.mockResolvedValue({ kind: "deleted" })
+  const onRemoved = await removeDraftRow(chatDraftRow)
+  await waitFor(() => expect(onRemoved).toHaveBeenCalledTimes(1))
+  expect(chatRemove).toHaveBeenCalledExactlyOnceWith("c1")
+  expect(deleteDraft).not.toHaveBeenCalled()
+})
+
+test("Remove asks before deleting a chat draft with a brief", async () => {
+  chatRead.mockResolvedValue({ kind: "ok", draft: { id: "c1", brief: "look at caching" } })
+  await removeDraftRow(chatDraftRow)
+  await screen.findByRole("alertdialog")
+  expect(chatRemove).not.toHaveBeenCalled()
 })
