@@ -332,24 +332,44 @@ describe("x on a chat opens a modal confirm", () => {
 })
 
 describe("chat draft page", () => {
-  const actions = { isEmpty: () => true, focusBrief: vi.fn(), remove: vi.fn(), rename: vi.fn() }
+  let empty = true
+  const actions = {
+    isEmpty: () => empty,
+    focusBrief: vi.fn(),
+    deleteNow: vi.fn(),
+    rename: vi.fn(),
+  }
   let unregister = () => {}
   beforeEach(() => {
-    actions.remove.mockClear()
+    empty = true
+    actions.deleteNow.mockClear()
     actions.rename.mockClear()
     unregister = registerChatDraftPage(actions)
   })
   afterEach(() => unregister())
 
-  test("{leader} x runs the chat draft page's registered remove and r its rename", () => {
+  test("{leader} r runs the page's rename and x on an empty draft deletes it at once", async () => {
     setupChats("/chat-drafts/c1")
     leaderKey()
     expect(screen.getByRole("menuitem", { name: /Remove/ })).toBeTruthy()
-    press("KeyX")
-    expect(actions.remove).toHaveBeenCalledTimes(1)
-    leaderKey()
     press("KeyR")
     expect(actions.rename).toHaveBeenCalledTimes(1)
+    leaderKey()
+    press("KeyX")
+    await waitFor(() => expect(actions.deleteNow).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole("dialog", { name: /Remove/ })).toBeNull()
+  })
+
+  test("{leader} x on a draft with content opens one confirm, and Remove deletes it", async () => {
+    empty = false
+    setupChats("/chat-drafts/c1")
+    leaderKey()
+    press("KeyX")
+    await screen.findByRole("dialog", { name: /Remove/ })
+    expect(actions.deleteNow).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button", { name: /^Remove/ }))
+    await waitFor(() => expect(actions.deleteNow).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.getByTestId("path").textContent).toBe("/epics"))
   })
 
   test("{leader} y does nothing: a draft has no ID", () => {
@@ -462,20 +482,20 @@ test("{leader} r from the Message box opens the popup and keeps the draft", () =
 
 describe("on a draft page", () => {
   const actions = {
-    remove: vi.fn(),
+    deleteNow: vi.fn(),
     rename: vi.fn(),
     isEmpty: () => true,
     focusPrompt: vi.fn(),
   }
   let unregister = () => {}
   beforeEach(() => {
-    actions.remove.mockClear()
+    actions.deleteNow.mockClear()
     actions.rename.mockClear()
     unregister = registerDraftPage(actions)
   })
   afterEach(() => unregister())
 
-  test("{leader} r runs the page's rename and x its remove", () => {
+  test("{leader} r runs the page's rename and x deletes the empty draft", async () => {
     setupChats("/drafts/d1")
     leaderKey()
     expect(screen.getByRole("menuitem", { name: /Rename/ })).toBeTruthy()
@@ -483,7 +503,7 @@ describe("on a draft page", () => {
     expect(actions.rename).toHaveBeenCalledTimes(1)
     leaderKey()
     press("KeyX")
-    expect(actions.remove).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(actions.deleteNow).toHaveBeenCalledTimes(1))
     expect(screen.getByTestId("renaming").textContent).toBe("none")
   })
 
@@ -494,7 +514,7 @@ describe("on a draft page", () => {
     leaderKey()
     press("KeyX")
     expect(actions.rename).not.toHaveBeenCalled()
-    expect(actions.remove).not.toHaveBeenCalled()
+    expect(actions.deleteNow).not.toHaveBeenCalled()
   })
 })
 

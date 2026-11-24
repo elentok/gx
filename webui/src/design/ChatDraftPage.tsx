@@ -203,7 +203,7 @@ function ChatDraftForm({
   const pageState = useLatest({
     empty,
     focusBrief,
-    remove: () => draftMenu.remove(),
+    deleteNow: remove,
     rename: () => titleInput.current?.focus(),
   })
   useEffect(
@@ -211,7 +211,7 @@ function ChatDraftForm({
       registerChatDraftPage({
         isEmpty: () => pageState.current.empty,
         focusBrief: () => pageState.current.focusBrief(),
-        remove: () => pageState.current.remove(),
+        deleteNow: () => pageState.current.deleteNow(),
         rename: () => pageState.current.rename(),
       }),
     [],

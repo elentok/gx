@@ -273,7 +273,7 @@ test("Rename on the draft's own page focuses the title; elsewhere it opens the r
   const rename = vi.fn()
   const off = registerDraftPage({
     rename,
-    remove: vi.fn(),
+    deleteNow: vi.fn(),
     isEmpty: () => true,
     focusPrompt: vi.fn(),
   })

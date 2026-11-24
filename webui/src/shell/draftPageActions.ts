@@ -1,7 +1,7 @@
 /** What the Chord box can ask of the open draft page. */
 export interface DraftPageActions {
-  /** Removes at once when the draft is empty, else shows the footer's Keep and Remove pair. */
-  remove: () => void
+  /** Stops the page's autosave and deletes the draft; the registry's Remove calls it after its confirm. */
+  deleteNow: () => void
   rename: () => void
   /** True when the draft has no prompt, images or slug. */
   isEmpty: () => boolean
@@ -25,8 +25,8 @@ export interface ChatDraftPageActions {
   /** True when the draft has no brief and no images. */
   isEmpty: () => boolean
   focusBrief: () => void
-  /** Runs the registry Remove with the modal origin. */
-  remove: () => void
+  /** Deletes the draft; the registry's Remove calls it after its confirm. */
+  deleteNow: () => void
   /** Focuses the Name field. */
   rename: () => void
 }

@@ -66,7 +66,7 @@ test("the context follows a navigation and is cleared on unmount", async () => {
 const page = (empty: boolean) => {
   const focusPrompt = vi.fn()
   const off = registerDraftPage({
-    remove: vi.fn(),
+    deleteNow: vi.fn(),
     rename: vi.fn(),
     isEmpty: () => empty,
     focusPrompt,
@@ -140,7 +140,7 @@ describe("startNewChatDraft", () => {
     const off = registerChatDraftPage({
       isEmpty: () => true,
       focusBrief,
-      remove: vi.fn(),
+      deleteNow: vi.fn(),
       rename: vi.fn(),
     })
     await startNewChatDraft(chatClient())
@@ -155,7 +155,7 @@ describe("startNewChatDraft", () => {
     const off = registerChatDraftPage({
       isEmpty: () => false,
       focusBrief: vi.fn(),
-      remove: vi.fn(),
+      deleteNow: vi.fn(),
       rename: vi.fn(),
     })
     await startNewChatDraft(chatClient())

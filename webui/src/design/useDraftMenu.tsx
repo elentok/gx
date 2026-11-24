@@ -1,5 +1,6 @@
 import { useRef, type ReactNode } from "react"
 import type { Entity } from "../actions/entity"
+import { draftEntity } from "../actions/openEntity"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { GxMenu, menuGroups } from "../ui/menu/Menu"
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
@@ -32,15 +33,8 @@ export function useDraftMenu({ kind, id, name, empty, deleteNow, onRemoved }: Op
       ? snapshot?.chat_drafts?.find((d) => d.id === id)
       : snapshot?.design_drafts?.find((d) => d.id === id)
   const wrap = useRef<HTMLSpanElement>(null)
-  const key = row?.member_key ?? `${kind === "chat-draft" ? "chat-draft" : "draft"}/${id}`
-  const entity: Entity = {
-    kind,
-    key,
-    name,
-    surface: "page",
-    workspace: row?.workspace,
-    draftEmpty: empty,
-  }
+  const entity: Entity = { ...draftEntity(row, kind, id), name, draftEmpty: empty }
+  const key = entity.key
   const writers: Partial<ActionWriters> = {
     deleteDraft: async () => {
       deleteNow()

@@ -1,8 +1,5 @@
 import { useLocation } from "react-router"
 import type { ReadyAction } from "../actions/useActions"
-import { agentKindOf, chatEntity, type Entity } from "../actions/entity"
-import { isChat } from "../agents/sessionWrites"
-import { isCurrent, useEpicListWhen } from "../epics/list"
 import { hasHistoryOpener } from "../history/historyOpener"
 import { designSession } from "../design/view"
 import { useConnectionContext, useConnectionState } from "../connection"
@@ -122,74 +119,6 @@ export function useOpenChat(): { path: string; session: SessionInfo | undefined 
       ? designSession(design, sessions)
       : undefined
   return { path: pathname, session }
-}
-
-/** The entity the open page shows, with the path and open chat `useOpenChat` gives. Undefined off an entity page. */
-export function useOpenEntity(): {
-  path: string
-  session: SessionInfo | undefined
-  entity: Entity | undefined
-} {
-  const { path, session } = useOpenChat()
-  const conn = useConnectionContext()
-  const snapshot = useConnectionState(conn).snapshot
-  const route = /^\/(e|d|t|archive)\/(.+)$/.exec(path)
-  const kind = route?.[1]
-  const key = route?.[2] ?? ""
-  // Only an epic or a Design needs the list: its card says which workspace it sits in.
-  const list = useEpicListWhen(kind === "e" || kind === "d", conn)
-  const card = list?.epics?.find((r) => isCurrent(r, key))
-  const base = { key, name: key, surface: "page" } as const
-
-  if (kind === "e")
-    return {
-      path,
-      session,
-      entity: { ...base, kind: "epic", workspace: card?.workspace || undefined },
-    }
-  if (kind === "d")
-    return {
-      path,
-      session,
-      entity: { ...base, kind: "design", workspace: card?.workspace || undefined, session },
-    }
-  if (kind === "t") return { path, session, entity: { ...base, kind: "ticket" } }
-  if (kind === "archive")
-    return { path, session, entity: { ...base, kind: "epic", archived: true } }
-
-  const chat = agentIdOf(path)
-  if (chat) {
-    if (!session) return { path, session, entity: undefined }
-    const agent = agentKindOf(session)
-    // A builder or flow session is never offered the plain chat's actions.
-    const agentKind = agent === "chat" && !isChat(session) ? "managed" : agent
-    return { path, session, entity: { ...chatEntity(session), surface: "page", agent: agentKind } }
-  }
-  const draft = draftIdOf(path)
-  if (draft) {
-    const row = snapshot?.design_drafts?.find((d) => d.id === draft)
-    const entity: Entity = {
-      kind: "design-draft",
-      key: row?.member_key ?? `draft/${draft}`,
-      name: row?.label ?? "draft",
-      surface: "page",
-      workspace: row?.workspace,
-    }
-    return { path, session, entity }
-  }
-  const chatDraft = chatDraftIdOf(path)
-  if (chatDraft) {
-    const row = snapshot?.chat_drafts?.find((d) => d.id === chatDraft)
-    const entity: Entity = {
-      kind: "chat-draft",
-      key: row?.member_key ?? `chat-draft/${chatDraft}`,
-      name: row?.label ?? "chat draft",
-      surface: "page",
-      workspace: row?.workspace,
-    }
-    return { path, session, entity }
-  }
-  return { path, session, entity: undefined }
 }
 
 /** What an entity chord needs of a registry action; `useActions` gives the real ones. */

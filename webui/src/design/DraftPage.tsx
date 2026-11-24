@@ -215,8 +215,6 @@ function DraftForm({
     deleteNow: autosave.remove,
     onRemoved: () => navigate("/epics"),
   })
-  // A chord has no button to anchor on, so its confirm is a modal.
-  const askRemove = () => draftMenu.remove()
   const renameFocus = () => slugInput.current?.focus()
   // The Chord host calls these through the registry, so it always sees the latest closures.
   const formRef = useRef<HTMLFormElement | null>(null)
@@ -254,7 +252,7 @@ function DraftForm({
     focus: focusPrompt,
   })
   const actions = useLatest({
-    remove: askRemove,
+    deleteNow: autosave.remove,
     rename: renameFocus,
     focusPrompt,
     hasContent,
@@ -262,7 +260,7 @@ function DraftForm({
   useEffect(
     () =>
       registerDraftPage({
-        remove: () => actions.current.remove(),
+        deleteNow: () => actions.current.deleteNow(),
         rename: () => actions.current.rename(),
         isEmpty: () => !actions.current.hasContent(),
         focusPrompt: () => actions.current.focusPrompt(),
