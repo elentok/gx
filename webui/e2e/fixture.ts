@@ -759,8 +759,11 @@ export const toasts = (page: Page) =>
 /** Closes every toast on screen, as a user would before clicking a control the toast covers. */
 export async function dismissToasts(page: Page) {
   const close = toasts(page).locator("[data-part='close-trigger']")
-  for (const closer of await close.all()) await closer.click()
-  await expect(toasts(page)).toHaveCount(0)
+  // A toast can arrive, or leave on its own, while this runs, so the whole block retries.
+  await expect(async () => {
+    for (const closer of await close.all()) await closer.click({ timeout: 1_000 })
+    await expect(toasts(page)).toHaveCount(0, { timeout: 1_000 })
+  }).toPass({ timeout: 15_000 })
 }
 
 export { expect }

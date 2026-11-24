@@ -68,6 +68,7 @@ test("202. Context badge (stories 1 to 28)", async ({ page, start }) => {
   await ask(fixture, green.id, "and again")
   await expect(badge(page)).toHaveText("70K")
   await expect.poll(() => fillOf(page)).toBeGreaterThan(before)
+  await dismissToasts(page)
   await badge(page).click()
   await expect(page.getByRole("dialog", { name: "Context usage" })).toContainText(
     /70K\s*of 130K smart zone/,
