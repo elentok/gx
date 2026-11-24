@@ -5,7 +5,8 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { MemoryRouter } from "react-router"
 import { expect, test } from "vitest"
-import { PrototypeSwitcher, SWITCHER_CSS } from "./PrototypeSwitcher"
+import { PrototypeSwitcher } from "./PrototypeSwitcher"
+import { SWITCHER_CSS } from "./PrototypeSwitcher.css"
 
 const snippet = readFileSync(
   join(__dirname, "../../../skills/gx-prototype/switcher-snippet.html"),

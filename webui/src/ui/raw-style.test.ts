@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest"
 
 const srcDir = join(__dirname, "..")
 // theme.ts is the one place raw colors and font names belong.
-const allowed = new Set(["ui/theme.ts"])
+// The switcher CSS must stay byte-equal to the gx-prototype snippet, which has fixed neutral colors.
+const allowed = new Set(["ui/theme.ts", "dev/PrototypeSwitcher.css.ts"])
 
 const rawHex = /#(?!\d+[ ·])[0-9a-fA-F]{3,8}\b/
 const fontTokens = new Set(["condensed", "text", "mono", "inherit"])
