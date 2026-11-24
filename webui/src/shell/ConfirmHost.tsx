@@ -1,5 +1,6 @@
 import { Box, Popover, Portal, Spinner, Text, Textarea } from "@chakra-ui/react"
-import { useEffect, useRef, useState, type RefObject } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react"
+import { CONFIRM_INSET, confirmFit } from "../actions/confirmFit"
 import {
   closeConfirm,
   useConfirmRequest,
@@ -10,8 +11,10 @@ import { useLatest } from "../hooks"
 import { isMac } from "../platform"
 import { MENU_TRIGGER } from "../select/selectKeys"
 import { Button } from "../ui/button/Button"
+import { BottomSheet } from "../ui/modal/BottomSheet"
 import { Modal } from "../ui/modal/Modal"
 import { showToast } from "../ui/toaster"
+import { useWide } from "../useWide"
 import { refusalText } from "../useWrite"
 import { focusMainHeadingAfterLanding } from "./focusMainHeading"
 
@@ -91,8 +94,31 @@ function Confirm({ request }: { request: ConfirmRequest }) {
     }
   }, [prepare])
 
+  // On a phone, decide once, on the first full body, whether the popover fits on either side of its
+  // anchor. The prepare step's spinner is not the full body, and the choice is kept until close.
+  const wide = useWide()
+  const [measured, setMeasured] = useState<HTMLElement | null>(null)
+  const [{ sheet, side }, setPlacement] = useState<{ sheet: boolean; side: "above" | "below" }>({
+    sheet: false,
+    side: "below",
+  })
+  const decided = useRef(false)
+  useLayoutEffect(() => {
+    if (decided.current || preparing || !measured || surface.mode !== "anchor" || wide) return
+    decided.current = true
+    const vv = window.visualViewport
+    const fit = confirmFit({
+      anchor: surface.anchor.getBoundingClientRect(),
+      // The popover's own border is outside the card.
+      height: measured.getBoundingClientRect().height + 2,
+      viewport: { offsetTop: vv?.offsetTop ?? 0, height: vv?.height ?? window.innerHeight },
+    })
+    setPlacement({ sheet: !fit.fits, side: fit.side })
+  }, [measured, preparing, surface, wide])
+
   // The modal puts focus on its panel as it mounts; this runs after it, so Cancel ends up focused.
-  useEffect(() => cancelRef.current?.focus(), [])
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the sheet remounts the card, so focus again
+  useEffect(() => cancelRef.current?.focus(), [sheet])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -127,6 +153,7 @@ function Confirm({ request }: { request: ConfirmRequest }) {
       onText={setText}
       canConfirm={canConfirm}
       cancelRef={cancelRef}
+      measureRef={setMeasured}
       onCancel={() => close(false)}
       onConfirm={() => close(true)}
     />
@@ -146,6 +173,13 @@ function Confirm({ request }: { request: ConfirmRequest }) {
       </Modal>
     )
   }
+  if (sheet) {
+    return (
+      <BottomSheet label={request.title} onClose={() => close(false)} data-part="confirm-sheet">
+        {card}
+      </BottomSheet>
+    )
+  }
   const { anchor } = surface
   return (
     <Popover.Root
@@ -156,8 +190,10 @@ function Confirm({ request }: { request: ConfirmRequest }) {
       // The anchor's own click would otherwise count as outside and reopen what it closed.
       persistentElements={[() => anchor]}
       positioning={{
-        placement: "bottom-end",
+        placement: side === "above" ? "top-end" : "bottom-end",
         gutter: 10,
+        flip: true,
+        overflowPadding: CONFIRM_INSET,
         getAnchorRect: () => anchor.getBoundingClientRect(),
       }}
       unmountOnExit
@@ -168,13 +204,14 @@ function Confirm({ request }: { request: ConfirmRequest }) {
             role="alertdialog"
             aria-label={request.title}
             data-part="confirm-popover"
+            data-side={side}
             bg="surface.raised"
             borderWidth="1px"
             borderColor="border"
             borderRadius="10px"
             boxShadow="lg"
             color="text"
-            w={`min(${request.body.input ? 346 : 326}px, calc(100vw - 32px))`}
+            w={`min(${request.body.input ? 346 : 326}px, calc(100vw - ${2 * CONFIRM_INSET}px))`}
             css={{ "--popover-bg": "colors.surface.raised" }}
           >
             <Popover.Arrow>
@@ -211,6 +248,7 @@ function ConfirmCard({
   onText,
   canConfirm,
   cancelRef,
+  measureRef,
   onCancel,
   onConfirm,
 }: {
@@ -221,11 +259,13 @@ function ConfirmCard({
   onText: (t: string) => void
   canConfirm: boolean
   cancelRef: RefObject<HTMLButtonElement | null>
+  measureRef: (el: HTMLElement | null) => void
   onCancel: () => void
   onConfirm: () => void
 }) {
   return (
     <Box
+      ref={measureRef}
       p={request.surface.mode === "modal" ? "4" : "3"}
       display="flex"
       flexDirection="column"

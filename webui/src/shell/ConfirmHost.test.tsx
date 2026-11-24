@@ -7,6 +7,7 @@ import {
   type ConfirmRequest,
 } from "../actions/confirmRequest"
 import { renderThemed } from "../ui/render"
+import { WideContext } from "../useWide"
 import { ConfirmHost } from "./ConfirmHost"
 import { MAIN_HEADING_ATTR } from "./focusMainHeading"
 
@@ -235,4 +236,120 @@ test("a bulk request lists every row and counts them on the button", () => {
   expect(screen.getAllByRole("alertdialog")).toHaveLength(1)
   fireEvent.click(confirm(/^Stop 3/))
   expect(req.onConfirm).toHaveBeenCalledTimes(1)
+})
+
+describe("on a phone", () => {
+  const rects = { anchor: { top: 100, bottom: 130 }, card: 200 }
+  const inputBody = { lines: ["Again."], input: { label: "Reason", required: true } }
+
+  beforeEach(() => {
+    rects.anchor = { top: 100, bottom: 130 }
+    rects.card = 200
+    vi.stubGlobal("visualViewport", {
+      offsetTop: 0,
+      height: 800,
+      addEventListener() {},
+      removeEventListener() {},
+    })
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (this === anchor)
+        return { ...rects.anchor, left: 300, right: 340, width: 40, height: 30 } as DOMRect
+      return {
+        top: 0,
+        bottom: rects.card,
+        left: 0,
+        right: 0,
+        width: 0,
+        height: rects.card,
+      } as DOMRect
+    })
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  function openPhone(over: Partial<ConfirmRequest> = {}, wide = false) {
+    const req = request(over)
+    renderThemed(
+      <WideContext.Provider value={wide}>
+        <ConfirmHost />
+      </WideContext.Provider>,
+    )
+    act(() => openConfirm(req))
+    return req
+  }
+  const placement = () =>
+    document.querySelector('[data-part="confirm-popover"]')?.getAttribute("data-side")
+
+  test("a fitting confirm is a popover below a top anchor and above a bottom one", () => {
+    openPhone()
+    expect(screen.getByRole("alertdialog")).toBeTruthy()
+    expect(placement()).toBe("below")
+    act(() => closeConfirm())
+    rects.anchor = { top: 700, bottom: 730 }
+    act(() => openConfirm(request()))
+    expect(placement()).toBe("above")
+  })
+
+  test("a confirm taller than both sides is the bottom sheet, with Cancel focused", () => {
+    rects.card = 700
+    openPhone()
+    expect(screen.getByRole("dialog", { name: "Remove gx bugs" })).toBeTruthy()
+    expect(screen.queryByRole("alertdialog")).toBeNull()
+    expect(screen.getByTestId("grab-handle")).toBeTruthy()
+    expect(document.activeElement).toBe(cancel())
+  })
+
+  test("the choice is kept when the body grows after the first full render", () => {
+    openPhone({ body: inputBody })
+    rects.card = 700
+    fireEvent.change(screen.getByRole("textbox", { name: "Reason" }), { target: { value: "x" } })
+    expect(screen.getByRole("alertdialog")).toBeTruthy()
+  })
+
+  test("a prepare step's spinner does not decide; the first full body does", async () => {
+    rects.card = 60
+    let finish!: (b: ConfirmBody) => void
+    openPhone({ prepare: () => new Promise((r) => (finish = r)) })
+    expect(screen.getByRole("alertdialog")).toBeTruthy()
+    rects.card = 700
+    await act(async () => finish({ lines: ["Long."] }))
+    expect(screen.getByRole("dialog")).toBeTruthy()
+  })
+
+  test("the sheet keeps the keys: the reason field types, Cmd+Enter confirms", () => {
+    rects.card = 700
+    const req = openPhone({ body: inputBody })
+    const field = screen.getByRole("textbox", { name: "Reason" })
+    fireEvent.keyDown(field, { key: "y" })
+    fireEvent.keyDown(field, { key: "n" })
+    expect(req.onConfirm).not.toHaveBeenCalled()
+    expect(confirm(/^Remove/).hasAttribute("disabled")).toBe(true)
+    fireEvent.change(field, { target: { value: "why" } })
+    fireEvent.keyDown(field, { key: "Enter", metaKey: true })
+    expect(req.onConfirm).toHaveBeenCalledExactlyOnceWith("why")
+  })
+
+  test("Esc and n close the sheet, y confirms", () => {
+    rects.card = 700
+    const req = openPhone()
+    fireEvent.keyDown(document.activeElement ?? window, { key: "Escape" })
+    expect(screen.queryByRole("dialog")).toBeNull()
+    act(() => openConfirm(request()))
+    fireEvent.keyDown(window, { key: "n" })
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(req.onConfirm).not.toHaveBeenCalled()
+    act(() => openConfirm(request()))
+    fireEvent.keyDown(window, { key: "y" })
+    expect(screen.queryByRole("dialog")).toBeNull()
+  })
+
+  test("a wide screen never uses the sheet", () => {
+    rects.card = 700
+    openPhone({}, true)
+    expect(screen.getByRole("alertdialog")).toBeTruthy()
+  })
 })

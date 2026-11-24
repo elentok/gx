@@ -54,6 +54,15 @@ function ConfirmCases() {
       >
         Popover bulk
       </Button>
+      <Button
+        emphasis="secondary"
+        onClick={open(() => ({
+          title: "Remove gx bugs",
+          prepare: () => new Promise(() => {}),
+        }))}
+      >
+        Popover, held prepare
+      </Button>
       <Button emphasis="secondary" onClick={open(() => ({ surface: { mode: "modal" } }))}>
         Modal
       </Button>
@@ -62,5 +71,19 @@ function ConfirmCases() {
 }
 
 export const confirmEntries: GalleryEntry[] = [
-  { name: "Confirm", cases: [{ label: "popover, input, bulk and modal", node: <ConfirmCases /> }] },
+  {
+    name: "Confirm",
+    cases: [
+      { label: "popover, input, bulk and modal", node: <ConfirmCases /> },
+      // Open the gallery at 390px: the confirm flips above this button and a tall one becomes the bottom dialog.
+      {
+        label: "phone, button at the bottom of the page",
+        node: (
+          <Box minH="80vh" display="flex" alignItems="flex-end">
+            <ConfirmCases />
+          </Box>
+        ),
+      },
+    ],
+  },
 ]
