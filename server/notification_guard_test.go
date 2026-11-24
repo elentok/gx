@@ -559,7 +559,7 @@ func eventually(t *testing.T, what string, ok func() bool) {
 
 func TestChannelBreaker_DesktopFloodLeavesPushAndSlackSending(t *testing.T) {
 	t.Parallel()
-	r := newBreakerRig(t, time.Now)
+	r := newBreakerRig(t, noonClock)
 	for i := range 25 {
 		r.desktop(i)
 	}
@@ -582,7 +582,7 @@ func TestChannelBreaker_DesktopFloodLeavesPushAndSlackSending(t *testing.T) {
 
 func TestChannelBreaker_OnePushToThreeDevicesIsOneSend(t *testing.T) {
 	t.Parallel()
-	r := newBreakerRig(t, time.Now)
+	r := newBreakerRig(t, noonClock)
 	r.s.push.Subs = threeDevices{r.s.push.Subs.(oneTarget)}
 	r.s.chat.Push(notify.PushNote{Kind: notifykind.BudgetAndUsage, Title: "push"})
 	eventually(t, "three pushes", func() bool { return r.hits.Load() == 3 })
@@ -629,7 +629,7 @@ func TestChannelBreaker_RestPeriodAndUncheckedKindAddNoAttempt(t *testing.T) {
 func TestChannelBreaker_ClearsWithTheShortKnob(t *testing.T) {
 	t.Parallel()
 	const clear = 300 * time.Millisecond
-	r := newBreakerRig(t, time.Now, func(c *Config) { c.ChannelBreakerClear = clear })
+	r := newBreakerRig(t, noonClock, func(c *Config) { c.ChannelBreakerClear = clear })
 	for i := range 22 {
 		r.desktop(i)
 	}
@@ -653,11 +653,11 @@ func TestChannelBreaker_ClearsWithTheShortKnob(t *testing.T) {
 
 func TestChannelBreaker_NoticeShowsTheConfiguredClearTime(t *testing.T) {
 	t.Parallel()
-	r := newBreakerRig(t, time.Now, func(c *Config) { c.ChannelBreakerClear = 90 * time.Second })
+	r := newBreakerRig(t, noonClock, func(c *Config) { c.ChannelBreakerClear = 90 * time.Second })
 	if got := breakerNotice(r.s, "Desktop"); !strings.Contains(got, "1m30s") || strings.Contains(got, "5 minutes") {
 		t.Fatalf("notice = %q, want the configured 1m30s", got)
 	}
-	d := newBreakerRig(t, time.Now)
+	d := newBreakerRig(t, noonClock)
 	if got := breakerNotice(d.s, "Desktop"); !strings.Contains(got, "5m0s") {
 		t.Fatalf("default notice = %q, want 5m0s", got)
 	}
@@ -666,7 +666,7 @@ func TestChannelBreaker_NoticeShowsTheConfiguredClearTime(t *testing.T) {
 // Story 13: a person's manual mute of Slack stops Slack only.
 func TestChannelBreaker_ManualSlackMuteLeavesTheOtherChannelsSending(t *testing.T) {
 	t.Parallel()
-	r := newBreakerRig(t, time.Now)
+	r := newBreakerRig(t, noonClock)
 	r.s.chat.SessionAlert("p", nil, "name", "done", "body", true)
 	eventually(t, "the first Slack post", func() bool { return r.posts.Load() == 1 })
 

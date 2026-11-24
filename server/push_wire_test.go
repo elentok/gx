@@ -140,7 +140,7 @@ func TestPush_ServerSendsToTheServiceAndRestSendsNothing(t *testing.T) {
 // push again. An hour of merge delay makes any second hold a timeout.
 func TestPush_SessionPushSkipsTheDispatcherHold(t *testing.T) {
 	t.Parallel()
-	s, _, got := pushServer(t, time.Now)
+	s, _, got := pushServer(t, noonClock)
 	s.push.Merge = time.Hour
 	if s.sessions == nil {
 		t.Fatal("sessions must exist")
@@ -155,7 +155,7 @@ func TestPush_SessionPushSkipsTheDispatcherHold(t *testing.T) {
 
 func TestPush_NoWebListenerMeansNoTargets(t *testing.T) {
 	t.Parallel()
-	s, _, _ := pushServer(t, time.Now)
+	s, _, _ := pushServer(t, noonClock)
 	adapter := pushSubs{s}
 	if got := adapter.PushTargets(); len(got) != 0 {
 		t.Fatalf("targets = %v", got)
@@ -246,7 +246,7 @@ func (l *pushLog) all() []sentPush {
 func recordedPushServer(t *testing.T, ch settings.NotifyChannel) (*Server, *pushLog) {
 	t.Helper()
 	log := &pushLog{}
-	s, _, _ := pushServer(t, time.Now, func(c *Config) {
+	s, _, _ := pushServer(t, noonClock, func(c *Config) {
 		c.SessionPush = log
 		c.Settings.NotifyChannels = settings.NotifyChannels{Push: ch}
 	})
@@ -339,7 +339,7 @@ func TestPushChannel_TwoKindsOnOneTicketKeepTheirOwnTags(t *testing.T) {
 // pushWire is a server with the real dispatcher and the given devices.
 func pushWire(t *testing.T, devices int, tweak ...func(*Config)) (*Server, *atomic.Int32, chan http.Header) {
 	t.Helper()
-	s, hits, got := pushServer(t, time.Now, tweak...)
+	s, hits, got := pushServer(t, noonClock, tweak...)
 	one := s.push.Subs.PushTargets()[0]
 	var many []webauth.PushTarget
 	for i := range devices {
@@ -458,3 +458,8 @@ func TestBadge_SnapshotHasNoBadgeWhileTheSwitchIsOffAndTheKindListDoesNotChangeT
 		t.Errorf("badge = %d, live = %d, want 0 while the switch is off", got, liveBadge(off))
 	}
 }
+
+// noonClock is the Rest clock for tests that expect notifications to send.
+// The package pins time.Local to UTC+5, so a real clock lands inside the
+// 22:00-06:00 bedtime for about eight hours of every day and mutes every channel.
+func noonClock() time.Time { return time.Date(2026, 1, 5, 12, 0, 0, 0, time.Local) }

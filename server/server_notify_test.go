@@ -41,7 +41,7 @@ func routeServer(t *testing.T, ch settings.NotifyChannels) *Server {
 	t.Helper()
 	hook := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	t.Cleanup(hook.Close)
-	s, _, _ := pushServer(t, time.Now, func(c *Config) {
+	s, _, _ := pushServer(t, noonClock, func(c *Config) {
 		c.Settings.NotifyChannels = ch
 		c.Settings.Chat.SlackWebhookURL = hook.URL
 	})
@@ -112,7 +112,7 @@ func TestNotifyRoutes_PushWithoutContactEmailIsUnconfigured(t *testing.T) {
 	t.Parallel()
 	hook := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	t.Cleanup(hook.Close)
-	s, hits, _ := pushServer(t, time.Now, func(c *Config) {
+	s, hits, _ := pushServer(t, noonClock, func(c *Config) {
 		c.Settings.WebPushContact = ""
 		c.Settings.Chat.SlackWebhookURL = hook.URL
 	})
