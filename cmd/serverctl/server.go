@@ -183,6 +183,14 @@ func runServer(ctx context.Context, d Deps) error {
 			return fmt.Errorf("GX_LAUNCH_UNKNOWN_GRACE: %w", err)
 		}
 		ptyOverride.LaunchTimings = deliver.LaunchTimings{Window: grace, Grace: 3 * grace}
+		// Test hook: a shorter retype interval fits a retype inside a short window.
+		if v := os.Getenv("GX_LAUNCH_RETYPE_EVERY"); v != "" {
+			every, err := time.ParseDuration(v)
+			if err != nil {
+				return fmt.Errorf("GX_LAUNCH_RETYPE_EVERY: %w", err)
+			}
+			ptyOverride.LaunchTimings.RetypeEvery = every
+		}
 	}
 	runner, runnerFor := runnerbuild.New(choice, dirs.Environ(), stateDir, cfg.RunnerWait, runnerOpts, ptyOverride)
 	configPath, err := dirs.FilePath()
