@@ -165,7 +165,7 @@ test("Sidebar rows", async ({ page, start }) => {
   await expect(prompt).not.toBeFocused()
   await goto(page, "#/epics")
 
-  // Tree rows: a nested agent row sits on its parent's columns, has its own "..." menu (none for a Queue agent), and the button follows its own row's hover and focus.
+  // Tree rows: a nested agent row sits on its parent's columns, has its own "..." menu (Copy ID only for a Queue agent), and the button follows its own row's hover and focus.
   const x = async (l: Locator) => {
     await expect(l).toBeVisible()
     return (await l.boundingBox())!.x
@@ -213,7 +213,12 @@ test("Sidebar rows", async ({ page, start }) => {
   // The words differ in length, so their right edges are the shared column.
   expect(await right(wordsOf(working))).toBe(await right(wordsOf(row("paused-epic"))))
   expect(await x(frameButton(working))).toBe(await x(parentMenu))
-  await expect(frameButton(queueAgent)).toHaveCount(0)
+  // The Queue agent has a button too, in the same column, and its menu is Copy ID only.
+  await expect(frameButton(queueAgent)).toHaveCount(1)
+  expect(await right(frameButton(queueAgent))).toBe(await right(parentMenu))
+  await frameButton(queueAgent).click()
+  await expect(page.getByRole("menuitem")).toHaveText([/^Copy ID/])
+  await page.keyboard.press("Escape")
   // At 1280px the button shows on its own row only; Tab onto it shows it; without hover every row shows its button.
   const size = page.viewportSize()!
   await page.setViewportSize({ width: 1280, height: size.height })

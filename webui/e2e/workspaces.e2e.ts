@@ -70,10 +70,10 @@ test("Workspaces", async ({ page, start }) => {
   await expect(page.getByRole("menu").getByText("Agent", { exact: true })).toBeVisible()
   await expect(page.getByRole("menuitem", nav("Stop"))).toBeVisible()
   await page.getByRole("menuitem", nav("Remove")).click()
-  // The open page's own Remove leaves the page, so the confirm is a modal, not a popover on the row.
-  await expect(page.getByRole("dialog")).toBeVisible()
+  // The shared confirm opens as a popover on the row's "...".
+  await expect(page.getByRole("alertdialog")).toBeVisible()
   await page
-    .getByRole("dialog")
+    .getByRole("alertdialog")
     .getByRole("button", { name: /^Remove/ })
     .click()
   await expect(page).toHaveURL(/#\/agents$/)
@@ -342,7 +342,7 @@ test("Workspaces", async ({ page, start }) => {
   // Another held Design (held-design) may sort first, so look for the row anywhere below the header.
   await expect(onHold.locator("xpath=following::a").filter({ hasText: "ws-design" })).toHaveCount(1)
 
-  // Other sits below On hold and is the same in every workspace. Its Fix agents have a menu without Move or Hold; the Queue agent has none.
+  // Other sits below On hold and is the same in every workspace. Its Fix agents have a menu without Move or Hold; the Queue agent's menu is Copy ID only.
   const other = sidebar.getByRole("button", nav("Other"))
   const otherRows = ["fix-demo_cone-offs_s04", "fix-demo", "one-offs-iter-01"]
   const showOther = async () => {
@@ -353,8 +353,12 @@ test("Workspaces", async ({ page, start }) => {
   for (const name of otherRows)
     await expect(
       row(name).locator("xpath=..").getByRole("button", nav("More actions")),
-    ).toHaveCount(name === "one-offs-iter-01" ? 0 : 1)
+    ).toHaveCount(1)
+  await row("one-offs-iter-01").locator("xpath=..").getByRole("button", nav("More actions")).click()
+  await expect(page.getByRole("menuitem")).toHaveText([/^Copy ID/])
+  await closeMenus()
   await row("fix-demo").locator("xpath=..").getByRole("button", nav("More actions")).click()
+  await expect(page.getByRole("menuitem", nav("Copy ID"))).toBeVisible()
   await expect(page.getByRole("menuitem", nav("Remove"))).toBeVisible()
   await expect(page.getByRole("menuitem", { name: /^(Move|Hold)/ })).toHaveCount(0)
   await closeMenus()

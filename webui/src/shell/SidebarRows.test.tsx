@@ -3,7 +3,6 @@ import { createMemoryRouter, RouterProvider, useLocation } from "react-router"
 import { afterEach, expect, test, vi } from "vitest"
 import { closeConfirm } from "../actions/confirmRequest"
 import { session } from "../agents/agentsTestKit"
-import { SessionActions } from "../agents/SessionActions"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import {
   CardKindDesign,
@@ -337,7 +336,7 @@ test("a Fix agent row shows the wrench in its status colour; Queue and plain age
   ).toBeNull()
 })
 
-test("a nested agent row has the spacer slot and no icon; truncation styles sit on its title", async () => {
+test("a nested agent row has the menu slot and no icon; truncation styles sit on its title", async () => {
   setup("desktop", "/")
   await body().findByRole("link", { name: /Blog/ })
   fireEvent.click(body().getByRole("button", { name: "Expand Blog" }))
@@ -468,42 +467,66 @@ const expandBlog = async () => {
   fireEvent.click(body().getByRole("button", { name: "Expand Blog" }))
 }
 
-test("a nested agent's menu equals the agent page's, with Stop only while live; no Move or Promote", async () => {
-  setup("desktop")
-  await expandBlog()
+const openAgentMenu = async (name: RegExp) => {
   fireEvent.click(
-    within(body().getByRole("link", { name: /builder/ }).parentElement!).getByRole("button", {
+    within(body().getByRole("link", { name }).parentElement!).getByRole("button", {
       name: "More actions",
     }),
   )
   await screen.findAllByRole("menuitem")
-  const nested = menuLabels()
-  expect(nested).toContain("Stop")
-  expect(nested).toContain("Remove")
-  expect(nested.join()).not.toMatch(/Move|Promote|Hold/)
-  cleanup()
-  renderThemed(
-    <SessionActions session={session("s1", "p", { name: "builder" })} onRemoved={() => {}} />,
-  )
-  fireEvent.click(screen.getByRole("button", { name: "More actions" }))
-  await screen.findAllByRole("menuitem")
-  expect(menuLabels()).toEqual(nested)
+  return menuLabels()
+}
+
+test("a nested agent's menu lists Copy ID, Stop while live and Remove; no Move, Hold, Rename, Switch model or Promote", async () => {
+  setup("desktop")
+  await expandBlog()
+  expect(await openAgentMenu(/builder/)).toEqual(["Stop", "Copy ID", "Remove"])
 })
 
-test("an exited nested agent has no Stop; a Queue agent has no menu button", async () => {
+test("a Fix agent's menu is Stop, Copy ID, Remove in registry order with Remove in the danger colour, and keeps the Agent block above them", async () => {
   setup("desktop")
   await expandBlog()
-  expect(
-    within(body().getByRole("link", { name: /queuer/ }).parentElement!).queryByRole("button", {
-      name: "More actions",
-    }),
-  ).toBeNull()
+  expect(await openAgentMenu(/fixer/)).toEqual(["Stop", "Copy ID", "Remove"])
+  expect(getComputedStyle(screen.getByRole("menuitem", { name: "Remove" })).color).not.toBe(
+    getComputedStyle(screen.getByRole("menuitem", { name: "Copy ID" })).color,
+  )
+})
+
+test("a Queue agent's menu holds Copy ID only, with no select checkbox in select mode", async () => {
+  setup("desktop")
+  await expandBlog()
+  expect(await openAgentMenu(/queuer/)).toEqual(["Copy ID"])
+  expect(screen.queryByText("Tier")).toBeNull()
+})
+
+test("an exited nested agent has no Stop", async () => {
+  setup("desktop")
+  await expandBlog()
   fireEvent.click(body().getByRole("button", { name: "Other" }))
-  const scratch = within(body().getByRole("link", { name: /scratch/ }).parentElement!)
-  fireEvent.click(scratch.getByRole("button", { name: "More actions" }))
-  await screen.findAllByRole("menuitem")
-  expect(menuLabels()).toContain("Remove")
-  expect(menuLabels()).not.toContain("Stop")
+  expect(await openAgentMenu(/scratch/)).toEqual(["Copy ID", "Remove"])
+})
+
+test("Copy ID on a nested agent copies the session id and toasts it", async () => {
+  const writeText = vi.fn(async () => {})
+  vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } })
+  setup("desktop")
+  await expandBlog()
+  await openAgentMenu(/queuer/)
+  fireEvent.click(screen.getByRole("menuitem", { name: "Copy ID" }))
+  await waitFor(() => expect(writeText).toHaveBeenCalledWith("s6"))
+  expect(await screen.findByText("Copied s6")).toBeTruthy()
+})
+
+test("every row kind owns exactly one menu button in its own frame, and no menu spacer renders", async () => {
+  setup("desktop")
+  await expandBlog()
+  fireEvent.click(body().getByRole("button", { name: "Other" }))
+  const frames = [...body().getAllByRole("link")].map((a) => a.parentElement!)
+  expect(frames.length).toBeGreaterThan(6)
+  for (const f of frames) {
+    expect(within(f).getAllByRole("button", { name: "More actions" })).toHaveLength(1)
+  }
+  expect(document.querySelector('[data-testid="menu-spacer"]')).toBeNull()
 })
 
 test("removing the open nested agent from its row confirms, then goes to the agents list", async () => {

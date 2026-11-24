@@ -223,16 +223,13 @@ test("an exited chat has no Stop; Remove asks first, then removes and reports", 
   await waitFor(() => expect(onRemoved).toHaveBeenCalled())
 })
 
-test("a queue agent's row has no menu button", () => {
+test("a queue agent's menu holds Copy ID only", async () => {
   const item = chat("idle")
-  renderThemed(
-    <ItemMenu
-      item={{ ...item, session: { ...item.session!, queue: true } as ItemRef["session"] }}
-      workspaces={workspaces}
-      writers={writers()}
-    />,
+  await open(
+    { ...item, session: { ...item.session!, queue: true } as ItemRef["session"] },
+    writers(),
   )
-  expect(screen.queryByRole("button", { name: "More actions" })).toBeNull()
+  expect(labels()).toEqual(["Copy ID"])
 })
 
 test("Archive shows a spinner with the confirm off while the dry run runs, then the sessions and the trunk warning, then archives with yes", async () => {

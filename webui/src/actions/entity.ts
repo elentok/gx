@@ -2,8 +2,8 @@ import type { Action, SessionInfo } from "../generated/server"
 
 export type EntityKind = "epic" | "design" | "ticket" | "chat" | "design-draft" | "chat-draft"
 
-/** What a chat entity is: a plain chat, or one of the agents the app runs itself. */
-export type AgentKind = "chat" | "queue" | "fix" | "investigate"
+/** What a chat entity is: a plain chat, or one of the agents the app runs itself ("managed": a builder or Triage session on a sidebar row, offered only Stop, Copy ID and Remove). */
+export type AgentKind = "chat" | "queue" | "fix" | "investigate" | "managed"
 
 /** Where the action starts. A Design's Stop reads it: the page shows one session, a row lists them all. */
 export type Surface = "page" | "row"

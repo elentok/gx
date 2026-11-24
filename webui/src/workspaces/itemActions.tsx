@@ -7,7 +7,7 @@ import {
   type SessionInfo,
   type Workspace,
 } from "../generated/server"
-import { agentKindOf, type Entity, type EntityKind } from "../actions/entity"
+import { agentKindOf, type AgentKind, type Entity, type EntityKind } from "../actions/entity"
 import { useActions, type ReadyAction } from "../actions/useActions"
 import type { SurfaceContext } from "../actions/confirmRequest"
 import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu"
@@ -39,6 +39,8 @@ export interface ItemRef {
   session?: SessionInfo
   /** A draft's row, for Rename and Remove. */
   draft?: DesignDraftRow
+  /** Overrides the agent kind the session implies (a nested sidebar agent is never a plain chat). */
+  agent?: AgentKind
 }
 
 const ENTITY_KIND: Record<ItemRef["kind"], EntityKind> = {
@@ -60,7 +62,7 @@ export function entityOfItem(item: ItemRef): Entity {
     held: item.held,
     queued: item.queued,
     session: item.session,
-    agent: item.session ? agentKindOf(item.session) : undefined,
+    agent: item.agent ?? (item.session ? agentKindOf(item.session) : undefined),
   }
 }
 
@@ -150,8 +152,6 @@ export function useItemActions(
     if (hide.has(a.id) || (a.id === "move" && workspaces.length === 0)) continue
     // A design or epic row offers no Stop; its sessions stop through Hold and Archive.
     if (a.id === "stop" && (item?.kind === "design" || item?.kind === "epic")) continue
-    // The Queue agent is run by the queue; nothing on its row is a person's to use.
-    if (item?.session?.queue) continue
     if (a.group !== last) groups.push([])
     last = a.group
     groups[groups.length - 1]!.push(entryOf(a))
@@ -166,9 +166,12 @@ export function ItemMenu({
   writers,
   onRemoved,
   extra,
+  lead,
   roving,
   modal,
 }: {
+  /** A group the caller builds by hand, above the registry's (a nested agent's Agent block). */
+  lead?: MenuEntry[]
   /** True in an area with roving focus: the trigger leaves the Tab order and `.` opens the menu. */
   roving?: boolean
   item: ItemRef
@@ -185,7 +188,7 @@ export function ItemMenu({
   const { groups } = useItemActions(item, workspaces, writers, onRemoved, {
     anchor: modal ? undefined : () => wrap.current?.querySelector("button"),
   })
-  const all = extra?.length ? [...groups, extra] : groups
+  const all = [...(lead?.length ? [lead] : []), ...groups, ...(extra?.length ? [extra] : [])]
   if (all.length === 0) return null
   return (
     <span ref={wrap} style={{ display: "contents" }}>

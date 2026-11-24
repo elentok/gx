@@ -12,12 +12,13 @@ import {
 } from "../workspaces/sidebarModel"
 import type { Workspace } from "../generated/server"
 import { ItemMenu, type ItemRef } from "../workspaces/itemActions"
-import { SessionActions } from "../agents/SessionActions"
+import { agentKindOf } from "../actions/entity"
+import { agentSection } from "../design/SessionControls"
+import { useWide } from "../useWide"
 import { canManage } from "../agents/sessionWrites"
 import { useWorkspaces } from "../workspaces/useActiveWorkspace"
 import { ProgressRing } from "../ui/progress-ring/ProgressRing"
 import { CHAT_ATTR, NAV_ATTR } from "./SidebarKeys"
-import { useMoreActionsSize } from "../ui/menu/MoreActionsButton"
 import { GROUP_ON_HOLD, GROUP_OTHER } from "../select/selectModel"
 import { SelectBox, useSidebarSelect } from "./SidebarSelect"
 import { useAltHeld } from "./useShortcuts"
@@ -324,11 +325,6 @@ function IconSlot({ children }: { children?: ReactNode }) {
   )
 }
 
-/** Reserves the menu button's width (the nested row has no menu yet), so status words line up with the parent's. */
-function MenuSpacer() {
-  return <Box data-testid="menu-spacer" flex="none" w={useMoreActionsSize()} />
-}
-
 /** A nested agent row on the parent row's columns: empty chevron cell, icon slot (wrench for a Fix agent), title, status, menu slot. */
 function AgentLink({
   agent,
@@ -342,8 +338,9 @@ function AgentLink({
 }) {
   const current = agent.href === `#${useLocation().pathname}`
   const navigate = useNavigate()
-  // A Queue agent is gx-driven: no menu, just the spacer that keeps the status column aligned.
+  // A Queue agent is gx-driven: Copy ID only, no Agent block, and no select checkbox.
   const managed = canManage(agent.session)
+  const wide = useWide()
   const sel = useSidebarSelect()
   const selecting = sel.state.on
   return (
@@ -393,18 +390,24 @@ function AgentLink({
         </Box>
         <Status status={agent.status} />
       </chakra.a>
-      {managed ? (
-        <Box flex="none">
-          <MenuSlot>
-            <SessionActions
-              session={agent.session}
-              onRemoved={() => current && navigate("/agents")}
-            />
-          </MenuSlot>
-        </Box>
-      ) : (
-        <MenuSpacer />
-      )}
+      <Box flex="none">
+        <MenuSlot>
+          <ItemMenu
+            item={{
+              key: agent.id,
+              name: agent.label,
+              kind: "chat",
+              workspace: "",
+              session: agent.session,
+              // Nested agents are never plain chats: no Rename, Move, Switch model or Promote.
+              agent: agentKindOf(agent.session) === "chat" ? "managed" : undefined,
+            }}
+            workspaces={[]}
+            lead={managed ? agentSection(agent.session, wide) : undefined}
+            onRemoved={() => current && navigate("/agents")}
+          />
+        </MenuSlot>
+      </Box>
     </RowFrame>
   )
 }
