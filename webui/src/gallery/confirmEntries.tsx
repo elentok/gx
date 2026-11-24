@@ -35,7 +35,10 @@ function ConfirmCases() {
           actionId: "start-over",
           title: "Start over gx bugs 03",
           confirmLabel: "Start over",
-          body: { lines: ["The ticket runs again from the start."], input: { label: "Reason", required: true } },
+          body: {
+            lines: ["The ticket runs again from the start."],
+            input: { label: "Reason", required: true },
+          },
         }))}
       >
         Popover with input

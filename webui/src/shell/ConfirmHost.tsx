@@ -62,15 +62,20 @@ function Confirm({ request }: { request: ConfirmRequest }) {
     queueMicrotask(() => restoreFocus(request))
   }
 
+  const needsText = !!body.input?.required && text.trim() === ""
+  const canConfirm = !preparing && !needsText
+  const latest = useLatest({ close, canConfirm })
+
+  const { prepare } = request
   useEffect(() => {
-    if (!request.prepare) return
+    if (!prepare) return
     let live = true
-    request.prepare().then(
+    prepare().then(
       (res) => {
         if (!live) return
         if ("refused" in res) {
           showToast({ type: "error", title: refusalText(res) })
-          return close(false)
+          return latest.current.close(false)
         }
         setBody(res)
         setPreparing(false)
@@ -78,21 +83,16 @@ function Confirm({ request }: { request: ConfirmRequest }) {
       () => {
         if (!live) return
         showToast({ type: "error", title: "Could not reach gx. Try again." })
-        close(false)
+        latest.current.close(false)
       },
     )
     return () => {
       live = false
     }
-    // The request is fixed for this mount (the host keys on it).
-  }, [])
+  }, [prepare])
 
-  // The modal parks focus on its panel as it mounts; this runs after it, so Cancel ends up focused.
+  // The modal puts focus on its panel as it mounts; this runs after it, so Cancel ends up focused.
   useEffect(() => cancelRef.current?.focus(), [])
-
-  const needsText = !!body.input?.required && text.trim() === ""
-  const canConfirm = !preparing && !needsText
-  const latest = useLatest({ close, canConfirm })
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -116,7 +116,7 @@ function Confirm({ request }: { request: ConfirmRequest }) {
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [])
+  }, [surface.mode])
 
   const card = (
     <ConfirmCard
@@ -236,7 +236,14 @@ function ConfirmCard({
         <Text fontWeight="700" fontSize="14px" data-part="title">
           {request.title}
         </Text>
-        <Box data-part="body" fontSize="13px" color="text.dim" display="flex" flexDirection="column" gap="2">
+        <Box
+          data-part="body"
+          fontSize="13px"
+          color="text.dim"
+          display="flex"
+          flexDirection="column"
+          gap="2"
+        >
           {preparing ? (
             <Box role="status" aria-label="Checking" display="flex" alignItems="center" gap="2">
               <Spinner size="sm" color="tone.running.fg" />
@@ -265,7 +272,9 @@ function ConfirmCard({
             <Textarea
               data-part="reason-field"
               aria-label={body.input.label}
-              placeholder={body.input.required ? `${body.input.label} (required)` : body.input.label}
+              placeholder={
+                body.input.required ? `${body.input.label} (required)` : body.input.label
+              }
               value={text}
               onChange={(e) => onText(e.target.value)}
               rows={2}

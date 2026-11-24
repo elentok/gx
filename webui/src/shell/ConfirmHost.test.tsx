@@ -73,14 +73,17 @@ test("opens as a popover from a button and as a modal from a chord", () => {
   expect(screen.queryByRole("alertdialog")).toBeNull()
 })
 
-test.each(["anchor", "modal"] as const)("%s: title, body, Cancel and the action's own label", (mode) => {
-  open({ surface: mode === "anchor" ? { mode, anchor } : { mode } })
-  expect(screen.getByText("Remove gx bugs")).toBeTruthy()
-  expect(screen.getByText("Its session is deleted.")).toBeTruthy()
-  expect(cancel()).toBeTruthy()
-  expect(confirm(/^Remove/)).toBeTruthy()
-  expect(screen.queryByRole("button", { name: /^(OK|Yes|Keep)/ })).toBeNull()
-})
+test.each(["anchor", "modal"] as const)(
+  "%s: title, body, Cancel and the action's own label",
+  (mode) => {
+    open({ surface: mode === "anchor" ? { mode, anchor } : { mode } })
+    expect(screen.getByText("Remove gx bugs")).toBeTruthy()
+    expect(screen.getByText("Its session is deleted.")).toBeTruthy()
+    expect(cancel()).toBeTruthy()
+    expect(confirm(/^Remove/)).toBeTruthy()
+    expect(screen.queryByRole("button", { name: /^(OK|Yes|Keep)/ })).toBeNull()
+  },
+)
 
 test.each([
   ["danger", "paused"],
@@ -91,13 +94,16 @@ test.each([
   expect(confirm(/^Hold/).getAttribute("data-tone")).toBe(tone)
 })
 
-test.each(["anchor", "modal"] as const)("%s: Cancel has focus; Enter on it runs nothing", (mode) => {
-  const req = open({ surface: mode === "anchor" ? { mode, anchor } : { mode } })
-  expect(document.activeElement).toBe(cancel())
-  fireEvent.click(cancel())
-  expect(screen.queryByText("Remove gx bugs")).toBeNull()
-  expect(req.onConfirm).not.toHaveBeenCalled()
-})
+test.each(["anchor", "modal"] as const)(
+  "%s: Cancel has focus; Enter on it runs nothing",
+  (mode) => {
+    const req = open({ surface: mode === "anchor" ? { mode, anchor } : { mode } })
+    expect(document.activeElement).toBe(cancel())
+    fireEvent.click(cancel())
+    expect(screen.queryByText("Remove gx bugs")).toBeNull()
+    expect(req.onConfirm).not.toHaveBeenCalled()
+  },
+)
 
 test("Esc cancels and focus returns to the anchor", async () => {
   const req = open()
