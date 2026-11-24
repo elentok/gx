@@ -1,9 +1,18 @@
 # Changelog
 
-## Unreleased
+## v0.51.14 - 2026-11-24
 
 - Added delivery-failure cards for prompts gx could not send: a yellow "May not have been sent" card, a red "Send failed" card and a red Unknown command card with Resend and Restart agent. All three have Dismiss (`gx agents dismiss <id>`), which clears the card for every tab and the TUI.
 - Fixed a `/` command whose first Enter Claude swallowed. gx now presses Enter again only when the input row still starts with its own text, so the command needs no second Enter on the screen and never runs twice. Every prompt goes through one `Deliver` function, which is the only code that retries.
+- Added Web Push notifications for the installed web app. Devices subscribe from the Notifications page (with a Push on chip, Remove on web logins and a test button), and the server sends encrypted pushes for session events, paused tickets and escalations. Tapping a push opens the right page and survives login, and the app badge count follows the server.
+- Changed notifications to one router with five channels (Desktop, Slack, Telegram, Web toast and Push). Each channel has its own switch and kind list, old kind lists are migrated once on upgrade, and sends are rate-capped with a breaker. The Notifications settings page is split into a section per channel with dimming for disabled channels. `gx notify --status` lists all five channels, and `gx notify` and `gx config test-notifications` go through the server router.
+- Added a setup list to the checks config. Iteration, feature and conflict worktrees run it after the dependency install, the Launch view shows a running-setup step with its time, and Settings shows setup read-only. gx's own config installs Chromium this way.
+- Added a loading spinner in the chat area while a conversation loads, and Cmd+Enter in a chat draft now starts the chat.
+- Fixed the web UI backlog and initiatives lists, which no longer filter by workspace. Epics now load on demand when a new draft opens before the epic list is loaded.
+- Fixed Codex reading a received-at second that was dropped after a restart.
+- Changed draft commands to print the server's refusal reason and message.
+- Changed e2e flows and test fakes to cut flakiness: compact flows wait for the turn end, the fake agent starts a turn for `/compact` with arguments and redraws its input box, long flows are split, and the fixture drops `GX_AGENT_SESSION` from the CLI env.
+- Changed internal housekeeping: merged small server files and shrank `server/sessions`, `server/wire` and `tui` to stay under the size guards, and added an AST guard that fails when code outside an allowlist types, pastes or submits to a session.
 
 ## v0.51.13 - 2026-11-23
 
