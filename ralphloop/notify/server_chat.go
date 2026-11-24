@@ -343,7 +343,7 @@ func (c *ServerChat) DesignReady(project string, override *ServerChatConfig, des
 		return
 	}
 	msg := designReadyMessage(project, implEpic, count, link).as(notifykind.DesignReady)
-	c.show(msg, ticketTarget(project, implEpic, ""))
+	c.show(msg, Target{Design: project + ":" + designEpic})
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, epicSource(project+"/"+designEpic), "")
 	}

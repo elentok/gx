@@ -333,7 +333,9 @@ func fireBanner(mg *Manager, id string) {
 		kind = notifykind.DesignQuestion
 	}
 	urgent := m.Actionable.Reason != "" || info.Status.State == wire.SessionBlocked || t.failed || t.question
-	mg.alerts.Push(notify.PushNote{Kind: kind, Title: title, Body: body, Target: pushTarget(m, id), Tag: "session:" + id, Urgent: urgent, Merged: true})
+	target := pushTarget(m, id)
+	mg.alerts.Push(notify.PushNote{Kind: kind, Title: title, Body: body, Target: target, Tag: "session:" + id, Urgent: urgent, Merged: true})
+	mg.alerts.WebToast(notify.WebToastNote{Kind: kind, Title: title, Body: body, Target: target})
 	if onScreen {
 		return
 	}

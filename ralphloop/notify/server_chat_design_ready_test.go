@@ -49,6 +49,22 @@ func TestServerChat_DesignReadySendsTheMessageFromTheDesignEpic(t *testing.T) {
 	}
 }
 
+type recordingToast struct{ got []WebToastNote }
+
+func (r *recordingToast) Show(n WebToastNote) { r.got = append(r.got, n) }
+
+func TestServerChat_DesignReadyOpensTheDesignPage(t *testing.T) {
+	toast := &recordingToast{}
+	c := NewServerChat(ServerChatConfig{WebToast: toast})
+
+	c.DesignReady("gx", nil, "fast-queue-startup", "fast-queue-startup-impl", 7, "")
+	c.Close()
+
+	if len(toast.got) != 1 || toast.got[0].Target.Path() != "/d/gx:fast-queue-startup" {
+		t.Fatalf("toasts = %+v, want one opening /d/gx:fast-queue-startup", toast.got)
+	}
+}
+
 func TestServerChat_DesignReadyLeavesTheLinkOutWhenEmpty(t *testing.T) {
 	srv, reqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: srv.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})

@@ -55,9 +55,8 @@ func (c *ServerChat) Desktop(n DesktopNote) {
 	c.base.Desktop.Show(n)
 }
 
-// show hands a catalog message to Desktop as a banner without sound. A system
-// message has no catalog id and is never a kind.
-// It hands the same words to Push, once, whatever the project's override picks.
+// show sends a catalog message to every channel through fanOut, not urgent.
+// A message with no catalog id is dropped.
 func (c *ServerChat) show(msg chatMessage, target Target) { c.showUrgent(msg, target, false) }
 
 func (c *ServerChat) showUrgent(msg chatMessage, target Target, urgent bool) {
