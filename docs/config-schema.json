@@ -407,6 +407,277 @@
     "name-aliases": {
       "description": "TUI only, not shown on the web page"
     },
+    "notification-channels": {
+      "additionalProperties": false,
+      "properties": {
+        "desktop": {
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "default": true,
+              "description": "Send Desktop notifications. Off sends none, whatever the kind list says.",
+              "type": "boolean"
+            },
+            "kinds": {
+              "default": [
+                "session-alert",
+                "design-question",
+                "design-ready",
+                "chat-question",
+                "paused-ticket",
+                "one-off-result",
+                "conflict-resolution-started",
+                "epic-complete",
+                "epic-paused",
+                "progress-update",
+                "budget-and-usage",
+                "disk",
+                "project-and-trunk",
+                "server-started",
+                "cli-message"
+              ],
+              "description": "The kinds of notification sent to Desktop, as catalog ids.",
+              "items": {
+                "enum": [
+                  "session-alert",
+                  "design-question",
+                  "design-ready",
+                  "chat-question",
+                  "paused-ticket",
+                  "one-off-result",
+                  "conflict-resolution-started",
+                  "epic-complete",
+                  "epic-paused",
+                  "progress-update",
+                  "long-ticket",
+                  "budget-and-usage",
+                  "disk",
+                  "project-and-trunk",
+                  "server-started",
+                  "cli-message"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "push": {
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "default": true,
+              "description": "Send Push notifications. Off sends none, whatever the kind list says.",
+              "type": "boolean"
+            },
+            "kinds": {
+              "default": [
+                "session-alert",
+                "design-question",
+                "design-ready",
+                "chat-question",
+                "paused-ticket",
+                "one-off-result",
+                "conflict-resolution-started",
+                "epic-complete",
+                "epic-paused",
+                "progress-update",
+                "budget-and-usage",
+                "disk",
+                "project-and-trunk",
+                "server-started",
+                "cli-message"
+              ],
+              "description": "The kinds of notification sent to Push, as catalog ids.",
+              "items": {
+                "enum": [
+                  "session-alert",
+                  "design-question",
+                  "design-ready",
+                  "chat-question",
+                  "paused-ticket",
+                  "one-off-result",
+                  "conflict-resolution-started",
+                  "epic-complete",
+                  "epic-paused",
+                  "progress-update",
+                  "long-ticket",
+                  "budget-and-usage",
+                  "disk",
+                  "project-and-trunk",
+                  "server-started",
+                  "cli-message"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "slack": {
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "default": true,
+              "description": "Send Slack notifications. Off sends none, whatever the kind list says.",
+              "type": "boolean"
+            },
+            "kinds": {
+              "default": [
+                "session-alert",
+                "design-question",
+                "design-ready",
+                "chat-question",
+                "paused-ticket",
+                "one-off-result",
+                "conflict-resolution-started",
+                "epic-complete",
+                "epic-paused",
+                "progress-update",
+                "budget-and-usage",
+                "disk",
+                "project-and-trunk",
+                "server-started",
+                "cli-message"
+              ],
+              "description": "The kinds of notification sent to Slack, as catalog ids.",
+              "items": {
+                "enum": [
+                  "session-alert",
+                  "design-question",
+                  "design-ready",
+                  "chat-question",
+                  "paused-ticket",
+                  "one-off-result",
+                  "conflict-resolution-started",
+                  "epic-complete",
+                  "epic-paused",
+                  "progress-update",
+                  "long-ticket",
+                  "budget-and-usage",
+                  "disk",
+                  "project-and-trunk",
+                  "server-started",
+                  "cli-message"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "telegram": {
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "default": true,
+              "description": "Send Telegram notifications. Off sends none, whatever the kind list says.",
+              "type": "boolean"
+            },
+            "kinds": {
+              "default": [
+                "session-alert",
+                "design-question",
+                "design-ready",
+                "chat-question",
+                "paused-ticket",
+                "one-off-result",
+                "conflict-resolution-started",
+                "epic-complete",
+                "epic-paused",
+                "progress-update",
+                "budget-and-usage",
+                "disk",
+                "project-and-trunk",
+                "server-started",
+                "cli-message"
+              ],
+              "description": "The kinds of notification sent to Telegram, as catalog ids.",
+              "items": {
+                "enum": [
+                  "session-alert",
+                  "design-question",
+                  "design-ready",
+                  "chat-question",
+                  "paused-ticket",
+                  "one-off-result",
+                  "conflict-resolution-started",
+                  "epic-complete",
+                  "epic-paused",
+                  "progress-update",
+                  "long-ticket",
+                  "budget-and-usage",
+                  "disk",
+                  "project-and-trunk",
+                  "server-started",
+                  "cli-message"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "web-toast": {
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "default": true,
+              "description": "Send Web toast notifications. Off sends none, whatever the kind list says.",
+              "type": "boolean"
+            },
+            "kinds": {
+              "default": [
+                "session-alert",
+                "design-question",
+                "design-ready",
+                "chat-question",
+                "paused-ticket",
+                "one-off-result",
+                "conflict-resolution-started",
+                "epic-complete",
+                "epic-paused",
+                "progress-update",
+                "budget-and-usage",
+                "disk",
+                "project-and-trunk",
+                "server-started",
+                "cli-message"
+              ],
+              "description": "The kinds of notification sent to Web toast, as catalog ids.",
+              "items": {
+                "enum": [
+                  "session-alert",
+                  "design-question",
+                  "design-ready",
+                  "chat-question",
+                  "paused-ticket",
+                  "one-off-result",
+                  "conflict-resolution-started",
+                  "epic-complete",
+                  "epic-paused",
+                  "progress-update",
+                  "long-ticket",
+                  "budget-and-usage",
+                  "disk",
+                  "project-and-trunk",
+                  "server-started",
+                  "cli-message"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "notifications": {
       "additionalProperties": false,
       "properties": {

@@ -110,6 +110,13 @@ func TestReadProjectFile_RefusesGlobalOnlyServerKey(t *testing.T) {
 	}
 }
 
+func TestReadProjectFile_RefusesNotificationChannels(t *testing.T) {
+	_, err := ReadProjectFile(writeProjectJSON(t, `{"notification-channels": {"push": {"enabled": false}}}`))
+	if err == nil || !strings.Contains(err.Error(), "notification-channels") {
+		t.Errorf("want error naming notification-channels, got %v", err)
+	}
+}
+
 func TestParseProjectFile_RejectsBadTypes(t *testing.T) {
 	if _, err := ParseProjectFile([]byte(`{"max-agents": "two"}`)); err == nil || !strings.Contains(err.Error(), "max-agents") {
 		t.Errorf("want error naming max-agents, got %v", err)
@@ -192,6 +199,20 @@ func TestWithProject_NotificationsReplaceTheGlobalBlock(t *testing.T) {
 	got := global.WithProject(pf).Notifications
 	if got.Slack.WebhookURL != "u" || got.Telegram.BotToken != "" {
 		t.Errorf("notifications = %+v, want only the project's slack", got)
+	}
+}
+
+func TestWithProject_NotificationsKeepTheGlobalChannels(t *testing.T) {
+	global := Config{NotificationChannels: DefaultNotificationChannelsConfig()}
+	global.NotificationChannels.Push.Enabled = false
+	global.NotificationChannels.Slack.Kinds = []string{"disk"}
+	pf, err := ReadProjectFile(writeProjectJSON(t, `{"notifications": {"slack": {"webhook-url": "u"}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := global.WithProject(pf).NotificationChannels
+	if got.Push.Enabled || !slices.Equal(got.Slack.Kinds, []string{"disk"}) {
+		t.Errorf("channels = %+v, want the global ones", got)
 	}
 }
 

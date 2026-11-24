@@ -1,5 +1,7 @@
 package registry
 
+import "github.com/elentok/gx/notifykind"
+
 // Smallest accepted Break settings, shared with config's parser.
 const (
 	MinMentalHealthWorkMinutes  = 3
@@ -76,6 +78,22 @@ func coreEntries() []Entry {
 		Description: "The Slack webhook address that receives notifications."})
 	add(Place{CategoryNotifications, SectionPush, "Push"}, Entry{Key: Key("server", "web", "push-contact-email"), Type: TypeSecret, CheckString: checkContactEmail,
 		Description: "The email address web push sends to the push service as its contact. Needed before the browser can turn on push. Empty turns web push off."})
+
+	for _, ch := range []struct {
+		key, name string
+		place     Place
+	}{
+		{"desktop", "Desktop", desktop},
+		{"web-toast", "Web toast", Place{CategoryNotifications, SectionWebToast, "Web toast"}},
+		{"telegram", "Telegram", telegram},
+		{"slack", "Slack", Place{CategoryNotifications, SectionSlack, "Slack"}},
+		{"push", "Push", Place{CategoryNotifications, SectionPush, "Push"}},
+	} {
+		add(ch.place, Entry{Key: Key("notification-channels", ch.key, "enabled"), Type: TypeBool,
+			Description: "Send " + ch.name + " notifications. Off sends none, whatever the kind list says."})
+		add(ch.place, Entry{Key: Key("notification-channels", ch.key, "kinds"), Type: TypeStringList, Enum: notifykind.IDs(),
+			Description: "The kinds of notification sent to " + ch.name + ", as catalog ids."})
+	}
 
 	mh := func(g string) Place { return Place{CategoryMentalHealth, SectionMentalHealth, g} }
 	add(mh("General"), Entry{Key: Key("mental-health", "enabled"), Type: TypeBool,

@@ -145,7 +145,7 @@ test("/diff renders the Diff page through the lazy chunk and asks for the file l
 
 test("/settings/agents redirects to the Agents section", async () => {
   const { router } = renderAt("/settings/agents", okFor, undefined, undefined, {
-    settings: async () => ({ entries: [], categories: [], redirects: {} }),
+    settings: async () => ({ entries: [], categories: [], redirects: {}, notification_kinds: [] }),
     authState: async () => ({ totp_on: false, setup_code_required: false }) as never,
     logins: async () => [],
   })
@@ -175,7 +175,12 @@ test("/settings lands on the first section and a section route shows that sectio
       set: false,
     },
   ]
-  const settings = async () => ({ entries, categories: treeFromEntries(entries), redirects: {} })
+  const settings = async () => ({
+    entries,
+    categories: treeFromEntries(entries),
+    redirects: {},
+    notification_kinds: [],
+  })
   const extra: RouteFetchers = {
     settings,
     authState: async () => ({ totp_on: true, setup_code_required: false }) as never,

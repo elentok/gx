@@ -71,7 +71,15 @@ func CheckValue(e Entry, raw json.RawMessage, parseSize SizeParser) error {
 		return nil
 	case TypeStringList:
 		var v []string
-		return decode(raw, &v, "Not a list of text values.")
+		if err := decode(raw, &v, "Not a list of text values."); err != nil {
+			return err
+		}
+		for _, s := range v {
+			if len(e.Enum) > 0 && !slices.Contains(e.Enum, s) {
+				return fmt.Errorf("Not one of the allowed values: %s.", strings.Join(e.Enum, ", "))
+			}
+		}
+		return nil
 	case TypeNumberList:
 		var v []float64
 		if err := decode(raw, &v, "Not a list of numbers."); err != nil {

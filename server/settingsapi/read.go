@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/config/registry"
+	"github.com/elentok/gx/notifykind"
 	"github.com/elentok/gx/server/wire/ops"
 )
 
@@ -65,6 +66,10 @@ func (w *Writer) Read(t Target, pendingRestart []string) (ops.SettingsReadRespon
 	}
 	resp.Categories = buildTree(entries)
 	resp.Redirects = registry.RetiredSlugs()
+	resp.NotificationKinds = []ops.NotificationKind{}
+	for _, k := range notifykind.All() {
+		resp.NotificationKinds = append(resp.NotificationKinds, ops.NotificationKind{ID: k.ID, Name: k.Name, Hint: k.Hint, Default: k.Default})
+	}
 	return resp, nil
 }
 

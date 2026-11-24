@@ -16,6 +16,11 @@ execution-queue.max-released-agents execution-queue.stalled-nudge-delay
 budget.soft-limit budget.hard-limit budget.long-ticket-turns
 subscription.suppress-extra-usage-warning
 notifications.telegram.bot-token notifications.telegram.chat-id notifications.slack.webhook-url
+notification-channels.desktop.enabled notification-channels.desktop.kinds
+notification-channels.web-toast.enabled notification-channels.web-toast.kinds
+notification-channels.telegram.enabled notification-channels.telegram.kinds
+notification-channels.slack.enabled notification-channels.slack.kinds
+notification-channels.push.enabled notification-channels.push.kinds
 server.tab-env server.log-retention server.watch-config server.recently-finished
 server.web.allowed-hosts server.web.files.roots server.web.totp server.web.vi-escape server.web.leader-key-mac server.web.leader-key server.web.push-contact-email server.web.dev-frontend server.web.dev-dir
 cpu-watchdog.enabled cpu-watchdog.threshold-percent cpu-watchdog.sustain cpu-watchdog.cooldown

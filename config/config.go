@@ -41,17 +41,20 @@ type Config struct {
 	ExecutionQueue        ExecutionQueueConfig `json:"execution-queue"`
 	Budget                BudgetConfig         `json:"budget"`
 	Notifications         NotificationsConfig  `json:"notifications"`
-	Skills                SkillsConfig         `json:"skills"`
-	PR                    PRConfig             `json:"pr"`
-	Agents                AgentsConfig         `json:"agents"`
-	Subscription          SubscriptionConfig   `json:"subscription"`
-	TicketStore           TicketStoreConfig    `json:"ticket-store"`
-	Server                ServerConfig         `json:"server"`
-	Recovery              RecoveryConfig       `json:"recovery"`
-	CPUWatchdog           CPUWatchdogConfig    `json:"cpu-watchdog"`
-	Watchdog              WatchdogConfig       `json:"watchdog"`
-	DiskSpace             DiskSpaceConfig      `json:"disk-space"`
-	MentalHealth          MentalHealthConfig   `json:"mental-health"`
+	// NotificationChannels is top-level so a project's notifications block
+	// cannot replace it.
+	NotificationChannels NotificationChannelsConfig `json:"notification-channels"`
+	Skills               SkillsConfig               `json:"skills"`
+	PR                   PRConfig                   `json:"pr"`
+	Agents               AgentsConfig               `json:"agents"`
+	Subscription         SubscriptionConfig         `json:"subscription"`
+	TicketStore          TicketStoreConfig          `json:"ticket-store"`
+	Server               ServerConfig               `json:"server"`
+	Recovery             RecoveryConfig             `json:"recovery"`
+	CPUWatchdog          CPUWatchdogConfig          `json:"cpu-watchdog"`
+	Watchdog             WatchdogConfig             `json:"watchdog"`
+	DiskSpace            DiskSpaceConfig            `json:"disk-space"`
+	MentalHealth         MentalHealthConfig         `json:"mental-health"`
 	// AgentRunner is auto, headless or pty. It is validated when the
 	// server starts, not here, so a bad value never breaks the TUI. A stored
 	// herdr is read as auto.
@@ -154,6 +157,7 @@ func defaultWith(dataDir func() (string, error)) Config {
 		ExecutionQueue:        DefaultExecutionQueueConfig(),
 		Budget:                DefaultBudgetConfig(),
 		Notifications:         DefaultNotificationsConfig(),
+		NotificationChannels:  DefaultNotificationChannelsConfig(),
 		Skills:                DefaultSkillsConfig(),
 		PR:                    DefaultPRConfig(),
 		Agents:                DefaultAgentsConfig(),
@@ -309,6 +313,9 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 		if raw.Notifications.Telegram.ChatID != nil {
 			cfg.Notifications.Telegram.ChatID = *raw.Notifications.Telegram.ChatID
 		}
+	}
+	if err := raw.NotificationChannels.apply(&cfg.NotificationChannels); err != nil {
+		return cfg, err
 	}
 	if raw.Notifications != nil && raw.Notifications.Slack != nil {
 		if raw.Notifications.Slack.WebhookURL != nil {

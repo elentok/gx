@@ -5,12 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/config/registry"
+	"github.com/elentok/gx/notifykind"
 	"github.com/elentok/gx/server/wire/ops"
 )
 
@@ -126,6 +128,31 @@ func TestReadHerdrSettingShowsAutoWithNotice(t *testing.T) {
 		case e.Notice != "":
 			t.Errorf("%s has notice %q", e.Key, e.Notice)
 		}
+	}
+}
+
+func TestReadGlobalListsTheNotificationCatalog(t *testing.T) {
+	t.Parallel()
+	w, _ := readFixture(t, `{}`, `{}`)
+	resp, err := w.Read(Target{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, k := range resp.NotificationKinds {
+		ids = append(ids, k.ID)
+		if k.Name == "" || k.Hint == "" || k.Default == (k.ID == notifykind.LongTicket) {
+			t.Errorf("kind = %+v", k)
+		}
+	}
+	if !slices.Equal(ids, notifykind.IDs()) {
+		t.Errorf("kinds = %v, want the catalog in row order", ids)
+	}
+	for _, ch := range []string{"desktop", "web-toast", "telegram", "slack", "push"} {
+		if e := entryByKey(t, resp, "notification-channels."+ch+".kinds"); !slices.Equal(e.Enum, ids) {
+			t.Errorf("%s kinds Enum = %v", ch, e.Enum)
+		}
+		entryByKey(t, resp, "notification-channels."+ch+".enabled")
 	}
 }
 

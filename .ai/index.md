@@ -296,6 +296,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
 - `harness/` — what runs inside an interactive agent session
 - `modelrules/` — pure model-switch rules: `ParseID` (family and version), `Latest` (latest model of a family from the discovered list), `Effort` (effort carry-over); imports the standard library only
 - `herdr/` — herdr CLI client: the multiplexer's workspace calls and `Ping` (TUI split launch and the worktrees tab)
+- `notifykind/` — the catalog of 16 notification kinds (stable id, name, hint, default flag); stdlib only, so `config`, the registry and the server all import it
 - `runner/` — runs a child command with inherited stdio
 - `git/` — git operations
   - `git/internal/run` — runs git children (`Run`, `RunWith`, `RunRaw`, `RunError`) and the `Exec`/`AllowFail` helpers; `git` re-exports the public names

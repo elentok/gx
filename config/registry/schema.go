@@ -65,7 +65,11 @@ func entrySchema(e Entry) map[string]any {
 		s["items"] = map[string]any{"type": "number", "minimum": 0}
 	case TypeStringList:
 		s["type"] = "array"
-		s["items"] = map[string]any{"type": "string"}
+		items := map[string]any{"type": "string"}
+		if len(e.Enum) > 0 {
+			items["enum"] = e.Enum
+		}
+		s["items"] = items
 	case TypeEnum:
 		s["type"] = "string"
 		s["enum"] = e.Enum

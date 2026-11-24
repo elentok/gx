@@ -938,6 +938,20 @@ export interface SettingsReadResponse {
    * Redirects maps a retired section slug to the slug that now holds its keys.
    */
   redirects: { [key: string]: string};
+  /**
+   * NotificationKinds is the notification catalog in row order. The page
+   * reads it here, never from a copy in TypeScript.
+   */
+  notification_kinds: NotificationKind[];
+}
+/**
+ * NotificationKind is one row of the notification catalog.
+ */
+export interface NotificationKind {
+  id: string;
+  name: string;
+  hint: string;
+  default: boolean;
 }
 /**
  * SettingsCategory is one category of the page tree and its sections.

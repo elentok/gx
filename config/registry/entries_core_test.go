@@ -2,8 +2,11 @@ package registry
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/notifykind"
 )
 
 func TestCoreEntries(t *testing.T) {
@@ -70,6 +73,16 @@ func TestCoreEntries(t *testing.T) {
 		{key: Key("mental-health", "break", "break-minutes"), typ: TypeNumber, section: SectionMentalHealth},
 		{key: Key("mental-health", "break", "message"), typ: TypeString, section: SectionMentalHealth},
 		{key: Key("server", "web", "push-contact-email"), typ: TypeSecret, section: SectionPush},
+		{key: Key("notification-channels", "desktop", "enabled"), typ: TypeBool, section: SectionDesktop},
+		{key: Key("notification-channels", "desktop", "kinds"), typ: TypeStringList, section: SectionDesktop},
+		{key: Key("notification-channels", "web-toast", "enabled"), typ: TypeBool, section: SectionWebToast},
+		{key: Key("notification-channels", "web-toast", "kinds"), typ: TypeStringList, section: SectionWebToast},
+		{key: Key("notification-channels", "telegram", "enabled"), typ: TypeBool, section: SectionTelegram},
+		{key: Key("notification-channels", "telegram", "kinds"), typ: TypeStringList, section: SectionTelegram},
+		{key: Key("notification-channels", "slack", "enabled"), typ: TypeBool, section: SectionSlack},
+		{key: Key("notification-channels", "slack", "kinds"), typ: TypeStringList, section: SectionSlack},
+		{key: Key("notification-channels", "push", "enabled"), typ: TypeBool, section: SectionPush},
+		{key: Key("notification-channels", "push", "kinds"), typ: TypeStringList, section: SectionPush},
 	}
 	if got := len(r.All()); got != len(cases) {
 		t.Fatalf("entries = %d, want %d", got, len(cases))
@@ -89,6 +102,15 @@ func TestCoreEntries(t *testing.T) {
 		}
 		if e.Risky != (e.ConfirmText != "") {
 			t.Errorf("%v: risky and confirm text disagree", c.key)
+		}
+	}
+}
+
+func TestNotificationKindEntriesEnumIsTheCatalog(t *testing.T) {
+	for _, ch := range []string{"desktop", "web-toast", "telegram", "slack", "push"} {
+		e, ok := Default().Lookup(Key("notification-channels", ch, "kinds"))
+		if !ok || !slices.Equal(e.Enum, notifykind.IDs()) {
+			t.Errorf("%s: kinds entry missing or its Enum differs from the catalog ids: %v", ch, e.Enum)
 		}
 	}
 }

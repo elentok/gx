@@ -96,6 +96,11 @@ type Settings struct {
 	// AgentsFixAgentRemoteControl is read at each fix-agent start.
 	AgentsFixAgentRemoteControl bool
 
+	// NotifyChannels is config notification-channels: each channel's switch and
+	// kind list. Read with holder.Load() on every send. Kept out of
+	// notify.ServerChatConfig, which reloadHost compares with ==.
+	NotifyChannels NotifyChannels
+
 	// CPUWatchdog is config cpu-watchdog: when a CPU spike files a ticket.
 	CPUWatchdog config.CPUWatchdogConfig
 	// Watchdog is config watchdog: the process-storm limits.
@@ -195,6 +200,7 @@ func FromConfig(cfg config.Config) Settings {
 		AgentsClaudeArgs:            cfg.Agents.ClaudeArgs,
 		AgentsWritableDirectories:   cfg.Agents.WritableDirectories,
 		AgentsFixAgentRemoteControl: cfg.Agents.FixAgentRemoteControl,
+		NotifyChannels:              notifyChannelsFrom(cfg.NotificationChannels),
 		CPUWatchdog:                 cfg.CPUWatchdog,
 		Watchdog:                    cfg.Watchdog,
 		DiskSpace:                   cfg.DiskSpace,

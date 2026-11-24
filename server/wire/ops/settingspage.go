@@ -21,6 +21,17 @@ type SettingsReadResponse struct {
 	Categories []SettingsCategory `json:"categories"`
 	// Redirects maps a retired section slug to the slug that now holds its keys.
 	Redirects map[string]string `json:"redirects"`
+	// NotificationKinds is the notification catalog in row order. The page
+	// reads it here, never from a copy in TypeScript.
+	NotificationKinds []NotificationKind `json:"notification_kinds"`
+}
+
+// NotificationKind is one row of the notification catalog.
+type NotificationKind struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Hint    string `json:"hint"`
+	Default bool   `json:"default"`
 }
 
 // SettingsCategory is one category of the page tree and its sections.

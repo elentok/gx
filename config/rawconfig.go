@@ -38,7 +38,8 @@ type rawConfig struct {
 			WebhookURL *string `json:"webhook-url"`
 		} `json:"slack"`
 	} `json:"notifications"`
-	Skills *struct {
+	NotificationChannels *rawChannels `json:"notification-channels"`
+	Skills               *struct {
 		Implement  *string  `json:"implement"`
 		CodeReview []string `json:"code-review"`
 		CIFix      []string `json:"ci-fix"`

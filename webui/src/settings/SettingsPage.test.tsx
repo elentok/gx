@@ -90,6 +90,7 @@ describe("SettingsPage project scope", () => {
       entries,
       categories: treeFromEntries(entries),
       redirects: {},
+      notification_kinds: [],
     }))
     expect(await findByRole("heading", { name: "Project" })).toBeTruthy()
   })
@@ -175,6 +176,7 @@ describe("SettingsPage project scope", () => {
         entries,
         categories: treeFromEntries(entries),
         redirects: {},
+        notification_kinds: [],
       })
       const project = renderAt("/settings/p/gx/s/project", fetchSettings)
       expect(await project.findByRole("heading", { name: "Project" })).toBeTruthy()
@@ -211,7 +213,12 @@ describe("SettingsPage on a phone", () => {
       target === "gx"
         ? [entry("Project", "trunk"), entry("Budget", "cap", true), entry("Checks", "checks")]
         : [entry("Budget", "soft")]
-    return { entries, categories: treeFromEntries(entries), redirects: {} } as never
+    return {
+      entries,
+      categories: treeFromEntries(entries),
+      redirects: {},
+      notification_kinds: [],
+    } as never
   }
   const fetchEpics = async () => ({ epics: [{ project: "gx" }] }) as never
   const renderAt = (path: string) =>
