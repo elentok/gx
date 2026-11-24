@@ -54,7 +54,7 @@ func (t *tui) logLocalCommand(event string) error {
 
 // opensLocalDialog reports whether text is a bare /model or /help. Its launch
 // record is not written: a local command's records come when it ends.
-func (t *tui) opensLocalDialog(text string) bool {
+func opensLocalDialog(t *tui, text string) bool {
 	return text == dialogModel || text == dialogHelp
 }
 
@@ -65,7 +65,7 @@ func (t *tui) openLocalDialog(command string) {
 	t.draw()
 }
 
-func (t *tui) localDialogRows() []string {
+func localDialogRows(t *tui) []string {
 	rows := []string{localEcho(t.localDialog), BoxRule()}
 	if t.localDialog == dialogModel {
 		return append(rows,
@@ -124,7 +124,7 @@ func (t *tui) closeLocalDialog(result, event string) error {
 }
 
 // compactRows is the frame of a running /compact: the box stays, empty.
-func (t *tui) compactRows() []string {
+func compactRows(t *tui) []string {
 	return []string{
 		localEcho(t.compact.command),
 		"✢ Compacting conversation… (1s · ↓ 54 tokens)",
@@ -167,12 +167,12 @@ type compactRun struct{ command string }
 // undecidedRows is a frame the box reader cannot decide on: no box, and our
 // text on a row that is neither the echo nor a menu row. A menu row is
 // whitespace then "/", so the text follows a word.
-func (t *tui) undecidedRows() []string {
+func undecidedRows(t *tui) []string {
 	return []string{colored("✻ Welcome to Claude Code"), "", "  draft: " + t.typed.String()}
 }
 
 // armUndecided activates the undecided mode when the draft is a "/" command.
-func (t *tui) armUndecided() bool {
+func armUndecided(t *tui) bool {
 	if t.undecidedNext && strings.HasPrefix(t.typed.String(), "/") {
 		t.undecidedNext, t.undecided = false, true
 	}

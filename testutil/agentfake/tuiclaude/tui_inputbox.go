@@ -99,7 +99,7 @@ var slashMenu = []struct{ name, desc string }{
 }
 
 // knownCommand reports whether token ("/name") is a command claude highlights.
-func (t *tui) knownCommand(token string) bool {
+func knownCommand(t *tui, token string) bool {
 	if _, hidden := stripHidden(token); hidden > 0 {
 		return false
 	}
@@ -130,7 +130,7 @@ func commandColor() string {
 // menuRows is the suggestion menu under the box: the known commands that
 // start with the draft while it is one "/..." token. Esc closes it until the
 // next typed key.
-func (t *tui) menuRows() []string {
+func menuRows(t *tui) []string {
 	draft := t.typed.String()
 	if t.menuClosed || t.pid.Status != StatusIdle || !strings.HasPrefix(draft, "/") || strings.ContainsAny(draft, " \n") {
 		return nil
@@ -150,7 +150,7 @@ func (t *tui) menuRows() []string {
 }
 
 // boxRows is the idle input box: rule, draft rows, rule, then the menu.
-func (t *tui) boxRows() []string {
+func boxRows(t *tui) []string {
 	rule := BoxRule()
 	width := max(BoxCols()-2, 1)
 	prefix := "❯ "
@@ -162,7 +162,7 @@ func (t *tui) boxRows() []string {
 		text = strings.NewReplacer(" ", "\n", " ", "\n").Replace(text)
 		for i, line := range strings.Split(text, "\n") {
 			if i == 0 {
-				line = t.highlight(line)
+				line = highlight(t, line)
 			}
 			for j, row := range strings.Split(ansi.Wrap(line, width, ""), "\n") {
 				if i == 0 && j == 0 {
@@ -178,17 +178,17 @@ func (t *tui) boxRows() []string {
 	}
 	rows := append([]string{rule}, draft...)
 	rows = append(rows, rule)
-	return append(rows, t.menuRows()...)
+	return append(rows, menuRows(t)...)
 }
 
 // highlight paints the command token of a draft's first line when it is a
 // known command and the terminal has colour.
-func (t *tui) highlight(line string) string {
+func highlight(t *tui, line string) string {
 	if !colorEnabled() || !strings.HasPrefix(line, "/") {
 		return line
 	}
 	token, rest, _ := strings.Cut(line, " ")
-	if !t.knownCommand(token) {
+	if !knownCommand(t, token) {
 		return line
 	}
 	if rest != "" || strings.HasSuffix(line, " ") {
@@ -198,7 +198,7 @@ func (t *tui) highlight(line string) string {
 }
 
 // expandPastes puts the real text back for the chips of the draft.
-func (t *tui) expandPastes(text string) string {
+func expandPastes(t *tui, text string) string {
 	for i, p := range t.pastes {
 		text = strings.Replace(text, PastedChip(i+1, p), p, 1)
 	}

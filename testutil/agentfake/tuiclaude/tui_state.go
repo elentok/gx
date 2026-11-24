@@ -23,7 +23,7 @@ import (
 // turn it does nothing: only Ctrl+C cancels that. A stalled fake leaves a
 // dialog open.
 func (t *tui) interrupt() error {
-	if t.askHook == nil && len(t.menuRows()) > 0 {
+	if t.askHook == nil && len(menuRows(t)) > 0 {
 		// Esc on an open suggestion menu only closes it.
 		t.menuClosed = true
 		t.draw()
@@ -356,10 +356,10 @@ func (t *tui) draw() {
 		}
 		rows = []string{"Quick safety check: Is this a project you created or one you trust?", "", no, yes}
 	case t.localDialog != "":
-		rows = t.localDialogRows()
+		rows = localDialogRows(t)
 	case t.compact != nil && t.pid.Status == StatusBusy:
 		title = WorkingTitle
-		rows = t.compactRows()
+		rows = compactRows(t)
 	case t.pid.Status == StatusWaiting:
 		rows = []string{
 			"> " + t.prompt,
@@ -375,11 +375,11 @@ func (t *tui) draw() {
 		title = WorkingTitle
 		rows = []string{"> " + t.prompt, "✻ Working…"}
 	case t.undecided:
-		rows = t.undecidedRows()
+		rows = undecidedRows(t)
 	case t.opts.draft != "" || !t.opts.plainScreen:
 		// The input box claudeui.InputBox recognises.
 		rows = append([]string{colored("✻ Welcome to Claude Code"), ""}, t.landed...)
-		rows = append(rows, t.boxRows()...)
+		rows = append(rows, boxRows(t)...)
 	default:
 		rows = []string{colored("✻ Welcome to Claude Code"), "", "> " + t.typed.String()}
 	}

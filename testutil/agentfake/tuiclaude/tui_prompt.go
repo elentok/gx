@@ -19,7 +19,7 @@ func (t *tui) submit() error {
 		t.draw()
 		return nil
 	}
-	if t.pid.Status == StatusIdle && t.armUndecided() {
+	if t.pid.Status == StatusIdle && armUndecided(t) {
 		t.draw()
 		return nil
 	}
@@ -28,7 +28,7 @@ func (t *tui) submit() error {
 		t.draw()
 		return nil
 	}
-	text := t.expandPastes(t.typed.String())
+	text := expandPastes(t, t.typed.String())
 	if t.pid.Status == StatusIdle {
 		if cleaned, n := stripHidden(text); n > 0 {
 			if strings.HasPrefix(text, "/") || strings.HasPrefix(text, "!") {
@@ -236,7 +236,7 @@ func (o tuiOptions) skillUnknown(skill string, sinceStart time.Duration) bool {
 // whether it handled the prompt. The launch-record knob only writes the user
 // record and leaves the rest to the normal path.
 func (t *tui) skillPromptKnobs(text string) (bool, error) {
-	if !strings.HasPrefix(text, "/") || text == "/clear" || text == "/exit" || isCompact(text) || t.opensLocalDialog(text) {
+	if !strings.HasPrefix(text, "/") || text == "/clear" || text == "/exit" || isCompact(text) || opensLocalDialog(t, text) {
 		return false, nil
 	}
 	o := t.opts
@@ -456,7 +456,7 @@ func (t *tui) slashCommand(text string) error {
 		t.busyNext = false
 		t.prompt = text
 		return t.setStatus(StatusBusy, "")
-	case t.opensLocalDialog(text):
+	case opensLocalDialog(t, text):
 		t.openLocalDialog(text)
 	}
 	return nil
