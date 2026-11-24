@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
+    "mock:tokens": "node scripts/write-mock-tokens.mjs",
     "format": "biome format --write",
     "lint": "biome lint --diagnostic-level=info",
     "e2e": "playwright test -c e2e/playwright.config.ts"
