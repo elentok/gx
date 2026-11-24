@@ -1,0 +1,39 @@
+import type { Action, SessionInfo } from "../generated/server"
+
+export type EntityKind = "epic" | "design" | "ticket" | "chat" | "design-draft" | "chat-draft"
+
+/** What a chat entity is: a plain chat, or one of the agents the app runs itself. */
+export type AgentKind = "chat" | "queue" | "fix" | "investigate"
+
+/** Where the action starts. A Design's Stop reads it: the page shows one session, a row lists them all. */
+export type Surface = "page" | "row"
+
+/** One entity with the snapshot fields the registry rules read. The rules never fetch anything. */
+export interface Entity {
+  kind: EntityKind
+  /** The address, the session id, or the draft's workspace membership key. */
+  key: string
+  name: string
+  surface?: Surface
+  workspace?: string
+  held?: boolean
+  queued?: boolean
+  prUrl?: string
+  archived?: boolean
+  /** A chat's session, or the Design session its page shows. */
+  session?: SessionInfo
+  liveSessions?: number
+  agent?: AgentKind
+  /** A draft with no prompt, slug or images. Unknown (absent) counts as not empty. */
+  draftEmpty?: boolean
+  /** The ticket's server action list (`detail.actions`). */
+  serverActions?: Action[]
+  oneOff?: boolean
+  status?: string
+}
+
+export const isChatEntity = (e: Entity) => e.kind === "chat"
+export const isDraftEntity = (e: Entity) => e.kind === "design-draft" || e.kind === "chat-draft"
+export const agentOf = (e: Entity): AgentKind => e.agent ?? "chat"
+export const isPlainChat = (e: Entity) => isChatEntity(e) && agentOf(e) === "chat"
+export const isLoopEntity = (e: Entity) => e.kind === "epic" || e.kind === "design"
