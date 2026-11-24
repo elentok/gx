@@ -15,6 +15,10 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/notifykind"
+	"github.com/elentok/gx/ralphloop/notify"
+	"github.com/elentok/gx/ralphloop/schedule"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webpush"
 	"github.com/elentok/gx/server/wire"
@@ -35,7 +39,7 @@ func (o oneTarget) DeletePushSubscriptionIfEndpoint(string, string) error { retu
 // pushServer builds a server whose push service is an httptest one and whose
 // only device is subscribed to it. The web listener is off, so the real
 // adapter has no gate; the test swaps in the one device.
-func pushServer(t *testing.T, now func() time.Time) (s *Server, hits *atomic.Int32, got chan http.Header) {
+func pushServer(t *testing.T, now func() time.Time, tweak ...func(*Config)) (s *Server, hits *atomic.Int32, got chan http.Header) {
 	t.Helper()
 	hits = new(atomic.Int32)
 	got = make(chan http.Header, 8)
@@ -54,10 +58,14 @@ func pushServer(t *testing.T, now func() time.Time) (s *Server, hits *atomic.Int
 	mh.Enabled = true
 	mh.Bedtime.Enabled = true
 	mh.Bedtime.Start, mh.Bedtime.End = "22:00", "06:00"
-	s, err = New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: t.TempDir(),
+	cfg := Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: t.TempDir(),
 		RestClock: now, PushHTTPClient: svc.Client(), PushMergeDelay: 10 * time.Millisecond,
 		Settings:        Settings{MentalHealth: mh, WebPushContact: "me@example.com"},
-		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
+		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }}
+	for _, f := range tweak {
+		f(&cfg)
+	}
+	s, err = New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,5 +216,245 @@ func TestBadge_SnapshotEqualsLiveBadge(t *testing.T) {
 	}
 	if snap.Badge != liveBadge(s) {
 		t.Fatalf("snapshot badge %d != liveBadge %d", snap.Badge, liveBadge(s))
+	}
+}
+
+type sentPush struct {
+	Title, Body, Path, Tag string
+	Urgent                 bool
+}
+
+type pushLog struct {
+	mu   sync.Mutex
+	sent []sentPush
+}
+
+func (l *pushLog) SendPush(title, body, path, tag string, urgent bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.sent = append(l.sent, sentPush{title, body, path, tag, urgent})
+}
+
+func (l *pushLog) all() []sentPush {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]sentPush(nil), l.sent...)
+}
+
+// recordedPushServer is a server whose pushes are recorded and whose Push
+// channel is ch.
+func recordedPushServer(t *testing.T, ch settings.NotifyChannel) (*Server, *pushLog) {
+	t.Helper()
+	log := &pushLog{}
+	s, _, _ := pushServer(t, time.Now, func(c *Config) {
+		c.SessionPush = log
+		c.Settings.NotifyChannels = settings.NotifyChannels{Push: ch}
+	})
+	return s, log
+}
+
+func TestPushChannel_EveryNewKindSendsOneNormalPushWithTheChatHeadlineAndPath(t *testing.T) {
+	t.Parallel()
+	notice := func(kind string) func(*Server) {
+		return func(s *Server) {
+			s.chat.Notice(notify.ServerNotice{Kind: kind, Emoji: "ℹ️", Title: "Something happened", Detail: "details"})
+		}
+	}
+	for _, tc := range []struct {
+		name, kind, path string
+		send             func(*Server)
+	}{
+		{"design ready", notifykind.DesignReady, "/e/proj:impl", func(s *Server) { s.chat.DesignReady("proj", nil, "map", "impl", 2, "") }},
+		{"chat question", notifykind.ChatQuestion, "/", func(s *Server) { s.chat.ChatQuestion("proj", nil, "fix", "which one?", "") }},
+		{"one-off result", notifykind.OneOffResult, "/t/proj:epic/01", func(s *Server) {
+			s.chat.Result("proj", nil, t.TempDir(), "epic", "", "01", "all done")
+		}},
+		{"conflict resolution started", notifykind.ConflictResolutionStarted, "/t/proj:epic/01", func(s *Server) {
+			s.chat.FinishSink("proj", nil, "epic", "", "01", func() schedule.EpicCounts { return schedule.EpicCounts{} }).ConflictResolutionStarted("01")
+		}},
+		{"epic complete", notifykind.EpicComplete, "/e/proj:epic", func(s *Server) {
+			s.chat.EpicComplete("proj", nil, "epic", schedule.EpicCounts{}, 60, 1, true)
+		}},
+		{"epic paused", notifykind.EpicPaused, "/e/proj:epic", func(s *Server) { s.chat.EpicPause("proj", nil, "epic", "Merge blocked", "dirty trunk") }},
+		{"progress update", notifykind.ProgressUpdate, "/e/proj:epic", func(s *Server) { s.chat.Progress("proj", nil, "epic", notify.ProgressFacts{}) }},
+		{"long ticket", notifykind.LongTicket, "/", notice("long-ticket")},
+		{"budget and usage", notifykind.BudgetAndUsage, "/", notice("budget-soft-limit")},
+		{"disk", notifykind.Disk, "/", notice("disk-warn")},
+		{"project and trunk", notifykind.ProjectAndTrunk, "/", notice("trunk-found")},
+		{"server started", notifykind.ServerStarted, "/", notice("server-started")},
+		{"cli message", notifykind.CLIMessage, "/", func(s *Server) { s.chat.Notify("hello from the cli") }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			s, log := recordedPushServer(t, settings.NotifyChannel{Kinds: []string{tc.kind}})
+			tc.send(s)
+			got := log.all()
+			if len(got) != 1 {
+				t.Fatalf("pushes = %+v, want one", got)
+			}
+			if got[0].Title == "" || got[0].Path != tc.path || got[0].Urgent {
+				t.Errorf("push = %+v, want a headline title, path %q and normal urgency", got[0], tc.path)
+			}
+
+			// The same event with the kind unchecked sends nothing.
+			s, log = recordedPushServer(t, settings.NotifyChannel{Kinds: []string{}})
+			tc.send(s)
+			if got := log.all(); len(got) != 0 {
+				t.Errorf("unchecked kind pushed %+v", got)
+			}
+		})
+	}
+}
+
+func TestPushChannel_ARouterPushIsOnePushWhateverTheProjectOverrideSays(t *testing.T) {
+	t.Parallel()
+	s, log := recordedPushServer(t, settings.NotifyChannel{})
+	override := &notify.ServerChatConfig{}
+	s.chat.EpicComplete("proj", override, "epic", schedule.EpicCounts{}, 60, 1, true)
+	if got := log.all(); len(got) != 1 {
+		t.Fatalf("pushes = %+v, want one", got)
+	}
+}
+
+func TestPushChannel_SwitchOffSendsNothing(t *testing.T) {
+	t.Parallel()
+	s, log := recordedPushServer(t, settings.NotifyChannel{Off: true})
+	s.chat.Notify("hi")
+	if got := log.all(); len(got) != 0 {
+		t.Errorf("pushes = %+v, want none", got)
+	}
+}
+
+func TestPushChannel_TwoKindsOnOneTicketKeepTheirOwnTags(t *testing.T) {
+	t.Parallel()
+	s, log := recordedPushServer(t, settings.NotifyChannel{})
+	s.chat.Result("proj", nil, t.TempDir(), "epic", "", "01", "done")
+	s.chat.Pause("proj", nil, "epic", "", "01", "paused", "", "why", schedule.EpicCounts{})
+	got := log.all()
+	if len(got) != 2 || got[0].Tag == got[1].Tag || got[1].Tag != "ticket:proj:epic/01" {
+		t.Fatalf("pushes = %+v, want two with different tags, the pause keeping ticket:<addr>", got)
+	}
+}
+
+// pushWire is a server with the real dispatcher and the given devices.
+func pushWire(t *testing.T, devices int, tweak ...func(*Config)) (*Server, *atomic.Int32, chan http.Header) {
+	t.Helper()
+	s, hits, got := pushServer(t, time.Now, tweak...)
+	one := s.push.Subs.PushTargets()[0]
+	var many []webauth.PushTarget
+	for i := range devices {
+		d := one
+		d.LoginID = string(rune('a' + i))
+		many = append(many, d)
+	}
+	s.push.Subs = targets(many)
+	return s, hits, got
+}
+
+// switchAsked reports each time the dispatcher asks the server switch, which
+// it does first thing when an event fires.
+func switchAsked(s *Server) <-chan struct{} {
+	asked := make(chan struct{}, 8)
+	on := s.push.On
+	s.push.On = func() bool {
+		asked <- struct{}{}
+		return on()
+	}
+	return asked
+}
+
+func awaitAsked(t *testing.T, asked <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-asked:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the dispatcher never fired the event")
+	}
+}
+
+type targets []webauth.PushTarget
+
+func (o targets) PushTargets() []webauth.PushTarget { return o }
+func (o targets) PushSubscriptionOf(string) (webauth.PushSubscription, bool) {
+	return webauth.PushSubscription{}, false
+}
+func (o targets) DeletePushSubscriptionIfEndpoint(string, string) error { return nil }
+
+func TestPushLayers_OneEventReachesEveryDevice(t *testing.T) {
+	t.Parallel()
+	s, hits, got := pushWire(t, 3)
+	s.chat.Notify("hi")
+	for range 3 {
+		select {
+		case <-got:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("hits = %d, want 3 devices reached", hits.Load())
+		}
+	}
+}
+
+func TestPushLayers_NoSendWithTheSwitchOffNoEmailOrNoDevice(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		devices int
+		tweak   func(*Config)
+	}{
+		{"switch off", 1, func(c *Config) { c.Settings.NotifyChannels.Push.Off = true }},
+		{"no email", 1, func(c *Config) { c.Settings.WebPushContact = "" }},
+		{"no device", 0, func(*Config) {}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			s, hits, _ := pushWire(t, tc.devices, tc.tweak)
+			asked := switchAsked(s)
+			s.push.Push(webpush.Event{Title: "t", Tag: "x"})
+			awaitAsked(t, asked)
+			// Close waits for the event in flight, so a send would have landed by now.
+			s.push.Close()
+			if hits.Load() != 0 {
+				t.Errorf("hits = %d, want none", hits.Load())
+			}
+		})
+	}
+}
+
+func TestPushLayers_AnEventHeldWhileTheSwitchGoesOffIsDropped(t *testing.T) {
+	t.Parallel()
+	s, hits, _ := pushWire(t, 1)
+	s.push.Merge = 200 * time.Millisecond
+	asked := switchAsked(s)
+	s.chat.Notify("held")
+	cur := *s.settings.Load()
+	cur.NotifyChannels.Push.Off = true
+	s.settings.Store(&cur)
+	awaitAsked(t, asked)
+	s.push.Close()
+	if hits.Load() != 0 {
+		t.Errorf("hits = %d, want the held event dropped", hits.Load())
+	}
+}
+
+func TestBadge_SnapshotHasNoBadgeWhileTheSwitchIsOffAndTheKindListDoesNotChangeTheCount(t *testing.T) {
+	t.Parallel()
+	s, _ := recordedPushServer(t, settings.NotifyChannel{Kinds: []string{}})
+	if !pushSwitchOn(s) {
+		t.Fatal("an empty kind list turned the switch off")
+	}
+	snap := func(s *Server) wire.Snapshot {
+		var out wire.Snapshot
+		rec := httptest.NewRecorder()
+		rootRoutes{s}.snapshot(rec, httptest.NewRequest(http.MethodGet, "/v1/snapshot", nil))
+		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	if got, want := snap(s).Badge, liveBadge(s); got != want {
+		t.Errorf("badge %d != live %d with an empty kind list", got, want)
+	}
+	off, _ := recordedPushServer(t, settings.NotifyChannel{Off: true})
+	if got := snap(off).Badge; got != 0 || liveBadge(off) != 0 {
+		t.Errorf("badge = %d, live = %d, want 0 while the switch is off", got, liveBadge(off))
 	}
 }

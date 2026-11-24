@@ -269,6 +269,7 @@ const (
 // Refusals of the web push routes.
 const (
 	ReasonPushNoContact       = "push-no-contact"
+	ReasonPushSwitchOff       = "push-switch-off"
 	ReasonPushBadSubscription = "push-bad-subscription"
 	ReasonPushNoSubscription  = "push-no-subscription"
 	ReasonPushNotYours        = "push-not-yours"

@@ -97,7 +97,9 @@ func (r rootRoutes) snapshot(w http.ResponseWriter, _ *http.Request) {
 		s.log.Warn("list sessions for snapshot", "err", err)
 	}
 	snap.Sessions = sessions
-	snap.Badge = badgeCount(sessions, snap.Tickets)
+	if pushSwitchOn(s) {
+		snap.Badge = badgeCount(sessions, snap.Tickets)
+	}
 	snap.Placements = s.workspaces.Place(sessions)
 	snap.DesignDrafts = s.designs.DraftRows(s.workspaces.Workspace)
 	snap.ChatDrafts = s.chatDrafts.Rows(s.workspaces.Workspace)

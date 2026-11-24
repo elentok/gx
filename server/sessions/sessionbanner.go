@@ -207,8 +207,9 @@ func sendDesignQuestion(mg *Manager, id string, q DesignQuestion) bool {
 	return true
 }
 
-// NoteQuestionCards sends one push for each dialog, Codex or permission card a
-// plain chat newly shows, unless the session is open on screen. Other session
+// NoteQuestionCards sends one Chat question for each dialog, Codex or permission
+// card a plain chat newly shows (the router gives it to Push too), unless the
+// session is open on screen. Other session
 // classes send none: they have their own Question or banner.
 func (mg *Manager) NoteQuestionCards(id string) {
 	if mg.OpenOnScreen(id) {
@@ -281,12 +282,12 @@ func designRoot(m Meta) string {
 	return queue.RootOf(addr).String()
 }
 
-// pushPath is the route a session's push opens.
-func pushPath(m Meta, id string) string {
+// pushTarget is the page a session's push opens.
+func pushTarget(m Meta, id string) notify.Target {
 	if root := designRoot(m); root != "" {
-		return "/d/" + root
+		return notify.Target{Design: root}
 	}
-	return "/agents/" + id
+	return notify.Target{Session: id}
 }
 
 // OpenOnScreen reports whether the person already has the session open: a
@@ -327,16 +328,14 @@ func fireBanner(mg *Manager, id string) {
 		}
 		mg.alerts.SessionAlert(info.Project, mg.projects.ChatOverride(info.Project), info.Name, sessionStatusWord(info.Status.State), chatBody, info.Status.State != wire.SessionIdle)
 	}
-	if push := mg.cfg.Push; push != nil {
-		urgent := m.Actionable.Reason != "" || info.Status.State == wire.SessionBlocked || t.failed || t.question
-		push.SendPush(title, body, pushPath(m, id), "session:"+id, urgent)
-	}
-	if onScreen {
-		return
-	}
 	kind := notifykind.SessionAlert
 	if t.question {
 		kind = notifykind.DesignQuestion
+	}
+	urgent := m.Actionable.Reason != "" || info.Status.State == wire.SessionBlocked || t.failed || t.question
+	mg.alerts.Push(notify.PushNote{Kind: kind, Title: title, Body: body, Target: pushTarget(m, id), Tag: "session:" + id, Urgent: urgent, Merged: true})
+	if onScreen {
+		return
 	}
 	term, connected := mg.focus.clickTarget()
 	note := notify.DesktopNote{

@@ -79,6 +79,8 @@ func startWith(t *testing.T, store string, opts ...func(*server.Config)) *Harnes
 	// Desktop checks the two session kinds, as a migrated config does, so a
 	// test counting session banners sees no server notice. WithChannel widens it.
 	h.cfg.NotifyChannels.Desktop.Kinds = []string{notifykind.SessionAlert, notifykind.DesignQuestion}
+	// Push checks the three kinds it sent before, for the same reason.
+	h.cfg.NotifyChannels.Push.Kinds = []string{notifykind.SessionAlert, notifykind.DesignQuestion, notifykind.PausedTicket}
 	// An empty registry, so a harness server never runs the real steps over a
 	// seeded store. A test that wants migrations sets Config.Migrations.
 	h.cfg.Migrations = &migrations.Registry{}

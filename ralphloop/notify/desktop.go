@@ -52,12 +52,16 @@ func (c *ServerChat) Desktop(n DesktopNote) {
 
 // show hands a catalog message to Desktop as a banner without sound. A system
 // message has no catalog id and is never a kind.
-func (c *ServerChat) show(msg chatMessage, target Target) {
+// It hands the same words to Push, once, whatever the project's override picks.
+func (c *ServerChat) show(msg chatMessage, target Target) { c.showUrgent(msg, target, false) }
+
+func (c *ServerChat) showUrgent(msg chatMessage, target Target, urgent bool) {
 	if msg.catalog == "" {
 		return
 	}
 	title, body := pushText(msg)
 	c.Desktop(DesktopNote{Kind: msg.catalog, Title: title, Body: body, Target: target})
+	c.Push(PushNote{Kind: msg.catalog, Title: title, Body: body, Target: target, Urgent: urgent})
 }
 
 func ticketTarget(project, epic, identifier string) Target {

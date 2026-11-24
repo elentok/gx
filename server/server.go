@@ -301,6 +301,8 @@ func New(cfg Config) (*Server, error) {
 	cfg.Chat.Policy = policy
 	desktop := &desktopAdapter{}
 	cfg.Chat.Desktop = desktop
+	pushChannel := &pushAdapter{}
+	cfg.Chat.Push = pushChannel
 	viMode, err := queue.OpenViMode(cfg.StateDir, events)
 	if err != nil {
 		lock.Release()
@@ -389,6 +391,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	policy.h = &s.settings
 	desktop.s, desktop.webURL = s, s.WebURL
+	pushChannel.s = s
 	s.restarter = s.newRestarter()
 	s.initProjects()
 	s.settingsWriter = newSettingsWriter(cfg.ConfigPath, s.projects)

@@ -11,7 +11,7 @@ func newRecovery(s *Server) *srvrecovery.Recovery {
 	return srvrecovery.New(srvrecovery.Deps{
 		Log: s.log, Settings: &s.settings, Projects: s.projects, Migrator: s.migrator,
 		Index: s.idx, Queue: s.queue, Events: s.events, Guards: s.guards, Registry: s.registry,
-		Harness: s.harness, Chat: s.chat, Push: sessionPush(s), Writer: s.writer, Hold: &s.pauseHold,
+		Harness: s.harness, Chat: s.chat, Writer: s.writer, Hold: &s.pauseHold,
 		CompactRewaitTimeout: s.cfg.CompactRewaitTimeout, Host: recoveryHost{s},
 	})
 }

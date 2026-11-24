@@ -2,8 +2,10 @@ package server
 
 import (
 	"net/http"
+	"slices"
 	"time"
 
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webpush"
 	"github.com/elentok/gx/server/wire"
@@ -36,9 +38,20 @@ func badgeCount(sessions []wire.SessionInfo, ts []wire.TicketInfo) int {
 	return n
 }
 
-// liveBadge counts the badge from live state. The push sender calls it, and
-// the snapshot handler calls badgeCount on the lists it already holds.
+// pushSwitchOn is the server-wide Push switch. The kind list does not apply to
+// it: the badge and the routes ask only this.
+func pushSwitchOn(s *Server) bool {
+	cur := s.settings.Load()
+	return cur == nil || cur.NotifyChannels.Push.Enabled()
+}
+
+// liveBadge counts the badge from live state, 0 while the Push switch is off.
+// The push sender calls it, and the snapshot handler calls badgeCount on the
+// lists it already holds.
 func liveBadge(s *Server) int {
+	if !pushSwitchOn(s) {
+		return 0
+	}
 	sessions, _ := s.queue.ListSessionsWithQueue()
 	return badgeCount(sessions, s.idx.Snapshot().Tickets)
 }
@@ -61,9 +74,34 @@ func newPush(s *Server, quiet func() bool) *webpush.Dispatcher {
 		Subs:  pushSubs{s},
 		Send:  sender.Send,
 		Badge: func() int { return liveBadge(s) },
+		On:    func() bool { return pushSwitchOn(s) },
 		Merge: s.cfg.PushMergeDelay,
 		Log:   s.log,
 	}
+}
+
+// pushAdapter is the Push channel of the router: the switch and the kind list
+// apply here, the dispatcher then checks the switch again after its merge hold.
+// s is set once the Server exists.
+type pushAdapter struct{ s *Server }
+
+func (p *pushAdapter) Send(n notify.PushNote) {
+	if p.s == nil {
+		return
+	}
+	cur := p.s.settings.Load()
+	if cur != nil && (!cur.NotifyChannels.Push.Enabled() || !slices.Contains(cur.NotifyChannels.Push.KindIDs(), n.Kind)) {
+		return
+	}
+	tag := n.Tag
+	if tag == "" {
+		tag = n.Target.Tag(n.Kind)
+	}
+	send := sessionPush(p.s)
+	if n.Merged {
+		send = bannerPush(p.s)
+	}
+	send.SendPush(n.Title, n.Body, n.Target.Path(), tag, n.Urgent)
 }
 
 // pushService is the push routes' view of the server. The routes run only
@@ -73,6 +111,7 @@ func pushService(s *Server) *webpush.Service {
 		Store:      s.web.Gate(),
 		Dispatcher: s.push,
 		Contact:    func() string { return s.settings.Load().WebPushContact },
+		On:         func() bool { return pushSwitchOn(s) },
 		PublicKey:  s.vapid.Public,
 
 		AllowHTTPEndpoints: s.cfg.PushAllowHTTPEndpoints,

@@ -34,8 +34,6 @@ type SessionsConfig struct {
 	Player                  sound.Player
 	SessionBannerDelay      time.Duration
 	SessionExitCleanupDelay time.Duration
-	// Push sends the Web Push of a session event; nil sends none.
-	Push PushSender
 }
 
 // Host is what the Manager and the Resumer need from the rest of the root.

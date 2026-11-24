@@ -40,9 +40,7 @@ type Deps struct {
 	Registry *runs.Registry
 	Harness  *harnesschoice.Harness
 	Chat     *notify.ServerChat
-	// Push sends the Web Push of an escalation; nil sends none.
-	Push   ticketwrite.Pusher
-	Writer *ticketwrite.Writer
+	Writer   *ticketwrite.Writer
 	// Hold is the pause hold the server also reads for a ticket's recovery state.
 	Hold *ticketwrite.RecoveryHold
 	// CompactRewaitTimeout bounds R7's extended wait; zero means

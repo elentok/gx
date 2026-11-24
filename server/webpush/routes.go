@@ -39,7 +39,9 @@ type Service struct {
 	Store      Store
 	Dispatcher *Dispatcher
 	Contact    func() string
-	PublicKey  func() string
+	// On is the server-wide Push switch; nil means on.
+	On        func() bool
+	PublicKey func() string
 	// AllowHTTPEndpoints is a test seam: accept an http: endpoint, for the
 	// fixture's loopback push service. False for every user.
 	AllowHTTPEndpoints bool
@@ -73,6 +75,7 @@ type stateFailure struct {
 type stateResult struct {
 	PublicKey   string        `json:"public_key"`
 	ContactSet  bool          `json:"contact_set"`
+	ServerOn    bool          `json:"server_on"`
 	Subscribed  bool          `json:"subscribed"`
 	Endpoint    string        `json:"endpoint"`
 	LastFailure *stateFailure `json:"last_failure,omitempty"`
@@ -108,6 +111,8 @@ func readBody(w http.ResponseWriter, r *http.Request) (routeBody, bool) {
 }
 
 func (s *Service) contactSet() bool { return ValidContact(s.Contact()) }
+
+func (s *Service) switchOn() bool { return s.On == nil || s.On() }
 
 // validSubscription is whether b is a subscription a browser could have made
 // with the server's key: an https endpoint and keys the encryption can use.
@@ -204,6 +209,10 @@ func (s *Service) test(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !s.switchOn() {
+		refuse(w, wire.ReasonPushSwitchOff)
+		return
+	}
 	if !s.contactSet() {
 		refuse(w, wire.ReasonPushNoContact)
 		return
@@ -226,7 +235,7 @@ func (s *Service) state(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me := webauth.LoginIDFrom(r.Context())
-	out := stateResult{PublicKey: s.PublicKey(), ContactSet: s.contactSet()}
+	out := stateResult{PublicKey: s.PublicKey(), ContactSet: s.contactSet(), ServerOn: s.switchOn()}
 	if sub, ok := s.Store.PushSubscriptionOf(me); ok {
 		out.Subscribed, out.Endpoint = true, sub.Endpoint
 	}

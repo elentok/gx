@@ -5,25 +5,19 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/tickets"
 )
 
-type recordedPush struct {
-	title, body, path, tag string
-	urgent                 bool
-}
+type pushRecorder struct{ sent []notify.PushNote }
 
-type pushRecorder struct{ sent []recordedPush }
-
-func (r *pushRecorder) SendPush(title, body, path, tag string, urgent bool) {
-	r.sent = append(r.sent, recordedPush{title, body, path, tag, urgent})
-}
+func (r *pushRecorder) Send(n notify.PushNote) { r.sent = append(r.sent, n) }
 
 func TestWriterPush_ConflictChildPauseSendsOnePush(t *testing.T) {
 	t.Parallel()
 	rec := &pushRecorder{}
-	w := retroServer(t.TempDir()) // no Chat: the push does not need it
-	w.d.Push = rec
+	w := retroServer(t.TempDir())
+	w.d.Chat = notify.NewServerChat(notify.ServerChatConfig{Push: rec})
 	parentPath := filepath.Join(t.TempDir(), "epic-a", "issues", "01-first.md")
 	sink := w.FinishSink(tickets.Address{Project: "proj", Epic: "epic-a", ID: "01"}, parentPath)
 
@@ -37,7 +31,7 @@ func TestWriterPush_ConflictChildPauseSendsOnePush(t *testing.T) {
 		t.Fatalf("pushes = %+v, want one for the child", rec.sent)
 	}
 	got := rec.sent[0]
-	if got.tag != "ticket:proj:epic-a/01a" || got.path != "/t/proj:epic-a/01a" || got.urgent || got.body != "boom" {
+	if got.Tag != "" || got.Target.Tag(got.Kind) != "ticket:proj:epic-a/01a" || got.Target.Path() != "/t/proj:epic-a/01a" || got.Urgent || got.Body != "boom" {
 		t.Errorf("push = %+v, want the child's tag and path, normal urgency", got)
 	}
 }

@@ -38,6 +38,8 @@ type ServerChatConfig struct {
 	Policy ChannelPolicy
 	// Desktop is the OS banner channel. Nil shows none. A seam like Policy.
 	Desktop Desktop
+	// Push is the Web Push channel. Nil sends none. A seam like Policy.
+	Push Push
 }
 
 // Quieter is the predicate that silences chat.
@@ -191,7 +193,11 @@ func (c *ServerChat) pause(catalog, project string, override *ServerChatConfig, 
 		return
 	}
 	msg := ticketPauseMessage(project, epic, ticketPath, identifier, status, reason).as(catalog)
-	c.show(msg, ticketTarget(project, epic, identifier))
+	target := ticketTarget(project, epic, identifier)
+	if catalog == notifykind.EpicPaused {
+		target = ticketTarget(project, epic, "")
+	}
+	c.show(msg, target)
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, ticketPath, identifier)
 	}
@@ -266,7 +272,11 @@ func (c *ServerChat) Escalated(project string, override *ServerChatConfig, epic,
 		source = epicSource(project + "/" + epic)
 	}
 	msg := escalatedMessage(project, epic, ticketPath, identifier, failure).as(notifykind.PausedTicket)
-	c.show(msg, ticketTarget(project, epic, identifier))
+	target := ticketTarget(project, epic, identifier)
+	if ticketPath == "" {
+		target = ticketTarget(project, epic, "")
+	}
+	c.showUrgent(msg, target, true)
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, source, identifier)
 	}

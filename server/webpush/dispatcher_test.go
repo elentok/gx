@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -172,6 +173,46 @@ func TestDispatcher_PushNowSkipsTheMerge(t *testing.T) {
 	if got := f.next(t).msg.Title; got != "now" {
 		t.Fatalf("title = %q", got)
 	}
+}
+
+// An event held for the merge delay is dropped when the switch goes off before
+// it fires; one event reaches every device while the switch is on.
+func TestDispatcher_SwitchIsCheckedAfterTheMergeHold(t *testing.T) {
+	f := newDisp(t, "a", "b", "c")
+	var off atomic.Bool
+	asked := make(chan struct{}, 8)
+	f.d.On = func() bool {
+		asked <- struct{}{}
+		return !off.Load()
+	}
+	await := func() {
+		t.Helper()
+		select {
+		case <-asked:
+		case <-time.After(waitFor):
+			t.Fatal("the dispatcher never asked the switch")
+		}
+	}
+
+	f.d.Push(Event{Title: "on", Tag: "x"})
+	got := map[string]bool{}
+	for range 3 {
+		got[f.next(t).sub.Endpoint] = true
+	}
+	await()
+	if len(got) != 3 {
+		t.Fatalf("one event reached %d devices, want 3", len(got))
+	}
+
+	// The switch goes off while the event is held; it fires, asks, and is dropped.
+	f.d.Merge = 200 * time.Millisecond
+	f.d.Push(Event{Title: "held", Tag: "y"})
+	off.Store(true)
+	await()
+	f.none(t)
+	f.d.PushNow(Event{Title: "now", Tag: "z"})
+	await()
+	f.none(t)
 }
 
 func TestDispatcher_ABlockedDeviceDoesNotHoldBackAnother(t *testing.T) {

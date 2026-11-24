@@ -50,7 +50,6 @@ func newManager(s *Server) *sessions.Manager {
 			TicketStore: s.cfg.TicketStore, Env: s.cfg.Env, Holder: s.cfg.Holder,
 			Notifier: s.cfg.Notifier, Player: s.cfg.Player,
 			SessionBannerDelay: s.cfg.SessionBannerDelay, SessionExitCleanupDelay: s.cfg.SessionExitCleanupDelay,
-			Push: bannerPush(s),
 		},
 		Log:      s.log,
 		Events:   s.events,

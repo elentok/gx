@@ -32,6 +32,9 @@ type Dispatcher struct {
 	Subs  Subs
 	Send  SendFunc
 	Badge func() int
+	// On is the server-wide switch, asked after the merge hold so an event held
+	// while it goes off is dropped. Nil means on. TestPush ignores it.
+	On    func() bool
 	Merge time.Duration // zero means one second
 	Log   *slog.Logger
 
@@ -127,6 +130,9 @@ func (d *Dispatcher) Close() {
 }
 
 func (d *Dispatcher) fanOut(ev Event) {
+	if d.On != nil && !d.On() {
+		return
+	}
 	targets := d.Subs.PushTargets()
 	badge := d.Badge()
 	var wg sync.WaitGroup
