@@ -271,8 +271,9 @@ function ChatDraftForm({
             fontSize="lg"
             fontWeight="600"
             borderRadius="6px"
+            textOverflow="ellipsis"
             _placeholder={{ color: "text.dim" }}
-            _focus={{ bg: "surface.raised", outline: "none" }}
+            _focus={{ bg: "surface.raised", outline: "none", textOverflow: "clip" }}
           />
           <chakra.button
             type="button"

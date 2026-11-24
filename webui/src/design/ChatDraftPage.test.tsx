@@ -239,6 +239,11 @@ test("the settings and the brief render and Start is enabled", async () => {
   expect(startButton().disabled).toBe(false)
 })
 
+test("a long Name ends in an ellipsis instead of a hard clip", async () => {
+  await mountOpen(fakeDrafts())
+  expect(getComputedStyle(control("Name")).textOverflow).toBe("ellipsis")
+})
+
 test("only tiers with a resolved model are offered as models", async () => {
   await mountOpen(fakeDrafts())
   const values = Array.from((control("Model") as HTMLSelectElement).options).map((o) => o.value)
