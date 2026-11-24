@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/settings"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -136,5 +138,102 @@ func TestDesktop_NoWebListenerMeansNoLink(t *testing.T) {
 	(&desktopAdapter{s: s, webURL: func() string { return "" }}).Show(notify.DesktopNote{Kind: notifykind.Disk, Target: notify.Target{Epic: "p:e"}})
 	if got := banners.all(); len(got) != 1 || got[0].Link != "" {
 		t.Errorf("banners = %+v, want one with no Link", got)
+	}
+}
+
+func webToastServer(t *testing.T, ch settings.NotifyChannel) *Server {
+	t.Helper()
+	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(stateDir) })
+	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: t.TempDir(),
+		Settings: Settings{NotifyChannels: settings.NotifyChannels{WebToast: ch}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.chat.Close() })
+	return s
+}
+
+func sendServerStarted(s *Server) {
+	s.chat.Notice(notify.ServerNotice{Kind: NoticeServerStarted, Emoji: "🚀", Title: "server started", Detail: "Build x"})
+}
+
+func TestWebToast_CheckedKindReachesEveryOpenPageAndNoLaterPage(t *testing.T) {
+	t.Parallel()
+	s := webToastServer(t, settings.NotifyChannel{Kinds: []string{notifykind.ServerStarted}})
+	var chans []<-chan wire.Event
+	for range 2 {
+		ch, cancel, err := s.events.Subscribe(s.events.CurrentSeq())
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(cancel)
+		chans = append(chans, ch)
+	}
+	sendServerStarted(s)
+	for i, ch := range chans {
+		var ev wire.Event
+		select {
+		case ev = <-ch:
+		default:
+			t.Fatalf("subscriber %d got no event", i)
+		}
+		if ev.Type != wire.EventNotificationToast || ev.Title == "" || ev.Body == "" || ev.Path != "/" || ev.Address != "" {
+			t.Fatalf("subscriber %d event = %+v", i, ev)
+		}
+		raw, err := json.Marshal(ev)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var fields map[string]any
+		if err := json.Unmarshal(raw, &fields); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := fields["address"]; ok {
+			t.Fatalf("event JSON has an address: %s", raw)
+		}
+		for _, k := range []string{"title", "body", "path"} {
+			if _, ok := fields[k]; !ok {
+				t.Fatalf("event JSON lacks %q: %s", k, raw)
+			}
+		}
+	}
+	late, cancel, err := s.events.Subscribe(s.events.CurrentSeq())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(cancel)
+	select {
+	case ev := <-late:
+		t.Fatalf("a later subscriber got %+v", ev)
+	default:
+	}
+}
+
+func TestWebToast_SwitchOffOrKindUncheckedPublishesNothing(t *testing.T) {
+	t.Parallel()
+	cases := map[string]settings.NotifyChannel{
+		"switch off":     {Off: true, Kinds: []string{notifykind.ServerStarted}},
+		"kind unchecked": {Kinds: []string{notifykind.Disk}},
+	}
+	for name, ch := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			s := webToastServer(t, ch)
+			sub, cancel, err := s.events.Subscribe(s.events.CurrentSeq())
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(cancel)
+			sendServerStarted(s)
+			select {
+			case ev := <-sub:
+				t.Fatalf("got %+v", ev)
+			default:
+			}
+		})
 	}
 }

@@ -23,6 +23,15 @@ function isRoutePath(path: unknown): path is string {
   )
 }
 
+// Returns a function that navigates to path, or undefined when path is not a route path.
+export function routeOpener(path: unknown): (() => void) | undefined {
+  if (!isRoutePath(path)) return undefined
+  return () => {
+    if (router) void router.navigate(path)
+    else window.location.hash = `#${path}`
+  }
+}
+
 function onMessage(event: MessageEvent) {
   const data = event.data as { type?: unknown; path?: unknown } | null
   if (data?.type !== TAP_MESSAGE || !isRoutePath(data.path)) return

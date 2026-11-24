@@ -13,6 +13,10 @@ type Event struct {
 	Kind string `json:"kind,omitempty"`
 	// Client names the TUI an event is for, by its event-stream client id.
 	Client string `json:"client,omitempty"`
+	// Set only by EventNotificationToast; Path is a web route, not an Address.
+	Title string `json:"title,omitempty"`
+	Body  string `json:"body,omitempty"`
+	Path  string `json:"path,omitempty"`
 }
 
 // EventTicketChanged is emitted once per ticket whose indexed state changed

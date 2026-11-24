@@ -18,6 +18,7 @@ import { RestScreen } from "./RestScreen"
 import { createAppRouter } from "./routes"
 import { trackRouter } from "./routeSpans"
 import { NodeMissingToast } from "./NodeMissingToast"
+import { NotificationToast } from "./NotificationToast"
 import { RestWarningToast } from "./RestWarningToast"
 import { SkillsProblemToast } from "./SkillsProblemToast"
 import type { FetchDetail } from "./ticket/detail"
@@ -61,6 +62,7 @@ export function App({ deps, fetchDetail }: { deps?: ConnectionDeps; fetchDetail?
       <SkillsProblemToast />
       <NodeMissingToast />
       <RestWarningToast />
+      <NotificationToast />
     </ConnectionContext.Provider>
   )
 }

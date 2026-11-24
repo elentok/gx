@@ -245,6 +245,8 @@ const (
 	// EventReload tells every open page to reload: the UI served switched
 	// between Vite and the built files.
 	EventReload = "reload"
+	// EventNotificationToast asks every open page to show a toast (Title, Body, Path).
+	EventNotificationToast = "notification-toast"
 )
 
 // EventSessionChatChanged announces that a working session's transcript grew

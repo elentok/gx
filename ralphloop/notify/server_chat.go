@@ -40,6 +40,8 @@ type ServerChatConfig struct {
 	Desktop Desktop
 	// Push is the Web Push channel. Nil sends none. A seam like Policy.
 	Push Push
+	// WebToast is the open-page toast channel. Nil shows none. A seam like Policy.
+	WebToast WebToast
 }
 
 // Quieter is the predicate that silences chat.

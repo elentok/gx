@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/webpush"
+	"github.com/elentok/gx/server/wire"
 )
 
 // desktopAdapter is the Desktop channel of the router. The switch is a
@@ -46,4 +47,20 @@ func (d *desktopAdapter) Show(n notify.DesktopNote) {
 	if n.Session && n.Sound != "" && cur.AgentsSounds.Enabled {
 		d.s.cfg.Player.Play(context.Background(), cur.AgentsSounds, n.Sound)
 	}
+}
+
+// webToastAdapter is the Web toast channel of the router: the switch and the
+// kind list apply here. Nothing is stored, so a page that is not open misses
+// the toast. s is set once the Server exists.
+type webToastAdapter struct{ s *Server }
+
+func (w *webToastAdapter) Show(n notify.WebToastNote) {
+	if w.s == nil {
+		return
+	}
+	cur := w.s.settings.Load()
+	if cur == nil || !cur.NotifyChannels.WebToast.Enabled() || !slices.Contains(cur.NotifyChannels.WebToast.KindIDs(), n.Kind) {
+		return
+	}
+	w.s.events.PublishEvent(wire.Event{Type: wire.EventNotificationToast, Title: n.Title, Body: n.Body, Path: n.Target.Path()})
 }

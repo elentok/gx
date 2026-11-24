@@ -62,6 +62,7 @@ func (c *ServerChat) showUrgent(msg chatMessage, target Target, urgent bool) {
 	title, body := pushText(msg)
 	c.Desktop(DesktopNote{Kind: msg.catalog, Title: title, Body: body, Target: target})
 	c.Push(PushNote{Kind: msg.catalog, Title: title, Body: body, Target: target, Urgent: urgent})
+	c.WebToast(WebToastNote{Kind: msg.catalog, Title: title, Body: body, Target: target})
 }
 
 func ticketTarget(project, epic, identifier string) Target {

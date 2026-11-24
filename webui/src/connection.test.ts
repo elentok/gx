@@ -120,6 +120,18 @@ test("an event frame refetches the snapshot without reconnecting", async () => {
   conn.stop()
 })
 
+test("an event listener gets the parsed data as its third argument", async () => {
+  const { conn, streams } = setup()
+  const got: unknown[] = []
+  conn.onEvent((address, type, data) => got.push([address, type, data]))
+  conn.start()
+  await vi.advanceTimersByTimeAsync(0)
+  streams[0].push('id: 2\nevent: notification-toast\ndata: {"title":"t","body":"b","path":"/"}\n\n')
+  await vi.advanceTimersByTimeAsync(0)
+  expect(got).toEqual([[undefined, "notification-toast", { title: "t", body: "b", path: "/" }]])
+  conn.stop()
+})
+
 test("a dev-changed event refetches the snapshot", async () => {
   const { conn, log, streams } = setup()
   conn.start()

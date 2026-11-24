@@ -44,7 +44,7 @@ func (c *ServerChat) Enabled() bool {
 // server registered the Desktop or Push adapter, which decide for themselves.
 // Call sites that skip work when nothing would be sent ask this.
 func (c *ServerChat) Active() bool {
-	return c != nil && (c.base.Desktop != nil || c.base.Push != nil || c.Enabled())
+	return c != nil && (c.base.Desktop != nil || c.base.Push != nil || c.base.WebToast != nil || c.Enabled())
 }
 
 // as returns msg tagged with its catalog id.

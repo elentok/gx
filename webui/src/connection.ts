@@ -58,14 +58,14 @@ async function openEventStream(url: string, signal: AbortSignal): Promise<AsyncI
   })()
 }
 
-function eventAddress(block: string): string | undefined {
+function eventData(block: string): Record<string, unknown> {
   const line = /^data: ?(.*)$/m.exec(block)?.[1]
-  if (!line) return undefined
+  if (!line) return {}
   try {
-    const address = JSON.parse(line).address
-    return typeof address === "string" && address !== "" ? address : undefined
+    const data: unknown = JSON.parse(line)
+    return data && typeof data === "object" ? (data as Record<string, unknown>) : {}
   } catch {
-    return undefined
+    return {}
   }
 }
 
@@ -78,7 +78,12 @@ function eventName(block: string): string {
   return /^event: ?(.*)$/m.exec(block)?.[1] ?? ""
 }
 
-export type EventListener = (address: string | undefined, type: string) => void
+/** `data` is the parsed event body; most listeners need only the address and type. */
+export type EventListener = (
+  address: string | undefined,
+  type: string,
+  data: Record<string, unknown>,
+) => void
 
 export type Connection = ReturnType<typeof createConnection>
 
@@ -226,7 +231,10 @@ export function createConnection(deps: ConnectionDeps = {}) {
         if (events.length > 0) void refresh(g)
         for (const b of events) {
           if (eventName(b) === RELOAD_EVENT) maybeReload(b)
-          for (const l of eventListeners) l(eventAddress(b), eventName(b))
+          const data = eventData(b)
+          const address =
+            typeof data.address === "string" && data.address !== "" ? data.address : undefined
+          for (const l of eventListeners) l(address, eventName(b), data)
         }
       }
       if (g === gen) fail()
@@ -265,7 +273,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
   // and tells page-data hooks to refetch.
   function resync() {
     void connect()
-    for (const l of eventListeners) l(undefined, RESYNC_EVENT)
+    for (const l of eventListeners) l(undefined, RESYNC_EVENT, {})
   }
 
   function onVisibility() {
