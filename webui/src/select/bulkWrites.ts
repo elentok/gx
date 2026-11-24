@@ -1,4 +1,4 @@
-import { realChatDrafts } from "../design/chatDrafts"
+import { realChatDrafts, type ChatDraftsClient } from "../design/chatDrafts"
 import { deleteDraft, type DeleteDraft } from "../design/drafts"
 import { postTargetsTo, rowToken } from "../design/open"
 import {
@@ -92,7 +92,7 @@ const removeChatDraft = (id: string) => realChatDrafts.remove(id)
 /** One draft Remove per row, reported as target results keyed by the row so one refusal does not hide the others. */
 export async function bulkRemoveDrafts(
   drafts: DraftTarget[],
-  remove: { design: DeleteDraft; chat: (id: string) => Promise<{ kind: string }> } = {
+  remove: { design: DeleteDraft; chat: ChatDraftsClient["remove"] } = {
     design: deleteDraft,
     chat: removeChatDraft,
   },

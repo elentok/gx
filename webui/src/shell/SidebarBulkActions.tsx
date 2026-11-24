@@ -1,11 +1,10 @@
 import { Box } from "@chakra-ui/react"
 import { useRef, useState, type MouseEvent } from "react"
 import { bulkRequest } from "../actions/bulkPlan"
+import { isDraftEmpty } from "../actions/draftEmpty"
 import { openConfirm, type ConfirmBody } from "../actions/confirmRequest"
-import { actionById, bulkConfirms } from "../actions/registry"
+import { bulkConfirms, bulkDecl } from "../actions/registry"
 import { useConnectionContext } from "../connection"
-import { readDraft } from "../design/drafts"
-import { realChatDrafts } from "../design/chatDrafts"
 import { TargetDone, TargetRefused, type SessionInfo, type TargetResult } from "../generated/server"
 import { isExited } from "../agents/sessionWrites"
 import {
@@ -46,21 +45,6 @@ const BUTTON_TONE: Partial<Record<SelectAction, Tone>> = {
   remove: "paused",
   archive: "paused",
   unarchive: "running",
-}
-
-/** Whether a draft has nothing to lose; a draft that cannot be read counts as not empty. */
-async function draftIsEmpty(d: DraftTarget): Promise<boolean> {
-  try {
-    if (d.chat) {
-      const res = await realChatDrafts.read(d.id)
-      return res.kind === "ok" && !res.draft.brief.trim() && res.draft.images.length === 0
-    }
-    const res = await readDraft(d.id)
-    const x = res.kind === "ok" ? res.draft : undefined
-    return !!x && !x.idea.trim() && !x.slug && x.images.length === 0
-  } catch {
-    return false
-  }
 }
 
 /** The actions of a select bar: each runs on the selected rows it fits. `shown` limits which actions the bar offers. */
@@ -147,9 +131,12 @@ export function SidebarBulkActions({
 
   /** The confirm of a bulk run: a popover on the clicked button, listing every row the run covers. */
   const request = (v: ActionView, anchor: HTMLElement, onConfirm: () => void) => {
-    const decl = actionById(v.action)
-    if (!decl) throw new Error(`no registry action ${v.action}`)
-    return bulkRequest(decl, v.fit.fits.map(sel.nameOf), { mode: "anchor", anchor }, onConfirm)
+    return bulkRequest(
+      bulkDecl(v.action),
+      v.fit.fits.map(sel.nameOf),
+      { mode: "anchor", anchor },
+      onConfirm,
+    )
   }
 
   // A dry run first: live sessions are the only thing worth a question.
@@ -228,14 +215,18 @@ export function SidebarBulkActions({
         ...(await bulkRemoveDrafts(drafts)),
       ]
       const empty = new Map(
-        await Promise.all(drafts.map(async (d) => [d.key, await draftIsEmpty(d)] as const)),
+        await Promise.all(
+          drafts.map(
+            async (d) =>
+              [d.key, await isDraftEmpty(d.chat ? "chat-draft" : "design-draft", d.id)] as const,
+          ),
+        ),
       )
       const entities = keys.flatMap((k) => {
         const r = rowOf(k)
         return r ? [{ ...entityOfRow(r, sel.nameOf(k)), draftEmpty: empty.get(k) }] : []
       })
-      const decl = actionById(v.action)
-      if (!decl || !bulkConfirms(decl, entities)) return write()
+      if (!bulkConfirms(bulkDecl(v.action), entities)) return write()
       const live = sessions.filter((s) => !isExited(s))
       const req = request(v, anchor, () => void run(v, write))
       openConfirm({

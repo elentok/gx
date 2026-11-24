@@ -50,7 +50,7 @@ const FIXTURES: Record<string, Entity> = {
 const APP_CHORDS = ["c", "C", "d", "s", "b", "h"]
 
 /** Every structural invariant, as the list of violations it finds. */
-function violations(actions: ActionDecl[]): string[] {
+function violations(actions: readonly ActionDecl[]): string[] {
   const out: string[] = []
   const dup = (what: string, keys: string[]) => {
     for (const k of keys.filter((x, i) => keys.indexOf(x) !== i)) out.push(`duplicate ${what} ${k}`)

@@ -87,7 +87,7 @@ const confirmWhen = (rule: (e: Entity) => boolean): ConfirmDecl => ({ rule })
 const confirmAlways = confirmWhen(always)
 const confirmNever = confirmWhen(never)
 
-export const ACTIONS: ActionDecl[] = [
+export const ACTIONS = [
   {
     id: "open-design-epic",
     label: "Open design epic",
@@ -280,10 +280,13 @@ export const ACTIONS: ActionDecl[] = [
     available: never,
     confirm: confirmNever,
   },
-]
+] as const satisfies readonly ActionDecl[]
+
+/** The ids of the actions that declare a bulk rule: the bar's buttons. */
+export type BulkId = Extract<(typeof ACTIONS)[number], { bulk: BulkRule }>["id"]
 
 /** The chord letters of the entity actions, one per action; the pair Archive and Unarchive shares `a`. */
-export const chordLetters = (actions: ActionDecl[] = ACTIONS): string[] => [
+export const chordLetters = (actions: readonly ActionDecl[] = ACTIONS): string[] => [
   ...new Set(actions.flatMap((a) => (a.chord ? [a.chord] : []))),
 ]
 
@@ -291,12 +294,19 @@ const rank = (a: ActionDecl) =>
   a.menu === false ? -1 : GROUP_ORDER.indexOf(a.group) * 1000 + a.order
 
 /** Every menu action available for the entity, by group then order. Footer-only actions are left out. */
-export function menuActions(e: Entity, actions: ActionDecl[] = ACTIONS): ActionDecl[] {
+export function menuActions(e: Entity, actions: readonly ActionDecl[] = ACTIONS): ActionDecl[] {
   return actions.filter((a) => a.menu !== false && a.available(e)).sort((a, b) => rank(a) - rank(b))
 }
 
-export const actionById = (id: string, actions: ActionDecl[] = ACTIONS) =>
+export const actionById = (id: string, actions: readonly ActionDecl[] = ACTIONS) =>
   actions.find((a) => a.id === id)
+
+/** The declaration of a bar action. The ids are static, so a miss is a bug and throws. */
+export function bulkDecl(id: BulkId): ActionDecl {
+  const decl = actionById(id)
+  if (!decl) throw new Error(`no registry action ${id}`)
+  return decl
+}
 
 export interface BulkFit {
   fits: string[]
@@ -315,7 +325,7 @@ export function bulkFit(a: ActionDecl, selected: Entity[]): BulkFit {
 }
 
 export interface BulkView {
-  id: string
+  id: BulkId
   /** "Hold 2 of 5", or "Hold 2" when every selected entity fits. */
   label: string
   fit: BulkFit
@@ -330,13 +340,13 @@ export function bulkLabel(a: ActionDecl, fit: BulkFit): string {
 }
 
 /** The bar's actions in registry order, each with a count label, and none that fits no selected entity. */
-export function bulkBar(selected: Entity[], actions: ActionDecl[] = ACTIONS): BulkView[] {
+export function bulkBar(selected: Entity[], actions: readonly ActionDecl[] = ACTIONS): BulkView[] {
   return actions
     .filter((a) => a.bulk)
     .sort((a, b) => rank(a) - rank(b))
     .map((a) => {
       const fit = bulkFit(a, selected)
-      return { id: a.id, label: bulkLabel(a, fit), fit }
+      return { id: a.id as BulkId, label: bulkLabel(a, fit), fit }
     })
     .filter((v) => v.fit.fits.length > 0)
 }

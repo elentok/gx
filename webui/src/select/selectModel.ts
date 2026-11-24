@@ -10,10 +10,10 @@ import {
 } from "../generated/server"
 import { canManage } from "../agents/sessionWrites"
 import { agentKindOf, type Entity } from "../actions/entity"
-import { actionById, bulkBar, bulkFit, bulkLabel } from "../actions/registry"
+import { bulkBar, bulkDecl, bulkFit, bulkLabel, type BulkId } from "../actions/registry"
 
 /** A registry action id: the bar's buttons are the registry actions that declare a bulk rule. */
-export type SelectAction = "move" | "hold" | "unhold" | "stop" | "remove" | "archive" | "unarchive"
+export type SelectAction = BulkId
 
 /** One row of a select area, as the fit rules see it. The components build these from their own row data. */
 export interface SelectRow {
@@ -176,14 +176,12 @@ export function selectedEntities(
 }
 
 export function fitOf(action: SelectAction, s: SelectState, rows: SelectRow[]): Fit {
-  const decl = actionById(action)
-  return decl ? bulkFit(decl, selectedEntities(s, rows)) : { fits: [], skipped: [] }
+  return bulkFit(bulkDecl(action), selectedEntities(s, rows))
 }
 
 /** "Archive 2 of 6", or "Archive 2" when every selected row fits. */
 export function countLabel(action: SelectAction, f: Fit): string {
-  const decl = actionById(action)
-  return decl ? bulkLabel(decl, f) : ""
+  return bulkLabel(bulkDecl(action), f)
 }
 
 /** The tooltip lines: one "name: reason" per skipped row. */
@@ -200,7 +198,7 @@ export interface ActionView {
 /** The actions to show, in registry order: each with its label, and none that fits no selected row. */
 export function visibleActions(s: SelectState, rows: SelectRow[]): ActionView[] {
   return bulkBar(selectedEntities(s, rows)).map((v) => ({
-    action: v.id as SelectAction,
+    action: v.id,
     label: v.label,
     fit: v.fit,
   }))

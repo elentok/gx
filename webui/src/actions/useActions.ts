@@ -8,6 +8,7 @@ import {
 import { forgetLast } from "../agents/lastAgent"
 import { postRemoveSession, removeSession, type RemoveSession } from "../agents/sessionWrites"
 import { copyText } from "../clipboard"
+import { isDraftEmpty } from "./draftEmpty"
 import { realChatDrafts, type ChatDraftsClient } from "../design/chatDrafts"
 import {
   deleteDraft as postDeleteDraft,
@@ -287,17 +288,8 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
           onConfirm: del,
         })
       const decide = async () => {
-        let empty = e.draftEmpty
-        if (empty === undefined) {
-          if (chatDraft) {
-            const res = await w.readChatDraft(id).catch(() => undefined)
-            empty = res?.kind === "ok" && !res.draft.brief.trim() && res.draft.images.length === 0
-          } else {
-            const res = await w.readDraft(id).catch(() => undefined)
-            const d = res?.kind === "ok" ? res.draft : undefined
-            empty = !!d && !d.idea.trim() && !d.slug && d.images.length === 0
-          }
-        }
+        const empty =
+          e.draftEmpty ?? (await isDraftEmpty(chatDraft ? "chat-draft" : "design-draft", id, w))
         if (empty) del()
         else askDraft()
       }

@@ -18,9 +18,11 @@ import {
   toggle,
   toggleGroup,
   visibleActions,
+  type SelectAction,
   type SelectRow,
   type SelectState,
 } from "./selectModel"
+import { ACTIONS } from "../actions/registry"
 import {
   CardKindDesign,
   CardKindImplementation,
@@ -237,6 +239,30 @@ describe("labels", () => {
     expect(skipLines(fitOf("archive", on("a", "c"), rows), (k) => k.toUpperCase())).toEqual([
       "C: can't be archived",
     ])
+  })
+})
+
+describe("bar ids", () => {
+  it("fails loudly on an id the registry does not know", () => {
+    expect(() => fitOf("nope" as SelectAction, on("a"), [r("a")])).toThrow(
+      /no registry action nope/,
+    )
+    expect(() => countLabel("nope" as SelectAction, { fits: [], skipped: [] })).toThrow(
+      /no registry action nope/,
+    )
+  })
+
+  it("offers exactly the registry's bulk actions", () => {
+    const all = [
+      r("e"),
+      r("d", { kind: "draft" }),
+      r("c", { kind: "chat", session: session("c", "p") }),
+      r("a", { kind: "archived" }),
+    ]
+    const ids = visibleActions(on("e", "d", "c", "a"), all).map((v) => v.action)
+    const bulk = ACTIONS.filter((a) => "bulk" in a).map((a) => a.id)
+    expect(ids.every((id) => (bulk as string[]).includes(id))).toBe(true)
+    expect(new Set(ids).size).toBe(ids.length)
   })
 })
 

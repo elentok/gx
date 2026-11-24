@@ -17,8 +17,7 @@ import {
   type SurfaceContext,
 } from "./confirmRequest"
 import type { Entity } from "./entity"
-import { actionById } from "./registry"
-import { planBulk } from "./bulkPlan"
+import { isDraftEmpty } from "./draftEmpty"
 import { useActions, type ActionContext, type ActionWriters } from "./useActions"
 
 const { openRename, openModelPicker, showToast, removeToast, forgetLast } = vi.hoisted(() => ({
@@ -428,37 +427,27 @@ test("an action is disabled while a write runs, and a refusal toasts as useWrite
   expect(hook.result.current.get("archive")?.disabled).toBe(false)
 })
 
-const rows = (...over: Partial<Entity>[]): Entity[] =>
-  over.map((o, i) => ({ kind: "epic", key: `p:e${i}`, name: `E${i}`, ...o }))
-
-test("the bulk plan labels the fit, lists skips and merges the confirm with the count", () => {
-  const hold = actionById("hold")!
-  const plan = planBulk(
-    hold,
-    rows({ liveSessions: 1 }, {}, { queued: true }, { held: true }, { kind: "chat" }),
-    modal,
-    vi.fn(),
-  )
-  expect(plan.label).toBe("Hold 2 of 5")
-  expect(plan.skipLines).toEqual(["E2: queued", "E3: already on hold", "E4: can't be held"])
-  // Hold's confirm is the server's (a dry run), so the plan adds none.
-  expect(plan.confirm).toBeUndefined()
-
-  const remove = actionById("remove")!
-  const drafts = (n: number, nonEmpty = 0): Entity[] =>
-    Array.from({ length: n }, (_, i) => ({
-      kind: "design-draft",
-      key: `w/d${i}`,
-      name: `D${i}`,
-      draftEmpty: i >= nonEmpty,
-    }))
-  expect(planBulk(remove, drafts(4), modal, vi.fn()).confirm).toBeUndefined()
-  const onConfirm = vi.fn()
-  const withOne = planBulk(remove, drafts(4, 1), modal, onConfirm)
-  expect(withOne.confirm).toMatchObject({ confirmLabel: "Remove 4" })
-  expect(withOne.confirm?.body.rows).toEqual(["D0", "D1", "D2", "D3"])
-  withOne.confirm?.onConfirm()
-  expect(onConfirm).toHaveBeenCalledWith(
-    expect.arrayContaining([expect.objectContaining({ key: "w/d0" })]),
-  )
+test("isDraftEmpty: an empty draft is empty, one with content or unreadable is not", async () => {
+  const ok = (draft: object) => async () => ({ kind: "ok", draft }) as never
+  const readers = (design: object, chat: object) => ({
+    readDraft: vi.fn(ok(design)),
+    readChatDraft: vi.fn(ok(chat)),
+  })
+  const blankDesign = { idea: " ", slug: "", images: [] }
+  const blankChat = { brief: "", images: [] }
+  const empty = readers(blankDesign, blankChat)
+  expect(await isDraftEmpty("design-draft", "d1", empty)).toBe(true)
+  expect(await isDraftEmpty("chat-draft", "c1", empty)).toBe(true)
+  expect(empty.readDraft).toHaveBeenCalledWith("d1")
+  expect(empty.readChatDraft).toHaveBeenCalledWith("c1")
+  const full = readers({ ...blankDesign, idea: "x" }, { ...blankChat, brief: "x" })
+  expect(await isDraftEmpty("design-draft", "d1", full)).toBe(false)
+  expect(await isDraftEmpty("chat-draft", "c1", full)).toBe(false)
+  const broken = {
+    ...empty,
+    readDraft: vi.fn(async () => {
+      throw new Error("gone")
+    }),
+  }
+  expect(await isDraftEmpty("design-draft", "d1", broken)).toBe(false)
 })
