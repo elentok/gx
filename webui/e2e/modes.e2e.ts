@@ -103,8 +103,9 @@ test.describe("61. Page modes at 760px", () => {
     expect(wide.textOverflow).not.toBe("ellipsis")
     expect(wide.height).toBeGreaterThan(wide.lineHeight * 1.5)
 
-    // Each meta ends 16px short of its card's right edge, inside the 1px border.
-    for (const r of rows) expect(r.gap).toBeCloseTo(16, 0)
+    // Each meta ends 40px short of its card's right edge, inside the 1px border: every card
+    // reserves MENU_CLEARANCE (TicketCard.tsx) for its ⋯.
+    for (const r of rows) expect(r.gap).toBeCloseTo(40, 0)
   })
 
   // 760px is a tablet now, so the phone sheet is measured at 390px.
