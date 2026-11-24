@@ -146,7 +146,9 @@ test("the menu's Unarchive posts at once and navigates to the renamed active epi
     { target: "gx:blog-impl", status: "done", new_address: "gx:blog-impl-2" },
   ])
   const router = render("/archive/gx:blog-impl", detail())
-  fireEvent.click(await screen.findByRole("button", { name: "More actions" }))
+  await screen.findByTestId("archived-stamp")
+  const actions = screen.getByTestId("page-header-actions")
+  fireEvent.click(within(actions).getByRole("button", { name: "More actions" }))
   fireEvent.click(await screen.findByRole("menuitem", { name: "Unarchive" }))
   await waitFor(() => expect(router.state.location.pathname).toBe("/e/gx:blog-impl-2"))
   expect(bulkUnarchive).toHaveBeenCalledWith(["gx:blog-impl"])

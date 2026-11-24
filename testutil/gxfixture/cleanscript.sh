@@ -8,4 +8,4 @@ fail)
 	exit 1
 	;;
 esac
-printf '%s\n' "$want" > "$dir/free.tmp" && mv "$dir/free.tmp" "$dir/free"
+printf '%s\n' "$want" >"$dir/free.tmp" && mv "$dir/free.tmp" "$dir/free"
