@@ -146,6 +146,40 @@ func TestSettingsScenario(t *testing.T) {
 	}
 }
 
+// A fixture is a new install (marked); `--config notification-kinds-migrated=null`
+// drops the marker so the server loads the config as an upgrade.
+func TestWriteConfig_KindsMarkerIsSetUnlessOverriddenToNull(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		overrides []string
+		marked    bool
+	}{
+		"default":  {nil, true},
+		"null":     {[]string{"notification-kinds-migrated=null"}, false},
+		"explicit": {[]string{"notification-kinds-migrated=false"}, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := &fixture{root: t.TempDir()}
+			if err := f.writeConfig(1234, 0, tc.overrides); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := os.ReadFile(filepath.Join(f.root, "home", ".config", "gx", "config.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var cfg map[string]any
+			if err := json.Unmarshal(raw, &cfg); err != nil {
+				t.Fatal(err)
+			}
+			_, has := cfg["notification-kinds-migrated"]
+			if has != tc.marked {
+				t.Errorf("marker present = %v, want %v: %s", has, tc.marked, raw)
+			}
+		})
+	}
+}
+
 func TestSettingsScenario_CodexOnPathUnlessHidden(t *testing.T) {
 	t.Parallel()
 	with := start(t, "settings")

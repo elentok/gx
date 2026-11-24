@@ -144,6 +144,41 @@ func TestMigrateNotificationKindsLoadWritesOnceAndNewInstallWritesNothing(t *tes
 	}
 }
 
+// Story 39: a marked config keeps the list it holds when the registry default
+// moves on. The stored list stands in for an older default: it differs from
+// today's.
+func TestMigrateNotificationKindsMarkedConfigIgnoresALaterDefault(t *testing.T) {
+	path := useConfigDir(t)
+	stale := notifykind.DefaultIDs()[1:]
+	in, err := json.Marshal(map[string]any{
+		NotificationKindsMarkerKey: true,
+		"notification-channels": map[string]any{
+			"push": map[string]any{"kinds": stale},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, in, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := cfg.NotificationChannels.Push.Kinds; !slices.Equal(got, stale) || slices.Equal(got, notifykind.DefaultIDs()) {
+		t.Errorf("push = %v, want the stored list %v", got, stale)
+	}
+	after, _ := os.ReadFile(path)
+	if string(after) != string(in) {
+		t.Errorf("a marked file was rewritten:\n%s\n%s", in, after)
+	}
+}
+
 func TestMigrateNotificationKindsFailedWriteStillReturnsUpgradeLists(t *testing.T) {
 	path := useConfigDir(t)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

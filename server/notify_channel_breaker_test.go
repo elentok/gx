@@ -183,3 +183,46 @@ func TestChannelBreaker_NoticeShowsTheConfiguredClearTime(t *testing.T) {
 		t.Fatalf("default notice = %q, want 5m0s", got)
 	}
 }
+
+// Story 13: a person's manual mute of Slack stops Slack only.
+func TestChannelBreaker_ManualSlackMuteLeavesTheOtherChannelsSending(t *testing.T) {
+	t.Parallel()
+	r := newBreakerRig(t, time.Now)
+	r.s.chat.SessionAlert("p", nil, "name", "done", "body", true)
+	eventually(t, "the first Slack post", func() bool { return r.posts.Load() == 1 })
+
+	// The Slack key is the destination's; the other series are named by channel.
+	channels := map[string]bool{"desktop": true, "web-toast": true, "push": true}
+	if err := notify.UpdateNotificationState(r.s.cfg.Chat.GateStatePath, func(s *notify.NotificationState) {
+		for key, ts := range s.Transports {
+			if !channels[key] {
+				ts.Muted, ts.Reason = true, "manual-disable"
+				s.Transports[key] = ts
+			}
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	r.s.chat.SessionAlert("p", nil, "name", "done again", "body", true)
+	r.desktop(1)
+	r.s.chat.Push(notify.PushNote{Kind: notifykind.BudgetAndUsage, Title: "push"})
+	_, cancel, err := r.s.events.Subscribe(r.s.events.CurrentSeq())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(cancel)
+	r.s.chat.WebToast(notify.WebToastNote{Kind: notifykind.BudgetAndUsage, Title: "toast"})
+
+	eventually(t, "a push", func() bool { return r.hits.Load() == 1 })
+	if got := r.banners.n.Load(); got != 1 {
+		t.Errorf("banners = %d, want 1", got)
+	}
+	if got := len(r.series(t, "web-toast").Sends); got != 1 {
+		t.Errorf("web toast sends = %d, want 1", got)
+	}
+	<-time.After(100 * time.Millisecond) // longer than the flush interval: a Slack post would have gone out by now
+	if got := r.posts.Load(); got != 1 {
+		t.Errorf("slack posts = %d, want 1 (muted)", got)
+	}
+}
