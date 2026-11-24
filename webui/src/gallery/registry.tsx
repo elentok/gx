@@ -5,6 +5,7 @@ import { PageIcon } from "../page/PageIcon"
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router"
 import canned from "../canned-snapshot.json"
 import { authEntries } from "./authEntries"
+import { confirmEntries } from "./confirmEntries"
 import { designFooterEntries } from "./designFooterEntries"
 import { questionEntries } from "./questionEntries"
 import { shellEntries } from "./shellEntries"
@@ -1801,5 +1802,6 @@ export const galleryEntries: GalleryEntry[] = [
   },
   ...authEntries,
   ...shellEntries,
+  ...confirmEntries,
   ...designFooterEntries,
 ]

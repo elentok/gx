@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router"
 import { afterEach, describe, expect, test, vi } from "vitest"
+import { closeConfirm, openConfirm } from "../actions/confirmRequest"
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection"
 import { PageHeader } from "../page/PageHeader"
 import { renderThemed } from "../ui/render"
@@ -11,7 +12,26 @@ import { EDGE_PX, NO_SIDEBAR_SWIPE_ATTR } from "./useSidebarSwipe"
 
 afterEach(() => {
   closeNewItem()
+  closeConfirm()
   cleanup()
+})
+
+test("the shared confirm host is mounted: a request renders one modal", () => {
+  setup("desktop")
+  act(() =>
+    openConfirm({
+      actionId: "remove",
+      entityName: "gx bugs",
+      group: "danger",
+      confirmLabel: "Remove",
+      dismissLabel: "Cancel",
+      title: "Remove gx bugs",
+      body: { lines: ["Gone."] },
+      surface: { mode: "modal" },
+      onConfirm: () => {},
+    }),
+  )
+  expect(screen.getAllByRole("dialog", { name: "Remove gx bugs" })).toHaveLength(1)
 })
 
 let setState: (patch: Partial<ConnectionState>) => void

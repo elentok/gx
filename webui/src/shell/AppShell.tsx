@@ -21,6 +21,7 @@ import { JumpPalette } from "./JumpPalette"
 import { setJumpOpen } from "./jumpOpen"
 import { MascotToggle } from "./MascotToggle"
 import { NewItemHost } from "./NewItemHost"
+import { ConfirmHost } from "./ConfirmHost"
 import { RemoveConfirmHost } from "./RemoveConfirmHost"
 import { ModelPickerHost } from "./ModelPickerHost"
 import { RenameHost } from "./RenameHost"
@@ -376,6 +377,7 @@ export function AppShell({
         <CommandPalette />
         <NewItemHost />
         <RemoveConfirmHost />
+        <ConfirmHost />
         <RenameHost />
         <ModelPickerHost />
         <ChordHost />

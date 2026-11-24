@@ -1,5 +1,6 @@
 import { Box, Heading } from "@chakra-ui/react"
 import type { ReactNode } from "react"
+import { MAIN_HEADING_ATTR } from "../shell/focusMainHeading"
 import { MascotToggle } from "../shell/MascotToggle"
 import { useShell } from "../shell/ShellContext"
 import { useWide } from "../useWide"
@@ -38,6 +39,9 @@ export function PageHeader({
   const h1 = (
     <Heading
       as="h1"
+      {...{ [MAIN_HEADING_ATTR]: "" }}
+      tabIndex={-1}
+      outline="none"
       fontFamily="inherit"
       fontWeight="600"
       fontSize="19px"

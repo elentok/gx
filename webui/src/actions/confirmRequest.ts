@@ -1,4 +1,5 @@
 import { createExternalStore } from "../shell/externalStore"
+import type { Refusable } from "../useWrite"
 import type { ConfirmContent, Group } from "./registry"
 
 /** Where an action started: a button or menu item anchors its popover; a chord or palette opens a modal. */
@@ -28,8 +29,19 @@ export interface ConfirmRequest {
   title: string
   body: ConfirmBody
   surface: SurfaceContext
+  /** Runs when the confirm opens (the Archive dry run); the confirm button stays off until it ends. */
+  prepare?: () => Promise<ConfirmBody | PrepareRefusal>
+  /** Set when the action removes the page the person is on: focus goes to the main heading of the page they land on. */
+  removesOpenPage?: boolean
+  /** Where focus goes when the anchor is gone; the host falls back to the page's ⋯ button. */
+  focusAfter?: () => HTMLElement | null
   /** Runs the write. An action with an input gets the typed text. */
   onConfirm: (input?: string) => void
+}
+
+/** A dry run the server refused: the confirm closes and the reason is toasted. */
+export interface PrepareRefusal extends Refusable {
+  refused: true
 }
 
 const store = createExternalStore<ConfirmRequest | null>(null)
