@@ -150,7 +150,7 @@ export function PushControls({
       <Text mt="3" fontSize="sm" color="text.muted">
         Push alerts for sessions that need you, on this device only.
       </Text>
-      <Card part="switch-card">
+      <Card part="account-device-switch">
         <Box {...rowProps} cursor="default" _hover={{}}>
           <Box flex="1" minW="0">
             <Text fontWeight="600">{SWITCH_LABEL}</Text>

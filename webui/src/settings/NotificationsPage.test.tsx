@@ -115,6 +115,13 @@ afterEach(() => {
 })
 
 describe("PushDevicePanel", () => {
+  it("marks the device switch card as the account-device-switch mock part", async () => {
+    const { findByRole } = renderPage()
+    const sw = await findByRole("switch", { name: "Notifications on this device" })
+    const card = sw.closest('[data-mock-part="account-device-switch"]')
+    expect(card?.textContent).toContain("Notifications on this device")
+  })
+
   it("never asks for permission on load, and asks exactly once on the switch tap", async () => {
     const { findByRole } = renderPage()
     const sw = await findByRole("switch", { name: "Notifications on this device" })
