@@ -1,9 +1,44 @@
-import { PNG } from "./agentsKit"
+import type { Page } from "@playwright/test"
+import { PNG, sessions } from "./agentsKit"
 import { draftPage } from "./draftKit"
 import { expect, nav, swipe, test } from "./fixture"
 
 // 375 px is below the wide layout's 62em breakpoint.
 test.use({ viewport: { width: 375, height: 812 } })
+
+/** The page's ⋯ is the last control of the heading's row, on the heading's line, flush with the row's right edge. */
+async function expectMoreAtRowEnd(page: Page, heading = page.locator("h1").first()) {
+  await page.setViewportSize({ width: 390, height: 844 })
+  // The title row is the nearest ancestor of the heading that holds the ⋯ (PageHeader and the draft header differ).
+  const rowEl = heading.locator("xpath=ancestor::*[.//button[@aria-label='More actions']][1]")
+  const more = rowEl.getByRole("button", nav("More actions"))
+  await expect(rowEl).toBeVisible()
+  await expect(more).toBeVisible()
+  // The row reflows on the next frame, so the measurement polls until it holds.
+  await expect
+    .poll(async () => {
+      const row = (await rowEl.boundingBox())!
+      const h = (await heading.boundingBox())!
+      const m = (await more.boundingBox())!
+      // Every other control of the row sits left of the ⋯.
+      const rightmostOther = await rowEl.evaluate((el) => {
+        const own = el.querySelector("button[aria-label='More actions']")!
+        const rights = [...el.querySelectorAll("button, a, input")]
+          .filter((c) => c !== own && !own.contains(c))
+          .map((c) => c.getBoundingClientRect().right)
+        return Math.max(0, ...rights)
+      })
+      return {
+        flush: Math.abs(m.x + m.width - (row.x + row.width)) <= 1,
+        lastControl: rightmostOther <= m.x + 1,
+        sameLine: m.y + m.height / 2 >= h.y && m.y + m.height / 2 <= h.y + h.height,
+        size: [m.width, m.height],
+        noScroll: await page.evaluate(() => document.documentElement.scrollWidth <= 390),
+      }
+    })
+    // A phone's ⋯ is a 40px circle (MoreActionsButton), not the mock's 28px.
+    .toEqual({ flush: true, lastControl: true, sameLine: true, size: [40, 40], noScroll: true })
+}
 
 // Phone 23 and 53a (the "united" scenario) live in jump.e2e.ts flow 22, which already pays the settle wait.
 test.describe("53. Phone, epic page", () => {
@@ -102,6 +137,63 @@ test.describe("53. Phone, epic page", () => {
     expect(question.y + question.height).toBeLessThanOrEqual(ab.y)
     expect(askMeta.x + 80).toBeCloseTo(question.x, 0)
     expect(ab.x).toBeCloseTo(question.x, 0)
+
+    // The Epic page's ⋯ ends its title row, right of the ring.
+    await page.evaluate(() => (location.hash = "#/e/demo:mixed-epic"))
+    await expectMoreAtRowEnd(page)
+
+    // A second start on `paused`:the ticket page of 08 has the same placement.
+    await start("paused")
+    await page.evaluate(() => (location.hash = "#/t/demo:paused-epic/08"))
+    await expectMoreAtRowEnd(page)
+
+    // Start over from the ⋯: at 390x500 with the reason focused the confirm is the bottom-placed dialog,
+    // and at 390x844 it is the popover anchored on the ⋯.
+    const more = page.getByTestId("page-header-actions").getByRole("button", nav("More actions"))
+    const confirm = page.getByRole("alertdialog", nav("Start over"))
+    const sheet = page.getByRole("dialog", nav("Start over"))
+    const openStartOver = async (surface: typeof confirm) => {
+      await more.click()
+      await page.getByRole("menuitem", nav("Start over")).click()
+      await expect(surface).toBeVisible()
+    }
+    await page.setViewportSize({ width: 390, height: 500 })
+    // The soft keyboard takes the lower half of the visual viewport; the placement is decided as the confirm opens.
+    await page.evaluate(() => {
+      const vv = window.visualViewport!
+      Object.defineProperty(vv, "height", { configurable: true, get: () => 250 })
+    })
+    await openStartOver(sheet)
+    // The dialog focuses Cancel first, so the reason field is focused by tapping it.
+    await sheet.getByRole("textbox", { name: "Reason" }).click()
+    await expect(sheet.getByRole("textbox", { name: "Reason" })).toBeFocused()
+    await expect(confirm).toHaveCount(0)
+    await expect
+      .poll(async () => {
+        const c = (await sheet.boundingBox())!
+        return [c.x, c.width, c.y + c.height]
+      })
+      // Full width, its bottom edge on the bottom of the visual viewport (the keyboard's top).
+      .toEqual([0, 390, 250])
+    await page.keyboard.press("Escape")
+    await expect(sheet).toHaveCount(0)
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.evaluate(() => {
+      Reflect.deleteProperty(window.visualViewport!, "height")
+    })
+    await openStartOver(confirm)
+    await expect(sheet).toHaveCount(0)
+    await expect
+      .poll(async () => {
+        const a = (await more.boundingBox())!
+        const c = (await confirm.boundingBox())!
+        const centre = a.x + a.width / 2
+        return Math.abs(c.y - (a.y + a.height)) < 60 && centre > c.x && centre < c.x + c.width
+      })
+      .toBe(true)
+    await page.keyboard.press("Escape")
+    await expect(confirm).toHaveCount(0)
   })
 })
 
@@ -178,6 +270,28 @@ test("41. Phone, Design draft page", async ({ page, start }) => {
   await expect(d.remove).toBeVisible()
   const [rm2, c2] = [(await d.remove.boundingBox())!, (await clip.boundingBox())!]
   expect(c2.x + c2.width).toBeLessThanOrEqual(rm2.x)
+
+  // The draft page's ⋯ ends its ring-less title row, right of History and Saved.
+  await expectMoreAtRowEnd(page)
+
+  // A second start on `chat-draft`: a chat draft page has the same placement.
+  const chatFx = await start("chat-draft")
+  const [chatDraft] = JSON.parse(await chatFx.cli("server", "snapshot", "--json")).chat_drafts as {
+    id: string
+  }[]
+  await page.evaluate((hash) => (location.hash = hash), `#/chat-drafts/${chatDraft!.id}`)
+  // The chat draft's name field is its heading.
+  await expectMoreAtRowEnd(page, page.getByRole("textbox", nav("Name")))
+
+  // A third start on `bulk-actions`: an archived epic's page.
+  const bulkFx = await start("bulk-actions")
+  await bulkFx.cli("server", "epics", "archive", "demo:bulk-merged")
+  const archived = JSON.parse(await bulkFx.cli("server", "epics", "archived", "--json")).epics as {
+    address: string
+  }[]
+  const address = archived.find((e) => e.address.endsWith("bulk-merged"))!.address
+  await page.evaluate((hash) => (location.hash = hash), `#/archive/${address}`)
+  await expectMoreAtRowEnd(page)
 })
 
 test("24. Phone, Design page", async ({ page, start }) => {
@@ -344,28 +458,15 @@ test("24. Phone, Design page", async ({ page, start }) => {
   await expect(page.getByLabel("Images")).toHaveCount(0)
   await expect(view).toBeVisible()
   await expect(more).toBeVisible()
-  await expect(view.locator("xpath=../..").getByRole("button", nav("More actions"))).toBeVisible()
-  // The tabs-row ⋯ is at the right end of that row.
-  const tabsRow = view.locator("xpath=../..")
-  const tabsBox = (await tabsRow.boundingBox())!
-  const tabsMore = (await more.boundingBox())!
-  expect(tabsMore.x + tabsMore.width).toBeGreaterThan(tabsBox.x + tabsBox.width - 24)
+  // With the keyboard up there is no title: the row is the View toggle's, and the ⋯ ends it.
+  await expectMoreAtRowEnd(page, view)
   await setViewport(0)
   await box.blur()
   await expect(title).toBeVisible()
   await expect(topBar).toBeVisible()
   await expect(more).toHaveCount(1)
-  // The title-row ⋯ is the last child of the header actions and the right-most item of the row.
-  const slot = page.getByTestId("page-header-actions")
-  await expect(slot).toBeVisible()
-  expect(
-    await slot.evaluate(
-      (el) => !!el.lastElementChild?.querySelector("button[aria-label='More actions']"),
-    ),
-  ).toBe(true)
-  const slotBox = (await slot.boundingBox())!
-  const moreBox = (await more.boundingBox())!
-  expect(moreBox.x + moreBox.width).toBeGreaterThanOrEqual(slotBox.x + slotBox.width - 1)
+  // The title-row ⋯ is the last control of the heading's row.
+  await expectMoreAtRowEnd(page)
 
   // The ⋯ menu holds Effort, Tier and the link to the design epic; the model is in the footer, without effort.
   await more.click()
@@ -402,4 +503,10 @@ test("24. Phone, Design page", async ({ page, start }) => {
   expect(await sheet.boundingBox()).toMatchObject({ x: 0, y: 0, width: 390, height: 844 })
   await sheet.getByRole("button", nav("Close")).click()
   await expect(sheet).toHaveCount(0)
+
+  // A second start on `workspaces`: a chat page has the same placement.
+  const chats = await start("workspaces")
+  const chat = (await sessions(chats)).find((s) => !s.design && !s.queue)!
+  await page.evaluate((hash) => (location.hash = hash), `#/agents/${chat.id}`)
+  await expectMoreAtRowEnd(page)
 })
