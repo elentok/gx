@@ -151,6 +151,49 @@ test("a Queue agent's header still has the menu, with its Agent block and no Sto
   expect(await screen.findByText("Tier")).toBeTruthy()
   expect(screen.queryByRole("menuitem", { name: "Stop" })).toBeNull()
   expect(screen.queryByRole("menuitem", { name: "Remove" })).toBeNull()
+  expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Copy ID"])
+})
+
+test("a Fix agent's menu has Copy ID, Stop and Remove after its Agent block", async () => {
+  render(
+    [session("s-1", "p", { name: "f", fix_of: "gx:m/01", tier: "worker" })],
+    "/agents/s-1",
+    true,
+    chatOf(chat()),
+  )
+  await screen.findByRole("heading", { name: /f/ })
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }))
+  await screen.findByText("Tier")
+  const items = screen.getAllByRole("menuitem").map((i) => i.textContent)
+  expect(items.slice(-3)).toEqual(["Stop", "Copy ID", "Remove"])
+  expect(items).not.toContain("Move to workspace›")
+})
+
+test("a chat's menu lists Move to workspace after Rename, with the Agent block above", async () => {
+  const s = session("s-1", "p", { name: "c", tier: "worker" })
+  const { update } = render([s], "/agents/s-1", true, chatOf(chat()))
+  update({
+    snapshot: {
+      sessions: [s],
+      workspaces: [
+        { name: "Default", order: 0 },
+        { name: "Work", order: 1 },
+      ],
+      placements: [{ session: "s-1", kind: "chat", workspace: "Default" }],
+    },
+  } as never)
+  await screen.findByRole("heading", { name: /c/ })
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }))
+  await screen.findByText("Tier")
+  const items = screen.getAllByRole("menuitem").map((i) => i.textContent)
+  expect(items.indexOf("Tier")).toBeLessThan(items.indexOf("Rename"))
+  expect(items.slice(items.indexOf("Rename"))).toEqual([
+    "Rename",
+    "Move to workspace›",
+    "Stop",
+    "Copy ID",
+    "Remove",
+  ])
 })
 
 test("a Queue agent's session offers no Screen and no Type field", async () => {

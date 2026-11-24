@@ -285,10 +285,12 @@ test("Workspaces", async ({ page, start }) => {
   await expect(row("fork-chat-draft")).toBeVisible()
   await expect(side2.row("fork-chat-draft")).toBeVisible()
   // Clean up so the later steps keep their counts.
-  // A chat draft's row menu has Move only, so its page removes it (Remove, then the footer's confirm).
-  await row("fork-chat-draft").click()
-  await page.getByRole("button", nav("Remove")).click()
-  await page.getByRole("button", nav("Remove")).click()
+  await rowMenu("fork-chat-draft").click()
+  await page.getByRole("menuitem", nav("Remove")).click()
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: /^Remove/ })
+    .click()
   await expect(row("fork-chat-draft")).toHaveCount(0)
   await expect(side2.row("fork-chat-draft")).toHaveCount(0)
   await pick("gx bugs")

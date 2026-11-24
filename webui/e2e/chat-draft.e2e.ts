@@ -108,12 +108,39 @@ test("209. Chat draft page", async ({ page, start }) => {
   await goto(page, `#/chat-drafts/${removeMe}`)
   await expect(d.brief).toHaveValue("Brief of a draft to remove")
   await d.remove.click()
-  await d.remove.click()
+  // The footer's Remove opens a popover with its own Remove; it is the one inside the dialog.
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: /^Remove/ })
+    .click()
   await expect(page).toHaveURL(/#\/epics/)
   await expect(draftRow(removeMe)).toHaveCount(0)
   expect((await drafts(fx)).map((x) => x.id)).not.toContain(removeMe)
   expect((await sessions(fx)).length).toBe(count)
   expect(count).toBe(before + 2)
+
+  // An empty draft removes at once, with no popover.
+  const emptyId = (
+    await fx.cliInput(
+      "x",
+      "agents",
+      "drafts",
+      "create",
+      "--project",
+      "demo",
+      "--name",
+      "empty-me",
+      "--brief",
+      "-",
+    )
+  ).trim()
+  await goto(page, `#/chat-drafts/${emptyId}`)
+  await d.brief.fill("")
+  await expect(d.saved).toBeVisible()
+  await d.remove.click()
+  await expect(page).toHaveURL(/#\/epics/)
+  await expect(page.getByRole("alertdialog")).toHaveCount(0)
+  expect((await drafts(fx)).map((x) => x.id)).not.toContain(emptyId)
 
   // Codex: the same Start journey launches codex on the draft's model and effort.
   const codexId = await draftId(fx, "codex-draft")

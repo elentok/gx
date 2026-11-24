@@ -88,9 +88,10 @@ async function mount(
   defaults: LaunchDefaults = { model: "", effort: "" },
   wide = true,
   history: { pickHistory?: PickChatHistory; listHistory?: ListHistory } = {},
+  workspaces: { name: string; order: number }[] = [],
 ) {
   const listeners = new Set<(address: string, type: string) => void>()
-  const connState = { snapshot: { sessions: [], vi_mode: viMode } }
+  const connState = { snapshot: { sessions: [], vi_mode: viMode, workspaces } }
   const connection = {
     refresh: () => {},
     getState: () => connState,
@@ -569,6 +570,25 @@ test("an empty chat draft removes with no confirm", async () => {
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove" })))
   expect(screen.queryByRole("alertdialog")).toBeNull()
   await waitFor(() => expect(fake.remove).toHaveBeenCalledWith("c1"))
+})
+
+test("with workspaces the ⋯ lists Rename, Move to workspace, Remove, and Remove is red", async () => {
+  await mount(fakeDrafts(), false, { model: "", effort: "" }, true, {}, [
+    { name: "Default", order: 0 },
+    { name: "Work", order: 1 },
+  ])
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }))
+  const items = await screen.findAllByRole("menuitem")
+  expect(items.map((i) => i.textContent)).toEqual(["Rename", "Move to workspace›", "Remove"])
+  expect(getComputedStyle(items[2]!).color).not.toBe(getComputedStyle(items[0]!).color)
+})
+
+test("a chat draft with an image and no brief asks before Remove", async () => {
+  const fake = fakeDrafts({ brief: "", images: ["img1"] })
+  await mount(fake)
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove" })))
+  expect(await screen.findByRole("alertdialog")).toBeTruthy()
+  expect(fake.remove).not.toHaveBeenCalled()
 })
 
 test("Rename from the ⋯ focuses the Name field", async () => {

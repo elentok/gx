@@ -85,7 +85,9 @@ async function mount(
     state,
     pickHistory,
     listHistory,
+    workspaces = [],
   }: {
+    workspaces?: { name: string; order: number }[]
     state?: unknown
     projects?: string[]
     device?: Device
@@ -96,7 +98,7 @@ async function mount(
     listHistory?: ListHistory
   } = {},
 ) {
-  const connState = { snapshot: { sessions: [], vi_mode: viMode } }
+  const connState = { snapshot: { sessions: [], vi_mode: viMode, workspaces } }
   const listeners = new Set<(address: string, type: string) => void>()
   const connection = {
     refresh: () => {},
@@ -549,6 +551,19 @@ test("the title row ends with a More actions menu: Rename, then Remove (Move nee
     "Rename",
     "Remove",
   ])
+})
+
+test("with workspaces the ⋯ lists Rename, Move to workspace, Remove, and Remove is red", async () => {
+  await mount(fakeDrafts(), {
+    workspaces: [
+      { name: "Default", order: 0 },
+      { name: "Work", order: 1 },
+    ],
+  })
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }))
+  const items = await screen.findAllByRole("menuitem")
+  expect(items.map((i) => i.textContent)).toEqual(["Rename", "Move to workspace›", "Remove"])
+  expect(getComputedStyle(items[2]!).color).not.toBe(getComputedStyle(items[0]!).color)
 })
 
 test("Rename from the ⋯ focuses the slug field", async () => {
