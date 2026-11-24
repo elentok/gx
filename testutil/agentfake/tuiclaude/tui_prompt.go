@@ -423,6 +423,9 @@ func appendClassifierNoVerdict(path string) error {
 // fastTurn runs an armed fast turn: working, then done, with no busy status.
 func (t *tui) fastTurn() error {
 	t.fast = false
+	// The turn ends at once and sets no status, so nothing else would redraw the
+	// now empty box.
+	t.draw()
 	WriteReport(t.out, "working", "", "")
 	WriteReport(t.out, "done", "", "")
 	return nil
