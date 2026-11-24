@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -42,7 +43,7 @@ func (r rootRoutes) routes() []wire.Route {
 
 // notifySend is `gx notify <message>`: a CLI message through the router.
 func (r rootRoutes) notifySend(w http.ResponseWriter, req *http.Request) {
-	var body wire.NotifyRequest
+	var body ops.NotifyRequest
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil || body.Message == "" {
 		http.Error(w, "message required", http.StatusBadRequest)
 		return
@@ -55,10 +56,10 @@ func (r rootRoutes) notifyTest(w http.ResponseWriter, _ *http.Request) {
 	wire.WriteJSON(w, notifyResult(r.s.chat.TestNotifications()))
 }
 
-func notifyResult(outcomes []notify.ChannelOutcome) wire.NotifyResult {
-	res := wire.NotifyResult{Channels: make([]wire.NotifyChannel, 0, len(outcomes))}
+func notifyResult(outcomes []notify.ChannelOutcome) ops.NotifyResult {
+	res := ops.NotifyResult{Channels: make([]ops.NotifyChannel, 0, len(outcomes))}
 	for _, o := range outcomes {
-		res.Channels = append(res.Channels, wire.NotifyChannel{Channel: o.Channel, Outcome: o.Outcome})
+		res.Channels = append(res.Channels, ops.NotifyChannel{Channel: o.Channel, Outcome: o.Outcome})
 	}
 	return res
 }

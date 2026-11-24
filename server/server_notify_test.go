@@ -24,6 +24,7 @@ import (
 	"github.com/elentok/gx/server/sched"
 	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil"
@@ -53,7 +54,7 @@ func outcomes(t *testing.T, rec *httptest.ResponseRecorder) map[string]string {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d: %s", rec.Code, rec.Body)
 	}
-	var res wire.NotifyResult
+	var res ops.NotifyResult
 	if err := json.NewDecoder(rec.Body).Decode(&res); err != nil {
 		t.Fatal(err)
 	}

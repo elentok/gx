@@ -16,7 +16,7 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 	gxconfig "github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop/notify"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // Deps is the runtime context of `gx config` and `gx notify`.
@@ -189,7 +189,7 @@ func runConfigTestNotifications(c *cobra.Command, d Deps, jsonOut bool) error {
 	if err != nil {
 		return err
 	}
-	via, err := callRouter(c, d, func(ctx context.Context, a *apiclient.Admin) (wire.NotifyResult, error) {
+	via, err := callRouter(c, d, func(ctx context.Context, a *apiclient.Admin) (ops.NotifyResult, error) {
 		return a.TestNotifications(ctx)
 	})
 	if err != nil {

@@ -15,7 +15,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	"github.com/elentok/gx/ralphloop/notify"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 )
 
 // outcomeSkipped is the direct fallback's outcome for the three channels only
@@ -24,14 +24,14 @@ const outcomeSkipped = "skipped"
 
 // routedVia is the result of one router call: the server's answer, or none.
 type routedVia struct {
-	res wire.NotifyResult
+	res ops.NotifyResult
 	// direct is true when no usable server answered and the caller must send itself.
 	direct bool
 }
 
 // callRouter asks the server to send. No server, or one too old to have the
 // route, is not an error: the caller falls back to sending itself.
-func callRouter(c *cobra.Command, d Deps, call func(context.Context, *apiclient.Admin) (wire.NotifyResult, error)) (routedVia, error) {
+func callRouter(c *cobra.Command, d Deps, call func(context.Context, *apiclient.Admin) (ops.NotifyResult, error)) (routedVia, error) {
 	cl, err := d.Dial()()
 	if err != nil {
 		return routedVia{}, err
@@ -59,20 +59,20 @@ func failedDial(err error) bool {
 
 // directResult is the fallback's result in the router's shape: the two chat
 // channels as sent, and the other three skipped.
-func directResult(chat []notify.ChannelOutcome) wire.NotifyResult {
+func directResult(chat []notify.ChannelOutcome) ops.NotifyResult {
 	byChannel := map[string]string{}
 	for _, o := range chat {
 		byChannel[o.Channel] = o.Outcome
 	}
-	var res wire.NotifyResult
+	var res ops.NotifyResult
 	for _, ch := range []string{notify.ChannelDesktop, notify.ChannelWebToast, notify.ChannelTelegram, notify.ChannelSlack, notify.ChannelPush} {
-		res.Channels = append(res.Channels, wire.NotifyChannel{Channel: ch, Outcome: cmp.Or(byChannel[ch], outcomeSkipped)})
+		res.Channels = append(res.Channels, ops.NotifyChannel{Channel: ch, Outcome: cmp.Or(byChannel[ch], outcomeSkipped)})
 	}
 	return res
 }
 
 // printJSON prints res stamped with where it came from.
-func printJSON(w io.Writer, res wire.NotifyResult, direct bool) error {
+func printJSON(w io.Writer, res ops.NotifyResult, direct bool) error {
 	if !direct {
 		return cmdbase.EncodeProvenanceRefusal(w, res, false)
 	}
@@ -80,7 +80,7 @@ func printJSON(w io.Writer, res wire.NotifyResult, direct bool) error {
 }
 
 // sentTo lists the channels that sent, in order.
-func sentTo(res wire.NotifyResult) []string {
+func sentTo(res ops.NotifyResult) []string {
 	var sent []string
 	for _, ch := range res.Channels {
 		if ch.Outcome == notify.OutcomeSent {
@@ -91,7 +91,7 @@ func sentTo(res wire.NotifyResult) []string {
 }
 
 // skippedLine names every channel that did not send and why, "" when none.
-func skippedLine(res wire.NotifyResult) string {
+func skippedLine(res ops.NotifyResult) string {
 	var parts []string
 	for _, ch := range res.Channels {
 		if ch.Outcome != notify.OutcomeSent {

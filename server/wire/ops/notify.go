@@ -1,4 +1,4 @@
-package wire
+package ops
 
 // NotifyRequest is the body of POST /v1/notify/send.
 type NotifyRequest struct {

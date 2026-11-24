@@ -51,15 +51,15 @@ func (a *Admin) ReloadConfig(ctx context.Context) (wire.ReloadResult, error) {
 
 // Notify sends a CLI message through the router. A channel that did not send
 // is an outcome in the result, not an error.
-func (a *Admin) Notify(ctx context.Context, message string) (wire.NotifyResult, error) {
-	var res wire.NotifyResult
-	err := a.t.post(ctx, "/v1/notify/send", wire.NotifyRequest{Message: message}, &res)
+func (a *Admin) Notify(ctx context.Context, message string) (ops.NotifyResult, error) {
+	var res ops.NotifyResult
+	err := a.t.post(ctx, "/v1/notify/send", ops.NotifyRequest{Message: message}, &res)
 	return res, err
 }
 
 // TestNotifications sends a test message as a system message on all five channels.
-func (a *Admin) TestNotifications(ctx context.Context) (wire.NotifyResult, error) {
-	var res wire.NotifyResult
+func (a *Admin) TestNotifications(ctx context.Context) (ops.NotifyResult, error) {
+	var res ops.NotifyResult
 	err := a.t.post(ctx, "/v1/notify/test", struct{}{}, &res)
 	return res, err
 }

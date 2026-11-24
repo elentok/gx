@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	gxconfig "github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop/notify"
-	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/server/wire/ops"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -130,7 +130,7 @@ func sendNotify(c *cobra.Command, text string, jsonOut bool, d Deps) error {
 	if err != nil {
 		return err
 	}
-	via, err := callRouter(c, d, func(ctx context.Context, a *apiclient.Admin) (wire.NotifyResult, error) {
+	via, err := callRouter(c, d, func(ctx context.Context, a *apiclient.Admin) (ops.NotifyResult, error) {
 		return a.Notify(ctx, text)
 	})
 	if err != nil {
