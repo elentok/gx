@@ -90,53 +90,55 @@ func TestGxDesignPhrases(t *testing.T) {
 	}
 }
 
-func TestGxDesignChartStepReadsInitialPromptImages(t *testing.T) {
-	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
-	start := strings.Index(text, "The map has no `## Destination`")
-	if start < 0 {
-		t.Fatal("gx-design/SKILL.md lacks the chart step")
-	}
-	step := text[start:]
-	if end := strings.Index(step, "2. **"); end >= 0 {
-		step = step[:end]
-	}
-	for _, want := range []string{"`Images:`", "`## Initial prompt`"} {
-		if !strings.Contains(step, want) {
-			t.Errorf("chart step lacks %q", want)
+func TestGxDesignChartAndRubric(t *testing.T) {
+	t.Run("ReadsInitialPromptImages", func(t *testing.T) {
+		text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+		start := strings.Index(text, "The map has no `## Destination`")
+		if start < 0 {
+			t.Fatal("gx-design/SKILL.md lacks the chart step")
 		}
-	}
-}
-
-func TestGxDesignChartingSessionSubagentTiers(t *testing.T) {
-	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
-	start := strings.Index(text, "1. **The map has no `## Destination`**")
-	end := strings.Index(text, "2. **`destination_unconfirmed: true`**")
-	if start < 0 || end < start {
-		t.Fatal("gx-design/SKILL.md lacks the chart step")
-	}
-	step := text[start:end]
-	for _, want := range []string{
-		"`gx agent model strongest`",
-		"`gx agent model worker`",
-		"gx-to-spec, gx-to-tickets and gx-research",
-		"Research tickets spawned while charting also use `gx agent model worker`",
-	} {
-		if !strings.Contains(step, want) {
-			t.Errorf("gx-design chart step lacks %q", want)
+		step := text[start:]
+		if end := strings.Index(step, "2. **"); end >= 0 {
+			step = step[:end]
 		}
-	}
-}
+		for _, want := range []string{"`Images:`", "`## Initial prompt`"} {
+			if !strings.Contains(step, want) {
+				t.Errorf("chart step lacks %q", want)
+			}
+		}
+	})
 
-func TestGxDesignRubricFlagsSchemaChangeWithoutMigrationStep(t *testing.T) {
-	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
-	start := strings.Index(text, "## Design-review rubric (step 5)")
-	end := strings.Index(text, "## After every run")
-	if start < 0 || end < start {
-		t.Fatal("gx-design/SKILL.md lacks the rubric section")
-	}
-	if !strings.Contains(text[start:end], "without a new migration step") {
-		t.Error("rubric lacks the migration step line")
-	}
+	t.Run("SubagentTiers", func(t *testing.T) {
+		text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+		start := strings.Index(text, "1. **The map has no `## Destination`**")
+		end := strings.Index(text, "2. **`destination_unconfirmed: true`**")
+		if start < 0 || end < start {
+			t.Fatal("gx-design/SKILL.md lacks the chart step")
+		}
+		step := text[start:end]
+		for _, want := range []string{
+			"`gx agent model strongest`",
+			"`gx agent model worker`",
+			"gx-to-spec, gx-to-tickets and gx-research",
+			"Research tickets spawned while charting also use `gx agent model worker`",
+		} {
+			if !strings.Contains(step, want) {
+				t.Errorf("gx-design chart step lacks %q", want)
+			}
+		}
+	})
+
+	t.Run("RubricFlagsSchemaChangeWithoutMigrationStep", func(t *testing.T) {
+		text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+		start := strings.Index(text, "## Design-review rubric (step 5)")
+		end := strings.Index(text, "## After every run")
+		if start < 0 || end < start {
+			t.Fatal("gx-design/SKILL.md lacks the rubric section")
+		}
+		if !strings.Contains(text[start:end], "without a new migration step") {
+			t.Error("rubric lacks the migration step line")
+		}
+	})
 }
 
 func TestGxDesignChainingRules(t *testing.T) {
@@ -382,30 +384,32 @@ func TestPrototypeHandOverAsksPickAsGrillingRound(t *testing.T) {
 	}
 }
 
-func TestGxDesignQuestionBlockIsYAML(t *testing.T) {
-	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
-	for _, want := range []string{
-		"[gx-local-tracker.md](../gx-local-tracker.md)",
-		"never JSON",
-		"`type`",
-	} {
-		if !strings.Contains(text, want) {
-			t.Errorf("gx-design/SKILL.md lacks %q", want)
+func TestQuestionBlocksAreFlatYAML(t *testing.T) {
+	t.Run("GxDesignIsYAML", func(t *testing.T) {
+		text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+		for _, want := range []string{
+			"[gx-local-tracker.md](../gx-local-tracker.md)",
+			"never JSON",
+			"`type`",
+		} {
+			if !strings.Contains(text, want) {
+				t.Errorf("gx-design/SKILL.md lacks %q", want)
+			}
 		}
-	}
-}
+	})
 
-func TestGxLocalTrackerYesNoBlockIsFlat(t *testing.T) {
-	text := collapseSpace(readFile(t, "gx-local-tracker.md"))
-	for _, want := range []string{
-		"Each is a flat string. A nested map",
-		"is not accepted",
-		"type: yes-no recommended: yes yes: \"I rename the helper.\" no: \"I leave it as it is.\"",
-	} {
-		if !strings.Contains(text, want) {
-			t.Errorf("gx-local-tracker.md lacks %q", want)
+	t.Run("LocalTrackerYesNoIsFlat", func(t *testing.T) {
+		text := collapseSpace(readFile(t, "gx-local-tracker.md"))
+		for _, want := range []string{
+			"Each is a flat string. A nested map",
+			"is not accepted",
+			"type: yes-no recommended: yes yes: \"I rename the helper.\" no: \"I leave it as it is.\"",
+		} {
+			if !strings.Contains(text, want) {
+				t.Errorf("gx-local-tracker.md lacks %q", want)
+			}
 		}
-	}
+	})
 }
 
 func TestGxDesignLaterPointerAppendsToOutOfScope(t *testing.T) {
@@ -441,62 +445,66 @@ func requirePhrases(t *testing.T, name, text string, wants ...string) {
 	}
 }
 
-func TestGxDesignInitiativeCheck(t *testing.T) {
-	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
-	check := sectionAfter(t, text, "**Initiative check**", "Evaluate in order")
-	requirePhrases(t, "Initiative check", check,
-		"not a numbered step", "start of every run", "Destination", "Milestone entry", "Assumptions",
-		"deferred items", "stop, name the broken link", "is not this map's own slug",
-		"not the other Milestones", "never edits the Destination, the Milestone list or any Assumption",
-		"never formats an Initiative line")
-	requirePhrases(t, "gx-design", text,
-		"1. **The map has no `## Destination`**", "2. **`destination_unconfirmed: true`**")
+func TestGxDesignInitiativeRules(t *testing.T) {
+	t.Run("InitiativeCheck", func(t *testing.T) {
+		text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+		check := sectionAfter(t, text, "**Initiative check**", "Evaluate in order")
+		requirePhrases(t, "Initiative check", check,
+			"not a numbered step", "start of every run", "Destination", "Milestone entry", "Assumptions",
+			"deferred items", "stop, name the broken link", "is not this map's own slug",
+			"not the other Milestones", "never edits the Destination, the Milestone list or any Assumption",
+			"never formats an Initiative line")
+		requirePhrases(t, "gx-design", text,
+			"1. **The map has no `## Destination`**", "2. **`destination_unconfirmed: true`**")
+	})
+
+	t.Run("ChartStepInitiativeHint", func(t *testing.T) {
+		text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+		step := sectionAfter(t, text, "The map has no `## Destination`", "2. **")
+		requirePhrases(t, "chart step", step,
+			"candidates, not decisions", "too big for one reviewable PR", "no threshold",
+			"no automatic conversion", "In a plain Design, tell the person to run `/gx-initiative`",
+			`answering "later"`, "never point to `/gx-initiative`")
+	})
+
+	t.Run("ScopeAnswersAndItemStates", func(t *testing.T) {
+		text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+		scope := sectionAfter(t, text, "## Scope answers", "## Item states")
+		requirePhrases(t, "Scope answers", scope,
+			"three answers", "**In** this Milestone", "**Later**", "with a reason", "`unplaced`",
+			"never edit the Milestone list", "gx initiatives deferred add", "--from",
+			`"deferred to <milestone>, see the Initiative"`, `"Out of scope"`,
+			"never copied to the Initiative", "`follow-ups`")
+		states := sectionAfter(t, text, "## Item states", "## Researching")
+		requirePhrases(t, "Item states", states,
+			"after the spec is written (step 4)", "steps 6 and 6b", "gx initiatives deferred set",
+			"--state taken", "re-defer")
+		rubric := sectionAfter(t, text, "## Design-review rubric (step 5)", "## After every run")
+		requirePhrases(t, "rubric", rubric,
+			"every open deferred item for this Milestone appear in the spec as in, later or out",
+			"A missing one is a finding", "Does the spec change the ticket or epic schema")
+	})
 }
 
-func TestGxDesignChartStepInitiativeHint(t *testing.T) {
-	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
-	step := sectionAfter(t, text, "The map has no `## Destination`", "2. **")
-	requirePhrases(t, "chart step", step,
-		"candidates, not decisions", "too big for one reviewable PR", "no threshold",
-		"no automatic conversion", "In a plain Design, tell the person to run `/gx-initiative`",
-		`answering "later"`, "never point to `/gx-initiative`")
-}
+func TestInitiativeSkillText(t *testing.T) {
+	t.Run("WayfinderOutOfScopeAsksThreeValueScope", func(t *testing.T) {
+		text := collapseSpace(readFile(t, "gx-wayfinder/SKILL.md"))
+		sec := sectionAfter(t, text, "## Out of scope Fog only", "A Design source map")
+		requirePhrases(t, "wayfinder Out of scope", sec,
+			"In a map with `initiative:`", "three-value scope question", "gx initiatives deferred add",
+			"`unplaced`", `"deferred to <milestone>, see the Initiative"`)
+		requirePhrases(t, "wayfinder README", collapseSpace(readFile(t, "gx-wayfinder/README.md")),
+			"gx initiatives deferred add")
+	})
 
-func TestGxDesignScopeAnswersAndItemStates(t *testing.T) {
-	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
-	scope := sectionAfter(t, text, "## Scope answers", "## Item states")
-	requirePhrases(t, "Scope answers", scope,
-		"three answers", "**In** this Milestone", "**Later**", "with a reason", "`unplaced`",
-		"never edit the Milestone list", "gx initiatives deferred add", "--from",
-		`"deferred to <milestone>, see the Initiative"`, `"Out of scope"`,
-		"never copied to the Initiative", "`follow-ups`")
-	states := sectionAfter(t, text, "## Item states", "## Researching")
-	requirePhrases(t, "Item states", states,
-		"after the spec is written (step 4)", "steps 6 and 6b", "gx initiatives deferred set",
-		"--state taken", "re-defer")
-	rubric := sectionAfter(t, text, "## Design-review rubric (step 5)", "## After every run")
-	requirePhrases(t, "rubric", rubric,
-		"every open deferred item for this Milestone appear in the spec as in, later or out",
-		"A missing one is a finding", "Does the spec change the ticket or epic schema")
-}
-
-func TestGxWayfinderOutOfScopeAsksThreeValueScope(t *testing.T) {
-	text := collapseSpace(readFile(t, "gx-wayfinder/SKILL.md"))
-	sec := sectionAfter(t, text, "## Out of scope Fog only", "A Design source map")
-	requirePhrases(t, "wayfinder Out of scope", sec,
-		"In a map with `initiative:`", "three-value scope question", "gx initiatives deferred add",
-		"`unplaced`", `"deferred to <milestone>, see the Initiative"`)
-	requirePhrases(t, "wayfinder README", collapseSpace(readFile(t, "gx-wayfinder/README.md")),
-		"gx initiatives deferred add")
-}
-
-func TestInitiativeSkillTextNamesVerbsOnly(t *testing.T) {
-	for _, path := range []string{"gx-design/SKILL.md", "gx-wayfinder/SKILL.md"} {
-		text := readFile(t, path)
-		for _, bad := range []string{"| to:", "| state:"} {
-			if strings.Contains(text, bad) {
-				t.Errorf("%s hand-formats an Initiative line (%q)", path, bad)
+	t.Run("NamesVerbsOnly", func(t *testing.T) {
+		for _, path := range []string{"gx-design/SKILL.md", "gx-wayfinder/SKILL.md"} {
+			text := readFile(t, path)
+			for _, bad := range []string{"| to:", "| state:"} {
+				if strings.Contains(text, bad) {
+					t.Errorf("%s hand-formats an Initiative line (%q)", path, bad)
+				}
 			}
 		}
-	}
+	})
 }
