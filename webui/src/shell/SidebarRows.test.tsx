@@ -13,6 +13,7 @@ import {
   type ChatDraftRow,
   type DesignDraftRow,
   type EpicListRow,
+  type SessionInfo,
   type SessionPlacement,
 } from "../generated/server"
 import { renderThemed } from "../ui/render"
@@ -70,7 +71,15 @@ function Page() {
   return <div data-testid="page-path">{useLocation().pathname}</div>
 }
 
-function setup(device: Device, path = "/", extraRows: EpicListRow[] = []) {
+function setup(
+  device: Device,
+  path = "/",
+  extraRows: EpicListRow[] = [],
+  extra: { sessions: SessionInfo[]; placements: SessionPlacement[] } = {
+    sessions: [],
+    placements: [],
+  },
+) {
   vi.stubGlobal(
     "fetch",
     vi.fn(
@@ -96,8 +105,9 @@ function setup(device: Device, path = "/", extraRows: EpicListRow[] = []) {
         session("s4", "p", { name: "designer" }),
         session("s5", "p", { name: "fixer", fix_of: "p:blog/03", status: { state: "working" } }),
         session("s6", "p", { name: "queuer", queue: true, tier: "worker" }),
+        ...extra.sessions,
       ],
-      placements,
+      placements: [...placements, ...extra.placements],
     },
     connected: true,
     loadedOnce: true,
@@ -668,4 +678,39 @@ test("on a tablet a row click closes the sidebar", async () => {
       "false",
     ),
   )
+})
+
+const shopMenu = async () => {
+  const shop = await body().findByRole("link", { name: /Shop/ })
+  fireEvent.click(within(shop.closest("li")!).getByRole("button", { name: "More actions" }))
+  await screen.findAllByRole("menuitem")
+  return screen.getAllByRole("menuitem").map((i) => i.textContent)
+}
+
+test("a Design row with one live session shows Stop, and the confirm ends that session", async () => {
+  const fetchMock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) =>
+    String(url).includes("/v1/sessions/stop")
+      ? new Response(JSON.stringify({ results: [{ target: "s4", status: "done" }] }), {
+          status: 200,
+        })
+      : new Response(JSON.stringify({ epics: rows, follow_ups: [] }), { status: 200 }),
+  )
+  setup("desktop")
+  vi.stubGlobal("fetch", fetchMock)
+  expect(await shopMenu()).toContain("Stop")
+  fireEvent.click(screen.getByRole("menuitem", { name: "Stop" }))
+  await screen.findByRole("alertdialog")
+  fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: /^Stop/ }))
+  await waitFor(() => {
+    const call = fetchMock.mock.calls.find(([u]) => String(u).includes("/v1/sessions/stop"))
+    expect(JSON.parse((call![1] as RequestInit).body as string).targets[0].id).toBe("s4")
+  })
+})
+
+test("a Design row with two live sessions has no Stop", async () => {
+  setup("desktop", "/", [], {
+    sessions: [session("s7", "p", { name: "designer2" })],
+    placements: [{ session: "s7", kind: "epic", epic: "p:shop" }],
+  })
+  expect(await shopMenu()).not.toContain("Stop")
 })

@@ -8,8 +8,8 @@ import { MissingBanner } from "../checks/MissingBanner"
 import { SetupDialog } from "../checks/SetupDialog"
 import { postSaveChecks, type SaveChecks } from "../checks/setup"
 import { fetchChecksStatus, type FetchChecksStatus } from "../checks/status"
-import { useConnectionContext } from "../connection"
-import { CardKindFollowUps, type Workspace } from "../generated/server"
+import { useConnectionContext, useConnectionState } from "../connection"
+import { CardKindFollowUps, type SessionInfo, type Workspace } from "../generated/server"
 import { useLatest } from "../hooks"
 import { usePageKeys } from "../select/pageKeys"
 import { rowOfCard, type SelectAction } from "../select/selectModel"
@@ -54,6 +54,7 @@ function SectionBlock({
   now,
   open,
   workspaces,
+  sessions,
   select,
   onToggle,
   onChanged,
@@ -62,6 +63,7 @@ function SectionBlock({
   now: number
   open: boolean
   workspaces: Workspace[]
+  sessions: SessionInfo[]
   select: SelectApi
   onToggle: () => void
   onChanged: () => void
@@ -102,6 +104,7 @@ function SectionBlock({
               row={r}
               now={now}
               workspaces={workspaces}
+              sessions={sessions}
               onChanged={onChanged}
               select={
                 select.state.on && rowOfCard(r).selectable
@@ -129,6 +132,7 @@ export function EpicsPage({
   saveChecks?: SaveChecks
 }) {
   const conn = useConnectionContext()
+  const sessions = useConnectionState(conn).snapshot?.sessions ?? []
   const { list, failed, source, retry } = useEpicList(fetchList, conn)
   useFetchedReady({ failed, source }, list?.epics.length === 0)
   // A failed read shows no banner: it is not worth an error state.
@@ -337,6 +341,7 @@ export function EpicsPage({
               now={now}
               open={isOpen(s)}
               workspaces={workspaces}
+              sessions={sessions}
               select={select}
               onToggle={() => toggle(s.key)}
               onChanged={retry}

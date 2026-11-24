@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, describe, expect, test, vi } from "vitest"
-import { VerdictConcurrencyCap, type EpicListRow } from "../generated/server"
+import { session } from "../agents/agentsTestKit"
+import { VerdictConcurrencyCap, type EpicListRow, type SessionInfo } from "../generated/server"
 import { ConfirmHost } from "../shell/ConfirmHost"
 import { renderThemed } from "../ui/render"
 import { toaster } from "../ui/toaster"
@@ -1012,5 +1013,47 @@ describe("Create PR and Mark as merged", () => {
     fireEvent.click(screen.getByRole("button", { name: "More actions" }))
     await screen.findByText("Hold")
     expect(screen.queryByText("Mark as merged")).toBeNull()
+  })
+})
+
+describe("Stop on a Design card", () => {
+  const live = (id: string, over: Partial<SessionInfo> = {}) =>
+    session(id, "gx", { design: true, ticket: "gx:blog/00", ...over })
+  const designCard = () => row({ card_kind: "design", workspace: "Default" })
+  const menuItems = async () => {
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }))
+    return (await screen.findAllByRole("menuitem")).map(text)
+  }
+
+  test("one live session shows Stop, and the confirm ends it", async () => {
+    const fetchMock = vi.fn(
+      async (_url: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ results: [{ target: "s1", status: "done" }] }), {
+          status: 200,
+        }),
+    )
+    vi.stubGlobal("fetch", fetchMock)
+    renderThemed(
+      <>
+        <EpicCard
+          row={designCard()}
+          sessions={[live("s1"), live("s2", { status: { state: "exited" } })]}
+        />
+        <ConfirmHost />
+      </>,
+    )
+    expect(await menuItems()).toContain("Stop")
+    fireEvent.click(screen.getByRole("menuitem", { name: "Stop" }))
+    const dialog = await screen.findByRole("alertdialog")
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Stop/ }))
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([u]) => String(u).includes("/v1/sessions/stop"))
+      expect(JSON.parse((call![1] as RequestInit).body as string).targets[0].id).toBe("s1")
+    })
+  })
+
+  test.each([[[]], [[live("s1"), live("s2")]]])("%j live sessions hide Stop", async (sessions) => {
+    renderThemed(<EpicCard row={designCard()} sessions={sessions} />)
+    expect(await menuItems()).not.toContain("Stop")
   })
 })

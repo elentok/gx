@@ -23,6 +23,7 @@ import {
   SectionOnHold,
   type CardAction,
   type EpicListRow,
+  type SessionInfo,
   type Workspace,
 } from "../generated/server"
 import { BackLinkLine } from "../initiatives/BackLinkLine"
@@ -240,10 +241,13 @@ export function EpicCard({
   now = Date.now(),
   writes = {},
   workspaces = [],
+  sessions = [],
   onChanged = () => {},
   select,
 }: {
   row: EpicListRow
+  /** Every session; a Design card offers Stop when exactly one of its own is live. */
+  sessions?: SessionInfo[]
   /** Set while the page is in select mode: the card's corner checkbox. */
   select?: { checked: boolean; onToggle: () => void }
   /** The page clock, in epoch milliseconds. */
@@ -390,7 +394,7 @@ export function EpicCard({
         </Box>
         <Box ml="auto" flex="none">
           <ItemMenu
-            item={itemOfAnyCard(row)}
+            item={itemOfAnyCard(row, sessions)}
             workspaces={workspaces}
             writers={menuWriters}
             hide={menuHide}

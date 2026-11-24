@@ -8,6 +8,8 @@ import {
   type SessionInfo,
   type Workspace,
 } from "../generated/server"
+import { isExited } from "../agents/sessionWrites"
+import { designOf } from "../design/view"
 import { agentKindOf, type AgentKind, type Entity, type EntityKind } from "../actions/entity"
 import {
   useActions,
@@ -95,7 +97,7 @@ export function itemOfCard(card: EpicListRow | undefined): ItemRef | undefined {
  * The menu target of any card on the Epics page. A One-off card is a ticket; a card outside every
  * workspace is an epic with none, so the workspace actions stay off it.
  */
-export function itemOfAnyCard(card: EpicListRow): ItemRef {
+export function itemOfAnyCard(card: EpicListRow, sessions: SessionInfo[] = []): ItemRef {
   const base = {
     key: card.address,
     name: card.name,
@@ -103,12 +105,20 @@ export function itemOfAnyCard(card: EpicListRow): ItemRef {
     prUrl: card.pr?.url,
   }
   if (card.card_kind === CardKindOneOff) return { ...base, kind: "ticket" }
+  const design = card.card_kind === CardKindDesign
   return {
     ...base,
-    kind: card.card_kind === CardKindDesign ? "design" : "epic",
+    kind: design ? "design" : "epic",
     queued: card.queued,
     held: card.section === SectionOnHold,
+    ...(design ? liveOfDesign(sessions.filter((s) => designOf(s) === card.address)) : {}),
   }
+}
+
+/** A Design's Stop data: the live count, and the session when exactly one is live. */
+export function liveOfDesign(sessions: SessionInfo[]): Pick<ItemRef, "liveSessions" | "session"> {
+  const live = sessions.filter((s) => !isExited(s))
+  return { liveSessions: live.length, session: live.length === 1 ? live[0] : undefined }
 }
 
 /** Workspace actions: a card with no workspace offers none of them. */

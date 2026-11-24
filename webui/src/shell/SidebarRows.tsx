@@ -11,7 +11,7 @@ import {
   type SidebarStatus,
 } from "../workspaces/sidebarModel"
 import type { Workspace } from "../generated/server"
-import { ItemMenu, type ItemRef } from "../workspaces/itemActions"
+import { ItemMenu, liveOfDesign, type ItemRef } from "../workspaces/itemActions"
 import { agentKindOf } from "../actions/entity"
 import { agentSection } from "../design/SessionControls"
 import { useWide } from "../useWide"
@@ -473,6 +473,7 @@ function Row({
     held: row.held,
     session: row.session,
     draft: row.draft,
+    ...(kind === "design" ? liveOfDesign(row.sessions ?? []) : {}),
   }
   // The removed item's page is gone; leave it for the list, as the agent page does.
   const onRemoved = () => {
