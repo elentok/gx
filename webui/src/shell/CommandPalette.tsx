@@ -9,13 +9,13 @@ import { jumpHref, Menu, type ListSection } from "../nav/JumpMenu"
 import { isMac } from "../platform"
 import { useWide } from "../useWide"
 import { setCommandOpen, useCommandOpen } from "./commandOpen"
-import { canRename, useOpenChat } from "./chords"
+import { useOpenChat } from "./chords"
 import { startNewDesign } from "../design/newDesign"
 import { openNewAgent } from "./newItemOpen"
 import { nextQuestion } from "./nextQuestion"
-import { openRename } from "./renameOpen"
 import { useShell } from "./ShellContext"
 import { useDismissLayer } from "./useDismissLayer"
+import { useOpenEntityActions } from "./useOpenEntityActions"
 
 export interface Command {
   id: string
@@ -33,7 +33,7 @@ function useCommands(): Command[] {
   const snapshot = useConnectionState(useConnectionContext()).snapshot
   const afk = snapshot?.afk ?? false
   const { list } = useEpicList()
-  const { path: pathname, session } = useOpenChat()
+  const { path: pathname } = useOpenChat()
   const workspace = shell?.workspace || undefined
   const { next, count } = useMemo(
     () =>
@@ -69,9 +69,6 @@ function useCommands(): Command[] {
     return [
       { id: "new-design", title: "New design", run: () => void startNewDesign() },
       { id: "new-chat", title: "New chat", run: () => openNewAgent() },
-      ...(session && canRename({ path: pathname, session })
-        ? [{ id: "rename-chat", title: "Rename chat", run: () => openRename({ session }) }]
-        : []),
       nextRow,
       goto("go-epics", "Go to Epics", EPICS_HREF),
       goto("go-agents", "Go to Agents", AGENTS_HREF),
@@ -84,7 +81,7 @@ function useCommands(): Command[] {
         run: () => toggleAfk(afk),
       },
     ]
-  }, [navigate, shell, afk, next, count, session, pathname])
+  }, [navigate, shell, afk, next, count])
 }
 
 /** Cmd+P on a Mac, Ctrl+P elsewhere, on every page, in text fields too. Same layout as the jump palette. */
@@ -120,8 +117,25 @@ export function CommandPalette() {
 /** Rendered only while the palette is open, so the command list is not rebuilt on every epic change. */
 function CommandList({ phone, onClose }: { phone: boolean; onClose: () => void }) {
   const commands = useCommands()
+  const { actions } = useOpenEntityActions()
   const sections = useMemo<ListSection[]>(
     () => [
+      {
+        key: "entity",
+        title: "This page",
+        rows: actions
+          .filter((a) => !a.disabled)
+          .map((a) => ({
+            key: `action-${a.id}`,
+            title: a.label,
+            subtitle: "",
+            href: "",
+            searchText: a.label,
+            danger: a.danger,
+            hint: a.chord,
+            onSelect: a.run,
+          })),
+      },
       {
         key: "commands",
         title: "Commands",
@@ -135,7 +149,7 @@ function CommandList({ phone, onClose }: { phone: boolean; onClose: () => void }
         })),
       },
     ],
-    [commands],
+    [commands, actions],
   )
 
   return (

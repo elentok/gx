@@ -112,11 +112,16 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
       .filter((l) => l.includes("\t"))
       .map((l) => l.split("\t")[0]!.trim())
   const d = draftPage(page)
-  const newDraft = async (slug: string, prompt: string) => {
+  const newDraft = async (slug: string, prompt: string, onDraft = false) => {
     await page.keyboard.press("ControlOrMeta+p")
-    await expect(rows.first()).toHaveText(/^New design/)
-    await expect(rows.filter({ hasText: /^(Remove|Start design)/ })).toHaveCount(0)
-    await rows.first().click()
+    const newDesign = rows.filter({ hasText: /^New design/ })
+    await expect(newDesign).toBeVisible()
+    // On a draft page the entity rows come first; Start design is the page's button, never a row.
+    await expect(rows.filter({ hasText: /^Start design/ })).toHaveCount(0)
+    if (onDraft)
+      await expect(rows.filter({ hasText: /^(Rename|Move to workspace|Remove)/ })).toHaveCount(3)
+    else await expect(rows.filter({ hasText: /^(Rename|Move|Remove)/ })).toHaveCount(0)
+    await newDesign.click()
     await expect(palette).toHaveCount(0)
     await expect(page).toHaveURL(/#\/drafts\/[^/]+$/)
     await expect(d.prompt).toBeFocused()
@@ -127,7 +132,7 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   await newDraft("near-draft", "A near idea.")
   const nearUrl = page.url()
   expect(await draftIds()).toHaveLength(1)
-  await newDraft("far-draft", "A far idea.")
+  await newDraft("far-draft", "A far idea.", true)
   expect(await draftIds()).toHaveLength(2)
   await goto(page, "#/epics")
 
@@ -190,11 +195,61 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   await expect(confirm).toHaveCount(0)
   await expect.poll(draftIds).toHaveLength(1)
 
-  // Picking the draft row opens its page.
+  // The confirm is a modal, so the jump menu closed before it opened. Picking the draft row opens its page.
+  await expect(jump).toHaveCount(0)
+  await page.keyboard.press("ControlOrMeta+k")
   await expect(jump).toBeVisible()
   await jump.getByRole("combobox").fill("near-dr")
   await jumpRow("near-draft").click()
   await expect(page).toHaveURL(nearUrl)
+
+  // Cmd/Ctrl+P on the Epic page lists the epic's registry actions above the eight commands.
+  await goto(page, "#/e/demo:running-epic")
+  await page.keyboard.press("ControlOrMeta+p")
+  await expect(rows.filter({ hasText: /^Hold/ })).toBeVisible()
+  await expect(rows.filter({ hasText: /^Take off hold/ })).toHaveCount(0)
+  const epicRows = await rows.allInnerTexts()
+  expect(epicRows.findIndex((t) => t.startsWith("Hold"))).toBeLessThan(
+    epicRows.findIndex((t) => t.startsWith("New design")),
+  )
+  await expect(rows.last()).toHaveText(/^Toggle AFK/)
+  await page.keyboard.press("Escape")
+  await expect(palette).toHaveCount(0)
+
+  // On the Design page it offers Stop and Hold.
+  await goto(page, "#/d/demo:design-live")
+  await page.keyboard.press("ControlOrMeta+p")
+  await expect(rows.filter({ hasText: /^Stop/ })).toBeVisible()
+  await expect(rows.filter({ hasText: /^Hold/ })).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(palette).toHaveCount(0)
+
+  // Cmd/Ctrl+K rows: an epic offers Hold, a Design offers Stop with one live session, and a chat draft offers Rename, Move to workspace and Remove.
+  await page.keyboard.press("ControlOrMeta+e")
+  await page.keyboard.press("c")
+  await expect(page).toHaveURL(/#\/chat-drafts\/[^/]+$/)
+  await page.keyboard.press("ControlOrMeta+k")
+  await expect(jump).toBeVisible()
+  const rowMenuItems = async (title: string) => {
+    await jumpRow(title).getByRole("button", nav("More actions")).click()
+    await menuFocused()
+    const items = await page.getByRole("menuitem").allInnerTexts()
+    await page.keyboard.press("Escape")
+    await expect(jump).toHaveCount(0)
+    await page.keyboard.press("ControlOrMeta+k")
+    await expect(jump).toBeVisible()
+    return items
+  }
+  expect(await rowMenuItems("running-epic")).toContainEqual(expect.stringMatching(/^Hold/))
+  expect(await rowMenuItems("design-live")).toContainEqual(expect.stringMatching(/^Stop/))
+  const chatDraftRow = jump.getByRole("group", nav("Chat drafts")).getByRole("option")
+  await expect(chatDraftRow).toHaveCount(1)
+  await expect(chatDraftRow).toContainText("Draft")
+  await chatDraftRow.getByRole("button", nav("More actions")).click()
+  await menuFocused()
+  await expect(page.getByRole("menuitem")).toHaveText([/^Rename/, /^Move to workspace/, /^Remove/])
+  await page.keyboard.press("Escape")
+  await expect(jump).toHaveCount(0)
   await goto(page, "#/epics")
 
   // Phone layout on the same settled scenario. 375 px is below the wide layout's 62em breakpoint.

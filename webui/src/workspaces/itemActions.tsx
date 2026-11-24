@@ -42,8 +42,10 @@ export interface ItemRef {
   /** The epic (or the Design's -impl) holds a queue item. */
   queued?: boolean
   held?: boolean
-  /** A chat's session, for Stop and Remove. */
+  /** A chat's session, for Stop and Remove; a Design row with one live session carries that one. */
   session?: SessionInfo
+  /** A Design's live session count; its Stop is offered only at exactly one. */
+  liveSessions?: number
   /** A draft's row, for Rename and Remove. */
   draft?: DesignDraftRow
   /** Overrides the agent kind the session implies (a nested sidebar agent is never a plain chat). */
@@ -71,6 +73,7 @@ export function entityOfItem(item: ItemRef): Entity {
     queued: item.queued,
     prUrl: item.prUrl,
     session: item.session,
+    liveSessions: item.liveSessions,
     agent: item.agent ?? (item.session ? agentKindOf(item.session) : undefined),
   }
 }
@@ -212,14 +215,6 @@ export function useEntityActions(
   let last: string | undefined
   for (const a of actions) {
     if (hide.has(a.id) || (a.id === "move" && workspaces.length === 0)) continue
-    // A design or epic row offers no Stop; its sessions stop through Hold and Archive.
-    // The Design page's Stop ends the session it shows.
-    if (
-      a.id === "stop" &&
-      entity?.surface !== "page" &&
-      (entity?.kind === "design" || entity?.kind === "epic")
-    )
-      continue
     if (a.group !== last) groups.push([])
     last = a.group
     groups[groups.length - 1]!.push(entryOf(a))

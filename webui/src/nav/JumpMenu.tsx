@@ -33,6 +33,10 @@ export type ListRowData = {
   searchText: string
   lead?: ReactNode
   trailing?: ReactNode
+  /** A destructive action: the title takes the danger color. */
+  danger?: boolean
+  /** A small word before the trailing slot, such as a chord letter. */
+  hint?: string
   current?: boolean
   /** Runs instead of following `href`. */
   onSelect?: () => void
@@ -96,7 +100,14 @@ export function ListRow({
     >
       {row.lead}
       <Box minW="0" flex="1">
-        <Text fontFamily="condensed" fontSize="16px" fontWeight="600" lineClamp="1">
+        <Text
+          fontFamily="condensed"
+          fontSize="16px"
+          fontWeight="600"
+          lineClamp="1"
+          data-danger={row.danger || undefined}
+          color={row.danger ? "tone.paused.fg" : undefined}
+        >
           {row.title}
           {current && (
             <Text as="span" ml="2" fontSize="13px" color="text.dim" fontWeight="400">
@@ -110,6 +121,11 @@ export function ListRow({
           </Text>
         )}
       </Box>
+      {row.hint && (
+        <Text as="kbd" fontSize="13px" flex="none" color="text.faint">
+          {row.hint}
+        </Text>
+      )}
       {row.trailing}
     </Box>
   )

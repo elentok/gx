@@ -108,10 +108,6 @@ export const chatDraftIdOf = (path: string): string | undefined =>
 /** A draft page or a composer that offers History has registered its opener. */
 const canHistory = () => hasHistoryOpener()
 
-/** The one rule for the Rename chat chord and palette row: the open page is a chat's page. */
-export const canRename = (ctx: ChordContext) =>
-  agentIdOf(ctx.path) !== undefined && ctx.session !== undefined && isChat(ctx.session)
-
 /** The path and the session of the open `/agents/:id` page. `session` is undefined off that page. */
 export function useOpenChat(): { path: string; session: SessionInfo | undefined } {
   const { pathname } = useLocation()

@@ -307,7 +307,7 @@ test("Chords", async ({ page, start, context }) => {
   await expect.poll(() => fx.input(chordConv)).toContain("/rename chord-renamed")
   expect(await page.evaluate(() => (window as unknown as { __kept?: boolean }).__kept)).toBe(true)
   expect((await sessions(fx)).find((s) => s.id === otherChat.id)!.name).toBe(otherChat.name)
-  // The palette's Rename chat opens the same popup on the same chat.
+  // The palette's Rename row opens the same popup on the same chat.
   await page.keyboard.press("ControlOrMeta+p")
   await page.getByRole("dialog", nav("Commands")).getByRole("combobox").fill("Rename")
   await page.keyboard.press("Enter")
@@ -389,13 +389,13 @@ test("Chords", async ({ page, start, context }) => {
   await expect.poll(() => fx.cli("agents", "list")).not.toContain(chordChat.id)
 
   // Design page and a Queue agent: no r, m or x (y copies the ID, and w and a need a workspace card), and x does nothing.
-  // The palette lists no Rename chat there; its New chat row proves the filter ran.
+  // The palette lists no Rename there; its New chat row proves the filter ran.
   const expectNoRenameInPalette = async () => {
     await page.keyboard.press("ControlOrMeta+p")
     const commands = page.getByRole("dialog", nav("Commands"))
     await commands.getByRole("combobox").fill("chat")
     await expect(commands.getByText("New chat")).toBeVisible()
-    await expect(commands.getByText("Rename chat")).toHaveCount(0)
+    await expect(commands.getByText("Rename")).toHaveCount(0)
     await page.keyboard.press("Escape")
     await expect(commands).toHaveCount(0)
   }

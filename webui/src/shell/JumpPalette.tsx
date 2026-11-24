@@ -14,6 +14,7 @@ import {
   SectionNeedsYou,
   SectionOnHold,
   SectionReadyToDesign,
+  type ChatDraftRow,
   type DesignDraftRow,
   type EpicListRow,
   type SessionInfo,
@@ -21,8 +22,11 @@ import {
   type Workspace,
 } from "../generated/server"
 import { ItemMenu, itemOfCard, type ItemRef } from "../workspaces/itemActions"
-import { agentHref, currentAddress, draftHref } from "../hrefs"
-import { DraftIcon } from "./SidebarRows"
+import { useConfirmRequest } from "../actions/confirmRequest"
+import { liveSessions } from "../design/view"
+import { useOnChange } from "../hooks"
+import { agentHref, chatDraftHref, currentAddress, draftHref } from "../hrefs"
+import { ChatDraftIcon, DraftIcon } from "./SidebarRows"
 import { epicRow, Menu, type ListRowData, type ListSection } from "../nav/JumpMenu"
 import { useWide } from "../useWide"
 import {
@@ -85,7 +89,6 @@ function agentRow(
 }
 
 function draftRow(d: DesignDraftRow, subtitle: string, workspaces: Workspace[]): ListRowData {
-  const status = draftStatus()
   const item: ItemRef = {
     key: d.member_key,
     name: d.label,
@@ -100,7 +103,25 @@ function draftRow(d: DesignDraftRow, subtitle: string, workspaces: Workspace[]):
     href: draftHref(d.id),
     searchText: [d.label, d.project, subtitle].join(" "),
     lead: <DraftIcon />,
-    trailing: trailingOf(status, item, workspaces),
+    trailing: trailingOf(draftStatus(), item, workspaces),
+  }
+}
+
+function chatDraftRow(d: ChatDraftRow, subtitle: string, workspaces: Workspace[]): ListRowData {
+  const item: ItemRef = {
+    key: d.member_key,
+    name: d.label,
+    kind: "chat-draft",
+    workspace: d.workspace,
+  }
+  return {
+    key: d.member_key,
+    title: d.label,
+    subtitle,
+    href: chatDraftHref(d.id),
+    searchText: [d.label, d.project, subtitle].join(" "),
+    lead: <ChatDraftIcon />,
+    trailing: trailingOf(draftStatus(), item, workspaces),
   }
 }
 
@@ -109,6 +130,7 @@ export interface PaletteInput {
   sessions: SessionInfo[]
   placements: SessionPlacement[]
   drafts?: DesignDraftRow[]
+  chatDrafts?: ChatDraftRow[]
   workspaces?: Workspace[]
   workspace: string
   current: string
@@ -123,6 +145,7 @@ export function buildPalette({
   sessions,
   placements,
   drafts = [],
+  chatDrafts = [],
   workspaces = [],
   workspace,
   current,
@@ -138,8 +161,15 @@ export function buildPalette({
     return {
       ...epicRow(r, isCurrent(r, current)),
       subtitle: subtitle ?? "",
-      trailing: trailingOf(cardStatus(r), itemOfCard(r), workspaces),
+      trailing: trailingOf(cardStatus(r), cardItem(r), workspaces),
     }
+  }
+  // A Design's Stop ends its one live session, so the item carries that session and the count.
+  const cardItem = (r: EpicListRow): ItemRef | undefined => {
+    const item = itemOfCard(r)
+    if (item?.kind !== "design") return item
+    const live = liveSessions(r.address, sessions)
+    return { ...item, liveSessions: live.length, session: live[0] }
   }
   const elsewhere = (r: EpicListRow) => (mine(r) ? undefined : r.workspace)
   const held = (r: EpicListRow) => r.section === SectionOnHold
@@ -153,7 +183,13 @@ export function buildPalette({
       s,
       p.workspace === workspace ? "" : (p.workspace ?? ""),
       p.workspace
-        ? { key: s.id, name: s.name || s.ticket || s.id, kind: "chat", workspace: p.workspace }
+        ? {
+            key: s.id,
+            name: s.name || s.ticket || s.id,
+            kind: "chat",
+            workspace: p.workspace,
+            session: s,
+          }
         : undefined,
       workspaces,
     )
@@ -170,6 +206,13 @@ export function buildPalette({
       key: "design-drafts",
       title: "Design drafts",
       rows: drafts.filter((d) => d.workspace === workspace).map((d) => draftRow(d, "", workspaces)),
+    },
+    {
+      key: "chat-drafts",
+      title: "Chat drafts",
+      rows: chatDrafts
+        .filter((d) => d.workspace === workspace)
+        .map((d) => chatDraftRow(d, "", workspaces)),
     },
     {
       key: "epics",
@@ -206,6 +249,9 @@ export function buildPalette({
         ...drafts
           .filter((d) => d.workspace !== workspace)
           .map((d) => draftRow(d, d.workspace, workspaces)),
+        ...chatDrafts
+          .filter((d) => d.workspace !== workspace)
+          .map((d) => chatDraftRow(d, d.workspace, workspaces)),
       ],
     },
     {
@@ -277,6 +323,7 @@ export function JumpPalette({ fetcher, active }: { fetcher?: FetchEpicList; acti
   const placements = snapshot?.placements
   const workspaces = snapshot?.workspaces
   const drafts = snapshot?.design_drafts
+  const chatDrafts = snapshot?.chat_drafts
   const current = currentAddress(pathname)
   const sections = useMemo(
     () =>
@@ -285,12 +332,18 @@ export function JumpPalette({ fetcher, active }: { fetcher?: FetchEpicList; acti
         sessions: sessions ?? [],
         placements: placements ?? [],
         drafts,
+        chatDrafts,
         workspaces,
         workspace: active,
         current,
       }),
-    [rows, sessions, placements, drafts, workspaces, active, current],
+    [rows, sessions, placements, drafts, chatDrafts, workspaces, active, current],
   )
+  // A confirm started from a row is a modal, so the palette steps aside before it opens.
+  const confirming = useConfirmRequest() !== null
+  useOnChange(confirming, (now) => {
+    if (now) setOpen(false)
+  })
   if (!open) return null
   return (
     <Box ref={root} display="contents" data-gx-action="jump-menu">

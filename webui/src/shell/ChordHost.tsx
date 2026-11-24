@@ -1,39 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useOnChange } from "../hooks"
-import { useNavigate } from "react-router"
-import { isLoopEntity, type Entity } from "../actions/entity"
-import { useActions, type ReadyAction } from "../actions/useActions"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { useLatest } from "../hooks"
 import { leaderKeyOf } from "../leaderKey"
 import { hasLayer } from "../ui/modal/layers"
-import { WORKSPACE_ONLY } from "../workspaces/itemActions"
-import { useWorkspaces } from "../workspaces/useActiveWorkspace"
 import { ChordBox } from "./ChordBox"
 import { openHistory } from "../history/historyOpener"
-import { chatDraftPageActions, draftPageActions } from "./draftPageActions"
-import { chordTable, letterOf, matchesKey, useOpenEntity, type Chord } from "./chords"
-import { openWorkspacePicker } from "./workspacePickerOpen"
-
-/**
- * What a chord does for an action. A draft page owns its Rename (focus the title) and its Remove
- * (the footer pair or an instant delete), and Move has no submenu on a chord, so it opens the picker.
- */
-function runOf(a: ReadyAction, entity: Entity | undefined): () => void {
-  if (a.id === "move")
-    return () => openWorkspacePicker({ name: entity?.name ?? "", items: a.items ?? [] })
-  if (a.id === "rename" || a.id === "remove") {
-    const page =
-      entity?.kind === "design-draft"
-        ? draftPageActions
-        : entity?.kind === "chat-draft"
-          ? chatDraftPageActions
-          : undefined
-    const id = a.id
-    if (page) return () => page()?.[id]()
-  }
-  return a.run
-}
+import { chordTable, letterOf, matchesKey, type Chord } from "./chords"
+import { useOpenEntityActions } from "./useOpenEntityActions"
 
 const MODIFIER_KEYS = new Set(["Control", "Meta", "Alt", "Shift"])
 const BOX = '[role="menu"][aria-label="Chords"]'
@@ -44,22 +18,14 @@ const BOX = '[role="menu"][aria-label="Chords"]'
  * `chords` replaces the real table (tests pass their own).
  */
 export function ChordHost({ chords }: { chords?: Chord[] }) {
-  const navigate = useNavigate()
   const { snapshot } = useConnectionState(useConnectionContext())
   const leader = leaderKeyOf(snapshot)
-  const { path: pathname, session, entity } = useOpenEntity()
-  const { workspaces } = useWorkspaces(useConnectionContext())
+  const { path: pathname, session, actions } = useOpenEntityActions()
   const [open, setOpen] = useState(false)
   const ctx = useMemo(() => ({ path: pathname, session }), [pathname, session])
 
   // The listener is mounted once and reads everything at event time. Every chord is the registry's
-  // action for the open entity, run as a modal (a chord has no button to anchor on). A removed
-  // chat leaves its page.
-  const { actions } = useActions(entity, {
-    surface: { mode: "modal" },
-    workspaces,
-    onRemoved: () => navigate("/agents"),
-  })
+  // action for the open entity.
   const live = useLatest({ leader, ctx })
   const openRef = useRef(false)
   const close = useCallback(() => {
@@ -67,14 +33,10 @@ export function ChordHost({ chords }: { chords?: Chord[] }) {
     setOpen(false)
   }, [])
 
-  // A Design or epic outside every workspace has no Move and no Archive, as on its page.
-  const noWorkspace = !!entity && isLoopEntity(entity) && !entity.archived && !entity.workspace
   const table =
     chords ??
     chordTable({
-      actions: actions
-        .filter((a) => !(noWorkspace && WORKSPACE_ONLY.includes(a.id)))
-        .map((a) => ({ ...a, run: runOf(a, entity) })),
+      actions,
       history: () => {
         openHistory()
       },

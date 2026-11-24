@@ -13,8 +13,10 @@ import {
   SectionReadyToDesign,
   type DesignDraftRow,
   type EpicListRow,
+  type SessionInfo,
   type SessionPlacement,
 } from "../generated/server"
+import { closeConfirm, currentConfirm } from "../actions/confirmRequest"
 import { Modal } from "../ui/modal/Modal"
 import { renderThemed } from "../ui/render"
 import { JumpPalette } from "./JumpPalette"
@@ -86,7 +88,17 @@ function Where() {
   return <div data-testid="where">{useLocation().pathname}</div>
 }
 
-function setup({ path = "/agents", narrow = false } = {}) {
+const chatDrafts = [
+  { ...draft("c1", "Chat sketch", "Default", "homes"), harness: "claude" },
+  { ...draft("c2", "Far chat sketch", "Work"), harness: "claude" },
+].map((d) => ({ ...d, member_key: `chat-draft/${d.id}` }))
+
+function setup({
+  path = "/agents",
+  narrow = false,
+  extraSessions = [] as SessionInfo[],
+  withChatDrafts = false,
+} = {}) {
   vi.stubGlobal(
     "fetch",
     vi.fn(
@@ -109,9 +121,10 @@ function setup({ path = "/agents", narrow = false } = {}) {
     }))
   const state = {
     snapshot: {
-      sessions,
+      sessions: [...sessions, ...extraSessions],
       placements,
       design_drafts: drafts,
+      chat_drafts: withChatDrafts ? chatDrafts : [],
       workspaces: [
         { name: "Default", default: true, members: 3 },
         { name: "Work", members: 2 },
@@ -397,4 +410,71 @@ test("Hold from a row posts, and a held row offers Take off hold", async () => {
   type("frozen")
   fireEvent.click(menuOf("frozen")!)
   expect(await screen.findByRole("menuitem", { name: "Take off hold" })).toBeTruthy()
+})
+
+const menuLabels = async (name: string) => {
+  fireEvent.click(menuOf(name)!)
+  return (await screen.findAllByRole("menuitem")).map((i) => i.textContent?.replace("›", "") ?? "")
+}
+
+test("a chat row's menu offers Move, Switch model, Promote, Stop, Copy ID and Remove", async () => {
+  setup()
+  await open()
+  await waitFor(() => expect(names()).toContain("my-chat"))
+  const labels = await menuLabels("my-chat")
+  expect(labels).toEqual([
+    "Rename",
+    "Move to workspace",
+    "Switch model",
+    "Promote to Design",
+    "Stop",
+    "Copy ID",
+    "Remove",
+  ])
+})
+
+test.each([
+  [1, true],
+  [2, false],
+])("a Design row with %i live sessions offers Stop: %s", async (n, stop) => {
+  const live = Array.from({ length: n }, (_, i) =>
+    session(`ds${i}`, "p", { design: true, ticket: "p:shop/1", name: `ds${i}` }),
+  )
+  setup({ extraSessions: live })
+  await open()
+  await waitFor(() => expect(names()).toContain("shop"))
+  const labels = await menuLabels("shop")
+  expect(labels.includes("Stop")).toBe(stop)
+})
+
+test("chat drafts show in the active workspace and under Other workspaces, found by label or project", async () => {
+  setup({ withChatDrafts: true })
+  await open()
+  await waitFor(() => expect(names()).toContain("blog"))
+  expect(names()).toContain("Chat sketch")
+  expect(names()).not.toContain("Far chat sketch")
+  expect(within(option("Chat sketch")).getByText("Draft")).toBeTruthy()
+  type("far chat")
+  expect(names()).toEqual(["Far chat sketch"])
+  expect(within(option("Far chat sketch")).getByText("Work")).toBeTruthy()
+  type("homes")
+  expect(names()).toContain("Chat sketch")
+  const labels = await menuLabels("Chat sketch")
+  expect(labels).toEqual(["Rename", "Move to workspace", "Remove"])
+})
+
+test.each([
+  ["a chat row", "my-chat", {}],
+  ["a chat draft row", "Chat sketch", { withChatDrafts: true }],
+  ["a design draft row", "Kitchen sketch", {}],
+])("Remove on %s closes the palette and opens a modal confirm", async (_, name, opts) => {
+  setup(opts)
+  await open()
+  await waitFor(() => expect(names()).toContain(name))
+  fireEvent.click(menuOf(name)!)
+  fireEvent.click(await screen.findByRole("menuitem", { name: /^Remove/ }))
+  await waitFor(() => expect(currentConfirm()?.title).toBe(`Remove ${name}`))
+  expect(currentConfirm()?.surface.mode).toBe("modal")
+  expect(screen.queryByRole("dialog", { name: "Jump to" })).toBeNull()
+  closeConfirm()
 })

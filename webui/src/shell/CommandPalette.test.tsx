@@ -11,6 +11,7 @@ import {
   SectionNeedsYou,
   type EpicListRow,
 } from "../generated/server"
+import { closeConfirm, currentConfirm } from "../actions/confirmRequest"
 import { Modal } from "../ui/modal/Modal"
 import { renderThemed } from "../ui/render"
 import { CommandPalette } from "./CommandPalette"
@@ -82,6 +83,8 @@ function setup({
   epics = defaultEpics,
   follow_ups = [] as unknown[],
   sessions = [session("s1", "gamma")],
+  workspaces = [] as unknown[],
+  design_drafts = [] as unknown[],
 } = {}) {
   vi.spyOn(navigator, "platform", "get").mockReturnValue(mac ? "MacIntel" : "Linux x86_64")
   vi.stubGlobal(
@@ -105,7 +108,7 @@ function setup({
       removeEventListener() {},
     }))
   const state = {
-    snapshot: { sessions, placements: [], workspaces: [], afk },
+    snapshot: { sessions, placements: [], workspaces, design_drafts, afk },
     connected: true,
     loadedOnce: true,
     tick: 0,
@@ -175,27 +178,98 @@ test("opens from a focused text box with the filter focused, and a second press 
   expect(palette()).toBeNull()
 })
 
-test("lists Rename chat after New chat on a chat's page and opens the popup for that chat", () => {
-  setup({ path: "/agents/s2", sessions: [session("s1", "gamma"), session("s2", "gamma")] })
+const NAV = [
+  "New design",
+  "New chat",
+  "Next question",
+  "Go to Epics",
+  "Go to Agents",
+  "Go to Stats",
+  "Go to Settings",
+  "Toggle AFK",
+]
+const hintOf = (name: string) =>
+  within(screen.getByRole("option", { name: new RegExp(`^${name}`) })).queryByText(/^[a-z]$/)
+    ?.textContent
+
+test("a chat's page lists its registry actions above the commands, with chord hints, and Rename opens the popup", () => {
+  setup({
+    path: "/agents/s2",
+    sessions: [session("s1", "gamma"), session("s2", "gamma")],
+    workspaces: [{ name: "Default" }, { name: "Work" }],
+  })
   press({ key: "p", ctrlKey: true })
   const list = names()
-  expect(list.indexOf("Rename chat")).toBe(list.indexOf("New chat") + 1)
-  fireEvent.click(screen.getByRole("option", { name: /Rename chat/ }))
+  expect(list).toEqual([
+    "Rename",
+    "Move to workspace",
+    "Switch model",
+    "Promote to Design",
+    "Stop",
+    "Copy ID",
+    "Remove",
+    ...NAV,
+  ])
+  expect([
+    hintOf("Rename"),
+    hintOf("Move to workspace"),
+    hintOf("Switch model"),
+    hintOf("Promote to Design"),
+    hintOf("Stop"),
+    hintOf("Copy ID"),
+    hintOf("Remove"),
+  ]).toEqual(["r", "w", "m", undefined, undefined, "y", "x"])
+  const remove = screen.getByRole("option", { name: /^Remove/ })
+  expect(within(remove).getByText("Remove").getAttribute("data-danger")).toBe("true")
+  fireEvent.click(screen.getByRole("option", { name: /^Rename/ }))
   expect(screen.getByTestId("renaming").textContent).toBe("s2")
   act(() => closeRename())
+})
+
+test("a Remove row closes the palette and opens a modal confirm", async () => {
+  setup({ path: "/agents/s2", sessions: [session("s1", "gamma"), session("s2", "gamma")] })
+  press({ key: "p", ctrlKey: true })
+  fireEvent.click(screen.getByRole("option", { name: /^Remove/ }))
+  expect(palette()).toBeNull()
+  expect(currentConfirm()?.surface.mode).toBe("modal")
+  expect(currentConfirm()?.title).toBe("Remove s2")
+  closeConfirm()
 })
 
 test.each([
   ["a Queue agent page", "/agents/s1", { queue: true }],
   ["a Fix agent page", "/agents/s1", { fix_of: "gx:e/1" }],
   ["a Ticket agent page", "/agents/s1", { ticket: "gx:e/1" }],
-  ["a Design page", "/designs/s1", {}],
   ["the agents list", "/agents", {}],
   ["the epics page", "/epics", {}],
-])("hides Rename chat on %s", (_, path, over) => {
+])("offers no Rename on %s", (_, path, over) => {
   setup({ path, sessions: [session("s1", "gamma", over)] })
   press({ key: "p", ctrlKey: true })
-  expect(names()).not.toContain("Rename chat")
+  expect(names()).not.toContain("Rename")
+})
+
+test.each([
+  ["no live session", [], false],
+  ["one live session", ["a"], true],
+  // The page's Stop ends the session it shows, so two live sessions still offer it.
+  ["two live sessions", ["a", "b"], true],
+])("a Design page with %s offers Stop only while its session is live", async (_, ids, stop) => {
+  const sessions = ids.map((id) =>
+    session(id, "p", { design: true, ticket: "p:design/1", name: id }),
+  )
+  setup({ path: "/d/p:design", sessions, epics: [card("design", 1, { address: "p:design" })] })
+  press({ key: "p", ctrlKey: true })
+  await waitFor(() => expect(names()).toContain("Hold"))
+  expect(names().includes("Stop")).toBe(stop)
+})
+
+test("an epic page lists Hold and Mark as merged, never Take off hold with them", async () => {
+  setup({ path: "/e/p:blog", epics: [card("blog", 1, { address: "p:blog" })] })
+  press({ key: "p", ctrlKey: true })
+  await waitFor(() => expect(names()).toContain("Hold"))
+  expect(names()).not.toContain("Take off hold")
+  expect(names()).toContain("Mark as merged")
+  expect(names().slice(-NAV.length)).toEqual(NAV)
 })
 
 test("does nothing under a Modal", () => {
@@ -218,12 +292,16 @@ test("the New design row runs the action once and opens no dialog", async () => 
   expect(screen.queryByRole("dialog")).toBeNull()
 })
 
-test("on a draft page the list has no Remove, Start design or Rename chat row", () => {
-  setup({ path: "/drafts/d1" })
+test("on a design draft page the list offers Rename, Move to workspace and Remove, no Start design", () => {
+  setup({
+    path: "/drafts/d1",
+    workspaces: [{ name: "Default" }, { name: "Work" }],
+    design_drafts: [
+      { id: "d1", label: "far-draft", project: "p", workspace: "Default", member_key: "draft/d1" },
+    ],
+  })
   press({ key: "p", ctrlKey: true })
-  const list = names()
-  expect(list).toContain("New design")
-  expect(list.filter((n) => /remove|start design|rename/i.test(n ?? ""))).toEqual([])
+  expect(names()).toEqual(["Rename", "Move to workspace", "Remove", ...NAV])
 })
 
 test("never stacks with Cmd+K, in either order", async () => {

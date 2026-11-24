@@ -5,7 +5,6 @@ import type { SessionInfo } from "../generated/server"
 import { registerHistoryOpener } from "../history/historyOpener"
 import {
   agentIdOf,
-  canRename,
   chatDraftIdOf,
   chordTable,
   displayKey,
@@ -301,15 +300,5 @@ describe("chord table d", () => {
       .find((c) => c.key === "d")
       ?.run()
     expect(startNewDesign).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe("canRename", () => {
-  const path = "/agents/s-a"
-  it("holds on a plain chat's page only", () => {
-    expect(canRename({ path, session: session() })).toBe(true)
-    expect(canRename({ path, session: session({ queue: true }) })).toBe(false)
-    expect(canRename({ path: "/epics", session: session() })).toBe(false)
-    expect(canRename({ path })).toBe(false)
   })
 })

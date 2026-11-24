@@ -119,6 +119,44 @@ test("a menu keeps the caller's section order, hides hiddenUntilSearch sections 
   expect(within(beta).getByText("extra-mark")).toBeTruthy()
 })
 
+test("a row with danger colors its title and a hint shows before the trailing slot", async () => {
+  const sections: ListSection[] = [
+    {
+      key: "a",
+      title: "Actions",
+      rows: [
+        plain("Remove", { danger: true, hint: "x", trailing: <span>tail</span> }),
+        plain("Rename", { hint: "r" }),
+        plain("Stop"),
+      ],
+    },
+  ]
+  renderThemed(
+    <RouterProvider
+      router={createMemoryRouter([
+        {
+          path: "*",
+          element: (
+            <Menu
+              sections={sections}
+              label="Pick"
+              placeholder="Filter"
+              phone={false}
+              onClose={() => {}}
+            />
+          ),
+        },
+      ])}
+    />,
+  )
+  const [remove, rename, stop] = await screen.findAllByRole("option")
+  expect(within(remove).getByText("Remove").getAttribute("data-danger")).toBe("true")
+  expect(within(rename).getByText("Rename").hasAttribute("data-danger")).toBe(false)
+  expect(within(remove).getByText("x").nextElementSibling?.textContent).toBe("tail")
+  expect(within(rename).getByText("r")).toBeTruthy()
+  expect(within(stop).queryByText(/^[a-z]$/)).toBeNull()
+})
+
 test("typing searches the caller's search text, reveals hidden sections, and Enter opens the cursor row's link", async () => {
   setupMenu()
   const input = await screen.findByRole("combobox", { name: "Pick" })
