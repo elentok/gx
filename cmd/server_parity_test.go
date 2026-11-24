@@ -35,6 +35,8 @@ var routeVerbs = map[string]string{
 	"GET /v1/usage/summary":                     "usage summary",
 	"POST /v1/usage/report":                     "claude report-limits",
 	"POST /v1/config/reload":                    "server reload-config",
+	"POST /v1/notify/send":                      "notify",
+	"POST /v1/notify/test":                      "config test-notifications",
 	"GET /v1/config/status":                     "server config-status",
 	"GET /v1/checks/status":                     "server checks",
 	"GET /v1/cleanup":                           "server cleanup",

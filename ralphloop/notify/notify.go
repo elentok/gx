@@ -2,9 +2,12 @@ package notify
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/notifykind"
 )
 
 // notifyKindCLI tags gate/run-log bookkeeping for gx notify's synchronous
@@ -61,6 +64,59 @@ func sendMessage(cfg config.NotificationsConfig, statePath, text, telegramBaseUR
 		joined = fmt.Errorf("%w; %w", joined, err)
 	}
 	return sent, joined
+}
+
+// OutcomeFailed is the direct fallback's outcome for a send that errored. The
+// server never answers it: a failed send is retried there, not reported.
+const OutcomeFailed = "failed"
+
+// SendCLIMessage is SendMessage for the CLI without a server: it applies each
+// chat channel's switch and the CLI message kind in channels first, as the
+// router does, and says what each of Telegram and Slack did, in that order.
+func SendCLIMessage(cfg config.NotificationsConfig, channels config.NotificationChannelsConfig, statePath, text string) ([]ChannelOutcome, error) {
+	return sendCLIMessage(cfg, channels, statePath, text, cliTelegramBaseURL())
+}
+
+func sendCLIMessage(cfg config.NotificationsConfig, channels config.NotificationChannelsConfig, statePath, text, telegramBaseURL string) ([]ChannelOutcome, error) {
+	out := []ChannelOutcome{{Channel: ChannelTelegram}, {Channel: ChannelSlack}}
+	gates := []struct {
+		configured bool
+		ch         config.ChannelConfig
+	}{
+		{cfg.Telegram.BotToken != "", channels.Telegram},
+		{cfg.Slack.WebhookURL != "", channels.Slack},
+	}
+	masked := cfg
+	for i, g := range gates {
+		switch {
+		case !g.configured:
+			out[i].Outcome = OutcomeUnconfigured
+		case !g.ch.Enabled:
+			out[i].Outcome = OutcomeOff
+		case !slices.Contains(g.ch.Kinds, notifykind.CLIMessage):
+			out[i].Outcome = OutcomeUnchecked
+		default:
+			continue
+		}
+		if i == 0 {
+			masked.Telegram = config.TelegramConfig{}
+		} else {
+			masked.Slack = config.SlackConfig{}
+		}
+	}
+	sent, err := sendMessage(masked, statePath, text, telegramBaseURL)
+	for i := range out {
+		switch {
+		case out[i].Outcome != "":
+		case slices.Contains(sent, out[i].Channel):
+			out[i].Outcome = OutcomeSent
+		case err != nil && strings.Contains(err.Error(), out[i].Channel+": "):
+			out[i].Outcome = OutcomeFailed
+		default:
+			out[i].Outcome = OutcomeMuted
+		}
+	}
+	return out, err
 }
 
 // SendTestBatch sends a fixed 2-message test batch to every notification

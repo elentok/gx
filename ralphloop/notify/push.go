@@ -15,6 +15,8 @@ type PushNote struct {
 	// Merged marks an event the caller already merged (the session banner), so
 	// the dispatcher sends it without holding it again.
 	Merged bool
+	// System skips the channel's kind list; the switch and the rest still apply.
+	System bool
 }
 
 // Push is the channel that sends Web Push to the subscribed devices.

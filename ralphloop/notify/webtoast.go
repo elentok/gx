@@ -6,6 +6,8 @@ type WebToastNote struct {
 	Kind        string // catalog id
 	Title, Body string
 	Target      Target
+	// System skips the channel's kind list; the switch and the rest still apply.
+	System bool
 }
 
 // WebToast is the channel that shows a toast on every open page.

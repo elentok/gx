@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -21,6 +22,7 @@ import (
 	"github.com/elentok/gx/server/queue"
 	"github.com/elentok/gx/server/runs"
 	"github.com/elentok/gx/server/sched"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
@@ -31,6 +33,91 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 )
+
+// routeServer is a server whose Slack webhook is an httptest one and whose
+// channels are set by ch.
+func routeServer(t *testing.T, ch settings.NotifyChannels) *Server {
+	t.Helper()
+	hook := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	t.Cleanup(hook.Close)
+	s, _, _ := pushServer(t, time.Now, func(c *Config) {
+		c.Settings.NotifyChannels = ch
+		c.Settings.Chat.SlackWebhookURL = hook.URL
+	})
+	t.Cleanup(s.chat.Close)
+	return s
+}
+
+func outcomes(t *testing.T, rec *httptest.ResponseRecorder) map[string]string {
+	t.Helper()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body)
+	}
+	var res wire.NotifyResult
+	if err := json.NewDecoder(rec.Body).Decode(&res); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, c := range res.Channels {
+		got[c.Channel] = c.Outcome
+	}
+	if len(got) != 5 {
+		t.Fatalf("channels = %v, want all five", got)
+	}
+	return got
+}
+
+func TestNotifyRoutes_OffChannelIsAResultNotAnHTTPError(t *testing.T) {
+	t.Parallel()
+	s := routeServer(t, settings.NotifyChannels{Slack: settings.NotifyChannel{Off: true}})
+	rec := httptest.NewRecorder()
+
+	rootRoutes{s}.notifySend(rec, httptest.NewRequest("POST", "/v1/notify/send", strings.NewReader(`{"message":"hi"}`)))
+
+	got := outcomes(t, rec)
+	if got["slack"] != notify.OutcomeOff {
+		t.Errorf("slack = %q, want %q (all: %v)", got["slack"], notify.OutcomeOff, got)
+	}
+	if got["telegram"] != notify.OutcomeUnconfigured {
+		t.Errorf("telegram = %q, want %q", got["telegram"], notify.OutcomeUnconfigured)
+	}
+}
+
+func TestNotifyRoutes_SendAppliesTheKindListAndTestSkipsIt(t *testing.T) {
+	t.Parallel()
+	none := settings.NotifyChannel{Kinds: []string{}}
+	s := routeServer(t, settings.NotifyChannels{Desktop: none, WebToast: none, Slack: none, Push: none})
+
+	send := httptest.NewRecorder()
+	rootRoutes{s}.notifySend(send, httptest.NewRequest("POST", "/v1/notify/send", strings.NewReader(`{"message":"hi"}`)))
+	test := httptest.NewRecorder()
+	rootRoutes{s}.notifyTest(test, httptest.NewRequest("POST", "/v1/notify/test", nil))
+
+	gotSend := outcomes(t, send)
+	for _, ch := range []string{"desktop", "web-toast", "slack", "push"} {
+		if gotSend[ch] != notify.OutcomeUnchecked {
+			t.Errorf("send: %s = %q, want %q", ch, gotSend[ch], notify.OutcomeUnchecked)
+		}
+	}
+	gotTest := outcomes(t, test)
+	for _, ch := range []string{"desktop", "web-toast", "slack", "push"} {
+		if gotTest[ch] != notify.OutcomeSent {
+			t.Errorf("test: %s = %q, want %q: a test skips the kind list", ch, gotTest[ch], notify.OutcomeSent)
+		}
+	}
+}
+
+func TestNotifyRoutes_SendNeedsAMessage(t *testing.T) {
+	t.Parallel()
+	s := routeServer(t, settings.NotifyChannels{})
+	rec := httptest.NewRecorder()
+
+	rootRoutes{s}.notifySend(rec, httptest.NewRequest("POST", "/v1/notify/send", strings.NewReader(`{}`)))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rec.Code)
+	}
+}
 
 // chatServer is a server wired to a fake Slack webhook that records each body.
 // It keeps the real 6s batch tick, so notices sent before s.chat.Close() share

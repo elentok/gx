@@ -164,9 +164,25 @@ func (c *transport) postBody(ctx context.Context, path, contentType string, body
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("server returned %s for %s: %s", resp.Status, path, strings.TrimSpace(string(msg)))
+		err := fmt.Errorf("server returned %s for %s: %s", resp.Status, path, strings.TrimSpace(string(msg)))
+		if resp.StatusCode == http.StatusNotFound {
+			return &unknownRouteError{err}
+		}
+		return err
 	}
 	return json.NewDecoder(resp.Body).Decode(res)
+}
+
+// unknownRouteError is a 404 on a POST: the server is older than the route.
+type unknownRouteError struct{ error }
+
+func (e *unknownRouteError) Unwrap() error { return e.error }
+
+// IsUnknownRoute reports whether err means the server has no such route, so a
+// caller can tell an old server from a failure.
+func IsUnknownRoute(err error) bool {
+	var u *unknownRouteError
+	return errors.As(err, &u)
 }
 
 // getBytes reads a non-JSON body and the Content-Type the server sent with it.

@@ -49,6 +49,21 @@ func (a *Admin) ReloadConfig(ctx context.Context) (wire.ReloadResult, error) {
 	return res, err
 }
 
+// Notify sends a CLI message through the router. A channel that did not send
+// is an outcome in the result, not an error.
+func (a *Admin) Notify(ctx context.Context, message string) (wire.NotifyResult, error) {
+	var res wire.NotifyResult
+	err := a.t.post(ctx, "/v1/notify/send", wire.NotifyRequest{Message: message}, &res)
+	return res, err
+}
+
+// TestNotifications sends a test message as a system message on all five channels.
+func (a *Admin) TestNotifications(ctx context.Context) (wire.NotifyResult, error) {
+	var res wire.NotifyResult
+	err := a.t.post(ctx, "/v1/notify/test", struct{}{}, &res)
+	return res, err
+}
+
 // ConfigStatus is the last reload result, the startup-only keys waiting for a
 // restart and the hard-limit grace countdown.
 func (a *Admin) ConfigStatus(ctx context.Context) (wire.ConfigStatus, error) {

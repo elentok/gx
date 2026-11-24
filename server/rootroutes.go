@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/brief"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/server/epics"
 	"github.com/elentok/gx/server/ticketwrite"
 	"github.com/elentok/gx/server/webauth"
@@ -34,7 +35,32 @@ func (r rootRoutes) routes() []wire.Route {
 		{Pattern: "GET /v1/events", Handler: r.streamEvents, Web: wire.WebRead},
 		{Pattern: "GET /v1/restart/check", Handler: r.restartCheck, Web: wire.WebRead},
 		{Pattern: "POST /v1/restart", Handler: r.restartWrite, Web: wire.WebWrite},
+		{Pattern: "POST /v1/notify/send", Handler: r.notifySend},
+		{Pattern: "POST /v1/notify/test", Handler: r.notifyTest},
 	}
+}
+
+// notifySend is `gx notify <message>`: a CLI message through the router.
+func (r rootRoutes) notifySend(w http.ResponseWriter, req *http.Request) {
+	var body wire.NotifyRequest
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil || body.Message == "" {
+		http.Error(w, "message required", http.StatusBadRequest)
+		return
+	}
+	wire.WriteJSON(w, notifyResult(r.s.chat.NotifyOutcomes(body.Message)))
+}
+
+// notifyTest is `gx config test-notifications`: a system message on all five channels.
+func (r rootRoutes) notifyTest(w http.ResponseWriter, _ *http.Request) {
+	wire.WriteJSON(w, notifyResult(r.s.chat.TestNotifications()))
+}
+
+func notifyResult(outcomes []notify.ChannelOutcome) wire.NotifyResult {
+	res := wire.NotifyResult{Channels: make([]wire.NotifyChannel, 0, len(outcomes))}
+	for _, o := range outcomes {
+		res.Channels = append(res.Channels, wire.NotifyChannel{Channel: o.Channel, Outcome: o.Outcome})
+	}
+	return res
 }
 
 func (r rootRoutes) restartCheck(w http.ResponseWriter, req *http.Request) {

@@ -2,10 +2,12 @@ package notify
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/notifykind"
 )
 
 func TestSendMessage_NoneConfigured_NoOpsAndReturnsNoSent(t *testing.T) {
@@ -16,6 +18,50 @@ func TestSendMessage_NoneConfigured_NoOpsAndReturnsNoSent(t *testing.T) {
 	}
 	if len(sent) != 0 {
 		t.Fatalf("sent = %v, want none", sent)
+	}
+}
+
+func TestSendMessage_CLIChannelsApplySwitchKindListAndMute(t *testing.T) {
+	t.Parallel()
+	on := config.ChannelConfig{Enabled: true, Kinds: []string{notifykind.CLIMessage}}
+	for _, tc := range []struct {
+		name  string
+		slack config.ChannelConfig
+		mute  bool
+		want  string
+		posts int
+	}{
+		{"on", on, false, OutcomeSent, 1},
+		{"switch off", config.ChannelConfig{Kinds: on.Kinds}, false, OutcomeOff, 0},
+		{"kind unchecked", config.ChannelConfig{Enabled: true, Kinds: []string{}}, false, OutcomeUnchecked, 0},
+		{"manual mute", on, true, OutcomeMuted, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			slackServer, getSlackRequests := fakeSlackServer(t, http.StatusOK)
+			statePath := testStatePath(t)
+			if tc.mute {
+				if err := UpdateNotificationState(statePath, func(s *NotificationState) {
+					s.Transports["slack"] = TransportState{Muted: true, Reason: "manual-disable"}
+				}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cfg := config.NotificationsConfig{Slack: config.SlackConfig{WebhookURL: slackServer.URL}}
+
+			got, err := sendCLIMessage(cfg, config.NotificationChannelsConfig{Telegram: on, Slack: tc.slack}, statePath, "hi", telegramAPIBaseURL)
+
+			if err != nil {
+				t.Fatalf("sendCLIMessage: %v", err)
+			}
+			want := []ChannelOutcome{{ChannelTelegram, OutcomeUnconfigured}, {ChannelSlack, tc.want}}
+			if !slices.Equal(got, want) {
+				t.Errorf("outcomes = %v, want %v", got, want)
+			}
+			if n := len(getSlackRequests()); n != tc.posts {
+				t.Errorf("slack requests = %d, want %d", n, tc.posts)
+			}
+		})
 	}
 }
 

@@ -1,6 +1,9 @@
 package notify
 
-import "github.com/elentok/gx/sound"
+import (
+	"github.com/elentok/gx/notifykind"
+	"github.com/elentok/gx/sound"
+)
 
 // Target is what a notification is about. The first non-empty field wins; the
 // zero value is the app home.
@@ -37,6 +40,8 @@ type DesktopNote struct {
 	Group         string
 	Activate      string
 	Execute, Link string
+	// System skips the channel's kind list; the switch and the rest still apply.
+	System bool
 }
 
 // Desktop is the channel that shows OS banners and plays sounds.
@@ -56,13 +61,24 @@ func (c *ServerChat) Desktop(n DesktopNote) {
 func (c *ServerChat) show(msg chatMessage, target Target) { c.showUrgent(msg, target, false) }
 
 func (c *ServerChat) showUrgent(msg chatMessage, target Target, urgent bool) {
-	if msg.catalog == "" {
+	c.fanOut(msg, target, urgent, false)
+}
+
+// fanOut hands msg to Desktop, Push and Web toast. A message with no catalog id
+// is never a kind, so only a system message (which skips the kind lists) may go
+// out without one.
+func (c *ServerChat) fanOut(msg chatMessage, target Target, urgent, system bool) {
+	if msg.catalog == "" && !system {
 		return
 	}
+	kind := msg.catalog
+	if system {
+		kind = notifykind.CLIMessage
+	}
 	title, body := pushText(msg)
-	c.Desktop(DesktopNote{Kind: msg.catalog, Title: title, Body: body, Target: target})
-	c.Push(PushNote{Kind: msg.catalog, Title: title, Body: body, Target: target, Urgent: urgent})
-	c.WebToast(WebToastNote{Kind: msg.catalog, Title: title, Body: body, Target: target})
+	c.Desktop(DesktopNote{Kind: kind, Title: title, Body: body, Target: target, System: system})
+	c.Push(PushNote{Kind: kind, Title: title, Body: body, Target: target, Urgent: urgent, System: system})
+	c.WebToast(WebToastNote{Kind: kind, Title: title, Body: body, Target: target, System: system})
 }
 
 func ticketTarget(project, epic, identifier string) Target {

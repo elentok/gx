@@ -38,6 +38,20 @@ func fakeServer(t *testing.T, h wire.Handshake) *apiclient.Client {
 	return apiclient.New(sock)
 }
 
+func TestAdminNotify_AnswerOf404IsAnUnknownRoute(t *testing.T) {
+	c := fakeServer(t, wire.Handshake{APIVersion: wire.APIVersion, Build: "old"})
+
+	_, err := c.Admin.Notify(context.Background(), "hi")
+	_, errTest := c.Admin.TestNotifications(context.Background())
+
+	if !apiclient.IsUnknownRoute(err) || !apiclient.IsUnknownRoute(errTest) {
+		t.Errorf("errors = %v, %v, want an unknown-route error from an old server", err, errTest)
+	}
+	if apiclient.IsUnknownRoute(errors.New("server returned 500")) {
+		t.Error("a plain error counts as an unknown route")
+	}
+}
+
 func TestNegotiate_MatchingBuildHasNoHintAndAllowsWrites(t *testing.T) {
 	c := fakeServer(t, wire.Handshake{APIVersion: wire.APIVersion, Build: "b1"})
 

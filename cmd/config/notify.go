@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -8,24 +9,27 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elentok/gx/apiclient"
 	gxconfig "github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop/notify"
+	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/tickets"
 )
 
 // NewNotify returns `gx notify`.
 func NewNotify(d Deps) *cobra.Command {
 	var enable, disable, project string
-	var status, testBatch bool
+	var status, testBatch, jsonOut bool
 
 	cmd := &cobra.Command{
 		Use:   "notify [message]",
-		Short: "send a message via configured Telegram/Slack notifications",
+		Short: "send a message to every notification channel that wants it",
 		Args:  cobra.MaximumNArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return runNotify(args, enable, disable, project, status, testBatch, d)
+		RunE: func(c *cobra.Command, args []string) error {
+			return runNotify(c, args, enable, disable, project, status, testBatch, jsonOut, d)
 		},
 	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "with a message: emit each channel's outcome as JSON")
 	cmd.Flags().StringVar(&enable, "enable", "", "clear the manual mute for every destination of a transport (telegram/slack)")
 	cmd.Flags().StringVar(&disable, "disable", "", "trip the manual mute for every destination of a transport (telegram/slack)")
 	cmd.Flags().StringVar(&project, "project", "", "with --enable/--disable: only that project's destination")
@@ -68,7 +72,7 @@ func notifyDestinations(d Deps) ([]notify.Destination, error) {
 // modes was requested: send a message, flip a transport's manual mute, or
 // report status. Args holds at most one positional message (Args:
 // cobra.MaximumNArgs(1)).
-func runNotify(args []string, enable, disable, project string, status, testBatch bool, d Deps) error {
+func runNotify(c *cobra.Command, args []string, enable, disable, project string, status, testBatch, jsonOut bool, d Deps) error {
 	hasMessage := len(args) == 1
 	controlFlags := 0
 	if enable != "" {
@@ -89,6 +93,8 @@ func runNotify(args []string, enable, disable, project string, status, testBatch
 		return fmt.Errorf("a message and --enable/--disable/--status/--test-batch are mutually exclusive")
 	case controlFlags > 1:
 		return fmt.Errorf("--enable, --disable, --status, and --test-batch are mutually exclusive")
+	case jsonOut && !hasMessage:
+		return fmt.Errorf("--json only applies when sending a message, not with --enable/--disable/--status/--test-batch")
 	case project != "" && enable == "" && disable == "":
 		return fmt.Errorf("--project only narrows --enable/--disable")
 	case enable != "":
@@ -100,34 +106,66 @@ func runNotify(args []string, enable, disable, project string, status, testBatch
 	case testBatch:
 		return sendTestBatch(d)
 	case hasMessage:
-		return sendNotify(args[0], d)
+		return sendNotify(c, args[0], jsonOut, d)
 	default:
 		return fmt.Errorf("notify requires a message or one of --enable/--disable/--status/--test-batch")
 	}
 }
 
-// sendNotify sends text to every notification service configured in
-// ~/.config/gx/config.json (Telegram and/or Slack), no-op'ing per-service
-// when unconfigured, and reports which service(s) it sent to.
-func sendNotify(text string, d Deps) error {
+// sendNotify sends text through the server's router, to every channel that is
+// on and wants a CLI message. With no server (or one too old for the route) it
+// sends to Telegram and Slack itself, under the same switch and kind list, and
+// says Desktop, Web toast and Push were skipped.
+func sendNotify(c *cobra.Command, text string, jsonOut bool, d Deps) error {
 	cfg, err := d.LoadConfig()
 	if err != nil {
 		return err
 	}
-
-	statePath, err := notificationStatePath(d.Dirs())
+	via, err := callRouter(c, d, func(ctx context.Context, a *apiclient.Admin) (wire.NotifyResult, error) {
+		return a.Notify(ctx, text)
+	})
 	if err != nil {
 		return err
 	}
-	sent, err := notify.SendMessage(cfg.Notifications, statePath, text)
-	if len(sent) == 0 {
-		if err == nil {
-			fmt.Fprintf(d.Stdout, "no notification service configured (see `gx config edit`)\n")
+	var sendErr error
+	if via.direct {
+		statePath, err := notificationStatePath(d.Dirs())
+		if err != nil {
+			return err
 		}
-		return err
+		var chat []notify.ChannelOutcome
+		chat, sendErr = notify.SendCLIMessage(cfg.Notifications, cfg.NotificationChannels, statePath, text)
+		via.res = directResult(chat)
+		if allUnconfigured(chat) && !jsonOut {
+			fmt.Fprintf(d.Stdout, "no notification service configured (see `gx config edit`)\n")
+			return nil
+		}
 	}
-	fmt.Fprintf(d.Stdout, "sent to: %s\n", strings.Join(sent, ", "))
-	return err
+	if jsonOut {
+		if err := printJSON(d.Stdout, via.res, via.direct); err != nil {
+			return err
+		}
+		return sendErr
+	}
+	if sent := sentTo(via.res); len(sent) > 0 {
+		fmt.Fprintf(d.Stdout, "sent to: %s\n", strings.Join(sent, ", "))
+	} else if sendErr == nil {
+		fmt.Fprintf(d.Stdout, "sent to no channel\n")
+	}
+	if skipped := skippedLine(via.res); skipped != "" {
+		fmt.Fprintf(d.Stdout, "not sent: %s\n", skipped)
+	}
+	return sendErr
+}
+
+// allUnconfigured reports whether neither chat channel has credentials.
+func allUnconfigured(chat []notify.ChannelOutcome) bool {
+	for _, o := range chat {
+		if o.Outcome != notify.OutcomeUnconfigured {
+			return false
+		}
+	}
+	return true
 }
 
 // sendTestBatch sends a fixed 2-message batch to every notification service

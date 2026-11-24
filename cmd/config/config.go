@@ -3,6 +3,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,9 +12,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cmd/cmdbase"
 	gxconfig "github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop/notify"
+	"github.com/elentok/gx/server/wire"
 )
 
 // Deps is the runtime context of `gx config` and `gx notify`.
@@ -81,15 +84,22 @@ func New(d Deps) *cobra.Command {
 				return runConfigDefaults(d)
 			},
 		},
-		&cobra.Command{
-			Use:   "test-notifications",
-			Short: "send a test message to every configured notification service",
-			Args:  cobra.NoArgs,
-			RunE: func(_ *cobra.Command, _ []string) error {
-				return runConfigTestNotifications(d)
-			},
-		},
+		testNotifications(d),
 	)
+	return cmd
+}
+
+func testNotifications(d Deps) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "test-notifications",
+		Short: "send a test message on every notification channel",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return runConfigTestNotifications(c, d, jsonOut)
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit each channel's outcome as JSON")
 	return cmd
 }
 
@@ -168,45 +178,81 @@ func runConfigDefaults(d Deps) error {
 	return nil
 }
 
-// runConfigTestNotifications sends a fixed test message to every notification
-// service that has credentials configured, reporting each one's outcome as
-// it goes rather than failing fast, so a Slack success is still visible even
+// runConfigTestNotifications sends a test message as a system message on all
+// five channels through the server's router, and prints each channel's
+// outcome. With no server (or one too old for the route) it tests Telegram and
+// Slack itself and says the other three were skipped. It reports each outcome
+// as it goes rather than failing fast, so a Slack success is still visible even
 // if Telegram is misconfigured.
-func runConfigTestNotifications(d Deps) error {
+func runConfigTestNotifications(c *cobra.Command, d Deps, jsonOut bool) error {
 	cfg, err := d.LoadConfig()
 	if err != nil {
 		return err
 	}
-
-	configured := 0
-	failed := 0
-
-	if cfg.Notifications.Telegram.BotToken != "" {
-		configured++
-		if err := notify.SendTelegramTestMessage(cfg.Notifications.Telegram.BotToken, cfg.Notifications.Telegram.ChatID); err != nil {
-			failed++
-			fmt.Fprintf(d.Stderr, "telegram: failed: %v\n", err)
-		} else {
-			fmt.Fprintf(d.Stdout, "telegram: sent\n")
+	via, err := callRouter(c, d, func(ctx context.Context, a *apiclient.Admin) (wire.NotifyResult, error) {
+		return a.TestNotifications(ctx)
+	})
+	if err != nil {
+		return err
+	}
+	var failed, configured int
+	if via.direct {
+		var chat []notify.ChannelOutcome
+		chat, failed = testChatDirect(cfg, d.Stderr)
+		via.res = directResult(chat)
+		for _, o := range chat {
+			if o.Outcome != notify.OutcomeUnconfigured {
+				configured++
+			}
+		}
+		if configured == 0 && !jsonOut {
+			fmt.Fprintf(d.Stdout, "no notification service configured (see `gx config edit`)\n")
+			return nil
 		}
 	}
-
-	if cfg.Notifications.Slack.WebhookURL != "" {
-		configured++
-		if err := notify.SendSlackTestMessage(cfg.Notifications.Slack.WebhookURL); err != nil {
-			failed++
-			fmt.Fprintf(d.Stderr, "slack: failed: %v\n", err)
-		} else {
-			fmt.Fprintf(d.Stdout, "slack: sent\n")
+	if jsonOut {
+		if err := printJSON(d.Stdout, via.res, via.direct); err != nil {
+			return err
 		}
-	}
-
-	if configured == 0 {
-		fmt.Fprintf(d.Stdout, "no notification service configured (see `gx config edit`)\n")
-		return nil
+	} else {
+		for _, ch := range via.res.Channels {
+			if ch.Outcome != notify.OutcomeFailed {
+				fmt.Fprintf(d.Stdout, "%s: %s\n", ch.Channel, ch.Outcome)
+			}
+		}
 	}
 	if failed > 0 {
 		return fmt.Errorf("%d of %d notification(s) failed to send", failed, configured)
 	}
 	return nil
+}
+
+// testChatDirect tests Telegram and Slack from this process. A channel whose
+// switch is off is not tested, so the test tells the truth about what a real
+// message would do. It returns the outcomes and how many sends failed.
+func testChatDirect(cfg gxconfig.Config, stderr io.Writer) (out []notify.ChannelOutcome, failed int) {
+	test := func(channel string, configured bool, ch gxconfig.ChannelConfig, send func() error) {
+		switch {
+		case !configured:
+			out = append(out, notify.ChannelOutcome{Channel: channel, Outcome: notify.OutcomeUnconfigured})
+		case !ch.Enabled:
+			out = append(out, notify.ChannelOutcome{Channel: channel, Outcome: notify.OutcomeOff})
+		default:
+			if err := send(); err != nil {
+				failed++
+				fmt.Fprintf(stderr, "%s: failed: %v\n", channel, err)
+				out = append(out, notify.ChannelOutcome{Channel: channel, Outcome: notify.OutcomeFailed})
+			} else {
+				out = append(out, notify.ChannelOutcome{Channel: channel, Outcome: notify.OutcomeSent})
+			}
+		}
+	}
+	tg, slack := cfg.Notifications.Telegram, cfg.Notifications.Slack
+	test(notify.ChannelTelegram, tg.BotToken != "", cfg.NotificationChannels.Telegram, func() error {
+		return notify.SendTelegramTestMessage(tg.BotToken, tg.ChatID)
+	})
+	test(notify.ChannelSlack, slack.WebhookURL != "", cfg.NotificationChannels.Slack, func() error {
+		return notify.SendSlackTestMessage(slack.WebhookURL)
+	})
+	return out, failed
 }

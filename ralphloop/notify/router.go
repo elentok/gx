@@ -47,6 +47,74 @@ func (c *ServerChat) Active() bool {
 	return c != nil && (c.base.Desktop != nil || c.base.Push != nil || c.base.WebToast != nil || c.Enabled())
 }
 
+// The outcome strings are a public contract: the notify routes, the CLI and the
+// web UI show them.
+const (
+	OutcomeSent         = "sent"
+	OutcomeOff          = "off"          // the channel's switch is off
+	OutcomeUnchecked    = "unchecked"    // the kind is not in the channel's list
+	OutcomeMuted        = "muted"        // a rest period or a manual mute
+	OutcomeTripped      = "tripped"      // the send-rate breaker is tripped
+	OutcomeUnconfigured = "unconfigured" // nothing to send to
+)
+
+// The channel names, in the order the Notifications settings list them.
+const (
+	ChannelDesktop  = "desktop"
+	ChannelWebToast = "web-toast"
+	ChannelTelegram = "telegram"
+	ChannelSlack    = "slack"
+	ChannelPush     = "push"
+)
+
+// ChannelOutcome is what one channel did with one message.
+type ChannelOutcome struct{ Channel, Outcome string }
+
+// Preflighter is implemented by the Desktop, Web toast and Push adapters: it
+// says what the channel would do with a note of kind now. system skips the kind list.
+type Preflighter interface {
+	Preflight(kind string, system bool) string
+}
+
+func adapterOutcome(channel any, kind string, system bool) string {
+	if channel == nil {
+		return OutcomeUnconfigured
+	}
+	if p, ok := channel.(Preflighter); ok {
+		return p.Preflight(kind, system)
+	}
+	return OutcomeSent
+}
+
+// Route sends msg to all five channels and returns each one's outcome. A system
+// message skips the kind lists; every other gate applies. The Desktop, Web toast
+// and Push outcomes are read just before the send, so a racing send can differ.
+func (c *ServerChat) Route(msg chatMessage, target Target, system bool) []ChannelOutcome {
+	if c == nil {
+		return nil
+	}
+	kind := notifykind.CLIMessage
+	if !system && msg.catalog != "" {
+		kind = msg.catalog
+	}
+	byChannel := map[string]string{
+		ChannelDesktop:  adapterOutcome(c.base.Desktop, kind, system),
+		ChannelWebToast: adapterOutcome(c.base.WebToast, kind, system),
+		ChannelPush:     adapterOutcome(c.base.Push, kind, system),
+		ChannelTelegram: OutcomeUnconfigured,
+		ChannelSlack:    OutcomeUnconfigured,
+	}
+	c.fanOut(msg, target, false, system)
+	for _, s := range c.globalSinks() {
+		byChannel[s.transport.name()] = s.sendItem(newBatchedMessage(s.style, msg), "cli", "")
+	}
+	var out []ChannelOutcome
+	for _, ch := range []string{ChannelDesktop, ChannelWebToast, ChannelTelegram, ChannelSlack, ChannelPush} {
+		out = append(out, ChannelOutcome{Channel: ch, Outcome: byChannel[ch]})
+	}
+	return out
+}
+
 // as returns msg tagged with its catalog id.
 func (m chatMessage) as(id string) chatMessage {
 	m.catalog = id

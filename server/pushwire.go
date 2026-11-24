@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/ralphloop/notify"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/webauth"
 	"github.com/elentok/gx/server/webpush"
 	"github.com/elentok/gx/server/wire"
@@ -97,7 +98,7 @@ func (p *pushAdapter) Send(n notify.PushNote) {
 		return
 	}
 	cur := p.s.settings.Load()
-	if cur != nil && (!cur.NotifyChannels.Push.Enabled() || !slices.Contains(cur.NotifyChannels.Push.KindIDs(), n.Kind)) {
+	if cur != nil && (!cur.NotifyChannels.Push.Enabled() || !(n.System || slices.Contains(cur.NotifyChannels.Push.KindIDs(), n.Kind))) {
 		return
 	}
 	tag := n.Tag
@@ -109,6 +110,11 @@ func (p *pushAdapter) Send(n notify.PushNote) {
 		send = bannerPush(p.s)
 	}
 	send.SendPush(n.Title, n.Body, n.Target.Path(), tag, n.Urgent)
+}
+
+// Preflight is what the channel would do with a note of kind now.
+func (p *pushAdapter) Preflight(kind string, system bool) string {
+	return preflight(p.s, notify.ChannelPush, func(n settings.NotifyChannels) settings.NotifyChannel { return n.Push }, kind, system)
 }
 
 // pushService is the push routes' view of the server. The routes run only

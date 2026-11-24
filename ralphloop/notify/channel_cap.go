@@ -14,7 +14,7 @@ import "time"
 // (zero means seriesRetention).
 //
 // Unlike the Chat gate it never touches a ticket: the per-source mute and the
-// needs-repair parking stay with Telegram and Slack. If the state file is
+// pause of a ticket stay with Telegram and Slack. If the state file is
 // unavailable the notification goes out.
 func ChannelCap(path, channel string, now time.Time, clear time.Duration) (send, trip bool) {
 	if path == "" {

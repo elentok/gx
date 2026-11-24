@@ -575,30 +575,48 @@ func (s *chatEventSink) sendMessage(msg chatMessage, source, ticketIdentifier st
 	s.sendItem(newBatchedMessage(s.style, msg), source, ticketIdentifier)
 }
 
-func (s *chatEventSink) sendItem(item batchedMessage, source, ticketIdentifier string) {
-	if s.silenced() || s.kindUnchecked(item.msg) {
-		return
+// sendItem queues item unless a gate says no, and returns the router's outcome
+// for it (see Outcome*). Most callers ignore it.
+func (s *chatEventSink) sendItem(item batchedMessage, source, ticketIdentifier string) string {
+	switch {
+	case s.channelOff():
+		return OutcomeOff
+	case s.isQuiet():
+		return OutcomeMuted
+	case s.kindUnchecked(item.msg):
+		return OutcomeUnchecked
 	}
 	notifyKind := item.kind
 	result, err := s.gate(notifyKind, source, false)
 	if err != nil {
 		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
 		s.enqueueItem(item)
-		return
+		return OutcomeSent
 	}
 
 	switch result.Decision {
-	case Allowed:
-		s.enqueueItem(item)
 	case PerSourceMuted:
 		if result.EdgeTriggered {
 			s.enqueueMessage(mutedMessage(source, ticketIdentifier))
 		}
+		return OutcomeMuted
 	case GloballyMuted:
 		if result.EdgeTriggered {
 			s.enqueueMessage(globallyMutedMessage(s.transport.name()))
 		}
+		return s.globalMuteOutcome()
 	}
+	s.enqueueItem(item)
+	return OutcomeSent
+}
+
+// globalMuteOutcome tells the breaker's trip from a person's manual mute.
+func (s *chatEventSink) globalMuteOutcome() string {
+	state, err := LoadNotificationState(s.gateStatePath)
+	if err == nil && state.Transports[firstNonEmptyStr(s.gateKey, s.transport.name())].Reason == "auto-trip" {
+		return OutcomeTripped
+	}
+	return OutcomeMuted
 }
 
 // sendRaw runs sendNotificationSync in its own goroutine, bounded by

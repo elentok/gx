@@ -411,15 +411,17 @@ func (c *ServerChat) Notice(n ServerNotice) {
 
 // Notify sends one line of text to the global destination, through the same
 // gate as `gx notify`: source and kind are the CLI's, so its mutes apply.
-func (c *ServerChat) Notify(text string) {
-	if c == nil {
-		return
-	}
-	msg := chatMessage{subject: text, kind: notifyKindCLI, summaryWord: "Message", catalog: notifykind.CLIMessage}
-	c.show(msg, Target{})
-	for _, s := range c.globalSinks() {
-		s.sendMessage(msg, "cli", "")
-	}
+func (c *ServerChat) Notify(text string) { c.NotifyOutcomes(text) }
+
+// NotifyOutcomes is Notify that also says what each channel did.
+func (c *ServerChat) NotifyOutcomes(text string) []ChannelOutcome {
+	return c.Route(chatMessage{subject: text, kind: notifyKindCLI, summaryWord: "Message", catalog: notifykind.CLIMessage}, Target{}, false)
+}
+
+// TestNotifications sends a test message as a system message on all five
+// channels: it skips the kind lists, and a channel whose switch is off stays silent.
+func (c *ServerChat) TestNotifications() []ChannelOutcome {
+	return c.Route(testMessage(), Target{}, true)
 }
 
 // notifyKindSessionAlert tags an interactive session's banner sent to chat in

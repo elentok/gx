@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop/notify"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/webpush"
 	"github.com/elentok/gx/server/wire"
 )
@@ -27,7 +28,7 @@ func (d *desktopAdapter) Show(n notify.DesktopNote) {
 		return
 	}
 	cur := d.s.settings.Load()
-	if cur == nil || !cur.NotifyChannels.Desktop.Enabled() || !slices.Contains(cur.NotifyChannels.Desktop.KindIDs(), n.Kind) {
+	if cur == nil || !cur.NotifyChannels.Desktop.Enabled() || !(n.System || slices.Contains(cur.NotifyChannels.Desktop.KindIDs(), n.Kind)) {
 		return
 	}
 	note := osnotify.Notification{Title: n.Title, Body: n.Body, Group: n.Group, Activate: n.Activate, Execute: n.Execute, Link: n.Link}
@@ -67,6 +68,37 @@ func (d *desktopAdapter) notify(note osnotify.Notification) {
 	}
 }
 
+func (d *desktopAdapter) Preflight(kind string, system bool) string {
+	return preflight(d.s, notify.ChannelDesktop, func(n settings.NotifyChannels) settings.NotifyChannel { return n.Desktop }, kind, system)
+}
+
+func (w *webToastAdapter) Preflight(kind string, system bool) string {
+	return preflight(w.s, notify.ChannelWebToast, func(n settings.NotifyChannels) settings.NotifyChannel { return n.WebToast }, kind, system)
+}
+
+// preflight is what the channel would do with a note of kind now, in the router's
+// order: switch, kind list, breaker. It counts no attempt.
+func preflight(s *Server, name string, pick func(settings.NotifyChannels) settings.NotifyChannel, kind string, system bool) string {
+	if s == nil {
+		return notify.OutcomeUnconfigured
+	}
+	cur := s.settings.Load()
+	if cur == nil {
+		return notify.OutcomeUnconfigured
+	}
+	ch := pick(cur.NotifyChannels)
+	switch {
+	case !ch.Enabled():
+		return notify.OutcomeOff
+	case !system && !slices.Contains(ch.KindIDs(), kind):
+		return notify.OutcomeUnchecked
+	}
+	if state, err := notify.LoadNotificationState(s.cfg.Chat.GateStatePath); err == nil && state.Transports[name].ChannelTripped(time.Now(), s.cfg.ChannelBreakerClear) {
+		return notify.OutcomeTripped
+	}
+	return notify.OutcomeSent
+}
+
 // channelCap counts one attempt on a channel against the shared state file.
 func channelCap(s *Server, channel string) (send, trip bool) {
 	return notify.ChannelCap(s.cfg.Chat.GateStatePath, channel, time.Now(), s.cfg.ChannelBreakerClear)
@@ -86,7 +118,7 @@ func (w *webToastAdapter) Show(n notify.WebToastNote) {
 		return
 	}
 	cur := w.s.settings.Load()
-	if cur == nil || !cur.NotifyChannels.WebToast.Enabled() || !slices.Contains(cur.NotifyChannels.WebToast.KindIDs(), n.Kind) {
+	if cur == nil || !cur.NotifyChannels.WebToast.Enabled() || !(n.System || slices.Contains(cur.NotifyChannels.WebToast.KindIDs(), n.Kind)) {
 		return
 	}
 	send, trip := channelCap(w.s, "web-toast")
