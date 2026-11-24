@@ -5,6 +5,23 @@ import (
 	"testing"
 )
 
+func TestSaveScriptAnchors(t *testing.T) {
+	const path = "gx-prototype/gx/save-route-to-html.js"
+	checkAnchors(t, path,
+		"<style data-mock-inlined>", "data:font/woff2;base64,",
+		`querySelectorAll("script").forEach((s) => s.remove())`,
+	)
+	text := readFile(t, path)
+	if !strings.HasPrefix(text, "async page =>") {
+		t.Errorf("%s must start with the async page function", path)
+	}
+	for _, gone := range []string{"<script", "import ", "export ", "require("} {
+		if strings.Contains(text, gone) {
+			t.Errorf("%s still has %q", path, gone)
+		}
+	}
+}
+
 func TestMockGuidanceSwitcherSnippet(t *testing.T) {
 	const path = "gx-prototype/switcher-snippet.html"
 	checkAnchors(t, path,
