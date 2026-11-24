@@ -233,7 +233,7 @@ function ActionButtons({
 }
 
 /** Actions the card builds by hand or leaves to its page. */
-const CARD_MENU_HIDE = ["open-design-epic", "new-session", "delete-design"]
+const LEFT_TO_PAGE = ["open-design-epic", "new-session", "delete-design"]
 
 /** One /v1/epics card row. */
 export function EpicCard({
@@ -277,7 +277,7 @@ export function EpicCard({
   const markMerged = row.actions?.find((a) => a.kind === CardActionMarkMerged)
   const markMergedAddress = markMerged?.target ?? row.address
   // The registry's Mark as merged offers itself to every live epic; the server's action list decides here.
-  const menuHide = markMerged ? CARD_MENU_HIDE : [...CARD_MENU_HIDE, "mark-merged"]
+  const menuHide = markMerged ? LEFT_TO_PAGE : [...LEFT_TO_PAGE, "mark-merged"]
   const menuWriters = {
     markMerged: async (body: Parameters<PostEpicWrite>[0]) => {
       const res = await (writes.markMerged ?? postEpicMarkMerged)({

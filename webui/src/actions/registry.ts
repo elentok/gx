@@ -25,6 +25,8 @@ export interface ConfirmContent {
 export interface ConfirmDecl<P = unknown> {
   /** When the confirm applies, from the entity snapshot alone. */
   rule: (e: Entity) => boolean
+  /** True when the server decides: the write is refused with a question, and the surface asks then (Hold). `rule` is false. */
+  server?: true
   /** Runs before the confirm opens (the Archive dry run). */
   prepare?: (e: Entity) => Promise<P>
   body?: (e: Entity, prepared: P) => ConfirmContent
@@ -72,7 +74,8 @@ const canStop = (e: Entity) => {
 }
 
 const live = (e: Entity) => isLoopEntity(e) && !e.archived
-const epicOrDesign = (e: Entity) => live(e)
+/** An epic or Design outside every workspace has no Move, Hold, Take off hold or Archive. */
+const inWorkspace = (e: Entity) => live(e) && !!e.workspace
 
 /** A bulk rule that skips the Queue agent first and passes every other row to `rule`. */
 const bulkRule =
@@ -116,7 +119,7 @@ export const ACTIONS: ActionDecl[] = [
     group: "edit",
     order: 2,
     chord: "w",
-    available: (e) => live(e) || isPlainChat(e) || isDraftEntity(e),
+    available: (e) => inWorkspace(e) || isPlainChat(e) || isDraftEntity(e),
     confirm: confirmNever,
     barLabel: "Move",
     bulk: bulkRule((e) =>
@@ -153,9 +156,10 @@ export const ACTIONS: ActionDecl[] = [
     label: "Hold",
     group: "lifecycle",
     order: 2,
-    available: (e) => epicOrDesign(e) && !e.held,
+    available: (e) => inWorkspace(e) && !e.held,
     disabled: (e) => (e.queued ? HoldQueuedText : undefined),
-    confirm: confirmWhen((e) => liveOf(e) > 0),
+    // The server refuses a Hold that would end live sessions (ReasonNeedsYes); a bulk Hold dry-runs.
+    confirm: { ...confirmNever, server: true },
     bulk: bulkRule((e) => {
       if (!live(e)) return "can't be held"
       if (e.queued) return "queued"
@@ -167,7 +171,7 @@ export const ACTIONS: ActionDecl[] = [
     label: "Take off hold",
     group: "lifecycle",
     order: 3,
-    available: (e) => epicOrDesign(e) && !!e.held,
+    available: (e) => inWorkspace(e) && !!e.held,
     confirm: confirmNever,
     bulk: bulkRule((e) => (e.held ? undefined : "not on hold")),
   },
@@ -202,7 +206,7 @@ export const ACTIONS: ActionDecl[] = [
     group: "lifecycle",
     order: 6,
     chord: "a",
-    available: epicOrDesign,
+    available: inWorkspace,
     confirm: confirmAlways,
     // Like the row menu, the server's dry run decides which epics are finished enough.
     bulk: bulkRule((e) => (live(e) ? undefined : "can't be archived")),

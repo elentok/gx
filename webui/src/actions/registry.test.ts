@@ -31,19 +31,18 @@ const idsOf = (x: Entity, actions = ACTIONS) => menuActions(x, actions).map((a) 
 
 /** One fixture per entity and state the invariants run over. */
 const FIXTURES: Record<string, Entity> = {
-  epic: e("epic", { prUrl: "https://x/pr/1" }),
-  heldEpic: e("epic", { held: true }),
-  queuedEpic: e("epic", { queued: true }),
+  epic: e("epic", { workspace: "w", prUrl: "https://x/pr/1" }),
+  heldEpic: e("epic", { workspace: "w", held: true }),
+  queuedEpic: e("epic", { workspace: "w", queued: true }),
   archivedEpic: e("epic", { archived: true, prUrl: "https://x/pr/1" }),
-  design: e("design", { surface: "row", liveSessions: 1 }),
-  heldDesign: e("design", { held: true }),
+  design: e("design", { workspace: "w", surface: "row", liveSessions: 1 }),
+  heldDesign: e("design", { workspace: "w", held: true }),
   ticket: e("ticket", { serverActions: [ActionStartOver] }),
   oneOff: e("ticket", { key: ONE_OFF, status: "claimed" }),
   chat: e("chat", { session: live }),
   exitedChat: e("chat", { session: exited }),
   queueAgent: e("chat", { agent: "queue", session: live }),
   fixAgent: e("chat", { agent: "fix", session: live }),
-  investigateAgent: e("chat", { agent: "investigate", session: live }),
   designDraft: e("design-draft", { draftEmpty: true }),
   chatDraft: e("chat-draft", { draftEmpty: false }),
 }
@@ -173,9 +172,21 @@ describe("availability", () => {
     expect(idsOf(F.queueAgent)).toEqual(["copy-id"])
   })
 
-  it("offers Fix and Investigate agents Copy ID, Stop and Remove", () => {
-    for (const x of [F.fixAgent, F.investigateAgent])
-      expect(idsOf(x)).toEqual(["stop", "copy-id", "remove"])
+  it("offers a Fix agent Copy ID, Stop and Remove", () => {
+    expect(idsOf(F.fixAgent)).toEqual(["stop", "copy-id", "remove"])
+  })
+
+  it("offers an epic and a Design outside every workspace no workspace action", () => {
+    const gone = ["move", "hold", "unhold", "archive", "unarchive"]
+    for (const x of [
+      e("epic"),
+      e("epic", { held: true }),
+      e("design"),
+      e("design", { held: true }),
+    ])
+      for (const id of gone) expect(idsOf(x), `${x.kind} ${id}`).not.toContain(id)
+    expect(idsOf(F.epic)).toContain("move")
+    expect(idsOf(F.epic)).toContain("archive")
   })
 
   it("offers drafts Rename, Move to workspace and Remove, no Copy ID", () => {
@@ -243,9 +254,13 @@ describe("confirm rule", () => {
     expect(rule("remove", e("design-draft"))).toBe(true)
   })
 
-  it("confirms Hold and New session only with a live session", () => {
-    expect(rule("hold", e("epic", { liveSessions: 0 }))).toBe(false)
-    expect(rule("hold", e("epic", { liveSessions: 2 }))).toBe(true)
+  it("leaves Hold's confirm to the server: no snapshot rule, asked after the refusal", () => {
+    const hold = actionById("hold")!
+    expect(hold.confirm.server).toBe(true)
+    expect(rule("hold", e("epic", { liveSessions: 2 }))).toBe(false)
+  })
+
+  it("confirms New session only with a live session", () => {
     expect(rule("new-session", e("design", { liveSessions: 0 }))).toBe(false)
     expect(rule("new-session", e("design", { liveSessions: 1 }))).toBe(true)
   })

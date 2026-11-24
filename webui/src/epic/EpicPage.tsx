@@ -403,10 +403,7 @@ function useEpicActions(
         prUrl: prLink,
         archived: !!detail.archived_at,
       }
-  const hide = [
-    ...(card?.workspace ? [] : ["move", "hold", "unhold", "archive"]),
-    ...(markMerged ? [] : ["mark-merged"]),
-  ]
+  const hide = markMerged ? [] : ["mark-merged"]
   const { groups, get } = useEntityActions(
     entity,
     workspaces,

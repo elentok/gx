@@ -441,7 +441,8 @@ test("the bulk plan labels the fit, lists skips and merges the confirm with the 
   )
   expect(plan.label).toBe("Hold 2 of 5")
   expect(plan.skipLines).toEqual(["E2: queued", "E3: already on hold", "E4: can't be held"])
-  expect(plan.confirm?.body.rows).toEqual(["E0", "E1"])
+  // Hold's confirm is the server's (a dry run), so the plan adds none.
+  expect(plan.confirm).toBeUndefined()
 
   const remove = actionById("remove")!
   const drafts = (n: number, nonEmpty = 0): Entity[] =>

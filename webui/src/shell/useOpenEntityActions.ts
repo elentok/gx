@@ -1,9 +1,8 @@
 import { useMemo } from "react"
 import { useNavigate } from "react-router"
-import { isLoopEntity, type Entity } from "../actions/entity"
+import type { Entity } from "../actions/entity"
 import { useActions, type ReadyAction } from "../actions/useActions"
 import { useConnectionContext } from "../connection"
-import { WORKSPACE_ONLY } from "../workspaces/itemActions"
 import { useWorkspaces } from "../workspaces/useActiveWorkspace"
 import { chatDraftPageActions, draftPageActions } from "./draftPageActions"
 import { useOpenEntity } from "./chords"
@@ -44,14 +43,9 @@ export function useOpenEntityActions() {
     workspaces,
     onRemoved: () => navigate("/agents"),
   })
-  // A Design or epic outside every workspace has no Move and no Archive, as on its page.
-  const noWorkspace = !!entity && isLoopEntity(entity) && !entity.archived && !entity.workspace
   const ready = useMemo(
-    () =>
-      actions
-        .filter((a) => !(noWorkspace && WORKSPACE_ONLY.includes(a.id)))
-        .map((a) => ({ ...a, run: runOf(a, entity) })),
-    [actions, noWorkspace, entity],
+    () => actions.map((a) => ({ ...a, run: runOf(a, entity) })),
+    [actions, entity],
   )
   return { ...open, actions: ready }
 }

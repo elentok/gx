@@ -74,7 +74,6 @@ export function DesignPageMenu({
   const hide = [
     // The Start button begins the first session; New session needs one to replace.
     ...(shown ? [] : ["new-session"]),
-    ...(card?.workspace ? [] : ["move", "hold", "unhold", "archive"]),
     ...(deletable && live.length === 0 ? [] : ["delete-design"]),
   ]
   const { groups: registry } = useEntityActions(

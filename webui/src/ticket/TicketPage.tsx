@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router"
 import { useActions } from "../actions/useActions"
 import { ActionStartOver, type TicketDetail } from "../generated/server"
-import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu"
+import { GxMenu, menuGroups } from "../ui/menu/Menu"
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
-import { entryOf } from "../workspaces/itemActions"
+import { groupsOf } from "../workspaces/itemActions"
 import { ticketEntity } from "./recover"
 import { useConnectionContext, useConnectionState } from "../connection"
 import { FileLinkProvider } from "../files/FileLinkContext"
@@ -41,16 +41,9 @@ function TicketMenu({ detail, onRecovered }: { detail: TicketDetail; onRecovered
     tooltip: detail.action_info?.[ActionStartOver]?.tooltip,
     onRecovered,
   })
-  const groups: MenuEntry[][] = []
-  let last: string | undefined
-  for (const a of actions) {
-    if (a.group !== last) groups.push([])
-    last = a.group
-    groups[groups.length - 1]!.push(entryOf(a))
-  }
   return (
     <span ref={wrap} style={{ display: "contents" }}>
-      <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} />
+      <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groupsOf(actions))} />
     </span>
   )
 }

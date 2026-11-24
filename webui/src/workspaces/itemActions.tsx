@@ -121,21 +121,20 @@ export function liveOfDesign(sessions: SessionInfo[]): Pick<ItemRef, "liveSessio
   return { liveSessions: live.length, session: live.length === 1 ? live[0] : undefined }
 }
 
-/** Workspace actions: a card with no workspace offers none of them. */
-export const WORKSPACE_ONLY = ["move", "hold", "unhold", "archive", "unarchive"]
-
 /** Actions a card's own page or row builds by hand, so the shared set leaves them out. */
 const BUILT_BY_PAGE = ["open-design-epic", "open-pr", "new-session", "mark-merged", "delete-design"]
 const MODAL: SurfaceContext = { mode: "modal" }
 
-/**
- * The page-header form of {@link useItemActions}: no sections while the card is unknown. EpicPage
- * and SessionControls build the lifecycle items above by hand, so they are filtered out by id.
- */
-export function useCardActions(card: EpicListRow | undefined, workspaces: Workspace[]) {
-  return useItemActions(itemOfCard(card), workspaces, undefined, undefined, {
-    hide: BUILT_BY_PAGE,
-  })
+/** Splits ready actions into menu groups, in registry order. */
+export function groupsOf(actions: ReadyAction[]): MenuEntry[][] {
+  const groups: MenuEntry[][] = []
+  let last: string | undefined
+  for (const a of actions) {
+    if (a.group !== last) groups.push([])
+    last = a.group
+    groups[groups.length - 1]!.push(entryOf(a))
+  }
+  return groups
 }
 
 export function entryOf(a: ReadyAction): MenuEntry {
@@ -181,22 +180,13 @@ export function useItemActions(
     hide?: string[]
   } = {},
 ) {
-  // A card outside every workspace offers none of the workspace actions.
-  const cardKind = item?.kind === "epic" || item?.kind === "design" || item?.kind === "ticket"
-  const noWorkspace = cardKind && !item.workspace
-  const hide = noWorkspace ? [...(opts.hide ?? BUILT_BY_PAGE), ...WORKSPACE_ONLY] : opts.hide
-  return useEntityActions(
-    item && entityOfItem(item),
-    workspaces,
-    { ...opts, hide },
-    {
-      writers,
-      state: opts.state,
-      onRemoved,
-      draft: item?.draft,
-      promote: { connected: true },
-    },
-  )
+  return useEntityActions(item && entityOfItem(item), workspaces, opts, {
+    writers,
+    state: opts.state,
+    onRemoved,
+    draft: item?.draft,
+    promote: { connected: true },
+  })
 }
 
 /** The menu groups and the ready actions of one entity, for a row or a page that reads the registry. */
@@ -221,15 +211,10 @@ export function useEntityActions(
     ...ctx,
   })
   const hide = new Set(opts.hide ?? BUILT_BY_PAGE)
-  const groups: MenuEntry[][] = []
-  let last: string | undefined
-  for (const a of actions) {
-    if (hide.has(a.id) || (a.id === "move" && workspaces.length === 0)) continue
-    if (a.group !== last) groups.push([])
-    last = a.group
-    groups[groups.length - 1]!.push(entryOf(a))
-  }
-  return { groups, get }
+  const shown = actions.filter(
+    (a) => !hide.has(a.id) && !(a.id === "move" && workspaces.length === 0),
+  )
+  return { groups: groupsOf(shown), get }
 }
 
 /** The "..." menu of one item; renders nothing when it has no actions. */
