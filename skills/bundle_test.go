@@ -113,7 +113,7 @@ var requiredFiles = []string{
 	"gx-prototype/SKILL.md",
 	"gx-prototype/LOGIC.md",
 	"gx-prototype/UI.md",
-	"gx-prototype/switcher-snippet.html", "gx-prototype/gx/tokens.css", "gx-prototype/gx/base.css", "gx-prototype/gx/fonts.css", "gx-prototype/gx/save-route-to-html.js",
+	"gx-prototype/switcher-snippet.html", "gx-prototype/gx/tokens.css", "gx-prototype/gx/base.css", "gx-prototype/gx/fonts.css", "gx-prototype/gx/save-route-to-html.js", "gx-prototype/MOCK.md", "gx-prototype/gx/README.md",
 	"gx-prototype/LICENSE",
 	"gx-prototype/README.md",
 	"gx-prototype/agents/openai.yaml",

@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -19,6 +20,54 @@ func TestSaveScriptAnchors(t *testing.T) {
 		if strings.Contains(text, gone) {
 			t.Errorf("%s still has %q", path, gone)
 		}
+	}
+}
+
+func TestMockGuideAnchors(t *testing.T) {
+	checkAnchors(t, "gx-prototype/MOCK.md",
+		"Try the in-app route first (UI.md sub-shape A or B)", "one HTML file",
+		"Use a standalone file only when the app cannot run or the mock is an artifact",
+		"computed styles with the real page", "line height, disabled opacity and row heights",
+		"built from source only",
+		"Find the project's own theme file, fonts, components and icons",
+		"Never invent colors, use `system-ui` or guess a font size",
+		"The project's tokens win over the look the claude.ai artifact design skill pushes",
+		"Never redraw an icon", "switcher-snippet.html",
+		"<style data-mock-inlined>", "That is the only block the helper exempts",
+		"`?variant=` param in every project", "The `#v=` hash is only for a standalone file",
+		"same `data-mock-inlined` marker", "## In gx",
+		"gx/tokens.css", "gx/base.css", "gx/fonts.css", "gx/save-route-to-html.js", "gx/README.md",
+	)
+	checkAnchors(t, "gx-prototype/gx/README.md",
+		"webui/src/ui/<name>/", "webui/src/gallery/registry.tsx",
+		"webui/src/dev/PrototypeSwitcher.tsx", "webui/src/ui/theme.ts",
+		"react-icons/lu", "PiNotePencil", "react-icons/pi", "webui/src/design/Composer.tsx",
+		"webui/src/page/PageIcon.tsx", "webui/src/shell/SidebarFooter.tsx",
+		"Saira and Saira Condensed", "Chakra UI v3", "<style data-mock-inlined>",
+	)
+}
+
+func TestMockGuideGenericOutsideGx(t *testing.T) {
+	head, _, found := strings.Cut(readFile(t, "gx-prototype/MOCK.md"), "## In gx")
+	if !found {
+		t.Fatal("MOCK.md has no ## In gx section")
+	}
+	bodies := map[string]string{
+		"MOCK.md before ## In gx": head,
+		"switcher-snippet.html":   readFile(t, "gx-prototype/switcher-snippet.html"),
+	}
+	for name, body := range bodies {
+		for _, bad := range []string{"gx/", "webui/", "tokens.css", "base.css", "fonts.css", "--chakra", "Chakra", "Saira", "react-icons"} {
+			if strings.Contains(body, bad) {
+				t.Errorf("%s names gx-specific %q", name, bad)
+			}
+		}
+	}
+}
+
+func TestNoGxMockSkill(t *testing.T) {
+	if _, err := os.Stat("gx-mock"); !os.IsNotExist(err) {
+		t.Errorf("skills/gx-mock must not exist (stat err: %v)", err)
 	}
 }
 
