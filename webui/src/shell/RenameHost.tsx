@@ -9,7 +9,13 @@ import { BottomSheet } from "../ui/modal/BottomSheet"
 import { useFocusFirstField } from "../ui/modal/useFocusFirstField"
 import { useWide } from "../useWide"
 import { refusalText, useWrite } from "../useWrite"
-import { closeRename, useRenameRequest, type DraftIdentity } from "./renameOpen"
+import { realChatDrafts, type ChatDraftsClient } from "../design/chatDrafts"
+import {
+  closeRename,
+  useRenameRequest,
+  type ChatDraftIdentity,
+  type DraftIdentity,
+} from "./renameOpen"
 
 /** The server checks the same rules; the page must not send a name it would refuse. */
 const nameOk = (text: string) => text.trim() !== "" && !/[\r\n]/.test(text)
@@ -25,6 +31,15 @@ export function RenameHost() {
         key={request.draft.id}
         draft={request.draft}
         saveFields={request.saveFields}
+      />
+    )
+  }
+  if ("chatDraft" in request) {
+    return (
+      <ChatDraftRenameForm
+        key={request.chatDraft.id}
+        draft={request.chatDraft}
+        drafts={request.drafts}
       />
     )
   }
@@ -158,6 +173,46 @@ function DraftRenameForm({
       ) : (
         refusal && <Alert>{refusalText(refusal)}</Alert>
       )}
+    </RenameSheet>
+  )
+}
+
+function ChatDraftRenameForm({
+  draft,
+  drafts = realChatDrafts,
+}: {
+  draft: ChatDraftIdentity
+  drafts?: ChatDraftsClient
+}) {
+  const [text, setText] = useState(draft.name)
+  const { run, pending, refusal } = useWrite({ toastRefusal: false })
+  const valid = nameOk(text)
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!valid || pending) return
+    // The save needs the brief and revision, so read the draft first.
+    void run(
+      async () => {
+        const cur = await drafts.read(draft.id)
+        if (cur.kind !== "ok") return { refused: true, message: "This draft no longer exists." }
+        const res = await drafts.save({
+          id: draft.id,
+          brief: cur.draft.brief,
+          revision: cur.draft.revision,
+          name: text.trim(),
+        })
+        if (res.kind === "gone") return { refused: true, message: "This draft no longer exists." }
+        if (res.kind === "conflict")
+          return { refused: true, message: "The draft changed. Try again." }
+        return {}
+      },
+      { onDone: closeRename },
+    )
+  }
+  return (
+    <RenameSheet label="Rename draft" onSubmit={submit} disabled={!valid || pending}>
+      <Field label="Name" value={text} onChange={setText} />
+      {refusal && <Alert>{refusalText(refusal)}</Alert>}
     </RenameSheet>
   )
 }

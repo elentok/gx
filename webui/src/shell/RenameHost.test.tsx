@@ -1,6 +1,8 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { session } from "../agents/agentsTestKit"
+import type { ChatDraftsClient } from "../design/chatDrafts"
+import type { ChatDraft } from "../generated/server"
 import { slugProblem } from "../design/draftSlug"
 import type { DraftResult } from "../design/drafts"
 import { renderThemed } from "../ui/render"
@@ -81,6 +83,47 @@ test("a session request still opens Rename chat with the Name field", () => {
   open()
   expect(screen.getByRole("dialog", { name: "Rename chat" })).toBeTruthy()
   expect(field()).toBeTruthy()
+})
+
+describe("a chat draft request", () => {
+  const ok = (revision = 3) => ({
+    kind: "ok" as const,
+    draft: { id: "c1", brief: "hi", revision } as ChatDraft,
+  })
+  const openChatDraft = (drafts: Partial<ChatDraftsClient>) => {
+    renderThemed(<RenameHost />)
+    act(() =>
+      openRename({
+        chatDraft: { id: "c1", name: "old" },
+        drafts: drafts as ChatDraftsClient,
+      }),
+    )
+  }
+
+  test("saves the new name through the client with the read brief and revision, then closes", async () => {
+    const save = vi.fn(async () => ok(4))
+    openChatDraft({ read: vi.fn(async () => ok()), save })
+    expect(screen.getByRole("dialog", { name: "Rename draft" })).toBeTruthy()
+    expect(field().value).toBe("old")
+    fireEvent.change(field(), { target: { value: " fresh " } })
+    fireEvent.submit(field().closest("form")!)
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull())
+    expect(save).toHaveBeenCalledExactlyOnceWith({
+      id: "c1",
+      brief: "hi",
+      revision: 3,
+      name: "fresh",
+    })
+  })
+
+  test("a conflict keeps the form open with the reason", async () => {
+    openChatDraft({
+      read: vi.fn(async () => ok()),
+      save: vi.fn(async () => ({ kind: "conflict" as const })),
+    })
+    fireEvent.submit(field().closest("form")!)
+    expect(await screen.findByText("The draft changed. Try again.")).toBeTruthy()
+  })
 })
 
 describe("a draft request", () => {

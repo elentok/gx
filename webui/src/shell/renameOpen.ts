@@ -4,6 +4,7 @@ import type { DesignDraftRow, SessionInfo } from "../generated/server"
 import type { SaveDraftFields } from "../design/drafts"
 import type { MenuEntry } from "../ui/menu/Menu"
 import type { RenameSession } from "../design/open"
+import type { ChatDraftsClient } from "../design/chatDrafts"
 
 /** What a slug write needs: it sends the project along so the write keeps it. */
 export type DraftIdentity = Pick<DesignDraftRow, "id" | "slug" | "project">
@@ -19,7 +20,18 @@ export type RenameRequest =
       /** Overrides the real slug write; tests inject a fake. */
       saveFields?: SaveDraftFields
     }
+  | {
+      chatDraft: ChatDraftIdentity
+      /** Overrides the real chat draft calls; tests inject a fake. */
+      drafts?: ChatDraftsClient
+    }
   | null
+
+/** A chat draft row: its id and the name the row shows. */
+export interface ChatDraftIdentity {
+  id: string
+  name: string
+}
 
 // App-level state for the rename popup, kept outside React like removeConfirmOpen so the menu, the
 // chord and the palette open one popup and only the host re-renders.

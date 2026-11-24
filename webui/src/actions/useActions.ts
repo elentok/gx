@@ -304,6 +304,10 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
   }
 
   function runRename(e: Entity) {
+    if (e.kind === "chat-draft") {
+      openRename({ chatDraft: { id: ctx.draft?.id ?? e.key, name: e.name } })
+      return
+    }
     if (isDraftEntity(e)) {
       const page = draftPageActions()
       if (page && ctx.surface.page === e.key) page.rename()
