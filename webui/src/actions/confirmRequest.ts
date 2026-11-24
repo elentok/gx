@@ -35,8 +35,12 @@ export interface ConfirmRequest {
   removesOpenPage?: boolean
   /** Where focus goes when the anchor is gone; the host falls back to the page's ⋯ button. */
   focusAfter?: () => HTMLElement | null
-  /** Runs the write. An action with an input gets the typed text. */
-  onConfirm: (input?: string) => void
+  /**
+   * Runs the write. An action with an input gets the typed text. A sync caller closes the confirm, then
+   * runs. One that returns a promise keeps the confirm open while it runs: a refusal shows inside it, a
+   * success closes it.
+   */
+  onConfirm: (input?: string) => undefined | Promise<Refusable | undefined>
 }
 
 /** A dry run the server refused: the confirm closes and the reason is toasted. */

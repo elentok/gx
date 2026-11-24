@@ -6,6 +6,8 @@ import {
   type ConfirmBody,
   type ConfirmRequest,
 } from "../actions/confirmRequest"
+import { ConnectionContext } from "../connection"
+import { expectViEditor, findLargeEditor, viConnection } from "../ui/expandable-text/testing"
 import { renderThemed } from "../ui/render"
 import { WideContext } from "../useWide"
 import { ConfirmHost } from "./ConfirmHost"
@@ -194,6 +196,79 @@ describe("an input body", () => {
     const req = open({ body: input })
     fireEvent.keyDown(field(), { key: "Enter", metaKey: true })
     expect(req.onConfirm).not.toHaveBeenCalled()
+  })
+
+  test("the field is a PromptBox named recovery-reason with the body's placeholder", () => {
+    open({
+      body: {
+        ...input,
+        input: { ...input.input, name: "recovery-reason", placeholder: "Why start over?" },
+      },
+    })
+    const area = field() as HTMLTextAreaElement
+    expect(area.name).toBe("recovery-reason")
+    expect(area.placeholder).toBe("Why start over?")
+    expect(area.getAttribute("autocomplete")).toBe("off")
+    expect(screen.getByLabelText("Open the note in a large editor")).toBeTruthy()
+  })
+
+  test("with vi mode on the field is an editor, and y and n typed in it do nothing", async () => {
+    const req = request({ body: input })
+    renderThemed(
+      <ConnectionContext.Provider value={viConnection()}>
+        <ConfirmHost />
+      </ConnectionContext.Provider>,
+    )
+    act(() => openConfirm(req))
+    await expectViEditor("Reason")
+    const editor = field()
+    fireEvent.keyDown(editor, { key: "y" })
+    fireEvent.keyDown(editor, { key: "n" })
+    expect(req.onConfirm).not.toHaveBeenCalled()
+    expect(screen.getByRole("alertdialog")).toBeTruthy()
+  })
+
+  test("Esc in the large editor leaves the confirm open; Done closes the editor; Esc in the field cancels", async () => {
+    const req = open({ body: input })
+    fireEvent.click(screen.getByLabelText("Open the note in a large editor"))
+    const large = await findLargeEditor(`${req.title} reason`)
+    fireEvent.keyDown(large, { key: "Escape" })
+    expect(screen.getByRole("alertdialog")).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Done" }))
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+    expect(screen.getByRole("alertdialog")).toBeTruthy()
+    fireEvent.keyDown(field(), { key: "Escape" })
+    expect(screen.queryByRole("alertdialog")).toBeNull()
+  })
+})
+
+describe("an async confirm", () => {
+  const confirmNow = () => fireEvent.click(confirm(/^Remove/))
+
+  test("keeps the popover open on a refusal and shows it as an alert", async () => {
+    const onConfirm = vi.fn(async () => ({ refused: true, message: "The pause moved on." }))
+    open({ onConfirm })
+    confirmNow()
+    expect((await screen.findByRole("alert")).textContent).toBe("The pause moved on.")
+    expect(screen.getByRole("alertdialog")).toBeTruthy()
+    expect(confirm(/^Remove/).hasAttribute("disabled")).toBe(false)
+  })
+
+  test("disables the confirm button while it runs, then closes on success", async () => {
+    let finish: () => void = () => {}
+    const onConfirm = vi.fn(() => new Promise<object>((r) => (finish = () => r({}))))
+    open({ onConfirm })
+    confirmNow()
+    expect(confirm(/^Remove/).hasAttribute("disabled")).toBe(true)
+    expect(screen.getByRole("alertdialog")).toBeTruthy()
+    await act(async () => finish())
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+  })
+
+  test("a thrown write shows a reach error and stays open", async () => {
+    open({ onConfirm: vi.fn(async () => Promise.reject(new Error("net"))) })
+    confirmNow()
+    expect((await screen.findByRole("alert")).textContent).toBe("Could not reach gx. Try again.")
   })
 })
 

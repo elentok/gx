@@ -16,10 +16,14 @@ import { refusalText, useWrite, type Refusable } from "../useWrite"
 import { ReasonStale } from "./answer"
 import {
   ActionCancel,
+  CANCEL_NOTICE,
   canCancel,
+  DISCARD_NOTICE,
   isRecoverAction,
   postRecover,
   ReasonAgentWorking,
+  trackRecover,
+  useRecoverPending,
   type PostRecover,
   type RecoverBody,
 } from "./recover"
@@ -35,12 +39,6 @@ const WORKER_TIER = "worker"
 
 // A resume of a zero-commit pause with a live agent prompts it and leaves the pause in place.
 const PROMPTED_TOAST = "Sent to the running agent. The ticket stays paused until it finishes."
-
-const DISCARD_NOTICE =
-  "Start over discards the branch's commits and runs the ticket again from the base. A backup branch keeps them."
-
-const CANCEL_NOTICE =
-  "Cancel ends this run. If it belongs to a Schedule, later runs of that Schedule may start."
 
 const RUN_FINISHING = "A run is still finishing. Recovery actions return when it settles."
 
@@ -63,7 +61,10 @@ export function RecoveryActions({
   const [base, setBase] = useState("")
   const [confirming, setConfirming] = useState(false)
   const [cancelling, setCancelling] = useState(false)
-  const { run, pending, refusal } = useWrite()
+  const { run, pending: writing, refusal } = useWrite()
+  // The shared confirm's recovery writes count too: no second write while either is pending.
+  const recovering = useRecoverPending()
+  const pending = writing || recovering
   const [seenState, setSeenState] = useState(detail.state)
 
   // A new pause clears the pick: it may list different blockers.
@@ -81,12 +82,14 @@ export function RecoveryActions({
     run(
       async () => {
         const tier = action === ActionResumeOnWorker ? { tier: WORKER_TIER } : {}
-        const res = await post(action, {
-          address: detail.address,
-          state: detail.state ?? "",
-          ...tier,
-          ...extra,
-        })
+        const res = await trackRecover(() =>
+          post(action, {
+            address: detail.address,
+            state: detail.state ?? "",
+            ...tier,
+            ...extra,
+          }),
+        )
         if (res.refused && res.reason === ReasonStale) onStale?.()
         return res
       },

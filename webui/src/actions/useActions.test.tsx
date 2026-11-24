@@ -9,7 +9,7 @@ import {
 } from "../generated/server"
 import { rowToken } from "../design/open"
 import { registerDraftPage } from "../shell/draftPageActions"
-import { ActionCancel } from "../ticket/recover"
+import { ActionCancel, CANCEL_NOTICE, DISCARD_NOTICE } from "../ticket/recover"
 import {
   closeConfirm,
   currentConfirm,
@@ -126,10 +126,9 @@ test("an epic, a chat, a draft and a ticket each offer their own actions", () =>
   ])
   const ticket: Entity = {
     kind: "ticket",
-    key: "p:e/01",
+    key: "p:one-offs/01",
     name: "T",
     serverActions: [ActionStartOver],
-    oneOff: true,
     status: "open",
   }
   expect(setup(ticket).labels()).toEqual(["Copy ID", "Start over", "Cancel run"])
@@ -323,33 +322,79 @@ test("Start over asks for a reason and refuses an empty one; Cancel run has its 
   const recover = vi.fn(async () => ({}))
   const ticket: Entity = {
     kind: "ticket",
-    key: "p:e/01",
+    key: "p:one-offs/01",
     name: "T",
     serverActions: [ActionStartOver],
-    oneOff: true,
     status: "open",
   }
   const { act1 } = setup(ticket, { recover }, { state: "tok", tooltip: "Throw it away." })
   act(() => act1("start-over").run())
   const req = currentConfirm()
-  expect(req?.body.input).toEqual({ label: "Reason", required: true })
-  expect(req?.body.lines).toContain("Throw it away.")
-  act(() => req?.onConfirm("  "))
+  expect(req).toMatchObject({ title: "Start over", confirmLabel: "Start over" })
+  expect(req?.body.input).toEqual({
+    label: "Reason",
+    required: true,
+    name: "recovery-reason",
+    placeholder: "Why start over?",
+  })
+  expect(req?.body.lines).toEqual(["Throw it away.", DISCARD_NOTICE])
+  await act(async () => void (await req?.onConfirm("  ")))
   expect(recover).not.toHaveBeenCalled()
-  act(() => req?.onConfirm(" bad base "))
-  await waitFor(() =>
-    expect(recover).toHaveBeenCalledWith(ActionStartOver, {
-      address: "p:e/01",
-      state: "tok",
-      reason: "bad base",
-    }),
-  )
+  await act(async () => void (await req?.onConfirm(" bad base ")))
+  expect(recover).toHaveBeenCalledWith(ActionStartOver, {
+    address: "p:one-offs/01",
+    state: "tok",
+    reason: "bad base",
+  })
   act(() => act1("cancel-run").run())
-  expect(currentConfirm()).toMatchObject({ confirmLabel: "Cancel run", dismissLabel: "Cancel" })
-  act(() => currentConfirm()?.onConfirm())
-  await waitFor(() =>
-    expect(recover).toHaveBeenLastCalledWith(ActionCancel, { address: "p:e/01", state: "tok" }),
-  )
+  expect(currentConfirm()).toMatchObject({
+    title: "Cancel run of T",
+    confirmLabel: "Cancel run",
+    dismissLabel: "Cancel",
+    body: { lines: [CANCEL_NOTICE] },
+  })
+  await act(async () => void (await currentConfirm()?.onConfirm()))
+  expect(recover).toHaveBeenLastCalledWith(ActionCancel, { address: "p:one-offs/01", state: "tok" })
+})
+
+test("a confirm's write resolves with the refusal so the popover can show it", async () => {
+  const recover = vi.fn(async () => ({ refused: true, message: "The pause moved on." }))
+  const ticket: Entity = {
+    kind: "ticket",
+    key: "p:one-offs/01",
+    name: "T",
+    serverActions: [ActionStartOver],
+    status: "open",
+  }
+  const { act1 } = setup(ticket, { recover })
+  act(() => act1("start-over").run())
+  expect(await currentConfirm()?.onConfirm("why")).toMatchObject({ refused: true })
+})
+
+test("while a recovery write is pending, Start over and Cancel run are disabled", async () => {
+  let release: () => void = () => {}
+  const recover = vi.fn(() => new Promise<object>((r) => (release = () => r({}))))
+  const ticket: Entity = {
+    kind: "ticket",
+    key: "p:one-offs/01",
+    name: "T",
+    serverActions: [ActionStartOver],
+    status: "open",
+  }
+  const { act1, hook } = setup(ticket, { recover })
+  expect(act1("start-over").disabled).toBe(false)
+  act(() => act1("cancel-run").run())
+  let sent: Promise<unknown> | undefined
+  act(() => {
+    sent = Promise.resolve(currentConfirm()?.onConfirm())
+  })
+  expect(act1("start-over").disabled).toBe(true)
+  expect(act1("cancel-run").disabled).toBe(true)
+  await act(async () => {
+    release()
+    await sent
+  })
+  expect(hook.result.current.get("start-over")?.disabled).toBe(false)
 })
 
 test("a confirm request carries the anchor for a menu surface and modal for a chord", () => {

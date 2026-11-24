@@ -40,7 +40,15 @@ import { openModelPicker } from "../shell/modelPickerOpen"
 import { openRename, type DraftIdentity } from "../shell/renameOpen"
 import { bulkUnarchive } from "../select/bulkWrites"
 import { ReasonStale } from "../ticket/answer"
-import { ActionCancel, postRecover, type PostRecover } from "../ticket/recover"
+import {
+  ActionCancel,
+  CANCEL_NOTICE,
+  DISCARD_NOTICE,
+  postRecover,
+  trackRecover,
+  useRecoverPending,
+  type PostRecover,
+} from "../ticket/recover"
 import { showToast, toaster } from "../ui/toaster"
 import { useWrite } from "../useWrite"
 import {
@@ -150,11 +158,15 @@ export interface ReadyAction {
 
 const ARCHIVE_BUSY_TOAST = "item-archive-busy"
 
+/** The actions that post a recovery write; they wait for any recovery write in flight. */
+const RECOVERY_IDS = ["start-over", "cancel-run"]
+
 /** The name a confirm and a toast use for the entity. */
 const nameOf = (e: Entity) => e.session?.name || e.name || e.key
 
 export function useActions(entity: Entity | undefined, ctx: ActionContext) {
   const { run, pending } = useWrite()
+  const recoverPending = useRecoverPending()
   const w: ActionWriters = { ...defaults, ...ctx.writers }
 
   const surfaceOf = () => (typeof ctx.surface === "function" ? ctx.surface() : ctx.surface)
@@ -335,13 +347,18 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
       confirmLabel: decl.label,
       title: decl.label,
       body: {
-        lines: [...(ctx.tooltip ? [ctx.tooltip] : [])],
-        input: { label: "Reason", required: true },
+        lines: [...(ctx.tooltip ? [ctx.tooltip] : []), DISCARD_NOTICE],
+        input: {
+          label: "Reason",
+          required: true,
+          name: "recovery-reason",
+          placeholder: "Why start over?",
+        },
       },
       onConfirm: (input) => {
         const reason = input?.trim()
         if (!reason) return
-        void run(() =>
+        return trackRecover(() =>
           w.recover(ActionStartOver, { address: e.key, state: ctx.state ?? "", reason }),
         )
       },
@@ -353,9 +370,9 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
       confirmLabel: "Cancel run",
       dismissLabel: "Cancel",
       title: `Cancel run of ${e.name}`,
-      body: { lines: [`Cancel the run of ${e.name}?`] },
+      body: { lines: [CANCEL_NOTICE] },
       onConfirm: () =>
-        void run(() => w.recover(ActionCancel, { address: e.key, state: ctx.state ?? "" })),
+        trackRecover(() => w.recover(ActionCancel, { address: e.key, state: ctx.state ?? "" })),
     })
   }
 
@@ -483,7 +500,8 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
       order: decl.order,
       danger: !!decl.danger,
       chord: decl.chord,
-      disabled: pending || reason !== undefined,
+      disabled:
+        pending || (RECOVERY_IDS.includes(decl.id) && recoverPending) || reason !== undefined,
       reason,
       items:
         decl.id === "move"

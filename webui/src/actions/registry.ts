@@ -1,5 +1,6 @@
 import { ActionStartOver, HoldQueuedText } from "../generated/server"
 import { isExited } from "../agents/sessionWrites"
+import { canCancel } from "../ticket/recover"
 import {
   agentOf,
   isChatEntity,
@@ -17,7 +18,7 @@ export const GROUP_ORDER: Group[] = ["open", "edit", "lifecycle", "info", "dange
 /** What a confirm body returns: lines of consequence, and the input it collects (Start over's reason). */
 export interface ConfirmContent {
   lines: string[]
-  input?: { label: string; required?: boolean }
+  input?: { label: string; required?: boolean; placeholder?: string; name?: string }
 }
 
 /** The confirm of one action. The rule is data; `prepare` and `body` are filled by the writers in 02. */
@@ -55,10 +56,9 @@ const QUEUE_REASON = "managed by the queue"
 const isQueueAgent = (e: Entity) => isChatEntity(e) && agentOf(e) === "queue"
 const liveOf = (e: Entity) => e.liveSessions ?? 0
 
-/** The page's cancel rule: a One-off that has not ended. */
-export const CANCELLABLE_STATUSES = ["open", "claimed", "needs-answer", "needs-repair"] // oldword:ok
+/** The page's cancel rule: a One-off that has not ended. The entity key is the ticket's address. */
 export const canCancelRun = (e: Entity) =>
-  e.kind === "ticket" && !!e.oneOff && CANCELLABLE_STATUSES.includes(e.status ?? "")
+  e.kind === "ticket" && canCancel({ address: e.key, status: e.status ?? "" })
 
 const stopsOnDesign = (e: Entity) =>
   e.surface === "page" ? !!e.session && !isExited(e.session) : liveOf(e) === 1

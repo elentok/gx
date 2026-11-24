@@ -1,8 +1,9 @@
-import { Box, Popover, Portal, Spinner, Text, Textarea } from "@chakra-ui/react"
+import { Box, Popover, Portal, Spinner, Text } from "@chakra-ui/react"
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react"
 import { CONFIRM_INSET, confirmFit } from "../actions/confirmFit"
 import {
   closeConfirm,
+  currentConfirm,
   useConfirmRequest,
   type ConfirmBody,
   type ConfirmRequest,
@@ -11,11 +12,12 @@ import { useLatest } from "../hooks"
 import { isMac } from "../platform"
 import { MENU_TRIGGER } from "../select/selectKeys"
 import { Button } from "../ui/button/Button"
+import { PromptBox } from "../ui/expandable-text/PromptBox"
 import { BottomSheet } from "../ui/modal/BottomSheet"
 import { Modal } from "../ui/modal/Modal"
 import { showToast } from "../ui/toaster"
 import { useWide } from "../useWide"
-import { refusalText } from "../useWrite"
+import { refusalText, WriteError } from "../useWrite"
 import { focusMainHeadingAfterLanding } from "./focusMainHeading"
 
 /** The one primary color for every confirm that is not a Danger-group action. */
@@ -44,29 +46,64 @@ export function ConfirmHost() {
   return request ? <Confirm key={idOf(request)} request={request} /> : null
 }
 
+const inDialog = (t: EventTarget | null) =>
+  t instanceof Element && t.closest('[role="dialog"]') !== null
+
+// The vi editor is a CodeMirror content-editable; jsdom leaves `isContentEditable` unset, so ask its class too.
 const isEditable = (t: EventTarget | null) =>
-  t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))
+  t instanceof HTMLElement &&
+  (t.isContentEditable ||
+    /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) ||
+    t.closest(".cm-editor") !== null)
 
 function Confirm({ request }: { request: ConfirmRequest }) {
   const [body, setBody] = useState<ConfirmBody>(request.body)
   const [preparing, setPreparing] = useState(!!request.prepare)
   const [text, setText] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [refusal, setRefusal] = useState<string>()
   const done = useRef(false)
+  const running = useRef(false)
   const cancelRef = useRef<HTMLButtonElement>(null)
   const { surface } = request
 
   const close = (run: boolean) => {
-    if (done.current) return
-    done.current = true
+    if (done.current || running.current) return
     const from = window.location.pathname
-    closeConfirm()
-    if (run) request.onConfirm(request.body.input ? text : undefined)
-    if (run && request.removesOpenPage) return focusMainHeadingAfterLanding(from)
-    queueMicrotask(() => restoreFocus(request))
+    const finish = () => {
+      done.current = true
+      // A sync onConfirm may have opened the next confirm; only close our own.
+      if (currentConfirm() === request) closeConfirm()
+      if (run && request.removesOpenPage) return focusMainHeadingAfterLanding(from)
+      queueMicrotask(() => restoreFocus(request))
+    }
+    if (!run) return finish()
+    const out = request.onConfirm(request.body.input ? text : undefined)
+    if (!(out instanceof Promise)) return finish()
+    running.current = true
+    setBusy(true)
+    setRefusal(undefined)
+    const stay = (message: string) => {
+      running.current = false
+      setBusy(false)
+      setRefusal(message)
+    }
+    out.then(
+      (res) => {
+        if (done.current) return
+        if (res?.refused) return stay(refusalText(res))
+        running.current = false
+        finish()
+      },
+      (err) => {
+        if (!done.current)
+          stay(err instanceof WriteError ? err.message : "Could not reach gx. Try again.")
+      },
+    )
   }
 
   const needsText = !!body.input?.required && text.trim() === ""
-  const canConfirm = !preparing && !needsText
+  const canConfirm = !preparing && !needsText && !busy
   const latest = useLatest({ close, canConfirm })
 
   const { prepare } = request
@@ -124,7 +161,11 @@ function Confirm({ request }: { request: ConfirmRequest }) {
     const onKey = (e: KeyboardEvent) => {
       const { close, canConfirm } = latest.current
       // A modal closes itself on Escape, top layer only; the popover has no layer of its own.
-      if (e.key === "Escape" && surface.mode === "anchor") return close(false)
+      // The large editor is a dialog over the popover; its Escape closes only itself.
+      if (e.key === "Escape" && surface.mode === "anchor") {
+        if (inDialog(e.target)) return
+        return close(false)
+      }
       const mod = isMac() ? e.metaKey : e.ctrlKey
       if (e.key === "Enter" && mod) {
         e.preventDefault()
@@ -152,6 +193,8 @@ function Confirm({ request }: { request: ConfirmRequest }) {
       text={text}
       onText={setText}
       canConfirm={canConfirm}
+      busy={busy}
+      refusal={refusal}
       cancelRef={cancelRef}
       measureRef={setMeasured}
       onCancel={() => close(false)}
@@ -184,7 +227,13 @@ function Confirm({ request }: { request: ConfirmRequest }) {
   return (
     <Popover.Root
       open
+      // Escape is ours (the window handler): with the large editor open, it must close only that.
+      closeOnEscape={false}
       onOpenChange={(e) => !e.open && close(false)}
+      // The large editor opens over the popover, outside it; working in it is not a dismiss.
+      onInteractOutside={(e) => {
+        if (inDialog(e.detail.originalEvent.target)) e.preventDefault()
+      }}
       // An async confirm (Hold, a draft's Remove) can open above the menu that started it. When that
       // menu closes it asks the layers above it to dismiss; the confirm must stay.
       onRequestDismiss={(e) => e.preventDefault()}
@@ -252,6 +301,8 @@ function ConfirmCard({
   text,
   onText,
   canConfirm,
+  busy,
+  refusal,
   cancelRef,
   measureRef,
   onCancel,
@@ -263,6 +314,8 @@ function ConfirmCard({
   text: string
   onText: (t: string) => void
   canConfirm: boolean
+  busy: boolean
+  refusal?: string
   cancelRef: RefObject<HTMLButtonElement | null>
   measureRef: (el: HTMLElement | null) => void
   onCancel: () => void
@@ -314,25 +367,30 @@ function ConfirmCard({
             </>
           )}
           {body.input && !preparing && (
-            <Textarea
-              data-part="reason-field"
-              aria-label={body.input.label}
-              placeholder={
-                body.input.required ? `${body.input.label} (required)` : body.input.label
-              }
-              value={text}
-              onChange={(e) => onText(e.target.value)}
-              rows={2}
-              size="sm"
-              borderRadius="6px"
-              p="6px"
-              bg="surface.raised"
-              borderColor="border"
-              minH="0"
-              h="46px"
-            />
+            <Box data-part="reason-field">
+              <PromptBox
+                label={body.input.label}
+                name={body.input.name ?? "confirm-reason"}
+                title={`${request.title} ${body.input.label.toLowerCase()}`}
+                placeholder={
+                  body.input.placeholder ??
+                  (body.input.required ? `${body.input.label} (required)` : body.input.label)
+                }
+                value={text}
+                onChange={onText}
+                onSubmit={() => canConfirm && onConfirm()}
+                rows={2}
+                size="sm"
+                radius="6px"
+              />
+            </Box>
           )}
         </Box>
+        {refusal && (
+          <Text role="alert" fontSize="13px" color="tone.deadlocked.fg">
+            {refusal}
+          </Text>
+        )}
       </Box>
       <Box display="flex" justifyContent="flex-end" gap="2">
         <Button
@@ -352,6 +410,7 @@ function ConfirmCard({
           disabled={!canConfirm}
           onClick={onConfirm}
         >
+          {busy && <Spinner size="sm" />}
           {request.confirmLabel} <Key>y</Key>
         </Button>
       </Box>

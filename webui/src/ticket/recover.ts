@@ -11,6 +11,7 @@ import {
   type Action,
 } from "../generated/server"
 import { apiFetch } from "../apiFetch"
+import { createExternalStore } from "../shell/externalStore"
 import { WriteError, type Refusable } from "../useWrite"
 
 export const ReasonAgentWorking = "agent-working"
@@ -18,8 +19,29 @@ export const ReasonAgentWorking = "agent-working"
 /** Not a detail action: the page offers Cancel for a One-off from its address and status. */
 export const ActionCancel = "cancel"
 
+export const DISCARD_NOTICE =
+  "Start over discards the branch's commits and runs the ticket again from the base. A backup branch keeps them."
+
+export const CANCEL_NOTICE =
+  "Cancel ends this run. If it belongs to a Schedule, later runs of that Schedule may start."
+
 // A paused ticket reaches the page as its legacy word, never "paused". oldword:ok
 const CANCELLABLE_STATUSES = ["open", "claimed", "needs-answer", "needs-repair"] // oldword:ok
+
+// How many recovery writes are in flight, across the page's footer and the shared confirm. One
+// source, so the footer buttons and the Start over / Cancel run actions disable together.
+const inFlight = createExternalStore(0)
+export const useRecoverPending = () => inFlight.use() > 0
+
+/** Runs one recovery write and counts it while it is pending. */
+export async function trackRecover<R>(call: () => Promise<R>): Promise<R> {
+  inFlight.set(inFlight.get() + 1)
+  try {
+    return await call()
+  } finally {
+    inFlight.set(inFlight.get() - 1)
+  }
+}
 
 /** A One-off that has not ended. The server refuses any other ticket. */
 export const canCancel = (detail: { address: string; status: string }) =>

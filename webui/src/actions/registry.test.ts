@@ -15,6 +15,7 @@ import {
   menuActions,
   type ActionDecl,
 } from "./registry"
+import { canCancel } from "../ticket/recover"
 
 const e = (kind: EntityKind, over: Partial<Entity> = {}): Entity => ({
   kind,
@@ -23,6 +24,7 @@ const e = (kind: EntityKind, over: Partial<Entity> = {}): Entity => ({
   ...over,
 })
 
+const ONE_OFF = "p:one-offs/01"
 const live = session("live", "p")
 const exited = session("done", "p", { status: { state: "exited" } })
 const idsOf = (x: Entity, actions = ACTIONS) => menuActions(x, actions).map((a) => a.id)
@@ -36,7 +38,7 @@ const FIXTURES: Record<string, Entity> = {
   design: e("design", { surface: "row", liveSessions: 1 }),
   heldDesign: e("design", { held: true }),
   ticket: e("ticket", { serverActions: [ActionStartOver] }),
-  oneOff: e("ticket", { oneOff: true, status: "claimed" }),
+  oneOff: e("ticket", { key: ONE_OFF, status: "claimed" }),
   chat: e("chat", { session: live }),
   exitedChat: e("chat", { session: exited }),
   queueAgent: e("chat", { agent: "queue", session: live }),
@@ -187,11 +189,13 @@ describe("availability", () => {
     expect(idsOf(e("ticket"))).toEqual(["copy-id"])
   })
 
-  it("offers Cancel run to a One-off in each cancellable status only", () => {
-    for (const status of ["open", "claimed", "needs-answer", "needs-repair"]) // oldword:ok
-      expect(canCancelRun(e("ticket", { oneOff: true, status }))).toBe(true)
-    expect(canCancelRun(e("ticket", { oneOff: true, status: "done" }))).toBe(false)
-    expect(canCancelRun(e("ticket", { status: "claimed" }))).toBe(false)
+  it("offers Cancel run exactly where the page's canCancel does", () => {
+    const statuses = ["open", "claimed", "needs-answer", "needs-repair", "done"] // oldword:ok
+    for (const address of [ONE_OFF, "p:epic/01", "p:one-offs"])
+      for (const status of statuses)
+        expect(canCancelRun(e("ticket", { key: address, status }))).toBe(
+          canCancel({ address, status }),
+        )
     expect(idsOf(F.oneOff)).toContain("cancel-run")
     expect(idsOf(e("ticket", { status: "claimed" }))).not.toContain("cancel-run")
   })

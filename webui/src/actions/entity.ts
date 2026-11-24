@@ -28,7 +28,7 @@ export interface Entity {
   draftEmpty?: boolean
   /** The ticket's server action list (`detail.actions`). */
   serverActions?: Action[]
-  oneOff?: boolean
+  /** A ticket's status word as the page reads it; the address is `key`. */
   status?: string
 }
 

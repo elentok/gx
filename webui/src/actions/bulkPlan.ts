@@ -42,7 +42,9 @@ export function planBulk(
       title: confirmLabel,
       body: { lines: [`${confirmLabel}?`], rows },
       surface,
-      onConfirm: () => onConfirm(running),
+      onConfirm: () => {
+        onConfirm(running)
+      },
     },
   }
 }
