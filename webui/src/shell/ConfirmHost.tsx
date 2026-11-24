@@ -20,7 +20,13 @@ const PRIMARY_TONE = "running"
 const DANGER_TONE = "paused"
 
 /** The mock's button: 29px, radius 6px, regular weight. */
-const BUTTON_LOOK = { size: "sm", h: "29px", borderRadius: "6px", fontWeight: "400" } as const
+const BUTTON_LOOK = {
+  size: "sm",
+  h: "29px",
+  borderRadius: "6px",
+  fontWeight: "400",
+  _focusVisible: { outline: "2px solid", outlineColor: "tone.running.fg", outlineOffset: "1px" },
+} as const
 
 const ids = new WeakMap<ConfirmRequest, number>()
 let nextId = 0
@@ -128,7 +134,7 @@ function Confirm({ request }: { request: ConfirmRequest }) {
       <Modal
         label={request.title}
         onClose={() => close(false)}
-        w="min(340px, 100%)"
+        w="min(374px, 100%)"
         p="0"
         borderRadius="12px"
         data-part="confirm-modal"
@@ -165,7 +171,7 @@ function Confirm({ request }: { request: ConfirmRequest }) {
             borderRadius="10px"
             boxShadow="lg"
             color="text"
-            w="min(300px, calc(100vw - 32px))"
+            w={`min(${request.body.input ? 346 : 326}px, calc(100vw - 32px))`}
             css={{ "--popover-bg": "colors.surface.raised" }}
           >
             <Popover.Arrow>
@@ -216,8 +222,13 @@ function ConfirmCard({
   onConfirm: () => void
 }) {
   return (
-    <Box p="3" display="flex" flexDirection="column" gap="3">
-      <Box display="flex" flexDirection="column" gap="2">
+    <Box
+      p={request.surface.mode === "modal" ? "4" : "3"}
+      display="flex"
+      flexDirection="column"
+      gap="10px"
+    >
+      <Box display="flex" flexDirection="column" gap="1">
         <Text fontWeight="700" fontSize="14px" data-part="title">
           {request.title}
         </Text>
@@ -238,7 +249,7 @@ function ConfirmCard({
                 </Text>
               ))}
               {body.rows && (
-                <Box as="ul" pl="4" m="0">
+                <Box as="ul" pl="18px" m="0" listStyleType="disc">
                   {body.rows.map((row) => (
                     <li key={row}>{row}</li>
                   ))}
@@ -255,6 +266,10 @@ function ConfirmCard({
               onChange={(e) => onText(e.target.value)}
               rows={2}
               size="sm"
+              borderRadius="6px"
+              p="6px"
+              bg="surface"
+              borderColor="border"
             />
           )}
         </Box>
