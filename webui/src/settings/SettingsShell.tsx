@@ -356,6 +356,13 @@ const rowBuilder =
   }
 
 const PUSH_SECTION = "Push"
+const PUSH_SWITCH_KEY = "notification-channels.push.enabled"
+
+function pushServerOn(sectionEntries: SettingsEntry[]): boolean {
+  const entry = sectionEntries.find((e) => e.key === PUSH_SWITCH_KEY)
+  if (!entry) return true
+  return (entry.set ? entry.value : entry.default) !== false
+}
 
 type SectionBodyProps = Pick<
   ShellProps,
@@ -494,7 +501,9 @@ function SectionRows({
                 ),
               )
             )}
-            {project === undefined && section === PUSH_SECTION && <PushDevicePanel />}
+            {project === undefined && section === PUSH_SECTION && (
+              <PushDevicePanel serverOn={pushServerOn(sectionEntries)} />
+            )}
           </GroupBlock>
         ),
       )}

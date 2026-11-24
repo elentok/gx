@@ -5,7 +5,9 @@ import { ConnectionContext, type Connection, type ConnectionState } from "../con
 import { refreshPushDevice, resetPushDeviceForTest } from "../push/deviceState"
 import { fetchPushState, removePush, subscribePush, testPush } from "../push/pushApi"
 import { renderThemed } from "../ui/render"
-import { PushDevicePanel } from "./NotificationsPage"
+import { ChakraProvider } from "@chakra-ui/react"
+import { system } from "../ui/theme"
+import { PushDevicePanel, SERVER_OFF_TEXT } from "./NotificationsPage"
 import { fetchLogins } from "./logins"
 
 vi.mock("../push/pushApi", () => ({
@@ -29,14 +31,14 @@ const conn = {
   onEvent: () => () => {},
 } as unknown as Connection
 
-const renderPage = () =>
-  renderThemed(
-    <ConnectionContext.Provider value={conn}>
-      <MemoryRouter>
-        <PushDevicePanel />
-      </MemoryRouter>
-    </ConnectionContext.Provider>,
-  )
+const panel = (serverOn?: boolean) => (
+  <ConnectionContext.Provider value={conn}>
+    <MemoryRouter>
+      <PushDevicePanel serverOn={serverOn} />
+    </MemoryRouter>
+  </ConnectionContext.Provider>
+)
+const renderPage = (serverOn?: boolean) => renderThemed(panel(serverOn))
 
 const SERVER_KEY = "AQID"
 const NAME = "David's iPhone"
@@ -285,6 +287,50 @@ describe("PushDevicePanel", () => {
       fireEvent.click(sw)
       await waitFor(() => expect(sw.getAttribute("aria-checked")).toBe("true"))
       expect(localStorage.getItem("gx.push.keyChanged")).toBeNull()
+    })
+  })
+
+  describe("Push server switch off", () => {
+    const deviceOn = () => {
+      permission = "granted"
+      held = subscription
+      serverRecord = true
+    }
+
+    it("disables the switch with the server-off line, and keeps an On device On", async () => {
+      deviceOn()
+      const { findByRole, findByText, getByRole } = renderPage(false)
+      await findByText(SERVER_OFF_TEXT)
+      const sw = await findByRole("switch")
+      expect(sw.hasAttribute("disabled")).toBe(true)
+      expect(sw.getAttribute("aria-checked")).toBe("true")
+      expect(getByRole("button", { name: /Send test push/ }).hasAttribute("disabled")).toBe(true)
+      fireEvent.click(sw)
+      expect(removePush).not.toHaveBeenCalled()
+      expect(subscribePush).not.toHaveBeenCalled()
+    })
+
+    it("enables the same On device again when the server switch comes back", async () => {
+      deviceOn()
+      const { findByRole, findByText, rerender } = renderPage(false)
+      await findByText(SERVER_OFF_TEXT)
+      rerender(<ChakraProvider value={system}>{panel(true)}</ChakraProvider>)
+      await findByText(`On for “${NAME}”.`)
+      const sw = await findByRole("switch")
+      expect(sw.hasAttribute("disabled")).toBe(false)
+      expect(sw.getAttribute("aria-checked")).toBe("true")
+    })
+
+    it("puts the server-off line before the contact-email line", async () => {
+      vi.mocked(fetchPushState).mockResolvedValue({
+        public_key: SERVER_KEY,
+        contact_set: false,
+        subscribed: false,
+        endpoint: "",
+      })
+      const { findByText, queryByText } = renderPage(false)
+      await findByText(SERVER_OFF_TEXT)
+      expect(queryByText("Set a contact email in the server config")).toBeNull()
     })
   })
 

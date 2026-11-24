@@ -14,6 +14,7 @@ import {
   WebLoginsView,
 } from "./SettingsPage"
 import { SettingsRow } from "./SettingsRow"
+import { SERVER_OFF_TEXT } from "./NotificationsPage"
 import { SettingsShellView } from "./SettingsShell"
 import { treeFromEntries } from "../test-utils/settingsTree"
 import type { SettingsEntry } from "../generated/server"
@@ -1115,6 +1116,17 @@ describe("Notifications section: channel switches and kind rows", () => {
         { key: "notification-channels.push.enabled", value: false },
       ]),
     )
+  })
+
+  it("passes the Push switch state to the device panel", async () => {
+    const off = renderPage({ "push.enabled": false }, undefined, "/settings/s/push")
+    const block = await off.findByTestId("group-Push")
+    await waitFor(() => expect(block.textContent).toContain(SERVER_OFF_TEXT))
+    off.unmount()
+    const on = renderPage({ "push.enabled": true }, undefined, "/settings/s/push")
+    const onBlock = await on.findByTestId("group-Push")
+    await within(onBlock).findByRole("switch", { name: "Notifications on this device" })
+    expect(onBlock.textContent).not.toContain(SERVER_OFF_TEXT)
   })
 
   it("draws the strip switch with BoolControl, the switch of a bool row", async () => {

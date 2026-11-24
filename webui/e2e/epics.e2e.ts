@@ -454,6 +454,17 @@ test("2. Epic PWA: Force refresh and cold open", async ({ page, start, context }
       .poll(async () => (await pushState()).applied === (await snapshotBadge()))
       .toBe(true)
 
+    // Stories 46, 47, 50: the Push server switch off disables the device switch and the test row,
+    // and the device is still On when the server switch comes back. After the badge step: the page
+    // gets no new snapshot when the switch comes back on, so the badge waits for the next change.
+    const serverSwitch = notif.getByRole("switch", { name: "Server-wide Push", exact: true })
+    await serverSwitch.click()
+    await expect(toggle).toBeDisabled()
+    await expect(testRow).toBeDisabled()
+    await serverSwitch.click()
+    await expect(toggle).toBeEnabled()
+    await expect(toggle).toHaveAttribute("aria-checked", "true")
+
     // Story 6: switching off drops the row's chip and clears the badge.
     const clearedBefore = (await pushState()).cleared
     await toggle.click()

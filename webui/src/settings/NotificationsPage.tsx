@@ -16,6 +16,8 @@ import { Chevron, rowProps } from "./parts"
 export const SWITCH_LABEL = "Notifications on this device"
 export const SWITCH_OFF_TEXT = "Off. Turning it on asks this browser for permission."
 export const TEST_OFF_TEXT = "Turn notifications on first."
+export const SERVER_OFF_TEXT =
+  "Push is off for the whole server. Turn it on in Settings › Notifications › Push."
 export const TEST_ON_TEXT = "Sends one push to this device only."
 export const TEST_SENT_TEXT =
   "Sent. It should arrive in a few seconds. If nothing shows, check the Focus mode and iOS notification settings."
@@ -128,11 +130,13 @@ export function PushControls({
   busy,
   error,
   testMessage,
+  serverOn = true,
   onToggle,
   onTest,
 }: {
   device: PushDevice
   busy: boolean
+  serverOn?: boolean
   error?: string
   testMessage?: { ok: boolean; text: string }
   onToggle: () => void
@@ -151,7 +155,11 @@ export function PushControls({
           <Box flex="1" minW="0">
             <Text fontWeight="600">{SWITCH_LABEL}</Text>
             <Text fontSize="sm" color="text.muted">
-              {on ? `On for “${device.loginName ?? ""}”.` : (reason?.line ?? SWITCH_OFF_TEXT)}
+              {!serverOn
+                ? SERVER_OFF_TEXT
+                : on
+                  ? `On for “${device.loginName ?? ""}”.`
+                  : (reason?.line ?? SWITCH_OFF_TEXT)}
             </Text>
             {device.failureReason && (
               <Text fontSize="sm" color="tone.waiting.fg">
@@ -162,7 +170,7 @@ export function PushControls({
           </Box>
           <SwitchButton
             on={on}
-            disabled={busy || !!reason?.disabled || !device.supported}
+            disabled={!serverOn || busy || !!reason?.disabled || !device.supported}
             onToggle={onToggle}
           />
         </Box>
@@ -178,7 +186,12 @@ export function PushControls({
         </Text>
       )}
       <Card part="test-card">
-        <chakra.button type="button" {...rowProps} disabled={!on || busy} onClick={onTest}>
+        <chakra.button
+          type="button"
+          {...rowProps}
+          disabled={!on || busy || !serverOn}
+          onClick={onTest}
+        >
           <Box flex="1" minW="0" opacity={on ? 1 : 0.4}>
             <Text fontWeight="600">Send test push</Text>
             <Text fontSize="sm" color="text.muted">
@@ -198,7 +211,7 @@ export function PushControls({
 }
 
 /** The push controls with their own state: the device, the busy flag, the last error and the test result. */
-export function PushDevicePanel() {
+export function PushDevicePanel({ serverOn = true }: { serverOn?: boolean }) {
   const device = usePushDevice()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -240,9 +253,9 @@ export function PushDevicePanel() {
       busy={busy}
       error={error}
       testMessage={testMessage}
+      serverOn={serverOn}
       onToggle={() => void run(device.on ? turnOff : turnOn)}
       onTest={() => void test()}
     />
   )
 }
-

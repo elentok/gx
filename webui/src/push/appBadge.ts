@@ -11,7 +11,8 @@ function apply(badge: number) {
 /**
  * Shows the server's badge count on the app icon while push is on. Only a live snapshot counts:
  * a cached one may predate the badge. The app never counts itself. The server omits `badge` at 0,
- * so a live snapshot without it means 0.
+ * so a live snapshot without it means 0. The server also omits it while the Push switch
+ * (`notification-channels.push.enabled`) is off, so the icon clears then.
  */
 export function useAppBadge() {
   const { snapshot, liveSnapshot } = useConnectionState(useConnectionContext())

@@ -72,6 +72,21 @@ describe("useAppBadge", () => {
     expect(setAppBadge).not.toHaveBeenCalled()
   })
 
+  it("clears and never sets once the snapshot loses its badge (Push switch turned off)", () => {
+    device(true)
+    state(3)
+    const { rerender } = render(<Probe />)
+    expect(setAppBadge).toHaveBeenLastCalledWith(3)
+    setAppBadge.mockClear()
+    state(undefined)
+    rerender(<Probe />)
+    expect(clearAppBadge).toHaveBeenCalledTimes(1)
+    setVisibility("visible")
+    act(() => void document.dispatchEvent(new Event("visibilitychange")))
+    expect(clearAppBadge).toHaveBeenCalledTimes(2)
+    expect(setAppBadge).not.toHaveBeenCalled()
+  })
+
   it("ignores a cached snapshot", () => {
     device(true)
     state(3, false)
