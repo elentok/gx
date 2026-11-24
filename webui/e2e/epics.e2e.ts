@@ -524,7 +524,7 @@ test("7. Epic completion", async ({ page, start }) => {
   await expect(card(page, "finishing-epic").getByText("2/2")).toBeVisible()
   await card(page, "finishing-epic").getByRole("link", { name: "finishing-epic" }).click()
   await expect(page.getByText("Merged · $0.00 · 0s agent time")).toBeVisible()
-  await expect(page.getByText("2 done")).toBeVisible()
+  await expect(page.getByText("2 done", { exact: true })).toBeVisible()
   await expect(page.getByText("2/2")).toBeVisible()
   await expect(page.getByTestId("page-header-actions").getByTestId("comet")).toHaveCount(0)
   const more = page.getByRole("button", { name: /^More stats/ })

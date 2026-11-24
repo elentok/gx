@@ -3,7 +3,7 @@ import { basename } from "node:path"
 import type { Locator, Page } from "@playwright/test"
 import type { SessionInfo } from "../src/generated/server"
 import { ask, chatOf, composer, freshVisit, go, row, sessions, sidebar } from "./agentsKit"
-import { expect, nav, test, type Fixture } from "./fixture"
+import { dismissToasts, expect, nav, test, type Fixture } from "./fixture"
 
 const MODEL = /^(Claude|Codex) \S+/
 // A NoChat session's model text is not a Claude or Codex name, so only a two-word label is pinned.
@@ -56,6 +56,7 @@ test("202. Context badge (stories 1 to 28)", async ({ page, start }) => {
 
   // Stories 10, 13, 5, 4: the popover, then a usage line grows the count and the ring with no reload.
   const before = await fillOf(page)
+  await dismissToasts(page)
   await badge(page).click()
   await expect(page.getByRole("dialog", { name: "Context usage" })).toContainText(
     /40K\s*of 130K smart zone/,

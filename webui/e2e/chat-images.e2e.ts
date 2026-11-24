@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test"
-import { expect, nav, test } from "./fixture"
+import { dismissToasts, expect, nav, test } from "./fixture"
 import {
   addInput,
   chatOf,
@@ -104,6 +104,7 @@ test("189. Send images", async ({ page, start }) => {
   const beforeCompact = (await messagesOf(fixture, claude.id)).length
   // U+1BCA0 is outside gx's strip set, so the first Enter keeps the text and only the settle Enter lands it.
   await messageBox(page).fill("/compact foo\u{1BCA0}")
+  await dismissToasts(page)
   await sendButton(page).click()
   await expect(thumbs(page)).toHaveCount(0)
   await expect

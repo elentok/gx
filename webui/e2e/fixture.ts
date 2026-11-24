@@ -756,4 +756,11 @@ export async function blockEvents(page: Page): Promise<() => Promise<void>> {
 export const toasts = (page: Page) =>
   page.getByRole("region", { name: /^Notifications/ }).getByRole("status")
 
+/** Closes every toast on screen, as a user would before clicking a control the toast covers. */
+export async function dismissToasts(page: Page) {
+  const close = toasts(page).locator("[data-part='close-trigger']")
+  for (const closer of await close.all()) await closer.click()
+  await expect(toasts(page)).toHaveCount(0)
+}
+
 export { expect }

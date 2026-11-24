@@ -4,7 +4,7 @@ import { card, expect, holdRoute, nav, test } from "./fixture"
 const DISK = "fixture disk"
 
 /** The disk strip; other live regions share its role, so it is found by the disk name. */
-const strip = (page: Page) => page.getByRole("status").filter({ hasText: DISK })
+const strip = (page: Page) => page.locator("[role=status][data-tone]").filter({ hasText: DISK })
 
 // Also covers 78 (Clean now fails): the failing clean runs first, before the recovery steps.
 test("76. Disk banner and Clean now (and 78. Clean now fails)", async ({ page, start }) => {

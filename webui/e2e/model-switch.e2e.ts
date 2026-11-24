@@ -2,7 +2,7 @@ import { readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { Page } from "@playwright/test"
 import type { SessionInfo } from "../src/generated/server"
-import { expect, nav, test, type Fixture } from "./fixture"
+import { dismissToasts, expect, nav, test, type Fixture } from "./fixture"
 import { go, moreActions, sessions } from "./agentsKit"
 
 const LEADER = "ControlOrMeta+e"
@@ -279,6 +279,7 @@ test("205. Model switch", async ({ page, start }) => {
   const release = join(fakes.claude_dir, `${claudeKey}.release`)
   const sendMessage = async (text: string) => {
     await composerForm.getByRole("textbox").fill(text)
+    await dismissToasts(page)
     await sendButton.click()
   }
   await setBehaviour("opus", "model-not-found")
