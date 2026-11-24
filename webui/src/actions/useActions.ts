@@ -435,7 +435,9 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
         return ask(decl, e, {
           confirmLabel: "Mark as merged",
           title: `Mark ${e.name} as merged`,
-          body: { lines: [`Mark ${e.name} as merged?`] },
+          body: {
+            lines: [`Mark ${e.name} as merged? Do this only when its PR was merged outside gx.`],
+          },
           onConfirm: () => epicWrite(w.markMerged, e),
         })
       case "archive":

@@ -255,6 +255,14 @@ test("Bulk actions", async ({ page, start }) => {
   await archivedMore.click()
   await expect(page.getByRole("menu")).toHaveCount(0)
 
+  // A plain ticket card in the archive still has a ⋯, holding Copy ID only.
+  await page.locator("[data-indent]").first().getByRole("button", nav("More actions")).click()
+  await expect(page.getByRole("menu", nav("More actions")).getByRole("menuitem")).toHaveText([
+    "Copy ID",
+  ])
+  await page.keyboard.press("Escape")
+  await expect(page.locator('a[href^="#/t/"]')).toHaveCount(0)
+
   // Entry 32 and 38: Unarchive from the detail puts the epic back in its named workspace, active on the Epics page.
   const membersBefore =
     JSON.parse(await fx.cli("server", "workspaces", "list", "--json")).workspaces.find(

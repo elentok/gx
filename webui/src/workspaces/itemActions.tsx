@@ -1,6 +1,7 @@
 import { useRef } from "react"
 import {
   CardKindDesign,
+  CardKindOneOff,
   SectionOnHold,
   type DesignDraftRow,
   type EpicListRow,
@@ -8,11 +9,16 @@ import {
   type Workspace,
 } from "../generated/server"
 import { agentKindOf, type AgentKind, type Entity, type EntityKind } from "../actions/entity"
-import { useActions, type ActionContext, type ReadyAction } from "../actions/useActions"
+import {
+  useActions,
+  type ActionContext,
+  type ActionWriters,
+  type ReadyAction,
+} from "../actions/useActions"
 import type { SurfaceContext } from "../actions/confirmRequest"
 import { GxMenu, menuGroups, type MenuEntry } from "../ui/menu/Menu"
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
-import { defaultWriters, type ItemWriters } from "./itemWriters"
+import { defaultWriters } from "./itemWriters"
 
 export {
   defaultWriters,
@@ -24,14 +30,15 @@ export {
   type ItemWriters,
 } from "./itemWriters"
 
-/** What the menu needs of a Design or epic card, a chat or a jump row. One-off, Follow-ups and Other get no menu. */
+/** What the menu needs of a card, a ticket card, a chat or a jump row. */
 export interface ItemRef {
   /** The Design or epic address, the chat's session id, or the draft's workspace membership key. */
   key: string
   name: string
-  kind: "design" | "epic" | "chat" | "draft" | "chat-draft"
-  /** The workspace the item sits in. */
-  workspace: string
+  kind: "design" | "epic" | "chat" | "draft" | "chat-draft" | "ticket"
+  /** The workspace the item sits in; a card outside every workspace has none. */
+  workspace?: string
+  prUrl?: string
   /** The epic (or the Design's -impl) holds a queue item. */
   queued?: boolean
   held?: boolean
@@ -49,6 +56,7 @@ const ENTITY_KIND: Record<ItemRef["kind"], EntityKind> = {
   chat: "chat",
   draft: "design-draft",
   "chat-draft": "chat-draft",
+  ticket: "ticket",
 }
 
 /** The registry's view of a row. */
@@ -61,6 +69,7 @@ export function entityOfItem(item: ItemRef): Entity {
     workspace: item.workspace,
     held: item.held,
     queued: item.queued,
+    prUrl: item.prUrl,
     session: item.session,
     agent: item.agent ?? (item.session ? agentKindOf(item.session) : undefined),
   }
@@ -78,6 +87,29 @@ export function itemOfCard(card: EpicListRow | undefined): ItemRef | undefined {
     held: card.section === SectionOnHold,
   }
 }
+
+/**
+ * The menu target of any card on the Epics page. A One-off card is a ticket; a card outside every
+ * workspace is an epic with none, so the workspace actions stay off it.
+ */
+export function itemOfAnyCard(card: EpicListRow): ItemRef {
+  const base = {
+    key: card.address,
+    name: card.name,
+    workspace: card.workspace || undefined,
+    prUrl: card.pr?.url,
+  }
+  if (card.card_kind === CardKindOneOff) return { ...base, kind: "ticket" }
+  return {
+    ...base,
+    kind: card.card_kind === CardKindDesign ? "design" : "epic",
+    queued: card.queued,
+    held: card.section === SectionOnHold,
+  }
+}
+
+/** Workspace actions: a card with no workspace offers none of them. */
+const WORKSPACE_ONLY = ["move", "hold", "unhold", "archive", "unarchive"]
 
 /** Actions a card's own page or row builds by hand, so the shared set leaves them out. */
 const BUILT_BY_PAGE = ["open-design-epic", "open-pr", "new-session", "mark-merged", "delete-design"]
@@ -124,18 +156,25 @@ function entryOf(a: ReadyAction): MenuEntry {
 export function useItemActions(
   item: ItemRef | undefined,
   workspaces: Workspace[],
-  writers: ItemWriters = defaultWriters,
+  writers: Partial<ActionWriters> = defaultWriters,
   /** Runs after a chat's or draft's Remove lands. */
   onRemoved?: () => void,
   opts: {
+    /** The list state token Mark as merged posts. */
+    state?: string
     /** Where a confirm anchors, resolved when the action runs; absent means a modal. */
     anchor?: () => HTMLElement | null | undefined
     /** Action ids the caller builds itself. */
     hide?: string[]
   } = {},
 ) {
-  return useEntityActions(item && entityOfItem(item), workspaces, opts, {
+  // A card outside every workspace offers none of the workspace actions.
+  const cardKind = item?.kind === "epic" || item?.kind === "design" || item?.kind === "ticket"
+  const noWorkspace = cardKind && !item.workspace
+  const hide = noWorkspace ? [...(opts.hide ?? BUILT_BY_PAGE), ...WORKSPACE_ONLY] : opts.hide
+  return useEntityActions(item && entityOfItem(item), workspaces, { ...opts, hide }, {
     writers,
+    state: opts.state,
     onRemoved,
     draft: item?.draft,
     promote: { connected: true },
@@ -181,10 +220,11 @@ export function ItemMenu({
   workspaces,
   writers,
   onRemoved,
-  extra,
   lead,
   roving,
   modal,
+  hide,
+  state,
 }: {
   /** A group the caller builds by hand, above the registry's (a nested agent's Agent block). */
   lead?: MenuEntry[]
@@ -192,19 +232,23 @@ export function ItemMenu({
   roving?: boolean
   item: ItemRef
   workspaces: Workspace[]
-  writers?: ItemWriters
+  writers?: Partial<ActionWriters>
   onRemoved?: () => void
-  /** A card's own entries, as one more group after the item's. */
-  extra?: MenuEntry[]
   /** Confirms open as a modal, not a popover on the button (the Jump palette). */
   modal?: boolean
+  /** Action ids the caller leaves out; absent hides the ones a page builds by hand. */
+  hide?: string[]
+  /** The list state token Mark as merged posts. */
+  state?: string
 }) {
   const wrap = useRef<HTMLSpanElement>(null)
   // The wrapper owns the trigger, so the button is found from it when the pick runs.
   const { groups } = useItemActions(item, workspaces, writers, onRemoved, {
     anchor: modal ? undefined : () => wrap.current?.querySelector("button"),
+    hide,
+    state,
   })
-  const all = [...(lead?.length ? [lead] : []), ...groups, ...(extra?.length ? [extra] : [])]
+  const all = [...(lead?.length ? [lead] : []), ...groups]
   if (all.length === 0) return null
   return (
     <span ref={wrap} style={{ display: "contents" }}>

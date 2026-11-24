@@ -12,6 +12,7 @@ import type {
 } from "../generated/server"
 import { stubResolveFetch } from "../files/stubResolver.testutil"
 import { appRoutes } from "../routes"
+import type { FetchEpicDetail } from "./detail"
 import type { FixAgent } from "./fixAgent"
 import { renderThemed } from "../ui/render"
 
@@ -91,6 +92,17 @@ function render(
   const listDone = new Promise<void>((resolve) => {
     listSettled = resolve
   })
+  const fetchDetail: FetchEpicDetail = extra.hang
+    ? () => new Promise(() => {})
+    : extra.notFound
+      ? async () => ({ kind: "not-found" })
+      : async (address) => {
+          await listDone
+          return {
+            kind: "ok",
+            detail: { ...detailOf(address, kind), ...extra.detail },
+          }
+        }
   const router = createMemoryRouter(
     appRoutes({
       fixAgent: extra.fixAgent,
@@ -98,17 +110,8 @@ function render(
         listSettled()
         return list
       },
-      epic: extra.hang
-        ? () => new Promise(() => {})
-        : extra.notFound
-          ? async () => ({ kind: "not-found" })
-          : async (address) => {
-              await listDone
-              return {
-                kind: "ok",
-                detail: { ...detailOf(address, kind), ...extra.detail },
-              }
-            },
+      epic: fetchDetail,
+      archivedEpic: fetchDetail,
     }),
     { initialEntries: [path] },
   )
@@ -1304,4 +1307,61 @@ test("opening an unread epic marks it seen; a read one posts nothing", async () 
   } finally {
     vi.unstubAllGlobals()
   }
+})
+
+// A ticket card's ⋯ holds Copy ID only; Start over and Cancel run live on the ticket page.
+const cardMenuRows = () => [
+  tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString() }),
+  doneTk("02", 1),
+  doneTk("03", 2, { rendered_status: "cancelled" }),
+  tk("04", { rendered_status: "needs-answer", needs_answer: true, question: "Which db?" }),
+  tk("05", { rendered_status: "needs-repair", reason: "dirty tree" }),
+  tk("06", { parent: "gx:blog/01" }),
+]
+const cardMenu = (card: HTMLElement) =>
+  within(card).getAllByRole("button", { name: "More actions" })
+
+test("every ticket card has one ⋯ outside the ticket link, holding Copy ID only", async () => {
+  live(cardMenuRows())
+  for (const id of ["01", "02", "03", "04", "05", "06"]) {
+    const [more, ...rest] = cardMenu(await cardOf(id))
+    expect(rest).toEqual([])
+    expect(more.closest("a")).toBeNull()
+  }
+  fireEvent.click(cardMenu(await cardOf("01"))[0])
+  expect((await screen.findAllByRole("menuitem")).map((i) => i.textContent)).toEqual(["Copy ID"])
+})
+
+test("pressing a card's ⋯ or Copy ID does not navigate and copies the ticket address", async () => {
+  const writeText = vi.fn(async () => {})
+  vi.stubGlobal("navigator", { clipboard: { writeText } })
+  try {
+    const router = live(cardMenuRows())
+    const before = router.state.location.pathname
+    fireEvent.click(cardMenu(await cardOf("01"))[0])
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Copy ID" }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("gx:blog/01"))
+    expect(router.state.location.pathname).toBe(before)
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test("an archived epic's plain ticket cards have the ⋯ and still link nowhere", async () => {
+  render("/archive/gx:blog-impl", [], "loop", {
+    detail: { total: 2, rows: [doneTk("01", 1), doneTk("02", 2)] as EpicDetail["rows"] },
+  })
+  expect(cardMenu(await cardOf("01"))).toHaveLength(1)
+  expect(cardMenu(await cardOf("02"))).toHaveLength(1)
+  expect(document.querySelector('a[href^="#/t/"]')).toBeNull()
+})
+
+test("a note card's ⋯ comes before its Answer and Fix buttons, which stay reachable", async () => {
+  live(cardMenuRows())
+  const answer = within(await cardOf("04")).getAllByRole("button")
+  expect(answer[0].getAttribute("aria-label")).toBe("More actions")
+  expect(answer.at(-1)?.textContent).toBe("Answer")
+  const repair = within(await cardOf("05")).getAllByRole("button")
+  expect(repair[0].getAttribute("aria-label")).toBe("More actions")
+  expect(repair.at(-1)?.textContent).toBe("Fix it with an agent")
 })

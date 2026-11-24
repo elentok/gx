@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { VerdictConcurrencyCap, type EpicListRow } from "../generated/server"
+import { ConfirmHost } from "../shell/ConfirmHost"
 import { renderThemed } from "../ui/render"
 import { toaster } from "../ui/toaster"
 import { EpicCard } from "./EpicCard"
@@ -11,6 +12,10 @@ afterEach(() => {
   toaster.remove()
   vi.useRealTimers()
 })
+
+/** Every button but the card's own ⋯. */
+const footerButtons = () =>
+  screen.queryAllByRole("button").filter((b) => b.getAttribute("aria-label") !== "More actions")
 
 const row = (over: Partial<EpicListRow> = {}): EpicListRow => ({
   address: "gx:blog",
@@ -184,7 +189,7 @@ test.each([
   ["draft", { state: "draft", section: "ready-to-design", status_words: "Draft" }],
 ])("%s card has no footer", (_, over) => {
   renderThemed(<EpicCard row={row(over)} />)
-  expect(screen.queryByRole("button")).toBeNull()
+  expect(footerButtons()).toEqual([])
   expect(screen.queryByTestId("footer")).toBeNull()
 })
 
@@ -323,7 +328,7 @@ test("a CI failing card shows the Paused pill, the reason, Try again and Open PR
   expect(text(screen.getByTestId("status"))).toBe("CI failing")
   expect(text(screen.getByTestId("pill"))).toContain("Paused")
   expect(text(screen.getByTestId("reason"))).toContain("go-test failed 3 times")
-  expect(screen.getAllByRole("button").map(text)).toEqual(["Open PR", "Try again"])
+  expect(footerButtons().map(text)).toEqual(["Open PR", "Try again"])
   const open = vi.spyOn(window, "open").mockReturnValue(null)
   fireEvent.click(screen.getByRole("button", { name: "Open PR" }))
   expect(open).toHaveBeenCalledWith(
@@ -359,7 +364,7 @@ test("a merge-blocked PR card shows both merge buttons", () => {
       })}
     />,
   )
-  expect(screen.getAllByRole("button").map(text)).toEqual(["Stash, merge and restore", "Merge"])
+  expect(footerButtons().map(text)).toEqual(["Stash, merge and restore", "Merge"])
   expect(text(screen.getByTestId("status"))).toBe("PR merged")
 })
 
@@ -381,7 +386,7 @@ test("Ready for review has no buttons and shows the waiting reason", () => {
       } as Partial<EpicListRow>)}
     />,
   )
-  expect(screen.queryByRole("button")).toBeNull()
+  expect(footerButtons()).toEqual([])
   expect(text(screen.getByTestId("reason"))).toContain("Waiting for you to merge")
   expect(text(screen.getByTestId("pr-checks"))).toBe("5 of 5 checks passed")
 })
@@ -397,7 +402,7 @@ test("the Merge button is disabled while the merge is pending", async () => {
   })
   renderThemed(<EpicCard row={r} writes={{ merge }} />)
   fireEvent.click(screen.getByRole("button", { name: "Merge" }))
-  await waitFor(() => expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(true))
+  await waitFor(() => expect((footerButtons()[0] as HTMLButtonElement).disabled).toBe(true))
   release({ refused: true, reason: "x", message: "Conflicts with main" })
   expect(await screen.findByText("Conflicts with main")).toBeTruthy()
 })
@@ -767,7 +772,7 @@ describe("time label", () => {
   })
 })
 
-test("a card with a workspace shows its name and a menu; one without shows neither", () => {
+test("a card with a workspace shows its name and a menu; one without shows the menu only", () => {
   const { unmount } = renderThemed(
     <EpicCard
       row={row({ workspace: "Side" })}
@@ -779,7 +784,52 @@ test("a card with a workspace shows its name and a menu; one without shows neith
   unmount()
   renderThemed(<EpicCard row={row()} />)
   expect(screen.queryByTestId("workspace")).toBeNull()
-  expect(screen.queryByRole("button", { name: "More actions" })).toBeNull()
+  expect(screen.getByRole("button", { name: "More actions" })).toBeTruthy()
+})
+
+describe("the menu on a card outside every workspace", () => {
+  const menuItems = async () => {
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }))
+    return (await screen.findAllByRole("menuitem")).map(text)
+  }
+
+  test("a One-off card holds Copy ID only; it copies the ticket address and toasts it", async () => {
+    const writeText = vi.fn(async () => {})
+    vi.stubGlobal("navigator", { clipboard: { writeText } })
+    try {
+      renderThemed(
+        <EpicCard
+          row={row({ card_kind: "one-off", address: "demo:fix-typo/01", workspace: "" })}
+        />,
+      )
+      expect(await menuItems()).toEqual(["Copy ID"])
+      fireEvent.click(screen.getByRole("menuitem", { name: "Copy ID" }))
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith("demo:fix-typo/01"))
+      expect(await screen.findByText("Copied demo:fix-typo/01")).toBeTruthy()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  test("a Follow-ups card holds Copy ID and no Move to workspace, Hold or Archive", async () => {
+    renderThemed(<EpicCard row={row({ card_kind: "follow-ups", workspace: "" })} />)
+    expect(await menuItems()).toEqual(["Copy ID"])
+  })
+
+  test("an implementation card with no workspace has a menu with Copy ID", async () => {
+    renderThemed(<EpicCard row={row({ workspace: "" })} />)
+    expect(await menuItems()).toEqual(["Copy ID"])
+  })
+
+  test("Open PR leads the menu when the row has a PR URL, and opens it in a new tab", async () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null)
+    const pr = { number: 12, url: "https://github.com/o/r/pull/12", checks: "" }
+    renderThemed(<EpicCard row={row({ pr } as Partial<EpicListRow>)} />)
+    expect(await menuItems()).toEqual(["Open PR", "Copy ID"])
+    fireEvent.click(screen.getByRole("menuitem", { name: "Open PR" }))
+    expect(open).toHaveBeenCalledWith(pr.url, "_blank", "noopener")
+    open.mockRestore()
+  })
 })
 
 test("a held card is dimmed and Take off hold unholds it", async () => {
@@ -868,7 +918,7 @@ describe("Create PR and Mark as merged", () => {
   test("an awaiting-PR card has Create PR as its one main button", () => {
     renderThemed(<EpicCard row={awaitingPR()} />)
     expect(text(screen.getByTestId("pill"))).toContain("Awaiting PR")
-    expect(screen.getAllByRole("button").map(text)).toEqual(["Create PR"])
+    expect(footerButtons().map(text)).toEqual(["Create PR"])
   })
 
   test("a merge-project card shows Create PR as the secondary button left of Merge", () => {
@@ -882,7 +932,7 @@ describe("Create PR and Mark as merged", () => {
       ],
     })
     renderThemed(<EpicCard row={r} />)
-    const buttons = screen.getAllByRole("button")
+    const buttons = footerButtons()
     expect(buttons.map(text)).toEqual(["Create PR", "Merge"])
     expect(buttons[0].className).not.toBe(buttons[1].className)
   })
@@ -911,22 +961,49 @@ describe("Create PR and Mark as merged", () => {
     const markMergedWrite = vi.fn().mockResolvedValue({})
     const onChanged = vi.fn()
     renderThemed(
-      <EpicCard
-        row={awaitingPR({ workspace: "Default", actions: [create, markMerged] })}
-        writes={{ markMerged: markMergedWrite }}
-        onChanged={onChanged}
-      />,
+      <>
+        <EpicCard
+          row={awaitingPR({ workspace: "Default", actions: [create, markMerged] })}
+          writes={{ markMerged: markMergedWrite }}
+          onChanged={onChanged}
+        />
+        <ConfirmHost />
+      </>,
     )
-    expect(screen.getAllByRole("button").map(text)).not.toContain("Mark as merged")
+    expect(footerButtons().map(text)).not.toContain("Mark as merged")
     fireEvent.click(screen.getByRole("button", { name: "More actions" }))
     fireEvent.click(await screen.findByText("Mark as merged"))
     expect(markMergedWrite).not.toHaveBeenCalled()
-    const dialog = await screen.findByRole("dialog")
-    fireEvent.click(within(dialog).getByRole("button", { name: "Mark as merged" }))
+    // The shared confirm is a popover on the ⋯, not a Modal.
+    const dialog = await screen.findByRole("alertdialog")
+    expect(dialog.textContent).toContain("Do this only when its PR was merged outside gx.")
+    await waitFor(() =>
+      expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: /^Cancel/ })),
+    )
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Mark as merged/ }))
     await waitFor(() =>
       expect(markMergedWrite).toHaveBeenCalledWith({ address: "gx:blog", state: "awaiting-pr" }),
     )
     await waitFor(() => expect(onChanged).toHaveBeenCalled())
+  })
+
+  test("Esc closes the Mark as merged confirm without posting", async () => {
+    const markMergedWrite = vi.fn().mockResolvedValue({})
+    renderThemed(
+      <>
+        <EpicCard
+          row={awaitingPR({ workspace: "Default", actions: [create, markMerged] })}
+          writes={{ markMerged: markMergedWrite }}
+        />
+        <ConfirmHost />
+      </>,
+    )
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }))
+    fireEvent.click(await screen.findByText("Mark as merged"))
+    const dialog = await screen.findByRole("alertdialog")
+    fireEvent.keyDown(dialog, { key: "Escape" })
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+    expect(markMergedWrite).not.toHaveBeenCalled()
   })
 
   test("a card without the actions shows neither", async () => {

@@ -76,6 +76,12 @@ test("16. Needs you (+63, 28, 29, 30)", async ({ page, start }) => {
     await expect(card(page, name).getByTestId("pill")).toBeVisible()
   }
   await expect(page.getByTestId("pill")).toHaveCount(NEEDS_YOU.length)
+  // The One-off card has a ⋯ holding Copy ID only; the footer-button counts above exclude it.
+  await card(page, "paused").getByRole("button", nav("More actions")).click()
+  await expect(page.getByRole("menu", nav("More actions")).getByRole("menuitem")).toHaveText([
+    "Copy ID",
+  ])
+  await page.keyboard.press("Escape")
   const progress = await section(page, "Designing")
   await expect(progress.getByTestId("pill")).toHaveCount(0)
   await expect(progress.getByRole("link", { name: "design-stopped", exact: true })).toBeVisible()

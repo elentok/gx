@@ -54,6 +54,16 @@ test("2. Epic looks right", async ({ page, start, context }) => {
   await expect(menu).toHaveCount(0)
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("demo:mixed-epic")
   await expect(page.getByText("1 done, 1 cancelled")).toBeVisible()
+  // A ticket card's ⋯ holds Copy ID only, and copies the ticket address.
+  const ticket02 = page
+    .locator("[data-indent]")
+    .filter({ has: page.locator('a[href$="/t/demo:mixed-epic/02"]') })
+  await ticket02.getByRole("button", nav("More actions")).click()
+  const ticketMenu = page.getByRole("menu", nav("More actions"))
+  await expect(ticketMenu.getByRole("menuitem")).toHaveText(["Copy ID"])
+  await ticketMenu.getByRole("menuitem", nav("Copy ID")).click()
+  await expect(ticketMenu).toHaveCount(0)
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("demo:mixed-epic/02")
   await expect(page.getByRole("link", { name: "02 open ready" })).toBeVisible()
   await expect(page.getByRole("link", { name: "03 blocked after 02" })).toBeVisible()
   await expect(page.getByRole("link", { name: "04 drafted draft" })).toBeVisible()

@@ -54,6 +54,12 @@ test.describe("199. Triage journey", () => {
     await expect(final.getByText("Write this plan?")).toBeVisible()
     await expect(final.getByRole("button", nav("Review plan"))).toBeVisible()
     await expect(inboxButton().locator("span")).toHaveText("6")
+    // The Follow-ups card has a ⋯ holding Copy ID, with no workspace actions.
+    await final.getByRole("button", nav("More actions")).click()
+    await expect(page.getByRole("menu", nav("More actions")).getByRole("menuitem")).toHaveText([
+      "Copy ID",
+    ])
+    await page.keyboard.press("Escape")
     await final.getByRole("button", nav("Review plan")).click()
     await expect(page).toHaveURL(/#\/triage\/demo$/)
     await tell(page, "Object to decision 1")

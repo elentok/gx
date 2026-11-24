@@ -39,6 +39,19 @@ test.describe("53. Phone, epic page", () => {
     expect(moreBox.x + moreBox.width).toBeCloseTo(actionsBox.x + actionsBox.width, 0)
     await expect(page.getByTestId("page-header-caret")).toHaveCount(0)
 
+    // The ⋯ sits inside the card at its top-right, and the page does not scroll sideways.
+    const wrap = page
+      .locator("[data-indent]")
+      .filter({ has: page.locator('a[href$="/t/demo:mixed-epic/02"]') })
+    const wrapBox = (await wrap.boundingBox())!
+    const cardMoreBox = (await wrap.getByRole("button", nav("More actions")).boundingBox())!
+    expect(cardMoreBox.x + cardMoreBox.width).toBeLessThanOrEqual(wrapBox.x + wrapBox.width)
+    expect(wrapBox.x + wrapBox.width - (cardMoreBox.x + cardMoreBox.width)).toBeLessThan(16)
+    expect(cardMoreBox.y - wrapBox.y).toBeLessThan(16)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true)
+
     // A long title wraps, and its meta sits below the whole title.
     const longTitle = page.getByText(long, nav(long))
     await expect(longTitle).toBeVisible()

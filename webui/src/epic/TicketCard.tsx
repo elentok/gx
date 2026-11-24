@@ -6,6 +6,7 @@ import { useWide } from "../useWide"
 import { VerdictLine } from "../verdict"
 import { LongRunningBadge } from "../page/LongRunningBadge"
 import { Button } from "../ui/button/Button"
+import { ItemMenu } from "../workspaces/itemActions"
 import { HarnessLabel } from "../ui/harness-label/HarnessLabel"
 import type { EpicDetailRow } from "./detail"
 import { FixAgentDialog } from "./FixAgentDialog"
@@ -20,6 +21,9 @@ import {
   rowChips,
   toneOf,
 } from "./rows"
+
+/** The card's right padding: clears the 24px "More actions" button at its top-right corner. */
+const MENU_CLEARANCE = "40px"
 
 const toneVar = (tone: string) => `var(--chakra-colors-tone-${tone}-fg)`
 
@@ -221,7 +225,8 @@ function CardFrame({
       }
       borderRadius="12px"
       minH={wide ? (folded ? "44px" : "48px") : undefined}
-      px={wide ? "16px" : "14px"}
+      pl={wide ? "16px" : "14px"}
+      pr={MENU_CLEARANCE}
       py={folded ? "9px" : "10px"}
       display="flex"
       alignItems="center"
@@ -256,7 +261,8 @@ function NoteCard({
       borderWidth="1px"
       borderColor="rgba(255,112,102,0.35)"
       borderRadius="12px"
-      px="16px"
+      pl="16px"
+      pr={MENU_CLEARANCE}
       py="12px"
       display="flex"
       flexDirection="column"
@@ -330,7 +336,16 @@ export function TicketCard({
   const look = cardLook(row)
   const wide = useWide()
   return (
-    <Box data-indent={indent} data-tone={toneOf(row)} ml={`${indent * (wide ? 28 : 20)}px`}>
+    <Box
+      data-indent={indent}
+      data-tone={toneOf(row)}
+      ml={`${indent * (wide ? 28 : 20)}px`}
+      position="relative"
+    >
+      {/* A sibling of the link, not inside it: a button in an anchor is invalid and would navigate. */}
+      <Box position="absolute" top="6px" right="6px" zIndex="1">
+        <ItemMenu item={{ key: row.address, name: row.title, kind: "ticket" }} workspaces={[]} />
+      </Box>
       {plain ? (
         <CardFrame row={row} wide={wide}>
           <Line row={row} meta={meta} wide={wide} />

@@ -29,13 +29,11 @@ import { BackLinkLine } from "../initiatives/BackLinkLine"
 import { PAGE_ATTR, PAGE_OPEN_ATTR } from "../select/pageKeys"
 import { SelectBox } from "../shell/SidebarSelect"
 import { followUpsFocus } from "../workspaces/followUpsBadge"
-import { ItemMenu, itemOfCard, postUnhold, type ItemWriters } from "../workspaces/itemActions"
+import { ItemMenu, itemOfAnyCard, postUnhold, type ItemWriters } from "../workspaces/itemActions"
 import { designHref, epicHref, ticketHref, triageHref } from "../hrefs"
 import { postOpenDesign, type OpenDesign, type OpenFlow } from "../design/open"
 import { postOpenTriage } from "../triage/api"
 import { Button } from "../ui/button/Button"
-import { Modal } from "../ui/modal/Modal"
-import type { MenuEntry } from "../ui/menu/Menu"
 import { useWrite } from "../useWrite"
 import { launchOrVerdictText } from "../verdict"
 import { ProgressRing } from "../ui/progress-ring/ProgressRing"
@@ -233,6 +231,9 @@ function ActionButtons({
   return <>{footerActions(row).map(button)}</>
 }
 
+/** Actions the card builds by hand or leaves to its page. */
+const CARD_MENU_HIDE = ["open-design-epic", "new-session", "delete-design"]
+
 /** One /v1/epics card row. */
 export function EpicCard({
   row,
@@ -269,13 +270,20 @@ export function EpicCard({
   const followUps = row.card_kind === CardKindFollowUps
   const pillTone = followUps && row.state_pill ? followUpsTone(row) : tone
   const held = row.section === SectionOnHold
-  const { run } = useWrite()
-  const [confirmMerged, setConfirmMerged] = useState(false)
   const markMerged = row.actions?.find((a) => a.kind === CardActionMarkMerged)
   const markMergedAddress = markMerged?.target ?? row.address
-  const extra: MenuEntry[] | undefined = markMerged
-    ? [{ value: "mark-merged", label: markMerged.label, onSelect: () => setConfirmMerged(true) }]
-    : undefined
+  // The registry's Mark as merged offers itself to every live epic; the server's action list decides here.
+  const menuHide = markMerged ? CARD_MENU_HIDE : [...CARD_MENU_HIDE, "mark-merged"]
+  const menuWriters = {
+    markMerged: async (body: Parameters<PostEpicWrite>[0]) => {
+      const res = await (writes.markMerged ?? postEpicMarkMerged)({
+        ...body,
+        address: markMergedAddress,
+      })
+      if (!res.refused) onChanged()
+      return res
+    },
+  }
   return (
     <Box
       data-kind={kind}
@@ -380,41 +388,16 @@ export function EpicCard({
           </Text>
           <BackLinkLine link={row} />
         </Box>
-        {row.workspace && (
-          <Box ml="auto" flex="none">
-            <ItemMenu item={itemOfCard(row)!} workspaces={workspaces} extra={extra} roving />
-          </Box>
-        )}
-        {confirmMerged && (
-          <Modal
-            label={`Mark ${row.name} as merged`}
-            onClose={() => setConfirmMerged(false)}
-            maxW="sm"
-          >
-            <Text>Mark {row.name} as merged? Do this only when its PR was merged outside gx.</Text>
-            <Box display="flex" gap="2" justifyContent="flex-end">
-              <Button emphasis="secondary" onClick={() => setConfirmMerged(false)} autoFocus>
-                Cancel
-              </Button>
-              <Button
-                tone="done"
-                onClick={() => {
-                  setConfirmMerged(false)
-                  void run(
-                    () =>
-                      (writes.markMerged ?? postEpicMarkMerged)({
-                        address: markMergedAddress,
-                        state: row.state,
-                      }),
-                    { onDone: onChanged },
-                  )
-                }}
-              >
-                Mark as merged
-              </Button>
-            </Box>
-          </Modal>
-        )}
+        <Box ml="auto" flex="none">
+          <ItemMenu
+            item={itemOfAnyCard(row)}
+            workspaces={workspaces}
+            writers={menuWriters}
+            hide={menuHide}
+            state={row.state}
+            roving
+          />
+        </Box>
       </Box>
       <PrLine row={row} />
       {(needsYou || pillTone || reason) && (
