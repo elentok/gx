@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
-import { baseCss, outDir, tokensCss } from "../../scripts/mock-tokens"
+import { baseCss, fontsCss, outDir, tokensCss } from "../../scripts/mock-tokens"
 
 const committed = (name: string): string =>
   readFileSync(resolve(__dirname, "../..", outDir, name), "utf8")
@@ -13,6 +13,17 @@ describe("mock token files", () => {
 
   it("base.css matches a fresh run (run `pnpm run mock:tokens` in webui)", () => {
     expect(committed("base.css")).toBe(baseCss())
+  })
+
+  it("fonts.css matches a fresh run (run `pnpm run mock:tokens` in webui)", () => {
+    expect(committed("fonts.css")).toBe(fontsCss())
+  })
+
+  it("fonts.css inlines every face of src/ui/fonts.css and keeps no file path", () => {
+    const css = fontsCss()
+    expect(css.match(/^@font-face/gm)).toHaveLength(5)
+    expect(css.match(/url\("data:font\/woff2;base64,[A-Za-z0-9+/=]+"\)/g)).toHaveLength(5)
+    expect(css).not.toContain('url("./')
   })
 
   it("tokens.css carries the layer order, light, dark and base blocks", () => {

@@ -20,6 +20,7 @@ try {
   mkdirSync(out, { recursive: true })
   writeFileSync(resolve(out, "tokens.css"), gen.tokensCss())
   writeFileSync(resolve(out, "base.css"), gen.baseCss())
+  writeFileSync(resolve(out, "fonts.css"), gen.fontsCss())
 } finally {
   await server.close()
 }

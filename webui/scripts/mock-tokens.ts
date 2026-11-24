@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs"
+import { dirname, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 import { system } from "../src/ui/theme"
 
 // Chakra returns nested emotion-style objects; this turns them into CSS text.
@@ -52,6 +55,18 @@ export function toCss(tree: Dict): string {
 
 export function tokensCss(): string {
   return `${LAYER_ORDER}${toCss(system.getTokenCss() as Dict)}\n`
+}
+
+const uiDir = resolve(dirname(fileURLToPath(import.meta.url)), "../src/ui")
+
+// Keeps the rules of src/ui/fonts.css and swaps each file path for the font data.
+export function fontsCss(): string {
+  const source = readFileSync(resolve(uiDir, "fonts.css"), "utf8")
+  const inlined = source.replace(/url\("\.\/fonts\/([^"]+\.woff2)"\)/g, (_m, file: string) => {
+    const bytes = readFileSync(resolve(uiDir, "fonts", file))
+    return `url("data:font/woff2;base64,${bytes.toString("base64")}")`
+  })
+  return `${LAYER_ORDER}${inlined}`
 }
 
 export function baseCss(): string {
