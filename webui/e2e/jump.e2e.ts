@@ -186,7 +186,7 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   await menuFocused()
   await page.getByRole("menuitem", nav("Remove")).click()
   const confirm = page.getByRole("dialog", nav("Remove far-draft"))
-  await confirm.getByRole("button", nav("Remove")).click()
+  await confirm.getByRole("button", { name: /^Remove/ }).click()
   await expect(confirm).toHaveCount(0)
   await expect.poll(draftIds).toHaveLength(1)
 
@@ -235,8 +235,8 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   await rowMenu("near-draft").click()
   await page.getByRole("menuitem", nav("Remove")).click()
   await page
-    .getByRole("dialog", nav("Remove near-draft"))
-    .getByRole("button", nav("Remove"))
+    .getByRole("alertdialog", nav("Remove near-draft"))
+    .getByRole("button", { name: /^Remove/ })
     .click()
   await expect(row("near-draft")).toHaveCount(0)
   await expect.poll(draftIds).toHaveLength(0)

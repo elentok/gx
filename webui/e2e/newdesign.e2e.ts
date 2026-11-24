@@ -368,8 +368,8 @@ test("26. New Design form", async ({ page, start }) => {
     await rowMenu("Removed from the row menu").click()
     await page.getByRole("menuitem", nav("Remove")).click()
     await page
-      .getByRole("dialog", { name: /^Remove / })
-      .getByRole("button", nav("Remove"))
+      .getByRole("alertdialog", { name: /^Remove / })
+      .getByRole("button", { name: /^Remove/ })
       .click()
     await expect(row("Removed from the row menu")).toHaveCount(0)
     await expect.poll(draftIds).toEqual([])

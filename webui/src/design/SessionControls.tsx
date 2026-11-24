@@ -238,15 +238,18 @@ export function DesignActionsMenu({
       ),
     )
   if (sessionItems.length > 0) groups.push(sessionItems)
-  const copySection: MenuEntry[] = [
-    {
-      value: "copy-design-id",
-      label: designItems ? "Copy design ID" : "Copy triage ID",
-      hint: address,
-      inlineHint: true,
-      onSelect: () => void copyText(address, null),
-    },
-  ]
+  // A Design's Copy ID comes from the registry (itemGroups); the other flows keep their own.
+  const copySection: MenuEntry[] = designItems
+    ? []
+    : [
+        {
+          value: "copy-design-id",
+          label: "Copy triage ID",
+          hint: address,
+          inlineHint: true,
+          onSelect: () => void copyText(address, null),
+        },
+      ]
   copySection.push(...extraItems)
   if (canDelete && !confirming)
     copySection.push({

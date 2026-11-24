@@ -83,12 +83,11 @@ const MODAL: SurfaceContext = { mode: "modal" }
 
 /**
  * The page-header form of {@link useItemActions}: no sections while the card is unknown. EpicPage
- * and SessionControls build Copy ID and the lifecycle items above by hand, so they are filtered
- * out by id here until the pages read the registry themselves.
+ * and SessionControls build the lifecycle items above by hand, so they are filtered out by id.
  */
 export function useCardActions(card: EpicListRow | undefined, workspaces: Workspace[]) {
   return useItemActions(itemOfCard(card), workspaces, undefined, undefined, {
-    hide: [...BUILT_BY_PAGE, "copy-id"],
+    hide: BUILT_BY_PAGE,
   })
 }
 

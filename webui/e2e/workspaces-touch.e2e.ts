@@ -177,9 +177,12 @@ test("Workspaces touch", async ({ page, start }) => {
   await goto(page, `#/agents/${chatId}`)
   await chatMenu().click()
   await page.getByRole("menuitem", nav("Remove")).click()
-  await expect(page.getByRole("dialog")).toBeVisible()
+  await expect(page.getByRole("alertdialog")).toBeVisible()
   expect(await fx.cli("agents", "list")).toContain(chatId)
-  await page.getByRole("dialog").getByRole("button", nav("Remove")).click()
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: /^Remove/ })
+    .click()
   await expect(page).not.toHaveURL(new RegExp(`#/agents/${chatId}$`))
   await expect.poll(() => fx.cli("agents", "list")).not.toContain(chatId)
 

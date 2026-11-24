@@ -131,7 +131,7 @@ test.describe("72. Design actions menu", () => {
 })
 
 test.describe("72b. Design menu before Start", () => {
-  test("the button exists before Start and the menu holds Open design epic, Move, Hold, Copy design ID and Archive", async ({
+  test("the button exists before Start and the menu holds Open design epic, Move, Hold, Archive and Copy ID", async ({
     page,
     start,
   }) => {
@@ -144,25 +144,17 @@ test.describe("72b. Design menu before Start", () => {
     await expect(menu).toContainText("Archive")
     await expect(menu.getByRole("menuitem", nav("Move to workspace"))).toBeVisible()
     await expect(menu.getByRole("menuitem", { name: "Hold", exact: true })).toBeVisible()
-    await expect(menu.getByRole("menuitem", { name: /^Copy design ID/ })).toContainText(
-      "demo:design-epic",
-    )
+    await expect(menu.getByRole("menuitem", nav("Copy ID"))).toHaveCount(1)
   })
 })
 
 test.describe("128. Copy ID (Design)", () => {
-  test("Copy design ID puts <project>:<name> on the clipboard", async ({
-    page,
-    start,
-    context,
-  }) => {
+  test("Copy ID puts <project>:<name> on the clipboard", async ({ page, start, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"])
     await start("design")
     await openDesign(page)
     await moreActions(page).click()
-    await actionsMenu(page)
-      .getByRole("menuitem", { name: /^Copy design ID/ })
-      .click()
+    await actionsMenu(page).getByRole("menuitem", nav("Copy ID")).click()
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("demo:design-epic")
   })
 })

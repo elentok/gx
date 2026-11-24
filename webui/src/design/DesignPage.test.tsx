@@ -30,6 +30,8 @@ const map = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   queued: false,
   queueable: false,
   blocked_by_epics: [],
+  addresses: [`gx:${name}`],
+  workspace: "Default",
   ...over,
 })
 
@@ -201,14 +203,13 @@ test("with no session the menu has no Agent block, and Open design epic is its f
   await waitFor(() => expect(router.state.location.pathname).toBe("/e/gx:a"))
 })
 
-test("Copy design ID copies the address and shows it as the subtitle, with no session", async () => {
+test("Copy ID copies the address, with no session", async () => {
   const writeText = vi.fn(async () => {})
   vi.stubGlobal("navigator", { clipboard: { writeText } })
   try {
     render([map("a")], [], "/d/gx:a", detailOf())
     await openMenu()
-    const item = await screen.findByRole("menuitem", { name: /Copy design ID/ })
-    expect(item.textContent).toContain("gx:a")
+    const item = await screen.findByRole("menuitem", { name: /^Copy ID/ })
     expect(deleteItem()).toBeNull()
     fireEvent.click(item)
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("gx:a"))
@@ -562,7 +563,7 @@ test("Delete design shows only for a deletable Design with no live session, foll
   render([map("a")], [], "/d/gx:a", detailOf())
   await screen.findByRole("button", { name: "Start design session" })
   await openMenu()
-  expect(await screen.findByRole("menuitem", { name: /Copy design ID/ })).toBeTruthy()
+  expect(await screen.findByRole("menuitem", { name: /^Copy ID/ })).toBeTruthy()
   expect(deleteItem()).toBeNull()
 })
 
@@ -771,16 +772,14 @@ test("the tabs-row menu stays open and anchored through focusout and viewport re
     await waitFor(() => expect(moreIn(tabsRow())).toBeTruthy())
     const more = moreIn(tabsRow()) as HTMLElement
     fireEvent.click(more)
-    await screen.findByRole("menuitem", { name: /Copy design ID/ })
+    await screen.findByRole("menuitem", { name: /^Copy ID/ })
     blurComposer()
     kb.close()
-    expect(screen.getByRole("menuitem", { name: /Copy design ID/ })).toBeTruthy()
+    expect(screen.getByRole("menuitem", { name: /^Copy ID/ })).toBeTruthy()
     expect(moreIn(tabsRow())).toBe(more)
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull()
-    fireEvent.click(screen.getByRole("menuitem", { name: /Copy design ID/ }))
-    await waitFor(() =>
-      expect(screen.queryByRole("menuitem", { name: /Copy design ID/ })).toBeNull(),
-    )
+    fireEvent.click(screen.getByRole("menuitem", { name: /^Copy ID/ }))
+    await waitFor(() => expect(screen.queryByRole("menuitem", { name: /^Copy ID/ })).toBeNull())
     await waitFor(() => expect(moreIn(tabsRow())).toBeNull())
     expect(screen.getByRole("heading", { level: 1 })).toBeTruthy()
   }))
@@ -789,7 +788,7 @@ test("the title-row menu with the keyboard closed leaves the layout alone", () =
   withKeyboard(async () => {
     await renderRound()
     fireEvent.click(screen.getByRole("button", { name: "More actions" }))
-    await screen.findByRole("menuitem", { name: /Copy design ID/ })
+    await screen.findByRole("menuitem", { name: /^Copy ID/ })
     expect(moreIn(tabsRow())).toBeNull()
     expect(screen.getByRole("heading", { level: 1 })).toBeTruthy()
     expect(screen.getAllByRole("button", { name: "More actions" })).toHaveLength(1)

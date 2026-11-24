@@ -251,24 +251,27 @@ test("the menu lists Live sessions only with 2 or more, and has none with one", 
   expect(screen.queryByText(/Live sessions/)).toBeNull()
 })
 
-test("New session and the Live sessions rows share a section, with a rule before Copy design ID only", async () => {
-  render("/d/gx:a", [session("a"), session("b")])
+const spaces: Workspace[] = [
+  { name: "Default", default: true, members: 1 },
+  { name: "Work", members: 1 },
+]
+
+test("New session and the Live sessions rows share a section, and Copy ID shows once", async () => {
+  render("/d/gx:a", [session("a"), session("b")], {}, detailOf(), {
+    card: { addresses: ["gx:a"], workspace: "Work" },
+    workspaces: spaces,
+  })
   await openMenu()
   const fresh = await newSession()
   const live = screen.getByText(/Live sessions/)
-  const copy = screen.getByRole("menuitem", { name: /Copy design ID/ })
   const rules = screen.getAllByRole("separator")
   const between = (a: Node, b: Node) => (r: Node) =>
     !!(a.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING) &&
     !!(b.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_PRECEDING)
   expect(rules.filter(between(fresh, live))).toHaveLength(0)
-  expect(rules.filter(between(live, copy))).toHaveLength(1)
+  const copies = screen.getAllByRole("menuitem").filter((i) => /^Copy/.test(i.textContent ?? ""))
+  expect(copies.map((i) => i.textContent)).toEqual(["Copy ID"])
 })
-
-const spaces: Workspace[] = [
-  { name: "Default", default: true, members: 1 },
-  { name: "Work", members: 1 },
-]
 
 test("a Design in a workspace appends Move and Hold after the existing items", async () => {
   render("/d/gx:a", [session("a")], {}, detailOf(), {
@@ -280,10 +283,9 @@ test("a Design in a workspace appends Move and Hold after the existing items", a
   const labels = screen.getAllByRole("menuitem").map((i) => i.textContent)
   const at = (prefix: string) => labels.findIndex((l) => l?.startsWith(prefix))
   expect(at("New session")).toBeGreaterThanOrEqual(0)
-  expect(at("Copy design ID")).toBeGreaterThan(at("New session"))
-  expect(at("Move to workspace")).toBeGreaterThan(at("Copy design ID"))
+  expect(at("Move to workspace")).toBeGreaterThan(at("New session"))
   expect(at("Remove from workspace")).toBe(-1)
-  expect(labels.slice(-2)).toEqual(["Hold", "Archive"])
+  expect(labels.slice(-3)).toEqual(["Hold", "Archive", "Copy ID"])
 })
 
 test("a held Design offers Take off hold and says On hold in its subtitle", async () => {

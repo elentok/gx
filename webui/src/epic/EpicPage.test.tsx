@@ -1031,25 +1031,35 @@ test("the popover links a found path in the summary and the truncated trigger st
   }
 })
 
-test("Copy epic ID is the only menu item and copies project:name", async () => {
+const spaces: Workspace[] = [
+  { name: "Default", default: true, members: 1 },
+  { name: "Work", members: 1 },
+]
+
+test("Copy ID comes from the registry, once, and copies project:name", async () => {
   const writeText = vi.fn(async () => {})
   vi.stubGlobal("navigator", { clipboard: { writeText } })
   try {
-    render("/e/gx:blog-impl", [])
-    fireEvent.click(await screen.findByRole("button", { name: "More actions" }))
+    render("/e/gx:blog-impl", [row("blog-impl", { workspace: "Work" })], "loop", {
+      workspaces: spaces,
+    })
+    fireEvent.click(
+      await waitFor(
+        async () =>
+          (await screen.findAllByRole("button", { name: "More actions" })).find(
+            (b) => !b.closest("aside"),
+          )!,
+      ),
+    )
     const items = await screen.findAllByRole("menuitem")
-    expect(items.map((i) => i.textContent)).toEqual(["Copy epic IDgx:blog-impl"])
-    fireEvent.click(items[0])
+    const copies = items.filter((i) => /^Copy/.test(i.textContent ?? ""))
+    expect(copies.map((i) => i.textContent)).toEqual(["Copy ID"])
+    fireEvent.click(copies[0])
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("gx:blog-impl"))
   } finally {
     vi.unstubAllGlobals()
   }
 })
-
-const spaces: Workspace[] = [
-  { name: "Default", default: true, members: 1 },
-  { name: "Work", members: 1 },
-]
 const menuLabels = async () => {
   // The sidebar lists the same epic with its own More actions button; the page's is the one outside it.
   const pageButton = async () =>
@@ -1064,12 +1074,7 @@ test("a card in a named workspace adds Move, Remove and Hold to the menu", async
   render("/e/gx:blog-impl", [row("blog-impl", { workspace: "Work" })], "loop", {
     workspaces: spaces,
   })
-  expect(await menuLabels()).toEqual([
-    "Copy epic IDgx:blog-impl",
-    "Move to workspace›",
-    "Hold",
-    "Archive",
-  ])
+  expect(await menuLabels()).toEqual(["Move to workspace›", "Hold", "Archive", "Copy ID"])
 })
 
 test("a held card offers Take off hold", async () => {
@@ -1079,12 +1084,7 @@ test("a held card offers Take off hold", async () => {
     "loop",
     { workspaces: spaces },
   )
-  expect(await menuLabels()).toEqual([
-    "Copy epic IDgx:blog-impl",
-    "Move to workspace›",
-    "Take off hold",
-    "Archive",
-  ])
+  expect(await menuLabels()).toEqual(["Move to workspace›", "Take off hold", "Archive", "Copy ID"])
 })
 
 test("a queued epic's Hold is disabled", async () => {

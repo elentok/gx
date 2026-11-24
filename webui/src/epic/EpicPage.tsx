@@ -1,5 +1,4 @@
 import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react"
-import { copyText } from "../clipboard"
 import { withKeys } from "../uniqueKeys"
 import { GxMenu, menuGroups } from "../ui/menu/Menu"
 import { MoreActionsButton } from "../ui/menu/MoreActionsButton"
@@ -366,27 +365,11 @@ function DescriptionLine({ summary }: { summary: string }) {
   )
 }
 
-// Copy epic ID (the address, `<project>:<name>`), then Move, Remove and Hold for a card in a workspace.
-function EpicMenu({ address, card }: { address: string; card?: EpicListRow }) {
+// The registry's actions for the card: Copy ID, Move, Remove and Hold. None for a card outside a workspace.
+function EpicMenu({ card }: { card?: EpicListRow }) {
   const { workspaces } = useWorkspaces(useConnectionContext())
   const { groups } = useCardActions(card, workspaces)
-  return (
-    <GxMenu
-      trigger={<MoreActionsButton />}
-      items={menuGroups([
-        [
-          {
-            value: "copy-epic-id",
-            label: "Copy epic ID",
-            hint: address,
-            inlineHint: true,
-            onSelect: () => void copyText(address, null),
-          },
-        ],
-        ...groups,
-      ])}
-    />
-  )
+  return <GxMenu trigger={<MoreActionsButton />} items={menuGroups(groups)} />
 }
 
 const mergeBlocked = (detail: EpicDetail) => detail.state === "paused" && !!detail.land_block_reason
@@ -553,7 +536,7 @@ function EpicPageBody({
                   sessions={sessions}
                   size={wide ? "header" : "headerSm"}
                 />
-                {!readOnly && <EpicMenu address={address} card={card} />}
+                {!readOnly && <EpicMenu card={card} />}
               </>
             }
             meta={

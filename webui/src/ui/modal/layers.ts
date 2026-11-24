@@ -10,13 +10,20 @@ export const hasLayer = (): boolean => stack.length > 0
 export const FIRST_FIELD_ATTR = "data-first-field"
 
 /**
- * Moves focus into the topmost open dialog: its first text field where it marks one, else the panel.
+ * Moves focus into the topmost open dialog (a modal or the confirm popover): its first text field
+ * where it marks one, else a confirm's Cancel button, else the panel.
  * Does nothing when no dialog is open or `from` (the node focus landed on) is already inside it.
  */
 export function focusTopDialog(from?: Node | null): void {
-  const dialog = [...document.querySelectorAll<HTMLElement>('[aria-modal="true"]')].at(-1)
+  const dialog = [
+    ...document.querySelectorAll<HTMLElement>('[aria-modal="true"], [data-part="confirm-popover"]'),
+  ].at(-1)
   if (!dialog || (from && dialog.contains(from))) return
-  ;(dialog.querySelector<HTMLElement>(`[${FIRST_FIELD_ATTR}]`) ?? dialog).focus()
+  const target =
+    dialog.querySelector<HTMLElement>(`[${FIRST_FIELD_ATTR}]`) ??
+    dialog.querySelector<HTMLElement>('[data-part="cancel-button"]') ??
+    dialog
+  target.focus()
 }
 
 /**

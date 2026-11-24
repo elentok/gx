@@ -42,7 +42,7 @@ test.describe("5. Start a design session and answer a round", () => {
     await expect(step(page, "resolve-tickets", "current")).toBeVisible()
     // A Design is a workspace item now, so the Epics footer button no longer stands for it.
     await expect(epicsButton(page)).not.toHaveAttribute("aria-current", "page")
-    // The charted design has no session, so its ⋯ menu holds only Copy design ID and Hold.
+    // The charted design has no session, so its ⋯ menu holds only Copy ID and Hold.
     await expect(
       page.getByTestId("page-header-actions").getByRole("button", nav("More actions")),
     ).toHaveCount(1)

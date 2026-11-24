@@ -246,7 +246,7 @@ test("Chords", async ({ page, start }) => {
   await expect(sidebar.getByRole("link", { name: /Untitled design|A chord idea/ })).toHaveCount(0)
   await expect(page.getByRole("heading", { name: "Epics", level: 1 })).toBeVisible()
 
-  // On a live chat: Leader then x asks first with Keep focused, Keep leaves the chat, Remove deletes it.
+  // On a live chat: Leader then x asks first with Cancel focused, Cancel leaves the chat, Remove deletes it.
   await goto(page, "#/epics")
   await openBox()
   await page.keyboard.press("Shift+C")
@@ -350,14 +350,14 @@ test("Chords", async ({ page, start }) => {
   await expect(removeRow.locator("b")).not.toHaveCSS("color", plainColor)
   await page.keyboard.press("x")
   await expect(removeConfirm).toBeVisible()
-  await expect(removeConfirm.getByRole("button", nav("Keep"))).toBeFocused()
+  await expect(removeConfirm.getByRole("button", { name: /^Cancel/ })).toBeFocused()
   await page.keyboard.press("Enter")
   await expect(removeConfirm).toHaveCount(0)
   await expect(page).toHaveURL(chordChatUrl)
   expect(await fx.cli("agents", "list")).toContain(chordChat.id)
   await openBox()
   await page.keyboard.press("x")
-  await removeConfirm.getByRole("button", nav("Remove")).click()
+  await removeConfirm.getByRole("button", { name: /^Remove/ }).click()
   await expect(page).toHaveURL(/#\/agents$/)
   await expect.poll(() => fx.cli("agents", "list")).not.toContain(chordChat.id)
 
@@ -407,7 +407,7 @@ test("Chords", async ({ page, start }) => {
   await expect(chordBox.getByRole("menuitem", { name: /^r/ })).toHaveCount(0)
   await page.keyboard.press("x")
   await expect(removeConfirm).toBeVisible()
-  await removeConfirm.getByRole("button", nav("Keep")).click()
+  await removeConfirm.getByRole("button", { name: /^Cancel/ }).click()
   await expect(removeConfirm).toHaveCount(0)
   await expectNoRenameInPalette()
 })
