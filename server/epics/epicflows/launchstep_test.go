@@ -81,7 +81,7 @@ func TestEpicList_LaunchingEpicCardCarriesItsStep(t *testing.T) {
 	// on the registry makes the change visible by touching the ticket instead.
 	reg.SetLaunchStep("proj:work/01", "")
 	touch := rigs.IssueMD("01", "claimed", "", "A touched")
-	if err := os.WriteFile(filepath.Join(store, "proj", "work", "01-a.md"), []byte(touch), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(store, "proj", "work", "issues", "01-a.md"), []byte(touch), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	var got wire.LaunchStep
