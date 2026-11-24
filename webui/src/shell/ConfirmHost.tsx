@@ -87,6 +87,9 @@ function Confirm({ request }: { request: ConfirmRequest }) {
     // The request is fixed for this mount (the host keys on it).
   }, [])
 
+  // The modal parks focus on its panel as it mounts; this runs after it, so Cancel ends up focused.
+  useEffect(() => cancelRef.current?.focus(), [])
+
   const needsText = !!body.input?.required && text.trim() === ""
   const canConfirm = !preparing && !needsText
   const latest = useLatest({ close, canConfirm })
@@ -272,6 +275,7 @@ function ConfirmCard({
               bg="surface.raised"
               borderColor="border"
               minH="0"
+              h="46px"
             />
           )}
         </Box>
