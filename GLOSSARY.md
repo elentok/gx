@@ -1172,9 +1172,10 @@ iteration). Recovery runs at most once per `(ticket, kind)` and three times per 
 
 ## Notification Surfaces
 
-The four places a run or session event can surface. They are distinct surfaces, not levels of the
-same thing: an event may reach any combination of them. (A **destination** is something else — see
-below.)
+The places a run or session event can surface. The TUI and the Toast are surfaces. Desktop (the
+**Banner**), Web toast, Telegram, Slack and **Push** are the five **Channels**, each with a switch
+and a kind list. They are distinct surfaces, not levels of the same thing: an event may reach any
+combination of them. (A **destination** is something else — see below.)
 
 **TUI** — Queue tab state, driven by `reduceLiveEvent`. Everything gx knows shows up here.
 
@@ -1184,16 +1185,18 @@ screen. The web UI has its own toaster for web toasts, such as the Rest period w
 **Chat** — the outbound Slack/Telegram surface (the wrapper sinks). Deliberately a small, fixed
 subset of run events, for a person away from the terminal. The word **push** is retired for this
 sense: it collided with `git push`, and `notify` was already taken by the toast package. **Push**
-now names the web push surface below.
+now names the web push surface below. Telegram and Slack are two Channels, each with its own switch
+and kind list. Chat can send every kind.
 
 **Banner** — an OS-level notification, sent once by the server (never by a TUI), with an optional
 sound. For a person at the machine who isn't looking at the session it concerns. Distinct from a
-**toast**, which lives inside the TUI.
+**toast**, which lives inside the TUI. It is the Desktop Channel, with a switch and a kind list. It
+can send every kind; only Session alert and Design question play a sound.
 
 **Push** — a Web Push notification the server sends to a subscribed device, even with the web app
-closed. For events that need the person (an Actionable or failed session, a Design question, a
-Paused ticket), with the Banner's text. Per-device subscription, own switch, not gated by AFK mode;
-only the open-on-screen rule skips it. Distinct from **Chat** and **Banner**.
+closed, with the Banner's text. It is a Channel with a kind list and can send every kind. It has a
+server-wide switch beside the contact email, plus the per-device switch. Not gated by AFK mode; only
+the open-on-screen rule skips it. Distinct from **Chat** and **Banner**.
 
 **AFK mode** — a person-set, machine-wide state in which interactive session events also go to
 **Chat**, for a person away from the machine. It adds a surface; it never silences banners.

@@ -111,6 +111,8 @@ gx gains **Push**: a Web Push notification the server sends to a subscribed devi
 ### What is pushed
 
 - Events: Actionable, Blocked and Idle sessions, failed sessions, a Design waiting on a round, Paused tickets, escalations. Session pushes hang off the same triggers as the Banner and use its 1-second merge and its text. Paused ticket and escalation pushes use the Chat message's headline and plain sentence (`docs/specs/better-notifications.md`), with the ticket title. They fire where Chat sends its message, which is after the recovery hold (a pause that recovery fixes sends nothing), and skip Chat's mute and project-override gates. Chat sends them from three call sites, and the push hook sits at each one, beside the Chat call and not inside `ServerChat` (whose sinks apply the mute and quiet gates and which returns early when no Chat is configured): `Writer.sendPause` (unheld pauses and a recovery hold's release), `finishSink.TicketNeedsHuman` (a conflict-resolution child's pause, which never goes through `Writer.Pause`) and `Recovery.escalate` (ticket and epic escalations). `Merger.pauseRoot` (a merge-blocked epic) gets no push, as Out of Scope says. The badge still counts every `paused` ticket.
+
+_Superseded in part: a merge-blocked epic root pause now pushes when the Push kind list has Epic paused (`docs/specs/notification-alignment.md`)._
 - Push is independent of AFK mode, Chat and the Banner settings. Session pushes are skipped by the existing open-on-screen rule (a visible web tab, or a focused TUI when AFK mode is off) and by nothing else. The rule is global, not per device. Paused ticket and escalation pushes have no session, so the rule never skips them. An epic escalation opens the epic page.
 - A Rest period keeps Push quiet and never sends held-back events later, as the glossary says. The sender runs the same quiet check the Banner uses, at each send attempt, so a retry that falls inside a Rest period is dropped. The check stays true after "Unlock anyway" until the period's original end. The test push skips it. The snapshot's badge field keeps updating.
 - Chat is unchanged.
@@ -205,6 +207,7 @@ A verify ticket runs these against a temporary gx server after the epic is built
 53. Story 53: vitest tests (check 3: an open app with a differing endpoint calls the renewal route; the worker's `pushsubscriptionchange` does the same with `oldSubscription`). Go test: a renewal replaces the record when the old endpoint matches.
 54. Story 54: Go test (a subscribe with an `http:` endpoint is refused with `push-bad-subscription`).
 55. Story 55: Go tests with no Chat configured (a Paused ticket from `Writer.sendPause`, a conflict-resolution child's pause from `finishSink.TicketNeedsHuman` and an escalation from `Recovery.escalate` each send one push; a merge-blocked epic root pause sends none).
+    _Superseded in part: a merge-blocked epic root pause sends a push when the Push kind list has Epic paused, and none when it lacks it (`docs/specs/notification-alignment.md`)._
 56. Story 56: Go tests (a renewal after Remove, switch off, a 404/410 delete or the idle drop is refused with `push-no-subscription` and stores nothing; a renewal with a wrong old endpoint is refused).
 
 New flows or scenarios to write: no new Playwright flow and no new scenario. The steps join flow 2 on `mixed`, and the fixture gains a fake push service with a fail control. The vitest and Go tests above, the fixture's fake push service and the real-device verify ticket are implementation tickets.
@@ -229,11 +232,13 @@ Three states have no stored mock state: "Last push failed", "Set a contact email
 - Buttons on a notification that answer an agent without opening the app. It needs action payloads and posting from the worker, and iOS supports notification actions poorly. A later effort.
 - Chrome, Edge and Android are best-effort and not verified. Push may work there, but no test or device check covers it.
 - A server-wide push config key. The per-device switch is the only push switch.
+  _Superseded: Push now has a server-wide switch beside the contact email, and a kind list (`docs/specs/notification-alignment.md`)._
 - A rotate action for the VAPID key.
 - Any change to Chat, the Banner or AFK mode.
 - Several subscriptions per web login.
 - Re-sending events held back during a Rest period.
 - Pushes for merge-blocked epics (`merge-error`, `dirty-trunk`, `trunk-missing`, `needs-rebase`). They need the person, but the map's list names Paused tickets only.
+  _Superseded: the Epic paused row of the kind list covers them (`docs/specs/notification-alignment.md`)._
 - Editing `gx:webui-gaps/03` (this spec covers it, the ticket stays as it is).
 
 ## Further Notes
