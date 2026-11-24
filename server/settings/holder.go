@@ -167,5 +167,11 @@ func (h *Holder) Banner(level, title, body string) {
 			h.opts.Log.Warn("OS banner failed", "title", title, "error", err)
 		}
 	}()
+	h.Toast(level, title, body)
+}
+
+// Toast streams the config-reloaded event for the TUI to toast at its level,
+// with no OS banner.
+func (h *Holder) Toast(level, title, body string) {
 	h.opts.Events.PublishEvent(wire.Event{Type: wire.EventConfigReloaded, Level: level, Message: joinBanner(title, body)})
 }

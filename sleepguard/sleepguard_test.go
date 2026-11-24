@@ -80,7 +80,7 @@ var allowed = map[string]int{
 	"server/budget/grace_test.go":                                      5,
 	"server/budget/limits_test.go":                                     2,
 	"server/configreload_chat_test.go":                                 2,
-	"server/lifecycle/configreload_test.go":                            2,
+	"server/lifecycle/configreload_test.go":                            3, // the third is a negative wait: a banner the Desktop switch dropped would show by now
 	"server/sched/deadlock_test.go":                                    2,
 	"server/disk/diskhealth_test.go":                                   1, // negative wait: failed readings never leave the waiting state
 	"server/disk/diskhold_test.go":                                     3,
@@ -101,7 +101,7 @@ var allowed = map[string]int{
 	"server/queue/oneoffsweep_test.go":                                 2,
 	"server/queue/pause_test.go":                                       1,
 	"server/sched/launchtest/launch_inflight_test.go":                  1, // negative wait: a claim past the cap would show within a beat
-	"server/health/stormwatch_test.go":                                 7, // negative waits: a kill or a second banner would show within a few polls; a spike that ended must outlast the streak limit
+	"server/health/stormwatch_test.go":                                 8, // negative waits: a kill or a second banner or a banner the Desktop switch dropped would show within a few polls; a spike that ended must outlast the streak limit
 	"server/sched/launchtest/reclaim_waiting_test.go":                  1,
 	"server/sched/ratelimit_claim_hold_test.go":                        1, // negative wait: a claim would show within a few ticks
 	"server/sched/ratelimit_hold_run_test.go":                          1, // negative wait: a launch would show within a few ticks

@@ -207,7 +207,15 @@ func New(cfg Config) (*Server, error) {
 	if cfg.Notifier == nil {
 		cfg.Notifier = osnotify.NewSystemNotifier()
 	}
-	cfg.Notifier = quietNotifier{next: cfg.Notifier, quiet: quiet}
+	// The Desktop switch drops every banner and sound, system banners included.
+	desktopOff := func() bool {
+		if s == nil {
+			return false
+		}
+		cur := s.settings.Load()
+		return cur != nil && !cur.NotifyChannels.Desktop.Enabled()
+	}
+	cfg.Notifier = quietNotifier{next: quietNotifier{next: cfg.Notifier, quiet: desktopOff}, quiet: quiet}
 	if cfg.ProcessSource == nil {
 		cfg.ProcessSource = syshealth.DefaultProcess()
 	}
@@ -291,6 +299,8 @@ func New(cfg Config) (*Server, error) {
 	cfg.Chat.Quiet = restRunner
 	policy := &chatPolicy{}
 	cfg.Chat.Policy = policy
+	desktop := &desktopAdapter{}
+	cfg.Chat.Desktop = desktop
 	viMode, err := queue.OpenViMode(cfg.StateDir, events)
 	if err != nil {
 		lock.Release()
@@ -378,6 +388,7 @@ func New(cfg Config) (*Server, error) {
 		focus: sessions.NewFocusReports(),
 	}
 	policy.h = &s.settings
+	desktop.s, desktop.webURL = s, s.WebURL
 	s.restarter = s.newRestarter()
 	s.initProjects()
 	s.settingsWriter = newSettingsWriter(cfg.ConfigPath, s.projects)
@@ -439,7 +450,7 @@ func New(cfg Config) (*Server, error) {
 	if s.cfg.Player == nil {
 		s.cfg.Player = sound.NewSystemPlayer(log)
 	}
-	s.cfg.Player = quietPlayer{next: s.cfg.Player, quiet: quiet}
+	s.cfg.Player = quietPlayer{next: quietPlayer{next: s.cfg.Player, quiet: desktopOff}, quiet: quiet}
 	s.push = newPush(s, quiet)
 	s.writer = newTicketWriter(s)
 	s.recovery = newRecovery(s)

@@ -278,6 +278,47 @@ func TestConfigReload_ReportsBannerAndEventNotChat(t *testing.T) {
 	}
 }
 
+// The reload banner is a system banner: only the Desktop switch hides it, and
+// the config-reloaded event for the TUI toast still streams either way.
+func TestConfigReload_DesktopSwitchHidesTheBannerNotTheEvent(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		desktop map[string]any
+		banners int
+	}{
+		{"switch off", map[string]any{"enabled": false}, 0},
+		{"switch on with an empty list", map[string]any{"enabled": true, "kinds": []string{}}, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			store := t.TempDir()
+			path := filepath.Join(t.TempDir(), "config.json")
+			h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			snap, err := h.Client.Snapshot(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			evs, err := h.Client.Events(ctx, snap.Seq)
+			if err != nil {
+				t.Fatal(err)
+			}
+			servertest.WriteConfig(t, path, store, map[string]any{"notification-channels": map[string]any{"desktop": tc.desktop}})
+			reload(t, h)
+			servertest.WaitForEvent(ctx, t, evs, wire.EventConfigReloaded, "")
+			if tc.banners > 0 {
+				waitBanners(ctx, t, h, tc.banners)
+			}
+			time.Sleep(100 * time.Millisecond) // negative wait: a dropped banner would show by now
+			if n := len(h.Banners.Sent()); n != tc.banners {
+				t.Errorf("banners = %d, want %d", n, tc.banners)
+			}
+		})
+	}
+}
+
 func waitBanners(ctx context.Context, t *testing.T, h *servertest.Harness, n int) []osnotify.Notification {
 	t.Helper()
 	deadline, _ := ctx.Deadline()

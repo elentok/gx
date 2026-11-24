@@ -1,0 +1,68 @@
+package notify
+
+import "github.com/elentok/gx/sound"
+
+// Target is what a notification is about. The first non-empty field wins; the
+// zero value is the app home.
+type Target struct {
+	Ticket  string // "project:epic/id"
+	Epic    string // "project:epic"
+	Design  string // the Design's root, as the Design page route names it
+	Session string // a session id
+}
+
+// Path is the web route of the target, the one Push and Desktop both send.
+func (t Target) Path() string {
+	switch {
+	case t.Ticket != "":
+		return "/t/" + t.Ticket
+	case t.Epic != "":
+		return "/e/" + t.Epic
+	case t.Design != "":
+		return "/d/" + t.Design
+	case t.Session != "":
+		return "/agents/" + t.Session
+	}
+	return "/"
+}
+
+// DesktopNote is one notification handed to the Desktop channel. The adapter
+// applies the channel's kind list and settings, so callers send every one.
+type DesktopNote struct {
+	Kind          string // catalog id
+	Title, Body   string
+	Target        Target
+	Sound         sound.Name // empty plays none
+	Session       bool       // the caller sets Group, Activate, Execute and Link itself
+	Group         string
+	Activate      string
+	Execute, Link string
+}
+
+// Desktop is the channel that shows OS banners and plays sounds.
+type Desktop interface{ Show(DesktopNote) }
+
+// Desktop hands one note to the Desktop channel. A nil chat or channel sends none.
+func (c *ServerChat) Desktop(n DesktopNote) {
+	if c == nil || c.base.Desktop == nil {
+		return
+	}
+	c.base.Desktop.Show(n)
+}
+
+// show hands a catalog message to Desktop as a banner without sound. A system
+// message has no catalog id and is never a kind.
+func (c *ServerChat) show(msg chatMessage, target Target) {
+	if msg.catalog == "" {
+		return
+	}
+	title, body := pushText(msg)
+	c.Desktop(DesktopNote{Kind: msg.catalog, Title: title, Body: body, Target: target})
+}
+
+func ticketTarget(project, epic, identifier string) Target {
+	if identifier == "" {
+		return Target{Epic: project + ":" + epic}
+	}
+	return Target{Ticket: project + ":" + epic + "/" + identifier}
+}

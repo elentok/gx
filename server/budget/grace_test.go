@@ -107,6 +107,51 @@ func (f graceFixture) lowerBelowSpend(t *testing.T) {
 	}
 }
 
+// The grace banners are system banners: the Desktop switch hides them, the
+// kind list does not, and the countdown runs either way.
+func TestHardLimitGrace_DesktopSwitchHidesTheBannerNotTheCountdown(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		desktop map[string]any
+		banner  bool
+	}{
+		{"switch off", map[string]any{"enabled": false}, false},
+		{"switch on with an empty list", map[string]any{"enabled": true, "kinds": []string{}}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f := startGraceServer(t, time.Hour)
+			// The banner goes out on its own goroutine, so the switch is set by an
+			// earlier reload than the one that starts the countdown.
+			channels := map[string]any{"desktop": tc.desktop}
+			servertest.WriteConfig(t, f.path, f.store, map[string]any{"notification-channels": channels})
+			if res := reload(t, f.h); res.Refused {
+				t.Fatalf("channels reload = %+v", res)
+			}
+			servertest.WaitForEvent(f.ctx, t, f.evs, wire.EventConfigReloaded, "")
+			cfg := budgetLimits(0, 6)
+			cfg["notification-channels"] = channels
+			servertest.WriteConfig(t, f.path, f.store, cfg)
+			if res := reload(t, f.h); res.Refused {
+				t.Fatalf("reload = %+v", res)
+			}
+			servertest.WaitForEvent(f.ctx, t, f.evs, wire.EventConfigReloaded, "")
+			servertest.WaitForEvent(f.ctx, t, f.evs, wire.EventConfigReloaded, "")
+			st, err := f.h.Client.Admin.ConfigStatus(f.ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if left := time.Until(st.HardStopAt); left <= 0 || left > time.Hour {
+				t.Errorf("hard stop at = %v, want the countdown running", st.HardStopAt)
+			}
+			if got := f.waitBanners(f.startTitle, 1) == 1; got != tc.banner {
+				t.Errorf("start banner shown = %v, want %v", got, tc.banner)
+			}
+		})
+	}
+}
+
 func TestHardLimitGrace_ConfigStatusShowsCountdown(t *testing.T) {
 	t.Parallel()
 	f := startGraceServer(t, time.Hour)

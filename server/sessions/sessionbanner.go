@@ -1,7 +1,6 @@
 package sessions
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -12,7 +11,8 @@ import (
 	"github.com/elentok/gx/server/sessions/chat"
 	"github.com/elentok/gx/server/wire"
 
-	"github.com/elentok/gx/osnotify"
+	"github.com/elentok/gx/notifykind"
+	"github.com/elentok/gx/ralphloop/notify"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/tickets"
 )
@@ -334,22 +334,13 @@ func fireBanner(mg *Manager, id string) {
 	if onScreen {
 		return
 	}
-	set := mg.settings.Load()
-	if set.AgentsBanners {
-		sendSessionBanner(mg, info, title, body, link)
+	kind := notifykind.SessionAlert
+	if t.question {
+		kind = notifykind.DesignQuestion
 	}
-	if set.AgentsSounds.Enabled {
-		mg.Watches.Start(func() { mg.cfg.Player.Play(context.Background(), set.AgentsSounds, t.sound) })
-	}
-}
-
-func bannerTitle(info wire.SessionInfo) string { return info.Project + " · " + info.Name }
-
-func sendSessionBanner(mg *Manager, info wire.SessionInfo, title, body, link string) {
 	term, connected := mg.focus.clickTarget()
-	note := osnotify.Notification{
-		Title:    title,
-		Body:     body,
+	note := notify.DesktopNote{
+		Kind: kind, Session: true, Title: title, Body: body, Sound: t.sound,
 		Group:    "gx-agent-" + info.ID,
 		Activate: termBundleIDs[term],
 		Link:     link,
@@ -357,10 +348,10 @@ func sendSessionBanner(mg *Manager, info wire.SessionInfo, title, body, link str
 	if connected {
 		note.Execute = "gx agents focus " + info.ID
 	}
-	if err := mg.cfg.Notifier.Notify(context.Background(), note); err != nil {
-		mg.log.Warn("session banner", "session", info.ID, "err", err)
-	}
+	mg.alerts.Desktop(note)
 }
+
+func bannerTitle(info wire.SessionInfo) string { return info.Project + " · " + info.Name }
 
 // sessionStatusWord is the Status word a state reads as; an unknown state
 // reads as itself.

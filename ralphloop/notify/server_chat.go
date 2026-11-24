@@ -36,6 +36,8 @@ type ServerChatConfig struct {
 	// a seam a reload does not touch, and an interface so the config stays
 	// comparable (hold a pointer, never a slice).
 	Policy ChannelPolicy
+	// Desktop is the OS banner channel. Nil shows none. A seam like Policy.
+	Desktop Desktop
 }
 
 // Quieter is the predicate that silences chat.
@@ -189,6 +191,7 @@ func (c *ServerChat) pause(catalog, project string, override *ServerChatConfig, 
 		return
 	}
 	msg := ticketPauseMessage(project, epic, ticketPath, identifier, status, reason).as(catalog)
+	c.show(msg, ticketTarget(project, epic, identifier))
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, ticketPath, identifier)
 	}
@@ -201,6 +204,7 @@ func (c *ServerChat) EpicPause(project string, override *ServerChatConfig, epic,
 		return
 	}
 	msg := epicPauseMessage(project, epic, label, reason).as(notifykind.EpicPaused)
+	c.show(msg, ticketTarget(project, epic, ""))
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, epicSource(project+"/"+epic), "")
 	}
@@ -227,8 +231,10 @@ func (f finishSink) ConflictResolutionStarted(identifier string) {
 	if f.c == nil {
 		return
 	}
+	msg := conflictStartedMessage(f.project, f.epic, f.ticketPath, identifier).as(notifykind.ConflictResolutionStarted)
+	f.c.show(msg, ticketTarget(f.project, f.epic, identifier))
 	for _, s := range f.c.projectSinks(f.override) {
-		s.sendMessage(conflictStartedMessage(f.project, f.epic, f.ticketPath, identifier).as(notifykind.ConflictResolutionStarted), f.ticketPath, identifier)
+		s.sendMessage(msg, f.ticketPath, identifier)
 	}
 }
 
@@ -241,8 +247,10 @@ func (f finishSink) TicketNeedsHuman(identifier, _, status string, kind events.K
 	// The child sits beside the parent ticket: <scratch>/<epic>/issues/<id>-*.md.
 	epicDir := filepath.Dir(filepath.Dir(f.ticketPath))
 	childPath := ResolveTicketPath(filepath.Dir(epicDir), filepath.Base(epicDir), identifier)
+	msg := ticketPauseMessage(f.project, f.epic, childPath, identifier, status, reason).as(notifykind.PausedTicket)
+	f.c.show(msg, ticketTarget(f.project, f.epic, identifier))
 	for _, s := range f.c.projectSinks(f.override) {
-		s.sendMessage(ticketPauseMessage(f.project, f.epic, childPath, identifier, status, reason).as(notifykind.PausedTicket), source, identifier)
+		s.sendMessage(msg, source, identifier)
 	}
 }
 
@@ -258,6 +266,7 @@ func (c *ServerChat) Escalated(project string, override *ServerChatConfig, epic,
 		source = epicSource(project + "/" + epic)
 	}
 	msg := escalatedMessage(project, epic, ticketPath, identifier, failure).as(notifykind.PausedTicket)
+	c.show(msg, ticketTarget(project, epic, identifier))
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, source, identifier)
 	}
@@ -270,6 +279,7 @@ func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, ep
 		return
 	}
 	msg := epicOutcomeMessage(project, epic, counts, elapsedSeconds, totalCost, merged).as(notifykind.EpicComplete)
+	c.show(msg, ticketTarget(project, epic, ""))
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, epicSource(project+"/"+epic), "")
 	}
@@ -281,6 +291,7 @@ func (c *ServerChat) Progress(project string, override *ServerChatConfig, epic s
 		return
 	}
 	msg := progressMessage(project, epic, facts).as(notifykind.ProgressUpdate)
+	c.show(msg, ticketTarget(project, epic, ""))
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, epicSource(project+"/"+epic), "")
 	}
@@ -306,6 +317,7 @@ func (c *ServerChat) ChatQuestion(project string, override *ServerChatConfig, se
 		return
 	}
 	msg := chatQuestionMessage(project, session, question, link).as(notifykind.ChatQuestion)
+	c.show(msg, Target{})
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, serverSource, "")
 	}
@@ -319,6 +331,7 @@ func (c *ServerChat) DesignReady(project string, override *ServerChatConfig, des
 		return
 	}
 	msg := designReadyMessage(project, implEpic, count, link).as(notifykind.DesignReady)
+	c.show(msg, ticketTarget(project, implEpic, ""))
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, epicSource(project+"/"+designEpic), "")
 	}
@@ -347,6 +360,7 @@ func (c *ServerChat) Result(project string, override *ServerChatConfig, projectD
 		return
 	}
 	msg := resultMessage(project, epic, ticketPath, identifier, result).as(notifykind.OneOffResult)
+	c.show(msg, ticketTarget(project, epic, identifier))
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, ticketPath, identifier)
 		logNotificationSent(projectDir, epic, s.transport.name(), notifyKindResult, msg.Text(s.style.chatStyle).String())
@@ -362,6 +376,8 @@ type ServerNotice struct {
 	// HoldsWork marks a notice that means work is stopped: hard budget limit,
 	// low disk, trunk missing.
 	HoldsWork bool
+	// Target is the page a Desktop banner opens; the zero value is the app home.
+	Target Target
 }
 
 // serverSource is the gate source for server-level notices; like "cli" it has
@@ -375,6 +391,7 @@ func (c *ServerChat) Notice(n ServerNotice) {
 		return
 	}
 	msg := serverNoticeMessage(n).as(noticeCatalogID(n.Kind))
+	c.show(msg, n.Target)
 	for _, s := range c.globalSinks() {
 		s.sendMessage(msg, serverSource, "")
 	}
@@ -387,6 +404,7 @@ func (c *ServerChat) Notify(text string) {
 		return
 	}
 	msg := chatMessage{subject: text, kind: notifyKindCLI, summaryWord: "Message", catalog: notifykind.CLIMessage}
+	c.show(msg, Target{})
 	for _, s := range c.globalSinks() {
 		s.sendMessage(msg, "cli", "")
 	}

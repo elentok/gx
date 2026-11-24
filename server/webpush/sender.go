@@ -24,6 +24,18 @@ const (
 	bodyCharsSmall    = 100
 )
 
+// CutBody is body cut to limit characters. BodyChars is the plain payload's
+// limit; the Desktop banner shares it.
+func CutBody(body string, limit int) string {
+	if r := []rune(body); len(r) > limit {
+		return string(r[:limit])
+	}
+	return body
+}
+
+// BodyChars is the body limit of a push, and of a Desktop banner.
+const BodyChars = bodyChars
+
 var retryWaits = []time.Duration{time.Second, 5 * time.Second}
 
 // Subscription is a browser's push subscription, base64url as the browser gives it.
@@ -211,9 +223,7 @@ func (s *Sender) encryptMessage(sub Subscription, msg Message) ([]byte, error) {
 }
 
 func payload(msg Message, bodyLimit int) ([]byte, error) {
-	if r := []rune(msg.Body); len(r) > bodyLimit {
-		msg.Body = string(r[:bodyLimit])
-	}
+	msg.Body = CutBody(msg.Body, bodyLimit)
 	return json.Marshal(struct {
 		Title string `json:"title"`
 		Body  string `json:"body"`

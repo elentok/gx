@@ -58,14 +58,15 @@ func (b *Budget) alertLongTicket(addr tickets.Address, ticketPath string, turns 
 		b.log.Warn("mark long ticket", "ticket", addr.String(), "err", err)
 	}
 	b.events.Publish(wire.EventTicketChanged, addr.String())
-	body := fmt.Sprintf("%s has run %d assistant turns", addr, turns)
-	b.settings.Banner(wire.EventLevelWarning, "Long ticket", body)
+	// The TUI toast stays; the Desktop banner comes from the notice below, so
+	// the Desktop kind list decides it.
+	b.settings.Toast(wire.EventLevelWarning, "Long ticket", fmt.Sprintf("%s has run %d assistant turns", addr, turns))
 	phrase := "long ticket " + addr.Epic + "/" + addr.ID
 	if title := tickets.TicketTitle(ticketPath); title != "" {
 		phrase += " " + title
 	}
 	b.chat.Notice(notify.ServerNotice{Kind: NoticeLongTicket, Emoji: "⏳", Title: phrase,
-		Detail: fmt.Sprintf("The agent has run %d assistant turns.", turns)})
+		Detail: fmt.Sprintf("The agent has run %d assistant turns.", turns), Target: notify.Target{Ticket: addr.String()}})
 	if _, err := b.host.WriteFollowUp(addr, longTicketFollowUp(addr, turns)); err != nil {
 		b.log.Warn("file long-ticket follow-up", "ticket", addr.String(), "err", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/notifykind"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 )
@@ -41,10 +42,20 @@ func ticketFile(t *testing.T, store, epic string) string {
 
 func TestLongTicket_AlertsOnceMarksTheTicketAndKeepsTheSessionRunning(t *testing.T) {
 	t.Parallel()
+	t.Run("long-ticket checked for Desktop", func(t *testing.T) { t.Parallel(); runLongTicket(t, true) })
+	t.Run("default Desktop list", func(t *testing.T) { t.Parallel(); runLongTicket(t, false) })
+}
+
+// runLongTicket checks the ticket mark and the follow-up, and that Desktop
+// shows one banner only when its list has long-ticket.
+func runLongTicket(t *testing.T, desktopChecked bool) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	h := startPty(t, store, repo, func(c *server.Config) {
 		c.LongTicketTurns = longTicketTurns
 		c.RecoverySettings.FollowUps = "proj:follow-ups"
+		if desktopChecked {
+			WithChannel("desktop", true, []string{notifykind.LongTicket})(c)
+		}
 	})
 	longSession(h, longTicketTurns)
 	if res, err := h.Client.Queue.Add(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
@@ -67,8 +78,12 @@ func TestLongTicket_AlertsOnceMarksTheTicketAndKeepsTheSessionRunning(t *testing
 			banners++
 		}
 	}
-	if banners != 1 {
-		t.Errorf("long-ticket banners = %d, want 1", banners)
+	want := 0
+	if desktopChecked {
+		want = 1
+	}
+	if banners != want {
+		t.Errorf("long-ticket banners = %d, want %d", banners, want)
 	}
 }
 

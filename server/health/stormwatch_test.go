@@ -231,13 +231,14 @@ func startStormSession(t *testing.T, threshold int) (*servertest.Harness, contex
 
 // startStormSessionWith is startStormSession with a hard ceiling (0 for none)
 // and a poll interval. It also returns the conversation, to send more controls.
-func startStormSessionWith(t *testing.T, threshold, hard int, interval time.Duration) (*servertest.Harness, context.Context, <-chan wire.Event, string, []int, string) {
+func startStormSessionWith(t *testing.T, threshold, hard int, interval time.Duration, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan wire.Event, string, []int, string) {
 	t.Helper()
-	h, ctx, evs, id, conv := servertest.StartFakeSession(t, servertest.WithRealProcesses(), func(c *server.Config) {
+	opts = append([]func(*server.Config){servertest.WithRealProcesses(), func(c *server.Config) {
 		c.Settings.Watchdog.MaxTreeProcesses = threshold
 		c.Settings.Watchdog.HardMaxTreeProcesses = hard
 		c.Settings.Watchdog.Interval = interval
-	})
+	}}, opts...)
+	h, ctx, evs, id, conv := servertest.StartFakeSession(t, opts...)
 	c := servertest.WaitForHolder(t, filepath.Join(h.SessionsDir, id))
 	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionDescendants, Count: 6, Depth: 1}); err != nil {
 		t.Fatal(err)
@@ -261,6 +262,34 @@ func TestStorm_SessionTreeOverThresholdIsKilledWholeWithOneBanner(t *testing.T) 
 		t.Errorf("banner = %+v, want the process count", sent[0])
 	}
 	assertNamesAndRule(t, h, "process storm: session killed", "")
+}
+
+// The kill banner is a system banner: the Desktop switch hides it, an empty
+// kind list does not, and the kill happens either way.
+func TestStorm_DesktopSwitchHidesTheBannerNotTheKill(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		desktop func(*server.Config)
+		banner  bool
+	}{
+		{"switch off", servertest.WithChannel("desktop", false, nil), false},
+		{"switch on with an empty list", servertest.WithChannel("desktop", true, []string{}), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			h, ctx, evs, id, pids, _ := startStormSessionWith(t, 3, 0, 50*time.Millisecond, tc.desktop)
+			servertest.WaitForSession(ctx, t, h, evs, id, func(s wire.SessionInfo) bool { return s.Status.State == wire.SessionExited })
+			testutil.WaitFor(t, 10*time.Second, "the session tree to be gone", func() bool { return !anyAlive(pids) })
+			if tc.banner {
+				testutil.WaitFor(t, 10*time.Second, "the banner", func() bool { return len(killBanners(h)) > 0 })
+			}
+			time.Sleep(300 * time.Millisecond) // negative wait: a dropped banner would arrive within a few polls
+			if got := len(killBanners(h)) > 0; got != tc.banner {
+				t.Errorf("banners = %+v, want shown = %v", killBanners(h), tc.banner)
+			}
+		})
+	}
 }
 
 func TestStorm_SessionTreeUnderThresholdIsLeftAlone(t *testing.T) {
