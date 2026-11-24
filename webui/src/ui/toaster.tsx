@@ -74,13 +74,18 @@ function renderToast(toast: ToastOf, owner: typeof toaster) {
       {...(card && { borderLeftWidth: "3px", borderLeftColor: "tone.waiting.fg" })}
     >
       {!raised && <Toast.Indicator />}
-      <div>
+      <Box minW="0" flex="1">
         {toast.title && (
           <Toast.Title {...(raised && { fontWeight: "700", fontSize: "14px" })}>
             {toast.title}
           </Toast.Title>
         )}
-        {toast.description && <Toast.Description>{toast.description}</Toast.Description>}
+        {toast.description && (
+          // A long body scrolls inside the toast so the buttons stay on screen.
+          <Toast.Description maxH="40vh" overflowY="auto" overflowWrap="anywhere">
+            {toast.description}
+          </Toast.Description>
+        )}
         {actions && (
           <Box display="flex" gap="1.5" flexWrap="wrap" mt="2">
             {actions.map((a, i) => (
@@ -99,7 +104,7 @@ function renderToast(toast: ToastOf, owner: typeof toaster) {
             ))}
           </Box>
         )}
-      </div>
+      </Box>
       <Toast.CloseTrigger />
     </Toast.Root>
   )
