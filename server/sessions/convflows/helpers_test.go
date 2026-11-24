@@ -19,6 +19,7 @@ func TestMain(m *testing.M) {
 const runEndText = rigs.RunEndText
 
 var (
+	idleWithAction        = servertest.IdleWithAction
 	readMeta              = servertest.ReadMeta
 	report                = servertest.Report
 	setMapStep            = rigs.SetMapStep
