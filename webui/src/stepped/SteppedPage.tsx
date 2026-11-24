@@ -162,6 +162,17 @@ export function SteppedPage({
   const stepsInline = wide && sideColumn
   // Switching shows an older live session; once it is gone the newest drives the page again.
   const session = live.find((s) => s.id === selected) ?? current
+  // Off a wide screen the Start button and failure text would push the ⋯ onto a second row, so they sit in the meta bar.
+  const strip = (
+    <SessionStrip
+      address={address}
+      session={session}
+      actions={actions}
+      startFailure={startFailure}
+      startLabel={startLabel}
+      headerButton={headerButton}
+    />
+  )
   const chatty = hasChat(session?.harness)
   const { detail: chat, refetch: refetchChat } = useSessionChat(
     session && chatty ? session.id : undefined,
@@ -227,6 +238,7 @@ export function SteppedPage({
               fontSize="12px"
             >
               {metaLink}
+              {!wide && strip}
             </Box>
           }
           actions={
@@ -246,14 +258,7 @@ export function SteppedPage({
                     {ring("headerSm")}
                   </chakra.button>
                 ))}
-              <SessionStrip
-                address={address}
-                session={session}
-                actions={actions}
-                startFailure={startFailure}
-                startLabel={startLabel}
-                headerButton={headerButton}
-              />
+              {wide && strip}
               {!compact && menu()}
             </>
           }

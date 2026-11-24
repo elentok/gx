@@ -7,8 +7,8 @@ import { expect, nav, swipe, test } from "./fixture"
 test.use({ viewport: { width: 375, height: 812 } })
 
 /** The page's ⋯ is the last control of the heading's row, on the heading's line, flush with the row's right edge. */
-async function expectMoreAtRowEnd(page: Page, heading = page.locator("h1").first()) {
-  await page.setViewportSize({ width: 390, height: 844 })
+async function expectMoreAtRowEnd(page: Page, heading = page.locator("h1").first(), width = 390) {
+  await page.setViewportSize({ width, height: 844 })
   // The title row is the nearest ancestor of the heading that holds the ⋯ (PageHeader and the draft header differ).
   const rowEl = heading.locator("xpath=ancestor::*[.//button[@aria-label='More actions']][1]")
   const more = rowEl.getByRole("button", nav("More actions"))
@@ -33,7 +33,7 @@ async function expectMoreAtRowEnd(page: Page, heading = page.locator("h1").first
         lastControl: rightmostOther <= m.x + 1,
         sameLine: m.y + m.height / 2 >= h.y && m.y + m.height / 2 <= h.y + h.height,
         size: [m.width, m.height],
-        noScroll: await page.evaluate(() => document.documentElement.scrollWidth <= 390),
+        noScroll: await page.evaluate((w) => document.documentElement.scrollWidth <= w, width),
       }
     })
     // A phone's ⋯ is a 40px circle (MoreActionsButton), not the mock's 28px.
@@ -298,6 +298,11 @@ test("24. Phone, Design page", async ({ page, start }) => {
   const fixture = await start("design", { autoAdvanceDelay: "9s" })
 
   await page.evaluate(() => (location.hash = "#/d/demo:design-epic"))
+  // With Start design session showing, the ⋯ still ends the title row (390 and 360).
+  await expect(page.getByRole("button", nav("Start design session"))).toBeVisible()
+  await expectMoreAtRowEnd(page)
+  await expectMoreAtRowEnd(page, page.locator("h1").first(), 360)
+  await page.setViewportSize({ width: 375, height: 812 })
   await page.getByRole("button", nav("Start design session")).click()
   // The Questions view is up: the first message is hidden.
   const view = page.getByRole("group", nav("View"))
