@@ -264,7 +264,7 @@ func TestPushChannel_EveryNewKindSendsOneNormalPushWithTheChatHeadlineAndPath(t 
 		name, kind, path string
 		send             func(*Server)
 	}{
-		{"design ready", notifykind.DesignReady, "/e/proj:impl", func(s *Server) { s.chat.DesignReady("proj", nil, "map", "impl", 2, "") }},
+		{"design ready", notifykind.DesignReady, "/d/proj:map", func(s *Server) { s.chat.DesignReady("proj", nil, "map", "impl", 2, "") }},
 		{"chat question", notifykind.ChatQuestion, "/", func(s *Server) { s.chat.ChatQuestion("proj", nil, "fix", "which one?", "") }},
 		{"one-off result", notifykind.OneOffResult, "/t/proj:epic/01", func(s *Server) {
 			s.chat.Result("proj", nil, t.TempDir(), "epic", "", "01", "all done")
@@ -282,7 +282,7 @@ func TestPushChannel_EveryNewKindSendsOneNormalPushWithTheChatHeadlineAndPath(t 
 		{"disk", notifykind.Disk, "/", notice("disk-warn")},
 		{"project and trunk", notifykind.ProjectAndTrunk, "/", notice("trunk-found")},
 		{"server started", notifykind.ServerStarted, "/", notice("server-started")},
-		{"cli message", notifykind.CLIMessage, "/", func(s *Server) { s.chat.Notify("hello from the cli") }},
+		{"cli message", notifykind.CLIMessage, "/", func(s *Server) { s.chat.NotifyOutcomes("hello from the cli") }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -319,7 +319,7 @@ func TestPushChannel_ARouterPushIsOnePushWhateverTheProjectOverrideSays(t *testi
 func TestPushChannel_SwitchOffSendsNothing(t *testing.T) {
 	t.Parallel()
 	s, log := recordedPushServer(t, settings.NotifyChannel{Off: true})
-	s.chat.Notify("hi")
+	s.chat.NotifyOutcomes("hi")
 	if got := log.all(); len(got) != 0 {
 		t.Errorf("pushes = %+v, want none", got)
 	}
@@ -383,7 +383,7 @@ func (o targets) DeletePushSubscriptionIfEndpoint(string, string) error { return
 func TestPushLayers_OneEventReachesEveryDevice(t *testing.T) {
 	t.Parallel()
 	s, hits, got := pushWire(t, 3)
-	s.chat.Notify("hi")
+	s.chat.NotifyOutcomes("hi")
 	for range 3 {
 		select {
 		case <-got:
@@ -424,7 +424,7 @@ func TestPushLayers_AnEventHeldWhileTheSwitchGoesOffIsDropped(t *testing.T) {
 	s, hits, _ := pushWire(t, 1)
 	s.push.Merge = 200 * time.Millisecond
 	asked := switchAsked(s)
-	s.chat.Notify("held")
+	s.chat.NotifyOutcomes("held")
 	cur := *s.settings.Load()
 	cur.NotifyChannels.Push.Off = true
 	s.settings.Store(&cur)

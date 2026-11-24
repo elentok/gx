@@ -40,13 +40,6 @@ func (c *ServerChat) Enabled() bool {
 	return false
 }
 
-// Active reports whether anything could send: a chat channel is on, or the
-// server registered the Desktop or Push adapter, which decide for themselves.
-// Call sites that skip work when nothing would be sent ask this.
-func (c *ServerChat) Active() bool {
-	return c != nil && (c.base.Desktop != nil || c.base.Push != nil || c.base.WebToast != nil || c.Enabled())
-}
-
 // The outcome strings are a public contract: the notify routes, the CLI and the
 // web UI show them.
 const (

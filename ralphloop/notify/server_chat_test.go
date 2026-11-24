@@ -63,7 +63,7 @@ func TestServerChat_NotifyGoesThroughTheCLISourceGate(t *testing.T) {
 	gate := filepath.Join(t.TempDir(), "gate.json")
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: srv.URL, GateStatePath: gate})
 
-	c.Notify("Weather check: skipped the run.")
+	c.NotifyOutcomes("Weather check: skipped the run.")
 	c.Close()
 
 	got := reqs()

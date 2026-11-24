@@ -116,7 +116,7 @@ func catalogCalls(t *testing.T) map[string]func(*ServerChat) {
 		notifykind.Disk:            notice("disk-warn"),
 		notifykind.ProjectAndTrunk: notice("trunk-missing"),
 		notifykind.ServerStarted:   notice("server-started"),
-		notifykind.CLIMessage:      func(c *ServerChat) { c.Notify("hi") },
+		notifykind.CLIMessage:      func(c *ServerChat) { c.NotifyOutcomes("hi") },
 	}
 }
 
@@ -160,7 +160,7 @@ func TestRouter_RootPauseCountsAsAnEpicPause(t *testing.T) {
 func TestRouter_SwitchOffSendsNothingAndKeepsTheDestination(t *testing.T) {
 	r := newRouterRig(t)
 	r.policy.set(r.policy.off, "slack", true)
-	r.chat.Notify("hi")
+	r.chat.NotifyOutcomes("hi")
 	r.sink(t, "slack").enqueueMessage(mutedMessage("cli", ""))
 	r.sink(t, "slack").enqueueMessage(globallyMutedMessage("slack"))
 	if got := len(r.chat.globalSinks()); got != 2 {
@@ -184,7 +184,7 @@ func TestRouter_SystemMessageSkipsTheKindListButNotTheSwitch(t *testing.T) {
 		r.policy.set(r.policy.unchecked, id, true)
 	}
 	r.sink(t, "slack").enqueueMessage(globallyMutedMessage("slack"))
-	r.chat.Notify("hi")
+	r.chat.NotifyOutcomes("hi")
 	if slack, tg := r.sends(); slack != 1 || tg != 0 {
 		t.Errorf("slack=%d telegram=%d, want only the system message on slack", slack, tg)
 	}
@@ -201,7 +201,7 @@ func TestRouter_BatchQueuedBeforeTheSwitchWentOffIsDroppedAtFlushAndClose(t *tes
 	for _, via := range []string{"flush", "close"} {
 		t.Run(via, func(t *testing.T) {
 			r := newRouterRig(t)
-			r.chat.Notify("queued")
+			r.chat.NotifyOutcomes("queued")
 			r.policy.set(r.policy.off, "slack", true)
 			if via == "flush" {
 				r.sink(t, "slack").flush()

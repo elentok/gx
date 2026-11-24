@@ -304,7 +304,7 @@ func (s *Merger) pauseRoot(root queue.RootRef, one ralphloop.OneIteration, dir s
 	if !d.sendNotice() {
 		return
 	}
-	if s.chat.Active() {
+	if s.chat != nil {
 		s.chat.RootPause(project, s.projects.ChatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusLegacyAnswer), reason)
 	}
 	// Only a needs-rebase pause is the epic's outcome; any other pause waits on
@@ -317,7 +317,7 @@ func (s *Merger) pauseRoot(root queue.RootRef, one ralphloop.OneIteration, dir s
 // notifyEpicOutcome sends the epic-level notice. A one-off skips it.
 func (s *Merger) notifyEpicOutcome(project, dir string, one ralphloop.OneIteration, e tickets.Epic, merged bool) {
 	// The epic, not one: a one-off's merge ticket is not its one-off file.
-	if !s.chat.Active() || oneoff.IsOneOffEpic(e) {
+	if s.chat == nil || oneoff.IsOneOffEpic(e) {
 		return
 	}
 	elapsed, cost := schedule.EpicTotals(e)
@@ -534,7 +534,7 @@ func (s *Merger) pauseEpic(root queue.RootRef, e tickets.Epic, p mergePause) {
 	kind, reason := p.kind, p.reason
 	s.storeMergeBlock(root, e.Path, p)
 	s.events.PublishEvent(wire.Event{Type: wire.EventRootPaused, Address: root.String(), Kind: string(kind), Level: wire.EventLevelWarning, Message: reason})
-	if s.chat.Active() && !oneoff.IsOneOffEpic(e) {
+	if s.chat != nil && !oneoff.IsOneOffEpic(e) {
 		s.chat.EpicPause(root.Project, s.projects.ChatOverride(root.Project), root.Epic, schema.PauseReason(kind).Label(), reason)
 	}
 }

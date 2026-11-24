@@ -409,11 +409,9 @@ func (c *ServerChat) Notice(n ServerNotice) {
 	}
 }
 
-// Notify sends one line of text to the global destination, through the same
-// gate as `gx notify`: source and kind are the CLI's, so its mutes apply.
-func (c *ServerChat) Notify(text string) { c.NotifyOutcomes(text) }
-
-// NotifyOutcomes is Notify that also says what each channel did.
+// NotifyOutcomes sends one line of text to the global destination, through the
+// same gate as `gx notify`: source and kind are the CLI's, so its mutes apply.
+// It says what each channel did.
 func (c *ServerChat) NotifyOutcomes(text string) []ChannelOutcome {
 	return c.Route(chatMessage{subject: text, kind: notifyKindCLI, summaryWord: "Message", catalog: notifykind.CLIMessage}, Target{}, false)
 }

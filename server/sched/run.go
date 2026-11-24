@@ -593,7 +593,7 @@ func keepsAskedAgent(run runs.Run) bool {
 // sends nothing itself. A one-off never counts: it speaks only through
 // notifyResult, when its submit asked for it. Exported for tests.
 func (l *Launcher) NotifyDone(addr tickets.Address, ticketPath string) {
-	if !l.Chat.Active() || oneoff.IsOneOffTicket(ticketPath) {
+	if l.Chat == nil || oneoff.IsOneOffTicket(ticketPath) {
 		return
 	}
 	if e, t, ok := l.Writer.FreshTicket(addr); ok && !oneoff.IsOneOffEpic(e) {

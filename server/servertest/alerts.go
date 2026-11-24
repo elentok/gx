@@ -44,6 +44,9 @@ func WithChannel(channel string, on bool, kinds []string) func(*server.Config) {
 			n.Slack = ch
 		case "push":
 			n.Push = ch
+			if c.Settings.WebPushContact == "" {
+				c.Settings.WebPushContact = "me@example.com" // Push needs a contact email
+			}
 		default:
 			panic("servertest.WithChannel: unknown channel " + channel)
 		}

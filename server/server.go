@@ -215,7 +215,8 @@ func New(cfg Config) (*Server, error) {
 		cur := s.settings.Load()
 		return cur != nil && !cur.NotifyChannels.Desktop.Enabled()
 	}
-	cfg.Notifier = quietNotifier{next: quietNotifier{next: cfg.Notifier, quiet: desktopOff}, quiet: quiet}
+	silent := func() bool { return quiet() || desktopOff() }
+	cfg.Notifier = quietNotifier{next: cfg.Notifier, quiet: silent}
 	if cfg.ProcessSource == nil {
 		cfg.ProcessSource = syshealth.DefaultProcess()
 	}
@@ -437,7 +438,7 @@ func New(cfg Config) (*Server, error) {
 		schedStore.WithClock(cfg.SchedulesClock)
 	}
 	s.schedRunner = &schedules.Scheduler{
-		Store: schedStore, State: schedState, Submit: s.oneOffs, Notify: s.chat.Notify, TicketStore: cfg.TicketStore, Log: log,
+		Store: schedStore, State: schedState, Submit: s.oneOffs, Notify: func(text string) { s.chat.NotifyOutcomes(text) }, TicketStore: cfg.TicketStore, Log: log,
 		Now: cfg.SchedulesClock, Interval: cfg.SchedulesInterval, Ready: s.migrator.StartupDone(),
 	}
 	s.schedules = &schedules.Schedules{
@@ -456,7 +457,7 @@ func New(cfg Config) (*Server, error) {
 	if s.cfg.Player == nil {
 		s.cfg.Player = sound.NewSystemPlayer(log)
 	}
-	s.cfg.Player = quietPlayer{next: quietPlayer{next: s.cfg.Player, quiet: desktopOff}, quiet: quiet}
+	s.cfg.Player = quietPlayer{next: s.cfg.Player, quiet: silent}
 	s.push = newPush(s, quiet)
 	s.writer = newTicketWriter(s)
 	s.recovery = newRecovery(s)
