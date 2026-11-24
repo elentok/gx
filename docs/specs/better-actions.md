@@ -1,0 +1,222 @@
+## Problem Statement
+
+The same action looks and behaves differently depending on where I start it. Remove is "Remove" in one menu and "Remove chat" in another. Stop asks nothing from a menu but asks in the bulk bar. A draft's Remove asks with a modal from the sidebar and with an inline Keep/Remove row from the footer or a chord. New session uses the browser's own confirm. Cancel buttons read "Cancel" in some dialogs and "Keep" in others.
+
+The menus are also uneven. The ticket page, both draft pages and the archived epic page have no ⋯ menu. Ticket cards and some epic cards have none either. Queue agent rows in the sidebar have a blank spacer instead of a ⋯. A chat draft can only be removed from its page footer. Switch model sits in no menu. Orders differ: the sidebar, the epic header, the Design header and the cards list the same actions in four different orders.
+
+Four separate lists feed all this (the menu builder, the bulk bar's table, the chords and the command palette), and nothing ties them together. Every confirm is hand-built, so each one drifts.
+
+## Solution
+
+Every action that runs on one of the six entities (epic, Design, ticket, chat, design draft, chat draft) is declared once, in one action registry. The sidebar row menu, the page header menu, the card menu, the bulk bar, the chords, the command palette and the Jump palette all read their actions from it. Footer buttons stay where they are, but each one calls a registry action, so its label and confirm match the menus.
+
+- One label, one position and one group for each action on every surface ("Remove", never "Remove chat"). Groups are Open, Edit, Lifecycle, Info and Danger, with a separator between them. Destructive actions use the danger color in every menu. Bulk adds the count ("Move 3"). No action label equals the dismiss label "Cancel", so the ticket's Cancel is "Cancel run" everywhere.
+- Every in-scope page has a ⋯ menu as the last item of its header actions slot, at the far right of the title row. Cards have it top-right. Sidebar rows have it at the right end. The placement is the same on phone and desktop.
+- One shared confirm. It is a popover when the action starts from a button or a menu item, anchored on the ⋯, footer or bulk button that was used. It does this on phones too. It is a modal when the action starts from a chord, the command palette or the Jump palette. Every confirm answers `y` for confirm and `n` for Cancel.
+- The registry decides whether an action confirms: never, always, or only when a condition holds. Bulk uses the same rule.
+- Chords, the command palette and the Jump palette show registry labels and offer the same actions as the menus.
+
+## User Stories
+
+1. As a person using the web UI, I want every action to carry one label on every surface, so that I do not wonder whether "Remove chat" and "Remove" are the same thing.
+2. As a person using the web UI, I want every menu to list its actions in one order, grouped as Open, Edit, Lifecycle, Info and Danger, so that I find an action in the same place everywhere.
+3. As a person using the web UI, I want destructive actions in the danger color in every menu, so that I notice them before I click.
+4. As a person using the web UI, I want a menu to show only the actions that apply to the entity in its current state, so that I am not offered a Hold on a held epic or an Archive on an archived one.
+5. As a person using the web UI, I want Hold and Take off hold (and Archive and Unarchive) to show as one action at a time, so that the menu always says what the click will do.
+6. As a person using the web UI, I want an action's confirm to depend on the action and not on the surface I started it from, so that I can predict when I will be asked.
+7. As a person using the web UI, I want footer buttons that run an action to use the action's label and confirm, so that a footer Remove behaves like a menu Remove.
+8. As an implementer, I want to declare an action once and have every menu, the bulk bar, the chords and both palettes pick it up, so that a new action is a single change.
+9. As a person on the Epic page, I want the ⋯ menu as the last item at the far right of the title row, with status widgets to its left, so that I always find it in the same spot.
+10. As a person on an archived epic page, I want a ⋯ menu with Unarchive and Copy ID, so that a read-only page still has its actions in the usual place.
+11. As a person on the Design page, I want the ⋯ menu in the same header slot as on every other page, on desktop, on a phone and with the keyboard up, so that it does not hide inside the session strip.
+12. As a person on a ticket page, I want a ⋯ menu with Copy ID always, and Start over and Cancel run only when the server offers them for that ticket, so that I am never offered an action the ticket cannot take.
+13. As a person on a ticket page, I want the recovery verbs (Resume, Retry, Choose base, Keep waiting, Stop task, Merge) to stay in the footer, so that the actions the server picks stay where I expect them.
+14. As a person on a chat page, I want the ⋯ menu to include Move to workspace, so that the chat header matches the sidebar row.
+15. As a person on a design draft page, I want a ⋯ menu with Rename, Move to workspace and Remove, so that the draft is as manageable as any other entity.
+16. As a person on a chat draft page, I want a ⋯ menu with Rename, Move to workspace and Remove, so that a chat draft has the same actions as a design draft.
+17. As a person looking at cards, I want a ⋯ in the top-right corner of every epic card (including One-off, Follow-ups and Other) and every ticket card on the Epic page (a ticket card's ⋯ holds Copy ID only), so that I can act without opening the item.
+18. As a person using the sidebar, I want every row, queue agent rows included, to have its ⋯ at the right end (a queue, Fix or Investigate agent row's ⋯ holds Copy ID only), so that rows line up and no row is a dead end.
+19. As a person on a phone, I want the ⋯ in the same place as on desktop, so that I do not relearn the layout.
+20. As a person using the Epic and Design pages, I want the extra triangle beside the page title gone, so that the header shows one clear control.
+21. As a person with a chat, I want Move to workspace in every chat menu, so that I can file a chat from the sidebar, the header and the Jump palette alike.
+22. As a person with a chat, I want Promote to Design in the sidebar menu, the header menu and the palettes, so that I do not need the header to do it.
+23. As a person with a chat, I want Switch model in its menus as well as on its chord, so that I can find it without knowing the key.
+24. As a person with an epic, Design, ticket or chat, I want Copy ID in its menus, so that I can paste its address anywhere.
+25. As a person who copies an ID, I want a toast that shows the copied ID, from every surface, so that I know the copy worked.
+26. As a person on the Design page, I want New session, Stop, Delete design and Open design epic in the ⋯ menu in the shared order, so that the menu follows the same rules as the rest. Stop ends the session the page shows and the Design stays.
+27. As a person on the Epic page, I want Mark as merged in the ⋯ menu, so that it is not only on the footer and the card.
+28. As a person with a draft, I want Rename on the draft's own page to focus its title field and Rename anywhere else to open the rename form, so that Rename never opens a dialog over a field I could type in.
+29. As a person who starts an action from a menu item, I want a confirm to appear as a popover anchored on the ⋯ button I used, so that the question stays next to what I clicked.
+30. As a person who starts an action from a footer or bulk button, I want the confirm to appear as a popover on that button, so that I do not lose my place.
+31. As a person on a phone, I want the same popover with an 8px inset from the screen edge that opens above or below the button, so that the confirm stays near my thumb.
+32. As a person on a phone where a popover cannot fit between its button and the screen edge, I want the confirm as a bottom-placed dialog for that case only, so that the buttons are always reachable.
+33. As a keyboard user who presses a chord, I want a confirm to open as a modal, so that the question is not tied to a button I never touched.
+34. As a person using the command palette or the Jump palette, I want a confirm to open as a modal, so that the palette closes cleanly before I decide.
+35. As a person facing a confirm, I want a title that names the verb and the entity, a body that states the consequences, a Cancel button and a confirm button carrying the action's own label, in the danger color for a Danger-group action and in the primary color for the rest, so that I know what I am agreeing to and see which actions are destructive.
+36. As a keyboard user facing a confirm, I want focus on Cancel first, Enter to press the focused button, Esc to cancel and focus to return to the button that opened it (to the page's ⋯ when only the row is gone, or to the main heading of the page the app lands on when the action removed the open page's own entity), so that I never confirm by accident or lose my place.
+37. As a person using Start over, I want the reason field inside the popover and the confirm button off until I give a reason, so that I do not open a heavy modal from a button.
+38. As a person archiving an epic, I want the popover to show a spinner while the dry run runs, with the confirm button off until it ends, so that I only confirm what the server found.
+39. As a person holding an epic or Design with live sessions, I want the popover to list those sessions, so that I see which sessions will end.
+40. As a person removing an empty draft or empty chat draft, I want it to go at once with no confirm, so that I am not asked about nothing.
+41. As a person starting a new session on a Design with a live session, I want a confirm, and none when no session is live, so that I am asked only when something will end.
+42. As a person using any confirm, I want the dismiss button to always say "Cancel", and no action to carry that label (the ticket's Cancel is "Cancel run", with confirm buttons "Cancel run" and "Cancel"), so that "Keep" and other variants stop confusing me and I never wonder which "Cancel" does what.
+43. As a person with a chord, I want `r` Rename, `m` Switch model, `x` Remove, `w` Move to workspace, `y` Copy ID and `a` Archive or Unarchive to mean the same on every entity, so that a letter never changes meaning between pages.
+44. As a person on a chat draft page, I want Remove on its chord, so that a chat draft works like a design draft.
+45. As a person who opens the Chord box, I want the entity chords listed with registry labels (Remove in danger color) and the app-level chords in a separate group, so that the box matches the menus.
+46. As a person using Stop, Hold, Mark as merged, Promote to Design, Start over or Cancel run, I want to reach them from the command palette, so that actions without a chord are still keyboard-reachable.
+47. As a person using the command palette (Cmd+P), I want it to list every available action for the open page's entity with registry label, order, danger color and chord hint, so that it mirrors the page's ⋯ menu.
+48. As a person using the Jump palette (Cmd+K), I want every row it shows (epic, Design, chat, design draft and chat draft) to offer the same actions as its sidebar ⋯ menu, so that I can act without opening the item. I reach a ticket's actions through Cmd+P on the ticket page.
+49. As a person using the command palette or the Chord box, I want an action hidden when the open entity does not have it or its availability rule says no, so that I never press a dead entry.
+50. As a person selecting rows in the sidebar, I want each bulk action to show when it fits at least one selected row and to carry the count ("Hold 2 of 5"), so that I see how many rows it will touch.
+51. As a person selecting rows, I want the tooltip to name each skipped row and why ("queued", "managed by the queue"), so that I know what the action will leave alone.
+52. As a person confirming a bulk action, I want one popover on the clicked bulk button listing every row it runs on and a confirm button with the count ("Remove 4"), so that I see the full effect before I agree.
+53. As a person with chat drafts selected, I want bulk Remove to include them, so that drafts are not skipped as "can't be removed".
+54. As a person selecting rows, I want tickets to stay out of the bar and chats managed by the queue to keep skipping Move and Remove, so that today's protections do not change.
+55. As a maintainer, I want a registry test that fails on a chord clash, a duplicated label, group or order, an action labeled "Cancel", a wrong confirm rule, a wrong bulk rule, a wrong Stop availability on a Design or a destructive action without the danger flag, so that the menus cannot drift apart again.
+56. As a keyboard user facing any confirm, popover or modal, I want `y` to confirm and `n` to cancel, with the key shown on each button ("Cancel run y", "Cancel n"), and in a text field (the Start over reason) `y` and `n` to be plain typing with Cmd+Enter confirming, so that I can answer fast without typing into the wrong place.
+57. As a person with a Design, I want Stop on a Design row, card or Cmd+K row only when exactly one session is live, and on the Design page to end the session the page shows, with a confirm every time, so that Stop never guesses which of two sessions I mean.
+58. As a person selecting rows, I want a bulk Remove of only empty drafts to run with no confirm, and the confirm to return when I add a non-empty row, so that the bulk bar asks by the same rule as the single Remove.
+
+## Implementation Decisions
+
+- **Term**: "entity" means epic, Design, ticket, chat, design draft or chat draft, as the glossary defines it. The sidebar's item reference type becomes the entity reference.
+- **Registry module**: one declarative module, in the web app, replaces four lists: the menu builder, the bulk bar's action list, name table and fit table, the entity chords and the command palette's hardcoded actions. One hook turns the declarations into ready actions for an entity. Chords that are not entity actions (New chat, New chat draft, New design, Focus sidebar, Big prompt box, History) stay in the chord module.
+- **Declaration**: one per action, with id, label, group, order, danger flag, per-entity availability, confirm rule, optional bulk rule, optional chord and an optional `menu: false` flag that makes the action footer-only (a footer-only action has no group or order). One label, one group and one order per action id. No label equals the dismiss label "Cancel".
+- **Order and groups** on every surface, with a separator between groups: Open (Open design epic, Open PR); Edit (Rename, Move to workspace, Switch model, Promote to Design); Lifecycle (New session, Hold or Take off hold, Stop, Mark as merged, Archive or Unarchive); Info (Copy ID); Danger in danger color (Start over, Cancel run, Remove, Delete design).
+- **Availability per entity**, following today's rules for each entity's state:
+  - Chat entities: the Queue, Fix and Investigate agents, which a ticket or epic manages, are chat entities with Copy ID only. Move to workspace, Hold, Remove, Rename and Stop are unavailable on them (Move and Remove already skip them in bulk).
+  - Move to workspace: epic, Design, chat, design draft and chat draft, except archived epics.
+  - Rename: chat, design draft, chat draft.
+  - Switch model and Promote to Design: chat only.
+  - Copy ID: epic, Design, ticket, chat. Drafts have no stable ID until they start.
+  - Hold, Take off hold: epic and Design. Archive, Unarchive: epic and Design.
+  - Mark as merged: epic. Open PR: epic, in the epic page and epic card ⋯ when the snapshot has a PR URL.
+  - New session, Delete design, Open design epic: Design.
+  - Stop: chat, and a Design's session. On the Design page it ends the session the page shows. On a Design sidebar row, card or Cmd+K row it shows only when exactly one session is live. With two live sessions the session list stays the way to stop them. Stop ends the running agent session and the entity stays.
+  - Start over, Cancel run: ticket, only when the server's action list for that ticket includes them. Cancel run shows only for a one-off ticket in a cancellable status.
+  - Remove: chat, design draft, chat draft.
+  - A chat draft has what a design draft has: Rename, Move to workspace, Remove.
+  - An archived epic offers Unarchive and Copy ID.
+- **Server-driven state**: Hold and Take off hold are two actions, as are Archive and Unarchive. Each has an availability rule, so one shows at a time. Labels are static. The entity snapshot carries the server fields (held, queued, PR URL, session). Open PR is available only when the snapshot has a PR URL.
+- **Ticket menu**: the ticket page ⋯ holds Copy ID always. Start over and Cancel run show only when the server's action list for that ticket includes them. Start over's label is the static "Start over", and the server's tooltip text for it goes into the confirm body. The server-driven recovery verbs (Resume, Retry, Choose base, Keep waiting, Stop task, Merge) stay in the footer. A ticket card on the Epic page has a ⋯ that holds Copy ID only.
+- **Triage page**: it keeps today's ⋯ (Copy triage ID, Abandon, from the Design page's ⋯ component) and today's Abandon confirm, untouched, until Triage joins the registry in a later Design. The Design ⋯ change must leave the Triage menu as it is.
+- **Not in the registry**: the Design header's Agent button, session list, Interrupt, Auto-advance and Auto-queue (session controls, hand-built), the Fix agent dialog (a recovery flow), and the Rename, Switch model and New chat input popups (they collect input and are not confirms). The Rename and Switch model popups stay as they are.
+- **Footer and banner actions** (Queue, Merge, Create PR, Start design session) are declared with `menu: false`, so they are footer-only, with no group or order. Open PR is not one of them. Each calls its registry action through the same hook, so label, disabled state and confirm come from the registry and the popover anchors on the footer button. Mark as merged is also in the Epic page ⋯ menu.
+- **Confirm rule**, set per action in the registry and shared by every surface and by bulk:
+  - Always: Stop (alone and in bulk, and from the Design header, which has no confirm today), Remove (chat; design draft and chat draft only when not empty), Archive (after its dry run), Cancel run (ticket), Start over (with a reason field), Mark as merged, Delete design.
+  - On a condition: Hold (live sessions will end), New session (a live session exists).
+  - Never: Move to workspace, Rename, Unarchive, Copy ID, Promote to Design, Switch model, Take off hold.
+  - Bulk confirms when any selected row needs it. A bulk Remove of only empty drafts runs with no confirm, and adding a non-empty row brings the popover back.
+- **Confirm declaration**: a rule saying when the confirm applies, an optional asynchronous step that runs before the confirm opens (the Archive dry run), and a body that receives that step's result and can return input (the Start over reason, the Hold session list).
+- **One shared confirm host** places the confirm. It opens as a popover when the action starts from a button or a menu item, anchored on the ⋯ button, the footer button or the bulk button that was used. It opens as a modal when the action starts from a chord, the command palette or the Jump palette. The confirm opens after the menu has closed. The old remove-confirm host and its request store go, absorbed by the shared confirm. The hand-built confirms for Hold, Archive, Remove, draft Remove, Delete and Start over go with it. The Triage page's Abandon confirm stays as it is. The inline Keep/Delete rows and the browser's own confirm go.
+- **Confirm parts**: a title (verb plus entity name), a body with consequences, a Cancel button and a confirm button carrying the action's own label. The confirm button uses the danger color only for Danger-group actions and the primary color for the rest. Never "OK" or "Yes". The dismiss label is "Cancel" everywhere, so no action label is "Cancel" (the ticket's confirm buttons read "Cancel run" and "Cancel"). Bulk adds the count to the confirm label ("Stop 3") and lists the affected entities in the body. All input, dry-run spinners and session lists live in the popover body. No heavy confirm opens a modal from a button.
+- **Focus**: focus starts on Cancel on every confirm. Enter presses the focused button, Esc cancels, and focus returns to the ⋯ or footer button that opened the confirm, or to the page's ⋯ button when the row is gone. When the action removes the open page's own entity (the row and the page ⋯ are both gone), focus goes to the main heading of the page the app lands on.
+- **Confirm keys**: every confirm, popover or modal, answers `y` as confirm and `n` as Cancel, and each button shows its key as a hint ("Cancel run y", "Cancel n"). While focus is in a text field (the Start over reason field) `y` and `n` are plain typing and Cmd+Enter confirms. Esc still cancels. The keys work only while a confirm is open, so they never clash with the chord letters.
+- **Phone**: the confirm is the same popover with an 8px edge inset, flipping above or below its anchor. A popover "cannot fit" when its height exceeds the larger of the space above and the space below the anchor, minus the 8px insets. Then the confirm opens as a bottom-placed dialog for that case only. Every other case stays a popover.
+- **Menu placement**: the ⋯ is the last item of the page header's actions slot, at the far right of the title row, with status widgets (ring, dot, links) to its left. It is on the Epic, archived epic, Design, ticket, chat, design draft and chat draft pages. The Design page's ⋯ moves out of the session strip into this slot, on a phone and when the keyboard is up. Cards (every epic card including One-off, Follow-ups and Other, and ticket cards on the Epic page) have it top-right. Open PR shows in the epic page and epic card ⋯ when the snapshot has a PR URL. Sidebar rows have it at the right end and every row reserves the slot, so queue agent rows get a ⋯ in place of a spacer. The placement is the same on phone and desktop. No new kind of sidebar row is added.
+- **Page header**: the triangle option of the page header goes from the Epic and Design pages.
+- **Rename on drafts**: on the draft's own page the action focuses the title field. Everywhere else it opens the rename form. The pencil icon beside a draft title stays a direct-edit control.
+- **Copy ID**: shows a toast with the copied ID from every surface.
+- **Chords**: `r` Rename, `m` Switch model, `x` Remove, `w` Move to workspace, `y` Copy ID, `a` Archive or Unarchive (the pair shares one letter because their availability rules never both hold). Each works on every page whose entity has the action and whose availability rule holds. Stop, Hold, Mark as merged, Promote to Design, Start over and Cancel run have no chord. A chord that starts a confirm opens the modal. No two actions share a letter, and none uses a letter an app-level chord uses.
+- **Chord box**: shows the available entity chords with registry labels, Remove in danger color, and the app-level chords in a separate group.
+- **Command palette (Cmd+P)**: lists every available registry action for the open page's entity, with the registry's label, group order, danger color and chord hint where one exists. A confirm opens the modal. Its navigation commands (Go to Epics, Next question, Toggle AFK, New chat, New design) stay in its own list below.
+- **Jump palette (Cmd+K)**: every row kind it shows (epic, Design, chat, design draft and chat draft) offers the same actions as its sidebar row ⋯ menu, from the registry. Tickets are reached through Cmd+P on the ticket page. A confirm opens the modal.
+- **Bulk bar**: each action shows when it fits at least one selected row. The label carries the count ("Hold 2 of 5"). The tooltip lists each skipped row with its reason. Each action declares one optional per-entity bulk rule that returns nothing when the row fits, or a skip reason. An action without one never shows in the bar. Bar actions in registry order: Move, Hold, Take off hold, Stop, Archive, Unarchive, Remove. Selection state, fit counting, count labels and skip lines stay. Tickets are not selectable. Move and Remove keep skipping chats the queue manages. Chat drafts join bulk Remove.
+- **Bulk confirm**: one popover on the clicked bulk button, flipping above the bar. Its body lists every row the action runs on and its confirm button carries the count ("Remove 4").
+- **Destructive styling**: every action with the danger flag shows in the danger color in every menu, the Chord box and both palettes.
+- **Implementer's choices**: the module and hook names, the name and shape of the request store the confirm host reads, the markers that name each part of the confirm and menus for tests, and the exact wording of the Copy ID toast beyond showing the copied ID.
+- **Server and CLI**: no server or CLI behavior is added. Every action calls the endpoint it calls today.
+
+## Testing Decisions
+
+- A good test checks external behavior: which actions a surface offers, their labels and order, where a confirm opens and what it contains, what the server did. It does not check how the registry is built.
+- **Seam 1, registry unit tests** (vitest, jsdom), over all six entities. They check:
+  - no two actions on one entity share a chord letter, and none clashes with an app-level chord (an archive/unarchive pair whose availability rules exclude each other may share one);
+  - each action id has one label, one group and one order, and groups follow Open, Edit, Lifecycle, Info, Danger;
+  - availability per entity and state;
+  - the confirm rule per action: always for Stop, Remove, Archive, Cancel run, Start over and Mark as merged; on a condition for Hold and New session; none for the rest;
+  - no action label equals the dismiss label "Cancel";
+  - Stop on a Design: available on the Design page for the session it shows, and on a sidebar row, card or Cmd+K row only when exactly one session is live (absent with two);
+  - the `menu: false` actions (Queue, Merge, Create PR, Start design session) appear in no menu, and Open PR appears in the epic menus only with a PR URL;
+  - a queue, Fix or Investigate agent offers Copy ID only, and a ticket offers Start over and Cancel run only when its server action list has them;
+  - every bulk rule, with the "2 of 5" count and skip reasons;
+  - destructive actions carry the danger flag.
+- **Seam 2, component tests** (vitest): the confirm opens as a popover or a modal by where it started, Cancel is focused on every confirm, the confirm button is danger-colored only for Danger-group actions, Esc closes without running, `y` and `n` confirm and cancel on a danger confirm, they are plain typing in the Start over reason field and Cmd+Enter confirms there, a dry-run or input body runs only on confirm, every in-scope page and card renders its ⋯, and each footer button calls its registry action.
+- **Seam 3, Playwright**: extend existing flows only. No new flow is added and the flow budget stays at 161. Steps go into the Epic flow (flow 2), the Chat draft flow (209), the Chords flow, the bulk flow and the phone flows. They cover the ⋯ on the ticket page and on both draft pages, a popover confirm anchored on the ⋯ button on desktop and at 390px (including the bottom-placed dialog fallback for a popover that cannot fit), a modal confirm from a chord, and a bulk popover. `phone.e2e.ts` pins Start over opened from the ⋯ at a 390x500 viewport with the reason field focused and asserts the bottom-placed dialog, and a second assertion at a taller viewport asserts the anchored popover.
+- **Prior art**: the existing menu builder, bulk and chord tests; their list-shaped checks move into the registry tests when their lists go. Tests for non-entity chords stay.
+- Flows that assert old labels (for example "Remove chat", sibling counts on menus, the draft footer's inline Keep/Remove, the Start over dialog, the Design header's Stop, the ticket Cancel and the bulk Hold/Stop/Archive/Remove dialogs) change in the same ticket as the UI change.
+
+## Verification
+
+Run every check against a temporary gx server, one scenario at a time. Desktop checks use the 1280px viewport and phone checks the 390px viewport. A Mock states line below holds the look check, so a story entry names the state and does not repeat it.
+
+Registry, labels, order and danger color (stories 1 to 8, 55)
+- Flows: Workspaces (a sidebar row menu), Sidebar rows (design draft rows), Epic menu and Copy ID in flow 2, 128. Copy ID (Design). Check one label, one order and the danger color on each menu those flows open.
+- New steps: in the Epic flow (2), the Design flow (128) and the Workspaces flow, assert the menu orders and that Remove, Delete design, Start over and Cancel run render in the danger color. Mock states: epic-desktop, design-desktop, chat-desktop, sidebar-desktop.
+- Checks: the registry unit tests (`pnpm run test` in the web app) pass, including no label equal to "Cancel" and Stop on a Design with one and with two live sessions.
+
+⋯ placement on every page and card (stories 9 to 19)
+- Flows: 2. Epic looks right, 50. Design epic page, Header shape, 128. Copy ID (Design), 209. Chat draft page, 76. Send and draft (chat header), Sidebar rows, 41. Phone Design draft page, 24. Phone Design page, 199. Triage journey (ticket opened from a card).
+- New steps: add the ⋯ on the ticket page (scenario `pause`, `#/t/demo:paused-epic/08`), on the archived epic detail (scenario `bulk-actions`) and on both draft pages (design draft `ws-draft` in `workspaces`, a chat draft in `chat-draft`); on a ticket card on the Epic page, whose ⋯ holds Copy ID only, and on a One-off, Follow-ups and Other card; on a queue agent row in the sidebar, whose ⋯ holds Copy ID only; at 390px for each page. At the Design page with the keyboard up, the ⋯ stays at the far right. Mock states: epic-desktop, epic-phone, archived-epic-desktop, archived-epic-phone, design-desktop, design-phone, ticket-desktop, ticket-phone, chat-desktop, chat-phone, design-draft-desktop, design-draft-phone, chat-draft-desktop, chat-draft-phone, sidebar-desktop.
+- Checks: none (web only).
+
+Catalog coverage and menu contents (stories 20 to 28)
+- Flows: 2. Epic menu and Copy ID (Epic), 128. Copy ID (Design), Workspaces (Move from a row, a card and a jump row), 76. Send and draft (Promote to Design), 205. Model switch, Design flow "Stopped session card" and "Delete design", 209. Chat draft page.
+- New steps: the ticket menu holds Copy ID and, as the server's action list allows, Start over, while the footer keeps its recovery verbs; on the One-off ticket of the `schedules` scenario (shape `paused`, flow 203) the menu also holds Cancel run, and a ticket that is not a one-off has none; chat header menu holds Move to workspace; sidebar chat menu holds Promote to Design and Switch model; Copy ID shows a toast with the copied ID from a menu and from the chord `y`; the Epic page menu holds Mark as merged when it applies; Rename on a draft page focuses the title field and from the sidebar opens the rename form; no triangle beside the Epic or Design title. Mock states: ticket-desktop, design-desktop.
+- Checks: after Copy ID the clipboard holds `demo:mixed-epic` (epic) or `demo:design-epic` (Design). `gx agents list` and `gx designs drafts list` agree with each draft or chat rename.
+
+Shared confirm (stories 29 to 42, 56, 57)
+- Flows: Workspaces (Hold and end sessions, row Remove confirm), Workspaces touch (chat row Remove confirm at 390px), Chords (`x` on a live chat and on a draft), Bulk actions (Hold, Stop, Archive and Remove confirms), 203. Schedules journey (ticket Cancel run), the `vi-editor` entry "Escape closes the start-over dialog, Tab stays in it, and the editor over it keeps both open." (Start over reason), Design flow "Delete design" and "Stopped session card" (New session, and the Design header's Stop), `phone.e2e.ts`. The assertions of the Chords, Bulk actions, 203, the `vi-editor` entry and Design flow flows change with the Start over popover and the new confirms.
+- New steps: a popover confirm from a menu item, a footer button and a bulk button, each anchored on its own button; the same popover at 390px, including a case where it flips above and a case where it cannot fit and opens as a bottom-placed dialog; a modal from the chord `x` and from the Jump palette at 390px; Cancel focused, Esc closes without running, focus returns to the ⋯ (to the page's ⋯ when the row is gone, and to the main heading of the page the app lands on when Remove or Delete removes the open page's own entity); Start over's reason, the Archive dry-run spinner (hold the dry-run request with a route step), and the Hold session list inside the popover; an empty draft removes with no confirm; New session asks only with a live session; Stop asks from the Design header, and a Design sidebar row with two live sessions has no Stop; in the 203 flow the One-off ticket's confirm buttons read "Cancel run" and "Cancel" and the confirm button is primary-colored on Hold and danger-colored on Remove; the Start over popover opened from the ⋯ at 390x500 with the reason field focused is the bottom-placed dialog, and at a taller viewport it is the anchored popover (`phone.e2e.ts`); a chord-started modal (`x` on a live chat) confirms with `y` and cancels with `n`, and in the Start over dialog of the `vi-editor` entry typing "y" in the reason field types a letter, with Cmd+Enter confirming. Mock states: popover-desktop, popover-phone, popover-phone-flipped, popover-input-desktop, popover-bulk-desktop, modal-desktop, modal-phone.
+- Checks: `gx agents list` no longer lists a removed chat; `gx designs drafts list` no longer lists a removed draft; `gx server epics archived` lists an archived epic after the confirm; `gx tickets show <address>` shows the ticket's new status after Cancel run or Start over.
+
+Chords and palettes (stories 43 to 49)
+- Flows: Chords, 209. Chat draft page (chord `x` on a chat draft), Workspaces (Jump palette rows), jump.e2e.ts 22 and the `modes.e2e.ts` jump menu steps.
+- New steps: each of `r`, `m`, `x`, `w`, `y`, `a` on every entity that has the action, and nothing happens on one that lacks it; the Chord box lists registry labels with Remove in danger color and the app-level chords in a separate group; Cmd+P lists the open entity's actions with chord hints and offers Stop and Hold; Cmd+K rows for a chat draft and a design draft offer Rename, Move to workspace and Remove, and rows for an epic, a Design and a chat offer their registry actions; an unavailable action is absent. Mock states: modal-desktop, modal-phone.
+- Checks: none beyond the Playwright steps and the registry unit tests.
+
+Bulk bar (stories 50 to 54, 58)
+- Flows: Bulk actions (scenario `bulk-actions`).
+- New steps: a mixed selection shows "Hold 2 of 5" and a tooltip with each skipped row and its reason; Remove with a chat draft selected includes it; a bulk popover on the clicked bulk button listing every row, with a confirm button carrying the count; a ticket cannot be selected; the bar shows Move, Hold, Take off hold, Stop, Archive, Unarchive, Remove in that order; Remove of only the empty draft runs with no confirm, and adding the Exited chat brings the popover back (the existing assertion "Remove Untitled design? Its prompt and images are deleted." with Keep changes in the same ticket). Mock states: popover-bulk-desktop.
+- Checks: `gx designs drafts list` and `gx agents list` agree after a bulk Remove; `gx server workspaces list` counts moved rows.
+
+**Mock states** (mocks stored at `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/`; widths are the mock frame widths, checked at the 1280px desktop and 390px phone viewports; every scenario below already exists)
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `epic-desktop`, width 620, scenario `mixed` (Epic page of `mixed-epic`), parts: title-row, title, status-widget, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `epic-phone`, width 360, scenario `mixed`, parts: title-row, title, status-widget, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `archived-epic-desktop`, width 620, scenario `bulk-actions` (archived epic detail), parts: title-row, title, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `archived-epic-phone`, width 360, scenario `bulk-actions`, parts: title-row, title, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `design-desktop`, width 620, scenario `design`, parts: title-row, title, status-widget, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `design-phone`, width 360, scenario `design`, parts: title-row, title, status-widget, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `ticket-desktop`, width 620, scenario `pause` (ticket `demo:paused-epic/08`; its ⋯ follows the Availability decisions, Copy ID and Start over with no Cancel run since the ticket is not a one-off), parts: title-row, title, status-widget, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `ticket-phone`, width 360, scenario `pause`, parts: title-row, title, status-widget, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `chat-desktop`, width 620, scenario `workspaces` (a chat), parts: title-row, title, status-widget, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `chat-phone`, width 360, scenario `workspaces`, parts: title-row, title, status-widget, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `design-draft-desktop`, width 620, scenario `workspaces` (draft `ws-draft`), parts: title-row, title, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `design-draft-phone`, width 360, scenario `workspaces`, parts: title-row, title, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `chat-draft-desktop`, width 620, scenario `chat-draft`, parts: title-row, title, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `chat-draft-phone`, width 360, scenario `chat-draft`, parts: title-row, title, more-button, meta-row, card.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/05-header-and-card-menu-placement.html`, state `sidebar-desktop`, width 230, scenario `workspaces` for the epic, queue agent and design draft rows and `chat-draft` for the chat draft row, parts: sidebar, more-button (one per row).
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/06-shared-confirm.html`, state `popover-desktop`, width 520, scenario `workspaces` (Remove from a chat's sidebar ⋯ menu item), parts: page, popover, title, body, cancel-button, confirm-button.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/06-shared-confirm.html`, state `popover-phone`, width 360, scenario `workspaces` at 390px (Remove from a chat's ⋯ menu item), parts: page, popover, title, body, cancel-button, confirm-button.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/06-shared-confirm.html`, state `popover-phone-flipped`, width 360, scenario `workspaces` at 390px with a viewport short enough that the ⋯ sits near the bottom edge (Archive of an epic with its dry-run request held), parts: page, popover, title, body, cancel-button, confirm-button (off until the dry run ends).
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/06-shared-confirm.html`, state `popover-input-desktop`, width 520, scenario `pause` (Start over from the ⋯ of ticket `demo:paused-epic/08`), parts: page, popover, title, body, reason-field, cancel-button, confirm-button (off until a reason is typed).
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/06-shared-confirm.html`, state `popover-bulk-desktop`, width 520, scenario `bulk-actions` (Stop with three live rows selected), parts: page, popover, title, body (the list of rows), cancel-button, confirm-button ("Stop 3").
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/06-shared-confirm.html`, state `modal-desktop`, width 520, scenario `workspaces` (Remove from the chord `x` on a chat), parts: page, modal, title, body, cancel-button, confirm-button.
+- `/Users/david/.local/share/gx/tickets/gx/better-actions/mocks/06-shared-confirm.html`, state `modal-phone`, width 360, scenario `workspaces` at 390px (Remove from a Jump palette row), parts: page, modal, title, body, cancel-button, confirm-button.
+
+No new scenario is needed. The phone edge fit of the popover was not measured live when the mock was approved. The design rule above (a bottom-placed dialog for a popover that cannot fit, as defined there) holds regardless, and the `phone.e2e.ts` steps pin both outcomes with the "cannot fit" rule above.
+
+## Out of Scope
+
+- Actions on workspace, schedule, backlog, Triage, worktree cleanup and file. The registry's shape lets them join later, in another Design.
+- The Triage page. It keeps today's ⋯ (Copy triage ID, Abandon) and today's Abandon confirm, which does not move to the shared confirm until Triage joins the registry in a later Design.
+- Moving or redesigning footer buttons. They stay where they are and only call registry actions.
+- A standard page layout (Header, Content, Footer): filed as gx:follow-ups/763.
+- Session controls on the Design page (Agent button, session list, Interrupt, Auto-advance, Auto-queue), the Fix agent dialog, and the Rename, Switch model and New chat input popups.
+- Server and CLI changes.
+
+## Further Notes
+
+- The footer keeps the server-driven recovery verbs on the ticket page (Resume, Retry, Choose base, Keep waiting, Stop task, Merge). They are not in the ⋯ menu.
+- The registry uses the term "entity" from the glossary. "Item" is avoided because it clashes with menu item and queue item.
+- Research behind the shape (declaring each action once as data, one confirm host, popover with an alert dialog role) is in the research file for this epic.
