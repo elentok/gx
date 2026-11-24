@@ -59,10 +59,15 @@ export function Highlight({ text, query }: { text: string; query?: string }) {
 export const GroupBlock = ({
   title,
   changed,
+  dimmed,
+  part,
   children,
 }: {
   title: string
   changed: number
+  /** The block's body is faded, still editable. A channel whose switch is off. */
+  dimmed?: boolean
+  part?: string
   children: ReactNode
 }) => (
   <Box
@@ -73,6 +78,8 @@ export const GroupBlock = ({
     bg="surface.raised"
     overflow="hidden"
     data-testid={`group-${title}`}
+    data-mock-part={part}
+    data-dimmed={dimmed ? "true" : undefined}
   >
     <Box
       display="flex"
@@ -94,7 +101,7 @@ export const GroupBlock = ({
       </Text>
       {changed > 0 && <CountChip n={changed} testId={`group-count-${title}`} />}
     </Box>
-    {children}
+    <Box opacity={dimmed ? 0.5 : 1}>{children}</Box>
   </Box>
 )
 

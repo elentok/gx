@@ -197,6 +197,36 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   expect(JSON.stringify(await fixture.globalConfig())).toBe(beforeBogus)
   await page.getByRole("textbox", { name: "Search settings" }).fill("")
 
+  // The Push switch row sits in the Push section; off dims the strip box, the chips and the section, and keeps them editable.
+  const pushEnabled = async () =>
+    (await fixture.globalConfig())["notification-channels"]?.push?.enabled
+  await go(page, globalHash("push"), "Push")
+  await page.getByTestId("group-Push").getByRole("button", { name: "Set", exact: true }).click()
+  await page.getByLabel("New Push contact email").fill("me@example.com")
+  await save(page).click()
+  await expect(save(page)).toHaveCount(0)
+  await page.getByRole("switch", { name: "Server-wide Push" }).click()
+  await expect.poll(pushEnabled).toBe(false)
+  expect(JSON.stringify(await fixture.globalConfig())).toContain("push-contact-email")
+  await expect(page.getByTestId("group-Push")).toHaveAttribute("data-dimmed", "true")
+  await go(page, globalHash("notifications"), "Notifications")
+  await expect(strip.getByRole("switch", { name: "Push", exact: true })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  )
+  const pushChip = page
+    .getByTestId("kind-row-long-ticket")
+    .getByRole("button", { name: "Long ticket on Push" })
+  await expect(pushChip).toHaveCSS("opacity", "0.4")
+  const pushKinds = async () => (await fixture.globalConfig())["notification-channels"]?.push?.kinds
+  await pushChip.click()
+  await expect.poll(async () => (await pushKinds())?.includes("long-ticket")).toBe(true)
+  await pushChip.click()
+  await expect.poll(async () => (await pushKinds())?.includes("long-ticket")).toBe(false)
+  await go(page, globalHash("push"), "Push")
+  await page.getByRole("switch", { name: "Server-wide Push" }).click()
+  await expect.poll(pushEnabled).toBe(true)
+
   // A startup-only key says it needs a restart.
   await go(page, globalHash("agents"), "Agents")
   await saveText(page, "Runner wait", "45s")
@@ -352,6 +382,20 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   // The phone layout has no sideways scroll on a section, the home and the project's section list.
   await page.setViewportSize({ width: 390, height: 844 })
   await noSideScroll(page)
+  // Notifications on a phone: the chips sit under the name at the row's width; the strip has two columns.
+  await go(page, globalHash("notifications"), "Notifications")
+  await noSideScroll(page)
+  const row = page.getByTestId("kind-row-session-alert")
+  const rowBox = await row.boundingBox()
+  const nameBox = await row.locator("p").first().boundingBox()
+  const chipsBox = await row.locator("button").first().locator("xpath=..").boundingBox()
+  expect(chipsBox!.y).toBeGreaterThanOrEqual(nameBox!.y + nameBox!.height - 1)
+  expect(chipsBox!.width).toBeGreaterThan(rowBox!.width - 40)
+  const boxes = await page
+    .locator('[data-testid^="channel-switch-"]')
+    .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().top))
+  expect(Math.abs(boxes[0] - boxes[1])).toBeLessThan(2)
+  expect(boxes[2]).toBeGreaterThan(boxes[0] + 10)
   await page.getByRole("link", { name: "Back to Settings" }).click()
   await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible()
   const scope = page.getByRole("combobox", { name: "Settings scope" })

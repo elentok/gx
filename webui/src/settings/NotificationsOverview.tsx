@@ -2,6 +2,7 @@ import { Box, chakra, Text } from "@chakra-ui/react"
 import { useState } from "react"
 import type { NotificationChannel, NotificationKind, SettingsEntry } from "../generated/server"
 import { Chip } from "../ui/chip/Chip"
+import { useDevice } from "../useWide"
 import { useWrite } from "../useWrite"
 import { BoolControl, writeErrorText, type WriteSetting } from "./SettingsRow"
 import { setChange } from "./settingsApi"
@@ -29,6 +30,7 @@ export function NotificationsOverview({
   channels: NotificationChannel[]
   onWrite: WriteSetting
 }) {
+  const phone = useDevice() === "phone"
   const write = useWrite({ toastRefusal: false })
   const [lastKey, setLastKey] = useState("")
   const byKey = new Map(entries.map((e) => [e.key, e]))
@@ -70,7 +72,7 @@ export function NotificationsOverview({
             <Box
               key={c.id}
               data-testid={`channel-switch-${c.id}`}
-              flex="1"
+              flex={phone ? "1 1 45%" : "1"}
               minW="130px"
               display="flex"
               alignItems="center"
@@ -123,7 +125,13 @@ export function NotificationsOverview({
                 </Text>
               )}
             </Box>
-            <Box display="flex" flexWrap="wrap" flexShrink="0" gap="1.5">
+            <Box
+              display="flex"
+              flexWrap="wrap"
+              flex={phone ? "1 1 100%" : undefined}
+              flexShrink={phone ? undefined : "0"}
+              gap="1.5"
+            >
               {channels.map((c) => {
                 const checked = listOf(c).includes(k.id)
                 return (

@@ -81,7 +81,7 @@ func TestCoreEntries(t *testing.T) {
 		{key: Key("notification-channels", "telegram", "kinds"), typ: TypeStringList, section: SectionNotifications},
 		{key: Key("notification-channels", "slack", "enabled"), typ: TypeBool, section: SectionNotifications},
 		{key: Key("notification-channels", "slack", "kinds"), typ: TypeStringList, section: SectionNotifications},
-		{key: Key("notification-channels", "push", "enabled"), typ: TypeBool, section: SectionNotifications},
+		{key: Key("notification-channels", "push", "enabled"), typ: TypeBool, section: SectionPush},
 		{key: Key("notification-channels", "push", "kinds"), typ: TypeStringList, section: SectionNotifications},
 	}
 	if got := len(r.All()); got != len(cases) {
@@ -128,6 +128,16 @@ func TestPushContactEmailEntry(t *testing.T) {
 		if err := CheckValue(e, json.RawMessage(raw), nil); (err == nil) != ok {
 			t.Errorf("%s: err = %v, want ok=%v", raw, err, ok)
 		}
+	}
+}
+
+func TestPushSwitchEntrySitsBesideTheContactEmail(t *testing.T) {
+	e, ok := Default().Lookup(Key("notification-channels", "push", "enabled"))
+	if !ok || e.Place() != (Place{CategoryNotifications, SectionPush, "Push"}) {
+		t.Fatalf("entry missing or misplaced: %v %+v", ok, e.Place())
+	}
+	if want := "Off here stops Push for every device. Device switches keep their state."; e.Description != want {
+		t.Errorf("description = %q", e.Description)
 	}
 }
 

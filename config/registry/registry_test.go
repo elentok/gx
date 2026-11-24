@@ -227,11 +227,11 @@ func TestPlacementPinsTable(t *testing.T) {
 		"notification-channels.web-toast.enabled", "notification-channels.web-toast.kinds",
 		"notification-channels.telegram.enabled", "notification-channels.telegram.kinds",
 		"notification-channels.slack.enabled", "notification-channels.slack.kinds",
-		"notification-channels.push.enabled", "notification-channels.push.kinds")
+		"notification-channels.push.kinds")
 	pin("Notifications/Desktop/Desktop", "agents.banners.enabled", "agents.sounds.enabled", "agents.sounds.done", "agents.sounds.attention")
 	pin("Notifications/Telegram/Telegram", "notifications.telegram.bot-token", "notifications.telegram.chat-id")
 	pin("Notifications/Slack/Slack", "notifications.slack.webhook-url")
-	pin("Notifications/Push/Push", "server.web.push-contact-email")
+	pin("Notifications/Push/Push", "server.web.push-contact-email", "notification-channels.push.enabled")
 	pin("Web UI/Access/Network", "server.web.listen", "server.web.allowed-hosts", "server.web.files.roots")
 	pin("Web UI/Access/Sign-in", "server.web.totp")
 	pin("Web UI/Keybindings/Leader key", "server.web.leader-key-mac", "server.web.leader-key")

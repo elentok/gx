@@ -79,10 +79,16 @@ func coreEntries() []Entry {
 	add(Place{CategoryNotifications, SectionPush, "Push"}, Entry{Key: Key("server", "web", "push-contact-email"), Type: TypeSecret, CheckString: checkContactEmail,
 		Description: "The email address web push sends to the push service as its contact. Needed before the browser can turn on push. Empty turns web push off."})
 
+	// The Push switch sits in the Push group, beside the contact email; the strip reads it by key.
+	add(Place{CategoryNotifications, SectionPush, "Push"}, Entry{Key: Key("notification-channels", "push", "enabled"), Type: TypeBool,
+		Description: "Off here stops Push for every device. Device switches keep their state."})
+
 	overview := Place{CategoryNotifications, SectionNotifications, "Notifications"}
 	for _, ch := range notifykind.Channels() {
-		add(overview, Entry{Key: Key("notification-channels", ch.ID, "enabled"), Type: TypeBool,
-			Description: "Send " + ch.Label + " notifications. Off sends none, whatever the kind list says."})
+		if ch.ID != "push" {
+			add(overview, Entry{Key: Key("notification-channels", ch.ID, "enabled"), Type: TypeBool,
+				Description: "Send " + ch.Label + " notifications. Off sends none, whatever the kind list says."})
+		}
 		add(overview, Entry{Key: Key("notification-channels", ch.ID, "kinds"), Type: TypeStringList, Enum: notifykind.IDs(),
 			Description: "The kinds of notification sent to " + ch.Label + ", as catalog ids."})
 	}

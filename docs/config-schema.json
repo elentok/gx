@@ -468,7 +468,7 @@
           "properties": {
             "enabled": {
               "default": true,
-              "description": "Send Push notifications. Off sends none, whatever the kind list says.",
+              "description": "Off here stops Push for every device. Device switches keep their state.",
               "type": "boolean"
             },
             "kinds": {

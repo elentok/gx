@@ -419,6 +419,7 @@ function SectionRows({
   pendingRestart,
   onWrite,
   repoChecksFile,
+  notificationChannels,
   noteFor,
 }: SectionBodyProps & Pick<RowProps, "noteFor">) {
   const row = rowBuilder({ pendingRestart, onWrite, project, noteFor })
@@ -434,6 +435,13 @@ function SectionRows({
     )
   }
   const groups = sectionGroups(categories, section, sectionEntries)
+  // A channel's section is named like the channel; its switch is read from the snapshot.
+  const channel =
+    project === undefined ? notificationChannels?.find((c) => c.label === section) : undefined
+  const switchOff = (c: NotificationChannel) => {
+    const e = entries.find((x) => x.key === c.switch_key)
+    return (e?.set ? e.value : e?.default) === false
+  }
   return (
     <>
       {project !== undefined && groups.some((g) => g.table) && (
@@ -456,7 +464,13 @@ function SectionRows({
         g.name === "" ? (
           <Group key="">{g.entries.map(row)}</Group>
         ) : (
-          <GroupBlock key={g.name} title={g.name} changed={g.entries.filter(isChanged).length}>
+          <GroupBlock
+            key={g.name}
+            title={g.name}
+            changed={g.entries.filter(isChanged).length}
+            dimmed={channel !== undefined && switchOff(channel)}
+            part={channel && "channel-settings"}
+          >
             {g.table ? (
               <>
                 <ModelsTable

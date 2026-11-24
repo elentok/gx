@@ -21,7 +21,8 @@ import type { WebLoginEntry } from "./logins"
 
 const push = vi.hoisted(() => ({ on: false }))
 const refreshPushDevice = vi.hoisted(() => vi.fn(async () => {}))
-vi.mock("../push/deviceState", () => ({
+vi.mock("../push/deviceState", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../push/deviceState")>()),
   usePushDevice: () => ({ on: push.on }),
   refreshPushDevice,
 }))
@@ -912,11 +913,41 @@ describe("Notifications section: channel switches and kind rows", () => {
     set: false,
     default: def,
   })
+  const inSection = (e: SettingsEntry, name: string): SettingsEntry => ({
+    ...e,
+    section: name,
+    group: name,
+  })
   const snapshot = (over: Record<string, unknown> = {}) => {
-    const entries = CHANNELS.flatMap(([id]) => [
-      entry(`notification-channels.${id}.enabled`, "bool", over[`${id}.enabled`] ?? true),
-      entry(`notification-channels.${id}.kinds`, "string-list", over[`${id}.kinds`] ?? defaults),
-    ])
+    const entries = [
+      ...CHANNELS.flatMap(([id]) => {
+        const sw = entry(
+          `notification-channels.${id}.enabled`,
+          "bool",
+          over[`${id}.enabled`] ?? true,
+        )
+        return [
+          id === "push"
+            ? {
+                ...inSection(sw, "Push"),
+                label: "Server-wide Push",
+                description:
+                  "Off here stops Push for every device. Device switches keep their state.",
+              }
+            : sw,
+          entry(
+            `notification-channels.${id}.kinds`,
+            "string-list",
+            over[`${id}.kinds`] ?? defaults,
+          ),
+        ]
+      }),
+      inSection(entry("notifications.telegram.chat-id", "string", ""), "Telegram"),
+      {
+        ...inSection(entry("server.web.push-contact-email", "secret", ""), "Push"),
+        label: "Push contact email",
+      },
+    ]
     return {
       entries,
       categories: treeFromEntries(entries),
@@ -933,27 +964,37 @@ describe("Notifications section: channel switches and kind rows", () => {
   const renderPage = (
     over: Record<string, unknown> = {},
     postChanges = vi.fn(async () => ({}) as never),
+    at = "/settings/s/notifications",
+    device?: "phone",
   ) => {
     const view = renderThemed(
       <ConnectionContext.Provider value={conn}>
-        <MemoryRouter initialEntries={["/settings/s/notifications"]}>
-          <Routes>
-            <Route
-              path="/settings/s/:section"
-              element={
-                <SettingsPage
-                  fetchAuth={auth}
-                  fetchSettings={async () => snapshot(over)}
-                  postChanges={postChanges}
-                />
-              }
-            />
-          </Routes>
-        </MemoryRouter>
+        <DeviceContext.Provider value={device}>
+          <MemoryRouter initialEntries={[at]}>
+            <Routes>
+              <Route
+                path="/settings/s/:section"
+                element={
+                  <SettingsPage
+                    fetchAuth={auth}
+                    fetchSettings={async () => snapshot(over)}
+                    postChanges={postChanges}
+                  />
+                }
+              />
+            </Routes>
+          </MemoryRouter>
+        </DeviceContext.Provider>
       </ConnectionContext.Provider>,
     )
     return { ...view, postChanges }
   }
+
+  it("on a phone shows the Notifications drill-down page with the strip and the rows", async () => {
+    const { findByTestId, container } = renderPage({}, undefined, undefined, "phone")
+    await findByTestId("channel-switch-desktop")
+    expect(container.querySelector('[data-mock-part="kind-rows"]')).not.toBeNull()
+  })
 
   it("shows five switches in order, and 16 rows with five chips each", async () => {
     const { findByTestId, getByTestId, getAllByRole, queryAllByTestId, container } = renderPage()
@@ -1035,6 +1076,45 @@ describe("Notifications section: channel switches and kind rows", () => {
     expect(getComputedStyle(chip).opacity).toBe("0.4")
     fireEvent.click(chip)
     await waitFor(() => expect(postChanges).toHaveBeenCalled())
+  })
+
+  it("dims the body of an off channel's group block and leaves its inputs editable", async () => {
+    const { findByTestId } = renderPage(
+      { "telegram.enabled": false },
+      undefined,
+      "/settings/s/telegram",
+    )
+    const block = await findByTestId("group-Telegram")
+    expect(block.getAttribute("data-dimmed")).toBe("true")
+    expect(block.getAttribute("data-mock-part")).toBe("channel-settings")
+    const input = within(block).getByRole("textbox") as HTMLInputElement
+    expect(input.disabled).toBe(false)
+  })
+
+  it("does not dim the group block of a channel that is on", async () => {
+    const { findByTestId } = renderPage({}, undefined, "/settings/s/telegram")
+    expect((await findByTestId("group-Telegram")).getAttribute("data-dimmed")).toBeNull()
+  })
+
+  it("has no Web toast section while its strip switch exists", async () => {
+    const { findByTestId, queryByRole } = renderPage()
+    await findByTestId("channel-switch-web-toast")
+    expect(queryByRole("link", { name: /Web toast/ })).toBeNull()
+  })
+
+  it("puts the Push switch row in the Push group beside the contact email, and posts its key", async () => {
+    const { findByTestId, postChanges } = renderPage({}, undefined, "/settings/s/push")
+    const block = await findByTestId("group-Push")
+    expect(block.textContent).toContain("Off here stops Push for every device")
+    const sw = within(block).getByRole("switch", { name: "Server-wide Push" })
+    expect(sw.getAttribute("aria-checked")).toBe("true")
+    expect(block.textContent).toContain("Push contact email")
+    fireEvent.click(sw)
+    await waitFor(() =>
+      expect(postChanges).toHaveBeenCalledWith("global", [
+        { key: "notification-channels.push.enabled", value: false },
+      ]),
+    )
   })
 
   it("draws the strip switch with BoolControl, the switch of a bool row", async () => {
