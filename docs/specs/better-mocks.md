@@ -216,7 +216,7 @@ New flows or scenarios to write (these become implementation tickets)
 
 ## Further Notes
 
-- Whether a real claude.ai artifact accepts the inlined fonts is settled by map ticket 07 before the impl epic starts.
+- Map ticket 07 settled it: a real claude.ai artifact renders all five inlined Saira faces (the person saw `RENDERS SAIRA`). The block adds about 109 KB, about 0.7% of the 16 MB limit. No fallback is needed. Evidence: `docs/research/better-mocks-artifact-fonts.md`.
 - `mocks/03-variant-switcher.html` is a reference look for the pill, not a state mock. It carries scripts and a stand-in page, so it has no Mock states line and the stored-mock helper does not run on it.
 - Research and prototype branches hold the evidence: `research/better-mocks-font-snippet` (font run, `docs/research/better-mocks-font-snippet.md`) and `research/better-mocks-two-ways` (the standalone and in-app builds, the save script and the throwaway entry, under `docs/research/better-mocks-two-ways/`).
 - Dev-server gotchas from the two-ways build: `file:` URLs are blocked in playwright-cli, so serve a saved file with the fixture's `--mock-dir` and open its `mock_url`. A gallery entry needs the `label` field, or the label comes from the key. A throwaway entry needs a connection stub and a router.
