@@ -32,7 +32,11 @@ type chatMessage struct {
 	lines                 []string
 	project               string
 	kind                  string
-	urgency               urgency
+	// catalog is the notification catalog id the router checks against a
+	// channel's kind list. Empty means a system message: it obeys the channel
+	// switch only.
+	catalog string
+	urgency urgency
 	// summaryWord overrides status as the word a batch summary lists, for a
 	// message with no Status word of its own (a server notice).
 	summaryWord string

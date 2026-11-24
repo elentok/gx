@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/notifykind"
 	"github.com/elentok/gx/ralphloop/runlog"
 	"github.com/elentok/gx/ralphloop/schedule"
 )
@@ -30,6 +31,11 @@ type ServerChatConfig struct {
 	// a seam, not a setting: a reload does not touch it. An interface rather
 	// than a func so the config stays comparable.
 	Quiet Quieter
+	// Policy is the router's per-channel switch and kind list, read on every
+	// send. Nil means every channel on and every kind checked. Like Quiet it is
+	// a seam a reload does not touch, and an interface so the config stays
+	// comparable (hold a pointer, never a slice).
+	Policy ChannelPolicy
 }
 
 // Quieter is the predicate that silences chat.
@@ -56,11 +62,6 @@ func NewServerChat(cfg ServerChatConfig) *ServerChat {
 	c := &ServerChat{base: cfg, dests: map[string]*chatEventSink{}}
 	c.global = c.sinksFor(cfg)
 	return c
-}
-
-// Enabled reports whether a global destination is configured.
-func (c *ServerChat) Enabled() bool {
-	return len(c.globalSinks()) > 0
 }
 
 func (c *ServerChat) globalSinks() []*chatEventSink {
@@ -161,6 +162,7 @@ func newServerChatSink(style mrkdwnStyle, transport chatTransport, seams ServerC
 	s := newChatEventSink(runlog.NoopEventSink{}, style, transport, "", "")
 	s.gateStatePath = seams.GateStatePath
 	s.quiet = seams.Quiet
+	s.policy = seams.Policy
 	interval := seams.FlushInterval
 	if interval <= 0 {
 		interval = batchFlushInterval
@@ -173,11 +175,22 @@ func newServerChatSink(style mrkdwnStyle, transport chatTransport, seams ServerC
 // Every message starts with the project name: one server notifies for many.
 // override is the project's own notification block, nil to use the global one.
 func (c *ServerChat) Pause(project string, override *ServerChatConfig, epic, ticketPath, identifier, status string, kind events.Kind, reason string, counts schedule.EpicCounts) {
+	c.pause(notifykind.PausedTicket, project, override, epic, ticketPath, identifier, status, reason)
+}
+
+// RootPause is Pause for an all-done root the merge could not finish: the
+// catalog counts it as an epic pause.
+func (c *ServerChat) RootPause(project string, override *ServerChatConfig, epic, ticketPath, identifier, status, reason string) {
+	c.pause(notifykind.EpicPaused, project, override, epic, ticketPath, identifier, status, reason)
+}
+
+func (c *ServerChat) pause(catalog, project string, override *ServerChatConfig, epic, ticketPath, identifier, status, reason string) {
 	if c == nil {
 		return
 	}
+	msg := ticketPauseMessage(project, epic, ticketPath, identifier, status, reason).as(catalog)
 	for _, s := range c.projectSinks(override) {
-		s.sendMessage(ticketPauseMessage(project, epic, ticketPath, identifier, status, reason), ticketPath, identifier)
+		s.sendMessage(msg, ticketPath, identifier)
 	}
 }
 
@@ -187,7 +200,7 @@ func (c *ServerChat) EpicPause(project string, override *ServerChatConfig, epic,
 	if c == nil {
 		return
 	}
-	msg := epicPauseMessage(project, epic, label, reason)
+	msg := epicPauseMessage(project, epic, label, reason).as(notifykind.EpicPaused)
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, epicSource(project+"/"+epic), "")
 	}
@@ -215,7 +228,7 @@ func (f finishSink) ConflictResolutionStarted(identifier string) {
 		return
 	}
 	for _, s := range f.c.projectSinks(f.override) {
-		s.sendMessage(conflictStartedMessage(f.project, f.epic, f.ticketPath, identifier), f.ticketPath, identifier)
+		s.sendMessage(conflictStartedMessage(f.project, f.epic, f.ticketPath, identifier).as(notifykind.ConflictResolutionStarted), f.ticketPath, identifier)
 	}
 }
 
@@ -229,7 +242,7 @@ func (f finishSink) TicketNeedsHuman(identifier, _, status string, kind events.K
 	epicDir := filepath.Dir(filepath.Dir(f.ticketPath))
 	childPath := ResolveTicketPath(filepath.Dir(epicDir), filepath.Base(epicDir), identifier)
 	for _, s := range f.c.projectSinks(f.override) {
-		s.sendMessage(ticketPauseMessage(f.project, f.epic, childPath, identifier, status, reason), source, identifier)
+		s.sendMessage(ticketPauseMessage(f.project, f.epic, childPath, identifier, status, reason).as(notifykind.PausedTicket), source, identifier)
 	}
 }
 
@@ -244,8 +257,9 @@ func (c *ServerChat) Escalated(project string, override *ServerChatConfig, epic,
 	if source == "" {
 		source = epicSource(project + "/" + epic)
 	}
+	msg := escalatedMessage(project, epic, ticketPath, identifier, failure).as(notifykind.PausedTicket)
 	for _, s := range c.projectSinks(override) {
-		s.sendMessage(escalatedMessage(project, epic, ticketPath, identifier, failure), source, identifier)
+		s.sendMessage(msg, source, identifier)
 	}
 }
 
@@ -255,7 +269,7 @@ func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, ep
 	if c == nil {
 		return
 	}
-	msg := epicOutcomeMessage(project, epic, counts, elapsedSeconds, totalCost, merged)
+	msg := epicOutcomeMessage(project, epic, counts, elapsedSeconds, totalCost, merged).as(notifykind.EpicComplete)
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, epicSource(project+"/"+epic), "")
 	}
@@ -266,7 +280,7 @@ func (c *ServerChat) Progress(project string, override *ServerChatConfig, epic s
 	if c == nil {
 		return
 	}
-	msg := progressMessage(project, epic, facts)
+	msg := progressMessage(project, epic, facts).as(notifykind.ProgressUpdate)
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, epicSource(project+"/"+epic), "")
 	}
@@ -278,7 +292,7 @@ func (c *ServerChat) DesignQuestion(project string, override *ServerChatConfig, 
 	if c == nil {
 		return
 	}
-	msg := designQuestionMessage(project, epic, step, round, question, link)
+	msg := designQuestionMessage(project, epic, step, round, question, link).as(notifykind.DesignQuestion)
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, epicSource(project+"/"+epic), "")
 	}
@@ -291,7 +305,7 @@ func (c *ServerChat) ChatQuestion(project string, override *ServerChatConfig, se
 	if c == nil {
 		return
 	}
-	msg := chatQuestionMessage(project, session, question, link)
+	msg := chatQuestionMessage(project, session, question, link).as(notifykind.ChatQuestion)
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, serverSource, "")
 	}
@@ -304,7 +318,7 @@ func (c *ServerChat) DesignReady(project string, override *ServerChatConfig, des
 	if c == nil {
 		return
 	}
-	msg := designReadyMessage(project, implEpic, count, link)
+	msg := designReadyMessage(project, implEpic, count, link).as(notifykind.DesignReady)
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, epicSource(project+"/"+designEpic), "")
 	}
@@ -332,7 +346,7 @@ func (c *ServerChat) Result(project string, override *ServerChatConfig, projectD
 	if c == nil {
 		return
 	}
-	msg := resultMessage(project, epic, ticketPath, identifier, result)
+	msg := resultMessage(project, epic, ticketPath, identifier, result).as(notifykind.OneOffResult)
 	for _, s := range c.projectSinks(override) {
 		s.sendMessage(msg, ticketPath, identifier)
 		logNotificationSent(projectDir, epic, s.transport.name(), notifyKindResult, msg.Text(s.style.chatStyle).String())
@@ -360,7 +374,7 @@ func (c *ServerChat) Notice(n ServerNotice) {
 	if c == nil {
 		return
 	}
-	msg := serverNoticeMessage(n)
+	msg := serverNoticeMessage(n).as(noticeCatalogID(n.Kind))
 	for _, s := range c.globalSinks() {
 		s.sendMessage(msg, serverSource, "")
 	}
@@ -372,7 +386,7 @@ func (c *ServerChat) Notify(text string) {
 	if c == nil {
 		return
 	}
-	msg := chatMessage{subject: text, kind: notifyKindCLI, summaryWord: "Message"}
+	msg := chatMessage{subject: text, kind: notifyKindCLI, summaryWord: "Message", catalog: notifykind.CLIMessage}
 	for _, s := range c.globalSinks() {
 		s.sendMessage(msg, "cli", "")
 	}
@@ -398,7 +412,7 @@ func (c *ServerChat) SessionAlert(project string, override *ServerChatConfig, na
 }
 
 func sessionAlertMessage(project, name, status, body string, needsAttention bool) chatMessage {
-	msg := chatMessage{icon: "🔔", status: status, subject: name, lines: []string{body}, project: project, kind: notifyKindSessionAlert}
+	msg := chatMessage{icon: "🔔", status: status, subject: name, lines: []string{body}, project: project, kind: notifyKindSessionAlert, catalog: notifykind.SessionAlert}
 	if needsAttention {
 		msg.urgency = urgencyAnswer
 	}

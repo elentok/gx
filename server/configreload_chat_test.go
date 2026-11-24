@@ -128,6 +128,57 @@ func TestConfigReloadChat_ChangedDestinationTakesLaterMessages(t *testing.T) {
 	}
 }
 
+// writeSlackChannelConfig writes a config whose Slack channel has the given
+// switch and kind list.
+func writeSlackChannelConfig(t *testing.T, s *Server, path, webhook string, enabled bool, kinds []string) {
+	t.Helper()
+	data, err := json.Marshal(map[string]any{
+		"ticket-store":          map[string]any{"path": s.cfg.TicketStore},
+		"notifications":         map[string]any{"slack": map[string]any{"webhook-url": webhook}},
+		"notification-channels": map[string]any{"slack": map[string]any{"enabled": enabled, "kinds": kinds}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The Slack switch and kind list apply on the next send after a reload, with
+// no restart. Each phase ends with a message that must arrive, so a message
+// that must not arrive would sit in the same batch if it had been queued.
+func TestConfigReloadChat_ChannelSwitchAndKindListApplyOnTheNextSend(t *testing.T) {
+	t.Parallel()
+	hook := newChatHook(t, nil)
+	s, path := reloadChatServer(t, hook.URL, 20*time.Millisecond)
+	defer s.chat.Close()
+	reload := func(enabled bool, kinds []string) {
+		t.Helper()
+		writeSlackChannelConfig(t, s, path, hook.URL, enabled, kinds)
+		s.settings.Reload(settings.TriggerCommand)
+	}
+
+	reload(true, []string{"disk"})
+	notice(s, "server-started")
+	notice(s, "disk-warn")
+	hook.waitFor(t, "disk-warn")
+
+	reload(false, []string{"disk"})
+	notice(s, "disk-resume")
+	reload(true, []string{"disk"})
+	notice(s, "disk-clean")
+	hook.waitFor(t, "disk-clean")
+
+	for _, body := range hook.sent() {
+		for _, banned := range []string{"server-started", "disk-resume"} {
+			if strings.Contains(body, banned) {
+				t.Errorf("body %q holds %q, which the kind list or the switch should have dropped", body, banned)
+			}
+		}
+	}
+}
+
 func TestConfigReloadChat_RemovedCredentialsStopMessages(t *testing.T) {
 	t.Parallel()
 	hook := newChatHook(t, nil)

@@ -305,7 +305,7 @@ func (s *Merger) pauseRoot(root queue.RootRef, one ralphloop.OneIteration, dir s
 		return
 	}
 	if s.chat.Enabled() {
-		s.chat.Pause(project, s.projects.ChatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusLegacyAnswer), events.Kind(kind), reason, schedule.CountsOf(e))
+		s.chat.RootPause(project, s.projects.ChatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusLegacyAnswer), reason)
 	}
 	// Only a needs-rebase pause is the epic's outcome; any other pause waits on
 	// a person's fix and then merges.

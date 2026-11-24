@@ -289,6 +289,8 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("load rest state: %w", err)
 	}
 	cfg.Chat.Quiet = restRunner
+	policy := &chatPolicy{}
+	cfg.Chat.Policy = policy
 	viMode, err := queue.OpenViMode(cfg.StateDir, events)
 	if err != nil {
 		lock.Release()
@@ -375,6 +377,7 @@ func New(cfg Config) (*Server, error) {
 
 		focus: sessions.NewFocusReports(),
 	}
+	policy.h = &s.settings
 	s.restarter = s.newRestarter()
 	s.initProjects()
 	s.settingsWriter = newSettingsWriter(cfg.ConfigPath, s.projects)

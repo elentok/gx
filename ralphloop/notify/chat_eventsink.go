@@ -87,6 +87,8 @@ type chatEventSink struct {
 	gateStatePath string
 	// quiet drops events before the gate sees them; nil means never.
 	quiet Quieter
+	// policy is the router's per-channel switch and kind list; nil means all on.
+	policy ChannelPolicy
 	// gateKey is the destination's key in the notification state; empty means
 	// the transport name, i.e. the global destination.
 	gateKey string
@@ -286,7 +288,7 @@ func newBatchedMessage(style mrkdwnStyle, msg chatMessage) batchedMessage {
 // enqueueItem queues item, collapsing it into an identical queued entry. It
 // drops item while quiet, so no caller can leak a message past Rest.
 func (s *chatEventSink) enqueueItem(item batchedMessage) {
-	if s.isQuiet() {
+	if s.silenced() {
 		return
 	}
 	s.mu.Lock()
@@ -334,7 +336,7 @@ func (s *chatEventSink) flush() {
 	if s.flushMidpointHook != nil {
 		s.flushMidpointHook()
 	}
-	if s.isQuiet() {
+	if s.silenced() {
 		return
 	}
 	result, err := s.gate(notifyKindBatch, epicSource(s.epicName), !allRequeued(items))
@@ -371,7 +373,7 @@ func allRequeued(items []batchedMessage) bool {
 // exit right after Close returns.
 func (s *chatEventSink) closeFlush(deadline time.Time) {
 	items := s.emptyQueue()
-	if len(items) == 0 || s.isQuiet() {
+	if len(items) == 0 || s.silenced() {
 		return
 	}
 	result, err := s.gate(notifyKindBatch, epicSource(s.epicName), true)
@@ -574,7 +576,7 @@ func (s *chatEventSink) sendMessage(msg chatMessage, source, ticketIdentifier st
 }
 
 func (s *chatEventSink) sendItem(item batchedMessage, source, ticketIdentifier string) {
-	if s.isQuiet() {
+	if s.silenced() || s.kindUnchecked(item.msg) {
 		return
 	}
 	notifyKind := item.kind

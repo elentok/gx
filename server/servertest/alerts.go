@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/nativerunner/holder"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/settings"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -22,6 +23,30 @@ func WithAlerts(banners, sounds bool) func(*server.Config) {
 	return func(c *server.Config) {
 		c.Settings.AgentsBanners = banners
 		c.Settings.AgentsSounds.Enabled = sounds
+	}
+}
+
+// WithChannel sets one notification channel's switch and kind list. channel is
+// "desktop", "web-toast", "telegram", "slack" or "push". A nil kinds keeps the
+// default list; an empty non-nil list checks no kind.
+func WithChannel(channel string, on bool, kinds []string) func(*server.Config) {
+	return func(c *server.Config) {
+		ch := settings.NotifyChannel{Off: !on, Kinds: kinds}
+		n := &c.Settings.NotifyChannels
+		switch channel {
+		case "desktop":
+			n.Desktop = ch
+		case "web-toast":
+			n.WebToast = ch
+		case "telegram":
+			n.Telegram = ch
+		case "slack":
+			n.Slack = ch
+		case "push":
+			n.Push = ch
+		default:
+			panic("servertest.WithChannel: unknown channel " + channel)
+		}
 	}
 }
 
