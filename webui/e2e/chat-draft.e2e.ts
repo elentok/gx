@@ -33,7 +33,7 @@ test("209. Chat draft page", async ({ page, start }) => {
   test.setTimeout(120_000)
   const fx = await start("chat-draft")
   await stillMotion(page)
-  const { sidebar } = sidebarKit(page)
+  const { sidebar, closeMenus } = sidebarKit(page)
   // A draft row is found by its link: the chat it becomes keeps the draft's name.
   const draftRow = (id: string) => sidebar.locator(`a[href$="/chat-drafts/${id}"]`)
   const d = draftPage(page)
@@ -45,6 +45,15 @@ test("209. Chat draft page", async ({ page, start }) => {
   await expect(d.brief).toHaveValue("Brief of the Claude draft")
   await expect(d.start).toBeVisible()
   await expect(d.remove).toBeVisible()
+  // The ⋯ is the far-right control of the title row, right of the Name field, and lists Rename, Move to workspace, Remove.
+  // The sidebar rows have their own ⋯ buttons; the page's comes last in the document.
+  const more = page.getByRole("button", nav("More actions")).last()
+  const nameBox = (await page.getByRole("textbox", nav("Name")).boundingBox())!
+  const moreBox = (await more.boundingBox())!
+  expect(moreBox.x).toBeGreaterThan(nameBox.x + nameBox.width - 1)
+  await more.click()
+  await expect(page.getByRole("menuitem")).toHaveText([/^Rename/, /^Move to workspace/, /^Remove/])
+  await closeMenus()
   await d.brief.fill("Edited brief of the Claude draft")
   await expect(d.saved).toBeVisible()
   await d.start.click()

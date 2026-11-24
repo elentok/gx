@@ -17,6 +17,7 @@ import {
   sessions,
   thumbs,
 } from "./agentsKit"
+import { sidebarKit } from "./sidebarKit"
 
 const countOf = (text: string, part: string) => text.split(part).length - 1
 
@@ -25,6 +26,16 @@ test("76. Send and draft", async ({ page, start }) => {
   const idle = (await sessions(fixture))[0]
   await page.setViewportSize({ width: 1280, height: 800 })
   await go(page, `#/agents/${idle.id}`)
+
+  const { closeMenus } = sidebarKit(page)
+  // The chat header's ⋯ offers Move to workspace.
+  await moreActions(page).click()
+  await expect(
+    page
+      .getByRole("menu", nav("More actions"))
+      .getByRole("menuitem", { name: /^Move to workspace/ }),
+  ).toBeVisible()
+  await closeMenus()
 
   // The draft survives a new tab of the same browser.
   await messageBox(page).fill("a draft to keep")

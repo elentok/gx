@@ -304,6 +304,41 @@ test("Sidebar rows", async ({ page, start }) => {
   await expect(draftLink).toBeVisible()
   await expect(draftLink).toContainText("A draft in no workspace")
 
+  // A chat draft row has the same menu; Rename opens the form and the snapshot agrees on the new name.
+  const chatDraftId = (
+    await fx.cliInput(
+      "a chat brief",
+      "agents",
+      "drafts",
+      "create",
+      "--project",
+      "demo",
+      "--name",
+      "chat-row",
+      "--brief",
+      "-",
+    )
+  ).trim()
+  const chatDraftLink = sidebar.locator(`a[href$="/chat-drafts/${chatDraftId}"]`)
+  await expect(chatDraftLink).toBeVisible()
+  await frameButton(chatDraftLink).click()
+  await expect(page.getByRole("menuitem")).toHaveText([/^Rename/, /^Move to workspace/, /^Remove/])
+  await page.getByRole("menuitem", nav("Rename")).click()
+  const chatRename = page.getByRole("dialog", { name: /^Rename/ })
+  const nameField = chatRename.getByRole("textbox").first()
+  await expect(nameField).toHaveValue("chat-row")
+  await nameField.fill("chat-renamed")
+  await page.keyboard.press("Enter")
+  await expect(chatRename).toHaveCount(0)
+  await expect
+    .poll(
+      async () =>
+        (JSON.parse(await fx.cli("server", "snapshot", "--json")).chat_drafts ?? []).find(
+          (d: { id: string }) => d.id === chatDraftId,
+        )?.label,
+    )
+    .toBe("chat-renamed")
+
   // Remove on a non-empty draft asks first; Keep leaves it, Remove deletes it.
   const seeded = await draftIds()
   expect(seeded).toHaveLength(1)
