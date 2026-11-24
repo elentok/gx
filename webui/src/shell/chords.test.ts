@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { chatEntity, type Entity } from "../actions/entity"
+import { chordLetters, menuActions } from "../actions/registry"
 import type { SessionInfo } from "../generated/server"
 import { registerHistoryOpener } from "../history/historyOpener"
 import {
@@ -8,6 +10,7 @@ import {
   chordTable,
   displayKey,
   draftIdOf,
+  entityChords,
   letterOf,
   matchesKey,
   parseKey,
@@ -126,112 +129,138 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo => ({
   ...over,
 })
 
-describe("draft page chords", () => {
-  const table = chordTable({
-    remove: () => {},
-    rename: () => {},
-    switchModel: () => {},
-    history: () => {},
+const noop = () => {}
+/** What `useActions` hands the table for an entity: the registry's menu actions, ready to run. */
+const actionsOf = (e: Entity, run: () => void = noop) =>
+  menuActions(e).map((d) => ({
+    id: d.id,
+    label: d.label,
+    chord: d.chord,
+    danger: !!d.danger,
+    disabled: false,
+    run,
+  }))
+const tableOf = (e?: Entity, run?: () => void) =>
+  chordTable({ actions: e ? actionsOf(e, run) : [], history: noop })
+const entityRows = (e: Entity) =>
+  tableOf(e)
+    .filter((c) => c.group === "entity")
+    .map((c) => c.key)
+    .sort()
+
+const page = (e: Entity): Entity => ({ ...e, surface: "page" })
+const base = { key: "gx:ep", name: "ep", surface: "page" } as const
+const chat = (over: Partial<SessionInfo> = {}) => page(chatEntity(session(over)))
+
+describe("entity chords by entity", () => {
+  it.each<[string, Entity, string[]]>([
+    ["a plain chat", chat(), ["m", "r", "w", "x", "y"]],
+    ["a Queue agent", chat({ queue: true }), ["y"]],
+    ["a Fix agent", chat({ fix_of: "gx:e/1" }), ["x", "y"]],
+    ["a managed agent", { ...chat({ ticket: "gx:e/1" }), agent: "managed" }, ["x", "y"]],
+    ["a live epic", { ...base, kind: "epic", workspace: "Default" }, ["a", "w", "y"]],
+    ["a Design", { ...base, kind: "design", workspace: "Default" }, ["a", "w", "y"]],
+    ["an archived epic", { ...base, kind: "epic", archived: true }, ["a", "y"]],
+    ["a ticket", { ...base, kind: "ticket" }, ["y"]],
+    ["a design draft", { ...base, kind: "design-draft" }, ["r", "w", "x"]],
+    ["a chat draft", { ...base, kind: "chat-draft" }, ["r", "w", "x"]],
+  ])("%s offers exactly its registry chords", (_name, entity, keys) => {
+    expect(entityRows(entity)).toEqual(keys)
   })
-  const ctx = { path: "/drafts/d1" }
-  it("offers Rename and Remove on a draft page only", () => {
-    for (const [key, label] of [
-      ["r", "Rename"],
-      ["x", "Remove"],
-    ]) {
-      const ch = table.find((c) => c.key === key)!
-      expect(ch.available(ctx)).toBe(true)
-      expect(ch.label(ctx)).toBe(label)
-      expect(ch.available({ path: "/epics" })).toBe(false)
+
+  it("offers no entity chord with no open entity", () => {
+    expect(tableOf().filter((c) => c.group === "entity")).toEqual([])
+  })
+
+  it("takes letters and labels from the registry", () => {
+    const rows = Object.fromEntries(
+      tableOf(chat()).map((c) => [c.key, c.label({ path: "/agents/s-a" })]),
+    )
+    expect(rows).toMatchObject({
+      r: "Rename",
+      m: "Switch model",
+      w: "Move to workspace",
+      y: "Copy ID",
+      x: "Remove",
+    })
+  })
+
+  it("is Archive on a live epic and Unarchive on an archived one, on the same letter", () => {
+    const label = (e: Entity) =>
+      tableOf(e)
+        .find((c) => c.key === "a")
+        ?.label({ path: "/" })
+    expect(label({ ...base, kind: "epic", workspace: "Default" })).toBe("Archive")
+    expect(label({ ...base, kind: "epic", archived: true })).toBe("Unarchive")
+  })
+
+  it("marks Remove, and only Remove, as danger", () => {
+    const danger = tableOf(chat())
+      .filter((c) => c.danger)
+      .map((c) => c.key)
+    expect(danger).toEqual(["x"])
+  })
+
+  it("runs the registry action and leaves out one that cannot run", () => {
+    const run = vi.fn()
+    const row = tableOf(chat(), run).find((c) => c.key === "x")!
+    row.run()
+    expect(run).toHaveBeenCalledOnce()
+    const gone = entityChords([
+      { id: "remove", label: "Remove", chord: "x", danger: true, disabled: true, run },
+    ])
+    expect(gone).toEqual([])
+  })
+
+  it("never shares a letter between two chords, entity or app", () => {
+    const entities: Entity[] = [
+      chat(),
+      { ...base, kind: "epic", workspace: "Default" },
+      { ...base, kind: "epic", archived: true },
+      { ...base, kind: "design-draft" },
+    ]
+    for (const e of entities) {
+      const keys = tableOf(e).map((c) => c.key)
+      expect(new Set(keys).size, keys.join("")).toBe(keys.length)
     }
+    const app = tableOf().map((c) => c.key)
+    for (const letter of chordLetters()) expect(app).not.toContain(letter)
   })
+})
+
+describe("draft page paths", () => {
   it("reads the draft id from the path", () => {
     expect(draftIdOf("/drafts/d1")).toBe("d1")
     expect(draftIdOf("/drafts/d1/x")).toBeUndefined()
     expect(draftIdOf("/agents/d1")).toBeUndefined()
   })
-})
-
-describe("chord table x", () => {
-  const x = chordTable({
-    remove: () => {},
-    rename: () => {},
-    switchModel: () => {},
-    history: () => {},
-  }).find((c) => c.key === "x")!
-  const page = "/agents/s-a"
-
-  it("is available for a chat session, labelled Remove chat", () => {
-    const ctx = { path: page, session: session() }
-    expect(x.available(ctx)).toBe(true)
-    expect(x.label(ctx)).toBe("Remove chat")
-  })
-  it.each([{ ticket: "gx:e/1" }, { fix_of: "gx:e/1" }, { flow: "triage" }])(
-    "is labelled Remove for %j",
-    (over) => {
-      const ctx = { path: page, session: session(over) }
-      expect(x.available(ctx)).toBe(true)
-      expect(x.label(ctx)).toBe("Remove")
-    },
-  )
-  it("is unavailable for a Queue agent", () => {
-    expect(x.available({ path: page, session: session({ queue: true }) })).toBe(false)
-  })
-  it("is unavailable off an agent page or without a session", () => {
-    expect(x.available({ path: "/designs/a", session: session() })).toBe(false)
-    expect(x.available({ path: page })).toBe(false)
-  })
-  it("calls the handed-in remove opener and is danger", () => {
-    const remove = vi.fn()
-    const row = chordTable({
-      remove,
-      rename: () => {},
-      switchModel: () => {},
-      history: () => {},
-    }).find((c) => c.key === "x")!
-    row.run()
-    expect(remove).toHaveBeenCalledOnce()
-    expect(row.danger).toBe(true)
+  it("tells a chat draft's path from a design draft's", () => {
+    expect(chatDraftIdOf("/chat-drafts/c1")).toBe("c1")
+    expect(chatDraftIdOf("/drafts/c1")).toBeUndefined()
+    expect(draftIdOf("/chat-drafts/c1")).toBeUndefined()
   })
 })
 
-describe("chord table c and d", () => {
-  it("are always available with their labels", () => {
-    const t = chordTable({
-      remove: () => {},
-      rename: () => {},
-      switchModel: () => {},
-      history: () => {},
-    })
+describe("app chords", () => {
+  it("are always available, in their own group, with their labels", () => {
+    const t = tableOf()
     expect(t.map((c) => [c.key, c.label({ path: "/" }), c.available({ path: "/" })])).toEqual([
       ["c", "New chat draft", true],
       ["C", "New chat", true],
       ["d", "New design", true],
       ["s", "Focus sidebar", true],
       ["b", "Big prompt box", true],
-      ["r", "Rename chat", false],
-      ["m", "Switch model", false],
-      ["x", "Remove chat", false],
       ["h", "History", false],
     ])
+    expect(t.every((c) => c.group !== "entity")).toBe(true)
   })
 })
 
 describe("chord table h", () => {
-  const h = chordTable({
-    remove: () => {},
-    rename: () => {},
-    switchModel: () => {},
-    history: () => {},
-  }).filter((c) => c.key === "h")[0]
+  const h = tableOf().filter((c) => c.key === "h")[0]
 
   it("is the last row, labelled History", () => {
-    const t = chordTable({
-      remove: () => {},
-      rename: () => {},
-      switchModel: () => {},
-      history: () => {},
-    })
+    const t = tableOf()
     expect(t[t.length - 1].key).toBe("h")
     expect(h.label({ path: "/" })).toBe("History")
   })
@@ -243,36 +272,11 @@ describe("chord table h", () => {
     off()
     expect(h.available({ path: "/drafts/d1" })).toBe(false)
   })
-  it("tells a chat draft's path from a design draft's", () => {
-    expect(chatDraftIdOf("/chat-drafts/c1")).toBe("c1")
-    expect(chatDraftIdOf("/drafts/c1")).toBeUndefined()
-    expect(draftIdOf("/chat-drafts/c1")).toBeUndefined()
-  })
-  it("leaves r, m and x off a Design page's session", () => {
-    const ctx = {
-      path: "/d/gx:ep",
-      session: session({ design: true, ticket: "gx:ep/1" }),
-    }
-    const t = chordTable({
-      remove: () => {},
-      rename: () => {},
-      switchModel: () => {},
-      history: () => {},
-    })
-    for (const key of ["r", "m", "x"])
-      expect(t.find((c) => c.key === key)!.available(ctx)).toBe(false)
-  })
 })
 
 describe("chord table b", () => {
   afterEach(() => setBigPrompt(false))
-  const b = () =>
-    chordTable({
-      remove: () => {},
-      rename: () => {},
-      switchModel: () => {},
-      history: () => {},
-    }).find((c) => c.key === "b")!
+  const b = () => tableOf().find((c) => c.key === "b")!
 
   it("is offered on every page", () => {
     for (const path of ["/agents/s1", "/drafts/d1", "/designs/x", "/epics", "/agents"]) {
@@ -293,67 +297,19 @@ describe("chord table b", () => {
 describe("chord table d", () => {
   it("runs the New design action once", () => {
     startNewDesign.mockClear()
-    chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {}, history: () => {} })
+    tableOf()
       .find((c) => c.key === "d")
       ?.run()
     expect(startNewDesign).toHaveBeenCalledTimes(1)
   })
 })
 
-describe("chord table m", () => {
-  const switchModel = vi.fn()
-  const m = chordTable({ remove: () => {}, rename: () => {}, switchModel, history: () => {} }).find(
-    (c) => c.key === "m",
-  )!
-  const page = "/agents/s-a"
-
-  it("is available wherever Rename chat is, an exited chat included", () => {
-    for (const s of [session(), session({ status: { state: "exited" } })]) {
-      expect(m.available({ path: page, session: s })).toBe(canRename({ path: page, session: s }))
-      expect(m.available({ path: page, session: s })).toBe(true)
-    }
-  })
-  it.each([{ queue: true }, { ticket: "gx:e/1" }, { fix_of: "gx:e/1" }, { flow: "design" }])(
-    "is unavailable for %j",
-    (over) => {
-      expect(m.available({ path: page, session: session(over) })).toBe(false)
-    },
-  )
-  it("is unavailable on a draft page, off an agent page and without a session", () => {
-    expect(m.available({ path: "/drafts/d1" })).toBe(false)
-    expect(m.available({ path: "/designs/a", session: session() })).toBe(false)
-    expect(m.available({ path: page })).toBe(false)
-  })
-  it("calls the handed-in opener", () => {
-    m.run()
-    expect(switchModel).toHaveBeenCalledOnce()
-  })
-})
-
-describe("chord table r", () => {
-  const rename = vi.fn()
-  const r = chordTable({ remove: () => {}, rename, switchModel: () => {}, history: () => {} }).find(
-    (c) => c.key === "r",
-  )!
-  const page = "/agents/s-a"
-
-  it("is available on a chat's page", () => {
-    expect(r.available({ path: page, session: session() })).toBe(true)
-    expect(canRename({ path: page, session: session() })).toBe(true)
-  })
-  it.each([{ queue: true }, { ticket: "gx:e/1" }, { fix_of: "gx:e/1" }, { flow: "triage" }])(
-    "is unavailable for %j",
-    (over) => {
-      expect(r.available({ path: page, session: session(over) })).toBe(false)
-    },
-  )
-  it("is unavailable off an agent page or without a session", () => {
-    expect(r.available({ path: "/designs/a", session: session() })).toBe(false)
-    expect(r.available({ path: "/agents", session: session() })).toBe(false)
-    expect(r.available({ path: page })).toBe(false)
-  })
-  it("calls the handed-in rename opener", () => {
-    r.run()
-    expect(rename).toHaveBeenCalledOnce()
+describe("canRename", () => {
+  const path = "/agents/s-a"
+  it("holds on a plain chat's page only", () => {
+    expect(canRename({ path, session: session() })).toBe(true)
+    expect(canRename({ path, session: session({ queue: true }) })).toBe(false)
+    expect(canRename({ path: "/epics", session: session() })).toBe(false)
+    expect(canRename({ path })).toBe(false)
   })
 })

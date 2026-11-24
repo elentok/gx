@@ -11,7 +11,8 @@ import { ChordHost } from "./ChordHost"
 import { getBigPrompt, setBigPrompt } from "../ui/expandable-text/bigPromptStore"
 import { chordTable, type Chord } from "./chords"
 import { registerHistoryOpener } from "../history/historyOpener"
-import { registerDraftPage } from "./draftPageActions"
+import { registerChatDraftPage, registerDraftPage } from "./draftPageActions"
+import { WorkspacePickerHost } from "./WorkspacePickerHost"
 import { closeRename, useRenameRequest } from "./renameOpen"
 
 beforeEach(() => {
@@ -167,8 +168,7 @@ test("with a layer open the Leader key opens nothing", () => {
 })
 
 describe("Leader then b", () => {
-  const table = () =>
-    chordTable({ remove: () => {}, rename: () => {}, switchModel: () => {}, history: () => {} })
+  const table = () => chordTable({ actions: [], history: () => {} })
   afterEach(() => setBigPrompt(false))
 
   test("flips big mode from a focused textarea and the text stays", () => {
@@ -222,9 +222,13 @@ function RenameProbe() {
   )
 }
 
-function setupChats(path: string, sessions = [session("s1", "gamma"), session("s2", "gamma")]) {
+function setupChats(
+  path: string,
+  sessions = [session("s1", "gamma"), session("s2", "gamma")],
+  snapshot: Record<string, unknown> = {},
+) {
   const state = {
-    snapshot: { leader_key: "ctrl+e", sessions },
+    snapshot: { leader_key: "ctrl+e", sessions, ...snapshot },
     connected: true,
   } as unknown as ConnectionState
   const conn = {
@@ -242,6 +246,7 @@ function setupChats(path: string, sessions = [session("s1", "gamma"), session("s
             <RenameProbe />
             <PathProbe />
             <ConfirmHost />
+            <WorkspacePickerHost />
             <ChordHost />
           </>
         ),
@@ -255,6 +260,23 @@ function setupChats(path: string, sessions = [session("s1", "gamma"), session("s
     </ConnectionContext.Provider>,
   )
 }
+
+/** Answers each request with the body of the first route whose text is in the URL, else `{}`. */
+function stubApi(routes: Record<string, unknown>) {
+  const fetchMock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
+    const hit = Object.entries(routes).find(([route]) => String(url).includes(route))
+    return new Response(JSON.stringify(hit?.[1] ?? {}), { status: 200 })
+  })
+  vi.stubGlobal("fetch", fetchMock)
+  return fetchMock
+}
+
+/** The keys of the menu rows, in the order shown. */
+const menuKeys = () =>
+  screen
+    .getAllByRole("menuitem")
+    .map((i) => i.querySelector("b")?.textContent ?? "")
+    .filter((k) => !["c", "C", "d", "s", "b", "h"].includes(k))
 
 function PathProbe() {
   return <div data-testid="path">{useLocation().pathname}</div>
@@ -278,6 +300,144 @@ test("{leader} x on a live chat opens the shared confirm as a modal, then lands 
   await waitFor(() => expect(screen.getByTestId("path").textContent).toBe("/agents"))
   expect(fetchMock).toHaveBeenCalled()
   vi.unstubAllGlobals()
+})
+
+describe("x on a chat opens a modal confirm", () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  test("with Cancel focused; n cancels and posts nothing", async () => {
+    const fetchMock = stubApi({})
+    setupChats("/agents/s2")
+    leaderKey()
+    press("KeyX")
+    const dialog = await screen.findByRole("dialog", { name: /Remove/ })
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: /^Cancel/ })),
+    )
+    fireEvent.keyDown(window, { key: "n", code: "KeyN" })
+    await waitFor(() => expect(dialog.isConnected).toBe(false))
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(screen.getByTestId("path").textContent).toBe("/agents/s2")
+  })
+
+  test("y confirms and the chat's page is left", async () => {
+    stubApi({ "/v1/sessions": { results: [{ target: "s2", status: "done" }] } })
+    setupChats("/agents/s2")
+    leaderKey()
+    press("KeyX")
+    await screen.findByRole("dialog", { name: /Remove/ })
+    fireEvent.keyDown(window, { key: "y", code: "KeyY" })
+    await waitFor(() => expect(screen.getByTestId("path").textContent).toBe("/agents"))
+  })
+})
+
+describe("chat draft page", () => {
+  const actions = { isEmpty: () => true, focusBrief: vi.fn(), remove: vi.fn(), rename: vi.fn() }
+  let unregister = () => {}
+  beforeEach(() => {
+    actions.remove.mockClear()
+    actions.rename.mockClear()
+    unregister = registerChatDraftPage(actions)
+  })
+  afterEach(() => unregister())
+
+  test("{leader} x runs the chat draft page's registered remove and r its rename", () => {
+    setupChats("/chat-drafts/c1")
+    leaderKey()
+    expect(screen.getByRole("menuitem", { name: /Remove/ })).toBeTruthy()
+    press("KeyX")
+    expect(actions.remove).toHaveBeenCalledTimes(1)
+    leaderKey()
+    press("KeyR")
+    expect(actions.rename).toHaveBeenCalledTimes(1)
+  })
+
+  test("{leader} y does nothing: a draft has no ID", () => {
+    setupChats("/chat-drafts/c1")
+    leaderKey()
+    expect(screen.queryByRole("menuitem", { name: /Copy ID/ })).toBeNull()
+  })
+})
+
+describe("epic and Design pages", () => {
+  const card = { address: "gx:ep", addresses: ["gx:ep"], name: "ep", workspace: "Default" }
+  const workspaces = [
+    { name: "Default", default: true, members: 1 },
+    { name: "Work", members: 0 },
+  ]
+  afterEach(() => vi.unstubAllGlobals())
+
+  // The page's card arrives with the epic list; a chord box opened earlier would not show its chords.
+  async function openAfterList(fetchMock: ReturnType<typeof stubApi>) {
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith("/v1/epics"))).toBe(true),
+    )
+    await act(async () => {})
+    leaderKey()
+  }
+
+  test("a on an epic runs the Archive dry run, then opens the confirm as a modal", async () => {
+    const fetchMock = stubApi({
+      "/v1/epics/archive": { results: [{ target: "gx:ep", status: "done" }] },
+      "/v1/epics": { epics: [card] },
+    })
+    setupChats("/e/gx:ep", [], { workspaces })
+    await openAfterList(fetchMock)
+    expect(screen.getByRole("menuitem", { name: /Archive/ })).toBeTruthy()
+    press("KeyA")
+    await screen.findByRole("dialog", { name: /Archive/ })
+    const archive = fetchMock.mock.calls.filter(([u]) => String(u).includes("/v1/epics/archive"))
+    expect(archive.map(([, init]) => JSON.parse(String(init?.body)))).toEqual([
+      { targets: ["gx:ep"], dry_run: true },
+    ])
+  })
+
+  test("w opens a workspace picker with the current one marked; a pick posts the move", async () => {
+    const fetchMock = stubApi({
+      "/v1/workspaces/move": { results: [{ target: "gx:ep", status: "done" }] },
+      "/v1/epics": { epics: [card] },
+    })
+    setupChats("/e/gx:ep", [], { workspaces })
+    await openAfterList(fetchMock)
+    press("KeyW")
+    const dialog = await screen.findByRole("dialog", { name: "Move to workspace" })
+    expect(screen.getByRole("button", { name: "Default (current)" })).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Work" }))
+    await waitFor(() => expect(dialog.isConnected).toBe(false))
+    const move = fetchMock.mock.calls.find(([u]) => String(u).includes("/v1/workspaces/move"))
+    expect(JSON.parse(String(move?.[1]?.body))).toEqual({ name: "Work", targets: ["gx:ep"] })
+  })
+
+  test("an epic outside every workspace offers y only", async () => {
+    const fetchMock = stubApi({ "/v1/epics": { epics: [{ ...card, workspace: "" }] } })
+    setupChats("/e/gx:ep", [], { workspaces })
+    await openAfterList(fetchMock)
+    expect(menuKeys()).toEqual(["y"])
+  })
+
+  test("a Design page offers w, y and a once its card is in the list", async () => {
+    const design = session("s3", "gx", { design: true, ticket: "gx:ep/1" })
+    const fetchMock = stubApi({ "/v1/epics": { epics: [card] } })
+    setupChats("/d/gx:ep", [design], { workspaces })
+    await openAfterList(fetchMock)
+    expect(menuKeys()).toEqual(["w", "a", "y"])
+    for (const name of [/Rename/, /Switch model/, /Remove/]) {
+      expect(screen.queryByRole("menuitem", { name })).toBeNull()
+    }
+  })
+
+  test("an archived epic offers Unarchive on a and Copy ID on y", () => {
+    setupChats("/archive/gx:ep")
+    leaderKey()
+    expect(screen.getByRole("menuitem", { name: /Unarchive/ })).toBeTruthy()
+    expect(menuKeys()).toEqual(["a", "y"])
+  })
+
+  test("a ticket page offers y only", () => {
+    setupChats("/t/gx:ep/01")
+    leaderKey()
+    expect(menuKeys()).toEqual(["y"])
+  })
 })
 
 test("{leader} r on a chat page renames that chat only", () => {
@@ -378,10 +538,15 @@ describe("Leader then h", () => {
   })
 
   test("a Design page does not offer r, m or x", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("{}")),
+    )
     setupChats("/d/gx:ep", [design])
     leaderKey()
     for (const name of [/Rename/, /Switch model/, /Remove/]) {
       expect(screen.queryByRole("menuitem", { name })).toBeNull()
     }
+    vi.unstubAllGlobals()
   })
 })

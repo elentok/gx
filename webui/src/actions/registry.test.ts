@@ -96,9 +96,8 @@ describe("registry invariants", () => {
 
   it("matches the app-level chord keys", () => {
     const noop = () => {}
-    const keys = chordTable({ remove: noop, rename: noop, switchModel: noop, history: noop })
-      .map((c) => c.key)
-      .filter((k) => APP_CHORDS.includes(k))
+    // The table's app group is the pinned APP_CHORDS; the entity group is the registry's own letters.
+    const keys = chordTable({ actions: [], history: noop }).map((c) => c.key)
     expect(keys.sort()).toEqual([...APP_CHORDS].sort())
     expect(chordLetters()).toEqual(["r", "w", "m", "a", "y", "x"])
   })

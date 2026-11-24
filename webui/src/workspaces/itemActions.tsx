@@ -109,7 +109,7 @@ export function itemOfAnyCard(card: EpicListRow): ItemRef {
 }
 
 /** Workspace actions: a card with no workspace offers none of them. */
-const WORKSPACE_ONLY = ["move", "hold", "unhold", "archive", "unarchive"]
+export const WORKSPACE_ONLY = ["move", "hold", "unhold", "archive", "unarchive"]
 
 /** Actions a card's own page or row builds by hand, so the shared set leaves them out. */
 const BUILT_BY_PAGE = ["open-design-epic", "open-pr", "new-session", "mark-merged", "delete-design"]

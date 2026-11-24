@@ -42,5 +42,14 @@ export function useEpicList(
   return { list: data, failed, source, retry }
 }
 
+const idle: FetchEpicList = () => new Promise<EpicList>(() => {})
+
+/** The epic list, read only while `active`: an idle caller issues no request and shows no data. */
+export function useEpicListWhen(active: boolean, conn?: Connection): EpicList | null {
+  return useFetched("epics", shareInFlight(active ? fetchEpicList : idle), conn, {
+    id: active ? "" : "idle",
+  }).data
+}
+
 export const isCurrent = (row: EpicListRow, current: string) =>
   row.address === current || (row.addresses?.includes(current) ?? false)

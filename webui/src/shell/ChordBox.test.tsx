@@ -1,5 +1,8 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
+import { chatEntity } from "../actions/entity"
+import { menuActions } from "../actions/registry"
+import { session } from "../agents/agentsTestKit"
 import { setBigPrompt } from "../ui/expandable-text/bigPromptStore"
 import { hasLayer } from "../ui/modal/layers"
 import { renderThemed } from "../ui/render"
@@ -52,21 +55,30 @@ test("a row click runs its action, then closes", () => {
   expect(calls).toEqual(["run", "close"])
 })
 
-test("lists the real chord table", () => {
-  renderThemed(
-    <ChordBox
-      leader="cmd+e"
-      ctx={ctx}
-      chords={chordTable({
-        remove: () => {},
-        rename: () => {},
-        switchModel: () => {},
-        history: () => {},
-      })}
-      onClose={() => {}}
-    />,
+const noop = () => {}
+const chatActions = menuActions(chatEntity(session("s-a", "gamma"))).map((d) => ({
+  id: d.id,
+  label: d.label,
+  chord: d.chord,
+  danger: !!d.danger,
+  disabled: false,
+  run: noop,
+}))
+const realTable = () => chordTable({ actions: chatActions, history: noop })
+
+test("lists the real chord table: the entity group, a separator, then the app group", () => {
+  renderThemed(<ChordBox leader="cmd+e" ctx={ctx} chords={realTable()} onClose={() => {}} />)
+  const menu = screen.getByRole("menu")
+  const sequence = [...menu.querySelectorAll('[role="menuitem"], [role="separator"]')].map((i) =>
+    i.getAttribute("role") === "separator" ? "---" : i.textContent,
   )
-  expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+  expect(sequence).toEqual([
+    "rRename",
+    "wMove to workspace",
+    "mSwitch model",
+    "yCopy ID",
+    "xRemove",
+    "---",
     "cNew chat draft",
     "CNew chat",
     "dNew design",
@@ -75,13 +87,30 @@ test("lists the real chord table", () => {
   ])
 })
 
+test("shows no separator when only one group has rows", () => {
+  renderThemed(
+    <ChordBox
+      leader="cmd+e"
+      ctx={ctx}
+      chords={chordTable({ actions: [], history: noop })}
+      onClose={noop}
+    />,
+  )
+  expect(screen.queryByRole("separator")).toBeNull()
+})
+
+test("Remove is in the danger color and the rest are not", () => {
+  renderThemed(<ChordBox leader="cmd+e" ctx={ctx} chords={realTable()} onClose={() => {}} />)
+  const colorOf = (key: string) => {
+    const el = screen.getAllByRole("menuitem").find((i) => i.textContent?.startsWith(key))!
+    return getComputedStyle(el.querySelector("b")!).color
+  }
+  expect(colorOf("x")).not.toBe(colorOf("r"))
+  expect(colorOf("r")).toBe(colorOf("c"))
+})
+
 test("labels the b row Normal prompt box after big mode is on, and has no Gear control", () => {
-  const table = chordTable({
-    remove: () => {},
-    rename: () => {},
-    switchModel: () => {},
-    history: () => {},
-  })
+  const table = chordTable({ actions: [], history: noop })
   const open = () => {
     renderThemed(<ChordBox leader="cmd+e" ctx={ctx} chords={table} onClose={() => {}} />)
     const out = screen.getAllByRole("menuitem").map((i) => i.textContent)
@@ -95,29 +124,6 @@ test("labels the b row Normal prompt box after big mode is on, and has no Gear c
   } finally {
     setBigPrompt(false)
   }
-})
-
-test("lists Switch model on a chat's page and not on a design's", () => {
-  const session = {
-    id: "s-a",
-    status: { state: "idle" },
-  } as unknown as NonNullable<Parameters<typeof ChordBox>[0]["ctx"]["session"]>
-  const table = chordTable({
-    remove: () => {},
-    rename: () => {},
-    switchModel: () => {},
-    history: () => {},
-  })
-  const labels = (c: Parameters<typeof ChordBox>[0]["ctx"]) => {
-    renderThemed(<ChordBox leader="cmd+e" ctx={c} chords={table} onClose={() => {}} />)
-    const out = screen.getAllByRole("menuitem").map((i) => i.textContent)
-    cleanup()
-    return out
-  }
-  expect(labels({ path: "/agents/s-a", session })).toContain("mSwitch model")
-  expect(labels({ path: "/agents/s-a", session: { ...session, flow: "design" } })).not.toContain(
-    "mSwitch model",
-  )
 })
 
 test("is on the layer stack while mounted", () => {

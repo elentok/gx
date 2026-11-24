@@ -23,6 +23,7 @@ import { MascotToggle } from "./MascotToggle"
 import { NewItemHost } from "./NewItemHost"
 import { ConfirmHost } from "./ConfirmHost"
 import { ModelPickerHost } from "./ModelPickerHost"
+import { WorkspacePickerHost } from "./WorkspacePickerHost"
 import { RenameHost } from "./RenameHost"
 import { ShellContext, type Shell } from "./ShellContext"
 import { SidebarFooter } from "./SidebarFooter"
@@ -378,6 +379,7 @@ export function AppShell({
         <ConfirmHost />
         <RenameHost />
         <ModelPickerHost />
+        <WorkspacePickerHost />
         <ChordHost />
       </Box>
     </ShellContext.Provider>

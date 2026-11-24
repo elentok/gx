@@ -1,6 +1,8 @@
 import { Box } from "@chakra-ui/react"
 import { useEffect, useRef, type ReactNode } from "react"
 import { MemoryRouter } from "react-router"
+import { chatEntity } from "../actions/entity"
+import { menuActions } from "../actions/registry"
 import { ConnectionContext, type Connection } from "../connection"
 import {
   CardKindDesign,
@@ -169,23 +171,28 @@ const Frame = ({ w, h, children }: { w: string; h: string; children: ReactNode }
 
 const chordCtx = { path: "/agents/s1", session: session("s1", "builder") }
 
+// The registry's actions of the open chat, as ChordHost hands them to the table.
+const chatActions = menuActions(chatEntity(chordCtx.session)).map((a) => ({
+  id: a.id,
+  label: a.label,
+  chord: a.chord,
+  danger: !!a.danger,
+  disabled: false,
+  run: () => {},
+}))
+
 // The Chord box is position:fixed; the Frame's transform makes it sit in the frame's corner.
 const chordBoxEntry: GalleryEntry = {
   name: "ChordBox",
   cases: [
     {
-      label: "chat page (Remove chat available)",
+      label: "chat page (chat chords above the app chords)",
       node: (
         <Frame w="1040px" h="230px">
           <ChordBox
             leader="cmd+e"
             ctx={chordCtx}
-            chords={chordTable({
-              remove: () => {},
-              rename: () => {},
-              switchModel: () => {},
-              history: () => {},
-            })}
+            chords={chordTable({ actions: chatActions, history: () => {} })}
             onClose={() => {}}
           />
         </Frame>
@@ -198,12 +205,7 @@ const chordBoxEntry: GalleryEntry = {
           <ChordBox
             leader="cmd+e"
             ctx={{ path: "/" }}
-            chords={chordTable({
-              remove: () => {},
-              rename: () => {},
-              switchModel: () => {},
-              history: () => {},
-            })}
+            chords={chordTable({ actions: [], history: () => {} })}
             onClose={() => {}}
           />
         </Frame>

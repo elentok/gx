@@ -1,5 +1,8 @@
 import { useLocation } from "react-router"
-import { canManage, isChat } from "../agents/sessionWrites"
+import type { ReadyAction } from "../actions/useActions"
+import { agentKindOf, chatEntity, type Entity } from "../actions/entity"
+import { isChat } from "../agents/sessionWrites"
+import { isCurrent, useEpicListWhen } from "../epics/list"
 import { hasHistoryOpener } from "../history/historyOpener"
 import { designSession } from "../design/view"
 import { useConnectionContext, useConnectionState } from "../connection"
@@ -77,12 +80,17 @@ export function displayKey(setting: string | undefined): string {
 
 export type ChordContext = { path: string; session?: SessionInfo }
 
+/** "entity" chords act on the open page's entity and come from the registry; "app" chords work anywhere. */
+export type ChordGroup = "entity" | "app"
+
 export type Chord = {
   key: string
   label: (ctx: ChordContext) => string
   run: () => void
   danger?: boolean
   available: (ctx: ChordContext) => boolean
+  /** Absent means "app". */
+  group?: ChordGroup
 }
 
 /** The session id of an `/agents/:id` page, or undefined for any other path. */
@@ -99,12 +107,6 @@ export const chatDraftIdOf = (path: string): string | undefined =>
 
 /** A draft page or a composer that offers History has registered its opener. */
 const canHistory = () => hasHistoryOpener()
-
-const canRemove = (ctx: ChordContext) =>
-  draftIdOf(ctx.path) !== undefined ||
-  (agentIdOf(ctx.path) !== undefined && ctx.session !== undefined && canManage(ctx.session))
-
-const canRenameHere = (ctx: ChordContext) => draftIdOf(ctx.path) !== undefined || canRename(ctx)
 
 /** The one rule for the Rename chat chord and palette row: the open page is a chat's page. */
 export const canRename = (ctx: ChordContext) =>
@@ -126,18 +128,110 @@ export function useOpenChat(): { path: string; session: SessionInfo | undefined 
   return { path: pathname, session }
 }
 
-/** The chord table. `remove`, `rename` and `switchModel` are the popup openers, handed in so this module does not depend on them. */
+/** The entity the open page shows, with the path and open chat `useOpenChat` gives. Undefined off an entity page. */
+export function useOpenEntity(): {
+  path: string
+  session: SessionInfo | undefined
+  entity: Entity | undefined
+} {
+  const { path, session } = useOpenChat()
+  const conn = useConnectionContext()
+  const snapshot = useConnectionState(conn).snapshot
+  const route = /^\/(e|d|t|archive)\/(.+)$/.exec(path)
+  const kind = route?.[1]
+  const key = route?.[2] ?? ""
+  // Only an epic or a Design needs the list: its card says which workspace it sits in.
+  const list = useEpicListWhen(kind === "e" || kind === "d", conn)
+  const card = list?.epics?.find((r) => isCurrent(r, key))
+  const base = { key, name: key, surface: "page" } as const
+
+  if (kind === "e")
+    return {
+      path,
+      session,
+      entity: { ...base, kind: "epic", workspace: card?.workspace || undefined },
+    }
+  if (kind === "d")
+    return {
+      path,
+      session,
+      entity: { ...base, kind: "design", workspace: card?.workspace || undefined, session },
+    }
+  if (kind === "t") return { path, session, entity: { ...base, kind: "ticket" } }
+  if (kind === "archive")
+    return { path, session, entity: { ...base, kind: "epic", archived: true } }
+
+  const chat = agentIdOf(path)
+  if (chat) {
+    if (!session) return { path, session, entity: undefined }
+    const agent = agentKindOf(session)
+    // A builder or flow session is never offered the plain chat's actions.
+    const agentKind = agent === "chat" && !isChat(session) ? "managed" : agent
+    return { path, session, entity: { ...chatEntity(session), surface: "page", agent: agentKind } }
+  }
+  const draft = draftIdOf(path)
+  if (draft) {
+    const row = snapshot?.design_drafts?.find((d) => d.id === draft)
+    const entity: Entity = {
+      kind: "design-draft",
+      key: row?.member_key ?? `draft/${draft}`,
+      name: row?.label ?? "draft",
+      surface: "page",
+      workspace: row?.workspace,
+    }
+    return { path, session, entity }
+  }
+  const chatDraft = chatDraftIdOf(path)
+  if (chatDraft) {
+    const row = snapshot?.chat_drafts?.find((d) => d.id === chatDraft)
+    const entity: Entity = {
+      kind: "chat-draft",
+      key: row?.member_key ?? `chat-draft/${chatDraft}`,
+      name: row?.label ?? "chat draft",
+      surface: "page",
+      workspace: row?.workspace,
+    }
+    return { path, session, entity }
+  }
+  return { path, session, entity: undefined }
+}
+
+/** What an entity chord needs of a registry action; `useActions` gives the real ones. */
+export type EntityAction = Pick<
+  ReadyAction,
+  "id" | "label" | "chord" | "danger" | "disabled" | "run"
+>
+
+/** One chord per registry action that has a letter and can run now, in registry order. */
+export function entityChords(actions: EntityAction[]): Chord[] {
+  return actions.flatMap((a) =>
+    a.chord && !a.disabled
+      ? [
+          {
+            key: a.chord,
+            label: () => a.label,
+            run: a.run,
+            danger: a.danger,
+            available: () => true,
+            group: "entity" as const,
+          },
+        ]
+      : [],
+  )
+}
+
+/** The chord table: the open entity's registry chords, then the app-level ones. `history` opens the History popup, handed in so this module does not depend on it. */
 export function chordTable({
-  remove,
-  rename,
-  switchModel,
+  actions,
   history,
 }: {
-  remove: () => void
-  rename: () => void
-  switchModel: () => void
+  actions: EntityAction[]
   history: () => void
 }): Chord[] {
+  return [...entityChords(actions), ...appChords(history)]
+}
+
+function appChords(history: () => void): Chord[] {
   return [
     {
       key: "c",
@@ -159,22 +253,6 @@ export function chordTable({
       label: () => (getBigPrompt() ? "Normal prompt box" : "Big prompt box"),
       run: toggleBigPrompt,
       available: () => true,
-    },
-    {
-      key: "r",
-      label: ({ path }) => (draftIdOf(path) ? "Rename" : "Rename chat"),
-      run: rename,
-      available: canRenameHere,
-    },
-    // Offered on the pages where Rename chat is, so the picker never opens for a Queue agent or a flow.
-    { key: "m", label: () => "Switch model", run: switchModel, available: canRename },
-    {
-      key: "x",
-      label: ({ path, session: s }) =>
-        draftIdOf(path) || (s && (s.ticket || s.fix_of || s.flow)) ? "Remove" : "Remove chat",
-      run: remove,
-      danger: true,
-      available: canRemove,
     },
     { key: "h", label: () => "History", run: history, available: canHistory },
   ]

@@ -20,6 +20,41 @@ export function ChordBox({
   // Joins the layer stack while mounted so Esc handlers elsewhere defer to it.
   useIsTopLayer()
   const rows = chords.filter((c) => c.available(ctx))
+  // The open entity's chords come first, then the app-level ones as their own group.
+  const entityRows = rows.filter((c) => c.group === "entity")
+  const appRows = rows.filter((c) => c.group !== "entity")
+  const row = (c: Chord) => (
+    <Box
+      key={c.key}
+      role="menuitem"
+      tabIndex={-1}
+      display="flex"
+      gap="10px"
+      alignItems="baseline"
+      px="10px"
+      py="1"
+      borderRadius="8px"
+      cursor="pointer"
+      _hover={{ bg: "sidebar.hover" }}
+      onClick={() => {
+        c.run()
+        onClose()
+      }}
+    >
+      <Box
+        as="b"
+        w="1ch"
+        fontFamily="condensed"
+        lineHeight="normal"
+        fontSize="16px"
+        fontWeight="700"
+        color={c.danger ? "tone.paused.fg" : "text"}
+      >
+        {c.key}
+      </Box>
+      {c.label(ctx)}
+    </Box>
+  )
 
   return (
     <Box
@@ -61,38 +96,11 @@ export function ChordBox({
       >
         {displayKey(leader)}
       </Box>
-      {rows.map((c) => (
-        <Box
-          key={c.key}
-          role="menuitem"
-          tabIndex={-1}
-          display="flex"
-          gap="10px"
-          alignItems="baseline"
-          px="10px"
-          py="1"
-          borderRadius="8px"
-          cursor="pointer"
-          _hover={{ bg: "sidebar.hover" }}
-          onClick={() => {
-            c.run()
-            onClose()
-          }}
-        >
-          <Box
-            as="b"
-            w="1ch"
-            fontFamily="condensed"
-            lineHeight="normal"
-            fontSize="16px"
-            fontWeight="700"
-            color={c.danger ? "tone.paused.fg" : "text"}
-          >
-            {c.key}
-          </Box>
-          {c.label(ctx)}
-        </Box>
-      ))}
+      {entityRows.map(row)}
+      {entityRows.length > 0 && appRows.length > 0 && (
+        <Box role="separator" h="1px" mx="10px" my="1" bg="hairline" />
+      )}
+      {appRows.map(row)}
       <Box px="10px" pt="1" pb="2px" fontSize="12px" color="text.faint" textAlign="right">
         esc closes
       </Box>

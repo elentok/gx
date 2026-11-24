@@ -151,6 +151,31 @@ test("209. Chat draft page", async ({ page, start }) => {
   await expect(page.getByRole("alertdialog")).toHaveCount(0)
   expect((await drafts(fx)).map((x) => x.id)).not.toContain(emptyId)
 
+  // Leader then x is the same Remove: an empty draft goes at once, with no dialog.
+  const chordId = (
+    await fx.cliInput(
+      "x",
+      "agents",
+      "drafts",
+      "create",
+      "--project",
+      "demo",
+      "--name",
+      "chord-me",
+      "--brief",
+      "-",
+    )
+  ).trim()
+  await goto(page, `#/chat-drafts/${chordId}`)
+  await d.brief.fill("")
+  await expect(d.saved).toBeVisible()
+  await page.keyboard.press("ControlOrMeta+e")
+  await expect(page.getByRole("menuitem", { name: /^x\s*Remove$/ })).toBeVisible()
+  await page.keyboard.press("x")
+  await expect(page).toHaveURL(/#\/epics/)
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+  expect((await drafts(fx)).map((x) => x.id)).not.toContain(chordId)
+
   // Codex: the same Start journey launches codex on the draft's model and effort.
   const codexId = await draftId(fx, "codex-draft")
   await goto(page, `#/chat-drafts/${codexId}`)

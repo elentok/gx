@@ -5,8 +5,10 @@ import type { Locator } from "@playwright/test"
 import { goto } from "./sidebarKit"
 
 // The Leader key's Chord box over the `workspaces` scenario; split from the Workspaces flow so each stays inside its time limit.
-test("Chords", async ({ page, start }) => {
+test("Chords", async ({ page, start, context }) => {
   test.setTimeout(120_000)
+  // y copies the chat's ID; the flow reads it back.
+  await context.grantPermissions(["clipboard-read", "clipboard-write"])
   const fx = await start("workspaces")
   // Every menu close waits out its animation; the flow checks end states, not motion.
   await page.addStyleTag({
@@ -273,7 +275,7 @@ test("Chords", async ({ page, start }) => {
   await page.evaluate(() => ((window as unknown as { __kept?: boolean }).__kept = true))
   await prompt.fill("a draft")
   await openBox()
-  await expect(chordBox.getByRole("menuitem", { name: /^r\s*Rename chat/ })).toBeVisible()
+  await expect(chordBox.getByRole("menuitem", { name: /^r\s*Rename$/ })).toBeVisible()
   await page.keyboard.press("r")
   await expect(renameDialog).toBeVisible()
   await expect(renameField).toBeFocused()
@@ -342,25 +344,51 @@ test("Chords", async ({ page, start }) => {
   const removeRow = chordBox.getByRole("menuitem", { name: /^x\s*Remove/ })
   const removeConfirm = page.getByRole("dialog").filter({ hasText: "Stop and remove" })
   await openBox()
-  await expect(removeRow).toContainText("Remove chat")
+  await expect(removeRow).toHaveText(/^x\s*Remove$/)
+  // The chat's own chords come first, a separator, then the app-level group.
+  await expect(chordBox.getByRole("separator")).toHaveCount(1)
+  for (const key of ["r", "m", "w", "y", "x"]) {
+    await expect(chordBox.getByRole("menuitem", { name: new RegExp(`^${key}\\s`) })).toBeVisible()
+  }
   const plainKey = chordBox.getByRole("menuitem", { name: /^c\s*New chat/ }).locator("b")
   await expect(plainKey).toBeVisible()
   const plainColor = await plainKey.evaluate((e) => getComputedStyle(e).color)
   await expect(removeRow.locator("b")).not.toHaveCSS("color", plainColor)
+  await page.keyboard.press("Escape")
+  // y copies the ID and toasts it; w opens the workspace picker, m the model picker.
+  await openBox()
+  await page.keyboard.press("y")
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(chordChat.id)
+  await expect(page.getByText(`Copied ${chordChat.id}`)).toBeVisible()
+  await openBox()
+  await page.keyboard.press("w")
+  const movePicker = page.getByRole("dialog", nav("Move to workspace"))
+  await expect(movePicker).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(movePicker).toHaveCount(0)
+  await openBox()
+  await page.keyboard.press("m")
+  const modelPicker = page.getByRole("dialog", nav("Switch model"))
+  await expect(modelPicker).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(modelPicker).toHaveCount(0)
+  // x confirms in a modal: n cancels, y confirms.
+  await openBox()
   await page.keyboard.press("x")
   await expect(removeConfirm).toBeVisible()
   await expect(removeConfirm.getByRole("button", { name: /^Cancel/ })).toBeFocused()
-  await page.keyboard.press("Enter")
+  await page.keyboard.press("n")
   await expect(removeConfirm).toHaveCount(0)
   await expect(page).toHaveURL(chordChatUrl)
   expect(await fx.cli("agents", "list")).toContain(chordChat.id)
   await openBox()
   await page.keyboard.press("x")
-  await removeConfirm.getByRole("button", { name: /^Remove/ }).click()
+  await expect(removeConfirm).toBeVisible()
+  await page.keyboard.press("y")
   await expect(page).toHaveURL(/#\/agents$/)
   await expect.poll(() => fx.cli("agents", "list")).not.toContain(chordChat.id)
 
-  // Design page, Queue and a Queue agent: the box has c, C, d, s and b only, and x does nothing.
+  // Design page and a Queue agent: no r, m or x (y copies the ID, and w and a need a workspace card), and x does nothing.
   // The palette lists no Rename chat there; its New chat row proves the filter ran.
   const expectNoRenameInPalette = async () => {
     await page.keyboard.press("ControlOrMeta+p")
@@ -375,9 +403,12 @@ test("Chords", async ({ page, start }) => {
   for (const hash of ["#/d/side:side-design", queueAgentHash]) {
     await goto(page, hash)
     await openBox(chordBox.getByRole("menuitem", { name: /^c\s*New chat/ }))
-    await expect(chordBox.getByRole("menuitem")).toHaveCount(5)
-    await expect(chordBox.getByRole("menuitem", { name: /^x/ })).toHaveCount(0)
-    await expect(chordBox.getByRole("menuitem", { name: /^r/ })).toHaveCount(0)
+    await expect(chordBox.getByRole("menuitem", { name: /^y\s*Copy ID$/ })).toBeVisible()
+    for (const key of ["x", "r", "m"]) {
+      await expect(chordBox.getByRole("menuitem", { name: new RegExp(`^${key}\\s`) })).toHaveCount(
+        0,
+      )
+    }
     await page.keyboard.press("x")
     await expect(page.getByRole("dialog")).toHaveCount(0)
     await page.keyboard.press("Escape")
