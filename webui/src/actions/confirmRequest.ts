@@ -1,0 +1,40 @@
+import { createExternalStore } from "../shell/externalStore"
+import type { ConfirmContent, Group } from "./registry"
+
+/** Where an action started: a button or menu item anchors its popover; a chord or palette opens a modal. */
+export type SurfaceContext =
+  | { mode: "anchor"; anchor: HTMLElement; page?: string }
+  | { mode: "modal"; page?: string }
+
+/** What the confirm shows: the consequence lines, the rows a bulk run lists, and the input it collects. */
+export interface ConfirmBody extends ConfirmContent {
+  /** A bulk run lists every row it runs on. */
+  rows?: string[]
+  /** Cautions shown apart from the lines, such as an epic that is not on trunk. */
+  warnings?: string[]
+  /** What the dry run answered (Archive: live sessions, `on_trunk`). */
+  prepared?: unknown
+}
+
+/** One request to the confirm host. Running an action whose confirm applies renders nothing; it hands this over. */
+export interface ConfirmRequest {
+  actionId: string
+  entityName: string
+  /** The group sets the color; absent for a footer action. */
+  group?: Group
+  danger?: boolean
+  confirmLabel: string
+  dismissLabel: string
+  title: string
+  body: ConfirmBody
+  surface: SurfaceContext
+  /** Runs the write. An action with an input gets the typed text. */
+  onConfirm: (input?: string) => void
+}
+
+const store = createExternalStore<ConfirmRequest | null>(null)
+
+export const openConfirm = (request: ConfirmRequest) => store.set(request)
+export const closeConfirm = () => store.set(null)
+export const currentConfirm = store.get
+export const useConfirmRequest = store.use

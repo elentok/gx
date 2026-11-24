@@ -314,6 +314,13 @@ export interface BulkView {
   fit: BulkFit
 }
 
+/** "Hold 2 of 5", or "Hold 2" when every selected entity fits. */
+export function bulkLabel(a: ActionDecl, fit: BulkFit): string {
+  const n = fit.fits.length
+  const m = n + fit.skipped.length
+  return n === m ? `${a.label} ${n}` : `${a.label} ${n} of ${m}`
+}
+
 /** The bar's actions in registry order, each with a count label, and none that fits no selected entity. */
 export function bulkBar(selected: Entity[], actions: ActionDecl[] = ACTIONS): BulkView[] {
   return actions
@@ -321,9 +328,7 @@ export function bulkBar(selected: Entity[], actions: ActionDecl[] = ACTIONS): Bu
     .sort((a, b) => rank(a) - rank(b))
     .map((a) => {
       const fit = bulkFit(a, selected)
-      const n = fit.fits.length
-      const m = n + fit.skipped.length
-      return { id: a.id, label: n === m ? `${a.label} ${n}` : `${a.label} ${n} of ${m}`, fit }
+      return { id: a.id, label: bulkLabel(a, fit), fit }
     })
     .filter((v) => v.fit.fits.length > 0)
 }
