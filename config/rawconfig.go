@@ -39,6 +39,7 @@ type rawConfig struct {
 		} `json:"slack"`
 	} `json:"notifications"`
 	NotificationChannels *rawChannels `json:"notification-channels"`
+	KindsMigrated        *bool        `json:"notification-kinds-migrated"`
 	Skills               *struct {
 		Implement  *string  `json:"implement"`
 		CodeReview []string `json:"code-review"`

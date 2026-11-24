@@ -32,7 +32,12 @@ func TestParseMatchesLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	parsed, err := Parse(data)
+	// The unmarked file is an upgrade: Load rewrote it once, so Parse what is on disk now.
+	onDisk, err := os.ReadFile(filepath.Join(tmp, "gx", "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := Parse(onDisk)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}

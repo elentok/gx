@@ -678,6 +678,9 @@
       },
       "type": "object"
     },
+    "notification-kinds-migrated": {
+      "description": "written by gx, not a setting"
+    },
     "notifications": {
       "additionalProperties": false,
       "properties": {

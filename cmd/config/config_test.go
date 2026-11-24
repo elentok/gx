@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -143,6 +145,35 @@ func secretDeps(stdout *bytes.Buffer) Deps {
 			return cfg, nil
 		},
 	}}
+}
+
+func TestExecute_ConfigGet_UpgradedKindList(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	d := Deps{Env: cmdbase.Env{
+		Stdout: &stdout,
+		Stderr: bytes.NewBuffer(nil),
+		Env:    cmdtest.EnvFor(t),
+		LoadConfig: func() (gxconfig.Config, error) {
+			data, err := gxconfig.ReadMigrated(path)
+			if err != nil {
+				return gxconfig.Config{}, err
+			}
+			return gxconfig.Parse(data)
+		},
+	}}
+	if err := run(t, d, "config", "get", "notification-channels.push.kinds"); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"session-alert", "design-question", "paused-ticket"} {
+		if !strings.Contains(stdout.String(), id) {
+			t.Errorf("stdout = %q, want %s", stdout.String(), id)
+		}
+	}
 }
 
 func TestExecute_ConfigShow_RedactsSecretsUnlessRevealed(t *testing.T) {

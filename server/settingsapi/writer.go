@@ -64,7 +64,8 @@ func (w *Writer) Write(t Target, changes []Change) (Result, error) {
 	missing := errors.Is(err, fs.ErrNotExist)
 	switch {
 	case missing:
-		doc = []byte("{}")
+		// A new file is not an upgrade: carry the marker so no list is written.
+		doc = []byte(`{"` + config.NotificationKindsMarkerKey + `": true}`)
 	case err != nil:
 		return Result{}, err
 	}

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io/fs"
 	"net/http"
-	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -49,7 +48,7 @@ func (h *Holder) reloadLocked() (wire.ReloadResult, func()) {
 	if h.opts.ConfigPath == "" {
 		return refuseReload(wire.ReasonReloadUnavailable, "this server has no config file to reload"), nil
 	}
-	data, err := os.ReadFile(h.opts.ConfigPath)
+	data, err := config.ReadMigrated(h.opts.ConfigPath)
 	if errors.Is(err, fs.ErrNotExist) {
 		return refuseReload(wire.ReasonConfigMissing, "config file "+h.opts.ConfigPath+" does not exist; settings unchanged"), nil
 	}

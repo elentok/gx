@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/config/keyedit"
 )
 
 // UserConfigDir hardcodes ~/.config as gx's config base directory on every
@@ -207,7 +208,7 @@ func loadFrom(filePath, dataDir func() (string, error)) (Config, error) {
 		return cfg, err
 	}
 
-	data, err := os.ReadFile(path)
+	data, err := ReadMigrated(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return cfg, nil
@@ -599,7 +600,10 @@ func initAt(filePath func() (string, error)) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("encode default config: %w", err)
 	}
-	b = append(b, '\n')
+	// A new file is not an upgrade: stamp the marker so no list is written.
+	if b, err = keyedit.Set(b, []string{NotificationKindsMarkerKey}, true); err != nil {
+		return "", fmt.Errorf("stamp default config: %w", err)
+	}
 
 	if err := os.WriteFile(path, b, 0644); err != nil {
 		return "", fmt.Errorf("write config %s: %w", path, err)

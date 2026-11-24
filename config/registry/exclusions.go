@@ -11,6 +11,7 @@ func Exclusions() []Exclusion {
 	out := []Exclusion{
 		{Key: Key("$schema"), Project: true, Reason: "not a setting"},
 		{Key: Key("agents", "resume-on-start"), Reason: "legacy alias"},
+		{Key: Key("notification-kinds-migrated"), Reason: "written by gx, not a setting"},
 		{Key: Key("notifications"), Project: true,
 			Reason: "accepted in project.json, deliberately not editable on the web (secrets); ProjectFile still loads it and the page leaves an existing block untouched"},
 	}

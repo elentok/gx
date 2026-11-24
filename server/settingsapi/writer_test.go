@@ -141,6 +141,21 @@ func TestWriterMissingFileCreatedForSetLeftForRemove(t *testing.T) {
 	}
 }
 
+func TestWriterNewFileCarriesKindsMarkerSoLoadWritesNoList(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "config.json")
+	if _, err := newWriter(path).Write(Target{}, []Change{set(`"5m"`, "execution-queue", "waiting-slot-grace")}); err != nil {
+		t.Fatal(err)
+	}
+	before := readFile(t, path)
+	if _, err := config.ReadMigrated(path); err != nil {
+		t.Fatal(err)
+	}
+	if after := readFile(t, path); after != before || strings.Contains(after, `"kinds"`) {
+		t.Fatalf("a new file was migrated:\n%s", after)
+	}
+}
+
 func TestWriterRefusalLeavesFileUntouched(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

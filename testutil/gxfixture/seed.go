@@ -54,7 +54,10 @@ func (f *fixture) writeConfig(port, recentlyFinished int, overrides []string) er
 	}
 	// A wait shorter than a loaded fake's first turn reads as an undelivered
 	// prompt: the runner kills the agent mid-finish and relaunches it.
-	cfg := map[string]any{"agent-runner": "pty", "runner-wait": "2s", "server": server}
+	cfg := map[string]any{"agent-runner": "pty", "runner-wait": "2s", "server": server,
+		// A fixture is a new install; `--config notification-kinds-migrated=null`
+		// drops the marker to show the upgrade lists.
+		"notification-kinds-migrated": true}
 	for _, kv := range overrides {
 		key, raw, ok := strings.Cut(kv, "=")
 		if !ok || key == "" {
@@ -75,6 +78,9 @@ func (f *fixture) writeConfig(port, recentlyFinished int, overrides []string) er
 			node = next
 		}
 		node[parts[len(parts)-1]] = val
+	}
+	if cfg["notification-kinds-migrated"] == nil {
+		delete(cfg, "notification-kinds-migrated")
 	}
 	data, err := json.Marshal(cfg)
 	if err != nil {

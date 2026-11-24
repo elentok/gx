@@ -22,7 +22,8 @@ func WriteConfig(t *testing.T, path, store string, fields map[string]any) {
 	t.Helper()
 	// runner-wait is the harness's own 100ms, so a file that leaves it out
 	// does not read as a startup-only change.
-	all := map[string]any{"ticket-store": map[string]any{"path": store}, "runner-wait": "100ms"}
+	// The marker makes the file a new install, so Load writes no kind lists.
+	all := map[string]any{"ticket-store": map[string]any{"path": store}, "runner-wait": "100ms", "notification-kinds-migrated": true}
 	for k, v := range fields {
 		all[k] = v
 	}

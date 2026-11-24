@@ -1,8 +1,10 @@
 package settings_test
 
 import (
+	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/elentok/gx/config"
@@ -42,6 +44,39 @@ func TestSettings_ZeroValueReadsAsNewInstall(t *testing.T) {
 		if !ch.Enabled() || len(ids) != 15 || slices.Contains(ids, notifykind.LongTicket) {
 			t.Errorf("%s: enabled=%v kinds=%v, want on with the 15 default ids", name, ch.Enabled(), ids)
 		}
+	}
+}
+
+func TestConfigReload_UnmarkedFileReadsAsUpgrade(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	path := filepath.Join(t.TempDir(), "config.json")
+	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
+	servertest.WriteConfig(t, path, store, nil)
+	if res := reload(t, h); res.Refused {
+		t.Fatalf("baseline = %+v", res)
+	}
+
+	// Not WriteConfig: it presets the marker, which makes a file a new install.
+	if err := os.WriteFile(path, []byte(`{"ticket-store":{"path":`+strconv.Quote(store)+`},"runner-wait":"100ms","server":{"watch-config":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res := reload(t, h)
+	if res.Refused {
+		t.Fatalf("reload = %+v", res)
+	}
+	if !slices.Contains(res.Changed, "notification-channels.push.kinds") {
+		t.Errorf("reload = %+v, want push kinds changed", res)
+	}
+	got := h.Server.Settings().Load().NotifyChannels
+	if !slices.Equal(got.Push.KindIDs(), []string{notifykind.SessionAlert, notifykind.DesignQuestion, notifykind.PausedTicket}) {
+		t.Errorf("push = %v", got.Push.KindIDs())
+	}
+	if !slices.Equal(got.Desktop.KindIDs(), []string{notifykind.SessionAlert, notifykind.DesignQuestion}) || len(got.WebToast.KindIDs()) != 0 {
+		t.Errorf("desktop = %v, web-toast = %v", got.Desktop.KindIDs(), got.WebToast.KindIDs())
+	}
+	if len(got.Telegram.KindIDs()) != 15 || len(got.Slack.KindIDs()) != 15 {
+		t.Errorf("telegram = %v, slack = %v", got.Telegram.KindIDs(), got.Slack.KindIDs())
 	}
 }
 
