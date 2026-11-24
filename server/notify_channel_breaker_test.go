@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -83,9 +84,9 @@ func TestChannelBreaker_DesktopFloodLeavesPushAndSlackSending(t *testing.T) {
 	for i := range 25 {
 		r.desktop(i)
 	}
-	// 19 banners, then the trip notice, then nothing more.
-	if got := r.banners.n.Load(); got != 20 {
-		t.Fatalf("banners = %d, want 19 plus one notice", got)
+	// 20 banners, then the trip notice, then nothing more.
+	if got := r.banners.n.Load(); got != 21 {
+		t.Fatalf("banners = %d, want 20 plus one notice", got)
 	}
 	if ts := r.series(t, "desktop"); !ts.Muted || len(ts.Trips) != 1 {
 		t.Fatalf("desktop state = %+v", ts)
@@ -150,23 +151,35 @@ func TestChannelBreaker_ClearsWithTheShortKnob(t *testing.T) {
 	t.Parallel()
 	const clear = 300 * time.Millisecond
 	r := newBreakerRig(t, time.Now, func(c *Config) { c.ChannelBreakerClear = clear })
-	for i := range 21 {
+	for i := range 22 {
 		r.desktop(i)
 	}
-	if got := r.banners.n.Load(); got != 20 {
-		t.Fatalf("banners = %d, want 19 plus one notice", got)
+	if got := r.banners.n.Load(); got != 21 {
+		t.Fatalf("banners = %d, want 20 plus one notice", got)
 	}
 	// Attempts while tripped keep it tripped past one clear window.
 	for i := range 4 {
 		<-time.After(clear * 2 / 3)
 		r.desktop(100 + i)
 	}
-	if got := r.banners.n.Load(); got != 20 {
-		t.Fatalf("banners = %d while tripped, want 20", got)
+	if got := r.banners.n.Load(); got != 21 {
+		t.Fatalf("banners = %d while tripped, want 21", got)
 	}
 	<-time.After(clear + 50*time.Millisecond)
 	r.desktop(200)
-	if got := r.banners.n.Load(); got != 21 {
-		t.Fatalf("banners = %d after the quiet window, want 21", got)
+	if got := r.banners.n.Load(); got != 22 {
+		t.Fatalf("banners = %d after the quiet window, want 22", got)
+	}
+}
+
+func TestChannelBreaker_NoticeShowsTheConfiguredClearTime(t *testing.T) {
+	t.Parallel()
+	r := newBreakerRig(t, time.Now, func(c *Config) { c.ChannelBreakerClear = 90 * time.Second })
+	if got := breakerNotice(r.s, "Desktop"); !strings.Contains(got, "1m30s") || strings.Contains(got, "5 minutes") {
+		t.Fatalf("notice = %q, want the configured 1m30s", got)
+	}
+	d := newBreakerRig(t, time.Now)
+	if got := breakerNotice(d.s, "Desktop"); !strings.Contains(got, "5m0s") {
+		t.Fatalf("default notice = %q, want 5m0s", got)
 	}
 }

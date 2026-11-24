@@ -84,13 +84,14 @@ func newPush(s *Server, quiet func() bool) *webpush.Dispatcher {
 		Send:  sender.Send,
 		Badge: func() int { return liveBadge(s) },
 		On:    func() bool { return pushSwitchOn(s) },
-		Cap: func() (bool, bool) {
+		Cap: func(notice, send func()) {
 			if quiet() { // the sender drops it; a Rest period adds no attempt
-				return true, false
+				send()
+				return
 			}
-			return channelCap(s, notify.ChannelPush)
+			capped(s, notify.ChannelPush, notice, send)
 		},
-		Notice: webpush.Event{Title: "gx: Push paused", Body: breakerNotice("Push"), Path: "/", Tag: "notice:push-breaker"},
+		Notice: webpush.Event{Title: "gx: Push paused", Body: breakerNotice(s, "Push"), Path: "/", Tag: "notice:push-breaker"},
 		Merge:  s.cfg.PushMergeDelay,
 		Log:    s.log,
 	}

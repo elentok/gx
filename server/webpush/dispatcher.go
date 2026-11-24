@@ -35,10 +35,10 @@ type Dispatcher struct {
 	// On is the server-wide switch, asked after the merge hold so an event held
 	// while it goes off is dropped. Nil means on. TestPush ignores it.
 	On func() bool
-	// Cap is the send-rate cap, asked once per merged push as the last gate. It
-	// reports whether the push goes out and whether this call trips the breaker,
-	// in which case Notice goes out first, uncapped. Nil means no cap.
-	Cap    func() (send, trip bool)
+	// Cap is the send-rate cap, called once per merged push as the last gate. It
+	// runs notice (which delivers Notice, uncapped) on the call that trips the
+	// breaker and send when the push goes out. Nil means no cap.
+	Cap    func(notice, send func())
 	Notice Event
 	Merge  time.Duration // zero means one second
 	Log    *slog.Logger
@@ -139,13 +139,8 @@ func (d *Dispatcher) fanOut(ev Event) {
 		return
 	}
 	if d.Cap != nil {
-		send, trip := d.Cap()
-		if trip {
-			d.deliver(d.Notice)
-		}
-		if !send {
-			return
-		}
+		d.Cap(func() { d.deliver(d.Notice) }, func() { d.deliver(ev) })
+		return
 	}
 	d.deliver(ev)
 }

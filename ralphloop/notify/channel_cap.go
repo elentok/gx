@@ -2,6 +2,9 @@ package notify
 
 import "time"
 
+// DefaultChannelBreakerClear is the clear time a zero value stands for.
+const DefaultChannelBreakerClear = seriesRetention
+
 // ChannelCap counts one attempt on a Desktop, Web toast or Push channel and
 // says what the channel does with it. Call it last, after the switch, the kind
 // list and every other gate: only a notification that would be delivered is an
@@ -52,11 +55,14 @@ func applyChannelCap(state *NotificationState, channel string, now time.Time, cl
 	if ts.Muted && !ts.ChannelTripped(now, clear) {
 		ts.Muted, ts.TrippedAt, ts.Reason, ts.Sends = false, time.Time{}, "", nil
 	}
-	ts.Sends = append(trimSends(ts.Sends, now), NotificationSend{Time: now})
+	ts.Sends = trimSends(ts.Sends, now)
+	// Count before appending, like the Chat gate: the 21st send is the trip.
+	prior := countSendsInWindow(ts.Sends, now, globalWindow)
+	ts.Sends = append(ts.Sends, NotificationSend{Time: now})
 	if ts.Muted {
 		return false, false
 	}
-	if countSendsInWindow(ts.Sends, now, globalWindow) < globalThreshold {
+	if prior < globalThreshold {
 		return true, false
 	}
 	ts.Muted, ts.TrippedAt, ts.Reason = true, now, "auto-trip"

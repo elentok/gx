@@ -45,19 +45,16 @@ func (d *desktopAdapter) Show(n notify.DesktopNote) {
 		return
 	}
 	// The banner and its sound are one send, and the cap is the last gate.
-	send, trip := channelCap(d.s, notify.ChannelDesktop)
-	if trip {
-		d.notify(osnotify.Notification{Title: "gx: Desktop paused", Body: breakerNotice("Desktop"), Group: "gx-desktop-breaker"})
-	}
-	if !send {
-		return
-	}
-	if banner {
-		d.notify(note)
-	}
-	if sound {
-		d.s.cfg.Player.Play(context.Background(), cur.AgentsSounds, n.Sound)
-	}
+	capped(d.s, notify.ChannelDesktop, func() {
+		d.notify(osnotify.Notification{Title: "gx: Desktop paused", Body: breakerNotice(d.s, "Desktop"), Group: "gx-desktop-breaker"})
+	}, func() {
+		if banner {
+			d.notify(note)
+		}
+		if sound {
+			d.s.cfg.Player.Play(context.Background(), cur.AgentsSounds, n.Sound)
+		}
+	})
 }
 
 func (d *desktopAdapter) notify(note osnotify.Notification) {
@@ -106,13 +103,25 @@ func preflight(s *Server, name, kind string, system bool) string {
 	return notify.OutcomeSent
 }
 
-// channelCap counts one attempt on a channel against the shared state file.
-func channelCap(s *Server, channel string) (send, trip bool) {
-	return notify.ChannelCap(s.cfg.Chat.GateStatePath, channel, time.Now(), s.cfg.ChannelBreakerClear)
+// capped counts one attempt on a channel against the shared state file, as the
+// last gate. It runs notice on the call that trips the breaker (that call is
+// dropped too) and send when the attempt goes out.
+func capped(s *Server, channel string, notice, send func()) {
+	ok, trip := notify.ChannelCap(s.cfg.Chat.GateStatePath, channel, time.Now(), s.cfg.ChannelBreakerClear)
+	if trip {
+		notice()
+	}
+	if ok {
+		send()
+	}
 }
 
-func breakerNotice(channel string) string {
-	return channel + " sent too many notifications in a minute, so gx stops it until it has been quiet for 5 minutes."
+func breakerNotice(s *Server, channel string) string {
+	clear := s.cfg.ChannelBreakerClear
+	if clear == 0 {
+		clear = notify.DefaultChannelBreakerClear
+	}
+	return channel + " sent too many notifications in a minute, so gx stops it until it has been quiet for " + clear.String() + "."
 }
 
 // webToastAdapter is the Web toast channel of the router: the switch and the
@@ -127,12 +136,9 @@ func (w *webToastAdapter) Show(n notify.WebToastNote) {
 	if !channelAllows(w.s, notify.ChannelWebToast, n.Kind, n.System) {
 		return
 	}
-	send, trip := channelCap(w.s, notify.ChannelWebToast)
-	if trip {
-		w.s.events.PublishEvent(wire.Event{Type: wire.EventNotificationToast, Title: "gx: Web toast paused", Body: breakerNotice("Web toast"), Path: "/"})
-	}
-	if !send {
-		return
-	}
-	w.s.events.PublishEvent(wire.Event{Type: wire.EventNotificationToast, Title: n.Title, Body: n.Body, Path: n.Target.Path()})
+	capped(w.s, notify.ChannelWebToast, func() {
+		w.s.events.PublishEvent(wire.Event{Type: wire.EventNotificationToast, Title: "gx: Web toast paused", Body: breakerNotice(w.s, "Web toast"), Path: "/"})
+	}, func() {
+		w.s.events.PublishEvent(wire.Event{Type: wire.EventNotificationToast, Title: n.Title, Body: n.Body, Path: n.Target.Path()})
+	})
 }
