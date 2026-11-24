@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.51.15 - 2026-11-24
+
+- Added an entity action registry for the web UI. Every entity action is declared once and turned into ready actions with one hook. These surfaces now read it: sidebar row menus, ItemMenu, entity chords and the Chord box, page-header menus (ticket, epic, archived epic, Design, chat, Design draft and chat draft pages), the footer Start over / Cancel run / Remove buttons, the command palette (which lists the open entity's actions) and the Jump palette. Workspace-less availability and Hold's server-decided confirm also come from the registry. Old per-surface code was removed (`useSessionManage`, `useCardActions`, `planBulk`).
+- Added a menu in the top-right corner of every epic card and ticket card. Every sidebar row reserves a slot for its menu, queue agent rows included. Design draft and chat draft pages get the registry menu and a footer Remove popover. The chat page menu adds Move to workspace. The `w` chord opens a workspace picker, and Stop shows on a Design sidebar row and card when exactly one session is live.
+- Added one shared confirm host (popover or modal) with parts, focus handling and `y` / `n` keys. Confirms take an explicit anchor, accept a reason PromptBox, stay open on refusal, and fit a phone (8px inset, flip, bottom-dialog fallback). The bulk bar reads the registry bulk rules and confirms in one popover on the clicked button. Chat drafts join bulk Remove.
+- Changed Rename on a chat draft row to save the name through the chat draft client.
+- Fixed phone layout details: the Design page Start button moves to the meta bar below the wide breakpoint so the ⋯ stays on the title line, and the chat draft title ends in an ellipsis at 360px.
+- Added a mock workflow (MOCK.md and a gx folder guide) with a standard variant switcher snippet, a dev-only PrototypeSwitcher, a generated gx token file and Chakra base layer, generated inlined `fonts.css` with a drift test, and a `mocklint` helper for stored mocks. The gx save script ships for in-app routes. It keeps `var()` shorthands and inlines img sources as data URIs. The switcher label shows the variant key. UI.md, SKILL.md and the gx-design rubric now point to MOCK.md.
+- Changed docs: wrote and reviewed the better-actions and better-mocks specs, and added Entity to the glossary.
+- Fixed flaky Go tests: notification and push tests no longer fail during the bedtime window (they use a fixed noon Rest clock), and the epic card launch-step test touches the ticket where the index watches it.
+- Changed tests and housekeeping: e2e flows (3, 76, 126, 203, 209 and the phone and modes flows) follow the new popovers and confirms, the ArchiveDetail page-menu query is scoped to the page header, `cleanscript.sh` is formatted, gx-design rule tests are merged into subtests to fit the size guard, and the switcher CSS moves to an exempt file so the raw-style guard passes.
+
 ## v0.51.14 - 2026-11-24
 
 - Added delivery-failure cards for prompts gx could not send: a yellow "May not have been sent" card, a red "Send failed" card and a red Unknown command card with Resend and Restart agent. All three have Dismiss (`gx agents dismiss <id>`), which clears the card for every tab and the TUI.
