@@ -25,7 +25,7 @@ const BUTTON_LOOK = {
   h: "29px",
   borderRadius: "6px",
   fontWeight: "400",
-  _focusVisible: { outline: "2px solid", outlineColor: "tone.running.fg", outlineOffset: "1px" },
+  _focus: { outline: "2px solid", outlineColor: "tone.running.fg", outlineOffset: "1px" },
 } as const
 
 const ids = new WeakMap<ConfirmRequest, number>()
@@ -227,6 +227,7 @@ function ConfirmCard({
       display="flex"
       flexDirection="column"
       gap="10px"
+      lineHeight="normal"
     >
       <Box display="flex" flexDirection="column" gap="1">
         <Text fontWeight="700" fontSize="14px" data-part="title">
@@ -268,8 +269,9 @@ function ConfirmCard({
               size="sm"
               borderRadius="6px"
               p="6px"
-              bg="surface"
+              bg="surface.raised"
               borderColor="border"
+              minH="0"
             />
           )}
         </Box>
