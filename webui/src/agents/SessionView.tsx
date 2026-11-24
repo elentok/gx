@@ -1,4 +1,4 @@
-import { Box, Link, Text } from "@chakra-ui/react"
+import { Box, Link, Spinner, Text } from "@chakra-ui/react"
 import { useEffect, useState, type ComponentProps } from "react"
 import { useNavigate } from "react-router"
 import { useConnectionContext, useConnectionState } from "../connection"
@@ -203,7 +203,7 @@ export function SessionView({
   const chatty = hasChat(session.harness)
   const { kind, locked, unlock } = useComposerUnlock(session)
   const [confirming, setConfirming] = useState(false)
-  const { detail: chat, refetch } = useSessionChat(chatty ? session.id : undefined, conn, fetchChat)
+  const { detail: chat, notFound, refetch } = useSessionChat(chatty ? session.id : undefined, conn, fetchChat)
   // Prompts the server took that the transcript has not shown yet; each leaves once the chat has one more copy of its text.
   // Each sits right after the message that was last when it was sent, so replies that stream in land below it.
   const [echoed, setEchoed] = useState<
@@ -256,7 +256,22 @@ export function SessionView({
         </Text>
       )}
       {chatty ? (
-        shown && <AgentChat session={session} chat={shown} refetch={refetch} />
+        shown ? (
+          <AgentChat session={session} chat={shown} refetch={refetch} />
+        ) : (
+          // Fills the chat area while it loads, so the composer stays at the bottom instead of jumping down.
+          <Box
+            flex="1"
+            minH="0"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            role={notFound ? undefined : "progressbar"}
+            aria-label={notFound ? undefined : "Loading chat"}
+          >
+            {!notFound && <Spinner size="xl" borderWidth="3px" color="tone.muted.fg" />}
+          </Box>
+        )
       ) : (
         <>
           <NoChat session={session} fetchScreen={fetchScreen} />
