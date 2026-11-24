@@ -66,9 +66,19 @@ func (w *Writer) Read(t Target, pendingRestart []string) (ops.SettingsReadRespon
 	}
 	resp.Categories = buildTree(entries)
 	resp.Redirects = registry.RetiredSlugs()
-	resp.NotificationKinds = []ops.NotificationKind{}
-	for _, k := range notifykind.All() {
-		resp.NotificationKinds = append(resp.NotificationKinds, ops.NotificationKind{ID: k.ID, Name: k.Name, Hint: k.Hint, Default: k.Default})
+	if t.Project == "" {
+		resp.NotificationKinds = []ops.NotificationKind{}
+		for _, k := range notifykind.All() {
+			resp.NotificationKinds = append(resp.NotificationKinds, ops.NotificationKind{ID: k.ID, Name: k.Name, Hint: k.Hint, Default: k.Default})
+		}
+		resp.NotificationChannels = []ops.NotificationChannel{}
+		for _, c := range notifykind.Channels() {
+			resp.NotificationChannels = append(resp.NotificationChannels, ops.NotificationChannel{
+				ID: c.ID, Label: c.Label,
+				SwitchKey: "notification-channels." + c.ID + ".enabled",
+				ListKey:   "notification-channels." + c.ID + ".kinds",
+			})
+		}
 	}
 	return resp, nil
 }

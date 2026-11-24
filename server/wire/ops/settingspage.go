@@ -22,8 +22,20 @@ type SettingsReadResponse struct {
 	// Redirects maps a retired section slug to the slug that now holds its keys.
 	Redirects map[string]string `json:"redirects"`
 	// NotificationKinds is the notification catalog in row order. The page
-	// reads it here, never from a copy in TypeScript.
+	// reads it here, never from a copy in TypeScript. Only the global read
+	// carries it (and NotificationChannels): a project may not set the lists.
 	NotificationKinds []NotificationKind `json:"notification_kinds"`
+	// NotificationChannels are the five channels in display order.
+	NotificationChannels []NotificationChannel `json:"notification_channels"`
+}
+
+// NotificationChannel is one channel with the config keys of its switch and
+// kind list.
+type NotificationChannel struct {
+	ID        string `json:"id"`
+	Label     string `json:"label"`
+	SwitchKey string `json:"switch_key"`
+	ListKey   string `json:"list_key"`
 }
 
 // NotificationKind is one row of the notification catalog.

@@ -165,6 +165,9 @@ func TestTreeOrderAndModelsTables(t *testing.T) {
 		t.Fatalf("categories = %v, want %v", cats, want)
 	}
 	for _, c := range Tree() {
+		if c.Name == CategoryNotifications && c.Sections[0].Name != SectionNotifications {
+			t.Errorf("first Notifications section = %s, want %s", c.Sections[0].Name, SectionNotifications)
+		}
 		for _, s := range c.Sections {
 			for _, g := range s.Groups {
 				if isTable := s.Name == SectionModels; g.Table != isTable {
@@ -219,15 +222,16 @@ func TestPlacementPinsTable(t *testing.T) {
 	pin("Ralph loop/Pull requests/Waiting", "pr.no-checks-grace")
 	pin("Ralph loop/Evolve and recovery/Evolve", "evolve", "project.evolve")
 	pin("Ralph loop/Evolve and recovery/Recovery", "recovery.enabled", "recovery.disabled", "recovery.follow-ups", "recovery.notify-hold")
-	pin("Notifications/Desktop/Desktop", "agents.banners.enabled", "agents.sounds.enabled", "agents.sounds.done", "agents.sounds.attention",
-		"notification-channels.desktop.enabled", "notification-channels.desktop.kinds")
-	pin("Notifications/Web toast/Web toast", "notification-channels.web-toast.enabled", "notification-channels.web-toast.kinds")
-	pin("Notifications/Telegram/Telegram", "notifications.telegram.bot-token", "notifications.telegram.chat-id",
-		"notification-channels.telegram.enabled", "notification-channels.telegram.kinds")
-	pin("Notifications/Slack/Slack", "notifications.slack.webhook-url",
-		"notification-channels.slack.enabled", "notification-channels.slack.kinds")
-	pin("Notifications/Push/Push", "server.web.push-contact-email",
+	pin("Notifications/Notifications/Notifications",
+		"notification-channels.desktop.enabled", "notification-channels.desktop.kinds",
+		"notification-channels.web-toast.enabled", "notification-channels.web-toast.kinds",
+		"notification-channels.telegram.enabled", "notification-channels.telegram.kinds",
+		"notification-channels.slack.enabled", "notification-channels.slack.kinds",
 		"notification-channels.push.enabled", "notification-channels.push.kinds")
+	pin("Notifications/Desktop/Desktop", "agents.banners.enabled", "agents.sounds.enabled", "agents.sounds.done", "agents.sounds.attention")
+	pin("Notifications/Telegram/Telegram", "notifications.telegram.bot-token", "notifications.telegram.chat-id")
+	pin("Notifications/Slack/Slack", "notifications.slack.webhook-url")
+	pin("Notifications/Push/Push", "server.web.push-contact-email")
 	pin("Web UI/Access/Network", "server.web.listen", "server.web.allowed-hosts", "server.web.files.roots")
 	pin("Web UI/Access/Sign-in", "server.web.totp")
 	pin("Web UI/Keybindings/Leader key", "server.web.leader-key-mac", "server.web.leader-key")

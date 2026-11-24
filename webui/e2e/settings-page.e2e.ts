@@ -123,7 +123,7 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   expect(reset["execution-queue"]["max-released-agents"]).toBe(5)
 
   // Secrets: the read response and the page carry the state, never the value.
-  await go(page, globalHash("notifications"), "Notifications")
+  await go(page, globalHash("desktop"), "Desktop")
   // Banners and sounds sit in the Desktop group.
   const desktop = page.getByTestId("group-Desktop")
   await expect(desktop.getByRole("switch", { name: "OS banners" })).toBeVisible()
@@ -132,8 +132,10 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   expect(body).toContain("notifications.slack.webhook-url")
   expect(body).not.toContain("fixture-bot-token")
   expect(await page.content()).not.toContain("fixture-bot-token")
+  await go(page, globalHash("telegram"), "Telegram")
   const setChips = page.locator("span[data-tone]").filter({ hasText: /^Set$/ })
   await expect(setChips).toHaveCount(1)
+  await go(page, globalHash("slack"), "Slack")
   await expect(page.getByTestId("group-Slack").getByText("Not set", { exact: true })).toBeVisible()
   await page.getByTestId("group-Slack").getByRole("button", { name: "Set", exact: true }).click()
   await page.getByLabel("New Slack webhook URL").fill("https://hooks.slack.example/secret-webhook")
@@ -143,6 +145,57 @@ test("200. Settings page, global journey", async ({ page, start }) => {
   expect(JSON.stringify(await fixture.globalConfig())).toContain("secret-webhook")
   const reread = await page.evaluate(async () => (await fetch("/v1/settings?target=global")).text())
   expect(reread).not.toContain("secret-webhook")
+
+  // Notifications: the strip and the kind rows at 900 px.
+  await page.setViewportSize({ width: 900, height: 900 })
+  await go(page, globalHash("notifications"), "Notifications")
+  const strip = page.locator('[data-mock-part="channel-switches"]')
+  await expect(strip.getByRole("switch")).toHaveCount(5)
+  await expect(page.locator('[data-testid^="kind-row-"]')).toHaveCount(16)
+  // One chip changes one cell: the whole list for that channel is written, then written back.
+  const slackKinds = async () =>
+    (await fixture.globalConfig())["notification-channels"]?.slack?.kinds
+  const chip = page
+    .getByTestId("kind-row-long-ticket")
+    .getByRole("button", { name: "Long ticket on Slack" })
+  await expect(chip).toHaveAttribute("aria-pressed", "false")
+  await chip.click()
+  await expect.poll(async () => (await slackKinds())?.includes("long-ticket")).toBe(true)
+  await expect(chip).toHaveAttribute("aria-pressed", "true")
+  await chip.click()
+  await expect.poll(async () => (await slackKinds())?.includes("long-ticket")).toBe(false)
+  // A channel that is switched off keeps its token, chat id and checked kinds; its chips dim.
+  await strip.getByRole("switch", { name: "Telegram", exact: true }).click()
+  await expect(strip.getByRole("switch", { name: "Telegram", exact: true })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  )
+  await expect
+    .poll(async () => (await fixture.globalConfig())["notification-channels"]?.telegram?.enabled)
+    .toBe(false)
+  const telegram = (await fixture.globalConfig()).notifications.telegram
+  expect(telegram["bot-token"]).toBeTruthy()
+  expect(telegram["chat-id"]).toBe("12345")
+  await expect(
+    page.getByTestId("kind-row-session-alert").getByRole("button", { name: /on Telegram$/ }),
+  ).toHaveCSS("opacity", "0.4")
+  await go(page, globalHash("telegram"), "Telegram")
+  await expect(page.getByText("Set", { exact: true })).toBeVisible()
+  await go(page, globalHash("notifications"), "Notifications")
+  await strip.getByRole("switch", { name: "Telegram", exact: true }).click()
+  await expect
+    .poll(async () => (await fixture.globalConfig())["notification-channels"]?.telegram?.enabled)
+    .toBe(true)
+  // A hand-typed list that names no catalog kind is refused in the search results and config.json stays.
+  const beforeBogus = JSON.stringify(await fixture.globalConfig())
+  await page
+    .getByRole("textbox", { name: "Search settings" })
+    .fill("notification-channels.slack.kinds")
+  await page.getByLabel("Add to Kinds").fill("bogus")
+  await page.getByRole("button", { name: "Add", exact: true }).click()
+  await expect(page.getByRole("alert").filter({ hasText: "Not saved:" })).toBeVisible()
+  expect(JSON.stringify(await fixture.globalConfig())).toBe(beforeBogus)
+  await page.getByRole("textbox", { name: "Search settings" }).fill("")
 
   // A startup-only key says it needs a restart.
   await go(page, globalHash("agents"), "Agents")

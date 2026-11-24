@@ -1,7 +1,13 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { Fragment, useState, type ReactNode } from "react"
 import { Link } from "react-router"
-import type { SettingsCategory, SettingsEntry } from "../generated/server"
+import type {
+  NotificationChannel,
+  NotificationKind,
+  SettingsCategory,
+  SettingsEntry,
+} from "../generated/server"
+import { NotificationsOverview } from "./NotificationsOverview"
 import { aliasNote, useClaudeAliases } from "./aliasNote"
 import { SETTINGS_HREF } from "../hrefs"
 import { PageHeader } from "../page/PageHeader"
@@ -20,6 +26,7 @@ import { ModelsTable } from "./ModelsTable"
 import { CHECKS_KEY } from "./checks"
 
 const MODELS_SECTION = "Models"
+const NOTIFICATIONS_SECTION = "Notifications"
 
 export const projectPath = (project: string) => `/settings/p/${encodeURIComponent(project)}`
 
@@ -62,6 +69,9 @@ export interface ShellProps {
   onWrite: WriteSetting
   /** The project's repo holds .gx/checks.json, which wins over its checks setting. */
   repoChecksFile?: boolean
+  /** The catalog from the global read; the Notifications section draws its rows from it. */
+  notificationKinds?: NotificationKind[]
+  notificationChannels?: NotificationChannel[]
 }
 
 const ACCOUNT = "Account"
@@ -349,7 +359,14 @@ const PUSH_SECTION = "Push"
 
 type SectionBodyProps = Pick<
   ShellProps,
-  "entries" | "categories" | "project" | "pendingRestart" | "onWrite" | "repoChecksFile"
+  | "entries"
+  | "categories"
+  | "project"
+  | "pendingRestart"
+  | "onWrite"
+  | "repoChecksFile"
+  | "notificationKinds"
+  | "notificationChannels"
 > & { section: string }
 
 /** The section's entries split by group: the response's group order, then any group the tree does not name. A group with no entry is absent. */
@@ -377,6 +394,16 @@ function ModelsSectionBody(props: SectionBodyProps) {
 
 /** One section's titled group blocks, or the Checks editor. Shared by the sidebar shell and the phone page. */
 export function SectionBody(props: SectionBodyProps) {
+  if (props.section === NOTIFICATIONS_SECTION && props.project === undefined) {
+    return (
+      <NotificationsOverview
+        entries={props.entries}
+        kinds={props.notificationKinds ?? []}
+        channels={props.notificationChannels ?? []}
+        onWrite={props.onWrite}
+      />
+    )
+  }
   return props.section === MODELS_SECTION ? (
     <ModelsSectionBody {...props} />
   ) : (
@@ -453,9 +480,7 @@ function SectionRows({
                 ),
               )
             )}
-            {project === undefined && section === PUSH_SECTION && (
-              <PushDevicePanel />
-            )}
+            {project === undefined && section === PUSH_SECTION && <PushDevicePanel />}
           </GroupBlock>
         ),
       )}

@@ -109,7 +109,7 @@ export function TextControl({
   )
 }
 
-function BoolControl({ entry, draft, pending, locked, save }: ControlProps) {
+export function BoolControl({ entry, draft, pending, locked, save }: ControlProps) {
   const on = draft === "true"
   return (
     <chakra.button

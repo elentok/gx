@@ -13,6 +13,7 @@ import {
   WebLoginPage,
   WebLoginsView,
 } from "./SettingsPage"
+import { SettingsRow } from "./SettingsRow"
 import { SettingsShellView } from "./SettingsShell"
 import { treeFromEntries } from "../test-utils/settingsTree"
 import type { SettingsEntry } from "../generated/server"
@@ -91,6 +92,7 @@ describe("SettingsPage project scope", () => {
       categories: treeFromEntries(entries),
       redirects: {},
       notification_kinds: [],
+      notification_channels: [],
     }))
     expect(await findByRole("heading", { name: "Project" })).toBeTruthy()
   })
@@ -177,6 +179,7 @@ describe("SettingsPage project scope", () => {
         categories: treeFromEntries(entries),
         redirects: {},
         notification_kinds: [],
+        notification_channels: [],
       })
       const project = renderAt("/settings/p/gx/s/project", fetchSettings)
       expect(await project.findByRole("heading", { name: "Project" })).toBeTruthy()
@@ -865,5 +868,185 @@ describe("section page group blocks", () => {
     )
     expect(getByTestId("group-Repository").textContent).toContain("read-only")
     expect(getByTestId("group-Delivery")).toBeTruthy()
+  })
+})
+
+describe("Notifications section: channel switches and kind rows", () => {
+  const auth = async () => ({ totp_on: false, setup_code_required: false }) as never
+  const conn = {
+    getState: () => "open",
+    subscribe: () => () => {},
+    onEvent: () => () => {},
+  } as unknown as Connection
+  const CHANNELS = [
+    ["desktop", "Desktop"],
+    ["web-toast", "Web toast"],
+    ["telegram", "Telegram"],
+    ["slack", "Slack"],
+    ["push", "Push"],
+  ] as const
+  const kinds = [
+    ...Array.from({ length: 10 }, (_, i) => ({
+      id: `kind-${i}`,
+      name: `Kind ${i}`,
+      hint: i === 0 ? "A hint" : "",
+      default: true,
+    })),
+    { id: "long-ticket", name: "Long ticket", hint: "many turns", default: false },
+    ...Array.from({ length: 5 }, (_, i) => ({
+      id: `kind-${10 + i}`,
+      name: `Kind ${10 + i}`,
+      hint: "",
+      default: true,
+    })),
+  ]
+  const defaults = kinds.filter((k) => k.default).map((k) => k.id)
+  const entry = (key: string, type: string, def: unknown): SettingsEntry => ({
+    key,
+    path: key.split("."),
+    type,
+    section: "Notifications",
+    category: "Notifications",
+    group: "Notifications",
+    description: "d",
+    set: false,
+    default: def,
+  })
+  const snapshot = (over: Record<string, unknown> = {}) => {
+    const entries = CHANNELS.flatMap(([id]) => [
+      entry(`notification-channels.${id}.enabled`, "bool", over[`${id}.enabled`] ?? true),
+      entry(`notification-channels.${id}.kinds`, "string-list", over[`${id}.kinds`] ?? defaults),
+    ])
+    return {
+      entries,
+      categories: treeFromEntries(entries),
+      redirects: {},
+      notification_kinds: kinds,
+      notification_channels: CHANNELS.map(([id, label]) => ({
+        id,
+        label,
+        switch_key: `notification-channels.${id}.enabled`,
+        list_key: `notification-channels.${id}.kinds`,
+      })),
+    } as never
+  }
+  const renderPage = (
+    over: Record<string, unknown> = {},
+    postChanges = vi.fn(async () => ({}) as never),
+  ) => {
+    const view = renderThemed(
+      <ConnectionContext.Provider value={conn}>
+        <MemoryRouter initialEntries={["/settings/s/notifications"]}>
+          <Routes>
+            <Route
+              path="/settings/s/:section"
+              element={
+                <SettingsPage
+                  fetchAuth={auth}
+                  fetchSettings={async () => snapshot(over)}
+                  postChanges={postChanges}
+                />
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      </ConnectionContext.Provider>,
+    )
+    return { ...view, postChanges }
+  }
+
+  it("shows five switches in order, and 16 rows with five chips each", async () => {
+    const { findByTestId, getByTestId, getAllByRole, queryAllByTestId, container } = renderPage()
+    await findByTestId("channel-switch-desktop")
+    const strip = container.querySelector('[data-mock-part="channel-switches"]') as HTMLElement
+    expect(
+      within(strip)
+        .getAllByRole("switch")
+        .map((s) => s.getAttribute("aria-label")),
+    ).toEqual(CHANNELS.map(([, label]) => label))
+    const rows = container.querySelector('[data-mock-part="kind-rows"]') as HTMLElement
+    expect(rows.querySelectorAll('[data-testid^="kind-row-"]')).toHaveLength(16)
+    const row = getByTestId("kind-row-kind-0")
+    expect(
+      within(row)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(CHANNELS.map(([, label]) => label))
+    expect(getAllByRole("switch")).toHaveLength(5)
+    // The ten keys are not drawn a second time as generic rows.
+    expect(queryAllByTestId("group-Notifications")).toHaveLength(0)
+  })
+
+  it("presses a chip when the kind is in the channel's list; Long ticket is off everywhere", async () => {
+    const { findByTestId } = renderPage({ "slack.kinds": ["kind-0"] })
+    const long = await findByTestId("kind-row-long-ticket")
+    for (const b of within(long).getAllByRole("button"))
+      expect(b.getAttribute("aria-pressed")).toBe("false")
+    const first = within(await findByTestId("kind-row-kind-0")).getAllByRole("button")
+    expect(first.map((b) => b.getAttribute("aria-pressed"))).toEqual([
+      "true",
+      "true",
+      "true",
+      "true",
+      "true",
+    ])
+    const second = within(await findByTestId("kind-row-kind-1")).getAllByRole("button")
+    expect(second.map((b) => b.getAttribute("aria-pressed"))).toEqual([
+      "true",
+      "true",
+      "true",
+      "false",
+      "true",
+    ])
+  })
+
+  it("a chip click writes the whole list for that channel", async () => {
+    const { findByTestId, postChanges } = renderPage()
+    const chip = within(await findByTestId("kind-row-long-ticket")).getByRole("button", {
+      name: "Long ticket on Telegram",
+    })
+    fireEvent.click(chip)
+    await waitFor(() => expect(postChanges).toHaveBeenCalled())
+    expect(postChanges).toHaveBeenCalledWith("global", [
+      {
+        key: "notification-channels.telegram.kinds",
+        value: [...defaults.slice(0, 10), "long-ticket", ...defaults.slice(10)],
+      },
+    ])
+  })
+
+  it("shows the reason of a refused write", async () => {
+    const postChanges = vi.fn(async () => ({ refused: true, reason: "no good" }) as never)
+    const { findByTestId, findByRole } = renderPage({}, postChanges)
+    fireEvent.click(
+      within(await findByTestId("kind-row-kind-0")).getByRole("button", { name: "Kind 0 on Push" }),
+    )
+    expect((await findByRole("alert")).textContent).toBe("Not saved: no good")
+  })
+
+  it("dims a channel that is off and keeps its chips checked and clickable", async () => {
+    const { findByTestId, postChanges } = renderPage({ "telegram.enabled": false })
+    const strip = await findByTestId("channel-switch-telegram")
+    expect(within(strip).getByRole("switch").getAttribute("aria-checked")).toBe("false")
+    const chip = within(await findByTestId("kind-row-kind-0")).getByRole("button", {
+      name: "Kind 0 on Telegram",
+    })
+    expect(chip.getAttribute("aria-pressed")).toBe("true")
+    expect(getComputedStyle(chip).opacity).toBe("0.4")
+    fireEvent.click(chip)
+    await waitFor(() => expect(postChanges).toHaveBeenCalled())
+  })
+
+  it("draws the strip switch with BoolControl, the switch of a bool row", async () => {
+    const { findByTestId } = renderPage()
+    const strip = within(await findByTestId("channel-switch-desktop")).getByRole("switch")
+    const row = renderThemed(
+      <SettingsRow
+        entry={entry("a.b", "bool", true)}
+        pendingRestart={false}
+        onWrite={async () => ({})}
+      />,
+    )
+    expect(strip.className).toBe(within(row.container).getByRole("switch").className)
   })
 })

@@ -148,11 +148,35 @@ func TestReadGlobalListsTheNotificationCatalog(t *testing.T) {
 	if !slices.Equal(ids, notifykind.IDs()) {
 		t.Errorf("kinds = %v, want the catalog in row order", ids)
 	}
-	for _, ch := range []string{"desktop", "web-toast", "telegram", "slack", "push"} {
-		if e := entryByKey(t, resp, "notification-channels."+ch+".kinds"); !slices.Equal(e.Enum, ids) {
-			t.Errorf("%s kinds Enum = %v", ch, e.Enum)
+	var chans []string
+	for _, c := range resp.NotificationChannels {
+		chans = append(chans, c.ID+"|"+c.Label+"|"+c.SwitchKey+"|"+c.ListKey)
+		if e := entryByKey(t, resp, c.ListKey); !slices.Equal(e.Enum, ids) {
+			t.Errorf("%s kinds Enum = %v", c.ID, e.Enum)
 		}
-		entryByKey(t, resp, "notification-channels."+ch+".enabled")
+		entryByKey(t, resp, c.SwitchKey)
+	}
+	wantChans := []string{
+		"desktop|Desktop|notification-channels.desktop.enabled|notification-channels.desktop.kinds",
+		"web-toast|Web toast|notification-channels.web-toast.enabled|notification-channels.web-toast.kinds",
+		"telegram|Telegram|notification-channels.telegram.enabled|notification-channels.telegram.kinds",
+		"slack|Slack|notification-channels.slack.enabled|notification-channels.slack.kinds",
+		"push|Push|notification-channels.push.enabled|notification-channels.push.kinds",
+	}
+	if !slices.Equal(chans, wantChans) {
+		t.Errorf("channels = %v, want %v", chans, wantChans)
+	}
+}
+
+func TestReadProjectCarriesNoNotificationCatalog(t *testing.T) {
+	t.Parallel()
+	w, _ := readFixture(t, `{}`, `{"name":"proj","repo":"REPO"}`)
+	resp, err := w.Read(Target{Project: "proj"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.NotificationKinds) != 0 || len(resp.NotificationChannels) != 0 {
+		t.Errorf("project read carries kinds %d, channels %d", len(resp.NotificationKinds), len(resp.NotificationChannels))
 	}
 }
 

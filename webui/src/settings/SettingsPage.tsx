@@ -524,6 +524,8 @@ function SectionPage({
               section={section}
               pendingRestart={settings.data.pending_restart}
               repoChecksFile={settings.data.project?.repo_checks_file}
+              notificationKinds={settings.data.notification_kinds}
+              notificationChannels={settings.data.notification_channels}
               onWrite={onWrite}
             />
           </Box>
@@ -574,6 +576,8 @@ function ShellPage({
           onSignOut={() => void signOut()}
           pendingRestart={settings.data.pending_restart}
           repoChecksFile={settings.data.project?.repo_checks_file}
+          notificationKinds={settings.data.notification_kinds}
+          notificationChannels={settings.data.notification_channels}
           onWrite={onWrite}
         />
       ) : (

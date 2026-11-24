@@ -79,20 +79,12 @@ func coreEntries() []Entry {
 	add(Place{CategoryNotifications, SectionPush, "Push"}, Entry{Key: Key("server", "web", "push-contact-email"), Type: TypeSecret, CheckString: checkContactEmail,
 		Description: "The email address web push sends to the push service as its contact. Needed before the browser can turn on push. Empty turns web push off."})
 
-	for _, ch := range []struct {
-		key, name string
-		place     Place
-	}{
-		{"desktop", "Desktop", desktop},
-		{"web-toast", "Web toast", Place{CategoryNotifications, SectionWebToast, "Web toast"}},
-		{"telegram", "Telegram", telegram},
-		{"slack", "Slack", Place{CategoryNotifications, SectionSlack, "Slack"}},
-		{"push", "Push", Place{CategoryNotifications, SectionPush, "Push"}},
-	} {
-		add(ch.place, Entry{Key: Key("notification-channels", ch.key, "enabled"), Type: TypeBool,
-			Description: "Send " + ch.name + " notifications. Off sends none, whatever the kind list says."})
-		add(ch.place, Entry{Key: Key("notification-channels", ch.key, "kinds"), Type: TypeStringList, Enum: notifykind.IDs(),
-			Description: "The kinds of notification sent to " + ch.name + ", as catalog ids."})
+	overview := Place{CategoryNotifications, SectionNotifications, "Notifications"}
+	for _, ch := range notifykind.Channels() {
+		add(overview, Entry{Key: Key("notification-channels", ch.ID, "enabled"), Type: TypeBool,
+			Description: "Send " + ch.Label + " notifications. Off sends none, whatever the kind list says."})
+		add(overview, Entry{Key: Key("notification-channels", ch.ID, "kinds"), Type: TypeStringList, Enum: notifykind.IDs(),
+			Description: "The kinds of notification sent to " + ch.Label + ", as catalog ids."})
 	}
 
 	mh := func(g string) Place { return Place{CategoryMentalHealth, SectionMentalHealth, g} }

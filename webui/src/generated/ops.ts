@@ -940,9 +940,24 @@ export interface SettingsReadResponse {
   redirects: { [key: string]: string};
   /**
    * NotificationKinds is the notification catalog in row order. The page
-   * reads it here, never from a copy in TypeScript.
+   * reads it here, never from a copy in TypeScript. Only the global read
+   * carries it (and NotificationChannels): a project may not set the lists.
    */
   notification_kinds: NotificationKind[];
+  /**
+   * NotificationChannels are the five channels in display order.
+   */
+  notification_channels: NotificationChannel[];
+}
+/**
+ * NotificationChannel is one channel with the config keys of its switch and
+ * kind list.
+ */
+export interface NotificationChannel {
+  id: string;
+  label: string;
+  switch_key: string;
+  list_key: string;
 }
 /**
  * NotificationKind is one row of the notification catalog.
