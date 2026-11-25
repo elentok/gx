@@ -64,6 +64,8 @@ export function useDetail<T>(
   watchPrefix?: string,
   // Names the sessionStorage entry that repaints this page after a reload.
   cacheKey?: string,
+  // Also stale on an event this accepts, for a page whose key is not the event's address.
+  accepts?: (address: string | undefined, type: string, data: Record<string, unknown>) => boolean,
 ): DetailState<T> {
   const [state, setState] = useState<{
     address: string
@@ -100,8 +102,13 @@ export function useDetail<T>(
 
   useEffect(() => {
     refetch()
-    const off = conn.onEvent((a, type) => {
-      if (type === RESYNC_EVENT || a === address || (watchPrefix && a?.startsWith(watchPrefix)))
+    const off = conn.onEvent((a, type, data) => {
+      if (
+        type === RESYNC_EVENT ||
+        a === address ||
+        (watchPrefix && a?.startsWith(watchPrefix)) ||
+        accepts?.(a, type, data)
+      )
         refetch()
     })
     // Events sent while the stream was down never reach `onEvent`, so a reopened stream refetches.
@@ -117,7 +124,7 @@ export function useDetail<T>(
       offState()
       latest.current++
     }
-  }, [address, conn, refetch, watchPrefix])
+  }, [address, conn, refetch, watchPrefix, accepts])
 
   // Another ticket's detail must never show under this address while it loads.
   const mine = state.address === address

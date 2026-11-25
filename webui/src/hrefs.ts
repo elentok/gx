@@ -66,5 +66,13 @@ export const agentHref = (label: string) => `${AGENTS_HREF}/${label}`
 export const subagentHref = (session: string, callId: string) =>
   `${agentHref(encodeURIComponent(session))}/subagents/${encodeURIComponent(callId)}`
 
+/** Splits the splat of `/agents/*` (already decoded by the router) into the session id and an optional subagent call id. */
+export const parseAgentSplat = (splat: string): { session: string; callId?: string } => {
+  const at = splat.indexOf("/subagents/")
+  if (at < 0) return { session: splat }
+  const callId = splat.slice(at + "/subagents/".length)
+  return callId ? { session: splat.slice(0, at), callId } : { session: splat.slice(0, at) }
+}
+
 /** The router path of an agent's page, for navigate(). */
 export const agentPath = (label: string) => agentHref(label).slice(1)

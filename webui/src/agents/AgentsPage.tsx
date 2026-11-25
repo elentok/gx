@@ -12,7 +12,11 @@ import { Button } from "../ui/button/Button"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { useReadyWhen } from "../useReady"
 import { useWide } from "../useWide"
+import { parseAgentSplat } from "../hrefs"
 import { SessionView } from "./SessionView"
+import { SubagentView } from "./SubagentView"
+import type { PostSubagentWatch } from "./subagentWatch"
+import type { FetchSubagentChat } from "./useSubagentChat"
 
 import { readLast, writeLast } from "./lastAgent"
 
@@ -67,11 +71,16 @@ function EmptyState({ empty, onNew }: { empty: boolean; onNew: () => void }) {
 export function AgentsPage({
   fetchChat,
   fetchScreen,
+  fetchSubagentChat,
+  postSubagentWatch,
 }: {
   fetchChat?: FetchChat
   fetchScreen?: FetchScreen
+  fetchSubagentChat?: FetchSubagentChat
+  postSubagentWatch?: PostSubagentWatch
 }) {
-  const selected = useParams()["*"] || undefined
+  const { session: sessionId, callId } = parseAgentSplat(useParams()["*"] ?? "")
+  const selected = sessionId || undefined
   const wide = useWide()
   const navigate = useNavigate()
   const conn = useConnectionContext()
@@ -124,8 +133,17 @@ export function AgentsPage({
               </Box>
             </Box>
           )}
-          {session && (
-            <SessionView session={session} fetchChat={fetchChat} fetchScreen={fetchScreen} />
+          {session && callId ? (
+            <SubagentView
+              session={session}
+              callId={callId}
+              fetchSubagentChat={fetchSubagentChat}
+              postWatch={postSubagentWatch}
+            />
+          ) : (
+            session && (
+              <SessionView session={session} fetchChat={fetchChat} fetchScreen={fetchScreen} />
+            )
           )}
         </Box>
       )}

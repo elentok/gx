@@ -70,7 +70,7 @@ export function render(
     tick: 0,
   } as unknown as ConnectionState
   const listeners = new Set<() => void>()
-  const handlers = new Set<(a?: string) => void>()
+  const handlers = new Set<(a?: string, type?: string, data?: Record<string, unknown>) => void>()
   const conn = {
     clientId: "c1",
     getState: () => state,
@@ -78,7 +78,7 @@ export function render(
       listeners.add(fn)
       return () => listeners.delete(fn)
     },
-    onEvent: (fn: (a?: string) => void) => {
+    onEvent: (fn: (a?: string, type?: string, data?: Record<string, unknown>) => void) => {
       handlers.add(fn)
       return () => handlers.delete(fn)
     },
@@ -103,10 +103,10 @@ export function render(
   const setSessions = (next: SessionInfo[]) =>
     update({ snapshot: { sessions: next } } as Partial<ConnectionState>)
   const goLive = () => update({ liveSnapshot: true })
-  const emit = (address: string) =>
+  const emit = (address: string, type = "session-changed", data: Record<string, unknown> = {}) =>
     act(() =>
       handlers.forEach((fn) => {
-        fn(address)
+        fn(address, type, data)
       }),
     )
   return { router, setSessions, goLive, emit, update }

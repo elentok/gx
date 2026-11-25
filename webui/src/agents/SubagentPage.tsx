@@ -1,5 +1,5 @@
 import { Box, Link, Text } from "@chakra-ui/react"
-import { useEffect, useState, type ReactNode } from "react"
+import { Fragment, useEffect, useState, type ReactNode } from "react"
 import { ChatMessages, WorkingRow } from "../design/ChatCore"
 import { formatElapsed, tokenText } from "../design/taskRows"
 import { FileLinkProvider } from "../files/FileLinkContext"
@@ -13,7 +13,7 @@ import {
   type SessionChatResponse,
   type SessionInfo,
 } from "../generated/server"
-import { agentHref } from "../hrefs"
+import { agentHref, subagentHref } from "../hrefs"
 
 type PillTone = "muted" | "running" | "done"
 
@@ -87,9 +87,9 @@ function GoneNote({ children }: { children?: ReactNode }) {
   )
 }
 
-function BackLink({ sessionId }: { sessionId: string }) {
+function BackLink({ sessionId, href }: { sessionId: string; href?: string }) {
   return (
-    <Link href={agentHref(sessionId)} color="tone.running.fg" textDecoration="none">
+    <Link href={href ?? agentHref(sessionId)} color="tone.running.fg" textDecoration="none">
       ← Back to parent chat
     </Link>
   )
@@ -221,6 +221,14 @@ export function SubagentPage({
         <Link href={agentHref(session.id)} color="inherit">
           {session.name || session.id}
         </Link>
+        {sub.chain?.map((level) => (
+          <Fragment key={level.call_id}>
+            {" › "}
+            <Link href={subagentHref(session.id, level.call_id)} color="inherit">
+              {level.title || level.call_id}
+            </Link>
+          </Fragment>
+        ))}
         {" › "}
         {title}
       </Text>
@@ -252,7 +260,10 @@ export function SubagentPage({
           {sub.tool_calls !== undefined && (
             <Stat label="Tool calls" value={String(sub.tool_calls)} />
           )}
-          <BackLink sessionId={session.id} />
+          <BackLink
+            sessionId={session.id}
+            href={sub.parent_call_id ? subagentHref(session.id, sub.parent_call_id) : undefined}
+          />
         </Box>
       </Box>
       <FileLinkProvider base={{ session: session.id }} recheckKey={chat.messages.at(-1)?.id}>

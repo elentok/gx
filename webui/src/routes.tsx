@@ -15,6 +15,8 @@ import { AppShell } from "./shell/AppShell"
 import type { FetchLogins } from "./settings/logins"
 import type { FetchSettings } from "./settings/settingsApi"
 import { sectionPath } from "./settings/SettingsShell"
+import type { PostSubagentWatch } from "./agents/subagentWatch"
+import type { FetchSubagentChat } from "./agents/useSubagentChat"
 import type { FetchChat } from "./design/chat"
 import type { DeleteDesign, OpenDesign, OpenFlow, ResumeSession, StopSession } from "./design/open"
 import type { AbandonTriage } from "./triage/api"
@@ -293,6 +295,8 @@ export interface RouteFetchers {
   cleanupWrite?: PostCleanup
   tips?: FetchTips
   chat?: FetchChat
+  subagentChat?: FetchSubagentChat
+  subagentWatch?: PostSubagentWatch
   prompt?: PostPrompt
   answer?: PostAnswer
   focus?: PostFocus
@@ -356,7 +360,14 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
     // "/agents/*" also matches "/agents"; the splat is the session label.
     {
       path: "/agents/*",
-      element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} />,
+      element: (
+        <AgentsPage
+          fetchChat={fetchers.chat}
+          fetchScreen={fetchers.screen}
+          fetchSubagentChat={fetchers.subagentChat}
+          postSubagentWatch={fetchers.subagentWatch}
+        />
+      ),
     },
     // The splat is the absolute path of the file, without its leading slash.
     {

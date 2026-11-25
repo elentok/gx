@@ -129,6 +129,31 @@ test("the breadcrumb names the session and the back link goes to the parent chat
   )
 })
 
+test("a nested subagent goes back to its parent subagent and the breadcrumb links each level", () => {
+  show(
+    chat({
+      call_id: "call-2",
+      title: "Inner",
+      parent_call_id: "call-1",
+      chain: [
+        { call_id: "call-0", title: "Outer" },
+        { call_id: "call-1", title: "Middle" },
+      ],
+    }),
+  )
+  expect(screen.getByRole("link", { name: "← Back to parent chat" }).getAttribute("href")).toBe(
+    "#/agents/s-a/subagents/call-1",
+  )
+  expect(screen.getByRole("link", { name: "Main agent" }).getAttribute("href")).toBe("#/agents/s-a")
+  expect(screen.getByRole("link", { name: "Outer" }).getAttribute("href")).toBe(
+    "#/agents/s-a/subagents/call-0",
+  )
+  expect(screen.getByRole("link", { name: "Middle" }).getAttribute("href")).toBe(
+    "#/agents/s-a/subagents/call-1",
+  )
+  expect(screen.queryByRole("link", { name: "Inner" })).toBeNull()
+})
+
 test("the breadcrumb falls back to the session id", () => {
   show(chat({}), session({ name: undefined }))
   expect(screen.getByRole("link", { name: "s-a" })).toBeTruthy()
