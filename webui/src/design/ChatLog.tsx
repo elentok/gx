@@ -298,7 +298,7 @@ function ChatBody({
         {questions && busy && step && (
           <WorkingRow {...step} current={chat.current} others={chat.others} />
         )}
-        {questions && <TaskList tasks={chat.tasks} />}
+        {questions && <TaskList tasks={chat.tasks} sessionId={session.id} />}
         <ChatTail
           session={session}
           chat={chat}

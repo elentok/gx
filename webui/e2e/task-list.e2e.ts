@@ -51,6 +51,17 @@ test("208. Task list", async ({ page, start }) => {
     const rows = await rowsOf(page)
     if (first.length === 0) first = rows
     else expect(rows).toEqual(first)
+    // The subagent row links to its page beside the row button; a click on the row still opens its details.
+    const sub = rowOf(page, "Survey the sessions code")
+    await expect(sub.getByRole("link", { name: "Open ↗" })).toHaveAttribute(
+      "href",
+      new RegExp(`^#/agents/${claude.id}/subagents/.+`),
+    )
+    const subButton = sub.getByRole("button")
+    await subButton.click()
+    await expect(subButton).toHaveAttribute("aria-expanded", "true")
+    await subButton.click()
+    await expect(subButton).toHaveAttribute("aria-expanded", "false")
     const working = page.getByRole("status").filter({ hasText: /^Working/ })
     await expect(working).toBeVisible()
     await expect(working).not.toContainText("waiting on")

@@ -539,6 +539,29 @@ test("a tools entry shows its count and each call", async () => {
   expect(screen.getByText("Read: /x/a.go")).toBeTruthy()
 })
 
+test("a marked call in a tools entry is a link among the folded lines", async () => {
+  const tools = {
+    id: "t2",
+    role: "agent",
+    kind: "tools",
+    text: "",
+    at: new Date().toISOString(),
+    tool_count: 2,
+    calls: ["Read: /x/a.go", "Agent: Find auth"],
+    subagent_calls: [{ index: 1, call_id: "toolu_9", type: "Explore", description: "Find auth" }],
+  }
+  render(session(), chat({ messages: [tools] }))
+  const details = (await screen.findByTestId("tool-calls")) as HTMLDetailsElement
+  act(() => {
+    details.open = true
+    details.dispatchEvent(new Event("toggle"))
+  })
+  const link = screen.getByRole("link", { name: "Find auth ↗" })
+  expect(link.getAttribute("href")).toBe(`#/agents/${session().id}/subagents/toolu_9`)
+  expect(link.parentElement?.textContent).toBe("Agent · Explore · Find auth ↗")
+  expect(screen.getByText("Read: /x/a.go")).toBeTruthy()
+})
+
 test("a prompt with images shows a grid above its text", async () => {
   const m = {
     id: "p1",

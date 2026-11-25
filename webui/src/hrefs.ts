@@ -62,5 +62,9 @@ export const SETTINGS_HREF = "#/settings"
 /** A session's label is its id. */
 export const agentHref = (label: string) => `${AGENTS_HREF}/${label}`
 
+/** A subagent's page: the one place its URL is built. */
+export const subagentHref = (session: string, callId: string) =>
+  `${agentHref(encodeURIComponent(session))}/subagents/${encodeURIComponent(callId)}`
+
 /** The router path of an agent's page, for navigate(). */
 export const agentPath = (label: string) => agentHref(label).slice(1)

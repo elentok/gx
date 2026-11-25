@@ -1,9 +1,15 @@
-import { Box, Spinner as ChakraSpinner, Text } from "@chakra-ui/react"
+import { Box, chakra, Spinner as ChakraSpinner, Text } from "@chakra-ui/react"
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { Button } from "../ui/button/Button"
 import { fetchArchive } from "./chat"
 import { TaskList } from "./TaskList"
-import type { SessionChatImage, SessionChatMessage, SessionChatResponse } from "../generated/server"
+import type {
+  SessionChatImage,
+  SessionChatMessage,
+  SessionChatResponse,
+  SessionChatSubagentCall,
+} from "../generated/server"
+import { subagentHref } from "../hrefs"
 import { ImageViewer } from "./ImageViewer"
 import { InFlightTools } from "./InFlightTools"
 import { withKeys } from "../uniqueKeys"
@@ -135,7 +141,13 @@ function Entry({
 }) {
   if (m.kind === "compacted") return <Separator>Context compacted</Separator>
   if (m.kind === "interrupted") return <Separator>Turn interrupted</Separator>
-  if (m.kind === "tools") return showTools ? <ToolCalls m={m} /> : null
+  if (m.kind === "tools") {
+    return showTools ? (
+      <ToolCalls m={m} sessionId={sessionId} />
+    ) : (
+      <SubagentCallLinks m={m} sessionId={sessionId} />
+    )
+  }
   if (m.kind === "prompt") {
     const images = m.images ?? []
     const hasImages = images.length > 0
@@ -189,9 +201,74 @@ function Entry({
 // A run of tool calls, folded: the count in the summary, one line per call (shell commands, files) when opened.
 // The lines mount only once the run is opened: a closed <details> still keeps its children in the DOM, and a
 // long chat has hundreds of calls (each line also queues file lookups).
-function ToolCalls({ m }: { m: SessionChatMessage }) {
+function CallLine({ children, marked }: { children: ReactNode; marked?: boolean }) {
+  return (
+    <Box
+      as="li"
+      whiteSpace="pre-wrap"
+      wordBreak="break-all"
+      borderInlineStart="2px solid"
+      borderColor={marked ? "tone.running.fg" : "border"}
+      color={marked ? "text.muted" : undefined}
+      px="2.5"
+    >
+      {children}
+    </Box>
+  )
+}
+
+const CALL_LIST_PROPS = {
+  as: "ul",
+  listStyleType: "none",
+  m: "0",
+  p: "0",
+  fontFamily: "mono",
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.5",
+} as const
+
+// "Agent · <type> · " is plain text; the description and the arrow link to the subagent's page.
+function SubagentCallLine({
+  call,
+  sessionId,
+}: {
+  call: SessionChatSubagentCall
+  sessionId: string
+}) {
+  const prefix = call.type ? `Agent · ${call.type} · ` : "Agent · "
+  return (
+    <CallLine marked>
+      {prefix}
+      <chakra.a
+        href={subagentHref(sessionId, call.call_id)}
+        color="tone.running.fg"
+        textDecoration="none"
+        _hover={{ textDecoration: "underline" }}
+      >
+        {`${call.description ?? ""} ↗`}
+      </chakra.a>
+    </CallLine>
+  )
+}
+
+// A tools entry on a page that hides tool calls still shows its subagent calls, as links.
+function SubagentCallLinks({ m, sessionId }: { m: SessionChatMessage; sessionId: string }) {
+  const marks = m.subagent_calls ?? []
+  if (marks.length === 0) return null
+  return (
+    <Box {...CALL_LIST_PROPS} fontSize="xs" color="text.dim">
+      {marks.map((c) => (
+        <SubagentCallLine key={c.call_id} call={c} sessionId={sessionId} />
+      ))}
+    </Box>
+  )
+}
+
+function ToolCalls({ m, sessionId }: { m: SessionChatMessage; sessionId: string }) {
   const [open, setOpen] = useState(false)
   const calls = m.calls ?? []
+  const marks = new Map((m.subagent_calls ?? []).map((c) => [c.index, c]))
   const n = m.tool_count ?? calls.length
   return (
     <Box
@@ -206,30 +283,17 @@ function ToolCalls({ m }: { m: SessionChatMessage }) {
         {m.last_tool ? ` · last: ${m.last_tool}` : ""}
       </Box>
       {open && (
-        <Box
-          as="ul"
-          listStyleType="none"
-          m="0"
-          mt="1"
-          p="0"
-          fontFamily="mono"
-          display="flex"
-          flexDirection="column"
-          gap="0.5"
-        >
-          {withKeys(calls, (c) => c).map(({ key, item: c }) => (
-            <Box
-              as="li"
-              key={key}
-              whiteSpace="pre-wrap"
-              wordBreak="break-all"
-              borderInlineStart="2px solid"
-              borderColor="border"
-              px="2.5"
-            >
-              <LinkedText>{c}</LinkedText>
-            </Box>
-          ))}
+        <Box {...CALL_LIST_PROPS} mt="1">
+          {withKeys(calls, (c) => c).map(({ key, item: c }, i) => {
+            const mark = marks.get(i)
+            return mark ? (
+              <SubagentCallLine key={key} call={mark} sessionId={sessionId} />
+            ) : (
+              <CallLine key={key}>
+                <LinkedText>{c}</LinkedText>
+              </CallLine>
+            )
+          })}
         </Box>
       )}
     </Box>
@@ -293,7 +357,15 @@ export function WorkingRow({
   others,
 }: WorkingStep & Pick<SessionChatResponse, "current" | "others">) {
   return (
-    <Box role="status" display="flex" alignItems="center" gap="2" fontSize="sm" color="text.muted" minW="0">
+    <Box
+      role="status"
+      display="flex"
+      alignItems="center"
+      gap="2"
+      fontSize="sm"
+      color="text.muted"
+      minW="0"
+    >
       <ChakraSpinner size="sm" flexShrink="0" />
       {/* A flex row with minW 0, so a long step, title or tool label ends in an ellipsis instead of widening the page. */}
       <Text as="span" display="flex" minW="0" flex="1">
@@ -507,7 +579,7 @@ export function ChatMessages({
       {(busy && working) || (chat.tasks?.length ?? 0) > 0 ? (
         <Box flexShrink="0" display="flex" flexDirection="column" gap="3">
           {busy && working}
-          <TaskList tasks={chat.tasks} />
+          <TaskList tasks={chat.tasks} sessionId={sessionId} />
         </Box>
       ) : null}
     </>

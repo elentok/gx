@@ -1,11 +1,15 @@
 import { ChakraProvider } from "@chakra-ui/react"
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react"
-import type { ReactElement } from "react"
+import type { ComponentProps, ReactElement } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import type { SessionTask } from "../generated/server"
 import { system } from "../ui/theme"
-import { TaskList } from "./TaskList"
+import { TaskList as TaskListBase } from "./TaskList"
 import { elapsedText, formatElapsed, taskDetails, taskSummary, tokenText } from "./taskRows"
+
+const TaskList = (props: Omit<ComponentProps<typeof TaskListBase>, "sessionId">) => (
+  <TaskListBase sessionId="s 1" {...props} />
+)
 
 const T0 = Date.parse("2026-01-01T12:00:00Z")
 const at = (s: number) => new Date(T0 + s * 1000).toISOString()
@@ -243,4 +247,35 @@ test("the clock stops once the last row finished", () => {
   )
   expect(clear).toHaveBeenCalled()
   expect(vi.getTimerCount()).toBe(0)
+})
+
+test("a subagent row with a call id links to its page and the link does not toggle the row", () => {
+  renderThemed(
+    <TaskList
+      tasks={[task({ kind: "subagent", label: "Explore", call_id: "toolu/1", model: "opus" })]}
+    />,
+  )
+  const link = screen.getByRole("link", { name: "Open ↗" })
+  expect(link.getAttribute("href")).toBe("#/agents/s%201/subagents/toolu%2F1")
+  const row = screen.getByRole("button", { name: /Explore/ })
+  expect(row.contains(link)).toBe(false)
+  fireEvent.click(link)
+  expect(row.getAttribute("aria-expanded")).toBe("false")
+  fireEvent.click(row)
+  expect(row.getAttribute("aria-expanded")).toBe("true")
+})
+
+test("only a subagent row with a call id has an Open link", () => {
+  renderThemed(
+    <TaskList
+      tasks={[
+        task({ kind: "subagent", label: "no id" }),
+        task({ kind: "shell", label: "sh", call_id: "c1" }),
+        task({ kind: "monitor", label: "mon", call_id: "c2" }),
+        task({ kind: "call", label: "call", call_id: "c3" }),
+      ]}
+    />,
+  )
+  fireEvent.click(screen.getByRole("button", { name: /tasks done/ }))
+  expect(screen.queryByRole("link")).toBeNull()
 })

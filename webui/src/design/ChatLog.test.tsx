@@ -610,6 +610,38 @@ test("a crashed session, with no composer, still shows the footer line", async (
   expect(screen.queryByRole("form", { name: "Composer" })).toBeNull()
 })
 
+const subagentTools = (type: string) =>
+  msg({
+    kind: "tools",
+    tool_count: 2,
+    calls: ["Read: /x/a.go", "Agent: Find auth"],
+    subagent_calls: [{ index: 1, call_id: "toolu_9", type, description: "Find auth" }],
+  })
+
+test("on the Design chat a tools entry with a marked call shows only its link", async () => {
+  renderChat(
+    [session()],
+    okChat(
+      chatOf([
+        msg({ text: "hi" }),
+        subagentTools("Explore"),
+        msg({ kind: "tools", tool_count: 3 }),
+      ]),
+    ),
+  )
+  const link = await screen.findByRole("link", { name: "Find auth ↗" })
+  expect(link.getAttribute("href")).toBe("#/agents/s-a/subagents/toolu_9")
+  expect(link.parentElement?.textContent).toBe("Agent · Explore · Find auth ↗")
+  expect(screen.queryByText(/tool call|Read: /)).toBeNull()
+  expect(screen.getAllByRole("link", { name: /↗/ })).toHaveLength(1)
+})
+
+test("a marked call with no type drops the type and its separator", async () => {
+  renderChat([session()], okChat(chatOf([subagentTools("")])))
+  const link = await screen.findByRole("link", { name: "Find auth ↗" })
+  expect(link.parentElement?.textContent).toBe("Agent · Find auth ↗")
+})
+
 test("a Codex session loads its chat and renders every entry kind", async () => {
   const fetchChat = vi.fn<FetchChat>(
     okChat(

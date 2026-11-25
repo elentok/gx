@@ -1,6 +1,7 @@
 import { Box, chakra, Text } from "@chakra-ui/react"
 import { useEffect, useState } from "react"
 import type { SessionTask } from "../generated/server"
+import { subagentHref } from "../hrefs"
 import { withKeys } from "../uniqueKeys"
 import { TaskCommand } from "./TaskCommandBlock"
 import {
@@ -59,11 +60,13 @@ function StatusMark({ mark }: { mark: TaskMark }) {
 
 function TaskRow({
   task,
+  sessionId,
   now,
   open,
   onToggle,
 }: {
   task: SessionTask
+  sessionId: string
   now: number
   open: boolean
   onToggle: () => void
@@ -107,8 +110,11 @@ function TaskRow({
     gridTemplateColumns: "14px 62px minmax(0, 1fr) auto",
     columnGap: "2.5",
     alignItems: "baseline",
-    w: "100%",
+    flex: "1",
+    minW: "0",
   } as const
+  const link =
+    task.kind === "subagent" && task.call_id ? subagentHref(sessionId, task.call_id) : undefined
   return (
     <Box
       role="listitem"
@@ -120,23 +126,37 @@ function TaskRow({
       mx={open ? "-2" : undefined}
       my={open ? "0.5" : undefined}
     >
-      {expandable ? (
-        <chakra.button
-          type="button"
-          aria-expanded={open}
-          onClick={onToggle}
-          cursor="pointer"
-          borderRadius="md"
-          _hover={{ bg: "surface.hover" }}
-          textAlign="left"
-          color="inherit"
-          {...grid}
-        >
-          {header}
-        </chakra.button>
-      ) : (
-        <Box {...grid}>{header}</Box>
-      )}
+      <Box display="flex" columnGap="2.5" alignItems="baseline">
+        {expandable ? (
+          <chakra.button
+            type="button"
+            aria-expanded={open}
+            onClick={onToggle}
+            cursor="pointer"
+            borderRadius="md"
+            _hover={{ bg: "surface.hover" }}
+            textAlign="left"
+            color="inherit"
+            {...grid}
+          >
+            {header}
+          </chakra.button>
+        ) : (
+          <Box {...grid}>{header}</Box>
+        )}
+        {link && (
+          <chakra.a
+            href={link}
+            fontSize="xs"
+            color="tone.running.fg"
+            whiteSpace="nowrap"
+            textDecoration="none"
+            _hover={{ textDecoration: "underline" }}
+          >
+            Open ↗
+          </chakra.a>
+        )}
+      </Box>
       {open && (details || blockCommand) && (
         <Box pl="24px" minW="0">
           {details && (
@@ -163,7 +183,7 @@ function TaskRow({
 }
 
 /** The tasks the agent waits on: a summary line for two or more, then the rows. Read-only; the clock is the only thing that moves. */
-export function TaskList({ tasks }: { tasks?: SessionTask[] }) {
+export function TaskList({ tasks, sessionId }: { tasks?: SessionTask[]; sessionId: string }) {
   const list = tasks ?? []
   const anyRunning = list.some((t) => !t.finished)
   const [now, setNow] = useState(() => Date.now())
@@ -188,6 +208,7 @@ export function TaskList({ tasks }: { tasks?: SessionTask[] }) {
         <TaskRow
           key={key}
           task={t}
+          sessionId={sessionId}
           now={now}
           open={openRows.has(key)}
           onToggle={() => toggleRow(key)}
