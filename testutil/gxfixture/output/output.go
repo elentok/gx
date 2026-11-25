@@ -111,6 +111,8 @@ type Output struct {
 	FeatureWorktree string `json:"feature_worktree,omitempty"`
 	// HostFiles is the host-files scenario's paths; nil elsewhere.
 	HostFiles *HostFilesOutput `json:"host_files,omitempty"`
+	// WorktreeDiff is the worktree-diff scenario's targets; nil elsewhere.
+	WorktreeDiff *WorktreeDiffOutput `json:"worktree_diff,omitempty"`
 	// ModelFakes is the model-switch scenario's fake files; nil elsewhere.
 	ModelFakes *ModelFakesOutput `json:"model_fakes,omitempty"`
 }

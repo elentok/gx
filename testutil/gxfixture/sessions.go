@@ -27,6 +27,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/sessions"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -140,6 +141,9 @@ func (f sessionSeeder) createSpecSession(sc scenario, s sessionSpec) (string, er
 	dir := f.repoDir(sc, s.Project)
 	if s.HostFilesSecond {
 		dir = f.hostFiles.SecondWorktree
+	}
+	if s.Dir != "" {
+		dir = strings.ReplaceAll(s.Dir, spec.RootToken, f.root)
 	}
 	return f.createSession(s.Project, dir, s.Prompt, s.Harness)
 }

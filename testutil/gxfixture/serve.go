@@ -15,12 +15,12 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
-	"github.com/elentok/gx/server/wire/ops"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/gxfixture/draftseed"
 	"github.com/elentok/gx/testutil/gxfixture/output"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 	"github.com/elentok/gx/testutil/gxfixture/websignin"
@@ -43,6 +43,7 @@ type seeded struct {
 	checkWaitingFile string
 	outsideTreePID   int
 	transcripts      map[string]string
+	worktreeDiff     *output.WorktreeDiffOutput
 }
 
 // startServer launches `gx server` with its output in the log file. The caller closes
@@ -176,37 +177,6 @@ func sessionWorking(ctx context.Context, cl *apiclient.Client, id string) (bool,
 	}), nil
 }
 
-// seedLateDrafts creates the AfterStart drafts through the real create route.
-// Scenario order matters: creating a draft sweeps older unleased empty drafts,
-// so list the empty one last.
-func seedLateDrafts(ctx context.Context, stateD string, list []spec.Draft) error {
-	cl := apiclient.New(server.SocketPath(stateD))
-	for _, d := range list {
-		if !d.AfterStart {
-			continue
-		}
-		if res, err := cl.Sessions.SaveDesignDraft(ctx, ops.DesignDraftSaveRequest{Idea: d.Idea}); err != nil || res.Refused {
-			return fmt.Errorf("late draft %q: %v %+v", d.Slug, err, res)
-		}
-	}
-	return nil
-}
-
-// seedChatDrafts creates the scenario's chat drafts through the real create route.
-func seedChatDrafts(ctx context.Context, stateD string, list []spec.ChatDraft) error {
-	cl := apiclient.New(server.SocketPath(stateD))
-	for _, d := range list {
-		res, err := cl.Sessions.CreateChatDraft(ctx, ops.ChatDraftCreateRequest{
-			Project: d.Project, Brief: d.Brief, Name: d.Name, Harness: d.Harness,
-			Model: d.Model, Effort: d.Effort, Folder: d.Folder, Workspace: d.Workspace,
-		})
-		if err != nil || res.Refused {
-			return fmt.Errorf("chat draft %q: %v %+v", d.Name, err, res)
-		}
-	}
-	return nil
-}
-
 // startFixAgents starts the scenario's Fix agents through the API: one per
 // FixAgents ticket, and the project-level one for a recorded failed migration.
 func (f *fixture) startFixAgents(ctx context.Context, sc scenario) error {
@@ -290,10 +260,10 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 	if err := runSteps(f, sc.Steps); err != nil {
 		return s, err
 	}
-	if err := seedLateDrafts(ctx, f.stateD, sc.Drafts); err != nil {
+	if err := draftseed.Late(ctx, f.stateD, sc.Drafts); err != nil {
 		return s, err
 	}
-	if err := seedChatDrafts(ctx, f.stateD, sc.ChatDrafts); err != nil {
+	if err := draftseed.Chat(ctx, f.stateD, sc.ChatDrafts); err != nil {
 		return s, err
 	}
 	if err := f.startFixAgents(ctx, sc); err != nil {
@@ -346,6 +316,16 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 	}
 	if len(f.keyedTranscripts) > 0 {
 		s.transcripts = maps.Clone(f.keyedTranscripts)
+	}
+	if sc.PostStart != nil {
+		cl := apiclient.New(server.SocketPath(f.stateD))
+		s.worktreeDiff, err = sc.PostStart(spec.PostStartEnv{
+			Root: f.root, Repo: filepath.Join(f.root, "repo"), Store: f.store, Git: f.git,
+			Sessions: func() ([]wire.SessionInfo, error) { return cl.Sessions.List(ctx) },
+		})
+		if err != nil {
+			return s, fmt.Errorf("post-start: %w", err)
+		}
 	}
 	return s, nil
 }
@@ -427,6 +407,7 @@ func (f *fixture) buildOutput(sc scenario, rs *runningServer, s seeded) output.O
 		res.LateFinishScanHoldFile = f.lateFinishScanHold()
 	}
 	f.addScenarioOutput(&res, sc, s.transcripts)
+	res.WorktreeDiff = s.worktreeDiff
 	return res
 }
 

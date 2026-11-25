@@ -72,6 +72,8 @@ interface FixtureOutput {
   dev_control_file?: string
   /** Only the `host-files` scenario prints its paths. */
   host_files?: HostFiles
+  /** Only the `worktree-diff` scenario prints its targets. */
+  worktree_diff?: WorktreeDiff
   /** Only the `model-switch` scenario prints its fake files. */
   model_fakes?: ModelFakes
   /** The server's `GX_FORK_HOOK_DIR`; only the scenarios with `ForkHooks` print it. */
@@ -86,6 +88,25 @@ export interface HostFiles {
   temp_dir: string
   other_origin: string
   ticket: string
+}
+
+/** One place a Worktree diff opens from (`testutil/gxfixture/output/worktreediff.go`). `id` is empty when no chat runs there. */
+export interface WorktreeTarget {
+  id?: string
+  path: string
+  address?: string
+}
+
+/** The `worktree-diff` scenario's targets. */
+export interface WorktreeDiff {
+  chat: WorktreeTarget
+  ticket: WorktreeTarget
+  stacked: WorktreeTarget
+  blocker_branch: string
+  design: WorktreeTarget
+  fix_agent: WorktreeTarget
+  clone: WorktreeTarget
+  unclaimed: string
 }
 
 export interface Fixture {
@@ -218,6 +239,8 @@ export interface Fixture {
   readonly devControlFile: string
   /** The `host-files` scenario's repo, worktree and temp paths. Undefined elsewhere. */
   readonly hostFiles?: HostFiles
+  /** The `worktree-diff` scenario's targets. Undefined elsewhere. */
+  readonly worktreeDiff?: WorktreeDiff
   /** The `model-switch` scenario's fake files (`testutil/gxfixture/spec/output.go`). Undefined elsewhere. */
   readonly modelFakes?: ModelFakes
 }
@@ -379,6 +402,7 @@ async function startFixture(
     codexSessionsDir: out.codex_sessions_dir ?? "",
     devControlFile: out.dev_control_file ?? "",
     hostFiles: out.host_files,
+    worktreeDiff: out.worktree_diff,
     modelFakes: out.model_fakes,
     async cli(...args) {
       // A CLI call that blocks would otherwise eat the whole test timeout with no hint of which call hung.

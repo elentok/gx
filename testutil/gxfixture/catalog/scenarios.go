@@ -684,6 +684,8 @@ var Scenarios = map[string]scenario{
 	"initiative-epics-cards":     spec.InitiativeEpicsCardsScenario(),
 	"initiative-gate-ready":      spec.InitiativeGateReadyScenario(),
 	"initiative-resume":          spec.InitiativeResumeScenario(),
+	// worktree-diff: one target for each way a Worktree diff opens. See spec.WorktreeDiffScenario.
+	"worktree-diff": spec.WorktreeDiffScenario(),
 	// triage: follow-ups and a Triage in the state --shape names (default c-few).
 	// run swaps in spec.TriageScenario(shape).
 	"triage": {TriageShaped: true},

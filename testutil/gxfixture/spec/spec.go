@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/testutil/agentfake/triageplay"
 	"github.com/elentok/gx/testutil/gxfixture/bgtx"
 	"github.com/elentok/gx/testutil/gxfixture/limitseed"
+	"github.com/elentok/gx/testutil/gxfixture/output"
 	"github.com/elentok/gx/testutil/gxfixture/perfdata"
 	"github.com/elentok/gx/testutil/gxfixture/questionseed"
 )
@@ -159,6 +160,9 @@ type Scenario struct {
 	Questions map[string]questionseed.Question
 	// GitSetup shapes the project repo (branches, a dirty checkout) after its first commit.
 	GitSetup func(git Git, repo string) error
+	// PostStart runs at the end of the post-start seeding, once the claimed and Design
+	// worktrees exist; its result is Output.WorktreeDiff.
+	PostStart func(PostStartEnv) (*output.WorktreeDiffOutput, error)
 	// NoCheckConfig leaves the projects without a checks key in project.json; the
 	// other scenarios write an empty one, so the Epics page shows no banner.
 	NoCheckConfig bool
@@ -369,6 +373,9 @@ type SessionSpec struct {
 	// Harness is empty for Claude.
 	Harness string
 	Prompt  string
+	// Dir is the directory the session runs in, with RootToken for the fixture root;
+	// empty runs it in the project repo.
+	Dir string
 	// Workspace is the workspace the settled session is moved to; it must exist (a Steps entry).
 	Workspace string
 	// Link is the map address the finished session is marked a design session of.
