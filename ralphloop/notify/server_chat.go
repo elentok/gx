@@ -195,7 +195,7 @@ func (c *ServerChat) pause(catalog, project string, override *ServerChatConfig, 
 		return
 	}
 	msg := ticketPauseMessage(project, epic, ticketPath, identifier, status, reason).as(catalog)
-	target := ticketTarget(project, epic, identifier)
+	target := pauseTarget(project, epic, ticketPath, identifier)
 	if catalog == notifykind.EpicPaused {
 		target = ticketTarget(project, epic, "")
 	}
@@ -256,7 +256,7 @@ func (f finishSink) TicketNeedsHuman(identifier, _, status string, kind events.K
 	epicDir := filepath.Dir(filepath.Dir(f.ticketPath))
 	childPath := ResolveTicketPath(filepath.Dir(epicDir), filepath.Base(epicDir), identifier)
 	msg := ticketPauseMessage(f.project, f.epic, childPath, identifier, status, reason).as(notifykind.PausedTicket)
-	f.c.show(msg, ticketTarget(f.project, f.epic, identifier))
+	f.c.show(msg, pauseTarget(f.project, f.epic, childPath, identifier))
 	for _, s := range f.c.projectSinks(f.override) {
 		s.sendMessage(msg, source, identifier)
 	}

@@ -3,6 +3,8 @@ package notify
 import (
 	"github.com/elentok/gx/notifykind"
 	"github.com/elentok/gx/sound"
+	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tickets/ticketlog"
 )
 
 // Target is what a notification is about. The first non-empty field wins; the
@@ -12,11 +14,16 @@ type Target struct {
 	Epic    string // "project:epic"
 	Design  string // the Design's root, as the Design page route names it
 	Session string // a session id
+	// Answer opens a Ticket's answer page instead of its detail page. The tag
+	// ignores it, so the push still replaces the ticket's earlier one.
+	Answer bool
 }
 
 // Path is the web route of the target, the one Push and Desktop both send.
 func (t Target) Path() string {
 	switch {
+	case t.Ticket != "" && t.Answer:
+		return "/answer/" + t.Ticket
 	case t.Ticket != "":
 		return "/t/" + t.Ticket
 	case t.Epic != "":
@@ -85,4 +92,21 @@ func ticketTarget(project, epic, identifier string) Target {
 		return Target{Epic: project + ":" + epic}
 	}
 	return Target{Ticket: project + ":" + epic + "/" + identifier}
+}
+
+// pauseTarget is ticketTarget for a pause push: a self-reported pause whose
+// latest question round is open goes to the answer page. A failed read of the
+// ticket or its log keeps the detail page.
+func pauseTarget(project, epic, ticketPath, identifier string) Target {
+	t := ticketTarget(project, epic, identifier)
+	if ticketPath == "" || identifier == "" {
+		return t
+	}
+	tk, err := schema.ParseTicket(ticketPath)
+	if err != nil || tk.PauseReason != schema.PauseSelfReported {
+		return t
+	}
+	evs, err := ticketlog.ReadLog(ticketPath)
+	t.Answer = err == nil && ticketlog.OpenQuestion(evs) != nil
+	return t
 }
