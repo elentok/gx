@@ -15,6 +15,7 @@
 // --shape <c-zero|c-few|c-many|c-live|c-named|verify|route|route-12-backlogs|route-no-backlog|questions|final-approval|writing|result|stopped|journey|backlog|old-epics> picks the Triage state of the triage scenario (default c-few).
 // --shape <list|all-off|empty|page|paused|missing-project> picks the Schedules and Last runs of the schedules scenario (default list).
 // --shape <merged|running|unstamped|empty|missing-sha|pr|backfill> picks the Epic ranges and branches of the epic-diff scenario (default merged).
+// --shape <two-blockers|blocker-not-queued|blocker-paused|picker-open|cycle-refusal|release> picks the Waiting epics and blockers of the epic-waiting scenario (default two-blockers).
 // --shape <claude|single-task|subagent-with-inner-task|many|timed-out-shell|growing-output> picks the background tasks of the bg-progress scenario (default claude).
 // --shape <running|off|installing|starting|down|no-checkout> picks the Dev mode state of the dev-mode scenario (default running).
 // --shape <main-worktree|no-main-worktree> picks whether demo's trunk is checked out in the host-files scenario (default main-worktree).
@@ -89,6 +90,9 @@ func run(args []string) (err error) {
 	}
 	if sc.EpicDiffShaped {
 		sc, _ = spec.EpicDiffScenario(shape)
+	}
+	if sc.EpicWaitingShaped {
+		sc, _ = spec.EpicWaitingScenario(shape)
 	}
 	if sc.BgProgressShaped {
 		var built bool

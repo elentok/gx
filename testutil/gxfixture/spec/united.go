@@ -20,9 +20,13 @@ func UnitedEpics() []epic {
 		{project, "paused-epic", []ticket{{"01", "repair", servertest.TicketOpts{PauseReason: "iteration-error"}}}},
 		{project, "question-epic", []ticket{{"01", "answer", servertest.TicketOpts{PauseReason: "self-reported"}}}},
 		{project, "perm-epic", open},
-		// Its epic blocker is unmerged, so the ticket is blocked and nothing can
-		// run: the epic is deadlocked. A cycle would not do, since recovery pauses it.
-		{project, "deadlock-epic", []ticket{{"01", "first", servertest.TicketOpts{ClaimedAt: "2026-01-01T10:00:00Z"}}}},
+		// Two tickets block each other, so nothing can run: the epic is deadlocked.
+		// It stays unqueued, since a queued cycle starts recovery, which pauses it.
+		// An epic-level blocked_by would make it Waiting, not Deadlocked.
+		{project, "deadlock-epic", []ticket{
+			{"01", "first", servertest.TicketOpts{ClaimedAt: "2026-01-01T10:00:00Z", BlockedBy: []string{"02"}}},
+			{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
+		}},
 		{project, "blocked-merge-epic", done},
 		{project, "awaiting-epic", done},
 		{project, "dirty-trunk-epic", done},
@@ -73,7 +77,6 @@ func UnitedMeta() map[string]string {
 		project + ":blocked-merge-epic":   "status: open\nland_block_reason: needs a rebase\n" + doneStamp,
 		project + ":dirty-trunk-epic":     DirtyTrunkMeta("a.txt", "b.txt", "c.txt", "d.txt", "e.txt", "f.txt", "g.txt") + doneStamp,
 		project + ":awaiting-epic":        "status: open\n" + doneStamp,
-		project + ":deadlock-epic":        "status: open\nblocked_by: [\"ready-epic\"]\n",
 		project + ":draft-epic":           "status: draft\n",
 		project + ":publishing-epic-impl": "status: draft\n",
 		project + ":finished-a":           merged("01"),

@@ -108,6 +108,16 @@ range of epics with a run log and no pick (`bf-nocommit-impl`, `bf-second-nocomm
 `bf-pull-y-impl` (one entry), `bf-spread-impl` (spread over two entries), `bf-twice-impl` (merged twice), the map `bf-exact-a`,
 `bf-nolog-impl` (no run log) and `bf-offtrunk-impl` (commits not on trunk) get none.
 The names are constants in `testutil/gxfixture/spec/epicdiff.go`, `epicdiffpr.go` and `epicdiffbackfill.go`; the commits are made by `GitSetup` there.
+The `epic-waiting` scenario seeds Waiting epics and their blockers in the project `demo` (`start("epic-waiting", { shape })`; default
+`two-blockers`; data in `testutil/gxfixture/spec/epicwaiting.go`). Every shape has `notification-alignment-impl` (not queued: Ready to
+queue) and `notification-alignment-queued-impl` (queued: Implementing), each with tickets 01 and 02 done, 03 open (no `blocked_by`) and
+04 blocked by 03; `deliver-primitive-impl` and `push-notifications-impl` (the blockers); the picker rows `notification-polish` and
+`notifications-ui`; `notification-shipped-impl` (merged) and `notification-old-impl` (archived), which the picker leaves out. Shapes:
+`two-blockers` (both waiting epics blocked by both blockers, both queued and moving), `blocker-not-queued` (only `deliver-primitive-impl`,
+Ready to queue), `blocker-paused` (the same, with its ticket paused: Paused, in Needs you; the waiting epics are not),
+`picker-open` (one blocker, queued; the flow opens the picker), `cycle-refusal` (one blocker, plus the unqueued
+`waits-on-alignment-impl` blocked by `notification-alignment-impl`) and `release` (`deliver-primitive-impl` complete, unmerged and not queued;
+`gx server epics mark-merged demo:deliver-primitive-impl` releases the queued epic, so its ticket 03 is claimed). Workers are held.
 The `bg-progress` scenario seeds one Working Claude Design session of the map `design-epic` (so it opens on the Design page and
 the Agents page) whose transcript and task files hold background tasks (`start("bg-progress", { shape })`; default `claude`).
 All times are offsets before the seed time. Output keys: `transcripts[<shape>]` is the session's transcript, `taskFiles` has

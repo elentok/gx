@@ -320,6 +320,9 @@ type Scenario struct {
 	// EpicDiffShaped marks the epic-diff scenario, whose whole content comes
 	// from the --shape value (EpicDiffScenario).
 	EpicDiffShaped bool
+	// EpicWaitingShaped marks the epic-waiting scenario, whose whole content comes
+	// from the --shape value (EpicWaitingScenario).
+	EpicWaitingShaped bool
 	// BgProgressShaped marks the bg-progress scenario, whose whole content comes
 	// from the --shape value (BgProgressScenario).
 	BgProgressShaped bool
