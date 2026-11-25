@@ -217,6 +217,7 @@ func TestSubagentPage_WithoutSubagentThereIsNoHeader(t *testing.T) {
 func TestSubagentPage_CodexSessionDoesNotPanic(t *testing.T) {
 	t.Parallel()
 	f := newCodexFixture(t)
+	writeLines(t, f.path, `{"timestamp":"2026-01-01T10:00:00Z","ordinal":0,"type":"session_meta","payload":{"cli_version":"0.166.0"}}`)
 	code, _ := f.getQuery(t, "/v1/sessions/chat", "subagent=a1")
 	if code != http.StatusNotFound {
 		t.Fatalf("code = %d", code)
