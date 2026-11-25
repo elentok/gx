@@ -293,11 +293,11 @@ export function WorkingRow({
   others,
 }: WorkingStep & Pick<SessionChatResponse, "current" | "others">) {
   return (
-    <Box role="status" display="flex" alignItems="center" gap="2" fontSize="sm" color="text.muted">
-      <ChakraSpinner size="sm" />
-      {/* A flex row with minW 0, so a long tool label truncates (InFlightTools) instead of widening the page. */}
+    <Box role="status" display="flex" alignItems="center" gap="2" fontSize="sm" color="text.muted" minW="0">
+      <ChakraSpinner size="sm" flexShrink="0" />
+      {/* A flex row with minW 0, so a long step, title or tool label ends in an ellipsis instead of widening the page. */}
       <Text as="span" display="flex" minW="0" flex="1">
-        <Text as="span" flexShrink="0">
+        <Text as="span" minW="0" truncate whiteSpace="pre">
           Working
           {step && `: ${step}`}
           {title && ` · ${title}`}
