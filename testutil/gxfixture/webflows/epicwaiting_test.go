@@ -12,8 +12,8 @@ import (
 
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/gxfixture/epicwaiting"
 	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
-	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
 // epicRows is `gx server epics --json` by epic name.
@@ -58,7 +58,7 @@ func TestEpicWaitingScenario_UnknownShapeListsTheKnownOnes(t *testing.T) {
 	if err == nil {
 		t.Fatalf("--shape nope started:\n%s", out)
 	}
-	for _, shape := range spec.EpicWaitingShapes {
+	for _, shape := range epicwaiting.Shapes {
 		if !strings.Contains(string(out), shape) {
 			t.Errorf("error does not list %q:\n%s", shape, out)
 		}
@@ -69,17 +69,17 @@ func TestEpicWaitingScenario_TwoBlockers(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "epic-waiting", nil, "--shape", "two-blockers")
 	rows := r.waitRows(t, func(rows map[string]wire.EpicListRow) bool {
-		return rows[spec.EpicWaitingDeliver].Section == wire.SectionImplementing && rows[spec.EpicWaitingPush].Section == wire.SectionImplementing
+		return rows[epicwaiting.Deliver].Section == wire.SectionImplementing && rows[epicwaiting.Push].Section == wire.SectionImplementing
 	})
 	for name, section := range map[string]wire.CardSection{
-		spec.EpicWaitingQueued: wire.SectionImplementing,
-		spec.EpicWaitingEpic:   wire.SectionReadyToQueue,
+		epicwaiting.Queued: wire.SectionImplementing,
+		epicwaiting.Epic:   wire.SectionReadyToQueue,
 	} {
 		row := rows[name]
 		if !row.WaitingOnEpic || row.Section != section {
 			t.Errorf("%s: waiting %v in %q, want waiting in %q", name, row.WaitingOnEpic, row.Section, section)
 		}
-		if got, want := blockerNames(row), []string{spec.EpicWaitingDeliver, spec.EpicWaitingPush}; !slices.Equal(got, want) {
+		if got, want := blockerNames(row), []string{epicwaiting.Deliver, epicwaiting.Push}; !slices.Equal(got, want) {
 			t.Errorf("%s: blockers %v, want %v", name, got, want)
 		}
 	}
@@ -88,7 +88,7 @@ func TestEpicWaitingScenario_TwoBlockers(t *testing.T) {
 			t.Errorf("%s is in Needs you", row.Name)
 		}
 	}
-	for _, name := range []string{spec.EpicWaitingEpic, spec.EpicWaitingQueued} {
+	for _, name := range []string{epicwaiting.Epic, epicwaiting.Queued} {
 		if r.runLogMentions(t, name, "deadlocked") {
 			t.Errorf("run log of %s has a deadlocked event", name)
 		}
@@ -114,24 +114,24 @@ func (r *running) runLogMentions(t *testing.T, epic, word string) bool {
 // oneBlocker checks the waiting epics hold only deliver-primitive-impl and returns its entry.
 func oneBlocker(t *testing.T, rows map[string]wire.EpicListRow) wire.EpicBlocker {
 	t.Helper()
-	for _, name := range []string{spec.EpicWaitingEpic, spec.EpicWaitingQueued} {
-		if got := blockerNames(rows[name]); !slices.Equal(got, []string{spec.EpicWaitingDeliver}) {
-			t.Fatalf("%s: blockers %v, want only %s", name, got, spec.EpicWaitingDeliver)
+	for _, name := range []string{epicwaiting.Epic, epicwaiting.Queued} {
+		if got := blockerNames(rows[name]); !slices.Equal(got, []string{epicwaiting.Deliver}) {
+			t.Fatalf("%s: blockers %v, want only %s", name, got, epicwaiting.Deliver)
 		}
 	}
-	return rows[spec.EpicWaitingEpic].Blockers[0]
+	return rows[epicwaiting.Epic].Blockers[0]
 }
 
 func TestEpicWaitingScenario_BlockerNotQueued(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "epic-waiting", nil, "--shape", "blocker-not-queued")
 	rows := r.waitRows(t, func(rows map[string]wire.EpicListRow) bool {
-		return rows[spec.EpicWaitingQueued].Section == wire.SectionImplementing && rows[spec.EpicWaitingDeliver].Name != ""
+		return rows[epicwaiting.Queued].Section == wire.SectionImplementing && rows[epicwaiting.Deliver].Name != ""
 	})
 	if b := oneBlocker(t, rows); b.State != wire.EpicListReady {
 		t.Errorf("blocker state %q, want %q", b.State, wire.EpicListReady)
 	}
-	if got := rows[spec.EpicWaitingDeliver]; got.Section != wire.SectionReadyToQueue || got.Queued {
+	if got := rows[epicwaiting.Deliver]; got.Section != wire.SectionReadyToQueue || got.Queued {
 		t.Errorf("deliver: %q queued %v, want Ready to queue", got.Section, got.Queued)
 	}
 }
@@ -140,12 +140,12 @@ func TestEpicWaitingScenario_BlockerPaused(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "epic-waiting", nil, "--shape", "blocker-paused")
 	rows := r.waitRows(t, func(rows map[string]wire.EpicListRow) bool {
-		return rows[spec.EpicWaitingDeliver].Section == wire.SectionNeedsYou
+		return rows[epicwaiting.Deliver].Section == wire.SectionNeedsYou
 	})
 	if b := oneBlocker(t, rows); b.State != wire.EpicListPaused {
 		t.Errorf("blocker state %q, want %q", b.State, wire.EpicListPaused)
 	}
-	for _, name := range []string{spec.EpicWaitingEpic, spec.EpicWaitingQueued} {
+	for _, name := range []string{epicwaiting.Epic, epicwaiting.Queued} {
 		if rows[name].Section == wire.SectionNeedsYou {
 			t.Errorf("%s is in Needs you", name)
 		}
@@ -156,18 +156,18 @@ func TestEpicWaitingScenario_PickerOpen(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "epic-waiting", nil, "--shape", "picker-open")
 	rows := r.waitRows(t, func(rows map[string]wire.EpicListRow) bool {
-		return rows[spec.EpicWaitingDeliver].Section == wire.SectionImplementing
+		return rows[epicwaiting.Deliver].Section == wire.SectionImplementing
 	})
-	for _, name := range []string{spec.EpicWaitingPolish, spec.EpicWaitingUI, spec.EpicWaitingPush} {
+	for _, name := range []string{epicwaiting.Polish, epicwaiting.UI, epicwaiting.Push} {
 		if got := rows[name]; got.Section != wire.SectionReadyToQueue || got.MergedAt.IsZero() == false {
 			t.Errorf("%s: %q merged %v, want an open Ready to queue epic", name, got.Section, got.MergedAt)
 		}
 	}
-	if got := rows[spec.EpicWaitingMerged]; got.MergedAt.IsZero() {
-		t.Errorf("%s is not merged", spec.EpicWaitingMerged)
+	if got := rows[epicwaiting.Merged]; got.MergedAt.IsZero() {
+		t.Errorf("%s is not merged", epicwaiting.Merged)
 	}
-	if _, ok := rows[spec.EpicWaitingArchived]; ok {
-		t.Errorf("archived epic %s is listed", spec.EpicWaitingArchived)
+	if _, ok := rows[epicwaiting.Archived]; ok {
+		t.Errorf("archived epic %s is listed", epicwaiting.Archived)
 	}
 	var list wire.EpicList
 	if err := json.Unmarshal([]byte(r.Gx(t, "server", "epics", "--json")), &list); err != nil {
@@ -177,8 +177,8 @@ func TestEpicWaitingScenario_PickerOpen(t *testing.T) {
 	for _, row := range list.Epics {
 		count[row.Name]++
 	}
-	if count[spec.EpicWaitingEpic] != 1 {
-		t.Errorf("%s listed %d times, want once", spec.EpicWaitingEpic, count[spec.EpicWaitingEpic])
+	if count[epicwaiting.Epic] != 1 {
+		t.Errorf("%s listed %d times, want once", epicwaiting.Epic, count[epicwaiting.Epic])
 	}
 }
 
@@ -186,25 +186,25 @@ func TestEpicWaitingScenario_CycleRefusal(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "epic-waiting", nil, "--shape", "cycle-refusal")
 	rows := r.waitRows(t, func(rows map[string]wire.EpicListRow) bool {
-		return rows[spec.EpicWaitingCycle].Name != "" && rows[spec.EpicWaitingDeliver].Section == wire.SectionImplementing
+		return rows[epicwaiting.Cycle].Name != "" && rows[epicwaiting.Deliver].Section == wire.SectionImplementing
 	})
-	if got := blockerNames(rows[spec.EpicWaitingCycle]); !slices.Equal(got, []string{spec.EpicWaitingEpic}) {
-		t.Fatalf("%s: blockers %v, want %s", spec.EpicWaitingCycle, got, spec.EpicWaitingEpic)
+	if got := blockerNames(rows[epicwaiting.Cycle]); !slices.Equal(got, []string{epicwaiting.Epic}) {
+		t.Fatalf("%s: blockers %v, want %s", epicwaiting.Cycle, got, epicwaiting.Epic)
 	}
-	if rows[spec.EpicWaitingCycle].Queued {
-		t.Errorf("%s is queued, want it unticked", spec.EpicWaitingCycle)
+	if rows[epicwaiting.Cycle].Queued {
+		t.Errorf("%s is queued, want it unticked", epicwaiting.Cycle)
 	}
 	// Adding the cycle epic as a blocker of the alignment epic must be refused, with the file unchanged.
-	file := filepath.Join(r.Root(), "data", "gx", "tickets", "demo", spec.EpicWaitingEpic, "ticket.md")
+	file := filepath.Join(r.Root(), "data", "gx", "tickets", "demo", epicwaiting.Epic, "ticket.md")
 	before, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(fixturetest.GxBin, "tickets", "epic", "set", "demo:"+spec.EpicWaitingEpic, "--blocked-by", spec.EpicWaitingDeliver+","+spec.EpicWaitingCycle)
+	cmd := exec.Command(fixturetest.GxBin, "tickets", "epic", "set", "demo:"+epicwaiting.Epic, "--blocked-by", epicwaiting.Deliver+","+epicwaiting.Cycle)
 	cmd.Env = r.Env
 	out, err := cmd.CombinedOutput()
 	if err == nil || !strings.Contains(strings.ToLower(string(out)), "cycle") {
-		t.Errorf("adding %s was not refused with the cycle text (err %v):\n%s", spec.EpicWaitingCycle, err, out)
+		t.Errorf("adding %s was not refused with the cycle text (err %v):\n%s", epicwaiting.Cycle, err, out)
 	}
 	after, err := os.ReadFile(file)
 	if err != nil {
@@ -219,14 +219,14 @@ func TestEpicWaitingScenario_Release(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "epic-waiting", nil, "--shape", "release")
 	rows := r.waitRows(t, func(rows map[string]wire.EpicListRow) bool {
-		return rows[spec.EpicWaitingQueued].WaitingOnEpic
+		return rows[epicwaiting.Queued].WaitingOnEpic
 	})
-	if rows[spec.EpicWaitingDeliver].Queued {
-		t.Fatalf("%s is queued, want it complete and idle", spec.EpicWaitingDeliver)
+	if rows[epicwaiting.Deliver].Queued {
+		t.Fatalf("%s is queued, want it complete and idle", epicwaiting.Deliver)
 	}
-	r.Gx(t, "server", "epics", "mark-merged", "demo:"+spec.EpicWaitingDeliver)
-	r.WaitStatus(t, "demo:"+spec.EpicWaitingQueued+"/03", "claimed")
-	if rows := r.epicRows(t); rows[spec.EpicWaitingQueued].WaitingOnEpic {
-		t.Errorf("%s still waits after the blocker merged", spec.EpicWaitingQueued)
+	r.Gx(t, "server", "epics", "mark-merged", "demo:"+epicwaiting.Deliver)
+	r.WaitStatus(t, "demo:"+epicwaiting.Queued+"/03", "claimed")
+	if rows := r.epicRows(t); rows[epicwaiting.Queued].WaitingOnEpic {
+		t.Errorf("%s still waits after the blocker merged", epicwaiting.Queued)
 	}
 }

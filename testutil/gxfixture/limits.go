@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/testutil/gxfixture/epicwaiting"
 	"github.com/elentok/gx/testutil/gxfixture/limitseed"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
@@ -79,7 +80,7 @@ func checkShape(sc scenario, shape string) (string, error) {
 	case sc.EpicDiffShaped:
 		def, names = spec.EpicDiffShapes[0], spec.EpicDiffShapes
 	case sc.EpicWaitingShaped:
-		def, names = spec.EpicWaitingShapes[0], spec.EpicWaitingShapes
+		def, names = epicwaiting.Shapes[0], epicwaiting.Shapes
 	case sc.BgProgressShaped:
 		def, names = spec.BgProgressShapes[0], spec.BgProgressShapes
 	case sc.DevMode:

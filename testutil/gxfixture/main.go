@@ -49,6 +49,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/gxfixture/catalog"
+	"github.com/elentok/gx/testutil/gxfixture/epicwaiting"
 	"github.com/elentok/gx/testutil/gxfixture/output"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
@@ -92,7 +93,7 @@ func run(args []string) (err error) {
 		sc, _ = spec.EpicDiffScenario(shape)
 	}
 	if sc.EpicWaitingShaped {
-		sc, _ = spec.EpicWaitingScenario(shape)
+		sc, _ = epicwaiting.Scenario(shape)
 	}
 	if sc.BgProgressShaped {
 		var built bool

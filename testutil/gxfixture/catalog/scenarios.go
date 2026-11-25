@@ -695,7 +695,7 @@ var Scenarios = map[string]scenario{
 	// names (default merged). run swaps in spec.EpicDiffScenario(shape).
 	"epic-diff": {EpicDiffShaped: true},
 	// epic-waiting: Waiting epics and their blockers, in the shape --shape names (default
-	// two-blockers). run swaps in spec.EpicWaitingScenario(shape).
+	// two-blockers). run swaps in epicwaiting.Scenario(shape).
 	"epic-waiting": {EpicWaitingShaped: true},
 	// bg-progress: a Working Claude Design session whose transcript and task files hold
 	// background tasks, in the shape --shape names (default claude). run swaps in
