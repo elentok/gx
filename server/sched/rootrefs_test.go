@@ -78,7 +78,7 @@ func TestRootRefs(t *testing.T) {
 	stacked := func(base string) []tickets.Epic {
 		return []tickets.Epic{
 			{Name: "a", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}},
-			{Name: "b", BlockedBy: []string{"a/01"}, Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "open", Base: base}}},
+			{Name: "b", BlockedBy: []string{"a"}, Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "open", Base: base}}},
 		}
 	}
 	for name, tc := range map[string]struct {
@@ -118,15 +118,16 @@ func TestRootRefs_MergedBlockerWithDeletedBranchTargetsTrunk(t *testing.T) {
 	other := tickets.Epic{Name: "c", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}}
 	for name, tc := range map[string]struct {
 		dependent           tickets.Ticket
+		epicBlockers        []string
 		epics               []tickets.Epic
 		wantBase, wantMerge string
 	}{
-		"derived from a merged blocker":   {tickets.Ticket{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"a/01"}}, []tickets.Epic{blocker}, "develop", "develop"},
-		"explicit base on merged blocker": {tickets.Ticket{Number: 1, Identifier: "01", Status: "open", Base: "a/01"}, []tickets.Epic{blocker}, "develop", "develop"},
-		"merged blocker is not ambiguous": {tickets.Ticket{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"a/01", "c/01"}}, []tickets.Epic{blocker, other}, "c", "c"},
+		"derived from a merged blocker":   {tickets.Ticket{Number: 1, Identifier: "01", Status: "open"}, []string{"a"}, []tickets.Epic{blocker}, "develop", "develop"},
+		"explicit base on merged blocker": {tickets.Ticket{Number: 1, Identifier: "01", Status: "open", Base: "a/01"}, nil, []tickets.Epic{blocker}, "develop", "develop"},
+		"merged blocker is not ambiguous": {tickets.Ticket{Number: 1, Identifier: "01", Status: "open"}, []string{"a", "c"}, []tickets.Epic{blocker, other}, "c", "c"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			dependent := tickets.Epic{Name: "b", Tickets: []tickets.Ticket{tc.dependent}}
+			dependent := tickets.Epic{Name: "b", BlockedBy: tc.epicBlockers, Tickets: []tickets.Ticket{tc.dependent}}
 			base, target, err := s.RootRefs("proj", append(tc.epics, dependent), "b", tc.dependent, repo)
 			if err != nil || base != tc.wantBase || target != tc.wantMerge {
 				t.Errorf("got (%q, %q, %v), want (%q, %q)", base, target, err, tc.wantBase, tc.wantMerge)
@@ -141,9 +142,9 @@ func TestRootRefs_MergedBlockerWithDeletedBranchTargetsTrunk(t *testing.T) {
 func rootLowestEpics() []tickets.Epic {
 	return []tickets.Epic{
 		{Name: "a", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}},
-		{Name: "b", Tickets: []tickets.Ticket{
+		{Name: "b", BlockedBy: []string{"a"}, Tickets: []tickets.Ticket{
 			{Number: 3, Identifier: "03", Status: "done", Base: "release-1.2"},
-			{Number: 1, Identifier: "01", Status: "cancelled", BlockedBy: []string{"a/01"}},
+			{Number: 1, Identifier: "01", Status: "cancelled"},
 			{Number: 2, Identifier: "02", Status: "open", Base: "release-1.2"},
 		}},
 	}
@@ -195,7 +196,7 @@ func TestRootRefs_MissingTrunkFailsOnlyARootTargetingTrunk(t *testing.T) {
 	s, repo := rootRefsFixture(t)
 	runGit(t, repo, "branch", "-D", "develop")
 	blocker := tickets.Epic{Name: "a", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}}
-	stacked := tickets.Epic{Name: "b", BlockedBy: []string{"a/01"}, Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "open"}}}
+	stacked := tickets.Epic{Name: "b", BlockedBy: []string{"a"}, Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "open"}}}
 	if base, target, err := s.RootRefs("proj", []tickets.Epic{blocker, stacked}, "b", stacked.Tickets[0], repo); err != nil || base != "a" || target != "a" {
 		t.Errorf("stacked root = (%q, %q, %v), want (a, a)", base, target, err)
 	}

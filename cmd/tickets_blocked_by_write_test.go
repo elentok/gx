@@ -10,7 +10,10 @@ import (
 	"github.com/elentok/gx/cmd/cmdbase"
 )
 
-const widenNotice = "`other/01` needs commits; waiting for all of `other`"
+const (
+	crossEpicTicketRule = "a ticket may only be blocked by tickets in its own epic; to wait on other, run `gx tickets epic set e --blocked-by other`"
+	epicTicketRefRule   = "an epic may only be blocked by whole epics; to wait on other, run `gx tickets epic set e --blocked-by other`"
+)
 
 func blockedByDeps(dir, stdin string) (Deps, *bytes.Buffer) {
 	stderr := bytes.NewBuffer(nil)
@@ -39,14 +42,14 @@ func TestExecute_TicketsSet_BlockedByRefusals(t *testing.T) {
 		name, ref, want string
 	}{
 		{name: "dangling", ref: "09", want: `blocked_by "09" names no ticket in this epic`},
-		{name: "widened cycle", ref: "other/01", want: `blocked_by "other/01" (widened to epic "other") closes a cycle`},
+		{name: "cross-epic ticket", ref: "other/01", want: `blocked_by "other/01": ` + crossEpicTicketRule},
+		{name: "whole other epic", ref: "other", want: `blocked_by "other": ` + crossEpicTicketRule},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()
 			writeEpicTicket(t, dir, "other", "01-code.md", ticketFrontmatter("01", ""))
-			writeEpicTicket(t, dir, "other", "02-dep.md", ticketFrontmatter("02", "blocked_by:\n  - \"e/02\"\n"))
 			content := ticketFrontmatter("02", "")
 			path := writeEpicTicket(t, dir, "e", "02-second.md", content)
 
@@ -60,19 +63,23 @@ func TestExecute_TicketsSet_BlockedByRefusals(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsSet_BlockedByWideningPrintsNotice(t *testing.T) {
+func TestExecute_TicketsSet_EpicBlockedByRefusesTicketRef(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	writeEpicTicket(t, dir, "other", "01-code.md", ticketFrontmatter("01", ""))
-	path := writeEpicTicket(t, dir, "e", "02-second.md", ticketFrontmatter("02", ""))
+	writeEpicTicket(t, dir, "e", "01-first.md", ticketFrontmatter("01", ""))
+	epicFile := "---\nstatus: open\n---\n\n# e\n"
+	path := filepath.Join(dir, "e", "ticket.md")
+	if err := os.WriteFile(path, []byte(epicFile), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
-	d, stderr := blockedByDeps(dir, "")
-	if err := execute([]string{"tickets", "set", path, "--blocked-by", "other/01"}, d); err != nil {
-		t.Fatalf("set: %v", err)
+	d, _ := blockedByDeps(dir, "")
+	err := execute([]string{"tickets", "set", path, "--blocked-by", "other/01"}, d)
+	if want := `blocked_by "other/01": ` + epicTicketRefRule; err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want it to contain %q", err, want)
 	}
-	if !strings.Contains(stderr.String(), widenNotice) {
-		t.Errorf("stderr = %q, want the widening notice", stderr)
-	}
+	assertUnchanged(t, path, epicFile)
 }
 
 func TestExecute_TicketsAdd_BlockedByRefusals(t *testing.T) {
@@ -81,13 +88,13 @@ func TestExecute_TicketsAdd_BlockedByRefusals(t *testing.T) {
 		name, ref, want string
 	}{
 		{name: "dangling", ref: "09", want: `blocked_by "09" names no ticket in this epic`},
-		{name: "widened cycle", ref: "other/01", want: `blocked_by "other/01" (widened to epic "other") closes a cycle`},
+		{name: "cross-epic ticket", ref: "other/01", want: `blocked_by "other/01": ` + crossEpicTicketRule},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()
-			writeEpicTicket(t, dir, "other", "01-code.md", ticketFrontmatter("01", "blocked_by:\n  - \"e\"\n"))
+			writeEpicTicket(t, dir, "other", "01-code.md", ticketFrontmatter("01", ""))
 			writeEpicTicket(t, dir, "e", "01-first.md", ticketFrontmatter("01", ""))
 			epic := filepath.Join(dir, "e")
 
@@ -100,35 +107,5 @@ func TestExecute_TicketsAdd_BlockedByRefusals(t *testing.T) {
 				t.Errorf("refused add still wrote the ticket (stat err %v)", err)
 			}
 		})
-	}
-}
-
-func TestExecute_TicketsAdd_BlockedByWideningPrintsNotice(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	writeEpicTicket(t, dir, "other", "01-code.md", ticketFrontmatter("01", ""))
-	writeEpicTicket(t, dir, "e", "01-first.md", ticketFrontmatter("01", ""))
-
-	d, stderr := blockedByDeps(dir, "---\nblocked_by: [\"other/01\"]\n---\n# New\n")
-	if err := execute([]string{"tickets", "add", filepath.Join(dir, "e"), "--slug", "new", "--body", "-"}, d); err != nil {
-		t.Fatalf("add: %v", err)
-	}
-	if !strings.Contains(stderr.String(), widenNotice) {
-		t.Errorf("stderr = %q, want the widening notice", stderr)
-	}
-}
-
-func TestExecute_TicketsValidate_SilentOnWidenedToken(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	writeEpicTicket(t, dir, "other", "01-code.md", ticketFrontmatter("01", ""))
-	path := writeEpicTicket(t, dir, "e", "02-second.md", ticketFrontmatter("02", "blocked_by:\n  - \"other/01\"\n"))
-
-	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
-	if err := execute([]string{"tickets", "validate", path}, Deps{Env: cmdbase.Env{Stdout: stdout, Stderr: stderr}}); err != nil {
-		t.Fatalf("validate: %v", err)
-	}
-	if out := stdout.String() + stderr.String(); strings.Contains(out, "needs commits") || strings.Contains(out, "widen") {
-		t.Errorf("validate mentioned widening: %q", out)
 	}
 }

@@ -64,7 +64,7 @@ func NewCmd(d cmdbase.Env) *cobra.Command {
 	cmd.Flags().StringVar(&req.Name, "name", "", "epic name (default: the prompt's first words plus a short unique suffix)")
 	cmd.Flags().StringVar(&req.Agent, "agent", "", `agent to run the ticket under: "claude" or "codex" (default: the Default harness)`)
 	cmd.Flags().StringVar(&req.Type, "type", "", `ticket type: "prompt" (default), "evolve" or "diagnose"; a one-off never commits`)
-	cmd.Flags().StringArrayVar(&req.BlockedBy, "blocked-by", nil, "address of a ticket in the same project that must merge first (repeatable)")
+	cmd.Flags().StringArrayVar(&req.BlockedBy, "blocked-by", nil, "refused: a one-off cannot be blocked by a ticket; use `gx tickets epic set <epic> --blocked-by <other>`")
 	cmd.Flags().IntVar(&req.ExpectedContextWindow, "expected-context-window", 0, "expected context window in tokens")
 	cmd.Flags().BoolVar(&req.Front, "front", false, "queue it at the head instead of the tail")
 	cmd.Flags().BoolVar(&req.Notify, "notify", false, "send the ticket's Result to chat when it succeeds (a pause always notifies)")

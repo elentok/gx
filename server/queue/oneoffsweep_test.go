@@ -117,7 +117,8 @@ func TestSweep_ArchivesDoneAndCancelledOneOffsAndKeepsBrokenOnes(t *testing.T) {
 	for id, status := range map[string]string{"01": "done", "02": "cancelled", "03": "paused", "04": "open"} {
 		servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, id, "t"+id, servertest.TicketOpts{Type: "prompt", Status: status})
 	}
-	servertest.WriteTicketWith(t, store, "proj", "feature", "01", "after", servertest.TicketOpts{BlockedBy: []string{"one-offs/01"}})
+	// The dependent is terminal: an open ticket may not hold a cross-epic ref.
+	servertest.WriteTicketWith(t, store, "proj", "feature", "01", "after", servertest.TicketOpts{Status: "done", BlockedBy: []string{"one-offs/01"}})
 	startSweep(t, store)
 
 	archived := filepath.Join(proj, queue.OneOffsArchivedEpic, "issues")
@@ -173,7 +174,8 @@ func TestSweep_CrashBetweenArchiveWriteAndRemovalLeavesOneCopy(t *testing.T) {
 	if err := os.WriteFile(archivedCopy, []byte(servertest.ReadFile(t, archivedCopy)+"\n## Resolution\n\n- original: proj:one-offs/01\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	servertest.WriteTicketWith(t, store, "proj", "feature", "01", "after", servertest.TicketOpts{BlockedBy: []string{"one-offs/01"}})
+	// The dependent is terminal: an open ticket may not hold a cross-epic ref.
+	servertest.WriteTicketWith(t, store, "proj", "feature", "01", "after", servertest.TicketOpts{Status: "done", BlockedBy: []string{"one-offs/01"}})
 	startSweep(t, store)
 
 	waitForFile(t, filepath.Join(proj, queue.OneOffsEpic, "issues", "01-a.md"), false)
@@ -186,6 +188,9 @@ func TestSweep_CrashBetweenArchiveWriteAndRemovalLeavesOneCopy(t *testing.T) {
 	}
 }
 
+// A ticket may not hold a cross-epic blocker any more, so the dependents here
+// are terminal tickets that keep an old ref: the sweep follows the archive move
+// and the ticket keeps loading with its own status, not as an error.
 func TestSweep_DependentOfAnArchivedOneOffIsUnblockedLikeAnyTerminalBlocker(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
@@ -194,21 +199,24 @@ func TestSweep_DependentOfAnArchivedOneOffIsUnblockedLikeAnyTerminalBlocker(t *t
 		servertest.WriteTicketWith(t, store, "proj", queue.OneOffsEpic, id, "t"+id, servertest.TicketOpts{Type: "prompt", Status: status})
 	}
 	for id, blocker := range map[string]string{"01": "one-offs/01", "02": "one-offs/02", "03": "one-offs/03"} {
-		servertest.WriteTicketWith(t, store, "proj", "feature", id, "after", servertest.TicketOpts{BlockedBy: []string{blocker}})
+		servertest.WriteTicketWith(t, store, "proj", "feature", id, "after", servertest.TicketOpts{Status: "done", BlockedBy: []string{blocker}})
 	}
 	h := startSweep(t, store)
 	waitForFile(t, filepath.Join(proj, queue.OneOffsEpic, "issues", "01-t01.md"), false)
 	waitForFile(t, filepath.Join(proj, queue.OneOffsEpic, "issues", "02-t02.md"), false)
 
-	// "blocked" is the scheduler's word for a ticket with an unresolved blocker;
-	// an unblocked one falls through to the queue verdicts.
-	for id, want := range map[string]string{"01": "not queued", "02": "not queued", "03": "blocked"} {
+	for id, want := range map[string]string{"01": "one-offs-archived/01", "02": "one-offs-archived/02", "03": "one-offs/03"} {
+		if got := servertest.ReadFile(t, filepath.Join(proj, "feature", "issues", id+"-after.md")); !strings.Contains(got, want) {
+			t.Errorf("feature/%s: blocked_by lacks %q:\n%s", id, want, got)
+		}
+	}
+	for id := range map[string]bool{"01": true, "02": true, "03": true} {
 		ex, err := h.Client.Reads.Explain(context.Background(), "proj:feature/"+id)
 		if err != nil {
 			t.Fatalf("%s: %v", id, err)
 		}
-		if ex.Verdict != want {
-			t.Errorf("feature/%s: explain = %+v, want verdict %q", id, ex, want)
+		if ex.Verdict == "blocked" {
+			t.Errorf("feature/%s: explain = %+v, a terminal ticket is never blocked", id, ex)
 		}
 	}
 }

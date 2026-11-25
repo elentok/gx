@@ -27,16 +27,20 @@ func TestExecute_TicketsValidate_DanglingBlockedByFails(t *testing.T) {
 
 func TestExecute_TicketsValidate_QualifiedBlockedBy(t *testing.T) {
 	t.Parallel()
+	refusal := func(ref, other string) string {
+		return `blocked_by "` + ref + `": a ticket may only be blocked by tickets in its own epic; to wait on ` + other + ", run `gx tickets epic set e --blocked-by " + other + "`"
+	}
 	tests := []struct {
 		name string
 		ref  string
-		want string // empty: must pass
+		want string
 	}{
-		{name: "epic-qualified", ref: "other/06"},
-		{name: "own project prefix", ref: "PROJECT:other/06"},
+		{name: "epic-qualified", ref: "other/06", want: refusal("other/06", "other")},
+		{name: "own project prefix", ref: "PROJECT:other/06", want: refusal("PROJECT:other/06", "other")},
+		{name: "whole other epic", ref: "other", want: refusal("other", "other")},
 		{name: "other project", ref: "elsewhere:other/06", want: `blocked_by "elsewhere:other/06" names another project (cross-project blocking not supported)`},
-		{name: "unknown epic", ref: "nope/06", want: `blocked_by "nope/06" names no ticket in epic "nope"`},
-		{name: "unknown ticket", ref: "other/09", want: `blocked_by "other/09" names no ticket in epic "other"`},
+		{name: "unknown epic", ref: "nope/06", want: refusal("nope/06", "nope")},
+		{name: "unknown ticket", ref: "other/09", want: refusal("other/09", "other")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -48,33 +52,10 @@ func TestExecute_TicketsValidate_QualifiedBlockedBy(t *testing.T) {
 
 			d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
 			err := execute(t, []string{"tickets", "validate", path}, d)
-			if tt.want == "" {
-				if err != nil {
-					t.Fatalf("validate: %v", err)
-				}
-				return
-			}
 			if err == nil || !strings.Contains(err.Error(), strings.ReplaceAll(tt.want, "PROJECT", filepath.Base(dir))) {
 				t.Errorf("error = %v, want it to contain %q", err, tt.want)
 			}
 		})
-	}
-}
-
-func TestExecute_TicketsValidate_CrossEpicCycleReportsEveryEdge(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	path := cmdtest.WriteEpicTicket(t, dir, "a", "01-a.md", cmdtest.TicketFrontmatter("01", "blocked_by:\n  - \"b/01\"\n"))
-	cmdtest.WriteEpicTicket(t, dir, "b", "01-b.md", cmdtest.TicketFrontmatter("01", "blocked_by:\n  - \"c/01\"\n"))
-	cmdtest.WriteEpicTicket(t, dir, "c", "01-c.md", cmdtest.TicketFrontmatter("01", "blocked_by:\n  - \"a/01\"\n"))
-
-	d := testDeps(t, bytes.NewBuffer(nil), bytes.NewBuffer(nil), nil)
-	err := execute(t, []string{"tickets", "validate", path}, d)
-	if err == nil {
-		t.Fatal("expected a cycle error, got nil")
-	}
-	if want := `blocked_by "b/01" (widened to epic "b") closes a cycle: 01 → b → b/01 → c/01 → 01`; !strings.Contains(err.Error(), want) {
-		t.Errorf("error = %q, want it to contain %q", err, want)
 	}
 }
 

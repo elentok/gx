@@ -686,19 +686,6 @@ func TestNotifyDone_CrossEpicBlockersDoNotUndercountDoneTickets(t *testing.T) {
 	}
 }
 
-// A ref that names no ticket stays an error, which is never terminal.
-func TestCompleteRootIfDone_UnresolvedCrossEpicBlockerKeepsTheEpicOpen(t *testing.T) {
-	t.Parallel()
-	s, wait := chatServer(t, 0, 0)
-	crossEpicFixture(t, s, "other/99")
-
-	s.merger.CompleteRootIfDone(queue.RootRef{Project: "p", Epic: "epic"}, ralphloop.OneIteration{Epic: "epic"})
-	s.chat.Close()
-	if got := wait(-1); len(got) != 0 {
-		t.Fatalf("sends = %v, want none", got)
-	}
-}
-
 // With no GateStatePath configured, the gate state lands under the server's
 // state dir, not the real one.
 func TestServerChat_EmptyGateStatePathUsesTheStateDir(t *testing.T) {

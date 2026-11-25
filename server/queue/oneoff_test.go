@@ -144,13 +144,13 @@ func TestOneOff_OptionsMergeInFrontmatter(t *testing.T) {
 	h, repo := rigs.StartOneOffHarness(t)
 	res, err := h.Client.Queue.OneOff(context.Background(), wire.OneOffRequest{
 		Prompt: "build it", Cwd: repo,
-		BlockedBy: []string{"proj:epic-a/01"}, ExpectedContextWindow: 40000,
+		ExpectedContextWindow: 40000,
 	})
 	if err != nil || res.Refused {
 		t.Fatalf("one-off: %+v, %v", res, err)
 	}
 	raw := readOneOffTicket(t, h, res.Address)
-	for _, want := range []string{"type: prompt", "epic-a/01", "expected_context_window: 40000"} {
+	for _, want := range []string{"type: prompt", "expected_context_window: 40000"} {
 		if !strings.Contains(raw, want) {
 			t.Errorf("ticket lacks %q:\n%s", want, raw)
 		}
@@ -247,6 +247,7 @@ func TestOneOff_RefusesBadOptionsAndCreatesNothing(t *testing.T) {
 		req    wire.OneOffRequest
 		reason string
 	}{
+		{"existing blocker", wire.OneOffRequest{Prompt: "x", Cwd: repo, BlockedBy: []string{"proj:epic-a/01"}}, wire.ReasonBadBlocker},
 		{"unknown blocker", wire.OneOffRequest{Prompt: "x", Cwd: repo, BlockedBy: []string{"proj:epic-a/09"}}, wire.ReasonBadBlocker},
 		{"cross-project blocker", wire.OneOffRequest{Prompt: "x", Cwd: repo, BlockedBy: []string{"scratch:e/01"}}, wire.ReasonBadBlocker},
 	}

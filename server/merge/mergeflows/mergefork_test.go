@@ -124,7 +124,8 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 			t.Errorf("whole-epic dependent launched %d times before the merge", n)
 		}
 	})
-	servertest.WriteTicketWith(t, f.Store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{schedEpic}})
+	servertest.WriteTicketWith(t, f.Store, "proj", "dep", "01", "d", servertest.TicketOpts{})
+	servertest.WriteEpicBlockedBy(t, f.Store, "proj", "dep", schedEpic)
 	f.H.Server.Rescan()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -165,7 +166,7 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 func TestMergeFork_StackedEpicStampsTheBlockersTipBeforeAndAfterItsMergeTicket(t *testing.T) {
 	t.Parallel()
 	var blockerMoved atomic.Value
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {BlockedBy: []string{servertest.StackBlocker}}}, func(f *schedFixture, p *servertest.Turn, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		if isMergeTurn(p) {
 			gitOut(t, p.Cwd, "rebase", "-q", servertest.StackBlocker)
 			reportIteration(t, f.TicketFile(t, id), "finished")

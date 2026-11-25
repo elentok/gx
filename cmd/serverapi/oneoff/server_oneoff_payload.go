@@ -16,7 +16,7 @@ type oneOffFileFrontmatter struct {
 	Project               string   `yaml:"project"`
 	Name                  string   `yaml:"name"`
 	Agent                 string   `yaml:"agent"`
-	BlockedBy             []string `yaml:"blocked_by"`
+	BlockedBy             []string `yaml:"blocked_by"` // still read so the server can refuse it: a one-off takes no ticket blockers
 	ExpectedContextWindow int      `yaml:"expected_context_window"`
 	Front                 bool     `yaml:"front"`
 	Unique                string   `yaml:"unique"`

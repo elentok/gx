@@ -60,7 +60,6 @@ func TestExecute_TicketsValidate_OtherTicketsWarningsAreNotMentioned(t *testing.
 	cmdtest.WriteEpicTicket(t, dir, "e", "02-b.md", cmdtest.TicketFrontmatter("02", ""))
 	blocked := "blocked_by:\n  - \"01\"\n  - \"02\"\n"
 	cmdtest.WriteEpicTicket(t, dir, "e", "03-c.md", cmdtest.TicketFrontmatter("03", blocked))
-	cmdtest.WriteEpicTicket(t, dir, "other", "01-d.md", cmdtest.TicketFrontmatter("01", "blocked_by:\n  - \"e/01\"\n"))
 	path04 := cmdtest.WriteEpicTicket(t, dir, "e", "04-d.md", cmdtest.TicketFrontmatter("04", blocked))
 
 	stderr, err := validateStderr(t, path04)
@@ -113,23 +112,6 @@ func TestExecute_TicketsValidate_BaseWarnings(t *testing.T) {
 				"e/03-c.md": "blocked_by:\n  - \"01\"\n  - \"02\"\n",
 			},
 			path: "e/03-c.md",
-		},
-		{
-			name: "cross-epic commitful blocker",
-			files: map[string]string{
-				"other/01-a.md": "",
-				"e/02-b.md":     "blocked_by:\n  - \"other/01\"\n",
-			},
-			path: "e/02-b.md",
-			want: `ticket 02: blocker "other/01" is in another epic, so no base is derived`,
-		},
-		{
-			name: "cross-epic commitless blocker",
-			files: map[string]string{
-				"other/01-a.md": "commitless: true\n",
-				"e/02-b.md":     "blocked_by:\n  - \"other/01\"\n",
-			},
-			path: "e/02-b.md",
 		},
 		{
 			name: "resolved_base differs from the last claim",

@@ -260,7 +260,7 @@ func TestMergeRoot_StampsOnlyCompletedAtWhenTheMergePauses(t *testing.T) {
 // epic's branch, not into main.
 func stackedFixture(t *testing.T) *schedFixture {
 	t.Helper()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {BlockedBy: []string{servertest.StackBlocker}}}, func(f *schedFixture, p *servertest.Turn, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		f.EnableStackedAutoMerge(t)
 	})

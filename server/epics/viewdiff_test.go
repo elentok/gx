@@ -87,8 +87,10 @@ func TestEpicDetail_ViewDiffUnmerged(t *testing.T) {
 		for _, e := range []string{"bare", "ahead", "after-merge-blocker"} {
 			servertest.WriteTicketWith(t, store, "proj", e, "01", "t", servertest.TicketOpts{})
 		}
-		servertest.WriteTicketWith(t, store, "proj", "stacked", "01", "t", servertest.TicketOpts{BlockedBy: []string{"ahead/01"}})
-		servertest.WriteTicketWith(t, store, "proj", "after-merge", "01", "t", servertest.TicketOpts{BlockedBy: []string{"after-merge-blocker/01"}})
+		servertest.WriteTicketWith(t, store, "proj", "stacked", "01", "t", servertest.TicketOpts{})
+		servertest.WriteEpicBlockedBy(t, store, "proj", "stacked", "ahead")
+		servertest.WriteTicketWith(t, store, "proj", "after-merge", "01", "t", servertest.TicketOpts{})
+		servertest.WriteEpicBlockedBy(t, store, "proj", "after-merge", "after-merge-blocker")
 		servertest.WriteTicketWith(t, store, "proj", "explicit", "01", "t", servertest.TicketOpts{Base: "ahead"})
 		stampEpic(t, store, "after-merge-blocker", mergedFields(rangeBaseSHA, rangeTipSHA))
 		for _, b := range []string{"ahead", "stacked", "after-merge", "explicit"} {

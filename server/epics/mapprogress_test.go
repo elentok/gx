@@ -123,7 +123,8 @@ func handMergeEpic(t *testing.T, blocker, mapName string) func() tickets.Epic {
 		t.Fatal(err)
 	}
 	testutil.WriteFile(t, filepath.Join(store, "proj", mapName), "ticket.md", "---\nkind: map\nstatus: open\n---\n# Map\n")
-	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{blocker}})
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{})
+	servertest.WriteEpicBlockedBy(t, store, "proj", "dep", blocker)
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
 	if res, err := h.Client.Queue.Add(context.Background(), "proj:dep/01", "claude"); err != nil || res.Refused {

@@ -52,8 +52,8 @@ func setupMoveProject(t *testing.T) moveFixture {
 	src := filepath.Join(project, "src", "issues")
 	dst := filepath.Join(project, "dst", "issues")
 	testutil.WriteFile(t, src, "01-first.md", "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n\n# 01 — First\n\nbody\n")
-	testutil.WriteFile(t, src, "02-second.md", "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by:\n  - \"01\"\n---\n\n# 02 — Second\n")
-	testutil.WriteFile(t, src, "03-third.md", "---\nid: \"03\"\nstatus: open\ntype: implement\nblocked_by:\n  - \"01\"\n  - dst/01\nbase: \"02\"\n---\n\n# 03 — Third\n")
+	testutil.WriteFile(t, src, "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: implement\nblocked_by:\n  - \"01\"\n---\n\n# 02 — Second\n")
+	testutil.WriteFile(t, src, "03-third.md", "---\nid: \"03\"\nstatus: open\ntype: implement\nbase: \"02\"\n---\n\n# 03 — Third\n")
 	testutil.WriteFile(t, src, "04-run.md", "---\nid: \"04\"\nstatus: open\ntype: implement\nsession_ids:\n  - abc\n---\n\n# 04 — Run\n")
 	testutil.WriteFile(t, src, "05-done.md", "---\nid: \"05\"\nstatus: done\ntype: implement\n---\n\n# 05 — Done\n")
 	testutil.WriteFile(t, src, "06a-parent.md", "---\nid: \"06a\"\nstatus: open\ntype: implement\nparent: \"05\"\n---\n\n# 06a\n")
@@ -67,7 +67,8 @@ func setupMoveProject(t *testing.T) moveFixture {
 func TestExecute_TicketsMove_RenumbersAndRewritesOwnRefs(t *testing.T) {
 	f := setupMoveProject(t)
 
-	// 03 blocks on bare 01 (source epic) and dst/01 (target epic).
+	// 03 has no blocked_by: an open ticket that blocked on a source-epic ticket
+	// would turn into a cross-epic ref and the move would be refused (below).
 	out, err := runIn(t, f.repo, "tickets", "move", "src/03", "dst")
 	if err != nil {
 		t.Fatalf("move: %v", err)
@@ -86,8 +87,8 @@ func TestExecute_TicketsMove_RenumbersAndRewritesOwnRefs(t *testing.T) {
 	if got.ID != "03" || got.Status != schema.StatusOpen {
 		t.Errorf("id/status = %q/%q", got.ID, got.Status)
 	}
-	if want := []schema.TicketID{"src/01", "01"}; !equalIDs(got.BlockedBy, want) {
-		t.Errorf("blocked_by = %v, want %v", got.BlockedBy, want)
+	if len(got.BlockedBy) != 0 {
+		t.Errorf("blocked_by = %v, want none", got.BlockedBy)
 	}
 	if got.Base != "src/02" {
 		t.Errorf("base = %q, want src/02", got.Base)
@@ -95,6 +96,24 @@ func TestExecute_TicketsMove_RenumbersAndRewritesOwnRefs(t *testing.T) {
 	raw, _ := os.ReadFile(newPath)
 	if !strings.Contains(string(raw), "# 03 — Third") {
 		t.Errorf("title prefix not rewritten:\n%s", raw)
+	}
+}
+
+// An open ticket blocked on a source-epic ticket would hold a cross-epic ref
+// after the move, so the move is refused and writes nothing.
+func TestExecute_TicketsMove_OpenTicketWithOwnEpicRefIsRefused(t *testing.T) {
+	f := setupMoveProject(t)
+	testutil.WriteFile(t, filepath.Join(f.project, "src", "issues"), "09-x.md",
+		"---\nid: \"09\"\nstatus: open\ntype: implement\nblocked_by:\n  - \"01\"\n---\n\n# 09\n")
+	before := moveTreeSnapshot(t, f.project)
+
+	_, err := runIn(t, f.repo, "tickets", "move", "src/09", "dst")
+	var ae *tickets.AddressError
+	if !errors.As(err, &ae) || ae.Code != tickets.CodeMoveBrokenProj || !strings.Contains(err.Error(), "a ticket may only be blocked by tickets in its own epic") {
+		t.Fatalf("err = %v, want code %s with the cross-epic refusal", err, tickets.CodeMoveBrokenProj)
+	}
+	if after := moveTreeSnapshot(t, f.project); after != before {
+		t.Errorf("refusal wrote something")
 	}
 }
 
@@ -268,10 +287,10 @@ func addInboundFixtures(t *testing.T, f moveFixture) {
 	if err := os.MkdirAll(filepath.Join(far, "issues"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	testutil.WriteFile(t, far, "ticket.md", "---\nstatus: open\nblocked_by:\n  - src/01\n---\n\n# far\n")
-	testutil.WriteFile(t, filepath.Join(far, "issues"), "01-q.md", "---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by:\n  - mine:src/01\n---\n\n# 01\n")
+	testutil.WriteFile(t, far, "ticket.md", "---\nstatus: open\nblocked_by:\n  - src\n---\n\n# far\n")
+	testutil.WriteFile(t, filepath.Join(far, "issues"), "01-q.md", "---\nid: \"01\"\nstatus: done\ntype: implement\nblocked_by:\n  - mine:src/01\n---\n\n# 01\n")
 	testutil.WriteFile(t, filepath.Join(far, "issues"), "02-done.md", "---\nid: \"02\"\nstatus: done\ntype: implement\nblocked_by:\n  - src/01\n---\n\n# 02\n")
-	testutil.WriteFile(t, filepath.Join(f.project, "dst", "issues"), "04-in.md", "---\nid: \"04\"\nstatus: open\ntype: implement\nblocked_by:\n  - src/01\n  - src/08\n---\n\n# 04\n")
+	testutil.WriteFile(t, filepath.Join(f.project, "dst", "issues"), "04-in.md", "---\nid: \"04\"\nstatus: done\ntype: implement\nblocked_by:\n  - src/01\n  - src/08\n---\n\n# 04\n")
 	testutil.WriteFile(t, filepath.Join(f.project, "src", "issues"), "08-note.md", "---\nid: \"08\"\nstatus: open\ntype: research\n---\n\n# 08\n\nsee src/01 and src/010 for context\n")
 }
 
@@ -301,9 +320,10 @@ func TestExecute_TicketsMove_RewritesInboundRefsAndWarnsOnProse(t *testing.T) {
 			t.Errorf("%s: blocked_by = %v, want %v", tc.name, got.BlockedBy, tc.want)
 		}
 	}
+	// The epic's whole-epic blocked_by names no ticket, so the move leaves it.
 	md, _ := os.ReadFile(filepath.Join(f.project, "far", "ticket.md"))
-	if !strings.Contains(string(md), "dst/05") || strings.Contains(string(md), "src/01") || !strings.Contains(string(md), "# far") {
-		t.Errorf("epic ticket.md not rewritten:\n%s", md)
+	if !strings.Contains(string(md), "  - src\n") || !strings.Contains(string(md), "# far") {
+		t.Errorf("epic ticket.md changed:\n%s", md)
 	}
 
 	m := cmdtest.DecodeJSON(t, []byte(out))
@@ -313,7 +333,6 @@ func TestExecute_TicketsMove_RewritesInboundRefsAndWarnsOnProse(t *testing.T) {
 		filepath.Join(f.project, "dst", "issues", "04-in.md"),
 		filepath.Join(f.project, "far", "issues", "01-q.md"),
 		filepath.Join(f.project, "far", "issues", "02-done.md"),
-		filepath.Join(f.project, "far", "ticket.md"),
 	} {
 		if !listMentions(rewritten, p) {
 			t.Errorf("rewritten %v does not list %s", rewritten, p)

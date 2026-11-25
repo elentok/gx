@@ -42,7 +42,7 @@ func TestDeriveLeafBase(t *testing.T) {
 func baseEpics(blockerStatus string) []Epic {
 	return []Epic{
 		{Name: "a", Tickets: []Ticket{{Number: 1, Identifier: "01", Status: blockerStatus}}},
-		{Name: "b", BlockedBy: []string{"a/01"}, Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open"}}},
+		{Name: "b", BlockedBy: []string{"a"}, Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open"}}},
 	}
 }
 

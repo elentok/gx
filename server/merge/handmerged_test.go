@@ -23,7 +23,8 @@ func TestHandMerged_PlainGitMergeReleasesAnOnMergedDependent(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	commitOnBranch(t, repo, "blocker")
 	writeCompleteEpic(t, store, "blocker")
-	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker"}})
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{})
+	servertest.WriteEpicBlockedBy(t, store, "proj", "dep", "blocker")
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
 	launched := make(chan *servertest.Turn, 1)
@@ -86,7 +87,8 @@ func TestHandMerged_AnEpicWithAPRIsNotStampedByItsBranchBeingMerged(t *testing.T
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	writeCompleteEpic(t, store, "prepic")
-	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"prepic"}})
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{})
+	servertest.WriteEpicBlockedBy(t, store, "proj", "dep", "prepic")
 	if err := tickets.StampEpicFields(filepath.Join(store, "proj", "prepic"), map[string]any{"pr_number": 5, "pr_url": "https://github.com/o/r/pull/5"}); err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +124,8 @@ func TestHandMerged_StampsLinesFromTheEpicsTrailerCommits(t *testing.T) {
 	testutil.CommitAll(t, repo, "other epic's work\n\nRalph-Loop-Ticket: elsewhere/01")
 	runGitIn(t, repo, "checkout", "-q", "main")
 	writeCompleteEpic(t, store, "blocker")
-	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker"}})
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{})
+	servertest.WriteEpicBlockedBy(t, store, "proj", "dep", "blocker")
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
 	runGitIn(t, repo, "merge", "-q", "--ff-only", "blocker")
@@ -178,7 +181,8 @@ func TestHandMerged_FastForwardStampsTheReflogRange(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	trailerBranch(t, repo, "blocker", "blocker/01", "blocker/02")
 	writeCompleteEpic(t, store, "blocker")
-	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker"}})
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{})
+	servertest.WriteEpicBlockedBy(t, store, "proj", "dep", "blocker")
 	before, after, got := handMergeRange(t, store, repo, []string{"blocker"}, "merge", "-q", "--ff-only", "blocker")
 	if e := got["blocker"]; e.RangeBase != before || e.RangeTip != after {
 		t.Errorf("range = %q..%q, want %q..%q", e.RangeBase, e.RangeTip, before, after)
@@ -192,7 +196,8 @@ func TestHandMerged_NoFFMergeCommitMatches(t *testing.T) {
 	testutil.WriteFile(t, repo, "moved.txt", "m\n")
 	testutil.CommitAll(t, repo, "main moves on")
 	writeCompleteEpic(t, store, "blocker")
-	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker"}})
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{})
+	servertest.WriteEpicBlockedBy(t, store, "proj", "dep", "blocker")
 	before, after, got := handMergeRange(t, store, repo, []string{"blocker"}, "merge", "-q", "--no-ff", "-m", "merge", "blocker")
 	if e := got["blocker"]; e.RangeBase != before || e.RangeTip != after {
 		t.Errorf("range = %q..%q, want %q..%q", e.RangeBase, e.RangeTip, before, after)
@@ -210,7 +215,8 @@ func TestHandMerged_TwoEpicsInOneEntryGetNoRangeButBothMerged(t *testing.T) {
 	runGitIn(t, repo, "checkout", "-q", "main")
 	writeCompleteEpic(t, store, "blocker")
 	writeCompleteEpic(t, store, "other")
-	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker", "other"}})
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{})
+	servertest.WriteEpicBlockedBy(t, store, "proj", "dep", "blocker", "other")
 	_, _, got := handMergeRange(t, store, repo, []string{"blocker", "other"}, "merge", "-q", "--ff-only", "blocker")
 	for name, e := range got {
 		if e.RangeBase != "" || e.RangeTip != "" {
@@ -227,7 +233,8 @@ func TestHandMerged_EpicWithNoTrailerCommitsGetsAnEmptyRangeAtMainsTip(t *testin
 	testutil.CommitAll(t, repo, "no trailer")
 	runGitIn(t, repo, "checkout", "-q", "main")
 	writeCompleteEpic(t, store, "blocker")
-	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker"}})
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{})
+	servertest.WriteEpicBlockedBy(t, store, "proj", "dep", "blocker")
 	_, after, got := handMergeRange(t, store, repo, []string{"blocker"}, "merge", "-q", "--ff-only", "blocker")
 	if e := got["blocker"]; e.RangeBase != after || e.RangeTip != after {
 		t.Errorf("range = %q..%q, want empty at %q", e.RangeBase, e.RangeTip, after)
@@ -242,7 +249,8 @@ func TestHandMerged_StampsSummedTotalsFromTheEpicsTickets(t *testing.T) {
 	path := filepath.Join(store, "proj", "blocker", "issues", "01-t.md")
 	stamps := "\ntotal_tokens: 700\nactual_cost: 0.25\nfriction:\n  total_paused_secs: 9\n---\n\n"
 	testutil.WriteFile(t, filepath.Dir(path), filepath.Base(path), strings.Replace(servertest.ReadFile(t, path), "\n---\n\n", stamps, 1))
-	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker"}})
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{})
+	servertest.WriteEpicBlockedBy(t, store, "proj", "dep", "blocker")
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
 	runGitIn(t, repo, "merge", "-q", "--ff-only", "blocker")
@@ -269,7 +277,8 @@ func TestHandMerged_FrictionIncludesACancelledTicket(t *testing.T) {
 	testutil.WriteFile(t, filepath.Dir(path), filepath.Base(path), strings.Replace(servertest.ReadFile(t, path), "\n---\n\n", stamps, 1))
 	gone := "---\nid: \"02\"\nstatus: cancelled\ntype: implement\nfriction:\n  total_paused_secs: 4\n---\nBody.\n"
 	testutil.WriteFile(t, filepath.Dir(path), "02-gone.md", gone)
-	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker"}})
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{})
+	servertest.WriteEpicBlockedBy(t, store, "proj", "dep", "blocker")
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
 	runGitIn(t, repo, "merge", "-q", "--ff-only", "blocker")
@@ -302,7 +311,8 @@ func TestHandMerged_EpicWithNoQueuedRootAndNoDependentIsNotChecked(t *testing.T)
 		return false, nil
 	})
 	// The dependent arrives after the swap, so "waited" is the control that proves polls run.
-	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"waited"}})
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{})
+	servertest.WriteEpicBlockedBy(t, store, "proj", "dep", "waited")
 
 	has := func(ref string) bool {
 		mu.Lock()

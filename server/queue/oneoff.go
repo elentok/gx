@@ -148,10 +148,6 @@ func (o *OneOffs) oneOffValidate(req wire.OneOffRequest, scheduledFor time.Time,
 	if refused := o.oneOffOptionsRefusal(project, req); refused != nil {
 		return *refused, nil
 	}
-	for _, b := range req.BlockedBy {
-		a, _ := tickets.ParseAddress(b, tickets.AddressContext{})
-		tk.BlockedBy = append(tk.BlockedBy, schema.TicketID(a.Epic+"/"+a.ID))
-	}
 	// The queue refuses an unknown agent; the new epic can be neither a map epic
 	// nor already queued, so the agent is the only enqueue check left to do here.
 	agent, bad := resolveAgent(req.Agent)
@@ -307,7 +303,7 @@ func (o *OneOffs) NotifyResult(addr tickets.Address, ticketPath string) {
 }
 
 // oneOffOptionsRefusal checks the submit options before anything is written. A
-// blocker must be a ticket of the same project (no cross-project blocking).
+// one-off takes no blockers: cross-epic ticket blockers no longer exist.
 func (o *OneOffs) oneOffOptionsRefusal(project string, req wire.OneOffRequest) *wire.OneOffResult {
 	refuse := func(reason, msg string) *wire.OneOffResult {
 		r := oneOffRefusal(reason, msg)
@@ -319,23 +315,8 @@ func (o *OneOffs) oneOffOptionsRefusal(project string, req wire.OneOffRequest) *
 	if req.ExpectedContextWindow < 0 {
 		return refuse(wire.ReasonBadWindow, "expected context window must be non-negative")
 	}
-	if len(req.BlockedBy) == 0 {
-		return nil
-	}
-	if err := o.Index.Refresh(); err != nil {
-		r := oneOffRefusal(wire.ReasonBadBlocker, err.Error())
-		return &r
-	}
-	for _, b := range req.BlockedBy {
-		a, err := tickets.ParseAddress(b, tickets.AddressContext{})
-		switch {
-		case err != nil:
-			return refuse(wire.ReasonBadBlocker, err.Error())
-		case a.Project != project:
-			return refuse(wire.ReasonBadBlocker, b+" is in another project (cross-project blocking not supported)")
-		case !o.Queue.hasTicket(a.String()):
-			return refuse(wire.ReasonBadBlocker, "no ticket "+b)
-		}
+	if len(req.BlockedBy) > 0 {
+		return refuse(wire.ReasonBadBlocker, "a one-off cannot be blocked by a ticket (a ticket may only be blocked by tickets in its own epic); to hold the one-off's work behind an epic, run `gx tickets epic set <epic> --blocked-by <other>` on the epic that should wait")
 	}
 	return nil
 }

@@ -102,6 +102,21 @@ func WriteTicketWith(t *testing.T, store, project, epic, id, slug string, opts T
 	}
 }
 
+// WriteEpicBlockedBy makes the epic wait on whole epics: it creates the epic if
+// needed and writes its ticket.md with the blockers on the epic's blocked_by.
+// A ticket may only be blocked by tickets of its own epic, so a fixture that
+// needs cross-epic ordering blocks the dependent epic instead.
+func WriteEpicBlockedBy(t *testing.T, store, project, epic string, blockers ...string) {
+	t.Helper()
+	if err := WriteEpic(store, project, epic); err != nil {
+		t.Fatal(err)
+	}
+	md := "---\nstatus: open\nblocked_by: [" + strings.Join(blockers, ", ") + "]\n---\n"
+	if err := os.WriteFile(filepath.Join(store, project, epic, "ticket.md"), []byte(md), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // WriteEpic creates an epic with no tickets, and the project it lives in.
 // An empty epic name creates only the project.
 func WriteEpic(store, project, epic string) error {

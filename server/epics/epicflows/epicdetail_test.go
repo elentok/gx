@@ -29,14 +29,10 @@ func TestEpicDetail_LoopEpic(t *testing.T) {
 				"01-a.md": rigs.IssueMD("01", "done", "elapsed_time: 60\nactual_cost: 1.5\n", "A"),
 				"02-b.md": rigs.IssueMD("02", "done", "parent: \"01\"\nelapsed_time: 30\nactual_cost: 0.5\n", "B"),
 				"03-c.md": rigs.IssueMD("03", "cancelled", "", "C"),
-				"04-d.md": rigs.IssueMD("04", "open", "blocked_by: [\"other/06\"]\n", "D"),
+				"04-d.md": rigs.IssueMD("04", "open", "blocked_by: [\"06\"]\n", "D"),
 				"05-e.md": rigs.IssueMD("05", "open", "blocked_by: [\"04\"]\n", "E"),
 				"06-f.md": rigs.IssueMD("06", "open", "", "F"),
 			})
-
-		rigs.WriteEpicFiles(t, store, "other", "---\nstatus: open\n---\n", map[string]string{
-			"06-x.md": rigs.IssueMD("06", "open", "", "X"),
-		})
 
 		path := filepath.Join(store, "proj", "work", "issues", "06-f.md")
 		if err := schema.UpdateTicket(path, func(tk *schema.Ticket) {
@@ -72,8 +68,8 @@ func TestEpicDetail_LoopEpic(t *testing.T) {
 	if r := rowOf(t, d, "proj:work/03"); r.RenderedStatus != "cancelled" {
 		t.Errorf("row 03 = %+v", r)
 	}
-	if r := rowOf(t, d, "proj:work/04"); !slices.Equal(r.Blockers, []string{"other/06"}) {
-		t.Errorf("cross-epic blockers = %v, want [other/06]", r.Blockers)
+	if r := rowOf(t, d, "proj:work/04"); !slices.Equal(r.Blockers, []string{"06"}) {
+		t.Errorf("own-epic blockers = %v, want [06]", r.Blockers)
 	}
 	if r := rowOf(t, d, "proj:work/05"); !slices.Equal(r.Blockers, []string{"04"}) {
 		t.Errorf("own-epic blockers = %v, want [04]", r.Blockers)

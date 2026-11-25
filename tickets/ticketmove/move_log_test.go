@@ -1,8 +1,10 @@
 package ticketmove
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/tickets"
@@ -78,7 +80,9 @@ func TestRewriteRefsInFile_WaitsForProjectMigration(t *testing.T) {
 	})
 }
 
-func TestPlanMove_ArchivedBlockerIsNotABreak(t *testing.T) {
+// A ticket's blocker in another epic, archived or not, is refused: the moved
+// ticket holds a cross-epic ref, so the plan breaks the project.
+func TestPlanMove_CrossEpicBlockerIsRefused(t *testing.T) {
 	root := t.TempDir()
 	oldPath := filepath.Join(root, "src", "issues", "01-one.md")
 	tickettest.WriteFile(t, oldPath, "---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by:\n  - gone/01\n---\n\n# 01 — One\n")
@@ -86,8 +90,10 @@ func TestPlanMove_ArchivedBlockerIsNotABreak(t *testing.T) {
 	tickettest.WriteFile(t, filepath.Join(root, ".archive", "gone", "issues", ".keep"), "")
 
 	a := tickets.Address{Project: "p", Epic: "src", ID: "01"}
-	if _, err := PlanMove(root, a, tickets.Ticket{Identifier: "01", Path: oldPath}, "dst", "", MoveOpts{}); err != nil {
-		t.Fatalf("plan: %v", err)
+	_, err := PlanMove(root, a, tickets.Ticket{Identifier: "01", Path: oldPath}, "dst", "", MoveOpts{})
+	var ae *tickets.AddressError
+	if !errors.As(err, &ae) || ae.Code != tickets.CodeMoveBrokenProj || !strings.Contains(err.Error(), "a ticket may only be blocked by tickets in its own epic") {
+		t.Fatalf("plan err = %v, want %s with the cross-epic refusal", err, tickets.CodeMoveBrokenProj)
 	}
 }
 

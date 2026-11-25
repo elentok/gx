@@ -45,7 +45,7 @@ func TestPlanMove_SourceKinds(t *testing.T) {
 			tickettest.WriteFile(t, filepath.Join(root, "src", "issues", "01-a.md"), tk)
 			tickettest.WriteFile(t, filepath.Join(root, "dst", "ticket.md"), "---\nstatus: open\nkind: backlog\n---\n\n# dst\n")
 			tickettest.WriteFile(t, filepath.Join(root, "other", "issues", "01-b.md"),
-				"---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by:\n  - src/01\n---\n\n# b\n")
+				"---\nid: \"01\"\nstatus: done\ntype: implement\nblocked_by:\n  - src/01\n---\n\n# b\n")
 
 			plan, err := planFrom(t, root, "src", "dst", MoveOpts{Archive: tc.archive})
 			if tc.refused {

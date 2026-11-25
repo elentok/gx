@@ -199,7 +199,7 @@ func TestExecute_TicketsShow_RendersWidenedBlocker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "blocked_by: 06, other (via other/01), other/02\n") {
+	if !strings.Contains(out, "blocked_by: 06, other/01, other/02\n") {
 		t.Errorf("show printed %q", out)
 	}
 }

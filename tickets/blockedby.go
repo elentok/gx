@@ -13,9 +13,8 @@ import (
 
 // CheckBlockedBy is the one verdict on t's bare blocked_by refs, shared by
 // `gx tickets validate` and the loader so both report the same message: each
-// must name a ticket in e. A cross-epic ref ("epic/06" or a whole "epic")
-// needs the whole project to resolve, so it is left to ValidateProject. Every
-// bad ref is reported at once.
+// must name a ticket in e; a cross-epic ref ("epic/06" or a whole "epic") is
+// refused. Every bad ref is reported at once.
 func (e Epic) CheckBlockedBy(t Ticket) error {
 	return e.checkBlockedByIn(newProjectGraph("", []Epic{e}, nil), t)
 }
@@ -23,7 +22,6 @@ func (e Epic) CheckBlockedBy(t Ticket) error {
 // checkBlockedByIn is CheckBlockedBy against g, the graph of e alone, so a
 // caller checking every ticket builds it once.
 func (e Epic) checkBlockedByIn(g *projectGraph, t Ticket) error {
-	t.BlockedBy = slices.DeleteFunc(slices.Clone(t.BlockedBy), crossEpicRef)
 	return errors.Join(g.checkBlockedBy(e.Name, t)...)
 }
 
@@ -32,9 +30,10 @@ func (e Epic) checkBlockedByIn(g *projectGraph, t Ticket) error {
 // BlockedBy so the message and `validate` stay in step; StatusError is never
 // runnable, so the loop can't claim it.
 //
-// A single epic can't resolve a qualified ref (its own or its epic's), so it
-// fails closed here: only ResolveCrossEpic, which sees the whole project, lifts
-// that. This is what an in-process loop (no server) falls back on.
+// A ticket's cross-epic ref is refused outright. A single epic can't resolve
+// its epic's own whole-epic blocked_by, so it fails closed here: only
+// ResolveCrossEpic, which sees the whole project, lifts that. This is what an
+// in-process loop (no server) falls back on.
 func (e *Epic) flagDanglingBlockers() {
 	epicQualified := qualifiedRefs(e.BlockedBy)
 	g := newProjectGraph("", []Epic{*e}, nil)
@@ -49,8 +48,8 @@ func (e *Epic) flagDanglingBlockers() {
 		if t.IsTerminal() {
 			continue
 		}
-		if refs := append(qualifiedRefs(t.BlockedBy), epicQualified...); len(refs) > 0 {
-			t.BlockedByErr = fmt.Sprintf("blocked_by %s crosses epics; only the server resolves that", strings.Join(refs, ", "))
+		if len(epicQualified) > 0 {
+			t.BlockedByErr = fmt.Sprintf("blocked_by %s crosses epics; only the server resolves that", strings.Join(epicQualified, ", "))
 		}
 	}
 }

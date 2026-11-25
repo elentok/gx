@@ -46,7 +46,7 @@ func TestTicketDetail_LoopTicketPayload(t *testing.T) {
 		rigs.WriteEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
 			"01-a.md": rigs.IssueMD("01", "done", "", "Own blocker"),
 			"02-b.md": rigs.IssueMD("02", "done", "", "The parent"),
-			"03-c.md": issueWithBody("03", "open", "parent: \"02\"\nblocked_by: [\"01\", \"other/06\"]\n", "The ticket",
+			"03-c.md": issueWithBody("03", "done", "parent: \"02\"\nblocked_by: [\"01\", \"other/06\"]\n", "The ticket",
 				"## Description\n\nDo it.\n\n## Comments\n\nA note.\n"),
 			"04-d.md": rigs.IssueMD("04", "open", "parent: \"03\"\n", "A fork"),
 		})
@@ -71,7 +71,7 @@ func TestTicketDetail_LoopTicketPayload(t *testing.T) {
 		{Relation: wire.RelationBlocker, Address: "proj:work/01", Linkable: true, Title: "Own blocker", Status: "done"},
 		{Relation: wire.RelationBlocker, Address: "proj:other/06", Linkable: true, Title: "Cross blocker", Status: "claimed"},
 		{Relation: wire.RelationParent, Address: "proj:work/02", Linkable: true, Title: "The parent", Status: "waiting-for-children"},
-		{Relation: wire.RelationFork, Address: "proj:work/04", Linkable: true, Title: "A fork", Status: "blocked"},
+		{Relation: wire.RelationFork, Address: "proj:work/04", Linkable: true, Title: "A fork", Status: "open"},
 	}
 	if !slices.Equal(d.Related, want) {
 		t.Fatalf("related = %+v, want %+v", d.Related, want)

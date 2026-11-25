@@ -282,11 +282,49 @@ func (g *projectGraph) buildWait(epics []Epic) {
 func (g *projectGraph) checkBlockedBy(epic string, t Ticket) []error {
 	var errs []error
 	for _, ref := range t.BlockedBy {
+		if crossEpicRef(ref) {
+			// A finished ticket keeps its old cross-epic ref unchecked.
+			if t.IsTerminal() {
+				continue
+			}
+			if err := g.crossEpicRefusal(epic, ref, "a ticket may only be blocked by tickets in its own epic"); err != nil {
+				errs = append(errs, fmt.Errorf("ticket %s: blocked_by %w", t.DisplayNumber(), err))
+				continue
+			}
+		}
 		if _, err := g.resolveBlocker(epic, ref); err != nil {
 			errs = append(errs, fmt.Errorf("ticket %s: blocked_by %w", t.DisplayNumber(), err))
 		}
 	}
 	return errs
+}
+
+// refEpic is the project (empty for a bare ref) and epic a qualified or
+// whole-epic blocked_by ref names.
+func refEpic(ref string) (project, epic string, ok bool) {
+	if p, e, isEpic := BlockedByEpicRef("", ref); isEpic {
+		return p, e, true
+	}
+	if a, err := ParseAddress(ref, AddressContext{}); err == nil && strings.Contains(ref, "/") {
+		return a.Project, a.Epic, true
+	}
+	return "", "", false
+}
+
+// crossEpicRefusal is the error for a ref that names another epic of this
+// project, or nil when ref is not one (own epic, malformed: resolveBlocker
+// judges those). A ref naming another project keeps its own message.
+func (g *projectGraph) crossEpicRefusal(epic, ref, rule string) error {
+	project, other, ok := refEpic(ref)
+	switch {
+	case !ok:
+		return nil
+	case project != "" && project != g.project:
+		return fmt.Errorf("%q names another project (cross-project blocking not supported)", ref)
+	case other == epic:
+		return nil
+	}
+	return fmt.Errorf("%q: %s; to wait on %s, run `gx tickets epic set %s --blocked-by %s`", ref, rule, other, epic, other)
 }
 
 // cycleErrors reports each of t's blocked_by refs that closes a wait cycle,
@@ -313,8 +351,11 @@ func (g *projectGraph) cycleErrors(epic string, t Ticket) []error {
 func (g *projectGraph) epicBlockedByErrors(e Epic) []error {
 	var errs []error
 	for _, ref := range e.BlockedBy {
-		blocker, err := g.resolveBlocker(e.Name, ref)
-		if err == nil && !crossEpicRef(ref) {
+		var blocker string
+		var err error
+		if _, _, isEpic := BlockedByEpicRef(g.project, ref); isEpic {
+			blocker, err = g.resolveBlocker(e.Name, ref)
+		} else if err = g.crossEpicRefusal(e.Name, ref, "an epic may only be blocked by whole epics"); err == nil {
 			err = fmt.Errorf("%q names a ticket of this epic", ref)
 		}
 		if err != nil {

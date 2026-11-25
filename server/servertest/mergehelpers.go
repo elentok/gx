@@ -40,8 +40,9 @@ const StackBlocker = "blocker"
 
 // StackOnBlocker stacks the fixture's epic on a done, unmerged StackBlocker
 // epic with one commit on its own branch. The project releases on-done, so
-// the epic's merge target is that branch. The fixture's ticket 01 must name
-// StackBlocker in BlockedBy. With auto-ff-merge on, a done blocker releases
+// the epic's merge target is that branch. It writes the epic's blocked_by
+// (StackBlocker), so the fixture's tickets carry no cross-epic blocker. With
+// auto-ff-merge on, a done blocker releases
 // its dependents only once merged, so the project starts with it off:
 // EnableStackedAutoMerge turns it on, from the epic's agent turn. Call
 // StackOnBlocker before queuing the epic.
@@ -49,6 +50,7 @@ func (f *SchedFixture) StackOnBlocker(t *testing.T) {
 	t.Helper()
 	CommitOnBranch(t, f.Repo, StackBlocker)
 	WriteCompleteEpic(t, f.Store, StackBlocker)
+	WriteEpicBlockedBy(t, f.Store, "proj", SchedEpic, StackBlocker)
 	f.writeStackedProject(t, "")
 	f.H.Server.Rescan()
 }
