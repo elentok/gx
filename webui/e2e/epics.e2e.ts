@@ -669,8 +669,8 @@ test("213. Waiting epic", async ({ page, start }) => {
   await expect(stale).toBeVisible()
   await expect(stale.getByRole("link")).toHaveCount(0)
   await stale.getByRole("button").click()
-  // Clearing it is refused by the route today (gx:follow-ups/800); the page stays up.
-  await expect(page.getByTestId("stats-line")).toBeVisible()
+  await expect(stale).toHaveCount(0)
+  await expect.poll(blockedBy).not.toContain(ticketRef)
 
   // 8. Refusal inside the open picker, nothing written.
   const before = await blockedBy()

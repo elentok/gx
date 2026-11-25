@@ -42,8 +42,8 @@ func (s *Epics) EpicBlocker(req wire.EpicBlockerRequest) (wire.EpicBlockerResult
 	if !ok {
 		return blockerRefusal(res, wire.ReasonInvalidAddress, req.Address+" is not an epic address (want project:epic)"), nil
 	}
-	bProject, bEpic, ok := tickets.ParseEpicAddress(req.Blocker)
-	if !ok {
+	bProject, bEpic, blockerIsAddress := tickets.ParseEpicAddress(req.Blocker)
+	if !blockerIsAddress && !req.Remove {
 		return blockerRefusal(res, wire.ReasonInvalidAddress, req.Blocker+" is not an epic address (want project:epic)"), nil
 	}
 
@@ -62,12 +62,20 @@ func (s *Epics) EpicBlocker(req wire.EpicBlockerRequest) (wire.EpicBlockerResult
 	res.BlockedBy = stored
 	names := func(ref string) bool {
 		p, e, isEpic := tickets.BlockedByEpicRef(project, ref)
-		return isEpic && p == bProject && e == bEpic
+		return blockerIsAddress && isEpic && p == bProject && e == bEpic
 	}
 
 	refs := slices.Clone(stored)
 	if req.Remove {
-		refs = slices.DeleteFunc(refs, names)
+		// A stale entry (a ticket ref or a deleted epic's bare name) is not an
+		// epic address, so match the stored text exactly before parsing.
+		refs = slices.DeleteFunc(refs, func(ref string) bool { return ref == req.Blocker })
+		if slices.Equal(refs, stored) {
+			if !blockerIsAddress {
+				return blockerRefusal(res, wire.ReasonInvalidAddress, req.Blocker+" is not an epic address (want project:epic)"), nil
+			}
+			refs = slices.DeleteFunc(refs, names)
+		}
 	} else if !slices.ContainsFunc(stored, names) {
 		added := bEpic
 		if bProject != project {

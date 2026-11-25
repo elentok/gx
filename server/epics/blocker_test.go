@@ -89,6 +89,17 @@ func TestEpicBlocker_StaleEntryDoesNotBlockOthers(t *testing.T) {
 	}
 }
 
+func TestEpicBlocker_RemovesStaleEntryByStoredRef(t *testing.T) {
+	t.Parallel()
+	for _, stale := range []string{"other/06", "gone"} {
+		e, _ := blockerStore(t, "[landed, "+stale+", live]")
+		res := blocker(t, e, "p:target", stale, true)
+		if res.Refused || !slices.Equal(res.BlockedBy, []string{"landed", "live"}) {
+			t.Errorf("remove %q: %+v", stale, res)
+		}
+	}
+}
+
 func TestEpicBlocker_CycleRefusalWritesNothing(t *testing.T) {
 	t.Parallel()
 	e, md := blockerStore(t, "[]")
