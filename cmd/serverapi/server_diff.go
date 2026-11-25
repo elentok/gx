@@ -68,6 +68,23 @@ func newServerDiffBlobCmd(d Deps) *cobra.Command {
 		}, printDiffBlob)
 }
 
+func newServerDiffWorktreeCmd(d Deps) *cobra.Command {
+	return newDiffCmd(d, "diff-worktree <kind>:<id>", "snapshot a chat's or Design's worktree and print the SHAs to diff", 1, false,
+		func(ctx context.Context, cl *apiclient.Client, project string, a, _ []string) (wire.DiffWorktree, error) {
+			return cl.Reads.DiffWorktree(ctx, project, a[0])
+		}, printDiffWorktree)
+}
+
+func printDiffWorktree(w io.Writer, t wire.DiffWorktree) error {
+	if t.Reason != "" {
+		_, err := fmt.Fprintf(w, "no worktree diff: %s\n", t.Reason)
+		return err
+	}
+	_, err := fmt.Fprintf(w, "base %s (%s)\nhead %s\nsnapshot %s\nuncommitted %t\nleft out %d\n",
+		t.BaseLabel, t.BaseSHA, t.HeadSHA, t.SnapshotSHA, t.Uncommitted, t.LeftOut)
+	return err
+}
+
 func printDiffFiles(w io.Writer, f wire.DiffFiles) error {
 	if f.CommitsUnavailable {
 		_, err := fmt.Fprintln(w, commitsUnavailableText)

@@ -253,6 +253,14 @@ func (r *Reads) DiffBlob(ctx context.Context, project, base, tip, path string) (
 	return d, err
 }
 
+// DiffWorktree resolves a "<kind>:<id>" target to its Worktree diff snapshot.
+func (r *Reads) DiffWorktree(ctx context.Context, project, target string) (wire.DiffWorktree, error) {
+	q := url.Values{"project": {project}, "target": {target}}
+	var d wire.DiffWorktree
+	err := r.t.get(ctx, "/v1/diff/worktree?"+q.Encode(), &d)
+	return d, err
+}
+
 // Tips returns the tips for the server machine's OS.
 func (r *Reads) Tips(ctx context.Context) ([]wire.Tip, error) {
 	var l []wire.Tip

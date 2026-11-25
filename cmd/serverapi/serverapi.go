@@ -46,7 +46,7 @@ type Deps struct {
 func Commands(d Deps) []*cobra.Command {
 	return []*cobra.Command{
 		newServerSnapshotCmd(d), newServerEventsCmd(d), newServerLocksCmd(d), newServerTicketsCmd(d),
-		newServerEpicsCmd(d), newServerBacklogCmd(d), newServerInitiativesCmd(d), newServerInitiativeCmd(d), newServerStatsCmd(d), newServerDiffFilesCmd(d), newServerDiffPatchCmd(d), newServerDiffCommitsCmd(d), newServerDiffBlobCmd(d), newServerTipsCmd(d), newServerIterationsCmd(d), newServerAgentsCmd(d),
+		newServerEpicsCmd(d), newServerBacklogCmd(d), newServerInitiativesCmd(d), newServerInitiativeCmd(d), newServerStatsCmd(d), newServerDiffFilesCmd(d), newServerDiffPatchCmd(d), newServerDiffCommitsCmd(d), newServerDiffBlobCmd(d), newServerDiffWorktreeCmd(d), newServerTipsCmd(d), newServerIterationsCmd(d), newServerAgentsCmd(d),
 		newServerQueueCmd(d), oneoff.NewCmd(d.Env), newServerReloadConfigCmd(d), newServerConfigStatusCmd(d),
 		newServerChecksCmd(d), newServerChecksSaveCmd(d), newServerDefaultHarnessCmd(d), newServerDefaultHarnessSetCmd(d), newServerSettingsCmd(d), newServerSettingsSetCmd(d),
 		newServerCleanupCmd(d), newServerCleanupRemoveCmd(d), newServerCleanupRemoveUnmergedCmd(d), newServerCleanupArchiveCmd(d), newServerCleanupAgentCmd(d), newServerCleanupDeleteCmd(d), newServerDiskCmd(d), newServerHealthCmd(d), newServerRestartCheckCmd(d), newServerRestartNowCmd(d),

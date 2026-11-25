@@ -743,6 +743,45 @@ export interface DiffBlobs {
   old: DiffBlob;
   new: DiffBlob;
 }
+/**
+ * DiffNoWorktree: the target has no worktree of the project's repo.
+ */
+export const DiffNoWorktree = "no_worktree";
+/**
+ * DiffNoDiff: the target's entity has no Worktree diff (a Design or Triage
+ * session, or a target kind the server does not resolve yet).
+ */
+export const DiffNoDiff = "no_diff";
+/**
+ * Reasons a Worktree diff target has nothing to show.
+ */
+export type DiffNo = typeof DiffNoWorktree | typeof DiffNoDiff;
+/**
+ * DiffWorktree answers GET /v1/diff/worktree. The page calls files, patch and
+ * blob with BaseSHA and SnapshotSHA. Reason is set, and every other field
+ * empty, when the target has nothing to show.
+ */
+export interface DiffWorktree {
+  reason?: string;
+  /**
+   * BaseSHA is the merge-base of HEAD with trunk; BaseLabel is "<trunk>@<short sha>".
+   */
+  base_sha?: string;
+  base_label?: string;
+  head_sha?: string;
+  /**
+   * SnapshotSHA is the commit of the worktree's tracked and untracked changes.
+   */
+  snapshot_sha?: string;
+  /**
+   * Uncommitted says whether the worktree differs from HEAD.
+   */
+  uncommitted?: boolean;
+  /**
+   * LeftOut counts the untracked files the snapshot does not hold.
+   */
+  left_out?: number /* int */;
+}
 
 //////////
 // source: diskwatch.go

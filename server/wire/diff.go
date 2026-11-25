@@ -101,3 +101,29 @@ type DiffBlobs struct {
 	Old                DiffBlob `json:"old"`
 	New                DiffBlob `json:"new"`
 }
+
+// Reasons a Worktree diff target has nothing to show.
+const (
+	// DiffNoWorktree: the target has no worktree of the project's repo.
+	DiffNoWorktree = "no_worktree"
+	// DiffNoDiff: the target's entity has no Worktree diff (a Design or Triage
+	// session, or a target kind the server does not resolve yet).
+	DiffNoDiff = "no_diff"
+)
+
+// DiffWorktree answers GET /v1/diff/worktree. The page calls files, patch and
+// blob with BaseSHA and SnapshotSHA. Reason is set, and every other field
+// empty, when the target has nothing to show.
+type DiffWorktree struct {
+	Reason string `json:"reason,omitempty"`
+	// BaseSHA is the merge-base of HEAD with trunk; BaseLabel is "<trunk>@<short sha>".
+	BaseSHA   string `json:"base_sha,omitempty"`
+	BaseLabel string `json:"base_label,omitempty"`
+	HeadSHA   string `json:"head_sha,omitempty"`
+	// SnapshotSHA is the commit of the worktree's tracked and untracked changes.
+	SnapshotSHA string `json:"snapshot_sha,omitempty"`
+	// Uncommitted says whether the worktree differs from HEAD.
+	Uncommitted bool `json:"uncommitted,omitempty"`
+	// LeftOut counts the untracked files the snapshot does not hold.
+	LeftOut int `json:"left_out,omitempty"`
+}

@@ -574,6 +574,16 @@ func New(cfg Config) (*Server, error) {
 		s.webAttach.Forget(id)
 	}
 	s.designs.GiveSessions(s.sessions)
+	s.diff.GiveLookups(diff.Lookups{
+		Session: func(id string) (diff.SessionRef, bool) {
+			_, meta, res, err := s.sessions.SessionDir(id)
+			if err != nil || res.Refused {
+				return diff.SessionRef{}, false
+			}
+			return diff.SessionRef{Dir: meta.Dir, Stepped: meta.IsStepped()}, true
+		},
+		DesignWorktree: func(project, epic string) (string, error) { return designs.WorktreePath(s.designs, project, epic) },
+	})
 	s.prompt.GiveSessions(s.sessions)
 	s.triage.GiveSessions(s.sessions)
 	s.rec.GiveSessions(s.sessions)

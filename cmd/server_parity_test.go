@@ -202,6 +202,7 @@ var routeVerbs = map[string]string{
 	"GET /v1/diff/patch":                        "server diff-patch",
 	"GET /v1/diff/commits":                      "server diff-commits",
 	"GET /v1/diff/blob":                         "server diff-blob",
+	"GET /v1/diff/worktree":                     "server diff-worktree",
 	"GET /v1/schedules":                         "schedules list",
 	"GET /v1/schedules/show":                    "schedules show",
 	"POST /v1/schedules/create":                 "schedules create",

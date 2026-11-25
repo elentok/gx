@@ -162,3 +162,10 @@ func (s *Designs) DraftRows(workspace func(key string) string) []wire.DesignDraf
 
 // GiveSessions sets the Manager the design sessions are made and stopped through.
 func (s *Designs) GiveSessions(m *sessions.Manager) { s.sessions = m }
+
+// WorktreePath is where the map's Design worktree lives, whether or not it exists.
+// A function, not a method: Designs is at its method limit.
+func WorktreePath(s *Designs, project, epic string) (string, error) {
+	c, err := s.designCtxOf(project, epic)
+	return c.path, err
+}

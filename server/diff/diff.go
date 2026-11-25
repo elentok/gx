@@ -24,7 +24,10 @@ type Deps struct {
 }
 
 // Diff serves the Diff routes.
-type Diff struct{ Deps }
+type Diff struct {
+	Deps
+	lookups Lookups
+}
 
 // New builds the Diff read model.
 func New(d Deps) *Diff { return &Diff{Deps: d} }
@@ -43,6 +46,7 @@ func Routes(get func() *Diff) []wire.Route {
 		read("GET /v1/diff/patch", (*Diff).Patch),
 		read("GET /v1/diff/commits", (*Diff).Commits),
 		read("GET /v1/diff/blob", (*Diff).Blob),
+		read("GET /v1/diff/worktree", (*Diff).Worktree),
 	}
 }
 
