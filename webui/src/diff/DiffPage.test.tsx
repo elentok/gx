@@ -5,7 +5,10 @@ import type { Device } from "../useWide"
 import type { DiffFilesResult, FetchDiffCommitPatches, FetchDiffFiles, FetchDiffPatch } from "./api"
 import { COMMITS, filesForCommits, renderDiff } from "./renderDiff.testutil"
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 const range = (over: Partial<DiffRange> = {}): DiffRange => ({
   first_sha: "a",
@@ -299,9 +302,9 @@ test("the Split/Unified switch is in the header", async () => {
   await screen.findByTestId("range-chip")
   const toggle = screen.getByTestId("view-toggle")
   expect(screen.getByTestId("diff-header").contains(toggle)).toBe(true)
-  expect(screen.getByRole("button", { name: "Split" }).getAttribute("aria-pressed")).toBe("true")
-  fireEvent.click(screen.getByRole("button", { name: "Unified" }))
   expect(screen.getByRole("button", { name: "Unified" }).getAttribute("aria-pressed")).toBe("true")
+  fireEvent.click(screen.getByRole("button", { name: "Split" }))
+  expect(screen.getByRole("button", { name: "Split" }).getAttribute("aria-pressed")).toBe("true")
 })
 
 const style = () => (pierre.last?.options as { diffStyle: string } | undefined)?.diffStyle
@@ -354,22 +357,65 @@ test("large, generated and binary files get a header and no body or fetch", asyn
   expect(fetchPatch).not.toHaveBeenCalled()
 })
 
-test("split on desktop, unified on phone, and the switch changes the view and survives a file change", async () => {
+test("unified by default, and the switch changes the view and survives a file change", async () => {
+  render(OPEN, async () => TREE())
+  await screen.findByTestId("pierre")
+  expect(style()).toBe("unified")
+  fireEvent.click(screen.getByRole("button", { name: "Split" }))
+  await waitFor(() => expect(style()).toBe("split"))
+  press("n")
+  await waitFor(() =>
+    expect(screen.getByTestId("pierre").getAttribute("data-patch")).toBe("patch of src/b.go"),
+  )
+  expect(style()).toBe("split")
+  cleanup()
+  localStorage.clear()
+  render(OPEN, async () => TREE(), "phone")
+  fireEvent.click((await screen.findAllByTestId("tree-file"))[0])
+  await screen.findByTestId("pierre")
+  expect(style()).toBe("unified")
+})
+
+test("a picked view is remembered by the next render, in either direction", async () => {
+  render(OPEN, async () => TREE())
+  await screen.findByTestId("pierre")
+  fireEvent.click(screen.getByRole("button", { name: "Split" }))
+  await waitFor(() => expect(style()).toBe("split"))
+  cleanup()
+  pierre.last = undefined
   render(OPEN, async () => TREE())
   await screen.findByTestId("pierre")
   expect(style()).toBe("split")
   fireEvent.click(screen.getByRole("button", { name: "Unified" }))
   await waitFor(() => expect(style()).toBe("unified"))
-  press("n")
-  await waitFor(() =>
-    expect(screen.getByTestId("pierre").getAttribute("data-patch")).toBe("patch of src/b.go"),
-  )
-  expect(style()).toBe("unified")
   cleanup()
-  render(OPEN, async () => TREE(), "phone")
-  fireEvent.click((await screen.findAllByTestId("tree-file"))[0])
+  pierre.last = undefined
+  render(OPEN, async () => TREE())
   await screen.findByTestId("pierre")
   expect(style()).toBe("unified")
+})
+
+test("a junk stored view renders unified, and nothing is written on mount", async () => {
+  localStorage.setItem("gx.diff.view", "sideways")
+  const setItem = vi.spyOn(Storage.prototype, "setItem")
+  render(OPEN, async () => TREE())
+  await screen.findByTestId("pierre")
+  expect(style()).toBe("unified")
+  expect(setItem).not.toHaveBeenCalled()
+})
+
+test("an unreadable store renders unified and the switch still works", async () => {
+  vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    throw new Error("blocked")
+  })
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    throw new Error("blocked")
+  })
+  render(OPEN, async () => TREE())
+  await screen.findByTestId("pierre")
+  expect(style()).toBe("unified")
+  fireEvent.click(screen.getByRole("button", { name: "Split" }))
+  await waitFor(() => expect(style()).toBe("split"))
 })
 
 const NARROW = "/diff?project=gx&base=main&tip=dev&epic=gx:e-impl"

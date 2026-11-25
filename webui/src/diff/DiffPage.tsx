@@ -32,6 +32,7 @@ import type { DiffView } from "./DiffBody"
 import { DiffFileCard, type PatchRange } from "./DiffFileCard"
 import { diffQuery, parseDiffUrl } from "./diffUrl"
 import { useDiffData } from "./useDiffData"
+import { readView, writeView } from "./viewPref"
 
 export type { DiffView }
 
@@ -449,7 +450,11 @@ export function DiffPage({
   const [params, setParams] = useSearchParams()
   const url = parseDiffUrl(params)
   const device = useDevice()
-  const [view, setView] = useState<DiffView>(device === "phone" ? "unified" : "split")
+  const [view, setView] = useState<DiffView>(readView)
+  const changeView = (v: DiffView) => {
+    setView(v)
+    writeView(v)
+  }
   const [draft, setDraft] = useState({ first: url.first, second: url.second })
   const [nonce, setNonce] = useState(0)
   const [editing, setEditing] = useState(false)
@@ -551,7 +556,7 @@ export function DiffPage({
               {shown && <Counts files={shown} />}
             </Box>
           }
-          actions={<ViewToggle view={view} onChange={setView} />}
+          actions={<ViewToggle view={view} onChange={changeView} />}
         />
       </Box>
       {chipLabel && <NarrowChip label={chipLabel} onClear={() => setNarrowing(undefined)} />}

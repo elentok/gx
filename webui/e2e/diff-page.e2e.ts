@@ -110,13 +110,17 @@ test("Diff page", async ({ page, start }) => {
   await expect(page).toHaveURL(/commits=/)
   const file = await area.getAttribute("data-file")
   expect(file).toBeTruthy()
+  await expect(area).toHaveAttribute("data-view", "unified")
+  await page.getByTestId("view-toggle").getByRole("button", { name: "Split" }).click()
+  await expect(area).toHaveAttribute("data-view", "split")
   await page.reload()
   await expect(area).toHaveAttribute("data-file", file!)
+  await expect(area).toHaveAttribute("data-view", "split")
   await expect(chip).toContainText("Showing: ")
   await chip.getByRole("button", { name: "Clear narrowing" }).click()
   await expect(treeFiles(page)).toHaveCount(allFiles)
 
-  // Entry 18: split by default at 1200px, the switch changes it, the diff matches the app surface, 12.5px/19px code in the mono font, accents in the done and deadlocked tones.
+  // Entry 18: unified by default at 1200px and a picked Split survives the reload (checked above), the switch changes it, the diff matches the app surface, 12.5px/19px code in the mono font, accents in the done and deadlocked tones.
   await expect(area).toHaveAttribute("data-view", "split")
   const split = page.getByTestId("view-toggle")
   await split.getByRole("button", { name: "Unified" }).click()
@@ -212,6 +216,10 @@ test("Diff page", async ({ page, start }) => {
   await page.getByRole("link", { name: "View diff" }).click()
   await expect(chipOf(page)).toHaveText(/^[0-9a-f]{40}→[0-9a-f]{40}$/)
   await expect(page.locator('[data-testid="tree-file"][data-path="docs/old.md"]')).toBeVisible()
+
+  // The choice is stored in the browser, so put it back to Unified before the phone step.
+  await page.getByTestId("view-toggle").getByRole("button", { name: "Unified" }).click()
+  await expect(area).toHaveAttribute("data-view", "unified")
 
   // Entries 18 and 19: at 390px the page is unified by default, has Files and Diff tabs and no sideways scroll.
   await page.setViewportSize({ width: 390, height: 844 })
