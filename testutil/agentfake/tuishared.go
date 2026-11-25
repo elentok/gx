@@ -164,7 +164,7 @@ type DesignState struct {
 // IsAsk reports whether the behaviour's turn is a single gx ask call.
 func IsAsk(behaviour string) bool {
 	switch behaviour {
-	case BehaviourAsk, BehaviourAskOptions, BehaviourWriteAsk, BehaviourAskEmptyFinish:
+	case BehaviourAsk, BehaviourAskOptions, BehaviourAskPermission, BehaviourWriteAsk, BehaviourAskEmptyFinish:
 		return true
 	}
 	return false

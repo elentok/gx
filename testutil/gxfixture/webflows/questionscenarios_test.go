@@ -2,11 +2,49 @@ package webflows
 
 import (
 	"slices"
+	"strings"
 	"testing"
 	"unicode/utf8"
 
 	"github.com/elentok/gx/tickets/ticketlog"
 )
+
+func TestQuestionScenarios_OneOffQuestionIsPausedAgentAsk(t *testing.T) {
+	t.Parallel()
+	r := start(t, "one-off-question")
+	d := r.Detail(t, "demo:one-offs/01")
+	if r.TicketStatus(t, "demo:one-offs/01") != askedStatus {
+		t.Errorf("status = %q, want %q", r.TicketStatus(t, "demo:one-offs/01"), askedStatus)
+	}
+	if d.Latest.By != "agent" || len(d.Latest.Options) != 3 || d.Latest.Handoff == "" {
+		t.Errorf("latest = %+v, want an agent ask with three options and a handoff", d.Latest)
+	}
+	for _, want := range []string{"answer", "resume"} {
+		if !slices.Contains(d.Actions, want) {
+			t.Errorf("actions = %v, want %s", d.Actions, want)
+		}
+	}
+	r.Stop(t)
+}
+
+func TestQuestionScenarios_PermissionBlocksAnAskedAgent(t *testing.T) {
+	t.Parallel()
+	r := start(t, "permission")
+	const addr = "demo:permission-epic/01"
+	r.WaitStatus(t, addr, askedStatus)
+	d := r.WaitPermission(t, addr)
+	if d.Latest.By != "agent" || len(d.Latest.Options) != 2 || d.Latest.Recommended == "" {
+		t.Errorf("latest = %+v, want an agent ask with two options and a recommended one", d.Latest)
+	}
+	data, ok := r.Web(t).Try(t, "/v1/tickets/answer", map[string]any{"address": addr, "state": d.State, "choice": d.Latest.Recommended})
+	if ok || !strings.Contains(data, "agent-not-ready") {
+		t.Errorf("answer = %s (ok %v), want an agent-not-ready refusal", data, ok)
+	}
+	if got := r.TicketStatus(t, addr); got != askedStatus {
+		t.Errorf("status after the refusal = %q, want %q: the round stays open", got, askedStatus)
+	}
+	r.Stop(t)
+}
 
 func TestQuestionScenarios_LongAndShortAgentQuestions(t *testing.T) {
 	t.Parallel()

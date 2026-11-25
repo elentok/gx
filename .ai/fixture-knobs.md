@@ -82,6 +82,8 @@ in the scenario; the worker file is `.agentfake-worker.json`.
 | Host files, cache gate, launch state, images | `catalog/hostfiles.go`, `cachegate.go`, `launchstate.go`, `imagesscenarios.go` |
 | Context window / usage lines | `spec/contextwindow.go` |
 | `long-question`: a long and a short open agent question (`Questions` knob) | `catalog/questionscenarios.go` |
+| `one-off-question`: a One-off (`one-offs` epic) with an open agent question, for Cancel | `catalog/questionscenarios.go` |
+| `permission`: an open agent question while the live agent is blocked at a Bash prompt (`agentfake.BehaviourAskPermission`, `ask-permission`: asks like `ask-options`, then blocks once the ticket is paused) | `catalog/questionscenarios.go` |
 
 ## 7. Check the component before you write a locator
 

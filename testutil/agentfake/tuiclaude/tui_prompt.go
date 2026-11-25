@@ -398,6 +398,14 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 		_ = SendControl(t.ctlPath, Control{Action: ActionExit})
 		return
 	}
+	if cfg.Behaviour[address] == BehaviourAskPermission {
+		// Idle first so the server pauses the ticket and keeps the agent, then
+		// block it: the state is a paused open question with a blocked live agent.
+		_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
+		WaitTicketLeavesClaimed(cfg, address, exitAfterAskLimit)
+		_ = SendControl(t.ctlPath, Control{Action: ActionBlock, WaitingFor: "permission prompt", Dialog: BashPermissionDialog(PermissionCommand)})
+		return
+	}
 	if StartsBackgroundTask(cfg.Behaviour[address]) {
 		if err := t.startBackgroundTask(cfg.Hold); err != nil {
 			fmt.Fprintln(os.Stderr, "fakeclaude background task:", err)

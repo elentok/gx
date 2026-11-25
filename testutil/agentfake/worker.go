@@ -101,6 +101,9 @@ const (
 	// BehaviourAskOptions is BehaviourAsk with a lettered options question whose
 	// options carry consequences.
 	BehaviourAskOptions = "ask-options"
+	// BehaviourAskPermission asks like BehaviourAskOptions, then blocks on a Bash
+	// permission prompt once the ticket is paused. Only the Claude TUI fake blocks.
+	BehaviourAskPermission = "ask-permission"
 	// BehaviourWriteAsk leaves an uncommitted file in the worktree and asks. A
 	// relaunch that still sees the file finishes the ticket instead, so the
 	// worktree's survival is what lets it end.
@@ -262,7 +265,7 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 		return uncheckedTurn(cfg, address)
 	case BehaviourAsk:
 		return askQuestion(cfg, address, askBody)
-	case BehaviourAskOptions:
+	case BehaviourAskOptions, BehaviourAskPermission:
 		return askQuestion(cfg, address, askOptionsBody)
 	case BehaviourRefuseAsk:
 		return refuseThenAsk(cfg, address)

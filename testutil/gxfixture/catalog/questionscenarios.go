@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/gxfixture/questionseed"
 )
 
@@ -19,6 +20,38 @@ options:
     label: Move the question to its own page
     consequence: Every ask gets room, but answering takes one more tap.
 `
+
+// oneOffQuestion is the one-off-question scenario: a One-off (the one-offs
+// epic) with one open agent question and no live agent, so the web shows Cancel.
+func oneOffQuestion() scenario {
+	return scenario{
+		Epics: []epic{{Project: project, Name: "one-offs", Tickets: []ticket{
+			{ID: "01", Slug: "asks", Opts: servertest.TicketOpts{PauseReason: "self-reported"}},
+		}}},
+		Questions: map[string]questionseed.Question{
+			project + ":one-offs/01": {
+				Summary: "Keep the card as it is?",
+				Text:    "One line of context.",
+				Block:   questionOptions,
+				Handoff: "Nothing else changed.",
+			},
+		},
+	}
+}
+
+// permissionQuestion is the permission scenario: the agent asks the fake's
+// options question, the ticket pauses, then the live agent blocks on a Bash
+// permission prompt (agentfake.BehaviourAskPermission).
+func permissionQuestion() scenario {
+	const addr = project + ":permission-epic/01"
+	return scenario{
+		Epics: []epic{{Project: project, Name: "permission-epic", Tickets: []ticket{
+			{ID: "01", Slug: "asks-then-blocks", Opts: servertest.TicketOpts{}},
+		}}},
+		Behaviour: map[string]string{addr: agentfake.BehaviourAskPermission},
+		Queue:     []string{project + ":permission-epic"},
+	}
+}
 
 // longQuestion is the long-question scenario: one open agent question with a
 // long title, a bullet body and two earlier rounds, and one short one. Its epic

@@ -176,7 +176,7 @@ func TestWorkTicket_AskOptionsSendsOptionsWithConsequences(t *testing.T) {
 // A turn that is one gx ask must be held open by the TUI fake, or the launch's
 // turn poll can miss it.
 func TestIsAsk_EveryBehaviourThatAsksHoldsTheTurn(t *testing.T) {
-	for _, b := range []string{BehaviourAsk, BehaviourAskOptions, BehaviourWriteAsk} {
+	for _, b := range []string{BehaviourAsk, BehaviourAskOptions, BehaviourAskPermission, BehaviourWriteAsk} {
 		cfg, gxLog := WorkerEnv(t)
 		cfg.Behaviour = map[string]string{"p:e/01": b}
 		if err := WorkTicket(cfg, "p:e/01"); err != nil {

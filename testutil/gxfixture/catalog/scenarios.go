@@ -872,6 +872,11 @@ var Scenarios = map[string]scenario{
 	"agents-failures": spec.AgentsFailuresScenario(),
 	// long-question: a long and a short open agent question. See longQuestion.
 	"long-question": longQuestion(),
+	// one-off-question: a One-off with an open question. See oneOffQuestion.
+	"one-off-question": oneOffQuestion(),
+	// permission: an open question whose live agent is blocked at a permission
+	// prompt. See permissionQuestion.
+	"permission": permissionQuestion(),
 	// edge: a project with no epics, an epic with no tickets, and a ticket
 	// blocked by a dependency that is not merged.
 	"edge": {
