@@ -5,6 +5,7 @@ import type { Tone } from "../ui/tone"
 import { ticketPath } from "../hrefs"
 import { tierLabel } from "../tiers"
 import { epicBadge } from "../view"
+import { waitingWords } from "./waiting"
 
 type Bucket = "done" | "running" | "asking" | "waiting" | "children" | "attention"
 
@@ -64,6 +65,7 @@ const STATE_TONES: Record<NonNullable<EpicDetail["state"]>, Tone> = {
   finished: "done",
   paused: "paused",
   waiting: "waiting",
+  // Not "waiting": the theme's waiting tone is the Needs you amber, and an epic that waits on another epic needs no one.
   "waiting-on-epic": "muted",
   "awaiting-merge": "waiting",
   "awaiting-pr": "waiting",
@@ -75,10 +77,12 @@ const STATE_TONES: Record<NonNullable<EpicDetail["state"]>, Tone> = {
 // A draft -impl epic is still being published into; a Waiting epic that holds no queue item is not waiting for a slot.
 function statePart(d: EpicDetail): StatPart | undefined {
   if (!d.state) return undefined
-  return {
-    text: d.state === "waiting" && !d.queued ? "Not queued" : epicBadge(d.state),
-    tone: STATE_TONES[d.state],
-  }
+  return { text: statePartText(d, d.state), tone: STATE_TONES[d.state] }
+}
+
+function statePartText(d: EpicDetail, state: NonNullable<EpicDetail["state"]>): string {
+  if (state === "waiting-on-epic") return waitingWords(d.blockers ?? [])
+  return state === "waiting" && !d.queued ? "Not queued" : epicBadge(state)
 }
 
 // A running epic's clock counts up, so it reads plain; every other one reads "took".

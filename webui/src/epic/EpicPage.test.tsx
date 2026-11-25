@@ -280,6 +280,50 @@ test("a claimed row adds its time so far only while the Design has a live sessio
   expect(await statsOf()).toBe("spec")
 })
 
+const blocker = (name: string) => ({ address: `gx:${name}`, name, state: "running" as const })
+
+test.each([
+  ["one blocker", [blocker("a")], "Waiting on a · took 2m · $1.50 · 5m agent time"],
+  [
+    "two blockers",
+    [blocker("a"), blocker("b")],
+    "Waiting on a and 1 more · took 2m · $1.50 · 5m agent time",
+  ],
+] as const)("the stats line of an epic waiting on %s", async (_n, blockers, text) => {
+  render("/e/gx:blog", [], "loop", {
+    ...loop({ state: "waiting-on-epic", blockers: [...blockers] }),
+  })
+  expect(await statsOf()).toBe(text)
+})
+
+test("the Waiting words are muted, not the Needs you amber, and draw no pill", async () => {
+  const words = async (state: EpicDetail["state"]) => {
+    render("/e/gx:blog", [], "loop", loop({ state, blockers: [blocker("a")] }))
+    const line = await screen.findByTestId("stats-line")
+    const color = getComputedStyle(line.querySelector("span") as HTMLElement).color
+    expect(within(line).queryByRole("status")).toBeNull()
+    cleanup()
+    return color
+  }
+  const waitingOnEpic = await words("waiting-on-epic")
+  expect(waitingOnEpic).not.toBe("")
+  expect(waitingOnEpic).not.toBe(await words("awaiting-merge"))
+})
+
+test("a ticket row of a Waiting epic says after NN and never an epic name", async () => {
+  render("/e/gx:blog-impl", [], "loop", {
+    detail: {
+      state: "waiting-on-epic",
+      blockers: [blocker("other-epic")],
+      total: 1,
+      rows: [tk("02", { rendered_status: "blocked", blockers: ["01"] })] as EpicDetail["rows"],
+    },
+  })
+  const text = (await cardOf("02")).textContent
+  expect(text).toContain("after 01")
+  expect(text).not.toContain("other-epic")
+})
+
 const live = (rows: object[], kind: EpicDetail["kind"] = "loop", fixAgent?: FixAgent) =>
   render("/e/gx:blog-impl", [], kind, {
     fixAgent,

@@ -787,6 +787,24 @@ test("a card with a workspace shows its name and a menu; one without shows the m
   expect(screen.getByRole("button", { name: "More actions" })).toBeTruthy()
 })
 
+test.each([
+  ["queued", { state: "queued", section: "implementing", queued: true }],
+  ["unqueued", { state: "ready", section: "ready-to-queue", queued: false }],
+] as const)(
+  "a %s card waiting on epics shows the server's words and no blocker control",
+  async (_n, over) => {
+    renderThemed(
+      <EpicCard
+        row={row({ ...over, status_words: "Waiting on a and 1 more", waiting_on_epic: true })}
+      />,
+    )
+    expect(screen.getByTestId("status").textContent).toBe("Waiting on a and 1 more")
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }))
+    const items = (await screen.findAllByRole("menuitem")).map(text)
+    expect(items.filter((t) => /blocker|blocked/i.test(t))).toEqual([])
+  },
+)
+
 describe("the menu on a card outside every workspace", () => {
   const menuItems = async () => {
     fireEvent.click(screen.getByRole("button", { name: "More actions" }))
