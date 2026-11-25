@@ -1282,6 +1282,10 @@ disk space of the gx server's machine. Each icon shows a state; its popover show
 name comes from the macOS menu bar.
 _Avoid_: status area, indicators bar
 
+**Text box** — any native input or textarea in the web UI that the person types text into. A
+**Prompt box** is one kind. The vi editor is not a text box.
+_Avoid_: input, field, text field
+
 **Prompt box** — the text field where the person writes to an agent or answers a question: the chat
 composer, the design composer and note, the answer boxes, the deny note, the start-over reason and
 the schedule prompt. It is a textarea, or, with vi mode on and a pointer that is not coarse, an
