@@ -202,7 +202,8 @@ func TestWorktreeEmptyStates(t *testing.T) {
 		"chat:" + stepped:     wire.DiffNoDiff,
 		"design:epic":         wire.DiffNoWorktree,
 		"design:missing-map":  wire.DiffNoWorktree,
-		"ticket:proj:epic/01": wire.DiffNoDiff,
+		"ticket:proj:epic/01": wire.DiffNoWorktree,
+		"other:x":             wire.DiffNoDiff,
 	} {
 		got := worktree(t, h, target)
 		if got.Reason != reason || got.SnapshotSHA != "" {

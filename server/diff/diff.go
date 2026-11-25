@@ -21,6 +21,10 @@ type Deps struct {
 	TicketStore string
 	// Epics lists a project's epics, for the canonical ticket address of a commit.
 	Epics func(project string) ([]tickets.Epic, error)
+	// Run is the base a tracked run's iteration worktree branched from.
+	Run func(address string) (base string, ok bool)
+	// WorktreeDir is where the project's repo keeps its linked worktrees.
+	WorktreeDir func(project string) string
 }
 
 // Diff serves the Diff routes.

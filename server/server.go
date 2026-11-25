@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -524,7 +525,14 @@ func New(cfg Config) (*Server, error) {
 		Tokens: s.tokens, Burns: s.limits, MapEpics: tokenHost{s}, WebPerf: s.webPerf,
 		Rest: s.rest.Records(),
 	})
-	s.diff = diff.New(diff.Deps{TicketStore: cfg.TicketStore, Epics: s.projects.EpicsWithArchived})
+	s.diff = diff.New(diff.Deps{
+		TicketStore: cfg.TicketStore, Epics: s.projects.EpicsWithArchived,
+		Run: func(address string) (string, bool) {
+			t, ok := s.registry.Tracked(address)
+			return t.Base, ok
+		},
+		WorktreeDir: s.projects.WorktreeDir,
+	})
 	s.tips = tips.New(tips.Deps{
 		Projects: func() []string {
 			dirs, _ := tickets.ProjectDirs(cfg.TicketStore)
@@ -576,11 +584,15 @@ func New(cfg Config) (*Server, error) {
 	s.designs.GiveSessions(s.sessions)
 	s.diff.GiveLookups(diff.Lookups{
 		Session: func(id string) (diff.SessionRef, bool) {
-			_, meta, res, err := s.sessions.SessionDir(id)
+			_, meta, res, err := s.sessions.ReadableSession(id)
 			if err != nil || res.Refused {
 				return diff.SessionRef{}, false
 			}
-			return diff.SessionRef{Dir: meta.Dir, Stepped: meta.IsStepped()}, true
+			ref := diff.SessionRef{Dir: meta.Dir, Stepped: meta.IsStepped()}
+			if strings.HasPrefix(id, queue.AgentIDPrefix) {
+				ref.RunTicket = meta.RunTicket
+			}
+			return ref, true
 		},
 		DesignWorktree: func(project, epic string) (string, error) { return designs.WorktreePath(s.designs, project, epic) },
 	})
