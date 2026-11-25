@@ -4,7 +4,7 @@ import type { DetailRound, TicketDetail } from "../generated/server"
 import { Markdown } from "../markdown/Markdown"
 import { Card } from "../ui/card/Card"
 import { withKeys } from "../uniqueKeys"
-import { isAnsweredRound, type Sent } from "./answer"
+import { isAnsweredRound, showsSentCard, type Sent } from "./answer"
 import { AnswerResult } from "./AnswerResult"
 import { Collapsible } from "./Collapsible"
 
@@ -44,10 +44,17 @@ export function TicketReading({
 }) {
   const { latest } = detail
   const asker = askerLabel(latest)
-  const answered = isAnsweredRound(latest, sent)
+  const answered = isAnsweredRound(detail, sent)
 
   return (
     <Box mt="4" display="flex" flexDirection="column" gap="4">
+      {answered && latest?.handoff && showsSentCard(latest, sent) && (
+        <Collapsible label="Agent's notes">
+          <Markdown epic={detail.epic} smallHeadings>
+            {latest.handoff}
+          </Markdown>
+        </Collapsible>
+      )}
       {answered && <AnswerResult detail={detail} sent={sent} />}
       {latest && !answered && (
         <>

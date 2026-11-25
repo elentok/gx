@@ -218,3 +218,85 @@ test("no undo or withdraw control exists after a send", () => {
   expect(screen.queryAllByRole("button")).toHaveLength(0)
   expect(screen.queryByText(/undo|withdraw/i)).toBeNull()
 })
+
+const sentCard = (answer: object, extra: object = {}) =>
+  answeredWith(
+    { how: "answer", ...answer },
+    {
+      options: [
+        { id: "move", label: "Move them" },
+        { id: "trim", label: "Trim instead" },
+      ],
+      ...extra,
+    },
+  )
+const card = () => screen.getByRole("group", { name: "Answered question" })
+
+test("the Answer sent card shows title, lettered option, note and status, with one toggle", () => {
+  const detail = { ...sentCard({ choice: "trim", note: "keep history" }), chat: [] }
+  renderThemed(<AnswerResult detail={detail} sent={sentAs("delivered")} />)
+  expect(card().textContent).toBe(
+    "Answer sentWhich backend?B: Trim insteadNote: keep historyDelivered ·Agent is working▸ Show question",
+  )
+  expect(screen.getAllByRole("button")).toHaveLength(1)
+  expect(screen.queryByText("THE AGENT ASKED")).toBeNull()
+})
+
+test("Show question opens the full question and closes it again", () => {
+  renderThemed(<AnswerResult detail={sentCard({ choice: "move" })} sent={null} />)
+  const toggle = screen.getByRole("button", { name: /Show question/ })
+  expect(toggle.getAttribute("aria-expanded")).toBe("false")
+  expect(screen.queryByText(/Redis or in process memory/)).toBeNull()
+  fireEvent.click(toggle)
+  expect(toggle.getAttribute("aria-expanded")).toBe("true")
+  expect(screen.getByText(/Redis or in process memory/)).toBeTruthy()
+  fireEvent.click(toggle)
+  expect(screen.queryByText(/Redis or in process memory/)).toBeNull()
+})
+
+test("the Answer sent card keeps Huh? and note-only text", () => {
+  const huh = "I could not follow this question. Could you explain it another way?"
+  const huhDetail = { ...sentCard({ huh: true }), chat: [{ from: "web", text: huh }] }
+  renderThemed(<AnswerResult detail={huhDetail} sent={null} />)
+  expect(screen.getByText(huh)).toBeTruthy()
+  cleanup()
+  renderThemed(<AnswerResult detail={{ ...sentCard({ note: "neither" }), chat: [] }} sent={null} />)
+  expect(screen.getByText("no option picked")).toBeTruthy()
+  expect(screen.getByText("Note: neither")).toBeTruthy()
+})
+
+test("a delivered answer shows the card only until a reload; a queued one survives it", () => {
+  const delivered = { ...sentCard({ choice: "move" }), answered: false }
+  renderThemed(<AnswerResult detail={delivered} sent={null} />)
+  expect(screen.queryByRole("group")).toBeNull()
+  cleanup()
+  renderThemed(<AnswerResult detail={delivered} sent={sentAs("delivered")} />)
+  expect(card()).toBeTruthy()
+  cleanup()
+  renderThemed(<AnswerResult detail={sentCard({ choice: "move" })} sent={null} />)
+  expect(card()).toBeTruthy()
+})
+
+test("an adopted send shows the Answer sent card with what was sent", () => {
+  const unanswered: TicketDetail = {
+    ...base,
+    chat: [],
+    latest: { ...base.latest!, answer: undefined },
+  }
+  renderThemed(
+    <AnswerResult
+      detail={unanswered}
+      sent={sentOf(seq, base.address, { outcome: "adopted" }, "go on")}
+    />,
+  )
+  expect(screen.getByText("Answer sent")).toBeTruthy()
+  expect(screen.getByText("go on")).toBeTruthy()
+  expect(status()!.textContent).toBe("Sent ·The agent had already finished")
+})
+
+test("a round a recovery verb closed never reads Answer sent", () => {
+  const detail = answeredWith({ how: "resume", choice: "retry" })
+  renderThemed(<AnswerResult detail={{ ...detail, answered: false }} sent={null} />)
+  expect(screen.getByText("THE AGENT ASKED")).toBeTruthy()
+  expect(screen.queryByText("Answer sent")).toBeNull()
+})

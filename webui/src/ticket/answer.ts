@@ -47,11 +47,33 @@ export function sentOf(
 /** Whether the send reached an agent that had already finished, so no answer was recorded. */
 export const wasAdopted = (sent: Sent | null): boolean => sent?.outcome === OutcomeAdopted
 
-/** The one rule for whether a round shows the answered card: it has an answer, or the send was adopted. */
-export const isAnsweredRound = (
-  latest: { answer?: unknown } | null | undefined,
+export const HowAnswer = "answer"
+
+/** Whether the round was closed by a person answering it on the web (not by a recovery verb). */
+export const answeredByPerson = (latest: { answer?: { how?: string } } | null | undefined) =>
+  latest?.answer?.how === HowAnswer
+
+/** Whether the answered round shows the "Answer sent" card: a person's answer or an adopted send. */
+export const showsSentCard = (
+  latest: { answer?: { how?: string } } | null | undefined,
   sent: Sent | null,
-): boolean => !!latest?.answer || wasAdopted(sent)
+) => answeredByPerson(latest) || wasAdopted(sent)
+
+/**
+ * The one rule for whether a round shows an answered card. A person's answer shows while it is
+ * queued or while this page knows the send; a delivered answer claims the ticket again, so a reload
+ * drops the card. A recovery verb's answer always shows, in the old compact layout. An adopted send
+ * records no answer but shows too.
+ */
+export const isAnsweredRound = (
+  detail: { answered: boolean; latest?: { seq: number; answer?: { how?: string } } | null },
+  sent: Sent | null,
+): boolean => {
+  const { latest } = detail
+  if (wasAdopted(sent)) return true
+  if (!latest?.answer) return false
+  return !answeredByPerson(latest) || detail.answered || sent?.seq === latest.seq
+}
 
 /** Free text needs its text; every other kind is a choice. */
 export const isTextKind = (kind: string | undefined): boolean =>

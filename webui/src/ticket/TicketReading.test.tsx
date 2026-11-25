@@ -79,6 +79,26 @@ test("a closed round shows its reason read-only", () => {
   expect(screen.queryByRole("textbox")).toBeNull()
 })
 
+test("an answered round shows notes above the card, no chat, and earlier rounds below", () => {
+  const detail: TicketDetail = {
+    ...base,
+    status: "open",
+    answered: true,
+    latest: {
+      ...base.latest!,
+      outcome: "answered",
+      answer: { source: "web", how: "answer", text: "Redis" },
+    },
+    chat: [...base.chat, { from: "web", text: "Redis" }],
+    actions: [],
+  }
+  renderThemed(<TicketReading detail={detail} />)
+  const order = ["Agent's notes", "Answer sent", "Earlier rounds (2)"].map((s) => html().indexOf(s))
+  expect(order.every((i) => i >= 0)).toBe(true)
+  expect(order).toEqual([...order].sort((a, b) => a - b))
+  expect(screen.getAllByText("Redis")).toHaveLength(1)
+})
+
 test("the agent's notes render as markdown", () => {
   const handoff = "- Committed **abc**\n- Removed the row"
   renderThemed(<TicketReading detail={{ ...base, latest: { ...base.latest!, handoff } }} />)
