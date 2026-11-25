@@ -1,6 +1,10 @@
 package header
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -35,6 +39,7 @@ func TestEpicStatusLine_UsesStateLabels(t *testing.T) {
 		{wire.EpicStateAwaitingMerge, icons.TicketDone, "Awaiting merge"},
 		{wire.EpicStateRunning, "S", "Running"},
 		{wire.EpicStateWaiting, icons.EpicQueued, "Waiting for a slot"},
+		{wire.EpicStateWaitingOnEpic, icons.EpicQueued, "Waiting"},
 		{wire.EpicStatePaused, icons.Warning, "Paused"},
 		{wire.EpicStateMerging, "S", "Merging"},
 		{wire.EpicStateFinished, icons.TicketDone, "Merged"},
@@ -43,6 +48,50 @@ func TestEpicStatusLine_UsesStateLabels(t *testing.T) {
 		icon, text, _ := epicStatusLine(icons, wire.EpicSummary{State: tt.state}, "S")
 		if icon != tt.wantIcon || text != tt.wantText {
 			t.Errorf("state %q: got icon=%q text=%q, want icon=%q text=%q", tt.state, icon, text, tt.wantIcon, tt.wantText)
+		}
+	}
+}
+
+// wireEpicStates parses server/wire/epiclist.go for every EpicState constant,
+// so a new state cannot go without a label.
+func wireEpicStates(t *testing.T) []wire.EpicState {
+	t.Helper()
+	f, err := parser.ParseFile(token.NewFileSet(), "../../../../server/wire/epiclist.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []wire.EpicState
+	for _, d := range f.Decls {
+		gd, ok := d.(*ast.GenDecl)
+		if !ok || gd.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			vs := spec.(*ast.ValueSpec)
+			if id, ok := vs.Type.(*ast.Ident); !ok || id.Name != "EpicState" {
+				continue
+			}
+			for _, v := range vs.Values {
+				s, err := strconv.Unquote(v.(*ast.BasicLit).Value)
+				if err != nil {
+					t.Fatal(err)
+				}
+				out = append(out, wire.EpicState(s))
+			}
+		}
+	}
+	return out
+}
+
+func TestEpicStateLabels_EveryWireStateHasOne(t *testing.T) {
+	t.Parallel()
+	states := wireEpicStates(t)
+	if len(states) == 0 {
+		t.Fatal("found no EpicState constants")
+	}
+	for _, s := range states {
+		if epicStateLabels[s] == "" {
+			t.Errorf("wire state %q has no entry in epicStateLabels", s)
 		}
 	}
 }

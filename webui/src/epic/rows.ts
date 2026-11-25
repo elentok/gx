@@ -64,6 +64,7 @@ const STATE_TONES: Record<NonNullable<EpicDetail["state"]>, Tone> = {
   finished: "done",
   paused: "paused",
   waiting: "waiting",
+  "waiting-on-epic": "muted",
   "awaiting-merge": "waiting",
   "awaiting-pr": "waiting",
   "writing-pr-text": "running",

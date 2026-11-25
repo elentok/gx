@@ -328,7 +328,11 @@ const (
 	// EpicStateMerging is an epic whose only unfinished tickets are merge tickets
 	// that are open or claimed.
 	EpicStateMerging EpicState = "merging"
+	// EpicStateWaiting is Waiting for a slot: runnable, not yet running.
 	EpicStateWaiting EpicState = "waiting"
+	// EpicStateWaitingOnEpic is Waiting on epic: the epic's own blocked_by names
+	// an unreleased epic. It takes no slot and is not paused.
+	EpicStateWaitingOnEpic EpicState = "waiting-on-epic"
 	// The PR flow's states, derived from the ticket store. Awaiting PR is a
 	// complete epic in a pr-delivery project with no pull request yet; Writing PR
 	// text and Fixing CI are Merging's siblings; PR open has a pull request and no

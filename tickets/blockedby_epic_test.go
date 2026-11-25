@@ -196,6 +196,25 @@ func TestResolveEpicHold_EpicLevelErrorSkipsTerminalTickets(t *testing.T) {
 	}
 }
 
+func TestResolveEpicHold_TicketCycleSetsCycleErrNotBlockedByErr(t *testing.T) {
+	epics := []Epic{{Name: "d", Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"02"}},
+		{Number: 2, Identifier: "02", Status: "open", BlockedBy: []string{"01"}},
+	}}}
+	d := resolveEpicHold("p", EpicRelease{}, epics, nil)[0]
+	for _, tk := range d.Tickets {
+		if tk.CycleErr == "" {
+			t.Errorf("ticket %s: CycleErr is empty", tk.Identifier)
+		}
+		if tk.BlockedByErr != "" {
+			t.Errorf("ticket %s: BlockedByErr = %q, want none", tk.Identifier, tk.BlockedByErr)
+		}
+		if got := d.RenderedStatus(tk); got != StatusBlocked {
+			t.Errorf("ticket %s: got %v, want blocked", tk.Identifier, got)
+		}
+	}
+}
+
 func TestValidateRefs_WholeEpicCycleNamesTheEpic(t *testing.T) {
 	epics := []Epic{
 		{Name: "a", BlockedBy: []string{"d"}, Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open"}}},

@@ -66,7 +66,8 @@ func qualifiedRefs(refs []string) []string {
 // ancestor's blocked_by, the epic's refs are applied here instead. An
 // unreleased whole-epic ref goes into Ticket.ExternalBlockers (rendering the
 // ticket blocked); bad refs and wait cycles set BlockedByErr (rendering it
-// error), the same check ValidateRefs runs. release decides when a whole-epic
+// error), the same check ValidateRefs runs; a wait cycle sets CycleErr and
+// leaves the ticket blocked. release decides when a whole-epic
 // ref is resolved; archived holds the project's archived epic names, so a
 // blocker on one counts as satisfied.
 func resolveEpicHold(project string, release EpicRelease, epics []Epic, archived map[string]bool) []Epic {
@@ -79,10 +80,12 @@ func resolveEpicHold(project string, release EpicRelease, epics []Epic, archived
 		epicErrs := g.epicBlockedByErrors(*e)
 		for j := range e.Tickets {
 			t := &e.Tickets[j]
-			t.BlockedByErr, t.ExternalBlockers = "", nil
+			t.BlockedByErr, t.CycleErr, t.ExternalBlockers = "", "", nil
 			errs := g.checkBlockedBy(e.Name, *t)
 			if !t.IsTerminal() {
-				errs = append(errs, g.cycleErrors(e.Name, *t)...)
+				if cycles := g.cycleErrors(e.Name, *t); len(cycles) > 0 {
+					t.CycleErr = errors.Join(cycles...).Error()
+				}
 				errs = append(errs, epicErrs...)
 			}
 			if len(errs) > 0 {

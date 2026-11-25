@@ -246,6 +246,8 @@ func EpicStateFor(root queue.RootRef, e tickets.Epic, delivery string, claimedAt
 			}
 		}
 		return wire.EpicStateWaiting
+	case StateWaiting:
+		return wire.EpicStateWaitingOnEpic
 	default:
 		return wire.EpicStatePaused
 	}

@@ -7,6 +7,7 @@ const STATE_LABELS: Record<EpicState, string> = {
   running: "Running",
   merging: "Merging",
   waiting: "Waiting for a slot",
+  "waiting-on-epic": "Waiting",
   "awaiting-merge": "Awaiting merge",
   finished: "Merged",
   "awaiting-pr": "Awaiting PR",

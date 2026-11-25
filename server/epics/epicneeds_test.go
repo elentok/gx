@@ -84,11 +84,18 @@ func TestEpicList_NeedsYouReasons(t *testing.T) {
 		"01-a.md": rigs.IssueMD("01", "cancelled", "", "A"),
 		"02-b.md": rigs.IssueMD("02", "open", "parent: \"01\"\n", "B"),
 	}
+	ready := map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")}
+	realCycle := map[string]string{
+		"01-a.md": rigs.IssueMD("01", "open", "blocked_by: [\"02\"]\n", "A"),
+		"02-b.md": rigs.IssueMD("02", "open", "blocked_by: [\"01\"]\n", "B"),
+	}
 	h, base := rigs.StartEpicDetail(t, func(store string) {
 		rigs.WriteEpicFiles(t, store, "asking", loop, asking)
 		writeQuestionLog(t, store, "asking", "01-a.jsonl", "2026-03-01T10:00:00Z", "Which store?")
 		rigs.WriteEpicFiles(t, store, "repair", loop, repair)
 		rigs.WriteEpicFiles(t, store, "cycle", loop, cycle)
+		rigs.WriteEpicFiles(t, store, "realcycle", loop, realCycle)
+		rigs.WriteEpicFiles(t, store, "waiter", "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\nblocked_by: [ready]\n---\n", ready)
 		rigs.WriteEpicFiles(t, store, "blocked", "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: self-reported\nland_block_reason: conflict\n---\n", done)
 		rigs.WriteEpicFiles(t, store, "awaiting", loop, done)
 		rigs.WriteEpicFiles(t, store, "ready", loop, map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
@@ -116,6 +123,8 @@ func TestEpicList_NeedsYouReasons(t *testing.T) {
 			wire.CardAction{Kind: wire.CardActionOpenTicket, Label: "Open ticket", Target: "proj:repair/01"}},
 		"proj:cycle": {wire.SectionNeedsYou, "Deadlocked", "proj:cycle/02 waits on proj:cycle/01",
 			wire.CardAction{Kind: wire.CardActionOpenEpic, Label: "Open epic", Target: "proj:cycle"}},
+		"proj:realcycle": {wire.SectionNeedsYou, "Deadlocked", " waits on ",
+			wire.CardAction{Kind: wire.CardActionOpenEpic, Label: "Open epic", Target: "proj:realcycle"}},
 		"proj:blocked": {wire.SectionNeedsYou, "Merge blocked", "conflict",
 			wire.CardAction{Kind: wire.CardActionMerge, Label: "Merge", Target: "proj:blocked"}},
 		"proj:awaiting": {wire.SectionNeedsYou, "Awaiting merge", "Auto-merge is off for proj",
@@ -136,6 +145,9 @@ func TestEpicList_NeedsYouReasons(t *testing.T) {
 		if w.pill != "" && (len(r.Actions) == 0 || r.Actions[0] != w.action) {
 			t.Errorf("%s actions = %v, want [%v ...]", addr, r.Actions, w.action)
 		}
+	}
+	if r, ok := got["proj:waiter"]; !ok || r.Section == wire.SectionNeedsYou || r.StatePill != "" || r.State == wire.EpicListPaused {
+		t.Errorf("proj:waiter = %+v, want no Needs-you card and not paused", r)
 	}
 	if r := got["proj:asking"]; r.WaitingSince.Format("2006-01-02") != "2026-03-01" {
 		t.Errorf("asking waits since %v, want the question time", r.WaitingSince)

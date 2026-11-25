@@ -38,7 +38,7 @@ func TicketVerdict(epic tickets.Epic, scope RunScope, t tickets.Ticket, claimed,
 		d.Decision = runlog.DecisionFrontier
 	case status == tickets.StatusBlocked:
 		d.Decision = runlog.DecisionBlocked
-		d.Reason = strings.Join(epic.UnresolvedBlockers(t), ", ")
+		d.Reason = cmp.Or(t.CycleErr, strings.Join(epic.UnresolvedBlockers(t), ", "))
 	default:
 		d.Decision = runlog.DecisionUnclaimed
 	}

@@ -1,6 +1,8 @@
 package epics
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -362,6 +364,123 @@ func TestSummarizeEpic_DeadlockedAgreesWithStateOf(t *testing.T) {
 		if want := state == StateCycle; (got.Reason == wire.EpicReasonDeadlock) != want {
 			t.Errorf("%v: reason %q, StateOf %v", statuses, got.Reason, state)
 		}
+	}
+}
+
+// diskEpic and diskIssue mirror rigs.WriteEpicFiles and rigs.IssueMD, which
+// this package cannot import without a cycle.
+func diskEpic(t *testing.T, store, epic, ticketMD string, issues map[string]string) {
+	t.Helper()
+	dir := filepath.Join(store, "proj", epic)
+	if err := os.MkdirAll(filepath.Join(dir, "issues"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		filepath.Join(store, "proj", "project.json"): `{"name":"proj"}`,
+		filepath.Join(dir, "ticket.md"):              ticketMD,
+	}
+	for name, content := range issues {
+		files[filepath.Join(dir, "issues", name)] = content
+	}
+	for path, content := range files {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func diskIssue(id, status, extra, title string) string {
+	return "---\nid: \"" + id + "\"\nstatus: " + status + "\ntype: implement\n" + extra + "---\n\n# " + title + "\n"
+}
+
+// summaryOnDisk loads store/proj through the hold resolver and summarizes
+// the named epic.
+func summaryOnDisk(t *testing.T, store, name string) (tickets.Epic, wire.EpicSummary) {
+	t.Helper()
+	all, err := tickets.LoadResolved("proj", filepath.Join(store, "proj"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range all {
+		if e.Name == name {
+			root := queue.RootRef{Project: "proj", Epic: name}
+			none := func(string) (time.Time, bool) { return time.Time{}, false }
+			return e, summarizeEpic(root, e, "merge", none, func(string) string { return "" }, noLog)
+		}
+	}
+	t.Fatalf("epic %q not loaded", name)
+	return tickets.Epic{}, wire.EpicSummary{}
+}
+
+func TestSummarizeEpic_WaitingOnEpicUntilBlockerReleased(t *testing.T) {
+	t.Parallel()
+	issues := map[string]string{"01-a.md": diskIssue("01", "open", "", "A")}
+	for _, tc := range []struct {
+		name     string
+		project  string // project.json written after the epics, "" keeps the default
+		released string // blocker ticket.md once released
+	}{
+		{"on-merge", "", "---\nstatus: done\nmerged_at: 2026-01-02T11:00:00Z\n---\n"},
+		{"on-done", `{"landing":"on-done"}`, "---\nstatus: open\ncompleted_at: 2026-01-02T11:00:00Z\n---\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			store := t.TempDir()
+			write := func(blocker string, blockerIssues map[string]string) {
+				diskEpic(t, store, "blocker", blocker, blockerIssues)
+				diskEpic(t, store, "waiter", "---\nstatus: open\nblocked_by: [blocker]\n---\n", issues)
+				if tc.project != "" {
+					if err := os.WriteFile(filepath.Join(store, "proj", "project.json"), []byte(tc.project), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			write("---\nstatus: open\n---\n", issues)
+			e, sum := summaryOnDisk(t, store, "waiter")
+			if got := StateOf(e); got != StateWaiting {
+				t.Errorf("StateOf = %v, want StateWaiting", got)
+			}
+			if sum.State != wire.EpicStateWaitingOnEpic {
+				t.Errorf("state = %q, want %q", sum.State, wire.EpicStateWaitingOnEpic)
+			}
+			write(tc.released, map[string]string{"01-a.md": diskIssue("01", "done", "", "A")})
+			e, sum = summaryOnDisk(t, store, "waiter")
+			if got := StateOf(e); got != StateRunnable {
+				t.Errorf("released: StateOf = %v, want StateRunnable", got)
+			}
+			if sum.State == wire.EpicStateWaitingOnEpic || sum.State == wire.EpicStatePaused {
+				t.Errorf("released: state = %q", sum.State)
+			}
+		})
+	}
+}
+
+func TestSummarizeEpic_RealCycleIsDeadlockedNotErrored(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	cycle := map[string]string{
+		"01-a.md": diskIssue("01", "open", "blocked_by: [\"02\"]\n", "A"),
+		"02-b.md": diskIssue("02", "open", "blocked_by: [\"01\"]\n", "B"),
+	}
+	diskEpic(t, store, "blocker", "---\nstatus: open\n---\n", map[string]string{"01-a.md": diskIssue("01", "open", "", "A")})
+	diskEpic(t, store, "waiter", "---\nstatus: open\nblocked_by: [blocker]\n---\n", cycle)
+
+	e, sum := summaryOnDisk(t, store, "waiter")
+	if got := StateOf(e); got != StateCycle {
+		t.Errorf("StateOf = %v, want StateCycle", got)
+	}
+	if sum.State != wire.EpicStatePaused || sum.Reason != wire.EpicReasonDeadlock {
+		t.Errorf("summary = %q / %q, want paused / deadlock", sum.State, sum.Reason)
+	}
+
+	cycle["03-c.md"] = diskIssue("03", "paused", "pause_reason: zero-commit\n", "C")
+	diskEpic(t, store, "waiter", "---\nstatus: open\nblocked_by: [blocker]\n---\n", cycle)
+	e, sum = summaryOnDisk(t, store, "waiter")
+	if got := StateOf(e); got != StatePaused {
+		t.Errorf("with a paused ticket: StateOf = %v, want StatePaused", got)
+	}
+	if sum.State != wire.EpicStatePaused || sum.Reason == wire.EpicReasonDeadlock {
+		t.Errorf("with a paused ticket: summary = %q / %q, want paused with a ticket reason", sum.State, sum.Reason)
 	}
 }
 

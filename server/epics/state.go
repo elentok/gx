@@ -32,20 +32,24 @@ const (
 	// StateCycle: nothing runnable and nothing a person can clear, only blocked
 	// tickets.
 	StateCycle
+	// StateWaiting: nothing runnable because the epic's own blocked_by names an
+	// unreleased epic. Not a fault: the epic starts when that one lands.
+	StateWaiting
 )
 
 // StateOf is the server's one rule for an epic's state; the deadlock check and
-// the epic summary both derive from it. A status it does not recognize counts as
-// paused, never as a cycle: a person has to look at it.
+// the epic summary both derive from it. Precedence: done, running, paused,
+// cycle, waiting, then any other blocked ticket as a cycle. A status it does
+// not recognize counts as paused, never as a cycle: a person has to look at it.
 func StateOf(e tickets.Epic) State {
 	if !e.HoldsLoopWork() {
 		return StateDone
 	}
-	state := StateDone
+	var paused, hasCycle, waiting, blocked bool
 	for _, t := range e.Tickets {
 		status := e.RenderedStatus(t)
 		if status.Paused() {
-			state = StatePaused
+			paused = true
 			continue
 		}
 		switch status {
@@ -53,14 +57,24 @@ func StateOf(e tickets.Epic) State {
 			return StateRunnable
 		case tickets.StatusDone, tickets.StatusCancelled:
 		case tickets.StatusBlocked, tickets.StatusWaitingForChildren:
-			if state == StateDone {
-				state = StateCycle
-			}
+			blocked = true
+			hasCycle = hasCycle || t.CycleErr != ""
+			waiting = waiting || len(t.ExternalBlockers) > 0
 		default:
-			state = StatePaused
+			paused = true
 		}
 	}
-	return state
+	switch {
+	case paused:
+		return StatePaused
+	case hasCycle:
+		return StateCycle
+	case waiting:
+		return StateWaiting
+	case blocked:
+		return StateCycle
+	}
+	return StateDone
 }
 
 // TicketAddr is t's address under root.

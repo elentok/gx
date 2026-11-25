@@ -148,6 +148,11 @@ type Ticket struct {
 	// no ticket in the epic (see Epic.CheckBlockedBy). Renders as StatusError.
 	BlockedByErr string
 
+	// CycleErr names the wait cycle t's blocked_by closes, set in memory by
+	// resolveEpicHold. It is not a fault: t still renders StatusBlocked, and the
+	// epic state reads it as Deadlocked rather than Paused.
+	CycleErr string
+
 	// ExternalBlockers are the epic's unreleased whole-epic blocked_by entries,
 	// set in memory by resolveEpicHold. They hold the ticket blocked but are
 	// not listed as ticket blockers or sent on the wire.

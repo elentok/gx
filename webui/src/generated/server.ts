@@ -1531,7 +1531,15 @@ export const EpicStateRunning = "running";
  * that are open or claimed.
  */
 export const EpicStateMerging = "merging";
+/**
+ * EpicStateWaiting is Waiting for a slot: runnable, not yet running.
+ */
 export const EpicStateWaiting = "waiting";
+/**
+ * EpicStateWaitingOnEpic is Waiting on epic: the epic's own blocked_by names
+ * an unreleased epic. It takes no slot and is not paused.
+ */
+export const EpicStateWaitingOnEpic = "waiting-on-epic";
 /**
  * The PR flow's states, derived from the ticket store. Awaiting PR is a
  * complete epic in a pr-delivery project with no pull request yet; Writing PR
@@ -1547,7 +1555,7 @@ export const EpicStatePROpen = "pr-open";
  * dependency deadlock, or a blocked merge. EpicSummary.Reason says which.
  */
 export const EpicStatePaused = "paused";
-export type EpicState = typeof EpicStateAwaitingMerge | typeof EpicStateFinished | typeof EpicStateRunning | typeof EpicStateMerging | typeof EpicStateWaiting | typeof EpicStateAwaitingPR | typeof EpicStateWritingPRText | typeof EpicStateFixingCI | typeof EpicStatePROpen | typeof EpicStatePaused;
+export type EpicState = typeof EpicStateAwaitingMerge | typeof EpicStateFinished | typeof EpicStateRunning | typeof EpicStateMerging | typeof EpicStateWaiting | typeof EpicStateWaitingOnEpic | typeof EpicStateAwaitingPR | typeof EpicStateWritingPRText | typeof EpicStateFixingCI | typeof EpicStatePROpen | typeof EpicStatePaused;
 export const EpicReasonDeadlock = "Dependency deadlock";
 export const EpicReasonMergeBlocked = "Merge blocked";
 export const EpicReasonCIFailing = "CI failing";

@@ -42,7 +42,7 @@ func epicListState(e tickets.Epic, queued, queueable bool, loopState wire.EpicSt
 		return wire.EpicListMergeBlocked
 	case loopState == wire.EpicStatePaused && prstate.Blocked(e):
 		return wire.EpicListState(e.MergeBlockKind)
-	case loopState != wire.EpicStateWaiting && loopState != wire.EpicStateFinished:
+	case loopState != wire.EpicStateWaiting && loopState != wire.EpicStateWaitingOnEpic && loopState != wire.EpicStateFinished:
 		return wire.EpicListState(loopState)
 	case queued:
 		return wire.EpicListQueued

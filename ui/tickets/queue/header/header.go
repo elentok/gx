@@ -56,6 +56,7 @@ var epicStateLabels = map[wire.EpicState]string{
 	wire.EpicStatePaused:        "Paused",
 	wire.EpicStateRunning:       "Running",
 	wire.EpicStateWaiting:       "Waiting for a slot",
+	wire.EpicStateWaitingOnEpic: "Waiting",
 	wire.EpicStateAwaitingMerge: "Awaiting merge",
 	wire.EpicStateMerging:       "Merging",
 	wire.EpicStateFinished:      "Merged",
@@ -80,6 +81,8 @@ func epicStatusLine(icons ui.IconSet, sum wire.EpicSummary, spinnerGlyph string)
 			text += ": " + sum.VerdictReason
 		}
 		return icons.EpicQueued, text, lipgloss.NewStyle()
+	case wire.EpicStateWaitingOnEpic:
+		return icons.EpicQueued, epicStateLabels[sum.State], lipgloss.NewStyle()
 	case wire.EpicStatePaused:
 		text = epicStateLabels[sum.State]
 		if sum.Reason != "" {

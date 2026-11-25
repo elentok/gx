@@ -56,13 +56,30 @@ func TestEpicListState_EveryEpicStateHasItsOwn(t *testing.T) {
 		case wire.EpicStateFinished:
 			// Finished is decided by merged_at, not by the queue state.
 			e.MergedAt = time.Unix(100, 0)
-		case wire.EpicStateWaiting:
+		case wire.EpicStateWaiting, wire.EpicStateWaitingOnEpic:
 			// A waiting epic is queued, ready or has no open ticket, depending
 			// on the queue and its tickets; it has no list state of its own.
 			continue
 		}
 		if got := epicListState(e, false, false, s); got != want {
 			t.Errorf("epicListState(%q) = %q, want %q", s, got, want)
+		}
+	}
+}
+
+func TestEpicListState_WaitingOnEpicFallsToQueueState(t *testing.T) {
+	t.Parallel()
+	e := tickets.Epic{Name: "epic"}
+	for _, tc := range []struct {
+		queued, queueable bool
+		want              wire.EpicListState
+	}{
+		{true, true, wire.EpicListQueued},
+		{false, true, wire.EpicListReady},
+		{false, false, wire.EpicListNoOpenTickets},
+	} {
+		if got := epicListState(e, tc.queued, tc.queueable, wire.EpicStateWaitingOnEpic); got != tc.want {
+			t.Errorf("queued=%v queueable=%v: got %q, want %q", tc.queued, tc.queueable, got, tc.want)
 		}
 	}
 }
