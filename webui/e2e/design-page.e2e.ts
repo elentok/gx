@@ -173,6 +173,7 @@ test.describe("72b. Design menu before Start", () => {
     await expect(menu.getByRole("menuitem").first()).toHaveText("Open design epic")
     await expect(menu.getByRole("menuitem")).toHaveText([
       "Open design epic",
+      /^Show diff/,
       /^Move to workspace/,
       "Hold",
       "Archive",

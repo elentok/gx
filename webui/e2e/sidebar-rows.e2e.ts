@@ -217,7 +217,7 @@ test("Sidebar rows", async ({ page, start }) => {
   await expect(frameButton(queueAgent)).toHaveCount(1)
   expect(await right(frameButton(queueAgent))).toBe(await right(parentMenu))
   await frameButton(queueAgent).click()
-  await expect(page.getByRole("menuitem")).toHaveText([/^Copy ID/])
+  await expect(page.getByRole("menuitem")).toHaveText([/^Show diff/, /^Copy ID/])
   await page.keyboard.press("Escape")
   // At 1280px the button shows on its own row only; Tab onto it shows it; without hover every row shows its button.
   const size = page.viewportSize()!

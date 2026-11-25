@@ -357,7 +357,7 @@ test("Workspaces", async ({ page, start }) => {
       row(name).locator("xpath=..").getByRole("button", nav("More actions")),
     ).toHaveCount(1)
   await row("one-offs-iter-01").locator("xpath=..").getByRole("button", nav("More actions")).click()
-  await expect(page.getByRole("menuitem")).toHaveText([/^Copy ID/])
+  await expect(page.getByRole("menuitem")).toHaveText([/^Show diff/, /^Copy ID/])
   await closeMenus()
   await row("fix-demo").locator("xpath=..").getByRole("button", nav("More actions")).click()
   await expect(page.getByRole("menuitem", nav("Copy ID"))).toBeVisible()
@@ -508,7 +508,8 @@ test("Workspaces", async ({ page, start }) => {
   )
   await page.keyboard.press(".")
   await menuFocused()
-  // "." opens the menu with nothing highlighted: the first item is the Move submenu, then Take off hold.
+  // "." opens the menu with nothing highlighted: the first item is Show diff, then the Move submenu, then Take off hold.
+  await page.keyboard.press("ArrowDown")
   await page.keyboard.press("ArrowDown")
   await page.keyboard.press("ArrowDown")
   await expect(page.getByRole("menuitem", nav("Take off hold"))).toHaveAttribute(

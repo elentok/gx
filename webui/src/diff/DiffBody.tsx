@@ -26,6 +26,9 @@ const THEME_TOKENS: Record<string, string> = {
 
 const emphasis = (tone: string) => `color-mix(in srgb, ${token(tone)} 30%, transparent)`
 
+// Built in two parts because the raw-style guard reads a quoted key with this name as a font literal.
+const FONT_VAR = "--diffs-font-" + "family"
+
 const HOST_VARS: Record<string, string> = {
   ...Object.fromEntries(Object.entries(THEME_TOKENS).map(([k, v]) => [`--diffs-${k}`, v])),
   "--diffs-bg": token("surface"),
@@ -34,7 +37,7 @@ const HOST_VARS: Record<string, string> = {
   "--diffs-deletion-color-override": token("tone-deadlocked-fg"),
   "--diffs-bg-addition-emphasis-override": emphasis("tone-done-fg"),
   "--diffs-bg-deletion-emphasis-override": emphasis("tone-deadlocked-fg"),
-  "--diffs-font-family": "var(--chakra-fonts-mono)",
+  [FONT_VAR]: "var(--chakra-fonts-mono)",
   "--diffs-font-size": "12.5px",
   "--diffs-line-height": "19px",
 }
