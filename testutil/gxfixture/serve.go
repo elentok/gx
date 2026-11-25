@@ -22,7 +22,6 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/gxfixture/draftseed"
 	"github.com/elentok/gx/testutil/gxfixture/output"
-	"github.com/elentok/gx/testutil/gxfixture/spec"
 	"github.com/elentok/gx/testutil/gxfixture/websignin"
 )
 
@@ -319,7 +318,7 @@ func (f *fixture) seedAfterStart(ctx context.Context, o opts, sc scenario) (s se
 	}
 	if sc.PostStart != nil {
 		cl := apiclient.New(server.SocketPath(f.stateD))
-		s.worktreeDiff, err = sc.PostStart(spec.PostStartEnv{
+		s.worktreeDiff, err = sc.PostStart(output.PostStartEnv{
 			Root: f.root, Repo: filepath.Join(f.root, "repo"), Store: f.store, Git: f.git,
 			Sessions: func() ([]wire.SessionInfo, error) { return cl.Sessions.List(ctx) },
 		})

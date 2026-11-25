@@ -308,6 +308,9 @@ func TriageScenario(shape string) (Scenario, bool) {
 	return Scenario{}, false
 }
 
+// FollowUps is followUps for the scenarios in sub-packages.
+var FollowUps = followUps
+
 // followUps is a project's follow-ups epic with open bug and idea tickets.
 func followUps(project string, bugs, ideas int) Epic {
 	e := Epic{Project: project, Name: tickets.FollowUpsEpic}

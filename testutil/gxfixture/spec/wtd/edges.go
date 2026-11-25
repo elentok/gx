@@ -1,4 +1,4 @@
-package spec
+package wtd
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/gxfixture/output"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 )
 
 // WorktreeDiffCapFiles is how many untracked files the capped worktree holds:
@@ -19,10 +20,10 @@ const WorktreeDiffCapFiles = 501
 
 // edgeWorktrees makes the plain worktrees of the edge states, off main. g is
 // the project repo's git.
-func edgeWorktrees(git Git, g *epicDiffGit, root string) error {
-	add := func(dir string) *epicDiffGit {
+func edgeWorktrees(git spec.Git, g *repoGit, root string) error {
+	add := func(dir string) *repoGit {
 		g.run("worktree", "add", "-q", "-b", dir, filepath.Join(root, dir), "main")
-		return &epicDiffGit{git: git, repo: filepath.Join(root, dir), err: g.err}
+		return &repoGit{git: git, repo: filepath.Join(root, dir), err: g.err}
 	}
 	capped := add(wtdCappedDir)
 	capped.write("src/capped.txt", "tracked change\n")
@@ -57,11 +58,11 @@ func waitFile(path string) error {
 
 // edgePostStart seeds the targets that need the server: the Queue agents, the
 // Triage and the paused tickets. wtDir is the directory the iteration worktrees live in.
-func edgePostStart(env PostStartEnv, out *output.WorktreeDiffOutput, wtDir string) error {
+func edgePostStart(env output.PostStartEnv, out *output.WorktreeDiffOutput, wtDir string) error {
 	target := func(addr string, si wire.SessionInfo) output.WorktreeTarget {
 		return output.WorktreeTarget{ID: si.ID, Path: si.Dir, Address: addr}
 	}
-	si, err := env.waitSession("triage", func(si wire.SessionInfo) bool { return si.Flow == "triage" })
+	si, err := waitSession(env, "triage", func(si wire.SessionInfo) bool { return si.Flow == "triage" })
 	if err != nil {
 		return err
 	}
@@ -69,7 +70,7 @@ func edgePostStart(env PostStartEnv, out *output.WorktreeDiffOutput, wtDir strin
 
 	// The asking agent stays up: its ticket pauses with the run still tracked.
 	askAddr := wtdAddr(wtdAsk, "01")
-	si, err = env.waitSession(askAddr, func(si wire.SessionInfo) bool { return si.Queue && si.Ticket == askAddr })
+	si, err = waitSession(env, askAddr, func(si wire.SessionInfo) bool { return si.Queue && si.Ticket == askAddr })
 	if err != nil {
 		return err
 	}

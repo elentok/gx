@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/gxfixture/output"
-	"github.com/elentok/gx/testutil/gxfixture/spec"
+	"github.com/elentok/gx/testutil/gxfixture/spec/wtd"
 )
 
 // pausedStatus is how the CLI reports a ticket paused with a question (file status: paused).
@@ -35,8 +35,8 @@ func assertEdgeStates(t *testing.T, r *running, w *output.WorktreeDiffOutput, se
 
 	// The capped worktree has one untracked file more than the cap, and a committed tracked change.
 	untracked := strings.Fields(gitIn(t, w.Capped.Path, "ls-files", "-o", "--exclude-standard"))
-	if len(untracked) != spec.WorktreeDiffCapFiles {
-		t.Errorf("capped: %d untracked files, want %d", len(untracked), spec.WorktreeDiffCapFiles)
+	if len(untracked) != wtd.WorktreeDiffCapFiles {
+		t.Errorf("capped: %d untracked files, want %d", len(untracked), wtd.WorktreeDiffCapFiles)
 	}
 	if n := commitsPast(t, w.Capped.Path, "main"); n == 0 {
 		t.Error("capped: no committed tracked change past main")

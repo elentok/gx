@@ -162,7 +162,7 @@ type Scenario struct {
 	GitSetup func(git Git, repo string) error
 	// PostStart runs at the end of the post-start seeding, once the claimed and Design
 	// worktrees exist; its result is Output.WorktreeDiff.
-	PostStart func(PostStartEnv) (*output.WorktreeDiffOutput, error)
+	PostStart func(output.PostStartEnv) (*output.WorktreeDiffOutput, error)
 	// NoCheckConfig leaves the projects without a checks key in project.json; the
 	// other scenarios write an empty one, so the Epics page shows no banner.
 	NoCheckConfig bool

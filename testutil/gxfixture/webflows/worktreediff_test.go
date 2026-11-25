@@ -12,7 +12,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/gxfixture/output"
-	"github.com/elentok/gx/testutil/gxfixture/spec"
+	"github.com/elentok/gx/testutil/gxfixture/spec/wtd"
 )
 
 // commonDir is the repository a checkout belongs to.
@@ -27,22 +27,22 @@ func assertFullDirtyState(t *testing.T, dir string) {
 	t.Helper()
 	status := gitIn(t, dir, "status", "--porcelain", "--ignored", "-uall")
 	for want, how := range map[string]string{
-		spec.WorktreeDiffModified: " M ",
-		spec.WorktreeDiffRenamed:  " M ",
-		spec.WorktreeDiffDeleted:  " D ",
-		spec.WorktreeDiffNew:      "?? ",
-		spec.WorktreeDiffPNG:      "?? ",
-		spec.WorktreeDiffIgnored:  "!! ",
+		wtd.WorktreeDiffModified: " M ",
+		wtd.WorktreeDiffRenamed:  " M ",
+		wtd.WorktreeDiffDeleted:  " D ",
+		wtd.WorktreeDiffNew:      "?? ",
+		wtd.WorktreeDiffPNG:      "?? ",
+		wtd.WorktreeDiffIgnored:  "!! ",
 	} {
 		// gitIn trims the output, which drops the first line's leading space.
 		if !strings.Contains(status, strings.TrimSpace(how)+" "+want) {
 			t.Errorf("%s: status has no %q:\n%s", dir, how+want, status)
 		}
 	}
-	if untracked := gitIn(t, dir, "ls-files", "-o", "--exclude-standard"); strings.Contains(untracked, spec.WorktreeDiffIgnored) {
+	if untracked := gitIn(t, dir, "ls-files", "-o", "--exclude-standard"); strings.Contains(untracked, wtd.WorktreeDiffIgnored) {
 		t.Errorf("%s: ignored file is listed as untracked:\n%s", dir, untracked)
 	}
-	if got := gitIn(t, dir, "log", "--diff-filter=R", "--name-status", "--format=", "-M", "main..HEAD"); !strings.Contains(got, spec.WorktreeDiffRenamedOld+"\t"+spec.WorktreeDiffRenamed) {
+	if got := gitIn(t, dir, "log", "--diff-filter=R", "--name-status", "--format=", "-M", "main..HEAD"); !strings.Contains(got, wtd.WorktreeDiffRenamedOld+"\t"+wtd.WorktreeDiffRenamed) {
 		t.Errorf("%s: no rename commit past main:\n%s", dir, got)
 	}
 }

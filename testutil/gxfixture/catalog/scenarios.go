@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/testutil/gxfixture/limitseed"
 	"github.com/elentok/gx/testutil/gxfixture/perfdata"
 	"github.com/elentok/gx/testutil/gxfixture/spec"
+	"github.com/elentok/gx/testutil/gxfixture/spec/wtd"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -684,8 +685,8 @@ var Scenarios = map[string]scenario{
 	"initiative-epics-cards":     spec.InitiativeEpicsCardsScenario(),
 	"initiative-gate-ready":      spec.InitiativeGateReadyScenario(),
 	"initiative-resume":          spec.InitiativeResumeScenario(),
-	// worktree-diff: one target for each way a Worktree diff opens. See spec.WorktreeDiffScenario.
-	"worktree-diff": spec.WorktreeDiffScenario(),
+	// worktree-diff: one target for each way a Worktree diff opens. See wtd.Scenario.
+	"worktree-diff": wtd.Scenario(),
 	// triage: follow-ups and a Triage in the state --shape names (default c-few).
 	// run swaps in spec.TriageScenario(shape).
 	"triage": {TriageShaped: true},

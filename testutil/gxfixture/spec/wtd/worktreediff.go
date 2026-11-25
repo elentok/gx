@@ -1,18 +1,25 @@
-package spec
+// Package wtd defines the worktree-diff scenario. It is a sub-package of spec
+// because spec is at its sizeguard limit.
+package wtd
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/ralphloop/worktree"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/gxfixture/limitseed"
 	"github.com/elentok/gx/testutil/gxfixture/output"
+	"github.com/elentok/gx/testutil/gxfixture/spec"
 	"github.com/elentok/gx/tickets"
 )
+
+const project = limitseed.Project
 
 // Files of the worktree-diff scenario, relative to a worktree root.
 const (
@@ -49,16 +56,46 @@ const (
 
 func wtdAddr(epic, id string) string { return project + ":" + epic + "/" + id }
 
-// PostStartEnv is what a Scenario.PostStart hook works with once the server is up.
-type PostStartEnv struct {
-	Root, Repo, Store string
-	Git               Git
-	// Sessions lists the server's sessions.
-	Sessions func() ([]wire.SessionInfo, error)
+// repoGit makes a worktree's commits; the first failure sticks and turns every
+// later call into a no-op.
+type repoGit struct {
+	git  spec.Git
+	repo string
+	err  error
+}
+
+func (s *repoGit) run(args ...string) {
+	if s.err == nil {
+		s.err = s.git(s.repo, args...)
+	}
+}
+
+func (s *repoGit) write(path string, data string) {
+	if s.err != nil {
+		return
+	}
+	full := filepath.Join(s.repo, path)
+	if s.err = os.MkdirAll(filepath.Dir(full), 0o755); s.err == nil {
+		s.err = os.WriteFile(full, []byte(data), 0o644)
+	}
+}
+
+func (s *repoGit) commit(subject string) {
+	s.run("add", "-A")
+	s.run("commit", "-m", subject)
+}
+
+// numbered is n lines of text, "<prefix> <i>" each.
+func numbered(prefix string, n int) string {
+	var b strings.Builder
+	for i := 1; i <= n; i++ {
+		fmt.Fprintf(&b, "%s %d\n", prefix, i)
+	}
+	return b.String()
 }
 
 // waitSession polls until a session accepted by match has a directory on disk.
-func (e PostStartEnv) waitSession(what string, match func(wire.SessionInfo) bool) (wire.SessionInfo, error) {
+func waitSession(e output.PostStartEnv, what string, match func(wire.SessionInfo) bool) (wire.SessionInfo, error) {
 	for deadline := time.Now().Add(wtdWaitLimit); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
 		list, err := e.Sessions()
 		if err != nil {
@@ -75,18 +112,20 @@ func (e PostStartEnv) waitSession(what string, match func(wire.SessionInfo) bool
 	return wire.SessionInfo{}, fmt.Errorf("no %s session with a directory on disk", what)
 }
 
-// WorktreeDiffScenario seeds one target for each way a Worktree diff opens.
+// Scenario seeds one target for each way a Worktree diff opens.
 // GitSetup makes the chat worktree and the clone, which exist before the
 // server starts; PostStart commits and edits in the worktrees the queue and
 // the Design make, which exist only after the server is up.
-func WorktreeDiffScenario() Scenario {
-	open := func(epic string, tickets ...Ticket) Epic { return Epic{Project: project, Name: epic, Tickets: tickets} }
-	work := func(id, slug string, opts servertest.TicketOpts) Ticket {
-		return Ticket{ID: id, Slug: slug, Opts: opts}
+func Scenario() spec.Scenario {
+	open := func(epic string, tickets ...spec.Ticket) spec.Epic {
+		return spec.Epic{Project: project, Name: epic, Tickets: tickets}
+	}
+	work := func(id, slug string, opts servertest.TicketOpts) spec.Ticket {
+		return spec.Ticket{ID: id, Slug: slug, Opts: opts}
 	}
 	liveDesign := project + ":" + wtdMap
-	sc := Scenario{
-		Epics: []Epic{
+	sc := spec.Scenario{
+		Epics: []spec.Epic{
 			open(wtdMap),
 			open(wtdClaimed, work("01", "claimed", servertest.TicketOpts{})),
 			open(wtdStacked, work("01", "blocker", servertest.TicketOpts{}), work("02", "stacked", servertest.TicketOpts{BlockedBy: []string{"01"}})),
@@ -103,12 +142,12 @@ func WorktreeDiffScenario() Scenario {
 		Hold:         true,
 		Chat:         true,
 		FixAgents:    []string{wtdAddr(wtdFix, "01")},
-		Sessions: []SessionSpec{
-			{Project: project, Prompt: wtdChatPR, Read: true, Dir: RootToken + "/" + wtdChatDir},
-			{Project: project, Prompt: wtdChatPR, Read: true, Dir: RootToken + "/" + wtdCloneDir},
-			{Project: project, Prompt: wtdChatPR, Read: true, Dir: RootToken + "/" + wtdCappedDir},
-			{Project: project, Prompt: wtdChatPR, Read: true, Dir: RootToken + "/" + wtdOversizeDir},
-			{Project: project, Prompt: wtdChatPR, Read: true, Dir: RootToken + "/" + wtdCleanDir},
+		Sessions: []spec.SessionSpec{
+			{Project: project, Prompt: wtdChatPR, Read: true, Dir: spec.RootToken + "/" + wtdChatDir},
+			{Project: project, Prompt: wtdChatPR, Read: true, Dir: spec.RootToken + "/" + wtdCloneDir},
+			{Project: project, Prompt: wtdChatPR, Read: true, Dir: spec.RootToken + "/" + wtdCappedDir},
+			{Project: project, Prompt: wtdChatPR, Read: true, Dir: spec.RootToken + "/" + wtdOversizeDir},
+			{Project: project, Prompt: wtdChatPR, Read: true, Dir: spec.RootToken + "/" + wtdCleanDir},
 		},
 		StepsAfterSessions: [][]string{{"server", "triage", "open", project}},
 	}
@@ -116,9 +155,9 @@ func WorktreeDiffScenario() Scenario {
 		open(wtdAsk, work("01", "asks", servertest.TicketOpts{})),
 		open(wtdPause, work("01", "paused", servertest.TicketOpts{PauseReason: "self-reported"})),
 		open(wtdPauseStack, work("01", "blocker", servertest.TicketOpts{}), work("02", "paused", servertest.TicketOpts{BlockedBy: []string{"01"}, PauseReason: "self-reported"})),
-		followUps(project, 1, 0))
-	sc.GitSetup = func(git Git, repo string) error {
-		g := &epicDiffGit{git: git, repo: repo}
+		spec.FollowUps(project, 1, 0))
+	sc.GitSetup = func(git spec.Git, repo string) error {
+		g := &repoGit{git: git, repo: repo}
 		g.write(WorktreeDiffModified, "one\n")
 		g.write(WorktreeDiffRenamedOld, numbered("// old", 20))
 		g.write(WorktreeDiffDeleted, "gone\n")
@@ -127,7 +166,7 @@ func WorktreeDiffScenario() Scenario {
 		root := filepath.Dir(repo)
 		chat := filepath.Join(root, wtdChatDir)
 		g.run("worktree", "add", "-q", "-b", wtdChatDir, chat, "main")
-		w := &epicDiffGit{git: git, repo: chat, err: g.err}
+		w := &repoGit{git: git, repo: chat, err: g.err}
 		w.run("mv", WorktreeDiffRenamedOld, WorktreeDiffRenamed)
 		w.commit("Rename the old file")
 		w.write("src/added.txt", "added\n")
@@ -136,7 +175,7 @@ func WorktreeDiffScenario() Scenario {
 		g.run("clone", "-q", repo, filepath.Join(root, wtdCloneDir))
 		return firstErr(g.err, w.err, edgeWorktrees(git, g, root))
 	}
-	sc.PostStart = func(env PostStartEnv) (*output.WorktreeDiffOutput, error) { return worktreeDiffPostStart(env) }
+	sc.PostStart = worktreeDiffPostStart
 	return sc
 }
 
@@ -151,7 +190,7 @@ func firstErr(errs ...error) error {
 
 // dirty leaves every kind of uncommitted state in the worktree: modified,
 // renamed then edited, deleted, untracked, ignored and an untracked PNG.
-func (s *epicDiffGit) dirty() {
+func (s *repoGit) dirty() {
 	s.write(WorktreeDiffModified, "one\ntwo\n")
 	s.write(WorktreeDiffRenamed, numbered("// old", 20)+"// edited\n")
 	s.write(WorktreeDiffNew, "new\n")
@@ -163,19 +202,19 @@ func (s *epicDiffGit) dirty() {
 }
 
 // commitAndEdit adds one commit to the worktree in dir and leaves one edit uncommitted.
-func commitAndEdit(git Git, dir, name string) error {
-	s := &epicDiffGit{git: git, repo: dir}
+func commitAndEdit(git spec.Git, dir, name string) error {
+	s := &repoGit{git: git, repo: dir}
 	s.write("work/"+name+".txt", name+"\n")
 	s.commit(name + ": a commit")
 	s.write(WorktreeDiffModified, "edited by "+name+"\n")
 	return s.err
 }
 
-func worktreeDiffPostStart(env PostStartEnv) (*output.WorktreeDiffOutput, error) {
+func worktreeDiffPostStart(env output.PostStartEnv) (*output.WorktreeDiffOutput, error) {
 	out := &output.WorktreeDiffOutput{Unclaimed: wtdAddr(wtdIdle, "01")}
 	queue := func(epic string) (output.WorktreeTarget, error) {
 		addr := wtdAddr(epic, "01")
-		si, err := env.waitSession(addr, func(si wire.SessionInfo) bool { return si.Queue && si.Ticket == addr })
+		si, err := waitSession(env, addr, func(si wire.SessionInfo) bool { return si.Queue && si.Ticket == addr })
 		if err != nil {
 			return output.WorktreeTarget{}, err
 		}
@@ -203,7 +242,7 @@ func worktreeDiffPostStart(env PostStartEnv) (*output.WorktreeDiffOutput, error)
 		return nil, err
 	}
 	design := project + ":" + wtdMap
-	si, err := env.waitSession("design", func(si wire.SessionInfo) bool { return si.Flow == "design" && si.FlowKey == design })
+	si, err := waitSession(env, "design", func(si wire.SessionInfo) bool { return si.Flow == "design" && si.FlowKey == design })
 	if err != nil {
 		return nil, err
 	}
@@ -212,12 +251,12 @@ func worktreeDiffPostStart(env PostStartEnv) (*output.WorktreeDiffOutput, error)
 		return nil, err
 	}
 	fixAddr := wtdAddr(wtdFix, "01")
-	if si, err = env.waitSession("fix agent", func(si wire.SessionInfo) bool { return si.FixOf == fixAddr }); err != nil {
+	if si, err = waitSession(env, "fix agent", func(si wire.SessionInfo) bool { return si.FixOf == fixAddr }); err != nil {
 		return nil, err
 	}
 	out.FixAgent = output.WorktreeTarget{ID: si.ID, Path: si.Dir, Address: fixAddr}
 	// The Fix agent reads the trunk checkout: edits only, no commits.
-	trunk := &epicDiffGit{git: env.Git, repo: si.Dir}
+	trunk := &repoGit{git: env.Git, repo: si.Dir}
 	trunk.write(WorktreeDiffModified, "edited in the trunk checkout\n")
 	if trunk.err != nil {
 		return nil, trunk.err
