@@ -32,7 +32,7 @@ test("Interrupt replaces Send while Working, with the Working reason, and the bo
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull()
   expect(screen.getByRole("button", { name: "Interrupt" })).toBeTruthy()
   expect((await composerBox()).value).toBe("hi")
-  expect(screen.getByText("Working. Send turns on when the session is idle.")).toBeTruthy()
+  expect(screen.queryByText(/Send turns on when the session is idle/)).toBeNull()
 })
 
 test("a focus request focuses the prompt when the chat opens; without one it stays unfocused", async () => {
@@ -186,7 +186,7 @@ test("a Codex session shows its chat, and Send follows the idle rule", async () 
   await type("hi")
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull()
   expect(screen.getByRole("button", { name: "Interrupt" })).toBeTruthy()
-  expect(screen.getByText("Working. Send turns on when the session is idle.")).toBeTruthy()
+  expect(screen.queryByText(/Send turns on when the session is idle/)).toBeNull()
 })
 
 test("a harness with no chat loads no chat, shows the notice, Show screen opens the screen modal and the composer says why it is off", async () => {
@@ -340,7 +340,6 @@ const failureCases: {
     over: { status: { state: "working" } },
     label: "No progress for 15 min",
     buttons: ["Screen"],
-    reason: "Working. Send turns on when the session is idle.",
     sendOff: true,
   },
   {
@@ -348,7 +347,6 @@ const failureCases: {
     over: { status: { state: "blocked" } },
     label: "Waiting at a prompt in the terminal",
     buttons: ["Screen"],
-    reason: "Blocked. Send turns on when the session is idle.",
     sendOff: true,
   },
   {

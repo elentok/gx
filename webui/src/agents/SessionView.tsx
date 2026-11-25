@@ -145,6 +145,13 @@ function sendReason(s: SessionInfo, connected: boolean): string | undefined {
   }
 }
 
+/** The composer's reason line: Send is already replaced or explained elsewhere while working or blocked. */
+function composerReason(s: SessionInfo, connected: boolean): string | undefined {
+  const state = s.status.state
+  if (connected && (state === "working" || state === "blocked")) return undefined
+  return sendReason(s, connected)
+}
+
 /** Which kind of gx-driven agent this is; undefined for a plain session. */
 function drivenKind(s: SessionInfo): "Queue" | "Design" | "Triage" | undefined {
   if (s.queue) return "Queue"
@@ -321,7 +328,7 @@ export function SessionView({
             },
           ])
         }}
-        reason={locked ? undefined : sendReason(session, connected)}
+        reason={locked ? undefined : composerReason(session, connected)}
       />
     </Box>
   )
