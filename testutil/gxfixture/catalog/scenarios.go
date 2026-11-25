@@ -870,6 +870,8 @@ var Scenarios = map[string]scenario{
 	// agents-failures: four Claude sessions in demo, one per failure (stalled,
 	// auth, rate-limit, blocked). See spec.AgentsFailuresScenario.
 	"agents-failures": spec.AgentsFailuresScenario(),
+	// long-question: a long and a short open agent question. See longQuestion.
+	"long-question": longQuestion(),
 	// edge: a project with no epics, an epic with no tickets, and a ticket
 	// blocked by a dependency that is not merged.
 	"edge": {

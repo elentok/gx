@@ -6,6 +6,8 @@ Read this before probing `testutil/gxfixture`. Every path below was checked with
 
 - The data model (`Scenario`, `Epic`, `Ticket`, `SessionSpec`, `CommandStep`, `RestartSpec`) is in
   `testutil/gxfixture/spec/spec.go`. A new knob is a new field on `spec.Scenario`.
+  `Questions` (by ticket address) seeds an agent's open question and earlier answered rounds on a paused
+  ticket through `testutil/gxfixture/questionseed`, in place of the bare by-gx round.
 - Scenario definitions that need nothing from the fixture program are functions or vars in
   `testutil/gxfixture/spec/*.go` (one file per area: `agents.go`, `recovery.go`, `progress.go`, `stall.go`, ...).
 - The registry is `catalog.Scenarios` (a `map[string]scenario`) in `testutil/gxfixture/catalog/scenarios.go`.
@@ -79,6 +81,7 @@ in the scenario; the worker file is `.agentfake-worker.json`.
 | Model switching (`ModelFakes`) | `spec/modelswitch.go`, `modelswitch_test.go` |
 | Host files, cache gate, launch state, images | `catalog/hostfiles.go`, `cachegate.go`, `launchstate.go`, `imagesscenarios.go` |
 | Context window / usage lines | `spec/contextwindow.go` |
+| `long-question`: a long and a short open agent question (`Questions` knob) | `catalog/questionscenarios.go` |
 
 ## 7. Check the component before you write a locator
 

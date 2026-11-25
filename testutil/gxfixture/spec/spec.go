@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/testutil/gxfixture/bgtx"
 	"github.com/elentok/gx/testutil/gxfixture/limitseed"
 	"github.com/elentok/gx/testutil/gxfixture/perfdata"
+	"github.com/elentok/gx/testutil/gxfixture/questionseed"
 )
 
 const project = limitseed.Project
@@ -153,6 +154,9 @@ type Scenario struct {
 	// Recommend stores an investigate recommendation on the open round of a
 	// paused ticket, by ticket address.
 	Recommend map[string]Recommendation
+	// Questions seeds an agent's open question and its earlier answered rounds
+	// on a paused ticket, by ticket address, in place of the bare gx round.
+	Questions map[string]questionseed.Question
 	// GitSetup shapes the project repo (branches, a dirty checkout) after its first commit.
 	GitSetup func(git Git, repo string) error
 	// NoCheckConfig leaves the projects without a checks key in project.json; the

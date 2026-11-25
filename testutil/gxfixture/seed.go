@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/gxfixture/historyseed"
+	"github.com/elentok/gx/testutil/gxfixture/questionseed"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/tickets/ticketlog"
 	triagerec "github.com/elentok/gx/triage"
@@ -247,7 +248,13 @@ func (f *fixture) seed(sc scenario) error {
 			}
 			if tk.Opts.PauseReason != "" {
 				ticketPath := filepath.Join(f.store, e.Project, e.Name, "issues", tk.ID+"-"+tk.Slug+".md")
-				if err := seedPauseRound(ticketPath, tk.Opts.PauseReason, sc.Recommend[addr+"/"+tk.ID]); err != nil {
+				var err error
+				if q, ok := sc.Questions[addr+"/"+tk.ID]; ok {
+					err = questionseed.Seed(ticketPath, q)
+				} else {
+					err = seedPauseRound(ticketPath, tk.Opts.PauseReason, sc.Recommend[addr+"/"+tk.ID])
+				}
+				if err != nil {
 					return err
 				}
 			}
