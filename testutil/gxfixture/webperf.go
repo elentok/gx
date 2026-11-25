@@ -8,8 +8,7 @@ import (
 	"github.com/elentok/gx/webperf"
 )
 
-// seedWebPerf writes the scenario's samples through the store, each day's
-// batch received at noon of that past local day. The server loads them at start.
+// seedWebPerf writes the samples through the store, each day's batch received at noon of that past day.
 func seedWebPerf(stateDir string, days []perfdata.WebPerfDay) error {
 	now := time.Now()
 	store, err := webperf.Open(stateDir, time.Now)

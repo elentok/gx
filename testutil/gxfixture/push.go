@@ -7,10 +7,9 @@ import (
 	"github.com/elentok/gx/testutil/gxfixture/pushcapture"
 )
 
-// startPushService starts the fake push service for a PushService scenario,
-// lets the server accept its http: endpoint and gives it the contact email web
-// push needs. The returned func stops the service. It is a function, not a
-// method, to keep fixture under the sizeguard method limit.
+// startPushService starts the fake push service for a PushService scenario and
+// points the server at it. The returned func stops it. A function, not a method,
+// to keep fixture under the sizeguard method limit.
 func startPushService(f *fixture, o *opts, sc scenario) (func(), error) {
 	if !sc.PushService {
 		return func() {}, nil

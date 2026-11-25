@@ -59,8 +59,7 @@ func limitShapeNames() []string {
 	return names
 }
 
-// checkShape resolves the --shape value before anything starts: "" is fresh
-// for the limits scenario and normal for the spend one.
+// checkShape resolves --shape before anything starts: "" is the scenario's default.
 func checkShape(sc scenario, shape string) (string, error) {
 	var def string
 	var names []string
