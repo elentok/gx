@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import type { SaveStatus } from "./SaveIndicator"
 import { useLocation } from "react-router"
 import type { DesignDraft } from "../generated/server"
 import type { DesignDraftPickResult } from "../generated/ops"
@@ -15,7 +16,7 @@ import { clearUnsaved, stashUnsaved, type Restored } from "./unsaved"
 const AUTOSAVE_MS = 800
 const RETRY_MS = 5000
 
-export type SaveStatus = "none" | "saving" | "saved" | "unsaved"
+export type { SaveStatus }
 export type Banner = "conflict" | undefined
 
 /** `editing` saves; `starting` is Start in flight; `finished` is Start, Remove or a switch having taken the draft over. */
@@ -251,7 +252,7 @@ export function useDraftAutosave({
       setLabel(picked.label)
       imgs.reset(picked.images)
       settle()
-      setStatus(hasText(next) || picked.images.length > 0 ? "saved" : "none")
+      setStatus(hasText(next) || picked.images.length > 0 ? "restored" : "none")
     },
   })
 

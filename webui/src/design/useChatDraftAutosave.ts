@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import type { SaveStatus } from "./SaveIndicator"
 import { useConnectionContext } from "../connection"
 import type { ChatDraftPickResult } from "../generated/ops"
 import { EventChatDraftsChanged, type ChatDraft } from "../generated/server"
@@ -9,7 +10,7 @@ import type { ChatDraftsClient } from "./chatDrafts"
 const AUTOSAVE_MS = 800
 const RETRY_MS = 5000
 
-export type ChatSaveStatus = "none" | "saving" | "saved" | "unsaved"
+export type ChatSaveStatus = SaveStatus
 
 const SETTING_KEYS = [
   "project",
@@ -164,7 +165,7 @@ export function useChatDraftAutosave({
       setBrief(theirs.brief)
       setSettings(theirSettings)
       setFacts(theirs)
-      setStatus("saved")
+      setStatus("restored")
       resume()
     },
   }
@@ -190,7 +191,7 @@ export function useChatDraftAutosave({
       setBrief(picked.brief)
       setSettings(latestSettings.current)
       setFacts(picked)
-      setStatus("saved")
+      setStatus("restored")
     },
   })
 

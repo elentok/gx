@@ -3,9 +3,9 @@ import { act, cleanup, render, screen } from "@testing-library/react"
 import type { ReactElement } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { system } from "../ui/theme"
-import { SaveIndicator } from "./SaveIndicator"
+import { SaveIndicator, type SaveStatus } from "./SaveIndicator"
 
-type Status = "none" | "saving" | "saved" | "unsaved"
+type Status = SaveStatus
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => {
@@ -87,6 +87,15 @@ test("a retry that works shows the check for 1 s", async () => {
   set("saved")
   expect(slot().textContent).toBe("Draft saved")
   await wait(1000)
+  expect(slot().textContent).toBe("")
+})
+
+test("a history pick or load theirs while unsaved shows no check", async () => {
+  const set = mount("unsaved")
+  set("restored")
+  await wait(0)
+  expect(slot().textContent).toBe("")
+  await wait(2000)
   expect(slot().textContent).toBe("")
 })
 

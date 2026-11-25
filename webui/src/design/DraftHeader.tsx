@@ -3,7 +3,7 @@ import type { ReactNode, RefObject } from "react"
 import { HistoryButton } from "../history/HistoryButton"
 import { MascotToggle } from "../shell/MascotToggle"
 import { DraftIcon } from "../shell/SidebarRows"
-import { SaveIndicator } from "./SaveIndicator"
+import { SaveIndicator, type SaveStatus } from "./SaveIndicator"
 
 export const field = {
   fontSize: "16px",
@@ -22,7 +22,7 @@ interface Props {
   slug: string
   slugError: string | undefined
   slugInput: RefObject<HTMLInputElement | null>
-  status: "none" | "saving" | "saved" | "unsaved"
+  status: SaveStatus
   /** The ⋯ menu, last in the title row. */
   menu: ReactNode
   onRename: () => void

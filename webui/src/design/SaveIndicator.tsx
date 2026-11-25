@@ -2,15 +2,14 @@ import { Box, VisuallyHidden } from "@chakra-ui/react"
 import { useEffect, useRef, useState } from "react"
 import { LuCheck, LuSave, LuX } from "react-icons/lu"
 
-type SaveStatus = "none" | "saving" | "saved" | "unsaved"
+/** "restored" is "saved" without a save the person saw: a history pick or load-theirs. It shows nothing. */
+export type SaveStatus = "none" | "saving" | "saved" | "unsaved" | "restored"
 
 const SHOW_AFTER_MS = 300
 const MIN_SHOWN_MS = 600
 const CHECK_MS = 1000
 
-type Shown = "none" | "saving" | "saved" | "unsaved"
-
-const LABELS: Record<Shown, string> = {
+const LABELS: Record<Exclude<SaveStatus, "restored">, string> = {
   none: "",
   saving: "Saving the draft",
   saved: "Draft saved",
@@ -22,10 +21,10 @@ const LABELS: Record<Shown, string> = {
  * `SHOW_AFTER_MS` shows nothing, a shown icon stays `MIN_SHOWN_MS`, and a seen save ends with a check.
  */
 export function SaveIndicator({ status }: { status: SaveStatus }) {
-  const [shown, setShown] = useState<Shown>("none")
-  // When the saving icon appeared, and whether it is on screen, kept out of render state so the
-  // status effect below reads the latest values without re-running.
-  const sawSaving = useRef(0)
+  const [shown, setShown] = useState<Exclude<SaveStatus, "restored">>("none")
+  // When the saving or error icon appeared (0 when none has), kept out of render state so the
+  // status effect below reads the latest value without re-running.
+  const shownAt = useRef(0)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const prev = useRef<SaveStatus>(status)
 
@@ -37,26 +36,26 @@ export function SaveIndicator({ status }: { status: SaveStatus }) {
       timer.current = setTimeout(fn, ms)
     }
     const showCheck = () => {
-      sawSaving.current = 0
+      shownAt.current = 0
       setShown("saved")
       later(CHECK_MS, () => setShown("none"))
     }
-    const seen = sawSaving.current !== 0
+    const seen = shownAt.current !== 0
     if (status === "unsaved") {
-      sawSaving.current = Date.now()
+      shownAt.current = Date.now()
       setShown("unsaved")
     } else if (status === "saving") {
       // A retry from "unsaved" never gets here: the hooks keep "unsaved" until a save works.
       later(SHOW_AFTER_MS, () => {
-        sawSaving.current = Date.now()
+        shownAt.current = Date.now()
         setShown("saving")
       })
     } else if (status === "saved" && (seen || was === "unsaved")) {
-      const left = MIN_SHOWN_MS - (Date.now() - sawSaving.current)
+      const left = MIN_SHOWN_MS - (Date.now() - shownAt.current)
       if (was === "unsaved" || left <= 0) showCheck()
       else later(left, showCheck)
     } else {
-      sawSaving.current = 0
+      shownAt.current = 0
       setShown("none")
     }
   }, [status])
