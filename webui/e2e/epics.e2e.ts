@@ -576,3 +576,108 @@ test("6. Queue an epic, and outside changes show up", async ({ page, start }) =>
   await expect(progress.getByRole("link", { name: "ready-epic" })).toBeVisible()
   await expect(ready.getByRole("link", { name: "ready-epic" })).toHaveCount(0)
 })
+
+test("213. Waiting epic", async ({ page, start }) => {
+  const fixture = await start("epic-waiting", { shape: "cycle-refusal" })
+  const waiting = "notification-alignment-impl"
+  const queued = "notification-alignment-queued-impl"
+  const deliver = "deliver-primitive-impl"
+  const push = "push-notifications-impl"
+  const store = `demo:${waiting}`
+  const blockedBy = async () =>
+    (await fixture.cli("tickets", "show", store)).match(/blocked_by:.*(\n[ \t]+.*)*/)?.[0] ?? ""
+
+  // 1. Cards: the words stay when the epic moves, and no pill or blocker control comes with them.
+  const ready = await section(page, "Ready to queue")
+  await expect(card(page, waiting).getByTestId("status")).toHaveText(`Waiting on ${deliver}`)
+  await expect(ready.getByRole("link", { name: waiting, exact: true })).toBeVisible()
+  const implementing = await section(page, "Implementing")
+  await expect(implementing.getByRole("link", { name: queued, exact: true })).toBeVisible()
+  await expect(card(page, queued).getByTestId("status")).toHaveText(`Waiting on ${deliver}`)
+  await card(page, waiting).getByRole("button", nav("Queue")).click()
+  await expect(implementing.getByRole("link", { name: waiting, exact: true })).toBeVisible()
+  await expect(ready.getByRole("link", { name: waiting, exact: true })).toHaveCount(0)
+  await expect(card(page, waiting).getByTestId("status")).toHaveText(`Waiting on ${deliver}`)
+  await expect(card(page, waiting).getByText(/Paused|Deadlocked|Needs you/)).toHaveCount(0)
+  await card(page, waiting).getByRole("button", nav("More actions")).click()
+  const menu = page.getByRole("menu", nav("More actions"))
+  await expect(menu).toBeVisible()
+  await expect(menu.getByRole("menuitem", { name: /blocker/i })).toHaveCount(0)
+  await page.keyboard.press("Escape")
+
+  // 2. Sidebar.
+  const row = page.getByTestId("sidebar-body").locator(`a[href="#/e/${store}"]`)
+  await expect(row).toContainText("Waiting")
+  await expect(row.getByTitle(`Waiting on ${deliver}`)).toHaveText("Waiting")
+
+  // 3. Header and rows.
+  await card(page, waiting).getByRole("link", { name: waiting, exact: true }).click()
+  await expect(page.getByTestId("stats-line")).toContainText(`Waiting on ${deliver}`)
+  await expect(page.getByText("after 03")).toBeVisible()
+  await expect(page.getByText(/after .*deliver-primitive/)).toHaveCount(0)
+
+  // 4. Chip link: another epic's page with no reload.
+  await page.getByTestId("blocker-chip").getByRole("link", { name: deliver }).click()
+  await expect(page).toHaveURL(new RegExp(`#/e/demo:${deliver}$`))
+  await expect(page.getByTestId("stats-line")).not.toContainText("Waiting on")
+  await page.goBack()
+  await expect(page).toHaveURL(new RegExp(`#/e/${store}$`))
+
+  // 5. Picker: list, greyed self, no merged or archived epic, add, untick, remove.
+  await page.getByRole("button", nav("+ Blocker")).click()
+  const picker = page.getByTestId("blocker-picker")
+  await expect(picker.getByRole("searchbox", nav("Search epics"))).toBeVisible()
+  for (const name of [push, "notification-polish", "notifications-ui", queued])
+    await expect(picker.getByRole("button", { name: new RegExp(name) })).toBeVisible()
+  await expect(picker.getByText(`${waiting}: this epic`)).toBeVisible()
+  await expect(
+    picker.getByRole("button", { name: /notification-shipped-impl|notification-old-impl/ }),
+  ).toHaveCount(0)
+  await picker.getByRole("button", { name: new RegExp(push) }).click()
+  await expect(page.getByTestId("blocker-chip").getByRole("link", { name: push })).toBeVisible()
+  await expect(page.getByTestId("stats-line")).toContainText(`Waiting on ${push} and 1 more`)
+  await expect(page.getByTestId("blocked-by-hint")).toHaveText(
+    `${push} is not queued. This epic stays put until it is merged.`,
+  )
+  await expect.poll(blockedBy).toContain(push)
+  await picker.getByRole("button", { name: new RegExp(push) }).click()
+  await expect(page.getByTestId("blocker-chip").getByRole("link", { name: push })).toHaveCount(0)
+  await expect.poll(blockedBy).not.toContain(push)
+  await picker.getByRole("button", { name: /notification-polish/ }).click()
+  await picker.getByRole("button", { name: /notifications-ui/ }).click()
+  await expect(page.getByTestId("blocker-chip")).toHaveCount(3)
+  await page.getByRole("button", { name: "Remove notification-polish" }).click()
+  await expect(page.getByTestId("blocker-chip")).toHaveCount(2)
+  await expect.poll(blockedBy).not.toContain("notification-polish")
+  await expect.poll(blockedBy).toContain("notifications-ui")
+
+  // 6. CLI to page.
+  await fixture.cli("tickets", "epic", "set", store, "--blocked-by", push)
+  await expect(page.getByTestId("blocker-chip").getByRole("link", { name: push })).toBeVisible()
+  await expect.poll(blockedBy).toContain(push)
+
+  // 7. A stale ticket ref shows as an error chip that × clears.
+  const path = `demo/${waiting}/ticket.md`
+  const text = await fixture.readStoreFile(path)
+  const ticketRef = `${waiting}/03`
+  expect(text).toMatch(/^blocked_by:[ \t]*\n[ \t]+- /m)
+  await fixture.writeStoreFile(
+    path,
+    text.replace(/^blocked_by:[ \t]*\n([ \t]+)/m, `blocked_by:\n$1- ${ticketRef}\n$1`),
+  )
+  const stale = page.getByTestId("blocker-chip-error")
+  await expect(stale).toBeVisible()
+  await expect(stale.getByRole("link")).toHaveCount(0)
+  await stale.getByRole("button").click()
+  // Clearing it is refused by the route today (gx:follow-ups/800); the page stays up.
+  await expect(page.getByTestId("stats-line")).toBeVisible()
+
+  // 8. Refusal inside the open picker, nothing written.
+  const before = await blockedBy()
+  await picker.getByRole("button", { name: /waits-on-alignment-impl/ }).click()
+  await expect(picker.getByRole("alert")).toHaveText(
+    `Can’t add waits-on-alignment-impl: it already waits on ${waiting}. That would be a cycle.`,
+  )
+  await expect(picker.getByRole("button", { name: /☐ waits-on-alignment-impl/ })).toBeVisible()
+  expect(await blockedBy()).toBe(before)
+})

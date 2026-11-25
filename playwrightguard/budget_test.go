@@ -88,7 +88,10 @@ import (
 // real server, and flow 3 is near the 45 s slow limit; ActionCard.test.tsx covers each render alone.
 // Answer page flows (+2): the footer outside the scroll, the history stack, a reload and the keyboard viewport need a
 // real browser and a server round trip; AnswerForm.test.tsx and the route tests cover each rule alone.
-const maxFlows = 165
+// Waiting epic flow (+1): the real blocked-by-cycle refusal, the event stream moving the page, a reload-free hash
+// navigation between Epic pages and the sidebar and cards reading one server state need a real server and browser;
+// EpicPage.test.tsx covers the chips and picker alone.
+const maxFlows = 166
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 

@@ -211,7 +211,7 @@ worker outcome maps to ticket status, why fixture CLI writes land late, how to s
 and "read `test-results/**/error-context.md` first on a locator failure".
 
 The suite is capped by `maxFlows` in `playwrightguard/budget_test.go`, which equals the number of
-`test(` calls in `*.e2e.ts` (165). Before you add a flow, add a step to a flow on the same scenario
+`test(` calls in `*.e2e.ts` (166). Before you add a flow, add a step to a flow on the same scenario
 (see `gx-only-e2es`) and keep this file and `maxFlows` in step with the code.
 
 A flow's title starts with its plan number. A flow that absorbed others lists their numbers in its
@@ -230,6 +230,7 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **2. Epic PWA: Force refresh and cold open:** a fresh `mixed` fixture (declares `reloads: 1`): the manifest link, fields and icons; the worker activates and an outside ticket still reaches the page through the event stream; Force refresh (the planted shell-cache entry gone, one reload; the toast goes with the reload and `forceRefresh.test.ts` pins it); then, in a second page at 390 px with a faked permission, push manager and app badge (the fake push service answers the stored endpoint): the Settings Account rows read Web logins, Notifications, Password with an Off chip; the Notifications page shows the switch Off, "Send test push" disabled and no permission request; the tap asks once, reads "On for “<login>”" and the login row shows "Push on"; the "Server-wide Push" switch off disables the device switch and the test row, and the device is still On when the server switch comes back; a test push shows "Sent." with one request at TTL 60, a failing fixture shows "Last push failed:", a healthy one clears it; the badge applied is the snapshot's; switching off drops "Push on" and clears the badge; on again, Remove on the login's page keeps the login, drops the Push row and leaves the switch Off; then `stopServer()` and a cold open in a new page of the same context, showing the shell, the Offline strip and "Can't reach gx. Retrying…" with no epic data.
 - **7. Epic completion:** the epic page when the last ticket finishes.
 - **6. Queue an epic, and outside changes show up:** Queue button disabled while `/v1/queue/add` runs, then the card moves to Implementing; changes made outside the page appear.
+- **213. Waiting epic:** `epic-waiting` (`cycle-refusal`). Cards read "Waiting on <blocker>" in Implementing and Ready to queue and keep it when Queue moves one; no blocker item in the card menu; the sidebar row reads "Waiting" with the words as its title; the header and ticket rows ("after 03"); a chip link opens the blocker's page with no reload; the picker lists the project's open epics, greys this epic and leaves out merged and archived ones; add, untick and × match `gx tickets show`; a CLI `epic set --blocked-by` adds a chip; a stale ticket ref is an error chip cleared by ×; the cycle refusal shows inside the open picker and writes nothing.
 
 ### `initiatives.e2e.ts`
 
