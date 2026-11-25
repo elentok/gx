@@ -104,7 +104,7 @@ test("2. Epic looks right", async ({ page, start, context }) => {
 
   // 50, 51, 52: the ticket page's question lists each option with letter, id and consequence, and offers Huh? and a Note.
   await test.step("agent question: options, Huh? and Note at both widths", async () => {
-    await page.evaluate((hash) => (location.hash = hash), "#/t/demo:mixed-epic/06")
+    await page.evaluate((hash) => (location.hash = hash), "#/answer/demo:mixed-epic/06")
     const form = page.getByRole("form", { name: "Answer" })
     const send = form.getByRole("button", { name: "Send answer" })
     for (const width of [1440, 375]) {
@@ -137,7 +137,7 @@ test("2. Epic looks right", async ({ page, start, context }) => {
   // 55, 56: a note alone answers a choice question and the history reads "no option picked". The fake agent
   // asks once per ticket, so this answers 06 after the Epics-page checks above, which count it as asking.
   await test.step("agent question: note-only answer", async () => {
-    await page.evaluate((hash) => (location.hash = hash), "#/t/demo:mixed-epic/06")
+    await page.evaluate((hash) => (location.hash = hash), "#/answer/demo:mixed-epic/06")
     const form = page.getByRole("form", { name: "Answer" })
     const send = form.getByRole("button", { name: "Send answer" })
     await form.getByRole("button", { name: /^Note on question/ }).click()
@@ -159,7 +159,7 @@ test("2. Epic looks right", async ({ page, start, context }) => {
   await test.step("agent question: answer to a gone agent reads Queued", async () => {
     const queued = await start("answer-queued")
     await queued.waitAgentGone()
-    await page.evaluate((hash) => (location.hash = hash), "#/t/demo:queued-answer-epic/01")
+    await page.evaluate((hash) => (location.hash = hash), "#/answer/demo:queued-answer-epic/01")
     const form = page.getByRole("form", { name: "Answer" })
     await form.getByRole("textbox").fill("go on")
     await form.getByRole("button", { name: "Send answer" }).click({ timeout: 60_000 })
@@ -173,7 +173,7 @@ test("2. Epic looks right", async ({ page, start, context }) => {
     // Recovery would fork an investigation off the zero-commit pause.
     const finished = await start("answer-finished", { config: { "recovery.enabled": "false" } })
     const addr = "demo:finished-answer-epic/01"
-    await page.evaluate((hash) => (location.hash = hash), `#/t/${addr}`)
+    await page.evaluate((hash) => (location.hash = hash), `#/answer/${addr}`)
     const form = page.getByRole("form", { name: "Answer" })
     await form.getByRole("textbox").fill("go on", { timeout: 60_000 })
     // Cut the page off from the server so the form stays on screen while the ticket moves on.

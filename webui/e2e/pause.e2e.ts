@@ -95,8 +95,12 @@ test.describe("3. Pause reasons and recovery", () => {
     }
 
     await step("paused-epic", "03", "Waiting for your answer", async () => {
+      await page.evaluate((hash) => (location.hash = hash), "#/answer/demo:paused-epic/03")
       await page.getByRole("textbox", { name: /^Answer to question/ }).fill("go ahead")
       await page.getByRole("button", nav("Send answer")).click()
+      // The answer page's text never shows the pause reason, so the helper's wait would pass
+      // at once and the page's late return to the ticket would undo the next step's navigation.
+      await expect(page.getByRole("group", { name: "Answered question" })).toBeVisible()
     })
     await step("paused-epic", "04", "Ambiguous base", async () => {
       await page.getByRole("button", nav("01")).click()
