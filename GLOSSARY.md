@@ -959,8 +959,19 @@ _Avoid_: epic diff base, merge range.
 
 **Diff page** — the read-only web page that compares two refs of one project: the changes on the
 second ref since it forked from the first (a three-dot diff), with the range's commits grouped by
-ticket. The epic page opens it on the **Epic range**.
+ticket. The epic page opens it on the **Epic range**. It can also show a **Worktree diff**.
 _Avoid_: compare page, review page (kept for the later human code review).
+
+**Worktree diff** — what the **Diff page** shows for a directory where an agent works: the commits
+since the worktree's base plus its uncommitted edits, with untracked files that git does not ignore
+shown as added. The base is the merge-base with **Trunk** for a chat or a **Design worktree**, and
+the base gx gave the ticket at claim time for a queue agent.
+_Avoid_: working-tree diff, live diff.
+
+**Show diff** — the entity action that opens the **Diff page** for a chat, a Design, a ticket or an
+epic. A chat or a Design opens its **Worktree diff**. A claimed ticket opens its queue agent's
+**Worktree diff**, and a done ticket opens its commits. An epic opens its **Epic range**.
+_Avoid_: view diff (the older link label).
 
 **Delivery** — a project setting: how a complete epic's branch reaches **Trunk**. `merge` (the
 default): gx merges the branch into local trunk itself. `pr`: gx pushes the branch and opens a pull
