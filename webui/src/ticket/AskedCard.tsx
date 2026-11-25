@@ -21,6 +21,7 @@ export function AskedCard({
   const { latest } = detail
   return (
     <Box
+      data-mock-part="question-card"
       display="flex"
       flexDirection="column"
       gap="3"
@@ -32,7 +33,15 @@ export function AskedCard({
     >
       <Box>
         <Label>{askerLabel(latest)}</Label>
-        <Text fontSize="lg" fontWeight="600" mt="1">
+        <Text
+          data-mock-part="question-title"
+          fontSize="lg"
+          fontWeight="600"
+          mt="1"
+          display="-webkit-box"
+          overflow="hidden"
+          css={{ WebkitBoxOrient: "vertical", WebkitLineClamp: 3 }}
+        >
           {latest?.summary}
         </Text>
         {latest?.prompt && <Text>{latest.prompt}</Text>}

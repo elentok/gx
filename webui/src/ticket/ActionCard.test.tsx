@@ -438,6 +438,17 @@ test("an answerable ticket shows one compact card: label, title, Answer question
   expect(resume.getAttribute("data-emphasis")).toBe("secondary")
 })
 
+test("the question card clamps its title to three lines and keeps the full text", async () => {
+  const long = "Which backend should hold the session cache ".repeat(3).trim()
+  renderTicket(() => ({ ...withResume, latest: { ...withResume.latest!, summary: long } }))
+  await screen.findByRole("button", { name: "Answer question" })
+  const title = screen.getByText(long)
+  const style = getComputedStyle(title)
+  expect(style.getPropertyValue("-webkit-line-clamp")).toBe("3")
+  expect(style.overflow).toBe("hidden")
+  expect(title.textContent).toBe(long)
+})
+
 test("Answer question pushes the answer page and back returns to the ticket", async () => {
   const fetchDetail: FetchDetail = async () => ({ kind: "ok", detail: withResume })
   const router = createMemoryRouter(

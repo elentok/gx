@@ -170,6 +170,16 @@ export function RecoveryActions({
         gap="2"
         justifyContent={leading ? "flex-start" : "flex-end"}
         flexWrap="wrap"
+        // On a phone the compact card's buttons each take a full row, as in the mock.
+        css={
+          leading
+            ? {
+                "& > button": {
+                  "@media (max-width: 480px)": { flex: "1 1 100%", justifyContent: "center" },
+                },
+              }
+            : undefined
+        }
       >
         {leading}
         {actions.map((action, i) => {
