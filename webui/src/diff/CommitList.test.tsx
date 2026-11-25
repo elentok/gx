@@ -133,10 +133,23 @@ function openWorktree(uncommitted: boolean) {
 }
 const rows = () => within(screen.getByTestId("commits-disclosure")).getAllByRole("button")
 
-test("with uncommitted changes the opened list ends with a waiting Uncommitted changes row, not counted", async () => {
+test("the caret points down closed and up open; the open list sits in a raised card", async () => {
+  openWorktree(false)
+  await disclosure()
+  const button = toggle()
+  expect(button.textContent).toContain("▾")
+  expect(screen.queryByTestId("commits-list")).toBeNull()
+  fireEvent.click(button)
+  expect(button.textContent).toContain("▴")
+  const card = screen.getByTestId("commits-list")
+  expect(getComputedStyle(card).borderRadius).toBe("6px")
+  expect(getComputedStyle(card).backgroundColor).toBe(getComputedStyle(button).backgroundColor)
+})
+
+test("with uncommitted changes the count includes the Uncommitted changes row, which ends the list", async () => {
   openWorktree(true)
   await disclosure()
-  expect(toggle().textContent).toContain("5 commits")
+  expect(toggle().textContent).toContain("6 commits")
   fireEvent.click(toggle())
   const last = rows()[rows().length - 1]
   expect(last.textContent).toBe("·······Uncommitted changes")

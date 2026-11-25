@@ -107,12 +107,13 @@ export function CommitList({
   groups: CommitGroup[]
   count: number
   truncated: boolean
-  /** Worktree mode with changes since HEAD: adds the last row. It is not part of `count`. */
+  /** Worktree mode with changes since HEAD: adds the last row. It is not part of `count` but is in the header's number. */
   uncommitted?: boolean
   narrowing: string[] | undefined
   onNarrow: (shas: string[] | undefined) => void
 }) {
   const [open, setOpen] = useState(false)
+  const shown = count + (uncommitted ? 1 : 0)
   const isNarrowed = (shas: string[]) => !!narrowing && sameShas(shas, narrowing)
   return (
     <Box data-testid="commits-disclosure" mb="3">
@@ -132,14 +133,14 @@ export function CommitList({
         color="text.muted"
       >
         <Box as="span" flex="1" textAlign="left">
-          {`${count} ${count === 1 ? "commit" : "commits"}`}
+          {`${shown} ${shown === 1 ? "commit" : "commits"}`}
         </Box>
         <Box as="span" aria-hidden="true">
-          {open ? "▾" : "▸"}
+          {open ? "▴" : "▾"}
         </Box>
       </chakra.button>
       {open && (
-        <Box px="1" pb="2">
+        <Box data-testid="commits-list" p="1" borderRadius="6px" bg="surface.raised">
           {truncated && (
             <Box
               data-testid="commits-truncated"
