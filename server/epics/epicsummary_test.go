@@ -372,10 +372,8 @@ func TestPausedAndCycleReason(t *testing.T) {
 	if got, want := PausedReason(root, paused), "every remaining ticket is paused: proj:epic/01, proj:epic/02"; got != want {
 		t.Errorf("paused reason = %q, want %q", got, want)
 	}
-	first := summaryTicket("01", "open", "02")
-	first.ExternalBlockers = []string{"other:epic2/07"}
-	cycle := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{first, summaryTicket("02", "open", "01")}}
-	want := "proj:epic/01 waits on other:epic2/07, proj:epic/02; proj:epic/02 waits on proj:epic/01"
+	cycle := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{summaryTicket("01", "open", "02"), summaryTicket("02", "open", "01")}}
+	want := "proj:epic/01 waits on proj:epic/02; proj:epic/02 waits on proj:epic/01"
 	if got := CycleReason(root, cycle); got != want {
 		t.Errorf("cycle reason = %q, want %q", got, want)
 	}

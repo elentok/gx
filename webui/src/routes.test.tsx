@@ -769,13 +769,13 @@ test("live forks nest under a live parent, the indent stops at 2, and a fork of 
   ])
 })
 
-test("a blocked row lists its blockers, cross-epic ones as epic/NN", async () => {
+test("a blocked row lists its in-epic blockers", async () => {
   const rows = [
-    rowOf("02", "blocked", { blockers: ["04", "other-epic/06"] }),
+    rowOf("02", "blocked", { blockers: ["04", "05"] }),
     rowOf("03", "blocked", { blockers: ["04"] }),
   ]
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 2, rows }))
-  expect(await screen.findByText("after 04 and other-epic/06")).toBeTruthy()
+  expect(await screen.findByText("after 04 and 05")).toBeTruthy()
   expect(screen.getByText("after 04")).toBeTruthy()
 })
 

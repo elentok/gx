@@ -196,7 +196,7 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	if base != StatusOpen && base != StatusClaimed {
 		return base
 	}
-	if len(e.UnresolvedBlockers(t)) > 0 || !e.ParentDone(t) {
+	if len(t.ExternalBlockers) > 0 || len(e.UnresolvedBlockers(t)) > 0 || !e.ParentDone(t) {
 		return StatusBlocked
 	}
 	return base
@@ -285,7 +285,7 @@ func (e Epic) effectiveBlockedBy(t Ticket) []string {
 		return e.verifyBlockers(t)
 	}
 	if t.Type != typeCodeReview {
-		// Cross-epic refs name another epic; ExternalBlockers carries them.
+		// Cross-epic refs name another epic; the epic-level hold covers them.
 		return slices.DeleteFunc(slices.Clone(t.BlockedBy), crossEpicRef)
 	}
 	var tokens []string
@@ -406,7 +406,7 @@ func (e Epic) blocking(t Ticket, forkChildren map[string][]Ticket) bool {
 // counts as unresolved (it can't be verified done).
 func (e Epic) UnresolvedBlockers(t Ticket) []string {
 	blockedBy := e.effectiveBlockedBy(t)
-	unresolved := slices.Clone(t.ExternalBlockers)
+	var unresolved []string
 	if len(blockedBy) == 0 {
 		return unresolved
 	}

@@ -295,6 +295,13 @@ const tk = (id: string, over: object = {}) => ({
   ...over,
 })
 
+test("a blocked row with no blockers shows blocked and no after note", async () => {
+  live([tk("02", { rendered_status: "blocked" })])
+  const text = (await cardOf("02")).textContent
+  expect(text).toContain("blocked")
+  expect(text).not.toContain("after")
+})
+
 test("a live ticket is one link to its page with id, title and meta; paused rows have no Open link", async () => {
   live([
     tk("01"),

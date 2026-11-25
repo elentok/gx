@@ -180,6 +180,24 @@ func TestEpicDetail_Queueable(t *testing.T) {
 	}
 }
 
+func TestEpicDetail_RowHeldByEpicBlockerIsBlockedWithoutBlockers(t *testing.T) {
+	t.Parallel()
+	h, base := rigs.StartEpicDetail(t, func(store string) {
+		rigs.WriteEpicFiles(t, store, "first", "---\nstatus: open\n---\n",
+			map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+		rigs.WriteEpicFiles(t, store, "work", "---\nstatus: open\nblocked_by: [first]\n---\n",
+			map[string]string{"01-a.md": rigs.IssueMD("01", "open", "", "A")})
+	})
+
+	code, d, body := getEpicDetail(t, h, base, "proj:work")
+	if code != http.StatusOK {
+		t.Fatalf("status %d: %s", code, body)
+	}
+	if r := rowOf(t, d, "proj:work/01"); r.RenderedStatus != "blocked" || len(r.Blockers) != 0 {
+		t.Errorf("row 01 = %+v, want blocked with no blockers", r)
+	}
+}
+
 func TestEpicDetail_MapEpic(t *testing.T) {
 	t.Parallel()
 	h, base := rigs.StartEpicDetail(t, func(store string) {

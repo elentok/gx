@@ -4,7 +4,6 @@
 package tickets
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -149,21 +148,10 @@ type Ticket struct {
 	// no ticket in the epic (see Epic.CheckBlockedBy). Renders as StatusError.
 	BlockedByErr string
 
-	// ExternalBlockers are the epic's whole-epic refs still unresolved, set by
-	// resolveEpicHold.
+	// ExternalBlockers are the epic's unreleased whole-epic blocked_by entries,
+	// set in memory by resolveEpicHold. They hold the ticket blocked but are
+	// not listed as ticket blockers or sent on the wire.
 	ExternalBlockers []string
-
-	// WidenedBlockers is no longer set; kept until the wire fields go.
-	WidenedBlockers map[string]string
-}
-
-// BlockerLabel is how a blocked_by token reads to a person: a widened one
-// names the epic it waits on, e.g. "epic2 (via epic2/b)".
-func (t Ticket) BlockerLabel(ref string) string {
-	if epic, ok := t.WidenedBlockers[ref]; ok {
-		return fmt.Sprintf("%s (via %s)", epic, ref)
-	}
-	return ref
 }
 
 // DisplayNumber returns the filename's complete ticket identifier. Tickets

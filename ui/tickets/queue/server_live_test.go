@@ -221,16 +221,15 @@ func TestQueueServerMode_ClaimedMergeTicketShowsMergingAndCounts(t *testing.T) {
 	}
 }
 
-func TestQueueServerMode_CrossEpicBlockersShowTheirEpic(t *testing.T) {
+func TestQueueServerMode_BlockedRowsShowInEpicBlockersOnly(t *testing.T) {
 	m, _ := deliverQueue(t, wire.Snapshot{Seq: 1, Tickets: []wire.TicketInfo{
-		{Address: "gx:alpha/01", Title: "Widened", Status: "open", RenderedStatus: "blocked", BlockedBy: []string{"epic2/b"},
-			ExternalBlockers: []string{"epic2/b"}, WidenedBlockers: map[string]string{"epic2/b": "epic2"}},
-		{Address: "gx:alpha/02", Title: "Whole epic", Status: "open", RenderedStatus: "blocked", BlockedBy: []string{"epic3"},
-			ExternalBlockers: []string{"epic3"}},
-	}}, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
+		{Address: "gx:alpha/01", Title: "First", Status: "open"},
+		{Address: "gx:alpha/02", Title: "After first", Status: "open", RenderedStatus: "blocked", BlockedBy: []string{"01"}},
+		{Address: "gx:alpha/03", Title: "Held by its epic", Status: "open", RenderedStatus: "blocked"},
+	}}, []wire.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}, {Address: "gx:alpha/03"}})
 
 	epic := m.rows.Epics[0]
-	for i, want := range []string{"(blocked by epic2 (via epic2/b))", "(blocked by epic3)"} {
+	for i, want := range []string{"", "(blocked by 01)", ""} {
 		tk := epic.Tickets[i]
 		if got := rowfmt.BlockedBySuffix(epic, tk, rowfmt.TicketStatus(epic, tk)); got != want {
 			t.Errorf("blockedBySuffix(%s) = %q, want %q", tk.Identifier, got, want)

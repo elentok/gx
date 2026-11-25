@@ -34,7 +34,7 @@ type EpicDetailRow struct {
 	HolderUnreachable bool `json:"holder_unreachable,omitempty"`
 	// ClosedAt is when the ticket was done, else cancelled; the page sorts the done group by it.
 	ClosedAt time.Time `json:"closed_at,omitzero"`
-	// Blockers are the unresolved ones: own-epic bare ("04"), cross-epic as "epic/NN".
+	// Blockers are the unresolved ones: own-epic ticket numbers ("04").
 	Blockers []string `json:"blockers,omitempty"`
 	// Asking is set on a paused ticket with an open question; Question is its summary line.
 	Asking   bool   `json:"needs_answer,omitempty"`

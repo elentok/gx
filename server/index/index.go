@@ -328,9 +328,6 @@ func ticketInfo(project, epic string, t tickets.Ticket) indexedTicket {
 		BlockedBy: t.BlockedBy,
 		File:      t.Path,
 
-		ExternalBlockers: t.ExternalBlockers,
-		WidenedBlockers:  t.WidenedBlockers,
-
 		ActualContextWindow:   t.ActualContextWindow,
 		ExpectedContextWindow: t.ExpectedContextWindow,
 		ElapsedTime:           t.ElapsedTime,

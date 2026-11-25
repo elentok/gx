@@ -883,7 +883,7 @@ export interface EpicDetailRow extends HarnessLabel {
    */
   closed_at?: string;
   /**
-   * Blockers are the unresolved ones: own-epic bare ("04"), cross-epic as "epic/NN".
+   * Blockers are the unresolved ones: own-epic ticket numbers ("04").
    */
   blockers?: string[];
   /**
@@ -1866,12 +1866,6 @@ export interface TicketInfo extends HarnessLabel {
   rendered_status: string;
   type: string;
   blocked_by?: string[];
-  /**
-   * ExternalBlockers and WidenedBlockers carry the cross-epic resolution
-   * (see tickets.Ticket), which a client can't redo from one scope's tickets.
-   */
-  external_blockers?: string[];
-  widened_blockers?: { [key: string]: string};
   /**
    * Parent is the address of the ticket this one was forked from.
    */

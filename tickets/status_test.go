@@ -173,6 +173,16 @@ func TestEpic_UnresolvedBlockers_NoneWhenAllResolved(t *testing.T) {
 	}
 }
 
+func TestEpic_RenderedStatus_HeldByEpicBlocker(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{{Number: 1, Status: "open", ExternalBlockers: []string{"a"}}}}
+	if got := epic.RenderedStatus(epic.Tickets[0]); got != StatusBlocked {
+		t.Errorf("RenderedStatus = %v, want blocked", got)
+	}
+	if got := epic.UnresolvedBlockers(epic.Tickets[0]); got != nil {
+		t.Errorf("UnresolvedBlockers = %v, want nil: the hold is not a ticket blocker", got)
+	}
+}
+
 func TestEpic_UnresolvedBlockers_NilWhenNoBlockedBy(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{{Number: 1}}}
 	got := epic.UnresolvedBlockers(epic.Tickets[0])

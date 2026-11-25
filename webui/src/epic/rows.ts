@@ -139,7 +139,7 @@ function elapsedOf(row: EpicDetailRow, now: number): number | undefined {
   return row.elapsed
 }
 
-// Own-epic blockers are bare numbers and cross-epic ones are "epic/NN", so the ids print as they came.
+// Blockers are the row's own-epic ticket numbers, so the ids print as they came.
 // Past three blockers the rest fold into "+ N more", so the meta stays short beside the title.
 const shownBlockers = 3
 function blockerNote(blockers: string[]): string {
