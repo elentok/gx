@@ -151,16 +151,20 @@ function Notice({
   )
 }
 
-function Chip({ children }: { children: ReactNode }) {
+function Chip({ children, wrap }: { children: ReactNode; wrap?: boolean }) {
   return (
     <Box
       data-testid="range-chip"
-      display="inline-flex"
+      display={wrap ? "inline-block" : "inline-flex"}
       alignItems="center"
       gap="1.5"
-      h="28px"
+      minH="28px"
+      h={wrap ? "auto" : "28px"}
+      lineHeight={wrap ? "20px" : undefined}
+      py={wrap ? "1" : undefined}
       px="3"
-      borderRadius="full"
+      borderRadius={wrap ? "14px" : "full"}
+      overflowWrap={wrap ? "anywhere" : undefined}
       bg="surface.raised"
       color="text.muted"
       fontSize="sm"
@@ -189,12 +193,12 @@ function SourceChip({ chip }: { chip: DiffSource["chip"] }) {
     )
   }
   return (
-    <Chip>
+    <Chip wrap>
       <Box as="span" color="kind.implementation.fg">
         Worktree
       </Box>{" "}
       <Box as="span">·</Box>{" "}
-      <Box as="span" color="text" truncate minW="0">
+      <Box as="span" color="text">
         {chip.target}
       </Box>
       {chip.since && (
@@ -203,7 +207,7 @@ function SourceChip({ chip }: { chip: DiffSource["chip"] }) {
           <Box as="span" color="text.faint">
             since
           </Box>{" "}
-          <Box as="span" fontFamily="mono" fontSize="xs" truncate minW="0">
+          <Box as="span" fontFamily="mono" fontSize="xs">
             {chip.since}
           </Box>
         </>
@@ -242,8 +246,8 @@ function Tabs({
           role="tab"
           aria-selected={t === tab}
           onClick={() => onChange(t)}
-          flex="1"
           h="40px"
+          px="4"
           fontSize="sm"
           mb="-1px"
           borderBottom="2px solid"
