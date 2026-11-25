@@ -142,24 +142,24 @@ Look: the stored mock (see Mock states). The mock is Claude-only. Its a-parent t
 
 Entries refer to Mock states by state name and do not repeat the look check. "Chat read" is `GET /v1/sessions/chat?session=<id>&subagent=<call id>` on the temporary server, called with the ids of the `subagents` fixture. The CLI check is the same read through `gx agents chat <session> --subagent <call-id> --json`, hand-run with `go run . agents chat ...` because the installed `gx` is older than the worktree. Each CLI check expects exit code 0 and the same content as the chat read, except the unknown-id check, which expects a non-zero exit.
 
-Task row and call links (stories 1 to 6, 30, 46)
+Task row and call links (stories 1 to 6, 30 to 30, 46 to 46)
 - Mock states "a-parent". Flow 208 "Task list" (`task-list.e2e.ts`, `bg-progress`, updated) on the Design and Agents pages: the subagent task row has "Open ↗" and clicking the row still expands the details.
 - New flow on `subagents` (the one new flow file): the call in the folded tools entry is a link on the Agents page, the Design step page and one other step page (Initiative or Triage). After the task group has ended, the call link is still there and opens the page.
 - Same flow: on a subagent page, a nested Claude subagent call is a link of the same shape. A nested call inside a Codex child has no link.
 
-URL and navigation (stories 7, 8, 31, 32, 39, 43, 45)
+URL and navigation (stories 7 to 8, 31 to 32, 39 to 39, 43 to 43, 45 to 45)
 - Same flow: open a subagent from a step page; the URL is `/agents/<session>/subagents/<call id>`; "Back to parent chat" goes to `/agents/<session>`; the browser Back button returns to the step page. Reloading the subagent page shows the same page (declare the reload).
 - Same flow: a nested page's back link goes to the parent subagent, then to the session. The breadcrumb names the session and every level above the page, built from the leaf call id alone.
 - Chat read with an unknown call id: HTTP 404 with the body "no such subagent", and the page shows it. With an unknown session the 404 body is the unknown-session message and the page shows that, not "no such subagent". CLI: `--subagent nosuch` exits non-zero and prints "no such subagent".
 - Chat read of a known session whose parent transcript is gone: status "Not available", reason `gone`, no "no such subagent". For a Codex parent that exists only as `.jsonl.zst`: reason `compressed`. Page check for both: "Transcript no longer available", the back link, no header values and no prompt; for `compressed` also the line that the parent is archived and can be decoded from the chat page, and not the "not supported yet" text.
 
-Header and content (stories 9 to 14, 16 to 19, 29, 40, 44)
+Header and content (stories 9 to 14, 16 to 19, 29 to 29, 40 to 40, 44 to 44)
 - Mock states "a-subagent-running" and "a-subagent-finished". Chat read: the header has title, type, status, model, tokens and tool-call count equal to the task row's fields; the result is the handback message (Claude) or the last assistant message (Codex); the handback call is not in the tool list.
 - Chat read of a foreground Claude subagent that is still running (no agent id yet): the header has model, tokens and tool-call count, equal to the task row's. A subagent with no duration has no Time.
 - Chat read of a Claude subagent with a finished marker and no handback: status Stopped, its last assistant message is the muted result, and there is no green result card.
 - Chat read on the Codex child shape: no message from before `subagent_history_start_ordinal`, the prompt block reads "Prompt not readable", the type chip is absent for a null role and "Tool calls" is absent when there is no count.
 
-Status (stories 20 to 24, 41)
+Status (stories 20 to 24, 41 to 41)
 - New fixture shapes and chat reads: foreground call returned with a handback is Done; returned with no handback is Stopped and has no green result card; a background subagent whose call returned stays Running until its end notification, then Done or Stopped; a subagent of an exited session is Stopped; a Codex child ends by each task row rule (a "completed" event or completed `wait` status is Done, an exited session, a new run or the age-out is Stopped) and is not Stopped just because its `spawn_agent` call returned. Each status is the same with the task group open and closed.
 - Mock states "a-subagent-running" (Running chip, working row) and "a-subagent-finished" (Done chip, result).
 
@@ -168,15 +168,15 @@ Missing file and compressed child (stories 25 to 28, 42 to 44)
 - New fixture: a Codex child with only a `.jsonl.zst`. Chat read: not available with the reason "compressed". The page text says the file is compressed and that reading compressed children is not supported yet, and has no Decode button.
 - Go server test of the watch: a foreground Claude "Starting…" subagent (and a Codex child with no rollout) whose file then appears while the parent writes nothing; the subagent event is sent with no parent write. The web seam test shows that the page refetches on that event and shows the messages.
 
-Live updates and cost (stories 15, 35, 36, 42)
+Live updates and cost (stories 15 to 15, 35 to 36, 42 to 42)
 - Same flow: a running fixture subagent whose file grows; the open page shows the new message with no reload.
 - Server tests (Go, run with `scripts/proc-cap`): with no `subagent=` read and no open task group, no subagent file is opened; two reads of an unchanged file parse it once; after growth it parses again; a finished subagent's file is not parsed again; the watch ends when the page closes or its event stream disconnects. The watch write is in `WebOnlyRoutes`, the web-only route test passes, and the write refuses an unknown client id (`subagent-watch-unknown-client`) and an unknown call id (`unknown-subagent`).
 
-CLI and TUI (stories 37, 38)
+CLI and TUI (stories 37 to 38)
 - CLI: `go run . agents chat <session> --subagent <call-id>` prints the plain text defined under CLI output; `--json` prints the chat read. `cmd/server_parity_test.go` passes.
 - TUI: the Agents tab shows the same rows and no subagent link. Existing TUI checks pass.
 
-Read-only and phone (stories 33, 34)
+Read-only and phone (stories 33 to 34)
 - Mock states "a-subagent-running": the page has no composer and no input.
 - Same flow at 390px: the header wraps and the page has no sideways scroll, on a running subagent page and a not-available page. The existing phone flow's no-sideways-scroll check style applies.
 
