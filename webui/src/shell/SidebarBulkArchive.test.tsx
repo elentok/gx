@@ -41,7 +41,6 @@ const row = (address: string, over: Partial<EpicListRow>): EpicListRow =>
     total: 4,
     queued: false,
     queueable: false,
-    blocked_by_epics: [],
     workspace: "Default",
     card_kind: CardKindImplementation,
     section: SectionFinished,

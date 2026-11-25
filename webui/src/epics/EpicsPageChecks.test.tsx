@@ -39,7 +39,6 @@ const epic = (project: string): EpicListRow => ({
   total: 3,
   queued: false,
   queueable: true,
-  blocked_by_epics: [],
   card_kind: "implementation",
   section: "ready-to-queue",
   addresses: [`${project}:work`],

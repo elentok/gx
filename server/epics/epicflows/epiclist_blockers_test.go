@@ -60,13 +60,10 @@ func TestEpicList_BlockersListUnreleasedAndInvalid(t *testing.T) {
 	if got[1].Address != "proj:live" || got[1].Name != "live" || got[1].State != wire.EpicListReady {
 		t.Errorf("waiter blockers[1] = %+v, want live in state ready", got[1])
 	}
-	if !slices.Equal(rows["waiter"].BlockedByEpics, []string{"proj:live"}) {
-		t.Errorf("deprecated blocked_by_epics = %v, want [proj:live]", rows["waiter"].BlockedByEpics)
-	}
 	if rows["waiter"].WaitingOnEpic {
 		t.Error("waiter has an invalid ref, so it is in error, not Waiting")
 	}
-	if len(rows["free"].Blockers) != 0 || len(rows["free"].BlockedByEpics) != 0 || rows["free"].WaitingOnEpic {
+	if len(rows["free"].Blockers) != 0 || rows["free"].WaitingOnEpic {
 		t.Errorf("free = %+v, want no blockers", rows["free"])
 	}
 }

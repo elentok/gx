@@ -101,12 +101,6 @@ func (s *Epics) blockersOf(project string, e tickets.Epic, byName map[string]tic
 // applyBlockers sets the blocker list on row, and the Waiting words and flag.
 func applyBlockers(row *wire.EpicListRow, e tickets.Epic, blockers []wire.EpicBlocker) {
 	row.Blockers = blockers
-	row.BlockedByEpics = []string{}
-	for _, b := range blockers {
-		if !b.Invalid {
-			row.BlockedByEpics = append(row.BlockedByEpics, b.Address)
-		}
-	}
 	if e.IsMap || StateOf(e) != StateWaiting {
 		return
 	}

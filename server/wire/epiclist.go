@@ -89,9 +89,6 @@ type EpicListRow struct {
 	Queued bool `json:"queued"`
 	// Queueable is set when the Queue action applies; see epicQueueable.
 	Queueable bool `json:"queueable"`
-	// BlockedByEpics is the addresses of Blockers. Deprecated: transitional so
-	// the web fixtures type-check; removed with them.
-	BlockedByEpics []string `json:"blocked_by_epics"`
 	// Blockers is optional so fixtures without it type-check. WaitingOnEpic
 	// marks a Waiting epic, whose list State is only queued or ready.
 	Blockers      []EpicBlocker `json:"blockers,omitempty"`

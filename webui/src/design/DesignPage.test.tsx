@@ -34,7 +34,6 @@ const map = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   total: 0,
   queued: false,
   queueable: false,
-  blocked_by_epics: [],
   addresses: [`gx:${name}`],
   workspace: "Default",
   ...over,

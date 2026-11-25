@@ -90,7 +90,6 @@ const epicList = async (): Promise<EpicList> => ({
       total: 1,
       queued: false,
       queueable: true,
-      blocked_by_epics: [],
       created_at: "2026-10-01T00:00:00Z",
     },
     {
@@ -103,7 +102,6 @@ const epicList = async (): Promise<EpicList> => ({
       total: 1,
       queued: false,
       queueable: true,
-      blocked_by_epics: [],
       created_at: "2026-10-01T00:00:00Z",
     },
   ],

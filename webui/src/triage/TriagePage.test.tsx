@@ -380,7 +380,6 @@ test("a done Triage with a ready epic puts the Queue button on the ready line, n
     total: 1,
     queued: false,
     queueable: true,
-    blocked_by_epics: [],
     addresses: ["gx:ready-1"],
   }
   render([], {

@@ -17,7 +17,6 @@ const row = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   total: 4,
   queued: false,
   queueable: false,
-  blocked_by_epics: [],
   addresses: [`demo:${name}`],
   card_kind: "implementation",
   section: "implementing",

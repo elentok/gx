@@ -34,7 +34,6 @@ const row = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   total: 3,
   queued: false,
   queueable: false,
-  blocked_by_epics: [],
   card_kind: "implementation",
   section: "running",
   addresses: [`gx:${name}`],

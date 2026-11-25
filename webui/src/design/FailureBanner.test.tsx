@@ -87,7 +87,6 @@ function render(
             total: 0,
             queued: false,
             queueable: false,
-            blocked_by_epics: [],
           },
         ],
         follow_ups: [],

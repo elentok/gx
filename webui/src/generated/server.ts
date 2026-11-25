@@ -1200,11 +1200,6 @@ export interface EpicListRow extends BackLink {
    */
   queueable: boolean;
   /**
-   * BlockedByEpics is the addresses of Blockers. Deprecated: transitional so
-   * the web fixtures type-check; removed with them.
-   */
-  blocked_by_epics: string[];
-  /**
    * Blockers is optional so fixtures without it type-check. WaitingOnEpic
    * marks a Waiting epic, whose list State is only queued or ready.
    */

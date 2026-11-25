@@ -65,7 +65,6 @@ const listRow = (state: string): EpicListRow =>
     total: 1,
     queued: false,
     queueable: true,
-    blocked_by_epics: [],
     addresses: ["gx:ready-1"],
   }) as EpicListRow
 

@@ -216,13 +216,15 @@ first write action in the web UI. The page updates live.
   client through a new `apiclient` method (ADR 0028). The snapshot does not change.
 - The server returns every listable epic: all but one-offs, follow-ups and `*-archived`. Each row
   carries `address`, `project`, `name`, `kind` (`loop` or `map`), a computed `state`, `done`,
-  `total`, `completed_at`, `merged_at`, `queued`, `queueable`, `blocked_by_epics` and
+  `total`, `completed_at`, `merged_at`, `queued`, `queueable`, `blockers` and
   `last_activity_at`, plus `created_at`, the epic's own `created_at` (loop epics and maps alike). See
   "Ticket and map data changes".
 - `state` is one of `ready`, `designing`, `waiting-to-design`, `finished`, `queued`, `running`,
   `awaiting-merge`, `parked`, `deadlocked` and `draft`. Epics in `queued`, `running`, `awaiting-merge`
   and `parked` and `deadlocked` have no page section and show only in search.
-- `blocked_by_epics` lists only unmerged blockers. The server computes it.
+- `blockers` has one entry per unreleased own `blocked_by` entry of the epic: its address, name,
+  the blocker's Epics page state, and a hint epic when the blocker is not moving. The server computes
+  it from the hold's release rule, so a merged or released blocker is not listed.
 - `last_activity_at` is the newest `claimed_at` or `done_at` across the map's tickets.
 - The response also holds `follow_ups`, a list of `{project, open}`.
 - Without the web cookie the route gives `401`, like every web route. The web allowlist and the
@@ -275,8 +277,8 @@ first write action in the web UI. The page updates live.
   component internals.
 - Server seam: the web mux, through the existing web handler test setup. It covers the `GET
   /v1/epics` payload for each section rule (one case per row of the table, including drafts,
-  one-offs, follow-ups and archived epics left out), `blocked_by_epics` with merged blockers
-  ignored, the follow-up counts, `last_activity_at`, the `401` without a cookie, and `POST
+  one-offs, follow-ups and archived epics left out), `blockers` with merged and released
+  blockers left out, the follow-up counts, `last_activity_at`, the `401` without a cookie, and `POST
   /v1/queue/add` with an epic address (success, `map-epic`, `already-queued`, no open ticket, and
   the state token). Prior art is the ticket detail and queue write tests in the web tests and the
   web allowlist test.

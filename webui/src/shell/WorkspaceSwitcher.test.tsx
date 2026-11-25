@@ -26,7 +26,6 @@ const row = (address: string, workspace: string): EpicListRow =>
     total: 4,
     queued: false,
     queueable: false,
-    blocked_by_epics: [],
     workspace,
     card_kind: "implementation",
     section: SectionImplementing,
