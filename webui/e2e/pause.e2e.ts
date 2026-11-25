@@ -666,6 +666,11 @@ test.describe("214. Answer page, history, note and Send", () => {
       const sent = page.getByRole("group", { name: "Answered question" })
       await expect(sent).toBeVisible()
       await expect(sent).toContainText("Answer sent")
+      // The green card is the only bordered element: the Action card around it has no frame.
+      await expect(page.getByRole("group", { name: "Action card" })).toHaveCSS(
+        "border-top-width",
+        "0px",
+      )
       await expect(sent).toContainText(QUESTION_TITLE)
       await expect(sent).toContainText("A: Keep the current layout")
       await expect(sent).toContainText("Note: Do not touch the layout")

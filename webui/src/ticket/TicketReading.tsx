@@ -90,15 +90,15 @@ export function TicketReading({
           {latest.closed_reason && <Text>Closed: {latest.closed_reason}</Text>}
         </>
       )}
-      <EarlierRounds detail={detail} />
+      <EarlierRounds detail={detail} muted={answered && !!latest && showsSentCard(latest, sent)} />
     </Box>
   )
 }
 
-export function EarlierRounds({ detail }: { detail: TicketDetail }) {
+export function EarlierRounds({ detail, muted }: { detail: TicketDetail; muted?: boolean }) {
   if (detail.rounds.length === 0) return null
   return (
-    <Collapsible label={`Earlier rounds (${detail.rounds.length})`}>
+    <Collapsible muted={muted} label={`Earlier rounds (${detail.rounds.length})`}>
       {detail.rounds.map((r) => (
         <EarlierRound key={r.seq} round={r} />
       ))}

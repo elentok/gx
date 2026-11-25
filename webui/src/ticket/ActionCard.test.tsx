@@ -411,6 +411,31 @@ test("a sent answer keeps its result on screen after the refetch", async () => {
   expect(card()).toBeTruthy()
 })
 
+test("the sent state has no outer frame and mutes Earlier rounds; a recovery-closed round keeps both", async () => {
+  recordSent("gx:demo/12", { seq: 3, outcome: "queued" })
+  const answeredHow = (how: string): TicketDetail => ({
+    ...base,
+    status: "open",
+    answered: true,
+    latest: {
+      ...base.latest!,
+      outcome: "answered",
+      answer: { source: "web", text: "Redis", how },
+    },
+    actions: [],
+  })
+  renderTicket(() => answeredHow("answer"))
+  await screen.findByText("Answer sent")
+  expect(getComputedStyle(card()!).borderTopWidth).not.toBe("1px")
+  const muted = getComputedStyle(screen.getByRole("button", { name: /Earlier rounds/ })).color
+  cleanup()
+  renderTicket(() => answeredHow("resume"))
+  await screen.findByRole("group", { name: "Answered question" })
+  expect(getComputedStyle(card()!).borderTopWidth).toBe("1px")
+  const accent = getComputedStyle(screen.getByRole("button", { name: /Earlier rounds/ })).color
+  expect(accent).not.toBe(muted)
+})
+
 test("a stale detail does not show the open card again for the seq just sent", async () => {
   recordSent("gx:demo/12", { seq: 3, outcome: "queued" })
   renderTicket(() => base)

@@ -1,6 +1,6 @@
 import { Box, Text } from "@chakra-ui/react"
 import { ActionAnswer, type TicketDetail } from "../generated/server"
-import type { Sent } from "./answer"
+import { isAnsweredRound, showsSentCard, type Sent } from "./answer"
 import { AskedCard } from "./AskedCard"
 import { PermissionCard } from "./PermissionCard"
 import { canCancel, isRecoverAction } from "./recover"
@@ -37,6 +37,8 @@ const cardProps = {
   rounded: "md",
   bg: "surface.raised",
 } as const
+
+const frameless = { role: "group", "aria-label": "Action card", mt: "4" } as const
 
 // Everything the page asks a person to act on, right under the header. The old rounds live here
 // only, so a ticket nobody needs to act on shows no old questions.
@@ -99,8 +101,11 @@ export function ActionCard({
     )
   }
 
+  // The green Answer sent card is the only bordered element, so the outer frame goes.
+  const sentCard =
+    !!detail.latest && isAnsweredRound(detail, sent) && showsSentCard(detail.latest, sent)
   return (
-    <Box {...cardProps}>
+    <Box {...(sentCard ? frameless : cardProps)}>
       {/* A self-reported pause shows its question below, so its text is left out. */}
       {detail.pause_text && !hasOpenQuestion(detail) && (
         <Text color="tone.paused.fg" whiteSpace="pre-wrap">
