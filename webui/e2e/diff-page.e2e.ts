@@ -104,7 +104,7 @@ test("Diff page", async ({ page, start }) => {
   await chip.getByRole("button", { name: "Clear narrowing" }).click()
   await expect(treeFiles(page)).toHaveCount(allFiles)
 
-  // Entry 18: split by default at 1200px, the switch changes it, the diff matches the app surface, 12px/18px code.
+  // Entry 18: split by default at 1200px, the switch changes it, the diff matches the app surface, 12.5px/19px code in the mono font, accents in the done and deadlocked tones.
   await expect(area).toHaveAttribute("data-view", "split")
   const split = page.getByTestId("view-toggle")
   await split.getByRole("button", { name: "Unified" }).click()
@@ -125,8 +125,40 @@ test("Diff page", async ({ page, start }) => {
   })
   await expect(host).toHaveCSS("background-color", surface)
   const code = area.locator("code").first()
-  await expect(code).toHaveCSS("font-size", "12px")
-  await expect(code).toHaveCSS("line-height", "18px")
+  await expect(code).toHaveCSS("font-size", "12.5px")
+  await expect(code).toHaveCSS("line-height", "19px")
+  // Tokens read through a probe element, so the comparison uses the browser's resolved values.
+  const tokens = await page.evaluate(() => {
+    const probe = document.createElement("div")
+    probe.style.fontFamily = "var(--chakra-fonts-mono)"
+    probe.style.color = "var(--chakra-colors-tone-done-fg)"
+    probe.style.borderColor = "var(--chakra-colors-tone-deadlocked-fg)"
+    document.body.append(probe)
+    const s = getComputedStyle(probe)
+    const out = { mono: s.fontFamily, done: s.color, deadlocked: s.borderTopColor }
+    probe.remove()
+    return out
+  })
+  await expect(code).toHaveCSS("font-family", tokens.mono)
+  // The accents reach the rendered diff: the host resolves them to the done and deadlocked tones.
+  const accents = await area
+    .locator("diffs-container")
+    .first()
+    .evaluate((el) => {
+      const probe = document.createElement("div")
+      el.shadowRoot!.append(probe)
+      const read = (name: string) => {
+        probe.style.color = `var(${name})`
+        return getComputedStyle(probe).color
+      }
+      const out = {
+        add: read("--diffs-addition-color-override"),
+        del: read("--diffs-deletion-color-override"),
+      }
+      probe.remove()
+      return out
+    })
+  expect(accents).toEqual({ add: tokens.done, del: tokens.deadlocked })
 
   // Entry 21: expand context works un-narrowed (a real blob round trip).
   await page.getByTestId("file-filter").fill("long")

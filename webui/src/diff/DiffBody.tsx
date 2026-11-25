@@ -1,3 +1,4 @@
+import { registerCustomCSSVariableTheme } from "@pierre/diffs"
 import type { DiffLineAnnotation, FileDiffLoadedFiles, FileDiffMetadata } from "@pierre/diffs"
 import { PatchDiff, Virtualizer } from "@pierre/diffs/react"
 import { useMemo } from "react"
@@ -7,12 +8,49 @@ export type DiffView = "split" | "unified"
 
 export type LineAnchor = { path: string }
 
+const token = (name: string) => `var(--chakra-colors-${name})`
+
+// The theme's variables (Pierre's `--diffs-` prefix dropped) mapped to the app's Chakra tokens.
+const THEME_TOKENS: Record<string, string> = {
+  foreground: token("text-muted"),
+  background: token("surface"),
+  "token-comment": token("text-faint"),
+  "token-parameter": token("text-muted"),
+  "token-punctuation": token("text-dim"),
+  "token-keyword": token("kind-design-fg"),
+  "token-string": token("kind-implementation-fg"),
+  "token-string-expression": token("kind-implementation-fg"),
+  "token-function": token("tone-running-fg"),
+  "token-constant": token("tone-waiting-fg"),
+}
+
+const emphasis = (tone: string) => `color-mix(in srgb, ${token(tone)} 30%, transparent)`
+
+const HOST_VARS: Record<string, string> = {
+  ...Object.fromEntries(Object.entries(THEME_TOKENS).map(([k, v]) => [`--diffs-${k}`, v])),
+  "--diffs-bg": token("surface"),
+  "--diffs-bg-context-gutter-override": token("surface"),
+  "--diffs-addition-color-override": token("tone-done-fg"),
+  "--diffs-deletion-color-override": token("tone-deadlocked-fg"),
+  "--diffs-bg-addition-emphasis-override": emphasis("tone-done-fg"),
+  "--diffs-bg-deletion-emphasis-override": emphasis("tone-deadlocked-fg"),
+  "--diffs-font-family": "var(--chakra-fonts-mono)",
+  "--diffs-font-size": "12.5px",
+  "--diffs-line-height": "19px",
+}
+
+export const THEME_NAME = "gx"
+
+// A second registration of one name logs an error, so this runs once at module load.
+registerCustomCSSVariableTheme(THEME_NAME, THEME_TOKENS)
+
 // Pierre draws inside a shadow root. Custom properties pass through it, so the app's Chakra
-// tokens reach it. The font-size variable alone has no effect, hence the rules on pre and code.
+// tokens reach it. The font-size variable alone leaves `code` at 16px, hence the pre, code rule.
 export const UNSAFE_CSS = `
-.diffs-host { --diffs-font-family: var(--chakra-fonts-mono); --diffs-font-size: 12px; --diffs-line-height: 18px; }
-pre, [data-diffs] { --diffs-bg: var(--chakra-colors-surface); font-size: 12px; line-height: 18px; }
-code { font-size: 12px; line-height: 18px; }
+:host { ${Object.entries(HOST_VARS)
+  .map(([k, v]) => `${k}: ${v};`)
+  .join(" ")} }
+pre, code { font-size: 12.5px; line-height: 19px; }
 `
 
 /** One anchor per added and deleted line: deleted lines use the old number, added the new one. */
@@ -69,7 +107,7 @@ export function DiffBody({
   const options = useMemo(
     () => ({
       diffStyle: view,
-      theme: "pierre-dark" as const,
+      theme: THEME_NAME,
       themeType: "dark" as const,
       disableFileHeader: true,
       unsafeCSS: UNSAFE_CSS,

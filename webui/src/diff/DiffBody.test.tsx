@@ -3,6 +3,9 @@ import { expect, test, vi } from "vitest"
 import { DiffBody, UNSAFE_CSS, lineAnchors } from "./DiffBody"
 
 const props = vi.hoisted(() => ({ last: undefined as Record<string, unknown> | undefined }))
+// Registration runs at import time, so only a module mock can see the call.
+const registerTheme = vi.hoisted(() => vi.fn())
+vi.mock("@pierre/diffs", () => ({ registerCustomCSSVariableTheme: registerTheme }))
 vi.mock("@pierre/diffs/react", () => ({
   PatchDiff: (p: Record<string, unknown>) => {
     props.last = p
@@ -28,14 +31,54 @@ test("passes the patch and the view to Pierre", () => {
   expect(props.last).toMatchObject({ options: { diffStyle: "unified" } })
 })
 
-test("maps the surface and mono tokens at 12px and 18px", () => {
+test("maps the theme and accent tokens in one :host block at 12.5px and 19px", () => {
   render(<DiffBody patch={PATCH} view="split" path="a.go" />)
-  const options = props.last?.options as { unsafeCSS: string }
+  const options = props.last?.options as { unsafeCSS: string; theme: string }
   expect(options.unsafeCSS).toBe(UNSAFE_CSS)
-  expect(UNSAFE_CSS).toContain("--chakra-colors-surface")
-  expect(UNSAFE_CSS).toContain("--chakra-fonts-mono")
-  expect(UNSAFE_CSS).toMatch(/pre[^{]*\{[^}]*font-size: 12px; line-height: 18px/)
-  expect(UNSAFE_CSS).toMatch(/code \{ font-size: 12px; line-height: 18px/)
+  expect(options.theme).toBe("gx")
+  expect(UNSAFE_CSS.match(/:host \{/g)).toHaveLength(1)
+  const decl = (name: string) => new RegExp(`${name}: ([^;]+);`).exec(UNSAFE_CSS)?.[1]
+  const c = (t: string) => `var(--chakra-colors-${t})`
+  expect(decl("--diffs-font-family")).toBe("var(--chakra-fonts-mono)")
+  expect(decl("--diffs-font-size")).toBe("12.5px")
+  expect(decl("--diffs-line-height")).toBe("19px")
+  expect(UNSAFE_CSS).toContain("pre, code { font-size: 12.5px; line-height: 19px; }")
+  const want: Record<string, string> = {
+    foreground: "text-muted",
+    background: "surface",
+    bg: "surface",
+    "token-comment": "text-faint",
+    "token-parameter": "text-muted",
+    "token-punctuation": "text-dim",
+    "token-keyword": "kind-design-fg",
+    "token-string": "kind-implementation-fg",
+    "token-string-expression": "kind-implementation-fg",
+    "token-function": "tone-running-fg",
+    "token-constant": "tone-waiting-fg",
+    "bg-context-gutter-override": "surface",
+    "addition-color-override": "tone-done-fg",
+    "deletion-color-override": "tone-deadlocked-fg",
+  }
+  for (const [name, tok] of Object.entries(want)) expect(decl(`--diffs-${name}`)).toBe(c(tok))
+  expect(decl("--diffs-bg-addition-emphasis-override")).toBe(
+    "color-mix(in srgb, var(--chakra-colors-tone-done-fg) 30%, transparent)",
+  )
+  expect(decl("--diffs-bg-deletion-emphasis-override")).toBe(
+    "color-mix(in srgb, var(--chakra-colors-tone-deadlocked-fg) 30%, transparent)",
+  )
+  expect(UNSAFE_CSS).not.toContain("!important")
+  expect(UNSAFE_CSS).not.toContain("diffs-host")
+})
+
+test("registers the theme once with the token defaults", () => {
+  expect(registerTheme).toHaveBeenCalledTimes(1)
+  expect(registerTheme).toHaveBeenCalledWith(
+    "gx",
+    expect.objectContaining({
+      foreground: "var(--chakra-colors-text-muted)",
+      "token-keyword": "var(--chakra-colors-kind-design-fg)",
+    }),
+  )
 })
 
 test("anchors the added line on the additions side and the deleted line on the deletions side", () => {
