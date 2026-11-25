@@ -1,7 +1,14 @@
 import { access } from "node:fs/promises"
 import type { Page } from "@playwright/test"
 import { chatOf, PNG, png, steerUploads } from "./agentsKit"
-import { draftPage, history, renameDraft, startDesign } from "./draftKit"
+import {
+  designDraftHolds,
+  draftPage,
+  history,
+  renameDraft,
+  startDesign,
+  startReason,
+} from "./draftKit"
 import { expect, flag, holdRoute, nav, openEpics, section, sessionRows, test } from "./fixture"
 import { sidebarKit } from "./sidebarKit"
 
@@ -49,9 +56,9 @@ test("26. New Design form", async ({ page, start }) => {
   )
   await expect(page.getByRole("button", nav("Add image"))).toBeVisible()
   await expect(d.remove).toBeVisible()
-  // With no prompt Start gives the first reason; the footer's Start sits at the right edge.
-  await expect(d.start).toBeDisabled()
-  await expect(page.getByText("Write a prompt first")).toBeVisible()
+  // With no prompt Start is blocked and shows no hint text; the footer's Start sits at the right edge.
+  await expect(d.start).toHaveAttribute("aria-disabled", "true")
+  await expect(page.getByText("Write a prompt first")).toHaveCount(0)
   const [foot, rm, st] = [
     (await d.remove.locator("xpath=..").boundingBox())!,
     (await d.remove.boundingBox())!,
@@ -95,7 +102,7 @@ test("26. New Design form", async ({ page, start }) => {
     await expect(d.prompt).toBeVisible()
     expect(await draftIds()).toEqual([first])
     await renameDraft(page, "keep-me")
-    await expect(page.getByText("Saved")).toBeVisible()
+    await designDraftHolds(fixture, first, "keep-me")
     await openEpics(page)
     expect(await draftIds()).toEqual([first])
     await row("keep-me").click()
@@ -114,7 +121,7 @@ test("26. New Design form", async ({ page, start }) => {
     const third = idOf(page)
     await d.prompt.fill("Ready to type now")
     await d.project.selectOption("demo")
-    await expect(page.getByText("Saved")).toBeVisible()
+    await designDraftHolds(fixture, third, "Ready to type now")
     await sidebar.getByRole("button", { name: "+ New", exact: true }).click()
     await page.getByRole("menuitem", { name: /^New design/ }).click()
     await expect(d.prompt).toHaveValue("")
@@ -126,12 +133,12 @@ test("26. New Design form", async ({ page, start }) => {
     await expect(page).toHaveURL(new RegExp(`#/drafts/${third}$`))
     await expect.poll(draftIds).toEqual([third])
 
-    // Autosave shows "Saving..." then "Saved". The row and the title take the prompt's first words.
+    // A held save shows the floppy icon. The row and the title take the prompt's first words once it lands.
     const release = await holdRoute(page, "**/v1/designs/drafts/save")
     await d.prompt.fill("Ready to type now and more words")
-    await expect(page.getByText("Saving...")).toBeVisible()
+    await expect(d.saveStatus).toHaveText("Saving the draft")
     release()
-    await expect(page.getByText("Saved")).toBeVisible()
+    await designDraftHolds(fixture, third, "and more words")
     await expect(row("Ready to type now and")).toBeVisible()
     await expect(page).toHaveTitle(/^Ready to type now and · Design draft · gx/)
     // The pencil focuses the slug; a new slug updates the row and the title; clearing it brings the prompt label back.
@@ -140,12 +147,12 @@ test("26. New Design form", async ({ page, start }) => {
     await expect(page).toHaveTitle(/^alpha · Design draft · gx/)
     await expect(d.start).toBeEnabled()
     await d.slug.fill("")
-    await expect(d.start).toBeDisabled()
+    await expect(d.start).toHaveAttribute("aria-disabled", "true")
     await expect(row("Ready to type now and")).toBeVisible()
     await expect(page).toHaveTitle(/^Ready to type now and · Design draft · gx/)
-    await expect(page.getByText("Name the epic to start.")).toBeVisible()
+    await expect(page.getByText("Name the epic to start.")).toHaveCount(0)
     await d.slug.fill("alpha")
-    await expect(page.getByText("Saved")).toBeVisible()
+    await designDraftHolds(fixture, third, "alpha")
 
     // A reload brings back the same draft and text, with no second row.
     await page.reload()
@@ -162,7 +169,7 @@ test("26. New Design form", async ({ page, start }) => {
     await page2.goto(page.url())
     await expect(d2.prompt).toHaveValue("Ready to type now and more words")
     await d2.prompt.fill("Theirs")
-    await expect(page2.getByText("Saved")).toBeVisible()
+    await designDraftHolds(fixture, third, "Theirs")
     await d.prompt.fill("Mine")
     const banner = page.getByRole("alert").filter({ hasText: "changed on another device" })
     await expect(banner).toBeVisible()
@@ -170,7 +177,7 @@ test("26. New Design form", async ({ page, start }) => {
     await expect(banner).toBeHidden()
     await expect(d.prompt).toHaveValue("Theirs")
     await d2.prompt.fill("Theirs again")
-    await expect(page2.getByText("Saved")).toBeVisible()
+    await designDraftHolds(fixture, third, "Theirs again")
     await d.prompt.fill("Mine again")
     await expect(banner).toBeVisible()
     await banner.getByRole("button", { name: "Keep mine" }).click()
@@ -193,7 +200,7 @@ test("26. New Design form", async ({ page, start }) => {
     await expect(d.slug).toHaveValue("gamma")
     await expect(banner).toHaveCount(0)
     await d.prompt.fill("Mine again, more")
-    await expect(page.getByText("Saved")).toBeVisible()
+    await designDraftHolds(fixture, third, "Mine again, more")
     await expect.poll(() => fixture.cli("designs", "drafts", "list")).toContain("gamma")
     await expect(d.slug).toHaveValue("gamma")
 
@@ -218,23 +225,23 @@ test("26. New Design form", async ({ page, start }) => {
 
     // Start stays off with each reason in turn.
     await d.slug.fill("")
-    await expect(d.start).toBeDisabled()
-    await expect(page.getByText("Name the epic to start.")).toBeVisible()
+    await expect(d.start).toHaveAttribute("aria-disabled", "true")
+    await expect(page.getByText("Name the epic to start.")).toHaveCount(0)
     await d.slug.fill("ready-epic")
     await expect(d.start).toBeEnabled()
 
-    // A held upload shows the spinner and "1 uploading"; a failed one shows the red tile.
+    // A held upload shows the spinner and "1 uploading"; a failed one shows the red tile. Start's reason is its tooltip.
     uploads.set("hold")
     await page.getByTestId("image-input").setInputFiles([png(2)])
     await expect(page.getByLabel("Uploading")).toBeVisible()
     await expect(page.getByText("1 uploading")).toBeVisible()
-    await expect(d.start).toBeDisabled()
-    await expect(page.getByText("Wait for the upload to finish")).toBeVisible()
+    await expect(d.start).toHaveAttribute("aria-disabled", "true")
+    await expect(await startReason(page, d.start)).toHaveText("Wait for the upload to finish")
     await uploads.release("fail")
     const failed = page.locator('[data-state="failed"]')
     await expect(failed).toBeVisible()
-    await expect(page.getByText("Remove the failed image first")).toBeVisible()
-    await expect(d.start).toBeDisabled()
+    await expect(await startReason(page, d.start)).toHaveText("Remove the failed image first")
+    await expect(d.start).toHaveAttribute("aria-disabled", "true")
     await failed.getByRole("button", nav("Remove image")).click()
     await expect(failed).toHaveCount(0)
     await expect(d.start).toBeEnabled()
@@ -252,7 +259,7 @@ test("26. New Design form", async ({ page, start }) => {
     expect(starts).toEqual([])
 
     // An existing epic is refused: the draft and its images stay.
-    await expect(page.getByText("Saved")).toBeVisible()
+    await designDraftHolds(fixture, third, "ready-epic")
     await d.start.click()
     await expect(toast.last()).toContainText("already has an epic")
     await expect(open).toHaveCount(2)
@@ -329,7 +336,7 @@ test("26. New Design form", async ({ page, start }) => {
     await expect(open).toHaveCount(1)
     const fourth = idOf(page)
     await expect.poll(() => exists(fixture.draftDir(fourth))).toBe(true)
-    await expect(page.getByText("Saved")).toBeVisible()
+    await designDraftHolds(fixture, fourth, "To be removed")
     await page2.goto(page.url())
     await expect(d2.prompt).toHaveValue("To be removed")
     const removeDialog = page.getByRole("alertdialog", { name: /^Remove / })
@@ -364,7 +371,7 @@ test("26. New Design form", async ({ page, start }) => {
     // Remove from the sidebar row menu and with Leader then x each add a row with their own text.
     await newDesign(page)
     await d.prompt.fill("Removed from the row menu")
-    await expect(page.getByText("Saved")).toBeVisible()
+    await designDraftHolds(fixture, idOf(page), "Removed from the row menu")
     await expect(row("Removed from the row menu")).toBeVisible()
     await rowMenu("Removed from the row menu").click()
     await page.getByRole("menuitem", nav("Remove")).click()
@@ -376,7 +383,7 @@ test("26. New Design form", async ({ page, start }) => {
     await expect.poll(draftIds).toEqual([])
     await newDesign(page)
     await d.prompt.fill("Removed with Leader x")
-    await expect(page.getByText("Saved")).toBeVisible()
+    await designDraftHolds(fixture, idOf(page), "Removed with Leader x")
     await page.keyboard.press("ControlOrMeta+e")
     await page.keyboard.press("x")
     // A chord has no button to anchor on, so its confirm is a modal dialog.

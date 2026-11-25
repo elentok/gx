@@ -138,7 +138,7 @@ test("88. Phone, Agents page", async ({ page, start }) => {
 
   // The page alone, with the shared sidebar slid away.
   await go(page, "#/agents")
-  await expect(page.getByRole("heading", { name: "Pick a session" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Pick a chat" })).toBeVisible()
   await expect(row(page, target)).toBeHidden()
 
   // The sidebar's row opens the session on its own and slides the sidebar closed.

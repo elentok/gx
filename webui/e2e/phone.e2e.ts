@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test"
 import { PNG, sessions } from "./agentsKit"
-import { draftPage } from "./draftKit"
+import { draftPage, startReason } from "./draftKit"
 import { expect, nav, swipe, test } from "./fixture"
 
 // 375 px is below the wide layout's 62em breakpoint.
@@ -240,14 +240,42 @@ test("41. Phone, Design draft page", async ({ page, start }) => {
   })
   expect(s.width).toBeCloseTo(content, 0)
 
-  // With the prompt empty the one-line hint shows above the footer, and Start keeps its width.
-  await expect(d.start).toBeDisabled()
-  const hint = page.getByText("Write a prompt first")
-  await expect(hint).toBeVisible()
-  const h = (await hint.boundingBox())!
-  expect(h.height).toBeLessThan(24)
-  expect(h.y + h.height).toBeLessThanOrEqual(foot.y)
+  // With the prompt empty Start is blocked with no hint text, and it keeps its width.
+  await expect(d.start).toHaveAttribute("aria-disabled", "true")
+  await expect(page.getByText("Write a prompt first")).toHaveCount(0)
   expect((await d.start.boundingBox())!.width).toBeCloseTo(s.width, 0)
+
+  // At 375px Start design stays on one line and the footer holds only Attach, Remove and Start design.
+  await expect(page.viewportSize()).toEqual({ width: 375, height: 812 })
+  await expect
+    .poll(async () => {
+      const [st, rem, att, row] = [
+        await d.start.boundingBox(),
+        await d.remove.boundingBox(),
+        await clip.boundingBox(),
+        await d.remove.locator("xpath=..").boundingBox(),
+      ]
+      return (
+        st!.height === rem!.height &&
+        st!.x + st!.width <= row!.x + row!.width + 1 &&
+        att!.x + att!.width <= rem!.x
+      )
+    })
+    .toBe(true)
+  const footer = d.remove.locator("xpath=..")
+  await expect(footer.getByRole("button")).toHaveCount(3)
+  await expect(footer.getByRole("button")).toHaveText(["", "", "Start design"])
+  await expect(d.remove).toHaveText("")
+  await expect(d.remove).toHaveAccessibleName("Remove draft")
+
+  // A blocked Start opens its reason (a name that is not a slug) as a tooltip.
+  // follow-ups/829: a tap cannot reach a blocked Start yet (pointer-events none), so focus opens it here.
+  await d.prompt.fill("An idea for the tap.")
+  await d.slug.fill("Bad Slug")
+  await expect(d.start).toHaveAttribute("aria-disabled", "true")
+  await expect(await startReason(page, d.start)).toContainText("is not a slug")
+  await d.slug.fill("")
+  await d.prompt.fill("")
 
   // A file picked through the paperclip gets a thumbnail; a click opens the viewer and closing it starts no design.
   const starts: string[] = []
@@ -271,7 +299,7 @@ test("41. Phone, Design draft page", async ({ page, start }) => {
   const [rm2, c2] = [(await d.remove.boundingBox())!, (await clip.boundingBox())!]
   expect(c2.x + c2.width).toBeLessThanOrEqual(rm2.x)
 
-  // The draft page's ⋯ ends its ring-less title row, right of History and Saved.
+  // The draft page's ⋯ ends its ring-less title row, right of History and the save icon.
   await expectMoreAtRowEnd(page)
 
   // A second start on `chat-draft`: a chat draft page has the same placement.

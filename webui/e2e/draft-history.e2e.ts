@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test"
 import { composer, go, messageBox, sessions } from "./agentsKit"
-import { draftPage, history } from "./draftKit"
+import { draftPage, editedAt, history } from "./draftKit"
 import { expect, nav, test, type Fixture } from "./fixture"
 import { stillMotion } from "./sidebarKit"
 
@@ -43,15 +43,15 @@ const rowOf = (popup: Locator, text: string) =>
 
 const box = async (l: Locator) => (await l.boundingBox())!
 
-/** The History button and the "Saved" status share one row of the title. */
-async function besideSaved(page: Page) {
+/** The History button and the save icon's slot (always rendered, empty while idle) share one row of the title. */
+async function besideSaveIcon(page: Page) {
   const button = historyButton(page)
-  const saved = page.getByText(/^(✓\s*)?Saved$/)
+  const slot = draftPage(page).saveStatus
   await expect(button).toBeVisible()
-  await expect(saved).toBeVisible()
+  await expect(slot).toBeAttached()
   await expect
     .poll(async () => {
-      const [b, s] = [await box(button), await box(saved)]
+      const [b, s] = [await box(button), await box(slot)]
       return Math.abs(b.y + b.height / 2 - (s.y + s.height / 2)) < 8
     })
     .toBe(true)
@@ -128,12 +128,12 @@ test("Draft history popup", async ({ page, start }) => {
     await rowOf(popup.popup, "History design draft with a deleted image").click()
     await expect(page.getByText("1 images missing")).toBeVisible()
 
-    // Type, wait for Saved, pick: the pick brings text, images and slug and keeps the project.
+    // Type, wait for the server to hold it, pick: the pick brings text, images and slug and keeps the project.
     await d.prompt.fill("Typed before the pick")
     await expect
       .poll(async () => (await showDraft(fx, designId)).idea)
       .toBe("Typed before the pick")
-    await besideSaved(page)
+    await besideSaveIcon(page)
     await popup.open()
     await rowOf(popup.popup, "History design draft with two images").click()
     await expect(popup.popup).toHaveCount(0)
@@ -163,8 +163,10 @@ test("Draft history popup", async ({ page, start }) => {
     const brief = page.getByRole("textbox", nav("Brief"))
     await go(page, `#/chat-drafts/${chatDraft.id}`)
     await expect(brief).toHaveValue("Brief of the history chat draft")
+    const was = await editedAt(fx, chatDraft.id)
     await brief.fill("Brief of the history chat draft, edited")
-    await besideSaved(page)
+    await expect.poll(() => editedAt(fx, chatDraft.id)).not.toBe(was)
+    await besideSaveIcon(page)
     await leaderH(page, "Chat drafts")
 
     const popup = history(page, "Chat drafts")

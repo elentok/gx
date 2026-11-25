@@ -38,6 +38,7 @@ export function MoreActionsButton({
       boxSizing="border-box"
       w={size}
       h={size}
+      flexShrink={0}
       borderRadius="full"
       color="text.dim"
       position="relative"

@@ -1,5 +1,5 @@
-import type { Page } from "@playwright/test"
-import { expect, nav } from "./fixture"
+import type { Locator, Page } from "@playwright/test"
+import { expect, nav, type Fixture } from "./fixture"
 
 export const draftPage = (page: Page) => ({
   prompt: page.getByRole("textbox", nav("Prompt")),
@@ -7,8 +7,38 @@ export const draftPage = (page: Page) => ({
   project: page.getByRole("combobox", nav("Project")),
   rename: page.getByRole("button", nav("Rename")),
   start: page.getByRole("button", nav("Start design")),
-  remove: page.getByRole("button", nav("Remove")),
+  remove: page.getByRole("button", nav("Remove draft")),
+  /** The save icon's slot: always rendered, empty while idle. */
+  saveStatus: page.locator("[data-save-shown]"),
 })
+
+/** A blocked Start's reason is its tooltip. Focus opens it; a hover cannot reach an `aria-disabled` Start. */
+export const startReason = async (page: Page, start: Locator) => {
+  await start.focus()
+  return page.getByRole("tooltip")
+}
+
+/** The id in a draft page's URL, `#/drafts/<id>`. */
+export const designDraftId = (page: Page) => page.url().split("/drafts/")[1]!
+
+/** Polls the server until the Design draft holds `text`: its prompt (`show`) or its slug (`list`). */
+export const designDraftHolds = (fx: Fixture, id: string, text: string) =>
+  expect
+    .poll(
+      async () =>
+        (await fx.cli("designs", "drafts", "show", id)) +
+        (await fx.cli("designs", "drafts", "list")),
+    )
+    .toContain(text)
+
+/** The chat draft's `edited_at`, which moves on every save: read it before an edit, poll for a change after. */
+export const editedAt = async (fx: Fixture, id: string) =>
+  (
+    JSON.parse(await fx.cli("server", "snapshot", "--json")).chat_drafts as {
+      id: string
+      edited_at: string
+    }[]
+  ).find((x) => x.id === id)!.edited_at
 
 /** The History popup of a draft page or composer: `list` is "Design drafts", "Chat drafts" or "Sent messages". */
 export const history = (page: Page, list: string) => {

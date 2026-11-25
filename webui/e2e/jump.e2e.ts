@@ -1,5 +1,5 @@
 import { card, expect, menu, menuButton, nav, test } from "./fixture"
-import { draftPage, renameDraft } from "./draftKit"
+import { designDraftHolds, designDraftId, draftPage, renameDraft } from "./draftKit"
 import { goto, sidebarKit } from "./sidebarKit"
 
 test("22. Back link count, then the phone layout", async ({ page, start }) => {
@@ -127,7 +127,7 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
     await expect(d.prompt).toBeFocused()
     await d.prompt.fill(prompt)
     await renameDraft(page, slug)
-    await expect(page.getByText("Saved")).toBeVisible()
+    await designDraftHolds(fx, designDraftId(page), slug)
   }
   await newDraft("near-draft", "A near idea.")
   const nearUrl = page.url()
