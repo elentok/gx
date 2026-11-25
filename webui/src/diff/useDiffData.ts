@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import type { FetchEpicDetail } from "../epic/detail"
 import { useLatest } from "../hooks"
 import { useKeyedFetch } from "../useKeyedFetch"
-import type { FetchDiffCommits, FetchDiffFiles } from "./api"
+import type { FetchDiffCommits, FetchDiffFiles, FetchDiffWorktree } from "./api"
 import { groupCommits } from "./commitGroups"
-import type { DiffUrl } from "./diffUrl"
+import { type DiffUrl, worktreeValue } from "./diffUrl"
 
 /** Ticket titles by address: the epic's rows, or its archived detail when the epic is archived. */
 function useTicketTitles(
@@ -36,31 +36,50 @@ export function useDiffData(
   fetchers: {
     fetchFiles: FetchDiffFiles
     fetchCommits: FetchDiffCommits
+    fetchWorktree: FetchDiffWorktree
     fetchEpic: FetchEpicDetail
     fetchArchivedEpic: FetchEpicDetail
   },
 ) {
-  const { fetchFiles, fetchCommits, fetchEpic, fetchArchivedEpic } = fetchers
-  const { project, first, second } = url
-  const canFetch = !!project && !!first && !!second
-  const key = `${project}\n${first}\n${second}`
+  const { fetchFiles, fetchCommits, fetchWorktree, fetchEpic, fetchArchivedEpic } = fetchers
+  const { project, worktree } = url
   const titles = useTicketTitles(url.epic, fetchEpic, fetchArchivedEpic)
 
   // Only the focus event and an explicit refetch ask again; the old answer stays on screen meanwhile.
   const [tick, setTick] = useState(0)
   const refetch = useCallback(() => setTick((n) => n + 1), [])
   const refetchRef = useLatest(refetch)
+
+  // Worktree mode: the route's answer holds the SHAs, so it comes first. Each ask snapshots the
+  // worktree and gives new SHAs, which are new keys for everything below.
+  const target = worktree ? worktreeValue(worktree) : ""
+  const worktreeFetch = useKeyedFetch(
+    project && target ? `worktree\n${project}\n${target}` : null,
+    () => fetchWorktree(project, target),
+    tick,
+  )
+  const answer = worktreeFetch && "value" in worktreeFetch ? worktreeFetch.value : undefined
+  const noWorktree = !!answer?.reason
+  const first = worktree ? (noWorktree ? "" : (answer?.base_sha ?? "")) : url.first
+  const second = worktree ? (noWorktree ? "" : (answer?.snapshot_sha ?? "")) : url.second
+  // The commit list reads base to HEAD; the snapshot is not a commit of the branch.
+  const commitsTip = worktree ? (answer?.head_sha ?? "") : second
+  const canFetch = !!project && !!first && !!second
+  const key = `${project}\n${first}\n${second}`
+  // A worktree refetch is the worktree call above; the SHAs it returns are the new keys.
+  const refresh = worktree ? 0 : tick
+  const canRefetch = canFetch || !!worktree
   useEffect(() => {
-    if (!canFetch) return
+    if (!canRefetch) return
     const onFocus = () => refetchRef.current()
     window.addEventListener("focus", onFocus)
     return () => window.removeEventListener("focus", onFocus)
-  }, [canFetch])
+  }, [canRefetch])
 
   const commitsFetch = useKeyedFetch(
-    canFetch ? key : null,
-    () => fetchCommits(project, first, second),
-    tick,
+    canFetch ? `${key}\n${commitsTip}` : null,
+    () => fetchCommits(project, first, commitsTip),
+    refresh,
   )
   // Only commits the commit call returned can be narrowed to. Until it answers, the URL's SHAs
   // are held back so the file call is not made with a set that may be dropped.
@@ -96,17 +115,24 @@ export function useDiffData(
   const narrowedFetch = useKeyedFetch(
     narrowedKey,
     () => fetchFiles(project, first, second, narrowing),
-    tick,
+    refresh,
   )
   const narrowedFiles =
     narrowedFetch && "value" in narrowedFetch && narrowedFetch.value.kind === "files"
       ? narrowedFetch.value.files.files
       : []
 
-  const files = useKeyedFetch(canFetch ? key : null, () => fetchFiles(project, first, second), tick)
+  const files = useKeyedFetch(
+    canFetch ? key : null,
+    () => fetchFiles(project, first, second),
+    refresh,
+  )
 
   return {
     canFetch,
+    worktreeFetch,
+    noWorktree,
+    answer,
     refetch,
     files,
     returned,

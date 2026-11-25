@@ -6,6 +6,7 @@ import type {
   DiffFiles,
   DiffPatch,
   DiffRange,
+  DiffWorktree,
 } from "../generated/server"
 
 // The Go DiffFiles embeds DiffRange, so the JSON is flat. The generated type nests it under
@@ -101,6 +102,16 @@ export const fetchDiffBlob: FetchDiffBlob = async (project, base, tip, path) => 
   const q = new URLSearchParams({ project, base, tip, path })
   const res = await apiFetch(`/v1/diff/blob?${q}`)
   if (!res.ok) throw new Error(`diff blob: HTTP ${res.status}`)
+  return res.json()
+}
+
+/** Each call snapshots the worktree, so a refetch gets new SHAs. `target` is `<kind>:<id>`. */
+export type FetchDiffWorktree = (project: string, target: string) => Promise<DiffWorktree>
+
+export const fetchDiffWorktree: FetchDiffWorktree = async (project, target) => {
+  const q = new URLSearchParams({ project, target })
+  const res = await apiFetch(`/v1/diff/worktree?${q}`)
+  if (!res.ok) throw new Error(`diff worktree: HTTP ${res.status}`)
   return res.json()
 }
 

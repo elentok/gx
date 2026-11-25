@@ -2,7 +2,7 @@ import { Box, chakra } from "@chakra-ui/react"
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router"
 import { fetchArchivedEpicDetail, fetchEpicDetail, type FetchEpicDetail } from "../epic/detail"
-import type { DiffFile } from "../generated/server"
+import { DiffNoDiff, type DiffFile } from "../generated/server"
 import { useLatest } from "../hooks"
 import { DetailPage } from "../page/DetailPage"
 import { PageHeader } from "../page/PageHeader"
@@ -20,12 +20,14 @@ import {
   fetchDiffCommitPatches,
   fetchDiffCommits,
   fetchDiffPatch,
+  fetchDiffWorktree,
   type DiffFilesResult,
   type FetchDiffBlob,
   type FetchDiffCommitPatches,
   type FetchDiffCommits,
   type FetchDiffFiles,
   type FetchDiffPatch,
+  type FetchDiffWorktree,
 } from "./api"
 import { CommitList, TRUNCATED_TEXT } from "./CommitList"
 import type { DiffView } from "./DiffBody"
@@ -174,6 +176,44 @@ function RangeChip({ base, tip }: { base: string; tip: string }) {
       <Box as="span" fontFamily="mono" fontSize="xs" color="text" truncate minW="0">
         {tip}
       </Box>
+    </Box>
+  )
+}
+
+function WorktreeChip({ target, label }: { target: string; label: string | undefined }) {
+  return (
+    <Box
+      data-testid="range-chip"
+      display="inline-flex"
+      alignItems="center"
+      gap="1.5"
+      h="28px"
+      px="3"
+      borderRadius="full"
+      bg="surface.raised"
+      color="text.muted"
+      fontSize="sm"
+      minW="0"
+      maxW="100%"
+    >
+      <Box as="span" color="kind.implementation.fg">
+        Worktree
+      </Box>{" "}
+      <Box as="span">·</Box>{" "}
+      <Box as="span" color="text" truncate minW="0">
+        {target}
+      </Box>
+      {label && (
+        <>
+          {" "}
+          <Box as="span" color="text.faint">
+            since
+          </Box>{" "}
+          <Box as="span" fontFamily="mono" fontSize="xs" truncate minW="0">
+            {label}
+          </Box>
+        </>
+      )}
     </Box>
   )
 }
@@ -368,13 +408,30 @@ function FilesBrowser({
   )
 }
 
+function noWorktreeText(target: string, reason: string) {
+  return reason === DiffNoDiff
+    ? `${target} has no worktree diff.`
+    : `${target} has no worktree of this project to diff.`
+}
+
 function noticeOf(
   loaded: Loaded | undefined,
   noRange: boolean,
   first: string,
   second: string,
   onRetry: () => void,
+  noWorktree?: { target: string; reason: string },
 ): { notice: ReactNode; files: number | null; invalid?: "first" | "second" } {
+  if (noWorktree) {
+    return {
+      notice: (
+        <Notice kind="no-worktree" tone="muted" title="No worktree">
+          {noWorktreeText(noWorktree.target, noWorktree.reason)}
+        </Notice>
+      ),
+      files: null,
+    }
+  }
   if (noRange) {
     return {
       notice: (
@@ -462,10 +519,12 @@ export function DiffPage({
   fetchPatch = fetchDiffPatch,
   fetchBlob = fetchDiffBlob,
   fetchCommits = fetchDiffCommits,
+  fetchWorktree = fetchDiffWorktree,
   fetchCommitPatches = fetchDiffCommitPatches,
   fetchEpic = fetchEpicDetail,
   fetchArchivedEpic = fetchArchivedEpicDetail,
 }: {
+  fetchWorktree?: FetchDiffWorktree
   fetchFiles?: FetchDiffFiles
   fetchPatch?: FetchDiffPatch
   fetchBlob?: FetchDiffBlob
@@ -485,9 +544,12 @@ export function DiffPage({
   const [draft, setDraft] = useState({ first: url.first, second: url.second })
   const [editing, setEditing] = useState(false)
 
-  const { project, first, second } = url
+  const { project, first, second, worktree } = url
   const {
     canFetch,
+    worktreeFetch,
+    noWorktree,
+    answer,
     refetch,
     files: loaded,
     returned,
@@ -496,16 +558,27 @@ export function DiffPage({
     emptyNarrowing,
     groups,
     narrowedFiles,
-  } = useDiffData(url, { fetchFiles, fetchCommits, fetchEpic, fetchArchivedEpic })
+  } = useDiffData(url, { fetchFiles, fetchCommits, fetchWorktree, fetchEpic, fetchArchivedEpic })
 
   useEffect(() => {
     setDraft({ first, second })
   }, [first, second])
 
-  const noRange = !!url.epic && !first && !second
+  const noRange = !worktree && !!url.epic && !first && !second
   const fresh = canFetch ? loaded : undefined
-  const { notice, files, invalid } = noticeOf(fresh, noRange, first, second, refetch)
-  const settled = noRange || !canFetch || !!fresh
+  const targetName = worktree?.id ?? ""
+  const worktreeFailed = !!worktree && !!worktreeFetch && "failed" in worktreeFetch
+  // A worktree call that failed has no files to show, whatever an older answer left behind.
+  const { notice, files, invalid } = noticeOf(
+    worktreeFailed ? { failed: true } : fresh,
+    noRange,
+    worktree ? (answer?.base_label ?? "") : first,
+    worktree ? "the worktree" : second,
+    refetch,
+    noWorktree && answer?.reason ? { target: targetName, reason: answer.reason } : undefined,
+  )
+  const worktreePending = !!worktree && !!project && !worktreeFetch
+  const settled = noRange || (!canFetch && !worktreePending) || !!fresh || worktreeFailed
   useReadyWhen(settled, "ready", "network")
 
   const inputsOpen = editing || !first || !second || !!invalid
@@ -543,8 +616,17 @@ export function DiffPage({
         <PageHeader
           title="Diff"
           inline={
-            <Box display="flex" flexWrap="wrap" alignItems="center" gap="3" minW="0" flex="1 1 0">
-              {inputsOpen ? (
+            <Box
+              display="flex"
+              flexWrap="wrap"
+              alignItems="center"
+              gap="3"
+              minW="0"
+              flex={worktree ? "1 1 260px" : "1 1 0"}
+            >
+              {worktree ? (
+                <WorktreeChip target={targetName} label={answer?.base_label} />
+              ) : inputsOpen ? (
                 <>
                   <RefInput
                     phone={device === "phone"}
@@ -569,15 +651,17 @@ export function DiffPage({
               ) : (
                 <RangeChip base={first} tip={second} />
               )}
-              <chakra.button
-                type="button"
-                onClick={() => (editing ? closeEdit() : setEditing(true))}
-                color="text.dim"
-                fontSize="sm"
-                textDecoration="underline"
-              >
-                Edit refs
-              </chakra.button>
+              {!worktree && (
+                <chakra.button
+                  type="button"
+                  onClick={() => (editing ? closeEdit() : setEditing(true))}
+                  color="text.dim"
+                  fontSize="sm"
+                  textDecoration="underline"
+                >
+                  Edit refs
+                </chakra.button>
+              )}
               {shown && <Counts files={shown} />}
             </Box>
           }
@@ -585,7 +669,9 @@ export function DiffPage({
         />
       </Box>
       {notice}
-      {canFetch && !fresh && !noRange && <FullScreenLoader label="Loading diff" />}
+      {((canFetch && !fresh && !noRange) || worktreePending) && (
+        <FullScreenLoader label="Loading diff" />
+      )}
       {loadedFiles && shown ? (
         <FilesBrowser
           files={shown}

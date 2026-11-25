@@ -1,8 +1,14 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
-import type { DiffRange } from "../generated/server"
+import type { DiffRange, DiffWorktree } from "../generated/server"
 import type { Device } from "../useWide"
-import type { DiffFilesResult, FetchDiffCommitPatches, FetchDiffFiles, FetchDiffPatch } from "./api"
+import type {
+  DiffFilesResult,
+  FetchDiffCommitPatches,
+  FetchDiffFiles,
+  FetchDiffPatch,
+  FetchDiffWorktree,
+} from "./api"
 import { COMMITS, filesForCommits, renderDiff } from "./renderDiff.testutil"
 
 afterEach(() => {
@@ -634,4 +640,64 @@ test("an older refetch that answers last does not replace the newer list", async
   await waitFor(() => expect(treePaths()).toEqual(["new.go+1"]))
   await act(async () => answers[0](named("old.go", "older.go")))
   expect(treePaths()).toEqual(["new.go+1"])
+})
+
+const WORKTREE = "/diff?project=p&worktree=ticket:gx:e-impl/03&base=x&tip=y"
+const snap = (n: number): DiffWorktree => ({
+  base_sha: "base1",
+  base_label: "main@base1",
+  head_sha: `head${n}`,
+  snapshot_sha: `snap${n}`,
+  uncommitted: true,
+})
+
+test("worktree mode: the chip names target and base, and every call gets the route's SHAs", async () => {
+  const fetchWorktree = vi.fn<FetchDiffWorktree>(async () => snap(1))
+  const fetchFiles = vi.fn<FetchDiffFiles>(async () => named("a.go"))
+  const fetchCommits = vi.fn(async () => ({ commits: [], truncated: false }))
+  const fetchPatch = vi.fn<FetchDiffPatch>(async () => "patch")
+  render(WORKTREE, fetchFiles, undefined, fetchPatch, {
+    diffWorktree: fetchWorktree,
+    diffCommits: fetchCommits,
+  })
+  const chip = await screen.findByTestId("range-chip")
+  expect(chip.textContent).toBe("Worktree · gx:e-impl/03 since main@base1")
+  expect(screen.queryByRole("textbox")).toBeNull()
+  expect(screen.queryByRole("button", { name: "Edit refs" })).toBeNull()
+  await screen.findByTestId("diff-area")
+  expect(fetchWorktree).toHaveBeenCalledWith("p", "ticket:gx:e-impl/03")
+  expect(fetchFiles).toHaveBeenCalledWith("p", "base1", "snap1")
+  expect(fetchCommits).toHaveBeenCalledWith("p", "base1", "head1")
+  await waitFor(() => expect(fetchPatch).toHaveBeenCalled())
+  expect(fetchPatch).toHaveBeenCalledWith("p", "a", "b", "a.go")
+})
+
+test("worktree mode: a no-worktree reason shows an empty state naming the target and fetches nothing", async () => {
+  const fetchFiles = vi.fn<FetchDiffFiles>(async () => named("a.go"))
+  const fetchCommits = vi.fn(async () => ({ commits: [], truncated: false }))
+  render(WORKTREE, fetchFiles, undefined, undefined, {
+    diffWorktree: async () => ({ reason: "no_worktree" }),
+    diffCommits: fetchCommits,
+  })
+  const notice = await screen.findByTestId("notice")
+  expect(notice.getAttribute("data-kind")).toBe("no-worktree")
+  expect(notice.textContent).toContain("gx:e-impl/03")
+  await new Promise((r) => setTimeout(r, 30))
+  expect(fetchFiles).not.toHaveBeenCalled()
+  expect(fetchCommits).not.toHaveBeenCalled()
+})
+
+test("worktree mode: focus calls the worktree route again and the files follow the new SHAs", async () => {
+  let n = 1
+  const fetchWorktree = vi.fn<FetchDiffWorktree>(async () => snap(n))
+  const fetchFiles = vi.fn<FetchDiffFiles>(async (_p, _a, second) =>
+    second === "snap1" ? named("a.go") : named("a.go", "b.go"),
+  )
+  render(WORKTREE, fetchFiles, undefined, undefined, { diffWorktree: fetchWorktree })
+  await waitFor(() => expect(treePaths()).toHaveLength(1))
+  n = 2
+  focus()
+  await waitFor(() => expect(treePaths()).toHaveLength(2))
+  expect(fetchWorktree).toHaveBeenCalledTimes(2)
+  expect(fetchFiles).toHaveBeenLastCalledWith("p", "base1", "snap2")
 })

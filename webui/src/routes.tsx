@@ -47,6 +47,7 @@ import type { FetchStats } from "./stats/stats"
 import type { FetchDetail } from "./ticket/detail"
 import type {
   FetchDiffCommitPatches,
+  FetchDiffWorktree,
   FetchDiffCommits,
   FetchDiffFiles,
   FetchDiffPatch,
@@ -270,6 +271,7 @@ export interface RouteFetchers {
   diffPatch?: FetchDiffPatch
   diffCommits?: FetchDiffCommits
   diffCommitPatches?: FetchDiffCommitPatches
+  diffWorktree?: FetchDiffWorktree
   archived?: FetchArchived
   backlog?: FetchBacklog
   initiatives?: FetchInitiatives
@@ -434,6 +436,7 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
           fetchFiles={fetchers.diffFiles}
           fetchPatch={fetchers.diffPatch}
           fetchCommits={fetchers.diffCommits}
+          fetchWorktree={fetchers.diffWorktree}
           fetchCommitPatches={fetchers.diffCommitPatches}
           fetchEpic={fetchers.epic}
           fetchArchivedEpic={fetchers.archivedEpic}

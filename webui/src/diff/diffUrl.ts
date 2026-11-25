@@ -1,12 +1,32 @@
 // The Diff page's address: every part of the view lives in the query, so a reload or a pasted link
 // shows the same view. This module owns the query names; nothing else spells them.
 
+export const WORKTREE_KINDS = ["chat", "design", "ticket"] as const
+
+/** A worktree diff's target. The id of a ticket holds colons, so only the first one splits. */
+export interface WorktreeTarget {
+  kind: (typeof WORKTREE_KINDS)[number]
+  id: string
+}
+
+export const worktreeValue = (t: WorktreeTarget) => `${t.kind}:${t.id}`
+
+function parseWorktree(v: string): WorktreeTarget | undefined {
+  const i = v.indexOf(":")
+  const kind = v.slice(0, i)
+  const id = v.slice(i + 1)
+  const known = WORKTREE_KINDS.find((k) => k === kind)
+  return known && id ? { kind: known, id } : undefined
+}
+
 export interface DiffUrl {
   project: string
-  /** The base ref, as typed. */
+  /** The base ref, as typed. Empty in worktree mode. */
   first: string
-  /** The tip ref, as typed. */
+  /** The tip ref, as typed. Empty in worktree mode. */
   second: string
+  /** Worktree mode: the page diffs this target's worktree; the base is never in the URL. */
+  worktree?: WorktreeTarget
   epic?: string
   /** Commit SHAs the view is narrowed to. */
   commits?: string[]
@@ -24,15 +44,18 @@ const KEYS = {
   commits: "commits",
   ticket: "ticket",
   file: "file",
+  worktree: "worktree",
 } as const
 
 export function parseDiffUrl(params: URLSearchParams): DiffUrl {
   const get = (k: string) => params.get(k) ?? ""
+  const worktree = parseWorktree(get(KEYS.worktree))
   const out: DiffUrl = {
     project: get(KEYS.project),
-    first: get(KEYS.first),
-    second: get(KEYS.second),
+    first: worktree ? "" : get(KEYS.first),
+    second: worktree ? "" : get(KEYS.second),
   }
+  if (worktree) out.worktree = worktree
   if (get(KEYS.epic)) out.epic = get(KEYS.epic)
   const commits = get(KEYS.commits).split(",").filter(Boolean)
   if (commits.length) out.commits = commits
@@ -46,8 +69,11 @@ export function diffQuery(url: DiffUrl): string {
   const p = new URLSearchParams()
   const set = (k: string, v: string | undefined) => v && p.set(k, v)
   set(KEYS.project, url.project)
-  set(KEYS.first, url.first)
-  set(KEYS.second, url.second)
+  if (url.worktree) set(KEYS.worktree, worktreeValue(url.worktree))
+  else {
+    set(KEYS.first, url.first)
+    set(KEYS.second, url.second)
+  }
   set(KEYS.epic, url.epic)
   set(KEYS.commits, url.commits?.join(","))
   set(KEYS.ticket, url.ticket)
