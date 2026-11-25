@@ -177,6 +177,16 @@ call `marked`): meta `finished: true`, the file has no `SubagentHandback` and en
 `running` subagent of `foreground-running`, with the parent transcript deleted after seeding (no `tools` entry; the chat read still
 answers). `exited`: the same, with the session crashed (exit 1) so it is Exited. Data: `testutil/gxfixture/spec/subagents.go` and
 `bgtx/subagents.go`.
+The `codex-*` shapes make the parent a Codex session (rollout version 0.166.0) with one `spawn_agent` call "review".
+`subagents.calls.spawn` is the call id, `subagents.calls.thread` the child's thread id, `subagents.parentPath` the parent
+rollout (append a `SubAgentActivity` "completed" item_completed event to end the child). `taskFiles["subagent-codex-rollout"]`
+is the child's rollout path. `codex-starting`: the call and "started" event, no child rollout (that path is reserved, a flow
+writes it). `codex-child`: a rollout whose `session_meta` has `agent_role` "reviewer", `agent_path`, `thread_source: "subagent"`
+and `subagent_history_start_ordinal`, then the parent's history ending in the marker developer message, then the child's own
+lines (encrypted `agent_message`, `turn_context` model, tool calls, `token_count`, a last assistant message).
+`codex-null-role`: the same with `agent_role: null`. `codex-compressed`: only `rollout-...-<thread>.jsonl.zst` under
+`sessions/`, no `.jsonl`. `codex-nested`: the child's own lines hold a `spawn_agent` call (no link is expected).
+Data: `bgtx/codex_subagents.go`.
 The `dev-mode` scenario runs a Dev checkout (`server.web.dev-dir`, with `webui/package.json`) against the fake `pnpm`
 (`testutil/vitefake`), first on the server's PATH, in the state its shape names (`start("dev-mode", { shape })`; default `running`).
 The snapshot Dev block (`GET /v1/snapshot`) shows: `off` (key off, valid checkout), `installing` (key on, stale `node_modules`, install

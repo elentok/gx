@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/server/wire"
 	"github.com/elentok/gx/testutil/gxfixture/bgtx"
 	"github.com/elentok/gx/testutil/gxfixture/fixturetest"
@@ -211,6 +212,104 @@ func TestSubagents_Shapes(t *testing.T) {
 				}
 			}
 			tc.check(t, r, chat)
+		})
+	}
+}
+
+func TestSubagents_CodexShapes(t *testing.T) {
+	t.Parallel()
+	// rolloutLines reads the child's rollout lines; the path is in the output either way.
+	rolloutLines := func(t *testing.T, r *running) []string {
+		raw, err := os.ReadFile(r.TaskFiles[bgtx.CodexSubRolloutKey])
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.Split(strings.TrimSpace(string(raw)), "\n")
+	}
+	// checkChild checks the session_meta, the history before the ordinal and the own lines after it.
+	checkChild := func(t *testing.T, r *running, wantRole any) []string {
+		lines := rolloutLines(t, r)
+		var meta struct {
+			Payload map[string]any `json:"payload"`
+		}
+		if err := json.Unmarshal([]byte(lines[0]), &meta); err != nil {
+			t.Fatal(err)
+		}
+		p := meta.Payload
+		role, hasRole := p["agent_role"]
+		if !hasRole || role != wantRole || p["thread_source"] != "subagent" || p["id"] != r.Subagents.Calls["thread"] {
+			t.Fatalf("session_meta = %v, want agent_role %v, thread_source subagent and the thread id", p, wantRole)
+		}
+		ordinal, ok := p["subagent_history_start_ordinal"].(float64)
+		if !ok || int(ordinal) < 3 || int(ordinal) >= len(lines) {
+			t.Fatalf("session_meta = %v, want a subagent_history_start_ordinal inside the file", p)
+		}
+		if !strings.Contains(lines[int(ordinal)-1], bgtx.CodexSubMarker) || !strings.Contains(lines[1], "Please review the change.") {
+			t.Fatalf("lines before the ordinal = %v, want the parent history ending in the marker", lines[:int(ordinal)])
+		}
+		own := lines[int(ordinal):]
+		if !strings.Contains(own[0], `"agent_message"`) || !strings.Contains(strings.Join(own, "\n"), bgtx.CodexSubLast) {
+			t.Fatalf("own lines = %v, want the prompt first and the last message", own)
+		}
+		return own
+	}
+	home := func(r *running) string { return filepath.Dir(filepath.Dir(r.TaskFiles[bgtx.CodexSubRolloutKey])) }
+	cases := []struct {
+		name  string
+		check func(t *testing.T, r *running, row wire.SessionTask)
+	}{
+		{"codex-starting", func(t *testing.T, r *running, row wire.SessionTask) {
+			if _, err := os.Stat(r.TaskFiles[bgtx.CodexSubRolloutKey]); !os.IsNotExist(err) {
+				t.Fatalf("child rollout exists at start: %v", err)
+			}
+			if _, ok, err := codexsession.RolloutPathIn(home(r), r.Subagents.Calls["thread"]); ok || err != nil {
+				t.Fatalf("RolloutPathIn = %v, %v, want none", ok, err)
+			}
+			if row.Finished {
+				t.Fatalf("row = %+v, want it counted as running", row)
+			}
+		}},
+		{"codex-child", func(t *testing.T, r *running, row wire.SessionTask) {
+			checkChild(t, r, "reviewer")
+			if row.Finished || row.Model != bgtx.CodexChildModel || row.Tokens != bgtx.CodexChildTokens {
+				t.Fatalf("row = %+v, want running with the child's model and tokens", row)
+			}
+		}},
+		{"codex-null-role", func(t *testing.T, r *running, _ wire.SessionTask) { checkChild(t, r, nil) }},
+		{"codex-compressed", func(t *testing.T, r *running, _ wire.SessionTask) {
+			thread := r.Subagents.Calls["thread"]
+			zst, ok, err := codexsession.ArchivedRolloutIn(home(r), thread)
+			if err != nil || !ok || !strings.HasSuffix(zst, ".jsonl.zst") || !strings.Contains(filepath.Base(zst), thread) {
+				t.Fatalf("ArchivedRolloutIn = %q, %v, %v, want the .jsonl.zst", zst, ok, err)
+			}
+			if path, ok, err := codexsession.RolloutPathIn(home(r), thread); ok || err != nil {
+				t.Fatalf("RolloutPathIn = %q, %v, %v, want none", path, ok, err)
+			}
+		}},
+		{"codex-nested", func(t *testing.T, r *running, _ wire.SessionTask) {
+			if own := strings.Join(checkChild(t, r, "reviewer"), "\n"); !strings.Contains(own, `"name":"spawn_agent"`) || !strings.Contains(own, bgtx.CodexSubGrandcall) {
+				t.Fatalf("own lines = %s, want a spawn_agent call", own)
+			}
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r := startWith(t, "subagents", nil, "--shape", tc.name)
+			chat := r.subChat(t)
+			if r.Subagents.Calls["spawn"] == "" || r.Subagents.Calls["thread"] == "" || r.Subagents.ParentPath == "" {
+				t.Fatalf("output subagents = %+v, want spawn and thread ids and the parent path", r.Subagents)
+			}
+			var row wire.SessionTask
+			for _, task := range chat.Tasks {
+				if task.Label == bgtx.CodexSubName {
+					row = task
+				}
+			}
+			if row.Label == "" {
+				t.Fatalf("no task row %q in %+v", bgtx.CodexSubName, chat.Tasks)
+			}
+			tc.check(t, r, row)
 		})
 	}
 }

@@ -67,13 +67,21 @@ func (b *Lines) commandDone(ago, started time.Duration, command string, code int
 		"started_at_ms": b.when(started).UnixMilli(), "completed_at_ms": b.when(ago).UnixMilli()})
 }
 
-// codexSubagent spawns a subagent whose child rollout (thread) the seeder writes.
-func (b *Lines) codexSubagent(ago time.Duration, callID, name, thread string) {
+// codexSpawn is the parent's spawn_agent call and its result, and the
+// SubAgentActivity "started" event when started.
+func (b *Lines) codexSpawn(ago time.Duration, callID, name, thread string, started bool) {
 	b.fnCall(ago, callID, "spawn_agent", jsonLine(map[string]any{"task_name": name, "message": "Review the change."}))
 	b.fnOut(ago-time.Second, callID, jsonLine(map[string]any{"task_name": "/root/" + name}))
-	b.rollout(ago-2*time.Second, "event_msg", map[string]any{"type": "item_completed",
-		"item": map[string]any{"type": "SubAgentActivity", "kind": "started", "id": callID,
-			"agent_thread_id": thread, "agent_path": "/root/" + name, "model": "gpt-spawn"}})
+	if started {
+		b.rollout(ago-2*time.Second, "event_msg", map[string]any{"type": "item_completed",
+			"item": map[string]any{"type": "SubAgentActivity", "kind": "started", "id": callID,
+				"agent_thread_id": thread, "agent_path": "/root/" + name, "model": "gpt-spawn"}})
+	}
+}
+
+// codexSubagent spawns a subagent whose child rollout (thread) the seeder writes.
+func (b *Lines) codexSubagent(ago time.Duration, callID, name, thread string) {
+	b.codexSpawn(ago, callID, name, thread, true)
 	child := []string{
 		jsonLine(map[string]any{"timestamp": b.when(ago).UTC().Format(time.RFC3339Nano), "type": "session_meta", "payload": map[string]any{"id": thread, "cli_version": "0.166.0"}}),
 		jsonLine(map[string]any{"type": "turn_context", "payload": map[string]any{"model": CodexChildModel, "effort": "medium"}}),

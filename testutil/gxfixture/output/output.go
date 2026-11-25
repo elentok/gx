@@ -15,6 +15,8 @@ import (
 type SubagentsOutput struct {
 	SessionID string            `json:"session_id"`
 	Calls     map[string]string `json:"calls"`
+	// ParentPath is the parent's transcript or rollout, which a flow appends to.
+	ParentPath string `json:"parent_path"`
 }
 
 // Output is the JSON gxfixture prints once the server answers.

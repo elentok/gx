@@ -63,8 +63,10 @@ func (f sessionSeeder) seedBgProgress(id string, s sessionSpec) error {
 			return err
 		}
 	}
+	if seed.Calls != nil {
+		f.subagents = &output.SubagentsOutput{SessionID: id, Calls: seed.Calls, ParentPath: path}
+	}
 	if seed.Ready != nil {
-		f.subagents = &output.SubagentsOutput{SessionID: id, Calls: seed.Calls}
 		if err := f.waitFor(id, "the subagent calls", func(_ wire.SessionInfo, c wire.SessionChatResponse) bool { return seed.CallsShown(c) }); err != nil {
 			return err
 		}

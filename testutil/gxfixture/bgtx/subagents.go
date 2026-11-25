@@ -73,6 +73,7 @@ const (
 // launched by name (Output.Subagents.Calls) and the call descriptions the chat
 // read must list before the session is ready.
 type Subagent struct {
+	Codex bool // the parent is a Codex session
 	Build func(b *Lines)
 	Calls map[string]string
 	Ready []string
