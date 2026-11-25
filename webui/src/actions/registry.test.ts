@@ -235,7 +235,8 @@ describe("availability", () => {
         diffChat("fix"),
         e("design", { key: "p:map" }),
         e("ticket", { key: "p:e/01", status: "claimed", hasWorktree: true }),
-        e("ticket", { key: "p:e/01", status: "paused", hasWorktree: true }),
+        e("ticket", { key: "p:e/01", status: "needs-answer", hasWorktree: true }), // oldword:ok
+        e("ticket", { key: "p:e/01", status: "needs-repair", hasWorktree: true }), // oldword:ok
         e("ticket", { key: "p:e/01", status: "done", viewDiff: range }),
         e("epic", { viewDiff: range }),
         e("epic", { viewDiff: range, archived: true }),

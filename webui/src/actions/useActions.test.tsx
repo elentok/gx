@@ -120,7 +120,7 @@ test("Show diff navigates to the worktree of a chat, a Design and a ticket", asy
     kind: "ticket",
     key: "demo:e/01",
     name: "t",
-    status: "paused",
+    status: "needs-answer", // oldword:ok
     hasWorktree: true,
   }
   expect(await run(ticket)).toBe("#/diff?project=demo&worktree=ticket%3Ademo%3Ae%2F01")

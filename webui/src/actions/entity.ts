@@ -41,6 +41,8 @@ export interface Entity {
 export const viewDiffOf = (epic: string, d: ViewDiff): Entity["viewDiff"] =>
   d.shows_view_diff ? { epic, base: d.diff_base, tip: d.diff_tip } : undefined
 
+const PAUSED_OR_CLAIMED = ["claimed", "needs-answer", "needs-repair"] // oldword:ok
+
 /** The Diff page URL the Show diff action opens, or undefined when the entity has none. Reads the snapshot only. */
 export function showDiffUrl(e: Entity): DiffUrl | undefined {
   switch (e.kind) {
@@ -54,7 +56,8 @@ export function showDiffUrl(e: Entity): DiffUrl | undefined {
         id: e.key.slice(e.key.indexOf(":") + 1),
       })
     case "ticket":
-      if ((e.status === "claimed" || e.status === "paused") && e.hasWorktree)
+      // The server sends a paused ticket under its legacy words, never "paused".
+      if (PAUSED_OR_CLAIMED.includes(e.status ?? "") && e.hasWorktree)
         return worktreeUrl(projectOf(e.key), { kind: "ticket", id: e.key })
       return e.viewDiff ? viewDiffUrl({ ...e.viewDiff, ticket: e.key }) : undefined
     case "epic":

@@ -315,4 +315,81 @@ test("22. Back link count, then the phone layout", async ({ page, start }) => {
   await expect(back(9)).toBeVisible()
   await fx.cli("tickets", "set", "demo:paused-epic/01", "--status", "open")
   await expect(back(8)).toBeVisible()
+
+  // Show diff lives on other scenarios, so it runs last, back on the wide layout.
+  // The palette's "This page" section and the page's action menu list it together, or neither does.
+  await page.setViewportSize({ width: 1200, height: 900 })
+  const showDiffRow = palette
+    .getByRole("group", nav("This page"))
+    .getByRole("option", { name: /^Show diff/ })
+  // Design, epic and ticket pages keep the button in the page-header-actions group; a chat page has its own header.
+  const pageMenu = page
+    .getByTestId("page-header-actions")
+    .or(page.locator("header"))
+    .getByRole("button", nav("More actions"))
+    .first()
+  const menuTexts = async () => {
+    await pageMenu.click()
+    await menuFocused()
+    const items = await page.getByRole("menuitem").allInnerTexts()
+    await page.keyboard.press("Escape")
+    await expect(page.getByRole("menu")).toHaveCount(0)
+    return items
+  }
+  const showDiffOn = async (hash: string, present: boolean) => {
+    await goto(page, hash)
+    // The palette reads the page's loaded detail once, so open the page's own menu first: its button shows with the loaded page.
+    const items = await menuTexts()
+    await page.keyboard.press("ControlOrMeta+p")
+    await expect(palette).toBeVisible()
+    await expect(showDiffRow, hash).toHaveCount(present ? 1 : 0)
+    await page.keyboard.press("Escape")
+    await expect(palette).toHaveCount(0)
+    const at = items.findIndex((t) => t.startsWith("Show diff"))
+    expect(at >= 0).toBe(present)
+    const rename = items.findIndex((t) => t.startsWith("Rename"))
+    if (present && rename >= 0) expect(at).toBeLessThan(rename)
+  }
+  const runShowDiff = async (hash: string, worktree: string) => {
+    await goto(page, hash)
+    await page.keyboard.press("ControlOrMeta+p")
+    await showDiffRow.click()
+    await expect(palette).toHaveCount(0)
+    await expect(page).toHaveURL((u) => decodeURIComponent(u.hash).includes(`worktree=${worktree}`))
+  }
+  const wt = (await start("worktree-diff", {})).worktreeDiff!
+  for (const hash of [
+    `#/agents/${wt.chat.id}`,
+    `#/d/${wt.design.address}`,
+    `#/t/${wt.ticket.address}`,
+    `#/t/${wt.paused_feature.address}`,
+    `#/agents/${wt.ticket.id}`,
+    `#/agents/${wt.fix_agent.id}`,
+  ])
+    await showDiffOn(hash, true)
+  for (const hash of [`#/agents/${wt.clone.id}`, `#/t/${wt.unclaimed}`, `#/agents/${wt.triage.id}`])
+    await showDiffOn(hash, false)
+  await runShowDiff(`#/agents/${wt.chat.id}`, `chat:${wt.chat.id}`)
+  await runShowDiff(`#/d/${wt.design.address}`, `design:${wt.design.address!.split(":")[1]}`)
+  await runShowDiff(`#/t/${wt.ticket.address}`, `ticket:${wt.ticket.address}`)
+  await runShowDiff(`#/t/${wt.paused_feature.address}`, `ticket:${wt.paused_feature.address}`)
+
+  // An epic with a range and a done ticket open the URL their View diff link has, and the link still works.
+  await start("epic-diff", { shape: "merged", reloads: 1 })
+  for (const hash of ["#/e/demo:widgets-impl", "#/t/demo:widgets-impl/01"]) {
+    await showDiffOn(hash, true)
+    const link = page.getByRole("link", { name: "View diff" })
+    const href = await link.getAttribute("href")
+    await page.keyboard.press("ControlOrMeta+p")
+    await showDiffRow.click()
+    await expect(palette).toHaveCount(0)
+    await expect(page).toHaveURL((u) => u.hash === href)
+    await goto(page, hash)
+    await link.click()
+    await expect(page.getByTestId("diff-header")).toBeVisible()
+    await expect(page).toHaveURL((u) => u.hash === href)
+  }
+  await start("epic-diff", { shape: "running", reloads: 1 })
+  await showDiffOn("#/e/demo:quiet-impl", false)
+  await expect(page.getByRole("link", { name: "View diff" })).toHaveCount(0)
 })

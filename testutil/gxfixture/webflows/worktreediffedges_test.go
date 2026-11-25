@@ -15,7 +15,7 @@ import (
 )
 
 // pausedStatus is how the CLI reports a ticket paused with a question (file status: paused).
-const pausedStatus = "needs-answer"
+const pausedStatus = "needs-answer" // oldword:ok
 
 // hasRun reports whether runs.json has an entry for addr.
 func hasRun(t *testing.T, r *running, addr string) bool {
