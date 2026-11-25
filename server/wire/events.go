@@ -13,6 +13,7 @@ type Event struct {
 	Kind string `json:"kind,omitempty"`
 	// Client names the TUI an event is for, by its event-stream client id.
 	Client string `json:"client,omitempty"`
+	Call   string `json:"call,omitempty"` // EventSessionSubagentChanged's call id
 	// Set only by EventNotificationToast; Path is a web route, not an Address.
 	Title string `json:"title,omitempty"`
 	Body  string `json:"body,omitempty"`

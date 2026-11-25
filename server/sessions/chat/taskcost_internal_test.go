@@ -289,6 +289,30 @@ func TestTaskCost_NoChatReadOpensNoTaskFile(t *testing.T) {
 	wantReads(t, e, map[string]int{})
 }
 
+// A watch tick is a stat: the file moving gives an event and no parse.
+func TestTaskCost_WatchTickParsesNoSubagentFile(t *testing.T) {
+	t.Parallel()
+	f := newClaudeFixture(t)
+	e := newCostEnv(t, f)
+	agentFile := e.subagentFile("ag1")
+	writeLines(t, agentFile, costSubagentLine)
+	writeLines(t, f.path, costSubagent("a1", "ag1", time.Second)...)
+
+	e.c.cfg.ChatPollInterval = 20 * time.Millisecond
+	moved := make(chan struct{}, 8)
+	w, known := WatchSubagent(e.c, "s1", "dir", "a1", func() { moved <- struct{}{} })
+	if w == nil || !known {
+		t.Fatalf("WatchSubagent = %v, %v, want a watch", w, known)
+	}
+	defer w.Close()
+	atOpen := e.reads.all()
+	e.touch(t, agentFile)
+	<-moved
+	if got := e.reads.all(); !reflect.DeepEqual(got, atOpen) {
+		t.Fatalf("reads after a watch tick = %v, want %v", got, atOpen)
+	}
+}
+
 func TestTaskCost_ClockPastMonitorTimeoutChangesTheRowAndParsesNothing(t *testing.T) {
 	t.Parallel()
 	e := newCostEnv(t, newClaudeFixture(t))

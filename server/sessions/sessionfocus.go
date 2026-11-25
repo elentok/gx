@@ -21,6 +21,8 @@ type FocusReports struct {
 	// lastTerm outlives its client's disconnect, so a banner sent with no TUI
 	// still activates the terminal the person last used.
 	lastTerm string
+	// OnGone is told a client whose last stream closed. Set before serving.
+	OnGone func(client string)
 }
 
 func NewFocusReports() *FocusReports {
@@ -36,12 +38,24 @@ func (f *FocusReports) Connect(client string) {
 // Disconnect drops the client's report with its last stream.
 func (f *FocusReports) Disconnect(client string) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	if f.streams[client]--; f.streams[client] > 0 {
+		f.mu.Unlock()
 		return
 	}
 	delete(f.streams, client)
 	delete(f.reports, client)
+	gone := f.OnGone
+	f.mu.Unlock()
+	if gone != nil {
+		gone(client)
+	}
+}
+
+// connected reports whether the client has an open event stream.
+func (f *FocusReports) connected(client string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.streams[client] > 0
 }
 
 // report saves r, reporting false when its client has no open stream.

@@ -58,7 +58,9 @@ type Manager struct {
 	// chat reads the sessions' transcripts for the watch loop.
 	chat  *chat.Chat
 	focus *FocusReports
-	afk   *queue.AFK
+	// subagentWatches are the subagent pages open in the web.
+	subagentWatches subagentWatches
+	afk             *queue.AFK
 	// alerts sends the AFK chat alert of a banner.
 	alerts *notify.ServerChat
 	// queue is the Queue whose live agents the reads show.
@@ -139,7 +141,7 @@ func NewManager(d ManagerDeps) *Manager {
 	if d.DiffDirs == nil {
 		d.DiffDirs = diffdir.New(d.Cfg.TicketStore, nil)
 	}
-	return &Manager{
+	mg := &Manager{
 		Models: d.Models, diffDirs: d.DiffDirs,
 		cfg: d.Cfg, log: d.Log, events: d.Events, projects: d.Projects,
 		settings: d.Settings, harness: d.Harness, idx: d.Idx, chat: d.Chat,
@@ -150,6 +152,10 @@ func NewManager(d ManagerDeps) *Manager {
 		Conv:    &convrecord.Recorder{Dir: d.Cfg.ConversationsDir, Log: d.Log, Host: convHost{d.Projects, maps}},
 		designs: d.Designs, rollouts: d.Rollouts, workspaces: d.Workspaces,
 	}
+	if d.Focus != nil {
+		d.Focus.OnGone = mg.subagentWatches.endClient
+	}
+	return mg
 }
 
 // convHost is the convrecord.Host over the project registry and the map epics.

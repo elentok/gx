@@ -46,3 +46,12 @@ type SessionSubagent struct {
 	// finished marker it is the last assistant message, which the page mutes.
 	Result string `json:"result,omitempty"`
 }
+
+// WatchRequest opens (or, with Closed, ends) the watch of one subagent page.
+// Client is the page's event-stream client id.
+type WatchRequest struct {
+	Client  string `json:"client"`
+	Session string `json:"session"`
+	CallID  string `json:"call_id"`
+	Closed  bool   `json:"closed,omitempty"`
+}

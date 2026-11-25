@@ -204,6 +204,9 @@ type SessionFailure struct {
 	Recrashed bool   `json:"recrashed,omitempty"`
 }
 
+// Refusals of the web-only subagent watch write (public contract).
+const ReasonSubagentWatchUnknownClient, ReasonUnknownSubagent = "subagent-watch-unknown-client", "unknown-subagent"
+
 // ReasonFocusNotConnected refuses a focus report from a client with no open
 // event stream: the report would never expire.
 const ReasonFocusNotConnected = "not-connected"

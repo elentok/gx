@@ -253,6 +253,9 @@ const (
 // or shrank; its address is the session id.
 const EventSessionChatChanged = "session-chat-changed"
 
+// EventSessionSubagentChanged: an open page watch's subagent file moved.
+const EventSessionSubagentChanged = "session-subagent-changed"
+
 // ReasonSessionNotWorking refuses an interrupt of a session with no turn to end.
 const ReasonSessionNotWorking = "session-not-working"
 
