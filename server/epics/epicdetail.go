@@ -218,7 +218,7 @@ func (s *Epics) decorateRow(row *wire.EpicDetailRow, root queue.RootRef, e ticke
 	row.HarnessLabel = s.Harness.LabelFor(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}, t.Agent, row.RenderedStatus)
 	if at, ok := s.Runs.StartedAtOf(row.Address); ok && status == tickets.StatusClaimed {
 		row.ClaimedAt = at
-		row.LaunchStep = s.launchStep(row.Address)
+		row.LaunchStep = launchStep(s.Runs, row.Address)
 		row.HolderUnreachable = s.Runs.HolderUnreachableOf(row.Address)
 	}
 	evs := queue.ReadLogLenient(t)

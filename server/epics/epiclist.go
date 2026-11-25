@@ -315,12 +315,12 @@ func (s *Epics) epicListRow(project string, e tickets.Epic, qidx queueIndex) wir
 	if !e.IsMap {
 		row.QueueSlot = qidx.slot(root.String())
 		decorateLoopCard(&row, row.QueueSlot, claimedPhase(e))
-		row.Verdict, row.Reason = s.capLine(root, e, row.Queued)
+		row.Verdict, row.Reason = capLine(s.CapHeld, root, e, row.Queued)
 		for _, t := range e.Tickets {
 			if e.RenderedStatus(t) != tickets.StatusClaimed {
 				continue
 			}
-			if row.LaunchStep = s.launchStep(root.TicketAddress(t.DisplayNumber())); row.LaunchStep != (wire.LaunchStep{}) {
+			if row.LaunchStep = launchStep(s.Runs, root.TicketAddress(t.DisplayNumber())); row.LaunchStep != (wire.LaunchStep{}) {
 				break
 			}
 		}

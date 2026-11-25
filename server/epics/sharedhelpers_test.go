@@ -15,6 +15,16 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+// The servertest harness runs this test binary as its session holder;
+// without the call the binary re-runs the suite in every child and forks
+// without end.
+func TestMain(m *testing.M) {
+	servertest.RunSessionProcesses()
+	code := m.Run()
+	servertest.RemoveFakeCodex()
+	os.Exit(code)
+}
+
 // Short names for the helpers that live in servertest because the root
 // package's tests use them too.
 const (

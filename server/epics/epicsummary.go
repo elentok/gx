@@ -40,28 +40,28 @@ func (s *Epics) EpicSummaries(all []wire.TicketInfo) []wire.EpicSummary {
 		sum := summarizeEpic(root, projEpics[i], s.Delivery(root.Project), s.Runs.StartedAtOf, recoveryOf, queue.ReadLogLenient)
 		for j := range sum.Active {
 			sum.Active[j].NeedsApproval = s.needsApproval(sum.Active[j].Address)
-			sum.Active[j].LaunchStep = s.launchStep(sum.Active[j].Address)
+			sum.Active[j].LaunchStep = launchStep(s.Runs, sum.Active[j].Address)
 		}
 		sum.Blockers = s.blockersOf(root.Project, projEpics[i], epicsByName(projEpics))
-		sum.Verdict, sum.VerdictReason = s.capLine(root, projEpics[i], sum.State == wire.EpicStateWaiting || sum.State == wire.EpicStateRunning)
+		sum.Verdict, sum.VerdictReason = capLine(s.CapHeld, root, projEpics[i], sum.State == wire.EpicStateWaiting || sum.State == wire.EpicStateRunning)
 		out = append(out, sum)
 	}
 	return out
 }
 
 // launchStep is the wire form of the step the run at address is launching in.
-func (s *Epics) launchStep(address string) wire.LaunchStep {
-	label, position, total := s.Runs.LaunchStepOf(address)
+func launchStep(runs Runs, address string) wire.LaunchStep {
+	label, position, total := runs.LaunchStepOf(address)
 	return wire.LaunchStep{Label: label, Position: position, Total: total}
 }
 
 // capLine is the verdict word and reason of the epic's next ready ticket while
 // a cap holds it back; empty when active is false or no cap holds it.
-func (s *Epics) capLine(root queue.RootRef, e tickets.Epic, active bool) (verdict, reason string) {
-	if !active || s.CapHeld == nil {
+func capLine(capHeld func(root queue.RootRef, e tickets.Epic) (wire.Explanation, bool), root queue.RootRef, e tickets.Epic, active bool) (verdict, reason string) {
+	if !active || capHeld == nil {
 		return "", ""
 	}
-	if ex, held := s.CapHeld(root, e); held {
+	if ex, held := capHeld(root, e); held {
 		return ex.Verdict, ex.Reason
 	}
 	return "", ""
