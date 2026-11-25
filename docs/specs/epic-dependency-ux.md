@@ -14,11 +14,11 @@ None of this is true. The epic is waiting, and it will start by itself once the 
 
 The server gets one new epic state, **Waiting** (waiting on another epic). Every surface reads it: the Epic page, the Epics page card, the sidebar, the TUI Queue tab, the Needs you counts and the scheduler. The state names the blocker epics. It is never Paused, Deadlocked or Needs you.
 
-An epic is Waiting only when it has an unmerged blocker epic (its own epic-level `blocked_by`), nothing is running, no ticket is Paused and there is no real cycle inside the epic.
+An epic is Waiting only when it has an unreleased blocker epic (its own epic-level `blocked_by`), nothing is running, no ticket is Paused and there is no real cycle inside the epic.
 
 This effort also removes cross-epic ticket blockers. A ticket's `blocked_by` names only tickets of its own epic, and an epic's `blocked_by` names only whole epics. Waiting then has one source and the state rule stays simple.
 
-The Epic page gets a "Blocked by" row of chips under the header (one chip per unmerged own `blocked_by` entry), with a "+ Blocker" picker. It adds and removes blockers and writes the same field as `gx tickets epic set --blocked-by`. A server refusal (a cycle) shows inside the picker.
+The Epic page gets a "Blocked by" row of chips under the header (one chip per unreleased own `blocked_by` entry), with a "+ Blocker" picker. It adds and removes blockers and writes the same field as `gx tickets epic set --blocked-by`. A server refusal (a cycle) shows inside the picker.
 
 ## User Stories
 
@@ -42,10 +42,10 @@ The Epic page gets a "Blocked by" row of chips under the header (one chip per un
 18. As a person, I want a queued waiting epic to keep its queue place and use no agent slot, so that it starts by itself once the blocker merges.
 19. As a person, I want the scheduler to log no Deadlocked event and start no recovery agent for a waiting epic, so that no agent runs for nothing.
 20. As a person, I want a Paused ticket in the epic to beat Waiting, so that something I must resume is never hidden.
-21. As a person, I want a real dependency cycle inside one epic to stay Deadlocked, even while a blocker epic is unmerged, so that a genuine error is still reported.
+21. As a person, I want a hand-written dependency cycle inside one epic to read Deadlocked, even while a blocker epic is unreleased, so that a gx bug or a bad manual edit is reported as what it is. A ticket whose only fault is a `blocked_by` cycle does not count as Paused. A real Paused ticket still beats it.
 22. As a person, I want the epic to leave Waiting by itself when the blocker merges (or is done under the on-done policy), so that I do nothing to restart it.
-23. As a person, I want Epic page ticket rows to keep reading "after <epic>/NN", so that I still see which ticket holds a row.
-24. As a person, I want a "Blocked by" chip row on the Epic page, one chip for every unmerged own `blocked_by` entry (whole epics only), each showing the blocker name as a link and a × to remove it, so that I can see and change the dependency in one place.
+23. As a person, I want Epic page ticket rows to show only in-epic blockers ("after NN") and leave out the epic-level blocker, so that the header and chips are the one place that names the epic that holds the whole epic.
+24. As a person, I want a "Blocked by" chip row on the Epic page, one chip for every unreleased own `blocked_by` entry (whole epics only), each showing the blocker name as a link and a × to remove it, so that I can see and change the dependency in one place.
 25. As a person, I want a "+ Blocker" button that opens a picker with a search field, so that I can find an epic by name.
 26. As a person, I want the picker to list the project's loop epics, minus this epic and archived and merged ones, so that I can only pick a valid blocker.
 27. As a person, I want each picker row to show the epic's state ("Implementing", "Ready to queue"), so that I pick the right one.
@@ -56,25 +56,28 @@ The Epic page gets a "Blocked by" row of chips under the header (one chip per un
 32. As a person, I want the web control to write the same field, with the same checks, as `gx tickets epic set --blocked-by`, so that web and CLI never disagree.
 33. As a person, I want a blocker added in the web to show in `gx tickets epic set`'s field and the other way round, and the page to follow without a reload, so that the two stay in step.
 34. As a person, I want the Epics page card to show no blocker control, so that the card stays simple and the control lives on the Epic page.
-35. As a person, I want the web change to keep the other `blocked_by` entries of the epic (merged epics, which show no chip) when I add or remove one blocker, so that an edit never drops a dependency I cannot see.
+35. As a person, I want the web change to keep the other `blocked_by` entries of the epic (released epics, which show no chip) when I add or remove one blocker, so that an edit never drops a dependency I cannot see.
 36. As a contributor reading `gx-local-tracker.md`, I want epic-level `blocked_by` documented, so that I know the field exists, how to set it and when the epic starts.
 37. As a contributor reading `GLOSSARY.md`, I want a Waiting term, and Deadlocked no longer covering this case, so that the words match the product.
 38. As a person, I want a ticket's `blocked_by` to name only tickets of its own epic, so that an epic's dependencies live in one place, the epic-level `blocked_by`.
 39. As a person, I want `gx tickets validate` to refuse a ticket `blocked_by` that names a ticket of another epic (such as `other/06`), with a message that points to the epic-level `--blocked-by`, so that I know what to do instead.
 40. As a person, I want the ticket write commands to refuse the same thing with the same message, so that I cannot create what validate would refuse.
 41. As a person, I want an epic's `blocked_by` to name only whole epics, and a ticket ref there refused with the same pointer, so that the field means one thing.
-42. As a person, I want no data migration, because no live ticket in the store uses a cross-epic ticket blocker, so that nothing breaks on upgrade.
-43. As a contributor reading `skills/gx-local-tracker.md`, I want the qualified `epic/NN` token and cross-epic cycles gone from it, so that the doc matches the tracker.
+42. As a person, I want no data migration and no broken ticket on upgrade. Two cancelled tickets (`follow-ups-archived` 144 and 146) carry old cross-epic refs; terminal tickets are never refused, so they keep loading.
+43. As a contributor reading `skills/gx-local-tracker.md`, I want the qualified `blocked_by: [epic/06]` text and the cross-epic cycle text gone from it, so that the doc matches the tracker. The `epic/NN` ticket address stays.
+44. As a person, I want a stored epic `blocked_by` entry that the new check refuses (a ticket ref, a deleted epic) to show as an error chip with a ×, so that I can clear it and a web add or remove never fails on an entry I cannot see.
 
 ## Implementation Decisions
 
 **Server state**
 
 - A new epic state in `server/epics/state.go` (`StateWaiting`, name is the implementer's choice) sits beside Done, Runnable, Paused and Cycle. `StateOf` stays the one rule; the deadlock check and the epic summary both derive from it. No `EpicState` is stored: the state is derived on every read.
-- The epic is Waiting when it has at least one unmerged own blocker epic, no ticket is running, no ticket is Paused and there is no real cycle among its remaining tickets. There is no ticket-level walk, no parent-to-child walk and no "held from outside" logic: with cross-epic ticket blockers removed, the only outside hold is the epic-level `blocked_by`.
-- Precedence: Done (no open tickets) first. Then a running ticket. Then a Paused ticket beats Waiting. Then a real in-epic cycle (Cycle) beats Waiting, so a cycle stays Deadlocked even while a blocker epic is unmerged. Then Waiting. Then Runnable.
+- The epic is Waiting when it has at least one unreleased own blocker epic, no ticket is running, no ticket is Paused and there is no cycle among its remaining tickets. "Unreleased" is the hold's own predicate (`g.blocking` with `EpicRelease.stamped`: merged, or done under the on-done policy, or auto-ff-merged), not `MergedAt` alone. There is no ticket-level walk, no parent-to-child walk and no "held from outside" logic: with cross-epic ticket blockers removed, the only outside hold is the epic-level `blocked_by`.
+- Precedence: Done (no open tickets) first. Then a running ticket. Then a Paused ticket beats Waiting. Then a cycle (Cycle) beats Waiting, so a cycle reads Deadlocked even while a blocker epic is unreleased. Then Waiting. Then Runnable.
 - The release rule is unchanged: the blocker epic merges to trunk, or is done under the on-done policy.
-- The blocker list (the epic's unmerged own `blocked_by` entries) is derived in one place and is the source for every surface. It replaces the `blocked_by_epics` field on the epic list row, so the two never disagree.
+- Cycle is made reachable (correct fix). Today `cycleErrors` marks a cycle ticket as `error`, which counts as Paused, so `StateCycle` never fires. A ticket whose only error is a `blocked_by` cycle gets its own rendered status that is not Paused, and `StateOf` maps an epic whose remaining tickets are only such cycle tickets to Cycle (Deadlocked). A real Paused ticket (answer, repair, other error, draft) still wins. A new seam-1 test covers a hand-written two-ticket cycle.
+- The epic-level hold keeps one project-wide resolver. Today `tickets/blockedby.go` copies the epic's own `blocked_by` into every ticket's `ExternalBlockers`, and `UnresolvedBlockers`, the `LoadResolved` callers and `EpicsWaitedOn` read it. That resolver stays, renamed to say what it is (the epic-level hold), and keeps applying the release rule. Only the ticket-level qualified refs and the widening go.
+- The blocker list (the epic's unreleased own `blocked_by` entries) is derived in one place from the same predicate as the hold (R4) and is the source for every surface. Its chain walk keeps a visited set, so a hand-edited epic cycle ends the walk instead of looping. It replaces the `blocked_by_epics` field on the epic list row, so the two never disagree.
 
 **Wire**
 
@@ -83,7 +86,7 @@ The Epic page gets a "Blocked by" row of chips under the header (one chip per un
 - Moving: a blocker is not moving when its Epics page state is Ready to queue, Draft or No open tickets (state label in the hint: "not queued"), or Paused, Deadlocked, Merge blocked, CI failing or PR text failed (the hint uses that state's own label). Implementing, running, Awaiting merge, Awaiting PR and PR open are moving. A blocker that is itself Waiting is not moving when one of its own blockers is not moving, followed down the chain (cycles are refused, so the walk ends). The hint then names the deepest not-moving epic, with that epic's own state label.
 - Order: the server sorts the blocker list not-moving first, then by name. Every surface (header, card, hint, sidebar tooltip, TUI) takes the first entry as "A".
 - The epic list state for a Waiting epic maps like slot-waiting: Implementing when queued, Ready to queue when not. It never maps to Paused, so it never reaches Needs you. The Needs you rule keeps `PillDeadlocked` for a real Cycle only.
-- Migration, one change, in this order: remove `blocked_by_epics` from the Go types and the OpenAPI source, add the new state value and the blocker list, regenerate `generated/server.ts`, update the fixtures that carry `blocked_by_epics`, update `docs/specs/web-epics-page.md` (which documents the field), then update every reader. Nothing is stored, so no data migration.
+- Migration, one change, in this order: remove `blocked_by_epics` from the Go types and the OpenAPI source, add the new state value and the blocker list, regenerate `generated/server.ts`, remove `external_blockers` and `widened_blockers` from the index wire (`server/wire/index.go`, `server/index/index.go`, `ui/tickets/tabapi/viewmodel.go`, `generated/server.ts`) and drop the "(via …)" form of `Ticket.BlockerLabel` (`cmd/tickets/tickets_show.go`), update the fixtures that carry `blocked_by_epics`, update `docs/specs/web-epics-page.md` (which documents the field), then update every reader. Nothing is stored, so no data migration.
 - The new state value goes into the wire enum, the TUI label map and the web `LABELS` in the same change. A test fails when a wire epic state has no label in the TUI map or in `LABELS` (iterate the generated state list).
 
 **Scheduler**
@@ -92,17 +95,17 @@ The Epic page gets a "Blocked by" row of chips under the header (one chip per un
 
 **Web write route**
 
-- A new route like `POST /v1/epics/mark-merged`: it takes the epic address and a blocker address to add or remove, reads the epic's current `blocked_by` under the project lock, applies the one change, runs `CheckEpicBlockedByWrite` and then `UpdateEpicFields`, the same pair the CLI runs. It keeps entries it does not show (merged epics). A refusal writes nothing. The cycle refusal is a coded error `blocked-by-cycle` that carries the blocker and the chain; it is not only text. Cross-project blockers and ticket refs stay refused by the check.
+- A new route like `POST /v1/epics/mark-merged`: it takes the epic address and a blocker address to add or remove, reads the epic's current `blocked_by` under the project lock, applies the one change, runs `CheckEpicBlockedByWrite` and then `UpdateEpicFields`, the same pair the CLI runs. It keeps entries it does not show (released epics). It checks only the entry it adds, so a stale stored entry never blocks an add or remove of another one. A refusal writes nothing. The cycle refusal is a coded error `blocked-by-cycle` that carries the blocker and the chain; it is not only text. Cross-project blockers stay refused by the check. A ticket ref in an epic's `blocked_by` is newly refused (the check accepts it today).
 - The route is a web write, so it follows the same auth and event rules as the other epic routes. The event stream carries the change so open pages follow without a reload.
 
 **Web**
 
 - The Epic page header status word reads "Waiting on <blocker>" in the muted tone, never the amber Needs you tone (the theme's `waiting` tone is amber, so the Waiting word uses the muted tone explicitly). Two or more read "Waiting on A and 1 more". No separate pill.
 - The hint is one dim line under the header, always "<blocker> is not queued / <blocker's own state label>. This epic stays put until it is merged." It uses the Paused text tone for a stuck state (Paused, Deadlocked, Merge blocked, CI failing, PR text failed), and the dim tone for "not queued". It is not red or amber. The blocker is the first of the sorted list, or the deepest not-moving epic when that blocker is itself Waiting. There is no ticket-blocker wording.
-- The "Blocked by" chip row sits under the header, one chip for every unmerged own `blocked_by` entry, each with a ×: the blocker name is a link with no underline, the × removes it, "+ Blocker" opens the picker. The picker is a search field over the project's loop epics, minus this epic and archived and merged ones, each row showing its state; a click toggles; this epic is shown greyed as "this epic". The cycle refusal shows inside the open picker: the web builds the mock's wording ("Can't add <blocker>: it already waits on <this epic>. That would be a cycle.") from the `blocked-by-cycle` error's blocker and chain, not from the server's text.
+- The "Blocked by" chip row sits under the header, one chip for every unreleased own `blocked_by` entry, each with a ×. A stored entry the check refuses (a ticket ref, a deleted epic) shows as an error chip with a × and no link, so it can be cleared: the blocker name is a link with no underline, the × removes it, "+ Blocker" opens the picker. The picker is a search field over the project's loop epics, minus this epic and archived and merged ones, each row showing its state; a click toggles; this epic is shown greyed as "this epic". The cycle refusal shows inside the open picker: the web builds the mock's wording ("Can't add <blocker>: it already waits on <this epic>. That would be a cycle.") from the `blocked-by-cycle` error's blocker and chain, not from the server's text.
 - The Epics page card status line shows the same words as the header. The sidebar row shows the bare word "Waiting" in the muted tone, with the full words in its tooltip. The card menu gets no blocker control. The jump palette trailing status follows `cardStatus`.
 - The sidebar's `cardStatus` maps the new wire state to the bare word "Waiting" and builds the tooltip ("Waiting on A and 1 more") from the blocker list. The Epics page card reads the server's `status_words`. Neither derives a label from ticket blockers. The jump palette's trailing status follows `cardStatus`.
-- Epic page ticket rows (`blockerNote`) are unchanged.
+- Epic page ticket rows (`blockerNote`) show only in-epic blockers ("after NN"). The epic-level blocker no longer appears on rows, in the TUI rows (`ui/tickets/rowfmt/row_style.go`) or in the ralphloop schedule reason as a ticket blocker; the header names it. The map's ticket 03 resolution (rows unchanged) is superseded by this.
 
 **TUI**
 
@@ -110,11 +113,11 @@ The Epic page gets a "Blocked by" row of chips under the header (one chip per un
 
 **Removal of cross-epic ticket blockers**
 
-- `tickets/blockedby.go` loses `resolveCrossEpic` and its tests, and the cross-epic cycle code that goes with it (ticket-level external blockers, `ExternalBlockers`, qualified-token parsing). Nothing else in the scheduler or the epic state reads them any more.
-- `gx tickets validate` refuses a ticket `blocked_by` that names a ticket of another epic, and an epic `blocked_by` that names a ticket ref. The message says the dependency belongs in the epic-level `--blocked-by`, for example "a ticket may only be blocked by tickets in its own epic; to wait on <other>, run `gx tickets epic set <epic> --blocked-by <other>`".
+- `tickets/blockedby.go` loses `resolveCrossEpic` and its tests, the cross-epic cycle code, qualified ticket-token parsing and widening (`WidenedBlockers`). The epic-level hold resolver stays (see Server state).
+- `gx tickets validate` refuses a ticket `blocked_by` that names a ticket of another epic, and an epic `blocked_by` that names a ticket ref. Both refusals skip terminal tickets, as `validate` already does, and the load path (`checkBlockedBy`) skips them too, so a cancelled ticket with an old ref never renders `error`. The message says the dependency belongs in the epic-level `--blocked-by`, for example "a ticket may only be blocked by tickets in its own epic; to wait on <other>, run `gx tickets epic set <epic> --blocked-by <other>`".
 - The write commands (ticket create and set with a blocker, `epic set --blocked-by`) run the same check and refuse with the same message, so no refused value can be written.
-- No data migration: no live ticket in the store uses a cross-epic ticket blocker (checked before this spec). If one appears before the change lands, `validate` names it and the person moves it to an epic-level blocker by hand.
-- `skills/gx-local-tracker.md` stops documenting the qualified `epic/NN` token and cross-epic cycles.
+- No data migration. The only live cross-epic refs are on two cancelled tickets (`follow-ups-archived` 144 and 146), which stay as they are. If a non-terminal one appears before the change lands, `validate` names it and the person moves it to an epic-level blocker by hand. A test loads a terminal ticket with an old ref and expects no error.
+- `skills/gx-local-tracker.md` stops documenting the qualified `blocked_by: [epic/06]` token and cross-epic cycles (the `epic/NN` ticket address stays). `skills/gx-investigate/gotchas.md` (the cross-epic `blocked_by` gotcha near line 282) is updated the same way.
 
 **Docs**
 
@@ -136,25 +139,27 @@ The Epic page gets a "Blocked by" row of chips under the header (one chip per un
 Stories 1 to 8, 10 to 15, 23 (Waiting words on every surface; see Mock states):
 
 - Flows to run: the Epic flows of `webui/e2e/CATALOG.md` (flow 2 "Epic looks right", flow 6 "Queue an epic") to confirm no regression of the other states.
-- Checks: with the `epic-waiting` fixture, `gx server epics` lists the waiting epic with the new state and its blockers, and `gx server epics detail <project:epic>` carries the same; the epic's card is in Implementing when queued and Ready to queue when not; the sidebar tooltip names the blocker; the Epic page's ticket rows still read "after <epic>/NN". Clicking a chip name on the Epic page lands on the blocker's Epic page with no full page reload (story 11).
+- Checks: with the `epic-waiting` fixture, `gx server epics` lists the waiting epic with the new state and its blockers, and `gx server epics detail <project:epic>` carries the same; the epic's card is in Implementing when queued and Ready to queue when not; the sidebar tooltip names the blocker; the Epic page's ticket rows show no "after <blocker-epic>" text and still show in-epic "after NN" (story 23). Clicking a chip name on the Epic page lands on the blocker's Epic page with no full page reload (story 11).
 - New flow to write: "Waiting epic" (below). New scenario: `epic-waiting`.
 - The TUI line (stories 5, 8, 15): a header status-line test for each of one blocker, two blockers, not queued and Paused; and, with the fixture, `gx server epics detail` shows the same state the TUI reads.
 
 Stories 6, 16 to 22 (state and scheduler):
 
-- Checks: `gx server epics` shows no Paused, Deadlocked or Needs you pill for the waiting epic; the run log (`gx tickets` events for the epic) has no `deadlocked` event; no recovery session starts. A Paused ticket added to the epic turns it Paused. A two-ticket cycle inside the epic stays Deadlocked, even with the blocker unmerged. While the epic is Waiting and queued, `gx server queue` still lists it at its place and no session runs for it (story 18). After the blocker is marked merged (`gx server epics mark-merged` or its merge), the epic starts and, if queued, runs without a person acting.
+- Extra seam-1 checks: an on-done blocker (released but not merged) leaves the blocker list and the Waiting state together; a hand-written epic cycle between two epics ends the chain walk.
+
+- Checks: `gx server epics` shows no Paused, Deadlocked or Needs you pill for the waiting epic; the run log (`gx tickets` events for the epic) has no `deadlocked` event; no recovery session starts. A Paused ticket added to the epic turns it Paused. A two-ticket cycle inside the epic reads Deadlocked, even with the blocker unreleased; adding a Paused ticket turns it Paused. While the epic is Waiting and queued, `gx server queue` still lists it at its place and no session runs for it (story 18). After the blocker is marked merged (`gx server epics mark-merged` or its merge), the epic starts and, if queued, runs without a person acting.
 - New flows or scenarios to write: seam-1 Go tests above, plus a scenario shape `release` where the blocker merges.
 
 Stories 9, 38 to 43 (removal of cross-epic ticket blockers):
 
-- Checks: a ticket with `blocked_by: [other/06]` is refused by `gx tickets validate` and by the write commands, with the message that points to `--blocked-by`; an epic `blocked_by` with a ticket ref is refused the same way; `rg "resolveCrossEpic|ExternalBlockers" --glob '*.go'` finds nothing; `gx tickets validate` over the live store is clean (no data to migrate); `rg "epic/NN|cross-epic" skills/gx-local-tracker.md` finds no qualified token or cross-epic cycle text.
+- Checks: a ticket with `blocked_by: [other/06]` is refused by `gx tickets validate` and by the write commands, with the message that points to `--blocked-by`; an epic `blocked_by` with a ticket ref is refused the same way; `gx tickets validate` over the live store is clean (the two cancelled tickets are skipped) and a terminal ticket with an old ref still loads without `error`; `rg "resolveCrossEpic|WidenedBlockers" --glob '*.go'` finds nothing while the epic-level hold resolver still holds a blocked epic's tickets; `rg "blocked_by: \[[a-z-]+/[0-9]+\]|cross-epic" skills/gx-local-tracker.md skills/gx-investigate/gotchas.md` finds no qualified token or cross-epic cycle text.
 - Go tests: the removed cross-epic tests are gone, and new tests cover the refusals.
 
 Stories 24 to 31, 34 (the control):
 
 - Flow: the new "Waiting epic" flow (which also clicks a chip name and lands on the blocker's Epic page with no reload) adds a blocker from the picker, sees the chip and the Waiting words with no reload, removes it with the chip's ×, adds two blockers, and triggers the cycle refusal. The card menu has no blocker control.
 - Checks: after each action `gx tickets show <project:epic>` shows the expected `blocked_by`; after the refusal it is unchanged.
-- The picker (stories 26 to 28): lists the other loop epics with their states, shows this epic greyed as "this epic", and lists no archived or merged epic.
+- A stale stored entry (a ticket ref) shows as an error chip with a ×, and removing it works (story 44). The picker (stories 26 to 28): lists the other loop epics with their states, shows this epic greyed as "this epic", and lists no archived or merged epic.
 
 Stories 32, 33, 35 (parity with the CLI):
 
@@ -177,7 +182,7 @@ New flows or scenarios to write (these become implementation tickets): the `epic
 ## Out of Scope
 
 - Cross-project blockers: `validate` refuses them today and this effort keeps that.
-- Cross-epic ticket blockers are not kept in any form (see the removal stories).
+- Cross-epic ticket blockers are not kept in any form (see the removal stories). Lost with them: waiting on a commitless ticket in another epic, or on a map-epic ticket.
 - A notification when the blocker merges and the waiting epic starts.
 - A new Epics page section for waiting epics. They stay in Implementing or Ready to queue.
 - A blocker control on the Epics page card menu, and the Epic page three-dots menu (the control is the chip row).
@@ -199,7 +204,7 @@ Choices the spec makes without a person's answer. Each has its reason.
 - Hint and suffix use the blocker's own state label ("is Deadlocked", "(Merge blocked)") in the Paused text tone, because "Paused" alone is wrong for Deadlocked, Merge blocked, CI failing and PR text failed.
 - A Waiting blocker is not moving when its own blocker is not moving, and the hint names the deepest not-moving epic, because a queued Waiting blocker over a stalled one would otherwise read as moving.
 - Blocker order: the server sorts not-moving first, then by name, and every surface takes the first, so "A" and the hint agree everywhere.
-- Precedence: Paused beats Waiting and Cycle beats Waiting (owner's answers). Waiting comes only from an unmerged epic-level blocker, with nothing running.
+- Precedence: Paused beats Waiting and Cycle beats Waiting (owner's answers). Paused beats Cycle. Waiting comes only from an unmerged epic-level blocker, with nothing running.
 - Which states count as moving: Implementing, running, Awaiting merge, Awaiting PR, PR open. A blocker that needs a merge or a pull request already shows that on its own card.
 - One blocker list replaces `blocked_by_epics` (the waiting-on set and the own-blocker list are identical once ticket-level blockers are gone), in one change with regenerated `server.ts`, fixtures and docs.
 - Chip scope: one chip per unmerged own `blocked_by` entry, whole epics only, each with ×. Merged entries show no chip and are kept on every web write.
@@ -207,5 +212,9 @@ Choices the spec makes without a person's answer. Each has its reason.
 - Cycle refusal is a coded error `blocked-by-cycle` with blocker and chain, so the web renders the mock's wording itself and the server text can change.
 - `cardStatus` maps the new state to "Waiting" and builds the tooltip from the blocker list; the jump palette follows `cardStatus`.
 - Mock states: the mock binds only header, chips, picker, card and sidebar; the cycle-refusal fixture uses an unticked epic that waits on this one, and ticket rows differ from the mock.
-- Cross-epic ticket blockers are removed with no migration, because no live ticket uses one.
+- Cross-epic ticket blockers are removed with no migration, because only two cancelled tickets carry one and terminal tickets are skipped.
+- Cycle (Deadlocked) is kept and made reachable instead of retired, because a cycle is a gx bug or a bad manual edit and "Deadlocked" says so (owner's answer).
+- Rows of a Waiting epic show only in-epic blockers; the epic-level blocker lives in the header and chips (owner's answer).
+- Refused stored entries show as error chips with a ×, and the web route checks only the entry it changes (owner's answer, with a default for the check scope).
+- The blocker list and the hold share one release predicate, so on-done releases agree everywhere.
 - Picker scope (loop epics of the same project) and the release rule are unchanged defaults from charting.
