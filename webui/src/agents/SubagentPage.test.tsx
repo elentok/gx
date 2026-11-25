@@ -2,7 +2,7 @@ import { act, cleanup, screen } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import type { SessionChatResponse, SessionInfo, SessionSubagent } from "../generated/server"
 import { renderThemed } from "../ui/render"
-import { SubagentPage } from "./SubagentPage"
+import { SubagentMissing, SubagentPage } from "./SubagentPage"
 
 afterEach(() => {
   cleanup()
@@ -151,4 +151,74 @@ test("Time ticks while running and stops after unmount", () => {
   expect(screen.getByText("1m 05s")).toBeTruthy()
   unmount()
   expect(vi.getTimerCount()).toBe(0)
+})
+
+const gone = (over: Partial<SessionSubagent>) =>
+  chat({ status: "not_available", unavailable: "gone", type: "Explore", ...over }, { messages: [] })
+
+test("Starting shows the prompt of a Claude subagent", () => {
+  show(chat({ status: "running", unavailable: "starting" }, { messages: [] }))
+  expect(screen.getByText("Starting…")).toBeTruthy()
+  expect(screen.getByText("Prompt from the parent agent")).toBeTruthy()
+  expect(screen.getByText("Find the entry point")).toBeTruthy()
+})
+
+test("Starting a Codex child shows Prompt not readable", () => {
+  show(chat({ status: "running", unavailable: "starting", prompt: undefined }, { messages: [] }))
+  expect(screen.getByText("Starting…")).toBeTruthy()
+  expect(screen.getByText("Prompt not readable")).toBeTruthy()
+})
+
+test("A gone file shows Not available, the note and the Claude prompt", () => {
+  show(gone({}))
+  expect(screen.getByText("Not available")).toBeTruthy()
+  expect(screen.getByText("Transcript no longer available")).toBeTruthy()
+  expect(screen.getByText("Find the entry point")).toBeTruthy()
+  expect(screen.getByRole("heading", { name: "Explore the repo" })).toBeTruthy()
+})
+
+test("A compressed child says reading is not supported yet and has no Decode button", () => {
+  show(gone({ unavailable: "compressed", prompt: undefined }))
+  expect(screen.getByText("Transcript no longer available")).toBeTruthy()
+  expect(screen.getByText(/not supported yet/)).toBeTruthy()
+  expect(screen.queryByRole("button", { name: "Decode" })).toBeNull()
+})
+
+const parentGone = (unavailable: string) =>
+  show(
+    chat(
+      { status: "not_available", unavailable, title: undefined, prompt: undefined },
+      { messages: [] },
+    ),
+  )
+
+test("An unreadable parent shows only the note and the back link", () => {
+  parentGone("gone")
+  expect(screen.getByText("Transcript no longer available")).toBeTruthy()
+  expect(screen.getByRole("link", { name: /Back to parent chat/ }).getAttribute("href")).toBe(
+    "#/agents/s-a",
+  )
+  expect(screen.queryByRole("heading")).toBeNull()
+  expect(screen.queryByText("Not available")).toBeNull()
+  expect(screen.queryByText("Prompt from the parent agent")).toBeNull()
+})
+
+test("An archived parent points to the chat page and never says not supported yet", () => {
+  parentGone("compressed")
+  expect(screen.getByText(/parent session is archived/)).toBeTruthy()
+  expect(screen.getByRole("link", { name: "chat page" }).getAttribute("href")).toBe("#/agents/s-a")
+  expect(screen.queryByText(/not supported yet/)).toBeNull()
+  expect(screen.queryByText("Prompt from the parent agent")).toBeNull()
+})
+
+test("A 404 shows the server's message and the back link", () => {
+  renderThemed(<SubagentMissing sessionId="s-a" message="no such subagent" />)
+  expect(screen.getByText("no such subagent")).toBeTruthy()
+  expect(screen.getByRole("link", { name: /Back to parent chat/ })).toBeTruthy()
+})
+
+test("An unknown session's message never reads no such subagent", () => {
+  renderThemed(<SubagentMissing sessionId="s-x" message="no session s-x" />)
+  expect(screen.getByText("no session s-x")).toBeTruthy()
+  expect(screen.queryByText(/no such subagent/)).toBeNull()
 })

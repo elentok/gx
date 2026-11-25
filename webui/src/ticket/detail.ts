@@ -18,6 +18,19 @@ export async function fetchJson<T>(url: string, label: string): Promise<DetailRe
   return { kind: "ok", detail: await res.json() }
 }
 
+/** Like `DetailResult`, but a 404 keeps the server's message for the page to show. */
+export type MessageResult<T> = { kind: "ok"; detail: T } | { kind: "not-found"; message: string }
+
+export async function fetchJsonWithMessage<T>(
+  url: string,
+  label: string,
+): Promise<MessageResult<T>> {
+  const res = await apiFetch(url)
+  if (res.status === 404) return { kind: "not-found", message: (await res.text()).trim() }
+  if (!res.ok) throw new Error(`${label}: HTTP ${res.status}`)
+  return { kind: "ok", detail: await res.json() }
+}
+
 export const fetchDetail: FetchDetail = (address) =>
   fetchJson(`/v1/tickets/detail?address=${encodeURIComponent(address)}`, "detail")
 

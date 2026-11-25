@@ -5,8 +5,11 @@ import { formatElapsed, tokenText } from "../design/taskRows"
 import { FileLinkProvider } from "../files/FileLinkContext"
 import {
   SubagentStatusDone,
+  SubagentStatusNotAvailable,
   SubagentStatusRunning,
   SubagentStatusStopped,
+  SubagentUnavailableCompressed,
+  SubagentUnavailableStarting,
   type SessionChatResponse,
   type SessionInfo,
 } from "../generated/server"
@@ -40,6 +43,7 @@ const STATUS_LABEL: Record<string, string> = {
   [SubagentStatusRunning]: "Running",
   [SubagentStatusDone]: "Done",
   [SubagentStatusStopped]: "Stopped",
+  [SubagentStatusNotAvailable]: "Not available",
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -65,6 +69,62 @@ function useNow(running: boolean): number {
   return now
 }
 
+function GoneNote({ children }: { children?: ReactNode }) {
+  return (
+    <Box
+      data-part="missing-note"
+      borderWidth="1px"
+      borderStyle="dashed"
+      borderColor="border"
+      borderRadius="lg"
+      p="3"
+      color="text.dim"
+      fontSize="sm"
+    >
+      <Text>Transcript no longer available</Text>
+      {children}
+    </Box>
+  )
+}
+
+function BackLink({ sessionId }: { sessionId: string }) {
+  return (
+    <Link href={agentHref(sessionId)} color="tone.running.fg" textDecoration="none">
+      ← Back to parent chat
+    </Link>
+  )
+}
+
+/** The parent transcript is gone or archived: nothing of the subagent is known, so no header at all. */
+function ParentGone({ sessionId, archived }: { sessionId: string; archived: boolean }) {
+  return (
+    <Box display="flex" flexDirection="column" gap="3" px="4" py="3">
+      <GoneNote>
+        {archived && (
+          <Text>
+            The parent session is archived. Decode it from the{" "}
+            <Link href={agentHref(sessionId)} color="inherit">
+              chat page
+            </Link>
+            .
+          </Text>
+        )}
+      </GoneNote>
+      <BackLink sessionId={sessionId} />
+    </Box>
+  )
+}
+
+/** A 404 of the subagent read: the server's message, never reworded, and the way back. */
+export function SubagentMissing({ sessionId, message }: { sessionId: string; message: string }) {
+  return (
+    <Box display="flex" flexDirection="column" gap="3" px="4" py="3">
+      <Text color="text.dim">{message}</Text>
+      <BackLink sessionId={sessionId} />
+    </Box>
+  )
+}
+
 /** One subagent's page: header, the prompt, its messages and tool calls, and the result. Read-only. */
 export function SubagentPage({
   session,
@@ -77,6 +137,21 @@ export function SubagentPage({
   const running = sub?.status === SubagentStatusRunning
   const now = useNow(running)
   if (!sub) return null
+  // The parent's own call is unreadable, so the header holds no title; a child's file holds one.
+  if (
+    sub.unavailable &&
+    sub.unavailable !== SubagentUnavailableStarting &&
+    !sub.title &&
+    !sub.type
+  ) {
+    return (
+      <ParentGone
+        sessionId={session.id}
+        archived={sub.unavailable === SubagentUnavailableCompressed}
+      />
+    )
+  }
+  const unavailable = sub.unavailable
   const title = sub.title ?? ""
   const status = STATUS_LABEL[sub.status]
   const started = sub.started_at ? Date.parse(sub.started_at) : undefined
@@ -177,22 +252,38 @@ export function SubagentPage({
           {sub.tool_calls !== undefined && (
             <Stat label="Tool calls" value={String(sub.tool_calls)} />
           )}
-          <Link href={agentHref(session.id)} color="tone.running.fg" textDecoration="none">
-            ← Back to parent chat
-          </Link>
+          <BackLink sessionId={session.id} />
         </Box>
       </Box>
       <FileLinkProvider base={{ session: session.id }} recheckKey={chat.messages.at(-1)?.id}>
         <Box display="flex" flexDirection="column" gap="3" flex="1 1 auto" minH="0">
-          <ChatMessages
-            chat={chat}
-            busy={running}
-            sessionId={session.id}
-            showTools
-            head={prompt}
-            tail={result}
-            working={<WorkingRow current={chat.current} others={chat.others} />}
-          />
+          {unavailable ? (
+            <Box display="flex" flexDirection="column" gap="3" px="4">
+              {prompt}
+              {unavailable === SubagentUnavailableStarting ? (
+                <Text color="text.dim">Starting…</Text>
+              ) : (
+                <GoneNote>
+                  {unavailable === SubagentUnavailableCompressed && (
+                    <Text>
+                      The transcript file is compressed. Reading compressed children is not
+                      supported yet.
+                    </Text>
+                  )}
+                </GoneNote>
+              )}
+            </Box>
+          ) : (
+            <ChatMessages
+              chat={chat}
+              busy={running}
+              sessionId={session.id}
+              showTools
+              head={prompt}
+              tail={result}
+              working={<WorkingRow current={chat.current} others={chat.others} />}
+            />
+          )}
         </Box>
       </FileLinkProvider>
     </Box>

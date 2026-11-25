@@ -6,7 +6,7 @@ import {
   type SessionChatResponse,
   type SessionRoundCard,
 } from "../generated/server"
-import { fetchJson, useDetail, type DetailResult } from "../ticket/detail"
+import { fetchJson, fetchJsonWithMessage, useDetail, type DetailResult } from "../ticket/detail"
 
 export type FetchChat = (sessionId: string) => Promise<DetailResult<SessionChatResponse>>
 
@@ -16,6 +16,13 @@ export const fetchChat: FetchChat = (sessionId) =>
 /** Decodes a Codex session's archived rollout; only the Decode button calls it. */
 export const fetchArchive: FetchChat = (sessionId) =>
   fetchJson(`/v1/sessions/chat/archive?session=${encodeURIComponent(sessionId)}`, "archived chat")
+
+/** One subagent's page; a 404 carries the server's message ("no such subagent", or the unknown-session one). */
+export const fetchSubagentChat = (sessionId: string, callId: string) =>
+  fetchJsonWithMessage<SessionChatResponse>(
+    `/v1/sessions/chat?session=${encodeURIComponent(sessionId)}&subagent=${encodeURIComponent(callId)}`,
+    "subagent chat",
+  )
 
 /** The harnesses whose transcripts gx reads into a chat. */
 export const hasChat = (harness: string | undefined) => harness === "claude" || harness === "codex"
