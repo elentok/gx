@@ -115,7 +115,7 @@ function NoChat({ session, fetchScreen }: { session: SessionInfo; fetchScreen?: 
         py="2"
       >
         <Text color="text.muted" fontSize="sm">
-          Chat works for Claude and Codex sessions only.
+          Chat works for Claude and Codex chats only.
         </Text>
         <Button emphasis="secondary" onClick={() => setScreen(true)}>
           Show screen
@@ -137,11 +137,11 @@ function NoChat({ session, fetchScreen }: { session: SessionInfo; fetchScreen?: 
 function sendReason(s: SessionInfo, connected: boolean): string | undefined {
   const state = s.status.state
   if (!connected) return "Offline. Send turns on when gx reconnects."
-  if (!hasChat(s.harness)) return "Sending works for Claude and Codex sessions only"
+  if (!hasChat(s.harness)) return "Sending works for Claude and Codex chats only"
   if (state === "exited") return "Exited. Restore it to send."
   if (switchRunning(s)) return "Switching model. Send turns on when the new agent is idle."
   if (!promptable(s)) {
-    return `${stateLabel(s)}. Send turns on when the session is idle.`
+    return `${stateLabel(s)}. Send turns on when the chat is idle.`
   }
 }
 
@@ -210,7 +210,11 @@ export function SessionView({
   const chatty = hasChat(session.harness)
   const { kind, locked, unlock } = useComposerUnlock(session)
   const [confirming, setConfirming] = useState(false)
-  const { detail: chat, notFound, refetch } = useSessionChat(chatty ? session.id : undefined, conn, fetchChat)
+  const {
+    detail: chat,
+    notFound,
+    refetch,
+  } = useSessionChat(chatty ? session.id : undefined, conn, fetchChat)
   // Prompts the server took that the transcript has not shown yet; each leaves once the chat has one more copy of its text.
   // Each sits right after the message that was last when it was sent, so replies that stream in land below it.
   const [echoed, setEchoed] = useState<

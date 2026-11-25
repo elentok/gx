@@ -32,7 +32,7 @@ test("Interrupt replaces Send while Working, with the Working reason, and the bo
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull()
   expect(screen.getByRole("button", { name: "Interrupt" })).toBeTruthy()
   expect((await composerBox()).value).toBe("hi")
-  expect(screen.queryByText(/Send turns on when the session is idle/)).toBeNull()
+  expect(screen.queryByText(/Send turns on when the chat is idle/)).toBeNull()
 })
 
 test("a focus request focuses the prompt when the chat opens; without one it stays unfocused", async () => {
@@ -55,7 +55,7 @@ test("a focus request does not outlive its navigation: a chat with no composer l
     { pathname: "/agents/s-1", state: FOCUS_PROMPT_STATE },
     true,
   )
-  await screen.findByText("Chat works for Claude and Codex sessions only.")
+  await screen.findByText("Chat works for Claude and Codex chats only.")
   cleanup()
   render([session("s-2", "p")], "/agents/s-2", true, chatOf(chat()))
   const box = await composerBox()
@@ -70,7 +70,7 @@ test("the reason line names each state in order", async () => {
   expect(sendButton().disabled).toBe(true)
   cleanup()
   render([session("s-2", "p", { harness: "other" })], "/agents/s-2", true, chatOf(chat()))
-  expect(await screen.findByText("Sending works for Claude and Codex sessions only")).toBeTruthy()
+  expect(await screen.findByText("Sending works for Claude and Codex chats only")).toBeTruthy()
   cleanup()
   render(
     [session("s-3", "p", { status: { state: "exited" } })],
@@ -86,9 +86,7 @@ test("the reason line names each state in order", async () => {
     true,
     chatOf(chat()),
   )
-  expect(
-    await screen.findByText("Rate limited. Send turns on when the session is idle."),
-  ).toBeTruthy()
+  expect(await screen.findByText("Rate limited. Send turns on when the chat is idle.")).toBeTruthy()
 })
 
 test("Idle with text enables Send; accept clears the draft and the box", async () => {
@@ -186,7 +184,7 @@ test("a Codex session shows its chat, and Send follows the idle rule", async () 
   await type("hi")
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull()
   expect(screen.getByRole("button", { name: "Interrupt" })).toBeTruthy()
-  expect(screen.queryByText(/Send turns on when the session is idle/)).toBeNull()
+  expect(screen.queryByText(/Send turns on when the chat is idle/)).toBeNull()
 })
 
 test("a harness with no chat loads no chat, shows the notice, Show screen opens the screen modal and the composer says why it is off", async () => {
@@ -202,9 +200,9 @@ test("a harness with no chat loads no chat, shows the notice, Show screen opens 
       return { kind: "ok", detail: { rows: ["$ codex"] } } as never
     },
   })
-  expect(await screen.findByText("Chat works for Claude and Codex sessions only.")).toBeTruthy()
+  expect(await screen.findByText("Chat works for Claude and Codex chats only.")).toBeTruthy()
   expect(chatCalls).toEqual([])
-  expect(screen.getByText("Sending works for Claude and Codex sessions only")).toBeTruthy()
+  expect(screen.getByText("Sending works for Claude and Codex chats only")).toBeTruthy()
   expect(sendButton().disabled).toBe(true)
   fireEvent.click(screen.getByRole("button", { name: "Show screen" }))
   expect((await screen.findByLabelText("Screen rows")).textContent).toBe("$ codex")
@@ -248,7 +246,7 @@ test.each([
     expect(banner.getByText(c.label)).toBeTruthy()
     expect(banner.queryAllByRole("button").map((b) => b.textContent)).toEqual(c.buttons)
     expect(screen.queryByRole("button", { name: "New chat" })).toBeNull()
-    expect(screen.getByText("Chat works for Claude and Codex sessions only.")).toBeTruthy()
+    expect(screen.getByText("Chat works for Claude and Codex chats only.")).toBeTruthy()
   },
 )
 
@@ -260,11 +258,11 @@ test.each(["auth", "stalled"])(
       "/agents/s-2",
       true,
     )
-    await screen.findByText("Chat works for Claude and Codex sessions only.")
+    await screen.findByText("Chat works for Claude and Codex chats only.")
     expect(screen.queryByRole("region", { name: "Session failure" })).toBeNull()
     cleanup()
     render([session("s-2", "p", { harness: "other" })], "/agents/s-2", true)
-    await screen.findByText("Chat works for Claude and Codex sessions only.")
+    await screen.findByText("Chat works for Claude and Codex chats only.")
     expect(screen.queryByRole("region", { name: "Session failure" })).toBeNull()
   },
 )
@@ -355,7 +353,7 @@ const failureCases: {
     label: "Rate limited",
     text: "resets at 5pm",
     buttons: [],
-    reason: "Rate limited. Send turns on when the session is idle.",
+    reason: "Rate limited. Send turns on when the chat is idle.",
     sendOff: true,
   },
 ]

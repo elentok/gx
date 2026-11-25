@@ -211,7 +211,7 @@ test("an exited chat has no Stop; Remove asks first, then removes and reports", 
   expect(labels()).not.toContain("Stop")
   expect(labels().at(-1)).toBe("Remove")
   fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }))
-  expect((await screen.findByText("Remove talk? Its session is deleted.")).textContent).toBeTruthy()
+  expect((await screen.findByText("Remove talk? Its chat is deleted.")).textContent).toBeTruthy()
   expect(postRemoveSession).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole("button", { name: /^Remove/ }))
   await waitFor(() =>

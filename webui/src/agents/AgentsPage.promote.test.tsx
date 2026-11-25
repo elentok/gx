@@ -66,7 +66,7 @@ describe.each([true, false])("wide=%s", (wide) => {
     await screen.findByText("hello there")
     expect(disabled(await findPromote())).toBe(true)
     expect(
-      screen.getAllByText("Working. Send turns on when the session is idle.").length,
+      screen.getAllByText("Working. Send turns on when the chat is idle.").length,
     ).toBeGreaterThan(0)
   })
 

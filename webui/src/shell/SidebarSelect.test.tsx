@@ -413,7 +413,7 @@ test("a chat and a draft share one confirmation, and Remove calls both removes o
   fireEvent.click(box("Select Landing page"))
   fireEvent.click(bar().getByRole("button", { name: "Remove 2" }))
   const dialog = await screen.findByRole("alertdialog")
-  expect(dialog.textContent).toContain("Their sessions are deleted.")
+  expect(dialog.textContent).toContain("Their chats are deleted.")
   expect(dialog.textContent).toContain("A draft's prompt and images are deleted.")
   fireEvent.click(within(dialog).getByRole("button", { name: /^Remove 2/ }))
   await waitFor(() => expect(ctl.calls).toHaveLength(2))

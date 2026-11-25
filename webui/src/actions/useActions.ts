@@ -65,7 +65,7 @@ import {
   type ConfirmRequest,
   type SurfaceContext,
 } from "./confirmRequest"
-import { isDraftEntity, type Entity } from "./entity"
+import { isDraftEntity, isPlainChat, type Entity } from "./entity"
 import { actionById, menuActions, type ActionDecl, type Group } from "./registry"
 
 export interface ActionWriters extends ItemWriters {
@@ -300,14 +300,15 @@ export function useActions(entity: Entity | undefined, ctx: ActionContext) {
     if (!s) return
     const name = s.name || s.id
     const exited = s.status.state === "exited"
+    const gone = isPlainChat(e) ? "chat" : "agent"
     ask(decl, e, {
       confirmLabel: "Remove",
       title: `Remove ${name}`,
       body: {
         lines: [
           exited
-            ? `Remove ${name}? Its session is deleted.`
-            : `Stop and remove ${name}? Its session is deleted.`,
+            ? `Remove ${name}? Its ${gone} is deleted.`
+            : `Stop and remove ${name}? Its ${gone} is deleted.`,
         ],
       },
       onConfirm: () =>

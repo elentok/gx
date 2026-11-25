@@ -235,7 +235,12 @@ test("Remove asks to stop and remove a live chat, only remove an exited one, the
   const done = session("c2", "p", { name: "Done", status: { state: "exited" } })
   const b = setup({ kind: "chat", key: "c2", name: "Done", session: done })
   act(() => b.act1("remove").run())
-  expect(currentConfirm()?.body.lines[0]).toBe("Remove Done? Its session is deleted.")
+  expect(currentConfirm()?.body.lines[0]).toBe("Remove Done? Its chat is deleted.")
+  closeConfirm()
+  const fix = session("c3", "p", { name: "Fixer", status: { state: "exited" } })
+  const c = setup({ kind: "chat", key: "c3", name: "Fixer", session: fix, agent: "fix" })
+  act(() => c.act1("remove").run())
+  expect(currentConfirm()?.body.lines[0]).toBe("Remove Fixer? Its agent is deleted.")
 })
 
 test("Remove on an empty draft or chat draft deletes at once; a full or unreadable one asks", async () => {

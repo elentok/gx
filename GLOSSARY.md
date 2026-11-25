@@ -389,7 +389,8 @@ investigate agent decides. _Avoid_: zombie.
 
 **Interactive session** — a session a person starts and types into from the Agents tab, rather than
 one the loop launches for an iteration. `gx server` keeps it alive while no TUI is open. _Avoid_:
-"chat", "agent" alone (an agent is the program in the session, not the session).
+"agent" alone (an agent is the program in the session, not the session). A plain interactive
+session is a **Chat session**.
 
 **Restore (interactive session)** — relaunch an Exited interactive session on its latest
 conversation, in the same dir, keeping the same session (name, Unread, Actionable). A person does it

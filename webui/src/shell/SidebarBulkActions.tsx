@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react"
 import { useRef, useState, type MouseEvent } from "react"
 import { bulkRequest } from "../actions/bulkPlan"
+import { agentKindOf } from "../actions/entity"
 import { isDraftEmpty } from "../actions/draftEmpty"
 import { openConfirm, type ConfirmBody } from "../actions/confirmRequest"
 import { bulkConfirms, bulkDecl } from "../actions/registry"
@@ -234,7 +235,13 @@ export function SidebarBulkActions({
         body: {
           ...req.body,
           lines: [
-            ...(sessions.length > 0 ? ["Their sessions are deleted."] : []),
+            ...(sessions.length > 0
+              ? [
+                  sessions.every((s) => agentKindOf(s) === "chat")
+                    ? "Their chats are deleted."
+                    : "Their chats and agents are deleted.",
+                ]
+              : []),
             ...(live.length > 0
               ? [`Live and stopped first: ${live.map((s) => sel.nameOf(s.id)).join(", ")}.`]
               : []),

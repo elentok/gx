@@ -606,7 +606,7 @@ test("removing the open chat from its row confirms, then leaves its page", async
   fireEvent.click(within(chat.closest("li")!).getByRole("button", { name: "More actions" }))
   fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }))
   expect(
-    (await screen.findByText("Stop and remove talk? Its session is deleted.")).textContent,
+    (await screen.findByText("Stop and remove talk? Its chat is deleted.")).textContent,
   ).toBeTruthy()
   expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/v1/sessions/remove"))).toBe(false)
   expect(screen.getByRole("alertdialog")).toBeTruthy()
@@ -674,9 +674,9 @@ test("Alt with a chat's Remove confirmation open leaves it open", async () => {
   const chat = await body().findByRole("link", { name: /^Chat talk/ })
   fireEvent.click(within(chat.closest("li")!).getByRole("button", { name: "More actions" }))
   fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }))
-  await screen.findByText("Stop and remove talk? Its session is deleted.")
+  await screen.findByText("Stop and remove talk? Its chat is deleted.")
   altDown()
-  expect(screen.getByText("Stop and remove talk? Its session is deleted.")).toBeTruthy()
+  expect(screen.getByText("Stop and remove talk? Its chat is deleted.")).toBeTruthy()
   altUp()
 })
 
