@@ -43,6 +43,26 @@ function useHeld<T>(fetched: T | undefined, scope: string | null): T | undefined
   return held?.scope === scope ? held.value : undefined
 }
 
+/** What the page shows for the diff's source: a ref range, or a worktree against its base. */
+export type DiffSource = {
+  chip:
+    | { kind: "range"; base: string; tip: string }
+    | { kind: "worktree"; target: string; since?: string }
+  firstLabel: string
+  secondLabel: string
+  emptyText: string
+  /** Refs can be edited in the page. */
+  canEdit: boolean
+  /** The source's own call failed. */
+  failed: boolean
+  /** The source's own call has not answered yet. */
+  pending: boolean
+  target: string
+  /** Untracked files the snapshot skipped. */
+  leftOut: number
+  uncommitted: boolean
+}
+
 /** The data side of the Diff page: the range's files and commits, and the files narrowed to chosen commits. */
 export function useDiffData(
   url: DiffUrl,
@@ -155,7 +175,36 @@ export function useDiffData(
     heldScope,
   )
 
+  const targetName = answer?.target_label || (worktree?.id ?? "")
+  const source: DiffSource = worktree
+    ? {
+        chip: { kind: "worktree", target: targetName, since: answer?.base_label },
+        firstLabel: answer?.base_label ?? "",
+        secondLabel: "the worktree",
+        emptyText: `No changes since ${answer?.base_label ?? ""}`,
+        canEdit: false,
+        // A worktree call that failed has no files to show, whatever an older answer left behind.
+        failed: !!worktreeFetch && "failed" in worktreeFetch,
+        pending: !!project && !worktreeFetch,
+        target: targetName,
+        leftOut: noWorktree ? 0 : (answer?.left_out ?? 0),
+        uncommitted: !!answer?.uncommitted,
+      }
+    : {
+        chip: { kind: "range", base: url.first, tip: url.second },
+        firstLabel: url.first,
+        secondLabel: url.second,
+        emptyText: `Nothing differs between ${url.first} and ${url.second}.`,
+        canEdit: true,
+        failed: false,
+        pending: false,
+        target: "",
+        leftOut: 0,
+        uncommitted: false,
+      }
+
   return {
+    source,
     canFetch,
     worktreeFetch,
     noWorktree,

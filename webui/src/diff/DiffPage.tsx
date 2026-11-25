@@ -33,7 +33,7 @@ import { CommitList, TRUNCATED_TEXT } from "./CommitList"
 import type { DiffView } from "./DiffBody"
 import { DiffFileCard, type PatchRange } from "./DiffFileCard"
 import { diffQuery, parseDiffUrl } from "./diffUrl"
-import { useDiffData } from "./useDiffData"
+import { type DiffSource, useDiffData } from "./useDiffData"
 import { readView, writeView } from "./viewPref"
 
 export type { DiffView }
@@ -151,7 +151,7 @@ function Notice({
   )
 }
 
-function RangeChip({ base, tip }: { base: string; tip: string }) {
+function Chip({ children }: { children: ReactNode }) {
   return (
     <Box
       data-testid="range-chip"
@@ -167,54 +167,48 @@ function RangeChip({ base, tip }: { base: string; tip: string }) {
       minW="0"
       maxW="100%"
     >
-      <Box as="span" fontFamily="mono" fontSize="xs" truncate minW="0">
-        {base}
-      </Box>
-      <Box as="span" aria-hidden="true" color="text.faint">
-        →
-      </Box>
-      <Box as="span" fontFamily="mono" fontSize="xs" color="text" truncate minW="0">
-        {tip}
-      </Box>
+      {children}
     </Box>
   )
 }
 
-function WorktreeChip({ target, label }: { target: string; label: string | undefined }) {
+function SourceChip({ chip }: { chip: DiffSource["chip"] }) {
+  if (chip.kind === "range") {
+    return (
+      <Chip>
+        <Box as="span" fontFamily="mono" fontSize="xs" truncate minW="0">
+          {chip.base}
+        </Box>
+        <Box as="span" aria-hidden="true" color="text.faint">
+          →
+        </Box>
+        <Box as="span" fontFamily="mono" fontSize="xs" color="text" truncate minW="0">
+          {chip.tip}
+        </Box>
+      </Chip>
+    )
+  }
   return (
-    <Box
-      data-testid="range-chip"
-      display="inline-flex"
-      alignItems="center"
-      gap="1.5"
-      h="28px"
-      px="3"
-      borderRadius="full"
-      bg="surface.raised"
-      color="text.muted"
-      fontSize="sm"
-      minW="0"
-      maxW="100%"
-    >
+    <Chip>
       <Box as="span" color="kind.implementation.fg">
         Worktree
       </Box>{" "}
       <Box as="span">·</Box>{" "}
       <Box as="span" color="text" truncate minW="0">
-        {target}
+        {chip.target}
       </Box>
-      {label && (
+      {chip.since && (
         <>
           {" "}
           <Box as="span" color="text.faint">
             since
           </Box>{" "}
           <Box as="span" fontFamily="mono" fontSize="xs" truncate minW="0">
-            {label}
+            {chip.since}
           </Box>
         </>
       )}
-    </Box>
+    </Chip>
   )
 }
 
@@ -421,12 +415,9 @@ function noWorktreeText(target: string, reason: string) {
 function noticeOf(
   loaded: Loaded | undefined,
   noRange: boolean,
-  first: string,
-  second: string,
+  source: DiffSource,
   onRetry: () => void,
   noWorktree?: { target: string; reason: string },
-  /** Worktree mode: `first` is the chip's base text and the empty text names it. */
-  sinceBase = false,
 ): { notice: ReactNode; files: number | null; invalid?: "first" | "second" } {
   if (noWorktree) {
     return {
@@ -470,7 +461,7 @@ function noticeOf(
   }
   const result = loaded.value
   if (result.kind === "unknown-ref") {
-    const name = result.side === "first" ? first : second
+    const name = result.side === "first" ? source.firstLabel : source.secondLabel
     return {
       notice: (
         <Notice kind="unknown-ref" tone="deadlocked" title={`Unknown ref "${name}"`}>
@@ -501,7 +492,7 @@ function noticeOf(
     return {
       notice: (
         <Notice kind="no-common-history" tone="muted" title="No common history">
-          {`${first} and ${second} share no ancestor, so there is nothing to compare.`}
+          {`${source.firstLabel} and ${source.secondLabel} share no ancestor, so there is nothing to compare.`}
         </Notice>
       ),
       files: null,
@@ -511,9 +502,7 @@ function noticeOf(
     return {
       notice: (
         <Notice kind="no-changes" tone="muted" title="No changes">
-          {sinceBase
-            ? `No changes since ${first}`
-            : `Nothing differs between ${first} and ${second}.`}
+          {source.emptyText}
         </Notice>
       ),
       files: 0,
@@ -554,8 +543,8 @@ export function DiffPage({
 
   const { project, first, second, worktree } = url
   const {
+    source,
     canFetch,
-    worktreeFetch,
     noWorktree,
     answer,
     refetch,
@@ -576,21 +565,14 @@ export function DiffPage({
 
   const noRange = !worktree && !!url.epic && !first && !second
   const fresh = canFetch ? loaded : undefined
-  const targetName = answer?.target_label || (worktree?.id ?? "")
-  const worktreeFailed = !!worktree && !!worktreeFetch && "failed" in worktreeFetch
-  // A worktree call that failed has no files to show, whatever an older answer left behind.
   const { notice, files, invalid } = noticeOf(
-    worktreeFailed ? { failed: true } : fresh,
+    source.failed ? { failed: true } : fresh,
     noRange,
-    worktree ? (answer?.base_label ?? "") : first,
-    worktree ? "the worktree" : second,
+    source,
     refetch,
-    noWorktree && answer?.reason ? { target: targetName, reason: answer.reason } : undefined,
-    !!worktree,
+    noWorktree && answer?.reason ? { target: source.target, reason: answer.reason } : undefined,
   )
-  const leftOut = worktree && !noWorktree ? (answer?.left_out ?? 0) : 0
-  const worktreePending = !!worktree && !!project && !worktreeFetch
-  const settled = noRange || (!canFetch && !worktreePending) || !!fresh || worktreeFailed
+  const settled = noRange || (!canFetch && !source.pending) || !!fresh || source.failed
   useReadyWhen(settled, "ready", "network")
 
   const inputsOpen = editing || !first || !second || !!invalid
@@ -634,11 +616,9 @@ export function DiffPage({
               alignItems="center"
               gap="3"
               minW="0"
-              flex={worktree ? "1 1 260px" : "1 1 0"}
+              flex={source.canEdit ? "1 1 0" : "1 1 260px"}
             >
-              {worktree ? (
-                <WorktreeChip target={targetName} label={answer?.base_label} />
-              ) : inputsOpen ? (
+              {source.canEdit && inputsOpen ? (
                 <>
                   <RefInput
                     phone={device === "phone"}
@@ -661,9 +641,9 @@ export function DiffPage({
                   />
                 </>
               ) : (
-                <RangeChip base={first} tip={second} />
+                <SourceChip chip={source.chip} />
               )}
-              {!worktree && (
+              {source.canEdit && (
                 <chakra.button
                   type="button"
                   onClick={() => (editing ? closeEdit() : setEditing(true))}
@@ -681,12 +661,12 @@ export function DiffPage({
         />
       </Box>
       {notice}
-      {leftOut > 0 && (
+      {source.leftOut > 0 && (
         <Notice kind="untracked-skipped" tone="waiting" title="Untracked files not shown">
-          {`Untracked files not shown (${leftOut}). Add them to .gitignore or commit them.`}
+          {`Untracked files not shown (${source.leftOut}). Add them to .gitignore or commit them.`}
         </Notice>
       )}
-      {((canFetch && !fresh && !noRange) || worktreePending) && (
+      {((canFetch && !fresh && !noRange) || source.pending) && (
         <FullScreenLoader label="Loading diff" />
       )}
       {loadedFiles && shown ? (
@@ -697,7 +677,7 @@ export function DiffPage({
           commitList={
             returned && (
               <CommitList
-                uncommitted={!!worktree && !!answer?.uncommitted}
+                uncommitted={source.uncommitted}
                 groups={groups}
                 count={returned.commits.length}
                 truncated={returned.truncated}
