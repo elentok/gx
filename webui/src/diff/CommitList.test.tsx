@@ -111,6 +111,58 @@ test("All commits restores the full tree, clears the URL and takes the highlight
   expect(current().textContent).toBe("All commits5")
 })
 
+const WT = "/diff?project=gx&worktree=ticket:gx:e-impl/03"
+function openWorktree(uncommitted: boolean) {
+  const fetchFiles = vi.fn(filesForCommits)
+  const router = renderDiff(WT, {
+    diffFiles: fetchFiles,
+    diffPatch: async () => "p",
+    diffCommits: async () => ({ commits: COMMITS, truncated: false }),
+    diffCommitPatches: async () => [],
+    diffWorktree: async () => ({
+      base_sha: "base1",
+      base_label: "main@base1",
+      head_sha: "head1",
+      snapshot_sha: "snap1",
+      uncommitted,
+    }),
+    epic: noEpic,
+    archivedEpic: noEpic,
+  })
+  return { fetchFiles, router }
+}
+const rows = () => within(screen.getByTestId("commits-disclosure")).getAllByRole("button")
+
+test("with uncommitted changes the opened list ends with a waiting Uncommitted changes row, not counted", async () => {
+  openWorktree(true)
+  await disclosure()
+  expect(toggle().textContent).toContain("5 commits")
+  fireEvent.click(toggle())
+  const last = rows()[rows().length - 1]
+  expect(last.textContent).toBe("·······Uncommitted changes")
+  expect(getComputedStyle(last).color).not.toBe(getComputedStyle(rows()[1]).color)
+})
+
+test("without uncommitted changes there is no such row", async () => {
+  openWorktree(false)
+  await disclosure()
+  fireEvent.click(toggle())
+  expect(screen.queryByText("Uncommitted changes")).toBeNull()
+})
+
+test("picking the row narrows to HEAD..snapshot with the fixed word, and All commits clears it", async () => {
+  const { fetchFiles, router } = openWorktree(true)
+  await disclosure()
+  fireEvent.click(toggle())
+  pick(/Uncommitted changes/)
+  await waitFor(() => expect(fetchFiles).toHaveBeenLastCalledWith("gx", "head1", "snap1"))
+  expect(router.state.location.search).toContain("commits=uncommitted")
+  expect(current().textContent).toContain("Uncommitted changes")
+  pick(/^All commits/)
+  await waitFor(() => expect(router.state.location.search).not.toContain("commits="))
+  expect(current().textContent).toBe("All commits5")
+})
+
 test("a truncated commit list says so in the disclosure", async () => {
   open(true)
   await disclosure()

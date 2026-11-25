@@ -9,6 +9,12 @@ export interface WorktreeTarget {
   id: string
 }
 
+/**
+ * The narrowing to the changes between HEAD and the snapshot, spelled as the one entry of `commits`.
+ * It cannot be a SHA: each refetch builds a new snapshot.
+ */
+export const UNCOMMITTED = "uncommitted"
+
 export const worktreeValue = (t: WorktreeTarget) => `${t.kind}:${t.id}`
 
 function parseWorktree(v: string): WorktreeTarget | undefined {

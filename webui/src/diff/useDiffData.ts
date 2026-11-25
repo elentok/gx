@@ -4,7 +4,7 @@ import { useLatest } from "../hooks"
 import { useKeyedFetch } from "../useKeyedFetch"
 import type { FetchDiffCommits, FetchDiffFiles, FetchDiffWorktree } from "./api"
 import { groupCommits } from "./commitGroups"
-import { type DiffUrl, worktreeValue } from "./diffUrl"
+import { type DiffUrl, UNCOMMITTED, worktreeValue } from "./diffUrl"
 
 /** Ticket titles by address: the epic's rows, or its archived detail when the epic is archived. */
 function useTicketTitles(
@@ -101,9 +101,13 @@ export function useDiffData(
     [returned, urlCommits, url.ticket],
   )
   const narrowing = useMemo(
-    () => (returned ? wanted?.filter((s) => returned.commits.some((c) => c.sha === s)) : wanted),
+    () =>
+      returned
+        ? wanted?.filter((s) => s === UNCOMMITTED || returned.commits.some((c) => c.sha === s))
+        : wanted,
     [returned, wanted],
   )
+  const uncommittedPicked = !!worktree && narrowing?.length === 1 && narrowing[0] === UNCOMMITTED
   const emptyNarrowing = !!wanted && !commitsPending && narrowing?.length === 0
   const groups = useMemo(
     () => (returned ? groupCommits(returned.commits, url.epic, titles) : []),
@@ -114,13 +118,17 @@ export function useDiffData(
     canFetch && narrowing?.length && !commitsPending ? `${key}\n${narrowing.join(",")}` : null
   const narrowedFetch = useKeyedFetch(
     narrowedKey,
-    () => fetchFiles(project, first, second, narrowing),
+    () =>
+      uncommittedPicked
+        ? fetchFiles(project, answer?.head_sha ?? "", second)
+        : fetchFiles(project, first, second, narrowing),
     refresh,
   )
-  const narrowedFiles =
+  const narrowedResult =
     narrowedFetch && "value" in narrowedFetch && narrowedFetch.value.kind === "files"
-      ? narrowedFetch.value.files.files
-      : []
+      ? narrowedFetch.value.files
+      : undefined
+  const narrowedFiles = narrowedResult?.files ?? []
 
   const files = useKeyedFetch(
     canFetch ? key : null,
@@ -141,5 +149,8 @@ export function useDiffData(
     emptyNarrowing,
     groups,
     narrowedFiles,
+    uncommittedPicked,
+    /** The SHAs the patch calls use while the uncommitted row is picked. */
+    uncommittedRange: uncommittedPicked && narrowedResult ? narrowedResult : undefined,
   }
 }

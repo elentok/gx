@@ -2,7 +2,9 @@ import { Box, chakra } from "@chakra-ui/react"
 import { useState } from "react"
 import type { DiffCommit } from "../generated/server"
 import type { CommitGroup } from "./commitGroups"
+import { UNCOMMITTED } from "./diffUrl"
 
+export const UNCOMMITTED_LABEL = "Uncommitted changes"
 export const TRUNCATED_TEXT = "Showing the first 500 commits"
 export const ALL_COMMITS = "All commits"
 
@@ -25,11 +27,13 @@ function Row({
   active,
   onClick,
   indent = false,
+  waiting = false,
   children,
 }: {
   active: boolean
   onClick: () => void
   indent?: boolean
+  waiting?: boolean
   children: React.ReactNode
 }) {
   return (
@@ -40,7 +44,7 @@ function Row({
       {...rowProps}
       pl={indent ? "6" : "2"}
       bg={active ? "tone.running.bg" : "transparent"}
-      color={active ? "text" : "text.muted"}
+      color={waiting ? "tone.waiting.fg" : active ? "text" : "text.muted"}
       _hover={{ color: "text" }}
     >
       {children}
@@ -98,10 +102,13 @@ export function CommitList({
   truncated,
   narrowing,
   onNarrow,
+  uncommitted = false,
 }: {
   groups: CommitGroup[]
   count: number
   truncated: boolean
+  /** Worktree mode with changes since HEAD: adds the last row. It is not part of `count`. */
+  uncommitted?: boolean
   narrowing: string[] | undefined
   onNarrow: (shas: string[] | undefined) => void
 }) {
@@ -182,6 +189,28 @@ export function CommitList({
               </Box>
             )
           })}
+          {uncommitted && (
+            <Box mt="3">
+              <Row
+                waiting
+                active={isNarrowed([UNCOMMITTED])}
+                onClick={() => onNarrow([UNCOMMITTED])}
+              >
+                <Box
+                  as="span"
+                  aria-hidden="true"
+                  fontFamily="mono"
+                  fontSize="xs"
+                  color="text.faint"
+                >
+                  {"·······"}
+                </Box>
+                <Box as="span" flex="1" minW="0">
+                  {UNCOMMITTED_LABEL}
+                </Box>
+              </Row>
+            </Box>
+          )}
         </Box>
       )}
     </Box>

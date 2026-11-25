@@ -421,6 +421,8 @@ function noticeOf(
   second: string,
   onRetry: () => void,
   noWorktree?: { target: string; reason: string },
+  /** Worktree mode: `first` is the chip's base text and the empty text names it. */
+  sinceBase = false,
 ): { notice: ReactNode; files: number | null; invalid?: "first" | "second" } {
   if (noWorktree) {
     return {
@@ -505,7 +507,9 @@ function noticeOf(
     return {
       notice: (
         <Notice kind="no-changes" tone="muted" title="No changes">
-          {`Nothing differs between ${first} and ${second}.`}
+          {sinceBase
+            ? `No changes since ${first}`
+            : `Nothing differs between ${first} and ${second}.`}
         </Notice>
       ),
       files: 0,
@@ -558,6 +562,8 @@ export function DiffPage({
     emptyNarrowing,
     groups,
     narrowedFiles,
+    uncommittedPicked,
+    uncommittedRange,
   } = useDiffData(url, { fetchFiles, fetchCommits, fetchWorktree, fetchEpic, fetchArchivedEpic })
 
   useEffect(() => {
@@ -576,7 +582,9 @@ export function DiffPage({
     worktree ? "the worktree" : second,
     refetch,
     noWorktree && answer?.reason ? { target: targetName, reason: answer.reason } : undefined,
+    !!worktree,
   )
+  const leftOut = worktree && !noWorktree ? (answer?.left_out ?? 0) : 0
   const worktreePending = !!worktree && !!project && !worktreeFetch
   const settled = noRange || (!canFetch && !worktreePending) || !!fresh || worktreeFailed
   useReadyWhen(settled, "ready", "network")
@@ -669,16 +677,22 @@ export function DiffPage({
         />
       </Box>
       {notice}
+      {leftOut > 0 && (
+        <Notice kind="untracked-skipped" tone="waiting" title="Untracked files not shown">
+          {`Untracked files not shown (${leftOut}). Add them to .gitignore or commit them.`}
+        </Notice>
+      )}
       {((canFetch && !fresh && !noRange) || worktreePending) && (
         <FullScreenLoader label="Loading diff" />
       )}
       {loadedFiles && shown ? (
         <FilesBrowser
           files={shown}
-          commits={wanted ? narrowing : undefined}
+          commits={wanted && !uncommittedPicked ? narrowing : undefined}
           commitList={
             returned && (
               <CommitList
+                uncommitted={!!worktree && !!answer?.uncommitted}
                 groups={groups}
                 count={returned.commits.length}
                 truncated={returned.truncated}
@@ -691,8 +705,8 @@ export function DiffPage({
           fetchCommitPatches={fetchCommitPatches}
           range={{
             project,
-            firstSha: loadedFiles.first_sha,
-            secondSha: loadedFiles.second_sha,
+            firstSha: (uncommittedRange ?? loadedFiles).first_sha,
+            secondSha: (uncommittedRange ?? loadedFiles).second_sha,
           }}
           fetchPatch={fetchPatch}
           fetchBlob={fetchBlob}

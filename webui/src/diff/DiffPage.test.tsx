@@ -672,6 +672,40 @@ test("worktree mode: the chip names target and base, and every call gets the rou
   expect(fetchPatch).toHaveBeenCalledWith("p", "a", "b", "a.go")
 })
 
+test("worktree mode: narrowing to Uncommitted changes asks files for HEAD and the snapshot, and a rerender from the URL keeps it", async () => {
+  const fetchFiles = vi.fn<FetchDiffFiles>(async (_p, first) =>
+    first === "head1" ? named("only-uncommitted.go") : named("a.go", "b.go"),
+  )
+  render(`${WORKTREE}&commits=uncommitted`, fetchFiles, undefined, undefined, {
+    diffWorktree: async () => snap(1),
+  })
+  await waitFor(() => expect(treePaths()).toEqual(["only-uncommitted.go+1"]))
+  expect(fetchFiles).toHaveBeenCalledWith("p", "head1", "snap1")
+})
+
+test("worktree mode: skipped untracked files show a notice and the tracked files stay", async () => {
+  render(WORKTREE, async () => named("a.go"), undefined, undefined, {
+    diffWorktree: async () => ({ ...snap(1), left_out: 3 }),
+  })
+  const notice = await screen.findByTestId("notice")
+  expect(notice.textContent).toContain(
+    "Untracked files not shown (3). Add them to .gitignore or commit them.",
+  )
+  await waitFor(() => expect(treePaths()).toEqual(["a.go+1"]))
+})
+
+test("worktree mode: an empty answer says No changes since the base; ref mode keeps its text", async () => {
+  render(WORKTREE, async () => files(0), undefined, undefined, {
+    diffWorktree: async () => snap(1),
+  })
+  expect((await screen.findByTestId("notice")).textContent).toContain("No changes since main@base1")
+  cleanup()
+  render(OPEN, async () => files(0))
+  expect((await screen.findByTestId("notice")).textContent).toContain(
+    "Nothing differs between main and dev.",
+  )
+})
+
 test("worktree mode: a no-worktree reason shows an empty state naming the target and fetches nothing", async () => {
   const fetchFiles = vi.fn<FetchDiffFiles>(async () => named("a.go"))
   const fetchCommits = vi.fn(async () => ({ commits: [], truncated: false }))
