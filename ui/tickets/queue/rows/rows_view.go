@@ -40,10 +40,10 @@ func (r Rows) RenderOpts(env RowsEnv, width int) tree.RenderOpts[Node] {
 			case NodeEpicSeparator:
 				return ""
 			case NodeEpicName:
-				_, _, fill := h.EpicStatus(entry.Value.Epic)
+				_, _, fill := h.EpicStatus(entry.Value.Epic, 0)
 				return header.EpicNameLine(entry.Value.Epic.Name, h.Summaries[entry.Value.Epic.Name], fill, entry.Value.Layout, env.LabelWidth)
 			case NodeEpicBar:
-				_, _, fill := h.EpicStatus(entry.Value.Epic)
+				_, _, fill := h.EpicStatus(entry.Value.Epic, 0)
 				return header.EpicBarLine(h.Summaries[entry.Value.Epic.Name], fill, entry.Value.Layout)
 			case NodeEpicSpacer:
 				return ""

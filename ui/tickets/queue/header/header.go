@@ -3,6 +3,7 @@
 package header
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 	"time"
@@ -51,7 +52,47 @@ var (
 	EpicStatusPausedRepairStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
 )
 
-// epicStateLabels must match LABELS in webui/src/view.ts.
+// blockerSuffixes labels a not-moving blocker state; any other state is moving
+// and gets no suffix. Paused-family labels match the Epics page.
+var blockerSuffixes = map[wire.EpicListState]string{
+	wire.EpicListReady:         "not queued",
+	wire.EpicListDraft:         "not queued",
+	wire.EpicListNoOpenTickets: "not queued",
+	wire.EpicListPaused:        "Paused",
+	wire.EpicListMergeBlocked:  wire.EpicReasonMergeBlocked,
+	wire.EpicListCIFailing:     wire.EpicReasonCIFailing,
+	wire.EpicListPRTextFailed:  wire.EpicReasonPRTextFailed,
+}
+
+// waitingOnText is "Waiting on A +N more (<why A is stuck>)". Only the name A
+// is cut to fit maxW (0 means no cut), so the count and the suffix stay whole.
+func waitingOnText(blockers []wire.EpicBlocker, maxW int) string {
+	if len(blockers) == 0 {
+		return epicStateLabels[wire.EpicStateWaitingOnEpic]
+	}
+	first := blockers[0]
+	name := cmp.Or(first.Name, first.Ref)
+	state, deadlocked := first.State, first.Deadlocked
+	if first.Hint != nil {
+		state, deadlocked = first.Hint.State, first.Hint.Deadlocked
+	}
+	var tail string
+	if len(blockers) > 1 {
+		tail = fmt.Sprintf(" +%d more", len(blockers)-1)
+	}
+	if deadlocked {
+		tail += " (Deadlocked)"
+	} else if label := blockerSuffixes[state]; label != "" {
+		tail += " (" + label + ")"
+	}
+	const prefix = "Waiting on "
+	if maxW > 0 {
+		name = ansi.Truncate(name, max(maxW-lipgloss.Width(prefix+tail), 1), "…")
+	}
+	return prefix + name + tail
+}
+
+// epicStateLabels must match STATE_LABELS in webui/src/view.ts.
 var epicStateLabels = map[wire.EpicState]string{
 	wire.EpicStatePaused:        "Paused",
 	wire.EpicStateRunning:       "Running",
@@ -68,8 +109,9 @@ var epicStateLabels = map[wire.EpicState]string{
 
 // epicStatusLine picks an epic header's status-line icon, text, and color from
 // the server's summary. The text is the state's label, plus the reason for a
-// deadlocked epic.
-func epicStatusLine(icons ui.IconSet, sum wire.EpicSummary, spinnerGlyph string) (icon, text string, style lipgloss.Style) {
+// deadlocked epic. maxW is the room for the text (0 means no cut); only the
+// blocker name of a Waiting epic is cut to fit it.
+func epicStatusLine(icons ui.IconSet, sum wire.EpicSummary, spinnerGlyph string, maxW int) (icon, text string, style lipgloss.Style) {
 	switch sum.State {
 	case wire.EpicStateAwaitingMerge, wire.EpicStateFinished, wire.EpicStateAwaitingPR, wire.EpicStatePROpen:
 		return icons.TicketDone, epicStateLabels[sum.State], epicStatusDoneStyle
@@ -82,7 +124,7 @@ func epicStatusLine(icons ui.IconSet, sum wire.EpicSummary, spinnerGlyph string)
 		}
 		return icons.EpicQueued, text, lipgloss.NewStyle()
 	case wire.EpicStateWaitingOnEpic:
-		return icons.EpicQueued, epicStateLabels[sum.State], lipgloss.NewStyle()
+		return icons.EpicQueued, waitingOnText(sum.Blockers, maxW), lipgloss.NewStyle()
 	case wire.EpicStatePaused:
 		text = epicStateLabels[sum.State]
 		if sum.Reason != "" {
@@ -127,9 +169,9 @@ type Header struct {
 
 // EpicStatus is epicStatusLine for an epic on the Queue tab, with the current
 // spinner frame filled in.
-func (h Header) EpicStatus(epic tickets.Epic) (icon, text string, style lipgloss.Style) {
+func (h Header) EpicStatus(epic tickets.Epic, maxW int) (icon, text string, style lipgloss.Style) {
 	glyph := strings.TrimRight(h.Spinner.View(), " ")
-	return epicStatusLine(h.Icons, h.Summaries[epic.Name], glyph)
+	return epicStatusLine(h.Icons, h.Summaries[epic.Name], glyph, maxW)
 }
 
 // epicElapsedSeconds sums the epic's tickets' done ElapsedTime, for the
@@ -307,8 +349,14 @@ func epicStatusParts(epic tickets.Epic, now time.Time, live map[string]rowfmt.Li
 // EpicStatusRow renders "Status: <icon> <state> · elapsed · agent · cost ·
 // n compact(s)", all dim except the state, zero parts hidden, cut at labelW.
 func (h Header) EpicStatusRow(epic tickets.Epic, labelW int) string {
-	icon, text, style := h.EpicStatus(epic)
-	line := " " + rowfmt.MetricsLineStyle.Render("Status:") + " " + style.Render(icon+" "+text)
+	prefix := " " + rowfmt.MetricsLineStyle.Render("Status:") + " "
+	room := 0
+	if labelW > 0 {
+		// Only the Waiting-on text uses the room, and its icon is EpicQueued.
+		room = max(labelW-lipgloss.Width(prefix+h.Icons.EpicQueued+" "), 1)
+	}
+	icon, text, style := h.EpicStatus(epic, room)
+	line := prefix + style.Render(icon+" "+text)
 	var live map[string]rowfmt.LiveTicketState
 	if h.RunningEpics[epic.Name] {
 		live = h.Live[epic.Name]

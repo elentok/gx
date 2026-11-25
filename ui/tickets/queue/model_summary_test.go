@@ -72,6 +72,22 @@ func TestQueueServerMode_HeaderReadsSummary(t *testing.T) {
 	}
 }
 
+func TestQueueServerMode_WaitingOnEpicShowsTheBlocker(t *testing.T) {
+	m := summaryQueue(t,
+		wire.EpicSummary{Address: "gx:alpha", Name: "alpha", State: wire.EpicStateWaitingOnEpic, Total: 1,
+			Blockers: []wire.EpicBlocker{{Name: "beta", State: wire.EpicListPaused}}},
+		wire.TicketInfo{Address: "gx:alpha/01", Title: "First", Status: "open"},
+	)
+
+	body := ansi.Strip(m.View().Content)
+	if !strings.Contains(body, "Waiting on beta (Paused)") {
+		t.Errorf("view lacks the Waiting on line:\n%s", body)
+	}
+	if strings.Contains(body, "Waiting for a slot") {
+		t.Errorf("a Waiting on epic must not read as a slot wait:\n%s", body)
+	}
+}
+
 func TestQueueServerMode_ShowsPauseReasonFromSummary(t *testing.T) {
 	m := summaryQueue(t,
 		wire.EpicSummary{
