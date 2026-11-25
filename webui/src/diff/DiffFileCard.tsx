@@ -13,52 +13,23 @@ export type PatchRange = { project: string; firstSha: string; secondSha: string 
 /** A whole-range patch has no label; a narrowed view has one part per commit, labelled by subject. */
 type PatchPart = { label?: string; text: string }
 
-const STATUS_TONE: Record<string, string> = { A: "done", D: "deadlocked" }
-
-function Header({ file }: { file: DiffFile }) {
+/** Sticks to the top of the diff pane; the tree row carries the status and counts. */
+function PathLine({ file }: { file: DiffFile }) {
   const renamed = !!file.old_path && file.old_path !== file.path
-  const slash = file.path.lastIndexOf("/") + 1
-  const name = renamed ? (
-    `${file.old_path} → ${file.path}`
-  ) : (
-    <>
-      <Box as="span" color="text.muted">
-        {file.path.slice(0, slash)}
-      </Box>
-      {file.path.slice(slash)}
-    </>
-  )
   return (
     <Box
-      data-testid="file-card-header"
-      display="flex"
-      alignItems="center"
-      gap="3"
-      px="3"
-      py="2"
-      borderBottom="1px solid"
-      borderColor="border"
-      bg="surface.raised"
+      data-testid="file-path"
+      position="sticky"
+      top="0"
+      zIndex="1"
+      bg="surface"
+      pb="2"
       fontFamily="mono"
       fontSize="sm"
+      color="text.muted"
+      overflowWrap="anywhere"
     >
-      <Box
-        as="span"
-        data-testid="file-status"
-        color={`tone.${STATUS_TONE[file.status] ?? "muted"}.fg`}
-        border="1px solid"
-        borderColor="currentColor"
-        borderRadius="full"
-        px="2"
-        fontSize="xs"
-      >
-        {file.status}
-      </Box>
-      <Box as="span" flex="1" minW="0" overflowWrap="anywhere" color="text">
-        {name}
-      </Box>
-      <Box as="span" color="tone.done.fg">{`+${file.added}`}</Box>
-      <Box as="span" color="tone.deadlocked.fg">{`−${file.deleted}`}</Box>
+      {renamed ? `${file.old_path} → ${file.path}` : file.path}
     </Box>
   )
 }
@@ -190,15 +161,8 @@ export function DiffFileCard(props: {
     body = <Body {...props} narrowed={narrowed} loadBlobs={loadBlobs} />
   }
   return (
-    <Box
-      data-testid="file-card"
-      data-file={file.path}
-      border="1px solid"
-      borderColor="border"
-      borderRadius="8px"
-      overflow="hidden"
-    >
-      <Header file={file} />
+    <Box data-testid="file-card" data-file={file.path}>
+      <PathLine file={file} />
       {body}
     </Box>
   )

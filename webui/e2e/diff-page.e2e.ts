@@ -217,6 +217,40 @@ test("Diff page", async ({ page, start }) => {
   await expect(area.getByText("// generated 25", { exact: false }).first()).toBeVisible()
   await page.getByTestId("file-filter").fill("")
 
+  // Independent scroll: at a short desktop window the page does not scroll, the diff pane does, the tree column stays put, the path line sticks to the pane's top and a file picked low in the tree starts at the top. Whether the loaded big file overflows the pane is read in the run, so all boxes come from one poll.
+  await page.setViewportSize({ width: 1200, height: 320 })
+  const pane = page.getByTestId("diff-pane")
+  const left = page.getByTestId("diff-left")
+  const pathLine = page.getByTestId("file-path")
+  await expect(pathLine).toHaveText(BIG_FILE)
+  await expect(pane).toBeVisible()
+  await expect(left).toBeVisible()
+  const read = async () => {
+    // The earlier click may have scrolled the tree to its row; only the pane's own scroll is under test.
+    await left.evaluate((el) => (el.scrollTop = 0))
+    await pane.evaluate((el) => (el.scrollTop = 10))
+    return page.evaluate(() => {
+      const box = (id: string) => document.querySelector(`[data-testid="${id}"]`)!
+      const pane = box("diff-pane")
+      return {
+        docOverflow: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+        paneScroll: pane.scrollTop,
+        leftScroll: box("diff-left").scrollTop,
+        lineTop: box("file-path").getBoundingClientRect().top - pane.getBoundingClientRect().top,
+      }
+    })
+  }
+  await expect
+    .poll(read)
+    .toEqual({ docOverflow: expect.any(Number), paneScroll: 10, leftScroll: 0, lineTop: 0 })
+  expect((await read()).docOverflow).toBeLessThanOrEqual(0)
+  await treeFiles(page).last().click()
+  await expect(area).not.toHaveAttribute("data-file", BIG_FILE)
+  await expect(pathLine).toHaveText((await area.getAttribute("data-file"))!)
+  await expect.poll(() => pane.evaluate((el) => el.scrollTop)).toBe(0)
+  await expect(left).toBeVisible()
+  await page.setViewportSize({ width: 1200, height: 900 })
+
   // Entry 5: a done ticket's page opens the epic's Diff page narrowed to it; the commitless one has no link.
   await go(page, `#/t/${EPIC}/01`)
   await page.getByRole("link", { name: "View diff" }).click()
@@ -258,6 +292,24 @@ test("Diff page", async ({ page, start }) => {
     client: document.documentElement.clientWidth,
   }))
   expect(widths.scroll).toBeLessThanOrEqual(widths.client)
+
+  // At a short phone window each tab scrolls on its own and the document never does.
+  await page.setViewportSize({ width: 390, height: 300 })
+  const scrolls = (id: string) =>
+    page.evaluate((testId) => {
+      const el = document.querySelector(`[data-testid="${testId}"]`)!
+      el.scrollTop = 30
+      return {
+        own: el.scrollTop,
+        doc: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+      }
+    }, id)
+  await page.getByRole("tab", { name: /^Files/ }).click()
+  await expect.poll(() => scrolls("diff-left")).toEqual({ own: 30, doc: expect.any(Number) })
+  expect((await scrolls("diff-left")).doc).toBeLessThanOrEqual(0)
+  await treeFiles(page).filter({ hasText: "long.go" }).click()
+  await expect.poll(() => scrolls("diff-pane")).toEqual({ own: 30, doc: expect.any(Number) })
+  expect((await scrolls("diff-pane")).doc).toBeLessThanOrEqual(0)
   await page.setViewportSize({ width: 1200, height: 900 })
 
   // Entry 3: each running epic's link opens its derived refs; the quiet epic has none.

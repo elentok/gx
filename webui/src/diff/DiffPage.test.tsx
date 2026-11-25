@@ -315,7 +315,7 @@ test("a filter that matches nothing selects no file and says so", async () => {
   expect(selectedPath()).toBeNull()
   expect(screen.getByTestId("no-files").textContent).toBe("No files in this selection.")
   expect(screen.getByTestId("file-tree").textContent).toBe('No files match "zzzz".')
-  expect(screen.queryByTestId("file-card-header")).toBeNull()
+  expect(screen.queryByTestId("file-path")).toBeNull()
 })
 
 test("the selected file is in the URL and a fresh render from that URL picks it", async () => {
@@ -337,6 +337,9 @@ test("on a phone the Files and Diff tabs show one pane each and picking a file o
   fireEvent.click(screen.getAllByTestId("tree-file")[1])
   expect(await screen.findByTestId("diff-area")).toBeTruthy()
   expect(screen.queryByTestId("file-tree")).toBeNull()
+  expect(screen.getByRole("tab", { name: "Diff" }).getAttribute("aria-selected")).toBe("true")
+  fireEvent.click(screen.getByRole("tab", { name: "Files 3" }))
+  expect(screen.getByTestId("file-tree")).toBeTruthy()
 })
 
 test("desktop has no tabs", async () => {
@@ -383,24 +386,32 @@ test("a failed patch shows a retry that fetches again", async () => {
   expect(fetchPatch).toHaveBeenCalledTimes(2)
 })
 
-test("a renamed file shows both paths in its header", async () => {
+test("a plain file's path line shows the path only, with no status or counts", async () => {
+  render(OPEN, async () => TREE())
+  const line = await screen.findByTestId("file-path")
+  expect(line.textContent).toBe("src/a.go")
+  expect(screen.queryByTestId("file-status")).toBeNull()
+})
+
+test("a renamed file shows both paths in its path line", async () => {
   const renamed: DiffFilesResult = {
     kind: "files",
     files: { ...range(), files: [{ ...file, path: "new.go", old_path: "old.go", status: "R" }] },
   }
   render(OPEN, async () => renamed)
-  const header = await screen.findByTestId("file-card-header")
-  expect(header.textContent).toContain("old.go → new.go")
+  const line = await screen.findByTestId("file-path")
+  expect(line.textContent).toBe("old.go → new.go")
 })
 
-test("large, generated and binary files get a header and no body or fetch", async () => {
+test("large, generated and binary files get a path line and no body or fetch", async () => {
   const fetchPatch = vi.fn<FetchDiffPatch>(async () => "x")
   const flagged: DiffFilesResult = {
     kind: "files",
     files: { ...range(), files: [{ ...file, path: "big.go", large: true }] },
   }
   render(OPEN, async () => flagged, undefined, fetchPatch)
-  expect(await screen.findByTestId("file-card-header")).toBeTruthy()
+  expect((await screen.findByTestId("file-path")).textContent).toBe("big.go")
+  expect(screen.getByRole("button", { name: "Load diff" })).toBeTruthy()
   expect(screen.queryByTestId("pierre")).toBeNull()
   expect(fetchPatch).not.toHaveBeenCalled()
 })

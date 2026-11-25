@@ -310,8 +310,9 @@ function FilesBrowser({
       )}
     </>
   )
+  // Keyed by file so a newly picked file starts at the top of the pane, not at the old offset.
   const right = (
-    <Box minW="0">
+    <Box key={selected} data-testid="diff-pane" minW="0" minH="0" overflowY="auto" flex="1">
       <Box data-testid="diff-area" data-view={view} data-file={selected}>
         {!selectedFile && order.length === 0 && (
           <Box data-testid="no-files" fontSize="sm" color="text.muted">
@@ -337,13 +338,29 @@ function FilesBrowser({
     return (
       <>
         <Tabs tab={tab} fileCount={files.length} onChange={setTab} />
-        <Box mt="4">{tab === "files" ? left : right}</Box>
+        {tab === "files" ? (
+          <Box data-testid="diff-left" mt="4" flex="1" minH="0" overflowY="auto">
+            {left}
+          </Box>
+        ) : (
+          <Box mt="4" flex="1" minH="0" display="flex" flexDirection="column">
+            {right}
+          </Box>
+        )}
       </>
     )
   }
   return (
-    <Box mt="6" display="grid" gridTemplateColumns="300px minmax(0, 1fr)" gap="4">
-      <Box data-testid="diff-left" minW="0">
+    <Box
+      mt="6"
+      flex="1"
+      minH="0"
+      display="grid"
+      gridTemplateColumns="300px minmax(0, 1fr)"
+      gridTemplateRows="minmax(0, 1fr)"
+      gap="4"
+    >
+      <Box data-testid="diff-left" minW="0" minH="0" overflowY="auto">
         {left}
       </Box>
       {right}
@@ -522,7 +539,7 @@ export function DiffPage({
       : undefined
   const shown = loadedFiles ? (wanted ? narrowedFiles : loadedFiles.files) : undefined
   return (
-    <DetailPage title={{ kind: "Diff", name: url.epic }}>
+    <DetailPage fill title={{ kind: "Diff", name: url.epic }}>
       <Box data-testid="diff-header">
         <PageHeader
           title="Diff"
