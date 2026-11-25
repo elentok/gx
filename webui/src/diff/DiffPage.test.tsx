@@ -54,15 +54,39 @@ const base = () => screen.findByRole("textbox", { name: "Base ref" }) as Promise
 const tip = () => screen.getByRole("textbox", { name: "Tip ref" }) as HTMLInputElement
 const OPEN = "/diff?project=gx&base=main&tip=dev"
 
-test("the fields fill from the URL with ... between them", async () => {
+const editLink = () => screen.getByRole("button", { name: "Edit refs" })
+const openEdit = async () => {
+  await screen.findByTestId("range-chip")
+  fireEvent.click(editLink())
+  return base()
+}
+
+test("the chip shows the URL refs; the edit link opens the inputs filled from them", async () => {
   render(
     OPEN,
     vi.fn(async () => files(2)),
   )
-  expect((await base()).value).toBe("main")
+  expect((await screen.findByTestId("range-chip")).textContent).toBe("main→dev")
+  expect(screen.queryByRole("textbox", { name: "Base ref" })).toBeNull()
+  expect((await openEdit()).value).toBe("main")
   expect(tip().value).toBe("dev")
-  expect(screen.getByTestId("ref-bar").textContent).toContain("...")
   expect((await screen.findByTestId("diff-counts")).textContent).toBe("2 files +2 −0")
+  expect(screen.queryByRole("button", { name: /Apply|Reload/ })).toBeNull()
+})
+
+test("Esc and a second click on the edit link close the inputs and drop the typed text", async () => {
+  render(OPEN, async () => files(1))
+  const input = await openEdit()
+  fireEvent.change(input, { target: { value: "typed" } })
+  fireEvent.keyDown(input, { key: "Escape" })
+  expect(screen.queryByRole("textbox", { name: "Base ref" })).toBeNull()
+  expect((await screen.findByTestId("range-chip")).textContent).toBe("main→dev")
+  expect((await openEdit()).value).toBe("main")
+  fireEvent.change(tip(), { target: { value: "typed" } })
+  fireEvent.click(editLink())
+  expect(screen.queryByRole("textbox", { name: "Tip ref" })).toBeNull()
+  await openEdit()
+  expect(tip().value).toBe("dev")
 })
 
 test("the header holds the range chip, the signed counts and the toggle; no Prev, Next or subtitle", async () => {
@@ -77,33 +101,35 @@ test("the header holds the range chip, the signed counts and the toggle; no Prev
   expect(screen.queryByTestId("page-header-subtitle")).toBeNull()
 })
 
-test("Reload writes the URL and asks again with the typed refs; no polling", async () => {
+test("Enter writes the URL, asks with the typed refs and closes the inputs; no polling", async () => {
   const fetchFiles = vi.fn(async () => files(1))
   const router = render(OPEN, fetchFiles)
-  const input = await base()
+  const input = await openEdit()
   await waitFor(() => expect(fetchFiles).toHaveBeenCalledTimes(1))
   fireEvent.change(input, { target: { value: "v1" } })
   expect(fetchFiles).toHaveBeenCalledTimes(1)
-  fireEvent.click(screen.getByRole("button", { name: "Reload" }))
+  fireEvent.keyDown(input, { key: "Enter" })
   await waitFor(() => expect(fetchFiles).toHaveBeenCalledTimes(2))
   expect(fetchFiles).toHaveBeenLastCalledWith("gx", "v1", "dev")
   expect(router.state.location.search).toContain("base=v1")
+  expect(screen.queryByRole("textbox", { name: "Base ref" })).toBeNull()
   await new Promise((r) => setTimeout(r, 50))
   expect(fetchFiles).toHaveBeenCalledTimes(2)
 })
 
-test("Enter reloads like the button, and Reload with unchanged refs asks again", async () => {
+test("Enter in the tip input applies, and Enter with unchanged refs asks again", async () => {
   const fetchFiles = vi.fn(async () => files(1))
   render(OPEN, fetchFiles)
-  const input = await base()
+  await openEdit()
   await waitFor(() => expect(fetchFiles).toHaveBeenCalledTimes(1))
   fireEvent.change(tip(), { target: { value: "v2" } })
   fireEvent.keyDown(tip(), { key: "Enter" })
   await waitFor(() => expect(fetchFiles).toHaveBeenCalledTimes(2))
   expect(fetchFiles).toHaveBeenLastCalledWith("gx", "main", "v2")
-  fireEvent.click(screen.getByRole("button", { name: "Reload" }))
+  await openEdit()
+  fireEvent.keyDown(tip(), { key: "Enter" })
   await waitFor(() => expect(fetchFiles).toHaveBeenCalledTimes(3))
-  expect(input.value).toBe("main")
+  expect(screen.queryByRole("textbox", { name: "Tip ref" })).toBeNull()
 })
 
 test("nothing is fetched while a ref is empty", async () => {
@@ -127,6 +153,8 @@ test("an unknown ref names the field, marks it invalid and stays editable", asyn
   render(OPEN, async () => ({ kind: "unknown-ref", side: "second" }))
   const n = await notice()
   expect(n.textContent).toContain('Unknown ref "dev"')
+  expect(n.textContent).toContain("Fix the ref with the edit link.")
+  expect(n.textContent).not.toContain("Reload")
   expect(tip().getAttribute("aria-invalid")).toBe("true")
   expect((await base()).getAttribute("aria-invalid")).toBeNull()
   editable()
@@ -137,6 +165,7 @@ test("an empty range says No changes", async () => {
   const n = await notice()
   expect(n.textContent).toContain("No changes")
   expect(n.textContent).toContain("Nothing differs between main and main.")
+  await openEdit()
   editable()
 })
 
@@ -145,6 +174,7 @@ test("no common history is a neutral notice like No changes", async () => {
   const n = await notice()
   expect(n.textContent).toContain("No common history")
   expect(n.getAttribute("data-tone")).toBe("muted")
+  await openEdit()
   editable()
 })
 
@@ -154,7 +184,7 @@ test("an epic with empty refs shows No diff recorded and fetches nothing", async
   const n = await notice()
   expect(n.textContent).toContain("No diff recorded")
   expect(n.textContent).toContain(
-    "gx has no exact range for this epic. Type two refs above to compare them.",
+    "gx has no exact range for this epic. Type two refs to compare them.",
   )
   expect(n.getAttribute("data-tone")).toBe("waiting")
   expect(fetchFiles).not.toHaveBeenCalled()
@@ -166,17 +196,26 @@ test("unavailable commits show an amber notice in the same area", async () => {
   render(OPEN, async () => files(0, { commits_unavailable: true }))
   const n = await notice()
   expect(n.textContent).toContain("Commits not available in this clone")
+  expect(n.textContent).toContain("Fetch them, then return to this window.")
+  expect(n.textContent).not.toContain("Reload")
   expect(n.getAttribute("data-tone")).toBe("waiting")
+  await openEdit()
   editable()
 })
 
-test("a failed load shows Could not load the diff and keeps both ref fields editable", async () => {
-  render(OPEN, async () => {
+test("a failed load shows Could not load the diff; Try again calls the fetch again", async () => {
+  const fetchFiles = vi.fn<FetchDiffFiles>(async () => {
     throw new Error("down")
   })
+  render(OPEN, fetchFiles)
   const n = await notice()
   expect(n.textContent).toContain("Could not load the diff")
+  expect(n.textContent).not.toContain("Reload")
   expect(n.getAttribute("data-tone")).toBe("deadlocked")
+  await waitFor(() => expect(fetchFiles).toHaveBeenCalledTimes(1))
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }))
+  await waitFor(() => expect(fetchFiles).toHaveBeenCalledTimes(2))
+  await openEdit()
   editable()
 })
 
@@ -257,7 +296,7 @@ test("desktop has no tabs", async () => {
 
 test("the Split/Unified switch is in the header", async () => {
   render(OPEN, async () => files(1))
-  await base()
+  await screen.findByTestId("range-chip")
   const toggle = screen.getByTestId("view-toggle")
   expect(screen.getByTestId("diff-header").contains(toggle)).toBe(true)
   expect(screen.getByRole("button", { name: "Split" }).getAttribute("aria-pressed")).toBe("true")

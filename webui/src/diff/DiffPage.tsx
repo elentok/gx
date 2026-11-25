@@ -37,7 +37,7 @@ export type { DiffView }
 
 type Loaded = Keyed<DiffFilesResult>
 
-const NO_RANGE_TEXT = "gx has no exact range for this epic. Type two refs above to compare them."
+const NO_RANGE_TEXT = "gx has no exact range for this epic. Type two refs to compare them."
 
 function RefInput({
   label,
@@ -115,11 +115,13 @@ function Notice({
   kind,
   title,
   tone,
+  action,
   children,
 }: {
   kind: string
   title: string
   tone: "muted" | "waiting" | "deadlocked"
+  action?: ReactNode
   children: string
 }) {
   return (
@@ -141,6 +143,7 @@ function Notice({
       <Box mt="1" fontSize="sm" color="text.muted">
         {children}
       </Box>
+      {action && <Box mt="3">{action}</Box>}
     </Box>
   )
 }
@@ -342,6 +345,7 @@ function noticeOf(
   noRange: boolean,
   first: string,
   second: string,
+  onRetry: () => void,
 ): { notice: ReactNode; files: number | null; invalid?: "first" | "second" } {
   if (noRange) {
     return {
@@ -357,8 +361,17 @@ function noticeOf(
   if ("failed" in loaded) {
     return {
       notice: (
-        <Notice kind="failed" tone="deadlocked" title="Could not load the diff">
-          The server did not answer. Press Reload to try again.
+        <Notice
+          kind="failed"
+          tone="deadlocked"
+          title="Could not load the diff"
+          action={
+            <Button emphasis="secondary" onClick={onRetry}>
+              Try again
+            </Button>
+          }
+        >
+          The server did not answer.
         </Notice>
       ),
       files: null,
@@ -370,7 +383,7 @@ function noticeOf(
     return {
       notice: (
         <Notice kind="unknown-ref" tone="deadlocked" title={`Unknown ref "${name}"`}>
-          The project has no branch, tag or commit by that name. Fix the ref above and press Reload.
+          The project has no branch, tag or commit by that name. Fix the ref with the edit link.
         </Notice>
       ),
       files: null,
@@ -386,7 +399,8 @@ function noticeOf(
           tone="waiting"
           title="Commits not available in this clone"
         >
-          This clone does not have the commits of this range. Fetch them, then press Reload.
+          This clone does not have the commits of this range. Fetch them, then return to this
+          window.
         </Notice>
       ),
       files: null,
@@ -438,6 +452,7 @@ export function DiffPage({
   const [view, setView] = useState<DiffView>(device === "phone" ? "unified" : "split")
   const [draft, setDraft] = useState({ first: url.first, second: url.second })
   const [nonce, setNonce] = useState(0)
+  const [editing, setEditing] = useState(false)
 
   const { project, first, second } = url
   const {
@@ -457,17 +472,25 @@ export function DiffPage({
 
   const noRange = !!url.epic && !first && !second
   const fresh = canFetch ? loaded : undefined
-  const { notice, files, invalid } = noticeOf(fresh, noRange, first, second)
+  const retry = () => setNonce((n) => n + 1)
+  const { notice, files, invalid } = noticeOf(fresh, noRange, first, second, retry)
   const settled = noRange || !canFetch || !!fresh
   useReadyWhen(settled, "ready", "network")
 
-  const reload = () => {
+  const inputsOpen = editing || !first || !second || !!invalid
+  const closeEdit = () => {
+    setEditing(false)
+    setDraft({ first, second })
+  }
+  const apply = () => {
     const next = { ...url, first: draft.first.trim(), second: draft.second.trim() }
-    if (next.first === first && next.second === second) setNonce((n) => n + 1)
+    setEditing(false)
+    if (next.first === first && next.second === second) retry()
     else setParams(diffQuery(next))
   }
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter") reload()
+    if (e.key === "Enter") apply()
+    else if (e.key === "Escape") closeEdit()
   }
 
   const setNarrowing = (commits: string[] | undefined) =>
@@ -491,43 +514,45 @@ export function DiffPage({
           title="Diff"
           inline={
             <Box display="flex" flexWrap="wrap" alignItems="center" gap="3" minW="0" flex="1 1 0">
-              <RangeChip base={first} tip={second} />
+              {inputsOpen ? (
+                <>
+                  <RefInput
+                    phone={device === "phone"}
+                    label="Base ref"
+                    value={draft.first}
+                    invalid={invalid === "first"}
+                    onChange={(v) => setDraft((d) => ({ ...d, first: v }))}
+                    onKeyDown={onKeyDown}
+                  />
+                  <Box as="span" aria-hidden="true" color="text.muted" fontFamily="mono">
+                    →
+                  </Box>
+                  <RefInput
+                    phone={device === "phone"}
+                    label="Tip ref"
+                    value={draft.second}
+                    invalid={invalid === "second"}
+                    onChange={(v) => setDraft((d) => ({ ...d, second: v }))}
+                    onKeyDown={onKeyDown}
+                  />
+                </>
+              ) : (
+                <RangeChip base={first} tip={second} />
+              )}
+              <chakra.button
+                type="button"
+                onClick={() => (editing ? closeEdit() : setEditing(true))}
+                color="text.dim"
+                fontSize="sm"
+                textDecoration="underline"
+              >
+                Edit refs
+              </chakra.button>
               {shown && <Counts files={shown} />}
             </Box>
           }
           actions={<ViewToggle view={view} onChange={setView} />}
         />
-      </Box>
-      <Box
-        data-testid="ref-bar"
-        mt="4"
-        display="flex"
-        flexWrap={device === "phone" ? "nowrap" : "wrap"}
-        alignItems="center"
-        gap="2"
-      >
-        <RefInput
-          phone={device === "phone"}
-          label="Base ref"
-          value={draft.first}
-          invalid={invalid === "first"}
-          onChange={(v) => setDraft((d) => ({ ...d, first: v }))}
-          onKeyDown={onKeyDown}
-        />
-        <Box as="span" aria-hidden="true" color="text.muted" fontFamily="mono">
-          ...
-        </Box>
-        <RefInput
-          phone={device === "phone"}
-          label="Tip ref"
-          value={draft.second}
-          invalid={invalid === "second"}
-          onChange={(v) => setDraft((d) => ({ ...d, second: v }))}
-          onKeyDown={onKeyDown}
-        />
-        <Button emphasis="secondary" onClick={reload}>
-          Reload
-        </Button>
       </Box>
       {chipLabel && <NarrowChip label={chipLabel} onClear={() => setNarrowing(undefined)} />}
       {notice}

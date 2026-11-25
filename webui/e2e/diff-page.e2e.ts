@@ -16,8 +16,17 @@ const treeFiles = (page: Page) => page.getByTestId("tree-file")
 async function openDiff(page: Page, hash: string) {
   await go(page, hash)
   await page.getByRole("link", { name: "View diff" }).click()
-  await expect(page.getByTestId("ref-bar")).toBeVisible()
+  await expect(page.getByTestId("diff-header")).toBeVisible()
 }
+
+/** Opens the ref inputs through the edit link unless they are already open. */
+async function editRefs(page: Page) {
+  if (!(await baseRef(page).isVisible()))
+    await page.getByRole("button", { name: "Edit refs" }).click()
+  await expect(baseRef(page)).toBeVisible()
+}
+
+const chipOf = (page: Page) => page.getByTestId("range-chip")
 
 test("Diff page", async ({ page, start }) => {
   // start() resets the allowed reload count on every call, so each start declares the one reload.
@@ -27,20 +36,24 @@ test("Diff page", async ({ page, start }) => {
   await start("epic-diff", { ...opts, shape: "merged" })
   await go(page, `#/e/${EPIC}`)
   await page.getByRole("link", { name: "View diff" }).click()
-  await expect(baseRef(page)).toHaveValue(/^[0-9a-f]{40}$/)
-  await expect(tipRef(page)).toHaveValue(/^[0-9a-f]{40}$/)
+  await expect(chipOf(page)).toHaveText(/^[0-9a-f]{40}→[0-9a-f]{40}$/)
   await expect(treeFiles(page).first()).toBeVisible()
+  await editRefs(page)
   const base = await baseRef(page).inputValue()
   const tip = await tipRef(page).inputValue()
+  expect(base).toMatch(/^[0-9a-f]{40}$/)
+  expect(tip).toMatch(/^[0-9a-f]{40}$/)
   const allFiles = await treeFiles(page).count()
 
-  // Entry 1: a different base ref and Reload; the tree and the URL follow.
+  // Entry 1: a different base ref and Enter; the tree and the URL follow and the inputs close.
   await baseRef(page).fill(`${tip}~5`)
-  await page.getByRole("button", { name: "Reload" }).click()
+  await baseRef(page).press("Enter")
   await expect(page).toHaveURL(new RegExp(`${tip}~5`.replace("~", "(?:~|%7E)")))
+  await expect(baseRef(page)).toHaveCount(0)
   await expect(treeFiles(page)).not.toHaveCount(allFiles)
+  await editRefs(page)
   await baseRef(page).fill(base)
-  await page.getByRole("button", { name: "Reload" }).click()
+  await baseRef(page).press("Enter")
   await expect(treeFiles(page)).toHaveCount(allFiles)
 
   // Entry 12: the commit list is collapsed at load; a ticket narrows the tree and the chip clears it.
@@ -197,7 +210,7 @@ test("Diff page", async ({ page, start }) => {
   // Entry 4: the archived epic's link opens its stamped range.
   await go(page, `#/archive/${ARCHIVED}`)
   await page.getByRole("link", { name: "View diff" }).click()
-  await expect(baseRef(page)).toHaveValue(/^[0-9a-f]{40}$/)
+  await expect(chipOf(page)).toHaveText(/^[0-9a-f]{40}→[0-9a-f]{40}$/)
   await expect(page.locator('[data-testid="tree-file"][data-path="docs/old.md"]')).toBeVisible()
 
   // Entries 18 and 19: at 390px the page is unified by default, has Files and Diff tabs and no sideways scroll.
@@ -228,8 +241,7 @@ test("Diff page", async ({ page, start }) => {
   ]
   for (const [epic, first, second] of refs) {
     await openDiff(page, `#/e/demo:${epic}`)
-    await expect(baseRef(page)).toHaveValue(first)
-    await expect(tipRef(page)).toHaveValue(second)
+    await expect(chipOf(page)).toHaveText(`${first}→${second}`)
   }
   await go(page, "#/e/demo:quiet-impl")
   await expect(page.getByRole("heading", { name: /quiet-impl/ }).first()).toBeVisible()
@@ -252,6 +264,8 @@ test("Diff page", async ({ page, start }) => {
   await openDiff(page, `#/e/${EPIC}`)
   await expect(page.getByTestId("notice")).toBeVisible()
   await expect(treeFiles(page)).toHaveCount(0)
+  await expect(page.getByTestId("notice")).not.toContainText("Reload")
+  await editRefs(page)
   await expect(baseRef(page)).toBeEditable()
   await expect(tipRef(page)).toBeEditable()
 })

@@ -138,7 +138,7 @@ test("/diff renders the Diff page through the lazy chunk and asks for the file l
     },
   }))
   renderAt("/diff?project=gx&base=main&tip=dev", okFor, undefined, undefined, { diffFiles })
-  expect(await screen.findByTestId("ref-bar")).toBeTruthy()
+  expect(await screen.findByTestId("range-chip")).toBeTruthy()
   await waitFor(() => expect(title()).toBe("Diff · gx"))
   expect(diffFiles).toHaveBeenCalledWith("gx", "main", "dev")
 })
