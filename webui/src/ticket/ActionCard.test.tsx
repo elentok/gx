@@ -8,7 +8,7 @@ import { appRoutes } from "../routes"
 import { expectViEditor, viConnection } from "../ui/expandable-text/testing"
 import { renderThemed } from "../ui/render"
 import type { FetchDetail } from "./detail"
-import { clearSents } from "./sent"
+import { clearSents, recordSent } from "./sent"
 
 afterEach(() => {
   cleanup()
@@ -64,14 +64,13 @@ const footerButton = async (name: string) =>
   })
 const popover = (name: string | RegExp) => screen.getByRole("alertdialog", { name })
 
-test("an open question shows the card first under the header, with its chat and rounds", async () => {
+test("an open question shows the card first under the header, with its rounds", async () => {
   renderTicket(() => base)
   const c = await screen.findByRole("group", { name: "Action card" })
   const header = screen.getByRole("heading", { level: 1 })
   expect(header.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  expect(c.textContent).toContain("Should the cache live in Redis or in process memory?")
+  expect(c.textContent).toContain("Which backend?")
   expect(c.textContent).toContain("Earlier rounds (2)")
-  expect(c.querySelector('[role="form"]')).toBeTruthy()
 })
 
 test("a permission prompt on a running ticket shows the card", async () => {
@@ -398,29 +397,72 @@ test("an Answered ticket keeps the last question and the answer", async () => {
 })
 
 test("a sent answer keeps its result on screen after the refetch", async () => {
-  let detail = base
-  stubFetch(
-    vi.fn(async () => {
-      detail = {
-        ...base,
-        status: "open",
-        answered: true,
-        latest: { ...base.latest!, outcome: "answered", answer: { source: "web", text: "Redis" } },
-        actions: [],
-      }
-      return new Response(JSON.stringify({ outcome: "queued" }))
-    }),
-  )
-  renderTicket(() => detail)
-  fireEvent.change(await screen.findByLabelText(/^Answer to question/), {
-    target: { value: "Redis" },
-  })
-  fireEvent.click(screen.getByRole("button", { name: "Send answer" }))
+  recordSent("gx:demo/12", { seq: 3, outcome: "queued" })
+  renderTicket(() => ({
+    ...base,
+    status: "open",
+    answered: true,
+    latest: { ...base.latest!, outcome: "answered", answer: { source: "web", text: "Redis" } },
+    actions: [],
+  }))
   const result = await screen.findByRole("status", { name: "Answer result" })
   expect(result.textContent).toContain("Queued ·")
-  await waitFor(() => expect(screen.queryByLabelText(/^Answer to question/)).toBeNull())
-  expect(screen.getByRole("status", { name: "Answer result" })).toBeTruthy()
+  expect(screen.queryByRole("button", { name: "Answer question" })).toBeNull()
   expect(card()).toBeTruthy()
+})
+
+test("a stale detail does not show the open card again for the seq just sent", async () => {
+  recordSent("gx:demo/12", { seq: 3, outcome: "queued" })
+  renderTicket(() => base)
+  await screen.findByRole("group", { name: "Action card" })
+  expect(screen.queryByRole("button", { name: "Answer question" })).toBeNull()
+})
+
+const withResume: TicketDetail = {
+  ...base,
+  actions: ["answer", "resume"],
+  action_info: { resume: { label: "Resume without answering", tooltip: "" } },
+}
+
+test("an answerable ticket shows one compact card: label, title, Answer question main, Resume secondary", async () => {
+  renderTicket(() => withResume)
+  const answer = await screen.findByRole("button", { name: "Answer question" })
+  const c = screen.getByRole("group", { name: "Action card" })
+  expect(c.textContent).toContain("THE AGENT ASKS")
+  expect(c.textContent).toContain("Which backend?")
+  expect(c.textContent).not.toContain("Should the cache live in Redis")
+  expect(screen.queryByRole("form", { name: "Answer" })).toBeNull()
+  const resume = within(c).getByRole("button", { name: /Resume without answering/ })
+  expect(answer.compareDocumentPosition(resume) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(answer.getAttribute("data-emphasis")).toBe("main")
+  expect(resume.getAttribute("data-emphasis")).toBe("secondary")
+})
+
+test("Answer question pushes the answer page and back returns to the ticket", async () => {
+  const fetchDetail: FetchDetail = async () => ({ kind: "ok", detail: withResume })
+  const router = createMemoryRouter(
+    appRoutes({ ticket: fetchDetail, epicList: async () => ({ epics: [], follow_ups: [] }) }),
+    { initialEntries: ["/t/gx:demo/12"] },
+  )
+  renderThemed(
+    <ConnectionContext.Provider value={conn}>
+      <RouterProvider router={router} />
+    </ConnectionContext.Provider>,
+  )
+  fireEvent.click(await screen.findByRole("button", { name: "Answer question" }))
+  await waitFor(() => expect(router.state.location.pathname).toBe("/answer/gx:demo/12"))
+  await router.navigate(-1)
+  await waitFor(() => expect(router.state.location.pathname).toBe("/t/gx:demo/12"))
+})
+
+test("without Resume the card shows only Answer question", async () => {
+  renderTicket(() => base)
+  await screen.findByRole("button", { name: "Answer question" })
+  expect(
+    footer()
+      .getAllByRole("button")
+      .map((b) => b.textContent),
+  ).toEqual(["Answer question"])
 })
 
 test("a done ticket and a plain open ticket show no card and no earlier rounds", async () => {
@@ -552,6 +594,17 @@ test.each(["open", "claimed", "needs-answer", "needs-repair"])(
     expect(await footerButton("Cancel run")).toBeTruthy()
   },
 )
+
+test("a One-off with an open question shows Cancel run as a secondary button after Answer question", async () => {
+  renderTicket(() => ({ ...oneOff("needs-answer"), latest: base.latest, actions: ["answer"] }))
+  const buttons = (await screen.findByRole("form", { name: "Recovery actions" })).querySelectorAll(
+    "button",
+  )
+  expect([...buttons].map((b) => [b.textContent, b.getAttribute("data-emphasis")])).toEqual([
+    ["Answer question", "main"],
+    ["Cancel run", "secondary"],
+  ])
+})
 
 test.each([
   ["a done One-off", oneOff("done")],

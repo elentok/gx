@@ -21,7 +21,7 @@ import { Button } from "../ui/button/Button"
 import { EmptyState } from "../ui/empty-state/EmptyState"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { ActionCard, needsActionCard } from "./ActionCard"
-import { recordSent, useSent } from "./sent"
+import { useSent } from "./sent"
 import { useDetailReady } from "../useReady"
 import { useTicketDetail, type FetchDetail } from "./detail"
 import { TicketHeader } from "./TicketHeader"
@@ -126,12 +126,7 @@ export function TicketPage({
                 onClose={() => setShowScreen(false)}
               />
             )}
-            <ActionCard
-              detail={detail}
-              sent={sent}
-              onSent={(s) => recordSent(address, s)}
-              refetch={refetch}
-            />
+            <ActionCard detail={detail} sent={sent} refetch={refetch} />
             {!detail.parse_error && (
               <>
                 <TicketSections detail={detail} now={Date.now()} />

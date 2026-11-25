@@ -1,4 +1,5 @@
 import { Box, Text } from "@chakra-ui/react"
+import type { ReactNode } from "react"
 import type { DetailRound, TicketDetail } from "../generated/server"
 import { Markdown } from "../markdown/Markdown"
 import { Card } from "../ui/card/Card"
@@ -34,9 +35,12 @@ function EarlierRound({ round }: { round: DetailRound }) {
 export function TicketReading({
   detail,
   sent = null,
+  card,
 }: {
   detail: TicketDetail
   sent?: Sent | null
+  /** The compact question card of an answerable ticket: it replaces the question text and the chat. */
+  card?: ReactNode
 }) {
   const { latest } = detail
   const asker = askerLabel(latest)
@@ -47,14 +51,16 @@ export function TicketReading({
       {answered && <AnswerResult detail={detail} sent={sent} />}
       {latest && !answered && (
         <>
-          <Box>
-            <Label>{asker}</Label>
-            {latest.text ? (
-              <Markdown epic={detail.epic}>{latest.text}</Markdown>
-            ) : (
-              <Text>{latest.summary}</Text>
-            )}
-          </Box>
+          {!card && (
+            <Box>
+              <Label>{asker}</Label>
+              {latest.text ? (
+                <Markdown epic={detail.epic}>{latest.text}</Markdown>
+              ) : (
+                <Text>{latest.summary}</Text>
+              )}
+            </Box>
+          )}
           {latest.handoff && (
             <Collapsible label="Agent's notes">
               <Markdown epic={detail.epic} smallHeadings>
@@ -62,7 +68,8 @@ export function TicketReading({
               </Markdown>
             </Collapsible>
           )}
-          {detail.chat.length > 0 && (
+          {card}
+          {!card && detail.chat.length > 0 && (
             <Box display="flex" flexDirection="column" gap="2">
               {withKeys(detail.chat, (m) => `${m.from}|${m.text}`).map(({ item: m, key }) => (
                 <Card key={key}>
@@ -72,7 +79,7 @@ export function TicketReading({
               ))}
             </Box>
           )}
-          {latest.prompt && <Text>{latest.prompt}</Text>}
+          {!card && latest.prompt && <Text>{latest.prompt}</Text>}
           {latest.closed_reason && <Text>Closed: {latest.closed_reason}</Text>}
         </>
       )}

@@ -1,5 +1,5 @@
 import { Box, Spinner, Text } from "@chakra-ui/react"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { useActions } from "../actions/useActions"
 import { modelName } from "../modelName"
 import {
@@ -46,6 +46,7 @@ export function RecoveryActions({
   post = postRecover,
   onDone,
   onStale,
+  leading,
 }: {
   detail: TicketDetail
   post?: PostRecover
@@ -53,6 +54,11 @@ export function RecoveryActions({
   onDone?: () => void
   /** The pause changed under the person: refetch so the current one shows. */
   onStale?: () => void
+  /**
+   * Set for the question card: this is its main button, shown first in the row. The row then sits
+   * in the card, not sticky, with every recovery button secondary.
+   */
+  leading?: ReactNode
 }) {
   const bases = detail.bases ?? []
   const [base, setBase] = useState("")
@@ -78,7 +84,7 @@ export function RecoveryActions({
 
   const actions = detail.actions.filter(isRecoverAction)
   const cancellable = canCancel(detail)
-  if (actions.length === 0 && !cancellable)
+  if (actions.length === 0 && !cancellable && !leading)
     return detail.run_finishing ? <Text>{RUN_FINISHING}</Text> : null
 
   const send = (action: string, extra: Partial<RecoverBody> = {}) =>
@@ -113,10 +119,8 @@ export function RecoveryActions({
 
   return (
     <Box
-      position="sticky"
-      bottom="0"
+      {...(leading ? { py: "0" } : { position: "sticky", bottom: "0", py: "3" })}
       bg="surface.raised"
-      py="3"
       display="flex"
       flexDirection="column"
       gap="2"
@@ -161,14 +165,20 @@ export function RecoveryActions({
           </Button>
         </Box>
       )}
-      <Box display="flex" gap="2" justifyContent="flex-end" flexWrap="wrap">
+      <Box
+        display="flex"
+        gap="2"
+        justifyContent={leading ? "flex-start" : "flex-end"}
+        flexWrap="wrap"
+      >
+        {leading}
         {actions.map((action, i) => {
           const info = detail.action_info?.[action]
           return (
             <Button
               key={action}
               title={info?.tooltip}
-              emphasis={i === 0 ? "main" : "secondary"}
+              emphasis={i === 0 && !leading ? "main" : "secondary"}
               disabled={!ready(action) || pending}
               onClick={(e) =>
                 action === ActionStartOver

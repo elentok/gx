@@ -1,7 +1,7 @@
 import { Box, Text } from "@chakra-ui/react"
 import { ActionAnswer, type TicketDetail } from "../generated/server"
 import type { Sent } from "./answer"
-import { AnswerForm } from "./AnswerForm"
+import { AskedCard } from "./AskedCard"
 import { PermissionCard } from "./PermissionCard"
 import { canCancel, isRecoverAction } from "./recover"
 import { RecoveryActions } from "./RecoveryActions"
@@ -43,12 +43,10 @@ const cardProps = {
 export function ActionCard({
   detail,
   sent,
-  onSent,
   refetch,
 }: {
   detail: TicketDetail
   sent: Sent | null
-  onSent: (sent: Sent) => void
   refetch: () => void
 }) {
   if (!needsActionCard(detail, sent)) return null
@@ -80,6 +78,27 @@ export function ActionCard({
     )
   }
 
+  // The answer form lives on the answer page. Right after a send the cached detail still shows the
+  // question as open, so the card stays hidden for the seq the sent store knows.
+  const answerable =
+    detail.actions.includes(ActionAnswer) &&
+    hasOpenQuestion(detail) &&
+    sent?.seq !== detail.latest?.seq
+
+  if (answerable) {
+    return (
+      <Box role="group" aria-label="Action card" mt="4">
+        <TaskCard detail={detail} />
+        <PermissionCard detail={detail} onDone={refetch} onStale={refetch} />
+        <TicketReading
+          detail={detail}
+          sent={sent}
+          card={<AskedCard detail={detail} onDone={refetch} onStale={refetch} />}
+        />
+      </Box>
+    )
+  }
+
   return (
     <Box {...cardProps}>
       {/* A self-reported pause shows its question below, so its text is left out. */}
@@ -91,14 +110,6 @@ export function ActionCard({
       <TaskCard detail={detail} />
       <TicketReading detail={detail} sent={sent} />
       <PermissionCard detail={detail} onDone={refetch} onStale={refetch} />
-      <AnswerForm
-        detail={detail}
-        onSent={(s) => {
-          onSent(s)
-          refetch()
-        }}
-        onStale={refetch}
-      />
       <RecoveryActions detail={detail} onDone={refetch} onStale={refetch} />
     </Box>
   )

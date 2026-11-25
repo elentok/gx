@@ -91,13 +91,12 @@ export function AnswerPageFrame({
 }
 
 // The answer area. The server decides whether it shows (the detail's actions).
-// "sticky" is the box under the ticket page; "page" is a scroll body with the Send footer outside it.
+// A scroll body with the Send footer outside it, for the answer page.
 export function AnswerForm({
   detail,
   post = postAnswer,
   onSent,
   onStale,
-  layout = "sticky",
   stale,
   lead,
   children,
@@ -107,12 +106,11 @@ export function AnswerForm({
   onSent?: (sent: Sent) => void
   /** The question changed under the person: refetch so the current one shows. */
   onStale?: () => void
-  layout?: "sticky" | "page"
-  /** Page layout: the question can no longer be answered. Shows the banner and only a way back. */
+  /** The question can no longer be answered. Shows the banner and only a way back. */
   stale?: { banner: string; onBack: () => void }
-  /** Page layout: scroll content above the question. */
+  /** Scroll content above the question. */
   lead?: ReactNode
-  /** Page layout: scroll content below the question. */
+  /** Scroll content below the question. */
   children?: ReactNode
 }) {
   const { latest } = detail
@@ -160,13 +158,12 @@ export function AnswerForm({
     links: latest.links,
   }
 
-  const sticky = layout === "sticky"
   const question = <Question card={card} answer={answer} onChange={setAnswer} onPicked={() => {}} />
   const alert = error && <Text role="alert">{error}</Text>
   const sendButton = (
     <Button
       emphasis="main"
-      alignSelf={sticky ? "flex-end" : FOOTER_ALIGN}
+      alignSelf={FOOTER_ALIGN}
       disabled={!ready || pending}
       onClick={send}
     >
@@ -174,51 +171,24 @@ export function AnswerForm({
     </Button>
   )
 
-  if (layout === "page") {
-    return (
-      <AnswerPageFrame
-        form
-        banner={stale?.banner}
-        footer={
-          stale ? (
-            <BackButton onClick={stale.onBack} />
-          ) : (
-            <>
-              {alert}
-              {sendButton}
-            </>
-          )
-        }
-      >
-        {lead}
-        {question}
-        {children}
-      </AnswerPageFrame>
-    )
-  }
-
   return (
-    <Box
-      position="sticky"
-      bottom="0"
-      bg="surface.raised"
-      py="3"
-      display="flex"
-      flexDirection="column"
-      gap="2"
-      aria-label="Answer"
-      role="form"
-      borderWidth="1px"
-      borderColor="tone.waiting.fg"
-      borderRadius="12px"
-      px="3"
+    <AnswerPageFrame
+      form
+      banner={stale?.banner}
+      footer={
+        stale ? (
+          <BackButton onClick={stale.onBack} />
+        ) : (
+          <>
+            {alert}
+            {sendButton}
+          </>
+        )
+      }
     >
-      {/* A long question scrolls inside this area so the Send button stays on screen. */}
-      <Box overflowY="auto" minH="0" maxH="calc(100dvh - 160px)" overscrollBehavior="contain">
-        {question}
-      </Box>
-      {alert}
-      {sendButton}
-    </Box>
+      {lead}
+      {question}
+      {children}
+    </AnswerPageFrame>
   )
 }

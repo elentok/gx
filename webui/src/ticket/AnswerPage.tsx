@@ -109,7 +109,6 @@ export function AnswerPage({
             )}
             {shown && (
               <AnswerForm
-                layout="page"
                 detail={shown}
                 stale={banner ? { banner, onBack: leave } : undefined}
                 onSent={(s) => {
