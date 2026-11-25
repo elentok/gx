@@ -2,7 +2,8 @@ import { useCallback, useMemo, useSyncExternalStore } from "react"
 import type { Answer } from "../ui/question-sheet/round"
 
 // The unsent answer per ticket, in memory only: it outlives the answer page (leaving and coming
-// back) but a reload clears it. It remembers the detail.state token it belongs to.
+// back) but a reload clears it. It remembers the question (round seq) it belongs to; the state
+// token moves on activity within one question and must not drop the pick.
 type Draft = { answer: Answer; state: string | undefined }
 
 const drafts = new Map<string, Draft>()

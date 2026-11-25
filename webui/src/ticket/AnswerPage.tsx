@@ -39,13 +39,12 @@ function staleBanner(
 // Where a person answers one open question. Opened from the ticket page it sits on top of it, so
 // leaving goes back one entry (the ticket page marks that with fromTicket state); opened any other
 // way (deep link, reload, push tap) the entry below is not the ticket, so leaving replaces this one.
-export function AnswerPage({
-  address,
-  fetchDetail,
-}: {
-  address: string
-  fetchDetail?: FetchDetail
-}) {
+export function AnswerPage(props: { address: string; fetchDetail?: FetchDetail }) {
+  // Keyed by address so a route change in place starts a fresh form, not the old ticket's question.
+  return <AnswerPageFor key={props.address} {...props} />
+}
+
+function AnswerPageFor({ address, fetchDetail }: { address: string; fetchDetail?: FetchDetail }) {
   const conn = useConnectionContext()
   const navigate = useNavigate()
   const fromTicket = !!(useLocation().state as { fromTicket?: boolean } | null)?.fromTicket
@@ -86,14 +85,18 @@ export function AnswerPage({
         ) : detail ? (
           <>
             <Box
+              data-mock-part="answer-header"
               display={compact ? "none" : "flex"}
               alignItems="center"
               gap="10px"
               py="12px"
+              // The shell's floating Show sidebar button (40px at 16px) covers the start on a phone.
+              ps={{ base: "50px", md: "0" }}
               borderBottomWidth="1px"
               borderColor="border"
             >
               <chakra.a
+                data-mock-part="back-link"
                 href={ticketHref(address)}
                 color="text.muted"
                 fontSize="15px"

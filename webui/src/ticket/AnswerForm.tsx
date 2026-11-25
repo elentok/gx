@@ -134,7 +134,7 @@ export function AnswerForm({
 }) {
   const { latest } = detail
   // A new question clears the pick and the text; the note stays so a stale refusal loses nothing.
-  const [answer, setAnswer] = useDraft(detail.address, detail.state)
+  const [answer, setAnswer] = useDraft(detail.address, latest ? String(latest.seq) : undefined)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState("")
   const [sentSeq, setSentSeq] = useState<number | null>(null)

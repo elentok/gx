@@ -725,8 +725,24 @@ test.describe("215. Answer page, stale and permission refusal", () => {
       // The event stream shows the stale banner and drops Send before the person can click it.
       await expect(page.getByText("This question was answered elsewhere")).toBeVisible()
       await expect(noteField(page)).toHaveValue("Typed before the CLI answered")
+      await expect(optionA(page)).toHaveAttribute("aria-pressed", "true")
       await expect(answerFooter(page).getByRole("button")).toHaveText(["Back to ticket"])
       await expect(sendAnswer(page)).toHaveCount(0)
+    })
+
+    await test.step("on a phone the back link is clear of the Show sidebar button", async () => {
+      await page.setViewportSize({ width: 390, height: 800 })
+      const link = await page.getByRole("link", nav("← Ticket")).boundingBox()
+      const toggle = await page.getByRole("button", nav("Show sidebar")).boundingBox()
+      expect(link).not.toBeNull()
+      expect(toggle).not.toBeNull()
+      const apart =
+        link!.x >= toggle!.x + toggle!.width ||
+        link!.y >= toggle!.y + toggle!.height ||
+        link!.x + link!.width <= toggle!.x ||
+        link!.y + link!.height <= toggle!.y
+      expect(apart).toBe(true)
+      await page.setViewportSize({ width: 1100, height: 700 })
     })
 
     // The fixture has no way to replace a question under an open page (story 23), so that step is not here.

@@ -221,14 +221,19 @@ test("a new question swaps in with the note kept and the pick cleared", async ()
   rerender(
     <ChakraProvider value={system}>
       <AnswerForm
-        detail={{ ...withLatest({ kind: "yes-no", summary: "New question" }), state: "tok-2" }}
+        detail={{
+          ...withLatest({ kind: "yes-no", summary: "New question", seq: seq + 1 }),
+          state: "tok-2",
+        }}
         post={post}
       />
       <AppToaster />
     </ChakraProvider>,
   )
   expect(screen.getByRole("button", { name: "Yes" }).getAttribute("aria-pressed")).toBe("false")
-  expect(noteField().value).toBe("keep me")
+  expect(
+    (screen.getByLabelText(`Note text for question ${seq + 1}`) as HTMLTextAreaElement).value,
+  ).toBe("keep me")
 })
 
 test("no answer action renders nothing", () => {

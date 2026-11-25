@@ -292,6 +292,56 @@ test("a new question while open shows the changed banner and keeps the old quest
   expect(screen.queryByRole("button", { name: "Send answer" })).toBeNull()
 })
 
+const withOptions = (d: TicketDetail): TicketDetail => ({
+  ...d,
+  latest: {
+    ...d.latest!,
+    kind: "options",
+    options: [
+      { id: "a", label: "Keep it" },
+      { id: "b", label: "Change it" },
+    ],
+  },
+})
+
+test("a stale banner keeps the picked option pressed even when the state token moved first", async () => {
+  const open = withOptions(detail)
+  renderLive([ticketUrl, answerUrl], open)
+  await screen.findByText("THE AGENT ASKS")
+  fireEvent.click(screen.getByRole("button", { name: "Keep it" }))
+  changeTicket({ ...open, state: "tok-2" })
+  await waitFor(() => expect(served.state).toBe("tok-2"))
+  changeTicket({ ...withOptions(round(detail.latest!.seq, "answered", "tok-9")) })
+  expect(await screen.findByText("This question was answered elsewhere")).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Keep it" }).getAttribute("aria-pressed")).toBe("true")
+})
+
+test("a route change to another address shows that ticket's question, not the old one", async () => {
+  const other: TicketDetail = {
+    ...detail,
+    address: "gx:demo/13",
+    latest: { ...detail.latest!, seq: detail.latest!.seq + 4, summary: "Other question?" },
+  }
+  served = detail
+  const fetchBy: FetchDetail = async (addr) => ({
+    kind: "ok",
+    detail: addr === other.address ? other : detail,
+  })
+  const router = createMemoryRouter(
+    [{ path: "/answer/*", element: <AnswerRoute fetchDetail={fetchBy} /> }],
+    { initialEntries: [answerUrl] },
+  )
+  renderThemed(
+    <ConnectionContext.Provider value={liveConn as unknown as Connection}>
+      <RouterProvider router={router} />
+    </ConnectionContext.Provider>,
+  )
+  await screen.findByText(/Which backend\?/)
+  await act(() => router.navigate(`/answer/${other.address}`))
+  expect(await screen.findByText(/Other question\?/)).toBeTruthy()
+  expect(screen.queryByText(/This question changed/)).toBeNull()
+})
+
 test("a stale refusal refetches and shows the changed banner", async () => {
   renderLive([ticketUrl, answerUrl])
   await screen.findByText("THE AGENT ASKS")
