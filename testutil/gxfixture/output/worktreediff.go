@@ -27,4 +27,24 @@ type WorktreeDiffOutput struct {
 	Clone WorktreeTarget `json:"clone"`
 	// Unclaimed is the address of a ticket with no worktree.
 	Unclaimed string `json:"unclaimed"`
+	// Capped is a chat in a worktree with one more untracked file than the
+	// listing cap, and a committed tracked change.
+	Capped WorktreeTarget `json:"capped"`
+	// Oversize is a chat in a worktree with an untracked file over the blob cap
+	// and a small untracked file.
+	Oversize WorktreeTarget `json:"oversize"`
+	// Clean is a chat in a worktree with no changes, HEAD at its base.
+	Clean WorktreeTarget `json:"clean"`
+	// PausedRun is a paused ticket whose run is still tracked, and its Queue agent chat.
+	PausedRun WorktreeTarget `json:"paused_run"`
+	// PausedStacked is a paused ticket with no run entry, stacked on
+	// PausedBlockerBranch.
+	PausedStacked       WorktreeTarget `json:"paused_stacked"`
+	PausedBlockerBranch string         `json:"paused_blocker_branch"`
+	// PausedFeature is a paused ticket with no run entry, based on the epic's
+	// feature branch FeatureBranch.
+	PausedFeature WorktreeTarget `json:"paused_feature"`
+	FeatureBranch string         `json:"feature_branch"`
+	// Triage is a managed Triage chat.
+	Triage WorktreeTarget `json:"triage"`
 }

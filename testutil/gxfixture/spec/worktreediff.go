@@ -29,15 +29,22 @@ const (
 const (
 	wtdMap = "wtd" // the Design's map
 	// Not wtd-impl: that is the Design's impl branch, which puts it past its Branch step.
-	wtdClaimed   = "wtd-claimed-impl" // 01 is claimed
-	wtdStacked   = "wtd-stack-impl"   // 01 is claimed, 02 starts from its branch
-	wtdIdle      = "wtd-idle-impl"    // 01 is never claimed
-	wtdFix       = "wtd-fix-impl"     // 01 is paused for repair
-	wtdChatDir   = "chat-worktree"    // under the fixture root
-	wtdCloneDir  = "chat-clone"       // under the fixture root
-	wtdChatPR    = "hello"            // prompt of the two chats
-	wtdMaxAgents = `,"max-agents":4`  // two queue agents and a Design hold slots
-	wtdWaitLimit = 30 * time.Second
+	wtdClaimed = "wtd-claimed-impl" // 01 is claimed
+	wtdStacked = "wtd-stack-impl"   // 01 is claimed, 02 starts from its branch
+	wtdIdle    = "wtd-idle-impl"    // 01 is never claimed
+	wtdFix     = "wtd-fix-impl"     // 01 is paused for repair
+	wtdAsk     = "wtd-ask-impl"     // 01 asks and its agent stays up
+	wtdPause   = "wtd-pause-impl"   // 01 is paused with no run entry
+	// 01 is a blocker with a branch only; 02 is paused with no run entry.
+	wtdPauseStack  = "wtd-pstack-impl"
+	wtdCappedDir   = "capped-worktree"
+	wtdOversizeDir = "oversize-worktree"
+	wtdCleanDir    = "clean-worktree"
+	wtdChatDir     = "chat-worktree"   // under the fixture root
+	wtdCloneDir    = "chat-clone"      // under the fixture root
+	wtdChatPR      = "hello"           // prompt of the two chats
+	wtdMaxAgents   = `,"max-agents":8` // the queue agents, a Design and a Fix agent hold slots
+	wtdWaitLimit   = 30 * time.Second
 )
 
 func wtdAddr(epic, id string) string { return project + ":" + epic + "/" + id }
@@ -90,16 +97,26 @@ func WorktreeDiffScenario() Scenario {
 		DesignSteps:  map[string]string{liveDesign: string(tickets.StepSpec)},
 		DesignByMap:  map[string][]string{liveDesign: {agentfake.DesignTurnPlain}},
 		OpenDesigns:  []string{liveDesign},
-		Queue:        []string{project + ":" + wtdClaimed, project + ":" + wtdStacked},
+		Queue:        []string{project + ":" + wtdClaimed, project + ":" + wtdStacked, project + ":" + wtdAsk},
 		ProjectExtra: map[string]string{project: wtdMaxAgents},
+		Behaviour:    map[string]string{wtdAddr(wtdAsk, "01"): agentfake.BehaviourWriteAsk},
 		Hold:         true,
 		Chat:         true,
 		FixAgents:    []string{wtdAddr(wtdFix, "01")},
 		Sessions: []SessionSpec{
 			{Project: project, Prompt: wtdChatPR, Read: true, Dir: RootToken + "/" + wtdChatDir},
 			{Project: project, Prompt: wtdChatPR, Read: true, Dir: RootToken + "/" + wtdCloneDir},
+			{Project: project, Prompt: wtdChatPR, Read: true, Dir: RootToken + "/" + wtdCappedDir},
+			{Project: project, Prompt: wtdChatPR, Read: true, Dir: RootToken + "/" + wtdOversizeDir},
+			{Project: project, Prompt: wtdChatPR, Read: true, Dir: RootToken + "/" + wtdCleanDir},
 		},
+		StepsAfterSessions: [][]string{{"server", "triage", "open", project}},
 	}
+	sc.Epics = append(sc.Epics,
+		open(wtdAsk, work("01", "asks", servertest.TicketOpts{})),
+		open(wtdPause, work("01", "paused", servertest.TicketOpts{PauseReason: "self-reported"})),
+		open(wtdPauseStack, work("01", "blocker", servertest.TicketOpts{}), work("02", "paused", servertest.TicketOpts{BlockedBy: []string{"01"}, PauseReason: "self-reported"})),
+		followUps(project, 1, 0))
 	sc.GitSetup = func(git Git, repo string) error {
 		g := &epicDiffGit{git: git, repo: repo}
 		g.write(WorktreeDiffModified, "one\n")
@@ -117,7 +134,7 @@ func WorktreeDiffScenario() Scenario {
 		w.commit("Add a file")
 		w.dirty()
 		g.run("clone", "-q", repo, filepath.Join(root, wtdCloneDir))
-		return firstErr(g.err, w.err)
+		return firstErr(g.err, w.err, edgeWorktrees(git, g, root))
 	}
 	sc.PostStart = func(env PostStartEnv) (*output.WorktreeDiffOutput, error) { return worktreeDiffPostStart(env) }
 	return sc
@@ -205,6 +222,9 @@ func worktreeDiffPostStart(env PostStartEnv) (*output.WorktreeDiffOutput, error)
 	if trunk.err != nil {
 		return nil, trunk.err
 	}
+	if err := edgePostStart(env, out, filepath.Dir(blocker.Path)); err != nil {
+		return nil, err
+	}
 	list, err := env.Sessions()
 	if err != nil {
 		return nil, err
@@ -215,6 +235,12 @@ func worktreeDiffPostStart(env PostStartEnv) (*output.WorktreeDiffOutput, error)
 			out.Chat = output.WorktreeTarget{ID: si.ID, Path: si.Dir}
 		case filepath.Join(env.Root, wtdCloneDir):
 			out.Clone = output.WorktreeTarget{ID: si.ID, Path: si.Dir}
+		case filepath.Join(env.Root, wtdCappedDir):
+			out.Capped = output.WorktreeTarget{ID: si.ID, Path: si.Dir}
+		case filepath.Join(env.Root, wtdOversizeDir):
+			out.Oversize = output.WorktreeTarget{ID: si.ID, Path: si.Dir}
+		case filepath.Join(env.Root, wtdCleanDir):
+			out.Clean = output.WorktreeTarget{ID: si.ID, Path: si.Dir}
 		}
 	}
 	return out, nil

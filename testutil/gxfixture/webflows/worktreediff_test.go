@@ -122,6 +122,8 @@ func TestWorktreeDiffScenario(t *testing.T) {
 		t.Errorf("clone shares the repo's git dir %s", repoCommon)
 	}
 
+	assertEdgeStates(t, r, w, sessions)
+
 	// The unclaimed ticket has no worktree and no iteration branch.
 	if w.Unclaimed == "" {
 		t.Fatal("no unclaimed ticket address")

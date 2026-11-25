@@ -88,6 +88,18 @@ something far away.", and its `break-start` record. `break-warning`: Break on, w
 active minute now, no Rest period. `bedtime-warning`: Bedtime on, start 10 minutes ahead, no Rest period. Data:
 `testutil/gxfixture/spec/rest.go`; the state file `rest.json` and the records under `rest-records/` in the state dir are
 written by `testutil/gxfixture/seedrest.go` through the server's own runner (only the Break text is patched afterwards).
+The `worktree-diff` scenario seeds one target for each way a Worktree diff opens (output `worktree_diff`; seeding in
+`testutil/gxfixture/spec/worktreediff.go` and `worktreediffedges.go`). Chats: `chat` (worktree off `main` with a rename, a
+commit and every kind of uncommitted file) and `clone` (a separate clone). Queue agents: `ticket` (claimed, its iteration
+worktree) and `stacked` (starts from `blocker_branch`, the iteration branch of its blocker). `design` is a Design chat and
+`fix_agent` a Fix agent in the trunk checkout (edits only). `unclaimed` is a ticket address with no worktree. Edge states, each
+with its own worktree and a chat on it: `capped` (501 untracked files git does not ignore, plus a committed tracked change),
+`oversize` (`big/huge.txt` one byte over `MaxBlobBytes` and a small `big/small.txt`, both untracked) and `clean` (no changes,
+HEAD at its merge-base with `main`: "No changes since <base>"). Paused tickets with an iteration worktree: `paused_run` (its
+agent stays up and the run entry stays in `runs.json`, with `uncommitted-note.txt` in the worktree), `paused_stacked` (no run
+entry; starts from `paused_blocker_branch`, which stays as a branch only) and `paused_feature` (no run entry; starts from the
+epic's feature branch `feature_branch`). `triage` is the managed Triage chat. A Queue agent chat with no tracked run is not
+seeded: the session leaves the list with its run (see the ticket's Spec deviations).
 The `epic-diff` scenario seeds real git history and stored epics in the project `demo` for the Diff page
 (`start("epic-diff", { shape })`; default `merged`). Shapes: `merged` is the merged `widgets-impl` (map `widgets`, merged, no
 range) with a stamped Epic range of 15 commits over tickets 01 (every commit stamped `demo:<epic>/<id>`), 02 (legacy

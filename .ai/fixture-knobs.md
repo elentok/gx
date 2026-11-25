@@ -81,6 +81,7 @@ in the scenario; the worker file is `.agentfake-worker.json`.
 | Model switching (`ModelFakes`) | `spec/modelswitch.go`, `modelswitch_test.go` |
 | Host files, cache gate, launch state, images | `catalog/hostfiles.go`, `cachegate.go`, `launchstate.go`, `imagesscenarios.go` |
 | Context window / usage lines | `spec/contextwindow.go` |
+| `worktree-diff`: chat, clone, Queue, Design, Fix and Triage targets; capped (501 untracked), oversize, clean and paused-ticket worktrees (`GitSetup` + `PostStart`) | `spec/worktreediff.go`, `spec/worktreediffedges.go` |
 | `long-question`: a long and a short open agent question (`Questions` knob) | `catalog/questionscenarios.go` |
 | `one-off-question`: a One-off (`one-offs` epic) with an open agent question, for Cancel | `catalog/questionscenarios.go` |
 | `permission`: an open agent question while the live agent is blocked at a Bash prompt (`agentfake.BehaviourAskPermission`, `ask-permission`: asks like `ask-options`, then blocks once the ticket is paused) | `catalog/questionscenarios.go` |
