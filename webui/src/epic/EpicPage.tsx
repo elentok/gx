@@ -625,7 +625,7 @@ function EpicPageBody({
               )
             }
           />
-          <BlockedBy detail={detail} />
+          <BlockedBy detail={detail} address={address} refetch={refetch} readOnly={readOnly} />
           <PrActivity entries={detail.pr_activity} />
           {detail.total === 0 ? (
             <Text mt="4" color="text.muted">

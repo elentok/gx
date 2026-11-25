@@ -16,6 +16,12 @@ import type { FetchEpicDetail } from "./detail"
 import type { FixAgent } from "./fixAgent"
 import { renderThemed } from "../ui/render"
 
+const { showToast } = vi.hoisted(() => ({ showToast: vi.fn() }))
+vi.mock("../ui/toaster", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../ui/toaster")>()),
+  showToast,
+}))
+
 afterEach(unmountAll)
 
 // A second render in one test must not paint the first one's page cache: the cache is not an input.
@@ -66,6 +72,7 @@ function render(
     notFound?: boolean
     fixAgent?: FixAgent
     pending?: PendingRow[]
+    onDetailFetch?: () => void
   } = {},
 ) {
   const state = {
@@ -96,6 +103,7 @@ function render(
     : extra.notFound
       ? async () => ({ kind: "not-found" })
       : async (address) => {
+          extra.onDetailFetch?.()
           await listDone
           return {
             kind: "ok",
@@ -1464,3 +1472,112 @@ test.each(["running", "awaiting-merge", "awaiting-pr", "pr-open", "merging"])(
     expect(screen.queryByTestId("blocked-by-hint")).toBeNull()
   },
 )
+
+// A fresh Response per call: a body reads once, and the shell's own fetches share the stub.
+const answer = (body: unknown) => new Response(JSON.stringify(body), { status: 200 })
+const blockerCall = (fetchMock: ReturnType<typeof vi.fn>) =>
+  fetchMock.mock.calls.find(([url]) => url === "/v1/epics/blocker")
+
+test("two blockers show two chips in the list's order, linked, with Remove buttons", async () => {
+  render("/e/gx:blog", [], "loop", {
+    ...loop({
+      state: "waiting-on-epic",
+      blockers: [
+        { address: "gx:b", name: "b", state: "running" },
+        { address: "gx:a", name: "a", state: "running" },
+      ],
+    }),
+  })
+  const chips = await screen.findAllByTestId("blocker-chip")
+  expect(chips.map((c) => c.textContent)).toEqual(["b×", "a×"])
+  expect(within(chips[0]).getByRole("link", { name: "b" }).getAttribute("href")).toBe("#/e/gx:b")
+  expect(screen.getByRole("button", { name: "Remove a" })).toBeTruthy()
+})
+
+test("no blocker entry draws no Blocked by row", async () => {
+  render("/e/gx:blog", [], "loop", loop({}))
+  await statsOf()
+  expect(screen.queryByText("Blocked by")).toBeNull()
+})
+
+test("a refused stored entry is an error chip with no link, and its × posts a remove", async () => {
+  const fetchMock = vi.fn().mockImplementation(async () => answer({ blocked_by: [] }))
+  vi.stubGlobal("fetch", fetchMock)
+  try {
+    render("/e/gx:blog", [], "loop", loop({ blockers: [{ invalid: true, ref: "gx:blog/01" }] }))
+    const chip = await screen.findByTestId("blocker-chip-error")
+    expect(chip.textContent).toBe("gx:blog/01×")
+    expect(within(chip).queryByRole("link")).toBeNull()
+    fireEvent.click(within(chip).getByRole("button", { name: "Remove gx:blog/01" }))
+    await waitFor(() => expect(blockerCall(fetchMock)).toBeTruthy())
+    expect(JSON.parse(blockerCall(fetchMock)![1].body)).toEqual({
+      address: "gx:blog",
+      blocker: "gx:blog/01",
+      remove: true,
+    })
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test("a chip × removes only that blocker, then the page refetches", async () => {
+  const fetchMock = vi.fn().mockImplementation(async () => answer({ blocked_by: ["b"] }))
+  vi.stubGlobal("fetch", fetchMock)
+  const onDetailFetch = vi.fn()
+  try {
+    render("/e/gx:blog", [], "loop", {
+      ...loop({
+        blockers: [
+          { address: "gx:a", name: "a", state: "running" },
+          { address: "gx:b", name: "b", state: "running" },
+        ],
+      }),
+      onDetailFetch,
+    })
+    fireEvent.click(await screen.findByRole("button", { name: "Remove a" }))
+    await waitFor(() => expect(blockerCall(fetchMock)).toBeTruthy())
+    expect(JSON.parse(blockerCall(fetchMock)![1].body)).toEqual({
+      address: "gx:blog",
+      blocker: "gx:a",
+      remove: true,
+    })
+    await waitFor(() => expect(onDetailFetch.mock.calls.length).toBeGreaterThanOrEqual(2))
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test("a refused chip removal shows its text and keeps the chip", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockImplementation(async () =>
+      answer({ blocked_by: ["a"], refused: true, message: "Nope, stays." }),
+    )
+  vi.stubGlobal("fetch", fetchMock)
+  try {
+    render(
+      "/e/gx:blog",
+      [],
+      "loop",
+      loop({ blockers: [{ address: "gx:a", name: "a", state: "running" }] }),
+    )
+    fireEvent.click(await screen.findByRole("button", { name: "Remove a" }))
+    await waitFor(() =>
+      expect(showToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Nope, stays." })),
+    )
+    expect(screen.getByTestId("blocker-chip")).toBeTruthy()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test("an archived epic page has no Blocked by row", async () => {
+  render(
+    "/archive/gx:blog",
+    [],
+    "loop",
+    loop({ blockers: [{ address: "gx:a", name: "a", state: "running" }] }),
+  )
+  await statsOf()
+  expect(screen.queryByTestId("blocker-chip")).toBeNull()
+})
