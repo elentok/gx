@@ -7,6 +7,8 @@ import { ActionAnswer, type TicketDetail } from "../generated/server"
 import { ticketHref, ticketPath } from "../hrefs"
 import { DetailPage } from "../page/DetailPage"
 import { StateHeader } from "../page/StateHeader"
+import { useKeyboardOpen } from "../page/useKeyboardOpen"
+import { useDevice } from "../useWide"
 import { EmptyState } from "../ui/empty-state/EmptyState"
 import { FullScreenLoader } from "../ui/loader/FullScreenLoader"
 import { useDetailReady } from "../useReady"
@@ -50,6 +52,11 @@ export function AnswerPage({
   const { detail, notFound, source, refetch } = useTicketDetail(address, conn, fetchDetail)
   useDetailReady({ detail, notFound, source })
 
+  // The keyboard leaves little height, so the header gives it to the scroll body. The footer stays.
+  const keyboardOpen = useKeyboardOpen()
+  const device = useDevice()
+  const compact = keyboardOpen && device !== "desktop"
+
   const leave = () => (openedCold ? navigate(ticketPath(address), { replace: true }) : navigate(-1))
 
   // The round the form loaded. firstSeq comes from the first network detail only: the cached copy
@@ -79,7 +86,7 @@ export function AnswerPage({
         ) : detail ? (
           <>
             <Box
-              display="flex"
+              display={compact ? "none" : "flex"}
               alignItems="center"
               gap="10px"
               py="12px"

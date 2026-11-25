@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider, useParams } from "react-router"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import canned from "../canned-detail.json"
@@ -11,6 +11,7 @@ import type { FetchDetail } from "./detail"
 import { clearDrafts } from "./draft"
 import { clearSents, useSent } from "./sent"
 import { writePageCache } from "../pageCache"
+import { DeviceContext, type Device } from "../useWide"
 
 const post = vi.fn<(b: AnswerBody) => Promise<unknown>>()
 vi.mock("./answer", async (orig) => ({
@@ -50,6 +51,7 @@ function AnswerRoute({ fetchDetail }: { fetchDetail: FetchDetail }) {
 function renderAnswer(
   entries: string[],
   fetchDetail: FetchDetail = async () => ({ kind: "ok", detail }),
+  device?: Device,
 ) {
   const router = createMemoryRouter(
     [
@@ -59,9 +61,11 @@ function renderAnswer(
     { initialEntries: entries, initialIndex: entries.length - 1 },
   )
   renderThemed(
-    <ConnectionContext.Provider value={fakeConn}>
-      <RouterProvider router={router} />
-    </ConnectionContext.Provider>,
+    <DeviceContext.Provider value={device}>
+      <ConnectionContext.Provider value={fakeConn}>
+        <RouterProvider router={router} />
+      </ConnectionContext.Provider>
+    </DeviceContext.Provider>,
   )
   return router
 }
@@ -321,4 +325,61 @@ test("agent-not-ready keeps the answer, shows the hint and stays on the page", a
 test("a ticket that does not exist shows Ticket not found", async () => {
   renderAnswer([answerUrl], async () => ({ kind: "not-found" }))
   expect(await screen.findByText("Ticket not found")).toBeTruthy()
+})
+
+class FakeViewport extends EventTarget {
+  height = 800
+  scale = 1
+  offsetTop = 0
+  resize(height: number) {
+    this.height = height
+    this.dispatchEvent(new Event("resize"))
+  }
+}
+
+function withKeyboardViewport() {
+  const vv = new FakeViewport()
+  Object.defineProperty(window, "visualViewport", { value: vv, configurable: true })
+  Object.defineProperty(window, "innerHeight", { value: 800, configurable: true })
+  return vv
+}
+
+afterEach(() => {
+  Object.defineProperty(window, "visualViewport", { value: undefined, configurable: true })
+})
+
+const pageHeader = () =>
+  screen.getByRole("heading", { name: "Answer question", hidden: true }).parentElement!
+
+test("on a phone the header hides while the keyboard is open and the footer stays", async () => {
+  const vv = withKeyboardViewport()
+  renderAnswer([answerUrl], undefined, "phone")
+  const field = await screen.findByLabelText(`Answer to question ${detail.latest!.seq}`)
+  expect(getComputedStyle(pageHeader()).display).not.toBe("none")
+  act(() => {
+    field.focus()
+    vv.resize(500)
+  })
+  await waitFor(() => expect(getComputedStyle(pageHeader()).display).toBe("none"))
+  expect(sendButton()).toBeTruthy()
+  expect(document.documentElement.style.getPropertyValue("--fill-height")).toBe("500px")
+  act(() => {
+    field.blur()
+    vv.resize(800)
+  })
+  await waitFor(() => expect(getComputedStyle(pageHeader()).display).not.toBe("none"))
+})
+
+test("on a desktop the same shrink hides nothing", async () => {
+  const vv = withKeyboardViewport()
+  renderAnswer([answerUrl])
+  const field = await screen.findByLabelText(`Answer to question ${detail.latest!.seq}`)
+  act(() => {
+    field.focus()
+    vv.resize(500)
+  })
+  await waitFor(() =>
+    expect(document.documentElement.style.getPropertyValue("--fill-height")).toBe("500px"),
+  )
+  expect(getComputedStyle(pageHeader()).display).not.toBe("none")
 })

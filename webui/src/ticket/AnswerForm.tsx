@@ -20,10 +20,21 @@ import { clearDraft, useDraft } from "./draft"
 // The page footer's button fills the row on a phone and sits at the right edge on a wide screen.
 const FOOTER_ALIGN = { base: "stretch", md: "flex-end" }
 
+// The mock's phone option rows: tighter padding, 15px text and no "recommended" caption.
+const PHONE_OPTION_ROWS = {
+  "& button[data-answer]": {
+    px: { base: "12px", md: "4" },
+    py: "8px",
+    fontSize: { base: "15px", md: "base" },
+  },
+  "& [data-recommended]": { display: { base: "none", md: "inline" } },
+}
+
 export const BackButton = ({ onClick }: { onClick: () => void }) => (
   <Button
     emphasis="main"
     alignSelf={FOOTER_ALIGN}
+    justifyContent="center"
     data-mock-part="back-to-ticket"
     onClick={onClick}
   >
@@ -53,7 +64,15 @@ export function AnswerPageFrame({
       flexDirection="column"
     >
       <Box flex="1" minH="0" overflowY="auto" overscrollBehavior="contain">
-        <Box maxW="760px" mx="auto" py="4" display="flex" flexDirection="column" gap="4">
+        <Box
+          maxW="760px"
+          mx="auto"
+          py="4"
+          display="flex"
+          flexDirection="column"
+          gap="4"
+          css={PHONE_OPTION_ROWS}
+        >
           {banner && (
             <Box
               role="status"
@@ -164,6 +183,7 @@ export function AnswerForm({
     <Button
       emphasis="main"
       alignSelf={FOOTER_ALIGN}
+      justifyContent="center"
       disabled={!ready || pending}
       onClick={send}
     >

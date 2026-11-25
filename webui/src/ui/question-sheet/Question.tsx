@@ -77,7 +77,12 @@ function Choice({
           </Text>
         )}
         {recommended && (
-          <Text as="span" fontSize="xs" color={on ? "surface" : "tone.waiting.fg"}>
+          <Text
+            as="span"
+            data-recommended=""
+            fontSize="xs"
+            color={on ? "surface" : "tone.waiting.fg"}
+          >
             ★ recommended
           </Text>
         )}
