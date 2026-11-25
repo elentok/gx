@@ -1494,10 +1494,12 @@ test("two blockers show two chips in the list's order, linked, with Remove butto
   expect(screen.getByRole("button", { name: "Remove a" })).toBeTruthy()
 })
 
-test("no blocker entry draws no Blocked by row", async () => {
+test("no blocker entry draws the Blocked by row with the + Blocker button alone", async () => {
   render("/e/gx:blog", [], "loop", loop({}))
   await statsOf()
-  expect(screen.queryByText("Blocked by")).toBeNull()
+  expect(screen.getByText("Blocked by")).toBeTruthy()
+  expect(screen.queryByTestId("blocker-chip")).toBeNull()
+  expect(screen.getByRole("button", { name: "+ Blocker" })).toBeTruthy()
 })
 
 test("a refused stored entry is an error chip with no link, and its × posts a remove", async () => {
@@ -1580,4 +1582,116 @@ test("an archived epic page has no Blocked by row", async () => {
   )
   await statsOf()
   expect(screen.queryByTestId("blocker-chip")).toBeNull()
+  expect(screen.queryByRole("button", { name: "+ Blocker" })).toBeNull()
+})
+
+const pickerList = [
+  row("blog-impl", { section: "implementing", addresses: ["gx:blog-impl"] }),
+  row("a-impl", { section: "implementing", addresses: ["gx:a-impl"] }),
+  row("b-impl", { section: "ready-to-queue", addresses: ["gx:b-impl"] }),
+  row("paused-impl", {
+    section: "needs-you",
+    state_pill: "Paused",
+    addresses: ["gx:paused-impl"],
+  }),
+  row("done-impl", { state: "finished", section: "finished", addresses: ["gx:done-impl"] }),
+  row("map-only", { card_kind: "design", addresses: ["gx:map-only"] }),
+  row("c-impl", {
+    card_kind: "design",
+    section: "implementing",
+    addresses: ["gx:c-impl", "gx:c"],
+  }),
+  row("oneoff", { card_kind: "one-off", addresses: ["gx:oneoff"] }),
+  row("other-impl", {
+    project: "other",
+    address: "other:other-impl",
+    addresses: ["other:other-impl"],
+  }),
+]
+
+async function openPicker(extra: Parameters<typeof render>[3] = {}) {
+  render("/e/gx:blog-impl", pickerList, "loop", {
+    ...loop({ blockers: [{ address: "gx:a-impl", name: "a-impl", state: "running" }] }),
+    ...extra,
+  })
+  fireEvent.click(await screen.findByRole("button", { name: "+ Blocker" }))
+  return screen.findByTestId("blocker-picker")
+}
+
+test("the picker lists the project's loop epics with their states and marks the blockers", async () => {
+  const picker = await openPicker()
+  const rows = within(picker)
+    .getAllByRole("button")
+    .map((b) => b.textContent)
+  expect(rows).toEqual([
+    "☑ a-implImplementing",
+    "☐ b-implReady to queue",
+    "☐ paused-implPaused",
+    "☐ c-implImplementing",
+  ])
+  expect(within(picker).getByText("blog-impl: this epic")).toBeTruthy()
+  expect(within(picker).getByRole("searchbox", { name: "Search epics" })).toBeTruthy()
+})
+
+test("the picker search filters by name, ignoring case", async () => {
+  const picker = await openPicker()
+  fireEvent.change(within(picker).getByRole("searchbox"), { target: { value: "B-IM" } })
+  expect(
+    within(picker)
+      .getAllByRole("button")
+      .map((b) => b.textContent),
+  ).toEqual(["☐ b-implReady to queue"])
+})
+
+test("a click on an unticked row posts one add and the page refetches", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockImplementation(async () => answer({ blocked_by: ["a-impl", "b-impl"] }))
+  vi.stubGlobal("fetch", fetchMock)
+  const onDetailFetch = vi.fn()
+  try {
+    const picker = await openPicker({ onDetailFetch })
+    fireEvent.click(within(picker).getByRole("button", { name: /b-impl/ }))
+    await waitFor(() => expect(blockerCall(fetchMock)).toBeTruthy())
+    expect(JSON.parse(blockerCall(fetchMock)![1].body)).toEqual({
+      address: "gx:blog-impl",
+      blocker: "gx:b-impl",
+    })
+    await waitFor(() => expect(onDetailFetch.mock.calls.length).toBeGreaterThanOrEqual(2))
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test("a click on a ticked row posts one remove", async () => {
+  const fetchMock = vi.fn().mockImplementation(async () => answer({ blocked_by: [] }))
+  vi.stubGlobal("fetch", fetchMock)
+  try {
+    const picker = await openPicker()
+    fireEvent.click(within(picker).getByRole("button", { name: /a-impl/ }))
+    await waitFor(() => expect(blockerCall(fetchMock)).toBeTruthy())
+    expect(JSON.parse(blockerCall(fetchMock)![1].body)).toEqual({
+      address: "gx:blog-impl",
+      blocker: "gx:a-impl",
+      remove: true,
+    })
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test("a refused picker write shows its text inside the open panel and leaves the marks", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockImplementation(async () => answer({ blocked_by: [], refused: true, message: "Not now." }))
+  vi.stubGlobal("fetch", fetchMock)
+  try {
+    const picker = await openPicker()
+    fireEvent.click(within(picker).getByRole("button", { name: /b-impl/ }))
+    expect((await within(picker).findByRole("alert")).textContent).toBe("Not now.")
+    expect(within(picker).getByRole("button", { name: /☐ b-impl/ })).toBeTruthy()
+    expect(within(picker).getByRole("button", { name: /☑ a-impl/ })).toBeTruthy()
+  } finally {
+    vi.unstubAllGlobals()
+  }
 })

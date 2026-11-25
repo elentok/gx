@@ -31,6 +31,10 @@ const SECTIONS: Omit<Section, "rows">[] = [
   { key: SectionOnHold, title: "On hold", tone: "muted", collapsedByDefault: true },
 ]
 
+/** The section's heading, such as "Ready to queue"; empty for a card with no section. */
+export const sectionTitle = (key: string | undefined) =>
+  SECTIONS.find((s) => s.key === key)?.title ?? ""
+
 /**
  * Groups the cards by the section the server put them in, keeping the server's order. Without a
  * text filter, Finished shows only its first `finishedCap` cards; text searches all of them. A

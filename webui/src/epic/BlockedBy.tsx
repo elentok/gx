@@ -1,7 +1,11 @@
 import { Box, chakra, Link, Text } from "@chakra-ui/react"
+import { useState } from "react"
+import type { EpicList } from "../epics/list"
 import type { EpicBlocker } from "../generated/server"
 import { epicHref } from "../hrefs"
+import { Button } from "../ui/button/Button"
 import { useWrite } from "../useWrite"
+import { BlockerPicker } from "./BlockerPicker"
 import { postBlockerRemove } from "./blockerWrite"
 import type { EpicDetail } from "./detail"
 import { blockerHint } from "./waiting"
@@ -52,18 +56,21 @@ function Chip({ blocker, onRemove }: { blocker: EpicBlocker; onRemove: () => voi
 export function BlockedBy({
   detail,
   address,
+  list,
   refetch,
   readOnly,
 }: {
   detail: EpicDetail
   address: string
+  list: EpicList | null
   refetch: () => void
   readOnly?: boolean
 }) {
   const { run } = useWrite()
+  const [open, setOpen] = useState(false)
   const blockers = detail.blockers ?? []
   const hint = blockerHint(blockers)
-  const chips = !readOnly && blockers.length > 0
+  const chips = !readOnly
   if (!hint && !chips) return null
   return (
     <Box display="flex" flexDirection="column" mt="4" gap="3">
@@ -93,7 +100,18 @@ export function BlockedBy({
               />
             )
           })}
+          <Button tone="muted" emphasis="ghost" size="sm" onClick={() => setOpen(!open)}>
+            + Blocker
+          </Button>
         </Box>
+      ) : null}
+      {chips && open ? (
+        <BlockerPicker
+          list={list}
+          address={address}
+          ticked={new Set(blockers.map((b) => b.address ?? ""))}
+          refetch={refetch}
+        />
       ) : null}
     </Box>
   )
