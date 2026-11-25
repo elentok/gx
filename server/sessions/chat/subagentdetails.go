@@ -1,24 +1,6 @@
 package chat
 
-import (
-	"path/filepath"
-	"strings"
-
-	"github.com/elentok/gx/transcript"
-)
-
-// subagentFilePath is where a subagent's own transcript is: the exact output
-// path its launch or notification named, else the file next to the parent
-// transcript. Both come from transcript text, so unsafe shapes give "".
-func subagentFilePath(r transcript.TaskRecord, parentPath string) string {
-	if safeShellOutputPath(r.OutputPath) {
-		return r.OutputPath
-	}
-	if r.ID == "" || filepath.Base(r.ID) != r.ID || r.ID == "." || r.ID == ".." {
-		return ""
-	}
-	return strings.TrimSuffix(parentPath, ".jsonl") + "/subagents/agent-" + r.ID + ".jsonl"
-}
+import "github.com/elentok/gx/transcript"
 
 // withSubagentDetails returns records with each Claude subagent's model,
 // tokens, tool calls and current call filled. It runs on every chat read and
@@ -32,11 +14,11 @@ func (c *Chat) withSubagentDetails(records []transcript.TaskRecord, parentPath s
 	return enrichTasks(records, enrichSpec[transcript.SubagentDetails]{
 		cache: &c.subagentFiles, compute: compute,
 		path: func(r transcript.TaskRecord) (string, bool) {
-			if r.Kind != transcript.TaskKindSubagent || r.ID == "" || r.UsageFinal {
+			if r.Kind != transcript.TaskKindSubagent || r.UsageFinal {
 				return "", false
 			}
-			p := subagentFilePath(r, parentPath)
-			return p, p != ""
+			ref, ok := c.claudeSubagent(r, parentPath)
+			return ref.Path, ok
 		},
 		usable: func(d transcript.SubagentDetails) bool { return d != (transcript.SubagentDetails{}) },
 		merge: func(r *transcript.TaskRecord, d transcript.SubagentDetails) {

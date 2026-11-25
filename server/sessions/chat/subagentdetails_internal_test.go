@@ -153,3 +153,42 @@ func TestRead_SubagentWithNoAgentIDGetsNoDetails(t *testing.T) {
 		t.Fatalf("row = %+v, reads = %d", got, f.reads.Load())
 	}
 }
+
+// runningForeground rewrites the fixture's parent so call a1 has no result yet
+// and returns the subagents directory.
+func (f *subagentFixture) runningForeground(t *testing.T) string {
+	t.Helper()
+	dir := filepath.Dir(f.file)
+	writeLines(t, f.path,
+		fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"content":[{"type":"tool_use","id":"a1","name":"Agent","input":{"description":"explore","prompt":"p"}}]}}`, time.Now().UTC().Add(-time.Minute).Format(time.RFC3339Nano)))
+	writeLines(t, filepath.Join(dir, "agent-x.jsonl"), subagentFileBody)
+	return dir
+}
+
+func TestRead_RunningForegroundSubagentTakesDetailsFromItsMetaFile(t *testing.T) {
+	t.Parallel()
+	f := newSubagentFixture(t, `{"status":"completed"}`, "")
+	dir := f.runningForeground(t)
+	writeLines(t, filepath.Join(dir, "agent-x.meta.json"), `{"toolUseId":"a1","agentType":"Explore"}`)
+	got := f.agent(t)
+	if got.Tokens != 150 || got.Model != "claude-x" || got.ToolCalls != 1 {
+		t.Fatalf("row = %+v", got)
+	}
+}
+
+func TestClaudeSubagent_FindsNestedCallByIDAlone(t *testing.T) {
+	t.Parallel()
+	f := newSubagentFixture(t, `{"status":"completed"}`, "")
+	dir := f.runningForeground(t)
+	writeLines(t, filepath.Join(dir, "agent-x.meta.json"), `{"toolUseId":"a1","agentType":"Explore"}`)
+	writeLines(t, filepath.Join(dir, "agent-y.meta.json"), `{"toolUseId":"inner","agentType":"Plan","parentAgentId":"x","finished":true}`)
+	c := claudeChat(f.src, f.config)
+	ref, ok := c.claudeSubagent(transcript.TaskRecord{CallID: "inner"}, f.path)
+	want := subagentRef{Path: dir + "/agent-y.jsonl", AgentID: "y", ParentAgentID: "x", AgentType: "Plan", Finished: true}
+	if !ok || ref != want {
+		t.Fatalf("ref = %+v, %v; want %+v", ref, ok, want)
+	}
+	if _, ok := c.claudeSubagent(transcript.TaskRecord{CallID: "nope"}, f.path); ok {
+		t.Fatal("unknown call resolved")
+	}
+}

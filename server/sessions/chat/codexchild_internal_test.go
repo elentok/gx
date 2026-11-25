@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/server/wire"
+	"github.com/elentok/gx/transcript"
 )
 
 func TestCodexChildPath_MissExpiresWhenTheTestClockMoves(t *testing.T) {
@@ -95,5 +96,18 @@ func TestRead_CodexSubagentRowsTakeDetailsFromTheChildRollout(t *testing.T) {
 	}
 	if parses.Load() != 2 {
 		t.Errorf("grown child parsed %d times in total, want 2", parses.Load())
+	}
+}
+
+func TestCodexSubagent_ResolvesThroughThreadIDOnly(t *testing.T) {
+	t.Parallel()
+	c := claudeChat(newFakeSource(), t.TempDir())
+	c.rolloutPath = func(_, id string) (string, bool, error) { return "/r/" + id, true, nil }
+	ref, ok := c.codexSubagent(transcript.TaskRecord{CallID: "c1", ID: "th1"}, Meta{})
+	if !ok || ref.Path != "/r/th1" || ref.AgentID != "th1" {
+		t.Fatalf("ref = %+v, %v", ref, ok)
+	}
+	if _, ok := c.codexSubagent(transcript.TaskRecord{CallID: "c1"}, Meta{}); ok {
+		t.Fatal("a call with no started event resolved")
 	}
 }

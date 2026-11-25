@@ -8,6 +8,8 @@ type taskReads struct {
 	shellOutput func(path string) (ShellOutput, error)
 	subagent    func(path string) (transcript.SubagentDetails, error)
 	codexChild  func(path string) (codexChild, error)
+	// subagentScan is called once per scan of a subagents/ directory.
+	subagentScan func(dir string)
 }
 
 // enrichSpec says how one kind of record picks its file and takes the details.

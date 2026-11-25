@@ -63,10 +63,11 @@ func (c *Chat) withCodexChildren(records []transcript.TaskRecord, meta Meta) []t
 	return enrichTasks(records, enrichSpec[codexChild]{
 		cache: &c.codexChildren, compute: compute,
 		path: func(r transcript.TaskRecord) (string, bool) {
-			if r.Kind != transcript.TaskKindSubagent || r.ID == "" {
+			if r.Kind != transcript.TaskKindSubagent {
 				return "", false
 			}
-			return c.codexChildPath(r.ID, meta)
+			ref, ok := c.codexSubagent(r, meta)
+			return ref.Path, ok
 		},
 		usable: func(d codexChild) bool { return d != (codexChild{}) },
 		merge: func(r *transcript.TaskRecord, d codexChild) {

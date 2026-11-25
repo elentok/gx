@@ -358,3 +358,26 @@ func TestLoader_ClaudeScansTheTranscriptOnceForTasksAndOpenCalls(t *testing.T) {
 		t.Errorf("scans = %d, records = %d, open calls = %d; want 1, 1, 1", scans, len(snap.Records), len(snap.InFlight))
 	}
 }
+
+func TestTaskCost_SubagentDirScansOnceAndFindsLaterMeta(t *testing.T) {
+	t.Parallel()
+	e := newCostEnv(t, newClaudeFixture(t))
+	var scans atomic.Int32
+	e.c.reads.subagentScan = func(string) { scans.Add(1) }
+	writeLines(t, e.f.path, costUse("Agent", "a1", 0, `{"description":"x","prompt":"p"}`))
+	dir := filepath.Dir(e.subagentFile("x"))
+	writeLines(t, filepath.Join(dir, "agent-other.meta.json"), `{"toolUseId":"zz"}`)
+	e.read(t)
+	e.read(t)
+	if scans.Load() != 1 {
+		t.Fatalf("scans = %d, want 1", scans.Load())
+	}
+	file := e.subagentFile("x")
+	writeLines(t, file, costSubagentLine)
+	writeLines(t, filepath.Join(dir, "agent-x.meta.json"), `{"toolUseId":"a1"}`)
+	e.read(t)
+	if scans.Load() != 2 {
+		t.Fatalf("scans = %d, want 2", scans.Load())
+	}
+	wantReads(t, e, map[string]int{file: 1})
+}

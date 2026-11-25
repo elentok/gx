@@ -123,6 +123,9 @@ type Chat struct {
 	shellOutputs FileCache[ShellOutput]
 	// subagentFiles caches each Claude subagent transcript's details.
 	subagentFiles FileCache[transcript.SubagentDetails]
+	// subagentMetas caches each subagent sidecar; subagentScans maps call ids to agent ids per directory.
+	subagentMetas FileCache[subagentMeta]
+	subagentScans subagentScan
 	// codexChildren caches each Codex subagent rollout's details.
 	codexChildren FileCache[codexChild]
 	// reads replaces the enrichers' file readers; tests count reads with them.
