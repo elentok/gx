@@ -14,11 +14,14 @@ const LEASE_MS = 30_000
 const designPath = (address: string) => designHref(address).slice(1)
 
 /** Leaves a gone draft's page: for where it was started as (`startedPath` turns its id into a route; the Design's by default), else for the Epics page with a note. */
-export function useLeaveGone(startedPath: (started: string) => string = designPath) {
+export function useLeaveGone(
+  startedPath: (started: string) => string = designPath,
+  startedState?: Record<string, unknown>,
+) {
   const navigate = useNavigate()
   return (started?: string) =>
     started
-      ? navigate(startedPath(started), { replace: true })
+      ? navigate(startedPath(started), { replace: true, state: startedState })
       : navigate("/epics", { replace: true, state: { note: REMOVED_NOTE } })
 }
 

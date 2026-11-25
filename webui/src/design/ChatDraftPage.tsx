@@ -71,7 +71,7 @@ export function ChatDraftPage({
 }: PageProps) {
   const params = useParams()
   const id = props.id ?? params.id ?? ""
-  const leaveGone = useLeaveGone(agentPath)
+  const leaveGone = useLeaveGone(agentPath, { creating: true })
   // `undefined` is still loading; `null` is no such draft.
   const [loaded, setLoaded] = useState<ChatDraft | null>()
   // The client is fixed for the page's life, so the read uses the latest of them without re-running.
@@ -140,7 +140,7 @@ function ChatDraftForm({
   listHistory?: ListHistory
 }) {
   const navigate = useNavigate()
-  const leaveGone = useLeaveGone(agentPath)
+  const leaveGone = useLeaveGone(agentPath, { creating: true })
   const {
     facts,
     brief,

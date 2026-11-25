@@ -70,7 +70,11 @@ export function useChatDraftAutosave({
   })
   const changedKeys = () =>
     SETTING_KEYS.filter((k) => latestSettings.current[k] !== server.current.settings[k])
+  const dirty = () => latest.current !== server.current.text || changedKeys().length > 0
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // The ref twin of `starting`, and a count of Starts so a save sent before one can be told apart.
+  const startingNow = useRef(false)
+  const startGen = useRef(0)
   const chain = useRef<Promise<void>>(Promise.resolve())
   const phase = useRef<Phase>("editing")
   // The banner's ref twin, so a flush in flight sees it before a render.
@@ -85,15 +89,16 @@ export function useChatDraftAutosave({
 
   /** Saves the brief; false when it did not settle. */
   const persist = async () => {
-    if (phase.current !== "editing") return
+    if (phase.current !== "editing" || startingNow.current) return
     const s = server.current
     const text = latest.current
     const sent = { ...latestSettings.current }
     const changed = changedKeys()
-    if (text === s.text && changed.length === 0) {
+    if (!dirty()) {
       setStatus("saved")
       return
     }
+    const gen = startGen.current
     let res: Awaited<ReturnType<typeof drafts.save>>
     // A retry keeps the steady failure state until a save works.
     setStatus((was) => (was === "unsaved" ? was : "saving"))
@@ -105,10 +110,11 @@ export function useChatDraftAutosave({
         ...Object.fromEntries(changed.map((k) => [k, sent[k]])),
       })
     } catch {
-      setStatus("unsaved")
+      if (gen === startGen.current) setStatus("unsaved")
       return
     }
-    if (phase.current !== "editing") return
+    // A Start began after this save was sent; only Start's answer counts now.
+    if (phase.current !== "editing" || gen !== startGen.current) return
     if (res.kind === "ok") {
       Object.assign(s, { revision: res.draft.revision, text, settings: sent })
       setFacts(res.draft)
@@ -122,7 +128,7 @@ export function useChatDraftAutosave({
 
   const flush = () => {
     clearTimeout(timer.current)
-    if (phase.current === "finished" || blocked.current) return
+    if (phase.current === "finished" || blocked.current || startingNow.current) return
     chain.current = chain.current.then(persist).catch(() => setStatus("unsaved"))
   }
 
@@ -201,7 +207,8 @@ export function useChatDraftAutosave({
         .then((res) => {
           if (phase.current === "finished") return
           if (res.kind === "ok") setFacts((was) => ({ ...res.draft, brief: was.brief }))
-          else if (res.kind === "gone") latestFns.current.leaveGone(res.started)
+          else if (res.kind === "gone" && !startingNow.current)
+            latestFns.current.leaveGone(res.started)
         })
         .catch(() => {})
     })
@@ -256,13 +263,22 @@ export function useChatDraftAutosave({
 
   /** Starts the chat: `onStarted` gets its session id. A failure keeps the draft and the page. */
   const start = async (onStarted: (session: string) => void) => {
-    if (phase.current !== "editing" || starting) return
+    if (phase.current !== "editing" || startingNow.current || blocked.current) return
+    clearTimeout(timer.current)
+    // Start carries the latest edit and sends no revision: a save of this page in flight would
+    // otherwise make the server refuse it. Late answers of such a save are dropped by `startGen`.
+    const edit = dirty()
+      ? {
+          brief: latest.current,
+          ...Object.fromEntries(changedKeys().map((k) => [k, latestSettings.current[k]])),
+        }
+      : undefined
+    startGen.current++
+    startingNow.current = true
     setStarting(true)
+    let refreshed = false
     try {
-      // Stop-gap until Start carries the edit: Start no longer waits for a pending debounce.
-      flush()
-      await chain.current
-      const res = await drafts.start(initial.id)
+      const res = await (edit ? drafts.start(initial.id, edit) : drafts.start(initial.id))
       if (res.kind === "started") {
         phase.current = "finished"
         clearTimeout(timer.current)
@@ -273,13 +289,25 @@ export function useChatDraftAutosave({
       setStartError(res.message)
       // The failed Start may have left a worktree; the draft says where.
       const again = await drafts.read(initial.id)
-      if (again.kind === "ok") setFacts((was) => ({ ...again.draft, brief: was.brief }))
-      else if (again.kind === "gone") leaveGone(again.started)
+      if (again.kind === "ok") {
+        Object.assign(server.current, {
+          revision: again.draft.revision,
+          text: again.draft.brief,
+          settings: settingsOf(again.draft),
+        })
+        setFacts((was) => ({ ...again.draft, brief: was.brief }))
+        refreshed = true
+      } else if (again.kind === "gone") leaveGone(again.started)
     } catch (e) {
       setStartError(e instanceof Error ? e.message : "Start failed")
     } finally {
+      startingNow.current = false
       setStarting(false)
     }
+    // Words typed during Start save against the re-read revision.
+    if (!refreshed) return
+    if (dirty()) flush()
+    else setStatus("saved")
   }
 
   return {

@@ -62,9 +62,11 @@ function fakeDrafts(over: Partial<ChatDraft> = {}) {
 /** Shows where the router is, so a redirect is visible. */
 function Where() {
   const { pathname, state } = useLocation()
+  const s = state as { note?: string; creating?: boolean } | null
   return (
     <p data-testid="where">
-      {pathname} {(state as { note?: string } | null)?.note}
+      {pathname} {s?.note}
+      {s?.creating ? "creating" : ""}
     </p>
   )
 }
@@ -194,14 +196,15 @@ test("Start is blocked for a blank brief only, never while typing, with no reaso
   expect(screen.getByRole("status").textContent).toBe("")
 })
 
-test("Start flushes a pending debounce before it starts", async () => {
+test("Start inside the debounce window sends the typed text with the start and saves nothing", async () => {
   vi.useFakeTimers()
   const fake = fakeDrafts()
   await mount(fake)
   typeBrief("last words")
   await act(async () => fireEvent.click(startButton()))
-  expect(fake.save).toHaveBeenCalledWith(expect.objectContaining({ brief: "last words" }))
-  expect(fake.start).toHaveBeenCalledWith("c1")
+  expect(fake.start).toHaveBeenCalledTimes(1)
+  expect(fake.start).toHaveBeenCalledWith("c1", { brief: "last words" })
+  expect(fake.save).not.toHaveBeenCalled()
 })
 
 test("Cmd+Enter does nothing while Start is blocked, and a click on blocked Start does not start", async () => {
@@ -660,7 +663,103 @@ test("a draft that was started goes to its session", async () => {
   const fake = fakeDrafts()
   fake.read.mockResolvedValueOnce({ kind: "gone", started: "sess-1" })
   await mount(fake)
-  expect(where()).toBe("/agents/sess-1 ")
+  expect(where()).toBe("/agents/sess-1 creating")
+})
+
+test("a chat-drafts-changed event that reads gone does not leave the page while Start runs", async () => {
+  const fake = fakeDrafts()
+  let finish!: (r: ChatStartOutcome) => void
+  fake.start.mockImplementationOnce(() => new Promise((r) => (finish = r)))
+  const { emit } = await mount(fake)
+  await clickStart()
+  fake.read.mockResolvedValueOnce({ kind: "gone" })
+  await emit(EventChatDraftsChanged)
+  expect(screen.queryByTestId("where")).toBeNull()
+  await act(async () => finish({ kind: "gone", started: "sess-4" }))
+  expect(where()).toBe("/agents/sess-4 creating")
+})
+
+test("a late save answer after Start changes nothing, and no save goes out while Start runs", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts()
+  let answer!: (r: ChatDraftOutcome) => void
+  fake.save.mockImplementationOnce(() => new Promise((r) => (answer = r)))
+  let finish!: (r: ChatStartOutcome) => void
+  fake.start.mockImplementationOnce(() => new Promise((r) => (finish = r)))
+  await mount(fake)
+  typeBrief("first")
+  await wait(800)
+  expect(fake.save).toHaveBeenCalledTimes(1)
+  typeBrief("second")
+  await clickStart()
+  expect(fake.start).toHaveBeenCalledWith("c1", { brief: "second" })
+  await act(async () => answer({ kind: "gone", started: "sess-7" }))
+  expect(screen.queryByTestId("where")).toBeNull()
+  await wait(5000)
+  await act(async () => void window.dispatchEvent(new Event("pagehide")))
+  expect(fake.save).toHaveBeenCalledTimes(1)
+  await act(async () => finish({ kind: "started", session: "sess-9" }))
+  expect(where()).toBe("/agents/sess-9 ")
+})
+
+test("a late conflict from a save sent before Start raises no banner", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts()
+  let answer!: (r: ChatDraftOutcome) => void
+  fake.save.mockImplementationOnce(() => new Promise((r) => (answer = r)))
+  fake.start.mockImplementationOnce(() => new Promise(() => {}))
+  await mount(fake)
+  typeBrief("first")
+  await wait(800)
+  await clickStart()
+  await act(async () => answer({ kind: "conflict" }))
+  expect(screen.queryByText("This draft changed on another device.")).toBeNull()
+})
+
+test("Start does not start while the conflict banner shows", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts()
+  fake.save.mockResolvedValueOnce({ kind: "conflict" })
+  await mount(fake)
+  typeBrief("Mine")
+  await wait(800)
+  expect(screen.getByText("This draft changed on another device.")).toBeTruthy()
+  await clickStart()
+  await act(async () => fireEvent.keyDown(brief(), { key: "Enter", metaKey: true }))
+  expect(fake.start).not.toHaveBeenCalled()
+})
+
+test("a refused edit keeps the typed text, and the next autosave uses the re-read revision", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts()
+  fake.start.mockImplementationOnce(async () => {
+    fake.stored.revision = 8
+    return { kind: "failed", message: "no such model" }
+  })
+  await mount(fake)
+  typeBrief("typed")
+  await clickStart()
+  expect(screen.getByRole("alert").textContent).toContain("no such model")
+  expect(brief().value).toBe("typed")
+  // The refused edit left the draft as it was, so the text is still unsaved and goes out now.
+  expect(fake.save).toHaveBeenCalledTimes(1)
+  expect(fake.save).toHaveBeenLastCalledWith({ id: "c1", brief: "typed", revision: 8 })
+  await clickStart()
+  expect(fake.start).toHaveBeenCalledTimes(2)
+  expect(where()).toBe("/agents/sess-9 ")
+})
+
+test("changed settings go in Start's edit and unchanged ones stay out", async () => {
+  vi.useFakeTimers()
+  const fake = fakeDrafts()
+  await mountOpen(fake)
+  fireEvent.change(control("Effort"), { target: { value: "max" } })
+  await clickStart()
+  expect(fake.save).not.toHaveBeenCalled()
+  expect(fake.start).toHaveBeenCalledWith("c1", {
+    brief: "Split the auth work out.",
+    effort: "max",
+  })
 })
 
 test("a chat-drafts-changed event that finds the draft gone leaves the page", async () => {

@@ -7,6 +7,7 @@ import {
   type ChatDraftResult,
   type ChatDraftSaveRequest,
 } from "../generated/server"
+import type { ChatDraftEdit, ChatDraftStartRequest } from "../generated/ops"
 import { WriteError } from "../useWrite"
 import { json } from "./drafts"
 
@@ -31,7 +32,7 @@ export interface ChatDraftsClient {
   read: (id: string) => Promise<ChatDraftOutcome>
   save: (body: ChatDraftSaveRequest) => Promise<ChatDraftOutcome>
   remove: (id: string) => Promise<ChatDraftOutcome>
-  start: (id: string) => Promise<ChatStartOutcome>
+  start: (id: string, edit?: ChatDraftEdit) => Promise<ChatStartOutcome>
 }
 
 /** What a new chat draft starts with; the brief is empty and the other settings take the server's defaults. */
@@ -88,7 +89,10 @@ function toStart(r: ChatDraftResult): ChatStartOutcome {
 
 export const realChatDrafts: ChatDraftsClient = {
   create: createDraft,
-  start: async (id) => toStart(await json<ChatDraftResult>(`${BASE}/start`, { id })),
+  start: async (id, edit) => {
+    const body: ChatDraftStartRequest = { id, edit }
+    return toStart(await json<ChatDraftResult>(`${BASE}/start`, body))
+  },
   read: (id) => call("read", { id }),
   save: (body) => call("save", body),
   remove: (id) => call("delete", { id }),
