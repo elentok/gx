@@ -94,8 +94,34 @@ test.describe("3. Pause reasons and recovery", () => {
       await expect(target).toHaveAttribute("title", title)
     }
 
+    // A question gx asked has no answer card: the first verb is the main button, and the answer page
+    // sends the person back to the ticket.
+    const gxAsked = async (id: string, verb: string) => {
+      await expect(page.getByRole("button", nav("Answer question"))).toHaveCount(0)
+      await expect(recovery(page).getByRole("button", nav(verb)).first()).toHaveAttribute(
+        "data-emphasis",
+        "main",
+      )
+      await page.evaluate((hash) => (location.hash = hash), `#/answer/demo:paused-epic/${id}`)
+      await expect(page.getByText("This question is answered on the ticket page.")).toBeVisible()
+      await expect(page.getByRole("button", nav("Send answer"))).toHaveCount(0)
+      await page.getByRole("button", nav("Back to ticket")).click()
+      await expect(page).toHaveURL(new RegExp(`/t/demo:paused-epic/${id}$`))
+    }
+
     await step("paused-epic", "03", "Waiting for your answer", async () => {
-      await page.evaluate((hash) => (location.hash = hash), "#/answer/demo:paused-epic/03")
+      // The compact card: the asker, the title once and a static button row. The seeded round is
+      // gx's own and has no handoff, so the label reads "GX ASKS" and there are no Agent's notes.
+      await expect(page.getByText("GX ASKS", { exact: true })).toBeVisible()
+      await expect(page.getByText("Seeded pause: self-reported", { exact: true })).toHaveCount(1)
+      const answer = page.getByRole("button", nav("Answer question"))
+      await expect(answer).toHaveAttribute("data-emphasis", "main")
+      await expect(
+        recovery(page).getByRole("button", nav("Resume without answering")),
+      ).toHaveAttribute("data-emphasis", "secondary")
+      await expect(recovery(page)).toHaveCSS("position", "static")
+      await answer.click()
+      await expect(page).toHaveURL(/#\/answer\/demo:paused-epic\/03$/)
       await page.getByRole("textbox", { name: /^Answer to question/ }).fill("go ahead")
       await page.getByRole("button", nav("Send answer")).click()
       // The answer page's text never shows the pause reason, so the helper's wait would pass
@@ -103,8 +129,15 @@ test.describe("3. Pause reasons and recovery", () => {
       await expect(page.getByRole("group", { name: "Answered question" })).toBeVisible()
     })
     await step("paused-epic", "04", "Ambiguous base", async () => {
+      await expect(recovery(page)).toHaveCSS("position", "sticky")
+      await gxAsked("04", "Choose base")
       await page.getByRole("button", nav("01")).click()
       await page.getByRole("button", nav("Choose base")).click()
+    })
+    await step("paused-epic", "06", "Agent stopped without a result", async () => {
+      await gxAsked("06", "Retry")
+      await recovery(page).getByRole("button", nav("Retry")).click()
+      await expect(page.getByText("Answer sent", { exact: true })).toHaveCount(0)
     })
     await step("paused-epic", "07", "Run failed", async () => {
       await recovery(page).getByRole("button", nav("Retry")).click()
@@ -408,9 +441,86 @@ test.describe("147. Resume on worker", () => {
       recovery(page).getByText("Ran on Claude Opus 4, expected Claude Sonnet 4."),
     ).toBeVisible()
     await expect(recovery(page).getByRole("button")).toHaveText([/^Resume on worker$/])
+    await expect(page.getByRole("button", nav("Answer question"))).toHaveCount(0)
+    await expect(recovery(page).getByRole("button", nav("Resume on worker"))).toHaveAttribute(
+      "data-emphasis",
+      "main",
+    )
+    await page.evaluate((hash) => (location.hash = hash), "#/answer/demo:mismatch-epic/01")
+    await expect(page.getByText("This question is answered on the ticket page.")).toBeVisible()
+    await expect(page.getByRole("button", nav("Back to ticket"))).toBeVisible()
+    await page.getByRole("button", nav("Back to ticket")).click()
+    await expect(recovery(page)).toBeVisible()
 
     await recovery(page).getByRole("button", nav("Resume on worker")).click()
     await expect(page.getByText("Wrong model")).toHaveCount(0)
+  })
+})
+
+test.describe("213. Question card, long question and One-off Cancel", () => {
+  test("a long title clamps in a static card and a One-off's Cancel ends the run", async ({
+    page,
+    start,
+  }) => {
+    test.setTimeout(120_000)
+    await start("long-question")
+    await openTicket(page, "01", "long-question-epic")
+    await expect(page.getByText("Paused · Waiting for your answer", { exact: true })).toBeVisible()
+
+    const answer = page.getByRole("button", nav("Answer question"))
+    const resume = recovery(page).getByRole("button", nav("Resume without answering"))
+    const title = page.locator('[data-mock-part="question-title"]')
+    const checkCard = async () => {
+      await expect(page.getByText("THE AGENT ASKS", { exact: true })).toBeVisible()
+      await expect(title).toHaveCSS("-webkit-line-clamp", "3")
+      await expect(answer).toHaveAttribute("data-emphasis", "main")
+      await expect(resume).toHaveAttribute("data-emphasis", "secondary")
+      await expect(recovery(page)).toHaveCSS("position", "static")
+    }
+    await test.step("1100px", async () => {
+      await page.setViewportSize({ width: 1100, height: 800 })
+      await checkCard()
+    })
+    await test.step("390px", async () => {
+      await page.setViewportSize({ width: 390, height: 800 })
+      await checkCard()
+      await expect
+        .poll(async () => {
+          const boxes = [await answer.boundingBox(), await resume.boundingBox()]
+          return boxes.every(
+            (b) =>
+              b !== null && b.y >= 0 && b.y + b.height <= 800 && b.x >= 0 && b.x + b.width <= 390,
+          )
+        })
+        .toBe(true)
+    })
+    await test.step("earlier rounds sit below the card", async () => {
+      await page.getByRole("button", { name: /Earlier rounds \(2\)$/ }).click()
+      await expect
+        .poll(async () => {
+          const card = await page.locator('[data-mock-part="question-card"]').boundingBox()
+          const rounds = await page.getByText(/^#1 · /).boundingBox()
+          return card !== null && rounds !== null && rounds.y > card.y + card.height
+        })
+        .toBe(true)
+    })
+
+    await test.step("One-off Cancel ends the run", async () => {
+      const oneOff = await start("one-off-question")
+      await page.setViewportSize({ width: 1100, height: 800 })
+      await page.evaluate((hash) => (location.hash = hash), "#/t/demo:one-offs/01")
+      await expect(answer).toHaveAttribute("data-emphasis", "main")
+      const cancel = recovery(page).getByRole("button", nav("Cancel run"))
+      await expect(cancel).toHaveAttribute("data-emphasis", "secondary")
+      await cancel.click()
+      await page
+        .getByRole("alertdialog")
+        .getByRole("button", { name: /^Cancel run/ })
+        .click()
+      await expect
+        .poll(() => oneOff.cli("tickets", "show", "demo:one-offs/01"))
+        .toMatch(/^status: cancelled$/m)
+    })
   })
 })
 

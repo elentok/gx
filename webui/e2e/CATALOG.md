@@ -201,7 +201,7 @@ worker outcome maps to ticket status, why fixture CLI writes land late, how to s
 and "read `test-results/**/error-context.md` first on a locator failure".
 
 The suite is capped by `maxFlows` in `playwrightguard/budget_test.go`, which equals the number of
-`test(` calls in `*.e2e.ts` (162). Before you add a flow, add a step to a flow on the same scenario
+`test(` calls in `*.e2e.ts` (163). Before you add a flow, add a step to a flow on the same scenario
 (see `gx-only-e2es`) and keep this file and `maxFlows` in step with the code.
 
 A flow's title starts with its plan number. A flow that absorbed others lists their numbers in its
@@ -281,7 +281,8 @@ assertions; the shared helpers are in `fixture.ts`, `agentsKit.ts` and `restart-
 - **A verify finish with an unchecked story pauses** (scenario `verify-unchecked`): the agent reports finished without recording its story and again after each block message; the pause says "unchecked units: Story 1", offers Retry and Start over, and Retry ends it until the agent is blocked twice more and the pause returns.
 - **Herdr removal states.** Scenarios `herdr-leftover-empty` (a claimed ticket on a removed herdr run, clean worktree: reopened and claimed again), `herdr-leftover-work` (the same with one commit: paused `handle-mismatch`, offers Retry and Start over) and `agent-pane-busy` (a ticket paused `agent_pane_busy` before the migration: shows the `iteration-error` recovery verbs). Scenario `old-run-log` holds removed run-log event types; the Queue tab renders.
 - **Unknown skill.**
-- **A model-mismatch pause resumes on the worker tier.**
+- **A model-mismatch pause resumes on the worker tier.** No "Answer question" button, "Resume on worker" is main, and `#/answer/demo:mismatch-epic/01` shows "This question is answered on the ticket page." with Back to ticket.
+- **213. Question card, long question and One-off Cancel** (scenarios `long-question`, `one-off-question`): the long title clamps to three lines in a static card with "Answer question" main and "Resume without answering" secondary at 1100 px and 390 px (both buttons inside the viewport); Earlier rounds sits below the card; a One-off's "Cancel run" and its confirm cancel the ticket.
 - **Copy, start, and refuse a second agent.**
 - **Retry lifts the pause.**
 - **Names the Claude app.**

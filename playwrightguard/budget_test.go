@@ -84,7 +84,9 @@ import (
 // own flows.
 // Delivery cards flow (+1): Copy needs the real clipboard, Dismiss across a second tab needs a real browser, and
 // Show screen and the later good send need the fixture's fake agents; DeliveryCard.test.tsx covers each card alone.
-const maxFlows = 162
+// Question card flow (+1): the long title at 390px, the static button row and a One-off's Cancel need real layout and a
+// real server, and flow 3 is near the 45 s slow limit; ActionCard.test.tsx covers each render alone.
+const maxFlows = 163
 
 var flowStart = regexp.MustCompile(`(?m)^\s*test\(`)
 
