@@ -320,6 +320,18 @@ test("a ticket route shows a spinner, then the ticket whose address is in the ha
   expect(screen.queryByRole("status", { name: "Loading ticket" })).toBeNull()
 })
 
+test("an answer route loads the ticket whose address is in the hash and titles the tab", async () => {
+  renderAt("/answer/gx:e/01", okFor)
+  expect(await screen.findByRole("link", { name: "← Ticket" })).toBeTruthy()
+  expect(screen.getByRole("heading", { name: "Answer question" })).toBeTruthy()
+  expect(title()).toBe("Title of gx:e/01 · Answer question · gx")
+})
+
+test("an answer route for a missing ticket shows Ticket not found", async () => {
+  renderAt("/answer/gx:e/99", async () => ({ kind: "not-found" }))
+  expect(await screen.findByText("Ticket not found")).toBeTruthy()
+})
+
 test("a 404 shows Ticket not found", async () => {
   renderAt("/t/gx:e/99", async () => ({ kind: "not-found" }))
   expect(await screen.findByText("Ticket not found")).toBeTruthy()
@@ -1334,13 +1346,14 @@ test("a route name comes from the pattern, never the URL", async () => {
   expect(JSON.stringify(samples())).not.toMatch(/proj|secret|frag/)
 })
 
-test("every page route pattern has one of the 21 route names", () => {
+test("every page route pattern has one of the 22 route names", () => {
   // /rest/* are demo routes on made-up state; they carry no route name on purpose.
   const real = pageRoutePatterns().filter((p) => !p.startsWith("/rest/"))
   for (const pattern of real) expect(ROUTE_NAMES[pattern], pattern).toBeTruthy()
   expect([...new Set(Object.values(ROUTE_NAMES))].sort()).toEqual(
     [
       "agents",
+      "answer",
       "archive",
       "archive-epic",
       "backlog",

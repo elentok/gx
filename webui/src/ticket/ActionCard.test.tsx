@@ -8,9 +8,11 @@ import { appRoutes } from "../routes"
 import { expectViEditor, viConnection } from "../ui/expandable-text/testing"
 import { renderThemed } from "../ui/render"
 import type { FetchDetail } from "./detail"
+import { clearSents } from "./sent"
 
 afterEach(() => {
   cleanup()
+  clearSents()
   vi.unstubAllGlobals()
 })
 

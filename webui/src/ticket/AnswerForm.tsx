@@ -1,23 +1,42 @@
 import { Box, Text } from "@chakra-ui/react"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { ActionAnswer, type TicketDetail } from "../generated/server"
 import { Button } from "../ui/button/Button"
 import { Question } from "../ui/question-sheet/Question"
-import { isAnswered, type Answer, type QuestionCard } from "../ui/question-sheet/round"
-import { postAnswer, ReasonStale, sentOf, type PostAnswer, type Sent } from "./answer"
+import type { Answer, QuestionCard } from "../ui/question-sheet/round"
+import {
+  answerBody,
+  isReady,
+  isTextKind,
+  postAnswer,
+  ReasonStale,
+  refusalText,
+  sentOf,
+  type PostAnswer,
+  type Sent,
+} from "./answer"
 
-// The sticky answer area. The server decides whether it shows (the detail's actions).
+// The answer area. The server decides whether it shows (the detail's actions).
+// "sticky" is the box under the ticket page; "page" is a scroll body with the Send footer outside it.
 export function AnswerForm({
   detail,
   post = postAnswer,
   onSent,
   onStale,
+  layout = "sticky",
+  lead,
+  children,
 }: {
   detail: TicketDetail
   post?: PostAnswer
   onSent?: (sent: Sent) => void
   /** The question changed under the person: refetch so the current one shows. */
   onStale?: () => void
+  layout?: "sticky" | "page"
+  /** Page layout: scroll content above the question. */
+  lead?: ReactNode
+  /** Page layout: scroll content below the question. */
+  children?: ReactNode
 }) {
   const { latest } = detail
   const [answer, setAnswer] = useState<Answer>({})
@@ -34,34 +53,17 @@ export function AnswerForm({
 
   if (!latest || !detail.actions.includes(ActionAnswer) || sentSeq === latest.seq) return null
 
-  const isText = latest.kind !== "yes-no" && latest.kind !== "options"
-  // A choice question may be answered by a note alone; free text needs its text.
-  const ready = isAnswered(answer) || (!isText && !!answer.note?.trim())
+  const isText = isTextKind(latest.kind)
+  const ready = isReady(answer, isText)
 
   const send = async () => {
     if (!ready || pending) return
     setPending(true)
     setError("")
     try {
-      const body = {
-        address: detail.address,
-        state: detail.state ?? "",
-        ...(answer.huh
-          ? { huh: true }
-          : isText
-            ? { text: answer.text }
-            : answer.choice
-              ? { choice: answer.choice }
-              : {}),
-        ...(!isText && answer.note?.trim() ? { note: answer.note } : {}),
-      }
-      const res = await post(body)
+      const res = await post(answerBody(detail, answer, isText))
       if ("refused" in res) {
-        setError(
-          res.reason === "agent-not-ready"
-            ? `${res.message} Approve the agent's prompt first, then send again.`
-            : res.message,
-        )
+        setError(refusalText(res))
         if (res.reason === ReasonStale) onStale?.()
       } else {
         setSentSeq(latest.seq)
@@ -86,6 +88,40 @@ export function AnswerForm({
     links: latest.links,
   }
 
+  const question = <Question card={card} answer={answer} onChange={setAnswer} onPicked={() => {}} />
+  const alert = error && <Text role="alert">{error}</Text>
+  const sendButton = (
+    <Button emphasis="main" alignSelf="flex-end" disabled={!ready || pending} onClick={send}>
+      Send answer
+    </Button>
+  )
+
+  if (layout === "page") {
+    return (
+      <Box role="form" aria-label="Answer" flex="1" minH="0" display="flex" flexDirection="column">
+        <Box flex="1" minH="0" overflowY="auto" overscrollBehavior="contain">
+          <Box maxW="760px" mx="auto" py="4" display="flex" flexDirection="column" gap="4">
+            {lead}
+            {question}
+            {children}
+          </Box>
+        </Box>
+        <Box
+          borderTopWidth="1px"
+          borderColor="border"
+          bg="surface.raised"
+          py="12px"
+          display="flex"
+          flexDirection="column"
+          gap="2"
+        >
+          {alert}
+          {sendButton}
+        </Box>
+      </Box>
+    )
+  }
+
   return (
     <Box
       position="sticky"
@@ -104,12 +140,10 @@ export function AnswerForm({
     >
       {/* A long question scrolls inside this area so the Send button stays on screen. */}
       <Box overflowY="auto" minH="0" maxH="calc(100dvh - 160px)" overscrollBehavior="contain">
-        <Question card={card} answer={answer} onChange={setAnswer} onPicked={() => {}} />
+        {question}
       </Box>
-      {error && <Text role="alert">{error}</Text>}
-      <Button emphasis="main" alignSelf="flex-end" disabled={!ready || pending} onClick={send}>
-        Send answer
-      </Button>
+      {alert}
+      {sendButton}
     </Box>
   )
 }

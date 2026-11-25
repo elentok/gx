@@ -120,6 +120,7 @@ const READY_WIRING: Record<
   "/chat-drafts/:id": "useReadyWhen",
   "/triage/*": "useDetailReady",
   "/t/*": "useDetailReady",
+  "/answer/*": "useDetailReady",
   "/e/*": "useDetailReady",
   "/diff": "useReadyWhen",
 }

@@ -28,7 +28,7 @@ const (
 
 var (
 	webPerfMetrics = []string{"lcp", "inp", "cls", "fcp", "app_ready", "route_ready"}
-	webPerfRoutes  = []string{"epics", "epic", "archive", "archive-epic", "agents", "stats", "cleanup", "schedules", "schedule", "tips", "settings", "design", "triage", "ticket"}
+	webPerfRoutes  = []string{"epics", "epic", "archive", "archive-epic", "agents", "stats", "cleanup", "schedules", "schedule", "tips", "settings", "design", "triage", "ticket", "answer"}
 	webPerfEnums   = map[string][]string{
 		"outcome":          {"ready", "error", "empty"},
 		"trigger":          {"click", "keyboard", "history", "programmatic"},

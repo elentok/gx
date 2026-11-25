@@ -33,6 +33,7 @@ export const ROUTE_NAMES: Record<string, string> = {
   "/chat-drafts/:id": "chat-draft",
   "/triage/*": "triage",
   "/t/*": "ticket",
+  "/answer/*": "answer",
   "/e/*": "epic",
   "/diff": "diff",
 }

@@ -97,6 +97,9 @@ const SchedulesPage = lazy(() =>
 const StatsPage = lazy(() =>
   import("./stats/StatsPage").then(({ StatsPage }) => ({ default: StatsPage })),
 )
+const AnswerPage = lazy(() =>
+  import("./ticket/AnswerPage").then(({ AnswerPage }) => ({ default: AnswerPage })),
+)
 const TicketPage = lazy(() =>
   import("./ticket/TicketPage").then(({ TicketPage }) => ({ default: TicketPage })),
 )
@@ -150,6 +153,11 @@ function TicketRoute({
   // An address holds a slash (project:epic/NN), so it arrives as the splat.
   const address = useParams()["*"] ?? ""
   return <TicketPage address={address} fetchDetail={fetchDetail} fetchScreen={fetchScreen} />
+}
+
+function AnswerRoute({ fetchDetail }: { fetchDetail?: FetchDetail }) {
+  const address = useParams()["*"] ?? ""
+  return <AnswerPage address={address} fetchDetail={fetchDetail} />
 }
 
 function EpicRoute({
@@ -418,6 +426,7 @@ function pageRoutes(fetchers: RouteFetchers): RouteObject[] {
       path: "/t/*",
       element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} />,
     },
+    { path: "/answer/*", element: <AnswerRoute fetchDetail={fetchers.ticket} /> },
     {
       path: "/diff",
       element: (

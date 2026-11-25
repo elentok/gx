@@ -7,7 +7,10 @@ import { isAnsweredRound, type Sent } from "./answer"
 import { AnswerResult } from "./AnswerResult"
 import { Collapsible } from "./Collapsible"
 
-const Label = ({ children }: { children: string }) => (
+export const askerLabel = (latest: { by?: string } | null | undefined) =>
+  latest?.by === "gx" ? "GX ASKS" : "THE AGENT ASKS"
+
+export const Label = ({ children }: { children: string }) => (
   <Text
     fontFamily="condensed"
     fontSize="xs"
@@ -36,7 +39,7 @@ export function TicketReading({
   sent?: Sent | null
 }) {
   const { latest } = detail
-  const asker = latest?.by === "gx" ? "GX ASKS" : "THE AGENT ASKS"
+  const asker = askerLabel(latest)
   const answered = isAnsweredRound(latest, sent)
 
   return (
@@ -73,13 +76,18 @@ export function TicketReading({
           {latest.closed_reason && <Text>Closed: {latest.closed_reason}</Text>}
         </>
       )}
-      {detail.rounds.length > 0 && (
-        <Collapsible label={`Earlier rounds (${detail.rounds.length})`}>
-          {detail.rounds.map((r) => (
-            <EarlierRound key={r.seq} round={r} />
-          ))}
-        </Collapsible>
-      )}
+      <EarlierRounds detail={detail} />
     </Box>
+  )
+}
+
+export function EarlierRounds({ detail }: { detail: TicketDetail }) {
+  if (detail.rounds.length === 0) return null
+  return (
+    <Collapsible label={`Earlier rounds (${detail.rounds.length})`}>
+      {detail.rounds.map((r) => (
+        <EarlierRound key={r.seq} round={r} />
+      ))}
+    </Collapsible>
   )
 }

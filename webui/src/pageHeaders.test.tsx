@@ -513,6 +513,20 @@ const rows: Row[] = [
     fetchers: { ticket: notFound },
     marker: "Ticket not found",
   },
+  {
+    name: "answer loading",
+    pattern: "/answer/*",
+    path: "/answer/gx:map/01",
+    fetchers: { ticket: never },
+    marker: "Loading ticket",
+  },
+  {
+    name: "answer not found",
+    pattern: "/answer/*",
+    path: "/answer/gx:map/01",
+    fetchers: { ticket: notFound },
+    marker: "Ticket not found",
+  },
 
   {
     name: "draft loading",

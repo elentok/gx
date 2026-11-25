@@ -9,6 +9,10 @@ export const ticketPath = (address: string) => `/t/${address}`
 
 export const ticketHref = (address: string) => `#${ticketPath(address)}`
 
+export const answerPath = (address: string) => `/answer/${address}`
+
+export const answerHref = (address: string) => `#${answerPath(address)}`
+
 /** A Design is its map epic's canonical address (ADR 0027). */
 export const designHref = (address: string) => `#/d/${address}`
 
@@ -26,7 +30,7 @@ export function currentAddress(pathname: string): string {
   const [, kind, ...rest] = pathname.split("/")
   const id = decodeURIComponent(rest.join("/"))
   if (kind === "d" || kind === "e") return id
-  if (kind === "t") return id.replace(/\/[^/]*$/, "")
+  if (kind === "t" || kind === "answer") return id.replace(/\/[^/]*$/, "")
   return ""
 }
 

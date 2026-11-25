@@ -12,6 +12,7 @@ export type PageTitle = {
     | "Design draft"
     | "Triage"
     | "Ticket"
+    | "Answer question"
     | "Settings"
     | "Cleanup"
     | "Tips"

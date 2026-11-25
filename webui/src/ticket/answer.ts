@@ -1,4 +1,5 @@
 import { apiFetch } from "../apiFetch"
+import { isAnswered, type Answer } from "../ui/question-sheet/round"
 
 export interface AnswerBody {
   address: string
@@ -51,6 +52,38 @@ export const isAnsweredRound = (
   latest: { answer?: unknown } | null | undefined,
   sent: Sent | null,
 ): boolean => !!latest?.answer || wasAdopted(sent)
+
+/** Free text needs its text; every other kind is a choice. */
+export const isTextKind = (kind: string | undefined): boolean =>
+  kind !== "yes-no" && kind !== "options"
+
+/** A pick or text; a choice question may also be answered by a note alone. */
+export const isReady = (answer: Answer, isText: boolean): boolean =>
+  isAnswered(answer) || (!isText && !!answer.note?.trim())
+
+export function answerBody(
+  detail: { address: string; state?: string },
+  answer: Answer,
+  isText: boolean,
+): AnswerBody {
+  return {
+    address: detail.address,
+    state: detail.state ?? "",
+    ...(answer.huh
+      ? { huh: true }
+      : isText
+        ? { text: answer.text }
+        : answer.choice
+          ? { choice: answer.choice }
+          : {}),
+    ...(!isText && answer.note?.trim() ? { note: answer.note } : {}),
+  }
+}
+
+export const refusalText = (res: { reason: string; message: string }): string =>
+  res.reason === "agent-not-ready"
+    ? `${res.message} Approve the agent's prompt first, then send again.`
+    : res.message
 
 export type PostAnswer = (body: AnswerBody) => Promise<AnswerResult>
 
